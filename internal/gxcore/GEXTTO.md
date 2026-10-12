@@ -1,161 +1,160 @@
-# Motore gx-core — panoramica
+# gx-core engine — overview
 
-Questa cartella contiene il **motore** di gx-core (il binario `gx-torrent`),
-parte del modulo principale come
-`github.com/buzzqw/gextto/internal/gxcore`. Lo usa solo il demone
-`cmd/gx-torrent`. Una parte del codice deriva da lavoro con licenza MIT: vedi
+This folder contains the **engine** of gx-core (the `gx-torrent` binary), part of
+the main module as `github.com/buzzqw/gextto/internal/gxcore`. It is used only by
+the daemon `cmd/gx-torrent`. Part of the code derives from MIT-licensed work: see
 [`LICENSE`](LICENSE).
 
-Questa tabella è l'**inventario delle funzionalità** del motore e dei file che
-le implementano.
+This table is the **inventory of the engine's features** and of the files that
+implement them.
 
-Test del motore (girano dentro questo modulo):
+Engine tests (they run inside this module):
 
-- `internal/blocklist/blocklist_test.go` — formati del filtro IP, merge degli intervalli ai bordi (0.0.0.0/255.255.255.255) e lookup senza allocazioni;
-- `internal/magnet/magnet_test.go` — parsing del magnet: v2 (`urn:btmh:`), `so=` (BEP 53), `ws=` e `dht=` (convenzioni magnet);
-- `internal/mse/mse_test.go` — scrittura MSE in place: round-trip di cifratura e zero allocazioni per blocco;
-- `internal/peerconn/peerconn_test.go` — contatore dei byte di protocollo;
-- `internal/peerconn/peerwriter/peerwriter_test.go` — la finestra di dedup delle richieste servite resta limitata e sfratta la più vecchia;
-- `internal/piececache/cache_test.go` — scadenza TTL lazy e sweeper, ricarica dopo scadenza, eviction per dimensione e uso concorrente;
-- `internal/bitfield/bitfield_test.go` — `Count` con popcount hardware uguale al conteggio bit per bit, anche a cavallo delle parole;
-- `internal/piecepicker/sequential_skip_test.go` — i pezzi dei file esclusi non
-  vengono mai scelti, nemmeno in modalità sequenziale o dal percorso
-  "file edge";
-- `internal/bandwidth/limiter_test.go` — il limite cambia a caldo;
-- `internal/storage/filestorage/preallocate_linux_test.go` — niente
-  preallocazione su tmpfs;
-- `internal/unchoker/sim_test.go` — harness deterministico del choking: proprietà
-  dell'algoritmo (downloader/uploader più veloci, optimistic, budget di slot,
-  fairness) e benchmark del tick, per confrontare varianti e misurarne il costo;
-- `torrent/torrent_superseed_test.go` — rotazione dei pezzi offerti e selezione
-  dei pezzi del super-seeding (mai un pezzo già posseduto o già offerto);
-- `internal/peerprotocol/holepunch_test.go` — codec BEP 55 `ut_holepunch`
-  (round-trip v4/v6, errori, framing nell'estensione, fuzz) e header BEP 21
-  `upload_only` nell'extension handshake (round-trip bencode);
-- `internal/announcer/announce_test.go` — BEP 21 lato tracker: un seed parziale
-  annuncia `event=paused`, `stopped` resta `stopped`, un downloader resta
+- `internal/blocklist/blocklist_test.go` — IP filter formats, merging of the ranges at the edges (0.0.0.0/255.255.255.255) and allocation-free lookup;
+- `internal/magnet/magnet_test.go` — magnet parsing: v2 (`urn:btmh:`), `so=` (BEP 53), `ws=` and `dht=` (magnet conventions);
+- `internal/mse/mse_test.go` — in-place MSE writing: encryption round-trip and zero allocations per block;
+- `internal/peerconn/peerconn_test.go` — protocol byte counter;
+- `internal/peerconn/peerwriter/peerwriter_test.go` — the dedup window of the served requests stays bounded and evicts the oldest;
+- `internal/piececache/cache_test.go` — lazy TTL expiry and sweeper, reload after expiry, size-based eviction and concurrent use;
+- `internal/bitfield/bitfield_test.go` — `Count` with hardware popcount equal to the bit-by-bit count, including across word boundaries;
+- `internal/piecepicker/sequential_skip_test.go` — the pieces of excluded files are
+  never chosen, not even in sequential mode or from the "file edge" path;
+- `internal/bandwidth/limiter_test.go` — the limit changes on the fly;
+- `internal/storage/filestorage/preallocate_linux_test.go` — no
+  preallocation on tmpfs;
+- `internal/unchoker/sim_test.go` — deterministic choking harness: algorithm
+  properties (faster downloader/uploader, optimistic, slot budget, fairness)
+  and tick benchmark, to compare variants and measure their cost;
+- `torrent/torrent_superseed_test.go` — rotation of the offered pieces and
+  selection of the super-seeding pieces (never a piece already owned or already
+  offered);
+- `internal/peerprotocol/holepunch_test.go` — BEP 55 `ut_holepunch` codec
+  (v4/v6 round-trip, errors, framing in the extension, fuzz) and BEP 21
+  `upload_only` header in the extension handshake (bencode round-trip);
+- `internal/announcer/announce_test.go` — BEP 21 tracker side: a partial seed
+  announces `event=paused`, `stopped` remains `stopped`, a downloader remains
   `empty`;
-- `internal/peerprotocol/donthave_test.go` — codec BEP 54 `lt_donthave`
-  (round-trip, annuncio nell'handshake, payload corto rifiutato);
-- `internal/piecepicker/donthave_test.go` — `HandleDontHave` azzera il bitfield
-  e la disponibilità del pezzo;
-- `torrent/torrent_donthave_test.go` — `handleDontHave` azzera il bitfield del
-  peer;
-- `torrent/torrent_selection_test.go` — maschere di selezione `so=` (BEP 53:
-  indici sui file non-padding) e flag `Config.FileSelection`;
-- `torrent/torrent_holepunch_test.go` — decisione del relè (connect a entrambi,
-  errori `NotConnected`/`NoSupport`/`NoSelf`/`NoSuchPeer`).
+- `internal/peerprotocol/donthave_test.go` — BEP 54 `lt_donthave` codec
+  (round-trip, announcement in the handshake, short payload rejected);
+- `internal/piecepicker/donthave_test.go` — `HandleDontHave` clears the bitfield
+  and the piece availability;
+- `torrent/torrent_donthave_test.go` — `handleDontHave` clears the peer's
+  bitfield;
+- `torrent/torrent_selection_test.go` — `so=` selection masks (BEP 53:
+  indices on non-padding files) and `Config.FileSelection` flag;
+- `torrent/torrent_holepunch_test.go` — relay decision (connect to both,
+  `NotConnected`/`NoSupport`/`NoSelf`/`NoSuchPeer` errors).
 
-Funzionalità e aree del motore:
+Features and areas of the engine:
 
-| Area | File | Cosa |
+| Area | File | What |
 |---|---|---|
-| Porta unica | `torrent/session_listen.go`, `internal/btconn/accept.go`, `torrent/session.go`, `torrent/torrent_start.go`, `torrent/session_load.go`, `torrent/torrent.go`, `torrent/torrent_run.go` | `Config.ListenPort`: un solo listener di sessione. L'handshake BitTorrent/MSE sceglie il torrent dall'info hash (`AcceptRouted`) e consegna la connessione al torrent; tutti i torrent annunciano la stessa porta |
-| Uscita e proxy | `internal/netx`, `internal/btconn/dial.go`, `internal/trackermanager`, `internal/tracker/udptracker/transport.go`, `torrent/session*.go` | `Config.OutgoingInterface` (killswitch VPN: senza indirizzo non esce nulla) e `Config.Proxy` (SOCKS5 o HTTP CONNECT per peer, tracker HTTP e web seed; tracker UDP rifiutati) |
-| Filtro IP | `internal/blocklist/blocklist.go`, `torrent/session_blocklist.go` | Formati intervallo, P2P e eMule `.dat` oltre al CIDR; `Session.LoadBlocklist` da file locale. Le regole IPv4/IPv6 stanno in **intervalli ordinati e uniti** (ricerca binaria): un lookup non alloca e una regola costa pochi byte (prima un segment tree a puntatori, ~300 B/regola) |
-| Selezione file | `torrent/torrent_selection.go`, `internal/allocator`, `internal/piece`, `internal/piecepicker`, `torrent/torrent_pieces.go`, `torrent/torrent_verification.go`, `torrent/torrent_allocation.go`, `torrent/torrent_stats.go` | `Config.FileSelection` e `Config.PartsDir`. I file esclusi stanno in `PartsDir/<id>`; il piece picker salta i pezzi non voluti; il completamento e `Stats.Bytes.Selected*` considerano solo i file scelti |
-| Priorità file | `torrent/torrent_selection.go`, `torrent/config.go`, `internal/piece`, `internal/piecepicker`, `torrent/session_torrent.go` | `Config.FilePriorities` (0 = salta, 1..4 = normale, 5..7 = alta, scala libtorrent/qBittorrent) e `piece.Piece.Priority` (massimo tra i file del pezzo); `Config.FileSelection` resta come fallback booleano mappato su 0/4. Stadio `PiecePicker.pickHigh` dopo readahead e prima di file-edge/allowed-fast/rarest; `Torrent.RefreshSelection` riapplica i livelli a caldo senza fermare il torrent |
-| uTP | `torrent/session.go`, `torrent/session_listen.go`, `internal/netx` | `Config.UTP`: un socket UDP sulla porta unica, condiviso con il DHT; in uscita uTP e TCP in parallelo; peer uTP segnalati in `Peer.UTP`; contatori in `SessionStats` |
-| Preallocazione | `internal/storage/filestorage`, `torrent/session_storage.go`, `torrent/session_add.go`, `torrent/session_load.go` | `Config.Preallocate`: i file nuovi vengono riservati con `fallocate` invece di essere creati sparsi. Il flag viaggia nel provider di storage, così vale sia per l'aggiunta sia per il ricaricamento |
-| Durabilità I/O | `internal/storage/storage.go`, `internal/storage/filestorage`, `internal/storage/padding.go`, `torrent/torrent_pieces.go`, `torrent/session_stats.go` | Nessun `O_SYNC` per scrittura: `storage.File.Sync()` (no-op sui padding, `fdatasync` su Linux) e `torrent.syncPieces()` sul run loop. `writeBitfield()` ordina snapshot→fsync→scrittura e `updateStats` è in due fasi. `filestorage.Mmap` (opt-in) serve i file da una mappatura condivisa: scritture asincrone in page cache |
-| Storage mmap | `internal/storage/filestorage/mapped.go`, `mapped_linux.go`, `mapped_other.go`, `torrent/config.go`, `torrent/session_storage.go` | `Config.Mmap` (flag demone `-mmap`): `ReadAt`/`WriteAt` copiano da/verso la mappatura, `Sync` usa `msync`. Fallback a file normali fuori da Linux o su errore di mapping |
-| Byte di protocollo | `internal/peerconn/peerconn.go`, `torrent/session_stats.go` | Contatore dei byte grezzi in lettura/scrittura per l'overhead di protocollo |
-| MSE in place | `internal/mse/mse.go` | `inPlaceStreamWriter`: cifra RC4 nello stesso buffer del chiamante, eliminando l'allocazione per blocco di `cipher.StreamWriter` sul percorso di upload |
-| Dedup richieste servite | `internal/peerconn/peerwriter/peerwriter.go` | `servedWindow`: finestra limitata (1024) al posto della mappa illimitata; evita la crescita senza limite e il rifiuto permanente delle ritrasmissioni |
-| Popcount | `internal/bitfield/bitfield.go` | `Bitfield.Count` con `math/bits.OnesCount64` (istruzione hardware) invece della tabella di lookup da 256 byte |
-| Statistiche | `internal/netx/netx.go`, `torrent/session_listen.go`, `torrent/session_stats.go`, `torrent/torrent_stats.go` | Contatori uTP/TCP e connessioni in entrata TCP/uTP, peer correnti per trasporto, nodi DHT, byte di protocollo, padding, totali di operazioni I/O (`ReadOpsTotal`/`WriteOpsTotal` dai meter di read/write cache) |
-| Limiti a caldo | `internal/bandwidth`, `internal/peer`, `internal/peerconn/*`, `internal/urldownloader`, `torrent/session.go`, `torrent/session_limits.go` | `Session.SetSpeedLimits`: i peer usano un `bandwidth.Limiter` il cui ritmo cambia senza riaprire la sessione (prima `*ratelimit.Bucket` fisso) |
-| Cache a caldo | `internal/piececache/cache.go`, `internal/resourcemanager`, `torrent/session_limits.go` | `Session.SetCacheSizes`: read cache (`SetMaxSize`, sfratta l'eccedenza) e buffer di scrittura (`SetLimit`) ridimensionati sulla sessione in corso. `Cache` usa anche una scadenza lazy con un solo sweeper periodico, al posto di un `time.Timer` per pezzo |
-| Preallocazione su tmpfs | `internal/storage/filestorage/filestorage_linux.go` | Su tmpfs i file restano sparsi anche con `Preallocate` (test `preallocate_linux_test.go`) |
-| Verifica dopo errore | `torrent/torrent_stop.go` | `handleStopped` riavvia per la verifica solo dopo uno stop pulito: se l'allocazione dei file fallisce (file sparito, cartella non scrivibile) il torrent resta fermo con l'errore, invece di ripartire in un ciclo stretto che ricrea file vuoti a ogni giro. Test `TestVerifyStopsOnceWhenFilesCannotBeAllocated` in `cmd/gx-torrent` |
-| Tracker a caldo | `torrent/session_torrent.go`, `torrent/torrent_announce.go` | `Torrent.SetTrackers`: sostituisce la lista dei tracker a runtime (lista vuota = rimuovi tutto); i tracker rimossi ricevono un announce `stopped` best-effort; la lista è persistita nel resume |
-| Web seed a caldo | `torrent/torrent_webseed.go`, `torrent/session_torrent.go`, `internal/piecepicker/piecepicker.go` | `Torrent.AddWebseeds`/`RemoveWebseeds`: aggiungono/rimuovono web seed a runtime (persistiti nel resume); il picker tiene aggiornata la lista delle sorgenti |
-| Ordine a caldo | `internal/piecepicker/piecepicker.go`, `torrent/torrent_commands.go`, `torrent/session_torrent.go` | `PiecePicker.SetOrder` e `Torrent.SetSequential`/`SetFirstLast`: cambiano sequenziale/prima-ultima sul torrent in corso, ricalcolando i bordi dei file e persistendo il flag nel resume |
-| Diagnostica pezzi | `internal/piecepicker/piecepicker.go`, `torrent/session_torrent.go` | `PiecePicker.PieceDownloading` e `Torrent.PieceStates`: stato per pezzo (`have`/`downloading`/`skipped`/mancante) per la mappa pezzi; dopo il completamento il motore azzera il picker, quindi gli stati si ricavano dai `pieces` |
-| Limiti per-torrent | `internal/bandwidth/limiter.go`, `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_start.go`, `torrent/session_limits.go` | `Limiter.SetParent`/`SetLimitKiB` e `Torrent.SetSpeedLimits`: ogni torrent ha un limitatore proprio che eredita quello di sessione (`-1`), è illimitato (`0`) o ha un tetto (`>0`); peer e web seed usano quello del torrent, quindi cambia a caldo |
-| Connessioni/upload per-torrent | `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_connection.go`, `torrent/session_listen.go`, `torrent/torrent_run.go`, `internal/unchoker/unchoker.go`, `torrent/session_limits.go` | `Torrent.SetMaxConnections`/`SetMaxUploads`: tetto alle connessioni instaurate (chiude subito le eccedenti) e `Unchoker.SetNumUnchoked` per gli slot di upload |
-| Streaming | `internal/piecepicker/piecepicker.go`, `torrent/session_stream.go` | `PiecePicker.SetStreamWindow` e `Torrent.FilePieceRange`/`SetFileStreamWindow`: i pezzi della finestra letta da un player vengono scelti per primi. `Torrent.PiecesDone(begin,end)`: check mirato del range, senza allocare uno stato per ogni pezzo |
-| File completati da fermo | `torrent/torrent.go` (`fileStatsFromBitfield`, `fileStatsFromPieces`) | `FileStats` di un torrent fermo (pezzi non in memoria) calcola i byte completati di ogni file dal bitfield verificato, padding incluso negli offset, invece di rispondere con un errore: Gextto recupera così gli episodi già completi di un pack parcheggiato o abbandonato. Test `filestats_bitfield_test.go` |
-| Super-seeding | `torrent/torrent_superseed.go`, `torrent/torrent_peer.go`, `torrent/torrent_messagehandler.go`, `torrent/torrent_run.go`, `torrent/torrent_pieces.go`, `torrent/session_torrent.go`, `torrent/session_add.go`, `torrent/session_load.go`, `internal/resumer/boltdbresumer` | `Torrent.SetSuperSeeding`: BEP 16 sul torrent in corso, attivo solo a torrent completato. Annuncia un pezzo alla volta e serve solo i pezzi *offerti* a quel peer; i pezzi offerti non si ripetono, `have`/`not-interested` e un tick di ritentativo fanno avanzare, e a esaurimento il peer viene liberato col bitfield pieno. Il flag è persistito nel resume. Il motore traccia anche il bitfield remoto quando il piece picker è `nil` (seed), che il super-seeding richiede |
-| Holepunching | `internal/peerprotocol/holepunch.go`, `internal/peerprotocol/extension.go`, `internal/peersource`, `torrent/config.go`, `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_messagehandler.go`, `torrent/torrent_handshake.go`, `torrent/torrent_holepunch.go`, `torrent/torrent_stats.go`, `torrent/torrent_commands.go`, `torrent/session_rpc_handler.go` | BEP 55 `ut_holepunch`: `Config.Holepunch` annuncia l'estensione e abilita il relè peer. Quando un dial fallisce, `tryHolepunchRendezvous` (una volta per endpoint, max 8 relè) chiede l'introduzione; il relè risponde con `connect` a entrambi e ogni lato dial su uTP (`peersource.Holepunch`, sorgente `SourceHolepunch`). `planHolepunchRendezvous` è pura e testata. Log di debug (`holepunch rendezvous …`) per seguire invio e ricezione del rendezvous |
-| Ban di sessione | `torrent/session.go`, `torrent/torrent_write.go`, `torrent/torrent_peer.go`, `torrent/torrent_connection.go`, `torrent/session_listen.go`, `torrent/torrent_holepunch.go` | `Session.BanIP`/`IsBannedIP`: un peer che invia un pezzo corrotto viene bannato, **con scadenza** (`sessionBanTTL`, 30 min), da **tutta la sessione** e non solo dal torrent; `Torrent.ipBanned` unifica il controllo (per-torrent + sessione) in tutti i punti di connessione/dial/holepunch |
-| BitTorrent v2 | `internal/metainfo`, `internal/merkle`, `internal/piece`, `internal/verifier`, `internal/piecewriter`, `internal/magnet`, `internal/peerprotocol`, `torrent/session_add.go`, `torrent/torrent_hashrequest.go` | Supporto **v2-only da `.torrent` e da magnet** (`urn:btmh:`): parsing `meta version`/`file tree`/`piece layers`, info-hash SHA-256 (troncato a 20 byte per l'identità), modello a **pezzi per-file** (coda più corta, nessun padding nel pezzo), verifica via **nodo Merkle** SHA-256 e **fetch dei `piece layers` dai peer** con i messaggi `hash request`/`hashes`/`hash reject` (id 21/22/23). Il bit riservato v2 è annunciato nell'handshake solo per i torrent con identità v2; il seed risponde dalle sue `piece layers` e, per un file presente per intero, anche alle richieste a livello blocco (`base = 0`, albero ricostruito dai dati e messo in cache); un file incompleto riceve `hash reject`. Gli **ibridi** restano scaricati come v1 |
-| Tracker scrape | `internal/tracker/tracker.go`, `internal/tracker/tier.go`, `internal/tracker/httptracker/httptracker.go`, `internal/tracker/udptracker/{action,messages,request,requestbase,transaction,connection,transport,udptracker}.go`, `torrent/torrent_scrape.go` | `Tracker.Scrape` (BEP 48): **HTTP** su `/scrape` (mappa `…/announce`→`…/scrape` conservando la passkey) e **UDP** con l'azione BEP 15. Il transport UDP è generalizzato a `udpRequest` (`GetDest`/`SetConnectionID`/`Done`), così accoglie anche lo scrape oltre all'announce. `Tier.Scrape` delega al tracker corrente e avanza sull'errore come `Announce`; `Torrent.Scrape` scrapa tutti i tracker in parallelo (errore per-tracker). Test in `internal/tracker/{httptracker,udptracker}` |
-| Bus di eventi | `torrent/events.go`, `torrent/session.go`, `torrent/session_add.go`, `torrent/torrent_write.go`, `torrent/torrent_peer.go`, `torrent/torrent_close.go`, `torrent/torrent_stop.go`, `internal/announcer/periodic.go` (`SetResultHook`) | `Session.Subscribe()` → canale di `Event`. Tipi: `torrent_added`, `torrent_completed`, `torrent_stopped`, `torrent_error`, `torrent_piece` (alta frequenza), `peer_connected`/`peer_disconnected`, `tracker_announce` (con seeders/leechers o l'errore). L'engine non blocca mai su un subscriber lento (scarta se il buffer da 64 è pieno). Esposto dal demone come SSE `GET /ui/events` e usato dalla pagina per aggiornarsi subito |
-| Creazione torrent | `torrent/torrent_create.go` | `CreateTorrent(path, opt)`: costruisce un `.torrent` v1 da un file o cartella, esponendo il già presente `metainfo.NewInfoBytes`/`NewBytes` (nome, tracker, web seed, private, piece length, commento). Usato dal demone (form `POST /ui/create-torrent` e `POST /api/v1/create-torrent`) |
-| Diagnosi storage | `torrent/torrent_write.go`, `torrent/session.go`, `torrent/session_stats.go` | L'errore di scrittura di un pezzo viene arricchito con la **cartella di storage** (`storage %q could not write piece #N`, con `%w`) e contato in `SessionStats.StorageErrors` (esposto come `storage_errors` nei dati del demone), per distinguere un disco/mount guasto da un problema di rete |
-| Priorità graduata (streaming) | `internal/piecepicker/piecepicker.go`, `torrent/session_stream.go`, `cmd/gx-torrent/stream.go` | `PiecePicker.SetReadaheadWindow`/`pickReadahead`: la finestra del player (`SetStreamWindow`) ha priorità sulla finestra di **readahead** (nuova `Torrent.SetFileReadaheadWindow`), che precede rarest-first/allowed-fast. Il demone aggiorna entrambe (`setStreamWindows`) mentre serve il file |
-| Coda richieste adattiva | `internal/peer/peer.go` (`RequestQueue`), `torrent/torrent_start.go`, `torrent/torrent_messagehandler.go` | La profondità delle richieste in volo parte da `DefaultRequestsOut` (o `reqq`) e **cresce di uno per blocco consegnato** fino a `MaxRequestsOut`; **reset su choke e su snub**. Un peer lento resta alla base, uno veloce scava più a fondo. Harness: `make measure-pipeline` (locale; su loopback la profondità non è il collo di bottiglia — §6.8 misura su sciame reale) |
-| BEP 27 (privati) | `torrent/torrent.go` (`privateSwarm`), `torrent/torrent_start.go`, `torrent/torrent_messagehandler.go` | Regola centralizzata in `torrent.privateSwarm()`: **DHT** (announcer), **PEX** (invio *e* ricezione) disattivati sui torrent privati; la **LSD** (demone) salta i privati su invio e ricezione. Il **PEX in ricezione** era l'unico percorso non filtrato (fix 2026-10-11), con guard test `torrent_private_test.go` |
-| BEP 53 (`so=`) + magnet `ws=`/`dht=` | `internal/magnet/magnet.go`, `torrent/session_add.go`, `torrent/torrent_selection.go`, `torrent/torrent.go`, `torrent/session_torrent.go` | Il parametro `so` del magnet (Select Only, BEP 53: indici e range tipo `0,2,4-7`, de-duplicati) è parsato in `Magnet.SelectOnly` e diventa il **seed** del torrent (`AddTorrentOptions.SelectOnly`/`torrent.selectOnly`, guardato da `selectOnlyMu`). `skippedInfoFiles` usa il seed **solo** quando `Config.FileSelection` non restituisce una maschera: la scelta dell'app ha sempre la precedenza, così l'utente può ripristinarla. `Torrent.SelectOnly`/`ClearSelectOnly` leggono e azzerano il seed. Il demone lo converte in `FilePriorities` appena arriva il metadata (`docs/gx-torrent.md`). Il parametro `ws=` (web seed, convenzione Magnet URI) è parsato in `Magnet.WebSeeds` e passato come web seed del torrent, persistito nel resume (`Spec.URLList`). I parametri `xs=`/`as=` (sorgente esatta/accettabile) sono parsati in `Magnet.ExactSources`/`AcceptableSources`: `Session.addMagnet` scarica il `.torrent` da quegli URL (`MetadataSources`) e lo usa solo se l'info hash corrisponde (`magnetInfoHashMatches`), altrimenti ricade sullo sciame (`session_add.go`). Il parametro `dht=` (nodo DHT di bootstrap, convenzione Magnet URI) è parsato in `Magnet.DHTNodes` e aggiunto alla DHT di sessione (`session.dht.AddNode`) |
-| BEP 21 (`upload_only`, `event=paused`) | `internal/peerprotocol/extension.go`, `torrent/torrent_peer.go` (`sendExtensionHandshake`), `torrent/torrent_pieces.go` (`checkCompletion`), `torrent/torrent_selection.go` (`uploadOnly`), `torrent/torrent_announce.go` (`PartialSeed`), `internal/tracker/event.go`, `internal/announcer/announce.go` | L'extension handshake BEP 10 include `upload_only: 1` quando il torrent è completo (`torrent.uploadOnly` = `completed`): seed pieno o **parziale** (tutti i pezzi *voluti* presenti, selection). Inviato alla connessione e **rinviato a tutti i peer** al passaggio a seed. Il valore ricevuto resta in `peer.ExtensionHandshake.UploadOnly`. **Lato tracker**: un seed parziale (`tracker.Torrent.PartialSeed`, da `announcerFields`) annuncia `event=paused` (`tracker.EventPaused`) su ogni announce non-`stopped`; il `stopped` resta invariato. Manca solo il campo `downloaders` dello scrape (lo fornisce il tracker, opzionale) |
-| BEP 54 (`lt_donthave`) | `internal/peerprotocol/extension.go` (`DontHaveMessage`, `ExtensionKeyDontHave`), `torrent/torrent_messagehandler.go` (`handleDontHave`), `internal/piecepicker/piecepicker.go` (`HandleDontHave`) | `lt_donthave` è annunciato nell'extension handshake; un `DontHave` in arrivo (`op 20`, subop, **indice a 4 byte** big-endian) azzera il bit del pezzo nel bitfield del peer e la sua disponibilità nel picker (`removeHavingPeer`); se la **Fast Extension** non è negoziata viene cancellato anche il download attivo di quel pezzo da quel peer (`closePieceDownloader`, come per un choke). Solo **ricezione**: gx-core non scarta pezzi di torrent attivi, quindi non invia `DontHave` |
-| BEP 31 (`retry in`) | `internal/tracker/tracker.go` (`Error.SetRetryIn`/`NewError`), `internal/tracker/httptracker/httptracker.go`, `internal/tracker/udptracker/transport.go`, `internal/tracker/tier.go`, `internal/announcer/periodic.go` | Il valore `retry in` è decodificato in un solo punto (`tracker.NewError`): un numero di minuti rinvia il prossimo annuncio (announce e scrape, HTTP e UDP); `"never"` imposta `Error.NeverRetry` e `tracker.Tier` scarta il tracker **per sempre**, senza fermare gli altri dello stesso tier (se il tier si esaurisce, `ErrTierExhausted`). Test `retry_test.go`, `tier_test.go` |
-| BEP 38 (`similar`/`collections`) | `internal/metainfo/bep38.go`, `internal/metainfo/info.go`, `internal/metainfo/metainfo.go`, `torrent/torrent.go`, `torrent/session_torrent.go`, `torrent/torrent_commands.go` | Gli hint sono letti dal dizionario info **e** dal livello superiore e uniti (`mergeCollections`/`mergeSimilar`, con deduplica e scarto degli info-hash di lunghezza ≠ 20); `Info.Collections`/`Info.Similar` li espongono via `Torrent.Collections`/`SimilarTorrents` e l'export li riscrive (`NewBytesWithHints`). La scoperta dei torrent locali correlati è nel demone (`cmd/gx-torrent/bep38.go`); il riuso dei blocchi è lo Swarm Merging (`docs/evoluzione.md` §15.2) |
-| Swarm Merging (Fase 1) | `torrent/localmerge.go`, `torrent/torrent_allocation.go`, `torrent/torrent.go` (`localData`) | Riuso locale tra torrent a **layout identico**: ogni torrent pubblica uno snapshot immutabile dei propri pezzi e del bitfield; all'allocazione A legge gli snapshot degli altri torrent della sessione, per ogni pezzo **già verificato** con hash e lunghezza uguali legge i byte dalla storage dell'altro, li riverifica contro il proprio hash e li scrive nella propria storage; il verificatore esistente marca i pezzi. Guardia **BEP 27** (niente merge se A o B sono privati), nessuna query cross-torrent (niente deadlock). Fase 2 (v2 per-radice Merkle) da fare |
+| Single port | `torrent/session_listen.go`, `internal/btconn/accept.go`, `torrent/session.go`, `torrent/torrent_start.go`, `torrent/session_load.go`, `torrent/torrent.go`, `torrent/torrent_run.go` | `Config.ListenPort`: a single session listener. The BitTorrent/MSE handshake selects the torrent from the info hash (`AcceptRouted`) and hands the connection to the torrent; all torrents announce the same port |
+| Outgoing and proxy | `internal/netx`, `internal/btconn/dial.go`, `internal/trackermanager`, `internal/tracker/udptracker/transport.go`, `torrent/session*.go` | `Config.OutgoingInterface` (VPN killswitch: without an address nothing goes out) and `Config.Proxy` (SOCKS5 or HTTP CONNECT for peers, HTTP trackers and web seeds; UDP trackers rejected) |
+| IP filter | `internal/blocklist/blocklist.go`, `torrent/session_blocklist.go` | Range, P2P and eMule `.dat` formats in addition to CIDR; `Session.LoadBlocklist` from a local file. The IPv4/IPv6 rules live in **sorted and merged ranges** (binary search): a lookup does not allocate and a rule costs a few bytes (previously a pointer-based segment tree, ~300 B/rule) |
+| File selection | `torrent/torrent_selection.go`, `internal/allocator`, `internal/piece`, `internal/piecepicker`, `torrent/torrent_pieces.go`, `torrent/torrent_verification.go`, `torrent/torrent_allocation.go`, `torrent/torrent_stats.go` | `Config.FileSelection` and `Config.PartsDir`. The excluded files live in `PartsDir/<id>`; the piece picker skips the unwanted pieces; completion and `Stats.Bytes.Selected*` consider only the chosen files |
+| File priority | `torrent/torrent_selection.go`, `torrent/config.go`, `internal/piece`, `internal/piecepicker`, `torrent/session_torrent.go` | `Config.FilePriorities` (0 = skip, 1..4 = normal, 5..7 = high, libtorrent/qBittorrent scale) and `piece.Piece.Priority` (maximum among the piece's files); `Config.FileSelection` remains as a boolean fallback mapped to 0/4. `PiecePicker.pickHigh` stage after readahead and before file-edge/allowed-fast/rarest; `Torrent.RefreshSelection` reapplies the levels on the fly without stopping the torrent |
+| uTP | `torrent/session.go`, `torrent/session_listen.go`, `internal/netx` | `Config.UTP`: a UDP socket on the single port, shared with the DHT; on the outgoing side uTP and TCP in parallel; uTP peers reported in `Peer.UTP`; counters in `SessionStats` |
+| Preallocation | `internal/storage/filestorage`, `torrent/session_storage.go`, `torrent/session_add.go`, `torrent/session_load.go` | `Config.Preallocate`: new files are reserved with `fallocate` instead of being created sparse. The flag travels in the storage provider, so it applies both to adding and to reloading |
+| I/O durability | `internal/storage/storage.go`, `internal/storage/filestorage`, `internal/storage/padding.go`, `torrent/torrent_pieces.go`, `torrent/session_stats.go` | No `O_SYNC` for writes: `storage.File.Sync()` (no-op on padding, `fdatasync` on Linux) and `torrent.syncPieces()` on the run loop. `writeBitfield()` orders snapshot→fsync→write and `updateStats` is in two phases. `filestorage.Mmap` (opt-in) serves files from a shared mapping: asynchronous writes into the page cache |
+| Storage mmap | `internal/storage/filestorage/mapped.go`, `mapped_linux.go`, `mapped_other.go`, `torrent/config.go`, `torrent/session_storage.go` | `Config.Mmap` (daemon flag `-mmap`): `ReadAt`/`WriteAt` copy from/to the mapping, `Sync` uses `msync`. Fallback to regular files outside Linux or on mapping error |
+| Protocol bytes | `internal/peerconn/peerconn.go`, `torrent/session_stats.go` | Counter of the raw read/write bytes for protocol overhead |
+| In-place MSE | `internal/mse/mse.go` | `inPlaceStreamWriter`: encrypts RC4 in the caller's own buffer, eliminating the per-block allocation of `cipher.StreamWriter` on the upload path |
+| Served request dedup | `internal/peerconn/peerwriter/peerwriter.go` | `servedWindow`: bounded window (1024) instead of the unbounded map; avoids unbounded growth and the permanent rejection of retransmissions |
+| Popcount | `internal/bitfield/bitfield.go` | `Bitfield.Count` with `math/bits.OnesCount64` (hardware instruction) instead of the 256-byte lookup table |
+| Statistics | `internal/netx/netx.go`, `torrent/session_listen.go`, `torrent/session_stats.go`, `torrent/torrent_stats.go` | uTP/TCP counters and incoming TCP/uTP connections, current peers per transport, DHT nodes, protocol bytes, padding, totals of I/O operations (`ReadOpsTotal`/`WriteOpsTotal` from the read/write cache meters) |
+| Hot limits | `internal/bandwidth`, `internal/peer`, `internal/peerconn/*`, `internal/urldownloader`, `torrent/session.go`, `torrent/session_limits.go` | `Session.SetSpeedLimits`: peers use a `bandwidth.Limiter` whose rate changes without reopening the session (previously a fixed `*ratelimit.Bucket`) |
+| Hot cache | `internal/piececache/cache.go`, `internal/resourcemanager`, `torrent/session_limits.go` | `Session.SetCacheSizes`: read cache (`SetMaxSize`, evicts the excess) and write buffer (`SetLimit`) resized on the running session. `Cache` also uses a lazy expiry with a single periodic sweeper, instead of a `time.Timer` per piece |
+| Preallocation on tmpfs | `internal/storage/filestorage/filestorage_linux.go` | On tmpfs files remain sparse even with `Preallocate` (test `preallocate_linux_test.go`) |
+| Verification after error | `torrent/torrent_stop.go` | `handleStopped` restarts for verification only after a clean stop: if file allocation fails (file gone, folder not writable) the torrent stays stopped with the error, instead of restarting in a tight loop that recreates empty files on every pass. Test `TestVerifyStopsOnceWhenFilesCannotBeAllocated` in `cmd/gx-torrent` |
+| Hot trackers | `torrent/session_torrent.go`, `torrent/torrent_announce.go` | `Torrent.SetTrackers`: replaces the tracker list at runtime (empty list = remove everything); the removed trackers receive a best-effort `stopped` announce; the list is persisted in the resume |
+| Hot web seeds | `torrent/torrent_webseed.go`, `torrent/session_torrent.go`, `internal/piecepicker/piecepicker.go` | `Torrent.AddWebseeds`/`RemoveWebseeds`: add/remove web seeds at runtime (persisted in the resume); the picker keeps the source list up to date |
+| Hot order | `internal/piecepicker/piecepicker.go`, `torrent/torrent_commands.go`, `torrent/session_torrent.go` | `PiecePicker.SetOrder` and `Torrent.SetSequential`/`SetFirstLast`: change sequential/first-last on the running torrent, recalculating the file edges and persisting the flag in the resume |
+| Piece diagnostics | `internal/piecepicker/piecepicker.go`, `torrent/session_torrent.go` | `PiecePicker.PieceDownloading` and `Torrent.PieceStates`: per-piece state (`have`/`downloading`/`skipped`/missing) for the piece map; after completion the engine resets the picker, so the states are derived from the `pieces` |
+| Per-torrent limits | `internal/bandwidth/limiter.go`, `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_start.go`, `torrent/session_limits.go` | `Limiter.SetParent`/`SetLimitKiB` and `Torrent.SetSpeedLimits`: each torrent has its own limiter that inherits the session one (`-1`), is unlimited (`0`) or has a cap (`>0`); peers and web seeds use the torrent's, so it changes on the fly |
+| Per-torrent connections/uploads | `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_connection.go`, `torrent/session_listen.go`, `torrent/torrent_run.go`, `internal/unchoker/unchoker.go`, `torrent/session_limits.go` | `Torrent.SetMaxConnections`/`SetMaxUploads`: cap on established connections (immediately closes the excess) and `Unchoker.SetNumUnchoked` for the upload slots |
+| Streaming | `internal/piecepicker/piecepicker.go`, `torrent/session_stream.go` | `PiecePicker.SetStreamWindow` and `Torrent.FilePieceRange`/`SetFileStreamWindow`: the pieces of the window read by a player are chosen first. `Torrent.PiecesDone(begin,end)`: targeted check of the range, without allocating a state for each piece |
+| Completed files while stopped | `torrent/torrent.go` (`fileStatsFromBitfield`, `fileStatsFromPieces`) | `FileStats` of a stopped torrent (pieces not in memory) computes the completed bytes of each file from the verified bitfield, padding included in the offsets, instead of responding with an error: Gextto thus recovers the already complete episodes of a parked or abandoned pack. Test `filestats_bitfield_test.go` |
+| Super-seeding | `torrent/torrent_superseed.go`, `torrent/torrent_peer.go`, `torrent/torrent_messagehandler.go`, `torrent/torrent_run.go`, `torrent/torrent_pieces.go`, `torrent/session_torrent.go`, `torrent/session_add.go`, `torrent/session_load.go`, `internal/resumer/boltdbresumer` | `Torrent.SetSuperSeeding`: BEP 16 on the running torrent, active only on a completed torrent. It announces one piece at a time and serves only the pieces *offered* to that peer; the offered pieces do not repeat, `have`/`not-interested` and a retry tick make it progress, and when exhausted the peer is released with a full bitfield. The flag is persisted in the resume. The engine also tracks the remote bitfield when the piece picker is `nil` (seed), which super-seeding requires |
+| Holepunching | `internal/peerprotocol/holepunch.go`, `internal/peerprotocol/extension.go`, `internal/peersource`, `torrent/config.go`, `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_messagehandler.go`, `torrent/torrent_handshake.go`, `torrent/torrent_holepunch.go`, `torrent/torrent_stats.go`, `torrent/torrent_commands.go`, `torrent/session_rpc_handler.go` | BEP 55 `ut_holepunch`: `Config.Holepunch` announces the extension and enables the peer relay. When a dial fails, `tryHolepunchRendezvous` (once per endpoint, max 8 relays) requests the introduction; the relay responds with `connect` to both and each side dials over uTP (`peersource.Holepunch`, source `SourceHolepunch`). `planHolepunchRendezvous` is pure and tested. Debug logs (`holepunch rendezvous …`) to follow the sending and receiving of the rendezvous |
+| Session ban | `torrent/session.go`, `torrent/torrent_write.go`, `torrent/torrent_peer.go`, `torrent/torrent_connection.go`, `torrent/session_listen.go`, `torrent/torrent_holepunch.go` | `Session.BanIP`/`IsBannedIP`: a peer that sends a corrupt piece is banned, **with expiry** (`sessionBanTTL`, 30 min), from the **whole session** and not just from the torrent; `Torrent.ipBanned` unifies the check (per-torrent + session) at all connection/dial/holepunch points |
+| BitTorrent v2 | `internal/metainfo`, `internal/merkle`, `internal/piece`, `internal/verifier`, `internal/piecewriter`, `internal/magnet`, `internal/peerprotocol`, `torrent/session_add.go`, `torrent/torrent_hashrequest.go` | **v2-only support from `.torrent` and from magnet** (`urn:btmh:`): parsing `meta version`/`file tree`/`piece layers`, SHA-256 info-hash (truncated to 20 bytes for the identity), **per-file pieces** model (shorter queue, no padding in the piece), verification via SHA-256 **Merkle node** and **fetch of the `piece layers` from peers** with the `hash request`/`hashes`/`hash reject` messages (id 21/22/23). The reserved v2 bit is announced in the handshake only for torrents with a v2 identity; the seed answers from its `piece layers` and, for a file present in full, also to block-level requests (`base = 0`, tree rebuilt from the data and cached); an incomplete file receives `hash reject`. **Hybrids** remain downloaded as v1 |
+| Tracker scrape | `internal/tracker/tracker.go`, `internal/tracker/tier.go`, `internal/tracker/httptracker/httptracker.go`, `internal/tracker/udptracker/{action,messages,request,requestbase,transaction,connection,transport,udptracker}.go`, `torrent/torrent_scrape.go` | `Tracker.Scrape` (BEP 48): **HTTP** on `/scrape` (maps `…/announce`→`…/scrape` preserving the passkey) and **UDP** with the BEP 15 action. The UDP transport is generalised to `udpRequest` (`GetDest`/`SetConnectionID`/`Done`), so it also accommodates scrape in addition to announce. `Tier.Scrape` delegates to the current tracker and advances on error like `Announce`; `Torrent.Scrape` scrapes all trackers in parallel (per-tracker error). Tests in `internal/tracker/{httptracker,udptracker}` |
+| Event bus | `torrent/events.go`, `torrent/session.go`, `torrent/session_add.go`, `torrent/torrent_write.go`, `torrent/torrent_peer.go`, `torrent/torrent_close.go`, `torrent/torrent_stop.go`, `internal/announcer/periodic.go` (`SetResultHook`) | `Session.Subscribe()` → channel of `Event`. Types: `torrent_added`, `torrent_completed`, `torrent_stopped`, `torrent_error`, `torrent_piece` (high frequency), `peer_connected`/`peer_disconnected`, `tracker_announce` (with seeders/leechers or the error). The engine never blocks on a slow subscriber (it drops if the 64-sized buffer is full). Exposed by the daemon as SSE `GET /ui/events` and used by the page to refresh immediately |
+| Torrent creation | `torrent/torrent_create.go` | `CreateTorrent(path, opt)`: builds a v1 `.torrent` from a file or folder, exposing the already present `metainfo.NewInfoBytes`/`NewBytes` (name, trackers, web seeds, private, piece length, comment). Used by the daemon (form `POST /ui/create-torrent` and `POST /api/v1/create-torrent`) |
+| Storage diagnostics | `torrent/torrent_write.go`, `torrent/session.go`, `torrent/session_stats.go` | The write error of a piece is enriched with the **storage folder** (`storage %q could not write piece #N`, with `%w`) and counted in `SessionStats.StorageErrors` (exposed as `storage_errors` in the daemon's data), to distinguish a faulty disk/mount from a network problem |
+| Graded priority (streaming) | `internal/piecepicker/piecepicker.go`, `torrent/session_stream.go`, `cmd/gx-torrent/stream.go` | `PiecePicker.SetReadaheadWindow`/`pickReadahead`: the player window (`SetStreamWindow`) has priority over the **readahead** window (new `Torrent.SetFileReadaheadWindow`), which precedes rarest-first/allowed-fast. The daemon updates both (`setStreamWindows`) while serving the file |
+| Adaptive request queue | `internal/peer/peer.go` (`RequestQueue`), `torrent/torrent_start.go`, `torrent/torrent_messagehandler.go` | The depth of in-flight requests starts from `DefaultRequestsOut` (or `reqq`) and **grows by one per delivered block** up to `MaxRequestsOut`; **reset on choke and on snub**. A slow peer stays at the base, a fast one digs deeper. Harness: `make measure-pipeline` (local; on loopback the depth is not the bottleneck — §6.8 measures on a real swarm) |
+| BEP 27 (private) | `torrent/torrent.go` (`privateSwarm`), `torrent/torrent_start.go`, `torrent/torrent_messagehandler.go` | Centralised rule in `torrent.privateSwarm()`: **DHT** (announcer), **PEX** (sending *and* receiving) disabled on private torrents; **LSD** (daemon) skips private ones on send and receive. **PEX on receive** was the only unfiltered path (fix 2026-10-11), with guard test `torrent_private_test.go` |
+| BEP 53 (`so=`) + magnet `ws=`/`dht=` | `internal/magnet/magnet.go`, `torrent/session_add.go`, `torrent/torrent_selection.go`, `torrent/torrent.go`, `torrent/session_torrent.go` | The `so` parameter of the magnet (Select Only, BEP 53: indices and ranges like `0,2,4-7`, de-duplicated) is parsed into `Magnet.SelectOnly` and becomes the **seed** of the torrent (`AddTorrentOptions.SelectOnly`/`torrent.selectOnly`, guarded by `selectOnlyMu`). `skippedInfoFiles` uses the seed **only** when `Config.FileSelection` does not return a mask: the app's choice always takes precedence, so the user can restore it. `Torrent.SelectOnly`/`ClearSelectOnly` read and clear the seed. The daemon converts it into `FilePriorities` as soon as the metadata arrives (`docs/gx-torrent.md`). The `ws=` parameter (web seed, Magnet URI convention) is parsed into `Magnet.WebSeeds` and passed as the torrent's web seed, persisted in the resume (`Spec.URLList`). The `xs=`/`as=` parameters (exact/acceptable source) are parsed into `Magnet.ExactSources`/`AcceptableSources`: `Session.addMagnet` downloads the `.torrent` from those URLs (`MetadataSources`) and uses it only if the info hash matches (`magnetInfoHashMatches`), otherwise it falls back to the swarm (`session_add.go`). The `dht=` parameter (DHT bootstrap node, Magnet URI convention) is parsed into `Magnet.DHTNodes` and added to the session DHT (`session.dht.AddNode`) |
+| BEP 21 (`upload_only`, `event=paused`) | `internal/peerprotocol/extension.go`, `torrent/torrent_peer.go` (`sendExtensionHandshake`), `torrent/torrent_pieces.go` (`checkCompletion`), `torrent/torrent_selection.go` (`uploadOnly`), `torrent/torrent_announce.go` (`PartialSeed`), `internal/tracker/event.go`, `internal/announcer/announce.go` | The BEP 10 extension handshake includes `upload_only: 1` when the torrent is complete (`torrent.uploadOnly` = `completed`): full or **partial** seed (all *wanted* pieces present, selection). Sent at connection and **re-sent to all peers** on the transition to seed. The received value stays in `peer.ExtensionHandshake.UploadOnly`. **Tracker side**: a partial seed (`tracker.Torrent.PartialSeed`, from `announcerFields`) announces `event=paused` (`tracker.EventPaused`) on every non-`stopped` announce; `stopped` remains unchanged. Only the `downloaders` field of scrape is missing (the tracker provides it, optional) |
+| BEP 54 (`lt_donthave`) | `internal/peerprotocol/extension.go` (`DontHaveMessage`, `ExtensionKeyDontHave`), `torrent/torrent_messagehandler.go` (`handleDontHave`), `internal/piecepicker/piecepicker.go` (`HandleDontHave`) | `lt_donthave` is announced in the extension handshake; an incoming `DontHave` (`op 20`, subop, **4-byte index** big-endian) clears the piece bit in the peer's bitfield and its availability in the picker (`removeHavingPeer`); if the **Fast Extension** is not negotiated, the active download of that piece from that peer is also cancelled (`closePieceDownloader`, as for a choke). **Receive only**: gx-core does not discard pieces of active torrents, so it does not send `DontHave` |
+| BEP 31 (`retry in`) | `internal/tracker/tracker.go` (`Error.SetRetryIn`/`NewError`), `internal/tracker/httptracker/httptracker.go`, `internal/tracker/udptracker/transport.go`, `internal/tracker/tier.go`, `internal/announcer/periodic.go` | The `retry in` value is decoded in a single place (`tracker.NewError`): a number of minutes postpones the next announce (announce and scrape, HTTP and UDP); `"never"` sets `Error.NeverRetry` and `tracker.Tier` discards the tracker **forever**, without stopping the others of the same tier (if the tier is exhausted, `ErrTierExhausted`). Tests `retry_test.go`, `tier_test.go` |
+| BEP 38 (`similar`/`collections`) | `internal/metainfo/bep38.go`, `internal/metainfo/info.go`, `internal/metainfo/metainfo.go`, `torrent/torrent.go`, `torrent/session_torrent.go`, `torrent/torrent_commands.go` | The hints are read from the info dictionary **and** from the top level and merged (`mergeCollections`/`mergeSimilar`, with deduplication and discarding of info-hashes of length ≠ 20); `Info.Collections`/`Info.Similar` expose them via `Torrent.Collections`/`SimilarTorrents` and the export rewrites them (`NewBytesWithHints`). The discovery of related local torrents is in the daemon (`cmd/gx-torrent/bep38.go`); block reuse is the Swarm Merging (`docs/evoluzione.md` §15.2) |
+| Swarm Merging (Phase 1) | `torrent/localmerge.go`, `torrent/torrent_allocation.go`, `torrent/torrent.go` (`localData`) | Local reuse between torrents with an **identical layout**: each torrent publishes an immutable snapshot of its own pieces and bitfield; on allocation A reads the snapshots of the other torrents of the session, for each piece **already verified** with equal hash and length it reads the bytes from the other's storage, re-verifies them against its own hash and writes them into its own storage; the existing verifier marks the pieces. **BEP 27** guard (no merge if A or B are private), no cross-torrent query (no deadlock). Phase 2 (v2 per-root Merkle) to do |
 
-Il DHT vive in `internal/dht` (modulo a sé). Caratteristiche:
+The DHT lives in `internal/dht` (a module of its own). Features:
 
-- `Config.PacketConn`, per usare il socket uTP;
-- `Stats()` con nodi, traffico e **diagnostica per RPC** (`queries_in`/`queries_out`/`replies_in` per ping/get_peers/find_node/announce_peer) più i contatori di **screening** (`blocked_hosts`, `self_promotions`, `dupe_references`, `nodes_killed`), l'**indirizzo esterno riflesso** (`reflected_port`/`reflected_observations`, dal campo `ip` BEP 42) e il **tipo di NAT** dedotto (`nat_mapping`: 0 ignoto, 1 endpoint-independent, 2 address/port-dependent) e la **composizione della routing table** per la visibilità Sybil (`subnet_share_max` = massimo nodi nello stesso /24 o /48, `nodes_insecure_id`); il demone li espone come `dht_<chiave>` in API e UI, ed è la base di misura dell'hardening anti-Sybil (test `stats_test.go`, `dht_table_metrics_test.go`, dettaglio in `docs/evoluzione.md` §4.10–§4.11);
-- **dual-stack IPv6 (BEP 32)**: con `Config.UDPProto == "udp"` il DHT parla
-  entrambe le famiglie; i contatti v4 e v6 vengono separati nei campi
-  `nodes`/`nodes6` delle risposte (`nodesForInfoHash`, `replyFindNode`), letti
-  entrambi in ingresso (`nodeResponseFields`) e richiesti con `want: ["n4","n6"]`
-  in `get_peers`. `"udp4"` (default) e `"udp6"` restano mono-famiglia;
-- **read-loop robusto**: `readFromSocket` restituisce il buffer all'arena sul
-  percorso d'errore e controlla `stop` prima di bloccarsi su `Pop`, così
-  `Stop()` non può più restare appeso quando il socket condiviso viene chiuso;
-- **security extension BEP 42** (`dht_sec.go`): l'ID nodo è derivato dall'IP
-  esterno (`SecureNodeID`/`NodeIDSecure`, CRC32C Castagnoli, vettori del BEP
-  verificati in `dht_sec_test.go`), così non può essere scelto per avvicinarsi a
-  un info-hash bersaglio. L'IP esterno arriva da `Config.PublicIP` (impostato dal
-  motore da `DHTHost` o dall'interfaccia uscente) o, se sconosciuto, dal campo
-  `ip` delle risposte (`noteExternalIP`, adozione una tantum con ID sicuro
-  persistito). Gli indirizzi locali restano esenti. Il campo `ip` è anche
-  **inviato** in ogni risposta (`addIPField`: ping, find_node, get_peers,
-  announce_peer e `get`/`put` BEP 44), così un peer dietro NAT scopre il proprio
-  indirizzo riflesso; il contatore `reflected_sent` lo rende osservabile;
-- **`implied_port` (BEP 5)**: un `announce_peer` con `implied_port: 1` usa la
-  **porta sorgente** del pacchetto al posto del campo `port`, per i peer dietro
-  NAT che non conoscono la propria porta esterna;
-- **Igiene dei token** (`dht.go`, `hostToken`/`checkToken`): il token di
-  `announce_peer` è legato a **indirizzo sorgente + scope** (l'info-hash per
-  `get_peers`/`announce_peer`, `nil` per i percorsi BEP 44), quindi un token
-  preso per uno sciame non si riusa su un altro (*query non corrispondente*);
-  restano il doppio segreto rotante e i contatori `announce_ok_token`/
-  `announce_bad_token`; test `dht_token_test.go`;
-- **BEP 44** (`bep44.go`): archivio chiave/valore nel DHT — item **immutabili**
-  (target = SHA-1 del valore bencodato) e **mutabili** (target = SHA-1 della
-  chiave ed25519 + salt, firma ed25519, `seq` monotono, `cas`). Implementate le
-  query `get`/`put` (token; limiti 1000/64 byte; errori 205/206/207/301/302) e
-  l'API locale `PutImmutable`/`PutMutable`/`Get`; item con TTL 2 h. I vettori
-  ufficiali del BEP sono verificati in `bep44_test.go`;
-- **BEP 44 client uscente + BEP 46** (`bep44_client.go`): `GetImmutable`/
-  `GetMutable` fanno una traversal bounded sui nodi più vicini
-  (`bep44LookupMaxNodes`), verificando firma e target prima di accettare il
-  valore; `PublishImmutable`/`PublishMutable` raccolgono il token con una `get`
-  e pubblicano con `put`; `handleBep44Reply` decodifica la risposta con il
-  decoder panic-free. La **BEP 46** usa tutto questo: un magnet
-  `xs=urn:btpk:<pubkey>` (+ `s=<salt>`) risolve l'info hash dall'item mutabile
+- `Config.PacketConn`, to use the uTP socket;
+- `Stats()` with nodes, traffic and **per-RPC diagnostics** (`queries_in`/`queries_out`/`replies_in` per ping/get_peers/find_node/announce_peer) plus the **screening** counters (`blocked_hosts`, `self_promotions`, `dupe_references`, `nodes_killed`), the **reflected external address** (`reflected_port`/`reflected_observations`, from the BEP 42 `ip` field) and the deduced **NAT type** (`nat_mapping`: 0 unknown, 1 endpoint-independent, 2 address/port-dependent) and the **composition of the routing table** for Sybil visibility (`subnet_share_max` = maximum nodes in the same /24 or /48, `nodes_insecure_id`); the daemon exposes them as `dht_<key>` in the API and UI, and it is the measurement basis of the anti-Sybil hardening (tests `stats_test.go`, `dht_table_metrics_test.go`, detail in `docs/evoluzione.md` §4.10–§4.11);
+- **dual-stack IPv6 (BEP 32)**: with `Config.UDPProto == "udp"` the DHT speaks
+  both families; v4 and v6 contacts are separated into the `nodes`/`nodes6`
+  fields of the responses (`nodesForInfoHash`, `replyFindNode`), both read on
+  ingress (`nodeResponseFields`) and requested with `want: ["n4","n6"]`
+  in `get_peers`. `"udp4"` (default) and `"udp6"` remain single-family;
+- **robust read loop**: `readFromSocket` returns the buffer to the arena on the
+  error path and checks `stop` before blocking on `Pop`, so
+  `Stop()` can no longer hang when the shared socket is closed;
+- **BEP 42 security extension** (`dht_sec.go`): the node ID is derived from the
+  external IP (`SecureNodeID`/`NodeIDSecure`, CRC32C Castagnoli, BEP vectors
+  verified in `dht_sec_test.go`), so it cannot be chosen to get closer to a
+  target info-hash. The external IP comes from `Config.PublicIP` (set by the
+  engine from `DHTHost` or from the outgoing interface) or, if unknown, from the
+  `ip` field of the responses (`noteExternalIP`, one-time adoption with a
+  persisted secure ID). Local addresses remain exempt. The `ip` field is also
+  **sent** in every response (`addIPField`: ping, find_node, get_peers,
+  announce_peer and BEP 44 `get`/`put`), so a peer behind NAT discovers its
+  reflected address; the `reflected_sent` counter makes it observable;
+- **`implied_port` (BEP 5)**: an `announce_peer` with `implied_port: 1` uses the
+  **source port** of the packet instead of the `port` field, for peers behind
+  NAT that do not know their own external port;
+- **Token hygiene** (`dht.go`, `hostToken`/`checkToken`): the `announce_peer`
+  token is bound to **source address + scope** (the info-hash for
+  `get_peers`/`announce_peer`, `nil` for the BEP 44 paths), so a token
+  obtained for one swarm is not reused on another (*mismatched query*);
+  the rotating double secret and the `announce_ok_token`/
+  `announce_bad_token` counters remain; test `dht_token_test.go`;
+- **BEP 44** (`bep44.go`): key/value store in the DHT — **immutable** items
+  (target = SHA-1 of the bencoded value) and **mutable** items (target = SHA-1 of
+  the ed25519 key + salt, ed25519 signature, monotonic `seq`, `cas`). Implemented the
+  `get`/`put` queries (token; limits 1000/64 bytes; errors 205/206/207/301/302) and
+  the local API `PutImmutable`/`PutMutable`/`Get`; items with a 2 h TTL. The
+  official BEP vectors are verified in `bep44_test.go`;
+- **outgoing BEP 44 client + BEP 46** (`bep44_client.go`): `GetImmutable`/
+  `GetMutable` perform a bounded traversal on the closest nodes
+  (`bep44LookupMaxNodes`), verifying signature and target before accepting the
+  value; `PublishImmutable`/`PublishMutable` collect the token with a `get`
+  and publish with `put`; `handleBep44Reply` decodes the response with the
+  panic-free decoder. **BEP 46** uses all of this: a magnet
+  `xs=urn:btpk:<pubkey>` (+ `s=<salt>`) resolves the info hash from the mutable item
   (`Session.addMagnet`);
-- **BEP 43** (read-only): con `Config.ReadOnly` il nodo non risponde alle query e
-  aggiunge `ro: 1` alle proprie; un nodo che riceve una query con `ro` non
-  aggiunge il mittente alla routing table. Nel demone: flag `-dht-read-only`
+- **BEP 43** (read-only): with `Config.ReadOnly` the node does not respond to queries and
+  adds `ro: 1` to its own; a node that receives a query with `ro` does not
+  add the sender to the routing table. In the daemon: flag `-dht-read-only`
   (`GX_TORRENT_DHT_READ_ONLY`);
-- **BEP 33** (DHT scrape): `bloom.go` (filtro 2048 bit, k=2, vettore ufficiale
-  verificato) e `peer_store.go` (IP unici per info-hash con flag seed). Una
-  `get_peers` con `scrape=1` risponde con **`BFpe`/`BFsd`** (256 byte); `noseed=1`
-  filtra i seed; `announce_peer` con `seed=1` marca il peer. Lato client
-  `scrape_client.go` (`DHT.Scrape`) interroga i nodi più vicini, aggrega i filtri
-  e stima (`EstimateScrape`); il motore lo espone con `Session.DHTScrape` /
-  `Torrent.DHTScrape`, il demone con `GET /api/v1/torrents/{hash}/dhtscrape` e la
-  pagina con il pulsante **DHT swarm** (`GET /ui/dhtscrape`).
-- **misura e anti-Sybil** (`make measure-dht`, `internal/dht/measure_test.go`, opt-in, fuori
-  dalla CI): avvia un nodo reale contro la DHT pubblica e traccia nodi,
-  `subnet_share_max`, `nodes_insecure_id` e il successo delle query (`docs/evoluzione.md`
-  §4.10); `Config.MaxNodesPerSubnet` applica un cap opzionale per /24 (/48 v6),
-  **default disattivato**, con contatore `nodes_capped`; i nodi oltre soglia
-  restano noti ma fuori dall'albero (`noTree`), per non ri-scoprirli in loop.
+- **BEP 33** (DHT scrape): `bloom.go` (2048-bit filter, k=2, official vector
+  verified) and `peer_store.go` (unique IPs per info-hash with a seed flag). A
+  `get_peers` with `scrape=1` responds with **`BFpe`/`BFsd`** (256 bytes); `noseed=1`
+  filters the seeds; `announce_peer` with `seed=1` marks the peer. Client side
+  `scrape_client.go` (`DHT.Scrape`) queries the closest nodes, aggregates the filters
+  and estimates (`EstimateScrape`); the engine exposes it with `Session.DHTScrape` /
+  `Torrent.DHTScrape`, the daemon with `GET /api/v1/torrents/{hash}/dhtscrape` and the
+  page with the **DHT swarm** button (`GET /ui/dhtscrape`).
+- **measurement and anti-Sybil** (`make measure-dht`, `internal/dht/measure_test.go`, opt-in, outside
+  CI): starts a real node against the public DHT and tracks nodes,
+  `subnet_share_max`, `nodes_insecure_id` and the success of the queries (`docs/evoluzione.md`
+  §4.10); `Config.MaxNodesPerSubnet` applies an optional cap per /24 (/48 v6),
+  **disabled by default**, with the `nodes_capped` counter; nodes beyond the threshold
+  remain known but outside the tree (`noTree`), so as not to re-discover them in a loop.
 
-uTP usa la libreria `github.com/anacrolix/utp` come dipendenza.
+uTP uses the `github.com/anacrolix/utp` library as a dependency.

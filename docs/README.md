@@ -1,30 +1,30 @@
-# Documentazione Gextto
+# Gextto documentation
 
-Questa cartella raccoglie la documentazione mantenuta insieme al codice. Parti
-dal manuale nella lingua preferita; gli altri documenti servono a esigenze
-specifiche.
+This folder holds the documentation maintained together with the code. Start
+from the manual in the language you prefer; the other documents cover specific
+needs.
 
-| Documento | Quando usarlo |
+| Document | When to use it |
 |---|---|
-| [Manuale italiano](MANUAL.it.md) | Configurazione e uso quotidiano della UI web. |
+| [Manuale italiano](MANUAL.it.md) | Setup and day-to-day use of the web UI. |
 | [English manual](MANUAL.en.md) | English version of the complete user guide. |
-| [Guida avanzata](ADVANCED.it.md) | NAS, permessi, proxy, backup e diagnostica. |
+| [Guida avanzata (Italiano)](ADVANCED.it.md) | NAS, permissions, proxy, backup and diagnostics. |
 | [Advanced guide](ADVANCED.en.md) | English advanced-operation guide. |
-| [API HTTP](API.md) | Automazioni e integrazioni che usano il daemon. |
-| [Migrazione](MIGRATION.md) | Passaggio sicuro da un'installazione precedente. |
-| [qBittorrent-nox per Gextto](qbittorrent-nox.md) | Come configurare il backend qBittorrent-nox: impostazioni, mappatura dei percorsi, esempi e casi tipici. |
-| [Sicurezza](SECURITY.md) | Esposizione di rete, segreti e segnalazione vulnerabilità. |
-| [TUI](tui.md) | Client terminale e scorciatoie da tastiera. |
-| [Sviluppatori](DEVELOPERS.md) | Build, test e convenzioni per contributor. |
-| [Tempi di build e test](tempistiche.md) | Quanto costano build e suite di test su un ambiente reale, e quanto dura la CI. |
-| [Architettura](ARCHITECTURE.md) | Mappa delle cartelle e dei file del codice. |
-| [Scelte di progetto, migliorie ed evoluzione](evoluzione.md) | Backlog, migliorie implementate, piani gx-torrent, misure, revisioni e direzione strategica. |
-| [Motore gx-torrent](gx-torrent.md) | Documento tecnico del motore torrent in Go (gx-core, demone, adapter). |
-| [Conformità BEP](bep.md) | Quali specifiche BitTorrent (BEP) supporta il motore, quali mancano e la roadmap. |
-| [gx-torrent evoluto (gx-nox)](gx-torrent-evoluto.md) | Analisi e decisione: gx-torrent come client torrent standalone (un binario, due modalità). |
-| [BitTorrent v2 (BEP 52)](gx-torrent-v2.md) | Progetto di implementazione del supporto BitTorrent v2 in `gx-core`. |
-| [Archivio](archive/README.md) | Report e piani storici, non più aggiornati. |
+| [HTTP API](API.md) | Automations and integrations that use the daemon. |
+| [Migration](MIGRATION.md) | A safe move from a previous install. |
+| [qBittorrent-nox for Gextto](qbittorrent-nox.md) | How to configure the qBittorrent-nox backend: settings, path mapping, examples and typical cases. |
+| [Security](SECURITY.md) | Network exposure, secrets and vulnerability reporting. |
+| [TUI](tui.md) | Terminal client and keyboard shortcuts. |
+| [Developers](DEVELOPERS.md) | Build, tests and contributor conventions. |
+| [Build and test times](tempistiche.md) | What builds and the test suite cost on a real machine, and how long CI takes. |
+| [Architecture](ARCHITECTURE.md) | Map of the code folders and files. |
+| [Design choices, improvements and evolution](evoluzione.md) | Backlog, implemented improvements, gx-torrent plans, measurements, reviews and strategic direction. |
+| [gx-torrent engine](gx-torrent.md) | Technical document of the pure-Go torrent engine (gx-core, daemon, adapter). |
+| [BEP compliance](bep.md) | Which BitTorrent specifications (BEPs) the engine supports, which are missing and the roadmap. |
+| [gx-torrent evolved (gx-nox)](gx-torrent-evoluto.md) | Analysis and decision: gx-torrent as a standalone torrent client (one binary, two modes). |
+| [BitTorrent v2 (BEP 52)](gx-torrent-v2.md) | Implementation plan for BitTorrent v2 support in `gx-core`. |
+| [Archive](archive/README.md) | Historical reports and plans, no longer maintained. |
 
 > [!NOTE]
-> I percorsi, le porte e i comandi qui descritti sono esempi. Verifica sempre
-> utente del servizio, mount NAS e permessi nell'installazione reale.
+> The paths, ports and commands here are examples. Always check the service
+> user, the NAS mount and the permissions in your real install.

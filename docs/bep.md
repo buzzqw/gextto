@@ -1,123 +1,123 @@
-# Conformità BitTorrent (BEP) di gx-core
+# BitTorrent (BEP) compliance of gx-core
 
-Stato di supporto alle specifiche BitTorrent (BEP) del motore **gx-core**
-(`internal/gxcore`) e del demone `gx-torrent` (`cmd/gx-torrent`).
+Support status for the BitTorrent specifications (BEPs) of the **gx-core** engine
+(`internal/gxcore`) and the `gx-torrent` daemon (`cmd/gx-torrent`).
 
-Questo documento è la **fonte unica dello stato per BEP**: lo stato riflette il
-codice, non confronti con altri client. Il dettaglio per file è in
-[`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) (inventario del
-motore) e in [`gx-torrent.md`](gx-torrent.md) (demone); motivazioni, misure e
+This document is the **single source of truth for BEP status**: the status reflects
+the code, not comparisons with other clients. The per-file detail is in
+[`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) (engine inventory)
+and in [`gx-torrent.md`](gx-torrent.md) (daemon); rationale, measurements and
 backlog in [`evoluzione.md`](evoluzione.md).
 
-Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
-**no** = assente; **escluso** = fuori scope per scelta.
+Status legend: **yes** = implemented and tested; **partial** = only a part;
+**no** = absent; **excluded** = out of scope by choice.
 
-## Peer wire e metadati
+## Peer wire and metadata
 
-| BEP | Specifica | Stato |
+| BEP | Specification | Status |
 |---|---|---|
-| 3 | The BitTorrent Protocol Specification (core TCP/UDP wire) | sì |
-| 4 | Reserved bits nell'handshake | sì |
-| 6 | Fast Extension (`have all`/`have none`, `suggest`, `allowed fast`) | sì |
-| 9 | `ut_metadata` (metadati da magnet) | sì |
-| 10 | Extension Protocol (handshake `m`) | sì |
-| 11 | Peer Exchange (`ut_pex`, IPv4 + `added6`/`dropped6`) | sì |
-| 12 | Multitracker Metadata Extension (`announce-list` a livelli) | sì |
-| 14 | Local Service Discovery (LSD, IPv4 e IPv6) | sì |
-| 16 | Super-seeding (initial seeding, una parte alla volta) | sì |
-| 19 | WebSeed ("GetRight style", HTTP Range) | sì |
-| 20 | Peer ID Conventions | sì |
-| 21 | Extension for Partial Seeds (`upload_only`, `event=paused`) | sì |
-| 23 | Compact Peer Lists for Trackers | sì |
-| 24 | Tracker Returns External IP (`ip`) | sì |
-| 27 | Private Torrents (`private: 1`, niente DHT/PEX/LSD) | sì |
-| 38 | Finding Local Data Via Torrent File Hints (`similar`/`collections`) | **parziale**: hint letti (info + top-level, uniti), esposti con i torrent locali candidati e riscritti nell'export; il riuso a livello di blocco è Swarm Merging |
-| 40 | Canonical Peer Priority (tie-break) | sì |
-| 47 | Padding Files (`.pad/`) | sì |
-| 54 | The `lt_donthave` extension (un peer non ha più un pezzo) | sì (ricezione) |
+| 3 | The BitTorrent Protocol Specification (core TCP/UDP wire) | yes |
+| 4 | Reserved bits in the handshake | yes |
+| 6 | Fast Extension (`have all`/`have none`, `suggest`, `allowed fast`) | yes |
+| 9 | `ut_metadata` (metadata from magnet) | yes |
+| 10 | Extension Protocol (handshake `m`) | yes |
+| 11 | Peer Exchange (`ut_pex`, IPv4 + `added6`/`dropped6`) | yes |
+| 12 | Multitracker Metadata Extension (tiered `announce-list`) | yes |
+| 14 | Local Service Discovery (LSD, IPv4 and IPv6) | yes |
+| 16 | Super-seeding (initial seeding, one piece at a time) | yes |
+| 19 | WebSeed ("GetRight style", HTTP Range) | yes |
+| 20 | Peer ID Conventions | yes |
+| 21 | Extension for Partial Seeds (`upload_only`, `event=paused`) | yes |
+| 23 | Compact Peer Lists for Trackers | yes |
+| 24 | Tracker Returns External IP (`ip`) | yes |
+| 27 | Private Torrents (`private: 1`, no DHT/PEX/LSD) | yes |
+| 38 | Finding Local Data Via Torrent File Hints (`similar`/`collections`) | **partial**: hints read (info + top-level, merged), exposed together with the candidate local torrents and rewritten in the export; block-level reuse is Swarm Merging |
+| 40 | Canonical Peer Priority (tie-break) | yes |
+| 47 | Padding Files (`.pad/`) | yes |
+| 54 | The `lt_donthave` extension (a peer no longer has a piece) | yes (reception) |
 
-## Trasporto, cifratura e NAT
+## Transport, encryption and NAT
 
-| BEP | Specifica | Stato |
+| BEP | Specification | Status |
 |---|---|---|
-| 29 | uTP (uTorrent Transport Protocol) | sì |
-| 55 | Holepunch Extension (`ut_holepunch` su uTP) | sì |
-| — | MSE/PE (Protocol Encryption, de-facto) | sì |
+| 29 | uTP (uTorrent Transport Protocol) | yes |
+| 55 | Holepunch Extension (`ut_holepunch` over uTP) | yes |
+| — | MSE/PE (Protocol Encryption, de-facto) | yes |
 
-## Tracker
+## Trackers
 
-| BEP | Specifica | Stato |
+| BEP | Specification | Status |
 |---|---|---|
-| 7 | IPv6 Tracker Extension (`peers6`) | sì |
-| 15 | UDP Tracker Protocol (connect/announce/scrape) | sì |
-| 31 | Tracker Failure Retry Extension | sì (`retry in` in minuti e `never`, che scarta il tracker dal tier) |
-| 41 | UDP Tracker Protocol Extensions (`URLData`, opzione `0x2`) | sì |
-| 48 | Tracker Scrape (HTTP `/scrape` e UDP) | sì |
-| 34 | DNS Tracker Preferences (record SRV) | no (usata da pochissimi tracker) |
+| 7 | IPv6 Tracker Extension (`peers6`) | yes |
+| 15 | UDP Tracker Protocol (connect/announce/scrape) | yes |
+| 31 | Tracker Failure Retry Extension | yes (`retry in` in minutes and `never`, which drops the tracker from the tier) |
+| 41 | UDP Tracker Protocol Extensions (`URLData`, option `0x2`) | yes |
+| 48 | Tracker Scrape (HTTP `/scrape` and UDP) | yes |
+| 34 | DNS Tracker Preferences (SRV records) | no (used by very few trackers) |
 
 ## DHT (Mainline / BEP 5)
 
-| BEP | Specifica | Stato |
+| BEP | Specification | Status |
 |---|---|---|
-| 5 | Mainline DHT Protocol (Kademlia IPv4) | sì |
-| 32 | IPv6 Extension for DHT (`nodes6`, `want`) | sì |
-| 33 | DHT Scrape (filtri Bloom `BFpe`/`BFsd`) | sì |
-| 42 | DHT Security Extension (Secure Node ID, CRC32C) | sì; il campo `ip` delle risposte è al **primo livello** del messaggio, come da specifica e come libtorrent (corretto il 2026-10-12: prima stava dentro `r` e nessun client lo leggeva né lo inviava nel posto giusto) |
-| 43 | Read-only DHT Nodes (`ro: 1`) | sì |
-| 44 | Storing arbitrary data in the DHT (K/V Ed25519) | sì: store locale, responder `get`/`put` e **client uscente iterativo** (bounded) per leggere e pubblicare item; il `put` va ai **8 nodi più vicini** al target fra quelli che hanno dato un token |
+| 5 | Mainline DHT Protocol (Kademlia IPv4) | yes |
+| 32 | IPv6 Extension for DHT (`nodes6`, `want`) | yes |
+| 33 | DHT Scrape (Bloom filters `BFpe`/`BFsd`) | yes |
+| 42 | DHT Security Extension (Secure Node ID, CRC32C) | yes; the `ip` field of the responses is at the **top level** of the message, as per the specification and as libtorrent does (fixed on 2026-10-12: previously it sat inside `r` and no client read it or sent it in the right place) |
+| 43 | Read-only DHT Nodes (`ro: 1`) | yes |
+| 44 | Storing arbitrary data in the DHT (K/V Ed25519) | yes: local store, `get`/`put` responder and an **outgoing iterative client** (bounded) to read and publish items; the `put` goes to the **8 closest nodes** to the target among those that provided a token |
 | 45 | Multiple-address Operation for DHT (multi-homed) | no |
-| 46 | Updating Torrents via DHT Mutable Items (`urn:btpk:`) | sì (magnet `xs=urn:btpk:`, risolto dal client BEP 44 all'aggiunta) |
+| 46 | Updating Torrents via DHT Mutable Items (`urn:btpk:`) | yes (magnet `xs=urn:btpk:`, resolved by the BEP 44 client on add) |
 | 51 | DHT Infohash Indexing (`sample_infohashes`) | no |
 
-> BEP 42 è completo in **entrambe le direzioni**: l'ID nodo deriva dall'IP esterno
-> e il campo `ip` è letto *e* inviato in ogni risposta (`reflected_sent`). BEP 5
-> rispetta `implied_port` in `announce_peer`.
+> BEP 42 is complete in **both directions**: the node ID is derived from the
+> external IP and the `ip` field is read *and* sent in every response
+> (`reflected_sent`). BEP 5 honours `implied_port` in `announce_peer`.
 
-## BitTorrent v2 e magnet
+## BitTorrent v2 and magnet
 
-| BEP | Specifica | Stato |
+| BEP | Specification | Status |
 |---|---|---|
-| 52 | BitTorrent v2 (alberi Merkle SHA-256, `piece layers`) | sì (v1, ibridi, v2-only da `.torrent` e da magnet) |
-| 53 | Magnet URI extension: `so=` (Select Only) | sì |
+| 52 | BitTorrent v2 (SHA-256 Merkle trees, `piece layers`) | yes (v1, hybrids, v2-only from `.torrent` and from magnet) |
+| 53 | Magnet URI extension: `so=` (Select Only) | yes |
 
-> Il parametro magnet `so=` è **BEP 53**. `ws=` (web seed), `xs=` (sorgente
-> esatta), `as=` (sorgente accettabile) e `dht=` (nodo DHT di bootstrap) vengono
-> dalla **convenzione Magnet URI** (non da una BEP): gx-core gestisce `ws=`,
-> `dht=`, `xs=` e `as=` (con `xs=`/`as=` scarica il `.torrent` dalla sorgente,
-> verificando che l'info hash corrisponda, così i metadati non dipendono dallo
-> sciame).
+> The magnet parameter `so=` is **BEP 53**. `ws=` (web seed), `xs=` (exact
+> source), `as=` (acceptable source) and `dht=` (DHT bootstrap node) come
+> from the **Magnet URI convention** (not from a BEP): gx-core handles `ws=`,
+> `dht=`, `xs=` and `as=` (with `xs=`/`as=` it downloads the `.torrent` from the
+> source, verifying that the info hash matches, so metadata does not depend on the
+> swarm).
 
-## Fuori scope / obsolete
+## Out of scope / obsolete
 
-| BEP / tecnologia | Motivo |
+| BEP / technology | Reason |
 |---|---|
-| 8 (Tracker Peer Obfuscation) | deferred dal processo BEP |
-| 17 (HTTP Seeding "Hoffman") | superata da BEP 19 |
+| 8 (Tracker Peer Obfuscation) | deferred by the BEP process |
+| 17 (HTTP Seeding "Hoffman") | superseded by BEP 19 |
 | 18 (Search Engine) / 22 (Local Tracker Discovery) / 26 (Zeroconf) / 28 (Tracker exchange) | deferred |
-| 30 (Merkle tree torrent extension, v1) | superata da BEP 52 (v2) |
-| 35 (Torrent signing) | standard mai affermatosi |
-| 36 / 39 / 49 (Feed RSS, aggiornamento via feed, feed distribuiti) | livello applicativo: Gextto ha già RSS/Torznab |
-| 50 (Publish/Subscribe Protocol) | nicchia (pub/sub su DHT); costo > beneficio |
-| WebTorrent (WebRTC) | richiede lo stack WebRTC; componente esterno, non nel core |
-| I2P SAM nativo | usabili proxy SOCKS5/HTTP; SAM nativo fuori scope |
+| 30 (Merkle tree torrent extension, v1) | superseded by BEP 52 (v2) |
+| 35 (Torrent signing) | standard that never took off |
+| 36 / 39 / 49 (RSS feeds, updating via feed, distributed feeds) | application level: Gextto already has RSS/Torznab |
+| 50 (Publish/Subscribe Protocol) | niche (pub/sub over DHT); cost > benefit |
+| WebTorrent (WebRTC) | requires the WebRTC stack; external component, not in the core |
+| Native I2P SAM | SOCKS5/HTTP proxies can be used; native SAM out of scope |
 
-## Residui e roadmap
+## Remaining items and roadmap
 
-1. **BEP 45 (DHT multi-address)** e **BEP 51 (`sample_infohashes`)**: marginali
-   per un client domestico/NAS (multi-interfaccia; indicizzazione per crawler).
-2. **Throughput 10 Gbps (pipelining)**: la coda richieste adattiva esiste già;
-   ogni modifica va **misurata prima e dopo** (CPU, RAM, throughput), come da
-   regola performance di `AGENTS.md`.
-3. **BEP 38 — `similar`/`collections` — parziale.** Gli hint sono letti dal
-   dizionario info **e** dal livello superiore (uniti, deduplicati), riemessi
-   nell'export del `.torrent` e mostrati insieme ai torrent locali che
-   condividono un hint (API `GET /api/v1/torrents/{hash}/collections`, pagina
-   del demone, dettaglio in Gextto). Il **riuso effettivo dei blocchi** — il
-   vero guadagno del BEP — è lo **Swarm Merging** (`evoluzione.md` §15.2): qui
-   c'è solo la scoperta dei candidati.
+1. **BEP 45 (DHT multi-address)** and **BEP 51 (`sample_infohashes`)**: marginal
+   for a home/NAS client (multi-interface; indexing for crawlers).
+2. **10 Gbps throughput (pipelining)**: the adaptive request queue already
+   exists; every change must be **measured before and after** (CPU, RAM,
+   throughput), as per the performance rule in `AGENTS.md`.
+3. **BEP 38 — `similar`/`collections` — partial.** The hints are read from the
+   info dictionary **and** from the top level (merged, deduplicated), re-emitted
+   in the `.torrent` export and shown together with the local torrents that
+   share a hint (API `GET /api/v1/torrents/{hash}/collections`, daemon
+   page, detail in Gextto). The **actual block reuse** — the
+   real gain of the BEP — is **Swarm Merging** (`evoluzione.md` §15.2): here
+   there is only the discovery of candidates.
 
-## Manutenzione
+## Maintenance
 
-Aggiornare questa tabella a ogni nuova BEP implementata o esclusa, insieme ai
-documenti collegati (`GEXTTO.md`, `gx-torrent.md`, `evoluzione.md`); una voce
-data per assente va chiusa o riqualificata quando il codice la implementa.
+Update this table on every new BEP implemented or excluded, together with the
+linked documents (`GEXTTO.md`, `gx-torrent.md`, `evoluzione.md`); an entry
+given as absent must be closed or reclassified when the code implements it.

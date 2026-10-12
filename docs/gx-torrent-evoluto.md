@@ -1,715 +1,714 @@
-# gx-torrent evoluto: da motore di Gextto a client torrent standalone
+# gx-torrent evolved: from Gextto engine to standalone torrent client
 
-Analisi completa della domanda: **è meglio evolvere `gx-torrent` in un client
-standalone oppure creare un nuovo progetto `gx-nox`?** Data: **2026-10-10**.
+Complete analysis of the question: **is it better to evolve `gx-torrent` into a
+standalone client or to create a new `gx-nox` project?** Date: **2026-10-10**.
 
-Questo documento è la **decisione e il piano**. Lo stato corrente del motore è in
-[`docs/gx-torrent.md`](gx-torrent.md); il backlog del motore e le misure in
-[`docs/evoluzione.md`](evoluzione.md) (§4–§7); l'inventario delle funzionalità
-del motore in [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md).
+This document is the **decision and the plan**. The current state of the engine is in
+[`docs/gx-torrent.md`](gx-torrent.md); the engine backlog and the measurements in
+[`docs/evoluzione.md`](evoluzione.md) (§4–§7); the inventory of the engine's
+features in [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md).
 
 > [!NOTE]
-> Nato dall'estrazione della §14 di `evoluzione.md`, che ora rimanda qui. Il
-> documento tecnico `gx-torrent.md` descrive **ciò che c'è**; questo descrive
-> **dove si vuole andare**, e resta separato per non mescolare i due piani.
+> Born from the extraction of §14 of `evoluzione.md`, which now points here. The
+> technical document `gx-torrent.md` describes **what exists**; this one describes
+> **where we want to go**, and it stays separate so as not to mix the two plans.
 >
-> **Nome:** il nome del prodotto è **gx-core** (deciso 2026-10-10). Il binario
-> resta `gx-torrent` e "gx-nox" è solo il nome storico della modalità
-> standalone; il motore è `internal/gxcore`.
+> **Name:** the product name is **gx-core** (decided 2026-10-10). The binary
+> stays `gx-torrent` and "gx-nox" is only the historical name of the standalone
+> mode; the engine is `internal/gxcore`.
 
-## Indice
+## Index
 
-1. [Sintesi](#1-sintesi)
-2. [Domanda, requisiti e criteri](#2-domanda-requisiti-e-criteri)
-3. [Stato attuale](#3-stato-attuale)
+1. [Summary](#1-summary)
+2. [Question, requirements and criteria](#2-question-requirements-and-criteria)
+3. [Current state](#3-current-state)
 4. [Gap analysis](#4-gap-analysis)
-5. [Le tre strade](#5-le-tre-strade)
-6. [Decisione (ADR)](#6-decisione-adr)
-7. [Architettura target](#7-architettura-target)
-8. [Costo zero quando lo standalone non è usato](#8-costo-zero-quando-lo-standalone-non-è-usato)
-9. [Modello di sicurezza](#9-modello-di-sicurezza)
-10. [Requisito "migliore di qBittorrent"](#10-requisito-migliore-di-qbittorrent)
-11. [Cherry-pick dal motore e licenze](#11-cherry-pick-dal-motore-e-licenze)
-12. [Roadmap e cancelli](#12-roadmap-e-cancelli)
-13. [Requisiti → soluzione](#13-requisiti--soluzione)
-14. [Rischi e mitigazioni](#14-rischi-e-mitigazioni)
-15. [Domande aperte](#15-domande-aperte)
-16. [Riferimenti](#16-riferimenti)
+5. [The three paths](#5-the-three-paths)
+6. [Decision (ADR)](#6-decision-adr)
+7. [Target architecture](#7-target-architecture)
+8. [Zero cost when standalone is not used](#8-zero-cost-when-standalone-is-not-used)
+9. [Security model](#9-security-model)
+10. ["Better than qBittorrent" requirement](#10-better-than-qbittorrent-requirement)
+11. [Cherry-picking from the engine and licences](#11-cherry-picking-from-the-engine-and-licences)
+12. [Roadmap and gates](#12-roadmap-and-gates)
+13. [Requirements → solution](#13-requirements--solution)
+14. [Risks and mitigations](#14-risks-and-mitigations)
+15. [Open questions](#15-open-questions)
+16. [References](#16-references)
 
 ---
 
-## 1. Sintesi
+## 1. Summary
 
-**Risposta: conviene evolvere `gx-torrent`, non creare un nuovo `gx-nox`.** Un
-solo binario con due modalità: `-mode=managed` quando lo lancia Gextto (comanda
-Gextto) e `-mode=standalone` quando è un prodotto a sé (comanda gx-torrent).
-"gx-nox" può restare il **nome pubblico** della modalità standalone, ma non è un
-secondo progetto.
+**Answer: it is worth evolving `gx-torrent`, not creating a new `gx-nox`.** A
+single binary with two modes: `-mode=managed` when Gextto launches it (Gextto is
+in charge) and `-mode=standalone` when it is a product of its own (gx-torrent is
+in charge). "gx-nox" can remain the **public name** of the standalone mode, but it is not a
+second project.
 
-Il motivo decisivo non è la fatica iniziale, è il **requisito 5** (a tendere:
-fare cherry-pick per valore da libtorrent/anacrolix). Quel percorso
-trasforma il motore in codice vostro: con due progetti ci sarebbero **due
-divergenze dello stesso motore**, e ogni porting andrebbe fatto due volte.
-Prima o poi `gx-torrent` resterebbe indietro e Gextto si ritroverebbe col motore
-peggiore dei due.
+The decisive reason is not the initial effort, it is **requirement 5** (in
+prospect: cherry-picking by value from libtorrent/anacrolix). That path
+turns the engine into your own code: with two projects there would be **two
+divergences of the same engine**, and every porting would have to be done twice.
+Sooner or later `gx-torrent` would fall behind and Gextto would end up with the
+worse of the two engines.
 
-Il **requisito 1** (compatibilità perfetta con Gextto) è la ragione per cui la
-strada nuova è rischiosa: si garantisce con **un solo motore + test di contratto
-sull'API v1**, non con due alberi di codice da risincronizzare a mano.
+**Requirement 1** (perfect compatibility with Gextto) is the reason why the
+new path is risky: it is guaranteed with **a single engine + contract tests
+on the v1 API**, not with two code trees to be resynchronised by hand.
 
-Il punto di partenza è più avanti di quanto sembri: gx-torrent ha già REST API,
-pagina web in sei lingue, coda, limiti per torrent, streaming, super-seeding,
-holepunching, UPnP/NAT-PMP e test della porta. Per diventare un'alternativa a
-qbittorrent-nox gli mancano soprattutto **le cose che oggi fa Gextto al posto
-suo** (autenticazione, impostazioni da UI, categorie/tag, RSS, ricerca su
-indexer, wizard) più due lacune di motore che uno standalone non può permettersi:
-**IPv6** e **BitTorrent v2**.
+The starting point is further ahead than it seems: gx-torrent already has a REST API,
+a web page in six languages, a queue, per-torrent limits, streaming, super-seeding,
+holepunching, UPnP/NAT-PMP and port testing. To become an alternative to
+qbittorrent-nox it mainly lacks **the things Gextto currently does in its place**
+(authentication, settings from the UI, categories/tags, RSS, indexer search, wizard)
+plus two engine gaps that a standalone cannot afford:
+**IPv6** and **BitTorrent v2**.
 
-Tre condizioni perché la scelta regga (dettaglio in §6–§8):
+Three conditions for the choice to hold (details in §6–§8):
 
-- **Una sola regola di potere**: in managed comanda Gextto (coda, categorie, RSS
-  restano suoi); in standalone comanda gx-torrent. Le funzioni standalone si
-  **spengono**, non si duplicano, quando Gextto è presente.
-- **Prima il refactor, poi le funzioni**: `cmd/gx-torrent` resta un unico
-  `package main` da 12.573 righe (20.742 col test), ma i pacchetti riusabili
-  sono già stati estratti in `internal/` (`queue`, `webui`, `rss`, `torznab`).
-- **Il contratto con Gextto diventa un test**: le risposte dell'API v1 usate da
-  `gxtorrent_engine.go` vanno fissate in test di contratto che girano a ogni
-  build. È il cancello che rende innocuo tutto il resto.
+- **A single rule of power**: in managed, Gextto is in charge (queue, categories, RSS
+  remain its own); in standalone, gx-torrent is in charge. The standalone functions
+  **switch off**, they do not get duplicated, when Gextto is present.
+- **Refactor first, then features**: `cmd/gx-torrent` remains a single
+  `package main` of 12,573 lines (20,742 with tests), but the reusable packages
+  have already been extracted into `internal/` (`queue`, `webui`, `rss`, `torznab`).
+- **The contract with Gextto becomes a test**: the responses of the v1 API used by
+  `gxtorrent_engine.go` must be fixed in contract tests that run at every
+  build. It is the gate that makes everything else harmless.
 
 ---
 
-## 2. Domanda, requisiti e criteri
+## 2. Question, requirements and criteria
 
-### 2.1 La domanda
+### 2.1 The question
 
-> Evolvere `gx-torrent` in **anche** un client torrent standalone: mantenendo la
-> perfetta compatibilità con Gextto, se lanciato da solo diventa l'equivalente di
-> `qbittorrent-nox`.
+> Evolve `gx-torrent` into **also** a standalone torrent client: while keeping
+> perfect compatibility with Gextto, when launched on its own it becomes the
+> equivalent of `qbittorrent-nox`.
 
-### 2.2 I requisiti
+### 2.2 The requirements
 
-I requisiti hanno **pesi diversi**: il primo è un **vincolo**, gli altri sono
-**obiettivi**. Ogni scelta che migliora lo standalone ma tocca il percorso Gextto
-va respinta o messa dietro un flag.
+The requirements have **different weights**: the first is a **constraint**, the
+others are **goals**. Every choice that improves the standalone but touches the
+Gextto path must be rejected or put behind a flag.
 
-| # | Requisito | Tipo | Implicazione progettuale |
+| # | Requirement | Type | Design implication |
 | --- | --- | --- | --- |
-| 1 | Funziona perfettamente con Gextto | **vincolo** | API v1 congelata; in managed nessuna funzione standalone attiva; `fingerprint` stabile |
-| 2 | Client efficace, potente, parsimonioso, migliore di qbittorrent-nox | obiettivo | misure contro qbittorrent-nox; niente funzioni che consumano se non usate |
-| 3 | Interfaccia web ottima, facile e completa come qBittorrent | obiettivo | UI come applicazione (asset, impostazioni, categorie/tag, RSS, ricerca), non una pagina operativa |
-| 4 | Wizard di primo avvio | obiettivo | lingua, cartelle, password, LAN senza password (default sì), porte + test porta, indexer Jackett/Prowlarr/MIRCrew |
-| 5 | A tendere cherry-pick per valore da anacrolix/libtorrent | direzione | motore trattato come codice proprio; un solo motore condiviso dai due usi |
+| 1 | Works perfectly with Gextto | **constraint** | v1 API frozen; in managed no standalone function is active; `fingerprint` stable |
+| 2 | Effective, powerful, frugal client, better than qbittorrent-nox | goal | measurements against qbittorrent-nox; no features that consume when unused |
+| 3 | Excellent web interface, as easy and complete as qBittorrent | goal | UI as an application (assets, settings, categories/tags, RSS, search), not an operational page |
+| 4 | First-run wizard | goal | language, folders, password, LAN without password (default yes), ports + port test, Jackett/Prowlarr/MIRCrew indexers |
+| 5 | In prospect, cherry-pick by value from anacrolix/libtorrent | direction | engine treated as own code; a single engine shared by the two uses |
 
-### 2.3 Criteri di valutazione
+### 2.3 Evaluation criteria
 
-Per scegliere tra le strade (§5) uso sette criteri, valutati a parità di
-requisiti:
+To choose between the paths (§5) I use seven criteria, evaluated at equal
+requirements:
 
-1. **Compatibilità con Gextto** (requisito 1): quanto è garantita per costruzione.
-2. **Manutenzione del motore**: quanti alberi di codice vanno tenuti.
-3. **Propagazione di fix e migliorie**: una modifica arriva a entrambi gli usi o
-   va portata a mano?
-4. **Peso del binario gestito**: cosa Gextto si porta dietro anche se non lo usa.
-5. **Superficie d'attacco in managed**: quanto codice in più è raggiungibile.
-6. **Libertà di design** di API e UI standalone.
-7. **Tempo al primo standalone usabile**.
+1. **Compatibility with Gextto** (requirement 1): how well it is guaranteed by construction.
+2. **Engine maintenance**: how many code trees must be kept.
+3. **Propagation of fixes and improvements**: does a change reach both uses or
+   must it be ported by hand?
+4. **Weight of the managed binary**: what Gextto carries with it even if it does not use it.
+5. **Attack surface in managed**: how much extra code is reachable.
+6. **Design freedom** of the standalone API and UI.
+7. **Time to the first usable standalone**.
 
 ---
 
-## 3. Stato attuale
+## 3. Current state
 
-gx-torrent è un demone Go puro (build `CGO_ENABLED=0`) con il motore **gx-core**
-(`internal/gxcore`), con l'**inventario delle aree** in `GEXTTO.md`. Gextto lo avvia, lo sorveglia e lo
-**riaggancia ai riavvii** tramite `fingerprint`. Il demone è già usabile da solo
-(`gx-torrent -listen … -data …`), anche come client standalone.
+gx-torrent is a pure-Go daemon (`CGO_ENABLED=0` build) with the **gx-core** engine
+(`internal/gxcore`), with the **inventory of areas** in `GEXTTO.md`. Gextto starts it, watches it and
+**reattaches it across restarts** via `fingerprint`. The daemon is already usable on its own
+(`gx-torrent -listen … -data …`), even as a standalone client.
 
-| Strato | Dove | Cosa c'è già | Dimensione (2026-10-11) |
+| Layer | Where | What already exists | Size (2026-10-11) |
 | --- | --- | --- | --- |
-| Motore | `internal/gxcore`, `internal/dht`, `anacrolix/utp` | porta unica, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, web seed e tracker a caldo, limiti per torrent, priorità file graduate, streaming con finestra, filtro IP multi-formato, proxy, killswitch VPN, preallocazione, durabilità a batch, mmap opt-in, cache regolabile a caldo | 44 aree |
-| Demone | `cmd/gx-torrent` | coda dinamica con slot, seed ratio/giorni per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, stato in `state.json` | 12.573 righe (20.742 col test) |
-| API | `cmd/gx-torrent/api.go` | REST v1 con header `X-Gx-Token`: health, stats, portcheck, torrents, add, azioni, config, ipfilter | 706 righe |
-| UI | `cmd/gx-torrent/ui.go` | tabella, filtri per stato, dettaglio a schede (generale, file, peer, tracker, pezzi), azioni di gruppo, sei lingue | 1.562 righe; asset in `internal/webui/assets` (`embed.FS`) |
-| Adapter | `gxtorrent_engine.go`, `gxtorrent_runtime.go` | contratto `TorrentEngine`, matrice `capabilityLevels`, avvio in scope systemd | 1.801 + 728 righe |
+| Engine | `internal/gxcore`, `internal/dht`, `anacrolix/utp` | single port, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, hot web seeds and trackers, per-torrent limits, graduated file priority, windowed streaming, multi-format IP filter, proxy, VPN killswitch, preallocation, batched durability, opt-in mmap, hot-adjustable cache | 44 areas |
+| Daemon | `cmd/gx-torrent` | dynamic queue with slots, seed ratio/days per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, state in `state.json` | 12,573 lines (20,742 with tests) |
+| API | `cmd/gx-torrent/api.go` | REST v1 with `X-Gx-Token` header: health, stats, portcheck, torrents, add, actions, config, ipfilter | 706 lines |
+| UI | `cmd/gx-torrent/ui.go` | table, filters by state, tabbed detail (general, files, peers, trackers, pieces), group actions, six languages | 1,562 lines; assets in `internal/webui/assets` (`embed.FS`) |
+| Adapter | `gxtorrent_engine.go`, `gxtorrent_runtime.go` | `TorrentEngine` contract, `capabilityLevels` matrix, launch in a systemd scope | 1,801 + 728 lines |
 
-Misure grezze, come base per il requisito 2: `bin/gx-torrent` pesa **13,7 MB**; il
-demone in esercizio su questa macchina usa **~307 MB di RSS** e 10 thread, quasi
-tutti di cache dei pezzi.
+Raw measurements, as a basis for requirement 2: `bin/gx-torrent` weighs **13.7 MB**; the
+daemon in operation on this machine uses **~307 MB of RSS** and 10 threads, almost
+all of them piece cache.
 
-Cose oggi legate **solo** a Gextto: `-orphan-timeout`, `-fingerprint`,
-`-gextto-log`, `-ipfilter-source`. In **standalone** le impostazioni vivono in
-`settings.json` (`cmd/gx-torrent/ui_settings.go`) e si modificano dalla pagina
-`/ui/settings`, che è **autorevole**: un valore scritto lì vince sul flag di
-avvio. In **managed** il file non viene letto e i flag passati da Gextto restano
-sovrani.
+Things currently tied **only** to Gextto: `-orphan-timeout`, `-fingerprint`,
+`-gextto-log`, `-ipfilter-source`. In **standalone** the settings live in
+`settings.json` (`cmd/gx-torrent/ui_settings.go`) and are changed from the page
+`/ui/settings`, which is **authoritative**: a value written there wins over the startup
+flag. In **managed** the file is not read and the flags passed by Gextto remain
+sovereign.
 
 ---
 
 ## 4. Gap analysis
 
-### 4.1 Funzioni che Gextto forniva e che il demone standalone ha ripreso
+### 4.1 Functions that Gextto provided and that the standalone daemon has taken back
 
-| Funzione | Oggi in Gextto | In gx-torrent | Dove sta |
+| Function | Today in Gextto | In gx-torrent | Where it lives |
 | --- | --- | --- | --- |
-| Login, sessioni, password | UI v2 (`authEnabledSetting`, argon2/bcrypt) | fatto (`standalone_auth.go`: login bcrypt, sessioni, bypass LAN) | `internal/webui` + `internal/auth` |
-| Impostazioni persistenti da UI | `uiweb_v2_settings*` | fatto (`settings.json`, pagina `/ui/settings`) | `settings.json` + `internal/settings` |
-| Wizard primo avvio | `uiweb_v2_setup.go` (527 righe, 5 passi: Accesso, Cartelle, Fonti, Primo titolo, Attiva) | fatto (`cmd/gx-torrent/setup.go`, `internal/webui/assets/setup.html`) | `internal/webui/setup` |
-| Categorie, tag, percorso per categoria | sì | fatto (`cmd/gx-torrent/ui_categories.go`) | `internal/gxcore` |
-| RSS con regole di scarico | `rss.go` (2.588 righe) | fatto (`internal/rss`, `cmd/gx-torrent/feed.go`, `ui_feeds.go`) | `internal/rss` (estratto) |
-| Ricerca Torznab/Prowlarr/Jackett/MIRCrew | `websearch.go` (863), `torznab_caps.go` (243), `indexer_health.go` (121) | fatto (`internal/torznab`, `cmd/gx-torrent/ui_search.go`) | `internal/torznab` (estratto) |
-| Scheduler di banda, limiti alternativi | sì | fatto (`cmd/gx-torrent/schedule.go`, `/ui/settings`) | `internal/gxcore` |
-| Notifiche, hook a fine download | `notifier.go`, `hooks.go` | parziale (webhook `cmd/gx-torrent/notify.go`; mancano gli hook di fine download) | `internal/gxcore` (opzionale) |
-| Spostamento a fine download, cartella temporanea | `postprocess.go` | parziale (cartella temporanea impostata dal wizard; lo spostamento automatico a fine download resta manuale) | `internal/gxcore` |
+| Login, sessions, password | UI v2 (`authEnabledSetting`, argon2/bcrypt) | done (`standalone_auth.go`: bcrypt login, sessions, LAN bypass) | `internal/webui` + `internal/auth` |
+| Persistent settings from the UI | `uiweb_v2_settings*` | done (`settings.json`, page `/ui/settings`) | `settings.json` + `internal/settings` |
+| First-run wizard | `uiweb_v2_setup.go` (527 lines, 5 steps: Access, Folders, Sources, First title, Activate) | done (`cmd/gx-torrent/setup.go`, `internal/webui/assets/setup.html`) | `internal/webui/setup` |
+| Categories, tags, path per category | yes | done (`cmd/gx-torrent/ui_categories.go`) | `internal/gxcore` |
+| RSS with download rules | `rss.go` (2,588 lines) | done (`internal/rss`, `cmd/gx-torrent/feed.go`, `ui_feeds.go`) | `internal/rss` (extracted) |
+| Torznab/Prowlarr/Jackett/MIRCrew search | `websearch.go` (863), `torznab_caps.go` (243), `indexer_health.go` (121) | done (`internal/torznab`, `cmd/gx-torrent/ui_search.go`) | `internal/torznab` (extracted) |
+| Bandwidth scheduler, alternative limits | yes | done (`cmd/gx-torrent/schedule.go`, `/ui/settings`) | `internal/gxcore` |
+| Notifications, download-completion hooks | `notifier.go`, `hooks.go` | partial (webhook `cmd/gx-torrent/notify.go`; the completion hooks are missing) | `internal/gxcore` (optional) |
+| Move on completion, temporary folder | `postprocess.go` | partial (temporary folder set by the wizard; the automatic move on completion remains manual) | `internal/gxcore` |
 
-**Vincolo di codice, non di volontà**: ricerca e RSS stavano nel **pacchetto
-radice** `gextto` (240 file `.go`) e non erano importabili dal demone senza
-trascinarsi dietro tutto Gextto. Sono stati **estratti in `internal/rss` e
-`internal/torznab`**, così sono condivisi dai due prodotti.
+**A code constraint, not one of will**: search and RSS were in the **root
+package** `gextto` (240 `.go` files) and could not be imported by the daemon without
+dragging all of Gextto along. They have been **extracted into `internal/rss` and
+`internal/torznab`**, so they are shared by the two products.
 
-### 4.2 Lacune del motore
+### 4.2 Engine gaps
 
-- **IPv6**: **fatto** — listener a porta unica, uTP e DHT su socket dual-stack;
-  `peers6` dei tracker (BEP 7), PEX `added6`/`dropped6` (BEP 11), tracker UDP,
-  `yourip`, blocklist CIDR e scoperta DHT su IPv6 (BEP 32), **LSD anche sul
-  gruppo IPv6** `[ff15::efc0:988f]:6771` (`cmd/gx-torrent/lsd.go`, BEP 14).
-- **BitTorrent v2**: **fatto** — il motore legge v1, la parte v1 degli ibridi e i
-  solo-v2 da `.torrent` e da magnet. Alberi Merkle SHA-256, handshake con hash
-  troncato (bit riservato v2) e fetch dei `piece layers` (`hash request`/`hashes`).
-- **Qualità**: smart ban dei peer corrotti (**fatto**: ban di sessione con
-  scadenza, `Session.BanIP`), profondità adattiva della coda richieste (**fatto**,
-  con harness e isolamento a latenza: §6.4 di `evoluzione.md`), choking rate-based
-  (banco deterministico, §6), reader con readahead per lo streaming (**fatto**),
-  **priorità file graduate (fatto, §4.11)** e I/O disco (**mmap opt-in + durabilità
-  a batch fatti, §5.4; scritture contigue non necessarie senza misura**). Sono
-  "cherry-pick" (§11), non blocchi.
+- **IPv6**: **done** — single-port listener, uTP and DHT on dual-stack sockets;
+  tracker `peers6` (BEP 7), PEX `added6`/`dropped6` (BEP 11), UDP trackers,
+  `yourip`, CIDR blocklist and DHT discovery over IPv6 (BEP 32), **LSD also on the
+  IPv6 group** `[ff15::efc0:988f]:6771` (`cmd/gx-torrent/lsd.go`, BEP 14).
+- **BitTorrent v2**: **done** — the engine reads v1, the v1 part of hybrids and
+  v2-only from `.torrent` and from magnet. SHA-256 Merkle trees, handshake with
+  truncated hash (v2 reserved bit) and fetch of `piece layers` (`hash request`/`hashes`).
+- **Quality**: smart ban of corrupt peers (**done**: session ban with
+  expiry, `Session.BanIP`), adaptive depth of the request queue (**done**,
+  with harness and latency isolation: §6.4 of `evoluzione.md`), rate-based
+  choking (deterministic bench, §6), reader with readahead for streaming (**done**),
+  **graduated file priority (done, §4.11)** and disk I/O (**opt-in mmap + batched
+  durability done, §5.4; contiguous writes not necessary without measurements**). These are
+  "cherry-picks" (§11), not blockers.
 
-### 4.3 Debito tecnico (risolto)
+### 4.3 Technical debt (resolved)
 
-- Da `cmd/gx-torrent` sono stati estratti i pacchetti riusabili: la logica di
-  coda in `internal/queue`, il web layer e gli asset in `internal/webui`, RSS e
-  Torznab in `internal/rss` e `internal/torznab`.
-- Gli asset della UI vivono in `internal/webui/assets` dietro `embed.FS` e il
-  template di `ui.go` è compilato **pigramente** al primo uso (`sync.Once`), non
-  in stringhe Go all'avvio.
+- The reusable packages have been extracted from `cmd/gx-torrent`: the queue logic
+  in `internal/queue`, the web layer and the assets in `internal/webui`, RSS and
+  Torznab in `internal/rss` and `internal/torznab`.
+- The UI assets live in `internal/webui/assets` behind `embed.FS` and the
+  template of `ui.go` is compiled **lazily** at first use (`sync.Once`), not
+  in Go strings at startup.
 
 ---
 
-## 5. Le tre strade
+## 5. The three paths
 
-- **A. Evolvere gx-torrent**: stesso binario, `-mode=managed|standalone`, funzioni
-  standalone spente in managed.
-- **B. Nuovo gx-nox separato**: nuovo repository o nuovo `cmd/`, copia del motore,
-  evoluzione indipendente.
-- **C. Core condiviso, due binari**: `internal/gxcore` (il motore) + il core del
-  demone (`internal/daemon`, oggi ancora dentro `cmd/gx-torrent`) usati da
-  `cmd/gx-torrent` (snello, per Gextto) e `cmd/gx-nox` (completo).
+- **A. Evolve gx-torrent**: same binary, `-mode=managed|standalone`, standalone
+  functions switched off in managed.
+- **B. New separate gx-nox**: a new repository or a new `cmd/`, a copy of the engine,
+  independent evolution.
+- **C. Shared core, two binaries**: `internal/gxcore` (the engine) + the core of the
+  daemon (`internal/daemon`, today still inside `cmd/gx-torrent`) used by
+  `cmd/gx-torrent` (slim, for Gextto) and `cmd/gx-nox` (complete).
 
-| Criterio | A. Evolvere | B. Nuovo gx-nox | C. Core + due binari |
+| Criterion | A. Evolve | B. New gx-nox | C. Core + two binaries |
 | --- | --- | --- | --- |
-| Compatibilità Gextto (req. 1) | garantita dai test esistenti | da risincronizzare a mano | garantita: Gextto usa il binario snello |
-| Manutenzione del motore | un albero di codice | due alberi che divergono | un albero |
-| Propagazione di fix e migliorie | arrivano a entrambi | portate a mano | arrivano a entrambi |
-| Peso del binario per Gextto | cresce con UI, RSS, ricerca | invariato | invariato |
-| Superficie d'attacco in managed | più codice, ma spento | invariata | invariata |
-| Libertà di design dell'API e UI | vincolata da v1 | totale | totale sopra v1 |
-| Tempo al primo standalone usabile | il più breve | il più lungo | breve, dopo il refactor |
+| Gextto compatibility (req. 1) | guaranteed by the existing tests | to be resynchronised by hand | guaranteed: Gextto uses the slim binary |
+| Engine maintenance | one code tree | two trees that diverge | one tree |
+| Propagation of fixes and improvements | they reach both | ported by hand | they reach both |
+| Weight of the binary for Gextto | grows with UI, RSS, search | unchanged | unchanged |
+| Attack surface in managed | more code, but switched off | unchanged | unchanged |
+| Design freedom of the API and UI | bound by v1 | total | total above v1 |
+| Time to the first usable standalone | the shortest | the longest | short, after the refactor |
 
-**Il rischio vero di B è il requisito 5.** Se `gx-nox` e `gx-torrent` sono
-progetti distinti, ogni porting dal motore va fatto due volte, oppure `gx-torrent`
-resta indietro e Gextto si ritrova col motore peggiore dei due. Dopo un anno il
-secondo caso è quasi certo.
+**The real risk of B is requirement 5.** If `gx-nox` and `gx-torrent` are distinct
+projects, every porting from the engine must be done twice, or `gx-torrent`
+falls behind and Gextto ends up with the worse of the two engines. After a year the
+second case is almost certain.
 
-**Tra A e C**: C terrebbe fuori dal demone gestito il codice di RSS e ricerca. Lo
-stesso risultato si ottiene in A **se quel codice non parte finché non serve**
-(§8): un solo artefatto da compilare e distribuire, e nessun rischio che i due
-binari divergano. Il refactor della fase 0 crea comunque i pacchetti del core,
-quindi separare un secondo binario resta possibile il giorno in cui le misure lo
-giustificassero.
-
----
-
-## 6. Decisione (ADR)
-
-**Stato**: accettata (2026-10-10).
-
-**Contesto**: si vuole anche un client standalone, senza rompere l'uso come motore
-di Gextto.
-
-**Decisione**: **strada A**. Un solo binario `gx-torrent`, due modalità decise
-all'avvio:
-
-- `-mode=managed` (passato da `gxtorrent_runtime.go`): comportamento di oggi.
-- `-mode=standalone`: wizard, login, impostazioni persistenti, UI completa.
-- Senza flag: **managed se c'è `-fingerprint`**, altrimenti standalone.
-
-"gx-nox" resta il **nome pubblico** con cui lo standalone si presenta agli
-utenti/documentazione; non è un secondo binario né un secondo repository.
-
-**Conseguenze positive**: un solo albero di codice; fix e ottimizzazioni arrivano a
-entrambi; compatibilità Gextto garantita per costruzione; tempo al primo
-standalone usabile minimo.
-
-**Conseguenze negative / costi accettati**: il binario gestito contiene anche il
-codice standalone (mitigato dalle regole del §8); l'API e la UI standalone
-convivono con la v1 congelata (mitigato dall'additività).
-
-**Alternative scartate**: B perché raddoppia la manutenzione del motore proprio
-mentre lo si vuole unificare; C perché il beneficio (demone snello) si
-ottiene già con l'avvio pigro dei moduli, senza introdurre due binari.
-
-**Cosa farebbe riaprire la decisione**: se Gextto abbandonasse gx-torrent per
-qBittorrent o libtorrent, il vincolo di compatibilità sparisce e B torna sensato.
+**Between A and C**: C would keep the RSS and search code out of the managed
+daemon. The same result is achieved in A **if that code does not start until it is
+needed** (§8): a single artefact to compile and distribute, and no risk that the two
+binaries diverge. The refactor of phase 0 creates the core packages anyway,
+so separating a second binary remains possible the day the measurements
+justify it.
 
 ---
 
-## 7. Architettura target
+## 6. Decision (ADR)
 
-Il motore e la logica di coda diventano pacchetti interni; sopra sta un solo
-`main` che sceglie la modalità all'avvio. Il riquadro tratteggiato è il codice che
-in managed non viene mai avviato.
+**Status**: accepted (2026-10-10).
+
+**Context**: a standalone client is also wanted, without breaking the use as
+Gextto's engine.
+
+**Decision**: **path A**. A single `gx-torrent` binary, two modes decided
+at startup:
+
+- `-mode=managed` (passed by `gxtorrent_runtime.go`): today's behaviour.
+- `-mode=standalone`: wizard, login, persistent settings, complete UI.
+- Without a flag: **managed if `-fingerprint` is present**, otherwise standalone.
+
+"gx-nox" remains the **public name** under which the standalone presents itself to
+users/documentation; it is not a second binary nor a second repository.
+
+**Positive consequences**: a single code tree; fixes and optimisations reach
+both; Gextto compatibility guaranteed by construction; time to the first
+usable standalone minimal.
+
+**Negative consequences / accepted costs**: the managed binary also contains the
+standalone code (mitigated by the rules of §8); the standalone API and UI
+coexist with the frozen v1 (mitigated by additivity).
+
+**Rejected alternatives**: B because it doubles the engine maintenance precisely
+while we want to unify it; C because the benefit (slim daemon) is already
+obtained with the lazy startup of the modules, without introducing two binaries.
+
+**What would reopen the decision**: if Gextto abandoned gx-torrent for
+qBittorrent or libtorrent, the compatibility constraint would disappear and B would make sense again.
+
+---
+
+## 7. Target architecture
+
+The engine and the queue logic become internal packages; above them sits a single
+`main` that chooses the mode at startup. The dashed box is the code that
+in managed is never started.
 
 ```mermaid
 flowchart TB
-    G["Gextto<br/>avvia, sorveglia, comanda"]
-    B["Browser<br/>utente via LAN o login"]
-    A["Sonarr, Radarr, *arr<br/>client qBittorrent esistenti"]
-    X["gx-torrent: un solo binario<br/>-mode=managed se lo lancia Gextto<br/>-mode=standalone con wizard e UI completa"]
-    subgraph CORE["Core condiviso (internal/)"]
-        C1["daemon<br/>coda, stato, API v1<br/>seed policy, portcheck"]
-        C2["webui, auth, settings<br/>login, LAN, CSRF<br/>embed.FS, sei lingue"]
-        C3["moduli standalone<br/>RSS, indexer, categorie, API qBit<br/>avviati solo se configurati"]
+    G["Gextto<br/>starts, watches, commands"]
+    B["Browser<br/>user over LAN or login"]
+    A["Sonarr, Radarr, *arr<br/>existing qBittorrent clients"]
+    X["gx-torrent: a single binary<br/>-mode=managed if Gextto launches it<br/>-mode=standalone with wizard and complete UI"]
+    subgraph CORE["Shared core (internal/)"]
+        C1["daemon<br/>queue, state, v1 API<br/>seed policy, portcheck"]
+        C2["webui, auth, settings<br/>login, LAN, CSRF<br/>embed.FS, six languages"]
+        C3["standalone modules<br/>RSS, indexer, categories, qBit API<br/>started only if configured"]
     end
-    E["internal/gxcore: il motore (codice proprio)<br/>DHT, uTP, holepunch, IPv6, smart ban, BitTorrent v2"]
-    G -- "API v1, congelata" --> X
+    E["internal/gxcore: the engine (own code)<br/>DHT, uTP, holepunch, IPv6, smart ban, BitTorrent v2"]
+    G -- "v1 API, frozen" --> X
     B -- "web UI" --> X
-    A -- "API qBit v2" --> X
+    A -- "qBit v2 API" --> X
     X --> CORE
     CORE --> E
     style C3 stroke-width:2px,stroke-dasharray:4 3
 ```
 
-Gextto lancia il binario con `-mode=managed` e parla l'API v1; browser e client
-*arr parlano con lo stesso binario lanciato in `-mode=standalone`. Ogni miglioria
-del motore arriva a entrambi gli usi senza alcun porting.
+Gextto launches the binary with `-mode=managed` and speaks the v1 API; browsers and
+*arr clients speak to the same binary launched in `-mode=standalone`. Every improvement
+of the engine reaches both uses without any porting.
 
-### 7.1 Scelte di dettaglio
+### 7.1 Detailed choices
 
-- **API v1 congelata**: si aggiunge, non si cambia; le funzioni standalone vivono
-  sotto `/api/v2` o `/ui`. Test di contratto sull'API v1 usata da
+- **Frozen v1 API**: it is added to, not changed; the standalone functions live
+  under `/api/v2` or `/ui`. Contract tests on the v1 API used by
   `gxtorrent_engine.go`.
-- **Modalità**: decisa all'avvio, **mai cambiata a caldo**.
-- **Impostazioni**: un file `settings.json` nella cartella dati, scritto dalla UI
-  con scrittura atomica. In managed i flag passati da Gextto **vincono sempre** sul
-  file, così il `fingerprint` resta stabile e Gextto non riavvia il demone a ogni
-  salvataggio.
-- **UI**: HTML, CSS e JS in `internal/webui/assets` con `embed.FS`, aggiornamenti
-  via SSE o polling come oggi (`/ui/live`). Niente framework con build Node: il
-  binario resta compilabile con il solo `go build`, coerente con l'UI di Gextto
+- **Mode**: decided at startup, **never changed while running**.
+- **Settings**: a `settings.json` file in the data folder, written by the UI
+  with atomic writes. In managed, the flags passed by Gextto **always win** over the
+  file, so the `fingerprint` stays stable and Gextto does not restart the daemon on every
+  save.
+- **UI**: HTML, CSS and JS in `internal/webui/assets` with `embed.FS`, updates
+  via SSE or polling as today (`/ui/live`). No framework with a Node build: the
+  binary stays compilable with just `go build`, consistent with Gextto's UI
   (SSR + HTMX).
-- **API compatibile qBittorrent** (`/api/v2/auth`, `/api/v2/torrents/*`,
-  `/api/v2/app/*`): è la funzione che porta utenti, perché Sonarr, Radarr,
-  Prowlarr e le app mobili la parlano già. Gextto ha un client qBittorrent
-  completo in `qbittorrent_engine.go`: si può usare come **banco di prova
-  automatico** di questa API.
-- **Indexer e RSS**: estratti dal pacchetto radice in `internal/torznab` e
-  `internal/rss`, condivisi dai due prodotti.
-- **Distribuzione**: binario statico per amd64 e arm64, unit systemd, immagine
-  container. Il pacchetto di Gextto continua a includere solo `gx-torrent`.
+- **qBittorrent-compatible API** (`/api/v2/auth`, `/api/v2/torrents/*`,
+  `/api/v2/app/*`): it is the feature that brings users, because Sonarr, Radarr,
+  Prowlarr and mobile apps already speak it. Gextto has a complete qBittorrent
+  client in `qbittorrent_engine.go`: it can be used as an **automatic test
+  bench** of this API.
+- **Indexers and RSS**: extracted from the root package into `internal/torznab` and
+  `internal/rss`, shared by the two products.
+- **Distribution**: static binary for amd64 and arm64, systemd unit, container
+  image. The Gextto package continues to include only `gx-torrent`.
 
 ---
 
-## 8. Costo zero quando lo standalone non è usato
+## 8. Zero cost when standalone is not used
 
-**In un binario Go il codice non usato pesa solo su disco; pesa in CPU e RAM solo
-ciò che viene avviato.** Linux carica le pagine dell'eseguibile solo quando
-vengono eseguite: RSS, indexer e wizard compilati ma mai chiamati non entrano in
-memoria. Il rischio vero sono le cose che **partono da sole all'avvio**.
+**In a Go binary, unused code weighs only on disk; only what is started weighs on
+CPU and RAM.** Linux loads the pages of the executable only when they are
+executed: RSS, indexer and wizard compiled but never called do not enter
+memory. The real risk is the things that **start by themselves at startup**.
 
-### 8.1 Regole per ogni modulo standalone
+### 8.1 Rules for every standalone module
 
-1. **Niente lavoro in `init()` né in variabili di pacchetto.** Template, cataloghi,
-   regex e client HTTP si costruiscono al primo uso con `sync.Once`. **Fatto**:
-   `uiTemplate` in `ui.go` è compilato pigramente (`sync.Once`) e gli asset
-   stanno in `internal/webui/assets` (`embed.FS`).
-2. **Nessuna goroutine o ticker se il modulo è spento.** Il poller RSS, il
-   controllo degli indexer e lo scheduler partono solo se in `settings.json` c'è
-   almeno un feed, un indexer o una regola. In managed non partono mai.
-3. **Nessun database o file aperto in anticipo.** Lo storico RSS e la cache delle
-   ricerche si aprono al primo feed configurato.
-4. **Le rotte HTTP si registrano sempre**, ma rispondono 404 o rimandano al wizard
-   se il modulo è spento: registrare una rotta costa pochi byte.
-5. **Asset della UI con `embed.FS`**: restano nel binario su disco e si leggono
-   solo quando un browser li chiede.
+1. **No work in `init()` nor in package variables.** Templates, catalogues,
+   regexes and HTTP clients are built at first use with `sync.Once`. **Done**:
+   `uiTemplate` in `ui.go` is compiled lazily (`sync.Once`) and the assets
+   are in `internal/webui/assets` (`embed.FS`).
+2. **No goroutine or ticker if the module is switched off.** The RSS poller, the
+   indexer check and the scheduler start only if in `settings.json` there is
+   at least one feed, indexer or rule. In managed they never start.
+3. **No database or file opened in advance.** The RSS history and the search
+   cache are opened at the first configured feed.
+4. **HTTP routes are always registered**, but they respond 404 or redirect to the wizard
+   if the module is switched off: registering a route costs a few bytes.
+5. **UI assets with `embed.FS`**: they stay in the binary on disk and are read
+   only when a browser requests them.
 
-### 8.2 Test di guardia
+### 8.2 Guard tests
 
-Nel cancello della fase 0 e di ogni fase dopo: un test avvia il demone in modalità
-**managed** e confronta con la base quattro grandezze — RSS a riposo (tolleranza
-5%), numero di goroutine e thread, tempo di avvio, CPU in 60 secondi di
-inattività. Se una delle quattro peggiora, la build fallisce.
+In the gate of phase 0 and of every phase after: a test starts the daemon in
+**managed** mode and compares against the baseline four quantities — idle RSS (tolerance
+5%), number of goroutines and threads, startup time, CPU over 60 seconds of
+inactivity. If any of the four worsens, the build fails.
 
-In pratica, due livelli:
+In practice, two levels:
 
-- **sempre attivo** (`footprint_test.go`): goroutine e tempo di avvio limitati e
-  nessuna crescita a riposo: cattura i moduli standalone che partono da soli;
-- **opt-in** (`GX_FOOTPRINT=1`, `footprint_optin_test.go`): avvia il binario
-  costruito, misura RSS a riposo, thread, tempo di avvio e CPU, e li confronta
-  con la baseline `cmd/gx-torrent/testdata/footprint.json` (tolleranza 25%;
-  `GX_UPDATE_FOOTPRINT=1` la aggiorna). Con `GX_QBT=/path/qbittorrent-nox` misura
-  anche qBittorrent per il confronto. Non gira nella suite normale: è lento e
-  dipende dall'hardware.
-
----
-
-## 9. Modello di sicurezza
-
-Oggi il demone ha un solo meccanismo: un **token condiviso** (`X-Gx-Token`). Per
-lo standalone servono autenticazione vera e sessioni.
-
-### 9.1 Accesso
-
-- Utente e password con hash **argon2id** (o bcrypt), sessioni con cookie `Secure`
-  e `HttpOnly`, scadenza e revoca.
-- Il login vale per la UI standalone; l'API v1 in managed resta col token, che
-  **non** si mescola col login.
-
-### 9.2 LAN senza password: default sì, ma con tre protezioni
-
-Richiesto dal requisito 4 (default sì). Senza protezioni, qualunque sito aperto
-da un PC della LAN può aggiungere o cancellare torrent. Quindi:
-
-- **CSRF**: rifiutare le POST senza `Origin`/`Referer` uguale all'host della UI,
-  oppure con token di form.
-- **DNS rebinding**: accettare solo richieste con `Host` uguale a un IP locale o a
-  nomi configurati.
-- **Definizione di LAN**: indirizzo sorgente RFC 1918, link-local, loopback e ULA
-  IPv6, letti **dal socket**. `X-Forwarded-For` si accetta **solo da proxy
-  dichiarati**, altrimenti un reverse proxy rende "LAN" tutto Internet.
-
-In managed queste protezioni e il wizard non si attivano (nessun login richiesto
-dal demone: comanda Gextto).
+- **always active** (`footprint_test.go`): goroutines and startup time bounded and
+  no growth when idle: it catches the standalone modules that start by themselves;
+- **opt-in** (`GX_FOOTPRINT=1`, `footprint_optin_test.go`): it starts the built
+  binary, measures idle RSS, threads, startup time and CPU, and compares them
+  with the baseline `cmd/gx-torrent/testdata/footprint.json` (tolerance 25%;
+  `GX_UPDATE_FOOTPRINT=1` updates it). With `GX_QBT=/path/qbittorrent-nox` it also
+  measures qBittorrent for comparison. It does not run in the normal suite: it is slow and
+  depends on the hardware.
 
 ---
 
-## 10. Requisito "migliore di qBittorrent"
+## 9. Security model
 
-"Migliore di qbittorrent-nox" va **dimostrato con misure**, non dichiarato.
-Metriche proposte, sempre confrontate con qbittorrent-nox (libtorrent 2.0) sulla
-stessa macchina:
+Today the daemon has a single mechanism: a **shared token** (`X-Gx-Token`). For
+the standalone, real authentication and sessions are needed.
 
-| Metrica | Scenario | Obiettivo |
+### 9.1 Access
+
+- Username and password with **argon2id** hash (or bcrypt), sessions with `Secure`
+  and `HttpOnly` cookies, expiry and revocation.
+- The login applies to the standalone UI; the v1 API in managed stays with the token, which
+  **does not** mix with the login.
+
+### 9.2 LAN without password: default yes, but with three protections
+
+Required by requirement 4 (default yes). Without protections, any site opened
+from a PC on the LAN can add or delete torrents. Therefore:
+
+- **CSRF**: reject POSTs without `Origin`/`Referer` equal to the host of the UI,
+  or with a form token.
+- **DNS rebinding**: accept only requests with a `Host` equal to a local IP or to
+  configured names.
+- **Definition of LAN**: source address RFC 1918, link-local, loopback and IPv6
+  ULA, read **from the socket**. `X-Forwarded-For` is accepted **only from declared
+  proxies**, otherwise a reverse proxy makes the whole Internet "LAN".
+
+In managed these protections and the wizard do not activate (no login required
+by the daemon: Gextto is in charge).
+
+---
+
+## 10. "Better than qBittorrent" requirement
+
+"Better than qbittorrent-nox" must be **demonstrated with measurements**, not declared.
+Proposed metrics, always compared against qbittorrent-nox (libtorrent 2.0) on the
+same machine:
+
+| Metric | Scenario | Goal |
 | --- | --- | --- |
-| RSS a riposo | 0 torrent attivi, 500 in seed | ≤ qbittorrent-nox |
-| CPU per Gbit/s | download su LAN da seed locale | ≤ 1,2× qbittorrent-nox |
-| Tempo di avvio | 2.000 torrent con fast resume | ≤ qbittorrent-nox |
-| Velocità su sciame reale | 10 torrent pubblici, mediana su 5 run | ≥ 0,95× qbittorrent-nox |
+| Idle RSS | 0 active torrents, 500 seeding | ≤ qbittorrent-nox |
+| CPU per Gbit/s | download over LAN from a local seed | ≤ 1.2× qbittorrent-nox |
+| Startup time | 2,000 torrents with fast resume | ≤ qbittorrent-nox |
+| Speed on a real swarm | 10 public torrents, median over 5 runs | ≥ 0.95× qbittorrent-nox |
 
-**Dove si può vincere**: memoria a riposo, semplicità di installazione (un binario
-statico, niente Qt né Boost), avvio a freddo, distribuzione (container, arm64).
-**Dove è difficile**: il throughput puro e il choking fine, dove libtorrent ha
-anni di vantaggio e il Go paga GC e goroutine per peer. L'onestà qui è parte del
-requisito: si pubblicano le misure a ogni release, vincenti o no.
+**Where we can win**: idle memory, ease of installation (a static
+binary, no Qt nor Boost), cold start, distribution (container, arm64).
+**Where it is hard**: pure throughput and fine choking, where libtorrent has
+years of advantage and Go pays for GC and a goroutine per peer. Honesty here is part of the
+requirement: the measurements are published at every release, winning or not.
 
 ---
 
-## 11. Cherry-pick dal motore e licenze
+## 11. Cherry-picking from the engine and licences
 
-Il motore è già una base solida e sorvegliata. Le due lacune che pesavano
-di più per uno standalone, IPv6 e BitTorrent v2, sono **chiuse** (vedi §12);
-tutto il resto è qualità che si porta **un algoritmo alla volta**, misurando prima e dopo. Valutazioni di memoria,
-da verificare sul codice delle librerie prima di ogni porting.
+The engine is already a solid and well-watched base. The two gaps that weighed
+most for a standalone, IPv6 and BitTorrent v2, are **closed** (see §12);
+everything else is quality that is brought in **one algorithm at a time**, measuring before and after. Memory considerations,
+to be verified against the libraries' code before each porting.
 
-| Area | gx-torrent (motore gx-core) | anacrolix/torrent | libtorrent 2.0 | qbittorrent-nox |
+| Area | gx-torrent (gx-core engine) | anacrolix/torrent | libtorrent 2.0 | qbittorrent-nox |
 | --- | --- | --- | --- | --- |
-| Linguaggio, licenza | Go, EUPL-1.2 | Go, MPL-2.0 | C++, BSD-3 | C++/Qt, GPL-2+ |
-| IPv6 | sì (dual-stack, DHT BEP 32, LSD v6 incluso) | sì | sì | sì |
-| BitTorrent v2 / ibridi | sì (v2-only da `.torrent` e magnet, ibridi) | sì | sì | sì |
-| uTP | sì (`anacrolix/utp`) | sì | sì, LEDBAT proprio | sì |
-| Holepunch BEP 55 | sì | sì | sì | sì |
-| Streaming | finestra graduata + HTTP Range, seek e readahead | Reader con seek e readahead | deadline per pezzo | sì |
+| Language, licence | Go, EUPL-1.2 | Go, MPL-2.0 | C++, BSD-3 | C++/Qt, GPL-2+ |
+| IPv6 | yes (dual-stack, DHT BEP 32, LSD v6 included) | yes | yes | yes |
+| BitTorrent v2 / hybrids | yes (v2-only from `.torrent` and magnet, hybrids) | yes | yes | yes |
+| uTP | yes (`anacrolix/utp`) | yes | yes, its own LEDBAT | yes |
+| Holepunch BEP 55 | yes | yes | yes | yes |
+| Streaming | graduated window + HTTP Range, seek and readahead | Reader with seek and readahead | per-piece deadline | yes |
 | Storage | file, mmap (opt-in) | file, mmap, bolt, sqlite, pluggable | file, mmap (2.0) | libtorrent |
-| WebTorrent | no | sì | no | no |
-| Choking seed | default del motore, misurato corretto | semplice | più algoritmi (rate-based, anti-leech) | libtorrent |
-| Smart ban (pezzi corrotti) | sì (ban di sessione con scadenza) | sì | sì | sì |
-| API compatibile qBittorrent | sì (standalone, `/api/v2`) | no | — | è il riferimento |
+| WebTorrent | no | yes | no | no |
+| Seed choking | engine defaults, measured correct | simple | more algorithms (rate-based, anti-leech) | libtorrent |
+| Smart ban (corrupt pieces) | yes (session ban with expiry) | yes | yes | yes |
+| qBittorrent-compatible API | yes (standalone, `/api/v2`) | no | — | it is the reference |
 
-### 11.1 Cosa prendere, in ordine di valore
+### 11.1 What to take, in order of value
 
-| # | Funzione | Fonte | Perché | Costo |
+| # | Feature | Source | Why | Cost |
 | --- | --- | --- | --- | --- |
-| 1 | IPv6 (listener, DHT BEP 32, tracker, PEX) | anacrolix, libtorrent | senza IPv6 non c'è parità con qBittorrent; molti peer domestici sono raggiungibili solo in v6 | alto |
-| 2 | Smart ban — **estensione** (ban globale e temporizzato) | libtorrent, anacrolix | il motore **già bannava** il peer che invia un pezzo corrotto nel singolo torrent (`bannedPeerIPs`); ora il ban è **di sessione, con scadenza** (`Session.BanIP`, 30 min) e vale per tutti i torrent e i punti di connessione | fatto |
-| 3 | Profondità della coda richieste adattiva | libtorrent, anacrolix | la velocità su peer lontani dipende da quante richieste sono in volo; ora la profondità cresce di uno per blocco consegnato (`RequestQueue`) | fatto |
-| 4 | Reader con readahead per lo streaming | anacrolix | il prefetch ha priorità sul rarest-first (`SetFileReadaheadWindow`), al posto dell'attesa a polling (200 ms, timeout 2 min) | fatto |
-| 5 | BitTorrent v2 e ibridi | anacrolix | torrent v2-only già in circolazione; serve merkle per file | alto |
-| 6 | Choking rate-based e anti-leech | libtorrent | qualità del seeding; da validare con l'harness `unchoker/sim_test.go` | medio |
-| 7 | Disk I/O: scrittura in blocchi contigui, hash su pool | libtorrent | CPU e usura disco su NAS lenti | **mmap + `fdatasync` fatti (§5.4 di `evoluzione.md`); contiguo/hash su pool non necessari senza misura** |
-| 8 | Share mode | libtorrent | già scartato per Gextto (§4.3, decisione 2); per lo standalone vale come opzione | basso |
-| 9 | WebTorrent | anacrolix | nicchia | alto |
+| 1 | IPv6 (listener, DHT BEP 32, trackers, PEX) | anacrolix, libtorrent | without IPv6 there is no parity with qBittorrent; many home peers are reachable only over v6 | high |
+| 2 | Smart ban — **extension** (global and timed ban) | libtorrent, anacrolix | the engine **already banned** the peer that sends a corrupt piece in the single torrent (`bannedPeerIPs`); now the ban is **per session, with expiry** (`Session.BanIP`, 30 min) and applies to all torrents and connection points | done |
+| 3 | Adaptive request queue depth | libtorrent, anacrolix | speed on distant peers depends on how many requests are in flight; now the depth grows by one per delivered block (`RequestQueue`) | done |
+| 4 | Reader with readahead for streaming | anacrolix | the prefetch has priority over rarest-first (`SetFileReadaheadWindow`), instead of waiting by polling (200 ms, 2 min timeout) | done |
+| 5 | BitTorrent v2 and hybrids | anacrolix | v2-only torrents already in circulation; merkle per file is needed | high |
+| 6 | Rate-based choking and anti-leech | libtorrent | seeding quality; to be validated with the `unchoker/sim_test.go` harness | medium |
+| 7 | Disk I/O: writing in contiguous blocks, hashing on a pool | libtorrent | CPU and disk wear on slow NAS | **mmap + `fdatasync` done (§5.4 of `evoluzione.md`); contiguous/pool hashing not necessary without measurements** |
+| 8 | Share mode | libtorrent | already discarded for Gextto (§4.3, decision 2); for the standalone it counts as an option | low |
+| 9 | WebTorrent | anacrolix | niche | high |
 
-**Shortlist concordata (2026-10-10) per il prelievo da anacrolix:** reader con
-seek e readahead + **priorità di pezzo graduata**, **coda richieste adattiva**,
-`anacrolix/dht` come dipendenza (BEP 42/43/44), **tracker scrape**. Dettaglio,
-vie di prelievo (riscrittura vs dipendenza) e verifiche in
-[`evoluzione.md` §4.7](evoluzione.md). Le voci 3 e 4 della tabella qui sopra sono
-incluse; lo **scrape** è già implementato. Altri quattro punti (bus di eventi,
-creazione `.torrent` da cartella, bad-storage, BEP 14) in
+**Agreed shortlist (2026-10-10) for taking from anacrolix:** reader with
+seek and readahead + **graduated piece priority**, **adaptive request queue**,
+`anacrolix/dht` as a dependency (BEP 42/43/44), **tracker scrape**. Detail,
+ways of taking (rewrite vs dependency) and verifications in
+[`evoluzione.md` §4.7](evoluzione.md). Items 3 and 4 of the table above are
+included; **scrape** is already implemented. Four other points (event bus,
+`.torrent` creation from a folder, bad storage, BEP 14) in
 [`evoluzione.md` §4.8](evoluzione.md).
 
-### 11.2 Licenze
+### 11.2 Licences
 
-Gextto è **EUPL-1.2**. Da **libtorrent** (BSD-3) si può portare codice con
-l'attribuzione. Da **anacrolix** (MPL-2.0) il codice copiato resta MPL file per
-file: meglio **riscrivere l'algoritmo** che copiare i file. Da **qBittorrent**
-(GPL) non si copia nulla; reimplementare il suo protocollo Web API è lecito.
-`anacrolix/utp` è MPL-2.0 (dipendenza non modificata).
+Gextto is **EUPL-1.2**. From **libtorrent** (BSD-3) code can be ported with
+attribution. From **anacrolix** (MPL-2.0) copied code stays MPL file by
+file: it is better to **rewrite the algorithm** than to copy the files. From **qBittorrent**
+(GPL) nothing is copied; reimplementing its Web API protocol is lawful.
+`anacrolix/utp` is MPL-2.0 (unmodified dependency).
 
-### 11.3 Motore come codice proprio
+### 11.3 Engine as own code
 
-Il requisito 5 significa trattare il motore come codice proprio. **Fatto
-(2026-10-10):** il modulo è `github.com/buzzqw/gextto/internal/gxcore`, la
-cartella è sotto `internal/`, l'identità di rete è "gx-core" e `GEXTTO.md` è
-l'inventario delle funzionalità del motore.
+Requirement 5 means treating the engine as own code. **Done
+(2026-10-10):** the module is `github.com/buzzqw/gextto/internal/gxcore`, the
+folder is under `internal/`, the network identity is "gx-core" and `GEXTTO.md` is
+the inventory of the engine's features.
 
 ---
 
-## 12. Roadmap e cancelli
+## 12. Roadmap and gates
 
-La fase 0 non aggiunge funzioni ma è quella che rende possibile tutto il resto
-senza toccare Gextto. Le fasi del motore (F4) possono partire da F1 in parallelo,
-perché vivono sotto lo stesso core e migliorano anche Gextto. Nessuna stima di
-durata: la complessità è indicata come S/M/L e dipende dal tempo che ci si dedica.
+Phase 0 adds no features but is the one that makes everything else possible
+without touching Gextto. The engine phases (F4) can start from F1 in parallel,
+because they live under the same core and also improve Gextto. No duration estimates:
+complexity is indicated as S/M/L and depends on the time one dedicates to it.
 
-| Fase | Contenuto | Cancello (si chiude quando) | Complessità |
+| Phase | Content | Gate (closes when) | Complexity |
 | --- | --- | --- | --- |
-| **F0 · Refactor e contratto** | core in `internal/`, test di contratto API v1, template `ui.go` pigro e asset `embed.FS` | Gextto invariato, `make test` verde, test di guardia §8.2 verde | M |
-| **F1 · Standalone minimo** | `settings.json`, login e LAN sicura, wizard, test porta, unit systemd | installazione pulita senza Gextto, primo download dal wizard | M |
-| **F2 · Parità con la WebUI di qBittorrent** | categorie e tag, cartella temporanea, RSS, ricerca indexer, scheduler, virtualizzazione tabella | checklist funzioni qBittorrent completa | L |
-| **F3 · Ecosistema** | API compatibile qBit v2, pacchetto standalone, immagine container | Sonarr aggiunge e importa un episodio senza patch | M |
-| **F4 · Motore proprio** (in parallelo da F1) | IPv6, smart ban, coda richieste adattiva, readahead, BitTorrent v2, eventuale spostamento `internal/gxcore` | misure contro qbittorrent-nox §10 | L |
+| **F0 · Refactor and contract** | core in `internal/`, v1 API contract tests, lazy `ui.go` template and `embed.FS` assets | Gextto unchanged, `make test` green, §8.2 guard test green | M |
+| **F1 · Minimal standalone** | `settings.json`, login and secure LAN, wizard, port test, systemd unit | clean installation without Gextto, first download from the wizard | M |
+| **F2 · Parity with qBittorrent's WebUI** | categories and tags, temporary folder, RSS, indexer search, scheduler, table virtualisation | complete qBittorrent feature checklist | L |
+| **F3 · Ecosystem** | qBit v2 compatible API, standalone package, container image | Sonarr adds and imports an episode without patches | M |
+| **F4 · Own engine** (in parallel from F1) | IPv6, smart ban, adaptive request queue, readahead, BitTorrent v2, possible move of `internal/gxcore` | measurements against qbittorrent-nox §10 | L |
 
-Ogni fase si chiude **solo** quando il suo cancello è verificato. Il cancello di F0
-vale anche per tutte le fasi successive: **ogni commit deve lasciare Gextto
-invariato**.
+Every phase closes **only** when its gate is verified. The F0 gate
+also applies to all subsequent phases: **every commit must leave Gextto
+unchanged**.
 
-### 12.1 Stato di attuazione
+### 12.1 Implementation status
 
-Aggiornato al 2026-10-11.
+Updated to 2026-10-11.
 
-**Prossimi item concordati** (in ordine di lavoro), poi si riparla dei punti
-rimanenti:
+**Agreed next items** (in order of work), then we will talk again about the remaining
+points:
 
-| Voce | Piano | Stato |
+| Item | Plan | Status |
 | --- | --- | --- |
-| Nome e identità: prodotto **gx-core**, motore in `internal/gxcore`, identità di rete "gx-core", **marcatori di origine rimossi** dai commenti del codice, doc riallineate | §15, §11.3 | fatto (binario `gx-torrent` invariato) |
-| F4 — IPv6: socket dual-stack (TCP peer + UDP uTP/DHT), risoluzione e indirizzi v6, peer compatti **`peers6`** dei tracker (BEP 7), **PEX `added6`/`dropped6`** (BEP 11), tracker **UDP** v6, `yourip` v6, **blocklist** CIDR v6, **scoperta DHT v6** (BEP 32: dual-stack della libreria, `want`, split `nodes`/`nodes6`) | §14, §4.2 | fatto (LSD v6 inclusa) |
-| F4 — BitTorrent v2 (BEP 52) | §11, §4.2 | **Fatto**: v2-only da `.torrent` e da **magnet** (`urn:btmh:`). Parsing v2, modello a **pezzi per-file** (coda più corta), verifica via **nodo Merkle** SHA-256, identità troncata a 20 byte, bit riservato v2 nell'handshake, fetch dei `piece layers` dai peer con `hash request`/`hashes`/`hash reject`, test seed/leech end-to-end (`.torrent` e magnet) |
-| F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | fatto (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
-| F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | fatto |
-| F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
-| F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | fatto (base nel motore + estensione: ban di sessione con scadenza) |
-| F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`, notifiche webhook su match/errore) | §12.2 | fatto |
-| F2 — RSS/UI guidati: editor di feed (solo nome e URL sorgente, senza parametri serie/filtri che risiedono in *Cercati* e regole) e indexer con preset (`ui_rss_edit.go`, `uiIndexerPresets`), regole ordinate con su/giù/disabilita, `episode_filter` in stile qBittorrent (`internal/rss/episode_filter.go`), cooldown `ignore_days` (`internal/rss/rules.go`), smart-episode REPACK/PROPER (`cmd/gx-torrent/feed.go`), **lista Cercati** con tendina qualità, registro episodi e gap search (`cmd/gx-torrent/wanted.go`; suggerimenti `GET /ui/rss-suggest`/`GET /ui/wanted-search`), pulsante **Check feeds**, pagina `/ui/settings` (cartelle, rete e porte, protocolli, coda e cache, banda, scheduler, lingua, notifiche), selettore cartella `/ui/browse-dir` nel wizard | §12.2 | fatto |
-| CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
+| Name and identity: product **gx-core**, engine in `internal/gxcore`, network identity "gx-core", **origin markers removed** from code comments, docs realigned | §15, §11.3 | done (`gx-torrent` binary unchanged) |
+| F4 — IPv6: dual-stack sockets (TCP peer + UDP uTP/DHT), v6 resolution and addresses, tracker compact **`peers6`** (BEP 7), **PEX `added6`/`dropped6`** (BEP 11), v6 **UDP** trackers, `yourip` v6, v6 CIDR **blocklist**, **v6 DHT discovery** (BEP 32: library dual-stack, `want`, split `nodes`/`nodes6`) | §14, §4.2 | done (LSD v6 included) |
+| F4 — BitTorrent v2 (BEP 52) | §11, §4.2 | **Done**: v2-only from `.torrent` and from **magnet** (`urn:btmh:`). v2 parsing, **per-file pieces** model (shorter queue), verification via SHA-256 **Merkle node**, identity truncated to 20 bytes, v2 reserved bit in the handshake, fetch of `piece layers` from peers with `hash request`/`hashes`/`hash reject`, end-to-end seed/leech tests (`.torrent` and magnet) |
+| F0 — opt-in RSS/CPU harness against qbittorrent-nox | §8.2 | done (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
+| F2 — bandwidth scheduler (alternative limits by schedule) | §14.3 | done |
+| F2 — torrent table virtualisation | §14.3 | done (rendering window `?rows=` + *Show more*) |
+| F4 — smart ban (bans the peer that sends blocks of a failed piece) | §14.4 | done (base in the engine + extension: session ban with expiry) |
+| F2 — complete RSS manager (ordered PASS/FAIL rules, numeric filters, smart-episode, actions, page `/ui/rss`, webhook notifications on match/error) | §12.2 | done |
+| F2 — guided RSS/UI: feed editor (only name and source URL, without series/filter parameters that live in *Wanted* and rules) and indexers with presets (`ui_rss_edit.go`, `uiIndexerPresets`), ordered rules with up/down/disable, `episode_filter` in qBittorrent style (`internal/rss/episode_filter.go`), `ignore_days` cooldown (`internal/rss/rules.go`), smart-episode REPACK/PROPER (`cmd/gx-torrent/feed.go`), **Wanted list** with quality dropdown, episode log and gap search (`cmd/gx-torrent/wanted.go`; suggestions `GET /ui/rss-suggest`/`GET /ui/wanted-search`), **Check feeds** button, page `/ui/settings` (folders, network and ports, protocols, queue and cache, bandwidth, scheduler, language, notifications), folder selector `/ui/browse-dir` in the wizard | §12.2 | done |
+| CI — publish the standalone gx-torrent (artefact/release usable as qbittorrent-nox) | §12.3 | done |
 
-**Punto finale:** al termine, **controllo approfondito di tutto il codice
-lavorato** in questa sessione (IPv6/DHT BEP 32, BitTorrent v2, API qBittorrent e
-RSS, container) prima di considerarlo chiuso.
+**Final point:** at the end, **in-depth review of all the code worked on**
+in this session (IPv6/DHT BEP 32, BitTorrent v2, qBittorrent API and
+RSS, container) before considering it closed.
 
-**Punti aperti:** nessuno tra i precedenti; sono chiusi i ritocchi al wizard
-(indexer/cartella temporanea) — il wizard usa il selettore di cartella
-`/ui/browse-dir` e i preset indexer (`uiIndexerPresets` in `setup.go`). Il
-**BitTorrent v2** (BEP 52) è completo, magnet compresi. Nel codice non resta alcun
-marcatore di origine; l'inventario delle funzionalità del motore è in
+**Open points:** none among the previous ones; the touches to the wizard are closed
+(indexer/temporary folder) — the wizard uses the folder selector
+`/ui/browse-dir` and the indexer presets (`uiIndexerPresets` in `setup.go`). The
+**BitTorrent v2** (BEP 52) is complete, magnets included. In the code no origin
+marker remains; the inventory of the engine's features is in
 `internal/gxcore/GEXTTO.md`.
 
-**Verifiche ricorrenti:** a ogni ciclo di modifiche, la **TUI di Gextto** deve
-continuare a funzionare — `go test ./internal/tui/` e il test d'integrazione
-`go test . -run TestTUILibraryClientAgainstTheRouter`, più smoke `gexttod tui`
-contro il daemon; il percorso managed resta invariato.
+**Recurring checks:** at every cycle of changes, **Gextto's TUI** must
+continue to work — `go test ./internal/tui/` and the integration test
+`go test . -run TestTUILibraryClientAgainstTheRouter`, plus the `gexttod tui` smoke test
+against the daemon; the managed path stays unchanged.
 
-Storico (fatto):
+History (done):
 
-| Voce F0 | Stato |
+| F0 item | Status |
 | --- | --- |
-| Logica di coda estratta in `internal/queue` (con i suoi test) | fatto |
-| Test di contratto API v1 (`cmd/gx-torrent/contract_test.go`) | fatto |
-| `ui.go`: template pigro (`sync.Once`) e asset in `internal/webui/assets` (`embed.FS`) | fatto |
-| Test di guardia §8.2 (goroutine, tempo di avvio, assenza di lavoro idle) | fatto |
-| F1: `-mode` managed/standalone (autodetect da `-fingerprint`) e store `settings.json` (base) | fatto |
-| F1: protezione CSRF/same-origin della pagina in standalone | fatto |
-| F1: DNS rebinding (`Host` IP/localhost) e classificazione sorgente LAN | fatto |
-| F1: login con password (bcrypt), sessioni, bypass LAN senza password | fatto |
-| F1: ascolto LAN senza token permesso in standalone (managed invariato) | fatto |
-| F1: wizard di primo avvio (lingua, cartella, password, LAN, porta) | fatto |
-| F3: API compatibile qBittorrent (auth, app, transfer, torrents info/add/delete/pause/resume/recheck/properties/files/trackers/reannounce/setLocation + categorie/tag) | fatto |
-| F3: compatibilità verificata col client qBittorrent di Gextto (`internal/qbittorrent`) | fatto |
-| F3: app/preferences e altri endpoint qBittorrent | fatto |
-| F2: categorie/tag nella pagina (filtro laterale + editor nel dettaglio) | fatto |
-| F2: ricerca su indexer — client Torznab (`internal/torznab`) ed endpoint `/ui/search` | fatto |
-| F2: ricerca su indexer — casella e risultati nella pagina | fatto |
-| F2: RSS con regole (feed, include/escludi, categoria/cartella, dedup persistito) + riquadro nella pagina | fatto |
-| F2: Jackett/Prowlarr/MIRCrew via Torznab (ricerca e feed) | fatto |
-| F1: wizard — indexer opzionali (Jackett/Prowlarr/MIRCrew) e cartella temporanea | fatto |
+| Queue logic extracted into `internal/queue` (with its tests) | done |
+| v1 API contract tests (`cmd/gx-torrent/contract_test.go`) | done |
+| `ui.go`: lazy template (`sync.Once`) and assets in `internal/webui/assets` (`embed.FS`) | done |
+| §8.2 guard test (goroutines, startup time, absence of idle work) | done |
+| F1: `-mode` managed/standalone (autodetect from `-fingerprint`) and `settings.json` store (base) | done |
+| F1: CSRF/same-origin protection of the page in standalone | done |
+| F1: DNS rebinding (`Host` IP/localhost) and LAN source classification | done |
+| F1: login with password (bcrypt), sessions, LAN bypass without password | done |
+| F1: LAN listening without token allowed in standalone (managed unchanged) | done |
+| F1: first-run wizard (language, folder, password, LAN, port) | done |
+| F3: qBittorrent-compatible API (auth, app, transfer, torrents info/add/delete/pause/resume/recheck/properties/files/trackers/reannounce/setLocation + categories/tags) | done |
+| F3: compatibility verified with Gextto's qBittorrent client (`internal/qbittorrent`) | done |
+| F3: app/preferences and other qBittorrent endpoints | done |
+| F2: categories/tags in the page (side filter + editor in the detail) | done |
+| F2: indexer search — Torznab client (`internal/torznab`) and endpoint `/ui/search` | done |
+| F2: indexer search — box and results in the page | done |
+| F2: RSS with rules (feeds, include/exclude, category/folder, persisted dedup) + box in the page | done |
+| F2: Jackett/Prowlarr/MIRCrew via Torznab (search and feeds) | done |
+| F1: wizard — optional indexers (Jackett/Prowlarr/MIRCrew) and temporary folder | done |
 
-### 12.2 Gestore RSS (obiettivo di eccellenza)
+### 12.2 RSS manager (goal of excellence)
 
-**Requisito (concordato):** il gestore RSS/filtro di gx-torrent deve essere
-**eccezionale**: il meglio tra qBittorrent, Deluge (YaRSS2) e BiglyBT, un gestore
-**integrato e completo**. I riferimenti sono i sorgenti di quei progetti:
+**Requirement (agreed):** gx-torrent's RSS manager/filter must be
+**exceptional**: the best of qBittorrent, Deluge (YaRSS2) and BiglyBT, an
+**integrated and complete** manager. The references are the sources of those projects:
 qBittorrent `src/rss`, Deluge `deluge-yarss-plugin` (YaRSS2), BiglyBT
-`BiglyBT-plugin-rssfeed` (guarda anche `Help.stf`) e le *Subscriptions* di
-BiglyBT. Vanno studiati prima di progettare le parti avanzate.
+`BiglyBT-plugin-rssfeed` (see also `Help.stf`) and the *Subscriptions* of
+BiglyBT. They must be studied before designing the advanced parts.
 
-Matrice delle capacità (fonte → obiettivo gx-torrent):
+Capability matrix (source → gx-torrent goal):
 
-| Capacità | qBittorrent | Deluge/YaRSS2 | BiglyBT | gx-torrent (obiettivo) |
+| Capability | qBittorrent | Deluge/YaRSS2 | BiglyBT | gx-torrent (goal) |
 | --- | --- | --- | --- | --- |
-| Feed multipli, cartelle | sì | sì | sì | sì |
-| Intervallo per-feed e globale, TTL | sì | sì (obey TTL) | sì | sì |
-| Regole **ordinate PASS/FAIL** (primo match vince) | no | no | sì | **sì** |
-| Regex sul titolo, must-not | sì | sì | sì | sì |
-| Episodi `SxxExx`, season pack, **smart episode** (una volta sola) | sì | parziale | sì | **sì** |
-| Filtri per dimensione, seeders/peers, età | parziale | no | sì | **sì** |
-| Azioni: cartella, categoria, tag, pausa, priorità, sequenziale, limiti per torrent, in cima | sì | sì | sì | **sì** |
-| Storico download persistito (mai due volte) | solo smart episode | last matched | sì | **sì** |
-| Articoli corrispondenti per regola | sì | sì | sì | **sì** |
-| Feed anche da risultati di ricerca | plugin | no | sì | sì (`search` sugli indexer) |
-| Notifiche su match/errore | mail | mail | sì | sì (webhook `notify-url`) |
+| Multiple feeds, folders | yes | yes | yes | yes |
+| Per-feed and global interval, TTL | yes | yes (obey TTL) | yes | yes |
+| **Ordered PASS/FAIL rules** (first match wins) | no | no | yes | **yes** |
+| Regex on the title, must-not | yes | yes | yes | yes |
+| `SxxExx` episodes, season pack, **smart episode** (only once) | yes | partial | yes | **yes** |
+| Filters by size, seeders/peers, age | partial | no | yes | **yes** |
+| Actions: folder, category, tag, pause, priority, sequential, per-torrent limits, top | yes | yes | yes | **yes** |
+| Persisted download history (never twice) | smart episode only | last matched | yes | **yes** |
+| Articles matching per rule | yes | yes | yes | **yes** |
+| Feeds also from search results | plugin | no | yes | yes (`search` on indexers) |
+| Notifications on match/error | mail | mail | yes | yes (webhook `notify-url`) |
 
-Stato attuale (base già in `internal/rss` e `feed.go`): parsing RSS/Atom/Torznab,
-**regole ordinate PASS/FAIL (primo match)**, filtri include/exclude, regex,
-dimensione, seeders/peers, età, `require_episode`, **smart-episode**, azioni
-(cartella, categoria, tag, pausa, sequenziale, prima/ultima, in cima), storico
-persistito, worker e **pagina di gestione `/ui/rss`** con articoli corrispondenti
-per regola e Add manuale. I **feed caricano le release periodiche**: i parametri di
-ricerca e watchlist di serie/film sono centralizzati nella sezione **Cercati**
-(Wanted), così la configurazione è chiara e non si duplicano filtri. Le **notifiche su match/errore**
-sono disponibili via webhook (`-notify-url` / `GX_TORRENT_NOTIFY_URL`, eventi `feed_match` e `feed_error`).
+Current status (base already in `internal/rss` and `feed.go`): RSS/Atom/Torznab parsing,
+**ordered PASS/FAIL rules (first match)**, include/exclude filters, regex,
+size, seeders/peers, age, `require_episode`, **smart-episode**, actions
+(folder, category, tag, pause, sequential, first/last, top), persisted history,
+worker and **management page `/ui/rss`** with matching articles
+per rule and manual Add. **Feeds load releases periodically**: the search
+parameters and the series/movie watchlist are centralised in the **Wanted**
+section, so the configuration is clear and filters are not duplicated. **Notifications on match/error**
+are available via webhook (`-notify-url` / `GX_TORRENT_NOTIFY_URL`, events `feed_match` and `feed_error`).
 
-L'editing è **guidato** (`cmd/gx-torrent/ui_rss_edit.go`): menu a tendina del tipo
-di indexer con URL preimpostati (`uiIndexerPresets`), form dei feed essenziale
-(nome e URL RSS), editor delle **regole ordinate** con sposta su/giù e
-disabilita, `episode_filter` in stile qBittorrent
-(`internal/rss/episode_filter.go`) e cooldown `ignore_days`
-(`internal/rss/rules.go`). Lo **smart-episode** riconosce anche REPACK/PROPER
-(`cmd/gx-torrent/feed.go`). La lista **Cercati** tiene i titoli da cercare (con menu
-a tendina per le qualità, tipo serie/film, cartella e categoria opzionali): il
-nome della serie viene suggerito dai risultati degli indexer
-(`GET /ui/rss-suggest`) e `GET /ui/wanted-search` propone i titoli trovati nei
-feed e negli indexer. Il motore (`cmd/gx-torrent/wanted.go`) cerca ogni titolo
-negli indexer e nei feed, registra in `state.json` cosa è apparso e cosa è stato
-scaricato e ricerca gli episodi mancanti (gap search), anche quando non ci sono
-feed configurati. Il pulsante
-**Check feeds** forza subito il controllo di tutti i feed. Dalla pagina
-`/ui/settings` si impostano cartelle, rete e porte, protocolli, coda e cache,
-banda e scheduler, lingua e notifiche; la cartella di download anche dal
-selettore `/ui/browse-dir`.
+Editing is **guided** (`cmd/gx-torrent/ui_rss_edit.go`): a dropdown menu of the indexer
+type with preset URLs (`uiIndexerPresets`), an essential feed form
+(name and RSS URL), an editor of the **ordered rules** with move up/down and
+disable, `episode_filter` in qBittorrent style
+(`internal/rss/episode_filter.go`) and `ignore_days` cooldown
+(`internal/rss/rules.go`). The **smart-episode** also recognises REPACK/PROPER
+(`cmd/gx-torrent/feed.go`). The **Wanted** list holds the titles to search for (with a
+dropdown for qualities, series/movie type, optional folder and category): the
+series name is suggested by the indexer results
+(`GET /ui/rss-suggest`) and `GET /ui/wanted-search` proposes the titles found in the
+feeds and in the indexers. The engine (`cmd/gx-torrent/wanted.go`) searches for every title
+in the indexers and feeds, logs in `state.json` what has appeared and what has been
+downloaded and searches for the missing episodes (gap search), even when there are no
+feeds configured. The **Check feeds** button immediately forces the check of all feeds. From the
+`/ui/settings` page one sets folders, network and ports, protocols, queue and cache,
+bandwidth and scheduler, language and notifications; the download folder also from the
+`/ui/browse-dir` selector.
 
-### 12.3 CI: gx-torrent standalone
+### 12.3 CI: standalone gx-torrent
 
-**Requisito (concordato):** la CI di GitHub deve **costruire e pubblicare il
-`gx-torrent` standalone**, così un utente può scaricarlo e usarlo come
-`qbittorrent-nox`, senza Gextto.
+**Requirement (agreed):** GitHub's CI must **build and publish the standalone
+`gx-torrent`**, so that a user can download it and use it as
+`qbittorrent-nox`, without Gextto.
 
-Stato attuale: `scripts/build-release.sh` compila `bin/gx-torrent` (build
-number proprio) e lo include nell'archivio di Gextto
-(`gextto-linux-<arch>[-libtorrent].tar.gz`, con il controllo `./gx-torrent`);
-`release.yml` e `continuous.yml` pubblicano quegli archivi. Il binario è quindi
-**già distribuito**, ma **dentro** il pacchetto di Gextto, non come prodotto a
-sé.
+Current status: `scripts/build-release.sh` compiles `bin/gx-torrent` (its own build
+number) and includes it in Gextto's archive
+(`gextto-linux-<arch>[-libtorrent].tar.gz`, with the `./gx-torrent` control);
+`release.yml` and `continuous.yml` publish those archives. The binary is therefore
+**already distributed**, but **inside** Gextto's package, not as a product of its
+own.
 
-Realizzato:
+Implemented:
 
-- `scripts/package-gx-torrent.sh` produce l'archivio dedicato
-  `gx-torrent-linux-<arch>.tar.gz` (binario + `run.sh` + `gx-torrent.service` +
-  `README.md` + `VERSION`), con checksum; verificato in locale (il binario nel
-  pacchetto gira: `gx-torrent --version`);
-- `build-release.sh` lo genera nella variante Go pura e ne controlla il
-  contenuto;
-- `release.yml` e `continuous.yml` caricano l'artifact `gx-torrent-linux-<arch>`
-  (solo variante `go`) e lo pubblicano nel release (`dist/gx-torrent-linux-*`);
-- la CI (`ci.yml`, job `build-test`) cross-compila per **Windows** (amd64/arm64)
-  sia il motore `internal/gxcore` sia il demone `cmd/gx-torrent`, così il
-  supporto non regredisce; il job `windows-platform` esegue i test di
-  piattaforma su `windows-latest` e `windows-service` (non bloccante) installa
-  davvero il servizio, lo avvia, interroga `/api/v1/health` e lo ferma;
-- `scripts/package-gx-torrent-windows.sh` produce `gx-torrent-windows-<arch>.zip`
-  (amd64/arm64: `gx-torrent.exe` come servizio nativo, `install-service.ps1`,
-  `uninstall-service.ps1`, `README.txt`); `build-release.sh` lo genera nella
-  variante Go pura e `release.yml`/`continuous.yml` lo pubblicano
-  (`dist/gx-torrent-windows-*`). Vedi `gx-torrent.md`, *Uso standalone →
-  Installazione su Windows*.
+- `scripts/package-gx-torrent.sh` produces the dedicated archive
+  `gx-torrent-linux-<arch>.tar.gz` (binary + `run.sh` + `gx-torrent.service` +
+  `README.md` + `VERSION`), with checksum; verified locally (the binary in the
+  package runs: `gx-torrent --version`);
+- `build-release.sh` generates it in the pure-Go variant and checks its
+  content;
+- `release.yml` and `continuous.yml` upload the `gx-torrent-linux-<arch>` artefact
+  (only the `go` variant) and publish it in the release (`dist/gx-torrent-linux-*`);
+- the CI (`ci.yml`, `build-test` job) cross-compiles for **Windows** (amd64/arm64)
+  both the `internal/gxcore` engine and the `cmd/gx-torrent` daemon, so that
+  support does not regress; the `windows-platform` job runs the platform tests
+  on `windows-latest` and `windows-service` (non-blocking) actually installs
+  the service, starts it, queries `/api/v1/health` and stops it;
+- `scripts/package-gx-torrent-windows.sh` produces `gx-torrent-windows-<arch>.zip`
+  (amd64/arm64: `gx-torrent.exe` as a native service, `install-service.ps1`,
+  `uninstall-service.ps1`, `README.txt`); `build-release.sh` generates it in the
+  pure-Go variant and `release.yml`/`continuous.yml` publish it
+  (`dist/gx-torrent-windows-*`). See `gx-torrent.md`, *Standalone use →
+  Windows installation*.
 
-**Chiarimento (concordato):** il pacchetto standalone è **lo stesso binario**
-che Gextto usa come motore (regola d'oro: un solo codice). La CI non costruisce
-un secondo prodotto: compila `gx-torrent` e lo pubblica **a parte** dall'archivio
-di Gextto, così l'utente lo scarica e lo usa come demone autonomo (come
-qbittorrent-nox). Nessuna doppia manutenzione.
+**Clarification (agreed):** the standalone package is **the same binary**
+that Gextto uses as engine (golden rule: a single code base). The CI does not build
+a second product: it compiles `gx-torrent` and publishes it **separately** from Gextto's
+archive, so the user downloads it and uses it as an autonomous daemon (like
+qbittorrent-nox). No double maintenance.
 
-Da verificare: la prima esecuzione in CI su **Debian 12 / Ubuntu 22.04**
-(glibc 2.35), amd64 e arm64, e l'eventuale immagine container.
+To be verified: the first run in CI on **Debian 12 / Ubuntu 22.04**
+(glibc 2.35), amd64 and arm64, and the possible container image.
 
 ---
 
-## 13. Requisiti → soluzione
+## 13. Requirements → solution
 
-| Requisito | Come viene soddisfatto | Fase | Verifica |
+| Requirement | How it is satisfied | Phase | Verification |
 | --- | --- | --- | --- |
-| 1. Compatibilità Gextto | un solo motore; API v1 congelata; modalità managed con funzioni standalone spente; `fingerprint` stabile | F0 | test di contratto API v1; `make test`; zero riavvii del demone per salvataggi UI |
-| 2. Efficienza | avvio pigro dei moduli; cache adattiva; misure contro qbittorrent-nox | F1, F4 | le 4 metriche del §10 |
-| 3. UI alla pari di qBittorrent | asset `embed.FS`, impostazioni da UI, categorie/tag, RSS, ricerca, grafici, telefono, tema scuro | F2, F3 | checklist qBittorrent + test Playwright (come `uiweb/v2/end2end`) |
-| 4. Wizard | lingua, cartelle, accesso (LAN senza password default sì + 3 protezioni), porte + test porta, indexer Jackett/Prowlarr/MIRCrew | F1 | setup da zero in meno di 5 minuti |
-| 5. Motore come codice proprio | cherry-pick per valore da anacrolix/libtorrent; licenze rispettate | F4 | misura prima/dopo ogni porting; inventario del motore |
+| 1. Gextto compatibility | a single engine; frozen v1 API; managed mode with standalone functions switched off; stable `fingerprint` | F0 | v1 API contract tests; `make test`; zero daemon restarts for UI saves |
+| 2. Efficiency | lazy startup of the modules; adaptive cache; measurements against qbittorrent-nox | F1, F4 | the 4 metrics of §10 |
+| 3. UI on par with qBittorrent | `embed.FS` assets, settings from the UI, categories/tags, RSS, search, charts, phone, dark theme | F2, F3 | qBittorrent checklist + Playwright tests (like `uiweb/v2/end2end`) |
+| 4. Wizard | language, folders, access (LAN without password default yes + 3 protections), ports + port test, Jackett/Prowlarr/MIRCrew indexers | F1 | setup from scratch in less than 5 minutes |
+| 5. Engine as own code | cherry-pick by value from anacrolix/libtorrent; licences respected | F4 | before/after measurement for every porting; engine inventory |
 
 ---
 
-## 14. Rischi e mitigazioni
+## 14. Risks and mitigations
 
-| Rischio | Effetto | Contromisura |
+| Risk | Effect | Countermeasure |
 | --- | --- | --- |
-| Regressione nel percorso Gextto | download bloccati sull'installazione principale | test di contratto API v1; `fingerprint` indipendente da `settings.json`; funzioni standalone spente in managed |
-| Due padroni della stessa coda | torrent spostati due volte, limiti sovrascritti | modalità decisa all'avvio, mai cambiata a caldo |
-| LAN senza password sfruttata | un sito esterno aggiunge o cancella torrent dal browser dell'utente | controllo `Origin` e `Host`, LAN letta dal socket, `X-Forwarded-For` solo da proxy dichiarati |
-| UI che cresce in una stringa Go | modifiche lente, regressioni visive | asset in `embed.FS` e test Playwright come quelli di `uiweb/v2/end2end` |
-| Porting dal motore costoso | IPv6 e v2 toccano DHT, tracker, picker, storage | un porting per volta, con test del motore e misura prima/dopo |
-| Licenze | codice MPL dentro file EUPL | riscrivere gli algoritmi di anacrolix invece di copiarli |
-| Porting da altri motori | si perdono eventuali fix altrui | controllare a mano i loro commit una volta a trimestre |
-| Estrazione di RSS/ricerca dal pacchetto radice | refactor ampio, possibile instabilità in Gextto | estrarre in `internal/` a comportamento costante, con i test esistenti come rete |
+| Regression in the Gextto path | downloads blocked on the main installation | v1 API contract tests; `fingerprint` independent of `settings.json`; standalone functions switched off in managed |
+| Two masters of the same queue | torrents moved twice, limits overwritten | mode decided at startup, never changed while running |
+| LAN without password exploited | an external site adds or deletes torrents from the user's browser | `Origin` and `Host` check, LAN read from the socket, `X-Forwarded-For` only from declared proxies |
+| UI growing into a Go string | slow changes, visual regressions | assets in `embed.FS` and Playwright tests like those of `uiweb/v2/end2end` |
+| Costly porting from the engine | IPv6 and v2 touch DHT, trackers, picker, storage | one porting at a time, with engine tests and before/after measurement |
+| Licences | MPL code inside EUPL files | rewrite anacrolix's algorithms instead of copying them |
+| Porting from other engines | any fixes from others are lost | check their commits by hand once a quarter |
+| Extraction of RSS/search from the root package | broad refactor, possible instability in Gextto | extract into `internal/` with constant behaviour, with the existing tests as a safety net |
 
 ---
 
-## 15. Domande aperte
+## 15. Open questions
 
-Decisioni da prendere **prima** di F1/F2, non urgenti in F0:
+Decisions to be made **before** F1/F2, not urgent in F0:
 
-1. **Nome definitivo** — **deciso (2026-10-10): `gx-core`**. Mappa nome ↔
-   modulo: il prodotto/release è **gx-core**; il **binario resta `gx-torrent`**
-   (il percorso managed di Gextto non cambia: adapter, fingerprint, unit e scope
-   systemd); il **motore** è `internal/gxcore` (il core del demone, coda/stato/API
-   v1, resta dove è oggi finché non viene estratto: `internal/daemon`). "gx-nox"
-   è solo il nome storico della modalità standalone, non un prodotto a sé.
-2. **Modulo del motore** — **deciso e fatto:** il motore è
-   `github.com/buzzqw/gextto/internal/gxcore`, dentro il modulo principale, non
-   più un modulo a sé né un `replace`.
-3. **Dove vivono i moduli condivisi**: estrarre RSS/indexer in `internal/` dentro
-   il repo Gextto (condivisi dai due prodotti) o in un modulo separato?
-4. **Target di distribuzione**: solo Linux (amd64/arm64) come gextto, o anche
-   Windows/macOS come client desktop?
-5. **i18n**: le sei lingue della pagina web bastano per il prodotto standalone, o
-   si estende il catalogo?
-6. **Autenticazione**: argon2id o bcrypt? (Proposta: argon2id, come già fa Gextto.)
+1. **Final name** — **decided (2026-10-10): `gx-core`**. Name ↔
+   module map: the product/release is **gx-core**; the **binary stays `gx-torrent`**
+   (Gextto's managed path does not change: adapter, fingerprint, systemd unit and scope
+   systemd); the **engine** is `internal/gxcore` (the daemon's core, queue/state/v1
+   API, stays where it is today until it is extracted: `internal/daemon`). "gx-nox"
+   is only the historical name of the standalone mode, not a product of its own.
+2. **Engine module** — **decided and done:** the engine is
+   `github.com/buzzqw/gextto/internal/gxcore`, inside the main module, no
+   longer a module of its own nor a `replace`.
+3. **Where the shared modules live**: extract RSS/indexer into `internal/` inside
+   the Gextto repo (shared by the two products) or into a separate module?
+4. **Distribution targets**: Linux only (amd64/arm64) like gextto, or also
+   Windows/macOS as a desktop client?
+5. **i18n**: are the six languages of the web page enough for the standalone product, or
+   is the catalogue extended?
+6. **Authentication**: argon2id or bcrypt? (Proposal: argon2id, as Gextto already does.)
 
 ---
 
-## 16. Riferimenti
+## 16. References
 
-- [`docs/gx-torrent.md`](gx-torrent.md) — riferimento tecnico del motore attuale.
-- [`docs/evoluzione.md`](evoluzione.md) — §4–§7: lacune del motore, ottimizzazioni,
-  misure di choking; §14: rimando a questo documento.
-- [`docs/gx-torrent-v2.md`](gx-torrent-v2.md) — progetto di implementazione
-  BitTorrent v2 (BEP 52): modello a pezzi per-file, incrementi, test.
-- [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) — inventario delle
-  funzionalità del motore.
-- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — mappa del codice di Gextto.
+- [`docs/gx-torrent.md`](gx-torrent.md) — technical reference of the current engine.
+- [`docs/evoluzione.md`](evoluzione.md) — §4–§7: engine gaps, optimisations,
+  choking measurements; §14: pointer to this document.
+- [`docs/gx-torrent-v2.md`](gx-torrent-v2.md) — BitTorrent v2 (BEP 52)
+  implementation project: per-file pieces model, increments, tests.
+- [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) — inventory of the
+  engine's features.
+- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — map of Gextto's code.
 - [`LICENSE`](../LICENSE) — EUPL-1.2.

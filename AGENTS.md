@@ -44,7 +44,7 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   `gextto-gx-torrent-*.scope`): al riavvio Gextto lo riaggancia se binario e
   opzioni sono uguali (`fingerprint` in `/api/v1/health`), altrimenti lo
   riavvia. Si ferma da solo dopo 15 minuti senza Gextto. Dettagli in
-  `docs/gx-torrent.md`, *Attivazione*.
+  `docs/gx-torrent.md`, *Startup*.
 
 ## Motore gx-core (`internal/gxcore`)
 - `internal/gxcore` è il **motore** di gx-core (il binario `gx-torrent`), codice
@@ -118,7 +118,7 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   `scripts/gx-torrent-service-selftest.ps1` (install/start/health/stop). Il buffer della junction è costruito
   da `mountPointReparseData` (`junction.go`), testato anche su Linux. Gextto intero (`cmd/gexttod`) **non** è Windows:
   TUI, gestione processi/systemd, metadati fs e installer/updater sono Unix
-  (vedi `docs/gx-torrent.md`, *Uso standalone → Piattaforme*).
+  (vedi `docs/gx-torrent.md`, *Standalone use → Platforms*).
 - `make test` — `check-ui-settings-index` + `installer-selftest` +
   `CGO_ENABLED=0 go test ./...` (Go puro; i test del motore libtorrent sono dietro
   `//go:build cgo`). `make test-libtorrent` (`CGO_ENABLED=1 go test ./...`) esegue

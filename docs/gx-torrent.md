@@ -1,417 +1,416 @@
-# gx-torrent: il motore torrent alternativo in puro Go
+# gx-torrent: the alternative torrent engine in pure Go
 
-`gx-torrent` è un piccolo demone BitTorrent scritto in Go puro sopra il motore
-**gx-core** (`internal/gxcore`). È il motore predefinito di
-Gextto (`torrent_backend = gx-torrent`): non richiede `libtorrent-rasterbar`,
-gira in un processo separato e si controlla via REST su `127.0.0.1:8890`, dove
-espone anche una pagina web operativa apribile dal browser (per default solo da
-questo server: vedi *Interfaccia web* per aprirla alla LAN). Il motore integrato
-libtorrent resta selezionabile — sulle build che lo includono — e fa da
-fallback automatico se gx-torrent non parte.
+`gx-torrent` is a small BitTorrent daemon written in pure Go on top of the
+**gx-core** engine (`internal/gxcore`). It is the default engine of
+Gextto (`torrent_backend = gx-torrent`): it does not require `libtorrent-rasterbar`,
+runs in a separate process and is controlled via REST on `127.0.0.1:8890`, where
+it also exposes an operational web page openable from the browser (by default only from
+this server: see *Web interface* to open it to the LAN). The embedded
+libtorrent engine remains selectable — on builds that include it — and acts as an
+automatic fallback if gx-torrent does not start.
 
-Il motore gx-core vive in `internal/gxcore`. Le funzionalità sono
-descritte in `internal/gxcore/GEXTTO.md`: porta unica, interfaccia uscente,
-proxy, filtro IP, selezione dei file e alcune correzioni. Lo **stato di
-conformità alle specifiche BitTorrent (BEP)** e la roadmap sono in
-[Conformità BEP](bep.md).
+The gx-core engine lives in `internal/gxcore`. Its features are
+described in `internal/gxcore/GEXTTO.md`: single port, outgoing interface,
+proxy, IP filter, file selection and some fixes. The **state of
+compliance with the BitTorrent specifications (BEP)** and the roadmap are in
+[BEP compliance](bep.md).
 
-Codice:
+Code:
 
-| File | Ruolo |
+| File | Role |
 |---|---|
-| `cmd/gx-torrent/main.go` | flag, avvio, segnali, spegnimento pulito |
-| `cmd/gx-torrent/daemon.go` | sessione gx-core, stato persistente, ciclo della coda, operazioni |
-| `internal/queue/queue.go` | pianificatore della coda (funzione pura) e coda dinamica |
-| `cmd/gx-torrent/storage.go` | symlink per torrent, spostamento e cancellazione sicuri |
-| `cmd/gx-torrent/api.go` | REST API con token |
-| `cmd/gx-torrent/network.go` | porta, interfacce, proxy, cifratura, filtro IP |
-| `cmd/gx-torrent/portmap.go` | apertura della porta sul router (UPnP, NAT-PMP) |
-| `cmd/gx-torrent/selection.go` | selezione dei file |
-| `cmd/gx-torrent/cache.go` | cache adattiva (RAM disponibile, carico, tipo di storage) |
-| `cmd/gx-torrent/stream.go` | streaming HTTP (Range) con readahead dei pezzi |
-| `cmd/gx-torrent/ui.go` | pagina web del demone (riepilogo, tabella, dettaglio, azioni) |
-| `cmd/gx-torrent/i18n.go` | traduzioni della pagina web (it/en/de/fr/es/pl) |
-| `cmd/gx-torrent/lsd.go` | scoperta in rete locale (BEP 14) |
-| `cmd/gx-torrent/tracker_health.go` | rimozione dei tracker che non hanno mai risposto |
-| `cmd/gx-torrent/lifecycle.go` | log ruotato del demone, watchdog degli orfani, coda del log di Gextto |
-| `gxtorrent_engine.go` | adapter `TorrentEngine` lato Gextto |
-| `gxtorrent_runtime.go` | avvio e sorveglianza del demone da parte di Gextto |
+| `cmd/gx-torrent/main.go` | flags, startup, signals, clean shutdown |
+| `cmd/gx-torrent/daemon.go` | gx-core session, persistent state, queue loop, operations |
+| `internal/queue/queue.go` | queue scheduler (pure function) and dynamic queue |
+| `cmd/gx-torrent/storage.go` | per-torrent symlink, safe move and deletion |
+| `cmd/gx-torrent/api.go` | REST API with token |
+| `cmd/gx-torrent/network.go` | port, interfaces, proxy, encryption, IP filter |
+| `cmd/gx-torrent/portmap.go` | opening the port on the router (UPnP, NAT-PMP) |
+| `cmd/gx-torrent/selection.go` | file selection |
+| `cmd/gx-torrent/cache.go` | adaptive cache (available RAM, load, storage type) |
+| `cmd/gx-torrent/stream.go` | HTTP streaming (Range) with piece readahead |
+| `cmd/gx-torrent/ui.go` | daemon web page (summary, table, detail, actions) |
+| `cmd/gx-torrent/i18n.go` | web page translations (it/en/de/fr/es/pl) |
+| `cmd/gx-torrent/lsd.go` | local network discovery (BEP 14) |
+| `cmd/gx-torrent/tracker_health.go` | removal of trackers that never responded |
+| `cmd/gx-torrent/lifecycle.go` | rotated daemon log, orphan watchdog, Gextto log queue |
+| `gxtorrent_engine.go` | Gextto-side `TorrentEngine` adapter |
+| `gxtorrent_runtime.go` | startup and supervision of the daemon by Gextto |
 
-## Indice
+## Index
 
-- [Attivazione](#attivazione)
-- [Interfaccia web](#interfaccia-web)
-  - [Esposizione in rete](#esposizione-in-rete)
-- [Uso standalone](#uso-standalone)
-  - [Archivio dei feed](#archivio-dei-feed)
-- [Rete](#rete)
-- [uTP e LSD](#utp-e-lsd)
+- [Startup](#startup)
+- [Web interface](#web-interface)
+  - [Network exposure](#network-exposure)
+- [Standalone use](#standalone-use)
+  - [Feed archive](#feed-archive)
+- [Network](#network)
+- [uTP and LSD](#utp-and-lsd)
 - [Holepunching (BEP 55)](#holepunching-bep-55)
-  - [Verifica](#verifica)
-- [Selezione dei file e priorità](#selezione-dei-file-e-priorità)
-- [Download sequenziale (streaming)](#download-sequenziale-streaming)
-- [Torrent BitTorrent v2](#torrent-bittorrent-v2)
-- [Statistiche](#statistiche)
-- [Diagnostica pezzi](#diagnostica-pezzi)
-- [Streaming HTTP (HTTP Range)](#streaming-http-http-range)
-- [Cache disco, preallocazione e storage mmap](#cache-disco-preallocazione-e-storage-mmap)
+  - [Verification](#verification)
+- [File selection and priorities](#file-selection-and-priorities)
+- [Sequential download (streaming)](#sequential-download-streaming)
+- [BitTorrent v2 torrents](#bittorrent-v2-torrents)
+- [Statistics](#statistics)
+- [Piece diagnostics](#piece-diagnostics)
+- [HTTP streaming (HTTP Range)](#http-streaming-http-range)
+- [Disk cache, preallocation and mmap storage](#disk-cache-preallocation-and-mmap-storage)
 - [RAM disk](#ram-disk)
-- [Layout su disco e sicurezza dei dati](#layout-su-disco-e-sicurezza-dei-dati)
-- [Coda autogestita](#coda-autogestita)
-- [Stalled: divisione dei compiti](#stalled-divisione-dei-compiti)
+- [On-disk layout and data safety](#on-disk-layout-and-data-safety)
+- [Self-managed queue](#self-managed-queue)
+- [Stalled: division of tasks](#stalled-division-of-tasks)
 - [Seed](#seed)
 - [Super-seeding (BEP 16)](#super-seeding-bep-16)
-- [Scritture sul disco di stato](#scritture-sul-disco-di-stato)
-- [Limiti di banda](#limiti-di-banda)
+- [Writes to the state disk](#writes-to-the-state-disk)
+- [Bandwidth limits](#bandwidth-limits)
 - [REST API (v1)](#rest-api-v1)
-- [Disponibilità dell'API (snapshot e lock)](#disponibilità-dellapi-snapshot-e-lock)
-- [Limiti noti (motore)](#limiti-noti-motore)
-- [Test](#test)
+- [API availability (snapshot and lock)](#api-availability-snapshot-and-lock)
+- [Known limits (engine)](#known-limits-engine)
+- [Tests](#tests)
 
-## Attivazione
+## Startup
 
-1. `make build` (o `scripts/build-daemon.sh`) compila `bin/gx-torrent` accanto
-   a `bin/gexttod`; `make gx-torrent` compila solo il demone. Il pacchetto, `install.sh`
-   e `gexttod --update` installano `gx-torrent` accanto a `gexttod`. Il demone ha
-   un **numero di build proprio** (`gx-torrent.build_number`), indipendente da
-   quello di Gextto: cresce di uno a ogni sua ricompilazione e resta invariato
-   quando la build non lo tocca. È la versione `1.1.<n>` riportata da
-   `gx-torrent --version`, dalla sua pagina web e da `/api/v1/health`.
-2. `gx-torrent` è il motore predefinito di una nuova installazione: non serve
-   sceglierlo. Per usare invece libtorrent integrato imposta *Motore torrent* su
-   `embedded` e riavvia. Una configurazione che ha già salvato un motore resta
-   com'era: il nuovo default vale solo per le installazioni nuove.
-3. Gextto **avvia sempre e sorveglia** il demone quando gx-torrent è il motore
-   attivo:
-   - dati in `DATA_DIR/gx-torrent`;
-   - log in `DATA_DIR/gx-torrent/gx-torrent.log`, scritto dal demone stesso e
-     ruotato a 5 MB tenendo 4 file; gli errori dei singoli peer (handshake
-     scaduti, reset) e degli announce falliti sono a livello debug;
-   - cartella di scarico predefinita uguale a quella di libtorrent;
-   - il demone viene riavviato se si chiude;
-   - **resta acceso quando Gextto si riavvia** (ad esempio per un
-     aggiornamento): sotto systemd parte in uno scope proprio
-     (`gextto-gx-torrent-*.scope`), quindi l'arresto del servizio non lo tocca.
-     Al riavvio Gextto lo riaggancia se ha lo stesso binario e le stesse
-     opzioni (`fingerprint` in `/api/v1/health`): peer, coda e trasferimenti
-     proseguono senza interruzioni. Se il binario o un'opzione di avvio sono
-     cambiati, Gextto lo ferma con SIGTERM (45 secondi di grazia, il motore salva i
-     resume data) e ne avvia uno nuovo. `make build` sostituisce
-     `bin/gx-torrent` solo se il suo codice è cambiato
-     (`bin/gx-torrent.code-sha256`), così un aggiornamento che tocca solo
-     gexttod non ferma i download;
-   - se Gextto non torna, il demone si ferma da solo dopo 15 minuti senza
-     richieste (`-orphan-timeout`); se il motore attivo non è più gx-torrent,
-     Gextto all'avvio ferma il demone rimasto acceso. Gextto riaggancia o
-     ferma solo un demone con la propria cartella dati;
-   - dopo 6 avvii/arresti anomali in 10 minuti Gextto smette di riprovare.
-     Su una build con libtorrent integrato torna al motore `embedded` e riavvia
-     il servizio; su una build di **puro Go** (quella predefinita) non c'è un
-     motore di ripiego, quindi continua con gx-torrent in **modalità sicura**
-     (senza uTP né holepunch) e attese crescenti tra i tentativi (1 m, 5 m,
-     15 m, 1 h). Uno spegnimento pulito (riavvio di Gextto o del servizio, ad
-     esempio per un aggiornamento) non conta: il budget considera solo le uscite
-     inattese e gli avvii falliti; un demone che resta attivo abbastanza a lungo
-     lo azzera (10 minuti per il budget degli arresti, 30 minuti per azzerare le
-     attese crescenti).
+1. `make build` (or `scripts/build-daemon.sh`) compiles `bin/gx-torrent` alongside
+   `bin/gexttod`; `make gx-torrent` compiles only the daemon. The package, `install.sh`
+   and `gexttod --update` install `gx-torrent` alongside `gexttod`. The daemon has
+   its **own build number** (`gx-torrent.build_number`), independent of
+   Gextto's: it increases by one at every recompilation and stays unchanged
+   when the build does not touch it. It is the `1.1.<n>` version reported by
+   `gx-torrent --version`, by its web page and by `/api/v1/health`.
+2. `gx-torrent` is the default engine of a new installation: there is no need to
+   choose it. To use embedded libtorrent instead, set *Torrent engine* to
+   `embedded` and restart. A configuration that has already saved an engine stays
+   as it was: the new default applies only to new installations.
+3. Gextto **always starts and supervises** the daemon when gx-torrent is the active
+   engine:
+   - data in `DATA_DIR/gx-torrent`;
+   - log in `DATA_DIR/gx-torrent/gx-torrent.log`, written by the daemon itself and
+     rotated at 5 MB keeping 4 files; errors of individual peers (expired
+     handshakes, resets) and of failed announces are at debug level;
+   - default download folder equal to libtorrent's;
+   - the daemon is restarted if it exits;
+   - **it stays up when Gextto restarts** (for example for an
+     update): under systemd it starts in its own scope
+     (`gextto-gx-torrent-*.scope`), so stopping the service does not affect it.
+     On restart Gextto re-attaches to it if it has the same binary and the same
+     options (`fingerprint` in `/api/v1/health`): peers, queue and transfers
+     continue without interruption. If the binary or a startup option have
+     changed, Gextto stops it with SIGTERM (45 seconds of grace, the engine saves the
+     resume data) and starts a new one. `make build` replaces
+     `bin/gx-torrent` only if its code has changed
+     (`bin/gx-torrent.code-sha256`), so an update that touches only
+     gexttod does not stop downloads;
+   - if Gextto does not come back, the daemon stops by itself after 15 minutes without
+     requests (`-orphan-timeout`); if the active engine is no longer gx-torrent,
+     Gextto stops the daemon left running at startup. Gextto re-attaches to or
+     stops only a daemon with its own data folder;
+   - after 6 abnormal starts/stops in 10 minutes Gextto stops retrying.
+     On a build with embedded libtorrent it falls back to the `embedded` engine and restarts
+     the service; on a **pure Go** build (the default one) there is no
+     fallback engine, so it continues with gx-torrent in **safe mode**
+     (without uTP or holepunch) and growing waits between attempts (1 m, 5 m,
+     15 m, 1 h). A clean shutdown (restart of Gextto or of the service, for
+     example for an update) does not count: the budget considers only unexpected
+     exits and failed starts; a daemon that stays up long enough
+     resets it (10 minutes for the stop budget, 30 minutes to reset the
+     growing waits).
 
-   Se sull'URL risponde già un gx-torrent (ad esempio un servizio systemd tuo),
-   Gextto usa quello.
+   If a gx-torrent already answers on the URL (for example a systemd service of yours),
+   Gextto uses that one.
 
-Impostazioni (scheda *Motore torrent*, gruppo *gx-torrent*):
+Settings (*Torrent engine* tab, *gx-torrent* group):
 
-| Chiave | Default | Note |
+| Key | Default | Notes |
 |---|---|---|
-| `gxtorrent_url` | `http://127.0.0.1:8890` | URL con cui Gextto raggiunge il demone |
-| `gxtorrent_listen` | `127.0.0.1:8890` | indirizzo di ascolto del demone gestito: per default pagina e API restano solo su questo server. Per aprirle alla LAN vedi *Interfaccia web → Esposizione in rete*. La porta viene allineata a quella di `gxtorrent_url` (Gextto deve poterlo raggiungere) |
-| `gxtorrent_token` | vuoto | header `X-Gx-Token`; obbligatorio se il demone ascolta in rete |
-| `gxtorrent_auto` | `true` | autogestione di gx-torrent: coda dinamica e cache adattiva. Disattivala per fissare a mano slot e cache |
+| `gxtorrent_url` | `http://127.0.0.1:8890` | URL with which Gextto reaches the daemon |
+| `gxtorrent_listen` | `127.0.0.1:8890` | listen address of the managed daemon: by default page and API stay only on this server. To open them to the LAN see *Web interface → Network exposure*. The port is aligned to that of `gxtorrent_url` (Gextto must be able to reach it) |
+| `gxtorrent_token` | empty | `X-Gx-Token` header; mandatory if the daemon listens on the network |
+| `gxtorrent_auto` | `true` | self-management of gx-torrent: dynamic queue and adaptive cache. Disable it to set slots and cache by hand |
 | `gxtorrent_request_timeout_secs` | `15` | 1–300 |
-| `gxtorrent_poll_interval_ms` | `1500` | intervallo minimo tra due letture dello stato (250–60000) |
-| `gxtorrent_proxy` | vuoto | proxy per gx-torrent: `socks5://[utente:password@]host:porta` o `http://host:porta`. Peer, tracker HTTP e web seed passano dal proxy; DHT e tracker UDP vengono spenti. Viaggia nell'ambiente del demone, non sulla riga di comando |
+| `gxtorrent_poll_interval_ms` | `1500` | minimum interval between two state reads (250–60000) |
+| `gxtorrent_proxy` | empty | proxy for gx-torrent: `socks5://[user:password@]host:port` or `http://host:port`. Peers, HTTP trackers and web seeds go through the proxy; DHT and UDP trackers are turned off. It travels in the daemon's environment, not on the command line |
 
-Le impostazioni di coda e banda restano quelle della sezione *libtorrent*:
+The queue and bandwidth settings remain those of the *libtorrent* section:
 
-- download e seed attivi, limite totale;
-- "non contare i torrent lenti";
-- coda dinamica con minimo e massimo;
-- limiti di velocità standard, programmati e temporanei.
+- active downloads and seeds, total limit;
+- "don't count slow torrents";
+- dynamic queue with minimum and maximum;
+- standard, scheduled and temporary speed limits.
 
-Gextto le inoltra al demone.
+Gextto forwards them to the daemon.
 
-## Interfaccia web
+## Web interface
 
-All'indirizzo indicato da `gxtorrent_url` (default `http://127.0.0.1:8890`) il
-demone non espone solo l'API REST: `GET /` (o `/ui`) apre una **pagina web
-operativa** pensata per chi apre quell'indirizzo dal browser, come la Web UI di
-qBittorrent. Si aggiorna da sola ogni 2 secondi senza ricaricare la pagina.
-La scheda del browser mostra l'icona del demone (una freccia di download blu),
-inclusa nella pagina e servita anche da `GET /favicon.ico` senza token.
-La pagina è **tradotta** (italiano, inglese, tedesco, francese, spagnolo,
-polacco): all'avvio Gextto passa la lingua dell'interfaccia al demone con
-`-lang`, e `?lang=xx` la sovrascrive per la singola richiesta.
+At the address indicated by `gxtorrent_url` (default `http://127.0.0.1:8890`) the
+daemon does not expose only the REST API: `GET /` (or `/ui`) opens an **operational
+web page** intended for whoever opens that address from the browser, like qBittorrent's
+Web UI. It refreshes by itself every 2 seconds without reloading the page.
+The browser tab shows the daemon icon (a blue download arrow),
+included in the page and also served by `GET /favicon.ico` without a token.
+The page is **translated** (Italian, English, German, French, Spanish,
+Polish): at startup Gextto passes the interface language to the daemon with
+`-lang`, and `?lang=xx` overrides it for the single request.
 
-- **Riepilogo sessione**: in cima i riquadri con i conteggi (torrent, downloading,
-  seeding, stalled, paused, moving), porta peer, regole del filtro IP, cache
-  read/write, operazioni di I/O e connessioni in entrata; i valori live
-  (velocità, scaricato/caricato nella sessione, spazio libero, DHT, porta,
-  cifratura) stanno nella barra di stato in basso, sempre visibile, con il
-  pulsante *Test ports*.
-- **Aggiunta** da un'unica form: magnet, URL a un `.torrent` o file locale
-  caricato, con destinazione, pausa, "in cima alla coda", download
-  sequenziale, prima/ultima parte e super-seeding; i limiti di seed e velocità
-  si impostano per torrent nel dettaglio *Generale*.
-- **Tabella** a due righe per torrent (nome e cartella; avanzamento, stato,
-  dimensioni, velocità, peer, seed, ratio di condivisione, ETA), con ricerca/filtro per nome, **filtro per stato** nella barra
-  laterale, colonne ordinabili, selezione multipla e azioni di gruppo
-  (pausa/riprendi/verifica/ri-annuncio/cima/rimozione).
-- **Dettaglio per torrent** a schede: *Generale* (dati, pezzi, spazio,
-  date, copia magnet, esporta `.torrent`, pin, sposta, limiti di
-  velocità/connessioni/upload e seed, **web seed**), *File* (scarica/salta e
-  **streaming HTTP** con ▶), *Peers* (flag di connessione, trasporto, cifratura),
-  *Trackers* (stato, sciame, aggiunta e **rimozione**), *Pezzi* (mappa colorata).
-- **Filtro IP** da URL o file; il campo è precompilato con il filtro
-  configurato in Gextto.
-- **Test porte**: dalla barra di stato un pulsante verifica che la porta peer
-  sia in ascolto e che il router la inoltri (la stessa verifica del pulsante
-  *Test porte* di Gextto, sopra `GET /api/v1/portcheck`). Con il DHT attivo il
-  risultato mostra anche la **porta riflessa** che i nodi DHT vedono per noi
-  (campo `reflected_port`, dal campo `ip` di BEP 42) e il **tipo di NAT** dedotto
-  (`nat_mapping`: endpoint-independent se gli osservatori concordano sulla porta,
-  address/port-dependent se no): se la porta riflessa coincide con quella locale
-  il NAT conserva la porta, altrimenti la riscrive.
-- **Scheda *Gextto log***: le ultime righe di `gextto.log` (200–2000), lette
-  solo quando apri la scheda o premi *Ricarica*, con filtro testuale, DEBUG
-  nascosti di default e avvisi/errori colorati. Mentre è aperta la tabella
-  torrent non si aggiorna.
-- **Liste grandi** (solo standalone): la tabella rende al più `?rows=` torrent
-  (predefinito 300) e mostra *Showing X of Y · Show more* per allargare la
-  finestra; in managed rende sempre tutti i torrent, come prima.
-- Scorciatoie: `/` per cercare, `Esc` per chiudere il dettaglio.
+- **Session summary**: at the top the tiles with the counts (torrents, downloading,
+  seeding, stalled, paused, moving), peer port, IP filter rules, cache
+  read/write, I/O operations and incoming connections; the live
+  values (speed, downloaded/uploaded in the session, free space, DHT, port,
+  encryption) are in the status bar at the bottom, always visible, with the
+  *Test ports* button.
+- **Add** from a single form: magnet, URL to a `.torrent` or uploaded local file,
+  with destination, pause, "top of queue", sequential download,
+  first/last part and super-seeding; seed and speed limits
+  are set per torrent in the *General* detail.
+- **Table** with two rows per torrent (name and folder; progress, status,
+  size, speed, peers, seeds, share ratio, ETA), with search/filter by name, **filter by status** in the side
+  bar, sortable columns, multi-selection and group actions
+  (pause/resume/verify/reannounce/top/remove).
+- **Per-torrent detail** in tabs: *General* (data, pieces, space,
+  dates, copy magnet, export `.torrent`, pin, move, speed/connection/upload and seed
+  limits, **web seeds**), *Files* (download/skip and
+  **HTTP streaming** with ▶), *Peers* (connection flags, transport, encryption),
+  *Trackers* (status, swarm, add and **remove**), *Pieces* (coloured map).
+- **IP filter** from a URL or file; the field is pre-filled with the filter
+  configured in Gextto.
+- **Test ports**: from the status bar a button checks that the peer port
+  is listening and that the router forwards it (the same check as Gextto's
+  *Test ports* button, on top of `GET /api/v1/portcheck`). With DHT active the
+  result also shows the **reflected port** that the DHT nodes see for us
+  (`reflected_port` field, from the `ip` field of BEP 42) and the deduced **NAT
+  type** (`nat_mapping`: endpoint-independent if the observers agree on the port,
+  address/port-dependent if not): if the reflected port matches the local one
+  the NAT preserves the port, otherwise it rewrites it.
+- ***Gextto log* tab**: the last lines of `gextto.log` (200–2000), read
+  only when you open the tab or press *Reload*, with text filter, DEBUG
+  hidden by default and warnings/errors coloured. While it is open the torrent
+  table does not refresh.
+- **Large lists** (standalone only): the table renders at most `?rows=` torrents
+  (default 300) and shows *Showing X of Y · Show more* to widen the
+  window; in managed it always renders all torrents, as before.
+- Shortcuts: `/` to search, `Esc` to close the detail.
 
-Il comando definitivo resta comunque Gextto; la pagina è una comodità per
-l'operatore.
+The definitive command remains Gextto; the page is a convenience for
+the operator.
 
-### Esposizione in rete
+### Network exposure
 
-**Per default pagina e API restano solo su questo server**
-(`gxtorrent_listen = 127.0.0.1:8890`). Per aprirle a tutta la LAN imposta
-`gxtorrent_listen = 0.0.0.0:8890` **e** un `gxtorrent_token`.
+**By default page and API stay only on this server**
+(`gxtorrent_listen = 127.0.0.1:8890`). To open them to the whole LAN set
+`gxtorrent_listen = 0.0.0.0:8890` **and** a `gxtorrent_token`.
 
-- La porta di `gxtorrent_listen` viene **allineata** a quella di
-  `gxtorrent_url`: Gextto deve poter raggiungere il demone, quindi una porta
-  diversa non ha effetto (viene segnalato nel log).
-- Un ascolto non loopback richiede `gxtorrent_token`: senza token Gextto avvia
-  il demone in `-insecure` (coerente con la LAN fidata di default di Gextto) e
-  lo annota nel log a livello debug.
-- Con `gxtorrent_token`, la pagina lo chiede al primo accesso (accetta anche
-  `?token=…`) e lo ricorda in un cookie; l'API resta protetta come prima.
+- The port of `gxtorrent_listen` is **aligned** to that of
+  `gxtorrent_url`: Gextto must be able to reach the daemon, so a different port
+  has no effect (it is reported in the log).
+- A non-loopback listen requires `gxtorrent_token`: without a token Gextto starts
+  the daemon in `-insecure` (consistent with Gextto's trusted-LAN default) and
+  notes it in the log at debug level.
+- With `gxtorrent_token`, the page asks for it on first access (it also accepts
+  `?token=…`) and remembers it in a cookie; the API stays protected as before.
 
-## Uso standalone
+## Standalone use
 
 ```
 gx-torrent [-listen 127.0.0.1:8890] [-data ~/.local/share/gx-torrent]
-           [-download-dir DIR] [-token SEGRETO] [-allowed-roots /srv/media,/data]
+           [-download-dir DIR] [-token SECRET] [-allowed-roots /srv/media,/data]
            [-peer-ports 6881-6891] [-listen-interface IP|iface]
-           [-outgoing-interface wg0] [-proxy socks5://host:porta]
+           [-outgoing-interface wg0] [-proxy socks5://host:port]
            [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-utp] [-no-holepunch]
-           [-no-lsd] [-no-upnp] [-no-natpmp] [-dht-bootstrap host:porta,...]
+           [-no-lsd] [-no-upnp] [-no-natpmp] [-dht-bootstrap host:port,...]
            [-ipfilter FILE] [-ipfilter-trackers=true] [-lang it]
            [-mode managed|standalone] [-log-file FILE] [-insecure]
            [-debug] [-version]
 ```
 
-`-mode` sceglie come gira il demone. Senza il flag: **managed** se c'è
-`-fingerprint` (lo passa Gextto), **standalone** altrimenti. In managed le flag
-passate da Gextto hanno sempre la precedenza e il file `settings.json` nella
-cartella dati **non** viene letto (così l'impronta resta stabile); in standalone
-`settings.json` fornisce i valori che Gextto non passa — lingua, `listen`,
+`-mode` chooses how the daemon runs. Without the flag: **managed** if there is
+`-fingerprint` (Gextto passes it), **standalone** otherwise. In managed the flags
+passed by Gextto always take precedence and the `settings.json` file in the
+data folder is **not** read (so the fingerprint stays stable); in standalone
+`settings.json` provides the values that Gextto does not pass — language, `listen`,
 `download-dir`, `peer-ports`, `auth-user`/`auth-password`, `local-bypass`,
-`indexers` — e una flag esplicita vince comunque.
+`indexers` — and an explicit flag still wins.
 
-In standalone le POST della pagina (`/ui/*`) sono accettate solo se
-`Origin`/`Referer` coincide con l'host della richiesta (protezione CSRF) e l'host
-della richiesta (`Host`) deve essere un IP o `localhost`, mai un nome che risolve
-a questa macchina (protezione DNS rebinding). La stessa protezione CSRF vale per
-le **POST di `/api/v2`** (che non usano un token): un client che non manda
-`Origin`/`Referer` resta ammesso. In managed la pagina si comporta come prima (le
-POST dell'API v1 restano protette dal token).
+In standalone the page's POSTs (`/ui/*`) are accepted only if
+`Origin`/`Referer` matches the request host (CSRF protection) and the request
+host (`Host`) must be an IP or `localhost`, never a name that resolves
+to this machine (DNS rebinding protection). The same CSRF protection applies to
+the **POSTs of `/api/v2`** (which do not use a token): a client that does not send
+`Origin`/`Referer` is still allowed. In managed the page behaves as before (the
+v1 API POSTs stay protected by the token).
 
-**Percorsi di salvataggio.** In standalone **non c'è alcuna restrizione di
-percorso**: una `destination` (o un save path di categoria, o `setLocation`) può
-essere qualunque percorso assoluto, come in qBittorrent, così lo strumento resta
-pienamente utilizzabile con qualsiasi cartella. Il flag opzionale
-`-allowed-roots /srv/media,/data` limita le destinazioni a quelle cartelle, per
-chi vuole chiudere l'API a percorsi controllati; **non è impostato di default**,
-proprio per non tagliare fuori l'utente. La difesa di base resta il login (e, su
-Windows, il servizio gira come account dedicato e non SYSTEM, quindi la scrittura
-è comunque confinata a ciò che quell'account può scrivere).
+**Save paths.** In standalone **there is no path restriction**:
+a `destination` (or a category save path, or `setLocation`) can be
+any absolute path, as in qBittorrent, so the tool stays
+fully usable with any folder. The optional flag
+`-allowed-roots /srv/media,/data` restricts destinations to those folders, for
+those who want to close the API to controlled paths; it is **not set by default**,
+precisely so as not to cut the user out. The basic defence remains the login (and, on
+Windows, the service runs as a dedicated account and not SYSTEM, so writing
+is still confined to what that account can write).
 
-**Piattaforme.** Il demone è Go puro e gira anche su **Windows** (amd64 e
-arm64): `GOOS=windows CGO_ENABLED=0 go build ./cmd/gx-torrent/`. Le letture di
-sistema usano le API Win32, quindi la cache e la diagnostica restano piene:
-memoria (`GlobalMemoryStatusEx`) per dimensionare la cache, spazio libero
-(`GetDiskFreeSpaceEx`), filesystem di rete (`GetDriveType`), classe del disco
-HDD/SSD (seek penalty via `IOCTL_STORAGE_QUERY_PROPERTY`) e gateway di default
-per UPnP/NAT-PMP (`GetBestRoute`, cioè la rotta che Windows usa davvero anche
-con VPN e LAN insieme, con fallback alla rotta `0.0.0.0` a metrica minore). La
-cartella dati di default è
-`%LOCALAPPDATA%\gx-torrent`. Il **link di libreria** di ogni torrent
-(`DataDir/<id>`) è una **junction** su Windows, non un symlink: la junction non
-richiede il privilegio `SeCreateSymbolicLinkPrivilege` (né la Modalità
-sviluppatore). `os.Readlink` la legge come un symlink, ma da Go 1.23 `os.Lstat`
-la riporta come `ModeIrregular`: il demone la riconosce con `isDirLink`
-(`link_*.go`). Rimuovere la junction non tocca mai i dati a cui punta; per
-ripuntarla dopo un move la nuova junction è costruita completa sotto un nome
-temporaneo e poi scambiata, così una lettura concorrente non vede mai il link
-mancante. Una junction però può puntare solo a un **volume locale**: con una
-cartella di download su una **share di rete** (`\\nas\media`, o un'unità mappata
-`DRIVE_REMOTE`) il demone usa un **symlink** (l'unico link che può puntare a una
-share) e, se manca il privilegio symlink, restituisce un errore chiaro che
-nomina la cartella di rete invece di far fallire l'aggiunta del torrent. Un
-**servizio** gira in sessione 0 e non vede le unità mappate dell'utente: per le
-cartelle di rete usare un percorso **UNC** (`\\server\share\...`), non la lettera
-di unità. Su Unix
-resta il symlink atomico. La migrazione tra volumi riconosce anche l'errore Windows
-`ERROR_NOT_SAME_DEVICE`, quindi il fallback copia funziona come su Unix; senza
-il privilegio symlink, un symlink del payload che punta a un file viene copiato
-come file invece di far fallire lo spostamento (su Unix resta un symlink).
-Restano senza equivalente nativo solo due **ottimizzazioni** di I/O — il
-readahead (`fadvise`) e la preallocazione con `fallocate` — che usano il
-fallback (`Truncate`): funzionano, senza l'ottimizzazione.
+**Platforms.** The daemon is pure Go and also runs on **Windows** (amd64 and
+arm64): `GOOS=windows CGO_ENABLED=0 go build ./cmd/gx-torrent/`. System
+reads use the Win32 APIs, so the cache and diagnostics stay complete:
+memory (`GlobalMemoryStatusEx`) to size the cache, free space
+(`GetDiskFreeSpaceEx`), network filesystem (`GetDriveType`), disk
+class HDD/SSD (seek penalty via `IOCTL_STORAGE_QUERY_PROPERTY`) and default gateway
+for UPnP/NAT-PMP (`GetBestRoute`, i.e. the route Windows actually uses even
+with a VPN and LAN together, with a fallback to the `0.0.0.0` route at the lowest metric). The
+default data folder is
+`%LOCALAPPDATA%\gx-torrent`. The **library link** of each torrent
+(`DataDir/<id>`) is a **junction** on Windows, not a symlink: the junction does not
+require the `SeCreateSymbolicLinkPrivilege` privilege (nor Developer
+Mode). `os.Readlink` reads it as a symlink, but since Go 1.23 `os.Lstat`
+reports it as `ModeIrregular`: the daemon recognises it with `isDirLink`
+(`link_*.go`). Removing the junction never touches the data it points to; to
+re-point it after a move the new junction is built complete under a
+temporary name and then swapped, so a concurrent read never sees the link
+missing. A junction can however point only to a **local volume**: with a
+download folder on a **network share** (`\\nas\media`, or a mapped drive
+`DRIVE_REMOTE`) the daemon uses a **symlink** (the only link that can point to a
+share) and, if the symlink privilege is missing, returns a clear error that
+names the network folder instead of making the torrent addition fail. A
+**service** runs in session 0 and does not see the user's mapped drives: for
+network folders use a **UNC** path (`\\server\share\...`), not the drive
+letter. On Unix the atomic symlink remains. Migration between volumes also recognises the Windows
+error `ERROR_NOT_SAME_DEVICE`, so the copy fallback works as on Unix; without
+the symlink privilege, a symlink of the payload pointing to a file is copied
+as a file instead of making the move fail (on Unix it remains a symlink).
+Only two I/O **optimisations** remain without a native equivalent — the
+readahead (`fadvise`) and preallocation with `fallocate` — which use the
+fallback (`Truncate`): they work, without the optimisation.
 
-**Installazione su Windows.** Il demone riconosce di essere avviato dal
-Service Control Manager (`svc.IsWindowsService`, `service_windows.go`) e gira
-come **servizio nativo**: un solo comando avvia il server HTTP e i torrent, e lo
-stop del servizio li ferma in modo pulito. Il servizio gira come **account
-virtuale** `NT SERVICE\gx-torrent` (non `LocalSystem`): lo crea il Service
-Control Manager e non ha diritti oltre a quelli concessi dall'installer — la
-cartella del programma in lettura/esecuzione e `%ProgramData%\gx-torrent` in
-scrittura. Una **cartella di download** scelta altrove va concessa a parte
-(`icacls D:\media /grant "NT SERVICE\gx-torrent:(OI)(CI)M"`), altrimenti il
-demone non può scrivere. Girare sotto un account dedicato (invece di SYSTEM)
-limita anche la scrittura di file arbitrari a cui un client dell'API può
-arrivare impostando `destination`. Il pacchetto
-`scripts/package-gx-torrent-windows.sh` produce
-`gx-torrent-windows-<arch>.zip` con `gx-torrent.exe`, `install-service.ps1`
-(`New-Service` + account virtuale + `icacls`, avviato in PowerShell elevato),
-`uninstall-service.ps1` e `README.txt` con l'alternativa `sc create`. Dati e log
-in `%ProgramData%\gx-torrent`; il servizio gira in **sessione 0**, quindi non
-apre il browser: l'installazione guidata resta il wizard web su `/ui/setup`.
-Installer e unit systemd restano per Linux. Il pacchetto Linux
-`scripts/package-gx-torrent.sh` produce
-`gx-torrent-linux-<arch>.tar.gz` con il binario, l'unit, `run.sh` e **due
-script**: `sudo ./install-service.sh` crea l'utente di sistema `gx-torrent`,
-installa in `/opt/gx-torrent` e abilita il servizio; `sudo
-./uninstall-service.sh` lo rimuove lasciando i dati. L'unit usa
-`StateDirectory=gx-torrent`, quindi systemd crea e possiede
-`/var/lib/gx-torrent` prima dell'avvio (l'installer non deve crearla).
+**Installation on Windows.** The daemon recognises that it is started by the
+Service Control Manager (`svc.IsWindowsService`, `service_windows.go`) and runs
+as a **native service**: a single command starts the HTTP server and the torrents, and
+stopping the service stops them cleanly. The service runs as the **virtual
+account** `NT SERVICE\gx-torrent` (not `LocalSystem`): it is created by the Service
+Control Manager and has no rights beyond those granted by the installer — the
+program folder read/execute and `%ProgramData%\gx-torrent` write. A **download
+folder** chosen elsewhere must be granted separately
+(`icacls D:\media /grant "NT SERVICE\gx-torrent:(OI)(CI)M"`), otherwise the
+daemon cannot write. Running under a dedicated account (instead of SYSTEM)
+also limits the writing of arbitrary files that an API client can
+reach by setting `destination`. The package
+`scripts/package-gx-torrent-windows.sh` produces
+`gx-torrent-windows-<arch>.zip` with `gx-torrent.exe`, `install-service.ps1`
+(`New-Service` + virtual account + `icacls`, run in elevated PowerShell),
+`uninstall-service.ps1` and `README.txt` with the `sc create` alternative. Data and logs
+in `%ProgramData%\gx-torrent`; the service runs in **session 0**, so it does not
+open the browser: the guided installation remains the web wizard on `/ui/setup`.
+Installer and systemd unit remain for Linux. The Linux package
+`scripts/package-gx-torrent.sh` produces
+`gx-torrent-linux-<arch>.tar.gz` with the binary, the unit, `run.sh` and **two
+scripts**: `sudo ./install-service.sh` creates the system user `gx-torrent`,
+installs in `/opt/gx-torrent` and enables the service; `sudo
+./uninstall-service.sh` removes it leaving the data. The unit uses
+`StateDirectory=gx-torrent`, so systemd creates and owns
+`/var/lib/gx-torrent` before startup (the installer must not create it).
 
-In breve, sul PC Windows:
+In short, on the Windows PC:
 
 ```powershell
-# PowerShell con privilegi di amministratore, nella cartella dello zip estratto
-.\install-service.ps1     # registra e avvia il servizio (avvio automatico)
-Stop-Service gx-torrent    # ferma
-.\uninstall-service.ps1   # rimuove il servizio (i dati restano)
+# PowerShell with administrator privileges, in the folder of the extracted zip
+.\install-service.ps1     # registers and starts the service (automatic startup)
+Stop-Service gx-torrent    # stops
+.\uninstall-service.ps1   # removes the service (data remains)
 ```
 
-Lo zip è pubblicato in ogni release (`gx-torrent-windows-amd64.zip`,
-`gx-torrent-windows-arm64.zip`, con checksum `.sha256`). La CI lo verifica su
-`windows-latest` a due livelli: il job `windows-platform` esegue i test di
-piattaforma (junction, memoria, gateway, setup, move tra volumi, ciclo di vita
-del demone `TestDaemonStartServeStop`); il job `windows-service`, non
-bloccante, installa davvero il servizio con lo stesso `binPath` del pacchetto,
-lo avvia, attende `/api/v1/health` e ne verifica lo stop pulito
-(`scripts/gx-torrent-service-selftest.ps1`, riusabile anche a mano).
+The zip is published in every release (`gx-torrent-windows-amd64.zip`,
+`gx-torrent-windows-arm64.zip`, with `.sha256` checksum). The CI verifies it on
+`windows-latest` at two levels: the `windows-platform` job runs the platform tests
+(junction, memory, gateway, setup, cross-volume move, daemon lifecycle
+`TestDaemonStartServeStop`); the `windows-service` job, non-blocking,
+actually installs the service with the same `binPath` as the package,
+starts it, waits for `/api/v1/health` and verifies its clean stop
+(`scripts/gx-torrent-service-selftest.ps1`, reusable by hand too).
 
-In standalone, se `settings.json` contiene `auth-password` (hash bcrypt col
-prefisso `bcrypt:`), la pagina chiede il login (`/ui/login`, sessione in un
-cookie `gx_session`) tranne che dalle sorgenti LAN quando `local-bypass` è attivo
-(predefinito). Senza password la pagina resta aperta, così la prima
-configurazione è raggiungibile. Altre chiavi: `auth-user` (predefinito `admin`),
-`local-bypass` (`true`/`false`). La password protegge anche `/api/v1` e l'API
-qBittorrent `/api/v2` (stessi criteri della pagina: nessuna password, bypass LAN,
-o cookie `gx_session`/`SID`)
-e tutte le richieste che cambiano stato su `/api/` sono rifiutate se cross-site
-(`Origin`/`Referer`). Dopo 5 tentativi di login falliti dallo stesso indirizzo,
-l'IP è bloccato per 15 minuti.
+In standalone, if `settings.json` contains `auth-password` (bcrypt hash with the
+`bcrypt:` prefix), the page asks for login (`/ui/login`, session in a
+`gx_session` cookie) except from LAN sources when `local-bypass` is active
+(default). Without a password the page stays open, so the first
+configuration is reachable. Other keys: `auth-user` (default `admin`),
+`local-bypass` (`true`/`false`). The password also protects `/api/v1` and the
+qBittorrent API `/api/v2` (same criteria as the page: no password, LAN bypass,
+or `gx_session`/`SID` cookie)
+and all state-changing requests on `/api/` are rejected if cross-site
+(`Origin`/`Referer`). After 5 failed login attempts from the same address,
+the IP is blocked for 15 minutes.
 
-### Reverse proxy e host ammessi
+### Reverse proxy and allowed hosts
 
-Con un reverse proxy davanti al demone, ogni richiesta arriva da `127.0.0.1` e,
-se `local-bypass` è attivo, verrebbe considerata LAN (cioè senza password). Due
-chiavi di `settings.json` regolano il caso:
+With a reverse proxy in front of the daemon, every request arrives from
+`127.0.0.1` and, if `local-bypass` is active, would be considered LAN (that is,
+without a password). Two keys of `settings.json` handle the case:
 
-- `trusted-proxies`: elenco (separato da virgole o a capo) di indirizzi o reti
-  CIDR **fidati** (`127.0.0.1`, `10.0.0.0/8`). Solo da questi indirizzi si
-  crede a `X-Forwarded-For`/`X-Real-IP` per stabilire il client reale; una
-  richiesta che arriva da un proxy non dichiarato con questi header **non** è
-  considerata LAN (quindi richiede il login se c'è una password). Il percorso
-  usato è l'ultimo indirizzo non fidato della catena.
-- `allowed-hosts`: elenco di nomi host accettati nell'header `Host`, oltre agli
-  IP letterali e a `localhost`. Serve quando il proxy conserva il nome originale
-  (`proxy_set_header Host $host`) o si accede con un nome tipo `nas.local`.
-  Senza questa chiave un proxy che lascia `Host` a un nome non-IP riceve
-  `403 host not allowed` (protezione anti DNS-rebinding).
+- `trusted-proxies`: list (comma or newline separated) of **trusted** addresses or
+  CIDR networks (`127.0.0.1`, `10.0.0.0/8`). Only from these addresses is
+  `X-Forwarded-For`/`X-Real-IP` believed to establish the real client; a
+  request that arrives from an undeclared proxy with these headers is **not**
+  considered LAN (so it requires login if there is a password). The path
+  used is the last untrusted address of the chain.
+- `allowed-hosts`: list of host names accepted in the `Host` header, besides
+  literal IPs and `localhost`. It is needed when the proxy preserves the original name
+  (`proxy_set_header Host $host`) or access is via a name like `nas.local`.
+  Without this key a proxy that leaves `Host` as a non-IP name receives
+  `403 host not allowed` (anti DNS-rebinding protection).
 
-Il proxy deve passare l'indirizzo del client:
-`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` (nginx) o
-l'equivalente di Caddy.
+The proxy must pass the client address:
+`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` (nginx) or
+Caddy's equivalent.
 
-Al primo avvio in standalone, finché il setup non è completato, la pagina
-reindirizza al **wizard** (`/ui/setup`): lingua, cartella di download e cartella
-temporanea (con **selettore di cartelle**: `GET /ui/browse-dir` elenca le
-directory del server e un pulsante *Sfoglia* le fa scegliere, senza digitare il
-percorso), porta peer con **test di raggiungibilità** (`/api/v1/portcheck`:
-esito, metodo UPnP/NAT-PMP, IP esterno), **limiti di banda** globali
-(download/upload in KiB/s, 0 = illimitato), utente e password, "LAN senza
-password" e indexer facoltativi. Le due cartelle sono **precompilate** con due
-sottocartelle della directory che contiene il binario del demone (la cartella
-principale prende il nome dalla lingua scelta — `download` in inglese, `scarico`
-in italiano, `telechargements`, `descargas`, `pobrane`; quella temporanea è
-sempre `download-temp`): sono solo proposte, accettabili, modificabili o
-svuotabili, così un'installazione da archivio tiene i download accanto a sé. Il
-campo **Indexer** è una tendina dei prodotti
-già supportati (Prowlarr, Jackett, MIRCrew, altre): scegliendo Prowlarr o
-Jackett l'URL viene precompilato con il loro solito indirizzo locale e porta
-(`127.0.0.1:9696` / `127.0.0.1:9117`), comunque modificabile. Il wizard scrive
-`settings.json` e marca il setup completato; lingua e limiti di banda valgono
-subito (se i limiti non si applicano, l'errore è mostrato nella pagina e il
-setup non viene marcato completato), cartella e porta al prossimo avvio (la
-chiave `peer-ports` è letta quando la flag non è passata).
+At the first startup in standalone, until the setup is completed, the page
+redirects to the **wizard** (`/ui/setup`): language, download folder and temporary
+folder (with a **folder picker**: `GET /ui/browse-dir` lists the
+server's directories and a *Browse* button lets you choose them, without typing the
+path), peer port with **reachability test** (`/api/v1/portcheck`:
+outcome, UPnP/NAT-PMP method, external IP), global **bandwidth limits**
+(download/upload in KiB/s, 0 = unlimited), user and password, "LAN without
+password" and optional indexers. The two folders are **pre-filled** with two
+subfolders of the directory containing the daemon binary (the main folder
+takes its name from the chosen language — `download` in English, `scarico`
+in Italian, `telechargements`, `descargas`, `pobrane`; the temporary one is
+always `download-temp`): they are only proposals, acceptable, editable or
+clearable, so that an archive installation keeps the downloads next to itself. The
+**Indexer** field is a drop-down of the already supported products (Prowlarr,
+Jackett, MIRCrew, others): choosing Prowlarr or
+Jackett pre-fills the URL with their usual local address and port
+(`127.0.0.1:9696` / `127.0.0.1:9117`), still editable. The wizard writes
+`settings.json` and marks the setup as completed; language and bandwidth limits apply
+immediately (if the limits are not applied, the error is shown on the page and the
+setup is not marked as completed), folder and port at the next startup (the
+`peer-ports` key is read when the flag is not passed).
 
-Il demone apre da solo il browser sul wizard, **dopo** che il server è in
-ascolto e solo se c'è una sessione grafica: `rundll32` su Windows (saltato in
-sessione 0, cioè servizi e attività senza utente collegato), `xdg-open` su Unix
-con fallback `gio`/`sensible-browser` (solo con `DISPLAY`, `WAYLAND_DISPLAY` o
-`XDG_SESSION_TYPE`). Negli altri casi il log stampa comunque l'URL da aprire.
+The daemon opens the browser on the wizard by itself, **after** the server is
+listening and only if there is a graphical session: `rundll32` on Windows (skipped in
+session 0, i.e. services and tasks without a logged-in user), `xdg-open` on Unix
+with `gio`/`sensible-browser` fallback (only with `DISPLAY`, `WAYLAND_DISPLAY` or
+`XDG_SESSION_TYPE`). In other cases the log still prints the URL to open.
 
-In standalone il demone espone anche un'**API compatibile qBittorrent**
-(`/api/v2`) per Sonarr, Radarr e le app mobili: `auth/login` e `auth/logout`
-(cookie `SID`, la stessa password del login), `app/version`,
-`app/webapiVersion`, `app/preferences|setPreferences`, `transfer/info` e
-`torrents/info|add|delete|pause|resume|recheck`, più categorie e tag
+In standalone the daemon also exposes a **qBittorrent-compatible API**
+(`/api/v2`) for Sonarr, Radarr and mobile apps: `auth/login` and `auth/logout`
+(`SID` cookie, the same login password), `app/version`,
+`app/webapiVersion`, `app/preferences|setPreferences`, `transfer/info` and
+`torrents/info|add|delete|pause|resume|recheck`, plus categories and tags
 (`torrents/categories`, `createCategory`, `removeCategories`, `setCategory`,
-`torrents/tags`, `createTags`, `deleteTags`, `addTags`, `removeTags`; categoria
-e tag viaggiano anche su `torrents/add`), `torrents/properties|files|trackers`
-e `torrents/reannounce|setLocation` (più gli alias 5.x `stop`/`start`),
+`torrents/tags`, `createTags`, `deleteTags`, `addTags`, `removeTags`; category
+and tag also travel on `torrents/add`), `torrents/properties|files|trackers`
+and `torrents/reannounce|setLocation` (plus the 5.x aliases `stop`/`start`),
 `torrents/toggleSequentialDownload|setSuperSeeding|addTrackers|removeTrackers|editTracker|filePrio|export|setForceStart|setAutoManagement|setDownloadLimit|setUploadLimit|setShareLimits`,
-`transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit`, `sync/maindata` (con `rid` incrementale) e
-`sync/torrentPeers` (che riporta `rid: 0`), e `content_path` in
-`torrents/info`, come leggono Sonarr e Radarr). L'API usa gli stessi criteri di
-accesso della pagina: senza password è aperta, altrimenti servono il bypass LAN
-(se `local-bypass` è attivo) o una sessione (`SID` qBittorrent o `gx_session`
-della pagina). In managed **non** è esposta: comanda solo
-Gextto. La compatibilità è verificata dai test usando il client qBittorrent di
-Gextto (`internal/qbittorrent`) contro il demone.
+`transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit`, `sync/maindata` (with incremental `rid`) and
+`sync/torrentPeers` (which reports `rid: 0`), and `content_path` in
+`torrents/info`, as Sonarr and Radarr read). The API uses the same access
+criteria as the page: without a password it is open, otherwise the LAN bypass
+is needed (if `local-bypass` is active) or a session (`SID` qBittorrent or `gx_session`
+of the page). In managed it is **not** exposed: only Gextto commands.
+Compatibility is verified by tests using Gextto's qBittorrent client
+(`internal/qbittorrent`) against the daemon.
 
 ### Container
 
-Il demone standalone si può eseguire in container: il `Dockerfile` nella radice
-compila `gx-torrent` (Go puro) e lo impacchetta in `debian:12-slim` con i
-certificati CA, in **modalità standalone**, dati in `/data`, UI su `0.0.0.0:8080`
-e porta peer `6881` (TCP+UDP); il processo gira come utente non privilegiato.
+The standalone daemon can be run in a container: the `Dockerfile` in the root
+compiles `gx-torrent` (pure Go) and packages it in `debian:12-slim` with the CA
+certificates, in **standalone mode**, data in `/data`, UI on `0.0.0.0:8080`
+and peer port `6881` (TCP+UDP); the process runs as an unprivileged user.
 
 ```sh
 docker build -t gx-torrent .
@@ -420,268 +419,269 @@ docker run -d --name gx-torrent \
   -v gx-torrent-data:/data gx-torrent
 ```
 
-Alla prima apertura (`http://HOST:8080/`) la pagina reindirizza al wizard
+On first open (`http://HOST:8080/`) the page redirects to the wizard
 (`/ui/setup`).
 
-In standalone la pagina ha anche un filtro **Categorie** nella barra laterale e,
-nel dettaglio *Generale*, i campi **Categoria** e **Tag** (scrivere una categoria
-nuova la crea). In managed questi controlli non compaiono e l'endpoint
-`/ui/category` rifiuta la richiesta.
+In standalone the page also has a **Categories** filter in the side bar and,
+in the *General* detail, the **Category** and **Tag** fields (writing a new
+category creates it). In managed these controls do not appear and the endpoint
+`/ui/category` rejects the request.
 
-La **ricerca su indexer** (standalone) usa la chiave `indexers` di
-`settings.json`, un array JSON di endpoint Torznab
-(`[{"name":"Jackett","url":"http://host:9117","apikey":"…"}]`, così Jackett e
-Prowlarr): `GET /ui/search?q=…` interroga tutti, unisce i risultati e li ordina
-per seed. Con almeno un indexer configurato compare nella pagina la **casella di
-ricerca**, con i risultati e un pulsante *Add* per aggiungere il torrent. In
-managed non è disponibile. **Jackett, Prowlarr e MIRCrew** parlano tutti Torznab
-(il servizio `mircrew-indexer` espone un endpoint Torznab), quindi si configurano
-allo stesso modo: URL che finisce in `/api` (per MIRCrew la porta è scelta a
-mano, non ha un default). Un indexer può mettere il **magnet nel link o
-nell'enclosure** invece che in un attributo `magneturl` (è il caso di MIRCrew):
-viene riconosciuto e aggiunto come magnet, senza tentare di scaricarlo via HTTP.
-Un indexer che risponde con un **documento di errore** (es. chiave API non
-valida: HTTP 200 con `<error code="100" description="…">`, come fa Jackett)
-viene segnalato come **errore**, non scambiato per un feed vuoto: una chiave
-sbagliata non passa più in silenzio.
-Le ricerche automatiche in un feed di ricerca attendono ogni indexer **fino a 45
-secondi**, perché MIRCrew può cercare sul forum prima di rispondere.
+The **indexer search** (standalone) uses the `indexers` key of
+`settings.json`, a JSON array of Torznab endpoints
+(`[{"name":"Jackett","url":"http://host:9117","apikey":"…"}]`, so Jackett and
+Prowlarr): `GET /ui/search?q=…` queries all of them, merges the results and sorts them
+by seed. With at least one indexer configured the **search box** appears on the page,
+with the results and an *Add* button to add the torrent. In
+managed it is not available. **Jackett, Prowlarr and MIRCrew** all speak Torznab
+(the `mircrew-indexer` service exposes a Torznab endpoint), so they are configured
+in the same way: URL ending in `/api` (for MIRCrew the port is chosen by
+hand, it has no default). An indexer can put the **magnet in the link or
+in the enclosure** instead of in a `magneturl` attribute (this is MIRCrew's case):
+it is recognised and added as a magnet, without trying to download it via HTTP.
+An indexer that responds with an **error document** (e.g. invalid API key:
+HTTP 200 with `<error code="100" description="…">`, as Jackett does)
+is reported as an **error**, not mistaken for an empty feed: a wrong key no
+longer passes silently.
+Automatic searches in a search feed wait for each indexer **up to 45
+seconds**, because MIRCrew may search the forum before responding.
 
-L'**RSS** (standalone) usa la chiave `feeds`: un array JSON di feed con le
-regole, ad esempio
+**RSS** (standalone) uses the `feeds` key: a JSON array of feeds with the
+rules, for example
 `[{"name":"Serie","url":"http://…rss","folder":"serie","include":"1080p,ita","exclude":"cam","category":"tv","savepath":"/srv/tv"}]`.
-Ogni feed può avere un `folder` (gruppo) facoltativo per organizzarlo nel
-riquadro dei feed, che li raggruppa.
-Un worker (ogni `feed-interval-secs`, predefinito 15 minuti, modificabile dalla
-pagina RSS in minuti) scarica ogni feed attivo, applica `include`/`exclude` sul
-titolo e aggiunge magnet e `.torrent` non ancora visti (l'elenco degli elementi
-già aggiunti è persistito, quindi un riavvio non li ripropone). `disabled: true`
-sospende i controlli automatici di un feed senza cancellarlo (il *disable feed*
-di qBittorrent; il pulsante ↻ della riga funziona comunque). Ogni elemento letto
-finisce anche nell'**archivio dei feed** (sotto). Nella pagina compaiono un
-riquadro *Feeds* con *Check feeds* e `GET /ui/feeds`/`POST /ui/feeds/poll` per lo
-stato e un controllo immediato; `POST /ui/feeds/poll` con `feed=<nome>` controlla
-**un solo feed in modo sincrono** e risponde con il suo stato (`items`, `new` =
-elementi mai visti prima, `added`, `last_error`, `last_check`), così la riga si
-aggiorna con l'esito; se un giro è già in corso risponde 409. In managed non è
-disponibile.
+Each feed can have an optional `folder` (group) to organise it in the
+feeds box, which groups them.
+A worker (every `feed-interval-secs`, default 15 minutes, editable from the
+RSS page in minutes) downloads every active feed, applies `include`/`exclude` on the
+title and adds magnets and `.torrent`s not seen yet (the list of already added
+items is persisted, so a restart does not re-propose them). `disabled: true`
+suspends a feed's automatic checks without deleting it (qBittorrent's *disable feed*;
+the row's ↻ button still works). Every item read also ends up in the **feed
+archive** (below). On the page appear a *Feeds* box with *Check feeds* and
+`GET /ui/feeds`/`POST /ui/feeds/poll` for the status and an immediate check;
+`POST /ui/feeds/poll` with `feed=<name>` checks
+**a single feed synchronously** and responds with its status (`items`, `new` =
+items never seen before, `added`, `last_error`, `last_check`), so the row
+refreshes with the outcome; if a round is already in progress it responds 409. In managed it
+is not available.
 
-Un feed può essere anche la **pagina HTML di un elenco** invece di un RSS, come
-in Gextto: una pagina uploader o di ricerca di **ext.to** (link magnet diretti:
-titolo dal testo o dal `dn`, dedup per info-hash) o di **TorrentGalaxy**
-(`/get-posts/user:NOME/`: le righe puntano a pagine `/post-detail/` lette con 3
-richieste parallele e una cache in memoria, quindi un giro costa una richiesta
-per release nuova). Una pagina che pubblicizza un feed (`<link rel="alternate"
-type="application/rss+xml">`) viene seguita; una pagina HTML senza link torrent
-dà un errore chiaro (*pagina HTML senza link torrent, non un feed RSS*) invece
-del vecchio `XML syntax error`. Le richieste usano uno User-Agent da browser
+A feed can also be the **HTML page of a listing** instead of an RSS, as
+in Gextto: an uploader or search page of **ext.to** (direct magnet links:
+title from the text or from `dn`, dedup by info-hash) or of **TorrentGalaxy**
+(`/get-posts/user:NAME/`: the rows point to `/post-detail/` pages read with 3
+parallel requests and an in-memory cache, so a round costs one request
+per new release). A page that advertises a feed (`<link rel="alternate"
+type="application/rss+xml">`) is followed; an HTML page without torrent links
+gives a clear error (*HTML page without torrent links, not an RSS feed*) instead
+of the old `XML syntax error`. Requests use a browser User-Agent
 (`internal/rss/listing.go`).
 
-Un feed può anche essere una **ricerca**: al posto di `url` si usa `search` (una
-query) e il worker interroga gli **indexer** Torznab configurati, trattando i
-risultati come articoli del feed (stesse regole, dedup e azioni). Esempio:
+A feed can also be a **search**: instead of `url` a `search` (a
+query) is used and the worker queries the configured Torznab **indexers**, treating the
+results as feed items (same rules, dedup and actions). Example:
 `[{"name":"cerca-serie","search":"Serie S01","include":"1080p"}]`.
 
-Con la chiave `rules` (array JSON) si passa al **set di regole ordinate**, come
-BiglyBT: la prima regola che corrisponde decide (`fail: true` scarta, altrimenti
-aggiunge). Ogni regola ha `name`, `feeds` (per limitarla ad alcuni feed; vuoto =
-tutti), `fail`, `match` e `action`:
+With the `rules` key (JSON array) you switch to the **ordered rule set**, like
+BiglyBT: the first rule that matches decides (`fail: true` discards, otherwise
+it adds). Each rule has `name`, `feeds` (to limit it to some feeds; empty =
+all), `fail`, `match` and `action`:
 
-- `match`: `include`/`exclude` (sottostringhe), `regex`/`not_regex`,
-  `min_size`/`max_size` (byte), `min_seeders`/`max_seeders`, `min_peers`,
-  `max_age_days`, `require_episode`, `episode_filter` e `smart_episode`
-  (aggiunge un episodio di una serie una volta sola, tenendo traccia
-  dell'ultimo: come lo smart episode filter di qBittorrent; un **REPACK** o
-  **PROPER** di un episodio già preso viene accettato una volta sola);
-- `ignore_days` (0 = spento): **cooldown** in tempo reale — dopo un match la regola
-  non fa più match per N giorni, come *ignore days* di qBittorrent ("ignora i
-  match successivi per N giorni"); non dipende dalla data di pubblicazione degli
-  item, quindi un episodio uscito due giorni dopo il precedente non viene perso;
-- ogni regola è attiva per default; `enabled: false` la disattiva senza
-  cancellarla (l'editor mostra un'etichetta *Disattivata* e un pulsante
-  *Attiva/Disattiva*). Una regola copre i feed elencati in `feeds` (vuoto =
-  tutti); un feed **senza alcuna regola che lo copra** usa i propri
-  `include`/`exclude`, quindi aggiungere una regola per un feed non ferma gli
-  altri. Anche una regola **disattivata** copre i suoi feed: spegnere l'unica
-  regola di un feed (o una regola *once* che si spegne da sola) ferma i download
-  invece di ricadere sul filtro del feed. Un feed **senza Include/Escludi e
-  senza regole** non scarica nulla: fa solo crescere l'**archivio** (la sua riga
-  lo segnala con *solo archivio*, e il log lo dice a ogni giro), a meno che
-  l'operatore accenda il flag **Prendi tutto**. Aggiungere un feed, quindi, non
-  significa tirare giù quello che contiene: significa che quel materiale c'è, e
-  a scaricarlo decidono le regole e i **Cercati**.
+- `match`: `include`/`exclude` (substrings), `regex`/`not_regex`,
+  `min_size`/`max_size` (bytes), `min_seeders`/`max_seeders`, `min_peers`,
+  `max_age_days`, `require_episode`, `episode_filter` and `smart_episode`
+  (adds an episode of a series only once, keeping track
+  of the last one: like qBittorrent's smart episode filter; a **REPACK** or
+  **PROPER** of an already taken episode is accepted only once);
+- `ignore_days` (0 = off): real-time **cooldown** — after a match the rule
+  no longer matches for N days, like qBittorrent's *ignore days* ("ignore
+  subsequent matches for N days"); it does not depend on the publication date of the
+  items, so an episode released two days after the previous one is not lost;
+- every rule is active by default; `enabled: false` disables it without
+  deleting it (the editor shows a *Disabled* label and an
+  *Enable/Disable* button). A rule covers the feeds listed in `feeds` (empty =
+  all); a feed **without any rule covering it** uses its own
+  `include`/`exclude`, so adding a rule for a feed does not stop the
+  others. Even a **disabled** rule covers its feeds: turning off the only
+  rule of a feed (or an *once* rule that turns itself off) stops the downloads
+  instead of falling back to the feed filter. A feed **without Include/Exclude and
+  without rules** downloads nothing: it only grows the **archive** (its row
+  reports it with *archive only*, and the log says so at every round), unless
+  the operator turns on the **Take all** flag. Adding a feed, then, does not
+  mean pulling down what it contains: it means that material is there, and
+  what to download is decided by the rules and the **Wanted** list.
 - `action`: `savepath`, `category`, `tags`, `paused`, `sequential`, `first_last`,
-  `top`, `once` (disattiva la regola dopo il primo download; lo usa *Segui un
-  titolo* per i film).
+  `top`, `once` (disables the rule after the first download; it is used by *Follow a
+  title* for movies).
 
-Il **filtro episodi** `episode_filter` usa la sintassi di qBittorrent: `1x01`
-(singolo), `1x01-05` (intervallo nella stagione), `1x01-1x05` (a cavallo di due
-stagioni), `1x01-` (aperto), `1x??`/`1x*` (tutta la stagione), separati da virgole
-o punti e virgola (`1x01, 1x03, 2x01-`); sono accettate anche le forme `S01E01`,
-il range con coda `S01E01-E05` e la sola stagione `S01`/`s1`. Il filtro vale solo
-per i titoli con un episodio riconoscibile; un filtro non valido non fa mai match
-(l'editor lo rifiuta prima di salvare).
+The **episode filter** `episode_filter` uses qBittorrent's syntax: `1x01`
+(single), `1x01-05` (range within the season), `1x01-1x05` (spanning two
+seasons), `1x01-` (open), `1x??`/`1x*` (whole season), separated by commas
+or semicolons (`1x01, 1x03, 2x01-`); the `S01E01` forms are also accepted,
+the range with tail `S01E01-E05` and the season alone `S01`/`s1`. The filter applies only
+to titles with a recognisable episode; an invalid filter never matches
+(the editor rejects it before saving).
 
-Esempio:
+Example:
 `[{"name":"no-cam","fail":true,"match":{"regex":"(?i)cam"}},{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv","savepath":"/srv/tv"}}]`.
 
-La pagina **`/ui/rss`** (standalone, raggiungibile dal collegamento *RSS e
-indexer* nella barra di ogni pagina) è pensata per l'uso quotidiano. In cima c'è
-**Cercati**: i titoli che l'operatore vuole. Ogni titolo ha tipo (serie/film),
-stagioni (`1+`, `2-4`, `1`), lingua, qualità (selezionabile da menu a tendina
-tra *Any*, *360p*, *480p*, *576p*, *720p*, *720p+*, *720p-1080p*, *1080p*,
-*1080p+*, *2160p 4K*, *2160p+ 4K+*), esclusi, filtro episodi, categoria
-e percorso. Si aggiunge a mano, oppure si scrive un nome e si preme **Cerca nei
-feed**: vengono interrogati gli indexer e i feed RSS già configurati e la pagina
-propone i **nomi trovati** (filtrati per lingua/qualità già inserite e per le
-parole cercate: i feed consegnano tutto il loro contenuto attuale, non una
-ricerca, quindi i loro nomi estranei alla query non compaiono), da
-scegliere con un clic. Il **titolo è richiesto** (regex tollerante ai separatori,
-quindi i risultati fuzzy su parole comuni non entrano) e lingua/qualità sono in
-**AND**. Il risultato dice anche **da dove arrivano i nomi** (`Indexer: N ·
-Feed: M · Archive: K`), oppure *Nessun indexer configurato* o l'errore
-dell'indexer: così si
-distingue subito un indexer assente o che non risponde dai soli risultati dei
-feed.
+The **`/ui/rss`** page (standalone, reachable from the *RSS and indexers* link
+in the bar of every page) is designed for daily use. At the top there is
+**Wanted**: the titles the operator wants. Each title has type (series/movie),
+seasons (`1+`, `2-4`, `1`), language, quality (selectable from a drop-down
+among *Any*, *360p*, *480p*, *576p*, *720p*, *720p+*, *720p-1080p*, *1080p*,
+*1080p+*, *2160p 4K*, *2160p+ 4K+*), excluded, episode filter, category
+and path. You add it by hand, or you type a name and press **Search in
+feeds**: the indexers and the already configured RSS feeds are queried and the page
+proposes the **names found** (filtered by the language/quality already entered and by the
+searched words: feeds deliver all their current content, not a
+search, so their names unrelated to the query do not appear), to be
+chosen with a click. The **title is required** (regex tolerant of separators,
+so fuzzy results on common words do not enter) and language/quality are in
+**AND**. The result also says **where the names come from**
+(`Indexer: N · Feed: M · Archive: K`), or *No indexer configured* or the indexer's
+error: so you can
+immediately tell an absent or unresponsive indexer from the results of the
+feeds alone.
 
-Il demone, a ogni ciclo, cerca ogni titolo negli **indexer**, nei **feed RSS** e
-nell'**archivio** (dove i feed depositano tutto ciò che trovano, anche ciò che
-non è più nel feed; bastano gli indexer se non ci sono feed) e prende
-gli episodi che compaiono; tiene un **registro** (nel file di stato) di cosa è
-apparso e cosa è stato scaricato, mostra i **mancanti** nella tabella e li
-**ricerca di nuovo** (gap search, con query `Titolo SxxEyy`) finché non li trova.
-Per un **film** prende una release e non ne cerca altre. La lista non crea feed o
-regole: è il motore a interrogare indexer e feed per il titolo, così la lingua e
-la qualità valgono in AND e i feed restano liberi per le regole avanzate.
+The daemon, at every cycle, searches every title in the **indexers**, in the **RSS
+feeds** and in the **archive** (where feeds deposit everything they find, even what
+is no longer in the feed; indexers suffice if there are no feeds) and takes
+the episodes that appear; it keeps a **record** (in the state file) of what has
+appeared and what has been downloaded, shows the **missing** ones in the table and
+**searches again** (gap search, with query `Title SxxEyy`) until it finds them.
+For a **movie** it takes one release and does not look for others. The list does not create feeds or
+rules: it is the engine that queries indexers and feeds for the title, so language and
+quality apply in AND and feeds remain free for advanced rules.
 
-Sotto: elenchi con pulsanti per aggiungere, **modificare** (il form si riempie
-con i valori della riga; una chiave API vuota la mantiene) **testare** (richiesta
-Torznab `t=caps`, esito accanto alla riga) e rimuovere **indexer** (tendina
-Prowlarr/Jackett/Altro, URL precompilato; il nome è un **link alla pagina web
-dell'indexer**, cioè schema e host dell'URL Torznab, aperto in una nuova scheda).
-I **feed** hanno una tabella con stato (*attivo*/*disattivato*, *aggiunge in
-pausa*), **ultimo controllo** con elementi, nuovi e aggiunti o l'errore, e per
-riga i pulsanti **↻ Ricarica** (a sinistra di *Rimuovi*: legge subito quel feed
-e aggiorna la riga), **Modifica** (il form si riempie, comprese le *Opzioni del
-feed*: cartella, include/escludi, categoria, percorso, pausa, disattivato),
-**Attiva/Disattiva** e **Rimuovi**. Un riquadro **opzioni RSS** imposta
-l'intervallo di aggiornamento (minuti) e la conservazione dell'archivio (giorni)
-e mostra l'ora del prossimo controllo automatico. L'**editor delle regole** ha
-una regola per riga con **Modifica** (carica la regola nel form; salvando resta al
-suo posto nell'ordine), **Attiva/Disattiva**, frecce per cambiarne l'ordine — la
-prima che corrisponde vince — e *Rimuovi*; il form ha anche *Scarica una volta*
-(`once`) e **Anteprima corrispondenze**: prova la regola del form, salvata o no,
-sugli ultimi 5.000 elementi dell'archivio e mostra quelli che prenderebbe (la
-vista "articoli corrispondenti" di qBittorrent, istantanea e senza richieste di
-rete). Regex e filtri numerici stanno sotto *Filtri avanzati*. Seguono le
-textarea JSON avanzate per feed, regole e indexer (salvate con validazione) e,
-per ogni feed, un pulsante che legge subito gli articoli correnti con la regola
-che li prenderebbe e un *Add* manuale.
-Tutti i controlli, pulsanti e campi di inserimento della UI standalone
-dispongono di tooltip descrittivi e localizzati. Nel wizard di primo avvio
-(`/ui/setup`), il pulsante *Testa porta* verifica la porta digitata nel campo
-(tramite `/api/v1/portcheck?port=...`).
+Below: lists with buttons to add, **edit** (the form is filled
+with the row's values; an empty API key keeps it) **test** (Torznab request
+`t=caps`, outcome next to the row) and remove **indexers** (drop-down
+Prowlarr/Jackett/Other, pre-filled URL; the name is a **link to the indexer's web
+page**, i.e. scheme and host of the Torznab URL, opened in a new tab).
+The **feeds** have a table with status (*active*/*disabled*, *adds
+paused*), **last check** with items, new and added or the error, and per
+row the buttons **↻ Reload** (to the left of *Remove*: reads that feed immediately
+and refreshes the row), **Edit** (the form is filled, including the *Feed
+options*: folder, include/exclude, category, path, pause, disabled),
+**Enable/Disable** and **Remove**. An **RSS options** box sets
+the refresh interval (minutes) and the archive retention (days)
+and shows the time of the next automatic check. The **rule editor** has
+one rule per row with **Edit** (loads the rule into the form; saving keeps it in
+its place in the order), **Enable/Disable**, arrows to change its order — the
+first that matches wins — and *Remove*; the form also has *Download once*
+(`once`) and **Match preview**: it tries the form's rule, saved or not,
+on the last 5,000 items of the archive and shows those it would take (qBittorrent's
+"matching articles" view, instantaneous and without network requests).
+Regexes and numeric filters are under *Advanced filters*. Then follow the
+advanced JSON textareas for feeds, rules and indexers (saved with validation) and,
+for each feed, a button that immediately reads the current items with the rule
+that would take them and a manual *Add*.
+All controls, buttons and input fields of the standalone UI
+have descriptive, localised tooltips. In the first-startup wizard
+(`/ui/setup`), the *Test port* button checks the port typed in the field
+(via `/api/v1/portcheck?port=...`).
 
-Gli stessi risultati si ottengono via
-`POST /ui/rss-indexer`, `POST /ui/rss-feed` (op `add` — con `index` modifica sul
-posto —, `toggle`, `remove`), `POST /ui/rss-rule` (op `add` — con `index` modifica
-—, `toggle`, `remove`, `up`, `down`), `POST /ui/rss-rule-preview` (stessi campi
-del form, risponde `{matches, scanned}`), `POST /ui/rss-settings` (`interval` in
-minuti, `archive_days`) e `POST /ui/wanted`; le textarea JSON restano su
+The same results are obtained via
+`POST /ui/rss-indexer`, `POST /ui/rss-feed` (op `add` — with `index` it edits in
+place —, `toggle`, `remove`), `POST /ui/rss-rule` (op `add` — with `index` it edits
+—, `toggle`, `remove`, `up`, `down`), `POST /ui/rss-rule-preview` (same fields
+as the form, responds `{matches, scanned}`), `POST /ui/rss-settings` (`interval` in
+minutes, `archive_days`) and `POST /ui/wanted`; the JSON textareas remain on
 `POST /ui/rss-config`.
 
-### Archivio dei feed
+### Feed archive
 
-Ogni elemento restituito da un feed (RSS, elenco HTML o ricerca) viene
-conservato in **`<data>/feed-archive.db`** (bbolt, già usato per il resume: nessuna
-dipendenza in più), **deduplicato** per info-hash (o per link `.torrent`), con
-titolo, link, dimensione, seed/leech (aggiornati quando il feed li ripropone),
-feed d'origine, data di prima e ultima apparizione e il flag *scaricato* (messo
-quando una regola, il filtro del feed o l'utente lo aggiungono). La pagina
-**`/ui/archive`** (voce *Archivio* nella barra) lo cerca come l'Archivio di
-Gextto: parole (tutte presenti, ignorando maiuscole e separatori `. _ -`),
-**frasi tra virgolette**, **`-parole` escluse**, filtro per feed e *solo
-scaricati*, ordinamento per data, seed, dimensione o titolo, paginazione da 50,
-badge di risoluzione ed episodio, *nella sessione*/*scaricato*, e per riga
-*Aggiungi*, *Copia magnet* ed elimina; la sezione *Pulizia* elimina i risultati
-della ricerca corrente (mai l'intero archivio con una ricerca vuota) o gli
-elementi più vecchi di N giorni.
+Every item returned by a feed (RSS, HTML listing or search) is
+kept in **`<data>/feed-archive.db`** (bbolt, already used for the resume: no
+extra dependency), **deduplicated** by info-hash (or by `.torrent` link), with
+title, link, size, seed/leech (updated when the feed re-proposes them),
+origin feed, first and last appearance date and the *downloaded* flag (set
+when a rule, the feed filter or the user adds it). The **`/ui/archive`** page
+(*Archive* entry in the bar) searches it like Gextto's Archive:
+words (all present, ignoring case and separators `. _ -`),
+**phrases in quotes**, **`-words` excluded**, filter by feed and *downloaded
+only*, sort by date, seed, size or title, pagination from 50,
+resolution and episode badges, *in the session*/*downloaded*, and per row
+*Add*, *Copy magnet* and delete; the *Cleanup* section deletes the results
+of the current search (never the whole archive with an empty search) or the
+items older than N days.
 
-Una casella **Cerca anche negli indexer** fa interrogare *dal vivo* gli
-**indexer** Torznab configurati (Jackett, Prowlarr) con la stessa query
-(`GET /ui/search`, che riporta in `X-Gx-Indexers` quanti ne sono configurati) e
-mostra i risultati in una sezione a parte con indexer e data di pubblicazione e
-un pulsante *Aggiungi*: così compare anche ciò che i feed non hanno ancora
-restituito, cioè il caso in cui un indexer ha la release ma l'RSS del feed no.
+A **Search in indexers too** checkbox makes the configured Torznab **indexers**
+(Jackett, Prowlarr) be queried *live* with the same query
+(`GET /ui/search`, which reports in `X-Gx-Indexers` how many are configured) and
+shows the results in a separate section with indexer and publication date and
+an *Add* button: so also what the feeds have not yet
+returned appears, i.e. the case where an indexer has the release but the feed's
+RSS does not.
 
-La conservazione automatica è `archive-days` (predefinito 180, `0` = tieni
-tutto), con un tetto di 200.000 elementi; la potatura gira alla fine di ogni giro
-completo dei feed e parte dagli elementi più vecchi fermandosi al primo da
-tenere, quindi costa quasi nulla. Il database ha un **indice compatto** (titolo
-già normalizzato, feed, dimensione, seed, flag) accanto al JSON degli elementi:
-la ricerca scorre solo l'indice e decodifica il JSON delle sole righe della
-pagina — su 100.000 elementi **~7 ms e ~44 KB per ricerca** (vedi
-`docs/evoluzione.md`). L'indice si ricostruisce da solo all'apertura se manca.
+The automatic retention is `archive-days` (default 180, `0` = keep
+everything), with a cap of 200,000 items; the pruning runs at the end of every complete
+feed round and starts from the oldest items stopping at the first one to
+keep, so it costs almost nothing. The database has a **compact index** (title
+already normalised, feed, size, seed, flags) next to the JSON of the items:
+the search scans only the index and decodes the JSON of only the rows of the
+page — on 100,000 items **~7 ms and ~44 KB per search** (see
+`docs/evoluzione.md`). The index rebuilds itself on opening if missing.
 
-Endpoint: `GET /ui/archive/items?q=&feed=&added=1&sort=new|old|seeds|size|title&page=N`
-(JSON con `items`, `total`, `page`, `pages`, `entries`, `size_bytes`),
-`POST /ui/archive/add` (`id`), `POST /ui/archive/delete` (`id` ripetibile, oppure
-`all=1` con `q`/`feed`/`added`, oppure `days=N`).
+Endpoints: `GET /ui/archive/items?q=&feed=&added=1&sort=new|old|seeds|size|title&page=N`
+(JSON with `items`, `total`, `page`, `pages`, `entries`, `size_bytes`),
+`POST /ui/archive/add` (`id`), `POST /ui/archive/delete` (`id` repeatable, or
+`all=1` with `q`/`feed`/`added`, or `days=N`).
 
-Lo **scheduler di banda** (standalone) applica limiti globali alternativi in una
-finestra oraria quotidiana, come qBittorrent: con `schedule-enabled` attivo e
-`schedule-start`/`schedule-end` (`HH:MM`, anche a cavallo della mezzanotte) il
-demone usa `schedule-download`/`schedule-upload` (KiB/s) dentro la finestra e i
-limiti normali fuori. I limiti cambiano a caldo, senza riaprire la sessione.
-Si configura dalla pagina **`/ui/settings`** (collegamento *Impostazioni* nella
-barra di ogni pagina), che in **standalone** è il pannello completo del client:
-**Cartelle** (download, temporanea), **Rete** (indirizzo di ascolto, intervallo
-porte peer, interfaccia in entrata/uscita, proxy, token), **IP filter** (sotto),
-**Protocolli** (cifratura, DHT/PEX/uTP/holepunch/LSD/UPnP/NAT-PMP, nodi bootstrap,
-DHT read-only), **Coda e cache** (download/seed attivi, limite attivi, cache
-disco, preallocazione, sequenziale), **Ottimizzazione** (sotto), **banda** e
-**scheduler**, **lingua** e **notifiche** (`notify-url`). Banda, scheduler e
-limiti di coda si applicano subito; cartelle, rete e protocolli valgono **dal
-prossimo avvio**. Il **DHT read-only (BEP 43)** resta spento di default: un nodo
-read-only non risponde alle query e chiede di non entrare nelle tabelle altrui,
-utile per nodi con poca banda o dietro NAT simmetrici, ma un client completo che
-usa il DHT deve anche servirlo (è anche la scelta di libtorrent e qBittorrent).
+The **bandwidth scheduler** (standalone) applies alternative global limits in a
+daily time window, like qBittorrent: with `schedule-enabled` active and
+`schedule-start`/`schedule-end` (`HH:MM`, also across midnight) the
+daemon uses `schedule-download`/`schedule-upload` (KiB/s) inside the window and the
+normal limits outside. The limits change on the fly, without reopening the session.
+It is configured from the **`/ui/settings`** page (*Settings* link in the
+bar of every page), which in **standalone** is the client's complete panel:
+**Folders** (download, temporary), **Network** (listen address, peer port
+range, incoming/outgoing interface, proxy, token), **IP filter** (below),
+**Protocols** (encryption, DHT/PEX/uTP/holepunch/LSD/UPnP/NAT-PMP, bootstrap nodes,
+DHT read-only), **Queue and cache** (active downloads/seeds, active limit, disk
+cache, preallocation, sequential), **Optimisation** (below), **bandwidth** and
+**scheduler**, **language** and **notifications** (`notify-url`). Bandwidth, scheduler and
+queue limits apply immediately; folders, network and protocols apply **from
+the next startup**. The **DHT read-only (BEP 43)** stays off by default: a
+read-only node does not respond to queries and asks not to be entered into
+others' tables, useful for nodes with little bandwidth or behind symmetric NAT,
+but a complete client that uses the DHT must also serve it (it is also the choice of
+libtorrent and qBittorrent).
 
-L'**IP filter** (`ipfilter`) è un file locale o un **URL** (formato P2P, eMule o
-CIDR, semplice o gzip). Un URL viene scaricato in `<data>/ipfilter.dat` all'avvio
-(la sessione usa subito la copia scaricata l'ultima volta, se c'è) e di nuovo
-ogni `ipfilter-refresh-hours` (predefinito 24, `0` = mai); un file locale viene
-ricaricato quando cambia su disco (dimensione o mtime, controllati ogni 10
-minuti). Il riquadro mostra regole caricate, ora e percorso del caricamento,
-prossimo aggiornamento ed eventuale errore; **Carica ora** applica subito il
-valore del campo (anche non salvato) senza salvare il resto della pagina
-(`POST /ui/ipfilter` con `return=settings`). Prima di questa modifica un URL
-scritto nelle impostazioni non veniva caricato all'avvio.
+The **IP filter** (`ipfilter`) is a local file or a **URL** (P2P, eMule or
+CIDR format, plain or gzip). A URL is downloaded to `<data>/ipfilter.dat` at startup
+(the session immediately uses the copy downloaded last time, if any) and again
+every `ipfilter-refresh-hours` (default 24, `0` = never); a local file is
+reloaded when it changes on disk (size or mtime, checked every 10
+minutes). The box shows loaded rules, time and path of the load,
+next refresh and any error; **Load now** immediately applies the
+value of the field (even unsaved) without saving the rest of the page
+(`POST /ui/ipfilter` with `return=settings`). Before this change a URL
+written in the settings was not loaded at startup.
 
-L'**Ottimizzazione** è l'equivalente del pulsante *Ottimizza* di Gextto, diviso
-in tre azioni (`POST /ui/optimize` con `optimize=queue|cache|bandwidth`), ognuna
-delle quali cambia solo le proprie impostazioni: **coda** = la base di Gextto (3
-download, 3 seed, 5 attivi, coda dinamica tra 1 e 10 slot, torrent lenti non
-conteggiati, autogestione attiva); **cache** = di nuovo automatica (dimensionata
-su RAM e tipo di disco, TTL 300 s); **banda** = download illimitato e upload
-all'**80% del picco di upload misurato dall'avvio** (un upstream saturo ritarda
-gli ACK dei download), con l'auto-speed sulla latenza attivo e minimo a un decimo
-del limite. Se non è ancora stato misurato abbastanza upload (meno di 50 KiB/s)
-l'azione rifiuta con una spiegazione; se l'upload era già al limite attuale la
-capacità della linea non è nota: il limite resta e si attiva solo l'auto-speed.
-Il riquadro mostra i picchi ↓/↑ misurati.
+**Optimisation** is the equivalent of Gextto's *Optimise* button, divided
+into three actions (`POST /ui/optimize` with `optimize=queue|cache|bandwidth`), each
+of which changes only its own settings: **queue** = Gextto's base (3
+downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not
+counted, self-management active); **cache** = automatic again (sized
+on RAM and disk type, TTL 300 s); **bandwidth** = unlimited download and upload
+at **80% of the upload peak measured since startup** (a saturated upstream delays
+the download ACKs), with auto-speed on latency active and a minimum of a tenth
+of the limit. If not enough upload has been measured yet (less than 50 KiB/s)
+the action refuses with an explanation; if the upload was already at the current limit the
+line capacity is unknown: the limit stays and only auto-speed is activated.
+The box shows the measured ↓/↑ peaks.
 
-Nella pagina **Torrents** in standalone non compaiono le tile *cache r/w* e *I/O
-ops r/w* (diagnostica utile a Gextto, non all'utente del client) e la tile della
-**porta peer** ha un pallino **verde** quando la porta è raggiungibile — mapping
-UPnP/NAT-PMP/PCP attivo oppure connessioni in ingresso già ricevute — e **rosso**
-altrimenti. In
-**standalone `settings.json` è autorevole**: un valore scritto qui vince sul flag
-di avvio (in *managed* il file non viene letto e i flag di Gextto restano
-sovrani).
+On the **Torrents** page in standalone the *cache r/w* and *I/O
+ops r/w* tiles do not appear (diagnostics useful to Gextto, not to the client's
+user) and the **peer port** tile has a **green** dot when the port is reachable —
+UPnP/NAT-PMP/PCP mapping active or incoming connections already received — and **red**
+otherwise. In **standalone `settings.json` is authoritative**: a value written here wins over
+the startup flag (in *managed* the file is not read and Gextto's flags remain
+sovereign).
 
-La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
-esempio:
+Most flags have their own environment variable `GX_TORRENT_*`, for
+example:
 
 - `GX_TORRENT_LISTEN`, `GX_TORRENT_DATA`, `GX_TORRENT_DOWNLOAD_DIR`;
 - `GX_TORRENT_TOKEN`, `GX_TORRENT_ALLOWED_ROOTS`;
@@ -693,820 +693,820 @@ esempio:
   `GX_TORRENT_NO_NATPMP`, `GX_TORRENT_DHT_BOOTSTRAP`;
 - `GX_TORRENT_IPFILTER`, `GX_TORRENT_IPFILTER_TRACKERS`;
 - `GX_TORRENT_WEB_SOURCES_ALLOW_PRIVATE` (flag `-web-sources-allow-private`,
-  chiave `web-sources-allow-private`, casella in *Impostazioni → Rete*): permette
-  a web seed e sorgenti magnet `xs=`/`as=` di raggiungere indirizzi privati della
-  LAN. Spento di default, anche in modalità gestita: quegli URL arrivano dai dati
-  del torrent (anche da un feed non fidato) e senza questo limite potrebbero far
-  contattare al client il router, il NAS o altri servizi interni (SSRF). Vedi
-  `docs/bep.md`, *Revisione del 2026-10-12*;
+  key `web-sources-allow-private`, checkbox in *Settings → Network*): allows
+  web seeds and magnet sources `xs=`/`as=` to reach private LAN addresses.
+  Off by default, also in managed mode: those URLs come from the torrent's
+  data (even from an untrusted feed) and without this limit they could make
+  the client contact the router, the NAS or other internal services (SSRF). See
+  `docs/bep.md`, *Revision of 2026-10-12*;
 - `GX_TORRENT_LANG`, `GX_TORRENT_MODE`, `GX_TORRENT_LOG_FILE`, `GX_TORRENT_DEBUG`,
-  `GX_TORRENT_NOTIFY_URL` (webhook per le notifiche dei feed);
-- `GX_TORRENT_MMAP` (storage mmap opt-in, Linux: flag `-mmap`).
+  `GX_TORRENT_NOTIFY_URL` (webhook for feed notifications);
+- `GX_TORRENT_MMAP` (opt-in mmap storage, Linux: flag `-mmap`).
 
-Alcuni flag sono interni (`-insecure`, `-version`, `-fingerprint`,
-`-orphan-timeout`, `-ipfilter-source`, `-gextto-log`): li usa solo Gextto per
-avviare, riagganciare e sorvegliare il demone.
+Some flags are internal (`-insecure`, `-version`, `-fingerprint`,
+`-orphan-timeout`, `-ipfilter-source`, `-gextto-log`): only Gextto uses them to
+start, re-attach and supervise the daemon.
 
-Gextto, in modalità gestita, passa da solo questi valori dalle impostazioni
-*libtorrent* (porte, interfacce, cifratura, DHT, PEX, uTP, LSD, UPnP, NAT-PMP,
-filtro IP, nodi bootstrap DHT) e dall'impostazione `gxtorrent_proxy`. Il limite
-globale di connessioni (`libtorrent_connections_limit`) viene ripartito tra
-dial uscenti e accept entranti del motore. Proxy e token viaggiano nell'ambiente,
-non sulla riga di comando. Le modifiche valgono dal riavvio di gextto.
+Gextto, in managed mode, passes these values itself from the *libtorrent*
+settings (ports, interfaces, encryption, DHT, PEX, uTP, LSD, UPnP, NAT-PMP,
+IP filter, DHT bootstrap nodes) and from the `gxtorrent_proxy` setting. The global
+connection limit (`libtorrent_connections_limit`) is split between the engine's
+outgoing dials and incoming accepts. Proxy and token travel in the environment,
+not on the command line. Changes apply from the restart of gextto.
 
-In modalità gestita il demone **non ha restrizioni di percorso**: Gextto decide
-le destinazioni, le valida e le limita già con le proprie regole. Il flag
-`-allowed-roots` esiste solo per l'**uso standalone** del demone (vedi sotto) e
-Gextto non lo imposta mai.
+In managed mode the daemon **has no path restrictions**: Gextto decides
+the destinations, validates them and already limits them with its own rules. The flag
+`-allowed-roots` exists only for the **standalone use** of the daemon (see below) and
+Gextto never sets it.
 
-Il demone **in managed** rifiuta di ascoltare su un indirizzo non loopback senza
-token (salvo `-insecure`); **in standalone** è permesso, perché l'accesso è
-protetto dal login e dalle regole LAN (o aperto se non c'è password). Il server
-RPC interno del motore è disattivato.
+The daemon **in managed** refuses to listen on a non-loopback address without a
+token (unless `-insecure`); **in standalone** it is allowed, because access is
+protected by login and LAN rules (or open if there is no password). The engine's internal
+RPC server is disabled.
 
-## Rete
+## Network
 
-- **Porta unica, come libtorrent.**
-  - Il demone usa la prima porta libera dell'intervallo (`-peer-ports`,
-    default 6881-6891): TCP per i peer, UDP per il DHT.
-  - Tutti i torrent la condividono. L'handshake, anche cifrato, sceglie il
-    torrent dall'info hash.
-  - `-peer-ports 0` torna alla porta per torrent originale.
-- **Apertura sul router.**
-  - UPnP (IGD v1 e v2), quindi **PCP** (RFC 6887, sul default gateway) e infine
-    NAT-PMP, provati in quest'ordine; i mapping sono rinnovati ogni 20 minuti e
-    rimossi allo spegnimento. PCP è un client MAP minimale, senza dipendenze
-    esterne; su un router che non lo parla la richiesta scade e si passa a
+- **Single port, like libtorrent.**
+  - The daemon uses the first free port of the range (`-peer-ports`,
+    default 6881-6891): TCP for peers, UDP for the DHT.
+  - All torrents share it. The handshake, even encrypted, chooses the
+    torrent from the info hash.
+  - `-peer-ports 0` returns to the original per-torrent port.
+- **Opening on the router.**
+  - UPnP (IGD v1 and v2), then **PCP** (RFC 6887, on the default gateway) and finally
+    NAT-PMP, tried in this order; mappings are renewed every 20 minutes and
+    removed at shutdown. PCP is a minimal MAP client, without external
+    dependencies; on a router that does not speak it the request expires and it moves to
     NAT-PMP.
-  - Esito e indirizzo esterno sono in `GET /api/v1/stats` (`port_mapping`).
-  - Se nessuno dei tre funziona, il log dice di aprire la porta a mano.
-- **Interfaccia in ascolto**: `-listen-interface` accetta un IP o un nome di
-  interfaccia. Da gextto arriva da `libtorrent_listen_interfaces`
-  (es. `wg0:51413`), che ha la precedenza su `libtorrent_port_min/max`.
-- **Interfaccia uscente (killswitch VPN).** Con `-outgoing-interface wg0`
-  peer, tracker, web seed e DHT escono solo da quell'interfaccia. Se non ha un
-  indirizzo, non esce nulla finché non torna.
+  - Outcome and external address are in `GET /api/v1/stats` (`port_mapping`).
+  - If none of the three works, the log says to open the port by hand.
+- **Listening interface**: `-listen-interface` accepts an IP or an interface
+  name. From gextto it comes from `libtorrent_listen_interfaces`
+  (e.g. `wg0:51413`), which takes precedence over `libtorrent_port_min/max`.
+- **Outgoing interface (VPN killswitch).** With `-outgoing-interface wg0`
+  peers, trackers, web seeds and DHT go out only from that interface. If it has no
+  address, nothing goes out until it returns.
 - **Proxy.**
-  - `socks5://[utente:password@]host:porta` oppure `http://host:porta`
-    (tunnel CONNECT).
-  - Peer, tracker HTTP e web seed passano dal proxy; i nomi dei tracker li
-    risolve il proxy.
-  - DHT e tracker UDP vengono spenti, perché non possono passare da un proxy
-    TCP e altrimenti uscirebbero fuori.
-  - Le connessioni in ingresso restano dirette sulla porta unica.
-- **Cifratura** (`libtorrent_encryption`):
-  - 0: le connessioni in uscita sono in chiaro;
-  - 1: si prova la cifratura, con ripiego in chiaro;
-  - 2: cifratura obbligatoria in entrata e in uscita.
-- **Filtro IP.**
-  - Formati accettati: CIDR, intervalli `a.b.c.d-e.f.g.h`, P2P
-    (`nome:inizio-fine`) ed eMule `ipfilter.dat`. Le regole eMule con livello
-    ≥ 128 consentono il traffico; le regole IPv6 in forma CIDR sono applicate
-    (intervalli/P2P/eMule restano solo IPv4).
-  - Il filtro si applica ai peer in entrata e in uscita, e ai tracker se
-    `libtorrent_apply_ip_filter` è attivo.
-  - Il pulsante "Aggiorna IP filter" di gextto funziona anche con gx-torrent:
-    scarica la lista se è un URL e la ricarica nel demone.
-  - Il file viene **aggiornato all'avvio del servizio** e poi **una volta a
-    settimana** mentre il servizio resta attivo (oltre al pulsante manuale).
-- **DHT** (BEP 5), condiviso sulla stessa porta UDP dei peer uTP.
-  - Scoperta IPv6 **BEP 32** dual-stack: nodi v4 e v6 tenuti separati
+  - `socks5://[user:password@]host:port` or `http://host:port`
+    (CONNECT tunnel).
+  - Peers, HTTP trackers and web seeds go through the proxy; the tracker names
+    are resolved by the proxy.
+  - DHT and UDP trackers are turned off, because they cannot go through a TCP
+    proxy and otherwise would go out.
+  - Incoming connections stay direct on the single port.
+- **Encryption** (`libtorrent_encryption`):
+  - 0: outgoing connections are in the clear;
+  - 1: encryption is tried, with a fallback in the clear;
+  - 2: mandatory encryption incoming and outgoing.
+- **IP filter.**
+  - Accepted formats: CIDR, ranges `a.b.c.d-e.f.g.h`, P2P
+    (`name:start-end`) and eMule `ipfilter.dat`. eMule rules with level
+    ≥ 128 allow traffic; IPv6 rules in CIDR form are applied
+    (ranges/P2P/eMule remain IPv4 only).
+  - The filter applies to incoming and outgoing peers, and to trackers if
+    `libtorrent_apply_ip_filter` is active.
+  - gextto's "Update IP filter" button also works with gx-torrent:
+    it downloads the list if it is a URL and reloads it in the daemon.
+  - The file is **updated at the startup of the service** and then **once a
+    week** while the service stays active (besides the manual button).
+- **DHT** (BEP 5), shared on the same UDP port as the uTP peers.
+  - **IPv6 discovery BEP 32** dual-stack: v4 and v6 nodes kept separate
     (`nodes`/`nodes6`, `want: n4/n6`).
-  - **Security extension BEP 42**: l'ID nodo è derivato dall'IP esterno quando è
-    noto (l'indirizzo di ascolto routabile da `-listen-interface`, o l'IP
-    dell'interfaccia uscente), così nessuno può
-    sceglierne uno vicino a un info-hash bersaglio; se l'IP non è noto all'avvio
-    viene adottato dal campo `ip` delle risposte DHT e il nuovo ID è persistito.
-    Gli indirizzi di rete locale sono esenti. Il campo `ip` è anche **inviato**
-    in ogni risposta (ping, find_node, get_peers, announce_peer e le risposte
-    BEP 44), così un peer dietro NAT scopre il proprio indirizzo riflesso;
-    `dht_reflected_sent` conta gli invii. Un `announce_peer` con
-    `implied_port: 1` usa la porta sorgente del pacchetto al posto di `port`.
-  - **BEP 44** (archivio chiave/valore): item immutabili (target = SHA-1 del
-    valore) e mutabili (firma ed25519, `seq` monotono, `cas`), con token, limiti
-    di dimensione e TTL 2 h; query `get`/`put` e API locale. C'è anche il
-    **client uscente**: `GetImmutable`/`GetMutable` leggono e
-    `PublishImmutable`/`PublishMutable` pubblicano sui nodi più vicini. È la
-    base della **BEP 46**: un magnet `xs=urn:btpk:<pubkey>` (+ `s=<salt>`)
-    risolve l'info hash dall'item mutabile all'aggiunta.
-  - **BEP 33** (DHT scrape): un `get_peers` con `scrape=1` riceve i filtri di
-    Bloom (`BFpe`/`BFsd`) e ne stima seed/peer dello sciame; il client interroga
-    i nodi più vicini e aggrega. In UI: pulsante **DHT swarm** nella scheda
-    Generale (`GET /ui/dhtscrape`), oltre a `GET /api/v1/torrents/{hash}/dhtscrape`.
-  - **BEP 43** (read-only): un nodo può non rispondere alle query e chiedere di
-    non essere inserito nelle routing table (`ro`); si attiva con
+  - **Security extension BEP 42**: the node ID is derived from the external IP when it is
+    known (the routable listen address from `-listen-interface`, or the IP
+    of the outgoing interface), so no one can
+    choose one close to a target info-hash; if the IP is not known at startup
+    it is adopted from the `ip` field of DHT responses and the new ID is persisted.
+    Local network addresses are exempt. The `ip` field is also **sent**
+    in every response (ping, find_node, get_peers, announce_peer and the
+    BEP 44 responses), so a peer behind NAT discovers its own reflected address;
+    `dht_reflected_sent` counts the sends. An `announce_peer` with
+    `implied_port: 1` uses the packet's source port instead of `port`.
+  - **BEP 44** (key/value archive): immutable items (target = SHA-1 of the
+    value) and mutable ones (ed25519 signature, monotonic `seq`, `cas`), with token, size
+    limits and TTL 2 h; `get`/`put` queries and local API. There is also the
+    **outgoing client**: `GetImmutable`/`GetMutable` read and
+    `PublishImmutable`/`PublishMutable` publish to the closest nodes. It is the
+    basis of **BEP 46**: a magnet `xs=urn:btpk:<pubkey>` (+ `s=<salt>`)
+    resolves the info hash from the mutable item at addition.
+  - **BEP 33** (DHT scrape): a `get_peers` with `scrape=1` receives the Bloom
+    filters (`BFpe`/`BFsd`) and estimates seed/peer of the swarm from them; the client queries
+    the closest nodes and aggregates. In the UI: **DHT swarm** button in the General
+    tab (`GET /ui/dhtscrape`), besides `GET /api/v1/torrents/{hash}/dhtscrape`.
+  - **BEP 43** (read-only): a node can not respond to queries and ask not
+    to be entered into the routing tables (`ro`); it is activated with
     `-dht-read-only` (`GX_TORRENT_DHT_READ_ONLY`).
-- **Tracker e BEP 31** (`retry in`).
-  - Un tracker che risponde con `failure reason` e `retry in: N` rinvia il
-    prossimo annuncio di N minuti (announce e scrape, HTTP e UDP).
-  - `retry in: never` **scarta il tracker dal tier**: non viene più
-    ricontattato, ma gli altri tracker dello stesso tier continuano a essere
-    usati; solo se il tier si esaurisce il torrent smette di annunciare a quel
+- **Trackers and BEP 31** (`retry in`).
+  - A tracker that responds with `failure reason` and `retry in: N` postpones the
+    next announce by N minutes (announce and scrape, HTTP and UDP).
+  - `retry in: never` **discards the tracker from the tier**: it is no longer
+    contacted, but the other trackers of the same tier continue to be
+    used; only if the tier is exhausted does the torrent stop announcing to that
     tier.
-- **Hint BEP 38** (`similar`/`collections`).
-  - Gli hint del `.torrent` (dal dizionario info e dal livello superiore, uniti)
-    sono mostrati nella scheda Generale insieme ai torrent **locali** che
-    condividono un hint (dati che si potrebbero riusare), restano su
-    `GET /api/v1/torrents/{hash}/collections` e sono riscritti nell'export del
+- **BEP 38 hints** (`similar`/`collections`).
+  - The `.torrent` hints (from the info dictionary and from the top level, merged)
+    are shown in the General tab together with the **local** torrents that
+    share a hint (data that could be reused), remain on
+    `GET /api/v1/torrents/{hash}/collections` and are rewritten in the export of the
     `.torrent`.
 
-## uTP e LSD
+## uTP and LSD
 
-- **uTP** (`libtorrent_utp`, attivo di default) usa la stessa porta UDP dei
-  peer, condivisa con il DHT come in libtorrent.
-  - In uscita si tentano uTP e TCP insieme e vince il primo che si connette.
-  - In entrata l'handshake viene instradato come per TCP.
-  - La lista dei peer indica quali sono connessi in uTP.
-  - Con un proxy uTP è spento; con l'interfaccia uscente il socket UDP è
-    legato all'IP della VPN.
-- **LSD**, la scoperta in rete locale (BEP 14, `libtorrent_lsd`).
-  - Annunci multicast su 239.192.152.143:6771 (IPv4) e, se disponibile,
-    `[ff15::efc0:988f]:6771` (IPv6) ogni 5 minuti per ogni torrent attivo non
-    privato.
-  - I peer della LAN che annunciano gli stessi torrent vengono aggiunti.
-  - È spento con proxy o interfaccia uscente, per non annunciare i torrent
-    fuori dal tunnel.
+- **uTP** (`libtorrent_utp`, active by default) uses the same UDP port as the
+  peers, shared with the DHT as in libtorrent.
+  - Outgoing, uTP and TCP are attempted together and the first to connect wins.
+  - Incoming, the handshake is routed as for TCP.
+  - The peer list indicates which ones are connected over uTP.
+  - With a proxy uTP is off; with the outgoing interface the UDP socket is
+    bound to the VPN's IP.
+- **LSD**, local network discovery (BEP 14, `libtorrent_lsd`).
+  - Multicast announcements on 239.192.152.143:6771 (IPv4) and, if available,
+    `[ff15::efc0:988f]:6771` (IPv6) every 5 minutes for every active non-private
+    torrent.
+  - LAN peers announcing the same torrents are added.
+  - It is off with a proxy or outgoing interface, so as not to announce the torrents
+    outside the tunnel.
 
 ## Holepunching (BEP 55)
 
-Un peer dietro NAT che non può ricevere connessioni in entrata può comunque
-essere raggiunto passando da un peer che fa da **relè** (`ut_holepunch`). È lo
-standard BEP 55, quindi interoperabile con µTorrent, BitComet, qBittorrent e
-libtorrent; non è il relè via nodo DHT proprietario di libtorrent.
+A peer behind NAT that cannot receive incoming connections can still
+be reached by going through a peer acting as a **relay** (`ut_holepunch`). It is the
+BEP 55 standard, therefore interoperable with µTorrent, BitComet, qBittorrent and
+libtorrent; it is not libtorrent's proprietary DHT-node relay.
 
-- Si attiva con l'impostazione **Holepunching (BEP 55)** in *Configurazione →
-  Motore torrent → Ricerca peer e tracker* (attiva di default). Richiede uTP
-  (`libtorrent_utp`): senza uTP (o con un proxy) è spento, perché il "buco" si
-  apre sulle mappature UDP. Sul demone il flag è `-no-holepunch`
+- It is activated with the **Holepunching (BEP 55)** setting in *Configuration →
+  Torrent engine → Peer and tracker discovery* (active by default). It requires uTP
+  (`libtorrent_utp`): without uTP (or with a proxy) it is off, because the "hole" is
+  opened on the UDP mappings. On the daemon the flag is `-no-holepunch`
   (`GX_TORRENT_NO_HOLEPUNCH=1`).
-- Quando un dial diretto fallisce, gx-torrent chiede a un peer connesso
-  (al massimo 8) di fare da relè per quell'endpoint, una volta sola; il relè,
-  se è connesso al bersaglio e questi supporta l'estensione, manda un
-  `connect` a entrambi e ognuno avvia una connessione uTP verso l'altro.
-- Il bersaglio viene ricercato tra i peer connessi per IP e porta; gli errori
-  di protocollo (`NoSuchPeer`, `NotConnected`, `NoSupport`, `NoSelf`) vengono
-  riportati come previsto dal BEP.
-- Limite noto: come per `ut_metadata`/`ut_pex`, il messaggio in entrata viene
-  riconosciuto tramite l'ID locale dell'estensione; un peer che assegna a
-  `ut_holepunch` un ID diverso da 3 non viene capito (limite preesistente
-  dell'architettura estensioni del motore).
+- When a direct dial fails, gx-torrent asks a connected peer
+  (at most 8) to act as relay for that endpoint, once only; the relay,
+  if it is connected to the target and the latter supports the extension, sends a
+  `connect` to both and each starts a uTP connection towards the other.
+- The target is searched among the connected peers by IP and port; protocol
+  errors (`NoSuchPeer`, `NotConnected`, `NoSupport`, `NoSelf`) are
+  reported as provided by the BEP.
+- Known limit: as for `ut_metadata`/`ut_pex`, the incoming message is
+  recognised via the local ID of the extension; a peer that assigns to
+  `ut_holepunch` an ID other than 3 is not understood (pre-existing limit
+  of the engine's extension architecture).
 
-### Verifica
+### Verification
 
-Il codec, la decisione del relè, l'inoltro della configurazione e la mappatura
-della sorgente sono coperti dai test (`make test-engine`,
-`go test ./cmd/gx-torrent/`, `go test .`). Per una prova **reale** su NAT c'è un
-harness root-only, `scripts/holepunch-netns-test.sh`:
+The codec, the relay decision, the configuration forwarding and the source
+mapping are covered by the tests (`make test-engine`,
+`go test ./cmd/gx-torrent/`, `go test .`). For a **real** test on NAT there is a
+root-only harness, `scripts/holepunch-netns-test.sh`:
 
 ```bash
-make gx-torrent          # costruisce bin/gx-torrent
+make gx-torrent          # builds bin/gx-torrent
 sudo scripts/holepunch-netns-test.sh
 ```
 
-Crea due reti client **distinte** dietro **firewall stateful** (nessun NAT: i
-client conservano IP e porta peer), un tracker HTTP minimo e quattro daemon con
-uTP e holepunch attivi: un seed pubblico e un relay, su IP diversi in `gx-lab`,
-più due client (A dietro gx-r1, B dietro gx-r2). Il firewall lascia uscire, DROPa
-le nuove connessioni in entrata e accetta le risposte: è il comportamento che
-conta per il BEP 55 (filtro "cone" port-preserving). B entra come leecher,
-scarica dal seed e completa restando connesso al relay: serve un relay **leecher
-interessato** ai suoi dati, perché un seed scarta i peer non interessati quando
-completa. Solo allora entra A (leecher): A non raggiunge B direttamente, chiede
-l'introduzione al relay; il relay manda `connect` a entrambi e i due dialano su
-uTP. Chi diala per primo compare con origine **`holepunch`**, l'altro vede la
-connessione come `incoming`: il test passa se compare su uno dei due. I router
-rifiutano il TCP verso le porte peer, così il buco si apre su uTP. `--keep` lascia
-la topologia attiva per il debug; lo script riporta cosa ha osservato (holepunch
-/ diretta / niente) e, sui fallimenti, le righe `holepunch` dei log (rendezvous
-inviato/ricevuto, `connect` ricevuto).
+It creates two **distinct** client networks behind a **stateful firewall** (no NAT: the
+clients keep peer IP and port), a minimal HTTP tracker and four daemons with
+uTP and holepunch active: a public seed and a relay, on different IPs in `gx-lab`,
+plus two clients (A behind gx-r1, B behind gx-r2). The firewall lets traffic out, DROPs
+new incoming connections and accepts responses: it is the behaviour that
+matters for BEP 55 (port-preserving "cone" filter). B enters as leecher,
+downloads from the seed and completes while staying connected to the relay: an
+**interested leecher** relay is needed for its data, because a seed discards uninterested peers when
+it completes. Only then does A enter (leecher): A does not reach B directly, it asks
+the relay for the introduction; the relay sends `connect` to both and the two dial over
+uTP. Whoever dials first appears with origin **`holepunch`**, the other sees the
+connection as `incoming`: the test passes if it appears on either one. The routers
+refuse TCP towards the peer ports, so the hole is opened over uTP. `--keep` leaves
+the topology active for debugging; the script reports what it observed (holepunch
+/ direct / nothing) and, on failures, the `holepunch` lines of the logs (rendezvous
+sent/received, `connect` received).
 
-Perché firewall e non NAT: netfilter Linux **non emula un NAT port-translating
-"cone"**. Un pacchetto diretto all'IP WAN del router (il dial diretto del
-leecher, prima del rendezvous) crea una entry conntrack locale che occupa la
-porta esterna del peer e impedisce al target di creare la propria mappatura
-quando riceve il `connect`; con un solo IP esterno condiviso il buco non può
-aprirsi. Il firewall stateful, senza traduzione di indirizzo, riproduce lo stesso
-comportamento osservabile (inbound non richiesto bloccato, buco che si apre solo
-dopo il dial incrociato) e rende il test deterministico. Il comportamento è
-verificato dal criterio `source`/`incoming` su `/api/v1/torrents/<hash>/peers`
-(la pagina web del demone mostra la stessa origine).
+Why firewall and not NAT: Linux netfilter **does not emulate a port-translating
+"cone" NAT**. A packet directed at the router's WAN IP (the leecher's direct dial,
+before the rendezvous) creates a local conntrack entry that occupies the
+peer's external port and prevents the target from creating its own mapping
+when it receives the `connect`; with a single shared external IP the hole cannot be
+opened. The stateful firewall, without address translation, reproduces the same
+observable behaviour (unrequested inbound blocked, hole that opens only
+after the crossed dial) and makes the test deterministic. The behaviour is
+verified by the `source`/`incoming` criterion on `/api/v1/torrents/<hash>/peers`
+(the daemon's web page shows the same origin).
 
-Nota: seed e relay devono stare su IP diversi perché il motore deduplica i peer per
-IP (`connectedPeerIPs`); due daemon sullo stesso IP verrebbero visti come un solo
-peer. Entrambi vanno avviati con `-outgoing-interface` uguale all'IP di ascolto,
-altrimenti annunciano al tracker il proprio IP "di default" (sbagliato).
+Note: seed and relay must be on different IPs because the engine deduplicates peers by
+IP (`connectedPeerIPs`); two daemons on the same IP would be seen as a single
+peer. Both must be started with `-outgoing-interface` equal to the listen IP,
+otherwise they announce to the tracker their "default" IP (wrong).
 
-## Selezione dei file e priorità
+## File selection and priorities
 
-Si possono scaricare solo alcuni file di un torrent e dare precedenza agli
-altri. La scala è quella di libtorrent/qBittorrent: **0 = escluso**, **1..4 =
-normale**, **5..7 = alto** (i file ad alta priorità vengono scaricati prima).
-Si imposta dalla scheda file di gextto o con
-`POST /api/v1/torrents/{hash}/file-priorities` (`priorities=4,0,7`); l'API
-compatibile qBittorrent usa la sua scala 0/1/6/7.
+You can download only some files of a torrent and give priority to the
+others. The scale is that of libtorrent/qBittorrent: **0 = excluded**, **1..4 =
+normal**, **5..7 = high** (high-priority files are downloaded first).
+It is set from gextto's files tab or with
+`POST /api/v1/torrents/{hash}/file-priorities` (`priorities=4,0,7`); the
+qBittorrent-compatible API uses its 0/1/6/7 scale.
 
-- I file esclusi non compaiono mai nella cartella di destinazione. I pezzi a
-  cavallo con un file incluso vengono scritti in `DATA/parts/<id>`, come il
-  partfile di libtorrent.
-- Progresso, dimensione e completamento si riferiscono ai soli file scelti:
-  gextto riceve "completato" quando sono pronti quelli.
-- Cambiare **quali** file sono esclusi ferma il torrent per un attimo, sposta i
-  file interessati tra `parts` e destinazione e lo fa ripartire; cambiare **solo
-  i livelli** di priorità (negli stessi file scaricati) viene invece applicato al
-  torrent in corso, senza fermarlo né spostare file.
-- Il motore calcola la priorità di ogni pezzo come il **massimo** tra i file che
-  tocca: un pezzo a cavallo tra un file normale e uno ad alta priorità è alto; il
-  picker lo richiede subito dopo la finestra di streaming/readahead e prima di
-  file-edge, allowed-fast e rarest.
-- Se il **magnet link** porta il parametro `so=` (BEP 53, *Select Only*, es.
-  `so=0,2,4-7`), il motore scarica da subito solo quei file e appena arrivano i
-  metadati il demone registra la scelta come normali priorità: la scheda file
-  mostra gli stessi file esclusi e si possono cambiare come sempre.
-- Se il magnet porta `ws=` (BEP 53, web seed), i web seed vengono aggiunti al
-  torrent e restano anche dopo un riavvio.
-- Se il magnet porta `dht=` (nodo DHT di bootstrap), il nodo viene aggiunto alla
-  DHT della sessione.
-- Se il magnet porta `xs=`/`as=` (sorgente esatta/accettabile, convenzione Magnet
-  URI), il motore prova a scaricare il `.torrent` da quegli URL e lo usa **solo
-  se l'info hash corrisponde**, così i metadati arrivano subito senza sciame;
-  altrimenti ricade sul download dei metadati via peer/DHT.
-- Un **seed parziale** (tutti i file scelti completi, torrent non intero) si
-  dichiara tale ai peer con `upload_only` (BEP 21), così smettono di offrirgli
-  pezzi che non vuole, e lo segnala ai **tracker** con `event=paused` a ogni
-  announce, così viene distinto da un downloader attivo.
+- Excluded files never appear in the destination folder. Pieces that
+  span an included file are written to `DATA/parts/<id>`, like libtorrent's
+  partfile.
+- Progress, size and completion refer only to the chosen files:
+  gextto receives "complete" when those are ready.
+- Changing **which** files are excluded stops the torrent for a moment, moves the
+  affected files between `parts` and the destination and starts it again; changing **only
+  the priority levels** (in the same downloaded files) is instead applied to the
+  torrent in progress, without stopping it or moving files.
+- The engine computes the priority of each piece as the **maximum** between the files it
+  touches: a piece spanning a normal and a high-priority file is high; the
+  picker requests it right after the streaming/readahead window and before
+  file-edge, allowed-fast and rarest.
+- If the **magnet link** carries the `so=` parameter (BEP 53, *Select Only*, e.g.
+  `so=0,2,4-7`), the engine immediately downloads only those files and as soon as the
+  metadata arrives the daemon records the choice as normal priorities: the files tab
+  shows the same excluded files and they can be changed as always.
+- If the magnet carries `ws=` (BEP 53, web seed), the web seeds are added to the
+  torrent and remain even after a restart.
+- If the magnet carries `dht=` (bootstrap DHT node), the node is added to the
+  session's DHT.
+- If the magnet carries `xs=`/`as=` (exact/acceptable source, Magnet
+  URI convention), the engine tries to download the `.torrent` from those URLs and uses it **only
+  if the info hash matches**, so the metadata arrives immediately without a swarm;
+  otherwise it falls back to downloading the metadata via peer/DHT.
+- A **partial seed** (all chosen files complete, torrent not whole) declares itself
+  as such to the peers with `upload_only` (BEP 21), so they stop offering it
+  pieces it does not want, and reports it to the **trackers** with `event=paused` at every
+  announce, so it is distinguished from an active downloader.
 
-## Download sequenziale (streaming)
+## Sequential download (streaming)
 
-Con `sequential` il torrent scarica i pezzi in ordine di indice invece che
-"rarest-first", e per prima cosa i bordi di ogni file (primo e ultimo ~1%,
-fino a 8 MB): è la modalità pensata per lo streaming, così un player può
-iniziare mentre il download prosegue. È più lenta nel complesso e peggiora la
-salute dello sciame, quindi resta **opzionale e spenta di default**.
+With `sequential` the torrent downloads pieces in index order instead of
+"rarest-first", and first of all the edges of each file (first and last ~1%,
+up to 8 MB): it is the mode designed for streaming, so a player can
+start while the download continues. It is slower overall and worsens the
+health of the swarm, so it remains **optional and off by default**.
 
-- Si imposta al momento dell'aggiunta: dalla pagina web (caselle
-  *sequential* e *first/last*), con `sequential=1` / `first_last=1` su
-  `POST /api/v1/add`, oppure dai campi `AddOptions.Sequential` /
-  `AddOptions.FirstLast` di Gextto (impostazioni *Download sequenziale*,
-  `libtorrent_sequential`, e *Prima/ultima parte dei file*,
-  `libtorrent_first_last`, oltre alle caselle del form di aggiunta).
-- `first_last` scarica per primi i bordi di ogni file e poi prosegue
-  **rarest-first**: è indipendente dall'ordine sequenziale e utile allo
-  streaming senza rinunciare alla salute dello sciame.
-- Il valore predefinito per i torrent aggiunti dopo si imposta con
-  `POST /api/v1/config` (`{"sequential":true}`): Gextto lo fa quando cambia
-  l'impostazione. **Cambiare questo valore a caldo applica l'ordine anche ai
-  torrent già in corso**, come libtorrent. `first_last` non ha un default di
-  sessione nel demone: con *Prima/ultima parte dei file* attiva è Gextto ad
-  aggiungere `first_last=1` a ogni nuovo torrent.
-- il motore può cambiare l'ordine a caldo anche sul singolo torrent
-  (`Torrent.SetSequential`/`SetFirstLast` internamente); lo stato è persistito e
-  riportato in `GET /api/v1/torrents` (`sequential`, `first_last`).
+- It is set at the moment of addition: from the web page (*sequential* and
+  *first/last* checkboxes), with `sequential=1` / `first_last=1` on
+  `POST /api/v1/add`, or from Gextto's `AddOptions.Sequential` /
+  `AddOptions.FirstLast` fields (settings *Sequential download*,
+  `libtorrent_sequential`, and *First/last part of files*,
+  `libtorrent_first_last`, besides the add form checkboxes).
+- `first_last` downloads the edges of each file first and then continues
+  **rarest-first**: it is independent of the sequential order and useful for
+  streaming without giving up the health of the swarm.
+- The default value for torrents added afterwards is set with
+  `POST /api/v1/config` (`{"sequential":true}`): Gextto does it when it changes
+  the setting. **Changing this value on the fly also applies the order to torrents
+  already in progress**, like libtorrent. `first_last` has no session
+  default in the daemon: with *First/last part of files* active it is Gextto that
+  adds `first_last=1` to every new torrent.
+- the engine can change the order on the fly also on the single torrent
+  (`Torrent.SetSequential`/`SetFirstLast` internally); the state is persisted and
+  reported in `GET /api/v1/torrents` (`sequential`, `first_last`).
 
-## Torrent BitTorrent v2
+## BitTorrent v2 torrents
 
-Il motore scarica i torrent **v1**, la parte v1 degli **ibridi** (v1+v2) e i
-torrent **solo v2** aggiunti da un file `.torrent` che include i **`piece
-layers`** (BEP 52). I pezzi sono costruiti **file per file**: il pezzo di coda di
-un file è più corto di `piece length` e **non** contiene padding; ogni pezzo è
-verificato con un **nodo Merkle SHA-256** sui blocchi da 16 KiB (foglie mancanti
-= hash zero). L'identità del torrent è lo SHA-256 troncato a 20 byte, quindi
-handshake, DHT e tracker restano identici a v1.
+The engine downloads **v1** torrents, the v1 part of **hybrids** (v1+v2) and
+**v2-only** torrents added from a `.torrent` file that includes the **`piece
+layers`** (BEP 52). Pieces are built **file by file**: a file's tail piece is
+shorter than `piece length` and does **not** contain padding; each piece is
+verified with a **SHA-256 Merkle node** over the 16 KiB blocks (missing leaves
+= zero hash). The torrent identity is the SHA-256 truncated to 20 bytes, so
+handshake, DHT and trackers remain identical to v1.
 
-Anche i torrent **solo v2** senza `piece layers` (i **magnet** v2, `urn:btmh:`)
-sono supportati: l'info dict arriva via BEP 9 e i **`piece layers`** per-file
-vengono richiesti ai peer con i messaggi `hash request`/`hashes`/`hash reject`
-(BEP 52), verificati contro i `pieces root` e persistiti nel resume. Il bit
-riservato **v2** (byte 7, `0x10`) è annunciato nell'handshake solo per un torrent
-con identità v2, così i peer libtorrent accettano le `hash request`. Il seed
-risponde alle richieste del **layer dei pezzi** (`base = piece layer`) dai suoi
-`piece layers`, senza leggere i file. Risponde anche alle richieste del **layer
-dei blocchi** (`base = 0`), che un leecher libtorrent usa per verificare i
-blocchi mentre li scarica: l'albero dei blocchi è costruito dai dati dei pezzi
-verificati, **in cache per-file** e solo per un file **interamente presente**
-(altrimenti `hash reject`, perché un albero con foglie mancanti non si
-ancorerebbe al `pieces root`). Progetto completo in `docs/gx-torrent-v2.md`.
+**v2-only** torrents without `piece layers` (the v2 **magnets**, `urn:btmh:`)
+are also supported: the info dict arrives via BEP 9 and the per-file **`piece
+layers`** are requested from the peers with the `hash request`/`hashes`/`hash reject`
+messages (BEP 52), verified against the `pieces root` and persisted in the resume. The
+reserved **v2** bit (byte 7, `0x10`) is announced in the handshake only for a torrent
+with v2 identity, so libtorrent peers accept the `hash request`. The seed
+responds to the **piece layer** requests (`base = piece layer`) from its
+`piece layers`, without reading the files. It also responds to the **block
+layer** requests (`base = 0`), which a libtorrent leecher uses to verify
+blocks while downloading them: the block tree is built from the data of the verified
+pieces, **cached per-file** and only for a file **entirely present**
+(otherwise `hash reject`, because a tree with missing leaves would not
+anchor to the `pieces root`). Full plan in `docs/gx-torrent-v2.md`.
 
-## Riuso di dati locali (Swarm Merging, Fase 1)
+## Local data reuse (Swarm Merging, Phase 1)
 
-Se un altro torrent della sessione ha **lo stesso contenuto** con un layout
-identico (stessa `piece length`, stessa lunghezza e stessi hash ai medesimi
-indici), i suoi pezzi **già verificati** vengono riusati: all'allocazione il
-nuovo torrent legge i byte dalla storage dell'altro, li **riverifica contro il
-proprio hash** e li scrive nella propria, così riparte solo dai pezzi mancanti e
-può completarsi **anche senza peer**. È utile per un episodio ricaricato o per
-`.torrent` diversi dello stesso contenuto, e «resuscita» un torrent senza seeder
-quando il contenuto è già presente altrove. Il merge è **disattivato se un lato è
-un torrent privato** (BEP 27): mescolare sciami privati viola le regole dei
-tracker. È indipendente dagli hint **BEP 38**, che servono a *segnalare* i
-candidati (dettaglio in [`evoluzione.md`](evoluzione.md) §15.2).
+If another torrent of the session has the **same content** with an identical layout
+(same `piece length`, same length and same hashes at the same
+indices), its **already verified** pieces are reused: at allocation the
+new torrent reads the bytes from the other's storage, **re-verifies them against
+its own hash** and writes them into its own, so it restarts only from the missing pieces and
+can complete **even without peers**. It is useful for a reloaded episode or for
+different `.torrent`s of the same content, and «resurrects» a torrent without a seeder
+when the content is already present elsewhere. Merging is **disabled if one side is
+a private torrent** (BEP 27): mixing private swarms violates the tracker
+rules. It is independent of the **BEP 38** hints, which serve to *report* the
+candidates (details in [`evoluzione.md`](evoluzione.md) §15.2).
 
-## Statistiche
+## Statistics
 
-La pagina **Salute** di gextto ha un pannello "Motore torrent", aggiornato
-ogni 15 secondi, per tutti i motori.
+gextto's **Health** page has a "Torrent engine" panel, refreshed
+every 15 seconds, for all engines.
 
-Con gx-torrent mostra:
+With gx-torrent it shows:
 
-- versione e torrent per stato;
-- velocità e slot della coda;
-- porta e apertura sul router (in rosso se non riuscita);
-- DHT (nodi), uTP (connessioni uTP e TCP), LSD (peer trovati);
-- connessioni in entrata e I/O disco (job in coda, letture/scritture totali);
-- cifratura, proxy, regole del filtro IP;
-- disco e cache, totali della sessione.
+- version and torrents by status;
+- speed and queue slots;
+- port and opening on the router (in red if unsuccessful);
+- DHT (nodes), uTP (uTP and TCP connections), LSD (peers found);
+- incoming connections and disk I/O (jobs in queue, total reads/writes);
+- encryption, proxy, IP filter rules;
+- disk and cache, session totals.
 
-Con libtorrent mostra:
+With libtorrent it shows:
 
-- torrent per stato;
-- nodi DHT, peer TCP e uTP;
-- connessioni in entrata, job su disco, totali.
+- torrents by status;
+- DHT nodes, TCP and uTP peers;
+- incoming connections, disk jobs, totals.
 
-Gli stessi dati sono in `GET /api/v1/stats` del demone e in
-`GET /api/libtorrent/session-stats` di gextto. I contatori condivisi usano i
-**nomi di libtorrent** anche per gx-torrent (`net.recv_payload_bytes`,
-`peer.num_tcp_peers`, `disk.num_read_ops`, …), così l'endpoint è uniforme; i
-contatori specifici del motore (cache, velocità disco, traffico DHT) restano
-accanto. Rispetto a libtorrent:
+The same data are in `GET /api/v1/stats` of the daemon and in
+`GET /api/libtorrent/session-stats` of gextto. Shared counters use the
+**libtorrent names** also for gx-torrent (`net.recv_payload_bytes`,
+`peer.num_tcp_peers`, `disk.num_read_ops`, …), so the endpoint is uniform; the
+engine-specific counters (cache, disk speed, DHT traffic) remain
+alongside. Compared to libtorrent:
 
-- l'**overhead di protocollo** è disponibile (`protocol_overhead_bytes`: byte
-  scambiati sulle connessioni peer meno il payload, cifratura compresa);
-- **mancano** i tempi dei job su disco e i pezzi falliti per peer: il motore non li
-  misura e non sono implementati.
+- the **protocol overhead** is available (`protocol_overhead_bytes`: bytes
+  exchanged on the peer connections minus the payload, encryption included);
+- disk job times and failed pieces per peer are **missing**: the engine does not
+  measure them and they are not implemented.
 
-Il pulsante *Test porte* (in Gextto e nella pagina del demone) non legge
-`/api/v1/stats`: interroga `GET /api/v1/portcheck`, che risponde se la porta peer
-è in ascolto e se il router la inoltra.
+The *Test ports* button (in Gextto and on the daemon page) does not read
+`/api/v1/stats`: it queries `GET /api/v1/portcheck`, which responds whether the peer port
+is listening and whether the router forwards it.
 
-## Diagnostica pezzi
+## Piece diagnostics
 
-`GET /api/v1/torrents/{hash}/pieces` riporta lo stato di ogni pezzo come
-intervalli compatti (`begin`/`end` inclusivi, `state`): `have` (scaricato),
-`downloading` (in corso), `skipped` (file escluso) o `""` (mancante). La pagina
-web del demone ha una scheda **Pieces** con la mappa colorata; Gextto mostra la
-stessa mappa nella scheda **Pezzi** del dettaglio torrent. gx-torrent è il primo
-motore di Gextto a esporre la diagnostica dei pezzi (libtorrent risponde "non
-disponibile").
+`GET /api/v1/torrents/{hash}/pieces` reports the status of every piece as
+compact intervals (`begin`/`end` inclusive, `state`): `have` (downloaded),
+`downloading` (in progress), `skipped` (excluded file) or `""` (missing). The daemon's
+web page has a **Pieces** tab with the coloured map; Gextto shows the
+same map in the **Pieces** tab of the torrent detail. gx-torrent is the first
+Gextto engine to expose piece diagnostics (libtorrent responds "not
+available").
 
-## Streaming HTTP (HTTP Range)
+## HTTP streaming (HTTP Range)
 
-Oltre al download sequenziale, il demone sa servire un file a un player mentre
-lo scarica: `GET /ui/stream?hash=<hash>&file=<indice>` restituisce il file e
-supporta una singola intestazione `Range: bytes=…` (risposta `206` con
-`Content-Range`, `Accept-Ranges: bytes`). I pezzi della finestra richiesta, più
-circa 16 MB di readahead, vengono chiesti per primi; se un pezzo non è ancora
-arrivato il demone aspetta (fino a 2 minuti) invece di servire zeri. Richieste
-non soddisfacibili rispondono `416`.
+Besides sequential download, the daemon can serve a file to a player while
+downloading it: `GET /ui/stream?hash=<hash>&file=<index>` returns the file and
+supports a single `Range: bytes=…` header (response `206` with
+`Content-Range`, `Accept-Ranges: bytes`). The pieces of the requested window, plus
+about 16 MB of readahead, are requested first; if a piece has not yet
+arrived the daemon waits (up to 2 minutes) instead of serving zeros. Unsatisfiable
+requests respond `416`.
 
-I pezzi sono ordinati su **due livelli**: la finestra che il player legge ora
-(`SetFileStreamWindow`) ha priorità sul **readahead** (`SetFileReadaheadWindow`),
-che a sua volta precede il rarest-first. Così il playhead non resta dietro al
+Pieces are ordered on **two levels**: the window the player reads now
+(`SetFileStreamWindow`) has priority over the **readahead** (`SetFileReadaheadWindow`),
+which in turn precedes rarest-first. So the playhead does not stay behind the
 prefetch.
 
-L'autenticazione è quella della pagina web (cookie, header o `?token=`), quindi
-anche un player esterno (VLC, mpv) può usare l'URL completo di token. Da Gextto
-`GET /api/torrents/{hash}/stream?file=<indice>` reindirizza al demone aggiungendo
-il token lato server; nella scheda **Contenuto** del dettaglio torrent ogni file
-ha un pulsante **▶**, e la pagina del demone lo ha nella scheda **Files**.
+Authentication is that of the web page (cookie, header or `?token=`), so
+even an external player (VLC, mpv) can use the full token URL. From Gextto
+`GET /api/torrents/{hash}/stream?file=<index>` redirects to the daemon adding
+the token server-side; in the **Content** tab of the torrent detail every file
+has a **▶** button, and the daemon page has it in the **Files** tab.
 
-## Cache disco, preallocazione e storage mmap
+## Disk cache, preallocation and mmap storage
 
-Le impostazioni libtorrent di gextto valgono anche per gx-torrent, ma la cache
-di gx-torrent è **adattiva**: il demone la ricalcola dal carico reale invece di
-usare valori fissi.
+gextto's libtorrent settings also apply to gx-torrent, but gx-torrent's cache
+is **adaptive**: the daemon recomputes it from the real load instead of
+using fixed values.
 
-- **`libtorrent_cache_size` = -1** (predefinito): **cache adattiva**. Il demone
-  la ricalcola ogni 3 minuti da:
-  - **RAM disponibile** (`MemAvailable`, memoria reclamabile), non la RAM
-    totale: su un server occupato la cache si sgonfia da sola;
-  - **download attivi** (buffer di scrittura) e **seed attivi** (read cache);
-  - **classe dello storage** della cartella di scarico: su HDD o NFS i valori
-    raddoppiano (più coalescing, meno round-trip), su SSD/NVMe restano bassi.
-  - Tetti: scrittura 96 MB–1,5 GB, lettura 32–512 MB, mai oltre 1/4 della RAM e
-    1/8 della memoria disponibile.
-  - **Isteresi**: si riapplica solo se il target cambia di oltre il 25%, al
-    massimo una volta ogni 10 minuti. Il motore ridimensiona read cache e
-    buffer di scrittura sulla sessione in corso: nessuna riapertura.
-  - il motore non ha una cache write-back: il valore è un **tetto sui pezzi in volo**,
-    e la cache di scrittura/coalescing vera la fa il kernel. La policy serve
-    soprattutto a non sovra-dimensionare quando il carico è basso e a dare più
-    read cache durante il seed.
-- **`libtorrent_cache_size` > 0**: **override manuale**; la dimensione indicata
-  (blocchi da 16 KiB) vale per lettura e scrittura e la policy adattiva tace.
-- **`libtorrent_cache_expiry`**: dopo quanto scade un blocco in cache.
-- **`libtorrent_preallocate`**: i file nuovi vengono riservati per intero con
-  `fallocate`; i file esclusi dalla selezione restano sparsi, e su tmpfs (RAM
-  disk) restano sparsi sempre: riservarli toglierebbe subito tutta la loro
-  dimensione alla RAM.
-- **`-mmap`** (sperimentale, Linux): i file del torrent vengono serviti da una
-  **mappatura in memoria condivisa** invece che con `read`/`write`. Le scritture
-  dei pezzi diventano copie nella page cache (writeback asincrono del kernel) e le
-  letture evitano la syscall: benchmark `filestorage` su tmpfs ~7,0 GB/s contro
-  ~5,9 GB/s di `pwrite`. È **opt-in** (anche `GX_TORRENT_MMAP=1`) perché mappa
-  ogni file aperto: con torrent da migliaia di file si avvicina al limite
-  `vm.max_map_count`. Fuori da Linux è ignorato (si usano file normali).
-- **"Ottimizza impostazioni"**: con gx-torrent riporta la cache in automatico e
-  la applica subito.
-- La dimensione della cache cambia a caldo; scadenza della cache e
-  preallocazione invece riaprono la sessione del demone.
-- Il pannello Salute e `GET /api/v1/stats` mostrano la cache effettiva, il
-  target scelto (`cache_read_mb`, `cache_write_mb`), il **motivo**
-  (`cache_reason`), la classe storage (`cache_storage`) e la memoria
-  disponibile (`mem_available_mb`).
+- **`libtorrent_cache_size` = -1** (default): **adaptive cache**. The daemon
+  recomputes it every 3 minutes from:
+  - **available RAM** (`MemAvailable`, reclaimable memory), not the total
+    RAM: on a busy server the cache deflates by itself;
+  - **active downloads** (write buffer) and **active seeds** (read cache);
+  - **storage class** of the download folder: on HDD or NFS the values
+    double (more coalescing, fewer round-trips), on SSD/NVMe they stay low.
+  - Limits: write 96 MB–1.5 GB, read 32–512 MB, never more than 1/4 of the RAM and
+    1/8 of the available memory.
+  - **Hysteresis**: it is reapplied only if the target changes by more than 25%, at
+    most once every 10 minutes. The engine resizes read cache and write
+    buffer on the session in progress: no reopening.
+  - the engine does not have a write-back cache: the value is a **cap on the pieces in flight**,
+    and the real write/coalescing cache is done by the kernel. The policy serves
+    above all not to oversize when the load is low and to give more
+    read cache during seeding.
+- **`libtorrent_cache_size` > 0**: **manual override**; the indicated size
+  (16 KiB blocks) applies to reading and writing and the adaptive policy is silent.
+- **`libtorrent_cache_expiry`**: after how long a block in the cache expires.
+- **`libtorrent_preallocate`**: new files are reserved in full with
+  `fallocate`; files excluded from the selection remain sparse, and on tmpfs (RAM
+  disk) they always remain sparse: reserving them would immediately take their whole
+  size from the RAM.
+- **`-mmap`** (experimental, Linux): the torrent's files are served from a
+  **shared memory mapping** instead of with `read`/`write`. Piece writes
+  become copies into the page cache (asynchronous kernel writeback) and
+  reads avoid the syscall: `filestorage` benchmark on tmpfs ~7.0 GB/s versus
+  ~5.9 GB/s for `pwrite`. It is **opt-in** (also `GX_TORRENT_MMAP=1`) because it maps
+  every open file: with torrents of thousands of files it approaches the
+  `vm.max_map_count` limit. Outside Linux it is ignored (normal files are used).
+- **"Optimise settings"**: with gx-torrent it resets the cache to automatic and
+  applies it immediately.
+- The cache size changes on the fly; cache expiry and
+  preallocation instead reopen the daemon session.
+- The Health panel and `GET /api/v1/stats` show the effective cache, the
+  chosen target (`cache_read_mb`, `cache_write_mb`), the **reason**
+  (`cache_reason`), the storage class (`cache_storage`) and the available
+  memory (`mem_available_mb`).
 
 ## RAM disk
 
-Il flusso RAM disk di gextto (scaricare su tmpfs e spostare quando non c'è
-più spazio o a fine download) funziona: lo spostamento tra filesystem diversi
-copia i file e riparte dal punto in cui era. È provato da un test che sposta
-un download al 20% da `/dev/shm` al disco.
+gextto's RAM disk flow (download to tmpfs and move when there is no more
+space or at the end of the download) works: the move between different filesystems
+copies the files and resumes from the point it was at. It is proven by a test that moves
+a download at 20% from `/dev/shm` to the disk.
 
-- Le copie `.torrent` nella cartella scelta dall'operatore
-  (`libtorrent_torrent_copy_dir`) prendono il nome del torrent, come con
-  libtorrent; le vecchie copie `<hash>.torrent` vengono rinominate all'avvio.
-- Un torrent in download che non ha ancora nessun pezzo verificato viene
-  spostato senza copiare i suoi file vuoti: vengono ricreati nella
-  destinazione, senza scrivere gigabyte di zeri sul NAS e senza il controllo
-  completo che il motore farebbe trovando file già presenti.
-- Un torrent con dimensione sconosciuta all'aggiunta (magnet) non parte sul RAM
-  disk: resta su disco finché i metadati non rivelano la dimensione, poi viene
-  spostato sul RAM disk solo se rientra nella soglia. Un file troppo grande non
-  tocca mai il tmpfs. La regola vale anche per gli add manuali e per ogni motore
-  con supporto `ramdisk`; qBittorrent (`ramdisk: none`) scarica sempre su disco.
-- Lo spazio "riservato" sul RAM disk non conta i torrent che ne stanno già
-  uscendo.
+- The `.torrent` copies in the folder chosen by the operator
+  (`libtorrent_torrent_copy_dir`) take the torrent's name, as with
+  libtorrent; the old `<hash>.torrent` copies are renamed at startup.
+- A downloading torrent that does not yet have any verified piece is
+  moved without copying its empty files: they are recreated in the
+  destination, without writing gigabytes of zeros to the NAS and without the full
+  check the engine would do finding files already present.
+- A torrent with unknown size at addition (magnet) does not start on the RAM
+  disk: it stays on disk until the metadata reveals the size, then it is
+  moved to the RAM disk only if it falls within the threshold. A file too large never
+  touches the tmpfs. The rule also applies to manual adds and to every engine
+  with `ramdisk` support; qBittorrent (`ramdisk: none`) always downloads to disk.
+- The "reserved" space on the RAM disk does not count the torrents already
+  leaving it.
 
-## Layout su disco e sicurezza dei dati
+## On-disk layout and data safety
 
-il motore salva ogni torrent in `DataDir/<id>` e alla rimozione esegue sempre
-`os.RemoveAll(DataDir/<id>)`. Per questo gx-torrent:
+the engine saves every torrent in `DataDir/<id>` and at removal always runs
+`os.RemoveAll(DataDir/<id>)`. For this reason gx-torrent:
 
-- crea **sempre** `DATA/links/<id>` come symlink verso la cartella di
-  destinazione reale. I file finiscono in `destinazione/<nome torrent>`, con lo
-  stesso layout di libtorrent, quindi `CompletionPath` funziona invariato;
-- rimuovere un torrent cancella solo il symlink. I dati si cancellano solo con
-  `delete_files=1`, e solo il file o la cartella del torrent, mai la
-  destinazione intera né altri file;
-- una vecchia cartella reale al posto del symlink (layout precedente) viene
-  spostata in `DATA/orphaned/<id>` prima della rimozione, mai cancellata;
-- le destinazioni devono essere percorsi assoluti; il flag `-allowed-roots`
-  (solo uso standalone, Gextto non lo imposta) può limitarle.
+- **always** creates `DATA/links/<id>` as a symlink towards the real
+  destination folder. Files end up in `destination/<torrent name>`, with the
+  same layout as libtorrent, so `CompletionPath` works unchanged;
+- removing a torrent deletes only the symlink. Data is deleted only with
+  `delete_files=1`, and only the torrent's file or folder, never the
+  whole destination or other files;
+- an old real folder in place of the symlink (previous layout) is
+  moved to `DATA/orphaned/<id>` before removal, never deleted;
+- destinations must be absolute paths; the flag `-allowed-roots`
+  (standalone use only, Gextto does not set it) can restrict them.
 
-**Durabilità.** I file di dati non sono aperti con `O_SYNC`: il motore scrive i
-pezzi in modo bufferizzato e fa il flush a batch con `storage.File.Sync()` prima
-di persistere il bitfield (ordine snapshot → fsync → scrittura; `updateStats` in
-due fasi). Un bit che sopravvive a un crash si riferisce quindi sempre a dati già
-su disco, e al massimo si riscaricano i pezzi degli ultimi minuti. Su HDD e NFS
-questo toglie un fsync per ogni scrittura di pezzo (misure in `evoluzione.md`
+**Durability.** Data files are not opened with `O_SYNC`: the engine writes
+pieces in buffered mode and flushes in batch with `storage.File.Sync()` before
+persisting the bitfield (order snapshot → fsync → write; `updateStats` in
+two phases). A bit that survives a crash therefore always refers to data already
+on disk, and at most the pieces of the last few minutes are re-downloaded. On HDD and NFS
+this removes one fsync per piece write (measurements in `evoluzione.md`
 §5.4/§5.12).
 
-**Spostamento**:
+**Move**:
 
-1. il torrent viene fermato;
-2. il demone attende che il motore chiuda i file;
-3. il contenuto viene spostato, con `rename` oppure con copia e rimozione se
-   cambia filesystem (tramite file `.gxpart`);
-4. il symlink viene ripuntato in modo atomico;
-5. il torrent riparte.
+1. the torrent is stopped;
+2. the daemon waits for the engine to close the files;
+3. the content is moved, with `rename` or with copy and removal if
+   the filesystem changes (via `.gxpart` files);
+4. the symlink is re-pointed atomically;
+5. the torrent starts again.
 
-Gextto riceve `storage_moved` quando il nuovo percorso appare nella lista, e
-`storage_move_failed` in caso di errore. `AssociateStorage` ripunta senza
-spostare e riverifica.
+Gextto receives `storage_moved` when the new path appears in the list, and
+`storage_move_failed` on error. `AssociateStorage` re-points without
+moving and re-verifies.
 
-Lo stato proprio del demone sta in `DATA/state.json`, scritto in modo atomico.
-Per ogni torrent contiene:
+The daemon's own state is in `DATA/state.json`, written atomically.
+For each torrent it contains:
 
-- percorso, posizione in coda, pausa utente, parcheggio per stallo, pin;
-- probe in corso, rotazione, limiti di seed;
-- dimensione dello sciame dall'ultimo scrape;
-- data di completamento ed errore.
+- path, queue position, user pause, park for stall, pin;
+- probe in progress, rotation, seed limits;
+- swarm size from the last scrape;
+- completion date and error.
 
-Sopravvive ai riavvii insieme al database del motore (`DATA/session.db`).
+It survives restarts together with the engine database (`DATA/session.db`).
 
-## Coda autogestita
+## Self-managed queue
 
-il motore non ha una coda: la gestisce il demone stesso, ogni 3 secondi (e subito
-dopo ogni comando), con la stessa politica che Gextto applica a libtorrent.
+the engine does not have a queue: the daemon itself manages it, every 3 seconds (and immediately
+after every command), with the same policy that Gextto applies to libtorrent.
 
-- **Slot.** I download attivi (`active_downloads`) partono in ordine di
-  posizione in coda. I seed (`active_seeds`) hanno slot propri.
-- **Torrent lenti** (`dont_count_slow`, predefinito attivo). Un torrent che da
-  `slow_after_secs` (120 s) trasferisce meno di `slow_rate` (2 KiB/s) continua
-  a girare ma libera il suo slot, così parte il successivo. Uno sciame morto non
-  blocca mai i download sani. Appena avviato, un torrent ha un periodo di grazia.
-- **Limite totale** (`active_limit`). È un tetto rigido sui torrent in
-  esecuzione, lenti compresi. Quando viene superato, il demone:
-  1. non riavvia i torrent appena messi da parte;
-  2. ferma i seed lenti, poi i download lenti, dal fondo della coda;
-  3. solo dopo rinuncia ad avviare torrent sani.
+- **Slots.** Active downloads (`active_downloads`) start in order of
+  queue position. Seeds (`active_seeds`) have their own slots.
+- **Slow torrents** (`dont_count_slow`, active by default). A torrent that after
+  `slow_after_secs` (120 s) transfers less than `slow_rate` (2 KiB/s) keeps
+  running but frees its slot, so the next one starts. A dead swarm never
+  blocks healthy downloads. Just started, a torrent has a grace period.
+- **Total limit** (`active_limit`). It is a hard cap on the running
+  torrents, slow ones included. When it is exceeded, the daemon:
+  1. does not restart the torrents just set aside;
+  2. stops the slow seeds, then the slow downloads, from the bottom of the queue;
+  3. only afterwards gives up starting healthy torrents.
 
-  I torrent lenti fermati vengono **ruotati** in fondo alla coda e riprovano dopo
-  `slow_rotate_secs` (30 min). Così ogni download bloccato viene ritentato
-  periodicamente mentre quelli sani procedono, senza avvii e fermate continui
-  tra un turno e l'altro.
-- **Mai toccati dalla coda.** La coda non avvia mai:
-  - i torrent messi in pausa dall'utente (o da Gextto a fine seed);
-  - quelli parcheggiati come stalled da Gextto;
-  - quelli in errore;
-  - quelli in spostamento.
-- **Pin e probe.** I torrent con pin e quelli in probe (vedi sotto) girano
-  sempre e non occupano slot.
-- **Coda dinamica** (`dynamic_queue`, con minimo e massimo). È la stessa logica
-  del bridge libtorrent:
-  - restringe gli slot se il limite globale di download resta saturo (≥ 90%)
-    per dieci minuti;
-  - li allarga rapidamente se la banda resta inutilizzata (≤ 70%) e ci sono
-    torrent in attesa;
-  - con download in coda da 5 minuti, i seed scendono a uno.
-- **Mettere in testa.** `QueueTop` all'aggiunta, o l'azione `top`.
+  The stopped slow torrents are **rotated** to the bottom of the queue and retry after
+  `slow_rotate_secs` (30 min). So every blocked download is retried
+  periodically while the healthy ones proceed, without continuous starts and stops
+  between one turn and the next.
+- **Never touched by the queue.** The queue never starts:
+  - torrents paused by the user (or by Gextto at the end of seeding);
+  - those parked as stalled by Gextto;
+  - those in error;
+  - those moving.
+- **Pin and probe.** Torrents with pin and those in probe (see below) always
+  run and do not occupy slots.
+- **Dynamic queue** (`dynamic_queue`, with minimum and maximum). It is the same logic
+  as the libtorrent bridge:
+  - it narrows the slots if the global download limit stays saturated (≥ 90%)
+    for ten minutes;
+  - it widens them quickly if the bandwidth stays unused (≤ 70%) and there are
+    torrents waiting;
+  - with downloads queued for 5 minutes, the seeds drop to one.
+- **Move to top.** `QueueTop` at addition, or the `top` action.
 
-Stati riportati a Gextto:
+Statuses reported to Gextto:
 
-| Stato | Significato |
+| Status | Meaning |
 |---|---|
-| `downloading` | in esecuzione (anche allocazione) |
-| `downloading_metadata` | magnet in attesa dei metadati |
-| `checking_files` | verifica in corso |
-| `seeding` | completo, in condivisione |
-| `paused` | `auto_managed=true`: in coda, in attesa di uno slot. `auto_managed=false`: in pausa utente o fermo a fine seed |
-| `stalled` | parcheggiato da Gextto, oppure messo da parte dalla coda perché non scaricava nulla. Resta `stalled` finché non riparte, così l'orologio degli stalli di Gextto non si azzera |
-| `moving` | spostamento in corso |
-| `error` | errore del motore o spostamento fallito; un `resume` o un `verify` lo azzerano |
+| `downloading` | running (allocation too) |
+| `downloading_metadata` | magnet waiting for metadata |
+| `checking_files` | check in progress |
+| `seeding` | complete, sharing |
+| `paused` | `auto_managed=true`: queued, waiting for a slot. `auto_managed=false`: user-paused or stopped at the end of seeding |
+| `stalled` | parked by Gextto, or set aside by the queue because it was not downloading anything. It stays `stalled` until it restarts, so Gextto's stall clock does not reset |
+| `moving` | move in progress |
+| `error` | engine error or failed move; a `resume` or a `verify` resets it |
 
-Il flag `auto_managed` (con `parked` e `pinned`) è ciò che Gextto riassume nella
-riga **Auto-managed** del dettaglio torrent, con il termine di *chi* controlla lo
-scheduling: `managed` quando lo gestisce la coda, `paused` quando l'hai messo in
-pausa tu, `parked` quando è in stallo ed è stato messo da parte, `pinned` quando è
-forzato fuori coda. Non è quindi un semplice sì/no.
+The `auto_managed` flag (with `parked` and `pinned`) is what Gextto summarises in the
+**Auto-managed** row of the torrent detail, with the term for *who* controls the
+scheduling: `managed` when the queue manages it, `paused` when you paused it
+yourself, `parked` when it is stalled and has been set aside, `pinned` when it is
+forced out of the queue. It is therefore not a simple yes/no.
 
-## Stalled: divisione dei compiti
+## Stalled: division of tasks
 
-La gestione a lungo termine degli stalli resta in Gextto (`MonitorStalled`),
-identica per tutti i motori:
+The long-term management of stalls remains in Gextto (`MonitorStalled`),
+identical for all engines:
 
-1. dopo `libtorrent_stall_after_min` senza progressi Gextto chiama
-   `MarkStalled`, cioè l'azione `park` (fermo, fuori coda, stato `stalled`);
-2. i tentativi seguono il backoff 1 h → 3 h → 6 h → 12 h → 24 h e usano
-   `Restart`, cioè l'azione `restart`: il torrent gira fuori coda per una
-   finestra di probe di 15 minuti e viene riannunciato a tracker e DHT;
-3. se arrivano byte, Gextto chiama `ClearStalled` (`unpark`); altrimenti
-   lo riparcheggia;
-4. scaduto il give-up, Gextto rimuove il torrent e cerca un'altra release.
+1. after `libtorrent_stall_after_min` without progress Gextto calls
+   `MarkStalled`, i.e. the `park` action (stopped, out of the queue, `stalled` state);
+2. the attempts follow the backoff 1 h → 3 h → 6 h → 12 h → 24 h and use
+   `Restart`, i.e. the `restart` action: the torrent runs out of the queue for a
+   15-minute probe window and is re-announced to trackers and DHT;
+3. if bytes arrive, Gextto calls `ClearStalled` (`unpark`); otherwise
+   it parks it again;
+4. once the give-up has expired, Gextto removes the torrent and looks for another release.
 
-Il demone aggiunge la gestione **a breve termine**: torrent lenti fuori dagli
-slot e rotazione al limite totale. Il parcheggio sopravvive ai riavvii del
-demone.
+The daemon adds **short-term** management: slow torrents out of the
+slots and rotation at the total limit. Parking survives restarts of the
+daemon.
 
-Per la diagnosi (`dead_swarm`, `no_connected_seed`, ...):
+For diagnosis (`dead_swarm`, `no_connected_seed`, ...):
 
-- seeder e leecher dello sciame vengono dall'ultimo scrape riuscito dei tracker
-  e restano noti anche a torrent fermo;
-- i "seed connessi" sono i peer da cui si sta effettivamente ricevendo.
+- swarm seeders and leechers come from the last successful scrape of the trackers
+  and remain known even with the torrent stopped;
+- "connected seeds" are the peers from which one is actually receiving.
 
 ## Seed
 
-I limiti per torrent (`SetLimits` con ratio e giorni) vengono salvati dal
-demone e riportati nella lista (`-1` = globale, `0` = infinito). Li applica
-`EnforceSeedPolicy` di Gextto, come per gli altri motori: pausa a fine seed,
-poi spostamento o rimozione.
+The per-torrent limits (`SetLimits` with ratio and days) are saved by the
+daemon and reported in the list (`-1` = global, `0` = infinite). Gextto's
+`EnforceSeedPolicy` applies them, as for the other engines: pause at the end of seeding,
+then move or remove.
 
 ## Super-seeding (BEP 16)
 
-Su un torrent **completato** si può attivare il super-seeding: il motore non
-annuncia l'intero bitfield, ma **un pezzo alla volta** per peer, e serve solo i
-pezzi offerti a quel peer. Serve per il *seeding iniziale*: spinge lo sciame a
-scambiarsi i dati invece di scaricarli tutti dal seed, al prezzo di un upload del
-seed **volutamente più basso**.
+On a **completed** torrent super-seeding can be activated: the engine does not
+announce the whole bitfield, but **one piece at a time** per peer, and serves only the
+pieces offered to that peer. It is for *initial seeding*: it pushes the swarm to
+exchange the data instead of downloading it all from the seed, at the price of a
+**deliberately lower** seed upload.
 
-- `POST /api/v1/torrents/{hash}/super-seeding` con `enabled=1/0`, o la casella
-  nella pagina del demone; Gextto lo attiva dal tab **Generale** del dettaglio.
-- Vale solo a torrent completato: attivato prima, entra in funzione al
-  completamento; su un torrent in download o fermo è inerte.
-- È una **strategia di seeding**: non tocca coda, slot, seed policy né limiti di
-  banda. Quando la seed policy di Gextto (ratio/giorni) ferma il torrent, il
-  super-seeding si ferma con lui.
-- Il flag è persistito nel resume del demone, quindi sopravvive a un riavvio.
-- Come libtorrent, `have` e `not-interested` fanno avanzare gli annunci; i pezzi
-  offerti non si ripetono e, quando sono finiti, il peer viene liberato col
-  bitfield pieno.
+- `POST /api/v1/torrents/{hash}/super-seeding` with `enabled=1/0`, or the checkbox
+  on the daemon page; Gextto activates it from the **General** tab of the detail.
+- It applies only to a completed torrent: activated earlier, it comes into effect at
+  completion; on a downloading or stopped torrent it is inert.
+- It is a **seeding strategy**: it does not touch the queue, slots, seed policy or bandwidth
+  limits. When Gextto's seed policy (ratio/days) stops the torrent,
+  super-seeding stops with it.
+- The flag is persisted in the daemon's resume, so it survives a restart.
+- Like libtorrent, `have` and `not-interested` advance the announces; the pieces
+  offered are not repeated and, when they are finished, the peer is released with the
+  full bitfield.
 
-Gextto segnala la capacità `super_seeding` per gx-torrent (`full`).
+Gextto reports the capability `super_seeding` for gx-torrent (`full`).
 
-## Scritture sul disco di stato
+## Writes to the state disk
 
-Lo stato del demone (`DATA_DIR/gx-torrent`: `session.db`, `state.json`, log)
-resta sul disco locale: `session.db` è un database bbolt (mmap e lock), non
-adatto a NFS. Le scritture sono contenute: il motore salva statistiche e bitfield
-ogni 2 minuti (il demone alza a 2 minuti i 30 s predefiniti di
-`ResumeWriteInterval`), con un fsync dei dati prima di ogni scrittura del
-bitfield: circa 100 MB al giorno a riposo; il log ruota a
+The daemon's state (`DATA_DIR/gx-torrent`: `session.db`, `state.json`, logs)
+stays on the local disk: `session.db` is a bbolt database (mmap and lock), not
+suitable for NFS. Writes are contained: the engine saves statistics and bitfield
+every 2 minutes (the daemon raises to 2 minutes the 30 s default of
+`ResumeWriteInterval`), with a fsync of the data before every bitfield
+write: about 100 MB per day at rest; the log rotates at
 5 MB × 4.
 
-## Limiti di banda
+## Bandwidth limits
 
-I limiti globali cambiano a caldo (programmazione, limite temporaneo): il motore
-usa un limitatore il cui ritmo si aggiorna mentre i peer lo usano,
-quindi nessuna riapertura della sessione e nessun peer perso. Gextto invia la
-configurazione solo quando cambia. Riaprono la sessione solo i limiti di peer
-(`max_peer_dial`/`max_peer_accept`), la scadenza della cache e la
-preallocazione.
+Global limits change on the fly (scheduling, temporary limit): the engine
+uses a limiter whose rate updates while the peers use it,
+so no reopening of the session and no peer lost. Gextto sends the
+configuration only when it changes. Only the peer limits
+(`max_peer_dial`/`max_peer_accept`), the cache expiry and the
+preallocation reopen the session.
 
-Ogni torrent ha un **limite di velocità proprio** (download e upload, KiB/s):
-`-1` eredita il globale, `0` è illimitato, un valore positivo è il limite. I
-peer del torrent usano un limitatore dedicato che, quando il torrent eredita,
-inoltra al limitatore di sessione: un cambio vale subito, senza riconnettere, e
-il limite globale continua a valere per la somma dei torrent che lo ereditano.
-Si imposta con `POST /api/v1/torrents/{hash}/seed-limits` (campi
-`download_limit`, `upload_limit`) o dalla pagina del demone; Gextto lo fa dal
-tab **Limiti** del dettaglio torrent. Gextto conserva i valori tra un riavvio e
-l'altro e il demone li riapplica alla sessione ricaricata.
+Every torrent has its **own speed limit** (download and upload, KiB/s):
+`-1` inherits the global, `0` is unlimited, a positive value is the limit. The
+torrent's peers use a dedicated limiter which, when the torrent inherits,
+forwards to the session limiter: a change applies immediately, without reconnecting, and
+the global limit continues to apply to the sum of the torrents that inherit it.
+It is set with `POST /api/v1/torrents/{hash}/seed-limits` (fields
+`download_limit`, `upload_limit`) or from the daemon page; Gextto does it from the
+**Limits** tab of the torrent detail. Gextto keeps the values between one restart
+and the next and the daemon reapplies them to the reloaded session.
 
-Ogni torrent ha anche un **limite di connessioni** e di **slot di upload**
-propri (`POST /api/v1/torrents/{hash}/conn-limits`, campi `max_connections` e
-`max_uploads`; `-1` e `0` significano entrambi nessun tetto per-torrent — il
-budget globale `max_peer_dial`/`max_peer_accept` resta). Il limite di
-connessioni vale sulle connessioni instaurate; se lo si abbassa sotto il numero
-corrente, le eccedenti vengono chiuse subito. Gli slot di upload cambiano il
-numero di peer che l'unchoker tiene sbloccati.
+Every torrent also has its own **connection limit** and **upload
+slots** (`POST /api/v1/torrents/{hash}/conn-limits`, fields `max_connections` and
+`max_uploads`; `-1` and `0` both mean no per-torrent cap — the global
+budget `max_peer_dial`/`max_peer_accept` remains). The connection limit applies
+to the connections established; if it is lowered below the current number,
+the excess ones are closed immediately. The upload slots change the
+number of peers the unchoker keeps unblocked.
 
-### Auto-speed sulla latenza (anti-bufferbloat)
+### Auto-speed on latency (anti-bufferbloat)
 
-Opzione **standalone** (settings.json, come lo scheduler di banda), ispirata al
-*Ping Auto-Speed* di BiglyBT. Un probe misura ogni secondo la **latenza di
-andata e ritorno** con una connessione TCP verso il **gateway** (porte 80, 443,
-53) o verso un host configurato; il valore più basso degli ultimi 60 s è la
-**baseline a riposo**. Quando la latenza supera `baseline × 1.5` **e**
-`baseline + 20 ms`, il demone **abbassa l'upload** del 15% rispetto al tetto in
-vigore (mai sotto il minimo configurato); quando la linea torna a riposo lo
-rialza di `tetto/20` per volta. Riduce **solo** l'upload effettivo: il limite
-globale o programmato resta il tetto, e un limite illimitato (o l'assenza di
-misure) disattiva il clamp.
+**Standalone** option (settings.json, like the bandwidth scheduler), inspired by
+BiglyBT's *Ping Auto-Speed*. A probe measures every second the **round-trip
+latency** with a TCP connection towards the **gateway** (ports 80, 443,
+53) or towards a configured host; the lowest value of the last 60 s is the
+**resting baseline**. When the latency exceeds `baseline × 1.5` **and**
+`baseline + 20 ms`, the daemon **lowers the upload** by 15% with respect to the limit in
+force (never below the configured minimum); when the line returns to rest it
+raises it again by `limit/20` at a time. It reduces **only** the effective upload: the global
+or scheduled limit remains the cap, and an unlimited limit (or the absence of
+measurements) disables the clamp.
 
-Chiavi in settings.json: `autospeed-enabled` (default `false`),
-`autospeed-target` (host o `host:port`; vuoto = gateway), `autospeed-min`
-(KiB/s, default 50). Serve un **limite di upload positivo** (globale o
-programmato) perché l'auto-speed possa agire; la pagina lo impone. Le decisioni
-compaiono nel log con motivo `auto-speed` (`effective speed limits …`). La
-pagina delle impostazioni mostra la latenza misurata e il tetto corrente.
+Keys in settings.json: `autospeed-enabled` (default `false`),
+`autospeed-target` (host or `host:port`; empty = gateway), `autospeed-min`
+(KiB/s, default 50). A **positive upload limit** (global or
+scheduled) is needed for auto-speed to act; the page enforces it. The decisions
+appear in the log with reason `auto-speed` (`effective speed limits …`). The
+settings page shows the measured latency and the current cap.
 
 ## REST API (v1)
 
-Tutte le richieste richiedono `X-Gx-Token` (o `Authorization: Bearer`) se il
-token è impostato.
+All requests require `X-Gx-Token` (or `Authorization: Bearer`) if the
+token is set.
 
-| Metodo e percorso | Descrizione |
+| Method and path | Description |
 |---|---|
-| `GET /api/v1/health` | stato e versione |
-| `GET /api/v1/stats` | contatori: in download, seed, in coda, stalled, lenti, velocità, peer, slot effettivi |
-| `GET /api/v1/portcheck` | test porte: la porta peer è in ascolto e il router la inoltra |
-| `GET /api/v1/torrents` | lista completa (progresso %, dimensioni, velocità, peer, sciame, stato, percorso, limiti di seed, flag di coda) |
-| `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `super_seeding`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
-| `POST /api/v1/add-file` | multipart `torrent` più gli stessi campi |
-| `POST /api/v1/create-torrent` | JSON `path`/`name`/`trackers`/`webseeds`/`private`/`piece_length`/`comment`: crea un `.torrent` da un file o cartella del server e lo restituisce come download (mktorrent-style). `piece_length` (multiplo di 16 KiB, 0 = automatico) è limitato a 16 MiB per non trasformare un valore arbitrario in un'allocazione enorme |
-| `DELETE /api/v1/torrents/{hash}?delete_files=1` | rimozione |
-| `POST /api/v1/torrents/{hash}/{azione}` | vedi elenco sotto |
-| `GET /api/v1/torrents/{hash}/files\|peers\|trackers\|pieces\|torrent-file\|scrape\|dhtscrape\|collections` | ispezione (i file includono `priority`; `pieces` riporta gli intervalli di stato; `scrape` interroga i tracker per seeders/leechers, BEP 48; `dhtscrape` stima lo sciame dal DHT, BEP 33; `collections` riporta gli hint BEP 38 — `collections`, `similar` in hex e i torrent locali che condividono un hint) |
-| `POST /api/v1/pins/clear` | toglie tutti i pin |
-| `POST /api/v1/ipfilter` | ricarica il filtro IP (`path` facoltativo) |
-| `GET /api/v1/config` | configurazione e slot effettivi |
-| `POST /api/v1/config` | JSON parziale: chiavi sconosciute rifiutate |
-| `GET /ui/events` | SSE degli eventi di sessione (`torrent_added`, `torrent_completed`, `torrent_stopped`, `torrent_error`, `torrent_piece`, `peer_connected`, `peer_disconnected`, `tracker_announce`); la pagina li usa per aggiornarsi subito |
+| `GET /api/v1/health` | status and version |
+| `GET /api/v1/stats` | counters: downloading, seeding, queued, stalled, slow, speeds, peers, effective slots |
+| `GET /api/v1/portcheck` | port test: the peer port is listening and the router forwards it |
+| `GET /api/v1/torrents` | full list (progress %, sizes, speeds, peers, swarm, status, path, seed limits, queue flags) |
+| `POST /api/v1/add` | form fields: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `super_seeding`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Responds `{hash, existing}` |
+| `POST /api/v1/add-file` | multipart `torrent` plus the same fields |
+| `POST /api/v1/create-torrent` | JSON `path`/`name`/`trackers`/`webseeds`/`private`/`piece_length`/`comment`: creates a `.torrent` from a file or folder of the server and returns it as a download (mktorrent-style). `piece_length` (multiple of 16 KiB, 0 = automatic) is limited to 16 MiB so as not to turn an arbitrary value into a huge allocation |
+| `DELETE /api/v1/torrents/{hash}?delete_files=1` | removal |
+| `POST /api/v1/torrents/{hash}/{action}` | see list below |
+| `GET /api/v1/torrents/{hash}/files\|peers\|trackers\|pieces\|torrent-file\|scrape\|dhtscrape\|collections` | inspection (files include `priority`; `pieces` reports the status intervals; `scrape` queries the trackers for seeders/leechers, BEP 48; `dhtscrape` estimates the swarm from the DHT, BEP 33; `collections` reports the BEP 38 hints — `collections`, `similar` in hex and the local torrents that share a hint) |
+| `POST /api/v1/pins/clear` | removes all pins |
+| `POST /api/v1/ipfilter` | reloads the IP filter (optional `path`) |
+| `GET /api/v1/config` | configuration and effective slots |
+| `POST /api/v1/config` | partial JSON: unknown keys rejected |
+| `GET /ui/events` | SSE of session events (`torrent_added`, `torrent_completed`, `torrent_stopped`, `torrent_error`, `torrent_piece`, `peer_connected`, `peer_disconnected`, `tracker_announce`); the page uses them to refresh immediately |
 
-Azioni disponibili su `POST /api/v1/torrents/{hash}/{azione}`:
+Actions available on `POST /api/v1/torrents/{hash}/{action}`:
 
 - `pause`, `resume`, `verify`, `reannounce`;
-- `restart` (con `probe_secs`), `park`, `unpark`;
-- `pin` (con `pinned=1/0`), `top`;
-- `move` e `associate` (con `destination`);
-- `seed-limits` (`seed_ratio`, `seed_days`, `download_limit`, `upload_limit` in KiB/s: -1 globale, 0 illimitato);
-- `conn-limits` (`max_connections`, `max_uploads`: -1 e 0 = nessun tetto per-torrent);
-- `trackers` (con `urls`, uno per riga);
-- `set-trackers` (con `urls`, uno per riga: **sostituisce** la lista, elenco vuoto la azzera);
-- `webseeds` (con `urls`, uno per riga, e `remove=1` per rimuoverli);
-- `super-seeding` (con `enabled=1/0`: BEP 16 sul torrent completato);
-- `file-priorities` (con `priorities`, separate da virgola; 0 = salta, 1..4 normale, 5..7 alta).
+- `restart` (with `probe_secs`), `park`, `unpark`;
+- `pin` (with `pinned=1/0`), `top`;
+- `move` and `associate` (with `destination`);
+- `seed-limits` (`seed_ratio`, `seed_days`, `download_limit`, `upload_limit` in KiB/s: -1 global, 0 unlimited);
+- `conn-limits` (`max_connections`, `max_uploads`: -1 and 0 = no per-torrent cap);
+- `trackers` (with `urls`, one per line);
+- `set-trackers` (with `urls`, one per line: **replaces** the list, an empty list clears it);
+- `webseeds` (with `urls`, one per line, and `remove=1` to remove them);
+- `super-seeding` (with `enabled=1/0`: BEP 16 on the completed torrent);
+- `file-priorities` (with `priorities`, comma-separated; 0 = skip, 1..4 normal, 5..7 high).
 
-Chiavi accettate da `POST /api/v1/config`:
+Keys accepted by `POST /api/v1/config`:
 
 - `active_downloads`, `active_seeds`, `active_limit`;
 - `dont_count_slow`, `slow_rate`, `slow_after_secs`, `slow_rotate_secs`;
 - `dynamic_queue`, `dynamic_min`, `dynamic_max`;
 - `speed_limit_download`, `speed_limit_upload` (KiB/s);
 - `max_peer_dial`, `max_peer_accept`;
-- `cache_mb`, `cache_ttl_secs`, `preallocate` (cache e preallocazione: `cache_mb`
-  ≤ 0 = adattiva);
-- `auto` (autogestione: coda dinamica e cache adattiva);
-- `sequential` (predefinito per i torrent aggiunti dopo).
+- `cache_mb`, `cache_ttl_secs`, `preallocate` (cache and preallocation: `cache_mb`
+  ≤ 0 = adaptive);
+- `auto` (self-management: dynamic queue and adaptive cache);
+- `sequential` (default for torrents added afterwards).
 
-## Disponibilità dell'API (snapshot e lock)
+## API availability (snapshot and lock)
 
-Gextto interroga `GET /api/v1/torrents` a ogni polling (1,5 s) con un timeout di
-15 s: se la risposta non arriva, il demone viene considerato non raggiungibile.
-La lista è quindi servita da uno **snapshot** pubblicato dal tick della coda e
-dai comandi che modificano lo stato, **senza prendere `d.mu` e senza toccare il
-run loop di alcun torrent**. Un torrent bloccato su I/O di storage (per esempio
-una copia lunga verso un mount di rete) non può così far sembrare l'API morta.
+Gextto queries `GET /api/v1/torrents` at every poll (1.5 s) with a timeout of
+15 s: if the response does not arrive, the daemon is considered unreachable.
+The list is therefore served from a **snapshot** published by the queue tick and
+by the commands that change the state, **without taking `d.mu` and without touching the
+run loop of any torrent**. A torrent blocked on storage I/O (for example
+a long copy to a network mount) cannot therefore make the API seem dead.
 
-Il tick lavora in tre fasi, per non tenere mai `d.mu` durante un'operazione che
-può bloccarsi:
+The tick works in three phases, so as never to hold `d.mu` during an operation that
+can block:
 
-1. **Campionamento** (senza lock): per ogni torrent legge stats, peer e tracker
-   dal suo run loop e classifica lo storage (lo `statfs` sul mount di rete può
-   bloccarsi a lungo).
-2. **Applicazione** (con `d.mu`): aggiorna meta e coda a partire dai campioni,
-   calcola il piano e pubblica lo snapshot. Nessuna chiamata al run loop qui.
-3. **Azioni** (senza lock): esegue `Start`/`Stop` decisi dal piano; se il run
-   loop è occupato, l'azione viene semplicemente ritentata al tick successivo.
+1. **Sampling** (without lock): for each torrent it reads stats, peers and trackers
+   from its run loop and classifies the storage (the `statfs` on the network mount can
+   block for a long time).
+2. **Application** (with `d.mu`): it updates meta and queue from the samples,
+   computes the plan and publishes the snapshot. No call to the run loop here.
+3. **Actions** (without lock): it runs the `Start`/`Stop` decided by the plan; if the run
+   loop is busy, the action is simply retried at the next tick.
 
-Lo snapshot può essere vecchio al massimo di un tick (3 s predefiniti); ogni
-comando che cambia lo stato fa ripartire subito un tick, quindi la UI e Gextto
-vedono la modifica quasi immediatamente.
+The snapshot can be at most one tick old (3 s default); every
+command that changes the state immediately restarts a tick, so the UI and Gextto
+see the change almost immediately.
 
-Anche l'**aggiunta** di un torrent chiama il motore senza `d.mu`: un magnet può
-prima risolvere un item DHT (BEP 46, fino a 10 s) o scaricare il `.torrent` da
-una sorgente `xs=`/`as=`, e in quell'attesa API, pagina e coda devono restare
-reattive. L'id in aggiunta sta in `d.adding`, così il tick non avvia il torrent
-prima che il suo stato (pausa, posizione, categoria…) sia registrato; se nel
-frattempo la sessione è stata ricostruita, l'aggiunta fallisce con un errore
-chiaro. Test `TestAddDoesNotHoldTheLockWhileResolving`.
+The **addition** of a torrent also calls the engine without `d.mu`: a magnet can
+first resolve a DHT item (BEP 46, up to 10 s) or download the `.torrent` from
+an `xs=`/`as=` source, and during that wait API, page and queue must stay
+responsive. The id being added is in `d.adding`, so the tick does not start the torrent
+before its state (pause, position, category…) is recorded; if in the
+meantime the session has been rebuilt, the addition fails with a clear
+error. Test `TestAddDoesNotHoldTheLockWhileResolving`.
 
-## Limiti noti (motore)
+## Known limits (engine)
 
-Le operazioni che il motore non supporta rispondono con un errore esplicito di
-capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
+Operations that the engine does not support respond with an explicit capability
+error (`ErrCapabilityUnavailable`), never with a false success:
 
-- v2 come **seed**: le richieste `hash request` del layer dei blocchi
-  (`base = 0`) sono servite solo per un file **interamente presente** e vengono
-  costruite leggendo i dati (una volta per file, poi in cache); per un file
-  incompleto rispondono `hash reject` (vedi *Torrent BitTorrent v2*);
-- IPv6: **supporto parziale** (vedi *IPv6* qui sotto).
+- v2 as **seed**: the `hash request` requests of the block layer
+  (`base = 0`) are served only for a file **entirely present** and are
+  built by reading the data (once per file, then cached); for an incomplete
+  file they respond `hash reject` (see *BitTorrent v2 torrents*);
+- IPv6: **partial support** (see *IPv6* below).
 
-Il **download sequenziale** e la priorità **prima/ultima parte** sono supportati
-(vedi la sezione dedicata): il motore scarica per primi i bordi di
-ogni file (~1% della dimensione, fino a 8 MB), così i player trovano subito
-l'indice. La prima/ultima parte è **indipendente** dall'ordine
-sequenziale.
+**Sequential download** and **first/last part** priority are supported
+(see the dedicated section): the engine downloads first the edges of
+every file (~1% of the size, up to 8 MB), so players immediately find
+the index. The first/last part is **independent** of the sequential
+order.
 
-Gli slot di upload e le connessioni per torrent **non** sono un limite: si
-impostano con `conn-limits` (e i limiti di banda con `seed-limits`), come visto
-in *Limiti di banda*.
+The upload slots and the per-torrent connections are **not** a limitation: they are
+set with `conn-limits` (and the bandwidth limits with `seed-limits`), as seen
+in *Bandwidth limits*.
 
 ### IPv6
 
-Il listener a porta unica (TCP) e la socket UDP condivisa da uTP e DHT sono
-**dual-stack**: se il host di ascolto è non specificato (`0.0.0.0`, `::` o
-vuoto) si apre un unico socket che accetta sia IPv4 sia IPv6 e, se la macchina
-non ha IPv6, si ripiega su IPv4. Un indirizzo specifico resta mono-famiglia.
+The single-port listener (TCP) and the UDP socket shared by uTP and DHT are
+**dual-stack**: if the listen host is unspecified (`0.0.0.0`, `::` or
+empty) a single socket is opened that accepts both IPv4 and IPv6 and, if the machine
+has no IPv6, it falls back to IPv4. A specific address remains single-family.
 
-I peer IPv6 si scoprono dai tracker (campo `peers6`, BEP 7), dallo scambio PEX
-(`added6`/`dropped6`, BEP 11) e dalla **scoperta DHT su IPv6** (BEP 32): il DHT
-condivide la socket dual-stack, tiene i nodi v4 e v6 separati nei campi
-`nodes`/`nodes6` e chiede entrambe le famiglie (`want`). Peer, tracker HTTP e
-**UDP**, e web seed vengono risolti anche su IPv6 (con preferenza per IPv4
-quando il nome ne ha entrambi). Il campo `yourip` dell'handshake esteso è
-accettato sia in forma IPv4 sia IPv6, il **filtro IP** accetta regole CIDR IPv6
-(le forme a intervallo/P2P/eMule restano IPv4) e il motore accetta i peer DHT
-IPv6 (contatti da 18 byte).
+IPv6 peers are discovered from the trackers (`peers6` field, BEP 7), from the PEX
+exchange (`added6`/`dropped6`, BEP 11) and from **DHT discovery over IPv6** (BEP 32): the DHT
+shares the dual-stack socket, keeps v4 and v6 nodes separate in the fields
+`nodes`/`nodes6` and requests both families (`want`). Peers, HTTP and
+**UDP** trackers, and web seeds are also resolved over IPv6 (with a preference for IPv4
+when the name has both). The extended handshake `yourip` field is
+accepted in both IPv4 and IPv6 form, the **IP filter** accepts IPv6 CIDR rules
+(the range/P2P/eMule forms remain IPv4) and the engine accepts IPv6 DHT
+peers (18-byte contacts).
 
-Manca solo l'annuncio LSD su **IPv6** nelle reti dove il multicast v6 non è
-disponibile: se il listener v6 non si apre, la LSD resta attiva su IPv4. Negli
-altri casi la LSD annuncia e ascolta anche sul gruppo `[ff15::efc0:988f]:6771`
-(come anacrolix).
+Only the LSD announcement over **IPv6** is missing in networks where v6 multicast is not
+available: if the v6 listener does not open, the LSD stays active on IPv4. In the
+other cases the LSD also announces and listens on the group `[ff15::efc0:988f]:6771`
+(like anacrolix).
 
-## Test
+## Tests
 
-- `go test ./cmd/gx-torrent/` copre:
-  - il pianificatore (slot, lenti, rotazione con raffreddamento, tetto rigido,
-    forzati, coda dinamica);
-  - un ciclo di vita reale su una sessione gx-core senza rete (aggiunta, verifica,
-    pausa utente rispettata dalla coda, spostamento, rimozione che preserva i
-    dati, cancellazione mirata, parcheggio e probe, persistenza dopo il riavvio
-    della sessione);
-  - token e configurazione;
-  - la pagina web (pagina, frammenti live, azioni, token, favicon) e le
-    traduzioni della sua lingua;
-  - l'origine dei peer (incluso `holepunch`), l'holepunch legato a uTP e il
-    test porte;
-  - la scoperta LSD, la diagnostica dei pezzi e lo streaming con `Range`;
-  - trasferimenti reali tra due demoni in locale:
-    - attraverso la porta unica, in chiaro e con cifratura forzata;
-    - con selezione dei file e riattivazione di un file escluso;
-    - via proxy SOCKS5 e HTTP;
-    - con spostamento da RAM disk a metà download;
-    - solo in uTP, con il DHT sullo stesso socket UDP;
-    - con il peer trovato via LSD (multicast reale);
-  - caricamento del filtro IP.
-  - (opt-in, `GX_MEASURE=1` / `make measure-seeding`) la misura seeding/choking
-    su sciame locale, con byte e tempi per peer: metodo e metriche in
+- `go test ./cmd/gx-torrent/` covers:
+  - the scheduler (slots, slow, rotation with cooling, hard cap,
+    forced, dynamic queue);
+  - a real lifecycle on a gx-core session without network (addition, verification,
+    user pause respected by the queue, move, removal that preserves the
+    data, targeted deletion, parking and probe, persistence after the restart
+    of the session);
+  - token and configuration;
+  - the web page (page, live fragments, actions, token, favicon) and the
+    translations of its language;
+  - the origin of the peers (including `holepunch`), the holepunch tied to uTP and the
+    port test;
+  - the LSD discovery, the piece diagnostics and the streaming with `Range`;
+  - real transfers between two local daemons:
+    - through the single port, in the clear and with forced encryption;
+    - with file selection and reactivation of an excluded file;
+    - via SOCKS5 and HTTP proxy;
+    - with a move from RAM disk at mid-download;
+    - uTP only, with the DHT on the same UDP socket;
+    - with the peer found via LSD (real multicast);
+  - loading of the IP filter.
+  - (opt-in, `GX_MEASURE=1` / `make measure-seeding`) the seeding/choking measurement
+    on a local swarm, with bytes and times per peer: method and metrics in
     `docs/evoluzione.md` (§6).
-- `go test ./internal/blocklist` in `internal/gxcore` copre i formati del
-  filtro IP.
-- `make test-engine` copre anche l'harness deterministico del choking
-  (`internal/unchoker/sim_test.go`) e il super-seeding
+- `go test ./internal/blocklist` in `internal/gxcore` covers the formats of the
+  IP filter.
+- `make test-engine` also covers the deterministic choking harness
+  (`internal/unchoker/sim_test.go`) and super-seeding
   (`torrent/torrent_superseed_test.go`).
-- `go test -run GxEngine .` copre l'adapter:
-  - stati ed eventi;
-  - cache su interruzione;
-  - park, probe e unpark;
-  - invio della politica di coda;
-  - operazioni e token;
+- `go test -run GxEngine .` covers the adapter:
+  - statuses and events;
+  - cache on interruption;
+  - park, probe and unpark;
+  - sending of the queue policy;
+  - operations and token;
   - `storage_moved`.

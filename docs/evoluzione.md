@@ -1,2413 +1,2409 @@
-# Migliorie ed evoluzione di Gextto e gx-torrent
+# Improvements and evolution of Gextto and gx-torrent
 
-Documento unico di lavoro del **2026-10-10**: raccoglie backlog, migliorie
-implementate, piani di miglioramento, misure, revisioni tecniche e direzione
-strategica di Gextto e del motore gx-torrent.
+Single working document for **2026-10-10**: it collects the backlog, implemented
+improvements, improvement plans, measurements, technical reviews and the
+strategic direction of Gextto and the gx-torrent engine.
 
-Sostituisce i seguenti file, spostati in `docs/archive/` come copie locali non
-tracciate in git (vedi Appendice A per la mappa):
+It replaces the following files, moved to `docs/archive/` as local copies not
+tracked in git (see Appendix A for the map):
 
 - `proposte-migliorie.md`, `da-fare.md`, `lavoro-sessione.md`,
   `scelte-di-progetto.md`, `accessibility-analysis.md`,
   `holepunch-test-harness.md`
 - `gx-torrent-migliorie.md`, `gx-torrent-ottimizzazioni-prestazionali-v2.md`,
   `gx-torrent-misure-seeding.md`
-- `revisione-1.md` (già locale, già in `.gitignore`)
+- `revisione-1.md` (already local, already in `.gitignore`)
 - `archive/revisione-2.md`, `archive/UI_V2.md`, `archive/gextto-terra.md`,
-  `archive/pro-terra.md` (già archiviati)
+  `archive/pro-terra.md` (already archived)
 
-Restano documenti a sé, perché descrivono lo stato corrente e non un piano:
-`docs/gx-torrent.md` (riferimento tecnico del motore), manuali, API,
-architettura, sicurezza, migrazione, guide avanzate, TUI.
+The following remain separate documents, because they describe the current state
+rather than a plan: `docs/gx-torrent.md` (technical reference for the engine),
+manuals, API, architecture, security, migration, advanced guides, TUI.
 
-La **§14** (client standalone gx-nox) è stata estratta in
-[`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md), per tenere separati il piano
-strategico e il documento tecnico del motore.
+**§14** (gx-nox standalone client) has been extracted into
+[`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md), to keep the strategic plan
+and the engine's technical document separate.
 
-## Indice
+## Index
 
-1. [Backlog attivo](#1-backlog-attivo)
-2. [Migliorie Gextto implementate](#2-migliorie-gextto-implementate)
-3. [Direzione strategica](#3-direzione-strategica)
-4. [gx-torrent: lacune e piano di miglioramento](#4-gx-torrent-lacune-e-piano-di-miglioramento)
-5. [gx-torrent: ottimizzazioni prestazionali](#5-gx-torrent-ottimizzazioni-prestazionali)
-6. [gx-torrent: misure di choking e seeding](#6-gx-torrent-misure-di-choking-e-seeding)
-7. [Holepunching: harness di test](#7-holepunching-harness-di-test)
-8. [Revisione tecnica 1: client, i18n, job, concorrenza](#8-revisione-tecnica-1-client-i18n-job-concorrenza)
-9. [Revisione tecnica 2: bug e debito al commit 97142c1](#9-revisione-tecnica-2-bug-e-debito-al-commit-97142c1)
-10. [Rapporti Terra e Pro Terra](#10-rapporti-terra-e-pro-terra)
-11. [UI SSR + HTMX: report di migrazione](#11-ui-ssr--htmx-report-di-migrazione)
-12. [Handover tra sessioni di lavoro](#12-handover-tra-sessioni-di-lavoro)
-13. [Accessibilità](#13-accessibilita)
-14. [gx-torrent standalone (gx-nox): rimando](#14-gx-torrent-standalone-gx-nox-rimando)
-15. [Estensioni ad alto valore dal confronto con BiglyBT](#15-estensioni-ad-alto-valore-dal-confronto-con-biglybt)
-16. [Appendice A: file consolidati](#appendice-a-file-consolidati)
+1. [Active backlog](#1-active-backlog)
+2. [Gextto improvements implemented](#2-gextto-improvements-implemented)
+3. [Strategic direction](#3-strategic-direction)
+4. [gx-torrent: gaps and improvement plan](#4-gx-torrent-gaps-and-improvement-plan)
+5. [gx-torrent: performance optimisations](#5-gx-torrent-performance-optimisations)
+6. [gx-torrent: choking and seeding measurements](#6-gx-torrent-choking-and-seeding-measurements)
+7. [Holepunching: test harness](#7-holepunching-test-harness)
+8. [Technical review 1: client, i18n, jobs, concurrency](#8-technical-review-1-client-i18n-jobs-concurrency)
+9. [Technical review 2: bugs and debt at commit 97142c1](#9-technical-review-2-bugs-and-debt-at-commit-97142c1)
+10. [Terra and Pro Terra reports](#10-terra-and-pro-terra-reports)
+11. [SSR + HTMX UI: migration report](#11-ssr--htmx-ui-migration-report)
+12. [Handover between work sessions](#12-handover-between-work-sessions)
+13. [Accessibility](#13-accessibility)
+14. [gx-torrent standalone (gx-nox): pointer](#14-gx-torrent-standalone-gx-nox-pointer)
+15. [High-value extensions from the comparison with BiglyBT](#15-high-value-extensions-from-the-comparison-with-biglybt)
+16. [Appendix A: consolidated files](#appendix-a-consolidated-files)
 
 ---
 
-## 1. Backlog attivo
+## 1. Active backlog
 
-Ex `docs/da-fare.md`. Ripristinato l'8-10-2026: era finito per errore in
-`docs/archive/` pur essendo un backlog **attivo**.
+Ex `docs/da-fare.md`. Restored on 08-10-2026: it had ended up in
+`docs/archive/` by mistake even though it is an **active** backlog.
 
-**Verifiche ricorrenti (ogni chiusura di ciclo).** `make test` (`check-ui` +
+**Recurring checks (at every cycle close).** `make test` (`check-ui` +
 `installer-test` + `test-dht` + `CGO_ENABLED=0 go test ./...`), `make test-engine`
-e `make vet`; invarianti `scripts/check-ui-settings-index.sh` /
-`scripts/installer-selftest.sh`. **La TUI di Gextto deve sempre funzionare**:
+and `make vet`; invariants `scripts/check-ui-settings-index.sh` /
+`scripts/installer-selftest.sh`. **The Gextto TUI must always work**:
 `go test ./internal/tui/` + `go test . -run TestTUILibraryClientAgainstTheRouter`
-(+ smoke `gexttod tui` contro il daemon) — vedi §12.1 di
+(+ `gexttod tui` smoke test against the daemon) — see §12.1 of
 [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md).
 
-### 1.1 Osservabilità: metriche nel tempo (fatto)
+### 1.1 Observability: metrics over time (done)
 
-ID di correlazione e runbook sono fatti (vedi §1.3). Le metriche nel tempo sono
-salvate nel database e mostrate in *Salute*, senza Prometheus:
+Correlation IDs and the runbook are done (see §1.3). Metrics over time are
+stored in the database and shown in *Health*, without Prometheus:
 
-- ~~durata delle ricerche e sorgenti che non rispondono, ciclo per ciclo~~ —
-  fatto (2026-10-10): `CycleStats` salva durata ed esito per sorgente nel ciclo
-  (`cycle_history`), con il pannello **Ricerche** in *Salute* (`uiweb.go`,
+- ~~duration of searches and sources that do not respond, cycle by cycle~~ —
+  done (2026-10-10): `CycleStats` stores duration and outcome per source per cycle
+  (`cycle_history`), with the **Searches** panel in *Health* (`uiweb.go`,
   `RecentCycleStats`, `ScrapeAll`);
-- ~~avviso oltre una soglia~~ — fatto (2026-10-10): `cycle_monitor.go` avvisa
-  (riga WARN + notifica) se una sorgente ha fallito in 3 delle ultime ricerche,
-  se l'ultima ricerca supera 3 ore o se non c'è un ciclo senza errori da 3
-  intervalli (minimo 2 ore), e segnala il ritorno alla normalità;
-- ~~titoli in coda con il tempo di attesa~~ — fatto (2026-10-10): pannello **Coda
-  titoli** in *Salute* (`Database.PendingQueue`, `pending_queue.go`), con
-  titolo, attesa da `first_seen_at` e tempo al `due_at` (serie e film);
-- ~~import falliti al giorno~~ — fatto (2026-10-10): pannello **Import falliti**
-  in *Salute* (`Database.FailedImportsDaily`, `acquisition.go`), che conta per
-  giorno gli ERROR di import dagli `acquisition_events`;
-- la salute degli indexer del manager è già in Sources (`indexer_health.go`).
+- ~~warning above a threshold~~ — done (2026-10-10): `cycle_monitor.go` warns
+  (WARN line + notification) if a source has failed in 3 of the last searches,
+  if the last search exceeds 3 hours or if there has been no error-free cycle for 3
+  intervals (minimum 2 hours), and signals the return to normal;
+- ~~titles in the queue with their waiting time~~ — done (2026-10-10): **Title
+  queue** panel in *Health* (`Database.PendingQueue`, `pending_queue.go`), with
+  title, wait since `first_seen_at` and time to `due_at` (series and movies);
+- ~~failed imports per day~~ — done (2026-10-10): **Failed imports** panel
+  in *Health* (`Database.FailedImportsDaily`, `acquisition.go`), which counts per
+  day the import ERRORs from `acquisition_events`;
+- the health of the manager's indexers is already in Sources (`indexer_health.go`).
 
-**Freschezza della UI.** I due pannelli si aggiornano da soli ogni 60 s (HTMX
-`hx-trigger`, endpoint `GET /partial/health/queue`); i riquadri hanno già
-`TestV2HealthTilesPollIndependently`. Il render è sempre fresco:
-`TestV2HealthRefreshesWhenDataChanges` fissa che un dato aggiunto dopo il primo
-render compaia al render successivo (niente cache stantia).
+**UI freshness.** The two panels refresh themselves every 60 s (HTMX
+`hx-trigger`, endpoint `GET /partial/health/queue`); the tiles already have
+`TestV2HealthTilesPollIndependently`. The render is always fresh:
+`TestV2HealthRefreshesWhenDataChanges` fixes that a datum added after the first
+render appears on the next render (no stale cache).
 
-### 1.2 Benchmark del motore gx-core (fatto)
+### 1.2 Benchmark of the gx-core engine (done)
 
-- **`scripts/bench-engines.sh`** — sonda riproducibile RAM/throughput di gx-core:
-  throughput dello sciame su loopback (harness esistente, con RSS di picco) e
-  throughput di scrittura su disco di una cartella (`--dir`, puntala a un mount
-  NFS per confrontare). Uso: `scripts/bench-engines.sh [--size MiB] [--dir DIR]
-  [--leechers N]`. Fuori dalla CI: serve solo a decidere con numeri.
-- **`make measure-dht`** — misura su **DHT pubblica** riempimento della routing
-  table e successo delle query (`GX_MEASURE_DHT=5m`,
-  `internal/dht/measure_test.go`): è la base dei numeri per l'hardening
-  anti-Sybil e il multi-path (§4.10). Fuori dalla CI. C'è anche
-  `make measure-seeding` per il choking (§6).
+- **`scripts/bench-engines.sh`** — reproducible RAM/throughput probe of gx-core:
+  swarm throughput on loopback (existing harness, with peak RSS) and
+  disk write throughput of a directory (`--dir`, point it at a
+  mount NFS to compare). Usage: `scripts/bench-engines.sh [--size MiB] [--dir DIR]
+  [--leechers N]`. Outside CI: it only serves to decide with numbers.
+- **`make measure-dht`** — measures on the **public DHT** the filling of the routing
+  table and the success of queries (`GX_MEASURE_DHT=5m`,
+  `internal/dht/measure_test.go`): it is the basis of the numbers for the anti-Sybil
+  hardening and multi-path (§4.10). Outside CI. There is also
+  `make measure-seeding` for choking (§6).
 
-### 1.3 Chiusi / decisioni
+### 1.3 Closed / decisions
 
-- **i18n in sei lingue** — fatto (2026-10-10). Pacchetto completo it/en/de/fr/es/pl:
-  UI web (chrome, etichette, tooltip, hint, messaggi server-side e stringhe
-  generate dal client JS via `window.__v2i18n` + `t()` in `v2-core.js`); errori
-  API/HTMX mostrati all'utente localizzati con `uiText`; notifiche
-  (Telegram/email/webhook) con `messages.Pick` su catalogo it→{de,fr,es,pl}
-  (`internal/messages/catalog.go`); TUI a 6 lingue (`internal/tui/i18n.go`);
-  pagina web di gx-torrent tradotta con lo stesso approccio (catalogo +
-  `translateHTML`, lingua passata da Gextto con `-lang` e `?lang=xx`).
-  Guardia: `TestUIIsTranslatable` fallisce se una stringa UI di template o
-  view-model Go (o un letterale di `uiText`) non è chiave dei cataloghi, con
-  allowlist esplicito; `TestClientI18nKeysTranslated` copre le chiavi client.
-  Restano **in inglese per scelta** i log del daemon; le stringhe tecniche degli
-  errori API non mostrate all'utente possono rimanere nella lingua originale.
-- **ID di correlazione e storia dei download** — fatto (2026-10-10). Le righe di
-  log su un torrent portano `acq: <id>` (ID corto derivato dall'hash, che resta
-  nascosto) e finiscono in `acquisition_events`: scheda *Storia* nel dettaglio
-  torrent, 📜 per puntata e pannello nella pagina della serie, API
+- **i18n in six languages** — done (2026-10-10). Full it/en/de/fr/es/pl package:
+  web UI (chrome, labels, tooltips, hints, server-side messages and strings
+  generated by the client JS via `window.__v2i18n` + `t()` in `v2-core.js`); API/HTMX
+  errors shown to the user localised with `uiText`; notifications
+  (Telegram/email/webhook) with `messages.Pick` on the it→{de,fr,es,pl}
+  catalogue (`internal/messages/catalog.go`); TUI in 6 languages (`internal/tui/i18n.go`);
+  gx-torrent web page translated with the same approach (catalogue +
+  `translateHTML`, language passed by Gextto with `-lang` and `?lang=xx`).
+  Guard: `TestUIIsTranslatable` fails if a UI string from a template or a Go
+  view-model (or a `uiText` literal) is not a key of the catalogues, with an
+  explicit allowlist; `TestClientI18nKeysTranslated` covers the client keys.
+  The daemon logs remain **in English by choice**; the technical strings of
+  API errors not shown to the user may remain in the original language.
+- **Correlation IDs and download history** — done (2026-10-10). Log lines about
+  a torrent carry `acq: <id>` (a short ID derived from the hash, which stays
+  hidden) and end up in `acquisition_events`: *History* tab in the torrent
+  detail, 📜 per episode and a panel in the series page, API
   `/api/acquisitions` (`acquisition.go`).
-- **Runbook "un episodio non è arrivato"** — fatto (2026-10-10), in
-  *Risoluzione problemi* di `MANUAL.it.md`/`MANUAL.en.md`, costruito sulla storia.
-- **Wizard di primo avvio (onboarding)** — fatto e giudicato concluso
-  (2026-10-10). Procedura guidata in `uiweb_v2_setup.go` (commit `c8162d8`), poi
-  TVDB come alternativa a TMDB e scelta della lingua al primo passo.
-- **Pulsante «Predefinito» su ogni impostazione** — fatto. Ogni campo non segreto
-  con un default registrato (anche vuoto) mostra ↺ accanto a «Salva»: riempie il
-  campo col default e l'utente conferma salvando; il valore del default è mostrato
-  accanto se compatto (`Resettable`/`DefaultInline` in `uiweb_v2.go`, `HasDefault`
-  in `uiweb_pages.go`). Esclusi: campi disabilitati per il motore attivo, gestiti
-  dall'auto-tuning, segreti o senza default.
-- **Log di upgrade unificati** — fatto (commit `988d60a`). Una sostituzione
-  produce una sola riga: `♻️ FBI S03E01 updated (1.4 GB): … · previous version
-  «…» moved to the trash`. L'aggiunta normale resta `📁 … added to the library …`.
-- **Pannello "Operazioni in background"** — risolto (commit `65cb9bf`). Resta e
-  funziona (polling, annullamento), ma è **nascosto quando non c'è alcun job**.
-- **Write-back cache nel motore gx-core** — chiuso: la misura mostra
-  `write_cache=0` (storage e download di pari passo), quindi non ci sarebbe
-  guadagno. Da riaprire solo con uno storage realmente più lento della rete.
-- **Campi specialistici nel form di aggiunta** — chiuso: nessuna richiesta
-  concreta, sarebbe fuffa preventiva.
-- **Benchmark UI come test di performance in CI** — chiuso: il rendering SSR
-  costa ~1–3 ms/pagina, non è un problema.
-- **Cap cache su storage lento (NFS)** — superato: la cache si autoregola
+- **Runbook "an episode did not arrive"** — done (2026-10-10), in
+  *Troubleshooting* of `MANUAL.it.md`/`MANUAL.en.md`, built on the history.
+- **First-start wizard (onboarding)** — done and judged complete
+  (2026-10-10). Guided procedure in `uiweb_v2_setup.go` (commit `c8162d8`), then
+  TVDB as an alternative to TMDB and choice of language at the first step.
+- **"Default" button on every setting** — done. Every non-secret
+  field with a registered default (even empty) shows ↺ next to "Save": it fills
+  the field with the default and the user confirms by saving; the default value is shown
+  next to it if compact (`Resettable`/`DefaultInline` in `uiweb_v2.go`, `HasDefault`
+  in `uiweb_pages.go`). Excluded: fields disabled for the active engine, handled
+  by auto-tuning, secrets or without a default.
+- **Unified upgrade logs** — done (commit `988d60a`). A replacement
+  produces a single line: `♻️ FBI S03E01 updated (1.4 GB): … · previous version
+  «…» moved to the trash`. A normal addition stays `📁 … added to the library …`.
+- **"Background operations" panel** — resolved (commit `65cb9bf`). It remains and
+  works (polling, cancellation), but it is **hidden when there is no job**.
+- **Write-back cache in the gx-core engine** — closed: the measurement shows
+  `write_cache=0` (storage and download in step), so there would be no
+  gain. To be reopened only with storage genuinely slower than the network.
+- **Specialist fields in the add form** — closed: no concrete request,
+  it would be preventive fluff.
+- **UI benchmark as a performance test in CI** — closed: SSR rendering
+  costs ~1–3 ms/page, it is not a problem.
+- **Cache cap on slow storage (NFS)** — superseded: the cache self-regulates
   (`cmd/gx-torrent/cache.go`, tuner `cacheSizes`).
-- **Dashboard: diagnostica "Ultimi trovati nelle sorgenti"** — già fatto
+- **Dashboard: "Latest found in the sources" diagnostics** — already done
   (route `GET /dashboard/feed`, `uiweb_v2.go`).
-- **Verifica live del flusso RAM disk con gx-torrent** — fatto (2026-10-07).
-- **README allineato alla copertura BEP — fatto (2026-10-11).** Le sezioni
-  *Motore torrent* di `README.md`/`README.it.md` ora riassumono **tutta** la
-  copertura BitTorrent coi numeri di BEP (wire 3, Fast Extension 6,
+- **Live verification of the RAM disk flow with gx-torrent** — done (2026-10-07).
+- **README aligned with BEP coverage — done (2026-10-11).** The
+  *Torrent engine* sections of `README.md`/`README.it.md` now summarise **all** the
+  BitTorrent coverage with the BEP numbers (wire 3, Fast Extension 6,
   `ut_metadata` 9, Extension Protocol 10, PEX v4/v6 11, multitracker 12, LSD
   v4/v6 14, Web Seed 19, `upload_only` 21, padding 47, `lt_donthave` 54; tracker
   IPv6 7, UDP 15, URLData 41, scrape 48; DHT 5/32/33/42/43/44; v2 52, magnet
-  `so=` 53) e rimandano a `docs/bep.md` come fonte unica; i BEP deprecati/di
-  nicchia e WebTorrent/I2P sono dichiarati fuori scope. Regola generale aggiunta
-  ad `AGENTS.md`: il README è documentazione e va aggiornato a ogni modifica
-  impattante per l'utente.
+  `so=` 53) and refer to `docs/bep.md` as the single source; the deprecated/niche
+  BEPs and WebTorrent/I2P are declared out of scope. General rule added
+  to `AGENTS.md`: the README is documentation and must be updated with every change
+  that impacts the user.
 
-### 1.4 Micro-ottimizzazioni UI/i18n (fatte, misurate il 2026-10-10)
+### 1.4 UI/i18n micro-optimisations (done, measured on 2026-10-10)
 
-Follow-up dei commit `06c9128`/`6cf568e`/`7f43b44`. Nessuno è un collo di
-bottiglia: vanno prese solo come rifiniture, con i numeri sotto.
+Follow-up to commits `06c9128`/`6cf568e`/`7f43b44`. None of them is a bottleneck:
+they are to be taken only as refinements, with the numbers below.
 
-| # | Voce | Misura (disco locale, `CGO_ENABLED=0 go test`) | Guadagno atteso |
+| # | Item | Measurement (local disk, `CGO_ENABLED=0 go test`) | Expected gain |
 |---|---|---|---|
-| 1 | Probe di scrivibilità nel chrome | `stat`+`write_probe` (create+fsync+delete): **~15,6 µs/op** (200 it.); `uiShellChromeFrom` intero **~164 µs/op** → il probe è ~10% del chrome in test | ~15 µs/render, niente fsync per render; su datadir NFS varrebbe millisecondi |
-| 2 | Test di identità della cache dizionario | riuso confermato: due `Dictionary("de")` = **stesso puntatore** | solo qualità del test, nessun effetto runtime |
-| 3 | Memo client i18n per `AppState` | **+1 entry per stato**, ~**2,4 KB/entry** (20 stati → 20 entry, 47.240 byte) | nullo in produzione (1 entry); pulizia solo per i test |
+| 1 | Writability probe in the chrome | `stat`+`write_probe` (create+fsync+delete): **~15.6 µs/op** (200 iterations); whole `uiShellChromeFrom` **~164 µs/op** → the probe is ~10% of the chrome under test | ~15 µs/render, no fsync per render; on an NFS datadir it would be worth milliseconds |
+| 2 | Dictionary cache identity test | reuse confirmed: two `Dictionary("de")` = **same pointer** | test quality only, no runtime effect |
+| 3 | i18n client memo for `AppState` | **+1 entry per state**, ~**2.4 KB/entry** (20 states → 20 entries, 47,240 bytes) | nil in production (1 entry); cleanup only for tests |
 
-1. **Probe di scrivibilità cachato nel chrome. Fatto.** `uiShellChromeFrom` ora
-   usa `dataDirWritable` (`uiweb_shell.go`), che riusa l'esito per
-   `dataDirWritableTTL` (30 s): niente `create+fsync+delete` a ogni pagina,
-   partial e tick SSE. Test `TestDataDirWritableCache` (riuso entro il TTL,
-   ricalcolo dopo).
-2. **Test di identità della cache dizionario. Fatto.**
-   `TestDictionaryCacheAndInvalidate` confronta l'identità con
-   `reflect.ValueOf(first).Pointer() == reflect.ValueOf(second).Pointer()`: una
-   rebuild a ogni chiamata ora fallisce.
-3. **Pulizia di `v2ClientI18nMemo`. Fatto.** `resetV2ClientI18nMemo()`
-   (`uiweb_v2_client_i18n.go`) svuota la cache; `newTestAppState` lo chiama, così
-   i test non accumulano entry (in produzione resta una sola). Test
+1. **Writability probe cached in the chrome. Done.** `uiShellChromeFrom` now
+   uses `dataDirWritable` (`uiweb_shell.go`), which reuses the outcome for
+   `dataDirWritableTTL` (30 s): no `create+fsync+delete` on every page,
+   partial and SSE tick. Test `TestDataDirWritableCache` (reuse within the TTL,
+   recomputation after).
+2. **Dictionary cache identity test. Done.**
+   `TestDictionaryCacheAndInvalidate` compares identity with
+   `reflect.ValueOf(first).Pointer() == reflect.ValueOf(second).Pointer()`: a
+   rebuild on every call now fails.
+3. **Cleanup of `v2ClientI18nMemo`. Done.** `resetV2ClientI18nMemo()`
+   (`uiweb_v2_client_i18n.go`) empties the cache; `newTestAppState` calls it, so
+   tests do not accumulate entries (in production only one remains). Test
    `TestV2ClientI18nMemoIsReset`.
 
-### 1.5 gx-torrent su Windows e magnet v2 (chiuse, revisione del 2026-10-10)
+### 1.5 gx-torrent on Windows and magnet v2 (closed, review of 2026-10-10)
 
-La revisione dei commit Windows/v2 ha corretto R-001…R-013 (junction, `isDirLink`,
-scadenza delle hash request, sessione 0, job CI `windows-platform`; commit
-`95495e5`, `ebae504`, `1fae2ea`, `0363a02`). Le migliorie emerse (M-01…M-08)
-sono state **tutte implementate**:
+The review of the Windows/v2 commits fixed R-001…R-013 (junction, `isDirLink`,
+expiry of hash requests, session 0, CI job `windows-platform`; commits
+`95495e5`, `ebae504`, `1fae2ea`, `0363a02`). The improvements that emerged (M-01…M-08)
+were **all implemented**:
 
-| Item | Stato |
+| Item | Status |
 | --- | --- |
-| M-01 test del flusso link su Windows (`pointLink`→`readLink`→move→rimozione, `protectLegacyDir` non sposta la junction) | fatto (`48edb97`, `TestWindowsLinkFlow`) |
-| M-02 allargare `windows-platform` ad altri test (Setup, CrossDevice) con test portabili | fatto (`48edb97`) |
-| M-03 layer v2 in parallelo: chunk da ≤512 hash per peer diverso, con retry | fatto (`92f0a84`) |
-| M-04 wizard: errore mostrato in pagina se i limiti di banda non si applicano | fatto (`fbc9eaf`) |
-| M-05 `replaceDirLink` Windows: junction costruita completa e poi scambiata | fatto (`d4e1485`) |
-| M-06 servizio Windows nativo (`windows/svc`) e pacchetto zip con `sc create` | fatto (`b145b73`, `9120fc5`; selftest del servizio in CI `8403c71`) |
-| M-07 gateway Windows: usare la rotta scelta da Windows (`GetBestRoute`) | fatto (`d4e1485`) |
-| M-08 interop v2 `base=0`: servire il layer dei blocchi come seed | fatto (`ab0a603`: risposta `base=0` dai pezzi verificati, in cache per-file, solo a file completo; interop con client grezzo `e9d8a78`) |
+| M-01 test of the link flow on Windows (`pointLink`→`readLink`→move→removal, `protectLegacyDir` does not move the junction) | done (`48edb97`, `TestWindowsLinkFlow`) |
+| M-02 widen `windows-platform` to other tests (Setup, CrossDevice) with portable tests | done (`48edb97`) |
+| M-03 v2 layer in parallel: chunks of ≤512 hashes per different peer, with retry | done (`92f0a84`) |
+| M-04 wizard: error shown on the page if the bandwidth limits do not apply | done (`fbc9eaf`) |
+| M-05 `replaceDirLink` Windows: junction built complete and then swapped | done (`d4e1485`) |
+| M-06 native Windows service (`windows/svc`) and zip package with `sc create` | done (`b145b73`, `9120fc5`; service selftest in CI `8403c71`) |
+| M-07 Windows gateway: use the route chosen by Windows (`GetBestRoute`) | done (`d4e1485`) |
+| M-08 v2 interop `base=0`: serve the block layer as a seed | done (`ab0a603`: `base=0` response from verified pieces, per-file cached, only when the file is complete; interop with a raw client `e9d8a78`) |
 
-**M-06 (servizio Windows)** — fatto: `main` ora riconosce `svc.IsWindowsService()`
-(`service_windows.go` / `service_other.go`) e avvia lo stesso demone
-(`startDaemon`, estratto e condiviso col percorso interattivo) dentro `svc.Run`,
-fermandolo su stop dell'SCM. `scripts/package-gx-torrent-windows.sh` produce
-`gx-torrent-windows-<arch>.zip` con `gx-torrent.exe`, `install-service.ps1`
-(`New-Service`), `uninstall-service.ps1` e `README.txt` (alternativa `sc create`).
-Lo zip è ora generato **dentro** `build-release.sh` (variante Go pura, dove Go è
-disponibile) e pubblicato da `continuous.yml`/`release.yml` come artifact e nel
-release (`dist/gx-torrent-windows-<arch>.zip`). `TestDaemonStartServeStop` copre
-il ciclo di vita condiviso (`startDaemon`/`shutdown`) su Linux e, col filtro
-`windows-platform`, su Windows. L'installazione reale è coperta dal job CI
-`windows-service` (`8403c71`, non bloccante perché l'SCM è asincrono):
-`scripts/gx-torrent-service-selftest.ps1` registra il servizio con `New-Service`
-e lo stesso `binPath` del pacchetto, lo avvia, attende `/api/v1/health` e ne
-verifica lo stop pulito.
+**M-06 (Windows service)** — done: `main` now recognises `svc.IsWindowsService()`
+(`service_windows.go` / `service_other.go`) and starts the same daemon
+(`startDaemon`, extracted and shared with the interactive path) inside `svc.Run`,
+stopping it on SCM stop. `scripts/package-gx-torrent-windows.sh` produces
+`gx-torrent-windows-<arch>.zip` with `gx-torrent.exe`, `install-service.ps1`
+(`New-Service`), `uninstall-service.ps1` and `README.txt` (alternative `sc create`).
+The zip is now generated **inside** `build-release.sh` (pure-Go variant, where Go is
+available) and published by `continuous.yml`/`release.yml` as an artifact and in the
+release (`dist/gx-torrent-windows-<arch>.zip`). `TestDaemonStartServeStop` covers
+the shared lifecycle (`startDaemon`/`shutdown`) on Linux and, with the
+`windows-platform` filter, on Windows. The real installation is covered by the CI job
+`windows-service` (`8403c71`, non-blocking because the SCM is asynchronous):
+`scripts/gx-torrent-service-selftest.ps1` registers the service with `New-Service`
+and the same `binPath` as the package, starts it, waits for `/api/v1/health` and
+verifies its clean stop.
 
-### 1.6 Motore presentato come codice nostro (fatto)
+### 1.6 Engine presented as our own code (done)
 
-**Regola.** gx-core è il nostro motore e lo presentiamo come tale: la
-documentazione non pubblicizza l'origine del codice. L'unica attribuzione è
-quella **richiesta dalle licenze permissive** dei componenti derivati, nei file
-`internal/gxcore/LICENSE` (MIT) e `internal/dht/LICENSE` (BSD-3) e in
-`THIRD-PARTY-NOTICES`. Restano anche i riferimenti generici alla *funzionalità*
-di altri client (per esempio "come fa libtorrent", "come fa anacrolix") e le
-normali dipendenze di terze parti, con il loro import e la loro licenza
-(`github.com/anacrolix/utp` per uTP, `libtorrent` per il motore alternativo).
+**Rule.** gx-core is our engine and we present it as such: the
+documentation does not advertise the origin of the code. The only attribution is
+the one **required by the permissive licences** of the derived components, in the files
+`internal/gxcore/LICENSE` (MIT) and `internal/dht/LICENSE` (BSD-3) and in
+`THIRD-PARTY-NOTICES`. Generic references to the *functionality*
+of other clients also remain (for example "as libtorrent does", "as anacrolix does") and the
+normal third-party dependencies, with their import and their licence
+(`github.com/anacrolix/utp` for uTP, `libtorrent` for the alternative engine).
 
-**Fatto (2026-10-11).** Rimossi changelog "rispetto alla base" e marcatori di
-origine dal codice e dai documenti (inclusi archivio e script); le dipendenze
-riconducibili agli autori del codice originario sono state sostituite con codice
-nostro: il DHT è ora `internal/dht` (decodifica indirizzi e throttle propri), il
-logger dell'engine è `internal/gxcore/logging` e il backoff è
-`internal/gxcore/internal/backoff`. Il peer ID prefix è `-GX`. Le licenze MIT/BSD
-dei componenti derivati sono state ripristinate nei rispettivi `LICENSE` e
-raccolte in `THIRD-PARTY-NOTICES`; l'identità di rete è `"gx-core " + Version`.
+**Done (2026-10-11).** Removed "relative to the base" changelogs and origin
+markers from the code and the documents (including archive and scripts); the dependencies
+traceable to the authors of the original code were replaced with our own code:
+the DHT is now `internal/dht` (its own address decoding and throttle), the
+engine logger is `internal/gxcore/logging` and the backoff is
+`internal/gxcore/internal/backoff`. The peer ID prefix is `-GX`. The MIT/BSD licences
+of the derived components have been restored in their respective `LICENSE` files and
+collected in `THIRD-PARTY-NOTICES`; the network identity is `"gx-core " + Version`.
 
-### 1.7 Controllo approfondito di performance (CPU e RAM)
+### 1.7 In-depth performance check (CPU and RAM)
 
-**Punto.** Fare periodicamente un controllo approfondito di performance
-dell'applicativo e del motore, con ottimizzazione di CPU e RAM. Vincolo: ogni
-sostituzione o modifica deve essere **almeno equivalente** alla precedente, se
-non migliore, e va misurata prima e dopo.
+**Point.** Periodically carry out an in-depth performance check
+of the application and the engine, optimising CPU and RAM. Constraint: every
+replacement or change must be **at least equivalent** to the previous one, if not
+better, and must be measured before and after.
 
-**Come.** Benchmark (`go test -bench … -benchmem`), profili `pprof` CPU/heap,
-footprint del demone e di `gx-torrent` (RSS, goroutine, allocazioni),
-`make measure-seeding` per il seeding. Annotare i numeri qui.
+**How.** Benchmarks (`go test -bench … -benchmem`), `pprof` CPU/heap profiles,
+footprint of the daemon and of `gx-torrent` (RSS, goroutines, allocations),
+`make measure-seeding` for seeding. Record the numbers here.
 
-**Prima tornata (2026-10-11, Intel N97).** Identità di rete e dipendenze
-sostituite con codice nostro (§1.6) senza regressioni. Ottimizzazione
-applicata: il logger del motore scarta i record sotto la soglia dell'handler
-**prima** di formattarli, così a WARNING (uso normale del demone) le chiamate
-`Debugf`/`Infof` sulle hot path non allocano più il messaggio. Micro-benchmark
-`BenchmarkEngineLoggerFiltered` vs `Forwarded`: ~151 ns / 3 alloc contro
-~785 ns / 6 alloc per chiamata. I record che l'handler riceve non cambiano
-(ERROR/WARNING restano, i conteggi del rumore di sciame non si perdono).
+**First round (2026-10-11, Intel N97).** Network identity and dependencies
+replaced with our own code (§1.6) with no regressions. Optimisation
+applied: the engine logger discards records below the handler threshold
+**before** formatting them, so at WARNING (normal daemon use) the
+`Debugf`/`Infof` calls on the hot paths no longer allocate the message. Micro-benchmark
+`BenchmarkEngineLoggerFiltered` vs `Forwarded`: ~151 ns / 3 allocs against
+~785 ns / 6 allocs per call. The records that the handler receives do not change
+(ERROR/WARNING remain, the swarm-noise counts are not lost).
 
-**Seconda tornata (2026-10-11, Intel N97) — filtro IP.** Diagnosi: con la
-blocklist Aetherinox (34 MB, **666 763 regole**) `gx-torrent` teneva ~295 MB di
-RSS, di cui **~190 MB** nel segment tree a puntatori del filtro IP
-(`internal/blocklist/stree`) più i 34 MB del file grezzo tenuti in cache dal
-demone. Sostituzione: le regole IPv4, come già le IPv6, stanno in **intervalli
-ordinati e uniti** con ricerca binaria (`sortMergeV4`/`v4Contains`),
-`stree` rimosso. Misura isolata sul file reale: heap vivo **190 MB → 5,4 MB**
-(666 763 regole → 343 024 intervalli dopo il merge); `BenchmarkBlocked`:
-**18,6 ns/op, 0 alloc/op** (prima `stree.Contains` allocava una `map` e una
-slice a ogni lookup, sul percorso di ogni connessione peer/tracker). In
-esercizio: RSS di `gx-torrent` **295 MB → ~105 MB** (RssAnon 275 → 92 MB) a
-parità di regole caricate. Restano in cache i 34 MB del file grezzo (rilettura
-rara su ricarica manuale): rimovibili in seguito.
+**Second round (2026-10-11, Intel N97) — IP filter.** Diagnosis: with the
+Aetherinox blocklist (34 MB, **666,763 rules**) `gx-torrent` held ~295 MB of
+RSS, of which **~190 MB** in the pointer-based segment tree of the IP filter
+(`internal/blocklist/stree`) plus the 34 MB of the raw file kept in cache by the
+daemon. Replacement: the IPv4 rules, like the IPv6 ones already, are stored in
+**sorted and merged intervals** with binary search (`sortMergeV4`/`v4Contains`),
+`stree` removed. Isolated measurement on the real file: live heap **190 MB → 5.4 MB**
+(666,763 rules → 343,024 intervals after the merge); `BenchmarkBlocked`:
+**18.6 ns/op, 0 alloc/op** (previously `stree.Contains` allocated a `map` and a
+slice on every lookup, on the path of every peer/tracker connection). In
+operation: `gx-torrent` RSS **295 MB → ~105 MB** (RssAnon 275 → 92 MB) with
+the same number of rules loaded. The 34 MB of the raw file remain in cache (rare
+re-reading on manual reload): removable later.
 
-**Terza tornata (2026-10-11, Intel N97) — page cache SQLite.** La `cache_size`
-delle connessioni SQLite (`sqlite.go`) passa da 8 MB a **2 MB** (default di
-SQLite). Misura isolata sul DB archivio reale (510 MB, FTS5; query
-`Archive.Browse` e `CountMatches`, provate fino a 16 MB di cache): la latenza è
-**piatta**, entro il rumore anche sul `MATCH` ampio (~1,14 s), perché a servire
-il file è la page cache dell'OS, non quella di SQLite. Live su `gexttod`, a parità
-di uptime (2 minuti): RSS **109,7 → 67,6 MB** (RssAnon 88,4 → 46,2 MB, RssFile
-invariato); il delta sono le page cache delle 4 connessioni.
+**Third round (2026-10-11, Intel N97) — SQLite page cache.** The `cache_size`
+of the SQLite connections (`sqlite.go`) goes from 8 MB to **2 MB** (SQLite's
+default). Isolated measurement on the real archive DB (510 MB, FTS5; query
+`Archive.Browse` and `CountMatches`, tried up to 16 MB of cache): the latency is
+**flat**, within the noise even on the broad `MATCH` (~1.14 s), because it is the
+OS page cache that serves the file, not SQLite's. Live on `gexttod`, with the same
+uptime (2 minutes): RSS **109.7 → 67.6 MB** (RssAnon 88.4 → 46.2 MB, RssFile
+unchanged); the delta is the page caches of the 4 connections.
 
 ---
 
-## 2. Migliorie Gextto implementate
+## 2. Gextto improvements implemented
 
-Ex `docs/proposte-migliorie.md` (stato al 2026-10-07: **tutte approvate e
-implementate**). Confronto con Sonarr/Radarr (serie/film), Mylar3/Kapowarr
-(fumetti), Bazarr (sottotitoli), Prowlarr (indexer).
+Ex `docs/proposte-migliorie.md` (state as of 2026-10-07: **all approved and
+implemented**). Comparison with Sonarr/Radarr (series/movies), Mylar3/Kapowarr
+(comics), Bazarr (subtitles), Prowlarr (indexers).
 
-| # | Proposta | Decisione | Commit |
+| # | Proposal | Decision | Commit |
 |---|---|---|---|
-| 1 | Hardlink invece della copia durante il seed | sì, con garanzia anti-perdita | `20b28eb` |
-| 2 | Aggiornamento mirato di Jellyfin e Plex | sì | `1bfaad4` |
-| 3 | Soglia "upgrade until" | sì, oltre alla differenza minima | `95f6f97` |
-| 4 | Autenticazione facoltativa | sì, spenta di default, LAN esente | `7dae752` |
-| 5 | Calendario iCal | sì, con date italiane dichiarate | `e78bcc2`, `a919fcd` |
-| 6 | `ComicInfo.xml` nei fumetti | sì | `6a7f739` |
-| 7 | Mancanti: escludere gli episodi in download | sì | `e815180` |
-| 8 | Badge dei download attivi nella barra | sì | `893bc94`, `42db4b2` |
-| 8.1 | Traduzioni dei nuovi elementi in tutte le lingue | richiesta del proprietario | `698efbf` |
-| 9 | Aggiornamento della documentazione | richiesta del proprietario | commit `docs:` finale |
+| 1 | Hardlink instead of copy during seeding | yes, with an anti-loss guarantee | `20b28eb` |
+| 2 | Targeted refresh of Jellyfin and Plex | yes | `1bfaad4` |
+| 3 | "upgrade until" threshold | yes, in addition to the minimum difference | `95f6f97` |
+| 4 | Optional authentication | yes, off by default, LAN exempt | `7dae752` |
+| 5 | iCal calendar | yes, with declared Italian dates | `e78bcc2`, `a919fcd` |
+| 6 | `ComicInfo.xml` in comics | yes | `6a7f739` |
+| 7 | Missing: exclude episodes being downloaded | yes | `e815180` |
+| 8 | Badge of active downloads in the bar | yes | `893bc94`, `42db4b2` |
+| 8.1 | Translations of the new elements in all languages | owner's request | `698efbf` |
+| 9 | Documentation update | owner's request | final `docs:` commit |
 
-### 2.1 Hardlink invece della copia durante il seed
+### 2.1 Hardlink instead of copy during seeding
 
-- **Prima**: un file in seed veniva copiato in libreria (spazio occupato due volte).
-- **Ora** (`hardlink.go`, `hardlink_seeding`, default attivo): episodi in cartella,
-  season pack ed episodi in modalità copia entrano in libreria come hardlink. Il
-  link nasce con nome nascosto e viene rinominato: il file del torrent non viene
-  mai toccato. Se il link non è possibile (filesystem diversi, RAM disk,
-  condivisioni senza hardlink) si copia come prima, con una riga di log per
-  coppia di dischi.
-- **Sicurezza**: i due nomi sono alla pari (non come i symlink). Cancellare il
-  nome nel download lascia intatto l'archivio (si interrompe solo il seed); i
-  dati spariscono solo cancellando entrambi. Verificato con test.
-- I film non sono coinvolti: vengono già spostati col torrent (nessuna copia).
+- **Before**: a file being seeded was copied into the library (space used twice).
+- **Now** (`hardlink.go`, `hardlink_seeding`, active by default): episodes in a folder,
+  season packs and episodes in copy mode enter the library as hardlinks. The
+  link is created with a hidden name and then renamed: the torrent file is never
+  touched. If the link is not possible (different filesystems, RAM disk,
+  shares without hardlinks) it is copied as before, with a log line per
+  pair of disks.
+- **Safety**: the two names are peers (not like symlinks). Deleting the
+  name in the download leaves the archive intact (only the seed is interrupted); the
+  data disappears only by deleting both. Verified with tests.
+- Movies are not involved: they are already moved with the torrent (no copy).
 
-### 2.2 Aggiornamento mirato di Jellyfin e Plex
+### 2.2 Targeted refresh of Jellyfin and Plex
 
-- **Ora** (`media_refresh.go`): dopo un import Jellyfin riceve
-  `/Library/Media/Updated` con la cartella e Plex
-  `/library/sections/{id}/refresh?path=` per la sezione che la contiene. Le
-  richieste durante un aggiornamento vengono unite. Cartella sconosciuta, nessuna
-  sezione Plex o rifiuto del server → aggiornamento completo come prima.
-- Mappature `jellyfin_path_mappings` / `plex_path_mappings` per server in Docker.
-  I pulsanti manuali restano completi.
+- **Now** (`media_refresh.go`): after an import Jellyfin receives
+  `/Library/Media/Updated` with the folder and Plex
+  `/library/sections/{id}/refresh?path=` for the section that contains it. The
+  requests during a refresh are merged. Unknown folder, no
+  Plex section or server refusal → full refresh as before.
+- `jellyfin_path_mappings` / `plex_path_mappings` mappings per server in Docker.
+  The manual buttons remain complete.
 
-### 2.3 Soglia "upgrade until"
+### 2.3 "upgrade until" threshold
 
-- **Ora** (`upgrade_until.go`, `upgrade_until_score`, 0 = spenta): con punteggio
-  ≥ soglia la copia non viene più sostituita; restano accettati REPACK e PROPER.
-  Vale per ciclo, mancanti, season pack e film. «Perché non questa?» indica gli
-  scarti per soglia. Riferimenti: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL
+- **Now** (`upgrade_until.go`, `upgrade_until_score`, 0 = off): with a score
+  ≥ threshold the copy is no longer replaced; REPACK and PROPER remain accepted.
+  It applies to the cycle, missing episodes, season packs and movies. "Why not this one?" indicates the
+  rejects by threshold. References: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL
   H.265 DD+ ≈ 1480, 2160p ≈ 2480.
-- La differenza minima (`upgrade_min_score_diff`) resta (*di quanto* deve
-  migliorare vs *fino a dove*). Il blocco per titolo («Niente upgrade») è anche
-  nella scheda serie web.
+- The minimum difference (`upgrade_min_score_diff`) remains (*by how much* it must
+  improve vs *up to where*). The per-title block ("No upgrade") is also
+  in the web series tab.
 
-### 2.4 Autenticazione facoltativa
+### 2.4 Optional authentication
 
-- **Ora** (`auth.go`, *Configurazione → Accesso*): spenta di default. Accesa: chi
-  non è in LAN fa login (password bcrypt, cookie firmato 30 giorni, nuova
-  password chiude le sessioni) o usa la chiave API (`X-Api-Key` o `?apikey=`; la
-  TUI la prende da `GEXTTO_API_KEY`).
-- LAN esente di default. Dietro reverse proxy contano gli indirizzi inoltrati
+- **Now** (`auth.go`, *Configuration → Access*): off by default. On: anyone
+  not on the LAN must log in (bcrypt password, signed cookie valid 30 days, a new
+  password closes the sessions) or use the API key (`X-Api-Key` or `?apikey=`; the
+  TUI takes it from `GEXTTO_API_KEY`).
+- LAN exempt by default. Behind a reverse proxy the forwarded addresses count
   (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`).
-- 5 password sbagliate = blocco IP per 1 minuto. Senza password né chiave il
-  controllo resta aperto (avviso nel log). `GEXTTO_AUTH_DISABLE=1` per rientrare.
+- 5 wrong passwords = IP block for 1 minute. Without a password or key the
+  check remains open (warning in the log). `GEXTTO_AUTH_DISABLE=1` to get back in.
 
-### 2.5 Calendario iCal
+### 2.5 iCal calendar
 
-- **Ora** (`calendar_ics.go`, `GET /feed/calendar.ics`, link in Integrazioni).
-  Per il pubblico italiano (serie doppiate mesi/anni dopo) distingue:
-  - 📥 **arrivati in libreria** negli ultimi 30 giorni (giorno dell'arrivo);
-  - 📺 **messa in onda originale** TMDB della stagione in corso (✓ se in libreria);
-  - 🎬 **uscita italiana dei film** TMDB (digitale → home video → cinema), con
-    ripiego dichiarato sulla data originale.
-- Il riquadro "Prossime uscite" della Dashboard dichiara che è la messa in onda
-  originale.
+- **Now** (`calendar_ics.go`, `GET /feed/calendar.ics`, link in Integrations).
+  For the Italian audience (series dubbed months/years later) it distinguishes:
+  - 📥 **arrived in the library** in the last 30 days (day of arrival);
+  - 📺 **original air date** TMDB of the current season (✓ if in the library);
+  - 🎬 **Italian release of movies** TMDB (digital → home video → cinema), with a
+    declared fallback to the original date.
+- The "Upcoming releases" tile of the Dashboard declares that it is the original
+  air date.
 
-### 2.6 Fumetti: `ComicInfo.xml`
+### 2.6 Comics: `ComicInfo.xml`
 
-- **Ora** (`comicinfo.go`): nei CBZ scaricati direttamente (HTTP, Mega) viene
-  aggiunto `ComicInfo.xml` con serie/numero/anno dal titolo GetComics. Non
-  toccati: file che lo hanno già, CBR, fumetti via torrent (in seed). Un errore
-  non compromette mai il download.
+- **Now** (`comicinfo.go`): in CBZ files downloaded directly (HTTP, Mega)
+  `ComicInfo.xml` is added with series/number/year from the GetComics title. Not
+  touched: files that already have it, CBR, comics via torrent (being seeded). An error
+  never compromises the download.
 
-### 2.7 Mancanti senza gli episodi già in download
+### 2.7 Missing without episodes already being downloaded
 
-- Gli episodi con torrent attivo (anche aggiunto a mano, da cartella osservata o
-  telefono) e le stagioni con season pack in corso non sono più mancanti, né nel
-  ciclo né nella scheda serie. Un download in errore li fa tornare mancanti.
+- Episodes with an active torrent (even added by hand, from a watched folder or
+  phone) and seasons with a season pack in progress are no longer missing, either in the
+  cycle or in the series tab. A download in error makes them missing again.
 
-### 2.8 Badge dei download in corso
+### 2.8 Badge of ongoing downloads
 
-- La voce "Scarico" mostra i download in corso (torrent non finiti + HTTP attivi,
-  non i seed), ogni 5 s; sul telefono è un contatore sull'icona.
+- The "Downloading" entry shows the ongoing downloads (unfinished torrents + active HTTP,
+  not seeds), every 5 s; on the phone it is a counter on the icon.
 
-### 2.9 Escluse perché già presenti o tolte di proposito
+### 2.9 Excluded because already present or deliberately removed
 
-Webhook HMAC, event hook, alias titoli, blocklist, ritardi (delay profile), pack
-di stagione, sottotitoli nel punteggio, Discover/Popular TMDB: già presenti.
-Trakt: rimossa di proposito (`TestTraktIntegrationRoutesRemoved`).
+Webhook HMAC, event hook, title aliases, blocklist, delays (delay profile), season
+packs, subtitles in the score, Discover/Popular TMDB: already present.
+Trakt: deliberately removed (`TestTraktIntegrationRoutesRemoved`).
 
-### 2.10 Rimozione con dati, rinuncia allo stallo e tabelle (2026-10-12)
+### 2.10 Removal with data, giving up on stall and tables (2026-10-12)
 
-Caso reale: «Morgane…S04E01-08» (0%) non spariva con *Torrent + dati*.
-- **Ordine sbagliato in `SafeRemoveTorrent`:** i file venivano spostati nel
-  cestino *prima* di togliere il torrent dal motore. Con cestino e download su
-  due condivisioni NFS diverse lo spostamento è una copia (8 file preallocati,
-  18,8 GB di zeri) fatta dentro la richiesta HTTP, mentre gx-torrent teneva i file
-  aperti: il `.nfsXXXX` "busy" faceva fallire la copia e il torrent ricompariva.
-  Ora il torrent esce prima dal motore; il rename sullo stesso filesystem resta
-  sincrono, la copia tra filesystem va in background (log a fine copia); un
-  torrent senza byte scaricati non passa dal cestino (elimina il motore); il log
-  non dice più "file eliminati" quando lo spostamento fallisce. Test
+Real case: "Morgane…S04E01-08" (0%) did not disappear with *Torrent + data*.
+- **Wrong order in `SafeRemoveTorrent`:** the files were moved to the
+  trash *before* removing the torrent from the engine. With the trash and the download on
+  two different NFS shares the move is a copy (8 preallocated files,
+  18.8 GB of zeros) done inside the HTTP request, while gx-torrent kept the files
+  open: the "busy" `.nfsXXXX` made the copy fail and the torrent reappeared.
+  Now the torrent leaves the engine first; the rename on the same filesystem remains
+  synchronous, the copy between filesystems goes to the background (log at the end of the copy); a
+  torrent without downloaded bytes does not go through the trash (the engine deletes it); the log
+  no longer says "files deleted" when the move fails. Test
   `TestSafeRemoveTorrentNothingDownloadedSkipsTrash`.
-- **Rinuncia allo stallo senza blocklist:** dopo il *Gave up* la ricerca
-  successiva aveva ripreso la stessa release (da un hit d'archivio). Ora la
-  release va in blocklist (`stalled_dead_swarm`), come già faceva il ramo
-  *magnet morto*.
-- **Tabelle del pannello Download:** a 1366 px la tabella dei torrent chiedeva
-  1489 px (scroll orizzontale anche a 1600 px), lo *Storico download* 1451 px.
-  Layout fisso + container query in `em` (seguono A−/A+): le colonne secondarie
-  confluiscono nella cella di avanzamento. Misurato con Chromium headless a
-  1024/1280/1366/1600/1920 px e testo 85/100/140%: nessun overflow da 1366 px in
-  su; l'Archivio con testo al 140% non trabocca più (colonna azioni in rem).
+- **Giving up on a stall without a blocklist:** after the *Gave up* the next
+  search had picked up the same release (from an archive hit). Now the
+  release goes into the blocklist (`stalled_dead_swarm`), as the *dead magnet* branch
+  already did.
+- **Tables of the Downloads panel:** at 1366 px the torrent table asked for
+  1489 px (horizontal scroll even at 1600 px), the *Download history* 1451 px.
+  Fixed layout + container query in `em` (they follow A−/A+): the secondary columns
+  flow into the progress cell. Measured with headless Chromium at
+  1024/1280/1366/1600/1920 px and text at 85/100/140%: no overflow from 1366 px
+  upwards; the Archive with text at 140% no longer overflows (actions column in rem).
 
 ---
 
-## 3. Direzione strategica
+## 3. Strategic direction
 
-Ex `docs/scelte-di-progetto.md` (estratto l'8-10-2026 dal piano di adozione
-`SONARR_RADARR_REPLACEMENT_PLAN.md`, rimosso: qui le parti durevoli).
+Ex `docs/scelte-di-progetto.md` (extracted on 08-10-2026 from the adoption plan
+`SONARR_RADARR_REPLACEMENT_PLAN.md`, removed: the durable parts are here).
 
-### 3.1 Posizionamento
+### 3.1 Positioning
 
-- Gextto è per **installazioni nuove**, non drop-in di Sonarr/Radarr: niente
-  import dei loro database, niente migrazione in place, niente rollback.
-- Integrazione **verso** i gestori di indexer (Jackett/Prowlarr), non
-  duplicandoli dentro Gextto.
-- **Non-goal**: compatibilità API `*arr` / `/api/v3`; quality profile e custom
-  format; autenticazione multi-utente (l'esposizione remota passa dal reverse
-  proxy in `docs/SECURITY.md`). Le differenze si pubblicano, non si nascondono.
-- Target: chi ha un server + media server (Jellyfin/Plex) e vuole "trova,
-  scarica, rinomina, archivia" con un solo demone; molto probabilmente ha già
-  Jackett o Prowlarr.
+- Gextto is for **new installations**, not a drop-in for Sonarr/Radarr: no
+  import of their databases, no in-place migration, no rollback.
+- Integration **towards** the indexer managers (Jackett/Prowlarr), not
+  duplicating them inside Gextto.
+- **Non-goal**: `*arr` / `/api/v3` API compatibility; quality profile and custom
+  format; multi-user authentication (remote exposure goes through the reverse
+  proxy in `docs/SECURITY.md`). The differences are published, not hidden.
+- Target: whoever has a server + media server (Jellyfin/Plex) and wants "find,
+  download, rename, archive" with a single daemon; very likely they already have
+  Jackett or Prowlarr.
 
-### 3.2 Gestori di indexer (Jackett/Prowlarr)
+### 3.2 Indexer managers (Jackett/Prowlarr)
 
-Gextto tratta il manager come **un'unica sorgente aggregata** e non importa la
-sua lista di indexer: il manager è l'unica fonte di verità per indexer,
-categorie, credenziali, FlareSolverr e rate limit.
+Gextto treats the manager as **a single aggregated source** and does not import its
+list of indexers: the manager is the only source of truth for indexers,
+categories, credentials, FlareSolverr and rate limits.
 
-Misure (stessa libreria, stesso host):
+Measurements (same library, same host):
 
-| Scenario | Latenza | Risultati |
+| Scenario | Latency | Results |
 |---|---|---|
-| Aggregato con un indexer rotto abilitato | 60 s (timeout) | 0 |
-| Indexer sano chiamato direttamente | 0,25–2,4 s | 40–100 |
-| Aggregato dopo aver disabilitato il rotto nel manager | 2–4 s | 156–240 |
+| Aggregate with a broken indexer enabled | 60 s (timeout) | 0 |
+| Healthy indexer called directly | 0.25–2.4 s | 40–100 |
+| Aggregate after disabling the broken one in the manager | 2–4 s | 156–240 |
 
-Conseguenze (tutte implementate):
+Consequences (all implemented):
 
-- un prototipo che duplicava la lista indexer è stato costruito, misurato e
-  **revertito**: nessun guadagno di stabilità, solo deriva di configurazione;
-- le **categorie** sono state rimosse: un aggregato serve serie e film, una
-  categoria statica per indexer è inutile o dannosa (query TV con categoria
-  "film" → zero risultati);
-- il tipo di manager si può **dichiarare** (`manager` in `config.go` e UI)
-  invece di dedurlo da URL/porta/nome (resta il fallback);
-- la salute del manager (Prowlarr `indexerstatus`) è in Sources: un indexer
-  rotto/disabilitato è visibile invece di dare zero risultati in silenzio
+- a prototype that duplicated the indexer list was built, measured and
+  **reverted**: no stability gain, only configuration drift;
+- the **categories** were removed: an aggregate serves series and movies, a
+  static category per indexer is useless or harmful (TV query with the "movie"
+  category → zero results);
+- the manager type can be **declared** (`manager` in `config.go` and the UI)
+  instead of inferred from URL/port/name (the fallback remains);
+- the manager's health (Prowlarr `indexerstatus`) is in Sources: a
+  broken/disabled indexer is visible instead of giving zero results in silence
   (`indexer_health.go`);
-- un **timeout per sorgente** limita una singola richiesta sotto il budget della
-  ricerca;
-- l'API di ricerca di Prowlarr **ignora** stagione/episodio ed external-id
-  (misurato): non vengono inoltrati; anche `type` non ha effetto osservato;
-- la lista indexer di **Jackett non è raggiungibile** con la chiave Torznab (la
-  sua API risponde con redirect al login): irrilevante, serve solo l'aggregato.
-  Jackett espone Torznab su `/api/v2.0/indexers/all/results/torznab/api` invece del
-  generico `/api` (che risponde 404): `internal/torznab` lo deduce dalla porta `:9117`
-  o dal nome con fallback automatico su 404, condiviso tra Gextto e `gx-torrent`.
+- a **timeout per source** limits a single request below the search budget;
+- Prowlarr's search API **ignores** season/episode and external-id
+  (measured): they are not forwarded; `type` also has no observed effect;
+- **Jackett's** indexer list **is not reachable** with the Torznab key (its
+  API responds with a redirect to the login): irrelevant, only the aggregate is needed.
+  Jackett exposes Torznab at `/api/v2.0/indexers/all/results/torznab/api` instead of the
+  generic `/api` (which responds 404): `internal/torznab` infers it from the `:9117` port
+  or from the name with an automatic fallback on 404, shared between Gextto and `gx-torrent`.
 
 ### 3.3 FlareSolverr
 
-- **Sessioni persistenti** per dominio, con TTL breve e distruzione, invece di un
-  browser per richiesta; se non supportate → modalità stateless.
-- **Mai per i gestori di indexer**: Jackett/Prowlarr gestiscono Cloudflare da
-  soli; un 403 o errore di rete lì viene riportato com'è invece di sprecare
-  20–30 s mascherando la causa.
-- Si rispetta `solution.status`: pagina "risolta ma in errore" non interpretata
-  come contenuto.
+- **Persistent sessions** per domain, with a short TTL and destruction, instead of a
+  browser per request; if not supported → stateless mode.
+- **Never for indexer managers**: Jackett/Prowlarr handle Cloudflare on their
+  own; a 403 or network error there is reported as it is instead of wasting
+  20–30 s masking the cause.
+- `solution.status` is respected: a page "solved but in error" is not interpreted
+  as content.
 
-### 3.4 Politica di selezione
+### 3.4 Selection policy
 
-Gextto **non** implementa profili di qualità, custom format o motore regex/score
-come `*arr`. Sceglie invece default globali (risoluzione, sorgente, codec,
-audio, HDR, lingua, vincoli di dimensione) + **override ed esclusioni
-per-titolo** + **spiegabilità** (l'API di spiegazione dice perché un release è
-accettato/rifiutato/preferito). Motivo: i profili sono la parte più complessa —
-e più configurata male — del modello `*arr`.
+Gextto does **not** implement quality profiles, custom formats or a regex/score engine
+like `*arr`. Instead it chooses global defaults (resolution, source, codec,
+audio, HDR, language, size constraints) + **per-title overrides and exclusions** +
+**explainability** (the explanation API says why a release is
+accepted/rejected/preferred). Reason: profiles are the most complex part —
+and the most misconfigured — of the `*arr` model.
 
-### 3.5 Confronto con Sonarr/Radarr (fotografia onesta, 2026-10)
+### 3.5 Comparison with Sonarr/Radarr (honest snapshot, 2026-10)
 
-**Dove Sonarr/Radarr sono avanti:**
+**Where Sonarr/Radarr are ahead:**
 
-- **Profili di qualità e custom format**: score per risoluzione/sorgente/tipo/
-  release group (anche regex), delay profile, profili diversi per serie e film.
-  Gextto ha politica unica + "upgrade until" + override per-titolo: più facile,
-  meno potente per regole fini. *Fattibilità:* dare **nomi ai profili sul modello
-  Gextto** è un passo medio (la globale diventa "Default", ogni combinazione di
-  override un profilo generato, migrazione automatica dai dati per-titolo in
-  `series.quality/language/subtitle/exclude` e `movies_config.*`). Riprodurre la
-  **semantica Sonarr** (qualità ordinate + cutoff + custom format) è più costoso;
-  i custom format (motore regex + UI) vanno valutati a parte.
-- **Maturità di import e rinomina**: multi-episodio, specials,
-  daily, import manuale con matching e sostituzione. *Fattibilità:* si studia il
-  comportamento e si reimplementa; Sonarr è GPLv3, Gextto EUPL 1.2: **non si
-  copia codice né file di test**, ci si costruisce un corpus proprio da nomi
-  reali.
-- **Ecosistema e API**: `/api/v3` consumata da Overseerr/Jellyseerr; Gextto non
-  la espone. *Fattibilità:* la compatibilità completa non è realistica; un
-  **sottoinsieme** per Jellyseerr sì (`system/status`, `qualityprofile`,
+- **Quality profiles and custom formats**: score per resolution/source/type/
+  release group (even regex), delay profile, different profiles per series and movie.
+  Gextto has a single policy + "upgrade until" + per-title override: easier,
+  less powerful for fine rules. *Feasibility:* giving **names to profiles on the Gextto
+  model** is a medium step (the global one becomes "Default", each combination of
+  overrides a generated profile, automatic migration from the per-title data in
+  `series.quality/language/subtitle/exclude` and `movies_config.*`). Reproducing the
+  **Sonarr semantics** (ordered qualities + cutoff + custom format) is more expensive;
+  custom formats (regex engine + UI) must be evaluated separately.
+- **Maturity of import and rename**: multi-episode, specials,
+  daily, manual import with matching and replacement. *Feasibility:* study the
+  behaviour and reimplement it; Sonarr is GPLv3, Gextto EUPL 1.2: **no
+  code or test files are copied**, we build our own corpus from real
+  names.
+- **Ecosystem and API**: `/api/v3` consumed by Overseerr/Jellyseerr; Gextto does not
+  expose it. *Feasibility:* full compatibility is not realistic; a
+  **subset** for Jellyseerr is (`system/status`, `qualityprofile`,
   `languageprofile`, `rootfolder`, `tag`, `series/lookup` + `POST series`,
-  `movie/lookup` + `POST movie`, `queue`) — ma dopo profili nominati, root folder
-  e tag, e provato con un Jellyseerr reale.
-- **Notifiche**: *fatto* — il webhook parla anche **Discord, Slack, ntfy, Gotify
-  e Pushover** via selettore di formato (`notify_webhook_format`); restano i
-  provider più esoterici.
-- **Import di librerie esistenti**: parziale in Gextto, non prioritario.
-- **Community, wiki, Docker, cadenza**: questione di tempo, non di architettura.
+  `movie/lookup` + `POST movie`, `queue`) — but after named profiles, root folder
+  and tags, and tested with a real Jellyseerr.
+- **Notifications**: *done* — the webhook also speaks **Discord, Slack, ntfy, Gotify
+  and Pushover** via a format selector (`notify_webhook_format`); the more esoteric
+  providers remain.
+- **Import of existing libraries**: partial in Gextto, not a priority.
+- **Community, wiki, Docker, cadence**: a matter of time, not architecture.
 
-**Differenze che sono scelte, non lacune:** indexer via gestore esterno
-(separazione più pulita e sicura); **niente usenet** (torrent, HTTP, web seed;
-nel contesto italiano l'usenet è marginale).
+**Differences that are choices, not gaps:** indexers via an external manager
+(cleaner and safer separation); **no usenet** (torrent, HTTP, web seed;
+in the Italian context usenet is marginal).
 
-**Dove Gextto è avanti (o pari):** tutto in uno (serie, film **e fumetti**) in un
-solo demone; motore torrent integrato (gx-torrent Go puro, libtorrent oppure
-qBittorrent-nox); spiegabilità; ricerca anche da motori web; leggerezza (un
-binario Go + SQLite vs .NET); semplicità (health, backup, manutenzione integrati).
+**Where Gextto is ahead (or on par):** all in one (series, movies **and comics**) in a
+single daemon; integrated torrent engine (gx-torrent pure Go, libtorrent or
+qBittorrent-nox); explainability; search also from web engines; lightness (a
+Go binary + SQLite vs .NET); simplicity (health, backup, maintenance integrated).
 
-**Verdetto:** Sonarr/Radarr restano migliori su selezione (profili/custom
-format), casi limite di import ed ecosistema/API. Gextto è migliore su scope
-unico, motore integrato, spiegabilità, footprint e semplicità. Posizione
-corretta: **alternativa per installazioni nuove**, senza rivendicare parità.
+**Verdict:** Sonarr/Radarr remain better at selection (profiles/custom
+formats), import edge cases and ecosystem/API. Gextto is better at single
+scope, integrated engine, explainability, footprint and simplicity. Correct position:
+**an alternative for new installations**, without claiming parity.
 
 ---
 
-## 4. gx-torrent: lacune e piano di miglioramento
+## 4. gx-torrent: gaps and improvement plan
 
-Ex `docs/gx-torrent-migliorie.md` (stato al 2026-10-08: lavoro completato,
-ricontrollo finale fatto).
+Ex `docs/gx-torrent-migliorie.md` (state as of 2026-10-08: work completed,
+final re-check done).
 
-### 4.1 Contesto
+### 4.1 Context
 
-`gx-torrent` = motore BitTorrent **in puro Go**, alternativo a libtorrent:
+`gx-torrent` = BitTorrent engine in **pure Go**, an alternative to libtorrent:
 
-- **motore gx-core** (`internal/gxcore`): trasferimento;
-- **demone + adapter** (`cmd/gx-torrent`, `gxtorrent_engine.go`): REST, pagina
-  web, coda autogestita, ponte con Gextto (`TorrentEngine`).
+- **gx-core engine** (`internal/gxcore`): transfer;
+- **daemon + adapter** (`cmd/gx-torrent`, `gxtorrent_engine.go`): REST, web
+  page, self-managed queue, bridge with Gextto (`TorrentEngine`).
 
-Gextto fornisce già per tutti i motori: queue/slot, stalled/retry, seed policy,
-RSS, ricerca, categorie/tag, scheduler di banda, post-processing, spostamenti e
-RAM disk, filtro IP, proxy. Queste **non sono lacune del motore**.
+Gextto already provides for all engines: queue/slot, stalled/retry, seed policy,
+RSS, search, categories/tags, bandwidth scheduler, post-processing, moves and
+RAM disk, IP filter, proxy. These **are not gaps of the engine**.
 
-Stato per capacità: `capabilityLevels` (`torrent_engine.go`), unica fonte di
-verità usata dall'UI.
+State per capability: `capabilityLevels` (`torrent_engine.go`), the single source of
+truth used by the UI.
 
-### 4.2 Lacune reali
+### 4.2 Real gaps
 
-**vs libtorrent / qBittorrent** (stato post-lavoro):
+**vs libtorrent / qBittorrent** (state after the work):
 
-| Area | Cosa mancava | Esito |
+| Area | What was missing | Outcome |
 |---|---|---|
-| Limiti per-torrent | velocità download/upload | fatto (`SetLimits`) |
-| Limiti per-torrent | connessioni e upload slot | fatto (`SetMaxConnections`/`SetMaxUploads`) |
-| Modalità | upload/share mode | saltato (si usa seed infinito ratio 0); super-seeding fatto |
-| Priorità | per-pezzo, diagnostica pezzi, priorità file | fatto (API `pieces`, diagnostica, **priorità file graduate 0..7**, §4.11) |
-| Tracker | rimozione | fatto (`set-trackers`) |
-| Web seed | add/remove a caldo | fatto (azione `webseeds`) |
-| Sequenziale | toggle a runtime | fatto (`PiecePicker.SetOrder`) |
-| Protocollo | IPv6 | fatto (socket dual-stack, `peers6`, PEX v6, DHT BEP 32); LSD v6 fatto |
-| Protocollo | BitTorrent v2-only | fatto (`.torrent` e magnet, BEP 52) |
-| Qualità | algoritmi di seeding/choking | misurato, vedi §6 |
+| Per-torrent limits | download/upload speed | done (`SetLimits`) |
+| Per-torrent limits | connections and upload slots | done (`SetMaxConnections`/`SetMaxUploads`) |
+| Modes | upload/share mode | skipped (infinite seed with ratio 0 is used); super-seeding done |
+| Priority | per-piece, piece diagnostics, file priority | done (`pieces` API, diagnostics, **graduated file priorities 0..7**, §4.11) |
+| Trackers | removal | done (`set-trackers`) |
+| Web seed | hot add/remove | done (`webseeds` action) |
+| Sequential | runtime toggle | done (`PiecePicker.SetOrder`) |
+| Protocol | IPv6 | done (dual-stack socket, `peers6`, PEX v6, DHT BEP 32); LSD v6 done |
+| Protocol | BitTorrent v2-only | done (`.torrent` and magnet, BEP 52) |
+| Quality | seeding/choking algorithms | measured, see §6 |
 
-**vs anacrolix/torrent**: lo **streaming HTTP Range è fatto** (§4.3 #7) e anche il
-**reader con seek e readahead** è fatto (finestra graduata, §4.7); **mmap** c'è
-come opzione di storage (§5.4) e restano gli **storage alternativi** (blob, bolt,
-sqlite) e WebTorrent/WebRTC (wishlist).
-gx-torrent ha invece daemon
-sorvegliato, UI web, REST, UPnP/NAT-PMP, porta unica, proxy SOCKS/HTTP, filtro
-IP multi-formato, killswitch VPN, preallocazione, cache adattiva.
+**vs anacrolix/torrent**: the **HTTP Range streaming is done** (§4.3 #7) and so is the
+**reader with seek and readahead** (graduated window, §4.7); **mmap** is there
+as a storage option (§5.4) and the **alternative storages** remain (blob, bolt,
+sqlite) and WebTorrent/WebRTC (wishlist).
+gx-torrent has instead a supervised
+daemon, web UI, REST, UPnP/NAT-PMP, single port, SOCKS/HTTP proxy, multi-format IP
+filter, VPN killswitch, preallocation, adaptive cache.
 
-**Non lacune**: RSS, search plugin, categorie/tag, scheduler, ratio,
-post-processing, sequenziale come modalità (mancava solo il toggle a caldo),
-cifratura, IP filter, proxy, DHT/PEX/LSD, UPnP/NAT-PMP, fast resume, selezione
-file.
+**Not gaps**: RSS, search plugin, categories/tags, scheduler, ratio,
+post-processing, sequential as a mode (only the hot toggle was missing),
+encryption, IP filter, proxy, DHT/PEX/LSD, UPnP/NAT-PMP, fast resume, file
+selection.
 
-### 4.3 Decisioni
+### 4.3 Decisions
 
-| # | Miglioria | Decisione |
+| # | Improvement | Decision |
 |---|---|---|
-| 1 | Rimozione/sostituzione tracker | **Fatto** — `Torrent.SetTrackers` nel motore + `set-trackers` |
-| 2 | Upload/share mode | **Saltato** — seed infinito (ratio 0) |
-| 3 | Toggle sequential/first-last a caldo | **Fatto** — `PiecePicker.SetOrder` + `SetSequential` |
-| 4 | Web seed add/remove via API | **Fatto** — `AddWebseeds`/`RemoveWebseeds` + azione `webseeds` |
-| 5 | Diagnostica pezzi | **Fatto** — API `pieces`, scheda Pezzi in Gextto e nel demone |
-| 6 | Limiti velocità per-torrent | **Fatto** — `Limiter.SetParent`/`SetLimitKiB` + `SetSpeedLimits`, riapplicati al riavvio |
-| 7 | Streaming HTTP Range + priorità pezzi | **Fatto** — `SetStreamWindow`, `/ui/stream`, redirect Gextto, pulsante ▶ |
-| 8 | Limiti connessioni/upload per-torrent | **Fatto** — `SetMaxConnections`/`SetMaxUploads` + `Unchoker.SetNumUnchoked` |
-| 9 | IPv6 | **Fatto** — socket TCP/UDP dual-stack, risoluzione e indirizzi v6, `peers6`, PEX `added6`/`dropped6`, tracker UDP v6, `yourip` v6, blocklist CIDR v6, DHT dual-stack (BEP 32) |
-| 10 | BitTorrent v2-only | **Fatto** — parsing `meta version`/`file tree`/`piece layers`, info-hash SHA-256 troncato, pacchetto `merkle`, modello a pezzi per-file, verifica Merkle, download da `.torrent` e da **magnet**: i `piece layers` si scaricano dai peer con `hash request`/`hashes`/`hash reject` (BEP 52) e si verificano contro i `pieces root` |
-| 11 | Super-seeding (BEP 16) | **Fatto** — `SetSuperSeeding` + azione `super-seeding`; capacità `full` |
-| 12 | Holepunching (BEP 55) | **Fatto** — `ut_holepunch` nel motore, relè peer, dial uTP, avvio dopo dial fallito; WebTorrent resta wishlist |
-| 13 | Qualità seeding/choking | **Misurato (locale)** — choking corretto ed economico; super-seeding senza guadagno su sciami piccoli, opt-in; scaling su sciame reale, vedi §6 |
+| 1 | Tracker removal/replacement | **Done** — `Torrent.SetTrackers` in the engine + `set-trackers` |
+| 2 | Upload/share mode | **Skipped** — infinite seed (ratio 0) |
+| 3 | Hot sequential/first-last toggle | **Done** — `PiecePicker.SetOrder` + `SetSequential` |
+| 4 | Web seed add/remove via API | **Done** — `AddWebseeds`/`RemoveWebseeds` + `webseeds` action |
+| 5 | Piece diagnostics | **Done** — `pieces` API, Pieces tab in Gextto and in the daemon |
+| 6 | Per-torrent speed limits | **Done** — `Limiter.SetParent`/`SetLimitKiB` + `SetSpeedLimits`, reapplied on restart |
+| 7 | HTTP Range streaming + piece priority | **Done** — `SetStreamWindow`, `/ui/stream`, Gextto redirect, ▶ button |
+| 8 | Per-torrent connection/upload limits | **Done** — `SetMaxConnections`/`SetMaxUploads` + `Unchoker.SetNumUnchoked` |
+| 9 | IPv6 | **Done** — dual-stack TCP/UDP socket, v6 resolution and addresses, `peers6`, PEX `added6`/`dropped6`, UDP v6 tracker, `yourip` v6, blocklist CIDR v6, dual-stack DHT (BEP 32) |
+| 10 | BitTorrent v2-only | **Done** — parsing of `meta version`/`file tree`/`piece layers`, truncated SHA-256 info-hash, `merkle` package, per-file piece model, Merkle verification, download from `.torrent` and from **magnet**: the `piece layers` are downloaded from peers with `hash request`/`hashes`/`hash reject` (BEP 52) and verified against the `pieces root` |
+| 11 | Super-seeding (BEP 16) | **Done** — `SetSuperSeeding` + `super-seeding` action; capability `full` |
+| 12 | Holepunching (BEP 55) | **Done** — `ut_holepunch` in the engine, peer relay, uTP dial, startup after a failed dial; WebTorrent remains wishlist |
+| 13 | Seeding/choking quality | **Measured (local)** — correct and cheap choking; super-seeding with no gain on small swarms, opt-in; scaling on a real swarm, see §6 |
 
-Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
+Semantics of limits: **-1 = inherit the global one, 0 = unlimited** (like libtorrent).
 
-### 4.4 Wishlist residua
+### 4.4 Remaining wishlist
 
-- **BitTorrent v2-only**: **supportato end-to-end** — `.torrent` con `piece
-  layers` e **magnet** (`urn:btmh:`), modello a pezzi per-file, verifica via
-  nodo Merkle SHA-256, identità troncata e **fetch dei `piece layers` dai peer**
-  (`hash request`/`hashes`, BEP 52). Test seed/leech per `.torrent` e magnet.
-  Progetto dettagliato in [`gx-torrent-v2.md`](gx-torrent-v2.md).
-- **WebTorrent/WebRTC**: nicchia, molto lavoro.
-- **Qualità seeding/choking**: prima tornata fatta (vedi §6); per lo scaling
-  serve campagna su sciame reale (gx-torrent vs libtorrent/qBittorrent, stessa
-  politica, mediana su più run).
+- **BitTorrent v2-only**: **supported end-to-end** — `.torrent` with `piece
+  layers` and **magnet** (`urn:btmh:`), per-file piece model, verification via
+  SHA-256 Merkle node, truncated identity and **fetch of the `piece layers` from peers**
+  (`hash request`/`hashes`, BEP 52). Seed/leech test for `.torrent` and magnet.
+  Detailed design in [`gx-torrent-v2.md`](gx-torrent-v2.md).
+- **WebTorrent/WebRTC**: niche, a lot of work.
+- **Seeding/choking quality**: first round done (see §6); for scaling
+  a campaign on a real swarm is needed (gx-torrent vs libtorrent/qBittorrent, same
+  policy, median over several runs).
 
-### 4.5 Criterio di verifica (applicato)
+### 4.5 Verification criterion (applied)
 
-- Per punto: `go test ./cmd/gx-torrent/`, `go test -run GxEngine .`, motore dove
-  tocca (`make test-engine`).
-- Con effetto visibile: `docs/gx-torrent.md`, `MANUAL.*`, `README`.
-- Ogni miglioria visibile in **entrambe le UI** (Gextto `uiweb/v2` + pagina del
-  demone `cmd/gx-torrent/ui.go`), mai solo via API.
-- Confronti con libtorrent/qBittorrent solo su misura.
+- Per point: `go test ./cmd/gx-torrent/`, `go test -run GxEngine .`, the engine where
+  it is touched (`make test-engine`).
+- With a visible effect: `docs/gx-torrent.md`, `MANUAL.*`, `README`.
+- Every improvement visible in **both UIs** (Gextto `uiweb/v2` + the daemon
+  page `cmd/gx-torrent/ui.go`), never only via API.
+- Comparisons with libtorrent/qBittorrent only by measurement.
 
-### 4.6 Ricontrollo finale (fatto)
+### 4.6 Final re-check (done)
 
-- `capabilityLevels`: gx-torrent `full` per `limits`, `trackers`, `sequential`,
-  `piece_diagnostics`, `web_seeds`, `super_seeding`, `session_stats`; anche
-  `first_last` e `holepunch` sono `full`.
-- Note/testi aggiornati: `v2DetailCapsFor`, "Limiti noti", `gx-torrent.md`,
+- `capabilityLevels`: gx-torrent `full` for `limits`, `trackers`, `sequential`,
+  `piece_diagnostics`, `web_seeds`, `super_seeding`, `session_stats`; also
+  `first_last` and `holepunch` are `full`.
+- Notes/texts updated: `v2DetailCapsFor`, "Known limitations", `gx-torrent.md`,
   `API.md`, `MANUAL.*`, `README*`.
-- Ogni feature visibile in entrambe le UI (tracker, web seed, limiti,
-  diagnostica pezzi, streaming, super-seeding).
-- Test percorso felice + casi limite (lista vuota, duplicati, not-found, 416,
-  completato/fermo); `make test` e `make test-engine` verdi (+ pacchetto
-  `unchoker` in `make test-engine`).
-- Inventario delle modifiche in `internal/gxcore/GEXTTO.md`;
-  `go vet`, `gofmt` verdi; semantica `-1`/`0`/`>0` coerente.
-- Nota residua: attesa pezzi nello streaming a polling (200 ms, timeout 2 min),
-  senza test end-to-end su sciame reale; coperti dati presenti e mappatura
-  byte→pezzi.
+- Every feature visible in both UIs (trackers, web seed, limits,
+  piece diagnostics, streaming, super-seeding).
+- Happy-path test + edge cases (empty list, duplicates, not-found, 416,
+  completed/stopped); `make test` and `make test-engine` green (+ the `unchoker`
+  package in `make test-engine`).
+- Inventory of the changes in `internal/gxcore/GEXTTO.md`;
+  `go vet`, `gofmt` green; `-1`/`0`/`>0` semantics consistent.
+- Remaining note: waiting for pieces in polling streaming (200 ms, timeout 2 min),
+  without end-to-end tests on a real swarm; present data and the byte→piece
+  mapping are covered.
 
-### 4.7 Cherry-pick da anacrolix (shortlist concordata, 2026-10-10)
+### 4.7 Cherry-pick from anacrolix (agreed shortlist, 2026-10-10)
 
-Fonte: `github.com/anacrolix/torrent` v1.61 (Go, **MPL-2.0**). Due vie di
-prelievo, coerenti con la politica del repo (**non si copia il codice di terzi;
-si riscrive l'algoritmo** — l'idea non è coperta da copyright, l'espressione
-sì — oppure si adotta il modulo come **dipendenza** MPL-2.0, come già
-`github.com/anacrolix/utp`). Nessun cambio di licenza di Gextto/gx-core.
+Source: `github.com/anacrolix/torrent` v1.61 (Go, **MPL-2.0**). Two ways of
+taking from it, consistent with the repo policy (**third-party code is not copied;
+the algorithm is rewritten** — the idea is not covered by copyright, the expression
+is — or the module is adopted as an MPL-2.0 **dependency**, as
+`github.com/anacrolix/utp` already is). No licence change for Gextto/gx-core.
 
-Regole: un item = un commit; **misura prima/dopo**; modifiche a `internal/gxcore`
-registrate in `GEXTTO.md`; test mirati (`./cmd/gx-torrent/`, `GxEngine`,
-`make test-engine`, `make test`); con effetto visibile anche le due UI (Gextto
-`uiweb/v2` e pagina del demone).
+Rules: one item = one commit; **measure before/after**; changes to `internal/gxcore`
+recorded in `GEXTTO.md`; targeted tests (`./cmd/gx-torrent/`, `GxEngine`,
+`make test-engine`, `make test`); with a visible effect also the two UIs (Gextto
+`uiweb/v2` and the daemon page).
 
-| # | Voce | Fonte anacrolix | Via | Sforzo | Stato |
+| # | Item | anacrolix source | Way | Effort | Status |
 |---|---|---|---|---|---|
-| 1 | Reader con seek + readahead e **priorità di pezzo graduata** | `torrent.Reader`, `ReadaheadContext`, `PiecePriority`, `File.SetPriority` | riscrivere | M | **fatto (priorità)** |
-| 2 | **Coda richieste adattiva** | `client-piece-request-order.go`, `RequestIndex`, `reqq` | riscrivere | M | **fatto** |
-| 3 | **`anacrolix/dht`** al posto del DHT attuale (BEP 42/43/44, BEP 33) | modulo `github.com/anacrolix/dht` | dipendenza | M | **BEP 42/43/44/33 fatti nel motore** |
-| 4 | **Tracker scrape** (BEP 48) | `tracker` (scrape) | riscrivere | S | **fatto** |
+| 1 | Reader with seek + readahead and **graduated piece priority** | `torrent.Reader`, `ReadaheadContext`, `PiecePriority`, `File.SetPriority` | rewrite | M | **done (priority)** |
+| 2 | **Adaptive request queue** | `client-piece-request-order.go`, `RequestIndex`, `reqq` | rewrite | M | **done** |
+| 3 | **`anacrolix/dht`** in place of the current DHT (BEP 42/43/44, BEP 33) | module `github.com/anacrolix/dht` | dependency | M | **BEP 42/43/44/33 done in the engine** |
+| 4 | **Tracker scrape** (BEP 48) | `tracker` (scrape) | rewrite | S | **done** |
 
-Ordine di lavoro: **1+2 insieme** (stesso intervento: lo streaming), poi **4**
-(pronto), poi **3** (valutato, sotto). Stato: **1** e **4** fatti, **2** fatto
-(da misurare su sciame), **3** rimandato con motivazione.
+Work order: **1+2 together** (same intervention: streaming), then **4**
+(ready), then **3** (evaluated, below). Status: **1** and **4** done, **2** done
+(to be measured on a swarm), **3** postponed with justification.
 
-**1 — Reader con seek, readahead e priorità di pezzo. Fatto (priorità).** Lo
-streaming ora usa **due finestre graduate**: `SetFileStreamWindow` (i byte che il
-player legge adesso) ha priorità sul **nuovo** `SetFileReadaheadWindow` (il
-prefetch), che a sua volta precede il rarest-first. Nel picker:
-`SetReadaheadWindow`/`pickReadahead`, provati prima delle allowed-fast e del
-rarest; test `TestReadaheadWindowAfterStreamWindow`. Il demone aggiorna entrambe
-le finestre mentre scrive (`setStreamWindows`). Il **reader con seek** non è un
-tipo nuovo del motore: la funzione è già coperta dal gestore HTTP `Range`
-(ogni richiesta imposta la finestra), e i test del picker coprono le due
-finestre.
+**1 — Reader with seek, readahead and piece priority. Done (priority).** Streaming
+now uses **two graduated windows**: `SetFileStreamWindow` (the bytes the
+player reads now) has priority over the **new** `SetFileReadaheadWindow` (the
+prefetch), which in turn precedes rarest-first. In the picker:
+`SetReadaheadWindow`/`pickReadahead`, tried before the allowed-fast and the
+rarest ones; test `TestReadaheadWindowAfterStreamWindow`. The daemon updates both
+windows while writing (`setStreamWindows`). The **reader with seek** is not a new
+engine type: the function is already covered by the HTTP `Range` handler
+(every request sets the window), and the picker tests cover the two
+windows.
 
-**2 — Coda richieste adattiva. Fatto.** La profondità delle richieste in volo per
-peer era fissa a `DefaultRequestsOut` (50), con tetto `MaxRequestsOut` (250) o il
-`reqq` annunciato. Ora `peer.RequestQueue` **cresce di uno a ogni blocco
-consegnato** (`boostRequestQueue`, chiamata sul refill in
-`torrent_messagehandler.go`) fino al tetto, e **si azzera sul choke**
-(`resetRequestQueue`): un peer lento resta alla base, uno veloce scivola verso
-`MaxRequestsOut`; con `reqq` piccolo il tetto resta quello. Logica in
+**2 — Adaptive request queue. Done.** The depth of in-flight requests per
+peer was fixed at `DefaultRequestsOut` (50), with a cap of `MaxRequestsOut` (250) or the
+announced `reqq`. Now `peer.RequestQueue` **grows by one with every delivered
+block** (`boostRequestQueue`, called on the refill in
+`torrent_messagehandler.go`) up to the cap, and **is reset on choke**
+(`resetRequestQueue`): a slow peer stays at the base, a fast one slides towards
+`MaxRequestsOut`; with a small `reqq` the cap stays that one. Logic in
 `torrent_start.go` (`maxAllowedRequests`/`requestQueueCap`/`boost`/`reset`), test
-`TestAdaptiveRequestQueue`. Da **validare su sciame reale** (come da regola del
-repo) prima di considerarla stabile.
+`TestAdaptiveRequestQueue`. To be **validated on a real swarm** (as per the repo
+rule) before considering it stable.
 
-**3 — `anacrolix/dht` e modernizzazione del DHT. BEP 42 fatta;
-adozione rimandata.** Oggi
-`internal/dht` è il DHT del motore (modulo a sé, `replace` in `go.mod`):
-dual-stack BEP 32, `Stats()`, `Config.PacketConn` per il socket uTP
-condiviso, read-loop robusto. Candidato: `github.com/anacrolix/dht/v2`
-(**MPL-2.0**, mantenuto; valutato **v2.24.0**, maggio 2026). Cosa c'è a monte
-(verificato su pkg.go.dev): `ServerConfig.Conn net.PacketConn` (**socket uTP
-condiviso**, come `Config.PacketConn` del motore), `IPBlocklist iplist.Ranger`
-(filtro IP), **BEP 42** (`SecureNodeId`/`NodeIdSecure`), **BEP 44** (`bep44`,
-`Store`, `Put`/`Get`), **BEP 33** (`Scrape()`), più BEP 5/43.
+**3 — `anacrolix/dht` and DHT modernisation. BEP 42 done;
+adoption postponed.** Today
+`internal/dht` is the engine's DHT (a module of its own, `replace` in `go.mod`):
+dual-stack BEP 32, `Stats()`, `Config.PacketConn` for the shared uTP socket,
+robust read-loop. Candidate: `github.com/anacrolix/dht/v2`
+(**MPL-2.0**, maintained; evaluated **v2.24.0**, May 2026). What it has upstream
+(verified on pkg.go.dev): `ServerConfig.Conn net.PacketConn` (**shared uTP
+socket**, like the engine's `Config.PacketConn`), `IPBlocklist iplist.Ranger`
+(IP filter), **BEP 42** (`SecureNodeId`/`NodeIdSecure`), **BEP 44** (`bep44`,
+`Store`, `Put`/`Get`), **BEP 33** (`Scrape()`), plus BEP 5/43.
 
-Perché **non è drop-in**: il modello API è diverso. Il DHT attuale espone un canale
-`PeersRequestResults` + un tick periodico + `PeersRequestPort` (così è scritto
-`session_dht.go`); `anacrolix/dht` usa `AnnounceTraversal(ih)` → `*Announce` con
-canale `Peers`, più `Bootstrap`/`TableMaintainer`/`AddNode`. Andrebbero riscritti:
-`session_dht.go` (ricerca → traversal per torrent), la creazione in `session.go`
-(`NewServer(ServerConfig)`), i **stats** (`ServerStats` puntato vs la mappa di
-`dht.Stats()` usata da `session_stats.go` e dalla UI) e la mappatura della
-blocklist su `iplist.Ranger`. Inoltre le patch del motore (dual-stack BEP 32,
-`PacketConn`, read-loop) vanno **riverificate** a monte.
+Why it is **not drop-in**: the API model is different. The current DHT exposes a
+`PeersRequestResults` channel + a periodic tick + `PeersRequestPort` (this is how
+`session_dht.go` is written); `anacrolix/dht` uses `AnnounceTraversal(ih)` → `*Announce` with a
+`Peers` channel, plus `Bootstrap`/`TableMaintainer`/`AddNode`. The following would need rewriting:
+`session_dht.go` (search → traversal per torrent), the creation in `session.go`
+(`NewServer(ServerConfig)`), the **stats** (`ServerStats` pointed vs the map of
+`dht.Stats()` used by `session_stats.go` and the UI) and the mapping of the
+blocklist onto `iplist.Ranger`. Moreover the engine patches (dual-stack BEP 32,
+`PacketConn`, read-loop) must be **re-verified** upstream.
 
-Guadagno: dipendenza mantenuta, BEP 42/44/33, e **niente modulo a sé + `replace`**.
-Costo: **rework del layer DHT** (M/L), doppia validazione (dual-stack, socket
-condiviso) e perderemmo il controllo del DHT. L'uso DHT di gx-core è minimale
-(solo ricerca e announce), quindi il beneficio non è immediato. **Verdetto: non
-ora**; da riaprire se servono BEP 44 (mutable items) o il security BEP 42, o se il
-modulo a sé diventa un peso — come task a sé con piano di validazione (sciame reale,
-dual-stack, socket condiviso, stats). Licenza MPL-2.0 (dipendenza non modificata,
-come `anacrolix/utp`), nessun problema.
+Gain: a maintained dependency, BEP 42/44/33, and **no module of its own + `replace`**.
+Cost: **rework of the DHT layer** (M/L), double validation (dual-stack, shared
+socket) and we would lose control of the DHT. The DHT use in gx-core is minimal
+(only search and announce), so the benefit is not immediate. **Verdict: not
+now**; to be reopened if BEP 44 (mutable items) or the BEP 42 security are needed, or if the
+module of its own becomes a burden — as a task of its own with a validation plan (real swarm,
+dual-stack, shared socket, stats). MPL-2.0 licence (unmodified dependency,
+like `anacrolix/utp`), no problem.
 
-**Modernizzazione BEP 42 + 44 + 43 + 33 (2026-10-11).** Il DHT è stato aggiornato
-con la **security extension BEP 42** (`dht_sec.go`): l'ID nodo è derivato dall'IP
-esterno (CRC32C Castagnoli; i vettori ufficiali del BEP sono verificati in
-`dht_sec_test.go`). L'IP esterno arriva da `DHTHost` routabile o dall'interfaccia
-uscente; se sconosciuto, il nodo lo apprende dal campo `ip` delle risposte e
-adotta un ID sicuro (persistito). Gli indirizzi locali sono esenti. Aggiunti
-anche **BEP 44** (`bep44.go`: archivio chiave/valore immutabile e mutabile firmato
-ed25519, query `get`/`put`, API locale; vettori ufficiali in `bep44_test.go`),
-**BEP 43** (read-only: `Config.ReadOnly`, flag demone `-dht-read-only`) e **BEP 33**
-(`bloom.go` + `peer_store.go` + `scrape_client.go`: filtri `BFpe`/`BFsd`, stima
-dello sciame, client verso i nodi più vicini; vettore ufficiale in
-`bloom_test.go`), esposta dal motore (`Torrent.DHTScrape`), dal demone
-(`GET /api/v1/torrents/{hash}/dhtscrape`) e dalla pagina (pulsante **DHT swarm**).
-La **BEP 44** ha ora anche il **client iterativo di rete** (`bep44_client.go`):
-`GetImmutable`/`GetMutable` fanno una traversal bounded sui nodi più vicini e
-`PublishImmutable`/`PublishMutable` pubblicano raccogliendo prima il token con
-una `get`. È il consumatore che abilita la **BEP 46** (magnet `xs=urn:btpk:`).
+**BEP 42 + 44 + 43 + 33 modernisation (2026-10-11).** The DHT has been updated
+with the **security extension BEP 42** (`dht_sec.go`): the node ID is derived from the
+external IP (CRC32C Castagnoli; the official BEP vectors are verified in
+`dht_sec_test.go`). The external IP comes from a routable `DHTHost` or from the
+outgoing interface; if unknown, the node learns it from the `ip` field of the
+responses and adopts a secure ID (persisted). Local addresses are exempt. Also added:
+**BEP 44** (`bep44.go`: immutable and mutable signed ed25519 key/value store,
+`get`/`put` queries, local API; official vectors in `bep44_test.go`),
+**BEP 43** (read-only: `Config.ReadOnly`, daemon flag `-dht-read-only`) and **BEP 33**
+(`bloom.go` + `peer_store.go` + `scrape_client.go`: `BFpe`/`BFsd` filters, swarm
+estimate, client towards the nearest nodes; official vector in
+`bloom_test.go`), exposed by the engine (`Torrent.DHTScrape`), by the daemon
+(`GET /api/v1/torrents/{hash}/dhtscrape`) and by the page (**DHT swarm** button).
+**BEP 44** now also has the **iterative network client** (`bep44_client.go`):
+`GetImmutable`/`GetMutable` do a bounded traversal over the nearest nodes and
+`PublishImmutable`/`PublishMutable` publish by first collecting the token with
+a `get`. It is the consumer that enables **BEP 46** (magnet `xs=urn:btpk:`).
 
-**Fix BEP 44 (2026-10-11).** Le richieste `get`/`put` decodificano il dizionario
-`a` con un decoder bencode proprio (`internal/dht/bencode.go`): `bencode-go`
-v1.0.0 andava in **panico** (`reflect: reflect.Value.Set using unaddressable
-value`) sui valori stringa di un `map[string]interface{}`, cioè su **ogni**
-`get`/`put`, facendo crashare l'intero demone (`exit status 2`, riavvio di
-Gextto). Il decoder non usa reflection, ha un tetto di profondità (32) e
-restituisce errori invece di panico; `readResponse` ora segnala l'errore quando
-recupera un panico, invece di restituire dati parziali con errore `nil`. Test in
+**BEP 44 fix (2026-10-11).** The `get`/`put` requests decode the dictionary
+`a` with its own bencode decoder (`internal/dht/bencode.go`): `bencode-go`
+v1.0.0 used to **panic** (`reflect: reflect.Value.Set using unaddressable
+value`) on the string values of a `map[string]interface{}`, i.e. on **every**
+`get`/`put`, crashing the whole daemon (`exit status 2`, restart of
+Gextto). The decoder does not use reflection, has a depth cap (32) and
+returns errors instead of panicking; `readResponse` now signals the error when
+it recovers a panic, instead of returning partial data with a `nil` error. Tests in
 `bencode_test.go`.
 
-**4 — Tracker scrape (BEP 48).** **Fatto.** `Scrape` è stato aggiunto
-all'interfaccia `tracker.Tracker` e implementato in **HTTP** (`/scrape`, con
-`scrapeURL` che mappa `…/announce` → `…/scrape` tenendo la passkey) e **UDP**
-(nuova azione BEP 15, request generalizzato a `udpRequest` con
-`GetDest`/`SetConnectionID`/`Done`). `Tier.Scrape` delega al tracker corrente e
-avanza sull'errore come `Announce`. Esposto come `Torrent.Scrape` (scrape
-concorrente di tutti i tracker, errore per-tracker) e dal demone con
-`GET /api/v1/torrents/{hash}/scrape`. Test: `httptracker_test.go`,
-`udptracker_test.go`. Resta il pulsante nella pagina del demone.
+**4 — Tracker scrape (BEP 48).** **Done.** `Scrape` was added
+to the `tracker.Tracker` interface and implemented in **HTTP** (`/scrape`, with
+`scrapeURL` mapping `…/announce` → `…/scrape` keeping the passkey) and **UDP**
+(new BEP 15 action, request generalised to `udpRequest` with
+`GetDest`/`SetConnectionID`/`Done`). `Tier.Scrape` delegates to the current tracker and
+advances on error like `Announce`. Exposed as `Torrent.Scrape` (concurrent
+scrape of all trackers, error per tracker) and by the daemon with
+`GET /api/v1/torrents/{hash}/scrape`. Tests: `httptracker_test.go`,
+`udptracker_test.go`. The button in the daemon page remains.
 
-**Nota (voci 1‑2, 2026-10-10).** Dopo lo studio, la **#2** si è rivelata
-implementabile **senza** il pipelining multi-pezzo di anacrolix:
-`DefaultRequestsOut` (50) è una base reale sotto il tetto `MaxRequestsOut` (250),
-quindi la profondità può adattarsi **entro** l'architettura attuale (un pezzo per
-peer). La **#1** resta la priorità graduata (stream > readahead); il "reader con
-seek" è coperto dal gestore HTTP `Range`. Entrambe vanno **misurate su sciame
-reale** prima di considerarle chiuse.
+**Note (items 1‑2, 2026-10-10).** After the study, **#2** turned out to be
+implementable **without** anacrolix's multi-piece pipelining:
+`DefaultRequestsOut` (50) is a real base below the `MaxRequestsOut` cap (250),
+so the depth can adapt **within** the current architecture (one piece per
+peer). **#1** remains the graduated priority (stream > readahead); the "reader with
+seek" is covered by the HTTP `Range` handler. Both must be **measured on a real
+swarm** before considering them closed.
 
-### 4.8 Oltre la shortlist (nuovi punti, 2026-10-10)
+### 4.8 Beyond the shortlist (new items, 2026-10-10)
 
-Quattro punti emersi dal confronto con anacrolix/libtorrent, **oltre** alla
-shortlist §4.7. Stesse regole: riscrittura dell'algoritmo (o dipendenza MPL-2.0),
-un item = un commit, misura/test, `GEXTTO.md`, entrambe le UI.
+Four items that emerged from the comparison with anacrolix/libtorrent, **beyond**
+the §4.7 shortlist. Same rules: rewriting of the algorithm (or an MPL-2.0
+dependency), one item = one commit, measurement/tests, `GEXTTO.md`, both UIs.
 
-| # | Voce | Fonte | Via | Sforzo | Stato |
+| # | Item | Source | Way | Effort | Status |
 |---|---|---|---|---|---|
-| 1 | **Bus di eventi del motore** (stato pezzi, peer/messaggi, tracker) | anacrolix `SubscribePieceStateChanges`, `PeerMessageEvent`, `StatusEvent`; libtorrent *alerts* | riscrivere | M | **fatto** |
-| 2 | **Creazione `.torrent` da una cartella** (`mktorrent`-style) | anacrolix `metainfo` | riscrivere | M | **fatto** |
-| 3 | **Bad-storage / errori di scrittura a runtime** | anacrolix `bad-storage.go`, `SetOnWriteChunkError` | riscrivere | S/M | **fatto (diagnosi)** |
-| 4 | **LSD IPv6** (BEP 14, gruppo `ff15::efc0:988f`) | anacrolix `bep14.go` (`Ip6`) | riscrivere | S | **fatto** |
+| 1 | **Engine event bus** (piece state, peer/messages, trackers) | anacrolix `SubscribePieceStateChanges`, `PeerMessageEvent`, `StatusEvent`; libtorrent *alerts* | rewrite | M | **done** |
+| 2 | **`.torrent` creation from a folder** (`mktorrent`-style) | anacrolix `metainfo` | rewrite | M | **done** |
+| 3 | **Bad-storage / write errors at runtime** | anacrolix `bad-storage.go`, `SetOnWriteChunkError` | rewrite | S/M | **done (diagnosis)** |
+| 4 | **LSD IPv6** (BEP 14, group `ff15::efc0:988f`) | anacrolix `bep14.go` (`Ip6`) | rewrite | S | **done** |
 
-**1 — Bus di eventi del motore. Fatto.** `Session.Subscribe()` (`torrent/events.go`)
-restituisce un canale di `Event`; l'engine non blocca mai su un subscriber lento
-(scarta se il buffer da 64 è pieno). Tipi: `torrent_added`,
+**1 — Engine event bus. Done.** `Session.Subscribe()` (`torrent/events.go`)
+returns a channel of `Event`; the engine never blocks on a slow subscriber
+(it discards if the buffer of 64 is full). Types: `torrent_added`,
 `torrent_completed`, `torrent_stopped`, `torrent_error`, **`torrent_piece`**
-(alta frequenza), **`peer_connected`/`peer_disconnected`**, **`tracker_announce`**
-(con seeders/leechers, o l'errore). Emessi in `session_add.go`,
-`torrent_write.go`, `torrent_peer.go`, `torrent_close.go`, `torrent_stop.go` e dal
-gancio sull'announcer (`SetResultHook`). Esposto dal demone come **SSE `GET
-/ui/events`** e consumato dalla pagina, che si aggiorna subito sugli eventi di
-stato invece di aspettare il polling (2 s) — il polling resta come rete di
-sicurezza.
+(high frequency), **`peer_connected`/`peer_disconnected`**, **`tracker_announce`**
+(with seeders/leechers, or the error). Emitted in `session_add.go`,
+`torrent_write.go`, `torrent_peer.go`, `torrent_close.go`, `torrent_stop.go` and by the
+hook on the announcer (`SetResultHook`). Exposed by the daemon as **SSE `GET
+/ui/events`** and consumed by the page, which updates immediately on state
+events instead of waiting for polling (2 s) — polling remains as a safety
+net.
 
-**2 — Creazione `.torrent` da una cartella. Fatto.** La parte di
-`internal/metainfo` che scrive l'info dict esisteva già (`NewInfoBytes` +
-`NewBytes`); mancava l'esposizione. Aggiunta `torrent.CreateTorrent(path, opt)`
-(`torrent_create.go`) e, nel demone, un **form nella pagina** (`POST
-/ui/create-torrent`) e l'endpoint **`POST /api/v1/create-torrent`**, che
-restituiscono il `.torrent` come download. Verifica: il `.torrent` creato è
-riletto da `metainfo.New`.
+**2 — `.torrent` creation from a folder. Done.** The part of
+`internal/metainfo` that writes the info dict already existed (`NewInfoBytes` +
+`NewBytes`); the exposure was missing. Added `torrent.CreateTorrent(path, opt)`
+(`torrent_create.go`) and, in the daemon, a **form on the page** (`POST
+/ui/create-torrent`) and the endpoint **`POST /api/v1/create-torrent`**, which
+return the `.torrent` as a download. Verification: the created `.torrent` is
+re-read by `metainfo.New`.
 
-**3 — Bad-storage / errori di scrittura. Fatto (diagnosi).** Il motore **già**
-ferma il torrent su errore di scrittura senza loop (`handleStopped` con
-`lastError`). Il valore aggiunto è la diagnosi: l'errore ora identifica la
-**cartella di storage** (`storage %q could not write piece #N`) e i guasti sono
-contati (`SessionStats.StorageErrors`, esposto come `storage_errors` nei dati del
-demone). Non è una macchina a stati separata come in anacrolix.
+**3 — Bad-storage / write errors. Done (diagnosis).** The engine **already**
+stops the torrent on a write error without looping (`handleStopped` with
+`lastError`). The added value is the diagnosis: the error now identifies the
+**storage folder** (`storage %q could not write piece #N`) and the failures are
+counted (`SessionStats.StorageErrors`, exposed as `storage_errors` in the daemon
+data). It is not a separate state machine as in anacrolix.
 
-**4 — LSD IPv6 (BEP 14). Fatto.** Correzione: **BEP 14 è la Local Service
-Discovery**, già presente (`cmd/gx-torrent/lsd.go`), non la negoziazione dei
-messaggi. L'aggiunta è la **seconda famiglia**: annuncio e ascolto anche sul
-gruppo IPv6 `[ff15::efc0:988f]:6771` (best-effort: senza IPv6 multicast resta la
-v4), come anacrolix (`config.Ip6`). Stato LSD con `ipv6` in `/api/v1/status`.
+**4 — LSD IPv6 (BEP 14). Done.** Correction: **BEP 14 is Local Service
+Discovery**, already present (`cmd/gx-torrent/lsd.go`), not the negotiation of
+messages. The addition is the **second family**: announcement and listening also on the
+IPv6 group `[ff15::efc0:988f]:6771` (best-effort: without IPv6 multicast the
+v4 one remains), like anacrolix (`config.Ip6`). LSD state with `ipv6` in `/api/v1/status`.
 
-### 4.9 Conformità BEP: stato dopo la revisione (2026-10-11)
+### 4.9 BEP compliance: state after the review (2026-10-11)
 
-Voce aggiunta dopo una revisione esterna (documento `analisi5.md`, tenuto fuori
-dal repo) che confrontava `gx-core` con libtorrent, Transmission, BiglyBT,
-anacrolix/torrent e rain. La revisione ha **corretto due affermazioni errate** e
-ha aperto due item che sono stati chiusi qui.
+Item added after an external review (document `analisi5.md`, kept outside
+the repo) that compared `gx-core` with libtorrent, Transmission, BiglyBT,
+anacrolix/torrent and rain. The review **corrected two wrong claims** and
+opened two items that have been closed here.
 
-| BEP / area | Stato reale | Note |
+| BEP / area | Real state | Notes |
 |---|---|---|
-| **BEP 21** (`upload_only`) | **fatto (peer + tracker)** | Il magnet non c'entra: BEP 21 è la chiave `upload_only` nell'extension handshake BEP 10, più `event=paused` all'announce e `downloaders` nello scrape. L'header è inviato alla connessione e rinviato a tutti i peer quando il torrent diventa seed (`torrent.uploadOnly` = `completed`, quindi anche seed parziali su selection); un **seed parziale** annuncia `event=paused` (`tracker.EventPaused`). Manca solo il campo `downloaders` dello scrape (opzionale, lo fornisce il tracker) |
-| **BEP 53** (`so=`) + magnet `ws=`/`dht=` | **parziale** | `so=` (Select Only, BEP 53): `Magnet.SelectOnly` parsa indici e range, de-duplicati, come seed del torrent applicato da `skippedInfoFiles` **solo** quando `Config.FileSelection` non fornisce una maschera (`Torrent.SelectOnly`/`ClearSelectOnly`); il demone lo trasforma in `FilePriorities` all'arrivo del metadata. Convenzioni magnet: `ws=` (web seed) → `Magnet.WebSeeds`, persistito nel resume; `dht=` (nodo DHT di bootstrap) → `Magnet.DHTNodes`, aggiunto alla DHT di sessione. Restano `xs=`/`as=` |
-| **BEP 41** (UDP tracker URLData) | **già presente** | Il documento la dava per assente: `internal/tracker/udptracker/messages.go` scrive già le opzioni TLV (tipo `0x2` = URLData, non `0x1`) da `u.RequestURI()`. Nessun lavoro |
-| **BEP 44 client iterativo + BEP 46** (`urn:btpk:`) | **fatto** | Il DHT ha ora il client uscente (`internal/dht/bep44_client.go`): `GetImmutable`/`GetMutable` con traversal bounded sui nodi più vicini, `PublishImmutable`/`PublishMutable` che raccolgono il token con una `get` e pubblicano con `put`; `handleBep44Reply` decodifica la risposta con il decoder panic-free e continua la traversal. **BEP 46**: il magnet `xs=urn:btpk:<pubkey>` (+ `s=<salt>`) risolve l'info hash dall'item mutabile in `Session.addMagnet`. Test: `bep44_client_test.go`, `bep46_test.go`, magnet |
-| **BEP 54** (`lt_donthave`) | **fatto (ricezione)** | Estensione BEP 10 `lt_donthave`: un `DontHave` azzera il bit del pezzo nel bitfield del peer e la disponibilità nel picker; senza Fast Extension cancella anche il download attivo di quel pezzo. Solo ricezione (gx-core non scarta pezzi). Correzione: BEP 54 **non** è STUN (errore dell'analisi esterna); non esiste una BEP per STUN |
-| **BEP 31** (`retry in`) | **fatto** | Annuncio e scrape HTTP/UDP estraggono `retry in` in minuti e lo rispettano; il valore `"never"` scarta il tracker dal tier per sempre (`tracker.Tier`, senza fermare gli altri tracker dello stesso tier). Parsing unico in `tracker.NewError`/`SetRetryIn` |
-| **BEP 38** (`similar`/`collections`) | **parziale (scoperta dei candidati)** | Hint letti dal dizionario info **e** dal livello superiore (uniti e deduplicati in `metainfo/bep38.go`), riemessi nell'export (`NewBytesWithHints`), esposti con i torrent locali che condividono un hint (API `GET /api/v1/torrents/{hash}/collections`, pagina del demone, dettaglio Gextto, con la simmetria del BEP). Il **riuso dei blocchi** è lo Swarm Merging (§15.2) |
-| **BEP 17 / 34 / 35 / 51, WebTorrent, I2P** | **fuori scope** | Superate, irrilevanti o costose (WebRTC, SAM). Confermato; 45/51 marginali |
-| **Pipelining 10 Gbps** | **da misurare** | La coda richieste adattiva esiste già (§4.7); un ring buffer di scrittura è speculativo. Vale solo con misure prima/dopo (regola performance di `AGENTS.md`) |
+| **BEP 21** (`upload_only`) | **done (peer + tracker)** | The magnet is not involved: BEP 21 is the `upload_only` key in the BEP 10 extension handshake, plus `event=paused` on announce and `downloaders` in the scrape. The header is sent on connection and forwarded to all peers when the torrent becomes a seed (`torrent.uploadOnly` = `completed`, therefore also partial seeds on selection); a **partial seed** announces `event=paused` (`tracker.EventPaused`). Only the `downloaders` field of the scrape is missing (optional, provided by the tracker) |
+| **BEP 53** (`so=`) + magnet `ws=`/`dht=` | **partial** | `so=` (Select Only, BEP 53): `Magnet.SelectOnly` parses indices and ranges, de-duplicated, as the torrent's seed applied by `skippedInfoFiles` **only** when `Config.FileSelection` does not provide a mask (`Torrent.SelectOnly`/`ClearSelectOnly`); the daemon turns it into `FilePriorities` on arrival of the metadata. Magnet conventions: `ws=` (web seed) → `Magnet.WebSeeds`, persisted in the resume; `dht=` (bootstrap DHT node) → `Magnet.DHTNodes`, added to the session DHT. `xs=`/`as=` remain |
+| **BEP 41** (UDP tracker URLData) | **already present** | The document gave it as absent: `internal/tracker/udptracker/messages.go` already writes the TLV options (type `0x2` = URLData, not `0x1`) from `u.RequestURI()`. No work |
+| **BEP 44 iterative client + BEP 46** (`urn:btpk:`) | **done** | The DHT now has the outgoing client (`internal/dht/bep44_client.go`): `GetImmutable`/`GetMutable` with bounded traversal over the nearest nodes, `PublishImmutable`/`PublishMutable` that collect the token with a `get` and publish with `put`; `handleBep44Reply` decodes the response with the panic-free decoder and continues the traversal. **BEP 46**: the magnet `xs=urn:btpk:<pubkey>` (+ `s=<salt>`) resolves the info hash from the mutable item in `Session.addMagnet`. Tests: `bep44_client_test.go`, `bep46_test.go`, magnet |
+| **BEP 54** (`lt_donthave`) | **done (reception)** | BEP 10 extension `lt_donthave`: a `DontHave` clears the bit of the piece in the peer's bitfield and the availability in the picker; without Fast Extension it also cancels the active download of that piece. Reception only (gx-core does not discard pieces). Correction: BEP 54 is **not** STUN (error of the external analysis); there is no BEP for STUN |
+| **BEP 31** (`retry in`) | **done** | HTTP/UDP announce and scrape extract `retry in` in minutes and respect it; the value `"never"` removes the tracker from the tier forever (`tracker.Tier`, without stopping the other trackers of the same tier). Single parsing in `tracker.NewError`/`SetRetryIn` |
+| **BEP 38** (`similar`/`collections`) | **partial (candidate discovery)** | Hints read from the info dictionary **and** from the top level (united and de-duplicated in `metainfo/bep38.go`), re-emitted in the export (`NewBytesWithHints`), exposed with the local torrents that share a hint (API `GET /api/v1/torrents/{hash}/collections`, daemon page, Gextto detail, with the symmetry of the BEP). **Block reuse** is Swarm Merging (§15.2) |
+| **BEP 17 / 34 / 35 / 51, WebTorrent, I2P** | **out of scope** | Superseded, irrelevant or expensive (WebRTC, SAM). Confirmed; 45/51 marginal |
+| **10 Gbps pipelining** | **to be measured** | The adaptive request queue already exists (§4.7); a write ring buffer is speculative. It is worth it only with before/after measurements (performance rule of `AGENTS.md`) |
 
-Correzioni al documento esterno, tenute come nota: (a) BEP 41 **non** era
-mancante e l'opzione URLData è `0x2`; (b) BEP 21 **non** è un messaggio di
-estensione con id in `m`, ma un header dell'handshake, più le modifiche tracker;
-(c) il parser magnet **non** estraeva `ws`/`xs`, quindi BEP 53 era "assente" e non
-"parziale"; (d) il motore espone `Config.FileSelection`, non un metodo
-`Torrent.SetFileSelection`; (e) la matrice comparativa con i client esterni è
-indiziaria e non va usata come fonte.
+Corrections to the external document, kept as a note: (a) BEP 41 was **not**
+missing and the URLData option is `0x2`; (b) BEP 21 is **not** an extension
+message with an id in `m`, but a handshake header, plus the tracker changes;
+(c) the magnet parser **did not** extract `ws`/`xs`, so BEP 53 was "absent" and not
+"partial"; (d) the engine exposes `Config.FileSelection`, not a method
+`Torrent.SetFileSelection`; (e) the comparative matrix with the external clients is
+circumstantial and must not be used as a source.
 
-**Performance (BEP 31 e 38).** Nessuna modifica al *data path*: il BEP 31 tocca
-solo l'announce (il `Tier` passa da `atomic.Int32` a un mutex sull'indice, fuori
-dal percorso dei dati) e il BEP 38 legge due campi opzionali del metainfo e li
-mostra. I benchmark del picker e dell'unchoker restano invariati
-(`BenchmarkPickerRarestSteady` ~102 µs/op, **0 alloc/op**; unchoker 1,3 µs/op),
-quindi non serve una misura di throughput.
+**Performance (BEP 31 and 38).** No change to the *data path*: BEP 31 touches
+only the announce (the `Tier` goes from `atomic.Int32` to a mutex on the index, outside
+the data path) and BEP 38 reads two optional fields of the metainfo and
+shows them. The picker and unchoker benchmarks remain unchanged
+(`BenchmarkPickerRarestSteady` ~102 µs/op, **0 alloc/op**; unchoker 1.3 µs/op),
+so a throughput measurement is not needed.
 
-**Revisione dei BEP esistenti (2026-10-12).** Quattro migliorie a implementazioni
-già presenti: (a) **BEP 42** — il campo `ip` ora è anche **inviato** in ogni
-risposta (a ping, find_node, get_peers, announce_peer e `get`/`put` BEP 44), non
-solo letto, con il contatore `reflected_sent`; (b) **BEP 5** — `announce_peer`
-rispetta `implied_port` (usa la porta sorgente); (c) **BEP 11** — le liste
-`dropped`/`dropped6` non sono più aggiunte come peer candidati (lo erano per
-errore, facendo dialare peer usciti dallo sciame) e una lista malformata non
-scarta più le altre; (d) **BEP 9** — l'offset della richiesta di metadati è
-calcolato a 64 bit, quindi un indice di pezzo enorme non va più in overflow e
-non serve il pezzo sbagliato. Test: `internal/dht/ipfield_test.go`,
+**Review of the existing BEPs (2026-10-12).** Four improvements to implementations
+already present: (a) **BEP 42** — the `ip` field is now also **sent** in every
+response (to ping, find_node, get_peers, announce_peer and the BEP 44 `get`/`put`), not
+only read, with the `reflected_sent` counter; (b) **BEP 5** — `announce_peer`
+respects `implied_port` (uses the source port); (c) **BEP 11** — the lists
+`dropped`/`dropped6` are no longer added as candidate peers (they were, by
+mistake, causing dials to peers that had left the swarm) and a malformed list no
+longer discards the others; (d) **BEP 9** — the offset of the metadata request is
+computed at 64 bits, so an enormous piece index no longer overflows and
+does not request the wrong piece. Tests: `internal/dht/ipfield_test.go`,
 `torrent_pex_test.go`, `torrent_metadataextension_test.go`.
 
-### 4.10 DHT: diagnosi, hardening e multi-path (piano e fattibilità)
+### 4.10 DHT: diagnosis, hardening and multi-path (plan and feasibility)
 
-Nato dal confronto con **Tixati** (2026-10-11), il cui changelog (v3.39, v3.43)
-rivendica un DHT molto evoluto: screening anti-Sybil dei nodi malevoli,
-multi-path lookups, igiene dei token, DHT su I2P e diagnostica fine. Il DHT di
-gx-core (`internal/dht`) copre già **BEP 5/32/33/42/43/44** con una routing
-table ad **albero binario senza bucket**; le differenze con Tixati sono di
-**hardening e diagnostica**, non di copertura BEP (vedi [`bep.md`](bep.md)).
-Tixati è closed-source: se ne riscrive l'*idea*, non il codice.
+Born from the comparison with **Tixati** (2026-10-11), whose changelog (v3.39, v3.43)
+claims a very evolved DHT: anti-Sybil screening of malicious nodes,
+multi-path lookups, token hygiene, DHT over I2P and fine diagnostics. The gx-core DHT
+(`internal/dht`) already covers **BEP 5/32/33/42/43/44** with a routing
+table as a **binary tree without buckets**; the differences with Tixati are of
+**hardening and diagnostics**, not of BEP coverage (see [`bep.md`](bep.md)).
+Tixati is closed-source: its *idea* is rewritten, not its code.
 
-**Fatto (diagnostica, 2026-10-11).** `dht.Stats()` ora espone, oltre a nodi,
-traffico e pacchetti scartati, i contatori per RPC e di screening:
+**Done (diagnostics, 2026-10-11).** `dht.Stats()` now exposes, besides nodes,
+traffic and discarded packets, the per-RPC and screening counters:
 `queries_in`/`queries_out`/`replies_in` (ping, get_peers, find_node,
-announce_peer) e `blocked_hosts`/`self_promotions`/`dupe_references`/
-`nodes_killed`. Erano già misurati come `expvar` ma non esposti; aggiunti i due
-contatori mancanti (`totalRecvPing`, `totalRecvAnnouncePeer`,
-`totalSentAnnouncePeer`). Il demone li propaga come `dht_<chiave>` (API e UI),
-quindi il lavoro è visibile end-to-end. Test: `internal/dht/stats_test.go`.
-**Perché prima:** è la base di misura degli item sotto (regola performance di
-`AGENTS.md`). Chiuso anche un residuo: il commento di origine "Taipei Torrent"
-in `dht.go` (era un marcatore che la §1.6 dà per rimosso; l'attribuzione resta
-il `LICENSE` BSD-3).
+announce_peer) and `blocked_hosts`/`self_promotions`/`dupe_references`/
+`nodes_killed`. They were already measured as `expvar` but not exposed; the two missing
+counters were added (`totalRecvPing`, `totalRecvAnnouncePeer`,
+`totalSentAnnouncePeer`). The daemon propagates them as `dht_<key>` (API and UI),
+so the work is visible end-to-end. Test: `internal/dht/stats_test.go`.
+**Why first:** it is the measurement basis of the items below (performance rule of
+`AGENTS.md`). A residue was also closed: the origin comment "Taipei Torrent"
+in `dht.go` (it was a marker that §1.6 gives as removed; the attribution remains
+the BSD-3 `LICENSE`).
 
-**Item da aprire (ognuno con piano e misura prima/dopo):**
+**Items to open (each with a plan and before/after measurement):**
 
-| # | Voce | Cosa | Rischio | Sforzo | Verifica | Stato |
+| # | Item | What | Risk | Effort | Verification | Status |
 |---|---|---|---|---|---|---|
-| 1 | Hardening anti-Sybil | limitare la concentrazione di nodi per subnet (e deprioritizzare gli ID non-BEP 42 quando la tabella è piena, **senza** rifiuto netto: BEP 42 non è applicato ovunque) | M | M | `subnet_share_max`/`nodes_insecure_id`, dimensione tabella e peer trovati su sciame reale | osservabilità fatta; enforcement da misurare |
-| 2 | Multi-path lookup | condurre `get_peers` su più rami in parallelo e preferire i peer confermati da ≥2 percorsi | M/A | M | peer trovati e tempo di ricerca su sciame reale | dedup **già presente** (`isOK`/`wasContactedRecently`); multi-path completo da fare, guadagno non provato |
-| 3 | Igiene dei token | rilevare replay e token presi da query non corrispondenti | S | S | test unitari sul codec | **fatto** |
+| 1 | Anti-Sybil hardening | limit the concentration of nodes per subnet (and deprioritise non-BEP 42 IDs when the table is full, **without** an outright rejection: BEP 42 is not applied everywhere) | M | M | `subnet_share_max`/`nodes_insecure_id`, table size and peers found on a real swarm | observability done; enforcement to be measured |
+| 2 | Multi-path lookup | conduct `get_peers` on several branches in parallel and prefer peers confirmed by ≥2 paths | M/A | M | peers found and search time on a real swarm | dedup **already present** (`isOK`/`wasContactedRecently`); full multi-path to do, gain not proven |
+| 3 | Token hygiene | detect replay and tokens taken from non-matching queries | S | S | unit tests on the codec | **done** |
 
-**Igiene dei token — fatto (2026-10-11).** Il token di `announce_peer` è ora
-legato a **indirizzo sorgente + scope** (`hostToken`/`checkToken` prendono lo
-scope; per `get_peers`/`announce_peer` è l'info-hash), quindi un token ottenuto
-per uno sciame non si riusa su un altro: è il rilevamento delle *query non
-corrispondenti* di Tixati. I percorsi BEP 44 restano legati al solo indirizzo
-(`scope = nil`), invariati. Aggiunti i contatori `announce_ok_token` /
-`announce_bad_token` (in `Stats()`, quindi visibili come `dht_announce_*`).
-Test: `TestHostTokenBindsScope`. Resta il doppio segreto rotante già presente.
+**Token hygiene — done (2026-10-11).** The `announce_peer` token is now
+bound to **source address + scope** (`hostToken`/`checkToken` take the
+scope; for `get_peers`/`announce_peer` it is the info-hash), so a token obtained
+for one swarm is not reused on another: it is the detection of Tixati's *non-matching
+queries*. The BEP 44 paths remain bound to the address alone
+(`scope = nil`), unchanged. Added the counters `announce_ok_token` /
+`announce_bad_token` (in `Stats()`, therefore visible as `dht_announce_*`).
+Test: `TestHostTokenBindsScope`. The rotating double secret already present remains.
 
-**Osservabilità della concentrazione — fatto (2026-10-11).** Prima di introdurre
-qualunque cap anti-Sybil, la routing table è ora **osservabile**: `Stats()`
-espone `subnet_share_max` (il massimo numero di nodi nello stesso /24, o /48 per
-IPv6) e `nodes_insecure_id` (nodi con ID non secure per BEP 42), ricalcolati a
-ogni `cleanup` dal run loop (`tableMetrics`/`subnetKey` in `dht_sec.go`). Sono i
-numeri con cui decidere *se* e *quanto* stringere; l'**enforcement non è attivo
-di proposito**, perché BEP 42 non è applicato ovunque e un cap per /24 punirebbe
-i nodi legittimi dietro CGNAT/mobile. Test: `TestSubnetKey`,
+**Observability of the concentration — done (2026-10-11).** Before introducing
+any anti-Sybil cap, the routing table is now **observable**: `Stats()`
+exposes `subnet_share_max` (the maximum number of nodes in the same /24, or /48 for
+IPv6) and `nodes_insecure_id` (nodes with a non-secure ID per BEP 42), recomputed at
+every `cleanup` by the run loop (`tableMetrics`/`subnetKey` in `dht_sec.go`). They are the
+numbers with which to decide *whether* and *how much* to tighten; the **enforcement is deliberately
+not active**, because BEP 42 is not applied everywhere and a per-/24 cap would punish
+legitimate nodes behind CGNAT/mobile. Tests: `TestSubnetKey`,
 `TestTableMetricsConcentration`.
 
-**Harness di misura — fatto (2026-10-11).** `make measure-dht`
+**Measurement harness — done (2026-10-11).** `make measure-dht`
 (`GX_MEASURE_DHT=5m`, `GX_MEASURE_DHT_INTERVAL=10s`; `internal/dht/measure_test.go`,
-opt-in e fuori dalla CI) avvia un nodo vero contro la DHT pubblica e stampa,
-campione per campione, riempimento della routing table ed esito delle query.
-Prima misura (45 s, 2026-10-11):
+opt-in and outside CI) starts a real node against the public DHT and prints,
+sample by sample, the filling of the routing table and the outcome of the queries.
+First measurement (45 s, 2026-10-11):
 
-| metrica | valore |
+| metric | value |
 |---|---|
-| nodi conosciuti | ~740 |
-| `subnet_share_max` (nodi nello stesso /24) | **14** |
-| `nodes_insecure_id` (ID non-BEP 42) | **312 / ~740 ≈ 42%** |
-| query out / reply in | 1089 / 339 (~31% grezzo) |
-| pacchetti scartati dal rate limit | 485 |
+| known nodes | ~740 |
+| `subnet_share_max` (nodes in the same /24) | **14** |
+| `nodes_insecure_id` (non-BEP 42 IDs) | **312 / ~740 ≈ 42%** |
+| query out / reply in | 1089 / 339 (~31% raw) |
+| packets discarded by the rate limit | 485 |
 | `reflected_observations` | 0 |
 
-Lette per decidere: **BEP 42 non va applicato rigidamente** (il 42% dei nodi non lo
-rispetta: scartarli dimezzerebbe la tabella), quindi il cap per subnet è il lever
-giusto e **14** è il valore da cui scegliere la soglia; `obs=0` conferma l'assenza
-del campo `ip` in questa rete.
+Reading to decide: **BEP 42 must not be applied rigidly** (42% of nodes do not
+respect it: discarding them would halve the table), so the per-subnet cap is the right lever
+and **14** is the value from which to choose the threshold; `obs=0` confirms the absence
+of the `ip` field on this network.
 
-**Multi-path lookup — design.** Richiede la riscrittura del lookup iterativo
-(`get_peers` su più rami e incrocio dei risultati); ora c'è l'harness su cui
-misurare il prima/dopo. Nessun codice speculativo.
+**Multi-path lookup — design.** It requires rewriting the iterative lookup
+(`get_peers` on several branches and cross-checking the results); now there is the harness on which to
+measure the before/after. No speculative code.
 
-**Verifica del dedup — già presente (2026-10-12).** Provando a implementare il
-traversal bounded/deduplicato si è scoperto che **il routing table già deduplica**:
-`nTree.isOK` chiama `wasContactedRecently(ih)`, quindi un nodo già interrogato per
-quello stesso infohash **non compare** in `lookupFiltered(ih)` per
-`searchRetryPeriod` (15 s). Il re-queue iterativo non richiede quindi gli stessi
-nodi: un `lookups` map con finestra 45 s era **ridondante** e aggiungeva
-complessità. Scelta: **niente codice** per la parte di dedup (regola "nessun
-codice speculativo"). Il **multi-path completo** — rami paralleli con peer
-confermati da ≥2 percorsi — resta un'idea non provata: la misura su sciame reale
-è troppo rumorosa per attribuirne un guadagno (in run da 45 s `nodes` oscilla
-587→3774 e `q_out` 946→4069 senza correlazione col codice).
+**Dedup verification — already present (2026-10-12).** While trying to implement the
+bounded/deduplicated traversal it was discovered that **the routing table already deduplicates**:
+`nTree.isOK` calls `wasContactedRecently(ih)`, so a node already queried for
+that same infohash **does not appear** in `lookupFiltered(ih)` for
+`searchRetryPeriod` (15 s). The iterative re-queue therefore does not require the same
+nodes: a `lookups` map with a 45 s window was **redundant** and added
+complexity. Choice: **no code** for the dedup part (the "no
+speculative code" rule). The **full multi-path** — parallel branches with peers
+confirmed by ≥2 paths — remains an unproven idea: the measurement on a real swarm
+is too noisy to attribute a gain to it (in 45 s runs `nodes` oscillates
+587→3774 and `q_out` 946→4069 without correlation with the code).
 
-**Bug di shutdown — trovato e corretto (2026-10-12).** L'harness di misura si
-bloccava nel `Stop()`: `pingSlowly` faceva `pingRequest <- r` **senza** `select`
-sullo stop, quindi con nodi da pingare la goroutine restava appesa e `wg.Wait()`
-non ritornava mai. Nel demone lo stesso percorso poteva bloccare
-`Session.dht.Stop()` a ogni riconfigurazione. Ora la send onora `stop`
+**Shutdown bug — found and fixed (2026-10-12).** The measurement harness got
+stuck in `Stop()`: `pingSlowly` did `pingRequest <- r` **without** a `select`
+on the stop, so with nodes to ping the goroutine stayed hung and `wg.Wait()`
+never returned. In the daemon the same path could block
+`Session.dht.Stop()` on every reconfiguration. Now the send honours `stop`
 (`TestPingSlowlyStopsWithoutReader`).
 
-**Harness — migliorato (2026-10-12).** `GX_MEASURE_DHT_INFOHASH=<40 hex>` sonda un
-infohash specifico (es. un torrent pubblico popolato) e la misura stampa anche
-`peers_found`, così si può verificare la scoperta di peer veri e non solo il
-riempimento della tabella (un infohash casuale non ha peer, quindi `peers_found`
-resta 0). Con l'harness riparato le run terminano e si possono confrontare.
+**Harness — improved (2026-10-12).** `GX_MEASURE_DHT_INFOHASH=<40 hex>` probes a
+specific infohash (e.g. a populated public torrent) and the measurement also prints
+`peers_found`, so real peer discovery can be verified and not just the filling
+of the table (a random infohash has no peers, so `peers_found`
+stays 0). With the harness fixed the runs terminate and can be compared.
 
-**La scoperta funziona: misura su torrent pubblico libero (2026-10-12).** Con
-l'infohash del torrent **Ubuntu 24.04.3 desktop amd64**
-(`d160b8d8ea35a5b4e52837468fc8f03d55cef1f7`, scaricato da `releases.ubuntu.com`)
-l'harness trova **108 peer in ~30 s** con `q_out=395` e 79 risposte: la ricerca
-DHT porta a termine la scoperta su uno sciame reale e ben seedato. È il numero di
-riferimento per un eventuale A/B futuro del multi-path. (Il `dht_peers_found` del
-demone in esecuzione resta basso — ~6 — perché i suoi torrent sono in gran parte
-privati, quindi con DHT disattivato, o poco popolati: non è un difetto del
-lookup.)
+**Discovery works: measurement on a free public torrent (2026-10-12).** With
+the infohash of the **Ubuntu 24.04.3 desktop amd64** torrent
+(`d160b8d8ea35a5b4e52837468fc8f03d55cef1f7`, downloaded from `releases.ubuntu.com`)
+the harness finds **108 peers in ~30 s** with `q_out=395` and 79 replies: the DHT
+search completes discovery on a real, well-seeded swarm. It is the reference
+number for any future A/B of multi-path. (The `dht_peers_found` of the running
+daemon stays low — ~6 — because its torrents are mostly private, therefore with DHT
+disabled, or poorly populated: it is not a defect of the lookup.)
 
-**Cap anti-Sybil per subnet — implementato e misurato (2026-10-11).**
-`Config.MaxNodesPerSubnet` (default 0 = disattivato) limita i nodi **nell'albero**
-di routing allo stesso /24 (IPv4) o /48 (IPv6); i nodi oltre soglia restano nel
-libretto degli indirizzi con `noTree` (così non vengono ri-scoperti in loop) e si
-contano in `nodes_capped`. Si misura con
+**Anti-Sybil cap per subnet — implemented and measured (2026-10-11).**
+`Config.MaxNodesPerSubnet` (default 0 = disabled) limits the nodes **in the routing
+tree** to the same /24 (IPv4) or /48 (IPv6); nodes beyond the threshold remain in
+the address book with `noTree` (so they are not re-discovered in a loop) and are
+counted in `nodes_capped`. It is measured with
 `GX_MEASURE_DHT_SUBNET_CAP=8 make measure-dht`.
 
-**La misura ha trovato e corretto un bug reale.** La prima versione scartava del
-tutto i nodi oltre soglia e il DHT li ri-scopriva e ri-processava a ogni giro:
-tempesta di query (`q_out` **14.352** contro ~1.089 senza cap, successo **10%**
-contro 31%, nodi **4.640** contro ~740). Tenendo il nodo in `noTree` la tempesta
-sparisce (nodi ~814, `q_out` ~1.975). Due avvertenze: il cap **non è attivo di
-default**, e la soglia va scelta con più run — in un campione con cap=8 non è mai
-scattato (`capped=0`, `subnet_max` 6, mentre un run senza cap aveva visto **14**),
-quindi la concentrazione varia molto tra run e il **successo delle query è
-rumoroso** (17% e 31% senza differenze di cap). Test:
+**The measurement found and fixed a real bug.** The first version discarded
+all nodes beyond the threshold and the DHT re-discovered and re-processed them at every round:
+a storm of queries (`q_out` **14,352** against ~1,089 without a cap, success **10%**
+against 31%, nodes **4,640** against ~740). Keeping the node in `noTree` the storm
+disappears (nodes ~814, `q_out` ~1,975). Two caveats: the cap **is not active by
+default**, and the threshold must be chosen with more runs — in a sample with cap=8 it never
+triggered (`capped=0`, `subnet_max` 6, while a run without a cap had seen **14**),
+so the concentration varies a lot between runs and the **query success is
+noisy** (17% and 31% with no cap differences). Test:
 `TestSubnetCapKeepsTreeBounded`.
 
-**Fuori scope:** DHT su I2P (nessun I2P nel progetto) e BEP 44/46 **client
-uscente** (nessun consumatore: regola "niente codice speculativo"; lato server e
-API locale restano pronti).
+**Out of scope:** DHT over I2P (no I2P in the project) and BEP 44/46 **outgoing
+client** (no consumer: the "no speculative code" rule; the server side and the local
+API remain ready).
 
-**Avvio a freddo — fatto (2026-10-12).** Un magnet senza tracker restava in
-`downloading_metadata` per ~75 s pur con il DHT funzionante: `DHTMinAnnounceInterval`
-(default 1 min) era l'intervallo di ritentativo mentre il torrent cerca peer,
-quindi la tabella DHT (~30 s a riempirsi) veniva interrogata di nuovo solo dopo
-un minuto. Portato a **15 s**; la stessa prova scende a **~49 s** (test
-`announcer/dht_test.go`). Misura in §6.8.
+**Cold start — done (2026-10-12).** A magnet without a tracker stayed in
+`downloading_metadata` for ~75 s even with the DHT working: `DHTMinAnnounceInterval`
+(default 1 min) was the retry interval while the torrent looks for peers,
+so the DHT table (~30 s to fill) was queried again only after
+a minute. Brought to **15 s**; the same test drops to **~49 s** (test
+`announcer/dht_test.go`). Measurement in §6.8.
 
-### 4.11 Port mapping (PCP), rilevamento NAT e priorità file (fattibilità)
+### 4.11 Port mapping (PCP), NAT detection and file priority (feasibility)
 
-Tre lacune rispetto a Tixati, con parere di fattibilità fondato sul codice
-attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
+Three gaps compared with Tixati, with a feasibility opinion founded on the current
+code (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
 
-| Voce | Stato oggi | Fattibilità | Sforzo | Valore |
+| Item | State today | Feasibility | Effort | Value |
 |---|---|---|---|---|
-| **PCP** (RFC 6887) per l'apertura porta | solo UPnP + NAT-PMP (`portMapper`) | **fatto (2026-10-11)** | M | medio |
-| **Rilevamento tipo di NAT / porta riflessa** | `reflected_port`/`nat_mapping` nel `portcheck`, dal campo `ip` BEP 42 | **fatto** | S/M | medio |
-| **Priorità file graduata** (+ allocate on demand) | solo incluso/escluso (`file_priorities: none`) | **fatto (2026-10-12)** | L | medio |
+| **PCP** (RFC 6887) for port opening | only UPnP + NAT-PMP (`portMapper`) | **done (2026-10-11)** | M | medium |
+| **NAT type / reflected port detection** | `reflected_port`/`nat_mapping` in the `portcheck`, from the BEP 42 `ip` field | **done** | S/M | medium |
+| **Graduated file priority** (+ allocate on demand) | only included/excluded (`file_priorities: none`) | **done (2026-10-12)** | L | medium |
 
-- **PCP — fatto (2026-10-11).** Client MAP minimale in `cmd/gx-torrent/pcp.go`
-  (RFC 6887: header, nonce, verifica del result code e del nonce, mappatura
-  lifetime 0 per rimuovere): ~120 righe proprie, nessuna dipendenza. Si aggancia
-  al `portMapper` come terzo metodo, provato **dopo UPnP e prima di NAT-PMP**
-  (abilitato quando NAT-PMP è attivo: stesso gateway e nessuna nuova
-  impostazione UI). Test con un finto server PCP su loopback
+- **PCP — done (2026-10-11).** Minimal MAP client in `cmd/gx-torrent/pcp.go`
+  (RFC 6887: header, nonce, verification of the result code and the nonce, mapping
+  with lifetime 0 to remove): ~120 lines of our own, no dependency. It hooks
+  into the `portMapper` as a third method, tried **after UPnP and before NAT-PMP**
+  (enabled when NAT-PMP is active: same gateway and no new
+  UI setting). Test with a fake PCP server on loopback
   (`TestPCPMapSuccess`, `TestPCPMapNonceMismatch`, `TestPCPMapErrorResult`,
   `TestPCPMapRequestShape`).
-- **Rilevamento NAT — fatto (2026-10-11).** Il DHT cattura la porta riflessa dal
-  campo `ip` di BEP 42 (`reflected_port`, la più frequente tra gli osservatori;
-  `reflected_observations` conta i campi ricevuti) e deduce il **tipo di mapping**
-  (`nat_mapping`) confrontando la porta vista da osservatori in /24 (o /48)
-  diversi: tutti d'accordo = endpoint-independent (*cone*), disaccordo =
-  address/port-dependent (*simmetrico*); con meno di 2 osservatori resta ignoto.
-  Set per-osservatore limitato; parsing in `parseReflected`/`recordReflected`
-  (`internal/dht/dht_sec.go`). Il `portcheck` del demone
-  (`GET /api/v1/portcheck`) riporta `reflected_port`/`nat_mapping` e `natHint`
-  dice se il NAT conserva o riscrive la porta.
+- **NAT detection — done (2026-10-11).** The DHT captures the reflected port from the
+  `ip` field of BEP 42 (`reflected_port`, the most frequent among the observers;
+  `reflected_observations` counts the fields received) and infers the **mapping type**
+  (`nat_mapping`) by comparing the port seen by observers in different
+  /24 (or /48) subnets: all in agreement = endpoint-independent (*cone*), disagreement =
+  address/port-dependent (*symmetric*); with fewer than 2 observers it stays unknown.
+  Per-observer set limited; parsing in `parseReflected`/`recordReflected`
+  (`internal/dht/dht_sec.go`). The daemon's `portcheck`
+  (`GET /api/v1/portcheck`) reports `reflected_port`/`nat_mapping` and `natHint`
+  says whether the NAT preserves or rewrites the port.
 
-  **Misura live (2026-10-11).** Sul DHT pubblico `reflected_observations` resta
-  **0** dopo 500+ query: il campo `ip` di BEP 42 — che la spec dice *SHOULD* in
-  ogni risposta — **non arriva** dal traffico reale (il codec è corretto,
-  `TestReadResponseDecodesIPField`). La funzione è quindi pronta ma **non
-  osservabile in questa rete**: si attiva dove i nodi lo includono (tipicamente
-  dietro NAT). È il motivo per cui esiste `reflected_observations`, che dice se
-  il dato c'è; la classificazione del consensus è stata sostituita con quella
-  per-osservatore proprio perché il consensus a ≥2 non si popolava mai. Test:
+  **Live measurement (2026-10-11).** On the public DHT `reflected_observations` stays
+  **0** after 500+ queries: the `ip` field of BEP 42 — which the spec says *SHOULD* be in
+  every response — **does not arrive** from real traffic (the codec is correct,
+  `TestReadResponseDecodesIPField`). The function is therefore ready but **not
+  observable on this network**: it activates where the nodes include it (typically
+  behind NAT). It is the reason `reflected_observations` exists, which says whether
+  the datum is there; the consensus classification has been replaced with the
+  per-observer one precisely because the consensus at ≥2 never populated. Tests:
   `TestParseReflected`, `TestRecordReflectedNATMapping`, `TestNATHint`,
   `TestReadResponseDecodesIPField`.
 
-  **Lato invio — fatto (2026-10-12).** Il codice **leggeva** il campo `ip` ma non
-  lo **inviava**: ogni risposta ora lo include (`addIPField`, applicato a ping,
-  find_node, get_peers, announce_peer e alle risposte `get`/`put` di BEP 44), così
-  un peer dietro NAT può imparare il proprio indirizzo riflesso da noi. Aggiunto
-  il contatore `reflected_sent` (in `Stats()`, quindi `dht_reflected_sent`) per
-  rendere osservabile anche il lato invio. Test: `TestRepliesIncludeIPField`.
+  **Sending side — done (2026-10-12).** The code **read** the `ip` field but did not
+  **send** it: every response now includes it (`addIPField`, applied to ping,
+  find_node, get_peers, announce_peer and the BEP 44 `get`/`put` responses), so
+  a peer behind NAT can learn its reflected address from us. Added
+  the `reflected_sent` counter (in `Stats()`, therefore `dht_reflected_sent`) to
+  make the sending side observable too. Test: `TestRepliesIncludeIPField`.
 
-  **`implied_port` di BEP 5 — fatto (2026-10-12).** `announce_peer` con
-  `implied_port: 1` ora usa la **porta sorgente** del pacchetto invece del campo
-  `port` (che un peer dietro NAT spesso non conosce). Prima il campo era
-  ignorato. Test: `TestAnnouncePeerImpliedPort`.
-- **Priorità file graduata — fatto (2026-10-12).** Modello a priorità nel motore
-  (0 = salta, 1..4 = normale, 5..7 = alta, scala libtorrent/qBittorrent), con
-  l'attuale bool mappato su 0/4; `Config.FilePriorities` (il vecchio
-  `Config.FileSelection` resta come fallback), `piece.Piece.Priority` per pezzo
-  (il massimo tra i file che tocca) e nuovo stadio **`pickHigh`** nel piece
-  picker **subito dopo readahead e prima di file-edge/allowed-fast/rarest**.
-  Cambiare i soli livelli si applica a caldo (`Torrent.RefreshSelection`), senza
-  fermare il torrent; cambiare quali file si scaricano resta stop/rilocazione/
-  avvio. Da lato app: `capabilityLevels` porta `file_priorities` da `none` a
-  `full`, la scheda File del demone e di Gextto offrono la scala, l'API qBittorrent
-  mappa 0/1/6/7, i18n in tutte le lingue. Il piano originale (storico):
+  **BEP 5 `implied_port` — done (2026-10-12).** `announce_peer` with
+  `implied_port: 1` now uses the **source port** of the packet instead of the `port`
+  field (which a peer behind NAT often does not know). Before, the field was
+  ignored. Test: `TestAnnouncePeerImpliedPort`.
+- **Graduated file priority — done (2026-10-12).** Priority model in the engine
+  (0 = skip, 1..4 = normal, 5..7 = high, libtorrent/qBittorrent scale), with
+  the current bool mapped to 0/4; `Config.FilePriorities` (the old
+  `Config.FileSelection` remains as fallback), `piece.Piece.Priority` per piece
+  (the maximum among the files it touches) and a new stage **`pickHigh`** in the piece
+  picker **right after readahead and before file-edge/allowed-fast/rarest**.
+  Changing only the levels applies hot (`Torrent.RefreshSelection`), without
+  stopping the torrent; changing which files are downloaded remains stop/relocation/
+  start. From the app side: `capabilityLevels` brings `file_priorities` from `none` to
+  `full`, the File tab of the daemon and of Gextto offer the scale, the qBittorrent API
+  maps 0/1/6/7, i18n in all languages. The original plan (historical):
 
-  Il modello era solo incluso/escluso. Punti di contatto reali (dal codice):
-  - **modello di selezione**: `Config.FileSelection func(torrentID) []bool`
-    (`torrent/config.go`) e `skippedInfoFiles`/`maskFromFlags`
-    (`torrent_selection.go`) sono un **bool skip** per file; serve un modello a
-    priorità;
-  - **pezzi**: `skippedPieces` → `t.pieces[i].Skip`; il picker
-    (`internal/piecepicker`) ha già stadi graduati (finestra di **stream**,
-    **readahead**, allowed-fast, rarest) e la priorità file sarebbe un nuovo
-    stadio tra readahead e allowed-fast;
-  - **demone**: `file-priorities` (`priorities=4,0,4`) e scheda File; la matrice
-    `capabilityLevels` porta `file_priorities` da `none` a `full`;
-  - **Gextto**: adapter e scheda File (oggi solo incluso/escluso).
+  The model was only included/excluded. Real contact points (from the code):
+  - **selection model**: `Config.FileSelection func(torrentID) []bool`
+    (`torrent/config.go`) and `skippedInfoFiles`/`maskFromFlags`
+    (`torrent_selection.go`) are a **bool skip** per file; a priority model is needed;
+  - **pieces**: `skippedPieces` → `t.pieces[i].Skip`; the picker
+    (`internal/piecepicker`) already has graduated stages (**stream** window,
+    **readahead**, allowed-fast, rarest) and the file priority would be a new
+    stage between readahead and allowed-fast;
+  - **daemon**: `file-priorities` (`priorities=4,0,4`) and the File tab; the matrix
+    `capabilityLevels` brings `file_priorities` from `none` to `full`;
+  - **Gextto**: adapter and File tab (today only included/excluded).
 
-  Slice consigliati (**uno per commit**, misura a ogni passo):
-  1. modello interno a priorità (0 = skip, 1 = bassa, 4 = normale, 7 = alta, come
-     libtorrent) con l'attuale bool mappato su 0/4; test del mapping e di
+  Recommended slices (**one per commit**, measurement at every step):
+  1. internal priority model (0 = skip, 1 = low, 4 = normal, 7 = high, like
+     libtorrent) with the current bool mapped to 0/4; test of the mapping and of
      `skippedPieces`;
-  2. nuovo stadio "alta priorità" nel `piecepicker` (sopra rarest, sotto
-     readahead) + test del picker;
-  3. API/UI demone **e** Gextto, `capabilityLevels`, traduzioni, manuali;
-  4. misura: throughput e seeding con file a priorità mista (harness locale +
-     sciame reale).
+  2. new "high priority" stage in the `piecepicker` (above rarest, below
+     readahead) + picker test;
+  3. daemon **and** Gextto API/UI, `capabilityLevels`, translations, manuals;
+  4. measurement: throughput and seeding with mixed-priority files (local harness +
+     real swarm).
 
-  **"Allocate on demand"** è invece già coperto di fatto: con `Preallocate`
-  disattivo (default) i file nascono **sparsi** e l'OS alloca alla scrittura;
-  serve al più un'opzione esplicita che lo dichiari.
+  **"Allocate on demand"** is instead already covered in practice: with `Preallocate`
+  off (default) the files are created **sparse** and the OS allocates on write;
+  at most an explicit option that declares it is needed.
 
-  **Stato:** modello, picker, demone e Gextto **fatti** (slice 1–3). La **misura**
-  (slice 4: throughput e seeding con priorità mista) è **da fare**: il nuovo
-  stadio `pickHigh` è un predicato sul percorso caldo (nessun cambio di ordine
-  senza priorità), quindi la misura serve a confermare il comportamento con file
-  misti, non a giustificare l'esistenza del codice.
+  **Status:** model, picker, daemon and Gextto **done** (slices 1–3). The **measurement**
+  (slice 4: throughput and seeding with mixed priority) is **to do**: the new
+  `pickHigh` stage is a predicate on the hot path (no order change
+  without priorities), so the measurement serves to confirm the behaviour with mixed
+  files, not to justify the existence of the code.
 
-**Raccomandazione d'ordine:** prima la diagnostica DHT (**fatta**), poi gli item
-a basso rischio (**token e passo 1 del NAT fatti**), poi l'hardening anti-Sybil e
-il multi-path (con misura su sciame reale), infine PCP (**fatto**) e la priorità
-file (**fatta**).
+**Recommended order:** first the DHT diagnostics (**done**), then the low-risk
+items (**token and step 1 of NAT done**), then the anti-Sybil hardening and
+multi-path (with measurement on a real swarm), finally PCP (**done**) and file
+priority (**done**).
 
-### 4.13 Revisione del lavoro BEP (2026-10-12)
+### 4.13 Review of the BEP work (2026-10-12)
 
-Revisione dei commit BEP dei giorni precedenti; dettaglio ed esito per voce in
-[`docs/bep.md`, *Revisione del 2026-10-12*](bep.md#revisione-del-2026-10-12).
-Corretti: campo `ip` di BEP 42 al primo livello (rilevamento di porta riflessa
-e NAT, prima mai attivo: da 0 a 89 osservazioni dopo il riavvio), porta non
-valida in `announce_peer`, `put` BEP 44 solo agli 8 nodi più vicini, aggiunta di
-magnet BEP 46/`xs=` senza lock globale, `so=` (ciclo infinito e espansione
-illimitata da un magnet ostile), blocchi `ut_metadata` duplicati, interesse dopo
-`lt_donthave` (con guardia sul bitfield nullo), candidati dello Swarm Merging
-senza bitfield. Aggiunta anche la protezione anti-SSRF: web seed e sorgenti
-`xs=`/`as=` non raggiungono indirizzi privati salvo `web-sources-allow-private`
-(controllo sull'IP risolto, nessun costo misurabile: una risoluzione DNS già
-necessaria per collegarsi).
+Review of the BEP commits of the previous days; detail and outcome per item in
+[`docs/bep.md`, *Review of 2026-10-12*](bep.md#revisione-del-2026-10-12).
+Fixed: BEP 42 `ip` field at the top level (detection of reflected port
+and NAT, never active before: from 0 to 89 observations after the restart), invalid
+port in `announce_peer`, BEP 44 `put` only to the 8 nearest nodes, addition of
+BEP 46 magnet/`xs=` without a global lock, `so=` (infinite loop and unlimited
+expansion from a hostile magnet), duplicate `ut_metadata` blocks, interest after
+`lt_donthave` (with a guard on the null bitfield), Swarm Merging candidates
+without a bitfield. The anti-SSRF protection was also added: web seed and `xs=`/`as=`
+sources do not reach private addresses except with `web-sources-allow-private`
+(check on the resolved IP, no measurable cost: a DNS resolution already
+needed to connect).
 
-### 4.12 Qualità fine: cosa manca al motore (analisi 2026-10-12)
+### 4.12 Fine quality: what the engine lacks (analysis 2026-10-12)
 
-Analisi del divario di **artigianato** (non di elenco di funzioni) tra gx-core e
-libtorrent. La copertura BEP di gx-core è ampia; il divario sta nello strato che
-non si vede nella matrice delle capacità: robustezza su sciami reali e ostili,
-throughput estremo, I/O disco, priorità fini e casi limite del protocollo.
-Fonti: [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md),
-[`bep.md`](bep.md), §5–§6 di questo documento.
+Analysis of the **craftsmanship** gap (not of the feature list) between gx-core and
+libtorrent. The BEP coverage of gx-core is broad; the gap is in the layer that
+is not seen in the capability matrix: robustness on real and hostile swarms,
+extreme throughput, disk I/O, fine priorities and protocol edge cases.
+Sources: [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md),
+[`bep.md`](bep.md), §5–§6 of this document.
 
-| Area | libtorrent | gx-core oggi | Divario |
+| Area | libtorrent | gx-core today | Gap |
 | --- | --- | --- | --- |
-| Choking / seeding | choking rate-based, anti-leech, peer classes | speed-based + optimistic, harness deterministico (`unchoker/sim_test.go`) | algoritmi di qualità assenti; misure **solo locali** (§6.6) |
-| Pipelining | multi-pezzo per peer, ring buffer | coda adattiva (50→250), un pezzo per peer | 10 Gbps dato per «da misurare» (`bep.md` §6); **nessun harness** |
-| I/O disco | mmap, storage pluggable, O_DIRECT/AIO, scritture contigue + hash su pool | **`O_SYNC` rimosso, `fdatasync`, mmap opt-in (2026-10-12)**; restano niente O_DIRECT/io_uring/contiguo esplicito (analisi: la page cache già coalesce e Go già sovrappone I/O) | ridotto (§5.4) |
-| Priorità file | 0–7 graduate | **fatte (0 = salta, 1..4 = normale, 5..7 = alta)**; `capabilityLevels.file_priorities = full`; misura con file misti da fare (§4.11) | chiuso (misura residua) |
-| DHT | multi-path, anti-Sybil attivo | BEP 5/32/33/42/43/44/46, dedup; cap e multi-path spenti | hardening **non attivo** (§4.10) |
-| v2 / merge | seed v2 completo, riuso per blocco | v2-only download; seed v2 solo file interi (`hash reject`); merge fase 1 | seed v2 incompleto, merge fase 2 (§15.2) |
-| Robustezza adversariale | anni di campo su sciami ostili | snub, ban di sessione con TTL, filtro IP | superficie meno collaudata |
+| Choking / seeding | rate-based choking, anti-leech, peer classes | speed-based + optimistic, deterministic harness (`unchoker/sim_test.go`) | quality algorithms absent; measurements **local only** (§6.6) |
+| Pipelining | multi-piece per peer, ring buffer | adaptive queue (50→250), one piece per peer | 10 Gbps given as "to be measured" (`bep.md` §6); **no harness** |
+| Disk I/O | mmap, pluggable storage, O_DIRECT/AIO, contiguous writes + hash on a pool | **`O_SYNC` removed, `fdatasync`, mmap opt-in (2026-10-12)**; O_DIRECT/io_uring/explicit contiguous remain absent (analysis: the page cache already coalesces and Go already overlaps I/O) | reduced (§5.4) |
+| File priority | graduated 0–7 | **done (0 = skip, 1..4 = normal, 5..7 = high)**; `capabilityLevels.file_priorities = full`; measurement with mixed files to do (§4.11) | closed (residual measurement) |
+| DHT | multi-path, active anti-Sybil | BEP 5/32/33/42/43/44/46, dedup; cap and multi-path off | hardening **not active** (§4.10) |
+| v2 / merge | full v2 seed, per-block reuse | v2-only download; v2 seed only whole files (`hash reject`); merge phase 1 | v2 seed incomplete, merge phase 2 (§15.2) |
+| Adversarial robustness | years of field experience on hostile swarms | snub, session ban with TTL, IP filter | less battle-tested surface |
 
-I **tre divari a più alto valore** in esercizio reale, in ordine di priorità:
+The **three highest-value gaps** in real operation, in order of priority:
 
-1. **Priorità file graduate** — **fatte (2026-10-12)**: modello a priorità nel
-   motore (`piece.Piece.Priority`), `Config.FilePriorities`, stadio `pickHigh` nel
-   picker, demone e Gextto a 0/1/4/6/7, `capabilityLevels` a `full` (§4.11). Resta
-   solo la **misura** con file a priorità mista.
-2. **I/O disco** — **fatto (2026-10-12)**: `O_SYNC` rimosso, `storage.File.Sync()`
-   (`fdatasync`), invariante snapshot→fsync→bitfield e `updateStats` in due fasi;
-   **mmap opt-in** per l'I/O asincrono (§5.4). Restano non fatti O_DIRECT/io_uring
-   e il coalescing esplicito delle scritture, senza misura che li giustifichi.
-3. **Dimostrazione su sciame reale e isolamento** — **fatta (2026-10-12)**: gx-core
-   alla pari o sopra libtorrent sullo stesso torrent pubblico ben seedato (§6.8);
-   il **pipelining** è isolato con un proxy di latenza in-process (§6.4: ~12× con
-   la coda adattiva a RTT 50 ms) e il **choking** dal banco deterministico
-   (`unchoker/sim_test.go`). Resta fuori solo `tc netem` reale (root), non
-   necessario per l'isolamento.
+1. **Graduated file priority** — **done (2026-10-12)**: priority model in the
+   engine (`piece.Piece.Priority`), `Config.FilePriorities`, `pickHigh` stage in the
+   picker, daemon and Gextto at 0/1/4/6/7, `capabilityLevels` at `full` (§4.11). Only
+   the **measurement** with mixed-priority files remains.
+2. **Disk I/O** — **done (2026-10-12)**: `O_SYNC` removed, `storage.File.Sync()`
+   (`fdatasync`), snapshot→fsync→bitfield invariant and `updateStats` in two phases;
+   **mmap opt-in** for asynchronous I/O (§5.4). O_DIRECT/io_uring
+   and explicit write coalescing remain undone, with no measurement to justify them.
+3. **Demonstration on a real swarm and isolation** — **done (2026-10-12)**: gx-core
+   on par with or above libtorrent on the same well-seeded public torrent (§6.8);
+   **pipelining** is isolated with an in-process latency proxy (§6.4: ~12× with
+   the adaptive queue at RTT 50 ms) and **choking** by the deterministic bench
+   (`unchoker/sim_test.go`). Only real `tc netem` remains out (root), not
+   needed for the isolation.
 
-Fuori scope per scelta (documentato in `bep.md`): BEP 8/17/18/22/26/28/30/34/35/
-45/50/51, WebTorrent, I2P nativo; restano raggiungibili via proxy SOCKS5/HTTP.
+Out of scope by choice (documented in `bep.md`): BEP 8/17/18/22/26/28/30/34/35/
+45/50/51, WebTorrent, native I2P; they remain reachable via a SOCKS5/HTTP proxy.
 
-**Criterio**: sono divari di **qualità**, non di conformità; si chiudono con
-**misura** (regola performance di `AGENTS.md`) e con la stessa disciplina delle
-altre voci: un item = un commit, `GEXTTO.md` aggiornato, entrambe le UI, i18n.
+**Criterion**: these are gaps of **quality**, not of compliance; they are closed with
+**measurement** (performance rule of `AGENTS.md`) and with the same discipline as the
+other items: one item = one commit, `GEXTTO.md` updated, both UIs, i18n.
 
 ---
 
-## 5. gx-torrent: ottimizzazioni prestazionali
+## 5. gx-torrent: performance optimisations
 
-Ex `docs/gx-torrent-ottimizzazioni-prestazionali-v2.md`. Sostituisce la v1
-(rimossa l'08-10-2026): diagnosi in gran parte corrette come lettura del codice
-ma con tre difetti — non distingueva il codice originale dalle modifiche, presentava
-benchmark non riproducibili (nessuna `Benchmark*` esisteva nel repo), ordinava
-per priorità interventi irrilevanti o rischiosi. Qui **solo ciò che vale la
-pena fare**, con come/rischi/verifica; una voce = un task/commit.
+Ex `docs/gx-torrent-ottimizzazioni-prestazionali-v2.md`. It replaces v1
+(removed on 08-10-2026): the diagnoses were largely correct as a reading of the code
+but with three faults — it did not distinguish the original code from the changes, it presented
+non-reproducible benchmarks (no `Benchmark*` existed in the repo), it ordered
+irrelevant or risky interventions by priority. Here **only what is worth
+doing**, with how/risks/verification; one item = one task/commit.
 
-### 5.1 Stato di avanzamento
+### 5.1 Progress state
 
-| # | Voce | Stato | Commit |
+| # | Item | Status | Commit |
 |---|---|---|---|
-| 1 | LSD senza `d.mu` e senza `t.Stats()` | **fatto** | `d2a4060` |
-| 2 | Streaming: `PiecesDone` mirato | **fatto** | `ff2d4bf` |
-| 4 | MSE `StreamWriter` in-place | **fatto** | `5af2ee0` |
-| 5 | `servedRequests` a finestra limitata | **fatto** | `a8b3e77` |
-| 6 | Piece cache: TTL lazy (sharding condizionale, non fatto) | **fatto** | `60b090e` |
-| 7 | `Bitfield.Count` con `math/bits` | **fatto** | `8caf6ad` |
-| 3 | Rimozione `O_SYNC` + invariante di durabilità | **fatto (2026-10-12)** | — |
-| 8 | Opzionali (`findLocked` O(1), ETag/304) | **non da fare** | — |
+| 1 | LSD without `d.mu` and without `t.Stats()` | **done** | `d2a4060` |
+| 2 | Streaming: targeted `PiecesDone` | **done** | `ff2d4bf` |
+| 4 | MSE `StreamWriter` in-place | **done** | `5af2ee0` |
+| 5 | `servedRequests` with a limited window | **done** | `a8b3e77` |
+| 6 | Piece cache: lazy TTL (conditional sharding, not done) | **done** | `60b090e` |
+| 7 | `Bitfield.Count` with `math/bits` | **done** | `8caf6ad` |
+| 3 | Removal of `O_SYNC` + durability invariant | **done (2026-10-12)** | — |
+| 8 | Optionals (`findLocked` O(1), ETag/304) | **not to do** | — |
 
-Ordine per **valore atteso = (impatto × certezza) / (sforzo × rischio)**.
-Regole per voce (da `AGENTS.md`): modifiche a `internal/gxcore` registrate in
-`GEXTTO.md`; un commit per voce; test mirati
-(`./cmd/gx-torrent/`, `GxEngine`, `make test-engine`, `make test`); invarianti
-degli script; mai `bin/`/`gx-torrent.build_number`/`data/`; con comportamento
-visibile aggiornare README/MANUAL/`gx-torrent.md`.
+Order by **expected value = (impact × certainty) / (effort × risk)**.
+Rules per item (from `AGENTS.md`): changes to `internal/gxcore` recorded in
+`GEXTTO.md`; one commit per item; targeted tests
+(`./cmd/gx-torrent/`, `GxEngine`, `make test-engine`, `make test`); script
+invariants; never `bin/`/`gx-torrent.build_number`/`data/`; with visible
+behaviour update README/MANUAL/`gx-torrent.md`.
 
-| # | Intervento | Impatto | Sforzo | Rischio | Codice |
+| # | Intervention | Impact | Effort | Risk | Code |
 |---|---|---|---|---|---|
-| 1 | LSD senza `d.mu` / `t.Stats()` | Alto (latenza demone) | S | S | cmd (demone) |
-| 2 | Streaming: check pezzi mirato | Medio (GC/coupling) | S | S | demone+motore |
-| 3 | Rimozione `O_SYNC` + durabilità | **Molto alto** (disco) | M/L | M | motore |
-| 4 | MSE in-place | Medio (upload) | S | S | motore |
-| 5 | `servedRequests` a finestra | Medio (memoria) | S/M | M | motore |
-| 6 | Piece cache TTL lazy (+ sharding) | Medio (seed) | M | M | motore |
-| 7 | `Bitfield.Count` con `math/bits` | Basso | S | S | motore |
-| 8 | Opzionali: mappa in `findLocked`, ETag/304 | Basso | S | S | cmd (demone) |
+| 1 | LSD without `d.mu` / `t.Stats()` | High (daemon latency) | S | S | cmd (daemon) |
+| 2 | Streaming: targeted piece check | Medium (GC/coupling) | S | S | daemon+engine |
+| 3 | Removal of `O_SYNC` + durability | **Very high** (disk) | M/L | M | engine |
+| 4 | In-place MSE | Medium (upload) | S | S | engine |
+| 5 | `servedRequests` with a window | Medium (memory) | S/M | M | engine |
+| 6 | Lazy-TTL piece cache (+ sharding) | Medium (seed) | M | M | engine |
+| 7 | `Bitfield.Count` with `math/bits` | Low | S | S | engine |
+| 8 | Optionals: map in `findLocked`, ETag/304 | Low | S | S | cmd (daemon) |
 
-`S` ≈ mezza giornata, `M` ≈ 1–2 giorni, `L` ≈ oltre.
+`S` ≈ half a day, `M` ≈ 1–2 days, `L` ≈ more.
 
-### 5.2 Voce 1 — LSD senza `d.mu`, senza interrogare i run loop (fatta)
+### 5.2 Item 1 — LSD without `d.mu`, without querying the run loops (done)
 
-`dueHashes` (`cmd/gx-torrent/lsd.go`) prendeva `d.mu` e, tenendolo, chiamava
-`t.Stats()` su **ogni** torrent — query bloccante senza timeout al run loop. Con
-storage lento (mount di rete) il mutex globale congelava tutte le REST.
-Riscritta leggendo dallo snapshot lock-free (`snapshotViews`); stati
-annunciabili: `downloading`, `downloading_metadata`, `seeding`,
-`checking_files`, `moving`. Differenza: un torrent in `error` non viene più
-annunciato (corretto). Verifica: test che `paused`/`stalled`/privati non
-compaiono, `downloading` pubblico sì, e che `dueHashes` non prende `d.mu`.
+`dueHashes` (`cmd/gx-torrent/lsd.go`) took `d.mu` and, holding it, called
+`t.Stats()` on **every** torrent — a blocking query without a timeout to the run loop. With
+slow storage (network mount) the global mutex froze all the REST calls.
+Rewritten by reading from the lock-free snapshot (`snapshotViews`); announceable
+states: `downloading`, `downloading_metadata`, `seeding`,
+`checking_files`, `moving`. Difference: a torrent in `error` is no longer
+announced (correct). Verification: a test that `paused`/`stalled`/private ones do not
+appear, public `downloading` does, and that `dueHashes` does not take `d.mu`.
 
-### 5.3 Voce 2 — Streaming: check pezzi mirato (fatta)
+### 5.3 Item 2 — Streaming: targeted piece check (done)
 
-`piecesPresent` (`stream.go`) chiamava `t.PieceStates()`: allocava un vettore
-lungo quanto il torrent e scansionava tutti i pezzi sul run loop ogni 200 ms per
-controllarne 1–2. Aggiunto `Torrent.PiecesDone(begin, end)` mirato
-(`session_torrent.go`), che scansiona solo l'intervallo (con `len==0 → false`,
-come prima). `PieceStates` resta per la mappa pezzi di API/UI. Follow-up non
-fatto: notifica a evento invece del polling (non necessaria finché non alloca).
+`piecesPresent` (`stream.go`) called `t.PieceStates()`: it allocated a vector as
+long as the torrent and scanned all the pieces on the run loop every 200 ms to
+check 1–2 of them. Added the targeted `Torrent.PiecesDone(begin, end)`
+(`session_torrent.go`), which scans only the interval (with `len==0 → false`,
+as before). `PieceStates` remains for the piece map of the API/UI. Follow-up not
+done: event notification instead of polling (not necessary as long as it does not allocate).
 
-### 5.4 Voce 3 — Rimozione `O_SYNC` + invariante di durabilità (fatta 2026-10-12)
+### 5.4 Item 3 — Removal of `O_SYNC` + durability invariant (done 2026-10-12)
 
-`filestorage.go` apriva ogni file con `O_RDWR|O_SYNC`: ogni `write(2)` andava su
-storage stabile — su HDD/rete il throughput è limitato dalle IOPS.
+`filestorage.go` opened every file with `O_RDWR|O_SYNC`: every `write(2)` went to
+stable storage — on HDD/network the throughput is limited by the IOPS.
 
-**Fatto.** `O_SYNC` è rimosso (`filestorage.go`); `storage.File` ha ora `Sync()`
-(no-op per `PaddingFile`, il `*os.File` di filestorage lo implementa già). La
-durabilità è **a batch**, con l'invariante *un bit persistito si riferisce a dati
-già fsyncati*:
+**Done.** `O_SYNC` is removed (`filestorage.go`); `storage.File` now has `Sync()`
+(no-op for `PaddingFile`, the `*os.File` of filestorage already implements it). The
+durability is **batched**, with the invariant *a persisted bit refers to data
+already fsynced*:
 
-- `torrent.syncPieces()` fa il flush di ogni file aperto, sul **run loop** del
-  torrent (`t.files` è di sua proprietà);
-- `writeBitfield()` ordina **snapshot del bitfield → `syncPieces` → scrittura**,
-  quindi un bit non anticipa mai dati non ancora su disco (su crash si
-  riscaricano ≤ `ResumeWriteInterval`, mai corruzione);
-- `session_stats.updateStats` è in **due fasi**: campiona bitfield e fsync su ogni
-  run loop (nessuna transazione Bolt aperta durante i fsync), poi scrive tutto in
-  una sola transazione durevole. Il bucket di un torrent rimosso nel frattempo
-  viene saltato.
+- `torrent.syncPieces()` flushes every open file, on the torrent's **run loop**
+  (`t.files` is owned by it);
+- `writeBitfield()` orders **bitfield snapshot → `syncPieces` → write**,
+  so a bit never precedes data not yet on disk (on a crash at most
+  `ResumeWriteInterval` are re-downloaded, never corruption);
+- `session_stats.updateStats` is in **two phases**: it samples the bitfield and fsyncs on every
+  run loop (no Bolt transaction open during the fsyncs), then writes everything in
+  a single durable transaction. The bucket of a torrent removed in the meantime
+  is skipped.
 
-Test: `filestorage/sync_test.go` (write + `Sync` + riapertura),
-`storage/padding_test.go`, `torrent/torrent_sync_test.go` (`syncPieces` su ogni
-file). Il percorso end-to-end (completamento, stop, resume dopo riavvio) è
-coperto dai test del demone. Progetto storico: estendere l'interfaccia con
-`Sync()`, togliere `O_SYNC`, helper `syncPieces` testabile, ordine critico in
-`writeBitfield` e ristrutturazione in due fasi di `session_stats.updateStats`
-(niente transazione Bolt aperta durante gli fsync) — tutto applicato. Misura
-vedi §5.10: su questo host il guadagno stimato era ~1,2x–1,8x su NFS (non il
-"+300–800%" della v1).
+Tests: `filestorage/sync_test.go` (write + `Sync` + reopen),
+`storage/padding_test.go`, `torrent/torrent_sync_test.go` (`syncPieces` on every
+file). The end-to-end path (completion, stop, resume after restart) is
+covered by the daemon tests. Historical design: extend the interface with
+`Sync()`, remove `O_SYNC`, a testable `syncPieces` helper, the critical order in
+`writeBitfield` and the two-phase restructuring of `session_stats.updateStats`
+(no Bolt transaction open during the fsyncs) — all applied. Measurement
+see §5.10: on this host the estimated gain was ~1.2x–1.8x on NFS (not the
+"+300–800%" of v1).
 
-**Seguito — mmap, `fdatasync`, AIO (2026-10-12).**
-- **`fdatasync`** invece di `fsync` per i dati dei pezzi (`osFile.Sync` su
-  Linux): non serve flushare i metadati, il file è già dimensionato.
-- **mmap opt-in** (`-mmap`, `Config.Mmap`): `filestorage` serve i file da una
-  mappatura condivisa; `WriteAt` è una copia in page cache (writeback asincrono,
-  nessun `pwrite`), `ReadAt` una copia dalla page cache, `Sync` un `msync`.
-  Benchmark su tmpfs: **~7,0 GB/s** contro **~5,9 GB/s** di `pwrite`
-  (`BenchmarkStorageWrite{,Mmap}`). Caveat: mappa ogni file aperto, quindi
-  sconsigliato con torrent da migliaia di file (`vm.max_map_count`); fuori da
-  Linux è ignorato.
-- **AIO (io_uring): non aggiunto di proposito.** Il motore scrive i pezzi da
-  goroutine (pipeline `piecewriter` + `fadvise`/`fallocate`) e con mmap la
-  scrittura è già asincrona via writeback del kernel; Go non espone io_uring
-  senza dipendenza o cgo. Senza una misura che mostri un guadagno reale,
-  introdurre io_uring violerebbe la regola "niente codice speculativo" e
-  rischierebbe regressioni. La voce "AIO" della §4.12 è quindi coperta dal
-  percorso asincrono esistente + mmap, non da io_uring.
-- **Scritture contigue:** ogni pezzo è già scritto con una singola `WriteAt`
-  (fino a 2 MiB contigui) e la page cache unisce i writeback adiacenti; un
-  buffer di coalescing esplicito non ha mostrato necessità, quindi non è stato
-  aggiunto (misura prima/dopo non disponibile a favore).
+**Follow-up — mmap, `fdatasync`, AIO (2026-10-12).**
+- **`fdatasync`** instead of `fsync` for the piece data (`osFile.Sync` on
+  Linux): there is no need to flush the metadata, the file is already sized.
+- **mmap opt-in** (`-mmap`, `Config.Mmap`): `filestorage` serves the files from a
+  shared mapping; `WriteAt` is a copy into the page cache (asynchronous writeback,
+  no `pwrite`), `ReadAt` a copy from the page cache, `Sync` an `msync`.
+  Benchmark on tmpfs: **~7.0 GB/s** against **~5.9 GB/s** for `pwrite`
+  (`BenchmarkStorageWrite{,Mmap}`). Caveat: it maps every open file, so it is
+  not advised with torrents of thousands of files (`vm.max_map_count`); outside
+  Linux it is ignored.
+- **AIO (io_uring): deliberately not added.** The engine writes the pieces from
+  goroutines (`piecewriter` pipeline + `fadvise`/`fallocate`) and with mmap the
+  write is already asynchronous via the kernel writeback; Go does not expose io_uring
+  without a dependency or cgo. Without a measurement showing a real gain,
+  introducing io_uring would violate the "no speculative code" rule and
+  risk regressions. The "AIO" item of §4.12 is therefore covered by the
+  existing asynchronous path + mmap, not by io_uring.
+- **Contiguous writes:** every piece is already written with a single `WriteAt`
+  (up to 2 MiB contiguous) and the page cache merges adjacent writebacks; an
+  explicit coalescing buffer showed no need, so it was not
+  added (no before/after measurement in favour).
 
-### 5.5 Voce 4 — MSE `StreamWriter` in-place (fatta)
+### 5.5 Item 4 — MSE `StreamWriter` in-place (done)
 
-`cipher.StreamWriter` faceva `make` per ogni blocco cifrato (decine di MiB/s di
-spazzatura in upload). Sostituito con writer in-place (`XORKeyStream(p, p)`) in
-`internal/mse/mse.go`: i chiamanti non riusano il buffer dopo la scrittura.
-Verifica: `mse_test.go` con `AllocsPerRun == 0` + round-trip; pacchetto aggiunto
-a `make test-engine`.
+`cipher.StreamWriter` did a `make` for every encrypted block (tens of MiB/s of
+garbage in upload). Replaced with an in-place writer (`XORKeyStream(p, p)`) in
+`internal/mse/mse.go`: the callers do not reuse the buffer after the write.
+Verification: `mse_test.go` with `AllocsPerRun == 0` + round-trip; package added
+to `make test-engine`.
 
-### 5.6 Voce 5 — `servedRequests` a finestra limitata (fatta)
+### 5.6 Item 5 — `servedRequests` with a limited window (done)
 
-Mappa che cresceva indefinitamente coi blocchi serviti (memoria ∝ GB caricati su
-seed longevi) e rifiutava per sempre anche re-request legittimi. Sostituita con
-finestra mappa+FIFO da N≈1024 (`peerwriter.go`): dedup anti-abuso immediata,
-memoria limitata. Test: dedup entro finestra, eviction oltre, nessuna crescita.
+A map that grew indefinitely with the served blocks (memory ∝ GB uploaded on
+long-lived seeds) and refused forever even legitimate re-requests. Replaced with a
+map+FIFO window of N≈1024 (`peerwriter.go`): immediate anti-abuse dedup,
+limited memory. Tests: dedup within the window, eviction beyond, no growth.
 
-### 5.7 Voce 6 — Piece cache: TTL lazy (fatta; sharding solo se serve)
+### 5.7 Item 6 — Piece cache: lazy TTL (done; sharding only if needed)
 
-La cache serve **solo** l'upload (`cachedpiece` ← `RequestMessage`), non
-download né streaming locale (`stream.go` usa `os.Open`/`ReadAt`). Costi reali:
-un `time.Timer` per pezzo con `Reset` a ogni accesso + lock esclusivo anche su
-hit. Fatto: TTL lazy (`expireAt` + ticker di sweep ~30 s, `Close()` lo ferma).
-Non fatto: sharding in 16 partizioni — solo se il profiling mostra contesa sotto
-forte seeding (refactor ampio di file del motore, non "a naso"). Verifica: sweep,
-rinnovo su hit, eviction invariata; `internal/piececache` in `make test-engine`.
+The cache serves **only** the upload (`cachedpiece` ← `RequestMessage`), not
+download or local streaming (`stream.go` uses `os.Open`/`ReadAt`). Real costs:
+a `time.Timer` per piece with `Reset` on every access + an exclusive lock even on
+hit. Done: lazy TTL (`expireAt` + sweep ticker ~30 s, `Close()` stops it).
+Not done: sharding into 16 partitions — only if profiling shows contention under
+heavy seeding (a broad refactor of engine files, not "by guesswork"). Verification: sweep,
+renewal on hit, eviction unchanged; `internal/piececache` in `make test-engine`.
 
-### 5.8 Voce 7 — `Bitfield.Count` con `math/bits` (fatta)
+### 5.8 Item 7 — `Bitfield.Count` with `math/bits` (done)
 
-Somma byte-a-byte su tabella 256 byte → `bits.OnesCount64/8` a blocchi di 8,
-tabella rimossa. Micro-ottimizzo non su percorso critico (`Count` usato in
-`torrent_stats.go` e `All()`), ma banale e sicuro. Property test vs tabella.
+Byte-by-byte sum over a 256-byte table → `bits.OnesCount64/8` in blocks of 8,
+table removed. A micro-optimisation not on a critical path (`Count` used in
+`torrent_stats.go` and `All()`), but trivial and safe. Property test vs table.
 
-### 5.9 Voce 8 — Opzionali (non da fare)
+### 5.9 Item 8 — Optionals (not to do)
 
-- **`findLocked` O(1)**: `ListTorrents()` + scan per ogni lookup per hash.
-  A 4 torrent la risposta `/api/v1/torrents` è 3.822 byte in 0,5–0,7 ms:
-  guadagno nullo (<0,05% CPU). Misurabile solo a centinaia/migliaia di torrent
-  (~1 MB di lista): rimandato a quel carico — **poi fatto** il 2026-10-11 con
-  indice hash→torrent e fallback auto-riparante (vedi §5.13).
-- **ETag/304 su `/api/v1/torrents`**: `handleList` serve già lo snapshot
-  precompilato, costo = solo `json.Marshal`; durante attività i tassi cambiano a
-  ogni tick e il 304 non scatterebbe. Solo con misura che lo giustifichi.
+- **`findLocked` O(1)**: `ListTorrents()` + scan for every lookup by hash.
+  With 4 torrents the `/api/v1/torrents` response is 3,822 bytes in 0.5–0.7 ms:
+  nil gain (<0.05% CPU). Measurable only at hundreds/thousands of torrents
+  (~1 MB of list): postponed to that load — **then done** on 2026-10-11 with a
+  hash→torrent index and self-repairing fallback (see §5.13).
+- **ETag/304 on `/api/v1/torrents`**: `handleList` already serves the precompiled
+  snapshot, cost = only `json.Marshal`; during activity the rates change at
+  every tick and the 304 would not trigger. Only with a measurement that justifies it.
 
-### 5.10 Esclusi, con motivazione (misurati)
+### 5.10 Excluded, with justification (measured)
 
-- **Rarity buckets / refactor picker**: costo reale a 27.250 pezzi ~0,11
-  ms/pick in regime normale (pdqsort adattivo), <1% di un core a decine di
-  pick/s. Risparmio ~0,1 ms/pick per refactor pesante (`HandleHave`/`Cancel`/
-  `removeHaving`, endgame): non conviene.
-- **Cursore watermark in `pickSequential`/`pickFileEdge`**: ~0,10 ms/pick e
-  ~0,04 ms per il full scan di `pickFileEdge`: non merita il rischio.
-- **Bitmask in `PieceDownloader`**: mappe solo per download concorrenti (≈ n.
-  peer); bitmask 64 bit non copre pezzi da 2–4 MiB: trascurabile.
-- **`clear(b.Data)` in `bufferpool`**: ~0,8 µs per 16 KiB → <0,1% di un core a
-  1000 blocchi/s; pool condiviso, non dimostrato che tutti i percorsi riempiano
-  il buffer: solo con audit completo.
-- **`FADV_RANDOM`**: la giustificazione v1 (penalizza lo streaming) non vale —
-  `stream.go` legge fuori dallo storage del motore. Al più `FADV_SEQUENTIAL` in
-  verifica.
-- **`saveLocked` fuori da `d.mu`**: non sul polling (solo mutazioni e
-  tick-quando-dirty ~1/min); `state.json` 2,5 KB, ~0,1–0,3 ms. E la proposta v1
-  azzerava `dirty` prima della scrittura perdendolo sull'errore.
-- **`/proc/meminfo` sotto `d.mu`**: decine di µs, irrilevante.
-- **`HandleDisconnect` O(N)**: poche disconnessioni/s, decine di µs: irrilevante.
+- **Rarity buckets / picker refactor**: real cost at 27,250 pieces ~0.11
+  ms/pick in normal regime (adaptive pdqsort), <1% of a core at tens of
+  picks/s. Saving ~0.1 ms/pick for a heavy refactor (`HandleHave`/`Cancel`/
+  `removeHaving`, endgame): not worth it.
+- **Watermark cursor in `pickSequential`/`pickFileEdge`**: ~0.10 ms/pick and
+  ~0.04 ms for the full scan of `pickFileEdge`: not worth the risk.
+- **Bitmask in `PieceDownloader`**: maps only for concurrent downloads (≈ no.
+  peers); a 64-bit bitmask does not cover 2–4 MiB pieces: negligible.
+- **`clear(b.Data)` in `bufferpool`**: ~0.8 µs per 16 KiB → <0.1% of a core at
+  1000 blocks/s; shared pool, it is not proven that all paths fill
+  the buffer: only with a full audit.
+- **`FADV_RANDOM`**: the v1 justification (it penalises streaming) does not hold —
+  `stream.go` reads outside the engine storage. At most `FADV_SEQUENTIAL` under
+  verification.
+- **`saveLocked` outside `d.mu`**: not on polling (only mutations and
+  tick-when-dirty ~1/min); `state.json` 2.5 KB, ~0.1–0.3 ms. And the v1 proposal
+  zeroed `dirty` before the write, losing it on error.
+- **`/proc/meminfo` under `d.mu`**: tens of µs, irrelevant.
+- **`HandleDisconnect` O(N)**: few disconnections/s, tens of µs: irrelevant.
 
-### 5.11 Correzioni sostanziali alla v1 (riferimento)
+### 5.11 Substantial corrections to v1 (reference)
 
-- 10 voci su ~16 erano **codice invariato**, non lavoro gextto.
-- `O_SYNC` non è un quick win; `storage.File` non ha `Sync()`.
-- "Bitfield salvato a ogni pezzo" è falso (solo completamento/stop/verifica/
+- 10 items out of ~16 were **unchanged code**, not gextto work.
+- `O_SYNC` is not a quick win; `storage.File` does not have `Sync()`.
+- "Bitfield saved on every piece" is false (only completion/stop/verification/
   `ResumeWriteInterval`).
-- I moltiplicatori "15.500x/65.000x/600.000x" venivano da microbenchmark
-  eterogenei, non end-to-end; nessun `Benchmark*` esisteva nel repo.
-- Piece cache sul percorso **upload**, non download/streaming.
-- `handleList` serve già uno snapshot: non "clona i torrent".
+- The multipliers "15,500x/65,000x/600,000x" came from heterogeneous microbenchmarks,
+  not end-to-end; no `Benchmark*` existed in the repo.
+- Piece cache on the **upload** path, not download/streaming.
+- `handleList` already serves a snapshot: it does not "clone the torrents".
 
-### 5.12 Misure prima dell'implementazione (Intel N97)
+### 5.12 Measurements before implementation (Intel N97)
 
-**Voce 3 — `O_SYNC`**: download dir su **NFS4** (1 GbE), alternativa ext4/NVMe.
-N MiB in blocchi di B, `O_SYNC` per write vs bufferizzate + fsync finale:
+**Item 3 — `O_SYNC`**: download dir on **NFS4** (1 GbE), alternative ext4/NVMe.
+N MiB in blocks of B, `O_SYNC` per write vs buffered + final fsync:
 
-NFS: 16 KiB 35,1 → 81,3 MiB/s (**2,3x**); 64 KiB 60,2 → 89,6 (1,5x);
-256 KiB 67,4 → 108,7 (1,6x); 1 MiB 86,8 → 102,4 (1,2x).
-NVMe: 16 KiB 7,3 → 862,7 (~118x); 256 KiB 150,5 → 975,5 (6,5x);
-1 MiB 371,8 → 962,5 (2,6x).
-**Previsione** (pezzi 32 KiB–2 MiB su NFS): **~1,2x–1,8x**, tetto link
-~100–110 MiB/s. Guadagno maggiore con pezzi piccoli e disco veloce. Seed in
-lettura non toccato.
+NFS: 16 KiB 35.1 → 81.3 MiB/s (**2.3x**); 64 KiB 60.2 → 89.6 (1.5x);
+256 KiB 67.4 → 108.7 (1.6x); 1 MiB 86.8 → 102.4 (1.2x).
+NVMe: 16 KiB 7.3 → 862.7 (~118x); 256 KiB 150.5 → 975.5 (6.5x);
+1 MiB 371.8 → 962.5 (2.6x).
+**Forecast** (pieces 32 KiB–2 MiB on NFS): **~1.2x–1.8x**, link ceiling
+~100–110 MiB/s. Greater gain with small pieces and fast disk. Seeding on
+read is not touched.
 
-**Picker** (`picker_bench_test.go`, 27.250 pezzi): `pickRarest` 110 µs steady /
-1,11 ms peggiore (rimescolato ogni pick, shuffle incluso); `pickSequential`
-~100 µs; `pickFileEdge` full scan 38 µs. La v1 misurava il caso rimescolato
-spacciandolo per tipico.
+**Picker** (`picker_bench_test.go`, 27,250 pieces): `pickRarest` 110 µs steady /
+1.11 ms worst (reshuffled at every pick, shuffle included); `pickSequential`
+~100 µs; `pickFileEdge` full scan 38 µs. v1 measured the reshuffled case
+and passed it off as typical.
 
-**`saveLocked`**: 2,5 KB, ~0,1–0,3 ms per operazione utente esplicita.
-Conclusione: fuori dalle voci fatte (1, 2, 4, 5, 6, 7) **nulla altro della v1
-merita** a questo carico.
+**`saveLocked`**: 2.5 KB, ~0.1–0.3 ms per explicit user operation.
+Conclusion: beyond the done items (1, 2, 4, 5, 6, 7) **nothing else of v1
+is worth it** at this load.
 
-### 5.13 Controllo 2026-10-11 (`controllo2`): voci applicate
+### 5.13 Check 2026-10-11 (`controllo2`): items applied
 
-Revisione esterna (`/home/andres/controllo2.md`) verificata sul codice e applicata.
-Nessuna modifica cambia la matrice capacità o l'indice delle impostazioni UI; per
-le voci motore la suite `internal/gxcore/...` resta verde e non si osserva
-regressione (le modifiche sono micro-ottimizzazioni o I/O aggregato, non algoritmi
-sul percorso caldo).
+External review (`/home/andres/controllo2.md`) verified against the code and applied.
+No change alters the capability matrix or the UI settings index; for
+the engine items the `internal/gxcore/...` suite remains green and no
+regression is observed (the changes are micro-optimisations or aggregate I/O, not algorithms
+on the hot path).
 
-Motore (`internal/gxcore`):
+Engine (`internal/gxcore`):
 
-- **O-04** `buildV2BlockTreeData`: la capacità di `leaves` era il numero di
-  *pezzi*, ma le foglie a `base=0` sono *blocchi* da 16 KiB: preallocato
-  `ceil(f.Length/BlockSize)` per evitare decine di riallocazioni su file grandi.
-- **M-14** stessa funzione: controllo di `t.closeC` nel ciclo di lettura, così un
-  torrent rimosso a metà costruzione dell'albero (lettura di GB) non continua a
-  leggere il disco.
-- **C-07** `handlePeerSnubbed`: aggiunto `resetRequestQueue`, coerente con il
-  commento della funzione ("after a choke (or a stall)"); prima la coda adattiva
-  restava profonda dopo uno stallo. Test `TestSnubResetsRequestQueue`.
+- **O-04** `buildV2BlockTreeData`: the capacity of `leaves` was the number of
+  *pieces*, but the leaves at `base=0` are *blocks* of 16 KiB: preallocated
+  `ceil(f.Length/BlockSize)` to avoid dozens of reallocations on large files.
+- **M-14** same function: check of `t.closeC` in the read loop, so a
+  torrent removed halfway through building the tree (reading GBs) does not continue
+  reading from disk.
+- **C-07** `handlePeerSnubbed`: added `resetRequestQueue`, consistent with the
+  comment of the function ("after a choke (or a stall)"); before, the adaptive queue
+  stayed deep after a stall. Test `TestSnubResetsRequestQueue`.
 
-Demone (`cmd/gx-torrent`) e DHT:
+Daemon (`cmd/gx-torrent`) and DHT:
 
-- **C-02** streaming: `waitForPieces`/`streamRange` accettano il `context` della
-  richiesta, così seek/chiusura del player non lasciano la goroutine a fare
-  polling per 2 minuti con il file aperto.
-- **O-01** `trusted-proxies`/`allowed-hosts`: cache del parsing (chiave = stringa
-  grezza), azzera le allocazioni per richiesta; il valore cambiato è visto subito.
-- **O-02** feed: `markFeedSeen`/`markSmartEpisode` non chiamano più `saveLocked`
-  per item; un'unica scrittura atomica a fine `pollFeeds` (prima fino a 2N
-  riscritture di `state.json` per ciclo).
-- **O-03** DHT BEP 42: tabella CRC32C Castagnoli come variabile di pacchetto.
-- **O-05** `findLocked`: indice hash/ID con fallback auto-riparante, ricostruito
-  quando la sessione viene riaperta (§5.9).
-- **C-01** rate limit login: `loginFails` limitata e prunata (cap 2000, evizione dei
-  più vecchi) contro crescita illimitata.
-- **C-05** BEP 44 `itemStore`: cap `bep44MaxItems` + prune degli scaduti e
-  evizione del più vecchio in `put`.
-- **C-06** BEP 33: filtro Bloom vuoto stima 0 (prima il clamp dava ~0,5 → 1).
-- **C-03** Windows: un percorso UNC è rete per costruzione, senza dipendere da
-  `GetDriveType` (share offline → `DRIVE_NO_ROOT_DIR` → junction su UNC).
-- **C-04** `qbitAuth` delega a `standaloneAPIAllowed`: bypass LAN e cookie
-  `gx_session` valgono anche per `/api/v2` come per UI e `/api/v1`.
-- **M-09/M-10/M-11/M-13** parità qBittorrent: `content_path` in `torrents/info`,
-  `rid` incrementale in `sync/maindata`, priorità `autoTMM` all'add, flag
-  booleani via `formBool`; ricerche Torznab concorrenti.
+- **C-02** streaming: `waitForPieces`/`streamRange` accept the `context` of the
+  request, so a seek/close of the player does not leave the goroutine polling
+  for 2 minutes with the file open.
+- **O-01** `trusted-proxies`/`allowed-hosts`: parsing cache (key = raw
+  string), zeroes the per-request allocations; a changed value is seen immediately.
+- **O-02** feed: `markFeedSeen`/`markSmartEpisode` no longer call `saveLocked`
+  per item; a single atomic write at the end of `pollFeeds` (before, up to 2N
+  rewrites of `state.json` per cycle).
+- **O-03** DHT BEP 42: CRC32C Castagnoli table as a package variable.
+- **O-05** `findLocked`: hash/ID index with a self-repairing fallback, rebuilt
+  when the session is reopened (§5.9).
+- **C-01** login rate limit: `loginFails` bounded and pruned (cap 2000, eviction of the
+  oldest) against unlimited growth.
+- **C-05** BEP 44 `itemStore`: cap `bep44MaxItems` + prune of the expired ones and
+  eviction of the oldest in `put`.
+- **C-06** BEP 33: empty Bloom filter estimates 0 (before, the clamp gave ~0.5 → 1).
+- **C-03** Windows: a UNC path is network by construction, without depending on
+  `GetDriveType` (offline share → `DRIVE_NO_ROOT_DIR` → junction on UNC).
+- **C-04** `qbitAuth` delegates to `standaloneAPIAllowed`: LAN bypass and the
+  `gx_session` cookie also apply to `/api/v2` as for the UI and `/api/v1`.
+- **M-09/M-10/M-11/M-13** qBittorrent parity: `content_path` in `torrents/info`,
+  incremental `rid` in `sync/maindata`, `autoTMM` priority on add, boolean
+  flags via `formBool`; concurrent Torznab searches.
 
-### 5.14 Rimandato a dopo (dal controllo `controllo2`)
+### 5.14 Postponed (from the `controllo2` check)
 
-- **`renameFile`/`renameFolder` qBittorrent**: richiede supporto di rinomina nel
-  motore (rinomina su disco + metadati), feature a sé, non in questa tornata.
+- **qBittorrent `renameFile`/`renameFolder`**: it requires rename support in the
+  engine (rename on disk + metadata), a feature of its own, not in this round.
 
-### 5.15 Revisione `analisi4.md` (2026-10-11): voci verificate e applicate
+### 5.15 Review `analisi4.md` (2026-10-11): items verified and applied
 
-Revisione esterna (`/home/andres/analisi4.md`) su installer standalone e gestore
-RSS, verificata sul codice prima di applicare. **Applicate** le tre voci RSS
-d'impatto reale, nella forma corretta (le proposte del documento erano in parte
-inefficaci):
+External review (`/home/andres/analisi4.md`) on the standalone installer and the RSS
+manager, verified against the code before applying. **Applied** the three RSS items
+of real impact, in the correct form (the document's proposals were partly
+ineffective):
 
-- **B.1 `ignore_days`**: era un filtro sulla *data di pubblicazione* rispetto
-  all'ultimo match, così un episodio uscito poco dopo il precedente non veniva
-  più preso. Ora è un **cooldown wall-clock** (`internal/rss/rules.go`,
-  `ruleWithinIgnoreWindow`), e `markRuleMatch` registra l'istante del match
-  (`cmd/gx-torrent/feed.go`), non la `pubDate`. Etichetta UI aggiornata
-  (*Attesa tra match*). Test `TestEvaluateIgnoreDaysWindow`,
+- **B.1 `ignore_days`**: it was a filter on the *publication date* relative to
+  the last match, so an episode released shortly after the previous one was no longer
+  picked up. Now it is a **wall-clock cooldown** (`internal/rss/rules.go`,
+  `ruleWithinIgnoreWindow`), and `markRuleMatch` records the instant of the match
+  (`cmd/gx-torrent/feed.go`), not the `pubDate`. UI label updated
+  (*Wait between matches*). Tests `TestEvaluateIgnoreDaysWindow`,
   `TestPollFeedsIgnoreDaysWindow`.
-- **B.2 film "download once"**: la funzione *Segui un titolo* di allora (oggi
-  sostituita dalla lista **Cercati**, §5.16) rendeva la regola `once`
-  (`rss.Action.Once`): prende una release e disattiva la regola, anche a
-  più risultati nello stesso ciclo (`disableRules`, `onceHit` in `pollFeeds`).
+- **B.2 "download once" movie**: the *Follow a title* function of the time (today
+  replaced by the **Wanted** list, §5.16) turned the rule into `once`
+  (`rss.Action.Once`): it takes one release and disables the rule, even with
+  multiple results in the same cycle (`disableRules`, `onceHit` in `pollFeeds`).
   Test `TestPollFeedsOnceDisablesRule`.
-- **B.3 titolo nei criteri**: la proposta del documento (aggiungere il titolo a
-  `Match.Include`) **non funziona**: `Include` è un OR, quindi allarga i match.
-  Applicata invece una **regex tollerante** che richiede le parole del titolo in
-  ordine (`titleMatchRegex` — allora `followTitleRegex` —, es.
+- **B.3 title in the criteria**: the document's proposal (adding the title to
+  `Match.Include`) **does not work**: `Include` is an OR, so it widens the matches.
+  Instead a **tolerant regex** requiring the words of the title in
+  order was applied (`titleMatchRegex` — then `followTitleRegex` —, e.g.
   `(?i)mamma[\s._\-]+mia`). Test `TestTitleMatchRegex`.
 
-- **B.4 feed scoped**: aggiunto `rss.FeedCoveredByRules`; il fallback ai filtri
-  locali del feed vale **solo se nessuna regola copre quel feed** (la proposta
-  del documento lo applicava anche quando una regola lo copriva, aggirandola).
+- **B.4 scoped feeds**: added `rss.FeedCoveredByRules`; the fallback to the local
+  filters of the feed applies **only if no rule covers that feed** (the document's
+  proposal applied it even when a rule covered it, bypassing it).
   Test `TestScopedRulesDoNotDisableOtherFeeds`.
-- **B.5 REPACK+PROPER al primo download**: `smartEpisodeVerdict` registra anche i
-  token inferiori. Test `TestSmartEpisodeFirstRepackAndProper`.
-- **B.6 filtro episodi**: `ParseEpisodeFilter` accetta `S01E01-E05` e la sola
-  stagione `S01`/`s1`.
-- **B.7 log `/ui/rss-suggest`**: `searchFeedSuggest` non logga gli errori per
-  indexer mentre si digita.
-- **A.1–A.4 installer**: `install-service.sh`/`uninstall-service.sh` nel
-  pacchetto Linux (`package-gx-torrent.sh`) con `StateDirectory=gx-torrent`
-  nell'unit, l'attesa dello stop in `uninstall-service.ps1` e i due script di
-  packaging nel `installer-selftest.sh`.
+- **B.5 REPACK+PROPER on the first download**: `smartEpisodeVerdict` also records the
+  lower tokens. Test `TestSmartEpisodeFirstRepackAndProper`.
+- **B.6 episode filter**: `ParseEpisodeFilter` accepts `S01E01-E05` and just the
+  season `S01`/`s1`.
+- **B.7 `/ui/rss-suggest` log**: `searchFeedSuggest` does not log the errors for
+  indexers while typing.
+- **A.1–A.4 installer**: `install-service.sh`/`uninstall-service.sh` in the
+  Linux package (`package-gx-torrent.sh`) with `StateDirectory=gx-torrent`
+  in the unit, the wait for the stop in `uninstall-service.ps1` and the two
+  packaging scripts in `installer-selftest.sh`.
 
-Con questo la revisione `analisi4.md` è **applicata per intero** (A.1–A.4,
+With this the `analisi4.md` review is **fully applied** (A.1–A.4,
 B.1–B.7).
 
-### 5.16 Cercati (`wanted`) nel demone standalone (2026-10-11)
+### 5.16 Wanted (`wanted`) in the standalone daemon (2026-10-11)
 
-Su richiesta del proprietario, la pagina `/ui/rss` del demone standalone cambia
-modello: da "feed + regole" a **Cercati** (titoli che si vogliono). Ogni titolo
-ha tipo (serie/film), stagioni, lingua, qualità, esclusi, filtro episodi,
-categoria e percorso; si aggiunge a mano o con **Cerca nei feed**, che interroga
-indexer e feed RSS configurati e propone i nomi trovati (filtrati per
-lingua/qualità). Il **titolo è richiesto** come regex tollerante ai separatori e
-lingua/qualità sono in **AND** (l'`Include` del motore delle regole è un OR, non
-andava bene).
+At the owner's request, the `/ui/rss` page of the standalone daemon changes
+model: from "feed + rules" to **Wanted** (titles that are wanted). Each title
+has type (series/movie), seasons, language, quality, exclusions, episode filter,
+category and path; it is added by hand or with **Search the feeds**, which queries
+the configured indexers and RSS feeds and proposes the names found (filtered by
+language/quality). The **title is required** as a regex tolerant to separators and
+language/quality are in **AND** (the `Include` of the rule engine is an OR, it was not
+suitable).
 
-Il motore (`cmd/gx-torrent/wanted.go`) a ogni ciclo cerca ogni titolo negli
-indexer e nei feed RSS (`applyWanted` sugli item dei feed, ricerca per titolo
-sugli indexer) e prende gli episodi che compaiono; un **registro** in
-`state.json` (`wanted_seen` / `wanted_taken`) dice cosa è apparso e cosa è stato
-scaricato, la tabella mostra i **mancanti** e una **gap search** (query
-`Titolo SxxEyy`, throttled a 30 min, max 3 a ciclo) li ricerca finché non li
-trova: è il "gx-core sa che manca e lo scarica" richiesto. Per un film prende una
-release e non ne cerca altre. La lista non genera feed/regole, così i feed
-restano liberi per le regole avanzate. UI in `ui_wanted.go` + sezione in
-`rss.html`; test in `wanted_test.go`.
+The engine (`cmd/gx-torrent/wanted.go`) at every cycle searches each title in the
+indexers and in the RSS feeds (`applyWanted` on the feed items, search by title
+on the indexers) and takes the episodes that appear; a **register** in
+`state.json` (`wanted_seen` / `wanted_taken`) says what has appeared and what has been
+downloaded, the table shows the **missing** ones and a **gap search** (query
+`Title SxxEyy`, throttled to 30 min, max 3 per cycle) searches for them until it
+finds them: it is the "gx-core knows what is missing and downloads it" requested. For a movie it takes one
+release and does not look for others. The list does not generate feeds/rules, so the feeds
+remain free for the advanced rules. UI in `ui_wanted.go` + section in
+`rss.html`; tests in `wanted_test.go`.
 
-**Correzioni successive (revisione 2026-10-11).** Il motore era invocato solo
-alla fine di `pollFeeds`, che usciva subito quando non c'erano feed: una
-configurazione con soli indexer e titoli cercati non veniva mai servita. Ora
-`pollFeeds` non esce più presto e `pollWanted` gira anche senza feed. Rimossi i
-residui della vecchia funzione *Segui un titolo* (endpoint `POST /ui/rss-follow`,
-chiavi i18n, test), il campo inerte `Folder` delle voci cercate e i commenti che
-descrivevano il vecchio modello «un titolo = feed + regola»; `followTitleRegex`
-è diventato `titleMatchRegex`.
+**Subsequent corrections (review 2026-10-11).** The engine was invoked only
+at the end of `pollFeeds`, which exited immediately when there were no feeds: a
+configuration with only indexers and wanted titles was never served. Now
+`pollFeeds` no longer exits early and `pollWanted` also runs without feeds. Removed the
+residues of the old *Follow a title* function (endpoint `POST /ui/rss-follow`,
+i18n keys, tests), the inert `Folder` field of the wanted entries and the comments that
+described the old model "one title = feed + rule"; `followTitleRegex`
+became `titleMatchRegex`.
 
-### 5.17 RSS standalone completo, archivio dei feed, IP filter e ottimizzazione (2026-10-12)
+### 5.17 Complete standalone RSS, feed archive, IP filter and optimisation (2026-10-12)
 
-Revisione del gx-core standalone su richiesta del proprietario, con l'obiettivo
-di un pannello RSS all'altezza di qBittorrent e Deluge/YaRSS2.
+Review of the standalone gx-core at the owner's request, with the goal
+of an RSS panel on a par with qBittorrent and Deluge/YaRSS2.
 
-- **Elenchi HTML come feed** (`internal/rss/listing.go`): le pagine di ext.to e
-  TorrentGalaxy davano `XML syntax error … <meta> closed by </head>`. Ora: magnet
-  diretti, pagine `/post-detail/` risolte (3 worker, cache), feed pubblicizzati
-  seguiti, errore chiaro altrimenti. Misurato sui due URL reali: 50 elementi in
-  0,3 s (ext.to) e 50 in 1,9 s (TorrentGalaxy, prima volta; poi dalla cache).
-- **Pannello RSS:** stato per feed (ultimo controllo, elementi, nuovi, aggiunti,
-  errore), ↻ ricarica sincrona, modifica, attiva/disattiva (`disabled`),
-  intervallo configurabile e prossimo controllo; regole modificabili, attiva/
-  disattiva, `once` nel form e **anteprima** sull'archivio; link alla pagina web
-  dell'indexer.
-- **Bug delle regole disattivate:** una regola disattivata non copriva più il
-  feed, che ricadeva sul proprio filtro (vuoto = prende tutto): una regola
-  *once* che si spegneva da sola faceva scaricare al giro dopo le altre release
-  dello stesso film. Il test `TestPollFeedsOnceDisablesRule` lo nascondeva
-  perché contava lo snapshot asincrono; ora conta lo stato e la copertura vale
-  anche per le regole disattivate.
-- **Archivio dei feed** (`feed_archive.go`, `ui_archive.go`, `archive.html`):
-  bbolt (già linkato), indice compatto separato dal JSON. Benchmark
-  `BenchmarkFeedArchiveSearch` (100.000 elementi, Intel N97):
+- **HTML listings as feeds** (`internal/rss/listing.go`): the pages of ext.to and
+  TorrentGalaxy gave `XML syntax error … <meta> closed by </head>`. Now: direct
+  magnets, `/post-detail/` pages resolved (3 workers, cache), advertised feeds
+  followed, a clear error otherwise. Measured on the two real URLs: 50 elements in
+  0.3 s (ext.to) and 50 in 1.9 s (TorrentGalaxy, first time; then from the cache).
+- **RSS panel:** per-feed state (last check, elements, new, added,
+  error), ↻ synchronous reload, edit, enable/disable (`disabled`),
+  configurable interval and next check; rules editable, enable/
+  disable, `once` in the form and **preview** on the archive; link to the web page
+  of the indexer.
+- **Bug of the disabled rules:** a disabled rule no longer covered the
+  feed, which fell back on its own filter (empty = takes everything): a *once* rule
+  that turned itself off made the next round download the other releases
+  of the same movie. The test `TestPollFeedsOnceDisablesRule` hid it
+  because it counted the asynchronous snapshot; now it counts the state and the coverage applies
+  also to disabled rules.
+- **Feed archive** (`feed_archive.go`, `ui_archive.go`, `archive.html`):
+  bbolt (already linked), a compact index separate from the JSON. Benchmark
+  `BenchmarkFeedArchiveSearch` (100,000 elements, Intel N97):
 
-  | Versione | ns/op | B/op | allocs/op |
+  | Version | ns/op | B/op | allocs/op |
   |---|---:|---:|---:|
-  | prima stesura (decodifica JSON di ogni elemento) | 362.613.936 | 126.176.356 | 1.300.727 |
-  | indice compatto, JSON solo per la pagina | 7.429.315 | 44.643 | 337 |
+  | first draft (JSON decoding of every element) | 362,613,936 | 126,176,356 | 1,300,727 |
+  | compact index, JSON only for the page | 7,429,315 | 44,643 | 337 |
 
-  49× più veloce, 2.800× meno memoria allocata.
-- **IP filter** (`ipfilter_refresh.go`): un URL in `settings.json` non veniva
-  caricato (la sessione faceva `os.Stat` sull'URL). Ora: copia locale subito,
-  download all'avvio e ogni `ipfilter-refresh-hours`, file locale ricaricato se
-  cambia; stato e *Carica ora* nelle impostazioni.
-- **Ottimizzazione** (`optimize.go`): coda (base di Gextto), cache (automatica),
-  banda (80% del picco di upload misurato nel `tick`, auto-speed attivo).
-- **UI Torrents:** tile cache/I/O nascoste in standalone, pallino della porta peer.
+  49× faster, 2,800× less memory allocated.
+- **IP filter** (`ipfilter_refresh.go`): a URL in `settings.json` was not
+  loaded (the session did `os.Stat` on the URL). Now: local copy immediately,
+  download at startup and every `ipfilter-refresh-hours`, local file reloaded if
+  it changes; state and *Load now* in the settings.
+- **Optimisation** (`optimize.go`): queue (Gextto base), cache (automatic),
+  bandwidth (80% of the peak upload measured in the `tick`, auto-speed active).
+- **Torrents UI:** cache/I/O tiles hidden in standalone, peer port dot.
 
-**Impronta del demone** (build `-s -w`, standalone, nessun torrent, DHT/UPnP/
-NAT-PMP/LSD spenti, misurato dopo il primo giro dei feed):
+**Daemon footprint** (build `-s -w`, standalone, no torrents, DHT/UPnP/
+NAT-PMP/LSD off, measured after the first feed round):
 
-| | prima (9ac13b4) | dopo |
+| | before (9ac13b4) | after |
 |---|---:|---:|
-| binario | 14.774.432 B | 15.093.920 B (+2,2%: pagine, traduzioni, handler) |
-| VmRSS a riposo | 19.048 kB | 19.324 kB (+1,4%) |
-| CPU a riposo | 0,0% | 0,0% |
+| binary | 14,774,432 B | 15,093,920 B (+2.2%: pages, translations, handlers) |
+| idle VmRSS | 19,048 kB | 19,324 kB (+1.4%) |
+| idle CPU | 0.0% | 0.0% |
 
 ---
 
-## 6. gx-torrent: misure di choking e seeding
+## 6. gx-torrent: choking and seeding measurements
 
-Ex `docs/gx-torrent-misure-seeding.md`. Supporto alla voce §4.3 #13. Regola di
-fondo: **misurare prima**, poi decidere se toccare il core del motore.
+Ex `docs/gx-torrent-misure-seeding.md`. Support for item §4.3 #13. Underlying
+rule: **measure first**, then decide whether to touch the engine core.
 
-### 6.1 Vincolo: non forzare l'automazione
+### 6.1 Constraint: do not force the automation
 
-Le misure riflettono il sistema **come gira davvero** (coda/slot, seed policy,
-scheduler accesi): harness deterministico sul puro algoritmo (nessuna sessione);
-sciame locale col demone e automanagement attivi; campagna reale con Gextto
-(`AdjustQueue`, seed policy, limiti). Mai "a code spente": sarebbe laboratorio,
-non produzione.
+The measurements reflect the system **as it really runs** (queue/slots, seed policy,
+scheduler on): a deterministic harness on the pure algorithm (no session);
+local swarm with the daemon and automanagement active; real campaign with Gextto
+(`AdjustQueue`, seed policy, limits). Never "with queues off": that would be a laboratory,
+not production.
 
-### 6.2 Metriche
+### 6.2 Metrics
 
-Choking (slot di upload): chi viene sbloccato e per quanto, fairness a pari
-velocità, rotazione optimistic unchoke, comportamento in download (premia i
-downloader veloci) e in seed (premia gli uploader veloci).
-Seeding (end-to-end): byte caricati dal seed vs corpus (`Nx corpus`),
-throughput up/down, tempo di completamento, ratio e tempo a 1:1 in campagna reale.
+Choking (upload slots): who is unchoked and for how long, fairness at equal
+speed, optimistic unchoke rotation, behaviour in download (rewards fast
+downloaders) and in seed (rewards fast uploaders).
+Seeding (end-to-end): bytes uploaded by the seed vs corpus (`Nx corpus`),
+up/down throughput, completion time, ratio and time to 1:1 in a real campaign.
 
-### 6.3 Banco 1 — harness deterministico dell'unchoker
+### 6.3 Bench 1 — deterministic harness of the unchoker
 
-`internal/gxcore/internal/unchoker/sim_test.go` (in `make test-engine`): pilota
-l'`Unchoker` reale con peer sintetici e fissa le proprietà (download veloci in
-download, upload veloci in seed, `FastUnchoke` immediato, optimistic che non
-ruba slot regolari e ruota, budget rispettato, fairness) + `BenchmarkTickUnchokeSeeding`.
-Uso: `go test …/internal/unchoker -v` e `-bench TickUnchoke`. Rete di sicurezza
-per varianti future dell'algoritmo.
+`internal/gxcore/internal/unchoker/sim_test.go` (in `make test-engine`): it drives
+the real `Unchoker` with synthetic peers and fixes the properties (fast downloads in
+download, fast uploads in seed, immediate `FastUnchoke`, optimistic that does not
+steal regular slots and rotates, budget respected, fairness) + `BenchmarkTickUnchokeSeeding`.
+Usage: `go test …/internal/unchoker -v` and `-bench TickUnchoke`. A safety
+net for future variants of the algorithm.
 
-### 6.4 Banco 2 — sciame locale (opt-in)
+### 6.4 Bench 2 — local swarm (opt-in)
 
-`cmd/gx-torrent/measure_test.go`, fuori da `make test`, con `GX_MEASURE=1`:
+`cmd/gx-torrent/measure_test.go`, outside `make test`, with `GX_MEASURE=1`:
 
 ```
-make measure-seeding                        # seeder + 3 leecher
-GX_MEASURE_SUPERSEED=1 make measure-seeding # confronto super-seeding
-GX_MEASURE_MESH=1 make measure-seeding      # leecher collegati tra loro
-GX_MEASURE_LEECHERS=2 make measure-seeding  # sciame di 2 peer
+make measure-seeding                        # seeder + 3 leechers
+GX_MEASURE_SUPERSEED=1 make measure-seeding # super-seeding comparison
+GX_MEASURE_MESH=1 make measure-seeding      # leechers connected to each other
+GX_MEASURE_LEECHERS=2 make measure-seeding  # swarm of 2 peers
 ```
 
-**Pipelining.** `cmd/gx-torrent/measure_pipeline_test.go` è l'harness dedicato
-alla **coda richieste adattiva** (opt-in, `make measure-pipeline`): avvia lo stesso
-sciame locale a profondità diversa (`shallow` def=4/max=4, `default` 50/250,
-`deep` 200/500) e riporta byte e tempo. I knob viaggiano in `NetworkOptions`
-(`MaxRequestsOut`/`DefaultRequestsOut`). **Limite dichiarato:** su loopback il RTT
-è ~0, quindi la profondità non è il collo di bottiglia e i profili danno numeri
-quasi identici (~200 ms, ~40 MB/s con 1 leecher).
+**Pipelining.** `cmd/gx-torrent/measure_pipeline_test.go` is the harness dedicated
+to the **adaptive request queue** (opt-in, `make measure-pipeline`): it starts the same
+local swarm at different depths (`shallow` def=4/max=4, `default` 50/250,
+`deep` 200/500) and reports bytes and time. The knobs travel in `NetworkOptions`
+(`MaxRequestsOut`/`DefaultRequestsOut`). **Declared limitation:** on loopback the RTT
+is ~0, so the depth is not the bottleneck and the profiles give almost identical
+numbers (~200 ms, ~40 MB/s with 1 leecher).
 
-**Isolamento con latenza (fatto, 2026-10-12).**
-`TestMeasurePipeliningLatency` mette un **proxy di latenza in-process** davanti al
-seed (nessun `tc`/`netem`, nessun root): ogni chunk è rilasciato ad
-arrivo+latenza, in ordine e **senza limitare la banda**, quindi si aggiunge RTT
-senza strozzare il link. Con RTT 50 ms, pezzi da 256 KiB (16 blocchi) e corpus
-4 MiB, un solo leecher:
+**Isolation with latency (done, 2026-10-12).**
+`TestMeasurePipeliningLatency` puts an **in-process latency proxy** in front of the
+seed (no `tc`/`netem`, no root): every chunk is released at
+arrival+latency, in order and **without limiting the bandwidth**, so RTT is added
+without throttling the link. With RTT 50 ms, 256 KiB pieces (16 blocks) and a corpus
+of 4 MiB, a single leecher:
 
-| Profilo | blocco in volo | tempo | media |
+| Profile | blocks in flight | time | average |
 | --- | --- | --- | --- |
-| `shallow` def=1/max=1 | 1 | 13,4 s | 305 KiB/s |
-| `default` def=50/max=250 | ≤50 | 1,1 s | **3,8 MiB/s** |
+| `shallow` def=1/max=1 | 1 | 13.4 s | 305 KiB/s |
+| `default` def=50/max=250 | ≤50 | 1.1 s | **3.8 MiB/s** |
 
-~12× con la coda adattiva: è l'isolamento che il loopback (RTT ~0) non può dare.
-Il **choking** è isolato dal banco deterministico (`internal/unchoker/sim_test.go`,
-in `make test-engine`), che pilota l'`Unchoker` reale con peer sintetici e fissa
-fairness, slot e rotazione optimistic; il seed end-to-end è in §6.4/§6.6.
+~12× with the adaptive queue: it is the isolation that loopback (RTT ~0) cannot give.
+**Choking** is isolated by the deterministic bench (`internal/unchoker/sim_test.go`,
+in `make test-engine`), which drives the real `Unchoker` with synthetic peers and fixes
+fairness, slots and optimistic rotation; the end-to-end seed is in §6.4/§6.6.
 
-Seeder + N leecher su loopback con IP `127.0.0.x` distinti (il motore rifiuta due
-connessioni dallo stesso IP). Default: ogni leecher solo verso il seeder — si
-misura l'**upload del seed** (ciò che il super-seeding cambia). Mesh
-sperimentale su un host (connessioni multiple su loopback instabili: peer che
-non si connettono/non completano): solo fotografia indicativa, pochi peer,
-ripetere. Output: `uploaded=Nx corpus`, medie, tempi. Limiti: numeri assoluti
-dipendenti dalla macchina (non confrontabili tra run diversi); un peer può
-impiegare due tick di retry (10 s) nel super-seeding: l'harness riporta invece
-di fallire su un peer lento.
+Seeder + N leechers on loopback with distinct `127.0.0.x` IPs (the engine refuses two
+connections from the same IP). Default: every leecher only towards the seeder — the
+**seed upload** is measured (what super-seeding changes). Experimental mesh
+on one host (multiple connections on loopback unstable: peers that
+do not connect/do not complete): only an indicative snapshot, few peers,
+repeat. Output: `uploaded=Nx corpus`, averages, times. Limits: absolute numbers
+dependent on the machine (not comparable between different runs); one peer may
+take two retry ticks (10 s) in super-seeding: the harness reports instead
+of failing on a slow peer.
 
-### 6.5 Banco 3 — campagna su sciame reale
+### 6.5 Bench 3 — campaign on a real swarm
 
-Per gx-torrent vs **libtorrent/qBittorrent**: stesso sciame e ruolo, stesse
-politiche (slot, banda, n. peer), stesse metriche (byte seed `Nx corpus`,
-throughput, tempo a 1:1, seed generati), mediana su più run, automazione attiva.
-Unico banco che mostra il beneficio del super-seeding (~1x invece di Nx) e la
-qualità del choking con scambio reale. Prima run (download reale, gx-core vs
+For gx-torrent vs **libtorrent/qBittorrent**: same swarm and role, same
+policies (slots, bandwidth, no. peers), same metrics (seed bytes `Nx corpus`,
+throughput, time to 1:1, seeds generated), median over several runs, automation active.
+The only bench that shows the benefit of super-seeding (~1x instead of Nx) and the
+quality of choking with real exchange. First run (real download, gx-core vs
 libtorrent) in **§6.8**.
 
-### 6.6 Risultati (prima tornata, locale; Intel N97, corpus 2 MiB)
+### 6.6 Results (first round, local; Intel N97, corpus 2 MiB)
 
-Choking deterministico: tutte le proprietà passano; tick con 50 peer ~1,1 µs,
-896 B/op, 1 alloc — trascurabile.
-Seeding senza mesh (seed → 3 leecher, 5 ripetizioni): normale ~41–42 ms, seed
-**3,00x**; super-seeding ~51–52 ms (**~24% più lento**), seed **3,00x**.
-Mesh a 2 peer (indicativo): entrambi **1,00x** (i leecher si scambiano i pezzi).
-Mesh a 3+ peer su un host non converge.
+Deterministic choking: all properties pass; tick with 50 peers ~1.1 µs,
+896 B/op, 1 alloc — negligible.
+Seeding without mesh (seed → 3 leechers, 5 repetitions): normal ~41–42 ms, seed
+**3.00x**; super-seeding ~51–52 ms (**~24% slower**), seed **3.00x**.
+Mesh with 2 peers (indicative): both **1.00x** (the leechers exchange the pieces).
+Mesh with 3+ peers on one host does not converge.
 
-Lettura onesta: il choking del motore è **corretto e trascurabile come costo**;
-su sciami piccoli/veloci il super-seeding **non riduce** l'upload (lo scambio
-basta già) e costa throughput/variabilità. Il vantaggio BEP 16 è per l'*initial
-seeding* di torrent grandi con molti peer lenti, non riproducibile su un host.
-Conseguenza: super-seeding **opt-in**, non default; scaling via campagna reale.
-Hardening applicato: un peer interessato ma in stallo (velocità zero) riceve il
-pezzo successivo al tick invece di attendere il solo `not-interested`.
+Honest reading: the engine's choking is **correct and negligible as a cost**;
+on small/fast swarms super-seeding **does not reduce** the upload (the exchange
+is already enough) and costs throughput/variability. The BEP 16 advantage is for the *initial
+seeding* of large torrents with many slow peers, not reproducible on one host.
+Consequence: super-seeding **opt-in**, not default; scaling via a real campaign.
+Hardening applied: an interested but stalled peer (zero speed) receives the
+next piece at the tick instead of waiting for `not-interested` alone.
 
-### 6.7 Cosa decidere in base ai risultati
+### 6.7 What to decide based on the results
 
-- Choking peggiore di libtorrent su sciame reale → si interviene su
-  `internal/unchoker` col banco deterministico come rete e lo sciame come verifica.
-- Super-seeding più lento in locale ma più leggero su sciame reale → resta
-  opzione di *initial seeding* (BEP 16), non default.
-- Nessuna differenza misurabile → non si tocca il core (costo rebase non
-  giustificato).
+- Choking worse than libtorrent on a real swarm → act on
+  `internal/unchoker` with the deterministic bench as a net and the swarm as verification.
+- Super-seeding slower locally but lighter on a real swarm → it remains
+  an *initial seeding* option (BEP 16), not default.
+- No measurable difference → the core is not touched (rebase cost not
+  justified).
 
-### 6.8 Campagna su sciame reale — prima run (2026-10-12)
+### 6.8 Campaign on a real swarm — first run (2026-10-12)
 
-Requisito §4.12 punto 3. Stesso torrent pubblico ben seedato (**Ubuntu 24.04.3
-desktop amd64**, ~6,0 GB), stessa macchina, stessa finestra di 40 s (dopo 5 s di
-rampa post-metadata), tre tracker UDP pubblici nel magnet, run **sequenziali**
-(mai in parallelo). Due sistemi diversi, 2 run ciascuno: **libtorrent 2.0.11**
-(`python3-libtorrent`) e **gx-core** (`gx-torrent -mode standalone`).
+Requirement §4.12 point 3. Same well-seeded public torrent (**Ubuntu 24.04.3
+desktop amd64**, ~6.0 GB), same machine, same 40 s window (after 5 s of
+ramp-up post-metadata), three public UDP trackers in the magnet, **sequential** runs
+(never in parallel). Two different systems, 2 runs each: **libtorrent 2.0.11**
+(`python3-libtorrent`) and **gx-core** (`gx-torrent -mode standalone`).
 
-| Client | run | metadata | peer (finestra) | finestra | scaricato | media |
+| Client | run | metadata | peers (window) | window | downloaded | average |
 | --- | --- | --- | --- | --- | --- | --- |
-| libtorrent 2.0.11 | 1 | 3 s | 83 (81 seed) | 40 s | 292,9 MB | **7.149 KiB/s** |
-| libtorrent 2.0.11 | 2 | 3 s | 66 (61 seed) | 40 s | 258,8 MB | **6.317 KiB/s** |
-| gx-core | 1 | 3 s | 80 (77 seed) | 40 s | 385,1 MB | **9.401 KiB/s** |
-| gx-core | 2 | 3 s | 81 (79 seed) | 40 s | 381,2 MB | **9.305 KiB/s** |
+| libtorrent 2.0.11 | 1 | 3 s | 83 (81 seed) | 40 s | 292.9 MB | **7,149 KiB/s** |
+| libtorrent 2.0.11 | 2 | 3 s | 66 (61 seed) | 40 s | 258.8 MB | **6,317 KiB/s** |
+| gx-core | 1 | 3 s | 80 (77 seed) | 40 s | 385.1 MB | **9,401 KiB/s** |
+| gx-core | 2 | 3 s | 81 (79 seed) | 40 s | 381.2 MB | **9,305 KiB/s** |
 
-Lettura onesta: su questo sciame gx-core è **alla pari o sopra** libtorrent
-(mediana ~9,3 contro ~6,7 MiB/s), con metadata immediati e un numero di peer
-comparabile. **Non** è una dimostrazione isolata di choking o pipelining (la
-scelta dei peer differisce, una sola macchina, due run): è la prova che gx-core
-scarica davvero da uno sciame reale e che choking e coda richieste non sono un
-collo di bottiglia rispetto a libtorrent su questo carico. L'isolamento dei due
-algoritmi è in §6.4 (proxy di latenza in-process per il pipelining, banco
-deterministico per il choking); `tc netem` reale non è necessario.
+Honest reading: on this swarm gx-core is **on par with or above** libtorrent
+(median ~9.3 against ~6.7 MiB/s), with immediate metadata and a comparable
+number of peers. It is **not** an isolated demonstration of choking or pipelining (the
+choice of peers differs, a single machine, two runs): it is the proof that gx-core
+really downloads from a real swarm and that choking and the request queue are not a
+bottleneck compared with libtorrent at this load. The isolation of the two
+algorithms is in §6.4 (in-process latency proxy for pipelining, deterministic
+bench for choking); real `tc netem` is not needed.
 
-**Avvio a freddo DHT — migliorato (2026-10-12).** Lo stesso torrent **senza
-tracker** (solo DHT dal magnet) veniva risolto dopo **~75 s**: la causa era
-`DHTMinAnnounceInterval` a **1 minuto**, usato come intervallo di ritentativo
-mentre il torrent cerca peer (l'annuncio parte subito, poi aspetta questo
-intervallo). Portato a **15 s**. La stessa prova ora ottiene i metadati in
-**~49 s** con 12 peer (prima ~75 s, 2 peer). Il tempo residuo è il riempimento
-della routing table DHT (~30 s a freddo), non il lookup: l'harness
-`internal/dht` trova ~108 peer per lo stesso infohash in ~30 s. Il DHT a freddo
-non è quindi rotto, era **lento a ritentare**.
+**DHT cold start — improved (2026-10-12).** The same torrent **without
+trackers** (DHT only from the magnet) was resolved after **~75 s**: the cause was
+`DHTMinAnnounceInterval` at **1 minute**, used as the retry interval
+while the torrent looks for peers (the announce starts immediately, then waits this
+interval). Brought to **15 s**. The same test now obtains the metadata in
+**~49 s** with 12 peers (before ~75 s, 2 peers). The remaining time is the filling
+of the DHT routing table (~30 s cold), not the lookup: the `internal/dht` harness
+finds ~108 peers for the same infohash in ~30 s. The cold DHT is
+therefore not broken, it was **slow to retry**.
 
 ---
 
-## 7. Holepunching: harness di test
+## 7. Holepunching: test harness
 
-Ex `docs/holepunch-test-harness.md`. Supporto a
-`scripts/holepunch-netns-test.sh` (comportamento motore in `docs/gx-torrent.md`).
+Ex `docs/holepunch-test-harness.md`. Support for
+`scripts/holepunch-netns-test.sh` (engine behaviour in `docs/gx-torrent.md`).
 
-**Scopo**: verificare end-to-end che gx-torrent apra un buco (BEP 55,
-`ut_holepunch`) tra due client dietro NAT/firewall usando un peer pubblico come
-**relay**. Root-only, tutto in network namespace dedicati: la rete host non
-viene toccata.
+**Purpose**: verify end-to-end that gx-torrent opens a hole (BEP 55,
+`ut_holepunch`) between two clients behind NAT/firewall using a public peer as a
+**relay**. Root-only, all inside dedicated network namespaces: the host network is
+not touched.
 
-**Topologia**: `gx-lab` (pubblico: tracker `10.0.0.1:13800`, seed, relay
-`10.1.0.1:51410`) + due firewall stateful `gx-r1`/`gx-r2` (lasciano uscire,
-DROPPano nuove connessioni in entrata, accettano `ESTABLISHED,RELATED`,
-rifiutano TCP verso le porte peer così il buco si apre su uTP) + client
-`gx-a 10.10.0.2` (leecher) e `gx-b 10.20.0.2` (seed).
+**Topology**: `gx-lab` (public: tracker `10.0.0.1:13800`, seed, relay
+`10.1.0.1:51410`) + two stateful firewalls `gx-r1`/`gx-r2` (they let outbound through,
+DROP new inbound connections, accept `ESTABLISHED,RELATED`,
+refuse TCP towards the peer ports so the hole opens over uTP) + clients
+`gx-a 10.10.0.2` (leecher) and `gx-b 10.20.0.2` (seed).
 
-**Sequenza**: tracker minimo Python (interval 30 s) → seed con dati → B entra
-leecher, scarica, completa restando connesso al relay (leecher interessato) →
-solo allora entra A: non raggiunge B, chiede introduzione al relay, `connect` a
-entrambi, dial incrociato su uTP. Successo: peer con origine **`holepunch`**
-(chi diala) o `incoming` (l'altro lato) in
+**Sequence**: minimal Python tracker (interval 30 s) → seed with data → B enters as
+leecher, downloads, completes while staying connected to the relay (interested leecher) →
+only then A enters: it does not reach B, asks the relay for an introduction, `connect` to
+both, cross dial over uTP. Success: a peer with origin **`holepunch`**
+(the one that dials) or `incoming` (the other side) in
 `/api/v1/torrents/<hash>/peers`.
 
-**Scelte**: firewall stateful invece di NAT (conntrack non emula un NAT
-cone port-translating: il dial diretto crea una entry locale che confligge col
-SNAT; lo stateful riproduce lo stesso osservabile e rende il test
-deterministico); seed e relay su IP diversi (il motore deduplica i peer per IP);
-`-outgoing-interface` = IP di ascolto (altrimenti announce con IP sbagliato);
-relay leecher interessato (un torrent completato non diala e scarta i non
-interessati); tracker con interval lungo (un re-annuncio attribuirebbe la
-connessione al dial tracker invece che all'holepunch); successo rilevato su
-entrambi i lati (corsa del dial).
+**Choices**: stateful firewall instead of NAT (conntrack does not emulate a cone
+port-translating NAT: the direct dial creates a local entry that conflicts with the
+SNAT; the stateful one reproduces the same observable and makes the test
+deterministic); seed and relay on different IPs (the engine deduplicates peers by IP);
+`-outgoing-interface` = listening IP (otherwise announce with the wrong IP);
+interested leecher relay (a completed torrent does not dial and discards the
+non-interested ones); tracker with a long interval (a re-announce would attribute
+the connection to the tracker dial instead of the holepunch); success detected on
+both sides (race of the dial).
 
-**Bug storici dello script**: unico NAT condiviso (buco impossibile);
-`/peers` senza `source` (campo poi aggiunto all'API); ruoli sbagliati (relay
-seed + B seed); `progress` 0–100 letto come 0–1; `grep` su log binari (serve
-`-a`).
+**Historical bugs of the script**: a single shared NAT (hole impossible);
+`/peers` without `source` (a field later added to the API); wrong roles (relay
+seed + B seed); `progress` 0–100 read as 0–1; `grep` on binary logs (`-a` is
+needed).
 
-**Uso**: `make gx-torrent`, poi `sudo scripts/holepunch-netns-test.sh`
-(`--keep` per debug, `--size 16` per torrent più grande). Esempio riuscito in
+**Usage**: `make gx-torrent`, then `sudo scripts/holepunch-netns-test.sh`
+(`--keep` for debugging, `--size 16` for a larger torrent). A successful example in
 `scripts/risultato.txt`. Debug: `HOLEPUNCH_DEADLINE` (default 90 s),
-`HOLEPUNCH_B_DEADLINE` (60 s), `HOLEPUNCH_DIAG=1` (dump conntrack). Su
-fallimento stampa le righe `holepunch` dei log (rendezvous/connect).
+`HOLEPUNCH_B_DEADLINE` (60 s), `HOLEPUNCH_DIAG=1` (conntrack dump). On
+failure it prints the `holepunch` lines of the logs (rendezvous/connect).
 
-**Limiti**: emulazione con firewall stateful, non NAT cone reale; esito
-`holepunch`/`incoming` secondo chi vince la corsa; dedup peer per IP del motore
-(in uno swarm reale i peer sono su IP diversi).
+**Limits**: emulation with a stateful firewall, not a real cone NAT; outcome
+`holepunch`/`incoming` according to who wins the race; IP dedup of peers by the
+engine (in a real swarm the peers are on different IPs).
 
 ---
 
-## 8. Revisione tecnica 1: client, i18n, job, concorrenza
+## 8. Technical review 1: client, i18n, jobs, concurrency
 
-Ex `docs/revisione-1.md` (già locale/non tracciato; citato da commenti in
-`jobs.go`, `web.go`, `internal_translations.yml`). Anomalie e debito emersi da
-revisione del codice, con correzioni incrementali senza cambiare il
-comportamento stabilizzato. Perimetro: client JS della UI, i18n, HTML dinamico,
-attività asincrone/job, concorrenza e test. Fuori perimetro: autenticazione e
-sicurezza LAN (LAN trusted per decisione).
+Ex `docs/revisione-1.md` (already local/untracked; cited by comments in
+`jobs.go`, `web.go`, `internal_translations.yml`). Anomalies and debt that emerged from a
+review of the code, with incremental corrections without changing the
+stabilised behaviour. Scope: UI JS client, i18n, dynamic HTML,
+asynchronous activities/jobs, concurrency and tests. Out of scope: authentication and
+LAN security (LAN trusted by decision).
 
-Al momento della revisione: `go test ./...` e `go vet` verdi; client UI unico
-file IIFE `uiweb/static/gextto-ui.js` (~253 KiB, 5.194 righe); CSS in
-`gextto-ui.css`; template server-rendered; polling + partial HTML + dialoghi
-dinamici. Nessun errore bloccante: criticità di manutenzione, osservabilità,
-coerenza e robustezza futura. Modello i18n effettivo: chiavi = **stringhe
-italiane di sorgente**, cataloghi `internal_translations*.yml`
-(italiano → lingua) uniti in SQLite all'avvio; client con `translateUINode()` +
-`MutationObserver` e fallback inglese.
+At the time of the review: `go test ./...` and `go vet` green; a single UI client
+IIFE file `uiweb/static/gextto-ui.js` (~253 KiB, 5,194 lines); CSS in
+`gextto-ui.css`; server-rendered templates; polling + partial HTML + dynamic
+dialogs. No blocking errors: maintenance, observability,
+consistency and future robustness concerns. Effective i18n model: keys = **Italian
+source strings**, catalogues `internal_translations*.yml`
+(Italian → language) merged in SQLite at startup; client with `translateUINode()` +
+`MutationObserver` and English fallback.
 
-Priorità: **P1** prima di aggiungere funzioni (regressioni/diagnosi difficili);
-**P2** debito compatibile con l'esercizio; **P3** qualità/manutenzione.
+Priority: **P1** before adding functions (difficult regressions/diagnosis);
+**P2** debt compatible with operation; **P3** quality/maintenance.
 
-### 8.1 Client JavaScript monolitico (P2)
+### 8.1 Monolithic JavaScript client (P2)
 
-Un solo IIFE con bootstrap, tema, i18n, polling/API, dashboard, torrent, serie/
-film/archivio/fumetti, configurazione, manutenzione, log, dialoghi/tabelle/
-accessibilità. Su disco è grande ma compresso è piccolo: il problema è la
-manutenzione (stato globale condiviso, collisioni future, init mescolato a
-codice comune, logica render/rete/eventi nello stesso blocco, test solo su
-output HTTP). Proposta: moduli (`ui-core.js` con contratto stabile
-`api`/`pollRequest`/`esc`/`storage`/`notify`/dialoghi, poi dialoghi, shell, log/
-manutenzione, torrent, libreria/discovery/fumetti), migrazione per estrazioni
-senza big bang (prima ES nativi, poi eventuale bundle in build). Accettazione:
-nessuna regressione, no-JS con contenuto essenziale, nessun accesso a variabili
-private altrui, peso compresso invariato, focus/tastiera/dialoghi invariati.
+A single IIFE with bootstrap, theme, i18n, polling/API, dashboard, torrents, series/
+movies/archive/comics, configuration, maintenance, logs, dialogs/tables/
+accessibility. On disk it is large but compressed it is small: the problem is
+maintenance (shared global state, future collisions, init mixed with
+common code, render/network/event logic in the same block, tests only on
+HTTP output). Proposal: modules (`ui-core.js` with a stable contract
+`api`/`pollRequest`/`esc`/`storage`/`notify`/dialogs, then dialogs, shell, log/
+maintenance, torrents, library/discovery/comics), migration by extractions
+without a big bang (first native ES, then an eventual bundle in the build). Acceptance:
+no regressions, no-JS with essential content, no access to other people's
+private variables, unchanged compressed weight, focus/keyboard/dialogs unchanged.
 
-### 8.2 Internazionalizzazione (P1 controllo cataloghi, P2 migrazione)
+### 8.2 Internationalisation (P1 catalogue check, P2 migration)
 
-Rischi del modello a stringa: una variazione ortografica rompe la traduzione,
-stringhe dinamiche con regex restano parzialmente in italiano, cataloghi
-server/client divergenti, `MutationObserver` costoso su pagine dinamiche,
-fallback non controllabili. Target: chiavi stabili (`dashboard.title`),
-cataloghi versionati, fallback deterministico (attiva → base → chiave),
-interpolazione parametrica, helper server/client, niente traduzione globale del
-DOM. Migrazione graduale: controllo cataloghi → chiavi per nuove funzioni →
-shell/dialoghi/toast → pagine una alla volta → `translateUINode` solo legacy →
-rimozione observer. Test: ogni chiave nel catalogo base, nessuna traduzione
-vuota, snapshot multilingua, stessa lingua per testo/title/aria/placeholder,
-plurali e HTML nei valori.
+Risks of the string model: a spelling variation breaks the translation,
+dynamic strings with regex partly remain in Italian, server/client catalogues
+divergent, `MutationObserver` expensive on dynamic pages,
+fallback not controllable. Target: stable keys (`dashboard.title`),
+versioned catalogues, deterministic fallback (active → base → key),
+parametric interpolation, server/client helpers, no global translation of the
+DOM. Gradual migration: catalogue check → keys for new functions →
+shell/dialogs/toast → pages one at a time → `translateUINode` legacy only →
+removal of the observer. Tests: every key in the base catalogue, no empty
+translation, multilingual snapshot, same language for text/title/aria/placeholder,
+plurals and HTML in the values.
 
-### 8.3 HTML dinamico e sicurezza del rendering (P1 nuovo codice, P2 storico)
+### 8.3 Dynamic HTML and rendering safety (P1 new code, P2 historical)
 
-`innerHTML` ovunque (tabelle, toast, dialoghi, TMDB/release/fumetti, partial
-server): `esc()` usato in molti punti ma ogni interpolazione deve ricordarselo
-nel contesto giusto (testo vs attributo vs `data-*` JSON, errori da provider).
-Nuovo codice: `textContent`, `setAttribute` validati, `createElement`,
-`DocumentFragment`, `innerHTML` solo per markup statico, mai valori da
-API/DB/provider/filesystem in stringhe HTML. Storico: `esc()` centralizzato,
-`htmlTrusted()` esplicito per frammenti statici, tabelle esposte migrate per
-prime (release, provider, blocklist, ricerche), test con payload ostili
-(`<script>`, virgolette, `&`, newline, URL speciali). Accettazione: valori
-ostili resi come testo, funzioni trusted riconoscibili dal nome, nessun calo di
-sort/focus/paginazione/accessibilità.
+`innerHTML` everywhere (tables, toasts, dialogs, TMDB/release/comics, server
+partials): `esc()` used in many places but every interpolation must remember it
+in the right context (text vs attribute vs `data-*` JSON, provider errors).
+New code: `textContent`, validated `setAttribute`, `createElement`,
+`DocumentFragment`, `innerHTML` only for static markup, never values from
+API/DB/provider/filesystem in HTML strings. Historical: centralised `esc()`,
+explicit `htmlTrusted()` for static fragments, exposed tables migrated first
+(release, provider, blocklist, searches), tests with hostile payloads
+(`<script>`, quotes, `&`, newline, special URLs). Acceptance: hostile values
+rendered as text, trusted functions recognisable by name, no drop in
+sort/focus/pagination/accessibility.
 
-### 8.4 Job manager (P1 operazioni distruttive/lunghe, P2 altre)
+### 8.4 Job manager (P1 destructive/long operations, P2 others)
 
-Modello non uniforme: 202 prima dell'esito, stato globale singolo, doppi avvii,
-errori tardivi solo nei log, cancellazione non uniforme, retry/idempotenza non
-rappresentati, log non correlati, test con sleep/polling. Proposto: `Job`
+Non-uniform model: 202 before the outcome, single global state, double starts,
+late errors only in the logs, non-uniform cancellation, retry/idempotency not
+represented, uncorrelated logs, tests with sleep/polling. Proposed: `Job`
 (`queued/running/succeeded/failed/canceled`, progress, message/error,
-**result** strutturato, timestamp, cancel via context) + manager (concorrenza
-limitata, dedup per chiave, retention, log con `job_id`, shutdown ordinato) +
-endpoint (`GET /api/jobs`, `GET /api/jobs/{id}`, `POST …/cancel`; niente `POST
-/api/jobs` generico: i job nascono dalle operazioni reali validate). Prime da
-migrare: rinomina massiva/repair, scansioni archivi/librerie, backfill
-MediaInfo, backup/restore, manutenzione DB/scoring, diagnostica sorgenti,
-pulizie. Accettazione: niente doppi lavori, stato osservabile, errori tardivi
-in stato+log, cancellazione senza orfani, refresh che conserva lo stato, niente
-goroutine illimitate.
+structured **result**, timestamp, cancel via context) + manager (limited
+concurrency, dedup by key, retention, log with `job_id`, ordered shutdown) +
+endpoints (`GET /api/jobs`, `GET /api/jobs/{id}`, `POST …/cancel`; no generic
+`POST /api/jobs`: jobs are born from the real validated operations). First to
+migrate: bulk rename/repair, archive/library scans, MediaInfo backfill,
+backup/restore, DB/scoring maintenance, source diagnostics,
+cleanups. Acceptance: no double jobs, observable state, late errors
+in state+log, cancellation without orphans, refresh that preserves the state, no
+unlimited goroutines.
 
-### 8.5 Concorrenza e race (P1 race in CI, P2 bonifica)
+### 8.5 Concurrency and races (P1 race in CI, P2 cleanup)
 
-`go vet` non è un race detector. Aree: mappe retry/post-seed, cache config,
-stato torrent tra polling/callback/shutdown, progressi manutenzione, registri
-job/notifiche, contatori/metriche, chiusura sessione libtorrent, stato/DB
-durante backup/restore. Strategia: un solo meccanismo per stato (mutex, atomic,
-snapshot immutabili, canali, context, mappe sempre col lock documentato). CI:
-`go test -race ./...` (se pesante: veloci+vet per push, completi per PR, race
-in coda dedicata/giornaliera, motori reali in job separati). Test con timeout,
-`Cleanup`, tmpdir e porte casuali, mai dipendenti dal servizio in esecuzione.
+`go vet` is not a race detector. Areas: retry/post-seed maps, config cache,
+torrent state between polling/callbacks/shutdown, maintenance progress, job/notification
+registries, counters/metrics, libtorrent session closure, state/DB
+during backup/restore. Strategy: a single mechanism per state (mutex, atomic,
+immutable snapshots, channels, context, maps always with a documented lock). CI:
+`go test -race ./...` (if heavy: fast+vet per push, full per PR, race
+in a dedicated/daily queue, real engines in separate jobs). Tests with timeout,
+`Cleanup`, tmpdir and random ports, never dependent on the running service.
 
-### 8.6 Piano raccomandato (Fase 0–4)
+### 8.6 Recommended plan (Phase 0–4)
 
-0 Baseline (test comportamento, metriche, convenzione log/ID, cataloghi +
-race non bloccante). 1 Rischio basso (`ui-core.js`/dialoghi/shell, helper DOM,
-test XSS, chiavi nuove stringhe). 2 Coerenza UI (cataloghi, observer solo
-legacy, moduli tabelle/log/manutenzione, test multilingua). 3 Job (manager,
-rinomina/scansioni, cancel/dedup/retention, `job_id` in UI/log/notifiche).
-4 Concorrenza (race ripetuti, mappe/snapshot, shutdown/restart, race bloccanti).
-Atteso: client modificabile senza regressioni incrociate, traduzioni verificabili
-pre-rilascio, confini dati/markup, operazioni osservabili/cancellabili/correlate,
-fiducia sulla concorrenza, consumi invariati. **Non riscrivere tutto**: piccole
-estrazioni, test verdi a ogni fase, refactoring separato dalle funzioni.
+0 Baseline (behaviour tests, metrics, log/ID convention, catalogues +
+non-blocking race). 1 Low risk (`ui-core.js`/dialogs/shell, DOM helpers,
+XSS tests, new-string keys). 2 UI consistency (catalogues, observer legacy only,
+table/log/maintenance modules, multilingual tests). 3 Jobs (manager,
+rename/scans, cancel/dedup/retention, `job_id` in UI/log/notifications).
+4 Concurrency (repeated races, maps/snapshots, shutdown/restart, blocking races).
+Expected: client modifiable without cross regressions, translations verifiable
+pre-release, data/markup boundaries, operations observable/cancellable/correlated,
+confidence in concurrency, unchanged consumption. **Do not rewrite everything**: small
+extractions, tests green at every phase, refactoring separate from the features.
 
-### 8.7 Stato di attuazione
+### 8.7 Implementation state
 
-Fase 0: race non bloccante (`make test-race`, job CI `continue-on-error`) e
-controllo cataloghi (`i18n_catalog_test.go`: YAML valido, niente duplicati/
-vuoti, insiemi coerenti) fatti; metriche caricamento e convenzione `job_id` da
-fare. Fase 1: test XSS end-to-end (`security.spec.ts`: injection, attribute/
-tag breakout, `javascript:`) e `esc()` uniforme (anche `'`) fatti; estrazione
-moduli, helper DOM e chiavi nuove stringhe rimandati/ricepiti come convenzione.
-Fase 2: catalogo inglese completato (1.345 traduzioni mancanti, ora 3.130 chiavi
-come le altre; test impone copertura) e test multilingua end-to-end
-(`i18n.spec.ts`) fatti; observer e fallback client invariati. Fase 3:
-`JobManager` + test completi (ciclo vita, dedup, cancel, concorrenza, retention,
-panico→failed, chiusura) + endpoint read-only (in `API.md`) fatti; migrate
-**rinomina massiva** (cancel tra serie, `/api/rename-progress` invariato,
-`job_id` in risposta), **scansione archivi** (da sincrona bloccante a job,
-`202` + `job_id`), **backfill MediaInfo** (report in `Job.Result`); UI dei job
-(seguono fino a esito, pulsante Annulla; `jobs.spec.ts`) fatta; `Fail` esplicito
-e `SetResult` aggiunti. Restano una alla volta le altre operazioni. Fase 4:
-`make test-race ./...` verde (**0 data race**); bonifica e race bloccante dopo
-la Fase 3. Test browser obsoleti riallineati senza mascherare regressioni; fix
-reale: tabelle scrollabili raggiungibili da tastiera; suite browser 30/30.
+Phase 0: non-blocking race (`make test-race`, CI job `continue-on-error`) and
+catalogue check (`i18n_catalog_test.go`: valid YAML, no duplicates/
+empties, consistent sets) done; loading metrics and `job_id` convention to
+do. Phase 1: end-to-end XSS tests (`security.spec.ts`: injection, attribute/
+tag breakout, `javascript:`) and uniform `esc()` (also `'`) done; extraction of
+modules, DOM helpers and new-string keys postponed/repeated as a convention.
+Phase 2: English catalogue completed (1,345 missing translations, now 3,130 keys
+like the others; a test enforces coverage) and end-to-end multilingual tests
+(`i18n.spec.ts`) done; observer and client fallback unchanged. Phase 3:
+`JobManager` + complete tests (lifecycle, dedup, cancel, concurrency, retention,
+panic→failed, closure) + read-only endpoints (in `API.md`) done; migrated
+**bulk rename** (cancel between series, `/api/rename-progress` unchanged,
+`job_id` in the response), **archive scan** (from blocking synchronous to a job,
+`202` + `job_id`), **MediaInfo backfill** (report in `Job.Result`); the jobs UI
+(follow through to the outcome, Cancel button; `jobs.spec.ts`) done; explicit `Fail`
+and `SetResult` added. The other operations remain, one at a time. Phase 4:
+`make test-race ./...` green (**0 data race**); cleanup and blocking race after
+Phase 3. Obsolete browser tests realigned without masking regressions; real fix:
+scrollable tables reachable from the keyboard; browser suite 30/30.
 
-Difetti trovati: chiave fantasma solo-spagnola `Nuevo File Archiviato`
-(rimossa; ora il controllo l'intercetterebbe); inglese sottoinsieme con 1.345
-voci mancanti (generate automaticamente — **richiedono revisione linguistica**
-pre-rilascio); `esc()` senza `'` (corretto); test non idempotente sotto race
-(reso ripetibile con cleanup).
+Defects found: phantom Spanish-only key `Nuevo File Archiviato`
+(removed; now the check would catch it); English subset with 1,345
+missing entries (generated automatically — **they require linguistic review**
+pre-release); `esc()` without `'` (fixed); non-idempotent test under race
+(made repeatable with cleanup).
 
-**Race su `t.info` (2026-10-12).** Il job race su `cmd/gx-torrent` segnalava
-`Collections()`/`Similar()` (goroutine del demone) mentre il run loop pubblicava
-i metadati di un magnet: il campo è ora `atomic.Pointer[metainfo.Info]` con
-accessori `info()`/`setInfo()` (commit `a496160`).
-`go test -race ./cmd/gx-torrent/` e `./internal/gxcore/torrent/`: **0 data race**.
-Resta la **Fase 4** (bonifica + race bloccante) del piano qui sopra.
+**Race on `t.info` (2026-10-12).** The race job on `cmd/gx-torrent` reported
+`Collections()`/`Similar()` (daemon goroutines) while the run loop published
+the metadata of a magnet: the field is now `atomic.Pointer[metainfo.Info]` with
+accessors `info()`/`setInfo()` (commit `a496160`).
+`go test -race ./cmd/gx-torrent/` and `./internal/gxcore/torrent/`: **0 data race**.
+**Phase 4** (cleanup + blocking race) of the plan above remains.
 
-### 8.8 Osservazioni emerse (ridimensionano il piano)
+### 8.8 Observations that emerged (they resize the plan)
 
-- **Modularizzazione completa del client: non consigliata così com'è.** 11
-  moduli ES = refactor ampio e rischioso (IIFE→moduli, call-site, test browser)
-  per beneficio solo manutentivo; il file compresso non è un problema browser.
-  Solo quando la manutenzione diventa il collo di bottiglia, con bundle in build.
-  Intanto `esc()` + test XSS coprono il rischio reale.
-- **Chiavi i18n stabili globali: non necessarie ora.** Il modello a stringa
-  italiana funziona; il buco era la copertura inglese (risolta). 3.130 voci × 6
-  lingue riscritte = rischio regressioni. Ibrido: stabili solo per nuove
-  stringhe dinamiche, legacy invariate, controllo automatico anti-buchi.
-- **`POST /api/jobs` omesso di proposito** (validazione nelle operazioni reali).
-- **Backup, pulisci trash, vacuum restano sincroni per scelta** (effetti esterni,
-  cancellazioni definitive, VACUUM non interrompibile): non migrare.
-- Miglioramenti: `Job.Result`, cancellazione ai punti sicuri (mai a metà
-  unità), `Fail` esplicito, traduzioni EN automatiche da rileggere.
-- Fase 3: nessuna migrazione obbligatoria rimasta. Fase 4: bonifica + race
-  bloccante sui componenti stabilizzati. Prossimi passi: revisione linguistica
-  EN; UI su `/api/jobs`; shutdown esplicito per operazione migrata.
-
----
-
-## 9. Revisione tecnica 2: bug e debito al commit 97142c1
-
-Ex `docs/archive/revisione-2.md` (analisi del 2026-10-06; metodo: lettura quasi
-integrale di orchestrator/worker/eventi/database/config/postprocess/cleaner/
-safety/web+router, poi engine/rss/parser/update/hooks/notifier/httpx/comics/
-watcher/libtorrent; `go test` e `go vet` verdi; severità con grado di certezza
-*Confermato*/*Da verificare*, nulla riprodotto a runtime).
-
-### 9.1 Bug e criticità (stato: tutti corretti)
-
-| Voce | Problema | Correzione |
-|---|---|---|
-| B1 | Path non raggiungibile azzera stato episodi (NAS smontata = dir vuota = `ENOENT`) | reset solo se cartella esistente, o primo antenato esistente non vuoto (`archiveFileConfirmedMissing`; `archive_mount_test.go`) |
-| B2 | Errore transitorio di completamento = terminale + torrent staccato, nessun retry | retry transitori (EIO/ENOSPC/ESTALE/rete/DB occupato) dopo 1,2,4,8,16,32 min, poi definitivo; identità/file assenti subito definitivi (`isTransientCompletionError`, `completionRetries`; contatori in memoria) |
-| B3 | Torrent aggiunto ma non registrato se la scrittura DB fallisce (ciclo abortito, torrent "esterno") | registrazione fallita → torrent ritirato, placeholder annullato, `continue` |
-| B4 | `last_comics_check_ts` aggiornato anche se il ciclo fumetti fallisce (+7 giorni di buco) | timestamp solo a successo; errore → retry ~1 h |
-| B5 | Errori DB fumetti abortiscono cicli serie/film | impostazioni fumetti lette solo se servono, errori degradati |
-| B6 | Stop per "poco spazio" senza salvare statistiche né report | `finishCycleWithoutDownloads`: salva e riporta comunque (controllo globale invariato) |
-| B7 | Config ricaricata male nel worker eventi (fallback = config di avvio) | resta l'ultima valida |
-| B8 | Rename repair fuori da `cycle_lock` (concorrenza con ciclo/eventi/rinomine) | lock per-serie (`TryAcquireArchiveRename`/`AcquireArchiveImport`), marcatore import con conteggio; repair resta fuori dal lock ma mutuamente esclusivo per serie |
-
-### 9.2 Illogicità e incoerenze (stato: corrette)
-
-| Voce | Problema | Correzione |
-|---|---|---|
-| L1 | Booleana ridondante nella selezione (`incumbentWins` valutato 2 volte) | riscritta `covers && incumbentWins`, test esistenti |
-| L2 | Supersede/remove non speculari → esito dipendente dall'ordine (confermato: episodio prima del pack = entrambi scaricati) | `mergeSeriesCandidate`/`releaseStrictlyBetter`: a parità vince chi copre di più (REMUX preferito); test con 2000 input rimescolati (fallisce con la vecchia regola) |
-| L3 | Funzioni `Check*` che scrivono (approva-subito/annulla-poi fragile) | approvazione in due fasi: decisione in sola lettura → add torrent → conferma in scrittura + registrazione; rollback solo per registrazione fallita post-conferma (`approval_phases_test.go`) |
-| L4 | `last_deep_gap_fill_ts` scritto prima del lavoro | salvato solo a passaggio completato e non annullato |
-| L5 | Soglie gap non coordinate (deep 6 h vs 23 h hard-coded) | `gap_research_hours` mai sotto l'intervallo deep |
-| L6 | Doppia notifica `torrent_finished` + `storage_moved` | `torrent_completed` una sola volta (`alreadyAnnounced`, `completionNotified`; `seeding:true` resta distinto) |
-| L7 | Lingue mescolate in log e valori di dato (`"Feed RSS"` usato come chiave) | costanti `episodeOrigin*` condivise g2/g7/dettaglio (valori invariati: arrivano ad API/UI) |
-
-### 9.3 Loop logici (stato: corretti)
-
-| Voce | Problema | Correzione |
-|---|---|---|
-| C1 | Restart worker dopo panic senza backoff (ciclo panic→restart su evento "veleno") | `workerRestartBackoff`: attesa 5 s→5 min, reset dopo 10 min sani |
-| C2 | Ricostruzione eventi a ogni tick (750 ms, doppia fonte di verità, mappe in memoria) | spostamenti salvati in DB (`torrent_moves`, ripristino a +60 s) + ricontrollo ogni 30 s invece che ogni giro; eventi restano il canale principale (`torrent_moves_restart_test.go`) |
-| C3 | Lavoro lento inline nel loop (notifiche SMTP/HTTP, `SizeOfPath`, ffprobe, refresh Jellyfin/Plex) | notifiche async (`notifier.Async`, coda 256 best-effort; test di prova resta sincrono), `RefreshMediaLibraries` in goroutine con coalescenza |
-
-### 9.4 Inefficienze (stato: corrette o chiuse con motivo)
-
-| Voce | Problema | Esito |
-|---|---|---|
-| I1 | `DELETE` per ogni torrent a ogni tick su SQLite single-conn | solo per voci realmente persistite |
-| I2 | Query per ogni torrent completo a ogni tick | cache `settledTorrents` 60 s (o fino a cambio percorso/evento) |
-| I3 | `torrents.List()` ~10 volte per tick | rinviato (cache backend 500 ms mitiga) |
-| I4 | `LoadConfig` pesante da molti punti, copie divergenti | convertito il worker che legge senza modificare; `LatestConfig` ha già cache invalidata al salvataggio |
-| I5 | Stat di tutto l'archivio per un log di debug, sotto lock | solo con diagnostica attiva |
-| I6 | Selezione O(n²) con ricalcoli | non fatto: quadratico solo entro serie+stagione, trascurabile |
-| I7 | Una ricerca d'archivio per query | chiuso: non un problema nell'uso reale |
-| I8 | `RecordSeenBatch` ignora errori in Debug | portato a WARN |
-
-### 9.5 Secondo passaggio: parser, feed, notifiche, hook, fumetti, update
-
-| Voce | Problema | Correzione |
-|---|---|---|
-| P1 | Parser su titoli reali (anno da `1917`/`2001`, `S2024E05` non riconosciuto, `Stagione 2 Episodio 3`, `2160p` nel nome, gruppo `dl` da `WEB-DL`, audio 5.1 da `x265.10bit`, `720p` da CAM) | anno = ultimo prima dei tag tecnici; stagioni a 4 cifre; `Stagione N Episodio/Puntata M` e `[Completa]`; risoluzione fuori dal nome; 5.1 isolato; `hd`/`pal` solo come parola; coda `WEB-DL`/`Blu-Ray` mai gruppo (`parser_regression_test.go`). Non errori: giornaliero S2024E133 (legacy voluto), sentinella `EpisodeRange=[0]` per i pack; non gestito: pack multi-stagione `S01-S03` |
-| P2 | `FetchFeed`: pagina non scaricabile → tiene le precedenti; non analizzabile → butta tutto, senza log | tiene sempre le pagine lette, con log |
-| P3 | Paginazione presunta base-0 (ext.to: `page=1` = prima pagina → early-stop, crawl fermo) | `listingPageNumber` per ext.to (verificato live); Corsaro invariato |
-| P4 | Parser scelto da sottostringa sull'intero URL (query inclusa) | scelta da host+percorso (`feedKindSubject`) |
-| P5 | Cache magnet indicizzata dal solo titolo (collisioni) | chiave = URL dettaglio; eviction dei più vecchi (non a caso) |
-| P6 | Retry Telegram senza attesa iniziale + sleep finale inutile | attesa prima del tentativo |
-| P7 | `smtp.SendMail` senza timeout nel thread chiamante (congela il worker) | `sendMailWithTimeout` 30 s (stesso STARTTLS/AUTH) |
-| P8 | Token Telegram nei log (URL intero nell'errore) | `redactRequestError` (schema+host) + maschera `/bot<id>:<token>`; contraddiceva `SECURITY.md` |
-| P9 | Hook: variabili espanse prima dello split (titoli con spazi/virgolette = injection argomenti) | prima `SplitArgs`, poi `Expand` per argomento (script che contavano sullo split vanno adattati) |
-| P10 | Hook: timeout inefficace coi figli, concorrenza illimitata, niente recover | kill del gruppo processi, `WaitDelay` 5 s, max 4 concorrenti |
-| P11 | Panic in goroutine fan-out = morte processo (solo 4 `recover`) | `recoverGoroutine` in 20 goroutine (engine/orchestrator/rss/hooks/handler/restart/qBittorrent) |
-| P12 | Ciclo fumetti: download sincroni non annullabili sotto `cycle_lock` + Mega senza timeout + "primo file nuovo" ambiguo | watchdog inattività 2 min su HTTP, timeout 2 h + kill gruppo per `megadl`, interrompibile tra titoli (`comics_stall_test.go`) |
-| P13 | Due parser HTML (700 righe artigianali + `x/net/html`) | non si corregge (scelta: va provato su pagine reali) |
-| P14 | Checksum update che "fallisce in aperto" + tar senza `--no-same-owner` | non corretto (scelta) |
-| P15 | Sessione libtorrent letta senza lock in ~40 metodi (abort su handle distrutto) | contatore + `enterSession`/`exitSession`/`drainSession` su 43 metodi: niente nuove chiamate in shutdown, attesa ≤30 s (`libtorrent_session_guard_test.go`) |
-| P16 | Watcher: nessun limite profondità/dimensione/stabilità | in parte: profondità max 8, nomi specifici (limite dimensione e doppia osservazione già esistevano nel worker; `ReadDir` non segue symlink) |
-| P17 | Naming misto snake_case/camelCase, prefissi di gruppo | non fatto (stile, nessun bug) |
-
-Altre note sicurezza: P8/P14 le più concrete; P9 injection da titoli di feed;
-nessuna restrizione SSRF (coerente con LAN, da ricordare se esposto).
-
-Debito strutturale non fatto con motivo (S1–S8: funzioni da 1100/600/380
-righe, duplicati g2/g7, nomi route, parsing booleani → però `settingTruthy`
-uniforme fatto, S5, con bug `weekly_enabled` trovato; errori `_ =` in 81 punti,
-mappe in memoria, traduzioni 3800 righe): rifattorizzazioni senza bug noti, da
-fare a parte se si vuole. Cose verificate a posto: niente deadlock con
-single-conn (uso di `tx`), copia atomica con fsync (senza checksum, rename
-sovrascrive), backoff qBittorrent, fail-closed su blocklist illeggibile, SQL
-parametrizzato.
-
-Domande chiuse: B1 controllo aggiunto; B2 retry solo transitori; L6 doppia
-notifica = errore; B8 esclusione per serie; P1 parser corretto; P14 checksum
-invariato. Verifica complessiva: `go test ./...` e `go test -race .` verdi a
-ogni tornata; ancora da fare: I3, I6, P17, S1–S4, S6–S8.
+- **Full modularisation of the client: not advised as it stands.** 11
+  ES modules = a broad and risky refactor (IIFE→modules, call-site, browser tests)
+  for a purely maintenance benefit; the compressed file is not a browser problem.
+  Only when maintenance becomes the bottleneck, with a bundle in the build.
+  Meanwhile `esc()` + XSS tests cover the real risk.
+- **Global stable i18n keys: not necessary now.** The Italian-string
+  model works; the hole was the English coverage (resolved). 3,130 entries × 6
+  languages rewritten = risk of regressions. Hybrid: stable only for new
+  dynamic strings, legacy unchanged, an automatic anti-hole check.
+- **`POST /api/jobs` deliberately omitted** (validation in the real operations).
+- **Backup, clean trash, vacuum remain synchronous by choice** (external effects,
+  definitive deletions, non-interruptible VACUUM): do not migrate.
+- Improvements: `Job.Result`, cancellation at safe points (never halfway through a
+  unit), explicit `Fail`, automatic EN translations to be re-read.
+- Phase 3: no mandatory migration left. Phase 4: cleanup + blocking race
+  on the stabilised components. Next steps: EN linguistic review;
+  UI on `/api/jobs`; explicit shutdown per migrated operation.
 
 ---
 
-## 10. Rapporti Terra e Pro Terra
+## 9. Technical review 2: bugs and debt at commit 97142c1
 
-Ex `docs/archive/gextto-terra.md` e `docs/archive/pro-terra.md` (letture del
-sorgente con migliorie concrete; nessuna vulnerabilità in produzione affermata;
-nessun cambio di comportamento del daemon nei report stessi).
+Ex `docs/archive/revisione-2.md` (analysis of 2026-10-06; method: almost
+complete reading of orchestrator/worker/events/database/config/postprocess/cleaner/
+safety/web+router, then engine/rss/parser/update/hooks/notifier/httpx/comics/
+watcher/libtorrent; `go test` and `go vet` green; severity with a degree of certainty
+*Confirmed*/*To verify*, nothing reproduced at runtime).
 
-### 10.1 Terra: priorità e stato
+### 9.1 Bugs and criticalities (state: all fixed)
 
-Implementati punti 2, 3, 5 + primo passo del 7 (concorrenza indexer, contesto
-radice di shutdown con attesa worker, test parità router/documentazione,
-registrazione UI isolata). Punto 1 escluso su richiesta. Punti 4 e 6 restano
-proposte progettuali deliberatamente non introdotte (cache archivio senza
-invalidazione affidabile; sostituzione API C++ senza matrice versioni): niente
-scorciatoie su correttezza decisioni o compatibilità build.
+| Item | Problem | Fix |
+|---|---|---|
+| B1 | Unreachable path zeroes episode state (unmounted NAS = empty dir = `ENOENT`) | reset only if the folder exists, or the first existing non-empty ancestor (`archiveFileConfirmedMissing`; `archive_mount_test.go`) |
+| B2 | Transient completion error = terminal + torrent detached, no retry | transient retries (EIO/ENOSPC/ESTALE/network/DB busy) after 1,2,4,8,16,32 min, then final; identity/files absent immediately final (`isTransientCompletionError`, `completionRetries`; in-memory counters) |
+| B3 | Torrent added but not registered if the DB write fails (cycle aborted, "external" torrent) | failed registration → torrent withdrawn, placeholder cancelled, `continue` |
+| B4 | `last_comics_check_ts` updated even if the comics cycle fails (+7 days of hole) | timestamp only on success; error → retry ~1 h |
+| B5 | Comics DB errors abort series/movie cycles | comics settings read only if needed, errors degraded |
+| B6 | Stop for "low space" without saving statistics or reporting | `finishCycleWithoutDownloads`: saves and reports anyway (global check unchanged) |
+| B7 | Config reloaded badly in the event worker (fallback = startup config) | the last valid one remains |
+| B8 | Rename repair outside `cycle_lock` (concurrency with cycle/events/renames) | per-series lock (`TryAcquireArchiveRename`/`AcquireArchiveImport`), import marker with a count; repair remains outside the lock but mutually exclusive per series |
 
-| Priorità | Area | Intervento | Esito |
+### 9.2 Illogicalities and inconsistencies (state: fixed)
+
+| Item | Problem | Fix |
+|---|---|---|
+| L1 | Redundant boolean in the selection (`incumbentWins` evaluated twice) | rewritten `covers && incumbentWins`, existing tests |
+| L2 | Supersede/remove not symmetrical → outcome dependent on order (confirmed: episode before the pack = both downloaded) | `mergeSeriesCandidate`/`releaseStrictlyBetter`: at equal, the one that covers more wins (REMUX preferred); test with 2000 reshuffled inputs (fails with the old rule) |
+| L3 | `Check*` functions that write (approve-immediately/cancel-afterwards fragile) | two-phase approval: read-only decision → add torrent → write confirmation + registration; rollback only for a failed registration after confirmation (`approval_phases_test.go`) |
+| L4 | `last_deep_gap_fill_ts` written before the work | saved only when the pass is completed and not cancelled |
+| L5 | Gap thresholds not coordinated (deep 6 h vs 23 h hard-coded) | `gap_research_hours` never below the deep interval |
+| L6 | Double notification `torrent_finished` + `storage_moved` | `torrent_completed` only once (`alreadyAnnounced`, `completionNotified`; `seeding:true` remains distinct) |
+| L7 | Mixed languages in logs and data values (`"Feed RSS"` used as a key) | shared `episodeOrigin*` constants g2/g7/detail (values unchanged: they reach the API/UI) |
+
+### 9.3 Logic loops (state: fixed)
+
+| Item | Problem | Fix |
+|---|---|---|
+| C1 | Worker restart after a panic without backoff (panic→restart cycle on a "poison" event) | `workerRestartBackoff`: wait 5 s→5 min, reset after 10 healthy minutes |
+| C2 | Event reconstruction at every tick (750 ms, double source of truth, in-memory maps) | moves saved in the DB (`torrent_moves`, restore at +60 s) + re-check every 30 s instead of every round; events remain the main channel (`torrent_moves_restart_test.go`) |
+| C3 | Slow work inline in the loop (SMTP/HTTP notifications, `SizeOfPath`, ffprobe, Jellyfin/Plex refresh) | async notifications (`notifier.Async`, best-effort queue 256; a test probe stays synchronous), `RefreshMediaLibraries` in a goroutine with coalescing |
+
+### 9.4 Inefficiencies (state: fixed or closed with a reason)
+
+| Item | Problem | Outcome |
+|---|---|---|
+| I1 | `DELETE` for every torrent at every tick on single-conn SQLite | only for entries really persisted |
+| I2 | Query for every complete torrent at every tick | `settledTorrents` cache 60 s (or until a path/event change) |
+| I3 | `torrents.List()` ~10 times per tick | postponed (500 ms backend cache mitigates) |
+| I4 | Heavy `LoadConfig` from many points, divergent copies | converted the worker that reads without modifying; `LatestConfig` already has a cache invalidated on save |
+| I5 | Stats of the whole archive for a debug log, under lock | only with diagnostics active |
+| I6 | O(n²) selection with recomputations | not done: quadratic only within series+season, negligible |
+| I7 | One archive search per query | closed: not a problem in real use |
+| I8 | `RecordSeenBatch` ignores errors in Debug | raised to WARN |
+
+### 9.5 Second pass: parser, feeds, notifications, hooks, comics, update
+
+| Item | Problem | Fix |
+|---|---|---|
+| P1 | Parser on real titles (year from `1917`/`2001`, `S2024E05` unrecognised, `Stagione 2 Episodio 3`, `2160p` in the name, group `dl` from `WEB-DL`, audio 5.1 from `x265.10bit`, `720p` from CAM) | year = last before the technical tags; 4-digit seasons; `Stagione N Episodio/Puntata M` and `[Completa]`; resolution outside the name; 5.1 isolated; `hd`/`pal` only as a word; tail `WEB-DL`/`Blu-Ray` never a group (`parser_regression_test.go`). Not errors: daily S2024E133 (legacy intended), sentinel `EpisodeRange=[0]` for the packs; not handled: multi-season pack `S01-S03` |
+| P2 | `FetchFeed`: page not downloadable → keeps the previous ones; not parseable → throws everything away, without logs | always keeps the pages read, with logs |
+| P3 | Pagination assumed base-0 (ext.to: `page=1` = first page → early-stop, crawl stalled) | `listingPageNumber` for ext.to (verified live); Corsaro unchanged |
+| P4 | Parser chosen by substring on the whole URL (query included) | chosen by host+path (`feedKindSubject`) |
+| P5 | Magnet cache indexed by title alone (collisions) | key = detail URL; eviction of the oldest (not randomly) |
+| P6 | Telegram retry without an initial wait + useless final sleep | wait before the attempt |
+| P7 | `smtp.SendMail` without a timeout in the calling thread (freezes the worker) | `sendMailWithTimeout` 30 s (same STARTTLS/AUTH) |
+| P8 | Telegram token in the logs (whole URL in the error) | `redactRequestError` (scheme+host) + mask `/bot<id>:<token>`; it contradicted `SECURITY.md` |
+| P9 | Hook: variables expanded before the split (titles with spaces/quotes = argument injection) | first `SplitArgs`, then `Expand` per argument (scripts that relied on the split must be adapted) |
+| P10 | Hook: ineffective timeout with children, unlimited concurrency, no recover | kill of the process group, `WaitDelay` 5 s, max 4 concurrent |
+| P11 | Panic in a fan-out goroutine = process death (only 4 `recover`) | `recoverGoroutine` in 20 goroutines (engine/orchestrator/rss/hooks/handler/restart/qBittorrent) |
+| P12 | Comics cycle: synchronous non-cancellable downloads under `cycle_lock` + Mega without timeout + ambiguous "first new file" | inactivity watchdog 2 min on HTTP, timeout 2 h + group kill for `megadl`, interruptible between titles (`comics_stall_test.go`) |
+| P13 | Two HTML parsers (700 hand-written lines + `x/net/html`) | not fixed (choice: it must be tested on real pages) |
+| P14 | Update checksum that "fails in the open" + tar without `--no-same-owner` | not fixed (choice) |
+| P15 | libtorrent session read without a lock in ~40 methods (abort on destroyed handle) | counter + `enterSession`/`exitSession`/`drainSession` on 43 methods: no new calls during shutdown, wait ≤30 s (`libtorrent_session_guard_test.go`) |
+| P16 | Watcher: no depth/size/stability limit | partly: max depth 8, specific names (size limit and double observation already existed in the worker; `ReadDir` does not follow symlinks) |
+| P17 | Mixed snake_case/camelCase naming, group prefixes | not done (style, no bug) |
+
+Other security notes: P8/P14 the most concrete ones; P9 injection from feed titles;
+no SSRF restriction (consistent with LAN, to remember if exposed).
+
+Structural debt not done with a reason (S1–S8: functions of 1100/600/380
+lines, g2/g7 duplicates, route names, boolean parsing → but the uniform
+`settingTruthy` done, S5, with the `weekly_enabled` bug found; `_ =` errors in 81 places,
+in-memory maps, translations 3800 lines): refactorings without known bugs, to be
+done separately if wanted. Things verified as fine: no deadlock with
+single-conn (use of `tx`), atomic copy with fsync (without checksum, rename
+overwrites), qBittorrent backoff, fail-closed on an unreadable blocklist, parameterised SQL.
+
+Closed questions: B1 check added; B2 retry only transient; L6 double
+notification = error; B8 exclusion per series; P1 parser fixed; P14 checksum
+unchanged. Overall verification: `go test ./...` and `go test -race .` green at
+every round; still to do: I3, I6, P17, S1–S4, S6–S8.
+
+---
+
+## 10. Terra and Pro Terra reports
+
+Ex `docs/archive/gextto-terra.md` and `docs/archive/pro-terra.md` (readings of the
+source with concrete improvements; no vulnerability in production claimed;
+no change of daemon behaviour in the reports themselves).
+
+### 10.1 Terra: priority and status
+
+Implemented points 2, 3, 5 + first step of 7 (indexer concurrency, root
+shutdown context with worker wait, router/documentation parity tests,
+isolated UI registration). Point 1 excluded on request. Points 4 and 6 remain
+design proposals deliberately not introduced (archive cache without reliable
+invalidation; replacement of the C++ API without a version matrix): no
+shortcuts on decision correctness or build compatibility.
+
+| Priority | Area | Intervention | Outcome |
 |---|---|---|---|
-| Alta | Esposizione HTTP | Separare/restringere il listener `EngineListen` (stesso `Router` su entrambe le porte, secondo accesso amministrativo senza auth) | escluso su richiesta |
-| Alta | Ricerca provider | Budget concorrenza indexer (semaforo 4–6, default prudente) | fatto |
-| Media | Arresto | Chiusura deterministica worker prima di libtorrent (contesto radice, registro operazioni, attesa quiescenza) | fatto |
-| Media | Scalabilità | Indice archivio incrementale fuori dal ciclo critico (il ciclo rilegge la NAS) | proposta (indice persistito + timestamp, scansione come fallback; decisioni identiche) |
-| Media | API | Riferimento API generato e verificato (route qBit mancanti dalla tabella) | fatto (test di parità) |
-| Bassa | Bridge C++ | Rimuovere API libtorrent deprecate (`half_open_limit`, cache, priorità, tracker, resume) | proposta (matrice versioni + adapter, warning attesi come lista in CI) |
-| Bassa | Router | Modularizzare la registrazione (`registerTorrentRoutes`, …) senza cambiare il contratto | primo passo fatto (registrazione UI isolata) |
+| High | HTTP exposure | Separate/restrict the `EngineListen` listener (same `Router` on both ports, second administrative access without auth) | excluded on request |
+| High | Provider search | Indexer concurrency budget (semaphore 4–6, cautious default) | done |
+| Medium | Shutdown | Deterministic worker closure before libtorrent (root context, operation registry, quiescence wait) | done |
+| Medium | Scalability | Incremental archive index outside the critical cycle (the cycle re-reads the NAS) | proposal (persisted index + timestamp, scan as fallback; identical decisions) |
+| Medium | API | Generated and verified API reference (qBit routes missing from the table) | done (parity test) |
+| Low | C++ bridge | Remove deprecated libtorrent APIs (`half_open_limit`, cache, priority, trackers, resume) | proposal (version matrix + adapter, expected warnings as a list in CI) |
+| Low | Router | Modularise the registration (`registerTorrentRoutes`, …) without changing the contract | first step done (isolated UI registration) |
 
-Piano consigliato: esposizione listener → concorrenza indexer + test API →
-shutdown → indice archivio + compatibilità libtorrent.
+Recommended plan: listener exposure → indexer concurrency + API tests →
+shutdown → archive index + libtorrent compatibility.
 
-### 10.2 Pro Terra: priorità e stato
+### 10.2 Pro Terra: priority and status
 
-Seguito di Terra su sicurezza, concorrenza, lifecycle, integrità dati. Correzioni
-applicate (LAN fidata: gli hardening puri di rete rinviati): arresto (punto 5 —
-`trackOperation()` per `RunNow`/`RenameAll`/repair, attesa prima di distruggere
-la sessione: chiude la corsa sull'handle); concorrenza (punto 6 —
-`torrent_engine` sotto `engine_mu`, `RenameProgress` protetta, `categoryReady`
-sotto `e.mu`, `safeGo` senza doppio report e restart interrompibile, handle
-SQLite chiusi); integrità (punti 7–8 — upgrade serie/film transazionali,
-niente `DELETE` su hash magnet vuoto); robustezza (punto 9 — errori non più
-silenziosi, `gibSetting` saturato, limite dimensione `HTTPDownload`). Punto 1
-parziale (causa risolta col tracciamento, disciplina `sessionMu` su ~90 metodi
-raccomandata come difesa in profondità — poi fatta in revisione-2 P15).
-Punti 2–4 rinviati (allowlist hook, filtro SSRF, redazione chiavi in
-`ConfigView`): valide se mai esposto oltre la LAN.
+Follow-up to Terra on security, concurrency, lifecycle, data integrity. Corrections
+applied (LAN trusted: the pure network hardening postponed): shutdown (point 5 —
+`trackOperation()` for `RunNow`/`RenameAll`/repair, wait before destroying
+the session: it closes the race on the handle); concurrency (point 6 —
+`torrent_engine` under `engine_mu`, protected `RenameProgress`, `categoryReady`
+under `e.mu`, `safeGo` without double reporting and interruptible restart, SQLite
+handles closed); integrity (points 7–8 — transactional series/movie upgrades,
+no `DELETE` on an empty magnet hash); robustness (point 9 — errors no longer
+silent, saturated `gibSetting`, size limit `HTTPDownload`). Point 1
+partial (cause resolved with the tracking, `sessionMu` discipline on ~90 methods
+recommended as defence in depth — then done in revision-2 P15).
+Points 2–4 postponed (hook allowlist, SSRF filter, key redaction in
+`ConfigView`): valid if ever exposed beyond the LAN.
 
-| Priorità | Intervento | Dettaglio |
+| Priority | Intervention | Detail |
 |---|---|---|
-| Critica | Sincronizzare ogni lettura di `LibtorrentClient.session` | solo `listUncached` usava il lock; lettura senza lock + `Shutdown` che azzera = abort Boost su handle distrutto; proposta helper `withSession`/estensione `RLock` + stress test |
-| Critica | Vincolare `Program` degli event hook | solo non-vuoto e assoluto: con `/bin/bash -c` = shell arbitraria da porta non autenticata; proposta allowlist o segreto separato + doc in manuale/`SECURITY.md` |
-| Alta | Filtrare URL remoti (SSRF) e origini percorsi | `send-magnet`/`archive/add`/`search/add` validano solo `http(s)://`, client segue redirect; proposte helper condiviso (no privati/link-local/metadata, redirect limitati, no de-ref listener locale) + percorsi dentro le radici configurate |
-| Alta | Non esporre chiavi in `ConfigView` | `api_key` indexer + `tmdb/tvdb_api_key` in chiaro (altri segreti già booleani); proposta soli flag |
-| Alta | Tracciare goroutine dagli handler | `RunNow`/`RenameAll`/repair non in `bgWG`, toccano il motore dopo `ShutdownEmbedded` |
-| Media | Stato condiviso | vedi sopra (fatto) |
-| Media/Media | Transazioni DB + hash magnet vuoto | vedi sopra (fatto) |
-| Bassa | Errori ignorati e limiti | vedi sopra (fatto); più `staticcheck`/`errcheck` in CI |
+| Critical | Synchronise every read of `LibtorrentClient.session` | only `listUncached` used the lock; read without lock + `Shutdown` that zeroes = Boost abort on a destroyed handle; proposal `withSession` helper/extension of `RLock` + stress test |
+| Critical | Constrain the `Program` of the event hooks | only non-empty and absolute: with `/bin/bash -c` = arbitrary shell from an unauthenticated port; proposal allowlist or a separate secret + doc in manual/`SECURITY.md` |
+| High | Filter remote URLs (SSRF) and path origins | `send-magnet`/`archive/add`/`search/add` validate only `http(s)://`, the client follows redirects; proposals for a shared helper (no private/link-local/metadata, limited redirects, no de-ref local listener) + paths within the configured roots |
+| High | Do not expose keys in `ConfigView` | indexer `api_key` + `tmdb/tvdb_api_key` in clear (other secrets already booleans); proposal flags only |
+| High | Track goroutines from the handlers | `RunNow`/`RenameAll`/repair not in `bgWG`, they touch the engine after `ShutdownEmbedded` |
+| Medium | Shared state | see above (done) |
+| Medium/Medium | DB transactions + empty magnet hash | see above (done) |
+| Low | Ignored errors and limits | see above (done); plus `staticcheck`/`errcheck` in CI |
 
-Piano: race handle + goroutine → hook + segreti → SSRF + percorsi → locking +
-transazioni → errori ignorati + race/staticcheck in CI.
+Plan: handle race + goroutines → hooks + secrets → SSRF + paths → locking +
+transactions → ignored errors + race/staticcheck in CI.
 
 ---
 
-## 11. UI SSR + HTMX: report di migrazione
+## 11. SSR + HTMX UI: migration report
 
 Ex `docs/archive/UI_V2.md` (2026-10-01, build 1229, libtorrent 2.0.11.0).
-L'interfaccia ufficiale è SSR + HTMX, non dipende più da `gextto-ui.js`: è su
-**`/`**, `/v2` reindirizza (301, query preservata), riusa API JSON, view-model
-Go e CSS di base; tabelle renderizzate dal server via handler API in-process
-(`v2InternalJSON`: stessa validazione, niente rete); i18n server-side con
+The official interface is SSR + HTMX, it no longer depends on `gextto-ui.js`: it is at
+**`/`**, `/v2` redirects (301, query preserved), it reuses the JSON API, Go
+view-models and base CSS; tables rendered by the server via in-process API handlers
+(`v2InternalJSON`: same validation, no network); server-side i18n with a
 tokenizer (`v2TranslateHTML`: text node, `title`/`placeholder`/`aria-label`,
-fallback inglese, mai `<script>`/`<style>`, con IT byte-per-byte); JS minimale
-(HTMX + `v2-core.js`: tema/font, modali accessibili); route UI isolate
-(`v2Handle`, fuori dalla tabella route API: `API.md` e test di parità invariati);
-vecchia route `/ui` rimossa.
+English fallback, never `<script>`/`<style>`, with IT byte-for-byte); minimal JS
+(HTMX + `v2-core.js`: theme/font, accessible modals); isolated UI routes
+(`v2Handle`, outside the API route table: `API.md` and parity tests unchanged);
+old `/ui` route removed.
 
-Architettura (`uiweb_v2*.go`, `uiweb/v2/templates/v2.html`,
-`uiweb/v2/static/{htmx.min.js,v2-core.js,v2.css}`, 1 riga in `web_router.go`):
-shell/navigazione/i18n, renderer tabelle generico, pannelli Manutenzione/
-Integrazioni, Esplora, dettagli Serie/Film, editor strutturati (feed, checkbox,
-righe, rinomina, traduzioni), widget Manutenzione, widget speciali (duplicati,
-DB, RAM disk, rinomina, OAuth/PIN, job, upload, TMDB, traduzioni per chiave,
-anteprima rinomina); test in `uiweb_v2_test.go` /
+Architecture (`uiweb_v2*.go`, `uiweb/v2/templates/v2.html`,
+`uiweb/v2/static/{htmx.min.js,v2-core.js,v2.css}`, 1 line in `web_router.go`):
+shell/navigation/i18n, generic table renderer, Maintenance/
+Integrations panels, Explore, Series/Movie details, structured editors (feed, checkbox,
+rows, rename, translations), Maintenance widgets, special widgets (duplicates,
+DB, RAM disk, rename, OAuth/PIN, jobs, upload, TMDB, translations by key,
+rename preview); tests in `uiweb_v2_test.go` /
 `uiweb_v2_bench_test.go`.
 
-Copertura: tutte le 16 voci di menu + dettagli (Dashboard con Prossime uscite
-etichettate; Scarico con badge download ogni 5 s, limiti/storage,
-tracker/file/web seed, storico, aggiunta, tag in massa; Serie/Film con hero
-TMDB, stagioni on/off, Niente-upgrade, rinomina; Mancanti; Esplora con
-calendario/tendenze/ricerca TMDB; Archivio con spiegazione decisione; Fumetti
-con coda HTTP e weekly; Configurazione 4 aree/13 sezioni con Predefinito,
-savebar, pannelli esperti/motore; Integrazioni Simkl/Jellyfin/Plex/FlareSolverr/
-indexer/iCal/verifica sorgenti; Manutenzione con cestino/duplicati/DB/RAM
-disk/rinomina/job; Salute; Log con colori server-side; Blocklist; Manuale e
-Licenza server-side; `/login` per accesso protetto).
+Coverage: all 16 menu items + details (Dashboard with labelled Upcoming releases;
+Downloads with a download badge every 5 s, limits/storage,
+trackers/files/web seeds, history, add, bulk tags; Series/Movies with TMDB hero,
+seasons on/off, No-upgrade, rename; Missing; Explore with
+calendar/trends/TMDB search; Archive with decision explanation; Comics
+with HTTP queue and weekly; Configuration 4 areas/13 sections with Default,
+savebar, expert/engine panels; Integrations Simkl/Jellyfin/Plex/FlareSolverr/
+indexers/iCal/source check; Maintenance with trash/duplicates/DB/RAM
+disk/rename/jobs; Health; Logs with server-side colours; Blocklist; Manual and
+Licence server-side; `/login` for protected access).
 
-Residui consapevoli: "Ultimi trovati nei feed" su richiesta (diagnostica, non
-operativa); aggiunta manuale avanzata solo campi principali (specialistici solo
-via API); calendario via HTMX async; azioni lunghe nel pannello Operazioni in
-background senza barra dedicata. Differenze accettate: ordinamento/filtro
-server-side; modali con focus-trap/Escape/backdrop; log a intervalli invece di
-SSE; job via polling `/api/jobs`.
+Conscious residues: "Latest found in the feeds" on request (diagnostics, not
+operational); advanced manual add only main fields (specialist only
+via API); calendar via async HTMX; long actions in the Background operations panel
+without a dedicated bar. Accepted differences: server-side sorting/filtering;
+modals with focus-trap/Escape/backdrop; logs at intervals instead of
+SSE; jobs via `/api/jobs` polling.
 
-Test: `go test .` e `./...` verdi (suite v2 completa); script indice
-impostazioni (173 voci, 13 sezioni) e installer-selftest OK; vet/gofmt puliti;
-live 16/16 voci → 200, 0 segnaposto; IT→EN con traduzioni reali. Benchmark
-(N97, Go 1.26, CGO): `V2TranslateHTML` ~0,42 ms; `V2FormatCell` ~2,9 µs;
-`V2RenderTableFragment` (500 righe) ~1,05 ms; `V2RenderShell` ~0,30 ms —
-rendering ~1–3 ms/pagina, trascurabile su LAN (la traduzione è il costo
-maggiore, solo per lingue ≠ IT). Correttezza: contratto API invariato, azioni
-solo su path `/api/…`, salvataggio con gli stessi vincoli, editor a righe
-compatibili. Promozione a default e rimozione UI classica completate (CSS
-embedded in `uiweb/v2/static/`, view-model/handler condivisi mantenuti).
-Prossimi passi: barra contestuale per azione lunga; campi specialistici nel
-form; benchmark come test di performance in CI (poi chiuso, vedi §1.3).
-
----
-
-## 12. Handover tra sessioni di lavoro
-
-Ex `docs/lavoro-sessione.md` (aggiornato al 2026-10-07; copre dal commit
-`d9e5d5e` del 06/10 sera al `432ce98` + commit `docs:` del 07/10).
-
-### 12.1 Regole di lavoro (vincolanti, in aggiunta ad `AGENTS.md`)
-
-1. Mai riferimenti a Claude/Anthropic in autore/committer/trailer/messaggi/PR
-   (prevale su hook o promemoria dell'ambiente).
-2. Identità git `buzzqw <azanzani@gmail.com>`, `commit.gpgsign false` in cloud
-   (la firma cloud risulterebbe "Unverified").
-3. Lavoro e push diretti su `main`; niente branch/PR salvo richiesta; ignorare
-   branch `claude/...` assegnati dall'ambiente.
-4. Niente force-push su `main`: fetch + merge prima del push, test rilanciati.
-5. Italiano nelle risposte; testi UI nei cataloghi (ogni testo nuovo tradotto
-   in tutte le lingue; `uiText` fuori template; TUI bilingue; notifiche
-   it/en; log daemon solo inglese).
-6. Pubblico italiano: mai dare per scontata la disponibilità all'air-date
-   (date TMDB = "messa in onda originale").
-7. Log leggibili (frasi, no dump), senza doppioni; dettagli in DEBUG; una riga
-   INFO al giorno dai controlli che non trovano nulla.
-8. Con "sistema"/"procedi in autonomia": decidere, fare, verificare, riferire
-   in sintesi.
-
-### 12.2 Lavoro svolto (06–07/10, per area)
-
-- **Log e notifiche** (`d9e5d5e` e seguenti): pulizia completati che elenca i
-  rimossi; rimozione manuale con una sola riga (destino cestino); niente
-  notifica per pezzi danneggiati (resta WARN); backup: passo non configurato
-  non è "non riuscito"; notifiche doppie eliminate (fumetti torrent ×2,
-  "in attesa" a ogni ciclo, errori libtorrent 1 volta/6 h per torrent+tipo,
-  archiviazione manuale già annunciata); backup Telegram >50 MB in parti da 45
-  MiB con istruzioni `cat`.
-- **Stalled, ciclo, FlareSolverr** (merge `281f89a`): backoff reale
-  (intervallo → 3 h → 6 h → 12 h → 24 h, step salvato in DB, ogni tentativo
-  loggato col prossimo orario); "📊 Downloads" solo al cambio numeri; backup una
-  riga INFO; FlareSolverr con causa breve ed esito (chiusure appese in INFO coi
-  domini); riepilogo ricerca coi motivi di scarto; dedup per hash feed/archivio
-  ("releases checked" su release distinte); controllo libreria con una riga per
-  rinomina/copia inferiore eliminata + riga giornaliera "all correctly named".
-  Nota: titolo del merge con nome branch assegnato dall'ambiente (solo il
-  proprietario può correggerlo con force-push).
-- **TUI** (`internal/tui`): testi mancanti, lingua interfaccia vs release,
-  aiuto 1-9 scorrevole, Salute in italiano (test chiavi); numeri sempre di
-  scheda, ←→ in Libreria; avvio ricerca (Invio/s/f/m/c); log con `w` avvisi e ↓
-  di una riga; tabella torrent (dimensione, ETA/ratio, seed/peer, niente hash);
-  torrent bloccati spiegati + `F` con azzeramento ritardo (anche daemon in
-  `MarkTorrentFailed`, `stalled_since`/`next_retry_at` in API); Stato con ultima
-  ricerca in frase e migliaia separate; "⚠ N nuovi avvisi"; `/` anche sui
-  torrent; aiuto sempre visibile in Stato.
-- **Web su telefono** (`uiweb/v2`): layout ≤560 px (striscia stato toccabile,
-  barra in basso una riga, menu Altro, Dashboard riordinata, Scarico con lista
-  prima e opzioni dietro ⚙, azioni di gruppo solo con selezione); Log compatto
-  con "Solo avvisi ed errori" (anche desktop); PWA (manifest, icone, service
-  worker minimo, share target `/share`, pull-to-refresh); contatore WARN/ERROR
-  (`ProblemCount`); fix template Scarico (div aperto); avvisi CodeQL (host
-  validati, `nosniff`, redirect `/share` con `url.URL`, conversioni sicure).
-- **Migliorie §2** (dettaglio sopra): hardlink, refresh mirato, upgrade-until,
-  auth, iCal, ComicInfo, mancanti, badge, traduzioni, docs.
-- **gx-torrent completato**: da scheletro non selezionabile a motore funzionante
-  (coda autogestita con slot/tetto/lenti ignorati/rotazione/pin/probe/coda
-  dinamica; stalled come park/probe/unpark persistente; symlink, delete sicura,
-  rename-o-copia; token + loopback-only senza token, RPC del motore spento; avvio e
-  sorveglianza con fallback a libtorrent dopo 3 crash/10 min; impostazioni
-  token/eseguibile; matrice capacità onesta; test demone + adapter). Smoke test:
-  avvio, verify→seed, pausa/ripresa, spostamento con symlink, kill -9 →
-  riavvio, SIGTERM allo spegnimento. (Big Buck Bunny in `downloading_metadata`
-  nel sandbox senza peer.)
-- **Rete, selezione file, v2**: motore dentro `internal/gxcore` (`replace`,
-  inventario `GEXTTO.md`); porta unica + DHT sulla stessa UDP + UPnP/NAT-PMP
-  ogni 20 min; selezione file (esclusi in `DATA/parts`, progresso sui scelti);
-  interfaccia ascolto/uscente (killswitch), proxy SOCKS5/HTTP
-  (`gxtorrent_proxy`), cifratura 0/1/2, filtro IP multi-formato; **v2-only ora
-  accettati end-to-end** (§4.4; all'epoca erano rifiutati con blocklist e poi
-  superati); session-stats anche per gx-torrent; bug del motore (IP mai
-  ricontattati, race logger); test reali demone↔demone (porta unica, cifratura,
-  selezione, proxy, RAM disk a metà, filtro IP); smoke (flag di rete, porta
-  6881, migrazione torrent, messaggio senza UPnP).
-- **uTP, LSD, Salute**: socket UDP condiviso col DHT (`internal/dht`), dial
-  parallelo uTP+TCP, LSD multicast BEP 14, pannello Motore torrent in Salute;
-  test reali (solo-uTP, LSD); bug chiusura DHT su socket condiviso.
-- **Dettaglio torrent + qBittorrent**: scheda con soli comandi supportati dal
-  motore + nota lacune, file "Salta/Scarica", errori in scheda, righe
-  sciame/motore, colonna Connessione peer; qBit: avanzamento peer (era ×0,01),
-  connessione+flag, super-seeding sbloccato, "Salva tracker" che sostituisce;
-  gx-torrent: avanzamento/seed da bitfield, tracker corrente, seed contati.
-- **Cache automatica + log v2**: cache da RAM (lettura 1/32, scrittura 1/16) o
-  da `libtorrent_cache_size`, scadenza + `fallocate`, "Ottimizza" anche per
-  gx-torrent, riga in Salute; log v2-only (🔁 alternativa v1 / ⏳ in attesa /
-  ⌛ non più tracciato dopo 30 giorni; memoria in RAM).
-- **gx-torrent default**: `torrent_backend` mancante/vuoto = `gx-torrent`
-  (installazioni esistenti invariate, `anacrolix` → `embedded`, fallback a
-  libtorrent se non si attiva); servizio agnostico (`GEXTTO_LIBTORRENT` solo
-  override); impostazioni rete/coda/cache condivise non più disabilitate con
-  gx-torrent; README + `gx-torrent.md` aggiornati.
-
-### 12.3 Punti aperti al 07/10 (storico; vari chiusi/superati)
-
-> Elenco **datato 07/10/2026**, tenuto come storico. Nel frattempo sono stati
-> chiusi il wizard/indexer e il supporto v2 (vedi §4.4 e
-> [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md) §12), quindi alcuni punti qui
-> sotto vanno riletti come superati.
-
-Da decidere: doppia notifica "completato — in seed" in `move_episodes`
-(proposto di togliere la prima); backup Telegram come didascalia dell'ultima
-parte; tasti TUI con significato per scheda (`d`, `R`, `i`, `e`); tabelle
-Serie/Film/Archivio su telefono con dati veri (schede vs tabelle).
-Da fare/verificare: PWA/condivisione su HTTPS reale; backoff stalled sul server
-reale (ripresa da `notice_step`); indexer mircrew (solo in locale sul server);
-titolo merge `281f89a`; «router port N opened» nel log demone (o apertura
-manuale TCP+UDP); con VPN impostare interfaccia uscente (killswitch);
-procedura gx-torrent (scelta motore, Big Buck Bunny, slot/pause); migliorie §2
-(hardlink con `ls -li`, scansione cartella Jellyfin/Plex, login via proxy con
-`X-Forwarded-For`, calendario con chiave TMDB).
-
-### 12.4 Ambiente e insidie (sessione cloud, riferimento)
-
-Build con `libtorrent-rasterbar-dev` (warning C++ normali); test radice ~60 s.
-Dry-run con `GEXTTO_DATA_DIR` dedicato; stop via `kill` sui PID (mai
-`pkill -f`, che uccide anche la shell). TUI in `tmux` + `capture-pane`;
-pausa tra `Escape` e lettera (Alt+lettera). Web/telefono con Chromium +
-Playwright preinstallati (config senza `channel: chrome`, `executablePath`
-esplicito, data dir nuovo; 36 test verdi). Insidie: `gofmt` che riallinea
-`internal/tui/i18n.go`; `go test` cached; push/force-push bloccati; `go test …
-| grep … && git commit` committa anche con test rossi (controllare `$?`);
-registro download fumetti globale nei test; `#` a inizio riga nei manuali =
-titolo Markdown (lo trova l'e2e); manuale embedded (ricompilare prima degli
-e2e). Mappa codice toccato e ripresa: vedi file originale in archivio.
+Tests: `go test .` and `./...` green (full v2 suite); settings index script
+(173 entries, 13 sections) and installer-selftest OK; vet/gofmt clean;
+live 16/16 items → 200, 0 placeholders; IT→EN with real translations. Benchmark
+(N97, Go 1.26, CGO): `V2TranslateHTML` ~0.42 ms; `V2FormatCell` ~2.9 µs;
+`V2RenderTableFragment` (500 rows) ~1.05 ms; `V2RenderShell` ~0.30 ms —
+rendering ~1–3 ms/page, negligible on a LAN (translation is the greatest
+cost, only for languages ≠ IT). Correctness: API contract unchanged, actions
+only on `/api/…` paths, saving with the same constraints, row editors
+compatible. Promotion to default and removal of the classic UI completed (CSS
+embedded in `uiweb/v2/static/`, shared view-models/handlers kept).
+Next steps: contextual bar for a long action; specialist fields in the
+form; benchmark as a performance test in CI (then closed, see §1.3).
 
 ---
 
-## 13. Accessibilità
+## 12. Handover between work sessions
 
-Ex `docs/accessibility-analysis.md` (analisi del 29-09-2026 su
-`uiweb/v2/templates/`, `uiweb/v2/static/`, test in `uiweb/end2end/`; riferimento
-WCAG 2.1 AA, pratiche compatibili 2.2).
+Ex `docs/lavoro-sessione.md` (updated on 2026-10-07; it covers from commit
+`d9e5d5e` of 06/10 evening to `432ce98` + `docs:` commit of 07/10).
 
-**Stato**: interfaccia **parzialmente accessibile** con baseline automatizzata
-molto migliorata; i controlli automatici passano ma non sono una certificazione
-WCAG/EN 301 549/legale. Una conclusione formale richiede test manuali con
-tastiera, screen reader, ingrandimento e tecnologie assistive su browser e
-dispositivi supportati.
+### 12.1 Working rules (binding, in addition to `AGENTS.md`)
 
-**Metodo**: review statica (HTML/CSS/JS), semantica/nomi/ARIA/focus, layout
-responsive/focus visibile/reduced-motion, contrasto temi chiaro/scuro, axe-core
-via Playwright, regression test (dialoghi, sort tastiera, polling, viewport
-stretti). Suite: **12 test verdi** su dashboard, downloads, settings,
+1. Never references to Claude/Anthropic in author/committer/trailer/messages/PR
+   (prevails over hooks or environment reminders).
+2. Git identity `buzzqw <azanzani@gmail.com>`, `commit.gpgsign false` in the cloud
+   (the cloud signature would appear "Unverified").
+3. Work and push directly to `main`; no branches/PRs unless requested; ignore
+   `claude/...` branches assigned by the environment.
+4. No force-push to `main`: fetch + merge before the push, tests rerun.
+5. Italian in replies; UI texts in the catalogues (every new text translated
+   in all languages; `uiText` outside templates; bilingual TUI; notifications
+   it/en; daemon logs English only).
+6. Italian audience: never take availability on the air-date for granted
+   (TMDB dates = "original air date").
+7. Readable logs (sentences, no dumps), without duplicates; details in DEBUG; one
+   INFO line per day from the checks that find nothing.
+8. With "system"/"proceed autonomously": decide, do, verify, report
+   in summary.
+
+### 12.2 Work carried out (06–07/10, per area)
+
+- **Logs and notifications** (`d9e5d5e` and following): completed-cleanup listing the
+  removed ones; manual removal with a single line (trash destination); no
+  notification for damaged pieces (WARN remains); backup: an unconfigured step
+  is not "failed"; duplicate notifications removed (torrent comics ×2,
+  "waiting" at every cycle, libtorrent errors once/6 h per torrent+type,
+  manual archiving already announced); Telegram backup >50 MB in parts of 45
+  MiB with `cat` instructions.
+- **Stalled, cycle, FlareSolverr** (merge `281f89a`): real backoff
+  (interval → 3 h → 6 h → 12 h → 24 h, step saved in the DB, every attempt
+  logged with the next time); "📊 Downloads" only on a change of numbers; backup one
+  INFO line; FlareSolverr with a short cause and outcome (closures hung in INFO with the
+  domains); search summary with the rejection reasons; dedup by feed/archive hash
+  ("releases checked" on distinct releases); library check with one line per
+  rename/lower copy removed + a daily line "all correctly named".
+  Note: merge title with a branch name assigned by the environment (only the
+  owner can fix it with a force-push).
+- **TUI** (`internal/tui`): missing texts, interface language vs release,
+  scrollable help 1-9, Health in Italian (key tests); numbers always per
+  tab, ←→ in Library; start search (Enter/s/f/m/c); log with `w` warnings and ↓
+  one line; torrent table (size, ETA/ratio, seed/peer, no hash);
+  blocked torrents explained + `F` with delay reset (also daemon in
+  `MarkTorrentFailed`, `stalled_since`/`next_retry_at` in the API); Status with the last
+  search in a sentence and thousands separated; "⚠ N new warnings"; `/` also on the
+  torrents; help always visible in Status.
+- **Web on phone** (`uiweb/v2`): layout ≤560 px (touchable status strip,
+  bottom bar one line, More menu, reordered Dashboard, Downloads with the list
+  first and options behind ⚙, group actions only with a selection); compact Log
+  with "Only warnings and errors" (also desktop); PWA (manifest, icons, minimal service
+  worker, share target `/share`, pull-to-refresh); WARN/ERROR counter
+  (`ProblemCount`); Downloads template fix (open div); CodeQL warnings (validated
+  hosts, `nosniff`, `/share` redirect with `url.URL`, safe conversions).
+- **Improvements §2** (detail above): hardlink, targeted refresh, upgrade-until,
+  auth, iCal, ComicInfo, missing, badge, translations, docs.
+- **gx-torrent completed**: from a non-selectable skeleton to a working engine
+  (self-managed queue with slots/cap/slow-ignored/rotation/pin/probe/dynamic
+  queue; stalled as persistent park/probe/unpark; symlink, safe delete,
+  rename-or-copy; token + loopback-only without a token, engine RPC off; startup and
+  supervision with fallback to libtorrent after 3 crashes/10 min; token/executable
+  settings; honest capability matrix; daemon + adapter tests). Smoke test:
+  startup, verify→seed, pause/resume, move with symlink, kill -9 →
+  restart, SIGTERM on shutdown. (Big Buck Bunny in `downloading_metadata`
+  in the sandbox without peers.)
+- **Network, file selection, v2**: engine inside `internal/gxcore` (`replace`,
+  `GEXTTO.md` inventory); single port + DHT on the same UDP + UPnP/NAT-PMP
+  every 20 min; file selection (excluded in `DATA/parts`, progress on the chosen ones);
+  listening/outgoing interface (killswitch), SOCKS5/HTTP proxy
+  (`gxtorrent_proxy`), encryption 0/1/2, multi-format IP filter; **v2-only now
+  accepted end-to-end** (§4.4; at the time they were refused with a blocklist and then
+  superseded); session-stats also for gx-torrent; engine bugs (IP never
+  re-contacted, logger race); real daemon↔daemon tests (single port, encryption,
+  selection, proxy, half RAM disk, IP filter); smoke (network flags, port
+  6881, torrent migration, message without UPnP).
+- **uTP, LSD, Health**: UDP socket shared with the DHT (`internal/dht`), parallel
+  uTP+TCP dial, LSD multicast BEP 14, Torrent engine panel in Health;
+  real tests (uTP-only, LSD); DHT closure bug on the shared socket.
+- **Torrent detail + qBittorrent**: tab with only commands supported by the
+  engine + a gap note, "Skip/Download" files, errors in the tab, swarm/engine
+  rows, peer Connection column; qBit: peer progress (was ×0.01),
+  connection+flag, super-seeding unblocked, "Save trackers" that replaces;
+  gx-torrent: progress/seed from the bitfield, current tracker, seeds counted.
+- **Automatic cache + v2 logs**: cache from RAM (read 1/32, write 1/16) or
+  from `libtorrent_cache_size`, expiry + `fallocate`, "Optimise" also for
+  gx-torrent, line in Health; v2-only logs (🔁 v1 alternative / ⏳ waiting /
+  ⌛ no longer tracked after 30 days; memory in RAM).
+- **gx-torrent default**: missing/empty `torrent_backend` = `gx-torrent`
+  (existing installations unchanged, `anacrolix` → `embedded`, fallback to
+  libtorrent if it does not start); agnostic service (`GEXTTO_LIBTORRENT` only an
+  override); shared network/queue/cache settings no longer disabled with
+  gx-torrent; README + `gx-torrent.md` updated.
+
+### 12.3 Open points as of 07/10 (historical; several closed/superseded)
+
+> List **dated 07/10/2026**, kept as historical. In the meantime the wizard/indexer
+> and v2 support have been closed (see §4.4 and
+> [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md) §12), so some points below
+> must be read as superseded.
+
+To decide: double notification "completed — seeding" in `move_episodes`
+(proposed to remove the first); Telegram backup as a caption of the last
+part; TUI keys with a meaning per tab (`d`, `R`, `i`, `e`); Series/Movies/Archive
+tables on the phone with real data (tabs vs tables).
+To do/verify: PWA/sharing on real HTTPS; stalled backoff on the real server
+(resume from `notice_step`); mircrew indexer (only locally on the server);
+merge title `281f89a`; "router port N opened" in the daemon log (or manual
+opening TCP+UDP); with VPN set the outgoing interface (killswitch);
+gx-torrent procedure (engine choice, Big Buck Bunny, slot/pause); §2 improvements
+(hardlink with `ls -li`, Jellyfin/Plex folder scan, login via proxy with
+`X-Forwarded-For`, calendar with a TMDB key).
+
+### 12.4 Environment and pitfalls (cloud session, reference)
+
+Build with `libtorrent-rasterbar-dev` (normal C++ warnings); root tests ~60 s.
+Dry-run with a dedicated `GEXTTO_DATA_DIR`; stop via `kill` on the PIDs (never
+`pkill -f`, which also kills the shell). TUI in `tmux` + `capture-pane`;
+pause between `Escape` and letter (Alt+letter). Web/phone with Chromium +
+Playwright preinstalled (config without `channel: chrome`, explicit
+`executablePath`, new data dir; 36 tests green). Pitfalls: `gofmt` that realigns
+`internal/tui/i18n.go`; cached `go test`; blocked push/force-push; `go test …
+| grep … && git commit` also commits with red tests (check `$?`);
+global comics download registry in tests; `#` at the beginning of a line in the manuals =
+Markdown title (the e2e finds it); embedded manual (recompile before the
+e2e). Map of touched code and resumption: see the original file in the archive.
+
+---
+
+## 13. Accessibility
+
+Ex `docs/accessibility-analysis.md` (analysis of 29-09-2026 on
+`uiweb/v2/templates/`, `uiweb/v2/static/`, tests in `uiweb/end2end/`; reference
+WCAG 2.1 AA, compatible 2.2 practices).
+
+**State**: **partially accessible** interface with a greatly improved automated
+baseline; the automatic checks pass but they are not a WCAG/EN 301 549/legal
+certification. A formal conclusion requires manual tests with keyboard,
+screen reader, magnification and assistive technologies on supported browsers and
+devices.
+
+**Method**: static review (HTML/CSS/JS), semantics/names/ARIA/focus,
+responsive layout/visible focus/reduced-motion, light/dark theme contrast, axe-core
+via Playwright, regression tests (dialogs, keyboard sort, polling, narrow
+viewports). Suite: **12 green tests** on dashboard, downloads, settings,
 maintenance, health, logs (`cd uiweb/end2end && npm ci && npm run test:a11y`;
-rete di sicurezza, non sostituto della valutazione manuale).
+a safety net, not a substitute for the manual assessment).
 
-**Miglioramenti implementati**: lingua via attributo `lang`; landmark
+**Improvements implemented**: language via the `lang` attribute; landmarks
 (skip-nav, `aside`/`nav`/`header`/`main`); `aria-current="page"`;
-nomi accessibili (non solo placeholder/tooltip); label su controlli a icona;
-dialoghi (focus dentro, trap Tab/Shift+Tab, Escape, ripristino focus);
-header ordinabili da tastiera con `aria-sort`; focus preservato sotto polling;
-focus visibile; tabelle con caption/scope (anche dinamiche); progressbar con
-valore; ARIA per tab/dialoghi/landmark; live region per stati/errori/notifiche/
-async; simboli decorativi mai al posto del testo; ricerca impostazioni con
-sinonimi (`memo`, `memory`, `RAM`, `cache`); contrasti tema chiaro scuriti dove
-serviva; reflow mobile (tabelle con scroll interno); reduced-motion rispettato.
+accessible names (not just placeholder/tooltip); labels on icon controls;
+dialogs (focus inside, Tab/Shift+Tab trap, Escape, focus restore);
+keyboard-sortable headers with `aria-sort`; focus preserved under polling;
+visible focus; tables with caption/scope (also dynamic); progressbar with a
+value; ARIA for tabs/dialogs/landmarks; live region for states/errors/notifications/
+async; decorative symbols never instead of text; settings search with
+synonyms (`memo`, `memory`, `RAM`, `cache`); light-theme contrasts darkened where
+needed; mobile reflow (tables with internal scroll); reduced-motion respected.
 
-**Validazione residua** (prima di qualsiasi dichiarazione formale): workflow
-primari con Tab/Shift+Tab/Invio/Spazio/frecce/Escape; almeno uno screen reader
-desktop (NVDA+Firefox o VoiceOver+Safari) e TalkBack dove applicabile; zoom
-200%/400% (overflow, dialoghi, tabelle, form); ogni form con screen reader
-(riepilogo errori, associazione campi, stati invalidi, recovery); stati async
-non solo-colore (loading/successo/warning/fallimento/vuoto/retry); entrambi i
-temi, viewport mobili, reduced motion; comportamenti browser-specifici e
-contenuti esterni iniettati.
+**Residual validation** (before any formal declaration): primary
+workflows with Tab/Shift+Tab/Enter/Space/arrows/Escape; at least one desktop
+screen reader (NVDA+Firefox or VoiceOver+Safari) and TalkBack where applicable; zoom
+200%/400% (overflow, dialogs, tables, forms); every form with a screen reader
+(error summary, field association, invalid states, recovery); async
+states not colour-only (loading/success/warning/failure/empty/retry); both
+themes, mobile viewports, reduced motion; browser-specific behaviours and
+injected external content.
 
-**Criteri di accettazione**: nome+ruolo affidabili per ogni controllo; ogni
-azione mouse da tastiera; focus contenuto/ripristinato nei dialoghi; annunci
-async senza interruzioni eccessive; contrasti in entrambi i temi; semantica
-usabile per tabelle/tab/progress/errori; nessun regresso su desktop e mobile.
+**Acceptance criteria**: reliable name+role for every control; every
+mouse action from the keyboard; focus contained/restored in the dialogs;
+async announcements without excessive interruptions; contrasts in both themes; semantics
+usable for tables/tabs/progress/errors; no regression on desktop and mobile.
 
 ---
 
-## 14. gx-torrent standalone (gx-nox): rimando
+## 14. gx-torrent standalone (gx-nox): pointer
 
-**Estratto.** L'analisi completa e la decisione — evolvere `gx-torrent` con un solo
-binario e due modalità oppure creare un nuovo `gx-nox` — sono in
-[`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md). Qui resta solo il rimando e
-la decisione in una riga: **si evolve gx-torrent**, e "gx-nox" è il nome pubblico
-della modalità standalone, non un secondo progetto. Il lavoro RSS/UI dello
-standalone (editor guidati, `/ui/settings`, `/ui/browse-dir`) è tracciato in
+**Extract.** The full analysis and the decision — evolve `gx-torrent` with a single
+binary and two modes, or create a new `gx-nox` — are in
+[`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md). Here only the pointer and
+the decision in one line remain: **gx-torrent is evolved**, and "gx-nox" is the public name
+of the standalone mode, not a second project. The RSS/UI work of the
+standalone (guided editors, `/ui/settings`, `/ui/browse-dir`) is tracked in
 [`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md) §12.
 
 ---
 
-## 15. Estensioni ad alto valore dal confronto con BiglyBT
+## 15. High-value extensions from the comparison with BiglyBT
 
-Ex analisi comparativa con **BiglyBT** (client Java, erede di Azureus/Vuze). La
-maggior parte delle sue capacità è **applicativa o storica** (chat/amici, Vuze
-DDB, media server, plugin, WebTorrent) e non va portata. Restano due sole
-funzioni *core* davvero interessanti per gx-core: entrambe sono **backlog**, non
-lavoro fatto; qui c'è il piano, con gli agganci già presenti nel codice.
+Ex comparative analysis with **BiglyBT** (Java client, heir of Azureus/Vuze). The
+majority of its capabilities are **application-level or historical** (chat/friends, Vuze
+DDB, media server, plugins, WebTorrent) and must not be ported. Only two
+truly interesting *core* functions remain for gx-core: both are **backlog**, not
+work done; here is the plan, with the hooks already present in the code.
 
-### 15.1 Ping-Based Auto-Speed (anti-bufferbloat) — fatto
+### 15.1 Ping-Based Auto-Speed (anti-bufferbloat) — done
 
-**Idea.** BiglyBT misura di continuo l'RTT (verso il gateway o un host
-affidabile); quando l'upload satura la coda del modem l'RTT schizza e il motore
-**riduce dinamicamente il limite di upload** prima che la connessione perda
-pacchetti e peggiori la navigazione/VoIP degli altri dispositivi. È un controllo
-in retroazione sulla **latenza**, non sulla banda: agisce solo sul tetto, non
-tocca il data path.
+**Idea.** BiglyBT continuously measures the RTT (towards the gateway or a
+reliable host); when the upload saturates the modem queue the RTT spikes and the engine
+**dynamically reduces the upload limit** before the connection loses
+packets and worsens the browsing/VoIP of the other devices. It is a feedback
+control on **latency**, not on bandwidth: it acts only on the cap, it does not
+touch the data path.
 
-**Implementato (standalone).** `cmd/gx-torrent/autospeed.go`:
+**Implemented (standalone).** `cmd/gx-torrent/autospeed.go`:
 
-- Un **probe** (`runAutoSpeed`, avviato accanto al loop della coda) misura ogni
-  secondo l'RTT con un **TCP connect** al gateway (porte 80/443/53, gateway
-  risolto dal default route) o all'`autospeed-target` configurato; la baseline a
-  riposo è il **minimo degli ultimi 60 s**.
-- Il **controllore** (`autoSpeed.clampUpload`) riduce l'upload del 15%
-  (`autoSpeedReduceNum/Den`) quando la latenza supera `baseline × 1.5` **e**
-  `baseline + 20 ms`, e lo rialza di `tetto/20` quando la linea è a riposo; mai
-  sotto `autospeed-min`. Non supera **mai** il tetto configurato o programmato.
-- L'**unico** punto che chiama `Session.SetSpeedLimits` resta
+- A **probe** (`runAutoSpeed`, started next to the queue loop) measures every
+  second the RTT with a **TCP connect** to the gateway (ports 80/443/53, gateway
+  resolved from the default route) or to the configured `autospeed-target`; the baseline at
+  rest is the **minimum of the last 60 s**.
+- The **controller** (`autoSpeed.clampUpload`) reduces the upload by 15%
+  (`autoSpeedReduceNum/Den`) when the latency exceeds `baseline × 1.5` **and**
+  `baseline + 20 ms`, and raises it by `cap/20` when the line is at rest; never
+  below `autospeed-min`. It **never** exceeds the configured or scheduled cap.
+- The **only** point that calls `Session.SetSpeedLimits` remains
   `applyEffectiveSpeedLimitsLocked` (`schedule.go`): base/config → scheduler →
-  clamp auto-speed, con motivo `auto-speed` nel log. Il gancio a caldo del
-  motore era già pronto (`internal/gxcore/torrent/session_limits.go`).
-- Chiavi in settings.json: `autospeed-enabled` (default `false`),
-  `autospeed-target` (vuoto = gateway), `autospeed-min` (KiB/s, default 50).
-  Serve un limite di upload positivo (globale o programmato) e la pagina lo
-  impone. L'opzione è nella pagina del demone (`settings.html`), con lo stato
-  *latenza attuale / tetto upload*; è **solo standalone** come lo scheduler di
-  banda (in managed è Gextto a governare i limiti).
+  auto-speed clamp, with reason `auto-speed` in the log. The engine's hot
+  hook was already ready (`internal/gxcore/torrent/session_limits.go`).
+- Keys in settings.json: `autospeed-enabled` (default `false`),
+  `autospeed-target` (empty = gateway), `autospeed-min` (KiB/s, default 50).
+  A positive upload limit is needed (global or scheduled) and the page enforces
+  it. The option is in the daemon page (`settings.html`), with the
+  *current latency / upload cap* state; it is **standalone only** like the bandwidth
+  scheduler (in managed mode it is Gextto that governs the limits).
 
-**Test.** `cmd/gx-torrent/autospeed_test.go`: clamp su latenza alta e recupero a
-riposo, pavimento al minimo, inattività senza tetto o senza misure, `reset`,
-probe contro un listener locale, parsing dei candidati e integrazione
+**Test.** `cmd/gx-torrent/autospeed_test.go`: clamp on high latency and recovery at
+rest, floor at the minimum, inactivity without a cap or without measurements, `reset`,
+probe against a local listener, parsing of the candidates and integration
 `applyEffectiveSpeedLimitsLocked` (1000 → 850 KiB/s) + UI
-(`TestUISettingsSavesAutoSpeed`). La copertura i18n (`TestUIPageIsFullyTranslatable`)
-copre le nuove stringhe. **Misura**: il probe è ~1 connessione/s e non tocca il
-data path; con auto-speed **spento** non cambia nulla (nessuna regressione).
+(`TestUISettingsSavesAutoSpeed`). The i18n coverage (`TestUIPageIsFullyTranslatable`)
+covers the new strings. **Measurement**: the probe is ~1 connection/s and does not touch the
+data path; with auto-speed **off** nothing changes (no regression).
 
-**Follow-up possibile.** Versione lato Gextto (managed): Gextto misura l'RTT e
-modula i limiti via `SetLimits`, così l'opzione vale anche per i motori gestiti.
+**Possible follow-up.** Gextto-side (managed) version: Gextto measures the RTT and
+modulates the limits via `SetLimits`, so the option also applies to managed engines.
 
-### 15.2 Swarm Merging (condivisione file tra torrent) — Fase 1 fatta
+### 15.2 Swarm Merging (file sharing between torrents) — Phase 1 done
 
-**Idea.** Far collaborare sciami diversi che contengono **lo stesso file**,
-riusando i pezzi già presenti in un altro torrent A invece di riscaricarli:
-resuscita torrent senza seeder quando esiste contenuto identico altrove. In
-gx-core manca su v1; in v2 esiste già la deduplicazione intrinseca di protocollo.
+**Idea.** Make different swarms that contain **the same file** collaborate,
+reusing the pieces already present in another torrent A instead of re-downloading them:
+it revives torrents without seeders when identical content exists elsewhere. In
+gx-core it is missing on v1; in v2 the intrinsic protocol deduplication already exists.
 
-**Agganci già presenti.** `piece.Piece.Data` è un `filesection.Piece` e ogni
-`FileSection{File, Offset, Length, Padding}` punta a file+offset **assoluto**
-(`internal/filesection/section.go`): scrivere un pezzo è `File.WriteAt(buf, off)`.
-Gli hint **BEP 38** (`similar`/`collections`) sono già letti e uniti
-(`internal/gxcore/internal/metainfo/bep38.go`) e i torrent locali che li
-condividono sono già trovati (`cmd/gx-torrent/bep38.go`): è la scoperta dei
-candidati, il punto di partenza del merge.
-La verifica c'è già (`Piece.VerifyHash` v1, `Piece.VerifyV2` v2); in v2
-`metainfo.V2Files[fi].Root` è l'**identità per-file**, e `internal/merkle`
-fornisce le foglie da 16 KiB per la verifica **per blocco**. Il problema non è il
-disco, è la **verifica**: non ci si fida dei byte di B finché non sono validati
-contro la struttura di A.
+**Hooks already present.** `piece.Piece.Data` is a `filesection.Piece` and every
+`FileSection{File, Offset, Length, Padding}` points to a file+**absolute** offset
+(`internal/filesection/section.go`): writing a piece is `File.WriteAt(buf, off)`.
+The **BEP 38** hints (`similar`/`collections`) are already read and merged
+(`internal/gxcore/internal/metainfo/bep38.go`) and the local torrents that
+share them are already found (`cmd/gx-torrent/bep38.go`): it is the discovery of the
+candidates, the starting point of the merge.
+The verification already exists (`Piece.VerifyHash` v1, `Piece.VerifyV2` v2); in v2
+`metainfo.V2Files[fi].Root` is the **per-file identity**, and `internal/merkle`
+provides the 16 KiB leaves for the **per-block** verification. The problem is not the
+disk, it is the **verification**: B's bytes are not trusted until they are validated
+against A's structure.
 
-**Fase 1 (fatta, `torrent/localmerge.go`).** Merge solo tra torrent a **layout
-identico** (stessa piece length, stessa lunghezza totale e stessi hash ai medesimi
-indici): i pezzi sono direttamente interscambiabili e vengono verificati con
-l'hash di **A**. Copre il caso comune "stesso contenuto, `.torrent`/name/tracker
-diversi" a rischio corruzione ≈ nullo. Implementazione: alla fine
-dell'allocazione di A (`handleAllocationDone`) ogni torrent pubblica uno
-snapshot immutabile dei propri pezzi (`localData`); A legge gli snapshot degli
-altri torrent della sessione, per ogni pezzo **già verificato** dall'altro
-(bitfield) con hash e lunghezza uguali legge i byte dalla storage dell'altro,
-li riverifica contro il proprio hash e li scrive nella propria storage; il
-verificatore esistente marca poi i pezzi e chiude il completamento. Nessuna
-query cross-torrent (snapshot atomico + bitfield sotto lock): niente deadlock.
-Contabilità (bitfield/completamento) per-torrent.
+**Phase 1 (done, `torrent/localmerge.go`).** Merge only between torrents with an
+**identical layout** (same piece length, same total length and same hashes at the same
+indices): the pieces are directly interchangeable and are verified with
+**A**'s hash. It covers the common case "same content, different `.torrent`/name/tracker"
+with a corruption risk ≈ nil. Implementation: at the end
+of A's allocation (`handleAllocationDone`) every torrent publishes an
+immutable snapshot of its own pieces (`localData`); A reads the snapshots of the
+other torrents of the session, for every piece **already verified** by the other
+(bitfield) with the same hash and length reads the bytes from the other's storage,
+re-verifies them against its own hash and writes them into its own storage; the
+existing verifier then marks the pieces and closes the completion. No
+cross-torrent query (atomic snapshot + bitfield under lock): no deadlock.
+Accounting (bitfield/completion) per torrent.
 
-- **Fase 2 (v2-first):** match per **radice Merkle per-file** e verifica
-  **per blocco** con prova Merkle → file identici anche con layout diversi,
-  senza corruzione. Ancora da fare.
-- **No v1 a layout diverso:** niente euristiche ED2K/parziali di BiglyBT.
+- **Phase 2 (v2-first):** match by **per-file Merkle root** and **per-block**
+  verification with a Merkle proof → identical files even with different layouts,
+  without corruption. Still to do.
+- **No v1 with a different layout:** no ED2K/partial heuristics of BiglyBT.
 
-**Guardia critica: BEP 27.** Il merge è disattivato se A **o** B sono privati
-(`info.Private`): mescolare sciami privati viola le regole dei tracker e inquina
-ratio/statistiche. È una guardia, non un'opzione.
+**Critical guard: BEP 27.** The merge is disabled if A **or** B is private
+(`info.Private`): mixing private swarms violates the tracker rules and pollutes
+ratio/statistics. It is a guard, not an option.
 
-**Test/misura.** `torrent/localmerge_test.go` (riuso, contenuto diverso, guardia
-privati) e `cmd/gx-torrent/swarmmerge_test.go` (end-to-end: B popolato da disco,
-A con contenuto identico e nome diverso si completa **senza peer**). I due test
-passano anche con `-race`. Sforzo: Fase 1 **media** (fatta), Fase 2 **grande**.
+**Test/measurement.** `torrent/localmerge_test.go` (reuse, different content, private
+guard) and `cmd/gx-torrent/swarmmerge_test.go` (end-to-end: B populated from disk,
+A with identical content and a different name completes **without peers**). The two tests
+also pass with `-race`. Effort: Phase 1 **medium** (done), Phase 2 **large**.
 
-**Costo.** Il merge gira una volta per torrent, alla fine dell'allocazione: il
-confronto per-pezzo (hash e lunghezza) avviene **solo** per i torrent con la
-stessa `piece length` e la stessa lunghezza totale (il filtro esterno è O(torrent)
-con due letture di campo), e solo i pezzi che superano il confronto comportano
-I/O. Nessun percorso stazionario (picker, peer, scrittura pezzi) è toccato.
+**Cost.** The merge runs once per torrent, at the end of the allocation: the
+per-piece comparison (hash and length) happens **only** for the torrents with the
+same `piece length` and the same total length (the outer filter is O(torrent)
+with two field reads), and only the pieces that pass the comparison involve
+I/O. No steady-state path (picker, peers, piece writing) is touched.
 
-### 15.3 Criterio di verifica (come §4.5)
+### 15.3 Verification criterion (like §4.5)
 
-Per ogni punto: test mirati (`./cmd/gx-torrent/`, `GxEngine`, `make test-engine`,
-`make test`); con effetto visibile anche la documentazione (`docs/gx-torrent.md`,
-`MANUAL.*`, `README*`) e **entrambe le UI** (Gextto `uiweb/v2` + pagina del
-demone), mai solo via API. **Misura prima/dopo** CPU, RAM e throughput, come da
-regola performance di `AGENTS.md`; i nuovi controlli UI rispettano
-l'accessibilità e l'i18n.
+For every point: targeted tests (`./cmd/gx-torrent/`, `GxEngine`, `make test-engine`,
+`make test`); with a visible effect also the documentation (`docs/gx-torrent.md`,
+`MANUAL.*`, `README*`) and **both UIs** (Gextto `uiweb/v2` + the daemon
+page), never only via API. **Before/after measurement** of CPU, RAM and throughput, as per the
+performance rule of `AGENTS.md`; the new UI controls respect
+accessibility and i18n.
 
 ---
 
-## Appendice A: file consolidati
+## Appendix A: consolidated files
 
-| File originale | Ora (copia locale, non tracciata) | Sezione qui |
+| Original file | Now (local copy, untracked) | Section here |
 |---|---|---|
 | `docs/proposte-migliorie.md` | `docs/archive/proposte-migliorie.md` | §2 |
 | `docs/da-fare.md` | `docs/archive/da-fare.md` | §1 |
@@ -2419,7 +2415,7 @@ l'accessibilità e l'i18n.
 | `docs/gx-torrent-ottimizzazioni-prestazionali-v2.md` | `docs/archive/gx-torrent-ottimizzazioni-prestazionali-v2.md` | §5 |
 | `docs/gx-torrent-misure-seeding.md` | `docs/archive/gx-torrent-misure-seeding.md` | §6 |
 | `docs/revisione-1.md` | `docs/archive/revisione-1.md` | §8 |
-| `docs/archive/revisione-2.md` | resta in `docs/archive/` (non tracciato) | §9 |
-| `docs/archive/UI_V2.md` | resta in `docs/archive/` (non tracciato) | §11 |
-| `docs/archive/gextto-terra.md` | resta in `docs/archive/` (non tracciato) | §10.1 |
-| `docs/archive/pro-terra.md` | resta in `docs/archive/` (non tracciato) | §10.2 |
+| `docs/archive/revisione-2.md` | remains in `docs/archive/` (untracked) | §9 |
+| `docs/archive/UI_V2.md` | remains in `docs/archive/` (untracked) | §11 |
+| `docs/archive/gextto-terra.md` | remains in `docs/archive/` (untracked) | §10.1 |
+| `docs/archive/pro-terra.md` | remains in `docs/archive/` (untracked) | §10.2 |

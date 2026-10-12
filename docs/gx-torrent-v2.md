@@ -1,169 +1,175 @@
-# BitTorrent v2 (BEP 52) — progetto di implementazione
+# BitTorrent v2 (BEP 52) — implementation plan
 
-> Documento operativo per completare il supporto **BitTorrent v2** in `gx-core`
-> (`internal/gxcore`). Stato in [`gx-torrent.md`](gx-torrent.md) e
-> [`evoluzione.md`](evoluzione.md) §4.4; piano generale in
-> [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md). Obiettivo: attivare tutto
-> **solo** per `meta version == 2`, così v1 (usato da Gextto) resta invariato.
+> Working document to complete **BitTorrent v2** support in `gx-core`
+> (`internal/gxcore`). Status in [`gx-torrent.md`](gx-torrent.md) and
+> [`evoluzione.md`](evoluzione.md) §4.4; overall plan in
+> [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md). Goal: enable everything
+> **only** for `meta version == 2`, so v1 (used by Gextto) stays unchanged.
 
-## 1. Stato attuale (implementato)
+## 1. Current state (implemented)
 
-- `internal/gxcore/internal/metainfo`: legge `meta version`, `file tree`,
-  `piece layers`; calcola l'info-hash SHA-256 (`Info.V2Hash`) e il troncato;
-  `NewV2Info` accetta un info dict v2-only; `VerifyPieceLayers` valida i
-  `piece layers` contro i `pieces root`; `ErrV2Only`/`ErrUnknownMetaVersion`.
-- `internal/gxcore/internal/magnet`: legge la `btmh` (`V2InfoHash`).
-- `internal/gxcore/internal/merkle`: alberi SHA-256 (blocchi 16 KiB, foglie
-  mancanti = **hash zero**, `Layer`, `PieceLayer`, `Root`, `ZeroRoot`,
+- `internal/gxcore/internal/metainfo`: reads `meta version`, `file tree`,
+  `piece layers`; computes the SHA-256 info-hash (`Info.V2Hash`) and the
+  truncated one; `NewV2Info` accepts a v2-only info dict; `VerifyPieceLayers`
+  validates the `piece layers` against the `pieces root`;
+  `ErrV2Only`/`ErrUnknownMetaVersion`.
+- `internal/gxcore/internal/magnet`: reads the `btmh` (`V2InfoHash`).
+- `internal/gxcore/internal/merkle`: SHA-256 trees (16 KiB blocks, missing
+  leaves = **zero hash**, `Layer`, `PieceLayer`, `Root`, `ZeroRoot`,
   `VerifyProof`).
-- Il motore è v1-only per i percorsi non v2; gli **ibridi** si scaricano come v1.
+- The engine is v1-only for non-v2 paths; **hybrids** are downloaded as v1.
 
-**Realizzato (2026-10-10):** modello a **pezzi per-file** (`NewPieces` ramo v2),
-`Piece.VerifyV2` (nodo Merkle via `merkle`), verifica SHA-256 in
-`verifier`/`piecewriter`, identità troncata (`Info.Hash` = primi 20 byte di
-`V2Hash`), abilitazione dei **`.torrent` v2** (il demone non rifiuta più i v2-only
-da file), **persistenza dei `piece layers`** nel resume (i torrent v2
-sopravvivono al riavvio e l'**export/serve del `.torrent` li include**) e **test
-end-to-end** (seed/leech multi-file con `piece length` > 16 KiB).
+**Done (2026-10-10):** **per-file piece** model (`NewPieces` v2 branch),
+`Piece.VerifyV2` (Merkle node via `merkle`), SHA-256 verification in
+`verifier`/`piecewriter`, truncated identity (`Info.Hash` = first 20 bytes of
+`V2Hash`), enabling **v2 `.torrent`** (the daemon no longer rejects v2-only
+from file), **persistence of `piece layers`** in the resume (v2 torrents
+survive a restart and the **export/serve of the `.torrent` includes them**) and
+**end-to-end tests** (multi-file seed/leech with `piece length` > 16 KiB).
 
-**Realizzato (2026-10-10) — I5:** i **magnet v2** (`urn:btmh:`) sono supportati.
-L'info dict arriva via BEP 9; i `piece layers` per-file si scaricano dai peer con
-i messaggi `hash request`/`hashes`/`hash reject` (BEP 52, id 21/22/23, payload
-binario), si verificano contro i `pieces root` (uncle hash inclusi) e si
-persistono nel resume. Il **bit riservato v2** (byte 7, `0x10`) è annunciato
-nell'handshake solo per i torrent con identità v2. Il seed risponde dalle sue
-`piece layers`, senza leggere i dati. Test end-to-end `TestV2MagnetTransfer` (seed e
-leech in-process).
+**Done (2026-10-10) — I5:** **v2 magnets** (`urn:btmh:`) are supported. The
+info dict arrives via BEP 9; the per-file `piece layers` are downloaded from
+peers with the `hash request`/`hashes`/`hash reject` messages (BEP 52, ids
+21/22/23, binary payload), verified against the `pieces root` (uncle hashes
+included) and persisted in the resume. The **v2 reserved bit** (byte 7,
+`0x10`) is announced in the handshake only for torrents with v2 identity. The
+seed answers from its `piece layers`, without reading the data. End-to-end test
+`TestV2MagnetTransfer` (seed and leech in-process).
 
-**Realizzato (2026-10-10) — layer dei pezzi in parallelo e `base = 0`:**
-- il `piece layer` di un file è diviso in chunk fissi (≤512 hash), ciascuno
-  chiesto a un peer diverso; un chunk fallito, scaduto (30 s) o rifiutato torna
-  in coda per un altro peer. Le `hash request` partono solo verso i peer che
-  annunciano il bit v2 (`TestV2LayerChunksAreAssignedAndRetried`,
+**Done (2026-10-10) — piece layers in parallel and `base = 0`:**
+- a file's `piece layer` is split into fixed chunks (≤512 hashes), each
+  requested from a different peer; a failed, expired (30 s) or rejected chunk
+  goes back into the queue for another peer. The `hash request`s start only
+  towards peers that announce the v2 bit
+  (`TestV2LayerChunksAreAssignedAndRetried`,
   `TestExpireV2HashRequestsReleasesStaleRequest`);
-- il seed risponde anche alle richieste del **layer dei blocchi** (`base = 0`),
-  che un leecher libtorrent usa per verificare i blocchi durante il download:
-  l'albero è costruito dai pezzi verificati (`v2BlockTree`), **fuori dal loop del
-  torrent** (lettura completa del file: un `hash reject` è "non ancora pronto",
-  il client ritenta), in cache per-file con **budget di memoria** ed eviction LRU,
-  solo per un file interamente presente e con la radice **verificata** contro
-  `pieces root`, altrimenti `hash reject`
+- the seed also answers requests for the **block layer** (`base = 0`), which a
+  libtorrent leecher uses to verify blocks during the download: the tree is
+  built from the verified pieces (`v2BlockTree`), **outside the torrent loop**
+  (full read of the file: a `hash reject` means "not ready yet", the client
+  retries), cached per-file with a **memory budget** and LRU eviction, only for
+  a file entirely present and with the root **verified** against
+  `pieces root`, otherwise `hash reject`
   (`TestAppendBlockLeavesMatchesContiguousHashes`,
-  `TestV2BlockCacheEvictsLeastRecentlyUsed`; interop end-to-end con un
-  client TCP grezzo in `cmd/gx-torrent/v2_blocklayer_test.go`).
+  `TestV2BlockCacheEvictsLeastRecentlyUsed`; end-to-end interop with a raw TCP
+  client in `cmd/gx-torrent/v2_blocklayer_test.go`).
 
-## 2. BEP 52 in sintesi (regole che contano)
+## 2. BEP 52 in a nutshell (the rules that matter)
 
-- **Info-hash**: SHA-256 dell'info dict; per tracker/handshake si usa il
-  **troncato a 20 byte** (wire identico a v1).
-- **`pieces root`**: radice di un Merkle a branch 2 sui **blocchi da 16 KiB** del
-  file; l'ultimo blocco può essere più corto (hash dei byte effettivi); le foglie
-  oltre la fine del file sono **hash di 32 byte a zero**.
-- **`piece layers`** (top-level, fuori da `info`): chiave = `pieces root`, valore
-  = hash di un layer scelto perché un hash copra `piece length` byte; gli hash
-  oltre la fine del file **si omettono**. Il torrent è invalido se non combaciano.
-- **Allineamento**: i file sono mappati sui confini di pezzo; **l'ultimo pezzo di
-  un file può essere più corto** di `piece length` (lo "alignment gap" **non**
-  appartiene ad alcun pezzo). I pezzi **non** attraversano due file.
-- **Estensioni peer**: `hash request` (21), `hashes` (22), `hash reject` (23).
-- **Ibridi**: un info dict con entrambi i campi; v1=SHA-1 e v2=SHA-256 su quel
-  dict completo.
+- **Info-hash**: SHA-256 of the info dict; for trackers/handshake the
+  **20-byte truncated** one is used (wire identical to v1).
+- **`pieces root`**: root of a branch-2 Merkle tree over the file's **16 KiB
+  blocks**; the last block may be shorter (hash of the actual bytes); the
+  leaves beyond the end of the file are **32-byte zero hashes**.
+- **`piece layers`** (top-level, outside `info`): key = `pieces root`, value =
+  hash of a layer chosen so that one hash covers `piece length` bytes; the
+  hashes beyond the end of the file **are omitted**. The torrent is invalid if
+  they do not match.
+- **Alignment**: the files are mapped onto piece boundaries; **the last piece
+  of a file may be shorter** than `piece length` (the "alignment gap" **does
+  not** belong to any piece). The pieces **do not** span two files.
+- **Peer extensions**: `hash request` (21), `hashes` (22), `hash reject` (23).
+- **Hybrids**: an info dict with both fields; v1=SHA-1 and v2=SHA-256 over
+  that complete dict.
 
-## 3. Decisione: modello pezzi per-file (NON concatenato)
+## 3. Decision: per-file piece model (NOT concatenated)
 
-**Tentativo scartato e perché.** Un primo tentativo ha modellato il v2
-riusando la macchina v1 con **file di padding sintetico** (BEP 47) tra i file,
-per allineare i pezzi. **Non funziona**: in v2 il pezzo di coda di un file è
-*più corto* di `piece length` e la parte mancante è un **hash zero**, non un
-blocco di zeri. Il modello concatenato inserisce un blocco di zeri **dentro** il
-pezzo: il primo blocco di dati reali, poi un blocco di zeri, il cui hash è
-`SHA256(zeri)` e non l'hash zero atteso. La verifica non combacia mai.
+**Attempt discarded and why.** A first attempt modelled v2 by reusing the v1
+machinery with **synthetic padding files** (BEP 47) between the files, to align
+the pieces. **It does not work**: in v2 a file's tail piece is *shorter* than
+`piece length` and the missing part is a **zero hash**, not a block of zeros.
+The concatenated model inserts a block of zeros **inside** the piece: the first
+block of real data, then a block of zeros, whose hash is `SHA256(zeros)` and
+not the expected zero hash. The verification never matches.
 
-**Scelta corretta: pezzi per-file.** Per un torrent v2 i pezzi sono generati
-**file per file**: il file `f` occupa pezzi `[k, k+ceil(len_f/pieceLength))`,
-il pezzo di coda ha `Length = len_f mod pieceLength` (o `pieceLength`) e **non
-contiene padding**. Dopo un file si riparte da un nuovo indice di pezzo (lo
-spazio degli indirizzi è discontinuo). Il modello `Piece` attuale lo consente
-(`Piece.Length` può essere `< pieceLength`); va cambiata la **costruzione**
-(`piece.NewPieces`) per il caso v2.
+**Correct choice: per-file pieces.** For a v2 torrent the pieces are generated
+**file by file**: file `f` occupies pieces `[k, k+ceil(len_f/pieceLength))`,
+the tail piece has `Length = len_f mod pieceLength` (or `pieceLength`) and
+**contains no padding**. After a file it restarts from a new piece index (the
+address space is discontinuous). The current `Piece` model allows it
+(`Piece.Length` can be `< pieceLength`); the **construction**
+(`piece.NewPieces`) must be changed for the v2 case.
 
-**Verifica del pezzo (v2).** L'hash atteso di un pezzo v2 **non** è un hash
-piatto del pezzo: è il **nodo Merkle** sui blocchi da 16 KiB del pezzo, con le
-foglie mancanti (per arrivare a `pieceLength/16KiB` foglie) pari a **hash zero**.
-Va confrontato con l'hash del `piece layers` di quel file.
+**Piece verification (v2).** The expected hash of a v2 piece **is not** a flat
+hash of the piece: it is the **Merkle node** over the piece's 16 KiB blocks,
+with the missing leaves (to reach `pieceLength/16KiB` leaves) equal to **zero
+hash**. It must be compared with the hash from that file's `piece layers`.
 
-Conseguenza: `piece.NewPieces` (o un costruttore v2) deve ricevere gli hash dei
-pezzi **per file** (dal `piece layers`), e `Piece` deve sapere che è v2 e quante
-foglie copre un pezzo (`pieceLength/16KiB`).
+Consequence: `piece.NewPieces` (or a v2 constructor) must receive the
+**per-file** piece hashes (from the `piece layers`), and `Piece` must know that
+it is v2 and how many leaves a piece covers (`pieceLength/16KiB`).
 
-## 4. Incrementi (in ordine di dipendenza, tutti realizzati)
+## 4. Increments (in dependency order, all done)
 
-### I1 — Modello pezzi per-file (L) — **fatto**
-- `piece.NewPieces`: ramo v2 che costruisce i pezzi file per file (coda più
-  corta, nessun padding), indicizzandoli globalmente e prendendo l'hash di ogni
-  pezzo dal layer del file.
-- `Piece`: campi `V2 bool` e `V2Leaves int` (`pieceLength/16KiB`).
-- Verifica: nuova `Piece.VerifyV2(buf)` = nodo Merkle dei blocchi del pezzo
-  (foglie mancanti = hash zero) confrontato con `Piece.Hash`.
-- **Test**: pezzo pieno, pezzo di coda più corto, ultimo blocco parziale; con un
-  `pieceLength` > 16 KiB (per esercitare i nodi Merkle, non solo le foglie).
+### I1 — Per-file piece model (L) — **done**
+- `piece.NewPieces`: v2 branch that builds the pieces file by file (shorter
+  tail, no padding), indexing them globally and taking each piece's hash from
+  the file's layer.
+- `Piece`: fields `V2 bool` and `V2Leaves int` (`pieceLength/16KiB`).
+- Verification: new `Piece.VerifyV2(buf)` = Merkle node of the piece's blocks
+  (missing leaves = zero hash) compared with `Piece.Hash`.
+- **Tests**: full piece, shorter tail piece, partial last block; with a
+  `pieceLength` > 16 KiB (to exercise the Merkle nodes, not just the leaves).
 
-### I2 — Verifica/verificatore v2 (M) — **fatto**
-- `verifier`/`piecewriter`: se `Piece.V2`, usare `VerifyV2`; altrimenti
-  `VerifyHash(buf, sha1.New())`. Per v1 nulla cambia.
-- **Test**: pezzo v2 valido/corrotto (nodo Merkle) + regressione v1.
+### I2 — v2 verification/verifier (M) — **done**
+- `verifier`/`piecewriter`: if `Piece.V2`, use `VerifyV2`; otherwise
+  `VerifyHash(buf, sha1.New())`. For v1 nothing changes.
+- **Tests**: valid/corrupt v2 piece (Merkle node) + v1 regression.
 
-### I3 — Identità e sessione (M) — **fatto**
-- v2-only: identità = primi 20 byte di `V2Hash`; handshake/DHT/tracker invariati.
-- Metadata BEP 9 con SHA-256 troncato per v2; persistenza `piece layers` nel
-  resumer.
-- **Test**: routing a porta unica col troncato; ricarica da resume.
+### I3 — Identity and session (M) — **done**
+- v2-only: identity = first 20 bytes of `V2Hash`; handshake/DHT/tracker
+  unchanged.
+- BEP 9 metadata with truncated SHA-256 for v2; `piece layers` persistence in
+  the resumer.
+- **Tests**: single-port routing with the truncated hash; reload from resume.
 
-### I4 — Collegare i piece layers (S/M) — **fatto**
-- `metainfo.New`: per `meta version == 2`, costruire l'info v2 (parse file tree),
-  validare i `piece layers` (`VerifyPieceLayers`) e fornire gli hash per-file a
-  `NewPieces`.
-- **Test**: layer incoerente → torrent rifiutato; valido → verifica ok.
+### I4 — Wiring up the piece layers (S/M) — **done**
+- `metainfo.New`: for `meta version == 2`, build the v2 info (parse file tree),
+  validate the `piece layers` (`VerifyPieceLayers`) and provide the per-file
+  hashes to `NewPieces`.
+- **Tests**: inconsistent layer → torrent rejected; valid → verification ok.
 
-### I5 — Estensioni `hash request`/`hashes` (L) — **fatto**
-- Codec **binario** (non bencode): messaggi 21/22/23, header
-  `pieces root | base | index | length | proof layers` (32+4×4 byte);
-  `hashes` = header + hash richiesti + uncle. Dispatch in `peerreader`,
-  serializzazione `WriteTo`, fuzz sull'header.
-- Lato client: `v2LayerFile`, richieste a blocchi di ≤512 hash, verifica di ogni
-  risposta con `merkle.VerifyHashes` (ricostruzione della radice con gli uncle),
-  assemblaggio del layer e `AttachV2Pieces`, persistenza in `piece layers`.
-- Lato server: `LayerTree` costruito dagli hash dei pezzi già posseduti;
-  `base = 0` (layer dei blocchi) servito dai pezzi verificati per un file
-  completo; `hash_reject` quando il layer non è servibile.
-- **Test**: round-trip codec + fuzz; `TestLayerTreeRoundTrip` e
-  `TestV2MagnetTransfer` (scarica i layer da un seed, li valida, verifica i pezzi).
+### I5 — `hash request`/`hashes` extensions (L) — **done**
+- **Binary** codec (not bencode): messages 21/22/23, header
+  `pieces root | base | index | length | proof layers` (32+4×4 bytes);
+  `hashes` = header + requested hashes + uncle. Dispatch in `peerreader`,
+  `WriteTo` serialisation, fuzzing on the header.
+- Client side: `v2LayerFile`, requests in chunks of ≤512 hashes, verification
+  of each response with `merkle.VerifyHashes` (rebuilding the root with the
+  uncles), assembly of the layer and `AttachV2Pieces`, persistence in
+  `piece layers`.
+- Server side: `LayerTree` built from the hashes of the pieces already owned;
+  `base = 0` (block layer) served from the verified pieces for a complete file;
+  `hash_reject` when the layer cannot be served.
+- **Tests**: codec round-trip + fuzzing; `TestLayerTreeRoundTrip` and
+  `TestV2MagnetTransfer` (downloads the layers from a seed, validates them,
+  verifies the pieces).
 
-### I6 — Abilitazione e UX (S/M) — **fatto**
-- Demone: accettare i v2-only (`.torrent` con layer), rilevamento basato sul
-  modello, `torrent_version` in UI; togliere la blocklist/rimozione v2 in Gextto.
-- **Test**: `add` v2 con seed/leech locale; aggiornare `TestV2OnlyDetection`.
+### I6 — Enabling and UX (S/M) — **done**
+- Daemon: accept v2-only (`.torrent` with layers), model-based detection,
+  `torrent_version` in the UI; remove the v2 blocklist/removal in Gextto.
+- **Tests**: `add` v2 with a local seed/leech; update `TestV2OnlyDetection`.
 
-## 5. Test end-to-end (chiave)
+## 5. End-to-end tests (key)
 
-Costruire in test un torrent v2-only deterministico: dati, foglie
-(`SHA256` dei blocchi 16 KiB), `pieces root`, `piece layers`, info dict +
-`.torrent`. Seed + leech in-process (come `TestSharedPortTransfer`) e confronto
-dei byte. **Usare `piece length` > 16 KiB** in almeno un caso per esercitare i
-nodi Merkle. Il primo tentativo con `piece length = 2 blocchi` e padding
-sintetico ha fallito proprio qui (progress 0: hash del pezzo sbagliato).
+Build a deterministic v2-only torrent in the test: data, leaves
+(`SHA256` of the 16 KiB blocks), `pieces root`, `piece layers`, info dict +
+`.torrent`. Seed + leech in-process (as in `TestSharedPortTransfer`) and
+comparison of the bytes. **Use `piece length` > 16 KiB** in at least one case
+to exercise the Merkle nodes. The first attempt with `piece length = 2 blocks`
+and synthetic padding failed right here (progress 0: wrong piece hash).
 
-## 6. Rischi e mitigazioni
+## 6. Risks and mitigations
 
-| Rischio | Mitigazione |
+| Risk | Mitigation |
 | --- | --- |
-| Regressione v1/Gextto | tutto dietro `meta version == 2`; `make test` (trasferimenti reali v1) + race a ogni passo |
-| Modello pezzi sbagliato | pezzi per-file espliciti; test con coda più corta e blocco parziale |
-| Hash del pezzo sbagliato | nodo Merkle con padding a hash zero, non hash piatto; `merkle` come riferimento |
-| Identità troncata | handshake/DHT/tracker a 20 byte; test di routing |
-| `piece layers` assenti | scaricati dai peer con `hash request` (I5); un peer muto scade dopo 30 s |
-| Licenze | algoritmi riscritti (niente MPL di anacrolix); BEP 52 è pubblico dominio |
+| v1/Gextto regression | everything behind `meta version == 2`; `make test` (real v1 transfers) + race at every step |
+| Wrong piece model | explicit per-file pieces; tests with a shorter tail and a partial block |
+| Wrong piece hash | Merkle node with zero-hash padding, not a flat hash; `merkle` as reference |
+| Truncated identity | 20-byte handshake/DHT/tracker; routing tests |
+| Missing `piece layers` | downloaded from peers with `hash request` (I5); a silent peer expires after 30 s |
+| Licences | algorithms rewritten (no anacrolix MPL); BEP 52 is public domain |
 
-## 7. Fuori scope (per ora)
+## 7. Out of scope (for now)
 
-- WebTorrent/WebRTC; storage alternativi; `share mode`.
+- WebTorrent/WebRTC; alternative storage; `share mode`.

@@ -1,50 +1,50 @@
-# Architettura e mappa del codice
+# Architecture and code map
 
-Questo documento spiega **come è organizzato il repository** e **dove mettere le
-mani** per i compiti più comuni. È pensato per chi legge il codice, non per
-l'utente finale: per l'installazione e l'uso vedi il [manuale](MANUAL.it.md).
+This document explains **how the repository is organised** and **where to make
+changes** for the most common tasks. It is intended for those reading the code,
+not for the end user: for installation and usage see the [manual](MANUAL.it.md).
 
 > [!NOTE]
-> Gextto è un daemon Go. La logica applicativa di Gextto vive in **un unico
-> package Go** (`github.com/buzzqw/gextto`) nella cartella principale del repo;
-> `cmd/gexttod` ne è solo l'eseguibile. Il repository contiene però anche il
-> demone torrent standalone `cmd/gx-torrent` e il motore torrent `internal/gxcore`
-> (Go puro), oltre ai pacchetti condivisi in `internal/`. I file della root sono
-> quindi tanti, ma **raggruppati per prefisso**: le sezioni qui sotto sono la
-> mappa di quei prefissi.
+> Gextto is a Go daemon. Gextto's application logic lives in **a single Go
+> package** (`github.com/buzzqw/gextto`) in the main folder of the repo;
+> `cmd/gexttod` is only its executable. The repository, however, also contains the
+> standalone torrent daemon `cmd/gx-torrent` and the torrent engine `internal/gxcore`
+> (pure Go), as well as the shared packages in `internal/`. The root files are
+> therefore many, but **grouped by prefix**: the sections below are the map of
+> those prefixes.
 
-## 1. Panoramica delle cartelle
+## 1. Folder overview
 
 ```text
 gextto/
-├── cmd/gexttod/            eseguibile di Gextto (main): smista i comandi e avvia il daemon
-├── cmd/gx-torrent/         eseguibile standalone del motore torrent: demone, UI e API
-├── *.go                    il package gextto: la logica di Gextto (vedi §3 e §4)
-├── *_test.go               test, accanto al codice che verificano
-├── internal/               pacchetti condivisi e librerie (vedi §5), incluso gxcore (motore torrent)
-├── uiweb/v2/               UI server-side: template HTML e asset statici
+├── cmd/gexttod/            Gextto executable (main): dispatches commands and starts the daemon
+├── cmd/gx-torrent/         standalone executable of the torrent engine: daemon, UI and API
+├── *.go                    the gextto package: Gextto's logic (see §3 and §4)
+├── *_test.go               tests, next to the code they verify
+├── internal/               shared packages and libraries (see §5), including gxcore (torrent engine)
+├── uiweb/v2/               server-side UI: HTML templates and static assets
 │   ├── templates/*.html
 │   └── static/*            CSS, htmx, JS (v2-core.js)
-├── uiweb/end2end/          test Playwright (Node, non Go)
-├── docs/                   documentazione (questo file, manuali, API...)
-├── scripts/                build, update, packaging e service helper
-├── systemd/                unit file di esempio per il servizio
+├── uiweb/end2end/          Playwright tests (Node, not Go)
+├── docs/                   documentation (this file, manuals, API...)
+├── scripts/                build, update, packaging and service helper
+├── systemd/                example unit files for the service
 ├── .github/                CI, CodeQL, dependabot, release
-├── go.mod / go.sum         dipendenze Go
-├── Makefile                comandi di build/test
-├── VERSION, build_number   versione e numero di build (build_number committato, condiviso con la CI)
-└── bin/                    binario compilato (ignorato da git)
+├── go.mod / go.sum         Go dependencies
+├── Makefile                build/test commands
+├── VERSION, build_number   version and build number (build_number committed, shared with CI)
+└── bin/                    compiled binary (ignored by git)
 ```
 
-Cartelle **generate/locali** da non confondere con il codice: `bin/` (build),
-`data/` (database e stato runtime), `uiweb/end2end/node_modules/`,
-`gextto-data/` (directory dati del servizio). Sono elencate in `.gitignore`.
+**Generated/local** folders not to be confused with the code: `bin/` (build),
+`data/` (database and runtime state), `uiweb/end2end/node_modules/`,
+`gextto-data/` (data directory of the service). They are listed in `.gitignore`.
 
-## 2. Come nasce il binario
+## 2. How the binary is built
 
 ```
 cmd/gexttod/main.go  →  gextto.Parse(args)
-  ├── comando daemon  →  runDaemon(...)                 (cmd/gexttod/main.go)
+  ├── daemon command  →  runDaemon(...)                 (cmd/gexttod/main.go)
   │                       →  LoadConfig → PrepareDirs
   │                       →  OpenDatabase / OpenArchive / OpenComicsDb / OpenI18nDb
   │                       →  NewLibtorrentClient(...)
@@ -53,224 +53,224 @@ cmd/gexttod/main.go  →  gextto.Parse(args)
   └── --update        →  gextto.Run(...)                (update.go)
 ```
 
-Il **numero di build** di Gextto è generato dallo script `scripts/build-daemon.sh`
-(e `scripts/next-build-number.sh`) e inciso nel binario. Anche il demone
-`gx-torrent` ha un **proprio** contatore, indipendente: cresce di uno a ogni
-build reale tramite `scripts/next-gx-build-number.sh` e vive in
-`gx-torrent.build_number` (non committato).
+Gextto's **build number** is generated by the script `scripts/build-daemon.sh`
+(and `scripts/next-build-number.sh`) and stamped into the binary. The `gx-torrent`
+daemon also has its **own**, independent counter: it increases by one on every real
+build via `scripts/next-gx-build-number.sh` and lives in
+`gx-torrent.build_number` (not committed).
 
-La build predefinita è in **Go puro** (gx-torrent, nessun libtorrent). Il
-**bridge C++** per libtorrent è **opt-in**: è la coppia nella root
-`libtorrent_bridge.cpp` (compilato da cgo) + `libtorrent_bridge.h` (header),
-inclusa solo con `CGO_ENABLED=1` (`make build-libtorrent`,
-`GEXTTO_LIBTORRENT=1 scripts/build-daemon.sh`). Senza cgo, `libtorrent_nocgo.go`
-fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
-`LibtorrentCompiled()` distingue le due build.
+The default build is in **pure Go** (gx-torrent, no libtorrent). The
+**C++ bridge** for libtorrent is **opt-in**: it is the pair in the root
+`libtorrent_bridge.cpp` (compiled by cgo) + `libtorrent_bridge.h` (header),
+included only with `CGO_ENABLED=1` (`make build-libtorrent`,
+`GEXTTO_LIBTORRENT=1 scripts/build-daemon.sh`). Without cgo, `libtorrent_nocgo.go`
+provides the stubs (`//go:build !cgo`), `libtorrent.go` stays unchanged and
+`LibtorrentCompiled()` distinguishes the two builds.
 
-## 3. Package principale: file per area
+## 3. Main package: files by area
 
-### Avvio, orchestrazione e servizio
-| File | Ruolo |
+### Startup, orchestration and service
+| File | Role |
 |---|---|
-| `cli.go` | parsing dei comandi (`gexttod --version`, `--update`, ...). |
-| `appstate.go` | costruzione dello stato condiviso `AppState` (`NewAppState`). |
-| `engine.go` | motore di scrape/ricerca: feed HTML/RSS, Torznab, motori web. |
-| `orchestrator.go` | un ciclo completo di acquisizione. |
-| `web_serve.go` | avvio del server web e dei worker di background. |
-| `service_restart.go` | azioni systemd pianificate (es. riavvio del servizio). |
-| `update.go` | auto-aggiornamento del binario. |
-| `safety.go` | riavvio controllato dei worker dopo un panic. |
-| `watcher.go` | cartelle "watched": i file `.torrent`/`.magnet` vengono aggiunti da soli. |
+| `cli.go` | command parsing (`gexttod --version`, `--update`, ...). |
+| `appstate.go` | construction of the shared state `AppState` (`NewAppState`). |
+| `engine.go` | scrape/search engine: HTML/RSS feeds, Torznab, web engines. |
+| `orchestrator.go` | one complete acquisition cycle. |
+| `web_serve.go` | startup of the web server and background workers. |
+| `service_restart.go` | scheduled systemd actions (e.g. service restart). |
+| `update.go` | self-update of the binary. |
+| `safety.go` | controlled restart of workers after a panic. |
+| `watcher.go` | "watched" folders: `.torrent`/`.magnet` files are added by themselves. |
 
-### Configurazione, stato e database
-| File | Ruolo |
+### Configuration, state and database
+| File | Role |
 |---|---|
-| `config.go` | il modello `Config`: lettura/scrittura, generazione, default. |
-| `database.go` | store SQLite: serie, film, torrent, storico feed, backoff provider. |
-| `sqlite.go` | apertura di un DB SQLite con pragma condivisi. |
-| `archive.go` | catalogo durevole delle release archiviate. |
-| `migrate.go` | migrazione della directory dati. |
-| `backup.go` | backup dei database (manuale e schedulato). |
-| `library_alias.go` | helper di persistenza della libreria. |
-| `web_inputs_extra.go` | struct di input delle API web. |
+| `config.go` | the `Config` model: read/write, generation, defaults. |
+| `database.go` | SQLite store: series, movies, torrents, feed history, provider backoff. |
+| `sqlite.go` | opening a SQLite DB with shared pragmas. |
+| `archive.go` | durable catalogue of archived releases. |
+| `migrate.go` | migration of the data directory. |
+| `backup.go` | database backups (manual and scheduled). |
+| `library_alias.go` | helper for library persistence. |
+| `web_inputs_extra.go` | input structs of the web APIs. |
 
-### Pipeline media (release → archivio)
-| File | Ruolo |
+### Media pipeline (release → archive)
+| File | Role |
 |---|---|
-| `parser.go` | parsing dei nomi release e della qualità. |
-| `upgrade_until.go` | soglia «smetti di migliorare» (`upgrade_until_score`) applicata alle decisioni di upgrade. |
-| `decision.go` | spiegazione (sola lettura) delle decisioni su una release. |
-| `cleaner.go` | indice dell'archivio, rilevamento duplicati inferiori, pulizia. |
-| `postprocess.go` | post-processing: spostamento, rinomina, sidecar. |
-| `hardlink.go` | import in libreria come hardlink dei file in seed, con ritorno alla copia. |
-| `media_guard.go` | guardie sui file video (estensioni, protezione). |
-| `mediainfo.go` | ispezione reale dei file via `ffprobe`. |
-| `comics.go` | fumetti: scraper, DB, download HTTP, ciclo dedicato. |
-| `comicinfo.go` | scrittura di `ComicInfo.xml` nei CBZ scaricati direttamente. |
+| `parser.go` | parsing of release names and quality. |
+| `upgrade_until.go` | "stop improving" threshold (`upgrade_until_score`) applied to upgrade decisions. |
+| `decision.go` | (read-only) explanation of the decisions on a release. |
+| `cleaner.go` | archive index, detection of lower duplicates, cleanup. |
+| `postprocess.go` | post-processing: move, rename, sidecar. |
+| `hardlink.go` | import into the library as hardlinks of the seeding files, with fallback to copy. |
+| `media_guard.go` | guards on video files (extensions, protection). |
+| `mediainfo.go` | actual inspection of files via `ffprobe`. |
+| `comics.go` | comics: scraper, DB, HTTP download, dedicated cycle. |
+| `comicinfo.go` | writing of `ComicInfo.xml` into directly downloaded CBZ files. |
 
-### Sorgenti, ricerca e metadati
-| File | Ruolo |
+### Sources, search and metadata
+| File | Role |
 |---|---|
-| `rss.go` | feed RSS/XML delle sorgenti. |
-| `websearch.go` | motori di ricerca web e limiter condiviso. |
-| `indexer_health.go` | salute degli indexer (Prowlarr). |
-| `tmdb.go` / `tvdb.go` | metadati TMDB e TheTVDB. |
-| `integrations.go` | URL base delle integrazioni esterne. |
-| `media_refresh.go` | aggiornamento mirato (per cartella) di Jellyfin e Plex, con ripiego sull'aggiornamento completo. |
-| `calendar_ics.go` | calendario iCal `/feed/calendar.ics`: arrivi, messe in onda originali, uscite locali dei film. |
+| `rss.go` | RSS/XML feeds of the sources. |
+| `websearch.go` | web search engines and shared limiter. |
+| `indexer_health.go` | indexer health (Prowlarr). |
+| `tmdb.go` / `tvdb.go` | TMDB and TheTVDB metadata. |
+| `integrations.go` | base URLs of the external integrations. |
+| `media_refresh.go` | targeted (per-folder) refresh of Jellyfin and Plex, with fallback to a full refresh. |
+| `calendar_ics.go` | iCal calendar `/feed/calendar.ics`: arrivals, original airings, local movie releases. |
 
-### Notifiche, hook, i18n
-| File | Ruolo |
+### Notifications, hooks, i18n
+| File | Role |
 |---|---|
-| `notifier.go` | notifiche via Telegram, webhook HTTP e SMTP. |
-| `hooks.go` | hook utente sugli eventi. |
-| `i18n.go` | traduzioni incorporate (`internal_translations*.yml`). |
+| `notifier.go` | notifications via Telegram, HTTP webhook and SMTP. |
+| `hooks.go` | user hooks on events. |
+| `i18n.go` | embedded translations (`internal_translations*.yml`). |
 
-### Motori torrent (piano di trasferimento)
-| File | Ruolo |
+### Torrent engines (transfer plane)
+| File | Role |
 |---|---|
-| `torrent_engine.go` | contratto `TorrentEngine` tra Gextto e il motore. |
-| `torrent_engine_select.go` | scelta del backend da `torrent_backend` + preflight. |
-| `gxtorrent_engine.go` + `gxtorrent_runtime.go` + `cmd/gx-torrent/` | backend **gx-torrent** (Go puro, predefinito): adapter REST, avvio e sorveglianza del demone, che usa il motore gx-core in `internal/gxcore`. Lo stesso demone gira anche da solo (standalone) su Linux e Windows; lo strato di piattaforma è in `cmd/gx-torrent/*_linux.go` / `*_windows.go` / `*_other.go` (memoria, classe disco, gateway, cartella dati, link/junction, move tra volumi, apertura del browser, servizio Windows in `service_windows.go`). |
-| `libtorrent.go` + `libtorrent_cgo.go` + `libtorrent_bridge.cpp/.h` + `libtorrent_nocgo.go` | backend libtorrent (C++/cgo), **opzionale di build** (`GEXTTO_LIBTORRENT=1`; `LibtorrentCompiled()`): in una build Go pura vale lo stub `libtorrent_nocgo.go` e il backend non è selezionabile; se compilato è anche il fallback automatico di gx-torrent. |
-| `qbittorrent_engine.go` + `qbittorrent_runtime.go` | backend qBittorrent. |
-| `torrent_migration.go` | preparazione della migrazione tra backend. |
-| `torrent_removal.go` | registrazione delle rimozioni manuali. |
+| `torrent_engine.go` | the `TorrentEngine` contract between Gextto and the engine. |
+| `torrent_engine_select.go` | backend selection from `torrent_backend` + preflight. |
+| `gxtorrent_engine.go` + `gxtorrent_runtime.go` + `cmd/gx-torrent/` | **gx-torrent** backend (pure Go, default): REST adapter, startup and supervision of the daemon, which uses the gx-core engine in `internal/gxcore`. The same daemon also runs on its own (standalone) on Linux and Windows; the platform layer is in `cmd/gx-torrent/*_linux.go` / `*_windows.go` / `*_other.go` (memory, disk class, gateway, data folder, link/junction, cross-volume move, browser opening, Windows service in `service_windows.go`). |
+| `libtorrent.go` + `libtorrent_cgo.go` + `libtorrent_bridge.cpp/.h` + `libtorrent_nocgo.go` | libtorrent backend (C++/cgo), **optional at build time** (`GEXTTO_LIBTORRENT=1`; `LibtorrentCompiled()`): in a pure Go build the `libtorrent_nocgo.go` stub applies and the backend is not selectable; when compiled it is also the automatic fallback of gx-torrent. |
+| `qbittorrent_engine.go` + `qbittorrent_runtime.go` | qBittorrent backend. |
+| `torrent_migration.go` | preparation of the migration between backends. |
+| `torrent_removal.go` | recording of manual removals. |
 
-### Web/API e worker
-| File | Ruolo |
+### Web/API and workers
+| File | Role |
 |---|---|
-| `web.go` | definizioni condivise: `AppState`, helper risposta/query, setup. |
-| `web_router.go` | costruzione del mux HTTP e tabella delle rotte. |
-| `auth.go` | accesso facoltativo: middleware davanti a tutte le rotte, esenzione rete locale, login, chiave API. |
-| `web_handlers_core.go` | handler core, streaming log, middleware. |
-| `web_handlers_g0.go` … `web_handlers_g7.go` | gruppi di handler portati dal progetto di riferimento. |
-| `web_handlers_compat.go` | endpoint di compatibilità/diagnostica. |
-| `web_handlers_jobs.go`, `web_handlers_libtorrent.go`, `web_handlers_torrent_backend.go`, `web_handlers_torrent_diag.go` | handler specifici (job, libtorrent, backend, diagnostica). |
-| `web_handlers_series.go`, `web_handlers_torrent_stream.go` | handler delle serie (`/api/series/{name}`) e redirect verso lo streaming del demone gx-torrent, con il token aggiunto lato server. |
-| `web_torrent_events.go` | macchina a eventi del ciclo di vita dei torrent. |
-| `web_background.go` | worker di background di lunga durata. |
-| `web_workers_media.go` | worker media: backup schedulato, backfill MediaInfo, calendario. |
-| `web_maintenance_rename.go` | rinomina cartelle con revisione utente. |
-| `httpx.go` | client HTTP condiviso per sorgenti e provider. |
-| `jsonutil.go` | normalizzazione fedele delle risposte JSON. |
-| `health.go` | report di salute (dashboard/endpoint). |
-| `acquisition.go` + `web_handlers_acquisitions.go` | storia dei download: le righe di log con un hash torrent (campo `acq: <id>` di `internal/logging`) salvate in `acquisition_events`; API `/api/acquisitions`, scheda *Storia* e 📜 nella UI. |
-| `health_monitor.go` | monitor che logga lo stato `degraded` con motivo e recupero. |
-| `jobs.go` | gestore dei job di background. |
+| `web.go` | shared definitions: `AppState`, response/query helpers, setup. |
+| `web_router.go` | construction of the HTTP mux and route table. |
+| `auth.go` | optional access: middleware in front of all routes, local network exemption, login, API key. |
+| `web_handlers_core.go` | core handlers, log streaming, middleware. |
+| `web_handlers_g0.go` … `web_handlers_g7.go` | groups of handlers ported from the reference project. |
+| `web_handlers_compat.go` | compatibility/diagnostics endpoints. |
+| `web_handlers_jobs.go`, `web_handlers_libtorrent.go`, `web_handlers_torrent_backend.go`, `web_handlers_torrent_diag.go` | specific handlers (jobs, libtorrent, backend, diagnostics). |
+| `web_handlers_series.go`, `web_handlers_torrent_stream.go` | series handlers (`/api/series/{name}`) and redirect to the streaming of the gx-torrent daemon, with the token added server-side. |
+| `web_torrent_events.go` | event machine of the torrent lifecycle. |
+| `web_background.go` | long-running background workers. |
+| `web_workers_media.go` | media workers: scheduled backup, MediaInfo backfill, calendar. |
+| `web_maintenance_rename.go` | folder rename with user review. |
+| `httpx.go` | shared HTTP client for sources and providers. |
+| `jsonutil.go` | faithful normalisation of JSON responses. |
+| `health.go` | health report (dashboard/endpoint). |
+| `acquisition.go` + `web_handlers_acquisitions.go` | download history: the log lines with a torrent hash (field `acq: <id>` of `internal/logging`) saved in `acquisition_events`; `/api/acquisitions` API, *History* tab and 📜 in the UI. |
+| `health_monitor.go` | monitor that logs the `degraded` state with reason and recovery. |
+| `jobs.go` | background job manager. |
 
-### UI server-side (`uiweb` v2)
-| File | Ruolo |
+### Server-side UI (`uiweb` v2)
+| File | Role |
 |---|---|
-| `uiweb.go` | view-model e formatter condivisi usati dalla UI v2 SSR/HTMX; embed di manuali e licenza. |
-| `uiweb_pages.go` | pagine lista/azione guidate dai dati. |
-| `uiweb_sections.go` | sezioni riutilizzabili (tabella, azioni, form, progresso...). |
-| `uiweb_detail.go` | pagine di dettaglio serie/film. |
-| `uiweb_shell.go` | "chrome" della UI: barra in alto, sidebar, stato. |
-| `uiweb_settings.go`, `uiweb_settings_meta.go`, `uiweb_settings_defaults.go`, `uiweb_tooltips.go` | pagina Configurazione: aree, sezioni e indice con il pannello (`Group`) di ogni impostazione; unità, valori speciali, tipo di controllo e interruttore da cui dipende; default; descrizioni. |
-| `uiweb_v2.go` | shell v2 (HTMX), routing dei frammenti e rendering. |
-| `uiweb_v2_dashboard.go`, `uiweb_v2_downloads.go`, `uiweb_v2_detail.go`, `uiweb_v2_search.go`, `uiweb_v2_comics.go`, `uiweb_v2_maintenance.go` | pagine v2 dedicate. |
-| `uiweb_v2_sections.go` | pagine composte da sezioni (Manutenzione, Integrazioni). |
-| `uiweb_v2_settings_extras.go` | editor strutturati della Configurazione v2. |
-| `uiweb_v2_table.go` | renderer generico di tabelle server-side. |
-| `uiweb_v2_widgets.go` | widget migrati (duplicati, database, RAM disk, rinomina, OAuth, job...). |
-| `uiweb_engine_stats.go` | pannello "Motore torrent" della pagina Salute. |
-| `uiweb_v2_setup.go` | configurazione guidata di primo avvio (`/?view=setup`). |
-| `uiweb_v2_pwa.go` | supporto PWA (installazione come app, condivisione magnet/`.torrent`). |
-| `uiweb_v2_problems.go` | dashboard "Da controllare" (cosa richiede attenzione). |
-| `uiweb_v2_client_i18n.go` | dizionario per le stringhe impostate a runtime dal client. |
+| `uiweb.go` | view-model and formatters shared by the v2 SSR/HTMX UI; embed of manuals and licence. |
+| `uiweb_pages.go` | data-driven list/action pages. |
+| `uiweb_sections.go` | reusable sections (table, actions, form, progress...). |
+| `uiweb_detail.go` | series/movie detail pages. |
+| `uiweb_shell.go` | UI "chrome": top bar, sidebar, status. |
+| `uiweb_settings.go`, `uiweb_settings_meta.go`, `uiweb_settings_defaults.go`, `uiweb_tooltips.go` | Configuration page: areas, sections and index with the panel (`Group`) of each setting; units, special values, control type and the toggle it depends on; defaults; descriptions. |
+| `uiweb_v2.go` | v2 shell (HTMX), fragment routing and rendering. |
+| `uiweb_v2_dashboard.go`, `uiweb_v2_downloads.go`, `uiweb_v2_detail.go`, `uiweb_v2_search.go`, `uiweb_v2_comics.go`, `uiweb_v2_maintenance.go` | dedicated v2 pages. |
+| `uiweb_v2_sections.go` | pages composed of sections (Maintenance, Integrations). |
+| `uiweb_v2_settings_extras.go` | structured editors of the v2 Configuration. |
+| `uiweb_v2_table.go` | generic server-side table renderer. |
+| `uiweb_v2_widgets.go` | migrated widgets (duplicates, database, RAM disk, rename, OAuth, jobs...). |
+| `uiweb_engine_stats.go` | "Torrent engine" panel of the Health page. |
+| `uiweb_v2_setup.go` | guided first-start configuration (`/?view=setup`). |
+| `uiweb_v2_pwa.go` | PWA support (installation as an app, magnet/`.torrent` sharing). |
+| `uiweb_v2_problems.go` | "To check" dashboard (what needs attention). |
+| `uiweb_v2_client_i18n.go` | dictionary for the strings set at runtime by the client. |
 
-## 4. Convenzioni di naming dei file
+## 4. File naming conventions
 
-- `web_handlers_g0.go` … `web_handlers_g7.go`: gruppi di handler portati dal
-  progetto di riferimento. Il numero **non** indica una priorità: serve solo a
-  spezzare l'enorme tabella di handler in file maneggiabili.
-- `uiweb_v2_*.go`: tutto ciò che riguarda la **UI v2** (SSR + HTMX). `uiweb_*.go`
-  senza `_v2` è il livello condiviso (view-model e formatter) usato dalla UI v2.
-- `libtorrent_*`, `gxtorrent_*`, `qbittorrent_*`: i backend torrent.
-- `*_test.go`: test accanto al file che verificano.
-- Gli helper privati di un gruppo usano il prefisso del gruppo (`gh2_...`,
-  `gh3_...`, `bg_...`) per evitare collisioni tra file dello stesso package.
+- `web_handlers_g0.go` … `web_handlers_g7.go`: groups of handlers ported from the
+  reference project. The number does **not** indicate a priority: it only serves
+  to split the huge handler table into manageable files.
+- `uiweb_v2_*.go`: everything related to **UI v2** (SSR + HTMX). `uiweb_*.go`
+  without `_v2` is the shared layer (view-model and formatters) used by UI v2.
+- `libtorrent_*`, `gxtorrent_*`, `qbittorrent_*`: the torrent backends.
+- `*_test.go`: tests next to the file they verify.
+- The private helpers of a group use the group prefix (`gh2_...`,
+  `gh3_...`, `bg_...`) to avoid collisions between files of the same package.
 
-## 5. Pacchetti in `internal/`
+## 5. Packages in `internal/`
 
-| Pacchetto | Contenuto |
+| Package | Content |
 |---|---|
-| `internal/constants` | costanti condivise (porte, default, versione/build). |
-| `internal/logging` | logger del daemon; trasforma i campi hash in `acq: <id>` e passa quelle righe al sink della storia dei download. |
-| `internal/models` | tipi condivisi. |
-| `internal/rules` | regole di matching. |
-| `internal/utils` | utilità generiche. |
+| `internal/constants` | shared constants (ports, defaults, version/build). |
+| `internal/logging` | daemon logger; it turns hash fields into `acq: <id>` and passes those lines to the download history sink. |
+| `internal/models` | shared types. |
+| `internal/rules` | matching rules. |
+| `internal/utils` | generic utilities. |
 | `internal/cache` | cache. |
-| `internal/backoff` | backoff esponenziale. |
-| `internal/messages` | messaggi/testi. |
-| `internal/qbittorrent` | client dell'API qBittorrent. |
-| `internal/tui` | client terminale (TUI). |
-| `internal/auth` | controllo d'accesso del demone standalone: hashing password e sessioni di login (`/ui/login`); la modalità gestita non lo usa. |
-| `internal/dht` | implementazione DHT, un modulo a sé sotto il modulo principale. |
-| `internal/gxcore` | motore torrent gx-core (il binario `gx-torrent`): codice nostro con porzioni derivate da progetti MIT/BSD. |
-| `internal/queue` | gestore della coda di gx-torrent (quali torrent far girare). |
-| `internal/rss` | parsing dei feed RSS/Atom/Torznab e degli elenchi HTML (ext.to, TorrentGalaxy: `listing.go`), regole ordinate e filtro episodi. |
-| `internal/settings` | store chiave/valore persistente della modalità standalone di gx-torrent. |
-| `internal/torznab` | client per indexer Torznab (Jackett, Prowlarr e simili). |
-| `internal/webui` | template e asset incorporati della UI del demone gx-torrent (vedi §7). |
+| `internal/backoff` | exponential backoff. |
+| `internal/messages` | messages/texts. |
+| `internal/qbittorrent` | qBittorrent API client. |
+| `internal/tui` | terminal client (TUI). |
+| `internal/auth` | access control of the standalone daemon: password hashing and login sessions (`/ui/login`); the managed mode does not use it. |
+| `internal/dht` | DHT implementation, a module of its own under the main module. |
+| `internal/gxcore` | gx-core torrent engine (the `gx-torrent` binary): our code with portions derived from MIT/BSD projects. |
+| `internal/queue` | manager of the gx-torrent queue (which torrents to run). |
+| `internal/rss` | parsing of RSS/Atom/Torznab feeds and HTML listings (ext.to, TorrentGalaxy: `listing.go`), ordered rules and episode filter. |
+| `internal/settings` | persistent key/value store of the gx-torrent standalone mode. |
+| `internal/torznab` | client for Torznab indexers (Jackett, Prowlarr and similar). |
+| `internal/webui` | templates and embedded assets of the gx-torrent daemon UI (see §7). |
 
-## 6. Il demone gx-torrent (`cmd/gx-torrent`)
+## 6. The gx-torrent daemon (`cmd/gx-torrent`)
 
-Il demone standalone del motore torrent (`gx-torrent`, Go puro) ha una propria
-architettura, distinta dal package principale di Gextto. Espone sia la propria
-UI web sia due API: quella JSON nativa usata da Gextto e quella compatibile con
-qBittorrent.
+The standalone daemon of the torrent engine (`gx-torrent`, pure Go) has its own
+architecture, distinct from Gextto's main package. It exposes both its own web UI
+and two APIs: the native JSON one used by Gextto and the qBittorrent-compatible
+one.
 
-| File | Ruolo |
+| File | Role |
 |---|---|
-| `main.go`, `daemon.go`, `lifecycle.go`, `mode.go` | avvio e ciclo di vita del demone (modalità gestita o standalone). |
-| `ui.go`, `ui_search.go`, `ui_categories.go` | UI web del demone (`handleUI`), frammenti live, ricerca e categorie. |
-| `internal/webui/assets/*` | template e asset incorporati della UI del demone (vedi §7). |
-| `api.go` | rotte dell'API JSON nativa (`/api/v1/...`) e pagine `/ui/...`. |
-| `api_qbit.go` | API compatibile con qBittorrent (`/api/v2/...`). |
-| `setup.go` | configurazione guidata di primo avvio (`/ui/setup`). |
-| `ui_feeds.go`, `ui_rss_edit.go` | pagina RSS: feed (stato, ricarica, modifica, attiva/disattiva), regole (modifica, anteprima), indexer, opzioni RSS. |
-| `feed.go`, `feed_search.go`, `wanted.go` | motore RSS: poll dei feed (anche di uno solo), regole, ricerche Torznab, titoli cercati. |
-| `feed_archive.go`, `ui_archive.go` | archivio dei feed (bbolt `feed-archive.db` con indice compatto) e pagina Archivio. |
-| `ui_settings.go` | pagina Impostazioni (cartelle, rete, protocolli, coda, banda e scheduler). |
-| `ipfilter_refresh.go` | IP filter da file o URL: caricamento all'avvio, aggiornamento periodico, stato. |
-| `optimize.go` | ottimizzazione con un clic (coda, cache, banda) e stato dei picchi misurati. |
-| `ui_browse.go` | selettore di cartelle lato server. |
+| `main.go`, `daemon.go`, `lifecycle.go`, `mode.go` | startup and lifecycle of the daemon (managed or standalone mode). |
+| `ui.go`, `ui_search.go`, `ui_categories.go` | web UI of the daemon (`handleUI`), live fragments, search and categories. |
+| `internal/webui/assets/*` | templates and embedded assets of the daemon UI (see §7). |
+| `api.go` | routes of the native JSON API (`/api/v1/...`) and `/ui/...` pages. |
+| `api_qbit.go` | qBittorrent-compatible API (`/api/v2/...`). |
+| `setup.go` | guided first-start configuration (`/ui/setup`). |
+| `ui_feeds.go`, `ui_rss_edit.go` | RSS page: feeds (status, reload, edit, enable/disable), rules (edit, preview), indexers, RSS options. |
+| `feed.go`, `feed_search.go`, `wanted.go` | RSS engine: feed polling (including a single one), rules, Torznab searches, searched titles. |
+| `feed_archive.go`, `ui_archive.go` | feed archive (bbolt `feed-archive.db` with compact index) and Archive page. |
+| `ui_settings.go` | Settings page (folders, network, protocols, queue, bandwidth and scheduler). |
+| `ipfilter_refresh.go` | IP filter from a file or URL: loading at startup, periodic update, status. |
+| `optimize.go` | one-click optimisation (queue, cache, bandwidth) and measured peak status. |
+| `ui_browse.go` | server-side folder picker. |
 
-## 7. Asset incorporati nel binario (`go:embed`)
+## 7. Assets embedded in the binary (`go:embed`)
 
-- `uiweb/v2/templates/*.html`, `uiweb/v2/static/*` — UI web di Gextto.
-- `internal/webui/assets/*` — UI del demone gx-torrent (`ui.tmpl`, `login.html`, `setup.html`, `rss.html`, `settings.html`, `archive.html`, `token.html`, `favicon.svg`).
-- `docs/MANUAL.it.md`, `docs/MANUAL.en.md` — manuale mostrato nella UI.
-- `internal_translations*.yml` — traduzioni.
-- `LICENSE` — licenza servita dall'app.
+- `uiweb/v2/templates/*.html`, `uiweb/v2/static/*` — Gextto's web UI.
+- `internal/webui/assets/*` — gx-torrent daemon UI (`ui.tmpl`, `login.html`, `setup.html`, `rss.html`, `settings.html`, `archive.html`, `token.html`, `favicon.svg`).
+- `docs/MANUAL.it.md`, `docs/MANUAL.en.md` — manual shown in the UI.
+- `internal_translations*.yml` — translations.
+- `LICENSE` — licence served by the app.
 
-Se modifichi questi file **serve ricompilare** il binario per vederli.
+If you modify these files **you need to recompile** the binary to see them.
 
-## 8. Dove mettere le mani (compiti comuni)
+## 8. Where to make changes (common tasks)
 
-| Voglio... | File da toccare |
+| I want to... | Files to touch |
 |---|---|
-| Aggiungere/modificare un endpoint API | `web_router.go` + un `web_handlers_*.go` (+ eventuale struct in `web_inputs_extra.go`) |
-| Aggiungere una pagina o un widget UI | `uiweb_v2*.go` + `uiweb/v2/templates/v2.html` (+ CSS/JS in `uiweb/v2/static/`) |
-| Aggiungere un worker di background | `web_serve.go` (registrazione) + `web_background.go` o `web_workers_media.go` |
-| Cambiare lo schema del database | `database.go` (+ test) e, se serve, `migrate.go` |
-| Aggiungere un'impostazione | `config.go` + `uiweb_settings.go` (sezione e `Group`) + `uiweb_settings_meta.go` (unità, valore speciale, dipendenza) + `uiweb_settings_defaults.go` + `uiweb_tooltips.go` + cataloghi `internal_translations*.yml` |
-| Toccare la ricerca/sorgenti | `engine.go`, `rss.go`, `websearch.go`, `indexer_health.go` |
-| Toccare un motore torrent | `torrent_engine*.go` e il backend specifico |
-| Cambiare il bridge C++ | `libtorrent_bridge.cpp` + `libtorrent_bridge.h` (root), `libtorrent_cgo.go` |
+| Add/modify an API endpoint | `web_router.go` + a `web_handlers_*.go` (+ optional struct in `web_inputs_extra.go`) |
+| Add a page or a UI widget | `uiweb_v2*.go` + `uiweb/v2/templates/v2.html` (+ CSS/JS in `uiweb/v2/static/`) |
+| Add a background worker | `web_serve.go` (registration) + `web_background.go` or `web_workers_media.go` |
+| Change the database schema | `database.go` (+ tests) and, if needed, `migrate.go` |
+| Add a setting | `config.go` + `uiweb_settings.go` (section and `Group`) + `uiweb_settings_meta.go` (unit, special value, dependency) + `uiweb_settings_defaults.go` + `uiweb_tooltips.go` + `internal_translations*.yml` catalogues |
+| Touch search/sources | `engine.go`, `rss.go`, `websearch.go`, `indexer_health.go` |
+| Touch a torrent engine | `torrent_engine*.go` and the specific backend |
+| Change the C++ bridge | `libtorrent_bridge.cpp` + `libtorrent_bridge.h` (root), `libtorrent_cgo.go` |
 
-## 9. Note di manutenzione
+## 9. Maintenance notes
 
-- **Una sola copia del bridge C++.** `libtorrent_bridge.cpp` è l'unico file
-  compilato da cgo; l'header deve restare accanto a lui nella root. Non
-  ricreare copie "di riferimento" in sottocartelle: cgo **non** compila file
-  fuori dalla cartella del package e le copie divergono silenziosamente.
-- **La logica di Gextto resta in un unico package principale.** I nuovi moduli
-  condivisi vanno in `internal/`; un'eventuale divisione del package principale
-  va fatta per fasi, con build e test verdi a ogni passo.
-- **Aggiornare i test.** Ogni modifica al comportamento dovrebbe aggiornare il
-  test accanto al file interessato; `go test ./...` è la rete di sicurezza.
+- **A single copy of the C++ bridge.** `libtorrent_bridge.cpp` is the only file
+  compiled by cgo; the header must stay next to it in the root. Do not
+  recreate "reference" copies in subfolders: cgo does **not** compile files
+  outside the package folder and the copies diverge silently.
+- **Gextto's logic stays in a single main package.** New shared modules
+  go in `internal/`; any split of the main package
+  must be done in phases, with builds and tests green at every step.
+- **Update the tests.** Every change in behaviour should update the
+  test next to the file concerned; `go test ./...` is the safety net.
 
-Vedi anche [DEVELOPERS.md](DEVELOPERS.md) per build, test e flusso di contribuzione.
+See also [DEVELOPERS.md](DEVELOPERS.md) for build, test and contribution workflow.
