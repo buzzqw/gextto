@@ -231,6 +231,7 @@ func DeleteTrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	removed := 0
 	var byteCount uint64
 	errors := []string{}
+	removedNames := []string{}
 	for _, name := range names {
 		if strings.TrimSpace(name) == "" || !gh3SingleComponent(name) || !filepath.IsLocal(name) {
 			errors = append(errors, name)
@@ -260,11 +261,13 @@ func DeleteTrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		removed++
 		byteCount += size
+		removedNames = append(removedNames, name)
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":      true,
 		"removed": removed,
 		"bytes":   byteCount,
+		"names":   removedNames,
 		"errors":  errors,
 	})
 }

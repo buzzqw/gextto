@@ -7,9 +7,13 @@ package gextto
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/logging"
 )
 
 type v2TrashItem struct {
@@ -52,7 +56,8 @@ func V2TrashList(w http.ResponseWriter, r *http.Request, s *AppState) {
 	v2Render(w, http.StatusOK, "v2_trash_list", v2TrashViewFrom(s), dict, eng)
 }
 
-// V2TrashDelete deletes one entry or empties the trash.
+// V2TrashDelete deletes one entry or empties the trash. It reports back, as a
+// toast, which entries were removed and how much space was freed.
 func V2TrashDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var body []byte
 	if r.FormValue("all") != "" {
@@ -60,15 +65,67 @@ func V2TrashDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else if name := strings.TrimSpace(r.FormValue("name")); name != "" {
 		body, _ = json.Marshal(map[string][]string{"names": {name}})
 	}
+	message, failed := "", false
 	if len(body) > 0 {
-		v2InternalJSON(s, http.MethodPost, "/api/trash/delete", nil, body)
+		raw, status := v2InternalJSON(s, http.MethodPost, "/api/trash/delete", nil, body)
+		message, failed = v2TrashDeleteMessage(raw, status)
+	}
+	redirect := "/?view=maintenance"
+	if message != "" {
+		redirect += "&msg=" + url.QueryEscape(message)
+		if failed {
+			redirect += "&msg_err=1"
+		}
 	}
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
+		http.Redirect(w, r, redirect, http.StatusSeeOther)
 		return
 	}
-	w.Header().Set("HX-Redirect", "/?view=maintenance")
+	w.Header().Set("HX-Redirect", redirect)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// v2TrashDeleteMessage turns the delete API answer into a one-line toast: how
+// many entries were removed, which ones, and the total space freed. It never
+// claims success when the API reported an error.
+func v2TrashDeleteMessage(raw []byte, status int) (string, bool) {
+	if status >= 400 {
+		return "Cestino: eliminazione non riuscita.", true
+	}
+	var res struct {
+		Removed int      `json:"removed"`
+		Bytes   uint64   `json:"bytes"`
+		Names   []string `json:"names"`
+		Errors  []string `json:"errors"`
+	}
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return "Cestino svuotato.", false
+	}
+	if res.Removed == 0 {
+		if len(res.Errors) > 0 {
+			return "Cestino: nulla rimosso.", true
+		}
+		return "Cestino già vuoto.", false
+	}
+	word, verb, freed := "elementi", "rimossi", "liberati"
+	if res.Removed == 1 {
+		word, verb, freed = "elemento", "rimosso", "liberato"
+	}
+	message := fmt.Sprintf("%d %s %s · %s %s", res.Removed, word, verb,
+		logging.HumanBytesI64(int64(res.Bytes)), freed)
+	if len(res.Names) > 0 {
+		shown := res.Names
+		tail := ""
+		if len(shown) > 8 {
+			shown = shown[:8]
+			tail = ", …"
+		}
+		message += ": " + strings.Join(shown, ", ") + tail
+	}
+	if len(res.Errors) > 0 {
+		message += fmt.Sprintf(" (%d non rimossi)", len(res.Errors))
+	}
+	return message, len(res.Errors) > 0
 }
 
 // V2SourcesCheck runs the source health check on demand and returns the table.
