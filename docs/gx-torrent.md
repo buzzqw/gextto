@@ -53,7 +53,7 @@ Codice:
 - [Statistiche](#statistiche)
 - [Diagnostica pezzi](#diagnostica-pezzi)
 - [Streaming HTTP (HTTP Range)](#streaming-http-http-range)
-- [Cache disco e preallocazione](#cache-disco-e-preallocazione)
+- [Cache disco, preallocazione e storage mmap](#cache-disco-preallocazione-e-storage-mmap)
 - [RAM disk](#ram-disk)
 - [Layout su disco e sicurezza dei dati](#layout-su-disco-e-sicurezza-dei-dati)
 - [Coda autogestita](#coda-autogestita)
@@ -930,7 +930,7 @@ anche un player esterno (VLC, mpv) può usare l'URL completo di token. Da Gextto
 il token lato server; nella scheda **Contenuto** del dettaglio torrent ogni file
 ha un pulsante **▶**, e la pagina del demone lo ha nella scheda **Files**.
 
-## Cache disco e preallocazione
+## Cache disco, preallocazione e storage mmap
 
 Le impostazioni libtorrent di gextto valgono anche per gx-torrent, ma la cache
 di gx-torrent è **adattiva**: il demone la ricalcola dal carico reale invece di

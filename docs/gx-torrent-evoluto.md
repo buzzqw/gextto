@@ -120,13 +120,13 @@ requisiti:
 ## 3. Stato attuale
 
 gx-torrent è un demone Go puro (build `CGO_ENABLED=0`) con il motore **gx-core**
-(`internal/gxcore`), **34 aree** descritte in `GEXTTO.md`. Gextto lo avvia, lo sorveglia e lo
+(`internal/gxcore`), con l'**inventario delle aree** in `GEXTTO.md`. Gextto lo avvia, lo sorveglia e lo
 **riaggancia ai riavvii** tramite `fingerprint`. Il demone è già usabile da solo
 (`gx-torrent -listen … -data …`), anche come client standalone.
 
 | Strato | Dove | Cosa c'è già | Dimensione (2026-10-11) |
 | --- | --- | --- | --- |
-| Motore | `internal/gxcore`, `internal/dht`, `anacrolix/utp` | porta unica, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, web seed e tracker a caldo, limiti per torrent, streaming con finestra, filtro IP multi-formato, proxy, killswitch VPN, preallocazione, cache regolabile a caldo | 34 aree |
+| Motore | `internal/gxcore`, `internal/dht`, `anacrolix/utp` | porta unica, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, web seed e tracker a caldo, limiti per torrent, priorità file graduate, streaming con finestra, filtro IP multi-formato, proxy, killswitch VPN, preallocazione, durabilità a batch, mmap opt-in, cache regolabile a caldo | 44 aree |
 | Demone | `cmd/gx-torrent` | coda dinamica con slot, seed ratio/giorni per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, stato in `state.json` | 12.573 righe (20.742 col test) |
 | API | `cmd/gx-torrent/api.go` | REST v1 con header `X-Gx-Token`: health, stats, portcheck, torrents, add, azioni, config, ipfilter | 706 righe |
 | UI | `cmd/gx-torrent/ui.go` | tabella, filtri per stato, dettaglio a schede (generale, file, peer, tracker, pezzi), azioni di gruppo, sei lingue | 1.562 righe; asset in `internal/webui/assets` (`embed.FS`) |
