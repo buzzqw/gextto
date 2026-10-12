@@ -148,6 +148,9 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	store.Set("encryption", strconv.Itoa(encryption))
 	store.Set("ipfilter-trackers", strconv.FormatBool(formBool(r, "ipfilter-trackers")))
+	if hours := formInt(r, ipFilterRefreshKey, ipFilterDefaultRefreshHours); hours >= 0 && hours <= 24*30 {
+		store.Set(ipFilterRefreshKey, strconv.FormatInt(hours, 10))
+	}
 	store.Set("dht-read-only", strconv.FormatBool(formBool(r, "dht-read-only")))
 	for _, toggle := range []string{"dht", "pex", "utp", "holepunch", "lsd", "upnp", "natpmp"} {
 		store.Set("no-"+toggle, strconv.FormatBool(!formBool(r, toggle)))
@@ -264,6 +267,9 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{PROXY}}", get("proxy"))
 	repl("{{TOKEN}}", get("token"))
 	repl("{{IPFILTER}}", get("ipfilter"))
+	repl("{{IPFILTER_REFRESH}}", strconv.Itoa(int(d.ipFilterRefreshEvery()/time.Hour)))
+	repl("{{IPFILTER_STATUS}}", d.ipFilterStatusHTML())
+	repl("{{OPT_STATUS}}", d.optimizationStatusHTML())
 	repl("{{IPFILTER_TRACKERS}}", checkedIf(!strings.EqualFold(strings.TrimSpace(store.Get("ipfilter-trackers", "true")), "false")))
 	repl("{{ENC_OPTIONS}}", encryptionOptions(store.Get("encryption", "1")))
 	repl("{{DHT_BOOTSTRAP}}", get("dht-bootstrap"))

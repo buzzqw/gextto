@@ -44,6 +44,9 @@ type feedConfig struct {
 	Category string `json:"category,omitempty"`
 	SavePath string `json:"savepath,omitempty"`
 	Paused   bool   `json:"paused,omitempty"`
+	// Disabled stops the automatic polling of the feed without deleting it
+	// (qBittorrent's "disable feed"); its reload button still works.
+	Disabled bool `json:"disabled,omitempty"`
 }
 
 func (c feedConfig) rule() rss.TitleFilter {
@@ -56,6 +59,7 @@ type feedStatus struct {
 	URL       string `json:"url"`
 	Items     int    `json:"items"`
 	Added     int    `json:"added"`
+	New       int    `json:"new"` // items not seen before (archived)
 	LastError string `json:"last_error,omitempty"`
 	LastCheck int64  `json:"last_check,omitempty"`
 }
@@ -122,13 +126,17 @@ func (d *Daemon) runFeeds(stop <-chan struct{}) {
 	}
 	for {
 		d.pollFeeds()
+		interval := d.feedInterval()
+		d.feedMu.Lock()
+		d.feedNextPoll = time.Now().Add(interval)
+		d.feedMu.Unlock()
 		select {
 		case <-stop:
 			return
 		case <-d.feedWake:
 			// The feeds were just edited: poll again now instead of waiting a
 			// whole interval.
-		case <-time.After(d.feedInterval()):
+		case <-time.After(interval):
 		}
 	}
 }
@@ -149,8 +157,16 @@ func (d *Daemon) pokeFeeds() {
 // torrents that were not added before. Only one poll runs at a time: the loop
 // and the manual button must not fetch the same feed together.
 func (d *Daemon) pollFeeds() {
+	d.pollFeedsOnly("")
+}
+
+// pollFeedsOnly is pollFeeds limited to one feed (by name or URL) when only is
+// set: the feed page's reload button. A single-feed poll skips the wanted
+// search and the archive pruning, which belong to the full cycle. It reports
+// false when another poll was already running.
+func (d *Daemon) pollFeedsOnly(only string) bool {
 	if !d.feedPollMu.TryLock() {
-		return
+		return false
 	}
 	defer d.feedPollMu.Unlock()
 	// The wanted titles run even with no feed configured: pollWanted searches
@@ -161,6 +177,12 @@ func (d *Daemon) pollFeeds() {
 	var rulesOnce []string
 	onceHit := map[string]bool{}
 	for _, feed := range feeds {
+		if only != "" && feed.Name != only && feed.URL != only {
+			continue
+		}
+		if feed.Disabled && only == "" {
+			continue
+		}
 		search := strings.TrimSpace(feed.Search)
 		if strings.TrimSpace(feed.URL) == "" && search == "" {
 			continue
@@ -201,6 +223,11 @@ func (d *Daemon) pollFeeds() {
 			continue
 		}
 		status.Items = len(items)
+		if newItems, err := d.archive().record(name, items, time.Now()); err != nil {
+			logf("feed %s: cannot archive the items: %v", name, err)
+		} else {
+			status.New = newItems
+		}
 		added := 0
 		var addedTitles []string
 		rules := d.rules()
@@ -242,6 +269,7 @@ func (d *Daemon) pollFeeds() {
 				continue
 			}
 			d.markFeedSeen(name, item.GUID)
+			d.archive().markAdded(name, item)
 			if smartKey != "" {
 				d.markSmartEpisode(smartKey, smartTokens)
 			}
@@ -279,11 +307,17 @@ func (d *Daemon) pollFeeds() {
 	}
 	d.mu.Unlock()
 
+	if only != "" {
+		return true
+	}
+	d.pruneArchive(time.Now())
+
 	// Wanted titles: search the indexers and take the missing episodes/movies,
 	// plus the gap search for what appeared but was not downloaded.
 	gapCtx, cancelGap := context.WithTimeout(context.Background(), 5*time.Minute)
 	d.pollWanted(gapCtx)
 	cancelGap()
+	return true
 }
 
 // filterFeedItem decides whether an item is added and with which action. When at
@@ -545,6 +579,13 @@ func (d *Daemon) markFeedSeen(feed, guid string) {
 	// Only mark dirty: pollFeeds does one atomic save at the end of the cycle,
 	// instead of rewriting state.json for every item added.
 	d.dirty = true
+}
+
+// nextFeedPoll is when the RSS loop polls again (zero before the first poll).
+func (d *Daemon) nextFeedPoll() time.Time {
+	d.feedMu.Lock()
+	defer d.feedMu.Unlock()
+	return d.feedNextPoll
 }
 
 func (d *Daemon) setFeedStatus(status feedStatus) {

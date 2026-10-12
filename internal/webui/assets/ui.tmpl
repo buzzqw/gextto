@@ -15,6 +15,9 @@ header h1{font-size:20px;margin:0;font-weight:600}
 .nav a{padding:5px 12px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;text-decoration:none;color:#dbe4f0;font-size:14px;white-space:nowrap}
 .nav a:hover{background:#243049}
 .nav a.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.dot,.card span.dot{display:inline-block;width:.6em;height:.6em;border-radius:50%;margin-right:.35em;vertical-align:middle}
+.dot-ok{background:#22c55e;box-shadow:0 0 0 2px #14532d}
+.dot-bad{background:#ef4444;box-shadow:0 0 0 2px #7f1d1d}
 main{padding:16px 20px;max-width:none;width:100%;margin:0}
 .muted{color:#93a1b5;font-size:14px}
 a{color:#93c5fd}
@@ -132,8 +135,9 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
   <span class="muted">{{.Version}} · <span>up for</span> {{.Uptime}} · {{.Now}}</span>
   {{if .Standalone}}
   <nav class="nav">
-    <a class="on" href="/" title="Torrents list and transfer status">Torrents</a>
+    <a class="on" href="/" aria-current="page" title="Torrents list and transfer status">Torrents</a>
     <a href="/ui/rss" title="RSS feeds, indexers and wanted list">RSS &amp; indexers</a>
+    <a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a>
     <a href="/ui/settings" title="Daemon configuration and options">Settings</a>
   </nav>
   {{end}}
@@ -275,10 +279,12 @@ setInterval(function(){refresh(false)},2000);
     <div class="card"><b>{{.Stalled}}</b><span>stalled</span></div>
     <div class="card"><b>{{.Paused}}</b><span>paused</span></div>
     <div class="card"><b>{{.Moving}}</b><span>moving</span></div>
-    <div class="card"><b>{{.PeerPort}}</b><span>peer port</span></div>
+    <div class="card"{{if .PortReachable}} title="The peer port is reachable from the internet (router mapping or incoming peers)"{{else}} title="No router mapping and no incoming peer yet: the peer port may be closed"{{end}}><b><span class="dot {{if .PortReachable}}dot-ok{{else}}dot-bad{{end}}" role="img" aria-label="{{if .PortReachable}}open{{else}}not open{{end}}"></span>{{.PeerPort}}</b><span>peer port</span></div>
     <div class="card"{{if .IPFilterPath}} title="{{.IPFilterPath}}"{{end}}><b>{{if .IPFilter}}{{.IPFilter}}{{else}}none{{end}}</b><span>IP filter rules</span></div>
+    {{if not .Standalone}}
     <div class="card" title="Read / write cache"><b>{{.CacheReadMB}}/{{.CacheWB}} <span>MB</span></b><span>cache r/w</span></div>
     <div class="card" title="Disk read / write operations since start"><b>{{.ReadOpsTotal}}/{{.WriteOpsTotal}}</b><span>I/O ops r/w</span></div>
+    {{end}}
     <div class="card" title="Incoming peer connections since start"><b>{{.IncomingConns}}</b><span>incoming</span></div>
   </div>
 {{end}}{{define "live"}}

@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"html"
 	"net/http"
 	"strconv"
@@ -38,10 +39,56 @@ func (d *Daemon) handleUIFeedPoll(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
 		return
 	}
+	// One feed (the reload button of its row) is polled at once and its new
+	// status returned, so the row can show the outcome.
+	if name := strings.TrimSpace(r.FormValue("feed")); name != "" {
+		if !d.pollFeedsOnly(name) {
+			writeError(w, http.StatusConflict, errors.New("a feed check is already running"))
+			return
+		}
+		for _, status := range d.feedStatusesSnapshot() {
+			if status.Name == name || status.URL == name {
+				writeJSON(w, http.StatusOK, status)
+				return
+			}
+		}
+		writeError(w, http.StatusNotFound, errNotFound)
+		return
+	}
 	// Poll in the background: fetching several feeds can take seconds, and the
 	// page must stay responsive.
 	go d.pollFeeds()
 	w.WriteHeader(http.StatusOK)
+}
+
+// handleUIRssSettings saves the RSS page's global options: the polling interval
+// (minutes) and the archive retention (days, 0 = keep everything).
+func (d *Daemon) handleUIRssSettings(w http.ResponseWriter, r *http.Request) {
+	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	minutes, err := strconv.Atoi(strings.TrimSpace(r.FormValue("interval")))
+	if err != nil || minutes < 1 || minutes > 24*60 {
+		d.renderRSS(w, r, "The refresh interval must be between 1 and 1440 minutes.")
+		return
+	}
+	days, err := strconv.Atoi(strings.TrimSpace(r.FormValue("archive_days")))
+	if err != nil || days < 0 || days > 3650 {
+		d.renderRSS(w, r, "The archive retention must be between 0 and 3650 days.")
+		return
+	}
+	d.opts.Settings.Set(feedIntervalKey, strconv.Itoa(minutes*60))
+	d.opts.Settings.Set(archiveDaysKey, strconv.Itoa(days))
+	if err := d.opts.Settings.Save(); err != nil {
+		d.renderRSS(w, r, "Cannot save settings: "+err.Error())
+		return
+	}
+	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
 }
 
 // feedItemView is one feed item annotated with the rule decision.
@@ -182,6 +229,13 @@ func (d *Daemon) renderRSS(w http.ResponseWriter, r *http.Request, errKey string
 	page = strings.Replace(page, "{{RULECOUNT}}", strconv.Itoa(len(d.rules())), 1)
 	page = strings.Replace(page, "{{WANTEDROWS}}", d.uiWantedRowsHTML(), 1)
 	page = strings.Replace(page, "{{WANTEDCOUNT}}", strconv.Itoa(len(d.wantedList())), 1)
+	page = strings.Replace(page, "{{FEEDINTERVAL}}", strconv.Itoa(int(d.feedInterval()/time.Minute)), 1)
+	page = strings.Replace(page, "{{ARCHIVEDAYS}}", strconv.Itoa(d.archiveRetentionDays()), 1)
+	nextPoll := "—"
+	if next := d.nextFeedPoll(); !next.IsZero() {
+		nextPoll = next.Format("15:04")
+	}
+	page = strings.Replace(page, "{{NEXTPOLL}}", nextPoll, 1)
 
 	names := make([]string, 0, 8)
 	for _, feed := range d.feeds() {

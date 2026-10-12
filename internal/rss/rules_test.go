@@ -84,3 +84,15 @@ func TestEvaluateOrderedRules(t *testing.T) {
 		t.Fatal("the rule must match its own feed")
 	}
 }
+
+func TestFeedCoveredByDisabledRule(t *testing.T) {
+	off := false
+	rules := []Rule{{Name: "once", Enabled: &off, Match: Criteria{Include: []string{"Movie"}}}}
+	if !FeedCoveredByRules(rules, "any") {
+		t.Fatal("a disabled rule must keep its feeds under the rules (no fall back to the feed filter)")
+	}
+	scoped := []Rule{{Name: "a", Feeds: []string{"a"}}}
+	if FeedCoveredByRules(scoped, "b") {
+		t.Fatal("a rule scoped to another feed must not cover this one")
+	}
+}

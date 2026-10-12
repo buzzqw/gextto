@@ -227,13 +227,16 @@ func ruleAppliesToFeed(rule Rule, feedName string) bool {
 	return false
 }
 
-// FeedCoveredByRules reports whether at least one enabled rule targets feedName
-// (a rule with no Feeds applies to every feed). When no rule covers a feed, the
-// feed's own include/exclude filter still governs it: adding a rule for one feed
-// must not silently stop the other feeds.
+// FeedCoveredByRules reports whether at least one rule targets feedName (a rule
+// with no Feeds applies to every feed). When no rule covers a feed, the feed's
+// own include/exclude filter still governs it: adding a rule for one feed must
+// not silently stop the other feeds. A disabled rule still covers its feeds:
+// turning off the only rule (or a "download once" rule disabling itself) must
+// stop the downloads, not fall back to the feed filter, which takes everything
+// when it is empty.
 func FeedCoveredByRules(rules []Rule, feedName string) bool {
 	for _, rule := range rules {
-		if RuleEnabled(rule) && ruleAppliesToFeed(rule, feedName) {
+		if ruleAppliesToFeed(rule, feedName) {
 			return true
 		}
 	}

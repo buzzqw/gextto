@@ -239,11 +239,16 @@ type Daemon struct {
 	// feedMu guards feedStatuses (the RSS feeds' last outcome).
 	feedMu       sync.Mutex
 	feedStatuses map[string]feedStatus
+	feedNextPoll time.Time
 	// feedWake asks runFeeds for an immediate poll when the feeds are edited.
 	feedWake chan struct{}
 	// feedPollMu serialises polls: the loop and the manual button must not run
 	// two polls against the same feed at once.
 	feedPollMu sync.Mutex
+	// feedArchive keeps every item the feeds returned (feed_archive.go),
+	// opened on first use by archive().
+	archiveOnce sync.Once
+	feedArchive *feedArchive
 	// appliedDL/appliedUL are the global limits currently on the session.
 	appliedDL int64
 	appliedUL int64
@@ -275,6 +280,13 @@ type Daemon struct {
 	// disk; ipFilterStamp is path|size|mtime and is empty when not cached.
 	ipFilterData  []byte
 	ipFilterStamp string
+	// ipFilterStatus is the last load outcome and the next refresh
+	// (ipfilter_refresh.go), for the settings page.
+	ipFilterStatus ipFilterState
+	// peakDown/peakUp are the highest total rates (bytes/s) seen since start,
+	// the measure the bandwidth optimization starts from.
+	peakDown int64
+	peakUp   int64
 
 	// Adaptive disk cache (see cache.go). The engine reads the cache sizes when the
 	// session is created, so a retune reopens the session on a coarse cadence.
@@ -495,10 +507,22 @@ func (d *Daemon) openSessionLocked() error {
 		if path == "" {
 			path = d.opts.Network.IPFilter
 		}
-		if rules, err := d.loadIPFilterLocked(path); err != nil {
-			logf("IP filter %s not loaded: %v", path, err)
-		} else {
-			logf("IP filter loaded: %d rules from %s", rules, path)
+		if isIPFilterURL(path) {
+			// The session reads files only: use the copy downloaded last time
+			// at once; runIPFilterRefresh downloads a fresh one.
+			path = filepath.Join(d.opts.DataDir, "ipfilter.dat")
+			if _, err := os.Stat(path); err != nil {
+				path = ""
+			}
+		}
+		// An empty path means nothing was downloaded yet: runIPFilterRefresh
+		// loads the list shortly.
+		if path != "" {
+			if rules, err := d.loadIPFilterLocked(path); err != nil {
+				logf("IP filter %s not loaded: %v", path, err)
+			} else {
+				logf("IP filter loaded: %d rules from %s", rules, path)
+			}
 		}
 	}
 	now := time.Now()
@@ -599,6 +623,11 @@ func (d *Daemon) close() {
 		}
 		d.session = nil
 	}
+	if d.feedArchive != nil {
+		if err := d.feedArchive.close(); err != nil {
+			logf("feed archive close: %v", err)
+		}
+	}
 }
 
 // findLocked looks a torrent up by info hash (case-insensitive) or the engine ID.
@@ -695,6 +724,8 @@ func (d *Daemon) run(stop <-chan struct{}) {
 	go d.runFeeds(stop)
 	// The latency probe runs beside the queue loop while auto-speed is enabled.
 	go d.runAutoSpeed(stop)
+	// The IP filter refresh (standalone): a URL is downloaded and kept current.
+	go d.runIPFilterRefresh(stop)
 	ticker := time.NewTicker(d.opts.Tick)
 	defer ticker.Stop()
 	for {
@@ -838,6 +869,13 @@ func (d *Daemon) tick(now time.Time) {
 			statsOf[t.ID()] = d.adjustStatsLocked(t, sample.stats)
 		}
 	}
+	var totalDown, totalUp int64
+	for _, stats := range statsOf {
+		totalDown += int64(stats.Speed.Download)
+		totalUp += int64(stats.Speed.Upload)
+	}
+	d.peakDown = max(d.peakDown, totalDown)
+	d.peakUp = max(d.peakUp, totalUp)
 	positions := d.queuePositionsLocked(torrents, statsOf)
 
 	handles := make(map[string]*torrent.Torrent, len(torrents))
@@ -1292,6 +1330,13 @@ func (d *Daemon) buildViewsLocked() []torrentInfo {
 	for _, t := range torrents {
 		statsOf[t.ID()] = d.statsLocked(t)
 	}
+	var totalDown, totalUp int64
+	for _, stats := range statsOf {
+		totalDown += int64(stats.Speed.Download)
+		totalUp += int64(stats.Speed.Upload)
+	}
+	d.peakDown = max(d.peakDown, totalDown)
+	d.peakUp = max(d.peakUp, totalUp)
 	positions := d.queuePositionsLocked(torrents, statsOf)
 	out := make([]torrentInfo, 0, len(torrents))
 	for _, t := range torrents {

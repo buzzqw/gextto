@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gx-torrent</title>
+<style>body{margin:0;font:15px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
+header{padding:14px 20px;border-bottom:1px solid #223;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;font-weight:600}
+.nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.nav a{padding:5px 12px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;text-decoration:none;color:#dbe4f0;font-size:14px;white-space:nowrap}
+.nav a:hover{background:#243049}
+.nav a.on{background:#2563eb;border-color:#2563eb;color:#fff}
+main{padding:16px 20px;max-width:1200px;margin:0 auto}
+a{color:#93c5fd}
+:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+label{color:#93a1b5;font-size:13px;display:flex;flex-direction:column;gap:3px}
+label.chk{flex-direction:row;align-items:center;gap:6px}
+input,select{padding:8px;border-radius:8px;border:1px solid #2b3a55;background:#0f1420;color:inherit;font:inherit}
+input[type=search]{min-width:min(420px,80vw)}
+button{padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;font:inherit}
+button.sm{padding:4px 9px;background:#243049;font-weight:500}
+button.danger{background:#3a1417;color:#fca5a5;border:1px solid #7f1d1d;font-weight:500}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
+.muted{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}
+table{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed}
+th,td{padding:7px 8px;text-align:left;border-bottom:1px solid #1f2839;font-size:14px;vertical-align:middle}
+th{color:#93a1b5;font-weight:600}
+td.title{overflow-wrap:anywhere}
+th.c-size,th.c-seeds{width:5.5rem}th.c-feed{width:9rem}th.c-seen{width:7rem}th.c-act{width:13rem}
+td.feed{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.act{text-align:right;white-space:nowrap}
+.flag{font-size:12px;padding:1px 6px;border-radius:6px;background:#243049;color:#cbd5e1;white-space:nowrap;margin-left:4px}
+.flag.on{background:#14532d;color:#86efac}
+.pager{display:flex;gap:10px;align-items:center;justify-content:center;margin:12px 0}
+details{margin-top:16px;border:1px solid #243049;border-radius:10px;padding:8px 14px;background:#10151f}
+summary{cursor:pointer;color:#93a1b5}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(max-width:760px){th.c-feed,td.feed,th.c-seen,td.seen{display:none}th.c-act{width:9rem}}
+</style></head>
+<body>
+<header>
+  <h1>Archive</h1>
+  <nav class="nav" aria-label="Pages"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/rss" title="RSS feeds, indexers and wanted list">RSS &amp; indexers</a><a class="on" href="/ui/archive" aria-current="page" title="Everything the feeds found, searchable">Archive</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a></nav>
+</header>
+<main>
+<p class="muted">Every item the RSS feeds returned is kept here, also after it leaves the feed. Search with words, phrases in quotes and -excluded words.</p>
+<form class="row" id="archive-form" role="search">
+  <label>Search<input type="search" id="archive-q" name="q" placeholder="title words, -exclude" autocomplete="off" title="Words that must all appear in the title; -word excludes, quotes match a phrase"></label>
+  <label>Feed<select id="archive-feed" name="feed" title="Show only the items of one feed"><option value="">All feeds</option>{{FEEDOPTIONS}}</select></label>
+  <label>Sort<select id="archive-sort" name="sort" title="Order of the results">
+    <option value="new">Newest first</option>
+    <option value="old">Oldest first</option>
+    <option value="seeds">Most seeders</option>
+    <option value="size">Largest</option>
+    <option value="title">Title</option>
+  </select></label>
+  <label class="chk"><input type="checkbox" id="archive-added" name="added" value="1" title="Show only the items already downloaded"> Downloaded only</label>
+  <button type="submit" title="Search the archive">Search</button>
+</form>
+<p class="muted" id="archive-info" aria-live="polite"></p>
+<table>
+  <caption class="sr-only">Archive search results</caption>
+  <thead><tr><th scope="col">Title</th><th scope="col" class="c-size">Size</th><th scope="col" class="c-seeds">Seeds</th><th scope="col" class="c-feed">Feed</th><th scope="col" class="c-seen">Found</th><th scope="col" class="c-act"><span class="sr-only">Actions</span></th></tr></thead>
+  <tbody id="archive-rows"></tbody>
+</table>
+<div class="pager"><button type="button" class="sm" id="archive-prev" title="Previous page">‹ Previous</button><span class="muted" id="archive-page" aria-live="polite"></span><button type="button" class="sm" id="archive-next" title="Next page">Next ›</button></div>
+<details>
+  <summary>Clean up</summary>
+  <div class="row">
+    <button type="button" class="danger" id="archive-delete-results" title="Delete every item matching the current search">Delete the search results</button>
+  </div>
+  <div class="row">
+    <label>Older than (days)<input type="number" min="1" id="archive-days" value="90" title="Delete the items found more than this many days ago"></label>
+    <button type="button" class="danger" id="archive-prune" title="Delete the items found more than this many days ago">Delete old items</button>
+  </div>
+  <p class="muted"><span>Automatic retention (days, 0 = keep all)</span>: {{ARCHIVE_DAYS}} · <a href="/ui/rss#rss-settings" title="Change the retention on the RSS page">RSS &amp; indexers</a></p>
+</details>
+</main>
+<script id="ui-i18n"></script>
+<script>
+function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
+function fmtBytes(n){if(!n||n<0)return '—';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}
+function fmtDate(s){if(!s)return '—';var d=new Date(s*1000);return d.toLocaleDateString(undefined,{day:'2-digit',month:'2-digit',year:'2-digit'});}
+var state={page:1,pages:1};
+function params(extra){var p=new URLSearchParams();p.set('q',document.getElementById('archive-q').value.trim());p.set('feed',document.getElementById('archive-feed').value);p.set('sort',document.getElementById('archive-sort').value);if(document.getElementById('archive-added').checked){p.set('added','1');}if(extra){for(var k in extra){p.set(k,extra[k]);}}return p;}
+function post(url,body){return fetch(url,{method:'POST',body:body,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json().then(function(j){if(!r.ok){throw new Error(j.error||r.status);}return j;});});}
+function flag(text,on,title){var s=document.createElement('span');s.className='flag'+(on?' on':'');s.textContent=text;if(title){s.title=title;}return s;}
+function load(page){var info=document.getElementById('archive-info');info.textContent=t('Searching…');var p=params({page:page||1});fetch('/ui/archive/items?'+p.toString(),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(res){state.page=res.page;state.pages=res.pages;var body=document.getElementById('archive-rows');body.innerHTML='';(res.items||[]).forEach(function(it){var tr=document.createElement('tr');var td=document.createElement('td');td.className='title';var name=document.createElement('span');name.textContent=it.title;td.appendChild(name);if(it.episode){td.appendChild(flag(it.episode,false));}if(it.quality){td.appendChild(flag(it.quality,false));}if(it.in_session){td.appendChild(flag(t('in session'),true,t('This torrent is in the session')));}else if(it.added){td.appendChild(flag(t('downloaded'),true,t('Already added once')));}tr.appendChild(td);var sz=document.createElement('td');sz.textContent=fmtBytes(it.size);tr.appendChild(sz);var sd=document.createElement('td');sd.textContent=(it.seeders||0)+' / '+(it.leechers||0);sd.title=t('Seeders / leechers when last seen');tr.appendChild(sd);var fd=document.createElement('td');fd.className='feed';fd.textContent=it.feed;fd.title=it.feed;tr.appendChild(fd);var sn=document.createElement('td');sn.className='seen';sn.textContent=fmtDate(it.first_seen);tr.appendChild(sn);var act=document.createElement('td');act.className='act';var add=document.createElement('button');add.type='button';add.className='sm';add.textContent=t('Add');add.title=t('Add this torrent to the session');add.setAttribute('aria-label',t('Add')+': '+it.title);add.disabled=!!it.in_session;add.onclick=function(){add.disabled=true;var f=new URLSearchParams();f.set('id',it.id);post('/ui/archive/add',f).then(function(){add.textContent=t('Added');}).catch(function(e){add.disabled=false;info.textContent=t('Error')+': '+e.message;});};act.appendChild(add);if(it.download.indexOf('magnet:')===0){var cp=document.createElement('button');cp.type='button';cp.className='sm';cp.textContent=t('Copy magnet');cp.title=t('Copy the magnet link');cp.setAttribute('aria-label',t('Copy magnet')+': '+it.title);cp.onclick=function(){var done=function(){cp.textContent=t('Copied');};if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(it.download).then(done);}else{var ta=document.createElement('textarea');ta.value=it.download;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done();}catch(e){}document.body.removeChild(ta);}};act.appendChild(document.createTextNode(' '));act.appendChild(cp);}var del=document.createElement('button');del.type='button';del.className='sm danger';del.textContent='✕';del.title=t('Delete from the archive');del.setAttribute('aria-label',t('Delete from the archive')+': '+it.title);del.onclick=function(){var f=new URLSearchParams();f.append('id',it.id);post('/ui/archive/delete',f).then(function(){tr.remove();});};act.appendChild(document.createTextNode(' '));act.appendChild(del);tr.appendChild(act);body.appendChild(tr);});if(!res.items||!res.items.length){var tr=document.createElement('tr');var td=document.createElement('td');td.colSpan=6;td.className='muted';td.textContent=t('No results');tr.appendChild(td);body.appendChild(tr);}info.textContent=res.total+' '+t('results')+' · '+res.entries+' '+t('items in the archive')+' · '+fmtBytes(res.size_bytes);document.getElementById('archive-page').textContent=res.page+' / '+res.pages;document.getElementById('archive-prev').disabled=res.page<=1;document.getElementById('archive-next').disabled=res.page>=res.pages;}).catch(function(){info.textContent=t('The archive is not available');});}
+document.getElementById('archive-form').addEventListener('submit',function(e){e.preventDefault();load(1);});
+['archive-feed','archive-sort','archive-added'].forEach(function(id){document.getElementById(id).addEventListener('change',function(){load(1);});});
+(function(){var timer=null;document.getElementById('archive-q').addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(function(){load(1);},350);});})();
+document.getElementById('archive-prev').onclick=function(){if(state.page>1){load(state.page-1);}};
+document.getElementById('archive-next').onclick=function(){if(state.page<state.pages){load(state.page+1);}};
+document.getElementById('archive-delete-results').onclick=function(){if(!confirm(t('Delete every item matching the current search?'))){return;}var p=params({all:'1'});post('/ui/archive/delete',p).then(function(res){document.getElementById('archive-info').textContent=res.removed+' '+t('items deleted');load(1);}).catch(function(e){document.getElementById('archive-info').textContent=t('Error')+': '+e.message;});};
+document.getElementById('archive-prune').onclick=function(){var days=document.getElementById('archive-days').value;if(!confirm(t('Delete the items found more than this many days ago?'))){return;}var f=new URLSearchParams();f.set('days',days);post('/ui/archive/delete',f).then(function(res){document.getElementById('archive-info').textContent=res.removed+' '+t('items deleted');load(1);}).catch(function(e){document.getElementById('archive-info').textContent=t('Error')+': '+e.message;});};
+load(1);
+</script>
+</body></html>

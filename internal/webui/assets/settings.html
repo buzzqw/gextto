@@ -22,12 +22,15 @@ label.chk input{width:auto}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 @media(max-width:640px){.grid{grid-template-columns:1fr}}
 button{padding:9px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
-.muted{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}
+.muted{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;overflow-wrap:anywhere}
+button.secondary{background:#243049;color:#dbe4f0;border:1px solid #2b3a55;font-weight:500}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 </style></head>
 <body>
 <header>
   <h1>gx-torrent</h1>
-  <nav class="nav"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/rss" title="RSS feeds, indexers and wanted list">RSS &amp; indexers</a><a class="on" href="/ui/settings" title="Daemon configuration and options">Settings</a></nav>
+  <nav class="nav"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/rss" title="RSS feeds, indexers and wanted list">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a class="on" href="/ui/settings" aria-current="page" title="Daemon configuration and options">Settings</a></nav>
 </header>
 <main>
 <p class="muted">Folders, network, ports and the engine options apply from the next start; the bandwidth, queue limits and language apply at once.</p>
@@ -48,9 +51,19 @@ button{padding:9px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff
     <label>Outgoing interface (VPN killswitch)<input type="text" name="outgoing-interface" value="{{OUT_IFACE}}" autocomplete="off" title="Network interface for outgoing traffic (VPN killswitch)"></label>
     <label>Proxy (socks5:// or http://)<input type="text" name="proxy" value="{{PROXY}}" autocomplete="off" title="SOCKS5 or HTTP proxy URL for peer traffic"></label>
     <label>API token<input type="text" name="token" value="{{TOKEN}}" autocomplete="off" title="Authentication token for API requests"></label>
-    <label>IP filter file<input type="text" name="ipfilter" value="{{IPFILTER}}" autocomplete="off" title="Path or URL to IP filter blocklist"></label>
+  </div>
+</fieldset>
+<fieldset id="ipfilter">
+  <legend>IP filter</legend>
+  <div class="grid">
+    <label>IP filter (file or URL)<input type="text" name="ipfilter" value="{{IPFILTER}}" autocomplete="off" placeholder="https://…/blocklist.gz" title="Path or URL to IP filter blocklist (P2P, eMule or CIDR format, plain or gzip)"></label>
+    <label>Update every (hours, 0 = never)<input type="number" min="0" max="720" name="ipfilter-refresh-hours" value="{{IPFILTER_REFRESH}}" title="How often a URL list is downloaded again; a local file is reloaded when it changes"></label>
     <label class="chk"><input type="checkbox" name="ipfilter-trackers" value="1"{{IPFILTER_TRACKERS}} title="Block filtered IP addresses on tracker connections too"> Apply the IP filter to trackers</label>
   </div>
+  <p class="muted" aria-live="polite">{{IPFILTER_STATUS}}</p>
+  <input type="hidden" name="return" value="settings">
+  <button type="button" class="secondary" data-formaction="/ui/ipfilter" title="Download (if a URL) and apply the IP filter in the field now, without saving the other settings">Load now</button>
+  <p class="muted">A URL is downloaded at start-up and again at the interval above; a local file is reloaded when it changes on disk.</p>
 </fieldset>
 <fieldset>
   <legend>Protocols</legend>
@@ -79,6 +92,16 @@ button{padding:9px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff
     <label class="chk"><input type="checkbox" name="preallocate" value="1"{{PREALLOCATE}} title="Preallocate disk space before writing file chunks"> Preallocate disk space</label>
     <label class="chk"><input type="checkbox" name="sequential" value="1"{{SEQUENTIAL}} title="Download torrent pieces in sequential order"> Download in sequential order</label>
   </div>
+</fieldset>
+<fieldset id="optimize">
+  <legend>Optimization</legend>
+  <p class="muted">One click puts a part of the engine on values that work well; each button changes only its own settings.</p>
+  <div class="actions">
+    <button type="button" class="secondary" data-formaction="/ui/optimize" data-optimize="queue" title="3 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not counted">Optimize queue</button>
+    <button type="button" class="secondary" data-formaction="/ui/optimize" data-optimize="cache" title="Disk cache back to automatic: sized from the RAM and the disk type, adapted while running">Optimize cache</button>
+    <button type="button" class="secondary" data-formaction="/ui/optimize" data-optimize="bandwidth" title="Download unlimited, upload at 80% of the highest upload measured, latency auto-speed on">Optimize bandwidth</button>
+  </div>
+  <p class="muted">{{OPT_STATUS}}</p>
 </fieldset>
 <fieldset>
   <legend>Bandwidth</legend>
@@ -132,6 +155,21 @@ function ensureTooltips(root) {
     if (text) { node.setAttribute('title', text); }
   }
 }
+// "Load now" and the optimization buttons post the form elsewhere; they are
+// plain buttons so Enter in a field still saves the settings.
+Array.prototype.forEach.call(document.querySelectorAll('[data-formaction]'), function (btn) {
+  btn.addEventListener('click', function () {
+    var form = btn.closest('form');
+    var opt = btn.getAttribute('data-optimize');
+    if (opt) {
+      var input = document.createElement('input');
+      input.type = 'hidden'; input.name = 'optimize'; input.value = opt;
+      form.appendChild(input);
+    }
+    form.action = btn.getAttribute('data-formaction');
+    form.submit();
+  });
+});
 document.addEventListener('DOMContentLoaded', function () { ensureTooltips(document); });
 ensureTooltips(document);
 </script>

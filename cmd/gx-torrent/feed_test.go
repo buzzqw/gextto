@@ -568,9 +568,13 @@ func TestPollFeedsOnceDisablesRule(t *testing.T) {
 	if !disabled {
 		t.Fatal("the once rule must be disabled after the first download")
 	}
-	// A second poll adds nothing more.
+	// A second poll adds nothing more. Count the daemon state, not the
+	// published snapshot: the snapshot lags and once hid a second add.
 	d.pollFeeds()
-	if got := len(d.snapshotViews()); got != 1 {
+	d.mu.Lock()
+	got := len(d.state.Torrents)
+	d.mu.Unlock()
+	if got != 1 {
 		t.Fatalf("after the once rule is off, %d torrents, want 1", got)
 	}
 }

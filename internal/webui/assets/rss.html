@@ -36,11 +36,14 @@ details{margin-top:12px;border:1px solid #243049;border-radius:10px;padding:8px 
 summary{cursor:pointer;color:#93a1b5}
 .form-card{border:1px solid #243049;border-radius:10px;padding:6px 14px 14px;margin-top:8px;background:#131a28}
 .lead{border-color:#2563eb}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.wrap{overflow-wrap:anywhere}
+:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 </style></head>
 <body>
 <header>
   <h1>RSS &amp; indexers</h1>
-  <nav class="nav"><a href="/" title="Torrents list and transfer status">Torrents</a><a class="on" href="/ui/rss" title="RSS feeds, indexers and wanted list">RSS &amp; indexers</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a></nav>
+  <nav class="nav"><a href="/" title="Torrents list and transfer status">Torrents</a><a class="on" href="/ui/rss" aria-current="page" title="RSS feeds, indexers and wanted list">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a></nav>
 </header>
 <main>
 <p class="muted">Feeds, rules and indexers are saved in settings.json. The rules are evaluated in order; the first match wins.</p>
@@ -109,18 +112,44 @@ summary{cursor:pointer;color:#93a1b5}
 </form>
 
 <h2>Feeds <span class="muted">({{FEEDCOUNT}})</span></h2>
+<div class="row"><button type="button" onclick="pollFeeds()" title="Fetch new items from configured RSS feeds now">Check feeds</button><span class="muted" id="pollinfo" aria-live="polite"></span></div>
 <table>
-  <thead><tr><th>Name</th><th>Feed URL</th><th>State</th><th></th></tr></thead>
+  <thead><tr><th>Name</th><th>Feed URL</th><th>State</th><th>Last check</th><th><span class="sr-only">Actions</span></th></tr></thead>
   <tbody>{{FEEDROWS}}</tbody>
 </table>
-<form class="form-card" method="post" action="/ui/rss-feed">
+<form class="form-card" id="feed-form" method="post" action="/ui/rss-feed">
   <input type="hidden" name="op" value="add">
+  <input type="hidden" name="index" id="feed-index">
   <div class="row">
     <label>Name<input type="text" name="name" placeholder="Feed name" autocomplete="off" title="Feed name"></label>
-    <label>Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off" title="RSS feed URL"></label>
-    <button type="submit" title="Add RSS feed">Add feed</button>
+    <label>Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off" title="RSS feed URL, or the page of an ext.to or TorrentGalaxy listing"></label>
+    <button type="submit" id="feed-submit" title="Add RSS feed">Add feed</button>
+    <button type="button" class="sm" id="feed-cancel" style="display:none" title="Cancel editing the feed">Cancel</button>
   </div>
-  <p class="muted">A feed is an RSS URL. Its items are fetched periodically and evaluated by rules and wanted titles. Empty = the global default.</p>
+  <details>
+    <summary>Feed options</summary>
+    <div class="row">
+      <label>Folder<input type="text" name="folder" placeholder="tv" autocomplete="off" title="Group shown next to the feed name"></label>
+      <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off" title="Terms that must appear in the title (used when no rule covers this feed)"></label>
+      <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off" title="Terms that must not appear in the title (used when no rule covers this feed)"></label>
+      <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
+      <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="paused" value="1" title="Add matched torrents in paused state"> Paused</label>
+      <label class="chk"><input type="checkbox" name="disabled" value="1" title="Do not check this feed automatically (the reload button still works)"> Disabled</label>
+    </div>
+  </details>
+  <p class="muted">A feed is an RSS URL, or the page of an ext.to or TorrentGalaxy listing. Its items are fetched periodically, kept in the archive and evaluated by rules and wanted titles. Without rules covering the feed, its own include/exclude decide.</p>
+</form>
+
+<form class="form-card" id="rss-settings" method="post" action="/ui/rss-settings">
+  <div class="row">
+    <label>Refresh interval (minutes)<input type="number" min="1" max="1440" name="interval" value="{{FEEDINTERVAL}}" title="How often every active feed is checked"></label>
+    <label>Archive retention (days, 0 = keep all)<input type="number" min="0" max="3650" name="archive_days" value="{{ARCHIVEDAYS}}" title="Items found longer ago are removed from the archive"></label>
+    <button type="submit" title="Save the RSS options">Save</button>
+  </div>
+  <p class="muted"><span>Next automatic check</span>: {{NEXTPOLL}}</p>
 </form>
 
 <h2>Rules <span class="muted">({{RULECOUNT}})</span></h2>
@@ -128,8 +157,9 @@ summary{cursor:pointer;color:#93a1b5}
   <thead><tr><th>Name</th><th>Scope</th><th>Match</th><th>Actions</th><th></th></tr></thead>
   <tbody>{{RULEROWS}}</tbody>
 </table>
-<form class="form-card" method="post" action="/ui/rss-rule">
+<form class="form-card" id="rule-form" method="post" action="/ui/rss-rule">
   <input type="hidden" name="op" value="add">
+  <input type="hidden" name="index" id="rule-index">
   <div class="row">
     <label>Rule name<input type="text" name="name" placeholder="shows" autocomplete="off" title="Rule name"></label>
     <label>Feeds (comma)<input type="text" name="feeds" placeholder="serie" autocomplete="off" title="Feeds to apply this rule to (empty = all)"></label>
@@ -148,13 +178,17 @@ summary{cursor:pointer;color:#93a1b5}
     <label class="chk"><input type="checkbox" name="sequential" value="1" title="Download pieces in sequential order"> sequential</label>
     <label class="chk"><input type="checkbox" name="first_last" value="1" title="Download start and end pieces of files first"> first/last</label>
     <label class="chk"><input type="checkbox" name="top" value="1" title="Place matched torrents at top of queue"> top</label>
+    <label class="chk"><input type="checkbox" name="once" value="1" title="Disable the rule after it adds its first torrent"> Download once</label>
   </div>
   <div class="row">
     <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
     <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
     <label>Tags<input type="text" name="tags" placeholder="tag, tag" autocomplete="off" title="Tags assigned to added torrents"></label>
-    <button type="submit" title="Save filter rule">Add rule</button>
+    <button type="submit" id="rule-submit" title="Save filter rule">Add rule</button>
+    <button type="button" class="sm" id="rule-preview" title="Show which archived items this rule would match">Preview matches</button>
+    <button type="button" class="sm" id="rule-cancel" style="display:none" title="Cancel editing the rule">Cancel</button>
   </div>
+  <div id="rule-preview-box" aria-live="polite"></div>
   <details>
     <summary>Advanced filters</summary>
     <div class="row">
@@ -185,7 +219,7 @@ summary{cursor:pointer;color:#93a1b5}
 </details>
 
 <h2>Feed items</h2>
-<div class="row"><button type="button" onclick="pollFeeds()" title="Fetch new items from configured RSS feeds now">Check feeds</button><span class="muted" id="pollinfo"></span></div>
+<p class="muted">Pick a feed to fetch it now and see its items with the rule that would take each one.</p>
 <div class="row" id="feedbar"></div>
 <div id="items"></div>
 <!--ERROR-->
@@ -206,7 +240,13 @@ var FEEDNAMES={{FEEDNAMES}};
 (function(){var form=document.getElementById('wanted-form');if(!form){return;}var idx=document.getElementById('wanted-index');var submit=document.getElementById('wanted-submit');var cancel=document.getElementById('wanted-cancel');var fields=['name','kind','seasons','language','quality','exclude','episode_filter','category','savepath'];function setField(n,v){var el=form.querySelector('[name='+n+']');if(!el){return;}if(el.tagName==='SELECT'&&v&&!el.querySelector('option[value="'+v+'"]')){var o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o);}el.value=v||'';}function clear(){idx.value='';fields.forEach(function(n){setField(n,'');});form.querySelector('[name=paused]').checked=false;submit.textContent=t('Add wanted');cancel.style.display='none';}Array.prototype.forEach.call(document.querySelectorAll('[data-wanted-edit]'),function(btn){btn.addEventListener('click',function(){idx.value=btn.getAttribute('data-index');setField('name',btn.getAttribute('data-name'));setField('kind',btn.getAttribute('data-kind'));setField('seasons',btn.getAttribute('data-seasons'));setField('language',btn.getAttribute('data-language'));setField('quality',btn.getAttribute('data-quality'));setField('exclude',btn.getAttribute('data-exclude'));setField('episode_filter',btn.getAttribute('data-episode'));setField('category',btn.getAttribute('data-category'));setField('savepath',btn.getAttribute('data-savepath'));form.querySelector('[name=paused]').checked=btn.getAttribute('data-paused')==='true';submit.textContent=t('Save wanted');cancel.style.display='';form.scrollIntoView({behavior:'smooth',block:'center'});});});if(cancel){cancel.addEventListener('click',clear);}})();
 (function(){var btn=document.getElementById('wanted-search');if(!btn){return;}btn.addEventListener('click',function(){var form=document.getElementById('wanted-form');var box=document.getElementById('wanted-results');var name=form.querySelector('[name=name]').value.trim();if(name.length<2){box.textContent=t('type at least two characters');return;}box.textContent=t('Searching…');var p=new URLSearchParams({q:name,language:form.querySelector('[name=language]').value,quality:form.querySelector('[name=quality]').value});fetch('/ui/wanted-search?'+p.toString(),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){box.innerHTML='';if(!names||!names.length){box.textContent=t('No results');return;}(names).forEach(function(n){var b=document.createElement('button');b.type='button';b.className='feed';b.textContent=n;b.onclick=function(){form.querySelector('[name=name]').value=n;};box.appendChild(b);});}).catch(function(){box.textContent=t('No results');});});})();
 function loadItems(name){var box=document.getElementById('items');box.textContent='…';fetch('/ui/feed-items?feed='+encodeURIComponent(name),{cache:'no-store'}).then(function(r){return r.ok?r.json():[]}).then(function(list){box.innerHTML='';if(!list.length){box.textContent='—';return;}var table=document.createElement('table');var head=document.createElement('tr');[t('Title'),t('Size'),t('Seeds'),t('Rule')].forEach(function(h){var th=document.createElement('th');th.textContent=h;head.appendChild(th);});table.appendChild(head);list.forEach(function(it){var tr=document.createElement('tr');var td=document.createElement('td');td.textContent=it.title;tr.appendChild(td);var s=document.createElement('td');s.textContent=fmtBytes(it.size);tr.appendChild(s);var sd=document.createElement('td');sd.textContent=it.seeders;tr.appendChild(sd);var r=document.createElement('td');r.textContent=it.rule;tr.appendChild(r);var a=document.createElement('td');var b=document.createElement('button');b.textContent=t('Add');b.onclick=function(){var f=new URLSearchParams();f.set('source',it.download);fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){b.disabled=true;});};a.appendChild(b);tr.appendChild(a);table.appendChild(tr);});box.appendChild(table);}).catch(function(){box.textContent='—';});}
-function pollFeeds(){var info=document.getElementById('pollinfo');if(!info){return;}info.textContent=t('Checking…');fetch('/ui/feeds/poll',{method:'POST'}).then(function(){return fetch('/ui/feeds',{cache:'no-store'})}).then(function(r){return r.ok?r.json():[]}).then(function(list){var errs=list.filter(function(f){return f.last_error;}).map(function(f){return f.name+': '+f.last_error;});info.textContent=errs.join(' · ');}).catch(function(){info.textContent='';});}
+function pollFeeds(){var info=document.getElementById('pollinfo');if(!info){return;}info.textContent=t('Checking…');var before={};fetch('/ui/feeds',{cache:'no-store'}).then(function(r){return r.ok?r.json():[]}).then(function(list){list.forEach(function(f){before[f.name]=f.last_check;});return fetch('/ui/feeds/poll',{method:'POST'});}).then(function(){var tries=0;var timer=setInterval(function(){tries++;fetch('/ui/feeds',{cache:'no-store'}).then(function(r){return r.ok?r.json():[]}).then(function(list){var done=list.length>0&&list.every(function(f){return f.last_check!==before[f.name];});if(done||tries>=40){clearInterval(timer);location.reload();}});},3000);}).catch(function(){info.textContent='';});}
+// Reload one feed: fetch it now and show its new status in the row.
+(function(){Array.prototype.forEach.call(document.querySelectorAll('[data-feed-reload]'),function(btn){btn.addEventListener('click',function(){var name=btn.getAttribute('data-feed-reload');var row=btn.closest('tr');var cell=row?row.querySelector('[data-feed-status]'):null;btn.disabled=true;if(cell){cell.textContent=t('Checking…');}var f=new URLSearchParams();f.set('feed',name);fetch('/ui/feeds/poll',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json().then(function(j){if(!r.ok){throw new Error(j.error||r.status);}return j;});}).then(function(st){if(!cell){return;}cell.textContent='';if(st.last_error){var e=document.createElement('span');e.className='err';e.setAttribute('role','status');e.textContent=st.last_error;cell.appendChild(e);return;}var ok=document.createElement('span');ok.className='ok';ok.textContent='✓ '+st.items+' '+t('items')+(st.new?' · '+st.new+' '+t('new'):'')+(st.added?' · '+st.added+' '+t('added'):'');cell.appendChild(ok);}).catch(function(e){if(cell){cell.textContent=t('Error')+': '+e.message;}}).then(function(){btn.disabled=false;});});});})();
+// Feed edit: fill the form with the row's feed and remember its index.
+(function(){var form=document.getElementById('feed-form');if(!form){return;}var idx=document.getElementById('feed-index');var submit=document.getElementById('feed-submit');var cancel=document.getElementById('feed-cancel');var text=['name','url','folder','include','exclude','category','savepath'];function clear(){idx.value='';text.forEach(function(n){form.querySelector('[name='+n+']').value='';});form.querySelector('[name=paused]').checked=false;form.querySelector('[name=disabled]').checked=false;submit.textContent=t('Add feed');cancel.style.display='none';}Array.prototype.forEach.call(document.querySelectorAll('[data-feed-edit]'),function(btn){btn.addEventListener('click',function(){var feed={};try{feed=JSON.parse(btn.getAttribute('data-feed')||'{}');}catch(e){}idx.value=btn.getAttribute('data-index');text.forEach(function(n){form.querySelector('[name='+n+']').value=feed[n]||'';});form.querySelector('[name=paused]').checked=!!feed.paused;form.querySelector('[name=disabled]').checked=!!feed.disabled;var det=form.querySelector('details');if(det&&(feed.folder||feed.include||feed.exclude||feed.category||feed.savepath||feed.paused||feed.disabled)){det.open=true;}submit.textContent=t('Save feed');cancel.style.display='';form.scrollIntoView({behavior:'smooth',block:'center'});form.querySelector('[name=name]').focus();});});if(cancel){cancel.addEventListener('click',clear);}})();
+// Rule edit: load a saved rule into the form; Preview tests the form against the archive.
+(function(){var form=document.getElementById('rule-form');if(!form){return;}var idx=document.getElementById('rule-index');var submit=document.getElementById('rule-submit');var cancel=document.getElementById('rule-cancel');function set(n,v){var el=form.querySelector('[name='+n+']');if(!el){return;}if(el.type==='checkbox'){el.checked=!!v;}else{el.value=(v===undefined||v===null||v===0)?'':v;}}function mib(b){return b?Math.round(b/1048576):'';}function clear(){form.reset();idx.value='';submit.textContent=t('Add rule');cancel.style.display='none';}Array.prototype.forEach.call(document.querySelectorAll('[data-rule-edit]'),function(btn){btn.addEventListener('click',function(){var r={};try{r=JSON.parse(btn.getAttribute('data-rule')||'{}');}catch(e){}var m=r.match||{},a=r.action||{};form.reset();idx.value=btn.getAttribute('data-index');set('name',r.name);set('feeds',(r.feeds||[]).join(', '));set('enabled',r.enabled!==false);set('fail',r.fail);set('include',(m.include||[]).join(', '));set('exclude',(m.exclude||[]).join(', '));set('episode_filter',m.episode_filter);set('require_episode',m.require_episode);set('smart_episode',m.smart_episode);set('paused',a.paused);set('sequential',a.sequential);set('first_last',a.first_last);set('top',a.top);set('once',a.once);set('savepath',a.savepath);set('category',a.category);set('tags',(a.tags||[]).join(', '));set('regex',m.regex);set('not_regex',m.not_regex);set('min_size',mib(m.min_size));set('max_size',mib(m.max_size));set('min_seeders',m.min_seeders);set('max_seeders',m.max_seeders);set('min_peers',m.min_peers);set('max_age_days',m.max_age_days);set('ignore_days',r.ignore_days);submit.textContent=t('Save rule');cancel.style.display='';form.scrollIntoView({behavior:'smooth',block:'center'});form.querySelector('[name=name]').focus();});});if(cancel){cancel.addEventListener('click',clear);}var pv=document.getElementById('rule-preview');var box=document.getElementById('rule-preview-box');if(pv&&box){pv.addEventListener('click',function(){box.textContent=t('Searching…');fetch('/ui/rss-rule-preview',{method:'POST',body:new URLSearchParams(new FormData(form)),headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json().then(function(j){if(!r.ok){throw new Error(j.error||r.status);}return j;});}).then(function(res){box.innerHTML='';var head=document.createElement('p');head.className='muted';head.textContent=res.matches.length+' '+t('matches among the last')+' '+res.scanned+' '+t('archived items');box.appendChild(head);if(!res.matches.length){return;}var table=document.createElement('table');res.matches.forEach(function(m){var tr=document.createElement('tr');var td=document.createElement('td');td.className='wrap';td.textContent=m.title;if(m.added){var f=document.createElement('span');f.className='flag on';f.textContent=t('downloaded');td.appendChild(document.createTextNode(' '));td.appendChild(f);}tr.appendChild(td);var fd=document.createElement('td');fd.className='muted';fd.textContent=m.feed;tr.appendChild(fd);var sz=document.createElement('td');sz.textContent=fmtBytes(m.size);tr.appendChild(sz);table.appendChild(tr);});box.appendChild(table);}).catch(function(e){box.textContent=t('Error')+': '+e.message;});});}})();
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}
 function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
 (function(){var bar=document.getElementById('feedbar');FEEDNAMES.forEach(function(name){var b=document.createElement('button');b.type='button';b.className='feed';b.textContent=name;b.onclick=function(){loadItems(name);};bar.appendChild(b);});})();

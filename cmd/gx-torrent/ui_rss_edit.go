@@ -221,6 +221,13 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		list = append(list[:index], list[index+1:]...)
+	case "toggle":
+		index, err := parseFormIndex(r.FormValue("index"))
+		if err != nil || index < 0 || index >= len(list) {
+			d.renderRSS(w, r, "The feed does not exist anymore.")
+			return
+		}
+		list[index].Disabled = !list[index].Disabled
 	default:
 		feed := feedConfig{
 			Name:     strings.TrimSpace(r.FormValue("name")),
@@ -232,6 +239,7 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 			Category: strings.TrimSpace(r.FormValue("category")),
 			SavePath: strings.TrimSpace(r.FormValue("savepath")),
 			Paused:   r.FormValue("paused") != "",
+			Disabled: r.FormValue("disabled") != "",
 		}
 		if feed.URL == "" && feed.Search == "" {
 			d.renderRSS(w, r, "Give the feed an RSS URL.")
@@ -241,7 +249,16 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 			d.renderRSS(w, r, "The feed URL must start with http:// or https://.")
 			return
 		}
-		list = append(list, feed)
+		if index, err := parseFormIndex(r.FormValue("index")); err == nil && index >= 0 {
+			// Editing an existing feed: replace it in place, so a rename works.
+			if index >= len(list) {
+				d.renderRSS(w, r, "The feed does not exist anymore.")
+				return
+			}
+			list[index] = feed
+		} else {
+			list = append(list, feed)
+		}
 	}
 	if err := d.saveFeeds(list); err != nil {
 		d.renderRSS(w, r, "Cannot save the feeds: "+err.Error())
@@ -273,6 +290,18 @@ func (d *Daemon) handleUIRssRule(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		list = append(list[:index], list[index+1:]...)
+	case "toggle":
+		index, err := parseFormIndex(r.FormValue("index"))
+		if err != nil || index < 0 || index >= len(list) {
+			d.renderRSS(w, r, "The rule does not exist anymore.")
+			return
+		}
+		enabled := !rss.RuleEnabled(list[index])
+		if enabled {
+			list[index].Enabled = nil
+		} else {
+			list[index].Enabled = &enabled
+		}
 	case "up":
 		if index, err := parseFormIndex(r.FormValue("index")); err == nil && index > 0 && index < len(list) {
 			list[index-1], list[index] = list[index], list[index-1]
@@ -287,7 +316,16 @@ func (d *Daemon) handleUIRssRule(w http.ResponseWriter, r *http.Request) {
 			d.renderRSS(w, r, err.Error())
 			return
 		}
-		list = append(list, rule)
+		if index, err := parseFormIndex(r.FormValue("index")); err == nil && index >= 0 {
+			// Editing an existing rule keeps its place in the order.
+			if index >= len(list) {
+				d.renderRSS(w, r, "The rule does not exist anymore.")
+				return
+			}
+			list[index] = rule
+		} else {
+			list = append(list, rule)
+		}
 	}
 	if err := d.saveRules(list); err != nil {
 		d.renderRSS(w, r, "Cannot save the rules: "+err.Error())
@@ -419,6 +457,7 @@ func uiRuleFromForm(r *http.Request) (rss.Rule, error) {
 			Sequential: formBool(r, "sequential"),
 			FirstLast:  formBool(r, "first_last"),
 			Top:        formBool(r, "top"),
+			Once:       formBool(r, "once"),
 		},
 	}
 	for field, pattern := range map[string]string{"regex": rule.Match.Regex, "not_regex": rule.Match.NotRegex} {
@@ -474,8 +513,15 @@ func (d *Daemon) uiRuleRowsHTML() string {
 		b.WriteString("<td>" + flags + ` <span class="muted">` + html.EscapeString(scope) + "</span></td>")
 		b.WriteString(`<td class="mono">` + html.EscapeString(uiRuleMatchSummary(rule)) + "</td>")
 		b.WriteString(`<td class="mono">` + html.EscapeString(uiRuleActionSummary(rule)) + "</td>")
-		b.WriteString(`<td class="actions"><form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="up"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="sm">↑</button></form>`)
-		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="down"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="sm">↓</button></form>`)
+		ruleJSON, _ := json.Marshal(rule)
+		toggle := "Disable"
+		if !rss.RuleEnabled(rule) {
+			toggle = "Enable"
+		}
+		b.WriteString(`<td class="actions"><button type="button" class="sm" data-rule-edit data-index="` + strconv.Itoa(index) + `" data-rule="` + html.EscapeString(string(ruleJSON)) + `" title="Load this rule into the form to change it">Edit</button> `)
+		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="toggle"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="sm" title="Turn this rule on or off without deleting it">` + toggle + `</button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="up"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="sm" title="Move up: rules are evaluated in order" aria-label="Move up">↑</button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="down"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="sm" title="Move down: rules are evaluated in order" aria-label="Move down">↓</button></form>`)
 		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="danger">Remove</button></form></td></tr>`)
 	}
 	return b.String()
@@ -585,7 +631,11 @@ func (d *Daemon) uiIndexerRowsHTML() string {
 	}
 	var b strings.Builder
 	for index, indexer := range list {
-		b.WriteString("<tr><td>" + html.EscapeString(orDefault(indexer.Name, "—")) + "</td>")
+		nameCell := html.EscapeString(orDefault(indexer.Name, "—"))
+		if page := indexerPageURL(indexer.URL); page != "" {
+			nameCell = `<a href="` + html.EscapeString(page) + `" target="_blank" rel="noopener noreferrer" title="Open the indexer's web page in a new tab">` + nameCell + ` <span aria-hidden="true">↗</span></a>`
+		}
+		b.WriteString("<tr><td>" + nameCell + "</td>")
 		b.WriteString(`<td class="mono">` + html.EscapeString(indexer.URL) + "</td>")
 		keyState := "—"
 		if strings.TrimSpace(indexer.APIKey) != "" {
@@ -601,12 +651,17 @@ func (d *Daemon) uiIndexerRowsHTML() string {
 	return b.String()
 }
 
-// uiFeedRowsHTML renders the configured feeds as table rows, each with a remove
-// button; the row index is the removal key.
+// uiFeedRowsHTML renders the configured feeds as table rows with their last
+// outcome and the reload, edit, enable/disable and remove buttons; the row
+// index is the key of the edit/remove operations.
 func (d *Daemon) uiFeedRowsHTML() string {
 	list := d.feeds()
 	if len(list) == 0 {
-		return `<tr><td colspan="4" class="muted">None</td></tr>`
+		return `<tr><td colspan="5" class="muted">None</td></tr>`
+	}
+	statuses := map[string]feedStatus{}
+	for _, status := range d.feedStatusesSnapshot() {
+		statuses[status.Name] = status
 	}
 	rows := make([]struct {
 		index int
@@ -625,24 +680,74 @@ func (d *Daemon) uiFeedRowsHTML() string {
 	var b strings.Builder
 	for _, row := range rows {
 		feed := row.feed
+		index := strconv.Itoa(row.index)
 		source := strings.TrimSpace(feed.URL)
 		if source == "" && strings.TrimSpace(feed.Search) != "" {
 			source = "search: " + feed.Search
 		}
-		state := "active"
-		if feed.Paused {
-			state = "paused"
+		key := feed.Name
+		if key == "" {
+			key = source
 		}
 		name := orDefault(feed.Name, "—")
 		if feed.Folder != "" {
 			name += " (" + feed.Folder + ")"
 		}
-		b.WriteString("<tr><td>" + html.EscapeString(name) + "</td>")
-		b.WriteString(`<td class="mono">` + html.EscapeString(source) + "</td>")
+		state := `<span class="flag on">active</span>`
+		if feed.Disabled {
+			state = `<span class="flag">disabled</span>`
+		}
+		if feed.Paused {
+			state += ` <span class="flag" title="Torrents from this feed are added paused">adds paused</span>`
+		}
+		b.WriteString(`<tr data-feed-row="` + html.EscapeString(key) + `"><td>` + html.EscapeString(name) + "</td>")
+		b.WriteString(`<td class="mono wrap">` + html.EscapeString(source) + "</td>")
 		b.WriteString("<td>" + state + "</td>")
-		b.WriteString(`<td><form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(row.index) + `"><button type="submit" class="danger">Remove</button></form></td></tr>`)
+		b.WriteString(`<td data-feed-status>` + uiFeedStatusHTML(statuses[key]) + `</td>`)
+		feedJSON, _ := json.Marshal(feed)
+		toggle := "Disable"
+		if feed.Disabled {
+			toggle = "Enable"
+		}
+		b.WriteString(`<td class="actions">`)
+		b.WriteString(`<button type="button" class="sm" data-feed-reload="` + html.EscapeString(key) + `" title="Fetch this feed now and apply the rules" aria-label="Reload this feed now">↻ Reload</button> `)
+		b.WriteString(`<button type="button" class="sm" data-feed-edit data-index="` + index + `" data-feed="` + html.EscapeString(string(feedJSON)) + `" title="Load this feed into the form to change it">Edit</button> `)
+		b.WriteString(`<form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="toggle"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="sm" title="Stop or resume the automatic checks of this feed without deleting it">` + toggle + `</button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="danger" title="Delete this feed">Remove</button></form></td></tr>`)
 	}
 	return b.String()
+}
+
+// uiFeedStatusHTML renders a feed's last outcome: when it was checked, how
+// many items it returned (and how many were new or added), or its error.
+func uiFeedStatusHTML(status feedStatus) string {
+	if status.LastCheck == 0 {
+		return `<span class="muted">not checked yet</span>`
+	}
+	when := time.Unix(status.LastCheck, 0).Format("02/01 15:04")
+	out := `<span class="muted" title="Last check">` + when + `</span> `
+	if status.LastError != "" {
+		return out + `<span class="err" role="status">` + html.EscapeString(status.LastError) + `</span>`
+	}
+	out += `<span title="Items in the feed">` + strconv.Itoa(status.Items) + `</span> <span class="muted">items</span>`
+	if status.New > 0 {
+		out += ` · <span class="ok">` + strconv.Itoa(status.New) + `</span> <span class="muted">new</span>`
+	}
+	if status.Added > 0 {
+		out += ` · <span class="ok">` + strconv.Itoa(status.Added) + `</span> <span class="muted">added</span>`
+	}
+	return out
+}
+
+// indexerPageURL is the web page of an indexer: the scheme and host of its
+// Torznab URL, where Prowlarr, Jackett and the other managers serve their UI
+// (the API path below it is not a page). Empty for an invalid URL.
+func indexerPageURL(raw string) string {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return ""
+	}
+	return parsed.Scheme + "://" + parsed.Host + "/"
 }
 
 // orDefault returns value when it is not blank, otherwise fallback.

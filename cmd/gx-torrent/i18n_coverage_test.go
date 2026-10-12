@@ -53,7 +53,7 @@ func uiI18nWorth(s string) bool {
 }
 
 func TestUIPageIsFullyTranslatable(t *testing.T) {
-	raw := assets.UITemplate() + "\n" + assets.LoginPage() + "\n" + assets.SetupPage() + "\n" + assets.RSSPage() + "\n" + assets.SettingsPage()
+	raw := assets.UITemplate() + "\n" + assets.LoginPage() + "\n" + assets.SetupPage() + "\n" + assets.RSSPage() + "\n" + assets.SettingsPage() + "\n" + assets.ArchivePage()
 	text := raw
 	// <script>/<style> content is not translated (the translator skips it) and
 	// would only produce JS/CSS false positives; strip it before scanning.

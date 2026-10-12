@@ -55,19 +55,22 @@ type uiPageData struct {
 	TotalDown    int64
 	TotalUp      int64
 
-	PeerPort     int
-	Listen       string
-	Router       string
-	ExternalIP   string
-	PortOpen     bool
-	PeerErrors   string
-	DHT          bool
-	DHTNodes     int64
-	UTP          bool
-	Encryption   string
-	Proxy        bool
-	IPFilter     int
-	IPFilterPath string
+	PeerPort   int
+	Listen     string
+	Router     string
+	ExternalIP string
+	PortOpen   bool
+	// PortReachable lights the peer-port dot: a router mapping, or incoming
+	// peers (proof the port is reachable even when forwarded by hand).
+	PortReachable bool
+	PeerErrors    string
+	DHT           bool
+	DHTNodes      int64
+	UTP           bool
+	Encryption    string
+	Proxy         bool
+	IPFilter      int
+	IPFilterPath  string
 	// IPFilterSource prefills the IP filter field with Gextto's setting.
 	IPFilterSource string
 	// GexttoLog enables the Gextto log tab.
@@ -796,26 +799,40 @@ func (d *Daemon) handleUIIPFilter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = r.ParseForm()
-	source := strings.TrimSpace(r.FormValue("source"))
-	if source == "" {
-		d.uiDone(w, r, "", fmt.Errorf("provide a URL or a file path"))
-		return
-	}
-	path := source
-	if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
-		fetched, err := d.fetchIPFilterURL(source)
-		if err != nil {
-			d.uiDone(w, r, "", fmt.Errorf("download: %w", err))
+	// The settings page's "Load now" posts its own form: the source is its
+	// "ipfilter" field and the answer goes back to that page.
+	fromSettings := r.FormValue("return") == "settings"
+	done := func(message string, err error) {
+		if !fromSettings {
+			d.uiDone(w, r, message, err)
 			return
 		}
-		path = fetched
+		ok := "1"
+		if err != nil {
+			ok, message = "0", "Error: "+err.Error()
+		}
+		http.Redirect(w, r, uiSettingsPath+"?msg="+url.QueryEscape(message)+"&ok="+ok+"#ipfilter", http.StatusSeeOther)
 	}
-	rules, err := d.loadIPFilter(path)
-	if err != nil {
-		d.uiDone(w, r, "", err)
+	source := strings.TrimSpace(r.FormValue("source"))
+	if source == "" {
+		source = strings.TrimSpace(r.FormValue("ipfilter"))
+	}
+	if source == "" {
+		done("", fmt.Errorf("provide a URL or a file path"))
 		return
 	}
-	d.uiDone(w, r, fmt.Sprintf("IP filter loaded: %d rules", rules), nil)
+	rules, err := d.loadIPFilterSource(source)
+	if err != nil {
+		done("", err)
+		return
+	}
+	if fromSettings {
+		// The rule count is in the page's status line: a fixed message stays
+		// translatable.
+		done("IP filter loaded", nil)
+		return
+	}
+	done(fmt.Sprintf("IP filter loaded: %d rules", rules), nil)
 }
 
 // handleUIFilePriority sets one file's priority. 0 = skip, 1..4 = normal,
@@ -1170,6 +1187,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 	default:
 		page.Router = "—"
 	}
+	page.PortReachable = page.PortOpen || page.IncomingConns > 0
 	page.PeerErrors = uiPeerErrors(stats.PeerErrors)
 	for name := range d.categoriesSnapshot() {
 		page.Categories = append(page.Categories, name)
