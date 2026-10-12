@@ -146,11 +146,18 @@ func archiveIdxRecord(entry archiveEntry) []byte {
 	if len(feed) > 0xffff {
 		feed = feed[:0xffff]
 	}
+	// Seeders come from a feed (strconv.Atoi, no upper bound) and the index
+	// field is 4 bytes: clamp both ends with explicit guards so the conversion
+	// cannot truncate.
+	seeders := entry.Seeders
+	if seeders < 0 {
+		seeders = 0
+	}
+	if seeders > math.MaxUint32 {
+		seeders = math.MaxUint32
+	}
 	out := make([]byte, 15, 15+len(feed)+len(title))
 	binary.BigEndian.PutUint64(out[0:8], uint64(max(entry.Size, 0)))
-	// Seeders come from a feed and can be arbitrarily large: clamp both ends so
-	// the uint32 conversion cannot truncate (feed_archive's index is 4 bytes).
-	seeders := min(max(entry.Seeders, 0), math.MaxUint32)
 	binary.BigEndian.PutUint32(out[8:12], uint32(seeders))
 	if entry.Added {
 		out[12] = archiveFlagAdded
