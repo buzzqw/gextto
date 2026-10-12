@@ -131,31 +131,38 @@ func (m *portMapper) refresh() {
 		if err := m.mapUPnP(); err == nil {
 			return
 		} else {
-			errs = append(errs, "UPnP: "+err.Error())
+			errs = append(errs, oneLine("UPnP: "+err.Error()))
 		}
 	}
 	if m.pcp {
 		if err := m.mapPCP(); err == nil {
 			return
 		} else {
-			errs = append(errs, "PCP: "+err.Error())
+			errs = append(errs, oneLine("PCP: "+err.Error()))
 		}
 	}
 	if m.natpmp {
 		if err := m.mapNATPMP(); err == nil {
 			return
 		} else {
-			errs = append(errs, "NAT-PMP: "+err.Error())
+			errs = append(errs, oneLine("NAT-PMP: "+err.Error()))
 		}
 	}
+	message := strings.Join(errs, "; ")
 	m.mu.Lock()
-	changed := m.lastErr != strings.Join(errs, "; ")
-	m.lastErr = strings.Join(errs, "; ")
+	changed := m.lastErr != message
+	m.lastErr = message
 	m.method = ""
 	m.mu.Unlock()
 	if changed {
-		logf("router port %d not opened automatically (%s): forward it by hand for incoming peers", m.port, strings.Join(errs, "; "))
+		logf("router port %d not opened automatically (%s): forward it by hand for incoming peers", m.port, message)
 	}
+}
+
+// oneLine collapses runs of whitespace (including the newlines of a SOAP fault)
+// into single spaces, so a router error stays on one log line.
+func oneLine(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }
 
 func (m *portMapper) mapUPnP() error {

@@ -186,6 +186,10 @@ Or using the binary directly:
 ./gx-torrent -mode standalone -listen 0.0.0.0:8890 -data /var/lib/gx-torrent
 ```
 
+At startup the daemon prints the addresses where its web UI is reachable, e.g.
+`web UI: http://192.168.1.10:8890/` (LAN) and `web UI: http://127.0.0.1:8890/`
+(this host), so you can open the page without looking up the IP.
+
 ### Initial Setup Wizard
 
 Open your browser at `http://<server-ip>:8890/`.

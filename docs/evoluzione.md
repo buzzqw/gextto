@@ -2202,6 +2202,10 @@ Ex `docs/lavoro-sessione.md` (updated on 2026-10-07; it covers from commit
   libtorrent if it does not start); agnostic service (`GEXTTO_LIBTORRENT` only an
   override); shared network/queue/cache settings no longer disabled with
   gx-torrent; README + `gx-torrent.md` updated.
+- **gx-torrent startup address**: standalone logs the address to open, not only
+  the wildcard it binds — `web UI: http://<lan-ip>:8890/` (interface towards the
+  default gateway) plus the loopback URL; a pinned `-listen` shows just that one.
+  The router-refused-port error (UPnP/PCP/NAT-PMP) is collapsed to a single line.
 
 ### 12.3 Open points as of 07/10 (historical; several closed/superseded)
 

@@ -238,6 +238,16 @@ so it is reachable from the LAN by default, like `qbittorrent-nox`. Set
 `-listen 127.0.0.1:8890` (or a specific interface IP) to keep it on one host
 only; the packaged systemd unit already passes `-listen 0.0.0.0:8890`.
 
+**Startup address.** At startup the daemon prints the address to open, not only
+the wildcard it binds: `web UI: http://<lan-ip>:8890/` (the interface that
+reaches the default gateway, so it works from another device) followed by
+`web UI: http://127.0.0.1:8890/`; with a pinned `-listen` only that address is
+listed. When the wizard is still to run, an additional `first run: open …`
+line points at `/ui/setup`. A router that refuses the port mapping
+(UPnP/PCP/NAT-PMP) is reported on a single line, e.g.
+`router port 6881 not opened automatically (…): forward it by hand for incoming
+peers`.
+
 In standalone the page's POSTs (`/ui/*`) are accepted only if
 `Origin`/`Referer` matches the request host (CSRF protection) and the request
 host (`Host`) must be an IP or `localhost`, never a name that resolves

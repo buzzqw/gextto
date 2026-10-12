@@ -304,7 +304,9 @@ the default gateway (UPnP/NAT-PMP), and links each torrent into place with a
 **junction**, so it needs neither the symbolic-link privilege nor Developer
 Mode. Only gx-torrent runs on Windows; Gextto itself remains Linux-only.
 
-**First run.** Open `http://<host>:8890/`: the wizard guides you through
+**First run.** Open `http://<host>:8890/`: at startup the daemon already prints
+the addresses to open (`web UI: http://<lan-ip>:8890/` and
+`http://127.0.0.1:8890/`), so there is no need to look up the IP. The wizard guides you through
 language, download and temporary folders (with a **folder picker** browsing the
 server; both are pre-filled with two subfolders of the daemon's own directory —
 `download`/its word in the chosen language and `download-temp` — ready to accept

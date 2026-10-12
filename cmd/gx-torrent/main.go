@@ -421,8 +421,12 @@ func startDaemon(opts Options) (*daemonRun, error) {
 	}
 	server := &http.Server{Handler: daemon.routes(), ReadHeaderTimeout: 10 * time.Second}
 	serverErr := make(chan error, 1)
+	boundHost, boundPort, _ := net.SplitHostPort(listener.Addr().String())
+	logf("version %s listening on %s (data %s, downloads %s)", runtimeVersion(), listener.Addr(), opts.DataDir, opts.DownloadDir)
+	for _, url := range webUIURLs(boundHost, boundPort) {
+		logf("web UI: %s", url)
+	}
 	go func() {
-		logf("version %s listening on %s (data %s, downloads %s)", runtimeVersion(), listener.Addr(), opts.DataDir, opts.DownloadDir)
 		serverErr <- server.Serve(listener)
 	}()
 

@@ -312,7 +312,9 @@ torrent con una **junction**, quindi non servono né il privilegio dei link
 simbolici né la Modalità sviluppatore. Su Windows gira solo gx-torrent; Gextto
 resta solo Linux.
 
-**Primo avvio.** Apri `http://<host>:8890/`: il wizard guida lingua, cartelle
+**Primo avvio.** Apri `http://<host>:8890/`: all'avvio il demone stampa già gli
+indirizzi da aprire (`web UI: http://<lan-ip>:8890/` e
+`http://127.0.0.1:8890/`), quindi non serve cercare l'IP. Il wizard guida lingua, cartelle
 di download e temporanea (con un **selettore di cartelle** che sfoglia il
 server; entrambe sono precompilate con due sottocartelle della directory del
 demone — `scarico`/il termine della lingua scelta e `download-temp` — pronte da
