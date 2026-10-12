@@ -547,6 +547,34 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
   color: var(--accent); font-size: 0.7rem; font-weight: 700;
 }
 .torrent-name { min-width: 220px; max-width: 420px; }
+/* Torrent list: a two-line card at every width - name on top, progress and the
+   live metrics below, actions on the right. No horizontal scrolling is needed;
+   the structure follows the gx-torrent daemon's own list. */
+.data-table.torrent-table { display: block; width: 100%; min-width: 0; table-layout: auto; }
+.data-table.torrent-table thead { display: none; }
+.data-table.torrent-table tbody { display: flex; flex-direction: column; }
+.data-table.torrent-table tr { display: block; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); }
+.data-table.torrent-table tbody tr:last-child { border-bottom: 0; }
+.data-table.torrent-table tbody tr:hover { background: var(--surface-2); }
+.data-table.torrent-table td.torrent-card-cell { display: block; padding: 0; border: 0; }
+.torrent-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px; align-items: start; }
+.torrent-head { grid-column: 1; display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.torrent-select { flex: none; display: flex; align-items: center; padding-top: 2px; }
+.torrent-name { flex: 1 1 auto; min-width: 0; max-width: none; }
+.torrent-name > .truncate { display: block; font-weight: 600; }
+.torrent-state { flex: none; }
+.torrent-body { grid-column: 1; min-width: 0; }
+.torrent-progress { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.torrent-progress .progress { flex: 1 1 auto; min-width: 60px; }
+.torrent-progress small { flex: none; white-space: nowrap; }
+.torrent-metrics { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.torrent-metric { white-space: nowrap; }
+.torrent-card > .row-actions { grid-column: 2; grid-row: 1 / span 2; align-self: center; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; min-width: 0; white-space: normal; }
+@media (max-width: 700px) {
+  .torrent-card { grid-template-columns: minmax(0, 1fr); }
+  .torrent-card > .row-actions { grid-column: 1; grid-row: auto; justify-content: flex-start; padding-top: 6px; border-top: 1px solid var(--line-soft); }
+  .torrent-card > .row-actions .btn { min-height: 40px; }
+}
 .torrent-name > .truncate { display: block; font-weight: 600; }
 .origin { display: block; margin-top: 2px; font-size: 0.72rem; }
 .th-sort { cursor: pointer; user-select: none; }
@@ -1328,73 +1356,6 @@ pre.log-view { margin: 0; }
   .download-bulk-toolbar .input { min-width: 0; }
   .download-bulk-toolbar .compact { width: 100%; }
 
-  /* Torrent table → card tiles.
-     Each row becomes a self-contained summary card: header line with the
-     name and status badge, a progress row and a full-width actions strip.
-     Secondary columns (rates, ETA, peers, ratio) go into the detail dialog. */
-  .data-table.torrent-table {
-    display: block;
-    min-width: 0 !important;
-    table-layout: auto;
-  }
-  .data-table.torrent-table thead { display: none; }
-  .data-table.torrent-table tbody { display: flex; flex-direction: column; }
-  .data-table.torrent-table tr {
-    display: grid;
-    grid-template-columns: 26px 1fr auto;
-    grid-template-rows: auto auto auto;
-    column-gap: 8px;
-    row-gap: 4px;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--line-soft);
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .data-table.torrent-table tbody tr:last-child { border-bottom: 0; }
-  .data-table.torrent-table tbody tr:hover { background: var(--surface-2); }
-
-  /* cell 1 — checkbox */
-  .data-table.torrent-table td:nth-child(1) {
-    display: flex; align-items: flex-start; padding: 3px 0 0;
-    grid-column: 1; grid-row: 1;
-  }
-  /* cell 2 — name + tags + origin */
-  .data-table.torrent-table td:nth-child(2) {
-    display: block; padding: 0; min-width: 0;
-    grid-column: 2; grid-row: 1;
-  }
-  .data-table.torrent-table .torrent-name { min-width: 0; max-width: none; }
-  /* cell 3 — status badge */
-  .data-table.torrent-table td:nth-child(3) {
-    display: flex; align-items: flex-start; padding: 2px 0 0;
-    grid-column: 3; grid-row: 1;
-  }
-  /* cell 4 — progress bar */
-  .data-table.torrent-table td:nth-child(4) {
-    display: block; padding: 0; min-width: 0;
-    grid-column: 2 / 4; grid-row: 2;
-  }
-  /* cells 5–9 — download rate / upload rate / ETA / peers / ratio — hidden;
-     details reachable via the ⓘ dialog */
-  .data-table.torrent-table td:nth-child(5),
-  .data-table.torrent-table td:nth-child(6),
-  .data-table.torrent-table td:nth-child(7),
-  .data-table.torrent-table td:nth-child(8),
-  .data-table.torrent-table td:nth-child(9) { display: none !important; }
-  /* cell 10 — actions strip (full width, thumb-sized icons) */
-  .data-table.torrent-table td:nth-child(10) {
-    display: flex !important;
-    flex-wrap: nowrap;
-    justify-content: flex-end;
-    gap: 6px;
-    padding: 6px 0 0;
-    border-top: 1px solid var(--line-soft);
-    grid-column: 1 / -1;
-    grid-row: 3;
-    min-width: 0;
-    white-space: normal;
-  }
-  .data-table.torrent-table .row-actions .btn { min-height: 40px; }
 
   /* Episode actions also wrap instead of forcing a very wide table. */
 .data-table.series-episodes { min-width: 620px; }

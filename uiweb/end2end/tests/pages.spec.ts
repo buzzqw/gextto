@@ -168,7 +168,7 @@ test.describe("mobile", () => {
   test("Scarico usa schede compatte e conserva l'ordinamento touch", async ({ page }) => {
     await page.goto("/?view=downloads");
     await expect(page.locator("#v2-sort")).toBeVisible();
-    await expect(page.locator(".mobile-torrent-sort")).toContainText("Ordina per");
+    await expect(page.locator(".torrent-sort")).toContainText("Ordina per");
     const cardStyles = await page.evaluate(() => {
       const table = document.createElement("table");
       table.className = "data-table torrent-table";
@@ -179,7 +179,7 @@ test.describe("mobile", () => {
       table.remove();
       return result;
     });
-    expect(cardStyles).toEqual({ table: "block", row: "grid" });
+    expect(cardStyles).toEqual({ table: "block", row: "block" });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(2);
   });

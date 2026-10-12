@@ -378,7 +378,7 @@
          hx-trigger="submit, input changed delay:300ms from:#v2-filter, change from:#v2-tag-filter{{if .Auto}}, every 5s{{end}}">
     {{/* Live counter for the panel head (outside the refreshed fragment). */}}
     <span id="v2-session-count" hx-swap-oob="innerHTML" hidden>{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · <span>aggiornato</span> {{.UpdatedAt}}</span>
-    <label class="mobile-torrent-sort"><span>Ordina per</span><select id="v2-sort" class="input compact" name="sort" aria-label="Ordina i torrent" onchange="this.form.requestSubmit()">{{range .Columns}}<option value="{{.Key}}"{{if eq $.Sort .Key}} selected{{end}}>{{.Label}}</option>{{end}}</select><button class="btn sm" type="submit" name="sort_click" value="{{.Sort}}" title="Inverti la direzione dell'ordinamento">{{if eq .Dir "desc"}}↓{{else}}↑{{end}}</button></label>
+    <label class="torrent-sort"><span>Ordina per</span><select id="v2-sort" class="input compact" name="sort" aria-label="Ordina i torrent" onchange="this.form.requestSubmit()">{{range .Columns}}<option value="{{.Key}}"{{if eq $.Sort .Key}} selected{{end}}>{{.Label}}</option>{{end}}</select><button class="btn sm" type="submit" name="sort_click" value="{{.Sort}}" title="Inverti la direzione dell'ordinamento">{{if eq .Dir "desc"}}↓{{else}}↑{{end}}</button></label>
     <input type="hidden" name="dir" value="{{.Dir}}">
     <input type="hidden" name="auto_state" value="{{if .Auto}}1{{else}}0{{end}}">
     {{/* Live head fragments (outside the refreshed area). */}}
@@ -410,57 +410,67 @@
       </div>
 
      {{if or .Rows .HTTPDownloads}}
-     <p class="table-scroll-hint torrent-scroll-hint">Scorri lateralmente per vedere tutte le colonne</p>
-     <p class="mobile-torrent-hint muted">Ogni torrent è mostrato come scheda. Usa “Ordina per” per cambiare ordinamento.</p>
-    <div class="table-wrap" tabindex="0" role="region" aria-label="Tabella torrent e download HTTP">
+    <div class="table-wrap" role="region" aria-label="Tabella torrent e download HTTP">
       <table class="data-table torrent-table">
         <caption class="sr-only">Torrent e download HTTP nella sessione</caption>
-        <thead><tr>
-           <th scope="col"><span class="sr-only">Selezione</span></th>
-           {{range .Columns}}<th scope="col" class="th-sort"><button class="table-sort-button" type="submit" name="sort_click" value="{{.Key}}" title="Ordina i torrent per {{.Label}}">{{.Label}}{{arrow $.Sort $.Dir .Key}}</button></th>{{end}}
-           <th scope="col" title="Azioni disponibili per il torrent">Azioni</th>
-        </tr></thead>
         <tbody>
           {{range .Rows}}
           <tr id="v2-torrent-{{.Hash}}" data-hash="{{.Hash}}">
-              <td class="torrent-select"><input type="checkbox" data-v2-select name="hash" value="{{.Hash}}" aria-label="Seleziona {{.Name}}" title="Seleziona questo torrent per le azioni di gruppo" /></td>
-            <td class="torrent-name">
-              <span class="truncate" title="{{.Name}}">{{.Name}}</span>
-              {{if .Archived}}<span class="badge ok" title="Copia archiviata presente">NAS</span>{{end}}
-              {{if .SeedInfinite}}<span class="badge warn" title="Seed senza limiti">seed ∞</span>{{end}}
-              {{if or .Reason .Source}}<small class="origin muted"><span>Perché:</span> {{if .Reason}}{{.Reason}}{{else}}—{{end}} · <span>Fonte:</span> {{if .Source}}{{.Source}}{{else}}—{{end}}</small>{{end}}
-              {{if .Tags}}<span class="tag-chips">{{range .Tags}}<span class="tag-chip">{{.}}</span>{{end}}</span>{{end}}
-            </td>
-             <td class="torrent-state"><span class="badge {{.StateClass}}">{{.State}}</span></td>
-             <td class="torrent-progress" style="min-width:150px"><div class="progress {{.ProgressClass}}"><span style="width:{{.ProgressPct}}%"></span></div><small class="muted">{{.ProgressPct}}% · {{bytes .TotalDone}} / {{bytes .TotalSize}}</small><div class="torrent-mobile-rates">{{if or .DownloadRate .UploadRate}}<span class="rate-dl">↓ {{rate .DownloadRate}}</span><span class="rate-ul">↑ {{rate .UploadRate}}</span>{{end}}{{if and .ETA (ne .ETA "—") (ne .ETA "∞") (ne .ETA "")}}<span class="rate-eta">⏱ {{.ETA}}</span>{{end}}</div></td>
-             <td class="torrent-dl numeric">{{rate .DownloadRate}}</td>
-             <td class="torrent-ul numeric">{{rate .UploadRate}}</td>
-             <td class="torrent-eta numeric">{{.ETA}}</td>
-             <td class="torrent-peers numeric">{{.NumPeers}} / {{.NumSeeds}}</td>
-             <td class="torrent-ratio numeric">{{printf "%.2f" .Ratio}}</td>
-            <td class="row-actions">
-              {{if .Paused}}<button class="btn sm icon-action" type="submit" name="row_action" value="resume:{{.Hash}}" title="Riprendi" aria-label="Riprendi"><span aria-hidden="true">▶</span></button>
-              {{else}}<button class="btn sm icon-action" type="submit" name="row_action" value="pause:{{.Hash}}" title="Pausa" aria-label="Pausa"><span aria-hidden="true">⏸</span></button>{{end}}
-              <button class="btn sm icon-action" type="submit" name="row_action" value="recheck:{{.Hash}}" title="Verifica dati" aria-label="Verifica dati"><span aria-hidden="true">⟳</span></button>
-              <button class="btn sm icon-action" type="submit" name="row_action" value="reannounce:{{.Hash}}" title="Riannuncia ai tracker" aria-label="Riannuncia"><span aria-hidden="true">↻</span></button>
-              <button class="btn sm icon-action" type="button" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-modal" hx-swap="innerHTML" title="Dettagli" aria-label="Dettagli"><span aria-hidden="true">ⓘ</span></button>
-              <button class="btn sm icon-action danger" type="button" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Rimuovi" aria-label="Rimuovi"><span aria-hidden="true">🗑️</span></button>
+            <td class="torrent-card-cell">
+              <div class="torrent-card">
+                <div class="torrent-head">
+                  <span class="torrent-select"><input type="checkbox" data-v2-select name="hash" value="{{.Hash}}" aria-label="Seleziona {{.Name}}" title="Seleziona questo torrent per le azioni di gruppo" /></span>
+                  <span class="torrent-name">
+                    <span class="truncate" title="{{.Name}}">{{.Name}}</span>
+                    {{if .Archived}}<span class="badge ok" title="Copia archiviata presente">NAS</span>{{end}}
+                    {{if .SeedInfinite}}<span class="badge warn" title="Seed senza limiti">seed ∞</span>{{end}}
+                    {{if .Tags}}<span class="tag-chips">{{range .Tags}}<span class="tag-chip">{{.}}</span>{{end}}</span>{{end}}
+                    {{if or .Reason .Source}}<small class="origin muted"><span>Perché:</span> {{if .Reason}}{{.Reason}}{{else}}—{{end}} · <span>Fonte:</span> {{if .Source}}{{.Source}}{{else}}—{{end}}</small>{{end}}
+                  </span>
+                  <span class="torrent-state badge {{.StateClass}}">{{.State}}</span>
+                </div>
+                <div class="torrent-body">
+                  <div class="torrent-progress"><div class="progress {{.ProgressClass}}"><span style="width:{{.ProgressPct}}%"></span></div><small class="muted">{{.ProgressPct}}% · {{bytes .TotalDone}} / {{bytes .TotalSize}}</small></div>
+                  <div class="torrent-metrics">
+                    <span class="torrent-metric" title="↓ Download"><span class="sr-only">↓ Download</span><span aria-hidden="true">↓</span> {{rate .DownloadRate}}</span>
+                    <span class="torrent-metric" title="↑ Upload"><span class="sr-only">↑ Upload</span><span aria-hidden="true">↑</span> {{rate .UploadRate}}</span>
+                    <span class="torrent-metric" title="ETA"><span class="sr-only">ETA</span><span aria-hidden="true">⏱</span> {{.ETA}}</span>
+                    <span class="torrent-metric" title="Peer / Seed"><span class="sr-only">Peer / Seed</span><span aria-hidden="true">👥</span> {{.NumPeers}} / {{.NumSeeds}}</span>
+                    <span class="torrent-metric" title="Ratio"><span class="sr-only">Ratio</span><span aria-hidden="true">⇅</span> {{printf "%.2f" .Ratio}}</span>
+                  </div>
+                </div>
+                <div class="row-actions">
+                  {{if .Paused}}<button class="btn sm icon-action" type="submit" name="row_action" value="resume:{{.Hash}}" title="Riprendi" aria-label="Riprendi"><span aria-hidden="true">▶</span></button>
+                  {{else}}<button class="btn sm icon-action" type="submit" name="row_action" value="pause:{{.Hash}}" title="Pausa" aria-label="Pausa"><span aria-hidden="true">⏸</span></button>{{end}}
+                  <button class="btn sm icon-action" type="submit" name="row_action" value="recheck:{{.Hash}}" title="Verifica dati" aria-label="Verifica dati"><span aria-hidden="true">⟳</span></button>
+                  <button class="btn sm icon-action" type="submit" name="row_action" value="reannounce:{{.Hash}}" title="Riannuncia ai tracker" aria-label="Riannuncia"><span aria-hidden="true">↻</span></button>
+                  <button class="btn sm icon-action" type="button" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-modal" hx-swap="innerHTML" title="Dettagli" aria-label="Dettagli"><span aria-hidden="true">ⓘ</span></button>
+                  <button class="btn sm icon-action danger" type="button" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Rimuovi" aria-label="Rimuovi"><span aria-hidden="true">🗑️</span></button>
+                </div>
+              </div>
             </td>
           </tr>
           {{end}}
           {{range .HTTPDownloads}}
           <tr id="v2-http-download-{{.ID}}" data-http-download="{{.ID}}">
-             <td class="torrent-select"></td>
-             <td class="torrent-name"><span class="truncate" title="{{.Title}}">{{.Title}}</span> <span class="badge">HTTP</span></td>
-             <td class="torrent-state"><span class="badge{{if eq .Status "completed"}} ok{{else if eq .Status "error"}} err{{else if eq .Status "paused"}} warn{{end}}">{{if eq .Status "downloading"}}In scarico{{else if eq .Status "completed"}}Completato{{else if eq .Status "paused"}}In pausa{{else}}{{.Status}}{{end}}</span></td>
-             <td class="torrent-progress" style="min-width:150px">{{if ge .Progress 0.0}}<div class="progress"><span style="width:{{printf "%.1f" .Progress}}%"></span></div><small class="muted">{{printf "%.1f" .Progress}}% · {{bytesU .DownloadedBytes}}</small>{{else}}<small class="muted">{{bytesU .DownloadedBytes}}</small>{{end}}{{if .SpeedBytes}}<div class="torrent-mobile-rates"><span class="rate-dl">↓ {{rate .SpeedBytes}}</span></div>{{end}}</td>
-             <td class="torrent-dl numeric">{{rate .SpeedBytes}}</td>
-             <td class="torrent-ul numeric">—</td><td class="torrent-eta numeric">—</td><td class="torrent-peers numeric">—</td><td class="torrent-ratio numeric">—</td>
-            <td class="row-actions">
+            <td class="torrent-card-cell">
+              <div class="torrent-card">
+                <div class="torrent-head">
+                  <span class="torrent-select"></span>
+                  <span class="torrent-name"><span class="truncate" title="{{.Title}}">{{.Title}}</span> <span class="badge">HTTP</span></span>
+                  <span class="torrent-state badge{{if eq .Status "completed"}} ok{{else if eq .Status "error"}} err{{else if eq .Status "paused"}} warn{{end}}">{{if eq .Status "downloading"}}In scarico{{else if eq .Status "completed"}}Completato{{else if eq .Status "paused"}}In pausa{{else}}{{.Status}}{{end}}</span>
+                </div>
+                <div class="torrent-body">
+                  <div class="torrent-progress">{{if ge .Progress 0.0}}<div class="progress"><span style="width:{{printf "%.1f" .Progress}}%"></span></div><small class="muted">{{printf "%.1f" .Progress}}% · {{bytesU .DownloadedBytes}}</small>{{else}}<small class="muted">{{bytesU .DownloadedBytes}}</small>{{end}}</div>
+                  <div class="torrent-metrics">{{if .SpeedBytes}}<span class="torrent-metric" title="↓ Download"><span class="sr-only">↓ Download</span><span aria-hidden="true">↓</span> {{rate .SpeedBytes}}</span>{{end}}</div>
+                </div>
+                <div class="row-actions">
                   {{if eq .Status "downloading"}}<button class="btn sm icon-action" type="submit" name="http_action" value="pause:{{.ID}}" title="Metti in pausa il download HTTP" aria-label="Metti in pausa il download HTTP"><span aria-hidden="true">⏸</span></button>{{end}}
-               {{if eq .Status "paused"}}<button class="btn sm icon-action" type="submit" name="http_action" value="resume:{{.ID}}" title="Riprendi il download HTTP" aria-label="Riprendi il download HTTP"><span aria-hidden="true">▶</span></button>{{end}}
-               <button class="btn sm icon-action" type="button" hx-get="/downloads/http-detail?id={{.ID}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Mostra i dettagli del download HTTP" aria-label="Mostra i dettagli del download HTTP"><span aria-hidden="true">ⓘ</span></button>
-                <button class="btn sm icon-action danger" type="submit" name="http_action" value="remove:{{.ID}}" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-http-download-{{.ID}}')?.remove()" title="Rimuovi il download HTTP" aria-label="Rimuovi il download HTTP"><span aria-hidden="true">🗑️</span></button>
+                  {{if eq .Status "paused"}}<button class="btn sm icon-action" type="submit" name="http_action" value="resume:{{.ID}}" title="Riprendi il download HTTP" aria-label="Riprendi il download HTTP"><span aria-hidden="true">▶</span></button>{{end}}
+                  <button class="btn sm icon-action" type="button" hx-get="/downloads/http-detail?id={{.ID}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Mostra i dettagli del download HTTP" aria-label="Mostra i dettagli del download HTTP"><span aria-hidden="true">ⓘ</span></button>
+                  <button class="btn sm icon-action danger" type="submit" name="http_action" value="remove:{{.ID}}" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-http-download-{{.ID}}')?.remove()" title="Rimuovi il download HTTP" aria-label="Rimuovi il download HTTP"><span aria-hidden="true">🗑️</span></button>
+                </div>
+              </div>
             </td>
           </tr>
           {{end}}
