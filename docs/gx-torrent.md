@@ -440,6 +440,10 @@ allo stesso modo: URL che finisce in `/api` (per MIRCrew la porta è scelta a
 mano, non ha un default). Un indexer può mettere il **magnet nel link o
 nell'enclosure** invece che in un attributo `magneturl` (è il caso di MIRCrew):
 viene riconosciuto e aggiunto come magnet, senza tentare di scaricarlo via HTTP.
+Un indexer che risponde con un **documento di errore** (es. chiave API non
+valida: HTTP 200 con `<error code="100" description="…">`, come fa Jackett)
+viene segnalato come **errore**, non scambiato per un feed vuoto: una chiave
+sbagliata non passa più in silenzio.
 Le ricerche automatiche in un feed di ricerca attendono ogni indexer **fino a 45
 secondi**, perché MIRCrew può cercare sul forum prima di rispondere.
 

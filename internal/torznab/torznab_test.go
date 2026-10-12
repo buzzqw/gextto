@@ -29,6 +29,26 @@ const sampleFeed = `<?xml version="1.0" encoding="UTF-8"?>
 </channel>
 </rss>`
 
+// TestParseReportsIndexerError fixes that an error document returned with HTTP
+// 200 (Jackett/Prowlarr answer "Invalid API Key" this way) is reported as an
+// error and not mistaken for an empty feed, which used to hide the failure.
+func TestParseReportsIndexerError(t *testing.T) {
+	body := `<?xml version="1.0" encoding="UTF-8"?><error code="100" description="Invalid API Key" />`
+	_, err := Parse(strings.NewReader(body), "jackett")
+	if err == nil || !strings.Contains(err.Error(), "Invalid API Key") {
+		t.Fatalf("error = %v, want the indexer description", err)
+	}
+}
+
+// TestParseEmptyFeedIsNotAnError keeps the honest empty answer (a real feed with
+// no items) successful: only the error document is a failure.
+func TestParseEmptyFeedIsNotAnError(t *testing.T) {
+	items, err := Parse(strings.NewReader(`<?xml version="1.0"?><rss version="2.0"><channel></channel></rss>`), "jackett")
+	if err != nil || len(items) != 0 {
+		t.Fatalf("empty feed: items=%d err=%v", len(items), err)
+	}
+}
+
 func TestParse(t *testing.T) {
 	items, err := Parse(strings.NewReader(sampleFeed), "jackett")
 	if err != nil {

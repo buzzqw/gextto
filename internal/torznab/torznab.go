@@ -24,6 +24,11 @@ type Indexer struct {
 	APIKey string `json:"apikey"`
 }
 
+// maxTorznabBody caps how much of a Torznab response is read: a search answer
+// with a large result set is a few hundred kB, so a much bigger body means
+// something is wrong.
+const maxTorznabBody = 16 << 20
+
 // Item is one search result.
 type Item struct {
 	Title     string    `json:"title"`
@@ -186,10 +191,35 @@ func (idx Indexer) pingEndpoint(ctx context.Context, endpointStr string) error {
 	return nil
 }
 
+// torznabError is the error document a Torznab indexer (Jackett, Prowlarr)
+// returns with HTTP 200 when the request itself is wrong — typically a bad API
+// key. Decoding it as an empty feed would hide the failure, so Parse reports it.
+type torznabError struct {
+	XMLName xml.Name
+	Code    string `xml:"code,attr"`
+	Desc    string `xml:"description,attr"`
+}
+
 // Parse reads a Torznab RSS body into items.
 func Parse(r io.Reader, indexerName string) ([]Item, error) {
+	data, err := io.ReadAll(io.LimitReader(r, maxTorznabBody))
+	if err != nil {
+		return nil, fmt.Errorf("torznab: cannot read the response: %w", err)
+	}
+	var probe torznabError
+	_ = xml.Unmarshal(data, &probe)
+	if strings.EqualFold(probe.XMLName.Local, "error") {
+		desc := strings.TrimSpace(probe.Desc)
+		if desc == "" {
+			desc = "indexer error"
+		}
+		if code := strings.TrimSpace(probe.Code); code != "" {
+			return nil, fmt.Errorf("torznab: %s (code %s)", desc, code)
+		}
+		return nil, fmt.Errorf("torznab: %s", desc)
+	}
 	var feed rssFeed
-	if err := xml.NewDecoder(r).Decode(&feed); err != nil {
+	if err := xml.Unmarshal(data, &feed); err != nil {
 		return nil, fmt.Errorf("torznab: cannot parse the feed: %w", err)
 	}
 	items := make([]Item, 0, len(feed.Items))
