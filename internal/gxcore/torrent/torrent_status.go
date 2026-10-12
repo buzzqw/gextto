@@ -47,7 +47,7 @@ func (t *torrent) status() Status {
 		return Verifying
 	case t.completed:
 		return Seeding
-	case t.info == nil:
+	case t.info() == nil:
 		return DownloadingMetadata
 	default:
 		return Downloading

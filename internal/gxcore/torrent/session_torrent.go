@@ -158,8 +158,8 @@ func (t *Torrent) AddPeer(addr string) error {
 // AddTracker adds a new tracker to the torrent.
 func (t *Torrent) AddTracker(uri string) error {
 	var private bool
-	if t.torrent.info != nil {
-		private = t.torrent.info.Private
+	if t.torrent.info() != nil {
+		private = t.torrent.info().Private
 	}
 	tr, err := t.torrent.session.trackerManager.Get(uri, t.torrent.session.config.TrackerHTTPTimeout, t.torrent.session.getTrackerUserAgent(private), int64(t.torrent.session.config.TrackerHTTPMaxResponseSize))
 	if err != nil {
@@ -192,7 +192,7 @@ func (t *Torrent) AddTracker(uri string) error {
 // alone; the removed trackers get a best-effort "stopped" announce, and the new
 // list is persisted so `Trackers()` and the resume data reflect the change.
 func (t *Torrent) SetTrackers(uris []string) error {
-	private := t.torrent.info != nil && t.torrent.info.Private
+	private := t.torrent.info() != nil && t.torrent.info().Private
 	var (
 		resolved []tracker.Tracker
 		raw      [][]string

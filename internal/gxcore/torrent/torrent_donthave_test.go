@@ -15,13 +15,13 @@ import (
 // negotiated, so there is no outstanding download to cancel here).
 func TestHandleDontHaveClearsPeerBitfield(t *testing.T) {
 	tr := &torrent{
-		info:                    &metainfo.Info{NumPieces: 2},
 		bitfield:                bitfield.New(2),
 		pieces:                  []piece.Piece{{Index: 0}, {Index: 1}},
 		pieceDownloaders:        map[*peer.Peer]*piecedownloader.PieceDownloader{},
 		pieceDownloadersSnubbed: map[*peer.Peer]*piecedownloader.PieceDownloader{},
 		pieceDownloadersChoked:  map[*peer.Peer]*piecedownloader.PieceDownloader{},
 	}
+	tr.setInfo(&metainfo.Info{NumPieces: 2})
 	pe := &peer.Peer{Bitfield: bitfield.New(2)}
 	pe.Bitfield.Set(1)
 	tr.handleDontHave(pe, peerprotocol.DontHaveMessage{Index: 1})

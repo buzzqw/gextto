@@ -171,7 +171,7 @@ func (s *Session) CompactDatabase(output string) error {
 		return err
 	}
 	for _, t := range s.torrents {
-		if t.torrent.info == nil {
+		if t.torrent.info() == nil {
 			s.log.Warningf("skipping torrent %s: info is nil", t.torrent.id)
 			continue
 		}
@@ -182,7 +182,7 @@ func (s *Session) CompactDatabase(output string) error {
 			Trackers:          t.torrent.rawTrackers,
 			URLList:           t.torrent.rawWebseedSources,
 			FixedPeers:        t.torrent.fixedPeers,
-			Info:              t.torrent.info.Bytes,
+			Info:              t.torrent.info().Bytes,
 			Bitfield:          t.torrent.bitfield.Bytes(),
 			AddedAt:           t.torrent.addedAt,
 			BytesDownloaded:   t.torrent.bytesDownloaded.Count(),

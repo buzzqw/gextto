@@ -157,18 +157,18 @@ func (t *torrent) stats() Stats {
 	s.Speed.Download = int(t.downloadSpeed.Rate1())
 	s.Speed.Upload = int(t.uploadSpeed.Rate1())
 
-	if t.info != nil {
-		s.Bytes.Total = t.info.Length
-		s.Bytes.Padding = t.info.Padding
+	if t.info() != nil {
+		s.Bytes.Total = t.info().Length
+		s.Bytes.Padding = t.info().Padding
 		s.Bytes.Completed = t.bytesComplete()
 		s.Bytes.Incomplete = s.Bytes.Total - s.Bytes.Completed
 		s.Bytes.Selected, s.Bytes.SelectedCompleted = t.selectedBytes()
 
-		s.Name = t.info.Name
-		s.Private = t.info.Private
-		s.FileCount = len(t.info.Files)
-		s.PieceLength = t.info.PieceLength
-		s.Pieces.Total = t.info.NumPieces
+		s.Name = t.info().Name
+		s.Private = t.info().Private
+		s.FileCount = len(t.info().Files)
+		s.PieceLength = t.info().PieceLength
+		s.Pieces.Total = t.info().NumPieces
 	} else {
 		s.Name = t.name
 	}
@@ -216,9 +216,9 @@ func (t *torrent) bytesComplete() int64 {
 	if t.bitfield == nil || len(t.pieces) == 0 {
 		return 0
 	}
-	n := int64(t.info.PieceLength) * int64(t.bitfield.Count())
+	n := int64(t.info().PieceLength) * int64(t.bitfield.Count())
 	if t.bitfield.Test(t.bitfield.Len() - 1) {
-		n -= int64(t.info.PieceLength)
+		n -= int64(t.info().PieceLength)
 		n += int64(t.pieces[t.bitfield.Len()-1].Length)
 	}
 	return n
@@ -283,10 +283,10 @@ func (t *torrent) getPeers() []Peer {
 			UploadSpeed:        pe.UploadSpeed(),
 			UTP:                netx.IsUTPAddr(pe.Addr().String()),
 		}
-		if pe.Bitfield != nil && t.info != nil && t.info.NumPieces > 0 {
+		if pe.Bitfield != nil && t.info() != nil && t.info().NumPieces > 0 {
 			have := pe.Bitfield.Count()
-			p.Progress = float64(have) / float64(t.info.NumPieces)
-			p.Seed = have == t.info.NumPieces
+			p.Progress = float64(have) / float64(t.info().NumPieces)
+			p.Seed = have == t.info().NumPieces
 		}
 		peers = append(peers, p)
 	}

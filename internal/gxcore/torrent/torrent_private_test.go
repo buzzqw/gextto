@@ -14,10 +14,10 @@ func TestPrivateSwarmDisablesDiscovery(t *testing.T) {
 	if (&torrent{}).privateSwarm() {
 		t.Fatal("a torrent without metadata must not be treated as private")
 	}
-	if !(&torrent{info: &metainfo.Info{Private: true}}).privateSwarm() {
+	if !torrentWithInfo(&metainfo.Info{Private: true}).privateSwarm() {
 		t.Fatal("a private torrent must be detected")
 	}
-	if (&torrent{info: &metainfo.Info{Private: false}}).privateSwarm() {
+	if torrentWithInfo(&metainfo.Info{Private: false}).privateSwarm() {
 		t.Fatal("a public torrent must not be private")
 	}
 }

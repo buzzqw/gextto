@@ -75,12 +75,14 @@ func TestPrefillLocalDataReusesIdenticalLayout(t *testing.T) {
 	for i := uint32(0); i < info.NumPieces; i++ {
 		bf.Set(i)
 	}
-	b := &torrent{info: info, pieces: piece.NewPieces(info, filesB), bitfield: bf}
+	b := &torrent{pieces: piece.NewPieces(info, filesB), bitfield: bf}
+	b.setInfo(info)
 	b.publishLocalData()
 
 	// A is empty, with the same layout.
 	filesA := testFiles(t, t.TempDir(), info)
-	a := &torrent{info: info, pieces: piece.NewPieces(info, filesA)}
+	a := &torrent{pieces: piece.NewPieces(info, filesA)}
+	a.setInfo(info)
 
 	if got := a.prefillFrom([]*Torrent{{torrent: b}}); got != int(info.NumPieces) {
 		t.Fatalf("merged %d pieces, want %d", got, info.NumPieces)
@@ -111,10 +113,12 @@ func TestPrefillLocalDataSkipsDifferentContent(t *testing.T) {
 	for i := uint32(0); i < infoB.NumPieces; i++ {
 		bf.Set(i)
 	}
-	b := &torrent{info: infoB, pieces: piece.NewPieces(infoB, filesB), bitfield: bf}
+	b := &torrent{pieces: piece.NewPieces(infoB, filesB), bitfield: bf}
+	b.setInfo(infoB)
 	b.publishLocalData()
 
-	a := &torrent{info: infoA, pieces: piece.NewPieces(infoA, testFiles(t, t.TempDir(), infoA))}
+	a := &torrent{pieces: piece.NewPieces(infoA, testFiles(t, t.TempDir(), infoA))}
+	a.setInfo(infoA)
 	if got := a.prefillFrom([]*Torrent{{torrent: b}}); got != 0 {
 		t.Fatalf("merged %d pieces with a different content, want 0", got)
 	}
@@ -136,11 +140,13 @@ func TestPrefillLocalDataRespectsPrivacy(t *testing.T) {
 	for i := uint32(0); i < info.NumPieces; i++ {
 		bf.Set(i)
 	}
-	b := &torrent{info: info, pieces: piece.NewPieces(info, filesB), bitfield: bf}
+	b := &torrent{pieces: piece.NewPieces(info, filesB), bitfield: bf}
+	b.setInfo(info)
 	snap := &localDataSnapshot{pieces: b.pieces, private: true, length: info.Length, pieceLength: info.PieceLength}
 	b.localData.Store(snap)
 
-	a := &torrent{info: info, pieces: piece.NewPieces(info, testFiles(t, t.TempDir(), info))}
+	a := &torrent{pieces: piece.NewPieces(info, testFiles(t, t.TempDir(), info))}
+	a.setInfo(info)
 	if got := a.prefillFrom([]*Torrent{{torrent: b}}); got != 0 {
 		t.Fatalf("merged %d pieces from a private swarm, want 0", got)
 	}

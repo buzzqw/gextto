@@ -92,8 +92,8 @@ func (lf *v2LayerFile) done() bool {
 // bit be set in the handshake. Setting it on a v1 torrent makes libtorrent
 // reject the connection.
 func (t *torrent) advertisesV2() bool {
-	if t.info != nil {
-		return t.info.HasV2
+	if t.info() != nil {
+		return t.info().HasV2
 	}
 	return t.hasV2Hint
 }
@@ -131,11 +131,11 @@ func (t *torrent) handleHashRequest(pe *peer.Peer, msg peerprotocol.HashRequestM
 }
 
 func (t *torrent) serveHashes(req peerprotocol.HashRequestHeader) ([][merkle.HashSize]byte, bool) {
-	if t.info == nil || !t.info.V2 || !t.info.HasPieceHashes() {
+	if t.info() == nil || !t.info().V2 || !t.info().HasPieceHashes() {
 		return nil, false
 	}
 	fi := -1
-	for i, f := range t.info.V2Files {
+	for i, f := range t.info().V2Files {
 		if f.HasRoot && f.PiecesRoot == req.Root {
 			fi = i
 			break
@@ -148,7 +148,7 @@ func (t *torrent) serveHashes(req peerprotocol.HashRequestHeader) ([][merkle.Has
 	if req.Base == 0 {
 		// Leaf/block layer: needs the file data, so only a file we fully have.
 		tree = t.v2BlockTree(fi)
-	} else if t.info.V2Files[fi].Length > int64(t.info.PieceLength) {
+	} else if t.info().V2Files[fi].Length > int64(t.info().PieceLength) {
 		// The piece layer and above come from the attached piece hashes; a file
 		// that fits in one piece has no layer entry.
 		tree = t.v2Tree(fi)
@@ -187,7 +187,7 @@ type v2BlockTreeEntry struct {
 // torrent loop. A file that is not fully present, or whose data no longer
 // matches its pieces root, is not served.
 func (t *torrent) v2BlockTree(fi int) *merkle.LayerTree {
-	f := t.info.V2Files[fi]
+	f := t.info().V2Files[fi]
 	key := string(f.PiecesRoot[:])
 	now := time.Now()
 	t.v2BlockMu.Lock()
@@ -266,12 +266,12 @@ func (t *torrent) buildV2BlockTree(fi int, key string) {
 // reused across a file's pieces: allocating p.Length bytes per piece would be
 // wasteful for large pieces.
 func (t *torrent) buildV2BlockTreeData(fi int) *merkle.LayerTree {
-	f := t.info.V2Files[fi]
+	f := t.info().V2Files[fi]
 	if !t.v2FileComplete(fi) {
 		return nil
 	}
 	start, count := t.v2FilePieceRange(fi)
-	buf := make([]byte, int(t.info.PieceLength))
+	buf := make([]byte, int(t.info().PieceLength))
 	// The leaves of the base-0 tree are 16 KiB blocks, not pieces: seed the
 	// capacity with the block count so large files do not reallocate the slice
 	// dozens of times while appending.
@@ -327,14 +327,14 @@ func (t *torrent) evictV2BlockTreesLocked() {
 // address space (v2 pieces are file-aligned).
 func (t *torrent) v2FilePieceRange(fi int) (start, count int) {
 	perFile := func(i int) int {
-		f := t.info.V2Files[i]
+		f := t.info().V2Files[i]
 		switch {
 		case f.Length == 0:
 			return 0
-		case f.Length <= int64(t.info.PieceLength):
+		case f.Length <= int64(t.info().PieceLength):
 			return 1
 		default:
-			return int((f.Length + int64(t.info.PieceLength) - 1) / int64(t.info.PieceLength))
+			return int((f.Length + int64(t.info().PieceLength) - 1) / int64(t.info().PieceLength))
 		}
 	}
 	for i := 0; i < fi; i++ {
@@ -352,16 +352,16 @@ func appendBlockLeaves(leaves [][merkle.HashSize]byte, data []byte) [][merkle.Ha
 // v2Tree returns (and caches) the merkle tree at and above the piece layer for
 // a v2 file, built from its attached piece hashes.
 func (t *torrent) v2Tree(fi int) *merkle.LayerTree {
-	f := t.info.V2Files[fi]
+	f := t.info().V2Files[fi]
 	key := string(f.PiecesRoot[:])
 	if tree, ok := t.v2Trees[key]; ok {
 		return tree
 	}
-	raw := t.info.V2FilePieces(fi)
+	raw := t.info().V2FilePieces(fi)
 	if len(raw) == 0 || len(raw)%merkle.HashSize != 0 {
 		return nil
 	}
-	level := merkle.PieceLevel(int(t.info.PieceLength))
+	level := merkle.PieceLevel(int(t.info().PieceLength))
 	if level < 0 {
 		return nil
 	}
@@ -388,15 +388,15 @@ func (t *torrent) initV2Layers() {
 	t.v2LayerByRoot = make(map[string]*v2LayerFile)
 	t.v2Pending = make(map[*peer.Peer]*v2HashRequest)
 	t.v2NoHashPeers = make(map[*peer.Peer]struct{})
-	level := merkle.PieceLevel(int(t.info.PieceLength))
+	level := merkle.PieceLevel(int(t.info().PieceLength))
 	if level < 0 {
 		return
 	}
-	for fi, f := range t.info.V2Files {
-		if f.Length == 0 || !f.HasRoot || f.Length <= int64(t.info.PieceLength) {
+	for fi, f := range t.info().V2Files {
+		if f.Length == 0 || !f.HasRoot || f.Length <= int64(t.info().PieceLength) {
 			continue
 		}
-		numPieces := int((f.Length + int64(t.info.PieceLength) - 1) / int64(t.info.PieceLength))
+		numPieces := int((f.Length + int64(t.info().PieceLength) - 1) / int64(t.info().PieceLength))
 		numBlocks := int((f.Length + int64(merkle.BlockSize) - 1) / int64(merkle.BlockSize))
 		paddedLeaves := merkle.NextPowerOfTwo(numBlocks)
 		padded := paddedLeaves >> level
@@ -440,18 +440,18 @@ func (t *torrent) nextV2Chunk() (*v2LayerFile, int, bool) {
 // the same time. It runs on the torrent loop, the only goroutine touching this
 // state.
 func (t *torrent) startV2LayerDownload() {
-	if t.info == nil || !t.info.V2 {
+	if t.info() == nil || !t.info().V2 {
 		return
 	}
-	if !t.info.NeedsV2Layers() {
+	if !t.info().NeedsV2Layers() {
 		// Nothing to fetch: either the layers are already attached or every
 		// file fits in one piece.
-		if !t.info.HasPieceHashes() && t.v2LayerByRoot == nil {
+		if !t.info().HasPieceHashes() && t.v2LayerByRoot == nil {
 			t.finishV2Layers()
 		}
 		return
 	}
-	if t.info.HasPieceHashes() {
+	if t.info().HasPieceHashes() {
 		return
 	}
 	t.initV2Layers()
@@ -617,7 +617,7 @@ func (t *torrent) v2LayersComplete() bool {
 // finishV2Layers attaches the fetched layers, persists them and starts the
 // allocator so the download can begin.
 func (t *torrent) finishV2Layers() {
-	if t.info == nil || t.info.HasPieceHashes() {
+	if t.info() == nil || t.info().HasPieceHashes() {
 		return
 	}
 	layers := make(map[string][]byte, len(t.v2LayerByRoot))
@@ -629,7 +629,7 @@ func (t *torrent) finishV2Layers() {
 		}
 		layers[key] = lf.data
 	}
-	if err := t.info.AttachV2Pieces(layers); err != nil {
+	if err := t.info().AttachV2Pieces(layers); err != nil {
 		t.stop(err)
 		return
 	}

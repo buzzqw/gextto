@@ -38,8 +38,8 @@ func (t *torrent) start() {
 	// peers arrive (they are ignored while it counts as completed).
 	t.resetCompletionIfWantedMissing()
 
-	if t.info != nil {
-		if t.info.NeedsV2Layers() && !t.info.HasPieceHashes() {
+	if t.info() != nil {
+		if t.info().NeedsV2Layers() && !t.info().HasPieceHashes() {
 			// A v2 torrent (usually a magnet reloaded from resume) whose piece
 			// layers are still missing: fetch them before allocating files.
 			t.addFixedPeers()
@@ -87,7 +87,7 @@ func (t *torrent) startAllocator() {
 	if parts == nil {
 		skip = nil
 	}
-	go t.allocator.RunSelected(t.info, t.storage, skip, parts, t.allocatorProgressC, t.allocatorResultC)
+	go t.allocator.RunSelected(t.info(), t.storage, skip, parts, t.allocatorProgressC, t.allocatorResultC)
 }
 
 func (t *torrent) addFixedPeers() {
@@ -161,7 +161,7 @@ func (t *torrent) startAcceptor() {
 }
 
 func (t *torrent) startInfoDownloaders() {
-	if t.info != nil {
+	if t.info() != nil {
 		return
 	}
 	for len(t.infoDownloaders)-len(t.infoDownloadersSnubbed) < t.session.config.ParallelMetadataDownloads {
@@ -227,7 +227,7 @@ func (t *torrent) startWebseedDownloader(sp *piecepicker.WebseedDownloadSpec) {
 		src.DownloadSpeed = metrics.NewMeter()
 		break
 	}
-	go ud.Run(t.webseedClient, t.pieces, len(t.info.Files) > 1, t.webseedPieceResultC.SendC(), t.piecePool, t.session.config.WebseedResponseBodyReadTimeout)
+	go ud.Run(t.webseedClient, t.pieces, len(t.info().Files) > 1, t.webseedPieceResultC.SendC(), t.piecePool, t.session.config.WebseedResponseBodyReadTimeout)
 }
 
 func (t *torrent) startPieceDownloaderFor(pe *peer.Peer) {
@@ -238,7 +238,7 @@ func (t *torrent) startPieceDownloaderFor(pe *peer.Peer) {
 		t.startSinglePieceDownloader(pe)
 		return
 	}
-	ok := t.session.ram.Request(t.id, pe, int64(t.info.PieceLength), t.ramNotifyC, pe.Done())
+	ok := t.session.ram.Request(t.id, pe, int64(t.info().PieceLength), t.ramNotifyC, pe.Done())
 	if ok {
 		t.startSinglePieceDownloader(pe)
 	}
@@ -248,7 +248,7 @@ func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) {
 	var started bool
 	defer func() {
 		if !started && t.session.ram != nil {
-			t.session.ram.Release(int64(t.info.PieceLength))
+			t.session.ram.Release(int64(t.info().PieceLength))
 		}
 	}()
 	if t.status() != Downloading {

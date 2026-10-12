@@ -85,7 +85,7 @@ func (t *torrent) closePieceDownloader(pd *piecedownloader.PieceDownloader) {
 	}
 	pe.Downloading = false
 	if t.session.ram != nil {
-		t.session.ram.Release(int64(t.info.PieceLength))
+		t.session.ram.Release(int64(t.info().PieceLength))
 	}
 }
 

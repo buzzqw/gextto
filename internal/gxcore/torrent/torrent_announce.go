@@ -77,7 +77,7 @@ func (t *torrent) announcerFields() tracker.Torrent {
 		// Some trackers don't send any peer address if don't tell we have missing bytes.
 		tr.BytesLeft = math.MaxUint32
 	} else {
-		tr.BytesLeft = t.info.Length - t.bytesComplete()
+		tr.BytesLeft = t.info().Length - t.bytesComplete()
 		// BEP 21: a partial seed has every wanted piece but not the whole
 		// torrent, so its announces carry event=paused.
 		tr.PartialSeed = t.completed && !t.bitfield.All()

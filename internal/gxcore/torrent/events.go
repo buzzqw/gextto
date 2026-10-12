@@ -91,8 +91,8 @@ func (s *Session) emit(ev Event) {
 // baseEvent builds an event carrying the torrent identity.
 func (t *torrent) baseEvent(typ EventType) Event {
 	ev := Event{Type: typ, Torrent: hex.EncodeToString(t.infoHash[:])}
-	if t.info != nil {
-		ev.Name = t.info.Name
+	if t.info() != nil {
+		ev.Name = t.info().Name
 	}
 	return ev
 }

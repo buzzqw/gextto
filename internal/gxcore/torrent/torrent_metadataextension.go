@@ -21,11 +21,11 @@ func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.Extensio
 		if !ok {
 			break
 		}
-		if t.info == nil {
+		if t.info() == nil {
 			t.sendMetadataReject(pe, msg.Piece, extMsgID)
 			break
 		}
-		data, ok := metadataPiece(t.info.Bytes, msg.Piece)
+		data, ok := metadataPiece(t.info().Bytes, msg.Piece)
 		if !ok {
 			t.sendMetadataReject(pe, msg.Piece, extMsgID)
 			break
@@ -33,7 +33,7 @@ func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.Extensio
 		dataMsg := peerprotocol.ExtensionMetadataMessage{
 			Type:      peerprotocol.ExtensionMetadataMessageTypeData,
 			Piece:     msg.Piece,
-			TotalSize: len(t.info.Bytes),
+			TotalSize: len(t.info().Bytes),
 			Data:      data,
 		}
 		extDataMsg := peerprotocol.ExtensionMessage{
@@ -81,9 +81,9 @@ func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.Extensio
 			t.stop(errors.New("private torrent from magnet"))
 			break
 		}
-		t.info = info
+		t.setInfo(info)
 		t.piecePool = bufferpool.New(int(info.PieceLength))
-		err = t.session.resumer.WriteInfo(t.id, t.info.Bytes)
+		err = t.session.resumer.WriteInfo(t.id, t.info().Bytes)
 		if err != nil {
 			t.stop(fmt.Errorf("cannot write resume info: %w", err))
 			break

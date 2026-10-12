@@ -153,8 +153,8 @@ func (t *torrent) startPeer(
 	pe := peer.New(conn, source, peerID, extensions, cipher, t.session.config.PieceReadTimeout, t.session.config.RequestTimeout, t.session.config.MaxRequestsIn, int(t.session.config.MaxMetadataSize), t.bucketDownload, t.bucketUpload)
 	t.peers[pe] = struct{}{}
 	peers[pe] = struct{}{}
-	if t.info != nil {
-		pe.Bitfield = bitfield.New(t.info.NumPieces)
+	if t.info() != nil {
+		pe.Bitfield = bitfield.New(t.info().NumPieces)
 	}
 	go pe.Run(t.messages, t.pieceMessagesC.SendC(), t.peerSnubbedC, t.peerDisconnectedC)
 	t.session.metrics.Peers.Inc(1)
@@ -181,7 +181,7 @@ func (t *torrent) sendFirstMessage(p *peer.Peer) {
 	// Super-seeding skips the allowed-fast set, like libtorrent:
 	// it would let a peer grab unadvertised pieces.
 	if p.FastEnabled && t.pieces != nil && !t.superSeedActive() {
-		p.GenerateAndSendAllowedFastMessages(t.session.config.AllowedFastSet, t.info.NumPieces, t.infoHash, t.pieces)
+		p.GenerateAndSendAllowedFastMessages(t.session.config.AllowedFastSet, t.info().NumPieces, t.infoHash, t.pieces)
 	}
 }
 
@@ -189,8 +189,8 @@ func (t *torrent) sendFirstMessage(p *peer.Peer) {
 // including the BEP 21 "upload_only" header when we are a (partial) seed.
 func (t *torrent) sendExtensionHandshake(p *peer.Peer) {
 	var metadataSize uint32
-	if t.info != nil {
-		metadataSize = uint32(len(t.info.Bytes))
+	if t.info() != nil {
+		metadataSize = uint32(len(t.info().Bytes))
 	}
 	p.SendMessage(peerprotocol.ExtensionMessage{
 		ExtendedMessageID: peerprotocol.ExtensionIDHandshake,
@@ -225,7 +225,7 @@ func (t *torrent) sendBitfield(p *peer.Peer) {
 }
 
 func (t *torrent) getClientVersion() string {
-	if t.info != nil && t.info.Private {
+	if t.info() != nil && t.info().Private {
 		return t.session.config.PrivateExtensionHandshakeClientVersion
 	}
 	return publicExtensionHandshakeClientVersion

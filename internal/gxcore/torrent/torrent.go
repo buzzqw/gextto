@@ -80,8 +80,11 @@ type torrent struct {
 	// TCP Port to listen for peer connections.
 	port int
 
-	// Contains info about files in torrent. This can be nil at start for magnet downloads.
-	info *metainfo.Info
+	// Contains info about files in torrent. This can be nil at start for magnet
+	// downloads. It is written once by the run loop and read from other
+	// goroutines (the daemon, the announcers, `Status`), so it is an atomic
+	// pointer: use info()/setInfo, never the field directly.
+	infoPtr atomic.Pointer[metainfo.Info]
 
 	// pieceLayers is the BEP 52 top-level "piece layers" of a v2 torrent,
 	// kept so the .torrent can be exported/served with them.
@@ -375,7 +378,6 @@ func newTorrent(
 		name:                      name,
 		storage:                   sto,
 		port:                      port,
-		info:                      info,
 		bitfield:                  bf,
 		log:                       logger.New("torrent " + id),
 		peerDisconnectedC:         make(chan *peer.Peer),
@@ -437,6 +439,9 @@ func newTorrent(
 	}
 	// Per-torrent limiters inherit the session ones until an explicit limit is
 	// set.
+	// Publish the info dictionary through the atomic pointer: it is read from
+	// other goroutines (the daemon, announcers, Status), never from the field.
+	t.setInfo(info)
 	t.bucketDownload = bandwidth.New(0)
 	t.bucketDownload.SetParent(s.bucketDownload)
 	t.bucketUpload = bandwidth.New(0)
@@ -455,8 +460,8 @@ func newTorrent(
 		blocklistForOutgoingConns = s.blocklist
 	}
 	t.addrList = addrlist.New(cfg.MaxPeerAddresses, blocklistForOutgoingConns, port, &t.externalIP)
-	if t.info != nil {
-		t.piecePool = bufferpool.New(int(t.info.PieceLength))
+	if t.info() != nil {
+		t.piecePool = bufferpool.New(int(t.info().PieceLength))
 	}
 	n := t.copyPeerIDPrefix()
 	_, err := rand.Read(t.peerID[n:])
@@ -469,7 +474,7 @@ func newTorrent(
 }
 
 func (t *torrent) copyPeerIDPrefix() int {
-	if t.info != nil && t.info.Private {
+	if t.info() != nil && t.info().Private {
 		return copy(t.peerID[:], t.session.config.PrivatePeerIDPrefix)
 	}
 	return copy(t.peerID[:], publicPeerIDPrefix)
@@ -487,20 +492,33 @@ func (t *torrent) Name() string {
 	return t.name
 }
 
+// info returns the parsed torrent metadata, or nil for a magnet before its
+// metadata arrives. The run loop publishes it once with setInfo; every read
+// (including from the daemon, the announcers and Status) goes through the
+// atomic pointer, so there is no data race on the field.
+func (t *torrent) info() *metainfo.Info {
+	return t.infoPtr.Load()
+}
+
+// setInfo publishes the parsed metadata (called by the run loop).
+func (t *torrent) setInfo(info *metainfo.Info) {
+	t.infoPtr.Store(info)
+}
+
 // Collections returns the BEP 38 "collections" identifiers of the torrent.
 func (t *torrent) Collections() []string {
-	if t.info == nil {
+	if t.info() == nil {
 		return nil
 	}
-	return append([]string(nil), t.info.Collections...)
+	return append([]string(nil), t.info().Collections...)
 }
 
 // Similar returns the BEP 38 "similar" info hashes of the torrent.
 func (t *torrent) Similar() [][20]byte {
-	if t.info == nil {
+	if t.info() == nil {
 		return nil
 	}
-	return append([][20]byte(nil), t.info.Similar...)
+	return append([][20]byte(nil), t.info().Similar...)
 }
 
 func (t *torrent) InfoHash() []byte {
@@ -514,11 +532,11 @@ func (t *torrent) Dir() string {
 }
 
 func (t *torrent) Files() ([]File, error) {
-	if t.info == nil {
+	if t.info() == nil {
 		return nil, errors.New("torrent metadata not ready")
 	}
-	files := make([]File, 0, len(t.info.Files))
-	for _, f := range t.info.Files {
+	files := make([]File, 0, len(t.info().Files))
+	for _, f := range t.info().Files {
 		if !f.Padding {
 			files = append(files, File{
 				path:   f.Path,
@@ -594,7 +612,7 @@ func (t *torrent) announceDHT() {
 // LSD) must be disabled for this torrent (BEP 27). Unknown metadata is treated
 // as non-private; a private magnet is stopped as soon as the info dict arrives.
 func (t *torrent) privateSwarm() bool {
-	return t.info != nil && t.info.Private
+	return t.info() != nil && t.info().Private
 }
 
 // DisableLogging disables all log messages printed to console.
@@ -608,10 +626,10 @@ func DisableLogging() {
 func (t *torrent) fileStatsFromBitfield() ([]FileStats, error) {
 	t.mBitfield.RLock()
 	defer t.mBitfield.RUnlock()
-	if t.info == nil || t.bitfield == nil || t.info.PieceLength == 0 {
+	if t.info() == nil || t.bitfield == nil || t.info().PieceLength == 0 {
 		return nil, errors.New("torrent not running so file stats unavailable")
 	}
-	return fileStatsFromPieces(t.info.Files, int64(t.info.PieceLength), t.bitfield.Test), nil
+	return fileStatsFromPieces(t.info().Files, int64(t.info().PieceLength), t.bitfield.Test), nil
 }
 
 // fileStatsFromPieces maps completed pieces onto the files laid end to end

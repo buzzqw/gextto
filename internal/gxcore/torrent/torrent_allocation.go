@@ -28,7 +28,7 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 	if t.pieces != nil {
 		t.crash("pieces exists")
 	}
-	pieces := piece.NewPieces(t.info, t.files)
+	pieces := piece.NewPieces(t.info(), t.files)
 	if len(pieces) == 0 {
 		t.stop(fmt.Errorf("torrent has zero pieces"))
 		return
@@ -38,7 +38,7 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 	t.publishLocalData()
 
 	for pe := range t.peers {
-		pe.GenerateAndSendAllowedFastMessages(t.session.config.AllowedFastSet, t.info.NumPieces, t.infoHash, t.pieces)
+		pe.GenerateAndSendAllowedFastMessages(t.session.config.AllowedFastSet, t.info().NumPieces, t.infoHash, t.pieces)
 	}
 
 	if t.piecePicker != nil {
@@ -47,7 +47,7 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 	t.piecePicker = piecepicker.New(t.pieces, t.session.config.EndgameMaxDuplicateDownloads, t.webseedSources, t.sequential, t.firstLast)
 
 	for pe := range t.peers {
-		pe.Bitfield = bitfield.New(t.info.NumPieces)
+		pe.Bitfield = bitfield.New(t.info().NumPieces)
 	}
 
 	// If we already have bitfield from resume db, skip verification and start downloading.
@@ -76,7 +76,7 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 	// nothing was merged.
 	if !al.HasExisting && merged == 0 {
 		t.mBitfield.Lock()
-		t.bitfield = bitfield.New(t.info.NumPieces)
+		t.bitfield = bitfield.New(t.info().NumPieces)
 		t.mBitfield.Unlock()
 		t.processQueuedMessages()
 		t.addFixedPeers()

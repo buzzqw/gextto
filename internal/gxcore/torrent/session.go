@@ -527,8 +527,8 @@ func (s *Session) stopAndRemoveData(t *Torrent, keepData bool) error {
 	var dest string
 	if s.config.DataDirIncludesTorrentID {
 		dest = filepath.Join(s.config.DataDir, t.torrent.id)
-	} else if t.torrent.info != nil {
-		dest = filepath.Join(s.config.DataDir, t.torrent.info.Name)
+	} else if t.torrent.info() != nil {
+		dest = filepath.Join(s.config.DataDir, t.torrent.info().Name)
 	}
 	if dest != "" {
 		err = os.RemoveAll(dest)

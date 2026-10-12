@@ -6,7 +6,7 @@ package torrent
 // filePieceRange maps a byte range of the non-padding file `fileIndex` to the
 // piece range that covers it. It must run in the torrent goroutine.
 func (t *torrent) filePieceRange(fileIndex int, offset, length int64) (uint32, uint32, bool) {
-	if t.info == nil || fileIndex < 0 || length <= 0 || t.info.PieceLength == 0 {
+	if t.info() == nil || fileIndex < 0 || length <= 0 || t.info().PieceLength == 0 {
 		return 0, 0, false
 	}
 	// The user-facing file index skips the padding files, which still count for
@@ -14,7 +14,7 @@ func (t *torrent) filePieceRange(fileIndex int, offset, length int64) (uint32, u
 	var absolute int64
 	var index int
 	found := false
-	for _, f := range t.info.Files {
+	for _, f := range t.info().Files {
 		if f.Padding {
 			absolute += f.Length
 			continue
@@ -33,11 +33,11 @@ func (t *torrent) filePieceRange(fileIndex int, offset, length int64) (uint32, u
 	if start < 0 {
 		start = 0
 	}
-	pl := int64(t.info.PieceLength)
+	pl := int64(t.info().PieceLength)
 	begin := uint32(start / pl)
 	end := uint32((start+length-1)/pl) + 1
-	if end > t.info.NumPieces {
-		end = t.info.NumPieces
+	if end > t.info().NumPieces {
+		end = t.info().NumPieces
 	}
 	if begin >= end {
 		return 0, 0, false

@@ -17,12 +17,12 @@ import (
 // legacy FileSelection skip list; when neither is set the BEP 53 magnet "so="
 // seed is used.
 func (t *torrent) selectionPriorities() []int {
-	if t.info == nil {
+	if t.info() == nil {
 		return nil
 	}
 	if fp := t.session.config.FilePriorities; fp != nil {
 		if prio := fp(t.id); len(prio) > 0 {
-			return prioritiesToInfoFiles(t.info, prio)
+			return prioritiesToInfoFiles(t.info(), prio)
 		}
 	}
 	if selection := t.session.config.FileSelection; selection != nil {
@@ -33,11 +33,11 @@ func (t *torrent) selectionPriorities() []int {
 					prio[i] = piece.PriorityNormal
 				}
 			}
-			return prioritiesToInfoFiles(t.info, prio)
+			return prioritiesToInfoFiles(t.info(), prio)
 		}
 	}
-	if skip := maskFromSelectOnly(t.info, t.getSelectOnly()); skip != nil {
-		prio := make([]int, len(t.info.Files))
+	if skip := maskFromSelectOnly(t.info(), t.getSelectOnly()); skip != nil {
+		prio := make([]int, len(t.info().Files))
 		for i := range prio {
 			prio[i] = piece.PriorityNormal
 			if skip[i] {
@@ -101,13 +101,13 @@ func prioritiesToInfoFiles(info *metainfo.Info, prio []int) []int {
 // nil means "every piece is normal", so the picker keeps no per-piece value.
 func (t *torrent) piecePriorities() []uint8 {
 	prio := t.selectionPriorities()
-	if prio == nil || t.info == nil {
+	if prio == nil || t.info() == nil {
 		return nil
 	}
-	pieceLength := int64(t.info.PieceLength)
-	out := make([]uint8, t.info.NumPieces)
+	pieceLength := int64(t.info().PieceLength)
+	out := make([]uint8, t.info().NumPieces)
 	var offset int64
-	for i, f := range t.info.Files {
+	for i, f := range t.info().Files {
 		start, end := offset, offset+f.Length
 		offset = end
 		if f.Padding || f.Length == 0 || prio[i] <= 0 {
@@ -195,13 +195,13 @@ func maskFromSelectOnly(info *metainfo.Info, wanted []int) []bool {
 
 // skippedPieces flags the pieces that touch no wanted file. nil means none.
 func (t *torrent) skippedPieces(skipFiles []bool) []bool {
-	if skipFiles == nil || t.info == nil {
+	if skipFiles == nil || t.info() == nil {
 		return nil
 	}
-	pieceLength := int64(t.info.PieceLength)
-	wanted := make([]bool, t.info.NumPieces)
+	pieceLength := int64(t.info().PieceLength)
+	wanted := make([]bool, t.info().NumPieces)
 	var offset int64
-	for i, f := range t.info.Files {
+	for i, f := range t.info().Files {
 		start, end := offset, offset+f.Length
 		offset = end
 		if f.Padding || skipFiles[i] || f.Length == 0 {
@@ -278,18 +278,18 @@ func (t *torrent) resetCompletionIfWantedMissing() {
 // selectedBytes returns the size of the wanted pieces and how much of it is
 // downloaded, from the bitfield (also while stopped).
 func (t *torrent) selectedBytes() (total, done int64) {
-	if t.info == nil {
+	if t.info() == nil {
 		return 0, 0
 	}
 	skip := t.skippedPieces(t.skippedInfoFiles())
-	pieceLength := int64(t.info.PieceLength)
-	for i := uint32(0); i < t.info.NumPieces; i++ {
+	pieceLength := int64(t.info().PieceLength)
+	for i := uint32(0); i < t.info().NumPieces; i++ {
 		if skip != nil && skip[i] {
 			continue
 		}
 		length := pieceLength
-		if i == t.info.NumPieces-1 {
-			length = t.info.Length - pieceLength*int64(t.info.NumPieces-1)
+		if i == t.info().NumPieces-1 {
+			length = t.info().Length - pieceLength*int64(t.info().NumPieces-1)
 		}
 		total += length
 		if t.bitfield != nil && t.bitfield.Test(i) {

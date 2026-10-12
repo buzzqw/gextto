@@ -106,9 +106,9 @@ func TestSelectionPrioritiesSkipAndHigh(t *testing.T) {
 	}
 	tr := &torrent{
 		id:      "t1",
-		info:    info,
 		session: &Session{config: Config{FilePriorities: func(string) []int { return []int{0, 7} }}},
 	}
+	tr.setInfo(info)
 	if got := tr.skippedInfoFiles(); !slices.Equal(got, []bool{true, false}) {
 		t.Fatalf("skippedInfoFiles = %v, want [true false]", got)
 	}
@@ -116,7 +116,8 @@ func TestSelectionPrioritiesSkipAndHigh(t *testing.T) {
 		t.Fatalf("piecePriorities = %v, want [0 7]", got)
 	}
 	// No callback → every piece is normal and nothing is skipped.
-	plain := &torrent{id: "t2", info: info, session: &Session{}}
+	plain := &torrent{id: "t2", session: &Session{}}
+	plain.setInfo(info)
 	if got := plain.skippedInfoFiles(); got != nil {
 		t.Fatalf("no selection skippedInfoFiles = %v, want nil", got)
 	}
@@ -140,9 +141,9 @@ func TestLegacyFileSelectionStillWorks(t *testing.T) {
 	}
 	tr := &torrent{
 		id:      "t1",
-		info:    info,
 		session: &Session{config: Config{FileSelection: func(string) []bool { return []bool{true, false} }}},
 	}
+	tr.setInfo(info)
 	if got := tr.skippedInfoFiles(); !slices.Equal(got, []bool{true, false}) {
 		t.Fatalf("skippedInfoFiles = %v, want [true false]", got)
 	}

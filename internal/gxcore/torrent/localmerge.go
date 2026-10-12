@@ -29,14 +29,14 @@ type localDataSnapshot struct {
 // publishLocalData records the snapshot once the pieces are built. It is called
 // from the run loop in handleAllocationDone.
 func (t *torrent) publishLocalData() {
-	if t.info == nil || len(t.pieces) == 0 {
+	if t.info() == nil || len(t.pieces) == 0 {
 		return
 	}
 	t.localData.Store(&localDataSnapshot{
 		pieces:      t.pieces,
-		private:     t.info.Private,
-		length:      t.info.Length,
-		pieceLength: t.info.PieceLength,
+		private:     t.info().Private,
+		length:      t.info().Length,
+		pieceLength: t.info().PieceLength,
 	})
 }
 
@@ -65,7 +65,7 @@ func (t *torrent) prefillLocalData() int {
 // prefillFrom is prefillLocalData over an explicit candidate set, so it can be
 // tested without a session.
 func (t *torrent) prefillFrom(candidates []*Torrent) int {
-	if t.info == nil || len(t.pieces) == 0 {
+	if t.info() == nil || len(t.pieces) == 0 {
 		return 0
 	}
 	merged := 0
@@ -79,11 +79,11 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 			continue
 		}
 		// BEP 27: never mix a swarm that is private on either side.
-		if snap.private || t.info.Private {
+		if snap.private || t.info().Private {
 			continue
 		}
 		// Only an identical layout: same piece length and same content length.
-		if snap.pieceLength != t.info.PieceLength || snap.length != t.info.Length {
+		if snap.pieceLength != t.info().PieceLength || snap.length != t.info().Length {
 			continue
 		}
 		have := other.torrent.haveBits()

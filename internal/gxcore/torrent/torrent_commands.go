@@ -99,7 +99,7 @@ func (t *torrent) NotifyListen() <-chan int {
 }
 
 func (t *torrent) Magnet() (string, error) {
-	if t.info != nil && t.info.Private {
+	if t.info() != nil && t.info().Private {
 		return "", errors.New("torrent is private")
 	}
 	m := magnet.Magnet{
@@ -112,14 +112,14 @@ func (t *torrent) Magnet() (string, error) {
 }
 
 func (t *torrent) Torrent() ([]byte, error) {
-	if t.info == nil {
+	if t.info() == nil {
 		return nil, errors.New("torrent metadata not ready")
 	}
 	webseeds := make([]string, len(t.webseedSources))
 	for i, ws := range t.webseedSources {
 		webseeds[i] = ws.URL
 	}
-	return metainfo.NewBytesWithHints(t.info.Bytes, t.getTieredTrackers(), webseeds, t.pieceLayers, "", t.info.Collections, t.info.Similar)
+	return metainfo.NewBytesWithHints(t.info().Bytes, t.getTieredTrackers(), webseeds, t.pieceLayers, "", t.info().Collections, t.info().Similar)
 }
 
 func (t *torrent) getTieredTrackers() [][]string {
