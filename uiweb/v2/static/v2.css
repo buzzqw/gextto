@@ -348,12 +348,14 @@ html, body {
   }
 }
 
-/* The page title only needs enough room for a short label such as Dashboard.
-   Giving it the old 18vw slot needlessly pushes the operational controls to
-   the right and creates a horizontal chrome scroll on medium desktops. */
+/* The title sizes to its own label, so a long one like "Configurazione" is not
+   truncated while a short one like "Dashboard" does not push the operational
+   controls to the right. Under pressure the title shrinks first (min-width: 0
+   plus the ellipsis on h1); the controls keep their minimum width. */
 @media (min-width: 901px) {
   .v2-topbar-sticky .topbar-title {
-    flex: 0 1 clamp(120px, 11vw, 150px);
+    flex: 0 1 auto;
+    min-width: 0;
   }
   .v2-topbar-sticky {
     padding-left: 12px;
@@ -370,6 +372,9 @@ html, body {
 .v2-topbar-sticky .top-actions {
   gap: 5px;
   min-width: 0;
+  /* When the title needs its width and the controls would run off the right
+     edge, they wrap onto a second line instead of being clipped. */
+  flex-wrap: wrap;
   overflow: visible;
 }
 .v2-topbar-sticky .top-metric {
@@ -402,7 +407,10 @@ html, body {
   line-height: 1.05;
   text-align: center;
 }
-@media (min-width: 701px) and (max-width: 1180px) {
+/* Medium desktops cannot fit the title and the full control strip on one line
+   without truncating the title, so the chrome stacks: title on its own row,
+   controls below. */
+@media (min-width: 701px) and (max-width: 1499px) {
   .v2-topbar-sticky {
     flex-wrap: wrap;
   }
