@@ -201,3 +201,74 @@ func TestJackettEndpointAndFallback(t *testing.T) {
 		t.Fatalf("ping should succeed via fallback: %v", err)
 	}
 }
+
+// TestProwlarrAggregateSearch pins the Prowlarr shape: its aggregate search is
+// the JSON API (`query`/`type`, not Torznab `t`/`q`), usenet results are
+// skipped and a result with only an infohash still gets a magnet.
+func TestProwlarrAggregateSearch(t *testing.T) {
+	// Served under /prowlarr, like a reverse proxy: the URL names Prowlarr.
+	srv := httptest.NewServer(http.StripPrefix("/prowlarr", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/search":
+			q := r.URL.Query()
+			if q.Get("query") != "mandalorian" || q.Get("type") != "search" || q.Get("apikey") != "k" || q.Get("t") != "" {
+				http.Error(w, "bad params: "+r.URL.RawQuery, http.StatusBadRequest)
+				return
+			}
+			_, _ = w.Write([]byte(`[
+ {"title":"The Mandalorian S02E07 1080p","size":2000000000,"seeders":40,"leechers":3,"magnetUrl":"magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567","protocol":"torrent","publishDate":"2026-10-01T10:00:00Z"},
+ {"title":"The Mandalorian S01 pack","size":9000000000,"seeders":12,"infoHash":"ABCDEF0123456789ABCDEF0123456789ABCDEF01","downloadUrl":"http://p/dl?link=x&file=y","protocol":"torrent"},
+ {"title":"The Mandalorian nzb","size":1,"protocol":"usenet","downloadUrl":"http://p/nzb"}
+]`))
+		case "/api/v1/system/status":
+			if r.URL.Query().Get("apikey") != "k" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			_, _ = w.Write([]byte(`{"appName":"Prowlarr","version":"1.20.0"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	})))
+	defer srv.Close()
+	base := srv.URL + "/prowlarr"
+	idx := Indexer{Name: "prowlarr", URL: base, APIKey: "k"}
+	if ep := idx.Endpoint(); ep != base+"/api/v1/search" {
+		t.Fatalf("endpoint = %q", ep)
+	}
+	items, err := idx.Search(context.Background(), "mandalorian")
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("items = %d (%+v), want 2 (usenet skipped)", len(items), items)
+	}
+	if items[0].Seeders != 40 || items[0].Leechers != 3 || items[0].Published.IsZero() || !strings.HasPrefix(items[0].Magnet, "magnet:") {
+		t.Fatalf("first item = %+v", items[0])
+	}
+	if !strings.HasPrefix(items[1].Magnet, "magnet:?xt=urn:btih:abcdef0123456789") || items[1].Leechers != -1 {
+		t.Fatalf("infohash item = %+v", items[1])
+	}
+	if err := idx.Ping(context.Background()); err != nil {
+		t.Fatalf("ping: %v", err)
+	}
+	if err := (Indexer{Name: "prowlarr", URL: base, APIKey: "bad"}).Ping(context.Background()); err == nil {
+		t.Fatal("a wrong API key must fail the Prowlarr ping")
+	}
+}
+
+// TestParseToleratesStrayAmpersand: a tracker title or URL with a raw "&" or an
+// HTML entity must not make the whole feed unreadable.
+func TestParseToleratesStrayAmpersand(t *testing.T) {
+	body := `<?xml version="1.0"?><rss version="2.0"><channel>` +
+		`<item><title>Tom &amp; Jerry &egrave; S01E01</title><link>http://t/dl?id=1&link=2</link></item>` +
+		`<item><title>Other S01E02</title><link>http://t/dl?id=2</link></item>` +
+		`</channel></rss>`
+	items, err := Parse(strings.NewReader(body), "x")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(items) != 2 || items[0].Link != "http://t/dl?id=1&link=2" {
+		t.Fatalf("items = %+v", items)
+	}
+}

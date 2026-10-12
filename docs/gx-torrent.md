@@ -433,10 +433,19 @@ The **indexer search** (standalone) uses the `indexers` key of
 Prowlarr): `GET /ui/search?q=…` queries all of them, merges the results and sorts them
 by seed. With at least one indexer configured the **search box** appears on the page,
 with the results and an *Add* button to add the torrent. In
-managed it is not available. **Jackett, Prowlarr and MIRCrew** all speak Torznab
-(the `mircrew-indexer` service exposes a Torznab endpoint), so they are configured
-in the same way: URL ending in `/api` (for MIRCrew the port is chosen by
-hand, it has no default). An indexer can put the **magnet in the link or
+managed it is not available. **Jackett, Prowlarr and MIRCrew** are configured
+in the same way, with the **base address** (an address ending in `/api` is also
+accepted): Jackett gets its aggregate Torznab path
+(`/api/v2.0/indexers/all/results/torznab/api`), a direct Torznab service such as
+the `mircrew-indexer` gets `<base>/api` (for MIRCrew the port is chosen by hand, it
+has no default), and **Prowlarr** (`:9696` or `prowlarr` in the URL) is queried
+through its aggregate search `/api/v1/search` (`query`/`type`/`limit=100`), which
+answers JSON: `internal/torznab` reads it (usenet results skipped, magnet built
+from the infohash when missing) and the connection test uses
+`/api/v1/system/status`. Gextto applies the same rule (`torznab_endpoint` in
+`rss.go`), so the address to type is identical in both. The Torznab XML is read
+**leniently**: a raw `&` or an HTML entity in a scraped title or URL no longer
+makes the whole answer unreadable. An indexer can put the **magnet in the link or
 in the enclosure** instead of in a `magneturl` attribute (this is MIRCrew's case):
 it is recognised and added as a magnet, without trying to download it via HTTP.
 An indexer that responds with an **error document** (e.g. invalid API key:
@@ -1236,7 +1245,12 @@ The `auto_managed` flag (with `parked` and `pinned`) is what Gextto summarises i
 **Auto-managed** row of the torrent detail, with the term for *who* controls the
 scheduling: `managed` when the queue manages it, `paused` when you paused it
 yourself, `parked` when it is stalled and has been set aside, `pinned` when it is
-forced out of the queue. It is therefore not a simple yes/no.
+forced out of the queue. It is therefore not a simple yes/no. The same terms are
+used for every engine: with qBittorrent-nox `pinned` is `force_start` and the queue
+owns every torrent that is neither force-started nor stopped (qBittorrent's
+`auto_tmm` is the automatic management of save paths, not of the queue, so it
+does not count); a torrent outside the queue that is not transferring (stopped,
+checking, in error) reads `paused`. The TUI shows the same row.
 
 ## Stalled: division of tasks
 

@@ -7,6 +7,7 @@ package torznab
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -87,15 +88,24 @@ func (idx Indexer) Endpoint() string {
 	// Prowlarr and Jackett aggregate many trackers and have their own search
 	// paths; anything else is a direct Torznab service, whose endpoint is
 	// simply <base>/api. Gextto follows the same rule, so the address to type
-	// is identical in both.
+	// is identical in both. Prowlarr's aggregate search is its JSON API, read
+	// by ParseProwlarr.
 	if strings.Contains(lower, "prowlarr") || strings.Contains(lower, ":9696") {
-		return base + "/api/v1/search"
+		return base + prowlarrSearchPath
 	}
 	// Jackett default port or jackett in URL (e.g. http://host:9117 or http://jackett/...)
 	if strings.Contains(lower, "jackett") || strings.Contains(lower, ":9117") {
 		return base + "/api/v2.0/indexers/all/results/torznab/api"
 	}
 	return base + "/api"
+}
+
+// prowlarrSearchPath is Prowlarr's aggregate search across all its indexers. It
+// answers JSON, not Torznab XML, and takes `query`/`type`, not `t`/`q`.
+const prowlarrSearchPath = "/api/v1/search"
+
+func isProwlarrSearch(endpoint string) bool {
+	return strings.HasSuffix(strings.TrimRight(endpoint, "/"), prowlarrSearchPath)
 }
 
 // Search queries one indexer and returns its results.
@@ -123,9 +133,17 @@ func (idx Indexer) searchEndpoint(ctx context.Context, endpointStr, query string
 	if err != nil {
 		return nil, fmt.Errorf("torznab: invalid indexer URL: %w", err)
 	}
+	prowlarr := isProwlarrSearch(endpoint.Path)
 	params := endpoint.Query()
-	params.Set("t", "search")
-	params.Set("q", query)
+	if prowlarr {
+		params.Set("query", query)
+		params.Set("type", "search")
+		// Ask for a full page, as Gextto does; the default is much smaller.
+		params.Set("limit", "100")
+	} else {
+		params.Set("t", "search")
+		params.Set("q", query)
+	}
 	if key := strings.TrimSpace(idx.APIKey); key != "" {
 		params.Set("apikey", key)
 	}
@@ -143,7 +161,97 @@ func (idx Indexer) searchEndpoint(ctx context.Context, endpointStr, query string
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("torznab: %s returned HTTP %d", idx.Name, resp.StatusCode)
 	}
+	if prowlarr {
+		return ParseProwlarr(resp.Body, idx.Name)
+	}
 	return Parse(resp.Body, idx.Name)
+}
+
+// prowlarrRelease is the part of a Prowlarr /api/v1/search result we use.
+type prowlarrRelease struct {
+	Title       string `json:"title"`
+	Size        int64  `json:"size"`
+	Seeders     *int   `json:"seeders"`
+	Leechers    *int   `json:"leechers"`
+	MagnetURL   string `json:"magnetUrl"`
+	DownloadURL string `json:"downloadUrl"`
+	InfoHash    string `json:"infoHash"`
+	PublishDate string `json:"publishDate"`
+	Protocol    string `json:"protocol"`
+}
+
+// ParseProwlarr reads the JSON answer of Prowlarr's aggregate search. Usenet
+// results are skipped; a result without a magnet gets one from its infohash,
+// the same fallback Gextto uses.
+func ParseProwlarr(r io.Reader, indexerName string) ([]Item, error) {
+	data, err := io.ReadAll(io.LimitReader(r, maxTorznabBody))
+	if err != nil {
+		return nil, fmt.Errorf("torznab: cannot read the response: %w", err)
+	}
+	if trimmed := bytes.TrimSpace(data); len(trimmed) > 0 && trimmed[0] == '<' {
+		// A Prowlarr behind a proxy may still answer Torznab XML (or an error
+		// document): read it as such instead of failing on the JSON.
+		return Parse(bytes.NewReader(data), indexerName)
+	}
+	var raw []prowlarrRelease
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("torznab: %s did not answer a Prowlarr search (check URL and API key): %w", indexerName, err)
+	}
+	items := make([]Item, 0, len(raw))
+	for _, rel := range raw {
+		if rel.Protocol != "" && !strings.EqualFold(rel.Protocol, "torrent") {
+			continue
+		}
+		item := Item{
+			Title:    strings.TrimSpace(rel.Title),
+			Size:     rel.Size,
+			Leechers: -1,
+			Link:     strings.TrimSpace(rel.DownloadURL),
+			Indexer:  indexerName,
+		}
+		if rel.Seeders != nil {
+			item.Seeders = *rel.Seeders
+		}
+		if rel.Leechers != nil {
+			item.Leechers = *rel.Leechers
+		}
+		switch {
+		case strings.HasPrefix(strings.ToLower(rel.MagnetURL), "magnet:"):
+			item.Magnet = strings.TrimSpace(rel.MagnetURL)
+		case strings.HasPrefix(strings.ToLower(item.Link), "magnet:"):
+			item.Magnet = item.Link
+		default:
+			item.Magnet = infoHashMagnet(rel.InfoHash, item.Title)
+		}
+		if t, err := parseTorznabTime(rel.PublishDate); err == nil {
+			item.Published = t
+		}
+		if item.Title == "" || item.Download() == "" {
+			continue
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+// infoHashMagnet builds a magnet from a v1 (40 hex) or v2 (64 hex) infohash.
+func infoHashMagnet(hash, title string) string {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	for _, c := range hash {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return ""
+		}
+	}
+	var magnet string
+	switch len(hash) {
+	case 40:
+		magnet = "magnet:?xt=urn:btih:" + hash
+	case 64:
+		magnet = "magnet:?xt=urn:btmh:1220" + hash
+	default:
+		return ""
+	}
+	return magnet + "&dn=" + url.QueryEscape(title)
 }
 
 // Ping checks that the indexer answers a Torznab `t=caps` request. It validates
@@ -172,6 +280,9 @@ func (idx Indexer) pingEndpoint(ctx context.Context, endpointStr string) error {
 	if err != nil {
 		return fmt.Errorf("torznab: invalid indexer URL: %w", err)
 	}
+	if isProwlarrSearch(endpoint.Path) {
+		return idx.pingProwlarr(ctx, endpoint)
+	}
 	params := endpoint.Query()
 	params.Set("t", "caps")
 	if key := strings.TrimSpace(idx.APIKey); key != "" {
@@ -198,6 +309,41 @@ func (idx Indexer) pingEndpoint(ctx context.Context, endpointStr string) error {
 	return nil
 }
 
+// pingProwlarr checks Prowlarr through its system status, which validates
+// reachability and the API key (Prowlarr's aggregate search has no `caps`).
+func (idx Indexer) pingProwlarr(ctx context.Context, search *url.URL) error {
+	status := *search
+	status.Path = strings.TrimSuffix(strings.TrimRight(status.Path, "/"), prowlarrSearchPath) + "/api/v1/system/status"
+	params := url.Values{}
+	if key := strings.TrimSpace(idx.APIKey); key != "" {
+		params.Set("apikey", key)
+	}
+	status.RawQuery = params.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, status.String(), nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("torznab: %s rejected the API key", idx.Name)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("torznab: %s returned HTTP %d", idx.Name, resp.StatusCode)
+	}
+	var probe struct {
+		Version string `json:"version"`
+	}
+	if json.Unmarshal(body, &probe) != nil || probe.Version == "" {
+		return fmt.Errorf("torznab: %s answered without a Prowlarr status (check URL and API key)", idx.Name)
+	}
+	return nil
+}
+
 // torznabError is the error document a Torznab indexer (Jackett, Prowlarr)
 // returns with HTTP 200 when the request itself is wrong — typically a bad API
 // key. Decoding it as an empty feed would hide the failure, so Parse reports it.
@@ -214,7 +360,7 @@ func Parse(r io.Reader, indexerName string) ([]Item, error) {
 		return nil, fmt.Errorf("torznab: cannot read the response: %w", err)
 	}
 	var probe torznabError
-	_ = xml.Unmarshal(data, &probe)
+	_ = newLenientDecoder(data).Decode(&probe)
 	if strings.EqualFold(probe.XMLName.Local, "error") {
 		desc := strings.TrimSpace(probe.Desc)
 		if desc == "" {
@@ -226,7 +372,7 @@ func Parse(r io.Reader, indexerName string) ([]Item, error) {
 		return nil, fmt.Errorf("torznab: %s", desc)
 	}
 	var feed rssFeed
-	if err := xml.Unmarshal(data, &feed); err != nil {
+	if err := newLenientDecoder(data).Decode(&feed); err != nil {
 		return nil, fmt.Errorf("torznab: cannot parse the feed: %w", err)
 	}
 	items := make([]Item, 0, len(feed.Items))
@@ -268,6 +414,16 @@ func Parse(r io.Reader, indexerName string) ([]Item, error) {
 		items = append(items, item)
 	}
 	return items, nil
+}
+
+// newLenientDecoder reads indexer XML the way browsers do: a stray "&" or an
+// HTML entity in a title or URL (common in scraped trackers) must not make the
+// whole answer unreadable.
+func newLenientDecoder(data []byte) *xml.Decoder {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	decoder.Strict = false
+	decoder.Entity = xml.HTMLEntity
+	return decoder
 }
 
 // parseTorznabTime reads the RFC1123(Z) or RFC3339 dates indexers emit.
