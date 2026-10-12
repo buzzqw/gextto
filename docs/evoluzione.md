@@ -955,6 +955,13 @@ rumoroso** (17% e 31% senza differenze di cap). Test:
 uscente** (nessun consumatore: regola "niente codice speculativo"; lato server e
 API locale restano pronti).
 
+**Avvio a freddo — fatto (2026-10-12).** Un magnet senza tracker restava in
+`downloading_metadata` per ~75 s pur con il DHT funzionante: `DHTMinAnnounceInterval`
+(default 1 min) era l'intervallo di ritentativo mentre il torrent cerca peer,
+quindi la tabella DHT (~30 s a riempirsi) veniva interrogata di nuovo solo dopo
+un minuto. Portato a **15 s**; la stessa prova scende a **~49 s** (test
+`announcer/dht_test.go`). Misura in §6.8.
+
 ### 4.11 Port mapping (PCP), rilevamento NAT e priorità file (fattibilità)
 
 Tre lacune rispetto a Tixati, con parere di fattibilità fondato sul codice
@@ -1534,12 +1541,15 @@ collo di bottiglia rispetto a libtorrent su questo carico. Per isolare i due
 algoritmi serve latenza controllata (`tc netem`, che richiede root) o un
 ambiente dedicato.
 
-**Osservazione DHT.** Lo stesso torrent **senza tracker** (solo DHT dal magnet) è
-stato risolto e scaricato, ma con metadata dopo **~75 s** e solo **2 peer** (~3,9
-MiB/s), contro 3 s e ~80 peer con i tracker. L'harness `internal/dht`
-(`make measure-dht`) trova ~108 peer per lo stesso infohash in ~30 s: il ritardo
-è quindi nell'avvio a freddo del DHT del motore e/o nel percorso di scoperta dei
-metadati del magnet, non nel lookup DHT in sé. Voce da verificare in §4.10.
+**Avvio a freddo DHT — migliorato (2026-10-12).** Lo stesso torrent **senza
+tracker** (solo DHT dal magnet) veniva risolto dopo **~75 s**: la causa era
+`DHTMinAnnounceInterval` a **1 minuto**, usato come intervallo di ritentativo
+mentre il torrent cerca peer (l'annuncio parte subito, poi aspetta questo
+intervallo). Portato a **15 s**. La stessa prova ora ottiene i metadati in
+**~49 s** con 12 peer (prima ~75 s, 2 peer). Il tempo residuo è il riempimento
+della routing table DHT (~30 s a freddo), non il lookup: l'harness
+`internal/dht` trova ~108 peer per lo stesso infohash in ~30 s. Il DHT a freddo
+non è quindi rotto, era **lento a ritentare**.
 
 ---
 

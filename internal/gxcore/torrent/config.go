@@ -298,11 +298,17 @@ var DefaultConfig = Config{
 	TrackerHTTPVerifyTLS:        true,
 
 	// DHT node
-	DHTEnabled:             true,
-	DHTHost:                "0.0.0.0",
-	DHTPort:                7246,
-	DHTAnnounceInterval:    30 * time.Minute,
-	DHTMinAnnounceInterval: time.Minute,
+	DHTEnabled:          true,
+	DHTHost:             "0.0.0.0",
+	DHTPort:             7246,
+	DHTAnnounceInterval: 30 * time.Minute,
+	// DHTMinAnnounceInterval is how often the DHT is asked again while the
+	// torrent still needs peers: it is the cold-start retry. The engine
+	// announces immediately at start, then at this interval until it finds
+	// peers (a fresh DHT routing table takes ~30 s to fill) and drops to
+	// DHTAnnounceInterval once peers are connected. Before it was 1 minute,
+	// which made a tracker-less magnet wait ~75 s for metadata.
+	DHTMinAnnounceInterval: 15 * time.Second,
 	DHTBootstrapNodes: []string{
 		"router.bittorrent.com:6881",
 		"dht.transmissionbt.com:6881",
