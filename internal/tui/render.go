@@ -1540,7 +1540,7 @@ func (m *Model) renderDetail(width, contentHeight int) []Line {
 		{m.Tr.T("label.superseeding"), boolLabel(torrent.SuperSeeding)},
 		{m.Tr.T("label.metadata"), metadata},
 		{m.Tr.T("label.version2"), torrent.TorrentVersion},
-		{m.Tr.T("label.automanaged"), boolLabel(torrent.AutoManaged)},
+		{m.Tr.T("label.automanaged"), autoManagedLabel(listed)},
 		{m.Tr.T("label.norename"), boolLabel(m.Detail.NoRename)},
 		{m.Tr.T("label.archived"), boolLabel(torrent.Archived)},
 		{m.Tr.T("label.source"), firstNonEmpty(torrent.Source, "-")},
@@ -1554,6 +1554,24 @@ func (m *Model) renderDetail(width, contentHeight int) []Line {
 		lines = append(lines, Line{Text: PadRight(row[0]+":", 20) + " " + row[1], Style: StyleNormal})
 	}
 	return lines
+}
+
+// autoManagedLabel names what controls a torrent's scheduling, matching the web
+// UI so the two never disagree: the queue ("managed"), a user pause, Gextto's
+// parking of a stalled torrent, or a force start ("pinned").
+func autoManagedLabel(t Torrent) string {
+	switch {
+	case t.Pinned:
+		return "pinned"
+	case t.AutoManaged:
+		return "managed"
+	case t.Stalled:
+		return "parked"
+	case t.State == "paused" || t.State == "queued":
+		return "paused"
+	default:
+		return "pinned"
+	}
 }
 
 // renderDetailSelectable lists the files or trackers of the open torrent

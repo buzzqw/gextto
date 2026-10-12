@@ -34,6 +34,8 @@ type Torrent struct {
 	SeedDays        *float64 `json:"seed_days"`
 	HasMetadata     bool     `json:"has_metadata"`
 	AutoManaged     bool     `json:"auto_managed"`
+	Stalled         bool     `json:"stalled"`
+	Pinned          bool     `json:"pinned"`
 	IsSeeding       bool     `json:"is_seeding"`
 	Archived        bool     `json:"archived"`
 	SavePath        string   `json:"save_path"`
