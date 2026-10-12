@@ -531,6 +531,9 @@ type TorrentView struct {
 	TotalSize         int64   `json:"total_size"`
 	TotalDone         int64   `json:"total_done"`
 	Stalled           bool    `json:"stalled"`
+	// Pinned marks a torrent force-started outside the queue (libtorrent and
+	// qBittorrent call it "force start").
+	Pinned bool `json:"pinned"`
 	// Rich status exposed by libtorrent that the UI and diagnostics can use.
 	Error             string `json:"error"`
 	CurrentTracker    string `json:"current_tracker"`

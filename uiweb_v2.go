@@ -1475,7 +1475,7 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		{Label: "Posizione coda", Value: fmt.Sprintf("%d", torrent.QueuePosition)},
 		{Label: "Metadata", Value: ternaryString(torrent.HasMetadata, "presenti", "in attesa")},
 		{Label: "Versione torrent", Value: torrent.TorrentVersion},
-		{Label: "Auto-managed", Value: ternaryString(torrent.AutoManaged, "sì", "no")},
+		{Label: "Auto-managed", Value: v2AutoManagedLabel(torrent)},
 		{Label: "Percorso di salvataggio", Value: torrent.SavePath},
 		{Label: "Tracker corrente", Value: torrent.CurrentTracker},
 		{Label: "Non rinominare", Value: fmt.Sprintf("%t", noRename)},
@@ -1539,6 +1539,30 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		view.TabError = "Il motore non ha risposto: " + tabErr.Error()
 	}
 	return view
+}
+
+// v2AutoManagedLabel names what controls a torrent's scheduling, so the detail
+// tab never shows a bare "no" that looks like the torrent left the queue:
+//
+//   - "managed":   the queue owns it (it runs or waits for a slot on its own);
+//   - "paused":    paused by the user (a pause is not the queue stopping it);
+//   - "parked":    set aside by Gextto's stall handling, retried later;
+//   - "pinned":    force-started outside the queue (pin/force start).
+func v2AutoManagedLabel(torrent models.TorrentView) string {
+	switch {
+	case torrent.Pinned:
+		return "pinned"
+	case torrent.AutoManaged:
+		return "managed"
+	case torrent.Stalled:
+		return "parked"
+	case torrent.State == "paused" || torrent.State == "queued":
+		return "paused"
+	default:
+		// Not auto-managed but still running: a force start the engine did not
+		// flag explicitly (libtorrent clears auto_managed on a pin).
+		return "pinned"
+	}
 }
 
 // v2SwarmLabel shows the tracker scrape, "n/d" when no tracker answered.

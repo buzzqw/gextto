@@ -1232,6 +1232,12 @@ Stati riportati a Gextto:
 | `moving` | spostamento in corso |
 | `error` | errore del motore o spostamento fallito; un `resume` o un `verify` lo azzerano |
 
+Il flag `auto_managed` (con `parked` e `pinned`) è ciò che Gextto riassume nella
+riga **Auto-managed** del dettaglio torrent, con il termine di *chi* controlla lo
+scheduling: `managed` quando lo gestisce la coda, `paused` quando l'hai messo in
+pausa tu, `parked` quando è in stallo ed è stato messo da parte, `pinned` quando è
+forzato fuori coda. Non è quindi un semplice sì/no.
+
 ## Stalled: divisione dei compiti
 
 La gestione a lungo termine degli stalli resta in Gextto (`MonitorStalled`),

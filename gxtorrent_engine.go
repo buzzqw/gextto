@@ -450,6 +450,7 @@ type gxTorrentItem struct {
 	HasMetadata      bool   `json:"has_metadata"`
 	AutoManaged      bool   `json:"auto_managed"`
 	Parked           bool   `json:"parked"`
+	Pinned           bool   `json:"pinned"`
 	Error            string `json:"error"`
 	CompletedAt      int64  `json:"completed_at"`
 	CurrentTracker   string `json:"current_tracker"`
@@ -489,6 +490,7 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 		SeedDays:          item.SeedDays,
 		HasMetadata:       item.HasMetadata,
 		AutoManaged:       item.AutoManaged,
+		Pinned:            item.Pinned,
 		TorrentVersion:    gxTorrentVersion(item.TorrentVersion),
 		TotalSize:         item.TotalSize,
 		TotalDone:         item.TotalDone,

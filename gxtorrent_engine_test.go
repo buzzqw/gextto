@@ -128,6 +128,16 @@ func TestGxEngineMapsStatesAndEmitsEvents(t *testing.T) {
 	}
 }
 
+func TestGxEngineMapsPinned(t *testing.T) {
+	engine, fake := newTestGxEngine(t, "")
+	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "seeding", SavePath: "/dl",
+		SeedRatio: -1, SeedDays: -1, AutoManaged: false, Pinned: true})
+	views := engine.List()
+	if len(views) != 1 || !views[0].Pinned || views[0].AutoManaged {
+		t.Fatalf("pinned flag not mapped: %+v", views)
+	}
+}
+
 func TestGxEngineKeepsStaleCacheDuringOutage(t *testing.T) {
 	engine, fake := newTestGxEngine(t, "")
 	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "downloading"})

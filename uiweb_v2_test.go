@@ -1564,6 +1564,28 @@ func TestV2DetailShowsBEP38(t *testing.T) {
 	}
 }
 
+// TestV2AutoManagedLabel checks the detail tab names the entity that controls a
+// torrent's scheduling instead of a bare yes/no.
+func TestV2AutoManagedLabel(t *testing.T) {
+	cases := []struct {
+		name string
+		in   models.TorrentView
+		want string
+	}{
+		{"queue", models.TorrentView{AutoManaged: true}, "managed"},
+		{"user pause", models.TorrentView{State: "paused"}, "paused"},
+		{"queued", models.TorrentView{State: "queued"}, "paused"},
+		{"parked", models.TorrentView{State: "stalled", Stalled: true}, "parked"},
+		{"pinned", models.TorrentView{Pinned: true}, "pinned"},
+		{"forced running", models.TorrentView{State: "downloading"}, "pinned"},
+	}
+	for _, tc := range cases {
+		if got := v2AutoManagedLabel(tc.in); got != tc.want {
+			t.Fatalf("%s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
 // TestV2ClientI18nCacheInvalidates checks the memoized client dictionary is
 // rebuilt after a translation changes.
 func TestV2ClientI18nCacheInvalidates(t *testing.T) {

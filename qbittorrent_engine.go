@@ -378,6 +378,7 @@ func (e *qbittorrentEngine) toView(t qbittorrent.Torrent) models.TorrentView {
 		SeedDays:          qbmapSeedDays(t.SeedingLimit),
 		HasMetadata:       hasMetadata,
 		AutoManaged:       t.AutoManaged,
+		Pinned:            t.ForceStart,
 		TorrentVersion:    torrentVersion,
 		TotalSize:         totalSize,
 		TotalDone:         totalDone,

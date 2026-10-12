@@ -55,7 +55,7 @@ var gxTorrentItemKeys = []string{
 	"seeding_seconds", "active_seconds", "queue_position", "num_peers",
 	"num_seeds", "num_complete", "num_incomplete", "seed_ratio", "seed_days",
 	"download_limit_kib", "upload_limit_kib", "has_metadata", "auto_managed",
-	"parked", "error", "completed_at", "current_tracker", "torrent_version",
+	"parked", "pinned", "error", "completed_at", "current_tracker", "torrent_version",
 	"super_seeding",
 }
 
