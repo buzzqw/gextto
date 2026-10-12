@@ -1085,9 +1085,10 @@ I **tre divari a più alto valore** in esercizio reale, in ordine di priorità:
 2. **I/O disco** — **fatto (2026-10-12)**: `O_SYNC` rimosso, `storage.File.Sync()`
    e invariante snapshot→fsync→bitfield, `updateStats` in due fasi (§5.4). Restano
    fuori scope mmap/AIO/scritture contigue, che richiedono misure dedicate.
-3. **Dimostrazione su sciame reale** di choking e pipelining — coda adattiva e
-   choking sono validati **solo in locale**; la campagna §6.5 è ancora da fare.
-   Finché manca, «sufficiente e più leggero» è onesto, «alla pari» no.
+3. **Dimostrazione su sciame reale** — **fatta, prima run (2026-10-12)**: gx-core
+   alla pari o sopra libtorrent sullo stesso torrent pubblico ben seedato (§6.8).
+   Resta da isolare choking e pipelining con latenza controllata (`tc netem`,
+   root): la §6.8 misura il risultato end-to-end, non l'algoritmo in isolamento.
 
 Fuori scope per scelta (documentato in `bep.md`): BEP 8/17/18/22/26/28/30/34/35/
 45/50/51, WebTorrent, I2P nativo; restano raggiungibili via proxy SOCKS5/HTTP.
@@ -1455,6 +1456,15 @@ GX_MEASURE_MESH=1 make measure-seeding      # leecher collegati tra loro
 GX_MEASURE_LEECHERS=2 make measure-seeding  # sciame di 2 peer
 ```
 
+**Pipelining.** `cmd/gx-torrent/measure_pipeline_test.go` è l'harness dedicato
+alla **coda richieste adattiva** (opt-in, `make measure-pipeline`): avvia lo stesso
+sciame locale a profondità diversa (`shallow` def=4/max=4, `default` 50/250,
+`deep` 200/500) e riporta byte e tempo. I knob viaggiano in `NetworkOptions`
+(`MaxRequestsOut`/`DefaultRequestsOut`). **Limite dichiarato:** su loopback il RTT
+è ~0, quindi la profondità non è il collo di bottiglia e i profili danno numeri
+quasi identici (~200 ms, ~40 MB/s con 1 leecher): serve una misura con latenza
+vera (rete reale o `tc netem`, che richiede root), che è la §6.5.
+
 Seeder + N leecher su loopback con IP `127.0.0.x` distinti (il motore rifiuta due
 connessioni dallo stesso IP). Default: ogni leecher solo verso il seeder — si
 misura l'**upload del seed** (ciò che il super-seeding cambia). Mesh
@@ -1471,7 +1481,8 @@ Per gx-torrent vs **libtorrent/qBittorrent**: stesso sciame e ruolo, stesse
 politiche (slot, banda, n. peer), stesse metriche (byte seed `Nx corpus`,
 throughput, tempo a 1:1, seed generati), mediana su più run, automazione attiva.
 Unico banco che mostra il beneficio del super-seeding (~1x invece di Nx) e la
-qualità del choking con scambio reale.
+qualità del choking con scambio reale. Prima run (download reale, gx-core vs
+libtorrent) in **§6.8**.
 
 ### 6.6 Risultati (prima tornata, locale; Intel N97, corpus 2 MiB)
 
@@ -1498,6 +1509,37 @@ pezzo successivo al tick invece di attendere il solo `not-interested`.
   opzione di *initial seeding* (BEP 16), non default.
 - Nessuna differenza misurabile → non si tocca il core (costo rebase non
   giustificato).
+
+### 6.8 Campagna su sciame reale — prima run (2026-10-12)
+
+Requisito §4.12 punto 3. Stesso torrent pubblico ben seedato (**Ubuntu 24.04.3
+desktop amd64**, ~6,0 GB), stessa macchina, stessa finestra di 40 s (dopo 5 s di
+rampa post-metadata), tre tracker UDP pubblici nel magnet, run **sequenziali**
+(mai in parallelo). Due sistemi diversi, 2 run ciascuno: **libtorrent 2.0.11**
+(`python3-libtorrent`) e **gx-core** (`gx-torrent -mode standalone`).
+
+| Client | run | metadata | peer (finestra) | finestra | scaricato | media |
+| --- | --- | --- | --- | --- | --- | --- |
+| libtorrent 2.0.11 | 1 | 3 s | 83 (81 seed) | 40 s | 292,9 MB | **7.149 KiB/s** |
+| libtorrent 2.0.11 | 2 | 3 s | 66 (61 seed) | 40 s | 258,8 MB | **6.317 KiB/s** |
+| gx-core | 1 | 3 s | 80 (77 seed) | 40 s | 385,1 MB | **9.401 KiB/s** |
+| gx-core | 2 | 3 s | 81 (79 seed) | 40 s | 381,2 MB | **9.305 KiB/s** |
+
+Lettura onesta: su questo sciame gx-core è **alla pari o sopra** libtorrent
+(mediana ~9,3 contro ~6,7 MiB/s), con metadata immediati e un numero di peer
+comparabile. **Non** è una dimostrazione isolata di choking o pipelining (la
+scelta dei peer differisce, una sola macchina, due run): è la prova che gx-core
+scarica davvero da uno sciame reale e che choking e coda richieste non sono un
+collo di bottiglia rispetto a libtorrent su questo carico. Per isolare i due
+algoritmi serve latenza controllata (`tc netem`, che richiede root) o un
+ambiente dedicato.
+
+**Osservazione DHT.** Lo stesso torrent **senza tracker** (solo DHT dal magnet) è
+stato risolto e scaricato, ma con metadata dopo **~75 s** e solo **2 peer** (~3,9
+MiB/s), contro 3 s e ~80 peer con i tracker. L'harness `internal/dht`
+(`make measure-dht`) trova ~108 peer per lo stesso infohash in ~30 s: il ritardo
+è quindi nell'avvio a freddo del DHT del motore e/o nel percorso di scoperta dei
+metadati del magnet, non nel lookup DHT in sé. Voce da verificare in §4.10.
 
 ---
 

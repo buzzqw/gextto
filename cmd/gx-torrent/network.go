@@ -55,6 +55,12 @@ type NetworkOptions struct {
 	IPFilter string
 	// IPFilterTrackers applies the filter to trackers too.
 	IPFilterTrackers bool
+	// MaxRequestsOut/DefaultRequestsOut size the adaptive per-peer request
+	// queue (pipelining): the depth starts at DefaultRequestsOut and grows by
+	// one per delivered block up to MaxRequestsOut (or the peer's reqq). Zero
+	// keeps the engine defaults (250/50). Used by the pipelining harness.
+	MaxRequestsOut     int
+	DefaultRequestsOut int
 }
 
 // resolveInterface turns an interface name or IP into an IPv4 address.
@@ -154,6 +160,12 @@ func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 	}
 	cfg.PEXEnabled = n.PEX
 	cfg.OutgoingInterface = n.OutgoingInterface
+	if n.MaxRequestsOut > 0 {
+		cfg.MaxRequestsOut = n.MaxRequestsOut
+	}
+	if n.DefaultRequestsOut > 0 {
+		cfg.DefaultRequestsOut = n.DefaultRequestsOut
+	}
 	if n.OutgoingInterface != "" {
 		// The DHT is UDP: bind it to the VPN address or turn it off.
 		if ip, err := resolveInterface(n.OutgoingInterface); err == nil {

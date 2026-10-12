@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-dht
+.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-dht
 
 all: build
 
@@ -81,6 +81,13 @@ test-race:
 # for the swarm size. See docs/evoluzione.md (section 6).
 measure-seeding:
 	GX_MEASURE=1 go test ./cmd/gx-torrent/ -run MeasureSeeding -v -count=1
+
+# Pipelining (adaptive request queue) harness: runs the local swarm at a shallow
+# and at deeper queue depths. On loopback the RTT is ~0, so the depth barely
+# matters: it is a regression/sanity harness, not a WAN demonstration. Add
+# GX_MEASURE_LEECHERS=N. See docs/evoluzione.md (section 6).
+measure-pipeline:
+	GX_MEASURE_PIPELINE=1 go test ./cmd/gx-torrent/ -run MeasurePipelining -v -count=1
 
 # DHT real-swarm measurement (opt-in, outside CI): routing-table fill and query
 # success over time, the numbers behind the anti-Sybil/multi-path decisions.
