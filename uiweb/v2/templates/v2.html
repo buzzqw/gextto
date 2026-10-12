@@ -450,7 +450,6 @@
           {{end}}
           {{range .HTTPDownloads}}
           <tr id="v2-http-download-{{.ID}}" data-http-download="{{.ID}}">
-            <td></td>
              <td class="torrent-select"></td>
              <td class="torrent-name"><span class="truncate" title="{{.Title}}">{{.Title}}</span> <span class="badge">HTTP</span></td>
              <td class="torrent-state"><span class="badge{{if eq .Status "completed"}} ok{{else if eq .Status "error"}} err{{else if eq .Status "paused"}} warn{{end}}">{{if eq .Status "downloading"}}In scarico{{else if eq .Status "completed"}}Completato{{else if eq .Status "paused"}}In pausa{{else}}{{.Status}}{{end}}</span></td>

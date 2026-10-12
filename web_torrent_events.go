@@ -786,6 +786,12 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			restored, _ := db.RestoreUpgrade(torrent.Hash)
 			restored = restored || salvageRestored
 			_ = db.MarkTorrentError(torrent.Hash, "stalled download")
+			// The log promises another version: without the blocklist the next
+			// search can pick the very same dead release again (it happened with
+			// an archive hit a few hours after the give-up).
+			if metadata != nil {
+				_ = db.Blocklist(&metadata.Release, "stalled_dead_swarm")
+			}
 			nextStep := "the next search will look for another version"
 			if salvaged > 0 {
 				nextStep = "the next search will look for the episodes still missing"

@@ -1689,3 +1689,70 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 @media (max-width: 560px) {
   .v2-setup-steps span:not(.v2-setup-num) { display: none; }
 }
+
+/* Session downloads and download history on desktop: the tables always fit
+   their panel. Fixed layout gives the name every pixel the other columns leave
+   (a long name ends with an ellipsis, the full name is in the tooltip). The
+   wrap is a size container and the thresholds are in em, i.e. relative to the
+   A−/A+ text scale: when the panel is narrow for the current text size the
+   less important columns fold into the progress cell (↓ ↑ ⏱ chips) instead of
+   pushing the action buttons out of sight. */
+@media (min-width: 701px) {
+  .table-wrap:has(> .torrent-table), .table-wrap:has(> .download-history-table) { container-type: inline-size; }
+  .data-table.torrent-table { table-layout: fixed; width: 100%; min-width: 0; }
+  .torrent-table th:nth-child(1) { width: 2.6rem; }
+  .torrent-table th:nth-child(3) { width: 6.6rem; }
+  .torrent-table th:nth-child(4) { width: 10rem; }
+  .torrent-table th:nth-child(5),
+  .torrent-table th:nth-child(6) { width: 6.2rem; }
+  .torrent-table th:nth-child(7) { width: 4.8rem; }
+  .torrent-table th:nth-child(8) { width: 6rem; }
+  .torrent-table th:nth-child(9) { width: 4.4rem; }
+  .torrent-table th:last-child { width: 14.2rem; }
+  .torrent-table td.torrent-name { min-width: 0; max-width: none; }
+  .torrent-table td.torrent-name > .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .torrent-table td.torrent-progress { min-width: 0 !important; }
+  .torrent-table td.row-actions { display: table-cell; min-width: 0; white-space: nowrap; text-align: right; }
+  .torrent-table td.row-actions .btn { margin-left: 2px; }
+
+  .data-table.download-history-table { table-layout: fixed; width: 100%; min-width: 0; }
+  .download-history-table th:first-child, .download-history-table td:first-child { width: auto; min-width: 0; overflow-wrap: anywhere; }
+  .download-history-table th:nth-child(2) { width: 5.5rem; }
+  .download-history-table th:nth-child(3) { width: 5.5rem; }
+  .download-history-table th:nth-child(4) { width: 5rem; }
+  .download-history-table th:nth-child(5) { width: 6.5rem; }
+  .download-history-table th:nth-child(6) { width: 9rem; }
+  .download-history-table th:nth-child(7), .download-history-table td:nth-child(7) { width: 7rem; max-width: none; }
+  .download-history-table th:last-child, .download-history-table td:last-child { width: 9rem; }
+  .download-history-table td:nth-child(n+2) { overflow: hidden; text-overflow: ellipsis; }
+}
+@container (max-width: 79em) {
+  .torrent-table th:nth-child(8), .torrent-table td:nth-child(8),
+  .torrent-table th:nth-child(9), .torrent-table td:nth-child(9) { display: none; }
+}
+@container (max-width: 69em) {
+  .torrent-table th:nth-child(5), .torrent-table td:nth-child(5),
+  .torrent-table th:nth-child(6), .torrent-table td:nth-child(6),
+  .torrent-table th:nth-child(7), .torrent-table td:nth-child(7) { display: none; }
+  .torrent-table .torrent-mobile-rates { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+  .torrent-table .torrent-mobile-rates span { padding: 1px 6px; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--muted); font-weight: 600; }
+  .torrent-table .torrent-mobile-rates .rate-dl { color: var(--accent); }
+  .torrent-table .torrent-mobile-rates .rate-ul { color: var(--accent-2); }
+  .torrent-table .torrent-mobile-rates .rate-eta { color: var(--warn); }
+}
+@container (max-width: 44em) {
+  .torrent-table th:nth-child(4) { width: 7rem; }
+  .torrent-table th:last-child { width: 7.6rem; }
+  .torrent-table td.row-actions { white-space: normal; }
+  .download-history-table th:nth-child(3), .download-history-table td:nth-child(3),
+  .download-history-table th:nth-child(4), .download-history-table td:nth-child(4),
+  .download-history-table th:nth-child(7), .download-history-table td:nth-child(7) { display: none; }
+}
+@container (max-width: 64em) {
+  .download-history-table th:nth-child(2), .download-history-table td:nth-child(2) { display: none; }
+}
+
+/* Archive: the action column grows with the text scale (four icon buttons)
+   and a long source ends with an ellipsis instead of running over the score. */
+.archive-table th:last-child, .archive-table td:last-child { width: 11.5rem; }
+.archive-table td:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }

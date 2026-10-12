@@ -43,15 +43,46 @@ func manualTorrentRemovalInfo(s *AppState, hash string) (name, state string, has
 // received torrent metadata yet, which is otherwise easy to miss in the log.
 // trashTarget is the trash location the files were moved to, empty when they
 // were kept or deleted outright.
-func logManualTorrentRemoval(hash string, deleteFiles bool, trashTarget, name, state string, hasMetadata bool) {
-	files := "its files are kept"
-	if trashTarget != "" {
-		files = "its files were moved to the trash: " + trashTarget
-	} else if deleteFiles {
-		files = "its files were deleted"
-	}
+func logManualTorrentRemoval(hash, files, name, state string, hasMetadata bool) {
 	logging.Info(fmt.Sprintf("🗑️ You removed «%s» from the download list; %s", name, files))
 	logging.Debug("torrent removed by user", "hash", hash, "state", state, "metadata_available", hasMetadata)
+}
+
+// moveRemovedToTrash moves the payload of a removed torrent into the trash,
+// logging a failure.
+func moveRemovedToTrash(hash, source, trash string) (string, error) {
+	target, err := MoveToTrash(source, trash)
+	if err != nil {
+		logging.Error("could not move removed torrent source to trash",
+			"hash", hash, "source", source, "error", err.Error())
+		return "", err
+	}
+	logging.Debug("removed torrent source moved to trash", "hash", hash, "source", source, "trash", target)
+	return target, nil
+}
+
+// torrentNothingDownloaded reports a torrent that has not received any data.
+func torrentNothingDownloaded(view *models.TorrentView) bool {
+	switch strings.ToLower(view.State) {
+	case "seeding", "finished", "completed", "uploading", "stalledup", "pausedup", "queuedup":
+		return false
+	}
+	return view.TotalDone <= 0 && view.Progress <= 0
+}
+
+// sameFilesystem reports whether a rename from source into dir stays on one
+// filesystem (no copy). Unknown counts as different, the safe side.
+func sameFilesystem(source, dir string) bool {
+	var a, b syscall.Stat_t
+	if syscall.Stat(source, &a) != nil {
+		return false
+	}
+	if syscall.Stat(dir, &b) != nil {
+		if syscall.Stat(filepath.Dir(filepath.Clean(dir)), &b) != nil {
+			return false
+		}
+	}
+	return a.Dev == b.Dev
 }
 
 // logAutomaticTorrentRemoval records a removal that gextto performed on its own
@@ -84,38 +115,54 @@ func SafeRemoveTorrent(s *AppState, cfg *Config, hash string, requestedDeleteFil
 	}
 
 	deleteFiles := requestedDeleteFiles
-
 	engineDeleteFiles := deleteFiles
-	trashTarget := ""
-	if targetTorrent != nil {
+	trashSource, trashDir := "", ""
+	if targetTorrent != nil && deleteFiles && cfg != nil && cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" && cfg.CleanupAction != "delete" {
 		source := CompletionPath(&models.TorrentEvent{
 			Kind:     "torrent_finished",
 			Hash:     targetTorrent.Hash,
 			Name:     targetTorrent.Name,
 			SavePath: targetTorrent.SavePath,
 		})
-
-		if !deleteFiles {
-			engineDeleteFiles = false
-		} else if cfg != nil && cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" && cfg.CleanupAction != "delete" {
+		// A download that never received a byte holds only placeholder
+		// (preallocated) files: moving gigabytes of zeros into the trash is
+		// pointless, the engine deletes them.
+		if !torrentNothingDownloaded(targetTorrent) {
 			if _, statErr := os.Stat(source); statErr == nil {
-				if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {
-					logging.Error("could not move removed torrent source to trash",
-						"hash", hash, "source", source, "error", moveErr.Error())
-				} else {
-					trashTarget = target
-					logging.Debug("removed torrent source moved to trash",
-						"hash", hash, "source", source, "trash", target)
-				}
+				trashSource, trashDir = source, *cfg.TrashPath
+				engineDeleteFiles = false
 			}
-			engineDeleteFiles = false
 		}
 	}
 
 	removalName, removalState, removalHasMetadata := manualTorrentRemovalInfo(s, hash)
+	// The torrent leaves the engine first: until then it keeps its files open
+	// (and may still write them), and moving an open file off an NFS share
+	// leaves a busy .nfsXXXX behind that makes the move fail.
 	removed, err := s.activeEngine().Remove(hash, engineDeleteFiles)
 	if err == nil && removed {
-		logManualTorrentRemoval(hash, deleteFiles, trashTarget, removalName, removalState, removalHasMetadata)
+		files := "its files are kept"
+		switch {
+		case trashSource != "" && sameFilesystem(trashSource, trashDir):
+			// A rename: instant, done before answering.
+			if target, moveErr := moveRemovedToTrash(hash, trashSource, trashDir); moveErr == nil {
+				files = "its files were moved to the trash: " + target
+			} else {
+				files = "moving its files to the trash failed, so they are kept: " + moveErr.Error()
+			}
+		case trashSource != "":
+			// Another filesystem means a full copy, which can take minutes
+			// on a NAS: it runs in the background so the page answers now.
+			files = "its files are being moved to the trash: " + trashDir
+			go func(source, dir string) {
+				if target, moveErr := moveRemovedToTrash(hash, source, dir); moveErr == nil {
+					logging.Info(fmt.Sprintf("🗑️ Files of «%s» moved to the trash: %s", removalName, target))
+				}
+			}(trashSource, trashDir)
+		case deleteFiles:
+			files = "its files were deleted"
+		}
+		logManualTorrentRemoval(hash, files, removalName, removalState, removalHasMetadata)
 		if s.db != nil {
 			_ = s.db.MarkTorrentRemoved(hash)
 			_ = s.db.ForgetRemovedTorrent(hash)

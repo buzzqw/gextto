@@ -416,3 +416,31 @@ func TestForeignTorrentAlreadyAnnouncedComics(t *testing.T) {
 		t.Error("unknown foreign torrent should not count as already announced")
 	}
 }
+
+// A download stuck at 0% holds only placeholder files: "remove with data" lets
+// the engine delete them instead of copying gigabytes of zeros to the trash.
+func TestSafeRemoveTorrentNothingDownloadedSkipsTrash(t *testing.T) {
+	root := t.TempDir()
+	downloadDir := filepath.Join(root, "downloads")
+	trashDir := filepath.Join(root, "trash")
+	if err := os.MkdirAll(filepath.Join(downloadDir, "Show.S01E01-08"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	hash := "aaaa222233334444555566667777888899990000"
+	engine := &mockTorrentEngine{torrents: []models.TorrentView{{
+		Hash: hash, Name: "Show.S01E01-08", SavePath: downloadDir, State: "stalled", TotalSize: 1 << 30,
+	}}}
+	cfg := DefaultConfig()
+	cfg.TrashPath = &trashDir
+	cfg.CleanupAction = "move"
+	ok, err := SafeRemoveTorrent(&AppState{torrent_engine: engine}, &cfg, hash, true)
+	if err != nil || !ok {
+		t.Fatalf("remove = %v, %v", ok, err)
+	}
+	if !engine.removed[hash] {
+		t.Fatal("engine should delete the placeholder files itself (deleteFiles=true)")
+	}
+	if entries, _ := os.ReadDir(trashDir); len(entries) != 0 {
+		t.Fatalf("trash should stay empty, got %d entries", len(entries))
+	}
+}
