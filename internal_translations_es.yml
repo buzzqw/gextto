@@ -419,6 +419,7 @@ spa:
   Calendario: Calendario
   Calendario TMDB: Calendario TMDB
   Cambia tra tema chiaro e scuro: Cambiar entre tema claro y oscuro
+  "Cambia tema: scuro, chiaro o crema": "Cambiar tema: oscuro, claro o crema"
   Campione: Muestra
   Campo: Campo
   Canali: Canales
@@ -3171,7 +3172,8 @@ spa:
   Telegram configurato: Telegrama configurado
   Telegram non configurato: Telegram no configurado
   Telemetria e Storico: Telemetría e Historial
-  Tema chiaro: Borrar tema
+  Tema chiaro: Tema claro
+  Tema crema: Tema crema
   Tema scuro: Tema oscuro
   Tempi (Attivo / Seeding): Tiempos (Activo / Seeding)
   Tempistiche Motore: Tiempos del Motor

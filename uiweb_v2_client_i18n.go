@@ -66,6 +66,7 @@ var v2ClientKeys = []string{
 	"Inserisci un valore",
 	"Seleziona un valore",
 	"Tema chiaro",
+	"Tema crema",
 	"Tema scuro",
 	"Testo ",
 	"Tipo di carattere",

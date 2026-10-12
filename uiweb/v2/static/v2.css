@@ -1292,9 +1292,12 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
    Configurazione: section navigation, setting rows and the save bar.
    ------------------------------------------------------------------------ */
 
-/* Dark text on the light-theme accent fill was 3.1:1. */
+/* The light and cream themes use a dark --accent for the fill, where dark text
+   would be below AA: the active chip/tab uses white text instead. */
 :root[data-theme="light"] .chip.active,
-:root[data-theme="light"] .torrent-detail-tabs [role="tab"].tab-active { color: #fff; }
+:root[data-theme="cream"] .chip.active,
+:root[data-theme="light"] .torrent-detail-tabs [role="tab"].tab-active,
+:root[data-theme="cream"] .torrent-detail-tabs [role="tab"].tab-active { color: #fff; }
 
 .settings-view .settings-head { position: static; }
 .settings-view .settings-title-row { align-items: center; flex-wrap: wrap; }

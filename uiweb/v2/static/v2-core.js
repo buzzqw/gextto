@@ -30,20 +30,29 @@
   }
 
   // ---------------------------------------------------------------- theme --
-  function themeLabel() {
-    return doc.getAttribute("data-theme") === "light" ? t("Tema scuro") : t("Tema chiaro");
+  // The button cycles dark -> light -> cream; its label names the next theme.
+  var themes = ["dark", "light", "cream"];
+  function themeName(mode) {
+    if (mode === "light") return t("Tema chiaro");
+    if (mode === "cream") return t("Tema crema");
+    return t("Tema scuro");
+  }
+  function nextTheme(mode) {
+    var index = themes.indexOf(mode);
+    return themes[(index < 0 ? 0 : index + 1) % themes.length];
   }
   function setTheme(mode) {
+    if (themes.indexOf(mode) < 0) mode = "dark";
     doc.setAttribute("data-theme", mode);
     storageSet("gextto_theme", mode);
     // The toggle exists twice: in the top bar and, on phones, in "Altro".
     var buttons = document.querySelectorAll("[data-theme-toggle]");
-    for (var i = 0; i < buttons.length; i++) buttons[i].textContent = themeLabel();
+    for (var i = 0; i < buttons.length; i++) buttons[i].textContent = themeName(nextTheme(mode));
   }
   function toggleTheme() {
-    setTheme(doc.getAttribute("data-theme") === "light" ? "dark" : "light");
+    setTheme(nextTheme(doc.getAttribute("data-theme")));
   }
-  setTheme(storageGet("gextto_theme") === "light" ? "light" : "dark");
+  setTheme(storageGet("gextto_theme") || "dark");
 
   // ----------------------------------------------------------- font scale --
   function readScale() {

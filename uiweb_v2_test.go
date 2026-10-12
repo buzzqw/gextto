@@ -1586,6 +1586,24 @@ func TestV2AutoManagedLabel(t *testing.T) {
 	}
 }
 
+// TestV2CreamTheme pins the third theme so the toggle cannot silently drop it:
+// the palette, the active-chip contrast override and the client cycle.
+func TestV2CreamTheme(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	if code, css := v2Request(t, server, http.MethodGet, "/static/gextto-ui.css", nil); code != http.StatusOK || !strings.Contains(css, `[data-theme="cream"]`) {
+		t.Fatalf("cream palette missing from gextto-ui.css -> %d", code)
+	}
+	if code, css := v2Request(t, server, http.MethodGet, "/static/v2.css", nil); code != http.StatusOK || !strings.Contains(css, `[data-theme="cream"] .chip.active`) {
+		t.Fatalf("cream active-chip contrast override missing -> %d", code)
+	}
+	if code, js := v2Request(t, server, http.MethodGet, "/static/v2-core.js", nil); code != http.StatusOK || !strings.Contains(js, `["dark", "light", "cream"]`) {
+		t.Fatalf("theme cycle missing cream -> %d", code)
+	}
+}
+
 // TestV2ClientI18nCacheInvalidates checks the memoized client dictionary is
 // rebuilt after a translation changes.
 func TestV2ClientI18nCacheInvalidates(t *testing.T) {

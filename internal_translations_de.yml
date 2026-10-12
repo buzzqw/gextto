@@ -428,6 +428,7 @@ deu:
   Calendario: Kalender
   Calendario TMDB: TMDB-Kalender
   Cambia tra tema chiaro e scuro: Wechseln Sie zwischen hellem und dunklem Thema
+  "Cambia tema: scuro, chiaro o crema": "Thema wechseln: dunkel, hell oder creme"
   Campione: Stichprobe
   Campo: Feld
   Canali: Kanäle
@@ -3220,7 +3221,8 @@ deu:
   Telegram configurato: Telegramm konfiguriert
   Telegram non configurato: Telegramm nicht konfiguriert
   Telemetria e Storico: Telemetrie und Verlauf
-  Tema chiaro: Klares Thema
+  Tema chiaro: Helles Thema
+  Tema crema: Cremefarbenes Thema
   Tema scuro: Dunkles Thema
   Tempi (Attivo / Seeding): Zeiten (Aktiv / Seeding)
   Tempistiche Motore: Engine-Timings

@@ -1,7 +1,7 @@
 /* Gextto UI — stylesheet for the server-rendered interface.
    Desktop baseline with a usable compact layout on small screens. It is a
-   functional clone of the classic UI, not a copy of its look. Dark by default,
-   light via <html data-theme="light">. */
+   functional clone of the classic UI, not a copy of its look. Dark by default;
+   light and cream via <html data-theme="light|cream">. */
 
 :root {
   --bg: #0b1120;
@@ -54,6 +54,35 @@
   --btn-line: #bac8dc;
   --shadow: 0 12px 30px rgba(31, 45, 71, 0.10);
   --topbar: rgba(237, 241, 247, 0.92);
+  color-scheme: light;
+}
+
+[data-theme="cream"] {
+  /* Warm, low-glare light theme: a soft cream/sepia palette for long reading
+     without the brightness of the blue-white light theme. Contrast is AA on
+     every pair: text 10.8:1 on --bg, links/status ≥ 5.5:1 on the surfaces;
+     active chips use white text on the dark green --accent (6.5:1) and
+     primary buttons dark text on --accent-action (6.8:1). */
+  --bg: #f4ecda;
+  --glow: #ecdfc4;
+  --surface: #fbf6ea;
+  --surface-2: #f6efdd;
+  --surface-3: #efe5cf;
+  --line: #ddceb2;
+  --line-soft: #e9dfc8;
+  --text: #3a3222;
+  --muted: #6a5c44;
+  --accent: #1f6b47;
+  --accent-2: #155a86;
+  --ok: #1f6b47;
+  --warn: #8a5a00;
+  --err: #ab2f5a;
+  --accent-action: #3fae82;
+  --btn: #efe4cd;
+  --btn-text: #3a3222;
+  --btn-line: #d8c7a6;
+  --shadow: 0 12px 30px rgba(90, 72, 45, 0.12);
+  --topbar: rgba(251, 246, 234, 0.92);
   color-scheme: light;
 }
 
