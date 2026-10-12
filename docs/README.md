@@ -15,6 +15,7 @@ specifiche.
 | [Sicurezza](SECURITY.md) | Esposizione di rete, segreti e segnalazione vulnerabilità. |
 | [TUI](tui.md) | Client terminale e scorciatoie da tastiera. |
 | [Sviluppatori](DEVELOPERS.md) | Build, test e convenzioni per contributor. |
+| [Tempi di build e test](tempistiche.md) | Quanto costano build e suite di test su un ambiente reale, e quanto dura la CI. |
 | [Architettura](ARCHITECTURE.md) | Mappa delle cartelle e dei file del codice. |
 | [Scelte di progetto, migliorie ed evoluzione](evoluzione.md) | Backlog, migliorie implementate, piani gx-torrent, misure, revisioni e direzione strategica. |
 | [Motore gx-torrent](gx-torrent.md) | Documento tecnico del motore torrent in Go (gx-core, demone, adapter). |
