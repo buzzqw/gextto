@@ -23,3 +23,8 @@ func (f PaddingFile) WriteAt(p []byte, off int64) (n int, err error) {
 func (f PaddingFile) Close() error {
 	return nil
 }
+
+// Sync is a no-op: a padding file is never written.
+func (f PaddingFile) Sync() error {
+	return nil
+}

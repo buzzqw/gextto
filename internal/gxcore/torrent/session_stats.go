@@ -180,28 +180,75 @@ func (s *Session) updateStatsLoop() {
 	}
 }
 
+// statsSnapshot is the durable state of one torrent collected by updateStats
+// before the Bolt transaction is opened.
+type statsSnapshot struct {
+	id              []byte
+	bitfield        []byte
+	bytesDownloaded int64
+	bytesUploaded   int64
+	bytesWasted     int64
+	seededFor       time.Duration
+}
+
+// updateStats persists the counters and the bitfield of every torrent. It runs
+// in two phases: it samples the bitfield and fsyncs the data on each torrent's
+// run loop (so the sample cannot race with the piece writers or closeData, and
+// no Bolt transaction is open during the fsyncs), then writes every snapshot in
+// a single durable transaction. The order preserves the durability invariant:
+// a persisted bit refers to piece data already synced.
 func (s *Session) updateStats() {
 	s.mTorrents.RLock()
-	defer s.mTorrents.RUnlock()
+	torrents := make([]*Torrent, 0, len(s.torrents))
+	for _, t := range s.torrents {
+		torrents = append(torrents, t)
+	}
+	s.mTorrents.RUnlock()
+
+	snaps := make([]statsSnapshot, 0, len(torrents))
+	for _, t := range torrents {
+		snap := query(t.torrent, func() statsSnapshot {
+			t.torrent.mBitfield.RLock()
+			var bits []byte
+			if t.torrent.bitfield != nil {
+				bits = append([]byte(nil), t.torrent.bitfield.Bytes()...)
+			}
+			t.torrent.mBitfield.RUnlock()
+			t.torrent.syncPieces()
+			return statsSnapshot{
+				id:              []byte(t.torrent.id),
+				bitfield:        bits,
+				bytesDownloaded: t.torrent.bytesDownloaded.Count(),
+				bytesUploaded:   t.torrent.bytesUploaded.Count(),
+				bytesWasted:     t.torrent.bytesWasted.Count(),
+				seededFor:       time.Duration(t.torrent.seededFor.Count()),
+			}
+		})
+		if snap.id == nil {
+			// The torrent was closed before its snapshot could run.
+			continue
+		}
+		snaps = append(snaps, snap)
+	}
+
 	err := s.db.Update(func(tx *bbolt.Tx) error {
 		mb := tx.Bucket(torrentsBucket)
-		for _, t := range s.torrents {
-			b := mb.Bucket([]byte(t.torrent.id))
-			_ = b.Put(boltdbresumer.Keys.BytesDownloaded, []byte(strconv.FormatInt(t.torrent.bytesDownloaded.Count(), 10)))
-			_ = b.Put(boltdbresumer.Keys.BytesUploaded, []byte(strconv.FormatInt(t.torrent.bytesUploaded.Count(), 10)))
-			_ = b.Put(boltdbresumer.Keys.BytesWasted, []byte(strconv.FormatInt(t.torrent.bytesWasted.Count(), 10)))
-			_ = b.Put(boltdbresumer.Keys.SeededFor, []byte(time.Duration(t.torrent.seededFor.Count()).String()))
-
-			t.torrent.mBitfield.RLock()
-			if t.torrent.bitfield != nil {
-				_ = b.Put(boltdbresumer.Keys.Bitfield, t.torrent.bitfield.Bytes())
+		for _, snap := range snaps {
+			b := mb.Bucket(snap.id)
+			if b == nil {
+				// The torrent was removed meanwhile: nothing to persist.
+				continue
+			}
+			_ = b.Put(boltdbresumer.Keys.BytesDownloaded, []byte(strconv.FormatInt(snap.bytesDownloaded, 10)))
+			_ = b.Put(boltdbresumer.Keys.BytesUploaded, []byte(strconv.FormatInt(snap.bytesUploaded, 10)))
+			_ = b.Put(boltdbresumer.Keys.BytesWasted, []byte(strconv.FormatInt(snap.bytesWasted, 10)))
+			_ = b.Put(boltdbresumer.Keys.SeededFor, []byte(snap.seededFor.String()))
+			if snap.bitfield != nil {
+				_ = b.Put(boltdbresumer.Keys.Bitfield, snap.bitfield)
 			}
 		}
 		return nil
 	})
-	for _, t := range s.torrents {
-		t.torrent.mBitfield.RUnlock()
-	}
 	if err != nil {
 		s.log.Errorln("cannot update stats:", err.Error())
 	}

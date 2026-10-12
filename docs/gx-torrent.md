@@ -1006,6 +1006,14 @@ il motore salva ogni torrent in `DataDir/<id>` e alla rimozione esegue sempre
 - le destinazioni devono essere percorsi assoluti; il flag `-allowed-roots`
   (solo uso standalone, Gextto non lo imposta) può limitarle.
 
+**Durabilità.** I file di dati non sono aperti con `O_SYNC`: il motore scrive i
+pezzi in modo bufferizzato e fa il flush a batch con `storage.File.Sync()` prima
+di persistere il bitfield (ordine snapshot → fsync → scrittura; `updateStats` in
+due fasi). Un bit che sopravvive a un crash si riferisce quindi sempre a dati già
+su disco, e al massimo si riscaricano i pezzi degli ultimi minuti. Su HDD e NFS
+questo toglie un fsync per ogni scrittura di pezzo (misure in `evoluzione.md`
+§5.4/§5.12).
+
 **Spostamento**:
 
 1. il torrent viene fermato;
@@ -1138,7 +1146,8 @@ Lo stato del demone (`DATA_DIR/gx-torrent`: `session.db`, `state.json`, log)
 resta sul disco locale: `session.db` è un database bbolt (mmap e lock), non
 adatto a NFS. Le scritture sono contenute: il motore salva statistiche e bitfield
 ogni 2 minuti (il demone alza a 2 minuti i 30 s predefiniti di
-`ResumeWriteInterval`), circa 100 MB al giorno a riposo; il log ruota a
+`ResumeWriteInterval`), con un fsync dei dati prima di ogni scrittura del
+bitfield: circa 100 MB al giorno a riposo; il log ruota a
 5 MB × 4.
 
 ## Limiti di banda

@@ -55,9 +55,11 @@ func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool
 		}
 	}()
 
-	// Open OS file.
+	// Open OS file. Data is NOT written with O_SYNC: the engine batches the
+	// durability with storage.File.Sync() when it persists the resume bitfield
+	// (see torrent.syncPieces), so a set bit always refers to synced data.
 	var mode = s.perm &^ 0111
-	openFlags := os.O_RDWR | os.O_SYNC
+	openFlags := os.O_RDWR
 	openFlags = applyNoAtimeFlag(openFlags)
 	of, err = os.OpenFile(name, openFlags, mode)
 	if os.IsNotExist(err) {

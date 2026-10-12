@@ -16,6 +16,10 @@ type File interface {
 	io.ReaderAt
 	io.WriterAt
 	io.Closer
+	// Sync flushes the file's data to stable storage. The engine calls it
+	// before persisting the resume bitfield so a bit that survives a crash
+	// always refers to data already on disk.
+	Sync() error
 }
 
 // Provider is a torrent storage provider.

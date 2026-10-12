@@ -1070,7 +1070,7 @@ Fonti: [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md),
 | --- | --- | --- | --- |
 | Choking / seeding | choking rate-based, anti-leech, peer classes | speed-based + optimistic, harness deterministico (`unchoker/sim_test.go`) | algoritmi di qualità assenti; misure **solo locali** (§6.6) |
 | Pipelining | multi-pezzo per peer, ring buffer | coda adattiva (50→250), un pezzo per peer | 10 Gbps dato per «da misurare» (`bep.md` §6); **nessun harness** |
-| I/O disco | mmap, storage pluggable, O_DIRECT/AIO, scritture contigue + hash su pool | `filestorage` con `O_SYNC` **su ogni scrittura**, file sparsi, `fallocate` | durabilità per-write; niente mmap/AIO/contiguo (§5.4) |
+| I/O disco | mmap, storage pluggable, O_DIRECT/AIO, scritture contigue + hash su pool | **`O_SYNC` rimosso (2026-10-12)**: `storage.File.Sync()` + invariante snapshot→fsync→bitfield e `updateStats` in due fasi; restano niente mmap/AIO/contiguo | ridotto (§5.4) |
 | Priorità file | 0–7 graduate | **fatte (0 = salta, 1..4 = normale, 5..7 = alta)**; `capabilityLevels.file_priorities = full`; misura con file misti da fare (§4.11) | chiuso (misura residua) |
 | DHT | multi-path, anti-Sybil attivo | BEP 5/32/33/42/43/44/46, dedup; cap e multi-path spenti | hardening **non attivo** (§4.10) |
 | v2 / merge | seed v2 completo, riuso per blocco | v2-only download; seed v2 solo file interi (`hash reject`); merge fase 1 | seed v2 incompleto, merge fase 2 (§15.2) |
@@ -1082,10 +1082,9 @@ I **tre divari a più alto valore** in esercizio reale, in ordine di priorità:
    motore (`piece.Piece.Priority`), `Config.FilePriorities`, stadio `pickHigh` nel
    picker, demone e Gextto a 0/1/4/6/7, `capabilityLevels` a `full` (§4.11). Resta
    solo la **misura** con file a priorità mista.
-2. **I/O disco** — `os.O_RDWR|os.O_SYNC` su **ogni** scrittura di pezzo
-   (`filestorage.go`), nessun `Sync()` su `storage.File`, niente mmap/AIO né
-   scritture contigue. Il progetto era in §5.4 (allora «non da fare»): è il costo
-   maggiore su NAS/NFS (previsione 1,2–1,8×, §5.12).
+2. **I/O disco** — **fatto (2026-10-12)**: `O_SYNC` rimosso, `storage.File.Sync()`
+   e invariante snapshot→fsync→bitfield, `updateStats` in due fasi (§5.4). Restano
+   fuori scope mmap/AIO/scritture contigue, che richiedono misure dedicate.
 3. **Dimostrazione su sciame reale** di choking e pipelining — coda adattiva e
    choking sono validati **solo in locale**; la campagna §6.5 è ancora da fare.
    Finché manca, «sufficiente e più leggero» è onesto, «alla pari» no.
@@ -1118,7 +1117,7 @@ pena fare**, con come/rischi/verifica; una voce = un task/commit.
 | 5 | `servedRequests` a finestra limitata | **fatto** | `a8b3e77` |
 | 6 | Piece cache: TTL lazy (sharding condizionale, non fatto) | **fatto** | `60b090e` |
 | 7 | `Bitfield.Count` con `math/bits` | **fatto** | `8caf6ad` |
-| 3 | Rimozione `O_SYNC` + invariante di durabilità | **non da fare** | — |
+| 3 | Rimozione `O_SYNC` + invariante di durabilità | **fatto (2026-10-12)** | — |
 | 8 | Opzionali (`findLocked` O(1), ETag/304) | **non da fare** | — |
 
 Ordine per **valore atteso = (impatto × certezza) / (sforzo × rischio)**.
@@ -1161,19 +1160,33 @@ controllarne 1–2. Aggiunto `Torrent.PiecesDone(begin, end)` mirato
 come prima). `PieceStates` resta per la mappa pezzi di API/UI. Follow-up non
 fatto: notifica a evento invece del polling (non necessaria finché non alloca).
 
-### 5.4 Voce 3 — Rimozione `O_SYNC` + invariante di durabilità (non da fare)
+### 5.4 Voce 3 — Rimozione `O_SYNC` + invariante di durabilità (fatta 2026-10-12)
 
-`filestorage.go` apre ogni file con `O_RDWR|O_SYNC`: ogni `write(2)`
-va su storage stabile — su HDD/rete il throughput è limitato dalle IOPS. **Ma
-non è un quick win**: il motore affida a `O_SYNC` tutta la durabilità, e `storage.File`
-non ha `Sync()`; il bitfield è persistito solo a completamento/stop/verifica e
-ogni `ResumeWriteInterval` (2 min), non "a ogni pezzo". Il progetto (conservato
-come riferimento) richiedeva: estendere l'interfaccia con `Sync()`, togliere
-`O_SYNC`, helper `syncPieces` testabile, ordine critico in `writeBitfield`
-(**prima snapshot bitfield, poi sync, poi scrittura** — mai il contrario) e
-ristrutturazione in due fasi di `session_stats.updateStats` (niente transazione
-Bolt aperta durante gli fsync). Invariante: *un bit persistito si riferisce a
-dati già fsyncati* (su crash si riscaricano ≤2 min, mai corruzione). Misure
+`filestorage.go` apriva ogni file con `O_RDWR|O_SYNC`: ogni `write(2)` andava su
+storage stabile — su HDD/rete il throughput è limitato dalle IOPS.
+
+**Fatto.** `O_SYNC` è rimosso (`filestorage.go`); `storage.File` ha ora `Sync()`
+(no-op per `PaddingFile`, il `*os.File` di filestorage lo implementa già). La
+durabilità è **a batch**, con l'invariante *un bit persistito si riferisce a dati
+già fsyncati*:
+
+- `torrent.syncPieces()` fa il flush di ogni file aperto, sul **run loop** del
+  torrent (`t.files` è di sua proprietà);
+- `writeBitfield()` ordina **snapshot del bitfield → `syncPieces` → scrittura**,
+  quindi un bit non anticipa mai dati non ancora su disco (su crash si
+  riscaricano ≤ `ResumeWriteInterval`, mai corruzione);
+- `session_stats.updateStats` è in **due fasi**: campiona bitfield e fsync su ogni
+  run loop (nessuna transazione Bolt aperta durante i fsync), poi scrive tutto in
+  una sola transazione durevole. Il bucket di un torrent rimosso nel frattempo
+  viene saltato.
+
+Test: `filestorage/sync_test.go` (write + `Sync` + riapertura),
+`storage/padding_test.go`, `torrent/torrent_sync_test.go` (`syncPieces` su ogni
+file). Il percorso end-to-end (completamento, stop, resume dopo riavvio) è
+coperto dai test del demone. Progetto storico: estendere l'interfaccia con
+`Sync()`, togliere `O_SYNC`, helper `syncPieces` testabile, ordine critico in
+`writeBitfield` e ristrutturazione in due fasi di `session_stats.updateStats`
+(niente transazione Bolt aperta durante gli fsync) — tutto applicato. Misura
 vedi §5.10: su questo host il guadagno stimato era ~1,2x–1,8x su NFS (non il
 "+300–800%" della v1).
 

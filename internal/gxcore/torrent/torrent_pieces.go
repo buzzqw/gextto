@@ -6,8 +6,36 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/outgoinghandshaker"
 )
 
+// syncPieces flushes every open data file of the torrent to stable storage. It
+// must run on the torrent's run loop: t.files is owned by it. It is called
+// before the resume bitfield is persisted so a bit that survives a crash always
+// refers to piece data already on disk (the engine no longer relies on O_SYNC).
+func (t *torrent) syncPieces() {
+	for _, f := range t.files {
+		if f.Storage == nil {
+			continue
+		}
+		if err := f.Storage.Sync(); err != nil {
+			t.log.Errorf("cannot sync %q: %s", f.Name, err)
+		}
+	}
+}
+
+// writeBitfield persists the verified bitfield to the resume database.
+// Invariant: snapshot the bitfield, then flush the data, then write the
+// bitfield, so a persisted bit never anticipates data that is not yet durable.
 func (t *torrent) writeBitfield() error {
-	err := t.session.resumer.WriteBitfield(t.id, t.bitfield.Bytes())
+	var snapshot []byte
+	t.mBitfield.RLock()
+	if t.bitfield != nil {
+		snapshot = append([]byte(nil), t.bitfield.Bytes()...)
+	}
+	t.mBitfield.RUnlock()
+	t.syncPieces()
+	if snapshot == nil {
+		return nil
+	}
+	err := t.session.resumer.WriteBitfield(t.id, snapshot)
 	if err != nil {
 		t.log.Errorf("cannot write bitfield to resume db: %s", err)
 	}
