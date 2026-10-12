@@ -29,7 +29,8 @@ veloce e un motore BitTorrent proprio, scritto da zero in Go puro.
   questo progetto: BitTorrent v2, uTP, holepunching NAT, DHT IPv6, streaming —
   in un processo che a riposo occupa **~25 MB** dove qBittorrent arriva ai
   gigabyte.
-- **Funziona anche senza Gextto.** Lo stesso motore esiste come **gx-torrent**,
+- **Funziona anche senza Gextto.** Lo stesso motore esiste come
+  **[gx-torrent](https://github.com/buzzqw/gextto/releases)**,
   un client autonomo per Linux e Windows con UI web completa, API compatibile
   con qBittorrent per Sonarr/Radarr e un gestore RSS all'altezza dei migliori.
 - **È software onesto.** Go puro, nessuna dipendenza C, un binario per

@@ -28,7 +28,8 @@ engine written from scratch in pure Go.
 - **It has its own engine.** `gx-core` is a BitTorrent implementation built for
   this project: BitTorrent v2, uTP, NAT holepunching, IPv6 DHT, streaming —
   in a process that idles at **~25 MB** where qBittorrent can reach gigabytes.
-- **It also works without Gextto.** The same engine ships as **gx-torrent**, a
+- **It also works without Gextto.** The same engine ships as
+  **[gx-torrent](https://github.com/buzzqw/gextto/releases)**, a
   standalone client for Linux and Windows with a full web UI, a qBittorrent-
   compatible API for Sonarr/Radarr, and an RSS manager on par with the best.
 - **It is honest software.** Pure Go, no C dependencies, one binary per
