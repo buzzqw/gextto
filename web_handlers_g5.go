@@ -789,6 +789,20 @@ func ProvidersStatusView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if extra := gh5_gxTorrentServiceStatus(r.FormValue("public_base"), s, r, cfg); extra != nil {
 		live = append(live, *extra)
 	}
+	// Every configured indexer must be visible even when it has no problem: the
+	// person expects the full provider list, not only the failing ones. A name
+	// that already has a saved failure row or a live row is left to those, so a
+	// healthy row never hides a real error.
+	if cfg != nil {
+		known := make(map[string]struct{}, len(items)+len(live))
+		for _, entry := range items {
+			known[strings.ToLower(strings.TrimSpace(entry.Provider))] = struct{}{}
+		}
+		for _, entry := range live {
+			known[strings.ToLower(strings.TrimSpace(entry.Provider))] = struct{}{}
+		}
+		live = append(live, gh5_healthyIndexerStatuses(cfg, known)...)
+	}
 	// A live probe supersedes a saved backoff row for the same provider: a
 	// service that has both a stale failure row and a live row showed up twice
 	// (for example Prowlarr as both "indexer" and "servizio"). The live state is
@@ -809,6 +823,33 @@ func ProvidersStatusView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		items = append(kept, live...)
 	}
 	jsonResponse(w, map[string]any{"ok": true, "items": items})
+}
+
+// gh5_healthyIndexerStatuses returns a row for every enabled configured indexer
+// that has no saved failure and no live row yet, so the provider list is always
+// complete. The caller passes the set of names already known; this function adds
+// the new ones to it.
+func gh5_healthyIndexerStatuses(cfg *Config, known map[string]struct{}) []models.ProviderStatus {
+	var out []models.ProviderStatus
+	for _, indexer := range cfg.Indexers {
+		name := strings.TrimSpace(indexer.Name)
+		key := strings.ToLower(name)
+		if !indexer.Enabled || key == "" {
+			continue
+		}
+		if _, ok := known[key]; ok {
+			continue
+		}
+		known[key] = struct{}{}
+		out = append(out, models.ProviderStatus{
+			Provider:        name,
+			Kind:            "indexer",
+			URL:             gh5_providerURL(cfg, name),
+			UserMessage:     "Nessun problema rilevato.",
+			SuggestedAction: "Nessuna azione necessaria.",
+		})
+	}
+	return out
 }
 
 // gh5_gxTorrentServiceStatus reports whether the active gx-torrent engine is up
