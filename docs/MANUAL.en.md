@@ -65,7 +65,7 @@ including dialogs, keyboard sorting, polling and 320 px reflow. This result is
 not a WCAG or legal-compliance declaration: an attestation also requires manual
 screen-reader, keyboard, magnification and assistive-technology testing, plus
 an assessment of the applicable requirements. See
-[`evoluzione.md`](evoluzione.md#13-accessibilità) for the detailed scope
+[`evoluzione.md`](evoluzione.md#13-accessibility) for the detailed scope
 and known limitations.
 
 This manual distinguishes between:
@@ -266,11 +266,17 @@ release package the installer uses (README, *Install on Linux*).
 
 ## 2. Dashboard
 
-- **Interface controls** — the top bar offers theme, text size and a **Font**
-  dropdown. It applies a generic preset, a detected local font or a manually
-  entered family to the interface and logs. The choice is local to the browser;
-  installed-font detection depends on browser support for the Local Font Access
-  API and may require permission.
+- **Interface controls** — the top bar offers theme, text size, **Font** and
+  **Colors**. The theme button goes from *dark* to *light* to *cream* (a warm,
+  less bright light theme for long reading) and, once you have chosen colours,
+  to *custom*. **Colors** opens a dialog with four pickers (background, panels,
+  text, accent): the other shades are computed from them and the text on accent
+  buttons turns light or dark depending on the accent, so it stays readable;
+  *Defaults* goes back to the dark theme. **Font** applies a generic preset, a
+  detected local font or a manually entered family to the interface and logs.
+  Theme, colours and font stay local to the browser; on a phone theme and
+  colours are in the *Other* menu. Installed-font detection depends on browser
+  support for the Local Font Access API and may require permission.
 - **Manual global search** — searches archive + indexers + web engines.
 - **Automatic search** — run a full cycle or a single domain (Series, Movies,
   Comics); shows next run, interval and last-cycle outcome; backup now.
@@ -703,8 +709,8 @@ same data.
   adaptive**: the daemon recomputes it every few minutes from available memory,
   active downloads/seeds and the storage class (larger on HDD/NFS, small on
   SSD) and applies it in place, like the speed limits, without dropping peers;
-  the **IP filter** refreshes
-  at boot and then once a week. If the daemon cannot stay up (6 abnormal starts
+  an **IP filter** downloaded from a URL refreshes once a day; at boot it is
+  downloaded again only when the cached copy is older than 24 hours. If the daemon cannot stay up (6 abnormal starts
   in 10 minutes) Gextto falls back to libtorrent by itself, when it is
   compiled in. It supports
   **sequential download** and **first/last piece** priority (set when adding a
@@ -816,7 +822,9 @@ problematic source.
 
 The delay is set in *Configuration → General → Delay before downloading*. The
 backoff state (level, deadline and last error) is in *Health → Provider
-status*. Use **Reset** per source after fixing the cause; do not use it to hide a wrong API
+status*, which **always lists every configured and enabled indexer** (healthy
+ones as "No problem detected"), with a *Technical detail* column holding the raw
+error. Use **Reset** per source after fixing the cause; do not use it to hide a wrong API
 key, or backoff will start again.
 
 ### Configuring a NAS safely
@@ -917,7 +925,10 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   in the **Trash** panel are forced manual actions: they remove the content
   immediately. `trash_retention_days` (0 = delete everything) only applies to
   non-forced cleanups requested through the API
-  (`/api/maintenance/clean-trash` with `force=false`).
+  (`/api/maintenance/clean-trash` with `force=false`). After a cleanup a notice
+  says how many items were removed, how much space was freed and their names
+  (up to 8); when something could not be removed the notice says so instead of
+  claiming success.
 - **Video duplicates** — *Preview duplicates* and *Clean duplicates* find video
   files clearly inferior (strictly lower resolution) left next to the best
   version in the same folder, e.g. an old 480p next to the new 1080p, and move
@@ -1854,8 +1865,10 @@ access control on (see *Access*) add `?apikey=<key>` to the address.
 | Test | Tests the indexer (for Jackett it uses `t=caps`). |
 
 A **direct** Torznab indexer (not Jackett/Prowlarr), for example the
-`mircrew-indexer` service on the same machine or the LAN, is added here with a
-URL ending in `/api`. Automatic searches wait up to 45 seconds for each indexer,
+`mircrew-indexer` service on the same machine or the LAN, is added here with
+its base address (e.g. `http://192.168.1.10:9118`) or one ending in `/api`:
+Gextto uses `<base>/api`, the same rule as gx-torrent, so the address to type is
+identical in both. Automatic searches wait up to 45 seconds for each indexer,
 so an answer that needs a forum search still arrives in the same cycle. When an
 indexer on a local or private-network address drops the connection or does not
 answer, Gextto does **not** retry through FlareSolverr (Cloudflare does not

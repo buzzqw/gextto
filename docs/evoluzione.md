@@ -1088,8 +1088,8 @@ priority (**done**).
 
 ### 4.13 Review of the BEP work (2026-10-12)
 
-Review of the BEP commits of the previous days; detail and outcome per item in
-[`docs/bep.md`, *Review of 2026-10-12*](bep.md#revisione-del-2026-10-12).
+Review of the BEP commits of the previous days; the current state of every BEP
+is in the tables of [`docs/bep.md`](bep.md) (a single status list, not a log).
 Fixed: BEP 42 `ip` field at the top level (detection of reflected port
 and NAT, never active before: from 0 to 89 observations after the restart), invalid
 port in `announce_peer`, BEP 44 `put` only to the 8 nearest nodes, addition of

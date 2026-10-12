@@ -67,7 +67,7 @@ px. Il risultato non è una dichiarazione di conformità WCAG o normativa: per
 un'attestazione servono anche audit manuale con screen reader, tastiera,
 ingrandimento e tecnologie assistive, oltre alla valutazione dei requisiti
 applicabili. Per il dettaglio vedere
-[`evoluzione.md`](evoluzione.md#13-accessibilità).
+[`evoluzione.md`](evoluzione.md#13-accessibility).
 
 Il manuale distingue sempre tra:
 
@@ -264,10 +264,17 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
 ## 2. Dashboard
 
 - **Controlli dell'interfaccia** — la barra superiore offre tema, dimensione del
-  testo e menu a discesa **Font**. Applica un preset generico, un font locale
-  rilevato o una famiglia inserita manualmente all'interfaccia e ai log. La scelta
-  resta locale al browser; il rilevamento dei font installati dipende dal supporto
-  del browser alla Local Font Access API e può richiedere un'autorizzazione.
+  testo, **Font** e **Colori**. Il pulsante del tema passa da *scuro* a *chiaro*
+  a *crema* (un chiaro caldo e meno luminoso, per letture lunghe) e, se hai
+  scelto dei colori, a *personale*. **Colori** apre un dialogo con quattro
+  selettori (sfondo, pannelli, testo, accento): gli altri toni si calcolano da
+  questi e il testo sui pulsanti d'accento diventa chiaro o scuro in base
+  all'accento, così resta leggibile; *Predefiniti* torna al tema scuro. **Font**
+  applica un preset generico, un font locale rilevato o una famiglia inserita
+  manualmente all'interfaccia e ai log. Tema, colori e font restano locali al
+  browser; su telefono tema e colori sono nel menu *Altro*. Il rilevamento dei
+  font installati dipende dal supporto del browser alla Local Font Access API e
+  può richiedere un'autorizzazione.
 - **Ricerca manuale globale** — cerca in archivio + indexer + motori web.
 - **Ricerca automatica** — avvia un ciclo completo o di un solo dominio (Serie,
   Film, Fumetti); mostra prossima esecuzione, intervallo ed esito dell'ultimo
@@ -720,7 +727,8 @@ dati.
   ogni pochi minuti da memoria disponibile, download/seed attivi e tipo di
   storage (più grande su HDD/NFS, piccola su SSD) e la applica a caldo, come i
   limiti di velocità, senza perdere i peer; il **filtro
-  IP** si aggiorna all'avvio e poi una volta a settimana. Se il demone non
+  IP** scaricato da un URL si aggiorna una volta al giorno; all'avvio si
+  riscarica solo se la copia in cache ha più di 24 ore. Se il demone non
   riesce a restare attivo (6 avvii anomali in 10 minuti) Gextto torna da solo a
   libtorrent, se è compilato. Supporta il **download sequenziale** e la **prima/ultima parte**
   dei file (si impostano all'aggiunta, o per tutti i nuovi torrent in
@@ -836,7 +844,9 @@ ripetuti e impedisce temporaneamente nuove richieste alla sorgente problematica.
 
 Il ritardo si imposta in *Configurazione → Generale → Ritardo prima di
 scaricare*. Lo stato dei backoff (livello, scadenza e ultimo errore) è in
-*Salute → Stato provider*. Usa **Azzera** per singola sorgente dopo aver corretto la causa; non usarlo per
+*Salute → Stato provider*, che elenca **sempre tutti gli indexer configurati e
+attivi** (quelli senza problemi come «Nessun problema rilevato»), con la colonna
+*Dettaglio tecnico* che riporta l'errore grezzo. Usa **Azzera** per singola sorgente dopo aver corretto la causa; non usarlo per
 mascherare un'API key sbagliata, altrimenti il backoff ricomincerà.
 
 ### Configurare il NAS senza sorprese
@@ -943,7 +953,9 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   cestino** nel pannello **Trash** sono azioni manuali forzate: rimuovono subito
   il contenuto. `trash_retention_days` (0 = elimina tutto) si applica solo alle
   pulizie non forzate richieste via API (`/api/maintenance/clean-trash` con
-  `force=false`).
+  `force=false`). Dopo la pulizia un avviso dice quanti elementi sono stati
+  rimossi, quanto spazio si è liberato e i nomi (fino a 8); se qualcosa non si è
+  potuto rimuovere l'avviso lo dice invece di dichiarare un successo.
 - **Duplicati video** — *Anteprima duplicati* e *Pulisci duplicati* trovano i
   file video chiaramente inferiori (risoluzione strettamente più bassa) rimasti
   accanto alla versione migliore nella stessa cartella — es. il vecchio 480p
@@ -1899,8 +1911,10 @@ l'accesso protetto (vedi *Accesso*) aggiungi `?apikey=<chiave>` all'indirizzo.
 | Verifica | Testa l'indexer (per Jackett usa `t=caps`). |
 
 Un indexer Torznab **diretto** (non Jackett/Prowlarr), per esempio il servizio
-`mircrew-indexer` sulla stessa macchina o in LAN, si aggiunge qui con l'URL che
-finisce in `/api`. Le ricerche automatiche aspettano ogni indexer fino a 45
+`mircrew-indexer` sulla stessa macchina o in LAN, si aggiunge qui con l'indirizzo
+base (es. `http://192.168.1.10:9118`) o con quello che finisce in `/api`: Gextto
+usa `<base>/api`, la stessa regola di gx-torrent, quindi l'indirizzo da scrivere
+è identico nei due. Le ricerche automatiche aspettano ogni indexer fino a 45
 secondi, così anche una risposta che richiede una ricerca sul forum arriva nello
 stesso ciclo. Se un indexer su un indirizzo locale o di rete privata chiude la
 connessione o non risponde, Gextto **non** ritenta via FlareSolverr (Cloudflare

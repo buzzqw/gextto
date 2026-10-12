@@ -300,3 +300,59 @@ func TestLicenseEndpoint(t *testing.T) {
 		t.Fatalf("license body does not contain the EUPL text: %.120s", body)
 	}
 }
+
+// TestThirdPartyNoticesMatchGoMod keeps the notices shown on the Licence page
+// (and shipped in every package) in step with the dependencies: every module
+// section of THIRD-PARTY-NOTICES names the version go.mod requires, and the
+// page/API carry that file.
+func TestThirdPartyNoticesMatchGoMod(t *testing.T) {
+	gomod, err := os.ReadFile("go.mod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	required := map[string]string{}
+	for _, line := range strings.Split(string(gomod), "\n") {
+		fields := strings.Fields(strings.TrimPrefix(strings.TrimSpace(line), "require "))
+		if len(fields) >= 2 && strings.Contains(fields[0], ".") && strings.HasPrefix(fields[1], "v") {
+			required[fields[0]] = fields[1]
+		}
+	}
+	notices := uiThirdPartyText
+	if !strings.Contains(notices, "Boost Software License") || !strings.Contains(notices, "internal/gxcore") {
+		t.Fatal("THIRD-PARTY-NOTICES lost the Boost or gx-core section")
+	}
+	checked := 0
+	lines := strings.Split(notices, "\n")
+	for i, line := range lines {
+		// A module section is "path version" right after a rule of '='.
+		if i == 0 || !strings.HasPrefix(lines[i-1], "=====") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		want, ok := required[fields[0]]
+		if !ok {
+			continue
+		}
+		checked++
+		if fields[1] != want {
+			t.Errorf("THIRD-PARTY-NOTICES lists %s %s, go.mod requires %s", fields[0], fields[1], want)
+		}
+	}
+	if checked < 20 {
+		t.Fatalf("only %d module sections checked: the format changed", checked)
+	}
+
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	_, _, body := webGet(t, server, "/api/license")
+	var answer struct {
+		ThirdParty string `json:"third_party"`
+	}
+	if err := json.Unmarshal(body, &answer); err != nil || !strings.Contains(answer.ThirdParty, "golang.org/x/sys") {
+		t.Fatalf("/api/license must carry THIRD-PARTY-NOTICES: %v", err)
+	}
+}

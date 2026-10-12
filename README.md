@@ -85,7 +85,7 @@ engine written from scratch in pure Go.
 - **Flexible sources:** RSS feeds, HTML listings (ext.to, TorrentGalaxy, Corsaro), Torznab indexers (Jackett, Prowlarr), dedicated web search engines, and optional FlareSolverr integration.
 - **Notifications & Media Servers:** dispatches alerts via Telegram, e-mail, or webhooks (Discord, Slack, ntfy, Gotify, Pushover), including daemon restarts and engine warnings; sends targeted folder-level library refreshes to Jellyfin and Plex, and provides an iCal calendar feed of library arrivals and air dates.
 - **Full lifecycle traceability:** every download carries a unique **Acquisition ID** preserved across search, selection, transfer, post-processing, and archiving logs; the dashboard **To check** panel aggregates edge cases, and threshold alerts warn if an indexer fails consecutively or slows down.
-- **Server-Side UI (HTMX + SSR) & Native TUI:** responsive web UI installable as a mobile PWA, fully keyboard-navigable and verified with axe-core for accessibility; tables that fit the window at any text size; full terminal TUI for direct management via SSH. Available in 6 languages (IT, EN, DE, FR, ES, PL).
+- **Server-Side UI (HTMX + SSR) & Native TUI:** responsive web UI installable as a mobile PWA, fully keyboard-navigable and verified with axe-core for accessibility; tables that fit the window at any text size; dark, light and cream themes plus a **custom theme** built from four colours (background, panels, text, accent) with readable accent buttons computed automatically; full terminal TUI for direct management via SSH. Available in 6 languages (IT, EN, DE, FR, ES, PL).
 
 The web UI is available at `http://<host>:5000/`. The [English manual](docs/MANUAL.en.md) and [manuale italiano](docs/MANUAL.it.md) cover setup and every section of the UI.
 
@@ -252,7 +252,9 @@ Gextto in the same way as `qbittorrent-nox` or `transmission-daemon`. It is
 - **Standalone Web UI & Setup Wizard:** features a dedicated, full-featured web UI
   with real-time graphs and diagnostics, categories and tags, and direct
   multi-indexer search (Jackett, Prowlarr, MIRCrew), each indexer linked to its
-  own web page.
+  own web page. Every indexer takes its plain base address, exactly as in Gextto:
+  Jackett's aggregate Torznab path, Prowlarr's aggregate search API and a direct
+  Torznab service's `/api` are worked out for you.
 - **An RSS manager on par with qBittorrent and Deluge/YaRSS2:** feeds are RSS
   URLs or HTML listings (ext.to, TorrentGalaxy uploader pages), each with its
   last check, item count, new and added items and errors, a **↻ reload**
@@ -403,7 +405,7 @@ npm run test:a11y
 The current automated suite covers the main UI sections with 13 accessibility
 tests. This is not, by itself, a legal accessibility certification: manual
 screen-reader, keyboard and assistive-technology testing is still required.
-See the [accessibility analysis](docs/evoluzione.md#13-accessibilità) for scope and known
+See the [accessibility analysis](docs/evoluzione.md#13-accessibility) for scope and known
 limitations.
 
 ## Documentation
@@ -418,7 +420,7 @@ limitations.
 | gx-torrent engine and standalone client | [gx-torrent technical document](docs/gx-torrent.md) (Italian) |
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |
-| Accessibility scope and testing | [Accessibility analysis](docs/evoluzione.md#13-accessibilità) |
+| Accessibility scope and testing | [Accessibility analysis](docs/evoluzione.md#13-accessibility) |
 
 For the full documentation tree, start from the [documentation index](docs/README.md).
 
@@ -448,5 +450,7 @@ any copyrighted content.
 
 ## License
 
-Gextto is licensed under the [EUPL-1.2](LICENSE). See [NOTICE](NOTICE) for
-notices about bundled and optional third-party components.
+Gextto is licensed under the [EUPL-1.2](LICENSE). See
+[THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES) for the copyright notices and licence
+texts of the bundled and optional third-party components (also shown on the
+*Licence* page of the web interface).

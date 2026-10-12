@@ -86,7 +86,7 @@ veloce e un motore BitTorrent proprio, scritto da zero in Go puro.
 - **Sorgenti flessibili:** feed RSS, elenchi HTML (ext.to, TorrentGalaxy, Corsaro), indexer Torznab (Jackett, Prowlarr), motori web dedicati e supporto opzionale a FlareSolverr.
 - **Notifiche e Media Server:** notifica gli eventi via Telegram, e-mail o webhook (Discord, Slack, ntfy, Gotify, Pushover), inclusi riavvii di Gextto e anomalie di gx-torrent; invia refresh mirati a Jellyfin e Plex toccando solo la cartella modificata ed esporta un calendario iCal con arrivi e uscite.
 - **Tracciabilità completa dei download:** ogni operazione ha un **ID di acquisizione** univoco tracciato in tutti i log (ricerca, selezione, download, post-processing e archivio); la dashboard **Da controllare** raccoglie i casi anomali, e gli avvisi a soglia segnalano tempestivamente se una sorgente fallisce tre cicli consecutivi o rallenta.
-- **Interfaccia Web SSR + HTMX e TUI da terminale:** UI responsive fruibile su desktop e smartphone (PWA), navigabile interamente da tastiera e verificata con axe-core per l'accessibilità; tabelle che stanno nella finestra a qualsiasi dimensione del testo; TUI nativa completa per l'amministrazione via SSH. Disponibile in 6 lingue (IT, EN, DE, FR, ES, PL).
+- **Interfaccia Web SSR + HTMX e TUI da terminale:** UI responsive fruibile su desktop e smartphone (PWA), navigabile interamente da tastiera e verificata con axe-core per l'accessibilità; tabelle che stanno nella finestra a qualsiasi dimensione del testo; temi scuro, chiaro e crema più un **tema personale** costruito da quattro colori (sfondo, pannelli, testo, accento), con i pulsanti d'accento resi leggibili in automatico; TUI nativa completa per l'amministrazione via SSH. Disponibile in 6 lingue (IT, EN, DE, FR, ES, PL).
 
 La UI è disponibile su `http://<host>:5000/`. Il [manuale italiano](docs/MANUAL.it.md) e l'[English manual](docs/MANUAL.en.md) spiegano la configurazione e tutte le sezioni dell'interfaccia.
 
@@ -257,7 +257,10 @@ binario** che Gextto pilota come motore, non un prodotto separato:
 - **Interfaccia Web Indipendente e Wizard di Setup:** include una UI web completa
   con grafici e diagnostica in tempo reale, gestione categorie e tag e ricerca
   diretta sugli indexer (Jackett, Prowlarr, MIRCrew), ognuno con il link alla
-  propria pagina web.
+  propria pagina web. Ogni indexer si configura con il semplice indirizzo base,
+  esattamente come in Gextto: il percorso Torznab aggregato di Jackett, l'API di
+  ricerca aggregata di Prowlarr e l'`/api` di un servizio Torznab diretto vengono
+  ricavati da soli.
 - **Un gestore RSS all'altezza di qBittorrent e Deluge/YaRSS2:** i feed sono URL
   RSS o elenchi HTML (pagine uploader di ext.to e TorrentGalaxy), ognuno con
   ultimo controllo, elementi, nuovi e aggiunti ed errori, un pulsante
@@ -413,7 +416,7 @@ npm run test:a11y
 La suite automatica attuale copre le sezioni principali della UI con 13 test di
 accessibilità. Questo non costituisce da solo una certificazione normativa:
 servono ancora test manuali con screen reader, tastiera e tecnologie assistive.
-Consulta l'[analisi di accessibilità](docs/evoluzione.md#13-accessibilità) per ambito e
+Consulta l'[analisi di accessibilità](docs/evoluzione.md#13-accessibility) per ambito e
 limitazioni note.
 
 ## Documentazione
@@ -428,7 +431,7 @@ limitazioni note.
 | Motore gx-torrent e client autonomo | [Documento tecnico di gx-torrent](docs/gx-torrent.md) |
 | Compilare o contribuire | [Manuale sviluppatori](docs/DEVELOPERS.md) |
 | Rete e protezione dati | [Politica di sicurezza](docs/SECURITY.md) |
-| Ambito e test accessibilità | [Analisi accessibilità](docs/evoluzione.md#13-accessibilità) |
+| Ambito e test accessibilità | [Analisi accessibilità](docs/evoluzione.md#13-accessibility) |
 
 Per l'intera struttura documentale parti dall'[indice della documentazione](docs/README.md).
 
@@ -456,5 +459,7 @@ distribuisce contenuti protetti da copyright.
 
 ## Licenza
 
-Gextto è distribuito con [EUPL-1.2](LICENSE). I componenti di terze parti sono
-indicati in [NOTICE](NOTICE).
+Gextto è distribuito con [EUPL-1.2](LICENSE). Le note di copyright e i testi di
+licenza dei componenti di terze parti (inclusi e opzionali) sono in
+[THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES), mostrato anche nella pagina
+*Licenza* dell'interfaccia web.
