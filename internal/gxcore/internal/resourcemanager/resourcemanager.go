@@ -3,6 +3,11 @@ package resourcemanager
 import "math/rand/v2"
 
 // ResourceManager is a fair manager for distributing limited amount of resources to requesters.
+//
+// A requester that cannot be served right now is queued and notified when room
+// frees. As a liveness guarantee, an isolated request is always granted even if
+// it exceeds the whole limit: a limit smaller than a single request must never
+// be able to block every requester forever.
 type ResourceManager[T any] struct {
 	limit     int64
 	available int64
@@ -134,9 +139,6 @@ func (m *ResourceManager[T]) run() {
 		case req.notifyC <- req.data:
 			m.available -= req.n
 			m.objects++
-			if m.available < 0 {
-				panic("invalid request call 1")
-			}
 			m.deleteRequest(req.key, i)
 		case <-req.cancelC:
 			m.deleteRequest(req.key, i)
@@ -168,11 +170,16 @@ func (m *ResourceManager[T]) deleteRequest(key string, i int) {
 	}
 }
 
+// randomRequest returns a queued request that fits the free budget. When
+// nothing is outstanding it also returns an over-limit request: a single
+// isolated grant can drive `available` negative, which is the guarantee that a
+// limit smaller than one request (e.g. a piece buffer) can never wedge every
+// torrent. While something is outstanding, only requests that fit are granted.
 func (m *ResourceManager[T]) randomRequest() (request[T], int) {
 	for _, rs := range m.requests {
 		i := rand.IntN(len(rs)) // nolint: gosec
 		r := rs[i]
-		if r.n > m.available {
+		if r.n > m.available && m.objects != 0 {
 			break
 		}
 		return r, i
@@ -181,15 +188,12 @@ func (m *ResourceManager[T]) randomRequest() (request[T], int) {
 }
 
 func (m *ResourceManager[T]) handleRequest(r request[T]) {
-	acquired := m.available >= r.n
+	acquired := m.available >= r.n || m.objects == 0
 	select {
 	case r.doneC <- acquired:
 		if acquired {
 			m.available -= r.n
 			m.objects++
-			if m.available < 0 {
-				panic("invalid request call 2")
-			}
 		} else {
 			m.requests[r.key] = append(m.requests[r.key], r)
 		}
