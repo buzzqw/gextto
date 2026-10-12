@@ -101,10 +101,6 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 | WebTorrent (WebRTC) | richiede lo stack WebRTC; componente esterno, non nel core |
 | I2P SAM nativo | usabili proxy SOCKS5/HTTP; SAM nativo fuori scope |
 
-> Nota: BEP 54 è **`lt_donthave`**, non STUN (errore di una versione precedente
-> di questo documento e dell'analisi esterna). Non esiste una BEP per il NAT
-> traversal via STUN.
-
 ## Residui e roadmap
 
 1. **BEP 21 — fatta.** Lato peer: `upload_only` nell'extension handshake, inviato
