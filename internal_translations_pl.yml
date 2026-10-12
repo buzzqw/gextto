@@ -3168,6 +3168,21 @@ pol:
   Tema chiaro: Jasny motyw
   Tema crema: Motyw kremowy
   Tema scuro: Ciemny motyw
+  "Tema personale": "Motyw własny"
+  "Colori": "Kolory"
+  "Sfondo": "Tło"
+  "Pannelli": "Panele"
+  "Accento": "Akcent"
+  "Scegli i colori dell'interfaccia": "Wybierz kolory interfejsu"
+  "Scegli sfondo, pannelli, testo e accento: gli altri toni vengono calcolati da questi.": "Wybierz tło, panele, tekst i akcent: pozostałe odcienie są z nich obliczane."
+  "Colore di sfondo della pagina": "Kolor tła strony"
+  "Colore dei pannelli, delle schede e delle tabelle": "Kolor paneli, kart i tabel"
+  "Colore del testo": "Kolor tekstu"
+  "Colore di accento di pulsanti e link": "Kolor akcentu przycisków i linków"
+  "Applica i colori scelti": "Zastosuj wybrane kolory"
+  "Predefiniti": "Domyślne"
+  "Torna ai colori predefiniti": "Wróć do domyślnych kolorów"
+  "Chiudi i colori": "Zamknij kolory"
   Tempi (Attivo / Seeding): Czasy (aktywne / wysiewające)
   Tempistiche Motore: Rozrządy silnika
   Template custom: Szablon niestandardowy

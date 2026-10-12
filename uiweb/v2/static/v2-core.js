@@ -30,19 +30,57 @@
   }
 
   // ---------------------------------------------------------------- theme --
-  // The button cycles dark -> light -> cream; its label names the next theme.
-  var themes = ["dark", "light", "cream"];
+  // The button cycles dark -> light -> cream -> personalizzato (only once the
+  // person has saved colours); its label names the next theme.
+  function customColors() {
+    try {
+      var raw = storageGet("gextto_colors");
+      if (!raw) return null;
+      var c = JSON.parse(raw);
+      if (c && c.bg && c.surface && c.text && c.accent) return c;
+    } catch (error) { /* ignore a malformed value */ }
+    return null;
+  }
+  function accentOnColor(hex) {
+    var h = String(hex || "").replace("#", "");
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    if (h.length !== 6) return "#04121f";
+    function lin(v) { return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+    var r = lin(parseInt(h.slice(0, 2), 16) / 255),
+        g = lin(parseInt(h.slice(2, 4), 16) / 255),
+        b = lin(parseInt(h.slice(4, 6), 16) / 255);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#04121f" : "#ffffff";
+  }
+  function applyColors(c) {
+    if (!c) return;
+    doc.style.setProperty("--c-bg", c.bg);
+    doc.style.setProperty("--c-surface", c.surface);
+    doc.style.setProperty("--c-text", c.text);
+    doc.style.setProperty("--c-accent", c.accent);
+    doc.style.setProperty("--c-on-accent", accentOnColor(c.accent));
+  }
+  function clearColors() {
+    ["--c-bg", "--c-surface", "--c-text", "--c-accent", "--c-on-accent"].forEach(function (name) {
+      doc.style.removeProperty(name);
+    });
+  }
+  function themeModes() {
+    return customColors() ? ["dark", "light", "cream", "custom"] : ["dark", "light", "cream"];
+  }
   function themeName(mode) {
     if (mode === "light") return t("Tema chiaro");
     if (mode === "cream") return t("Tema crema");
+    if (mode === "custom") return t("Tema personale");
     return t("Tema scuro");
   }
   function nextTheme(mode) {
-    var index = themes.indexOf(mode);
-    return themes[(index < 0 ? 0 : index + 1) % themes.length];
+    var list = themeModes();
+    var index = list.indexOf(mode);
+    return list[(index < 0 ? 0 : index + 1) % list.length];
   }
   function setTheme(mode) {
-    if (themes.indexOf(mode) < 0) mode = "dark";
+    if (themeModes().indexOf(mode) < 0) mode = "dark";
+    if (mode === "custom") applyColors(customColors());
     doc.setAttribute("data-theme", mode);
     storageSet("gextto_theme", mode);
     // The toggle exists twice: in the top bar and, on phones, in "Altro".
@@ -52,7 +90,39 @@
   function toggleTheme() {
     setTheme(nextTheme(doc.getAttribute("data-theme")));
   }
+  function applyCustomColors(colors) {
+    storageSet("gextto_colors", JSON.stringify(colors));
+    applyColors(colors);
+    setTheme("custom");
+  }
+  function resetCustomColors() {
+    try { window.localStorage.removeItem("gextto_colors"); } catch (error) { /* ignore */ }
+    clearColors();
+    setTheme("dark");
+  }
   setTheme(storageGet("gextto_theme") || "dark");
+
+  // Colours dialog: four inputs, everything else derived in CSS.
+  function colorInputValue(id) {
+    var el = document.getElementById(id);
+    return el && /^#[0-9a-fA-F]{6}$/.test(el.value) ? el.value : "";
+  }
+  function applyColorForm() {
+    applyCustomColors({
+      bg: colorInputValue("v2-color-bg") || "#0b1120",
+      surface: colorInputValue("v2-color-surface") || "#131c2e",
+      text: colorInputValue("v2-color-text") || "#e9f0fb",
+      accent: colorInputValue("v2-color-accent") || "#4fd6a1"
+    });
+  }
+  function initColorInputs() {
+    var c = customColors() || { bg: "#0b1120", surface: "#131c2e", text: "#e9f0fb", accent: "#4fd6a1" };
+    var map = { "v2-color-bg": c.bg, "v2-color-surface": c.surface, "v2-color-text": c.text, "v2-color-accent": c.accent };
+    for (var id in map) {
+      var el = document.getElementById(id);
+      if (el) el.value = map[id];
+    }
+  }
 
   // ----------------------------------------------------------- font scale --
   function readScale() {
@@ -1107,7 +1177,7 @@
     updateProblemsChip();
     updateDownloadsBadge();
     ensureTooltips(event.target);
-    if (event.target.id === "v2-modal") { scanModal(); return; }
+    if (event.target.id === "v2-modal") { scanModal(); initColorInputs(); return; }
     updateTorrentSelection();
     if (event.target.id === "v2-logs-view") {
       updateLogsFollowButton();
@@ -1220,6 +1290,8 @@
       return;
     }
     if (target.closest("[data-font-open]")) { event.preventDefault(); openFontPicker(target.closest("[data-font-open]")); return; }
+    if (target.closest("[data-color-apply]")) { event.preventDefault(); applyColorForm(); closeDialog(); return; }
+    if (target.closest("[data-color-reset]")) { event.preventDefault(); resetCustomColors(); closeDialog(); return; }
     if (target.closest("[data-theme-toggle]")) { event.preventDefault(); toggleTheme(); }
   });
 

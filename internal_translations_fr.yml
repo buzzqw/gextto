@@ -3214,6 +3214,21 @@ fra:
   Tema chiaro: Thème clair
   Tema crema: Thème crème
   Tema scuro: Thème sombre
+  "Tema personale": "Thème personnalisé"
+  "Colori": "Couleurs"
+  "Sfondo": "Fond"
+  "Pannelli": "Panneaux"
+  "Accento": "Accent"
+  "Scegli i colori dell'interfaccia": "Choisir les couleurs de l'interface"
+  "Scegli sfondo, pannelli, testo e accento: gli altri toni vengono calcolati da questi.": "Choisissez fond, panneaux, texte et accent : les autres teintes en sont calculées."
+  "Colore di sfondo della pagina": "Couleur de fond de la page"
+  "Colore dei pannelli, delle schede e delle tabelle": "Couleur des panneaux, des cartes et des tableaux"
+  "Colore del testo": "Couleur du texte"
+  "Colore di accento di pulsanti e link": "Couleur d'accent des boutons et des liens"
+  "Applica i colori scelti": "Appliquer les couleurs choisies"
+  "Predefiniti": "Par défaut"
+  "Torna ai colori predefiniti": "Revenir aux couleurs par défaut"
+  "Chiudi i colori": "Fermer les couleurs"
   Tempi (Attivo / Seeding): Temps (Actif / Seeding)
   Tempistiche Motore: Horaires du Moteur
   Template custom: Modèle personnalisé

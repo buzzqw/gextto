@@ -3176,6 +3176,21 @@ spa:
   Tema chiaro: Tema claro
   Tema crema: Tema crema
   Tema scuro: Tema oscuro
+  "Tema personale": "Tema personalizado"
+  "Colori": "Colores"
+  "Sfondo": "Fondo"
+  "Pannelli": "Paneles"
+  "Accento": "Acento"
+  "Scegli i colori dell'interfaccia": "Elige los colores de la interfaz"
+  "Scegli sfondo, pannelli, testo e accento: gli altri toni vengono calcolati da questi.": "Elige fondo, paneles, texto y acento: los demás tonos se calculan a partir de ellos."
+  "Colore di sfondo della pagina": "Color de fondo de la página"
+  "Colore dei pannelli, delle schede e delle tabelle": "Color de los paneles, las tarjetas y las tablas"
+  "Colore del testo": "Color del texto"
+  "Colore di accento di pulsanti e link": "Color de acento de botones y enlaces"
+  "Applica i colori scelti": "Aplicar los colores elegidos"
+  "Predefiniti": "Predeterminados"
+  "Torna ai colori predefiniti": "Volver a los colores predeterminados"
+  "Chiudi i colori": "Cerrar los colores"
   Tempi (Attivo / Seeding): Tiempos (Activo / Seeding)
   Tempistiche Motore: Tiempos del Motor
   Template custom: Plantilla personalizada

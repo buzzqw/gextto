@@ -3225,6 +3225,21 @@ deu:
   Tema chiaro: Helles Thema
   Tema crema: Cremefarbenes Thema
   Tema scuro: Dunkles Thema
+  "Tema personale": "Eigenes Thema"
+  "Colori": "Farben"
+  "Sfondo": "Hintergrund"
+  "Pannelli": "Panels"
+  "Accento": "Akzent"
+  "Scegli i colori dell'interfaccia": "Wähle die Farben der Oberfläche"
+  "Scegli sfondo, pannelli, testo e accento: gli altri toni vengono calcolati da questi.": "Wähle Hintergrund, Panels, Text und Akzent: die übrigen Töne werden daraus berechnet."
+  "Colore di sfondo della pagina": "Hintergrundfarbe der Seite"
+  "Colore dei pannelli, delle schede e delle tabelle": "Farbe von Panels, Karten und Tabellen"
+  "Colore del testo": "Textfarbe"
+  "Colore di accento di pulsanti e link": "Akzentfarbe für Schaltflächen und Links"
+  "Applica i colori scelti": "Gewählte Farben anwenden"
+  "Predefiniti": "Standard"
+  "Torna ai colori predefiniti": "Zurück zu den Standardfarben"
+  "Chiudi i colori": "Farben schließen"
   Tempi (Attivo / Seeding): Zeiten (Aktiv / Seeding)
   Tempistiche Motore: Engine-Timings
   Template custom: Benutzerdefinierte Vorlagen

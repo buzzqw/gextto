@@ -86,6 +86,37 @@
   color-scheme: light;
 }
 
+[data-theme="custom"] {
+  /* A theme the person builds: only four colours are chosen (background,
+     surface, text, accent); every other token is derived from them with
+     color-mix, so the interface stays coherent. --c-on-accent is computed in
+     the client from the accent luminance, so a light or a dark accent both
+     keep their buttons readable. */
+  --bg: var(--c-bg, #0b1120);
+  --surface: var(--c-surface, #131c2e);
+  --text: var(--c-text, #e9f0fb);
+  --accent: var(--c-accent, #4fd6a1);
+  --glow: color-mix(in srgb, var(--bg) 78%, var(--accent));
+  --surface-2: color-mix(in srgb, var(--surface) 94%, var(--bg));
+  --surface-3: color-mix(in srgb, var(--surface) 86%, var(--bg));
+  --line: color-mix(in srgb, var(--surface) 72%, var(--text) 28%);
+  --line-soft: color-mix(in srgb, var(--surface) 86%, var(--text) 14%);
+  --muted: color-mix(in srgb, var(--text) 62%, var(--bg));
+  --accent-2: color-mix(in srgb, var(--accent) 72%, var(--text));
+  --ok: var(--accent);
+  --warn: #e0a63a;
+  --err: #ef6f88;
+  --accent-action: var(--accent);
+  --btn: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  --btn-text: var(--text);
+  --btn-line: color-mix(in srgb, var(--surface) 70%, var(--text) 30%);
+  --shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  --topbar: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+[data-theme="custom"] .btn.primary,
+[data-theme="custom"] .chip.active,
+[data-theme="custom"] .torrent-detail-tabs [role="tab"].tab-active { color: var(--c-on-accent, #04121f); }
+
 * { box-sizing: border-box; }
 
 html {

@@ -219,6 +219,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// Manutenzione: cestino e verifica sorgenti.
 	v2Handle(s, mux, "GET /partial/trash", V2TrashList)
 	v2Handle(s, mux, "POST /trash/delete", V2TrashDelete)
+	v2Handle(s, mux, "GET /colors", V2ColorsModal)
 	v2Handle(s, mux, "GET /partial/sources-check", V2SourcesCheck)
 
 	// Manutenzione: widget dedicati (duplicati, database, RAM disk, rinomina).

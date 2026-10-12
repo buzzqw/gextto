@@ -22,7 +22,19 @@
   (function () {
     try {
       var theme = localStorage.getItem("gextto_theme");
-      if (theme === "light" || theme === "dark" || theme === "cream") document.documentElement.setAttribute("data-theme", theme);
+      if (theme === "light" || theme === "dark" || theme === "cream") {
+        document.documentElement.setAttribute("data-theme", theme);
+      } else if (theme === "custom") {
+        var colors = JSON.parse(localStorage.getItem("gextto_colors") || "null");
+        if (colors && colors.bg && colors.surface && colors.text && colors.accent) {
+          var style = document.documentElement.style;
+          style.setProperty("--c-bg", colors.bg);
+          style.setProperty("--c-surface", colors.surface);
+          style.setProperty("--c-text", colors.text);
+          style.setProperty("--c-accent", colors.accent);
+          document.documentElement.setAttribute("data-theme", "custom");
+        }
+      }
     } catch (error) { /* storage may be unavailable */ }
   }());
 </script>
@@ -88,6 +100,7 @@
         <button class="btn" type="button" data-font="100" title="Dimensione testo predefinita"><span data-font-label>Testo 100%</span></button>
         <button class="btn" type="button" data-font="+5" title="Testo più grande">A+</button>
         <button class="btn" type="button" data-font-open title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog">Font</button>
+        <button class="btn" type="button" hx-get="/colors" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli i colori dell'interfaccia" aria-haspopup="dialog">Colori</button>
         <button class="btn v2-theme-toggle" type="button" data-theme-toggle title="Cambia tema: scuro, chiaro o crema">Tema chiaro</button>
         <button class="btn btn-refresh" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati" aria-label="Ricarica i dati mostrati"><span class="btn-refresh-icon" aria-hidden="true">↺</span><span class="btn-refresh-label">Aggiorna</span></button>
         {{template "v2_live_status" .Chrome}}
@@ -1250,6 +1263,28 @@
     <div class="panel-body"><pre class="log-view">{{.ThirdParty}}</pre></div>
   </div>
   {{end}}
+</div>
+{{end}}
+
+{{define "v2_colors_modal"}}
+<div class="overlay" style="display:block">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-colors-title">
+    <div class="modal-head"><h3 id="v2-colors-title">Colori</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi i colori">Chiudi</button></div>
+    <div class="modal-body">
+      <p class="hint">Scegli sfondo, pannelli, testo e accento: gli altri toni vengono calcolati da questi.</p>
+      <div class="form-grid">
+        <label class="field"><span>Sfondo</span><input class="input" type="color" id="v2-color-bg" value="#0b1120" title="Colore di sfondo della pagina"></label>
+        <label class="field"><span>Pannelli</span><input class="input" type="color" id="v2-color-surface" value="#131c2e" title="Colore dei pannelli, delle schede e delle tabelle"></label>
+        <label class="field"><span>Testo</span><input class="input" type="color" id="v2-color-text" value="#e9f0fb" title="Colore del testo"></label>
+        <label class="field"><span>Accento</span><input class="input" type="color" id="v2-color-accent" value="#4fd6a1" title="Colore di accento di pulsanti e link"></label>
+      </div>
+      <div class="form-actions">
+        <button class="btn primary" type="button" data-color-apply title="Applica i colori scelti">Applica</button>
+        <button class="btn" type="button" data-color-reset title="Torna ai colori predefiniti">Predefiniti</button>
+      </div>
+    </div>
+  </div>
 </div>
 {{end}}
 
