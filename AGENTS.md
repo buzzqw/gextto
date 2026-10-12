@@ -19,6 +19,13 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   `go test ./...`) e procedi solo se è **completamente verde**. Se un test
   fallisce, prima lo si sistema. Non c'è bisogno di far girare tutta la suite di
   test se la modifica riguarda esclusivamente la documentazione (es. file `.md`).
+- **Riferisci sempre le azioni sull'ambiente.** Ogni volta che committi, pushi,
+  ricompili (`make build`, `make gx-torrent`, …) o riavvii il servizio
+  (`systemctl --user restart gextto`), **avvisa esplicitamente** nel messaggio,
+  indicando il **numero del commit** (short hash, es. `a685e5f`) e il ramo/remoto
+  del push (`origin/main`). Non dare per scontato che l'utente lo veda da solo:
+  senza questa segnalazione l'utente non sa se il lavoro è stato committato,
+  pushato, ricompilato e riavviato.
 
 ## Che cos'è gextto
 - Daemon Go per acquisizione media e archiviazione. Il package principale è
