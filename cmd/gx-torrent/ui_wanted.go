@@ -1,10 +1,12 @@
 package main
 
-// ui_wanted.go is the "wanted" section of the RSS page: the titles the operator
-// is looking for. The list is edited here; the engine (see wanted.go) searches
-// the configured indexers and the RSS feeds for each title. The "search in
-// feeds" step probes the indexers and the configured RSS feeds for candidate
-// series, filtered by the language/quality typed so far.
+// ui_wanted.go is the dedicated "wanted" page (/ui/wanted): the titles the
+// operator is looking for. The list is edited here; the engine (see wanted.go)
+// searches the configured indexers and the RSS feeds for each title, on the
+// periodic cycle or immediately (the page's "Search all wanted" / per-row
+// "Search" buttons). The "search in feeds" step probes the indexers and the
+// configured RSS feeds for candidate series, filtered by the language/quality
+// typed so far.
 //
 // A wanted title does not generate a feed or a rule: it is the engine that
 // queries the indexers and the feeds for it.
@@ -535,7 +537,7 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		b.WriteString(`<button type="button" class="sm" ` + attrs + ` title="Edit wanted title">Edit</button> `)
 		b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="toggle-pause"><input type="hidden" name="index" value="` + idxStr + `"><button type="submit" class="secondary" title="` + pauseBtnTitle + `">` + pauseBtnText + `</button></form> `)
 		b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idxStr + `"><button type="submit" class="danger" title="Remove this wanted title">Remove</button></form> `)
-		b.WriteString(`<span class="muted" data-wanted-status="` + idxStr + `" style="margin-left:6px"></span>`)
+		b.WriteString(`<span class="muted" data-wanted-status="` + idxStr + `" aria-live="polite" style="margin-left:6px"></span>`)
 		b.WriteString("</td></tr>")
 	}
 	return b.String()

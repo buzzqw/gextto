@@ -47,10 +47,11 @@ func TestEveryOptionHasATooltip(t *testing.T) {
 	}
 }
 
-// hasTooltip reports whether a tag carries a tooltip the translator localizes.
+// hasTooltip reports whether a tag carries a tooltip the translator localizes
+// (title or aria-label: both are translated by uiTranslatableAttr).
 func hasTooltip(tag string) bool {
 	lower := strings.ToLower(tag)
-	return strings.Contains(lower, " title=")
+	return strings.Contains(lower, " title=") || strings.Contains(lower, " aria-label=")
 }
 
 // labelHasTooltipBefore reports whether the control starting at idx sits inside

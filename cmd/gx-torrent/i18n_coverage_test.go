@@ -160,3 +160,19 @@ func TestUIPageIsFullyTranslatable(t *testing.T) {
 		t.Fatalf("%d string(s) without a uiCatalog key:\n%s", len(missing), strings.Join(lines, "\n"))
 	}
 }
+
+// TestWantedRowsTooltipsAreTranslated guards the wanted table rows: they are
+// built in Go (uiWantedRowsHTML), so they are not part of the page assets the
+// test above scans. Every tooltip they carry must still have a catalog entry,
+// or a new row button would ship an untranslated title.
+func TestWantedRowsTooltipsAreTranslated(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Show","kind":"series","seasons":"1+"},{"name":"Film","kind":"movie","paused":true}]`)
+	rows := d.uiWantedRowsHTML()
+	for _, m := range regexp.MustCompile(`title="([^"{}]+)"`).FindAllStringSubmatch(rows, -1) {
+		if _, ok := uiCatalog[m[1]]; !ok {
+			t.Errorf("wanted row tooltip %q has no uiCatalog entry", m[1])
+		}
+	}
+}

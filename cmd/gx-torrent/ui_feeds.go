@@ -229,8 +229,6 @@ func (d *Daemon) renderRSS(w http.ResponseWriter, r *http.Request, errKey string
 	page = strings.Replace(page, "{{FEEDCOUNT}}", strconv.Itoa(len(d.feeds())), 1)
 	page = strings.Replace(page, "{{RULEROWS}}", d.uiRuleRowsHTML(), 1)
 	page = strings.Replace(page, "{{RULECOUNT}}", strconv.Itoa(len(d.rules())), 1)
-	page = strings.Replace(page, "{{WANTEDROWS}}", d.uiWantedRowsHTML(), 1)
-	page = strings.Replace(page, "{{WANTEDCOUNT}}", strconv.Itoa(len(d.wantedList())), 1)
 	page = strings.Replace(page, "{{FEEDINTERVAL}}", strconv.Itoa(int(d.feedInterval()/time.Minute)), 1)
 	page = strings.Replace(page, "{{ARCHIVEDAYS}}", strconv.Itoa(d.archiveRetentionDays()), 1)
 	nextPoll := "—"
