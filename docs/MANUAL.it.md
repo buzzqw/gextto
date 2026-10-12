@@ -334,7 +334,10 @@ bloccata, già presente o inferiore al file archiviato.
   (`collections`/`similar`) con i torrent locali che li condividono, quando il
   torrent ne ha; in
   **Tracker** puoi modificare l'intera lista (`tier|url` per riga); in
-  **Contenuto** imposti la **priorità per file** (Salta/Normale/Alta/Massima).
+  **Contenuto** imposti la **priorità per file** (Salta/Normale/Alta/Massima: i
+  file ad alta priorità vengono scaricati per primi). Con gx-torrent cambiare
+  **solo il livello** è immediato, senza fermare il torrent; escludere o
+  reincludere un file lo riavvia per un attimo per spostarne i dati.
   In **Pezzi** c'è la mappa dei pezzi (verde scaricato, giallo in corso, grigio
   mancante, spento saltato): compare con i motori che la espongono (gx-torrent).
   Con gx-torrent ogni file ha un pulsante **▶** che apre lo **streaming HTTP**

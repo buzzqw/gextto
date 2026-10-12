@@ -335,7 +335,10 @@ inferior to the archived file.
   (`collections`/`similar`) with the local torrents that share them, when the
   torrent carries any; **Tracker** lets you edit the whole
   list (`tier|url` per line); **Content** sets the **per-file priority**
-  (Skip/Normal/High/Maximum). **Pieces** shows the piece map (green have, yellow
+  (Skip/Normal/High/Maximum: high-priority files are fetched first). With
+  gx-torrent changing **only the level** is immediate, without stopping the
+  torrent; excluding or re-including a file restarts it for a moment to move its
+  data. **Pieces** shows the piece map (green have, yellow
   downloading, grey missing, dimmed skipped) on engines that expose it
   (gx-torrent). With gx-torrent every file has a **▶** button that opens the
   file's **HTTP streaming** (with Range): the pieces of the part being read are
