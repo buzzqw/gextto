@@ -852,7 +852,7 @@ il `LICENSE` BSD-3).
 | # | Voce | Cosa | Rischio | Sforzo | Verifica | Stato |
 |---|---|---|---|---|---|---|
 | 1 | Hardening anti-Sybil | limitare la concentrazione di nodi per subnet (e deprioritizzare gli ID non-BEP 42 quando la tabella è piena, **senza** rifiuto netto: BEP 42 non è applicato ovunque) | M | M | `subnet_share_max`/`nodes_insecure_id`, dimensione tabella e peer trovati su sciame reale | osservabilità fatta; enforcement da misurare |
-| 2 | Multi-path lookup | condurre `get_peers` su più rami in parallelo e preferire i peer confermati da ≥2 percorsi | M/A | M | peer trovati e tempo di ricerca su sciame reale | da fare (design + harness) |
+| 2 | Multi-path lookup | condurre `get_peers` su più rami in parallelo e preferire i peer confermati da ≥2 percorsi | M/A | M | peer trovati e tempo di ricerca su sciame reale | dedup **già presente** (`isOK`/`wasContactedRecently`); multi-path completo da fare, guadagno non provato |
 | 3 | Igiene dei token | rilevare replay e token presi da query non corrispondenti | S | S | test unitari sul codec | **fatto** |
 
 **Igiene dei token — fatto (2026-10-11).** Il token di `announce_peer` è ora
@@ -897,6 +897,31 @@ del campo `ip` in questa rete.
 **Multi-path lookup — design.** Richiede la riscrittura del lookup iterativo
 (`get_peers` su più rami e incrocio dei risultati); ora c'è l'harness su cui
 misurare il prima/dopo. Nessun codice speculativo.
+
+**Verifica del dedup — già presente (2026-10-12).** Provando a implementare il
+traversal bounded/deduplicato si è scoperto che **il routing table già deduplica**:
+`nTree.isOK` chiama `wasContactedRecently(ih)`, quindi un nodo già interrogato per
+quello stesso infohash **non compare** in `lookupFiltered(ih)` per
+`searchRetryPeriod` (15 s). Il re-queue iterativo non richiede quindi gli stessi
+nodi: un `lookups` map con finestra 45 s era **ridondante** e aggiungeva
+complessità. Scelta: **niente codice** per la parte di dedup (regola "nessun
+codice speculativo"). Il **multi-path completo** — rami paralleli con peer
+confermati da ≥2 percorsi — resta un'idea non provata: la misura su sciame reale
+è troppo rumorosa per attribuirne un guadagno (in run da 45 s `nodes` oscilla
+587→3774 e `q_out` 946→4069 senza correlazione col codice).
+
+**Bug di shutdown — trovato e corretto (2026-10-12).** L'harness di misura si
+bloccava nel `Stop()`: `pingSlowly` faceva `pingRequest <- r` **senza** `select`
+sullo stop, quindi con nodi da pingare la goroutine restava appesa e `wg.Wait()`
+non ritornava mai. Nel demone lo stesso percorso poteva bloccare
+`Session.dht.Stop()` a ogni riconfigurazione. Ora la send onora `stop`
+(`TestPingSlowlyStopsWithoutReader`).
+
+**Harness — migliorato (2026-10-12).** `GX_MEASURE_DHT_INFOHASH=<40 hex>` sonda un
+infohash specifico (es. un torrent pubblico popolato) e la misura stampa anche
+`peers_found`, così si può verificare la scoperta di peer veri e non solo il
+riempimento della tabella (un infohash casuale non ha peer, quindi `peers_found`
+resta 0). Con l'harness riparato le run terminano e si possono confrontare.
 
 **Cap anti-Sybil per subnet — implementato e misurato (2026-10-11).**
 `Config.MaxNodesPerSubnet` (default 0 = disattivato) limita i nodi **nell'albero**

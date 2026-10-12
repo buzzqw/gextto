@@ -2,6 +2,7 @@ package dht
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"os"
 	"strconv"
 	"testing"
@@ -66,9 +67,17 @@ func TestMeasureDHTRealSwarm(t *testing.T) {
 		node.Port(), dur, interval, cfg.MaxNodesPerSubnet)
 
 	// A random infohash exercises the get_peers lookup path even though no peer
-	// is expected to exist, so the counters reflect real lookup traffic.
+	// is expected to exist, so the counters reflect real lookup traffic. Set
+	// GX_MEASURE_DHT_INFOHASH=<40 hex> to probe a specific (populated) infohash
+	// and see peers_found.
 	var ih [20]byte
-	if _, err := rand.Read(ih[:]); err != nil {
+	if h := os.Getenv("GX_MEASURE_DHT_INFOHASH"); h != "" {
+		b, err := hex.DecodeString(h)
+		if err != nil || len(b) != 20 {
+			t.Fatalf("GX_MEASURE_DHT_INFOHASH must be 40 hex characters")
+		}
+		copy(ih[:], b)
+	} else if _, err := rand.Read(ih[:]); err != nil {
 		t.Fatalf("rand: %v", err)
 	}
 	node.PeersRequest(string(ih[:]), false)
@@ -80,10 +89,10 @@ func TestMeasureDHTRealSwarm(t *testing.T) {
 	for time.Now().Before(deadline) {
 		<-ticker.C
 		st := Stats()
-		t.Logf("t=%4s nodes=%4d subnet_max=%3d insecure=%3d capped=%4d q_out=%5d q_in=%4d replies=%5d drop=%4d obs=%d nat=%d bad_token=%d",
+		t.Logf("t=%4s nodes=%4d subnet_max=%3d insecure=%3d capped=%4d q_out=%5d q_in=%4d replies=%5d drop=%4d obs=%d nat=%d bad_token=%d peers=%d",
 			time.Since(start).Round(time.Second), st["nodes"], st["subnet_share_max"], st["nodes_insecure_id"], st["nodes_capped"],
 			st["queries_out"], st["queries_in"], st["replies_in"], st["dropped"],
-			st["reflected_observations"], st["nat_mapping"], st["announce_bad_token"])
+			st["reflected_observations"], st["nat_mapping"], st["announce_bad_token"], st["peers_found"])
 	}
 
 	st := Stats()
@@ -91,7 +100,7 @@ func TestMeasureDHTRealSwarm(t *testing.T) {
 	if st["queries_out"] > 0 {
 		success = float64(st["replies_in"]) / float64(st["queries_out"]) * 100
 	}
-	t.Logf("SUMMARY nodes=%d subnet_max=%d insecure=%d capped=%d queries_out=%d queries_in=%d replies_in=%d success=%.1f%% dropped=%d reflected_obs=%d",
+	t.Logf("SUMMARY nodes=%d subnet_max=%d insecure=%d capped=%d queries_out=%d queries_in=%d replies_in=%d success=%.1f%% dropped=%d reflected_obs=%d peers_found=%d",
 		st["nodes"], st["subnet_share_max"], st["nodes_insecure_id"], st["nodes_capped"],
-		st["queries_out"], st["queries_in"], st["replies_in"], success, st["dropped"], st["reflected_observations"])
+		st["queries_out"], st["queries_in"], st["replies_in"], success, st["dropped"], st["reflected_observations"], st["peers_found"])
 }

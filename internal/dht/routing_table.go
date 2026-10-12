@@ -331,7 +331,14 @@ func pingSlowly(pingRequest chan *remoteNode, needPing []*remoteNode, cleanupPer
 	duration := cleanupPeriod - (1 * time.Minute)
 	perPingWait := duration / time.Duration(len(needPing))
 	for _, r := range needPing {
-		pingRequest <- r
+		// The send must also honor stop: once the run loop has exited nobody
+		// reads pingRequest, so a bare send would block forever and Stop() would
+		// never return (wg.Wait would hang).
+		select {
+		case pingRequest <- r:
+		case <-stop:
+			return
+		}
 		select {
 		case <-time.After(perPingWait):
 		case <-stop:
