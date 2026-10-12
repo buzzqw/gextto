@@ -68,7 +68,10 @@ func V2TrashDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 	message, failed := "", false
 	if len(body) > 0 {
 		raw, status := v2InternalJSON(s, http.MethodPost, "/api/trash/delete", nil, body)
-		message, failed = v2TrashDeleteMessage(raw, status)
+		dict, eng := v2Dictionaries(s)
+		message, failed = v2TrashDeleteMessage(raw, status, func(key string) string {
+			return v2TranslateText(key, dict, eng)
+		})
 	}
 	redirect := "/?view=maintenance"
 	if message != "" {
@@ -87,10 +90,12 @@ func V2TrashDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // v2TrashDeleteMessage turns the delete API answer into a one-line toast: how
 // many entries were removed, which ones, and the total space freed. It never
-// claims success when the API reported an error.
-func v2TrashDeleteMessage(raw []byte, status int) (string, bool) {
+// claims success when the API reported an error. tr translates each fixed
+// phrase (catalog key) into the interface language before the numbers and
+// names are filled in.
+func v2TrashDeleteMessage(raw []byte, status int, tr func(string) string) (string, bool) {
 	if status >= 400 {
-		return "Cestino: eliminazione non riuscita.", true
+		return tr("Cestino: eliminazione non riuscita."), true
 	}
 	var res struct {
 		Removed int      `json:"removed"`
@@ -99,20 +104,19 @@ func v2TrashDeleteMessage(raw []byte, status int) (string, bool) {
 		Errors  []string `json:"errors"`
 	}
 	if err := json.Unmarshal(raw, &res); err != nil {
-		return "Cestino svuotato.", false
+		return tr("Cestino svuotato."), false
 	}
 	if res.Removed == 0 {
 		if len(res.Errors) > 0 {
-			return "Cestino: nulla rimosso.", true
+			return tr("Cestino: nulla rimosso."), true
 		}
-		return "Cestino già vuoto.", false
+		return tr("Cestino già vuoto."), false
 	}
-	word, verb, freed := "elementi", "rimossi", "liberati"
+	format := tr("%d elementi rimossi · %s liberati")
 	if res.Removed == 1 {
-		word, verb, freed = "elemento", "rimosso", "liberato"
+		format = tr("%d elemento rimosso · %s liberato")
 	}
-	message := fmt.Sprintf("%d %s %s · %s %s", res.Removed, word, verb,
-		logging.HumanBytesI64(int64(res.Bytes)), freed)
+	message := fmt.Sprintf(format, res.Removed, logging.HumanBytesI64(int64(res.Bytes)))
 	if len(res.Names) > 0 {
 		shown := res.Names
 		tail := ""
@@ -123,7 +127,7 @@ func v2TrashDeleteMessage(raw []byte, status int) (string, bool) {
 		message += ": " + strings.Join(shown, ", ") + tail
 	}
 	if len(res.Errors) > 0 {
-		message += fmt.Sprintf(" (%d non rimossi)", len(res.Errors))
+		message += " (" + fmt.Sprintf(tr("%d non rimossi"), len(res.Errors)) + ")"
 	}
 	return message, len(res.Errors) > 0
 }

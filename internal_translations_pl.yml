@@ -419,7 +419,6 @@ pol:
   Calendario: Kalendarz
   Calendario TMDB: Kalendarz TMDB
   Cambia tra tema chiaro e scuro: Przełączaj między jasnym i ciemnym motywem
-  "Cambia tema: scuro, chiaro o crema": "Zmień motyw: ciemny, jasny lub kremowy"
   Campione: Próbka
   Campo: Pole
   Canali: Kanały
@@ -3169,6 +3168,41 @@ pol:
   Tema crema: Motyw kremowy
   Tema scuro: Ciemny motyw
   "Tema personale": "Motyw własny"
+  "Dettaglio tecnico": "Szczegóły techniczne"
+  "Servizio mircrew-indexer raggiungibile, ma il login al forum MirCrew non è riuscito.": "Usługa mircrew-indexer jest osiągalna, ale logowanie na forum MirCrew nie powiodło się."
+  "Nessun problema rilevato.": "Nie wykryto problemów."
+  "Nessuna azione necessaria.": "Nie są wymagane żadne działania."
+  "Motore torrent gx-torrent attivo e raggiungibile.": "Silnik torrent gx-torrent działa i jest osiągalny."
+  "Nessuna azione necessaria. Apri la sua pagina web dal link.": "Nie są wymagane żadne działania. Otwórz jego stronę internetową z linku."
+  "Motore torrent gx-torrent non raggiungibile.": "Silnik torrent gx-torrent jest nieosiągalny."
+  "Il demone è avviato e sorvegliato da Gextto: controlla l'indirizzo gxtorrent_url e i log. Se non riparte, Gextto torna a libtorrent.": "Demon jest uruchamiany i nadzorowany przez Gextto: sprawdź adres gxtorrent_url i logi. Jeśli nie uruchomi się ponownie, Gextto wróci do libtorrent."
+  "Servizio mircrew-indexer non raggiungibile.": "Usługa mircrew-indexer jest nieosiągalna."
+  "Avvia il servizio (systemctl --user start mircrew-indexer) e verifica URL/porta dell’indexer.": "Uruchom usługę (systemctl --user start mircrew-indexer) i sprawdź URL/port indeksera."
+  "Apri la web UI del servizio e controlla la API key dell’indexer.": "Otwórz interfejs WWW usługi i sprawdź klucz API indeksera."
+  "Servizio mircrew-indexer attivo e raggiungibile.": "Usługa mircrew-indexer działa i jest osiągalna."
+  "Controlla utente e password nella web UI del servizio (Impostazioni) e usa «Rifai login».": "Sprawdź użytkownika i hasło w interfejsie WWW usługi (Impostazioni) i użyj «Rifai login»."
+  "Il provider ha limitato temporaneamente le richieste.": "Dostawca tymczasowo ograniczył żądania."
+  "Attendi il nuovo tentativo automatico; riduci le ricerche manuali se il problema continua.": "Poczekaj na automatyczną ponowną próbę; ogranicz ręczne wyszukiwania, jeśli problem się utrzymuje."
+  "Il provider ha rifiutato l’accesso.": "Dostawca odmówił dostępu."
+  "Controlla credenziali, API key o cookie del provider; poi usa Azzera per riprovare subito.": "Sprawdź dane logowania, klucz API lub cookie dostawcy; następnie użyj Zresetuj, aby od razu spróbować ponownie."
+  "L’indirizzo configurato del provider non è stato trovato.": "Nie znaleziono skonfigurowanego adresu dostawcy."
+  "Controlla URL e percorso del provider; poi usa Azzera per riprovare subito.": "Sprawdź URL i ścieżkę dostawcy; następnie użyj Zresetuj, aby od razu spróbować ponownie."
+  "Il provider non ha risposto entro il tempo previsto.": "Dostawca nie odpowiedział w przewidzianym czasie."
+  "Verifica rete e disponibilità del provider; Gextto riproverà automaticamente.": "Sprawdź sieć i dostępność dostawcy; Gextto spróbuje ponownie automatycznie."
+  "Il provider non è raggiungibile dalla rete di Gextto.": "Dostawca jest nieosiągalny z sieci Gextto."
+  "Verifica DNS, rete, certificato e URL; poi usa Azzera per riprovare subito.": "Sprawdź DNS, sieć, certyfikat i URL; następnie użyj Zresetuj, aby od razu spróbować ponownie."
+  "Il provider ha segnalato un errore temporaneo del proprio servizio.": "Dostawca zgłosił tymczasowy błąd własnej usługi."
+  "Attendi il nuovo tentativo automatico; non è necessaria una modifica locale.": "Poczekaj na automatyczną ponowną próbę; zmiana lokalna nie jest potrzebna."
+  "Il provider non ha completato l’ultima richiesta.": "Dostawca nie zakończył ostatniego żądania."
+  "Consulta il dettaglio tecnico, verifica la configurazione e usa Azzera dopo la correzione.": "Zobacz szczegóły techniczne, sprawdź konfigurację i użyj Zresetuj po poprawce."
+  "Cestino: eliminazione non riuscita.": "Kosz: usuwanie nie powiodło się."
+  "Cestino svuotato.": "Kosz opróżniony."
+  "Cestino: nulla rimosso.": "Kosz: nic nie usunięto."
+  "Cestino già vuoto.": "Kosz jest już pusty."
+  "%d elemento rimosso · %s liberato": "Usunięto %d element · zwolniono %s"
+  "%d elementi rimossi · %s liberati": "Usunięte elementy: %d · zwolniono %s"
+  "%d non rimossi": "Nieusunięte: %d"
+  "Cambia tema: scuro, chiaro, crema o personale": "Zmień motyw: ciemny, jasny, kremowy lub własny"
   "Colori": "Kolory"
   "Sfondo": "Tło"
   "Pannelli": "Panele"

@@ -420,7 +420,6 @@ spa:
   Calendario: Calendario
   Calendario TMDB: Calendario TMDB
   Cambia tra tema chiaro e scuro: Cambiar entre tema claro y oscuro
-  "Cambia tema: scuro, chiaro o crema": "Cambiar tema: oscuro, claro o crema"
   Campione: Muestra
   Campo: Campo
   Canali: Canales
@@ -3177,6 +3176,41 @@ spa:
   Tema crema: Tema crema
   Tema scuro: Tema oscuro
   "Tema personale": "Tema personalizado"
+  "Dettaglio tecnico": "Detalle técnico"
+  "Servizio mircrew-indexer raggiungibile, ma il login al forum MirCrew non è riuscito.": "Servicio mircrew-indexer accesible, pero el inicio de sesión en el foro MirCrew ha fallado."
+  "Nessun problema rilevato.": "No se ha detectado ningún problema."
+  "Nessuna azione necessaria.": "No se requiere ninguna acción."
+  "Motore torrent gx-torrent attivo e raggiungibile.": "Motor torrent gx-torrent activo y accesible."
+  "Nessuna azione necessaria. Apri la sua pagina web dal link.": "No se requiere ninguna acción. Abre su página web desde el enlace."
+  "Motore torrent gx-torrent non raggiungibile.": "Motor torrent gx-torrent no accesible."
+  "Il demone è avviato e sorvegliato da Gextto: controlla l'indirizzo gxtorrent_url e i log. Se non riparte, Gextto torna a libtorrent.": "El demonio lo inicia y supervisa Gextto: comprueba la dirección gxtorrent_url y los registros. Si no se reinicia, Gextto vuelve a libtorrent."
+  "Servizio mircrew-indexer non raggiungibile.": "Servicio mircrew-indexer no accesible."
+  "Avvia il servizio (systemctl --user start mircrew-indexer) e verifica URL/porta dell’indexer.": "Inicia el servicio (systemctl --user start mircrew-indexer) y comprueba la URL/el puerto del indexador."
+  "Apri la web UI del servizio e controlla la API key dell’indexer.": "Abre la interfaz web del servicio y comprueba la clave API del indexador."
+  "Servizio mircrew-indexer attivo e raggiungibile.": "Servicio mircrew-indexer activo y accesible."
+  "Controlla utente e password nella web UI del servizio (Impostazioni) e usa «Rifai login».": "Comprueba el usuario y la contraseña en la interfaz web del servicio (Impostazioni) y usa «Rifai login»."
+  "Il provider ha limitato temporaneamente le richieste.": "El proveedor ha limitado temporalmente las solicitudes."
+  "Attendi il nuovo tentativo automatico; riduci le ricerche manuali se il problema continua.": "Espera el reintento automático; reduce las búsquedas manuales si el problema continúa."
+  "Il provider ha rifiutato l’accesso.": "El proveedor ha rechazado el acceso."
+  "Controlla credenziali, API key o cookie del provider; poi usa Azzera per riprovare subito.": "Comprueba las credenciales, la clave API o la cookie del proveedor; luego usa Restablecer para reintentarlo enseguida."
+  "L’indirizzo configurato del provider non è stato trovato.": "No se ha encontrado la dirección configurada del proveedor."
+  "Controlla URL e percorso del provider; poi usa Azzera per riprovare subito.": "Comprueba la URL y la ruta del proveedor; luego usa Restablecer para reintentarlo enseguida."
+  "Il provider non ha risposto entro il tempo previsto.": "El proveedor no respondió a tiempo."
+  "Verifica rete e disponibilità del provider; Gextto riproverà automaticamente.": "Comprueba la red y la disponibilidad del proveedor; Gextto lo reintentará automáticamente."
+  "Il provider non è raggiungibile dalla rete di Gextto.": "El proveedor no es accesible desde la red de Gextto."
+  "Verifica DNS, rete, certificato e URL; poi usa Azzera per riprovare subito.": "Comprueba DNS, red, certificado y URL; luego usa Restablecer para reintentarlo enseguida."
+  "Il provider ha segnalato un errore temporaneo del proprio servizio.": "El proveedor ha indicado un error temporal de su servicio."
+  "Attendi il nuovo tentativo automatico; non è necessaria una modifica locale.": "Espera el reintento automático; no es necesario ningún cambio local."
+  "Il provider non ha completato l’ultima richiesta.": "El proveedor no completó la última solicitud."
+  "Consulta il dettaglio tecnico, verifica la configurazione e usa Azzera dopo la correzione.": "Consulta el detalle técnico, comprueba la configuración y usa Restablecer tras la corrección."
+  "Cestino: eliminazione non riuscita.": "Papelera: no se pudo eliminar."
+  "Cestino svuotato.": "Papelera vaciada."
+  "Cestino: nulla rimosso.": "Papelera: no se ha eliminado nada."
+  "Cestino già vuoto.": "Papelera ya vacía."
+  "%d elemento rimosso · %s liberato": "%d elemento eliminado · %s liberado"
+  "%d elementi rimossi · %s liberati": "%d elementos eliminados · %s liberados"
+  "%d non rimossi": "%d no eliminados"
+  "Cambia tema: scuro, chiaro, crema o personale": "Cambiar tema: oscuro, claro, crema o personalizado"
   "Colori": "Colores"
   "Sfondo": "Fondo"
   "Pannelli": "Paneles"

@@ -96,7 +96,7 @@ func TestGh5MirCrewServiceStatusReportsForumLogin(t *testing.T) {
 	}
 	reset()
 	status := gh5_mirCrewServiceStatus(&cfg)
-	if status == nil || !strings.Contains(status.UserMessage, "login al forum MirCrew non è riuscito: wrong password") || !strings.Contains(status.SuggestedAction, "Rifai login") {
+	if status == nil || !strings.Contains(status.UserMessage, "login al forum MirCrew non è riuscito.") || status.LastError != "wrong password" || !strings.Contains(status.SuggestedAction, "Rifai login") {
 		t.Fatalf("failed forum login not reported: %#v", status)
 	}
 

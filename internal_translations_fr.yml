@@ -428,7 +428,6 @@ fra:
   Calendario: Calendrier
   Calendario TMDB: Calendrier TMDB
   Cambia tra tema chiaro e scuro: Basculer entre le thème clair et sombre
-  "Cambia tema: scuro, chiaro o crema": "Changer de thème : sombre, clair ou crème"
   Campione: Échantillon
   Campo: Champ
   Canali: Chaînes
@@ -3215,6 +3214,41 @@ fra:
   Tema crema: Thème crème
   Tema scuro: Thème sombre
   "Tema personale": "Thème personnalisé"
+  "Dettaglio tecnico": "Détail technique"
+  "Servizio mircrew-indexer raggiungibile, ma il login al forum MirCrew non è riuscito.": "Service mircrew-indexer joignable, mais la connexion au forum MirCrew a échoué."
+  "Nessun problema rilevato.": "Aucun problème détecté."
+  "Nessuna azione necessaria.": "Aucune action nécessaire."
+  "Motore torrent gx-torrent attivo e raggiungibile.": "Moteur torrent gx-torrent actif et joignable."
+  "Nessuna azione necessaria. Apri la sua pagina web dal link.": "Aucune action nécessaire. Ouvrez sa page web depuis le lien."
+  "Motore torrent gx-torrent non raggiungibile.": "Moteur torrent gx-torrent injoignable."
+  "Il demone è avviato e sorvegliato da Gextto: controlla l'indirizzo gxtorrent_url e i log. Se non riparte, Gextto torna a libtorrent.": "Le démon est lancé et surveillé par Gextto : vérifiez l'adresse gxtorrent_url et les journaux. S'il ne redémarre pas, Gextto revient à libtorrent."
+  "Servizio mircrew-indexer non raggiungibile.": "Service mircrew-indexer injoignable."
+  "Avvia il servizio (systemctl --user start mircrew-indexer) e verifica URL/porta dell’indexer.": "Démarrez le service (systemctl --user start mircrew-indexer) et vérifiez l'URL/le port de l'indexeur."
+  "Apri la web UI del servizio e controlla la API key dell’indexer.": "Ouvrez l'interface web du service et vérifiez la clé API de l'indexeur."
+  "Servizio mircrew-indexer attivo e raggiungibile.": "Service mircrew-indexer actif et joignable."
+  "Controlla utente e password nella web UI del servizio (Impostazioni) e usa «Rifai login».": "Vérifiez l'utilisateur et le mot de passe dans l'interface web du service (Impostazioni) et utilisez «Rifai login»."
+  "Il provider ha limitato temporaneamente le richieste.": "Le fournisseur a temporairement limité les requêtes."
+  "Attendi il nuovo tentativo automatico; riduci le ricerche manuali se il problema continua.": "Attendez la nouvelle tentative automatique ; réduisez les recherches manuelles si le problème persiste."
+  "Il provider ha rifiutato l’accesso.": "Le fournisseur a refusé l'accès."
+  "Controlla credenziali, API key o cookie del provider; poi usa Azzera per riprovare subito.": "Vérifiez les identifiants, la clé API ou le cookie du fournisseur ; puis utilisez Réinitialiser pour réessayer tout de suite."
+  "L’indirizzo configurato del provider non è stato trovato.": "L'adresse configurée du fournisseur est introuvable."
+  "Controlla URL e percorso del provider; poi usa Azzera per riprovare subito.": "Vérifiez l'URL et le chemin du fournisseur ; puis utilisez Réinitialiser pour réessayer tout de suite."
+  "Il provider non ha risposto entro il tempo previsto.": "Le fournisseur n'a pas répondu dans le délai prévu."
+  "Verifica rete e disponibilità del provider; Gextto riproverà automaticamente.": "Vérifiez le réseau et la disponibilité du fournisseur ; Gextto réessaiera automatiquement."
+  "Il provider non è raggiungibile dalla rete di Gextto.": "Le fournisseur n'est pas joignable depuis le réseau de Gextto."
+  "Verifica DNS, rete, certificato e URL; poi usa Azzera per riprovare subito.": "Vérifiez le DNS, le réseau, le certificat et l'URL ; puis utilisez Réinitialiser pour réessayer tout de suite."
+  "Il provider ha segnalato un errore temporaneo del proprio servizio.": "Le fournisseur a signalé une erreur temporaire de son service."
+  "Attendi il nuovo tentativo automatico; non è necessaria una modifica locale.": "Attendez la nouvelle tentative automatique ; aucune modification locale n'est nécessaire."
+  "Il provider non ha completato l’ultima richiesta.": "Le fournisseur n'a pas terminé la dernière requête."
+  "Consulta il dettaglio tecnico, verifica la configurazione e usa Azzera dopo la correzione.": "Consultez le détail technique, vérifiez la configuration et utilisez Réinitialiser après la correction."
+  "Cestino: eliminazione non riuscita.": "Corbeille : la suppression a échoué."
+  "Cestino svuotato.": "Corbeille vidée."
+  "Cestino: nulla rimosso.": "Corbeille : rien n'a été supprimé."
+  "Cestino già vuoto.": "Corbeille déjà vide."
+  "%d elemento rimosso · %s liberato": "%d élément supprimé · %s libéré"
+  "%d elementi rimossi · %s liberati": "%d éléments supprimés · %s libérés"
+  "%d non rimossi": "%d non supprimés"
+  "Cambia tema: scuro, chiaro, crema o personale": "Changer de thème : sombre, clair, crème ou personnalisé"
   "Colori": "Couleurs"
   "Sfondo": "Fond"
   "Pannelli": "Panneaux"

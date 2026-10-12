@@ -1035,11 +1035,12 @@ func gh5_mirCrewServiceStatus(cfg *Config) *models.ProviderStatus {
 		// login is broken; then no new magnet can be unlocked. The service's
 		// /status (no API key, no side effects) tells the login state.
 		if loginError, failed := gh5_mirCrewLoginState(entry.URL); failed {
-			entry.UserMessage = "Servizio mircrew-indexer raggiungibile, ma il login al forum MirCrew non è riuscito"
+			// The message is a fixed phrase (translated by the catalog); the
+			// service's own error text goes to the technical detail column.
+			entry.UserMessage = "Servizio mircrew-indexer raggiungibile, ma il login al forum MirCrew non è riuscito."
 			if loginError != "" {
-				entry.UserMessage += ": " + loginError
+				entry.LastError = loginError
 			}
-			entry.UserMessage += "."
 			entry.SuggestedAction = "Controlla utente e password nella web UI del servizio (Impostazioni) e usa «Rifai login»."
 		}
 	}

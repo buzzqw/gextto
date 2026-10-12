@@ -380,17 +380,17 @@ func (e *qbittorrentEngine) toView(t qbittorrent.Torrent) models.TorrentView {
 		// qBittorrent's `auto_tmm` is Automatic Torrent Management of save paths,
 		// not queueing: a torrent belongs to the queue unless it is force-started
 		// or stopped, which is what AutoManaged means everywhere else in Gextto.
-		AutoManaged:       !t.ForceStart && state != "paused",
-		Pinned:            t.ForceStart,
-		TorrentVersion:    torrentVersion,
-		TotalSize:         totalSize,
-		TotalDone:         totalDone,
-		CurrentTracker:    t.Tracker,
-		IsSeeding:         t.State == "uploading" || t.State == "forcedUP" || t.State == "stalledUP",
-		Sequential:        t.Sequential,
-		SuperSeeding:      t.SuperSeeding,
-		Error:             errMessage,
-		Stalled:           state == "stalled",
+		AutoManaged:    !t.ForceStart && state != "paused",
+		Pinned:         t.ForceStart,
+		TorrentVersion: torrentVersion,
+		TotalSize:      totalSize,
+		TotalDone:      totalDone,
+		CurrentTracker: t.Tracker,
+		IsSeeding:      t.State == "uploading" || t.State == "forcedUP" || t.State == "stalledUP",
+		Sequential:     t.Sequential,
+		SuperSeeding:   t.SuperSeeding,
+		Error:          errMessage,
+		Stalled:        state == "stalled",
 	}
 	view.Diagnosis, _, _ = DiagnoseTorrent(&view)
 	return view

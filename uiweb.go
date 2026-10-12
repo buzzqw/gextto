@@ -28,7 +28,7 @@ import (
 //go:embed LICENSE
 var uiLicenseText string
 
-//go:embed NOTICE
+//go:embed THIRD-PARTY-NOTICES
 var uiThirdPartyText string
 
 //go:embed docs/MANUAL.it.md
@@ -251,8 +251,9 @@ type uiManualData struct {
 // uiLicenseData is the view-model of the Licenza page.
 type uiLicenseData struct {
 	Text string
-	// ThirdParty is the NOTICE file: the bundled components and the licences of
-	// the dependencies, reproduced so the page credits them too.
+	// ThirdParty is THIRD-PARTY-NOTICES, the file shipped in every package: the
+	// bundled components and the licences of the dependencies, reproduced so
+	// the page credits them too.
 	ThirdParty string
 }
 
@@ -490,6 +491,10 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 					{Key: "disabled_till", Label: "Disabilitato fino a"},
 					{Key: "user_message", Label: "Situazione", Format: "truncate"},
 					{Key: "suggested_action", Label: "Cosa fare", Format: "truncate"},
+					// The raw error the suggested actions refer to ("consulta il
+					// dettaglio tecnico"): kept apart so the message stays a
+					// translatable phrase.
+					{Key: "last_error", Label: "Dettaglio tecnico", Format: "truncate"},
 				}),
 				ActionsJSON: uiJSON([]uiAction{
 					{Label: "Azzera", Class: "primary", Method: "POST", Path: "/api/providers/status", Body: `{"provider":"{provider}"}`},
