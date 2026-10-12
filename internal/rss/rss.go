@@ -5,6 +5,7 @@
 package rss
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
 	"fmt"
@@ -84,19 +85,22 @@ func (r TitleFilter) Filter(list []Item) []Item {
 
 // Fetch downloads a feed and parses it. source is the feed's display name.
 func Fetch(ctx context.Context, client *http.Client, rawURL, source string) ([]Item, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSpace(rawURL), nil)
+	return fetch(ctx, client, rawURL, source, true)
+}
+
+// fetch downloads a feed; an HTML page is read as a torrent listing (listing.go).
+func fetch(ctx context.Context, client *http.Client, rawURL, source string, follow bool) ([]Item, error) {
+	body, contentType, err := get(ctx, client, rawURL)
 	if err != nil {
+		if strings.HasPrefix(err.Error(), "HTTP ") {
+			return nil, fmt.Errorf("rss: %s returned %v", source, err)
+		}
 		return nil, err
 	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
+	if looksLikeHTML(contentType, body) {
+		return parseListing(ctx, client, rawURL, body, source, follow)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("rss: %s returned HTTP %d", source, resp.StatusCode)
-	}
-	return Parse(resp.Body, source)
+	return Parse(bytes.NewReader(body), source)
 }
 
 // Parse reads an RSS/Atom/Torznab body into items.
