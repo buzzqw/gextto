@@ -337,7 +337,7 @@ func (d *Daemon) wantedRSSItems(ctx context.Context) []rss.Item {
 		if ctx.Err() != nil {
 			break
 		}
-		items, err := rss.Fetch(ctx, client, feed.URL, feed.Name)
+		items, err := d.fetchFeedItems(ctx, client, feed.URL, feed.Name)
 		if err != nil {
 			continue
 		}

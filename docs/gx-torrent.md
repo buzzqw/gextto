@@ -600,7 +600,11 @@ or error indicators) rather than running silently in the background. Below: list
 buttons to add, **edit** (the form is filled with the row's values; an empty API key keeps it)
 **test** (Torznab request `t=caps`, outcome next to the row) and remove **indexers** (drop-down
 Prowlarr/Jackett/Other, pre-filled URL; the name is a **link to the indexer's web page**, i.e.
-scheme and host of the Torznab URL, opened in a new tab).
+scheme and host of the Torznab URL, opened in a new tab). A **FlareSolverr URL**
+can be set next to the RSS options and tested with **Test FlareSolverr**: feeds
+and indexers behind a Cloudflare challenge are then fetched through it (the
+direct request is tried first, FlareSolverr is the fallback, and local/LAN hosts
+are never retried there), like Gextto does.
 The **feeds** have a table with status (*active*/*disabled*, *adds paused*), **last check**
 with items, new and added or the error, and per row the buttons **↻ Reload** (to the left of
 *Remove*: reads that feed immediately and refreshes the row), **Edit** (the form is filled,

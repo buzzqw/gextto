@@ -86,6 +86,11 @@ func (d *Daemon) handleUIRssSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	d.opts.Settings.Set(feedIntervalKey, strconv.Itoa(minutes*60))
 	d.opts.Settings.Set(archiveDaysKey, strconv.Itoa(days))
+	// Only set FlareSolverr when the field was submitted, so a form that does not
+	// carry it does not clear the configured URL.
+	if _, ok := r.Form["flaresolverr"]; ok {
+		d.opts.Settings.Set(flareURLKey, strings.TrimSpace(r.FormValue("flaresolverr")))
+	}
 	if err := d.opts.Settings.Save(); err != nil {
 		d.renderRSS(w, r, "Cannot save settings: "+err.Error())
 		return
@@ -133,7 +138,7 @@ func (d *Daemon) handleUIFeedItems(w http.ResponseWriter, r *http.Request) {
 		feedName = chosen.URL
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), feedRequestTimeout)
-	items, err := rss.Fetch(ctx, &http.Client{Timeout: feedRequestTimeout}, chosen.URL, feedName)
+	items, err := d.fetchFeedItems(ctx, &http.Client{Timeout: feedRequestTimeout}, chosen.URL, feedName)
 	cancel()
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
@@ -231,6 +236,7 @@ func (d *Daemon) renderRSS(w http.ResponseWriter, r *http.Request, errKey string
 	page = strings.Replace(page, "{{RULECOUNT}}", strconv.Itoa(len(d.rules())), 1)
 	page = strings.Replace(page, "{{FEEDINTERVAL}}", strconv.Itoa(int(d.feedInterval()/time.Minute)), 1)
 	page = strings.Replace(page, "{{ARCHIVEDAYS}}", strconv.Itoa(d.archiveRetentionDays()), 1)
+	page = strings.Replace(page, "{{FLARESOLVERR}}", html.EscapeString(strings.TrimSpace(d.opts.Settings.Get(flareURLKey, ""))), 1)
 	nextPoll := "—"
 	if next := d.nextFeedPoll(); !next.IsZero() {
 		nextPoll = next.Format("15:04")

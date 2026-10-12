@@ -33,6 +33,13 @@ func (d *Daemon) indexers() []torznab.Indexer {
 		logf("cannot parse the indexers setting: %v", err)
 		return nil
 	}
+	// With FlareSolverr configured, route the indexer requests through it (direct
+	// first, FlareSolverr on failure), like Gextto does for external indexers.
+	if d.flareEndpoint() != "" {
+		for i := range list {
+			list[i].Get = d.remoteGet
+		}
+	}
 	return list
 }
 

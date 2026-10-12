@@ -23,6 +23,11 @@ type Indexer struct {
 	Name   string `json:"name"`
 	URL    string `json:"url"`
 	APIKey string `json:"apikey"`
+	// Get, when set, fetches a URL and returns the body. It is nil by default
+	// (the default HTTP client is used); the standalone daemon sets it to route
+	// the request through FlareSolverr when the indexer is behind a Cloudflare
+	// challenge. It is not serialized.
+	Get func(ctx context.Context, rawURL string) ([]byte, error) `json:"-"`
 }
 
 // maxTorznabBody caps how much of a Torznab response is read: a search answer
@@ -149,22 +154,38 @@ func (idx Indexer) searchEndpoint(ctx context.Context, endpointStr, query string
 	}
 	endpoint.RawQuery = params.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	data, status, err := idx.getBody(ctx, endpoint.String())
 	if err != nil {
 		return nil, err
+	}
+	if status < 200 || status >= 300 {
+		return nil, fmt.Errorf("torznab: %s returned HTTP %d", idx.Name, status)
+	}
+	if prowlarr {
+		return ParseProwlarr(bytes.NewReader(data), idx.Name)
+	}
+	return Parse(bytes.NewReader(data), idx.Name)
+}
+
+// getBody fetches rawURL with the indexer's Get hook (FlareSolverr) or with the
+// default HTTP client. A hook answer is treated as HTTP 200: FlareSolverr solves
+// the challenge and returns the page.
+func (idx Indexer) getBody(ctx context.Context, rawURL string) ([]byte, int, error) {
+	if idx.Get != nil {
+		data, err := idx.Get(ctx, rawURL)
+		return data, http.StatusOK, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, 0, err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("torznab: %s returned HTTP %d", idx.Name, resp.StatusCode)
-	}
-	if prowlarr {
-		return ParseProwlarr(resp.Body, idx.Name)
-	}
-	return Parse(resp.Body, idx.Name)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, maxTorznabBody))
+	return body, resp.StatusCode, nil
 }
 
 // prowlarrRelease is the part of a Prowlarr /api/v1/search result we use.
@@ -290,20 +311,14 @@ func (idx Indexer) pingEndpoint(ctx context.Context, endpointStr string) error {
 	}
 	endpoint.RawQuery = params.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	data, status, err := idx.getBody(ctx, endpoint.String())
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
+	if status < 200 || status >= 300 {
+		return fmt.Errorf("torznab: %s returned HTTP %d", idx.Name, status)
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("torznab: %s returned HTTP %d", idx.Name, resp.StatusCode)
-	}
-	if !bytes.Contains(body, []byte("<caps")) {
+	if !bytes.Contains(data, []byte("<caps")) {
 		return fmt.Errorf("torznab: %s answered without a caps document (check URL and API key)", idx.Name)
 	}
 	return nil
@@ -312,33 +327,27 @@ func (idx Indexer) pingEndpoint(ctx context.Context, endpointStr string) error {
 // pingProwlarr checks Prowlarr through its system status, which validates
 // reachability and the API key (Prowlarr's aggregate search has no `caps`).
 func (idx Indexer) pingProwlarr(ctx context.Context, search *url.URL) error {
-	status := *search
-	status.Path = strings.TrimSuffix(strings.TrimRight(status.Path, "/"), prowlarrSearchPath) + "/api/v1/system/status"
+	statusURL := *search
+	statusURL.Path = strings.TrimSuffix(strings.TrimRight(statusURL.Path, "/"), prowlarrSearchPath) + "/api/v1/system/status"
 	params := url.Values{}
 	if key := strings.TrimSpace(idx.APIKey); key != "" {
 		params.Set("apikey", key)
 	}
-	status.RawQuery = params.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, status.String(), nil)
+	statusURL.RawQuery = params.Encode()
+	data, status, err := idx.getBody(ctx, statusURL.String())
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
-	if resp.StatusCode == http.StatusUnauthorized {
+	if status == http.StatusUnauthorized {
 		return fmt.Errorf("torznab: %s rejected the API key", idx.Name)
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("torznab: %s returned HTTP %d", idx.Name, resp.StatusCode)
+	if status < 200 || status >= 300 {
+		return fmt.Errorf("torznab: %s returned HTTP %d", idx.Name, status)
 	}
 	var probe struct {
 		Version string `json:"version"`
 	}
-	if json.Unmarshal(body, &probe) != nil || probe.Version == "" {
+	if json.Unmarshal(data, &probe) != nil || probe.Version == "" {
 		return fmt.Errorf("torznab: %s answered without a Prowlarr status (check URL and API key)", idx.Name)
 	}
 	return nil

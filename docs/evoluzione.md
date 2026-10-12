@@ -2214,6 +2214,13 @@ Ex `docs/lavoro-sessione.md` (updated on 2026-10-07; it covers from commit
   moved behind an explicit **Search indexers too** checkbox. The archive-only
   feed notice is logged once, neutrally (a feed that only grows the archive is a
   valid configuration).
+- **gx-torrent FlareSolverr**: a `flaresolverr-url` setting (field + *Test
+  FlareSolverr* button on the RSS page, translated in every language) routes
+  feeds and Torznab indexers behind a Cloudflare challenge through the service:
+  the direct request is tried first, FlareSolverr is the fallback, and local/LAN
+  hosts are never retried there (like Gextto). New `internal/flaresolverr`
+  package (stateless `request.get`) and a `torznab.Indexer.Get` transport hook;
+  `rss-suggest`/feeds honour it.
 
 ### 12.3 Open points as of 07/10 (historical; several closed/superseded)
 

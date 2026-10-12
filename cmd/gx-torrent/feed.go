@@ -238,7 +238,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 		if search != "" {
 			items, err = d.searchFeed(ctx, name, search)
 		} else {
-			items, err = rss.Fetch(ctx, client, feed.URL, name)
+			items, err = d.fetchFeedItems(ctx, client, feed.URL, name)
 		}
 		cancel()
 		feedsChecked++

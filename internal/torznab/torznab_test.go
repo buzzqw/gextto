@@ -119,6 +119,26 @@ func TestSearchRejectsBadStatus(t *testing.T) {
 	}
 }
 
+// TestSearchUsesGetHook: when Get is set (the standalone daemon routing through
+// FlareSolverr), Search goes through it instead of the default HTTP client.
+func TestSearchUsesGetHook(t *testing.T) {
+	var gotURL string
+	idx := Indexer{Name: "x", URL: "https://indexer.invalid", APIKey: "k", Get: func(_ context.Context, rawURL string) ([]byte, error) {
+		gotURL = rawURL
+		return []byte(sampleFeed), nil
+	}}
+	items, err := idx.Search(context.Background(), "movie")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("items via the hook = %d, want 2", len(items))
+	}
+	if !strings.Contains(gotURL, "q=movie") || !strings.Contains(gotURL, "apikey=k") {
+		t.Fatalf("hook URL = %q", gotURL)
+	}
+}
+
 func TestIndexerPing(t *testing.T) {
 	caps := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("t") != "caps" {
