@@ -648,6 +648,12 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 @media (max-width: 700px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) { .stat-grid { grid-template-columns: 1fr; } }
 .torrent-modal .form-grid { margin-top: 10px; }
+/* Torrent details: two wide columns instead of three narrow ones, so long
+   values (paths, hashes, trackers) are not cut short. */
+.torrent-modal .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 28px; }
+.torrent-modal .stat-grid > .row > span { flex: 0 0 auto; white-space: nowrap; color: var(--muted); }
+.torrent-modal .stat-grid > .row > strong { min-width: 0; text-align: right; }
+@media (max-width: 700px) { .torrent-modal .stat-grid { grid-template-columns: 1fr; } }
 
 /* tables */
 .table-wrap { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-sm); }
@@ -1001,7 +1007,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .trash-table th:last-child, .trash-table td:last-child { width: 1%; min-width: 100px; white-space: nowrap; }
 .trash-table td:last-child .btn { white-space: nowrap; }
 /* The torrent detail keeps a stable size so switching tab does not resize it. */
-.torrent-modal { width: min(1120px, 96vw); height: min(85vh, 900px); display: flex; flex-direction: column; }
+.torrent-modal { width: min(1400px, 96vw); height: min(85vh, 900px); display: flex; flex-direction: column; }
 .torrent-modal .modal-body { flex: 1; min-height: 0; overflow-y: auto; }
 .remove-options { display: flex; flex-direction: column; gap: 8px; }
 .remove-options .btn { justify-content: flex-start; text-align: left; }
