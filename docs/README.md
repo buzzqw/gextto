@@ -12,6 +12,7 @@ specifiche.
 | [Advanced guide](ADVANCED.en.md) | English advanced-operation guide. |
 | [API HTTP](API.md) | Automazioni e integrazioni che usano il daemon. |
 | [Migrazione](MIGRATION.md) | Passaggio sicuro da un'installazione precedente. |
+| [qBittorrent-nox per Gextto](qbittorrent-nox.md) | Come configurare il backend qBittorrent-nox: impostazioni, mappatura dei percorsi, esempi e casi tipici. |
 | [Sicurezza](SECURITY.md) | Esposizione di rete, segreti e segnalazione vulnerabilità. |
 | [TUI](tui.md) | Client terminale e scorciatoie da tastiera. |
 | [Sviluppatori](DEVELOPERS.md) | Build, test e convenzioni per contributor. |
