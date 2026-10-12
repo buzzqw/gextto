@@ -180,6 +180,24 @@ enables the timer (`systemctl --user list-timers gextto-build-cache.timer`);
 `--uninstall` removes it. The timer runs weekly and does nothing when the cache
 is still under the limit.
 
+### GitHub Actions cache
+
+Distinct from the local Go cache, GitHub keeps a **10 GB budget of Actions
+caches** per repository: the `setup-go` and npm caches, plus the CodeQL overlay
+base databases, which are one per commit and ~75 MB each — on this repository
+they alone fill most of the budget. GitHub has no "keep the last N" policy: past
+the budget the least recently used caches are evicted, which can throw away the
+useful build caches before the overlay databases that caused the pressure.
+`.github/workflows/cache-prune.yml` runs daily (and on demand from *Actions →
+Cache prune*) and keeps only the newest caches of every kind (default 20).
+
+```bash
+scripts/prune-actions-caches.sh --dry-run       # list what would be deleted
+scripts/prune-actions-caches.sh --keep 20       # keep the newest 20 per kind
+scripts/prune-actions-caches.sh --overlay-only  # CodeQL base databases only
+```
+
+
 ## Concurrency and safety
 
 The daemon mixes HTTP handlers, long-lived workers and (in a build made with
