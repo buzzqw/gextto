@@ -1379,6 +1379,14 @@ Lo snapshot può essere vecchio al massimo di un tick (3 s predefiniti); ogni
 comando che cambia lo stato fa ripartire subito un tick, quindi la UI e Gextto
 vedono la modifica quasi immediatamente.
 
+Anche l'**aggiunta** di un torrent chiama il motore senza `d.mu`: un magnet può
+prima risolvere un item DHT (BEP 46, fino a 10 s) o scaricare il `.torrent` da
+una sorgente `xs=`/`as=`, e in quell'attesa API, pagina e coda devono restare
+reattive. L'id in aggiunta sta in `d.adding`, così il tick non avvia il torrent
+prima che il suo stato (pausa, posizione, categoria…) sia registrato; se nel
+frattempo la sessione è stata ricostruita, l'aggiunta fallisce con un errore
+chiaro. Test `TestAddDoesNotHoldTheLockWhileResolving`.
+
 ## Limiti noti (motore)
 
 Le operazioni che il motore non supporta rispondono con un errore esplicito di

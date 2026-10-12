@@ -151,3 +151,26 @@ func TestPrefillLocalDataRespectsPrivacy(t *testing.T) {
 		t.Fatalf("merged %d pieces from a private swarm, want 0", got)
 	}
 }
+
+// TestPrefillLocalDataSkipsTorrentWithoutBitfield: a candidate that has not
+// verified anything yet (no bitfield: allocating or checking) is not read.
+func TestPrefillLocalDataSkipsTorrentWithoutBitfield(t *testing.T) {
+	const pieceLength = 16384
+	content := make([]byte, 40000)
+	if _, err := rand.Read(content); err != nil {
+		t.Fatal(err)
+	}
+	info := testInfoBytes(t, content, pieceLength)
+	filesB := testFiles(t, t.TempDir(), info)
+	if _, err := filesB[0].Storage.WriteAt(content, 0); err != nil {
+		t.Fatal(err)
+	}
+	b := &torrent{pieces: piece.NewPieces(info, filesB)} // no bitfield
+	b.setInfo(info)
+	b.publishLocalData()
+	a := &torrent{pieces: piece.NewPieces(info, testFiles(t, t.TempDir(), info))}
+	a.setInfo(info)
+	if got := a.prefillFrom([]*Torrent{{torrent: b}}); got != 0 {
+		t.Fatalf("merged %d pieces from a torrent with no verified piece", got)
+	}
+}

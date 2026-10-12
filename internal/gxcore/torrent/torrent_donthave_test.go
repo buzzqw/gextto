@@ -29,3 +29,17 @@ func TestHandleDontHaveClearsPeerBitfield(t *testing.T) {
 		t.Fatal("DontHave did not clear the peer bitfield bit")
 	}
 }
+
+// A DontHave from a peer that never sent a bitfield or have must not panic
+// (the interest is re-evaluated after the message).
+func TestHandleDontHaveWithoutPeerBitfield(t *testing.T) {
+	tr := &torrent{
+		bitfield:                bitfield.New(2),
+		pieces:                  []piece.Piece{{Index: 0}, {Index: 1}},
+		pieceDownloaders:        map[*peer.Peer]*piecedownloader.PieceDownloader{},
+		pieceDownloadersSnubbed: map[*peer.Peer]*piecedownloader.PieceDownloader{},
+		pieceDownloadersChoked:  map[*peer.Peer]*piecedownloader.PieceDownloader{},
+	}
+	tr.setInfo(&metainfo.Info{NumPieces: 2})
+	tr.handleDontHave(&peer.Peer{}, peerprotocol.DontHaveMessage{Index: 0})
+}

@@ -245,6 +245,9 @@ type Daemon struct {
 	// feedPollMu serialises polls: the loop and the manual button must not run
 	// two polls against the same feed at once.
 	feedPollMu sync.Mutex
+	// adding holds the ids being added (d.add runs the engine call without
+	// d.mu): the queue loop leaves them alone until their state is recorded.
+	adding map[string]bool
 	// feedArchive keeps every item the feeds returned (feed_archive.go),
 	// opened on first use by archive().
 	archiveOnce sync.Once
@@ -888,8 +891,9 @@ func (d *Daemon) tick(now time.Time) {
 	for _, t := range torrents {
 		id := t.ID()
 		stats, ok := statsOf[id]
-		if !ok {
-			// Added between the two phases: handled on the next tick.
+		if !ok || d.adding[id] {
+			// Added between the two phases, or still being added by d.add:
+			// handled on the next tick.
 			continue
 		}
 		handles[id] = t
@@ -1434,18 +1438,40 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		return "", false, err
 	}
 
+	// The engine call runs without d.mu: a magnet may first resolve a BEP 46
+	// DHT item or download its .torrent from an xs=/as= source, seconds during
+	// which the API, the page and the queue loop must keep working. The id is
+	// marked as being added so the queue loop does not start it before its
+	// state (paused, position, …) is recorded below.
 	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.session == nil {
+	session := d.session
+	sequential := req.Sequential || d.state.Config.Sequential
+	if session != nil {
+		if d.adding == nil {
+			d.adding = map[string]bool{}
+		}
+		d.adding[id] = true
+	}
+	d.mu.Unlock()
+	if session == nil {
 		_ = os.Remove(d.linkPath(id))
 		return "", false, errors.New("session not available")
 	}
-	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true, Sequential: req.Sequential || d.state.Config.Sequential, FirstLast: req.FirstLast, SuperSeeding: req.SuperSeeding}
+	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true, Sequential: sequential, FirstLast: req.FirstLast, SuperSeeding: req.SuperSeeding}
 	var t *torrent.Torrent
 	if req.Magnet != "" {
-		t, err = d.session.AddURI(req.Magnet, opt)
+		t, err = session.AddURI(req.Magnet, opt)
 	} else {
-		t, err = d.session.AddTorrent(strings.NewReader(string(req.TorrentData)), opt)
+		t, err = session.AddTorrent(strings.NewReader(string(req.TorrentData)), opt)
+	}
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	delete(d.adding, id)
+	if err == nil && d.session != session {
+		// The session was rebuilt meanwhile (a network/port change): the torrent
+		// went with the old one.
+		err = errors.New("the session restarted while adding the torrent: add it again")
 	}
 	if err != nil {
 		_ = os.Remove(d.linkPath(id))

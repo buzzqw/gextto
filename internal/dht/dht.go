@@ -705,7 +705,13 @@ func (d *DHT) processPacket(p packetType) {
 			node.lastResponseTime = time.Now()
 			// The reply answers a query we sent: trust its "ip" field enough to
 			// note our reflected external address (and the NAT mapping type).
-			recordReflected(r.R.IP, p.raddr.IP)
+			// BEP 42 puts "ip" at the top level; early gx-core builds put it
+			// inside "r", still read as a fallback.
+			reflected := r.IP
+			if reflected == "" {
+				reflected = r.R.IP
+			}
+			recordReflected(reflected, p.raddr.IP)
 			node.pastQueries[r.T] = query
 			d.routingTable.neighborhoodUpkeep(node, d.config.UDPProto, d.peerStore)
 
@@ -822,18 +828,17 @@ func (d *DHT) readOnlyFlag() int {
 	return 0
 }
 
-// addIPField adds the BEP 42 "ip" field to a reply: the requester's address as
-// we see it, in compact form (6 bytes IPv4, 18 IPv6). BEP 42 says a response
-// SHOULD carry it; it is what lets a node learn its reflected (NAT) address — the
-// reading side already existed (recordReflected), the sending side was missing.
-func addIPField(r map[string]interface{}, addr net.UDPAddr) {
-	if len(r) == 0 {
-		return
-	}
-	if bin := encodeCompactPeerAddr(addr.String()); bin != "" {
-		r["ip"] = bin
+// replyIP is the BEP 42 "ip" field of a reply: the requester's address as we
+// see it, in compact form (6 bytes IPv4, 18 IPv6). BEP 42 puts it at the top
+// level of the response (next to "t", "y" and "r"), where libtorrent and the
+// other clients read it; it is what lets a node behind a NAT learn its reflected
+// address.
+func replyIP(addr net.UDPAddr) string {
+	bin := encodeCompactPeerAddr(addr.String())
+	if bin != "" {
 		reflectedSent.Add(1)
 	}
+	return bin
 }
 
 // nodesField is a raw "nodes"/"nodes6" string together with the protocol that
@@ -965,14 +970,17 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 	)
 	// node can be nil if, for example, the server just restarted and received an announce_peer
 	// from a node it doesn't yet know about.
-	if node != nil && d.checkToken(addr, []byte(ih), r.A.Token) {
+	// BEP 5: with "implied_port": 1 the announcer does not know its external
+	// port, so the source port of the packet is the peer's port.
+	port := r.A.Port
+	if r.A.ImpliedPort == 1 {
+		port = addr.Port
+	}
+	// A port outside 1-65535 is not a reachable peer: storing it would hand a
+	// useless (or 16-bit truncated) contact to every get_peers for the hash.
+	validPort := port > 0 && port <= 65535
+	if node != nil && validPort && d.checkToken(addr, []byte(ih), r.A.Token) {
 		totalAnnounceTokenOK.Add(1)
-		// BEP 5: with "implied_port": 1 the announcer does not know its external
-		// port, so the source port of the packet is the peer's port.
-		port := r.A.Port
-		if r.A.ImpliedPort == 1 {
-			port = addr.Port
-		}
 		peerAddr := net.TCPAddr{IP: addr.IP, Port: port}
 		d.peerStore.addContact(ih, encodeCompactPeerAddr(peerAddr.String()), r.A.Seed == 1)
 		// Allow searching this node immediately, since it's telling us
@@ -989,11 +997,11 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 	}
 	// Always reply positively. jech says this is to avoid "back-tracking", not sure what that means.
 	reply := replyMessage{
-		T: r.T,
-		Y: "r",
-		R: map[string]interface{}{"id": d.nodeId},
+		T:  r.T,
+		Y:  "r",
+		IP: replyIP(addr),
+		R:  map[string]interface{}{"id": d.nodeId},
 	}
-	addIPField(reply.R, addr)
 	sendMsg(d.conn, addr, reply, d.DebugLogger)
 }
 
@@ -1008,11 +1016,11 @@ func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
 
 	ih := r.A.InfoHash
 	r0 := map[string]interface{}{"id": d.nodeId, "token": d.hostToken(addr, []byte(ih), d.tokenSecrets[0])}
-	addIPField(r0, addr)
 	reply := replyMessage{
-		T: r.T,
-		Y: "r",
-		R: r0,
+		T:  r.T,
+		Y:  "r",
+		IP: replyIP(addr),
+		R:  r0,
 	}
 
 	if r.A.Scrape == 1 {
@@ -1081,11 +1089,11 @@ func (d *DHT) replyFindNode(addr net.UDPAddr, r responseType) {
 
 	node := InfoHash(r.A.Target)
 	r0 := map[string]interface{}{"id": d.nodeId}
-	addIPField(r0, addr)
 	reply := replyMessage{
-		T: r.T,
-		Y: "r",
-		R: r0,
+		T:  r.T,
+		Y:  "r",
+		IP: replyIP(addr),
+		R:  r0,
 	}
 
 	neighbors := d.routingTable.lookupFiltered(node)
@@ -1119,11 +1127,11 @@ func (d *DHT) replyFindNode(addr net.UDPAddr, r responseType) {
 func (d *DHT) replyPing(addr net.UDPAddr, response responseType) {
 	d.DebugLogger.Debugf("DHT: reply ping => %v", addr)
 	reply := replyMessage{
-		T: response.T,
-		Y: "r",
-		R: map[string]interface{}{"id": d.nodeId},
+		T:  response.T,
+		Y:  "r",
+		IP: replyIP(addr),
+		R:  map[string]interface{}{"id": d.nodeId},
 	}
-	addIPField(reply.R, addr)
 	sendMsg(d.conn, addr, reply, d.DebugLogger)
 }
 

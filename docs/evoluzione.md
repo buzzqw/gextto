@@ -1089,6 +1089,18 @@ a basso rischio (**token e passo 1 del NAT fatti**), poi l'hardening anti-Sybil 
 il multi-path (con misura su sciame reale), infine PCP (**fatto**) e la priorità
 file (**fatta**).
 
+### 4.13 Revisione del lavoro BEP (2026-10-12)
+
+Revisione dei commit BEP dei giorni precedenti; dettaglio ed esito per voce in
+[`docs/bep.md`, *Revisione del 2026-10-12*](bep.md#revisione-del-2026-10-12).
+Corretti: campo `ip` di BEP 42 al primo livello (rilevamento di porta riflessa
+e NAT, prima mai attivo: da 0 a 89 osservazioni dopo il riavvio), porta non
+valida in `announce_peer`, `put` BEP 44 solo agli 8 nodi più vicini, aggiunta di
+magnet BEP 46/`xs=` senza lock globale, `so=` (ciclo infinito e espansione
+illimitata da un magnet ostile), blocchi `ut_metadata` duplicati, interesse dopo
+`lt_donthave` (con guardia sul bitfield nullo), candidati dello Swarm Merging
+senza bitfield. Resta da valutare una politica anti-SSRF per `xs=`/`as=`/`ws=`.
+
 ### 4.12 Qualità fine: cosa manca al motore (analisi 2026-10-12)
 
 Analisi del divario di **artigianato** (non di elenco di funzioni) tra gx-core e

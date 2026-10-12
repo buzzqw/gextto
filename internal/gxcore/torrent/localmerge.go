@@ -86,18 +86,22 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 		if snap.pieceLength != t.info().PieceLength || snap.length != t.info().Length {
 			continue
 		}
+		// Without a bitfield the other torrent has verified nothing yet (it is
+		// allocating or checking): reading and hashing its storage would cost
+		// a full read for no piece.
 		have := other.torrent.haveBits()
+		if len(have) == 0 {
+			continue
+		}
 		for i := range t.pieces {
 			dst := &t.pieces[i]
 			if dst.Done || dst.Skip || i >= len(snap.pieces) {
 				continue
 			}
 			// The other torrent must have verified this piece.
-			if len(have) > 0 {
-				byteIndex := i / 8
-				if byteIndex >= len(have) || have[byteIndex]&(1<<(7-uint(i)%8)) == 0 {
-					continue
-				}
+			byteIndex := i / 8
+			if byteIndex >= len(have) || have[byteIndex]&(1<<(7-uint(i)%8)) == 0 {
+				continue
 			}
 			src := &snap.pieces[i]
 			if src.Length != dst.Length || !bytes.Equal(src.Hash, dst.Hash) {

@@ -412,7 +412,8 @@ func (t *torrent) updateInterestedState(pe *peer.Peer) {
 		return
 	}
 	interested := false
-	if !t.completed {
+	// A peer that sent no bitfield/have yet has nothing we can want.
+	if !t.completed && pe.Bitfield != nil {
 		for i := uint32(0); i < t.bitfield.Len(); i++ {
 			weHave := t.bitfield.Test(i)
 			peerHave := pe.Bitfield.Test(i)
@@ -455,6 +456,9 @@ func (t *torrent) handleDontHave(pe *peer.Peer, msg peerprotocol.DontHaveMessage
 	if t.piecePicker != nil {
 		t.piecePicker.HandleDontHave(pe, msg.Index)
 	}
+	// The peer may have nothing we need any more: stay interested only if it
+	// still does, or we would hold one of its unchoke slots for nothing.
+	t.updateInterestedState(pe)
 	if pe.FastEnabled {
 		return
 	}

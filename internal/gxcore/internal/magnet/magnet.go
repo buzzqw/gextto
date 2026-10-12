@@ -294,9 +294,14 @@ func (m *Magnet) String() string {
 	return b.String()
 }
 
-// maxSelectOnlyRange caps the expansion of a single "lo-hi" range so a hostile
-// magnet cannot make the parser allocate an unbounded slice.
-const maxSelectOnlyRange = 1 << 20
+// maxSelectOnlyIndex is the highest file index "so" may name, and
+// maxSelectOnlyTotal the most indices it may expand to: a hostile link must not
+// make the parser loop forever (a range ending at the largest int would wrap
+// around) or allocate millions of entries. No real torrent has this many files.
+const (
+	maxSelectOnlyIndex = 1<<20 - 1
+	maxSelectOnlyTotal = 1 << 16
+)
 
 // parseSelectOnly parses the BEP 53 "so" values into a sorted, de-duplicated
 // list of file indices. Each value is a comma-separated list of indices, each
@@ -309,7 +314,7 @@ func parseSelectOnly(values []string) []int {
 	seen := make(map[int]struct{})
 	var out []int
 	add := func(n int) {
-		if n < 0 {
+		if n < 0 || n > maxSelectOnlyIndex || len(out) >= maxSelectOnlyTotal {
 			return
 		}
 		if _, ok := seen[n]; ok {
@@ -339,10 +344,11 @@ func parseSelectOnly(values []string) []int {
 			if a > b {
 				a, b = b, a
 			}
-			if b-a >= maxSelectOnlyRange {
-				b = a + maxSelectOnlyRange - 1
+			if a < 0 || a > maxSelectOnlyIndex {
+				continue
 			}
-			for n := a; n <= b; n++ {
+			b = min(b, maxSelectOnlyIndex)
+			for n := a; n <= b && len(out) < maxSelectOnlyTotal; n++ {
 				add(n)
 			}
 		}

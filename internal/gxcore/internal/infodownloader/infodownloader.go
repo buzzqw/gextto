@@ -17,6 +17,7 @@ type InfoDownloader struct {
 type block struct {
 	size      uint32
 	requested bool
+	received  bool
 }
 
 // Peer of a torrent.
@@ -47,6 +48,12 @@ func (d *InfoDownloader) GotBlock(index uint32, data []byte) error {
 	if uint32(len(data)) != b.size {
 		return fmt.Errorf("peer sent invalid size for metadata message: %d", len(data))
 	}
+	if b.received {
+		// A repeated block must not count twice: it would make Done() true
+		// before every block arrived.
+		return nil
+	}
+	b.received = true
 	d.pending--
 	begin := index * blockSize
 	end := begin + b.size

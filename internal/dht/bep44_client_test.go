@@ -9,11 +9,19 @@ import (
 
 // fakeConn records the packets written to it, so a test can drive the run-loop
 // handlers without a socket.
-type fakeConn struct{ writes [][]byte }
+type fakeConn struct {
+	writes [][]byte
+	addrs  []net.UDPAddr // destination of each write
+}
 
 func (f *fakeConn) ReadFrom([]byte) (int, net.Addr, error) { return 0, nil, nil }
-func (f *fakeConn) WriteTo(p []byte, _ net.Addr) (int, error) {
+func (f *fakeConn) WriteTo(p []byte, addr net.Addr) (int, error) {
 	f.writes = append(f.writes, append([]byte(nil), p...))
+	if u, ok := addr.(*net.UDPAddr); ok {
+		f.addrs = append(f.addrs, *u)
+	} else {
+		f.addrs = append(f.addrs, net.UDPAddr{})
+	}
 	return len(p), nil
 }
 func (f *fakeConn) LocalAddr() net.Addr { return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1} }
@@ -51,7 +59,7 @@ func TestBEP44HandleGetReplyImmutable(t *testing.T) {
 	encoded, _ := encodeBencodeValue("Hello World!")
 	lk := &bep44Lookup{
 		id: 1, req: bep44LookupRequest{target: ImmutableTarget(encoded)},
-		queried: map[string]bool{}, tokens: map[string]string{},
+		queried: map[string]bool{}, tokens: map[string]bep44Token{},
 	}
 	d.bep44s[1] = lk
 
@@ -61,12 +69,12 @@ func TestBEP44HandleGetReplyImmutable(t *testing.T) {
 	if lk.best == nil || lk.best.Value != "Hello World!" {
 		t.Fatalf("best = %+v", lk.best)
 	}
-	if lk.tokens[node.address.String()] != "tok" {
+	if lk.tokens[node.address.String()].token != "tok" {
 		t.Fatalf("token not recorded: %v", lk.tokens)
 	}
 
 	// A value that does not hash to the target is rejected.
-	lk2 := &bep44Lookup{id: 2, req: bep44LookupRequest{target: ImmutableTarget([]byte("other"))}, queried: map[string]bool{}, tokens: map[string]string{}}
+	lk2 := &bep44Lookup{id: 2, req: bep44LookupRequest{target: ImmutableTarget([]byte("other"))}, queried: map[string]bool{}, tokens: map[string]bep44Token{}}
 	d.bep44s[2] = lk2
 	d.handleBep44Reply(node, reply(t, map[string]interface{}{"v": "Hello World!"}), &queryType{Type: "get", bep44: 2})
 	if lk2.best != nil {
@@ -87,7 +95,7 @@ func TestBEP44HandleGetReplyMutable(t *testing.T) {
 
 	lk := &bep44Lookup{
 		id: 1, req: bep44LookupRequest{target: MutableTarget(pub, salt), mutable: true, pub: pub, salt: salt},
-		queried: map[string]bool{}, tokens: map[string]string{},
+		queried: map[string]bool{}, tokens: map[string]bep44Token{},
 	}
 	d.bep44s[1] = lk
 	node := newRemoteNode(net.UDPAddr{IP: net.IPv4(127, 0, 0, 2), Port: 9}, "n", &d.DebugLogger)
@@ -102,7 +110,7 @@ func TestBEP44HandleGetReplyMutable(t *testing.T) {
 	// A wrong signature (or a wrong key) is rejected.
 	lk2 := &bep44Lookup{
 		id: 2, req: bep44LookupRequest{target: MutableTarget(pub, salt), mutable: true, pub: pub, salt: salt},
-		queried: map[string]bool{}, tokens: map[string]string{},
+		queried: map[string]bool{}, tokens: map[string]bep44Token{},
 	}
 	d.bep44s[2] = lk2
 	d.handleBep44Reply(node, reply(t, map[string]interface{}{
@@ -113,33 +121,51 @@ func TestBEP44HandleGetReplyMutable(t *testing.T) {
 	}
 }
 
-// TestBEP44HandleGetReplyPublishes checks the publish flow: the token from the
-// get reply triggers a put to the same node.
+// TestBEP44HandleGetReplyPublishes checks the publish flow: the token of each
+// get reply is collected during the traversal and, when the lookup ends, the
+// put goes to the closest nodes only (BEP 44: the K closest to the target).
 func TestBEP44HandleGetReplyPublishes(t *testing.T) {
 	d, conn := newClientTestDHT(t)
-	auth, priv, _ := ed25519.GenerateKey(nil)
-	_ = auth
+	_, priv, _ := ed25519.GenerateKey(nil)
 	salt := []byte("s")
+	pub := priv.Public().(ed25519.PublicKey)
+	target := MutableTarget(pub, salt)
 	encoded, _ := encodeBencodeValue(map[string]interface{}{"ih": strings.Repeat("q", 20)})
+	resC := make(chan bep44Result, 1)
 	lk := &bep44Lookup{
 		id: 1,
 		req: bep44LookupRequest{
-			target: MutableTarget(priv.Public().(ed25519.PublicKey), salt), mutable: true,
-			pub: priv.Public().(ed25519.PublicKey), salt: salt,
-			publish: &StoredItem{Target: MutableTarget(priv.Public().(ed25519.PublicKey), salt), Value: map[string]interface{}{"ih": strings.Repeat("q", 20)}, Seq: 1, PublicKey: priv.Public().(ed25519.PublicKey), Signature: SignMutable(priv, 1, encoded, salt)},
+			target: target, mutable: true, pub: pub, salt: salt, result: resC,
+			publish: &StoredItem{Target: target, Value: map[string]interface{}{"ih": strings.Repeat("q", 20)}, Seq: 1, PublicKey: pub, Signature: SignMutable(priv, 1, encoded, salt)},
 		},
-		queried: map[string]bool{}, tokens: map[string]string{},
+		queried: map[string]bool{}, tokens: map[string]bep44Token{},
 	}
 	d.bep44s[1] = lk
-	node := newRemoteNode(net.UDPAddr{IP: net.IPv4(127, 0, 0, 2), Port: 9}, "n", &d.DebugLogger)
 
+	// Twelve responders: their ids differ from the target only in the last
+	// byte, by i+1, so responder i is the i-th closest.
 	before := len(conn.writes)
-	d.handleBep44Reply(node, reply(t, map[string]interface{}{"token": "tok"}), &queryType{Type: "get", bep44: 1})
-	if len(conn.writes) != before+1 {
-		t.Fatalf("expected one put write, got %d", len(conn.writes)-before)
+	for i := 0; i < 12; i++ {
+		id := []byte(string(target[:]))
+		id[19] ^= byte(i + 1)
+		node := newRemoteNode(net.UDPAddr{IP: net.IPv4(127, 0, 0, byte(10+i)), Port: 9}, string(id), &d.DebugLogger)
+		d.handleBep44Reply(node, reply(t, map[string]interface{}{"id": string(id), "token": "tok"}), &queryType{Type: "get", bep44: 1})
 	}
-	if lk.putSent != 1 {
-		t.Fatalf("putSent = %d, want 1", lk.putSent)
+	if len(conn.writes) != before {
+		t.Fatalf("no put before the traversal ends, got %d write(s)", len(conn.writes)-before)
+	}
+	d.finishBep44(1)
+	if res := <-resC; res.err != nil {
+		t.Fatalf("publish result: %v", res.err)
+	}
+	if lk.putSent != bep44PutNodes || len(conn.writes)-before != bep44PutNodes {
+		t.Fatalf("puts = %d (writes %d), want %d", lk.putSent, len(conn.writes)-before, bep44PutNodes)
+	}
+	// The puts went to the eight closest responders (127.0.0.10 … .17).
+	for _, w := range conn.addrs[before:] {
+		if last := w.IP.To4()[3]; last < 10 || last > 17 {
+			t.Fatalf("put sent to a far node %v", w)
+		}
 	}
 }
 

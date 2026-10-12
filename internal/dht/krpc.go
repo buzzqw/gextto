@@ -182,6 +182,9 @@ type responseType struct {
 	A answerType       `bencode:"a"`
 	// Ro is the BEP 43 read-only flag on an incoming query (top-level "ro": 1).
 	Ro int `bencode:"ro"`
+	// IP is the BEP 42 "ip" field of a reply: our address as the responder
+	// sees it, at the top level of the message.
+	IP string `bencode:"ip"`
 	// Unsupported mainline extension for client identification.
 	// V string(?)	"v"
 }
@@ -243,6 +246,9 @@ type replyMessage struct {
 	T string                 `bencode:"t"`
 	Y string                 `bencode:"y"`
 	R map[string]interface{} `bencode:"r"`
+	// IP is the BEP 42 "ip" field: the requester's compact address, at the top
+	// level of the reply.
+	IP string `bencode:"ip,omitempty"`
 }
 
 type packetType struct {

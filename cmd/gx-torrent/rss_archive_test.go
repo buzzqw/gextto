@@ -394,3 +394,40 @@ func TestFeedArchiveRebuildsIndexAndClampsPage(t *testing.T) {
 		t.Fatalf("rebuilt index / clamped page = %+v", page)
 	}
 }
+
+// TestAddDoesNotHoldTheLockWhileResolving: a magnet whose xs= source answers
+// slowly must not freeze the daemon (API, page, queue) for the whole wait.
+func TestAddDoesNotHoldTheLockWhileResolving(t *testing.T) {
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(1500 * time.Millisecond)
+		http.NotFound(w, nil)
+	}))
+	defer slow.Close()
+	d := feedDaemon(t, "")
+	magnet := "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&xs=" + url.QueryEscape(slow.URL+"/x.torrent")
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := d.add(addRequest{Magnet: magnet})
+		done <- err
+	}()
+	time.Sleep(300 * time.Millisecond)
+	start := time.Now()
+	d.mu.Lock()
+	waited := time.Since(start)
+	adding := len(d.adding)
+	d.mu.Unlock()
+	if waited > 500*time.Millisecond {
+		t.Fatalf("d.mu was held for %v while the magnet source was fetched", waited)
+	}
+	if adding != 1 {
+		t.Fatalf("the torrent being added is not marked (adding = %d)", adding)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if len(d.adding) != 0 || len(d.state.Torrents) != 1 {
+		t.Fatalf("after add: adding=%d torrents=%d", len(d.adding), len(d.state.Torrents))
+	}
+}

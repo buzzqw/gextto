@@ -62,9 +62,9 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 | 5 | Mainline DHT Protocol (Kademlia IPv4) | sì |
 | 32 | IPv6 Extension for DHT (`nodes6`, `want`) | sì |
 | 33 | DHT Scrape (filtri Bloom `BFpe`/`BFsd`) | sì |
-| 42 | DHT Security Extension (Secure Node ID, CRC32C) | sì |
+| 42 | DHT Security Extension (Secure Node ID, CRC32C) | sì; il campo `ip` delle risposte è al **primo livello** del messaggio, come da specifica e come libtorrent (corretto il 2026-10-12: prima stava dentro `r` e nessun client lo leggeva né lo inviava nel posto giusto) |
 | 43 | Read-only DHT Nodes (`ro: 1`) | sì |
-| 44 | Storing arbitrary data in the DHT (K/V Ed25519) | sì: store locale, responder `get`/`put` e **client uscente iterativo** (bounded) per leggere e pubblicare item |
+| 44 | Storing arbitrary data in the DHT (K/V Ed25519) | sì: store locale, responder `get`/`put` e **client uscente iterativo** (bounded) per leggere e pubblicare item; il `put` va ai **8 nodi più vicini** al target fra quelli che hanno dato un token |
 | 45 | Multiple-address Operation for DHT (multi-homed) | no |
 | 46 | Updating Torrents via DHT Mutable Items (`urn:btpk:`) | sì (magnet `xs=urn:btpk:`, risolto dal client BEP 44 all'aggiunta) |
 | 51 | DHT Infohash Indexing (`sample_infohashes`) | no |
@@ -147,6 +147,53 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 8. **BEP 31 — `retry in` — fatta.** Il valore in minuti (HTTP e UDP, announce e
    scrape) rinvia il prossimo annuncio; `"never"` scarta il tracker dal tier per
    sempre (`tracker.Tier`), senza fermare gli altri tracker dello stesso tier.
+
+## Revisione del 2026-10-12
+
+Revisione del lavoro BEP dei giorni precedenti (commit 48eb417, 9e50b76,
+aa686ec, 145eb98, c64d248, a8fd3e2, d53d71a, 7d13243, 7cad4cc, 672d06b). Esito:
+
+- **BEP 42, campo `ip` (bug).** Letto e scritto *dentro* il dizionario `r`, mentre
+  la specifica (e libtorrent/qBittorrent, la quasi totalità della rete) lo vuole
+  al primo livello della risposta. Sul nodo reale: 745 nodi, 666 `ip` inviati,
+  **0 osservazioni** ricevute, quindi porta riflessa e tipo di NAT non venivano
+  mai rilevati. Ora `replyMessage.IP`/`responseType.IP` di primo livello (`r.ip`
+  letto ancora come ripiego); dopo il riavvio 89 osservazioni in pochi minuti,
+  porta riflessa e NAT *cone* rilevati.
+- **BEP 5, `announce_peer` con porta non valida.** Porta 0 (senza
+  `implied_port`) o oltre 65535 veniva memorizzata e servita agli altri nodi come
+  peer: ora non viene memorizzata (la query riceve comunque risposta).
+- **BEP 44, pubblicazione.** Il `put` partiva verso ogni nodo che rispondeva con
+  un token durante la traversal (fino a 32, anche lontani); ora i token si
+  raccolgono e alla chiusura il `put` va agli 8 più vicini per distanza XOR.
+- **BEP 46 / magnet `xs=`/`as=`, disponibilità.** Il demone chiamava `AddURI`
+  tenendo il lock globale: la risoluzione DHT (fino a 10 s) o il download del
+  `.torrent` da una sorgente lenta bloccavano API, pagina e coda. Ora l'aggiunta
+  gira senza lock (gli id in aggiunta sono esclusi dal ciclo della coda).
+- **BEP 53, `so=` (bug di sicurezza).** Un intervallo che termina al massimo
+  intero faceva girare il parser **all'infinito** (overflow del contatore) e molti
+  intervalli potevano espandersi a centinaia di milioni di indici: ora indice
+  massimo 1.048.575 e al più 65.536 indici, con ciclo senza overflow.
+- **BEP 9, `ut_metadata`.** Un blocco ricevuto due volte contava due volte e
+  faceva risultare finito un download di metadati incompleto (poi scartato
+  dall'hash): ora i duplicati sono ignorati.
+- **BEP 54, `lt_donthave`.** Dopo un DontHave si ricalcola l'interesse verso il
+  peer (prima restavamo *interested* anche senza più nulla da chiedere);
+  `updateInterestedState` ora tollera un peer senza bitfield.
+- **Swarm Merging.** Un candidato senza bitfield (in allocazione o verifica)
+  veniva letto e hashato per intero senza poter dare alcun pezzo: ora si salta.
+
+Verificati e corretti senza modifiche: BEP 11 (solo `added`/`added6` come
+candidati), BEP 9 (offset a 64 bit, `metadata_size` limitato a 30 MB), BEP 31
+(`never` gestito anche per tracker singoli, sempre avvolti in un `Tier`), BEP 38
+(parsing robusto), BEP 21 (`paused` = 4 anche verso i tracker UDP, come
+libtorrent), binding dei token all'info-hash (coerente con libtorrent, nessun
+problema di interoperabilità), firma BEP 44 (`seq` int64, chiavi ordinate nella
+ricodifica).
+
+Da valutare: `xs=`/`as=` e `ws=` sono URL scelti da chi crea il magnet (anche da
+un feed non fidato) e il demone li scarica dalla propria rete; una politica che
+escluda gli indirizzi privati ridurrebbe il rischio SSRF verso la LAN.
 
 ## Manutenzione
 

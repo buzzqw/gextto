@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -34,7 +35,18 @@ const (
 	bep44LookupMaxNodes = 32
 	// bep44LookupFanout is how many of the closest nodes seed a lookup.
 	bep44LookupFanout = 8
+	// bep44PutNodes is how many of the closest nodes receive a put (BEP 44:
+	// the item is stored on the K closest nodes to its target).
+	bep44PutNodes = 8
 )
+
+// bep44Token is a write token from a get reply, with the responder's node id
+// (for the XOR distance to the target) and the node to send the put to.
+type bep44Token struct {
+	node  *remoteNode
+	id    string
+	token string
+}
 
 // bep44LookupRequest is one get or publish submitted to the run loop.
 type bep44LookupRequest struct {
@@ -60,8 +72,8 @@ type bep44Result struct {
 type bep44Lookup struct {
 	id      uint64
 	req     bep44LookupRequest
-	queried map[string]bool   // node address -> already queried
-	tokens  map[string]string // node address -> write token from a get reply
+	queried map[string]bool       // node address -> already queried
+	tokens  map[string]bep44Token // node address -> write token from a get reply
 	best    *StoredItem
 	sent    int
 	putSent int
@@ -146,7 +158,7 @@ func (d *DHT) startBep44(req bep44LookupRequest) {
 		id:      d.bep44Seq,
 		req:     req,
 		queried: map[string]bool{},
-		tokens:  map[string]string{},
+		tokens:  map[string]bep44Token{},
 	}
 	d.bep44s[lk.id] = lk
 
@@ -188,6 +200,7 @@ func (d *DHT) finishBep44(id uint64) {
 	}
 	delete(d.bep44s, id)
 	if lk.req.publish != nil {
+		d.bep44PutClosest(lk)
 		if lk.putSent == 0 {
 			lk.req.result <- bep44Result{err: errors.New("bep44: no node accepted the put")}
 			return
@@ -274,11 +287,9 @@ func (d *DHT) handleBep44Reply(node *remoteNode, p packetType, q *queryType) {
 		return
 	}
 
-	if token, ok := rmap["token"].(string); ok {
-		lk.tokens[node.address.String()] = token
-		if lk.req.publish != nil {
-			d.bep44SendPut(lk, node, token)
-		}
+	if token, ok := rmap["token"].(string); ok && token != "" {
+		nodeID, _ := rmap["id"].(string)
+		lk.tokens[node.address.String()] = bep44Token{node: node, id: nodeID, token: token}
 	}
 	if v, ok := rmap["v"]; ok {
 		if it := d.bep44Accept(lk, rmap, v); it != nil {
@@ -289,6 +300,29 @@ func (d *DHT) handleBep44Reply(node *remoteNode, p packetType, q *queryType) {
 	}
 	d.bep44Traverse(lk, rmap, "nodes", "udp4")
 	d.bep44Traverse(lk, rmap, "nodes6", "udp6")
+}
+
+// bep44PutClosest sends the put of a publish to the bep44PutNodes nodes closest
+// to the target among those that gave a write token. The puts wait for the
+// traversal to end: putting on every node met on the way would store the item
+// far from where it is looked up and waste traffic.
+func (d *DHT) bep44PutClosest(lk *bep44Lookup) {
+	candidates := make([]bep44Token, 0, len(lk.tokens))
+	for _, tok := range lk.tokens {
+		if len(tok.id) == 20 {
+			candidates = append(candidates, tok)
+		}
+	}
+	target := InfoHash(string(lk.req.target[:]))
+	sort.Slice(candidates, func(i, j int) bool {
+		return hashDistance(InfoHash(candidates[i].id), target) < hashDistance(InfoHash(candidates[j].id), target)
+	})
+	for i, tok := range candidates {
+		if i >= bep44PutNodes {
+			break
+		}
+		d.bep44SendPut(lk, tok.node, tok.token)
+	}
 }
 
 // bep44Traverse sends a get to the nodes a reply returned.

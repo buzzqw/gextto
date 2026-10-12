@@ -168,12 +168,13 @@ func TestReadResponseDualStackFields(t *testing.T) {
 // being absent from the traffic, not a codec bug.
 func TestReadResponseDecodesIPField(t *testing.T) {
 	field := string([]byte{1, 2, 3, 4, 0x1a, 0xe1}) // 1.2.3.4:6881
+	// BEP 42: "ip" is a top-level key of the reply.
 	payload := map[string]interface{}{
-		"t": "bb",
-		"y": "r",
+		"t":  "bb",
+		"y":  "r",
+		"ip": field,
 		"r": map[string]interface{}{
 			"id": strings.Repeat("I", 20),
-			"ip": field,
 		},
 	}
 	var b bytes.Buffer
@@ -184,10 +185,10 @@ func TestReadResponseDecodesIPField(t *testing.T) {
 	if err != nil {
 		t.Fatalf("readResponse: %v", err)
 	}
-	if resp.R.IP != field {
-		t.Fatalf("ip field = %q, want %q", resp.R.IP, field)
+	if resp.IP != field {
+		t.Fatalf("ip field = %q, want %q", resp.IP, field)
 	}
-	if _, port, ok := parseReflected(resp.R.IP); !ok || port != 6881 {
+	if _, port, ok := parseReflected(resp.IP); !ok || port != 6881 {
 		t.Fatalf("parseReflected(decoded ip) = port %d, ok %v", port, ok)
 	}
 }
