@@ -27,7 +27,8 @@ engine written from scratch in pure Go.
   replaced files, moves that resume after a restart.
 - **It has its own engine.** `gx-core` is a BitTorrent implementation built for
   this project: BitTorrent v2, uTP, NAT holepunching, IPv6 DHT, streaming —
-  in a process that idles at **~25 MB** where qBittorrent can reach gigabytes.
+  in a process with a far smaller memory footprint than qBittorrent (measured in
+  *Resource footprint* below).
 - **It also works without Gextto.** The same engine ships as
   **[gx-torrent](https://github.com/buzzqw/gextto/releases)**, a
   standalone client for Linux and Windows with a full web UI, a qBittorrent-
@@ -64,8 +65,7 @@ engine written from scratch in pure Go.
 ┌───────────────────────────────────▼────────────────────────────────────┐
 │                    gx-core Engine (internal/gxcore)                    │
 │  BitTorrent v1 / v2 (BEP 52 Merkle) · uTP (BEP 29) · Holepunch (BEP 55)│
-│  Dual-Stack IPv6 DHT (BEP 32/42/44) · Streaming Readahead · MSE In-Place│
-│  Zero CGO · Memory footprint: ~25 MB idle / ~100 MB peak               │
+│  Dual-Stack IPv6 DHT (BEP 32/42/44) · Streaming · MSE In-Place · Zero CGO│
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -127,10 +127,10 @@ Its engine core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementati
 - **Swarm protection:** strict BEP 27 private torrents (no DHT, PEX or LSD), a 30-minute quarantine for peers sending corrupt blocks, trackers dropped after `never` (BEP 31) or a long failure, per-piece diagnostics, resume data in BoltDB, live Server-Sent Events (`/ui/events`).
 - **Everywhere:** Gextto's internal engine or a standalone client with its own web UI and qBittorrent-compatible API, as a systemd service on Linux and a native Windows service on Windows (amd64/arm64).
 
-### Alternative engines
+### Engine comparison
 
-- **qBittorrent-nox:** for users who already run qBittorrent or prefer its desktop UI: Gextto controls it remotely via its official Web API.
-- **libtorrent (optional build):** available **only if built with CGO** (`make build-libtorrent`, `GEXTTO_LIBTORRENT=1`): runs inside Gextto's process and serves as automatic fallback if gx-torrent cannot start. An engine crash brings Gextto down as well.
+The table below sums up the alternatives to the default; how to include
+libtorrent is under *Install from source*.
 
 | Engine | Where it runs | When to pick it |
 |---|---|---|
@@ -282,10 +282,7 @@ Gextto in the same way as `qbittorrent-nox` or `transmission-daemon`. It is
   - **Linux (x86_64, aarch64):** standalone `tar.gz` package, bundled systemd unit
     (user or system service), and unprivileged Docker container (`Dockerfile`).
   - **Native Windows (amd64, arm64):** runs as a **native Windows service**
-    managed by PowerShell scripts (`install-service.ps1` / `uninstall-service.ps1`).
-    Leverages native Win32 APIs for memory, storage type, and default gateway,
-    and connects folders via **NTFS Junctions** (no developer mode or symlink
-    elevation needed).
+    (details in *Windows* below).
 
 Every release publishes dedicated packages next to Gextto's:
 

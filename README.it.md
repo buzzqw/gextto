@@ -27,8 +27,8 @@ veloce e un motore BitTorrent proprio, scritto da zero in Go puro.
   per i file sostituiti, spostamenti che riprendono dopo un riavvio.
 - **Ha un motore suo.** `gx-core` è un'implementazione BitTorrent costruita per
   questo progetto: BitTorrent v2, uTP, holepunching NAT, DHT IPv6, streaming —
-  in un processo che a riposo occupa **~25 MB** dove qBittorrent arriva ai
-  gigabyte.
+  in un processo con un'impronta di memoria molto inferiore a qBittorrent
+  (misurata in *Uso delle risorse* più sotto).
 - **Funziona anche senza Gextto.** Lo stesso motore esiste come
   **[gx-torrent](https://github.com/buzzqw/gextto/releases)**,
   un client autonomo per Linux e Windows con UI web completa, API compatibile
@@ -65,8 +65,7 @@ veloce e un motore BitTorrent proprio, scritto da zero in Go puro.
 ┌───────────────────────────────────▼────────────────────────────────────┐
 │                    gx-core Engine (internal/gxcore)                    │
 │  BitTorrent v1 / v2 (BEP 52 Merkle) · uTP (BEP 29) · Holepunch (BEP 55)│
-│  Dual-Stack IPv6 DHT (BEP 32/42/44) · Streaming Readahead · MSE In-Place│
-│  Zero CGO · Memory footprint: ~25 MB idle / ~100 MB peak               │
+│  Dual-Stack IPv6 DHT (BEP 32/42/44) · Streaming · MSE In-Place · Zero CGO│
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -128,10 +127,10 @@ Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un'implementazione BitTorre
 - **Protezione degli swarm:** torrent privati BEP 27 rigorosi (niente DHT, PEX, LSD), quarantena di 30 minuti per i peer che inviano blocchi corrotti, tracker rimossi dopo `never` (BEP 31) o un lungo guasto, diagnostica per pezzo, dati di resume in BoltDB, Server-Sent Events in tempo reale (`/ui/events`).
 - **Ovunque:** motore interno di Gextto o client autonomo con UI web e API compatibile qBittorrent, come servizio systemd su Linux e servizio Windows nativo su Windows (amd64/arm64).
 
-### Motori alternativi
+### Confronto dei motori
 
-- **qBittorrent-nox:** l'alternativa per chi lo usa già o preferisce la sua interfaccia nativa: Gextto lo pilota via Web API.
-- **libtorrent (build opzionale):** disponibile **solo se compili Gextto con libtorrent** (`make build-libtorrent`, `GEXTTO_LIBTORRENT=1`): gira all'interno del processo di Gextto ed è anche il fallback automatico se gx-torrent non riesce a restare attivo. Un crash del motore coinvolge anche Gextto.
+La tabella riassume le alternative al predefinito; come includere libtorrent è
+più sotto.
 
 | Motore | Dove gira | Quando sceglierlo |
 |---|---|---|
@@ -289,10 +288,7 @@ binario** che Gextto pilota come motore, non un prodotto separato:
   - **Linux (x86_64, aarch64):** pacchetto standalone `tar.gz`, unit systemd inclusa
     (utente o sistema) e container Docker non privilegiato (`Dockerfile`).
   - **Windows nativo (amd64, arm64):** gira come **servizio Windows nativo**
-    gestito da script PowerShell (`install-service.ps1` / `uninstall-service.ps1`).
-    Sfrutta le API Win32 per memoria, tipologia disco e gateway di default,
-    e gestisce i percorsi tramite **NTFS Junctions** (nessun bisogno di permessi
-    amministratore per i symlink né di Modalità sviluppatore).
+    (dettagli in *Windows* più sotto).
 
 Ogni release pubblica pacchetti dedicati accanto a quelli di Gextto:
 
