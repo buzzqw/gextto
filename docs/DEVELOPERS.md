@@ -157,7 +157,7 @@ changing UI templates, styles or client-side interaction code.
 The Go build cache (`GOCACHE`, normally `~/.cache/go-build`) grows over time and
 balloons with CGO builds (the embedded libtorrent engine): a few gigabytes are
 normal on a busy machine. `scripts/refresh-build-cache.sh` keeps it in check:
-when the cache passes a threshold (default 8 GiB; override with
+when the cache passes a threshold (default 5 GiB; override with
 `GEXTTO_BUILD_CACHE_LIMIT_GB` or `--limit-gb N`) it runs `go clean -cache`, then
 `go build ./...` and `make test`, so the cache is left **clean and warm** rather
 than cold. A fresh rebuild is usually far smaller than the accumulated one (for

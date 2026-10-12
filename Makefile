@@ -119,7 +119,7 @@ installer-test:
 	scripts/installer-selftest.sh
 
 # Keep the Go build cache from growing without bound: when it passes the
-# threshold (8 GiB by default) wipe it and rebuild + test so a clean, warm cache
+# threshold (5 GiB by default) wipe it and rebuild + test so a clean, warm cache
 # is left behind. Install a weekly systemd user timer with
 # `scripts/refresh-build-cache.sh --install`. See docs/DEVELOPERS.md.
 cache-refresh:

@@ -15,7 +15,7 @@
 #   scripts/refresh-build-cache.sh --uninstall  # remove that timer
 #
 # Configuration:
-#   GEXTTO_BUILD_CACHE_LIMIT_GB   threshold in GiB (default 8); --limit-gb N overrides it
+#   GEXTTO_BUILD_CACHE_LIMIT_GB   threshold in GiB (default 5); --limit-gb N overrides it
 #   GEXTTO_GO                     path to the go binary (default: from PATH, then common locations)
 #
 # The rebuild deliberately does NOT run `make build`: that bumps the committed
@@ -25,7 +25,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LIMIT_GB="${GEXTTO_BUILD_CACHE_LIMIT_GB:-8}"
+LIMIT_GB="${GEXTTO_BUILD_CACHE_LIMIT_GB:-5}"
 MODE="check"
 LOCK_FILE="${XDG_RUNTIME_DIR:-${HOME}/.cache}/gextto-build-cache.lock"
 UNIT_DIR="${HOME}/.config/systemd/user"
