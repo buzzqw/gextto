@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,6 +48,9 @@ func (d *Daemon) handleUISearch(w http.ResponseWriter, r *http.Request) {
 	}
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 	indexers := d.indexers()
+	// The archive page reads this to tell "no indexer configured" from "no
+	// result"; the body shape stays a plain array for the other callers.
+	w.Header().Set("X-Gx-Indexers", strconv.Itoa(len(indexers)))
 	if query == "" || len(indexers) == 0 {
 		writeJSON(w, http.StatusOK, []torznab.Item{})
 		return

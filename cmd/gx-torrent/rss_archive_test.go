@@ -163,6 +163,22 @@ func TestPollFeedsArchivesItemsAndServesTheArchivePage(t *testing.T) {
 	if !strings.Contains(string(page), `<option value="f">f</option>`) || strings.Contains(string(page), "{{") {
 		t.Fatalf("archive page not rendered: %.300s", page)
 	}
+	// The live indexer search is an option of the same form, wired to the
+	// search endpoint like the rest of the page.
+	for _, marker := range []string{`id="archive-live"`, `id="archive-live-section"`, `/ui/search?q=`} {
+		if !strings.Contains(string(page), marker) {
+			t.Fatalf("archive page is missing %q", marker)
+		}
+	}
+	resp, err = http.Get(srv.URL + "/ui/archive?lang=de")
+	if err != nil {
+		t.Fatal(err)
+	}
+	german, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(german), "Von den Indexern") || !strings.Contains(string(german), "Auch die Indexer durchsuchen") {
+		t.Fatalf("archive page not translated: %.300s", german)
+	}
 }
 
 func TestUIFeedReloadEditToggle(t *testing.T) {

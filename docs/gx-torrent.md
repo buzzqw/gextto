@@ -591,6 +591,13 @@ badge di risoluzione ed episodio, *nella sessione*/*scaricato*, e per riga
 della ricerca corrente (mai l'intero archivio con una ricerca vuota) o gli
 elementi più vecchi di N giorni.
 
+Una casella **Cerca anche negli indexer** fa interrogare *dal vivo* gli
+**indexer** Torznab configurati (Jackett, Prowlarr) con la stessa query
+(`GET /ui/search`, che riporta in `X-Gx-Indexers` quanti ne sono configurati) e
+mostra i risultati in una sezione a parte con indexer e data di pubblicazione e
+un pulsante *Aggiungi*: così compare anche ciò che i feed non hanno ancora
+restituito, cioè il caso in cui un indexer ha la release ma l'RSS del feed no.
+
 La conservazione automatica è `archive-days` (predefinito 180, `0` = tieni
 tutto), con un tetto di 200.000 elementi; la potatura gira alla fine di ogni giro
 completo dei feed e parte dagli elementi più vecchi fermandosi al primo da

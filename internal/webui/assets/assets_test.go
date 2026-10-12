@@ -30,3 +30,19 @@ func TestAssetsAreEmbedded(t *testing.T) {
 		t.Error("FaviconSVG is not an SVG")
 	}
 }
+
+// TestArchivePageHasLiveIndexerSearch checks the archive page keeps the
+// "search the indexers too" option wired to the live search endpoint.
+func TestArchivePageHasLiveIndexerSearch(t *testing.T) {
+	page := ArchivePage()
+	for _, marker := range []string{
+		`id="archive-live"`,
+		`id="archive-live-section"`,
+		`id="archive-live-rows"`,
+		`/ui/search?q=`,
+	} {
+		if !strings.Contains(page, marker) {
+			t.Errorf("archive page is missing %q", marker)
+		}
+	}
+}

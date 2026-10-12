@@ -52,6 +52,29 @@ func TestUISearch(t *testing.T) {
 	if items[0].Indexer != "fake" {
 		t.Fatalf("indexer = %q", items[0].Indexer)
 	}
+	// The archive page reads this header to tell "no indexer configured" from
+	// "configured but no result".
+	if got := resp.Header.Get("X-Gx-Indexers"); got != "1" {
+		t.Fatalf("X-Gx-Indexers = %q, want 1", got)
+	}
+}
+
+// TestUISearchIndexerCountHeader checks the count header is present even when
+// no indexer is configured, so the archive page can report it accurately.
+func TestUISearchIndexerCountHeader(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/search?q=movie")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if got := resp.Header.Get("X-Gx-Indexers"); got != "0" {
+		t.Fatalf("X-Gx-Indexers = %q, want 0", got)
+	}
 }
 
 func TestUISearchDisabledInManaged(t *testing.T) {

@@ -264,7 +264,9 @@ Gextto in the same way as `qbittorrent-nox` or `transmission-daemon`. It is
   (deduplicated by info-hash) and searchable — words, phrases in quotes,
   `-excluded` words, per feed, downloaded only, sorted by date, seeders, size or
   title — with resolution and episode badges, add, copy magnet and delete. A
-  search over 100,000 releases takes ~7 ms.
+  search over 100,000 releases takes ~7 ms. A **search the indexers too** option
+  queries the configured Jackett/Prowlarr indexers live, so a release an indexer
+  has but the feeds never returned shows up and can be added straight away.
 - **Bandwidth Control:** global and per-torrent speed limits, a daily bandwidth
   scheduler, and a **latency auto-speed** that lowers the upload when the
   round-trip latency rises, to keep the line responsive (anti-bufferbloat).

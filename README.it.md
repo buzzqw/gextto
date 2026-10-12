@@ -270,7 +270,10 @@ binario** che Gextto pilota come motore, non un prodotto separato:
   locale (deduplicato per info-hash) e si può cercare — parole, frasi tra
   virgolette, parole `-escluse`, per feed, solo scaricati, ordinati per data,
   seed, dimensione o titolo — con badge di risoluzione ed episodio, aggiungi,
-  copia magnet ed elimina. Una ricerca su 100.000 release richiede ~7 ms.
+  copia magnet ed elimina. Una ricerca su 100.000 release richiede ~7 ms. Una
+  casella **cerca anche negli indexer** interroga dal vivo gli indexer
+  Jackett/Prowlarr configurati, così una release presente nell'indexer ma mai
+  restituita dai feed compare e si può aggiungere subito.
 - **Controllo della banda:** limiti globali e per torrent, programmazione
   giornaliera della banda e un'**auto-velocità sulla latenza** che abbassa
   l'upload quando il ping sale, per tenere la linea reattiva (anti-bufferbloat).

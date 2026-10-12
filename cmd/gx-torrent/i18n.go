@@ -646,6 +646,13 @@ var uiCatalog = map[string][5]string{
 	"items deleted":                                            {"elementi eliminati", "Einträge gelöscht", "éléments supprimés", "elementos eliminados", "elementów usuniętych"},
 	"Delete the items found more than this many days ago?":     {"Eliminare gli elementi trovati più di questi giorni fa?", "Einträge löschen, die vor mehr als so vielen Tagen gefunden wurden?", "Supprimer les éléments trouvés il y a plus de ce nombre de jours ?", "¿Eliminar los elementos encontrados hace más de estos días?", "Usunąć elementy znalezione więcej niż tyle dni temu?"},
 	"Allow web seeds and magnet sources on the local network":  {"Consenti web seed e sorgenti magnet sulla rete locale", "Web-Seeds und Magnet-Quellen im lokalen Netzwerk erlauben", "Autoriser les web seeds et les sources magnet sur le réseau local", "Permitir web seeds y fuentes magnet en la red local", "Zezwalaj na web seedy i źródła magnet w sieci lokalnej"},
+	"Search the indexers too":                                  {"Cerca anche negli indexer", "Auch die Indexer durchsuchen", "Rechercher aussi dans les indexeurs", "Buscar también en los indexadores", "Szukaj także w indekserach"},
+	"Also query the configured Torznab indexers (Jackett, Prowlarr) live, so items the feeds have not returned show up too": {"Interroga dal vivo anche gli indexer Torznab configurati (Jackett, Prowlarr): compaiono così anche gli elementi che i feed non hanno restituito", "Fragt zusätzlich die konfigurierten Torznab-Indexer (Jackett, Prowlarr) live ab, sodass auch Einträge erscheinen, die die Feeds nicht geliefert haben", "Interroge aussi en direct les indexeurs Torznab configurés (Jackett, Prowlarr) : les éléments que les flux n'ont pas renvoyés apparaissent ainsi", "Consulta también en vivo los indexadores Torznab configurados (Jackett, Prowlarr): así aparecen los elementos que los feeds no devolvieron", "Odpyta także na żywo skonfigurowane indeksery Torznab (Jackett, Prowlarr), dzięki czemu pojawiają się też pozycje, których kanały nie zwróciły"},
+	"From the indexers":           {"Dagli indexer", "Von den Indexern", "Depuis les indexeurs", "De los indexadores", "Z indekserów"},
+	"Live indexer search results": {"Risultati in tempo reale dagli indexer", "Live-Suchergebnisse der Indexer", "Résultats de recherche en direct des indexeurs", "Resultados de búsqueda en vivo de los indexadores", "Wyniki wyszukiwania na żywo z indekserów"},
+	"Published":                   {"Pubblicato", "Veröffentlicht", "Publié", "Publicado", "Opublikowano"},
+	"Searching the indexers…":     {"Ricerca negli indexer…", "Indexer werden durchsucht…", "Recherche dans les indexeurs…", "Buscando en los indexadores…", "Wyszukiwanie w indekserach…"},
+	"No indexers configured":      {"Nessun indexer configurato", "Keine Indexer konfiguriert", "Aucun indexeur configuré", "No hay indexadores configurados", "Brak skonfigurowanych indekserów"},
 	"Web seeds and magnet sources (xs=/as=) come from torrent data: by default they cannot reach the local network, so a torrent from a feed cannot make the client request the router or the NAS": {"Web seed e sorgenti magnet (xs=/as=) arrivano dai dati del torrent: di default non possono raggiungere la rete locale, così un torrent da un feed non può far contattare al client il router o il NAS", "Web-Seeds und Magnet-Quellen (xs=/as=) stammen aus den Torrent-Daten: standardmäßig erreichen sie das lokale Netzwerk nicht, damit ein Torrent aus einem Feed den Client nicht den Router oder das NAS anfragen lässt", "Les web seeds et les sources magnet (xs=/as=) viennent des données du torrent : par défaut ils ne peuvent pas atteindre le réseau local, pour qu'un torrent issu d'un flux ne fasse pas interroger au client le routeur ou le NAS", "Los web seeds y las fuentes magnet (xs=/as=) vienen de los datos del torrent: por defecto no pueden alcanzar la red local, así un torrent de un feed no puede hacer que el cliente contacte el router o el NAS", "Web seedy i źródła magnet (xs=/as=) pochodzą z danych torrenta: domyślnie nie mogą sięgać sieci lokalnej, więc torrent z kanału nie zmusi klienta do łączenia się z routerem lub NAS"},
 }
 
@@ -710,6 +717,8 @@ var uiClientKeys = []string{
 	"Delete every item matching the current search?",
 	"items deleted",
 	"Delete the items found more than this many days ago?",
+	"Searching the indexers…",
+	"No indexers configured",
 }
 
 // uiLangIndex maps a language code to its column in uiCatalog.
