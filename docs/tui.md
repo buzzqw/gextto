@@ -1,162 +1,184 @@
 # Gextto terminal UI (TUI)
 
-Interfaccia a terminale per un daemon Gextto già in esecuzione. È bilingue
-(italiano/inglese), offre filtro e ordinamento dei download, dettagli, log SSE,
-metriche live e notifiche non invasive; non legge mai direttamente i database.
+Terminal interface for a Gextto daemon that is already running. It speaks the
+same six languages as the web UI (Italian, English, German, French, Spanish,
+Polish), offers filtering and sorting of the downloads, details, SSE logs, live
+metrics and non-intrusive notifications; it never reads the databases directly.
 
 > [!NOTE]
-> La TUI usa l'API HTTP del daemon. Il daemon deve quindi essere avviato e
-> raggiungibile dall'URL indicato prima di aprire la TUI.
+> The TUI uses the daemon's HTTP API. The daemon must therefore be running and
+> reachable at the given URL before the TUI is opened.
 
-## Avvio
+## Starting
 
 ```bash
-/opt/gextto/gexttod tui                    # installazione standard
+/opt/gextto/gexttod tui                    # standard installation
 /opt/gextto/gexttod tui --url http://host:5000 --lang en
 GEXTTO_URL=http://host:5000 GEXTTO_LANG=it /opt/gextto/gexttod tui
 ```
 
-Con un'installazione diversa da quella standard, sostituisci `/opt/gextto` con
-la directory che contiene `gexttod`.
+With an installation other than the standard one, replace `/opt/gextto` with
+the directory that contains `gexttod`.
 
-La lingua viene scelta in quest'ordine: `--lang`, `GEXTTO_LANG`, la lingua
-attiva del daemon (`/api/i18n/active`), altrimenti italiano.
+The language is chosen in this order: `--lang`, `GEXTTO_LANG`, the daemon's
+active language (`/api/i18n/active`), otherwise Italian. It can also be changed
+from the settings panel (`g`).
 
-Se il daemon ha l'accesso protetto attivo e la TUI gira fuori dalla rete
-locale, passa la chiave API con `GEXTTO_API_KEY=<chiave>`: viene inviata
-nell'header `X-Api-Key` di ogni richiesta. Dalla rete locale non serve.
+If the daemon has protected access enabled and the TUI runs outside the local
+network, pass the API key with `GEXTTO_API_KEY=<key>`: it is sent in the
+`X-Api-Key` header of every request. From the local network it is not needed.
 
-## Schede disponibili
+## Tabs
 
-1. **Stato** — cruscotto: daemon (versione, modalità, uptime, PID, CPU/RAM),
-   sistema (CPU, carico, RAM, disco, cestino), ciclo (conto alla rovescia,
-   ultimo avvio e contatori), feed, download per stato, traffico con
-   andamento, consumi, una riga **Attenzione** con ciò che richiede un
-   intervento (torrent in errore, percorsi non scrivibili, disco quasi pieno,
-   ultimo errore), i trasferimenti in corso con barra e ETA e, ancorate in
-   fondo, le **ultime righe di log**. Se la finestra è bassa la parte alta
-   scorre con `↑↓`/`PgUp`/`PgDn`.
-2. **Download** — elenco unificato torrent + download HTTP dei fumetti con stato,
-   progresso, byte, velocità e nome; filtro (`F`), ordinamento (`o`/`O`), dettagli
-   torrent (`Invio`), pausa/ripresa e rimozione dei download HTTP.
-   L'intestazione mostra i limiti di banda in vigore (base, programmati o
-   temporanei con i minuti rimasti). `T` imposta un limite temporaneo come nella
-   web: `DL UL [minuti]` in KiB/s, dove `0` è illimitato e senza minuti (o con
-   `0`) il limite resta finché non lo rimuovi; `off` lo rimuove e ripristina i
-   limiti normali. La durata massima è 1440 minuti.
-3. **Log** — ultime righe, filtro (`/`), segui (`f`), stream SSE live.
-4. **Salute** — CPU/RAM/disco, percorsi, dischi, RAM disk, ultimi errori.
-5. **Archivio** — archivio delle release, filtro e accodamento diretto.
-6. **Mancanti** — episodi mancanti della libreria monitorata: `Invio` apre la
-   serie sull'episodio, `s` lo cerca sugli indexer, `i` lo ignora.
-7. **Blocklist** — release bloccate, con rimozione interattiva.
-8. **Libreria** — Serie TV, Film e Fumetti monitorati. Serie e film si
-   gestiscono da qui: aggiunta cercando su TMDB, modifica dei requisiti con un
-   modulo a campi (per le serie, tra gli altri, *Niente upgrade*), pausa ed
-   eliminazione. Il dettaglio di una serie mostra una
-   stagione alla volta con lo stato di ogni episodio (✓ presente, ✗ mancante,
-   ↓ in download, `·` in uscita, `-` ignorato); da lì si attivano o
-   disattivano le stagioni, si cercano e accodano le release, si ignorano o
-   riscaricano episodi, si aggiornano i metadati e si rinominano i file. Il
-   dettaglio di un film mostra trama, storico e release già in archivio.
-   L'elenco si aggiorna ogni 10 secondi; le azioni ricaricano subito ciò che
-   cambiano. I fumetti restano in sola lettura.
+1. **Status** — dashboard: daemon (version, mode, uptime, PID, CPU/RAM), system
+   (CPU, load, RAM, disk, trash), cycle (countdown, last start and counters),
+   feeds, downloads by state, traffic with its trend, consumption, an
+   **Attention** line with what needs action (torrents in error, unwritable
+   paths, almost full disk, last error), the transfers in progress with bar and
+   ETA and, anchored at the bottom, the **latest log lines**. If the window is
+   short the upper part scrolls with `↑↓`/`PgUp`/`PgDn`.
+2. **Torrents** — unified list of torrents and HTTP comic downloads with state,
+   progress, bytes, speed and name; filter (`/` or `F`), sort (`o`/`O`),
+   torrent details (`Enter`), pause/resume and removal of HTTP downloads. Several
+   torrents can be marked (`Space`, `*` all/none) and paused, resumed, rechecked,
+   tagged or removed together; `#` tags, `A` sets the auto-removal, `H` opens the
+   history, `b` restarts. The header shows the bandwidth limits in force (base,
+   scheduled or temporary with the minutes left). `T` sets a temporary limit as
+   in the web UI: `DL UL [minutes]` in KiB/s, where `0` is unlimited and without
+   minutes (or with `0`) the limit stays until you remove it; `off` removes it
+   and restores the normal limits. The maximum duration is 1440 minutes.
+3. **Logs** — latest lines, filter (`/`), warnings/errors only (`w`), follow
+   (`f`), live SSE stream.
+4. **Health** — CPU/RAM/disk, paths, disks, RAM disk, latest errors; `x` empties
+   the trash (with confirmation).
+5. **Archive** — archive of the releases, paged, with filter, sort, details
+   and direct queueing.
+6. **Missing** — missing episodes of the monitored library: `Enter` opens the
+   series on the episode, `s` searches it on the indexers, `i` ignores it.
+7. **Blocklist** — blocked releases, with interactive removal.
+8. **Library** — monitored TV series, movies and comics. Series and movies are
+   managed from here: adding by searching TMDB, editing the requirements with a
+   field form (for series, among others, *No upgrades*), pause and deletion.
+   The detail of a series shows one season at a time with the state of each
+   episode (✓ present, ✗ missing, ↓ downloading, `·` upcoming, `-` ignored);
+   from there seasons are switched on or off, releases are searched and
+   queued, episodes are ignored or downloaded again, metadata is refreshed and
+   files are renamed. The detail of a movie shows plot, history and the
+   releases already in the archive. The list refreshes every 10 seconds;
+   actions reload at once what they change. Comics stay read-only.
+9. **Maintenance** — the maintenance actions of the web UI: backup, database
+   check, compaction (VACUUM) and statistics (ANALYZE), inferior duplicates
+   (preview, then `x` deletes), rename all series or one folder (preview with
+   `Space` to include/exclude, `x` applies), scan all archives, refresh
+   MediaInfo, database housekeeping, RAM disk and empty trash. Heavy operations
+   ask for confirmation; a long job shows its progress and `Enter` cancels it.
 
-Completamenti, errori, stalli e archiviazioni arrivano come messaggio temporaneo
-nella barra inferiore. La TUI mostra anche gli stessi cambi di stato per i
-download HTTP dei fumetti.
+Completions, errors, stalls and archivings arrive as a temporary message in the
+bottom bar. The TUI also shows the same state changes for the HTTP comic
+downloads.
 
-## Scorciatoie da tastiera
+The **settings panel** (`g`) changes the interface language, the time between
+searches, the download/upload limits and test mode (dry-run); `c` turns colours
+on or off and `h` switches the high-contrast theme.
 
-| Ambito | Tasti |
+## Keyboard shortcuts
+
+| Scope | Keys |
 | --- | --- |
-| Globali | `1`-`8`/`Tab` schede · `l` Libreria · `r` aggiorna · `?` aiuto · `q` esci |
-| Aggiunta | `a` magnet/URL · `t` file `.torrent` · `c` ciclo · `s` cerca · `e` eventi |
-| Download | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `Invio` dettagli torrent · `p` pausa/riprendi · `d`/`D` rimuovi (torrent con o senza file; HTTP dalla lista) · `X` pulisci completati · `k` verifica · `R` riannuncia · `n` senza-rinomina · `i`/`u` pin/unpin · `L` limiti globali · `T` limite temporaneo · `o`/`O` ordina · `F` filtro |
-| Dettagli | `1` generale · `2` tracker · `3` file · `4` peer · `↑↓` scorri · `Esc`/`Invio` indietro |
-| Log | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `/` filtro · `f` segui/ferma |
-| Stato | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` scorri |
-| Salute | `↑↓`/`PgUp`/`PgDn` scorri · `x` svuota cestino (con conferma) |
-| Terminale | `Ctrl-L` ridisegna tutto · incolla un magnet/URL per aprire "aggiungi" già compilato |
-| Archivio | `↑↓` seleziona · `Invio` accoda · `/` filtro |
-| Mancanti | `↑↓` seleziona · `Invio` apri la serie · `s` cerca l'episodio · `i` ignora · `r` aggiorna |
-| Blocklist | `↑↓` seleziona · `d` rimuovi |
-| Libreria | `1` Serie TV · `2` Film · `3` Fumetti · `↑↓` seleziona · `s`/`/` filtra · `Invio` dettagli · `a` aggiungi da TMDB · `e` modifica · `p` pausa/riprendi · `d` elimina · `m` cerca (mancanti della serie / il film) |
-| Serie | `←→` stagione · `Spazio` attiva/disattiva la stagione · `↑↓` episodio · `Invio` sorgenti in archivio · `s` cerca online · `i` ignora · `R` riscarica · `y` copia magnet · `m` cerca mancanti · `M` metadati TMDB · `n` rinomina (anteprima + conferma) · `e` modifica · `p` pausa · `d` elimina · `Esc` indietro |
-| Film | `↑↓` release in archivio · `Invio` accoda · `s` cerca online · `y` copia magnet · `e` modifica · `R` riscarica · `p` pausa · `d` elimina · `Esc` indietro |
-| Moduli | `↑↓` campo · `Invio` modifica (sì/no: `Invio` o `Spazio`) · `s` salva · `Esc` annulla; `*` segna i campi cambiati |
+| Global | `1`-`9`/`Tab` tabs · `l` Library · `g` settings · `r` refresh · `?` help · `q` quit |
+| Adding | `a` magnet/URL · `t` `.torrent` file · `c` cycle · `s` search · `e` events |
+| Torrents | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `Enter` torrent details · `p` pause/resume · `b` restart · `d`/`D` remove (torrent without or with files; HTTP from the list) · `X` clean completed · `k` recheck · `R` reannounce · `n` no-rename · `i`/`u` pin/unpin · `L` global limits · `T` temporary limit · `Space` mark · `*` mark all/none · `#` tag · `A` auto-remove · `H` history · `o`/`O` sort · `/` or `F` filter |
+| Details | `1` general · `2` trackers · `3` files · `4` peers · `↑↓` scroll · `F` discard and find another version · `Esc`/`Enter` back; files: `Space` skip/download, `+`/`-` priority; trackers: `a` add, `d` remove |
+| Logs | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `/` filter · `w` warnings/errors only · `f` follow/pause |
+| Status | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` scroll |
+| Health | `↑↓`/`PgUp`/`PgDn` scroll · `x` empty trash (with confirmation) |
+| Terminal | `Ctrl-L` redraws everything · pasting a magnet/URL opens "add" already filled in |
+| Archive | `↑↓` select · `PgUp`/`PgDn` page · `Enter` queue · `d` details · `o`/`O` sort · `s` search |
+| Missing | `↑↓` select · `Enter` open the series · `s` search the episode · `i` ignore · `r` refresh |
+| Blocklist | `↑↓` select · `d` remove |
+| Library | `←→` series/movies/comics · `↑↓` select · `s`/`/` filter · `Enter` details · `a` add from TMDB · `e` edit · `p` pause/resume · `d` delete · `m` search (the series' missing episodes / the movie) |
+| Series | `←→` season · `Space` season on/off · `↑↓` episode · `Enter` sources in the archive · `s` search online · `i` ignore · `R` download again · `y` copy magnet · `m` search missing · `M` TMDB metadata · `n` rename (preview + confirmation) · `e` edit · `p` pause · `d` delete · `Esc` back |
+| Movie | `↑↓` releases in the archive · `Enter` queue · `s` search online · `y` copy magnet · `e` edit · `R` download again · `p` pause · `d` delete · `Esc` back |
+| Maintenance | `↑↓` select · `Enter` run (heavy operations ask for confirmation) |
+| Settings | `↑↓` select · `Enter` edit · `c` colours · `h` contrast · `Esc` close |
+| Forms | `↑↓` field · `Enter` edit (yes/no: `Enter` or `Space`) · `s` save · `Esc` cancel; `*` marks the changed fields |
 
-Le conferme (rimozioni, cestino, pulizia) accettano solo `s`/`y`: `Invio` annulla e il
-testo incollato viene ignorato, così un `Invio` ripetuto su un link lento non può
-cancellare un torrent con i suoi file.
+Confirmations (removals, trash, cleanup) accept only `s`/`y`: `Enter` cancels
+and pasted text is ignored, so a repeated `Enter` on a slow link cannot delete
+a torrent together with its files.
 
-## Uso via SSH
+## Use over SSH
 
-La TUI è pensata per una sessione SSH:
+The TUI is designed for an SSH session:
 
-- **Banda.** Ogni frame invia solo le righe cambiate, e di una riga solo la parte
-  finale che cambia; quando il log scorre è il terminale a far scorrere la
-  regione e arrivano solo le righe nuove. I frame sono aggiornamenti
-  sincronizzati (niente sfarfallio). Salute e statistiche si interrogano ogni
-  10 secondi invece che a ogni aggiornamento. In basso a destra la TUI mostra la
-  banda che sta usando, per esempio `TUI ↓7.2KB/s ↑230B/s · 1.5 req/s`:
-  ↓ è ciò che riceve (risposte del daemon e tasti), ↑ ciò che invia (schermo e
-  richieste), `req/s` le richieste al daemon al secondo.
-- **A capo automatico.** Log, dettagli, salute e cruscotto vanno a capo invece di
-  essere tagliati; negli elenchi la riga selezionata mostra il titolo intero.
-  Le larghezze sono calcolate in colonne, quindi titoli con ideogrammi o emoji
-  non rompono l'impaginazione.
-- **Testo sicuro.** Sequenze di escape e caratteri di controllo presenti in nomi
-  di torrent, titoli dei feed o log vengono rimossi prima di arrivare al
-  terminale.
-- **Incolla.** Il bracketed paste è attivo: un magnet incollato arriva intero nel
-  campo, e fuori da un campo apre "aggiungi" invece di eseguire comandi.
-- **Copia (`y`).** Usa OSC52, che copia negli appunti del computer da cui ti
-  colleghi. In tmux serve `set -g set-clipboard on` (o `allow-passthrough on`);
-  la TUI invia la sequenza anche nella forma passthrough di tmux e GNU screen.
-- **Locale.** Con una locale non UTF-8 (es. `LANG=C`, frequente se SSH non
-  inoltra `LC_*`) la TUI disegna solo in ASCII. Si forza con
-  `GEXTTO_TUI_ASCII=1` o `GEXTTO_TUI_ASCII=0`.
-- **Link lenti.** Se le frecce diventano lettere, alza l'attesa per le sequenze
-  di escape: `GEXTTO_TUI_ESCDELAY=250` (millisecondi, default 100).
-- **Disconnessione.** Se la connessione cade (SIGHUP o terminale chiuso) la TUI
-  esce da sola. Un ridimensionamento della finestra ridisegna subito.
-- Senza terminale interattivo la TUI si ferma con un messaggio: da remoto usa
+- **Bandwidth.** Each frame sends only the lines that changed, and of a line
+  only the final part that changes; when the log scrolls the terminal scrolls
+  the region and only the new lines arrive. Frames are synchronised updates (no
+  flicker). Health and statistics are polled every 10 seconds instead of on
+  every refresh. Bottom right the TUI shows the bandwidth it is using, for
+  example `TUI ↓7.2KB/s ↑230B/s · 1.5 req/s`: ↓ is what it receives (daemon
+  answers and keys), ↑ what it sends (screen and requests), `req/s` the
+  requests to the daemon per second.
+- **Word wrap.** Logs, details, health and dashboard wrap instead of being cut;
+  in the lists the selected line shows the whole title. Widths are computed in
+  columns, so titles with ideograms or emoji do not break the layout.
+- **Safe text.** Escape sequences and control characters in torrent names,
+  feed titles or logs are removed before they reach the terminal.
+- **Paste.** Bracketed paste is on: a pasted magnet arrives whole in the field,
+  and outside a field it opens "add" instead of running commands.
+- **Copy (`y`).** It uses OSC52, which copies to the clipboard of the computer
+  you connect from. In tmux you need `set -g set-clipboard on` (or
+  `allow-passthrough on`); the TUI also sends the sequence in the tmux and GNU
+  screen passthrough form.
+- **Locale.** With a non-UTF-8 locale (e.g. `LANG=C`, frequent when SSH does not
+  forward `LC_*`) the TUI draws in ASCII only. It can be forced with
+  `GEXTTO_TUI_ASCII=1` or `GEXTTO_TUI_ASCII=0`.
+- **Slow links.** If the arrows turn into letters, raise the wait for escape
+  sequences: `GEXTTO_TUI_ESCDELAY=250` (milliseconds, default 100).
+- **Disconnection.** If the connection drops (SIGHUP or terminal closed) the TUI
+  exits by itself. Resizing the window redraws at once.
+- Without an interactive terminal the TUI stops with a message: remotely use
   `ssh -t host /opt/gextto/gexttod tui`.
 
-Altre variabili: `NO_COLOR` (o `TERM=dumb`) disattiva i colori,
-`GEXTTO_TUI_THEME=high-contrast` attiva il tema ad alto contrasto.
+Other variables: `NO_COLOR` (or `TERM=dumb`) turns colours off,
+`GEXTTO_TUI_THEME=high-contrast` turns the high-contrast theme on.
 
-## Architettura
+## Architecture
 
 `internal/tui`:
 
-- `i18n.go` — catalogo bilingue IT/EN, `Translator`, risoluzione della lingua.
-- `client.go` — client HTTP tipizzato di tutte le API del daemon.
-- `format.go` — formattazione di byte, durate, numeri opzionali.
-- `text.go` — larghezza in colonne, pulizia dei caratteri di controllo, a capo,
-  fallback ASCII.
-- `bandwidth.go` — misura della banda usata dalla TUI (piè di pagina).
-- `model.go` / `update.go` / `render.go` — stato puro, transizioni da tasti e
-  rendering in righe con stile semantico (testabili senza terminale).
-- `keys.go` — decodifica del flusso di byte in tasti (sequenze CSI complete di
-  modificatori, bracketed paste, UTF-8).
-- `term.go` — raw mode, schermo alternato e renderer incrementale.
-- `run.go` — ciclo principale: polling, stream SSE, esecuzione azioni.
+- `i18n.go` — six-language catalog, `Translator`, language resolution.
+- `client.go`, `client_torrents.go`, `client_library.go`,
+  `client_maintenance.go` — typed HTTP client of the daemon APIs.
+- `format.go` — formatting of bytes, durations, optional numbers.
+- `text.go` — column width, removal of control characters, wrapping, ASCII
+  fallback.
+- `bandwidth.go` — measurement of the bandwidth the TUI uses (footer).
+- `model.go` / `update.go` / `render.go` (with `render_library.go`,
+  `library.go`, `downloads.go`, `maintenance.go`) — pure state, transitions
+  from keys and rendering into lines with semantic style (testable without a
+  terminal).
+- `keys.go` — decoding of the byte stream into keys (complete CSI sequences with
+  modifiers, bracketed paste, UTF-8).
+- `term.go` — raw mode, alternate screen and incremental renderer.
+- `run.go` (with `run_downloads.go`, `run_library.go`, `run_maintenance.go`) —
+  main loop: polling, SSE stream, execution of the actions.
 
-La TUI parla **solo** con l'API HTTP del daemon e non tocca mai i database.
+The TUI talks **only** to the daemon's HTTP API and never touches the
+databases.
 
-Nei prompt di testo sono disponibili anche `←→`, `Home`/`End`, `Delete`,
-`Ctrl-A`/`Ctrl-E` (inizio/fine), `Ctrl-U` (svuota), `Ctrl-K` (cancella fino
-alla fine) e `Ctrl-W` (cancella la parola precedente).
+Text prompts also support `←→`, `Home`/`End`, `Delete`, `Ctrl-A`/`Ctrl-E`
+(start/end), `Ctrl-U` (clear), `Ctrl-K` (delete to the end) and `Ctrl-W`
+(delete the previous word).
 
-## Test
+## Tests
 
 ```bash
 go test ./internal/tui/...
 go test -race ./internal/tui/...
+go test . -run TestTUILibraryClientAgainstTheRouter   # client against the real API
 ```
 
-Coprono il catalogo i18n, la formattazione, il client (con un server HTTP di
-test), la decodifica dei tasti e tutte le transizioni del modello nei due
-linguaggi.
+They cover the i18n catalog, formatting, the client (with a test HTTP server
+and against the daemon's real router), key decoding and every transition of the
+model.

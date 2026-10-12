@@ -1,35 +1,33 @@
 # Gextto HTTP API
 
-Questa è la tabella delle route pubbliche registrate dal daemon. È un
-riferimento di superficie, non un contratto di integrazione stabile per ogni
-payload: prima di automatizzare un'azione, verifica richiesta e risposta sulla
-build in esecuzione.
+This is the table of the public routes registered by the daemon. It is a
+surface reference, not a stable integration contract for every payload: before
+automating an action, check the request and the response on the running build.
 
-## Prima di usare l'API
+## Before using the API
 
-- Per impostazione predefinita l'API è aperta, come in una LAN fidata. Con
-  *Configurazione → Accesso e servizi → Richiedi l'accesso (login)* attivo, chi non è in rete
-  locale deve mandare la chiave API nell'header `X-Api-Key` (o `?apikey=`
-  nell'indirizzo) oppure il cookie di sessione ottenuto da `/login`; senza
-  credenziali le route `/api/…` rispondono `401`. Per l'accesso da Internet usa
-  comunque HTTPS (reverse proxy con certificato o VPN).
-- `/login` e `/logout` esistono solo con l'accesso protetto attivo.
-- Le route che modificano configurazione, file, torrent o database usano di
-  norma `POST`/`DELETE`; trattale come azioni amministrative e conserva backup.
-- I segnaposto tra parentesi graffe, ad esempio `{hash}`, fanno parte del
-  percorso e devono essere codificati correttamente dal client.
-- Alcune route sono alias storici (`run_now`/`run-now`, per esempio). Le nuove
-  integrazioni dovrebbero preferire la forma più leggibile quando disponibile.
-- Le operazioni lunghe (`/api/scan-all-archives`,
-  `/api/maintenance/backfill-media-info`, `/api/rename-all`) rispondono `202` con
-  un `job_id`: segui stato, progresso ed esito con `GET /api/jobs/{id}` e annulla
-  con `POST /api/jobs/{id}/cancel`. L'elenco completo è su `GET /api/jobs`.
+- By default the API is open, as on a trusted LAN. With
+  *Configuration → Access and services → Require login* enabled, a client
+  outside the local network must send the API key in the `X-Api-Key` header (or
+  `?apikey=` in the address) or the session cookie obtained from `/login`;
+  without credentials the `/api/…` routes answer `401`. For access from the
+  Internet use HTTPS anyway (a reverse proxy with a certificate, or a VPN).
+- `/login` and `/logout` exist only when protected access is enabled.
+- Routes that change configuration, files, torrents or databases normally use
+  `POST`/`DELETE`; treat them as administrative actions and keep backups.
+- Placeholders in curly braces, for example `{hash}`, are part of the path and
+  must be encoded correctly by the client.
+- Some routes are historical aliases (`run_now`/`run-now`, for example). New
+  integrations should prefer the more readable form when available.
+- Long operations (`/api/scan-all-archives`,
+  `/api/maintenance/backfill-media-info`, `/api/rename-all`) answer `202` with a
+  `job_id`: follow state, progress and outcome with `GET /api/jobs/{id}` and
+  cancel with `POST /api/jobs/{id}/cancel`. The full list is at `GET /api/jobs`.
 
-La UI server-rendered ufficiale è disponibile su `/`; `/v2` è un alias tecnico.
-Le route HTMX interne sotto `/v2` non fanno parte di questa tabella di
-integrazione e possono cambiare. La vecchia route `/ui` non è più disponibile.
-Per verifiche operative usa prima
-`GET /api/health` e `GET /api/status`.
+The official server-rendered UI is at `/`; `/v2` is a technical alias. The
+internal HTMX routes under `/v2` are not part of this integration table and may
+change. The old `/ui` route is no longer available. For operational checks use
+`GET /api/health` and `GET /api/status` first.
 
 ## Route
 
