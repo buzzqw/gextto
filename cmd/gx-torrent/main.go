@@ -201,6 +201,7 @@ func main() {
 	lang := flag.String("lang", envOr("GX_TORRENT_LANG", ""), "web page language (it, en, de, fr, es, pl; empty = English)")
 	ipFilterTrackers := flag.Bool("ipfilter-trackers", envBool("GX_TORRENT_IPFILTER_TRACKERS", true), "apply the IP filter to trackers too")
 	dhtBootstrap := flag.String("dht-bootstrap", envOr("GX_TORRENT_DHT_BOOTSTRAP", ""), "comma-separated DHT router addresses (empty = built-in bootstrap nodes)")
+	webSourcesAllowPrivate := flag.Bool("web-sources-allow-private", envBool("GX_TORRENT_WEB_SOURCES_ALLOW_PRIVATE", false), "let web seeds and magnet xs=/as= sources reach private/LAN addresses (off: protects the LAN from URLs in untrusted torrents)")
 	dhtReadOnly := flag.Bool("dht-read-only", envBool("GX_TORRENT_DHT_READ_ONLY", false), "read-only DHT (BEP 43): do not answer queries and ask not to be added to routing tables")
 	insecure := flag.Bool("insecure", false, "allow a non-loopback listen address without a token")
 	debug := flag.Bool("debug", os.Getenv("GX_TORRENT_DEBUG") == "1", "verbose engine logging")
@@ -283,6 +284,7 @@ func main() {
 	noNATPMPValue := optBool(settingsStore, "no-natpmp", *noNATPMP)
 	dhtBootstrapValue := optStr(settingsStore, "dht-bootstrap", *dhtBootstrap)
 	dhtReadOnlyValue := optBool(settingsStore, "dht-read-only", *dhtReadOnly)
+	webSourcesAllowPrivateValue := optBool(settingsStore, "web-sources-allow-private", *webSourcesAllowPrivate)
 	var allowed []string
 	for _, root := range strings.Split(*roots, ",") {
 		if root = strings.TrimSpace(root); root != "" {
@@ -304,23 +306,24 @@ func main() {
 		Token:        tokenValue,
 		AllowedRoots: allowed,
 		Network: NetworkOptions{
-			PortBegin:         portBegin,
-			PortEnd:           portEnd,
-			ListenInterface:   listenIfaceValue,
-			OutgoingInterface: outIfaceValue,
-			Proxy:             proxyValue,
-			Encryption:        encryptionValue,
-			DHT:               !noDHTValue,
-			PEX:               !noPEXValue,
-			UTP:               !noUTPValue,
-			Holepunch:         !noHolepunchValue,
-			LSD:               !noLSDValue,
-			UPnP:              !noUPnPValue,
-			NATPMP:            !noNATPMPValue,
-			IPFilter:          ipFilterValue,
-			IPFilterTrackers:  ipFilterTrackersValue,
-			DHTBootstrap:      parseBootstrapNodes(dhtBootstrapValue),
-			DHTReadOnly:       dhtReadOnlyValue,
+			PortBegin:              portBegin,
+			PortEnd:                portEnd,
+			ListenInterface:        listenIfaceValue,
+			OutgoingInterface:      outIfaceValue,
+			Proxy:                  proxyValue,
+			Encryption:             encryptionValue,
+			DHT:                    !noDHTValue,
+			PEX:                    !noPEXValue,
+			UTP:                    !noUTPValue,
+			Holepunch:              !noHolepunchValue,
+			LSD:                    !noLSDValue,
+			UPnP:                   !noUPnPValue,
+			NATPMP:                 !noNATPMPValue,
+			IPFilter:               ipFilterValue,
+			IPFilterTrackers:       ipFilterTrackersValue,
+			DHTBootstrap:           parseBootstrapNodes(dhtBootstrapValue),
+			DHTReadOnly:            dhtReadOnlyValue,
+			WebSourcesAllowPrivate: webSourcesAllowPrivateValue,
 		},
 		Debug:          *debug,
 		Mode:           modeValue,

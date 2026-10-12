@@ -663,6 +663,13 @@ esempio:
   `GX_TORRENT_NO_HOLEPUNCH`, `GX_TORRENT_NO_LSD`, `GX_TORRENT_NO_UPNP`,
   `GX_TORRENT_NO_NATPMP`, `GX_TORRENT_DHT_BOOTSTRAP`;
 - `GX_TORRENT_IPFILTER`, `GX_TORRENT_IPFILTER_TRACKERS`;
+- `GX_TORRENT_WEB_SOURCES_ALLOW_PRIVATE` (flag `-web-sources-allow-private`,
+  chiave `web-sources-allow-private`, casella in *Impostazioni → Rete*): permette
+  a web seed e sorgenti magnet `xs=`/`as=` di raggiungere indirizzi privati della
+  LAN. Spento di default, anche in modalità gestita: quegli URL arrivano dai dati
+  del torrent (anche da un feed non fidato) e senza questo limite potrebbero far
+  contattare al client il router, il NAS o altri servizi interni (SSRF). Vedi
+  `docs/bep.md`, *Revisione del 2026-10-12*;
 - `GX_TORRENT_LANG`, `GX_TORRENT_MODE`, `GX_TORRENT_LOG_FILE`, `GX_TORRENT_DEBUG`,
   `GX_TORRENT_NOTIFY_URL` (webhook per le notifiche dei feed);
 - `GX_TORRENT_MMAP` (storage mmap opt-in, Linux: flag `-mmap`).

@@ -122,6 +122,7 @@ Its engine core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementati
 #### Streaming, safety and operations
 
 - **Streaming:** the piece picker separates the player's window (`SetStreamWindow`) from the readahead horizon (`SetReadaheadWindow`), and per-file priorities (0 = skip, 1–4 normal, 5–7 high) are applied live; MKV/MP4 are served to the browser or VLC with HTTP Range.
+- **LAN protection:** web seeds and magnet `xs=`/`as=` sources come from torrent data, so by default they cannot reach private addresses (router, NAS, other LAN services): the check is on the resolved IP, immune to DNS rebinding, and can be relaxed for a LAN web seed.
 - **Swarm protection:** strict BEP 27 private torrents (no DHT, PEX or LSD), a 30-minute quarantine for peers sending corrupt blocks, trackers dropped after `never` (BEP 31) or a long failure, per-piece diagnostics, resume data in BoltDB, live Server-Sent Events (`/ui/events`).
 - **Everywhere:** Gextto's internal engine or a standalone client with its own web UI and qBittorrent-compatible API, as a systemd service on Linux and a native Windows service on Windows (amd64/arm64).
 

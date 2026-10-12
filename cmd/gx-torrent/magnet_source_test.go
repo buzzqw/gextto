@@ -51,7 +51,9 @@ func makeTorrentWithHash(t *testing.T, dir, name string, size int) ([]byte, stri
 // fetches the .torrent from the exact source instead of waiting for a peer or
 // the DHT, so the metadata is available right after the add.
 func TestDaemonMagnetExactSource(t *testing.T) {
-	d := newTestDaemon(t)
+	// The source is on 127.0.0.1: allow private addresses for this test (the
+	// default refuses them, see TestMagnetSourceOnLANRefusedByDefault).
+	d := newTestDaemonWith(t, NetworkOptions{PortBegin: 42000, PortEnd: 42100, Encryption: 1, PEX: true, WebSourcesAllowPrivate: true})
 	dir := t.TempDir()
 	data, hash := makeTorrentWithHash(t, dir, "source.bin", 50_000)
 

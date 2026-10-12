@@ -1099,7 +1099,10 @@ valida in `announce_peer`, `put` BEP 44 solo agli 8 nodi più vicini, aggiunta d
 magnet BEP 46/`xs=` senza lock globale, `so=` (ciclo infinito e espansione
 illimitata da un magnet ostile), blocchi `ut_metadata` duplicati, interesse dopo
 `lt_donthave` (con guardia sul bitfield nullo), candidati dello Swarm Merging
-senza bitfield. Resta da valutare una politica anti-SSRF per `xs=`/`as=`/`ws=`.
+senza bitfield. Aggiunta anche la protezione anti-SSRF: web seed e sorgenti
+`xs=`/`as=` non raggiungono indirizzi privati salvo `web-sources-allow-private`
+(controllo sull'IP risolto, nessun costo misurabile: una risoluzione DNS già
+necessaria per collegarsi).
 
 ### 4.12 Qualità fine: cosa manca al motore (analisi 2026-10-12)
 

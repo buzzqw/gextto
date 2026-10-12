@@ -268,6 +268,13 @@ func NewSession(cfg Config) (*Session, error) {
 					if err != nil {
 						return nil, err
 					}
+					// A web seed URL comes from torrent or magnet data: it must
+					// not reach the LAN unless the operator allows it.
+					if !cfg.WebSourcesAllowPrivate {
+						if err := netx.CheckPublicTCPAddr(ip, port); err != nil {
+							return nil, err
+						}
+					}
 					var d net.Dialer
 					taddr := &net.TCPAddr{IP: ip, Port: port}
 					dctx, cancel := context.WithTimeout(ctx, cfg.WebseedDialTimeout)

@@ -323,9 +323,15 @@ func (s *Session) addMagnetFromSources(ma *magnet.Magnet, opt *AddTorrentOptions
 	if len(sources) == 0 {
 		return nil, errors.New("magnet has no HTTP source")
 	}
+	// The xs=/as= URLs come from the magnet, possibly from an untrusted feed:
+	// only public addresses, unless the operator allows private ones.
+	transport := netx.PublicHTTPTransport()
+	if s.config.WebSourcesAllowPrivate {
+		transport = netx.HTTPTransport()
+	}
 	client := http.Client{
 		Timeout:   s.config.TorrentAddHTTPTimeout,
-		Transport: netx.HTTPTransport(),
+		Transport: transport,
 	}
 	var lastErr error
 	for _, src := range sources {

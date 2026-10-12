@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -403,7 +404,7 @@ func TestAddDoesNotHoldTheLockWhileResolving(t *testing.T) {
 		http.NotFound(w, nil)
 	}))
 	defer slow.Close()
-	d := feedDaemon(t, "")
+	d := newTestDaemonWith(t, NetworkOptions{PortBegin: 42000, PortEnd: 42100, Encryption: 1, PEX: true, WebSourcesAllowPrivate: true})
 	magnet := "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&xs=" + url.QueryEscape(slow.URL+"/x.torrent")
 	done := make(chan error, 1)
 	go func() {
@@ -429,5 +430,25 @@ func TestAddDoesNotHoldTheLockWhileResolving(t *testing.T) {
 	defer d.mu.Unlock()
 	if len(d.adding) != 0 || len(d.state.Torrents) != 1 {
 		t.Fatalf("after add: adding=%d torrents=%d", len(d.adding), len(d.state.Torrents))
+	}
+}
+
+// TestMagnetSourceOnLANRefusedByDefault: an xs= source on a private address
+// (here 127.0.0.1) is never contacted unless the operator allows it, so a
+// magnet from an untrusted feed cannot make the client request LAN services.
+func TestMagnetSourceOnLANRefusedByDefault(t *testing.T) {
+	var hits atomic.Int32
+	lan := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		http.NotFound(w, nil)
+	}))
+	defer lan.Close()
+	d := newTestDaemon(t)
+	magnet := "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&xs=" + url.QueryEscape(lan.URL+"/x.torrent")
+	if _, _, err := d.add(addRequest{Magnet: magnet}); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if got := hits.Load(); got != 0 {
+		t.Fatalf("the LAN source was contacted %d time(s)", got)
 	}
 }

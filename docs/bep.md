@@ -191,9 +191,17 @@ libtorrent), binding dei token all'info-hash (coerente con libtorrent, nessun
 problema di interoperabilità), firma BEP 44 (`seq` int64, chiavi ordinate nella
 ricodifica).
 
-Da valutare: `xs=`/`as=` e `ws=` sono URL scelti da chi crea il magnet (anche da
-un feed non fidato) e il demone li scarica dalla propria rete; una politica che
-escluda gli indirizzi privati ridurrebbe il rischio SSRF verso la LAN.
+**Protezione SSRF (fatta lo stesso giorno).** `xs=`/`as=` e i web seed (`ws=` dei
+magnet e `url-list` dei `.torrent`) sono URL scelti da chi crea il torrent, anche
+da un feed non fidato: di default **non possono raggiungere indirizzi privati**
+(RFC 1918, loopback, link-local, CGNAT, ULA IPv6, multicast…). Il nome viene
+risolto e la connessione va all'IP verificato, quindi un rebinding DNS non aggira
+il controllo, anche con proxy o interfaccia VPN (`netx.DialPublic`,
+`netx.CheckPublicTCPAddr`). Chi ha davvero un web seed in LAN abilita
+`web-sources-allow-private` (flag, `GX_TORRENT_WEB_SOURCES_ALLOW_PRIVATE`,
+`settings.json` o casella in *Impostazioni → Rete*; nel motore
+`Config.WebSourcesAllowPrivate`). Il link `.torrent` incollato dall'operatore
+resta libero.
 
 ## Manutenzione
 

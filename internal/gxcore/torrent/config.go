@@ -239,6 +239,11 @@ type Config struct {
 	WebseedRetryInterval time.Duration `yaml:"webseed-retry-interval"`
 	// Verify TLS certificate for WebSeed URLs
 	WebseedVerifyTLS bool `yaml:"webseed-verify-tls"`
+	// WebSourcesAllowPrivate lets the URLs that come from torrent or magnet
+	// data — web seeds (url-list, ws=) and xs=/as= metadata sources — reach
+	// private, loopback and link-local addresses. Off by default: a magnet from
+	// an RSS feed must not make the client request services on the LAN (SSRF).
+	WebSourcesAllowPrivate bool `yaml:"web-sources-allow-private"`
 	// Limit the number of WebSeed sources in torrent.
 	WebseedMaxSources int `yaml:"webseed-max-sources"`
 	// Number of maximum simulateous downloads from WebSeed sources.

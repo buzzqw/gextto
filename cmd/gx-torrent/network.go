@@ -55,6 +55,10 @@ type NetworkOptions struct {
 	IPFilter string
 	// IPFilterTrackers applies the filter to trackers too.
 	IPFilterTrackers bool
+	// WebSourcesAllowPrivate lets web seeds and magnet xs=/as= sources reach
+	// private/LAN addresses (off by default, against SSRF from untrusted
+	// torrents and feeds).
+	WebSourcesAllowPrivate bool
 	// MaxRequestsOut/DefaultRequestsOut size the adaptive per-peer request
 	// queue (pipelining): the depth starts at DefaultRequestsOut and grows by
 	// one per delivered block up to MaxRequestsOut (or the peer's reqq). Zero
@@ -205,6 +209,7 @@ func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 		cfg.ForceIncomingEncryption = false
 	}
 	cfg.BlocklistEnabledForTrackers = n.IPFilterTrackers
+	cfg.WebSourcesAllowPrivate = n.WebSourcesAllowPrivate
 	cfg.BlocklistEnabledForIncomingConnections = true
 	cfg.BlocklistEnabledForOutgoingConnections = true
 }

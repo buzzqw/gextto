@@ -152,6 +152,7 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 		store.Set(ipFilterRefreshKey, strconv.FormatInt(hours, 10))
 	}
 	store.Set("dht-read-only", strconv.FormatBool(formBool(r, "dht-read-only")))
+	store.Set("web-sources-allow-private", strconv.FormatBool(formBool(r, "web-sources-allow-private")))
 	for _, toggle := range []string{"dht", "pex", "utp", "holepunch", "lsd", "upnp", "natpmp"} {
 		store.Set("no-"+toggle, strconv.FormatBool(!formBool(r, toggle)))
 	}
@@ -281,6 +282,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{UPNP_ON}}", checkedIf(featureOn("upnp")))
 	repl("{{NATPMP_ON}}", checkedIf(featureOn("natpmp")))
 	repl("{{DHT_READONLY}}", checkedIf(boolSetting("dht-read-only")))
+	repl("{{WEB_PRIVATE}}", checkedIf(boolSetting("web-sources-allow-private")))
 
 	repl("{{ACTIVE_DL}}", strconv.Itoa(cfg.ActiveDownloads))
 	repl("{{ACTIVE_SEEDS}}", strconv.Itoa(cfg.ActiveSeeds))
