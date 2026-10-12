@@ -1732,5 +1732,5 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 
 /* Archive: the action column grows with the text scale (four icon buttons)
    and a long source ends with an ellipsis instead of running over the score. */
-.archive-table th:last-child, .archive-table td:last-child { width: 11.5rem; }
+.archive-table th:last-child, .archive-table td:last-child { width: 12.5rem; }
 .archive-table td:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }

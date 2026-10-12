@@ -649,9 +649,9 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
    buttons) so the release name gets the room. */
 .archive-table { width: 100%; min-width: 0; table-layout: fixed; }
 .archive-table th:nth-child(1), .archive-table td:nth-child(1) { width: auto; }
-.archive-table th:nth-child(2), .archive-table td:nth-child(2) { width: 13%; }
-.archive-table th:nth-child(3), .archive-table td:nth-child(3) { width: 7%; }
-.archive-table th:nth-child(4), .archive-table td:nth-child(4) { width: 9%; }
+.archive-table th:nth-child(2), .archive-table td:nth-child(2) { width: 11%; }
+.archive-table th:nth-child(3), .archive-table td:nth-child(3) { width: 6%; }
+.archive-table th:nth-child(4), .archive-table td:nth-child(4) { width: 8%; }
 .archive-table th:last-child, .archive-table td:last-child { width: 168px; }
 .archive-table th, .archive-table td { padding: 8px 10px; }
 .archive-table td { white-space: nowrap; }
