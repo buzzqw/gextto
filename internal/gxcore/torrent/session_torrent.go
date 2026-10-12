@@ -300,6 +300,15 @@ func (t *Torrent) ClearSelectOnly() {
 	t.torrent.setSelectOnly(nil)
 }
 
+// RefreshSelection re-reads Config.FilePriorities/FileSelection and applies the
+// new per-piece priorities on the running torrent, without restarting it. It is
+// used when the app changes only the priority levels (the set of skipped files
+// is unchanged); changing which files are downloaded still goes through the
+// stop/relocate/start path.
+func (t *Torrent) RefreshSelection() {
+	t.torrent.sendCommand(func() { t.torrent.applySkippedPieces() })
+}
+
 // PieceStates returns the state of every piece, in index order:
 // "have", "downloading", "skipped" or "" (missing). The second value is false
 // when the torrent has no metadata/pieces yet. Once completed the engine drops the

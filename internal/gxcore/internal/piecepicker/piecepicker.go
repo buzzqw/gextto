@@ -104,6 +104,12 @@ func (p *myPiece) PickableBy(pe *peer.Peer) bool {
 	return p.Having.Has(pe)
 }
 
+// HighPriority reports whether the piece belongs to a high-priority file
+// (file priority 5..7): such pieces are downloaded before the rest.
+func (p *myPiece) HighPriority() bool {
+	return !p.Skip && p.Priority >= piece.PriorityHigh
+}
+
 // New returns a new PiecePicker.
 // If sequential is true, pieces are picked in sequential order instead of rarest-first.
 // If firstLast is true, the pieces at both ends of every file are picked first
@@ -241,6 +247,23 @@ func (p *PiecePicker) pickReadahead(pe *peer.Peer) *myPiece {
 		}
 	}
 	return nil
+}
+
+// pickHigh returns the rarest high-priority piece (file priority 5..7) the peer
+// can download right now. Pieces of high-priority files are requested before
+// the rest, right after the player's streaming and readahead windows.
+func (p *PiecePicker) pickHigh(pe *peer.Peer) *myPiece {
+	var picked *myPiece
+	for i := range p.pieces {
+		mp := &p.pieces[i]
+		if !mp.HighPriority() || !mp.PickableBy(pe) {
+			continue
+		}
+		if picked == nil || mp.Having.Len() < picked.Having.Len() {
+			picked = mp
+		}
+	}
+	return picked
 }
 
 // PieceDownloading reports whether the piece at index i is being downloaded
@@ -431,6 +454,10 @@ func (p *PiecePicker) findPiece(pe *peer.Peer) (mp *myPiece, allowedFast bool) {
 		}
 		// Then the readahead window (what the player will read next).
 		if mp = p.pickReadahead(pe); mp != nil {
+			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
+		}
+		// Then the high-priority files, before the rest.
+		if mp = p.pickHigh(pe); mp != nil {
 			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
 		}
 	}

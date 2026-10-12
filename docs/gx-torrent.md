@@ -47,7 +47,7 @@ Codice:
 - [uTP e LSD](#utp-e-lsd)
 - [Holepunching (BEP 55)](#holepunching-bep-55)
   - [Verifica](#verifica)
-- [Selezione dei file](#selezione-dei-file)
+- [Selezione dei file e priorità](#selezione-dei-file-e-priorità)
 - [Download sequenziale (streaming)](#download-sequenziale-streaming)
 - [Torrent BitTorrent v2](#torrent-bittorrent-v2)
 - [Statistiche](#statistiche)
@@ -758,19 +758,28 @@ IP (`connectedPeerIPs`); due daemon sullo stesso IP verrebbero visti come un sol
 peer. Entrambi vanno avviati con `-outgoing-interface` uguale all'IP di ascolto,
 altrimenti annunciano al tracker il proprio IP "di default" (sbagliato).
 
-## Selezione dei file
+## Selezione dei file e priorità
 
-Si possono scaricare solo alcuni file di un torrent: priorità 0 = escluso,
-qualsiasi altro valore = incluso. Si imposta dalla scheda file di gextto o con
-`POST /api/v1/torrents/{hash}/file-priorities` (`priorities=4,0,4`).
+Si possono scaricare solo alcuni file di un torrent e dare precedenza agli
+altri. La scala è quella di libtorrent/qBittorrent: **0 = escluso**, **1..4 =
+normale**, **5..7 = alto** (i file ad alta priorità vengono scaricati prima).
+Si imposta dalla scheda file di gextto o con
+`POST /api/v1/torrents/{hash}/file-priorities` (`priorities=4,0,7`); l'API
+compatibile qBittorrent usa la sua scala 0/1/6/7.
 
 - I file esclusi non compaiono mai nella cartella di destinazione. I pezzi a
   cavallo con un file incluso vengono scritti in `DATA/parts/<id>`, come il
   partfile di libtorrent.
 - Progresso, dimensione e completamento si riferiscono ai soli file scelti:
   gextto riceve "completato" quando sono pronti quelli.
-- Cambiare la selezione ferma il torrent per un attimo, sposta i file
-  interessati tra `parts` e destinazione e lo fa ripartire.
+- Cambiare **quali** file sono esclusi ferma il torrent per un attimo, sposta i
+  file interessati tra `parts` e destinazione e lo fa ripartire; cambiare **solo
+  i livelli** di priorità (negli stessi file scaricati) viene invece applicato al
+  torrent in corso, senza fermarlo né spostare file.
+- Il motore calcola la priorità di ogni pezzo come il **massimo** tra i file che
+  tocca: un pezzo a cavallo tra un file normale e uno ad alta priorità è alto; il
+  picker lo richiede subito dopo la finestra di streaming/readahead e prima di
+  file-edge, allowed-fast e rarest.
 - Se il **magnet link** porta il parametro `so=` (BEP 53, *Select Only*, es.
   `so=0,2,4-7`), il motore scarica da subito solo quei file e appena arrivano i
   metadati il demone registra la scelta come normali priorità: la scheda file
@@ -1257,7 +1266,6 @@ vedono la modifica quasi immediatamente.
 Le operazioni che il motore non supporta rispondono con un errore esplicito di
 capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 
-- livelli di priorità dei file oltre a incluso/escluso;
 - v2 come **seed**: le richieste `hash request` del layer dei blocchi
   (`base = 0`) sono servite solo per un file **interamente presente** e vengono
   costruite leggendo i dati (una volta per file, poi in cache); per un file

@@ -1375,7 +1375,7 @@ func v2DetailCapsFor(backend string) v2DetailCaps {
 	}
 	switch backend {
 	case BackendGxTorrent:
-		caps.FileNote = "gx-torrent scarica o salta ogni file (nessun livello di priorità); cambiare la selezione riavvia il torrent per un attimo."
+		caps.FileNote = "gx-torrent scarica per primi i file ad alta priorità; cambiare la selezione (salta/scarica) riavvia il torrent per un attimo."
 		caps.LimitsNote = "I limiti valgono per questo torrent: -1 usa il limite globale, 0 è illimitato."
 		caps.TrackerNote = "gx-torrent sostituisce l'intera lista dei tracker: le righe cancellate vengono rimosse."
 		caps.GeneralNote = "Con gx-torrent non è disponibile l'upload/share mode. Il download sequenziale e il super-seeding (BEP 16) si attivano anche a caldo, la prima/ultima parte solo quando aggiungi il torrent; il super-seeding vale solo a torrent completato e riduce di proposito l'upload del seed."

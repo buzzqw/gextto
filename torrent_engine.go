@@ -189,7 +189,7 @@ var capabilityLevels = map[string]map[string]string{
 		"first_last": "full", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
 		"piece_diagnostics": "full", "categories": "full", "tags": "full", "sync": "full",
 		"super_seeding": "full",
-		"connections":   "full", "file_priorities": "none",
+		"connections":   "full", "file_priorities": "full",
 		"ip_filter": "full", "session_stats": "full", "web_seeds": "full",
 		"holepunch": "full",
 	},

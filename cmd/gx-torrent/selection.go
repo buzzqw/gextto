@@ -1,9 +1,10 @@
 package main
 
-// selection.go: download only some files of a torrent (priority 0 = skip).
-// Skipped files live in DATA/parts/<id>, never in the save path; changing
-// the selection stops the torrent, moves the affected files between the two
-// places and starts it again.
+// selection.go: per-file download priorities. A priority of 0 skips the file;
+// 1..4 is normal, 5..7 is high (downloaded before the rest). Skipped files live
+// in DATA/parts/<id>, never in the save path: changing which files are skipped
+// stops the torrent, moves the affected files between the two places and starts
+// it again, while changing only the levels is applied to the running torrent.
 
 import (
 	"errors"
@@ -16,6 +17,8 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
+// skipMask returns, per file, true when the priority means "do not download".
+// nil when every file is wanted.
 func skipMask(priorities []int) []bool {
 	var mask []bool
 	for i, priority := range priorities {
@@ -29,18 +32,31 @@ func skipMask(priorities []int) []bool {
 	return mask
 }
 
+// normalFilePriority is the libtorrent default: a file with no explicit choice
+// is downloaded with the rest.
+const normalFilePriority = 4
+
+// isAllNormal reports whether every file is normal (no skip, no high priority).
+func isAllNormal(priorities []int) bool {
+	return !slices.ContainsFunc(priorities, func(p int) bool { return p != normalFilePriority })
+}
+
+// setSelection stores the priorities the engine reads through prioritiesFor. A
+// selection where every file is normal is the same as no selection, so the
+// entry is dropped; the slice is copied so the engine never aliases the
+// caller's.
 func (d *Daemon) setSelection(id string, priorities []int) {
 	d.selMu.Lock()
 	defer d.selMu.Unlock()
-	if mask := skipMask(priorities); mask != nil {
-		d.selection[id] = mask
-	} else {
+	if isAllNormal(priorities) {
 		delete(d.selection, id)
+		return
 	}
+	d.selection[id] = append([]int(nil), priorities...)
 }
 
-// selectionFor is the engine's FileSelection callback.
-func (d *Daemon) selectionFor(id string) []bool {
+// prioritiesFor is the engine's FilePriorities callback.
+func (d *Daemon) prioritiesFor(id string) []int {
 	d.selMu.RLock()
 	defer d.selMu.RUnlock()
 	return d.selection[id]
@@ -57,7 +73,8 @@ func filePriority(meta *torrentMeta, index int) int {
 	return 4
 }
 
-// setFilePriorities applies a new selection (one priority per file).
+// setFilePriorities applies a new selection: one priority per file (0 = skip,
+// 1..4 = normal, 5..7 = high).
 func (d *Daemon) setFilePriorities(key string, priorities []int) error {
 	d.mu.Lock()
 	t, meta := d.findLocked(key)
@@ -85,13 +102,19 @@ func (d *Daemon) setFilePriorities(key string, priorities []int) error {
 	}
 	oldMask := skipMask(meta.FilePriorities)
 	newMask := skipMask(priorities)
-	if skipMask(priorities) == nil {
-		priorities = nil
+	stored := priorities
+	if isAllNormal(stored) {
+		stored = nil
 	}
-	meta.FilePriorities = priorities
+	meta.FilePriorities = stored
 	if slices.Equal(oldMask, newMask) {
+		// The files to skip did not change: only the priority levels did (or
+		// nothing did). No file moves between the save path and the parts dir
+		// and the torrent keeps running; the engine picks up the new levels.
+		d.setSelection(id, stored)
 		d.saveLocked()
 		d.mu.Unlock()
+		t.RefreshSelection()
 		return nil
 	}
 	wasRunning := isRunning(t.Stats().Status)
@@ -109,11 +132,11 @@ func (d *Daemon) setFilePriorities(key string, priorities []int) error {
 	d.saveLocked()
 	d.mu.Unlock()
 
-	go d.finishSelection(id, t, paths, oldMask, newMask, savePath, wasRunning)
+	go d.finishSelection(id, t, paths, oldMask, newMask, stored, savePath, wasRunning)
 	return nil
 }
 
-func (d *Daemon) finishSelection(id string, t *torrent.Torrent, paths []string, oldMask, newMask []bool, savePath string, wasRunning bool) {
+func (d *Daemon) finishSelection(id string, t *torrent.Torrent, paths []string, oldMask, newMask []bool, priorities []int, savePath string, wasRunning bool) {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) && t.Stats().Status != torrent.Stopped {
 		time.Sleep(100 * time.Millisecond)
@@ -135,7 +158,7 @@ func (d *Daemon) finishSelection(id string, t *torrent.Torrent, paths []string, 
 			moveErr = err
 		}
 	}
-	d.setSelection(id, newMaskPriorities(newMask))
+	d.setSelection(id, priorities)
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -151,20 +174,6 @@ func (d *Daemon) finishSelection(id string, t *torrent.Torrent, paths []string, 
 	}
 	d.saveLocked()
 	d.poke()
-}
-
-// newMaskPriorities turns a skip mask back into priorities for setSelection.
-func newMaskPriorities(mask []bool) []int {
-	if mask == nil {
-		return nil
-	}
-	out := make([]int, len(mask))
-	for i, skip := range mask {
-		if !skip {
-			out[i] = 4
-		}
-	}
-	return out
 }
 
 // relocateFile moves one file (rename, or copy across filesystems). A

@@ -13,6 +13,17 @@ import (
 // BlockSize is the size of smallest piece data that we are going to request from peers.
 const BlockSize = 16 * 1024
 
+// File/piece priority levels, on the libtorrent/qBittorrent 0..7 scale used by
+// the daemon and Gextto:
+//
+//   - 0 = skip: the file is not downloaded (piece.Skip is set);
+//   - 1..4 = normal: downloaded with the rest (4 is the default);
+//   - 5..7 = high: downloaded before normal pieces.
+const (
+	PriorityNormal = 4
+	PriorityHigh   = 5
+)
+
 // Piece of a torrent.
 type Piece struct {
 	Index   uint32            // index in torrent
@@ -23,6 +34,10 @@ type Piece struct {
 	Done    bool
 	// Skip is set for pieces that belong only to unwanted files.
 	Skip bool
+	// Priority is the highest priority of the files this piece holds data from
+	// (see PriorityNormal/PriorityHigh). It only changes the pick order: a
+	// high-priority piece is requested before the normal ones.
+	Priority uint8
 	// V2 marks a BitTorrent v2 piece: it belongs to a single file and its hash
 	// is a SHA-256 merkle node over V2Leaves 16 KiB block leaves (BEP 52).
 	V2       bool

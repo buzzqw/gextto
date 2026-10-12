@@ -9,7 +9,7 @@ import (
 
 func newTestDaemonForTrackers() *Daemon {
 	return &Daemon{
-		selection: map[string][]bool{},
+		selection: map[string][]int{},
 		runtime:   map[string]*runtimeInfo{},
 		moving:    map[string]bool{},
 		trackers:  newTrackerHealth(),

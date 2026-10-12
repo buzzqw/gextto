@@ -480,7 +480,7 @@ setInterval(function(){refresh(false)},2000);
         <td class="num">{{bytes .Done}}</td>
         <td><form method="post" action="/ui/file-priority" onchange="this.submit()">
           <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="files"><input type="hidden" name="index" value="{{.Index}}">
-          <select name="priority" aria-label="Priority"><option value="0"{{if not .Wanted}} selected{{end}}>Skip</option><option value="4"{{if .Wanted}} selected{{end}}>Download</option></select>
+          <select name="priority" aria-label="Priority" title="Priority"><option value="0"{{if eq .Priority 0}} selected{{end}}>Skip</option><option value="4"{{if eq .Priority 4}} selected{{end}}>Normal</option><option value="6"{{if eq .Priority 6}} selected{{end}}>High</option><option value="7"{{if eq .Priority 7}} selected{{end}}>Maximum</option></select>
         </form></td>
         <td><a href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" title="Stream this file with HTTP Range; the pieces of the window are downloaded first">▶</a></td>
       </tr>

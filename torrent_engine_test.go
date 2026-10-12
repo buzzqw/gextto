@@ -123,9 +123,10 @@ func TestCapabilitiesBooleanMatchesLevels(t *testing.T) {
 	if CapabilityMatrix(BackendQbittorrent)["web_seeds"] != "none" {
 		t.Fatal("qbittorrent web_seeds must be none (the adapter returns a capability error)")
 	}
-	// gx-torrent selects files (skip/download) but has no priority levels.
-	if CapabilityMatrix(BackendGxTorrent)["file_priorities"] != "none" {
-		t.Fatal("gx-torrent file_priorities must be none")
+	// gx-torrent selects files with the libtorrent 0..7 priority scale:
+	// 0 = skip, 1..4 = normal, 5..7 = high (downloaded before the rest).
+	if CapabilityMatrix(BackendGxTorrent)["file_priorities"] != "full" {
+		t.Fatal("gx-torrent file_priorities must be full")
 	}
 }
 

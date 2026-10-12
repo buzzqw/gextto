@@ -1344,9 +1344,11 @@ func (e *gxTorrentEngine) PieceRuns(hash string) ([]TorrentPieceRun, bool, error
 	return runs, true, nil
 }
 
-// SetFilePriorities selects the files to download (0 = skip). gx-torrent has
-// no priority levels: any value above 0 means "download". Skipped files stay
-// out of the save path; changing the selection briefly restarts the torrent.
+// SetFilePriorities applies one priority per file on the libtorrent/qBittorrent
+// 0..7 scale: 0 = skip, 1..4 = normal, 5..7 = high (downloaded before the
+// rest). Skipped files stay out of the save path; changing which files are
+// skipped briefly restarts the torrent, while changing only the levels is
+// applied to the running torrent.
 func (e *gxTorrentEngine) SetFilePriorities(hash string, priorities []int32) (bool, error) {
 	if len(priorities) == 0 {
 		return false, nil

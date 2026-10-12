@@ -6,23 +6,120 @@ import (
 	"path/filepath"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage/filestorage"
 )
 
-// skippedInfoFiles maps Config.FileSelection (non-padding files) onto
-// info.Files. nil means every file is wanted. An app-provided selection takes
-// precedence; when the app has none, the BEP 53 magnet "so=" seed is used.
-func (t *torrent) skippedInfoFiles() []bool {
+// selectionPriorities resolves the priority of every info.Files entry
+// (0 = skip, 1..4 = normal, 5..7 = high), or nil when no explicit selection is
+// configured. An app-provided FilePriorities list takes precedence over the
+// legacy FileSelection skip list; when neither is set the BEP 53 magnet "so="
+// seed is used.
+func (t *torrent) selectionPriorities() []int {
 	if t.info == nil {
 		return nil
 	}
-	if selection := t.session.config.FileSelection; selection != nil {
-		if flags := selection(t.id); len(flags) > 0 {
-			return maskFromFlags(t.info, flags)
+	if fp := t.session.config.FilePriorities; fp != nil {
+		if prio := fp(t.id); len(prio) > 0 {
+			return prioritiesToInfoFiles(t.info, prio)
 		}
 	}
-	return maskFromSelectOnly(t.info, t.getSelectOnly())
+	if selection := t.session.config.FileSelection; selection != nil {
+		if flags := selection(t.id); len(flags) > 0 {
+			prio := make([]int, len(flags))
+			for i, skip := range flags {
+				if !skip {
+					prio[i] = piece.PriorityNormal
+				}
+			}
+			return prioritiesToInfoFiles(t.info, prio)
+		}
+	}
+	if skip := maskFromSelectOnly(t.info, t.getSelectOnly()); skip != nil {
+		prio := make([]int, len(t.info.Files))
+		for i := range prio {
+			prio[i] = piece.PriorityNormal
+			if skip[i] {
+				prio[i] = 0
+			}
+		}
+		return prio
+	}
+	return nil
+}
+
+// skippedInfoFiles maps the selection onto info.Files: true means "do not
+// download". nil means every file is wanted.
+func (t *torrent) skippedInfoFiles() []bool {
+	prio := t.selectionPriorities()
+	if prio == nil {
+		return nil
+	}
+	out := make([]bool, len(prio))
+	any := false
+	for i, p := range prio {
+		if p <= 0 {
+			out[i] = true
+			any = true
+		}
+	}
+	if !any {
+		return nil
+	}
+	return out
+}
+
+// prioritiesToInfoFiles maps a per-non-padding-file priority list onto
+// info.Files (padding files are normal). nil means no explicit selection, so
+// every file is normal.
+func prioritiesToInfoFiles(info *metainfo.Info, prio []int) []int {
+	out := make([]int, len(info.Files))
+	any := false
+	j := 0
+	for i, f := range info.Files {
+		out[i] = piece.PriorityNormal
+		if f.Padding {
+			continue
+		}
+		if j < len(prio) {
+			out[i] = prio[j]
+		}
+		if out[i] != piece.PriorityNormal {
+			any = true
+		}
+		j++
+	}
+	if !any {
+		return nil
+	}
+	return out
+}
+
+// piecePriorities returns the priority of every piece: the highest priority of
+// the non-padding files it holds data from (0 when it holds no wanted file).
+// nil means "every piece is normal", so the picker keeps no per-piece value.
+func (t *torrent) piecePriorities() []uint8 {
+	prio := t.selectionPriorities()
+	if prio == nil || t.info == nil {
+		return nil
+	}
+	pieceLength := int64(t.info.PieceLength)
+	out := make([]uint8, t.info.NumPieces)
+	var offset int64
+	for i, f := range t.info.Files {
+		start, end := offset, offset+f.Length
+		offset = end
+		if f.Padding || f.Length == 0 || prio[i] <= 0 {
+			continue
+		}
+		for p := start / pieceLength; p <= (end-1)/pieceLength && p < int64(len(out)); p++ {
+			if uint8(prio[i]) > out[p] {
+				out[p] = uint8(prio[i])
+			}
+		}
+	}
+	return out
 }
 
 // getSelectOnly returns the BEP 53 "so" seed. See selectOnlyMu.
@@ -136,8 +233,13 @@ func (t *torrent) partsStorage(skip []bool) storage.Storage {
 
 func (t *torrent) applySkippedPieces() {
 	skip := t.skippedPieces(t.skippedInfoFiles())
+	prio := t.piecePriorities()
 	for i := range t.pieces {
 		t.pieces[i].Skip = skip != nil && skip[i]
+		t.pieces[i].Priority = piece.PriorityNormal
+		if prio != nil {
+			t.pieces[i].Priority = prio[i]
+		}
 	}
 }
 

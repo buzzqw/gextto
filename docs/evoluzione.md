@@ -964,7 +964,7 @@ attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
 |---|---|---|---|---|
 | **PCP** (RFC 6887) per l'apertura porta | solo UPnP + NAT-PMP (`portMapper`) | **fatto (2026-10-11)** | M | medio |
 | **Rilevamento tipo di NAT / porta riflessa** | `reflected_port`/`nat_mapping` nel `portcheck`, dal campo `ip` BEP 42 | **fatto** | S/M | medio |
-| **Priorità file graduata** (+ allocate on demand) | solo incluso/escluso (`file_priorities: none`) | **alta se si tocca il motore, bassa senza** | L | medio |
+| **Priorità file graduata** (+ allocate on demand) | solo incluso/escluso (`file_priorities: none`) | **fatto (2026-10-12)** | L | medio |
 
 - **PCP — fatto (2026-10-11).** Client MAP minimale in `cmd/gx-torrent/pcp.go`
   (RFC 6887: header, nonce, verifica del result code e del nonce, mappatura
@@ -1007,10 +1007,19 @@ attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
   `implied_port: 1` ora usa la **porta sorgente** del pacchetto invece del campo
   `port` (che un peer dietro NAT spesso non conosce). Prima il campo era
   ignorato. Test: `TestAnnouncePeerImpliedPort`.
-- **Priorità file graduata — piano (L, non implementata in questa sessione).** È
-  l'unica voce **di motore** e tocca il percorso di download più critico, quindi
-  vale la regola del repo (*misura prima/dopo*, nessuna modifica non misurata):
-  qui il piano, non codice. Punti di contatto reali (dal codice):
+- **Priorità file graduata — fatto (2026-10-12).** Modello a priorità nel motore
+  (0 = salta, 1..4 = normale, 5..7 = alta, scala libtorrent/qBittorrent), con
+  l'attuale bool mappato su 0/4; `Config.FilePriorities` (il vecchio
+  `Config.FileSelection` resta come fallback), `piece.Piece.Priority` per pezzo
+  (il massimo tra i file che tocca) e nuovo stadio **`pickHigh`** nel piece
+  picker **subito dopo readahead e prima di file-edge/allowed-fast/rarest**.
+  Cambiare i soli livelli si applica a caldo (`Torrent.RefreshSelection`), senza
+  fermare il torrent; cambiare quali file si scaricano resta stop/rilocazione/
+  avvio. Da lato app: `capabilityLevels` porta `file_priorities` da `none` a
+  `full`, la scheda File del demone e di Gextto offrono la scala, l'API qBittorrent
+  mappa 0/1/6/7, i18n in tutte le lingue. Il piano originale (storico):
+
+  Il modello era solo incluso/escluso. Punti di contatto reali (dal codice):
   - **modello di selezione**: `Config.FileSelection func(torrentID) []bool`
     (`torrent/config.go`) e `skippedInfoFiles`/`maskFromFlags`
     (`torrent_selection.go`) sono un **bool skip** per file; serve un modello a
@@ -1037,14 +1046,56 @@ attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
   disattivo (default) i file nascono **sparsi** e l'OS alloca alla scrittura;
   serve al più un'opzione esplicita che lo dichiari.
 
-  **Decisione:** aprire come progetto a sé (L) quando c'è l'harness di misura;
-  in questa sessione ci si ferma al piano, coerente con *niente modifiche al
-  motore non misurate*.
+  **Stato:** modello, picker, demone e Gextto **fatti** (slice 1–3). La **misura**
+  (slice 4: throughput e seeding con priorità mista) è **da fare**: il nuovo
+  stadio `pickHigh` è un predicato sul percorso caldo (nessun cambio di ordine
+  senza priorità), quindi la misura serve a confermare il comportamento con file
+  misti, non a giustificare l'esistenza del codice.
 
 **Raccomandazione d'ordine:** prima la diagnostica DHT (**fatta**), poi gli item
 a basso rischio (**token e passo 1 del NAT fatti**), poi l'hardening anti-Sybil e
 il multi-path (con misura su sciame reale), infine PCP (**fatto**) e la priorità
-file (l'unica di motore: **piano** nei §4.11, da aprire con l'harness di misura).
+file (**fatta**).
+
+### 4.12 Qualità fine: cosa manca al motore (analisi 2026-10-12)
+
+Analisi del divario di **artigianato** (non di elenco di funzioni) tra gx-core e
+libtorrent. La copertura BEP di gx-core è ampia; il divario sta nello strato che
+non si vede nella matrice delle capacità: robustezza su sciami reali e ostili,
+throughput estremo, I/O disco, priorità fini e casi limite del protocollo.
+Fonti: [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md),
+[`bep.md`](bep.md), §5–§6 di questo documento.
+
+| Area | libtorrent | gx-core oggi | Divario |
+| --- | --- | --- | --- |
+| Choking / seeding | choking rate-based, anti-leech, peer classes | speed-based + optimistic, harness deterministico (`unchoker/sim_test.go`) | algoritmi di qualità assenti; misure **solo locali** (§6.6) |
+| Pipelining | multi-pezzo per peer, ring buffer | coda adattiva (50→250), un pezzo per peer | 10 Gbps dato per «da misurare» (`bep.md` §6); **nessun harness** |
+| I/O disco | mmap, storage pluggable, O_DIRECT/AIO, scritture contigue + hash su pool | `filestorage` con `O_SYNC` **su ogni scrittura**, file sparsi, `fallocate` | durabilità per-write; niente mmap/AIO/contiguo (§5.4) |
+| Priorità file | 0–7 graduate | **fatte (0 = salta, 1..4 = normale, 5..7 = alta)**; `capabilityLevels.file_priorities = full`; misura con file misti da fare (§4.11) | chiuso (misura residua) |
+| DHT | multi-path, anti-Sybil attivo | BEP 5/32/33/42/43/44/46, dedup; cap e multi-path spenti | hardening **non attivo** (§4.10) |
+| v2 / merge | seed v2 completo, riuso per blocco | v2-only download; seed v2 solo file interi (`hash reject`); merge fase 1 | seed v2 incompleto, merge fase 2 (§15.2) |
+| Robustezza adversariale | anni di campo su sciami ostili | snub, ban di sessione con TTL, filtro IP | superficie meno collaudata |
+
+I **tre divari a più alto valore** in esercizio reale, in ordine di priorità:
+
+1. **Priorità file graduate** — **fatte (2026-10-12)**: modello a priorità nel
+   motore (`piece.Piece.Priority`), `Config.FilePriorities`, stadio `pickHigh` nel
+   picker, demone e Gextto a 0/1/4/6/7, `capabilityLevels` a `full` (§4.11). Resta
+   solo la **misura** con file a priorità mista.
+2. **I/O disco** — `os.O_RDWR|os.O_SYNC` su **ogni** scrittura di pezzo
+   (`filestorage.go`), nessun `Sync()` su `storage.File`, niente mmap/AIO né
+   scritture contigue. Il progetto era in §5.4 (allora «non da fare»): è il costo
+   maggiore su NAS/NFS (previsione 1,2–1,8×, §5.12).
+3. **Dimostrazione su sciame reale** di choking e pipelining — coda adattiva e
+   choking sono validati **solo in locale**; la campagna §6.5 è ancora da fare.
+   Finché manca, «sufficiente e più leggero» è onesto, «alla pari» no.
+
+Fuori scope per scelta (documentato in `bep.md`): BEP 8/17/18/22/26/28/30/34/35/
+45/50/51, WebTorrent, I2P nativo; restano raggiungibili via proxy SOCKS5/HTTP.
+
+**Criterio**: sono divari di **qualità**, non di conformità; si chiudono con
+**misura** (regola performance di `AGENTS.md`) e con la stessa disciplina delle
+altre voci: un item = un commit, `GEXTTO.md` aggiornato, entrambe le UI, i18n.
 
 ---
 

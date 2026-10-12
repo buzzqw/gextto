@@ -361,7 +361,7 @@ func TestGxManagedListen(t *testing.T) {
 
 func TestV2DetailCapsPerEngine(t *testing.T) {
 	gx := v2DetailCapsFor(BackendGxTorrent)
-	if !gx.SuperSeeding || !gx.WebSeeds || !gx.RateLimits || !gx.Connections || gx.FileLevels || !gx.Pieces || gx.TrackerNote == "" {
+	if !gx.SuperSeeding || !gx.WebSeeds || !gx.RateLimits || !gx.Connections || !gx.FileLevels || !gx.Pieces || gx.TrackerNote == "" {
 		t.Fatalf("gx-torrent capabilities: %+v", gx)
 	}
 	qb := v2DetailCapsFor(BackendQbittorrent)

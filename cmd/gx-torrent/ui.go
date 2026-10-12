@@ -136,11 +136,12 @@ type uiTorrentRow struct {
 
 // uiFileRow, uiPeerRow and uiTrackerRow back the torrent detail tabs.
 type uiFileRow struct {
-	Index  int
-	Path   string
-	Size   int64
-	Done   int64
-	Wanted bool
+	Index    int
+	Path     string
+	Size     int64
+	Done     int64
+	Wanted   bool
+	Priority int
 }
 
 type uiPeerRow struct {
@@ -817,8 +818,8 @@ func (d *Daemon) handleUIIPFilter(w http.ResponseWriter, r *http.Request) {
 	d.uiDone(w, r, fmt.Sprintf("IP filter loaded: %d rules", rules), nil)
 }
 
-// handleUIFilePriority selects or skips one file of a torrent. The engine has no
-// priority levels: 0 = skip, any positive value = download.
+// handleUIFilePriority sets one file's priority. 0 = skip, 1..4 = normal,
+// 5..7 = high (downloaded before the rest).
 func (d *Daemon) handleUIFilePriority(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
@@ -832,6 +833,9 @@ func (d *Daemon) handleUIFilePriority(w http.ResponseWriter, r *http.Request) {
 	priority, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("priority")))
 	if priority < 0 {
 		priority = 0
+	}
+	if priority > 7 {
+		priority = 7
 	}
 
 	d.mu.Lock()
@@ -851,7 +855,7 @@ func (d *Daemon) handleUIFilePriority(w http.ResponseWriter, r *http.Request) {
 	}
 	priorities := make([]int, len(files))
 	for i := range priorities {
-		priorities[i] = 4
+		priorities[i] = normalFilePriority
 	}
 	for i := 0; i < len(priorities) && i < len(previous); i++ {
 		priorities[i] = previous[i]
@@ -1412,9 +1416,10 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 		priorities := append([]int(nil), meta.FilePriorities...)
 		d.mu.Unlock()
 		for index, file := range files {
+			priority := uiPriorityValue(filePriorityMeta(priorities, index))
 			data.Files = append(data.Files, uiFileRow{
 				Index: index, Path: file.Path(), Size: file.Length(), Done: done[index],
-				Wanted: filePriorityMeta(priorities, index) > 0,
+				Wanted: priority > 0, Priority: priority,
 			})
 		}
 	case "peers":
@@ -1537,7 +1542,23 @@ func filePriorityMeta(priorities []int, index int) int {
 		}
 		return priorities[index]
 	}
-	return 4
+	return normalFilePriority
+}
+
+// uiPriorityValue maps any stored priority to one of the four levels the page
+// offers (0 skip, 4 normal, 6 high, 7 maximum), so the select always shows the
+// right option even for values written by another client.
+func uiPriorityValue(p int) int {
+	switch {
+	case p <= 0:
+		return 0
+	case p >= 7:
+		return 7
+	case p >= 5:
+		return 6
+	default:
+		return normalFilePriority
+	}
 }
 
 func uiBytes(n int64) string {

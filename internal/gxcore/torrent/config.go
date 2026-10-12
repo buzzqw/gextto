@@ -99,7 +99,16 @@ type Config struct {
 	// per non-padding file, true = do not download). Skipped files are kept
 	// in PartsDir/<id> instead of the save path. It is called
 	// from the torrent goroutine and must not block on the session.
+	//
+	// FileSelection is the legacy skip/download-only contract; FilePriorities
+	// (below) takes precedence when both are set.
 	FileSelection func(torrentID string) []bool `yaml:"-"`
+	// FilePriorities returns, for a torrent ID, one priority per non-padding
+	// file on the libtorrent/qBittorrent 0..7 scale: 0 = skip, 1..4 = normal,
+	// 5..7 = high (downloaded before the rest). A short slice or nil means
+	// "normal". Like FileSelection it is called from the torrent goroutine and
+	// must not block. The engine only reads the returned slice.
+	FilePriorities func(torrentID string) []int `yaml:"-"`
 	// PartsDir holds the pieces of skipped files that border wanted ones.
 	PartsDir string `yaml:"parts-dir"`
 	// Global download speed limit in KB/s.

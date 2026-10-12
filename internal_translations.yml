@@ -4124,7 +4124,7 @@ eng:
   "Watchlist vuota o Simkl non configurato.": "Watchlist empty or Simkl not configured."
   "Weekly Pack ": "Weekly Pack "
   "es. Poison Ivy #41": "e.g. Poison Ivy #41"
-  "gx-torrent scarica o salta ogni file (nessun livello di priorità); cambiare la selezione riavvia il torrent per un attimo.": "gx-torrent either downloads or skips each file (no priority levels); changing the selection restarts the torrent for a moment."
+  "gx-torrent scarica per primi i file ad alta priorità; cambiare la selezione (salta/scarica) riavvia il torrent per un attimo.": "gx-torrent downloads high-priority files first; changing the selection (skip/download) restarts the torrent for a moment."
   "gx-torrent sostituisce l'intera lista dei tracker: le righe cancellate vengono rimosse.": "gx-torrent replaces the entire tracker list: deleted lines are removed."
   "magnet:?xt=urn:btih:…": "magnet:?xt=urn:btih:…"
   "qBittorrent non ha connessioni e slot di upload per singolo torrent: si impostano solo globalmente.": "qBittorrent has no per-torrent connection and upload slots: they are set globally only."

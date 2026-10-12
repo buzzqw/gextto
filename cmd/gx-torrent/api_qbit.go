@@ -488,16 +488,14 @@ func qbitLines(value string) []string {
 	return out
 }
 
-// handleQbitFilePrio sets the download/skip state of the given file indices.
-// qBittorrent priorities are 0 (skip) and 1..7 (normal..max); the engine only
-// has skip/download, so any non-zero priority means "download".
+// handleQbitFilePrio sets the priority of the given file indices.
+// qBittorrent file priorities are 0 (skip), 1 (normal), 6 (high) and 7
+// (maximal): the engine uses the same 0..7 scale (default 4), so 1 maps to 4
+// and 6/7 pass through as high priorities.
 func (d *Daemon) handleQbitFilePrio(w http.ResponseWriter, r *http.Request) {
 	hash := strings.TrimSpace(r.FormValue("hash"))
 	priority, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("priority")))
-	value := 4
-	if priority <= 0 {
-		value = 0
-	}
+	value := qbitFilePriorityIn(priority)
 	var indices []int
 	for _, id := range strings.FieldsFunc(r.FormValue("id"), func(r rune) bool {
 		return r == '|' || r == ',' || r == ' '
@@ -528,7 +526,7 @@ func (d *Daemon) handleQbitFilePrio(w http.ResponseWriter, r *http.Request) {
 	}
 	priorities := make([]int, len(files))
 	for i := range priorities {
-		priorities[i] = 4
+		priorities[i] = normalFilePriority
 	}
 	for i := 0; i < len(priorities) && i < len(previous); i++ {
 		priorities[i] = previous[i]
@@ -874,7 +872,7 @@ type qbitFile struct {
 
 func (d *Daemon) handleQbitFiles(w http.ResponseWriter, r *http.Request) {
 	d.mu.Lock()
-	t, _ := d.findLocked(r.URL.Query().Get("hash"))
+	t, meta := d.findLocked(r.URL.Query().Get("hash"))
 	d.mu.Unlock()
 	if t == nil {
 		http.Error(w, "Not found", http.StatusNotFound)
@@ -897,12 +895,45 @@ func (d *Daemon) handleQbitFiles(w http.ResponseWriter, r *http.Request) {
 		if file.Length() > 0 {
 			progress = float64(done[i]) / float64(file.Length())
 		}
+		priority := normalFilePriority
+		if meta != nil {
+			priority = filePriority(meta, i)
+		}
 		out = append(out, qbitFile{
 			Name: file.Path(), Size: file.Length(), Progress: progress,
-			Priority: 1, PieceRange: []int{0, 0}, Availability: -1,
+			Priority: qbitFilePriorityOut(priority), PieceRange: []int{0, 0}, Availability: -1,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// qbitFilePriorityIn maps a qBittorrent file priority to the engine scale:
+// qBittorrent uses 0 (skip), 1 (normal), 6 (high) and 7 (maximal); the engine
+// uses the same 0..7 scale with the libtorrent default 4, so 1 becomes 4.
+func qbitFilePriorityIn(p int) int {
+	switch {
+	case p <= 0:
+		return 0
+	case p == 1:
+		return normalFilePriority
+	default:
+		return p
+	}
+}
+
+// qbitFilePriorityOut maps an engine priority (0..7, default 4) back to the
+// qBittorrent scale so clients that read it see the values they expect.
+func qbitFilePriorityOut(p int) int {
+	switch {
+	case p <= 0:
+		return 0
+	case p >= 7:
+		return 7
+	case p >= 5:
+		return 6
+	default:
+		return 1
+	}
 }
 
 // ratioOf is uploaded over downloaded (or over the data held when it came from

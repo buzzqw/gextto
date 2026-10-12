@@ -289,10 +289,11 @@ type Daemon struct {
 	classCached    string
 	classCheckedAt time.Time
 
-	// selection is read by the engine from torrent goroutines: it has its own
-	// lock and must never wait for d.mu.
+	// selection holds the per-file priorities the engine reads from torrent
+	// goroutines (0 = skip, 1..4 = normal, 5..7 = high): it has its own lock
+	// and must never wait for d.mu.
 	selMu     sync.RWMutex
-	selection map[string][]bool
+	selection map[string][]int
 
 	wake chan struct{}
 }
@@ -317,7 +318,7 @@ func newDaemon(opts Options) (*Daemon, error) {
 	}
 	d := &Daemon{
 		opts:      opts,
-		selection: map[string][]bool{},
+		selection: map[string][]int{},
 		runtime:   map[string]*runtimeInfo{},
 		moving:    map[string]bool{},
 		startedAt: time.Now(),
@@ -467,7 +468,7 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	cfg.ResumeWriteInterval = 2 * time.Minute
 	d.applyNetwork(&cfg)
 	d.applyCache(&cfg)
-	cfg.FileSelection = d.selectionFor
+	cfg.FilePriorities = d.prioritiesFor
 	cfg.PartsDir = d.opts.PartsDir
 	cfg.SpeedLimitDownload = d.state.Config.SpeedLimitDownload
 	cfg.SpeedLimitUpload = d.state.Config.SpeedLimitUpload
