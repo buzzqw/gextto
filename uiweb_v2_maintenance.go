@@ -132,13 +132,6 @@ func v2TrashDeleteMessage(raw []byte, status int, tr func(string) string) (strin
 	return message, len(res.Errors) > 0
 }
 
-// V2ColorsModal renders the colour picker: four colours from which the whole
-// custom theme is derived in CSS.
-func V2ColorsModal(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_colors_modal", nil, dict, eng)
-}
-
 // V2SourcesCheck runs the source health check on demand and returns the table.
 func V2SourcesCheck(w http.ResponseWriter, r *http.Request, s *AppState) {
 	spec, ok := v2SpecFor(s, "health-sources")

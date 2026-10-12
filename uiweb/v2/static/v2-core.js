@@ -30,9 +30,13 @@
   }
 
   // ---------------------------------------------------------------- theme --
-  // The button cycles dark -> light -> cream -> personalizzato (only once the
-  // person has saved colours); its label names the next theme.
-  function customColors() {
+  // The "Tema" dialog lists the hand-tuned themes (dark, light, cream: their
+  // own CSS palette) and four-colour themes (editor palettes and the ones saved
+  // on the server), painted as data-theme="custom". The active choice is per
+  // browser: gextto_theme (mode), gextto_colors (the four colours, read by the
+  // inline bootstrap before first paint) and gextto_theme_id (the card).
+  var THEME_MODES = ["dark", "light", "cream", "custom"];
+  function storedColors() {
     try {
       var raw = storageGet("gextto_colors");
       if (!raw) return null;
@@ -41,15 +45,22 @@
     } catch (error) { /* ignore a malformed value */ }
     return null;
   }
-  function accentOnColor(hex) {
+  function luminance(hex) {
     var h = String(hex || "").replace("#", "");
     if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
-    if (h.length !== 6) return "#04121f";
+    if (h.length !== 6) return 0;
     function lin(v) { return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
-    var r = lin(parseInt(h.slice(0, 2), 16) / 255),
-        g = lin(parseInt(h.slice(2, 4), 16) / 255),
-        b = lin(parseInt(h.slice(4, 6), 16) / 255);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#04121f" : "#ffffff";
+    return 0.2126 * lin(parseInt(h.slice(0, 2), 16) / 255) +
+      0.7152 * lin(parseInt(h.slice(2, 4), 16) / 255) +
+      0.0722 * lin(parseInt(h.slice(4, 6), 16) / 255);
+  }
+  function contrast(a, b) {
+    var x = luminance(a), y = luminance(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  }
+  // Text on accent-filled buttons: whichever of dark or white reads better.
+  function accentOnColor(hex) {
+    return contrast(hex, "#04121f") >= contrast(hex, "#ffffff") ? "#04121f" : "#ffffff";
   }
   function applyColors(c) {
     if (!c) return;
@@ -58,74 +69,110 @@
     doc.style.setProperty("--c-text", c.text);
     doc.style.setProperty("--c-accent", c.accent);
     doc.style.setProperty("--c-on-accent", accentOnColor(c.accent));
+    if (luminance(c.bg) > 0.4) doc.setAttribute("data-tone", "light"); else doc.removeAttribute("data-tone");
   }
   function clearColors() {
     ["--c-bg", "--c-surface", "--c-text", "--c-accent", "--c-on-accent"].forEach(function (name) {
       doc.style.removeProperty(name);
     });
-  }
-  function themeModes() {
-    return customColors() ? ["dark", "light", "cream", "custom"] : ["dark", "light", "cream"];
-  }
-  function themeName(mode) {
-    if (mode === "light") return t("Tema chiaro");
-    if (mode === "cream") return t("Tema crema");
-    if (mode === "custom") return t("Tema personale");
-    return t("Tema scuro");
-  }
-  function nextTheme(mode) {
-    var list = themeModes();
-    var index = list.indexOf(mode);
-    return list[(index < 0 ? 0 : index + 1) % list.length];
+    doc.removeAttribute("data-tone");
   }
   function setTheme(mode) {
-    if (themeModes().indexOf(mode) < 0) mode = "dark";
-    if (mode === "custom") applyColors(customColors());
+    if (THEME_MODES.indexOf(mode) < 0 || (mode === "custom" && !storedColors())) mode = "dark";
+    if (mode === "custom") applyColors(storedColors()); else clearColors();
     doc.setAttribute("data-theme", mode);
     storageSet("gextto_theme", mode);
-    // The toggle exists twice: in the top bar and, on phones, in "Altro".
-    var buttons = document.querySelectorAll("[data-theme-toggle]");
-    for (var i = 0; i < buttons.length; i++) buttons[i].textContent = themeName(nextTheme(mode));
   }
-  function toggleTheme() {
-    setTheme(nextTheme(doc.getAttribute("data-theme")));
-  }
-  function applyCustomColors(colors) {
-    // Stored with the colours so the inline bootstrap paints readable accent
-    // buttons on the first frame, before this script runs.
-    colors.onAccent = accentOnColor(colors.accent);
-    storageSet("gextto_colors", JSON.stringify(colors));
-    applyColors(colors);
-    setTheme("custom");
-  }
-  function resetCustomColors() {
-    try { window.localStorage.removeItem("gextto_colors"); } catch (error) { /* ignore */ }
-    clearColors();
-    setTheme("dark");
+  function storeColors(c) {
+    // onAccent and tone are stored so the inline bootstrap paints readable
+    // accent buttons and the right status colours on the first frame.
+    storageSet("gextto_colors", JSON.stringify({
+      bg: c.bg, surface: c.surface, text: c.text, accent: c.accent,
+      onAccent: accentOnColor(c.accent), tone: luminance(c.bg) > 0.4 ? "light" : "dark"
+    }));
   }
   setTheme(storageGet("gextto_theme") || "dark");
 
-  // Colours dialog: four inputs, everything else derived in CSS.
-  function colorInputValue(id) {
-    var el = document.getElementById(id);
-    return el && /^#[0-9a-fA-F]{6}$/.test(el.value) ? el.value : "";
+  var THEME_INPUTS = { bg: "v2-color-bg", surface: "v2-color-surface", text: "v2-color-text", accent: "v2-color-accent" };
+  function cardColors(input) {
+    return { bg: input.getAttribute("data-bg"), surface: input.getAttribute("data-surface"),
+      text: input.getAttribute("data-text"), accent: input.getAttribute("data-accent") };
   }
-  function applyColorForm() {
-    applyCustomColors({
-      bg: colorInputValue("v2-color-bg") || "#0b1120",
-      surface: colorInputValue("v2-color-surface") || "#131c2e",
-      text: colorInputValue("v2-color-text") || "#e9f0fb",
-      accent: colorInputValue("v2-color-accent") || "#4fd6a1"
-    });
-  }
-  function initColorInputs() {
-    var c = customColors() || { bg: "#0b1120", surface: "#131c2e", text: "#e9f0fb", accent: "#4fd6a1" };
-    var map = { "v2-color-bg": c.bg, "v2-color-surface": c.surface, "v2-color-text": c.text, "v2-color-accent": c.accent };
-    for (var id in map) {
-      var el = document.getElementById(id);
-      if (el) el.value = map[id];
+  function editorColors() {
+    var c = {};
+    for (var key in THEME_INPUTS) {
+      var el = document.getElementById(THEME_INPUTS[key]);
+      if (!el || !/^#[0-9a-fA-F]{6}$/.test(el.value)) return null;
+      c[key] = el.value;
     }
+    return c;
   }
+  function fillEditor(c) {
+    for (var key in THEME_INPUTS) {
+      var el = document.getElementById(THEME_INPUTS[key]);
+      if (el && c && c[key]) el.value = c[key];
+    }
+    updateContrastHint();
+  }
+  function updateContrastHint() {
+    var hint = document.getElementById("v2-theme-contrast");
+    var c = editorColors();
+    if (!hint || !c) return;
+    var message = "";
+    if (Math.min(contrast(c.text, c.bg), contrast(c.text, c.surface)) < 4.5) {
+      message = t("Contrasto basso: il testo potrebbe essere difficile da leggere.");
+    } else if (contrast(c.accent, c.surface) < 3) {
+      message = t("Contrasto basso: l’accento si distingue poco dai pannelli.");
+    }
+    if (hint.textContent !== message) hint.textContent = message;
+  }
+  function selectThemeCard(input) {
+    var c = cardColors(input);
+    var mode = input.getAttribute("data-theme-mode");
+    if (mode === "custom") storeColors(c);
+    storageSet("gextto_theme_id", input.value);
+    setTheme(mode);
+    fillEditor(c);
+    var name = document.getElementById("v2-theme-name");
+    if (name) name.value = input.value.indexOf("saved:") === 0 ? input.value.slice(6) : "";
+  }
+  function editThemeColors() {
+    var c = editorColors();
+    if (!c) return;
+    storeColors(c);
+    storageSet("gextto_theme_id", "");
+    setTheme("custom");
+    var cards = document.querySelectorAll('input[name="v2-theme"]');
+    for (var i = 0; i < cards.length; i++) cards[i].checked = false;
+    updateContrastHint();
+  }
+  // Runs after the dialog is swapped in: marks the active card (or the one
+  // just saved) and seeds the editor with the colours on screen.
+  function initThemeModal() {
+    var modal = document.querySelector(".theme-modal");
+    if (!modal) return;
+    var cards = document.querySelectorAll('input[name="v2-theme"]');
+    var wanted = modal.getAttribute("data-theme-selected") || storageGet("gextto_theme_id") || "";
+    if (!wanted && doc.getAttribute("data-theme") !== "custom") wanted = doc.getAttribute("data-theme");
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i].value === wanted) {
+        cards[i].checked = true;
+        if (modal.getAttribute("data-theme-selected")) { selectThemeCard(cards[i]); return; }
+        fillEditor(cardColors(cards[i]));
+        if (wanted.indexOf("saved:") === 0) document.getElementById("v2-theme-name").value = wanted.slice(6);
+        return;
+      }
+    }
+    fillEditor(storedColors() || { bg: "#0b1120", surface: "#131c2e", text: "#e9f0fb", accent: "#4fd6a1" });
+  }
+  document.addEventListener("change", function (event) {
+    var target = event.target;
+    if (target && target.name === "v2-theme" && target.checked) selectThemeCard(target);
+  });
+  document.addEventListener("input", function (event) {
+    var target = event.target;
+    if (target && target.type === "color" && target.closest && target.closest(".theme-editor")) editThemeColors();
+  });
 
   // ----------------------------------------------------------- font scale --
   function readScale() {
@@ -1180,7 +1227,7 @@
     updateProblemsChip();
     updateDownloadsBadge();
     ensureTooltips(event.target);
-    if (event.target.id === "v2-modal") { scanModal(); initColorInputs(); return; }
+    if (event.target.id === "v2-modal") { scanModal(); initThemeModal(); return; }
     updateTorrentSelection();
     if (event.target.id === "v2-logs-view") {
       updateLogsFollowButton();
@@ -1293,9 +1340,6 @@
       return;
     }
     if (target.closest("[data-font-open]")) { event.preventDefault(); openFontPicker(target.closest("[data-font-open]")); return; }
-    if (target.closest("[data-color-apply]")) { event.preventDefault(); applyColorForm(); closeDialog(); return; }
-    if (target.closest("[data-color-reset]")) { event.preventDefault(); resetCustomColors(); closeDialog(); return; }
-    if (target.closest("[data-theme-toggle]")) { event.preventDefault(); toggleTheme(); }
   });
 
   // --------------------------------------------------------------- toasts --

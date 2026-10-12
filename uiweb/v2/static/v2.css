@@ -367,8 +367,8 @@ html, body {
   }
 }
 
-/* The operational chrome is dense by design. Tighten metric padding and let
-   the theme label use two lines so the final refresh button remains visible. */
+/* The operational chrome is dense by design: tighter metric padding keeps the
+   final refresh button visible. */
 .v2-topbar-sticky .top-actions {
   gap: 5px;
   min-width: 0;
@@ -397,14 +397,6 @@ html, body {
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-.v2-theme-toggle {
-  /* Keep the label ("Tema scuro", "Tema crema") on one line: a smaller font
-     lets it fit without wrapping into a taller button. */
-  white-space: nowrap;
-  font-size: 0.76rem;
-  padding-left: 8px;
-  padding-right: 8px;
 }
 /* Medium desktops cannot fit the title and the full control strip on one line
    without truncating the title, so the chrome stacks: title on its own row,
@@ -1205,7 +1197,6 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
     border-top: 1px solid var(--line-soft);
   }
   .nav-prefs .btn { min-height: 40px; width: auto; }
-  .nav-prefs .v2-theme-toggle { width: auto; min-width: 0; white-space: nowrap; }
   .nav-prefs-lang { flex: 1 1 120px; }
   .nav-prefs-lang select { width: 100%; min-height: 40px; }
 

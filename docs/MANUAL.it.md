@@ -263,18 +263,25 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
 
 ## 2. Dashboard
 
-- **Controlli dell'interfaccia** — la barra superiore offre tema, dimensione del
-  testo, **Font** e **Colori**. Il pulsante del tema passa da *scuro* a *chiaro*
-  a *crema* (un chiaro caldo e meno luminoso, per letture lunghe) e, se hai
-  scelto dei colori, a *personale*. **Colori** apre un dialogo con quattro
+- **Controlli dell'interfaccia** — la barra superiore offre **Tema**, dimensione
+  del testo e **Font**. **Tema** apre un unico dialogo: in alto la griglia dei
+  temi con l'anteprima dei loro colori (*Scuro*, *Chiaro*, *Crema* — un chiaro
+  caldo per letture lunghe — e i classici Nord, Dracula, Solarized, Gruvbox,
+  Monokai, One Dark, Tokyo Night, Catppuccin, GitHub, Rosé Pine, Everforest,
+  Nero OLED, Alto contrasto, nelle varianti scure e chiare); il tema si applica
+  appena lo selezioni, anche con le frecce della tastiera. Sotto, *I tuoi temi*
+  elenca i temi salvati e **Personalizza** parte dal tema scelto con quattro
   selettori (sfondo, pannelli, testo, accento): gli altri toni si calcolano da
-  questi e il testo sui pulsanti d'accento diventa chiaro o scuro in base
-  all'accento, così resta leggibile; *Predefiniti* torna al tema scuro. **Font**
-  applica un preset generico, un font locale rilevato o una famiglia inserita
-  manualmente all'interfaccia e ai log. Tema, colori e font restano locali al
-  browser; su telefono tema e colori sono nel menu *Altro*. Il rilevamento dei
-  font installati dipende dal supporto del browser alla Local Font Access API e
-  può richiedere un'autorizzazione.
+  questi, il testo sui pulsanti d'accento diventa chiaro o scuro per restare
+  leggibile e un avviso segnala un contrasto troppo basso. Dai un nome e premi
+  *Salva tema*: i temi salvati stanno sul server e compaiono su ogni
+  dispositivo (un nome già usato viene sovrascritto, ✕ elimina il tema). Il
+  tema attivo, la dimensione del testo e il font restano invece una scelta del
+  singolo browser; su telefono **Tema** è nel menu *Altro*. **Font** applica un
+  preset generico, un font locale rilevato o una famiglia inserita manualmente
+  all'interfaccia e ai log. Il rilevamento dei font installati dipende dal
+  supporto del browser alla Local Font Access API e può richiedere
+  un'autorizzazione.
 - **Ricerca manuale globale** — cerca in archivio + indexer + motori web.
 - **Ricerca automatica** — avvia un ciclo completo o di un solo dominio (Serie,
   Film, Fumetti); mostra prossima esecuzione, intervallo ed esito dell'ultimo

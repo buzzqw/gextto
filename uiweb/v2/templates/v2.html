@@ -33,6 +33,7 @@
           style.setProperty("--c-text", colors.text);
           style.setProperty("--c-accent", colors.accent);
           if (colors.onAccent) style.setProperty("--c-on-accent", colors.onAccent);
+          if (colors.tone === "light") document.documentElement.setAttribute("data-tone", "light");
           document.documentElement.setAttribute("data-theme", "custom");
         }
       }
@@ -66,8 +67,7 @@
          {{end}}
          {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "gaps"}}⚠️{{else}}•{{end}}</span><span>{{.Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
          {{if .System}}<div class="nav-prefs" aria-label="Aspetto">
-           <button class="btn sm v2-theme-toggle" type="button" data-theme-toggle title="Cambia tema: scuro, chiaro, crema o personale">Tema chiaro</button>
-           <button class="btn sm" type="button" hx-get="/colors" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli i colori dell'interfaccia" aria-haspopup="dialog">Colori</button>
+           <button class="btn sm" type="button" hx-get="/theme" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli il tema dell'interfaccia o creane uno" aria-haspopup="dialog">Tema</button>
            <button class="btn sm" type="button" data-font="-5" title="Testo più piccolo">A−</button>
            <button class="btn sm" type="button" data-font="+5" title="Testo più grande">A+</button>
            <form method="post" action="/language" class="nav-prefs-lang"><select class="input compact" name="lang" aria-label="Lingua dell'interfaccia" onchange="this.form.submit()">
@@ -102,8 +102,7 @@
         <button class="btn" type="button" data-font="100" title="Dimensione testo predefinita"><span data-font-label>Testo 100%</span></button>
         <button class="btn" type="button" data-font="+5" title="Testo più grande">A+</button>
         <button class="btn" type="button" data-font-open title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog">Font</button>
-        <button class="btn" type="button" hx-get="/colors" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli i colori dell'interfaccia" aria-haspopup="dialog">Colori</button>
-        <button class="btn v2-theme-toggle" type="button" data-theme-toggle title="Cambia tema: scuro, chiaro, crema o personale">Tema chiaro</button>
+        <button class="btn" type="button" hx-get="/theme" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli il tema dell'interfaccia o creane uno" aria-haspopup="dialog">Tema</button>
         <button class="btn btn-refresh" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati" aria-label="Ricarica i dati mostrati"><span class="btn-refresh-icon" aria-hidden="true">↺</span><span class="btn-refresh-label">Aggiorna</span></button>
         {{template "v2_live_status" .Chrome}}
       </div>
@@ -1268,23 +1267,43 @@
 </div>
 {{end}}
 
-{{define "v2_colors_modal"}}
+{{define "v2_theme_card"}}<label class="theme-card">
+  <input type="radio" name="v2-theme" value="{{.ID}}" data-theme-mode="{{.Mode}}" data-bg="{{.Bg}}" data-surface="{{.Surface}}" data-text="{{.Text}}" data-accent="{{.Accent}}">
+  <span class="theme-swatch" aria-hidden="true" style="background:{{.Bg}}"><span class="theme-swatch-panel" style="background:{{.Surface}};color:{{.Text}}">Aa<span class="theme-swatch-accent" style="background:{{.Accent}}"></span></span></span>
+  <span class="theme-name">{{.Name}}</span>
+</label>{{end}}
+
+{{define "v2_theme_modal"}}
 <div class="overlay" style="display:block">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-colors-title">
-    <div class="modal-head"><h3 id="v2-colors-title">Colori</h3>
-      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi i colori">Chiudi</button></div>
+  <div class="modal theme-modal" role="dialog" aria-modal="true" aria-labelledby="v2-theme-title" data-theme-selected="{{.Selected}}">
+    <div class="modal-head"><h3 id="v2-theme-title">Tema</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi la scelta del tema">Chiudi</button></div>
     <div class="modal-body">
-      <p class="hint">Scegli sfondo, pannelli, testo e accento: gli altri toni vengono calcolati da questi.</p>
-      <div class="form-grid">
-        <label class="field"><span>Sfondo</span><input class="input" type="color" id="v2-color-bg" value="#0b1120" title="Colore di sfondo della pagina"></label>
-        <label class="field"><span>Pannelli</span><input class="input" type="color" id="v2-color-surface" value="#131c2e" title="Colore dei pannelli, delle schede e delle tabelle"></label>
-        <label class="field"><span>Testo</span><input class="input" type="color" id="v2-color-text" value="#e9f0fb" title="Colore del testo"></label>
-        <label class="field"><span>Accento</span><input class="input" type="color" id="v2-color-accent" value="#4fd6a1" title="Colore di accento di pulsanti e link"></label>
-      </div>
-      <div class="form-actions">
-        <button class="btn primary" type="button" data-color-apply title="Applica i colori scelti">Applica</button>
-        <button class="btn" type="button" data-color-reset title="Torna ai colori predefiniti">Predefiniti</button>
-      </div>
+      {{if .Error}}<p class="hint theme-error" role="alert">{{.Error}}</p>{{end}}
+      <fieldset class="theme-group" title="Scegli un tema: si applica subito e vale per questo browser">
+        <legend>Temi</legend>
+        <div class="theme-grid">{{range .Builtin}}{{template "v2_theme_card" .}}{{end}}{{range .Presets}}{{template "v2_theme_card" .}}{{end}}</div>
+      </fieldset>
+      <fieldset class="theme-group" title="Temi salvati con un nome, disponibili su ogni dispositivo">
+        <legend>I tuoi temi</legend>
+        {{if .Saved}}<div class="theme-grid">{{range .Saved}}<div class="theme-saved">{{template "v2_theme_card" .}}<form class="theme-delete" hx-post="/theme/delete" hx-target="#v2-modal" hx-swap="innerHTML" hx-confirm="Eliminare questo tema salvato?"><input type="hidden" name="name" value="{{.Name}}"><button class="btn sm danger" type="submit" title="Elimina questo tema salvato" aria-label="Elimina questo tema salvato">✕</button></form></div>{{end}}</div>
+        {{else}}<p class="hint">Nessun tema salvato: personalizzane uno qui sotto e dagli un nome.</p>{{end}}
+      </fieldset>
+      <form class="theme-editor" id="v2-theme-form" hx-post="/theme/save" hx-target="#v2-modal" hx-swap="innerHTML">
+        <h4>Personalizza</h4>
+        <p class="hint">Parti dal tema scelto e cambia sfondo, pannelli, testo e accento: gli altri toni vengono calcolati da questi. Le modifiche si vedono subito.</p>
+        <div class="form-grid">
+          <label class="field"><span>Sfondo</span><input class="input" type="color" id="v2-color-bg" name="bg" value="#0b1120" title="Colore di sfondo della pagina"></label>
+          <label class="field"><span>Pannelli</span><input class="input" type="color" id="v2-color-surface" name="surface" value="#131c2e" title="Colore dei pannelli, delle schede e delle tabelle"></label>
+          <label class="field"><span>Testo</span><input class="input" type="color" id="v2-color-text" name="text" value="#e9f0fb" title="Colore del testo"></label>
+          <label class="field"><span>Accento</span><input class="input" type="color" id="v2-color-accent" name="accent" value="#4fd6a1" title="Colore di accento di pulsanti e link"></label>
+        </div>
+        <p class="hint theme-contrast" id="v2-theme-contrast" role="status" aria-live="polite"></p>
+        <div class="form-actions">
+          <label class="field theme-name-field"><span>Nome del tema</span><input class="input" type="text" name="name" id="v2-theme-name" maxlength="40" required placeholder="es. Il mio tema" title="Nome con cui salvare il tema: un nome già usato viene sovrascritto"></label>
+          <button class="btn primary" type="submit" title="Salva il tema con questo nome, disponibile su ogni dispositivo">Salva tema</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

@@ -266,16 +266,22 @@ release package the installer uses (README, *Install on Linux*).
 
 ## 2. Dashboard
 
-- **Interface controls** — the top bar offers theme, text size, **Font** and
-  **Colors**. The theme button goes from *dark* to *light* to *cream* (a warm,
-  less bright light theme for long reading) and, once you have chosen colours,
-  to *custom*. **Colors** opens a dialog with four pickers (background, panels,
-  text, accent): the other shades are computed from them and the text on accent
-  buttons turns light or dark depending on the accent, so it stays readable;
-  *Defaults* goes back to the dark theme. **Font** applies a generic preset, a
-  detected local font or a manually entered family to the interface and logs.
-  Theme, colours and font stay local to the browser; on a phone theme and
-  colours are in the *Other* menu. Installed-font detection depends on browser
+- **Interface controls** — the top bar offers **Theme**, text size and
+  **Font**. **Theme** opens a single dialog: at the top, the grid of themes with
+  a preview of their colours (*Dark*, *Light*, *Cream* — a warm light theme for
+  long reading — and the classic Nord, Dracula, Solarized, Gruvbox, Monokai,
+  One Dark, Tokyo Night, Catppuccin, GitHub, Rosé Pine, Everforest, OLED black,
+  High contrast, in dark and light variants); a theme applies as soon as you
+  select it, arrow keys included. Below, *Your themes* lists the saved themes and
+  **Customize** starts from the chosen theme with four pickers (background,
+  panels, text, accent): the other shades are computed from them, the text on
+  accent buttons turns light or dark to stay readable and a notice flags a
+  contrast that is too low. Give it a name and press *Save theme*: saved themes
+  live on the server and show up on every device (a name already in use is
+  overwritten, ✕ deletes the theme). The active theme, the text size and the
+  font stay a per-browser choice; on a phone **Theme** is in the *Other* menu.
+  **Font** applies a generic preset, a detected local font or a manually entered
+  family to the interface and logs. Installed-font detection depends on browser
   support for the Local Font Access API and may require permission.
 - **Manual global search** — searches archive + indexers + web engines.
 - **Automatic search** — run a full cycle or a single domain (Series, Movies,
