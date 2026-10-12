@@ -194,6 +194,36 @@ func TestQbittorrentEngineListMapping(t *testing.T) {
 	}
 }
 
+// TestQbittorrentEngineQueueManagement maps qBittorrent onto Gextto's meaning
+// of AutoManaged (owned by the queue): `auto_tmm` manages save paths, not the
+// queue, so it must not decide it. A force start is pinned, a stop is not managed.
+func TestQbittorrentEngineQueueManagement(t *testing.T) {
+	fake, engine, downloads := newFakeQBEngine(t)
+	fake.setTorrents([]qbittorrent.Torrent{
+		{Hash: "aa", Name: "queued", State: "downloading", Progress: 0.1, Size: 100, SavePath: downloads},
+		{Hash: "bb", Name: "forced", State: "forcedDL", ForceStart: true, Progress: 0.1, Size: 100, SavePath: downloads},
+		{Hash: "cc", Name: "stopped", State: "pausedDL", AutoManaged: true, Progress: 0.1, Size: 100, SavePath: downloads},
+	})
+	want := map[string]struct {
+		managed, pinned bool
+		label           string
+	}{
+		"aa": {true, false, "managed"},
+		"bb": {false, true, "pinned"},
+		"cc": {false, false, "paused"},
+	}
+	views := engine.List()
+	if len(views) != len(want) {
+		t.Fatalf("views = %d, want %d", len(views), len(want))
+	}
+	for _, view := range views {
+		w := want[view.Hash]
+		if view.AutoManaged != w.managed || view.Pinned != w.pinned || v2AutoManagedLabel(view) != w.label {
+			t.Fatalf("%s: managed=%v pinned=%v label=%q, want %+v", view.Hash, view.AutoManaged, view.Pinned, v2AutoManagedLabel(view), w)
+		}
+	}
+}
+
 func TestQbittorrentEnginePauseResumeIdempotent(t *testing.T) {
 	fake, engine, downloads := newFakeQBEngine(t)
 	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abc", Name: "x", State: "downloading", Progress: 0.1, Size: 100, SavePath: downloads}})

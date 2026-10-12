@@ -1557,13 +1557,24 @@ func v2AutoManagedLabel(torrent models.TorrentView) string {
 		return "managed"
 	case torrent.Stalled:
 		return "parked"
-	case torrent.State == "paused" || torrent.State == "queued":
-		return "paused"
-	default:
+	case v2TorrentRunning(torrent.State):
 		// Not auto-managed but still running: a force start the engine did not
 		// flag explicitly (libtorrent clears auto_managed on a pin).
 		return "pinned"
+	default:
+		// Paused, queued, checking or in error and outside the queue: it does
+		// not run until someone resumes it.
+		return "paused"
 	}
+}
+
+// v2TorrentRunning reports the states in which a torrent actually transfers.
+func v2TorrentRunning(state string) bool {
+	switch state {
+	case "downloading", "downloading_metadata", "seeding", "stalled", "finished":
+		return true
+	}
+	return false
 }
 
 // v2SwarmLabel shows the tracker scrape, "n/d" when no tracker answered.

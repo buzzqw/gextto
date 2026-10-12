@@ -1578,6 +1578,9 @@ func TestV2AutoManagedLabel(t *testing.T) {
 		{"parked", models.TorrentView{State: "stalled", Stalled: true}, "parked"},
 		{"pinned", models.TorrentView{Pinned: true}, "pinned"},
 		{"forced running", models.TorrentView{State: "downloading"}, "pinned"},
+		{"error outside the queue", models.TorrentView{State: "error"}, "paused"},
+		{"checking outside the queue", models.TorrentView{State: "checking_files"}, "paused"},
+		{"forced seeding", models.TorrentView{State: "seeding"}, "pinned"},
 	}
 	for _, tc := range cases {
 		if got := v2AutoManagedLabel(tc.in); got != tc.want {

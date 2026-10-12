@@ -1567,11 +1567,12 @@ func autoManagedLabel(t Torrent) string {
 		return "managed"
 	case t.Stalled:
 		return "parked"
-	case t.State == "paused" || t.State == "queued":
-		return "paused"
-	default:
+	}
+	switch t.State {
+	case "downloading", "downloading_metadata", "seeding", "stalled", "finished":
 		return "pinned"
 	}
+	return "paused"
 }
 
 // renderDetailSelectable lists the files or trackers of the open torrent

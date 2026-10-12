@@ -377,7 +377,10 @@ func (e *qbittorrentEngine) toView(t qbittorrent.Torrent) models.TorrentView {
 		SeedRatio:         qbmapRatio(t.RatioLimit),
 		SeedDays:          qbmapSeedDays(t.SeedingLimit),
 		HasMetadata:       hasMetadata,
-		AutoManaged:       t.AutoManaged,
+		// qBittorrent's `auto_tmm` is Automatic Torrent Management of save paths,
+		// not queueing: a torrent belongs to the queue unless it is force-started
+		// or stopped, which is what AutoManaged means everywhere else in Gextto.
+		AutoManaged:       !t.ForceStart && state != "paused",
 		Pinned:            t.ForceStart,
 		TorrentVersion:    torrentVersion,
 		TotalSize:         totalSize,

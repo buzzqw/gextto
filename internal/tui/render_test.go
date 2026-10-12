@@ -16,6 +16,9 @@ func TestAutoManagedLabel(t *testing.T) {
 		{"parked", Torrent{State: "stalled", Stalled: true}, "parked"},
 		{"pinned", Torrent{Pinned: true}, "pinned"},
 		{"forced running", Torrent{State: "downloading"}, "pinned"},
+		{"error outside the queue", Torrent{State: "error"}, "paused"},
+		{"checking outside the queue", Torrent{State: "checking_files"}, "paused"},
+		{"forced seeding", Torrent{State: "seeding"}, "pinned"},
 	}
 	for _, tc := range cases {
 		if got := autoManagedLabel(tc.in); got != tc.want {
