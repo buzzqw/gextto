@@ -96,8 +96,84 @@ func TestUIWantedSearchFallsBackToTitles(t *testing.T) {
 	if result.IndexerHits == 0 {
 		t.Fatalf("indexer hits = 0: %+v", result)
 	}
-	if len(result.Names) != 1 || !strings.Contains(result.Names[0], "Mandalorian") {
-		t.Fatalf("fallback titles = %v, want the matching release title", result.Names)
+	if len(result.Names) != 1 || result.Names[0] != "The Mandalorian" {
+		t.Fatalf("fallback names = %v, want the clean name, not the release title", result.Names)
+	}
+}
+
+// TestReleaseBaseName pins how a release title becomes the name to track.
+func TestReleaseBaseName(t *testing.T) {
+	cases := []struct {
+		title string
+		name  string
+		pack  bool
+	}{
+		{"The.Mandalorian.S01.2160p.UHD.BluRay", "the mandalorian", true},
+		{"The Mandalorian - S03 (2023 ITA/ENG) [Pir8]", "the mandalorian", true},
+		{"The Mandalorian Season 2 Complete 1080p", "the mandalorian", true},
+		{"The Mandalorian and Grogu 2026 2160p web YTS", "the mandalorian and grogu", false},
+		{"The.Mandalorian.and.Grogu.2026.1080p.HDTS.h264", "the mandalorian and grogu", false},
+		{"Lego Star Wars The Mandalorian", "lego star wars the mandalorian", false},
+		{"Star Wars - The Mandalorian and Grogu (2026) ITA ENG", "star wars the mandalorian and grogu", false},
+		{"Star Wars: The Mandalorian &amp; Grogu IMAX 10bit", "star wars the mandalorian and grogu", false},
+		{"Мандалорец и Грогу / The Mandalorian & Grogu (2026)", "the mandalorian and grogu", false},
+		{"The Mandalorian S03D01 BD", "the mandalorian", true},
+	}
+	for _, tc := range cases {
+		name, pack := releaseBaseName(tc.title, "mandalorian")
+		if name != tc.name || pack != tc.pack {
+			t.Fatalf("%q -> %q pack=%v, want %q pack=%v", tc.title, name, pack, tc.name, tc.pack)
+		}
+	}
+}
+
+// TestUIWantedSearchSeasonPacksAndPartialErrors: season packs give the series
+// name next to the episodes, a failing indexer is reported even when another
+// answered, and feed items unrelated to the query are not counted as hits.
+func TestUIWantedSearchSeasonPacksAndPartialErrors(t *testing.T) {
+	good := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><rss version="2.0"><channel>` +
+			`<item><title>Andor S01 1080p WEB</title><enclosure url="http://t/a.torrent" length="10"/></item>` +
+			`<item><title>Andor.S02E03.1080p</title><enclosure url="http://t/b.torrent" length="10"/></item>` +
+			`</channel></rss>`))
+	}))
+	defer good.Close()
+	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "down", http.StatusBadGateway)
+	}))
+	defer bad.Close()
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><rss version="2.0"><channel>` +
+			`<item><title>Unrelated.Show.S01E01</title><link>http://t/u.torrent</link></item>` +
+			`</channel></rss>`))
+	}))
+	defer feed.Close()
+
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(indexersSettingKey, `[{"name":"good","url":"`+good.URL+`","apikey":"k"},{"name":"bad","url":"`+bad.URL+`","apikey":"k"}]`)
+	d.opts.Settings.Set(feedsSettingKey, `[{"name":"f","url":"`+feed.URL+`"}]`)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=andor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var result wantedSearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(result.Names) != 1 || result.Names[0] != "Andor" {
+		t.Fatalf("names = %v, want [Andor] (episode and pack merged)", result.Names)
+	}
+	if result.IndexerHits != 2 || !strings.Contains(result.IndexerError, "bad") {
+		t.Fatalf("hits=%d error=%q, want 2 hits and the failing indexer named", result.IndexerHits, result.IndexerError)
+	}
+	if result.FeedHits != 0 {
+		t.Fatalf("feed hits = %d, want 0: the feed item does not match the query", result.FeedHits)
 	}
 }
 
@@ -138,6 +214,7 @@ func TestUIWantedSearchKeepsOnlyQueryMatches(t *testing.T) {
 		_, _ = w.Write([]byte(`<?xml version="1.0"?><rss version="2.0"><channel>
 <item><title>Arcane S01E01 1080p ITA WEB-DL</title><link>http://t/a.torrent</link></item>
 <item><title>Silo S02E03 1080p ITA WEB-DL</title><link>http://t/s.torrent</link></item>
+<item><title>The Mandalorian S01E02 1080p ITA WEB-DL</title><link>http://t/m.torrent</link></item>
 </channel></rss>`))
 	}))
 	defer feed.Close()
@@ -158,8 +235,10 @@ func TestUIWantedSearchKeepsOnlyQueryMatches(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if result.FeedHits == 0 {
-		t.Fatalf("the feed was not fetched: %+v", result)
+	// Only the feed item that matches the query is a hit: the others are the
+	// feed's unrelated content.
+	if result.FeedHits != 1 {
+		t.Fatalf("feed hits = %d, want 1: %+v", result.FeedHits, result)
 	}
 	for _, name := range result.Names {
 		if name == "Arcane" || name == "Silo" {

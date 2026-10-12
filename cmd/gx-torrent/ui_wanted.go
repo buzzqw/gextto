@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -172,29 +173,65 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 
 	result := wantedSearchResult{Names: []string{}}
 	var items []rss.Item
-	result.Indexers = len(d.indexers())
+	indexers := d.indexers()
+	result.Indexers = len(indexers)
 	if result.Indexers > 0 {
-		found, err := d.searchFeedSuggest(ctx, query)
-		if err != nil {
-			result.IndexerError = err.Error()
+		found, errs := searchIndexers(ctx, indexers, query)
+		// Every failing indexer is reported, also when the others answered:
+		// a silent failure made a search look complete when it was not.
+		var failed []string
+		for _, err := range errs {
+			failed = append(failed, err.Error())
 		}
+		result.IndexerError = strings.Join(failed, "; ")
 		result.IndexerHits = len(found)
 		items = append(items, found...)
 	}
-	feedItems := d.wantedRSSItems(ctx)
-	result.FeedHits = len(feedItems)
-	items = append(items, feedItems...)
+	// A feed hands over its whole current content, not a search: only the items
+	// that match the query count as hits, otherwise the counter looks full
+	// while nothing relevant was found.
+	terms := strings.Fields(strings.ToLower(query))
+	for _, item := range d.wantedRSSItems(ctx) {
+		if titleHasAllTerms(strings.ToLower(item.Title), terms) {
+			result.FeedHits++
+			items = append(items, item)
+		}
+	}
 	archiveItems := d.archiveWantedItems(query, wantedArchiveScan)
 	result.ArchiveHits = len(archiveItems)
 	items = append(items, archiveItems...)
 	result.Names = filterSuggestions(query, items, langFilters, qualityFilter, 20)
+	// Season packs ("Show S01", "Show Season 2") are series too, without an
+	// episode marker: their names join the list.
+	result.Names = mergeNames(result.Names, baseNameSuggestions(query, items, langFilters, qualityFilter, true), 20)
 	if len(result.Names) == 0 {
-		// No release carried an episode marker (a movie, or a pack without an
-		// SxxExx): fall back to the matching titles themselves, so the search
-		// is still useful instead of showing only "No results".
-		result.Names = fallbackTitles(query, items, langFilters, qualityFilter, 20)
+		// Nothing looks like a series (a movie, a special): suggest the clean
+		// names of the matching releases, never a raw release title.
+		result.Names = baseNameSuggestions(query, items, langFilters, qualityFilter, false)
+		if len(result.Names) > 20 {
+			result.Names = result.Names[:20]
+		}
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+// mergeNames appends the names of extra that are not in base yet (case
+// insensitively), up to limit.
+func mergeNames(base, extra []string, limit int) []string {
+	seen := map[string]bool{}
+	for _, name := range base {
+		seen[strings.ToLower(name)] = true
+	}
+	for _, name := range extra {
+		if len(base) >= limit {
+			break
+		}
+		if !seen[strings.ToLower(name)] {
+			seen[strings.ToLower(name)] = true
+			base = append(base, name)
+		}
+	}
+	return base
 }
 
 // wantedRSSItems fetches the items of every configured RSS feed (not the search
@@ -276,22 +313,56 @@ func filterSuggestions(query string, items []rss.Item, includeLang []string, qua
 	return out
 }
 
-// fallbackTitles returns the matching release titles themselves, best seeded
-// first and deduplicated, when no series name can be parsed (a movie, or a pack
-// without an episode marker). It applies the same query/language/quality filters
-// as filterSuggestions, so an unrelated feed item never sneaks in.
-func fallbackTitles(query string, items []rss.Item, includeLang []string, quality string, limit int) []string {
-	terms := strings.Fields(strings.ToLower(strings.TrimSpace(query)))
-	type candidate struct {
-		title   string
-		seeders int
+// releaseSeasonMarker matches a season marker without an episode (S01, a disc
+// S03D01, Season 2, Stagione 3, a complete pack); releaseNameCut matches where
+// the name of a release ends: a year, a resolution, a source/codec/format tag
+// or the start of a bracketed group.
+var (
+	releaseSeasonMarker = regexp.MustCompile(`(?i)(^|[\s._\-(\[])(s\d{1,2}(d\d{1,2})?(\b|[\s._\-])|season[\s._]*\d|stagione[\s._]*\d|complete\b|completa\b)`)
+	releaseNameCut      = regexp.MustCompile(`(?i)(^|[\s._\-(\[])((19|20)\d{2}\b|\d{3,4}p\b|\d+bit\b|4k\w*|uhd\b|imax\b|hdr\b|web[\s._\-]?(dl|rip)?\b|blu[\s._\-]?ray|bd\w*\b|hdts\b|hdtv|dvdrip|x26[45]|h[\s._]?26[45]|hevc|remux|ita\b|eng\b|multi\b)|[\[(*]`)
+	releaseNameSymbols  = regexp.MustCompile(`[^\p{L}\p{N}' ]+`)
+)
+
+// releaseBaseName reduces a release title to the name it is about and says
+// whether it is a season pack ("The.Mandalorian.S01.2160p" -> "the mandalorian",
+// true; "The Mandalorian and Grogu 2026 1080p" -> "the mandalorian and grogu",
+// false). A title in two languages ("Мандалорец / The Mandalorian") keeps the
+// part that matches the query terms.
+func releaseBaseName(title string, terms ...string) (name string, seasonPack bool) {
+	title = html.UnescapeString(html.UnescapeString(title))
+	if parts := strings.Split(title, " / "); len(parts) > 1 {
+		title = parts[len(parts)-1]
+		for _, part := range parts {
+			if titleHasAllTerms(strings.ToLower(part), terms) {
+				title = part
+				break
+			}
+		}
 	}
-	seen := map[string]bool{}
-	var candidates []candidate
+	cut := len(title)
+	if loc := releaseSeasonMarker.FindStringIndex(title); loc != nil {
+		cut, seasonPack = loc[0], true
+	}
+	if loc := releaseNameCut.FindStringIndex(title[:cut]); loc != nil && loc[0] > 0 {
+		cut = loc[0]
+	}
+	name = strings.ToLower(title[:cut])
+	name = strings.ReplaceAll(name, "&", " and ")
+	name = releaseNameSymbols.ReplaceAllString(strings.NewReplacer(".", " ", "_", " ").Replace(name), " ")
+	return strings.Join(strings.Fields(name), " "), seasonPack
+}
+
+// baseNameSuggestions returns the clean names of the matching releases, most
+// frequent first, with the same query/language/quality filters as
+// filterSuggestions. With packsOnly it keeps only season packs (series without
+// an episode marker); otherwise every release counts (movies, specials).
+func baseNameSuggestions(query string, items []rss.Item, includeLang []string, quality string, packsOnly bool) []string {
+	terms := strings.Fields(strings.ToLower(strings.TrimSpace(query)))
+	counts := map[string]int{}
+	var names []string
 	for _, item := range items {
-		title := strings.TrimSpace(item.Title)
-		lower := strings.ToLower(title)
-		if title == "" || !titleHasAllTerms(lower, terms) {
+		lower := strings.ToLower(item.Title)
+		if !titleHasAllTerms(lower, terms) {
 			continue
 		}
 		ok := true
@@ -304,24 +375,27 @@ func fallbackTitles(query string, items []rss.Item, includeLang []string, qualit
 		if !ok || !wantedQualityMatch(quality, lower) {
 			continue
 		}
-		if seen[lower] {
+		if _, _, _, episode := rss.FindEpisode(item.Title); episode {
+			continue // already a series name in filterSuggestions
+		}
+		name, pack := releaseBaseName(item.Title, terms...)
+		if (packsOnly && !pack) || len([]rune(name)) < 2 || !titleHasAllTerms(name, terms) {
 			continue
 		}
-		seen[lower] = true
-		candidates = append(candidates, candidate{title: title, seeders: item.Seeders})
-	}
-	sort.SliceStable(candidates, func(i, j int) bool {
-		if candidates[i].seeders != candidates[j].seeders {
-			return candidates[i].seeders > candidates[j].seeders
+		if _, seen := counts[name]; !seen {
+			names = append(names, name)
 		}
-		return candidates[i].title < candidates[j].title
-	})
-	if len(candidates) > limit {
-		candidates = candidates[:limit]
+		counts[name]++
 	}
-	out := make([]string, len(candidates))
-	for i, c := range candidates {
-		out[i] = c.title
+	sort.SliceStable(names, func(i, j int) bool {
+		if counts[names[i]] != counts[names[j]] {
+			return counts[names[i]] > counts[names[j]]
+		}
+		return names[i] < names[j]
+	})
+	out := make([]string, len(names))
+	for i, name := range names {
+		out[i] = titleCase(name)
 	}
 	return out
 }

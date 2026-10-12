@@ -596,8 +596,15 @@ disable, `episode_filter` in qBittorrent style
 (`cmd/gx-torrent/feed.go`). The **Wanted** list holds the titles to search for (with a
 dropdown for qualities, series/movie type, optional folder and category): the
 series name is suggested by the indexer results
-(`GET /ui/rss-suggest`) and `GET /ui/wanted-search` proposes the titles found in the
-feeds and in the indexers. The engine (`cmd/gx-torrent/wanted.go`) searches for every title
+(`GET /ui/rss-suggest`) and `GET /ui/wanted-search` proposes the names found in the
+feeds, in the indexers and in the archive: the series names of the episodes
+(`rss.FindEpisode`), plus those of the season packs (`S01`, `S03D01`, *Season 2*,
+*Stagione 3*, complete packs); when nothing looks like a series (a movie, a
+special) it proposes the **clean names** of the matching releases, cut at year,
+resolution and source/codec tags (`releaseBaseName`), never a raw release title.
+The counters only count what matches the query (a feed hands over its whole
+content), and an indexer that fails is reported next to the counters even when
+the others answered. The engine (`cmd/gx-torrent/wanted.go`) searches for every title
 in the indexers and feeds, logs in `state.json` what has appeared and what has been
 downloaded and searches for the missing episodes (gap search), even when there are no
 feeds configured. The **Check feeds** button immediately forces the check of all feeds. From the
