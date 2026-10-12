@@ -77,7 +77,7 @@ func startupBanner(prev runState, now time.Time) string {
 	if t, err := time.Parse(time.RFC3339, prev.StoppedAt); err == nil && !t.IsZero() {
 		down = "down for " + humanDuration(int64(now.Sub(t).Seconds()))
 	}
-	return fmt.Sprintf("♻️  Gextto RESTARTED (run #%d) — %s · %s", prev.Runs+1, identity, down)
+	return fmt.Sprintf("♻️ Gextto RESTARTED (run #%d) — %s · %s", prev.Runs+1, identity, down)
 }
 
 // shutdownBanner is the line written on a clean stop.
@@ -86,7 +86,7 @@ func shutdownBanner(s runState, now time.Time, reason string) string {
 	if t, err := time.Parse(time.RFC3339, s.StartedAt); err == nil && !t.IsZero() {
 		uptime = humanDuration(int64(now.Sub(t).Seconds()))
 	}
-	return fmt.Sprintf("🛑 Gextto stopping (%s) — uptime %s", reason, uptime)
+	return fmt.Sprintf("🛑 Gextto stopping gracefully (%s) — uptime %s", reason, uptime)
 }
 
 // logStartupBanner logs the start line, records the run and returns the

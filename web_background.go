@@ -1636,11 +1636,11 @@ func optimizeWorker(state *AppState) {
 
 // ipFilterRefreshInterval is how often the configured IP filter is downloaded
 // again and reloaded while the daemon stays up. The refresh at service boot is
-// separate (the managed gx-torrent gets a fresh list before it starts).
-const ipFilterRefreshInterval = 7 * 24 * time.Hour
+// separate and reuses the cached file when it is younger than 24h.
+const ipFilterRefreshInterval = 24 * time.Hour
 
 // ipFilterRefreshWorker keeps the IP filter fresh on a long-running daemon:
-// once a week it re-downloads the configured list (when it is a URL) and
+// once a day it re-downloads the configured list (when it is a URL) and
 // reloads it into the active engine, so a stale blocklist does not survive for
 // months. A backend without IP filter support is skipped.
 func ipFilterRefreshWorker(state *AppState) {

@@ -399,13 +399,12 @@ html, body {
   white-space: nowrap;
 }
 .v2-theme-toggle {
-  width: 62px;
-  min-width: 62px;
-  padding-left: 5px;
-  padding-right: 5px;
-  white-space: normal;
-  line-height: 1.05;
-  text-align: center;
+  /* Keep the label ("Tema scuro", "Tema crema") on one line: a smaller font
+     lets it fit without wrapping into a taller button. */
+  white-space: nowrap;
+  font-size: 0.76rem;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 /* Medium desktops cannot fit the title and the full control strip on one line
    without truncating the title, so the chrome stacks: title on its own row,

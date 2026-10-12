@@ -184,9 +184,10 @@ func newGxTorrentEngine(cfg *Config, notifier *Notifier) (*gxTorrentEngine, erro
 			}
 		}
 		if !alreadyRunning {
-			// Fresh start: refresh the IP filter first, so the daemon begins
-			// with a fresh list (a supervisor restart reuses it).
-			gxEnsureIPFilter(cfg, true)
+			// Fresh start: make sure the IP filter is on disk before the daemon
+			// starts. It is refreshed only when the cached file is older than
+			// 24h, so a plain restart keeps the list already downloaded.
+			gxEnsureIPFilter(cfg, false)
 			process, err := startManagedGxTorrent(cfg, settings)
 			if err != nil {
 				return nil, err
@@ -198,9 +199,10 @@ func newGxTorrentEngine(cfg *Config, notifier *Notifier) (*gxTorrentEngine, erro
 		return engine, nil
 	}
 	if alreadyRunning {
-		// A gx-torrent already runs (e.g. an operator-managed service): refresh
-		// and reload the IP filter for it too, so boot starts from a fresh list.
-		gxEnsureIPFilter(cfg, true)
+		// A gx-torrent already runs (e.g. an operator-managed service): make
+		// sure the IP filter is on disk and reload it for it too. It is
+		// refreshed only when the cached file is older than 24h.
+		gxEnsureIPFilter(cfg, false)
 		if path := gxIPFilterPath(cfg); path != "" {
 			if _, err := engine.LoadIPFilter(path); err != nil {
 				logging.Debug("gx-torrent IP filter reload skipped", "error", err.Error())
