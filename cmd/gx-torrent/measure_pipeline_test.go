@@ -15,7 +15,10 @@ package main
 //	GX_MEASURE_PIPELINE=1 go test ./cmd/gx-torrent/ -run MeasurePipelining -v
 
 import (
+	"crypto/rand"
+	"crypto/sha1"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -117,4 +120,169 @@ func runPipelineSwarm(t *testing.T, size int, leechers, def, max int) (int64, ti
 	elapsed := time.Since(start)
 	seedInfo, _ := findInfo(seeder, hash)
 	return seedInfo.Uploaded, elapsed
+}
+
+// latencyProxy listens locally and forwards every connection to target,
+// releasing each chunk at arrival+delay so it adds RTT without limiting
+// bandwidth. This emulates a WAN link without root (no tc/netem) and preserves
+// TCP order. Returns the listener (dial it instead of the target) and a stop
+// function.
+func latencyProxy(target string, delay time.Duration) (net.Listener, func()) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(err)
+	}
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go proxyConn(c, target, delay)
+		}
+	}()
+	return ln, func() { _ = ln.Close() }
+}
+
+func proxyConn(c net.Conn, target string, delay time.Duration) {
+	u, err := net.Dial("tcp", target)
+	if err != nil {
+		_ = c.Close()
+		return
+	}
+	go delayCopy(u, c, delay)
+	delayCopy(c, u, delay)
+}
+
+func delayCopy(dst, src net.Conn, delay time.Duration) {
+	defer dst.Close()
+	type chunk struct {
+		at   time.Time
+		data []byte
+	}
+	ch := make(chan chunk, 1024)
+	go func() {
+		for c := range ch {
+			if d := time.Until(c.at); d > 0 {
+				time.Sleep(d)
+			}
+			if _, err := dst.Write(c.data); err != nil {
+				return
+			}
+		}
+	}()
+	buf := make([]byte, 32<<10)
+	for {
+		n, err := src.Read(buf)
+		if n > 0 {
+			ch <- chunk{at: time.Now().Add(delay), data: append([]byte(nil), buf[:n]...)}
+		}
+		if err != nil {
+			close(ch)
+			return
+		}
+	}
+}
+
+// makeTorrentWithPieceLength builds a single-file .torrent with an explicit
+// piece length. The default test torrents use 16 KiB pieces (one block), which
+// cannot exercise the request queue (pipelining): a bigger piece has several
+// 16 KiB blocks, so the queue depth matters.
+func makeTorrentWithPieceLength(t *testing.T, dir, name string, size, pieceLength int) []byte {
+	t.Helper()
+	payload := make([]byte, size)
+	if _, err := rand.Read(payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, name), payload, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var pieces []byte
+	for offset := 0; offset < size; offset += pieceLength {
+		end := min(offset+pieceLength, size)
+		sum := sha1.Sum(payload[offset:end])
+		pieces = append(pieces, sum[:]...)
+	}
+	return bencode(map[string]any{
+		"info": map[string]any{
+			"name":         name,
+			"length":       size,
+			"piece length": pieceLength,
+			"pieces":       pieces,
+		},
+	})
+}
+
+// TestMeasurePipeliningLatency isolates the adaptive request queue (pipelining)
+// behind a controlled RTT: the leecher dials a latency proxy in front of the
+// seeder, so a shallow queue (1 block in flight) is limited by RTT while a deep
+// one fills the link. This is the isolation the loopback harness cannot give.
+func TestMeasurePipeliningLatency(t *testing.T) {
+	if os.Getenv("GX_MEASURE_PIPELINE") != "1" {
+		t.Skip("set GX_MEASURE_PIPELINE=1 to run the pipelining measurement")
+	}
+	const size = 4 << 20 // 4 MiB with 256 KiB pieces = 16 blocks each
+	const oneWay = 25 * time.Millisecond
+
+	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 44760, PortEnd: 44779, Encryption: 1})
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrentWithPieceLength(t, src, "lat.bin", size, 256<<10)
+	hash, _, err := seeder.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeder seeding", func() bool { return stateOf(seeder, hash) == "seeding" })
+	ln, stop := latencyProxy(fmt.Sprintf("127.0.0.1:%d", seeder.peerPort), oneWay)
+	defer stop()
+
+	profiles := []struct {
+		name string
+		def  int
+		max  int
+	}{
+		{"shallow", 1, 1},    // one block in flight: RTT-bound
+		{"default", 50, 250}, // the engine default
+	}
+	for _, p := range profiles {
+		t.Run(p.name, func(t *testing.T) {
+			leecher := newTestDaemonWith(t, NetworkOptions{
+				OutgoingInterface: "127.0.0.9",
+				PortBegin:         44960, PortEnd: 44979, Encryption: 1,
+				DefaultRequestsOut: p.def, MaxRequestsOut: p.max,
+			})
+			dst := filepath.Join(t.TempDir(), "dst")
+			if _, _, err := leecher.add(addRequest{TorrentData: data, Destination: dst, SeedRatio: -1, SeedDays: -1}); err != nil {
+				t.Fatal(err)
+			}
+			waitFor(t, "leecher running", func() bool {
+				s := stateOf(leecher, hash)
+				return s == "downloading" || s == "stalled"
+			})
+			leecher.mu.Lock()
+			handle, _ := leecher.findLocked(hash)
+			leecher.mu.Unlock()
+			if err := handle.AddPeer(ln.Addr().String()); err != nil {
+				t.Fatalf("add peer: %v", err)
+			}
+			start := time.Now()
+			deadline := start.Add(measureDeadline)
+			for time.Now().Before(deadline) {
+				if info, _ := findInfo(leecher, hash); info.Progress == 100 {
+					break
+				}
+				time.Sleep(50 * time.Millisecond)
+			}
+			elapsed := time.Since(start)
+			info, _ := findInfo(leecher, hash)
+			t.Logf("profile=%s def=%d max=%d rtt=%s downloaded=%d elapsed=%s (%.0f KiB/s) complete=%v",
+				p.name, p.def, p.max, 2*oneWay, info.Downloaded, elapsed.Round(time.Millisecond),
+				float64(info.Downloaded)/1024/elapsed.Seconds(), info.Progress == 100)
+			if info.Progress != 100 {
+				t.Fatalf("profile %s did not complete within %s", p.name, measureDeadline)
+			}
+		})
+	}
 }

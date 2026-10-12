@@ -1092,10 +1092,12 @@ I **tre divari a più alto valore** in esercizio reale, in ordine di priorità:
 2. **I/O disco** — **fatto (2026-10-12)**: `O_SYNC` rimosso, `storage.File.Sync()`
    e invariante snapshot→fsync→bitfield, `updateStats` in due fasi (§5.4). Restano
    fuori scope mmap/AIO/scritture contigue, che richiedono misure dedicate.
-3. **Dimostrazione su sciame reale** — **fatta, prima run (2026-10-12)**: gx-core
-   alla pari o sopra libtorrent sullo stesso torrent pubblico ben seedato (§6.8).
-   Resta da isolare choking e pipelining con latenza controllata (`tc netem`,
-   root): la §6.8 misura il risultato end-to-end, non l'algoritmo in isolamento.
+3. **Dimostrazione su sciame reale e isolamento** — **fatta (2026-10-12)**: gx-core
+   alla pari o sopra libtorrent sullo stesso torrent pubblico ben seedato (§6.8);
+   il **pipelining** è isolato con un proxy di latenza in-process (§6.4: ~12× con
+   la coda adattiva a RTT 50 ms) e il **choking** dal banco deterministico
+   (`unchoker/sim_test.go`). Resta fuori solo `tc netem` reale (root), non
+   necessario per l'isolamento.
 
 Fuori scope per scelta (documentato in `bep.md`): BEP 8/17/18/22/26/28/30/34/35/
 45/50/51, WebTorrent, I2P nativo; restano raggiungibili via proxy SOCKS5/HTTP.
@@ -1491,8 +1493,24 @@ sciame locale a profondità diversa (`shallow` def=4/max=4, `default` 50/250,
 `deep` 200/500) e riporta byte e tempo. I knob viaggiano in `NetworkOptions`
 (`MaxRequestsOut`/`DefaultRequestsOut`). **Limite dichiarato:** su loopback il RTT
 è ~0, quindi la profondità non è il collo di bottiglia e i profili danno numeri
-quasi identici (~200 ms, ~40 MB/s con 1 leecher): serve una misura con latenza
-vera (rete reale o `tc netem`, che richiede root), che è la §6.5.
+quasi identici (~200 ms, ~40 MB/s con 1 leecher).
+
+**Isolamento con latenza (fatto, 2026-10-12).**
+`TestMeasurePipeliningLatency` mette un **proxy di latenza in-process** davanti al
+seed (nessun `tc`/`netem`, nessun root): ogni chunk è rilasciato ad
+arrivo+latenza, in ordine e **senza limitare la banda**, quindi si aggiunge RTT
+senza strozzare il link. Con RTT 50 ms, pezzi da 256 KiB (16 blocchi) e corpus
+4 MiB, un solo leecher:
+
+| Profilo | blocco in volo | tempo | media |
+| --- | --- | --- | --- |
+| `shallow` def=1/max=1 | 1 | 13,4 s | 305 KiB/s |
+| `default` def=50/max=250 | ≤50 | 1,1 s | **3,8 MiB/s** |
+
+~12× con la coda adattiva: è l'isolamento che il loopback (RTT ~0) non può dare.
+Il **choking** è isolato dal banco deterministico (`internal/unchoker/sim_test.go`,
+in `make test-engine`), che pilota l'`Unchoker` reale con peer sintetici e fissa
+fairness, slot e rotazione optimistic; il seed end-to-end è in §6.4/§6.6.
 
 Seeder + N leecher su loopback con IP `127.0.0.x` distinti (il motore rifiuta due
 connessioni dallo stesso IP). Default: ogni leecher solo verso il seeder — si
@@ -1559,9 +1577,9 @@ Lettura onesta: su questo sciame gx-core è **alla pari o sopra** libtorrent
 comparabile. **Non** è una dimostrazione isolata di choking o pipelining (la
 scelta dei peer differisce, una sola macchina, due run): è la prova che gx-core
 scarica davvero da uno sciame reale e che choking e coda richieste non sono un
-collo di bottiglia rispetto a libtorrent su questo carico. Per isolare i due
-algoritmi serve latenza controllata (`tc netem`, che richiede root) o un
-ambiente dedicato.
+collo di bottiglia rispetto a libtorrent su questo carico. L'isolamento dei due
+algoritmi è in §6.4 (proxy di latenza in-process per il pipelining, banco
+deterministico per il choking); `tc netem` reale non è necessario.
 
 **Avvio a freddo DHT — migliorato (2026-10-12).** Lo stesso torrent **senza
 tracker** (solo DHT dal magnet) veniva risolto dopo **~75 s**: la causa era
