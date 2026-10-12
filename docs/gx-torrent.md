@@ -560,12 +560,13 @@ the titles the operator wants. Each title has type (series/movie),
 seasons (`1+`, `2-4`, `1`), language, quality (selectable from a drop-down
 among *Any*, *360p*, *480p*, *576p*, *720p*, *720p+*, *720p-1080p*, *1080p*,
 *1080p+*, *2160p 4K*, *2160p+ 4K+*), excluded, episode filter, category
-and path. You add it by hand, or you type a name and press **Search in
-feeds**: the indexers and the already configured RSS feeds are queried and the page
-proposes the **names found** (filtered by the language/quality already entered and by the
-searched words: feeds deliver all their current content, not a
-search, so their names unrelated to the query do not appear), to be
-chosen with a click. The **title is required** (regex tolerant of separators,
+and path. You add it by hand, or you type a name and press **Search**: it reads
+the **archive** (fast), where the RSS feeds and the periodic indexer polls deposit
+everything they find, and proposes the **names found** (filtered by the
+language/quality already entered and by the searched words). Tick **Search
+indexers too** to also query the configured indexers live — the slow path, for a
+title the archive does not know yet — and its results are archived too, so the
+next search is fast. The **title is required** (regex tolerant of separators,
 so fuzzy results on common words do not enter) and language/quality are in
 **AND**. The result also says **where the names come from**
 (`Indexer: N · Feed: M · Archive: K`), or *No indexer configured* or the indexer's
@@ -579,15 +580,18 @@ gap searches missing episodes, displaying real-time feedback with items added an
 Each row in the table provides individual **Search**, **Edit**, **Pause/Resume** and
 **Remove** actions, missing episodes ledger and real-time status.
 
-The daemon, at every cycle, searches every title in the **indexers**, in the **RSS
-feeds** and in the **archive** (where feeds deposit everything they find, even what
-is no longer in the feed; indexers suffice if there are no feeds) and takes
-the episodes that appear; it keeps a **record** (in the state file) of what has
-appeared and what has been downloaded, shows the **missing** ones in the table and
+The daemon, at every cycle, reads the **archive** for every title and turns the
+matching material into downloads. The **indexers** are queried only for the
+**monitored titles** — throttled (every 30 minutes per title), never for the whole
+world — and for the **gap search**; what comes back is **archived**, so the next
+search and the next cycle read it from the archive instead of asking the indexer
+again. It keeps a **record** (in the state file) of what has appeared and what has
+been downloaded, shows the **missing** ones in the table and
 **searches again** (gap search, with query `Title SxxEyy`) until it finds them.
-For a **movie** it takes one release and does not look for others. The list does not create feeds or
-rules: it is the engine that queries indexers and feeds for the title, so language and
-quality apply in AND and feeds remain free for advanced rules.
+For a **movie** it takes one release and does not look for others. The list does
+not create feeds or rules: the feeds grow the archive, the wanted titles turn it
+into downloads, so language and quality apply in AND and feeds remain free for
+advanced rules.
 
 The **`/ui/rss`** page (tab *RSS & indexers*) is dedicated to feeds, indexers and rule
 definitions without cluttering the view with wanted titles. The **Check feeds** button

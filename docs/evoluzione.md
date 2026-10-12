@@ -2206,6 +2206,14 @@ Ex `docs/lavoro-sessione.md` (updated on 2026-10-07; it covers from commit
   the wildcard it binds — `web UI: http://<lan-ip>:8890/` (interface towards the
   default gateway) plus the loopback URL; a pinned `-listen` shows just that one.
   The router-refused-port error (UPnP/PCP/NAT-PMP) is collapsed to a single line.
+- **gx-torrent archive-first search**: the RSS feeds grow the archive; the
+  indexers are queried only for the **monitored** titles (throttled to 30
+  minutes per title) and for the gap search, and their results are **archived**.
+  The interactive search (`/ui/wanted-search`) and the title typeahead
+  (`/ui/rss-suggest`) read the archive and answer at once; the live indexer query
+  moved behind an explicit **Search indexers too** checkbox. The archive-only
+  feed notice is logged once, neutrally (a feed that only grows the archive is a
+  valid configuration).
 
 ### 12.3 Open points as of 07/10 (historical; several closed/superseded)
 

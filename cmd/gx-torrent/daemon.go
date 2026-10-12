@@ -147,6 +147,10 @@ type persistedState struct {
 	WantedTaken map[string]smartEpisodes `json:"wanted_taken,omitempty"`
 	// WantedGapLast throttles the missing-episode gap search per wanted title.
 	WantedGapLast map[string]int64 `json:"wanted_gap_last,omitempty"`
+	// WantedSearchLast throttles the per-title indexer search: the archive is fed
+	// by the feeds, so a monitored title is searched on the indexers every so
+	// often, not at every cycle.
+	WantedSearchLast map[string]int64 `json:"wanted_search_last,omitempty"`
 }
 
 // smartEpisodes is the set of episodes already taken for one series+season, each

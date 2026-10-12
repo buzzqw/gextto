@@ -6,6 +6,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/buzzqw/gextto/internal/rss"
 )
 
 // wantedIndexerFeed is a Torznab answer with real episode titles, so the
@@ -34,7 +37,7 @@ func TestUIWantedSearchQueriesIndexers(t *testing.T) {
 	srv := httptest.NewServer(d.routes())
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian")
+	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian&live=1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +87,7 @@ func TestUIWantedSearchFallsBackToTitles(t *testing.T) {
 	srv := httptest.NewServer(d.routes())
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian")
+	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian&live=1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +160,7 @@ func TestUIWantedSearchSeasonPacksAndPartialErrors(t *testing.T) {
 	srv := httptest.NewServer(d.routes())
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=andor")
+	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=andor&live=1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,6 +180,62 @@ func TestUIWantedSearchSeasonPacksAndPartialErrors(t *testing.T) {
 	}
 }
 
+// TestUIWantedSearchReadsTheArchiveByDefault: without live=1 the search must not
+// query the indexers, even when they are configured. It answers from the archive
+// (kept full by the feeds and the periodic indexer polls), which is the fast
+// path; the indexer count is still reported so the page can offer the live query.
+func TestUIWantedSearchReadsTheArchiveByDefault(t *testing.T) {
+	indexerCalls := 0
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		indexerCalls++
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(wantedIndexerFeed))
+	}))
+	defer indexer.Close()
+
+	d := feedDaemon(t, "")
+	d.opts.Settings.Set(indexersSettingKey, `[{"name":"fake","url":"`+indexer.URL+`","apikey":"k"}]`)
+	if _, err := d.archive().record("feedA", []rss.Item{{
+		Title:  "The Mandalorian S01E01 1080p WEB-DL",
+		Magnet: "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567",
+	}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var result wantedSearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if indexerCalls != 0 {
+		t.Fatalf("the default search queried the indexer %d time(s)", indexerCalls)
+	}
+	if result.IndexerHits != 0 || result.IndexerError != "" {
+		t.Fatalf("archive-only search reported indexer results: %+v", result)
+	}
+	if result.Indexers != 1 {
+		t.Fatalf("the configured indexer count must be reported: %+v", result)
+	}
+	if result.ArchiveHits == 0 {
+		t.Fatalf("no archive hit: %+v", result)
+	}
+	found := false
+	for _, name := range result.Names {
+		if name == "The Mandalorian" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("archive result missing from %v", result.Names)
+	}
+}
+
 // TestUIWantedSearchReportsWhenNoIndexerIsConfigured fixes the diagnostic that
 // answers "seems to search only the feeds": with no indexer the page must be
 // able to say so instead of silently returning feed names only.
@@ -186,7 +245,7 @@ func TestUIWantedSearchReportsWhenNoIndexerIsConfigured(t *testing.T) {
 	srv := httptest.NewServer(d.routes())
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian")
+	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian&live=1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +285,7 @@ func TestUIWantedSearchKeepsOnlyQueryMatches(t *testing.T) {
 	srv := httptest.NewServer(d.routes())
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian")
+	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian&live=1")
 	if err != nil {
 		t.Fatal(err)
 	}

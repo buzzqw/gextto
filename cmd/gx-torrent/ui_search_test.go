@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/buzzqw/gextto/internal/rss"
 	"github.com/buzzqw/gextto/internal/torznab"
 )
 
@@ -95,45 +97,45 @@ const suggestFeed = `<?xml version="1.0"?>
 <item><title>Some.Movie.2024.1080p</title><enclosure url="http://t/4.torrent" length="10"/></item>
 </channel></rss>`
 
-// TestUIRssSuggest checks the follow box suggestions: release titles are reduced
-// to unique series names, most frequent first, title-cased.
+// TestUIRssSuggest checks the wanted-title typeahead: it reads the archive (fast)
+// and reduces release titles to unique series names, most frequent first,
+// title-cased. The indexers are not contacted while typing.
 func TestUIRssSuggest(t *testing.T) {
-	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/xml")
-		_, _ = w.Write([]byte(suggestFeed))
-	}))
-	defer feed.Close()
-
-	d := standaloneTestDaemon(t, "", true)
-	d.opts.Settings.Set(setupCompleteKey, "true")
-	d.opts.Settings.Set(indexersSettingKey, `[{"name":"fake","url":"`+feed.URL+`","apikey":"k"}]`)
+	d := feedDaemon(t, "")
+	if _, err := d.archive().record("feedA", []rss.Item{
+		{Title: "The.Last.of.Us.S01E01.1080p", Magnet: "magnet:?xt=urn:btih:1111111111111111111111111111111111111111"},
+		{Title: "The.Last.of.Us.S01E02.1080p", Magnet: "magnet:?xt=urn:btih:2222222222222222222222222222222222222222"},
+		{Title: "Breaking.Bad.S05E14.720p", Magnet: "magnet:?xt=urn:btih:3333333333333333333333333333333333333333"},
+		{Title: "Some.Movie.2024.1080p", Magnet: "magnet:?xt=urn:btih:4444444444444444444444444444444444444444"},
+	}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
 	srv := httptest.NewServer(d.routes())
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/ui/rss-suggest?q=the")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-	var names []string
-	if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
-		t.Fatal(err)
-	}
-	if len(names) != 2 || names[0] != "The Last Of Us" || names[1] != "Breaking Bad" {
-		t.Fatalf("suggestions = %v, want [The Last Of Us Breaking Bad]", names)
+	suggest := func(q string) []string {
+		t.Helper()
+		resp, err := http.Get(srv.URL + "/ui/rss-suggest?q=" + q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var names []string
+		if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
+			t.Fatal(err)
+		}
+		return names
 	}
 
-	// A one-character query is ignored (no indexer hit, no suggestions).
-	resp2, err := http.Get(srv.URL + "/ui/rss-suggest?q=t")
-	if err != nil {
-		t.Fatal(err)
+	names := suggest("the")
+	if len(names) != 1 || names[0] != "The Last Of Us" {
+		t.Fatalf("suggestions = %v, want [The Last Of Us]", names)
 	}
-	defer resp2.Body.Close()
-	var short []string
-	if err := json.NewDecoder(resp2.Body).Decode(&short); err != nil {
-		t.Fatal(err)
+	if names := suggest("breaking"); len(names) != 1 || names[0] != "Breaking Bad" {
+		t.Fatalf("suggestions = %v, want [Breaking Bad]", names)
 	}
-	if len(short) != 0 {
-		t.Fatalf("a one-character query must return no suggestions, got %v", short)
+	// A one-character query is ignored (no suggestions).
+	if names := suggest("t"); len(names) != 0 {
+		t.Fatalf("a one-character query must return no suggestions, got %v", names)
 	}
 }

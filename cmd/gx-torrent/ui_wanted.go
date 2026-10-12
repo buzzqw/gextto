@@ -229,8 +229,9 @@ func archiveItemToRSS(entry archiveEntry) rss.Item {
 	return item
 }
 
-// handleUIWantedSearch searches the indexers and the configured RSS feeds for
-// candidate series, applying the language/quality filters typed so far.
+// handleUIWantedSearch searches for candidate series. By default it reads the
+// archive (+ the configured RSS feeds), which is fast; with live=1 it also
+// queries the configured indexers (slow) and archives the results.
 func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 	if d.opts.Mode != ModeStandalone {
 		http.NotFound(w, r)
@@ -249,11 +250,16 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), indexerSearchTimeout)
 	defer cancel()
 
+	// The archive is the search index: the feeds and the periodic indexer polls
+	// keep it full, so a search answers at once. The indexers are queried live
+	// only when explicitly asked (live=1), because that is the slow path.
+	live := strings.TrimSpace(r.URL.Query().Get("live")) == "1"
+
 	result := wantedSearchResult{Names: []string{}}
 	var items []rss.Item
 	indexers := d.indexers()
 	result.Indexers = len(indexers)
-	if result.Indexers > 0 {
+	if live && result.Indexers > 0 {
 		found, errs := searchIndexers(ctx, indexers, query)
 		// Every failing indexer is reported, also when the others answered:
 		// a silent failure made a search look complete when it was not.
@@ -264,6 +270,13 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 		result.IndexerError = strings.Join(failed, "; ")
 		result.IndexerHits = len(found)
 		items = append(items, found...)
+		// The live results are archived too, so the next search reads them from
+		// the archive instead of asking the indexer again.
+		if len(found) > 0 {
+			if _, aerr := d.archive().record("search:"+strings.ToLower(query), found, time.Now()); aerr != nil {
+				logf("wanted search %q: cannot archive the indexer results: %v", query, aerr)
+			}
+		}
 	}
 	// A feed hands over its whole current content, not a search: only the items
 	// that match the query count as hits, otherwise the counter looks full

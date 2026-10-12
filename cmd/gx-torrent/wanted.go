@@ -25,6 +25,18 @@ const wantedSettingKey = "wanted"
 // wantedGapInterval throttles the missing-episode search per title.
 const wantedGapInterval = 30 * time.Minute
 
+// wantedIndexerInterval throttles the per-title indexer search: the feeds grow
+// the archive continuously, so the indexers are asked for a monitored title
+// every so often, not at every cycle.
+const wantedIndexerInterval = 30 * time.Minute
+
+// wantedFeedName is the archive feed name under which a wanted title's indexer
+// results are stored. Archiving them means a later search reads them from the
+// archive (fast) instead of asking the indexer again.
+func wantedFeedName(name string) string {
+	return "wanted:" + strings.TrimSpace(name)
+}
+
 // wantedGapMaxPerCycle bounds how many missing episodes are searched per title
 // per cycle, so a large gap does not flood the indexers.
 const wantedGapMaxPerCycle = 3
@@ -306,17 +318,25 @@ func (d *Daemon) pollWantedLocked(ctx context.Context, onlyName string) wantedPo
 		}
 		checked++
 		var items []rss.Item
-		if len(d.indexers()) > 0 {
+		if len(d.indexers()) > 0 && (onlyName != "" || d.wantedIndexerDue(w.Name, now)) {
 			found, err := d.searchFeedSuggest(ctx, w.Name)
 			if err != nil {
 				errorsList = append(errorsList, w.Name+": "+err.Error())
 			} else {
 				items = append(items, found...)
+				// The indexer results are archived too: the next search reads them
+				// from the archive (fast) instead of asking the indexer again.
+				if len(found) > 0 {
+					if _, aerr := d.archive().record(wantedFeedName(w.Name), found, now); aerr != nil {
+						logf("wanted %q: cannot archive the indexer results: %v", w.Name, aerr)
+					}
+				}
 			}
+			d.markWantedIndexer(w.Name, now)
 		}
 		items = append(items, d.archiveWantedItems(w.Name, wantedArchiveScan)...)
 		if len(items) > 0 {
-			n, titles := d.applyWanted(now, "wanted:"+strings.TrimSpace(w.Name), items)
+			n, titles := d.applyWanted(now, wantedFeedName(w.Name), items)
 			addedCount += n
 			addedTitles = append(addedTitles, titles...)
 		}
@@ -516,6 +536,11 @@ func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEnt
 		if err != nil {
 			continue
 		}
+		if len(items) > 0 {
+			if _, aerr := d.archive().record(wantedFeedName(w.Name), items, now); aerr != nil {
+				logf("wanted %q: cannot archive the gap-search results: %v", w.Name, aerr)
+			}
+		}
 		crit := w.criteria()
 		crit.EpisodeFilter = fmt.Sprintf("%dx%02d", ep.season, ep.episode)
 		for _, item := range items {
@@ -557,5 +582,29 @@ func (d *Daemon) markWantedGap(name string, now time.Time) {
 		d.state.WantedGapLast = map[string]int64{}
 	}
 	d.state.WantedGapLast[strings.TrimSpace(name)] = now.Unix()
+	d.dirty = true
+}
+
+// wantedIndexerDue reports whether the per-title indexer search is due. It is
+// separate from the gap search: the title search finds new releases (which the
+// feed cycle then turns into downloads), the gap search fills the episodes seen
+// but not yet taken.
+func (d *Daemon) wantedIndexerDue(name string, now time.Time) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	last := d.state.WantedSearchLast[strings.TrimSpace(name)]
+	if last <= 0 {
+		return true
+	}
+	return now.Sub(time.Unix(last, 0)) >= wantedIndexerInterval
+}
+
+func (d *Daemon) markWantedIndexer(name string, now time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.state.WantedSearchLast == nil {
+		d.state.WantedSearchLast = map[string]int64{}
+	}
+	d.state.WantedSearchLast[strings.TrimSpace(name)] = now.Unix()
 	d.dirty = true
 }

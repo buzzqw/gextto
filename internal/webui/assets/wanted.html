@@ -84,7 +84,8 @@ summary{cursor:pointer;color:#93a1b5}
       <option value="2160p">2160p 4K</option>
       <option value="2160p+">2160p+ 4K+</option>
     </select></label>
-    <button type="button" class="sm" id="wanted-search" title="Search configured feeds and indexers for matching titles">Search in feeds</button>
+    <label class="chk"><input type="checkbox" id="wanted-live" title="Also query the configured indexers live (slow); for a title not yet in the archive"> Search indexers too</label>
+    <button type="button" class="sm" id="wanted-search" title="Search the archive (fast) for matching titles">Search</button>
     <button type="submit" id="wanted-submit" title="Add title to wanted list">Add wanted</button>
     <button type="button" class="sm" id="wanted-cancel" style="display:none" title="Cancel editing wanted title">Cancel</button>
   </div>
@@ -100,7 +101,7 @@ summary{cursor:pointer;color:#93a1b5}
   </details>
   <div class="row" id="wanted-results" aria-live="polite"></div>
   <p class="muted" id="wanted-search-source" aria-live="polite"></p>
-  <p class="muted">A wanted title is searched in the indexers and in the configured RSS feeds; its missing episodes are fetched again. Fill language/quality and press Search in feeds to pick a title from what the feeds return.</p>
+  <p class="muted">A wanted title is searched in the archive (fed by the RSS feeds and the periodic indexer polls) and its missing episodes are fetched again. Fill language/quality and press Search to pick a title; tick "Search indexers too" to query the indexers live for a title not yet in the archive.</p>
 </form>
 <!--ERROR-->
 </main>
@@ -192,6 +193,8 @@ function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
     box.textContent=t('Searching…');
     if(hint){hint.textContent='';}
     var p=new URLSearchParams({q:name,language:form.querySelector('[name=language]').value,quality:form.querySelector('[name=quality]').value});
+    var live=document.getElementById('wanted-live');
+    if(live&&live.checked){p.set('live','1');}
     fetch('/ui/wanted-search?'+p.toString(),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(res){
       res=res||{};
       box.innerHTML='';

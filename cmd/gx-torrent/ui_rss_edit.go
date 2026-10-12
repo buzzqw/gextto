@@ -349,13 +349,13 @@ func (d *Daemon) handleUIRssSuggest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
-	if len([]rune(query)) < 2 || len(d.indexers()) == 0 {
+	if len([]rune(query)) < 2 {
 		writeJSON(w, http.StatusOK, []string{})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
-	defer cancel()
-	items, _ := d.searchFeedSuggest(ctx, query)
+	// The typeahead reads the archive (fast): the feeds and the periodic indexer
+	// polls keep it full, so typing does not hit the indexers.
+	items := d.archiveWantedItems(query, wantedArchiveScan)
 	writeJSON(w, http.StatusOK, seriesSuggestions(items, 12))
 }
 

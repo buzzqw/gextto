@@ -250,8 +250,10 @@ Gextto in the same way as `qbittorrent-nox` or `transmission-daemon`. It is
   same one Gextto drives it with, plus a sign-in page (`/ui/login`) when
   standalone authentication is enabled.
 - **Standalone Web UI & Setup Wizard:** features a dedicated, full-featured web UI
-  with real-time graphs and diagnostics, categories and tags, and direct
-  multi-indexer search (Jackett, Prowlarr, MIRCrew), each indexer linked to its
+  with real-time graphs and diagnostics, categories and tags, and multi-indexer
+  search that reads the local **archive** first (fed by the RSS feeds and by the
+  indexers for the monitored titles) and queries the configured indexers
+  (Jackett, Prowlarr, MIRCrew) live only on demand, each indexer linked to its
   own web page. Every indexer takes its plain base address, exactly as in Gextto:
   Jackett's aggregate Torznab path, Prowlarr's aggregate search API and a direct
   Torznab service's `/api` are worked out for you.
@@ -259,7 +261,7 @@ Gextto in the same way as `qbittorrent-nox` or `transmission-daemon`. It is
   - **Dedicated tabs:** clean separation between **Wanted** (`/ui/wanted`) for TV series and movies with missing-episode gap tracking and manual on-demand searches, and **RSS & Indexers** (`/ui/rss`) for feeds, indexers, and rules.
   - **Feeds & Indexers:** feeds are RSS URLs or HTML listings (ext.to, TorrentGalaxy uploader pages), with last check, item count, new and added counters, instant **Check feeds** feedback (`✓ N feeds checked: X new · Y added`), and per-row reload; Torznab indexer presets (Jackett, Prowlarr) with live testing.
   - **Automation rules:** ordered PASS/FAIL rules (include/exclude, regex, size, seeders, age, episode filter, smart episode, *download once*, cooldown) with save path, category, tags and flags, editable in place with **live match previews**.
-  - **Wanted list & Gap search:** tracks wanted series/movies with language and quality dropdowns (up to 2160p 4K+), gap searches missing episodes across indexers and the archive, with manual one-click search for all or single titles and instant visual status. Feeds **grow the archive**: a feed with no rule and no include/exclude downloads nothing (use the *take everything* flag to follow one in full), and wanted titles search the indexed **and** archived material.
+  - **Wanted list & Gap search:** tracks wanted series/movies with language and quality dropdowns (up to 2160p 4K+), gap searches missing episodes, with manual one-click search for all or single titles and instant visual status. Feeds **grow the archive**, and the indexers are queried only for the monitored titles and the gaps (their results are archived too), so searches read the **archive** and answer at once; a feed with no rule and no include/exclude downloads nothing (use the *take everything* flag to follow one in full), and a live query is one checkbox away (*Search indexers too*).
 - **Archive:** every item the feeds ever returned is kept in a local database
   (deduplicated by info-hash) and searchable — words, phrases in quotes,
   `-excluded` words, per feed, downloaded only, sorted by date, seeders, size or
