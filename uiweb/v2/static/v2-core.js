@@ -91,6 +91,9 @@
     setTheme(nextTheme(doc.getAttribute("data-theme")));
   }
   function applyCustomColors(colors) {
+    // Stored with the colours so the inline bootstrap paints readable accent
+    // buttons on the first frame, before this script runs.
+    colors.onAccent = accentOnColor(colors.accent);
     storageSet("gextto_colors", JSON.stringify(colors));
     applyColors(colors);
     setTheme("custom");

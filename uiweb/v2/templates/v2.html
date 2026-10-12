@@ -32,6 +32,7 @@
           style.setProperty("--c-surface", colors.surface);
           style.setProperty("--c-text", colors.text);
           style.setProperty("--c-accent", colors.accent);
+          if (colors.onAccent) style.setProperty("--c-on-accent", colors.onAccent);
           document.documentElement.setAttribute("data-theme", "custom");
         }
       }
@@ -65,7 +66,8 @@
          {{end}}
          {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "gaps"}}⚠️{{else}}•{{end}}</span><span>{{.Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
          {{if .System}}<div class="nav-prefs" aria-label="Aspetto">
-           <button class="btn sm v2-theme-toggle" type="button" data-theme-toggle title="Cambia tema: scuro, chiaro o crema">Tema chiaro</button>
+           <button class="btn sm v2-theme-toggle" type="button" data-theme-toggle title="Cambia tema: scuro, chiaro, crema o personale">Tema chiaro</button>
+           <button class="btn sm" type="button" hx-get="/colors" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli i colori dell'interfaccia" aria-haspopup="dialog">Colori</button>
            <button class="btn sm" type="button" data-font="-5" title="Testo più piccolo">A−</button>
            <button class="btn sm" type="button" data-font="+5" title="Testo più grande">A+</button>
            <form method="post" action="/language" class="nav-prefs-lang"><select class="input compact" name="lang" aria-label="Lingua dell'interfaccia" onchange="this.form.submit()">
@@ -101,7 +103,7 @@
         <button class="btn" type="button" data-font="+5" title="Testo più grande">A+</button>
         <button class="btn" type="button" data-font-open title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog">Font</button>
         <button class="btn" type="button" hx-get="/colors" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli i colori dell'interfaccia" aria-haspopup="dialog">Colori</button>
-        <button class="btn v2-theme-toggle" type="button" data-theme-toggle title="Cambia tema: scuro, chiaro o crema">Tema chiaro</button>
+        <button class="btn v2-theme-toggle" type="button" data-theme-toggle title="Cambia tema: scuro, chiaro, crema o personale">Tema chiaro</button>
         <button class="btn btn-refresh" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati" aria-label="Ricarica i dati mostrati"><span class="btn-refresh-icon" aria-hidden="true">↺</span><span class="btn-refresh-label">Aggiorna</span></button>
         {{template "v2_live_status" .Chrome}}
       </div>

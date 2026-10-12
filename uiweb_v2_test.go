@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -1604,6 +1605,45 @@ func TestV2CreamTheme(t *testing.T) {
 	}
 	if code, js := v2Request(t, server, http.MethodGet, "/static/v2-core.js", nil); code != http.StatusOK || !strings.Contains(js, `["dark", "light", "cream"]`) {
 		t.Fatalf("theme cycle missing cream -> %d", code)
+	}
+}
+
+// TestV2CustomColors pins the colour picker: the dialog with four labelled
+// colour inputs, the button in the top bar and in the phone menu, the derived
+// palette and the client cycle that only offers the custom theme once saved.
+func TestV2CustomColors(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, modal := v2Request(t, server, http.MethodGet, "/colors", nil)
+	if code != http.StatusOK || !strings.Contains(modal, `role="dialog"`) || !strings.Contains(modal, `aria-labelledby="v2-colors-title"`) {
+		t.Fatalf("colours dialog -> %d %s", code, modal)
+	}
+	for _, id := range []string{"v2-color-bg", "v2-color-surface", "v2-color-text", "v2-color-accent"} {
+		// Each input sits inside its <label>, so it has an accessible name.
+		if !regexp.MustCompile(`<label class="field"><span>[^<]+</span><input class="input" type="color" id="` + id + `"`).MatchString(modal) {
+			t.Fatalf("colour input %s is missing or unlabelled", id)
+		}
+	}
+	if !strings.Contains(modal, "data-color-apply") || !strings.Contains(modal, "data-color-reset") {
+		t.Fatal("apply/reset buttons missing")
+	}
+	_, page := v2Request(t, server, http.MethodGet, "/", nil)
+	if n := strings.Count(page, `hx-get="/colors"`); n != 2 {
+		t.Fatalf("colours button found %d times, want 2 (top bar and phone menu)", n)
+	}
+	if !strings.Contains(page, `"--c-on-accent", colors.onAccent`) {
+		t.Fatal("bootstrap must paint the accent text colour before the client runs")
+	}
+	if _, css := v2Request(t, server, http.MethodGet, "/static/gextto-ui.css", nil); !strings.Contains(css, `[data-theme="custom"]`) || !strings.Contains(css, "var(--c-on-accent") {
+		t.Fatal("custom palette missing from gextto-ui.css")
+	}
+	_, js := v2Request(t, server, http.MethodGet, "/static/v2-core.js", nil)
+	for _, want := range []string{`["dark", "light", "cream", "custom"]`, "colors.onAccent = accentOnColor", `t("Tema personale")`} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("v2-core.js missing %q", want)
+		}
 	}
 }
 
