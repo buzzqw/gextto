@@ -332,12 +332,14 @@ func RamdiskCheck(w http.ResponseWriter, r *http.Request, s *AppState) {
 	})
 }
 
-// LicenseApi ports extto's `get_license`: it returns the bundled licence text.
+// LicenseApi ports extto's `get_license`: it returns the bundled licence text
+// and the third-party notices.
 func LicenseApi(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, map[string]any{
-		"ok":      true,
-		"content": licenseText,
-		"license": "EUPL-1.2",
+		"ok":          true,
+		"content":     licenseText,
+		"third_party": uiThirdPartyText,
+		"license":     "EUPL-1.2",
 	})
 }
 

@@ -560,7 +560,7 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 	case "manual":
 		return "v2_manual", uiManualDataFrom(s)
 	case "license":
-		return "v2_license", uiLicenseData{Text: uiLicenseText}
+		return "v2_license", uiLicenseData{Text: uiLicenseText, ThirdParty: uiThirdPartyText}
 	case "movies":
 		return "v2_movies", v2MovieLibraryViewFrom(s, r)
 	case "series", "gaps", "archive", "blocklist", "maintenance", "integrations":

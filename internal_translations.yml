@@ -1404,6 +1404,7 @@ eng:
   "Attiva o disattiva del tutto il client libtorrent integrato.": "Enable or completely disable the built-in libtorrent client."
   "Auto-gestione dinamica coda e risorse": "Automatic queue and resource management"
   "Auto-managed": "Auto-managed"
+  "Componenti di terze parti": "Third-party components"
   "Avanzate": "Advanced"
   "Azione cleanup": "Cleanup action"
   "Azioni rapide": "Quick actions"

@@ -28,6 +28,9 @@ import (
 //go:embed LICENSE
 var uiLicenseText string
 
+//go:embed NOTICE
+var uiThirdPartyText string
+
 //go:embed docs/MANUAL.it.md
 var uiManualTextIT string
 
@@ -248,6 +251,9 @@ type uiManualData struct {
 // uiLicenseData is the view-model of the Licenza page.
 type uiLicenseData struct {
 	Text string
+	// ThirdParty is the NOTICE file: the bundled components and the licences of
+	// the dependencies, reproduced so the page credits them too.
+	ThirdParty string
 }
 
 // uiNavDefinition mirrors the NAV_GROUPS of the current UI so the two

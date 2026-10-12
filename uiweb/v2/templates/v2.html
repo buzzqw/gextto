@@ -1244,6 +1244,12 @@
     <div class="panel-head"><h3>Licenza</h3></div>
     <div class="panel-body"><pre class="log-view">{{.Text}}</pre></div>
   </div>
+  {{if .ThirdParty}}
+  <div class="panel">
+    <div class="panel-head"><h3>Componenti di terze parti</h3></div>
+    <div class="panel-body"><pre class="log-view">{{.ThirdParty}}</pre></div>
+  </div>
+  {{end}}
 </div>
 {{end}}
 
