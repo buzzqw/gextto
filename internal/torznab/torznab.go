@@ -84,6 +84,13 @@ func (idx Indexer) Endpoint() string {
 		return base + "/api"
 	}
 	lower := strings.ToLower(base)
+	// Prowlarr and Jackett aggregate many trackers and have their own search
+	// paths; anything else is a direct Torznab service, whose endpoint is
+	// simply <base>/api. Gextto follows the same rule, so the address to type
+	// is identical in both.
+	if strings.Contains(lower, "prowlarr") || strings.Contains(lower, ":9696") {
+		return base + "/api/v1/search"
+	}
 	// Jackett default port or jackett in URL (e.g. http://host:9117 or http://jackett/...)
 	if strings.Contains(lower, "jackett") || strings.Contains(lower, ":9117") {
 		return base + "/api/v2.0/indexers/all/results/torznab/api"

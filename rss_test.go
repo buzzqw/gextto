@@ -77,6 +77,16 @@ func TestBuildsTorznabEndpointsForJackettAndProwlarr(t *testing.T) {
 	if got := torznab_endpoint(jackettRenamed); got != "http://host:9117/api/v2.0/indexers/all/results/torznab/api" {
 		t.Fatalf("renamed jackett endpoint = %q", got)
 	}
+	// A direct Torznab service (the MirCrew indexer) accepts the bare base
+	// address, like the standalone gx-torrent: the endpoint is <base>/api.
+	direct := IndexerConfig{Name: "mircrew", URL: "http://192.168.1.161:9118", APIKey: "k", Enabled: true}
+	if got := torznab_endpoint(direct); got != "http://192.168.1.161:9118/api" {
+		t.Fatalf("direct torznab endpoint = %q", got)
+	}
+	directWithAPI := IndexerConfig{Name: "mircrew", URL: "http://192.168.1.161:9118/api", APIKey: "k", Enabled: true}
+	if got := torznab_endpoint(directWithAPI); got != "http://192.168.1.161:9118/api" {
+		t.Fatalf("direct torznab endpoint with /api = %q", got)
+	}
 }
 
 func TestParsesProwlarrJSONResults(t *testing.T) {

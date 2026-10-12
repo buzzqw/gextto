@@ -1654,10 +1654,18 @@ func isManagerSource(indexer IndexerConfig) bool {
 		strings.Contains(lowerName, "prowlarr") || strings.Contains(lowerName, "jackett")
 }
 
+// torznab_endpoint builds the search endpoint for an indexer. An explicit /api
+// or /torznab path is kept as-is. A manager (Prowlarr/Jackett) has its own
+// aggregate path; anything else is a direct Torznab service (for example the
+// MirCrew indexer), whose endpoint is simply <base>/api — the same rule the
+// standalone gx-torrent uses, so the address to type is identical everywhere.
 func torznab_endpoint(indexer IndexerConfig) string {
 	base := strings.TrimRight(strings.TrimSpace(indexer.URL), "/")
 	if strings.Contains(base, "/api") || strings.Contains(base, "torznab") {
 		return base
+	}
+	if !isManagerSource(indexer) {
+		return base + "/api"
 	}
 	if managerKind(indexer) == ManagerProwlarr {
 		return base + "/api/v1/search"
