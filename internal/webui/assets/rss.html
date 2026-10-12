@@ -229,8 +229,10 @@ summary{cursor:pointer;color:#93a1b5}
 <script id="ui-i18n"></script>
 <script>
 var FEEDNAMES={{FEEDNAMES}};
-// Choosing a known indexer fills the URL with its usual local address and port.
-(function(){var sel=document.getElementById('indexer-type');var url=document.getElementById('indexer-url');if(!sel||!url){return;}sel.addEventListener('change',function(){var o=sel.options[sel.selectedIndex];var filled=o?(o.getAttribute('data-url')||''):'';if(filled){url.value=filled;}});})();
+// Choosing a known indexer fills the URL with its usual local address and port,
+// and pre-fills an empty Name with the preset (e.g. "jackett"), so the field is
+// not typed twice; both stay editable.
+(function(){var sel=document.getElementById('indexer-type');var url=document.getElementById('indexer-url');var name=document.getElementById('indexer-name');if(!sel||!url){return;}sel.addEventListener('change',function(){var o=sel.options[sel.selectedIndex];if(!o){return;}var value=String(o.value||'');var filled=o.getAttribute('data-url')||'';if(filled){url.value=filled;}if(name&&!name.value.trim()&&value){name.value=value.toLowerCase();}});})();
 // Typeahead for the wanted title: suggestions come from the configured
 // indexers, so the series name does not have to be typed exactly.
 (function(){var input=document.getElementById('wanted-name');var list=document.getElementById('series-list');if(!input||!list){return;}var timer=null;input.addEventListener('input',function(){clearTimeout(timer);var q=input.value.trim();if(q.length<2){return;}timer=setTimeout(function(){fetch('/ui/rss-suggest?q='+encodeURIComponent(q),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){list.innerHTML='';(names||[]).forEach(function(n){var o=document.createElement('option');o.value=n;list.appendChild(o);});}).catch(function(){});},350);});})();
