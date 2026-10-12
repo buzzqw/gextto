@@ -3,9 +3,11 @@
 `gx-torrent` is a small BitTorrent daemon written in pure Go on top of the
 **gx-core** engine (`internal/gxcore`). It is the default engine of
 Gextto (`torrent_backend = gx-torrent`): it does not require `libtorrent-rasterbar`,
-runs in a separate process and is controlled via REST on `127.0.0.1:8890`, where
-it also exposes an operational web page openable from the browser (by default only from
-this server: see *Web interface* to open it to the LAN). The embedded
+runs in a separate process and is controlled via REST (`127.0.0.1:8890` when
+Gextto manages it, `0.0.0.0:8890` in standalone), where it also exposes an
+operational web page openable from the browser (managed: only from this server,
+see *Web interface* to open it to the LAN; standalone: already reachable from
+another PC on the LAN). The embedded
 libtorrent engine remains selectable — on builds that include it — and acts as an
 automatic fallback if gx-torrent does not start.
 
@@ -210,7 +212,7 @@ the operator.
 ## Standalone use
 
 ```
-gx-torrent [-listen 127.0.0.1:8890] [-data ~/.local/share/gx-torrent]
+gx-torrent [-listen 0.0.0.0:8890] [-data ~/.local/share/gx-torrent]
            [-download-dir DIR] [-token SECRET] [-allowed-roots /srv/media,/data]
            [-peer-ports 6881-6891] [-listen-interface IP|iface]
            [-outgoing-interface wg0] [-proxy socks5://host:port]
@@ -228,6 +230,13 @@ data folder is **not** read (so the fingerprint stays stable); in standalone
 `settings.json` provides the values that Gextto does not pass — language, `listen`,
 `download-dir`, `peer-ports`, `auth-user`/`auth-password`, `local-bypass`,
 `indexers` — and an explicit flag still wins.
+
+**Listen address.** With no `listen` in `settings.json` and no `-listen` flag,
+managed listens on `127.0.0.1:8890` and standalone on `0.0.0.0:8890`: standalone
+is a client to drive from another machine (its web UI, *arr apps, mobile apps),
+so it is reachable from the LAN by default, like `qbittorrent-nox`. Set
+`-listen 127.0.0.1:8890` (or a specific interface IP) to keep it on one host
+only; the packaged systemd unit already passes `-listen 0.0.0.0:8890`.
 
 In standalone the page's POSTs (`/ui/*`) are accepted only if
 `Origin`/`Referer` matches the request host (CSRF protection) and the request
@@ -328,7 +337,9 @@ In standalone, if `settings.json` contains `auth-password` (bcrypt hash with the
 `bcrypt:` prefix), the page asks for login (`/ui/login`, session in a
 `gx_session` cookie) except from LAN sources when `local-bypass` is active
 (default). Without a password the page stays open, so the first
-configuration is reachable. Other keys: `auth-user` (default `admin`),
+configuration is reachable — and, since standalone listens on the LAN by
+default, so is the wizard from another PC on the same network: set a password in
+the wizard (or in *Settings*) if the LAN is not trusted. Other keys: `auth-user` (default `admin`),
 `local-bypass` (`true`/`false`). The password also protects `/api/v1` and the
 qBittorrent API `/api/v2` (same criteria as the page: no password, LAN bypass,
 or `gx_session`/`SID` cookie)

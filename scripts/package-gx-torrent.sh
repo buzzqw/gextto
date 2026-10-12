@@ -285,7 +285,7 @@ In Sonarr / Radarr (*Settings → Download Clients → Add → qBittorrent*):
 | Flag | Environment Variable | Default | Description |
 |---|---|---|---|
 | `-mode` | `GX_TORRENT_MODE` | `standalone` | Operating mode: `standalone` or `managed` (by Gextto) |
-| `-listen` | `GX_TORRENT_LISTEN` | `127.0.0.1:8890` | Web UI and REST API bind address (use `0.0.0.0:8890` for LAN) |
+| `-listen` | `GX_TORRENT_LISTEN` | `0.0.0.0:8890` | Web UI and REST API bind address (standalone listens on the whole LAN; use `127.0.0.1:8890` to keep it on this host only) |
 | `-data` | `GX_TORRENT_DATA` | `~/.local/share/gx-torrent` | State directory (`settings.json`, session database, resume states) |
 | `-download-dir` | `GX_TORRENT_DOWNLOAD_DIR` | `<data>/downloads` | Default save path for downloaded files |
 | `-peer-ports` | `GX_TORRENT_PEER_PORTS` | `6881-6891` | Peer listening port range (uses first free port; `0` = dynamic per torrent) |

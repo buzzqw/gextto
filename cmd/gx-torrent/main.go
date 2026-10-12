@@ -179,8 +179,20 @@ func loopback(listen string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// defaultListen is the page/API address when neither settings.json nor the flag
+// sets one. Standalone is a client meant to be driven from another machine (its
+// web UI, *arr apps, mobile apps), so it listens on every interface and is
+// reachable over the LAN. Managed keeps the loopback default: Gextto runs beside
+// the daemon on this host and reaches it there.
+func defaultListen(mode Mode) string {
+	if mode == ModeStandalone {
+		return "0.0.0.0:8890"
+	}
+	return "127.0.0.1:8890"
+}
+
 func main() {
-	listen := flag.String("listen", envOr("GX_TORRENT_LISTEN", ""), "address of the REST API (default 127.0.0.1:8890)")
+	listen := flag.String("listen", envOr("GX_TORRENT_LISTEN", ""), "address of the REST API (standalone default 0.0.0.0:8890, managed 127.0.0.1:8890)")
 	dataDir := flag.String("data", envOr("GX_TORRENT_DATA", defaultDataDir()), "state directory (session, links, queue state)")
 	downloadDir := flag.String("download-dir", envOr("GX_TORRENT_DOWNLOAD_DIR", ""), "default save path (default <data>/downloads)")
 	token := flag.String("token", envOr("GX_TORRENT_TOKEN", ""), "shared secret required in the X-Gx-Token header")
@@ -250,7 +262,7 @@ func main() {
 	// API with no protection; standalone has its own login/LAN model instead.
 	listenValue := optStr(settingsStore, "listen", *listen)
 	if listenValue == "" {
-		listenValue = "127.0.0.1:8890"
+		listenValue = defaultListen(modeValue)
 	}
 	if modeValue != ModeStandalone && !loopback(listenValue) && tokenValue == "" && !*insecure {
 		log.Fatalf("refusing to listen on %s without a token: set -token/GX_TORRENT_TOKEN or use -insecure", listenValue)

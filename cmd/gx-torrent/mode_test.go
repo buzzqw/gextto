@@ -1,6 +1,25 @@
 package main
 
-import "testing"
+import (
+	"net"
+	"testing"
+)
+
+// TestDefaultListen pins the exposure default: standalone listens on every
+// interface so another PC on the LAN can reach the page and API, while managed
+// stays on loopback because Gextto runs beside the daemon.
+func TestDefaultListen(t *testing.T) {
+	standalone := defaultListen(ModeStandalone)
+	if loopback(standalone) {
+		t.Fatalf("standalone default %q is loopback, LAN clients cannot reach it", standalone)
+	}
+	if _, port, err := net.SplitHostPort(standalone); err != nil || port != "8890" {
+		t.Fatalf("standalone default %q is not host:8890", standalone)
+	}
+	if managed := defaultListen(ModeManaged); !loopback(managed) {
+		t.Fatalf("managed default %q is not loopback", managed)
+	}
+}
 
 func TestResolveMode(t *testing.T) {
 	cases := []struct {

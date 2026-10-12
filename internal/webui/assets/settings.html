@@ -45,7 +45,7 @@ button.secondary{background:#243049;color:#dbe4f0;border:1px solid #2b3a55;font-
 <fieldset>
   <legend>Network</legend>
   <div class="grid">
-    <label>Web UI / API listen address<input type="text" name="listen" value="{{LISTEN}}" placeholder="127.0.0.1:8890" autocomplete="off" title="IP address and port for the web interface and API"></label>
+    <label>Web UI / API listen address<input type="text" name="listen" value="{{LISTEN}}" placeholder="0.0.0.0:8890" autocomplete="off" title="IP address and port for the web interface and API"></label>
     <label>Peer port range<input type="text" name="peer-ports" value="{{PEER_PORTS}}" placeholder="6881-6891" autocomplete="off" title="Port or port range for incoming BitTorrent peer traffic"></label>
     <label>Incoming interface (IP or name)<input type="text" name="listen-interface" value="{{LISTEN_IFACE}}" autocomplete="off" title="Network interface or IP address for incoming connections"></label>
     <label>Outgoing interface (VPN killswitch)<input type="text" name="outgoing-interface" value="{{OUT_IFACE}}" autocomplete="off" title="Network interface for outgoing traffic (VPN killswitch)"></label>
