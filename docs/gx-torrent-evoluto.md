@@ -176,9 +176,12 @@ trascinarsi dietro tutto Gextto. Sono stati **estratti in `internal/rss` e
   solo-v2 da `.torrent` e da magnet. Alberi Merkle SHA-256, handshake con hash
   troncato (bit riservato v2) e fetch dei `piece layers` (`hash request`/`hashes`).
 - **Qualità**: smart ban dei peer corrotti (**fatto**: ban di sessione con
-  scadenza, `Session.BanIP`), profondità adattiva della coda
-  richieste, choking rate-based, reader con readahead per lo streaming, I/O disco
-  a blocchi contigui. Sono "cherry-pick" (§11), non blocchi.
+  scadenza, `Session.BanIP`), profondità adattiva della coda richieste (**fatto**,
+  con harness e isolamento a latenza: §6.4 di `evoluzione.md`), choking rate-based
+  (banco deterministico, §6), reader con readahead per lo streaming (**fatto**),
+  **priorità file graduate (fatto, §4.11)** e I/O disco (**mmap opt-in + durabilità
+  a batch fatti, §5.4; scritture contigue non necessarie senza misura**). Sono
+  "cherry-pick" (§11), non blocchi.
 
 ### 4.3 Debito tecnico (risolto)
 
@@ -424,7 +427,7 @@ da verificare sul codice delle librerie prima di ogni porting.
 | uTP | sì (`anacrolix/utp`) | sì | sì, LEDBAT proprio | sì |
 | Holepunch BEP 55 | sì | sì | sì | sì |
 | Streaming | finestra graduata + HTTP Range, seek e readahead | Reader con seek e readahead | deadline per pezzo | sì |
-| Storage | file | file, mmap, bolt, sqlite, pluggable | file, mmap (2.0) | libtorrent |
+| Storage | file, mmap (opt-in) | file, mmap, bolt, sqlite, pluggable | file, mmap (2.0) | libtorrent |
 | WebTorrent | no | sì | no | no |
 | Choking seed | default del motore, misurato corretto | semplice | più algoritmi (rate-based, anti-leech) | libtorrent |
 | Smart ban (pezzi corrotti) | sì (ban di sessione con scadenza) | sì | sì | sì |
@@ -440,7 +443,7 @@ da verificare sul codice delle librerie prima di ogni porting.
 | 4 | Reader con readahead per lo streaming | anacrolix | il prefetch ha priorità sul rarest-first (`SetFileReadaheadWindow`), al posto dell'attesa a polling (200 ms, timeout 2 min) | fatto |
 | 5 | BitTorrent v2 e ibridi | anacrolix | torrent v2-only già in circolazione; serve merkle per file | alto |
 | 6 | Choking rate-based e anti-leech | libtorrent | qualità del seeding; da validare con l'harness `unchoker/sim_test.go` | medio |
-| 7 | Disk I/O: scrittura in blocchi contigui, hash su pool | libtorrent | CPU e usura disco su NAS lenti | medio |
+| 7 | Disk I/O: scrittura in blocchi contigui, hash su pool | libtorrent | CPU e usura disco su NAS lenti | **mmap + `fdatasync` fatti (§5.4 di `evoluzione.md`); contiguo/hash su pool non necessari senza misura** |
 | 8 | Share mode | libtorrent | già scartato per Gextto (§4.3, decisione 2); per lo standalone vale come opzione | basso |
 | 9 | WebTorrent | anacrolix | nicchia | alto |
 

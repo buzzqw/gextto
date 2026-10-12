@@ -531,7 +531,7 @@ verità usata dall'UI.
 | Limiti per-torrent | velocità download/upload | fatto (`SetLimits`) |
 | Limiti per-torrent | connessioni e upload slot | fatto (`SetMaxConnections`/`SetMaxUploads`) |
 | Modalità | upload/share mode | saltato (si usa seed infinito ratio 0); super-seeding fatto |
-| Priorità | per-pezzo e diagnostica pezzi | fatto (API `pieces`, solo incluso/escluso per file) |
+| Priorità | per-pezzo, diagnostica pezzi, priorità file | fatto (API `pieces`, diagnostica, **priorità file graduate 0..7**, §4.11) |
 | Tracker | rimozione | fatto (`set-trackers`) |
 | Web seed | add/remove a caldo | fatto (azione `webseeds`) |
 | Sequenziale | toggle a runtime | fatto (`PiecePicker.SetOrder`) |
@@ -540,8 +540,9 @@ verità usata dall'UI.
 | Qualità | algoritmi di seeding/choking | misurato, vedi §6 |
 
 **vs anacrolix/torrent**: lo **streaming HTTP Range è fatto** (§4.3 #7) e anche il
-**reader con seek e readahead** è fatto (finestra graduata, §4.7); mancano gli
-**storage alternativi** (mmap/blob/bolt/sqlite) e WebTorrent/WebRTC (wishlist).
+**reader con seek e readahead** è fatto (finestra graduata, §4.7); **mmap** c'è
+come opzione di storage (§5.4) e restano gli **storage alternativi** (blob, bolt,
+sqlite) e WebTorrent/WebRTC (wishlist).
 gx-torrent ha invece daemon
 sorvegliato, UI web, REST, UPnP/NAT-PMP, porta unica, proxy SOCKS/HTTP, filtro
 IP multi-formato, killswitch VPN, preallocazione, cache adattiva.
@@ -1090,8 +1091,9 @@ I **tre divari a più alto valore** in esercizio reale, in ordine di priorità:
    picker, demone e Gextto a 0/1/4/6/7, `capabilityLevels` a `full` (§4.11). Resta
    solo la **misura** con file a priorità mista.
 2. **I/O disco** — **fatto (2026-10-12)**: `O_SYNC` rimosso, `storage.File.Sync()`
-   e invariante snapshot→fsync→bitfield, `updateStats` in due fasi (§5.4). Restano
-   fuori scope mmap/AIO/scritture contigue, che richiedono misure dedicate.
+   (`fdatasync`), invariante snapshot→fsync→bitfield e `updateStats` in due fasi;
+   **mmap opt-in** per l'I/O asincrono (§5.4). Restano non fatti O_DIRECT/io_uring
+   e il coalescing esplicito delle scritture, senza misura che li giustifichi.
 3. **Dimostrazione su sciame reale e isolamento** — **fatta (2026-10-12)**: gx-core
    alla pari o sopra libtorrent sullo stesso torrent pubblico ben seedato (§6.8);
    il **pipelining** è isolato con un proxy di latenza in-process (§6.4: ~12× con
@@ -1773,6 +1775,13 @@ Difetti trovati: chiave fantasma solo-spagnola `Nuevo File Archiviato`
 voci mancanti (generate automaticamente — **richiedono revisione linguistica**
 pre-rilascio); `esc()` senza `'` (corretto); test non idempotente sotto race
 (reso ripetibile con cleanup).
+
+**Race su `t.info` (2026-10-12).** Il job race su `cmd/gx-torrent` segnalava
+`Collections()`/`Similar()` (goroutine del demone) mentre il run loop pubblicava
+i metadati di un magnet: il campo è ora `atomic.Pointer[metainfo.Info]` con
+accessori `info()`/`setInfo()` (commit `a496160`).
+`go test -race ./cmd/gx-torrent/` e `./internal/gxcore/torrent/`: **0 data race**.
+Resta la **Fase 4** (bonifica + race bloccante) del piano qui sopra.
 
 ### 8.8 Osservazioni emerse (ridimensionano il piano)
 

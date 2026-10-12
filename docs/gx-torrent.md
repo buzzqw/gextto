@@ -1239,7 +1239,7 @@ Azioni disponibili su `POST /api/v1/torrents/{hash}/{azione}`:
 - `set-trackers` (con `urls`, uno per riga: **sostituisce** la lista, elenco vuoto la azzera);
 - `webseeds` (con `urls`, uno per riga, e `remove=1` per rimuoverli);
 - `super-seeding` (con `enabled=1/0`: BEP 16 sul torrent completato);
-- `file-priorities` (con `priorities`, separate da virgola).
+- `file-priorities` (con `priorities`, separate da virgola; 0 = salta, 1..4 normale, 5..7 alta).
 
 Chiavi accettate da `POST /api/v1/config`:
 
