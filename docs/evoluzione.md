@@ -923,6 +923,16 @@ infohash specifico (es. un torrent pubblico popolato) e la misura stampa anche
 riempimento della tabella (un infohash casuale non ha peer, quindi `peers_found`
 resta 0). Con l'harness riparato le run terminano e si possono confrontare.
 
+**La scoperta funziona: misura su torrent pubblico libero (2026-10-12).** Con
+l'infohash del torrent **Ubuntu 24.04.3 desktop amd64**
+(`d160b8d8ea35a5b4e52837468fc8f03d55cef1f7`, scaricato da `releases.ubuntu.com`)
+l'harness trova **108 peer in ~30 s** con `q_out=395` e 79 risposte: la ricerca
+DHT porta a termine la scoperta su uno sciame reale e ben seedato. È il numero di
+riferimento per un eventuale A/B futuro del multi-path. (Il `dht_peers_found` del
+demone in esecuzione resta basso — ~6 — perché i suoi torrent sono in gran parte
+privati, quindi con DHT disattivato, o poco popolati: non è un difetto del
+lookup.)
+
 **Cap anti-Sybil per subnet — implementato e misurato (2026-10-11).**
 `Config.MaxNodesPerSubnet` (default 0 = disattivato) limita i nodi **nell'albero**
 di routing allo stesso /24 (IPv4) o /48 (IPv6); i nodi oltre soglia restano nel
