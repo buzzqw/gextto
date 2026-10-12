@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -450,5 +451,28 @@ func TestMagnetSourceOnLANRefusedByDefault(t *testing.T) {
 	}
 	if got := hits.Load(); got != 0 {
 		t.Fatalf("the LAN source was contacted %d time(s)", got)
+	}
+}
+
+// TestArchiveIdxRecordClampsSeeders: seeders come from a feed and can be
+// arbitrarily large, so the compact 4-byte index field clamps both ends
+// instead of truncating the uint32 conversion.
+func TestArchiveIdxRecordClampsSeeders(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		seeders int
+		want    int
+	}{
+		{"negative", -3, 0},
+		{"in range", 42, 42},
+		{"above uint32", 1 << 40, math.MaxUint32},
+	} {
+		view, ok := parseArchiveIdx(archiveIdxRecord(archiveEntry{Title: "A", Seeders: tc.seeders}))
+		if !ok {
+			t.Fatalf("%s: index record not readable", tc.name)
+		}
+		if view.seeders != tc.want {
+			t.Fatalf("%s: seeders = %d, want %d", tc.name, view.seeders, tc.want)
+		}
 	}
 }

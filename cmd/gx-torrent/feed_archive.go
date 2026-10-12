@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -147,7 +148,10 @@ func archiveIdxRecord(entry archiveEntry) []byte {
 	}
 	out := make([]byte, 15, 15+len(feed)+len(title))
 	binary.BigEndian.PutUint64(out[0:8], uint64(max(entry.Size, 0)))
-	binary.BigEndian.PutUint32(out[8:12], uint32(max(entry.Seeders, 0)))
+	// Seeders come from a feed and can be arbitrarily large: clamp both ends so
+	// the uint32 conversion cannot truncate (feed_archive's index is 4 bytes).
+	seeders := min(max(entry.Seeders, 0), math.MaxUint32)
+	binary.BigEndian.PutUint32(out[8:12], uint32(seeders))
 	if entry.Added {
 		out[12] = archiveFlagAdded
 	}
