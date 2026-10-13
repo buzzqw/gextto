@@ -31,7 +31,18 @@ type peerConfirmEntry struct {
 	seen      time.Time
 }
 
-// notePeerReport records that the node at reporterAddr reported peer for ih,
+// reporterKey is the identity of a reporting path: the node's subnet (the
+// anti-Sybil unit of the routing table), so one host on many ports or a whole
+// /24 counts as a single path and cannot confirm its own peers. A node without
+// a usable IP falls back to its address.
+func reporterKey(node *remoteNode) string {
+	if k := subnetKey(node.address.IP); k != "" {
+		return k
+	}
+	return node.addressBinaryFormat
+}
+
+// notePeerReport records that the path reporterAddr (see reporterKey) reported peer for ih,
 // and counts the peer once when a second distinct reporter confirms it. Runs in
 // the DHT run loop.
 func (d *DHT) notePeerReport(ih InfoHash, peer, reporterAddr string) {

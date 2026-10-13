@@ -1,6 +1,7 @@
 package dht
 
 import (
+	"net"
 	"testing"
 	"time"
 )
@@ -58,5 +59,19 @@ func TestPeerConfirmExpiry(t *testing.T) {
 	d.expirePeerConfirm(time.Now().Add(peerConfirmWindow + time.Second))
 	if len(d.confirm) != 0 {
 		t.Fatalf("entry not expired: %d", len(d.confirm))
+	}
+}
+
+// TestReporterKeyIsTheSubnet: two nodes of the same /24 (or one host on two
+// ports) are one path; a node of another /24 is a second one.
+func TestReporterKeyIsTheSubnet(t *testing.T) {
+	a := &remoteNode{address: net.UDPAddr{IP: net.ParseIP("203.0.113.5"), Port: 6881}}
+	b := &remoteNode{address: net.UDPAddr{IP: net.ParseIP("203.0.113.77"), Port: 7000}}
+	c := &remoteNode{address: net.UDPAddr{IP: net.ParseIP("198.51.100.5"), Port: 6881}}
+	if reporterKey(a) != reporterKey(b) {
+		t.Fatal("same /24 counted as two paths")
+	}
+	if reporterKey(a) == reporterKey(c) {
+		t.Fatal("different subnets counted as one path")
 	}
 }

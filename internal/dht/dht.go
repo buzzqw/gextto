@@ -1159,11 +1159,12 @@ func (d *DHT) processGetPeerResults(node *remoteNode, resp responseType) {
 	}
 	if resp.R.Values != nil {
 		peers := make([]string, 0)
+		reporter := reporterKey(node)
 		for _, peerContact := range resp.R.Values {
 			// send peer even if we already have it in store
 			// the underlying client does/should handle dupes
 			d.peerStore.addContact(query.ih, peerContact, false)
-			d.notePeerReport(query.ih, peerContact, node.addressBinaryFormat)
+			d.notePeerReport(query.ih, peerContact, reporter)
 			peers = append(peers, peerContact)
 		}
 		if len(peers) > 0 {
