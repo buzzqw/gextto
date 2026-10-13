@@ -336,6 +336,70 @@ func TestUIPageRequiresToken(t *testing.T) {
 	}
 }
 
+// TestUILogViewOffersTheLogView checks the standalone page offers the Log view
+// and that /ui/log answers from the daemon's own recent log ring.
+func TestUILogViewOffersTheLogView(t *testing.T) {
+	standalone := renderUITemplate(t, &Daemon{}, true)
+	for _, want := range []string{`data-log-url="/ui/log"`, `id="pane-log"`} {
+		if !strings.Contains(standalone, want) {
+			t.Fatalf("the standalone page is missing %q", want)
+		}
+	}
+	if managed := renderUITemplate(t, &Daemon{}, false); strings.Contains(managed, `id="pane-log"`) {
+		t.Fatal("managed mode without a Gextto log must not offer the log view")
+	}
+
+	fmt.Fprintf(logRing, "log-view-test-marker\n")
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	resp, err := http.Get(srv.URL + "/ui/log?lines=100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /ui/log -> %d", resp.StatusCode)
+	}
+	var payload struct {
+		Lines []string `json:"lines"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	found := false
+	for _, line := range payload.Lines {
+		if strings.Contains(line, "log-view-test-marker") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("the log view did not return the daemon's recent log lines")
+	}
+}
+
+// TestLogRingBufferTail checks the ring keeps the last lines, oldest first.
+func TestLogRingBufferTail(t *testing.T) {
+	r := newLogRingBuffer(5)
+	for i := 1; i <= 8; i++ {
+		fmt.Fprintf(r, "line %d\n", i)
+	}
+	got := r.tail(3)
+	want := []string{"line 6", "line 7", "line 8"}
+	if len(got) != len(want) {
+		t.Fatalf("tail = %v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("tail = %v, want %v", got, want)
+		}
+	}
+	if all := r.tail(100); len(all) != 5 || all[0] != "line 4" || all[4] != "line 8" {
+		t.Fatalf("tail(100) = %v", all)
+	}
+}
+
 func TestUIGexttoLogTabReadsTheTail(t *testing.T) {
 	d := newTestDaemon(t)
 	logPath := filepath.Join(t.TempDir(), "gextto.log")

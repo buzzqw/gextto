@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -35,6 +36,8 @@ func (d *Daemon) handleUIOptimize(w http.ResponseWriter, r *http.Request) {
 	var message string
 	var err error
 	switch r.FormValue("optimize") {
+	case "all":
+		message, err = d.optimizeAll()
 	case "queue":
 		message, err = d.optimizeQueue()
 	case "cache":
@@ -49,6 +52,30 @@ func (d *Daemon) handleUIOptimize(w http.ResponseWriter, r *http.Request) {
 		ok, message = "0", err.Error()
 	}
 	http.Redirect(w, r, uiSettingsPath+"?msg="+url.QueryEscape(message)+"&ok="+ok+"#optimize", http.StatusSeeOther)
+}
+
+// optimizeAll runs every optimization for the single Optimize button: the queue
+// and the cache always, the bandwidth as far as it can. The upload cap needs
+// some measured traffic, so a not-yet-measured line is reported as a note, not
+// as a failure.
+func (d *Daemon) optimizeAll() (string, error) {
+	var parts []string
+	queueMsg, err := d.optimizeQueue()
+	if err != nil {
+		return "", err
+	}
+	parts = append(parts, queueMsg)
+	cacheMsg, err := d.optimizeCache()
+	if err != nil {
+		return "", err
+	}
+	parts = append(parts, cacheMsg)
+	if bandwidthMsg, err := d.optimizeBandwidth(); err != nil {
+		parts = append(parts, err.Error())
+	} else {
+		parts = append(parts, bandwidthMsg)
+	}
+	return strings.Join(parts, " "), nil
 }
 
 func rawJSON(value any) json.RawMessage {

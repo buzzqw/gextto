@@ -109,6 +109,141 @@ func TestWantedSeenTakenMissing(t *testing.T) {
 	}
 }
 
+// TestWantedRowListsHaveAndMissing checks the wanted row shows which episodes
+// were taken (Have) and which were seen but not downloaded (Missing): a season
+// with no gap collapses to its season, a gap lists the episodes.
+func TestWantedRowListsHaveAndMissing(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Show","kind":"series","seasons":"1+"}]`)
+	w := d.wantedList()[0]
+	d.recordWantedSeen(w, 1, 1)
+	d.recordWantedTaken(w, 1, 1)
+	row := d.uiWantedRowsHTML()
+	if strings.Contains(row, "Nothing missing") || strings.Contains(row, "<span>taken</span>") {
+		t.Fatalf("the wanted row must list the episodes, not a count: %s", row)
+	}
+	// A season with no gap collapses to its season alone.
+	if !strings.Contains(row, `>Have</span> S01`) || strings.Contains(row, ">Missing</span>") {
+		t.Fatalf("a complete season must collapse and show no gap: %s", row)
+	}
+	// A seen-but-not-taken episode opens a gap: Have lists the episodes held,
+	// Missing flags the episode seen but not downloaded.
+	d.recordWantedSeen(w, 1, 2)
+	row = d.uiWantedRowsHTML()
+	if !strings.Contains(row, `>Have</span> S01E01`) || !strings.Contains(row, `>Missing</span> S01E02`) {
+		t.Fatalf("the gap must be listed: %s", row)
+	}
+}
+
+// TestFormatHaveEpisodes checks that complete seasons collapse and seasons with
+// a gap list their episodes.
+func TestFormatHaveEpisodes(t *testing.T) {
+	if got := formatHaveEpisodes(
+		[]wantedEpisode{{1, 1}, {1, 2}, {1, 3}}, nil, 24); got != "S01" {
+		t.Fatalf("complete season = %q, want S01", got)
+	}
+	if got := formatHaveEpisodes(
+		[]wantedEpisode{{1, 1}, {1, 2}, {1, 3}}, []wantedEpisode{{1, 5}}, 24); got != "S01E01–E03" {
+		t.Fatalf("season with a gap = %q, want S01E01–E03", got)
+	}
+	if got := formatHaveEpisodes(
+		[]wantedEpisode{{1, 1}, {1, 2}, {2, 1}, {2, 2}}, []wantedEpisode{{2, 3}}, 24); got != "S01, S02E01–E02" {
+		t.Fatalf("mixed seasons = %q, want S01, S02E01–E02", got)
+	}
+}
+
+// TestUIWantedEpisodesManager checks the episode manager of the wanted page: it
+// lists the known episodes, marks one present/missing and adds one.
+func TestUIWantedEpisodesManager(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Show","kind":"series","seasons":"1+"}]`)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	list := func() []wantedEpisodeView {
+		t.Helper()
+		resp, err := http.Get(srv.URL + "/ui/wanted-episodes?index=0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("GET /ui/wanted-episodes -> %d", resp.StatusCode)
+		}
+		var payload struct {
+			Episodes []wantedEpisodeView `json:"episodes"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		return payload.Episodes
+	}
+	post := func(values url.Values) []wantedEpisodeView {
+		t.Helper()
+		resp, err := http.PostForm(srv.URL+"/ui/wanted-episodes", values)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("POST /ui/wanted-episodes -> %d", resp.StatusCode)
+		}
+		var payload struct {
+			Episodes []wantedEpisodeView `json:"episodes"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		return payload.Episodes
+	}
+
+	if got := list(); len(got) != 0 {
+		t.Fatalf("no episodes expected yet: %+v", got)
+	}
+	// Mark S01E01 as downloaded.
+	if eps := post(url.Values{"op": {"have"}, "index": {"0"}, "season": {"1"}, "episode": {"1"}}); len(eps) != 1 || !eps[0].Have {
+		t.Fatalf("after have: %+v", eps)
+	}
+	// Add S01E02 as missing (never seen).
+	eps := post(url.Values{"op": {"add"}, "index": {"0"}, "season": {"1"}, "episode": {"2"}})
+	if len(eps) != 2 || eps[0].Episode != 1 || !eps[0].Have || eps[1].Have {
+		t.Fatalf("after add: %+v", eps)
+	}
+	// Mark S01E01 missing again: it is searched once more.
+	eps = post(url.Values{"op": {"missing"}, "index": {"0"}, "season": {"1"}, "episode": {"1"}})
+	if len(eps) != 2 || eps[0].Have {
+		t.Fatalf("after missing: %+v", eps)
+	}
+	// A movie has no episodes.
+	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Film","kind":"movie"}]`)
+	resp, err := http.PostForm(srv.URL+"/ui/wanted-episodes", url.Values{"op": {"have"}, "index": {"0"}, "season": {"1"}, "episode": {"1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("a movie must have no episodes: %d", resp.StatusCode)
+	}
+}
+
+// TestFormatEpisodeRanges checks the Have/Missing episode compaction.
+func TestFormatEpisodeRanges(t *testing.T) {
+	eps := []wantedEpisode{{1, 1}, {1, 2}, {1, 3}, {1, 5}, {2, 1}}
+	if got := formatEpisodeRanges(eps, 24); got != "S01E01–E03, S01E05, S02E01" {
+		t.Fatalf("ranges = %q", got)
+	}
+	// The cap keeps at most max episodes and marks the rest.
+	many := make([]wantedEpisode, 0, 30)
+	for i := 1; i <= 30; i++ {
+		many = append(many, wantedEpisode{1, i})
+	}
+	if got := formatEpisodeRanges(many, 24); got != "S01E01–E24 +6" {
+		t.Fatalf("capped ranges = %q", got)
+	}
+}
+
 // TestPollFeedsDrivesWantedWithoutFeeds guards the wanted engine running even
 // when no RSS feed is configured: the wanted list searches the indexers
 // directly, so pollFeeds must not return early and skip pollWanted.

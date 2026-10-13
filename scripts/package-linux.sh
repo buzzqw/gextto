@@ -191,6 +191,10 @@ UNIT
 
 cp "${ROOT}/README.md" "$STAGE/README.md" 2>/dev/null || true
 cp "${ROOT}/README.it.md" "$STAGE/README.it.md" 2>/dev/null || true
+# Fail rather than ship a release with the wrong or a missing licence: every
+# package must carry the project's own EUPL 1.2 text.
+grep -q "EUROPEAN UNION PUBLIC LICENCE v. 1.2" "${ROOT}/LICENSE" \
+  || { echo "LICENSE does not contain the EUPL 1.2 text; refusing to package" >&2; exit 1; }
 cp "${ROOT}/LICENSE" "$STAGE/LICENSE"
 cp "${ROOT}/THIRD-PARTY-NOTICES" "$STAGE/THIRD-PARTY-NOTICES"
 echo "$LABEL" > "$STAGE/VERSION"

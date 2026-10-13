@@ -284,7 +284,8 @@ and `/api/v1/health` report it as `1.1.<n>`.
 
 gx-torrent is also a complete client usable without Gextto, like
 `qbittorrent-nox` or `transmission-daemon`. It is **the same binary** Gextto
-drives as its engine.
+drives as its engine. In short, it is a **simpler, reduced version of Gextto**:
+fewer features, but all the ones a standalone client needs.
 
 - **`*arr` ready.** qBittorrent Web API v2 (`/api/v2/...`) for Sonarr, Radarr,
   Lidarr, Readarr and mobile managers, plus its own JSON API (`/api/v1/...`)
@@ -294,8 +295,9 @@ drives as its engine.
   sortable multi-select list with context menu and keyboard shortcuts, torrent
   detail in a side panel, drag-and-drop of `.torrent` files and pasted
   magnets, phone-friendly cards. Every page axe-core checked.
-- **RSS and automation.** A **Wanted** page (cards per title with missing
-  episodes, guided add dialog) and an **RSS & Indexers** page (feeds, rules,
+- **RSS and automation.** A **Wanted** page (cards per title with Have/Missing
+  episodes, an episode manager to mark what you have or miss and force a new
+  search, guided add dialog) and an **RSS & Indexers** page (feeds, rules,
   indexers, options as tabbed cards; rule editor split into *which items* /
   *what to do* with live match preview). Ordered PASS/FAIL rules, per-row
   reload, live indexer tests, optional FlareSolverr, and a local **archive**

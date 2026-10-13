@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/rss"
 	"github.com/buzzqw/gextto/internal/torznab"
 )
 
@@ -65,6 +66,10 @@ func (d *Daemon) handleUISearch(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
 
+	// Indexers often answer with loosely related items (some do an OR or a
+	// full-text match); keep only the titles carrying every search term, the
+	// same rule the local archive section applies, so the two agree.
+	filter := parseArchiveQuery(query, "", false)
 	results := make([]torznab.Item, 0, 64)
 	for _, indexer := range indexers {
 		items, err := indexer.Search(ctx, query)
@@ -72,7 +77,12 @@ func (d *Daemon) handleUISearch(w http.ResponseWriter, r *http.Request) {
 			logf("indexer %s: %v", indexer.Name, err)
 			continue
 		}
-		results = append(results, items...)
+		for _, item := range items {
+			if !filter.matchTitle(item.Title) {
+				continue
+			}
+			results = append(results, item)
+		}
 	}
 	sort.SliceStable(results, func(i, j int) bool {
 		if results[i].Seeders != results[j].Seeders {
@@ -80,5 +90,17 @@ func (d *Daemon) handleUISearch(w http.ResponseWriter, r *http.Request) {
 		}
 		return results[i].Title < results[j].Title
 	})
+	// Archive the live results, so the next archive search finds them locally
+	// instead of asking the indexers again (the same behaviour as the Wanted
+	// live search). The key matches the one the Wanted search uses.
+	if len(results) > 0 {
+		items := make([]rss.Item, 0, len(results))
+		for _, item := range results {
+			items = append(items, rssItemFromTorznab(item))
+		}
+		if _, err := d.archive().record("search:"+strings.ToLower(query), items, time.Now()); err != nil {
+			logf("archive search %q: cannot archive the indexer results: %v", query, err)
+		}
+	}
 	writeJSON(w, http.StatusOK, results)
 }

@@ -22,7 +22,7 @@ const (
 	feedsSettingKey     = "feeds"
 	rulesSettingKey     = "rules"
 	feedIntervalKey     = "feed-interval-secs"
-	defaultFeedInterval = 15 * time.Minute
+	defaultFeedInterval = 180 * time.Minute
 	feedSeenRetention   = 30 * 24 * time.Hour
 	feedRequestTimeout  = 30 * time.Second
 	// indexerSearchTimeout gives a Torznab indexer more room than a plain RSS

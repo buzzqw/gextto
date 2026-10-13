@@ -336,6 +336,23 @@ func TestUIOptimizeQueueCacheBandwidth(t *testing.T) {
 	if d.opts.Settings.Get(autospeedEnabledKey, "") != "true" {
 		t.Fatal("bandwidth optimization must enable the latency auto-speed")
 	}
+
+	// The single Optimize button runs everything: the queue and the cache are
+	// applied even when the upload is not measured yet (the bandwidth part is
+	// then only a note), so a fresh client still gets optimized.
+	if _, err := d.setConfig(map[string]json.RawMessage{"active_downloads": rawJSON(9), "cache_mb": rawJSON(64)}); err != nil {
+		t.Fatal(err)
+	}
+	d.mu.Lock()
+	d.peakUp = 0
+	d.mu.Unlock()
+	if loc := post("all"); !strings.Contains(loc, "ok=1") {
+		t.Fatalf("all optimize = %s", loc)
+	}
+	cfg, _, _ = d.config()
+	if cfg.ActiveDownloads != 3 || cfg.ActiveLimit != 5 || cfg.CacheMB != -1 {
+		t.Fatalf("all optimize did not apply the queue and the cache: %+v", cfg)
+	}
 }
 
 func TestIPFilterSourceURLIsDownloadedAndReported(t *testing.T) {

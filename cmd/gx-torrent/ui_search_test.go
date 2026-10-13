@@ -13,9 +13,9 @@ import (
 
 const searchFeed = `<?xml version="1.0"?>
 <rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>
-<item><title>B</title><enclosure url="http://t/b.torrent" length="20"/>
+<item><title>Movie B 1080p</title><enclosure url="http://t/b.torrent" length="20"/>
 <torznab:attr name="seeders" value="5"/></item>
-<item><title>A</title><enclosure url="http://t/a.torrent" length="10"/>
+<item><title>Movie A 1080p</title><enclosure url="http://t/a.torrent" length="10"/>
 <torznab:attr name="seeders" value="42"/></item>
 </channel></rss>`
 
@@ -29,6 +29,7 @@ func TestUISearch(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
 	d.opts.Settings.Set(setupCompleteKey, "true")
 	d.opts.Settings.Set(indexersSettingKey, `[{"name":"fake","url":"`+feed.URL+`","apikey":"k"}]`)
+	d.opts.DataDir = t.TempDir() // so the live results can be archived
 
 	srv := httptest.NewServer(d.routes())
 	defer srv.Close()
@@ -48,7 +49,7 @@ func TestUISearch(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("items = %d, want 2", len(items))
 	}
-	if items[0].Title != "A" || items[0].Seeders != 42 {
+	if items[0].Title != "Movie A 1080p" || items[0].Seeders != 42 {
 		t.Fatalf("results not sorted by seeders: %+v", items)
 	}
 	if items[0].Indexer != "fake" {
@@ -58,6 +59,47 @@ func TestUISearch(t *testing.T) {
 	// "configured but no result".
 	if got := resp.Header.Get("X-Gx-Indexers"); got != "1" {
 		t.Fatalf("X-Gx-Indexers = %q, want 1", got)
+	}
+
+	// The live results are archived, so a later archive search finds them
+	// locally without querying the indexers again (issue: they used to be
+	// shown once and forgotten).
+	found, err := d.archive().search(parseArchiveQuery("movie", "", false), "new", 1, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found.Items) != 2 {
+		t.Fatalf("live results not archived: %d entries", len(found.Items))
+	}
+}
+
+// TestUISearchDropsUnrelatedResults checks the live indexer results are filtered
+// to the titles carrying every search term, like the local archive section: an
+// indexer that answers loosely must not flood the page with unrelated items.
+func TestUISearchDropsUnrelatedResults(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(searchFeed))
+	}))
+	defer feed.Close()
+
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(indexersSettingKey, `[{"name":"fake","url":"`+feed.URL+`","apikey":"k"}]`)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/search?q=movie%20a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var items []torznab.Item
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(items) != 1 || items[0].Title != "Movie A 1080p" {
+		t.Fatalf("filter kept the wrong items: %+v", items)
 	}
 }
 

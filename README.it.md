@@ -292,7 +292,8 @@ Verifica con `./bin/gexttod --version`. Il demone `gx-torrent` ha un
 
 gx-torrent è anche un client completo usabile senza Gextto, come
 `qbittorrent-nox` o `transmission-daemon`. È **lo stesso binario** che Gextto
-pilota come motore.
+pilota come motore. In sintesi, è una **versione più semplice e ridotta di
+Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
 
 - **Pronto per gli `*arr`.** API Web v2 di qBittorrent (`/api/v2/...`) per
   Sonarr, Radarr, Lidarr, Readarr e app mobili, più API JSON propria
@@ -303,7 +304,8 @@ pilota come motore.
   scorciatoie, dettaglio in un pannello laterale, trascinamento dei `.torrent`
   e magnet incollati, schede su telefono. Ogni pagina verificata con axe-core.
 - **RSS e automazione.** Pagina **Cercati** (schede per titolo con episodi
-  mancanti, finestra guidata di aggiunta) e pagina **RSS & Indexer** (feed,
+  Have/Missing, gestore puntate per segnare cosa hai o manca e forzare una nuova
+  ricerca, finestra guidata di aggiunta) e pagina **RSS & Indexer** (feed,
   regole, indexer, opzioni a schede; editor diviso in *quali elementi* / *cosa
   fare* con anteprima dal vivo). Regole PASS/FAIL ordinate, ricarica per riga,
   test indexer in tempo reale, FlareSolverr opzionale e un **archivio** locale

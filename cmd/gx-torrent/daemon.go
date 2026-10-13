@@ -272,6 +272,14 @@ type Daemon struct {
 	// autoSpeed is the latency auto-speed controller (see autospeed.go).
 	autoSpeed *autoSpeed
 
+	// procSample is the last process CPU sample, so the status bar can show the
+	// gx-torrent process load as a percent since the previous render.
+	procSampleMu sync.Mutex
+	procLastCPU  time.Duration
+	procLastAt   time.Time
+	procLastPct  float64
+	procHavePct  bool
+
 	// snapshot is the last published torrent view list. The REST list and the
 	// web page read it without d.mu, so a slow per-torrent call — a torrent run
 	// loop blocked on a network mount, say — can never make the daemon look

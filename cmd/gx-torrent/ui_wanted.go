@@ -13,7 +13,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"html"
 	"net/http"
 	"regexp"
@@ -25,6 +25,10 @@ import (
 	"github.com/buzzqw/gextto/internal/rss"
 	"github.com/buzzqw/gextto/internal/webui/assets"
 )
+
+// wantedEpisodeListMax bounds how many episodes the Have/Missing list of a
+// wanted row shows before a trailing "+N".
+const wantedEpisodeListMax = 24
 
 // handleUIWanted adds, edits, pauses/resumes or removes one wanted title.
 func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
@@ -117,6 +121,129 @@ func (d *Daemon) handleUIWantedGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.renderWanted(w, r, "")
+}
+
+// wantedEpisodeView is one episode of a wanted title for the episode manager.
+type wantedEpisodeView struct {
+	Season  int  `json:"season"`
+	Episode int  `json:"episode"`
+	Have    bool `json:"have"`
+}
+
+// wantedEpisodeViews lists the known episodes (seen or taken) of a title,
+// ordered by season then episode, with what the operator has.
+func (d *Daemon) wantedEpisodeViews(name string) []wantedEpisodeView {
+	d.mu.Lock()
+	seen := map[string]smartEpisodes{}
+	for key, eps := range d.state.WantedSeen {
+		seen[key] = eps
+	}
+	taken := map[string]smartEpisodes{}
+	for key, eps := range d.state.WantedTaken {
+		taken[key] = eps
+	}
+	d.mu.Unlock()
+
+	prefix := strings.TrimSpace(name) + "\x00"
+	have := map[[2]int]bool{}
+	var keys [][2]int
+	add := func(byKey map[string]smartEpisodes, isHave bool) {
+		for key, eps := range byKey {
+			if !strings.HasPrefix(key, prefix) {
+				continue
+			}
+			season, err := strconv.Atoi(strings.TrimPrefix(key, prefix))
+			if err != nil {
+				continue
+			}
+			for token := range eps {
+				episode, err := strconv.Atoi(strings.SplitN(token, "-", 2)[0])
+				if err != nil {
+					continue
+				}
+				k := [2]int{season, episode}
+				if _, ok := have[k]; !ok {
+					keys = append(keys, k)
+				}
+				if isHave {
+					have[k] = true
+				}
+			}
+		}
+	}
+	add(seen, false)
+	add(taken, true)
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i][0] != keys[j][0] {
+			return keys[i][0] < keys[j][0]
+		}
+		return keys[i][1] < keys[j][1]
+	})
+	out := make([]wantedEpisodeView, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, wantedEpisodeView{Season: k[0], Episode: k[1], Have: have[k]})
+	}
+	return out
+}
+
+// handleUIWantedEpisodes reads and edits the episode ledger of one wanted title:
+// the episode manager marks what is present and what is missing. A GET returns
+// the episodes; a POST (op=have|missing|add) changes one.
+func (d *Daemon) handleUIWantedEpisodes(w http.ResponseWriter, r *http.Request) {
+	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	list := d.wantedList()
+	if r.Method == http.MethodGet {
+		index, err := parseFormIndex(r.URL.Query().Get("index"))
+		if err != nil || index < 0 || index >= len(list) {
+			writeError(w, http.StatusNotFound, errNotFound)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, http.StatusOK, map[string]any{
+			"name":     list[index].Name,
+			"kind":     list[index].kind(),
+			"episodes": d.wantedEpisodeViews(list[index].Name),
+		})
+		return
+	}
+	if !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	index, err := parseFormIndex(r.FormValue("index"))
+	if err != nil || index < 0 || index >= len(list) {
+		writeError(w, http.StatusNotFound, errNotFound)
+		return
+	}
+	entry := list[index]
+	if entry.kind() == "movie" {
+		writeError(w, http.StatusBadRequest, errors.New("a movie has no episodes"))
+		return
+	}
+	season, errSeason := strconv.Atoi(strings.TrimSpace(r.FormValue("season")))
+	episode, errEpisode := strconv.Atoi(strings.TrimSpace(r.FormValue("episode")))
+	if errSeason != nil || errEpisode != nil || season < 0 || episode <= 0 {
+		writeError(w, http.StatusBadRequest, errors.New("season and episode are required"))
+		return
+	}
+	switch strings.TrimSpace(r.FormValue("op")) {
+	case "have":
+		d.setWantedTaken(entry.Name, season, episode, true)
+	case "missing", "add":
+		// Known and not downloaded: it counts as missing and is searched again.
+		d.addWantedSeen(entry.Name, season, episode)
+		d.setWantedTaken(entry.Name, season, episode, false)
+	default:
+		writeError(w, http.StatusBadRequest, errors.New("unknown episode operation"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "episodes": d.wantedEpisodeViews(entry.Name)})
 }
 
 func (d *Daemon) renderWanted(w http.ResponseWriter, r *http.Request, errKey string) {
@@ -501,7 +628,7 @@ func (d *Daemon) uiWantedRowsHTML() string {
 	var b strings.Builder
 	for index, w := range list {
 		idx := strconv.Itoa(index)
-		taken, lastSearch := d.wantedProgress(w)
+		taken, _ := d.wantedProgress(w)
 		icon, kindLabel := "i-tv", "Series"
 		if w.kind() == "movie" {
 			icon, kindLabel = "i-film", "Movie"
@@ -543,36 +670,28 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			b.WriteString(`<div class="chips">` + chips.String() + `</div>`)
 		}
 
-		// Progress: what is missing (series), what was taken, when it was last
-		// searched on the indexers.
+		// What the operator has and what is missing for a series, honestly: the
+		// episodes downloaded (Have) and the ones seen but not taken (Missing).
+		// No bare count and no "nothing missing" claim: a series is only as
+		// complete as the episodes seen so far.
 		b.WriteString(`<div class="item-status">`)
+		var statusParts []string
 		if w.kind() != "movie" {
+			have := d.wantedTakenEpisodes(w)
 			missing := d.wantedMissing(w)
-			if len(missing) == 0 && taken == 0 {
-				b.WriteString(`<span class="muted">Not found yet</span>`)
-			} else if len(missing) == 0 {
-				b.WriteString(`<span class="ok">✓ <span>Nothing missing</span></span>`)
-			} else {
-				b.WriteString(`<span class="warn"><span>Missing</span> ` + strconv.Itoa(len(missing)) + `:</span> `)
-				for i, ep := range missing {
-					if i == 12 {
-						b.WriteString(`<span class="chip warn">+` + strconv.Itoa(len(missing)-12) + `</span>`)
-						break
-					}
-					b.WriteString(`<span class="chip warn">` + fmt.Sprintf("S%02dE%02d", ep.season, ep.episode) + `</span> `)
-				}
+			if len(have) > 0 {
+				statusParts = append(statusParts, `<span class="ok" title="Episodes downloaded for this title">Have</span> `+formatHaveEpisodes(have, missing, wantedEpisodeListMax))
+			}
+			if len(missing) > 0 {
+				statusParts = append(statusParts, `<span class="warn" title="Episodes seen but not downloaded">Missing</span> `+formatEpisodeRanges(missing, wantedEpisodeListMax))
 			}
 		} else if taken > 0 {
-			b.WriteString(`<span class="ok">✓ <span>Downloaded</span></span>`)
-		} else {
-			b.WriteString(`<span class="muted">Not found yet</span>`)
+			statusParts = append(statusParts, `<span class="ok">✓ <span>Downloaded</span></span>`)
 		}
-		if w.kind() != "movie" && taken > 0 {
-			b.WriteString(` · <span title="Episodes downloaded for this title">` + strconv.Itoa(taken) + ` <span>taken</span></span>`)
+		if len(statusParts) == 0 {
+			statusParts = append(statusParts, `<span class="muted">Not found yet</span>`)
 		}
-		if !lastSearch.IsZero() {
-			b.WriteString(` · <span title="Last search on the indexers"><span>searched</span> ` + lastSearch.Format("02/01 15:04") + `</span>`)
-		}
+		b.WriteString(strings.Join(statusParts, ` · `))
 		b.WriteString(`</div><div class="item-status" data-wanted-status="` + idx + `" aria-live="polite"></div></div><div class="item-actions">`)
 
 		b.WriteString(`<button type="button" class="sm" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="Search this title now"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search</button>`)

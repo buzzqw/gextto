@@ -53,6 +53,54 @@ func TestScheduledSpeedLimits(t *testing.T) {
 	}
 }
 
+// TestScheduledSpeedLimitsDays checks the weekday restriction: an empty list
+// means every day, a list restricts the window to those days.
+func TestScheduledSpeedLimitsDays(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	s := d.opts.Settings
+	s.Set(scheduleEnabledKey, "true")
+	s.Set(scheduleStartKey, "08:00")
+	s.Set(scheduleEndKey, "22:00")
+	s.Set(scheduleDLKey, "1000")
+	s.Set(scheduleULKey, "100")
+
+	// clockAt builds a Thursday (2026-01-01).
+	thursday := clockAt(10, 0)
+	if thursday.Weekday() != time.Thursday {
+		t.Fatalf("test clock is not a Thursday: %v", thursday.Weekday())
+	}
+	if _, _, active := d.scheduledSpeedLimits(thursday); !active {
+		t.Fatal("an empty day list must apply every day")
+	}
+	s.Set(scheduleDaysKey, "1,2,3") // Mon-Wed, not Thursday
+	if _, _, active := d.scheduledSpeedLimits(thursday); active {
+		t.Fatal("a day outside the selected list must be inactive")
+	}
+	s.Set(scheduleDaysKey, "4,5") // Thursday and Friday
+	if _, _, active := d.scheduledSpeedLimits(thursday); !active {
+		t.Fatal("a selected day must be active")
+	}
+}
+
+func TestScheduleDaysForm(t *testing.T) {
+	all := [7]bool{true, true, true, true, true, true, true}
+	if got := scheduleDaysSet(""); got != all {
+		t.Fatalf("empty storage must mean every day: %v", got)
+	}
+	if got := scheduleDaysSet("0,4"); !got[0] || !got[4] || got[1] {
+		t.Fatalf("parsed days wrong: %v", got)
+	}
+	if got := formatScheduleDays(all); got != "" {
+		t.Fatalf("all days must collapse to empty, got %q", got)
+	}
+	if got := formatScheduleDays(parseScheduleDayForm([]string{"4", "0", "4", "x", "9"})); got != "0,4" {
+		t.Fatalf("formatted days = %q, want 0,4", got)
+	}
+	if n := scheduleDaysSelected(parseScheduleDayForm([]string{"1", "2"})); n != 2 {
+		t.Fatalf("selected = %d, want 2", n)
+	}
+}
+
 func TestApplyEffectiveSpeedLimitsSchedule(t *testing.T) {
 	store, err := settings.Load(filepath.Join(t.TempDir(), "settings.json"))
 	if err != nil {

@@ -7,7 +7,9 @@ runs in a separate process and is controlled via REST (`127.0.0.1:8890` when
 Gextto manages it, `0.0.0.0:8890` in standalone), where it also exposes an
 operational web page openable from the browser (managed: only from this server,
 see *Web interface* to open it to the LAN; standalone: already reachable from
-another PC on the LAN). The embedded
+another PC on the LAN). In short, as a standalone client it is a **simpler,
+reduced version of Gextto** — fewer features, but all the ones needed to run
+without it. The embedded
 libtorrent engine remains selectable — on builds that include it — and acts as an
 automatic fallback if gx-torrent does not start.
 
@@ -169,7 +171,8 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   two-minute **transfer graph**; a **toolbar** acting on the selection
   (resume, pause, recheck, reannounce, top, remove) plus *Tools* (IP filter,
   create `.torrent`, check feeds, test ports); the status bar at the bottom
-  with totals, free space, DHT, port reachability, incoming connections, IP
+  with totals, free space, the **CPU load and resident memory of the gx-torrent
+  process itself**, DHT, port reachability, incoming connections, IP
   filter, encryption.
 - **Table**: one row per torrent (name with category chip and folder, size,
   progress bar coloured by state, readable state badge, speeds, ETA,
@@ -181,14 +184,19 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   remove, `P` to pause/resume, `N` to add, Ctrl+A). Columns give way as the list
   narrows; on a phone the rows become cards. The list refreshes every 2 seconds
   (and at once on engine events) without losing selection, focus or scroll.
+  The periodic refresh swaps only the rows: the table header, and with it the
+  **select-all** checkbox, is never replaced, so a click is never lost to a
+  refresh landing between the press and the release.
 - **Add** in a dialog: several magnet links or `.torrent` URLs (one per line)
   and several files at once, destination (suggested from the existing save
-  paths), category (standalone) and the options (paused, top, sequential,
+  paths, with a *Browse* folder picker in standalone: `GET /ui/browse-dir` lists
+  the daemon machine's directories so the path is chosen instead of typed),
+  category (standalone) and the options (paused, top, sequential,
   first/last, super-seeding). A `.torrent` dropped anywhere on the page or a
   magnet pasted outside a field opens it pre-filled.
 - **Remove** asks in a dialog whether to delete the files too.
-- **Per-torrent detail** in a side panel next to the list (full screen on a
-  phone), with tabs: *General* (actions, data, pieces, space, dates, pin, speed,
+- **Per-torrent detail** in a panel below the list (like qBittorrent; full width
+  on a phone), with tabs: *General* (actions, data, pieces, space, dates, pin, speed,
   connection, upload and seed limits, super-seeding, move, category and tags,
   **web seeds**), *Files* (priority and **HTTP streaming** with ▶), *Peers*
   (connection flags, transport, encryption), *Trackers* (status, swarm, add and
@@ -201,9 +209,12 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   `GET /api/v1/portcheck`). With DHT active the result also shows the
   **reflected port** that the DHT nodes see for us (`reflected_port` field, from
   the `ip` field of BEP 42) and the deduced **NAT type** (`nat_mapping`).
-- ***Gextto log*** (toolbar, managed): the last lines of `gextto.log` (200–2000),
-  read only when you open it or press *Reload*, with text filter, DEBUG hidden by
-  default and warnings/errors coloured.
+- ***Log*** (toolbar): the last lines of the daemon's own log (200–2000), read
+  only when you open it or press *Reload*, with text filter, DEBUG hidden by
+  default and warnings/errors coloured. In standalone it reads the in-memory ring
+  of the daemon's recent lines, so it works whether the log goes to stderr or to
+  the rotating file already open in a terminal. In managed, when the daemon is
+  launched next to Gextto, the same button shows *gextto.log*.
 - **Large lists** (standalone only): the table renders at most `?rows=` torrents
   (default 300) and shows *Showing X of Y · Show more* to widen the window; in
   managed it always renders all torrents.
@@ -224,8 +235,15 @@ The standalone pages follow the same structure:
   The options tab holds the refresh interval, the archive retention,
   FlareSolverr (with its test) and the advanced JSON.
 - **Wanted** (`/ui/wanted`): a card per title with type, state, filters as
-  chips, the **missing episodes**, how many were taken and when it was last
-  searched, plus search now / edit / pause / remove. *Add title* is a guided
+  chips, and for a series what it has and what it lacks: **Have** collapses a
+  season with no gap into `S01` and lists the episodes of the seasons with gaps
+  (`S03E01–E03`), **Missing** highlights the episodes seen but not downloaded.
+  The card lists episodes, never a bare count nor a false "complete" (a season
+  is only as complete as the episodes seen so far), plus search now / edit /
+  pause / remove. The *Edit* dialog has an **Episodes** manager: it lists the
+  known episodes per season, a click marks one **downloaded** or **missing**, an
+  episode can be added as missing, and **Force download missing** searches the
+  indexers again for what is missing. *Add title* is a guided
   dialog: series or movie, the title with a search that shows how it is named in
   the archive, feeds and indexers (pick one to use it), then seasons, language
   (with quick picks) and quality, and the other options folded away.
@@ -522,7 +540,7 @@ rules, for example
 `[{"name":"Serie","url":"http://…rss","folder":"serie","include":"1080p,ita","exclude":"cam","category":"tv","savepath":"/srv/tv"}]`.
 Each feed can have an optional `folder` (group) to organise it in the
 feeds box, which groups them.
-A worker (every `feed-interval-secs`, default 15 minutes, editable from the
+A worker (every `feed-interval-secs`, default 180 minutes, editable from the
 RSS page in minutes) downloads every active feed, applies `include`/`exclude` on the
 title and adds magnets and `.torrent`s not seen yet (the list of already added
 items is persisted, so a restart does not re-propose them). `disabled: true`
@@ -647,7 +665,8 @@ and indexers behind a Cloudflare challenge are then fetched through it (the
 direct request is tried first, FlareSolverr is the fallback, and local/LAN hosts
 are never retried there), like Gextto does.
 The **feeds** have a table with status (*active*/*disabled*, *adds paused*), **last check**
-with items, new and added or the error, and per row the buttons **↻ Reload** (to the left of
+with items, new and added or the error shown at the right end of the name row (so
+it does not take a line of its own), and per row the buttons **↻ Reload** (to the left of
 *Remove*: reads that feed immediately and refreshes the row), **Edit** (the form is filled,
 including the *Feed options*: folder, include/exclude, category, path, pause, disabled),
 **Enable/Disable** and **Remove**. An **RSS options** box sets
@@ -699,7 +718,11 @@ A **Search in indexers too** checkbox makes the configured Torznab **indexers**
 shows the results in a separate section with indexer and publication date and
 an *Add* button: so also what the feeds have not yet
 returned appears, i.e. the case where an indexer has the release but the feed's
-RSS does not.
+RSS does not. The live answers are filtered to the titles carrying **every**
+search term (the same rule as the local section), because an indexer may answer
+loosely with loosely related items, and they are **archived**, so the next local
+search finds them without querying the indexers again. Toggling the checkbox
+does not start a search by itself: press *Search* (or type) as usual.
 
 The automatic retention is `archive-days` (default 180, `0` = keep
 everything), with a cap of 200,000 items; the pruning runs at the end of every complete
@@ -719,7 +742,10 @@ The **bandwidth scheduler** (standalone) applies alternative global limits in a
 daily time window, like qBittorrent: with `schedule-enabled` active and
 `schedule-start`/`schedule-end` (`HH:MM`, also across midnight) the
 daemon uses `schedule-download`/`schedule-upload` (KiB/s) inside the window and the
-normal limits outside. The limits change on the fly, without reopening the session.
+normal limits outside. The window can be restricted to some weekdays with
+`schedule-days` (a comma-separated list of `time.Weekday` numbers, 0=Sunday;
+empty means every day), set from the *Active days* checkboxes of the page. The
+limits change on the fly, without reopening the session.
 It is configured from the **`/ui/settings`** page (*Settings* link in the
 bar of every page), which in **standalone** is the client's complete panel:
 **Folders** (download, temporary), **Network** (listen address, peer port
@@ -745,9 +771,10 @@ next refresh and any error; **Load now** immediately applies the
 value of the field (even unsaved) without saving the rest of the page
 (`POST /ui/ipfilter` with `return=settings`).
 
-**Optimisation** is the equivalent of Gextto's *Optimise* button, divided
-into three actions (`POST /ui/optimize` with `optimize=queue|cache|bandwidth`), each
-of which changes only its own settings: **queue** = Gextto's base (3
+**Optimisation** is the equivalent of Gextto's *Optimise* button: a single
+**Optimize** button runs all three actions (`POST /ui/optimize` with
+`optimize=all`), each of which changes only its own settings: **queue** =
+Gextto's base (3
 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not
 counted, self-management active); **cache** = automatic again (sized
 on RAM and disk type, TTL 300 s); **bandwidth** = unlimited download and upload
@@ -756,7 +783,8 @@ the download ACKs), with auto-speed on latency active and a minimum of a tenth
 of the limit. If not enough upload has been measured yet (less than 50 KiB/s)
 the action refuses with an explanation; if the upload was already at the current limit the
 line capacity is unknown: the limit stays and only auto-speed is activated.
-The box shows the measured ↓/↑ peaks.
+The box shows the measured ↓/↑ peaks. The three individual actions stay
+available under *Advanced* (`optimize=queue|cache|bandwidth`).
 
 On the **Torrents** page in standalone the *cache r/w* and *I/O
 ops r/w* tiles do not appear (diagnostics useful to Gextto, not to the client's

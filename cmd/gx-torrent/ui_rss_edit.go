@@ -810,9 +810,8 @@ func (d *Daemon) uiFeedRowsHTML() string {
 			cls += " off"
 		}
 		b.WriteString(`<li class="` + cls + `" data-feed-row="` + html.EscapeString(key) + `"><div class="item-main">`)
-		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(orDefault(feed.Name, "—")) + `</span>` + badges + `</div>`)
+		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(orDefault(feed.Name, "—")) + `</span>` + badges + `<span class="item-status" data-feed-status>` + uiFeedStatusHTML(statuses[key]) + `</span></div>`)
 		b.WriteString(`<div class="item-sub mono" title="` + html.EscapeString(source) + `">` + html.EscapeString(source) + `</div>`)
-		b.WriteString(`<div class="item-status" data-feed-status>` + uiFeedStatusHTML(statuses[key]) + `</div>`)
 		if chips := uiFeedChipsHTML(feed); chips != "" {
 			b.WriteString(`<div class="chips">` + chips + `</div>`)
 		}

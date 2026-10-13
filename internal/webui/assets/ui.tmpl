@@ -38,6 +38,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .graph path.u{stroke:var(--ok);fill:none;stroke-width:1.6}
 .graph path.da{fill:var(--info-soft);stroke:none}
 .work{flex:1;min-width:0;display:flex;flex-direction:column}
+.torrentpane{flex:1;min-height:0;display:flex;flex-direction:column}
 .toolbar{display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
 .toolbar .sep{width:1px;height:20px;background:var(--border);margin:0 4px}
 .toolbar .selinfo{font-size:12.5px;color:var(--muted);margin-left:4px}
@@ -78,7 +79,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .statusbar .dot.ok{background:var(--ok)}.statusbar .dot.bad{background:var(--err)}
 .statusbar .disk{display:inline-flex;align-items:center;gap:6px}
 .statusbar .disk .progress{width:70px}
-.drawer{width:min(620px,48vw);flex:none;border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;min-height:0}
+.drawer{flex:none;height:clamp(220px,46vh,520px);border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;min-height:0}
 .drawer[hidden]{display:none}
 .drawer .dhead{display:flex;align-items:flex-start;gap:10px;padding:14px 16px 8px}
 .drawer .dhead h2{margin:0;font-size:15px;flex:1;word-break:break-word}
@@ -133,12 +134,11 @@ body{display:flex;flex-direction:column;overflow:hidden}
 @container (max-width:860px){.tbl.t col.c-peers,.tbl.t th.c-peers,.tbl.t td.c-peers,.tbl.t col.c-eta,.tbl.t th.c-eta,.tbl.t td.c-eta,.tbl.t col.c-upc,.tbl.t th.c-upc,.tbl.t td.c-upc{display:none}}
 @container (max-width:700px){.tbl.t col.c-size,.tbl.t th.c-size,.tbl.t td.c-size{display:none}.tbl.t col.c-prog{width:110px}}
 @container work (max-width:880px){.toolbar .lbl{display:none}}
-@media (max-width:1180px){.tbl.t col.c-ratio,.tbl.t th.c-ratio,.tbl.t td.c-ratio{display:none}.drawer{width:min(560px,56vw)}}
+@media (max-width:1180px){.tbl.t col.c-ratio,.tbl.t th.c-ratio,.tbl.t td.c-ratio{display:none}}
 @media (max-width:980px){
   .side{display:none}
   .side.open{display:flex;position:fixed;z-index:40;top:52px;bottom:0;left:0;box-shadow:var(--shadow-lg)}
   .menu-side{display:inline-flex!important}
-  .drawer{position:fixed;z-index:45;top:52px;right:0;bottom:0;width:min(620px,100vw);box-shadow:var(--shadow-lg)}
 }
 @media (max-width:760px){
   .topbar .search{display:none}.speeds{display:none}.brand small{display:none}
@@ -253,15 +253,20 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <span class="selinfo" id="selinfo" aria-live="polite"></span>
       <div class="right">
         {{if .SearchEnabled}}<button type="button" class="ghost" id="btn-search" title="Search configured Torznab indexers for releases"><svg class="i"><use href="#i-search"/></svg><span class="lbl">Search indexers</span></button>{{end}}
-        {{if .GexttoLog}}<button type="button" class="ghost" id="btn-log" aria-pressed="false" title="Switch to live server log view"><svg class="i"><use href="#i-log"/></svg><span class="lbl">Gextto log</span></button>{{end}}
+        {{if or .Standalone .GexttoLog}}<button type="button" class="ghost" id="btn-log" aria-pressed="false" data-log-url="{{if .Standalone}}/ui/log{{else}}/ui/gextto-log{{end}}" title="Switch to live server log view"><svg class="i"><use href="#i-log"/></svg><span class="lbl">{{if .Standalone}}Log{{else if .GexttoLog}}Gextto log{{end}}</span></button>{{end}}
         <button type="button" class="ghost" id="btn-tools" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" title="IP filter, create a .torrent, feeds"><svg class="i"><use href="#i-tools"/></svg><span class="lbl">Tools</span></button>
       </div>
     </div>
 
-    <div class="listwrap" id="pane-torrents">
-      <div id="live">{{template "live" .}}</div>
+    <div class="torrentpane" id="pane-torrents">
+      <div class="listwrap">
+        <div id="live">{{template "live" .}}</div>
+      </div>
+      <aside class="drawer" id="drawer" hidden aria-labelledby="drawer-title">
+        <div id="drawer-body"></div>
+      </aside>
     </div>
-    {{if .GexttoLog}}
+    {{if or .Standalone .GexttoLog}}
     <div id="pane-log" class="logpane" hidden>
       <div class="logbar">
         <label class="chk">Lines <select id="log-lines" title="Number of recent log lines to display"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
@@ -276,10 +281,6 @@ body{display:flex;flex-direction:column;overflow:hidden}
 
     <footer class="statusbar" id="statusbar">{{template "status" .}}</footer>
   </main>
-
-  <aside class="drawer" id="drawer" hidden aria-labelledby="drawer-title">
-    <div id="drawer-body"></div>
-  </aside>
 </div>
 
 <div class="menu" id="row-menu" role="menu" aria-label="Torrent actions" hidden>
@@ -317,7 +318,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <input type="file" name="torrent" id="add-files" multiple accept=".torrent,application/x-bittorrent" title="Select a local .torrent file to upload and start downloading">
       </div>
       <label class="field">Save to
-        <input type="text" name="destination" list="savepaths" placeholder="destination (empty = default)" autocomplete="off" title="Destination directory for download files (empty uses default download folder)">
+        <span class="field-row"><input type="text" id="add-destination" name="destination" list="savepaths" placeholder="destination (empty = default)" autocomplete="off" title="Destination directory for download files (empty uses default download folder)">{{if .Standalone}}<button type="button" class="browse" data-target="add-destination" title="Choose an existing folder on the server">Browse…</button>{{end}}</span>
       </label>
       {{if .Standalone}}
       <label class="field">Category
@@ -409,6 +410,17 @@ body{display:flex;flex-direction:column;overflow:hidden}
 </dialog>
 {{end}}
 
+{{if .Standalone}}
+<dialog id="browse-overlay" class="picker" data-browse-endpoint="/ui/browse-dir" aria-label="Choose an existing folder on the server">
+  <div class="picker-head"><code id="browse-path"></code><button type="button" data-picker-close title="Cancel folder selection">Cancel</button></div>
+  <div class="picker-list" id="browse-list"></div>
+  <div class="picker-foot">
+    <button type="button" data-picker-up title="Navigate to parent directory">↑ Parent</button>
+    <button type="button" class="primary" data-picker-choose title="Select the current directory as destination folder">Choose this folder</button>
+  </div>
+</dialog>
+{{end}}
+
 <datalist id="catlist-all">{{range .Categories}}<option value="{{.}}">{{end}}</datalist>
 <datalist id="savepaths"></datalist>
 <div class="dropzone" id="dropzone" hidden>Drop .torrent files to add them</div>
@@ -497,18 +509,40 @@ function applySort(){
 function setSort(key){var s=state.sort;state.sort={key:key,asc:s.key===key?!s.asc:true};store.set('sort',state.sort);applySort();}
 
 // ---------- live refresh ----------
-var refreshing=false,lastSide='';
+var refreshing=false,lastSide='',pointerDown=false;
+document.addEventListener('mousedown',function(){pointerDown=true;});
+document.addEventListener('mouseup',function(){pointerDown=false;});
+window.addEventListener('blur',function(){pointerDown=false;});
+// applyLive updates the table in place: only the rows change, while the static
+// header (and its Select all checkbox) is kept. Replacing the whole table every
+// 2s destroyed the checkbox under the user's click, so selecting all torrents
+// was hard. Falls back to a full swap when the table appears or disappears.
+function applyLive(frag){
+  var cur=$('#torrents'),next=$('#torrents',frag);
+  if(cur&&next&&cur.tBodies.length&&next.tBodies.length){
+    cur.tBodies[0].innerHTML=next.tBodies[0].innerHTML;
+    var curMore=$('#live .more-rows'),nextMore=$('.more-rows',frag);
+    if(nextMore){if(curMore)curMore.outerHTML=nextMore.outerHTML;else $('#live').appendChild(nextMore);}
+    else if(curMore)curMore.remove();
+    return;
+  }
+  $('#live').innerHTML=frag.innerHTML;
+}
 function refresh(){
-  if(refreshing||document.hidden)return;refreshing=true;
+  if(refreshing||document.hidden||pointerDown)return;refreshing=true;
   var active=document.activeElement,activeRow=rowOf(active),activeHash=activeRow&&activeRow.dataset.hash;
   fetch('/ui/live'+(state.rows?'?rows='+state.rows:''),{cache:'no-store'}).then(function(r){return r.ok?r.text():null;}).then(function(html){
     if(!html)return;
     var box=document.createElement('div');box.innerHTML=html;
     var live=$('#frag-live',box),side=$('#frag-side',box),status=$('#frag-status',box),speeds=$('#frag-speeds',box);
-    if(live){$('#live').innerHTML=live.innerHTML;}
-    if(side&&side.innerHTML!==lastSide){lastSide=side.innerHTML;$('#side-live').innerHTML=side.innerHTML;}
-    if(status)$('#statusbar').innerHTML=status.innerHTML;
-    if(speeds)$('#top-speeds').innerHTML=speeds.innerHTML;
+    // Never touch the DOM while the pointer is down: a click spans mousedown and
+    // mouseup, and a replacement in between loses it.
+    if(!pointerDown){
+      if(live)applyLive(live);
+      if(side&&side.innerHTML!==lastSide){lastSide=side.innerHTML;$('#side-live').innerHTML=side.innerHTML;}
+      if(status)$('#statusbar').innerHTML=status.innerHTML;
+      if(speeds)$('#top-speeds').innerHTML=speeds.innerHTML;
+    }
     afterRender();
     if(activeHash){var r=rows().find(function(x){return x.dataset.hash===activeHash;});if(r){r.tabIndex=0;r.focus({preventScroll:true});}}
     sampleGraph();
@@ -621,7 +655,7 @@ function showLog(on){
   var btn=$('#btn-log');if(!btn)return;btn.setAttribute('aria-pressed',on?'true':'false');
   $('#pane-torrents').hidden=on;$('#pane-log').hidden=!on;if(on)loadLog();
 }
-function loadLog(){var n=$('#log-lines').value;$('#log-info').textContent=t('loading…');fetch('/ui/gextto-log?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(x){throw new Error(x);});}).then(function(d){window.__log=d.lines||[];$('#log-info').textContent=d.path+' · '+(d.lines||[]).length+' '+t('lines')+' · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){$('#log-view').textContent=t('Cannot read the Gextto log:')+' '+e.message;$('#log-info').textContent='';});}
+function loadLog(){var n=$('#log-lines').value,url=($('#btn-log')&&$('#btn-log').getAttribute('data-log-url'))||'/ui/gextto-log';$('#log-info').textContent=t('loading…');fetch(url+'?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(x){throw new Error(x);});}).then(function(d){window.__log=d.lines||[];$('#log-info').textContent=(d.path?d.path+' · ':'')+(d.lines||[]).length+' '+t('lines')+' · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){$('#log-view').textContent=t('Cannot read the log:')+' '+e.message;$('#log-info').textContent='';});}
 function renderLog(scroll){var view=$('#log-view'),q=($('#log-filter').value||'').toLowerCase(),nodebug=$('#log-nodebug').checked,frag=document.createDocumentFragment();(window.__log||[]).forEach(function(line){if(nodebug&&/\sDEBUG\s/.test(line))return;if(q&&line.toLowerCase().indexOf(q)<0)return;var row=document.createElement('div');if(/\s(ERROR|FATAL)\s/.test(line))row.className='error';else if(/\sWARN(ING)?\s/.test(line))row.className='warn';else if(/\sDEBUG\s/.test(line))row.className='debug';row.textContent=line;frag.appendChild(row);});view.textContent='';view.appendChild(frag);if(scroll!==false)view.scrollTop=view.scrollHeight;}
 
 // ---------- add ----------
@@ -811,6 +845,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
 {{end}}{{define "status"}}
     <span class="hide-m" data-down="{{.DownRateRaw}}" data-up="{{.UpRateRaw}}" data-down-s="{{.DownloadRate}}" data-up-s="{{.UploadRate}}" title="Downloaded / uploaded since start"><span>Totals</span> <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
     <span class="disk" title="Free space on the download folder"><svg class="i"><use href="#i-disk"/></svg><span>Free space</span> <b>{{bytes .DiskFree}}</b><span class="subtle">/ {{bytes .DiskTotal}}</span></span>
+    <span class="hide-m" title="CPU load (percent of one core, short average) and resident memory of the gx-torrent process itself"><span>Process</span> <b>{{percent .CPUPercent}}%</b> · <b>{{bytes .ProcRSS}}</b></span>
     <span title="Nodes in the DHT routing table">DHT <b>{{if .DHT}}{{.DHTNodes}}{{else}}<span>off</span>{{end}}</b></span>
     <span {{if .PortReachable}}title="The peer port is reachable from the internet (router mapping or incoming peers)"{{else}}title="No router mapping and no incoming peer yet: the peer port may be closed"{{end}}><span class="dot {{if .PortReachable}}ok{{else}}bad{{end}}" aria-hidden="true"></span><span>Port</span> <b>{{.PeerPort}}</b> {{if .PortOpen}}<span class="subtle">{{.Router}}{{if .ExternalIP}} · {{.ExternalIP}}{{end}}</span>{{else}}<span class="subtle">not open</span>{{end}}</span>
     <span class="hide-m" title="Incoming peer connections since start"><span>Incoming</span> <b>{{.IncomingConns}}</b></span>

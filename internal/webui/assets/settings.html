@@ -16,6 +16,9 @@ label.chk{flex-direction:row;align-items:center;gap:8px;font-size:14px}
 input:not([type=checkbox]):not([type=radio]),select{width:100%}
 fieldset{scroll-margin-top:70px}
 fieldset .muted{font-size:13px}
+.days{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:6px 0}
+.days-label{flex-basis:100%;color:var(--subtle);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.days label.chk{margin:0}
 .savebar{position:sticky;bottom:0;margin:18px -16px 0;padding:12px 16px;display:flex;justify-content:flex-end;gap:10px;background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -6px 20px rgba(0,0,0,.08)}
 </style></head>
 <body>
@@ -91,12 +94,18 @@ fieldset .muted{font-size:13px}
 </fieldset>
 <fieldset id="optimize">
   <legend>Optimization</legend>
-  <p class="muted">One click puts a part of the engine on values that work well; each button changes only its own settings.</p>
+  <p class="muted">One click puts the queue, the disk cache and the bandwidth on values that work well.</p>
   <div class="actions">
-    <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="queue" title="3 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not counted">Optimize queue</button>
-    <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="cache" title="Disk cache back to automatic: sized from the RAM and the disk type, adapted while running">Optimize cache</button>
-    <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="bandwidth" title="Download unlimited, upload at 80% of the highest upload measured, latency auto-speed on">Optimize bandwidth</button>
+    <button type="button" class="primary sm" data-formaction="/ui/optimize" data-optimize="all" title="Set the queue, the disk cache and the bandwidth to values that work well; the upload cap needs some measured traffic">Optimize</button>
   </div>
+  <details class="more">
+    <summary>Advanced</summary>
+    <div class="actions">
+      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="queue" title="3 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not counted">Optimize queue</button>
+      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="cache" title="Disk cache back to automatic: sized from the RAM and the disk type, adapted while running">Optimize cache</button>
+      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="bandwidth" title="Download unlimited, upload at 80% of the highest upload measured, latency auto-speed on">Optimize bandwidth</button>
+    </div>
+  </details>
   <p class="muted">{{OPT_STATUS}}</p>
 </fieldset>
 <fieldset>
@@ -111,7 +120,18 @@ fieldset .muted{font-size:13px}
   <label>End (HH:MM)<input type="text" name="schedule-end" value="{{SCHED_END}}" placeholder="08:00" title="End time of the scheduled bandwidth window (HH:MM)"></label>
   <label>Scheduled download (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-download" value="{{SCHED_DL}}" title="Download speed limit during scheduled window in KiB/s"></label>
   <label>Scheduled upload (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-upload" value="{{SCHED_UL}}" title="Upload speed limit during scheduled window in KiB/s"></label>
-  <p class="muted">Inside the window the scheduled limits apply; outside, the global limits above (0 = unlimited). The window may cross midnight.</p>
+  <div class="days" role="group" aria-labelledby="sched-days-label">
+    <input type="hidden" name="schedule-days-form" value="1">
+    <span id="sched-days-label" class="days-label">Active days</span>
+    <label class="chk"><input type="checkbox" name="schedule-day" value="1"{{SCHED_DAY_1}} title="Apply the scheduled limits on this day of the week">Mon</label>
+    <label class="chk"><input type="checkbox" name="schedule-day" value="2"{{SCHED_DAY_2}} title="Apply the scheduled limits on this day of the week">Tue</label>
+    <label class="chk"><input type="checkbox" name="schedule-day" value="3"{{SCHED_DAY_3}} title="Apply the scheduled limits on this day of the week">Wed</label>
+    <label class="chk"><input type="checkbox" name="schedule-day" value="4"{{SCHED_DAY_4}} title="Apply the scheduled limits on this day of the week">Thu</label>
+    <label class="chk"><input type="checkbox" name="schedule-day" value="5"{{SCHED_DAY_5}} title="Apply the scheduled limits on this day of the week">Fri</label>
+    <label class="chk"><input type="checkbox" name="schedule-day" value="6"{{SCHED_DAY_6}} title="Apply the scheduled limits on this day of the week">Sat</label>
+    <label class="chk"><input type="checkbox" name="schedule-day" value="0"{{SCHED_DAY_0}} title="Apply the scheduled limits on this day of the week">Sun</label>
+  </div>
+  <p class="muted">Inside the window on the selected days the scheduled limits apply; outside, the global limits above (0 = unlimited). The window may cross midnight.</p>
 </fieldset>
 <fieldset>
   <legend>Latency auto-speed</legend>

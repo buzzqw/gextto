@@ -196,8 +196,18 @@ NOTES
   network folder is linked with a symlink, which may need Developer Mode (or the
   symlink privilege); a local folder uses a junction and needs no privilege.
 - Only the daemon is Windows-ready. Gextto (the manager) is Linux-only.
+
+LICENSE
+-------
+gx-torrent is open source, distributed under the European Union Public Licence
+v. 1.2. The full text is in LICENSE.txt; the notices and licences of the
+third-party components are in THIRD-PARTY-NOTICES.txt.
 README
 
+# Fail rather than ship a release with the wrong or a missing licence: every
+# package must carry the project's own EUPL 1.2 text.
+grep -q "EUROPEAN UNION PUBLIC LICENCE v. 1.2" "${ROOT}/LICENSE" \
+  || { echo "LICENSE does not contain the EUPL 1.2 text; refusing to package" >&2; exit 1; }
 cp "${ROOT}/LICENSE" "$STAGE/LICENSE.txt"
 cp "${ROOT}/THIRD-PARTY-NOTICES" "$STAGE/THIRD-PARTY-NOTICES.txt"
 echo "$LABEL" > "$STAGE/VERSION"

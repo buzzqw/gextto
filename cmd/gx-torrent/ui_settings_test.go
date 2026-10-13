@@ -91,6 +91,61 @@ func TestUISettingsRejectsBadWindow(t *testing.T) {
 	}
 }
 
+// TestUISettingsSavesScheduleDays checks the weekday checkboxes are saved and
+// shown, and that enabling the scheduler with no day selected is refused.
+func TestUISettingsSavesScheduleDays(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	// The day group marker is present but no day is checked: refused.
+	resp, err := http.PostForm(srv.URL+"/ui/settings", url.Values{
+		"schedule-enabled": {"1"}, "schedule-start": {"01:00"}, "schedule-end": {"08:00"},
+		"schedule-days-form": {"1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(body), "err") {
+		t.Fatalf("no day must be refused: %s", body)
+	}
+	if d.opts.Settings.Get(scheduleEnabledKey, "") == "true" {
+		t.Fatal("the invalid schedule must not be saved")
+	}
+
+	// Monday and Thursday selected.
+	resp, err = http.PostForm(srv.URL+"/ui/settings", url.Values{
+		"schedule-enabled": {"1"}, "schedule-start": {"01:00"}, "schedule-end": {"08:00"},
+		"schedule-days-form": {"1"}, "schedule-day": {"1", "4"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if got := d.opts.Settings.Get(scheduleDaysKey, ""); got != "1,4" {
+		t.Fatalf("schedule days = %q, want 1,4", got)
+	}
+
+	page, err := http.Get(srv.URL + "/ui/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = io.ReadAll(page.Body)
+	page.Body.Close()
+	htmlBody := string(body)
+	for _, want := range []string{`name="schedule-day" value="1" checked`, `name="schedule-day" value="4" checked`, `Active days`} {
+		if !strings.Contains(htmlBody, want) {
+			t.Fatalf("settings page missing %q", want)
+		}
+	}
+	if strings.Contains(htmlBody, `name="schedule-day" value="2" checked`) {
+		t.Fatal("Tuesday must not be checked")
+	}
+}
+
 // TestUISettingsSavesClientOptions checks the standalone settings page writes the
 // folders, network, protocols and queue/cache options.
 func TestUISettingsSavesClientOptions(t *testing.T) {

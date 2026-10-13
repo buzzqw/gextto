@@ -236,6 +236,21 @@ func TestUIRssSearchFeedCanBeAdded(t *testing.T) {
 	}
 }
 
+// TestAddFormOffersFolderPickerInStandalone checks the add-torrent dialog's
+// "Save to" field carries a Browse button and the shared picker dialog in
+// standalone, matching the /ui/browse-dir endpoint that managed mode refuses.
+func TestAddFormOffersFolderPickerInStandalone(t *testing.T) {
+	standalone := renderUITemplate(t, &Daemon{}, true)
+	for _, want := range []string{`data-target="add-destination"`, `id="browse-overlay"`, `class="browse"`} {
+		if !strings.Contains(standalone, want) {
+			t.Fatalf("the standalone add form is missing %q", want)
+		}
+	}
+	if managed := renderUITemplate(t, &Daemon{}, false); strings.Contains(managed, `data-target="add-destination"`) {
+		t.Fatal("managed mode must not offer the folder picker in the add form")
+	}
+}
+
 // TestStandaloneNavHasRssLink checks the standalone navigation exposes the RSS
 // and indexer management; managed mode stays without it.
 func TestStandaloneNavHasRssLink(t *testing.T) {
