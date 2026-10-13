@@ -556,7 +556,9 @@ Limit semantics: **-1 = inherit the global one, 0 = unlimited** (like libtorrent
 
 Policy (also in `AGENTS.md`): the algorithm is **rewritten** (third-party code is
 not copied — the idea is not covered by copyright, the expression is) or the module
-is adopted as an **MPL-2.0 dependency**, as `github.com/anacrolix/utp` already is.
+is adopted as an **MPL-2.0 dependency**, as `github.com/anacrolix/utp` was
+(now vendored in `internal/utp/upstream`, same licence, `GEXTTO:`-marked
+deltas).
 Rules: one item = one commit; **measure before/after**; changes to `internal/gxcore`
 recorded in `GEXTTO.md`; targeted tests; with a visible effect also both UIs and the docs.
 
