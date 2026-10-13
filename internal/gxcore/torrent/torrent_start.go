@@ -71,7 +71,7 @@ func (t *torrent) start() {
 
 // startVerifier verifies with no merge.
 func (t *torrent) startVerifier() {
-	t.startMergeVerifier(nil, false)
+	t.startMergeVerifier(nil, false, nil)
 }
 
 // startMergeVerifier runs the verifier, fronted by the swarm merge when
@@ -80,18 +80,38 @@ func (t *torrent) startVerifier() {
 // Merged pieces skip re-hashing (Skip, cleared after so a later manual check
 // verifies everything); with onlyMerged (storage created empty this run)
 // nothing else is even read (Only).
-func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool) {
+//
+// resume carries the pieces a reloaded bitfield already marks verified (nil on
+// a fresh add): with it the verifier touches no disk at all — those pieces keep
+// their bit (Skip) and, together with the merged ones, are the only accepted
+// pieces (Only) — so the resume path can still run the merge and re-derive the
+// Phase 3 partial blocks without hashing the whole torrent again.
+func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool, resume []byte) {
 	if t.verifier != nil {
 		t.crash("verifier exists")
 	}
 	if len(t.pieces) == 0 {
 		t.crash("zero length pieces")
 	}
+	// resumed reports the pieces the reloaded bitfield already verified.
+	resumed := func(i uint32) bool { return bitSet(resume, int(i)) }
 	t.verifier = verifier.New()
+	v := t.verifier
+	if resume != nil {
+		v.Skip = resumed
+		v.Only = resumed
+	}
 	if len(t.mergedPieces) > 0 {
 		merged := t.mergedPieces
 		t.mergedPieces = nil
-		t.verifier.Skip = func(i uint32) bool { return merged[i] }
+		base := v.Skip
+		if base == nil {
+			base = func(uint32) bool { return false }
+		}
+		v.Skip = func(i uint32) bool { return base(i) || merged[i] }
+		if resume != nil {
+			v.Only = v.Skip
+		}
 	}
 	if len(candidates) > 0 {
 		v, skip := t.verifier, t.mergeSkips()
@@ -102,6 +122,13 @@ func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool) {
 			// result, which happens after Prepare returns.
 			*out = t.mergeFrom(candidates, skip, stop)
 			merged := out.pieces
+			if resume != nil {
+				// Resume: keep the reloaded pieces, add the merged ones and
+				// still read nothing from disk (Only == Skip).
+				v.Skip = func(i uint32) bool { return resumed(i) || merged[i] }
+				v.Only = v.Skip
+				return
+			}
 			if len(merged) > 0 {
 				v.Skip = func(i uint32) bool { return merged[i] }
 			}

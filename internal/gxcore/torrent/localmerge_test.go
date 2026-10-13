@@ -15,7 +15,7 @@ import (
 )
 
 // testInfoBytes builds a single-file v1 info dictionary for content.
-func testInfoBytes(t *testing.T, content []byte, pieceLength int) *metainfo.Info {
+func testInfoBytes(t testing.TB, content []byte, pieceLength int) *metainfo.Info {
 	t.Helper()
 	var pieces []byte
 	for off := 0; off < len(content); off += pieceLength {

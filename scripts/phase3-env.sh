@@ -30,8 +30,8 @@ fetch() { # name torrent-url
 	local name=$1 url=$2
 	[[ -f "$DIR/$name.torrent" ]] || curl -sfLo "$DIR/$name.torrent" "$url"
 }
-debian=$(curl -sf https://cdimage.debian.org/debian-cd/current/amd64/bt-cd/ | grep -m1 -oE 'debian-[0-9.]+-amd64-netinst\.iso\.torrent' || true)
-arch=$(curl -sf https://archlinux.org/releng/releases/ | grep -m1 -oE '/releng/releases/[0-9.]+/torrent/' || true)
+debian=$(curl -sf https://cdimage.debian.org/debian-cd/current/amd64/bt-cd/ | grep -oE 'debian-[0-9.]+-amd64-netinst\.iso\.torrent' | head -n1 || true)
+arch=$(curl -sf https://archlinux.org/releng/releases/ | grep -oE '/releng/releases/[0-9.]+/torrent/' | head -n1 || true)
 fetch debian "https://cdimage.debian.org/debian-cd/current/amd64/bt-cd/$debian"
 fetch arch "https://archlinux.org$arch"
 

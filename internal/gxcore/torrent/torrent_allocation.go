@@ -61,6 +61,18 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 			t.stopAndSetStoppedOnComplete()
 			return
 		}
+		// Swarm Merging on the resume path: the merge is idempotent and
+		// re-derives the Phase 3 partial blocks of the pieces still missing,
+		// which a restart would otherwise download again. It runs off the run
+		// loop with the reloaded bitfield as the already-verified set, so no
+		// piece is re-read or re-hashed (Verifier.Skip/Only).
+		if t.session != nil && !t.wantedComplete() {
+			if candidates := t.mergeCandidates(t.session.ListTorrents()); len(candidates) > 0 {
+				resume := append([]byte(nil), t.bitfield.Bytes()...)
+				t.startMergeVerifier(candidates, false, resume)
+				return
+			}
+		}
 		t.processQueuedMessages()
 		t.addFixedPeers()
 		t.startAcceptor()
@@ -91,5 +103,5 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 	// On-disk data (or mergeable neighbors) exists: verify into a correct
 	// bitfield. A storage created empty this run can only hold what the
 	// merge writes, so nothing else is hashed.
-	t.startMergeVerifier(candidates, !al.HasExisting)
+	t.startMergeVerifier(candidates, !al.HasExisting, nil)
 }

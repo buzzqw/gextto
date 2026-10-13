@@ -65,6 +65,15 @@ func (t *torrent) haveBits() []byte {
 	return append([]byte(nil), t.bitfield.Bytes()...)
 }
 
+// hasBitfield reports whether the torrent has a piece bitfield yet, i.e. it has
+// finished allocating and is establishing what it holds. Unlike haveBits it
+// allocates nothing, so the candidate filter pays no copy per torrent.
+func (t *torrent) hasBitfield() bool {
+	t.mBitfield.RLock()
+	defer t.mBitfield.RUnlock()
+	return t.bitfield != nil
+}
+
 // mergeCandidates returns the torrents of the list that could lend pieces to
 // this one: the cheap per-candidate checks of both phases (published snapshot,
 // not private, something verified, same layout or a shared v2 file root),
@@ -87,7 +96,7 @@ func (t *torrent) mergeCandidates(list []*Torrent) []*Torrent {
 			continue
 		}
 		if snap.pieceLength == info.PieceLength && snap.length == info.Length {
-			if len(other.torrent.haveBits()) > 0 {
+			if other.torrent.hasBitfield() {
 				out = append(out, other)
 			}
 			continue
@@ -106,7 +115,7 @@ func (t *torrent) mergeCandidates(list []*Torrent) []*Torrent {
 		}
 		for _, f := range oinfo.V2Files {
 			if f.Length > 0 && f.HasRoot && roots[f.PiecesRoot] {
-				if len(other.torrent.haveBits()) > 0 {
+				if other.torrent.hasBitfield() {
 					out = append(out, other)
 				}
 				break
