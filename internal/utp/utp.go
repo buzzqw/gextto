@@ -22,6 +22,10 @@ type Stats struct {
 	Accepts      uint64
 	DialErrors   uint64
 	AcceptErrors uint64
+	// ResendsTimeout counts RTO-driven packet resends (loss/congestion
+	// signal); ResendsFast counts selective-ACK fast resends.
+	ResendsTimeout uint64
+	ResendsFast    uint64
 }
 
 // Socket is Gextto's uTP socket. It wraps a UDP packet connection, diverting
@@ -101,10 +105,13 @@ func (s *Socket) SetWriteDeadline(t time.Time) error { return s.inner.SetWriteDe
 
 // Stats returns the socket activity counters.
 func (s *Socket) Stats() Stats {
+	timeout, fast := s.inner.ResendStats()
 	return Stats{
-		Dials:        s.dials.Load(),
-		Accepts:      s.accepts.Load(),
-		DialErrors:   s.dialErrors.Load(),
-		AcceptErrors: s.acceptErrors.Load(),
+		Dials:          s.dials.Load(),
+		Accepts:        s.accepts.Load(),
+		DialErrors:     s.dialErrors.Load(),
+		AcceptErrors:   s.acceptErrors.Load(),
+		ResendsTimeout: uint64(timeout),
+		ResendsFast:    uint64(fast),
 	}
 }

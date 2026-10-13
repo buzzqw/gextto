@@ -88,4 +88,7 @@ func TestSocketLoopbackEcho(t *testing.T) {
 	if st.Accepts != 1 || st.AcceptErrors != 0 {
 		t.Fatalf("server stats: %+v", st)
 	}
+	if st.ResendsTimeout != 0 || st.ResendsFast != 0 {
+		t.Fatalf("fresh socket resend stats: %+v", st)
+	}
 }

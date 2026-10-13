@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/anacrolix/missinggo"
@@ -47,6 +48,12 @@ type Socket struct {
 	// here. This is because reading is done in its own goroutine to dispatch
 	// to uTP Conns.
 	ReadErr error
+
+	// GEXTTO: per-socket resend counters, the congestion signal exported
+	// to SessionStats. timeoutResends counts RTO-driven resends (send.go),
+	// fastResends counts selective-ACK fast resends (conn.go ackSkipped).
+	timeoutResends atomic.Int64
+	fastResends    atomic.Int64
 }
 
 func listenPacket(network, addr string) (pc net.PacketConn, err error) {
@@ -517,6 +524,19 @@ func (s *Socket) Accept() (net.Conn, error) {
 		}
 	}
 }
+
+// GEXTTO: ResendStats reports RTO-driven and selective-ACK fast resends
+// across the socket's connections since creation: the loss/congestion
+// signal behind SessionStats and the future adaptive RTO.
+func (s *Socket) ResendStats() (timeout, fast int64) {
+	return s.timeoutResends.Load(), s.fastResends.Load()
+}
+
+// GEXTTO: count one RTO-driven resend.
+func (s *Socket) addTimeoutResend() { s.timeoutResends.Add(1) }
+
+// GEXTTO: count one selective-ACK fast resend.
+func (s *Socket) addFastResend() { s.fastResends.Add(1) }
 
 // The address we're listening on for new uTP connections.
 func (s *Socket) Addr() net.Addr {

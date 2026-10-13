@@ -10,5 +10,8 @@
 // Upstream fixes are pulled by re-copying the files and re-applying the
 // local patches listed below (each marked with "GEXTTO:").
 //
-// Local patches: none yet.
+// Local patches (each marked "GEXTTO:" at the site):
+//   - socket.go: per-socket timeout/fast resend counters + ResendStats;
+//   - send.go: timeoutResend feeds the socket counter;
+//   - conn.go: ackSkipped fast resend feeds the socket counter.
 package upstream

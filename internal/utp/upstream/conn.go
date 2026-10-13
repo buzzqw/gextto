@@ -324,6 +324,8 @@ func (c *Conn) ackSkipped(seqNr uint16) {
 	case 3, 60:
 		ackSkippedResends.Add(1)
 		send.resend()
+		// GEXTTO: congestion signal for the socket counters.
+		c.socket.addFastResend()
 		send.resendTimer.Reset(c.resendTimeout() * time.Duration(send.numResends))
 	default:
 	}

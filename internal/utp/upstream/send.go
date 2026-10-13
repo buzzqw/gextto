@@ -57,6 +57,8 @@ func (s *send) timeoutResend() {
 	}
 	rt := s.conn.resendTimeout()
 	s.resend()
+	// GEXTTO: congestion signal for the socket counters.
+	s.conn.socket.addTimeoutResend()
 	s.numResends++
 	s.resendTimer.Reset(rt * time.Duration(s.numResends))
 }
