@@ -62,7 +62,7 @@ Status legend: **yes** = implemented and tested; **partial** = only a part;
 | 5 | Mainline DHT Protocol (Kademlia IPv4) | yes |
 | 32 | IPv6 Extension for DHT (`nodes6`, `want`) | yes |
 | 33 | DHT Scrape (Bloom filters `BFpe`/`BFsd`) | yes |
-| 42 | DHT Security Extension (Secure Node ID, CRC32C) | yes; the `ip` field of the responses is at the **top level** of the message, as per the specification and as libtorrent does (fixed on 2026-10-12: previously it sat inside `r` and no client read it or sent it in the right place) |
+| 42 | DHT Security Extension (Secure Node ID, CRC32C) | yes; the `ip` field of the responses is at the **top level** of the message, as per the specification and as libtorrent does |
 | 43 | Read-only DHT Nodes (`ro: 1`) | yes |
 | 44 | Storing arbitrary data in the DHT (K/V Ed25519) | yes: local store, `get`/`put` responder and an **outgoing iterative client** (bounded) to read and publish items; the `put` goes to the **8 closest nodes** to the target among those that provided a token |
 | 45 | Multiple-address Operation for DHT (multi-homed) | no |
@@ -86,6 +86,25 @@ Status legend: **yes** = implemented and tested; **partial** = only a part;
 > `dht=`, `xs=` and `as=` (with `xs=`/`as=` it downloads the `.torrent` from the
 > source, verifying that the info hash matches, so metadata does not depend on the
 > swarm).
+
+### How v2 differs from v1 (the rules that matter)
+
+- **Info-hash**: SHA-256 of the info dict; trackers and handshake use the
+  **20-byte truncated** form (wire identical to v1); magnets use `urn:btmh:`.
+- **`pieces root`**: root of a branch-2 Merkle tree over a file's **16 KiB
+  blocks**; the last block may be shorter (hash of the actual bytes) and the
+  leaves past the end of the file are **32-byte zero hashes**.
+- **`piece layers`** (top level, outside `info`): for each `pieces root`, the
+  hash of a layer chosen so that one hash covers `piece length` bytes; hashes
+  past the end of the file are omitted.
+- **Alignment**: files are mapped onto piece boundaries and pieces **do not**
+  span two files; the **last piece of a file may be shorter** than `piece
+  length` and carries no padding. gx-core therefore uses a **per-file piece
+  model** (not concatenated with synthetic padding).
+- **Peer extensions**: `hash request` (21), `hashes` (22), `hash reject` (23),
+  used to fetch a peer's `piece layers` (BEP 9 carries the info dict).
+- **Hybrids**: an info dict with both fields; v1 = SHA-1 and v2 = SHA-256 over
+  the complete dict.
 
 ## Out of scope / obsolete
 

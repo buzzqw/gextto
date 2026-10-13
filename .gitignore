@@ -36,6 +36,7 @@ docs/archive/revisione-2.md
 docs/archive/UI_V2.md
 docs/archive/gextto-terra.md
 docs/archive/pro-terra.md
+docs/archive/gx-torrent-v2.md
 
 # The gx-torrent daemon's own build number (independent from gextto's).
 gx-torrent.build_number

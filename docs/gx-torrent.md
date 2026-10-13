@@ -1030,7 +1030,7 @@ layer** requests (`base = 0`), which a libtorrent leecher uses to verify
 blocks while downloading them: the block tree is built from the data of the verified
 pieces, **cached per-file** and only for a file **entirely present**
 (otherwise `hash reject`, because a tree with missing leaves would not
-anchor to the `pieces root`). Full plan in `docs/gx-torrent-v2.md`.
+anchor to the `pieces root`). The v2 wire rules are in [`bep.md`](bep.md).
 
 ## Local data reuse (Swarm Merging)
 

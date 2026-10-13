@@ -714,8 +714,8 @@ Decisions to be made **before** F1/F2, not urgent in F0:
 - [`docs/gx-torrent.md`](gx-torrent.md) — technical reference of the current engine.
 - [`docs/evoluzione.md`](evoluzione.md) — §4–§7: engine gaps, optimisations,
   choking measurements; §14: pointer to this document.
-- [`docs/gx-torrent-v2.md`](gx-torrent-v2.md) — BitTorrent v2 (BEP 52)
-  implementation project: per-file pieces model, increments, tests.
+- [`docs/bep.md`](bep.md) — BEP status and the BitTorrent v2 rules; v2 state also
+  in [`docs/gx-torrent.md`](gx-torrent.md).
 - [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) — inventory of the
   engine's features.
 - [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — map of Gextto's code.

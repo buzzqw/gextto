@@ -23,20 +23,8 @@ documentazione corrente vedi l'indice in [`../README.md`](../README.md).
 | `gx-torrent-migliorie.md` | Lacune e piano di miglioramento gx-torrent | consolidati in `../evoluzione.md` §4 |
 | `gx-torrent-ottimizzazioni-prestazionali-v2.md` | Piano di ottimizzazioni prestazionali | consolidato in `../evoluzione.md` §5 |
 | `gx-torrent-misure-seeding.md` | Misure di choking e seeding | consolidate in `../evoluzione.md` §6 |
-
-## Documenti rimossi in questa pulizia (2026-10-08)
-
-Restano nella storia di git, non nel working tree:
-
-- `gextto-torrentd.md` — proposta di un demone torrent autonomo mai avviata, con
-  backend Anacrolix non più incluso;
-- un audit una tantum del motore, completato e superato dall'inventario in
-  `internal/gxcore/GEXTTO.md`;
-- `gx-torrent-ottimizzazioni-prestazionali.md` (v1) — analisi prestazionale
-  superata da [`../evoluzione.md`](../evoluzione.md) (§5).
+| `gx-torrent-v2.md` | Piano di implementazione BitTorrent v2 (BEP 52) | piano concluso; stato attuale e regole in `../bep.md` e `../gx-torrent.md` |
 
 Restano volutamente fuori dall'indice perché locali e non pubblicati (già in
 `.gitignore`): `docs/internal/` e i file della tabella sopra (citati da commenti
-nel codice solo tramite `../evoluzione.md`). Il vecchio piano di adozione
-`SONARR_RADARR_REPLACEMENT_PLAN.md` è stato rimosso: le parti durevoli sono in
-[`../evoluzione.md`](../evoluzione.md) (§3).
+nel codice solo tramite `../evoluzione.md`).

@@ -276,8 +276,8 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   documenti creati di recente (es. `docs/bep.md` per la conformità BEP).
 - **Ogni evoluzione, miglioria o altro lavoro aggiorna anche i documenti di
   riferimento**, non solo il codice. In particolare: `docs/evoluzione.md`
-  (analisi e lacune), `docs/gx-torrent-evoluto.md` e `docs/gx-torrent-v2.md`
-  (evoluzione del demone), `internal/gxcore/GEXTTO.md` (motore gx-core),
+  (analisi e lacune), `docs/gx-torrent-evoluto.md` (evoluzione del demone),
+  `internal/gxcore/GEXTTO.md` (motore gx-core),
   `docs/gx-torrent.md` (documento tecnico del demone), `docs/bep.md` (conformità
   BEP), `docs/ARCHITECTURE.md`, `README.md`/`README.it.md` e l'indice
   `docs/README.md`. Una voce data per
