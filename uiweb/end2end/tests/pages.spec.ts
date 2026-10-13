@@ -207,7 +207,7 @@ test.describe("mobile", () => {
     await expect(nav(page, "Configurazione")).toBeVisible();
     // The toggle stays in the bottom bar, and the appearance controls are here.
     await expect(page.locator("[data-mobile-system-toggle]")).toBeVisible();
-    await expect(page.locator(".nav-prefs [data-theme-toggle]")).toBeVisible();
+    await expect(page.locator('.nav-prefs button[hx-get="/theme"]')).toBeVisible();
     await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Esplora" })).toBeVisible();
     await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Archivio" })).toBeVisible();
     // Le voci facoltative (Blocklist, Licenza) vivono solo nel pannello: se non
