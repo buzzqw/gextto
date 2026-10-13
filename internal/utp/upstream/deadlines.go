@@ -1,6 +1,6 @@
 package upstream
 
-// GEXTTO: rewritten in-tree. Read/write deadlines: a deadline is a time plus an
+// GEXTTO: our own uTP (BEP 29) code; see doc.go. Read/write deadlines: a deadline is a time plus an
 // event that fires once it passes.
 
 import (

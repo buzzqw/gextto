@@ -1,5 +1,11 @@
 package upstream
 
+// GEXTTO: our own uTP (BEP 29) code; see doc.go.
+// Conn is one uTP stream. A Socket owns its Conns and dispatches packets to and
+// from them. Every Conn and Socket state change is serialised by the package
+// mutex mu, so the code below assumes mu is held (methods document the rare
+// exceptions).
+
 import (
 	"errors"
 	"fmt"
@@ -9,29 +15,35 @@ import (
 	"time"
 )
 
-// Conn is a uTP stream and implements net.Conn. It owned by a Socket, which
-// handles dispatching packets to and from Conns.
+// Conn is a uTP stream and implements net.Conn. Create it through a Socket
+// (newConn); the zero value is not usable.
 type Conn struct {
+	// recv_id is the id the peer writes in packets to us; send_id the one we
+	// write in packets to it. seq_nr counts our data packets, ack_nr the
+	// highest inbound sequence number consumed, lastAck the highest one the
+	// peer acknowledged.
 	recv_id, send_id uint16
 	seq_nr, ack_nr   uint16
 	lastAck          uint16
-	lastTimeDiff     uint32
-	peerWndSize      uint32
-	cur_window       uint32
-	connKey          connKey
+	// lastTimeDiff echoes the peer's clock skew, for RTT accounting.
+	lastTimeDiff uint32
+	// peerWndSize is the receive window the peer advertises; cur_window is the
+	// unacknowledged payload we have sent into it.
+	peerWndSize uint32
+	cur_window  uint32
+	connKey     connKey
 
-	// Data waiting to be Read.
+	// Data waiting to be read by the application.
 	readBuf         []byte
 	readBufNotEmpty Event
 
 	socket           *Socket
 	remoteSocketAddr net.Addr
-	// The uTP timestamp.
+	// startTimestamp anchors the uTP microsecond clock (see timestamp).
 	startTimestamp uint32
-	// When the conn was allocated.
-	created time.Time
+	created        time.Time
 
-	synAcked  bool // Syn is acked by the acceptor. Initiator also tracks it.
+	synAcked  bool // the peer echoed our SYN (acceptors set it directly)
 	gotFin    Event
 	wroteFin  Event
 	err       error
@@ -39,11 +51,13 @@ type Conn struct {
 	destroyed Event
 	canWrite  Event
 
+	// unackedSends holds the packets awaiting acknowledgement, oldest first.
 	unackedSends []*send
-	// Inbound payloads, the first is ack_nr+1.
+	// inbound holds out-of-order packets; inbound[0] is ack_nr+1.
 	inbound    []recv
 	inboundWnd int
 	connDeadlines
+	// latencies are the recent RTT samples the moving average uses.
 	latencies []time.Duration
 
 	// GEXTTO: adaptive RTO backoff (1..maxRTOBackoff). It doubles on each
@@ -52,29 +66,25 @@ type Conn struct {
 	// recovers is probed at the measured RTT again quickly. See resendTimeout.
 	rtoBackoff uint32
 
-	// We need to send state packet.
-	pendingSendState              bool
-	sendPendingSendSendStateTimer *time.Timer
-	// Send state is being delayed until sendStateTimer fires, which may have
-	// been set at the beginning of a batch of received packets.
+	// A state packet is owed to the peer, possibly batched by a short timer.
+	pendingSendState                bool
+	sendPendingSendSendStateTimer   *time.Timer
 	sendPendingSendStateTimerActive bool
 
-	// This timer fires when no packet has been received for a period.
+	// packetReadTimeoutTimer destroys the connection when nothing arrives for
+	// packetReadTimeout.
 	packetReadTimeoutTimer *time.Timer
 }
 
-var (
-	_ net.Conn = &Conn{}
-)
+var _ net.Conn = (*Conn)(nil)
 
-func (c *Conn) age() time.Duration {
-	return time.Since(c.created)
-}
+// age is how long ago the connection was created.
+func (c *Conn) age() time.Duration { return time.Since(c.created) }
 
-func (c *Conn) timestamp() uint32 {
-	return nowTimestamp() - c.startTimestamp
-}
+// timestamp is the connection's uTP clock in microseconds, since creation.
+func (c *Conn) timestamp() uint32 { return nowTimestamp() - c.startTimestamp }
 
+// sendPendingSendStateTimerCallback flushes a batched state packet.
 func (c *Conn) sendPendingSendStateTimerCallback() {
 	mu.Lock()
 	defer mu.Unlock()
@@ -83,7 +93,8 @@ func (c *Conn) sendPendingSendStateTimerCallback() {
 	c.sendPendingState()
 }
 
-// Send a state packet, if one is needed.
+// sendPendingState sends the state packet the connection owes: a reset once
+// destroyed, otherwise a state (ACK) packet.
 func (c *Conn) sendPendingState() {
 	if c.destroyed.IsSet() {
 		c.sendReset()
@@ -92,8 +103,8 @@ func (c *Conn) sendPendingState() {
 	}
 }
 
-// So far as the spec makes clear, this is how many more, as-yet-unacked bytes
-// we can fit into our receive buffers.
+// wndSize is how many more payload bytes fit in our receive buffers. That is
+// our advertised window.
 func (c *Conn) wndSize() uint32 {
 	if len(c.readBuf)+c.inboundWnd > readBufferLen {
 		return 0
@@ -101,6 +112,9 @@ func (c *Conn) wndSize() uint32 {
 	return uint32(readBufferLen - len(c.readBuf) - c.inboundWnd)
 }
 
+// makePacket builds a packet of _type with an up-to-date header, including a
+// selective ACK for the out-of-order packets currently held. The buffer comes
+// from sendBufferPool and must be returned there once sent.
 func (c *Conn) makePacket(_type st, connID, seqNr uint16, payload []byte) (p []byte) {
 	var selAck selectiveAckBitmask
 	for i := 1; i < len(c.inbound); i++ {
@@ -119,8 +133,8 @@ func (c *Conn) makePacket(_type st, connID, seqNr uint16, payload []byte) (p []b
 		TimestampDiff: c.lastTimeDiff,
 	}
 	if len(selAck.Bytes) != 0 {
-		// The spec requires the number of bytes for a selective ACK to be at
-		// least 4, and a multiple of 4.
+		// BEP 29 requires the selective-ACK payload to be at least 4 bytes and
+		// a multiple of 4.
 		if len(selAck.Bytes)%4 != 0 {
 			panic(len(selAck.Bytes))
 		}
@@ -140,7 +154,7 @@ func (c *Conn) makePacket(_type st, connID, seqNr uint16, payload []byte) (p []b
 	return
 }
 
-// Send the given payload with an up to date header.
+// send writes one packet to the peer. Callers hold mu.
 func (c *Conn) send(_type st, connID uint16, payload []byte, seqNr uint16) (err error) {
 	p := c.makePacket(_type, connID, seqNr, payload)
 	n1, err := c.socket.writeTo(p, c.remoteSocketAddr)
@@ -152,13 +166,14 @@ func (c *Conn) send(_type st, connID uint16, payload []byte, seqNr uint16) (err 
 		panic(n1)
 	}
 	if c.unpendSendState() && _type != stState {
-		// We needed to send a state packet, but this packet suppresses that
-		// need.
+		// A data packet just covered the state packet we owed.
 		unsentStatePackets.Add(1)
 	}
 	return
 }
 
+// unpendSendState cancels a batched state packet and reports whether one was
+// pending.
 func (c *Conn) unpendSendState() (wasPending bool) {
 	wasPending = c.pendingSendState
 	c.pendingSendState = false
@@ -167,10 +182,11 @@ func (c *Conn) unpendSendState() (wasPending bool) {
 	return
 }
 
+// pendSendState schedules a state packet, batched by pendingSendStateDelay so a
+// burst of inbound packets triggers one ACK, not one each.
 func (c *Conn) pendSendState() {
 	if c.pendingSendState {
-		// A state packet is pending but hasn't been sent, and we want to send
-		// another.
+		// A state packet is already owed and was deferred again.
 		unsentStatePackets.Add(1)
 	}
 	c.pendingSendState = true
@@ -180,11 +196,14 @@ func (c *Conn) pendSendState() {
 	}
 }
 
-func (me *Conn) writeSyn() {
-	me.write(stSyn, me.recv_id, nil, me.seq_nr)
-	return
+// writeSyn introduces us to the peer (an initiator's first packet).
+func (c *Conn) writeSyn() {
+	c.write(stSyn, c.recv_id, nil, c.seq_nr)
 }
 
+// write sends a data, SYN or FIN packet and records it for acknowledgement.
+// Data packets are truncated to maxPayloadSize. A write after FIN panics, which
+// is an internal invariant, not peer-reachable input.
 func (c *Conn) write(_type st, connID uint16, payload []byte, seqNr uint16) (n int, err error) {
 	switch _type {
 	case stSyn, stFin, stData:
@@ -197,17 +216,17 @@ func (c *Conn) write(_type st, connID uint16, payload []byte, seqNr uint16) (n i
 	if len(payload) > maxPayloadSize {
 		payload = payload[:maxPayloadSize]
 	}
-	err = c.send(_type, connID, payload, seqNr)
-	if err != nil {
+	if err := c.send(_type, connID, payload, seqNr); err != nil {
 		c.destroy(fmt.Errorf("error sending packet: %s", err))
-		return
+		return 0, err
 	}
 	n = len(payload)
-	// Copy payload so caller to write can continue to use the buffer.
+	// Copy the payload: the caller keeps its buffer, and the copy outlives
+	// this call for a possible resend.
 	if payload != nil {
 		payload = append(sendBufferPool.Get().([]byte)[:0:minMTU], payload...)
 	}
-	send := &send{
+	s := &send{
 		payloadSize: uint32(len(payload)),
 		started:     time.Now(),
 		_type:       _type,
@@ -216,19 +235,20 @@ func (c *Conn) write(_type st, connID uint16, payload []byte, seqNr uint16) (n i
 		seqNr:       seqNr,
 		conn:        c,
 	}
-	send.resendTimer = time.AfterFunc(c.resendTimeout(), send.timeoutResend)
-	c.unackedSends = append(c.unackedSends, send)
-	c.cur_window += send.payloadSize
+	s.resendTimer = time.AfterFunc(c.resendTimeout(), s.timeoutResend)
+	c.unackedSends = append(c.unackedSends, s)
+	c.cur_window += s.payloadSize
 	c.updateCanWrite()
 	c.seq_nr++
 	return
 }
 
-// GEXTTO: the vendored TODO "introduce a minimum latency" is resolved here.
-// The sampled RTT on fast paths (loopback, LAN) can be tens of microseconds,
-// which makes the RTO sub-millisecond and turns a briefly stalled peer into a
-// resend storm. The floor is the same 5 ms the seed already guarantees, so a
-// real WAN path (RTT ≫ 5 ms) is unaffected.
+// latency estimates the path RTT: the mean of the recent samples, floored at
+// minLatency so a fast path cannot collapse the RTO; before any sample it uses
+// the per-host seed (see Socket.initialLatencyFor) or the fixed initialLatency.
+//
+// GEXTTO: the floor resolves the reference "minimum latency" TODO; the seed
+// comes from the dial race.
 func (c *Conn) latency() (ret time.Duration) {
 	if len(c.latencies) != 0 {
 		for _, l := range c.latencies {
@@ -238,28 +258,26 @@ func (c *Conn) latency() (ret time.Duration) {
 		if ret < minLatencyDuration() {
 			ret = minLatencyDuration()
 		}
-		return
+		return ret
 	}
-	// GEXTTO: seed from the measured per-remote latency when available, so
-	// a lost first packet on a fast path does not wait out the fixed
-	// 400 ms assumption. Clamped: never below 5 ms (stale-low estimates
-	// must not cause spurious resends) and never above initialLatency
-	// (worst case = today's behaviour). Self-correcting within 10 samples.
 	if est, ok := c.socket.initialLatencyFor(c.remoteSocketAddr.String()); ok {
 		return est
 	}
 	return initialLatency
 }
 
+// sendState sends an (empty) state packet carrying our ACKs and window.
 func (c *Conn) sendState() {
 	c.send(stState, c.send_id, nil, c.seq_nr)
 	sentStatePackets.Add(1)
 }
 
+// sendReset sends an empty reset packet.
 func (c *Conn) sendReset() {
 	c.send(stReset, c.send_id, nil, c.seq_nr)
 }
 
+// addLatency records one RTT sample, keeping the last ten.
 func (c *Conn) addLatency(l time.Duration) {
 	c.latencies = append(c.latencies, l)
 	if len(c.latencies) > 10 {
@@ -267,17 +285,16 @@ func (c *Conn) addLatency(l time.Duration) {
 	}
 }
 
-// Ack our send with the given sequence number.
+// ack acknowledges our send with the given sequence number and trims the
+// acknowledged prefix of unackedSends.
 func (c *Conn) ack(nr uint16) {
 	if !seqLess(c.lastAck, nr) {
-		// Already acked.
-		return
+		return // already acknowledged
 	}
 	i := nr - c.lastAck - 1
 	if int(i) >= len(c.unackedSends) {
-		// Remote has acknowledged receipt of packets we haven't even sent.
+		// The peer acknowledged packets we have not even sent.
 		acksReceivedAheadOfSyn.Add(1)
-		// log.Printf("got ack ahead of syn (%x > %x)", nr, c.seq_nr-1)
 		return
 	}
 	s := c.unackedSends[i]
@@ -288,19 +305,17 @@ func (c *Conn) ack(nr uint16) {
 		c.addLatency(latency)
 		c.noteDelivery()
 	}
-	// Trim sends that aren't needed anymore.
 	for len(c.unackedSends) != 0 {
 		if !c.unackedSends[0].acked.IsSet() {
-			// Can't trim unacked sends any further.
-			return
+			return // the front packet is still outstanding
 		}
-		// Trim the front of the unacked sends.
 		c.unackedSends = c.unackedSends[1:]
 		c.updateCanWrite()
 		c.lastAck++
 	}
 }
 
+// ackTo acknowledges every packet up to nr.
 func (c *Conn) ackTo(nr uint16) {
 	if !seqLess(nr, c.seq_nr) {
 		return
@@ -310,46 +325,42 @@ func (c *Conn) ackTo(nr uint16) {
 	}
 }
 
-// Return the send state for the sequence number. Returns nil if there's no
-// outstanding send for that sequence number.
+// seqSend returns the send for a sequence number, or nil when there is none.
 func (c *Conn) seqSend(seqNr uint16) *send {
 	if !seqLess(c.lastAck, seqNr) {
-		// Presumably already acked.
-		return nil
+		return nil // already acknowledged
 	}
 	i := int(seqNr - c.lastAck - 1)
 	if i >= len(c.unackedSends) {
-		// No such send.
 		return nil
 	}
 	return c.unackedSends[i]
 }
 
+// resendTimeout is the retransmission timeout: an RTT-derived base with jitter,
+// scaled by the adaptive loss-driven backoff.
 func (c *Conn) resendTimeout() time.Duration {
 	l := c.latency()
 	ret := jitterDuration(3*l, l)
 	// GEXTTO: loss-driven backoff. Each RTO timeout is the congestion signal
-	// (the same one the socket counters expose) and makes this connection more
-	// patient, up to maxRTOBackoff, which cuts retransmission volume to a
-	// stalled or congested peer. A delivered packet halves it back
-	// (noteDelivery), so a link that recovers is probed at the measured RTT
-	// again quickly; a healthy connection never timeout-resends and keeps
-	// backoff 1, i.e. today's behaviour.
+	// the socket counters expose; it makes this connection more patient, up to
+	// maxRTOBackoff, which cuts retransmission volume to a stalled or
+	// congested peer. A delivered packet halves it (noteDelivery). A healthy
+	// connection never timeout-resends, so it stays at 1: today's behaviour.
 	if c.rtoBackoff > 1 {
 		ret *= time.Duration(c.rtoBackoff)
 	}
 	return ret
 }
 
-// GEXTTO: noteRTOTimeout records an RTO-driven resend on this connection and
-// backs its RTO off (doubling, capped at maxRTOBackoff). Called from
-// send.timeoutResend under mu.
+// noteRTOTimeout is the feedback for the adaptive RTO: it doubles the backoff,
+// capped at maxRTOBackoff. Called from send.timeoutResend under mu.
 func (c *Conn) noteRTOTimeout() {
 	if !adaptiveRTO.Load() {
 		return
 	}
 	switch {
-	case c.rtoBackoff == 0:
+	case c.rtoBackoff < 1:
 		c.rtoBackoff = 1
 	case c.rtoBackoff < maxRTOBackoff:
 		c.rtoBackoff *= 2
@@ -359,9 +370,9 @@ func (c *Conn) noteRTOTimeout() {
 	}
 }
 
-// GEXTTO: noteDelivery records a first ACK and relaxes the adaptive RTO
-// backoff by half (floor 1), so a connection that delivers again stops paying
-// the patience accumulated during a stall. Called from Conn.ack under mu.
+// noteDelivery relaxes the adaptive RTO backoff by half (floor 1) when a packet
+// is acknowledged, so a link that recovers stops paying for a past stall.
+// Called from Conn.ack under mu.
 func (c *Conn) noteDelivery() {
 	if !adaptiveRTO.Load() {
 		return
@@ -371,44 +382,51 @@ func (c *Conn) noteDelivery() {
 	}
 }
 
+// ackSkipped is called for a packet the peer did not acknowledge: a run of
+// skipped packets triggers a fast resend. Called from applyAcks under mu.
 func (c *Conn) ackSkipped(seqNr uint16) {
-	send := c.seqSend(seqNr)
-	if send == nil {
+	s := c.seqSend(seqNr)
+	if s == nil {
 		return
 	}
-	send.acksSkipped++
-	if send.acked.IsSet() {
+	s.acksSkipped++
+	if s.acked.IsSet() {
 		return
 	}
-	switch send.acksSkipped {
+	switch s.acksSkipped {
 	case 3, 60:
 		ackSkippedResends.Add(1)
-		send.resend()
+		s.resend()
 		// GEXTTO: congestion signal for the socket counters.
 		c.socket.addFastResend()
-		send.resendTimer.Reset(c.resendTimeout() * time.Duration(send.numResends))
-	default:
+		s.resendTimer.Reset(c.resendTimeout() * time.Duration(s.numResends))
 	}
 }
 
-// Handle a packet destined for this connection.
+// receivePacket hands one inbound packet to the connection state machine.
 func (c *Conn) receivePacket(h header, payload []byte) {
 	c.packetReadTimeoutTimer.Reset(packetReadTimeout)
 	c.processDelivery(h, payload)
 }
 
+// receivePacketTimeoutCallback destroys a connection that heard nothing for
+// packetReadTimeout.
 func (c *Conn) receivePacketTimeoutCallback() {
 	mu.Lock()
 	c.destroy(errors.New("no packet read timeout"))
 	mu.Unlock()
 }
 
+// lazyDestroy tears the connection down once it has said goodbye to the peer:
+// FIN written and acknowledged, FIN received (or the app closed).
 func (c *Conn) lazyDestroy() {
 	if c.wroteFin.IsSet() && len(c.unackedSends) <= 1 && (c.gotFin.IsSet() || c.closed.IsSet()) {
 		c.destroy(errors.New("lazily destroyed"))
 	}
 }
 
+// processDelivery applies one inbound packet: its acknowledgements, then its
+// payload (buffering out-of-order data and surfacing in-order data).
 func (c *Conn) processDelivery(h header, payload []byte) {
 	deliveriesProcessed.Add(1)
 	defer c.lazyDestroy()
@@ -426,6 +444,7 @@ func (c *Conn) processDelivery(h header, payload []byte) {
 		return
 	}
 	if !c.synAcked {
+		// The first packet must complete the handshake (a state packet).
 		if h.Type != stState {
 			return
 		}
@@ -437,29 +456,27 @@ func (c *Conn) processDelivery(h header, payload []byte) {
 	if h.Type == stState {
 		return
 	}
-	// Even if we didn't need or want this packet, we need to inform the peer
-	// what our state is, in case they missed something.
+	// Even if we do not want this packet, tell the peer our state in case it
+	// missed something.
 	c.pendSendState()
 	if !seqLess(c.ack_nr, h.SeqNr) {
-		// Already received this packet.
-		return
+		return // already received
 	}
 	inboundIndex := int(h.SeqNr - c.ack_nr - 1)
 	if inboundIndex < len(c.inbound) && c.inbound[inboundIndex].seen {
-		// Already received this packet.
-		return
+		return // already received
 	}
-	// Derived from running in production:
-	// grep -oP '(?<=packet out of order, index=)\d+' log | sort -n | uniq -c
-	// 64 should correspond to 8 bytes of selective ack.
+	// 64 packets corresponds to 8 bytes of selective ACK, the useful limit
+	// derived from production logs.
 	if inboundIndex >= maxUnackedInbound {
-		// Discard packet too far ahead.
+		// Too far ahead: discard.
 		if logLevel >= 1 {
-			log.Printf("received packet from %s %d ahead of next seqnr (%x > %x)", c.remoteSocketAddr, inboundIndex, h.SeqNr, c.ack_nr+1)
+			log.Printf("received packet from %s %d ahead of next seqnr (%x > %x)",
+				c.remoteSocketAddr, inboundIndex, h.SeqNr, c.ack_nr+1)
 		}
 		return
 	}
-	// Extend inbound so the new packet has a place.
+	// Extend inbound so the new packet has a slot.
 	for inboundIndex >= len(c.inbound) {
 		c.inbound = append(c.inbound, recv{})
 	}
@@ -468,35 +485,39 @@ func (c *Conn) processDelivery(h header, payload []byte) {
 	c.processInbound()
 }
 
+// applyAcks acknowledges our sends from the packet's AckNr and selective-ACK
+// extension, marking the gaps so a fast resend can fire.
 func (c *Conn) applyAcks(h header) {
 	c.ackTo(h.AckNr)
 	for _, ext := range h.Extensions {
-		switch ext.Type {
-		case extensionTypeSelectiveAck:
-			c.ackSkipped(h.AckNr + 1)
-			bitmask := selectiveAckBitmask{ext.Bytes}
-			for i := 0; i < bitmask.NumBits(); i++ {
-				if bitmask.BitIsSet(i) {
-					nr := h.AckNr + 2 + uint16(i)
-					// log.Printf("selectively acked %d", nr)
-					c.ack(nr)
-				} else {
-					c.ackSkipped(h.AckNr + 2 + uint16(i))
-				}
+		if ext.Type != extensionTypeSelectiveAck {
+			continue
+		}
+		c.ackSkipped(h.AckNr + 1)
+		bitmask := selectiveAckBitmask{Bytes: ext.Bytes}
+		for i := 0; i < bitmask.NumBits(); i++ {
+			nr := h.AckNr + 2 + uint16(i)
+			if bitmask.BitIsSet(i) {
+				c.ack(nr)
+			} else {
+				c.ackSkipped(nr)
 			}
 		}
 	}
 }
 
+// assertHeader guards the connection-id invariant: only a SYN carries the
+// peer's send id, every other packet ours. A mismatch is an internal bug, so it
+// panics rather than dropping the packet silently.
 func (c *Conn) assertHeader(h header) {
 	if h.Type == stSyn {
 		if h.ConnID != c.send_id {
 			panic(fmt.Sprintf("%d != %d", h.ConnID, c.send_id))
 		}
-	} else {
-		if h.ConnID != c.recv_id {
-			panic("erroneous delivery")
-		}
+		return
+	}
+	if h.ConnID != c.recv_id {
+		panic("erroneous delivery")
 	}
 }
 
@@ -504,8 +525,8 @@ func (c *Conn) updateReadBufNotEmpty() {
 	c.readBufNotEmpty.SetBool(len(c.readBuf) != 0)
 }
 
+// processInbound moves consecutive buffered packets into the read buffer.
 func (c *Conn) processInbound() {
-	// Consume consecutive next packets.
 	for !c.gotFin.IsSet() && len(c.inbound) > 0 && c.inbound[0].seen && len(c.readBuf) < readBufferLen {
 		c.ack_nr++
 		p := c.inbound[0]
@@ -519,16 +540,18 @@ func (c *Conn) processInbound() {
 	}
 }
 
+// waitAck blocks until the send with the given sequence number is acknowledged
+// or the connection is destroyed. Callers hold mu.
 func (c *Conn) waitAck(seq uint16) {
-	send := c.seqSend(seq)
-	if send == nil {
+	s := c.seqSend(seq)
+	if s == nil {
 		return
 	}
-	waitEvents(&mu, &send.acked, &c.destroyed)
-	return
+	waitEvents(&mu, &s.acked, &c.destroyed)
 }
 
-// Waits for sent SYN to be ACKed. Returns any errors.
+// recvSynAck waits for our SYN to be acknowledged and returns the connection
+// error, if any. Callers hold no lock.
 func (c *Conn) recvSynAck() (err error) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -541,15 +564,17 @@ func (c *Conn) recvSynAck() (err error) {
 	return err
 }
 
+// writeFin sends our FIN once.
 func (c *Conn) writeFin() {
 	if c.wroteFin.IsSet() {
 		return
 	}
 	c.write(stFin, c.send_id, nil, c.seq_nr)
 	c.wroteFin.Set()
-	return
 }
 
+// destroy marks the connection torn down with reason, detaching it from the
+// socket. Idempotent: the first reason wins.
 func (c *Conn) destroy(reason error) {
 	c.destroyed.Set()
 	if c.err == nil {
@@ -558,26 +583,29 @@ func (c *Conn) destroy(reason error) {
 	c.detach()
 }
 
+// closeNow closes the connection immediately, without waiting for the peer.
 func (c *Conn) closeNow() (err error) {
 	c.closed.Set()
 	c.writeFin()
 	c.destroy(errors.New("destroyed"))
-	return
+	return nil
 }
 
+// Close closes the stream gracefully: FIN is sent and the connection tears down
+// once the peer has also finished.
 func (c *Conn) Close() (err error) {
 	mu.Lock()
 	defer mu.Unlock()
 	c.closed.Set()
 	c.writeFin()
 	c.lazyDestroy()
-	return
+	return nil
 }
 
-func (c *Conn) LocalAddr() net.Addr {
-	return addr{c.socket.Addr()}
-}
+func (c *Conn) LocalAddr() net.Addr { return addr{c.socket.Addr()} }
 
+// Read copies buffered inbound data, blocking until some is available, the peer
+// closes, an error occurs or the read deadline passes.
 func (c *Conn) Read(b []byte) (n int, err error) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -586,24 +614,20 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 		c.readBuf = c.readBuf[n:]
 		c.updateReadBufNotEmpty()
 		if n != 0 {
-			// Inbound packets are backed up when the read buffer is too big.
+			// Refill the read buffer from any packets that were waiting.
 			c.processInbound()
-			return
+			return n, nil
 		}
-		if c.gotFin.IsSet() || c.closed.IsSet() {
-			err = io.EOF
-			return
-		}
-		if c.destroyed.IsSet() {
+		switch {
+		case c.gotFin.IsSet() || c.closed.IsSet():
+			return 0, io.EOF
+		case c.destroyed.IsSet():
 			if c.err == nil {
 				panic("closed without receiving fin, and no error")
 			}
-			err = c.err
-			return
-		}
-		if c.connDeadlines.read.passed.IsSet() {
-			err = errTimeout
-			return
+			return 0, c.err
+		case c.connDeadlines.read.passed.IsSet():
+			return 0, errTimeout
 		}
 		waitEvents(&mu,
 			&c.gotFin,
@@ -614,44 +638,40 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	}
 }
 
-func (c *Conn) RemoteAddr() net.Addr {
-	return addr{c.remoteSocketAddr}
-}
+func (c *Conn) RemoteAddr() net.Addr { return addr{c.remoteSocketAddr} }
 
 func (c *Conn) String() string {
 	return fmt.Sprintf("<UTPConn %s-%s (%d)>", c.LocalAddr(), c.RemoteAddr(), c.recv_id)
 }
 
+// updateCanWrite recomputes whether a data packet may be sent now.
 func (c *Conn) updateCanWrite() {
 	c.canWrite.SetBool(c.synAcked &&
 		len(c.unackedSends) < maxUnackedSends &&
 		c.cur_window <= c.peerWndSize)
 }
 
+// Write sends payload to the peer, blocking while the window is full, the
+// stream is closed, an error occurs or the write deadline passes.
 func (c *Conn) Write(p []byte) (n int, err error) {
 	mu.Lock()
 	defer mu.Unlock()
 	for len(p) != 0 {
-		if c.wroteFin.IsSet() || c.closed.IsSet() {
-			err = errClosed
-			return
+		switch {
+		case c.wroteFin.IsSet() || c.closed.IsSet():
+			return n, errClosed
+		case c.destroyed.IsSet():
+			return n, c.err
+		case c.connDeadlines.write.passed.IsSet():
+			return n, errTimeout
 		}
-		if c.destroyed.IsSet() {
-			err = c.err
-			return
-		}
-		if c.connDeadlines.write.passed.IsSet() {
-			err = errTimeout
-			return
-		}
-		// If peerWndSize is 0, we still want to send something, so don't
-		// block until we exceed it.
+		// With a zero peer window we still send one packet, so a stalled
+		// window does not deadlock the connection.
 		if c.canWrite.IsSet() {
-			var n1 int
-			n1, err = c.write(stData, c.send_id, p, c.seq_nr)
+			n1, werr := c.write(stData, c.send_id, p, c.seq_nr)
 			n += n1
-			if err != nil {
-				break
+			if werr != nil {
+				return n, werr
 			}
 			if n1 == 0 {
 				panic(len(p))
@@ -666,13 +686,14 @@ func (c *Conn) Write(p []byte) (n int, err error) {
 			&c.connDeadlines.write.passed,
 			&c.canWrite)
 	}
-	return
+	return n, nil
 }
 
+// detach removes the connection from its socket's map and lets the socket tear
+// down if it was waiting on it.
 func (c *Conn) detach() {
 	s := c.socket
-	_, ok := s.conns[c.connKey]
-	if !ok {
+	if _, ok := s.conns[c.connKey]; !ok {
 		return
 	}
 	delete(s.conns, c.connKey)

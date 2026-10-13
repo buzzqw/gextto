@@ -1,6 +1,6 @@
 package upstream
 
-// GEXTTO: rewritten in-tree (was vendored from anacrolix/utp): the uTP/BEP 29
+// GEXTTO: our own uTP (BEP 29) wire codec; see doc.go. The
 // wire codec. The 20-byte header and the selective-ACK extension are fixed by
 // the protocol; the parsing and encoding here are our own.
 

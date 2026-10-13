@@ -1,6 +1,6 @@
 package upstream
 
-// GEXTTO: rewritten in-tree. send is one outstanding data packet: its payload,
+// GEXTTO: our own uTP (BEP 29) code; see doc.go. send is one outstanding data packet: its payload,
 // resend timer and RTO backoff state.
 
 import (

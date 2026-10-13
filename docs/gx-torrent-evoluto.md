@@ -127,7 +127,7 @@ gx-torrent is a pure-Go daemon (`CGO_ENABLED=0` build) with the **gx-core** engi
 
 | Layer | Where | What already exists |
 | --- | --- | --- |
-| Engine | `internal/gxcore`, `internal/dht`, `internal/utp` (uTP vendored from `anacrolix/utp`, MPL-2.0) | single port, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, hot web seeds and trackers, per-torrent limits, graduated file priority, windowed streaming, multi-format IP filter, proxy, VPN killswitch, preallocation, batched durability, opt-in mmap, hot-adjustable cache |
+| Engine | `internal/gxcore`, `internal/dht`, `internal/utp` (our own uTP/BEP 29) | single port, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, hot web seeds and trackers, per-torrent limits, graduated file priority, windowed streaming, multi-format IP filter, proxy, VPN killswitch, preallocation, batched durability, opt-in mmap, hot-adjustable cache |
 | Daemon | `cmd/gx-torrent` | dynamic queue with slots, seed ratio/days per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, state in `state.json` |
 | API | `cmd/gx-torrent/api.go` | REST v1 with `X-Gx-Token` header: health, stats, portcheck, torrents, add, actions, config, ipfilter |
 | UI | `cmd/gx-torrent/ui.go` | table, filters by state, tabbed detail (general, files, peers, trackers, pieces), group actions, six languages; assets in `internal/webui/assets` (`embed.FS`) |
@@ -415,7 +415,7 @@ to be verified against the libraries' code before each porting.
 | Language, licence | Go, EUPL-1.2 | Go, MPL-2.0 | C++, BSD-3 | C++/Qt, GPL-2+ |
 | IPv6 | yes (dual-stack, DHT BEP 32, LSD v6 included) | yes | yes | yes |
 | BitTorrent v2 / hybrids | yes (v2-only from `.torrent` and magnet, hybrids) | yes | yes | yes |
-| uTP | yes (`internal/utp`, vendored) | yes | yes, its own LEDBAT | yes |
+| uTP | yes (`internal/utp`, our own BEP 29) | yes | yes, its own LEDBAT | yes |
 | Holepunch BEP 55 | yes | yes | yes | yes |
 | Streaming | graduated window + HTTP Range, seek and readahead | Reader with seek and readahead | per-piece deadline | yes |
 | Storage | file, mmap (opt-in) | file, mmap, bolt, sqlite, pluggable | file, mmap (2.0) | libtorrent |
@@ -450,11 +450,12 @@ included; **scrape** is already implemented. Four other points (event bus,
 ### 11.2 Licences
 
 Gextto is **EUPL-1.2**. From **libtorrent** (BSD-3) code can be ported with
-attribution. From **anacrolix** (MPL-2.0) copied code stays MPL file by
-file: it is better to **rewrite the algorithm** than to copy the files. From **qBittorrent**
+attribution. From **anacrolix** (MPL-2.0), copied code would stay MPL file by
+file, so the algorithm is **rewritten** instead: `internal/utp` (uTP/BEP 29) is
+our own code, written against the anacrolix/utp v0.2.0 reference, and the
+`missinggo`/`sync` helpers it used are reimplemented in-tree — no MPL component
+remains. From **qBittorrent**
 (GPL) nothing is copied; reimplementing its Web API protocol is lawful.
-`anacrolix/utp` is MPL-2.0, vendored in `internal/utp/upstream` (local deltas
-marked `GEXTTO:`).
 
 ### 11.3 Engine as own code
 
@@ -670,7 +671,7 @@ To be verified: the first run in CI on **Debian 12 / Ubuntu 22.04**
 | LAN without password exploited | an external site adds or deletes torrents from the user's browser | `Origin` and `Host` check, LAN read from the socket, `X-Forwarded-For` only from declared proxies |
 | UI growing into a Go string | slow changes, visual regressions | assets in `embed.FS` and Playwright tests like those of `uiweb/v2/end2end` |
 | Costly porting from the engine | IPv6 and v2 touch DHT, trackers, picker, storage | one porting at a time, with engine tests and before/after measurement |
-| Licences | MPL code inside EUPL files | rewrite anacrolix's algorithms instead of copying them |
+| Licences | MPL code inside EUPL files | done: `internal/utp` is our own rewrite of BEP 29 (no MPL component); future anacrolix work is rewritten, not copied |
 | Porting from other engines | any fixes from others are lost | check their commits by hand once a quarter |
 | Extraction of RSS/search from the root package | broad refactor, possible instability in Gextto | extract into `internal/` with constant behaviour, with the existing tests as a safety net |
 

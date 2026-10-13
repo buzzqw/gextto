@@ -1,30 +1,20 @@
-// Package upstream is the uTP (BEP 29) implementation vendored from
-// github.com/anacrolix/utp v0.2.0: upstream files are kept as-is apart from
-// the package name and the local patches listed below. It stays under its
-// original licence, Mozilla Public License 2.0
-// (see LICENSE in this directory); only this directory is MPL-covered,
-// the rest of Gextto remains EUPL-1.2.
+// Package upstream is Gextto's own uTP (BEP 29) implementation. It lives in
+// this repository under EUPL-1.2 and is written against the anacrolix/utp
+// v0.2.0 reference, whose observable behaviour it matches; the code is our own,
+// so the transport can be tuned and instrumented freely. The engine talks to
+// internal/utp, never here directly.
 //
-// The vendoring exists so the transport can be tuned and instrumented
-// (LEDBAT parameters, backlog policy, counters) without an external
-// dependency: the engine talks to internal/utp, never here directly.
-// Upstream fixes are pulled by re-copying the files and re-applying the
-// local patches listed below (each marked with "GEXTTO:").
+// A Socket multiplexes one packet connection and hands each uTP packet to the
+// Conn it belongs to; a Conn is a uTP stream and implements net.Conn. Every
+// Conn and Socket state change is serialised by the package mutex mu.
 //
-// Local patches (each marked "GEXTTO:" at the site):
-//   - gextto_support.go: own Event/waitEvents/jitterDuration/stoppedFuncTimer,
-//     replacing github.com/anacrolix/missinggo and the anacrolix/sync mutex,
-//     so no third-party helper remains;
-//   - socket.go: per-socket timeout/fast resend counters + ResendStats,
-//     initial-RTO seed hook (SetInitialLatencyEstimator/initialLatencyFor);
-//   - send.go: timeoutResend feeds the socket counter;
-//   - conn.go: ackSkipped fast resend feeds the socket counter; latency()
-//     seeds from the estimator when unsampled (clamped [5ms, 400ms]) and floors
-//     sampled RTT at minLatency (resolves the vendored minimum-latency TODO);
-//     resendTimeout applies the loss-driven adaptive backoff and a delivered
-//     packet relaxes it (noteRTOTimeout/noteDelivery, cap maxRTOBackoff);
-//   - header.go: Unmarshal rejects <20B inputs (hostile peers) instead of
-//     slicing out of range (proven by FuzzHeaderUnmarshal seed#0 on the
-//     pristine code).
-//   - socket.go: pushBacklog evictions counted (synDrops/SynDrops).
+// Improvements over the reference:
+//   - a floor on the sampled RTT (minLatency) and a loss-driven per-connection
+//     RTO backoff (resendTimeout, noteRTOTimeout, noteDelivery);
+//   - per-socket retransmission counters (ResendStats) and backlog SYN drops;
+//   - a per-remote RTT seed for fresh connections tied to the dial race;
+//   - a total, length-checked header parser that rejects short or malformed
+//     packets instead of slicing out of range (FuzzHeaderUnmarshal);
+//   - own support primitives (Event, waitEvents, jitterDuration,
+//     stoppedFuncTimer), so no third-party helper is linked.
 package upstream

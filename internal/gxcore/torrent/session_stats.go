@@ -33,12 +33,11 @@ type SessionStats struct {
 	UTPAcceptErrors int64
 	// UTPResendsTimeout counts RTO-driven packet resends (loss/congestion
 	// signal); UTPResendsFast counts selective-ACK fast resends. Fed by the
-	// vendored stack, kept for the future adaptive RTO; not shown in the
-	// UIs yet.
+	// uTP stack, they drive the adaptive RTO and are shown in both UIs.
 	UTPResendsTimeout int64
 	UTPResendsFast    int64
-	// UTPSynDrops counts backlog SYNs evicted under burst. Fed by the
-	// vendored stack; API-visible, no UI row.
+	// UTPSynDrops counts backlog SYNs evicted under burst. Fed by the uTP
+	// stack; shown in both UIs.
 	UTPSynDrops int64
 	// DHTStats are the DHT counters (nodes, peers found, traffic).
 	DHTStats map[string]int64

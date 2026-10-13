@@ -1,9 +1,9 @@
 package upstream
 
-// GEXTTO: own support primitives replacing github.com/anacrolix/missinggo and
-// github.com/anacrolix/sync, so the engine depends on no third-party transport
-// helper (both were MPL-2.0 or shipped without a licence file). Semantics match
-// the originals; the monotonic clock is the one Go already keeps in time.Time.
+// GEXTTO: own support primitives (Event, waitEvents, jitterDuration,
+// stoppedFuncTimer), so no third-party transport helper is linked (the
+// anacrolix/missinggo and anacrolix/sync modules are gone). Semantics match
+// the reference; the monotonic clock is the one Go already keeps in time.Time.
 
 import (
 	"math"

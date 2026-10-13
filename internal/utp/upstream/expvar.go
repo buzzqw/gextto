@@ -1,6 +1,6 @@
 package upstream
 
-// GEXTTO: rewritten in-tree. expvar counters for the uTP stack, exported on the
+// GEXTTO: our own uTP (BEP 29) code; see doc.go. expvar counters for the uTP stack, exported on the
 // process's /debug/vars page for diagnostics.
 
 import "expvar"

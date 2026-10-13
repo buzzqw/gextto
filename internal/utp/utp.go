@@ -1,10 +1,10 @@
 // Package utp isolates the uTP transport (BEP 29) behind Gextto's own API.
 //
-// The socket implementation is vendored in-tree (internal/utp/upstream,
-// MPL-2.0, from github.com/anacrolix/utp v0.2.0) so it can be tuned and
+// The socket implementation is Gextto's own (internal/utp/upstream, EUPL-1.2,
+// written against the anacrolix/utp v0.2.0 reference) so it can be tuned and
 // instrumented; the engine (internal/gxcore) only talks to the Socket type
-// below. The package also exports basic counters (dials, accepts and their
-// errors) as the foundation for smarter peer-racing and LEDBAT tuning.
+// below. The package also exports counters (dials, accepts, errors and their
+// retransmissions) behind peer-racing and the adaptive RTO.
 package utp
 
 import (

@@ -1,5 +1,11 @@
 package upstream
 
+// GEXTTO: our own uTP (BEP 29) code; see doc.go.
+// Socket multiplexes a net.PacketConn: it reads datagrams once and dispatches
+// each uTP packet to the Conn it belongs to. Conns and Sockets all share the
+// package mutex mu, so their state transitions are serialised (the reader loop
+// releases mu around the blocking read).
+
 import (
 	"context"
 	"errors"
@@ -17,15 +23,17 @@ var (
 	_ net.PacketConn = &Socket{}
 )
 
-// Uniquely identifies any uTP connection on top of the underlying packet
-// stream.
+// connKey identifies a connection on the underlying packet stream: the remote
+// address plus the connection id.
 type connKey struct {
 	remoteAddr resolvedAddrStr
 	connID     uint16
 }
 
-// A Socket wraps a net.PacketConn, diverting uTP packets to its child uTP
-// Conns.
+// Socket wraps a net.PacketConn and diverts uTP packets to its child Conns. It
+// also implements net.PacketConn itself: packets that belong to no uTP
+// connection (for example DHT traffic on the shared port) are handed to
+// ReadFrom.
 type Socket struct {
 	pc    net.PacketConn
 	conns map[connKey]*Conn
@@ -36,98 +44,101 @@ type Socket struct {
 	closed    Event
 	destroyed Event
 
+	// wgReadWrite tracks in-flight reads and writes on the packet connection,
+	// so CloseNow can wait for them.
 	wgReadWrite sync.WaitGroup
 
+	// unusedReads carries datagrams that are not uTP to ReadFrom.
 	unusedReads chan read
 	connDeadlines
-	// If a read error occurs on the underlying net.PacketConn, it is put
-	// here. This is because reading is done in its own goroutine to dispatch
-	// to uTP Conns.
+	// ReadErr is the error that stopped the read loop, if any.
 	ReadErr error
 
-	// GEXTTO: per-socket resend counters, the congestion signal exported
-	// to SessionStats. timeoutResends counts RTO-driven resends (send.go),
-	// fastResends counts selective-ACK fast resends (conn.go ackSkipped).
-	// synDrops counts backlog SYNs evicted under burst (pushBacklog).
+	// GEXTTO: per-socket resend counters, the congestion signal exported to
+	// SessionStats. timeoutResends counts RTO-driven resends (send.go),
+	// fastResends selective-ACK fast resends (conn.go ackSkipped), synDrops
+	// backlog SYNs evicted under burst (pushBacklog).
 	timeoutResends atomic.Int64
 	fastResends    atomic.Int64
 	synDrops       atomic.Int64
 
-	// GEXTTO: optional per-remote RTT estimate (e.g. from recent dial
-	// races) seeding the initial RTO of fresh connections. Nil = the fixed
+	// GEXTTO: optional per-remote RTT estimate (for example from recent dial
+	// races) seeding the initial RTO of fresh connections. Nil uses the fixed
 	// initialLatency. Consulted with "ip:port".
 	initialLatencyEstimator func(addr string) (time.Duration, bool)
 }
 
-func listenPacket(network, addr string) (pc net.PacketConn, err error) {
+func listenPacket(network, addr string) (net.PacketConn, error) {
 	return net.ListenPacket(network, addr)
 }
 
-// NewSocket creates a net.PacketConn with the given network and address, and
-// returns a Socket dispatching on it.
-func NewSocket(network, addr string) (s *Socket, err error) {
+// NewSocket creates a Socket over a new packet connection of the given network
+// (empty means "udp") and address ("host:port").
+func NewSocket(network, addr string) (*Socket, error) {
 	if network == "" {
 		network = "udp"
 	}
 	pc, err := listenPacket(network, addr)
 	if err != nil {
-		return
+		return nil, err
 	}
 	return NewSocketFromPacketConn(pc)
 }
 
-// Create a Socket, using the provided net.PacketConn. If you want to retain
-// use of the net.PacketConn after the Socket closes it, override the
-// net.PacketConn's Close method, or use NetSocketFromPacketConnNoClose.
-func NewSocketFromPacketConn(pc net.PacketConn) (s *Socket, err error) {
-	s = &Socket{
+// NewSocketFromPacketConn creates a Socket over pc, which the Socket then owns
+// and closes. To keep pc after the Socket closes, use
+// NewSocketFromPacketConnNoClose.
+func NewSocketFromPacketConn(pc net.PacketConn) (*Socket, error) {
+	s := &Socket{
 		backlog:     make(map[syn]struct{}, backlog),
 		pc:          pc,
 		unusedReads: make(chan read, 100),
-		wgReadWrite: sync.WaitGroup{},
 	}
 	mu.Lock()
 	sockets[s] = struct{}{}
 	mu.Unlock()
 	go s.reader()
-	return
+	return s, nil
 }
 
-// Create a Socket using the provided PacketConn, that doesn't close the
-// PacketConn when the Socket is closed.
-func NewSocketFromPacketConnNoClose(pc net.PacketConn) (s *Socket, err error) {
+// NewSocketFromPacketConnNoClose is NewSocketFromPacketConn for a PacketConn
+// that outlives the Socket.
+func NewSocketFromPacketConnNoClose(pc net.PacketConn) (*Socket, error) {
 	return NewSocketFromPacketConn(packetConnNopCloser{pc})
 }
 
-func (s *Socket) unusedRead(read read) {
+// unusedRead hands a non-uTP datagram to ReadFrom, or drops it when nobody is
+// reading (the shared socket is best-effort).
+func (s *Socket) unusedRead(r read) {
 	unusedReads.Add(1)
 	select {
-	case s.unusedReads <- read:
+	case s.unusedReads <- r:
 	default:
-		// Drop the packet.
 		unusedReadsDropped.Add(1)
 	}
 }
 
-func (s *Socket) strNetAddr(str string) (a net.Addr) {
-	var err error
+// strNetAddr resolves the connection's own network address form.
+func (s *Socket) strNetAddr(str string) net.Addr {
 	switch n := s.network(); n {
 	case "udp":
-		a, err = net.ResolveUDPAddr(n, str)
+		a, err := net.ResolveUDPAddr(n, str)
+		if err != nil {
+			panic(err)
+		}
+		return a
 	default:
 		panic(n)
 	}
-	if err != nil {
-		panic(err)
-	}
-	return
 }
 
-func (s *Socket) pushBacklog(syn syn) {
-	if _, ok := s.backlog[syn]; ok {
+// pushBacklog queues an unaccepted SYN, resetting an old one when the backlog is
+// full. The eviction is counted (burst signal for SessionStats).
+func (s *Socket) pushBacklog(sy syn) {
+	if _, ok := s.backlog[sy]; ok {
 		return
 	}
-	// Pop a pseudo-random syn to make room.
+	// Make room by dropping an arbitrary (map order) old SYN.
 	for k := range s.backlog {
 		if len(s.backlog) < backlog {
 			break
@@ -135,14 +146,17 @@ func (s *Socket) pushBacklog(syn syn) {
 		delete(s.backlog, k)
 		// GEXTTO: count the eviction (burst signal for SessionStats).
 		s.synDrops.Add(1)
-		// A syn is sent on the remote's recv_id, so this is where we can send
-		// the reset.
+		// A SYN is addressed to the remote's recv_id, so that is where the
+		// reset goes.
 		s.reset(s.strNetAddr(k.addr), k.seq_nr, k.conn_id)
 	}
-	s.backlog[syn] = struct{}{}
+	s.backlog[sy] = struct{}{}
 	s.backlogChanged()
 }
 
+// reader reads the packet connection and dispatches datagrams until it is
+// closed. It holds mu for the state it touches and releases it around the
+// blocking read.
 func (s *Socket) reader() {
 	mu.Lock()
 	defer mu.Unlock()
@@ -162,10 +176,7 @@ func (s *Socket) reader() {
 			s.ReadErr = err
 			return
 		}
-		s.handleReceivedPacket(read{
-			append([]byte(nil), b[:n]...),
-			addr,
-		})
+		s.handleReceivedPacket(read{data: append([]byte(nil), b[:n]...), from: addr})
 	}
 }
 
@@ -176,42 +187,39 @@ func receivedUTPPacketSize(n int) {
 	}
 }
 
-func (s *Socket) connForRead(h header, from net.Addr) (c *Conn, ok bool) {
-	c, ok = s.conns[connKey{
-		resolvedAddrStr(from.String()),
-		func() uint16 {
-			if h.Type == stSyn {
-				// SYNs have a ConnID one lower than the eventual recvID, and we index
-				// the connections with that, so use it for the lookup.
-				return h.ConnID + 1
-			} else {
-				return h.ConnID
-			}
-		}(),
-	}]
-	return
+// connForRead looks up the connection a packet belongs to. A SYN is indexed by
+// the id one below the eventual recv_id, so the lookup uses ConnID+1 for it.
+func (s *Socket) connForRead(h header, from net.Addr) (*Conn, bool) {
+	id := h.ConnID
+	if h.Type == stSyn {
+		id++
+	}
+	c, ok := s.conns[connKey{resolvedAddrStr(from.String()), id}]
+	return c, ok
 }
 
-func (s *Socket) handlePacketReceivedForEstablishedConn(h header, from net.Addr, data []byte, c *Conn) {
+// handlePacketReceivedForEstablishedConn delivers a packet to its connection,
+// first guarding the SYN collision case: a SYN for an id that a locally dialled
+// connection already owns (send_id is one higher) is a conflict, and the peer
+// gets a reset.
+func (s *Socket) handlePacketReceivedForEstablishedConn(h header, from net.Addr, payload []byte, c *Conn) {
 	if h.Type == stSyn {
 		if h.ConnID == c.send_id-2 {
-			// This is a SYN for connection that cannot exist locally. The
-			// connection the remote wants to establish here with the proposed
-			// recv_id, already has an existing connection that was dialled
-			// *out* from this socket, which is why the send_id is 1 higher,
-			// rather than 1 lower than the recv_id.
 			log.Print("resetting conflicting syn")
 			s.reset(from, h.SeqNr, h.ConnID)
 			return
-		} else if h.ConnID != c.send_id {
+		}
+		if h.ConnID != c.send_id {
 			panic("bad assumption")
 		}
 	}
-	c.receivePacket(h, data)
+	c.receivePacket(h, payload)
 }
 
+// handleReceivedPacket decodes a datagram and routes it: to its connection, to
+// the SYN backlog, or to ReadFrom (a reset or an unknown packet).
 func (s *Socket) handleReceivedPacket(p read) {
-	if len(p.data) < 20 {
+	if len(p.data) < headerLen {
 		s.unusedRead(p)
 		return
 	}
@@ -226,7 +234,7 @@ func (s *Socket) handleReceivedPacket(p read) {
 		s.handlePacketReceivedForEstablishedConn(h, p.from, p.data[hEnd:], c)
 		return
 	}
-	// Packet doesn't belong to an existing connection.
+	// No existing connection for this packet.
 	switch h.Type {
 	case stSyn:
 		s.pushBacklog(syn{
@@ -236,87 +244,66 @@ func (s *Socket) handleReceivedPacket(p read) {
 		})
 		return
 	case stReset:
-		// Could be a late arriving packet for a Conn we're already done with.
-		// If it was for an existing connection, we would have handled it
-		// earlier.
+		// A late reset for a connection we are already done with.
 	default:
 		unexpectedPacketsRead.Add(1)
-		// This is an unexpected packet. We'll send a reset, but also pass it
-		// on. I don't think you can reset on the received packets ConnID if
-		// it isn't a SYN, as the send_id will differ in this case.
+		// Send a reset for each possible interpretation of the connection id:
+		// the packet itself and the two neighbouring ids, since we cannot tell
+		// whether the connection would have been inbound or outbound.
 		s.reset(p.from, h.SeqNr, h.ConnID)
-		// Connection initiated by remote.
 		s.reset(p.from, h.SeqNr, h.ConnID-1)
-		// Connection initiated locally.
 		s.reset(p.from, h.SeqNr, h.ConnID+1)
 	}
 	s.unusedRead(p)
 }
 
-// Send a reset in response to a packet with the given header.
+// reset sends a reset packet to addr, acknowledging ackNr under connID.
 func (s *Socket) reset(addr net.Addr, ackNr, connId uint16) {
 	b := make([]byte, 0, maxHeaderSize)
-	h := header{
-		Type:    stReset,
-		Version: 1,
-		ConnID:  connId,
-		AckNr:   ackNr,
-	}
+	h := header{Type: stReset, Version: 1, ConnID: connId, AckNr: ackNr}
 	b = b[:h.Marshal(b)]
 	go s.writeTo(b, addr)
 }
 
-// Return a recv_id that should be free. Handling the case where it isn't is
-// deferred to a more appropriate function.
+// newConnID returns a recv_id that is free for remoteAddr: it picks an id not
+// used by an existing connection's recv_id or the neighbouring ids (which the
+// remote would use), so it also works when dialling our own Socket.
 func (s *Socket) newConnID(remoteAddr resolvedAddrStr) (id uint16) {
-	// Rather than use math.Rand, which requires generating all the IDs up
-	// front and allocating a slice, we do it on the stack, generating the IDs
-	// only as required. To do this, we use the fact that the array is
-	// default-initialized. IDs that are 0, are actually their index in the
-	// array. IDs that are non-zero, are +1 from their intended ID.
+	// Rather than shuffling a slice of every id, keep an implicit free list:
+	// ids holds the untried ids, 0 meaning "the value is its index", non-zero
+	// meaning "value-1 is the id".
 	var idsBack [0x10000]int
 	ids := idsBack[:]
 	for len(ids) != 0 {
-		// Pick the next ID from the untried ids.
 		i := rand.Intn(len(ids))
 		id = uint16(ids[i])
-		// If it's zero, then treat it as though the index i was the ID.
-		// Otherwise the value we get is the ID+1.
 		if id == 0 {
 			id = uint16(i)
 		} else {
 			id--
 		}
-		// Check there's no connection using this ID for its recv_id...
-		_, ok1 := s.conns[connKey{remoteAddr, id}]
-		// and if we're connecting to our own Socket, that there isn't a Conn
-		// already receiving on what will correspond to our send_id. Note that
-		// we just assume that we could be connecting to our own Socket. This
-		// will halve the available connection IDs to each distinct remote
-		// address. Presumably that's ~0x8000, down from ~0x10000.
-		_, ok2 := s.conns[connKey{remoteAddr, id + 1}]
-		_, ok4 := s.conns[connKey{remoteAddr, id - 1}]
-		if !ok1 && !ok2 && !ok4 {
-			return
+		_, usedRecv := s.conns[connKey{remoteAddr, id}]
+		_, usedAbove := s.conns[connKey{remoteAddr, id + 1}]
+		_, usedBelow := s.conns[connKey{remoteAddr, id - 1}]
+		if !usedRecv && !usedAbove && !usedBelow {
+			return id
 		}
-		// The set of possible IDs is shrinking. The highest one will be lost, so
-		// it's moved to the location of the one we just tried.
-		ids[i] = len(ids) // Conveniently already +1.
-		// And shrink.
+		// Remove the tried id from the free list by moving the last one in.
+		ids[i] = len(ids)
 		ids = ids[:len(ids)-1]
 	}
-	return
+	return 0
 }
 
 var (
 	zeroipv4 = net.ParseIP("0.0.0.0")
 	zeroipv6 = net.ParseIP("::")
 
-	ipv4lo = mustResolveUDP("127.0.0.1")
-	ipv6lo = mustResolveUDP("::1")
+	ipv4lo = mustResolveIP("127.0.0.1")
+	ipv6lo = mustResolveIP("::1")
 )
 
-func mustResolveUDP(addr string) net.IP {
+func mustResolveIP(addr string) net.IP {
 	u, err := net.ResolveIPAddr("ip", addr)
 	if err != nil {
 		panic(err)
@@ -324,34 +311,37 @@ func mustResolveUDP(addr string) net.IP {
 	return u.IP
 }
 
+// realRemoteAddr maps the unspecified addresses net gives for a wildcard
+// listener to loopback, so a loopback peer is not recorded as 0.0.0.0.
 func realRemoteAddr(addr net.Addr) net.Addr {
 	udpAddr, ok := addr.(*net.UDPAddr)
-	if ok {
-		if udpAddr.IP.Equal(zeroipv4) {
-			udpAddr.IP = ipv4lo
-		}
-		if udpAddr.IP.Equal(zeroipv6) {
-			udpAddr.IP = ipv6lo
-		}
+	if !ok {
+		return addr
+	}
+	switch {
+	case udpAddr.IP.Equal(zeroipv4):
+		udpAddr.IP = ipv4lo
+	case udpAddr.IP.Equal(zeroipv6):
+		udpAddr.IP = ipv6lo
 	}
 	return addr
 }
 
-func (s *Socket) newConn(addr net.Addr) (c *Conn) {
-	addr = realRemoteAddr(addr)
-
-	c = &Conn{
+// newConn allocates a Conn attached to this socket. Callers hold mu.
+func (s *Socket) newConn(addr net.Addr) *Conn {
+	c := &Conn{
 		socket:           s,
-		remoteSocketAddr: addr,
+		remoteSocketAddr: realRemoteAddr(addr),
 		created:          time.Now(),
 		// GEXTTO: adaptive RTO starts at the measured-behaviour multiplier.
 		rtoBackoff: 1,
 	}
 	c.sendPendingSendSendStateTimer = stoppedFuncTimer(c.sendPendingSendStateTimerCallback)
 	c.packetReadTimeoutTimer = time.AfterFunc(packetReadTimeout, c.receivePacketTimeoutCallback)
-	return
+	return c
 }
 
+// Dial connects to a remote uTP peer using this socket.
 func (s *Socket) Dial(addr string) (net.Conn, error) {
 	return s.DialContext(context.Background(), "", addr)
 }
@@ -364,50 +354,43 @@ func (s *Socket) resolveAddr(network, addr string) (net.Addr, error) {
 	return net.ResolveUDPAddr(n, addr)
 }
 
-func (s *Socket) network() string {
-	return s.pc.LocalAddr().Network()
-}
+func (s *Socket) network() string { return s.pc.LocalAddr().Network() }
 
-func (s *Socket) startOutboundConn(addr net.Addr) (c *Conn, err error) {
+// startOutboundConn registers a new outbound connection and sends its SYN.
+func (s *Socket) startOutboundConn(addr net.Addr) (*Conn, error) {
 	mu.Lock()
 	defer mu.Unlock()
-	c = s.newConn(addr)
+	c := s.newConn(addr)
 	c.recv_id = s.newConnID(resolvedAddrStr(c.RemoteAddr().String()))
 	c.send_id = c.recv_id + 1
 	if logLevel >= 1 {
 		log.Printf("dial registering addr: %s", c.RemoteAddr().String())
 	}
 	if !s.registerConn(c.recv_id, resolvedAddrStr(c.RemoteAddr().String()), c) {
-		err = errors.New("couldn't register new connection")
 		log.Println(c.recv_id, c.RemoteAddr().String())
-		for k, c := range s.conns {
-			log.Println(k, c, c.age())
+		for k, cc := range s.conns {
+			log.Println(k, cc, cc.age())
 		}
 		log.Printf("that's %d connections", len(s.conns))
-	}
-	if err != nil {
-		return
+		return nil, errors.New("couldn't register new connection")
 	}
 	c.seq_nr = 1
 	c.writeSyn()
-	return
+	return c, nil
 }
 
-func (s *Socket) DialContext(ctx context.Context, network, addr string) (nc net.Conn, err error) {
+// DialContext dials addr and waits for the handshake, honouring ctx.
+func (s *Socket) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	netAddr, err := s.resolveAddr(network, addr)
 	if err != nil {
-		return
+		return nil, err
 	}
-
 	c, err := s.startOutboundConn(netAddr)
 	if err != nil {
-		return
+		return nil, err
 	}
-
 	connErr := make(chan error, 1)
-	go func() {
-		connErr <- c.recvSynAck()
-	}()
+	go func() { connErr <- c.recvSynAck() }()
 	select {
 	case err = <-connErr:
 	case <-ctx.Done():
@@ -417,28 +400,25 @@ func (s *Socket) DialContext(ctx context.Context, network, addr string) (nc net.
 		mu.Lock()
 		c.destroy(errors.New("dial timeout"))
 		mu.Unlock()
-		return
+		return nil, err
 	}
 	mu.Lock()
 	c.updateCanWrite()
 	mu.Unlock()
-	nc = c
-	return
+	return c, nil
 }
 
-func (me *Socket) writeTo(b []byte, addr net.Addr) (n int, err error) {
-	apdc := artificialPacketDropChance
-	if apdc != 0 {
-		if rand.Float64() < apdc {
-			n = len(b)
-			return
-		}
+// writeTo writes a datagram to the underlying connection, applying the test
+// packet-drop knob. It is the connection's send path for every packet.
+func (s *Socket) writeTo(b []byte, addr net.Addr) (int, error) {
+	if drop := artificialPacketDropChance; drop != 0 && rand.Float64() < drop {
+		return len(b), nil
 	}
-	n, err = me.pc.WriteTo(b, addr)
-	return
+	return s.pc.WriteTo(b, addr)
 }
 
-// Returns true if the connection was newly registered, false otherwise.
+// registerConn indexes a connection under remoteAddr+recvID. It reports
+// whether the id was free; a duplicate keeps the existing connection.
 func (s *Socket) registerConn(recvID uint16, remoteAddr resolvedAddrStr, c *Conn) bool {
 	if s.conns == nil {
 		s.conns = make(map[connKey]*Conn)
@@ -453,85 +433,78 @@ func (s *Socket) registerConn(recvID uint16, remoteAddr resolvedAddrStr, c *Conn
 }
 
 func (s *Socket) backlogChanged() {
-	if len(s.backlog) != 0 {
-		s.backlogNotEmpty.Set()
-	} else {
-		s.backlogNotEmpty.Clear()
-	}
+	s.backlogNotEmpty.SetBool(len(s.backlog) != 0)
 }
 
-func (s *Socket) nextSyn() (syn syn, err error) {
+// nextSyn returns the next pending SYN, blocking until one arrives or the
+// socket closes. Callers hold mu.
+func (s *Socket) nextSyn() (sy syn, err error) {
 	for {
 		waitEvents(&mu, &s.closed, &s.backlogNotEmpty, &s.destroyed)
 		if s.closed.IsSet() {
-			err = errClosed
-			return
+			return sy, errClosed
 		}
 		if s.destroyed.IsSet() {
-			err = s.ReadErr
-			return
+			return sy, s.ReadErr
 		}
 		for k := range s.backlog {
-			syn = k
 			delete(s.backlog, k)
 			s.backlogChanged()
-			return
+			return k, nil
 		}
 	}
 }
 
-// ACK a SYN, and return a new Conn for it. ok is false if the SYN is bad, and
-// the Conn invalid.
-func (s *Socket) ackSyn(syn syn) (c *Conn, ok bool) {
-	c = s.newConn(s.strNetAddr(syn.addr))
-	c.send_id = syn.conn_id
+// ackSyn accepts a SYN: it creates the connection, sends the state packet (the
+// implicit handshake ACK) and reports ok false when the SYN duplicates an
+// existing connection (a resend, which is ACKed again).
+func (s *Socket) ackSyn(sy syn) (c *Conn, ok bool) {
+	c = s.newConn(s.strNetAddr(sy.addr))
+	c.send_id = sy.conn_id
 	c.recv_id = c.send_id + 1
 	c.seq_nr = uint16(rand.Int())
 	c.lastAck = c.seq_nr - 1
-	c.ack_nr = syn.seq_nr
+	c.ack_nr = sy.seq_nr
 	c.synAcked = true
 	c.updateCanWrite()
-	if !s.registerConn(c.recv_id, resolvedAddrStr(syn.addr), c) {
-		// SYN that triggered this accept duplicates existing connection.
-		// Ack again in case the SYN was a resend.
-		c = s.conns[connKey{resolvedAddrStr(syn.addr), c.recv_id}]
-		if c.send_id != syn.conn_id {
+	if !s.registerConn(c.recv_id, resolvedAddrStr(sy.addr), c) {
+		// A SYN resend for a connection already accepted: ACK it again.
+		c = s.conns[connKey{resolvedAddrStr(sy.addr), c.recv_id}]
+		if c.send_id != sy.conn_id {
 			panic(":|")
 		}
 		c.sendState()
-		return
+		return c, false
 	}
 	c.sendState()
-	ok = true
-	return
+	return c, true
 }
 
-// Accept and return a new uTP connection.
+// Accept blocks for the next inbound connection.
 func (s *Socket) Accept() (net.Conn, error) {
 	mu.Lock()
 	defer mu.Unlock()
 	for {
-		syn, err := s.nextSyn()
+		sy, err := s.nextSyn()
 		if err != nil {
 			return nil, err
 		}
-		c, ok := s.ackSyn(syn)
-		if ok {
+		if c, ok := s.ackSyn(sy); ok {
 			c.updateCanWrite()
 			return c, nil
 		}
 	}
 }
 
-// GEXTTO: SetInitialLatencyEstimator installs the per-remote RTT estimate
-// seeding fresh connections' RTO (see Conn.latency). Nil disables it. Call
-// once before dialling; afterwards it is only read.
+// GEXTTO: SetInitialLatencyEstimator installs the per-remote RTT estimate used
+// to seed fresh connections' RTO (see Conn.latency). Nil disables it. Call once
+// before dialling; it is only read afterwards.
 func (s *Socket) SetInitialLatencyEstimator(f func(addr string) (time.Duration, bool)) {
 	s.initialLatencyEstimator = f
 }
 
-// GEXTTO: initialLatencyFor returns the clamped seed RTT for addr, or false
-// when no estimate applies. Bounds: [5ms, initialLatency].
+// GEXTTO: initialLatencyFor returns the seed RTT for addr clamped to
+// [5 ms, initialLatency], or false when no estimate applies.
 func (s *Socket) initialLatencyFor(addr string) (time.Duration, bool) {
 	if s == nil || s.initialLatencyEstimator == nil {
 		return 0, false
@@ -550,27 +523,26 @@ func (s *Socket) initialLatencyFor(addr string) (time.Duration, bool) {
 	return est, true
 }
 
-// GEXTTO: ResendStats reports RTO-driven and selective-ACK fast resends
-// across the socket's connections since creation: the loss/congestion
-// signal behind SessionStats and the future adaptive RTO.
+// GEXTTO: ResendStats reports, over the socket's lifetime, the RTO-driven and
+// selective-ACK fast resends: the loss/congestion signal behind SessionStats.
 func (s *Socket) ResendStats() (timeout, fast int64) {
 	return s.timeoutResends.Load(), s.fastResends.Load()
 }
 
-// GEXTTO: count one RTO-driven resend.
+// GEXTTO: addTimeoutResend counts one RTO-driven resend.
 func (s *Socket) addTimeoutResend() { s.timeoutResends.Add(1) }
 
-// GEXTTO: count one selective-ACK fast resend.
+// GEXTTO: addFastResend counts one selective-ACK fast resend.
 func (s *Socket) addFastResend() { s.fastResends.Add(1) }
 
-// GEXTTO: SynDrops reports backlog SYNs evicted under burst.
+// GEXTTO: SynDrops reports the backlog SYNs evicted under burst.
 func (s *Socket) SynDrops() int64 { return s.synDrops.Load() }
 
-// The address we're listening on for new uTP connections.
-func (s *Socket) Addr() net.Addr {
-	return s.pc.LocalAddr()
-}
+// Addr is the local address the socket listens on.
+func (s *Socket) Addr() net.Addr { return s.pc.LocalAddr() }
 
+// CloseNow closes the socket and every connection at once, without the
+// graceful FIN handshake.
 func (s *Socket) CloseNow() error {
 	mu.Lock()
 	defer mu.Unlock()
@@ -583,6 +555,8 @@ func (s *Socket) CloseNow() error {
 	return nil
 }
 
+// Close starts a graceful shutdown: the socket tears down once every
+// connection has finished.
 func (s *Socket) Close() error {
 	mu.Lock()
 	defer mu.Unlock()
@@ -591,6 +565,7 @@ func (s *Socket) Close() error {
 	return nil
 }
 
+// lazyDestroy destroys a closed socket once no connection remains.
 func (s *Socket) lazyDestroy() {
 	if len(s.conns) != 0 {
 		return
@@ -601,6 +576,8 @@ func (s *Socket) lazyDestroy() {
 	s.destroy()
 }
 
+// destroy tears the socket down: unregisters it, closes the packet connection
+// and destroys its connections. Callers hold mu.
 func (s *Socket) destroy() {
 	delete(sockets, s)
 	s.destroyed.Set()
@@ -610,36 +587,31 @@ func (s *Socket) destroy() {
 	}
 }
 
-func (s *Socket) LocalAddr() net.Addr {
-	return s.pc.LocalAddr()
-}
+func (s *Socket) LocalAddr() net.Addr { return s.pc.LocalAddr() }
 
-func (s *Socket) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+// ReadFrom returns a datagram that was not uTP (shared DHT traffic), blocking
+// until one arrives or the read deadline passes.
+func (s *Socket) ReadFrom(p []byte) (int, net.Addr, error) {
 	select {
-	case read, ok := <-s.unusedReads:
+	case r, ok := <-s.unusedReads:
 		if !ok {
-			err = io.EOF
-			return
+			return 0, nil, io.EOF
 		}
-		n = copy(p, read.data)
-		addr = read.from
-		return
+		return copy(p, r.data), r.from, nil
 	case <-s.connDeadlines.read.passed.LockedChan(&mu):
-		err = errTimeout
-		return
+		return 0, nil, errTimeout
 	}
 }
 
-func (s *Socket) WriteTo(b []byte, addr net.Addr) (n int, err error) {
+// WriteTo writes a datagram through the shared socket (DHT traffic).
+func (s *Socket) WriteTo(b []byte, addr net.Addr) (int, error) {
 	mu.Lock()
-	if s.connDeadlines.write.passed.IsSet() {
-		err = errTimeout
-	}
+	timedOut := s.connDeadlines.write.passed.IsSet()
 	s.wgReadWrite.Add(1)
 	defer s.wgReadWrite.Done()
 	mu.Unlock()
-	if err != nil {
-		return
+	if timedOut {
+		return 0, errTimeout
 	}
 	return s.pc.WriteTo(b, addr)
 }
