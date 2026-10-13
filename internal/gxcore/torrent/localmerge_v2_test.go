@@ -187,6 +187,61 @@ func TestPrefillV2RespectsPrivacy(t *testing.T) {
 	}
 }
 
+// TestPrefillV2DeduplicatesCandidates: two sources with the same file but other
+// layouts share the work — a later candidate fills only the pieces a previous
+// one could not, and no piece is read or written twice.
+func TestPrefillV2DeduplicatesCandidates(t *testing.T) {
+	block := merkle.BlockSize
+	content := make([]byte, 5*block)
+	for i := range content {
+		content[i] = byte(i*17 + 3)
+	}
+	specs := []v2FileSpec{{name: "a.bin", data: content}}
+
+	// Candidate 1: 2 blocks per piece, only piece 0 verified (blocks 0..1).
+	src1Info := testV2Info(t, 2*block, specs)
+	files1 := testFiles(t, t.TempDir(), src1Info)
+	if _, err := files1[0].Storage.WriteAt(content, 0); err != nil {
+		t.Fatal(err)
+	}
+	bf1 := bitfield.New(src1Info.NumPieces)
+	bf1.Set(0)
+	cand1 := &torrent{pieces: piece.NewPieces(src1Info, files1), bitfield: bf1}
+	cand1.setInfo(src1Info)
+	cand1.publishLocalData()
+
+	// Candidate 2: the whole file in one piece, fully verified.
+	src2Info := testV2Info(t, 8*block, specs)
+	files2 := testFiles(t, t.TempDir(), src2Info)
+	if _, err := files2[0].Storage.WriteAt(content, 0); err != nil {
+		t.Fatal(err)
+	}
+	bf2 := bitfield.New(src2Info.NumPieces)
+	for i := uint32(0); i < src2Info.NumPieces; i++ {
+		bf2.Set(i)
+	}
+	cand2 := &torrent{pieces: piece.NewPieces(src2Info, files2), bitfield: bf2}
+	cand2.setInfo(src2Info)
+	cand2.publishLocalData()
+
+	dstInfo := testV2Info(t, block, specs)
+	filesDst := testFiles(t, t.TempDir(), dstInfo)
+	dst := &torrent{pieces: piece.NewPieces(dstInfo, filesDst)}
+	dst.setInfo(dstInfo)
+
+	got := dst.prefillFrom([]*Torrent{{torrent: cand1}, {torrent: cand2}})
+	if got != int(dstInfo.NumPieces) {
+		t.Fatalf("merged %d pieces, want %d (deduplicated)", got, dstInfo.NumPieces)
+	}
+	out := make([]byte, len(content))
+	if _, err := filesDst[0].Storage.ReadAt(out, 0); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(out, content) {
+		t.Fatal("destination file does not hold the reused content")
+	}
+}
+
 // BenchmarkPrefillFromUnrelatedV2 measures the one-shot allocation-time cost of
 // the Phase 2 scan when no file matches: it is a price every torrent pays once,
 // with no steady-state (picker, peer, piece-write) path involved.

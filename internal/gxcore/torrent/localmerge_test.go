@@ -174,3 +174,40 @@ func TestPrefillLocalDataSkipsTorrentWithoutBitfield(t *testing.T) {
 		t.Fatalf("merged %d pieces from a torrent with no verified piece", got)
 	}
 }
+
+// TestPrefillLocalDataDeduplicatesCandidates: the same content held by two
+// candidates is read and written once; the second fills the gaps of the first.
+func TestPrefillLocalDataDeduplicatesCandidates(t *testing.T) {
+	const pieceLength = 16384
+	content := make([]byte, 3*pieceLength) // three pieces
+	if _, err := rand.Read(content); err != nil {
+		t.Fatal(err)
+	}
+	info := testInfoBytes(t, content, pieceLength)
+
+	mk := func(firstOnly bool) *torrent {
+		files := testFiles(t, t.TempDir(), info)
+		if _, err := files[0].Storage.WriteAt(content, 0); err != nil {
+			t.Fatal(err)
+		}
+		bf := bitfield.New(info.NumPieces)
+		if firstOnly {
+			bf.Set(0)
+		} else {
+			for i := uint32(0); i < info.NumPieces; i++ {
+				bf.Set(i)
+			}
+		}
+		b := &torrent{pieces: piece.NewPieces(info, files), bitfield: bf}
+		b.setInfo(info)
+		b.publishLocalData()
+		return b
+	}
+
+	a := &torrent{pieces: piece.NewPieces(info, testFiles(t, t.TempDir(), info))}
+	a.setInfo(info)
+	got := a.prefillFrom([]*Torrent{{torrent: mk(true)}, {torrent: mk(false)}})
+	if got != int(info.NumPieces) {
+		t.Fatalf("merged %d pieces, want %d (deduplicated)", got, info.NumPieces)
+	}
+}

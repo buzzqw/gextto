@@ -70,6 +70,10 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 		return 0
 	}
 	merged := 0
+	// mergedIdx records the pieces already reused in this pass, so a piece is
+	// read and written once even when several candidates hold the same content
+	// and so a later candidate can still fill the gaps a previous one missed.
+	mergedIdx := make(map[uint32]bool)
 	var buf []byte
 	for _, other := range candidates {
 		if other == nil || other.torrent == t {
@@ -96,7 +100,7 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 		}
 		for i := range t.pieces {
 			dst := &t.pieces[i]
-			if dst.Done || dst.Skip || i >= len(snap.pieces) {
+			if dst.Done || dst.Skip || i >= len(snap.pieces) || mergedIdx[dst.Index] {
 				continue
 			}
 			// The other torrent must have verified this piece.
@@ -121,12 +125,13 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 			if _, err := dst.Data.Write(buf); err != nil {
 				continue
 			}
+			mergedIdx[dst.Index] = true
 			merged++
 		}
 	}
 	// Phase 2: the same-file-different-layout case (BitTorrent v2), matched by
 	// the per-file Merkle root instead of the piece index.
-	merged += t.prefillV2From(candidates)
+	merged += t.prefillV2From(candidates, mergedIdx)
 	if merged > 0 && t.log != nil {
 		t.log.Infof("swarm merge: reused %d piece(s) from local data", merged)
 	}
@@ -152,7 +157,7 @@ func bitSet(bits []byte, i int) bool {
 // when the two torrents use a different piece length. Every destination piece
 // is verified against its own hash before it is written, so no unverified byte
 // ever reaches this torrent's storage.
-func (t *torrent) prefillV2From(candidates []*Torrent) int {
+func (t *torrent) prefillV2From(candidates []*Torrent, mergedIdx map[uint32]bool) int {
 	info := t.info()
 	if info == nil || !info.V2 || info.Private || len(t.pieces) == 0 {
 		return 0
@@ -184,14 +189,14 @@ func (t *torrent) prefillV2From(candidates []*Torrent) int {
 		if len(have) == 0 {
 			continue
 		}
-		merged += t.mergeV2Files(other.torrent, oinfo, snap, have, &buf, &tmp)
+		merged += t.mergeV2Files(other.torrent, oinfo, snap, have, mergedIdx, &buf, &tmp)
 	}
 	return merged
 }
 
 // mergeV2Files reuses the destination pieces of every file whose Merkle root and
 // length match a file of the source torrent.
-func (t *torrent) mergeV2Files(src *torrent, sinfo *metainfo.Info, snap *localDataSnapshot, have []byte, bufp, tmpp *[]byte) int {
+func (t *torrent) mergeV2Files(src *torrent, sinfo *metainfo.Info, snap *localDataSnapshot, have []byte, mergedIdx map[uint32]bool, bufp, tmpp *[]byte) int {
 	info := t.info()
 	// Index the source files by their Merkle root: equal roots imply equal
 	// bytes, so a duplicate entry is harmless.
@@ -222,7 +227,7 @@ func (t *torrent) mergeV2Files(src *torrent, sinfo *metainfo.Info, snap *localDa
 				break
 			}
 			dst := &t.pieces[start+j]
-			if dst.Done || dst.Skip || len(dst.Data) == 0 {
+			if dst.Done || dst.Skip || len(dst.Data) == 0 || mergedIdx[dst.Index] {
 				continue
 			}
 			n := int(dst.Length)
@@ -242,6 +247,7 @@ func (t *torrent) mergeV2Files(src *torrent, sinfo *metainfo.Info, snap *localDa
 			if _, err := dst.Data.Write(buf); err != nil {
 				continue
 			}
+			mergedIdx[dst.Index] = true
 			merged++
 		}
 	}
