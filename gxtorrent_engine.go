@@ -920,6 +920,12 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		"cache_ttl_secs":   max(lt.CacheExpiry, 10),
 		"preallocate":      cfg.LibtorrentPreallocate(),
 	}
+	// Disk guard: Gextto's minimum free space also pauses the daemon's running
+	// downloads below it. Not set (0) keeps the daemon's own default, so the
+	// running downloads stay protected even when the cycle check is off.
+	if gib, err := strconv.ParseFloat(strings.TrimSpace(cfg.Settings["min_free_space_gb"]), 64); err == nil && gib > 0 {
+		policy["min_free_mb"] = int64(math.Ceil(gib * 1024))
+	}
 	// The engine has no single "connections limit": map the global libtorrent limit
 	// onto its outgoing dial and incoming accept budgets, keeping the engine's own
 	// 4:1 ratio so the total matches what the user configured.

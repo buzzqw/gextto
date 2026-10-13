@@ -1631,7 +1631,7 @@ it, always downloads to disk.
 
 | Setting | What it does |
 |---|---|
-| Minimum free space to download | Minimum free space (GB) on the download folder: below this threshold the cycle does not start downloads. *(Unit: GB; 0 = no check)* |
+| Minimum free space to download | Minimum free space (GB) on the download folder: below this threshold the cycle does not start downloads and gx-torrent pauses the running ones, which resume by themselves when space returns. *(Unit: GB; 0 = no cycle check, gx-torrent keeps its default of 1 GiB)* |
 
 ### System
 

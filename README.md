@@ -117,6 +117,7 @@ Its engine core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementati
 
 - **No giant cache by design:** pieces are written through and the reclaimable OS page cache does the coalescing; a read cache with lazy expiry and a write limiter sized from the RAM and the disk type (HDD, SSD, NFS) keep the footprint in tens of MB.
 - **Batched durability:** `fdatasync` before the resume bitfield is persisted, never `O_SYNC` per write; sparse files and `fallocate` preallocation (tmpfs-safe); RAM-disk temp folders; an opt-in mmap storage on Linux (`-mmap`).
+- **Disk guard:** when a download folder drops below the free-space threshold (1 GiB by default, Gextto's *minimum free space* when set) the unfinished downloads there pause by themselves and resume when space returns; seeding goes on, nothing ends in a write error, and with `-mmap` a full disk can no longer take the daemon down.
 - **Zero-alloc hot paths:** MSE/PE RC4 runs in place inside the network buffer (no per-block heap allocation), bitfields are counted with `math/bits.OnesCount64`, and the per-peer request queue depth adapts to each peer's delivery speed.
 - **IP blocklist in microseconds:** CIDR, ranges, P2P and eMule formats merged into sorted intervals and searched by binary search with zero allocations; a URL list is re-downloaded on a schedule.
 

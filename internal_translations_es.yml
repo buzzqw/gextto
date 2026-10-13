@@ -4212,6 +4212,7 @@ spa:
   "Spagnolo": "Español"
   "Spazio libero da lasciare sul RAM disk una volta completato il download (GB).": "Espacio libre que dejar en el disco RAM al terminar la descarga (GB)."
   "Spazio libero minimo (GB) sulla cartella download: sotto questa soglia il ciclo non avvia download.": "Espacio libre mínimo (GB) en la carpeta de descargas: por debajo, el ciclo no inicia descargas."
+  "Spazio libero minimo (GB) sulla cartella download: sotto questa soglia il ciclo non avvia download e gx-torrent mette in pausa quelli in corso, che ripartono da soli quando lo spazio torna (0 = nessun controllo del ciclo; gx-torrent usa il suo valore predefinito di 1 GiB).": "Espacio libre mínimo (GB) en la carpeta de descargas: por debajo, el ciclo no inicia descargas y gx-torrent pausa las que están en curso, que se reanudan solas cuando vuelve el espacio (0 = sin control del ciclo; gx-torrent mantiene su valor predeterminado de 1 GiB)."
   "Spazio minimo libero in byte richiesto per usare il RAM disk. 0 = usa il margine configurato.": "Espacio libre mínimo en bytes para usar el disco RAM. 0 = usar el margen configurado."
   "Stallo con zero seeder (dead swarm): rimosso dopo questo periodo, più breve, e la puntata viene ricercata di nuovo subito. Imposta 0 per usare la soglia generale.": "Bloqueo sin seeders (dead swarm): se quita tras este periodo más corto y el episodio se vuelve a buscar enseguida. Pon 0 para usar el umbral general."
   "Stato qBittorrent-nox": "Estado de qBittorrent-nox"

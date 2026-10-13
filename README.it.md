@@ -117,6 +117,7 @@ Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un'implementazione BitTorre
 
 - **Nessuna cache gigante, per scelta:** i pezzi vengono scritti subito e la page cache del sistema (recuperabile) fa l'accorpamento; una cache di lettura con scadenza pigra e un limitatore di scrittura dimensionati su RAM e tipo di disco (HDD, SSD, NFS) tengono l'impronta nelle decine di MB.
 - **Durabilità a lotti:** `fdatasync` prima di salvare il bitfield di resume, mai `O_SYNC` per scrittura; file sparsi e preallocazione `fallocate` (sicura su tmpfs); cartelle temporanee su RAM disk; storage mmap opzionale su Linux (`-mmap`).
+- **Protezione del disco:** quando una cartella di download scende sotto la soglia di spazio libero (1 GiB di default, lo *spazio libero minimo* di Gextto se impostato) i download non finiti lì vanno in pausa da soli e ripartono quando lo spazio torna; il seed continua, nessun download finisce in errore di scrittura e con `-mmap` un disco pieno non può più far cadere il demone.
 - **Percorsi critici senza allocazioni:** RC4 di MSE/PE cifra sul posto nel buffer di rete (nessuna allocazione per blocco), i bitfield si contano con `math/bits.OnesCount64` e la profondità della coda di richieste per peer si adatta alla sua velocità di consegna.
 - **Blocklist IP in microsecondi:** formati CIDR, intervalli, P2P ed eMule uniti in intervalli ordinati e cercati per bisezione senza allocazioni; una lista da URL viene riscaricata a intervalli regolari.
 

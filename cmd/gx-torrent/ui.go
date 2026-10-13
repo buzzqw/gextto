@@ -1238,6 +1238,10 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		default:
 			row.RatioGoal = "global seed ratio"
 		}
+		if view.DiskWait {
+			// Paused by the disk guard: shown apart from a user pause.
+			row.State = "disk_wait"
+		}
 		if view.Progress < 99.99 && view.ETASeconds >= 0 {
 			row.ETA = uiDuration(view.ETASeconds)
 			row.ETAVal = view.ETASeconds
@@ -1263,7 +1267,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 			page.CountMoving++
 		case "error":
 			page.CountError++
-		case "paused":
+		case "paused", "disk_wait":
 			page.CountPaused++
 		}
 	}

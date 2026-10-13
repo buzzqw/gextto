@@ -70,6 +70,9 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	if v := formInt(r, "cache-mb", cfg.CacheMB); v != cfg.CacheMB {
 		putInt("cache_mb", v)
 	}
+	if v := formInt(r, "min-free-mb", cfg.MinFree()>>20); v >= 0 && v != cfg.MinFree()>>20 {
+		putInt("min_free_mb", v)
+	}
 	if v := formBool(r, "preallocate"); v != cfg.Preallocate {
 		raw, _ := json.Marshal(v)
 		patch["preallocate"] = raw
@@ -286,6 +289,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 
 	repl("{{ACTIVE_DL}}", strconv.Itoa(cfg.ActiveDownloads))
 	repl("{{ACTIVE_SEEDS}}", strconv.Itoa(cfg.ActiveSeeds))
+	repl("{{MIN_FREE_MB}}", strconv.FormatInt(cfg.MinFree()>>20, 10))
 	repl("{{ACTIVE_LIMIT}}", strconv.Itoa(cfg.ActiveLimit))
 	cacheMB := cfg.CacheMB
 	if cacheMB < 0 {

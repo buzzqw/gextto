@@ -204,17 +204,21 @@ type runtimeInfo struct {
 	slow        bool
 	numSeeds    int
 	tracker     string
+	// diskWait is set while the disk guard keeps this download paused.
+	diskWait bool
 }
 
 // Daemon owns the engine session and the queue.
 type Daemon struct {
 	opts Options
 
-	mu             sync.Mutex
-	session        *torrent.Session
-	state          persistedState
-	runtime        map[string]*runtimeInfo
-	moving         map[string]bool
+	mu      sync.Mutex
+	session *torrent.Session
+	state   persistedState
+	runtime map[string]*runtimeInfo
+	moving  map[string]bool
+	// disk pauses downloads on a storage folder low on space (diskguard.go).
+	disk           diskGuard
 	dyn            queue.Dynamic
 	limits         queue.Limits
 	restartPending bool
@@ -855,6 +859,10 @@ func (d *Daemon) tick(now time.Time) {
 	// statfs on the download dir can block on a network mount: classify it
 	// outside d.mu.
 	d.refreshStorageClass(now)
+	// The disk guard reads the free space of the storage folders, also with
+	// statfs: outside d.mu too.
+	guardPaths, guardMin := d.diskGuardPaths()
+	d.disk.refresh(now, guardPaths, guardMin, false)
 	// Drop trackers that have been failing for too long. It takes d.mu through
 	// setTrackers, so it must run outside the section below.
 	d.updateTrackerHealth(collected, now)
@@ -991,6 +999,15 @@ func (d *Daemon) tick(now time.Time) {
 		}
 		if d.moving[id] {
 			// The mover owns this torrent: the queue neither starts nor stops it.
+			continue
+		}
+		// Disk guard: an unfinished download on a folder low on space waits,
+		// outside the queue, until space returns (then the queue resumes it).
+		rt.diskWait = !complete && !meta.UserPaused && guardMin > 0 && d.disk.isLow(d.savePathOf(meta))
+		if rt.diskWait {
+			if running {
+				pendingStops = append(pendingStops, t)
+			}
 			continue
 		}
 		if item.Managed && !complete && !running {
@@ -1137,19 +1154,21 @@ type torrentInfo struct {
 	SeedRatio      float64 `json:"seed_ratio"`
 	SeedDays       int64   `json:"seed_days"`
 	// Per-torrent speed limits in KiB/s: -1 global, 0 unlimited.
-	DownloadLimitKib int64  `json:"download_limit_kib"`
-	UploadLimitKib   int64  `json:"upload_limit_kib"`
-	HasMetadata      bool   `json:"has_metadata"`
-	AutoManaged      bool   `json:"auto_managed"`
-	Sequential       bool   `json:"sequential"`
-	FirstLast        bool   `json:"first_last"`
-	SuperSeeding     bool   `json:"super_seeding"`
-	Pinned           bool   `json:"pinned"`
-	Parked           bool   `json:"parked"`
-	Probing          bool   `json:"probing"`
-	Slow             bool   `json:"slow"`
-	Private          bool   `json:"private"`
-	TorrentVersion   string `json:"torrent_version"`
+	DownloadLimitKib int64 `json:"download_limit_kib"`
+	UploadLimitKib   int64 `json:"upload_limit_kib"`
+	HasMetadata      bool  `json:"has_metadata"`
+	AutoManaged      bool  `json:"auto_managed"`
+	Sequential       bool  `json:"sequential"`
+	FirstLast        bool  `json:"first_last"`
+	SuperSeeding     bool  `json:"super_seeding"`
+	Pinned           bool  `json:"pinned"`
+	Parked           bool  `json:"parked"`
+	// DiskWait: paused by the disk guard until the folder has space again.
+	DiskWait       bool   `json:"disk_wait,omitempty"`
+	Probing        bool   `json:"probing"`
+	Slow           bool   `json:"slow"`
+	Private        bool   `json:"private"`
+	TorrentVersion string `json:"torrent_version"`
 	// BEP 38 hints (see bep38.go): the collections the torrent belongs to and
 	// the info hashes of torrents that might share files, both read-only.
 	Collections     []string `json:"collections,omitempty"`
@@ -1264,6 +1283,7 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtime
 		SuperSeeding:     meta.SuperSeeding,
 		Pinned:           meta.Pinned,
 		Parked:           meta.Parked,
+		DiskWait:         rt != nil && rt.diskWait,
 		Probing:          !meta.ProbeUntil.IsZero(),
 		Slow:             rt.slow,
 		Private:          stats.Private,

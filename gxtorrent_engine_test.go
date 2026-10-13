@@ -1133,3 +1133,20 @@ func TestGxFingerprintIgnoresInterfaceLanguage(t *testing.T) {
 		t.Fatalf("the daemon is not started with the interface language: %v", german.args)
 	}
 }
+
+// TestGxQueuePolicyPushesMinFreeSpace: Gextto's minimum free space reaches the
+// daemon's disk guard in MiB; unset or 0 leaves the daemon on its own default.
+func TestGxQueuePolicyPushesMinFreeSpace(t *testing.T) {
+	cfg := &Config{Settings: map[string]string{}}
+	if _, ok := gxQueuePolicy(cfg)["min_free_mb"]; ok {
+		t.Fatal("unset minimum free space must keep the daemon default")
+	}
+	cfg.Settings["min_free_space_gb"] = "0"
+	if _, ok := gxQueuePolicy(cfg)["min_free_mb"]; ok {
+		t.Fatal("0 must keep the daemon default")
+	}
+	cfg.Settings["min_free_space_gb"] = "2.5"
+	if got := gxQueuePolicy(cfg)["min_free_mb"]; got != int64(2560) {
+		t.Fatalf("min_free_mb = %v, want 2560", got)
+	}
+}

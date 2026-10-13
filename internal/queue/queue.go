@@ -55,6 +55,24 @@ type Config struct {
 	// Auto enables gx-torrent's self-management: dynamic queue and adaptive
 	// cache. Default true; the user can disable it and set the values by hand.
 	Auto *bool `json:"auto"`
+	// MinFreeMB is the free space (MiB) below which unfinished downloads are
+	// paused until space returns (seeding goes on: it writes nothing). 0
+	// disables the guard; nil (an older state file) means the default.
+	MinFreeMB *int64 `json:"min_free_mb"`
+}
+
+// DefaultMinFreeMB is the default disk guard: pause downloads below 1 GiB.
+const DefaultMinFreeMB = 1024
+
+// Int64Ptr returns a pointer to v, for the optional numeric settings.
+func Int64Ptr(v int64) *int64 { return &v }
+
+// MinFree returns the disk guard threshold in bytes (0 = disabled).
+func (c Config) MinFree() int64 {
+	if c.MinFreeMB == nil {
+		return DefaultMinFreeMB << 20
+	}
+	return max(*c.MinFreeMB, 0) << 20
 }
 
 // DefaultConfig is the queue policy of a fresh installation.
@@ -72,6 +90,7 @@ func DefaultConfig() Config {
 		CacheMB:         -1,
 		CacheTTLSecs:    300,
 		Auto:            BoolPtr(true),
+		MinFreeMB:       Int64Ptr(DefaultMinFreeMB),
 	}
 }
 
@@ -126,6 +145,11 @@ func (c Config) Normalized() Config {
 	}
 	if c.Auto == nil {
 		c.Auto = BoolPtr(true)
+	}
+	if c.MinFreeMB == nil {
+		c.MinFreeMB = Int64Ptr(DefaultMinFreeMB)
+	} else if *c.MinFreeMB < 0 {
+		c.MinFreeMB = Int64Ptr(0)
 	}
 	return c
 }

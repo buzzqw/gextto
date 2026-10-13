@@ -119,7 +119,7 @@ var uiSettingTooltipText = map[string]string{
 	"libtorrent_ramdisk_min_free_bytes":            "Spazio minimo libero in byte richiesto per usare il RAM disk. 0 = usa il margine configurato.",
 	"libtorrent_port_min":                          "Porta minima della sessione libtorrent (richiede il riavvio del servizio).",
 	"libtorrent_port_max":                          "Porta massima della sessione libtorrent (richiede il riavvio del servizio).",
-	"min_free_space_gb":                            "Spazio libero minimo (GB) sulla cartella download: sotto questa soglia il ciclo non avvia download.",
+	"min_free_space_gb":                            "Spazio libero minimo (GB) sulla cartella download: sotto questa soglia il ciclo non avvia download e gx-torrent mette in pausa quelli in corso, che ripartono da soli quando lo spazio torna (0 = nessun controllo del ciclo; gx-torrent usa il suo valore predefinito di 1 GiB).",
 	"trash_retention_days":                         "Giorni di conservazione per le pulizie non forzate; 0 elimina tutto il contenuto del cestino. Le azioni manuali della UI svuotano sempre subito il cestino.",
 	"archive_cleanup_enabled":                      "Abilita la pulizia automatica dell'archivio secondo età massima e numero minimo da conservare.",
 	"archive_max_age_days":                         "Età massima delle release in archivio, in giorni (0 = nessun limite).",

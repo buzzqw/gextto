@@ -1674,7 +1674,7 @@ disk; qBittorrent, che non lo supporta, scarica sempre su disco.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Spazio libero minimo per scaricare | Spazio libero minimo (GB) sulla cartella download: sotto questa soglia il ciclo non avvia download. *(Unità: GB; 0 = nessun controllo)* |
+| Spazio libero minimo per scaricare | Spazio libero minimo (GB) sulla cartella download: sotto questa soglia il ciclo non avvia download e gx-torrent mette in pausa quelli in corso, che ripartono da soli quando lo spazio torna. *(Unità: GB; 0 = nessun controllo del ciclo, gx-torrent mantiene il suo default di 1 GiB)* |
 
 ### Sistema
 
