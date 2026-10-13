@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"strconv"
 	"sync"
@@ -159,15 +160,11 @@ type recv struct {
 	Type st
 }
 
-// resolvedAddrStr is a connection map key: the resolved remote address string,
-// so lookups do not depend on net.Addr comparability.
-type resolvedAddrStr string
-
 // syn is an unaccepted connection request held in the backlog.
 type syn struct {
 	seq_nr, conn_id uint16
-	// addr is net.Addr.String() of the Socket's real net.PacketConn.
-	addr string
+	// addr is the resolved remote address the SYN came from.
+	addr netip.AddrPort
 }
 
 // read is a datagram read from the underlying packet connection.

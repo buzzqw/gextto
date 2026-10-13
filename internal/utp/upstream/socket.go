@@ -13,6 +13,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,10 +25,28 @@ var (
 )
 
 // connKey identifies a connection on the underlying packet stream: the remote
-// address plus the connection id.
+// address plus the connection id. A netip.AddrPort is comparable and
+// allocation-free, unlike net.Addr.String(), which the reader would otherwise
+// compute for every inbound packet.
 type connKey struct {
-	remoteAddr resolvedAddrStr
+	remoteAddr netip.AddrPort
 	connID     uint16
+}
+
+// addrPortOf turns a UDP net.Addr into the comparable key form, normalising
+// IPv4-in-IPv6 and keeping a zone if present. It does not allocate.
+func addrPortOf(addr net.Addr) netip.AddrPort {
+	ua, ok := addr.(*net.UDPAddr)
+	if !ok {
+		ap, _ := netip.ParseAddrPort(addr.String())
+		return ap
+	}
+	ip, _ := netip.AddrFromSlice(ua.IP)
+	ip = ip.Unmap()
+	if ua.Zone != "" {
+		ip = ip.WithZone(ua.Zone)
+	}
+	return netip.AddrPortFrom(ip, uint16(ua.Port))
 }
 
 // Socket wraps a net.PacketConn and diverts uTP packets to its child Conns. It
@@ -118,20 +137,6 @@ func (s *Socket) unusedRead(r read) {
 	}
 }
 
-// strNetAddr resolves the connection's own network address form.
-func (s *Socket) strNetAddr(str string) net.Addr {
-	switch n := s.network(); n {
-	case "udp":
-		a, err := net.ResolveUDPAddr(n, str)
-		if err != nil {
-			panic(err)
-		}
-		return a
-	default:
-		panic(n)
-	}
-}
-
 // pushBacklog queues an unaccepted SYN, resetting an old one when the backlog is
 // full. The eviction is counted (burst signal for SessionStats).
 func (s *Socket) pushBacklog(sy syn) {
@@ -148,7 +153,7 @@ func (s *Socket) pushBacklog(sy syn) {
 		s.synDrops.Add(1)
 		// A SYN is addressed to the remote's recv_id, so that is where the
 		// reset goes.
-		s.reset(s.strNetAddr(k.addr), k.seq_nr, k.conn_id)
+		s.reset(net.UDPAddrFromAddrPort(k.addr), k.seq_nr, k.conn_id)
 	}
 	s.backlog[sy] = struct{}{}
 	s.backlogChanged()
@@ -194,7 +199,7 @@ func (s *Socket) connForRead(h header, from net.Addr) (*Conn, bool) {
 	if h.Type == stSyn {
 		id++
 	}
-	c, ok := s.conns[connKey{resolvedAddrStr(from.String()), id}]
+	c, ok := s.conns[connKey{addrPortOf(from), id}]
 	return c, ok
 }
 
@@ -240,7 +245,7 @@ func (s *Socket) handleReceivedPacket(p read) {
 		s.pushBacklog(syn{
 			seq_nr:  h.SeqNr,
 			conn_id: h.ConnID,
-			addr:    p.from.String(),
+			addr:    addrPortOf(p.from),
 		})
 		return
 	case stReset:
@@ -268,7 +273,7 @@ func (s *Socket) reset(addr net.Addr, ackNr, connId uint16) {
 // connIDFree reports whether id is usable as a recv_id for remoteAddr: it must
 // not collide with an existing connection's recv_id, nor with its neighbours
 // (the remote would use id-1 as its send_id when dialling our own Socket).
-func (s *Socket) connIDFree(remoteAddr resolvedAddrStr, id uint16) bool {
+func (s *Socket) connIDFree(remoteAddr netip.AddrPort, id uint16) bool {
 	if _, used := s.conns[connKey{remoteAddr, id}]; used {
 		return false
 	}
@@ -286,7 +291,7 @@ func (s *Socket) connIDFree(remoteAddr resolvedAddrStr, id uint16) bool {
 // connections per address a socket really has, and allocates nothing. The
 // previous implementation built a 64K-entry table per dial (half a megabyte)
 // to pick a random free id.
-func (s *Socket) newConnID(remoteAddr resolvedAddrStr) (id uint16) {
+func (s *Socket) newConnID(remoteAddr netip.AddrPort) (id uint16) {
 	const range16 = 1 << 16
 	start := uint16(rand.Intn(range16))
 	for i := 0; i < range16; i++ {
@@ -364,12 +369,13 @@ func (s *Socket) startOutboundConn(addr net.Addr) (*Conn, error) {
 	mu.Lock()
 	defer mu.Unlock()
 	c := s.newConn(addr)
-	c.recv_id = s.newConnID(resolvedAddrStr(c.RemoteAddr().String()))
+	key := addrPortOf(c.remoteSocketAddr)
+	c.recv_id = s.newConnID(key)
 	c.send_id = c.recv_id + 1
 	if logLevel >= 1 {
 		log.Printf("dial registering addr: %s", c.RemoteAddr().String())
 	}
-	if !s.registerConn(c.recv_id, resolvedAddrStr(c.RemoteAddr().String()), c) {
+	if !s.registerConn(c.recv_id, key, c) {
 		log.Println(c.recv_id, c.RemoteAddr().String())
 		for k, cc := range s.conns {
 			log.Println(k, cc, cc.age())
@@ -422,7 +428,7 @@ func (s *Socket) writeTo(b []byte, addr net.Addr) (int, error) {
 
 // registerConn indexes a connection under remoteAddr+recvID. It reports
 // whether the id was free; a duplicate keeps the existing connection.
-func (s *Socket) registerConn(recvID uint16, remoteAddr resolvedAddrStr, c *Conn) bool {
+func (s *Socket) registerConn(recvID uint16, remoteAddr netip.AddrPort, c *Conn) bool {
 	if s.conns == nil {
 		s.conns = make(map[connKey]*Conn)
 	}
@@ -462,7 +468,7 @@ func (s *Socket) nextSyn() (sy syn, err error) {
 // implicit handshake ACK) and reports ok false when the SYN duplicates an
 // existing connection (a resend, which is ACKed again).
 func (s *Socket) ackSyn(sy syn) (c *Conn, ok bool) {
-	c = s.newConn(s.strNetAddr(sy.addr))
+	c = s.newConn(net.UDPAddrFromAddrPort(sy.addr))
 	c.send_id = sy.conn_id
 	c.recv_id = c.send_id + 1
 	c.seq_nr = uint16(rand.Int())
@@ -470,9 +476,9 @@ func (s *Socket) ackSyn(sy syn) (c *Conn, ok bool) {
 	c.ack_nr = sy.seq_nr
 	c.synAcked = true
 	c.updateCanWrite()
-	if !s.registerConn(c.recv_id, resolvedAddrStr(sy.addr), c) {
+	if !s.registerConn(c.recv_id, sy.addr, c) {
 		// A SYN resend for a connection already accepted: ACK it again.
-		c = s.conns[connKey{resolvedAddrStr(sy.addr), c.recv_id}]
+		c = s.conns[connKey{sy.addr, c.recv_id}]
 		if c.send_id != sy.conn_id {
 			panic(":|")
 		}

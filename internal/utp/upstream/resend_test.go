@@ -3,6 +3,7 @@ package upstream
 import (
 	"context"
 	"net"
+	"net/netip"
 	"os"
 	"sync/atomic"
 	"testing"
@@ -79,7 +80,7 @@ func TestBacklogEvictionIsCounted(t *testing.T) {
 	defer s.CloseNow()
 	mu.Lock()
 	for i := 0; i < 51; i++ {
-		s.pushBacklog(syn{seq_nr: uint16(i), conn_id: uint16(i + 1), addr: "198.51.100.9:51413"})
+		s.pushBacklog(syn{seq_nr: uint16(i), conn_id: uint16(i + 1), addr: netip.MustParseAddrPort("198.51.100.9:51413")})
 	}
 	n := len(s.backlog)
 	drops := s.SynDrops()
