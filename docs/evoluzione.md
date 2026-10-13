@@ -2425,7 +2425,7 @@ data path; with auto-speed **off** nothing changes (no regression).
 **Possible follow-up.** Gextto-side (managed) version: Gextto measures the RTT and
 modulates the limits via `SetLimits`, so the option also applies to managed engines.
 
-### 15.2 Swarm Merging (file sharing between torrents) — Phase 1 done
+### 15.2 Swarm Merging (file sharing between torrents) — Phase 1 and 2 done
 
 **Idea.** Make different swarms that contain **the same file** collaborate,
 reusing the pieces already present in another torrent A instead of re-downloading them:
@@ -2459,9 +2459,18 @@ existing verifier then marks the pieces and closes the completion. No
 cross-torrent query (atomic snapshot + bitfield under lock): no deadlock.
 Accounting (bitfield/completion) per torrent.
 
-- **Phase 2 (v2-first):** match by **per-file Merkle root** and **per-block**
-  verification with a Merkle proof → identical files even with different layouts,
-  without corruption. Still to do.
+- **Phase 2 (v2-first) — done (2026-10-13, `prefillV2From`/`mergeV2Files` in
+  `torrent/localmerge.go`):** match by **per-file Merkle root** (`V2Files[].PiecesRoot`
+  plus length) → identical files even with **different layouts**, without
+  corruption. The destination pieces are reassembled from the source's
+  **verified** pieces (the source pieces overlapping the destination piece's
+  file-local range must be set in the source bitfield) and every destination
+  piece is then **re-verified against its own hash** (`VerifyV2`) before it is
+  written, so no unverified byte reaches the storage; the existing verifier then
+  marks the pieces. An identical-layout pair stays Phase 1's job. The BEP 27
+  guard is checked on both the snapshot and the parsed info. Tests:
+  `torrent/localmerge_v2_test.go` (different layout, partial source, different
+  content, private).
 - **No v1 with a different layout:** no ED2K/partial heuristics of BiglyBT.
 
 **Critical guard: BEP 27.** The merge is disabled if A **or** B is private

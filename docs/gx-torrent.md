@@ -1032,19 +1032,30 @@ pieces, **cached per-file** and only for a file **entirely present**
 (otherwise `hash reject`, because a tree with missing leaves would not
 anchor to the `pieces root`). Full plan in `docs/gx-torrent-v2.md`.
 
-## Local data reuse (Swarm Merging, Phase 1)
+## Local data reuse (Swarm Merging)
 
-If another torrent of the session has the **same content** with an identical layout
-(same `piece length`, same length and same hashes at the same
-indices), its **already verified** pieces are reused: at allocation the
-new torrent reads the bytes from the other's storage, **re-verifies them against
-its own hash** and writes them into its own, so it restarts only from the missing pieces and
-can complete **even without peers**. It is useful for a reloaded episode or for
-different `.torrent`s of the same content, and «resurrects» a torrent without a seeder
-when the content is already present elsewhere. Merging is **disabled if one side is
-a private torrent** (BEP 27): mixing private swarms violates the tracker
+If another torrent of the session has the **same content**, its **already
+verified** data is reused: at allocation the new torrent reads the bytes from
+the other's storage, **re-verifies them against its own hashes** and writes them
+into its own, so it restarts only from the missing pieces and can complete
+**even without peers**. It is useful for a reloaded episode or for different
+`.torrent`s of the same content, and «resurrects» a torrent without a seeder
+when the content is already present elsewhere. Merging is **disabled if one side
+is a private torrent** (BEP 27): mixing private swarms violates the tracker
 rules. It is independent of the **BEP 38** hints, which serve to *report* the
-candidates (details in [`evoluzione.md`](evoluzione.md) §15.2).
+candidates.
+
+Two levels:
+
+- **Phase 1 — identical layout.** Same `piece length`, same length and same
+  hashes at the same indices: the pieces are directly interchangeable and are
+  matched piece by piece.
+- **Phase 2 — v2, per-file Merkle root.** The files are matched by their BEP 52
+  per-file `pieces root` (and length), so the same file is shared even when the
+  two torrents use a **different piece length**: the destination piece's bytes
+  are reassembled from the source's verified pieces and **each destination piece
+  is verified against its own hash** before it is written. There is no v1
+  different-layout heuristic (§15.2 of [`evoluzione.md`](evoluzione.md)).
 
 ## Statistics
 

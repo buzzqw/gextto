@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
 
@@ -123,10 +124,168 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 			merged++
 		}
 	}
+	// Phase 2: the same-file-different-layout case (BitTorrent v2), matched by
+	// the per-file Merkle root instead of the piece index.
+	merged += t.prefillV2From(candidates)
 	if merged > 0 && t.log != nil {
 		t.log.Infof("swarm merge: reused %d piece(s) from local data", merged)
 	}
 	return merged
+}
+
+// bitSet reports whether bit i is set in a BEP 3 bitfield: index 0 is the most
+// significant bit of the first byte.
+func bitSet(bits []byte, i int) bool {
+	if i < 0 {
+		return false
+	}
+	byteIndex := i / 8
+	if byteIndex >= len(bits) {
+		return false
+	}
+	return bits[byteIndex]&(1<<(7-uint(i)%8)) != 0
+}
+
+// prefillV2From is the Phase 2 pass over the same candidate set (Swarm Merging,
+// docs/evoluzione.md §15.2): it reuses the data of another torrent's v2 files
+// matched by their per-file Merkle root, so identical files are shared even
+// when the two torrents use a different piece length. Every destination piece
+// is verified against its own hash before it is written, so no unverified byte
+// ever reaches this torrent's storage.
+func (t *torrent) prefillV2From(candidates []*Torrent) int {
+	info := t.info()
+	if info == nil || !info.V2 || info.Private || len(t.pieces) == 0 {
+		return 0
+	}
+	merged := 0
+	var buf, tmp []byte
+	for _, other := range candidates {
+		if other == nil || other.torrent == t {
+			continue
+		}
+		oinfo := other.torrent.info()
+		if oinfo == nil || !oinfo.V2 || oinfo.Private {
+			continue
+		}
+		snap := other.torrent.localData.Load()
+		if snap == nil || len(snap.pieces) == 0 {
+			continue
+		}
+		// BEP 27: the private flag may be recorded on either the snapshot or
+		// the parsed info; both must be checked.
+		if oinfo.Private || snap.private {
+			continue
+		}
+		// An identical layout is Phase 1's job (whole-piece match by index).
+		if snap.pieceLength == info.PieceLength && snap.length == info.Length {
+			continue
+		}
+		have := other.torrent.haveBits()
+		if len(have) == 0 {
+			continue
+		}
+		merged += t.mergeV2Files(other.torrent, oinfo, snap, have, &buf, &tmp)
+	}
+	return merged
+}
+
+// mergeV2Files reuses the destination pieces of every file whose Merkle root and
+// length match a file of the source torrent.
+func (t *torrent) mergeV2Files(src *torrent, sinfo *metainfo.Info, snap *localDataSnapshot, have []byte, bufp, tmpp *[]byte) int {
+	info := t.info()
+	// Index the source files by their Merkle root: equal roots imply equal
+	// bytes, so a duplicate entry is harmless.
+	byRoot := make(map[[32]byte]int, len(sinfo.V2Files))
+	for si := range sinfo.V2Files {
+		f := sinfo.V2Files[si]
+		if f.Length > 0 && f.HasRoot {
+			byRoot[f.PiecesRoot] = si
+		}
+	}
+	if len(byRoot) == 0 {
+		return 0
+	}
+	merged := 0
+	for fi := range info.V2Files {
+		df := info.V2Files[fi]
+		if df.Length == 0 || !df.HasRoot {
+			continue
+		}
+		si, ok := byRoot[df.PiecesRoot]
+		if !ok || sinfo.V2Files[si].Length != df.Length {
+			continue
+		}
+		sstart, _ := src.v2FilePieceRange(si)
+		start, count := t.v2FilePieceRange(fi)
+		for j := 0; j < count; j++ {
+			if start+j >= len(t.pieces) {
+				break
+			}
+			dst := &t.pieces[start+j]
+			if dst.Done || dst.Skip || len(dst.Data) == 0 {
+				continue
+			}
+			n := int(dst.Length)
+			if n <= 0 {
+				continue
+			}
+			if cap(*bufp) < n {
+				*bufp = make([]byte, n)
+			}
+			buf := (*bufp)[:n]
+			if !copyV2PieceFromSource(buf, dst.Data[0].Offset, snap, sstart, sinfo, have, tmpp) {
+				continue
+			}
+			if !verifyPieceBytes(dst, buf) {
+				continue
+			}
+			if _, err := dst.Data.Write(buf); err != nil {
+				continue
+			}
+			merged++
+		}
+	}
+	return merged
+}
+
+// copyV2PieceFromSource fills dst with the source file bytes covering the
+// destination piece's file-local range [dOff, dOff+len(dst)). The source pieces
+// that overlap the range must be verified by the source torrent (bitfield bit
+// set), which is what makes the copied bytes trustworthy; the caller then
+// re-verifies the assembled destination piece against its own hash.
+func copyV2PieceFromSource(dst []byte, dOff int64, snap *localDataSnapshot, sstart int, sinfo *metainfo.Info, have []byte, tmpp *[]byte) bool {
+	srcPL := int64(sinfo.PieceLength)
+	if srcPL <= 0 {
+		return false
+	}
+	end := dOff + int64(len(dst))
+	for off := dOff; off < end; {
+		k := int(off / srcPL)
+		g := sstart + k
+		if g < 0 || g >= len(snap.pieces) || !bitSet(have, g) {
+			return false
+		}
+		sp := &snap.pieces[g]
+		if len(sp.Data) == 0 || sp.Length == 0 {
+			return false
+		}
+		if cap(*tmpp) < int(sp.Length) {
+			*tmpp = make([]byte, sp.Length)
+		}
+		tmp := (*tmpp)[:sp.Length]
+		if _, err := sp.Data.ReadAt(tmp, 0); err != nil {
+			return false
+		}
+		segStart := int64(k) * srcPL
+		lo := max(off, segStart)
+		hi := min(end, segStart+int64(sp.Length))
+		if hi <= lo {
+			return false
+		}
+		copy(dst[lo-dOff:hi-dOff], tmp[lo-segStart:hi-segStart])
+		off = hi
+	}
+	return len(dst) > 0
 }
 
 // verifyPieceBytes checks a piece's bytes against its hash: the SHA-1 of the
