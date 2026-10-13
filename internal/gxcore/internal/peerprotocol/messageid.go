@@ -2,10 +2,12 @@ package peerprotocol
 
 import "strconv"
 
-// MessageID is identifier for messages sent between peers.
+// MessageID identifies peer wire messages: 0-9 are the base protocol,
+// 13-17 the fast extension (BEP 6), 20 the extension protocol (BEP 10),
+// 21-23 the v2 hash transfer (BEP 52).
 type MessageID uint8
 
-// Peer message types
+// Peer message ids, in wire order.
 const (
 	Choke MessageID = iota
 	Unchoke
@@ -23,38 +25,38 @@ const (
 	Reject      = 16
 	AllowedFast = 17
 	Extension   = 20
-	// BEP 52 hash tree messages.
 	HashRequest = 21
 	Hashes      = 22
 	HashReject  = 23
 )
 
+// messageIDStrings names the known ids for logs and diagnostics.
 var messageIDStrings = map[MessageID]string{
-	0:  "choke",
-	1:  "unchoke",
-	2:  "interested",
-	3:  "not interested",
-	4:  "have",
-	5:  "bitfield",
-	6:  "request",
-	7:  "piece",
-	8:  "cancel",
-	9:  "port",
-	13: "suggest",
-	14: "have all",
-	15: "have none",
-	16: "reject",
-	17: "allowed fast",
-	20: "extension",
-	21: "hash request",
-	22: "hashes",
-	23: "hash reject",
+	Choke:         "choke",
+	Unchoke:       "unchoke",
+	Interested:    "interested",
+	NotInterested: "not interested",
+	Have:          "have",
+	Bitfield:      "bitfield",
+	Request:       "request",
+	Piece:         "piece",
+	Cancel:        "cancel",
+	Port:          "port",
+	Suggest:       "suggest",
+	HaveAll:       "have all",
+	HaveNone:      "have none",
+	Reject:        "reject",
+	AllowedFast:   "allowed fast",
+	Extension:     "extension",
+	HashRequest:   "hash request",
+	Hashes:        "hashes",
+	HashReject:    "hash reject",
 }
 
+// String names the message, or its number when unknown.
 func (m MessageID) String() string {
-	s, ok := messageIDStrings[m]
-	if !ok {
-		return strconv.FormatInt(int64(m), 10)
+	if s, ok := messageIDStrings[m]; ok {
+		return s
 	}
-	return s
+	return strconv.FormatInt(int64(m), 10)
 }

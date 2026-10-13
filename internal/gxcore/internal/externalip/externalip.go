@@ -7,6 +7,8 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/logging"
 )
 
+// ips caches the host's public interface addresses at startup, so the
+// session can recognize (and refuse to dial) itself.
 var ips []net.IP
 
 func init() {
@@ -21,7 +23,7 @@ func init() {
 			continue
 		}
 		if i4 := in.IP.To4(); i4 != nil {
-			if isPublicIP(i4) {
+			if isPublicIPv4(i4) {
 				ips = append(ips, i4)
 			}
 			continue
@@ -32,9 +34,8 @@ func init() {
 	}
 }
 
-// isPublicIPv6 reports whether ip is a global IPv6 address that belongs to this
-// host (so we do not dial ourselves). ULA (fc00::/7), link-local and loopback
-// are excluded.
+// isPublicIPv6 reports global unicast IPv6 addresses: no loopback,
+// link-local, unspecified, ULA or private ranges.
 func isPublicIPv6(ip net.IP) bool {
 	if ip == nil || ip.To4() != nil || ip.To16() == nil {
 		return false
@@ -45,7 +46,9 @@ func isPublicIPv6(ip net.IP) bool {
 	return ip.IsGlobalUnicast() && !ip.IsPrivate()
 }
 
-func isPublicIP(ip4 net.IP) bool {
+// isPublicIPv4 reports routable IPv4 addresses: no loopback, link-local or
+// RFC 1918 ranges.
+func isPublicIPv4(ip4 net.IP) bool {
 	if ip4.IsLoopback() || ip4.IsLinkLocalMulticast() || ip4.IsLinkLocalUnicast() {
 		return false
 	}
@@ -61,14 +64,15 @@ func isPublicIP(ip4 net.IP) bool {
 	}
 }
 
-// IsExternal returns true if the given IP matches one of the IP address of the external network interfaces on the server.
+// IsExternal reports whether ip is one of this host's own public interface
+// addresses.
 func IsExternal(ip net.IP) bool {
 	return slices.ContainsFunc(ips, func(i net.IP) bool {
 		return ip.Equal(i)
 	})
 }
 
-// FirstExternalIP returns the first external IP of the network interfaces on the server.
+// FirstExternalIP returns an own public address, or nil on hosts without one.
 func FirstExternalIP() net.IP {
 	if len(ips) == 0 {
 		return nil

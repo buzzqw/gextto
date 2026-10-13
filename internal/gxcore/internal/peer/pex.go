@@ -9,11 +9,13 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/pexlist"
 )
 
+// pex trades peer addresses with one connection (BEP 11): discovered
+// addresses queue up and flush once a minute. Recently seen peers seed the
+// dropped set so we do not get our own swarm echoed straight back.
 type pex struct {
 	conn  *peerconn.Conn
 	extID uint8
 
-	// Contains added and dropped peers.
 	pexList *pexlist.PEXList
 
 	pexAddPeerC  chan *net.TCPAddr
@@ -23,10 +25,13 @@ type pex struct {
 	doneC  chan struct{}
 }
 
+// newPEX starts an exchange on conn, announcing extID as our PEX extension
+// number and preloading everyone already connected (except conn itself).
 func newPEX(conn *peerconn.Conn, extID uint8, initialPeers map[*Peer]struct{}, recentlySeen *pexlist.RecentlySeen) *pex {
 	pl := pexlist.NewWithRecentlySeen(recentlySeen.Peers())
+	self := conn.Addr().String()
 	for pe := range initialPeers {
-		if pe.Addr().String() != conn.Addr().String() {
+		if addr := pe.Addr().String(); addr != self {
 			pl.Add(pe.Addr())
 		}
 	}
@@ -68,6 +73,7 @@ func (p *pex) run() {
 	}
 }
 
+// Add queues a discovered address. Dropped silently once closed.
 func (p *pex) Add(addr *net.TCPAddr) {
 	select {
 	case p.pexAddPeerC <- addr:
@@ -75,6 +81,7 @@ func (p *pex) Add(addr *net.TCPAddr) {
 	}
 }
 
+// Drop queues a gone address. Dropped silently once closed.
 func (p *pex) Drop(addr *net.TCPAddr) {
 	select {
 	case p.pexDropPeerC <- addr:
@@ -82,20 +89,19 @@ func (p *pex) Drop(addr *net.TCPAddr) {
 	}
 }
 
+// pexFlushPeers sends the queued addresses, if any, as one extension message.
 func (p *pex) pexFlushPeers() {
 	added, added6, dropped, dropped6 := p.pexList.Flush()
 	if len(added) == 0 && len(added6) == 0 && len(dropped) == 0 && len(dropped6) == 0 {
 		return
 	}
-	extPEXMsg := peerprotocol.ExtensionPEXMessage{
-		Added:    added,
-		Added6:   added6,
-		Dropped:  dropped,
-		Dropped6: dropped6,
-	}
-	msg := peerprotocol.ExtensionMessage{
+	p.conn.SendMessage(peerprotocol.ExtensionMessage{
 		ExtendedMessageID: p.extID,
-		Payload:           extPEXMsg,
-	}
-	p.conn.SendMessage(msg)
+		Payload: peerprotocol.ExtensionPEXMessage{
+			Added:    added,
+			Added6:   added6,
+			Dropped:  dropped,
+			Dropped6: dropped6,
+		},
+	})
 }

@@ -7,14 +7,13 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 )
 
-const (
-	// BEP 11: Except for the initial PEX message the combined amount of added v4/v6 contacts should not exceed 50 entries.
-	// The same applies to dropped entries.
-	maxPeers = 50
-)
+// maxPeers caps the combined v4+v6 entries past the first PEX message
+// (BEP 11): gossip must stay small on long-lived connections.
+const maxPeers = 50
 
-// PEXList contains the list of peer address for sending them to a peer at certain interval.
-// List contains 2 separate lists for added and dropped addresses.
+// PEXList stages peer addresses for the next PEX message, split into added
+// and dropped sets per address family. Entries move between the sets as
+// peers appear and vanish; Flush emits and clears them.
 type PEXList struct {
 	added    map[tracker.CompactPeer]struct{}
 	dropped  map[tracker.CompactPeer]struct{}
@@ -23,7 +22,7 @@ type PEXList struct {
 	flushed  bool
 }
 
-// New returns a new empty PEXList.
+// New returns an empty PEXList.
 func New() *PEXList {
 	return &PEXList{
 		added:    make(map[tracker.CompactPeer]struct{}),
@@ -33,7 +32,8 @@ func New() *PEXList {
 	}
 }
 
-// NewWithRecentlySeen returns a new PEXList with given peers added to the dropped part.
+// NewWithRecentlySeen seeds the dropped set with recently seen peers, so the
+// first message already tells the remote side what we know.
 func NewWithRecentlySeen(rs []tracker.CompactPeer) *PEXList {
 	l := New()
 	for _, cp := range rs {
@@ -42,7 +42,7 @@ func NewWithRecentlySeen(rs []tracker.CompactPeer) *PEXList {
 	return l
 }
 
-// Add adds the address to the added part and removes from dropped part.
+// Add stages addr as appeared, un-dropping it when it was staged before.
 func (l *PEXList) Add(addr *net.TCPAddr) {
 	if tracker.IsIPv6(addr) {
 		p := tracker.NewCompactPeer6(addr)
@@ -55,7 +55,7 @@ func (l *PEXList) Add(addr *net.TCPAddr) {
 	delete(l.dropped, p)
 }
 
-// Drop adds the address to the dropped part and removes from added part.
+// Drop stages addr as gone, un-adding it when it was staged before.
 func (l *PEXList) Drop(addr *net.TCPAddr) {
 	if tracker.IsIPv6(addr) {
 		p := tracker.NewCompactPeer6(addr)
@@ -68,24 +68,24 @@ func (l *PEXList) Drop(addr *net.TCPAddr) {
 	delete(l.added, peer)
 }
 
-// Flush returns the added and dropped parts for IPv4 and IPv6 and empties the
-// list. The IPv6 parts are encoded as compact 18-byte records (BEP 11). Except
-// for the first message, BEP 11 caps the combined v4+v6 entries at maxPeers.
+// Flush encodes the staged sets as compact strings and resets them. The
+// first flush is uncapped; later ones share the maxPeers budget between the
+// families, IPv4 first.
 func (l *PEXList) Flush() (added, added6, dropped, dropped6 string) {
 	limit := -1 // unlimited on the first flush
 	if l.flushed {
 		limit = maxPeers
 	}
-	added, added6 = l.flushPair(l.added, l.added6, limit)
-	dropped, dropped6 = l.flushPair(l.dropped, l.dropped6, limit)
+	added, added6 = flushFamily(l.added, l.added6, limit)
+	dropped, dropped6 = flushFamily(l.dropped, l.dropped6, limit)
 	l.flushed = true
 	return
 }
 
-// flushPair emits the IPv4 entries first and the IPv6 ones with the remaining
-// budget, so the two families share the same maxPeers cap.
-func (l *PEXList) flushPair(m4 map[tracker.CompactPeer]struct{}, m6 map[tracker.CompactPeer6]struct{}, limit int) (string, string) {
-	s4 := l.flush(m4, limit)
+// flushFamily emits one added/dropped family pair, v4 first with the v6
+// remainder of the shared budget.
+func flushFamily(m4 map[tracker.CompactPeer]struct{}, m6 map[tracker.CompactPeer6]struct{}, limit int) (string, string) {
+	s4 := flush4(m4, limit)
 	remaining := limit
 	if remaining >= 0 {
 		remaining -= len(s4) / 6
@@ -93,16 +93,14 @@ func (l *PEXList) flushPair(m4 map[tracker.CompactPeer]struct{}, m6 map[tracker.
 			remaining = 0
 		}
 	}
-	s6 := l.flush6(m6, remaining)
-	return s4, s6
+	return s4, flush6(m6, remaining)
 }
 
-func (l *PEXList) flush(m map[tracker.CompactPeer]struct{}, limit int) string {
+func flush4(m map[tracker.CompactPeer]struct{}, limit int) string {
 	count := len(m)
 	if limit >= 0 && count > limit {
 		count = limit
 	}
-
 	var s strings.Builder
 	s.Grow(count * 6)
 	for p := range m {
@@ -110,7 +108,6 @@ func (l *PEXList) flush(m map[tracker.CompactPeer]struct{}, limit int) string {
 			break
 		}
 		count--
-
 		b, err := p.MarshalBinary()
 		if err != nil {
 			panic(err)
@@ -121,12 +118,11 @@ func (l *PEXList) flush(m map[tracker.CompactPeer]struct{}, limit int) string {
 	return s.String()
 }
 
-func (l *PEXList) flush6(m map[tracker.CompactPeer6]struct{}, limit int) string {
+func flush6(m map[tracker.CompactPeer6]struct{}, limit int) string {
 	count := len(m)
 	if limit >= 0 && count > limit {
 		count = limit
 	}
-
 	var s strings.Builder
 	s.Grow(count * 18)
 	for p := range m {
@@ -134,7 +130,6 @@ func (l *PEXList) flush6(m map[tracker.CompactPeer6]struct{}, limit int) string 
 			break
 		}
 		count--
-
 		b, err := p.MarshalBinary()
 		if err != nil {
 			panic(err)
