@@ -272,6 +272,22 @@ and 4 active torrents: `gexttod` RSS 113 MB (RssAnon 89 MB), `gx-torrent` RSS
 165 MB (RssAnon 150 MB) — workload-dependent (peers/active pieces), within the
 range of the earlier rounds, and no new steady-state allocation was introduced.
 
+**Seventh round (2026-10-13, Intel N97) — end-to-end seeding and pipelining
+before/after the rewrite.** The two local-swarm harnesses ran on the pre-merge
+`main` (`57d0a89`) and on the merged tree, same machine, one run each:
+
+| Harness / profile | before | after |
+|---|---|---|
+| `make measure-seeding`, 2 MiB, 3 leechers | 1.00× corpus, first leecher done in 33 ms | 1.00×, 32 ms |
+| `make measure-pipeline` shallow (def=1/max=1, RTT 50 ms) | 13.57 s, 302 KiB/s | 13.58 s, 302 KiB/s |
+| `make measure-pipeline` default (def=50/max=250, RTT 50 ms) | 0.607 s, 6748 KiB/s | 0.610 s, 6718 KiB/s |
+
+Equivalent within the noise. The loopback profiles of `measure-pipeline`
+(8 MiB) run to their 90 s window at ~91 KiB/s on both, expected of the
+depth-insensitive sanity harness (§6.4). Both trees serve a single leecher in
+`measure-seeding` (1.00× corpus); that is a **pre-merge** behaviour (the
+harness on `57d0a89` reports the same), not an effect of the rewrite.
+
 ---
 
 ## 2. Gextto improvements implemented
