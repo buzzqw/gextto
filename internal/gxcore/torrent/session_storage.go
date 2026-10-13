@@ -8,6 +8,9 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage/filestorage"
 )
 
+// fileStorageProvider issues file storages rooted at the data dir, carrying
+// the session's permissions, preallocation and mmap choices into every
+// torrent — whether added fresh or reloaded from resume.
 type fileStorageProvider struct {
 	DataDir                  string
 	DataDirIncludesTorrentID bool
@@ -18,6 +21,7 @@ type fileStorageProvider struct {
 	Mmap bool
 }
 
+// newFileStorageProvider snapshots the storage-relevant session config.
 func newFileStorageProvider(cfg *Config) *fileStorageProvider {
 	return &fileStorageProvider{
 		DataDir:                  cfg.DataDir,
@@ -28,6 +32,7 @@ func newFileStorageProvider(cfg *Config) *fileStorageProvider {
 	}
 }
 
+// GetStorage implements storage.Provider.
 func (p *fileStorageProvider) GetStorage(torrentID string) (storage.Storage, error) {
 	sto, err := filestorage.New(p.getDataDir(torrentID), p.FilePermissions)
 	if err != nil {
@@ -38,6 +43,8 @@ func (p *fileStorageProvider) GetStorage(torrentID string) (storage.Storage, err
 	return sto, nil
 }
 
+// getDataDir resolves the torrent's directory, namespaced by id when the
+// layout says so.
 func (p *fileStorageProvider) getDataDir(torrentID string) string {
 	if p.DataDirIncludesTorrentID {
 		return filepath.Join(p.DataDir, torrentID)

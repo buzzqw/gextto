@@ -6,17 +6,22 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/incominghandshaker"
 )
 
+// handleNewConnection vets an accepted socket through the admission gates —
+// capacity, blocklist, duplicate IP, session ban — and handshakes the
+// survivors. Rejections close the socket immediately and say why at debug
+// level; the IP is only pinned once a handshaker owns it.
 func (t *torrent) handleNewConnection(conn net.Conn) {
+	remote := conn.RemoteAddr().String()
 	if len(t.incomingHandshakers)+len(t.incomingPeers) >= t.session.config.MaxPeerAccept ||
 		(t.maxConnections > 0 && len(t.peers) >= t.maxConnections) {
-		t.log.Debugln("peer limit reached, rejecting peer", conn.RemoteAddr().String())
+		t.log.Debugln("peer limit reached, rejecting peer", remote)
 		conn.Close()
 		return
 	}
 	ip := conn.RemoteAddr().(*net.TCPAddr).IP
 	ipstr := ip.String()
 	if t.session.config.BlocklistEnabledForIncomingConnections && t.session.blocklist != nil && t.session.blocklist.Blocked(ip) {
-		t.log.Debugln("peer is blocked:", conn.RemoteAddr().String())
+		t.log.Debugln("peer is blocked:", remote)
 		conn.Close()
 		return
 	}

@@ -6,10 +6,9 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/outgoinghandshaker"
 )
 
-// syncPieces flushes every open data file of the torrent to stable storage. It
-// must run on the torrent's run loop: t.files is owned by it. It is called
-// before the resume bitfield is persisted so a bit that survives a crash always
-// refers to piece data already on disk (the engine no longer relies on O_SYNC).
+// syncPieces flushes every open data file. It must run on the run loop —
+// t.files belongs to it — and it precedes every resume-bitfield write, so a
+// persisted bit always describes bytes already durable (no O_SYNC writes).
 func (t *torrent) syncPieces() {
 	for _, f := range t.files {
 		if f.Storage == nil {
@@ -21,9 +20,9 @@ func (t *torrent) syncPieces() {
 	}
 }
 
-// writeBitfield persists the verified bitfield to the resume database.
-// Invariant: snapshot the bitfield, then flush the data, then write the
-// bitfield, so a persisted bit never anticipates data that is not yet durable.
+// writeBitfield persists a snapshot of the verified bitfield. The order is
+// load-bearing: snapshot, then flush data, then write — a stored bit never
+// anticipates undurable data.
 func (t *torrent) writeBitfield() error {
 	var snapshot []byte
 	t.mBitfield.RLock()
@@ -35,13 +34,17 @@ func (t *torrent) writeBitfield() error {
 	if snapshot == nil {
 		return nil
 	}
-	err := t.session.resumer.WriteBitfield(t.id, snapshot)
-	if err != nil {
+	if err := t.session.resumer.WriteBitfield(t.id, snapshot); err != nil {
 		t.log.Errorf("cannot write bitfield to resume db: %s", err)
+		return err
 	}
-	return err
+	return nil
 }
 
+// checkCompletion flips a torrent to seed the first time every wanted piece
+// lands. The transition tears down the download machinery (handshakers,
+// webseeds, picker, address pool), tells peers we lost interest (BEP 21
+// re-handshake), drops the uninterested, and fires the completion hook once.
 func (t *torrent) checkCompletion() bool {
 	if t.completed {
 		return true
@@ -53,13 +56,11 @@ func (t *torrent) checkCompletion() bool {
 	close(t.completeC)
 	for h := range t.outgoingHandshakers {
 		h.Close()
-		// a closed handshaker never reports back; release its IP.
+		// A closed handshaker never reports back; free its IP now.
 		delete(t.connectedPeerIPs, h.Addr.IP.String())
 	}
 	t.outgoingHandshakers = make(map[*outgoinghandshaker.OutgoingHandshaker]struct{})
 	t.stopWebseedDownloads()
-	// BEP 21: we are now a (partial) seed. Tell the connected peers we are not
-	// interested in downloading anything, so they stop offering us pieces.
 	for pe := range t.peers {
 		if pe.ExtensionsEnabled {
 			t.sendExtensionHandshake(pe)
@@ -80,15 +81,12 @@ func (t *torrent) checkCompletion() bool {
 	t.piecePicker = nil
 	t.updateSeedDuration(time.Now())
 	if t.superSeeding {
-		// The torrent just became a seed: start super-seeding the peers that
-		// are still connected.
 		t.superSeedAllPeers()
 	}
 	if !t.completeCmdRun && len(t.session.config.OnCompleteCmd) > 0 {
 		go t.session.runOnCompleteCmd(t)
 		t.completeCmdRun = true
-		err := t.session.resumer.WriteCompleteCmdRun(t.id)
-		if err != nil {
+		if err := t.session.resumer.WriteCompleteCmdRun(t.id); err != nil {
 			t.stop(err)
 		}
 	}

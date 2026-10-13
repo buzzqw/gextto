@@ -6,17 +6,17 @@ import (
 	"time"
 )
 
-// checkTorrent pings the torrent run loop periodically and crashes the program if a torrent does not respond in
-// specified timeout. This is not a good behavior for a production program but it helps to find deadlocks easily,
-// at least while developing.
+// checkTorrent watches one torrent's run loop: each interval it posts a
+// no-op command the loop must receive to prove liveness. A loop that stays
+// silent past the timeout dumps every goroutine stack to a temp file and
+// panics — loud by design, so deadlocks surface in testing instead of
+// masquerading as stalls in production.
 func (s *Session) checkTorrent(t *torrent) {
 	for {
 		select {
 		case <-time.After(s.config.HealthCheckInterval):
 			timeout := time.NewTimer(s.config.HealthCheckTimeout)
 			select {
-			// A no-op command the loop has to receive to make progress. We do
-			// not care what it does, only that it was taken.
 			case t.commandC <- func() {}:
 				timeout.Stop()
 			case <-t.closeC:
@@ -32,13 +32,13 @@ func (s *Session) checkTorrent(t *torrent) {
 	}
 }
 
+// crash persists the goroutine stacks for post-mortem and panics.
 func crash(torrentID string, msg string) {
 	f, err := os.CreateTemp("", "gx-core-crash-dump-"+torrentID+"-*")
 	if err == nil {
 		msg += " Saving goroutine stacks to: " + f.Name()
 		b := make([]byte, 100<<20)
-		n := runtime.Stack(b, true)
-		b = b[:n]
+		b = b[:runtime.Stack(b, true)]
 		_, _ = f.Write(b)
 		_ = f.Close()
 	}

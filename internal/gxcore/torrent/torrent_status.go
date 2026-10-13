@@ -1,40 +1,46 @@
 package torrent
 
-// Status of a Torrent
+// Status is the externally visible torrent lifecycle state.
 type Status int
 
 const (
-	// Stopped indicates that the torrent is not running.
-	// No peers are connected and files are not open.
+	// Stopped runs nothing: no peers, closed files.
 	Stopped Status = iota
-	// DownloadingMetadata indicates that the torrent is in the process of downloadin metadata.
-	// When torrent is added via magnet link, torrent has no metadata and it needs to be downloaded from peers before starting to download files.
+	// DownloadingMetadata fetches the info dict from peers (magnet links).
 	DownloadingMetadata
-	// Allocating indicates that the torrent is in the process of creating/opening files on the disk.
+	// Allocating creates or opens the files on disk.
 	Allocating
-	// Verifying indicates that the torrent has already some files on disk and it is checking the validity of pieces by comparing hashes.
+	// Verifying hashes existing files against the piece hashes.
 	Verifying
-	// Downloading the torrent's files from peers.
+	// Downloading fetches the torrent's files from peers.
 	Downloading
-	// Seeding the torrent. All pieces/files are downloaded.
+	// Seeding serves a complete torrent.
 	Seeding
-	// Stopping the torrent. This is the status after Stop() is called. All peers are disconnected and files are closed. A stop event sent to all trackers. After trackers responded the torrent switches into Stopped state.
+	// Stopping disconnects, closes files and announces stopped to the
+	// trackers; Stopped follows once they answer.
 	Stopping
 )
 
-func (s Status) String() string {
-	m := map[Status]string{
-		Stopped:             "Stopped",
-		DownloadingMetadata: "Downloading Metadata",
-		Allocating:          "Allocating",
-		Verifying:           "Verifying",
-		Downloading:         "Downloading",
-		Seeding:             "Seeding",
-		Stopping:            "Stopping",
-	}
-	return m[s]
+// statusNames renders statuses for the API and UI.
+var statusNames = map[Status]string{
+	Stopped:             "Stopped",
+	DownloadingMetadata: "Downloading Metadata",
+	Allocating:          "Allocating",
+	Verifying:           "Verifying",
+	Downloading:         "Downloading",
+	Seeding:             "Seeding",
+	Stopping:            "Stopping",
 }
 
+func (s Status) String() string {
+	return statusNames[s]
+}
+
+// status derives the state from the run loop's organs, in precedence order:
+// a missing command channel means never started; a stop announcer means
+// draining; allocator and verifier mean their phases; completion decides
+// between seeding and downloading, with metadata-less torrents still
+// fetching their info dict.
 func (t *torrent) status() Status {
 	switch {
 	case t.errC == nil:

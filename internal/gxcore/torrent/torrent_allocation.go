@@ -9,6 +9,11 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piecepicker"
 )
 
+// handleAllocationDone turns opened files into pieces, the picker and the
+// starting state. From a resume bitfield with no missing files the torrent
+// resumes downloading directly; from an empty storage with no mergeable
+// neighbors it starts with a blank bitfield; otherwise the verifier (plus
+// the off-loop swarm merge) establishes the truth first.
 func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 	if t.allocator != al {
 		t.crash("invalid allocator")
@@ -19,7 +24,6 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 		t.stop(fmt.Errorf("file allocation error: %w", al.Error))
 		return
 	}
-
 	if t.files != nil {
 		t.crash("files exist")
 	}
@@ -40,17 +44,14 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 	for pe := range t.peers {
 		pe.GenerateAndSendAllowedFastMessages(t.session.config.AllowedFastSet, t.info().NumPieces, t.infoHash, t.pieces)
 	}
-
 	if t.piecePicker != nil {
 		t.crash("piece picker exists")
 	}
 	t.piecePicker = piecepicker.New(t.pieces, t.session.config.EndgameMaxDuplicateDownloads, t.webseedSources, t.sequential, t.firstLast)
-
 	for pe := range t.peers {
 		pe.Bitfield = bitfield.New(t.info().NumPieces)
 	}
 
-	// If we already have bitfield from resume db, skip verification and start downloading.
 	if t.bitfield != nil && !al.HasMissing {
 		for i := uint32(0); i < t.bitfield.Len(); i++ {
 			t.pieces[i].Done = t.bitfield.Test(i)
@@ -68,16 +69,13 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 		return
 	}
 
-	// Swarm Merging: other local torrents that could lend verified pieces.
-	// Only the cheap checks run here; the reads, hashes and writes happen in
-	// the verifier goroutine (startMergeVerifier), off the run loop.
+	// Swarm Merging: sibling torrents that could lend verified pieces. Only
+	// the cheap candidate filter runs here; reads, hashes and writes happen
+	// in the verifier goroutine (startMergeVerifier), off the run loop.
 	var candidates []*Torrent
 	if t.session != nil {
 		candidates = t.mergeCandidates(t.session.ListTorrents())
 	}
-
-	// No need to verify files if they didn't exist when we create them and
-	// nothing can be merged.
 	if !al.HasExisting && len(candidates) == 0 {
 		t.mBitfield.Lock()
 		t.bitfield = bitfield.New(t.info().NumPieces)
@@ -90,8 +88,8 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 		return
 	}
 
-	// Some files exists on the disk (or can be merged), need to verify pieces
-	// to create a correct bitfield. Storage created empty holds only what the
-	// merge writes, so then nothing else is read.
+	// On-disk data (or mergeable neighbors) exists: verify into a correct
+	// bitfield. A storage created empty this run can only hold what the
+	// merge writes, so nothing else is hashed.
 	t.startMergeVerifier(candidates, !al.HasExisting)
 }
