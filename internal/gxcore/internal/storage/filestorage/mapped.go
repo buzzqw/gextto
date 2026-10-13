@@ -1,8 +1,11 @@
 package filestorage
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
 	"sync"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
@@ -47,22 +50,45 @@ type mmapFile struct {
 
 var _ storage.File = (*mmapFile)(nil)
 
-func (m *mmapFile) ReadAt(p []byte, off int64) (int, error) {
+// errMappedFault is returned when touching the mapping faults: the kernel
+// raises SIGBUS when a page cannot be backed (disk full on a sparse file, or
+// the file truncated by another process). Without the guard the fault would
+// crash the whole daemon; with it only the torrent sees an I/O error.
+var errMappedFault = errors.New("mmap access fault (disk full or file truncated)")
+
+// recoverFault turns a memory fault raised in the calling function into an
+// error and restores the previous SetPanicOnFault setting. It must be the
+// deferred function itself (recover only works there):
+//
+//	defer recoverFault(debug.SetPanicOnFault(true), &err)
+func recoverFault(old bool, err *error) {
+	debug.SetPanicOnFault(old)
+	if r := recover(); r != nil {
+		if _, ok := r.(interface{ Addr() uintptr }); !ok {
+			panic(r)
+		}
+		*err = fmt.Errorf("%w: %v", errMappedFault, r)
+	}
+}
+
+func (m *mmapFile) ReadAt(p []byte, off int64) (n int, err error) {
 	if off < 0 || off > int64(len(m.data)) {
 		return 0, io.EOF
 	}
-	n := copy(p, m.data[off:])
+	defer recoverFault(debug.SetPanicOnFault(true), &err)
+	n = copy(p, m.data[off:])
 	if n < len(p) {
 		return n, io.EOF
 	}
 	return n, nil
 }
 
-func (m *mmapFile) WriteAt(p []byte, off int64) (int, error) {
+func (m *mmapFile) WriteAt(p []byte, off int64) (n int, err error) {
 	if off < 0 || off+int64(len(p)) > int64(len(m.data)) {
 		return 0, os.ErrInvalid
 	}
-	n := copy(m.data[off:], p)
+	defer recoverFault(debug.SetPanicOnFault(true), &err)
+	n = copy(m.data[off:], p)
 	m.markDirty(off, off+int64(n))
 	return n, nil
 }

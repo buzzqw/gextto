@@ -2621,6 +2621,8 @@ here; the implemented ones are dated, the others are a proposal to be agreed.
 | 12 | Merge on **empty storage**: the verifier hashed every non-merged piece of files just created (holes) | same review | medium (no read+SHA-1 of the whole torrent after a partial merge) | low | **done (2026-10-13)**: `Verifier.Only` restricts the check to the merged pieces when no file existed |
 | 13 | **Word-wise interest** and deselected files: `updateInterestedState` scanned the bitfield bit by bit for every peer at every completed piece, and pieces of deselected files made a peer interesting | same review | high (run-loop CPU on large torrents) | low | **done (2026-10-13)**: `HasAnyOutside` + `skipBits`, 231 → 2.8 µs per peer on 100k pieces (×80), 0 alloc |
 | 14 | **Smarter eviction**: a partial seed kept peers that only had deselected pieces, and a fresh connection could be dropped as useless at the next tick and redialled (churn) | same review | medium | low | **done (2026-10-13)**: `peerUseful` uses the wanted set, keeps only interested peers when seeding, 30 s grace (`newPeerGrace`) |
+| 15 | DHT multi-path **per subnet**: the confirmation counted reporters per address, so a Sybil host or /24 confirmed its own peers | same review | medium (the §16.2 datum was inflatable) | low | **done (2026-10-13)**: `reporterKey` |
+| 16 | **mmap fault guard**: with `-mmap`, a full disk or a truncated file raised SIGBUS and crashed the whole daemon | same review | high for `-mmap` users | low | **done (2026-10-13)**: `recoverFault`, I/O error on the torrent; write bench equivalent (36.3–38.0 → 35.9–37.5 µs), 0 alloc |
 
 The criterion is the same as §4.5/§15.3: one item = one commit, measurement
 before/after for anything on a data path, both UIs and i18n for anything visible
@@ -2684,12 +2686,12 @@ instrumentation, not the rewrite.
 (info-hash, peer), bounded to `peerConfirmMax` entries and expiring after
 `peerConfirmWindow`; `peers_confirmed_multi` (in `Stats()`, therefore
 `dht_peers_confirmed_multi` in the daemon) counts the peers a second distinct
-node confirmed. It is read-only: it changes nothing about which peers are used.
+node confirmed. **Reporters are counted per subnet** (`reporterKey`, the same /24 or /48 unit as the anti-Sybil cap, fix 2026-10-13): counted per address, one host on many ports or a block of Sybil nodes in one /24 "confirmed" its own peers and inflated exactly the datum that has to justify the rewrite. It is read-only: it changes nothing about which peers are used.
 On a real swarm a non-trivial value is the evidence needed before spending the
 cost of a full multi-path lookup (an explicit per-lookup state machine with a
 bounded fan-out and a deadline, like `bep44_client.go`). Tests:
 `TestPeerConfirmCountsDistinctReporters`, `TestPeerConfirmIsBounded`,
-`TestPeerConfirmExpiry`.
+`TestPeerConfirmExpiry`, `TestReporterKeyIsTheSubnet`.
 
 ### 16.3 Multi-piece pipelining — measurement and plan
 

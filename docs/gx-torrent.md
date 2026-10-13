@@ -1161,6 +1161,9 @@ using fixed values.
   ~5.9 GB/s for `pwrite`. It is **opt-in** (also `GX_TORRENT_MMAP=1`) because it maps
   every open file: with torrents of thousands of files it approaches the
   `vm.max_map_count` limit. Outside Linux it is ignored (normal files are used).
+  A page the disk cannot back (disk full on a sparse file, file truncated by
+  another process) raises `SIGBUS`: the access is guarded and comes back as an
+  I/O error on that torrent instead of crashing the daemon.
 - **"Optimise settings"**: with gx-torrent it resets the cache to automatic and
   applies it immediately.
 - The cache size changes on the fly; cache expiry and
