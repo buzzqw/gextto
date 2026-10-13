@@ -1,32 +1,19 @@
-// DHT node for tracker-less peer information exchange: Kademlia (BEP 5) with
-// IPv6 (BEP 32), scrape (BEP 33), secure node IDs (BEP 42), read-only nodes
-// (BEP 43) and a key/value store (BEP 44).
+// DHT node for tracker-less peer discovery: Kademlia (BEP 5) with IPv6
+// (BEP 32), swarm scrape (BEP 33), secure node IDs (BEP 42), read-only mode
+// (BEP 43) and the distributed key/value store (BEP 44).
 // Status: Supports all DHT operations from the specification.
 
 package dht
 
-// Summary from the bittorrent DHT protocol specification:
-//
-// Message types:
-//  - query
-//  - response
-//  - error
+// Message types: query, response, error.
 //
 // RPCs:
-//      ping:
-//         see if node is reachable and save it on routing table.
-//      find_node:
-//	       run when DHT node count drops, or every X minutes. Just to ensure
-//	       our DHT routing table is still useful.
-//      get_peers:
-//	       the real deal. Iteratively queries DHT nodes and find new sources
-//	       for a particular infohash.
-//	announce_peer:
-//         announce that the peer associated with this node is downloading a
-//         torrent.
+//	ping: reachability probe, feeds the routing table.
+//	find_node: table upkeep, run as the table thins or every X minutes.
+//	get_peers: the real lookup: iterative peer search per info hash.
+//	announce_peer: publish ourselves as a peer for an info hash.
 //
-// Reference:
-//     http://www.bittorrent.org/beps/bep_0005.html
+// Reference: http://www.bittorrent.org/beps/bep_0005.html
 //
 
 import (
@@ -209,22 +196,46 @@ func New(config *Config) (node *DHT, err error) {
 	}
 	// Copy to avoid changes.
 	cfg := *config
-	node = &DHT{
+	node = makeNode(cfg)
+	c := openStore(cfg.Port, cfg.SaveRoutingTable)
+	node.store = c
+	if err := ensureNodeID(node, c); err != nil {
+		return nil, err
+	}
+	secureNodeID(node, c, cfg.PublicIP)
+	node.publicIP = cfg.PublicIP
+	// The types don't match because JSON marshalling needs []byte.
+	node.nodeId = string(c.Id)
+	node.routingTable.nodeId = node.nodeId
+
+	// Seed the stored remotes before the engine reads them.
+	node.wg.Add(1)
+	go func() {
+		defer node.wg.Done()
+		for addr := range c.Remotes {
+			node.AddNode(addr)
+		}
+	}()
+	return
+}
+
+// makeNode wires a DHT with its stores, channels, throttle and sub-clients.
+func makeNode(cfg Config) *DHT {
+	node := &DHT{
 		config:               cfg,
 		peerStore:            newPeerStore(cfg.MaxInfoHashes, cfg.MaxInfoHashPeers),
 		PeersRequestResults:  make(chan map[InfoHash][]string, 1),
 		stop:                 make(chan bool),
 		DebugLogger:          &nullLogger{},
 		exploredNeighborhood: false,
-		// Buffer to avoid blocking on sends.
+		// Buffered against senders that must not block.
 		remoteNodeAcquaintance: make(chan string, 100),
-		// Buffer to avoid deadlocks and blocking on sends.
-		peersRequest:   make(chan ihReq, 100),
-		nodesRequest:   make(chan ihReq, 100),
-		pingRequest:    make(chan *remoteNode),
-		portRequest:    make(chan int),
-		removeInfoHash: make(chan InfoHash),
-		clientThrottle: newClientThrottle(cfg.ClientPerMinuteLimit, cfg.ThrottlerTrackedClients),
+		peersRequest:           make(chan ihReq, 100),
+		nodesRequest:           make(chan ihReq, 100),
+		pingRequest:            make(chan *remoteNode),
+		portRequest:            make(chan int),
+		removeInfoHash:         make(chan InfoHash),
+		clientThrottle:         newClientThrottle(cfg.ClientPerMinuteLimit, cfg.ThrottlerTrackedClients),
 	}
 	routingTable := newRoutingTable(&node.DebugLogger)
 	routingTable.maxPerSubnet = cfg.MaxNodesPerSubnet
@@ -238,45 +249,37 @@ func New(config *Config) (node *DHT, err error) {
 	node.bep44Done = make(chan uint64, 4)
 	node.bep44s = make(map[uint64]*bep44Lookup)
 	node.confirm = make(map[peerConfirmKey]*peerConfirmEntry)
-	c := openStore(cfg.Port, cfg.SaveRoutingTable)
-	node.store = c
-	if len(c.Id) != 20 {
-		var err error
-		c.Id, err = randNodeId()
-		if err != nil {
-			return nil, err
-		}
-		node.DebugLogger.Debugf("Using a new random node ID: %x %d", c.Id, len(c.Id))
+	return node
+}
+
+// ensureNodeID mints and persists a random id when the store holds none.
+func ensureNodeID(node *DHT, c *dhtStore) error {
+	if len(c.Id) == 20 {
+		return nil
+	}
+	var err error
+	c.Id, err = randNodeId()
+	if err != nil {
+		return err
+	}
+	node.DebugLogger.Debugf("Using a new random node ID: %x %d", c.Id, len(c.Id))
+	saveStore(*c)
+	return nil
+}
+
+// secureNodeID replaces a spoofable id with a BEP 42 derivation of the
+// configured external IP, so enforcing peers do not ignore us.
+func secureNodeID(node *DHT, c *dhtStore, ip net.IP) {
+	if ip == nil {
+		return
+	}
+	var idArr [20]byte
+	copy(idArr[:], c.Id)
+	if !NodeIDSecure(idArr, ip) {
+		c.Id = generateSecureNodeID(ip)
 		saveStore(*c)
+		node.DebugLogger.Infof("DHT: using a BEP 42 secure node ID for external IP %s", ip)
 	}
-	// BEP 42: derive the node ID from our external IP when it is known, so it
-	// cannot be spoofed and enforcing peers do not ignore us.
-	node.publicIP = cfg.PublicIP
-	if ip := cfg.PublicIP; ip != nil {
-		var idArr [20]byte
-		copy(idArr[:], c.Id)
-		if !NodeIDSecure(idArr, ip) {
-			c.Id = generateSecureNodeID(ip)
-			saveStore(*c)
-			node.DebugLogger.Infof("DHT: using a BEP 42 secure node ID for external IP %s", ip)
-		}
-	}
-	// The types don't match because JSON marshalling needs []byte.
-	node.nodeId = string(c.Id)
-
-	// XXX refactor.
-	node.routingTable.nodeId = node.nodeId
-
-	// This is called before the engine is up and ready to read from the
-	// underlying channel.
-	node.wg.Add(1)
-	go func() {
-		defer node.wg.Done()
-		for addr := range c.Remotes {
-			node.AddNode(addr)
-		}
-	}()
-	return
 }
 
 func (d *DHT) newTokenSecret() string {
