@@ -1,4 +1,4 @@
-# Gextto — Expert Torrent Transfer Orchestrator
+# Gextto — EXpert Torrent Transfer Orchestrator
 
 **Tell Gextto what you want to watch. It finds the best release, downloads it,
 verifies it, names it and shelves it in your library — then keeps watching for
@@ -6,7 +6,7 @@ a better copy.**
 
 Gextto is a self-hosted media automation daemon with a fast web UI and its own
 BitTorrent engine, written from scratch in pure Go. One binary per component,
-no C dependencies, six interface languages.
+no C dependencies, no Node.js/npm frontend build, six interface languages.
 
 [![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-pure%2C%20zero%20CGO-00ADD8?logo=go)
@@ -29,20 +29,25 @@ no C dependencies, six interface languages.
   while seeding, a mount guard tells an unmounted NAS apart from a deleted
   file, replaced files go to a recycle bin, and interrupted moves resume after
   a restart.
-- **It ships its own engine.** `gx-core` is a BitTorrent implementation built
-  for this project — BitTorrent v2, uTP, NAT holepunching, IPv6 DHT,
-  streaming — running in a process far lighter than qBittorrent (see
-  *Resource footprint*).
+- **It ships an ultra-efficient, finely tuned engine.** `gx-core` is an original
+  BitTorrent implementation built from scratch for this project — BitTorrent
+  v2, parallel TCP+uTP on one port, NAT holepunching, IPv6 DHT, and streaming.
+  It runs at a fraction of the memory of traditional clients (~25 MB idle,
+  ~100 MB at 100 MB/s, up to 50x lighter than qBittorrent) thanks to
+  zero-allocation hot paths and streaming write-through (see *Resource footprint*).
 - **It doubles as a standalone client.** The same engine ships as
   **[gx-torrent](https://github.com/buzzqw/gextto/releases)**, a complete
   client for Linux and Windows with its own web UI, a qBittorrent-compatible
   API for Sonarr/Radarr, and an RSS suite on par with the best.
-- **It tunes itself.** Queue, disk cache and upload adapt to the machine and
-  the line; downloads pause before the disk fills up; the engine keeps the
-  peers that deliver and reuses data already on disk. No manual tuning needed.
-- **It is easy to audit.** Pure Go with zero CGO, a single supervised process
-  per component, over 1,750 test functions, and accessibility checks with
-  axe-core.
+- **It tunes, adapts and controls itself.** Queue concurrency, disk cache and
+  upload bandwidth adapt dynamically to hardware (RAM, NVMe/SSD/HDD/NFS) and
+  network latency (anti-bufferbloat); downloads pause before disk fills up;
+  delivering peers get priority while sluggish ones are pruned; data already on
+  disk is reused across swarms without re-downloading. Detailed live
+  diagnostics and connection telemetry are exposed at every layer.
+- **It is easy to audit and deploy.** Pure Go with zero CGO, zero Node.js/npm
+  runtime dependencies, a single supervised process per component, over 1,780
+  test functions, and accessibility checks with axe-core.
 
 ### At a glance
 
@@ -53,7 +58,7 @@ no C dependencies, six interface languages.
 | **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP proxy · VPN killswitch |
 | **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr) · RSS · web search · stuck-download replacement |
 | **Integrations** | Jellyfin, Plex, Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
-| **Interfaces** | Web UI (SSR + HTMX, installable PWA) · terminal TUI over SSH · JSON API |
+| **Interfaces** | Web UI (SSR + HTMX, zero-Node/pure Go, installable PWA) · terminal TUI over SSH · JSON API |
 | **Build** | Pure Go (`CGO_ENABLED=0`) · optional libtorrent engine · Linux x86_64/aarch64 · gx-torrent also on Windows |
 
 ## Features
@@ -100,10 +105,11 @@ no C dependencies, six interface languages.
   **To check** panel collects edge cases; threshold alerts warn when an
   indexer fails repeatedly or slows down.
 - **Interfaces.** Responsive web UI installable as a mobile PWA, fully
-  keyboard-navigable and axe-core checked; a single **Theme** picker with 20+
-  contrast-checked themes plus custom server-side themes that follow you to
-  every device; a full terminal TUI for SSH management. Six languages (IT, EN,
-  DE, FR, ES, PL).
+  keyboard-navigable and axe-core checked; server-side rendered (SSR + HTMX)
+  with all assets embedded — zero Node.js or npm runtime dependencies; a single
+  **Theme** picker with 20+ contrast-checked themes plus custom server-side
+  themes that follow you to every device; a full terminal TUI for SSH
+  management. Six languages (IT, EN, DE, FR, ES, PL).
 
 The web UI listens on `http://<host>:5000/`. Setup and every UI section are
 covered by the [English manual](docs/MANUAL.en.md) and the
@@ -166,36 +172,41 @@ BitTorrent traffic on the VPN. The DHT (`internal/dht`) covers mainline IPv6,
 scrape, CRC32C secure node IDs, read-only mode (off by default) and the signed
 K/V store with outbound `get`/`put`.
 
-**Self-management.** The active-download count follows measured throughput
-(dynamic queue); slow torrents stop occupying slots and stalled ones step
-aside. The disk cache is sized from free RAM, active torrents and disk type
-(HDD, SSD, NFS); latency auto-speed trims upload before the line saturates.
-When a download folder drops below the free-space threshold (1 GiB by
-default), unfinished downloads there pause and resume on their own — seeding
-continues, nothing ends in a write error. Each peer's request queue grows with
-what it delivers, a fast peer works on two pieces at once, and at the
-connection cap the useless, slowest connection is dropped — never a random
-one. Pieces of deselected files never count a peer as interesting.
+**Self-management and tuning.** The engine tunes its parameters continuously
+without manual intervention: the active-download count follows measured
+throughput (dynamic queue); slow torrents stop occupying slots and stalled
+ones step aside. The disk cache auto-sizes from free RAM, active torrents and
+storage class (NVMe, SSD, HDD, NFS); latency auto-speed trims upload before the
+line saturates (anti-bufferbloat). When a download folder drops below the
+free-space threshold (1 GiB by default), unfinished downloads there pause and
+resume on their own — seeding continues, nothing ends in a write error. Each
+peer's request queue adapts dynamically to its throughput, fast peers pipeline
+two pieces concurrently, and at the connection cap the slowest, idle connection
+is pruned — never a random one. Deselected file pieces never flag a peer as
+interesting.
 
-**Footprint by design.** Pieces are written through; the reclaimable OS page
-cache does the coalescing, so there is no gigabyte-sized in-process cache. A
-read cache with lazy expiry and a write limiter sized from RAM and disk type
-keep usage in the tens of MB. `fdatasync` is batched before the resume
-bitfield is persisted (never `O_SYNC` per write); sparse files, `fallocate`
-preallocation, RAM-disk temp folders, and an opt-in mmap mode on Linux
-(`-mmap`). Hot paths avoid allocations (in-place MSE/PE RC4, word-wise
-bitfield counts, adaptive per-peer queue depth). The IP blocklist (CIDR,
-ranges, P2P, eMule) is merged into sorted intervals and binary-searched with
-zero allocations; URL lists refresh on a schedule.
+**Footprint by design.** Pieces are written through directly; the reclaimable
+OS page cache coalesces I/O, eliminating multi-gigabyte in-process cache bloat.
+A read cache with lazy expiry and an adaptive write limiter sized from RAM and
+disk type keep memory usage in the tens of MB even under 100 MB/s sustained load.
+`fdatasync` is batched before persisting resume bitfields (never `O_SYNC` per
+write); sparse files, `fallocate` preallocation, RAM-disk temp folders, and an
+opt-in mmap mode on Linux (`-mmap`). Hot paths eliminate allocations (in-place
+MSE/PE RC4, word-wise bitfield math, zero-copy uTP data-path, adaptive per-peer
+buffers). The IP blocklist (CIDR, ranges, P2P, eMule) merges into sorted
+intervals and is binary-searched with zero allocations; URL lists refresh on a
+schedule.
 
-**Streaming and safety.** The picker separates the player window
-(`SetStreamWindow`) from the readahead horizon (`SetReadaheadWindow`); per-file
-priorities apply live and MKV/MP4 are served over HTTP Range. Web seeds and
-magnet `xs=`/`as=` sources default to no private-address access (checked on
-the resolved IP, rebinding-safe). Strict BEP 27 private torrents (no DHT, PEX
-or LSD), 30-minute quarantine for corrupt-sending peers, trackers dropped
-after BEP 31 `never` or prolonged failure, per-piece diagnostics, BoltDB
-resume data, live Server-Sent Events (`/ui/events`).
+**Streaming, safety and control.** The piece picker cleanly separates the
+player playback window (`SetStreamWindow`) from the readahead horizon
+(`SetReadaheadWindow`); per-file priorities apply live and MKV/MP4 stream
+smoothly over HTTP Range. Web seeds and magnet `xs=`/`as=` sources enforce
+strict SSRF protection (checked on resolved IPs, rebinding-safe). Strict BEP
+27 private torrents (no DHT, PEX or LSD), 30-minute quarantine for peers
+sending corrupted blocks, trackers dropped on BEP 31 `never` or repeated
+failure. Full control and telemetry: live per-peer diagnostics, I/O rates and
+queue depths, incoming connection breakdown (TCP vs uTP), BoltDB transactional
+resume storage, and real-time Server-Sent Events (`/ui/events`).
 
 ### Engine comparison
 
@@ -382,9 +393,11 @@ npm ci
 npm run test:a11y
 ```
 
-The suite currently covers the main sections with 13 tests. That is not a
-legal certification: manual screen-reader, keyboard and assistive-technology
-testing is still required. Scope and limits:
+The automated Playwright suite includes 63 end-to-end tests covering
+navigation, dialogs and workflows, with 13 tests dedicated specifically to
+axe-core WCAG accessibility audits on the main sections. That is not a legal
+certification: manual screen-reader, keyboard and assistive-technology testing
+is still required. Scope and limits:
 [accessibility analysis](docs/evoluzione.md#8-accessibility).
 
 ## Documentation
@@ -392,6 +405,9 @@ testing is still required. Scope and limits:
 | Need | Document |
 |---|---|
 | Operate the service | [English manual](docs/MANUAL.en.md) · [Manuale italiano](docs/MANUAL.it.md) |
+| Architecture and design | [Architecture](docs/ARCHITECTURE.md) |
+| BitTorrent specifications (BEPs) | [BEP compliance](docs/bep.md) |
+| Technical evolution and roadmap | [Evolution and roadmap](docs/evoluzione.md) |
 | NAS, reverse proxy, recovery | [Advanced guide](docs/ADVANCED.en.md) |
 | HTTP integrations | [API reference](docs/API.md) |
 | Move an existing installation | [Migration guide](docs/MIGRATION.md) |

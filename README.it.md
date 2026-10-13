@@ -6,7 +6,8 @@ a cercarne una copia migliore.**
 
 Gextto è un demone self-hosted di automazione multimediale con un'interfaccia
 web veloce e un motore BitTorrent proprio, scritto da zero in Go puro. Un
-binario per componente, nessuna dipendenza C, sei lingue nell'interfaccia.
+binario per componente, nessuna dipendenza C, nessun runtime o build frontend
+Node.js/npm, sei lingue nell'interfaccia.
 
 [![Licenza: EUPL-1.2](https://img.shields.io/badge/licenza-EUPL--1.2-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-puro%2C%20zero%20CGO-00ADD8?logo=go)
@@ -30,21 +31,27 @@ binario per componente, nessuna dipendenza C, sei lingue nell'interfaccia.
   hardlink durante il seed, una guardia distingue un NAS smontato da un file
   cancellato, i file sostituiti vanno in un cestino e gli spostamenti
   interrotti riprendono dopo un riavvio.
-- **Ha un motore suo.** `gx-core` è un'implementazione BitTorrent costruita per
-  questo progetto — BitTorrent v2, uTP, holepunching NAT, DHT IPv6,
-  streaming — in un processo molto più leggero di qBittorrent (vedi *Uso
-  delle risorse*).
+- **Ha un motore proprietario estremamente efficiente e perfezionato.** `gx-core`
+  è un'implementazione BitTorrent originale scritta da zero per questo
+  progetto — BitTorrent v2, TCP e uTP in parallelo su una sola porta,
+  holepunching NAT, DHT IPv6 e streaming. Gira con una frazione della memoria dei
+  client tradizionali (~25 MB a riposo, ~100 MB a 100 MB/s, fino a 50 volte più
+  leggero di qBittorrent) grazie a percorsi critici a zero allocazioni e
+  scrittura streaming diretta (vedi *Uso delle risorse*).
 - **Funziona anche da solo.** Lo stesso motore esiste come
   **[gx-torrent](https://github.com/buzzqw/gextto/releases)**, un client
   completo per Linux e Windows con UI web propria, API compatibile con
   qBittorrent per Sonarr/Radarr e una suite RSS all'altezza dei migliori.
-- **Si regola da solo.** Coda, cache disco e upload si adattano alla macchina
-  e alla linea; i download vanno in pausa prima che il disco si riempia; il
-  motore tiene i peer che consegnano e riusa i dati già su disco. Nessuna
-  taratura manuale.
-- **Si può controllare.** Go puro senza CGO, un processo sorvegliato per
-  componente, circa 1.780 funzioni di test e controlli di accessibilità con
-  axe-core.
+- **Si adatta, si calibra e si controlla da solo.** Coda dinamica, cache disco e
+  upload si adattano continuamente all'hardware (RAM, NVMe/SSD/HDD/NFS) e alla
+  latenza della linea (anti-bufferbloat); i download vanno in pausa prima che il
+  disco si riempia; il motore premia i peer veloci e scarta quelli lenti o
+  inattivi, riusando i dati già su disco tra swarm diversi. Diagnostica
+  dettagliata in tempo reale, telemetria delle connessioni e tassi di I/O sono
+  visibili a ogni livello.
+- **Si controlla e si distribuisce con facilità.** Go puro senza CGO, nessuna
+  dipendenza o build Node.js/npm, un processo sorvegliato per componente, oltre
+  1.780 funzioni di test e controlli di accessibilità con axe-core.
 
 ### In breve
 
@@ -55,7 +62,7 @@ binario per componente, nessuna dipendenza C, sei lingue nell'interfaccia.
 | **Rete** | TCP + uTP su una porta · UPnP, NAT-PMP, PCP · holepunching BEP 55 · proxy SOCKS5/HTTP · killswitch VPN |
 | **Automazione** | Serie TV, film, fumetti · Torznab (Jackett, Prowlarr) · RSS · ricerca web · recupero dei download bloccati |
 | **Integrazioni** | Jellyfin, Plex, Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
-| **Interfacce** | UI web (SSR + HTMX, PWA installabile) · TUI da terminale via SSH · API JSON |
+| **Interfacce** | UI web (SSR + HTMX, zero-Node/Go puro, PWA installabile) · TUI da terminale via SSH · API JSON |
 | **Build** | Go puro (`CGO_ENABLED=0`) · motore libtorrent opzionale · Linux x86_64/aarch64 · gx-torrent anche su Windows |
 
 ## Funzionalità
@@ -102,10 +109,11 @@ binario per componente, nessuna dipendenza C, sei lingue nell'interfaccia.
   archivio). Il pannello **Da controllare** raccoglie i casi anomali; gli
   avvisi a soglia segnalano le sorgenti che falliscono o rallentano.
 - **Interfacce.** UI web responsive installabile come PWA, interamente da
-  tastiera e verificata con axe-core; un selettore **Tema** unico con oltre 20
-  temi verificati per il contrasto più temi personali salvati sul server, che
-  ti seguono su ogni dispositivo; TUI completa via SSH. Sei lingue (IT, EN,
-  DE, FR, ES, PL).
+  tastiera e verificata con axe-core; renderizzata interamente server-side
+  (SSR + HTMX) con tutti gli asset incorporati — zero dipendenze o build
+  Node.js/npm; un selettore **Tema** unico con oltre 20 temi verificati per il
+  contrasto più temi personali salvati sul server, che ti seguono su ogni
+  dispositivo; TUI completa via SSH. Sei lingue (IT, EN, DE, FR, ES, PL).
 
 La UI è su `http://<host>:5000/`. Configurazione e sezioni sono nel
 [manuale italiano](docs/MANUAL.it.md) e nell'[English
@@ -169,39 +177,45 @@ tiene tutto il traffico BitTorrent sulla VPN. Il DHT (`internal/dht`) copre
 mainline IPv6, scrape, node ID sicuri CRC32C, modalità read-only (spenta di
 default) e store K/V firmato con client `get`/`put` in uscita.
 
-**Autogestione.** I download attivi seguono il throughput misurato (coda
-dinamica); i torrent lenti smettono di occupare slot e quelli fermi si fanno
-da parte. La cache disco si dimensiona su RAM libera, torrent attivi e tipo di
-disco (HDD, SSD, NFS); l'auto-speed sulla latenza riduce l'upload prima che la
-linea si saturi. Quando una cartella scende sotto la soglia di spazio libero
-(1 GiB di default), i download non finiti lì vanno in pausa da soli e
-ripartono — il seed continua, nessun errore di scrittura. La coda di richieste
-di ogni peer cresce con quello che consegna, un peer veloce lavora su due
-pezzi insieme e al limite di connessioni cade quella inutile e più lenta — mai
-una a caso. I pezzi dei file deselezionati non rendono mai un peer
-"interessante".
+**Autogestione e taratura continua.** Il motore calibra costantemente i
+propri parametri senza richiedere interventi manuali: i download attivi seguono
+il throughput misurato (coda dinamica); i torrent lenti lasciano spazio a quelli
+veloci e quelli fermi si fanno da parte. La cache disco si dimensiona in modo
+dinamico su RAM libera, torrent attivi e classe di storage (NVMe, SSD, HDD,
+NFS); l'auto-speed sulla latenza adatta l'upload prima che la linea si saturi
+(anti-bufferbloat). Quando una cartella scende sotto la soglia di spazio libero
+(1 GiB di default), i download non completati vanno in pausa da soli e riprendono
+all'occorrenza — il seeding prosegue, nessun errore di scrittura I/O. La coda di
+richieste di ogni peer si adatta alla sua velocità reale, i peer veloci lavorano
+su due pezzi in parallelo e al limite massimo di connessioni cade la connessione
+più lenta e improduttiva — mai una a caso. I pezzi dei file deselezionati non
+rendono mai un peer "interessante".
 
-**Impronta leggera, per scelta.** I pezzi vengono scritti subito; la page
-cache del sistema (recuperabile) fa l'accorpamento, quindi niente cache
-in-process da gigabyte. Cache di lettura a scadenza pigra e limitatore di
-scrittura dimensionati su RAM e disco tengono l'uso nelle decine di MB.
-`fdatasync` a lotti prima del salvataggio del bitfield (mai `O_SYNC` per
-scrittura); file sparsi, preallocazione `fallocate`, cartelle temporanee su
-RAM disk e modalità mmap opzionale su Linux (`-mmap`). Percorsi critici senza
-allocazioni (RC4 di MSE/PE sul posto, conteggi dei bitfield a parole,
-profondità di coda adattiva per peer). La blocklist IP (CIDR, intervalli, P2P,
-eMule) è unita in intervalli ordinati e cercata per bisezione senza
-allocazioni; le liste da URL si aggiornano a intervalli.
+**Impronta leggera, per scelta.** I pezzi vengono scritti direttamente in
+streaming; la page cache del sistema operativo fa l'accorpamento, eliminando la
+necessità di una cache in-process da vari gigabyte. Cache di lettura a scadenza
+pigra e limitatore di scrittura adattivo tengono la memoria nelle decine di MB
+anche sotto trasferimenti continui a 100 MB/s. `fdatasync` è eseguito a lotti
+prima di salvare i bitfield di resume (mai `O_SYNC` per singola scrittura);
+file sparsi, preallocazione `fallocate`, cartelle temporanee su RAM disk e
+modalità mmap opzionale su Linux (`-mmap`). Percorsi critici a zero allocazioni
+(RC4 di MSE/PE sul posto, bitfield vettoriali a parole di memoria, data-path uTP
+senza copie, buffer adattivi per peer). La blocklist IP (CIDR, intervalli, P2P,
+eMule) è unificata in intervalli ordinati e interrogata per bisezione senza
+allocare memoria; gli elenchi da URL si aggiornano a intervalli programmati.
 
-**Streaming e sicurezza.** Il selettore distingue la finestra del player
-(`SetStreamWindow`) dall'orizzonte di readahead (`SetReadaheadWindow`); le
-priorità per file si applicano a caldo e MKV/MP4 sono serviti in HTTP Range.
-Web seed e sorgenti magnet `xs=`/`as=` di default non raggiungono indirizzi
-privati (controllo sull'IP risolto, immune al rebinding). Torrent privati BEP
-27 rigorosi (niente DHT, PEX, LSD), quarantena di 30 minuti per i peer che
-inviano dati corrotti, tracker rimossi dopo `never` (BEP 31) o guasto
-prolungato, diagnostica per pezzo, resume in BoltDB, Server-Sent Events in
-tempo reale (`/ui/events`).
+**Streaming, sicurezza e telemetria.** Il selettore distingue nettamente la
+finestra di riproduzione del player (`SetStreamWindow`) dall'orizzonte di
+readahead (`SetReadaheadWindow`); le priorità per file si applicano a caldo e
+i file MKV/MP4 sono riprodotti fluidamente in streaming via HTTP Range. Web seed
+e sorgenti magnet `xs=`/`as=` implementano una rigida protezione SSRF (controllo
+sull'IP risolto, immune al DNS rebinding). Torrent privati rigorosi (BEP 27:
+niente DHT, PEX o LSD), quarantena di 30 minuti per i peer che inviano blocchi
+corrotti, tracker rimossi su BEP 31 `never` o fallimento prolungato. Controllo e
+telemetria completi: diagnostica per peer, tassi di lettura/scrittura e
+profondità di coda del disco, monitoraggio delle connessioni (TCP vs uTP),
+resume transazionale su BoltDB e flusso di Server-Sent Events in tempo reale
+(`/ui/events`).
 
 ### Confronto dei motori
 
@@ -391,7 +405,9 @@ npm ci
 npm run test:a11y
 ```
 
-La suite copre oggi le sezioni principali con 13 test. Non è una
+La suite automatizzata Playwright include 63 test end-to-end complessivi tra
+flussi, dialoghi e navigazione, di cui 13 dedicati specificamente alle verifiche
+di accessibilità WCAG con axe-core sulle sezioni principali. Non è una
 certificazione legale: restano necessari test manuali con screen reader,
 tastiera e tecnologie assistive. Ambito e limiti:
 [analisi di accessibilità](docs/evoluzione.md#8-accessibility).
@@ -401,6 +417,9 @@ tastiera e tecnologie assistive. Ambito e limiti:
 | Esigenza | Documento |
 |---|---|
 | Usare il servizio | [Manuale italiano](docs/MANUAL.it.md) · [English manual](docs/MANUAL.en.md) |
+| Architettura e design | [Architettura](docs/ARCHITECTURE.md) |
+| Specifiche BitTorrent (BEP) | [Conformità BEP](docs/bep.md) |
+| Evoluzione tecnica e roadmap | [Evoluzione e roadmap](docs/evoluzione.md) |
 | NAS, reverse proxy, ripristino | [Guida avanzata](docs/ADVANCED.it.md) |
 | Integrazioni HTTP | [Riferimento API](docs/API.md) |
 | Migrare un'installazione | [Guida migrazione](docs/MIGRATION.md) |
