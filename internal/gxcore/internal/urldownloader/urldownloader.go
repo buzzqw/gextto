@@ -16,7 +16,9 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
 
-// URLDownloader downloads files from a HTTP source.
+// URLDownloader fetches a piece range over HTTP (BEP 19/24 webseeds),
+// emitting one PieceResult per completed piece. The range end is atomic so
+// the picker can truncate a running download.
 type URLDownloader struct {
 	URL                 string
 	Begin, End, current uint32             // piece index
@@ -24,16 +26,17 @@ type URLDownloader struct {
 	closeC, doneC       chan struct{}
 }
 
-// PieceResult wraps the downloaded piece data.
+// PieceResult carries one downloaded piece (or its failure) to the torrent.
+// Done marks the range end.
 type PieceResult struct {
 	Downloader *URLDownloader
 	Buffer     bufferpool.Buffer
 	Index      uint32
 	Error      error
-	Done       bool // URL downloader finished downloading all requested pieces
+	Done       bool
 }
 
-// New returns a new URLDownloader for the given source and piece range.
+// New plans a fetch of [begin, end) from source, throttled by b.
 func New(source string, begin, end uint32, b *bandwidth.Limiter) *URLDownloader {
 	return &URLDownloader{
 		URL:     source,
@@ -46,18 +49,18 @@ func New(source string, begin, end uint32, b *bandwidth.Limiter) *URLDownloader 
 	}
 }
 
-// Close the URLDownloader.
+// Close aborts the download and waits for the run to unwind.
 func (d *URLDownloader) Close() {
 	close(d.closeC)
 	<-d.doneC
 }
 
-// String returns the URL being downloaded.
+// String names the source URL.
 func (d *URLDownloader) String() string {
 	return d.URL
 }
 
-// UpdateEnd updates the end index of the piece range being downloaded.
+// UpdateEnd truncates (or extends) the range while running.
 func (d *URLDownloader) UpdateEnd(value uint32) {
 	atomic.StoreUint32(&d.End, value)
 }
@@ -70,12 +73,14 @@ func (d *URLDownloader) incrCurrent() uint32 {
 	return atomic.AddUint32(&d.current, 1)
 }
 
-// ReadCurrent returns the index of piece that is currently being downloaded.
+// ReadCurrent is the piece currently being fetched.
 func (d *URLDownloader) ReadCurrent() uint32 {
 	return atomic.LoadUint32(&d.current)
 }
 
-// Run the URLDownloader and download pieces.
+// Run downloads the planned jobs in order: HTTP range fetches for data jobs,
+// buffer skips for padding jobs. A failing job reports its error and ends
+// the run, releasing the current buffer.
 func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile bool, resultC chan *PieceResult, pool *bufferpool.Pool, readTimeout time.Duration) {
 	defer close(d.doneC)
 	ctx, cancel := ctxutil.FromChan(d.closeC)
@@ -83,11 +88,11 @@ func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile
 
 	jobs := createJobs(pieces, d.Begin, d.readEnd())
 
-	var n int // position in piece
+	var n int // filled bytes in buf
 	buf := pool.Get(int(pieces[d.current].Length))
 
-	// completePiece sends the filled piece buffer as a result and prepares
-	// the buffer for the next piece. Returns true if this was the last piece.
+	// completePiece ships the filled buffer and opens the next piece.
+	// True means the range end was reached.
 	completePiece := func() (done bool) {
 		index := d.current
 		done = d.current >= d.readEnd()-1
@@ -96,25 +101,21 @@ func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile
 			return true
 		}
 		d.incrCurrent()
-		// Allocate new buffer for next piece
 		n = 0
 		buf = pool.Get(int(pieces[d.current].Length))
 		return false
 	}
 
-	// processPadding advances the position in the piece buffer without making
-	// a request. Padding files do not exist on the server. Their bytes are
-	// always zero and the buffer comes zeroed from the pool.
+	// processPadding skips padding spans: no request (padding is absent
+	// server-side), the zeroed pool buffer already holds the right bytes.
 	processPadding := func(job downloadJob) bool {
-		var m int64 // position in padding
+		var m int64 // consumed padding bytes
 		for m < job.Length {
-			skipSize := calcReadSize(buf, n, job, m)
-			n += int(skipSize)
-			m += skipSize
-			if n == len(buf.Data) { // piece completed
-				if completePiece() {
-					return true
-				}
+			skip := calcReadSize(buf, n, job, m)
+			n += int(skip)
+			m += skip
+			if n == len(buf.Data) && completePiece() {
+				return true
 			}
 		}
 		return true
@@ -135,19 +136,18 @@ func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile
 			return false
 		}
 		defer resp.Body.Close()
-		err = checkStatus(resp)
-		if err != nil {
+		if err := checkStatus(resp); err != nil {
 			d.sendResult(resultC, &PieceResult{Downloader: d, Error: err})
 			return false
 		}
 		timer := time.AfterFunc(readTimeout, cancel)
 		defer timer.Stop()
-		var m int64 // position in response
+		var m int64 // consumed response bytes
 		for m < job.Length {
 			readSize := calcReadSize(buf, n, job, m)
-			if waitDuration := d.bucket.Take(readSize); waitDuration > 0 {
+			if wait := d.bucket.Take(readSize); wait > 0 {
 				select {
-				case <-time.After(waitDuration):
+				case <-time.After(wait):
 				case <-d.closeC:
 					return false
 				}
@@ -159,14 +159,13 @@ func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile
 			}
 			n += o
 			m += int64(o)
-			if n == len(buf.Data) { // piece completed
-				if completePiece() {
-					return true
-				}
+			if n == len(buf.Data) && completePiece() {
+				return true
 			}
 		}
 		return true
 	}
+
 	for _, job := range jobs {
 		var ok bool
 		if job.Padding {
@@ -181,16 +180,18 @@ func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile
 	}
 }
 
+// calcReadSize bounds one read by the piece tail and the job tail alike.
 func calcReadSize(buf bufferpool.Buffer, bufPos int, job downloadJob, jobPos int64) int64 {
 	toPieceEnd := int64(len(buf.Data) - bufPos)
-	toResponseEnd := job.Length - jobPos
-	if toPieceEnd < toResponseEnd {
+	toJobEnd := job.Length - jobPos
+	if toPieceEnd < toJobEnd {
 		return toPieceEnd
 	}
-	return toResponseEnd
+	return toJobEnd
 }
 
-// readFull is similar to io.ReadFull call, plus it resets the read timer on each iteration.
+// readFull fills b like io.ReadFull, restarting the stall timer after every
+// read so a slow-but-moving server does not trip the timeout.
 func readFull(r io.Reader, b []byte, t *time.Timer, d time.Duration) (o int, err error) {
 	for o < len(b) && err == nil {
 		var nn int
@@ -204,6 +205,9 @@ func readFull(r io.Reader, b []byte, t *time.Timer, d time.Duration) (o int, err
 	return
 }
 
+// getURL addresses one file on the source: bare base URL for single-file
+// torrents (plus the file when the base is a directory), base plus path for
+// multi-file ones.
 func (d *URLDownloader) getURL(filename string, multifile bool) string {
 	src := d.URL
 	if !multifile {
@@ -218,11 +222,10 @@ func (d *URLDownloader) getURL(filename string, multifile bool) string {
 	return src + escapeFilePath(filename)
 }
 
-// escapeFilePath escapes each segment of the file's relative path separately,
-// keeping separators as literal slashes in the URL as required by BEP 19.
-// Escaping the whole path with url.PathEscape would encode separators as %2F,
-// which is not equivalent to a slash (RFC 3986) and is rejected by some servers.
-// Paths are built with filepath.Join, so they are split on the OS path separator.
+// escapeFilePath escapes each path segment separately, keeping slashes
+// literal as BEP 19 requires: a whole-path escape would turn them into %2F,
+// which some servers reject (RFC 3986 treats the two differently). Paths
+// arrive OS-joined, hence the OS separator split.
 func escapeFilePath(filename string) string {
 	parts := strings.Split(filename, string(filepath.Separator))
 	for i := range parts {
@@ -231,6 +234,7 @@ func escapeFilePath(filename string) string {
 	return strings.Join(parts, "/")
 }
 
+// sendResult delivers res unless the downloader closed meanwhile.
 func (d *URLDownloader) sendResult(resultC chan *PieceResult, res *PieceResult) {
 	select {
 	case <-d.closeC:
@@ -243,6 +247,7 @@ func (d *URLDownloader) sendResult(resultC chan *PieceResult, res *PieceResult) 
 	}
 }
 
+// checkStatus accepts full and partial content; anything else fails the job.
 func checkStatus(resp *http.Response) error {
 	switch resp.StatusCode {
 	case 200, 206:
