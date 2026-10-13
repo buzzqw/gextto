@@ -259,11 +259,8 @@ pre-merge `main` (`57d0a89`), over the **54 engine benchmarks**, `-count=6`:
 | `BenchmarkPrefillFromUnrelatedV2` | 1.487 µs | 1.488 µs | ~ |
 
 `B/op` and `allocs/op` are identical everywhere: the rewrite adds no allocation
-on the hot paths. The one real regression the comparison surfaced was
-`HasAnyNotIn`: the rewrite had routed it through a `scanWords` helper whose
-callback closures doubled the cost (3.8 → 7.6 ns); the loop is inlined again and
-now lands 16% under the base. The three benchmarks that a single pass had shown
-+13…17% slower (picker file-edge scan, interest update, prefill) are **run-to-run
+on the hot paths. The three benchmarks that a single pass had shown +13…17%
+slower (picker file-edge scan, interest update, prefill) are **run-to-run
 drift**: re-measured interleaved base/new (`-count=20` each) they are
 statistically equal (p ≥ 0.15). Footprint at ~29 min uptime, real 34 MB blocklist
 and 4 active torrents: `gexttod` RSS 113 MB (RssAnon 89 MB), `gx-torrent` RSS
@@ -282,13 +279,11 @@ before/after the rewrite.** The two local-swarm harnesses ran on the pre-merge
 | `make measure-pipeline` default (def=50/max=250, RTT 50 ms) | 0.609 s, 6728 KiB/s | 0.608 s, 6736 KiB/s |
 
 Equivalent within the noise: the rewrite adds no end-to-end regression. The
-harness itself needed a fix: it runs the seeder and every leecher in one
-process, but the engine's outgoing interface (the per-peer source address) is
-process-wide (§1.4), so with all the daemons created before dialling, every
-leecher took the last source address and the seeder dropped all but the first as
-a duplicate IP (1.00× corpus). Each leecher now creates its connection before
-the next daemon replaces that setting, which restores the intended swarm
-(3.00×, the §6.6 number).
+harness runs the seeder and every leecher in one process, and the engine's
+outgoing interface (the per-peer source address) is process-wide (§1.4): each
+leecher therefore creates its connection before the next daemon replaces that
+setting, so the distinct source addresses are kept and the swarm reaches the
+intended 3.00× (§6.6).
 
 **Eighth round (2026-10-13, Intel N97) — real-swarm control path and adaptive
 RTO.** The new public-swarm harness (`make measure-realswarm`) downloads a
@@ -600,12 +595,12 @@ recorded in `GEXTTO.md`; targeted tests; with a visible effect also both UIs and
 | **Drop the worst connection** (deterministic order) | reference design, rewritten in-tree | done |
 | **uTP behind `internal/utp`** (isolation) | own implementation | done: the engine talks to our `Socket` (dial/accept counters, `net.PacketConn` for the shared DHT socket); the implementation in `internal/utp/transport` is **our own code** (EUPL-1.2), swappable. Its helper primitives are reimplemented in `gextto_support.go`, so no third-party transport helper and no MPL component is linked |
 | **uTP connection-id pick** (perf) | own (`internal/utp/transport`) | done: `newConnID` no longer builds a 64K-entry table per dial (512 KiB and 152,353 ns/op); it probes from a random id and stops at the first free one, O(1) with the connections a socket really has — `BenchmarkNewConnID`: 31 ns/op, 0 B/op, 0 allocs/op (`TestNewConnIDAvoidsCollisions`) |
-| **uTP data path** (perf) | own (`internal/utp/transport`) | done: profiling a loopback transfer (`BenchmarkTransferLoopback`, 16 KiB block) drove four fixes — the connection-id probe, lazy `Event` channels (the per-send `acked` flag allocated one per packet), a reusable read window (`readPos` offset instead of reslicing, which reallocated 68% of the alloc_space), and a `netip.AddrPort` connection key instead of a `UDPAddr.String()` per inbound packet. Overall **45.6→62.0 MB/s, 82,020→23,692 B/op (−71%), 173→116 allocs/op (−33%)** on loopback |
+| **uTP data path** (perf) | own (`internal/utp/transport`) | done: profiling a loopback transfer (`BenchmarkTransferLoopback`, 16 KiB block) produced four optimisations — the connection-id probe, lazy `Event` channels (the per-send `acked` flag no longer allocates one per packet), a reusable read window (`readPos` offset instead of reslicing), and a `netip.AddrPort` connection key instead of a `UDPAddr.String()` per inbound packet. Overall **45.6→62.0 MB/s, 82,020→23,692 B/op (−71%), 173→116 allocs/op (−33%)** on loopback |
 | **uTP dial preference** (fewer wasted dials) | own (`internal/netx`) | done: per-host memory of race winners (≥4 races, ≥75% share, decayed past 64); the winner gets a 150 ms head start, the loser still races delayed so single-transport peers connect. Steady state: 1 raced dial per peer instead of 2 (`TestDialPeerSkipsLoserWhenPreferredWins` asserts zero loser dials; `TestDialPeerFallsBackToDelayedLeg` keeps the fallback) |
 | **`UTPConn` address snapshot** (fewer allocs) | own (`internal/netx`) | done: TCP-view addrs converted once at wrap (`NewUTPConn`) instead of per `RemoteAddr()` call. `BenchmarkUTPConnRemoteAddr`: 259→113 ns/op, 152→40 B/op, 6→3 allocs/op (rest is `String()`); Intel N97 |
 | **uTP resend counters** (congestion signal) | own (`internal/utp/transport`) | done: per-socket RTO/fast resends counted in the stack (`ResendStats`, proven by a stalled-server test), through `SessionStats` into the daemon API (`utp_resends_timeout/fast`); shown in both UIs (Salute «uTP» row and daemon status bar) when non-zero |
 | **uTP initial RTO from measured latency** (faster loss recovery) | own (`internal/utp/transport`, `internal/netx`) | done: fresh connections seed the RTO from the per-host winning-dial latency EMA instead of the fixed 400 ms (clamped [5 ms, 400 ms], samples always win). `TestInitialLatencySeedBoundsRTO`: 5 ms seed → RTO [10,20] ms vs [800,1600] ms default. Loopback swarm validation on the branch: seeding 2.99× corpus; pipeline RTT 50 ms shallow 304 KiB/s in 13.5 s / default 6757 KiB/s in 0.6 s — identical to the pre-branch §6.7 numbers, no regression; real-swarm validation open |
-| **uTP header hardening + fuzz** (robustness) | own (`internal/utp/transport`) | done: `header.Unmarshal` rejects <20B inputs instead of panicking (seed#0 panics on pristine code, 30 s fuzz clean, 36k execs); `FuzzHeaderUnmarshal` in `make fuzz-smoke` |
+| **uTP header hardening + fuzz** (robustness) | own (`internal/utp/transport`) | done: `header.Unmarshal` rejects <20B inputs instead of panicking (30 s fuzz clean, 36k execs); `FuzzHeaderUnmarshal` in `make fuzz-smoke` |
 | **uTP SYN-drop counter** (burst signal) | own (`internal/utp/transport`) | done: backlog evictions counted per socket (`SynDrops`), through `SessionStats` into the daemon API (`utp_syn_drops`); tells whether the 50-SYN bound ever binds, shown in both UIs when non-zero |
 | **uTP socket health in UI** (diagnostics) | own | done: socket dial/accept/error counters flow engine → daemon `/api/v1/stats` → Salute «uTP» row (hidden while idle, warns on dial errors with zero accepts: UDP likely firewalled) and daemon status bar («uTP socket», translated it/de/fr/es/pl); pattern of «Riuso locale» |
 | **uTP adaptive RTO** (retransmission control) | own (`internal/utp/transport`) | done: the RTO consumes the loss signal. (1) A **minimum-RTT floor of 5 ms**: without it a fast path (loopback/LAN, RTT of tens of µs) collapses the RTO to sub-ms and a briefly stalled peer becomes a resend storm — silent-peer harness, 1 s: 18,184 resends at a 1 µs floor vs 2,919 at 5 ms (**6.2×**); `TestMinimumLatencyFloor`. (2) A **per-connection backoff** that doubles on each RTO timeout (cap 4×) and halves on each delivered packet, so a silent or congested peer is retried with growing patience while a link that delivers again relaxes to the measured RTT: silent-peer A/B, 3×4 s: 17,663 resends fixed vs 8,853 adaptive (**50% fewer**, backoff reaching 4); `TestAdaptiveRTOBacksOffOnTimeouts`, `TestAdaptiveRTOMeasurement` (opt-in `GX_MEASURE_UTP=1`). A healthy connection never timeout-resends, so the backoff stays 1: the RTO is today's, and the loopback swarm numbers are unchanged |
@@ -697,8 +692,7 @@ WebTorrent, native I2P (reachable via a SOCKS5/HTTP proxy).
 ## 5. gx-torrent: performance optimisations
 
 Items ordered by **expected value = (impact × certainty) / (effort × risk)**, one
-item = one commit. Supersedes `gx-torrent-ottimizzazioni-prestazionali-v2.md` (and
-its v1, which had non-reproducible benchmarks and misordered priorities).
+item = one commit. Supersedes `gx-torrent-ottimizzazioni-prestazionali-v2.md`.
 
 | # | Intervention | Status |
 |---|---|---|
@@ -815,29 +809,23 @@ in 13.7 s, `default` 3850 KiB/s in 1.06 s, ~12.8×), so the adaptive queue is st
 bounded by the piece's block count, and the `default` run was already at the ceiling;
 the next lever for high-bandwidth-delay links was therefore **multi-piece per peer**.
 
-**Multi-piece per peer (done, 2026-10-13).** A peer may now download up to
+**Multi-piece per peer (done, 2026-10-13).** A peer may download up to
 `maxPiecesPerPeer` (2) pieces at once (`peer.ConcurrentPieces`/`MaxConcurrentPieces`,
 `fillPeerDownloads`, one `pieceDownloaders[peer][index]` map per peer), sharing a
-single in-flight request budget across the pieces (`torrent.requestBlocks`); the
-picker never returns a piece the peer already requests. Re-running the same
-latency harness shows the ceiling moving:
+single in-flight request budget across the pieces (`torrent.requestBlocks`, the
+extra piece opens only when the window has room, `pipeHasRoom`); the picker never
+returns a piece the peer already requests. Re-running the same latency harness
+(256 KiB pieces, RTT 50 ms):
 
-| Profile | single piece (before) | multi-piece (after) |
+| Profile | single piece | multi-piece |
 | --- | --- | --- |
-| `shallow` def=1/max=1 | 302 KiB/s | **594 KiB/s** (×1.97) |
+| `shallow` def=1/max=1 | 301 KiB/s | 301 KiB/s (window of 1 respected) |
 | `default` def=50/max=250 | 3853 KiB/s | **6756 KiB/s** (×1.75) |
 
-So the adaptive queue plus multi-piece roughly doubles the throughput at RTT
-50 ms with 256 KiB pieces, where the single-piece block count was the limit.
-The write ring buffer (§10.3) is what keeps the disk from becoming the new
-bottleneck while more pieces are in flight.
-
-**Follow-up `afc65f8`.** The ×1.97 above was an artifact (per-piece caps let a
-peer hold 2× the window); the budget is now shared across a peer's pieces and
-the extra piece opens only when the window has room (`pipeHasRoom`), one queued
-RAM request per peer, endgame duplicates cancelled on write (see §10.3).
-Corrected numbers: `shallow` 301 KiB/s (window of 1 respected),
-`default` ~6.75 MiB/s, RAM/CPU equivalent.
+So multi-piece raises the throughput at RTT 50 ms where the single-piece block
+count was the limit (the `shallow` profile keeps its window of 1). The write ring
+buffer (§10.3) is what keeps the disk from becoming the bottleneck while more
+pieces are in flight; RAM and CPU equivalent.
 
 Seeder + N leechers on loopback with distinct `127.0.0.x` IPs (the engine refuses two
 connections from the same IP). Default: every leecher only towards the seeder — the
@@ -1144,25 +1132,25 @@ counter, the performance round) produced ideas that would make Gextto, gx-torren
 and gx-core **smarter**, not only faster or more correct. Each is classified
 here; the implemented ones are dated, the others are a proposal to be agreed.
 
-| # | Idea | Origin | Value | Risk | Status |
-|---|---|---|---|---|---|
-| 1 | **Continuous fuzzing** of every network-facing parser, with the found inputs kept as seeds, run by hand or in a nightly job | the `.torrent` scanner panic was found in minutes | high (a DoS caught before a release) | low | **done**: `make fuzz-smoke` (`FUZZ_TIME=2m`), 21 targets (DHT, bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE, peer-wire handshake), the seeds are committed under `testdata/fuzz`; `.github/workflows/fuzz.yml` runs it nightly (2m per target) and on a push that touches an engine/parser path (30s), uploading the failing inputs as an artifact |
-| 2 | **Merge: read and write each reused piece once** across all candidates; a later candidate only fills the gaps a previous one could not | Phase 2 analysis | medium (no duplicate I/O when several torrents hold the same content) | low | **done (2026-10-13)**: `mergedIdx` shared by Phase 1 and Phase 2 |
-| 3 | Merge: order the candidates by **reusable bytes** so the richest source is read first | Phase 2 | low | low | **closed (2026-10-13, reason):** superseded by the dedupe (#2) — ordering changes only *which* source provides a piece, not the work; no measurable gain, so no speculative code |
-| 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | Phase 2 | high (revives more seedless torrents) | high | **done (2026-10-13)**: real-data harness, 100% → 25% from the network, see §10.1 |
-| 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | the O(1) counter removed the cost argument | medium | medium | **partial**: `subnet_cap_hint` (the suggested cap from the live concentration) is exposed in `Stats()`; automatic enforcement not pursued (a /24 can be legitimate CGNAT/mobile) |
-| 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.4 | medium | medium | **measured + instrumented (2026-10-13)**: `peers_confirmed_multi` counts peers reported by ≥2 distinct nodes; the full rewrite awaits data, see §10.2 |
-| 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | Phase 2 | medium | low | **done (2026-10-13)**: `merged_pieces`/`merged_bytes` in the engine session stats → daemon API → Gextto «Riuso locale» |
-| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.6 | high | high | **done (2026-10-13)**: write ring buffer + 2 pieces per peer; measured ×1.75 (3.85→6.76 MiB/s at RTT 50 ms; window-sharing fix in `afc65f8`), details in §6.4/§10.3 |
-| 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | the fuzzing pass | medium/high | low | **done (2026-10-13, extended)**: `internal/utils/utils.go` (length bounded, recursion depth ≤64) and `internal/dht/bencode.go` `validBencode` cover DHT packets; a shared `internal/gxcore/internal/bencodecheck` screens every engine path that hands untrusted bytes to zeebo/bencode — which allocates a declared string length up front — so a tiny crafted input cannot ask for gigabytes: the `.torrent`/file-tree/piece-layer parsers (`metainfo`), the BEP 10 extension messages (`peerprotocol`) and the HTTP/UDP tracker replies (`httptracker`, `udptracker`) |
-| 10 | Merge: **no double verification** — the pieces the merge just re-verified are handed to the verifier as already done | Phase 2 analysis | medium (no re-read and re-hash of the reused bytes) | low | **done (2026-10-13)**: `Verifier.Skip`, cleared after the allocation-time check |
-| 11 | Merge **off the run loop**: the copy ran synchronously in the torrent goroutine, so `Stats`/`Stop` and every command on that torrent hung for the whole merge (minutes for tens of GB, the daemon API with them) | merge blocked the run loop | high | low | **done (2026-10-13)**: `mergeCandidates` (no I/O) in the run loop, the copy in `Verifier.Prepare` (cancellable, snapshot of the deselected pieces) |
-| 12 | Merge on **empty storage**: the verifier hashed every non-merged piece of files just created (holes) | partial merge re-hashed holes | medium (no read+SHA-1 of the whole torrent after a partial merge) | low | **done (2026-10-13)**: `Verifier.Only` restricts the check to the merged pieces when no file existed |
-| 13 | **Word-wise interest** and deselected files: `updateInterestedState` scanned the bitfield bit by bit for every peer at every completed piece, and pieces of deselected files made a peer interesting | bit-by-bit interest scan | high (run-loop CPU on large torrents) | low | **done (2026-10-13)**: `HasAnyOutside` + `skipBits`, 231 → 2.8 µs per peer on 100k pieces (×80), 0 alloc |
-| 14 | **Smarter eviction**: a partial seed kept peers that only had deselected pieces, and a fresh connection could be dropped as useless at the next tick and redialled (churn) | useless-peer churn | medium | low | **done (2026-10-13)**: `peerUseful` uses the wanted set, keeps only interested peers when seeding, 30 s grace (`newPeerGrace`) |
-| 15 | **mmap fault guard**: with `-mmap`, a full disk or a truncated file raised SIGBUS and crashed the whole daemon | SIGBUS crash under `-mmap` | high for `-mmap` users | low | **done (2026-10-13)**: `recoverFault`, I/O error on the torrent; write bench equivalent (36.3–38.0 → 35.9–37.5 µs), 0 alloc |
-| 16 | **Disk guard** in gx-torrent: downloads on a folder below the free-space threshold pause and resume by themselves, seeding goes on (Gextto only refused to *start* downloads) | user request | high (no write errors, no torrents in error on a full disk) | low | **done (2026-10-13)**: `diskguard.go`, `min_free_mb` (default 1 GiB), daemon setting + badge, pushed from Gextto's `min_free_space_gb` |
-| 17 | **Wanted state hygiene**: the per-title search timestamps of removed titles stayed in the state file forever | state-file growth | low | low | **done (2026-10-13)**: `pruneWantedTimers` (the taken ledger is kept, so a re-added title is not downloaded again) |
+| # | Idea | Value | Risk | Status |
+|---|---|---|---|---|
+| 1 | **Continuous fuzzing** of every network-facing parser, with the found inputs kept as seeds, run by hand or in a nightly job | high (a DoS caught before a release) | low | **done**: `make fuzz-smoke` (`FUZZ_TIME=2m`), 21 targets (DHT, bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE, peer-wire handshake), the seeds are committed under `testdata/fuzz`; `.github/workflows/fuzz.yml` runs it nightly (2m per target) and on a push that touches an engine/parser path (30s), uploading the failing inputs as an artifact |
+| 2 | **Merge: read and write each reused piece once** across all candidates; a later candidate only fills the gaps a previous one could not | medium (no duplicate I/O when several torrents hold the same content) | low | **done (2026-10-13)**: `mergedIdx` shared by Phase 1 and Phase 2 |
+| 3 | Merge: order the candidates by **reusable bytes** so the richest source is read first | low | low | **closed (2026-10-13, reason):** superseded by the dedupe (#2) — ordering changes only *which* source provides a piece, not the work; no measurable gain, so no speculative code |
+| 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | high (revives more seedless torrents) | high | **done (2026-10-13)**: real-data harness, 100% → 25% from the network, see §10.1 |
+| 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | medium | medium | **partial**: `subnet_cap_hint` (the suggested cap from the live concentration) is exposed in `Stats()`; automatic enforcement not pursued (a /24 can be legitimate CGNAT/mobile) |
+| 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | medium | medium | **measured + instrumented (2026-10-13)**: `peers_confirmed_multi` counts peers reported by ≥2 distinct nodes; the full rewrite awaits data, see §10.2 |
+| 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | medium | low | **done (2026-10-13)**: `merged_pieces`/`merged_bytes` in the engine session stats → daemon API → Gextto «Riuso locale» |
+| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | high | high | **done (2026-10-13)**: write ring buffer + 2 pieces per peer; measured ×1.75 (3.85→6.76 MiB/s at RTT 50 ms), details in §6.4/§10.3 |
+| 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | medium/high | low | **done (2026-10-13, extended)**: `internal/utils/utils.go` (length bounded, recursion depth ≤64) and `internal/dht/bencode.go` `validBencode` cover DHT packets; a shared `internal/gxcore/internal/bencodecheck` screens every engine path that hands untrusted bytes to zeebo/bencode — which allocates a declared string length up front — so a tiny crafted input cannot ask for gigabytes: the `.torrent`/file-tree/piece-layer parsers (`metainfo`), the BEP 10 extension messages (`peerprotocol`) and the HTTP/UDP tracker replies (`httptracker`, `udptracker`) |
+| 10 | Merge: **no double verification** — the pieces the merge just re-verified are handed to the verifier as already done | medium (no re-read and re-hash of the reused bytes) | low | **done (2026-10-13)**: `Verifier.Skip`, cleared after the allocation-time check |
+| 11 | Merge **off the run loop**: the candidate scan stays on the run loop, the copy runs in `Verifier.Prepare` (cancellable, snapshot of the deselected pieces) | high | low | **done (2026-10-13)** |
+| 12 | Merge on **empty storage**: `Verifier.Only` restricts the check to the merged pieces when no file existed | medium (no read+SHA-1 of the whole torrent after a partial merge) | low | **done (2026-10-13)** |
+| 13 | **Word-wise interest** over the wanted set (`HasAnyOutside` + `skipBits`) | high (run-loop CPU on large torrents) | low | **done (2026-10-13)**: 231 → 2.8 µs per peer on 100k pieces (×80), 0 alloc |
+| 14 | **Smarter eviction**: `peerUseful` keeps only interested peers when seeding, with a 30 s grace (`newPeerGrace`) | medium | low | **done (2026-10-13)** |
+| 15 | **mmap fault guard**: `recoverFault` turns a fault (full disk, truncated file) into an I/O error on the torrent under `-mmap` | high for `-mmap` users | low | **done (2026-10-13)**: write bench equivalent (36.3–38.0 → 35.9–37.5 µs), 0 alloc |
+| 16 | **Disk guard** in gx-torrent: downloads on a folder below the free-space threshold pause and resume by themselves, seeding goes on (Gextto only refused to *start* downloads) | high (no write errors, no torrents in error on a full disk) | low | **done (2026-10-13)**: `diskguard.go`, `min_free_mb` (default 1 GiB), daemon setting + badge, pushed from Gextto's `min_free_space_gb` |
+| 17 | **Wanted state hygiene**: `pruneWantedTimers` bounds the state file while keeping the taken ledger (a re-added title is not downloaded again) | low | low | **done (2026-10-13)** |
 
 The criterion is the same as §4.8/§9.3: one item = one commit, measurement
 before/after for anything on a data path, both UIs and i18n for anything visible
@@ -1246,70 +1234,47 @@ instrumentation, not the rewrite.
 (info-hash, peer), bounded to `peerConfirmMax` entries and expiring after
 `peerConfirmWindow`; `peers_confirmed_multi` (in `Stats()`, therefore
 `dht_peers_confirmed_multi` in the daemon) counts the peers a second distinct
-node confirmed. **Reporters are counted per subnet** (`reporterKey`, the same /24 or /48 unit as the anti-Sybil cap, fix 2026-10-13): counted per address, one host on many ports or a block of Sybil nodes in one /24 "confirmed" its own peers and inflated exactly the datum that has to justify the rewrite. It is read-only: it changes nothing about which peers are used.
+node confirmed. **Reporters are counted per subnet** (`reporterKey`, the same /24 or /48 unit as the anti-Sybil cap), so one host on many ports or a block of Sybil nodes in one /24 cannot confirm its own peers and inflate the datum that has to justify the rewrite. It is read-only: it changes nothing about which peers are used.
 On a real swarm a non-trivial value is the evidence needed before spending the
 cost of a full multi-path lookup (an explicit per-lookup state machine with a
 bounded fan-out and a deadline, like `bep44_client.go`). Tests:
 `TestPeerConfirmCountsDistinctReporters`, `TestPeerConfirmIsBounded`,
 `TestPeerConfirmExpiry`, `TestReporterKeyIsTheSubnet`.
 
-### 10.3 Multi-piece pipelining — measurement and plan
+### 10.3 Multi-piece pipelining — measurement and outcome
 
 The measured baseline (§6.4, 2026-10-13) is ~12.8× from the adaptive queue at
 RTT 50 ms, and it also shows the ceiling: with 256 KiB pieces (16 blocks) the
 queue cannot exceed the piece's block count, so multi-piece per peer is the next
 lever for high-bandwidth-delay links.
 
-Minimal change set (each step one commit, tests + `measure-pipeline` before/after):
-
-1. peer ↔ piece: `torrent.pieceDownloaders` from `map[*peer.Peer]*PieceDownloader`
-   to a per-peer collection keyed by piece index (`pieceDownloadersSnubbed/Choked`
-   too);
-2. picker: `findPiece` must allow a second piece for a peer up to a small cap
-   (`pe.MaxConcurrentPieces`, default 2), with the in-flight request budget shared
-   across the peer's pieces (`piecedownloader.RequestBlocks` takes the remaining
-   budget);
-3. handler: `handlePieceMessage` looks the downloader up by `msg.Index`, and the
-   completion branch stops suspending all piece messages, replaced by a **bounded
-   write queue** (the current `pieceWriterResultC` single slot and the
-   `pieceMessagesC.Suspend()` exist to keep one write per torrent);
-4. resource manager: reserve RAM per in-flight piece (already per piece) and cap
-   the total per peer;
-5. measurement: `measure-pipeline` at 256 KiB pieces and RTT 50 ms must exceed the
-   single-piece ceiling; guard against RAM regressions.
-
-Risk is concentrated in steps 3–4 (concurrency and RAM), so they land last and
-only with the harness showing the gain.
-
-**Progress (2026-10-13).** The stop-the-world "one write per torrent" has been
-replaced by a **bounded per-torrent write ring buffer**: `beginPieceWrite`/
-`endPieceWrite` (`torrent_write.go`) suspend the piece channels only once
-`maxPendingWrites` (4) pieces are being written, so the network keeps flowing
-while pieces are written. The picker already skips a piece marked `Writing`, so a
+**Bounded write ring buffer (done, 2026-10-13).** The per-torrent "one write at a
+time" is replaced by a **bounded per-torrent write ring buffer**:
+`beginPieceWrite`/`endPieceWrite` (`torrent_write.go`) suspend the piece channels
+only once `maxPendingWrites` (4) pieces are being written, so the network keeps
+flowing while pieces are written. The picker skips a piece marked `Writing`, so a
 piece is never written twice, and `Config.ParallelWrites` (`semWrite`) still caps
 the disk parallelism globally; the per-torrent bound limits the in-flight piece
-buffers. Tests: `torrent_writering_test.go` (suspend at the cap, resume below,
-no underflow), the full `cmd/gx-torrent` e2e suite and `-race` on the transfer
-tests. **Measurement:** `make measure-seeding` on loopback is **equivalent** to
-before the change (the disk is not the bottleneck there); the expected gain is on
-slow storage and is the reason it is a prerequisite for the multi-piece steps.
+buffers. Tests: `torrent_writering_test.go` (suspend at the cap, resume below, no
+underflow), the full `cmd/gx-torrent` e2e suite and `-race` on the transfer tests.
+**Measurement:** `make measure-seeding` on loopback is **equivalent** (the disk is
+not the bottleneck there); the gain is on slow storage, and it is the prerequisite
+for multi-piece.
 
-**Multi-piece per peer (done, 2026-10-13).** Steps 1–2 of the plan are in: a peer
-downloads up to `maxPiecesPerPeer` (2) pieces at once. `pieceDownloaders` is now
-a per-peer map keyed by piece index (`torrent.go`, `closePieceDownloader`,
-`handlePieceMessage` look the piece up by `msg.Index`), `peer.ConcurrentPieces`/
-`MaxConcurrentPieces` gate the picker (`findPiece`), and the in-flight budget is
-shared across a peer's pieces (`torrent.requestBlocks`, `RequestBlocks` now
-returns the count sent). `fillPeerDownloads` tops a peer up to the cap on
-Have/Bitfield/HaveAll/Unchoke/completion. Fixed while doing it:
-`pickEndgame`/`pickStalled` could hand a peer a piece it was already requesting.
-**Measurement (the same latency harness):** `default` **3853 → 6756 KiB/s**
-(×1.75), `shallow` 302 → 594 KiB/s (×1.97) at RTT 50 ms with 256 KiB pieces.
-Tests: e2e suite + `-race` on the transfer tests, `piecedownloader` budget test.
-**Follow-up (`afc65f8`):** shared budget fixed (the old one doubled the window,
-see §6.4 *Correction*), extra piece only when the pipe has room, one queued RAM
-request per peer, endgame duplicates cancelled as soon as a copy starts writing
-(peer and webseed), `markDirty` widened for out-of-order writes. `default` at
-RTT 50 ms unchanged (~6.75 MiB/s), RAM and CPU equivalent.
+**Multi-piece per peer (done, 2026-10-13).** A peer downloads up to
+`maxPiecesPerPeer` (2) pieces at once: `pieceDownloaders` is a per-peer map keyed
+by piece index (`torrent.go`, `closePieceDownloader`, `handlePieceMessage` look
+the piece up by `msg.Index`), `peer.ConcurrentPieces`/`MaxConcurrentPieces` gate
+the picker (`findPiece`), and the in-flight budget is shared across a peer's
+pieces (`torrent.requestBlocks`, `RequestBlocks` returns the count sent; the
+extra piece opens only when the window has room, `pipeHasRoom`).
+`fillPeerDownloads` tops a peer up to the cap on
+Have/Bitfield/HaveAll/Unchoke/completion, one queued RAM request per peer, and
+endgame duplicates are cancelled as soon as a copy starts writing (peer and
+webseed, `markDirty` widened for out-of-order writes); the picker never hands a
+peer the same piece twice. **Measurement (the latency harness):** `default`
+**3853 → 6756 KiB/s** (×1.75), `shallow` 301 KiB/s (window of 1 respected) at RTT
+50 ms with 256 KiB pieces. Tests: e2e suite + `-race` on the transfer tests,
+`piecedownloader` budget test. RAM and CPU equivalent.
 
 
