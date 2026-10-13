@@ -144,15 +144,26 @@ func (t *torrent) serveHashes(req peerprotocol.HashRequestHeader) ([][merkle.Has
 	if fi < 0 {
 		return nil, false
 	}
-	var tree *merkle.LayerTree
-	if req.Base == 0 {
-		// Leaf/block layer: needs the file data, so only a file we fully have.
-		tree = t.v2BlockTree(fi)
-	} else if t.info().V2Files[fi].Length > int64(t.info().PieceLength) {
-		// The piece layer and above come from the attached piece hashes; a file
-		// that fits in one piece has no layer entry.
-		tree = t.v2Tree(fi)
+	level := merkle.PieceLevel(int(t.info().PieceLength))
+	if level < 0 {
+		return nil, false
 	}
+	// At or above the piece layer the answer comes from the attached piece
+	// hashes: no file data is needed, so a partly downloaded file serves it too.
+	if int(req.Base) >= level {
+		return getHashes(t.v2Tree(fi), req)
+	}
+	// Below the piece layer the answer needs the file's 16 KiB blocks.
+	if t.v2FileComplete(fi) {
+		return getHashes(t.v2BlockTree(fi), req)
+	}
+	// A partly downloaded file can still serve the leaf layer when the request
+	// spans at least one piece, so its proof lives at or above the piece layer.
+	return t.servePartialBlockHashes(fi, level, req)
+}
+
+// getHashes wraps LayerTree.GetHashes, mapping "cannot serve" to a hash reject.
+func getHashes(tree *merkle.LayerTree, req peerprotocol.HashRequestHeader) ([][merkle.HashSize]byte, bool) {
 	if tree == nil {
 		return nil, false
 	}
@@ -161,6 +172,110 @@ func (t *torrent) serveHashes(req peerprotocol.HashRequestHeader) ([][merkle.Has
 		return nil, false
 	}
 	return got, true
+}
+
+// servePartialBlockHashes serves a leaf-layer (base 0) hash request from a v2
+// file that is only partly downloaded: it computes just the requested 16 KiB
+// leaf hashes from the verified pieces and anchors them with the piece layer's
+// uncles, so a leecher can still fetch block hashes for the parts the seed has.
+// It refuses (hash reject) when a requested leaf sits in a missing piece, when
+// the range folds to a node below the piece layer (its uncles would need
+// missing blocks) or when the proof cannot reach the root.
+func (t *torrent) servePartialBlockHashes(fi, level int, req peerprotocol.HashRequestHeader) ([][merkle.HashSize]byte, bool) {
+	length := int(req.Length)
+	index := int(req.Index)
+	proof := int(req.ProofLayers)
+	if req.Base != 0 || length < 1 || length&(length-1) != 0 || index < 0 || index%length != 0 || proof < 0 {
+		return nil, false
+	}
+	m := merkle.Log2(length)
+	if m < level {
+		return nil, false
+	}
+	leaves, ok := t.blockLeavesRange(fi, index, length)
+	if !ok {
+		return nil, false
+	}
+	ret := append([][merkle.HashSize]byte{}, leaves...)
+	if proof > 0 {
+		tree := t.v2Tree(fi)
+		if tree == nil {
+			return nil, false
+		}
+		height := tree.Height()
+		if m >= height || proof > height-m {
+			return nil, false
+		}
+		// The requested range folds to the node at level m (in the piece tree);
+		// its sibling chain up to the root is the proof.
+		up, ok := getHashes(tree, peerprotocol.HashRequestHeader{
+			Root:        req.Root,
+			Base:        uint32(m),
+			Index:       uint32(index >> m),
+			Length:      1,
+			ProofLayers: uint32(proof - 1),
+		})
+		if !ok || len(up) != proof+1 {
+			return nil, false
+		}
+		ret = append(ret, up[1:]...) // drop the node itself, keep the uncles
+	}
+	return ret, true
+}
+
+// blockLeavesRange computes the 16 KiB leaf hashes of the file blocks
+// [index, index+length). It requires every covering piece to be verified;
+// otherwise the leaves cannot be trusted, so it reports false.
+func (t *torrent) blockLeavesRange(fi, index, length int) ([][merkle.HashSize]byte, bool) {
+	if t.pieces == nil || t.bitfield == nil {
+		return nil, false
+	}
+	f := t.info().V2Files[fi]
+	totalBlocks := int((f.Length + merkle.BlockSize - 1) / merkle.BlockSize)
+	if index < 0 || length < 1 || index+length > totalBlocks {
+		return nil, false
+	}
+	pieceLength := int(t.info().PieceLength)
+	if pieceLength < merkle.BlockSize || pieceLength%merkle.BlockSize != 0 {
+		return nil, false
+	}
+	blocksPerPiece := pieceLength / merkle.BlockSize
+	start, count := t.v2FilePieceRange(fi)
+	if count == 0 {
+		return nil, false
+	}
+	leaves := make([][merkle.HashSize]byte, 0, length)
+	var buf []byte
+	for first := index; first < index+length; {
+		p := first / blocksPerPiece
+		if p < 0 || p >= count {
+			return nil, false
+		}
+		global := start + p
+		if global >= len(t.pieces) || !t.bitfield.Test(uint32(global)) {
+			return nil, false
+		}
+		pc := &t.pieces[global]
+		if int(pc.Length) > len(buf) {
+			buf = make([]byte, pc.Length)
+		}
+		data := buf[:pc.Length]
+		if _, err := pc.Data.ReadAt(data, 0); err != nil {
+			return nil, false
+		}
+		ls := merkle.LeafHashes(data)
+		lo := max(index, p*blocksPerPiece) - p*blocksPerPiece
+		hi := min(index+length, p*blocksPerPiece+len(ls)) - p*blocksPerPiece
+		if lo < 0 || hi > len(ls) || lo >= hi {
+			return nil, false
+		}
+		leaves = append(leaves, ls[lo:hi]...)
+		first = p*blocksPerPiece + hi
+	}
+	if len(leaves) != length {
+		return nil, false
+	}
+	return leaves, true
 }
 
 // v2BlockCacheBudget bounds the memory the block-layer trees of one torrent may
