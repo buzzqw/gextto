@@ -2752,6 +2752,27 @@ request per peer, endgame duplicates cancelled as soon as a copy starts writing
 (peer and webseed), `markDirty` widened for out-of-order writes. `default` at
 RTT 50 ms unchanged (~6.75 MiB/s), RAM and CPU equivalent.
 
+
+### 16.4 Review of the night commits (2026-10-13)
+
+The last 24 hours of engine commits were re-read for correctness and for the
+"smartness" they promised; items 11–16 of the table above are what came out of
+it (commits `7eeb059`, `3d149b7`, `98a0297`, `5c2eb99`, after `afc65f8` for the
+pipelining window). Confirmed sound and kept as they are: the ranged mmap flush
+(with the out-of-order fix of `afc65f8`), the O(1) per-subnet counter, the
+bencode screen of DHT packets, the write ring buffer and the never-wedging RAM
+budget.
+
+**Measurement (before `5574f62` → after `9811849`, same machine):** latency
+harness at RTT 50 ms `default` 6750–6755 → 6739–6755 KiB/s, `shallow` 302 →
+302–303 KiB/s, peak RSS 32.3–34.2 → 34.1–34.3 MiB; `measure-seeding` (4
+leechers) seeder 1.00x corpus in both, RSS 30.6 → 32.6 MiB (run-to-run noise,
+32.5–32.6 in earlier runs), CPU 6.0 → 6.2 s. Equivalent, as expected: these
+harnesses neither merge nor carry 100k-piece torrents. The targeted gains are
+measured where they apply: interest check ×80 (`BenchmarkUpdateInterestNothingWanted`),
+merge no longer on the run loop (Stats/Stop answer during it), no hashing of
+empty storage after a partial merge.
+
 ---
 
 ## Appendix A: consolidated files
