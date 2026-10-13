@@ -124,8 +124,14 @@ func uiGxEngineStats(engine TorrentEngine) uiEngineStats {
 		out.Rows[len(out.Rows)-1].Detail = engineString(mapping, "error")
 	}
 	add("DHT", onOff(engineBool(stats, "dht"), fmt.Sprintf("%d nodi", engineNum(session, "dht_nodes"))), false)
-	add("uTP", onOff(engineBool(stats, "utp"), fmt.Sprintf("connessioni in uscita uTP %d / TCP %d · in entrata uTP %d",
-		engineNum(session, "peers_outgoing_utp"), engineNum(session, "peers_outgoing_tcp"), engineNum(session, "peers_incoming_utp"))), false)
+	utpText := fmt.Sprintf("connessioni in uscita uTP %d / TCP %d · in entrata uTP %d",
+		engineNum(session, "peers_outgoing_utp"), engineNum(session, "peers_outgoing_tcp"), engineNum(session, "peers_incoming_utp"))
+	utpWarn := false
+	if v, ok, warn := uiUTPSocketRow(session); ok {
+		utpText += " · " + v
+		utpWarn = warn
+	}
+	add("uTP", onOff(engineBool(stats, "utp"), utpText), utpWarn)
 	lsdText := onOff(engineBool(lsd, "enabled"), fmt.Sprintf("%d peer trovati in rete locale", engineNum(lsd, "peers_found")))
 	add("LSD", lsdText, engineString(lsd, "error") != "")
 	out.Rows[len(out.Rows)-1].Detail = engineString(lsd, "error")
@@ -179,6 +185,26 @@ func uiMergeReuseRow(session map[string]any) (string, bool) {
 		row += fmt.Sprintf(" · %d pezzi riusati a blocchi", partial)
 	}
 	return row, true
+}
+
+// uiUTPSocketRow renders the uTP socket dial/accept counters, hidden while
+// the socket never dialled nor accepted. Socket errors warn only when
+// nothing was ever accepted: persistent dial errors with zero accepts point
+// at firewalled UDP (or CGNAT), where uTP cannot work and TCP carries
+// everything; with accepts flowing the errors are noise.
+func uiUTPSocketRow(session map[string]any) (string, bool, bool) {
+	dials := engineNum(session, "utp_dials")
+	accepts := engineNum(session, "utp_accepts")
+	if dials <= 0 && accepts <= 0 {
+		return "", false, false
+	}
+	dialErrs := engineNum(session, "utp_dial_errors")
+	acceptErrs := engineNum(session, "utp_accept_errors")
+	row := fmt.Sprintf("socket: %d dial / %d accept", dials, accepts)
+	if dialErrs+acceptErrs > 0 {
+		row += fmt.Sprintf(" · errori %d dial / %d accept", dialErrs, acceptErrs)
+	}
+	return row, true, dialErrs > 0 && accepts == 0
 }
 
 func uiEmbeddedEngineStats(s *AppState, engine TorrentEngine) uiEngineStats {
