@@ -41,18 +41,18 @@ and `make vet`; invariants `scripts/check-ui-settings-index.sh` /
 Correlation IDs and the runbook are done (see §1.3). Metrics over time are
 stored in the database and shown in *Health*, without Prometheus:
 
-- ~~duration of searches and sources that do not respond, cycle by cycle~~ —
+- **Duration of searches and sources that do not respond, cycle by cycle** —
   done (2026-10-10): `CycleStats` stores duration and outcome per source per cycle
   (`cycle_history`), with the **Searches** panel in *Health* (`uiweb.go`,
   `RecentCycleStats`, `ScrapeAll`);
-- ~~warning above a threshold~~ — done (2026-10-10): `cycle_monitor.go` warns
+- **Warning above a threshold** — done (2026-10-10): `cycle_monitor.go` warns
   (WARN line + notification) if a source has failed in 3 of the last searches,
   if the last search exceeds 3 hours or if there has been no error-free cycle for 3
   intervals (minimum 2 hours), and signals the return to normal;
-- ~~titles in the queue with their waiting time~~ — done (2026-10-10): **Title
+- **Titles in the queue with their waiting time** — done (2026-10-10): **Title
   queue** panel in *Health* (`Database.PendingQueue`, `pending_queue.go`), with
   title, wait since `first_seen_at` and time to `due_at` (series and movies);
-- ~~failed imports per day~~ — done (2026-10-10): **Failed imports** panel
+- **Failed imports per day** — done (2026-10-10): **Failed imports** panel
   in *Health* (`Database.FailedImportsDaily`, `acquisition.go`), which counts per
   day the import ERRORs from `acquisition_events`;
 - the health of the manager's indexers is already in Sources (`indexer_health.go`).
