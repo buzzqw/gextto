@@ -1202,7 +1202,7 @@
 {{end}}
 
 {{define "v2_logs_view"}}
-<pre class="log-view" id="v2-logs-view" data-v2-logs-lines>{{range .Lines}}<span class="log-line">{{.}}</span>{{end}}</pre>
+<pre class="log-view" id="v2-logs-view" tabindex="0" role="region" aria-label="File di log" data-v2-logs-lines>{{range .Lines}}<span class="log-line">{{.}}</span>{{end}}</pre>
 {{end}}
 
 {{define "v2_gx_log_panel"}}
@@ -1234,7 +1234,7 @@
 {{end}}
 
 {{define "v2_gx_log_view"}}
-{{if .Lines}}<pre class="log-view" id="v2-gx-log-view">{{range .Lines}}<span class="log-line">{{.}}</span>{{end}}</pre>{{else}}<pre class="log-view" id="v2-gx-log-view"><span class="muted">Nessuna riga da mostrare: gx-torrent potrebbe non essere il motore attivo o il log non è ancora stato creato.</span></pre>{{end}}
+{{if .Lines}}<pre class="log-view" id="v2-gx-log-view" tabindex="0" role="region" aria-label="File di log gx-torrent">{{range .Lines}}<span class="log-line">{{.}}</span>{{end}}</pre>{{else}}<pre class="log-view" id="v2-gx-log-view" tabindex="0" role="region" aria-label="File di log gx-torrent"><span class="muted">Nessuna riga da mostrare: gx-torrent potrebbe non essere il motore attivo o il log non è ancora stato creato.</span></pre>{{end}}
 {{end}}
 
 {{/* ------------------------------------------------------------------ */}}
@@ -1255,13 +1255,13 @@
 {{define "v2_license"}}
 <div class="view">
   <div class="panel">
-    <div class="panel-head"><h3>Licenza</h3></div>
-    <div class="panel-body"><pre class="log-view">{{.Text}}</pre></div>
+    <div class="panel-head"><h3 id="v2-license-heading">Licenza</h3></div>
+    <div class="panel-body"><pre class="log-view" tabindex="0" role="region" aria-labelledby="v2-license-heading">{{.Text}}</pre></div>
   </div>
   {{if .ThirdParty}}
   <div class="panel">
-    <div class="panel-head"><h3>Componenti di terze parti</h3></div>
-    <div class="panel-body"><pre class="log-view">{{.ThirdParty}}</pre></div>
+    <div class="panel-head"><h3 id="v2-thirdparty-heading">Componenti di terze parti</h3></div>
+    <div class="panel-body"><pre class="log-view" tabindex="0" role="region" aria-labelledby="v2-thirdparty-heading">{{.ThirdParty}}</pre></div>
   </div>
   {{end}}
 </div>
@@ -1855,7 +1855,7 @@
       {{if .CanApply}}<form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" hx-confirm="Aggiornare Gextto ora? Il servizio si riavvia al termine." style="display:inline"><input type="hidden" name="action" value="apply" /><button class="btn sm primary" type="submit">Aggiorna ora</button></form>{{end}}
       {{if .CheckedAt}}<small class="muted"><span>Ultimo controllo:</span> {{.CheckedLabel}}</small>{{end}}
     </div>
-    {{if .LastLog}}<details><summary>Log dell'ultimo aggiornamento</summary><pre class="log-view">{{.LastLog}}</pre></details>{{end}}
+    {{if .LastLog}}<details><summary id="v2-update-lastlog-heading">Log dell'ultimo aggiornamento</summary><pre class="log-view" tabindex="0" role="region" aria-labelledby="v2-update-lastlog-heading">{{.LastLog}}</pre></details>{{end}}
     {{end}}
   </div>
 </div>

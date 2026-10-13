@@ -275,7 +275,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <button type="button" class="sm" id="log-reload" title="Reload latest logs from server">Reload</button>
         <span class="muted" id="log-info"></span>
       </div>
-      <pre class="logview" id="log-view">Loading…</pre>
+      <pre class="logview" id="log-view" tabindex="0" role="region" aria-label="Log">Loading…</pre>
     </div>
     {{end}}
 

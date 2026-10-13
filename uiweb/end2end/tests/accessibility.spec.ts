@@ -90,4 +90,22 @@ test.describe("accessibilità automatizzata", () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(2);
   });
+
+  test("i riquadri di log scorrevoli sono accessibili da tastiera e hanno un ruolo regione", async ({ page }) => {
+    await page.goto("/?view=logs");
+    const logView = page.locator("#v2-logs-view");
+    await expect(logView).toBeVisible();
+    await expect(logView).toHaveAttribute("tabindex", "0");
+    await expect(logView).toHaveAttribute("role", "region");
+    await logView.focus();
+    await expect(logView).toBeFocused();
+
+    await page.goto("/?view=maintenance");
+    const gxLogView = page.locator("#v2-gx-log-view");
+    await expect(gxLogView).toBeVisible();
+    await expect(gxLogView).toHaveAttribute("tabindex", "0");
+    await expect(gxLogView).toHaveAttribute("role", "region");
+    await gxLogView.focus();
+    await expect(gxLogView).toBeFocused();
+  });
 });

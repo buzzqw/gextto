@@ -675,7 +675,7 @@ func TestV2LogsAndStaticAndNoJSFallback(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	if code, body := v2Request(t, server, http.MethodGet, "/?view=logs", nil); code != http.StatusOK || !strings.Contains(body, "v2-logs-view") {
+	if code, body := v2Request(t, server, http.MethodGet, "/?view=logs", nil); code != http.StatusOK || !strings.Contains(body, "v2-logs-view") || !strings.Contains(body, `tabindex="0"`) || !strings.Contains(body, `role="region"`) {
 		t.Fatalf("logs page -> %d", code)
 	}
 	if code, css := v2Request(t, server, http.MethodGet, "/static/v2.css", nil); code != http.StatusOK || !strings.Contains(css, ".logs-toolbar") {
