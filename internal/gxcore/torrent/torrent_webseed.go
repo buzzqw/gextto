@@ -36,7 +36,10 @@ func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 	// "already have the piece" check in handlePieceWriteDone, so discard the
 	// stale result. This mirrors handlePieceMessage, which drops blocks whose
 	// downloader is no longer current.
-	if piece.Done {
+	//
+	// With the write ring buffer the result can also arrive while a peer's copy
+	// of the same piece is still being written (Writing): it is just as stale.
+	if piece.Done || piece.Writing {
 		t.log.Debugf("discarding already completed piece #%d from webseed %s", msg.Index, msg.Downloader.URL)
 		t.bytesWasted.Inc(int64(len(msg.Buffer.Data)))
 		msg.Buffer.Release()
@@ -73,6 +76,7 @@ func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 		t.crash("piece is already writing")
 	}
 	piece.Writing = true
+	t.cancelDuplicateDownloads(piece.Index)
 
 	// Bound the write ring buffer: the network keeps flowing while up to
 	// maxPendingWrites pieces are written.

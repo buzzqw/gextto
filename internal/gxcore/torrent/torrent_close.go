@@ -81,6 +81,7 @@ func (t *torrent) closePieceDownloader(pd *piecedownloader.PieceDownloader) {
 		return
 	}
 	delete(m, pd.Piece.Index)
+	pe.PipeRefillTried = false
 	if len(m) == 0 {
 		delete(t.pieceDownloaders, pe)
 		pe.Downloading = false

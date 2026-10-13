@@ -61,6 +61,15 @@ type Peer struct {
 	// Both are touched only from the torrent goroutine.
 	ConcurrentPieces    int
 	MaxConcurrentPieces int
+	// RAMQueued is true while a piece-buffer request for this peer is queued
+	// in the session's RAM manager, so repeated triggers (every HAVE) do not
+	// pile up duplicate requests. Torrent goroutine only.
+	RAMQueued bool
+	// PipeRefillTried is set once the torrent tried to open an extra piece
+	// because this peer's request pipe ran dry, and cleared when one of its
+	// pieces starts or ends: it bounds that attempt (a piece-picker scan) to
+	// once per piece instead of once per received block. Torrent goroutine only.
+	PipeRefillTried bool
 
 	// RequestQueue is the adaptive number of block requests kept in flight for
 	// this peer. It starts at DefaultRequestsOut (or the peer's

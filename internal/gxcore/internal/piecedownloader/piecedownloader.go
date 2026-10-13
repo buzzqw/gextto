@@ -154,6 +154,12 @@ func (d *PieceDownloader) RequestBlocks(queueLength int) int {
 	return requested
 }
 
+// Pending returns the number of block requests in flight.
+func (d *PieceDownloader) Pending() int { return len(d.pending) }
+
+// Remaining returns the number of blocks not requested yet.
+func (d *PieceDownloader) Remaining() int { return len(d.remaining) }
+
 // Done returns true if all blocks of the piece has been downloaded.
 func (d *PieceDownloader) Done() bool {
 	return len(d.done) == len(d.blocks)

@@ -15,9 +15,11 @@ func (fakeFile) WriteAt(p []byte, off int64) (int, error) { return len(p), nil }
 
 type fakePeer struct{ requested []uint32 }
 
-func (p *fakePeer) RequestPiece(index, begin, length uint32) { p.requested = append(p.requested, begin) }
-func (p *fakePeer) CancelPiece(index, begin, length uint32)  {}
-func (p *fakePeer) EnabledFast() bool                        { return false }
+func (p *fakePeer) RequestPiece(index, begin, length uint32) {
+	p.requested = append(p.requested, begin)
+}
+func (p *fakePeer) CancelPiece(index, begin, length uint32) {}
+func (p *fakePeer) EnabledFast() bool                       { return false }
 
 // TestRequestBlocksReturnsCount: RequestBlocks reports how many requests it
 // sent, so a caller can share one in-flight budget across a peer's pieces.

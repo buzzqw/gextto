@@ -19,9 +19,9 @@ func TestRetryInParsing(t *testing.T) {
 		{"never", 0, true},
 		{"NEVER", 0, true},
 		{"Never", 0, true},
-		{"0", 0, false},     // a zero retry is "no hint", not a pause
-		{"-5", 0, false},    // invalid: fall back to the backoff
-		{"soon", 0, false},  // invalid: fall back to the backoff
+		{"0", 0, false},    // a zero retry is "no hint", not a pause
+		{"-5", 0, false},   // invalid: fall back to the backoff
+		{"soon", 0, false}, // invalid: fall back to the backoff
 	}
 	for _, c := range cases {
 		e := NewError("failure", c.in)

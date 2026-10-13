@@ -3,6 +3,7 @@ package torrent
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
@@ -42,6 +43,29 @@ func (t *torrent) endPieceWrite() {
 	if t.pendingWrites < maxPendingWrites {
 		t.pieceMessagesC.Resume()
 		t.webseedPieceResultC.Resume()
+	}
+}
+
+// cancelDuplicateDownloads stops the other peers still fetching piece i
+// (endgame or stalled duplicates) once one complete copy is being written.
+// Writes no longer suspend the piece channels (write ring buffer), so their
+// blocks would keep arriving during the write and a second complete copy would
+// try to write the same piece again. The picker skips a Writing piece, so the
+// freed slots go to other pieces; if the hash check fails the piece is picked
+// again as usual. The requested set is cloned because closing a downloader
+// removes the peer from it (swap-with-last), which would skip peers.
+func (t *torrent) cancelDuplicateDownloads(i uint32) {
+	if t.piecePicker == nil {
+		return
+	}
+	for _, pe := range slices.Clone(t.piecePicker.RequestedPeers(i)) {
+		pd := t.pieceDownloaders[pe][i]
+		if pd == nil {
+			continue
+		}
+		t.closePieceDownloader(pd)
+		pd.CancelPending()
+		t.fillPeerDownloads(pe)
 	}
 }
 
@@ -103,15 +127,7 @@ func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 			}
 		}
 
-		for _, pe := range t.piecePicker.RequestedPeers(pw.Piece.Index) {
-			pd2 := t.pieceDownloaders[pe][pw.Piece.Index]
-			if pd2 == nil {
-				continue
-			}
-			t.closePieceDownloader(pd2)
-			pd2.CancelPending()
-			t.fillPeerDownloads(pe)
-		}
+		t.cancelDuplicateDownloads(pw.Piece.Index)
 	}
 
 	// Tell everyone that we have this piece

@@ -88,7 +88,12 @@ func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
 		pe := pd.Peer.(*peer.Peer)
 		if pd.AllowedFast || !pe.PeerChoking {
 			t.boostRequestQueue(pe)
-			t.requestBlocks(pe)
+			if t.requestBlocks(pe) && !pe.PipeRefillTried {
+				// The window has room no current piece can fill: try an
+				// extra piece once (multi-piece pipelining).
+				pe.PipeRefillTried = true
+				t.fillPeerDownloads(pe)
+			}
 			pe.ResetSnubTimer()
 		}
 		return
@@ -101,6 +106,7 @@ func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
 		t.crash("piece is already writing")
 	}
 	piece.Writing = true
+	t.cancelDuplicateDownloads(piece.Index)
 
 	// Request next piece while writing the completed piece, being optimistic about hash check.
 	t.fillPeerDownloads(pe)

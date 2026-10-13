@@ -35,6 +35,7 @@ func (t *torrent) run() {
 		case ve := <-t.verifierResultC:
 			t.handleVerificationDone(ve)
 		case data := <-t.ramNotifyC:
+			data.RAMQueued = false
 			t.startSinglePieceDownloader(data)
 		case addrs := <-t.addrsFromTrackers:
 			t.handleNewPeers(addrs, peersource.Tracker)

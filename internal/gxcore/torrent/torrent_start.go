@@ -202,13 +202,33 @@ func (t *torrent) startPieceDownloaders() {
 }
 
 // fillPeerDownloads starts pieces for the peer until it reaches the
-// multi-piece cap (maxPiecesPerPeer) or no piece is available.
+// multi-piece cap (maxPiecesPerPeer) or no piece is available. A peer always
+// gets a first piece; an extra one only when the pipe has room (pipeHasRoom),
+// so a piece large enough to keep the request window full does not reserve a
+// second piece buffer for nothing.
 func (t *torrent) fillPeerDownloads(pe *peer.Peer) {
-	for len(t.pieceDownloaders[pe]) < maxPiecesPerPeer {
+	for n := len(t.pieceDownloaders[pe]); n < maxPiecesPerPeer; n = len(t.pieceDownloaders[pe]) {
+		if n > 0 && !t.pipeHasRoom(pe) {
+			return
+		}
 		if !t.startPieceDownloaderFor(pe) {
 			return
 		}
 	}
+}
+
+// pipeHasRoom reports whether the peer's request window has room that its
+// current pieces cannot fill: every block is already requested and fewer than
+// maxAllowedRequests are in flight. Only then is a further piece worth its RAM.
+func (t *torrent) pipeHasRoom(pe *peer.Peer) bool {
+	pending := 0
+	for _, pd := range t.pieceDownloaders[pe] {
+		if pd.Remaining() > 0 {
+			return false
+		}
+		pending += pd.Pending()
+	}
+	return pending < t.maxAllowedRequests(pe)
 }
 
 func (t *torrent) startPieceDownloaderForWebseed(src *webseedsource.WebseedSource) (started bool) {
@@ -249,8 +269,9 @@ func (t *torrent) startWebseedDownloader(sp *piecepicker.WebseedDownloadSpec) {
 // maxPiecesPerPeer is how many pieces of one torrent a peer may download at the
 // same time. Above one, a peer whose current piece has fewer blocks than its
 // request budget keeps the pipe full on a second piece instead of idling; the
-// service is still bounded by the shared request budget and by the RAM reserved
-// per piece.
+// extra piece is opened only when the pipe really has room (pipeHasRoom), and
+// the service stays bounded by the shared request budget and by the RAM
+// reserved per piece.
 const maxPiecesPerPeer = 2
 
 func (t *torrent) startPieceDownloaderFor(pe *peer.Peer) bool {
@@ -266,8 +287,14 @@ func (t *torrent) startPieceDownloaderFor(pe *peer.Peer) bool {
 	if t.session.ram == nil {
 		return t.startSinglePieceDownloader(pe)
 	}
+	if pe.RAMQueued {
+		// A request is already waiting for this peer: its grant arrives on
+		// ramNotifyC and starts the piece then.
+		return false
+	}
 	ok := t.session.ram.Request(t.id, pe, int64(t.info().PieceLength), t.ramNotifyC, pe.Done())
 	if !ok {
+		pe.RAMQueued = true
 		return false
 	}
 	return t.startSinglePieceDownloader(pe)
@@ -299,6 +326,7 @@ func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) (started bool) {
 	t.pieceDownloaders[pe][pi.Index] = pd
 	pe.ConcurrentPieces++
 	pe.Downloading = true
+	pe.PipeRefillTried = false
 	t.requestBlocks(pe)
 	pe.ResetSnubTimer()
 	return true
@@ -306,15 +334,25 @@ func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) (started bool) {
 
 // requestBlocks refills the peer's in-flight block requests across all of its
 // pieces, sharing one budget (maxAllowedRequests) between them so multi-piece
-// pipelining does not multiply the in-flight window.
-func (t *torrent) requestBlocks(pe *peer.Peer) {
+// pipelining does not multiply the in-flight window: the budget is what is
+// left after the requests already pending on every piece. It reports whether
+// the window still has room that no current piece can fill (pipeHasRoom).
+func (t *torrent) requestBlocks(pe *peer.Peer) (room bool) {
+	m := t.pieceDownloaders[pe]
 	budget := t.maxAllowedRequests(pe)
-	for _, pd := range t.pieceDownloaders[pe] {
-		if budget <= 0 {
-			break
-		}
-		budget -= pd.RequestBlocks(budget)
+	for _, pd := range m {
+		budget -= pd.Pending()
 	}
+	remaining := 0
+	for _, pd := range m {
+		if budget > 0 {
+			// RequestBlocks caps the piece's own pending count, so the
+			// shared budget is added on top of what it already has in flight.
+			budget -= pd.RequestBlocks(pd.Pending() + budget)
+		}
+		remaining += pd.Remaining()
+	}
+	return budget > 0 && remaining == 0
 }
 
 func (t *torrent) maxAllowedRequests(pe *peer.Peer) int {

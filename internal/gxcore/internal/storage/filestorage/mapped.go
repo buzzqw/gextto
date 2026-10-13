@@ -78,10 +78,13 @@ func (m *mmapFile) markDirty(begin, end int64) {
 	defer m.mu.Unlock()
 	if n := len(m.dirty); n > 0 {
 		last := &m.dirty[n-1]
-		if begin <= last.end {
-			if end > last.end {
-				last.end = end
-			}
+		// Overlapping or adjacent on either side: widen the last interval.
+		// Concurrent piece writes (write ring buffer) land out of order, so a
+		// write just before the last interval must widen its start too, or
+		// its bytes would never be flushed.
+		if begin <= last.end && end >= last.begin {
+			last.begin = min(last.begin, begin)
+			last.end = max(last.end, end)
 			return
 		}
 	}

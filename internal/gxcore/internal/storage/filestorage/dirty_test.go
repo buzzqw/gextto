@@ -114,3 +114,22 @@ func TestMmapRangedSyncPersists(t *testing.T) {
 		t.Fatalf("tail = %q, want first", got[size-64:size-59])
 	}
 }
+
+// TestMarkDirtyOutOfOrderWrite: with concurrent piece writes a range can land
+// just before the last tracked one. The merged interval must widen its start
+// too, or those bytes would never be msync'd.
+func TestMarkDirtyOutOfOrderWrite(t *testing.T) {
+	m := &mmapFile{}
+	m.markDirty(1000, 2000)
+	m.markDirty(500, 1000) // adjacent, before
+	m.markDirty(300, 600)  // overlapping, before
+	want := []dirtyRange{{300, 2000}}
+	if !reflect.DeepEqual(m.dirty, want) {
+		t.Fatalf("dirty = %v, want %v", m.dirty, want)
+	}
+	m.markDirty(0, 100) // disjoint, before: a new interval
+	want = []dirtyRange{{300, 2000}, {0, 100}}
+	if !reflect.DeepEqual(m.dirty, want) {
+		t.Fatalf("dirty = %v, want %v", m.dirty, want)
+	}
+}
