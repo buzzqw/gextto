@@ -58,24 +58,13 @@ binario per componente, nessuna dipendenza C, sei lingue nell'interfaccia.
 | **Interfacce** | UI web (SSR + HTMX, PWA installabile) · TUI da terminale via SSH · API JSON |
 | **Build** | Go puro (`CGO_ENABLED=0`) · motore libtorrent opzionale · Linux x86_64/aarch64 · gx-torrent anche su Windows |
 
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                        Gextto Media Orchestrator                       │
-│  Decision Engine · Parse & Scoring · Multi-Indexer · Post-Processing   │
-│  Server-Side UI (HTMX + SSR) · Terminal TUI · Media Integrations       │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                     │ Engine contract (torrent_engine.go)
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                  gx-torrent (Managed / Standalone Daemon)              │
-│  Web UI · qBittorrent Web API v2 · RSS rules, archive, wanted titles   │
-│  Linux Service (systemd) and Native Windows Service (NTFS Junctions)   │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                     │
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                    gx-core Engine (internal/gxcore)                    │
-│  BitTorrent v1 / v2 (BEP 52 Merkle) · uTP (BEP 29) · Holepunch (BEP 55)│
-│  Dual-Stack IPv6 DHT (BEP 32/42/44) · Streaming · MSE In-Place · Zero CGO│
-└────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    orchestrator["Gextto Media Orchestrator<br/>Decision engine · Scoring · Multi-indexer · Post-processing<br/>Web UI (HTMX + SSR) · TUI · Integrations"]
+    daemon["gx-torrent — managed / standalone daemon<br/>Web UI · qBittorrent API · RSS, archive, wanted"]
+    engine["gx-core engine<br/>BitTorrent v1 / v2 · uTP · Holepunching<br/>IPv6 DHT · Streaming · Pure Go"]
+    orchestrator -- "engine contract (torrent_engine.go)" --> daemon
+    daemon -- "built on" --> engine
 ```
 
 ## Funzionalità
