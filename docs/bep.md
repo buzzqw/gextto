@@ -37,14 +37,28 @@ stay narrow and the tables remain readable.
 | 38 | Finding Local Data Via Torrent File Hints (`similar`/`collections`) | yes |
 | 40 | Canonical Peer Priority (tie-break) | yes |
 | 47 | Padding Files (`.pad/`) | yes |
-| 54 | The `lt_donthave` extension (a peer no longer has a piece) | yes (reception) |
+| 54 | The `lt_donthave` extension (a peer no longer has a piece) | partial (reception) |
 
 > **BEP 38 (`similar`/`collections`).** The hints are read from the info
 > dictionary **and** from the top level (merged, deduplicated), re-emitted in
 > the `.torrent` export and shown together with the local torrents that share a
-> hint. The **block-level reuse** of the shared data is a separate feature,
-> **Swarm Merging**, tracked in
-> [Remaining items](#remaining-items-and-roadmap), item 3.
+> hint. The **reuse of the shared data** — the point of the BEP — is
+> **Swarm Merging**, which is *not* driven by the hints but by the structure
+> (an identical piece layout, or an equal v2 per-file Merkle root): matching on
+> the identity of the bytes is what makes the reuse safe. Phases 1–3 are done
+> (`evoluzione.md` §9.2 and §10.1), including block-granularity reuse and the
+> resume path; see [Remaining items](#remaining-items-and-roadmap), item 3.
+>
+> **BEP 54 (`lt_donthave`).** Implemented on the **reception** side and
+> advertised in the BEP 10 handshake: a peer that drops a piece it had
+> announced has its availability cleared and the in-flight fetch cancelled
+> (without the fast extension; with it, the peer rejects the request
+> individually). Sending is **intentionally not implemented**: gx-core never
+> revokes a verified piece — there is no piece eviction or discard path — so
+> the only honest trigger for a `donthave` (dropping data it told a peer it
+> had) never occurs. If such a path is ever added, the extension is already
+> negotiated and the message type exists (`peerprotocol.DontHaveMessage`);
+> hence **partial**, not `no`.
 
 ## Transport, encryption and NAT
 
@@ -66,7 +80,14 @@ stay narrow and the tables remain readable.
 | 34 | DNS Tracker Preferences (SRV records) | no |
 
 > **BEP 31** honours `retry in` (in minutes) and `never`; `never` drops the
-> tracker from the tier. **BEP 34** is used by very few trackers.
+> tracker from the tier.
+>
+> **BEP 34 (DNS Tracker Preferences)** is not implemented: it lets a tracker
+> host advertise its endpoints as SRV records (`_udp.…`, `_http._tcp.…`) so a
+> client can find a tracker without a literal `host:port`. Almost no public
+> tracker publishes SRV records, and the ones that do are also reachable
+> through their normal announce URL, so the feature would add a DNS dependency
+> and a second discovery path for a case that does not occur in practice.
 
 ## DHT (Mainline / BEP 5)
 
@@ -94,6 +115,17 @@ stay narrow and the tables remain readable.
 >
 > **BEP 46** is reached through the magnet parameter `xs=urn:btpk:`, resolved by
 > the BEP 44 client on add.
+>
+> **BEP 45** and **BEP 51** are deliberately not implemented. BEP 45
+> (multi-homed DHT) lets a node reachable on several interfaces announce
+> several addresses per family; a home/NAS client with one public address gains
+> nothing from it, and the dual-stack case is already covered by BEP 32
+> (`nodes6`/`want`). BEP 51 (`sample_infohashes`) exposes a node's whole
+> infohash index so that crawlers can enumerate the swarm: it is a service for
+> indexers, and it adds a privacy and load surface (the node publishes **what it
+> is storing**) that a home client neither needs nor wants. Both are marginal
+> for this client, cost > benefit, and stay in
+> [Remaining items](#remaining-items-and-roadmap).
 
 ## BitTorrent v2 and magnet
 
@@ -147,8 +179,11 @@ stay narrow and the tables remain readable.
 
 ## Remaining items and roadmap
 
-1. **BEP 45 (DHT multi-address)** and **BEP 51 (`sample_infohashes`)**: marginal
-   for a home/NAS client (multi-interface; indexing for crawlers).
+1. **BEP 34 (DNS Tracker Preferences)**, **BEP 45 (DHT multi-address)** and
+   **BEP 51 (`sample_infohashes`)**: not implemented by choice — SRV trackers are
+   practically unused, multi-homed DHT is marginal for a single-address
+   home/NAS client (dual-stack is already BEP 32), and infohash indexing is a
+   crawler service with a privacy/load cost. Reasons in the notes above.
 2. **10 Gbps throughput (pipelining)**: the adaptive request queue already
    exists; every change must be **measured before and after** (CPU, RAM,
    throughput), as per the performance rule in `AGENTS.md`.
@@ -156,9 +191,14 @@ stay narrow and the tables remain readable.
    info dictionary **and** from the top level (merged, deduplicated), re-emitted
    in the `.torrent` export and shown together with the local torrents that
    share a hint (API `GET /api/v1/torrents/{hash}/collections`, daemon
-   page, detail in Gextto). The **actual block reuse** — the
-   real gain of the BEP — is **Swarm Merging** (`evoluzione.md` §9.2): here
-   there is only the discovery of candidates.
+   page, detail in Gextto). The **reuse of the shared data** — the real gain of
+   the BEP — is **Swarm Merging** (`evoluzione.md` §9.2), and it is **done**:
+   Phases 1–3 reuse whole pieces of an identical layout, whole identical v2
+   files with a different piece length, and 16 KiB blocks of a partially
+   verified source; the merge also runs on the **resume path**, so a restart no
+   longer drops the block-level reuse. What is left is only an *enhancement*
+   outside the BEP: re-triggering the merge when a sibling publishes its data
+   *after* a torrent allocated.
 
 ## Maintenance
 

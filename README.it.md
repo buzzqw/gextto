@@ -162,6 +162,8 @@ dimensione diversa — vengono copiati e ricontrollati in background invece di
 essere scaricati; le sorgenti parziali contribuiscono con i loro blocchi da 16
 KiB verificati e dalla rete arriva solo il resto (sulle ISO Debian e Arch con
 una sorgente completa al 75%, dalla rete è arrivato il 25% invece del 100%).
+Il riuso sopravvive al riavvio: un torrent ripreso dallo stato salvato
+ricostruisce i blocchi locali invece di riscaricarli.
 I torrent privati non vengono mai mescolati (BEP 27).
 
 **Rete.** TCP e uTP (BEP 29) in parallelo con fallback automatico su una sola

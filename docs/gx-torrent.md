@@ -1130,10 +1130,13 @@ the other's storage, **re-verifies them against its own hashes** and writes them
 into its own, so it restarts only from the missing pieces and can complete
 **even without peers**. It is useful for a reloaded episode or for different
 `.torrent`s of the same content, and «resurrects» a torrent without a seeder
-when the content is already present elsewhere. Merging is **disabled if one side
-is a private torrent** (BEP 27): mixing private swarms violates the tracker
-rules. It is independent of the **BEP 38** hints, which serve to *report* the
-candidates.
+when the content is already present elsewhere. The merge also runs when a
+torrent is **reloaded from its resume data**: the pieces the reloaded bitfield
+already verified are kept (never re-read or re-hashed) and the merge fills the
+rest and re-derives the block-level reuse, so a restart does not lose it.
+Merging is **disabled if one side is a private torrent** (BEP 27): mixing
+private swarms violates the tracker rules. It is independent of the **BEP 38**
+hints, which serve to *report* the candidates.
 
 Two levels:
 

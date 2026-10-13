@@ -1089,18 +1089,35 @@ Accounting (bitfield/completion) per torrent.
   guard is checked on both the snapshot and the parsed info. Tests:
   `torrent/localmerge_v2_test.go` (different layout, partial source, different
   content, private).
-- **No v1 with a different layout:** no ED2K/partial heuristics of BiglyBT.
+- **Phase 3 (block granularity) — done (2026-10-13, `storePartialBlocks`/
+  `prefillBlocks`):** the destination pieces that straddle verified and
+  unverified source pieces reuse the verified 16 KiB blocks (`partialBlocks`);
+  the downloader reads them from disk and requests only the rest. See §10.1.
+- **Resume path — done (2026-10-13):** the merge also runs when a torrent is
+  **reloaded from its resume data** instead of being freshly allocated
+  (`handleAllocationDone` + `startMergeVerifier` with the reloaded bitfield).
+  The pieces the reloaded bitfield already verified are kept and the merge fills
+  the rest, so a restart no longer drops the block-level reuse; the verifier
+  takes the reloaded and merged pieces through `Skip`/`Only`, so **nothing is
+  re-read or re-hashed** on that path.
+
+**No v1 with a different layout:** no ED2K/partial heuristics of BiglyBT.
 
 **Critical guard: BEP 27.** The merge is disabled if A **or** B is private
 (`info.Private`): mixing private swarms violates the tracker rules and pollutes
 ratio/statistics. It is a guard, not an option.
 
 **Test/measurement.** `torrent/localmerge_test.go` (reuse, different content, private
-guard) and `cmd/gx-torrent/swarmmerge_test.go` (end-to-end: B populated from disk,
-A with identical content and a different name completes **without peers**). The two tests
-also pass with `-race`. Effort: Phase 1 **medium** (done), Phase 2 **large**.
+guard), `torrent/localmerge_resume_test.go` (the resume path through
+`handleAllocationDone`: missing pieces filled and partial blocks re-derived, the
+reloaded pieces kept without a re-read) and `cmd/gx-torrent/swarmmerge_test.go`
+(end-to-end: B populated from disk, A with identical content and a different
+name completes **without peers**; `TestDaemonSwarmMergeResumePath` reloads A from
+resume across a daemon restart). The tests also pass with `-race`. Effort:
+Phase 1 **medium** (done), Phase 2 **large**.
 
-**Cost.** The merge runs once per torrent, at the end of the allocation: the
+**Cost.** The merge runs once per torrent, at the end of the allocation (and on
+a resume from the reloaded bitfield): the
 per-piece comparison (hash and length) happens **only** for the torrents with the
 same `piece length` and the same total length (the outer filter is O(torrent)
 with two field reads), and only the pieces that pass the comparison involve
@@ -1113,6 +1130,10 @@ re-verified against this torrent's own hashes are also handed to the verifier
 only the pieces that were already on disk are verified again. The skip set is
 consumed and cleared at the allocation-time verification, so a later manual
 re-check verifies everything.
+On the **resume path** the same filter runs before starting the pieces from the
+reloaded bitfield; when nothing is reusable it costs 115 ns and 0 allocations
+over 32 unrelated session torrents (`BenchmarkMergeCandidatesUnrelated`), and
+when something is, the merge is the intended work (§10.1).
 
 ### 9.3 Verification criterion (like §4.8)
 
@@ -1198,9 +1219,30 @@ and measures the bytes taken from the network; `GX_MEASURE_MERGE3_PEER` with
 | Debian with a libtorrent 2.0.11 seeder | — | 25.0% from the network, complete |
 
 All 756 (Debian) and 1565 (Arch) destination pieces were reused at block level
-and every one passed its hash. The reused blocks are not persisted: after a
-restart from the resume data, the blocks of pieces not yet completed are
-downloaded again (the merge does not run on that path).
+and every one passed its hash. The reused blocks are not persisted as such, but
+the merge now re-runs on the **resume path** (`handleAllocationDone` +
+`startMergeVerifier`, §9.2): after a restart from the resume data the blocks of
+the pieces not yet completed are re-derived from the source and are **not**
+downloaded again.
+
+**Resume-path measurement (2026-10-13, `TestMeasureMergeResumePath` on the
+Debian ISO, same harness/data as above).** A destination merged with no peer,
+then paused and reloaded by a restarted leecher session, downloads after the
+restart:
+
+| Run (loopback) | before (no resume merge) | after (resume merge) |
+| --- | --- | --- |
+| Debian 756 MiB: from the network after the restart | 792,723,456 B (100%) | **198,180,864 B (25.0%)** |
+| merged_bytes re-derived | 0 | 594,542,592 B |
+| partial (block-level) pieces re-derived | 0 | 756 (every destination piece) |
+| total time | 2.61 s | 1.00 s |
+
+Exactly the no-restart Phase 3 figure: the reloaded bitfield is kept (no piece
+re-read or re-hashed via `Verifier.Skip`/`Only`) and the block-level reuse is
+re-derived, so a restart no longer re-downloads the file. On the resume path the
+added cost when nothing is reusable is only the candidate filter: **115 ns and
+0 allocations** over 32 unrelated session torrents
+(`BenchmarkMergeCandidatesUnrelated`).
 
 ### 10.2 DHT multi-path — measurement and plan
 
