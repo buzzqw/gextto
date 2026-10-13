@@ -573,6 +573,7 @@ recorded in `GEXTTO.md`; targeted tests; with a visible effect also both UIs and
 | **Ranged mmap flush** | anacrolix `undirtied-chunks-iter.go` | done |
 | **Global in-flight budget — liveness** | anacrolix `MaxUnverifiedBytes`/`alloclim` | done |
 | **Drop the worst connection** (deterministic order) | anacrolix `worse-conns.go` | done |
+| **uTP behind `internal/utp`** (isolation) | anacrolix `utp` | in progress (`exp/utp-intree`): the engine talks to our `Socket` (dial/accept counters, `net.PacketConn` for the shared DHT socket); implementation still anacrolix, swappable |
 
 ### 4.4 DHT: hardening and multi-path
 

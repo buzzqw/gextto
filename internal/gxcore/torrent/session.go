@@ -16,8 +16,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/anacrolix/utp"
 	"github.com/buzzqw/gextto/internal/dht"
+	"github.com/buzzqw/gextto/internal/utp"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bandwidth"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/blocklist"

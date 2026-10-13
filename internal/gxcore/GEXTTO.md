@@ -174,4 +174,6 @@ The DHT lives in `internal/dht` (a module of its own). Features:
   O(1) per insert/update, kept in sync on insert/update/kill), not a scan of the
   address book.
 
-uTP uses the `github.com/anacrolix/utp` library as a dependency.
+uTP goes through `internal/utp` (`Socket` + dial/accept counters): the
+implementation is currently provided by the `github.com/anacrolix/utp`
+library, isolated behind our own API so it can be tuned or replaced.
