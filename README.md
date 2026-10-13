@@ -33,6 +33,9 @@ engine written from scratch in pure Go.
   **[gx-torrent](https://github.com/buzzqw/gextto/releases)**, a
   standalone client for Linux and Windows with a full web UI, a qBittorrent-
   compatible API for Sonarr/Radarr, and an RSS manager on par with the best.
+- **It runs itself.** The engine adapts its queue, cache and upload to the
+  machine and the line, pauses downloads before the disk fills up, keeps the
+  peers that deliver and reuses what is already on disk — no tuning needed.
 - **It is honest software.** Pure Go, no C dependencies, one binary per
   component, about 1,600 test functions, accessibility checked with axe-core,
   six interface languages.
@@ -113,11 +116,18 @@ Its engine core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementati
 - **Port mapping and diagnostics:** UPnP, NAT-PMP and **PCP** (RFC 6887), a port check that also reads the external port the DHT sees (cone vs symmetric NAT), SOCKS5 and HTTP CONNECT proxies, and an interface-binding killswitch (`outgoing-interface`) that keeps all BitTorrent traffic on the VPN.
 - **DHT subsystem (`internal/dht`):** mainline (BEP 5), dual-stack IPv6 (32), scrape (33), secure node IDs with CRC32C (42), read-only mode (43, off by default: a full client should serve the DHT it uses), signed immutable/mutable K/V storage with an outbound `get`/`put` client (44), `urn:btpk:` magnet updates (46).
 
+#### Self-management: it runs itself
+
+- **Queue that adapts:** the number of active downloads follows the measured throughput (dynamic queue), slow torrents stop counting against the slots and a download that moves no data is set aside so another one can run.
+- **Cache and bandwidth that follow the machine:** the disk cache is resized from the free RAM, the active torrents and the disk type (HDD, SSD, NFS); latency auto-speed lowers the upload before the line saturates (anti-bufferbloat), so browsing and calls stay smooth.
+- **Disk guard:** when a download folder drops below the free-space threshold (1 GiB by default, Gextto's *minimum free space* when set) the unfinished downloads there pause by themselves and resume when space returns; seeding goes on and nothing ends in a write error.
+- **Peers worth keeping:** each peer's request queue grows with what it delivers and a fast peer works on two pieces at once; when a torrent is at its connection cap the useless and slowest connection is dropped (never a random one) to make room for a fresh one; pieces of deselected files never make a peer "interesting".
+- **Local reuse before the network:** pieces another local torrent already verified (same layout, or the same BitTorrent v2 file) are copied and checked in the background instead of downloaded; a peer sending corrupt data is banned from the whole session.
+
 #### Disk, memory and CPU
 
 - **No giant cache by design:** pieces are written through and the reclaimable OS page cache does the coalescing; a read cache with lazy expiry and a write limiter sized from the RAM and the disk type (HDD, SSD, NFS) keep the footprint in tens of MB.
 - **Batched durability:** `fdatasync` before the resume bitfield is persisted, never `O_SYNC` per write; sparse files and `fallocate` preallocation (tmpfs-safe); RAM-disk temp folders; an opt-in mmap storage on Linux (`-mmap`).
-- **Disk guard:** when a download folder drops below the free-space threshold (1 GiB by default, Gextto's *minimum free space* when set) the unfinished downloads there pause by themselves and resume when space returns; seeding goes on, nothing ends in a write error, and with `-mmap` a full disk can no longer take the daemon down.
 - **Zero-alloc hot paths:** MSE/PE RC4 runs in place inside the network buffer (no per-block heap allocation), bitfields are counted with `math/bits.OnesCount64`, and the per-peer request queue depth adapts to each peer's delivery speed.
 - **IP blocklist in microseconds:** CIDR, ranges, P2P and eMule formats merged into sorted intervals and searched by binary search with zero allocations; a URL list is re-downloaded on a schedule.
 

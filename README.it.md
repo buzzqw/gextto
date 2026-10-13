@@ -33,6 +33,10 @@ veloce e un motore BitTorrent proprio, scritto da zero in Go puro.
   **[gx-torrent](https://github.com/buzzqw/gextto/releases)**,
   un client autonomo per Linux e Windows con UI web completa, API compatibile
   con qBittorrent per Sonarr/Radarr e un gestore RSS all'altezza dei migliori.
+- **Si gestisce da solo.** Il motore adatta coda, cache e upload alla
+  macchina e alla linea, mette in pausa i download prima che il disco si
+  riempia, tiene i peer che consegnano e riusa quello che è già su disco —
+  senza bisogno di tarature.
 - **È software onesto.** Go puro, nessuna dipendenza C, un binario per
   componente, circa 1.600 funzioni di test, accessibilità verificata con
   axe-core, sei lingue nell'interfaccia.
@@ -113,11 +117,18 @@ Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un'implementazione BitTorre
 - **Mappatura porte e diagnostica:** UPnP, NAT-PMP e **PCP** (RFC 6887), un test della porta che legge anche la porta esterna vista dal DHT (NAT cone o simmetrico), proxy SOCKS5 e HTTP CONNECT e un killswitch per interfaccia (`outgoing-interface`) che tiene tutto il traffico BitTorrent sulla VPN.
 - **Sottosistema DHT (`internal/dht`):** mainline (BEP 5), IPv6 dual-stack (32), scrape (33), node ID sicuri con CRC32C (42), modalità read-only (43, spenta di default: un client completo deve servire il DHT che usa), store K/V firmato immutabile/mutabile con client `get`/`put` in uscita (44), aggiornamenti magnet `urn:btpk:` (46).
 
+#### Autogestione: si gestisce da solo
+
+- **Coda che si adatta:** il numero di download attivi segue il throughput misurato (coda dinamica), i torrent lenti smettono di occupare uno slot e un download che non muove dati viene messo da parte per far partire un altro.
+- **Cache e banda che seguono la macchina:** la cache disco si ridimensiona sulla RAM libera, sui torrent attivi e sul tipo di disco (HDD, SSD, NFS); l'auto-speed sulla latenza abbassa l'upload prima che la linea si saturi (anti-bufferbloat), così navigazione e chiamate restano fluide.
+- **Protezione del disco:** quando una cartella di download scende sotto la soglia di spazio libero (1 GiB di default, lo *spazio libero minimo* di Gextto se impostato) i download non finiti lì vanno in pausa da soli e ripartono quando lo spazio torna; il seed continua e nessun download finisce in errore di scrittura.
+- **Peer che vale la pena tenere:** la coda di richieste di ogni peer cresce con quello che consegna e un peer veloce lavora su due pezzi insieme; quando un torrent è al limite di connessioni cade quella inutile e più lenta (mai una a caso) per far posto a una nuova; i pezzi dei file deselezionati non rendono mai "interessante" un peer.
+- **Riuso locale prima della rete:** i pezzi che un altro torrent locale ha già verificato (stessa struttura, o lo stesso file BitTorrent v2) vengono copiati e controllati in background invece di essere scaricati; un peer che manda dati corrotti viene bannato dall'intera sessione.
+
 #### Disco, memoria e CPU
 
 - **Nessuna cache gigante, per scelta:** i pezzi vengono scritti subito e la page cache del sistema (recuperabile) fa l'accorpamento; una cache di lettura con scadenza pigra e un limitatore di scrittura dimensionati su RAM e tipo di disco (HDD, SSD, NFS) tengono l'impronta nelle decine di MB.
 - **Durabilità a lotti:** `fdatasync` prima di salvare il bitfield di resume, mai `O_SYNC` per scrittura; file sparsi e preallocazione `fallocate` (sicura su tmpfs); cartelle temporanee su RAM disk; storage mmap opzionale su Linux (`-mmap`).
-- **Protezione del disco:** quando una cartella di download scende sotto la soglia di spazio libero (1 GiB di default, lo *spazio libero minimo* di Gextto se impostato) i download non finiti lì vanno in pausa da soli e ripartono quando lo spazio torna; il seed continua, nessun download finisce in errore di scrittura e con `-mmap` un disco pieno non può più far cadere il demone.
 - **Percorsi critici senza allocazioni:** RC4 di MSE/PE cifra sul posto nel buffer di rete (nessuna allocazione per blocco), i bitfield si contano con `math/bits.OnesCount64` e la profondità della coda di richieste per peer si adatta alla sua velocità di consegna.
 - **Blocklist IP in microsecondi:** formati CIDR, intervalli, P2P ed eMule uniti in intervalli ordinati e cercati per bisezione senza allocazioni; una lista da URL viene riscaricata a intervalli regolari.
 
