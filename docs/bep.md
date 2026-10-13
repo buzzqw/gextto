@@ -46,8 +46,9 @@ stay narrow and the tables remain readable.
 > **Swarm Merging**, which is *not* driven by the hints but by the structure
 > (an identical piece layout, or an equal v2 per-file Merkle root): matching on
 > the identity of the bytes is what makes the reuse safe. Phases 1–3 are done
-> (`evoluzione.md` §9.2 and §10.1), including block-granularity reuse and the
-> resume path; see [Remaining items](#remaining-items-and-roadmap), item 3.
+> (`evoluzione.md` §9.2 and §10.1), including block-granularity reuse, the
+> resume path and the re-trigger when a sibling appears after the allocation;
+> see [Remaining items](#remaining-items-and-roadmap), item 3.
 >
 > **BEP 54 (`lt_donthave`).** Implemented on the **reception** side and
 > advertised in the BEP 10 handshake: a peer that drops a piece it had
@@ -195,10 +196,9 @@ stay narrow and the tables remain readable.
    the BEP — is **Swarm Merging** (`evoluzione.md` §9.2), and it is **done**:
    Phases 1–3 reuse whole pieces of an identical layout, whole identical v2
    files with a different piece length, and 16 KiB blocks of a partially
-   verified source; the merge also runs on the **resume path**, so a restart no
-   longer drops the block-level reuse. What is left is only an *enhancement*
-   outside the BEP: re-triggering the merge when a sibling publishes its data
-   *after* a torrent allocated.
+   verified source; the merge runs on the **resume path** and is **re-triggered
+   when a sibling publishes its data after the allocation**, so neither a
+   restart nor the order in which the torrents are added loses the reuse.
 
 ## Maintenance
 

@@ -1133,7 +1133,11 @@ into its own, so it restarts only from the missing pieces and can complete
 when the content is already present elsewhere. The merge also runs when a
 torrent is **reloaded from its resume data**: the pieces the reloaded bitfield
 already verified are kept (never re-read or re-hashed) and the merge fills the
-rest and re-derives the block-level reuse, so a restart does not lose it.
+rest and re-derives the block-level reuse, so a restart does not lose it. And it
+is **re-triggered when a sibling appears after the allocation**: a torrent that
+publishes newly verified data wakes the others, and one that is already
+downloading merges it too (the fetch pipeline pauses for the merge and restarts
+at the end), so the order in which the torrents are added does not matter.
 Merging is **disabled if one side is a private torrent** (BEP 27): mixing
 private swarms violates the tracker rules. It is independent of the **BEP 38**
 hints, which serve to *report* the candidates.

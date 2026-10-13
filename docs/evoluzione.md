@@ -1100,6 +1100,16 @@ Accounting (bitfield/completion) per torrent.
   the rest, so a restart no longer drops the block-level reuse; the verifier
   takes the reloaded and merged pieces through `Skip`/`Only`, so **nothing is
   re-read or re-hashed** on that path.
+- **Later-sibling trigger — done (2026-10-13):** the merge is also re-triggered
+  when a sibling **publishes its data after** this torrent's allocation (the
+  one-shot allocation merge only saw the then-present siblings). Every torrent
+  that gains verified pieces wakes the others (`notifySiblings`, only when its
+  verified count grows, so two incomplete torrents cannot ping each other
+  forever with no-op merges); a downloading torrent queues the merge, waits for
+  the in-flight piece writes to drain (`mergeWaiting`/`pendingWrites`: an
+  adoption during the verifier's bitfield swap would be lost), then runs it in
+  the same exclusive window as the resume path (piece fetches and webseeds are
+  cancelled, so nothing else writes) and restarts the pipeline at the end.
 
 **No v1 with a different layout:** no ED2K/partial heuristics of BiglyBT.
 
@@ -1110,18 +1120,21 @@ ratio/statistics. It is a guard, not an option.
 **Test/measurement.** `torrent/localmerge_test.go` (reuse, different content, private
 guard), `torrent/localmerge_resume_test.go` (the resume path through
 `handleAllocationDone`: missing pieces filled and partial blocks re-derived, the
-reloaded pieces kept without a re-read) and `cmd/gx-torrent/swarmmerge_test.go`
+reloaded pieces kept without a re-read; the later-sibling trigger and its
+write-drain gate; the notify count guard) and `cmd/gx-torrent/swarmmerge_test.go`
 (end-to-end: B populated from disk, A with identical content and a different
 name completes **without peers**; `TestDaemonSwarmMergeResumePath` reloads A from
-resume across a daemon restart). The tests also pass with `-race`. Effort:
-Phase 1 **medium** (done), Phase 2 **large**.
+resume across a daemon restart; `TestDaemonSwarmMergeLaterSibling` adds A first
+and completes it when B appears afterwards). The tests also pass with `-race`.
+Effort: Phase 1 **medium** (done), Phase 2 **large**.
 
 **Cost.** The merge runs once per torrent, at the end of the allocation (and on
-a resume from the reloaded bitfield): the
+a resume from the reloaded bitfield, and — re-triggered — when a sibling
+publishes its data afterwards): the
 per-piece comparison (hash and length) happens **only** for the torrents with the
 same `piece length` and the same total length (the outer filter is O(torrent)
 with two field reads), and only the pieces that pass the comparison involve
-I/O. No steady-state path (picker, peers, piece writing) is touched. Within one
+I/O. Within one
 pass each reused piece is read and written **once** even when several candidates
 hold the same content (an index shared by Phase 1 and Phase 2), and a later
 candidate fills only the gaps a previous one could not. The pieces the merge
@@ -1130,6 +1143,11 @@ re-verified against this torrent's own hashes are also handed to the verifier
 only the pieces that were already on disk are verified again. The skip set is
 consumed and cleared at the allocation-time verification, so a later manual
 re-check verifies everything.
+The later-sibling wake-up is a non-blocking send on a buffered per-torrent
+channel, and only fires when a torrent's verified count grows (no steady-state
+cost, no ping-pong); the merge it starts is the only path that briefly pauses
+the fetch pipeline (piece fetches and webseeds are cancelled for the duration,
+then restarted), the price of reusing data that appeared after the allocation.
 On the **resume path** the same filter runs before starting the pieces from the
 reloaded bitfield; when nothing is reusable it costs 115 ns and 0 allocations
 over 32 unrelated session torrents (`BenchmarkMergeCandidatesUnrelated`), and
@@ -1243,6 +1261,22 @@ re-derived, so a restart no longer re-downloads the file. On the resume path the
 added cost when nothing is reusable is only the candidate filter: **115 ns and
 0 allocations** over 32 unrelated session torrents
 (`BenchmarkMergeCandidatesUnrelated`).
+
+**Later-sibling measurement (2026-10-13, `TestMeasureMergeLaterSibling` on the
+Debian ISO, same harness/data).** The destination is added **first**, with no
+sibling and no peer; the source is added afterwards and wakes it:
+
+| Run (loopback) | before (no trigger) | after (later-sibling trigger) |
+| --- | --- | --- |
+| later merge observed | no | yes |
+| merged_bytes | 0 | 594,542,592 B |
+| partial (block-level) pieces | 0 | 756 (every destination piece) |
+| Debian 756 MiB: from the network | 792,723,456 B (100%) | **198,180,864 B (25.0%)** |
+| total time | 2.61 s | 0.91 s |
+
+Same 25.0% as the no-restart Phase 3, the resume path and the first-run merge:
+the order in which the torrents are added no longer decides whether the reuse
+happens.
 
 ### 10.2 DHT multi-path — measurement and plan
 

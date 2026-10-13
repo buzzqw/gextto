@@ -157,9 +157,10 @@ different piece size — are copied and re-checked in the background instead of
 downloaded; partially available sources contribute their verified 16 KiB
 blocks and only the rest comes from the network (on the Debian and Arch ISOs
 with a 75%-complete source, 25% of the file came from the network instead of
-100%). The reuse survives a restart: a torrent resumed from its saved state
-re-derives the local blocks instead of downloading them again. Private torrents
-are never mixed (BEP 27).
+100%). The reuse survives a restart (a torrent resumed from its saved state
+re-derives the local blocks instead of downloading them again) and happens
+whichever order the torrents are added in (one that is already downloading picks
+up data a sibling publishes later). Private torrents are never mixed (BEP 27).
 
 **Network.** TCP and uTP (BEP 29) in parallel with automatic fallback on a
 single port — one UDP socket carries uTP and DHT, handshakes routed by
