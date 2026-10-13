@@ -41,7 +41,8 @@ and the engine's technical document separate.
 13. [Accessibility](#13-accessibility)
 14. [gx-torrent standalone (gx-nox): pointer](#14-gx-torrent-standalone-gx-nox-pointer)
 15. [High-value extensions from the comparison with BiglyBT](#15-high-value-extensions-from-the-comparison-with-biglybt)
-16. [Appendix A: consolidated files](#appendix-a-consolidated-files)
+16. [Smartness backlog: ideas from the 2026-10-13 night](#16-smartness-backlog-ideas-from-the-2026-10-13-night)
+17. [Appendix A: consolidated files](#appendix-a-consolidated-files)
 
 ---
 
@@ -1694,6 +1695,13 @@ of 4 MiB, a single leecher:
 | `default` def=50/max=250 | ≤50 | 1.1 s | **3.8 MiB/s** |
 
 ~12× with the adaptive queue: it is the isolation that loopback (RTT ~0) cannot give.
+**Confirmation (2026-10-13):** the same run reproduces it exactly (`shallow` 300 KiB/s
+in 13.7 s, `default` 3850 KiB/s in 1.06 s, ~12.8×), so the adaptive queue is stable.
+**Ceiling read from the numbers:** with 256 KiB pieces (16 blocks) a queue of ≤250 is
+bounded by the piece's block count, and the `default` run is already at the ceiling;
+the next lever for high-bandwidth-delay links is therefore **multi-piece per peer**
+(the engine currently gives a peer one piece at a time), which is why idea #8 of §16
+is measured against this baseline before any change.
 **Choking** is isolated by the deterministic bench (`internal/unchoker/sim_test.go`,
 in `make test-engine`), which drives the real `Unchoker` with synthetic peers and fixes
 fairness, slots and optimistic rotation; the end-to-end seed is in §6.4/§6.6.
@@ -2516,7 +2524,10 @@ also pass with `-race`. Effort: Phase 1 **medium** (done), Phase 2 **large**.
 per-piece comparison (hash and length) happens **only** for the torrents with the
 same `piece length` and the same total length (the outer filter is O(torrent)
 with two field reads), and only the pieces that pass the comparison involve
-I/O. No steady-state path (picker, peers, piece writing) is touched.
+I/O. No steady-state path (picker, peers, piece writing) is touched. Within one
+pass each reused piece is read and written **once** even when several candidates
+hold the same content (an index shared by Phase 1 and Phase 2), and a later
+candidate fills only the gaps a previous one could not.
 
 ### 15.3 Verification criterion (like §4.5)
 
@@ -2526,6 +2537,31 @@ For every point: targeted tests (`./cmd/gx-torrent/`, `GxEngine`, `make test-eng
 page), never only via API. **Before/after measurement** of CPU, RAM and throughput, as per the
 performance rule of `AGENTS.md`; the new UI controls respect
 accessibility and i18n.
+
+---
+
+## 16. Smartness backlog: ideas from the 2026-10-13 night
+
+The night session (parser fuzzing, Swarm Merging Phase 2, the DHT anti-Sybil
+counter, the performance round) produced ideas that would make Gextto, gx-torrent
+and gx-core **smarter**, not only faster or more correct. Each is classified
+here; the implemented ones are dated, the others are a proposal to be agreed.
+
+| # | Idea | Origin | Value | Risk | Status |
+|---|---|---|---|---|---|
+| 1 | **Continuous fuzzing** of every network-facing parser, with the found inputs kept as seeds, run by hand or in a nightly job | the `.torrent` scanner panic was found in minutes | high (a DoS caught before a release) | low | **done**: `make fuzz-smoke` (`FUZZ_TIME=2m`), the seeds are committed under `testdata/fuzz`; a CI job is proposed |
+| 2 | **Merge: read and write each reused piece once** across all candidates; a later candidate only fills the gaps a previous one could not | Phase 2 analysis | medium (no duplicate I/O when several torrents hold the same content) | low | **done (2026-10-13)**: `mergedIdx` shared by Phase 1 and Phase 2 |
+| 3 | Merge: order the candidates by **reusable bytes** so the richest source is read first | Phase 2 | low | low | idea |
+| 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | Phase 2 | high (revives more seedless torrents) | high | idea |
+| 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | the O(1) counter removed the cost argument | medium | medium | idea |
+| 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.10 | medium | medium | idea (needs the real-swarm measurement) |
+| 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | Phase 2 | medium | low | idea |
+| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.12 | high | high | measured, see §6 |
+| 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked) | the fuzzing pass | medium | low | **done**: `internal/utils/utils.go` (length bounded, recursion depth ≤64); `internal/dht/bencode.go` already bounded |
+
+The criterion is the same as §4.5/§15.3: one item = one commit, measurement
+before/after for anything on a data path, both UIs and i18n for anything visible
+to the user, and the reference documents kept aligned.
 
 ---
 

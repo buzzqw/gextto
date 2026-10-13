@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht test-ui container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-dht cache-refresh
+.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-dht cache-refresh
 
 all: build
 
@@ -69,6 +69,37 @@ test-engine:
 # so it is not covered by the root `go test ./...`).
 test-dht:
 	cd internal/dht && CGO_ENABLED=0 go test ./...
+
+# Short fuzzing pass over the network-facing parsers. `make test` runs only the
+# seed corpus; this actually fuzzes, so a panic on hostile input surfaces before
+# a release (the pass of 2026-10-13 found a .torrent scanner panic in minutes).
+# Not part of `make test`; run it by hand or in a nightly job. Override the
+# per-target time with FUZZ_TIME=2m. See docs/evoluzione.md §16.
+FUZZ_TIME ?= 30s
+fuzz-smoke:
+	@set -e; \
+	for t in FuzzDecodeBencode FuzzReadResponse FuzzParseNodesString; do \
+		echo "fuzz dht/$$t"; \
+		(cd internal/dht && go test -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZ_TIME) .); \
+	done; \
+	for spec in \
+	  "internal/utils:FuzzTorrentBytes FuzzMagnetParsing" \
+	  "internal/rss:FuzzParse" \
+	  "internal/torznab:FuzzParse" \
+	  "internal/gxcore/internal/metainfo:FuzzMetaInfoNew FuzzNewV2Info FuzzParseFileTree FuzzParseInfo" \
+	  "internal/gxcore/internal/magnet:FuzzNew" \
+	  "internal/gxcore/internal/peerprotocol:FuzzExtensionMessageUnmarshal FuzzHolepunchUnmarshal FuzzHashRequestHeader" \
+	  "internal/gxcore/internal/tracker:FuzzDecodePeersCompact" \
+	  "internal/gxcore/internal/tracker/httptracker:FuzzParsePeersDictionary" \
+	  "internal/gxcore/internal/mse:FuzzHandshakeIncoming"; do \
+		dir="$${spec%%:*}"; names="$${spec##*:}"; \
+		for t in $$names; do \
+			echo "fuzz $$dir/$$t"; \
+			go test -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZ_TIME) ./$$dir/; \
+		done; \
+	done; \
+	echo "fuzz . / FuzzParseRelease"; \
+	go test -run '^$$' -fuzz '^FuzzParseRelease$$' -fuzztime $(FUZZ_TIME) .
 
 # Race detector run (technical review, phase 0). Kept separate from `test` so it
 # can stay non-blocking until the shared state has been audited.

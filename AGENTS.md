@@ -130,6 +130,12 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   `CGO_ENABLED=0 go test ./...` (Go puro; i test del motore libtorrent sono dietro
   `//go:build cgo`). `make test-libtorrent` (`CGO_ENABLED=1 go test ./...`) esegue
   anche quelli e richiede libtorrent.
+- `make fuzz-smoke` — fuzzing breve dei parser esposti alla rete (DHT, bencode
+  `.torrent`, magnet, extension BEP 10, file tree BEP 52, tracker, Torznab, RSS,
+  MSE), `FUZZ_TIME` secondi per target (default 30s, es. `FUZZ_TIME=2m` per un
+  passaggio serio). Non fa parte di `make test`; i crash trovati vanno corretti e
+  i loro input committati come seed in `testdata/fuzz`. Vedi `docs/evoluzione.md`
+  §16.
 - Test mirati: `go test ./cmd/gx-torrent/` e `go test -run GxEngine .`.
 - Test del motore (`internal/gxcore`): `make test-engine` (`go test` dalla root sui
   pacchetti del motore). Fa parte del modulo, quindi `go test ./...` lo include
