@@ -84,3 +84,45 @@ func TestResendStatsPlumbing(t *testing.T) {
 		t.Fatalf("socket stats = (%d, %d), want (2, 1)", timeout, fast)
 	}
 }
+
+// The latency seed bounds the first RTO: a 5 ms estimate gives [10,20] ms
+// instead of the fixed [800,1600] ms, out-of-range estimates clamp, and real
+// samples always win over the seed.
+func TestInitialLatencySeedBoundsRTO(t *testing.T) {
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := NewSocketFromPacketConn(pc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.CloseNow()
+	c := s.newConn(&net.UDPAddr{IP: net.ParseIP("203.0.113.9"), Port: 51413})
+
+	if rt := c.resendTimeout(); rt < 800*time.Millisecond || rt > 1600*time.Millisecond {
+		t.Fatalf("default RTO = %v, want [800ms, 1600ms]", rt)
+	}
+	s.SetInitialLatencyEstimator(func(string) (time.Duration, bool) {
+		return 5 * time.Millisecond, true
+	})
+	if rt := c.resendTimeout(); rt < 10*time.Millisecond || rt > 20*time.Millisecond {
+		t.Fatalf("seeded RTO = %v, want [10ms, 20ms]", rt)
+	}
+	s.SetInitialLatencyEstimator(func(string) (time.Duration, bool) {
+		return time.Microsecond, true
+	})
+	if rt := c.resendTimeout(); rt < 10*time.Millisecond || rt > 20*time.Millisecond {
+		t.Fatalf("clamped-low RTO = %v, want [10ms, 20ms]", rt)
+	}
+	s.SetInitialLatencyEstimator(func(string) (time.Duration, bool) {
+		return time.Hour, true
+	})
+	if rt := c.resendTimeout(); rt < 800*time.Millisecond || rt > 1600*time.Millisecond {
+		t.Fatalf("clamped-high RTO = %v, want [800ms, 1600ms]", rt)
+	}
+	c.addLatency(50 * time.Millisecond)
+	if rt := c.resendTimeout(); rt < 100*time.Millisecond || rt > 200*time.Millisecond {
+		t.Fatalf("sampled RTO = %v, want [100ms, 200ms]", rt)
+	}
+}

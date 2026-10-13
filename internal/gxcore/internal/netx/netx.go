@@ -252,6 +252,26 @@ var (
 	dialPrefs = map[string]*transportPref{}
 )
 
+// DialLatencyEMA reports the recent winning-dial latency moving average
+// for the host of addr, preferring the uTP leg. It seeds the uTP initial
+// RTO: a handshake spans roughly one RTT plus processing, so it is a safe
+// (slightly conservative) RTT estimate.
+func DialLatencyEMA(addr string) (time.Duration, bool) {
+	prefMu.Lock()
+	defer prefMu.Unlock()
+	p := dialPrefs[dialHost(addr)]
+	if p == nil {
+		return 0, false
+	}
+	if p.utpEMA > 0 {
+		return p.utpEMA, true
+	}
+	if p.tcpEMA > 0 {
+		return p.tcpEMA, true
+	}
+	return 0, false
+}
+
 // dialHost keys the dial preference by host: peers on one host share the
 // network path whatever their port.
 func dialHost(addr string) string {

@@ -54,6 +54,11 @@ type Socket struct {
 	// fastResends counts selective-ACK fast resends (conn.go ackSkipped).
 	timeoutResends atomic.Int64
 	fastResends    atomic.Int64
+
+	// GEXTTO: optional per-remote RTT estimate (e.g. from recent dial
+	// races) seeding the initial RTO of fresh connections. Nil = the fixed
+	// initialLatency. Consulted with "ip:port".
+	initialLatencyEstimator func(addr string) (time.Duration, bool)
 }
 
 func listenPacket(network, addr string) (pc net.PacketConn, err error) {
@@ -523,6 +528,33 @@ func (s *Socket) Accept() (net.Conn, error) {
 			return c, nil
 		}
 	}
+}
+
+// GEXTTO: SetInitialLatencyEstimator installs the per-remote RTT estimate
+// seeding fresh connections' RTO (see Conn.latency). Nil disables it. Call
+// once before dialling; afterwards it is only read.
+func (s *Socket) SetInitialLatencyEstimator(f func(addr string) (time.Duration, bool)) {
+	s.initialLatencyEstimator = f
+}
+
+// GEXTTO: initialLatencyFor returns the clamped seed RTT for addr, or false
+// when no estimate applies. Bounds: [5ms, initialLatency].
+func (s *Socket) initialLatencyFor(addr string) (time.Duration, bool) {
+	if s == nil || s.initialLatencyEstimator == nil {
+		return 0, false
+	}
+	est, ok := s.initialLatencyEstimator(addr)
+	if !ok || est <= 0 {
+		return 0, false
+	}
+	const minSeedLatency = 5 * time.Millisecond
+	if est < minSeedLatency {
+		est = minSeedLatency
+	}
+	if est > initialLatency {
+		est = initialLatency
+	}
+	return est, true
 }
 
 // GEXTTO: ResendStats reports RTO-driven and selective-ACK fast resends

@@ -232,3 +232,21 @@ func TestDialPeerFallsBackToDelayedLeg(t *testing.T) {
 		t.Fatalf("expected exactly one uTP dial, got %d", utpDials.Load())
 	}
 }
+
+// DialLatencyEMA serves the uTP initial-RTO seed: unknown hosts report
+// nothing, known hosts the winning leg's moving average (uTP preferred).
+func TestDialLatencyEMA(t *testing.T) {
+	resetDialPrefs()
+	if _, ok := DialLatencyEMA("198.51.100.9:51413"); ok {
+		t.Fatal("unknown host must report no estimate")
+	}
+	noteDialWinner("198.51.100.9", "tcp", 120*time.Millisecond)
+	noteDialWinner("198.51.100.9", "tcp", 120*time.Millisecond)
+	if ema, ok := DialLatencyEMA("198.51.100.9:51413"); !ok || ema != 120*time.Millisecond {
+		t.Fatalf("tcp fallback EMA = %v, %v", ema, ok)
+	}
+	noteDialWinner("198.51.100.9", "utp", 30*time.Millisecond)
+	if ema, ok := DialLatencyEMA("198.51.100.9:51413"); !ok || ema != 30*time.Millisecond {
+		t.Fatalf("utp EMA = %v, %v, want 30ms", ema, ok)
+	}
+}

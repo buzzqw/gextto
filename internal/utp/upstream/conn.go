@@ -222,14 +222,22 @@ func (c *Conn) write(_type st, connID uint16, payload []byte, seqNr uint16) (n i
 
 // TODO: Introduce a minimum latency.
 func (c *Conn) latency() (ret time.Duration) {
-	if len(c.latencies) == 0 {
-		return initialLatency
+	if len(c.latencies) != 0 {
+		for _, l := range c.latencies {
+			ret += l
+		}
+		ret = (ret + time.Duration(len(c.latencies)) - 1) / time.Duration(len(c.latencies))
+		return
 	}
-	for _, l := range c.latencies {
-		ret += l
+	// GEXTTO: seed from the measured per-remote latency when available, so
+	// a lost first packet on a fast path does not wait out the fixed
+	// 400 ms assumption. Clamped: never below 5 ms (stale-low estimates
+	// must not cause spurious resends) and never above initialLatency
+	// (worst case = today's behaviour). Self-correcting within 10 samples.
+	if est, ok := c.socket.initialLatencyFor(c.remoteSocketAddr.String()); ok {
+		return est
 	}
-	ret = (ret + time.Duration(len(c.latencies)) - 1) / time.Duration(len(c.latencies))
-	return
+	return initialLatency
 }
 
 func (c *Conn) sendState() {

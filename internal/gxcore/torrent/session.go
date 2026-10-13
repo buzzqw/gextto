@@ -273,6 +273,9 @@ func openSharedSocket(cfg Config) (*utp.Socket, error) {
 		pc.Close()
 		return nil, err
 	}
+	// Seed fresh connections' initial RTO from the measured per-host dial
+	// latency instead of the fixed 400 ms assumption (clamped upstream).
+	utpSocket.SetInitialLatencyEstimator(netx.DialLatencyEMA)
 	netx.SetUTPDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 		return utpSocket.DialContext(ctx, "udp", addr)
 	}, cfg.UTPOnly)

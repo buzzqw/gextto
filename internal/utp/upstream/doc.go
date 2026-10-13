@@ -11,7 +11,9 @@
 // local patches listed below (each marked with "GEXTTO:").
 //
 // Local patches (each marked "GEXTTO:" at the site):
-//   - socket.go: per-socket timeout/fast resend counters + ResendStats;
+//   - socket.go: per-socket timeout/fast resend counters + ResendStats,
+//     initial-RTO seed hook (SetInitialLatencyEstimator/initialLatencyFor);
 //   - send.go: timeoutResend feeds the socket counter;
-//   - conn.go: ackSkipped fast resend feeds the socket counter.
+//   - conn.go: ackSkipped fast resend feeds the socket counter; latency()
+//     seeds from the estimator when unsampled (clamped [5ms, 400ms]).
 package upstream

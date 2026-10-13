@@ -103,6 +103,12 @@ func (s *Socket) SetReadDeadline(t time.Time) error { return s.inner.SetReadDead
 // SetWriteDeadline implements net.PacketConn.
 func (s *Socket) SetWriteDeadline(t time.Time) error { return s.inner.SetWriteDeadline(t) }
 
+// SetInitialLatencyEstimator installs the per-remote RTT estimate seeding
+// fresh connections' RTO. See upstream Socket.
+func (s *Socket) SetInitialLatencyEstimator(f func(addr string) (time.Duration, bool)) {
+	s.inner.SetInitialLatencyEstimator(f)
+}
+
 // Stats returns the socket activity counters.
 func (s *Socket) Stats() Stats {
 	timeout, fast := s.inner.ResendStats()
