@@ -90,15 +90,17 @@ func runPipelineSwarm(t *testing.T, size int, leechers, def, max int) (int64, ti
 			s := stateOf(d, hash)
 			return s == "downloading" || s == "stalled"
 		})
-		swarm = append(swarm, measureNode{daemon: d, ip: ip, port: d.peerPort})
-	}
-	for i := range swarm {
-		swarm[i].daemon.mu.Lock()
-		handle, _ := swarm[i].daemon.findLocked(hash)
-		swarm[i].daemon.mu.Unlock()
+		// Dial while this leecher's interface is still the process-wide one: netx
+		// keeps the outgoing interface globally (see measure_test.go), so dialing
+		// after every daemon exists would give them all one source address.
+		d.mu.Lock()
+		handle, _ := d.findLocked(hash)
+		d.mu.Unlock()
 		if err := handle.AddPeer(fmt.Sprintf("127.0.0.1:%d", seeder.peerPort)); err != nil {
 			t.Fatalf("add peer: %v", err)
 		}
+		waitActive(d, hash, 5*time.Second)
+		swarm = append(swarm, measureNode{daemon: d, ip: ip, port: d.peerPort})
 	}
 
 	start := time.Now()

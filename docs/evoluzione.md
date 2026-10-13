@@ -278,15 +278,19 @@ before/after the rewrite.** The two local-swarm harnesses ran on the pre-merge
 
 | Harness / profile | before | after |
 |---|---|---|
-| `make measure-seeding`, 2 MiB, 3 leechers | 1.00× corpus, first leecher done in 33 ms | 1.00×, 32 ms |
-| `make measure-pipeline` shallow (def=1/max=1, RTT 50 ms) | 13.57 s, 302 KiB/s | 13.58 s, 302 KiB/s |
-| `make measure-pipeline` default (def=50/max=250, RTT 50 ms) | 0.607 s, 6748 KiB/s | 0.610 s, 6718 KiB/s |
+| `make measure-seeding`, 2 MiB, 3 leechers | 2.99× corpus, all done in 11 ms | 3.00×, 11 ms |
+| `make measure-pipeline` local swarm, 8 MiB × 2 | 16 MiB in 101 ms, ~162 MiB/s | 16 MiB in 101 ms, ~162 MiB/s |
+| `make measure-pipeline` shallow (def=1/max=1, RTT 50 ms) | 13.54 s, 303 KiB/s | 13.55 s, 302 KiB/s |
+| `make measure-pipeline` default (def=50/max=250, RTT 50 ms) | 0.609 s, 6728 KiB/s | 0.608 s, 6736 KiB/s |
 
-Equivalent within the noise. The loopback profiles of `measure-pipeline`
-(8 MiB) run to their 90 s window at ~91 KiB/s on both, expected of the
-depth-insensitive sanity harness (§6.4). Both trees serve a single leecher in
-`measure-seeding` (1.00× corpus); that is a **pre-merge** behaviour (the
-harness on `57d0a89` reports the same), not an effect of the rewrite.
+Equivalent within the noise: the rewrite adds no end-to-end regression. The
+harness itself needed a fix: it runs the seeder and every leecher in one
+process, but the engine's outgoing interface (the per-peer source address) is
+process-wide (§1.4), so with all the daemons created before dialling, every
+leecher took the last source address and the seeder dropped all but the first as
+a duplicate IP (1.00× corpus). Each leecher now creates its connection before
+the next daemon replaces that setting, which restores the intended swarm
+(3.00×, the §6.6 number).
 
 ---
 

@@ -49,6 +49,22 @@ func measureCount(env string, def int) int {
 	return def
 }
 
+// waitActive waits up to limit for a leecher to have downloaded something, so
+// its outbound connection is established. The loopback transfer completes
+// almost immediately, so a connected-peer check races the driver; this only
+// needs to give the dial time to read the process-wide outgoing interface
+// before the next daemon replaces it. It does not fail: a peer the seeder has
+// not served yet is part of what the harness reports.
+func waitActive(d *Daemon, hash string, limit time.Duration) {
+	deadline := time.Now().Add(limit)
+	for time.Now().Before(deadline) {
+		if info, _ := findInfo(d, hash); info.Downloaded > 0 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
 // measureNode is one peer of the local swarm.
 type measureNode struct {
 	daemon *Daemon
@@ -83,12 +99,25 @@ func TestMeasureSeedingLocalSwarm(t *testing.T) {
 	waitFor(t, "seeder seeding", func() bool { return stateOf(seeder, hash) == "seeding" })
 	seederNode := measureNode{daemon: seeder, ip: "127.0.0.1", port: seeder.peerPort}
 
+	addPeer := func(from, to measureNode) {
+		from.daemon.mu.Lock()
+		handle, _ := from.daemon.findLocked(hash)
+		from.daemon.mu.Unlock()
+		if err := handle.AddPeer(to.addr()); err != nil {
+			t.Fatalf("add peer %s -> %s: %v", from.addr(), to.addr(), err)
+		}
+	}
+
+	// netx keeps the outgoing interface (the per-peer source address) in a
+	// process-wide setting, because gx-torrent runs a single session per
+	// process. In this harness the daemons share one process, so a leecher must
+	// create its connections *before* the next daemon replaces that setting:
+	// otherwise every leecher would dial from the last source address and the
+	// seeder would drop all but one as a duplicate IP.
 	swarm := make([]measureNode, 0, leechers)
 	for i := 0; i < leechers; i++ {
 		ip := fmt.Sprintf("127.0.0.%d", 10+i)
 		net := NetworkOptions{
-			// A distinct loopback source per leecher: the engine drops a second
-			// connection from the same IP to one torrent.
 			OutgoingInterface: ip,
 			PortBegin:         uint16(43800 + i*100), PortEnd: uint16(43899 + i*100), Encryption: 1,
 		}
@@ -105,26 +134,25 @@ func TestMeasureSeedingLocalSwarm(t *testing.T) {
 			state := stateOf(d, hash)
 			return state == "downloading" || state == "stalled"
 		})
-		swarm = append(swarm, measureNode{daemon: d, ip: ip, port: d.peerPort})
-	}
-
-	addPeer := func(from, to measureNode) {
-		from.daemon.mu.Lock()
-		handle, _ := from.daemon.findLocked(hash)
-		from.daemon.mu.Unlock()
-		if err := handle.AddPeer(to.addr()); err != nil {
-			t.Fatalf("add peer %s -> %s: %v", from.addr(), to.addr(), err)
-		}
-	}
-	for i := range swarm {
-		addPeer(swarm[i], seederNode)
+		node := measureNode{daemon: d, ip: ip, port: d.peerPort}
+		// Dial while this leecher's interface is still the process-wide one.
+		addPeer(node, seederNode)
 		if mesh {
-			for j := range swarm {
-				if i != j {
-					addPeer(swarm[i], swarm[j])
-				}
+			// One edge per pair (the new leecher dials the earlier ones): a
+			// reverse dial would come from the wrong source and be dropped.
+			for _, other := range swarm {
+				addPeer(node, other)
 			}
 		}
+		// Let the connections establish before the next daemon changes the
+		// process-wide outgoing interface. The engine's live peer list is the
+		// signal (the daemon's published NumPeers snapshot lags behind here).
+		// Let the leecher's outbound connection establish while its own
+		// interface is still the process-wide one. The transfer on loopback
+		// completes in milliseconds, so the live peer list is already empty by
+		// the time we could sample it: wait for the bytes instead.
+		waitActive(d, hash, 5*time.Second)
+		swarm = append(swarm, node)
 	}
 
 	start := time.Now()
