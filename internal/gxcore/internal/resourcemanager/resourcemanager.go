@@ -2,12 +2,10 @@ package resourcemanager
 
 import "math/rand/v2"
 
-// ResourceManager is a fair manager for distributing limited amount of resources to requesters.
-//
-// A requester that cannot be served right now is queued and notified when room
-// frees. As a liveness guarantee, an isolated request is always granted even if
-// it exceeds the whole limit: a limit smaller than a single request must never
-// be able to block every requester forever.
+// ResourceManager rations a finite budget (piece-buffer bytes) across
+// requesters keyed by name. Unservable requests queue and are notified on
+// room; an isolated over-limit request is always granted, so a limit smaller
+// than one request can never wedge every requester forever.
 type ResourceManager[T any] struct {
 	limit     int64
 	available int64
@@ -21,6 +19,7 @@ type ResourceManager[T any] struct {
 	doneC     chan struct{}
 }
 
+// request is one queued or notified grant.
 type request[T any] struct {
 	key     string
 	data    T
@@ -30,14 +29,14 @@ type request[T any] struct {
 	doneC   chan bool
 }
 
-// Stats about ResourceManager
+// Stats snapshots the budget: allocated size/objects and queued keys.
 type Stats struct {
 	AllocatedSize    int64
 	AllocatedObjects int
 	PendingKeys      int
 }
 
-// New returns a new ResourceManager with `limit` number of resources.
+// New starts a manager over limit units.
 func New[T any](limit int64) *ResourceManager[T] {
 	m := &ResourceManager[T]{
 		limit:     limit,
@@ -54,13 +53,13 @@ func New[T any](limit int64) *ResourceManager[T] {
 	return m
 }
 
-// Close resource manager.
+// Close stops the manager and waits for the loop to exit.
 func (m *ResourceManager[T]) Close() {
 	close(m.closeC)
 	<-m.doneC
 }
 
-// Stats returns statistics about current status.
+// Stats queries the current budget. Zero after Close.
 func (m *ResourceManager[T]) Stats() Stats {
 	var stats Stats
 	ch := make(chan Stats)
@@ -75,8 +74,9 @@ func (m *ResourceManager[T]) Stats() Stats {
 	return stats
 }
 
-// Request `n` resource from the manager for key `key`.
-// Release must be called after done with the resource.
+// Request asks n units for key, delivering data on notifyC when granted.
+// Release must follow every grant. Negative asks are refused outright;
+// cancellation while queued reports ungranted.
 func (m *ResourceManager[T]) Request(key string, data T, n int64, notifyC chan T, cancelC chan struct{}) (acquired bool) {
 	if n < 0 {
 		return
@@ -100,9 +100,9 @@ func (m *ResourceManager[T]) Request(key string, data T, n int64, notifyC chan T
 	return
 }
 
-// SetLimit changes the amount of resources (the write buffer is
-// retuned at runtime). Shrinking below what is allocated only stops new grants
-// until enough is released.
+// SetLimit retunes the budget live. Shrinking below the allocated amount
+// only pauses new grants until releases catch up. Negative limits are
+// ignored.
 func (m *ResourceManager[T]) SetLimit(limit int64) {
 	if limit < 0 {
 		return
@@ -113,7 +113,7 @@ func (m *ResourceManager[T]) SetLimit(limit int64) {
 	}
 }
 
-// Release `n` resource to the manager.
+// Release returns n units to the budget.
 func (m *ResourceManager[T]) Release(n int64) {
 	select {
 	case m.releaseC <- n:
@@ -123,7 +123,7 @@ func (m *ResourceManager[T]) Release(n int64) {
 
 func (m *ResourceManager[T]) run() {
 	for {
-		req, i := m.randomRequest()
+		req, i := m.grantable()
 		select {
 		case r := <-m.requestC:
 			m.handleRequest(r)
@@ -159,6 +159,7 @@ func (m *ResourceManager[T]) run() {
 	}
 }
 
+// deleteRequest drops the i-th queued request of key, swap-with-last.
 func (m *ResourceManager[T]) deleteRequest(key string, i int) {
 	rs := m.requests[key]
 	rs[i] = rs[len(rs)-1]
@@ -170,12 +171,11 @@ func (m *ResourceManager[T]) deleteRequest(key string, i int) {
 	}
 }
 
-// randomRequest returns a queued request that fits the free budget. When
-// nothing is outstanding it also returns an over-limit request: a single
-// isolated grant can drive `available` negative, which is the guarantee that a
-// limit smaller than one request (e.g. a piece buffer) can never wedge every
-// torrent. While something is outstanding, only requests that fit are granted.
-func (m *ResourceManager[T]) randomRequest() (request[T], int) {
+// grantable picks a queued request the free budget covers. With nothing
+// outstanding it also returns an over-limit one: the single isolated grant
+// may drive available negative, which is exactly the liveness guarantee.
+// While anything is outstanding, only fitting requests are granted.
+func (m *ResourceManager[T]) grantable() (request[T], int) {
 	for _, rs := range m.requests {
 		i := rand.IntN(len(rs)) // nolint: gosec
 		r := rs[i]
@@ -187,6 +187,9 @@ func (m *ResourceManager[T]) randomRequest() (request[T], int) {
 	return request[T]{}, -1
 }
 
+// handleRequest grants immediately when affordable (or nothing is out,
+// preserving the liveness guarantee), else queues. A raced cancellation
+// drops the request instead.
 func (m *ResourceManager[T]) handleRequest(r request[T]) {
 	acquired := m.available >= r.n || m.objects == 0
 	select {

@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-type memFile struct{ data []byte }
-
-func (m *memFile) ReadAt(p []byte, off int64) (int, error)  { return copy(p, m.data[off:]), nil }
-func (m *memFile) WriteAt(p []byte, off int64) (int, error) { return copy(m.data[off:], p), nil }
-
 // TestWriteAtAcrossSections: a write starting inside the first section and
 // ending in the third lands at the right file offsets, padding untouched.
 func TestWriteAtAcrossSections(t *testing.T) {

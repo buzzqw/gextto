@@ -1,4 +1,6 @@
-// Package peerpriority implements BEP 40.
+// Package peerpriority orders connection candidates per BEP 40: peers are
+// ranked by a CRC32C of the address pair, masked so that close addresses
+// (same /16, /24) spread across the hash space instead of clustering.
 package peerpriority
 
 import (
@@ -8,48 +10,47 @@ import (
 	"net"
 )
 
-// Priority is a number that determines the connect order for Peers.
+// Priority ranks dial candidates; higher pops first.
 type Priority = uint32
 
-var table = crc32.MakeTable(crc32.Castagnoli)
+var crcTable = crc32.MakeTable(crc32.Castagnoli)
 
-// Calculate returns the priority of a to client address b.
+// Calculate ranks candidate a against our own address b.
 func Calculate(a, b *net.TCPAddr) Priority {
-	bs := calculateBytes(a, b)
-	d := crc32.New(table)
-	if bytes.Compare(bs[0], bs[1]) < 0 {
-		_, _ = d.Write(bs[0])
-		_, _ = d.Write(bs[1])
+	first, second := priorityInputs(a, b)
+	digest := crc32.New(crcTable)
+	if bytes.Compare(first, second) < 0 {
+		_, _ = digest.Write(first)
+		_, _ = digest.Write(second)
 	} else {
-		_, _ = d.Write(bs[1])
-		_, _ = d.Write(bs[0])
+		_, _ = digest.Write(second)
+		_, _ = digest.Write(first)
 	}
-	return d.Sum32()
+	return digest.Sum32()
 }
 
-func calculateBytes(a, b *net.TCPAddr) (ret [2][]byte) {
+// priorityInputs derives the two hashed blobs: ports for identical IPs,
+// masked network parts for IPv4 pairs, full address plus port otherwise
+// (BEP 40 only defines IPv4; the fallback keeps distinct peers distinct).
+func priorityInputs(a, b *net.TCPAddr) (first, second []byte) {
 	if a.IP.Equal(b.IP) {
-		var buf [4]byte
-		binary.BigEndian.PutUint16(buf[0:2], uint16(a.Port))
-		binary.BigEndian.PutUint16(buf[2:4], uint16(b.Port))
-		ret[0] = buf[0:2]
-		ret[1] = buf[2:4]
-		return
+		var ports [4]byte
+		binary.BigEndian.PutUint16(ports[0:2], uint16(a.Port))
+		binary.BigEndian.PutUint16(ports[2:4], uint16(b.Port))
+		return ports[0:2], ports[2:4]
 	}
 	if a4, b4 := a.IP.To4(), b.IP.To4(); a4 != nil && b4 != nil {
-		m := ipv4Mask(a4, b4)
-		ret[0] = a4.Mask(m)
-		ret[1] = b4.Mask(m)
-		return
+		mask := subnetMask(a4, b4)
+		return a4.Mask(mask), b4.Mask(mask)
 	}
-	// Mixed families or IPv6 (BEP 40 covers IPv4 only): use the full address
-	// plus the port so distinct peers still get distinct priorities.
-	ret[0] = append(append([]byte{}, a.IP...), byte(a.Port>>8), byte(a.Port))
-	ret[1] = append(append([]byte{}, b.IP...), byte(b.Port>>8), byte(b.Port))
-	return
+	fullA := append(append([]byte{}, a.IP...), byte(a.Port>>8), byte(a.Port))
+	fullB := append(append([]byte{}, b.IP...), byte(b.Port>>8), byte(b.Port))
+	return fullA, fullB
 }
 
-func ipv4Mask(a, b net.IP) net.IPMask {
+// subnetMask picks the BEP 40 mask by closeness: /16 strangers share only
+// half the third byte, /24 neighbors the full prefix.
+func subnetMask(a, b net.IP) net.IPMask {
 	if !sameSubnet(16, 32, a, b) {
 		return net.IPv4Mask(0xff, 0xff, 0x55, 0x55)
 	}

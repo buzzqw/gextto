@@ -7,6 +7,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 )
 
+// pexAddPeer gossips a discovered address to every PEX-capable peer.
 func (t *torrent) pexAddPeer(addr *net.TCPAddr) {
 	for pe := range t.peers {
 		if pe.PEX != nil {
@@ -15,6 +16,7 @@ func (t *torrent) pexAddPeer(addr *net.TCPAddr) {
 	}
 }
 
+// pexDropPeer gossips a vanished address to every PEX-capable peer.
 func (t *torrent) pexDropPeer(addr *net.TCPAddr) {
 	for pe := range t.peers {
 		if pe.PEX != nil {
@@ -23,11 +25,10 @@ func (t *torrent) pexDropPeer(addr *net.TCPAddr) {
 	}
 }
 
-// pexCandidates returns the candidate peers of a received ut_pex message (BEP
-// 11): only the "added"/"added6" lists. "dropped"/"dropped6" list peers that
-// left the swarm and are informational, so they are never added as candidates
-// (doing so would make us dial peers that are gone). A malformed list is
-// skipped without discarding the other one.
+// pexCandidates extracts dial candidates from a ut_pex message (BEP 11):
+// the added/added6 lists only. The dropped lists describe peers that left
+// and are never dialled. Each family decodes independently, so one corrupt
+// list does not discard the other.
 func pexCandidates(msg peerprotocol.ExtensionPEXMessage) (added4, added6 []*net.TCPAddr) {
 	if a, err := tracker.DecodePeersCompact([]byte(msg.Added)); err == nil {
 		added4 = a

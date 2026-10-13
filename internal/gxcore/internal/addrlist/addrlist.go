@@ -12,7 +12,11 @@ import (
 	"github.com/google/btree"
 )
 
-// AddrList contains peer addresses that are ready to be connected.
+// AddrList is the pool of known-but-not-yet-connected peer addresses. It is
+// indexed twice: a btree by dial priority for Pop, and a slice by discovery
+// time for age-based eviction. Both indexes always describe the same set;
+// Push panics when they drift apart, because a silent desync would either
+// leak entries or dial garbage.
 type AddrList struct {
 	peerByTime     []*peerAddr
 	peerByPriority *btree.BTree
@@ -25,7 +29,7 @@ type AddrList struct {
 	countBySource map[peersource.Source]int
 }
 
-// New returns a new AddrList.
+// New builds an address list holding at most maxItems candidates.
 func New(maxItems int, blocklist *blocklist.Blocklist, listenPort int, clientIP *net.IP) *AddrList {
 	return &AddrList{
 		peerByPriority: btree.New(2),
@@ -38,24 +42,25 @@ func New(maxItems int, blocklist *blocklist.Blocklist, listenPort int, clientIP 
 	}
 }
 
-// Reset empties the address list.
+// Reset drops every candidate.
 func (d *AddrList) Reset() {
 	d.peerByTime = nil
 	d.peerByPriority.Clear(false)
 	d.countBySource = make(map[peersource.Source]int)
 }
 
-// Len returns the number of addresses in the list.
+// Len returns the number of candidate addresses.
 func (d *AddrList) Len() int {
 	return d.peerByPriority.Len()
 }
 
-// LenSource returns the number of addresses for a single source.
+// LenSource returns the number of candidates learned from one source.
 func (d *AddrList) LenSource(s peersource.Source) int {
 	return d.countBySource[s]
 }
 
-// Pop returns the next address. The returned address is removed from the list.
+// Pop removes and returns the highest-priority candidate, or nil when empty.
+// Popping also clears the by-time slot, keeping both indexes in sync.
 func (d *AddrList) Pop() (*net.TCPAddr, peersource.Source) {
 	item := d.peerByPriority.DeleteMax()
 	if item == nil {
@@ -67,74 +72,84 @@ func (d *AddrList) Pop() (*net.TCPAddr, peersource.Source) {
 	return p.addr, p.source
 }
 
-// Push adds a new address to the list. Does nothing if the address is already in the list.
+// Push admits new candidates from one source. Duplicates refresh the stored
+// entry (timestamp, priority) instead of doubling it. Afterwards the list is
+// re-sorted by time, re-indexed, and trimmed down to maxItems by evicting
+// the oldest entries first.
 func (d *AddrList) Push(addrs []*net.TCPAddr, source peersource.Source) {
 	now := time.Now()
-	var added int
-	for _, ad := range addrs {
-		// 0 port is invalid
-		if ad.Port == 0 {
-			continue
-		}
-		// Discard own client
-		if ad.IP.IsLoopback() && ad.Port == d.listenPort {
-			continue
-		} else if d.clientIP.Equal(ad.IP) {
-			continue
-		}
-		if externalip.IsExternal(ad.IP) {
-			continue
-		}
-		if d.blocklist != nil && d.blocklist.Blocked(ad.IP) {
+	admitted := 0
+	for _, addr := range addrs {
+		if !d.admissible(addr) {
 			continue
 		}
 		p := &peerAddr{
-			addr:      ad,
+			addr:      addr,
 			timestamp: now,
 			source:    source,
-			priority:  peerpriority.Calculate(ad, d.clientAddr()),
+			priority:  peerpriority.Calculate(addr, d.clientAddr()),
 		}
-		item := d.peerByPriority.ReplaceOrInsert(p)
-		if item != nil {
-			prev := item.(*peerAddr)
-			d.peerByTime[prev.index] = p
-			p.index = prev.index
-			d.countBySource[prev.source]--
+		if prev := d.peerByPriority.ReplaceOrInsert(p); prev != nil {
+			old := prev.(*peerAddr)
+			d.peerByTime[old.index] = p
+			p.index = old.index
+			d.countBySource[old.source]--
 		} else {
 			d.peerByTime = append(d.peerByTime, p)
 			p.index = len(d.peerByTime) - 1
 		}
-		added++
+		admitted++
 	}
-	d.filterNils()
+	d.compact()
 	slices.SortFunc(d.peerByTime, func(a, b *peerAddr) int { return a.timestamp.Compare(b.timestamp) })
 	for i, p := range d.peerByTime {
 		p.index = i
 	}
-	d.countBySource[source] += added
+	d.countBySource[source] += admitted
 
-	delta := d.peerByPriority.Len() - d.maxItems
-	if delta > 0 {
-		d.removeExcessItems(delta)
-		d.filterNils()
+	if excess := d.peerByPriority.Len() - d.maxItems; excess > 0 {
+		d.evictOldest(excess)
+		d.compact()
 	}
 	if len(d.peerByTime) != d.peerByPriority.Len() {
 		panic("addr list data structures not in sync")
 	}
 }
 
-func (d *AddrList) filterNils() {
-	b := d.peerByTime[:0]
-	for _, x := range d.peerByTime {
-		if x != nil {
-			b = append(b, x)
-			x.index = len(b) - 1
-		}
+// admissible filters out addresses that must never be dialed: port-less,
+// our own listener, our own interface IPs, and blocklisted ones.
+func (d *AddrList) admissible(addr *net.TCPAddr) bool {
+	// 0 port is invalid
+	if addr.Port == 0 {
+		return false
 	}
-	d.peerByTime = b
+	// Discard own client
+	if addr.IP.IsLoopback() && addr.Port == d.listenPort {
+		return false
+	} else if d.clientIP.Equal(addr.IP) {
+		return false
+	}
+	if externalip.IsExternal(addr.IP) {
+		return false
+	}
+	return d.blocklist == nil || !d.blocklist.Blocked(addr.IP)
 }
 
-func (d *AddrList) removeExcessItems(delta int) {
+// compact drops the nilled by-time slots in place and re-indexes the rest.
+func (d *AddrList) compact() {
+	kept := d.peerByTime[:0]
+	for _, p := range d.peerByTime {
+		if p == nil {
+			continue
+		}
+		kept = append(kept, p)
+		p.index = len(kept) - 1
+	}
+	d.peerByTime = kept
+}
+
+// evictOldest drops the delta longest-known candidates, from both indexes.
+func (d *AddrList) evictOldest(delta int) {
 	for i := range delta {
 		d.countBySource[d.peerByTime[i].source]--
 		d.peerByPriority.Delete(d.peerByTime[i])

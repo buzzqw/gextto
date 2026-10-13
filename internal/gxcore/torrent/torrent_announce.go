@@ -7,20 +7,20 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 )
 
+// handleNewTrackers appends trackers and announces to them right away,
+// unless the torrent is (going) stopped.
 func (t *torrent) handleNewTrackers(trackers []tracker.Tracker) {
 	t.trackers = append(t.trackers, trackers...)
-	status := t.status()
-	if status != Stopping && status != Stopped {
+	if status := t.status(); status != Stopping && status != Stopped {
 		for _, tr := range trackers {
 			t.startNewAnnouncer(tr)
 		}
 	}
 }
 
-// handleSetTrackers replaces the tracker list at runtime: the
-// current announcers are closed, the list is swapped and the announcers are
-// restarted on the new one. The trackers that are gone get a best-effort
-// "stopped" announce so they drop us from their peer list. It runs in the
+// handleSetTrackers hot-swaps the tracker list: current announcers close,
+// the list swaps, announcers restart on the survivors. Trackers that left
+// the list get a best-effort stopped announce so they drop us. Runs on the
 // torrent goroutine (see sendCommand).
 func (t *torrent) handleSetTrackers(trackers []tracker.Tracker, raw [][]string) {
 	kept := make(map[string]struct{}, len(trackers))
@@ -45,9 +45,9 @@ func (t *torrent) handleSetTrackers(trackers []tracker.Tracker, raw [][]string) 
 	t.announceStoppedTo(leaving)
 }
 
-// announceStoppedTo sends a best-effort stopped event to trackers that left the
-// list, each with its own timeout, without touching the torrent state (unlike
-// stop()'s StopAnnouncer, which drives the Stopping transition).
+// announceStoppedTo says goodbye to departed trackers, each on its own
+// goroutine with its own timeout. Unlike stop()'s StopAnnouncer it touches
+// no torrent state and drives no Stopping transition.
 func (t *torrent) announceStoppedTo(trackers []tracker.Tracker) {
 	if len(trackers) == 0 {
 		return
@@ -63,6 +63,10 @@ func (t *torrent) announceStoppedTo(trackers []tracker.Tracker) {
 	}
 }
 
+// announcerFields snapshots the counters every announce reports. Without a
+// bitfield yet the torrent claims MaxUint32 bytes left — some trackers send
+// no peers to a leecher that will not admit missing anything. A completed
+// torrent whose bitfield is not full is a BEP 21 partial seed.
 func (t *torrent) announcerFields() tracker.Torrent {
 	tr := tracker.Torrent{
 		InfoHash:        t.infoHash,
@@ -71,15 +75,12 @@ func (t *torrent) announcerFields() tracker.Torrent {
 		BytesDownloaded: t.bytesDownloaded.Count(),
 		BytesUploaded:   t.bytesUploaded.Count(),
 	}
-	// t.bytesComplete() uses t.bitfied for calculation.
+	// t.bytesComplete() reads t.bitfield; hold the lock across both uses.
 	t.mBitfield.RLock()
 	if t.bitfield == nil {
-		// Some trackers don't send any peer address if don't tell we have missing bytes.
 		tr.BytesLeft = math.MaxUint32
 	} else {
 		tr.BytesLeft = t.info().Length - t.bytesComplete()
-		// BEP 21: a partial seed has every wanted piece but not the whole
-		// torrent, so its announces carry event=paused.
 		tr.PartialSeed = t.completed && !t.bitfield.All()
 	}
 	t.mBitfield.RUnlock()

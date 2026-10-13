@@ -2,38 +2,41 @@ package sliceset
 
 import "slices"
 
-// SliceSet is a set implementation that uses slice internally.
+// SliceSet is an unordered pointer set backed by a slice. It suits small
+// sets (peers per piece) where a map's hashing and bookkeeping would cost
+// more than a linear scan, and removal is swap-with-last, O(1).
 type SliceSet[T any] struct {
 	Items []*T
 }
 
-// Add the piece to the set.
+// Add inserts pe, reporting false when it was already present.
 func (l *SliceSet[T]) Add(pe *T) bool {
-	if slices.Contains(l.Items, pe) {
+	if l.Has(pe) {
 		return false
 	}
 	l.Items = append(l.Items, pe)
 	return true
 }
 
-// Remove the piece from the set.
+// Remove deletes pe, reporting false when it was absent.
+// Order is not preserved.
 func (l *SliceSet[T]) Remove(pe *T) bool {
 	i := slices.Index(l.Items, pe)
-	if i == -1 {
+	if i < 0 {
 		return false
 	}
-	// Swap-with-last removal: order is not preserved.
-	l.Items[i] = l.Items[len(l.Items)-1]
-	l.Items = l.Items[:len(l.Items)-1]
+	last := len(l.Items) - 1
+	l.Items[i] = l.Items[last]
+	l.Items = l.Items[:last]
 	return true
 }
 
-// Has returns true if the set contains the piece.
+// Has reports whether pe is in the set.
 func (l *SliceSet[T]) Has(pe *T) bool {
 	return slices.Contains(l.Items, pe)
 }
 
-// Len returns the number of pieces in the set.
+// Len returns the number of items in the set.
 func (l *SliceSet[T]) Len() int {
 	return len(l.Items)
 }

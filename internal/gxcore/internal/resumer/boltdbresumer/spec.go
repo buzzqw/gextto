@@ -6,7 +6,9 @@ import (
 	"time"
 )
 
-// Spec contains fields for resuming an existing torrent.
+// Spec is the resume record of one torrent: identity, swarm configuration,
+// transfer totals and runtime flags. It travels through the bbolt resume
+// store and the JSON move-torrent protocol.
 type Spec struct {
 	InfoHash   []byte
 	Port       int
@@ -15,8 +17,8 @@ type Spec struct {
 	URLList    []string
 	FixedPeers []string
 	Info       []byte
-	// PieceLayers is the bencoded BEP 52 "piece layers" of a v2 torrent (nil
-	// for v1): the info dict alone is not enough to rebuild a v2 torrent.
+	// PieceLayers holds the bencoded BEP 52 piece layers of a v2 torrent (nil
+	// for v1): the info dict alone cannot rebuild a v2 torrent.
 	PieceLayers       []byte
 	Bitfield          []byte
 	AddedAt           time.Time
@@ -30,11 +32,14 @@ type Spec struct {
 	CompleteCmdRun    bool
 	Sequential        bool
 	FirstLast         bool
-	// SuperSeeding enables BEP 16 super-seeding.
+	// SuperSeeding arms BEP 16 super-seeding.
 	SuperSeeding bool
 	Version      int
 }
 
+// jsonSpec is the JSON projection of Spec. Raw bytes ride base64-encoded,
+// the duration as plain nanoseconds; field order is wire-significant for
+// readers that compare payloads literally.
 type jsonSpec struct {
 	Port              int
 	Name              string
@@ -62,9 +67,9 @@ type jsonSpec struct {
 	SeededFor   int64
 }
 
-// MarshalJSON converts the Spec to a JSON string.
+// MarshalJSON implements json.Marshaler.
 func (s Spec) MarshalJSON() ([]byte, error) {
-	j := jsonSpec{
+	return json.Marshal(jsonSpec{
 		Port:              s.Port,
 		Name:              s.Name,
 		Trackers:          s.Trackers,
@@ -88,31 +93,27 @@ func (s Spec) MarshalJSON() ([]byte, error) {
 		PieceLayers: base64.StdEncoding.EncodeToString(s.PieceLayers),
 		Bitfield:    base64.StdEncoding.EncodeToString(s.Bitfield),
 		SeededFor:   int64(s.SeededFor),
-	}
-	return json.Marshal(j)
+	})
 }
 
-// UnmarshalJSON fills the Spec from a JSON string.
+// UnmarshalJSON implements json.Unmarshaler. A corrupt base64 leg aborts
+// the whole record — a half-decoded resume is worse than none.
 func (s *Spec) UnmarshalJSON(b []byte) error {
 	var j jsonSpec
-	err := json.Unmarshal(b, &j)
-	if err != nil {
+	if err := json.Unmarshal(b, &j); err != nil {
 		return err
 	}
-	s.InfoHash, err = base64.StdEncoding.DecodeString(j.InfoHash)
-	if err != nil {
+	var err error
+	if s.InfoHash, err = base64.StdEncoding.DecodeString(j.InfoHash); err != nil {
 		return err
 	}
-	s.Info, err = base64.StdEncoding.DecodeString(j.Info)
-	if err != nil {
+	if s.Info, err = base64.StdEncoding.DecodeString(j.Info); err != nil {
 		return err
 	}
-	s.PieceLayers, err = base64.StdEncoding.DecodeString(j.PieceLayers)
-	if err != nil {
+	if s.PieceLayers, err = base64.StdEncoding.DecodeString(j.PieceLayers); err != nil {
 		return err
 	}
-	s.Bitfield, err = base64.StdEncoding.DecodeString(j.Bitfield)
-	if err != nil {
+	if s.Bitfield, err = base64.StdEncoding.DecodeString(j.Bitfield); err != nil {
 		return err
 	}
 	s.SeededFor = time.Duration(j.SeededFor)

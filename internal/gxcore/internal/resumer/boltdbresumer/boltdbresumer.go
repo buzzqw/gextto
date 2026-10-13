@@ -1,4 +1,8 @@
-// Package boltdbresumer provides a Resumer implementation that uses a Bolt database file as storage.
+// Package boltdbresumer persists torrent resume records in BoltDB: one
+// sub-bucket per torrent id, one key per field. Key names, text formats and
+// version semantics are the on-disk contract — existing session.db files
+// must keep loading, including pre-version records and the old []string
+// tracker shape.
 package boltdbresumer
 
 import (
@@ -11,10 +15,11 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-// LatestVersion is incremented every time there is a backwards-incompatible change in the interpretation of existing resumer data.
+// LatestVersion bumps on every backwards-incompatible reinterpretation of
+// stored records.
 const LatestVersion = 3
 
-// Keys for the persisten storage.
+// Keys names every persisted field.
 var Keys = struct {
 	InfoHash          []byte
 	Port              []byte
@@ -65,13 +70,13 @@ var Keys = struct {
 	Version:           []byte("version"),
 }
 
-// Resumer contains methods for saving/loading resume information of a torrent to a BoltDB database.
+// Resumer reads and writes resume records in a BoltDB bucket.
 type Resumer struct {
 	db     *bbolt.DB
 	bucket []byte
 }
 
-// New returns a new Resumer.
+// New opens the bucket, creating it on first use.
 func New(db *bbolt.DB, bucket []byte) (*Resumer, error) {
 	err := db.Update(func(tx *bbolt.Tx) error {
 		_, err2 := tx.CreateBucketIfNotExists(bucket)
@@ -86,9 +91,9 @@ func New(db *bbolt.DB, bucket []byte) (*Resumer, error) {
 	}, nil
 }
 
-// Write the torrent spec for torrent with `torrentID`.
+// Write stores the full spec of torrentID. An explicit spec.Version sticks;
+// zero means "current".
 func (r *Resumer) Write(torrentID string, spec *Spec) error {
-	port := strconv.Itoa(spec.Port)
 	trackers, err := json.Marshal(spec.Trackers)
 	if err != nil {
 		return err
@@ -111,7 +116,7 @@ func (r *Resumer) Write(torrentID string, spec *Spec) error {
 			return err
 		}
 		_ = b.Put(Keys.InfoHash, spec.InfoHash)
-		_ = b.Put(Keys.Port, []byte(port))
+		_ = b.Put(Keys.Port, []byte(strconv.Itoa(spec.Port)))
 		_ = b.Put(Keys.Name, []byte(spec.Name))
 		_ = b.Put(Keys.Trackers, trackers)
 		_ = b.Put(Keys.URLList, urlList)
@@ -136,8 +141,7 @@ func (r *Resumer) Write(torrentID string, spec *Spec) error {
 	})
 }
 
-// update runs fn on the sub-bucket of the torrent with torrentID.
-// It does nothing if the torrent is not in the database.
+// update applies fn to one torrent's sub-bucket, skipping missing torrents.
 func (r *Resumer) update(torrentID string, fn func(b *bbolt.Bucket) error) error {
 	return r.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(r.bucket).Bucket([]byte(torrentID))
@@ -148,76 +152,77 @@ func (r *Resumer) update(torrentID string, fn func(b *bbolt.Bucket) error) error
 	})
 }
 
-// WriteInfo writes only the info dict of a torrent.
+// WriteInfo replaces only the info dict.
 func (r *Resumer) WriteInfo(torrentID string, value []byte) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.Info, value)
 	})
 }
 
-// WritePieceLayers writes only the bencoded BEP 52 "piece layers" of a v2
-// torrent, once a magnet has fetched them from peers.
+// WritePieceLayers replaces only the bencoded BEP 52 piece layers,
+// persisted once a magnet fetches them from peers.
 func (r *Resumer) WritePieceLayers(torrentID string, value []byte) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.PieceLayers, value)
 	})
 }
 
-// WriteBitfield writes only bitfield of a torrent.
+// WriteBitfield replaces only the bitfield.
 func (r *Resumer) WriteBitfield(torrentID string, value []byte) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.Bitfield, value)
 	})
 }
 
-// WriteStarted writes the start status of a torrent.
+// WriteStarted replaces only the started flag.
 func (r *Resumer) WriteStarted(torrentID string, value bool) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.Started, []byte(strconv.FormatBool(value)))
 	})
 }
 
-// HandleStopAfterDownload clears the start status and stop_after_download fields.
+// HandleStopAfterDownload clears started and stop-after-download together.
 func (r *Resumer) HandleStopAfterDownload(torrentID string) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
-		err := b.Put(Keys.Started, []byte(strconv.FormatBool(false)))
-		if err != nil {
+		if err := b.Put(Keys.Started, []byte(strconv.FormatBool(false))); err != nil {
 			return err
 		}
 		return b.Put(Keys.StopAfterDownload, []byte(strconv.FormatBool(false)))
 	})
 }
 
-// HandleStopAfterMetadata clears the start status and stop_after_metadata fields.
+// HandleStopAfterMetadata clears started and stop-after-metadata together.
 func (r *Resumer) HandleStopAfterMetadata(torrentID string) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
-		err := b.Put(Keys.Started, []byte(strconv.FormatBool(false)))
-		if err != nil {
+		if err := b.Put(Keys.Started, []byte(strconv.FormatBool(false))); err != nil {
 			return err
 		}
 		return b.Put(Keys.StopAfterMetadata, []byte(strconv.FormatBool(false)))
 	})
 }
 
-// WriteCompleteCmdRun writes the start status of a torrent.
+// WriteCompleteCmdRun marks the completion hook as fired.
 func (r *Resumer) WriteCompleteCmdRun(torrentID string) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.CompleteCmdRun, []byte(strconv.FormatBool(true)))
 	})
 }
 
-// WriteSuperSeeding writes the super-seeding flag of a torrent.
+// WriteSuperSeeding replaces only the super-seeding flag.
 func (r *Resumer) WriteSuperSeeding(torrentID string, value bool) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.SuperSeeding, []byte(strconv.FormatBool(value)))
 	})
 }
 
+// Read loads one torrent's spec. Bolt values die with the transaction, so
+// every byte field is copied out. A storage fault (SIGBUS on a broken
+// mapping) becomes an error instead of a crash.
 func (r *Resumer) Read(torrentID string) (spec *Spec, err error) {
 	defer debug.SetPanicOnFault(debug.SetPanicOnFault(true))
 	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("cannot read torrent %q from db: %s", torrentID, r)
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("cannot read torrent %q from db: %s", torrentID, rec)
 		}
 	}()
 	err = r.db.Update(func(tx *bbolt.Tx) error {
@@ -225,198 +230,127 @@ func (r *Resumer) Read(torrentID string) (spec *Spec, err error) {
 		if b == nil {
 			return fmt.Errorf("bucket not found: %q", torrentID)
 		}
-
-		value := b.Get(Keys.InfoHash)
-		if value == nil {
+		if b.Get(Keys.InfoHash) == nil {
 			return fmt.Errorf("key not found: %q", string(Keys.InfoHash))
 		}
-
 		spec = new(Spec)
-		spec.InfoHash = make([]byte, len(value))
-		copy(spec.InfoHash, value)
-
+		spec.InfoHash = copied(b, Keys.InfoHash)
 		var err error
-		value = b.Get(Keys.Port)
-		spec.Port, err = strconv.Atoi(string(value))
-		if err != nil {
+		if spec.Port, err = requiredInt(b, Keys.Port); err != nil {
 			return err
 		}
-
-		value = b.Get(Keys.Name)
-		if value != nil {
-			spec.Name = string(value)
+		if v := b.Get(Keys.Name); v != nil {
+			spec.Name = string(v)
 		}
-
-		value = b.Get(Keys.Trackers)
-		if value != nil {
-			err = json.Unmarshal(value, &spec.Trackers)
-			if err != nil {
-				// Try to unmarshal old format `[]string`
-				trackers := make([]string, 0)
-				err = json.Unmarshal(value, &trackers)
-				if err != nil {
+		if err := readTrackers(b, spec); err != nil {
+			return err
+		}
+		if v := b.Get(Keys.URLList); v != nil {
+			if err := json.Unmarshal(v, &spec.URLList); err != nil {
+				return err
+			}
+		}
+		if v := b.Get(Keys.FixedPeers); v != nil {
+			if err := json.Unmarshal(v, &spec.FixedPeers); err != nil {
+				return err
+			}
+		}
+		spec.Info = copied(b, Keys.Info)
+		spec.PieceLayers = copied(b, Keys.PieceLayers)
+		spec.Bitfield = copied(b, Keys.Bitfield)
+		if v := b.Get(Keys.AddedAt); v != nil {
+			if spec.AddedAt, err = time.Parse(time.RFC3339, string(v)); err != nil {
+				return err
+			}
+		}
+		for _, num := range []struct {
+			key []byte
+			dst *int64
+		}{
+			{Keys.BytesDownloaded, &spec.BytesDownloaded},
+			{Keys.BytesUploaded, &spec.BytesUploaded},
+			{Keys.BytesWasted, &spec.BytesWasted},
+		} {
+			if v := b.Get(num.key); v != nil {
+				if *num.dst, err = strconv.ParseInt(string(v), 10, 64); err != nil {
 					return err
 				}
-				// Migrate to new format `[][]string`
-				spec.Trackers = make([][]string, len(trackers))
-				for i, t := range trackers {
-					spec.Trackers[i] = []string{t}
-				}
-				// Save in new format
-				bt, err := json.Marshal(spec.Trackers)
-				if err != nil {
+			}
+		}
+		if v := b.Get(Keys.SeededFor); v != nil {
+			if spec.SeededFor, err = time.ParseDuration(string(v)); err != nil {
+				return err
+			}
+		}
+		for _, flag := range []struct {
+			key []byte
+			dst *bool
+		}{
+			{Keys.Started, &spec.Started},
+			{Keys.StopAfterDownload, &spec.StopAfterDownload},
+			{Keys.StopAfterMetadata, &spec.StopAfterMetadata},
+			{Keys.CompleteCmdRun, &spec.CompleteCmdRun},
+			{Keys.Sequential, &spec.Sequential},
+			{Keys.FirstLast, &spec.FirstLast},
+			{Keys.SuperSeeding, &spec.SuperSeeding},
+		} {
+			if v := b.Get(flag.key); v != nil {
+				if *flag.dst, err = strconv.ParseBool(string(v)); err != nil {
 					return err
 				}
-				err = b.Put(Keys.Trackers, bt)
-				if err != nil {
-					return err
-				}
 			}
 		}
-
-		value = b.Get(Keys.URLList)
-		if value != nil {
-			err = json.Unmarshal(value, &spec.URLList)
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.FixedPeers)
-		if value != nil {
-			err = json.Unmarshal(value, &spec.FixedPeers)
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.Info)
-		if value != nil {
-			spec.Info = make([]byte, len(value))
-			copy(spec.Info, value)
-		}
-
-		value = b.Get(Keys.PieceLayers)
-		if value != nil {
-			spec.PieceLayers = make([]byte, len(value))
-			copy(spec.PieceLayers, value)
-		}
-
-		value = b.Get(Keys.Bitfield)
-		if value != nil {
-			spec.Bitfield = make([]byte, len(value))
-			copy(spec.Bitfield, value)
-		}
-
-		value = b.Get(Keys.AddedAt)
-		if value != nil {
-			spec.AddedAt, err = time.Parse(time.RFC3339, string(value))
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.BytesDownloaded)
-		if value != nil {
-			spec.BytesDownloaded, err = strconv.ParseInt(string(value), 10, 64)
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.BytesUploaded)
-		if value != nil {
-			spec.BytesUploaded, err = strconv.ParseInt(string(value), 10, 64)
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.BytesWasted)
-		if value != nil {
-			spec.BytesWasted, err = strconv.ParseInt(string(value), 10, 64)
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.SeededFor)
-		if value != nil {
-			spec.SeededFor, err = time.ParseDuration(string(value))
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.Started)
-		if value != nil {
-			spec.Started, err = strconv.ParseBool(string(value))
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.StopAfterDownload)
-		if value != nil {
-			spec.StopAfterDownload, err = strconv.ParseBool(string(value))
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.StopAfterMetadata)
-		if value != nil {
-			spec.StopAfterMetadata, err = strconv.ParseBool(string(value))
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.CompleteCmdRun)
-		if value != nil {
-			spec.CompleteCmdRun, err = strconv.ParseBool(string(value))
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.Sequential)
-		if value != nil {
-			spec.Sequential, err = strconv.ParseBool(string(value))
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.FirstLast)
-		if value != nil {
-			spec.FirstLast, err = strconv.ParseBool(string(value))
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.SuperSeeding)
-		if value != nil {
-			spec.SuperSeeding, err = strconv.ParseBool(string(value))
-			if err != nil {
-				return err
-			}
-		}
-
-		value = b.Get(Keys.Version)
-		if value != nil {
-			spec.Version, err = strconv.Atoi(string(value))
-			if err != nil {
+		if v := b.Get(Keys.Version); v != nil {
+			if spec.Version, err = strconv.Atoi(string(v)); err != nil {
 				return err
 			}
 		} else {
-			// Version field is added on version 2.
-			// Existing records with no version data must be interpreted as version 1.
+			// The version key arrived in version 2: older records read as v1.
 			spec.Version = 1
 		}
-
 		return nil
 	})
 	return
+}
+
+// copied returns a copy of the value under key, or nil when absent. The copy
+// is mandatory: Bolt reuses value memory across transactions.
+func copied(b *bbolt.Bucket, key []byte) []byte {
+	v := b.Get(key)
+	if v == nil {
+		return nil
+	}
+	out := make([]byte, len(v))
+	copy(out, v)
+	return out
+}
+
+// requiredInt parses a mandatory integer field.
+func requiredInt(b *bbolt.Bucket, key []byte) (int, error) {
+	return strconv.Atoi(string(b.Get(key)))
+}
+
+// readTrackers decodes the tier list, migrating the legacy flat []string
+// shape into tiers and persisting the migration in place.
+func readTrackers(b *bbolt.Bucket, spec *Spec) error {
+	v := b.Get(Keys.Trackers)
+	if v == nil {
+		return nil
+	}
+	if err := json.Unmarshal(v, &spec.Trackers); err == nil {
+		return nil
+	}
+	var flat []string
+	if err := json.Unmarshal(v, &flat); err != nil {
+		return err
+	}
+	spec.Trackers = make([][]string, len(flat))
+	for i, t := range flat {
+		spec.Trackers[i] = []string{t}
+	}
+	migrated, err := json.Marshal(spec.Trackers)
+	if err != nil {
+		return err
+	}
+	return b.Put(Keys.Trackers, migrated)
 }

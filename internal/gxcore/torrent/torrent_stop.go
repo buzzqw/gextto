@@ -8,15 +8,16 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
+// handleStopped lands the Stopping transition: the stopped announcer is
+// gone, the waiter gets the terminal error, and a clean stop with a pending
+// manual verification restarts into it. A stop that itself failed (missing
+// or unwritable files) never restarts — retrying would log thousands of
+// errors a second and recreate empty files on every attempt.
 func (t *torrent) handleStopped() {
 	t.stoppedEventAnnouncer = nil
 	t.errC <- t.lastError
 	t.errC = nil
 	t.portC = nil
-	// a verification restarts the torrent only after a clean
-	// stop. If it stopped on an error (missing or unwritable files), starting
-	// again fails the same way: the loop logged thousands of errors a second
-	// and re-created empty files at the save path on every attempt.
 	if t.doVerify && t.lastError != nil {
 		t.doVerify = false
 	}
@@ -35,28 +36,33 @@ func (t *torrent) handleStopped() {
 	}
 }
 
+// stopAndSetStoppedOnComplete records the stop-after-download flag, then stops.
 func (t *torrent) stopAndSetStoppedOnComplete() {
-	err := t.session.resumer.HandleStopAfterDownload(t.id)
-	if err != nil {
+	if err := t.session.resumer.HandleStopAfterDownload(t.id); err != nil {
 		t.log.Errorf("cannot write status to resume db: %s", err)
 	}
 	t.stop(nil)
 }
 
+// stopAndSetStoppedOnMetadata records the stop-after-metadata flag, then stops.
 func (t *torrent) stopAndSetStoppedOnMetadata() {
-	err := t.session.resumer.HandleStopAfterMetadata(t.id)
-	if err != nil {
+	if err := t.session.resumer.HandleStopAfterMetadata(t.id); err != nil {
 		t.log.Errorf("cannot write status to resume db: %s", err)
 	}
 	t.stop(nil)
 }
 
+// stop unwinds a running torrent in dependency order: acceptor, peers,
+// downloaders, webseeds, then the bitfield persist; periodical announcers
+// before data files (an announcing goroutine touching pieces during close
+// is a data race); data before allocator and verifier (their IO must be
+// already cancelled); handshakers; meters; and finally the stopped-event
+// announcer over the trackers that actually heard from us, which drives the
+// Stopping state. Already stopping or stopped torrents ignore the call.
 func (t *torrent) stop(err error) {
-	s := t.status()
-	if s == Stopping || s == Stopped {
+	if s := t.status(); s == Stopping || s == Stopped {
 		return
 	}
-
 	t.log.Info("stopping torrent")
 	t.lastError = err
 	if err != nil && err != errClosed {
@@ -73,18 +79,11 @@ func (t *torrent) stop(err error) {
 		_ = t.writeBitfield()
 	}
 
-	// Stop periodical announcers first. We'll create another announcer for announcing Stopped event.
-	// This must be done before closing data files because announcer accesses to t.pieces.
-	// If the announcer goroutine is active during close it is a data race.
-	// Bug details: https://github.com/buzzqw/gextto/internal/gxcore/issues/33
-	announcers := t.announcers // keep a reference to the list before nilling in order to start StopAnnouncer
+	announcers := t.announcers
 	t.stopPeriodicalAnnouncers()
 
-	// Closing data is necessary to cancel ongoing IO operations on files.
 	t.closeData()
-	// Data must be closed before closing Allocator.
 	t.stopAllocator()
-	// Data must be closed before closing Verifier.
 	t.stopVerifier()
 
 	t.stopOutgoingHandshakers()
@@ -92,9 +91,6 @@ func (t *torrent) stop(err error) {
 
 	t.resetSpeeds()
 
-	// Start new announcer to announce Stopped event to the trackers.
-	// The torrent enters "Stopping" state.
-	// This announcer times out in 5 seconds. After it's done the torrent is in "Stopped" status.
 	trackers := make([]tracker.Tracker, 0, len(announcers))
 	for _, an := range announcers {
 		if an.HasAnnounced {
@@ -105,12 +101,12 @@ func (t *torrent) stop(err error) {
 		t.crash("stopped event announcer exists")
 	}
 	t.stoppedEventAnnouncer = announcer.NewStopAnnouncer(trackers, t.announcerFields(), t.session.config.TrackerStopTimeout, t.announcersStoppedC, t.log)
-
 	go t.stoppedEventAnnouncer.Run()
 
 	t.addrList.Reset()
-	// handshakers closed above never report back, so their IPs
-	// would stay marked as connected and never be dialed again.
+	// Closed handshakers never report back, so rebuild the connected-IP set
+	// from the live peers only — otherwise their IPs stay pinned and are
+	// never dialled again.
 	t.connectedPeerIPs = make(map[string]struct{}, len(t.peers))
 	for pe := range t.peers {
 		t.connectedPeerIPs[pe.Conn.IP()] = struct{}{}
@@ -134,14 +130,13 @@ func (t *torrent) stopVerifier() {
 	}
 }
 
+// stopWebseedDownloads closes every webseed downloader and zeroes the
+// active counter: their teardown bypasses the piece-result path, so the
+// slots would otherwise leak across stop/restart cycles.
 func (t *torrent) stopWebseedDownloads() {
 	for _, src := range t.webseedSources {
 		t.closeWebseedDownloader(src)
 	}
-	// All webseed downloaders are now closed. Closing them does not go through
-	// handleWebseedPieceResult, so the active-downloads counter is not
-	// decremented per source; reset it here to avoid leaking slots across
-	// stop/restart cycles.
 	t.webseedActiveDownloads = 0
 }
 
@@ -168,11 +163,11 @@ func (t *torrent) stopIncomingHandshakers() {
 	t.incomingHandshakers = make(map[*incominghandshaker.IncomingHandshaker]struct{})
 }
 
+// closeData closes every open file and drops the in-memory piece state.
 func (t *torrent) closeData() {
 	t.log.Debugln("closing open files")
 	for _, f := range t.files {
-		err := f.Storage.Close()
-		if err != nil {
+		if err := f.Storage.Close(); err != nil {
 			t.log.Error(err)
 		}
 	}

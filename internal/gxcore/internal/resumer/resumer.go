@@ -1,7 +1,8 @@
-// Package resumer contains an interface that is used by torrent package for resuming an existing download.
+// Package resumer defines the persistence contract the torrent package uses
+// to save and restore download progress across restarts.
 package resumer
 
-// Stats of a torrent.
+// Stats carries the lifetime counters of a torrent.
 type Stats struct {
 	BytesDownloaded int64
 	BytesUploaded   int64

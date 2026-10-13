@@ -7,6 +7,9 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/verifier"
 )
 
+// handleVerifyCommand re-verifies on demand: immediately when stopped (the
+// bitfield is dropped and the torrent restarts into verification), or by
+// stopping first when running.
 func (t *torrent) handleVerifyCommand() {
 	t.log.Info("verifying")
 	t.doVerify = true
@@ -20,6 +23,9 @@ func (t *torrent) handleVerifyCommand() {
 	}
 }
 
+// handleVerificationDone installs the verified bitfield and resumes the
+// pipeline: haves fan out to peers, downloads restart, or the torrent stops
+// when this was a manual verification or a completed stop-after-download.
 func (t *torrent) handleVerificationDone(ve *verifier.Verifier) {
 	if t.verifier != ve {
 		t.crash("invalid verifier")
@@ -34,22 +40,16 @@ func (t *torrent) handleVerificationDone(ve *verifier.Verifier) {
 		t.stop(fmt.Errorf("file verification error: %w", ve.Error))
 		return
 	}
-
-	// Now we have a constructed and verified bitfield.
 	t.mBitfield.Lock()
 	t.bitfield = ve.Bitfield
 	t.mBitfield.Unlock()
 
-	// Save the bitfield to resume db.
-	err := t.writeBitfield()
-	if err != nil {
+	if err := t.writeBitfield(); err != nil {
 		t.stop(err)
 		return
 	}
 
 	var haveMessages []peerprotocol.HaveMessage
-
-	// Mark downloaded pieces.
 	for i := uint32(0); i < t.bitfield.Len(); i++ {
 		if t.bitfield.Test(i) {
 			t.pieces[i].Done = true
@@ -57,7 +57,8 @@ func (t *torrent) handleVerificationDone(ve *verifier.Verifier) {
 		}
 	}
 
-	// We may detect missing pieces after verification. Then, status must be set from Seeding to Downloading.
+	// Verification may demote a seed back to downloader when wanted pieces
+	// turn out missing.
 	if !t.wantedComplete() {
 		t.completed = false
 		if t.completeC == nil {
@@ -66,20 +67,16 @@ func (t *torrent) handleVerificationDone(ve *verifier.Verifier) {
 	}
 
 	if t.doVerify {
-		// Stop after manual verification command.
 		t.doVerify = false
 		t.stop(nil)
 		return
 	}
-
-	// Tell connected peers that pieces we have.
 	for pe := range t.peers {
 		for _, msg := range haveMessages {
 			pe.SendMessage(msg)
 		}
 		t.updateInterestedState(pe)
 	}
-
 	if t.checkCompletion() && t.stopAfterDownload {
 		t.stopAndSetStoppedOnComplete()
 		return

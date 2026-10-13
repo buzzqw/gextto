@@ -11,15 +11,17 @@ import (
 )
 
 var (
-	// ErrBlocked indicates that the resolved IP is blocked in the blocklist.
+	// ErrBlocked rejects an address whose IP is blocklisted.
 	ErrBlocked = errors.New("ip is blocked")
-	// ErrNotIPv4Address indicates that the resolved IP address is not IPv4.
+	// ErrNotIPv4Address reports a resolution with no usable address.
 	ErrNotIPv4Address = errors.New("not ipv4 address")
-	// ErrInvalidPort indicates that the port number in the address is invalid.
+	// ErrInvalidPort rejects out-of-range ports.
 	ErrInvalidPort = errors.New("invalid port number")
 )
 
-// Resolve `hostport` to an IP address (preferring IPv4, falling back to IPv6).
+// Resolve parses hostport, resolves the host (literals skip DNS), and
+// validates the result: IPv4 preferred with IPv6 fallback, blocklist
+// enforced. It returns the dialable IP and port.
 func Resolve(ctx context.Context, hostport string, timeout time.Duration, bl *blocklist.Blocklist) (net.IP, int, error) {
 	host, portStr, err := net.SplitHostPort(hostport)
 	if err != nil {
@@ -34,7 +36,7 @@ func Resolve(ctx context.Context, hostport string, timeout time.Duration, bl *bl
 	}
 	ip := net.ParseIP(host)
 	if ip == nil {
-		ip, err = resolveIP(ctx, timeout, host)
+		ip, err = lookupIP(ctx, timeout, host)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -48,8 +50,9 @@ func Resolve(ctx context.Context, hostport string, timeout time.Duration, bl *bl
 	return ip, port, nil
 }
 
-// resolveIP resolves `host` preferring an IPv4 address and falling back to IPv6.
-func resolveIP(ctx context.Context, timeout time.Duration, host string) (net.IP, error) {
+// lookupIP resolves host with a deadline, preferring IPv4 records and
+// accepting IPv6 only when no IPv4 exists.
+func lookupIP(ctx context.Context, timeout time.Duration, host string) (net.IP, error) {
 	var cancel func()
 	ctx, cancel = context.WithTimeout(ctx, timeout)
 	defer cancel()

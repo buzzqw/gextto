@@ -6,19 +6,19 @@ import (
 	"github.com/golang/groupcache/lru"
 )
 
-// For the inner map, the key address in binary form. value=ignored.
+// peerContactsSet holds one info hash's contacts: the set for membership,
+// a ring for rotating replies, and per-IP seed flags (BEP 33) for noseed
+// filtering and scrape blooms.
 type peerContactsSet struct {
 	set map[string]bool
-	// Needed to ensure different peers are returned each time.
+	// ring cycles so repeated queries spread across contacts.
 	ring *ring.Ring
-	// BEP 33: the unique IPs (raw, without the 2-byte port) announced for the
-	// infohash, with the seed status (true = seed). Used to build the scrape
-	// bloom filters and to honor "noseed".
+	// ips maps raw IP (contact minus the 2-byte port) to seed status; the
+	// latest announce wins.
 	ips map[string]bool
 }
 
-// markIP records the seed status of a contact's IP (BEP 33). The status is the
-// latest announced: a seed that stops seeding becomes a peer again.
+// markIP records a contact's seed flag. Short contacts carry no IP.
 func (p *peerContactsSet) markIP(peerContact string, seed bool) {
 	if len(peerContact) < 6 {
 		return
@@ -29,15 +29,14 @@ func (p *peerContactsSet) markIP(peerContact string, seed bool) {
 	p.ips[peerContact[:len(peerContact)-2]] = seed
 }
 
-// next returns up to 8 peer contacts, if available. Further calls will return a
-// different set of contacts, if possible.
+// next returns up to 8 contacts, rotating so consecutive calls spread.
+// Live contacts come first; a short second pass fills from the rest.
 func (p *peerContactsSet) next() []string {
 	count := kNodes
 	if count > len(p.set) {
 		count = len(p.set)
 	}
-	x := make([]string, 0, count)
-	xx := make(map[string]bool) //maps are easier to dedupe
+	xx := make(map[string]bool)
 	for range p.set {
 		nid := p.ring.Move(1).Value.(string)
 		if _, ok := xx[nid]; p.set[nid] && !ok {
@@ -47,7 +46,6 @@ func (p *peerContactsSet) next() []string {
 			break
 		}
 	}
-
 	if len(xx) < count {
 		for range p.set {
 			nid := p.ring.Move(1).Value.(string)
@@ -60,16 +58,15 @@ func (p *peerContactsSet) next() []string {
 			}
 		}
 	}
+	x := make([]string, 0, count)
 	for id := range xx {
 		x = append(x, id)
 	}
 	return x
 }
 
-// put adds a peerContact to an infohash contacts set. peerContact must be a binary encoded contact
-// address: either 6 bytes (4 bytes IPv4 + 2 bytes port) or 18 bytes (16 bytes IPv6 + 2 bytes port),
-// as produced by encodeCompactPeerAddr. peerContact with less than 6 bytes will not be stored,
-// so both families are accepted (and existing behavior is preserved).
+// put stores a binary contact (6-byte v4 or 18-byte v6, per
+// encodeCompactPeerAddr): too short is rejected, duplicates report false.
 func (p *peerContactsSet) put(peerContact string) bool {
 	if len(peerContact) < 6 {
 		return false
@@ -87,15 +84,14 @@ func (p *peerContactsSet) put(peerContact string) bool {
 	return true
 }
 
-// drop cycles throught the peerContactSet and deletes the contact if it finds it
-// if the argument is empty, it first tries to drop a dead peer
+// drop removes one contact: the named one when given, else a dead one
+// first, else the ring head. It returns what left.
 func (p *peerContactsSet) drop(peerContact string) string {
 	if peerContact == "" {
 		if c := p.dropDead(); c != "" {
 			return c
-		} else {
-			return p.drop(p.ring.Next().Value.(string))
 		}
+		return p.drop(p.ring.Next().Value.(string))
 	}
 	for i := 0; i < p.ring.Len()+1; i++ {
 		if p.ring.Move(1).Value.(string) == peerContact {
@@ -107,7 +103,7 @@ func (p *peerContactsSet) drop(peerContact string) string {
 	return ""
 }
 
-// dropDead drops the first dead contact, returns the id if a contact was dropped
+// dropDead unlinks the first dead contact it cycles past.
 func (p *peerContactsSet) dropDead() string {
 	for i := 0; i < p.ring.Len()+1; i++ {
 		if !p.set[p.ring.Move(1).Value.(string)] {
@@ -119,17 +115,19 @@ func (p *peerContactsSet) dropDead() string {
 	return ""
 }
 
+// kill marks a contact dead without unlinking it.
 func (p *peerContactsSet) kill(peerContact string) {
 	if ok := p.set[peerContact]; ok {
 		p.set[peerContact] = false
 	}
 }
 
-// Size is the number of contacts known for an infohash.
+// Size counts known contacts, dead or alive.
 func (p *peerContactsSet) Size() int {
 	return len(p.set)
 }
 
+// Alive counts the live contacts.
 func (p *peerContactsSet) Alive() int {
 	var ret int = 0
 	for ih := range p.set {
@@ -140,6 +138,7 @@ func (p *peerContactsSet) Alive() int {
 	return ret
 }
 
+// newPeerStore sizes the info-hash LRU and the per-hash contact cap.
 func newPeerStore(maxInfoHashes, maxInfoHashPeers int) *peerStore {
 	return &peerStore{
 		infoHashPeers:        lru.New(maxInfoHashes),
@@ -149,16 +148,16 @@ func newPeerStore(maxInfoHashes, maxInfoHashPeers int) *peerStore {
 	}
 }
 
+// peerStore caches swarm contacts per info hash (LRU) plus our own active
+// downloads (info hash to port).
 type peerStore struct {
-	// cache of peers for infohashes. Each key is an infohash and the
-	// values are peerContactsSet.
-	infoHashPeers *lru.Cache
-	// infoHashes for which we are peers.
-	localActiveDownloads map[InfoHash]int // value is port number
+	infoHashPeers        *lru.Cache
+	localActiveDownloads map[InfoHash]int
 	maxInfoHashes        int
 	maxInfoHashPeers     int
 }
 
+// get returns the contact set for ih, or nil.
 func (h *peerStore) get(ih InfoHash) *peerContactsSet {
 	c, ok := h.infoHashPeers.Get(string(ih))
 	if !ok {
@@ -168,7 +167,7 @@ func (h *peerStore) get(ih InfoHash) *peerContactsSet {
 	return contacts
 }
 
-// count shows the number of known peers for the given infohash.
+// count totals the known peers for ih.
 func (h *peerStore) count(ih InfoHash) int {
 	peers := h.get(ih)
 	if peers == nil {
@@ -177,6 +176,7 @@ func (h *peerStore) count(ih InfoHash) int {
 	return peers.Size()
 }
 
+// alive totals the live peers for ih.
 func (h *peerStore) alive(ih InfoHash) int {
 	peers := h.get(ih)
 	if peers == nil {
@@ -185,8 +185,8 @@ func (h *peerStore) alive(ih InfoHash) int {
 	return peers.Alive()
 }
 
-// peerContacts returns a random set of 8 peers for the ih InfoHash. With noseed,
-// seeders are excluded (BEP 33).
+// peerContacts returns up to 8 peers for ih; with noseed, seeded IPs drop
+// out (BEP 33), unless no IP data exists yet.
 func (h *peerStore) peerContacts(ih InfoHash, noseed bool) []string {
 	peers := h.get(ih)
 	if peers == nil {
@@ -209,8 +209,8 @@ func (h *peerStore) peerContacts(ih InfoHash, noseed bool) []string {
 	return kept
 }
 
-// scrapeFilters builds the BEP 33 bloom filters for ih: the peers (non-seed) and
-// the seeds. Either is non-nil only when there is something to report.
+// scrapeFilters builds the BEP 33 peer/seed bloom pair for ih, or nils when
+// there is nothing (or no IP data) to report.
 func (h *peerStore) scrapeFilters(ih InfoHash) (peersBloom, seedsBloom *scrapeBloom) {
 	peers := h.get(ih)
 	if peers == nil || len(peers.ips) == 0 {
@@ -228,9 +228,9 @@ func (h *peerStore) scrapeFilters(ih InfoHash) (peersBloom, seedsBloom *scrapeBl
 	return peersBloom, seedsBloom
 }
 
-// addContact adds a peer for the provided ih, with its seed status (BEP 33).
-// Returns true if the contact was added, false otherwise (e.g: already present,
-// or invalid).
+// addContact stores a peer for ih with its seed flag. Full sets evict
+// (dropping dead first) to make room; duplicates and invalid contacts fail.
+// A set of unexpected shape resets rather than mixing.
 func (h *peerStore) addContact(ih InfoHash, peerContact string, seed bool) bool {
 	var peers *peerContactsSet
 	p, ok := h.infoHashPeers.Get(string(ih))
@@ -250,7 +250,6 @@ func (h *peerStore) addContact(ih InfoHash, peerContact string, seed bool) bool 
 			h.infoHashPeers.Add(string(ih), peers)
 			return peers.put(peerContact)
 		}
-		// Bogus peer contacts, reset them.
 	}
 	peers = &peerContactsSet{set: make(map[string]bool)}
 	peers.markIP(peerContact, seed)
@@ -258,6 +257,7 @@ func (h *peerStore) addContact(ih InfoHash, peerContact string, seed bool) bool 
 	return peers.put(peerContact)
 }
 
+// killContact marks a contact dead in every locally-downloaded swarm.
 func (h *peerStore) killContact(peerContact string) {
 	if h == nil {
 		return
@@ -269,15 +269,18 @@ func (h *peerStore) killContact(peerContact string) {
 	}
 }
 
+// addLocalDownload registers our own download of ih on port.
 func (h *peerStore) addLocalDownload(ih InfoHash, port int) {
 	h.localActiveDownloads[ih] = port
 }
 
+// hasLocalDownload returns our download port for ih, if any.
 func (h *peerStore) hasLocalDownload(ih InfoHash) (port int) {
 	port, _ = h.localActiveDownloads[ih]
 	return
 }
 
+// removeLocalDownload forgets our download of ih.
 func (h *peerStore) removeLocalDownload(ih InfoHash) {
 	delete(h.localActiveDownloads, ih)
 }

@@ -1,19 +1,21 @@
 package tracker
 
-// Event type that is sent in an announce request.
+// Event is the announce lifecycle event. The numeric values double as the
+// BEP 15 UDP event ids; the names double as the BEP 23 HTTP event strings.
 type Event int32
 
-// Tracker Announce Events. Numbers corresponds to constants in UDP tracker protocol.
+// Announce events, in UDP protocol order.
 const (
 	EventNone Event = iota
 	EventCompleted
 	EventStarted
 	EventStopped
-	// EventPaused is the BEP 21 "paused" event, sent by a partial seed on every
-	// announce (not part of the original BEP 15 enum, which stops at 3).
+	// EventPaused is the BEP 21 "paused" event of a partial seed, sent on
+	// every announce. The original BEP 15 enum stops at EventStopped.
 	EventPaused
 )
 
+// eventNames renders events for HTTP trackers, index-aligned with the enum.
 var eventNames = [...]string{
 	"empty",
 	"completed",
@@ -22,7 +24,7 @@ var eventNames = [...]string{
 	"paused",
 }
 
-// String returns the name of event as represented in HTTP tracker protocol.
+// String returns the HTTP tracker spelling of the event.
 func (e Event) String() string {
 	return eventNames[e]
 }

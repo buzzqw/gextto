@@ -101,7 +101,7 @@ Gextto conserva il piano di controllo (coda, punteggi, post-processing, archivio
 
 **gx-torrent** è il motore predefinito ed è compilato in **Go puro** (`CGO_ENABLED=0`), senza alcuna dipendenza C/C++. Gira in un processo separato sorvegliato da Gextto, sopravvive ai riavvii e agli aggiornamenti dell'orchestratore (Gextto lo riaggancia se binario e opzioni coincidono), dispone di una propria interfaccia web ed è dove arrivano per prime le innovazioni di protocollo.
 
-Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un'implementazione BitTorrent sviluppata in questo repository (con porzioni derivate da progetti MIT/BSD; vedi `internal/gxcore/LICENSE`). Per chi conosce BitTorrent, ecco cosa c'è dentro.
+Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un'implementazione BitTorrent sviluppata in questo repository. Per chi conosce BitTorrent, ecco cosa c'è dentro.
 
 #### Protocollo
 

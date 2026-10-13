@@ -100,7 +100,7 @@ Gextto keeps the control plane (queue, scoring, post-processing, archiving) and 
 
 **gx-torrent** is the default engine and compiles as **pure Go** (`CGO_ENABLED=0`) with zero C/C++ dependencies. It runs as a separate supervised process, survives orchestrator restarts and updates (Gextto re-attaches to it when binary and options match), provides its own web interface, and receives protocol innovations first.
 
-Its engine core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementation developed in this repository (with portions derived under MIT/BSD licenses; see `internal/gxcore/LICENSE`). For those who know BitTorrent, this is what is inside.
+Its engine core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementation developed in this repository. For those who know BitTorrent, this is what is inside.
 
 #### Protocol
 

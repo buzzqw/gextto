@@ -1,4 +1,6 @@
-// Package magnet provides support for parsing magnet links.
+// Package magnet parses and renders magnet links: v1 (BEP 5) and v2/BEP 52
+// topics, BEP 53 file selection and webseeds, BEP 46 DHT-resolved keys,
+// tracker tiers and peer hints.
 package magnet
 
 import (
@@ -13,147 +15,142 @@ import (
 	"strings"
 )
 
-// Magnet link contains the information to download torrent metadata from network.
+// Magnet holds everything a link carries to fetch torrent metadata.
 type Magnet struct {
 	InfoHash [20]byte
 	Name     string
 	Trackers [][]string
 	Peers    []string
-	// HasV1 reports whether the link carried a v1 "urn:btih:" topic. For a
-	// v2-only link InfoHash is the truncated SHA-256 of the btmh topic.
+	// HasV1 marks a "urn:btih:" topic. On v2-only links InfoHash holds the
+	// truncated SHA-256 of the btmh topic instead.
 	HasV1 bool
-	// V2InfoHash is the SHA-256 info hash from a "urn:btmh:" topic (BEP 52),
-	// present on hybrid and v2-only links. HasV2 reports whether it was found.
+	// V2InfoHash is the SHA-256 info hash of a "urn:btmh:" topic (BEP 52),
+	// on hybrid and v2-only links alike.
 	V2InfoHash [32]byte
 	HasV2      bool
-	// SelectOnly is the sorted list of file indices to download, from the
-	// BEP 53 "so" parameter (Select Only). Empty means every file is wanted.
-	// Indices address the non-padding files, the same convention the engine's
-	// Config.FileSelection uses.
+	// SelectOnly lists the wanted file indices from BEP 53 "so", sorted and
+	// de-duplicated. Empty means everything. Indices count non-padding
+	// files, like Config.FileSelection.
 	SelectOnly []int
-	// WebSeeds are the HTTP web seed URLs from the BEP 53 "ws" parameters.
+	// WebSeeds holds the BEP 53 "ws" HTTP URLs.
 	WebSeeds []string
-	// DHTNodes are the DHT bootstrap nodes (host:port) from the magnet "dht"
-	// parameters, like libtorrent's add_torrent_params.dht_nodes.
+	// DHTNodes holds "dht" bootstrap nodes (host:port).
 	DHTNodes []string
-	// ExactSources are the magnet "xs" values: URLs (usually HTTP/HTTPS) that
-	// point at the exact .torrent this link refers to. AcceptableSources are
-	// the "as" values, a set of interchangeable sources. gx-core fetches the
-	// metainfo from them before waiting for a peer or the DHT.
+	// ExactSources ("xs") point at the exact .torrent; AcceptableSources
+	// ("as") at interchangeable sources. The engine fetches metainfo from
+	// them before involving peers or the DHT.
 	ExactSources      []string
 	AcceptableSources []string
-	// BTPKPublicKey is the ed25519 public key from a BEP 46 "xs=urn:btpk:"
-	// value: the link then carries no "xt" and the info hash is resolved from
-	// the DHT mutable item at add time. BTPKSalt is the optional "s" salt.
+	// BTPKPublicKey is the ed25519 key of a BEP 46 "xs=urn:btpk:" value: the
+	// link carries no "xt" and the info hash resolves from the DHT mutable
+	// item at add time. BTPKSalt is the optional "s" salt.
 	BTPKPublicKey []byte
 	BTPKSalt      []byte
 }
 
-// New parses the string and returns new Magnet.
+// New parses s into a Magnet, rejecting non-magnet schemes, links without
+// an xt (unless BEP 46 keyed), and xt topics that are neither btih nor btmh.
 func New(s string) (*Magnet, error) {
 	u, err := url.Parse(s)
 	if err != nil {
 		return nil, err
 	}
-
 	if u.Scheme != "magnet" {
 		return nil, errors.New("not a magnet link")
 	}
-
 	params := u.Query()
 
 	var magnet Magnet
 	xts := params["xt"]
-	// BEP 46: a link may carry "xs=urn:btpk:<public key>" instead of an "xt";
-	// the info hash is then resolved from the DHT mutable item at add time.
 	magnet.BTPKPublicKey, magnet.BTPKSalt = parseBTPK(params["xs"], params["s"])
 	if len(xts) == 0 && len(magnet.BTPKPublicKey) == 0 {
 		return nil, errors.New("missing xt param")
 	}
-
-	var h [20]byte
-	ok := false
-	if len(xts) > 0 {
-		h, ok, err = parseInfoHash(xts)
-		if err != nil {
-			return nil, err
-		}
+	if err := magnet.adoptTopics(xts); err != nil {
+		return nil, err
 	}
-	if ok {
-		magnet.InfoHash = h
-		magnet.HasV1 = true
-	}
-	magnet.V2InfoHash, magnet.HasV2 = parseV2InfoHash(xts)
-	if !magnet.HasV1 {
-		switch {
-		case magnet.HasV2:
-			// A v2-only link: the identity used on the wire (handshake, DHT,
-			// tracker) is the first 20 bytes of the SHA-256 info hash.
-			copy(magnet.InfoHash[:], magnet.V2InfoHash[:20])
-		case len(magnet.BTPKPublicKey) > 0:
-			// BEP 46: resolved from the DHT by the caller.
-		default:
-			return nil, errors.New("invalid xt param: must start with \"urn:btih:\" or \"urn:btmh:\"")
-		}
-	}
-
-	names := params["dn"]
-	if len(names) != 0 {
+	if names := params["dn"]; len(names) != 0 {
 		magnet.Name = names[0]
 	}
-
-	var tiers []trackerTier
-	for key, tier := range params {
-		if key == "tr" {
-			for i, tr := range tier {
-				tiers = append(tiers, trackerTier{trackers: []string{tr}, index: i - len(tier)})
-			}
-		} else if strings.HasPrefix(key, "tr.") {
-			index, err := strconv.Atoi(key[3:])
-			if err == nil && index >= 0 {
-				tiers = append(tiers, trackerTier{trackers: tier, index: index})
-			}
-		}
-	}
-
-	slices.SortFunc(tiers, func(a, b trackerTier) int { return cmp.Compare(a.index, b.index) })
-
-	magnet.Trackers = make([][]string, len(tiers))
-	for i, ti := range tiers {
-		magnet.Trackers[i] = ti.trackers
-	}
-
+	magnet.Trackers = parseTiers(params)
 	magnet.Peers = params["x.pe"]
-
-	// BEP 53 "so": Select Only, a list of file indices (comma separated, with
-	// ranges like "0,2,4-7"). Repeated parameters and repeated indices are
-	// accepted and de-duplicated.
 	magnet.SelectOnly = parseSelectOnly(params["so"])
-
-	// BEP 53 "ws": HTTP web seeds for the torrent.
 	for _, ws := range params["ws"] {
 		if ws = strings.TrimSpace(ws); ws != "" {
 			magnet.WebSeeds = append(magnet.WebSeeds, ws)
 		}
 	}
-
-	// Magnet "dht": DHT bootstrap nodes ("host:port"), like libtorrent's
-	// add_torrent_params.dht_nodes.
 	for _, node := range params["dht"] {
 		if node = strings.TrimSpace(node); node != "" {
 			magnet.DHTNodes = append(magnet.DHTNodes, node)
 		}
 	}
-
-	// Magnet "xs" (exact source) and "as" (acceptable source): URLs where the
-	// .torrent can be fetched, mostly HTTP(S).
 	magnet.ExactSources = cleanSourceList(params["xs"])
 	magnet.AcceptableSources = cleanSourceList(params["as"])
-
 	return &magnet, nil
 }
 
-// cleanSourceList trims a magnet source list and drops empty entries.
+// adoptTopics resolves the xt topics into the v1/v2 identities: a btih
+// topic (anywhere in a hybrid link) wins outright; a lone btmh topic lends
+// its first 20 digest bytes as the wire identity; a bare BTPK key resolves
+// later from the DHT.
+func (m *Magnet) adoptTopics(xts []string) error {
+	var h [20]byte
+	ok := false
+	var err error
+	if len(xts) > 0 {
+		if h, ok, err = parseInfoHash(xts); err != nil {
+			return err
+		}
+	}
+	if ok {
+		m.InfoHash = h
+		m.HasV1 = true
+	}
+	m.V2InfoHash, m.HasV2 = parseV2InfoHash(xts)
+	if !m.HasV1 {
+		switch {
+		case m.HasV2:
+			copy(m.InfoHash[:], m.V2InfoHash[:20])
+		case len(m.BTPKPublicKey) > 0:
+		default:
+			return errors.New("invalid xt param: must start with \"urn:btih:\" or \"urn:btmh:\"")
+		}
+	}
+	return nil
+}
+
+// trackerTier stages one tier with its sort position.
+type trackerTier struct {
+	trackers []string
+	index    int
+}
+
+// parseTiers orders the "tr" (bare, in arrival order) and "tr.N" tracker
+// parameters into tiers by their numeric position.
+func parseTiers(params url.Values) [][]string {
+	var tiers []trackerTier
+	for key, tier := range params {
+		switch {
+		case key == "tr":
+			for i, tr := range tier {
+				tiers = append(tiers, trackerTier{trackers: []string{tr}, index: i - len(tier)})
+			}
+		case strings.HasPrefix(key, "tr."):
+			if index, err := strconv.Atoi(key[3:]); err == nil && index >= 0 {
+				tiers = append(tiers, trackerTier{trackers: tier, index: index})
+			}
+		}
+	}
+	slices.SortFunc(tiers, func(a, b trackerTier) int { return cmp.Compare(a.index, b.index) })
+	out := make([][]string, len(tiers))
+	for i, ti := range tiers {
+		out[i] = ti.trackers
+	}
+	return out
+}
+
+// cleanSourceList trims a source list, dropping blanks.
 func cleanSourceList(values []string) []string {
 	var out []string
 	for _, v := range values {
@@ -167,9 +164,8 @@ func cleanSourceList(values []string) []string {
 // maxBTPKSalt mirrors BEP 44's 64-byte salt ceiling.
 const maxBTPKSalt = 64
 
-// parseBTPK parses a BEP 46 "xs=urn:btpk:<public key hex>" value together with
-// the optional "s" salt (hex). It returns a nil key when no valid urn:btpk is
-// present.
+// parseBTPK reads a BEP 46 "xs=urn:btpk:<key hex>" value with the optional
+// "s" salt (hex). Nil key means no usable urn:btpk was present.
 func parseBTPK(xs, salts []string) (ed25519.PublicKey, []byte) {
 	var pub ed25519.PublicKey
 	for _, x := range xs {
@@ -197,14 +193,13 @@ func parseBTPK(xs, salts []string) (ed25519.PublicKey, []byte) {
 	return pub, nil
 }
 
-// HasBTPK reports whether the link carries a BEP 46 "urn:btpk:" source, so its
-// info hash must be resolved from the DHT before the torrent is added.
+// HasBTPK reports a BEP 46 keyed link, whose info hash resolves from the
+// DHT before adding.
 func (m *Magnet) HasBTPK() bool { return len(m.BTPKPublicKey) > 0 }
 
-// MetadataSources returns the HTTP(S) URLs from "xs" (exact) then "as"
-// (acceptable), de-duplicated and in order: gx-core tries them to fetch the
-// .torrent without depending on a peer or the DHT. Non-HTTP values (for example
-// a nested magnet) are ignored.
+// MetadataSources lists the HTTP(S) URLs (exact first, then acceptable),
+// de-duplicated in order, for fetching the .torrent directly. Non-HTTP
+// values (nested magnets and the like) are ignored.
 func (m *Magnet) MetadataSources() []string {
 	seen := make(map[string]struct{}, len(m.ExactSources)+len(m.AcceptableSources))
 	var out []string
@@ -222,6 +217,8 @@ func (m *Magnet) MetadataSources() []string {
 	return out
 }
 
+// String renders the canonical link: xt topics, name, tiers, peers, web
+// seeds, DHT nodes, sources, salt, selection — in that order.
 func (m *Magnet) String() string {
 	var b strings.Builder
 	b.Grow(2048)
@@ -294,19 +291,18 @@ func (m *Magnet) String() string {
 	return b.String()
 }
 
-// maxSelectOnlyIndex is the highest file index "so" may name, and
-// maxSelectOnlyTotal the most indices it may expand to: a hostile link must not
-// make the parser loop forever (a range ending at the largest int would wrap
-// around) or allocate millions of entries. No real torrent has this many files.
+// maxSelectOnlyIndex caps the file index "so" may name and maxSelectOnlyTotal
+// caps the expansion: a hostile link must neither wrap the range loop (an end
+// at max int) nor allocate millions of entries. No real torrent is that wide.
 const (
 	maxSelectOnlyIndex = 1<<20 - 1
 	maxSelectOnlyTotal = 1 << 16
 )
 
-// parseSelectOnly parses the BEP 53 "so" values into a sorted, de-duplicated
-// list of file indices. Each value is a comma-separated list of indices, each
-// either a number ("3") or an inclusive range ("4-7"). Malformed parts are
-// ignored; an empty result means the parameter was absent or unusable.
+// parseSelectOnly parses BEP 53 "so" values into a sorted, de-duplicated
+// index list. Each value holds comma-separated numbers ("3") or inclusive
+// ranges ("4-7"); malformed parts are ignored, and an empty outcome reads as
+// "parameter absent or unusable".
 func parseSelectOnly(values []string) []int {
 	if len(values) == 0 {
 		return nil
@@ -360,14 +356,8 @@ func parseSelectOnly(values []string) []int {
 	return out
 }
 
-type trackerTier struct {
-	trackers []string
-	index    int
-}
-
-// parseInfoHash returns the v1 info hash found in xts, if any. Hybrid magnet
-// links carry both a "urn:btih:" (v1) and a "urn:btmh:" (v2) topic in no
-// particular order; a v2-only link carries only the latter and returns ok=false.
+// parseInfoHash finds the v1 hash in the xt topics. Hybrids carry btih and
+// btmh in any order; v2-only links carry just btmh and report ok=false.
 func parseInfoHash(xts []string) ([20]byte, bool, error) {
 	for _, xt := range xts {
 		if s, ok := strings.CutPrefix(xt, "urn:btih:"); ok {
@@ -381,10 +371,8 @@ func parseInfoHash(xts []string) ([20]byte, bool, error) {
 	return [20]byte{}, false, nil
 }
 
-// parseV2InfoHash returns the SHA-256 info hash of a "urn:btmh:" topic (BEP
-// 52). The value is a multihash: "1220" (SHA2-256, 32 bytes) followed by the
-// 64 hex characters of the digest. A hybrid magnet link carries both a btih and
-// a btmh topic; the v1 hash is the one usable today.
+// parseV2InfoHash reads the SHA-256 hash of a "urn:btmh:" multihash topic
+// (BEP 52): "1220" plus 64 hex digest characters.
 func parseV2InfoHash(xts []string) ([32]byte, bool) {
 	for _, xt := range xts {
 		s, ok := strings.CutPrefix(xt, "urn:btmh:")
@@ -405,8 +393,7 @@ func parseV2InfoHash(xts []string) ([32]byte, bool) {
 	return [32]byte{}, false
 }
 
-// infoHashString returns a new info hash value from a string.
-// s must be 40 (hex encoded) or 32 (base32 encoded) characters, otherwise it returns error.
+// infoHashString decodes a 40-char hex or 32-char base32 info hash.
 func infoHashString(s string) ([20]byte, error) {
 	var ih [20]byte
 	var b []byte

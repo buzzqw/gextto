@@ -2,41 +2,55 @@ package infodownloader
 
 import "fmt"
 
+// blockSize is the BEP 9 metadata block size: the info dict travels in
+// 16 KiB extension-protocol pieces.
 const blockSize = 16 * 1024
 
-// InfoDownloader downloads metadata of a torrent from a single peer.
+// InfoDownloader fetches a torrent's metadata (BEP 9) from one peer,
+// block by block, reassembling it into Bytes.
 type InfoDownloader struct {
 	Peer  Peer
 	Bytes []byte
 
 	blocks         []block
-	pending        int // in-flight requests
+	pending        int // requested but not yet received
 	nextBlockIndex uint32
 }
 
+// block tracks one metadata slice through request and delivery.
 type block struct {
 	size      uint32
 	requested bool
 	received  bool
 }
 
-// Peer of a torrent.
+// Peer abstracts the single connection metadata is pulled from.
 type Peer interface {
 	MetadataSize() uint32
 	RequestMetadataPiece(index uint32)
 }
 
-// New return new InfoDownloader for a single Peer.
+// New sizes the reassembly buffer from the peer's advertised metadata size
+// and plans the block map, last block possibly short.
 func New(pe Peer) *InfoDownloader {
 	d := &InfoDownloader{
 		Peer:  pe,
 		Bytes: make([]byte, pe.MetadataSize()),
 	}
-	d.blocks = d.createBlocks()
+	total, rem := pe.MetadataSize()/blockSize, pe.MetadataSize()%blockSize
+	d.blocks = make([]block, total)
+	for i := range d.blocks {
+		d.blocks[i].size = blockSize
+	}
+	if rem != 0 {
+		d.blocks = append(d.blocks, block{size: rem})
+	}
 	return d
 }
 
-// GotBlock must be called when a metadata block is received from the peer.
+// GotBlock stores one delivered block. Out-of-range, unsolicited or
+// wrong-sized blocks are peer misbehavior and rejected; a duplicate delivery
+// is acknowledged but counted once, so Done cannot trip early.
 func (d *InfoDownloader) GotBlock(index uint32, data []byte) error {
 	if index >= uint32(len(d.blocks)) {
 		return fmt.Errorf("peer sent invalid metadata piece index: %d", index)
@@ -49,37 +63,15 @@ func (d *InfoDownloader) GotBlock(index uint32, data []byte) error {
 		return fmt.Errorf("peer sent invalid size for metadata message: %d", len(data))
 	}
 	if b.received {
-		// A repeated block must not count twice: it would make Done() true
-		// before every block arrived.
 		return nil
 	}
 	b.received = true
 	d.pending--
-	begin := index * blockSize
-	end := begin + b.size
-	copy(d.Bytes[begin:end], data)
+	copy(d.Bytes[index*blockSize:], data)
 	return nil
 }
 
-func (d *InfoDownloader) createBlocks() []block {
-	numBlocks := d.Peer.MetadataSize() / blockSize
-	mod := d.Peer.MetadataSize() % blockSize
-	if mod != 0 {
-		numBlocks++
-	}
-	blocks := make([]block, numBlocks)
-	for i := range blocks {
-		blocks[i] = block{
-			size: blockSize,
-		}
-	}
-	if mod != 0 && len(blocks) > 0 {
-		blocks[len(blocks)-1].size = mod
-	}
-	return blocks
-}
-
-// RequestBlocks is called to request remaining blocks of metadata from the peer.
+// RequestBlocks tops the in-flight window up to queueLength, in order.
 func (d *InfoDownloader) RequestBlocks(queueLength int) {
 	for ; d.nextBlockIndex < uint32(len(d.blocks)) && d.pending < queueLength; d.nextBlockIndex++ {
 		d.Peer.RequestMetadataPiece(d.nextBlockIndex)
@@ -88,7 +80,7 @@ func (d *InfoDownloader) RequestBlocks(queueLength int) {
 	}
 }
 
-// Done returns true if all pieces of the metadata is downloaded.
+// Done reports whether every block was requested and received.
 func (d *InfoDownloader) Done() bool {
 	return d.nextBlockIndex == uint32(len(d.blocks)) && d.pending == 0
 }

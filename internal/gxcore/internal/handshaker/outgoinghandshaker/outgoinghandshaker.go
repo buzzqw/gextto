@@ -10,7 +10,9 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peersource"
 )
 
-// OutgoingHandshaker does the BitTorrent handshake on an outgoing connection.
+// OutgoingHandshaker dials a peer address and completes the BitTorrent
+// handshake on it. The negotiated connection (or the failure) is delivered
+// on resultC; Close aborts a handshake in flight.
 type OutgoingHandshaker struct {
 	Addr       *net.TCPAddr
 	Source     peersource.Source
@@ -24,7 +26,7 @@ type OutgoingHandshaker struct {
 	doneC  chan struct{}
 }
 
-// New returns a new OutgoingHandshaker for a TCP address.
+// New prepares a handshaker for addr discovered via source.
 func New(addr *net.TCPAddr, source peersource.Source) *OutgoingHandshaker {
 	return &OutgoingHandshaker{
 		Addr:   addr,
@@ -34,18 +36,20 @@ func New(addr *net.TCPAddr, source peersource.Source) *OutgoingHandshaker {
 	}
 }
 
-// Close the handshaker.
+// Close aborts the handshake and waits for Run to return.
 func (h *OutgoingHandshaker) Close() {
 	close(h.closeC)
 	<-h.doneC
 }
 
-// Run the handshaker.
+// Run dials and handshakes, then reports h on resultC. On failure h.Error
+// describes the cause and Conn stays nil; when Close wins the race the
+// freshly dialed conn is closed instead of leaking.
 func (h *OutgoingHandshaker) Run(dialTimeout, handshakeTimeout time.Duration, peerID, infoHash [20]byte, resultC chan *OutgoingHandshaker, ourExtensions [8]byte, disableOutgoingEncryption, forceOutgoingEncryption bool) {
 	defer close(h.doneC)
 	log := logger.New("peer -> " + h.Addr.String())
 
-	conn, cipher, peerExtensions, peerID, err := btconn.Dial(h.Addr, dialTimeout, handshakeTimeout, !disableOutgoingEncryption, forceOutgoingEncryption, ourExtensions, infoHash, peerID, h.closeC)
+	conn, cipher, peerExtensions, remoteID, err := btconn.Dial(h.Addr, dialTimeout, handshakeTimeout, !disableOutgoingEncryption, forceOutgoingEncryption, ourExtensions, infoHash, peerID, h.closeC)
 	if err != nil {
 		if !btconn.LogHandshakeError(log, err) {
 			log.Errorln("cannot complete outgoing handshake:", err)
@@ -57,10 +61,10 @@ func (h *OutgoingHandshaker) Run(dialTimeout, handshakeTimeout time.Duration, pe
 		}
 		return
 	}
-	log.Debugf("Connected to peer. (cipher=%s extensions=%x client=%q)", cipher, peerExtensions, peerID[:8])
+	log.Debugf("Connected to peer. (cipher=%s extensions=%x client=%q)", cipher, peerExtensions, remoteID[:8])
 
 	h.Conn = conn
-	h.PeerID = peerID
+	h.PeerID = remoteID
 	h.Extensions = peerExtensions
 	h.Cipher = cipher
 

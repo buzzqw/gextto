@@ -2,8 +2,9 @@
 
 This folder contains the **engine** of gx-core (the `gx-torrent` binary), part of
 the main module as `github.com/buzzqw/gextto/internal/gxcore`. It is used only by
-the daemon `cmd/gx-torrent`. Part of the code derives from MIT-licensed work: see
-[`LICENSE`](LICENSE).
+the daemon `cmd/gx-torrent`. It is original code written in this repository
+(early versions built on permissively licensed bases, since rewritten file by
+file; BitTorrent wire formats necessarily coincide).
 
 This table is the **inventory of the engine's features** and of the files that
 implement them.

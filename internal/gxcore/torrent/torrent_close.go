@@ -11,22 +11,23 @@ import (
 
 var errClosed = errors.New("torrent is closed")
 
+// close tears the torrent down: stop first, then park the in-flight stopped
+// announce where Session.Close can still wait for it (cancelling it would
+// hide our final upload totals from the trackers), then stop the meters.
 func (t *torrent) close() {
-	// Stop if running.
 	t.stop(errClosed)
-
-	// Maybe we are in "Stopping" state. Leave the "stopped" event announcer running. Closing it
-	// cancels the announce in flight, so the trackers never learn how much we have uploaded since
-	// the last periodical announce. It stops by itself after TrackerStopTimeout.
-	// Session.Close waits for it before closing the tracker transports.
 	if a := t.stoppedEventAnnouncer; a != nil {
 		t.session.detachedAnnouncers.Go(func() { <-a.Done() })
 	}
-
 	t.downloadSpeed.Stop()
 	t.uploadSpeed.Stop()
 }
 
+// closePeer disconnects one peer and unwinds everything attached to it:
+// piece and metadata downloads (v2 hash chunks go back to their file for
+// another peer), picker/unchoker/PEX bookkeeping, IP and id registries, and
+// the session peer count. Departures from a running torrent notify
+// subscribers; the mass close of a stop stays quiet.
 func (t *torrent) closePeer(pe *peer.Peer) {
 	if pe.Closed {
 		return
@@ -48,7 +49,6 @@ func (t *torrent) closePeer(pe *peer.Peer) {
 	if req, ok := t.v2Pending[pe]; ok {
 		delete(t.v2Pending, pe)
 		if req != nil && req.file != nil {
-			// Put the chunk back so another peer fetches it.
 			req.file.failChunk(req.index / req.file.chunk)
 		}
 	}
@@ -60,17 +60,19 @@ func (t *torrent) closePeer(pe *peer.Peer) {
 	t.pexDropPeer(pe.Addr())
 	t.dialAddresses()
 	t.session.metrics.Peers.Dec(1)
-	// A peer that goes away while the torrent is running is worth reporting;
-	// the mass close during a stop is not (it would flood subscribers).
 	if s := t.status(); s != Stopping && s != Stopped {
 		t.emitPeer(EventPeerDisconnected, pe.Addr().String())
 	}
 }
 
+// closeWebseedDownloader detaches a webseed source from the picker.
 func (t *torrent) closeWebseedDownloader(src *webseedsource.WebseedSource) {
 	t.piecePicker.CloseWebseedDownloader(src)
 }
 
+// closePieceDownloader retires one piece fetch: registry cleanup, download
+// flag and concurrency slot release, picker cancellation, and the RAM
+// budget refund for the piece buffer.
 func (t *torrent) closePieceDownloader(pd *piecedownloader.PieceDownloader) {
 	pe := pd.Peer.(*peer.Peer)
 	m := t.pieceDownloaders[pe]
@@ -97,6 +99,7 @@ func (t *torrent) closePieceDownloader(pd *piecedownloader.PieceDownloader) {
 	}
 }
 
+// closeInfoDownloader forgets a metadata fetch, snubbed or not.
 func (t *torrent) closeInfoDownloader(id *infodownloader.InfoDownloader) {
 	delete(t.infoDownloaders, id.Peer.(*peer.Peer))
 	delete(t.infoDownloadersSnubbed, id.Peer.(*peer.Peer))

@@ -7,18 +7,22 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// disableReadAhead hints random access so the page cache does not prefetch
+// sequentially across multi-gigabyte torrent files.
 func disableReadAhead(f *os.File) error {
 	return unix.Fadvise(int(f.Fd()), 0, 0, unix.FADV_RANDOM)
 }
 
+// applyNoAtimeFlag opens without atime updates: torrent workloads rewrite
+// metadata otherwise, pointlessly dirtying inodes on every read.
 func applyNoAtimeFlag(f int) int {
 	return f | syscall.O_NOATIME
 }
 
-// preallocate reserves the whole file on disk; filesystems
-// without fallocate fall back to a sparse file. On tmpfs (a RAM disk) the file
-// stays sparse: reserving it would take the whole size from RAM at once, even
-// for a torrent that is about to be relocated because it does not fit.
+// preallocate reserves the file up front so a nearly-full disk fails fast
+// at add time instead of mid-download. Filesystems without fallocate — and
+// tmpfs, where reserving would pin the whole size in RAM at once even for a
+// torrent about to be relocated for not fitting — fall back to sparse.
 func preallocate(f *os.File, size int64) error {
 	if size <= 0 {
 		return nil

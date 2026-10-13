@@ -13,18 +13,19 @@ import (
 	bencode "github.com/jackpal/bencode-go"
 )
 
-// Search a node again after some time.
+// searchRetryPeriod re-queries a node after this silence: answers freshness
+// for both pending and past queries in wasContactedRecently.
 var searchRetryPeriod = 15 * time.Second
 
-// Owned by the DHT engine.
+// remoteNode is one DHT contact: address, id, in-flight and answered
+// queries, reachability, downloads it announced, and the anti-Sybil
+// bookkeeping (noTree/countSubnet) plus its logger.
 type remoteNode struct {
 	address net.UDPAddr
-	// addressDotFormatted contains a binary representation of the node's host:port address.
+	// addressBinaryFormat is the compact host:port form of the address.
 	addressBinaryFormat string
 	id                  string
-	// lastQueryID should be incremented after consumed. Based on the
-	// protocol, it would be two letters, but I'm using 0-255, although
-	// treated as string.
+	// lastQueryID cycles 0-255 as transaction ids (two-letter by spec).
 	lastQueryID int
 	// TODO: key by infohash instead?
 	pendingQueries   map[string]*queryType // key: transaction ID
@@ -32,17 +33,17 @@ type remoteNode struct {
 	reachable        bool
 	lastResponseTime time.Time
 	lastSearchTime   time.Time
-	ActiveDownloads  []string // List of infohashes we know this peer is downloading.
-	// noTree marks a node kept in the address book but denied a routing-table
-	// tree slot because its subnet was at the anti-Sybil cap. Keeping it avoids
-	// re-discovering and re-processing it in a loop.
+	ActiveDownloads  []string // infohashes this peer announced
+	// noTree keeps an address-book node out of tree slots at the subnet cap:
+	// remembered without re-discovery loops.
 	noTree bool
-	// countedSubnet is true while this node is included in the routing table's
-	// incremental per-subnet counter, so insert/update/kill can keep it in sync.
+	// countedSubnet tracks inclusion in the incremental subnet counter for
+	// insert/update/kill sync.
 	countedSubnet bool
 	log           *DebugLogger
 }
 
+// newRemoteNode registers an address with a random first transaction id.
 func newRemoteNode(addr net.UDPAddr, id string, log *DebugLogger) *remoteNode {
 	return &remoteNode{
 		address:             addr,
@@ -56,19 +57,20 @@ func newRemoteNode(addr net.UDPAddr, id string, log *DebugLogger) *remoteNode {
 	}
 }
 
+// queryType is one outstanding exchange: kind, subject, origin, and the BEP
+// 33/44 sub-flags.
 type queryType struct {
 	Type    string
 	ih      InfoHash
 	srcNode string
-	// scrape marks a BEP 33 get_peers that asked for the bloom filters.
+	// scrape marks a BEP 33 bloom-filter get_peers.
 	scrape bool
-	// bep44 is the id of the BEP 44 outbound lookup this query belongs to (0
-	// when it is not a BEP 44 get/put).
+	// bep44 links the query to an outbound BEP 44 lookup (0 = none).
 	bep44 uint64
 }
 
 const (
-	// Once in a while I get a few bigger ones, but meh.
+	// maxUDPPacketSize bounds a datagram; full buffers warn (truncation).
 	maxUDPPacketSize = 4096
 	v4nodeContactLen = 26
 	v6nodeContactLen = 38 // some clients seem to send multiples of 38
@@ -81,7 +83,8 @@ var (
 	totalWrittenBytes = expvar.NewInt("totalWrittenBytes")
 )
 
-// The 'nodes' response is a string with fixed length contacts concatenated arbitrarily.
+// parseNodesString splits a concatenated nodes/nodes6 reply into id->address
+// by family length, rejecting misaligned blobs with a log line.
 func parseNodesString(nodes string, proto string, log DebugLogger) (parsed map[string]string) {
 	var nodeContactLen int
 	if proto == "udp4" {
@@ -96,21 +99,18 @@ func parseNodesString(nodes string, proto string, log DebugLogger) (parsed map[s
 		log.Debugf("DHT: len(NodeString) = %d, INVALID LENGTH, should be a multiple of %d", len(nodes), nodeContactLen)
 		log.Debugf("%T %#v\n", nodes, nodes)
 		return
-	} else {
-		log.Debugf("DHT: len(NodeString) = %d, had %d nodes, nodeContactLen=%d\n", len(nodes), len(nodes)/nodeContactLen, nodeContactLen)
 	}
+	log.Debugf("DHT: len(NodeString) = %d, had %d nodes, nodeContactLen=%d\n", len(nodes), len(nodes)/nodeContactLen, nodeContactLen)
 	for i := 0; i < len(nodes); i += nodeContactLen {
 		id := nodes[i : i+nodeIdLen]
 		address := decodeCompactPeerAddr(nodes[i+nodeIdLen : i+nodeContactLen])
 		parsed[id] = address
 	}
 	return
-
 }
 
-// newQuery creates a new transaction id and adds an entry to r.pendingQueries.
-// It does not set any extra information to the transaction information, so the
-// caller must take care of that.
+// newQuery opens a transaction of transType on the node, cycling the id.
+// Payload details stay the caller's job.
 func (r *remoteNode) newQuery(transType string) (transId string) {
 	(*r.log).Debugf("newQuery for %x, lastID %v", r.id, r.lastQueryID)
 	r.lastQueryID = (r.lastQueryID + 1) % 256
@@ -120,9 +120,9 @@ func (r *remoteNode) newQuery(transType string) (transId string) {
 	return
 }
 
-// wasContactedRecently returns true if a node was contacted recently _and_
-// one of the recent queries (not necessarily the last) was about the ih. If
-// the ih is different at each time, it will keep returning false.
+// wasContactedRecently reports a recent exchange about ih: any pending or
+// past query for it within the retry period. Mixed subjects keep answering
+// false.
 func (r *remoteNode) wasContactedRecently(ih InfoHash) bool {
 	if len(r.pendingQueries) == 0 && len(r.pastQueries) == 0 {
 		return false
@@ -146,36 +146,39 @@ func (r *remoteNode) wasContactedRecently(ih InfoHash) bool {
 	return false
 }
 
+// getPeersResponse is the decodable shape of get_peers/find_node replies,
+// extended with the BEP 42 ip and BEP 33 bloom fields.
 type getPeersResponse struct {
-	// TODO: argh, values can be a string depending on the client (e.g: original bittorrent).
+	// TODO: values can be a string on some clients (e.g. original bittorrent).
 	Values []string `bencode:"values"`
 	Id     string   `bencode:"id"`
 	Nodes  string   `bencode:"nodes"`
 	Nodes6 string   `bencode:"nodes6"`
 	Token  string   `bencode:"token"`
-	// IP is our external IP:port as seen by the responder (BEP 42, "ip" field).
+	// IP is our external address as the responder sees it (BEP 42).
 	IP string `bencode:"ip"`
-	// BFpe and BFsd are the BEP 33 scrape bloom filters (256 bytes each).
+	// BFpe/BFsd are the 256-byte BEP 33 scrape filters.
 	BFpe string `bencode:"BFpe"`
 	BFsd string `bencode:"BFsd"`
 }
 
+// answerType is the decodable shape of incoming queries.
 type answerType struct {
 	Id       string   `bencode:"id"`
 	Target   string   `bencode:"target"`
-	InfoHash InfoHash `bencode:"info_hash"` // should probably be a string.
+	InfoHash InfoHash `bencode:"info_hash"`
 	Port     int      `bencode:"port"`
 	Token    string   `bencode:"token"`
-	// ImpliedPort (BEP 5): when 1, the source port must be used instead of
-	// "port", for peers behind a NAT that do not know their external port.
+	// ImpliedPort (BEP 5): use the packet's source port, for NATed peers
+	// unaware of their external port.
 	ImpliedPort int `bencode:"implied_port"`
-	// BEP 33: whether the announcer is seeding, and the get_peers scrape flags.
+	// Seed/Scrape/NoSeed are the BEP 33 announce/lookup flags.
 	Seed   int `bencode:"seed"`
 	Scrape int `bencode:"scrape"`
 	NoSeed int `bencode:"noseed"`
 }
 
-// Generic stuff we read from the wire, not knowing what it is. This is as generic as can be.
+// responseType is the generic inbound message envelope.
 type responseType struct {
 	T string           `bencode:"t"`
 	Y string           `bencode:"y"`
@@ -183,17 +186,15 @@ type responseType struct {
 	R getPeersResponse `bencode:"r"`
 	E []string         `bencode:"e"`
 	A answerType       `bencode:"a"`
-	// Ro is the BEP 43 read-only flag on an incoming query (top-level "ro": 1).
+	// Ro is the BEP 43 read-only flag on queries.
 	Ro int `bencode:"ro"`
-	// IP is the BEP 42 "ip" field of a reply: our address as the responder
-	// sees it, at the top level of the message.
+	// IP is the BEP 42 reflected address on replies.
 	IP string `bencode:"ip"`
 	// Unsupported mainline extension for client identification.
 	// V string(?)	"v"
 }
 
-// sendMsg bencodes the data in 'query' and sends it to the remote node.
-// packetConn is the subset of net.PacketConn the DHT uses.
+// packetConn is the datagram socket subset the DHT needs.
 type packetConn interface {
 	ReadFrom(p []byte) (int, net.Addr, error)
 	WriteTo(p []byte, addr net.Addr) (int, error)
@@ -201,6 +202,8 @@ type packetConn interface {
 	Close() error
 }
 
+// sendMsg bencodes a query and datagrams it to the node, metering volume.
+// Marshal failures drop silently (nothing valid to send).
 func sendMsg(conn packetConn, raddr net.UDPAddr, query interface{}, log DebugLogger) {
 	totalSent.Add(1)
 	var b bytes.Buffer
@@ -212,27 +215,21 @@ func sendMsg(conn packetConn, raddr net.UDPAddr, query interface{}, log DebugLog
 	} else {
 		totalWrittenBytes.Add(int64(n))
 	}
-	return
 }
 
-// Read responses from bencode-speaking nodes. Return the appropriate data structure.
+// readResponse decodes one datagram into the generic envelope. The bounded
+// pre-scanner runs first: bencode-go would otherwise allocate a declared
+// string length (gigabytes on "d999999999:d") before noticing the short
+// buffer — an unrecoverable OOM. Decoder panics convert to errors, never to
+// fake successes.
 func readResponse(p packetType, log DebugLogger) (response responseType, err error) {
-	// bencode-go allocates a string of its declared length before checking that
-	// the buffer actually holds it, so a hostile packet like "d999999999:d"
-	// would make the whole node allocate gigabytes and die (a fatal OOM is not
-	// recoverable). The bounded scanner validates the packet (string length and
-	// recursion depth, both against the real buffer) without allocating, so
-	// bencode-go only ever sees a checked packet.
 	if verr := validBencode(p.b); verr != nil {
 		log.Debugf("DHT: rejecting malformed response %q: %v", string(p.b), verr)
 		return response, verr
 	}
-	// The calls to bencode.Unmarshal() can be fragile.
 	defer func() {
 		if x := recover(); x != nil {
 			log.Debugf("DHT: !!! Recovering from panic() after bencode.Unmarshal %q, %v", string(p.b), x)
-			// Do not report success: a partial response with a nil error would
-			// be processed as if it were complete.
 			err = fmt.Errorf("bencode.Unmarshal panic: %v", x)
 		}
 	}()
@@ -245,30 +242,34 @@ func readResponse(p packetType, log DebugLogger) (response responseType, err err
 	}
 }
 
-// Message to be sent out in the wire. Must not have any extra fields.
+// queryMessage is the outbound query shape. No extra fields may be added.
 type queryMessage struct {
 	T string                 `bencode:"t"`
 	Y string                 `bencode:"y"`
 	Q string                 `bencode:"q"`
 	A map[string]interface{} `bencode:"a"`
-	// Ro is the BEP 43 read-only flag: 1 in a read-only node's queries.
+	// Ro marks read-only nodes' queries (BEP 43).
 	Ro int `bencode:"ro,omitempty"`
 }
 
+// replyMessage is the outbound reply shape with the BEP 42 reflected
+// requester address.
 type replyMessage struct {
 	T string                 `bencode:"t"`
 	Y string                 `bencode:"y"`
 	R map[string]interface{} `bencode:"r"`
-	// IP is the BEP 42 "ip" field: the requester's compact address, at the top
-	// level of the reply.
+	// IP is the requester's compact address at top level.
 	IP string `bencode:"ip,omitempty"`
 }
 
+// packetType pairs a datagram with its source.
 type packetType struct {
 	b     []byte
 	raddr net.UDPAddr
 }
 
+// listen opens the datagram socket, logging but tolerating failure (nil
+// socket with the error).
 func listen(addr string, listenPort int, proto string, log DebugLogger) (socket packetConn, err error) {
 	log.Debugf("DHT: Listening for peers on IP: %s port: %d Protocol=%s\n", addr, listenPort, proto)
 	listener, err := net.ListenPacket(proto, net.JoinHostPort(addr, strconv.Itoa(listenPort)))
@@ -281,12 +282,12 @@ func listen(addr string, listenPort int, proto string, log DebugLogger) (socket 
 	return
 }
 
-// Read from UDP socket, writes slice of byte into channel.
+// readFromSocket pumps datagrams to the engine, recycling arena buffers on
+// every path so a burst of read errors can neither drain the arena (which
+// would wedge Stop) nor spin hot (10 ms backoff while unstopped). Full-size
+// datagrams warn (truncation); empty ones recycle silently.
 func readFromSocket(socket packetConn, conChan chan packetType, bytesArena arena, stop chan bool, log DebugLogger) {
 	for {
-		// Check stop before blocking on a free buffer: the arena holds only a
-		// few buffers, so a burst of read errors could drain it and block Pop
-		// forever, leaving Stop() unable to join this goroutine.
 		select {
 		case <-stop:
 			return
@@ -303,9 +304,6 @@ func readFromSocket(socket packetConn, conChan chan packetType, bytesArena arena
 			continue
 		}
 		if err != nil {
-			// Return the buffer so the arena never drains, then stop if asked.
-			// A short wait avoids a tight loop if the read error is persistent
-			// and stop has not been closed yet.
 			bytesArena.Push(b)
 			log.Debugf("DHT: readResponse error:%s\n", err)
 			select {
@@ -333,10 +331,13 @@ func readFromSocket(socket packetConn, conChan chan packetType, bytesArena arena
 	}
 }
 
+// bogusId rejects malformed node ids.
 func bogusId(id string) bool {
 	return len(id) != 20
 }
 
+// newTransactionId draws a random query id byte, wall-clock fallback on
+// randomness failure.
 func newTransactionId() int {
 	n, err := rand.Read(make([]byte, 1))
 	if err != nil {
@@ -345,14 +346,14 @@ func newTransactionId() int {
 	return n
 }
 
+// InfoHash is a binary info hash.
 type InfoHash string
 
 func (i InfoHash) String() string {
 	return fmt.Sprintf("%x", string(i))
 }
 
-// DecodeInfoHash transforms a hex-encoded 20-characters string to a binary
-// infohash.
+// DecodeInfoHash parses 40 hex characters into a binary info hash.
 func DecodeInfoHash(x string) (b InfoHash, err error) {
 	var h []byte
 	h, err = hex.DecodeString(x)
@@ -362,8 +363,8 @@ func DecodeInfoHash(x string) (b InfoHash, err error) {
 	return InfoHash(h), err
 }
 
-// DecodePeerAddress transforms the binary-encoded host:port address into a
-// human-readable format. So, "abcdef" becomes 97.98.99.100:25958.
+// DecodePeerAddress renders a binary host:port contact human-readable
+// ("abcdef" to 97.98.99.100:25958).
 func DecodePeerAddress(x string) string {
 	return decodeCompactPeerAddr(x)
 }

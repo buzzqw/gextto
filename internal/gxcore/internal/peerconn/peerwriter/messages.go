@@ -1,7 +1,7 @@
 package peerwriter
 
-// BlockUploaded is used to signal the Torrent when a piece block is uploaded to remote peer.
-// BlockUploaded can be used to count the number of bytes uploaded to peers.
+// BlockUploaded notifies the torrent that one block reached the remote peer,
+// feeding the per-torrent upload accounting.
 type BlockUploaded struct {
 	Length uint32
 }

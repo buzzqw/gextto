@@ -10,72 +10,69 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 )
 
-// BlockSize is the size of smallest piece data that we are going to request from peers.
+// BlockSize is the wire block size: the smallest span requested from peers.
 const BlockSize = 16 * 1024
 
-// File/piece priority levels, on the libtorrent/qBittorrent 0..7 scale used by
-// the daemon and Gextto:
+// File/piece priority levels, on the libtorrent/qBittorrent 0..7 scale the
+// daemon and Gextto speak:
 //
-//   - 0 = skip: the file is not downloaded (piece.Skip is set);
+//   - 0 = skip: excluded from download (Skip set);
 //   - 1..4 = normal: downloaded with the rest (4 is the default);
-//   - 5..7 = high: downloaded before normal pieces.
+//   - 5..7 = high: downloaded ahead of normal pieces.
 const (
 	PriorityNormal = 4
 	PriorityHigh   = 5
 )
 
-// Piece of a torrent.
+// Piece is one torrent piece: its hashes, its file sections, and its
+// download state.
 type Piece struct {
-	Index   uint32            // index in torrent
-	Length  uint32            // always equal to Info.PieceLength except last piece
-	Data    filesection.Piece // the place to write downloaded bytes
+	Index   uint32            // torrent-wide index
+	Length  uint32            // Info.PieceLength, except the tail piece
+	Data    filesection.Piece // where downloaded bytes land
 	Hash    []byte
 	Writing bool
 	Done    bool
-	// Skip is set for pieces that belong only to unwanted files.
+	// Skip marks pieces holding only unwanted-file bytes.
 	Skip bool
-	// Priority is the highest priority of the files this piece holds data from
-	// (see PriorityNormal/PriorityHigh). It only changes the pick order: a
-	// high-priority piece is requested before the normal ones.
+	// Priority is the highest priority among the piece's files: it orders
+	// picks, with high before normal.
 	Priority uint8
-	// V2 marks a BitTorrent v2 piece: it belongs to a single file and its hash
-	// is a SHA-256 merkle node over V2Leaves 16 KiB block leaves (BEP 52).
+	// V2 marks a BitTorrent v2 piece: single-file, hashed as a SHA-256
+	// merkle node over V2Leaves 16 KiB block leaves (BEP 52).
 	V2       bool
 	V2Leaves int
 }
 
-// Block is part of a Piece that is specified in peerprotocol.Request messages.
+// Block is one request-sized span of a piece (never past BlockSize, shorter
+// at tails and padding edges).
 type Block struct {
-	Begin  uint32 // Offset in piece
-	Length uint32 // Cannot exceed BlockSize. It's shorter for last block or if the next file is a padding file.
+	Begin  uint32 // piece offset
+	Length uint32
 }
 
-// NewPieces returns a slice of Pieces by mapping files to the pieces.
+// NewPieces maps info files onto pieces: v1 pieces span the concatenated
+// files, v2 pieces stay within one file each.
 func NewPieces(info *metainfo.Info, files []allocator.File) []Piece {
 	if info.V2 {
 		return newPiecesV2(info, files)
 	}
 	var (
-		fileIndex  int   // index of the current file in torrent
-		fileLength int64 // length of the file in fileIndex
-		fileEnd    int64 // absolute position of end of the file among all pieces
-		fileOffset int64 // offset in file: [0, fileLength)
+		fileIndex  int   // current file in the torrent
+		fileLength int64 // its length
+		fileEnd    int64 // its absolute end across the concatenation
+		fileOffset int64 // read cursor within it
 	)
-
 	nextFile := func() {
 		fileIndex++
 		fileLength = info.Files[fileIndex].Length
 		fileEnd += fileLength
 		fileOffset = 0
 	}
-
-	// Init first file
 	fileIndex = -1
 	nextFile()
-
 	fileLeft := func() int64 { return fileLength - fileOffset }
 
-	// Construct pieces
 	var total int64
 	pieces := make([]Piece, info.NumPieces)
 	for i := uint32(0); i < info.NumPieces; i++ {
@@ -83,30 +80,22 @@ func NewPieces(info *metainfo.Info, files []allocator.File) []Piece {
 			Index: i,
 			Hash:  info.PieceHash(i),
 		}
-
 		var sections filesection.Piece
-
-		// Construct p.Files
 		var pieceOffset uint32
-		pieceLeft := func() uint32 { return info.PieceLength - pieceOffset }
-		for left := pieceLeft(); left > 0; {
-			n := uint32(min(int64(left), fileLeft())) // number of bytes to write
-
-			file := filesection.FileSection{
+		for left := info.PieceLength - pieceOffset; left > 0; {
+			n := uint32(min(int64(left), fileLeft()))
+			sections = append(sections, filesection.FileSection{
 				File:    files[fileIndex].Storage,
 				Offset:  fileOffset,
 				Length:  int64(n),
 				Name:    files[fileIndex].Name,
 				Padding: files[fileIndex].Padding,
-			}
-			sections = append(sections, file)
-
+			})
 			left -= n
 			p.Length += n
 			pieceOffset += n
 			fileOffset += int64(n)
 			total += int64(n)
-
 			if total == info.Length {
 				break
 			}
@@ -114,43 +103,36 @@ func NewPieces(info *metainfo.Info, files []allocator.File) []Piece {
 				nextFile()
 			}
 		}
-
 		p.Data = sections
 		pieces[i] = p
 	}
 	return pieces
 }
 
-// numBlocks returns the number of blocks in the piece.
-// The calculation is only correct when there is no padding in piece.
-// It is only used in per-allocation of blocks slice in CalculateBlocks().
+// numBlocks counts the blocks sans padding (capacity hint only).
 func (p *Piece) numBlocks() int {
 	div, mod := divmod(p.Length, BlockSize)
-	numBlocks := div
 	if mod != 0 {
-		numBlocks++
+		div++
 	}
-	return int(numBlocks)
+	return int(div)
 }
 
+// CalculateBlocks splits the piece into request blocks, skipping padding
+// spans (their bytes never travel).
 func (p *Piece) CalculateBlocks() []Block {
 	return p.calculateBlocks(BlockSize)
 }
 
 func (p *Piece) calculateBlocks(blockSize uint32) []Block {
 	blocks := make([]Block, 0, p.numBlocks())
-
 	secIndex := 0
 	sec := p.Data[secIndex]
-	blk := Block{
-		Begin:  0,
-		Length: 0,
-	}
-	pieceOffset := uint32(0)
-	secOffset := uint32(0)
+	blk := Block{}
+	var pieceOffset, secOffset uint32
 	blkLeft := func() uint32 { return blockSize - blk.Length }
 	secLeft := func() uint32 { return uint32(sec.Length) - secOffset }
-	nextBlock := func() {
+	flushBlock := func() {
 		if blk.Length == 0 {
 			return
 		}
@@ -158,21 +140,20 @@ func (p *Piece) calculateBlocks(blockSize uint32) []Block {
 		blk.Begin = pieceOffset
 		blk.Length = 0
 	}
-	hasNextSection := true
-	nextSection := func() {
+	nextSection := func() bool {
 		secIndex++
 		if secIndex == len(p.Data) {
-			hasNextSection = false
-			return
+			return false
 		}
 		secOffset = 0
 		sec = p.Data[secIndex]
+		return true
 	}
-	for hasNextSection {
+	for hasSection := true; hasSection; {
 		if sec.Padding {
 			pieceOffset += uint32(sec.Length)
-			nextBlock()
-			nextSection()
+			flushBlock()
+			hasSection = nextSection()
 			continue
 		}
 		n := min(secLeft(), blkLeft())
@@ -180,29 +161,29 @@ func (p *Piece) calculateBlocks(blockSize uint32) []Block {
 		pieceOffset += n
 		secOffset += n
 		if blkLeft() == 0 {
-			nextBlock()
+			flushBlock()
 		}
 		if secLeft() == 0 {
-			nextSection()
+			hasSection = nextSection()
 		}
 	}
-	nextBlock()
+	flushBlock()
 	return blocks
 }
 
-// VerifyHash returns true if hash of piece data in buffer `buf` matches the hash of Piece.
+// VerifyHash checks buf against the v1 SHA-1 piece hash. Length mismatch
+// fails without hashing.
 func (p *Piece) VerifyHash(buf []byte, h hash.Hash) bool {
 	if uint32(len(buf)) != p.Length {
 		return false
 	}
 	_, _ = h.Write(buf)
-	sum := h.Sum(nil)
-	return bytes.Equal(sum, p.Hash)
+	return bytes.Equal(h.Sum(nil), p.Hash)
 }
 
-// newPiecesV2 maps the files to pieces for a BitTorrent v2 torrent: pieces are
-// built file by file, the tail piece of a file is shorter than the piece length
-// and no piece spans two files (BEP 52).
+// newPiecesV2 lays v2 pieces file by file: tails run short, none straddles
+// files (BEP 52). A file fitting one piece hashes as its pieces root over
+// nextPow2 leaves rather than a piece boundary.
 func newPiecesV2(info *metainfo.Info, files []allocator.File) []Piece {
 	pieceLeaves := int(info.PieceLength / BlockSize)
 	pieces := make([]Piece, 0, info.NumPieces)
@@ -210,15 +191,9 @@ func newPiecesV2(info *metainfo.Info, files []allocator.File) []Piece {
 		numBlocks := int((f.Length + BlockSize - 1) / BlockSize)
 		span := pieceLeaves
 		if numBlocks <= pieceLeaves {
-			// The file fits in one piece: its single hash is the file's pieces
-			// root, over nextPow2(numBlocks) leaves, not the piece boundary.
-			span = nextPow2(numBlocks)
-			if span < 1 {
-				span = 1
-			}
+			span = max(nextPow2(numBlocks), 1)
 		}
-		var off int64
-		for off < f.Length {
+		for off := int64(0); off < f.Length; {
 			n := int64(info.PieceLength)
 			if left := f.Length - off; left < n {
 				n = left
@@ -254,18 +229,14 @@ func nextPow2(n int) int {
 	return p
 }
 
-// VerifyV2 returns true when the buffer hashes to the piece's merkle node: the
-// SHA-256 tree over the piece's 16 KiB blocks, with the leaves missing to reach
-// V2Leaves set to zero (BEP 52).
+// VerifyV2 checks buf against the piece's merkle node: the SHA-256 tree over
+// its 16 KiB block leaves, zero-padded to V2Leaves (BEP 52).
 func (p *Piece) VerifyV2(buf []byte) bool {
 	if uint32(len(buf)) != p.Length {
 		return false
 	}
 	leaves := merkle.LeafHashes(buf)
-	n := p.V2Leaves
-	if n < 1 {
-		n = 1
-	}
+	n := max(p.V2Leaves, 1)
 	full := make([][merkle.HashSize]byte, n)
 	copy(full, leaves)
 	root := merkle.Root(full)

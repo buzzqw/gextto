@@ -11,16 +11,32 @@ import (
 	"github.com/powerman/rpc-codec/jsonrpc2"
 )
 
+// RPC error codes: 1 = unknown torrent id, 2 = bad input.
 var errTorrentNotFound = jsonrpc2.NewError(1, "torrent not found")
 
+// rpcHandler serves the engine's JSON-RPC surface to the host (the daemon).
+// Every method maps daemon types onto rpctypes; the mappings below are the
+// wire contract.
 type rpcHandler struct {
 	session *Session
+}
+
+// requireTorrent fetches the torrent or fails with the not-found code.
+func (h *rpcHandler) requireTorrent(id string) (*Torrent, error) {
+	if t := h.session.GetTorrent(id); t != nil {
+		return t, nil
+	}
+	return nil, errTorrentNotFound
 }
 
 func (h *rpcHandler) Version(args struct{}, reply *string) error {
 	*reply = Version
 	return nil
 }
+
+// ---------------------------------------------------------------------------
+// Adding and removing
+// ---------------------------------------------------------------------------
 
 func (h *rpcHandler) ListTorrents(args *rpctypes.ListTorrentsRequest, reply *rpctypes.ListTorrentsResponse) error {
 	torrents := h.session.ListTorrents()
@@ -31,45 +47,47 @@ func (h *rpcHandler) ListTorrents(args *rpctypes.ListTorrentsRequest, reply *rpc
 	return nil
 }
 
-func (h *rpcHandler) AddTorrent(args *rpctypes.AddTorrentRequest, reply *rpctypes.AddTorrentResponse) error {
-	r := base64.NewDecoder(base64.StdEncoding, strings.NewReader(args.Torrent))
-	opt := &AddTorrentOptions{
-		Stopped:           args.Stopped,
-		ID:                args.ID,
-		StopAfterDownload: args.StopAfterDownload,
-		StopAfterMetadata: args.StopAfterMetadata,
-		Sequential:        args.Sequential,
+// addOptions folds the two add-request shapes into engine options.
+func addOptions(stopped bool, id string, stopAfterDownload, stopAfterMetadata, sequential bool) *AddTorrentOptions {
+	return &AddTorrentOptions{
+		Stopped:           stopped,
+		ID:                id,
+		StopAfterDownload: stopAfterDownload,
+		StopAfterMetadata: stopAfterMetadata,
+		Sequential:        sequential,
 	}
-	t, err := h.session.AddTorrent(r, opt)
+}
+
+// inputError maps bad input to RPC code 2, passing other errors through.
+func inputError(err error) error {
 	if e, ok := errors.AsType[*InputError](err); ok {
 		return jsonrpc2.NewError(2, e.Error())
 	}
+	return err
+}
+
+func (h *rpcHandler) AddTorrent(args *rpctypes.AddTorrentRequest, reply *rpctypes.AddTorrentResponse) error {
+	r := base64.NewDecoder(base64.StdEncoding, strings.NewReader(args.Torrent))
+	opt := addOptions(args.Stopped, args.ID, args.StopAfterDownload, args.StopAfterMetadata, args.Sequential)
+	t, err := h.session.AddTorrent(r, opt)
 	if err != nil {
-		return err
+		return inputError(err)
 	}
 	reply.Torrent = torrentToRPC(t)
 	return nil
 }
 
 func (h *rpcHandler) AddURI(args *rpctypes.AddURIRequest, reply *rpctypes.AddURIResponse) error {
-	opt := &AddTorrentOptions{
-		Stopped:           args.Stopped,
-		ID:                args.ID,
-		StopAfterDownload: args.StopAfterDownload,
-		StopAfterMetadata: args.StopAfterMetadata,
-		Sequential:        args.Sequential,
-	}
+	opt := addOptions(args.Stopped, args.ID, args.StopAfterDownload, args.StopAfterMetadata, args.Sequential)
 	t, err := h.session.AddURI(args.URI, opt)
-	if e, ok := errors.AsType[*InputError](err); ok {
-		return jsonrpc2.NewError(2, e.Error())
-	}
 	if err != nil {
-		return err
+		return inputError(err)
 	}
 	reply.Torrent = torrentToRPC(t)
 	return nil
 }
 
+// torrentToRPC renders the torrent identity.
 func torrentToRPC(t *Torrent) rpctypes.Torrent {
 	return rpctypes.Torrent{
 		ID:       t.ID(),
@@ -84,20 +102,31 @@ func (h *rpcHandler) RemoveTorrent(args *rpctypes.RemoveTorrentRequest, reply *r
 	return h.session.RemoveTorrent(args.ID, args.KeepData)
 }
 
-func (h *rpcHandler) GetMagnet(args *rpctypes.GetMagnetRequest, reply *rpctypes.GetMagnetResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+func (h *rpcHandler) MoveTorrent(args *rpctypes.MoveTorrentRequest, reply *rpctypes.MoveTorrentResponse) error {
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
-	var err error
+	return t.Move(args.Target)
+}
+
+// ---------------------------------------------------------------------------
+// Metadata export
+// ---------------------------------------------------------------------------
+
+func (h *rpcHandler) GetMagnet(args *rpctypes.GetMagnetRequest, reply *rpctypes.GetMagnetResponse) error {
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
+	}
 	reply.Magnet, err = t.Magnet()
 	return err
 }
 
 func (h *rpcHandler) GetTorrent(args *rpctypes.GetTorrentRequest, reply *rpctypes.GetTorrentResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	b, err := t.Torrent()
 	if err != nil {
@@ -111,9 +140,19 @@ func (h *rpcHandler) CleanDatabase(args *rpctypes.CleanDatabaseRequest, reply *r
 	return h.session.CleanDatabase()
 }
 
+// ---------------------------------------------------------------------------
+// Statistics and views
+// ---------------------------------------------------------------------------
+
 func (h *rpcHandler) GetSessionStats(args *rpctypes.GetSessionStatsRequest, reply *rpctypes.GetSessionStatsResponse) error {
 	s := h.session.Stats()
-	reply.Stats = rpctypes.SessionStats{
+	reply.Stats = sessionStatsToRPC(s)
+	return nil
+}
+
+// sessionStatsToRPC converts durations to whole seconds for the wire.
+func sessionStatsToRPC(s SessionStats) rpctypes.SessionStats {
+	return rpctypes.SessionStats{
 		Uptime:         int(s.Uptime / time.Second),
 		Torrents:       s.Torrents,
 		Peers:          s.Peers,
@@ -148,16 +187,21 @@ func (h *rpcHandler) GetSessionStats(args *rpctypes.GetSessionStatsRequest, repl
 		BytesRead:       s.BytesRead,
 		BytesWritten:    s.BytesWritten,
 	}
-	return nil
 }
 
 func (h *rpcHandler) GetTorrentStats(args *rpctypes.GetTorrentStatsRequest, reply *rpctypes.GetTorrentStatsResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
-	s := t.Stats()
-	reply.Stats = rpctypes.Stats{
+	reply.Stats = torrentStatsToRPC(t.Stats())
+	return nil
+}
+
+// torrentStatsToRPC maps the snapshot field by field; a missing ETA reads
+// as -1 on the wire.
+func torrentStatsToRPC(s Stats) rpctypes.Stats {
+	out := rpctypes.Stats{
 		InfoHash: s.InfoHash.String(),
 		Port:     s.Port,
 		Status:   s.Status.String(),
@@ -256,97 +300,112 @@ func (h *rpcHandler) GetTorrentStats(args *rpctypes.GetTorrentStatsRequest, repl
 		},
 	}
 	if s.Error != nil {
-		reply.Stats.Error = s.Error.Error()
+		out.Error = s.Error.Error()
 	}
 	if s.ETA != nil {
-		reply.Stats.ETA = int(*s.ETA / time.Second)
+		out.ETA = int(*s.ETA / time.Second)
 	} else {
-		reply.Stats.ETA = -1
+		out.ETA = -1
 	}
-	return nil
+	return out
 }
 
 func (h *rpcHandler) GetTorrentTrackers(args *rpctypes.GetTorrentTrackersRequest, reply *rpctypes.GetTorrentTrackersResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	trackers := t.Trackers()
 	reply.Trackers = make([]rpctypes.Tracker, len(trackers))
 	for i, t := range trackers {
-		reply.Trackers[i] = rpctypes.Tracker{
-			URL:      t.URL,
-			Status:   trackerStatusToString(t.Status),
-			Leechers: t.Leechers,
-			Seeders:  t.Seeders,
-			Warning:  t.Warning,
-		}
-		if t.Error != nil {
-			reply.Trackers[i].Error = t.Error.Error()
-			reply.Trackers[i].ErrorInternal = t.Error.err.ErrorWithType()
-			reply.Trackers[i].ErrorUnknown = t.Error.Unknown()
-		}
-		if !t.LastAnnounce.IsZero() {
-			reply.Trackers[i].LastAnnounce = rpctypes.Time{Time: t.LastAnnounce}
-		}
-		if !t.NextAnnounce.IsZero() {
-			reply.Trackers[i].NextAnnounce = rpctypes.Time{Time: t.NextAnnounce}
-		}
+		reply.Trackers[i] = trackerToRPC(t)
 	}
 	return nil
 }
 
+// trackerToRPC maps one tracker status; zero announce times stay zero.
+func trackerToRPC(t Tracker) rpctypes.Tracker {
+	out := rpctypes.Tracker{
+		URL:      t.URL,
+		Status:   trackerStatusToString(t.Status),
+		Leechers: t.Leechers,
+		Seeders:  t.Seeders,
+		Warning:  t.Warning,
+	}
+	if t.Error != nil {
+		out.Error = t.Error.Error()
+		out.ErrorInternal = t.Error.err.ErrorWithType()
+		out.ErrorUnknown = t.Error.Unknown()
+	}
+	if !t.LastAnnounce.IsZero() {
+		out.LastAnnounce = rpctypes.Time{Time: t.LastAnnounce}
+	}
+	if !t.NextAnnounce.IsZero() {
+		out.NextAnnounce = rpctypes.Time{Time: t.NextAnnounce}
+	}
+	return out
+}
+
 func (h *rpcHandler) GetTorrentPeers(args *rpctypes.GetTorrentPeersRequest, reply *rpctypes.GetTorrentPeersResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	peers := t.Peers()
 	reply.Peers = make([]rpctypes.Peer, len(peers))
 	for i, p := range peers {
-		var source string
-		switch p.Source {
-		case SourceTracker:
-			source = "TRACKER"
-		case SourceDHT:
-			source = "DHT"
-		case SourcePEX:
-			source = "PEX"
-		case SourceIncoming:
-			source = "INCOMING"
-		case SourceManual:
-			source = "MANUAL"
-		case SourceHolepunch:
-			source = "HOLEPUNCH"
-		default:
-			source = "UNKNOWN"
-		}
-		reply.Peers[i] = rpctypes.Peer{
-			ID:                 hex.EncodeToString(p.ID[:]),
-			Client:             p.Client,
-			Addr:               p.Addr.String(),
-			Source:             source,
-			ConnectedAt:        rpctypes.Time{Time: p.ConnectedAt},
-			Downloading:        p.Downloading,
-			ClientInterested:   p.ClientInterested,
-			ClientChoking:      p.ClientChoking,
-			PeerInterested:     p.PeerInterested,
-			PeerChoking:        p.PeerChoking,
-			OptimisticUnchoked: p.OptimisticUnchoked,
-			Snubbed:            p.Snubbed,
-			EncryptedHandshake: p.EncryptedHandshake,
-			EncryptedStream:    p.EncryptedStream,
-			DownloadSpeed:      p.DownloadSpeed,
-			UploadSpeed:        p.UploadSpeed,
-		}
+		reply.Peers[i] = peerToRPC(p)
 	}
 	return nil
 }
 
+// peerSourceToRPC spells the origin in the daemon's uppercase convention,
+// UNKNOWN when unmapped.
+func peerSourceToRPC(s PeerSource) string {
+	switch s {
+	case SourceTracker:
+		return "TRACKER"
+	case SourceDHT:
+		return "DHT"
+	case SourcePEX:
+		return "PEX"
+	case SourceIncoming:
+		return "INCOMING"
+	case SourceManual:
+		return "MANUAL"
+	case SourceHolepunch:
+		return "HOLEPUNCH"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+// peerToRPC maps one peer, hexing the id for JSON.
+func peerToRPC(p Peer) rpctypes.Peer {
+	return rpctypes.Peer{
+		ID:                 hex.EncodeToString(p.ID[:]),
+		Client:             p.Client,
+		Addr:               p.Addr.String(),
+		Source:             peerSourceToRPC(p.Source),
+		ConnectedAt:        rpctypes.Time{Time: p.ConnectedAt},
+		Downloading:        p.Downloading,
+		ClientInterested:   p.ClientInterested,
+		ClientChoking:      p.ClientChoking,
+		PeerInterested:     p.PeerInterested,
+		PeerChoking:        p.PeerChoking,
+		OptimisticUnchoked: p.OptimisticUnchoked,
+		Snubbed:            p.Snubbed,
+		EncryptedHandshake: p.EncryptedHandshake,
+		EncryptedStream:    p.EncryptedStream,
+		DownloadSpeed:      p.DownloadSpeed,
+		UploadSpeed:        p.UploadSpeed,
+	}
+}
+
 func (h *rpcHandler) GetTorrentWebseeds(args *rpctypes.GetTorrentWebseedsRequest, reply *rpctypes.GetTorrentWebseedsResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	webseeds := t.Webseeds()
 	reply.Webseeds = make([]rpctypes.Webseed, len(webseeds))
@@ -363,9 +422,9 @@ func (h *rpcHandler) GetTorrentWebseeds(args *rpctypes.GetTorrentWebseedsRequest
 }
 
 func (h *rpcHandler) GetTorrentFiles(args *rpctypes.GetTorrentFilesRequest, reply *rpctypes.GetTorrentFilesResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	files, err := t.Files()
 	if err != nil {
@@ -382,9 +441,9 @@ func (h *rpcHandler) GetTorrentFiles(args *rpctypes.GetTorrentFilesRequest, repl
 }
 
 func (h *rpcHandler) GetTorrentFileStats(args *rpctypes.GetTorrentFileStatsRequest, reply *rpctypes.GetTorrentFileStatsResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	stats, err := t.FileStats()
 	if err != nil {
@@ -403,35 +462,39 @@ func (h *rpcHandler) GetTorrentFileStats(args *rpctypes.GetTorrentFileStatsReque
 	return nil
 }
 
+// ---------------------------------------------------------------------------
+// Torrent control
+// ---------------------------------------------------------------------------
+
 func (h *rpcHandler) StartTorrent(args *rpctypes.StartTorrentRequest, reply *rpctypes.StartTorrentResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	return t.Start()
 }
 
 func (h *rpcHandler) StopTorrent(args *rpctypes.StopTorrentRequest, reply *rpctypes.StopTorrentResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	return t.Stop()
 }
 
 func (h *rpcHandler) AnnounceTorrent(args *rpctypes.AnnounceTorrentRequest, reply *rpctypes.AnnounceTorrentResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	t.Announce()
 	return nil
 }
 
 func (h *rpcHandler) VerifyTorrent(args *rpctypes.VerifyTorrentRequest, reply *rpctypes.VerifyTorrentResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	return t.Verify()
 }
@@ -445,25 +508,17 @@ func (h *rpcHandler) StopAllTorrents(args *rpctypes.StopAllTorrentsRequest, repl
 }
 
 func (h *rpcHandler) AddPeer(args *rpctypes.AddPeerRequest, reply *rpctypes.AddPeerResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	return t.AddPeer(args.Addr)
 }
 
 func (h *rpcHandler) AddTracker(args *rpctypes.AddTrackerRequest, reply *rpctypes.AddTrackerResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
+	t, err := h.requireTorrent(args.ID)
+	if err != nil {
+		return err
 	}
 	return t.AddTracker(args.URL)
-}
-
-func (h *rpcHandler) MoveTorrent(args *rpctypes.MoveTorrentRequest, reply *rpctypes.MoveTorrentResponse) error {
-	t := h.session.GetTorrent(args.ID)
-	if t == nil {
-		return errTorrentNotFound
-	}
-	return t.Move(args.Target)
 }

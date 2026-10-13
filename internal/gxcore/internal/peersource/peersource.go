@@ -1,20 +1,21 @@
 package peersource
 
-// Source indicates how we found the Peer.
+// Source records where a peer address came from, for diagnostics,
+// per-source budgeting, and the session stats breakdown.
 type Source int
 
 const (
-	// Tracker indicates that the peer is found from tracker by announcing the torrent.
+	// Tracker peers arrived in a tracker announce.
 	Tracker Source = iota
-	// DHT indicates that the peer is found from DHT node.
+	// DHT peers arrived through the DHT.
 	DHT
-	// PEX indicates that the peer is found from another peer with PEX messages.
+	// PEX peers were gossiped by another peer.
 	PEX
-	// Manual indicates that the peer is added manually by user.
+	// Manual peers were added by the operator.
 	Manual
-	// Incoming indicates that the peer found us. We did not found the peer.
+	// Incoming peers dialed us.
 	Incoming
-	// Holepunch indicates that the peer was reached via a BEP 55 rendezvous
+	// Holepunch peers arrived via a BEP 55 rendezvous.
 	Holepunch
 )
 

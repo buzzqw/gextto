@@ -14,25 +14,16 @@ import (
 
 /*
 
-These are the things to consider when selecting a piece for downloading:
-
-  * Piece is done (hash checked and written to disk)
-  * Piece is writing
-  * Peer has the piece
-  * Peer is choking us
-  * Piece is marked as allowed-fast
-  * Piece is requested from another peers
-  * Piece is reserved for downloading by a webseed source
-  * Is endgame mode activated (all pieces are requested)
-  * Are there stalled peers (snubbed or choked in the middle of download)
-  * Is sequential download mode enabled
-
-Do not forget to re-check these when making changes.
+Piece selection weighs, in order: completion, in-flight writes, peer
+availability, choke state, allowed-fast grants, existing requests, webseed
+reservations, endgame (everything requested), stalled peers, and the
+sequential/streaming orders. Keep this list current: any new stage in
+findPiece belongs here.
 
 */
 
-// PiecePicker runs an algorithm to determine which piece to download next, from which peer or webseed source.
-// PiecePicker keeps track availability of pieces among peers.
+// PiecePicker decides which piece a peer (or webseed) downloads next and
+// tracks who has, wants and stalls what.
 type PiecePicker struct {
 	webseedSources       []*webseedsource.WebseedSource
 	pieces               []myPiece
@@ -43,22 +34,23 @@ type PiecePicker struct {
 	available            uint32
 	endgame              bool
 
-	// Pick the next piece in sequential order instead of the rarest piece.
+	// sequential picks index order over rarest-first.
 	sequential bool
 
-	// Pick the pieces at both ends of every file first, then continue
-	// rarest-first. Independent of sequential order.
+	// firstLast picks both file ends first, then rarest-first. Independent
+	// of sequential.
 	firstLast bool
 
-	// streamBegin/streamEnd are the piece range a player is reading:
-	// those pieces are requested before any other. Empty when equal.
+	// streamBegin/streamEnd is the player's current window: first pick.
+	// Equal bounds clear it.
 	streamBegin, streamEnd uint32
 
-	// readaheadBegin/readaheadEnd are the pieces the player is likely to read
-	// next: requested after the stream window, but before the rest.
+	// readaheadBegin/readaheadEnd is the likely-next window: second pick,
+	// independent of the stream window.
 	readaheadBegin, readaheadEnd uint32
 }
 
+// myPiece is a piece plus its swarm bookkeeping.
 type myPiece struct {
 	*piece.Piece
 	Having    sliceset.SliceSet[peer.Peer]
@@ -66,26 +58,26 @@ type myPiece struct {
 	Snubbed   sliceset.SliceSet[peer.Peer]
 	Choked    sliceset.SliceSet[peer.Peer]
 
-	// Downloading from webseed source or marked to be downloaded later.
+	// RequestedWebseed reserves the piece for a webseed source.
 	RequestedWebseed *webseedsource.WebseedSource
 
-	// The piece holds data from the first or the last fileEdgeSize bytes of a file.
-	// Only set in sequential download mode.
+	// FileHead/FileTail mark pieces holding a file's first or last edge
+	// bytes. Set in sequential-ish orders only.
 	FileHead, FileTail bool
 }
 
-// RunningDownloads returns the number of pieces that are being downloaded actively.
-// This number does not include downloads of a piece whose peers are snubbed or choked.
+// RunningDownloads counts the actively served fetches, excluding stalled ones.
 func (p *myPiece) RunningDownloads() int {
 	return p.Requested.Len() - p.StalledDownloads()
 }
 
-// StalledDownloads returns the number of piece downloads whose peers are snubbed or choked.
+// StalledDownloads counts fetches stuck on snubbed or choked peers.
 func (p *myPiece) StalledDownloads() int {
 	return p.Snubbed.Len() + p.Choked.Len()
 }
 
-// AvailableForWebseed returns true if the piece is allowed to be downloaded from a webseed source.
+// AvailableForWebseed allows a webseed fetch: unfinished, unreserved,
+// wanted pieces only.
 func (p *myPiece) AvailableForWebseed() bool {
 	if p.Done || p.Writing || p.Skip {
 		return false
@@ -93,7 +85,8 @@ func (p *myPiece) AvailableForWebseed() bool {
 	return p.RequestedWebseed == nil
 }
 
-// PickableBy returns true if the piece can be requested from the peer right away.
+// PickableBy allows an immediate peer request: wanted, unrequested, and
+// held by the peer.
 func (p *myPiece) PickableBy(pe *peer.Peer) bool {
 	if p.Done || p.Writing || p.Skip {
 		return false
@@ -104,28 +97,27 @@ func (p *myPiece) PickableBy(pe *peer.Peer) bool {
 	return p.Having.Has(pe)
 }
 
-// HighPriority reports whether the piece belongs to a high-priority file
-// (file priority 5..7): such pieces are downloaded before the rest.
+// HighPriority marks pieces of high-priority files (5..7): fetched ahead
+// of the rest, right after the player windows.
 func (p *myPiece) HighPriority() bool {
 	return !p.Skip && p.Priority >= piece.PriorityHigh
 }
 
-// New returns a new PiecePicker.
-// If sequential is true, pieces are picked in sequential order instead of rarest-first.
-// If firstLast is true, the pieces at both ends of every file are picked first
-// (sequential mode implies it).
+// New builds a picker over pieces. Sequential/firstLast arm the file-edge
+// flags up front (SetOrder maintains them later).
 func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webseedsource.WebseedSource, sequential, firstLast bool) *PiecePicker {
 	ps := make([]myPiece, len(pieces))
 	for i := range pieces {
 		ps[i] = myPiece{Piece: &pieces[i]}
 	}
-	sps := make([]*myPiece, len(ps))
-	sps2 := make([]*myPiece, len(ps))
-	for i := range sps {
-		sps[i] = &ps[i]
-		sps2[i] = &ps[i]
+	byAvailability := make([]*myPiece, len(ps))
+	byStalled := make([]*myPiece, len(ps))
+	for i := range byAvailability {
+		byAvailability[i] = &ps[i]
+		byStalled[i] = &ps[i]
 	}
-	maxWebseedPieces := len(pieces) / 20 // Download 5% of pieces in a single HTTP request (see BEP19)
+	// One HTTP range covers ~5% of the pieces (BEP 19 sizing).
+	maxWebseedPieces := len(pieces) / 20
 	if maxWebseedPieces == 0 {
 		maxWebseedPieces = 1
 	}
@@ -134,8 +126,8 @@ func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webse
 	}
 	return &PiecePicker{
 		pieces:               ps,
-		piecesByAvailability: sps,
-		piecesByStalled:      sps2,
+		piecesByAvailability: byAvailability,
+		piecesByStalled:      byStalled,
 		maxDuplicateDownload: maxDuplicateDownload,
 		maxWebseedPieces:     maxWebseedPieces,
 		webseedSources:       webseedSources,
@@ -144,19 +136,18 @@ func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webse
 	}
 }
 
-// Upper limit for the number of bytes that are downloaded first at both ends of a file.
+// maxFileEdgeSize caps the file-end span fetched ahead: enough for an MP4
+// moov atom or AVI index on long recordings (qBittorrent reserves 1% of the
+// file for the same purpose).
 const maxFileEdgeSize = 8 * 1024 * 1024
 
-// fileEdgeSize returns the number of bytes at both ends of a file that are downloaded before the
-// rest of the file. A single piece is not always enough: the moov atom of an MP4 file or the
-// idx1 index of an AVI file is a few megabytes long on a long recording.
-// qBittorrent reserves 1% of the file size for the same purpose.
+// fileEdgeSize spans 1% of the file, capped, minimum one byte.
 func fileEdgeSize(fileSize int64) int64 {
 	return max(min(fileSize/100, maxFileEdgeSize), 1)
 }
 
-// markFileEdges flags the pieces that hold data from either end of a file.
-// Padding files are skipped, they don't belong to any file.
+// markFileEdges flags pieces touching either end of a real (non-padding)
+// file.
 func markFileEdges(pieces []myPiece) {
 	sizes := make(map[string]int64)
 	for i := range pieces {
@@ -182,10 +173,9 @@ func markFileEdges(pieces []myPiece) {
 	}
 }
 
-// SetOrder changes the piece order at runtime: sequential picks
-// the pieces in index order, firstLast prioritizes the ends of every file.
-// Enabling either recomputes the file-edge flags; disabling both stops using
-// them (the flags may stay set, they are consulted only when an order is on).
+// SetOrder switches the piece order live, (re)computing edge flags when an
+// order turns on. Flags may linger after both turn off; nothing consults
+// them then.
 func (p *PiecePicker) SetOrder(sequential, firstLast bool) {
 	if (sequential || firstLast) && !p.sequential && !p.firstLast {
 		markFileEdges(p.pieces)
@@ -194,64 +184,53 @@ func (p *PiecePicker) SetOrder(sequential, firstLast bool) {
 	p.firstLast = firstLast
 }
 
-// SetStreamWindow prioritizes the pieces in [begin, end): the
-// pieces a player is reading are requested before the rest. begin == end clears
-// the window.
+// clampWindow bounds a player window to the piece list; inverted bounds
+// clear it.
+func clampWindow(begin, end uint32, total int) (uint32, uint32) {
+	if end > uint32(total) {
+		end = uint32(total)
+	}
+	if begin > end {
+		begin = end
+	}
+	return begin, end
+}
+
+// SetStreamWindow prioritizes [begin, end): the player's current reads.
 func (p *PiecePicker) SetStreamWindow(begin, end uint32) {
-	if end > uint32(len(p.pieces)) {
-		end = uint32(len(p.pieces))
-	}
-	if begin > end {
-		begin = end
-	}
-	p.streamBegin, p.streamEnd = begin, end
+	p.streamBegin, p.streamEnd = clampWindow(begin, end, len(p.pieces))
 }
 
-// pickStreaming returns the first piece in the streaming window the peer can
-// download right now.
+// pickStreaming takes the first pickable piece in the stream window.
 func (p *PiecePicker) pickStreaming(pe *peer.Peer) *myPiece {
-	for i := p.streamBegin; i < p.streamEnd; i++ {
-		if i >= uint32(len(p.pieces)) {
-			return nil
-		}
-		mp := &p.pieces[i]
-		if mp.PickableBy(pe) {
-			return mp
-		}
-	}
-	return nil
+	return firstPickable(p.pieces, p.streamBegin, p.streamEnd, pe)
 }
 
-// SetReadaheadWindow prioritizes the pieces in [begin, end) after the streaming
-// window (SetStreamWindow): the player is likely to read them next. begin ==
-// end clears it. It is independent of SetStreamWindow.
+// SetReadaheadWindow prioritizes [begin, end) after the stream window: the
+// player's likely-next reads, independent of it.
 func (p *PiecePicker) SetReadaheadWindow(begin, end uint32) {
-	if end > uint32(len(p.pieces)) {
-		end = uint32(len(p.pieces))
-	}
-	if begin > end {
-		begin = end
-	}
-	p.readaheadBegin, p.readaheadEnd = begin, end
+	p.readaheadBegin, p.readaheadEnd = clampWindow(begin, end, len(p.pieces))
 }
 
-// pickReadahead returns the first piece in the readahead window the peer can
-// download right now.
+// pickReadahead takes the first pickable piece in the readahead window.
 func (p *PiecePicker) pickReadahead(pe *peer.Peer) *myPiece {
-	for i := p.readaheadBegin; i < p.readaheadEnd; i++ {
-		if i >= uint32(len(p.pieces)) {
+	return firstPickable(p.pieces, p.readaheadBegin, p.readaheadEnd, pe)
+}
+
+// firstPickable scans [begin, end) for a piece the peer can take now.
+func firstPickable(pieces []myPiece, begin, end uint32, pe *peer.Peer) *myPiece {
+	for i := begin; i < end; i++ {
+		if i >= uint32(len(pieces)) {
 			return nil
 		}
-		if mp := &p.pieces[i]; mp.PickableBy(pe) {
+		if mp := &pieces[i]; mp.PickableBy(pe) {
 			return mp
 		}
 	}
 	return nil
 }
 
-// pickHigh returns the rarest high-priority piece (file priority 5..7) the peer
-// can download right now. Pieces of high-priority files are requested before
-// the rest, right after the player's streaming and readahead windows.
+// pickHigh takes the rarest high-priority piece the peer can take.
 func (p *PiecePicker) pickHigh(pe *peer.Peer) *myPiece {
 	var picked *myPiece
 	for i := range p.pieces {
@@ -266,8 +245,7 @@ func (p *PiecePicker) pickHigh(pe *peer.Peer) *myPiece {
 	return picked
 }
 
-// PieceDownloading reports whether the piece at index i is being downloaded
-// right now (for piece diagnostics).
+// PieceDownloading reports an in-flight piece (for diagnostics).
 func (p *PiecePicker) PieceDownloading(i uint32) bool {
 	if i >= uint32(len(p.pieces)) {
 		return false
@@ -276,7 +254,8 @@ func (p *PiecePicker) PieceDownloading(i uint32) bool {
 	return mp.Writing || mp.Requested.Len() > 0 || mp.RequestedWebseed != nil
 }
 
-// CloseWebseedDownloader closes the download from a webseed source.
+// CloseWebseedDownloader releases a source's pieces and stops its meter and
+// fetcher. A piece claimed by another source is a bug and panics.
 func (p *PiecePicker) CloseWebseedDownloader(src *webseedsource.WebseedSource) {
 	src.DownloadSpeed.Stop()
 	src.DownloadSpeed = metrics.NilMeter{}
@@ -293,16 +272,16 @@ func (p *PiecePicker) CloseWebseedDownloader(src *webseedsource.WebseedSource) {
 	src.Downloader = nil
 }
 
-// AddWebseedSource adds a web seed source at runtime. The list is
-// rebuilt so it never aliases the caller's slice.
+// AddWebseedSource registers a source live, without aliasing the caller's
+// slice.
 func (p *PiecePicker) AddWebseedSource(src *webseedsource.WebseedSource) {
 	next := make([]*webseedsource.WebseedSource, 0, len(p.webseedSources)+1)
 	next = append(next, p.webseedSources...)
 	p.webseedSources = append(next, src)
 }
 
-// RemoveWebseedSource drops a web seed source from the picker.
-// Close its downloader first (CloseWebseedDownloader) to release the pieces.
+// RemoveWebseedSource unregisters a source. Close its downloader first so
+// its pieces release.
 func (p *PiecePicker) RemoveWebseedSource(src *webseedsource.WebseedSource) {
 	kept := make([]*webseedsource.WebseedSource, 0, len(p.webseedSources))
 	for _, s := range p.webseedSources {
@@ -313,47 +292,47 @@ func (p *PiecePicker) RemoveWebseedSource(src *webseedsource.WebseedSource) {
 	p.webseedSources = kept
 }
 
-// WebseedStopAt sets the webseed downloader to stop at index `i`.
+// WebseedStopAt truncates a source's range at i, releasing the tail pieces.
+// Truncating past the read cursor closes the downloader and reports it. A
+// foreign-claimed tail piece is a bug and panics.
 func (p *PiecePicker) WebseedStopAt(src *webseedsource.WebseedSource, i uint32) (closed bool) {
 	oldEnd := src.Downloader.End
-	newEnd := i
-	for i := newEnd; i < oldEnd; i++ {
-		if p.pieces[i].RequestedWebseed != src {
-			panic(fmt.Sprintf("invalid source in piece #%d: %s", i, p.pieces[i].RequestedWebseed.URL))
+	for j := i; j < oldEnd; j++ {
+		if p.pieces[j].RequestedWebseed != src {
+			panic(fmt.Sprintf("invalid source in piece #%d: %s", j, p.pieces[j].RequestedWebseed.URL))
 		}
-		p.pieces[i].RequestedWebseed = nil
+		p.pieces[j].RequestedWebseed = nil
 	}
-	src.Downloader.UpdateEnd(newEnd)
-	if src.Downloader.ReadCurrent() >= newEnd {
+	src.Downloader.UpdateEnd(i)
+	if src.Downloader.ReadCurrent() >= i {
 		p.CloseWebseedDownloader(src)
 		return true
 	}
 	return false
 }
 
-// Available returns the number of available pieces among the swarm.
+// Available counts distinct swarm pieces.
 func (p *PiecePicker) Available() uint32 {
 	return p.available
 }
 
-// RequestedPeers returns the number of peers that the piece with the index is requested from.
+// RequestedPeers lists the peers fetching piece i.
 func (p *PiecePicker) RequestedPeers(i uint32) []*peer.Peer {
 	return p.pieces[i].Requested.Items
 }
 
-// RequestedWebseedSource returns the number of webseed sources that the piece with the index is requested from.
+// RequestedWebseedSource names the webseed fetching piece i, if any.
 func (p *PiecePicker) RequestedWebseedSource(i uint32) *webseedsource.WebseedSource {
 	return p.pieces[i].RequestedWebseed
 }
 
-// HandleHave must be called to set the availability of the piece at the peer.
+// HandleHave records peer availability of piece i.
 func (p *PiecePicker) HandleHave(pe *peer.Peer, i uint32) {
 	pe.Bitfield.Set(i)
 	p.addHavingPeer(i, pe)
 }
 
-// HandleDontHave must be called when a peer announces with a BEP 54 DontHave
-// that it no longer has the piece (index i): availability is cleared.
+// HandleDontHave clears BEP 54-reneged availability of piece i.
 func (p *PiecePicker) HandleDontHave(pe *peer.Peer, i uint32) {
 	if pe.Bitfield != nil {
 		pe.Bitfield.Clear(i)
@@ -361,12 +340,13 @@ func (p *PiecePicker) HandleDontHave(pe *peer.Peer, i uint32) {
 	p.removeHavingPeer(int(i), pe)
 }
 
-// HandleAllowedFast must be called to set the allowed-fast status of the piece at peer.
+// HandleAllowedFast records a fast-exception grant for piece i.
 func (p *PiecePicker) HandleAllowedFast(pe *peer.Peer, i uint32) {
 	pe.ReceivedAllowedFast.Add(p.pieces[i].Piece)
 }
 
-// HandleSnubbed must be called to set the peer as snubbed when it is slow or stalled.
+// HandleSnubbed marks a slow peer on piece i; snubbing a choked peer is a
+// bug and panics.
 func (p *PiecePicker) HandleSnubbed(pe *peer.Peer, i uint32) {
 	if p.pieces[i].Choked.Has(pe) {
 		panic("peer snubbed while choked")
@@ -374,25 +354,24 @@ func (p *PiecePicker) HandleSnubbed(pe *peer.Peer, i uint32) {
 	p.pieces[i].Snubbed.Add(pe)
 }
 
-// HandleChoke must be called to set choke status of the remote peer.
+// HandleChoke marks the peer choked on piece i.
 func (p *PiecePicker) HandleChoke(pe *peer.Peer, i uint32) {
-	p.pieces[i].Snubbed.Remove(pe)
 	p.pieces[i].Choked.Add(pe)
 }
 
-// HandleUnchoke must be called to unset choke status of the remote peer.
+// HandleUnchoke clears the choke mark on piece i.
 func (p *PiecePicker) HandleUnchoke(pe *peer.Peer, i uint32) {
 	p.pieces[i].Choked.Remove(pe)
 }
 
-// HandleCancelDownload must be called to update indexes when a piece download is canceled from the peer.
+// HandleCancelDownload forgets a cancelled fetch on piece i.
 func (p *PiecePicker) HandleCancelDownload(pe *peer.Peer, i uint32) {
 	p.pieces[i].Requested.Remove(pe)
 	p.pieces[i].Snubbed.Remove(pe)
 	p.pieces[i].Choked.Remove(pe)
 }
 
-// HandleDisconnect must be called to remove the peer from internal indexes.
+// HandleDisconnect forgets a peer everywhere.
 func (p *PiecePicker) HandleDisconnect(pe *peer.Peer) {
 	for i := range p.pieces {
 		p.HandleCancelDownload(pe, uint32(i))
@@ -400,21 +379,22 @@ func (p *PiecePicker) HandleDisconnect(pe *peer.Peer) {
 	}
 }
 
+// addHavingPeer counts a new holder, ticking availability on the first.
 func (p *PiecePicker) addHavingPeer(i uint32, pe *peer.Peer) {
-	ok := p.pieces[i].Having.Add(pe)
-	if ok && p.pieces[i].Having.Len() == 1 {
+	if ok := p.pieces[i].Having.Add(pe); ok && p.pieces[i].Having.Len() == 1 {
 		p.available++
 	}
 }
 
+// removeHavingPeer drops a holder, ticking availability at zero.
 func (p *PiecePicker) removeHavingPeer(i int, pe *peer.Peer) {
-	ok := p.pieces[i].Having.Remove(pe)
-	if ok && p.pieces[i].Having.Len() == 0 {
+	if ok := p.pieces[i].Having.Remove(pe); ok && p.pieces[i].Having.Len() == 0 {
 		p.available--
 	}
 }
 
-// PickFor selects the next piece for download from the peer.
+// PickFor selects the peer's next piece and marks it requested, clearing
+// the snub flag; the bool reports an allowed-fast grant.
 func (p *PiecePicker) PickFor(pe *peer.Peer) (pp *piece.Piece, allowedFast bool) {
 	pi, allowedFast := p.findPiece(pe)
 	if pi == nil {
@@ -425,84 +405,84 @@ func (p *PiecePicker) PickFor(pe *peer.Peer) (pp *piece.Piece, allowedFast bool)
 	return pi.Piece, allowedFast
 }
 
+// findPiece runs the selection stages in priority order: concurrency gate,
+// webseed-stealing mode, player windows and high priority (unchoked only),
+// file edges, allowed-fast grants, then — unchoked only — endgame, rarest
+// or sequential, and stalled re-requests. The bool tags allowed-fast picks.
 func (p *PiecePicker) findPiece(pe *peer.Peer) (mp *myPiece, allowedFast bool) {
-	// A peer may download more than one piece at a time (multi-piece
-	// pipelining), bounded by MaxConcurrentPieces; the single-piece behaviour is
-	// the historical default (MaxConcurrentPieces <= 1).
-	if pe.MaxConcurrentPieces > 1 {
-		if pe.ConcurrentPieces >= pe.MaxConcurrentPieces {
-			return nil, false
-		}
-	} else if pe.Downloading {
+	if !roomFor(pe) {
 		return nil, false
 	}
 	if p.downloadingWebseed() {
-		if pe.PeerChoking {
-			return nil, false
-		}
-		mp = p.pickLastPieceOfSmallestGap(pe)
-		if mp != nil {
-			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
-		}
-		mp = p.peerStealsFromWebseed(pe)
-		if mp != nil {
-			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
-		}
-		return nil, false
+		return p.findPieceAmongWebseeds(pe)
 	}
-	// Pieces at file edges come before the allowed-fast pieces, which are spread over the
-	// torrent. While choked they are the only pieces we can request, so this applies only
-	// after the peer unchokes us.
 	if !pe.PeerChoking {
-		// The player's streaming window comes first.
 		if mp = p.pickStreaming(pe); mp != nil {
 			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
 		}
-		// Then the readahead window (what the player will read next).
 		if mp = p.pickReadahead(pe); mp != nil {
 			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
 		}
-		// Then the high-priority files, before the rest.
 		if mp = p.pickHigh(pe); mp != nil {
 			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
 		}
 	}
+	// File edges precede the spread-out allowed-fast set and apply only
+	// unchoked (choked peers can only take fast grants).
 	if (p.sequential || p.firstLast) && !pe.PeerChoking {
-		mp = p.pickFileEdge(pe)
-		if mp != nil {
+		if mp = p.pickFileEdge(pe); mp != nil {
 			return mp, false
 		}
 	}
-	// Pick allowed fast piece
-	pi := p.pickAllowedFast(pe)
-	if pi != nil {
-		return pi, true
+	if mp = p.pickAllowedFast(pe); mp != nil {
+		return mp, true
 	}
-	// Must be unchoked to request a peer
 	if pe.PeerChoking {
 		return nil, false
 	}
-	// Short path for endgame mode.
 	if p.endgame {
 		return p.pickEndgame(pe), false
 	}
-	// Pieck rarest piece
 	if p.sequential {
-		pi = p.pickSequential(pe)
+		mp = p.pickSequential(pe)
 	} else {
-		pi = p.pickRarest(pe)
+		mp = p.pickRarest(pe)
 	}
-	if pi != nil {
-		return pi, false
+	if mp != nil {
+		return mp, false
 	}
-	// Check if endgame mode is activated
 	if p.endgame {
 		return p.pickEndgame(pe), false
 	}
-	// Re-request stalled downloads
 	return p.pickStalled(pe), false
 }
 
+// roomFor reports whether the peer may open another piece: multi-piece
+// peers up to their cap, single-piece peers only when idle.
+func roomFor(pe *peer.Peer) bool {
+	if pe.MaxConcurrentPieces > 1 {
+		return pe.ConcurrentPieces < pe.MaxConcurrentPieces
+	}
+	return !pe.Downloading
+}
+
+// findPieceAmongWebseeds serves a choked-by-webseeds swarm: choked peers
+// wait, others take gap tails or steal from webseeds.
+func (p *PiecePicker) findPieceAmongWebseeds(pe *peer.Peer) (*myPiece, bool) {
+	if pe.PeerChoking {
+		return nil, false
+	}
+	if mp := p.pickLastPieceOfSmallestGap(pe); mp != nil {
+		return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
+	}
+	if mp := p.peerStealsFromWebseed(pe); mp != nil {
+		return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
+	}
+	return nil, false
+}
+
+// pickAllowedFast takes a granted piece: first found normally, lowest index
+// in sequential mode (the grant set is unordered).
 func (p *PiecePicker) pickAllowedFast(pe *peer.Peer) *myPiece {
 	var picked *myPiece
 	for _, pi := range pe.ReceivedAllowedFast.Items {
@@ -514,7 +494,6 @@ func (p *PiecePicker) pickAllowedFast(pe *peer.Peer) *myPiece {
 			if !p.sequential {
 				return mp
 			}
-			// The allowed-fast set is unordered, so scan it all for the lowest index.
 			if picked == nil || mp.Index < picked.Index {
 				picked = mp
 			}
@@ -523,14 +502,12 @@ func (p *PiecePicker) pickAllowedFast(pe *peer.Peer) *myPiece {
 	return picked
 }
 
+// pickRarest takes the least-held unrequested piece the peer has, flipping
+// to endgame when nothing is unrequested anywhere.
 func (p *PiecePicker) pickRarest(pe *peer.Peer) *myPiece {
-	// Sort by rarity
-	slices.SortFunc(p.piecesByAvailability, func(a, b *myPiece) int {
-		return cmp.Compare(len(a.Having.Items), len(b.Having.Items))
-	})
+	sortByAvailability(p.piecesByAvailability)
 	var picked *myPiece
 	var hasUnrequested bool
-	// Select unrequested piece
 	for _, mp := range p.piecesByAvailability {
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
@@ -549,22 +526,26 @@ func (p *PiecePicker) pickRarest(pe *peer.Peer) *myPiece {
 	return picked
 }
 
-// pickFileEdge returns a piece at either end of a file that the peer has and nobody else is
-// downloading. Media files keep their index at one of the two ends, so these pieces come
-// before the rest of the pieces. Players need the index before they can start playing.
+// sortByAvailability orders pieces rarest-first by holder count.
+func sortByAvailability(pieces []*myPiece) {
+	slices.SortFunc(pieces, func(a, b *myPiece) int {
+		return cmp.Compare(len(a.Having.Items), len(b.Having.Items))
+	})
+}
+
+// pickFileEdge takes the first edge piece the peer holds that nobody
+// fetches: players need file ends (indexes) before anything else.
 func (p *PiecePicker) pickFileEdge(pe *peer.Peer) *myPiece {
 	for i := range p.pieces {
-		mp := &p.pieces[i]
-		if (mp.FileHead || mp.FileTail) && mp.PickableBy(pe) {
+		if mp := &p.pieces[i]; (mp.FileHead || mp.FileTail) && mp.PickableBy(pe) {
 			return mp
 		}
 	}
 	return nil
 }
 
-// pickSequential returns the first piece in index order that the peer has and nobody else is
-// downloading. It replaces pickRarest in sequential download mode. The pieces at file edges are
-// already picked by pickFileEdge before this function runs.
+// pickSequential takes the lowest unrequested index the peer holds,
+// flipping to endgame when nothing is unrequested anywhere.
 func (p *PiecePicker) pickSequential(pe *peer.Peer) *myPiece {
 	var hasUnrequested bool
 	for i := range p.pieces {
@@ -586,12 +567,10 @@ func (p *PiecePicker) pickSequential(pe *peer.Peer) *myPiece {
 	return nil
 }
 
+// pickEndgame duplicates the least-requested piece the peer holds and lacks,
+// under the duplicate cap.
 func (p *PiecePicker) pickEndgame(pe *peer.Peer) *myPiece {
-	// Sort by request count
-	slices.SortFunc(p.piecesByAvailability, func(a, b *myPiece) int {
-		return cmp.Compare(a.RunningDownloads(), b.RunningDownloads())
-	})
-	// Select unrequested piece
+	sortByRunning(p.piecesByAvailability)
 	for _, mp := range p.piecesByAvailability {
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
@@ -603,12 +582,19 @@ func (p *PiecePicker) pickEndgame(pe *peer.Peer) *myPiece {
 	return nil
 }
 
+// sortByRunning orders pieces by active fetch count.
+func sortByRunning(pieces []*myPiece) {
+	slices.SortFunc(pieces, func(a, b *myPiece) int {
+		return cmp.Compare(a.RunningDownloads(), b.RunningDownloads())
+	})
+}
+
+// pickStalled re-requests a stalled piece's idle copy: running pieces stay,
+// and the least-stalled duplicate under the cap wins.
 func (p *PiecePicker) pickStalled(pe *peer.Peer) *myPiece {
-	// Sort by request count
 	slices.SortFunc(p.piecesByStalled, func(a, b *myPiece) int {
 		return cmp.Compare(a.StalledDownloads(), b.StalledDownloads())
 	})
-	// Select unrequested piece
 	for _, mp := range p.piecesByStalled {
 		if mp.Done || mp.Writing || mp.Skip {
 			continue

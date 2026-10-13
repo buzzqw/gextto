@@ -1,127 +1,125 @@
 package torrent
 
 import (
-	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/mse"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peersource"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/stringutil"
 )
 
-// Stats contains statistics about Torrent.
+// Stats snapshots one torrent for the API and UI.
 type Stats struct {
-	// Info hash of torrent.
+	// InfoHash identifies the torrent.
 	InfoHash InfoHash
-	// Listening port number.
+	// Port is the listening port.
 	Port int
-	// Status of the torrent.
+	// Status is the lifecycle state.
 	Status Status
-	// Contains the error message if torrent is stopped unexpectedly.
+	// Error carries the unexpected stop reason, if any.
 	Error  error
 	Pieces struct {
-		// Number of pieces that are checked when torrent is in "Verifying" state.
+		// Checked counts hash-verified pieces (Verifying state).
 		Checked uint32
-		// Number of pieces that we are downloaded successfully and verivied by hash check.
+		// Have counts verified pieces.
 		Have uint32
-		// Number of pieces that need to be downloaded. Some of them may be being downloaded.
-		// Pieces that are being downloaded may counted as missing until they are downloaded and passed hash check.
+		// Missing counts pieces still to fetch (in-flight ones included
+		// until hashed).
 		Missing uint32
-		// Number of unique pieces available on swarm.
-		// If this number is less then the number of total pieces, the download may never finish.
+		// Available counts distinct swarm pieces; below Total the download
+		// may never finish.
 		Available uint32
-		// Number of total pieces in torrent.
+		// Total counts all pieces.
 		Total uint32
 	}
 	Bytes struct {
-		// Bytes that are downloaded and passed hash check.
+		// Completed holds verified bytes.
 		Completed int64
-		// The number of bytes that is needed to complete all missing pieces.
+		// Incomplete holds the bytes still missing.
 		Incomplete int64
-		// The number of total bytes of files in torrent.  Total = Completed + Incomplete
+		// Total holds all file bytes (Completed + Incomplete).
 		Total int64
-		// The number of total bytes of padding files in torrent.  Disk Size = Total - Padding
+		// Padding holds filler bytes (Disk = Total - Padding).
 		Padding int64
-		// Downloaded is the number of bytes downloaded from swarm.
-		// Because some pieces may be downloaded more than once, this number may be greater than completed bytes.
+		// Downloaded may exceed Completed on duplicate fetches.
 		Downloaded int64
-		// BytesUploaded is the number of bytes uploaded to the swarm.
+		// Uploaded holds the swarm upload total.
 		Uploaded int64
-		// Bytes downloaded due to duplicate/non-requested pieces.
+		// Wasted holds duplicate/unsolicited bytes.
 		Wasted int64
-		// Bytes allocated on storage.
+		// Allocated holds the on-storage bytes.
 		Allocated int64
-		// Selected is the size of the wanted pieces (file
-		// selection), SelectedCompleted the downloaded part of it. Both are
-		// computed from the bitfield, so they are valid while stopped.
+		// Selected/SelectedCompleted cover the wanted-files subset,
+		// bitfield-derived so they hold while stopped.
 		Selected          int64
 		SelectedCompleted int64
 	}
 	Peers struct {
-		// Number of peers that are connected, handshaked and ready to send and receive messages.
+		// Total counts handshaked peers.
 		Total int
-		// Number of peers that have connected to us.
+		// Incoming counts peers that dialed us.
 		Incoming int
-		// Number of peers that we have connected to.
+		// Outgoing counts peers we dialed.
 		Outgoing int
 	}
 	Handshakes struct {
-		// Number of peers that are not handshaked yet.
+		// Total counts pending handshakes.
 		Total int
-		// Number of incoming peers in handshake state.
+		// Incoming counts inbound handshakes.
 		Incoming int
-		// Number of outgoing peers in handshake state.
+		// Outgoing counts outbound handshakes.
 		Outgoing int
 	}
 	Addresses struct {
-		// Total number of peer addresses that are ready to be connected.
+		// Total counts dialable addresses.
 		Total int
-		// Peers found via trackers.
+		// Tracker/DHT/PEX split them by source.
 		Tracker int
-		// Peers found via DHT node.
-		DHT int
-		// Peers found via peer exchange.
-		PEX int
+		DHT     int
+		PEX     int
 	}
 	Downloads struct {
-		// Number of active piece downloads.
+		// Total counts active piece fetches.
 		Total int
-		// Number of pieces that are being downloaded normally.
+		// Running counts normally downloading pieces.
 		Running int
-		// Number of pieces that are being downloaded too slow.
+		// Snubbed counts stalled pieces.
 		Snubbed int
-		// Number of piece downloads in choked state.
+		// Choked counts choked-state fetches.
 		Choked int
 	}
 	MetadataDownloads struct {
-		// Number of active metadata downloads.
+		// Total counts active metadata fetches.
 		Total int
-		// Number of peers that uploading too slow.
+		// Snubbed counts stalled ones.
 		Snubbed int
-		// Number of peers that are being downloaded normally.
+		// Running counts healthy ones.
 		Running int
 	}
-	// Name can change after metadata is downloaded.
+	// Name follows the metadata once it arrives.
 	Name string
-	// Is private torrent?
+	// Private marks private torrents.
 	Private bool
-	// Number of files.
+	// FileCount counts the files.
 	FileCount int
-	// Length of a single piece.
+	// PieceLength is the nominal piece size.
 	PieceLength uint32
-	// Duration while the torrent is in Seeding status.
+	// SeededFor accumulates Seeding-state time.
 	SeededFor time.Duration
-	// Speed is calculated as 1-minute moving average.
+	// Speed holds 1-minute moving averages.
 	Speed struct {
-		// Downloaded bytes per second.
+		// Download bytes/s.
 		Download int
-		// Uploaded bytes per second.
+		// Upload bytes/s.
 		Upload int
 	}
-	// Time remaining to complete download. nil value means infinity.
+	// ETA estimates completion; nil means unknown.
 	ETA *time.Duration
 }
 
+// stats builds the snapshot: swarm census, counters, info-bound totals,
+// have/missing from the bitfield, and a rounded ETA while downloading.
 func (t *torrent) stats() Stats {
 	t.updateSeedDuration(time.Now())
 
@@ -143,9 +141,6 @@ func (t *torrent) stats() Stats {
 	s.MetadataDownloads.Total = len(t.infoDownloaders)
 	s.MetadataDownloads.Snubbed = len(t.infoDownloadersSnubbed)
 	s.MetadataDownloads.Running = len(t.infoDownloaders) - len(t.infoDownloadersSnubbed)
-	s.Downloads.Total = 0
-	s.Downloads.Snubbed = 0
-	s.Downloads.Choked = 0
 	for pe, m := range t.pieceDownloaders {
 		n := len(m)
 		s.Downloads.Total += n
@@ -188,33 +183,40 @@ func (t *torrent) stats() Stats {
 		s.Pieces.Missing = s.Pieces.Total - s.Pieces.Have
 	}
 	if s.Status == Downloading {
-		bps := int64(s.Speed.Download)
-		if bps != 0 {
-			eta := time.Duration(s.Bytes.Incomplete/bps) * time.Second
-			switch {
-			case eta > 8*time.Hour:
-				eta = eta.Round(time.Hour)
-			case eta > 4*time.Hour:
-				eta = eta.Round(30 * time.Minute)
-			case eta > 2*time.Hour:
-				eta = eta.Round(15 * time.Minute)
-			case eta > time.Hour:
-				eta = eta.Round(5 * time.Minute)
-			case eta > 30*time.Minute:
-				eta = eta.Round(1 * time.Minute)
-			case eta > 15*time.Minute:
-				eta = eta.Round(30 * time.Second)
-			case eta > 5*time.Minute:
-				eta = eta.Round(15 * time.Second)
-			case eta > time.Minute:
-				eta = eta.Round(5 * time.Second)
-			}
-			s.ETA = &eta
-		}
+		s.ETA = downloadETA(s.Bytes.Incomplete, s.Speed.Download)
 	}
 	return s
 }
 
+// downloadETA estimates the remaining time at bps bytes/s, rounded
+// coarser the further away it is; nil at zero speed.
+func downloadETA(incomplete int64, bps int) *time.Duration {
+	if bps == 0 {
+		return nil
+	}
+	eta := time.Duration(incomplete/int64(bps)) * time.Second
+	switch {
+	case eta > 8*time.Hour:
+		eta = eta.Round(time.Hour)
+	case eta > 4*time.Hour:
+		eta = eta.Round(30 * time.Minute)
+	case eta > 2*time.Hour:
+		eta = eta.Round(15 * time.Minute)
+	case eta > time.Hour:
+		eta = eta.Round(5 * time.Minute)
+	case eta > 30*time.Minute:
+		eta = eta.Round(time.Minute)
+	case eta > 15*time.Minute:
+		eta = eta.Round(30 * time.Second)
+	case eta > 5*time.Minute:
+		eta = eta.Round(15 * time.Second)
+	case eta > time.Minute:
+		eta = eta.Round(5 * time.Second)
+	}
+	return &eta
+}
+
+// avaliablePieceCount counts distinct swarm pieces (zero without a picker).
 func (t *torrent) avaliablePieceCount() uint32 {
 	if t.piecePicker == nil {
 		return 0
@@ -222,6 +224,7 @@ func (t *torrent) avaliablePieceCount() uint32 {
 	return t.piecePicker.Available()
 }
 
+// bytesComplete totals verified bytes, prorating the tail piece.
 func (t *torrent) bytesComplete() int64 {
 	if t.bitfield == nil || len(t.pieces) == 0 {
 		return 0
@@ -234,6 +237,7 @@ func (t *torrent) bytesComplete() int64 {
 	return n
 }
 
+// getTrackers snapshots every announcer's status.
 func (t *torrent) getTrackers() []Tracker {
 	trackers := make([]Tracker, len(t.announcers))
 	for i, an := range t.announcers {
@@ -254,6 +258,8 @@ func (t *torrent) getTrackers() []Tracker {
 	return trackers
 }
 
+// getPeers snapshots the connected peers, mapping internal sources to API
+// ones; an unmapped source is a bug and crashes.
 func (t *torrent) getPeers() []Peer {
 	peers := make([]Peer, 0, len(t.peers))
 	for pe := range t.peers {
@@ -303,19 +309,21 @@ func (t *torrent) getPeers() []Peer {
 	return peers
 }
 
+// getWebseeds snapshots the webseed sources.
 func (t *torrent) getWebseeds() []Webseed {
 	webseeds := make([]Webseed, 0, len(t.webseedSources))
 	for _, src := range t.webseedSources {
-		ws := Webseed{
+		webseeds = append(webseeds, Webseed{
 			URL:           src.URL,
 			Error:         src.LastError,
 			DownloadSpeed: int(src.DownloadSpeed.Rate1()),
-		}
-		webseeds = append(webseeds, ws)
+		})
 	}
 	return webseeds
 }
 
+// updateSeedDuration accrues Seeding-state time; leaving the state clears
+// the baseline.
 func (t *torrent) updateSeedDuration(now time.Time) {
 	if t.status() != Seeding {
 		t.seedDurationUpdatedAt = time.Time{}

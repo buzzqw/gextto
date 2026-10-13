@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"io"
 	"net"
 	"net/http"
@@ -17,46 +16,40 @@ import (
 	"github.com/buzzqw/gextto/internal/dht"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/magnet"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resumer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resumer/boltdbresumer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/webseedsource"
-	"github.com/gofrs/uuid"
 )
 
-// AddTorrentOptions contains options for adding a new torrent.
+// AddTorrentOptions tunes one added torrent.
 type AddTorrentOptions struct {
-	// ID uniquely identifies the torrent in Session.
-	// If empty, a random ID is generated.
+	// ID fixes the torrent id; empty mints a random one.
 	ID string
-	// Do not start torrent automatically after adding.
+	// Stopped skips the automatic start after adding.
 	Stopped bool
-	// Stop torrent after all pieces are downloaded.
+	// StopAfterDownload stops a finished download.
 	StopAfterDownload bool
-	// Stop torrent after metadata is downloaded from magnet links.
+	// StopAfterMetadata stops a magnet after its info dict arrives.
 	StopAfterMetadata bool
-	// Download both ends of every file first, then the remaining pieces in index order,
-	// instead of rarest-first.
-	// Useful for streaming, at the cost of slower overall download and worse swarm health.
+	// Sequential pulls both file ends first, then index order: streaming at
+	// the cost of slower overall download and a weaker swarm.
 	Sequential bool
-	// FirstLast downloads the pieces at both ends of every file first, then
-	// continues rarest-first. Useful for streaming without
-	// giving up the rarest-first ordering for the rest of the torrent.
+	// FirstLast pulls both file ends first, then rarest-first: streaming
+	// without giving up rarest-first for the rest.
 	FirstLast bool
-	// SuperSeeding enables BEP 16 super-seeding: once the
-	// torrent is complete it advertises one piece at a time and serves only
-	// that, so the swarm spreads the data. Seeding strategy only; it does not
-	// affect the queue, the seed policy or the bandwidth limits.
+	// SuperSeeding arms BEP 16 super-seeding once complete: one advertised
+	// piece at a time so the swarm spreads the data. Seeding strategy only.
 	SuperSeeding bool
 	// SelectOnly restricts the download to these non-padding file indices
-	// (BEP 53 "so"). Empty means every file is wanted. For a magnet link the
-	// "so" parameter is used when this field is empty. An app-provided
-	// Config.FileSelection takes precedence over it.
+	// (BEP 53 "so"); empty wants everything. A magnet's "so" fills it when
+	// empty; Config.FileSelection wins over both.
 	SelectOnly []int
 }
 
-// AddTorrent adds a new torrent to the session by reading .torrent metainfo from reader.
-// Nil value can be passed as opt for default options.
+// AddTorrent adds a torrent from .torrent metainfo, starting it unless told
+// otherwise. A nil opt means defaults.
 func (s *Session) AddTorrent(r io.Reader, opt *AddTorrentOptions) (*Torrent, error) {
 	if opt == nil {
 		opt = &AddTorrentOptions{}
@@ -71,6 +64,7 @@ func (s *Session) AddTorrent(r io.Reader, opt *AddTorrentOptions) (*Torrent, err
 	return t, err
 }
 
+// parseMetaInfo decodes metainfo capped at the configured piece ceiling.
 func (s *Session) parseMetaInfo(r io.Reader) (*metainfo.MetaInfo, error) {
 	mi, err := metainfo.New(r)
 	if err != nil {
@@ -82,6 +76,9 @@ func (s *Session) parseMetaInfo(r io.Reader) (*metainfo.MetaInfo, error) {
 	return mi, nil
 }
 
+// addTorrentStopped stages a .torrent torrent without starting it: id, port
+// and storage reservation, torrent construction, resume record. A failure at
+// any step unwinds the reservations.
 func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torrent, error) {
 	r = io.LimitReader(r, int64(s.config.MaxTorrentSize))
 	mi, err := s.parseMetaInfo(r)
@@ -145,8 +142,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		FirstLast:         opt.FirstLast,
 		SuperSeeding:      opt.SuperSeeding,
 	}
-	err = s.resumer.Write(id, rspec)
-	if err != nil {
+	if err = s.resumer.Write(id, rspec); err != nil {
 		return nil, err
 	}
 	t2 := s.insertTorrent(t)
@@ -154,10 +150,8 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 	return t2, nil
 }
 
-// AddURI adds a new torrent to the session from a URI.
-// URI may be a magnet link or a HTTP URL.
-// In case of a HTTP address, a torrent is tried to be downloaded from that URL.
-// Nil value can be passed as opt for default options.
+// AddURI adds a torrent from a magnet link or an HTTP(S) .torrent URL. A nil
+// opt means defaults.
 func (s *Session) AddURI(uri string, opt *AddTorrentOptions) (*Torrent, error) {
 	uri = filterOutControlChars(uri)
 	if opt == nil {
@@ -177,19 +171,20 @@ func (s *Session) AddURI(uri string, opt *AddTorrentOptions) (*Torrent, error) {
 	}
 }
 
+// filterOutControlChars strips ASCII control characters (and DEL) from a
+// user-supplied URI before parsing.
 func filterOutControlChars(s string) string {
 	var sb strings.Builder
 	sb.Grow(len(s))
 	for i := 0; i < len(s); i++ {
-		b := s[i]
-		if b < ' ' || b == 0x7f {
-			continue
+		if b := s[i]; b >= ' ' && b != 0x7f {
+			sb.WriteByte(b)
 		}
-		sb.WriteByte(b)
 	}
 	return sb.String()
 }
 
+// addURL fetches a .torrent over HTTP(S), size-capped, and adds it.
 func (s *Session) addURL(u string, opt *AddTorrentOptions) (*Torrent, error) {
 	client := http.Client{
 		Timeout:   s.config.TorrentAddHTTPTimeout,
@@ -204,44 +199,29 @@ func (s *Session) addURL(u string, opt *AddTorrentOptions) (*Torrent, error) {
 	if resp.ContentLength > int64(s.config.MaxTorrentSize) {
 		return nil, newInputError(fmt.Errorf("torrent too large: %d", resp.ContentLength))
 	}
-	r := io.LimitReader(resp.Body, int64(s.config.MaxTorrentSize))
-	return s.AddTorrent(r, opt)
+	return s.AddTorrent(io.LimitReader(resp.Body, int64(s.config.MaxTorrentSize)), opt)
 }
 
+// addMagnet stages a metadata-less torrent: DHT bootstrap nodes first, then
+// a direct .torrent fetch from xs/as sources, then BEP 46 key resolution,
+// and finally the swarm metadata download.
 func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, error) {
 	ma, err := magnet.New(link)
 	if err != nil {
 		return nil, newInputError(err)
 	}
-	// Magnet "dht=" bootstrap nodes feed the session DHT (libtorrent's
-	// add_torrent_params.dht_nodes). Harmless when the DHT is disabled.
 	for _, node := range ma.DHTNodes {
 		if s.dht != nil {
 			s.dht.AddNode(node)
 		}
 	}
-	// Magnet "xs"/"as": fetch the .torrent straight from the exact/acceptable
-	// source before waiting for a peer or the DHT. A failure is not fatal: the
-	// metadata download over the swarm still runs.
 	if t, err := s.addMagnetFromSources(ma, opt); err == nil {
 		return t, nil
 	}
-	// BEP 46: "xs=urn:btpk:" names a mutable DHT item whose value carries the
-	// info hash; resolve it before creating the (metadata-less) torrent.
 	if ma.HasBTPK() {
-		if s.dht == nil {
-			return nil, newInputError(errors.New("magnet uses xs=urn:btpk but the DHT is disabled"))
+		if err := s.resolveBTPK(ma); err != nil {
+			return nil, err
 		}
-		item, err := s.dht.GetMutable(ed25519.PublicKey(ma.BTPKPublicKey), ma.BTPKSalt, nil, bep46ResolveTimeout)
-		if err != nil {
-			return nil, newInputError(fmt.Errorf("BEP 46: cannot resolve the DHT item: %w", err))
-		}
-		ih, err := bep46InfoHash(item.Value)
-		if err != nil {
-			return nil, newInputError(err)
-		}
-		ma.InfoHash = ih
-		ma.HasV1 = true
 	}
 	id, port, sto, err := s.add(opt)
 	if err != nil {
@@ -277,7 +257,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		return nil, err
 	}
 	t.hasV2Hint = ma.HasV2
-	// BEP 53: the magnet "so" selection is the default; an explicit option wins.
+	// BEP 53: the magnet "so" is the default selection; an explicit option wins.
 	wanted := opt.SelectOnly
 	if len(wanted) == 0 {
 		wanted = ma.SelectOnly
@@ -303,8 +283,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		FirstLast:         opt.FirstLast,
 		SuperSeeding:      opt.SuperSeeding,
 	}
-	err = s.resumer.Write(id, rspec)
-	if err != nil {
+	if err = s.resumer.Write(id, rspec); err != nil {
 		return nil, err
 	}
 	t2 := s.insertTorrent(t)
@@ -314,17 +293,36 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 	return t2, err
 }
 
-// addMagnetFromSources tries the magnet "xs"/"as" URLs to obtain the .torrent
-// directly, so a link that names its source does not have to wait for the
-// swarm. It returns an error when no source yields metainfo matching the
-// magnet's info hash, so the caller can fall back to the peer/DHT download.
+// resolveBTPK resolves a BEP 46 keyed magnet's info hash from the DHT
+// mutable item, requiring an enabled DHT.
+func (s *Session) resolveBTPK(ma *magnet.Magnet) error {
+	if s.dht == nil {
+		return newInputError(errors.New("magnet uses xs=urn:btpk but the DHT is disabled"))
+	}
+	item, err := s.dht.GetMutable(ed25519.PublicKey(ma.BTPKPublicKey), ma.BTPKSalt, nil, bep46ResolveTimeout)
+	if err != nil {
+		return newInputError(fmt.Errorf("BEP 46: cannot resolve the DHT item: %w", err))
+	}
+	ih, err := bep46InfoHash(item.Value)
+	if err != nil {
+		return newInputError(err)
+	}
+	ma.InfoHash = ih
+	ma.HasV1 = true
+	return nil
+}
+
+// addMagnetFromSources fetches the .torrent straight from the magnet's
+// xs/as URLs, so a sourced link skips the swarm wait. It fails when no
+// source yields metainfo matching the magnet's hash, and the caller falls
+// back to the peer/DHT metadata download.
 func (s *Session) addMagnetFromSources(ma *magnet.Magnet, opt *AddTorrentOptions) (*Torrent, error) {
 	sources := ma.MetadataSources()
 	if len(sources) == 0 {
 		return nil, errors.New("magnet has no HTTP source")
 	}
-	// The xs=/as= URLs come from the magnet, possibly from an untrusted feed:
-	// only public addresses, unless the operator allows private ones.
+	// xs=/as= URLs may come from untrusted feeds: public addresses only,
+	// unless the operator allows private ones (SSRF guard).
 	transport := netx.PublicHTTPTransport()
 	if s.config.WebSourcesAllowPrivate {
 		transport = netx.HTTPTransport()
@@ -358,7 +356,7 @@ func (s *Session) addMagnetFromSources(ma *magnet.Magnet, opt *AddTorrentOptions
 			lastErr = err
 			continue
 		}
-		// Keep the extra trackers and the fixed peers the magnet carried.
+		// Keep the magnet's extra trackers and fixed peers on top.
 		if extra := s.parseTrackers(ma.Trackers, mi.Info.Private); len(extra) > 0 {
 			t.torrent.AddTrackers(extra)
 		}
@@ -370,7 +368,8 @@ func (s *Session) addMagnetFromSources(ma *magnet.Magnet, opt *AddTorrentOptions
 	return nil, lastErr
 }
 
-// fetchTorrent downloads one .torrent from a magnet source URL.
+// fetchTorrent downloads one magnet-sourced .torrent, status- and
+// size-checked.
 func (s *Session) fetchTorrent(src string, client *http.Client) ([]byte, error) {
 	resp, err := client.Get(src) // nolint: noctx
 	if err != nil {
@@ -386,9 +385,8 @@ func (s *Session) fetchTorrent(src string, client *http.Client) ([]byte, error) 
 	return io.ReadAll(io.LimitReader(resp.Body, int64(s.config.MaxTorrentSize)))
 }
 
-// magnetInfoHashMatches reports whether the metainfo's identity is the one the
-// magnet names: the v1 info hash for a "urn:btih:" link, or the (truncated)
-// SHA-256 for a "urn:btmh:" link.
+// magnetInfoHashMatches checks metainfo against the magnet: v1 hash for a
+// btih link, truncated SHA-256 for a btmh link.
 func magnetInfoHashMatches(ma *magnet.Magnet, info *metainfo.Info) bool {
 	if ma.HasV1 && info.Hash == ma.InfoHash {
 		return true
@@ -403,8 +401,8 @@ func magnetInfoHashMatches(ma *magnet.Magnet, info *metainfo.Info) bool {
 	return false
 }
 
-// resolvePeers turns magnet "x.pe" values (host:port) into TCP addresses,
-// dropping the ones that do not resolve.
+// resolvePeers turns "x.pe" host:port values into dialable addresses,
+// dropping the unresolvable.
 func resolvePeers(peers []string) []*net.TCPAddr {
 	var out []*net.TCPAddr
 	for _, p := range peers {
@@ -415,11 +413,10 @@ func resolvePeers(peers []string) []*net.TCPAddr {
 	return out
 }
 
-// bep46ResolveTimeout bounds the DHT lookup for a BEP 46 magnet.
+// bep46ResolveTimeout bounds the DHT lookup of a BEP 46 magnet.
 const bep46ResolveTimeout = 8 * time.Second
 
-// bep46InfoHash extracts the info hash from a BEP 46 DHT item value, which must
-// be a dictionary with a 20-byte binary "ih" (BEP 46).
+// bep46InfoHash extracts the 20-byte binary "ih" from a BEP 46 item value.
 func bep46InfoHash(value interface{}) ([20]byte, error) {
 	m, ok := value.(map[string]interface{})
 	if !ok {
@@ -434,6 +431,9 @@ func bep46InfoHash(value interface{}) ([20]byte, error) {
 	return h, nil
 }
 
+// add reserves an id, a port and the storage for a new torrent, unwinding
+// the port on failure. An explicit id must be unused; otherwise a v1 UUID
+// is minted.
 func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto storage.Storage, err error) {
 	port, err = s.getPort()
 	if err != nil {
@@ -444,22 +444,17 @@ func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto storage.
 			s.releasePort(port)
 		}
 	}()
-	var givenID string
 	if opt.ID != "" {
-		givenID = opt.ID
-	}
-	if givenID != "" {
 		s.mTorrents.RLock()
 		defer s.mTorrents.RUnlock()
-		if _, ok := s.torrents[givenID]; ok {
+		if _, ok := s.torrents[opt.ID]; ok {
 			err = errors.New("duplicate torrent id")
 			return
 		}
-		id = givenID
+		id = opt.ID
 	} else {
-		u1, err2 := uuid.NewV1()
-		if err2 != nil {
-			err = err2
+		var u1 [16]byte
+		if u1, err = newTorrentID(); err != nil {
 			return
 		}
 		id = base64.RawURLEncoding.EncodeToString(u1[:])
@@ -471,6 +466,7 @@ func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto storage.
 	return
 }
 
+// insertTorrent registers the torrent by id and info hash, announcing it.
 func (s *Session) insertTorrent(t *torrent) *Torrent {
 	t.log.Info("added torrent")
 	t2 := &Torrent{

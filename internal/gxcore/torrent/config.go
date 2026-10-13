@@ -9,6 +9,8 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 )
 
+// Client identity: peer id prefix, handshake client string and tracker user
+// agent all derive from the build version.
 var (
 	publicPeerIDPrefix                    = "-GX" + Version + "-"
 	publicExtensionHandshakeClientVersion = "gx-core " + Version
@@ -19,8 +21,11 @@ func init() {
 	metainfo.Creator = publicExtensionHandshakeClientVersion
 }
 
-// Config for Session.
+// Config tunes a Session. Copy DefaultConfig and adjust — never use the zero
+// value. Field names and yaml tags are the daemon's settings contract:
+// renaming either breaks stored configurations.
 type Config struct {
+	// Storage: where torrent bytes live.
 	// Database file to save resume data.
 	Database string `yaml:"database"`
 	// DataDir is where files are downloaded.
@@ -71,6 +76,8 @@ type Config struct {
 	MaxPieces uint32 `yaml:"max-pieces"`
 	// Time to wait when resolving host names for trackers and peers.
 	DNSResolveTimeout time.Duration `yaml:"dns-resolve-timeout"`
+
+	// Networking: single port, uTP, holepunch, egress control.
 	// ListenPort, when non-zero, is the single TCP port shared by all
 	// torrents. Zero keeps one port per torrent, the classic behaviour.
 	ListenPort uint16 `yaml:"listen-port"`
@@ -99,6 +106,8 @@ type Config struct {
 	// socks5://[user:pass@]host:port or http://[user:pass@]host:port. UDP
 	// trackers are disabled while it is set.
 	Proxy string `yaml:"proxy"`
+
+	// Selection: which files to fetch.
 	// FileSelection returns, for a torrent ID, the files to skip (one flag
 	// per non-padding file, true = do not download). Skipped files are kept
 	// in PartsDir/<id> instead of the save path. It is called
@@ -115,6 +124,8 @@ type Config struct {
 	FilePriorities func(torrentID string) []int `yaml:"-"`
 	// PartsDir holds the pieces of skipped files that border wanted ones.
 	PartsDir string `yaml:"parts-dir"`
+
+	// Limits and behavior.
 	// Global download speed limit in KB/s.
 	SpeedLimitDownload int64 `yaml:"speed-limit-download"`
 	// Global upload speed limit in KB/s.
@@ -129,6 +140,7 @@ type Config struct {
 	// Effective only when default storage provider is used.
 	FilePermissions fs.FileMode `yaml:"file-permissions"`
 
+	// RPC server (daemon control plane).
 	// Enable RPC server
 	RPCEnabled bool `yaml:"rpc-enabled"`
 	// Host to listen for RPC server
@@ -138,6 +150,7 @@ type Config struct {
 	// Time to wait for ongoing requests before shutting down RPC HTTP server.
 	RPCShutdownTimeout time.Duration `yaml:"rpc-shutdown-timeout"`
 
+	// DHT node.
 	// Enable DHT node.
 	DHTEnabled bool `yaml:"dht-enabled"`
 	// DHT node will listen on this IP.
@@ -154,6 +167,7 @@ type Config struct {
 	// Known routers to bootstrap local DHT node.
 	DHTBootstrapNodes []string `yaml:"dht-bootstrap-nodes"`
 
+	// Trackers.
 	// Number of peer addresses to request in announce request.
 	TrackerNumWant int `yaml:"tracker-num-want"`
 	// Time to wait for announcing stopped event.
@@ -173,6 +187,7 @@ type Config struct {
 	// Check and validate TLS ceritificates.
 	TrackerHTTPVerifyTLS bool `yaml:"tracker-http-verify-tls"`
 
+	// Peers: slots, queues and timeouts.
 	// Number of unchoked peers.
 	UnchokedPeers int `yaml:"unchoked-peers"`
 	// Number of optimistic unchoked peers.
@@ -205,6 +220,7 @@ type Config struct {
 	// Number of allowed-fast messages to send after handshake.
 	AllowedFastSet int `yaml:"allowed-fast-set"`
 
+	// Disk IO: caches and parallelism.
 	// Number of bytes to read when a piece is requested by a peer.
 	ReadCacheBlockSize int64 `yaml:"read-cache-block-size"`
 	// Number of cached bytes for piece read requests.
@@ -218,6 +234,7 @@ type Config struct {
 	// Number of bytes allocated in memory for downloading piece data.
 	WriteCacheSize int64 `yaml:"write-cache-size"`
 
+	// Encryption policy.
 	// When the client want to connect a peer, first it tries to do encrypted handshake.
 	// If it does not work, it connects to same peer again and does unencrypted handshake.
 	// This behavior can be changed via this variable.
@@ -227,13 +244,14 @@ type Config struct {
 	// Do not accept unencrypted connections.
 	ForceIncomingEncryption bool `yaml:"force-incoming-encryption"`
 
+	// Webseeds.
 	// TCP connect timeout for WebSeed sources
 	WebseedDialTimeout time.Duration `yaml:"webseed-dial-timeout"`
 	// TLS handshake timeout for WebSeed sources
 	WebseedTLSHandshakeTimeout time.Duration `yaml:"webseed-tls-handshake-timeout"`
 	// HTTP header timeout for WebSeed sources
 	WebseedResponseHeaderTimeout time.Duration `yaml:"webseed-response-header-timeout"`
-	// HTTP body read timeout for Webseed sources
+	// HTTP body read timeout for WebSeed sources
 	WebseedResponseBodyReadTimeout time.Duration `yaml:"webseed-response-body-read-timeout"`
 	// Retry interval for restarting failed downloads
 	WebseedRetryInterval time.Duration `yaml:"webseed-retry-interval"`
@@ -249,6 +267,7 @@ type Config struct {
 	// Number of maximum simulateous downloads from WebSeed sources.
 	WebseedMaxDownloads int `yaml:"webseed-max-downloads"`
 
+	// Hooks and overrides.
 	// Shell command to execute on torrent completion.
 	OnCompleteCmd []string `yaml:"on-complete-cmd"`
 
@@ -261,7 +280,9 @@ type Config struct {
 	Debug bool `yaml:"debug"`
 }
 
-// DefaultConfig for Session. Do not pass zero value Config to NewSession. Copy this struct and modify instead.
+// DefaultConfig seeds every Session. Copy it and adjust — never use the zero
+// value. The values below are behavior: changing any of them changes what
+// operators get out of the box.
 var DefaultConfig = Config{
 	// Session
 	Database:                               "$HOME/gx-core/session.db",

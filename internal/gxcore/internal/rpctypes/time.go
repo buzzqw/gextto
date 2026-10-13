@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-// Time is a wrapper around time.Time. Serialized as RFC3339 string.
+// Time is a time.Time that crosses the JSON-RPC boundary as an RFC3339
+// string instead of Go's default timestamp format.
 type Time struct {
 	time.Time
 }
@@ -15,19 +16,18 @@ var (
 	_ json.Unmarshaler = (*Time)(nil)
 )
 
-// MarshalJSON converts the time into RFC3339 string.
+// MarshalJSON implements json.Marshaler.
 func (t Time) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.Format(time.RFC3339))
 }
 
-// UnmarshalJSON sets the time from a RFC3339 string.
+// UnmarshalJSON implements json.Unmarshaler.
 func (t *Time) UnmarshalJSON(b []byte) error {
 	var s string
-	err := json.Unmarshal(b, &s)
-	if err != nil {
+	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	t2, err := time.Parse(time.RFC3339, s)
-	t.Time = t2
+	parsed, err := time.Parse(time.RFC3339, s)
+	t.Time = parsed
 	return err
 }

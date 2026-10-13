@@ -5,14 +5,18 @@ import (
 	"time"
 )
 
+// connection tracks one UDP tracker session: the initial connect handshake
+// plus the announce/scrape requests queued behind it. Once the transport's
+// run loop completes the connect, addr/id/connectedAt are filled in and the
+// queued requests go out with the negotiated connection id.
 type connection struct {
 	*requestBase
 	*connectRequest
 
-	// holds the announce requests that needs to be sent after the connection is successful.
+	// requests waits for the connect to succeed before being sent.
 	requests []udpRequest
 
-	// These fields are set by Transport.Run loop if connected successfully.
+	// Set by the Transport run loop on a successful connect.
 	addr        *net.UDPAddr
 	id          int64
 	connectedAt time.Time
@@ -20,6 +24,7 @@ type connection struct {
 
 var _ udpRequest = (*connection)(nil)
 
+// newConnection starts a session for req, issuing the connect first.
 func newConnection(req udpRequest) *connection {
 	return &connection{
 		requestBase:    newRequestBase(req.GetContext(), req.GetDest()),

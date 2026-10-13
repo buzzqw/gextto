@@ -5,7 +5,8 @@ import (
 	"strconv"
 )
 
-// StatusError is returned from HTTP tracker announces when the response code is not 200 OK.
+// StatusError reports an HTTP tracker response whose status is not 200 OK.
+// It carries the body so callers can surface the tracker's failure reason.
 type StatusError struct {
 	Code   int
 	Header http.Header

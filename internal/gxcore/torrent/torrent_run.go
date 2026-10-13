@@ -6,7 +6,10 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peersource"
 )
 
-// Torrent event loop
+// run is the torrent event loop: every subsystem (peers, trackers, storage,
+// timers) reports here over channels, and the loop mutates the torrent
+// state single-threaded. Public API calls arrive as commands carrying their
+// own behavior — torrent_commands.go lists what can come through commandC.
 func (t *torrent) run() {
 	t.seedDurationTicker = time.NewTicker(time.Second)
 	defer t.seedDurationTicker.Stop()
@@ -20,8 +23,6 @@ func (t *torrent) run() {
 			t.close()
 			close(t.doneC)
 			return
-		// Commands from the public API. Each carries its own behavior, so the
-		// senders in torrent_commands.go are the list of what can arrive here.
 		case f := <-t.commandC:
 			f()
 		case <-t.announcersStoppedC:

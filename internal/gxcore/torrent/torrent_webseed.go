@@ -13,91 +13,91 @@ import (
 	"go.etcd.io/bbolt"
 )
 
+// handleWebseedPieceResult settles one downloaded piece: errors disable the
+// source and restart the swarm; stale results for already-Done/ Writing
+// pieces are discarded (a concurrent peer copy won the race); fresh pieces
+// go to the write ring like peer pieces, and a finished range rotates the
+// source to a new one.
 func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 	if msg.Error != nil {
 		t.log.Debugln("webseed download error:", msg.Error)
-		// Possible causes:
-		// * Client.Do error
-		// * Unexpected status code
-		// * Response.Body.Read error
 		t.disableSource(msg.Downloader.URL, msg.Error, true)
 		t.webseedActiveDownloads--
 		t.startPieceDownloaders()
 		return
 	}
-
-	piece := &t.pieces[msg.Index]
-
-	// The piece may have already been completed by a peer that was downloading
-	// it concurrently: webseed ranges and peer downloads can overlap, and when
-	// a peer finishes such a piece the webseed range is only truncated after
-	// the fact (see WebseedStopAt). A result that was already in flight then
-	// arrives for a piece that is now Done. Writing it again would trip the
-	// "already have the piece" check in handlePieceWriteDone, so discard the
-	// stale result. This mirrors handlePieceMessage, which drops blocks whose
-	// downloader is no longer current.
-	//
-	// With the write ring buffer the result can also arrive while a peer's copy
-	// of the same piece is still being written (Writing): it is just as stale.
-	if piece.Done || piece.Writing {
-		t.log.Debugf("discarding already completed piece #%d from webseed %s", msg.Index, msg.Downloader.URL)
-		t.bytesWasted.Inc(int64(len(msg.Buffer.Data)))
-		msg.Buffer.Release()
-		if msg.Done {
-			for _, src := range t.webseedSources {
-				// Match by downloader identity: the source may already have a
-				// different (or no) downloader if it was closed elsewhere, in
-				// which case there is nothing to clean up here.
-				if src.Downloader != msg.Downloader {
-					continue
-				}
-				t.closeWebseedDownloader(src)
-				t.webseedActiveDownloads--
-				t.startPieceDownloaderForWebseed(src)
-				break
-			}
-		}
+	if piece := &t.pieces[msg.Index]; piece.Done || piece.Writing {
+		t.discardStaleWebseedPiece(msg)
 		return
 	}
-
 	t.log.Debugf("piece #%d downloaded from %s", msg.Index, msg.Downloader.URL)
 
-	t.bytesDownloaded.Inc(int64(len(msg.Buffer.Data)))
-	t.downloadSpeed.Mark(int64(len(msg.Buffer.Data)))
+	size := int64(len(msg.Buffer.Data))
+	t.bytesDownloaded.Inc(size)
+	t.downloadSpeed.Mark(size)
 	for _, src := range t.webseedSources {
 		if src.URL != msg.Downloader.URL {
 			continue
 		}
-		src.DownloadSpeed.Mark(int64(len(msg.Buffer.Data)))
+		src.DownloadSpeed.Mark(size)
 		break
 	}
 
+	piece := &t.pieces[msg.Index]
 	if piece.Writing {
 		t.crash("piece is already writing")
 	}
 	piece.Writing = true
 	t.cancelDuplicateDownloads(piece.Index)
-
-	// Bound the write ring buffer: the network keeps flowing while up to
-	// maxPendingWrites pieces are written.
 	t.beginPieceWrite()
 
 	pw := piecewriter.New(piece, msg.Downloader, msg.Buffer)
 	go pw.Run(t.pieceWriterResultC, t.doneC, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
 
 	if msg.Done {
-		for _, src := range t.webseedSources {
-			if src.URL != msg.Downloader.URL {
-				continue
-			}
-			t.closeWebseedDownloader(src)
-			t.webseedActiveDownloads--
-			t.startPieceDownloaderForWebseed(src)
-			break
-		}
+		t.rotateWebseedSource(msg.Downloader.URL)
 	}
 }
 
+// discardStaleWebseedPiece drops a result for a piece completed elsewhere
+// (peer copy, or a write still in flight): re-writing would trip the
+// already-have check downstream. A range that ended with it still rotates
+// its source, matched by downloader identity — the source may already carry
+// another downloader, in which case there is nothing to clean up.
+func (t *torrent) discardStaleWebseedPiece(msg *urldownloader.PieceResult) {
+	t.log.Debugf("discarding already completed piece #%d from webseed %s", msg.Index, msg.Downloader.URL)
+	t.bytesWasted.Inc(int64(len(msg.Buffer.Data)))
+	msg.Buffer.Release()
+	if !msg.Done {
+		return
+	}
+	for _, src := range t.webseedSources {
+		if src.Downloader != msg.Downloader {
+			continue
+		}
+		t.closeWebseedDownloader(src)
+		t.webseedActiveDownloads--
+		t.startPieceDownloaderForWebseed(src)
+		break
+	}
+}
+
+// rotateWebseedSource closes a finished range (matched by URL) and starts
+// the source's next one.
+func (t *torrent) rotateWebseedSource(url string) {
+	for _, src := range t.webseedSources {
+		if src.URL != url {
+			continue
+		}
+		t.closeWebseedDownloader(src)
+		t.webseedActiveDownloads--
+		t.startPieceDownloaderForWebseed(src)
+		break
+	}
+}
+
+// disableSource parks a failing source, optionally scheduling its retry in
+// a minute.
 func (t *torrent) disableSource(srcurl string, err error, retry bool) {
 	for _, src := range t.webseedSources {
 		if src.URL != srcurl {
@@ -113,6 +113,8 @@ func (t *torrent) disableSource(srcurl string, err error, retry bool) {
 	}
 }
 
+// notifyWebseedRetry re-offers a disabled source after a minute, unless the
+// torrent closed meanwhile.
 func (t *torrent) notifyWebseedRetry(src *webseedsource.WebseedSource) {
 	select {
 	case <-time.After(time.Minute):
@@ -124,8 +126,9 @@ func (t *torrent) notifyWebseedRetry(src *webseedsource.WebseedSource) {
 	}
 }
 
-// handleAddWebseeds appends web seed URLs at runtime, skipping the
-// duplicates and the configured maximum. It runs in the torrent goroutine.
+// handleAddWebseeds appends webseed URLs at runtime, skipping blanks,
+// duplicates and the configured ceiling, persisting the survivors. Sources
+// added while the picker is missing wait for the next start.
 func (t *torrent) handleAddWebseeds(urls []string) {
 	existing := make(map[string]struct{}, len(t.webseedSources)+len(urls))
 	for _, src := range t.webseedSources {
@@ -147,8 +150,6 @@ func (t *torrent) handleAddWebseeds(urls []string) {
 		t.webseedSources = append(t.webseedSources, src)
 		t.rawWebseedSources = append(t.rawWebseedSources, url)
 		existing[url] = struct{}{}
-		// The picker only exists between allocation and completion; while it is
-		// missing (stopped or finished) the source is used on the next start.
 		if t.piecePicker != nil {
 			t.piecePicker.AddWebseedSource(src)
 			t.startPieceDownloaderForWebseed(src)
@@ -157,8 +158,9 @@ func (t *torrent) handleAddWebseeds(urls []string) {
 	t.persistWebseeds()
 }
 
-// handleRemoveWebseeds drops web seed URLs by exact match at runtime. It runs
-// in the torrent goroutine.
+// handleRemoveWebseeds drops webseed URLs by exact match at runtime. A
+// downloading source's active slot is released here — its teardown never
+// passes through the piece-result path.
 func (t *torrent) handleRemoveWebseeds(urls []string) {
 	remove := make(map[string]struct{}, len(urls))
 	for _, url := range urls {
@@ -178,8 +180,6 @@ func (t *torrent) handleRemoveWebseeds(urls []string) {
 				t.closeWebseedDownloader(src)
 				t.piecePicker.RemoveWebseedSource(src)
 			}
-			// Closing the downloader does not go through
-			// handleWebseedPieceResult, so release its active slot here.
 			if wasDownloading && t.webseedActiveDownloads > 0 {
 				t.webseedActiveDownloads--
 			}
@@ -194,8 +194,8 @@ func (t *torrent) handleRemoveWebseeds(urls []string) {
 	t.startPieceDownloaders()
 }
 
-// persistWebseeds stores the current web seed URL list in the resume database,
-// so an added or removed source survives a session reload.
+// persistWebseeds stores the URL list in resume, so runtime additions and
+// removals survive a reload. An empty list deletes the key.
 func (t *torrent) persistWebseeds() {
 	raw := t.rawWebseedSources
 	_ = t.session.db.Update(func(tx *bbolt.Tx) error {

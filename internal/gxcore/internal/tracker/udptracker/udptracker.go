@@ -16,7 +16,9 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 )
 
-// UDPTracker is a torrent tracker that speaks UDP.
+// UDPTracker announces and scrapes over the UDP tracker protocol. The
+// connection handshake and retransmissions live in Transport; this type only
+// shapes requests and parses replies.
 type UDPTracker struct {
 	rawURL    string
 	dest      string
@@ -27,7 +29,7 @@ type UDPTracker struct {
 
 var _ tracker.Tracker = (*UDPTracker)(nil)
 
-// New returns a new UDPTracker.
+// New binds a tracker URL to a shared transport.
 func New(rawURL string, u *url.URL, t *Transport) *UDPTracker {
 	return &UDPTracker{
 		rawURL:    rawURL,
@@ -38,12 +40,12 @@ func New(rawURL string, u *url.URL, t *Transport) *UDPTracker {
 	}
 }
 
-// URL returns the URL string.
+// URL returns the configured tracker URL.
 func (t *UDPTracker) URL() string {
 	return t.rawURL
 }
 
-// Announce the torrent to UDP tracker.
+// Announce reports our progress and collects fresh peers.
 func (t *UDPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest) (*tracker.AnnounceResponse, error) {
 	announce := newTransportRequest(ctx, req, t.dest, t.urlData)
 
@@ -51,7 +53,6 @@ func (t *UDPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest) 
 	if err != nil {
 		return nil, err
 	}
-
 	response, peers, err := t.parseAnnounceResponse(reply)
 	if err != nil {
 		return nil, tracker.ErrDecode
@@ -66,13 +67,14 @@ func (t *UDPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest) 
 	}, nil
 }
 
+// parseAnnounceResponse decodes the fixed head and the trailing compact
+// peer list of an announce reply.
 func (t *UDPTracker) parseAnnounceResponse(data []byte) (*udpAnnounceResponse, []*net.TCPAddr, error) {
 	var response udpAnnounceResponse
-	err := binary.Read(bytes.NewReader(data), binary.BigEndian, &response)
-	if err != nil {
+	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, &response); err != nil {
 		return nil, nil, err
 	}
-	t.log.Debugf("annouceResponse: %#v", response)
+	t.log.Debugf("announceResponse: %#v", response)
 	if response.Action != actionAnnounce {
 		return nil, nil, errors.New("invalid action")
 	}
@@ -83,7 +85,7 @@ func (t *UDPTracker) parseAnnounceResponse(data []byte) (*udpAnnounceResponse, [
 	return &response, peers, nil
 }
 
-// Scrape asks the UDP tracker for swarm statistics (BEP 15, action 2).
+// Scrape fetches swarm totals for one info hash (BEP 15, action 2).
 func (t *UDPTracker) Scrape(ctx context.Context, req tracker.ScrapeRequest) (*tracker.ScrapeResponse, error) {
 	scrape := newTransportScrapeRequest(ctx, req.Torrent.InfoHash, t.dest)
 
@@ -91,7 +93,6 @@ func (t *UDPTracker) Scrape(ctx context.Context, req tracker.ScrapeRequest) (*tr
 	if err != nil {
 		return nil, err
 	}
-
 	response, err := t.parseScrapeResponse(reply)
 	if err != nil {
 		return nil, tracker.ErrDecode
@@ -100,6 +101,8 @@ func (t *UDPTracker) Scrape(ctx context.Context, req tracker.ScrapeRequest) (*tr
 	return response, nil
 }
 
+// parseScrapeResponse decodes the head plus the single per-hash body of a
+// scrape reply.
 func (t *UDPTracker) parseScrapeResponse(data []byte) (*tracker.ScrapeResponse, error) {
 	var header udpMessageHeader
 	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, &header); err != nil {
@@ -109,8 +112,7 @@ func (t *UDPTracker) parseScrapeResponse(data []byte) (*tracker.ScrapeResponse, 
 		return nil, errors.New("invalid action")
 	}
 	var response udpScrapeResponse
-	err := binary.Read(bytes.NewReader(data[binary.Size(header):]), binary.BigEndian, &response)
-	if err != nil {
+	if err := binary.Read(bytes.NewReader(data[binary.Size(header):]), binary.BigEndian, &response); err != nil {
 		return nil, err
 	}
 	return &tracker.ScrapeResponse{

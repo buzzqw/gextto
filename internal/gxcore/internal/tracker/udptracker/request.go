@@ -7,6 +7,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 )
 
+// transportRequest adapts a tracker-layer announce to the UDP wire.
 type transportRequest struct {
 	*requestBase
 	transferAnnounceRequest
@@ -14,6 +15,9 @@ type transportRequest struct {
 
 var _ udpRequest = (*transportRequest)(nil)
 
+// newTransportRequest builds the announce packet for req. The key echoes in
+// the peer id tail (bytes 16:20), a convention some trackers use to match
+// replies to senders behind NAT.
 func newTransportRequest(ctx context.Context, req tracker.AnnounceRequest, dest string, urlData string) *transportRequest {
 	request := &announceRequest{
 		InfoHash:   req.Torrent.InfoHash,
@@ -37,7 +41,7 @@ func newTransportRequest(ctx context.Context, req tracker.AnnounceRequest, dest 
 	}
 }
 
-// transportScrapeRequest carries one info hash to a UDP tracker (BEP 15, action 2).
+// transportScrapeRequest adapts a single-info-hash scrape to the UDP wire.
 type transportScrapeRequest struct {
 	*requestBase
 	*scrapeRequest
@@ -45,6 +49,7 @@ type transportScrapeRequest struct {
 
 var _ udpRequest = (*transportScrapeRequest)(nil)
 
+// newTransportScrapeRequest builds the scrape packet for one info hash.
 func newTransportScrapeRequest(ctx context.Context, infoHash [20]byte, dest string) *transportScrapeRequest {
 	request := &scrapeRequest{InfoHash: infoHash}
 	request.Action = actionScrape

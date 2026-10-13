@@ -6,20 +6,21 @@ import (
 	"math/rand/v2"
 )
 
+// transaction pairs one outgoing request with a random id and a child
+// context. The transport run loop cancels the context when the matching
+// reply arrives (or the exchange fails), releasing everyone waiting on it.
 type transaction struct {
 	id int32
 
-	// This can be a connection or announce request
+	// The in-flight exchange: a connect, announce or scrape request.
 	request udpRequest
 
-	// Child context of the request.
-	// Transaction has it's own sub-context.
-	// This context will be closed by run loop to signal waiters that the transaction is finished.
-	// Either successful or with error.
 	ctx    context.Context
 	cancel func()
 }
 
+// udpRequest is everything the transport needs to send an exchange and
+// deliver its outcome: wire serialization, addressing, and completion.
 type udpRequest interface {
 	io.WriterTo
 	SetTransactionID(int32)
@@ -31,6 +32,8 @@ type udpRequest interface {
 	SetResponse(data []byte, err error)
 }
 
+// newTransaction tags req with a random id and scopes it to a child of the
+// request context.
 func newTransaction(req udpRequest) *transaction {
 	t := &transaction{
 		id:      rand.Int32(), // nolint: gosec

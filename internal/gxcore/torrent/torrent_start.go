@@ -16,13 +16,14 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
+// start boots a stopped torrent: fresh channels and meters, completion
+// reopened for grown selections, then the pipeline matching the torrent's
+// state — metadata fetch, v2 layer fetch, direct download, verification or
+// allocation. Already-started torrents ignore the call.
 func (t *torrent) start() {
-	// Do not start if already started.
 	if t.errC != nil {
 		return
 	}
-
-	// Stop announcing Stopped event if in "Stopping" state.
 	if t.stoppedEventAnnouncer != nil {
 		t.stoppedEventAnnouncer.Close()
 		t.stoppedEventAnnouncer = nil
@@ -34,47 +35,51 @@ func (t *torrent) start() {
 	t.lastError = nil
 	t.downloadSpeed = metrics.NewMeter()
 	t.uploadSpeed = metrics.NewMeter()
-	// a selection that grew reopens a completed torrent before
-	// peers arrive (they are ignored while it counts as completed).
+	// A grown selection reopens a completed torrent before peers arrive
+	// (they are ignored while it reads as completed).
 	t.resetCompletionIfWantedMissing()
 
-	if t.info() != nil {
-		if t.info().NeedsV2Layers() && !t.info().HasPieceHashes() {
-			// A v2 torrent (usually a magnet reloaded from resume) whose piece
-			// layers are still missing: fetch them before allocating files.
-			t.addFixedPeers()
-			t.startAcceptor()
-			t.startAnnouncers()
-			t.startV2LayerDownload()
-		} else if t.pieces != nil {
-			if t.bitfield != nil {
-				t.addFixedPeers()
-				t.startAcceptor()
-				t.startAnnouncers()
-				t.startPieceDownloaders()
-			} else {
-				t.startVerifier()
-			}
-		} else {
-			t.startAllocator()
-		}
-	} else {
+	if t.info() == nil {
 		t.addFixedPeers()
 		t.startAcceptor()
 		t.startAnnouncers()
 		t.startInfoDownloaders()
+		return
 	}
+	if t.info().NeedsV2Layers() && !t.info().HasPieceHashes() {
+		// A v2 torrent (often a resume reloaded magnet) still missing its
+		// piece layers: fetch those before touching files.
+		t.addFixedPeers()
+		t.startAcceptor()
+		t.startAnnouncers()
+		t.startV2LayerDownload()
+		return
+	}
+	if t.pieces == nil {
+		t.startAllocator()
+		return
+	}
+	if t.bitfield == nil {
+		t.startVerifier()
+		return
+	}
+	t.addFixedPeers()
+	t.startAcceptor()
+	t.startAnnouncers()
+	t.startPieceDownloaders()
 }
 
+// startVerifier verifies with no merge.
 func (t *torrent) startVerifier() {
 	t.startMergeVerifier(nil, false)
 }
 
-// startMergeVerifier starts the verifier and, with candidates, runs the swarm
-// merge first inside the verifier goroutine: the run loop keeps answering
-// Stats/Stop/peers while pieces are read, hashed and copied. The merged pieces
-// are then not hashed again (Skip); with onlyMerged (storage created empty in
-// this run) nothing else is read either (Only), since nothing else can be valid.
+// startMergeVerifier runs the verifier, fronted by the swarm merge when
+// candidates exist: the merge's reads, hashes and writes run in the verifier
+// goroutine off the run loop, while Stats/Stop/peers keep answering here.
+// Merged pieces skip re-hashing (Skip, cleared after so a later manual check
+// verifies everything); with onlyMerged (storage created empty this run)
+// nothing else is even read (Only).
 func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool) {
 	if t.verifier != nil {
 		t.crash("verifier exists")
@@ -83,9 +88,6 @@ func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool) {
 		t.crash("zero length pieces")
 	}
 	t.verifier = verifier.New()
-	// Pieces the swarm merge already re-verified need no second read+hash: hand
-	// the set to the verifier and clear it, so a later manual re-check verifies
-	// everything.
 	if len(t.mergedPieces) > 0 {
 		merged := t.mergedPieces
 		t.mergedPieces = nil
@@ -111,6 +113,8 @@ func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool) {
 	go t.verifier.Run(t.pieces, t.verifierProgressC, t.verifierResultC)
 }
 
+// startAllocator opens the files, routing deselected ones to parts storage
+// (no parts storage means no skipping).
 func (t *torrent) startAllocator() {
 	if t.allocator != nil {
 		t.crash("allocator exists")
@@ -124,12 +128,15 @@ func (t *torrent) startAllocator() {
 	go t.allocator.RunSelected(t.info(), t.storage, skip, parts, t.allocatorProgressC, t.allocatorResultC)
 }
 
+// addFixedPeers queues the configured static peers.
 func (t *torrent) addFixedPeers() {
 	for _, pe := range t.fixedPeers {
 		_ = t.addPeerString(pe)
 	}
 }
 
+// startAnnouncers launches tracker announcers once, plus the DHT announcer
+// for public swarms when the DHT runs.
 func (t *torrent) startAnnouncers() {
 	if len(t.announcers) == 0 {
 		for _, tr := range t.trackers {
@@ -142,6 +149,8 @@ func (t *torrent) startAnnouncers() {
 	}
 }
 
+// startNewAnnouncer attaches one tracker with the session's announce
+// telemetry hook (dropped silently once the session is gone).
 func (t *torrent) startNewAnnouncer(tr tracker.Tracker) {
 	an := announcer.NewPeriodicalAnnouncer(
 		tr,
@@ -169,9 +178,10 @@ func (t *torrent) startNewAnnouncer(tr tracker.Tracker) {
 	go an.Run()
 }
 
+// startAcceptor listens for peers: the shared session port when configured
+// (announcing it without blocking), else one socket per torrent.
 func (t *torrent) startAcceptor() {
 	if t.session.sharedPort() {
-		// The session listens for everyone on the shared port.
 		t.port = int(t.session.config.ListenPort)
 		select {
 		case t.portC <- t.port:
@@ -194,6 +204,8 @@ func (t *torrent) startAcceptor() {
 	}
 }
 
+// startInfoDownloaders tops the metadata fetch window, skipping snubbed
+// peers.
 func (t *torrent) startInfoDownloaders() {
 	if t.info() != nil {
 		return
@@ -210,14 +222,15 @@ func (t *torrent) startInfoDownloaders() {
 	}
 }
 
+// startPieceDownloaders feeds webseeds first, then every peer. Only
+// Downloading torrents fetch.
 func (t *torrent) startPieceDownloaders() {
 	if t.status() != Downloading {
 		return
 	}
 	for _, src := range t.webseedSources {
 		if !src.Downloading() && !src.Disabled {
-			started := t.startPieceDownloaderForWebseed(src)
-			if !started {
+			if started := t.startPieceDownloaderForWebseed(src); !started {
 				break
 			}
 		}
@@ -227,11 +240,10 @@ func (t *torrent) startPieceDownloaders() {
 	}
 }
 
-// fillPeerDownloads starts pieces for the peer until it reaches the
-// multi-piece cap (maxPiecesPerPeer) or no piece is available. A peer always
-// gets a first piece; an extra one only when the pipe has room (pipeHasRoom),
-// so a piece large enough to keep the request window full does not reserve a
-// second piece buffer for nothing.
+// fillPeerDownloads opens pieces for pe up to the multi-piece cap. The
+// first piece always opens; further ones only with pipe room, so a piece
+// wide enough to fill the request window never reserves a second buffer for
+// nothing.
 func (t *torrent) fillPeerDownloads(pe *peer.Peer) {
 	for n := len(t.pieceDownloaders[pe]); n < maxPiecesPerPeer; n = len(t.pieceDownloaders[pe]) {
 		if n > 0 && !t.pipeHasRoom(pe) {
@@ -243,9 +255,9 @@ func (t *torrent) fillPeerDownloads(pe *peer.Peer) {
 	}
 }
 
-// pipeHasRoom reports whether the peer's request window has room that its
-// current pieces cannot fill: every block is already requested and fewer than
-// maxAllowedRequests are in flight. Only then is a further piece worth its RAM.
+// pipeHasRoom reports a request window with room no current piece can fill:
+// every block already requested, fewer in flight than allowed. Only then is
+// another piece worth its RAM.
 func (t *torrent) pipeHasRoom(pe *peer.Peer) bool {
 	pending := 0
 	for _, pd := range t.pieceDownloaders[pe] {
@@ -257,6 +269,8 @@ func (t *torrent) pipeHasRoom(pe *peer.Peer) bool {
 	return pending < t.maxAllowedRequests(pe)
 }
 
+// startPieceDownloaderForWebseed opens one webseed range within the active
+// download budget and only while downloading.
 func (t *torrent) startPieceDownloaderForWebseed(src *webseedsource.WebseedSource) (started bool) {
 	if t.webseedActiveDownloads >= t.session.config.WebseedMaxDownloads {
 		return false
@@ -273,6 +287,8 @@ func (t *torrent) startPieceDownloaderForWebseed(src *webseedsource.WebseedSourc
 	return true
 }
 
+// startWebseedDownloader runs one range fetch, binding it to its source
+// (fresh meter, enabled) unless already bound.
 func (t *torrent) startWebseedDownloader(sp *piecepicker.WebseedDownloadSpec) {
 	t.log.Debugf("downloading pieces %d-%d from webseed %s", sp.Begin, sp.End, sp.Source.URL)
 	ud := urldownloader.New(sp.Source.URL, sp.Begin, sp.End, t.bucketDownload)
@@ -292,14 +308,16 @@ func (t *torrent) startWebseedDownloader(sp *piecepicker.WebseedDownloadSpec) {
 	go ud.Run(t.webseedClient, t.pieces, len(t.info().Files) > 1, t.webseedPieceResultC.SendC(), t.piecePool, t.session.config.WebseedResponseBodyReadTimeout)
 }
 
-// maxPiecesPerPeer is how many pieces of one torrent a peer may download at the
-// same time. Above one, a peer whose current piece has fewer blocks than its
-// request budget keeps the pipe full on a second piece instead of idling; the
-// extra piece is opened only when the pipe really has room (pipeHasRoom), and
-// the service stays bounded by the shared request budget and by the RAM
-// reserved per piece.
+// maxPiecesPerPeer caps one peer's concurrent pieces: past the first, a
+// peer whose piece underfills its request budget keeps the pipe full on a
+// second piece instead of idling. The extra piece opens only with real pipe
+// room, and everything stays bounded by the shared request budget and the
+// per-piece RAM reservation.
 const maxPiecesPerPeer = 2
 
+// startPieceDownloaderFor opens one more piece for pe: never past the cap,
+// never while not downloading, through the RAM budget when one exists (an
+// already-queued request waits for its grant on ramNotifyC instead).
 func (t *torrent) startPieceDownloaderFor(pe *peer.Peer) bool {
 	if t.status() != Downloading {
 		return false
@@ -314,18 +332,18 @@ func (t *torrent) startPieceDownloaderFor(pe *peer.Peer) bool {
 		return t.startSinglePieceDownloader(pe)
 	}
 	if pe.RAMQueued {
-		// A request is already waiting for this peer: its grant arrives on
-		// ramNotifyC and starts the piece then.
 		return false
 	}
-	ok := t.session.ram.Request(t.id, pe, int64(t.info().PieceLength), t.ramNotifyC, pe.Done())
-	if !ok {
+	if ok := t.session.ram.Request(t.id, pe, int64(t.info().PieceLength), t.ramNotifyC, pe.Done()); !ok {
 		pe.RAMQueued = true
 		return false
 	}
 	return t.startSinglePieceDownloader(pe)
 }
 
+// startSinglePieceDownloader picks and opens one piece, refunding the RAM
+// reservation when nothing starts. A duplicate opener for the same piece is
+// a bug and crashes.
 func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) (started bool) {
 	defer func() {
 		if !started && t.session.ram != nil {
@@ -359,11 +377,10 @@ func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) (started bool) {
 	return true
 }
 
-// requestBlocks refills the peer's in-flight block requests across all of its
-// pieces, sharing one budget (maxAllowedRequests) between them so multi-piece
-// pipelining does not multiply the in-flight window: the budget is what is
-// left after the requests already pending on every piece. It reports whether
-// the window still has room that no current piece can fill (pipeHasRoom).
+// requestBlocks shares one in-flight budget (maxAllowedRequests minus
+// everything already pending across the peer's pieces) between those
+// pieces, topping each up in turn. It reports pipe room the current pieces
+// cannot fill.
 func (t *torrent) requestBlocks(pe *peer.Peer) (room bool) {
 	m := t.pieceDownloaders[pe]
 	budget := t.maxAllowedRequests(pe)
@@ -373,8 +390,8 @@ func (t *torrent) requestBlocks(pe *peer.Peer) (room bool) {
 	remaining := 0
 	for _, pd := range m {
 		if budget > 0 {
-			// RequestBlocks caps the piece's own pending count, so the
-			// shared budget is added on top of what it already has in flight.
+			// RequestBlocks caps at the piece's own pending count, so the
+			// shared remainder stacks on top of its in-flight requests.
 			budget -= pd.RequestBlocks(pd.Pending() + budget)
 		}
 		remaining += pd.Remaining()
@@ -382,6 +399,8 @@ func (t *torrent) requestBlocks(pe *peer.Peer) (room bool) {
 	return budget > 0 && remaining == 0
 }
 
+// maxAllowedRequests is the peer's in-flight target: initialized from
+// DefaultRequestsOut, clamped into [1, cap].
 func (t *torrent) maxAllowedRequests(pe *peer.Peer) int {
 	cap := t.requestQueueCap(pe)
 	if pe.RequestQueue <= 0 {
@@ -396,8 +415,8 @@ func (t *torrent) maxAllowedRequests(pe *peer.Peer) int {
 	return pe.RequestQueue
 }
 
-// requestQueueCap is the hard cap on in-flight requests for the peer: its
-// advertised reqq (if any) or MaxRequestsOut, never above MaxRequestsOut.
+// requestQueueCap hard-caps in-flight requests: the peer's advertised reqq
+// when smaller, else MaxRequestsOut, at least 1.
 func (t *torrent) requestQueueCap(pe *peer.Peer) int {
 	cap := t.session.config.MaxRequestsOut
 	if pe.ExtensionHandshake != nil && pe.ExtensionHandshake.RequestQueue > 0 && pe.ExtensionHandshake.RequestQueue < cap {
@@ -409,10 +428,9 @@ func (t *torrent) requestQueueCap(pe *peer.Peer) int {
 	return cap
 }
 
-// boostRequestQueue raises the peer's in-flight target by one, up to the cap, as
-// the peer keeps delivering blocks. This is the adaptive part of the request
-// queue depth: a fast peer slides towards MaxRequestsOut instead of staying at
-// the fixed DefaultRequestsOut.
+// boostRequestQueue grows the in-flight target by one toward the cap as the
+// peer delivers: the adaptive depth that lets fast peers slide to
+// MaxRequestsOut instead of sitting at DefaultRequestsOut.
 func (t *torrent) boostRequestQueue(pe *peer.Peer) {
 	cap := t.requestQueueCap(pe)
 	if pe.RequestQueue <= 0 {
@@ -423,8 +441,8 @@ func (t *torrent) boostRequestQueue(pe *peer.Peer) {
 	}
 }
 
-// resetRequestQueue lowers the target back to the base after a choke (or a
-// stall), so a peer that stops delivering is not kept with a deep queue.
+// resetRequestQueue drops the target to the base after a choke or stall, so
+// a quiet peer keeps no deep queue.
 func (t *torrent) resetRequestQueue(pe *peer.Peer) {
 	pe.RequestQueue = min(t.session.config.DefaultRequestsOut, t.requestQueueCap(pe))
 }

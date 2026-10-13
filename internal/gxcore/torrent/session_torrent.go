@@ -19,143 +19,139 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-// Torrent is created from a torrent file or a magnet link.
+// Torrent is the public handle of one session torrent. It forwards to the
+// run-loop-owned state; the query/command helpers in torrent_commands.go
+// carry the calls across.
 type Torrent struct {
 	torrent *torrent
 }
 
-// InfoHash is the unique value that represents the files in a torrent.
+// InfoHash is the 20-byte torrent identity, hex-rendered as 40 chars.
 type InfoHash [20]byte
 
-// String encodes info hash in hex as 40 characters.
+// String hex-encodes the info hash.
 func (h InfoHash) String() string {
 	return hex.EncodeToString(h[:])
 }
 
-// ID is a unique identifier in the Session.
+// ---------------------------------------------------------------------------
+// Identity and views
+// ---------------------------------------------------------------------------
+
+// ID is the session-unique torrent id.
 func (t *Torrent) ID() string {
 	return t.torrent.id
 }
 
-// Name of the torrent.
-// For magnet downloads name can change after metadata is downloaded but this method still returns the initial name.
-// Use Stats() method to get name in info dictionary.
+// Name is the torrent name (the initial one for magnets; Stats carries the
+// info-dict name once known).
 func (t *Torrent) Name() string {
 	return t.torrent.Name()
 }
 
-// Collections returns the BEP 38 "collections" identifiers of the torrent: the
-// groups it belongs to, used to find local data that can be reused. Empty when
-// the torrent carries no hint (or its metadata is not ready yet).
+// Collections returns the BEP 38 collection hints for local-data reuse;
+// empty without hints or metadata.
 func (t *Torrent) Collections() []string {
 	return t.torrent.Collections()
 }
 
-// SimilarTorrents returns the BEP 38 "similar" info hashes of the torrent:
-// torrents that might share files with it, used to find local data to reuse.
+// SimilarTorrents returns the BEP 38 similar info hashes for local-data reuse.
 func (t *Torrent) SimilarTorrents() [][20]byte {
 	return t.torrent.Similar()
 }
 
-// Dir returns the directory that contains the files in the torrent.
+// Dir holds the torrent's files.
 func (t *Torrent) Dir() string {
 	return t.torrent.Dir()
 }
 
-// Files in the torrent. An error is returned when metainfo isn't ready.
+// Files lists the files; it fails before metadata arrives.
 func (t *Torrent) Files() ([]File, error) {
 	return t.torrent.Files()
 }
 
-// FileStats returns statistics about each file in the torrent. An error is returned when torrent is not running.
+// FileStats reports per-file completion; it fails while stopped.
 func (t *Torrent) FileStats() ([]FileStats, error) {
 	return t.torrent.FileStats()
 }
 
-// InfoHash returns the hash of the info dictionary of torrent file.
-// Two different torrents may have the same info hash.
+// InfoHash identifies the torrent's files (shared across duplicate adds).
 func (t *Torrent) InfoHash() InfoHash {
 	var ih InfoHash
 	copy(ih[:], t.torrent.InfoHash())
 	return ih
 }
 
-// AddedAt returns the time that the torrent is added.
+// AddedAt is the add time.
 func (t *Torrent) AddedAt() time.Time {
 	return t.torrent.addedAt
 }
 
-// Stats returns statistics about the torrent.
+// Stats snapshots the torrent.
 func (t *Torrent) Stats() Stats {
 	return t.torrent.Stats()
 }
 
-// Magnet returns the magnet link.
-// Returns error if torrent is private.
+// Magnet exports the link; private torrents refuse.
 func (t *Torrent) Magnet() (string, error) {
 	return t.torrent.Magnet()
 }
 
-// Torrent returns the metainfo bytes (contents of .torrent file).
-// Returns error if torrent has no metadata yet.
+// Torrent exports the .torrent bytes; it fails before metadata arrives.
 func (t *Torrent) Torrent() ([]byte, error) {
 	return t.torrent.Torrent()
 }
 
-// Trackers returns the list of trackers of this torrent.
+// Trackers lists the torrent's trackers.
 func (t *Torrent) Trackers() []Tracker {
 	return t.torrent.Trackers()
 }
 
-// Peers returns the list of connected (handshake completed) peers of the torrent.
+// Peers lists the handshaked peers.
 func (t *Torrent) Peers() []Peer {
 	return t.torrent.Peers()
 }
 
-// Webseeds returns the list of WebSeed sources in the torrent.
+// Webseeds lists the HTTP sources.
 func (t *Torrent) Webseeds() []Webseed {
 	return t.torrent.Webseeds()
 }
 
-// Port returns the TCP port number that the torrent is listening peers.
+// Port is the listening peer port.
 func (t *Torrent) Port() int {
 	return t.torrent.port
 }
 
-// NotifyClose returns a channel for notifying removal/closure.  The
-// channel is closed once RemoveTorrent() is called, dropping it from
-// the session.
+// NotifyClose fires on RemoveTorrent.
 func (t *Torrent) NotifyClose() <-chan struct{} {
 	return t.torrent.NotifyClose()
 }
 
-// NotifyStop returns a new channel for notifying stop event.
-// Value from the channel contains the error if there is any, otherwise the value is nil.
-// NotifyStop must be called after calling Start().
+// NotifyStop carries the stop error; call after Start.
 func (t *Torrent) NotifyStop() <-chan error {
 	return t.torrent.NotifyError()
 }
 
-// NotifyComplete returns a channel for notifying completion.
-// The channel is closed once all torrent pieces are downloaded successfully.
-// NotifyComplete must be called after calling Start().
+// NotifyComplete fires on download completion; call after Start.
 func (t *Torrent) NotifyComplete() <-chan struct{} {
 	return t.torrent.NotifyComplete()
 }
 
-// NotifyMetadata returns a channel for notifying completion of metadata download from magnet links.
-// The channel is closed once all metadata pieces are downloaded successfully.
-// NotifyMetadata must be called after calling Start().
+// NotifyMetadata fires on magnet metadata arrival; call after Start.
 func (t *Torrent) NotifyMetadata() <-chan struct{} {
 	return t.torrent.NotifyMetadata()
 }
 
-// AddPeer adds a new peer to the torrent. Does nothing if torrent is stopped.
+// ---------------------------------------------------------------------------
+// Swarm membership
+// ---------------------------------------------------------------------------
+
+// AddPeer queues a peer; silent while stopped.
 func (t *Torrent) AddPeer(addr string) error {
 	return t.torrent.addPeerString(addr)
 }
 
-// AddTracker adds a new tracker to the torrent.
+// AddTracker appends a tracker and persists it in resume.
 func (t *Torrent) AddTracker(uri string) error {
 	var private bool
 	if t.torrent.info() != nil {
@@ -169,8 +165,7 @@ func (t *Torrent) AddTracker(uri string) error {
 		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.torrent.id))
 		value := b.Get(boltdbresumer.Keys.Trackers)
 		var trackers [][]string
-		err = json.Unmarshal(value, &trackers)
-		if err != nil {
+		if err := json.Unmarshal(value, &trackers); err != nil {
 			return err
 		}
 		trackers = append(trackers, []string{uri})
@@ -187,10 +182,9 @@ func (t *Torrent) AddTracker(uri string) error {
 	return nil
 }
 
-// SetTrackers replaces the torrent's tracker list: an empty list
-// removes every tracker, like libtorrent. Peers already connected are left
-// alone; the removed trackers get a best-effort "stopped" announce, and the new
-// list is persisted so `Trackers()` and the resume data reflect the change.
+// SetTrackers hot-swaps the tracker list (empty removes all, libtorrent
+// style): connected peers stay, departed trackers get a best-effort stopped
+// announce, and resume follows the new list.
 func (t *Torrent) SetTrackers(uris []string) error {
 	private := t.torrent.info() != nil && t.torrent.info().Private
 	var (
@@ -235,56 +229,53 @@ func (t *Torrent) SetTrackers(uris []string) error {
 	return nil
 }
 
-// AddWebseeds adds web seed URLs to the torrent at runtime,
-// without reopening it; duplicates and the configured maximum are ignored.
+// AddWebseeds appends webseed URLs live; duplicates and the ceiling are
+// ignored.
 func (t *Torrent) AddWebseeds(urls []string) error {
 	t.torrent.sendCommand(func() { t.torrent.handleAddWebseeds(urls) })
 	return nil
 }
 
-// RemoveWebseeds removes web seed URLs (exact match) at runtime.
+// RemoveWebseeds drops webseed URLs by exact match, live.
 func (t *Torrent) RemoveWebseeds(urls []string) error {
 	t.torrent.sendCommand(func() { t.torrent.handleRemoveWebseeds(urls) })
 	return nil
 }
 
-// SetSequential enables or disables sequential download on the running torrent;
-// unlike the add-time option it takes effect at once.
+// ---------------------------------------------------------------------------
+// Runtime tuning
+// ---------------------------------------------------------------------------
+
+// SetSequential toggles sequential download on the running torrent.
 func (t *Torrent) SetSequential(sequential bool) error {
 	t.torrent.sendCommand(func() { t.torrent.setOrder(sequential, t.torrent.firstLast) })
 	return nil
 }
 
-// SetFirstLast enables or disables the first/last-piece priority on the running
-// torrent.
+// SetFirstLast toggles the file-ends-first priority on the running torrent.
 func (t *Torrent) SetFirstLast(firstLast bool) error {
 	t.torrent.sendCommand(func() { t.torrent.setOrder(t.torrent.sequential, firstLast) })
 	return nil
 }
 
-// Sequential reports whether sequential download is enabled.
+// Sequential reports the sequential flag.
 func (t *Torrent) Sequential() bool {
 	return query(t.torrent, func() bool { return t.torrent.sequential })
 }
 
-// SetSuperSeeding enables or disables BEP 16 super-seeding on the running
-// torrent. It takes effect when the torrent is complete: the seed
-// advertises one piece at a time and serves only that piece, so the swarm
-// spreads the data. It is a seeding strategy only and never touches the queue,
-// the seed policy or the bandwidth limits.
+// SetSuperSeeding toggles BEP 16 super-seeding live; it bites once complete.
 func (t *Torrent) SetSuperSeeding(superSeeding bool) error {
 	t.torrent.sendCommand(func() { t.torrent.setSuperSeeding(superSeeding) })
 	return nil
 }
 
-// SuperSeeding reports whether super-seeding is enabled.
+// SuperSeeding reports the super-seeding flag.
 func (t *Torrent) SuperSeeding() bool {
 	return query(t.torrent, func() bool { return t.torrent.superSeeding })
 }
 
-// SelectOnly returns the BEP 53 "so" file selection of the torrent (non-padding
-// file indices), or nil when every file is wanted. It is the seed applied while
-// the embedding app provides no Config.FileSelection of its own.
+// SelectOnly reads the BEP 53 "so" seed (nil wants everything). It copies:
+// the caller must not mutate engine state.
 func (t *Torrent) SelectOnly() []int {
 	wanted := t.torrent.getSelectOnly()
 	if len(wanted) == 0 {
@@ -293,27 +284,23 @@ func (t *Torrent) SelectOnly() []int {
 	return append([]int(nil), wanted...)
 }
 
-// ClearSelectOnly drops the BEP 53 "so" seed, so the app's Config.FileSelection
-// (or "every file wanted") is authoritative from now on. The daemon calls it
-// once it has recorded the seed as an explicit file selection.
+// ClearSelectOnly drops the "so" seed, restoring Config.FileSelection (or
+// want-everything) as authoritative. The daemon calls it after recording
+// the seed explicitly.
 func (t *Torrent) ClearSelectOnly() {
 	t.torrent.setSelectOnly(nil)
 }
 
-// RefreshSelection re-reads Config.FilePriorities/FileSelection and applies the
-// new per-piece priorities on the running torrent, without restarting it. It is
-// used when the app changes only the priority levels (the set of skipped files
-// is unchanged); changing which files are downloaded still goes through the
-// stop/relocate/start path.
+// RefreshSelection reapplies Config.FilePriorities/FileSelection live,
+// without restarting. Only priority levels change here; a different skipped
+// set still needs stop/relocate/start.
 func (t *Torrent) RefreshSelection() {
 	t.torrent.sendCommand(func() { t.torrent.applySkippedPieces() })
 }
 
-// PieceStates returns the state of every piece, in index order:
-// "have", "downloading", "skipped" or "" (missing). The second value is false
-// when the torrent has no metadata/pieces yet. Once completed the engine drops the
-// piece picker, so the states are derived from the pieces and the picker is
-// consulted only for the "downloading" ones.
+// PieceStates maps every piece to "have", "downloading", "skipped" or ""
+// (missing), in index order. False means no metadata/pieces yet. Past
+// completion the picker is gone, so only "downloading" consults it.
 func (t *Torrent) PieceStates() ([]string, bool) {
 	states := query(t.torrent, func() []string {
 		pieces := t.torrent.pieces
@@ -338,36 +325,37 @@ func (t *Torrent) PieceStates() ([]string, bool) {
 	return states, states != nil
 }
 
-// Start downloading the torrent. If all pieces are completed, starts seeding them.
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+
+// Start downloads (seeding past completion), persisting the started flag.
 func (t *Torrent) Start() error {
-	err := t.torrent.session.resumer.WriteStarted(t.torrent.id, true)
-	if err != nil {
+	if err := t.torrent.session.resumer.WriteStarted(t.torrent.id, true); err != nil {
 		return err
 	}
 	t.torrent.Start()
 	return nil
 }
 
-// Stop the torrent. Does not block. After Stop is called, the torrent switches into Stopping state.
-// During Stopping state, a stop event sent to trackers with a timeout.
-// At most 5 seconds later, the torrent switches into Stopped state.
+// Stop halts without blocking; Stopping announces stopped, then Stopped
+// follows (within ~5 s), persisting the cleared flag.
 func (t *Torrent) Stop() error {
-	err := t.torrent.session.resumer.WriteStarted(t.torrent.id, false)
-	if err != nil {
+	if err := t.torrent.session.resumer.WriteStarted(t.torrent.id, false); err != nil {
 		return err
 	}
 	t.torrent.Stop()
 	return nil
 }
 
-// Announce the torrent to all trackers and DHT. It does not overrides the minimum interval value sent by the trackers or set in Config.
+// Announce asks trackers and DHT for peers now (minimum intervals still
+// apply).
 func (t *Torrent) Announce() {
 	t.torrent.Announce()
 }
 
-// Verify pieces of torrent by reading all of the torrents files from disk.
-// After Verify called, the torrent is stopped, then verification starts and the torrent switches into Verifying state.
-// The torrent stays stopped after verification finishes.
+// Verify re-hashes every file from disk: the torrent stops, verifies, and
+// stays stopped.
 func (t *Torrent) Verify() error {
 	err := t.torrent.session.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.torrent.id))
@@ -380,8 +368,12 @@ func (t *Torrent) Verify() error {
 	return nil
 }
 
-// Move torrent to another Session.
-// target must be the RPC server address in host:port form.
+// ---------------------------------------------------------------------------
+// Session transfer
+// ---------------------------------------------------------------------------
+
+// Move pushes the torrent to another session's /move-torrent endpoint
+// (host:port) and drops the local copy keeping its data.
 func (t *Torrent) Move(target string) error {
 	t.torrent.Stop()
 	spec, err := t.torrent.session.resumer.Read(t.torrent.id)
@@ -409,6 +401,8 @@ func (t *Torrent) Move(target string) error {
 	return t.torrent.session.RemoveTorrent(t.torrent.id, true)
 }
 
+// prepareBody streams the id, JSON metadata and tarred data parts, failing
+// the pipe on the first error.
 func (t *Torrent) prepareBody(pw *io.PipeWriter, mw *multipart.Writer, spec *boltdbresumer.Spec) {
 	var err error
 	defer func() { _ = pw.CloseWithError(err) }()
@@ -418,8 +412,7 @@ func (t *Torrent) prepareBody(pw *io.PipeWriter, mw *multipart.Writer, spec *bol
 		t.torrent.log.Errorln("cannot create id form filed:", err)
 		return
 	}
-	_, err = iw.Write([]byte(t.torrent.id))
-	if err != nil {
+	if _, err = iw.Write([]byte(t.torrent.id)); err != nil {
 		t.torrent.log.Errorln("cannot write id:", err)
 		return
 	}
@@ -428,8 +421,7 @@ func (t *Torrent) prepareBody(pw *io.PipeWriter, mw *multipart.Writer, spec *bol
 		t.torrent.log.Errorln("cannot create metadata form filed:", err)
 		return
 	}
-	err = json.NewEncoder(fw).Encode(spec)
-	if err != nil {
+	if err = json.NewEncoder(fw).Encode(spec); err != nil {
 		t.torrent.log.Errorln("cannot encode resumer spec:", err)
 		return
 	}
@@ -440,18 +432,18 @@ func (t *Torrent) prepareBody(pw *io.PipeWriter, mw *multipart.Writer, spec *bol
 	}
 	tpr, tpw := io.Pipe()
 	go t.generateTar(tpw)
-	_, err = io.Copy(dw, tpr)
-	if err != nil {
+	if _, err = io.Copy(dw, tpr); err != nil {
 		t.torrent.log.Errorln("error copying pipe:", err)
 		return
 	}
-	err = mw.Close()
-	if err != nil {
+	if err = mw.Close(); err != nil {
 		t.torrent.log.Errorln("cannot close multipart writer:", err)
 		return
 	}
 }
 
+// generateTar streams the torrent's data dir as a tar of regular files
+// (0600, paths relative to the root). A vanished root transfers empty.
 func (t *Torrent) generateTar(pw *io.PipeWriter) {
 	var err error
 	defer func() { _ = pw.CloseWithError(err) }()
@@ -476,8 +468,7 @@ func (t *Torrent) generateTar(pw *io.PipeWriter) {
 			Mode: 0600,
 			Size: info.Size(),
 		}
-		err = tw.WriteHeader(hdr)
-		if err != nil {
+		if err := tw.WriteHeader(hdr); err != nil {
 			t.torrent.log.Errorln("cannot write tar header:", err)
 			return err
 		}
@@ -503,8 +494,7 @@ func (t *Torrent) generateTar(pw *io.PipeWriter) {
 		t.torrent.log.Errorln("error walking files:", err)
 		return
 	}
-	err = tw.Close()
-	if err != nil {
+	if err = tw.Close(); err != nil {
 		t.torrent.log.Errorln("cannot close tar writer:", err)
 		return
 	}

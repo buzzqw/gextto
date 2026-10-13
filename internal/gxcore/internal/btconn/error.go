@@ -8,6 +8,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 )
 
+// Sentinel handshake failures: the peer is wrong, not us.
 var (
 	errInvalidInfoHash = &HandshakeError{"invalid info hash"}
 	errOwnConnection   = &HandshakeError{"dropped own connection"}
@@ -15,7 +16,7 @@ var (
 	errInvalidProtocol = &HandshakeError{"invalid protocol"}
 )
 
-// HandshakeError is an error while doing the protocol handshake.
+// HandshakeError describes a failure of the BitTorrent handshake phase.
 type HandshakeError struct {
 	message string
 }
@@ -24,10 +25,10 @@ func (e *HandshakeError) Error() string {
 	return e.message
 }
 
-// LogHandshakeError logs the common, expected handshake failure modes (peer
-// closing the connection, network and protocol errors) at debug level and
-// reports whether it handled err. When it returns false the failure is
-// unexpected and the caller should log err itself, at whatever level fits.
+// LogHandshakeError reports the routine, expected handshake failures
+// (peer hangups, network errors, protocol violations) at debug level and
+// returns true when it handled err. A false return means the failure is
+// surprising: the caller must log it itself, at a level of its choice.
 func LogHandshakeError(log logger.Logger, err error) bool {
 	var opErr *net.OpError
 	var hsErr *HandshakeError

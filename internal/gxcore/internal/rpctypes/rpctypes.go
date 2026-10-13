@@ -1,6 +1,18 @@
 package rpctypes
 
-// Torrent in a Session.
+// This file defines the JSON-RPC surface between the gx-core engine and its
+// host (the gx-torrent daemon): one Request/Response pair per Session method
+// plus the shared entity and statistics shapes.
+//
+// Field names and declaration order are wire-critical: responses are encoded
+// with encoding/json, so any rename or reorder changes what API clients see.
+// Reorganize freely, but never alter a field.
+
+// ---------------------------------------------------------------------------
+// Entities
+// ---------------------------------------------------------------------------
+
+// Torrent is a torrent registered in the session.
 type Torrent struct {
 	ID       string
 	Name     string
@@ -9,7 +21,7 @@ type Torrent struct {
 	AddedAt  Time
 }
 
-// Peer of a Torrent.
+// Peer is a peer connected to a torrent.
 type Peer struct {
 	ID                 string
 	Client             string
@@ -29,14 +41,14 @@ type Peer struct {
 	UploadSpeed        int
 }
 
-// Webseed source of a Torrent.
+// Webseed is a URL seed attached to a torrent.
 type Webseed struct {
 	URL           string
 	Error         string
 	DownloadSpeed int
 }
 
-// Tracker of a Torrent.
+// Tracker is a tracker announced to by a torrent.
 type Tracker struct {
 	URL           string
 	Status        string
@@ -50,19 +62,23 @@ type Tracker struct {
 	NextAnnounce  Time
 }
 
-// File inside a Torrent.
+// File is a file inside a torrent.
 type File struct {
 	Path   string
 	Length int64
 }
 
-// FileStats contains statistics about a File in a Torrent.
+// FileStats pairs a file with its verified completion.
 type FileStats struct {
 	File           File
 	BytesCompleted int64
 }
 
-// SessionStats contains statistics about a Session.
+// ---------------------------------------------------------------------------
+// Statistics snapshots
+// ---------------------------------------------------------------------------
+
+// SessionStats is a point-in-time snapshot of the whole session.
 type SessionStats struct {
 	Uptime         int
 	Torrents       int
@@ -99,7 +115,7 @@ type SessionStats struct {
 	BytesWritten    int64
 }
 
-// Stats contains statistics about a Torrent.
+// Stats is a point-in-time snapshot of one torrent.
 type Stats struct {
 	InfoHash string
 	Port     int
@@ -161,36 +177,11 @@ type Stats struct {
 	ETA int
 }
 
-// GetMagnetRequest contains request arguments for Session.GetMagnet method.
-type GetMagnetRequest struct {
-	ID string
-}
+// ---------------------------------------------------------------------------
+// Session methods: one Request/Response pair each, in RPC registration order
+// ---------------------------------------------------------------------------
 
-// GetMagnetResponse contains response arguments for Session.GetMagnet method.
-type GetMagnetResponse struct {
-	Magnet string
-}
-
-// GetTorrentRequest contains request arguments for Session.GetTorrent method.
-type GetTorrentRequest struct {
-	ID string
-}
-
-// GetTorrentResponse contains response arguments for Session.GetTorrent method.
-type GetTorrentResponse struct {
-	Torrent string
-}
-
-// ListTorrentsRequest contains request arguments for Session.ListTorrents method.
-type ListTorrentsRequest struct {
-}
-
-// ListTorrentsResponse contains response arguments for Session.ListTorrents method.
-type ListTorrentsResponse struct {
-	Torrents []Torrent
-}
-
-// AddTorrentOptions contains options for adding a new torrent.
+// AddTorrentOptions applies to both AddTorrent and AddURI.
 type AddTorrentOptions struct {
 	ID                string
 	Stopped           bool
@@ -199,193 +190,222 @@ type AddTorrentOptions struct {
 	Sequential        bool
 }
 
-// AddTorrentRequest contains request arguments for Session.AddTorrent method.
+// GetMagnetRequest is the request for Session.GetMagnet.
+type GetMagnetRequest struct {
+	ID string
+}
+
+// GetMagnetResponse is the response for Session.GetMagnet.
+type GetMagnetResponse struct {
+	Magnet string
+}
+
+// GetTorrentRequest is the request for Session.GetTorrent.
+type GetTorrentRequest struct {
+	ID string
+}
+
+// GetTorrentResponse is the response for Session.GetTorrent.
+type GetTorrentResponse struct {
+	Torrent string
+}
+
+// ListTorrentsRequest is the request for Session.ListTorrents.
+type ListTorrentsRequest struct {
+}
+
+// ListTorrentsResponse is the response for Session.ListTorrents.
+type ListTorrentsResponse struct {
+	Torrents []Torrent
+}
+
+// AddTorrentRequest is the request for Session.AddTorrent.
 type AddTorrentRequest struct {
 	Torrent string
 	AddTorrentOptions
 }
 
-// AddTorrentResponse contains response arguments for Session.AddTorrent method.
+// AddTorrentResponse is the response for Session.AddTorrent.
 type AddTorrentResponse struct {
 	Torrent Torrent
 }
 
-// AddURIRequest contains request arguments for Session.AddURI method.
+// AddURIRequest is the request for Session.AddURI.
 type AddURIRequest struct {
 	URI string
 	AddTorrentOptions
 }
 
-// AddURIResponse contains response arguments for Session.AddURI method.
+// AddURIResponse is the response for Session.AddURI.
 type AddURIResponse struct {
 	Torrent Torrent
 }
 
-// RemoveTorrentRequest contains request arguments for Session.RemoveTorrent method.
+// RemoveTorrentRequest is the request for Session.RemoveTorrent.
 type RemoveTorrentRequest struct {
 	ID       string
 	KeepData bool
 }
 
-// RemoveTorrentResponse contains response arguments for Session.RemoveTorrent method.
+// RemoveTorrentResponse is the response for Session.RemoveTorrent.
 type RemoveTorrentResponse struct {
 }
 
-// CleanDatabaseRequest contains request arguments for Session.CleanDatabase method.
+// CleanDatabaseRequest is the request for Session.CleanDatabase.
 type CleanDatabaseRequest struct {
 }
 
-// CleanDatabaseResponse contains response arguments for Session.CleanDatabase method.
+// CleanDatabaseResponse is the response for Session.CleanDatabase.
 type CleanDatabaseResponse struct {
 }
 
-// GetSessionStatsRequest contains request arguments for Session.GetSessionStats method.
+// GetSessionStatsRequest is the request for Session.GetSessionStats.
 type GetSessionStatsRequest struct {
 }
 
-// GetSessionStatsResponse contains response arguments for Session.GetSessionStats method.
+// GetSessionStatsResponse is the response for Session.GetSessionStats.
 type GetSessionStatsResponse struct {
 	Stats SessionStats
 }
 
-// GetTorrentStatsRequest contains request arguments for Session.GetTorrentStats method.
+// GetTorrentStatsRequest is the request for Session.GetTorrentStats.
 type GetTorrentStatsRequest struct {
 	ID string
 }
 
-// GetTorrentStatsResponse contains response arguments for Session.GetTorrentStats method.
+// GetTorrentStatsResponse is the response for Session.GetTorrentStats.
 type GetTorrentStatsResponse struct {
 	Stats Stats
 }
 
-// GetTorrentTrackersRequest contains request arguments for Session.GetTorrentTrackers method.
+// GetTorrentTrackersRequest is the request for Session.GetTorrentTrackers.
 type GetTorrentTrackersRequest struct {
 	ID string
 }
 
-// GetTorrentTrackersResponse contains response arguments for Session.GetTorrentTrackers method.
+// GetTorrentTrackersResponse is the response for Session.GetTorrentTrackers.
 type GetTorrentTrackersResponse struct {
 	Trackers []Tracker
 }
 
-// GetTorrentPeersRequest contains request arguments for Session.GetTorrentPeers method.
+// GetTorrentPeersRequest is the request for Session.GetTorrentPeers.
 type GetTorrentPeersRequest struct {
 	ID string
 }
 
-// GetTorrentPeersResponse contains response arguments for Session.GetTorrentPeers method.
+// GetTorrentPeersResponse is the response for Session.GetTorrentPeers.
 type GetTorrentPeersResponse struct {
 	Peers []Peer
 }
 
-// GetTorrentWebseedsRequest contains request arguments for Session.GetTorrentWebseeds method.
+// GetTorrentWebseedsRequest is the request for Session.GetTorrentWebseeds.
 type GetTorrentWebseedsRequest struct {
 	ID string
 }
 
-// GetTorrentWebseedsResponse contains response arguments for Session.GetTorrentWebseeds method.
+// GetTorrentWebseedsResponse is the response for Session.GetTorrentWebseeds.
 type GetTorrentWebseedsResponse struct {
 	Webseeds []Webseed
 }
 
-// GetTorrentFilesRequest contains request arguments for Session.GetTorrentFiles method.
+// GetTorrentFilesRequest is the request for Session.GetTorrentFiles.
 type GetTorrentFilesRequest struct {
 	ID string
 }
 
-// GetTorrentFilesResponse contains response arguments for Session.GetTorrentFiles method.
+// GetTorrentFilesResponse is the response for Session.GetTorrentFiles.
 type GetTorrentFilesResponse struct {
 	Files []File
 }
 
-// GetTorrentFileStatsRequest contains request arguments for Session.GetTorrentFileStats method.
+// GetTorrentFileStatsRequest is the request for Session.GetTorrentFileStats.
 type GetTorrentFileStatsRequest struct {
 	ID string
 }
 
-// GetTorrentFileStatsResponse contains response arguments for Session.GetTorrentFileStats method.
+// GetTorrentFileStatsResponse is the response for Session.GetTorrentFileStats.
 type GetTorrentFileStatsResponse struct {
 	FileStats []FileStats
 }
 
-// StartTorrentRequest contains request arguments for Session.StartTorrent method.
+// StartTorrentRequest is the request for Session.StartTorrent.
 type StartTorrentRequest struct {
 	ID string
 }
 
-// StartTorrentResponse contains response arguments for Session.StartTorrent method.
+// StartTorrentResponse is the response for Session.StartTorrent.
 type StartTorrentResponse struct {
 }
 
-// StopTorrentRequest contains request arguments for Session.StopTorrent method.
+// StopTorrentRequest is the request for Session.StopTorrent.
 type StopTorrentRequest struct {
 	ID string
 }
 
-// StopTorrentResponse contains response arguments for Session.StopTorrent method.
+// StopTorrentResponse is the response for Session.StopTorrent.
 type StopTorrentResponse struct {
 }
 
-// AnnounceTorrentRequest contains request arguments for Session.AnnounceTorrent method.
+// AnnounceTorrentRequest is the request for Session.AnnounceTorrent.
 type AnnounceTorrentRequest struct {
 	ID string
 }
 
-// AnnounceTorrentResponse contains response arguments for Session.AnnounceTorrent method.
+// AnnounceTorrentResponse is the response for Session.AnnounceTorrent.
 type AnnounceTorrentResponse struct {
 }
 
-// VerifyTorrentRequest contains request arguments for Session.VerifyTorrent method.
+// VerifyTorrentRequest is the request for Session.VerifyTorrent.
 type VerifyTorrentRequest struct {
 	ID string
 }
 
-// VerifyTorrentResponse contains response arguments for Session.VerifyTorrent method.
+// VerifyTorrentResponse is the response for Session.VerifyTorrent.
 type VerifyTorrentResponse struct {
 }
 
-// MoveTorrentRequest contains request arguments for Session.MoveTorrent method.
+// MoveTorrentRequest is the request for Session.MoveTorrent.
 type MoveTorrentRequest struct {
 	ID     string
 	Target string
 }
 
-// MoveTorrentResponse contains response arguments for Session.MoveTorrent method.
+// MoveTorrentResponse is the response for Session.MoveTorrent.
 type MoveTorrentResponse struct {
 }
 
-// AddPeerRequest contains request arguments for Session.AddPeer method.
+// AddPeerRequest is the request for Session.AddPeer.
 type AddPeerRequest struct {
 	ID   string
 	Addr string
 }
 
-// AddPeerResponse contains response arguments for Session.AddPeer method.
+// AddPeerResponse is the response for Session.AddPeer.
 type AddPeerResponse struct {
 }
 
-// AddTrackerRequest contains request arguments for Session.AddTracker method.
+// AddTrackerRequest is the request for Session.AddTracker.
 type AddTrackerRequest struct {
 	ID  string
 	URL string
 }
 
-// AddTrackerResponse contains response arguments for Session.AddTracker method.
+// AddTrackerResponse is the response for Session.AddTracker.
 type AddTrackerResponse struct {
 }
 
-// StartAllTorrentsRequest contains request arguments for Session.StartAllTorrents method.
+// StartAllTorrentsRequest is the request for Session.StartAllTorrents.
 type StartAllTorrentsRequest struct {
 }
 
-// StartAllTorrentsResponse contains response arguments for Session.StartAllTorrents method.
+// StartAllTorrentsResponse is the response for Session.StartAllTorrents.
 type StartAllTorrentsResponse struct {
 }
 
-// StopAllTorrentsRequest contains request arguments for Session.StopAllTorrents method.
+// StopAllTorrentsRequest is the request for Session.StopAllTorrents.
 type StopAllTorrentsRequest struct {
 }
 
-// StopAllTorrentsResponse contains response arguments for Session.StopAllTorrents method.
+// StopAllTorrentsResponse is the response for Session.StopAllTorrents.
 type StopAllTorrentsResponse struct {
 }

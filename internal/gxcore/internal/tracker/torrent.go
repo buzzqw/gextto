@@ -1,6 +1,7 @@
 package tracker
 
-// Torrent contains fields that are sent in an announce request.
+// Torrent carries the per-torrent numbers every announce (and scrape)
+// request reports to the tracker: transfer totals, identity and port.
 type Torrent struct {
 	BytesUploaded   int64
 	BytesDownloaded int64
@@ -8,7 +9,7 @@ type Torrent struct {
 	InfoHash        [20]byte
 	PeerID          [20]byte
 	Port            int
-	// PartialSeed is true when every wanted piece is present but the torrent is
-	// not complete (BEP 21): the announce then carries event=paused.
+	// PartialSeed marks a BEP 21 partial seed — every wanted piece present
+	// without full completion — whose announces carry event=paused.
 	PartialSeed bool
 }

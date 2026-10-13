@@ -1,5 +1,6 @@
 package dht
 
+// DebugLogger receives the DHT's diagnostic lines; the nullLogger drops them.
 type DebugLogger interface {
 	Debugf(format string, args ...interface{})
 	Infof(format string, args ...interface{})
