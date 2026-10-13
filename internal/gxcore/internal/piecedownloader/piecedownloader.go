@@ -8,90 +8,74 @@ import (
 )
 
 var (
-	// ErrBlockDuplicate is returned from PieceDownloader.GotBlock method when the received block is already present.
+	// ErrBlockDuplicate rejects an already-received block.
 	ErrBlockDuplicate = errors.New("received duplicate block")
-	// ErrBlockNotRequested is returned from PieceDownloader.GotBlock method when the received block is not requested yet.
+	// ErrBlockNotRequested flags data that arrived without a request. The
+	// bytes are still kept; the error only notifies the caller.
 	ErrBlockNotRequested = errors.New("received not requested block")
-	// ErrBlockInvalid is returned from PieceDownloader.GotBlock method when the received block is not in request list.
+	// ErrBlockInvalid rejects blocks outside the piece's block map.
 	ErrBlockInvalid = errors.New("received block is invalid")
 )
 
-// PieceDownloader downloads all blocks of a piece from a peer.
+// PieceDownloader pulls every block of one piece from one peer into a
+// buffer. Padding ranges never travel: they are absent from the block map.
 type PieceDownloader struct {
 	Piece       *piece.Piece
 	Peer        Peer
 	AllowedFast bool
 	Buffer      bufferpool.Buffer
 
-	// blocks contains blocks that needs to be downloaded from peers.
-	// It does not contain the parts that belong to padding files.
 	blocks    map[uint32]uint32   // begin -> length
-	remaining []uint32            // blocks to be downloaded from peers in consecutive order.
-	pending   map[uint32]struct{} // in-flight requests
-	done      map[uint32]struct{} // downloaded requests
+	remaining []uint32            // unrequested begins, in piece order
+	pending   map[uint32]struct{} // in-flight begins
+	done      map[uint32]struct{} // received begins
 }
 
-// Peer of a Torrent.
+// Peer abstracts the connection a piece is fetched from.
 type Peer interface {
 	RequestPiece(index, begin, length uint32)
 	CancelPiece(index, begin, length uint32)
 	EnabledFast() bool
 }
 
-// New returns a new PieceDownloader.
+// New plans the block map of pi (padding excluded) for pe.
 func New(pi *piece.Piece, pe Peer, allowedFast bool, buf bufferpool.Buffer) *PieceDownloader {
 	blocks := pi.CalculateBlocks()
+	byBegin := make(map[uint32]uint32, len(blocks))
+	order := make([]uint32, len(blocks))
+	for i, blk := range blocks {
+		byBegin[blk.Begin] = blk.Length
+		order[i] = blk.Begin
+	}
 	return &PieceDownloader{
 		Piece:       pi,
 		Peer:        pe,
 		AllowedFast: allowedFast,
 		Buffer:      buf,
-		blocks:      makeBlocks(blocks),
-		remaining:   makeRemaining(blocks),
+		blocks:      byBegin,
+		remaining:   order,
 		pending:     make(map[uint32]struct{}, len(blocks)),
 		done:        make(map[uint32]struct{}, len(blocks)),
 	}
 }
 
-func makeBlocks(blocks []piece.Block) map[uint32]uint32 {
-	ret := make(map[uint32]uint32, len(blocks))
-	for _, blk := range blocks {
-		ret[blk.Begin] = blk.Length
-	}
-	return ret
-}
-
-func makeRemaining(blocks []piece.Block) []uint32 {
-	ret := make([]uint32, len(blocks))
-	for i, blk := range blocks {
-		ret[i] = blk.Begin
-	}
-	return ret
-}
-
-// Choked must be called when the peer has choked us. This will cancel pending reuqests.
+// Choked requeues the in-flight requests — unless allowed-fast applies or
+// the peer speaks fast (it will cancel for us).
 func (d *PieceDownloader) Choked() {
-	if d.AllowedFast {
+	if d.AllowedFast || d.Peer.EnabledFast() {
 		return
 	}
-	if d.Peer.EnabledFast() {
-		// Peer will send cancel message for pending requests.
-		return
-	}
-	for i := range d.pending {
-		delete(d.pending, i)
-		d.remaining = append(d.remaining, i)
+	for begin := range d.pending {
+		delete(d.pending, begin)
+		d.remaining = append(d.remaining, begin)
 	}
 }
 
-func (d *PieceDownloader) findBlock(begin, length uint32) bool {
-	blockLength, ok := d.blocks[begin]
-	return ok && blockLength == length
-}
-
-// GotBlock must be called when a block is received from the peer.
+// GotBlock stores one received block, validating map membership, size,
+// duplication and solicitation in that order.
 func (d *PieceDownloader) GotBlock(begin uint32, data []byte) error {
-	if !d.findBlock(begin, uint32(len(data))) {
+	length, ok := d.blocks[begin]
+	if !ok || length != uint32(len(data)) {
 		return ErrBlockInvalid
 	}
 	if _, ok := d.done[begin]; ok {
@@ -100,17 +84,15 @@ func (d *PieceDownloader) GotBlock(begin uint32, data []byte) error {
 	copy(d.Buffer.Data[begin:begin+uint32(len(data))], data)
 	d.done[begin] = struct{}{}
 	if _, ok := d.pending[begin]; !ok {
-		// We got the block data although we didn't request it.
-		// Data is still saved but error returned here to notify the caller about the issue.
 		return ErrBlockNotRequested
 	}
 	delete(d.pending, begin)
 	return nil
 }
 
-// Rejected must be called when the peer has rejected a piece request.
+// Rejected requeues one refused request, reporting whether it was ours.
 func (d *PieceDownloader) Rejected(begin, length uint32) bool {
-	if !d.findBlock(begin, length) {
+	if l, ok := d.blocks[begin]; !ok || l != length {
 		return false
 	}
 	delete(d.pending, begin)
@@ -118,8 +100,8 @@ func (d *PieceDownloader) Rejected(begin, length uint32) bool {
 	return true
 }
 
-// CancelPending is called to cancel pending requests to the peer.
-// Must be called when remaining blocks are downloaded from another peer.
+// CancelPending withdraws every in-flight request. Call it when the
+// remaining blocks move to another peer.
 func (d *PieceDownloader) CancelPending() {
 	for begin := range d.pending {
 		length, ok := d.blocks[begin]
@@ -130,13 +112,12 @@ func (d *PieceDownloader) CancelPending() {
 	}
 }
 
-// RequestBlocks is called to request remaining blocks of the piece up to
-// `queueLength`. It returns how many new requests were sent, so a caller can
-// share one in-flight budget across several of a peer's pieces.
+// RequestBlocks issues up to queueLength new requests in piece order,
+// skipping already-received blocks, and returns how many went out — so the
+// caller can share one in-flight budget across a peer's pieces.
 func (d *PieceDownloader) RequestBlocks(queueLength int) int {
-	remaining := d.remaining
 	requested := 0
-	for _, begin := range remaining {
+	for _, begin := range d.remaining {
 		if len(d.pending) >= queueLength {
 			break
 		}
@@ -154,13 +135,13 @@ func (d *PieceDownloader) RequestBlocks(queueLength int) int {
 	return requested
 }
 
-// Pending returns the number of block requests in flight.
+// Pending counts the in-flight requests.
 func (d *PieceDownloader) Pending() int { return len(d.pending) }
 
-// Remaining returns the number of blocks not requested yet.
+// Remaining counts the never-requested blocks.
 func (d *PieceDownloader) Remaining() int { return len(d.remaining) }
 
-// Done returns true if all blocks of the piece has been downloaded.
+// Done reports a fully received piece.
 func (d *PieceDownloader) Done() bool {
 	return len(d.done) == len(d.blocks)
 }

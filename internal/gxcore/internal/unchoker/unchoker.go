@@ -6,40 +6,42 @@ import (
 	"slices"
 )
 
-// Unchoker implements an algorithm to select peers to unchoke based on their download speed.
+// Unchoker rotates upload slots across interested peers by speed: the
+// fastest downloaders (or uploaders, once complete) hold the regular slots,
+// with an optimistic slot probing a random peer every third round.
 type Unchoker struct {
 	numUnchoked           int
 	numOptimisticUnchoked int
 
-	// Every 3rd round an optimistic unchoke logic is applied.
+	// Every 3rd round runs the optimistic logic.
 	round uint8
 
 	peersUnchoked           map[Peer]struct{}
 	peersUnchokedOptimistic map[Peer]struct{}
 }
 
-// Peer of a torrent.
+// Peer abstracts what choking decisions need from a connection.
 type Peer interface {
-	// Sends messages and set choking status of local peeer
+	// Choke/Unchoke set the local choking state.
 	Choke()
 	Unchoke()
 
-	// Choking returns choke status of local peer
+	// Choking reports the local choke state.
 	Choking() bool
 
-	// Interested returns interest status of remote peer
+	// Interested reports the remote peer's interest.
 	Interested() bool
 
-	// SetOptimistic sets the uptimistic unchoke status of peer
+	// SetOptimistic/Optimistic track the optimistic slot holder.
 	SetOptimistic(value bool)
-	// OptimisticUnchoked returns the value previously set by SetOptimistic
 	Optimistic() bool
 
 	DownloadSpeed() int
 	UploadSpeed() int
 }
 
-// New returns a new Unchoker.
+// New sizes an unchoker for numUnchoked regular plus numOptimisticUnchoked
+// optimistic slots.
 func New(numUnchoked, numOptimisticUnchoked int) *Unchoker {
 	return &Unchoker{
 		numUnchoked:             numUnchoked,
@@ -49,14 +51,14 @@ func New(numUnchoked, numOptimisticUnchoked int) *Unchoker {
 	}
 }
 
-// HandleDisconnect must be called to remove the peer from internal indexes.
+// HandleDisconnect forgets a peer from both slot sets.
 func (u *Unchoker) HandleDisconnect(pe Peer) {
 	delete(u.peersUnchoked, pe)
 	delete(u.peersUnchokedOptimistic, pe)
 }
 
-// SetNumUnchoked changes the number of upload slots. It must be
-// called from the owner goroutine that also runs TickUnchoke.
+// SetNumUnchoked resizes the regular slots (minimum one). Call it from the
+// same goroutine that runs TickUnchoke.
 func (u *Unchoker) SetNumUnchoked(n int) {
 	if n < 1 {
 		n = 1
@@ -64,7 +66,27 @@ func (u *Unchoker) SetNumUnchoked(n int) {
 	u.numUnchoked = n
 }
 
-func (u *Unchoker) candidatesUnchoke(allPeers []Peer) []Peer {
+// TickUnchoke re-deals the slots: fastest interested peers first (by upload
+// once complete, by download otherwise), skipping optimistic holders on
+// non-optimistic rounds; leftovers choke. Round 0 additionally spends the
+// optimistic slots on random remaining peers.
+func (u *Unchoker) TickUnchoke(allPeers []Peer, torrentCompleted bool) {
+	optimistic := u.round == 0
+	peers := interestedOnly(allPeers)
+	sortBySpeed(peers, torrentCompleted)
+
+	rest := dealRegular(u, peers, optimistic)
+	if optimistic {
+		rest = dealOptimistic(u, rest)
+	}
+	for _, pe := range rest {
+		u.chokePeer(pe)
+	}
+	u.round = (u.round + 1) % 3
+}
+
+// interestedOnly filters the slot contenders in place.
+func interestedOnly(allPeers []Peer) []Peer {
 	peers := allPeers[:0]
 	for _, pe := range allPeers {
 		if pe.Interested() {
@@ -74,42 +96,40 @@ func (u *Unchoker) candidatesUnchoke(allPeers []Peer) []Peer {
 	return peers
 }
 
-func (u *Unchoker) sortPeers(peers []Peer, completed bool) {
-	byUploadSpeed := func(a, b Peer) int { return cmp.Compare(b.UploadSpeed(), a.UploadSpeed()) }
-	byDownloadSpeed := func(a, b Peer) int { return cmp.Compare(b.DownloadSpeed(), a.DownloadSpeed()) }
+// sortBySpeed ranks contenders fastest-first.
+func sortBySpeed(peers []Peer, completed bool) {
+	byUpload := func(a, b Peer) int { return cmp.Compare(b.UploadSpeed(), a.UploadSpeed()) }
+	byDownload := func(a, b Peer) int { return cmp.Compare(b.DownloadSpeed(), a.DownloadSpeed()) }
 	if completed {
-		slices.SortFunc(peers, byUploadSpeed)
+		slices.SortFunc(peers, byUpload)
 	} else {
-		slices.SortFunc(peers, byDownloadSpeed)
+		slices.SortFunc(peers, byDownload)
 	}
 }
 
-// TickUnchoke must be called at every 10 seconds.
-func (u *Unchoker) TickUnchoke(allPeers []Peer, torrentCompleted bool) {
-	optimistic := u.round == 0
-	peers := u.candidatesUnchoke(allPeers)
-	u.sortPeers(peers, torrentCompleted)
-	var i, unchoked int
-	for ; i < len(peers) && unchoked < u.numUnchoked; i++ {
+// dealRegular fills the regular slots from the ranked contenders, returning
+// the undealt remainder.
+func dealRegular(u *Unchoker, peers []Peer, optimistic bool) []Peer {
+	var dealt int
+	i := 0
+	for ; i < len(peers) && dealt < u.numUnchoked; i++ {
 		if !optimistic && peers[i].Optimistic() {
 			continue
 		}
 		u.unchokePeer(peers[i])
-		unchoked++
+		dealt++
 	}
-	peers = peers[i:]
-	if optimistic {
-		for i = 0; i < u.numOptimisticUnchoked && len(peers) > 0; i++ {
-			n := rand.IntN(len(peers)) // nolint: gosec
-			pe := peers[n]
-			u.optimisticUnchokePeer(pe)
-			peers[n], peers = peers[len(peers)-1], peers[:len(peers)-1]
-		}
+	return peers[i:]
+}
+
+// dealOptimistic spends the optimistic slots on random remainder peers.
+func dealOptimistic(u *Unchoker, peers []Peer) []Peer {
+	for i := 0; i < u.numOptimisticUnchoked && len(peers) > 0; i++ {
+		n := rand.IntN(len(peers)) // nolint: gosec
+		u.optimisticUnchokePeer(peers[n])
+		peers[n], peers = peers[len(peers)-1], peers[:len(peers)-1]
 	}
-	for _, pe := range peers {
-		u.chokePeer(pe)
-	}
-	u.round = (u.round + 1) % 3
+	return peers
 }
 
 func (u *Unchoker) chokePeer(pe Peer) {
@@ -125,7 +145,7 @@ func (u *Unchoker) chokePeer(pe Peer) {
 func (u *Unchoker) unchokePeer(pe Peer) {
 	if !pe.Choking() {
 		if pe.Optimistic() {
-			// Move into regular unchoked peers
+			// Promote into the regular set.
 			pe.SetOptimistic(false)
 			delete(u.peersUnchokedOptimistic, pe)
 			u.peersUnchoked[pe] = struct{}{}
@@ -140,7 +160,7 @@ func (u *Unchoker) unchokePeer(pe Peer) {
 func (u *Unchoker) optimisticUnchokePeer(pe Peer) {
 	if !pe.Choking() {
 		if !pe.Optimistic() {
-			// Move into optimistic unchoked peers
+			// Promote into the optimistic set.
 			pe.SetOptimistic(true)
 			delete(u.peersUnchoked, pe)
 			u.peersUnchokedOptimistic[pe] = struct{}{}
@@ -152,9 +172,8 @@ func (u *Unchoker) optimisticUnchokePeer(pe Peer) {
 	pe.SetOptimistic(true)
 }
 
-// FastUnchoke must be called when remote peer is interested.
-// Remote peer is unchoked immediately if there are not enough unchoked peers.
-// Without this function, remote peer would have to wait for next unchoke period.
+// FastUnchoke unchokes an interested peer immediately when slots remain,
+// instead of making it wait for the next round.
 func (u *Unchoker) FastUnchoke(pe Peer) {
 	if pe.Choking() && pe.Interested() && len(u.peersUnchoked) < u.numUnchoked {
 		u.unchokePeer(pe)

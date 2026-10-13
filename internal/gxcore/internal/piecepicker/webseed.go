@@ -9,20 +9,20 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/webseedsource"
 )
 
-// WebseedDownloadSpec contains information for downloading torrent data from webseed sources.
+// WebseedDownloadSpec assigns a piece range to one webseed source.
 type WebseedDownloadSpec struct {
 	Source *webseedsource.WebseedSource
 	Begin  uint32 // piece index
 	End    uint32 // piece index
 }
 
-// PickWebseed returns the next spec for downloading files from webseed sources.
+// PickWebseed claims the next range for src and marks its pieces, so no
+// other source picks them again.
 func (p *PiecePicker) PickWebseed(src *webseedsource.WebseedSource) *WebseedDownloadSpec {
 	r := p.findPieceRangeForWebseed()
 	if r == nil {
 		return nil
 	}
-	// Mark selected range as being downloaded so we won't select it again.
 	for i := r.Begin; i < r.End; i++ {
 		if p.pieces[i].RequestedWebseed != nil {
 			panic("already downloading from webseed url")
@@ -45,42 +45,43 @@ func (p *PiecePicker) downloadingWebseed() bool {
 	return false
 }
 
+// findPieceRangeForWebseed prefers file tails under sequential/first-last
+// (single-piece requests that finish fast), then the first gap in order,
+// else the largest gap at random.
 func (p *PiecePicker) findPieceRangeForWebseed() *Range {
-	gaps := p.findGaps()
-	if len(gaps) == 0 {
-		return p.webseedStealsFromAnotherWebseed()
-	}
-	if p.sequential || p.firstLast {
-		// Download the piece at the end of a file before anything else. It is a single piece
-		// request, so it completes quickly, while the gap at the beginning may span many pieces.
-		for i := range p.pieces {
-			mp := &p.pieces[i]
-			if mp.FileTail && mp.AvailableForWebseed() {
-				return &Range{Begin: mp.Index, End: mp.Index + 1}
+	if gaps := p.findGaps(); len(gaps) > 0 {
+		if p.sequential || p.firstLast {
+			for i := range p.pieces {
+				if mp := &p.pieces[i]; mp.FileTail && mp.AvailableForWebseed() {
+					return &Range{Begin: mp.Index, End: mp.Index + 1}
+				}
+			}
+			if p.sequential {
+				return &gaps[0]
 			}
 		}
-		if p.sequential {
-			// findGaps returns gaps in ascending index order.
-			return &gaps[0]
-		}
+		return selectRandomLargestGap(gaps)
 	}
-	gap := selectRandomLargestGap(gaps)
-	return &gap
+	return p.webseedStealsFromAnotherWebseed()
 }
 
-func selectRandomLargestGap(gaps []Range) Range {
+// selectRandomLargestGap picks uniformly among the longest gaps.
+func selectRandomLargestGap(gaps []Range) *Range {
 	slices.SortFunc(gaps, func(a, b Range) int { return cmp.Compare(b.Len(), a.Len()) })
-	length := gaps[0].Len()
+	longest := gaps[0].Len()
+	n := len(gaps)
 	for i := range gaps {
-		if gaps[i].Len() != length {
-			return gaps[rand.IntN(i)]
+		if gaps[i].Len() != longest {
+			n = i
+			break
 		}
 	}
-	return gaps[rand.IntN(len(gaps))]
+	pick := gaps[rand.IntN(n)]
+	return &pick
 }
 
 func (p *PiecePicker) getDownloadingSources() []*webseedsource.WebseedSource {
-	ret := make([]*webseedsource.WebseedSource, 0, len(p.webseedSources))
+	var ret []*webseedsource.WebseedSource
 	for _, src := range p.webseedSources {
 		if src.Downloading() {
 			ret = append(ret, src)
@@ -89,6 +90,8 @@ func (p *PiecePicker) getDownloadingSources() []*webseedsource.WebseedSource {
 	return ret
 }
 
+// webseedStealsFromAnotherWebseed splits the fullest active download in
+// half, handing the back half to an idle source.
 func (p *PiecePicker) webseedStealsFromAnotherWebseed() *Range {
 	downloading := p.getDownloadingSources()
 	if len(downloading) == 0 {
@@ -107,9 +110,11 @@ func (p *PiecePicker) webseedStealsFromAnotherWebseed() *Range {
 	return r
 }
 
+// peerStealsFromWebseed hands a peer the tail-most piece an active webseed
+// has not reached yet, provided the peer has it, wants allow, and nobody
+// fetches it already.
 func (p *PiecePicker) peerStealsFromWebseed(pe *peer.Peer) *myPiece {
-	downloading := p.getDownloadingSources()
-	for _, src := range downloading {
+	for _, src := range p.getDownloadingSources() {
 		if src.Remaining() == 0 {
 			continue
 		}
@@ -131,9 +136,11 @@ func (p *PiecePicker) peerStealsFromWebseed(pe *peer.Peer) *myPiece {
 	return nil
 }
 
+// findGaps lists the BEP 19 gaps — runs of webseed-fetchable pieces —
+// capped at maxWebseedPieces per gap.
 func (p *PiecePicker) findGaps() []Range {
 	a := make([]Range, 0, len(p.pieces)/2)
-	var inGap bool // See BEP19 for definition of "gap".
+	var inGap bool
 	var begin uint32
 	for _, pi := range p.pieces {
 		if !inGap {
@@ -141,15 +148,16 @@ func (p *PiecePicker) findGaps() []Range {
 				begin = pi.Index
 				inGap = true
 			}
-		} else {
-			r := Range{Begin: begin, End: pi.Index}
-			if !pi.AvailableForWebseed() {
-				a = append(a, r)
-				inGap = false
-			} else if r.Len() == p.maxWebseedPieces {
-				a = append(a, r)
-				begin = pi.Index
-			}
+			continue
+		}
+		r := Range{Begin: begin, End: pi.Index}
+		switch {
+		case !pi.AvailableForWebseed():
+			a = append(a, r)
+			inGap = false
+		case r.Len() == p.maxWebseedPieces:
+			a = append(a, r)
+			begin = pi.Index
 		}
 	}
 	if inGap {
@@ -158,6 +166,9 @@ func (p *PiecePicker) findGaps() []Range {
 	return a
 }
 
+// pickLastPieceOfSmallestGap offers a peer the tail-most fetchable piece of
+// the smallest gap first, skipping requested pieces, ones the peer lacks,
+// and choked non-allowed-fast ones.
 func (p *PiecePicker) pickLastPieceOfSmallestGap(pe *peer.Peer) *myPiece {
 	gaps := p.findGaps()
 	if len(gaps) == 0 {
@@ -165,7 +176,7 @@ func (p *PiecePicker) pickLastPieceOfSmallestGap(pe *peer.Peer) *myPiece {
 	}
 	slices.SortFunc(gaps, func(a, b Range) int { return cmp.Compare(a.Len(), b.Len()) })
 	for _, gap := range gaps {
-		// Convert index to int because it goes below zero in loop.
+		// int: the loop runs below zero.
 		for i := int(gap.End - 1); i >= int(gap.Begin); i-- {
 			mp := &p.pieces[i]
 			if mp.Requested.Len() > 0 {
@@ -183,13 +194,12 @@ func (p *PiecePicker) pickLastPieceOfSmallestGap(pe *peer.Peer) *myPiece {
 	return nil
 }
 
-// Range is a piece index range.
-// Begin is inclusive, End is exclusive.
+// Range is an inclusive-begin, exclusive-end piece span.
 type Range struct {
 	Begin, End uint32
 }
 
-// Len returns the number of pieces in the range.
+// Len counts the pieces in the range.
 func (r Range) Len() int {
 	return int(r.End) - int(r.Begin)
 }

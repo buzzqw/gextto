@@ -13,14 +13,14 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
 )
 
-// raw peer wire bytes, counted before the message layer so the
-// session can report protocol/encryption overhead as wire minus payload.
+// Wire byte counters, tallied below the message layer so the session can
+// report protocol and encryption overhead as wire minus payload.
 var (
 	WireBytesRead    atomic.Int64
 	WireBytesWritten atomic.Int64
 )
 
-// countingConn counts the bytes exchanged on a peer connection.
+// countingConn wraps a peer socket with wire accounting.
 type countingConn struct {
 	net.Conn
 }
@@ -37,7 +37,8 @@ func (c *countingConn) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// Conn is a peer connection that provides a channel for receiving messages and methods for sending messages.
+// Conn couples a socket with its reader and writer goroutines, merging both
+// message streams into one channel for the owning peer.
 type Conn struct {
 	conn     net.Conn
 	reader   *peerreader.PeerReader
@@ -48,7 +49,7 @@ type Conn struct {
 	doneC    chan struct{}
 }
 
-// New returns a new PeerConn by wrapping a net.Conn.
+// New wraps conn with rate-limited reading and writing.
 func New(conn net.Conn, l logger.Logger, pieceTimeout time.Duration, maxRequestsIn, maxMsgSize int, fastEnabled bool, br, bw *bandwidth.Limiter) *Conn {
 	conn = &countingConn{Conn: conn}
 	return &Conn{
@@ -62,58 +63,59 @@ func New(conn net.Conn, l logger.Logger, pieceTimeout time.Duration, maxRequests
 	}
 }
 
-// Addr returns the net.TCPAddr of the peer.
+// Addr returns the peer's address.
 func (p *Conn) Addr() *net.TCPAddr {
 	return p.conn.RemoteAddr().(*net.TCPAddr)
 }
 
-// IP returns the string representation of IP address.
+// IP returns the peer's IP in string form.
 func (p *Conn) IP() string {
 	return p.conn.RemoteAddr().(*net.TCPAddr).IP.String()
 }
 
-// String returns the remote address as string.
+// String returns the peer's remote address.
 func (p *Conn) String() string {
 	return p.conn.RemoteAddr().String()
 }
 
-// Close stops receiving and sending messages and closes underlying net.Conn.
+// Close stops the reader and writer and waits for the run loop to exit.
 func (p *Conn) Close() {
 	close(p.closeC)
 	<-p.doneC
 }
 
-// Logger for the peer that logs messages prefixed with peer address.
+// Logger prefixes peer logs with the connection identity.
 func (p *Conn) Logger() logger.Logger {
 	return p.log
 }
 
-// Messages received from the peer will be sent to the channel returned.
-// The channel and underlying net.Conn will be closed if any error occurs while receiving or sending.
+// Messages streams everything received from or reported about the peer. It
+// closes when the run loop exits; any reader or writer error ends the loop
+// and the socket with it.
 func (p *Conn) Messages() <-chan any {
 	return p.messages
 }
 
-// SendMessage queues a message for sending. Does not block.
+// SendMessage queues a protocol message without blocking.
 func (p *Conn) SendMessage(msg peerprotocol.Message) {
 	p.writer.SendMessage(msg)
 }
 
-// SendPiece queues a piece message for sending. Does not block.
-// Piece data is read just before the message is sent.
-// If queued messages greater than `maxRequestsIn` specified in constructor, the last message is dropped.
+// SendPiece queues one block upload without blocking. The bytes are read
+// from storage just before sending, so large pieces never fully sit in
+// memory. Past maxRequestsIn queued messages the newest is dropped.
 func (p *Conn) SendPiece(msg peerprotocol.RequestMessage, pi io.ReaderAt) {
 	p.writer.SendPiece(msg, pi)
 }
 
-// CancelRequest removes previously queued piece message matching msg.
+// CancelRequest drops a queued piece message matching msg.
 func (p *Conn) CancelRequest(msg peerprotocol.CancelMessage) {
 	p.writer.CancelRequest(msg)
 }
 
-// Run starts receiving messages from peer and starts sending queued messages.
-// If any error happens during receiving or sending messages,
-// the connection and the underlying net.Conn will be closed.
+// Run pumps reader and writer streams into Messages until Close, an error on
+// either side, or a peer going silent — then it stops the other side, closes
+// the socket, and returns.
 func (p *Conn) Run() {
 	defer close(p.doneC)
 	defer close(p.messages)
@@ -130,15 +132,9 @@ func (p *Conn) Run() {
 	for {
 		select {
 		case msg := <-p.reader.Messages():
-			select {
-			case p.messages <- msg:
-			case <-p.closeC:
-			}
+			p.relay(msg)
 		case msg := <-p.writer.Messages():
-			select {
-			case p.messages <- msg:
-			case <-p.closeC:
-			}
+			p.relay(msg)
 		case <-p.closeC:
 			p.reader.Stop()
 			p.writer.Stop()
@@ -150,5 +146,13 @@ func (p *Conn) Run() {
 			p.reader.Stop()
 			return
 		}
+	}
+}
+
+// relay forwards one message unless the connection is closing.
+func (p *Conn) relay(msg any) {
+	select {
+	case p.messages <- msg:
+	case <-p.closeC:
 	}
 }

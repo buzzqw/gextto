@@ -2,6 +2,7 @@ package btconn
 
 import (
 	"bytes"
+	"context"
 	"net"
 	"time"
 
@@ -11,9 +12,11 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 )
 
-// Dial new connection to the address. Does the BitTorrent protocol handshake.
-// Handles encryption. May try to connect again if encryption does not match with given setting.
-// Returns a net.Conn that is ready for sending/receiving BitTorrent peer protocol messages.
+// Dial connects to addr and completes the BitTorrent handshake, handling
+// encryption per the local policy: encrypted first when enabled (RC4, plus
+// plaintext unless forced), with one plaintext redial when the encrypted
+// attempt fails and encryption is optional. The returned conn is ready for
+// peer messages; on error the socket is already closed.
 func Dial(
 	addr net.Addr,
 	dialTimeout, handshakeTimeout time.Duration,
@@ -31,86 +34,42 @@ func Dial(
 	ctx, cancel := ctxutil.FromChan(stopC)
 	defer cancel()
 
-	// First connection
-	log.Debug("Connecting to peer...")
-	conn, err = netx.DialPeer(ctx, net.Dialer{Timeout: dialTimeout}, addr.Network(), addr.String())
-	if err != nil {
-		return
-	}
-	log.Debug("Connected")
-	defer func(conn net.Conn) {
-		if err != nil {
-			conn.Close()
-		}
-	}(conn)
-	go func(conn net.Conn) {
-		select {
-		case <-stopC:
-			conn.Close()
-		case <-done:
-		}
-	}(conn)
-
-	// Write first part of BitTorrent handshake to a buffer because we will use it in both encrypted and unencrypted handshake.
+	// The handshake bytes are buffered up front: the encrypted and the plain
+	// path send the same 68 bytes.
 	out := bytes.NewBuffer(make([]byte, 0, 68))
-	err = writeHandshake(out, ih, ourID, ourExtensions)
-	if err != nil {
+	if err = writeHandshake(out, ih, ourID, ourExtensions); err != nil {
 		return
 	}
 
-	// Handshake must be completed in allowed duration.
-	if err = conn.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+	dialer := net.Dialer{Timeout: dialTimeout}
+	conn, err = dialGuarded(ctx, &dialer, addr, handshakeTimeout, stopC, done, log)
+	if err != nil {
 		return
 	}
+	// Every error below closes the current conn; a redial closes the old one
+	// explicitly before replacing it (a failed redial leaves conn nil, which
+	// the guard must not close).
+	defer func() {
+		if err != nil && conn != nil {
+			conn.Close()
+		}
+	}()
 
 	if enableEncryption {
-		sKey := make([]byte, 20)
-		copy(sKey, ih[:])
-
-		provide := mse.RC4
-		if !forceEncryption {
-			provide |= mse.PlainText
-		}
-
-		// Try encryption handshake
-		encConn := mse.WrapConn(conn)
-		cipher, err = encConn.HandshakeOutgoing(sKey, provide, out.Bytes())
-		if err != nil {
-			select {
-			case <-stopC:
+		var encConn net.Conn
+		if encConn, cipher, err = tryEncrypted(conn, ih[:], out.Bytes(), forceEncryption, log); err != nil {
+			if stopped(stopC) {
 				return
-			default:
 			}
-			log.Debugln("Encrytpion handshake has failed:", err)
+			log.Debugln("Encryption handshake has failed:", err)
 			if forceEncryption {
-				log.Debug("Will not try again because ougoing encryption is forced.")
+				log.Debug("Will not try again because outgoing encryption is forced.")
 				err = errNotEncrypted
 				return
 			}
-
-			// Close current connection and try again without encryption
 			conn.Close()
 			log.Debug("Connecting again without encryption...")
-			conn, err = netx.DialPeer(ctx, net.Dialer{Timeout: dialTimeout}, addr.Network(), addr.String())
-			if err != nil {
-				return
-			}
-			log.Debug("Connected")
-			defer func(conn net.Conn) {
-				if err != nil {
-					conn.Close()
-				}
-			}(conn)
-			go func(conn net.Conn) {
-				select {
-				case <-stopC:
-					conn.Close()
-				case <-done:
-				}
-			}(conn)
-
-			// Send BT handshake
-			if err = conn.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+			if conn, err = dialGuarded(ctx, &dialer, addr, handshakeTimeout, stopC, done, log); err != nil {
 				return
 			}
 			if _, err = conn.Write(out.Bytes()); err != nil {
@@ -120,27 +79,19 @@ func Dial(
 			log.Debugf("Encryption handshake is successful. Selected cipher: %s", cipher)
 			conn = encConn
 		}
-	} else {
-		// Send BT handshake
-		_, err = conn.Write(out.Bytes())
-		if err != nil {
-			return
-		}
+	} else if _, err = conn.Write(out.Bytes()); err != nil {
+		return
 	}
 
-	// Read BT handshake
 	var ihRead [20]byte
-	peerExtensions, ihRead, err = readHandshake1(conn)
-	if err != nil {
+	if peerExtensions, ihRead, err = readHandshake1(conn); err != nil {
 		return
 	}
 	if ihRead != ih {
 		err = errInvalidInfoHash
 		return
 	}
-
-	peerID, err = readHandshake2(conn)
-	if err != nil {
+	if peerID, err = readHandshake2(conn); err != nil {
 		return
 	}
 	if peerID == ourID {
@@ -148,4 +99,55 @@ func Dial(
 		return
 	}
 	return
+}
+
+// dialGuarded dials, arms the handshake deadline, and ties the socket's
+// lifetime to stopC (closed on abort) versus done (normal return).
+func dialGuarded(ctx context.Context, dialer *net.Dialer, addr net.Addr, handshakeTimeout time.Duration, stopC, done chan struct{}, log logger.Logger) (net.Conn, error) {
+	log.Debug("Connecting to peer...")
+	conn, err := netx.DialPeer(ctx, *dialer, addr.Network(), addr.String())
+	if err != nil {
+		return nil, err
+	}
+	log.Debug("Connected")
+	go func() {
+		select {
+		case <-stopC:
+			conn.Close()
+		case <-done:
+		}
+	}()
+	if err := conn.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+// tryEncrypted runs the MSE handshake over conn: RC4 when offered, plaintext
+// only when not forced. On failure the raw conn is returned for the caller
+// to close or reuse.
+func tryEncrypted(conn net.Conn, sKeyHash, handshake []byte, forceEncryption bool, log logger.Logger) (net.Conn, mse.CryptoMethod, error) {
+	sKey := make([]byte, 20)
+	copy(sKey, sKeyHash)
+	provide := mse.RC4
+	if !forceEncryption {
+		provide |= mse.PlainText
+	}
+	encConn := mse.WrapConn(conn)
+	cipher, err := encConn.HandshakeOutgoing(sKey, provide, handshake)
+	if err != nil {
+		return conn, cipher, err
+	}
+	return encConn, cipher, nil
+}
+
+// stopped reports a stopC abort, when the caller must return as-is.
+func stopped(stopC chan struct{}) bool {
+	select {
+	case <-stopC:
+		return true
+	default:
+		return false
+	}
 }
