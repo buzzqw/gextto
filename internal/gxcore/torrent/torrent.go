@@ -42,65 +42,49 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
-// torrent connects to peers and downloads files from swarm.
+// torrent is one download: its metadata, files, pieces, peers and every
+// worker driving them. All mutable state belongs to the run() goroutine;
+// other goroutines reach it through commands, queries, or the documented
+// locks/atomics on individual fields.
 type torrent struct {
 	session *Session
 	id      string
 	addedAt time.Time
 
-	// Identifies the torrent being downloaded.
-	infoHash [20]byte
-
-	// List of addresses to announce this torrent.
+	// Identity: info hash, trackers, magnet extras, display name.
+	infoHash    [20]byte
 	trackers    []tracker.Tracker
 	rawTrackers [][]string
+	fixedPeers  []string
+	name        string
 
-	// Peers added from magnet URLS with x.pe parameter.
-	fixedPeers []string
-
-	// Name of the torrent.
-	name string
-
-	// hasV2Hint is set while the info dict is unknown (a magnet) to remember
-	// that the torrent identity is BitTorrent v2 (a btmh topic). Once info is
-	// known, Info.HasV2 is authoritative.
+	// hasV2Hint remembers a btmh-identified magnet while its info dict is
+	// unknown; Info.HasV2 rules once known.
 	hasV2Hint bool
 
-	// selectOnly, when non-nil, restricts the download to these non-padding
-	// file indices (BEP 53 magnet "so="). It is the engine-side seed applied
-	// while the embedding app has no opinion: once Config.FileSelection
-	// returns a mask, that mask takes precedence (see skippedInfoFiles).
-	// selectOnlyMu guards it because the daemon may clear it at runtime.
+	// selectOnly is the engine-side BEP 53 "so" seed (non-padding indices),
+	// authoritative until Config.FileSelection speaks. The daemon may clear
+	// it live, hence the mutex.
 	selectOnly   []int
 	selectOnlyMu sync.Mutex
 
-	// Storage implementation to save the files in torrent.
+	// Storage, port and metadata. infoPtr is atomic: published once by the
+	// run loop, read lock-free from anywhere — never touch the field.
 	storage storage.Storage
-
-	// TCP Port to listen for peer connections.
-	port int
-
-	// Contains info about files in torrent. This can be nil at start for magnet
-	// downloads. It is written once by the run loop and read from other
-	// goroutines (the daemon, the announcers, `Status`), so it is an atomic
-	// pointer: use info()/setInfo, never the field directly.
+	port    int
 	infoPtr atomic.Pointer[metainfo.Info]
 
-	// pieceLayers is the BEP 52 top-level "piece layers" of a v2 torrent,
-	// kept so the .torrent can be exported/served with them.
+	// pieceLayers carries the v2 top-level layers for export and serving.
 	pieceLayers map[string][]byte
 
-	// BEP 52 hash request support. A v2 magnet knows its file tree but not the
-	// per-file "piece layers": they are fetched from peers with "hash
-	// request"/"hashes" before any piece can be downloaded or served.
+	// BEP 52 hash-fetch state: v2 magnets learn per-file layers from peers
+	// before any piece builds or verifies.
 	v2LayerFiles  []*v2LayerFile
 	v2LayerByRoot map[string]*v2LayerFile
 	v2Trees       map[string]*merkle.LayerTree
-	// v2BlockTrees caches the block-layer (base=0) trees of the v2 files that
-	// have been asked for, built from the verified piece data so a seed can
-	// answer BEP 52 hash requests at the leaf layer too. v2BlockMu guards the
-	// cache and the build bookkeeping; the build itself runs off the torrent
-	// loop, so requests are refused until a tree is ready.
+	// v2BlockTrees caches leaf-layer trees built off-loop from verified
+	// data, for answering block-level hash requests; builds in flight
+	// refuse, failures cool down. v2BlockMu guards bookkeeping only.
 	v2BlockTrees  map[string]*v2BlockTreeEntry
 	v2BlockBytes  int64
 	v2BlockMu     sync.Mutex
@@ -109,167 +93,125 @@ type torrent struct {
 	v2Pending     map[*peer.Peer]*v2HashRequest
 	v2NoHashPeers map[*peer.Peer]struct{}
 
-	// Bitfield for pieces we have. It is created after we got info.
-	// Bits are set only after data is written to file.
-	bitfield *bitfield.Bitfield
-
-	// Protects bitfield writing from torrent loop and reading from announcer loop.
+	// Verified pieces, set only after bytes hit storage. mBitfield guards
+	// announcer-side reads against the run loop.
+	bitfield  *bitfield.Bitfield
 	mBitfield sync.RWMutex
 
-	// Unique peer ID is generated per downloader.
+	// Per-torrent peer id.
 	peerID [20]byte
 
-	files  []allocator.File
-	pieces []piece.Piece
-
+	// Files, pieces and the picker.
+	files       []allocator.File
+	pieces      []piece.Piece
 	piecePicker *piecepicker.PiecePicker
 
-	// Peers are sent to this channel when they are disconnected.
+	// Peer pumps and registries.
 	peerDisconnectedC chan *peer.Peer
+	pieceMessagesC    *suspendchan.Chan[peer.PieceMessage]
+	messages          chan peer.Message
+	peers             map[*peer.Peer]struct{}
+	incomingPeers     map[*peer.Peer]struct{}
+	outgoingPeers     map[*peer.Peer]struct{}
 
-	// Piece messages coming from peers are sent this channel.
-	pieceMessagesC *suspendchan.Chan[peer.PieceMessage]
-
-	// Other messages coming from peers are sent to this channel.
-	messages chan peer.Message
-
-	// We keep connected peers in this map after they complete handshake phase.
-	peers map[*peer.Peer]struct{}
-
-	// Also keep a reference to incoming and outgoing peers separately to count them quickly.
-	incomingPeers map[*peer.Peer]struct{}
-	outgoingPeers map[*peer.Peer]struct{}
-
-	// Keep recently seen peers to fill underpopulated PEX lists.
+	// recentlySeen seeds underpopulated PEX lists.
 	recentlySeen pexlist.RecentlySeen
 
-	// Unchoker implements an algorithm to select peers to unchoke based on their download speed.
 	unchoker *unchoker.Unchoker
 
-	// Active piece downloads are kept in this map.
-	// pieceDownloaders holds, per peer, the pieces it is downloading right now,
-	// keyed by piece index. A peer may have more than one (multi-piece
-	// pipelining), bounded by maxPiecesPerPeer. Touched only from the run loop.
+	// pieceDownloaders maps each peer to its active piece fetches by index.
+	// Multi-piece pipelining allows several per peer (see maxPiecesPerPeer).
+	// Run loop only.
 	pieceDownloaders map[*peer.Peer]map[uint32]*piecedownloader.PieceDownloader
 
-	// When a peer has snubbed us, a message sent to this channel.
 	peerSnubbedC chan *peer.Peer
 
-	// Active metadata downloads are kept in this map.
+	// Metadata (BEP 9) fetches, plus the snubbed subset.
 	infoDownloaders        map[*peer.Peer]*infodownloader.InfoDownloader
 	infoDownloadersSnubbed map[*peer.Peer]*infodownloader.InfoDownloader
 
 	pieceWriterResultC chan *piecewriter.PieceWriter
 
-	// This channel is closed once all torrent pieces are downloaded and verified.
-	completeC chan struct{}
-
-	// This channel is closed once all metadata pieces are downloaded and verified.
+	// completeC closes on verified completion; completeMetadataC on info
+	// arrival.
+	completeC         chan struct{}
 	completeMetadataC chan struct{}
 
-	// True after all pieces are download, verified and written to disk.
+	// completed latches once every wanted piece verifies.
 	completed bool
 
-	// If any unrecoverable error occurs, it will be sent to this channel and download will be stopped.
-	errC chan error
-
-	// After listener has started, port will be sent to this channel.
-	portC chan int
-
-	// Contains the last error sent to errC.
+	// errC carries the fatal error out; lastError remembers it.
+	errC      chan error
 	lastError error
 
-	// When Stop() is called, it will close this channel to signal run() function to stop.
-	closeC chan struct{}
+	// portC reports the listening port after start.
+	portC chan int
 
-	// Close() blocks until doneC is closed.
-	doneC chan struct{}
-
-	// Commands from the public API arrive here as closures and run on the run()
-	// goroutine, which is the only goroutine allowed to touch torrent state.
-	// See torrent_commands.go for the senders.
+	// Run-loop lifecycle: closeC stops, doneC confirms exit, commandC feeds
+	// API closures (see torrent_commands.go for the senders).
+	closeC   chan struct{}
+	doneC    chan struct{}
 	commandC chan func()
 
-	// Trackers send announce responses to this channel.
+	// Peer supply: tracker and DHT addresses, candidate pool, raw and routed
+	// sockets, duplicate-id registry, listener.
 	addrsFromTrackers chan []*net.TCPAddr
+	addrList          *addrlist.AddrList
+	incomingConnC     chan net.Conn
+	routedConnC       chan *incominghandshaker.IncomingHandshaker
+	peerIDs           map[[20]byte]struct{}
+	acceptor          *acceptor.Acceptor
 
-	// Keeps a list of peer addresses to connect.
-	addrList *addrlist.AddrList
-
-	// New raw connections created by OutgoingHandshaker are sent to here.
-	incomingConnC chan net.Conn
-	// routedConnC receives peers handshaked on the session's shared port.
-	routedConnC chan *incominghandshaker.IncomingHandshaker
-
-	// Keep a set of peer IDs to block duplicate connections.
-	peerIDs map[[20]byte]struct{}
-
-	// Listens for incoming peer connections.
-	acceptor *acceptor.Acceptor
-
-	// Special hash of info hash for encypted connection handshake.
+	// sKeyHash feeds the MSE stream-key lookup.
 	sKeyHash [20]byte
 
-	// Announces the status of torrent to trackers to get peer addresses periodically.
-	announcers []*announcer.PeriodicalAnnouncer
-
-	// This announcer announces Stopped event to the trackers after
-	// all periodical trackers are closed.
+	// Tracker and DHT announcers plus their result channels.
+	announcers            []*announcer.PeriodicalAnnouncer
 	stoppedEventAnnouncer *announcer.StopAnnouncer
+	dhtAnnouncer          *announcer.DHTAnnouncer
+	dhtPeersC             chan []*net.TCPAddr
 
-	// If not nil, torrent is announced to DHT periodically.
-	dhtAnnouncer *announcer.DHTAnnouncer
-	dhtPeersC    chan []*net.TCPAddr
-
-	// List of peers in handshake state.
-	incomingHandshakers map[*incominghandshaker.IncomingHandshaker]struct{}
-	outgoingHandshakers map[*outgoinghandshaker.OutgoingHandshaker]struct{}
-
-	// Handshake results are sent to these channels by handshakers.
+	// Handshake tracking: live handshakers and their result channels.
+	incomingHandshakers       map[*incominghandshaker.IncomingHandshaker]struct{}
+	outgoingHandshakers       map[*outgoinghandshaker.OutgoingHandshaker]struct{}
 	incomingHandshakerResultC chan *incominghandshaker.IncomingHandshaker
 	outgoingHandshakerResultC chan *outgoinghandshaker.OutgoingHandshaker
 
-	// When metadata of the torrent downloaded completely, a message is sent to this channel.
+	// infoDownloaderResultC is unused by the current metadata flow (kept for
+	// the channel inventory).
 	infoDownloaderResultC chan *infodownloader.InfoDownloader
 
-	// A ticker that ticks periodically to keep a certain number of peers unchoked.
+	// unchokeTicker paces the 10 s unchoke round.
 	unchokeTicker *time.Ticker
 
-	// A worker that opens and allocates files on the disk.
+	// Allocation and verification workers with progress/result channels and
+	// their counters.
 	allocator          *allocator.Allocator
 	allocatorProgressC chan allocator.Progress
 	allocatorResultC   chan *allocator.Allocator
 	bytesAllocated     int64
+	verifier           *verifier.Verifier
+	verifierProgressC  chan verifier.Progress
+	verifierResultC    chan *verifier.Verifier
+	checkedPieces      uint32
 
-	// A worker that does hash check of files on the disk.
-	verifier          *verifier.Verifier
-	verifierProgressC chan verifier.Progress
-	verifierResultC   chan *verifier.Verifier
-	checkedPieces     uint32
-
-	// localData is published once the pieces exist: an immutable snapshot of the
-	// torrent's pieces and storage that another torrent may read (Swarm Merging,
-	// Fase 1) without going through this torrent's run loop. See localmerge.go.
+	// localData snapshots pieces+storage for sibling-torrent Swarm Merging
+	// reads off the run loop (phase 1). See localmerge.go.
 	localData atomic.Pointer[localDataSnapshot]
 
-	// mergedPieces are the pieces the swarm merge just re-verified in this run
-	// (see localmerge.go). The verifier skips them: their bytes were checked
-	// against this torrent's own hashes, so re-reading and re-hashing them would
-	// only duplicate work. Cleared by startVerifier after it is consumed.
+	// mergedPieces holds merge re-verified pieces for the verifier to skip
+	// (consumed by startVerifier). See localmerge.go.
 	mergedPieces map[uint32]bool
 
-	// skipBits marks the pieces of deselected files (nil when none is), kept by
-	// applySkippedPieces: interest and peer usefulness ignore those pieces.
-	// Touched only from the run loop.
+	// skipBits marks deselected-file pieces (nil when none): interest and
+	// usefulness ignore them. Run loop only.
 	skipBits *bitfield.Bitfield
 
-	// pendingWrites is the number of pieces of this torrent whose write to disk
-	// is in flight. It bounds the write ring buffer (maxPendingWrites): above 0
-	// the network keeps flowing while a piece is written, instead of the old
-	// "one write per torrent" stop-the-world. Touched only from the run loop.
+	// pendingWrites bounds the write ring (maxPendingWrites): the network
+	// flows during writes instead of stopping the world. Run loop only.
 	pendingWrites int
 
-	// Metrics
+	// Meters and counters.
 	downloadSpeed   metrics.Meter
 	uploadSpeed     metrics.Meter
 	bytesDownloaded metrics.Counter
@@ -280,30 +222,32 @@ type torrent struct {
 	seedDurationUpdatedAt time.Time
 	seedDurationTicker    *time.Ticker
 
-	// Holds connected peer IPs so we don't dial/accept multiple connections to/from same IP.
+	// connectedPeerIPs prevents duplicate connections per IP.
 	connectedPeerIPs map[string]struct{}
 
-	// Peers that are sending corrupt data are banned.
+	// bannedPeerIPs holds corrupt-data peers.
 	bannedPeerIPs map[string]struct{}
 
-	// Endpoints already reached through a BEP 55 holepunch rendezvous: one
-	// rendezvous attempt per endpoint, so a failing dial does not
-	// flood relays.
+	// holepunchAttempted allows one BEP 55 rendezvous per endpoint, so dead
+	// dials cannot flood relays.
 	holepunchAttempted map[string]struct{}
 
-	// A signal sent to run() loop when announcers are stopped.
+	// announcersStoppedC fires when the stopped announcer finishes; buffered
+	// so a detached one never blocks.
 	announcersStoppedC chan struct{}
 
-	// Piece buffers that are being downloaded are pooled to reduce load on GC.
+	// piecePool recycles piece buffers off the GC.
 	piecePool *bufferpool.Pool
 
-	// Used to calculate canonical peer priority (BEP 40).
-	// Initialized with value found in network interfaces.
-	// Then, updated from "yourip" field in BEP 10 extension handshake message.
+	// externalIP seeds BEP 40 peer priority from local interfaces, refreshed
+	// from BEP 10 "yourip" fields.
 	externalIP net.IP
 
+	// ramNotifyC wakes RAM-granted piece starts.
 	ramNotifyC chan *peer.Peer
 
+	// Webseeds: shared client, sources, results, retries and the active
+	// download count.
 	webseedClient          *http.Client
 	webseedSources         []*webseedsource.WebseedSource
 	rawWebseedSources      []string
@@ -311,67 +255,60 @@ type torrent struct {
 	webseedRetryC          chan *webseedsource.WebseedSource
 	webseedActiveDownloads int
 
-	// Set to true when manual verification is requested
+	// doVerify requests a manual re-verification on next stop.
 	doVerify bool
 
-	// If true, the torrent is stopped automatically when all torrent pieces are downloaded.
+	// stopAfterDownload/stopAfterMetadata auto-stop at those milestones.
 	stopAfterDownload bool
-
-	// If true, the torrent is stopped automatically when all metadata pieces are downloaded.
 	stopAfterMetadata bool
 
-	// If true, pieces are downloaded in index order instead of rarest-first.
+	// sequential/firstLast order the picks (streaming-friendly).
 	sequential bool
+	firstLast  bool
 
-	// If true, the pieces at both ends of every file are downloaded first
-	firstLast bool
-
-	// superSeeding enables BEP 16 super-seeding: while seeding,
-	// the torrent advertises a single piece at a time and serves only that, so
-	// the swarm spreads the data instead of the seed uploading it repeatedly.
-	// It is a per-torrent, opt-in seeding strategy and never affects the
-	// queue, the seed policy or the bandwidth limits.
+	// superSeeding arms BEP 16: while seeding, one advertised piece at a
+	// time, served only then, so the swarm spreads data. Opt-in seeding
+	// strategy; never touches queue, seed policy or bandwidth.
 	superSeeding bool
 
-	// superSeedPeers holds per-peer super-seeding state. It is only populated
-	// while superSeeding is on and the torrent is completed. Owned by the run
-	// goroutine, like the rest of the torrent state.
+	// superSeedPeers tracks per-peer super-seeding, populated only while
+	// seeding with the flag on. Run goroutine owned.
 	superSeedPeers map[*peer.Peer]*superSeedPeer
 
-	// Per-torrent rate limiters. They inherit the session
-	// limiters until an explicit per-torrent limit is set; peers hold these, so
-	// a change applies without reconnecting.
+	// Per-torrent limiters inherit the session ones until explicit limits
+	// land; peers hold these, so changes apply without reconnecting.
 	bucketDownload *bandwidth.Limiter
 	bucketUpload   *bandwidth.Limiter
-	// Explicit per-torrent speed limits in KiB/s (-1 = inherit the session).
+	// downloadLimitKib/uploadLimitKib are explicit KiB/s caps (-1 inherits).
 	downloadLimitKib int64
 	uploadLimitKib   int64
-	// Per-torrent connection and upload-slot caps. Zero means no
-	// per-torrent cap; the session budgets still apply.
+	// maxConnections/maxUploads cap peers and upload slots (0 = session
+	// budgets only).
 	maxConnections int
 	maxUploads     int
 
-	// True means that completeCmd has run before.
+	// completeCmdRun remembers the fired completion hook.
 	completeCmdRun bool
 
 	log logger.Logger
 }
 
-// newTorrent is a constructor for torrent struct.
-// loadExistingTorrents, addTorrentStopped and addMagnet ultimately calls this method.
+// newTorrent builds a torrent: the add paths (resume load, .torrent add,
+// magnet add) converge here. Channels, maps, meters and registries start
+// empty; info, bitfield, stats and options arrive as arguments.
 func newTorrent(
 	s *Session,
 	id string,
 	addedAt time.Time,
 	infoHash []byte,
 	sto storage.Storage,
-	name string, // display name
-	port int, // tcp peer port
+	name string,
+	port int,
 	trackers []tracker.Tracker,
 	fixedPeers []string,
 	info *metainfo.Info,
 	bf *bitfield.Bitfield,
-	stats resumer.Stats, // initial stats from previous run
+	stats resumer.Stats,
 	ws []*webseedsource.WebseedSource,
 	stopAfterDownload bool,
 	stopAfterMetadata bool,
@@ -430,7 +367,7 @@ func newTorrent(
 		connectedPeerIPs:          make(map[string]struct{}),
 		bannedPeerIPs:             make(map[string]struct{}),
 		holepunchAttempted:        make(map[string]struct{}),
-		announcersStoppedC:        make(chan struct{}, 1), // buffered so a detached stop announcer can finish
+		announcersStoppedC:        make(chan struct{}, 1),
 		dhtPeersC:                 make(chan []*net.TCPAddr, 1),
 		externalIP:                externalip.FirstExternalIP(),
 		downloadSpeed:             metrics.NilMeter{},
@@ -453,10 +390,20 @@ func newTorrent(
 		superSeeding:              superSeeding,
 		superSeedPeers:            make(map[*peer.Peer]*superSeedPeer),
 	}
-	// Per-torrent limiters inherit the session ones until an explicit limit is
-	// set.
-	// Publish the info dictionary through the atomic pointer: it is read from
-	// other goroutines (the daemon, announcers, Status), never from the field.
+	t.finishConstruction(s, cfg, info, stats)
+	n := t.copyPeerIDPrefix()
+	if _, err := rand.Read(t.peerID[n:]); err != nil {
+		return nil, err
+	}
+	t.unchoker = unchoker.New(cfg.UnchokedPeers, cfg.OptimisticUnchokedPeers)
+	go t.run()
+	return t, nil
+}
+
+// finishConstruction publishes info, inherits the session limiters, caps an
+// overlong webseed list, restores counters, and wires the address pool and
+// piece pool.
+func (t *torrent) finishConstruction(s *Session, cfg Config, info *metainfo.Info, stats resumer.Stats) {
 	t.setInfo(info)
 	t.bucketDownload = bandwidth.New(0)
 	t.bucketDownload.SetParent(s.bucketDownload)
@@ -475,20 +422,14 @@ func newTorrent(
 	if cfg.BlocklistEnabledForOutgoingConnections {
 		blocklistForOutgoingConns = s.blocklist
 	}
-	t.addrList = addrlist.New(cfg.MaxPeerAddresses, blocklistForOutgoingConns, port, &t.externalIP)
+	t.addrList = addrlist.New(cfg.MaxPeerAddresses, blocklistForOutgoingConns, t.port, &t.externalIP)
 	if t.info() != nil {
 		t.piecePool = bufferpool.New(int(t.info().PieceLength))
 	}
-	n := t.copyPeerIDPrefix()
-	_, err := rand.Read(t.peerID[n:])
-	if err != nil {
-		return nil, err
-	}
-	t.unchoker = unchoker.New(cfg.UnchokedPeers, cfg.OptimisticUnchokedPeers)
-	go t.run()
-	return t, nil
 }
 
+// copyPeerIDPrefix stamps the peer id prefix (masked on private torrents),
+// returning the random tail's offset.
 func (t *torrent) copyPeerIDPrefix() int {
 	if t.info() != nil && t.info().Private {
 		return copy(t.peerID[:], t.session.config.PrivatePeerIDPrefix)
@@ -496,6 +437,7 @@ func (t *torrent) copyPeerIDPrefix() int {
 	return copy(t.peerID[:], publicPeerIDPrefix)
 }
 
+// getPeersForUnchoker snapshots the peers for the unchoke round.
 func (t *torrent) getPeersForUnchoker() []unchoker.Peer {
 	peers := make([]unchoker.Peer, 0, len(t.peers))
 	for pe := range t.peers {
@@ -504,24 +446,24 @@ func (t *torrent) getPeersForUnchoker() []unchoker.Peer {
 	return peers
 }
 
+// Name is the display name.
 func (t *torrent) Name() string {
 	return t.name
 }
 
-// info returns the parsed torrent metadata, or nil for a magnet before its
-// metadata arrives. The run loop publishes it once with setInfo; every read
-// (including from the daemon, the announcers and Status) goes through the
-// atomic pointer, so there is no data race on the field.
+// info reads the published metadata (nil for magnets in flight). Every
+// reader — run loop, daemon, announcers, Status — goes through the atomic
+// pointer: never the field.
 func (t *torrent) info() *metainfo.Info {
 	return t.infoPtr.Load()
 }
 
-// setInfo publishes the parsed metadata (called by the run loop).
+// setInfo publishes parsed metadata from the run loop.
 func (t *torrent) setInfo(info *metainfo.Info) {
 	t.infoPtr.Store(info)
 }
 
-// Collections returns the BEP 38 "collections" identifiers of the torrent.
+// Collections exposes the BEP 38 collection hints (nil-safe copy).
 func (t *torrent) Collections() []string {
 	if t.info() == nil {
 		return nil
@@ -529,7 +471,7 @@ func (t *torrent) Collections() []string {
 	return append([]string(nil), t.info().Collections...)
 }
 
-// Similar returns the BEP 38 "similar" info hashes of the torrent.
+// Similar exposes the BEP 38 similar hashes (nil-safe copy).
 func (t *torrent) Similar() [][20]byte {
 	if t.info() == nil {
 		return nil
@@ -537,16 +479,19 @@ func (t *torrent) Similar() [][20]byte {
 	return append([][20]byte(nil), t.info().Similar...)
 }
 
+// InfoHash copies the 20-byte identity out.
 func (t *torrent) InfoHash() []byte {
 	b := make([]byte, 20)
 	copy(b, t.infoHash[:])
 	return b
 }
 
+// Dir is the storage root.
 func (t *torrent) Dir() string {
 	return t.storage.RootDir()
 }
 
+// Files lists non-padding files; it fails before metadata arrives.
 func (t *torrent) Files() ([]File, error) {
 	if t.info() == nil {
 		return nil, errors.New("torrent metadata not ready")
@@ -563,11 +508,11 @@ func (t *torrent) Files() ([]File, error) {
 	return files, nil
 }
 
+// FileStats reports per-file completion: from live pieces while running,
+// from the verified bitfield while stopped (parked or abandoned packs stay
+// inspectable without restarting).
 func (t *torrent) FileStats() ([]FileStats, error) {
 	if len(t.pieces) == 0 {
-		// a stopped torrent has no pieces in memory but keeps its
-		// verified bitfield, so the completed files of a parked or abandoned
-		// download can still be found (and imported) without restarting it.
 		return t.fileStatsFromBitfield()
 	}
 
@@ -575,8 +520,6 @@ func (t *torrent) FileStats() ([]FileStats, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// calculate bytes completed for each file
 	fileComp := make(map[string]int64)
 	for _, p := range t.pieces {
 		if p.Done {
@@ -587,7 +530,6 @@ func (t *torrent) FileStats() ([]FileStats, error) {
 			}
 		}
 	}
-
 	stats := make([]FileStats, 0, len(files))
 	for _, f := range files {
 		stats = append(stats,
@@ -596,49 +538,52 @@ func (t *torrent) FileStats() ([]FileStats, error) {
 				BytesCompleted: fileComp[f.path],
 			})
 	}
-
 	return stats, nil
 }
 
+// FileStats pairs a file with its completed bytes.
 type FileStats struct {
 	File
 	BytesCompleted int64
 }
 
+// File is one torrent file: storage path and length.
 type File struct {
 	path   string
 	length int64
 }
 
+// Path is the storage-relative path.
 func (f File) Path() string {
 	return f.path
 }
 
+// Length is the file size.
 func (f File) Length() int64 {
 	return f.length
 }
 
+// announceDHT registers the torrent for DHT peer duty.
 func (t *torrent) announceDHT() {
 	t.session.mPeerRequests.Lock()
 	t.session.dhtPeerRequests[t] = struct{}{}
 	t.session.mPeerRequests.Unlock()
 }
 
-// privateSwarm reports whether peer discovery outside the tracker (DHT, PEX,
-// LSD) must be disabled for this torrent (BEP 27). Unknown metadata is treated
-// as non-private; a private magnet is stopped as soon as the info dict arrives.
+// privateSwarm disables non-tracker discovery (DHT, PEX, LSD) on private
+// torrents (BEP 27). Unknown metadata reads as public; a private magnet
+// stops at info arrival.
 func (t *torrent) privateSwarm() bool {
 	return t.info() != nil && t.info().Private
 }
 
-// DisableLogging disables all log messages printed to console.
-// This function needs to be called before creating a Session.
+// DisableLogging silences console logging; call before NewSession.
 func DisableLogging() {
 	logger.Disable()
 }
 
-// fileStatsFromBitfield computes the completed bytes of every file from the
-// verified bitfield, for a torrent whose pieces are not loaded.
+// fileStatsFromBitfield derives per-file completion from the verified
+// bitfield for pieces-less (stopped) torrents.
 func (t *torrent) fileStatsFromBitfield() ([]FileStats, error) {
 	t.mBitfield.RLock()
 	defer t.mBitfield.RUnlock()
@@ -648,9 +593,8 @@ func (t *torrent) fileStatsFromBitfield() ([]FileStats, error) {
 	return fileStatsFromPieces(t.info().Files, int64(t.info().PieceLength), t.bitfield.Test), nil
 }
 
-// fileStatsFromPieces maps completed pieces onto the files laid end to end
-// (padding files included, as they take space in the piece stream) and returns
-// the completed bytes of each non-padding file.
+// fileStatsFromPieces lays files end to end (padding included in the piece
+// stream) and counts completed bytes per non-padding file.
 func fileStatsFromPieces(files []metainfo.File, pieceLength int64, done func(uint32) bool) []FileStats {
 	stats := make([]FileStats, 0, len(files))
 	var offset int64
