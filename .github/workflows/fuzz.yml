@@ -1,0 +1,57 @@
+name: Fuzz
+
+# Nightly fuzzing of every network-facing parser (make fuzz-smoke): the DHT,
+# bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE and the peer-wire
+# handshake. Kept off the push path: it is long, and a failure does not block a
+# merge. The Go fuzzer writes a crashing input to testdata/fuzz/<Target>/; on a
+# failure it is uploaded as an artifact so it can be committed as a regression
+# seed (docs/evoluzione.md, section 10 item 1: a screen caught a .torrent DoS
+# before a release). See scripts/README or docs/DEVELOPERS.md for local runs.
+#
+# Manual run: Actions → Fuzz → Run workflow (optionally set fuzz_time, e.g. 5m
+# for a deeper pass; the default is 2m per target).
+
+on:
+  schedule:
+    - cron: "41 3 * * *" # every day at 03:41 UTC
+  workflow_dispatch:
+    inputs:
+      fuzz_time:
+        description: "Fuzzing time per target (Go duration, e.g. 30s, 2m, 10m)"
+        required: false
+        default: "2m"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: fuzz-smoke (x86_64)
+    runs-on: ubuntu-24.04
+    # Every target is pure Go: the libtorrent stub applies and no C/C++ headers
+    # are needed.
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Fuzz every network-facing parser
+        run: make fuzz-smoke FUZZ_TIME=${{ github.event.inputs.fuzz_time || '2m' }}
+
+      # The Go fuzzer writes a crashing input to testdata/fuzz/<Target>/; keep it
+      # so it can be fixed and committed as a seed.
+      - name: Upload the failing inputs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-crashers
+          path: "**/testdata/fuzz/**"
+          if-no-files-found: ignore
+          retention-days: 30

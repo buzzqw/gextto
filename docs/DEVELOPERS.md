@@ -152,6 +152,21 @@ It runs in CI in the `ui-e2e` job. `tests/accessibility.spec.ts` holds the
 axe-core checks and the keyboard/reflow regressions: it should pass before
 changing UI templates, styles or client-side interaction code.
 
+### Fuzzing
+
+The network-facing parsers have Go fuzz targets. Run them before touching the
+`internal/gxcore` codecs, the DHT packets, the `.torrent`/magnet/RSS/Torznab
+parsing or the MSE/peer-wire handshake:
+
+```bash
+make fuzz-smoke                # 30s per target (FUZZ_TIME default)
+FUZZ_TIME=2m make fuzz-smoke   # a serious pass
+```
+
+A crashing input is written under `testdata/fuzz/<Target>/`: fix the code and
+commit the input as a regression seed. `.github/workflows/fuzz.yml` runs the same
+check nightly (2m per target) and uploads the failing inputs as an artifact.
+
 ## Build cache
 
 The Go build cache (`GOCACHE`, normally `~/.cache/go-build`) grows over time and
