@@ -76,7 +76,7 @@ render appears on the next render (no stale cache).
   hardening and multi-path (§4.4). Outside CI. There is also
   `make measure-seeding` for choking (§6).
 
-### 1.3 Closed / decisions
+### 1.3 Decisions and completed items
 
 - **i18n in six languages** — done (2026-10-10). Full it/en/de/fr/es/pl package:
   web UI (chrome, labels, tooltips, hints, server-side messages and strings
@@ -110,8 +110,6 @@ render appears on the next render (no stale cache).
 - **Unified upgrade logs** — done (commit `988d60a`). A replacement
   produces a single line: `♻️ FBI S03E01 updated (1.4 GB): … · previous version
   «…» moved to the trash`. A normal addition stays `📁 … added to the library …`.
-- **"Background operations" panel** — resolved (commit `65cb9bf`). It remains and
-  works (polling, cancellation), but it is **hidden when there is no job**.
 - **Write-back cache in the gx-core engine** — closed: the measurement shows
   `write_cache=0` (storage and download in step), so there would be no
   gain. To be reopened only with storage genuinely slower than the network.
@@ -121,19 +119,6 @@ render appears on the next render (no stale cache).
   costs ~1–3 ms/page, it is not a problem.
 - **Cache cap on slow storage (NFS)** — superseded: the cache self-regulates
   (`cmd/gx-torrent/cache.go`, tuner `cacheSizes`).
-- **Dashboard: "Latest found in the sources" diagnostics** — already done
-  (route `GET /dashboard/feed`, `uiweb_v2.go`).
-- **Live verification of the RAM disk flow with gx-torrent** — done (2026-10-07).
-- **README aligned with BEP coverage — done (2026-10-11).** The
-  *Torrent engine* sections of `README.md`/`README.it.md` now summarise **all** the
-  BitTorrent coverage with the BEP numbers (wire 3, Fast Extension 6,
-  `ut_metadata` 9, Extension Protocol 10, PEX v4/v6 11, multitracker 12, LSD
-  v4/v6 14, Web Seed 19, `upload_only` 21, padding 47, `lt_donthave` 54; tracker
-  IPv6 7, UDP 15, URLData 41, scrape 48; DHT 5/32/33/42/43/44; v2 52, magnet
-  `so=` 53) and refer to `docs/bep.md` as the single source; the deprecated/niche
-  BEPs and WebTorrent/I2P are declared out of scope. General rule added
-  to `AGENTS.md`: the README is documentation and must be updated with every change
-  that impacts the user.
 
 ### 1.4 UI/i18n micro-optimisations (done, measured on 2026-10-10)
 
