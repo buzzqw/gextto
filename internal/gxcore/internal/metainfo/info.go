@@ -13,6 +13,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bencodecheck"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/zeebo/bencode"
 )
@@ -128,6 +129,9 @@ func (ib *infoType) overrideUTF8Keys() {
 // NewInfo decodes b into an Info: v1, hybrid or (via ErrV2Only) v2-only.
 // Validation runs meta-version first, then piece data, then file names.
 func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
+	if err := bencodecheck.Validate(b); err != nil {
+		return nil, err
+	}
 	var ib infoType
 	if err := bencode.DecodeBytes(b, &ib); err != nil {
 		return nil, err

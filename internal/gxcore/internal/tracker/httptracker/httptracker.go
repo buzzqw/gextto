@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bencodecheck"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 	"github.com/zeebo/bencode"
@@ -68,7 +69,7 @@ func (t *HTTPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest)
 	t.log.Debugf("read %d bytes from body", len(body))
 
 	var response announceResponse
-	if err := bencode.DecodeBytes(body, &response); err != nil {
+	if err := bencodecheck.DecodeBytes(body, &response); err != nil {
 		if code != 200 {
 			return nil, &StatusError{Code: code, Header: header, Body: string(body)}
 		}
@@ -145,7 +146,7 @@ func decodeAnnouncePeers(response announceResponse) ([]*net.TCPAddr, error) {
 			peers, err = parsePeersDictionary(response.Peers)
 		} else {
 			var b []byte
-			if err = bencode.DecodeBytes(response.Peers, &b); err != nil {
+			if err = bencodecheck.DecodeBytes(response.Peers, &b); err != nil {
 				return nil, tracker.ErrDecode
 			}
 			peers, err = tracker.DecodePeersCompact(b)
@@ -156,7 +157,7 @@ func decodeAnnouncePeers(response announceResponse) ([]*net.TCPAddr, error) {
 	}
 	if len(response.Peers6) > 0 {
 		var b6 []byte
-		if err := bencode.DecodeBytes(response.Peers6, &b6); err != nil {
+		if err := bencodecheck.DecodeBytes(response.Peers6, &b6); err != nil {
 			return nil, tracker.ErrDecode
 		}
 		p6, err := tracker.DecodePeersCompact6(b6)
@@ -214,7 +215,7 @@ func (t *HTTPTracker) Scrape(ctx context.Context, req tracker.ScrapeRequest) (*t
 	}
 
 	var response scrapeResponse
-	if err := bencode.DecodeBytes(body, &response); err != nil {
+	if err := bencodecheck.DecodeBytes(body, &response); err != nil {
 		if code != 200 {
 			return nil, &StatusError{Code: code, Header: header, Body: string(body)}
 		}
@@ -295,7 +296,7 @@ func parsePeersDictionary(b bencode.RawMessage) ([]*net.TCPAddr, error) {
 		IP   string `bencode:"ip"`
 		Port uint16 `bencode:"port"`
 	}
-	if err := bencode.DecodeBytes(b, &peers); err != nil {
+	if err := bencodecheck.DecodeBytes(b, &peers); err != nil {
 		return nil, tracker.ErrDecode
 	}
 	addrs := make([]*net.TCPAddr, len(peers))

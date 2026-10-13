@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/backoff"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bencodecheck"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/blocklist"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resolver"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
-	"github.com/zeebo/bencode"
 )
 
 const (
@@ -247,7 +247,7 @@ func (t *Transport) handleReply(st *runState, buf []byte) {
 			FailureReason string `bencode:"failure reason"`
 			RetryIn       string `bencode:"retry in"`
 		}
-		if derr := bencode.DecodeBytes(buf[binary.Size(header):], &terr); derr != nil {
+		if derr := bencodecheck.DecodeBytes(buf[binary.Size(header):], &terr); derr != nil {
 			err = tracker.ErrDecode
 		} else {
 			err = tracker.NewError(terr.FailureReason, terr.RetryIn)

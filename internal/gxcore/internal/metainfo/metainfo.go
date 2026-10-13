@@ -3,16 +3,24 @@
 package metainfo
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bencodecheck"
 	"github.com/zeebo/bencode"
 )
 
 // Creator stamps torrents minted by NewBytes; set it to the client name.
 var Creator string
+
+// maxMetaInfoBytes bounds a torrent decoded by New. The engine's own limits
+// (config.MaxTorrentSize, 10 MiB by default, and MaxMetadataSize, 30 MiB) are
+// well below it, so the cap never rejects a torrent the engine accepts.
+const maxMetaInfoBytes = 64 << 20
 
 // MetaInfo is the decoded .torrent: info dict, tracker tiers, webseeds and,
 // for v2, the top-level piece layers.
@@ -27,6 +35,20 @@ type MetaInfo struct {
 
 // New decodes a .torrent stream, accepting v1, hybrid and v2-only payloads.
 func New(r io.Reader) (*MetaInfo, error) {
+	data, err := io.ReadAll(io.LimitReader(r, maxMetaInfoBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxMetaInfoBytes {
+		return nil, fmt.Errorf("torrent file too large: over %d bytes", maxMetaInfoBytes)
+	}
+	// Reject declared string lengths beyond the bytes actually present before
+	// the decoder, which allocates the length up front, sees them: a small
+	// crafted .torrent (or magnet metadata) must not be able to ask for
+	// gigabytes and starve the daemon.
+	if err := bencodecheck.Validate(data); err != nil {
+		return nil, err
+	}
 	var t struct {
 		Info         bencode.RawMessage `bencode:"info"`
 		Announce     bencode.RawMessage `bencode:"announce"`
@@ -36,7 +58,7 @@ func New(r io.Reader) (*MetaInfo, error) {
 		Collections  bencode.RawMessage `bencode:"collections"`
 		Similar      bencode.RawMessage `bencode:"similar"`
 	}
-	if err := bencode.NewDecoder(r).Decode(&t); err != nil {
+	if err := bencode.NewDecoder(bytes.NewReader(data)).Decode(&t); err != nil {
 		return nil, err
 	}
 	if len(t.Info) == 0 {

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bencodecheck"
 	"github.com/zeebo/bencode"
 )
 
@@ -105,6 +106,15 @@ func (m *ExtensionMessage) UnmarshalBinary(data []byte) error {
 	}
 	m.ExtendedMessageID = extID
 	payload := data[1:]
+	// The bencoded sub-messages are screened before decoding: zeebo/bencode
+	// allocates a declared string length up front, so a tiny hostile message
+	// could otherwise ask for gigabytes. (Dont-have and holepunch are binary,
+	// so they are not screened here.)
+	if m.ExtendedMessageID == ExtensionIDHandshake || m.ExtendedMessageID == ExtensionIDMetadata || m.ExtendedMessageID == ExtensionIDPEX {
+		if err := bencodecheck.Validate(payload); err != nil {
+			return err
+		}
+	}
 	dec := bencode.NewDecoder(bytes.NewReader(payload))
 	var err error
 	switch m.ExtendedMessageID {

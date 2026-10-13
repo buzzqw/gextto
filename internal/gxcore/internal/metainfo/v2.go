@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bencodecheck"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/merkle"
 	"github.com/zeebo/bencode"
 )
@@ -33,6 +34,9 @@ type V2File struct {
 // order matches the tree: keys (path components) are sorted and walked depth
 // first, which is the order used to map files into the piece address space.
 func ParseFileTree(raw []byte) ([]V2File, error) {
+	if err := bencodecheck.Validate(raw); err != nil {
+		return nil, err
+	}
 	var out []V2File
 	var walk func(prefix string, raw bencode.RawMessage) error
 	walk = func(prefix string, raw bencode.RawMessage) error {
@@ -108,6 +112,9 @@ func parseLeaf(prefix string, raw bencode.RawMessage) (V2File, bool, error) {
 // accepted; the v1 fields are filled in too when present. It is the building
 // block for downloading v2 torrents and does not change NewInfo's behaviour.
 func NewV2Info(b []byte) (*Info, error) {
+	if err := bencodecheck.Validate(b); err != nil {
+		return nil, err
+	}
 	var ib infoType
 	if err := bencode.DecodeBytes(b, &ib); err != nil {
 		return nil, err
@@ -385,6 +392,9 @@ func EncodePieceLayers(layers map[string][]byte) ([]byte, error) {
 func DecodePieceLayers(b []byte) (map[string][]byte, error) {
 	if len(b) == 0 {
 		return nil, nil
+	}
+	if err := bencodecheck.Validate(b); err != nil {
+		return nil, err
 	}
 	var m map[string][]byte
 	if err := bencode.DecodeBytes(b, &m); err != nil {
