@@ -95,7 +95,7 @@ func (d *Daemon) handleUIRssSettings(w http.ResponseWriter, r *http.Request) {
 		d.renderRSS(w, r, "Cannot save settings: "+err.Error())
 		return
 	}
-	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+	http.Redirect(w, r, "/ui/rss#options", http.StatusSeeOther)
 }
 
 // feedItemView is one feed item annotated with the rule decision.
@@ -218,7 +218,7 @@ func (d *Daemon) handleUIRssConfig(w http.ResponseWriter, r *http.Request) {
 	// A feed saved now must be checked now, not only after a restart or the
 	// manual button.
 	d.pokeFeeds()
-	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+	http.Redirect(w, r, "/ui/rss#options", http.StatusSeeOther)
 }
 
 // renderRSS writes the RSS page, localized like the daemon page.
@@ -256,7 +256,7 @@ func (d *Daemon) renderRSS(w http.ResponseWriter, r *http.Request, errKey string
 
 	errorHTML := ""
 	if errKey != "" {
-		errorHTML = `<p class="err">` + html.EscapeString(errKey) + `</p>`
+		errorHTML = `<div class="notice err" role="alert">` + html.EscapeString(errKey) + `</div>`
 	}
 	page = strings.Replace(page, "<!--ERROR-->", errorHTML, 1)
 

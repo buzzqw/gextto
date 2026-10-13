@@ -376,10 +376,10 @@ func TestStandaloneCardsHideCacheAndShowPortDot(t *testing.T) {
 	page, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	text := string(page)
-	if strings.Contains(text, "I/O ops r/w") || strings.Contains(text, "cache r/w") {
-		t.Fatal("standalone page must not show the cache and I/O tiles")
+	if strings.Contains(text, "I/O ops r/w") || strings.Contains(text, "cache r/w") || strings.Contains(text, "<span>Cache</span>") {
+		t.Fatal("standalone page must not show the cache and I/O figures")
 	}
-	if !strings.Contains(text, `class="dot dot-`) || !strings.Contains(text, `href="/ui/archive"`) {
+	if !strings.Contains(text, `class="dot `) || !strings.Contains(text, `href="/ui/archive"`) {
 		t.Fatal("peer-port dot or Archive link missing")
 	}
 }

@@ -4,11 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gx-torrent</title>
-<style>body{margin:0;font:16px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
-form{max-width:360px;margin:80px auto;background:#161d2c;border:1px solid #243049;border-radius:12px;padding:22px}
-input,button{width:100%;padding:8px;margin:8px 0;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
-button{background:#2563eb;color:#fff;font-weight:600;border:0;cursor:pointer}
-.m{color:#93a1b5}.err{color:#fca5a5}</style></head>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="/favicon.ico">
+<script>try{var m=localStorage.getItem('gx-theme');if(m==='light'||m==='dark')document.documentElement.setAttribute('data-theme',m);}catch(e){}</script>
+<link rel="stylesheet" href="/assets/theme.css">
+<style>
+body{min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:72px 16px}
+form{width:min(380px,100%);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:26px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+form h2{margin:0;display:flex;align-items:center;gap:10px;font-size:18px}
+form h2::before{content:"";width:28px;height:28px;border-radius:7px;background:url(/favicon.ico) center/cover}
+input{width:100%}
+button{width:100%;height:38px}
+button[type=submit]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.m{color:var(--muted);margin:0}
+</style></head>
 <body><form method="post" action="/ui/login">
 <h2 style="margin:0 0 6px">gx-torrent</h2>
 <p class="m">Sign in to the gx-torrent page.</p>
@@ -16,4 +25,5 @@ button{background:#2563eb;color:#fff;font-weight:600;border:0;cursor:pointer}
 <input type="password" name="password" placeholder="password" autocomplete="current-password" title="Password for web interface login">
 <button type="submit" title="Sign in to the web interface">Sign in</button>
 <!--ERROR-->
-</form></body></html>
+</form><script src="/assets/common.js"></script>
+</body></html>

@@ -265,8 +265,13 @@ binario** che Gextto pilota come motore, non un prodotto separato:
 - **API JSON nativa e login:** espone una propria API JSON (`/api/v1/...`), la
   stessa con cui Gextto lo pilota, più una pagina di accesso (`/ui/login`) quando
   è attiva l'autenticazione standalone.
-- **Interfaccia Web Indipendente e Wizard di Setup:** include una UI web completa
-  con grafici e diagnostica in tempo reale, gestione categorie e tag e ricerca
+- **Interfaccia Web Indipendente e Wizard di Setup:** una UI web moderna nello
+  spirito di VueTorrent e Flood, con tema chiaro e scuro: barra laterale con
+  filtri per stato, categoria e tag e grafico del traffico in tempo reale, elenco
+  denso e ordinabile con selezione multipla, menu contestuale e scorciatoie da
+  tastiera, dettaglio del torrent in un pannello laterale, trascinamento dei file
+  `.torrent` e magnet incollati, schede su telefono, ogni pagina verificata con
+  axe-core. Include diagnostica in tempo reale, gestione categorie e tag e ricerca
   multi-indexer che legge prima l'**archivio** locale (alimentato dai feed RSS e
   dagli indexer per i titoli monitorati) e interroga gli indexer configurati
   (Jackett, Prowlarr, MIRCrew) in tempo reale solo su richiesta, ognuno con il
@@ -275,7 +280,7 @@ binario** che Gextto pilota come motore, non un prodotto separato:
   Jackett, l'API di ricerca aggregata di Prowlarr e l'`/api` di un servizio
   Torznab diretto vengono ricavati da soli.
 - **Una suite RSS e automazione all'altezza di qBittorrent e Deluge/YaRSS2:**
-  - **Schede dedicate:** separazione pulita tra **Wanted** (`/ui/wanted`) per serie TV e film con tracciamento degli episodi mancanti (gap search) e ricerche manuali istantanee, e **RSS & Indexer** (`/ui/rss`) per feed, indexer e regole di automazione.
+  - **Pagine dedicate:** **Cercati** (`/ui/wanted`) mostra una scheda per ogni serie o film con gli episodi mancanti, quelli già presi e l'ultima ricerca, e aggiunge i titoli con una finestra guidata (cerchi come il titolo è scritto nell'archivio e negli indexer, lo scegli, poi stagioni, lingua e qualità); **RSS & Indexer** (`/ui/rss`) divide feed, regole, indexer e opzioni in schede di card, con un editor delle regole organizzato in *quali elementi* / *cosa fare* e l'anteprima delle corrispondenze accanto.
   - **Feed & Indexer:** i feed sono URL RSS o elenchi HTML (pagine uploader di ext.to e TorrentGalaxy), con ultimo controllo, elementi, contatori nuovi/aggiunti, riscontro istantaneo al click su **Controlla feed** (`✓ N feed controllati: X nuovi · Y aggiunti`) e ricarica per singola riga; preset indexer Torznab (Jackett, Prowlarr) con test in tempo reale, più un **URL FlareSolverr** opzionale per superare feed e indexer dietro una sfida Cloudflare.
   - **Regole di automazione:** regole ordinate PASS/FAIL (include/escludi, regex, dimensione, seed, età, filtro episodi, smart episode, *scarica una volta*, pausa tra corrispondenze) con percorso, categoria, tag e opzioni, modificabili sul posto e con **anteprima dal vivo** di ciò che catturerebbero.
   - **Lista Wanted & Gap search:** traccia serie TV e film cercati con menu a discesa per lingua e qualità (fino a 2160p 4K+), ricerca automatica degli episodi mancanti (gap search), pulsante di ricerca manuale istantanea globale o per singolo titolo e stato visuale immediato. I feed **ingrossano l'archivio** e gli indexer vengono interrogati **solo** per i titoli monitorati e per i buchi (e anch'essi finiscono in archivio), quindi le ricerche leggono l'**archivio** e rispondono subito; un feed senza regole e senza include/escludi non scarica nulla (c'è il flag *prendi tutto* per seguirlo per intero) e la query dal vivo è a una casella di distanza (*Cerca anche negli indexer*).

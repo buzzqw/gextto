@@ -288,6 +288,12 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - Quando aggiungi o sposti documenti, aggiorna l'indice `docs/README.md`.
 
 ## Accessibilità dell'interfaccia
+- Le pagine del demone gx-torrent (`internal/webui/assets`) usano il **design
+  system condiviso**: `theme.css` (token di colore per tema chiaro e scuro,
+  componenti), `common.js` (selettore del tema, notifiche) e lo sprite
+  `icons.svg`, serviti su `/assets/`. Niente colori fissi nelle pagine: usa le
+  variabili (`--text`, `--surface`, `--accent`, …) e i componenti esistenti
+  (`.topbar`, `ul.items`, `dialog`, `.chip`, `.badge`, `.fsec`).
 - **Ogni modifica alla UI deve controllare e rispettare l'accessibilità.**
   Vale per `uiweb/v2` (SSR + HTMX), per la pagina del demone
   (`cmd/gx-torrent/ui.go`) e per ogni pagina HTML generata.

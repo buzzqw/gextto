@@ -170,7 +170,7 @@ func (d *Daemon) handleUIRssIndexer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.pokeFeeds()
-	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+	http.Redirect(w, r, "/ui/rss#indexers", http.StatusSeeOther)
 }
 
 // handleUIRssIndexerTest checks one configured indexer with a Torznab `t=caps`
@@ -266,7 +266,7 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.pokeFeeds()
-	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+	http.Redirect(w, r, "/ui/rss#feeds", http.StatusSeeOther)
 }
 
 // handleUIRssRule adds, removes or reorders one ordered RSS rule. At least one
@@ -333,7 +333,7 @@ func (d *Daemon) handleUIRssRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.pokeFeeds()
-	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+	http.Redirect(w, r, "/ui/rss#rules", http.StatusSeeOther)
 }
 
 // handleUIRssSuggest returns series-name suggestions for the follow box, derived
@@ -494,36 +494,135 @@ func mibToBytes(raw string) int64 {
 func (d *Daemon) uiRuleRowsHTML() string {
 	list := d.rules()
 	if len(list) == 0 {
-		return `<tr><td colspan="5" class="muted">None</td></tr>`
+		return `<li class="empty"><p>No rules yet: every feed only grows the archive, or takes what its own Include/Exclude allow.</p></li>`
 	}
 	var b strings.Builder
 	for index, rule := range list {
-		kind, kindClass := "Add", "flag on"
+		idx := strconv.Itoa(index)
+		enabled := rss.RuleEnabled(rule)
+		kind := `<span class="badge b-seeding">Add</span>`
 		if rule.Fail {
-			kind, kindClass = "Skip", "flag"
+			kind = `<span class="badge b-error">Skip</span>`
 		}
-		scope := "All"
+		if !enabled {
+			kind += ` <span class="badge b-paused">Disabled</span>`
+		}
+		scope := `<span>All feeds</span>`
 		if len(rule.Feeds) > 0 {
-			scope = strings.Join(rule.Feeds, ", ")
+			scope = html.EscapeString(strings.Join(rule.Feeds, ", "))
 		}
-		flags := `<span class="` + kindClass + `">` + kind + `</span>`
-		if !rss.RuleEnabled(rule) {
-			flags += ` <span class="flag">Disabled</span>`
+		cls := "item"
+		if !enabled {
+			cls += " off"
 		}
-		b.WriteString("<tr><td>" + html.EscapeString(orDefault(rule.Name, "—")) + "</td>")
-		b.WriteString("<td>" + flags + ` <span class="muted">` + html.EscapeString(scope) + "</span></td>")
-		b.WriteString(`<td class="mono">` + html.EscapeString(uiRuleMatchSummary(rule)) + "</td>")
-		b.WriteString(`<td class="mono">` + html.EscapeString(uiRuleActionSummary(rule)) + "</td>")
+		b.WriteString(`<li class="` + cls + `"><div class="item-order" aria-hidden="true">` + strconv.Itoa(index+1) + `</div><div class="item-main">`)
+		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(orDefault(rule.Name, "—")) + `</span>` + kind + `</div>`)
+		b.WriteString(`<div class="item-sub"><svg class="i"><use href="/assets/icons.svg#i-rss"/></svg>` + scope + `</div>`)
+		if chips := uiRuleChipsHTML(rule); chips != "" {
+			b.WriteString(`<div class="chips">` + chips + `</div>`)
+		}
+		b.WriteString(`</div><div class="item-actions">`)
 		ruleJSON, _ := json.Marshal(rule)
 		toggle := "Disable"
-		if !rss.RuleEnabled(rule) {
+		if !enabled {
 			toggle = "Enable"
 		}
-		b.WriteString(`<td class="actions"><button type="button" class="sm" data-rule-edit data-index="` + strconv.Itoa(index) + `" data-rule="` + html.EscapeString(string(ruleJSON)) + `" title="Load this rule into the form to change it">Edit</button> `)
-		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="toggle"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="sm" title="Turn this rule on or off without deleting it">` + toggle + `</button></form>`)
-		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="up"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="sm" title="Move up: rules are evaluated in order" aria-label="Move up">↑</button></form>`)
-		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="down"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="sm" title="Move down: rules are evaluated in order" aria-label="Move down">↓</button></form>`)
-		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="danger">Remove</button></form></td></tr>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="up"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm" title="Move up: rules are evaluated in order" aria-label="Move up"` + disabledIf(index == 0) + `><svg class="i"><use href="/assets/icons.svg#i-up"/></svg></button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="down"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm" title="Move down: rules are evaluated in order" aria-label="Move down"` + disabledIf(index == len(list)-1) + `><svg class="i"><use href="/assets/icons.svg#i-down"/></svg></button></form>`)
+		b.WriteString(`<button type="button" class="sm" data-rule-edit data-index="` + idx + `" data-rule="` + html.EscapeString(string(ruleJSON)) + `" title="Open this rule to change it">Edit</button>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="toggle"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="sm ghost" title="Turn this rule on or off without deleting it">` + toggle + `</button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule" data-confirm="Delete this rule?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm danger" title="Delete this rule" aria-label="Delete this rule"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
+		b.WriteString(`</div></li>`)
+	}
+	return b.String()
+}
+
+// disabledIf renders the disabled attribute when cond holds.
+func disabledIf(cond bool) string {
+	if cond {
+		return " disabled"
+	}
+	return ""
+}
+
+// uiChip renders one labelled chip; the label is its own element so the page
+// translator localizes it, the value stays as typed.
+func uiChip(class, label, value string) string {
+	return `<span class="chip ` + class + `"><span>` + label + `</span>&nbsp;` + html.EscapeString(value) + `</span>`
+}
+
+// uiRuleChipsHTML shows a rule as readable chips: what it matches, then what
+// it does with what it matched.
+func uiRuleChipsHTML(rule rss.Rule) string {
+	m, a := rule.Match, rule.Action
+	var b strings.Builder
+	add := func(class, label, value string) { b.WriteString(uiChip(class, label, value)) }
+	flag := func(label string) { b.WriteString(`<span class="chip"><span>` + label + `</span></span>`) }
+	if len(m.Include) > 0 {
+		add("in", "Include", strings.Join(m.Include, ", "))
+	}
+	if len(m.Exclude) > 0 {
+		add("out", "Exclude", strings.Join(m.Exclude, ", "))
+	}
+	if m.Regex != "" {
+		add("in", "Regex", m.Regex)
+	}
+	if m.NotRegex != "" {
+		add("out", "Not regex", m.NotRegex)
+	}
+	if m.EpisodeFilter != "" {
+		add("", "Episodes", m.EpisodeFilter)
+	}
+	if m.MinSize > 0 {
+		add("", "Min size", uiBytes(m.MinSize))
+	}
+	if m.MaxSize > 0 {
+		add("", "Max size", uiBytes(m.MaxSize))
+	}
+	if m.MinSeeders != 0 {
+		add("", "Min seeders", strconv.Itoa(m.MinSeeders))
+	}
+	if m.MaxSeeders != 0 {
+		add("", "Max seeders", strconv.Itoa(m.MaxSeeders))
+	}
+	if m.MinPeers != 0 {
+		add("", "Min peers", strconv.Itoa(m.MinPeers))
+	}
+	if m.MaxAgeDays != 0 {
+		add("", "Max age (days)", strconv.Itoa(m.MaxAgeDays))
+	}
+	if rule.IgnoreDays > 0 {
+		add("", "Cooldown (days)", strconv.Itoa(rule.IgnoreDays))
+	}
+	if m.RequireEpisode {
+		flag("Require episode")
+	}
+	if m.SmartEpisode {
+		flag("Smart episode")
+	}
+	if a.SavePath != "" {
+		add("act", "Save to", a.SavePath)
+	}
+	if a.Category != "" {
+		add("act", "Category", a.Category)
+	}
+	if len(a.Tags) > 0 {
+		add("act", "Tags", strings.Join(a.Tags, ", "))
+	}
+	if a.Paused {
+		flag("Paused")
+	}
+	if a.Sequential {
+		flag("sequential")
+	}
+	if a.FirstLast {
+		flag("first/last")
+	}
+	if a.Top {
+		flag("top")
+	}
+	if a.Once {
+		flag("Download once")
 	}
 	return b.String()
 }
@@ -628,26 +727,28 @@ func uiIndexerOptionsHTML() string {
 func (d *Daemon) uiIndexerRowsHTML() string {
 	list := d.indexers()
 	if len(list) == 0 {
-		return `<tr><td colspan="4" class="muted">None</td></tr>`
+		return `<li class="empty"><p>No indexers: add Prowlarr or Jackett to search releases and to let wanted titles find what the feeds miss.</p></li>`
 	}
 	var b strings.Builder
 	for index, indexer := range list {
-		nameCell := html.EscapeString(orDefault(indexer.Name, "—"))
+		idx := strconv.Itoa(index)
+		name := html.EscapeString(orDefault(indexer.Name, "—"))
 		if page := indexerPageURL(indexer.URL); page != "" {
-			nameCell = `<a href="` + html.EscapeString(page) + `" target="_blank" rel="noopener noreferrer" title="Open the indexer's web page in a new tab">` + nameCell + ` <span aria-hidden="true">↗</span></a>`
+			name = `<a href="` + html.EscapeString(page) + `" target="_blank" rel="noopener noreferrer" title="Open the indexer's web page in a new tab">` + name + ` <span aria-hidden="true">↗</span></a>`
 		}
-		b.WriteString("<tr><td>" + nameCell + "</td>")
-		b.WriteString(`<td class="mono">` + html.EscapeString(indexer.URL) + "</td>")
-		keyState := "—"
+		key := `<span class="badge b-paused">No API key</span>`
 		if strings.TrimSpace(indexer.APIKey) != "" {
-			keyState = "set"
+			key = `<span class="badge b-seeding">API key set</span>`
 		}
-		b.WriteString("<td>" + keyState + "</td>")
-		b.WriteString(`<td class="actions">`)
-		b.WriteString(`<button type="button" class="sm" data-idx-edit data-index="` + strconv.Itoa(index) + `" data-name="` + html.EscapeString(indexer.Name) + `" data-url="` + html.EscapeString(indexer.URL) + `">Edit</button> `)
-		b.WriteString(`<button type="button" class="sm" data-idx-test data-index="` + strconv.Itoa(index) + `">Test</button> `)
-		b.WriteString(`<span class="muted" data-idx-status="` + strconv.Itoa(index) + `"></span> `)
-		b.WriteString(`<form method="post" action="/ui/rss-indexer"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="danger">Remove</button></form></td></tr>`)
+		b.WriteString(`<li class="item"><div class="item-main">`)
+		b.WriteString(`<div class="item-title"><span class="name">` + name + `</span>` + key + `</div>`)
+		b.WriteString(`<div class="item-sub mono">` + html.EscapeString(indexer.URL) + `</div>`)
+		b.WriteString(`<div class="item-status" data-idx-status="` + idx + `" aria-live="polite"></div>`)
+		b.WriteString(`</div><div class="item-actions">`)
+		b.WriteString(`<button type="button" class="sm" data-idx-test data-index="` + idx + `" title="Check that the indexer answers (Torznab caps)">Test</button>`)
+		b.WriteString(`<button type="button" class="sm" data-idx-edit data-index="` + idx + `" data-name="` + html.EscapeString(indexer.Name) + `" data-url="` + html.EscapeString(indexer.URL) + `" title="Change this indexer">Edit</button>`)
+		b.WriteString(`<form method="post" action="/ui/rss-indexer" data-confirm="Delete this indexer?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm danger" title="Delete this indexer" aria-label="Delete this indexer"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
+		b.WriteString(`</div></li>`)
 	}
 	return b.String()
 }
@@ -658,7 +759,7 @@ func (d *Daemon) uiIndexerRowsHTML() string {
 func (d *Daemon) uiFeedRowsHTML() string {
 	list := d.feeds()
 	if len(list) == 0 {
-		return `<tr><td colspan="5" class="muted">None</td></tr>`
+		return `<li class="empty"><p>No feeds yet. Add an RSS URL, or the page of an ext.to or TorrentGalaxy listing: its items fill the archive and the rules decide what to download.</p></li>`
 	}
 	statuses := map[string]feedStatus{}
 	for _, status := range d.feedStatusesSnapshot() {
@@ -691,34 +792,63 @@ func (d *Daemon) uiFeedRowsHTML() string {
 		if key == "" {
 			key = source
 		}
-		name := orDefault(feed.Name, "—")
+		badges := ""
 		if feed.Folder != "" {
-			name += " (" + feed.Folder + ")"
+			badges += `<span class="chip cat">` + html.EscapeString(feed.Folder) + `</span>`
 		}
-		state := `<span class="flag on">active</span>`
 		if feed.Disabled {
-			state = `<span class="flag">disabled</span>`
+			badges += `<span class="badge b-paused">disabled</span>`
 		}
 		if feed.Paused {
-			state += ` <span class="flag" title="Torrents from this feed are added paused">adds paused</span>`
+			badges += `<span class="badge plain" title="Torrents from this feed are added paused">adds paused</span>`
 		}
 		if feedTakesEverything(rules, feed, key) {
-			state += ` <span class="flag" title="No rule and no Include/Exclude: this feed only grows the archive, nothing is downloaded">archive only</span>`
+			badges += `<span class="badge b-stalled" title="No rule and no Include/Exclude: this feed only grows the archive, nothing is downloaded">archive only</span>`
 		}
-		b.WriteString(`<tr data-feed-row="` + html.EscapeString(key) + `"><td>` + html.EscapeString(name) + "</td>")
-		b.WriteString(`<td class="mono wrap">` + html.EscapeString(source) + "</td>")
-		b.WriteString("<td>" + state + "</td>")
-		b.WriteString(`<td data-feed-status>` + uiFeedStatusHTML(statuses[key]) + `</td>`)
+		cls := "item"
+		if feed.Disabled {
+			cls += " off"
+		}
+		b.WriteString(`<li class="` + cls + `" data-feed-row="` + html.EscapeString(key) + `"><div class="item-main">`)
+		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(orDefault(feed.Name, "—")) + `</span>` + badges + `</div>`)
+		b.WriteString(`<div class="item-sub mono" title="` + html.EscapeString(source) + `">` + html.EscapeString(source) + `</div>`)
+		b.WriteString(`<div class="item-status" data-feed-status>` + uiFeedStatusHTML(statuses[key]) + `</div>`)
+		if chips := uiFeedChipsHTML(feed); chips != "" {
+			b.WriteString(`<div class="chips">` + chips + `</div>`)
+		}
 		feedJSON, _ := json.Marshal(feed)
 		toggle := "Disable"
 		if feed.Disabled {
 			toggle = "Enable"
 		}
-		b.WriteString(`<td class="actions">`)
-		b.WriteString(`<button type="button" class="sm" data-feed-reload="` + html.EscapeString(key) + `" title="Fetch this feed now and apply the rules" aria-label="Reload this feed now">↻ Reload</button> `)
-		b.WriteString(`<button type="button" class="sm" data-feed-edit data-index="` + index + `" data-feed="` + html.EscapeString(string(feedJSON)) + `" title="Load this feed into the form to change it">Edit</button> `)
-		b.WriteString(`<form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="toggle"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="sm" title="Stop or resume the automatic checks of this feed without deleting it">` + toggle + `</button></form>`)
-		b.WriteString(`<form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="danger" title="Delete this feed">Remove</button></form></td></tr>`)
+		b.WriteString(`</div><div class="item-actions">`)
+		b.WriteString(`<button type="button" class="sm" data-feed-reload="` + html.EscapeString(key) + `" title="Fetch this feed now and apply the rules" aria-label="Reload this feed now"><svg class="i"><use href="/assets/icons.svg#i-reload"/></svg>Reload</button>`)
+		b.WriteString(`<button type="button" class="sm" data-feed-items="` + html.EscapeString(key) + `" title="Show the items of this feed and the rule that takes each one">Items</button>`)
+		b.WriteString(`<button type="button" class="sm" data-feed-edit data-index="` + index + `" data-feed="` + html.EscapeString(string(feedJSON)) + `" title="Open this feed to change it">Edit</button>`)
+		b.WriteString(`<form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="toggle"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="sm ghost" title="Stop or resume the automatic checks of this feed without deleting it">` + toggle + `</button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-feed" data-confirm="Delete this feed?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="ghost icon sm danger" title="Delete this feed" aria-label="Delete this feed"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
+		b.WriteString(`</div></li>`)
+	}
+	return b.String()
+}
+
+// uiFeedChipsHTML shows the options of a feed that change what it adds.
+func uiFeedChipsHTML(feed feedConfig) string {
+	var b strings.Builder
+	if strings.TrimSpace(feed.Include) != "" {
+		b.WriteString(uiChip("in", "Include", feed.Include))
+	}
+	if strings.TrimSpace(feed.Exclude) != "" {
+		b.WriteString(uiChip("out", "Exclude", feed.Exclude))
+	}
+	if strings.TrimSpace(feed.SavePath) != "" {
+		b.WriteString(uiChip("act", "Save to", feed.SavePath))
+	}
+	if strings.TrimSpace(feed.Category) != "" {
+		b.WriteString(uiChip("act", "Category", feed.Category))
+	}
+	if feed.All {
+		b.WriteString(`<span class="chip act"><span>Take everything</span></span>`)
 	}
 	return b.String()
 }

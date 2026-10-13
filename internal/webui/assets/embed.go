@@ -9,7 +9,7 @@ package assets
 
 import "embed"
 
-//go:embed ui.tmpl token.html login.html setup.html rss.html wanted.html settings.html archive.html favicon.svg
+//go:embed ui.tmpl token.html login.html setup.html rss.html wanted.html settings.html archive.html favicon.svg theme.css common.js icons.svg
 var files embed.FS
 
 // UITemplate is the html/template source of the daemon page: the page body plus
@@ -36,6 +36,17 @@ func ArchivePage() string { return mustRead("archive.html") }
 
 // SettingsPage is the standalone settings page (global limits and scheduler).
 func SettingsPage() string { return mustRead("settings.html") }
+
+// ThemeCSS is the shared design system (colour tokens for the light and dark
+// themes, components) linked by every page as /assets/theme.css.
+func ThemeCSS() string { return mustRead("theme.css") }
+
+// CommonJS is the shared page script (theme switch, toasts) served as
+// /assets/common.js.
+func CommonJS() string { return mustRead("common.js") }
+
+// IconsSVG is the shared icon sprite (<use href="/assets/icons.svg#i-…">).
+func IconsSVG() string { return mustRead("icons.svg") }
 
 // FaviconSVG is the site icon, inlined in the pages and served at /favicon.ico.
 func FaviconSVG() string { return mustRead("favicon.svg") }

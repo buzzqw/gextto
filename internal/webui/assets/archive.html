@@ -4,48 +4,41 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gx-torrent</title>
-<style>body{margin:0;font:15px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
-header{padding:14px 20px;border-bottom:1px solid #223;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
-header h1{font-size:20px;margin:0;font-weight:600}
-.nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
-.nav a{padding:5px 12px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;text-decoration:none;color:#dbe4f0;font-size:14px;white-space:nowrap}
-.nav a:hover{background:#243049}
-.nav a.on{background:#2563eb;border-color:#2563eb;color:#fff}
-main{padding:16px 20px;max-width:1200px;margin:0 auto}
-a{color:#93c5fd}
-:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
-label{color:#93a1b5;font-size:13px;display:flex;flex-direction:column;gap:3px}
-label.chk{flex-direction:row;align-items:center;gap:6px}
-input,select{padding:8px;border-radius:8px;border:1px solid #2b3a55;background:#0f1420;color:inherit;font:inherit}
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="/favicon.ico">
+<script>try{var m=localStorage.getItem('gx-theme');if(m==='light'||m==='dark')document.documentElement.setAttribute('data-theme',m);}catch(e){}</script>
+<link rel="stylesheet" href="/assets/theme.css">
+<style>
+main{max-width:1200px;margin:0 auto;padding:20px 16px 40px}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px}
+label.chk{flex-direction:row;align-items:center;gap:8px;font-size:14px}
 input[type=search]{min-width:min(420px,80vw)}
-button{padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;font:inherit}
-button.sm{padding:4px 9px;background:#243049;font-weight:500}
-button.danger{background:#3a1417;color:#fca5a5;border:1px solid #7f1d1d;font-weight:500}
-button:disabled{opacity:.5;cursor:default}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
-.muted{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}
-table{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed}
-th,td{padding:7px 8px;text-align:left;border-bottom:1px solid #1f2839;font-size:14px;vertical-align:middle}
-th{color:#93a1b5;font-weight:600}
+table{width:100%;border-collapse:separate;border-spacing:0;margin-top:10px;table-layout:fixed;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;background:var(--surface)}
+tbody tr:hover td{background:var(--hover)}
 td.title{overflow-wrap:anywhere}
 th.c-size,th.c-seeds{width:5.5rem}th.c-feed{width:9rem}th.c-seen{width:7rem}th.c-act{width:13rem}
-td.feed{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.feed{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 td.act{text-align:right;white-space:nowrap}
-.flag{font-size:12px;padding:1px 6px;border-radius:6px;background:#243049;color:#cbd5e1;white-space:nowrap;margin-left:4px}
-.flag.on{background:#14532d;color:#86efac}
-.pager{display:flex;gap:10px;align-items:center;justify-content:center;margin:12px 0}
-details{margin-top:16px;border:1px solid #243049;border-radius:10px;padding:8px 14px;background:#10151f}
-summary{cursor:pointer;color:#93a1b5}
-.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-h2{font-size:16px;margin:18px 0 4px;font-weight:600}
+.flag{font-size:11.5px;padding:1px 7px;border-radius:6px;background:var(--surface-2);color:var(--muted);white-space:nowrap;margin-left:4px}
+.flag.on{background:var(--ok-soft);color:var(--ok)}
+.pager{display:flex;gap:10px;align-items:center;justify-content:center;margin:14px 0}
+details{margin-top:16px;border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;background:var(--surface)}
+summary{cursor:pointer;color:var(--muted);font-weight:550}
 @media(max-width:760px){th.c-feed,td.feed,th.c-seen,td.seen{display:none}th.c-act{width:9rem}}
 </style></head>
 <body>
-<header>
-  <h1>Archive</h1>
-  <nav class="nav" aria-label="Pages"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/wanted" title="TV shows and movies wanted list">Wanted</a><a href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a><a class="on" href="/ui/archive" aria-current="page" title="Everything the feeds found, searchable">Archive</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a></nav>
+<header class="topbar">
+  <a class="brand" href="/" title="gx-torrent"><img src="/favicon.ico" alt=""><span>gx-torrent</span></a>
+  <nav class="nav" aria-label="Sections"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/wanted" title="TV shows and movies wanted list">Wanted</a><a href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a><a class="on" href="/ui/archive" aria-current="page" title="Everything the feeds found, searchable">Archive</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a></nav>
+  <span class="spacer"></span>
+  <button type="button" class="ghost icon" data-theme-switch data-label-auto="Theme: automatic (follows the system)" data-label-light="Theme: light" data-label-dark="Theme: dark" aria-label="Theme: automatic (follows the system)" title="Switch theme (automatic, light, dark)"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
 </header>
 <main>
+<div class="page-head"><div class="grow"><h1>Archive</h1></div></div>
 <p class="muted">Every item the RSS feeds returned is kept here, also after it leaves the feed. Search with words, phrases in quotes and -excluded words.</p>
 <form class="row" id="archive-form" role="search">
   <label>Search<input type="search" id="archive-q" name="q" placeholder="title words, -exclude" autocomplete="off" title="Words that must all appear in the title; -word excludes, quotes match a phrase"></label>
@@ -90,6 +83,7 @@ h2{font-size:16px;margin:18px 0 4px;font-weight:600}
 </details>
 </main>
 <script id="ui-i18n"></script>
+<script src="/assets/common.js"></script>
 <script>
 function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
 function fmtBytes(n){if(!n||n<0)return '—';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}

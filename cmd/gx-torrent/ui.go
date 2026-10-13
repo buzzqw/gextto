@@ -18,7 +18,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -52,8 +54,11 @@ type uiPageData struct {
 
 	DownloadRate string
 	UploadRate   string
-	TotalDown    int64
-	TotalUp      int64
+	// Raw rates (bytes/s) for the page's transfer graph.
+	DownRateRaw int64
+	UpRateRaw   int64
+	TotalDown   int64
+	TotalUp     int64
 
 	PeerPort   int
 	Listen     string
@@ -112,11 +117,16 @@ type uiPageData struct {
 }
 
 type uiTorrentRow struct {
-	Hash      string
-	Name      string
-	State     string
-	Progress  float64
-	ProgressS string
+	Hash  string
+	Name  string
+	State string
+	// StateLabel is the human name of State (translated by the page).
+	StateLabel string
+	Progress   float64
+	ProgressS  string
+	// Size is the formatted total size (the column shows it; DoneSize keeps
+	// done / total for the tooltip).
+	Size      string
 	DoneSize  string
 	Down      string
 	Up        string
@@ -272,6 +282,8 @@ func uiTemplates() *template.Template {
 			"bytes":   uiBytes,
 			"rate":    uiRate,
 			"dur":     uiDuration,
+			// stateLabel prints the human name of a state, a catalog key.
+			"stateLabel": uiStateLabel,
 		}).Parse(assets.UITemplate()))
 	})
 	return uiTemplate
@@ -282,6 +294,32 @@ func handleFavicon(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	_, _ = w.Write([]byte(assets.FaviconSVG()))
+}
+
+// handleStaticAsset serves an embedded asset with a strong ETag, so a browser
+// revalidates it (304) instead of downloading it again on every page, and a
+// new build is picked up at once.
+func handleStaticAsset(contentType string, body func() string) http.HandlerFunc {
+	var (
+		once sync.Once
+		data []byte
+		etag string
+	)
+	return func(w http.ResponseWriter, r *http.Request) {
+		once.Do(func() {
+			data = []byte(body())
+			sum := sha256.Sum256(data)
+			etag = `"` + hex.EncodeToString(sum[:8]) + `"`
+		})
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("ETag", etag)
+		if r.Header.Get("If-None-Match") == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		_, _ = w.Write(data)
+	}
 }
 
 // handleUI renders the page.
@@ -1072,6 +1110,18 @@ func (d *Daemon) uiDoneDetail(w http.ResponseWriter, r *http.Request, hash, tab,
 }
 
 func (d *Daemon) uiRedirect(w http.ResponseWriter, r *http.Request, extra url.Values, okMessage string, err error) {
+	// The page's own script posts with X-GX-Fetch and wants the outcome, not
+	// a reload: answer with JSON (message translated for the page language).
+	if r.Header.Get("X-GX-Fetch") == "1" {
+		msg := okMessage
+		if err != nil {
+			msg = "Error: " + err.Error()
+		} else if msg == "" {
+			msg = "Done"
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": err == nil, "msg": uiTranslateText(msg, uiDictionary(d.uiLang(r)))})
+		return
+	}
 	query := url.Values{}
 	if err != nil {
 		query.Set("ok", "0")
@@ -1155,6 +1205,8 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		Moving:         stats.Moving,
 		DownloadRate:   uiRate(stats.DownloadRate),
 		UploadRate:     uiRate(stats.UploadRate),
+		DownRateRaw:    stats.DownloadRate,
+		UpRateRaw:      stats.UploadRate,
 		TotalDown:      stats.Session["bytes_downloaded"],
 		TotalUp:        stats.Session["bytes_uploaded"],
 		PeerPort:       stats.PeerPort,
@@ -1210,6 +1262,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 			Progress:  view.Progress,
 			ProgressS: fmt.Sprintf("%.1f%%", view.Progress),
 			DoneSize:  uiBytes(view.TotalDone) + " / " + uiBytes(view.TotalSize),
+			Size:      uiBytes(view.TotalSize),
 			Down:      uiRate(view.DownloadRate),
 			Up:        uiRate(view.UploadRate),
 			Peers:     view.NumPeers,
@@ -1242,6 +1295,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 			// Paused by the disk guard: shown apart from a user pause.
 			row.State = "disk_wait"
 		}
+		row.StateLabel = uiStateLabel(row.State)
 		if view.Progress < 99.99 && view.ETASeconds >= 0 {
 			row.ETA = uiDuration(view.ETASeconds)
 			row.ETAVal = view.ETASeconds
@@ -1637,4 +1691,53 @@ func uiEncryption(level int) string {
 	default:
 		return "on"
 	}
+}
+
+// uiStateLabel is the human name of a torrent state, a catalog key the page
+// translator localizes.
+func uiStateLabel(state string) string {
+	switch state {
+	case "downloading":
+		return "Downloading"
+	case "downloading_metadata":
+		return "Metadata"
+	case "checking_files":
+		return "Checking"
+	case "seeding":
+		return "Seeding"
+	case "paused":
+		return "Paused"
+	case "stalled":
+		return "Stalled"
+	case "moving":
+		return "Moving"
+	case "error":
+		return "Error"
+	case "disk_wait":
+		return "Waiting for disk space"
+	}
+	return state
+}
+
+// handleUIMagnet returns a torrent's magnet link as text, for the page's
+// "Copy magnet" menu entry.
+func (d *Daemon) handleUIMagnet(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	d.mu.Lock()
+	t, _ := d.findLocked(strings.TrimSpace(r.URL.Query().Get("hash")))
+	d.mu.Unlock()
+	if t == nil {
+		http.Error(w, "torrent not found", http.StatusNotFound)
+		return
+	}
+	magnet, err := t.Magnet()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write([]byte(magnet))
 }

@@ -22,7 +22,9 @@ const uiClientDictPlaceholder = `<script id="ui-i18n"></script>`
 // uiTranslatableAttr lists the attributes whose value is user-facing text.
 func uiTranslatableAttr(name string) bool {
 	switch name {
-	case "title", "placeholder", "aria-label", "label":
+	case "title", "placeholder", "aria-label", "label",
+		// The theme switch keeps one accessible name per mode.
+		"data-label-auto", "data-label-light", "data-label-dark":
 		return true
 	}
 	return false

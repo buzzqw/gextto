@@ -260,8 +260,13 @@ Gextto in the same way as `qbittorrent-nox` or `transmission-daemon`. It is
 - **Native JSON API and login:** exposes its own JSON API (`/api/v1/...`), the
   same one Gextto drives it with, plus a sign-in page (`/ui/login`) when
   standalone authentication is enabled.
-- **Standalone Web UI & Setup Wizard:** features a dedicated, full-featured web UI
-  with real-time graphs and diagnostics, categories and tags, and multi-indexer
+- **Standalone Web UI & Setup Wizard:** a modern web UI in the spirit of
+  VueTorrent and Flood, with light and dark themes: side bar with status,
+  category and tag filters and a live transfer graph, a dense sortable list with
+  multi-selection, context menu and keyboard shortcuts, the torrent detail in a
+  side panel, drag-and-drop of `.torrent` files and pasted magnets, cards on a
+  phone, every page checked with axe-core. It also brings real-time
+  diagnostics, categories and tags, and multi-indexer
   search that reads the local **archive** first (fed by the RSS feeds and by the
   indexers for the monitored titles) and queries the configured indexers
   (Jackett, Prowlarr, MIRCrew) live only on demand, each indexer linked to its
@@ -269,7 +274,7 @@ Gextto in the same way as `qbittorrent-nox` or `transmission-daemon`. It is
   Jackett's aggregate Torznab path, Prowlarr's aggregate search API and a direct
   Torznab service's `/api` are worked out for you.
 - **An RSS & Automation Suite on par with qBittorrent and Deluge/YaRSS2:**
-  - **Dedicated tabs:** clean separation between **Wanted** (`/ui/wanted`) for TV series and movies with missing-episode gap tracking and manual on-demand searches, and **RSS & Indexers** (`/ui/rss`) for feeds, indexers, and rules.
+  - **Dedicated pages:** **Wanted** (`/ui/wanted`) shows a card per series or movie with its missing episodes, what was taken and when it was last searched, and adds titles with a guided dialog (search how the title is named in the archive and indexers, pick it, then seasons, language and quality); **RSS & Indexers** (`/ui/rss`) splits feeds, rules, indexers and options into tabs of cards, with a rule editor organised in *which items* / *what to do* and the preview of the matches next to it.
   - **Feeds & Indexers:** feeds are RSS URLs or HTML listings (ext.to, TorrentGalaxy uploader pages), with last check, item count, new and added counters, instant **Check feeds** feedback (`✓ N feeds checked: X new · Y added`), and per-row reload; Torznab indexer presets (Jackett, Prowlarr) with live testing, plus an optional **FlareSolverr URL** to pass feeds and indexers behind a Cloudflare challenge.
   - **Automation rules:** ordered PASS/FAIL rules (include/exclude, regex, size, seeders, age, episode filter, smart episode, *download once*, cooldown) with save path, category, tags and flags, editable in place with **live match previews**.
   - **Wanted list & Gap search:** tracks wanted series/movies with language and quality dropdowns (up to 2160p 4K+), gap searches missing episodes, with manual one-click search for all or single titles and instant visual status. Feeds **grow the archive**, and the indexers are queried only for the monitored titles and the gaps (their results are archived too), so searches read the **archive** and answer at once; a feed with no rule and no include/exclude downloads nothing (use the *take everything* flag to follow one in full), and a live query is one checkbox away (*Search indexers too*).

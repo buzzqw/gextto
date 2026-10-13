@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/buzzqw/gextto/internal/webui/assets"
 	"io"
 	"mime"
 	"net/http"
@@ -47,6 +48,11 @@ func (d *Daemon) routes() http.Handler {
 	root.Handle("/api/", d.authenticate(api))
 	root.HandleFunc("GET /{$}", d.handleUI)
 	root.HandleFunc("GET /favicon.ico", handleFavicon)
+	// The shared stylesheet and script are public like the icon: the sign-in
+	// and setup pages need them before any session exists.
+	root.HandleFunc("GET /assets/theme.css", handleStaticAsset("text/css; charset=utf-8", assets.ThemeCSS))
+	root.HandleFunc("GET /assets/common.js", handleStaticAsset("text/javascript; charset=utf-8", assets.CommonJS))
+	root.HandleFunc("GET /assets/icons.svg", handleStaticAsset("image/svg+xml", assets.IconsSVG))
 	root.HandleFunc("GET /ui", d.handleUI)
 	root.HandleFunc("GET /ui/live", d.handleUILive)
 	root.HandleFunc("GET /ui/events", d.handleUIEvents)
@@ -74,6 +80,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /ui/portcheck", d.handleUIPortCheck)
 	root.HandleFunc("GET /ui/stream", d.handleUIStream)
 	root.HandleFunc("GET /ui/dhtscrape", d.handleUIDhtScrape)
+	root.HandleFunc("GET /ui/magnet", d.handleUIMagnet)
 	root.HandleFunc("GET /ui/login", d.handleUILogin)
 	root.HandleFunc("POST /ui/login", d.handleUILogin)
 	root.HandleFunc("GET /ui/setup", d.handleUISetup)
@@ -191,6 +198,7 @@ func addRequestFromForm(r *http.Request) addRequest {
 		SuperSeeding:   formBool(r, "super_seeding"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
+		Category:       strings.TrimSpace(r.FormValue("category")),
 	}
 }
 

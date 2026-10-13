@@ -153,43 +153,83 @@ The page is **translated** (Italian, English, German, French, Spanish,
 Polish): at startup Gextto passes the interface language to the daemon with
 `-lang`, and `?lang=xx` overrides it for the single request.
 
-- **Session summary**: at the top the tiles with the counts (torrents, downloading,
-  seeding, stalled, paused, moving), peer port, IP filter rules, cache
-  read/write, I/O operations and incoming connections; the live
-  values (speed, downloaded/uploaded in the session, free space, DHT, port,
-  encryption) are in the status bar at the bottom, always visible, with the
-  *Test ports* button.
-- **Add** from a single form: magnet, URL to a `.torrent` or uploaded local file,
-  with destination, pause, "top of queue", sequential download,
-  first/last part and super-seeding; seed and speed limits
-  are set per torrent in the *General* detail.
-- **Table** with two rows per torrent (name and folder; progress, status,
-  size, speed, peers, seeds, share ratio, ETA), with search/filter by name, **filter by status** in the side
-  bar, sortable columns, multi-selection and group actions
-  (pause/resume/verify/reannounce/top/remove).
-- **Per-torrent detail** in tabs: *General* (data, pieces, space,
-  dates, copy magnet, export `.torrent`, pin, move, speed/connection/upload and seed
-  limits, **web seeds**), *Files* (download/skip and
-  **HTTP streaming** with ▶), *Peers* (connection flags, transport, encryption),
-  *Trackers* (status, swarm, add and **remove**), *Pieces* (coloured map).
-- **IP filter** from a URL or file; the field is pre-filled with the filter
-  configured in Gextto.
-- **Test ports**: from the status bar a button checks that the peer port
-  is listening and that the router forwards it (the same check as Gextto's
-  *Test ports* button, on top of `GET /api/v1/portcheck`). With DHT active the
-  result also shows the **reflected port** that the DHT nodes see for us
-  (`reflected_port` field, from the `ip` field of BEP 42) and the deduced **NAT
-  type** (`nat_mapping`: endpoint-independent if the observers agree on the port,
-  address/port-dependent if not): if the reflected port matches the local one
-  the NAT preserves the port, otherwise it rewrites it.
-- ***Gextto log* tab**: the last lines of `gextto.log` (200–2000), read
-  only when you open the tab or press *Reload*, with text filter, DEBUG
-  hidden by default and warnings/errors coloured. While it is open the torrent
-  table does not refresh.
+All the daemon pages share one **design system** (`internal/webui/assets/theme.css`,
+`common.js`, `icons.svg`, served under `/assets/` without a token so the sign-in
+and setup pages use them too): colour tokens for a **light and a dark theme**
+(automatic from the system, or forced with the switch in the top bar and
+remembered in the browser), the same top bar and navigation on every page,
+native `<dialog>` windows, cards, chips and toasts announced to screen readers.
+Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
+
+- **Layout** (inspired by qBittorrent's Web UI, VueTorrent and Flood): a top bar
+  with search (`/`), live speeds and the theme switch; a **side bar** with the
+  status filters and their counts (all, downloading, seeding, *active*, paused,
+  stalled, moving, error), the **categories** and **tags** with counts, and a
+  two-minute **transfer graph**; a **toolbar** acting on the selection
+  (resume, pause, recheck, reannounce, top, remove) plus *Tools* (IP filter,
+  create `.torrent`, check feeds, test ports); the status bar at the bottom
+  with totals, free space, DHT, port reachability, incoming connections, IP
+  filter, encryption.
+- **Table**: one row per torrent (name with category chip and folder, size,
+  progress bar coloured by state, readable state badge, speeds, ETA,
+  seeds/peers, ratio), sortable columns (the order and the filters are
+  remembered), click / Ctrl-click / Shift-click selection, a **context menu**
+  (right click, the ⋯ button or the menu key: details, resume, pause, recheck,
+  reannounce, top, category and tags, copy magnet, export `.torrent`, remove)
+  and keyboard navigation (arrows, Space to select, Enter for the detail, Del to
+  remove, `P` to pause/resume, `N` to add, Ctrl+A). Columns give way as the list
+  narrows; on a phone the rows become cards. The list refreshes every 2 seconds
+  (and at once on engine events) without losing selection, focus or scroll.
+- **Add** in a dialog: several magnet links or `.torrent` URLs (one per line)
+  and several files at once, destination (suggested from the existing save
+  paths), category (standalone) and the options (paused, top, sequential,
+  first/last, super-seeding). A `.torrent` dropped anywhere on the page or a
+  magnet pasted outside a field opens it pre-filled.
+- **Remove** asks in a dialog whether to delete the files too.
+- **Per-torrent detail** in a side panel next to the list (full screen on a
+  phone), with tabs: *General* (actions, data, pieces, space, dates, pin, speed,
+  connection, upload and seed limits, super-seeding, move, category and tags,
+  **web seeds**), *Files* (priority and **HTTP streaming** with ▶), *Peers*
+  (connection flags, transport, encryption), *Trackers* (status, swarm, add and
+  **remove**), *Pieces* (coloured map). Peers, trackers and pieces refresh while
+  the panel is open; the forms save in place, without reloading the page.
+- **IP filter** from a URL or file (*Tools*); the field is pre-filled with the
+  filter configured in Gextto.
+- **Test ports** (*Tools*): checks that the peer port is listening and that the
+  router forwards it (the same check as Gextto's *Test ports* button, on top of
+  `GET /api/v1/portcheck`). With DHT active the result also shows the
+  **reflected port** that the DHT nodes see for us (`reflected_port` field, from
+  the `ip` field of BEP 42) and the deduced **NAT type** (`nat_mapping`).
+- ***Gextto log*** (toolbar, managed): the last lines of `gextto.log` (200–2000),
+  read only when you open it or press *Reload*, with text filter, DEBUG hidden by
+  default and warnings/errors coloured.
 - **Large lists** (standalone only): the table renders at most `?rows=` torrents
-  (default 300) and shows *Showing X of Y · Show more* to widen the
-  window; in managed it always renders all torrents, as before.
-- Shortcuts: `/` to search, `Esc` to close the detail.
+  (default 300) and shows *Showing X of Y · Show more* to widen the window; in
+  managed it always renders all torrents.
+- The page's own actions post with `X-GX-Fetch: 1` and get a JSON outcome
+  (`{"ok", "msg"}`, the message translated) instead of a redirect; classic form
+  posts keep the redirect with `?msg=`.
+
+The standalone pages follow the same structure:
+
+- **RSS & indexers** (`/ui/rss`) in four tabs (*Feeds*, *Rules*, *Indexers*,
+  *Options*; the tab is in the URL, so a save comes back to it). Each feed, rule
+  and indexer is a card with its state and actions; the feed card shows the last
+  check, its options as chips and opens its **items** (with the rule that takes
+  each one and an *Add* button). New and edited entries open an editor dialog;
+  the rule editor is organised in *Which items* (feeds, include, exclude,
+  episodes, advanced filters) and *What to do* (save path, category, tags,
+  flags), with the **preview** of the archived items it would take next to it.
+  The options tab holds the refresh interval, the archive retention,
+  FlareSolverr (with its test) and the advanced JSON.
+- **Wanted** (`/ui/wanted`): a card per title with type, state, filters as
+  chips, the **missing episodes**, how many were taken and when it was last
+  searched, plus search now / edit / pause / remove. *Add title* is a guided
+  dialog: series or movie, the title with a search that shows how it is named in
+  the archive, feeds and indexers (pick one to use it), then seasons, language
+  (with quick picks) and quality, and the other options folded away.
+- **Archive** and **Settings** use the same top bar, tables and fieldsets;
+  Settings keeps its *Save* button visible at the bottom while scrolling.
 
 The definitive command remains Gextto; the page is a convenience for
 the operator.

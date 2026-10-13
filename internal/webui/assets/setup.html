@@ -4,28 +4,37 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gx-torrent</title>
-<style>body{margin:0;font:16px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
-form{max-width:520px;margin:40px auto;background:#161d2c;border:1px solid #243049;border-radius:12px;padding:22px}
-label{display:block;margin:10px 0;color:#93a1b5}
-input,select{width:100%;padding:8px;margin-top:4px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
-button{width:100%;padding:10px;margin-top:14px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
-button.secondary{background:#243049;margin-top:8px}
-h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform:uppercase;letter-spacing:.03em}
-.chk{display:flex;gap:8px;align-items:center}.chk input{width:auto;margin:0}
-.m{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}
-.field-row{display:flex;gap:8px;align-items:flex-end}
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="/favicon.ico">
+<script>try{var m=localStorage.getItem('gx-theme');if(m==='light'||m==='dark')document.documentElement.setAttribute('data-theme',m);}catch(e){}</script>
+<link rel="stylesheet" href="/assets/theme.css">
+<style>
+body{padding:40px 16px}
+form{max-width:560px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:26px;box-shadow:var(--shadow)}
+form>h2{margin:0 0 6px;display:flex;align-items:center;gap:10px;font-size:20px}
+form>h2::before{content:"";width:30px;height:30px;border-radius:8px;background:url(/favicon.ico) center/cover}
+label{display:flex;flex-direction:column;gap:5px;margin:12px 0;font-size:13px}
+input:not([type=checkbox]),select{width:100%}
+button{width:100%;height:40px;margin-top:14px}
+button[type=submit]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+button.secondary{margin-top:8px}
+h3{margin:22px 0 0;font-size:12px;color:var(--subtle);text-transform:uppercase;letter-spacing:.05em}
+.chk{flex-direction:row;align-items:center;gap:8px;font-size:14px}.chk input{width:auto}
+.m{color:var(--muted)}
+.field-row{display:flex;gap:8px;align-items:center}
 .field-row input{flex:1 1 auto;min-width:0}
-.field-row button{width:auto;margin-top:4px;padding:8px 12px;white-space:nowrap;background:#243049;font-weight:500}
-.overlay{position:fixed;inset:0;background:rgba(4,8,16,.72);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:50}
-.picker{background:#131a28;border:1px solid #243049;border-radius:12px;width:min(640px,100%);padding:16px}
+.field-row button{width:auto;margin:0;height:34px;white-space:nowrap}
+.overlay{position:fixed;inset:0;background:rgba(8,12,20,.55);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:50}
+.picker{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:min(640px,100%);padding:16px;box-shadow:var(--shadow-lg)}
 .picker-head{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
-.picker-head code{color:#93c5fd;word-break:break-all;font-size:13px}
-.picker-head button{width:auto;margin:0;padding:6px 12px;background:#243049}
+.picker-head code{color:var(--accent);word-break:break-all;font-size:13px}
+.picker-head button{width:auto;margin:0}
 .picker-list{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow:auto}
-.picker-list button.dir{width:100%;margin:0;text-align:left;background:#161d2c;border:1px solid #243049;font-weight:400;color:#dbe4f0}
-.picker-list button.dir:hover{background:#243049}
+.picker-list button.dir{width:100%;margin:0;justify-content:flex-start;font-weight:400}
 .picker-foot{display:flex;gap:8px;justify-content:space-between;margin-top:12px}
-.picker-foot button{width:auto;margin:0;padding:8px 14px}.picker-foot button.primary{background:#2563eb}</style></head>
+.picker-foot button{width:auto;margin:0}
+.picker-foot button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+</style></head>
 <body><form method="post" action="/ui/setup">
 <h2>gx-torrent setup</h2>
 <p class="m">First run: choose how the daemon works. The settings are saved in settings.json.</p>
@@ -167,4 +176,5 @@ function ensureTooltips(root) {
 document.addEventListener('DOMContentLoaded', function () { ensureTooltips(document); });
 ensureTooltips(document);
 </script>
+<script src="/assets/common.js"></script>
 </body></html>

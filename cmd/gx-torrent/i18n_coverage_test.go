@@ -78,7 +78,7 @@ func TestUIPageIsFullyTranslatable(t *testing.T) {
 	for _, m := range regexp.MustCompile(`>([^<>{}]+)<`).FindAllStringSubmatch(text, -1) {
 		record("text", m[1])
 	}
-	for _, m := range regexp.MustCompile(`(?:title|placeholder|aria-label|label)="([^"{}]+)"`).FindAllStringSubmatch(text, -1) {
+	for _, m := range regexp.MustCompile(`(?:title|placeholder|aria-label|label|data-label-auto|data-label-light|data-label-dark)="([^"{}]+)"`).FindAllStringSubmatch(text, -1) {
 		record("attr", m[1])
 	}
 

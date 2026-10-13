@@ -138,7 +138,7 @@ func (d *Daemon) renderWanted(w http.ResponseWriter, r *http.Request, errKey str
 
 	errorHTML := ""
 	if errKey != "" {
-		errorHTML = `<p class="err">` + html.EscapeString(errKey) + `</p>`
+		errorHTML = `<div class="notice err" role="alert">` + html.EscapeString(errKey) + `</div>`
 	}
 	page = strings.Replace(page, "<!--ERROR-->", errorHTML, 1)
 
@@ -496,47 +496,87 @@ func baseNameSuggestions(query string, items []rss.Item, includeLang []string, q
 func (d *Daemon) uiWantedRowsHTML() string {
 	list := d.wantedList()
 	if len(list) == 0 {
-		return `<tr><td colspan="7" class="muted">None</td></tr>`
+		return `<li class="empty"><svg class="i" style="width:40px;height:40px;color:var(--subtle)"><use href="/assets/icons.svg#i-tv"/></svg><h3>Nothing wanted yet</h3><p>Add a series or a movie: gx-torrent watches the feeds and the indexers for it and downloads what is missing.</p></li>`
 	}
 	var b strings.Builder
 	for index, w := range list {
-		missingLabel := "—"
+		idx := strconv.Itoa(index)
+		taken, lastSearch := d.wantedProgress(w)
+		icon, kindLabel := "i-tv", "Series"
+		if w.kind() == "movie" {
+			icon, kindLabel = "i-film", "Movie"
+		}
+		cls := "item"
+		state := `<span class="badge b-seeding">Monitoring</span>`
+		pauseText, pauseTitle := "Pause", "Pause monitoring this wanted title"
+		if w.Paused {
+			cls += " off"
+			state = `<span class="badge b-paused">Paused</span>`
+			pauseText, pauseTitle = "Resume", "Resume monitoring this wanted title"
+		}
+		b.WriteString(`<li class="` + cls + `" data-wanted-row="` + idx + `"><div class="kind-icon" aria-hidden="true"><svg class="i"><use href="/assets/icons.svg#` + icon + `"/></svg></div><div class="item-main">`)
+		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(w.Name) + `</span><span class="chip">` + kindLabel + `</span>` + state + `</div>`)
+
+		var chips strings.Builder
+		if w.kind() != "movie" && strings.TrimSpace(w.Seasons) != "" {
+			chips.WriteString(uiChip("", "Seasons", w.Seasons))
+		}
+		if strings.TrimSpace(w.Language) != "" {
+			chips.WriteString(uiChip("in", "Language", w.Language))
+		}
+		if q := strings.TrimSpace(w.Quality); q != "" {
+			chips.WriteString(uiChip("in", "Quality", q))
+		}
+		if strings.TrimSpace(w.Exclude) != "" {
+			chips.WriteString(uiChip("out", "Exclude", w.Exclude))
+		}
+		if strings.TrimSpace(w.EpisodeFilter) != "" {
+			chips.WriteString(uiChip("", "Episodes", w.EpisodeFilter))
+		}
+		if strings.TrimSpace(w.Category) != "" {
+			chips.WriteString(uiChip("act", "Category", w.Category))
+		}
+		if strings.TrimSpace(w.SavePath) != "" {
+			chips.WriteString(uiChip("act", "Save to", w.SavePath))
+		}
+		if chips.Len() > 0 {
+			b.WriteString(`<div class="chips">` + chips.String() + `</div>`)
+		}
+
+		// Progress: what is missing (series), what was taken, when it was last
+		// searched on the indexers.
+		b.WriteString(`<div class="item-status">`)
 		if w.kind() != "movie" {
 			missing := d.wantedMissing(w)
-			if len(missing) == 0 {
-				missingLabel = "✓"
+			if len(missing) == 0 && taken == 0 {
+				b.WriteString(`<span class="muted">Not found yet</span>`)
+			} else if len(missing) == 0 {
+				b.WriteString(`<span class="ok">✓ <span>Nothing missing</span></span>`)
 			} else {
-				parts := make([]string, 0, len(missing))
+				b.WriteString(`<span class="warn"><span>Missing</span> ` + strconv.Itoa(len(missing)) + `:</span> `)
 				for i, ep := range missing {
-					if i == 8 {
-						parts = append(parts, "…")
+					if i == 12 {
+						b.WriteString(`<span class="chip warn">+` + strconv.Itoa(len(missing)-12) + `</span>`)
 						break
 					}
-					parts = append(parts, fmt.Sprintf("S%02dE%02d", ep.season, ep.episode))
+					b.WriteString(`<span class="chip warn">` + fmt.Sprintf("S%02dE%02d", ep.season, ep.episode) + `</span> `)
 				}
-				missingLabel = strings.Join(parts, " ")
 			}
+		} else if taken > 0 {
+			b.WriteString(`<span class="ok">✓ <span>Downloaded</span></span>`)
+		} else {
+			b.WriteString(`<span class="muted">Not found yet</span>`)
 		}
-		stateClass := "flag on"
-		stateText := "active"
-		pauseBtnText := "Pause"
-		pauseBtnTitle := "Pause monitoring this wanted title"
-		if w.Paused {
-			stateClass = "flag"
-			stateText = "paused"
-			pauseBtnText = "Resume"
-			pauseBtnTitle = "Resume monitoring this wanted title"
+		if w.kind() != "movie" && taken > 0 {
+			b.WriteString(` · <span title="Episodes downloaded for this title">` + strconv.Itoa(taken) + ` <span>taken</span></span>`)
 		}
-		idxStr := strconv.Itoa(index)
-		b.WriteString("<tr><td>" + html.EscapeString(w.Name) + "</td>")
-		b.WriteString("<td>" + html.EscapeString(w.kind()) + "</td>")
-		b.WriteString("<td>" + html.EscapeString(orDefault(w.Seasons, "—")) + "</td>")
-		b.WriteString("<td>" + html.EscapeString(strings.Join(w.includes(), ", ")) + "</td>")
-		b.WriteString("<td>" + html.EscapeString(missingLabel) + "</td>")
-		b.WriteString(`<td><span class="` + stateClass + `">` + stateText + `</span></td>`)
-		b.WriteString(`<td class="actions">`)
-		b.WriteString(`<button type="button" class="sm" data-wanted-poll data-index="` + idxStr + `" data-name="` + html.EscapeString(w.Name) + `" title="Search this title now">Search</button> `)
-		attrs := `data-wanted-edit data-index="` + idxStr + `"` +
+		if !lastSearch.IsZero() {
+			b.WriteString(` · <span title="Last search on the indexers"><span>searched</span> ` + lastSearch.Format("02/01 15:04") + `</span>`)
+		}
+		b.WriteString(`</div><div class="item-status" data-wanted-status="` + idx + `" aria-live="polite"></div></div><div class="item-actions">`)
+
+		b.WriteString(`<button type="button" class="sm" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="Search this title now"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search</button>`)
+		attrs := `data-wanted-edit data-index="` + idx + `"` +
 			` data-name="` + html.EscapeString(w.Name) + `"` +
 			` data-kind="` + w.kind() + `"` +
 			` data-seasons="` + html.EscapeString(w.Seasons) + `"` +
@@ -547,11 +587,27 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			` data-category="` + html.EscapeString(w.Category) + `"` +
 			` data-savepath="` + html.EscapeString(w.SavePath) + `"` +
 			` data-paused="` + strconv.FormatBool(w.Paused) + `"`
-		b.WriteString(`<button type="button" class="sm" ` + attrs + ` title="Edit wanted title">Edit</button> `)
-		b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="toggle-pause"><input type="hidden" name="index" value="` + idxStr + `"><button type="submit" class="secondary" title="` + pauseBtnTitle + `">` + pauseBtnText + `</button></form> `)
-		b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idxStr + `"><button type="submit" class="danger" title="Remove this wanted title">Remove</button></form> `)
-		b.WriteString(`<span class="muted" data-wanted-status="` + idxStr + `" aria-live="polite" style="margin-left:6px"></span>`)
-		b.WriteString("</td></tr>")
+		b.WriteString(`<button type="button" class="sm" ` + attrs + ` title="Edit wanted title">Edit</button>`)
+		b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="toggle-pause"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="sm ghost" title="` + pauseTitle + `">` + pauseText + `</button></form>`)
+		b.WriteString(`<form method="post" action="/ui/wanted" data-confirm="Stop monitoring this title?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm danger" title="Remove this wanted title" aria-label="Remove this wanted title"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
+		b.WriteString(`</div></li>`)
 	}
 	return b.String()
+}
+
+// wantedProgress returns how many episodes (or releases) were taken for a
+// wanted title and when its indexers were last searched.
+func (d *Daemon) wantedProgress(w wantedEntry) (taken int, lastSearch time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	prefix := strings.TrimSpace(w.Name) + "\x00"
+	for key, eps := range d.state.WantedTaken {
+		if strings.HasPrefix(key, prefix) {
+			taken += len(eps)
+		}
+	}
+	if last := d.state.WantedSearchLast[strings.TrimSpace(w.Name)]; last > 0 {
+		lastSearch = time.Unix(last, 0)
+	}
+	return taken, lastSearch
 }

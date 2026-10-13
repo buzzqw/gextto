@@ -4,35 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gx-torrent</title>
-<style>body{margin:0;font:15px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
-header{padding:14px 20px;border-bottom:1px solid #223;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
-header h1{font-size:20px;margin:0;font-weight:600}
-.nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
-.nav a{padding:5px 12px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;text-decoration:none;color:#dbe4f0;font-size:14px;white-space:nowrap}
-.nav a:hover{background:#243049}
-.nav a.on{background:#2563eb;border-color:#2563eb;color:#fff}
-main{padding:16px 20px;max-width:820px;margin:0 auto}
-h2{font-size:16px;margin:22px 0 8px}
-label{display:block;margin:10px 0;color:#93a1b5}
-input,select{width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
-fieldset{border:1px solid #243049;border-radius:10px;padding:10px 14px 14px;margin:0 0 14px;background:#131a28}
-legend{color:#93a1b5;padding:0 6px}
-label.chk{display:flex;gap:8px;align-items:center}
-label.chk input{width:auto}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
-@media(max-width:640px){.grid{grid-template-columns:1fr}}
-button{padding:9px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
-.muted{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;overflow-wrap:anywhere}
-button.secondary{background:#243049;color:#dbe4f0;border:1px solid #2b3a55;font-weight:500}
-.actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
-:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="/favicon.ico">
+<script>try{var m=localStorage.getItem('gx-theme');if(m==='light'||m==='dark')document.documentElement.setAttribute('data-theme',m);}catch(e){}</script>
+<link rel="stylesheet" href="/assets/theme.css">
+<style>
+main{max-width:900px;margin:0 auto;padding:20px 16px 90px}
+main>p.muted:first-child{margin-top:0}
+label{display:flex;flex-direction:column;gap:5px;margin:10px 0;font-size:13px}
+label.chk{flex-direction:row;align-items:center;gap:8px;font-size:14px}
+input:not([type=checkbox]):not([type=radio]),select{width:100%}
+fieldset{scroll-margin-top:70px}
+fieldset .muted{font-size:13px}
+.savebar{position:sticky;bottom:0;margin:18px -16px 0;padding:12px 16px;display:flex;justify-content:flex-end;gap:10px;background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -6px 20px rgba(0,0,0,.08)}
 </style></head>
 <body>
-<header>
-  <h1>gx-torrent</h1>
-  <nav class="nav"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/wanted" title="TV shows and movies wanted list">Wanted</a><a href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a class="on" href="/ui/settings" aria-current="page" title="Daemon configuration and options">Settings</a></nav>
+<header class="topbar">
+  <a class="brand" href="/" title="gx-torrent"><img src="/favicon.ico" alt=""><span>gx-torrent</span></a>
+  <nav class="nav" aria-label="Sections"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/wanted" title="TV shows and movies wanted list">Wanted</a><a href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a class="on" href="/ui/settings" aria-current="page" title="Daemon configuration and options">Settings</a></nav>
+  <span class="spacer"></span>
+  <button type="button" class="ghost icon" data-theme-switch data-label-auto="Theme: automatic (follows the system)" data-label-light="Theme: light" data-label-dark="Theme: dark" aria-label="Theme: automatic (follows the system)" title="Switch theme (automatic, light, dark)"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
 </header>
 <main>
+<div class="page-head"><div class="grow"><h1>Settings</h1></div></div>
 <p class="muted">Folders, network, ports and the engine options apply from the next start; the bandwidth, queue limits and language apply at once.</p>
 <form method="post" action="/ui/settings">
 <fieldset>
@@ -63,7 +57,7 @@ button.secondary{background:#243049;color:#dbe4f0;border:1px solid #2b3a55;font-
   </div>
   <p class="muted" aria-live="polite">{{IPFILTER_STATUS}}</p>
   <input type="hidden" name="return" value="settings">
-  <button type="button" class="secondary" data-formaction="/ui/ipfilter" title="Download (if a URL) and apply the IP filter in the field now, without saving the other settings">Load now</button>
+  <button type="button" class="secondary sm" data-formaction="/ui/ipfilter" title="Download (if a URL) and apply the IP filter in the field now, without saving the other settings">Load now</button>
   <p class="muted">A URL is downloaded at start-up and again at the interval above; a local file is reloaded when it changes on disk.</p>
 </fieldset>
 <fieldset>
@@ -99,9 +93,9 @@ button.secondary{background:#243049;color:#dbe4f0;border:1px solid #2b3a55;font-
   <legend>Optimization</legend>
   <p class="muted">One click puts a part of the engine on values that work well; each button changes only its own settings.</p>
   <div class="actions">
-    <button type="button" class="secondary" data-formaction="/ui/optimize" data-optimize="queue" title="3 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not counted">Optimize queue</button>
-    <button type="button" class="secondary" data-formaction="/ui/optimize" data-optimize="cache" title="Disk cache back to automatic: sized from the RAM and the disk type, adapted while running">Optimize cache</button>
-    <button type="button" class="secondary" data-formaction="/ui/optimize" data-optimize="bandwidth" title="Download unlimited, upload at 80% of the highest upload measured, latency auto-speed on">Optimize bandwidth</button>
+    <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="queue" title="3 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not counted">Optimize queue</button>
+    <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="cache" title="Disk cache back to automatic: sized from the RAM and the disk type, adapted while running">Optimize cache</button>
+    <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="bandwidth" title="Download unlimited, upload at 80% of the highest upload measured, latency auto-speed on">Optimize bandwidth</button>
   </div>
   <p class="muted">{{OPT_STATUS}}</p>
 </fieldset>
@@ -134,11 +128,12 @@ button.secondary{background:#243049;color:#dbe4f0;border:1px solid #2b3a55;font-
   <label>Language<select name="lang" title="Web interface language">{{LANG_OPTIONS}}</select></label>
   <label>Notification webhook URL<input type="text" name="notify-url" value="{{NOTIFY_URL}}" autocomplete="off" title="Webhook URL to receive notifications on torrent completion or feed events"></label>
 </fieldset>
-<button type="submit" title="Save settings to settings.json">Save</button>
+<div class="savebar"><button type="submit" class="primary" title="Save settings to settings.json">Save</button></div>
 <!--ERROR-->
 </form>
 </main>
 <script id="ui-i18n"></script>
+<script src="/assets/common.js"></script>
 <script>
 function ensureTooltips(root) {
   root = root || document;

@@ -471,7 +471,7 @@ func TestUISummaryCardsAreNotDuplicated(t *testing.T) {
 	raw, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	body := string(raw)
-	for _, want := range []string{"<span>moving</span>", ">DHT <b>", `name="delete_files"`} {
+	for _, want := range []string{`data-status="seeding"`, ">DHT <b>", `name="delete_files"`, `id="torrents"`, `data-hash="` + hash + `"`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("page missing %q", want)
 		}
@@ -545,8 +545,19 @@ func TestUIFaviconWithoutToken(t *testing.T) {
 	raw, _ = io.ReadAll(resp.Body)
 	resp.Body.Close()
 	body := string(raw)
-	if !strings.Contains(body, `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,`) {
+	if !strings.Contains(body, `<link rel="icon" type="image/svg+xml" href="/favicon.ico">`) {
 		t.Fatalf("token page without icon: %s", body)
+	}
+	// The shared stylesheet, script and icons load before any token too.
+	for _, asset := range []string{"/assets/theme.css", "/assets/common.js", "/assets/icons.svg"} {
+		r, err := http.Get(server.URL + asset)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Body.Close()
+		if r.StatusCode != http.StatusOK || r.Header.Get("ETag") == "" {
+			t.Fatalf("GET %s without token -> %d (etag %q)", asset, r.StatusCode, r.Header.Get("ETag"))
+		}
 	}
 	if strings.Contains(body, "%%") {
 		t.Fatalf("token page CSS carries a literal %%%%: %s", body)
