@@ -37,6 +37,9 @@ type SessionStats struct {
 	// UIs yet.
 	UTPResendsTimeout int64
 	UTPResendsFast    int64
+	// UTPSynDrops counts backlog SYNs evicted under burst. Fed by the
+	// vendored stack; API-visible, no UI row.
+	UTPSynDrops int64
 	// DHTStats are the DHT counters (nodes, peers found, traffic).
 	DHTStats map[string]int64
 
@@ -143,6 +146,7 @@ func (s *Session) Stats() SessionStats {
 		out.UTPAcceptErrors = int64(ust.AcceptErrors)
 		out.UTPResendsTimeout = int64(ust.ResendsTimeout)
 		out.UTPResendsFast = int64(ust.ResendsFast)
+		out.UTPSynDrops = int64(ust.SynDrops)
 	}
 	out.DHT = s.config.DHTEnabled
 	out.PeerWireDownloaded = peerconn.WireBytesRead.Load()

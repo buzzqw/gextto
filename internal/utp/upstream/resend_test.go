@@ -63,6 +63,33 @@ func TestTimeoutResendsAreCounted(t *testing.T) {
 	}
 }
 
+// Pushing past the 50-SYN backlog evicts one (with a reset) and counts
+// the drop: under burst the eviction, not the accept loop, is the bound.
+func TestBacklogEvictionIsCounted(t *testing.T) {
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := NewSocketFromPacketConn(pc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.CloseNow()
+	mu.Lock()
+	for i := 0; i < 51; i++ {
+		s.pushBacklog(syn{seq_nr: uint16(i), conn_id: uint16(i + 1), addr: "198.51.100.9:51413"})
+	}
+	n := len(s.backlog)
+	drops := s.SynDrops()
+	mu.Unlock()
+	if n != 50 {
+		t.Fatalf("backlog holds %d SYNs, want 50", n)
+	}
+	if drops != 1 {
+		t.Fatalf("syn drops = %d, want 1", drops)
+	}
+}
+
 // The fast-resend counter plumbing, without fabricating selective ACKs.
 func TestResendStatsPlumbing(t *testing.T) {
 	pc, err := net.ListenPacket("udp", "127.0.0.1:0")

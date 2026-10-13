@@ -2218,6 +2218,7 @@ func (d *Daemon) stats() daemonStats {
 			"utp_accept_errors":        s.UTPAcceptErrors,
 			"utp_resends_timeout":      s.UTPResendsTimeout,
 			"utp_resends_fast":         s.UTPResendsFast,
+			"utp_syn_drops":            s.UTPSynDrops,
 			"read_ops_total":           s.ReadOpsTotal,
 			"write_ops_total":          s.WriteOpsTotal,
 			"storage_errors":           s.StorageErrors,

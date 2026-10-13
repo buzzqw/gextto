@@ -23,9 +23,11 @@ type Stats struct {
 	DialErrors   uint64
 	AcceptErrors uint64
 	// ResendsTimeout counts RTO-driven packet resends (loss/congestion
-	// signal); ResendsFast counts selective-ACK fast resends.
+	// signal); ResendsFast counts selective-ACK fast resends. SynDrops
+	// counts backlog SYNs evicted under burst.
 	ResendsTimeout uint64
 	ResendsFast    uint64
+	SynDrops       uint64
 }
 
 // Socket is Gextto's uTP socket. It wraps a UDP packet connection, diverting
@@ -119,5 +121,6 @@ func (s *Socket) Stats() Stats {
 		AcceptErrors:   s.acceptErrors.Load(),
 		ResendsTimeout: uint64(timeout),
 		ResendsFast:    uint64(fast),
+		SynDrops:       uint64(s.inner.SynDrops()),
 	}
 }

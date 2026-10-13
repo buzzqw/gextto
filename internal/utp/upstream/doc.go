@@ -19,4 +19,5 @@
 //   - header.go: Unmarshal rejects <20B inputs (hostile peers) instead of
 //     slicing out of range (proven by FuzzHeaderUnmarshal seed#0 on the
 //     pristine code).
+//   - socket.go: pushBacklog evictions counted (synDrops/SynDrops).
 package upstream

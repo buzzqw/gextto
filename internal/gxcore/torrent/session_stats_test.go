@@ -80,4 +80,7 @@ func TestSessionStatsCarriesUTPSocketCounters(t *testing.T) {
 	if st.UTPResendsTimeout != 0 || st.UTPResendsFast != 0 {
 		t.Fatalf("expected zero resends, got %+v", st)
 	}
+	if st.UTPSynDrops != 0 {
+		t.Fatalf("expected zero syn drops, got %+v", st)
+	}
 }

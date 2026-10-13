@@ -52,8 +52,10 @@ type Socket struct {
 	// GEXTTO: per-socket resend counters, the congestion signal exported
 	// to SessionStats. timeoutResends counts RTO-driven resends (send.go),
 	// fastResends counts selective-ACK fast resends (conn.go ackSkipped).
+	// synDrops counts backlog SYNs evicted under burst (pushBacklog).
 	timeoutResends atomic.Int64
 	fastResends    atomic.Int64
+	synDrops       atomic.Int64
 
 	// GEXTTO: optional per-remote RTT estimate (e.g. from recent dial
 	// races) seeding the initial RTO of fresh connections. Nil = the fixed
@@ -141,6 +143,8 @@ func (s *Socket) pushBacklog(syn syn) {
 			break
 		}
 		delete(s.backlog, k)
+		// GEXTTO: count the eviction (burst signal for SessionStats).
+		s.synDrops.Add(1)
 		// A syn is sent on the remote's recv_id, so this is where we can send
 		// the reset.
 		s.reset(s.strNetAddr(k.addr), k.seq_nr, k.conn_id)
@@ -569,6 +573,9 @@ func (s *Socket) addTimeoutResend() { s.timeoutResends.Add(1) }
 
 // GEXTTO: count one selective-ACK fast resend.
 func (s *Socket) addFastResend() { s.fastResends.Add(1) }
+
+// GEXTTO: SynDrops reports backlog SYNs evicted under burst.
+func (s *Socket) SynDrops() int64 { return s.synDrops.Load() }
 
 // The address we're listening on for new uTP connections.
 func (s *Socket) Addr() net.Addr {
