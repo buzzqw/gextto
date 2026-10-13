@@ -186,6 +186,7 @@ func (a *PeriodicalAnnouncer) Run() {
 		case req := <-a.statsCommandC:
 			req.Response <- a.stats()
 		case <-a.closeC:
+			cancel()
 			return
 		}
 	}
