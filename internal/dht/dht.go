@@ -194,6 +194,9 @@ type DHT struct {
 	bep44Done    chan uint64
 	bep44s       map[uint64]*bep44Lookup
 	bep44Seq     uint64
+	// confirm tracks which nodes reported each peer (multi-path confirmation
+	// observability, run-loop owned).
+	confirm map[peerConfirmKey]*peerConfirmEntry
 }
 
 // New creates a DHT node. If config is nil, DefaultConfig will be used.
@@ -234,6 +237,7 @@ func New(config *Config) (node *DHT, err error) {
 	node.bep44Request = make(chan bep44LookupRequest, 4)
 	node.bep44Done = make(chan uint64, 4)
 	node.bep44s = make(map[uint64]*bep44Lookup)
+	node.confirm = make(map[peerConfirmKey]*peerConfirmEntry)
 	c := openStore(cfg.Port, cfg.SaveRoutingTable)
 	node.store = c
 	if len(c.Id) != 20 {
@@ -578,6 +582,7 @@ func (d *DHT) loop() {
 			subnetShareMax.Store(int64(ms))
 			nodesInsecureID.Store(int64(ins))
 			subnetCapHintValue.Store(int64(subnetCapHint(ms, d.routingTable.maxPerSubnet)))
+			d.expirePeerConfirm(time.Now())
 			needPing := d.routingTable.cleanup(d.config.CleanupPeriod, d.peerStore)
 			d.wg.Add(1)
 			go func() {
@@ -1158,6 +1163,7 @@ func (d *DHT) processGetPeerResults(node *remoteNode, resp responseType) {
 			// send peer even if we already have it in store
 			// the underlying client does/should handle dupes
 			d.peerStore.addContact(query.ih, peerContact, false)
+			d.notePeerReport(query.ih, peerContact, node.addressBinaryFormat)
 			peers = append(peers, peerContact)
 		}
 		if len(peers) > 0 {
@@ -1389,5 +1395,8 @@ func Stats() map[string]int64 {
 		// subnet_share_max (0 = nothing to suggest, e.g. the cap is already
 		// set). The engine never enables the cap by itself.
 		"subnet_cap_hint": subnetCapHintValue.Load(),
+		// peers_confirmed_multi counts the peers a second distinct node
+		// confirmed within the window (multi-path observability, §16.2).
+		"peers_confirmed_multi": peersConfirmedMulti.Value(),
 	}
 }

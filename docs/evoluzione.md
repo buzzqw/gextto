@@ -2593,7 +2593,7 @@ here; the implemented ones are dated, the others are a proposal to be agreed.
 | 3 | Merge: order the candidates by **reusable bytes** so the richest source is read first | Phase 2 | low | low | **closed (2026-10-13, reason):** superseded by the dedupe (#2) — ordering changes only *which* source provides a piece, not the work; no measurable gain, so no speculative code |
 | 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | Phase 2 | high (revives more seedless torrents) | high | **plan** in §16.1 |
 | 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | the O(1) counter removed the cost argument | medium | medium | **partial**: `subnet_cap_hint` (the suggested cap from the live concentration) is exposed in `Stats()`; automatic enforcement not pursued (a /24 can be legitimate CGNAT/mobile) |
-| 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.10 | medium | medium | **measured (2026-10-13)**, see §16.2; no speculative code |
+| 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.10 | medium | medium | **measured + instrumented (2026-10-13)**: `peers_confirmed_multi` counts peers reported by ≥2 distinct nodes; the full rewrite awaits data, see §16.2 |
 | 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | Phase 2 | medium | low | **done (2026-10-13)**: `merged_pieces`/`merged_bytes` in the engine session stats → daemon API → Gextto «Riuso locale» |
 | 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.12 | high | high | **done (2026-10-13)**: write ring buffer + 2 pieces per peer; measured ×1.75 (3.85→6.76 MiB/s at RTT 50 ms), details in §6.4/§16.3 |
 | 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | the fuzzing pass | medium/high | low | **done**: `internal/utils/utils.go` (length bounded, recursion depth ≤64); `internal/dht/bencode.go` `validBencode` screens DHT packets before bencode-go |
@@ -2653,9 +2653,20 @@ probe used a random info-hash).
 **Read:** the routing table is **not concentrated** and the anti-Sybil cap is not
 triggered, so the concentration lever is already sufficient; the ~71 % of
 unanswered queries are nodes that do not reply, not proof of poisoning. There is
-therefore **no data yet that justifies a multi-path lookup**: the next step is the
-instrumentation (reporters per candidate peer, `peers_confirmed_multi`), not the
-rewrite. This matches the "measure first" rule.
+therefore **no data yet that justifies a multi-path lookup**: the next step was the
+instrumentation, not the rewrite.
+
+**Instrumentation (done, 2026-10-13).** `notePeerReport`/`expirePeerConfirm`
+(`internal/dht/confirm.go`) track which responding nodes reported each
+(info-hash, peer), bounded to `peerConfirmMax` entries and expiring after
+`peerConfirmWindow`; `peers_confirmed_multi` (in `Stats()`, therefore
+`dht_peers_confirmed_multi` in the daemon) counts the peers a second distinct
+node confirmed. It is read-only: it changes nothing about which peers are used.
+On a real swarm a non-trivial value is the evidence needed before spending the
+cost of a full multi-path lookup (an explicit per-lookup state machine with a
+bounded fan-out and a deadline, like `bep44_client.go`). Tests:
+`TestPeerConfirmCountsDistinctReporters`, `TestPeerConfirmIsBounded`,
+`TestPeerConfirmExpiry`.
 
 ### 16.3 Multi-piece pipelining — measurement and plan
 
