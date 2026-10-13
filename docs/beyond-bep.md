@@ -36,18 +36,29 @@ inventory). Backlog, measurements and strategic direction:
 
 ## 1. Summary and recommendation
 
-| # | Item | Value here | Effort | Risk | Verdict |
+| # | Item | Value here | Effort | Risk | Status |
 |---|---|---|---|---|---|
-| 1 | **WebSocket tracker** (`ws://`/`wss://`) | medium-high (new swarms) | medium | low | **recommended** |
+| 1 | **WebSocket tracker** (`ws://`/`wss://`) | medium-high (new swarms) | medium | low | **done** (see the caveat in §3) |
 | 2 | **WebTorrent / WebRTC** peers | low-medium (browser swarms) | very large | high | **not now** |
-| 3 | **v1 cross-layout merge** | medium-high (more reuse) | medium-high | medium | **optional** |
-| 4 | **Decentralized feeds** on BEP 46 | medium (subscriptions) | small | low | **recommended** (as a feature) |
+| 3 | **v1 cross-layout merge** | medium-high (more reuse) | medium-high | medium | **done** (whole pieces) |
+| 4 | **Decentralized feeds** on BEP 46 | medium (subscriptions) | small | low | **done** |
 
-The order I would follow: **4 → 1 → 3 → (2)**. Item 4 is the cheapest and uses
-code we already have; item 1 unlocks new swarms and, later, the signalling that
-item 2 needs; item 3 is the last frontier of the feature we just completed but
-carries a real "wasted work" risk; item 2 is a strategic bet with a heavy new
-dependency.
+The order followed: **4 → 1 → 3**, leaving item 2 for a real browser-interop
+requirement. Item 1 unlocks new swarms and lays the signalling groundwork for
+item 2; item 4 was the cheapest and reuses code already present; item 3 was the
+last frontier of the merge feature and carries a real "wasted work" risk, which
+the design bounds.
+
+> [!IMPORTANT]
+> **Caveat found while implementing item 1.** The reference WebSocket tracker
+> (`bittorrent-tracker`, the de-facto implementation) treats every WebSocket
+> client as a WebRTC peer: `Swarm._getPeers` skips non-`ws` peers when
+> `isWebRTC` is true, and `numwant` is derived from the number of WebRTC
+> `offers`. A native client that speaks the protocol therefore gets **no TCP
+> peers** from that tracker; the client is still correct (and useful with
+> trackers that do return standard peers, and as the signalling channel of item
+> 2), but the standalone peer-discovery value against `bittorrent-tracker` is
+> low. This is why the two items are coupled and item 2 is the real unlock.
 
 ## 2. How the four were chosen
 
@@ -173,6 +184,13 @@ also lays the transport and the JSON signalling groundwork for item 2.
 engine surgery. Low risk: purely additive, isolated behind the `Tracker`
 interface, and the dial reuses the audited egress.
 
+**Status: done.** `internal/gxcore/internal/tracker/wstracker` (a bounded,
+original RFC 6455 client + the tracker), the `ws`/`wss` schemes in
+`trackermanager.Get` (sockets closed with the session), tests
+(`TestWSAnnounce`, `TestWSScrapeAndFailure`, `TestWSSecure`, a rejected
+handshake) and the `FuzzWSReadMessage` smoke target. Remember the §1 caveat:
+with `bittorrent-tracker` a native client receives no TCP peers.
+
 ## 4. WebTorrent / WebRTC peers
 
 **What it is.** WebTorrent lets browser clients be BitTorrent peers over
@@ -290,6 +308,15 @@ whole" path keep corruption out, but a bad heuristic match can read and hash a
 large source for nothing. That is why the guardrail above (and the fact that the
 v2 path stays preferred) matters.
 
+**Status: done (whole pieces).** `prefillV1From`/`mergeV1Files`/
+`copyV1PieceFromSource` in `internal/gxcore/torrent/localmerge.go`; matched by
+file path and length; **whole pieces only** (no Phase 3 blocks for v1, since
+there is no per-block hash to justify a partial write); a candidate is abandoned
+after `maxV1VerifyFailures` (64) hash failures, so a false match cannot read the
+whole source; a mismatch leaves the storage untouched. Tests:
+`TestPrefillV1MergesDifferentLayout`, `TestPrefillV1PartialSourceSkipsStraddlingPiece`,
+`TestPrefillV1WrongMetadataMatchIsSafe`.
+
 ## 6. Decentralized feeds on BEP 46
 
 **What it is.** A subscription channel published in the DHT as a **BEP 44
@@ -351,6 +378,14 @@ and a restart).
 primitives; no data-path change). The value depends on having feeds to subscribe
 to, which is why the **publisher** side (point 4) is what makes it a complete,
 single-player-useful feature.
+
+**Status: done (client side).** Engine: `bep46Feed` decodes both the single
+`{"ih"}` form and a feed (`{"items":[{"ih","name"}]}`), and
+`Session.ResolveDHTFeed` fetches it. Daemon: a feed URL of the form
+`dht://<pubkey-hex>[?salt=<hex>]` is resolved and mapped to RSS items (magnets),
+reusing the whole feed pipeline, plus `GET /api/v1/dht-feed` for external
+consumers. The **publisher** side (generating and signing a feed) is not
+implemented yet.
 
 ## 7. Dependencies and order
 

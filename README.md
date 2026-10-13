@@ -147,7 +147,10 @@ peers, private torrents, local-data hints (BEP 38), peer priority, padding,
 DHT suite (mainline, IPv6, scrape, secure node IDs, read-only nodes, K/V
 store, `urn:btpk:` updates) plus v2 and magnet `so=` selection. Deprecated or
 niche BEPs and WebTorrent/I2P are out of scope, with rationale in the same
-document.
+document. Beyond the BEPs: **`ws://`/`wss://` trackers** (WebTorrent protocol,
+with the caveat that the reference tracker returns only WebRTC peers) and
+**DHT feeds** (`dht://<pubkey>` feed URLs resolved from a BEP 46 mutable item)
+— see [`docs/beyond-bep.md`](docs/beyond-bep.md).
 
 **Local reuse.** A torrent's `similar`/`collections` hints (BEP 38) are kept on
 export and matched against local torrents

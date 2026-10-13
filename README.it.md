@@ -152,7 +152,10 @@ torrent privati, hint locali (BEP 38), priorità dei peer, padding,
 DHT (mainline, IPv6, scrape, node ID sicuri, nodi read-only, store K/V,
 aggiornamenti `urn:btpk:`), più v2 e selezione `so=` dei magnet. BEP
 deprecati o di nicchia e WebTorrent/I2P sono fuori scope, con le motivazioni
-nello stesso documento.
+nello stesso documento. Oltre i BEP: **tracker `ws://`/`wss://`** (protocollo
+WebTorrent, con l'avvertenza che il tracker di riferimento restituisce solo peer
+WebRTC) e **feed DHT** (URL di feed `dht://<pubkey>` risolti da un item
+mutabile BEP 46) — vedi [`docs/beyond-bep.md`](docs/beyond-bep.md).
 
 **Riuso locale.** Gli hint `similar`/`collections` (BEP 38) sono conservati
 nell'export e confrontati con gli altri torrent locali

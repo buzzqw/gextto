@@ -575,6 +575,13 @@ query) is used and the worker queries the configured Torznab **indexers**, treat
 results as feed items (same rules, dedup and actions). Example:
 `[{"name":"cerca-serie","search":"Serie S01","include":"1080p"}]`.
 
+A feed can also be a **DHT feed**: `url` of the form
+`dht://<ed25519-pubkey-hex>[?salt=<hex>]` is resolved from the DHT as a BEP 46
+signed mutable item listing torrents (see
+[`beyond-bep.md`](beyond-bep.md) §6); each entry becomes a magnet item, so the
+same rules/archive/add path applies. `GET /api/v1/dht-feed?key=<hex>[&salt=<hex>]`
+resolves one for external consumers. It needs the DHT enabled.
+
 With the `rules` key (JSON array) you switch to the **ordered rule set**, like
 BiglyBT: the first rule that matches decides (`fail: true` discards, otherwise
 it adds). Each rule has `name`, `feeds` (to limit it to some feeds; empty =
@@ -922,6 +929,12 @@ RPC server is disabled.
     contacted, but the other trackers of the same tier continue to be
     used; only if the tier is exhausted does the torrent stop announcing to that
     tier.
+  - **WebSocket trackers** (`ws://`/`wss://`) are supported: the
+    WebTorrent/bittorrent-tracker protocol (JSON announce/scrape on the socket),
+    dialed through the same egress as the HTTP tracker and closed with the
+    session. Note that the reference `bittorrent-tracker` returns only WebRTC
+    peers to a WebSocket client, so a native client receives no TCP peers from
+    it (see [`beyond-bep.md`](beyond-bep.md) §3).
 - **BEP 38 hints** (`similar`/`collections`).
   - The `.torrent` hints (from the info dictionary and from the top level, merged)
     are shown in the General tab together with the **local** torrents that
@@ -1161,6 +1174,13 @@ The merge has three phases:
   the Debian and Arch ISOs with a source 75% complete: 25% of the file from the
   network instead of 100% (§10.1 of [`evoluzione.md`](evoluzione.md), harness
   `scripts/phase3-env.sh` + `TestMeasureMergePhase3`).
+- **Phase 4 — v1, a different piece length.** Two **v1** torrents matched by
+  file **path and length** share **whole** pieces even when their piece grids
+  differ: each destination piece is assembled from verified source pieces and
+  checked against its own hash before it is written. v1 has no per-block hash,
+  so a piece only partly covered by the source is **not** reused (no block-level
+  write), and a wrong metadata match is abandoned after 64 hash failures instead
+  of reading the whole source. See [`beyond-bep.md`](beyond-bep.md) §5.
 
 The session statistics report `merged_pieces`, `merged_bytes` (block-level
 bytes included) and `merged_partial_pieces` (pieces reused at block level);

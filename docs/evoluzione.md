@@ -28,6 +28,15 @@ plan in [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md).
 Ex `docs/da-fare.md`. Restored on 08-10-2026: it had ended up in
 `docs/archive/` by mistake even though it is an **active** backlog.
 
+> [!NOTE]
+> **Next review (agenda).** Once the fuzz run (`make fuzz-smoke`) and the
+> recurring checks below are green, the next discussion is **what is open and
+> what is desired** in this document: go through §1 (active backlog), §3
+> (strategic direction) and §10 (smartness backlog), confirm or drop each
+> open item, and pick the desired next work. To be held at the end of the
+> checks, with the results of the just-landed work (`beyond-bep.md` §3/§5/§6:
+> WebSocket tracker, v1 cross-layout merge, DHT feeds) as the starting point.
+
 **Recurring checks (at every cycle close).** `make test` (`check-ui` +
 `installer-test` + `test-dht` + `CGO_ENABLED=0 go test ./...`), `make test-engine`
 and `make vet`; invariants `scripts/check-ui-settings-index.sh` /
@@ -1115,8 +1124,20 @@ Accounting (bitfield/completion) per torrent.
   adoption during the verifier's bitfield swap would be lost), then runs it in
   the same exclusive window as the resume path (piece fetches and webseeds are
   cancelled, so nothing else writes) and restarts the pipeline at the end.
+- **Phase 4, v1 cross-layout — done (2026-10-14):** reuse between two **v1**
+  torrents with a **different piece length**, matched by file **path and
+  length** (`v1FilesMatch`, a heuristic — unlike the v2 Merkle root; see
+  `beyond-bep.md` §5). Only **whole** destination pieces are reused: v1 has no
+  per-block hash to justify a partial write, so a piece is assembled from
+  verified source pieces and checked against its own hash **before** writing; a
+  wrong match therefore never writes, and a candidate is abandoned after
+  `maxV1VerifyFailures` (64) hash failures so it cannot read the whole source
+  for nothing.
 
-**No v1 with a different layout:** no ED2K/partial heuristics of BiglyBT.
+**No ED2K-style content hash.** The v1 cross-layout match is by file path and
+length, not by a chunk content hash (BiglyBT/ED2K): those hashes are not in the
+`.torrent`, so they would need a private index. The piece hash still verifies
+every reuse.
 
 **Critical guard: BEP 27.** The merge is disabled if A **or** B is private
 (`info.Private`): mixing private swarms violates the tracker rules and pollutes
@@ -1357,5 +1378,35 @@ peer the same piece twice. **Measurement (the latency harness):** `default`
 **3853 → 6756 KiB/s** (×1.75), `shallow` 301 KiB/s (window of 1 respected) at RTT
 50 ms with 256 KiB pieces. Tests: e2e suite + `-race` on the transfer tests,
 `piecedownloader` budget test. RAM and CPU equivalent.
+
+### 10.4 Beyond the BEPs: WebSocket tracker, DHT feeds, v1 cross-layout merge (done)
+
+The analysis and the design are in [`beyond-bep.md`](beyond-bep.md); these are
+the protocol extensions outside the BEP catalogue. Implemented **2026-10-14**:
+
+- **WebSocket tracker (ws/wss).** `internal/gxcore/internal/tracker/wstracker`
+  is a bounded, original RFC 6455 client plus the WebTorrent/bittorrent-tracker
+  tracker (JSON announce/scrape, binary fields as 20-code-point strings, full
+  and compact peers, BEP 31 retry); `trackermanager.Get` accepts `ws`/`wss` and
+  the sockets are closed with the session. It dials through the same egress as
+  the HTTP tracker (proxy, resolver, blocklist) and supports `wss`. Tests:
+  announce, scrape, failure, `wss`, a rejected handshake and a frame fuzzer
+  (`FuzzWSReadMessage`, in `make fuzz-smoke`). **Caveat:** the reference
+  `bittorrent-tracker` returns only WebRTC peers to a WebSocket client, so a
+  native client gets no TCP peers from it; the standalone value is limited to
+  trackers that return standard peers, and the real unlock is WebRTC (not done).
+- **DHT feeds (BEP 46).** Engine: `bep46Feed` decodes a mutable item value as a
+  single torrent (`{"ih"}`) or a feed (`{"items":[{"ih","name"}]}`), and
+  `Session.ResolveDHTFeed` resolves it (signature verified by the DHT client).
+  Daemon: a feed URL `dht://<pubkey-hex>[?salt=<hex>]` becomes a normal feed
+  source (resolved to magnet items, so rules/archive/dedup/add are reused) and
+  `GET /api/v1/dht-feed` resolves one for external consumers. Tests: the value
+  codec (engine) and the URL parse and item mapping (daemon). The **publisher**
+  side (signing a feed) is not implemented.
+- **v1 cross-layout merge** (Swarm Merging Phase 4, §9.2): two v1 torrents with
+  a different piece length share whole pieces, matched by file path and length
+  and verified against each destination piece's hash before writing. No
+  per-block reuse for v1 (no per-block hash), and a candidate is dropped after
+  64 failed verifications.
 
 
