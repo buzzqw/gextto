@@ -12,6 +12,9 @@ backlog in [`evoluzione.md`](evoluzione.md).
 Status legend: **yes** = implemented and tested; **partial** = only a part;
 **no** = absent; **excluded** = out of scope by choice.
 
+Long explanations are kept in the notes below each table, so that the columns
+stay narrow and the tables remain readable.
+
 ## Peer wire and metadata
 
 | BEP | Specification | Status |
@@ -31,10 +34,17 @@ Status legend: **yes** = implemented and tested; **partial** = only a part;
 | 23 | Compact Peer Lists for Trackers | yes |
 | 24 | Tracker Returns External IP (`ip`) | yes |
 | 27 | Private Torrents (`private: 1`, no DHT/PEX/LSD) | yes |
-| 38 | Finding Local Data Via Torrent File Hints (`similar`/`collections`) | **partial**: hints read (info + top-level, merged), exposed together with the candidate local torrents and rewritten in the export; block-level reuse is Swarm Merging |
+| 38 | Finding Local Data Via Torrent File Hints (`similar`/`collections`) | yes |
 | 40 | Canonical Peer Priority (tie-break) | yes |
 | 47 | Padding Files (`.pad/`) | yes |
 | 54 | The `lt_donthave` extension (a peer no longer has a piece) | yes (reception) |
+
+> **BEP 38 (`similar`/`collections`).** The hints are read from the info
+> dictionary **and** from the top level (merged, deduplicated), re-emitted in
+> the `.torrent` export and shown together with the local torrents that share a
+> hint. The **block-level reuse** of the shared data is a separate feature,
+> **Swarm Merging**, tracked in
+> [Remaining items](#remaining-items-and-roadmap), item 3.
 
 ## Transport, encryption and NAT
 
@@ -50,10 +60,13 @@ Status legend: **yes** = implemented and tested; **partial** = only a part;
 |---|---|---|
 | 7 | IPv6 Tracker Extension (`peers6`) | yes |
 | 15 | UDP Tracker Protocol (connect/announce/scrape) | yes |
-| 31 | Tracker Failure Retry Extension | yes (`retry in` in minutes and `never`, which drops the tracker from the tier) |
+| 31 | Tracker Failure Retry Extension | yes |
 | 41 | UDP Tracker Protocol Extensions (`URLData`, option `0x2`) | yes |
 | 48 | Tracker Scrape (HTTP `/scrape` and UDP) | yes |
-| 34 | DNS Tracker Preferences (SRV records) | no (used by very few trackers) |
+| 34 | DNS Tracker Preferences (SRV records) | no |
+
+> **BEP 31** honours `retry in` (in minutes) and `never`; `never` drops the
+> tracker from the tier. **BEP 34** is used by very few trackers.
 
 ## DHT (Mainline / BEP 5)
 
@@ -62,24 +75,36 @@ Status legend: **yes** = implemented and tested; **partial** = only a part;
 | 5 | Mainline DHT Protocol (Kademlia IPv4) | yes |
 | 32 | IPv6 Extension for DHT (`nodes6`, `want`) | yes |
 | 33 | DHT Scrape (Bloom filters `BFpe`/`BFsd`) | yes |
-| 42 | DHT Security Extension (Secure Node ID, CRC32C) | yes; the `ip` field of the responses is at the **top level** of the message, as per the specification and as libtorrent does |
+| 42 | DHT Security Extension (Secure Node ID, CRC32C) | yes |
 | 43 | Read-only DHT Nodes (`ro: 1`) | yes |
-| 44 | Storing arbitrary data in the DHT (K/V Ed25519) | yes: local store, `get`/`put` responder and an **outgoing iterative client** (bounded) to read and publish items; the `put` goes to the **8 closest nodes** to the target among those that provided a token |
+| 44 | Storing arbitrary data in the DHT (K/V Ed25519) | yes |
 | 45 | Multiple-address Operation for DHT (multi-homed) | no |
-| 46 | Updating Torrents via DHT Mutable Items (`urn:btpk:`) | yes (magnet `xs=urn:btpk:`, resolved by the BEP 44 client on add) |
+| 46 | Updating Torrents via DHT Mutable Items (`urn:btpk:`) | yes |
 | 51 | DHT Infohash Indexing (`sample_infohashes`) | no |
 
-> BEP 42 is complete in **both directions**: the node ID is derived from the
+> **BEP 42** is complete in **both directions**: the node ID is derived from the
 > external IP and the `ip` field is read *and* sent in every response
-> (`reflected_sent`). BEP 5 honours `implied_port` in `announce_peer`.
+> (`reflected_sent`); the `ip` field is at the **top level** of the message, as
+> per the specification and as libtorrent does. BEP 5 honours `implied_port` in
+> `announce_peer`.
+>
+> **BEP 44** offers a local store, a `get`/`put` responder and an **outgoing
+> iterative client** (bounded) to read and publish items; the `put` goes to the
+> **8 closest nodes** to the target among those that provided a token.
+>
+> **BEP 46** is reached through the magnet parameter `xs=urn:btpk:`, resolved by
+> the BEP 44 client on add.
 
 ## BitTorrent v2 and magnet
 
 | BEP | Specification | Status |
 |---|---|---|
-| 52 | BitTorrent v2 (SHA-256 Merkle trees, `piece layers`) | yes (v1, hybrids, v2-only from `.torrent` and from magnet) |
+| 52 | BitTorrent v2 (SHA-256 Merkle trees, `piece layers`) | yes |
 | 53 | Magnet URI extension: `so=` (Select Only) | yes |
 
+> **BEP 52** covers v1, hybrids and v2-only, both from `.torrent` and from
+> magnet.
+>
 > The magnet parameter `so=` is **BEP 53**. `ws=` (web seed), `xs=` (exact
 > source), `as=` (acceptable source) and `dht=` (DHT bootstrap node) come
 > from the **Magnet URI convention** (not from a BEP): gx-core handles `ws=`,
@@ -127,7 +152,7 @@ Status legend: **yes** = implemented and tested; **partial** = only a part;
 2. **10 Gbps throughput (pipelining)**: the adaptive request queue already
    exists; every change must be **measured before and after** (CPU, RAM,
    throughput), as per the performance rule in `AGENTS.md`.
-3. **BEP 38 — `similar`/`collections` — partial.** The hints are read from the
+3. **BEP 38 — `similar`/`collections`.** The hints are read from the
    info dictionary **and** from the top level (merged, deduplicated), re-emitted
    in the `.torrent` export and shown together with the local torrents that
    share a hint (API `GET /api/v1/torrents/{hash}/collections`, daemon
