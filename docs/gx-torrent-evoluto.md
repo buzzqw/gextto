@@ -127,7 +127,7 @@ gx-torrent is a pure-Go daemon (`CGO_ENABLED=0` build) with the **gx-core** engi
 
 | Layer | Where | What already exists |
 | --- | --- | --- |
-| Engine | `internal/gxcore`, `internal/dht`, `anacrolix/utp` | single port, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, hot web seeds and trackers, per-torrent limits, graduated file priority, windowed streaming, multi-format IP filter, proxy, VPN killswitch, preallocation, batched durability, opt-in mmap, hot-adjustable cache |
+| Engine | `internal/gxcore`, `internal/dht`, `internal/utp` (uTP vendored from `anacrolix/utp`, MPL-2.0) | single port, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, hot web seeds and trackers, per-torrent limits, graduated file priority, windowed streaming, multi-format IP filter, proxy, VPN killswitch, preallocation, batched durability, opt-in mmap, hot-adjustable cache |
 | Daemon | `cmd/gx-torrent` | dynamic queue with slots, seed ratio/days per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, state in `state.json` |
 | API | `cmd/gx-torrent/api.go` | REST v1 with `X-Gx-Token` header: health, stats, portcheck, torrents, add, actions, config, ipfilter |
 | UI | `cmd/gx-torrent/ui.go` | table, filters by state, tabbed detail (general, files, peers, trackers, pieces), group actions, six languages; assets in `internal/webui/assets` (`embed.FS`) |
@@ -415,7 +415,7 @@ to be verified against the libraries' code before each porting.
 | Language, licence | Go, EUPL-1.2 | Go, MPL-2.0 | C++, BSD-3 | C++/Qt, GPL-2+ |
 | IPv6 | yes (dual-stack, DHT BEP 32, LSD v6 included) | yes | yes | yes |
 | BitTorrent v2 / hybrids | yes (v2-only from `.torrent` and magnet, hybrids) | yes | yes | yes |
-| uTP | yes (`anacrolix/utp`) | yes | yes, its own LEDBAT | yes |
+| uTP | yes (`internal/utp`, vendored) | yes | yes, its own LEDBAT | yes |
 | Holepunch BEP 55 | yes | yes | yes | yes |
 | Streaming | graduated window + HTTP Range, seek and readahead | Reader with seek and readahead | per-piece deadline | yes |
 | Storage | file, mmap (opt-in) | file, mmap, bolt, sqlite, pluggable | file, mmap (2.0) | libtorrent |
@@ -453,7 +453,8 @@ Gextto is **EUPL-1.2**. From **libtorrent** (BSD-3) code can be ported with
 attribution. From **anacrolix** (MPL-2.0) copied code stays MPL file by
 file: it is better to **rewrite the algorithm** than to copy the files. From **qBittorrent**
 (GPL) nothing is copied; reimplementing its Web API protocol is lawful.
-`anacrolix/utp` is MPL-2.0 (unmodified dependency).
+`anacrolix/utp` is MPL-2.0, vendored in `internal/utp/upstream` (local deltas
+marked `GEXTTO:`).
 
 ### 11.3 Engine as own code
 
