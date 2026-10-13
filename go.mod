@@ -3,8 +3,6 @@ module github.com/buzzqw/gextto
 go 1.26.8
 
 require (
-	github.com/anacrolix/missinggo v1.3.0
-	github.com/anacrolix/sync v0.4.0
 	github.com/buzzqw/gextto/internal/dht v0.0.0
 	github.com/google/btree v1.1.3
 	github.com/huin/goupnp v1.3.0
@@ -24,13 +22,9 @@ require (
 )
 
 require (
-	github.com/anacrolix/envpprof v1.3.0 // indirect
-	github.com/anacrolix/missinggo/perf v1.0.0 // indirect
-	github.com/anacrolix/missinggo/v2 v2.5.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/huandu/xstrings v1.3.1 // indirect
 	github.com/jackpal/bencode-go v1.0.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect

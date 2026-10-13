@@ -12,6 +12,9 @@
 // local patches listed below (each marked with "GEXTTO:").
 //
 // Local patches (each marked "GEXTTO:" at the site):
+//   - gextto_support.go: own Event/waitEvents/jitterDuration/stoppedFuncTimer,
+//     replacing github.com/anacrolix/missinggo and the anacrolix/sync mutex,
+//     so no third-party helper remains;
 //   - socket.go: per-socket timeout/fast resend counters + ResendStats,
 //     initial-RTO seed hook (SetInitialLatencyEstimator/initialLatencyFor);
 //   - send.go: timeoutResend feeds the socket counter;

@@ -10,10 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/anacrolix/missinggo"
-	"github.com/anacrolix/missinggo/inproc"
-	"github.com/anacrolix/missinggo/pproffd"
 )
 
 var (
@@ -34,11 +30,11 @@ type Socket struct {
 	pc    net.PacketConn
 	conns map[connKey]*Conn
 
-	backlogNotEmpty missinggo.Event
+	backlogNotEmpty Event
 	backlog         map[syn]struct{}
 
-	closed    missinggo.Event
-	destroyed missinggo.Event
+	closed    Event
+	destroyed Event
 
 	wgReadWrite sync.WaitGroup
 
@@ -64,9 +60,6 @@ type Socket struct {
 }
 
 func listenPacket(network, addr string) (pc net.PacketConn, err error) {
-	if network == "inproc" {
-		return inproc.ListenPacket(network, addr)
-	}
 	return net.ListenPacket(network, addr)
 }
 
@@ -121,8 +114,6 @@ func (s *Socket) strNetAddr(str string) (a net.Addr) {
 	switch n := s.network(); n {
 	case "udp":
 		a, err = net.ResolveUDPAddr(n, str)
-	case "inproc":
-		a, err = inproc.ResolveAddr(n, str)
 	default:
 		panic(n)
 	}
@@ -136,8 +127,7 @@ func (s *Socket) pushBacklog(syn syn) {
 	if _, ok := s.backlog[syn]; ok {
 		return
 	}
-	// Pop a pseudo-random syn to make room. TODO: Use missinggo/orderedmap,
-	// coz that's what is wanted here.
+	// Pop a pseudo-random syn to make room.
 	for k := range s.backlog {
 		if len(s.backlog) < backlog {
 			break
@@ -357,7 +347,7 @@ func (s *Socket) newConn(addr net.Addr) (c *Conn) {
 		// GEXTTO: adaptive RTO starts at the measured-behaviour multiplier.
 		rtoBackoff: 1,
 	}
-	c.sendPendingSendSendStateTimer = missinggo.StoppedFuncTimer(c.sendPendingSendStateTimerCallback)
+	c.sendPendingSendSendStateTimer = stoppedFuncTimer(c.sendPendingSendStateTimerCallback)
 	c.packetReadTimeoutTimer = time.AfterFunc(packetReadTimeout, c.receivePacketTimeoutCallback)
 	return
 }
@@ -370,9 +360,6 @@ func (s *Socket) resolveAddr(network, addr string) (net.Addr, error) {
 	n := s.network()
 	if network != "" {
 		n = network
-	}
-	if n == "inproc" {
-		return inproc.ResolveAddr(n, addr)
 	}
 	return net.ResolveUDPAddr(n, addr)
 }
@@ -435,7 +422,7 @@ func (s *Socket) DialContext(ctx context.Context, network, addr string) (nc net.
 	mu.Lock()
 	c.updateCanWrite()
 	mu.Unlock()
-	nc = pproffd.WrapNetConn(c)
+	nc = c
 	return
 }
 
@@ -475,7 +462,7 @@ func (s *Socket) backlogChanged() {
 
 func (s *Socket) nextSyn() (syn syn, err error) {
 	for {
-		missinggo.WaitEvents(&mu, &s.closed, &s.backlogNotEmpty, &s.destroyed)
+		waitEvents(&mu, &s.closed, &s.backlogNotEmpty, &s.destroyed)
 		if s.closed.IsSet() {
 			err = errClosed
 			return

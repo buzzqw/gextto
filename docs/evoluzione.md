@@ -584,7 +584,8 @@ Policy (also in `AGENTS.md`): the algorithm is **rewritten** (third-party code i
 not copied — the idea is not covered by copyright, the expression is) or the module
 is adopted as an **MPL-2.0 dependency**, as `github.com/anacrolix/utp` was
 (now vendored in `internal/utp/upstream`, same licence, `GEXTTO:`-marked
-deltas).
+deltas; the support primitives it used, `missinggo`/`sync`, are reimplemented
+in-tree, so **no external MPL helper is linked**).
 Rules: one item = one commit; **measure before/after**; changes to `internal/gxcore`
 recorded in `GEXTTO.md`; targeted tests; with a visible effect also both UIs and the docs.
 
@@ -601,7 +602,7 @@ recorded in `GEXTTO.md`; targeted tests; with a visible effect also both UIs and
 | **Ranged mmap flush** | anacrolix `undirtied-chunks-iter.go` | done |
 | **Global in-flight budget — liveness** | anacrolix `MaxUnverifiedBytes`/`alloclim` | done |
 | **Drop the worst connection** (deterministic order) | anacrolix `worse-conns.go` | done |
-| **uTP behind `internal/utp`** (isolation) | anacrolix `utp` | done: the engine talks to our `Socket` (dial/accept counters, `net.PacketConn` for the shared DHT socket); the implementation is vendored in `internal/utp/upstream` (MPL-2.0, `GEXTTO:` deltas), swappable |
+| **uTP behind `internal/utp`** (isolation) | anacrolix `utp` | done: the engine talks to our `Socket` (dial/accept counters, `net.PacketConn` for the shared DHT socket); the implementation is vendored in `internal/utp/upstream` (MPL-2.0, `GEXTTO:` deltas), swappable. The `missinggo`/`sync` helpers it relied on are reimplemented in `gextto_support.go`, so no third-party transport helper is linked |
 | **uTP dial preference** (fewer wasted dials) | own (`internal/netx`) | done: per-host memory of race winners (≥4 races, ≥75% share, decayed past 64); the winner gets a 150 ms head start, the loser still races delayed so single-transport peers connect. Steady state: 1 raced dial per peer instead of 2 (`TestDialPeerSkipsLoserWhenPreferredWins` asserts zero loser dials; `TestDialPeerFallsBackToDelayedLeg` keeps the fallback) |
 | **`UTPConn` address snapshot** (fewer allocs) | own (`internal/netx`) | done: TCP-view addrs converted once at wrap (`NewUTPConn`) instead of per `RemoteAddr()` call. `BenchmarkUTPConnRemoteAddr`: 259→113 ns/op, 152→40 B/op, 6→3 allocs/op (rest is `String()`); Intel N97 |
 | **uTP resend counters** (congestion signal) | own (`internal/utp/upstream`, `GEXTTO:` marks) | done: per-socket RTO/fast resends counted in the vendored stack (`ResendStats`, proven by a stalled-server test), through `SessionStats` into the daemon API (`utp_resends_timeout/fast`); shown in both UIs (Salute «uTP» row and daemon status bar) when non-zero |
