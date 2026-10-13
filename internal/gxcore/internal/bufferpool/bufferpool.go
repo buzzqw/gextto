@@ -2,13 +2,14 @@ package bufferpool
 
 import "sync"
 
-// Pool is a wrapper around sync.Pool with a helper Release method on returned objects.
-// Objects in the Pool are Buffers which are wrapper of a slice with a pointer to the Pool object.
+// Pool recycles fixed-size scratch buffers (protocol reads) through a
+// sync.Pool. Borrowed memory travels inside a Buffer, which knows how to
+// hand itself back, so callers cannot forget the pool it came from.
 type Pool struct {
 	pool sync.Pool
 }
 
-// New returns a new Pool for Buffers of size buflen.
+// New builds a pool of buflen-byte backing arrays.
 func New(buflen int) *Pool {
 	return &Pool{
 		pool: sync.Pool{
@@ -20,32 +21,25 @@ func New(buflen int) *Pool {
 	}
 }
 
-// Get a new Buffer from the pool. datalen must not exceed buffer length given in constructor.
-// You should release the Buffer after your work is done by calling Buffer.Release.
+// Get borrows a Buffer exposing datalen bytes. Release it when done.
+// datalen must not exceed the pool's buflen.
 func (p *Pool) Get(datalen int) Buffer {
-	buf := p.pool.Get().(*[]byte)
-	return newBuffer(buf, datalen, p)
+	backing := p.pool.Get().(*[]byte)
+	b := Buffer{Data: (*backing)[:datalen], buf: backing, pool: p}
+	clear(b.Data)
+	return b
 }
 
-// Buffer is a slice with a pointer to Pool.
+// Buffer is a pooled byte slice. Data is the working window; buf is the
+// full backing array returned to the pool on Release.
 type Buffer struct {
 	Data []byte
 	buf  *[]byte
 	pool *Pool
 }
 
-func newBuffer(buf *[]byte, length int, pool *Pool) Buffer {
-	b := Buffer{
-		Data: (*buf)[:length],
-		buf:  buf,
-		pool: pool,
-	}
-	clear(b.Data)
-	return b
-}
-
-// Release the Buffer and return it to the Pool.
+// Release hands the backing array back to the pool.
 func (b Buffer) Release() {
-	// argument to Put should be pointer-like to avoid allocations
+	// Put takes the pointer, not the slice header, to avoid an allocation.
 	b.pool.pool.Put(b.buf)
 }

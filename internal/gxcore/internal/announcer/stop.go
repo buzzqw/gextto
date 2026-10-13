@@ -2,13 +2,16 @@ package announcer
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 )
 
-// StopAnnouncer is used to send a stop event to the Tracker.
+// StopAnnouncer delivers the final stopped announce to every tracker when a
+// torrent leaves the session. Run it, then wait on Done (or Close it to give
+// up waiting); the announce itself is bounded by timeout either way.
 type StopAnnouncer struct {
 	log      logger.Logger
 	timeout  time.Duration
@@ -19,7 +22,8 @@ type StopAnnouncer struct {
 	doneC    chan struct{}
 }
 
-// NewStopAnnouncer returns a new StopAnnouncer.
+// NewStopAnnouncer builds the stopped-event announcer. resultC receives one
+// value once every tracker has been contacted (or the wait is abandoned).
 func NewStopAnnouncer(trackers []tracker.Tracker, tra tracker.Torrent, timeout time.Duration, resultC chan struct{}, l logger.Logger) *StopAnnouncer {
 	return &StopAnnouncer{
 		log:      l,
@@ -32,25 +36,26 @@ func NewStopAnnouncer(trackers []tracker.Tracker, tra tracker.Torrent, timeout t
 	}
 }
 
-// Close the announcer.
+// Close abandons the wait for the trackers' replies.
 func (a *StopAnnouncer) Close() {
 	close(a.closeC)
 	<-a.doneC
 }
 
-// Done returns a channel that is closed when the announcer has finished.
+// Done closes when the announcer has finished, one way or the other.
 func (a *StopAnnouncer) Done() <-chan struct{} {
 	return a.doneC
 }
 
-// Run the announcer.
+// Run contacts every tracker in parallel and then signals resultC, unless
+// Close wins the race first.
 func (a *StopAnnouncer) Run() {
 	defer close(a.doneC)
 
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(a.timeout))
-	// Releases the goroutine below when announcing finishes before the deadline and nobody
-	// closes the announcer.
 	defer cancel()
+	// If Run returns early (Close), release the context so the in-flight
+	// announces do not linger until the deadline.
 	go func() {
 		select {
 		case <-ctx.Done():
@@ -59,20 +64,20 @@ func (a *StopAnnouncer) Run() {
 		}
 	}()
 
-	doneC := make(chan struct{})
+	var pending sync.WaitGroup
 	for _, trk := range a.trackers {
+		pending.Add(1)
 		go func(trk tracker.Tracker) {
+			defer pending.Done()
 			req := tracker.AnnounceRequest{
 				Torrent: a.torrent,
 				Event:   tracker.EventStopped,
 			}
 			_, _ = trk.Announce(ctx, req)
-			doneC <- struct{}{}
 		}(trk)
 	}
-	for range a.trackers {
-		<-doneC
-	}
+	pending.Wait()
+
 	select {
 	case a.resultC <- struct{}{}:
 	case <-a.closeC:

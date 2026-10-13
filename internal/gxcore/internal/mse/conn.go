@@ -4,27 +4,23 @@ import (
 	"net"
 )
 
-// Conn is a wrapper around net.Conn that does encryption/decryption on Read/Write methods.
+// Conn layers message-stream encryption over a peer connection.
+// Reads and writes pass through the negotiated Stream cipher.
 type Conn struct {
 	net.Conn
 	*Stream
 }
 
-// WrapConn returns a new wrapper around conn. You must call HandshakeIncoming or
-// HandshakeOutgoing methods before using Read/Write methods.
+// WrapConn attaches a fresh, pre-handshake Stream to conn. Complete
+// HandshakeIncoming or HandshakeOutgoing before exchanging data.
 func WrapConn(conn net.Conn) *Conn {
-	return &Conn{
-		Conn:   conn,
-		Stream: NewStream(conn),
-	}
+	return &Conn{Conn: conn, Stream: NewStream(conn)}
 }
 
 func (c *Conn) Read(p []byte) (n int, err error) {
-	n, err = c.Stream.Read(p)
-	return
+	return c.Stream.Read(p)
 }
 
 func (c *Conn) Write(p []byte) (n int, err error) {
-	n, err = c.Stream.Write(p)
-	return
+	return c.Stream.Write(p)
 }

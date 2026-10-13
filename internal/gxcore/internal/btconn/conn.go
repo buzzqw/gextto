@@ -1,4 +1,5 @@
-// Package btconn provides support for dialing and accepting BitTorrent connections.
+// Package btconn dials and accepts raw BitTorrent connections: plain or
+// MSE-encrypted TCP, plus the uTP path assembled by the session layer.
 package btconn
 
 import (
@@ -6,11 +7,15 @@ import (
 	"net"
 )
 
+// readWriter glues a separately-owned reader and writer into one stream,
+// used when the read side (e.g. an MSE decryptor) differs from the write side.
 type readWriter struct {
 	io.Reader
 	io.Writer
 }
 
+// rwConn presents a split readWriter stream as a net.Conn by borrowing the
+// metadata (addresses, deadlines) of an underlying connection.
 type rwConn struct {
 	rw io.ReadWriter
 	net.Conn

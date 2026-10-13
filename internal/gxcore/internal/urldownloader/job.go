@@ -4,27 +4,37 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
 
+// downloadJob is one contiguous byte range fetched from a single file over
+// HTTP. Adjacent sections of the same file merge into one job, so a torrent
+// with many small files does not drown the webseed in tiny range requests.
 type downloadJob struct {
 	Filename   string
 	RangeBegin int64
 	Length     int64
-	// Padding jobs are not requested from the server because padding files
-	// do not exist there. Their bytes are always zero and are skipped over
-	// in the piece buffer instead.
+	// Padding jobs are never requested: padding files do not exist on the
+	// server, their bytes are always zero and are skipped in the piece
+	// buffer instead.
 	Padding bool
 }
 
+// createJobs plans the HTTP fetches covering pieces [begin, end).
+// Consecutive sections sharing file and padding flag coalesce; zero-length
+// jobs (empty files) are dropped.
 func createJobs(pieces []piece.Piece, begin, end uint32) []downloadJob {
 	if begin == end {
 		return nil
 	}
 	jobs := make([]downloadJob, 0)
-	var job downloadJob
+	var current downloadJob
+	flush := func() {
+		if current.Length > 0 { // do not request 0 byte files
+			jobs = append(jobs, current)
+		}
+	}
 	for i := begin; i < end; i++ {
-		pi := &pieces[i]
-		for j, sec := range pi.Data {
+		for j, sec := range pieces[i].Data {
 			if i == 0 && j == 0 {
-				job = downloadJob{
+				current = downloadJob{
 					Filename:   sec.Name,
 					RangeBegin: sec.Offset,
 					Length:     sec.Length,
@@ -32,14 +42,12 @@ func createJobs(pieces []piece.Piece, begin, end uint32) []downloadJob {
 				}
 				continue
 			}
-			if sec.Name == job.Filename && sec.Padding == job.Padding {
-				job.Length += sec.Length
+			if sec.Name == current.Filename && sec.Padding == current.Padding {
+				current.Length += sec.Length
 				continue
 			}
-			if job.Length > 0 { // do not request 0 byte files
-				jobs = append(jobs, job)
-			}
-			job = downloadJob{
+			flush()
+			current = downloadJob{
 				Filename:   sec.Name,
 				RangeBegin: sec.Offset,
 				Length:     sec.Length,
@@ -47,8 +55,6 @@ func createJobs(pieces []piece.Piece, begin, end uint32) []downloadJob {
 			}
 		}
 	}
-	if job.Length > 0 { // do not request 0 byte files
-		jobs = append(jobs, job)
-	}
+	flush()
 	return jobs
 }

@@ -7,7 +7,8 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piececache"
 )
 
-// CachedPiece is a wrapper around a piece.Piece object that is capable of reading the data from a picecache.Cache.
+// CachedPiece serves the blocks of one piece through the shared read cache,
+// so repeated uploads of the same block hit memory instead of the disk.
 type CachedPiece struct {
 	pi       *piece.Piece
 	cache    *piececache.Cache
@@ -15,36 +16,35 @@ type CachedPiece struct {
 	peerID   []byte
 }
 
-// New returns a new CachedPiece object. Reads are done with blocks of `readSize`.
+// New binds pi to the cache. Disk is read in readSize chunks; peerID scopes
+// the cache keys to the requesting peer.
 func New(pi *piece.Piece, cache *piececache.Cache, readSize int64, peerID [20]byte) *CachedPiece {
-	return &CachedPiece{
-		pi:       pi,
-		cache:    cache,
-		readSize: readSize,
-		peerID:   peerID[:],
-	}
+	return &CachedPiece{pi: pi, cache: cache, readSize: readSize, peerID: peerID[:]}
 }
 
-// ReadAt implements the io.ReaderAt interface.
-func (c *CachedPiece) ReadAt(p []byte, off int64) (n int, err error) {
-	blk := uint32(off / c.readSize)
-	blkBegin := uint32(int64(blk) * c.readSize)
-	blkEnd := min(uint32(int64(blkBegin)+c.readSize), c.pi.Length)
-
+// cacheKey identifies one cached block: peer + piece index + block number.
+func (c *CachedPiece) cacheKey(block uint32) string {
 	key := make([]byte, 20+4+4)
 	copy(key, c.peerID)
 	binary.BigEndian.PutUint32(key[20:24], c.pi.Index)
-	binary.BigEndian.PutUint32(key[24:28], blk)
+	binary.BigEndian.PutUint32(key[24:28], block)
+	return string(key)
+}
 
-	buf, err := c.cache.Get(string(key), func() ([]byte, error) {
-		b := make([]byte, blkEnd-blkBegin)
-		_, err = c.pi.Data.ReadAt(b, int64(blkBegin))
+// ReadAt implements io.ReaderAt. Only the block containing off is loaded;
+// the requested span is then copied out of it.
+func (c *CachedPiece) ReadAt(p []byte, off int64) (n int, err error) {
+	block := uint32(off / c.readSize)
+	blockBegin := int64(block) * c.readSize
+	blockEnd := min(blockBegin+c.readSize, int64(c.pi.Length))
+
+	buf, err := c.cache.Get(c.cacheKey(block), func() ([]byte, error) {
+		b := make([]byte, blockEnd-blockBegin)
+		_, err := c.pi.Data.ReadAt(b, blockBegin)
 		return b, err
 	})
 	if err != nil {
-		return
+		return 0, err
 	}
-
-	begin := off - int64(blkBegin)
-	return copy(p, buf[begin:]), nil
+	return copy(p, buf[off-blockBegin:]), nil
 }
