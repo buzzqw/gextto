@@ -853,6 +853,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
     <span class="hide-m" title="Encryption policy for peer connections"><span>Encryption</span> <b>{{.Encryption}}</b></span>
     {{if not .Standalone}}<span title="Read / write cache"><span>Cache</span> <b>{{.CacheReadMB}}/{{.CacheWB}} MB</b></span>{{end}}
     {{if .PeerErrors}}<span title="Peer/tracker errors filtered from the log, by category (since start)"><span>Peer errors</span> <b>{{.PeerErrors}}</b></span>{{end}}
+    {{if .UTPSocket}}<span title="uTP socket dials, accepts and retransmissions since start (errors with no accepts: UDP is likely firewalled)"><span>uTP socket</span> <b>{{.UTPSocket}}</b></span>{{end}}
 {{end}}{{define "live"}}
   {{if .Rows}}
   <table class="tbl t" id="torrents" aria-label="Torrents">

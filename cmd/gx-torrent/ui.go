@@ -69,13 +69,16 @@ type uiPageData struct {
 	// peers (proof the port is reachable even when forwarded by hand).
 	PortReachable bool
 	PeerErrors    string
-	DHT           bool
-	DHTNodes      int64
-	UTP           bool
-	Encryption    string
-	Proxy         bool
-	IPFilter      int
-	IPFilterPath  string
+	// UTPSocket is the preformatted uTP socket dial/accept summary for the
+	// status bar, empty while the socket never dialled nor accepted.
+	UTPSocket    string
+	DHT          bool
+	DHTNodes     int64
+	UTP          bool
+	Encryption   string
+	Proxy        bool
+	IPFilter     int
+	IPFilterPath string
 	// IPFilterSource prefills the IP filter field with Gextto's setting.
 	IPFilterSource string
 	// GexttoLog enables the Gextto log tab.
@@ -416,6 +419,26 @@ func uiPeerErrors(counts map[string]int64) string {
 		parts = append(parts, fmt.Sprintf("%s %d", key, counts[key]))
 	}
 	return strings.Join(parts, " · ")
+}
+
+// uiUTPSocketSummary renders the uTP socket counter summary for the status
+// bar, or ("", false) while the socket never dialled nor accepted. Resends and
+// dropped SYNs are the congestion/burst signals and appear only when non-zero.
+func uiUTPSocketSummary(dials, accepts, dialErrs, acceptErrs, resendsTimeout, resendsFast, synDrops int64) (string, bool) {
+	if dials <= 0 && accepts <= 0 {
+		return "", false
+	}
+	out := fmt.Sprintf("%d dial / %d accept", dials, accepts)
+	if dialErrs+acceptErrs > 0 {
+		out += fmt.Sprintf(" · errors: %d dial, %d accept", dialErrs, acceptErrs)
+	}
+	if resendsTimeout+resendsFast > 0 {
+		out += fmt.Sprintf(" · resends: %d RTO, %d fast", resendsTimeout, resendsFast)
+	}
+	if synDrops > 0 {
+		out += fmt.Sprintf(" · SYN drops: %d", synDrops)
+	}
+	return out, true
 }
 
 func (d *Daemon) handleUIPortCheck(w http.ResponseWriter, r *http.Request) {
@@ -1246,6 +1269,11 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		DiskFree:       stats.DiskFreeBytes,
 		DiskTotal:      stats.DiskTotalBytes,
 	}
+	page.UTPSocket, _ = uiUTPSocketSummary(
+		stats.Session["utp_dials"], stats.Session["utp_accepts"],
+		stats.Session["utp_dial_errors"], stats.Session["utp_accept_errors"],
+		stats.Session["utp_resends_timeout"], stats.Session["utp_resends_fast"],
+		stats.Session["utp_syn_drops"])
 	page.CPUPercent, page.ProcRSS = d.processUsage(time.Now())
 	switch {
 	case stats.PortMapping.Method != "":

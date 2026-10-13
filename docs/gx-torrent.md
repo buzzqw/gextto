@@ -929,6 +929,23 @@ RPC server is disabled.
 - **uTP** (`libtorrent_utp`, active by default) uses the same UDP port as the
   peers, shared with the DHT as in libtorrent.
   - Outgoing, uTP and TCP are attempted together and the first to connect wins.
+    The per-host recent winner (≥4 races, ≥75% share) gets a 150 ms head start,
+    so at steady state one dial per peer is enough; the loser still races
+    delayed and single-transport peers connect anyway. Socket dials/accepts
+    and their errors are counted (`utp_dials`, `utp_accepts`,
+    `utp_dial_errors`, `utp_accept_errors` in `GET /api/v1/stats`); the
+    retransmission counters (`utp_resends_timeout`, `utp_resends_fast`) and the
+    dropped-SYN counter (`utp_syn_drops`) are shown in the Salute «uTP» row and
+    in the daemon status bar.
+  - The retransmission timeout adapts to the loss signal: a **minimum RTT of
+    5 ms** keeps a fast path (loopback/LAN, RTT of tens of microseconds) from
+    collapsing the RTO to sub-milliseconds and resending in a storm, and a
+    **per-connection backoff** doubles the RTO on each timeout (up to 4×) and
+    halves it on each delivered packet, so a silent or congested peer is
+    retried with growing patience (measured: 50% fewer resends against a peer
+    that stops answering) while a link that delivers again returns to the
+    measured RTT. A healthy connection never timeout-resends, so its RTO is
+    unchanged.
   - Incoming, the handshake is routed as for TCP.
   - The peer list indicates which ones are connected over uTP.
   - With a proxy uTP is off; with the outgoing interface the UDP socket is
@@ -1147,7 +1164,7 @@ With gx-torrent it shows:
 - version and torrents by status;
 - speed and queue slots;
 - port and opening on the router (in red if unsuccessful);
-- DHT (nodes), uTP (uTP and TCP connections), LSD (peers found);
+- DHT (nodes), uTP (uTP and TCP connections, plus socket dials/accepts, errors, resends and dropped SYNs), LSD (peers found);
 - incoming connections and disk I/O (jobs in queue, total reads/writes);
 - encryption, proxy, IP filter rules;
 - disk and cache, session totals.

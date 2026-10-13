@@ -16,7 +16,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/anacrolix/utp"
 	"github.com/buzzqw/gextto/internal/dht"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bandwidth"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
@@ -32,6 +31,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/trackermanager"
+	"github.com/buzzqw/gextto/internal/utp"
 	"go.etcd.io/bbolt"
 	berrors "go.etcd.io/bbolt/errors"
 )
@@ -273,6 +273,9 @@ func openSharedSocket(cfg Config) (*utp.Socket, error) {
 		pc.Close()
 		return nil, err
 	}
+	// Seed fresh connections' initial RTO from the measured per-host dial
+	// latency instead of the fixed 400 ms assumption (clamped upstream).
+	utpSocket.SetInitialLatencyEstimator(netx.DialLatencyEMA)
 	netx.SetUTPDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 		return utpSocket.DialContext(ctx, "udp", addr)
 	}, cfg.UTPOnly)

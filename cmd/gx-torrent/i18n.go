@@ -272,6 +272,8 @@ var uiCatalog = map[string][5]string{
 	"lines":    {"righe", "Zeilen", "lignes", "líneas", "wiersze"},
 	"Lines":    {"Righe", "Zeilen", "Lignes", "Líneas", "Wiersze"},
 	"Peer/tracker errors filtered from the log, by category (since start)": {"Errori peer/tracker filtrati dal log, per categoria (dall'avvio)", "Vom Peer/Tracker aus dem Log gefilterte Fehler, nach Kategorie (seit dem Start)", "Erreurs peer/tracker filtrées du journal, par catégorie (depuis le démarrage)", "Errores de peer/tracker filtrados del registro, por categoría (desde el inicio)", "Błędy peer/tracker odfiltrowane z dziennika, według kategorii (od uruchomienia)"},
+	"uTP socket": {"socket uTP", "uTP-Socket", "socket uTP", "socket uTP", "gniazdo uTP"},
+	"uTP socket dials, accepts and retransmissions since start (errors with no accepts: UDP is likely firewalled)": {"Dial, accept e ritrasmissioni del socket uTP dall'avvio (errori senza accept: probabilmente UDP è bloccato)", "uTP-Socket-Verbindungen und Neuübertragungen seit dem Start (Fehler ohne Annahmen: UDP ist wahrscheinlich blockiert)", "Connexions et retransmissions du socket uTP depuis le démarrage (erreurs sans acceptation : UDP est probablement bloqué)", "Conexiones y retransmisiones del socket uTP desde el inicio (errores sin aceptación: probablemente UDP está bloqueado)", "Połączenia i retransmisje gniazda uTP od uruchomienia (błędy bez akceptacji: UDP jest prawdopodobnie zablokowane)"},
 
 	// Tabs and Gextto log pane.
 	"Torrents":      {"Torrent", "Torrents", "Torrents", "Torrents", "Torrenty"},

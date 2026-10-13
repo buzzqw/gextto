@@ -217,6 +217,132 @@ func SetUTPDialer(dial func(ctx context.Context, addr string) (net.Conn, error),
 	mu.Unlock()
 }
 
+// Dial preference: per-host memory of which transport won recent dial races,
+// so the next race gives the winner a head start instead of opening two
+// connections every time. The loser still races (delayed, never skipped),
+// so peers speaking a single transport always connect.
+const (
+	// preferMinSamples is the remembered races before a transport earns a
+	// head start.
+	preferMinSamples = 4
+	// preferMinShare is the winner share, in eighths, required for a head
+	// start (6/8 = 75%).
+	preferMinShare = 6
+	// preferMaxSamples caps the remembered races per host; beyond it both
+	// counters halve, so the memory tracks recent conditions instead of
+	// going stale.
+	preferMaxSamples = 64
+	// maxDialPrefs bounds the per-host memory.
+	maxDialPrefs = 4096
+)
+
+// preferHeadStart is the preferred transport's head start. A var so tests
+// can widen it for assertability.
+var preferHeadStart = 150 * time.Millisecond
+
+type transportPref struct {
+	utpWins, tcpWins int
+	// utpEMA/tcpEMA are the winning-latency moving averages, kept for
+	// future delay sizing; the head start itself stays fixed.
+	utpEMA, tcpEMA time.Duration
+}
+
+var (
+	prefMu    sync.Mutex
+	dialPrefs = map[string]*transportPref{}
+)
+
+// DialLatencyEMA reports the recent winning-dial latency moving average
+// for the host of addr, preferring the uTP leg. It seeds the uTP initial
+// RTO: a handshake spans roughly one RTT plus processing, so it is a safe
+// (slightly conservative) RTT estimate.
+func DialLatencyEMA(addr string) (time.Duration, bool) {
+	prefMu.Lock()
+	defer prefMu.Unlock()
+	p := dialPrefs[dialHost(addr)]
+	if p == nil {
+		return 0, false
+	}
+	if p.utpEMA > 0 {
+		return p.utpEMA, true
+	}
+	if p.tcpEMA > 0 {
+		return p.tcpEMA, true
+	}
+	return 0, false
+}
+
+// dialHost keys the dial preference by host: peers on one host share the
+// network path whatever their port.
+func dialHost(addr string) string {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	return host
+}
+
+// preferredDialTransport reports "utp" or "tcp" when one transport dominates
+// recent races to host, else "".
+func preferredDialTransport(host string) string {
+	prefMu.Lock()
+	defer prefMu.Unlock()
+	p := dialPrefs[host]
+	if p == nil {
+		return ""
+	}
+	total := p.utpWins + p.tcpWins
+	if total < preferMinSamples {
+		return ""
+	}
+	if p.utpWins*8 >= total*preferMinShare {
+		return "utp"
+	}
+	if p.tcpWins*8 >= total*preferMinShare {
+		return "tcp"
+	}
+	return ""
+}
+
+// noteDialWinner records a race winner with its connect latency.
+func noteDialWinner(host, winner string, latency time.Duration) {
+	if winner != "utp" && winner != "tcp" {
+		return
+	}
+	prefMu.Lock()
+	defer prefMu.Unlock()
+	p := dialPrefs[host]
+	if p == nil {
+		if len(dialPrefs) >= maxDialPrefs {
+			for k := range dialPrefs {
+				delete(dialPrefs, k)
+				break
+			}
+		}
+		p = &transportPref{}
+		dialPrefs[host] = p
+	}
+	if p.utpWins+p.tcpWins >= preferMaxSamples {
+		p.utpWins /= 2
+		p.tcpWins /= 2
+	}
+	if winner == "utp" {
+		p.utpWins++
+		if p.utpEMA == 0 {
+			p.utpEMA = latency
+		} else {
+			p.utpEMA = (p.utpEMA*3 + latency) / 4
+		}
+		return
+	}
+	p.tcpWins++
+	if p.tcpEMA == 0 {
+		p.tcpEMA = latency
+	} else {
+		p.tcpEMA = (p.tcpEMA*3 + latency) / 4
+	}
+}
+
 // DialPeer connects to a peer. With uTP enabled (and no proxy) uTP and TCP
 // are tried at the same time and the first connection wins, so peers that
 // speak only one of the two are reached without waiting for a timeout.
@@ -239,7 +365,7 @@ func DialPeer(ctx context.Context, base net.Dialer, network, addr string) (net.C
 			return nil, err
 		}
 		OutgoingUTP.Add(1)
-		return TrackUTP(&UTPConn{Conn: conn}), nil
+		return TrackUTP(NewUTPConn(conn)), nil
 	}
 	if base.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -253,26 +379,56 @@ func DialPeer(ctx context.Context, base net.Dialer, network, addr string) (net.C
 		err  error
 	}
 	results := make(chan result, 2)
-	go func() {
-		conn, err := dialUTP(raceCtx, addr)
-		if err == nil {
-			conn = TrackUTP(&UTPConn{Conn: conn})
+	// runLeg dials after an optional head-start delay. A leg cancelled
+	// while waiting reports the cancellation, so the race always collects
+	// both results and never leaks the goroutine.
+	runLeg := func(delay time.Duration, dial func(context.Context) (net.Conn, error), wrap bool) {
+		if delay > 0 {
+			timer := time.NewTimer(delay)
+			defer timer.Stop()
+			select {
+			case <-raceCtx.Done():
+				results <- result{nil, raceCtx.Err()}
+				return
+			case <-timer.C:
+			}
+		}
+		conn, err := dial(raceCtx)
+		if err == nil && wrap {
+			conn = TrackUTP(NewUTPConn(conn))
 		}
 		results <- result{conn, err}
-	}()
-	go func() {
-		conn, err := DialContext(raceCtx, base, network, addr)
-		results <- result{conn, err}
-	}()
+	}
+	// The recent winner gets a head start; the loser still races delayed,
+	// so single-transport peers connect at worst preferHeadStart later.
+	host := dialHost(addr)
+	pref := preferredDialTransport(host)
+	start := time.Now()
+	utpDelay, tcpDelay := time.Duration(0), time.Duration(0)
+	switch pref {
+	case "utp":
+		tcpDelay = preferHeadStart
+	case "tcp":
+		utpDelay = preferHeadStart
+	}
+	go runLeg(utpDelay, func(ctx context.Context) (net.Conn, error) {
+		return dialUTP(ctx, addr)
+	}, true)
+	go runLeg(tcpDelay, func(ctx context.Context) (net.Conn, error) {
+		return DialContext(ctx, base, network, addr)
+	}, false)
 	var firstErr error
 	for i := 0; i < 2; i++ {
 		r := <-results
 		if r.err == nil {
+			winner := "tcp"
 			if IsUTP(r.conn) {
 				OutgoingUTP.Add(1)
+				winner = "utp"
 			} else {
 				OutgoingTCP.Add(1)
 			}
+			noteDialWinner(host, winner, time.Since(start))
 			cancel()
 			if i == 0 {
 				// Close the loser if it connects anyway.
@@ -292,9 +448,20 @@ func DialPeer(ctx context.Context, base net.Dialer, network, addr string) (net.C
 }
 
 // UTPConn presents a uTP connection with TCP addresses: the rest of the engine
-// keys peers by *net.TCPAddr.
+// keys peers by *net.TCPAddr. The converted addresses are snapshotted once at
+// wrap time: RemoteAddr/LocalAddr sit on hot paths (handshake, peer setup,
+// logging, stats) and must not convert and allocate per call.
 type UTPConn struct {
 	net.Conn
+	remote net.Addr
+	local  net.Addr
+}
+
+// NewUTPConn wraps a connected uTP conn, snapshotting its TCP-view
+// addresses. The peer address of a connection never changes, so the snapshot
+// stays valid for the conn's life.
+func NewUTPConn(raw net.Conn) *UTPConn {
+	return &UTPConn{Conn: raw, remote: tcpAddrOf(raw.RemoteAddr()), local: tcpAddrOf(raw.LocalAddr())}
 }
 
 func tcpAddrOf(addr net.Addr) net.Addr {
@@ -310,11 +477,11 @@ func tcpAddrOf(addr net.Addr) net.Addr {
 	return addr
 }
 
-// RemoteAddr returns the peer address as *net.TCPAddr.
-func (c *UTPConn) RemoteAddr() net.Addr { return tcpAddrOf(c.Conn.RemoteAddr()) }
+// RemoteAddr returns the peer address as *net.TCPAddr (snapshotted).
+func (c *UTPConn) RemoteAddr() net.Addr { return c.remote }
 
-// LocalAddr returns the local address as *net.TCPAddr.
-func (c *UTPConn) LocalAddr() net.Addr { return tcpAddrOf(c.Conn.LocalAddr()) }
+// LocalAddr returns the local address as *net.TCPAddr (snapshotted).
+func (c *UTPConn) LocalAddr() net.Addr { return c.local }
 
 // IsUTP reports whether a connection runs over uTP.
 func IsUTP(conn net.Conn) bool {

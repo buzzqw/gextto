@@ -1833,6 +1833,13 @@ func TestVerifyRefusesAFinishedTorrentWhosePayloadIsGone(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, "the pause", func() bool { return stateOf(d, hash) == "paused" })
+	// The payload-gone refusal keys on the completion bookkeeping, which the
+	// queue tick stamps asynchronously: without this wait a verify issued
+	// before the first post-completion tick would wrongly proceed.
+	waitFor(t, "the completion bookkeeping", func() bool {
+		info, ok := findInfo(d, hash)
+		return ok && info.CompletedAt != 0
+	})
 	payload := filepath.Join(src, "episode.mkv")
 	if err := os.Rename(payload, filepath.Join(src, "Episode - S01E01.mkv")); err != nil {
 		t.Fatal(err)

@@ -23,6 +23,23 @@ type SessionStats struct {
 	// UTP and DHT report whether they are active.
 	UTP bool
 	DHT bool
+	// UTPDials/UTPAccepts count the socket-level uTP dials and accepts
+	// since start; UTPDialErrors/UTPAcceptErrors count their failures.
+	// They diagnose transport health (firewalled UDP, CGNAT) where the
+	// peer-level counters alone cannot.
+	UTPDials        int64
+	UTPAccepts      int64
+	UTPDialErrors   int64
+	UTPAcceptErrors int64
+	// UTPResendsTimeout counts RTO-driven packet resends (loss/congestion
+	// signal); UTPResendsFast counts selective-ACK fast resends. Fed by the
+	// vendored stack, kept for the future adaptive RTO; not shown in the
+	// UIs yet.
+	UTPResendsTimeout int64
+	UTPResendsFast    int64
+	// UTPSynDrops counts backlog SYNs evicted under burst. Fed by the
+	// vendored stack; API-visible, no UI row.
+	UTPSynDrops int64
 	// DHTStats are the DHT counters (nodes, peers found, traffic).
 	DHTStats map[string]int64
 
@@ -121,6 +138,16 @@ func (s *Session) Stats() SessionStats {
 	out.MergedBytes = mergedBytesTotal.Load()
 	out.MergedPartialPieces = partialSourcePieces.Load()
 	out.UTP = s.utpSocket != nil
+	if s.utpSocket != nil {
+		ust := s.utpSocket.Stats()
+		out.UTPDials = int64(ust.Dials)
+		out.UTPAccepts = int64(ust.Accepts)
+		out.UTPDialErrors = int64(ust.DialErrors)
+		out.UTPAcceptErrors = int64(ust.AcceptErrors)
+		out.UTPResendsTimeout = int64(ust.ResendsTimeout)
+		out.UTPResendsFast = int64(ust.ResendsFast)
+		out.UTPSynDrops = int64(ust.SynDrops)
+	}
 	out.DHT = s.config.DHTEnabled
 	out.PeerWireDownloaded = peerconn.WireBytesRead.Load()
 	out.PeerWireUploaded = peerconn.WireBytesWritten.Load()

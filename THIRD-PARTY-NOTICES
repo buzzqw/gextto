@@ -13,7 +13,9 @@ licensed bases, since rewritten file by file in-tree), so only protocol-
 mandated formats coincide.
 
 Generated from the modules actually linked into the binaries (go list -deps
-./cmd/gexttod ./cmd/gx-torrent) and the libtorrent distribution. Regenerate
+./cmd/gexttod ./cmd/gx-torrent) and the libtorrent distribution, plus the
+uTP implementation vendored in-tree at internal/utp/upstream (MPL-2.0, not a
+linked module). Regenerate
 it when the dependencies change.
 
 ================================================================================
@@ -170,7 +172,9 @@ github.com/anacrolix/sync v0.4.0
 (no licence file in the module; see https://github.com/anacrolix/sync)
 
 ================================================================================
-github.com/anacrolix/utp v0.2.0
+uTP implementation vendored from github.com/anacrolix/utp v0.2.0 (MPL-2.0)
+— in-tree at internal/utp/upstream (see LICENSE there); the module is no
+longer linked, only missinggo/sync below remain as libraries. Licence text:
 ================================================================================
 
 Mozilla Public License, version 2.0
