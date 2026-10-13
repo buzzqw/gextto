@@ -573,3 +573,19 @@ func TestUIFaviconWithoutToken(t *testing.T) {
 		t.Fatalf("page without icon")
 	}
 }
+
+// TestUIUTPSocketSummary: the status-bar summary appears only with socket
+// activity and carries the error counts.
+func TestUIUTPSocketSummary(t *testing.T) {
+	if _, ok := uiUTPSocketSummary(0, 0, 0, 0); ok {
+		t.Fatal("idle socket must hide the summary")
+	}
+	s, ok := uiUTPSocketSummary(12, 3, 0, 0)
+	if !ok || s != "12 dial / 3 accept" {
+		t.Fatalf("summary = %q, %v", s, ok)
+	}
+	s, ok = uiUTPSocketSummary(12, 3, 2, 1)
+	if !ok || s != "12 dial / 3 accept · errors: 2 dial, 1 accept" {
+		t.Fatalf("summary = %q, %v", s, ok)
+	}
+}
