@@ -16,6 +16,6 @@ the web interface.
 
 Provenance: gx-core (internal/gxcore) and the DHT (internal/dht) were
 historically developed from permissively licensed bases and have since been
-rewritten file by file in this tree (see docs/evoluzione.md, section 1.5);
+rewritten file by file in this tree (see docs/evoluzione.md, section 1.4);
 only protocol-mandated formats (BEP wire layouts, API shapes) coincide. The
 full history is in git.
