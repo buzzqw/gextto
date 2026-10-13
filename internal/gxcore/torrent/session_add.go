@@ -21,7 +21,6 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resumer/boltdbresumer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/webseedsource"
-	"github.com/gofrs/uuid"
 )
 
 // AddTorrentOptions contains options for adding a new torrent.
@@ -457,7 +456,7 @@ func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto storage.
 		}
 		id = givenID
 	} else {
-		u1, err2 := uuid.NewV1()
+		u1, err2 := newTorrentID()
 		if err2 != nil {
 			err = err2
 			return
