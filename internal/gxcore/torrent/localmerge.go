@@ -23,7 +23,7 @@ var (
 	partialSourcePieces atomic.Int64
 )
 
-// Swarm Merging, Fase 1 (docs/evoluzione.md §15.2): reuse the pieces of another
+// Swarm Merging, Fase 1 (docs/evoluzione.md §9.2): reuse the pieces of another
 // torrent already in the session when the piece layout matches exactly — the
 // same piece length and the same piece hash and length at the same index. The
 // bytes are read from the other torrent's storage, verified against this
@@ -261,7 +261,7 @@ func bitSet(bits []byte, i int) bool {
 }
 
 // prefillV2From is the Phase 2 pass over the same candidate set (Swarm Merging,
-// docs/evoluzione.md §15.2): it reuses the data of another torrent's v2 files
+// docs/evoluzione.md §9.2): it reuses the data of another torrent's v2 files
 // matched by their per-file Merkle root, so identical files are shared even
 // when the two torrents use a different piece length. Every destination piece
 // is verified against its own hash before it is written, so no unverified byte

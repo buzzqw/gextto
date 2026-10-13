@@ -1,28 +1,12 @@
 # Improvements and evolution of Gextto and gx-torrent
 
-Single working document for **2026-10-10**: it collects the backlog, implemented
-improvements, improvement plans, measurements, technical reviews and the
-strategic direction of Gextto and the gx-torrent engine.
-
-It replaces the following files, moved to `docs/archive/` as local copies not
-tracked in git (see Appendix A for the map):
-
-- `proposte-migliorie.md`, `da-fare.md`, `lavoro-sessione.md`,
-  `scelte-di-progetto.md`, `accessibility-analysis.md`,
-  `holepunch-test-harness.md`
-- `gx-torrent-migliorie.md`, `gx-torrent-ottimizzazioni-prestazionali-v2.md`,
-  `gx-torrent-misure-seeding.md`
-- `revisione-1.md` (already local, already in `.gitignore`)
-- `archive/revisione-2.md`, `archive/UI_V2.md`, `archive/gextto-terra.md`,
-  `archive/pro-terra.md` (already archived)
-
-The following remain separate documents, because they describe the current state
-rather than a plan: `docs/gx-torrent.md` (technical reference for the engine),
-manuals, API, architecture, security, migration, advanced guides, TUI.
-
-**§14** (gx-nox standalone client) has been extracted into
-[`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md), to keep the strategic plan
-and the engine's technical document separate.
+Single working document for the **backlog, the improvements already made and the
+measurements** of Gextto and of the gx-torrent / gx-core engine: it records what
+is planned and what has been done to evolve the product, not the problems that
+have been solved (those stay in the git history). The current state of the engine
+is in [`gx-torrent.md`](gx-torrent.md), [`bep.md`](bep.md) and
+[`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md); the standalone
+plan in [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md).
 
 ## Index
 
@@ -33,16 +17,9 @@ and the engine's technical document separate.
 5. [gx-torrent: performance optimisations](#5-gx-torrent-performance-optimisations)
 6. [gx-torrent: choking and seeding measurements](#6-gx-torrent-choking-and-seeding-measurements)
 7. [Holepunching: test harness](#7-holepunching-test-harness)
-8. [Technical review 1: client, i18n, jobs, concurrency](#8-technical-review-1-client-i18n-jobs-concurrency)
-9. [Technical review 2: bugs and debt at commit 97142c1](#9-technical-review-2-bugs-and-debt-at-commit-97142c1)
-10. [Terra and Pro Terra reports](#10-terra-and-pro-terra-reports)
-11. [SSR + HTMX UI: migration report](#11-ssr--htmx-ui-migration-report)
-12. [Handover between work sessions](#12-handover-between-work-sessions)
-13. [Accessibility](#13-accessibility)
-14. [gx-torrent standalone (gx-nox): pointer](#14-gx-torrent-standalone-gx-nox-pointer)
-15. [High-value extensions from the comparison with BiglyBT](#15-high-value-extensions-from-the-comparison-with-biglybt)
-16. [Smartness backlog: ideas from the 2026-10-13 night](#16-smartness-backlog-ideas-from-the-2026-10-13-night)
-17. [Appendix A: consolidated files](#appendix-a-consolidated-files)
+8. [Accessibility](#8-accessibility)
+9. [High-value extensions from the comparison with BiglyBT](#9-high-value-extensions-from-the-comparison-with-biglybt)
+10. [Smartness backlog: ideas from the 2026-10-13 night](#10-smartness-backlog-ideas-from-the-2026-10-13-night)
 
 ---
 
@@ -96,7 +73,7 @@ render appears on the next render (no stale cache).
 - **`make measure-dht`** — measures on the **public DHT** the filling of the routing
   table and the success of queries (`GX_MEASURE_DHT=5m`,
   `internal/dht/measure_test.go`): it is the basis of the numbers for the anti-Sybil
-  hardening and multi-path (§4.10). Outside CI. There is also
+  hardening and multi-path (§4.8). Outside CI. There is also
   `make measure-seeding` for choking (§6).
 
 ### 1.3 Closed / decisions
@@ -183,41 +160,7 @@ they are to be taken only as refinements, with the numbers below.
    tests do not accumulate entries (in production only one remains). Test
    `TestV2ClientI18nMemoIsReset`.
 
-### 1.5 gx-torrent on Windows and magnet v2 (closed, review of 2026-10-10)
-
-The review of the Windows/v2 commits fixed R-001…R-013 (junction, `isDirLink`,
-expiry of hash requests, session 0, CI job `windows-platform`; commits
-`95495e5`, `ebae504`, `1fae2ea`, `0363a02`). The improvements that emerged (M-01…M-08)
-were **all implemented**:
-
-| Item | Status |
-| --- | --- |
-| M-01 test of the link flow on Windows (`pointLink`→`readLink`→move→removal, `protectLegacyDir` does not move the junction) | done (`48edb97`, `TestWindowsLinkFlow`) |
-| M-02 widen `windows-platform` to other tests (Setup, CrossDevice) with portable tests | done (`48edb97`) |
-| M-03 v2 layer in parallel: chunks of ≤512 hashes per different peer, with retry | done (`92f0a84`) |
-| M-04 wizard: error shown on the page if the bandwidth limits do not apply | done (`fbc9eaf`) |
-| M-05 `replaceDirLink` Windows: junction built complete and then swapped | done (`d4e1485`) |
-| M-06 native Windows service (`windows/svc`) and zip package with `sc create` | done (`b145b73`, `9120fc5`; service selftest in CI `8403c71`) |
-| M-07 Windows gateway: use the route chosen by Windows (`GetBestRoute`) | done (`d4e1485`) |
-| M-08 v2 interop `base=0`: serve the block layer as a seed | done (`ab0a603`: `base=0` response from verified pieces, per-file cached, only when the file is complete; interop with a raw client `e9d8a78`) |
-
-**M-06 (Windows service)** — done: `main` now recognises `svc.IsWindowsService()`
-(`service_windows.go` / `service_other.go`) and starts the same daemon
-(`startDaemon`, extracted and shared with the interactive path) inside `svc.Run`,
-stopping it on SCM stop. `scripts/package-gx-torrent-windows.sh` produces
-`gx-torrent-windows-<arch>.zip` with `gx-torrent.exe`, `install-service.ps1`
-(`New-Service`), `uninstall-service.ps1` and `README.txt` (alternative `sc create`).
-The zip is now generated **inside** `build-release.sh` (pure-Go variant, where Go is
-available) and published by `continuous.yml`/`release.yml` as an artifact and in the
-release (`dist/gx-torrent-windows-<arch>.zip`). `TestDaemonStartServeStop` covers
-the shared lifecycle (`startDaemon`/`shutdown`) on Linux and, with the
-`windows-platform` filter, on Windows. The real installation is covered by the CI job
-`windows-service` (`8403c71`, non-blocking because the SCM is asynchronous):
-`scripts/gx-torrent-service-selftest.ps1` registers the service with `New-Service`
-and the same `binPath` as the package, starts it, waits for `/api/v1/health` and
-verifies its clean stop.
-
-### 1.6 Engine presented as our own code (done)
+### 1.5 Engine presented as our own code (done)
 
 **Rule.** gx-core is our engine and we present it as such: the
 documentation does not advertise the origin of the code. The only attribution is
@@ -237,7 +180,7 @@ engine logger is `internal/gxcore/logging` and the backoff is
 of the derived components have been restored in their respective `LICENSE` files and
 collected in `THIRD-PARTY-NOTICES`; the network identity is `"gx-core " + Version`.
 
-### 1.7 In-depth performance check (CPU and RAM)
+### 1.6 In-depth performance check (CPU and RAM)
 
 **Point.** Periodically carry out an in-depth performance check
 of the application and the engine, optimising CPU and RAM. Constraint: every
@@ -249,7 +192,7 @@ footprint of the daemon and of `gx-torrent` (RSS, goroutines, allocations),
 `make measure-seeding` for seeding. Record the numbers here.
 
 **First round (2026-10-11, Intel N97).** Network identity and dependencies
-replaced with our own code (§1.6) with no regressions. Optimisation
+replaced with our own code (§1.5) with no regressions. Optimisation
 applied: the engine logger discards records below the handler threshold
 **before** formatting them, so at WARNING (normal daemon use) the
 `Debugf`/`Infof` calls on the hot paths no longer allocate the message. Micro-benchmark
@@ -302,7 +245,7 @@ swarm merge and the parser fuzzing:
 | `BenchmarkEngineLoggerFiltered` vs `Forwarded` | **175 vs 730 ns/op, 3 vs 6 allocs/op** | the below-threshold fast path still avoids the message formatting |
 | `BenchmarkPrefillFromUnrelatedV2` | **1.58 µs/op, 128 B/op, 16 allocs/op** (16 candidates) | one-shot cost of the Phase 2 merge scan at allocation, **no steady-state path** |
 
-The last row is the new Swarm Merging Phase 2 (§15.2): matching 16 unrelated v2
+The last row is the new Swarm Merging Phase 2 (§9.2): matching 16 unrelated v2
 candidates costs ~1.6 µs once per torrent (one small map per candidate), and the
 picker/peer/piece-write paths are not touched, so the merge cannot affect
 seeding or download throughput.
@@ -408,30 +351,6 @@ implemented**). Comparison with Sonarr/Radarr (series/movies), Mylar3/Kapowarr
 Webhook HMAC, event hook, title aliases, blocklist, delays (delay profile), season
 packs, subtitles in the score, Discover/Popular TMDB: already present.
 Trakt: deliberately removed (`TestTraktIntegrationRoutesRemoved`).
-
-### 2.10 Removal with data, giving up on stall and tables (2026-10-12)
-
-Real case: "Morgane…S04E01-08" (0%) did not disappear with *Torrent + data*.
-- **Wrong order in `SafeRemoveTorrent`:** the files were moved to the
-  trash *before* removing the torrent from the engine. With the trash and the download on
-  two different NFS shares the move is a copy (8 preallocated files,
-  18.8 GB of zeros) done inside the HTTP request, while gx-torrent kept the files
-  open: the "busy" `.nfsXXXX` made the copy fail and the torrent reappeared.
-  Now the torrent leaves the engine first; the rename on the same filesystem remains
-  synchronous, the copy between filesystems goes to the background (log at the end of the copy); a
-  torrent without downloaded bytes does not go through the trash (the engine deletes it); the log
-  no longer says "files deleted" when the move fails. Test
-  `TestSafeRemoveTorrentNothingDownloadedSkipsTrash`.
-- **Giving up on a stall without a blocklist:** after the *Gave up* the next
-  search had picked up the same release (from an archive hit). Now the
-  release goes into the blocklist (`stalled_dead_swarm`), as the *dead magnet* branch
-  already did.
-- **Tables of the Downloads panel:** at 1366 px the torrent table asked for
-  1489 px (horizontal scroll even at 1600 px), the *Download history* 1451 px.
-  Fixed layout + container query in `em` (they follow A−/A+): the secondary columns
-  flow into the progress cell. Measured with headless Chromium at
-  1024/1280/1366/1600/1920 px and text at 85/100/140%: no overflow from 1366 px
-  upwards; the Archive with text at 140% no longer overflows (actions column in rem).
 
 ---
 
@@ -582,7 +501,7 @@ truth used by the UI.
 | Per-torrent limits | download/upload speed | done (`SetLimits`) |
 | Per-torrent limits | connections and upload slots | done (`SetMaxConnections`/`SetMaxUploads`) |
 | Modes | upload/share mode | skipped (infinite seed with ratio 0 is used); super-seeding done |
-| Priority | per-piece, piece diagnostics, file priority | done (`pieces` API, diagnostics, **graduated file priorities 0..7**, §4.11) |
+| Priority | per-piece, piece diagnostics, file priority | done (`pieces` API, diagnostics, **graduated file priorities 0..7**, §4.9) |
 | Trackers | removal | done (`set-trackers`) |
 | Web seed | hot add/remove | done (`webseeds` action) |
 | Sequential | runtime toggle | done (`PiecePicker.SetOrder`) |
@@ -591,7 +510,7 @@ truth used by the UI.
 | Quality | seeding/choking algorithms | measured, see §6 |
 
 **vs anacrolix/torrent**: the **HTTP Range streaming is done** (§4.3 #7) and so is the
-**reader with seek and readahead** (graduated window, §4.7); **mmap** is there
+**reader with seek and readahead** (graduated window, §4.6); **mmap** is there
 as a storage option (§5.4) and the **alternative storages** remain (blob, bolt,
 sqlite) and WebTorrent/WebRTC (wishlist).
 gx-torrent has instead a supervised
@@ -644,25 +563,7 @@ Semantics of limits: **-1 = inherit the global one, 0 = unlimited** (like libtor
   page `cmd/gx-torrent/ui.go`), never only via API.
 - Comparisons with libtorrent/qBittorrent only by measurement.
 
-### 4.6 Final re-check (done)
-
-- `capabilityLevels`: gx-torrent `full` for `limits`, `trackers`, `sequential`,
-  `piece_diagnostics`, `web_seeds`, `super_seeding`, `session_stats`; also
-  `first_last` and `holepunch` are `full`.
-- Notes/texts updated: `v2DetailCapsFor`, "Known limitations", `gx-torrent.md`,
-  `API.md`, `MANUAL.*`, `README*`.
-- Every feature visible in both UIs (trackers, web seed, limits,
-  piece diagnostics, streaming, super-seeding).
-- Happy-path test + edge cases (empty list, duplicates, not-found, 416,
-  completed/stopped); `make test` and `make test-engine` green (+ the `unchoker`
-  package in `make test-engine`).
-- Inventory of the changes in `internal/gxcore/GEXTTO.md`;
-  `go vet`, `gofmt` green; `-1`/`0`/`>0` semantics consistent.
-- Remaining note: waiting for pieces in polling streaming (200 ms, timeout 2 min),
-  without end-to-end tests on a real swarm; present data and the byte→piece
-  mapping are covered.
-
-### 4.7 Cherry-pick from anacrolix (agreed shortlist, 2026-10-10)
+### 4.6 Cherry-pick from anacrolix (agreed shortlist, 2026-10-10)
 
 Source: `github.com/anacrolix/torrent` v1.61 (Go, **MPL-2.0**). Two ways of
 taking from it, consistent with the repo policy (**third-party code is not copied;
@@ -756,15 +657,6 @@ estimate, client towards the nearest nodes; official vector in
 `PublishImmutable`/`PublishMutable` publish by first collecting the token with
 a `get`. It is the consumer that enables **BEP 46** (magnet `xs=urn:btpk:`).
 
-**BEP 44 fix (2026-10-11).** The `get`/`put` requests decode the dictionary
-`a` with its own bencode decoder (`internal/dht/bencode.go`): `bencode-go`
-v1.0.0 used to **panic** (`reflect: reflect.Value.Set using unaddressable
-value`) on the string values of a `map[string]interface{}`, i.e. on **every**
-`get`/`put`, crashing the whole daemon (`exit status 2`, restart of
-Gextto). The decoder does not use reflection, has a depth cap (32) and
-returns errors instead of panicking; `readResponse` now signals the error when
-it recovers a panic, instead of returning partial data with a `nil` error. Tests in
-`bencode_test.go`.
 
 **4 — Tracker scrape (BEP 48).** **Done.** `Scrape` was added
 to the `tracker.Tracker` interface and implemented in **HTTP** (`/scrape`, with
@@ -784,10 +676,10 @@ peer). **#1** remains the graduated priority (stream > readahead); the "reader w
 seek" is covered by the HTTP `Range` handler. Both must be **measured on a real
 swarm** before considering them closed.
 
-### 4.8 Beyond the shortlist (new items, 2026-10-10)
+### 4.7 Beyond the shortlist (new items, 2026-10-10)
 
 Four items that emerged from the comparison with anacrolix/libtorrent, **beyond**
-the §4.7 shortlist. Same rules: rewriting of the algorithm (or an MPL-2.0
+the §4.6 shortlist. Same rules: rewriting of the algorithm (or an MPL-2.0
 dependency), one item = one commit, measurement/tests, `GEXTTO.md`, both UIs.
 
 | # | Item | Source | Way | Effort | Status |
@@ -830,53 +722,7 @@ messages. The addition is the **second family**: announcement and listening also
 IPv6 group `[ff15::efc0:988f]:6771` (best-effort: without IPv6 multicast the
 v4 one remains), like anacrolix (`config.Ip6`). LSD state with `ipv6` in `/api/v1/status`.
 
-### 4.9 BEP compliance: state after the review (2026-10-11)
-
-Item added after an external review (document `analisi5.md`, kept outside
-the repo) that compared `gx-core` with libtorrent, Transmission, BiglyBT,
-anacrolix/torrent and rain. The review **corrected two wrong claims** and
-opened two items that have been closed here.
-
-| BEP / area | Real state | Notes |
-|---|---|---|
-| **BEP 21** (`upload_only`) | **done (peer + tracker)** | The magnet is not involved: BEP 21 is the `upload_only` key in the BEP 10 extension handshake, plus `event=paused` on announce and `downloaders` in the scrape. The header is sent on connection and forwarded to all peers when the torrent becomes a seed (`torrent.uploadOnly` = `completed`, therefore also partial seeds on selection); a **partial seed** announces `event=paused` (`tracker.EventPaused`). Only the `downloaders` field of the scrape is missing (optional, provided by the tracker) |
-| **BEP 53** (`so=`) + magnet `ws=`/`dht=` | **partial** | `so=` (Select Only, BEP 53): `Magnet.SelectOnly` parses indices and ranges, de-duplicated, as the torrent's seed applied by `skippedInfoFiles` **only** when `Config.FileSelection` does not provide a mask (`Torrent.SelectOnly`/`ClearSelectOnly`); the daemon turns it into `FilePriorities` on arrival of the metadata. Magnet conventions: `ws=` (web seed) → `Magnet.WebSeeds`, persisted in the resume; `dht=` (bootstrap DHT node) → `Magnet.DHTNodes`, added to the session DHT. `xs=`/`as=` remain |
-| **BEP 41** (UDP tracker URLData) | **already present** | The document gave it as absent: `internal/tracker/udptracker/messages.go` already writes the TLV options (type `0x2` = URLData, not `0x1`) from `u.RequestURI()`. No work |
-| **BEP 44 iterative client + BEP 46** (`urn:btpk:`) | **done** | The DHT now has the outgoing client (`internal/dht/bep44_client.go`): `GetImmutable`/`GetMutable` with bounded traversal over the nearest nodes, `PublishImmutable`/`PublishMutable` that collect the token with a `get` and publish with `put`; `handleBep44Reply` decodes the response with the panic-free decoder and continues the traversal. **BEP 46**: the magnet `xs=urn:btpk:<pubkey>` (+ `s=<salt>`) resolves the info hash from the mutable item in `Session.addMagnet`. Tests: `bep44_client_test.go`, `bep46_test.go`, magnet |
-| **BEP 54** (`lt_donthave`) | **done (reception)** | BEP 10 extension `lt_donthave`: a `DontHave` clears the bit of the piece in the peer's bitfield and the availability in the picker; without Fast Extension it also cancels the active download of that piece. Reception only (gx-core does not discard pieces). Correction: BEP 54 is **not** STUN (error of the external analysis); there is no BEP for STUN |
-| **BEP 31** (`retry in`) | **done** | HTTP/UDP announce and scrape extract `retry in` in minutes and respect it; the value `"never"` removes the tracker from the tier forever (`tracker.Tier`, without stopping the other trackers of the same tier). Single parsing in `tracker.NewError`/`SetRetryIn` |
-| **BEP 38** (`similar`/`collections`) | **partial (candidate discovery)** | Hints read from the info dictionary **and** from the top level (united and de-duplicated in `metainfo/bep38.go`), re-emitted in the export (`NewBytesWithHints`), exposed with the local torrents that share a hint (API `GET /api/v1/torrents/{hash}/collections`, daemon page, Gextto detail, with the symmetry of the BEP). **Block reuse** is Swarm Merging (§15.2) |
-| **BEP 17 / 34 / 35 / 51, WebTorrent, I2P** | **out of scope** | Superseded, irrelevant or expensive (WebRTC, SAM). Confirmed; 45/51 marginal |
-| **10 Gbps pipelining** | **to be measured** | The adaptive request queue already exists (§4.7); a write ring buffer is speculative. It is worth it only with before/after measurements (performance rule of `AGENTS.md`) |
-
-Corrections to the external document, kept as a note: (a) BEP 41 was **not**
-missing and the URLData option is `0x2`; (b) BEP 21 is **not** an extension
-message with an id in `m`, but a handshake header, plus the tracker changes;
-(c) the magnet parser **did not** extract `ws`/`xs`, so BEP 53 was "absent" and not
-"partial"; (d) the engine exposes `Config.FileSelection`, not a method
-`Torrent.SetFileSelection`; (e) the comparative matrix with the external clients is
-circumstantial and must not be used as a source.
-
-**Performance (BEP 31 and 38).** No change to the *data path*: BEP 31 touches
-only the announce (the `Tier` goes from `atomic.Int32` to a mutex on the index, outside
-the data path) and BEP 38 reads two optional fields of the metainfo and
-shows them. The picker and unchoker benchmarks remain unchanged
-(`BenchmarkPickerRarestSteady` ~102 µs/op, **0 alloc/op**; unchoker 1.3 µs/op),
-so a throughput measurement is not needed.
-
-**Review of the existing BEPs (2026-10-12).** Four improvements to implementations
-already present: (a) **BEP 42** — the `ip` field is now also **sent** in every
-response (to ping, find_node, get_peers, announce_peer and the BEP 44 `get`/`put`), not
-only read, with the `reflected_sent` counter; (b) **BEP 5** — `announce_peer`
-respects `implied_port` (uses the source port); (c) **BEP 11** — the lists
-`dropped`/`dropped6` are no longer added as candidate peers (they were, by
-mistake, causing dials to peers that had left the swarm) and a malformed list no
-longer discards the others; (d) **BEP 9** — the offset of the metadata request is
-computed at 64 bits, so an enormous piece index no longer overflows and
-does not request the wrong piece. Tests: `internal/dht/ipfield_test.go`,
-`torrent_pex_test.go`, `torrent_metadataextension_test.go`.
-
-### 4.10 DHT: diagnosis, hardening and multi-path (plan and feasibility)
+### 4.8 DHT: diagnosis, hardening and multi-path (plan and feasibility)
 
 Born from the comparison with **Tixati** (2026-10-11), whose changelog (v3.39, v3.43)
 claims a very evolved DHT: anti-Sybil screening of malicious nodes,
@@ -896,7 +742,7 @@ counters were added (`totalRecvPing`, `totalRecvAnnouncePeer`,
 so the work is visible end-to-end. Test: `internal/dht/stats_test.go`.
 **Why first:** it is the measurement basis of the items below (performance rule of
 `AGENTS.md`). A residue was also closed: the origin comment "Taipei Torrent"
-in `dht.go` (it was a marker that §1.6 gives as removed; the attribution remains
+in `dht.go` (it was a marker that §1.5 gives as removed; the attribution remains
 the BSD-3 `LICENSE`).
 
 **Items to open (each with a plan and before/after measurement):**
@@ -1044,7 +890,7 @@ so the DHT table (~30 s to fill) was queried again only after
 a minute. Brought to **15 s**; the same test drops to **~49 s** (test
 `announcer/dht_test.go`). Measurement in §6.8.
 
-### 4.11 Port mapping (PCP), NAT detection and file priority (feasibility)
+### 4.9 Port mapping (PCP), NAT detection and file priority (feasibility)
 
 Three gaps compared with Tixati, with a feasibility opinion founded on the current
 code (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
@@ -1145,22 +991,7 @@ items (**token and step 1 of NAT done**), then the anti-Sybil hardening and
 multi-path (with measurement on a real swarm), finally PCP (**done**) and file
 priority (**done**).
 
-### 4.13 Review of the BEP work (2026-10-12)
-
-Review of the BEP commits of the previous days; the current state of every BEP
-is in the tables of [`docs/bep.md`](bep.md) (a single status list, not a log).
-Fixed: BEP 42 `ip` field at the top level (detection of reflected port
-and NAT, never active before: from 0 to 89 observations after the restart), invalid
-port in `announce_peer`, BEP 44 `put` only to the 8 nearest nodes, addition of
-BEP 46 magnet/`xs=` without a global lock, `so=` (infinite loop and unlimited
-expansion from a hostile magnet), duplicate `ut_metadata` blocks, interest after
-`lt_donthave` (with a guard on the null bitfield), Swarm Merging candidates
-without a bitfield. The anti-SSRF protection was also added: web seed and `xs=`/`as=`
-sources do not reach private addresses except with `web-sources-allow-private`
-(check on the resolved IP, no measurable cost: a DNS resolution already
-needed to connect).
-
-### 4.12 Fine quality: what the engine lacks (analysis 2026-10-12)
+### 4.10 Fine quality: what the engine lacks (analysis 2026-10-12)
 
 Analysis of the **craftsmanship** gap (not of the feature list) between gx-core and
 libtorrent. The BEP coverage of gx-core is broad; the gap is in the layer that
@@ -1174,16 +1005,16 @@ Sources: [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md),
 | Choking / seeding | rate-based choking, anti-leech, peer classes | speed-based + optimistic, deterministic harness (`unchoker/sim_test.go`) | quality algorithms absent; measurements **local only** (§6.6) |
 | Pipelining | multi-piece per peer, ring buffer | adaptive queue (50→250), **2 pieces per peer** with a shared request budget, write bounded to 4 pieces per torrent (`maxPendingWrites`), 2026-10-13: ×1.75 at RTT 50 ms | 10 Gbps given as "to be measured" (`bep.md` §6) |
 | Disk I/O | mmap, pluggable storage, O_DIRECT/AIO, contiguous writes + hash on a pool | **`O_SYNC` removed, `fdatasync`, mmap opt-in (2026-10-12)**; O_DIRECT/io_uring/explicit contiguous remain absent (analysis: the page cache already coalesces and Go already overlaps I/O) | reduced (§5.4) |
-| File priority | graduated 0–7 | **done (0 = skip, 1..4 = normal, 5..7 = high)**; `capabilityLevels.file_priorities = full`; measurement with mixed files to do (§4.11) | closed (residual measurement) |
-| DHT | multi-path, active anti-Sybil | BEP 5/32/33/42/43/44/46, dedup; cap and multi-path off | hardening **not active** (§4.10) |
-| v2 / merge | full v2 seed, per-block reuse | v2-only download; v2 seed only whole files (`hash reject`); merge phase 1 | v2 seed incomplete, merge phase 2 (§15.2) |
+| File priority | graduated 0–7 | **done (0 = skip, 1..4 = normal, 5..7 = high)**; `capabilityLevels.file_priorities = full`; measurement with mixed files to do (§4.9) | closed (residual measurement) |
+| DHT | multi-path, active anti-Sybil | BEP 5/32/33/42/43/44/46, dedup; cap and multi-path off | hardening **not active** (§4.8) |
+| v2 / merge | full v2 seed, per-block reuse | v2-only download; v2 seed only whole files (`hash reject`); merge phase 1 | v2 seed incomplete, merge phase 2 (§9.2) |
 | Adversarial robustness | years of field experience on hostile swarms | snub, session ban with TTL, IP filter | less battle-tested surface |
 
 The **three highest-value gaps** in real operation, in order of priority:
 
 1. **Graduated file priority** — **done (2026-10-12)**: priority model in the
    engine (`piece.Piece.Priority`), `Config.FilePriorities`, `pickHigh` stage in the
-   picker, daemon and Gextto at 0/1/4/6/7, `capabilityLevels` at `full` (§4.11). Only
+   picker, daemon and Gextto at 0/1/4/6/7, `capabilityLevels` at `full` (§4.9). Only
    the **measurement** with mixed-priority files remains.
 2. **Disk I/O** — **done (2026-10-12)**: `O_SYNC` removed, `storage.File.Sync()`
    (`fdatasync`), snapshot→fsync→bitfield invariant and `updateStats` in two phases;
@@ -1203,9 +1034,9 @@ Out of scope by choice (documented in `bep.md`): BEP 8/17/18/22/26/28/30/34/35/
 **measurement** (performance rule of `AGENTS.md`) and with the same discipline as the
 other items: one item = one commit, `GEXTTO.md` updated, both UIs, i18n.
 
-### 4.14 Three ideas from anacrolix, done our way (2026-10-13)
+### 4.11 Three ideas from anacrolix, done our way (2026-10-13)
 
-Follow-up on the comparison with `anacrolix/torrent` v1.61 (§4.7–§4.8): three
+Follow-up on the comparison with `anacrolix/torrent` v1.61 (§4.6–§4.7): three
 interventions on the engine, algorithm **rewritten** (no MPL code copied, as per
 repo policy). None adds an option and none changes what the user sees: all three
 are internal to `internal/gxcore`.
@@ -1373,7 +1204,7 @@ see §5.10: on this host the estimated gain was ~1.2x–1.8x on NFS (not the
   write is already asynchronous via the kernel writeback; Go does not expose io_uring
   without a dependency or cgo. Without a measurement showing a real gain,
   introducing io_uring would violate the "no speculative code" rule and
-  risk regressions. The "AIO" item of §4.12 is therefore covered by the
+  risk regressions. The "AIO" item of §4.10 is therefore covered by the
   existing asynchronous path + mmap, not by io_uring.
 - **Contiguous writes:** every piece is already written with a single `WriteAt`
   (up to 2 MiB contiguous) and the page cache merges adjacent writebacks; an
@@ -1417,7 +1248,7 @@ table removed. A micro-optimisation not on a critical path (`Count` used in
   With 4 torrents the `/api/v1/torrents` response is 3,822 bytes in 0.5–0.7 ms:
   nil gain (<0.05% CPU). Measurable only at hundreds/thousands of torrents
   (~1 MB of list): postponed to that load — **then done** on 2026-10-11 with a
-  hash→torrent index and self-repairing fallback (see §5.13).
+  hash→torrent index and self-repairing fallback.
 - **ETag/304 on `/api/v1/torrents`**: `handleList` already serves the precompiled
   snapshot, cost = only `json.Marshal`; during activity the rates change at
   every tick and the 304 would not trigger. Only with a measurement that justifies it.
@@ -1444,18 +1275,7 @@ table removed. A micro-optimisation not on a critical path (`Count` used in
 - **`/proc/meminfo` under `d.mu`**: tens of µs, irrelevant.
 - **`HandleDisconnect` O(N)**: few disconnections/s, tens of µs: irrelevant.
 
-### 5.11 Substantial corrections to v1 (reference)
-
-- 10 items out of ~16 were **unchanged code**, not gextto work.
-- `O_SYNC` is not a quick win; `storage.File` does not have `Sync()`.
-- "Bitfield saved on every piece" is false (only completion/stop/verification/
-  `ResumeWriteInterval`).
-- The multipliers "15,500x/65,000x/600,000x" came from heterogeneous microbenchmarks,
-  not end-to-end; no `Benchmark*` existed in the repo.
-- Piece cache on the **upload** path, not download/streaming.
-- `handleList` already serves a snapshot: it does not "clone the torrents".
-
-### 5.12 Measurements before implementation (Intel N97)
+### 5.11 Measurements before implementation (Intel N97)
 
 **Item 3 — `O_SYNC`**: download dir on **NFS4** (1 GbE), alternative ext4/NVMe.
 N MiB in blocks of B, `O_SYNC` per write vs buffered + final fsync:
@@ -1477,101 +1297,12 @@ and passed it off as typical.
 Conclusion: beyond the done items (1, 2, 4, 5, 6, 7) **nothing else of v1
 is worth it** at this load.
 
-### 5.13 Check 2026-10-11 (`controllo2`): items applied
-
-External review (`/home/andres/controllo2.md`) verified against the code and applied.
-No change alters the capability matrix or the UI settings index; for
-the engine items the `internal/gxcore/...` suite remains green and no
-regression is observed (the changes are micro-optimisations or aggregate I/O, not algorithms
-on the hot path).
-
-Engine (`internal/gxcore`):
-
-- **O-04** `buildV2BlockTreeData`: the capacity of `leaves` was the number of
-  *pieces*, but the leaves at `base=0` are *blocks* of 16 KiB: preallocated
-  `ceil(f.Length/BlockSize)` to avoid dozens of reallocations on large files.
-- **M-14** same function: check of `t.closeC` in the read loop, so a
-  torrent removed halfway through building the tree (reading GBs) does not continue
-  reading from disk.
-- **C-07** `handlePeerSnubbed`: added `resetRequestQueue`, consistent with the
-  comment of the function ("after a choke (or a stall)"); before, the adaptive queue
-  stayed deep after a stall. Test `TestSnubResetsRequestQueue`.
-
-Daemon (`cmd/gx-torrent`) and DHT:
-
-- **C-02** streaming: `waitForPieces`/`streamRange` accept the `context` of the
-  request, so a seek/close of the player does not leave the goroutine polling
-  for 2 minutes with the file open.
-- **O-01** `trusted-proxies`/`allowed-hosts`: parsing cache (key = raw
-  string), zeroes the per-request allocations; a changed value is seen immediately.
-- **O-02** feed: `markFeedSeen`/`markSmartEpisode` no longer call `saveLocked`
-  per item; a single atomic write at the end of `pollFeeds` (before, up to 2N
-  rewrites of `state.json` per cycle).
-- **O-03** DHT BEP 42: CRC32C Castagnoli table as a package variable.
-- **O-05** `findLocked`: hash/ID index with a self-repairing fallback, rebuilt
-  when the session is reopened (§5.9).
-- **C-01** login rate limit: `loginFails` bounded and pruned (cap 2000, eviction of the
-  oldest) against unlimited growth.
-- **C-05** BEP 44 `itemStore`: cap `bep44MaxItems` + prune of the expired ones and
-  eviction of the oldest in `put`.
-- **C-06** BEP 33: empty Bloom filter estimates 0 (before, the clamp gave ~0.5 → 1).
-- **C-03** Windows: a UNC path is network by construction, without depending on
-  `GetDriveType` (offline share → `DRIVE_NO_ROOT_DIR` → junction on UNC).
-- **C-04** `qbitAuth` delegates to `standaloneAPIAllowed`: LAN bypass and the
-  `gx_session` cookie also apply to `/api/v2` as for the UI and `/api/v1`.
-- **M-09/M-10/M-11/M-13** qBittorrent parity: `content_path` in `torrents/info`,
-  incremental `rid` in `sync/maindata`, `autoTMM` priority on add, boolean
-  flags via `formBool`; concurrent Torznab searches.
-
-### 5.14 Postponed (from the `controllo2` check)
+### 5.12 Postponed (from the `controllo2` check)
 
 - **qBittorrent `renameFile`/`renameFolder`**: it requires rename support in the
   engine (rename on disk + metadata), a feature of its own, not in this round.
 
-### 5.15 Review `analisi4.md` (2026-10-11): items verified and applied
-
-External review (`/home/andres/analisi4.md`) on the standalone installer and the RSS
-manager, verified against the code before applying. **Applied** the three RSS items
-of real impact, in the correct form (the document's proposals were partly
-ineffective):
-
-- **B.1 `ignore_days`**: it was a filter on the *publication date* relative to
-  the last match, so an episode released shortly after the previous one was no longer
-  picked up. Now it is a **wall-clock cooldown** (`internal/rss/rules.go`,
-  `ruleWithinIgnoreWindow`), and `markRuleMatch` records the instant of the match
-  (`cmd/gx-torrent/feed.go`), not the `pubDate`. UI label updated
-  (*Wait between matches*). Tests `TestEvaluateIgnoreDaysWindow`,
-  `TestPollFeedsIgnoreDaysWindow`.
-- **B.2 "download once" movie**: the *Follow a title* function of the time (today
-  replaced by the **Wanted** list, §5.16) turned the rule into `once`
-  (`rss.Action.Once`): it takes one release and disables the rule, even with
-  multiple results in the same cycle (`disableRules`, `onceHit` in `pollFeeds`).
-  Test `TestPollFeedsOnceDisablesRule`.
-- **B.3 title in the criteria**: the document's proposal (adding the title to
-  `Match.Include`) **does not work**: `Include` is an OR, so it widens the matches.
-  Instead a **tolerant regex** requiring the words of the title in
-  order was applied (`titleMatchRegex` — then `followTitleRegex` —, e.g.
-  `(?i)mamma[\s._\-]+mia`). Test `TestTitleMatchRegex`.
-
-- **B.4 scoped feeds**: added `rss.FeedCoveredByRules`; the fallback to the local
-  filters of the feed applies **only if no rule covers that feed** (the document's
-  proposal applied it even when a rule covered it, bypassing it).
-  Test `TestScopedRulesDoNotDisableOtherFeeds`.
-- **B.5 REPACK+PROPER on the first download**: `smartEpisodeVerdict` also records the
-  lower tokens. Test `TestSmartEpisodeFirstRepackAndProper`.
-- **B.6 episode filter**: `ParseEpisodeFilter` accepts `S01E01-E05` and just the
-  season `S01`/`s1`.
-- **B.7 `/ui/rss-suggest` log**: `searchFeedSuggest` does not log the errors for
-  indexers while typing.
-- **A.1–A.4 installer**: `install-service.sh`/`uninstall-service.sh` in the
-  Linux package (`package-gx-torrent.sh`) with `StateDirectory=gx-torrent`
-  in the unit, the wait for the stop in `uninstall-service.ps1` and the two
-  packaging scripts in `installer-selftest.sh`.
-
-With this the `analisi4.md` review is **fully applied** (A.1–A.4,
-B.1–B.7).
-
-### 5.16 Wanted (`wanted`) in the standalone daemon (2026-10-11)
+### 5.13 Wanted (`wanted`) in the standalone daemon (2026-10-11)
 
 At the owner's request, the `/ui/rss` page of the standalone daemon changes
 model: from "feed + rules" to **Wanted** (titles that are wanted). Each title
@@ -1602,7 +1333,7 @@ i18n keys, tests), the inert `Folder` field of the wanted entries and the commen
 described the old model "one title = feed + rule"; `followTitleRegex`
 became `titleMatchRegex`.
 
-### 5.17 Complete standalone RSS, feed archive, IP filter and optimisation (2026-10-12)
+### 5.14 Complete standalone RSS, feed archive, IP filter and optimisation (2026-10-12)
 
 Review of the standalone gx-core at the owner's request, with the goal
 of an RSS panel on a par with qBittorrent and Deluge/YaRSS2.
@@ -1734,7 +1465,7 @@ latency harness shows the ceiling moving:
 
 So the adaptive queue plus multi-piece roughly doubles the throughput at RTT
 50 ms with 256 KiB pieces, where the single-piece block count was the limit.
-The write ring buffer (§16.3) is what keeps the disk from becoming the new
+The write ring buffer (§10.3) is what keeps the disk from becoming the new
 bottleneck while more pieces are in flight.
 
 **Correction (2026-10-13, commit `afc65f8`).** The `shallow` ×1.97 above was an
@@ -1806,7 +1537,7 @@ next piece at the tick instead of waiting for `not-interested` alone.
 
 ### 6.8 Campaign on a real swarm — first run (2026-10-12)
 
-Requirement §4.12 point 3. Same well-seeded public torrent (**Ubuntu 24.04.3
+Requirement §4.10 point 3. Same well-seeded public torrent (**Ubuntu 24.04.3
 desktop amd64**, ~6.0 GB), same machine, same 40 s window (after 5 s of
 ramp-up post-metadata), three public UDP trackers in the magnet, **sequential** runs
 (never in parallel). Two different systems, 2 runs each: **libtorrent 2.0.11**
@@ -1873,11 +1604,6 @@ non-interested ones); tracker with a long interval (a re-announce would attribut
 the connection to the tracker dial instead of the holepunch); success detected on
 both sides (race of the dial).
 
-**Historical bugs of the script**: a single shared NAT (hole impossible);
-`/peers` without `source` (a field later added to the API); wrong roles (relay
-seed + B seed); `progress` 0–100 read as 0–1; `grep` on binary logs (`-a` is
-needed).
-
 **Usage**: `make gx-torrent`, then `sudo scripts/holepunch-netns-test.sh`
 (`--keep` for debugging, `--size 16` for a larger torrent). A successful example in
 `scripts/risultato.txt`. Debug: `HOLEPUNCH_DEADLINE` (default 90 s),
@@ -1890,526 +1616,7 @@ engine (in a real swarm the peers are on different IPs).
 
 ---
 
-## 8. Technical review 1: client, i18n, jobs, concurrency
-
-Ex `docs/revisione-1.md` (already local/untracked; cited by comments in
-`jobs.go`, `web.go`, `internal_translations.yml`). Anomalies and debt that emerged from a
-review of the code, with incremental corrections without changing the
-stabilised behaviour. Scope: UI JS client, i18n, dynamic HTML,
-asynchronous activities/jobs, concurrency and tests. Out of scope: authentication and
-LAN security (LAN trusted by decision).
-
-At the time of the review: `go test ./...` and `go vet` green; a single UI client
-IIFE file `uiweb/static/gextto-ui.js` (~253 KiB, 5,194 lines); CSS in
-`gextto-ui.css`; server-rendered templates; polling + partial HTML + dynamic
-dialogs. No blocking errors: maintenance, observability,
-consistency and future robustness concerns. Effective i18n model: keys = **Italian
-source strings**, catalogues `internal_translations*.yml`
-(Italian → language) merged in SQLite at startup; client with `translateUINode()` +
-`MutationObserver` and English fallback.
-
-Priority: **P1** before adding functions (difficult regressions/diagnosis);
-**P2** debt compatible with operation; **P3** quality/maintenance.
-
-### 8.1 Monolithic JavaScript client (P2)
-
-A single IIFE with bootstrap, theme, i18n, polling/API, dashboard, torrents, series/
-movies/archive/comics, configuration, maintenance, logs, dialogs/tables/
-accessibility. On disk it is large but compressed it is small: the problem is
-maintenance (shared global state, future collisions, init mixed with
-common code, render/network/event logic in the same block, tests only on
-HTTP output). Proposal: modules (`ui-core.js` with a stable contract
-`api`/`pollRequest`/`esc`/`storage`/`notify`/dialogs, then dialogs, shell, log/
-maintenance, torrents, library/discovery/comics), migration by extractions
-without a big bang (first native ES, then an eventual bundle in the build). Acceptance:
-no regressions, no-JS with essential content, no access to other people's
-private variables, unchanged compressed weight, focus/keyboard/dialogs unchanged.
-
-### 8.2 Internationalisation (P1 catalogue check, P2 migration)
-
-Risks of the string model: a spelling variation breaks the translation,
-dynamic strings with regex partly remain in Italian, server/client catalogues
-divergent, `MutationObserver` expensive on dynamic pages,
-fallback not controllable. Target: stable keys (`dashboard.title`),
-versioned catalogues, deterministic fallback (active → base → key),
-parametric interpolation, server/client helpers, no global translation of the
-DOM. Gradual migration: catalogue check → keys for new functions →
-shell/dialogs/toast → pages one at a time → `translateUINode` legacy only →
-removal of the observer. Tests: every key in the base catalogue, no empty
-translation, multilingual snapshot, same language for text/title/aria/placeholder,
-plurals and HTML in the values.
-
-### 8.3 Dynamic HTML and rendering safety (P1 new code, P2 historical)
-
-`innerHTML` everywhere (tables, toasts, dialogs, TMDB/release/comics, server
-partials): `esc()` used in many places but every interpolation must remember it
-in the right context (text vs attribute vs `data-*` JSON, provider errors).
-New code: `textContent`, validated `setAttribute`, `createElement`,
-`DocumentFragment`, `innerHTML` only for static markup, never values from
-API/DB/provider/filesystem in HTML strings. Historical: centralised `esc()`,
-explicit `htmlTrusted()` for static fragments, exposed tables migrated first
-(release, provider, blocklist, searches), tests with hostile payloads
-(`<script>`, quotes, `&`, newline, special URLs). Acceptance: hostile values
-rendered as text, trusted functions recognisable by name, no drop in
-sort/focus/pagination/accessibility.
-
-### 8.4 Job manager (P1 destructive/long operations, P2 others)
-
-Non-uniform model: 202 before the outcome, single global state, double starts,
-late errors only in the logs, non-uniform cancellation, retry/idempotency not
-represented, uncorrelated logs, tests with sleep/polling. Proposed: `Job`
-(`queued/running/succeeded/failed/canceled`, progress, message/error,
-structured **result**, timestamp, cancel via context) + manager (limited
-concurrency, dedup by key, retention, log with `job_id`, ordered shutdown) +
-endpoints (`GET /api/jobs`, `GET /api/jobs/{id}`, `POST …/cancel`; no generic
-`POST /api/jobs`: jobs are born from the real validated operations). First to
-migrate: bulk rename/repair, archive/library scans, MediaInfo backfill,
-backup/restore, DB/scoring maintenance, source diagnostics,
-cleanups. Acceptance: no double jobs, observable state, late errors
-in state+log, cancellation without orphans, refresh that preserves the state, no
-unlimited goroutines.
-
-### 8.5 Concurrency and races (P1 race in CI, P2 cleanup)
-
-`go vet` is not a race detector. Areas: retry/post-seed maps, config cache,
-torrent state between polling/callbacks/shutdown, maintenance progress, job/notification
-registries, counters/metrics, libtorrent session closure, state/DB
-during backup/restore. Strategy: a single mechanism per state (mutex, atomic,
-immutable snapshots, channels, context, maps always with a documented lock). CI:
-`go test -race ./...` (if heavy: fast+vet per push, full per PR, race
-in a dedicated/daily queue, real engines in separate jobs). Tests with timeout,
-`Cleanup`, tmpdir and random ports, never dependent on the running service.
-
-### 8.6 Recommended plan (Phase 0–4)
-
-0 Baseline (behaviour tests, metrics, log/ID convention, catalogues +
-non-blocking race). 1 Low risk (`ui-core.js`/dialogs/shell, DOM helpers,
-XSS tests, new-string keys). 2 UI consistency (catalogues, observer legacy only,
-table/log/maintenance modules, multilingual tests). 3 Jobs (manager,
-rename/scans, cancel/dedup/retention, `job_id` in UI/log/notifications).
-4 Concurrency (repeated races, maps/snapshots, shutdown/restart, blocking races).
-Expected: client modifiable without cross regressions, translations verifiable
-pre-release, data/markup boundaries, operations observable/cancellable/correlated,
-confidence in concurrency, unchanged consumption. **Do not rewrite everything**: small
-extractions, tests green at every phase, refactoring separate from the features.
-
-### 8.7 Implementation state
-
-Phase 0: non-blocking race (`make test-race`, CI job `continue-on-error`) and
-catalogue check (`i18n_catalog_test.go`: valid YAML, no duplicates/
-empties, consistent sets) done; loading metrics and `job_id` convention to
-do. Phase 1: end-to-end XSS tests (`security.spec.ts`: injection, attribute/
-tag breakout, `javascript:`) and uniform `esc()` (also `'`) done; extraction of
-modules, DOM helpers and new-string keys postponed/repeated as a convention.
-Phase 2: English catalogue completed (1,345 missing translations, now 3,130 keys
-like the others; a test enforces coverage) and end-to-end multilingual tests
-(`i18n.spec.ts`) done; observer and client fallback unchanged. Phase 3:
-`JobManager` + complete tests (lifecycle, dedup, cancel, concurrency, retention,
-panic→failed, closure) + read-only endpoints (in `API.md`) done; migrated
-**bulk rename** (cancel between series, `/api/rename-progress` unchanged,
-`job_id` in the response), **archive scan** (from blocking synchronous to a job,
-`202` + `job_id`), **MediaInfo backfill** (report in `Job.Result`); the jobs UI
-(follow through to the outcome, Cancel button; `jobs.spec.ts`) done; explicit `Fail`
-and `SetResult` added. The other operations remain, one at a time. Phase 4:
-`make test-race ./...` green (**0 data race**); cleanup and blocking race after
-Phase 3. Obsolete browser tests realigned without masking regressions; real fix:
-scrollable tables reachable from the keyboard; browser suite 30/30.
-
-Defects found: phantom Spanish-only key `Nuevo File Archiviato`
-(removed; now the check would catch it); English subset with 1,345
-missing entries (generated automatically — **they require linguistic review**
-pre-release); `esc()` without `'` (fixed); non-idempotent test under race
-(made repeatable with cleanup).
-
-**Race on `t.info` (2026-10-12).** The race job on `cmd/gx-torrent` reported
-`Collections()`/`Similar()` (daemon goroutines) while the run loop published
-the metadata of a magnet: the field is now `atomic.Pointer[metainfo.Info]` with
-accessors `info()`/`setInfo()` (commit `a496160`).
-`go test -race ./cmd/gx-torrent/` and `./internal/gxcore/torrent/`: **0 data race**.
-**Phase 4** (cleanup + blocking race) of the plan above remains.
-
-### 8.8 Observations that emerged (they resize the plan)
-
-- **Full modularisation of the client: not advised as it stands.** 11
-  ES modules = a broad and risky refactor (IIFE→modules, call-site, browser tests)
-  for a purely maintenance benefit; the compressed file is not a browser problem.
-  Only when maintenance becomes the bottleneck, with a bundle in the build.
-  Meanwhile `esc()` + XSS tests cover the real risk.
-- **Global stable i18n keys: not necessary now.** The Italian-string
-  model works; the hole was the English coverage (resolved). 3,130 entries × 6
-  languages rewritten = risk of regressions. Hybrid: stable only for new
-  dynamic strings, legacy unchanged, an automatic anti-hole check.
-- **`POST /api/jobs` deliberately omitted** (validation in the real operations).
-- **Backup, clean trash, vacuum remain synchronous by choice** (external effects,
-  definitive deletions, non-interruptible VACUUM): do not migrate.
-- Improvements: `Job.Result`, cancellation at safe points (never halfway through a
-  unit), explicit `Fail`, automatic EN translations to be re-read.
-- Phase 3: no mandatory migration left. Phase 4: cleanup + blocking race
-  on the stabilised components. Next steps: EN linguistic review;
-  UI on `/api/jobs`; explicit shutdown per migrated operation.
-
----
-
-## 9. Technical review 2: bugs and debt at commit 97142c1
-
-Ex `docs/archive/revisione-2.md` (analysis of 2026-10-06; method: almost
-complete reading of orchestrator/worker/events/database/config/postprocess/cleaner/
-safety/web+router, then engine/rss/parser/update/hooks/notifier/httpx/comics/
-watcher/libtorrent; `go test` and `go vet` green; severity with a degree of certainty
-*Confirmed*/*To verify*, nothing reproduced at runtime).
-
-### 9.1 Bugs and criticalities (state: all fixed)
-
-| Item | Problem | Fix |
-|---|---|---|
-| B1 | Unreachable path zeroes episode state (unmounted NAS = empty dir = `ENOENT`) | reset only if the folder exists, or the first existing non-empty ancestor (`archiveFileConfirmedMissing`; `archive_mount_test.go`) |
-| B2 | Transient completion error = terminal + torrent detached, no retry | transient retries (EIO/ENOSPC/ESTALE/network/DB busy) after 1,2,4,8,16,32 min, then final; identity/files absent immediately final (`isTransientCompletionError`, `completionRetries`; in-memory counters) |
-| B3 | Torrent added but not registered if the DB write fails (cycle aborted, "external" torrent) | failed registration → torrent withdrawn, placeholder cancelled, `continue` |
-| B4 | `last_comics_check_ts` updated even if the comics cycle fails (+7 days of hole) | timestamp only on success; error → retry ~1 h |
-| B5 | Comics DB errors abort series/movie cycles | comics settings read only if needed, errors degraded |
-| B6 | Stop for "low space" without saving statistics or reporting | `finishCycleWithoutDownloads`: saves and reports anyway (global check unchanged) |
-| B7 | Config reloaded badly in the event worker (fallback = startup config) | the last valid one remains |
-| B8 | Rename repair outside `cycle_lock` (concurrency with cycle/events/renames) | per-series lock (`TryAcquireArchiveRename`/`AcquireArchiveImport`), import marker with a count; repair remains outside the lock but mutually exclusive per series |
-
-### 9.2 Illogicalities and inconsistencies (state: fixed)
-
-| Item | Problem | Fix |
-|---|---|---|
-| L1 | Redundant boolean in the selection (`incumbentWins` evaluated twice) | rewritten `covers && incumbentWins`, existing tests |
-| L2 | Supersede/remove not symmetrical → outcome dependent on order (confirmed: episode before the pack = both downloaded) | `mergeSeriesCandidate`/`releaseStrictlyBetter`: at equal, the one that covers more wins (REMUX preferred); test with 2000 reshuffled inputs (fails with the old rule) |
-| L3 | `Check*` functions that write (approve-immediately/cancel-afterwards fragile) | two-phase approval: read-only decision → add torrent → write confirmation + registration; rollback only for a failed registration after confirmation (`approval_phases_test.go`) |
-| L4 | `last_deep_gap_fill_ts` written before the work | saved only when the pass is completed and not cancelled |
-| L5 | Gap thresholds not coordinated (deep 6 h vs 23 h hard-coded) | `gap_research_hours` never below the deep interval |
-| L6 | Double notification `torrent_finished` + `storage_moved` | `torrent_completed` only once (`alreadyAnnounced`, `completionNotified`; `seeding:true` remains distinct) |
-| L7 | Mixed languages in logs and data values (`"Feed RSS"` used as a key) | shared `episodeOrigin*` constants g2/g7/detail (values unchanged: they reach the API/UI) |
-
-### 9.3 Logic loops (state: fixed)
-
-| Item | Problem | Fix |
-|---|---|---|
-| C1 | Worker restart after a panic without backoff (panic→restart cycle on a "poison" event) | `workerRestartBackoff`: wait 5 s→5 min, reset after 10 healthy minutes |
-| C2 | Event reconstruction at every tick (750 ms, double source of truth, in-memory maps) | moves saved in the DB (`torrent_moves`, restore at +60 s) + re-check every 30 s instead of every round; events remain the main channel (`torrent_moves_restart_test.go`) |
-| C3 | Slow work inline in the loop (SMTP/HTTP notifications, `SizeOfPath`, ffprobe, Jellyfin/Plex refresh) | async notifications (`notifier.Async`, best-effort queue 256; a test probe stays synchronous), `RefreshMediaLibraries` in a goroutine with coalescing |
-
-### 9.4 Inefficiencies (state: fixed or closed with a reason)
-
-| Item | Problem | Outcome |
-|---|---|---|
-| I1 | `DELETE` for every torrent at every tick on single-conn SQLite | only for entries really persisted |
-| I2 | Query for every complete torrent at every tick | `settledTorrents` cache 60 s (or until a path/event change) |
-| I3 | `torrents.List()` ~10 times per tick | postponed (500 ms backend cache mitigates) |
-| I4 | Heavy `LoadConfig` from many points, divergent copies | converted the worker that reads without modifying; `LatestConfig` already has a cache invalidated on save |
-| I5 | Stats of the whole archive for a debug log, under lock | only with diagnostics active |
-| I6 | O(n²) selection with recomputations | not done: quadratic only within series+season, negligible |
-| I7 | One archive search per query | closed: not a problem in real use |
-| I8 | `RecordSeenBatch` ignores errors in Debug | raised to WARN |
-
-### 9.5 Second pass: parser, feeds, notifications, hooks, comics, update
-
-| Item | Problem | Fix |
-|---|---|---|
-| P1 | Parser on real titles (year from `1917`/`2001`, `S2024E05` unrecognised, `Stagione 2 Episodio 3`, `2160p` in the name, group `dl` from `WEB-DL`, audio 5.1 from `x265.10bit`, `720p` from CAM) | year = last before the technical tags; 4-digit seasons; `Stagione N Episodio/Puntata M` and `[Completa]`; resolution outside the name; 5.1 isolated; `hd`/`pal` only as a word; tail `WEB-DL`/`Blu-Ray` never a group (`parser_regression_test.go`). Not errors: daily S2024E133 (legacy intended), sentinel `EpisodeRange=[0]` for the packs; not handled: multi-season pack `S01-S03` |
-| P2 | `FetchFeed`: page not downloadable → keeps the previous ones; not parseable → throws everything away, without logs | always keeps the pages read, with logs |
-| P3 | Pagination assumed base-0 (ext.to: `page=1` = first page → early-stop, crawl stalled) | `listingPageNumber` for ext.to (verified live); Corsaro unchanged |
-| P4 | Parser chosen by substring on the whole URL (query included) | chosen by host+path (`feedKindSubject`) |
-| P5 | Magnet cache indexed by title alone (collisions) | key = detail URL; eviction of the oldest (not randomly) |
-| P6 | Telegram retry without an initial wait + useless final sleep | wait before the attempt |
-| P7 | `smtp.SendMail` without a timeout in the calling thread (freezes the worker) | `sendMailWithTimeout` 30 s (same STARTTLS/AUTH) |
-| P8 | Telegram token in the logs (whole URL in the error) | `redactRequestError` (scheme+host) + mask `/bot<id>:<token>`; it contradicted `SECURITY.md` |
-| P9 | Hook: variables expanded before the split (titles with spaces/quotes = argument injection) | first `SplitArgs`, then `Expand` per argument (scripts that relied on the split must be adapted) |
-| P10 | Hook: ineffective timeout with children, unlimited concurrency, no recover | kill of the process group, `WaitDelay` 5 s, max 4 concurrent |
-| P11 | Panic in a fan-out goroutine = process death (only 4 `recover`) | `recoverGoroutine` in 20 goroutines (engine/orchestrator/rss/hooks/handler/restart/qBittorrent) |
-| P12 | Comics cycle: synchronous non-cancellable downloads under `cycle_lock` + Mega without timeout + ambiguous "first new file" | inactivity watchdog 2 min on HTTP, timeout 2 h + group kill for `megadl`, interruptible between titles (`comics_stall_test.go`) |
-| P13 | Two HTML parsers (700 hand-written lines + `x/net/html`) | not fixed (choice: it must be tested on real pages) |
-| P14 | Update checksum that "fails in the open" + tar without `--no-same-owner` | not fixed (choice) |
-| P15 | libtorrent session read without a lock in ~40 methods (abort on destroyed handle) | counter + `enterSession`/`exitSession`/`drainSession` on 43 methods: no new calls during shutdown, wait ≤30 s (`libtorrent_session_guard_test.go`) |
-| P16 | Watcher: no depth/size/stability limit | partly: max depth 8, specific names (size limit and double observation already existed in the worker; `ReadDir` does not follow symlinks) |
-| P17 | Mixed snake_case/camelCase naming, group prefixes | not done (style, no bug) |
-
-Other security notes: P8/P14 the most concrete ones; P9 injection from feed titles;
-no SSRF restriction (consistent with LAN, to remember if exposed).
-
-Structural debt not done with a reason (S1–S8: functions of 1100/600/380
-lines, g2/g7 duplicates, route names, boolean parsing → but the uniform
-`settingTruthy` done, S5, with the `weekly_enabled` bug found; `_ =` errors in 81 places,
-in-memory maps, translations 3800 lines): refactorings without known bugs, to be
-done separately if wanted. Things verified as fine: no deadlock with
-single-conn (use of `tx`), atomic copy with fsync (without checksum, rename
-overwrites), qBittorrent backoff, fail-closed on an unreadable blocklist, parameterised SQL.
-
-Closed questions: B1 check added; B2 retry only transient; L6 double
-notification = error; B8 exclusion per series; P1 parser fixed; P14 checksum
-unchanged. Overall verification: `go test ./...` and `go test -race .` green at
-every round; still to do: I3, I6, P17, S1–S4, S6–S8.
-
----
-
-## 10. Terra and Pro Terra reports
-
-Ex `docs/archive/gextto-terra.md` and `docs/archive/pro-terra.md` (readings of the
-source with concrete improvements; no vulnerability in production claimed;
-no change of daemon behaviour in the reports themselves).
-
-### 10.1 Terra: priority and status
-
-Implemented points 2, 3, 5 + first step of 7 (indexer concurrency, root
-shutdown context with worker wait, router/documentation parity tests,
-isolated UI registration). Point 1 excluded on request. Points 4 and 6 remain
-design proposals deliberately not introduced (archive cache without reliable
-invalidation; replacement of the C++ API without a version matrix): no
-shortcuts on decision correctness or build compatibility.
-
-| Priority | Area | Intervention | Outcome |
-|---|---|---|---|
-| High | HTTP exposure | Separate/restrict the `EngineListen` listener (same `Router` on both ports, second administrative access without auth) | excluded on request |
-| High | Provider search | Indexer concurrency budget (semaphore 4–6, cautious default) | done |
-| Medium | Shutdown | Deterministic worker closure before libtorrent (root context, operation registry, quiescence wait) | done |
-| Medium | Scalability | Incremental archive index outside the critical cycle (the cycle re-reads the NAS) | proposal (persisted index + timestamp, scan as fallback; identical decisions) |
-| Medium | API | Generated and verified API reference (qBit routes missing from the table) | done (parity test) |
-| Low | C++ bridge | Remove deprecated libtorrent APIs (`half_open_limit`, cache, priority, trackers, resume) | proposal (version matrix + adapter, expected warnings as a list in CI) |
-| Low | Router | Modularise the registration (`registerTorrentRoutes`, …) without changing the contract | first step done (isolated UI registration) |
-
-Recommended plan: listener exposure → indexer concurrency + API tests →
-shutdown → archive index + libtorrent compatibility.
-
-### 10.2 Pro Terra: priority and status
-
-Follow-up to Terra on security, concurrency, lifecycle, data integrity. Corrections
-applied (LAN trusted: the pure network hardening postponed): shutdown (point 5 —
-`trackOperation()` for `RunNow`/`RenameAll`/repair, wait before destroying
-the session: it closes the race on the handle); concurrency (point 6 —
-`torrent_engine` under `engine_mu`, protected `RenameProgress`, `categoryReady`
-under `e.mu`, `safeGo` without double reporting and interruptible restart, SQLite
-handles closed); integrity (points 7–8 — transactional series/movie upgrades,
-no `DELETE` on an empty magnet hash); robustness (point 9 — errors no longer
-silent, saturated `gibSetting`, size limit `HTTPDownload`). Point 1
-partial (cause resolved with the tracking, `sessionMu` discipline on ~90 methods
-recommended as defence in depth — then done in revision-2 P15).
-Points 2–4 postponed (hook allowlist, SSRF filter, key redaction in
-`ConfigView`): valid if ever exposed beyond the LAN.
-
-| Priority | Intervention | Detail |
-|---|---|---|
-| Critical | Synchronise every read of `LibtorrentClient.session` | only `listUncached` used the lock; read without lock + `Shutdown` that zeroes = Boost abort on a destroyed handle; proposal `withSession` helper/extension of `RLock` + stress test |
-| Critical | Constrain the `Program` of the event hooks | only non-empty and absolute: with `/bin/bash -c` = arbitrary shell from an unauthenticated port; proposal allowlist or a separate secret + doc in manual/`SECURITY.md` |
-| High | Filter remote URLs (SSRF) and path origins | `send-magnet`/`archive/add`/`search/add` validate only `http(s)://`, the client follows redirects; proposals for a shared helper (no private/link-local/metadata, limited redirects, no de-ref local listener) + paths within the configured roots |
-| High | Do not expose keys in `ConfigView` | indexer `api_key` + `tmdb/tvdb_api_key` in clear (other secrets already booleans); proposal flags only |
-| High | Track goroutines from the handlers | `RunNow`/`RenameAll`/repair not in `bgWG`, they touch the engine after `ShutdownEmbedded` |
-| Medium | Shared state | see above (done) |
-| Medium/Medium | DB transactions + empty magnet hash | see above (done) |
-| Low | Ignored errors and limits | see above (done); plus `staticcheck`/`errcheck` in CI |
-
-Plan: handle race + goroutines → hooks + secrets → SSRF + paths → locking +
-transactions → ignored errors + race/staticcheck in CI.
-
----
-
-## 11. SSR + HTMX UI: migration report
-
-Ex `docs/archive/UI_V2.md` (2026-10-01, build 1229, libtorrent 2.0.11.0).
-The official interface is SSR + HTMX, it no longer depends on `gextto-ui.js`: it is at
-**`/`**, `/v2` redirects (301, query preserved), it reuses the JSON API, Go
-view-models and base CSS; tables rendered by the server via in-process API handlers
-(`v2InternalJSON`: same validation, no network); server-side i18n with a
-tokenizer (`v2TranslateHTML`: text node, `title`/`placeholder`/`aria-label`,
-English fallback, never `<script>`/`<style>`, with IT byte-for-byte); minimal JS
-(HTMX + `v2-core.js`: theme/font, accessible modals); isolated UI routes
-(`v2Handle`, outside the API route table: `API.md` and parity tests unchanged);
-old `/ui` route removed.
-
-Architecture (`uiweb_v2*.go`, `uiweb/v2/templates/v2.html`,
-`uiweb/v2/static/{htmx.min.js,v2-core.js,v2.css}`, 1 line in `web_router.go`):
-shell/navigation/i18n, generic table renderer, Maintenance/
-Integrations panels, Explore, Series/Movie details, structured editors (feed, checkbox,
-rows, rename, translations), Maintenance widgets, special widgets (duplicates,
-DB, RAM disk, rename, OAuth/PIN, jobs, upload, TMDB, translations by key,
-rename preview); tests in `uiweb_v2_test.go` /
-`uiweb_v2_bench_test.go`.
-
-Coverage: all 16 menu items + details (Dashboard with labelled Upcoming releases;
-Downloads with a download badge every 5 s, limits/storage,
-trackers/files/web seeds, history, add, bulk tags; Series/Movies with TMDB hero,
-seasons on/off, No-upgrade, rename; Missing; Explore with
-calendar/trends/TMDB search; Archive with decision explanation; Comics
-with HTTP queue and weekly; Configuration 4 areas/13 sections with Default,
-savebar, expert/engine panels; Integrations Simkl/Jellyfin/Plex/FlareSolverr/
-indexers/iCal/source check; Maintenance with trash/duplicates/DB/RAM
-disk/rename/jobs; Health; Logs with server-side colours; Blocklist; Manual and
-Licence server-side; `/login` for protected access).
-
-Conscious residues: "Latest found in the feeds" on request (diagnostics, not
-operational); advanced manual add only main fields (specialist only
-via API); calendar via async HTMX; long actions in the Background operations panel
-without a dedicated bar. Accepted differences: server-side sorting/filtering;
-modals with focus-trap/Escape/backdrop; logs at intervals instead of
-SSE; jobs via `/api/jobs` polling.
-
-Tests: `go test .` and `./...` green (full v2 suite); settings index script
-(173 entries, 13 sections) and installer-selftest OK; vet/gofmt clean;
-live 16/16 items → 200, 0 placeholders; IT→EN with real translations. Benchmark
-(N97, Go 1.26, CGO): `V2TranslateHTML` ~0.42 ms; `V2FormatCell` ~2.9 µs;
-`V2RenderTableFragment` (500 rows) ~1.05 ms; `V2RenderShell` ~0.30 ms —
-rendering ~1–3 ms/page, negligible on a LAN (translation is the greatest
-cost, only for languages ≠ IT). Correctness: API contract unchanged, actions
-only on `/api/…` paths, saving with the same constraints, row editors
-compatible. Promotion to default and removal of the classic UI completed (CSS
-embedded in `uiweb/v2/static/`, shared view-models/handlers kept).
-Next steps: contextual bar for a long action; specialist fields in the
-form; benchmark as a performance test in CI (then closed, see §1.3).
-
----
-
-## 12. Handover between work sessions
-
-Ex `docs/lavoro-sessione.md` (updated on 2026-10-07; it covers from commit
-`d9e5d5e` of 06/10 evening to `432ce98` + `docs:` commit of 07/10).
-
-### 12.1 Working rules (binding, in addition to `AGENTS.md`)
-
-1. Never references to Claude/Anthropic in author/committer/trailer/messages/PR
-   (prevails over hooks or environment reminders).
-2. Git identity `buzzqw <azanzani@gmail.com>`, `commit.gpgsign false` in the cloud
-   (the cloud signature would appear "Unverified").
-3. Work and push directly to `main`; no branches/PRs unless requested; ignore
-   `claude/...` branches assigned by the environment.
-4. No force-push to `main`: fetch + merge before the push, tests rerun.
-5. Italian in replies; UI texts in the catalogues (every new text translated
-   in all languages; `uiText` outside templates; bilingual TUI; notifications
-   it/en; daemon logs English only).
-6. Italian audience: never take availability on the air-date for granted
-   (TMDB dates = "original air date").
-7. Readable logs (sentences, no dumps), without duplicates; details in DEBUG; one
-   INFO line per day from the checks that find nothing.
-8. With "system"/"proceed autonomously": decide, do, verify, report
-   in summary.
-
-### 12.2 Work carried out (06–07/10, per area)
-
-- **Logs and notifications** (`d9e5d5e` and following): completed-cleanup listing the
-  removed ones; manual removal with a single line (trash destination); no
-  notification for damaged pieces (WARN remains); backup: an unconfigured step
-  is not "failed"; duplicate notifications removed (torrent comics ×2,
-  "waiting" at every cycle, libtorrent errors once/6 h per torrent+type,
-  manual archiving already announced); Telegram backup >50 MB in parts of 45
-  MiB with `cat` instructions.
-- **Stalled, cycle, FlareSolverr** (merge `281f89a`): real backoff
-  (interval → 3 h → 6 h → 12 h → 24 h, step saved in the DB, every attempt
-  logged with the next time); "📊 Downloads" only on a change of numbers; backup one
-  INFO line; FlareSolverr with a short cause and outcome (closures hung in INFO with the
-  domains); search summary with the rejection reasons; dedup by feed/archive hash
-  ("releases checked" on distinct releases); library check with one line per
-  rename/lower copy removed + a daily line "all correctly named".
-  Note: merge title with a branch name assigned by the environment (only the
-  owner can fix it with a force-push).
-- **TUI** (`internal/tui`): missing texts, interface language vs release,
-  scrollable help 1-9, Health in Italian (key tests); numbers always per
-  tab, ←→ in Library; start search (Enter/s/f/m/c); log with `w` warnings and ↓
-  one line; torrent table (size, ETA/ratio, seed/peer, no hash);
-  blocked torrents explained + `F` with delay reset (also daemon in
-  `MarkTorrentFailed`, `stalled_since`/`next_retry_at` in the API); Status with the last
-  search in a sentence and thousands separated; "⚠ N new warnings"; `/` also on the
-  torrents; help always visible in Status.
-- **Web on phone** (`uiweb/v2`): layout ≤560 px (touchable status strip,
-  bottom bar one line, More menu, reordered Dashboard, Downloads with the list
-  first and options behind ⚙, group actions only with a selection); compact Log
-  with "Only warnings and errors" (also desktop); PWA (manifest, icons, minimal service
-  worker, share target `/share`, pull-to-refresh); WARN/ERROR counter
-  (`ProblemCount`); Downloads template fix (open div); CodeQL warnings (validated
-  hosts, `nosniff`, `/share` redirect with `url.URL`, safe conversions).
-- **Improvements §2** (detail above): hardlink, targeted refresh, upgrade-until,
-  auth, iCal, ComicInfo, missing, badge, translations, docs.
-- **gx-torrent completed**: from a non-selectable skeleton to a working engine
-  (self-managed queue with slots/cap/slow-ignored/rotation/pin/probe/dynamic
-  queue; stalled as persistent park/probe/unpark; symlink, safe delete,
-  rename-or-copy; token + loopback-only without a token, engine RPC off; startup and
-  supervision with fallback to libtorrent after 3 crashes/10 min; token/executable
-  settings; honest capability matrix; daemon + adapter tests). Smoke test:
-  startup, verify→seed, pause/resume, move with symlink, kill -9 →
-  restart, SIGTERM on shutdown. (Big Buck Bunny in `downloading_metadata`
-  in the sandbox without peers.)
-- **Network, file selection, v2**: engine inside `internal/gxcore` (`replace`,
-  `GEXTTO.md` inventory); single port + DHT on the same UDP + UPnP/NAT-PMP
-  every 20 min; file selection (excluded in `DATA/parts`, progress on the chosen ones);
-  listening/outgoing interface (killswitch), SOCKS5/HTTP proxy
-  (`gxtorrent_proxy`), encryption 0/1/2, multi-format IP filter; **v2-only now
-  accepted end-to-end** (§4.4; at the time they were refused with a blocklist and then
-  superseded); session-stats also for gx-torrent; engine bugs (IP never
-  re-contacted, logger race); real daemon↔daemon tests (single port, encryption,
-  selection, proxy, half RAM disk, IP filter); smoke (network flags, port
-  6881, torrent migration, message without UPnP).
-- **uTP, LSD, Health**: UDP socket shared with the DHT (`internal/dht`), parallel
-  uTP+TCP dial, LSD multicast BEP 14, Torrent engine panel in Health;
-  real tests (uTP-only, LSD); DHT closure bug on the shared socket.
-- **Torrent detail + qBittorrent**: tab with only commands supported by the
-  engine + a gap note, "Skip/Download" files, errors in the tab, swarm/engine
-  rows, peer Connection column; qBit: peer progress (was ×0.01),
-  connection+flag, super-seeding unblocked, "Save trackers" that replaces;
-  gx-torrent: progress/seed from the bitfield, current tracker, seeds counted.
-- **Automatic cache + v2 logs**: cache from RAM (read 1/32, write 1/16) or
-  from `libtorrent_cache_size`, expiry + `fallocate`, "Optimise" also for
-  gx-torrent, line in Health; v2-only logs (🔁 v1 alternative / ⏳ waiting /
-  ⌛ no longer tracked after 30 days; memory in RAM).
-- **gx-torrent default**: missing/empty `torrent_backend` = `gx-torrent`
-  (existing installations unchanged, `anacrolix` → `embedded`, fallback to
-  libtorrent if it does not start); agnostic service (`GEXTTO_LIBTORRENT` only an
-  override); shared network/queue/cache settings no longer disabled with
-  gx-torrent; README + `gx-torrent.md` updated.
-- **gx-torrent startup address**: standalone logs the address to open, not only
-  the wildcard it binds — `web UI: http://<lan-ip>:8890/` (interface towards the
-  default gateway) plus the loopback URL; a pinned `-listen` shows just that one.
-  The router-refused-port error (UPnP/PCP/NAT-PMP) is collapsed to a single line.
-- **gx-torrent archive-first search**: the RSS feeds grow the archive; the
-  indexers are queried only for the **monitored** titles (throttled to 30
-  minutes per title) and for the gap search, and their results are **archived**.
-  The interactive search (`/ui/wanted-search`) and the title typeahead
-  (`/ui/rss-suggest`) read the archive and answer at once; the live indexer query
-  moved behind an explicit **Search indexers too** checkbox. The archive-only
-  feed notice is logged once, neutrally (a feed that only grows the archive is a
-  valid configuration).
-- **gx-torrent FlareSolverr**: a `flaresolverr-url` setting (field + *Test
-  FlareSolverr* button on the RSS page, translated in every language) routes
-  feeds and Torznab indexers behind a Cloudflare challenge through the service:
-  the direct request is tried first, FlareSolverr is the fallback, and local/LAN
-  hosts are never retried there (like Gextto). New `internal/flaresolverr`
-  package (stateless `request.get`) and a `torznab.Indexer.Get` transport hook;
-  `rss-suggest`/feeds honour it.
-
-### 12.3 Open points as of 07/10 (historical; several closed/superseded)
-
-> List **dated 07/10/2026**, kept as historical. In the meantime the wizard/indexer
-> and v2 support have been closed (see §4.4 and
-> [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md) §12), so some points below
-> must be read as superseded.
-
-To decide: double notification "completed — seeding" in `move_episodes`
-(proposed to remove the first); Telegram backup as a caption of the last
-part; TUI keys with a meaning per tab (`d`, `R`, `i`, `e`); Series/Movies/Archive
-tables on the phone with real data (tabs vs tables).
-To do/verify: PWA/sharing on real HTTPS; stalled backoff on the real server
-(resume from `notice_step`); mircrew indexer (only locally on the server);
-merge title `281f89a`; "router port N opened" in the daemon log (or manual
-opening TCP+UDP); with VPN set the outgoing interface (killswitch);
-gx-torrent procedure (engine choice, Big Buck Bunny, slot/pause); §2 improvements
-(hardlink with `ls -li`, Jellyfin/Plex folder scan, login via proxy with
-`X-Forwarded-For`, calendar with a TMDB key).
-
-### 12.4 Environment and pitfalls (cloud session, reference)
-
-Build with `libtorrent-rasterbar-dev` (normal C++ warnings); root tests ~60 s.
-Dry-run with a dedicated `GEXTTO_DATA_DIR`; stop via `kill` on the PIDs (never
-`pkill -f`, which also kills the shell). TUI in `tmux` + `capture-pane`;
-pause between `Escape` and letter (Alt+letter). Web/phone with Chromium +
-Playwright preinstalled (config without `channel: chrome`, explicit
-`executablePath`, new data dir; 36 tests green). Pitfalls: `gofmt` that realigns
-`internal/tui/i18n.go`; cached `go test`; blocked push/force-push; `go test …
-| grep … && git commit` also commits with red tests (check `$?`);
-global comics download registry in tests; `#` at the beginning of a line in the manuals =
-Markdown title (the e2e finds it); embedded manual (recompile before the
-e2e). Map of touched code and resumption: see the original file in the archive.
-
----
-
-## 13. Accessibility
+## 8. Accessibility
 
 Ex `docs/accessibility-analysis.md` (analysis of 29-09-2026 on
 `uiweb/v2/templates/`, `uiweb/v2/static/`, tests in `uiweb/end2end/`; reference
@@ -2424,7 +1631,7 @@ devices.
 **Method**: static review (HTML/CSS/JS), semantics/names/ARIA/focus,
 responsive layout/visible focus/reduced-motion, light/dark theme contrast, axe-core
 via Playwright, regression tests (dialogs, keyboard sort, polling, narrow
-viewports). Suite: **12 green tests** on dashboard, downloads, settings,
+viewports). Suite: **13 green tests** on dashboard, downloads, settings,
 maintenance, health, logs (`cd uiweb/end2end && npm ci && npm run test:a11y`;
 a safety net, not a substitute for the manual assessment).
 
@@ -2455,19 +1662,7 @@ usable for tables/tabs/progress/errors; no regression on desktop and mobile.
 
 ---
 
-## 14. gx-torrent standalone (gx-nox): pointer
-
-**Extract.** The full analysis and the decision — evolve `gx-torrent` with a single
-binary and two modes, or create a new `gx-nox` — are in
-[`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md). Here only the pointer and
-the decision in one line remain: **gx-torrent is evolved**, and "gx-nox" is the public name
-of the standalone mode, not a second project. The RSS/UI work of the
-standalone (guided editors, `/ui/settings`, `/ui/browse-dir`) is tracked in
-[`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md) §12.
-
----
-
-## 15. High-value extensions from the comparison with BiglyBT
+## 9. High-value extensions from the comparison with BiglyBT
 
 Ex comparative analysis with **BiglyBT** (Java client, heir of Azureus/Vuze). The
 majority of its capabilities are **application-level or historical** (chat/friends, Vuze
@@ -2475,7 +1670,7 @@ DDB, media server, plugins, WebTorrent) and must not be ported. Only two
 truly interesting *core* functions remain for gx-core: both are **backlog**, not
 work done; here is the plan, with the hooks already present in the code.
 
-### 15.1 Ping-Based Auto-Speed (anti-bufferbloat) — done
+### 9.1 Ping-Based Auto-Speed (anti-bufferbloat) — done
 
 **Idea.** BiglyBT continuously measures the RTT (towards the gateway or a
 reliable host); when the upload saturates the modem queue the RTT spikes and the engine
@@ -2516,7 +1711,7 @@ data path; with auto-speed **off** nothing changes (no regression).
 **Possible follow-up.** Gextto-side (managed) version: Gextto measures the RTT and
 modulates the limits via `SetLimits`, so the option also applies to managed engines.
 
-### 15.2 Swarm Merging (file sharing between torrents) — Phase 1 and 2 done
+### 9.2 Swarm Merging (file sharing between torrents) — Phase 1 and 2 done
 
 **Idea.** Make different swarms that contain **the same file** collaborate,
 reusing the pieces already present in another torrent A instead of re-downloading them:
@@ -2587,7 +1782,7 @@ only the pieces that were already on disk are verified again. The skip set is
 consumed and cleared at the allocation-time verification, so a later manual
 re-check verifies everything.
 
-### 15.3 Verification criterion (like §4.5)
+### 9.3 Verification criterion (like §4.5)
 
 For every point: targeted tests (`./cmd/gx-torrent/`, `GxEngine`, `make test-engine`,
 `make test`); with a visible effect also the documentation (`docs/gx-torrent.md`,
@@ -2598,7 +1793,7 @@ accessibility and i18n.
 
 ---
 
-## 16. Smartness backlog: ideas from the 2026-10-13 night
+## 10. Smartness backlog: ideas from the 2026-10-13 night
 
 The night session (parser fuzzing, Swarm Merging Phase 2, the DHT anti-Sybil
 counter, the performance round) produced ideas that would make Gextto, gx-torrent
@@ -2610,27 +1805,27 @@ here; the implemented ones are dated, the others are a proposal to be agreed.
 | 1 | **Continuous fuzzing** of every network-facing parser, with the found inputs kept as seeds, run by hand or in a nightly job | the `.torrent` scanner panic was found in minutes | high (a DoS caught before a release) | low | **done**: `make fuzz-smoke` (`FUZZ_TIME=2m`), 21 targets (DHT, bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE, peer-wire handshake), the seeds are committed under `testdata/fuzz`; a CI job is proposed |
 | 2 | **Merge: read and write each reused piece once** across all candidates; a later candidate only fills the gaps a previous one could not | Phase 2 analysis | medium (no duplicate I/O when several torrents hold the same content) | low | **done (2026-10-13)**: `mergedIdx` shared by Phase 1 and Phase 2 |
 | 3 | Merge: order the candidates by **reusable bytes** so the richest source is read first | Phase 2 | low | low | **closed (2026-10-13, reason):** superseded by the dedupe (#2) — ordering changes only *which* source provides a piece, not the work; no measurable gain, so no speculative code |
-| 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | Phase 2 | high (revives more seedless torrents) | high | **plan** in §16.1 |
+| 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | Phase 2 | high (revives more seedless torrents) | high | **plan** in §10.1 |
 | 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | the O(1) counter removed the cost argument | medium | medium | **partial**: `subnet_cap_hint` (the suggested cap from the live concentration) is exposed in `Stats()`; automatic enforcement not pursued (a /24 can be legitimate CGNAT/mobile) |
-| 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.10 | medium | medium | **measured + instrumented (2026-10-13)**: `peers_confirmed_multi` counts peers reported by ≥2 distinct nodes; the full rewrite awaits data, see §16.2 |
+| 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.8 | medium | medium | **measured + instrumented (2026-10-13)**: `peers_confirmed_multi` counts peers reported by ≥2 distinct nodes; the full rewrite awaits data, see §10.2 |
 | 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | Phase 2 | medium | low | **done (2026-10-13)**: `merged_pieces`/`merged_bytes` in the engine session stats → daemon API → Gextto «Riuso locale» |
-| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.12 | high | high | **done (2026-10-13)**: write ring buffer + 2 pieces per peer; measured ×1.75 (3.85→6.76 MiB/s at RTT 50 ms; window-sharing fix in `afc65f8`), details in §6.4/§16.3 |
+| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.10 | high | high | **done (2026-10-13)**: write ring buffer + 2 pieces per peer; measured ×1.75 (3.85→6.76 MiB/s at RTT 50 ms; window-sharing fix in `afc65f8`), details in §6.4/§10.3 |
 | 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | the fuzzing pass | medium/high | low | **done**: `internal/utils/utils.go` (length bounded, recursion depth ≤64); `internal/dht/bencode.go` `validBencode` screens DHT packets before bencode-go |
 | 10 | Merge: **no double verification** — the pieces the merge just re-verified are handed to the verifier as already done | Phase 2 analysis | medium (no re-read and re-hash of the reused bytes) | low | **done (2026-10-13)**: `Verifier.Skip`, cleared after the allocation-time check |
 | 11 | Merge **off the run loop**: the copy ran synchronously in the torrent goroutine, so `Stats`/`Stop` and every command on that torrent hung for the whole merge (minutes for tens of GB, the daemon API with them) | review of the night commits | high | low | **done (2026-10-13)**: `mergeCandidates` (no I/O) in the run loop, the copy in `Verifier.Prepare` (cancellable, snapshot of the deselected pieces) |
 | 12 | Merge on **empty storage**: the verifier hashed every non-merged piece of files just created (holes) | same review | medium (no read+SHA-1 of the whole torrent after a partial merge) | low | **done (2026-10-13)**: `Verifier.Only` restricts the check to the merged pieces when no file existed |
 | 13 | **Word-wise interest** and deselected files: `updateInterestedState` scanned the bitfield bit by bit for every peer at every completed piece, and pieces of deselected files made a peer interesting | same review | high (run-loop CPU on large torrents) | low | **done (2026-10-13)**: `HasAnyOutside` + `skipBits`, 231 → 2.8 µs per peer on 100k pieces (×80), 0 alloc |
 | 14 | **Smarter eviction**: a partial seed kept peers that only had deselected pieces, and a fresh connection could be dropped as useless at the next tick and redialled (churn) | same review | medium | low | **done (2026-10-13)**: `peerUseful` uses the wanted set, keeps only interested peers when seeding, 30 s grace (`newPeerGrace`) |
-| 15 | DHT multi-path **per subnet**: the confirmation counted reporters per address, so a Sybil host or /24 confirmed its own peers | same review | medium (the §16.2 datum was inflatable) | low | **done (2026-10-13)**: `reporterKey` |
+| 15 | DHT multi-path **per subnet**: the confirmation counted reporters per address, so a Sybil host or /24 confirmed its own peers | same review | medium (the §10.2 datum was inflatable) | low | **done (2026-10-13)**: `reporterKey` |
 | 16 | **mmap fault guard**: with `-mmap`, a full disk or a truncated file raised SIGBUS and crashed the whole daemon | same review | high for `-mmap` users | low | **done (2026-10-13)**: `recoverFault`, I/O error on the torrent; write bench equivalent (36.3–38.0 → 35.9–37.5 µs), 0 alloc |
 | 17 | **Disk guard** in gx-torrent: downloads on a folder below the free-space threshold pause and resume by themselves, seeding goes on (Gextto only refused to *start* downloads) | user request after the review | high (no write errors, no torrents in error on a full disk) | low | **done (2026-10-13)**: `diskguard.go`, `min_free_mb` (default 1 GiB), daemon setting + badge, pushed from Gextto's `min_free_space_gb` |
 | 18 | **Wanted state hygiene**: the per-title search timestamps of removed titles stayed in the state file forever | same | low | low | **done (2026-10-13)**: `pruneWantedTimers` (the taken ledger is kept, so a re-added title is not downloaded again) |
 
-The criterion is the same as §4.5/§15.3: one item = one commit, measurement
+The criterion is the same as §4.5/§9.3: one item = one commit, measurement
 before/after for anything on a data path, both UIs and i18n for anything visible
 to the user, and the reference documents kept aligned.
 
-### 16.1 Merge Phase 3 — block-granularity reuse (plan)
+### 10.1 Merge Phase 3 — block-granularity reuse (plan)
 
 Phase 2 reuses a destination piece only when **every** source piece overlapping
 it is verified; otherwise the whole piece is skipped. Phase 3 would reuse at
@@ -2656,7 +1851,7 @@ least one of its overlapping source pieces was verified, exposed as
 locale» shows it as `· N saltati per sorgente parziale`). Without that datum
 showing a real frequency, Phase 3 stays an idea (avoids speculative code).
 
-### 16.2 DHT multi-path — measurement and plan
+### 10.2 DHT multi-path — measurement and plan
 
 The iterative lookup already fans out to the ~8 closest nodes and re-enqueues
 while peers are still needed; the missing part is **confirmation across paths**
@@ -2695,7 +1890,7 @@ bounded fan-out and a deadline, like `bep44_client.go`). Tests:
 `TestPeerConfirmCountsDistinctReporters`, `TestPeerConfirmIsBounded`,
 `TestPeerConfirmExpiry`, `TestReporterKeyIsTheSubnet`.
 
-### 16.3 Multi-piece pipelining — measurement and plan
+### 10.3 Multi-piece pipelining — measurement and plan
 
 The measured baseline (§6.4, 2026-10-13) is ~12.8× from the adaptive queue at
 RTT 50 ms, and it also shows the ceiling: with 256 KiB pieces (16 blocks) the
@@ -2755,43 +1950,3 @@ request per peer, endgame duplicates cancelled as soon as a copy starts writing
 RTT 50 ms unchanged (~6.75 MiB/s), RAM and CPU equivalent.
 
 
-### 16.4 Review of the night commits (2026-10-13)
-
-The last 24 hours of engine commits were re-read for correctness and for the
-"smartness" they promised; items 11–16 of the table above are what came out of
-it (commits `7eeb059`, `3d149b7`, `98a0297`, `5c2eb99`, after `afc65f8` for the
-pipelining window). Confirmed sound and kept as they are: the ranged mmap flush
-(with the out-of-order fix of `afc65f8`), the O(1) per-subnet counter, the
-bencode screen of DHT packets, the write ring buffer and the never-wedging RAM
-budget.
-
-**Measurement (before `5574f62` → after `9811849`, same machine):** latency
-harness at RTT 50 ms `default` 6750–6755 → 6739–6755 KiB/s, `shallow` 302 →
-302–303 KiB/s, peak RSS 32.3–34.2 → 34.1–34.3 MiB; `measure-seeding` (4
-leechers) seeder 1.00x corpus in both, RSS 30.6 → 32.6 MiB (run-to-run noise,
-32.5–32.6 in earlier runs), CPU 6.0 → 6.2 s. Equivalent, as expected: these
-harnesses neither merge nor carry 100k-piece torrents. The targeted gains are
-measured where they apply: interest check ×80 (`BenchmarkUpdateInterestNothingWanted`),
-merge no longer on the run loop (Stats/Stop answer during it), no hashing of
-empty storage after a partial merge.
-
----
-
-## Appendix A: consolidated files
-
-| Original file | Now (local copy, untracked) | Section here |
-|---|---|---|
-| `docs/proposte-migliorie.md` | `docs/archive/proposte-migliorie.md` | §2 |
-| `docs/da-fare.md` | `docs/archive/da-fare.md` | §1 |
-| `docs/lavoro-sessione.md` | `docs/archive/lavoro-sessione.md` | §12 |
-| `docs/scelte-di-progetto.md` | `docs/archive/scelte-di-progetto.md` | §3 |
-| `docs/accessibility-analysis.md` | `docs/archive/accessibility-analysis.md` | §13 |
-| `docs/holepunch-test-harness.md` | `docs/archive/holepunch-test-harness.md` | §7 |
-| `docs/gx-torrent-migliorie.md` | `docs/archive/gx-torrent-migliorie.md` | §4 |
-| `docs/gx-torrent-ottimizzazioni-prestazionali-v2.md` | `docs/archive/gx-torrent-ottimizzazioni-prestazionali-v2.md` | §5 |
-| `docs/gx-torrent-misure-seeding.md` | `docs/archive/gx-torrent-misure-seeding.md` | §6 |
-| `docs/revisione-1.md` | `docs/archive/revisione-1.md` | §8 |
-| `docs/archive/revisione-2.md` | remains in `docs/archive/` (untracked) | §9 |
-| `docs/archive/UI_V2.md` | remains in `docs/archive/` (untracked) | §11 |
-| `docs/archive/gextto-terra.md` | remains in `docs/archive/` (untracked) | §10.1 |
-| `docs/archive/pro-terra.md` | remains in `docs/archive/` (untracked) | §10.2 |

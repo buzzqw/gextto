@@ -132,7 +132,7 @@ Status legend: **yes** = implemented and tested; **partial** = only a part;
    in the `.torrent` export and shown together with the local torrents that
    share a hint (API `GET /api/v1/torrents/{hash}/collections`, daemon
    page, detail in Gextto). The **actual block reuse** — the
-   real gain of the BEP — is **Swarm Merging** (`evoluzione.md` §15.2): here
+   real gain of the BEP — is **Swarm Merging** (`evoluzione.md` §9.2): here
    there is only the discovery of candidates.
 
 ## Maintenance

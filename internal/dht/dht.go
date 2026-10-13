@@ -1397,7 +1397,7 @@ func Stats() map[string]int64 {
 		// set). The engine never enables the cap by itself.
 		"subnet_cap_hint": subnetCapHintValue.Load(),
 		// peers_confirmed_multi counts the peers a second distinct node
-		// confirmed within the window (multi-path observability, §16.2).
+		// confirmed within the window (multi-path observability, §10.2).
 		"peers_confirmed_multi": peersConfirmedMulti.Value(),
 	}
 }

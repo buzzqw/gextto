@@ -135,7 +135,7 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   MSE), `FUZZ_TIME` secondi per target (default 30s, es. `FUZZ_TIME=2m` per un
   passaggio serio). Non fa parte di `make test`; i crash trovati vanno corretti e
   i loro input committati come seed in `testdata/fuzz`. Vedi `docs/evoluzione.md`
-  §16.
+  §10.
 - Test mirati: `go test ./cmd/gx-torrent/` e `go test -run GxEngine .`.
 - Test del motore (`internal/gxcore`): `make test-engine` (`go test` dalla root sui
   pacchetti del motore). Fa parte del modulo, quindi `go test ./...` lo include

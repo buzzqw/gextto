@@ -9,9 +9,10 @@ This document is the **decision and the plan**. The current state of the engine 
 features in [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md).
 
 > [!NOTE]
-> Born from the extraction of §14 of `evoluzione.md`, which now points here. The
-> technical document `gx-torrent.md` describes **what exists**; this one describes
-> **where we want to go**, and it stays separate so as not to mix the two plans.
+> Extracted from the strategic plan in [`evoluzione.md`](evoluzione.md), which
+> now points here. The technical document `gx-torrent.md` describes **what
+> exists**; this one describes **where we want to go**, and it stays separate so
+> as not to mix the two plans.
 >
 > **Name:** the product name is **gx-core** (decided 2026-10-10). The binary
 > stays `gx-torrent` and "gx-nox" is only the historical name of the standalone
@@ -178,7 +179,7 @@ dragging all of Gextto along. They have been **extracted into `internal/rss` and
   expiry, `Session.BanIP`), adaptive depth of the request queue (**done**,
   with harness and latency isolation: §6.4 of `evoluzione.md`), rate-based
   choking (deterministic bench, §6), reader with readahead for streaming (**done**),
-  **graduated file priority (done, §4.11)** and disk I/O (**opt-in mmap + batched
+  **graduated file priority (done, §4.9)** and disk I/O (**opt-in mmap + batched
   durability done, §5.4; contiguous writes not necessary without measurements**). These are
   "cherry-picks" (§11), not blockers.
 
@@ -441,10 +442,10 @@ to be verified against the libraries' code before each porting.
 seek and readahead + **graduated piece priority**, **adaptive request queue**,
 `anacrolix/dht` as a dependency (BEP 42/43/44), **tracker scrape**. Detail,
 ways of taking (rewrite vs dependency) and verifications in
-[`evoluzione.md` §4.7](evoluzione.md). Items 3 and 4 of the table above are
+[`evoluzione.md` §4.6](evoluzione.md). Items 3 and 4 of the table above are
 included; **scrape** is already implemented. Four other points (event bus,
 `.torrent` creation from a folder, bad storage, BEP 14) in
-[`evoluzione.md` §4.8](evoluzione.md).
+[`evoluzione.md` §4.7](evoluzione.md).
 
 ### 11.2 Licences
 
@@ -701,7 +702,7 @@ Decisions to be made **before** F1/F2, not urgent in F0:
 
 - [`docs/gx-torrent.md`](gx-torrent.md) — technical reference of the current engine.
 - [`docs/evoluzione.md`](evoluzione.md) — §4–§7: engine gaps, optimisations,
-  choking measurements; §14: pointer to this document.
+  choking measurements; the standalone plan is this document.
 - [`docs/bep.md`](bep.md) — BEP status and the BitTorrent v2 rules; v2 state also
   in [`docs/gx-torrent.md`](gx-torrent.md).
 - [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) — inventory of the

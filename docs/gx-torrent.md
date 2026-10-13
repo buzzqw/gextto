@@ -1054,7 +1054,7 @@ Two levels:
   two torrents use a **different piece length**: the destination piece's bytes
   are reassembled from the source's verified pieces and **each destination piece
   is verified against its own hash** before it is written. There is no v1
-  different-layout heuristic (§15.2 of [`evoluzione.md`](evoluzione.md)).
+  different-layout heuristic (§9.2 of [`evoluzione.md`](evoluzione.md)).
 
 ## Statistics
 
@@ -1227,7 +1227,7 @@ persisting the bitfield (order snapshot → fsync → write; `updateStats` in
 two phases). A bit that survives a crash therefore always refers to data already
 on disk, and at most the pieces of the last few minutes are re-downloaded. On HDD and NFS
 this removes one fsync per piece write (measurements in `evoluzione.md`
-§5.4/§5.12).
+§5.4/§5.11).
 
 **Move**:
 
