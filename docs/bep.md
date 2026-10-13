@@ -136,7 +136,12 @@ stay narrow and the tables remain readable.
 | 53 | Magnet URI extension: `so=` (Select Only) | yes |
 
 > **BEP 52** covers v1, hybrids and v2-only, both from `.torrent` and from
-> magnet.
+> magnet. As a seed it answers `hash request` for the piece layer from the
+> attached `piece layers` and, for the block layer (`base = 0`), both for a file
+> present in full and, for the parts already verified, for a partially
+> downloaded file (the requested 16 KiB leaf hashes are computed from the
+> verified pieces and anchored with the piece layer's uncles; a request that
+> touches a missing piece is refused).
 >
 > The magnet parameter `so=` is **BEP 53**. `ws=` (web seed), `xs=` (exact
 > source), `as=` (acceptable source) and `dht=` (DHT bootstrap node) come

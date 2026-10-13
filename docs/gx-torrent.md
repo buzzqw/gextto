@@ -1130,10 +1130,13 @@ with v2 identity, so libtorrent peers accept the `hash request`. The seed
 responds to the **piece layer** requests (`base = piece layer`) from its
 `piece layers`, without reading the files. It also responds to the **block
 layer** requests (`base = 0`), which a libtorrent leecher uses to verify
-blocks while downloading them: the block tree is built from the data of the verified
-pieces, **cached per-file** and only for a file **entirely present**
-(otherwise `hash reject`, because a tree with missing leaves would not
-anchor to the `pieces root`). The v2 wire rules are in [`bep.md`](bep.md).
+blocks while downloading them: for a file **entirely present** the block tree
+is built from the data and **cached per-file**; for a file that is only
+**partly downloaded** the requested 16 KiB leaf hashes are computed from the
+verified pieces and anchored with the piece layer's uncles, so the parts the
+seed already has are still servable. A request that touches a missing piece,
+folds below the piece layer, or has no complete proof is refused
+(`hash reject`). The v2 wire rules are in [`bep.md`](bep.md).
 
 ## Local data reuse (Swarm Merging)
 
@@ -1646,9 +1649,12 @@ Operations that the engine does not support respond with an explicit capability
 error (`ErrCapabilityUnavailable`), never with a false success:
 
 - v2 as **seed**: the `hash request` requests of the block layer
-  (`base = 0`) are served only for a file **entirely present** and are
-  built by reading the data (once per file, then cached); for an incomplete
-  file they respond `hash reject` (see *BitTorrent v2 torrents*);
+  (`base = 0`) are served for a file **entirely present** (built once by reading
+  the data, then cached) and, for a file only **partly downloaded**, for the
+  requested 16 KiB leaf hashes whose pieces are verified (anchored with the
+  piece layer's uncles); a request that touches a missing piece, folds below the
+  piece layer or has no complete proof responds `hash reject`
+  (see *BitTorrent v2 torrents*);
 - IPv6: **partial support** (see *IPv6* below).
 
 **Sequential download** and **first/last part** priority are supported
