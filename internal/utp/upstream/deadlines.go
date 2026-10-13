@@ -1,47 +1,54 @@
 package upstream
 
+// GEXTTO: rewritten in-tree. Read/write deadlines: a deadline is a time plus an
+// event that fires once it passes.
+
 import (
 	"time"
 )
 
+// deadline is a single read or write deadline.
 type deadline struct {
 	t      time.Time
 	passed Event
 	timer  *time.Timer
 }
 
-func (me *deadline) set(t time.Time) {
-	me.t = t
-	me.passed.Clear()
-	if me.timer != nil {
-		me.timer.Stop()
+// set arms the deadline for t, clearing any previous one.
+func (d *deadline) set(t time.Time) {
+	d.t = t
+	d.passed.Clear()
+	if d.timer != nil {
+		d.timer.Stop()
 	}
-	me.update()
+	d.update()
 }
 
-func (me *deadline) update() {
-	if me.t.IsZero() {
+// update rearms the timer, or marks the deadline passed when t is already due.
+func (d *deadline) update() {
+	if d.t.IsZero() {
 		return
 	}
-	if time.Now().Before(me.t) {
-		if me.timer == nil {
-			me.timer = time.AfterFunc(me.t.Sub(time.Now()), me.callback)
+	now := time.Now()
+	if now.Before(d.t) {
+		wait := d.t.Sub(now)
+		if d.timer == nil {
+			d.timer = time.AfterFunc(wait, d.callback)
 		} else {
-			me.timer.Reset(me.t.Sub(time.Now()))
+			d.timer.Reset(wait)
 		}
 		return
 	}
-	me.passed.Set()
+	d.passed.Set()
 }
 
-func (me *deadline) callback() {
+func (d *deadline) callback() {
 	mu.Lock()
 	defer mu.Unlock()
-	me.update()
+	d.update()
 }
 
-// This is embedded in Conn and Socket to provide deadline methods for
-// net.Conn.
+// connDeadlines embeds a read and a write deadline for net.Conn.
 type connDeadlines struct {
 	read, write deadline
 }

@@ -1,5 +1,9 @@
 package upstream
 
+// GEXTTO: rewritten in-tree (was vendored from anacrolix/utp): the uTP/BEP 29
+// wire codec. The 20-byte header and the selective-ACK extension are fixed by
+// the protocol; the parsing and encoding here are our own.
+
 import (
 	"encoding/binary"
 	"errors"
@@ -7,14 +11,19 @@ import (
 )
 
 const (
+	// extensionTypeSelectiveAck is the BEP 29 extension type for selective ACK.
 	extensionTypeSelectiveAck = 1
+	// headerLen is the base uTP header size, before extensions.
+	headerLen = 20
 )
 
+// extensionField is one TLV extension carried after the base header.
 type extensionField struct {
 	Type  byte
 	Bytes []byte
 }
 
+// header is the decoded uTP packet header.
 type header struct {
 	Type          st
 	Version       int
@@ -27,37 +36,33 @@ type header struct {
 	Extensions    []extensionField
 }
 
-func unmarshalExtensions(_type byte, b []byte) (n int, ef []extensionField, err error) {
-	for _type != 0 {
-		if _type != extensionTypeSelectiveAck {
-			// An extension type that is not known to us. Generally we're
-			// unmarshalling an packet that isn't actually uTP but we don't
-			// yet know for sure until we try to deliver it.
+var errInvalidHeader = errors.New("invalid header")
 
-			// logonce.Stderr.Printf("utp extension %d", _type)
-		}
+// parseExtensions walks the extension chain. curType is the type of the first
+// extension; b starts at its length byte (b[0] is the next type, b[1] the
+// length). It returns the extension bytes consumed and the decoded fields.
+func parseExtensions(curType byte, b []byte) (n int, ef []extensionField, err error) {
+	for curType != 0 {
 		if len(b) < 2 || len(b) < int(b[1])+2 {
 			err = fmt.Errorf("buffer ends prematurely: %x", b)
 			return
 		}
+		payload := b[2 : int(b[1])+2]
 		ef = append(ef, extensionField{
-			Type:  _type,
-			Bytes: append([]byte(nil), b[2:int(b[1])+2]...),
+			Type:  curType,
+			Bytes: append([]byte(nil), payload...),
 		})
-		_type = b[0]
-		n += 2 + int(b[1])
-		b = b[2+int(b[1]):]
+		n += 2 + len(payload)
+		curType = b[0]
+		b = b[2+len(payload):]
 	}
 	return
 }
 
-var errInvalidHeader = errors.New("invalid header")
-
+// Unmarshal decodes a uTP header. A hostile peer may send short or malformed
+// bytes: every read is length-checked and a bad header is rejected.
 func (h *header) Unmarshal(b []byte) (n int, err error) {
-	// GEXTTO: hostile peers send short packets; fail instead of slicing
-	// out of range. (handleReceivedPacket already drops <20B, this guards
-	// every current and future caller at the parser boundary.)
-	if len(b) < 20 {
+	if len(b) < headerLen {
 		err = errInvalidHeader
 		return
 	}
@@ -67,7 +72,8 @@ func (h *header) Unmarshal(b []byte) (n int, err error) {
 		err = errInvalidHeader
 		return
 	}
-	n, h.Extensions, err = unmarshalExtensions(b[1], b[20:])
+	var ext int
+	ext, h.Extensions, err = parseExtensions(b[1], b[headerLen:])
 	if err != nil {
 		return
 	}
@@ -77,66 +83,71 @@ func (h *header) Unmarshal(b []byte) (n int, err error) {
 	h.WndSize = binary.BigEndian.Uint32(b[12:16])
 	h.SeqNr = binary.BigEndian.Uint16(b[16:18])
 	h.AckNr = binary.BigEndian.Uint16(b[18:20])
-	n += 20
+	n = headerLen + ext
 	return
 }
 
+// Marshal encodes h into p, which must have room for the header and its
+// extensions, and returns the number of bytes written.
 func (h *header) Marshal(p []byte) (n int) {
-	n = 20 + func() (ret int) {
-		for _, ext := range h.Extensions {
-			ret += 2 + len(ext.Bytes)
-		}
-		return
-	}()
+	extLen := 0
+	for _, ext := range h.Extensions {
+		extLen += 2 + len(ext.Bytes)
+	}
+	n = headerLen + extLen
 	p = p[:n]
-	p[0] = byte(h.Type<<4 | 1)
+	p[0] = byte(h.Type<<4 | 1) // version 1
 	binary.BigEndian.PutUint16(p[2:4], h.ConnID)
 	binary.BigEndian.PutUint32(p[4:8], h.Timestamp)
 	binary.BigEndian.PutUint32(p[8:12], h.TimestampDiff)
 	binary.BigEndian.PutUint32(p[12:16], h.WndSize)
 	binary.BigEndian.PutUint16(p[16:18], h.SeqNr)
 	binary.BigEndian.PutUint16(p[18:20], h.AckNr)
-	// Pointer to the last type field so the next extension can set it.
-	_type := &p[1]
-	// We're done with the basic header.
-	p = p[20:]
+	// The base header's byte 1 holds the first extension's type; each
+	// extension's byte 0 holds the type of the next one (0 ends the chain).
+	nextType := p[1:2]
+	rest := p[headerLen:]
 	for _, ext := range h.Extensions {
-		*_type = ext.Type
-		// The next extension's type will go here.
-		_type = &p[0]
-		p[1] = uint8(len(ext.Bytes))
-		if int(p[1]) != copy(p[2:], ext.Bytes) {
+		nextType[0] = ext.Type
+		nextType = rest[0:1]
+		rest[1] = uint8(len(ext.Bytes))
+		if copy(rest[2:], ext.Bytes) != len(ext.Bytes) {
 			panic("unexpected extension length")
 		}
-		p = p[2+len(ext.Bytes):]
+		rest = rest[2+len(ext.Bytes):]
 	}
-	*_type = 0
-	if len(p) != 0 {
+	nextType[0] = 0
+	if len(rest) != 0 {
 		panic("header length changed")
 	}
 	return
 }
 
+// selectiveAckBitmask is the payload of a selective-ACK extension, one bit per
+// packet after the acked sequence number.
 type selectiveAckBitmask struct {
 	Bytes []byte
 }
 
-func (me *selectiveAckBitmask) expandBytesForBit(index int) {
-	minLen := (3 + (index / 8) + 1) / 4 * 4
-	for len(me.Bytes) < minLen {
-		me.Bytes = append(me.Bytes, 0)
+// expandBytesForBit grows the bitmask so bit index fits, rounding the length up
+// to a multiple of four bytes as BEP 29 requires.
+func (m *selectiveAckBitmask) expandBytesForBit(index int) {
+	minLen := (3 + index/8 + 1) / 4 * 4
+	for len(m.Bytes) < minLen {
+		m.Bytes = append(m.Bytes, 0)
 	}
 }
 
-func (me *selectiveAckBitmask) NumBits() int {
-	return len(me.Bytes) * 8
+// NumBits reports how many bits the bitmask currently holds.
+func (m *selectiveAckBitmask) NumBits() int { return len(m.Bytes) * 8 }
+
+// SetBit marks the bit at index.
+func (m *selectiveAckBitmask) SetBit(index int) {
+	m.expandBytesForBit(index)
+	m.Bytes[index/8] |= 1 << uint(index%8)
 }
 
-func (me *selectiveAckBitmask) SetBit(index int) {
-	me.expandBytesForBit(index)
-	me.Bytes[index/8] |= 1 << uint(index%8)
-}
-
-func (me *selectiveAckBitmask) BitIsSet(index int) bool {
-	return me.Bytes[index/8]>>uint(index%8)&1 == 1
+// BitIsSet reports whether the bit at index is set.
+func (m *selectiveAckBitmask) BitIsSet(index int) bool {
+	return m.Bytes[index/8]>>uint(index%8)&1 == 1
 }
