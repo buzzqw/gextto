@@ -1227,7 +1227,7 @@ persisting the bitfield (order snapshot → fsync → write; `updateStats` in
 two phases). A bit that survives a crash therefore always refers to data already
 on disk, and at most the pieces of the last few minutes are re-downloaded. On HDD and NFS
 this removes one fsync per piece write (measurements in `evoluzione.md`
-§5.4/§5.11).
+§5).
 
 **Move**:
 

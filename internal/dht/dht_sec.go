@@ -224,7 +224,7 @@ const subnetCapHintMinShare = 16
 // concentration, or 0 when there is nothing to suggest: the cap is already
 // configured, or no subnet concentrated. It is a read-only recommendation: the
 // engine never enables the cap by itself, because BEP 42 is not universal and
-// CGNAT/mobile legitimately share subnets (docs/evoluzione.md §4.8).
+// CGNAT/mobile legitimately share subnets (docs/evoluzione.md §4.4).
 func subnetCapHint(maxShare, maxPerSubnet int) int {
 	if maxPerSubnet > 0 || maxShare < subnetCapHintMinShare {
 		return 0

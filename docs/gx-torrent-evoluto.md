@@ -179,8 +179,8 @@ dragging all of Gextto along. They have been **extracted into `internal/rss` and
   expiry, `Session.BanIP`), adaptive depth of the request queue (**done**,
   with harness and latency isolation: §6.4 of `evoluzione.md`), rate-based
   choking (deterministic bench, §6), reader with readahead for streaming (**done**),
-  **graduated file priority (done, §4.9)** and disk I/O (**opt-in mmap + batched
-  durability done, §5.4; contiguous writes not necessary without measurements**). These are
+  **graduated file priority (done, §4.5)** and disk I/O (**opt-in mmap + batched
+  durability done, §5; contiguous writes not necessary without measurements**). These are
   "cherry-picks" (§11), not blockers.
 
 ---
@@ -434,18 +434,18 @@ to be verified against the libraries' code before each porting.
 | 4 | Reader with readahead for streaming | anacrolix | the prefetch has priority over rarest-first (`SetFileReadaheadWindow`), instead of waiting by polling (200 ms, 2 min timeout) | done |
 | 5 | BitTorrent v2 and hybrids | anacrolix | v2-only torrents already in circulation; merkle per file is needed | high |
 | 6 | Rate-based choking and anti-leech | libtorrent | seeding quality; to be validated with the `unchoker/sim_test.go` harness | medium |
-| 7 | Disk I/O: writing in contiguous blocks, hashing on a pool | libtorrent | CPU and disk wear on slow NAS | **mmap + `fdatasync` done (§5.4 of `evoluzione.md`); contiguous/pool hashing not necessary without measurements** |
-| 8 | Share mode | libtorrent | already discarded for Gextto (§4.3, decision 2); for the standalone it counts as an option | low |
+| 7 | Disk I/O: writing in contiguous blocks, hashing on a pool | libtorrent | CPU and disk wear on slow NAS | **mmap + `fdatasync` done (§5 of `evoluzione.md`); contiguous/pool hashing not necessary without measurements** |
+| 8 | Share mode | libtorrent | already discarded for Gextto (§4.1, decision 2); for the standalone it counts as an option | low |
 | 9 | WebTorrent | anacrolix | niche | high |
 
 **Agreed shortlist (2026-10-10) for taking from anacrolix:** reader with
 seek and readahead + **graduated piece priority**, **adaptive request queue**,
 `anacrolix/dht` as a dependency (BEP 42/43/44), **tracker scrape**. Detail,
 ways of taking (rewrite vs dependency) and verifications in
-[`evoluzione.md` §4.6](evoluzione.md). Items 3 and 4 of the table above are
+[`evoluzione.md` §4.3](evoluzione.md). Items 3 and 4 of the table above are
 included; **scrape** is already implemented. Four other points (event bus,
 `.torrent` creation from a folder, bad storage, BEP 14) in
-[`evoluzione.md` §4.7](evoluzione.md).
+[`evoluzione.md` §4.3](evoluzione.md).
 
 ### 11.2 Licences
 
@@ -491,8 +491,8 @@ points:
 | Item | Plan | Status |
 | --- | --- | --- |
 | Name and identity: product **gx-core**, engine in `internal/gxcore`, network identity "gx-core", **origin markers removed** from code comments, docs realigned | §15, §11.3 | done (`gx-torrent` binary unchanged) |
-| F4 — IPv6: dual-stack sockets (TCP peer + UDP uTP/DHT), v6 resolution and addresses, tracker compact **`peers6`** (BEP 7), **PEX `added6`/`dropped6`** (BEP 11), v6 **UDP** trackers, `yourip` v6, v6 CIDR **blocklist**, **v6 DHT discovery** (BEP 32: library dual-stack, `want`, split `nodes`/`nodes6`) | §14, §4.2 | done (LSD v6 included) |
-| F4 — BitTorrent v2 (BEP 52) | §11, §4.2 | **Done**: v2-only from `.torrent` and from **magnet** (`urn:btmh:`). v2 parsing, **per-file pieces** model (shorter queue), verification via SHA-256 **Merkle node**, identity truncated to 20 bytes, v2 reserved bit in the handshake, fetch of `piece layers` from peers with `hash request`/`hashes`/`hash reject`, end-to-end seed/leech tests (`.torrent` and magnet) |
+| F4 — IPv6: dual-stack sockets (TCP peer + UDP uTP/DHT), v6 resolution and addresses, tracker compact **`peers6`** (BEP 7), **PEX `added6`/`dropped6`** (BEP 11), v6 **UDP** trackers, `yourip` v6, v6 CIDR **blocklist**, **v6 DHT discovery** (BEP 32: library dual-stack, `want`, split `nodes`/`nodes6`) | §14, §4.1 | done (LSD v6 included) |
+| F4 — BitTorrent v2 (BEP 52) | §11, §4.1 | **Done**: v2-only from `.torrent` and from **magnet** (`urn:btmh:`). v2 parsing, **per-file pieces** model (shorter queue), verification via SHA-256 **Merkle node**, identity truncated to 20 bytes, v2 reserved bit in the handshake, fetch of `piece layers` from peers with `hash request`/`hashes`/`hash reject`, end-to-end seed/leech tests (`.torrent` and magnet) |
 | F0 — opt-in RSS/CPU harness against qbittorrent-nox | §8.2 | done (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
 | F2 — bandwidth scheduler (alternative limits by schedule) | §14.3 | done |
 | F2 — torrent table virtualisation | §14.3 | done (rendering window `?rows=` + *Show more*) |
