@@ -54,6 +54,13 @@ func unmarshalExtensions(_type byte, b []byte) (n int, ef []extensionField, err 
 var errInvalidHeader = errors.New("invalid header")
 
 func (h *header) Unmarshal(b []byte) (n int, err error) {
+	// GEXTTO: hostile peers send short packets; fail instead of slicing
+	// out of range. (handleReceivedPacket already drops <20B, this guards
+	// every current and future caller at the parser boundary.)
+	if len(b) < 20 {
+		err = errInvalidHeader
+		return
+	}
 	h.Type = st(b[0] >> 4)
 	h.Version = int(b[0] & 0xf)
 	if h.Type > stMax || h.Version != 1 {

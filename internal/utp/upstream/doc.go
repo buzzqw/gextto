@@ -16,4 +16,7 @@
 //   - send.go: timeoutResend feeds the socket counter;
 //   - conn.go: ackSkipped fast resend feeds the socket counter; latency()
 //     seeds from the estimator when unsampled (clamped [5ms, 400ms]).
+//   - header.go: Unmarshal rejects <20B inputs (hostile peers) instead of
+//     slicing out of range (proven by FuzzHeaderUnmarshal seed#0 on the
+//     pristine code).
 package upstream
