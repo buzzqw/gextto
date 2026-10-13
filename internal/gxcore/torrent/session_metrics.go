@@ -6,6 +6,9 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
+// sessionMetrics exposes the session's live counters through a
+// go-metrics registry. Gauges are functional: they are evaluated on read,
+// so they always reflect the current state without a refresh loop.
 type sessionMetrics struct {
 	session  *Session
 	registry metrics.Registry
@@ -36,56 +39,87 @@ type sessionMetrics struct {
 
 func (s *Session) initMetrics() {
 	r := metrics.NewRegistry()
-	s.metrics = &sessionMetrics{
-		session:  s,
-		registry: r,
+	s.metrics = &sessionMetrics{session: s, registry: r}
+	m := s.metrics
 
-		Uptime: metrics.NewRegisteredFunctionalGauge("uptime", r, func() int64 { return int64(time.Since(s.createdAt) / time.Second) }),
-		Torrents: metrics.NewRegisteredFunctionalGauge("torrents", r, func() int64 {
-			s.mTorrents.RLock()
-			defer s.mTorrents.RUnlock()
-			return int64(len(s.torrents))
-		}),
-		Peers: metrics.NewRegisteredCounter("peers", r),
-		PortsAvailable: metrics.NewRegisteredFunctionalGauge("ports_available", r, func() int64 {
-			s.mPorts.RLock()
-			defer s.mPorts.RUnlock()
-			return int64(len(s.availablePorts))
-		}),
-
-		BlockListRules: metrics.NewRegisteredFunctionalGauge("blocklist_rules", r, func() int64 { return int64(s.blocklist.Len()) }),
-		BlockListRecency: metrics.NewRegisteredFunctionalGauge("blocklist_recency", r, func() int64 {
-			s.mBlocklist.RLock()
-			defer s.mBlocklist.RUnlock()
-			if s.blocklistTimestamp.IsZero() {
-				return -1
-			}
-			return int64(time.Since(s.blocklistTimestamp) / time.Second)
-		}),
-
-		ReadCacheObjects:     metrics.NewRegisteredFunctionalGauge("read_cache_objects", r, func() int64 { return int64(s.pieceCache.Len()) }),
-		ReadCacheSize:        metrics.NewRegisteredFunctionalGauge("read_cache_size", r, func() int64 { return s.pieceCache.Size() }),
-		ReadCacheUtilization: metrics.NewRegisteredFunctionalGauge("read_cache_utilization", r, func() int64 { return int64(s.pieceCache.Utilization()) }),
-
-		ReadsPerSecond: s.pieceCache.NumLoad,
-		ReadsActive:    metrics.NewRegisteredFunctionalGauge("reads_active", r, func() int64 { return int64(s.pieceCache.LoadsActive()) }),
-		ReadsPending:   metrics.NewRegisteredFunctionalGauge("reads_pending", r, func() int64 { return int64(s.pieceCache.LoadsWaiting()) }),
-
-		WriteCacheObjects:     metrics.NewRegisteredFunctionalGauge("write_cache_objects", r, func() int64 { return int64(s.ram.Stats().AllocatedObjects) }),
-		WriteCacheSize:        metrics.NewRegisteredFunctionalGauge("write_cache_size", r, func() int64 { return s.ram.Stats().AllocatedSize }),
-		WriteCachePendingKeys: metrics.NewRegisteredFunctionalGauge("write_cache_pending_keys", r, func() int64 { return int64(s.ram.Stats().PendingKeys) }),
-
-		WritesPerSecond: metrics.NewRegisteredMeter("writes_per_second", r),
-		WritesActive:    metrics.NewRegisteredFunctionalGauge("writes_active", r, func() int64 { return int64(s.semWrite.Len()) }),
-		WritesPending:   metrics.NewRegisteredFunctionalGauge("writes_pending", r, func() int64 { return int64(s.semWrite.Waiting()) }),
-
-		SpeedDownload: metrics.NewRegisteredMeter("speed_download", r),
-		SpeedUpload:   metrics.NewRegisteredMeter("speed_upload", r),
-		SpeedRead:     s.pieceCache.NumLoadedBytes,
-		SpeedWrite:    metrics.NewRegisteredMeter("speed_write", r),
+	// gauge registers a functional gauge and assigns it to dst in one step,
+	// keeping the metric name next to the code that computes it.
+	gauge := func(dst *metrics.Gauge, name string, f func() int64) {
+		*dst = metrics.NewRegisteredFunctionalGauge(name, r, f)
 	}
-	_ = r.Register("speed_read", s.metrics.SpeedRead)
-	_ = r.Register("reads_per_seconds", s.metrics.ReadsPerSecond)
+
+	gauge(&m.Uptime, "uptime", func() int64 {
+		return int64(time.Since(s.createdAt) / time.Second)
+	})
+	gauge(&m.Torrents, "torrents", func() int64 {
+		s.mTorrents.RLock()
+		defer s.mTorrents.RUnlock()
+		return int64(len(s.torrents))
+	})
+	m.Peers = metrics.NewRegisteredCounter("peers", r)
+	gauge(&m.PortsAvailable, "ports_available", func() int64 {
+		s.mPorts.RLock()
+		defer s.mPorts.RUnlock()
+		return int64(len(s.availablePorts))
+	})
+
+	gauge(&m.BlockListRules, "blocklist_rules", func() int64 {
+		return int64(s.blocklist.Len())
+	})
+	gauge(&m.BlockListRecency, "blocklist_recency", func() int64 {
+		s.mBlocklist.RLock()
+		defer s.mBlocklist.RUnlock()
+		if s.blocklistTimestamp.IsZero() {
+			return -1
+		}
+		return int64(time.Since(s.blocklistTimestamp) / time.Second)
+	})
+
+	gauge(&m.ReadCacheObjects, "read_cache_objects", func() int64 {
+		return int64(s.pieceCache.Len())
+	})
+	gauge(&m.ReadCacheSize, "read_cache_size", func() int64 {
+		return s.pieceCache.Size()
+	})
+	gauge(&m.ReadCacheUtilization, "read_cache_utilization", func() int64 {
+		return int64(s.pieceCache.Utilization())
+	})
+
+	m.ReadsPerSecond = s.pieceCache.NumLoad
+	gauge(&m.ReadsActive, "reads_active", func() int64 {
+		return int64(s.pieceCache.LoadsActive())
+	})
+	gauge(&m.ReadsPending, "reads_pending", func() int64 {
+		return int64(s.pieceCache.LoadsWaiting())
+	})
+
+	gauge(&m.WriteCacheObjects, "write_cache_objects", func() int64 {
+		return int64(s.ram.Stats().AllocatedObjects)
+	})
+	gauge(&m.WriteCacheSize, "write_cache_size", func() int64 {
+		return s.ram.Stats().AllocatedSize
+	})
+	gauge(&m.WriteCachePendingKeys, "write_cache_pending_keys", func() int64 {
+		return int64(s.ram.Stats().PendingKeys)
+	})
+
+	m.WritesPerSecond = metrics.NewRegisteredMeter("writes_per_second", r)
+	gauge(&m.WritesActive, "writes_active", func() int64 {
+		return int64(s.semWrite.Len())
+	})
+	gauge(&m.WritesPending, "writes_pending", func() int64 {
+		return int64(s.semWrite.Waiting())
+	})
+
+	m.SpeedDownload = metrics.NewRegisteredMeter("speed_download", r)
+	m.SpeedUpload = metrics.NewRegisteredMeter("speed_upload", r)
+	m.SpeedRead = s.pieceCache.NumLoadedBytes
+	m.SpeedWrite = metrics.NewRegisteredMeter("speed_write", r)
+
+	// Historical metric names, kept for backward compatibility with
+	// dashboards scraping the registry.
+	_ = r.Register("speed_read", m.SpeedRead)
+	_ = r.Register("reads_per_seconds", m.ReadsPerSecond)
 }
 
 func (m *sessionMetrics) Close() {

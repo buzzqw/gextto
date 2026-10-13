@@ -13,6 +13,8 @@ import (
 	"github.com/powerman/rpc-codec/jsonrpc2"
 )
 
+// rpcServer exposes the session over JSON-RPC (for the gx-torrent daemon)
+// plus the internal /move-torrent transfer endpoint and expvar debug vars.
 type rpcServer struct {
 	rpcServer  *rpc.Server
 	httpServer http.Server
@@ -24,18 +26,23 @@ func newRPCServer(ses *Session) *rpcServer {
 	srv := rpc.NewServer()
 	_ = srv.RegisterName("Session", h)
 
+	return &rpcServer{
+		rpcServer: srv,
+		httpServer: http.Server{
+			Handler: newRPCMux(srv, h),
+		},
+		log: logger.New("rpc server"),
+	}
+}
+
+// newRPCMux routes the three endpoints served on the RPC listener. Both the
+// JSON-RPC API and the move-torrent transfer need the same session handler.
+func newRPCMux(srv *rpc.Server, h *rpcHandler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.Handle("/debug/vars", expvar.Handler())
 	mux.HandleFunc("/move-torrent", h.handleMoveTorrent)
 	mux.Handle("/", jsonrpc2.HTTPHandler(srv))
-
-	return &rpcServer{
-		rpcServer: srv,
-		httpServer: http.Server{
-			Handler: mux,
-		},
-		log: logger.New("rpc server"),
-	}
+	return mux
 }
 
 func (s *rpcServer) Start(host string, port int) error {
@@ -47,18 +54,17 @@ func (s *rpcServer) Start(host string, port int) error {
 
 	s.log.Infoln("RPC server is listening on", listener.Addr().String())
 
-	go func() {
-		err := s.httpServer.Serve(listener)
-		if err == http.ErrServerClosed {
-			return
-		}
-		// Log instead of Fatal: the torrent package is embeddable as a
-		// library, so an unexpected Serve error must not os.Exit the host
-		// process. (The pprof serve goroutine in main.go logs likewise.)
-		s.log.Errorln("rpc server stopped serving:", err)
-	}()
-
+	go s.serve(listener)
 	return nil
+}
+
+// serve runs until the listener closes. Serve errors are logged, never
+// fatal: the torrent package is embeddable as a library, so an unexpected
+// error must not os.Exit the host process.
+func (s *rpcServer) serve(listener net.Listener) {
+	if err := s.httpServer.Serve(listener); err != http.ErrServerClosed {
+		s.log.Errorln("rpc server stopped serving:", err)
+	}
 }
 
 func (s *rpcServer) Stop(timeout time.Duration) error {
