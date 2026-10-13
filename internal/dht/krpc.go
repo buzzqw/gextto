@@ -217,6 +217,16 @@ func sendMsg(conn packetConn, raddr net.UDPAddr, query interface{}, log DebugLog
 
 // Read responses from bencode-speaking nodes. Return the appropriate data structure.
 func readResponse(p packetType, log DebugLogger) (response responseType, err error) {
+	// bencode-go allocates a string of its declared length before checking that
+	// the buffer actually holds it, so a hostile packet like "d999999999:d"
+	// would make the whole node allocate gigabytes and die (a fatal OOM is not
+	// recoverable). The bounded scanner validates the packet (string length and
+	// recursion depth, both against the real buffer) without allocating, so
+	// bencode-go only ever sees a checked packet.
+	if verr := validBencode(p.b); verr != nil {
+		log.Debugf("DHT: rejecting malformed response %q: %v", string(p.b), verr)
+		return response, verr
+	}
 	// The calls to bencode.Unmarshal() can be fragile.
 	defer func() {
 		if x := recover(); x != nil {

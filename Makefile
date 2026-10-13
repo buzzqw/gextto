@@ -78,7 +78,7 @@ test-dht:
 FUZZ_TIME ?= 30s
 fuzz-smoke:
 	@set -e; \
-	for t in FuzzDecodeBencode FuzzReadResponse FuzzParseNodesString; do \
+	for t in FuzzDecodeBencode FuzzReadResponse FuzzValidBencode FuzzParseNodesString; do \
 		echo "fuzz dht/$$t"; \
 		(cd internal/dht && go test -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZ_TIME) .); \
 	done; \

@@ -91,3 +91,64 @@ func TestBep44RequestDecodeNotADict(t *testing.T) {
 		t.Fatal("expected an error for a non-dictionary packet")
 	}
 }
+
+// TestValidBencode: the cheap screen accepts well-formed packets and rejects a
+// declared length that exceeds the buffer (the shape that made bencode-go OOM),
+// without allocating.
+func TestValidBencode(t *testing.T) {
+	ok := [][]byte{
+		[]byte("de"),
+		[]byte("d1:t2:aa1:y1:re"),
+		[]byte("li1ei2ee"),
+		[]byte("4:spam"),
+		[]byte("d2:id20:aaaaaaaaaaaaaaaaaaaae"),
+	}
+	for _, b := range ok {
+		if err := validBencode(b); err != nil {
+			t.Errorf("validBencode(%q) = %v, want nil", b, err)
+		}
+	}
+	bad := [][]byte{
+		nil,
+		[]byte("d"),
+		[]byte("d122222222222:d"), // 122 GB declared, not present: must not allocate
+		[]byte("d1:t99999999:xxe"),
+		[]byte("3:ab"),
+		[]byte("i"),
+		[]byte("l"),
+		[]byte("d1:a"),
+		[]byte(strings.Repeat("l", 1000) + strings.Repeat("e", 1000)),
+	}
+	for _, b := range bad {
+		if err := validBencode(b); err == nil {
+			t.Errorf("validBencode(%q) = nil, want error", b)
+		}
+	}
+}
+
+// FuzzValidBencode feeds arbitrary bytes to the allocation-free screen: it must
+// return an error or nil, never allocate on a declared length or overflow.
+func FuzzValidBencode(f *testing.F) {
+	f.Add([]byte("d1:t2:aa1:y1:re"))
+	f.Add([]byte("d122222222222:d"))
+	f.Add([]byte("4:spam"))
+	f.Fuzz(func(t *testing.T, b []byte) {
+		_ = validBencode(b)
+	})
+}
+
+// BenchmarkValidBencode measures the per-packet screen that readResponse now
+// runs before bencode-go: it must be allocation-free.
+func BenchmarkValidBencode(b *testing.B) {
+	packet := []byte("d1:ad2:id20:aaaaaaaaaaaaaaaaaaaa9:info_hash20:bbbbbbbbbbbbbbbbbbbb1:q9:get_peers1:t2:aa1:y1:q1:v4:GX01e1:y1:qe")
+	if err := validBencode(packet); err != nil {
+		b.Fatalf("packet rejected: %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := validBencode(packet); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

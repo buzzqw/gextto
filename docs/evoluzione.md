@@ -946,6 +946,17 @@ concentrated, threshold 16). It is read-only: the engine never enables the cap b
 itself, because BEP 42 is not universal and CGNAT/mobile share subnets. Test:
 `TestSubnetCapHint`.
 
+**Hostile-packet OOM — fixed (2026-10-13).** The long fuzz campaign killed the
+node in under a second: `github.com/jackpal/bencode-go` allocates a string of its
+**declared** length before checking that the buffer holds it, so a packet as
+short as `d122222222222:d` made the process try to allocate **122 GB** and die
+(a fatal OOM is not recoverable by the existing `recover`). `readResponse` now
+runs `validBencode` first: an **allocation-free** scanner that validates every
+declared string length against the real buffer and bounds the recursion depth
+(`BenchmarkValidBencode`: **121 ns/op, 0 alloc/op**), so bencode-go only ever
+sees a checked packet. Tests: `TestValidBencode`, `FuzzValidBencode`; the
+failing input is kept as a regression seed.
+
 **Measurement harness — done (2026-10-11).** `make measure-dht`
 (`GX_MEASURE_DHT=5m`, `GX_MEASURE_DHT_INTERVAL=10s`; `internal/dht/measure_test.go`,
 opt-in and outside CI) starts a real node against the public DHT and prints,
@@ -2535,7 +2546,12 @@ with two field reads), and only the pieces that pass the comparison involve
 I/O. No steady-state path (picker, peers, piece writing) is touched. Within one
 pass each reused piece is read and written **once** even when several candidates
 hold the same content (an index shared by Phase 1 and Phase 2), and a later
-candidate fills only the gaps a previous one could not.
+candidate fills only the gaps a previous one could not. The pieces the merge
+re-verified against this torrent's own hashes are also handed to the verifier
+(`Verifier.Skip`), which sets their bit without re-reading and re-hashing them:
+only the pieces that were already on disk are verified again. The skip set is
+consumed and cleared at the allocation-time verification, so a later manual
+re-check verifies everything.
 
 ### 15.3 Verification criterion (like §4.5)
 
@@ -2565,7 +2581,8 @@ here; the implemented ones are dated, the others are a proposal to be agreed.
 | 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.10 | medium | medium | idea (needs the real-swarm measurement) |
 | 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | Phase 2 | medium | low | idea |
 | 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.12 | high | high | measured, see §6 |
-| 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked) | the fuzzing pass | medium | low | **done**: `internal/utils/utils.go` (length bounded, recursion depth ≤64); `internal/dht/bencode.go` already bounded |
+| 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | the fuzzing pass | medium/high | low | **done**: `internal/utils/utils.go` (length bounded, recursion depth ≤64); `internal/dht/bencode.go` `validBencode` screens DHT packets before bencode-go |
+| 10 | Merge: **no double verification** — the pieces the merge just re-verified are handed to the verifier as already done | Phase 2 analysis | medium (no re-read and re-hash of the reused bytes) | low | **done (2026-10-13)**: `Verifier.Skip`, cleared after the allocation-time check |
 
 The criterion is the same as §4.5/§15.3: one item = one commit, measurement
 before/after for anything on a data path, both UIs and i18n for anything visible

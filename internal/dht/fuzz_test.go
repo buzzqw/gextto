@@ -14,6 +14,7 @@ func FuzzDecodeBencode(f *testing.F) {
 	f.Fuzz(func(t *testing.T, b []byte) {
 		_, _ = decodeBencode(b)
 		_, _ = bep44RequestDecode(b)
+		_ = validBencode(b)
 	})
 }
 

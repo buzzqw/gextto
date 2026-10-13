@@ -33,6 +33,108 @@ func decodeBencode(data []byte) (interface{}, error) {
 	return v, nil
 }
 
+// validBencode reports whether data holds one well-formed bencode value. It
+// validates every declared string length against the buffer and bounds the
+// recursion, without allocating: it is the cheap screen used before handing a
+// packet to a decoder that trusts the declared lengths (bencode-go allocates a
+// string of its declared length before checking it, so a hostile packet like
+// "d999999999:d" would OOM the node).
+func validBencode(data []byte) error {
+	p := &bencodeReader{b: data}
+	if err := p.skip(0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *bencodeReader) skip(depth int) error {
+	if depth > maxBencodeDepth {
+		return errors.New("bencode: nesting too deep")
+	}
+	if p.i >= len(p.b) {
+		return io.ErrUnexpectedEOF
+	}
+	switch c := p.b[p.i]; c {
+	case 'i':
+		return p.skipInteger()
+	case 'l':
+		p.i++
+		for {
+			if p.i >= len(p.b) {
+				return io.ErrUnexpectedEOF
+			}
+			if p.b[p.i] == 'e' {
+				p.i++
+				return nil
+			}
+			if err := p.skip(depth + 1); err != nil {
+				return err
+			}
+		}
+	case 'd':
+		p.i++
+		for {
+			if p.i >= len(p.b) {
+				return io.ErrUnexpectedEOF
+			}
+			if p.b[p.i] == 'e' {
+				p.i++
+				return nil
+			}
+			if err := p.skipString(); err != nil { // key
+				return err
+			}
+			if err := p.skip(depth + 1); err != nil {
+				return err
+			}
+		}
+	default:
+		return p.skipString()
+	}
+}
+
+func (p *bencodeReader) skipInteger() error {
+	p.i++ // 'i'
+	start := p.i
+	for p.i < len(p.b) && p.b[p.i] != 'e' {
+		p.i++
+	}
+	if p.i >= len(p.b) {
+		return io.ErrUnexpectedEOF
+	}
+	if p.i == start {
+		return errors.New("bencode: empty integer")
+	}
+	p.i++ // 'e'
+	return nil
+}
+
+// skipString validates a bencode byte string without materializing it: the
+// length prefix is parsed by hand and clamped to the buffer, so a huge declared
+// length is rejected instead of allocating.
+func (p *bencodeReader) skipString() error {
+	start := p.i
+	for p.i < len(p.b) && p.b[p.i] >= '0' && p.b[p.i] <= '9' {
+		p.i++
+	}
+	if p.i == start || p.i >= len(p.b) || p.b[p.i] != ':' {
+		return errors.New("bencode: invalid string length")
+	}
+	n := 0
+	for _, c := range p.b[start:p.i] {
+		n = n*10 + int(c-'0')
+		if n > len(p.b) {
+			return errors.New("bencode: string length exceeds buffer")
+		}
+	}
+	p.i++ // ':'
+	if n > len(p.b)-p.i {
+		return io.ErrUnexpectedEOF
+	}
+	p.i += n
+	return nil
+}
+
 type bencodeReader struct {
 	b []byte
 	i int
