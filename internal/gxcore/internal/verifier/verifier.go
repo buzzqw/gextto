@@ -16,6 +16,16 @@ type Verifier struct {
 	// instance the pieces a swarm merge just re-verified against this torrent's
 	// own hashes): Run sets their bit without re-reading and re-hashing them.
 	Skip func(uint32) bool
+	// Only, when set, restricts the check to the pieces it accepts: the others
+	// are left unset without being read. It is for storage created empty in
+	// this run, where nothing but the pieces written before the check (a swarm
+	// merge) can be valid, so hashing the rest would only read holes.
+	Only func(uint32) bool
+	// Prepare, when set, runs first in the verifier goroutine, so slow work
+	// that must precede the check (the swarm merge reads, hashes and writes
+	// whole pieces) stays off the torrent's run loop. It may set Skip and Only;
+	// stop is closed when the verifier is closed and Prepare should return.
+	Prepare func(stop <-chan struct{})
 
 	closeC chan struct{}
 	doneC  chan struct{}
@@ -52,6 +62,14 @@ func (v *Verifier) Run(pieces []piece.Piece, progressC chan Progress, resultC ch
 	}()
 
 	v.Bitfield = bitfield.New(uint32(len(pieces)))
+	if v.Prepare != nil {
+		v.Prepare(v.closeC)
+		select {
+		case <-v.closeC:
+			return
+		default:
+		}
+	}
 	// The buffer is sized to the largest piece: in v2 the pieces have different
 	// lengths (per-file tails), so the first piece is not necessarily the widest.
 	maxLen := 0
@@ -64,6 +82,9 @@ func (v *Verifier) Run(pieces []piece.Piece, progressC chan Progress, resultC ch
 	hash := sha1.New()
 	var numOK uint32
 	for _, p := range pieces {
+		if v.Only != nil && !v.Only(p.Index) {
+			continue
+		}
 		if v.Skip != nil && v.Skip(p.Index) {
 			v.Bitfield.Set(p.Index)
 			numOK++

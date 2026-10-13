@@ -67,6 +67,15 @@ func (t *torrent) start() {
 }
 
 func (t *torrent) startVerifier() {
+	t.startMergeVerifier(nil, false)
+}
+
+// startMergeVerifier starts the verifier and, with candidates, runs the swarm
+// merge first inside the verifier goroutine: the run loop keeps answering
+// Stats/Stop/peers while pieces are read, hashed and copied. The merged pieces
+// are then not hashed again (Skip); with onlyMerged (storage created empty in
+// this run) nothing else is read either (Only), since nothing else can be valid.
+func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool) {
 	if t.verifier != nil {
 		t.crash("verifier exists")
 	}
@@ -81,6 +90,18 @@ func (t *torrent) startVerifier() {
 		merged := t.mergedPieces
 		t.mergedPieces = nil
 		t.verifier.Skip = func(i uint32) bool { return merged[i] }
+	}
+	if len(candidates) > 0 {
+		v, skip := t.verifier, t.mergeSkips()
+		v.Prepare = func(stop <-chan struct{}) {
+			merged, _ := t.mergeFrom(candidates, skip, stop)
+			if len(merged) > 0 {
+				v.Skip = func(i uint32) bool { return merged[i] }
+			}
+			if onlyMerged {
+				v.Only = func(i uint32) bool { return merged[i] }
+			}
+		}
 	}
 	go t.verifier.Run(t.pieces, t.verifierProgressC, t.verifierResultC)
 }

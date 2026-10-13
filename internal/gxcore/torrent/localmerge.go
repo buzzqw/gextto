@@ -67,22 +67,83 @@ func (t *torrent) haveBits() []byte {
 	return append([]byte(nil), t.bitfield.Bytes()...)
 }
 
-// prefillLocalData copies verified pieces from the other torrents in the session
-// and returns how many pieces were written. It runs in the run loop right after
-// the pieces are created, before the verifier: the verifier then reads this
-// torrent's storage (now containing the reused bytes) and marks them done.
-func (t *torrent) prefillLocalData() int {
-	if t.session == nil {
-		return 0
+// mergeCandidates returns the torrents of the list that could lend pieces to
+// this one: the cheap per-candidate checks of both phases (published snapshot,
+// not private, something verified, same layout or a shared v2 file root),
+// without reading any data. It runs in the run loop, so when it returns nothing
+// a fresh torrent skips the verifier entirely; the reads, hashes and writes
+// happen later off the run loop (startMergeVerifier).
+func (t *torrent) mergeCandidates(list []*Torrent) []*Torrent {
+	info := t.info()
+	if info == nil || info.Private || len(t.pieces) == 0 {
+		return nil
 	}
-	return t.prefillFrom(t.session.ListTorrents())
+	var roots map[[32]byte]bool
+	var out []*Torrent
+	for _, other := range list {
+		if other == nil || other.torrent == t {
+			continue
+		}
+		snap := other.torrent.localData.Load()
+		if snap == nil || len(snap.pieces) == 0 || snap.private {
+			continue
+		}
+		if snap.pieceLength == info.PieceLength && snap.length == info.Length {
+			if len(other.torrent.haveBits()) > 0 {
+				out = append(out, other)
+			}
+			continue
+		}
+		oinfo := other.torrent.info()
+		if !info.V2 || oinfo == nil || !oinfo.V2 || oinfo.Private {
+			continue
+		}
+		if roots == nil {
+			roots = make(map[[32]byte]bool, len(info.V2Files))
+			for _, f := range info.V2Files {
+				if f.Length > 0 && f.HasRoot {
+					roots[f.PiecesRoot] = true
+				}
+			}
+		}
+		for _, f := range oinfo.V2Files {
+			if f.Length > 0 && f.HasRoot && roots[f.PiecesRoot] {
+				if len(other.torrent.haveBits()) > 0 {
+					out = append(out, other)
+				}
+				break
+			}
+		}
+	}
+	return out
 }
 
-// prefillFrom is prefillLocalData over an explicit candidate set, so it can be
-// tested without a session.
+// mergeSkips snapshots the per-piece Skip flags, so a merge running off the run
+// loop never reads them while a file-priority command rewrites them.
+func (t *torrent) mergeSkips() []bool {
+	skip := make([]bool, len(t.pieces))
+	for i := range t.pieces {
+		skip[i] = t.pieces[i].Skip
+	}
+	return skip
+}
+
+// prefillFrom is the synchronous merge over an explicit candidate set: it
+// records the reused pieces in t.mergedPieces for the next verifier. Tests use
+// it; the torrent itself merges off the run loop (startMergeVerifier).
 func (t *torrent) prefillFrom(candidates []*Torrent) int {
+	idx, merged := t.mergeFrom(candidates, nil, nil)
+	t.mergedPieces = idx
+	return merged
+}
+
+// mergeFrom copies verified pieces from the candidates into this torrent's
+// storage and returns the reused piece set and its size. skip, when not nil,
+// replaces the pieces' own Skip flags (a snapshot taken in the run loop); stop,
+// when closed, ends the merge between two pieces.
+func (t *torrent) mergeFrom(candidates []*Torrent, skip []bool, stop <-chan struct{}) (map[uint32]bool, int) {
 	if t.info() == nil || len(t.pieces) == 0 {
-		return 0
+		return nil, 0
 	}
 	merged := 0
 	// mergedIdx records the pieces already reused in this pass, so a piece is
@@ -90,6 +151,7 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 	// and so a later candidate can still fill the gaps a previous one missed.
 	mergedIdx := make(map[uint32]bool)
 	var buf []byte
+candidates:
 	for _, other := range candidates {
 		if other == nil || other.torrent == t {
 			continue
@@ -115,8 +177,11 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 		}
 		for i := range t.pieces {
 			dst := &t.pieces[i]
-			if dst.Done || dst.Skip || i >= len(snap.pieces) || mergedIdx[dst.Index] {
+			if dst.Done || skipped(dst, skip) || i >= len(snap.pieces) || mergedIdx[dst.Index] {
 				continue
+			}
+			if stopped(stop) {
+				break candidates
 			}
 			// The other torrent must have verified this piece.
 			byteIndex := i / 8
@@ -146,8 +211,9 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 	}
 	// Phase 2: the same-file-different-layout case (BitTorrent v2), matched by
 	// the per-file Merkle root instead of the piece index.
-	merged += t.prefillV2From(candidates, mergedIdx)
-	t.mergedPieces = mergedIdx
+	if !stopped(stop) {
+		merged += t.prefillV2From(candidates, mergedIdx, skip, stop)
+	}
 	if merged > 0 {
 		var mergedBytes int64
 		for idx := range mergedIdx {
@@ -159,7 +225,26 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 	if merged > 0 && t.log != nil {
 		t.log.Infof("swarm merge: reused %d piece(s) from local data", merged)
 	}
-	return merged
+	return mergedIdx, merged
+}
+
+// skipped reports whether the merge must leave the piece alone: the snapshot
+// when there is one, the piece's own flag otherwise.
+func skipped(p *piece.Piece, skip []bool) bool {
+	if skip != nil && int(p.Index) < len(skip) {
+		return skip[p.Index]
+	}
+	return p.Skip
+}
+
+// stopped reports, without blocking, whether stop is closed.
+func stopped(stop <-chan struct{}) bool {
+	select {
+	case <-stop:
+		return true
+	default:
+		return false
+	}
 }
 
 // bitSet reports whether bit i is set in a BEP 3 bitfield: index 0 is the most
@@ -181,7 +266,7 @@ func bitSet(bits []byte, i int) bool {
 // when the two torrents use a different piece length. Every destination piece
 // is verified against its own hash before it is written, so no unverified byte
 // ever reaches this torrent's storage.
-func (t *torrent) prefillV2From(candidates []*Torrent, mergedIdx map[uint32]bool) int {
+func (t *torrent) prefillV2From(candidates []*Torrent, mergedIdx map[uint32]bool, skip []bool, stop <-chan struct{}) int {
 	info := t.info()
 	if info == nil || !info.V2 || info.Private || len(t.pieces) == 0 {
 		return 0
@@ -213,14 +298,14 @@ func (t *torrent) prefillV2From(candidates []*Torrent, mergedIdx map[uint32]bool
 		if len(have) == 0 {
 			continue
 		}
-		merged += t.mergeV2Files(other.torrent, oinfo, snap, have, mergedIdx, &buf, &tmp)
+		merged += t.mergeV2Files(other.torrent, oinfo, snap, have, mergedIdx, skip, stop, &buf, &tmp)
 	}
 	return merged
 }
 
 // mergeV2Files reuses the destination pieces of every file whose Merkle root and
 // length match a file of the source torrent.
-func (t *torrent) mergeV2Files(src *torrent, sinfo *metainfo.Info, snap *localDataSnapshot, have []byte, mergedIdx map[uint32]bool, bufp, tmpp *[]byte) int {
+func (t *torrent) mergeV2Files(src *torrent, sinfo *metainfo.Info, snap *localDataSnapshot, have []byte, mergedIdx map[uint32]bool, skip []bool, stop <-chan struct{}, bufp, tmpp *[]byte) int {
 	info := t.info()
 	// Index the source files by their Merkle root: equal roots imply equal
 	// bytes, so a duplicate entry is harmless.
@@ -251,8 +336,11 @@ func (t *torrent) mergeV2Files(src *torrent, sinfo *metainfo.Info, snap *localDa
 				break
 			}
 			dst := &t.pieces[start+j]
-			if dst.Done || dst.Skip || len(dst.Data) == 0 || mergedIdx[dst.Index] {
+			if dst.Done || skipped(dst, skip) || len(dst.Data) == 0 || mergedIdx[dst.Index] {
 				continue
+			}
+			if stopped(stop) {
+				return merged
 			}
 			n := int(dst.Length)
 			if n <= 0 {

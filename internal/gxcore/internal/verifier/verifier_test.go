@@ -83,3 +83,49 @@ func TestVerifiesWithoutSkip(t *testing.T) {
 		t.Errorf("reads = %d, want 1", fa.reads)
 	}
 }
+
+// TestPrepareAndOnly: Prepare runs first in the verifier goroutine and may set
+// Skip/Only; with Only, a piece outside the set is neither read nor marked,
+// which is what lets an empty, just-created storage skip hashing its holes.
+func TestPrepareAndOnly(t *testing.T) {
+	pa, fa := makePiece(0, []byte("piece-a-16-bytes"))
+	pb, fb := makePiece(1, []byte("piece-b-16-bytes"))
+
+	v := New()
+	prepared := false
+	v.Prepare = func(stop <-chan struct{}) {
+		prepared = true
+		v.Skip = func(i uint32) bool { return i == 0 }
+		v.Only = func(i uint32) bool { return i == 0 }
+	}
+	resultC := make(chan *Verifier, 1)
+	v.Run([]piece.Piece{pa, pb}, make(chan Progress, 4), resultC)
+	<-resultC
+	if !prepared {
+		t.Fatal("Prepare did not run")
+	}
+	if !v.Bitfield.Test(0) || v.Bitfield.Test(1) {
+		t.Fatalf("bitfield = %v/%v, want only piece 0", v.Bitfield.Test(0), v.Bitfield.Test(1))
+	}
+	if fa.reads != 0 || fb.reads != 0 {
+		t.Fatalf("reads = %d/%d, want none", fa.reads, fb.reads)
+	}
+}
+
+// TestCloseDuringPrepare: closing the verifier while Prepare runs stops it
+// before any piece is read, and Close does not wait for the whole check.
+func TestCloseDuringPrepare(t *testing.T) {
+	pa, fa := makePiece(0, []byte("piece-a-16-bytes"))
+	v := New()
+	entered := make(chan struct{})
+	v.Prepare = func(stop <-chan struct{}) {
+		close(entered)
+		<-stop
+	}
+	go v.Run([]piece.Piece{pa}, make(chan Progress, 1), make(chan *Verifier))
+	<-entered
+	v.Close()
+	if fa.reads != 0 {
+		t.Fatalf("piece read %d time(s) after close", fa.reads)
+	}
+}

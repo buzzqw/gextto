@@ -68,13 +68,17 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 		return
 	}
 
-	// Swarm Merging (Fase 1): reuse verified pieces from other local torrents
-	// with the same piece layout before verifying this torrent's own storage.
-	merged := t.prefillLocalData()
+	// Swarm Merging: other local torrents that could lend verified pieces.
+	// Only the cheap checks run here; the reads, hashes and writes happen in
+	// the verifier goroutine (startMergeVerifier), off the run loop.
+	var candidates []*Torrent
+	if t.session != nil {
+		candidates = t.mergeCandidates(t.session.ListTorrents())
+	}
 
 	// No need to verify files if they didn't exist when we create them and
-	// nothing was merged.
-	if !al.HasExisting && merged == 0 {
+	// nothing can be merged.
+	if !al.HasExisting && len(candidates) == 0 {
 		t.mBitfield.Lock()
 		t.bitfield = bitfield.New(t.info().NumPieces)
 		t.mBitfield.Unlock()
@@ -86,7 +90,8 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 		return
 	}
 
-	// Some files exists on the disk (or were merged), need to verify pieces to
-	// create a correct bitfield.
-	t.startVerifier()
+	// Some files exists on the disk (or can be merged), need to verify pieces
+	// to create a correct bitfield. Storage created empty holds only what the
+	// merge writes, so then nothing else is read.
+	t.startMergeVerifier(candidates, !al.HasExisting)
 }

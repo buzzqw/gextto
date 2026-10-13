@@ -221,3 +221,69 @@ func TestPrefillLocalDataDeduplicatesCandidates(t *testing.T) {
 		t.Fatalf("merged %d pieces, want %d (deduplicated)", got, info.NumPieces)
 	}
 }
+
+// TestMergeCandidatesCheapFilter: the run loop only keeps sources that could
+// lend a piece (same layout and something verified), without reading data.
+func TestMergeCandidatesCheapFilter(t *testing.T) {
+	content := make([]byte, 40000)
+	if _, err := rand.Read(content); err != nil {
+		t.Fatal(err)
+	}
+	info := testInfoBytes(t, content, 16384)
+	mk := func(verified bool) *torrent {
+		o := &torrent{pieces: piece.NewPieces(info, testFiles(t, t.TempDir(), info))}
+		if verified {
+			o.bitfield = bitfield.New(info.NumPieces)
+		}
+		o.setInfo(info)
+		o.publishLocalData()
+		return o
+	}
+	ready, checking := mk(true), mk(false)
+	other := testInfoBytes(t, content[:30000], 16384) // different length
+	diff := &torrent{pieces: piece.NewPieces(other, testFiles(t, t.TempDir(), other)), bitfield: bitfield.New(other.NumPieces)}
+	diff.setInfo(other)
+	diff.publishLocalData()
+
+	a := &torrent{pieces: piece.NewPieces(info, testFiles(t, t.TempDir(), info))}
+	a.setInfo(info)
+	got := a.mergeCandidates([]*Torrent{{torrent: a}, {torrent: ready}, {torrent: checking}, {torrent: diff}, nil})
+	if len(got) != 1 || got[0].torrent != ready {
+		t.Fatalf("candidates = %d, want only the verified same-layout source", len(got))
+	}
+}
+
+// TestMergeStopsWhenClosed: a merge whose stop channel is closed copies
+// nothing, so stopping a torrent never waits for a whole merge.
+func TestMergeStopsWhenClosed(t *testing.T) {
+	content := make([]byte, 40000)
+	if _, err := rand.Read(content); err != nil {
+		t.Fatal(err)
+	}
+	info := testInfoBytes(t, content, 16384)
+	filesB := testFiles(t, t.TempDir(), info)
+	if _, err := filesB[0].Storage.WriteAt(content, 0); err != nil {
+		t.Fatal(err)
+	}
+	bf := bitfield.New(info.NumPieces)
+	for i := uint32(0); i < info.NumPieces; i++ {
+		bf.Set(i)
+	}
+	b := &torrent{pieces: piece.NewPieces(info, filesB), bitfield: bf}
+	b.setInfo(info)
+	b.publishLocalData()
+	a := &torrent{pieces: piece.NewPieces(info, testFiles(t, t.TempDir(), info))}
+	a.setInfo(info)
+
+	stop := make(chan struct{})
+	close(stop)
+	if idx, n := a.mergeFrom([]*Torrent{{torrent: b}}, a.mergeSkips(), stop); n != 0 || len(idx) != 0 {
+		t.Fatalf("merged %d piece(s) after stop", n)
+	}
+	// The skip snapshot is honoured instead of the live flags.
+	skip := a.mergeSkips()
+	skip[1] = true
+	if _, n := a.mergeFrom([]*Torrent{{torrent: b}}, skip, nil); n != int(info.NumPieces)-1 {
+		t.Fatalf("merged %d, want %d (piece 1 skipped by the snapshot)", n, info.NumPieces-1)
+	}
+}
