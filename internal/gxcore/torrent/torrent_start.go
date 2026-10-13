@@ -93,8 +93,13 @@ func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool) {
 	}
 	if len(candidates) > 0 {
 		v, skip := t.verifier, t.mergeSkips()
+		out := &mergeResult{}
+		t.mergeOut = out
 		v.Prepare = func(stop <-chan struct{}) {
-			merged, _ := t.mergeFrom(candidates, skip, stop)
+			// The run loop reads *out only after it receives this verifier's
+			// result, which happens after Prepare returns.
+			*out = t.mergeFrom(candidates, skip, stop)
+			merged := out.pieces
 			if len(merged) > 0 {
 				v.Skip = func(i uint32) bool { return merged[i] }
 			}
@@ -335,6 +340,7 @@ func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) (started bool) {
 		return false
 	}
 	pd := piecedownloader.New(pi, pe, allowedFast, t.piecePool.Get(int(pi.Length)))
+	t.prefillBlocks(pd)
 	if m := t.pieceDownloaders[pe]; m != nil {
 		if _, ok := m[pi.Index]; ok {
 			t.crash("peer already has a piece downloader for this piece")
@@ -421,4 +427,31 @@ func (t *torrent) boostRequestQueue(pe *peer.Peer) {
 // stall), so a peer that stops delivering is not kept with a deep queue.
 func (t *torrent) resetRequestQueue(pe *peer.Peer) {
 	pe.RequestQueue = min(t.session.config.DefaultRequestsOut, t.requestQueueCap(pe))
+}
+
+// prefillBlocks hands the downloader the blocks of its piece that the swarm
+// merge already wrote from a local source (Phase 3): they are read back from
+// disk and never requested. A block that cannot be read is simply requested.
+// The entry stays until the piece completes, so endgame duplicates reuse it
+// too.
+func (t *torrent) prefillBlocks(pd *piecedownloader.PieceDownloader) {
+	begins := t.partialBlocks[pd.Piece.Index]
+	if len(begins) == 0 {
+		return
+	}
+	lengths := make(map[uint32]uint32, len(begins))
+	for _, b := range pd.Piece.CalculateBlocks() {
+		lengths[b.Begin] = b.Length
+	}
+	for _, begin := range begins {
+		length, ok := lengths[begin]
+		if !ok {
+			continue
+		}
+		data := pd.Buffer.Data[begin : begin+length]
+		if _, err := pd.Piece.Data.ReadAt(data, int64(begin)); err != nil {
+			continue
+		}
+		pd.Prefill(begin, data)
+	}
 }

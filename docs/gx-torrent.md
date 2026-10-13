@@ -1055,6 +1055,18 @@ Two levels:
   are reassembled from the source's verified pieces and **each destination piece
   is verified against its own hash** before it is written. There is no v1
   different-layout heuristic (§9.2 of [`evoluzione.md`](evoluzione.md)).
+- **Phase 3 — v2, 16 KiB blocks.** When the source has verified only part of
+  the source pieces a destination piece spans, the verified blocks are written
+  and only the missing blocks are requested from peers; the piece is verified
+  whole once complete. If that check fails, the local blocks are dropped and
+  the piece is downloaded whole (the peer is not banned for it). Measured on
+  the Debian and Arch ISOs with a source 75% complete: 25% of the file from the
+  network instead of 100% (§10.1 of [`evoluzione.md`](evoluzione.md), harness
+  `scripts/phase3-env.sh` + `TestMeasureMergePhase3`).
+
+The session statistics report `merged_pieces`, `merged_bytes` (block-level
+bytes included) and `merged_partial_pieces` (pieces reused at block level);
+Gextto shows them as «Riuso locale».
 
 ## Statistics
 

@@ -973,7 +973,7 @@ data path; with auto-speed **off** nothing changes (no regression).
 **Possible follow-up.** Gextto-side (managed) version: Gextto measures the RTT and
 modulates the limits via `SetLimits`, so the option also applies to managed engines.
 
-### 9.2 Swarm Merging (file sharing between torrents) — Phase 1 and 2 done
+### 9.2 Swarm Merging (file sharing between torrents) — Phases 1, 2 and 3 done
 
 **Idea.** Make different swarms that contain **the same file** collaborate,
 reusing the pieces already present in another torrent A instead of re-downloading them:
@@ -1067,7 +1067,7 @@ here; the implemented ones are dated, the others are a proposal to be agreed.
 | 1 | **Continuous fuzzing** of every network-facing parser, with the found inputs kept as seeds, run by hand or in a nightly job | the `.torrent` scanner panic was found in minutes | high (a DoS caught before a release) | low | **done**: `make fuzz-smoke` (`FUZZ_TIME=2m`), 21 targets (DHT, bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE, peer-wire handshake), the seeds are committed under `testdata/fuzz`; a CI job is proposed |
 | 2 | **Merge: read and write each reused piece once** across all candidates; a later candidate only fills the gaps a previous one could not | Phase 2 analysis | medium (no duplicate I/O when several torrents hold the same content) | low | **done (2026-10-13)**: `mergedIdx` shared by Phase 1 and Phase 2 |
 | 3 | Merge: order the candidates by **reusable bytes** so the richest source is read first | Phase 2 | low | low | **closed (2026-10-13, reason):** superseded by the dedupe (#2) — ordering changes only *which* source provides a piece, not the work; no measurable gain, so no speculative code |
-| 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | Phase 2 | high (revives more seedless torrents) | high | **plan** in §10.1 |
+| 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | Phase 2 | high (revives more seedless torrents) | high | **done (2026-10-13)**: real-data harness, 100% → 25% from the network, see §10.1 |
 | 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | the O(1) counter removed the cost argument | medium | medium | **partial**: `subnet_cap_hint` (the suggested cap from the live concentration) is exposed in `Stats()`; automatic enforcement not pursued (a /24 can be legitimate CGNAT/mobile) |
 | 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.4 | medium | medium | **measured + instrumented (2026-10-13)**: `peers_confirmed_multi` counts peers reported by ≥2 distinct nodes; the full rewrite awaits data, see §10.2 |
 | 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | Phase 2 | medium | low | **done (2026-10-13)**: `merged_pieces`/`merged_bytes` in the engine session stats → daemon API → Gextto «Riuso locale» |
@@ -1087,31 +1087,51 @@ The criterion is the same as §4.8/§9.3: one item = one commit, measurement
 before/after for anything on a data path, both UIs and i18n for anything visible
 to the user, and the reference documents kept aligned.
 
-### 10.1 Merge Phase 3 — block-granularity reuse (plan)
+### 10.1 Merge Phase 3 — block-granularity reuse (done)
 
 Phase 2 reuses a destination piece only when **every** source piece overlapping
-it is verified; otherwise the whole piece is skipped. Phase 3 would reuse at
-**16 KiB block** granularity, verified against the file's BEP 52 Merkle tree
-(`internal/merkle`: `LeafHashes`, `Root`, `PieceLevel`, `VerifyHashes`).
+it is verified. Phase 3 reuses the rest at **16 KiB block** granularity: the
+verified spans of a partially covered destination piece are written to disk
+(`storePartialBlocks`, `filesection.Piece.WriteAt`) and the blocks they cover
+are recorded per piece (`torrent.partialBlocks`, handed from the verifier
+goroutine to the run loop through `mergeOut`). When the piece is picked, the
+downloader reads those blocks back (`prefillBlocks` → `PieceDownloader.Prefill`)
+and requests only the others; the assembled piece is verified whole
+(`VerifyV2`) as usual.
 
-Why it is large (and why it is not attempted as part of a single night):
+**Why it is safe.** BEP 52 leaves are the 16 KiB blocks of the *file*, not of
+the piece: two torrents with the same `pieces root` share the whole Merkle tree
+below the piece layer, whatever their piece length. A span copied from a
+source piece the source verified is therefore the file's true content. The
+final whole-piece check still runs; if it fails on a piece with local blocks,
+the blocks are dropped, the peer is not banned (the mismatch cannot be blamed
+on it) and the piece is downloaded whole, where smart ban applies again.
 
-- the destination must start tracking **block-level availability** (which 16 KiB
-  blocks of a piece are present), not just a piece bitfield, because the
-  remaining blocks must still be requested from peers;
-- the picker and the piece downloader must be able to request a **subset** of a
-  piece's blocks and complete it from the network, verifying each block against
-  the Merkle leaf;
-- the write path must assemble a piece from mixed sources (local merge + network)
-  before the whole-piece `VerifyV2`.
+**Test environment (real data, public torrents).** `scripts/phase3-env.sh`
+downloads the Debian netinst and Arch Linux ISOs over BitTorrent (aria2c),
+builds with python3-libtorrent two **v2-only** torrents of each ISO — source
+with 256 KiB pieces, destination with 1 MiB pieces, same file so same root — and
+corrupts one source piece in four, so every destination piece straddles
+verified and unverified source pieces. `TestMeasureMergePhase3`
+(`GX_MEASURE_MERGE3=<dir>`, opt-in) runs a gx-torrent seeder of the destination
+and a leecher holding the partial source, adds the destination to the leecher
+and measures the bytes taken from the network; `GX_MEASURE_MERGE3_PEER` with
+`scripts/phase3-seed.py` uses a **libtorrent** seeder instead (interoperability).
 
-Decision gate: implement only with a measurement that shows partial-source reuse
-happens often enough on real libraries. The counter is now in place:
-`partialSourcePieces` counts every destination piece Phase 2 skipped although at
-least one of its overlapping source pieces was verified, exposed as
-`merged_partial_pieces` next to `merged_pieces`/`merged_bytes` (Gextto «Riuso
-locale» shows it as `· N saltati per sorgente parziale`). Without that datum
-showing a real frequency, Phase 3 stays an idea (avoids speculative code).
+| Run (loopback) | before (Phase 2) | after (Phase 3) |
+| --- | --- | --- |
+| Debian 756 MiB: from the network | 792,723,456 B (100%) | **198,180,864 B (25.0%)** |
+| Debian: total time | 2.81 s | **1.31 s** |
+| Arch 1.5 GiB: from the network | 1,640,497,152 B (100%) | **410,255,360 B (25.0%)** |
+| Arch: total time | 5.82 s | **2.71 s** |
+| Arch: CPU (whole process, seeder included) | 17.7 s | **10.0 s** |
+| Arch: peak RSS | 109 MiB | 111 MiB |
+| Debian with a libtorrent 2.0.11 seeder | — | 25.0% from the network, complete |
+
+All 756 (Debian) and 1565 (Arch) destination pieces were reused at block level
+and every one passed its hash. The reused blocks are not persisted: after a
+restart from the resume data, the blocks of pieces not yet completed are
+downloaded again (the merge does not run on that path).
 
 ### 10.2 DHT multi-path — measurement and plan
 

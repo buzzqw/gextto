@@ -130,6 +130,7 @@ func (t *torrent) stopVerifier() {
 	if t.verifier != nil {
 		t.verifier.Close()
 		t.verifier = nil
+		t.mergeOut = nil
 	}
 }
 

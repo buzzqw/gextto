@@ -122,7 +122,7 @@ Its engine core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementati
 - **Cache and bandwidth that follow the machine:** the disk cache is resized from the free RAM, the active torrents and the disk type (HDD, SSD, NFS); latency auto-speed lowers the upload before the line saturates (anti-bufferbloat), so browsing and calls stay smooth.
 - **Disk guard:** when a download folder drops below the free-space threshold (1 GiB by default, Gextto's *minimum free space* when set) the unfinished downloads there pause by themselves and resume when space returns; seeding goes on and nothing ends in a write error.
 - **Peers worth keeping:** each peer's request queue grows with what it delivers and a fast peer works on two pieces at once; when a torrent is at its connection cap the useless and slowest connection is dropped (never a random one) to make room for a fresh one; pieces of deselected files never make a peer "interesting".
-- **Local reuse before the network:** pieces another local torrent already verified (same layout, or the same BitTorrent v2 file) are copied and checked in the background instead of downloaded; a peer sending corrupt data is banned from the whole session.
+- **Local reuse before the network:** pieces another local torrent already verified (same layout, or the same BitTorrent v2 file even with a different piece size) are copied and checked in the background instead of downloaded; when the other torrent has only part of the file, its verified 16 KiB blocks are reused and only the missing ones come from peers (on the Debian and Arch ISOs with a source 75% complete, 25% of the file came from the network instead of 100%); a peer sending corrupt data is banned from the whole session.
 
 #### Disk, memory and CPU
 

@@ -107,9 +107,9 @@ type SessionStats struct {
 	// reused from other local torrents since start (no network involved).
 	MergedPieces int64
 	MergedBytes  int64
-	// MergedPartialPieces counts the destination pieces Phase 2 could not reuse
-	// only because the source was partially verified: the measurement basis for
-	// the block-granularity Phase 3.
+	// MergedPartialPieces counts the destination pieces reused at block level
+	// (Phase 3): part of their 16 KiB blocks came from a partially verified
+	// source, the rest from peers.
 	MergedPartialPieces int64
 }
 

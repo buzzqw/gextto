@@ -257,6 +257,14 @@ type torrent struct {
 	// against this torrent's own hashes, so re-reading and re-hashing them would
 	// only duplicate work. Cleared by startVerifier after it is consumed.
 	mergedPieces map[uint32]bool
+	// partialBlocks are, per piece, the 16 KiB blocks the swarm merge wrote
+	// from a partially verified v2 source (Phase 3, localmerge.go): the piece
+	// downloader takes them from disk. Dropped when the piece completes or
+	// fails its hash. Run loop only.
+	partialBlocks map[uint32][]uint32
+	// mergeOut receives the merge result from the verifier goroutine; the run
+	// loop reads it once the verifier is done (handleVerificationDone).
+	mergeOut *mergeResult
 
 	// skipBits marks the pieces of deselected files (nil when none is), kept by
 	// applySkippedPieces: interest and peer usefulness ignore those pieces.

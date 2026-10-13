@@ -108,6 +108,32 @@ func (d *PieceDownloader) GotBlock(begin uint32, data []byte) error {
 	return nil
 }
 
+// Prefill marks the block at begin as already present, copying data into the
+// piece buffer: it is never requested from the peer. It is for blocks a local
+// source already holds (swarm merge at block granularity); the whole piece is
+// still verified against its hash once complete. It must be called before the
+// first RequestBlocks and reports whether the block was taken.
+func (d *PieceDownloader) Prefill(begin uint32, data []byte) bool {
+	if !d.findBlock(begin, uint32(len(data))) {
+		return false
+	}
+	if _, ok := d.done[begin]; ok {
+		return false
+	}
+	if _, ok := d.pending[begin]; ok {
+		return false
+	}
+	copy(d.Buffer.Data[begin:begin+uint32(len(data))], data)
+	d.done[begin] = struct{}{}
+	for i, b := range d.remaining {
+		if b == begin {
+			d.remaining = append(d.remaining[:i], d.remaining[i+1:]...)
+			break
+		}
+	}
+	return true
+}
+
 // Rejected must be called when the peer has rejected a piece request.
 func (d *PieceDownloader) Rejected(begin, length uint32) bool {
 	if !d.findBlock(begin, length) {

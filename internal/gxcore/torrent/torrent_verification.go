@@ -25,6 +25,10 @@ func (t *torrent) handleVerificationDone(ve *verifier.Verifier) {
 		t.crash("invalid verifier")
 	}
 	t.verifier = nil
+	if out := t.mergeOut; out != nil {
+		t.mergeOut = nil
+		t.partialBlocks = out.partial
+	}
 
 	if ve.Error != nil {
 		t.stop(fmt.Errorf("file verification error: %w", ve.Error))

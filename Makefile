@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-dht cache-refresh
+.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-dht measure-merge3 cache-refresh
 
 all: build
 
@@ -129,6 +129,15 @@ measure-seeding:
 # GX_MEASURE_LEECHERS=N. See docs/evoluzione.md (section 6).
 measure-pipeline:
 	GX_MEASURE_PIPELINE=1 go test ./cmd/gx-torrent/ -run MeasurePipelining -v -count=1
+
+# Swarm merge Phase 3 on real data (opt-in, outside CI): public ISOs fetched
+# over BitTorrent and two v2 torrents of each with different piece lengths
+# (scripts/phase3-env.sh), then the bytes the destination takes from the
+# network. GX_PHASE3_DIR sets the folder, GX_PHASE3_SET picks debian or arch.
+# See docs/evoluzione.md (section 10.1).
+measure-merge3:
+	scripts/phase3-env.sh $${GX_PHASE3_DIR:-$$HOME/gx-phase3}
+	GX_MEASURE_MERGE3=$${GX_PHASE3_DIR:-$$HOME/gx-phase3}/$${GX_PHASE3_SET:-debian} go test ./cmd/gx-torrent/ -run MeasureMergePhase3 -v -count=1 -timeout 40m
 
 # DHT real-swarm measurement (opt-in, outside CI): routing-table fill and query
 # success over time, the numbers behind the anti-Sybil/multi-path decisions.

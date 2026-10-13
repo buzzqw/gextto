@@ -168,13 +168,15 @@ func uiGxEngineStats(engine TorrentEngine) uiEngineStats {
 // counters, or ("", false) when nothing was reused (the row is then hidden).
 func uiMergeReuseRow(session map[string]any) (string, bool) {
 	pieces := engineNum(session, "merged_pieces")
-	if pieces <= 0 {
+	partial := engineNum(session, "merged_partial_pieces")
+	if pieces <= 0 && partial <= 0 {
 		return "", false
 	}
 	row := fmt.Sprintf("%d pezzi · %s riusati da altri torrent (senza rete)",
 		pieces, logging.HumanBytesI64(engineNum(session, "merged_bytes")))
-	if partial := engineNum(session, "merged_partial_pieces"); partial > 0 {
-		row += fmt.Sprintf(" · %d saltati per sorgente parziale", partial)
+	if partial > 0 {
+		// Phase 3: pieces filled in part from local blocks, the rest from peers.
+		row += fmt.Sprintf(" · %d pezzi riusati a blocchi", partial)
 	}
 	return row, true
 }

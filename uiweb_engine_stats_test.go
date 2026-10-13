@@ -24,7 +24,10 @@ func TestUIMergeReuseRow(t *testing.T) {
 	withPartial, _ := uiMergeReuseRow(map[string]any{
 		"merged_pieces": int64(3), "merged_bytes": int64(2048), "merged_partial_pieces": int64(2),
 	})
-	if !strings.Contains(withPartial, "2 saltati per sorgente parziale") {
-		t.Fatalf("row = %q, want the partial-source count", withPartial)
+	if !strings.Contains(withPartial, "2 pezzi riusati a blocchi") {
+		t.Fatalf("row = %q, want the block-level reuse count", withPartial)
+	}
+	if _, ok := uiMergeReuseRow(map[string]any{"merged_bytes": int64(4096), "merged_partial_pieces": int64(1)}); !ok {
+		t.Fatal("block-level reuse alone must show the row")
 	}
 }

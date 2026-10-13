@@ -78,3 +78,36 @@ func (p Piece) Write(b []byte) (n int, err error) {
 	}
 	return
 }
+
+// WriteAt writes b at offset off of the piece, across its file sections.
+// Padding sections are skipped (their bytes are never written to a file).
+// Used to store part of a piece, e.g. the blocks a local source already holds.
+func (p Piece) WriteAt(b []byte, off int64) (n int, err error) {
+	var pos int64
+	for _, sec := range p {
+		if len(b) == 0 {
+			break
+		}
+		secEnd := pos + sec.Length
+		if off >= secEnd {
+			pos = secEnd
+			continue
+		}
+		start := off - pos
+		count := min(sec.Length-start, int64(len(b)))
+		if !sec.Padding {
+			var m int
+			m, err = sec.File.WriteAt(b[:count], sec.Offset+start)
+			n += m
+			if err != nil {
+				return n, err
+			}
+		} else {
+			n += int(count)
+		}
+		b = b[count:]
+		off += count
+		pos = secEnd
+	}
+	return n, nil
+}

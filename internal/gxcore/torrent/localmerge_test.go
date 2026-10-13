@@ -277,13 +277,13 @@ func TestMergeStopsWhenClosed(t *testing.T) {
 
 	stop := make(chan struct{})
 	close(stop)
-	if idx, n := a.mergeFrom([]*Torrent{{torrent: b}}, a.mergeSkips(), stop); n != 0 || len(idx) != 0 {
-		t.Fatalf("merged %d piece(s) after stop", n)
+	if res := a.mergeFrom([]*Torrent{{torrent: b}}, a.mergeSkips(), stop); res.merged != 0 || len(res.pieces) != 0 {
+		t.Fatalf("merged %d piece(s) after stop", res.merged)
 	}
 	// The skip snapshot is honoured instead of the live flags.
 	skip := a.mergeSkips()
 	skip[1] = true
-	if _, n := a.mergeFrom([]*Torrent{{torrent: b}}, skip, nil); n != int(info.NumPieces)-1 {
+	if n := a.mergeFrom([]*Torrent{{torrent: b}}, skip, nil).merged; n != int(info.NumPieces)-1 {
 		t.Fatalf("merged %d, want %d (piece 1 skipped by the snapshot)", n, info.NumPieces-1)
 	}
 }

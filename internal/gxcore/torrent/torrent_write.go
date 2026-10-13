@@ -76,6 +76,18 @@ func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 
 	pw.Buffer.Release()
 
+	_, prefilled := t.partialBlocks[pw.Piece.Index]
+	delete(t.partialBlocks, pw.Piece.Index)
+	if _, fromPeer := pw.Source.(*peer.Peer); !pw.HashOK && prefilled && fromPeer {
+		// Part of the piece came from local data (Phase 3 merge): the
+		// mismatch cannot be blamed on the peer. Drop the local blocks and
+		// download the piece whole; a corrupt peer is caught on that copy.
+		// (A webseed fetches whole pieces, so its failure stays its own.)
+		t.bytesWasted.Inc(int64(len(pw.Buffer.Data)))
+		t.log.Infof("piece #%d with reused local blocks failed its hash: downloading it whole", pw.Piece.Index)
+		t.startPieceDownloaders()
+		return
+	}
 	if !pw.HashOK {
 		t.bytesWasted.Inc(int64(len(pw.Buffer.Data)))
 		switch src := pw.Source.(type) {

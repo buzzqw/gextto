@@ -2,6 +2,8 @@ package torrent
 
 import (
 	"bytes"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bufferpool"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/piecedownloader"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
@@ -171,6 +173,39 @@ func TestPrefillV2CountsPartialSourcePieces(t *testing.T) {
 	}
 	if got := partialSourcePieces.Load() - before; got != 1 {
 		t.Fatalf("partial-source pieces += %d, want 1", got)
+	}
+
+	// Phase 3: the verified block is on disk and recorded for piece 0.
+	begins := dst.partialBlocks[0]
+	if len(begins) != 1 || begins[0] != 0 {
+		t.Fatalf("partial blocks of piece 0 = %v, want [0]", begins)
+	}
+	got := make([]byte, block)
+	if _, err := dst.pieces[0].Data.ReadAt(got, 0); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, content[:block]) {
+		t.Fatal("the reused block is not on the destination storage")
+	}
+	if _, ok := dst.partialBlocks[1]; ok {
+		t.Fatal("piece 1 overlaps no verified source piece and must not be partial")
+	}
+
+	// The downloader takes the block from disk and requests only the other.
+	wire := &pipePeer{}
+	pd := piecedownloader.New(&dst.pieces[0], wire, false, bufferpool.Buffer{Data: make([]byte, dst.pieces[0].Length)})
+	dst.prefillBlocks(pd)
+	if n := pd.RequestBlocks(10); n != 1 || wire.requests != 1 {
+		t.Fatalf("requested %d block(s), want only the missing one", n)
+	}
+	if !bytes.Equal(pd.Buffer.Data[:block], content[:block]) {
+		t.Fatal("prefilled block not in the piece buffer")
+	}
+	if err := pd.GotBlock(uint32(block), content[block:2*block]); err != nil {
+		t.Fatal(err)
+	}
+	if !pd.Done() || !dst.pieces[0].VerifyV2(pd.Buffer.Data) {
+		t.Fatal("the piece assembled from local and network blocks does not verify")
 	}
 }
 
