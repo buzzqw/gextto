@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/dht"
-	"github.com/buzzqw/gextto/internal/utp"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bandwidth"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/blocklist"
@@ -32,6 +31,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/trackermanager"
+	"github.com/buzzqw/gextto/internal/utp"
 	"go.etcd.io/bbolt"
 	berrors "go.etcd.io/bbolt/errors"
 )
