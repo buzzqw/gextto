@@ -10,8 +10,9 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/mse"
 )
 
-// Accept BitTorrent handshake from the connection. Handles encryption.
-// Returns a new connection that is ready for sending/receiving BitTorrent protocol messages.
+// Accept completes the BitTorrent handshake on an incoming connection,
+// transparently handling plain and MSE-encrypted peers. It returns a
+// connection ready for protocol messages.
 func Accept(
 	conn net.Conn,
 	handshakeTimeout time.Duration,
@@ -25,11 +26,10 @@ func Accept(
 }
 
 // AcceptRouted is Accept for a listener shared by many torrents: the info
-// hash sent by the peer selects the torrent, and lookup
-// returns the peer ID to answer with and the reserved bits to advertise for
-// that torrent (ok=false rejects the connection). The extensions are
-// per-torrent because the BitTorrent v2 reserved bit must only be set on a
-// torrent that actually has a v2 identity.
+// hash offered by the peer selects the torrent, and lookup supplies the peer
+// id and reserved bits to answer with for that torrent (ok=false drops the
+// peer). Extensions stay per-torrent because the v2 reserved bit may only be
+// advertised by a torrent that actually holds a v2 identity.
 func AcceptRouted(
 	conn net.Conn,
 	handshakeTimeout time.Duration,
@@ -42,64 +42,44 @@ func AcceptRouted(
 	if forceEncryption && getSKey == nil {
 		panic("forceEncryption && getSKey == nil")
 	}
-
 	if err = conn.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
 		return
 	}
 
-	isEncrypted := false
+	encrypted := false
 
-	// Try to do unencrypted handshake first.
-	// If protocol string is not valid, try to do encrypted handshake.
-	// rwConn returns the read bytes again that is read by handshake.Read1.
-	var (
-		buf    bytes.Buffer
-		reader = io.TeeReader(conn, &buf)
-	)
+	// Plain handshake first; on a protocol mismatch with a key source
+	// available, rewind the bytes already read and try MSE instead.
+	var seen bytes.Buffer
+	tee := io.TeeReader(conn, &seen)
 
-	peerExtensions, infoHash, err = readHandshake1(reader)
+	peerExtensions, infoHash, err = readHandshake1(tee)
 	if err == errInvalidProtocol && getSKey != nil {
-		conn = &rwConn{readWriter{io.MultiReader(&buf, conn), conn}, conn}
-		mseConn := mse.WrapConn(conn)
-		err = mseConn.HandshakeIncoming(
-			getSKey,
-			func(provided mse.CryptoMethod) (selected mse.CryptoMethod) {
-				if provided&mse.RC4 != 0 {
-					selected = mse.RC4
-					isEncrypted = true
-				} else if (provided&mse.PlainText != 0) && !forceEncryption {
-					selected = mse.PlainText
-				}
-				cipher = selected
-				return
-			})
+		conn, cipher, encrypted, err = upgradeToMSE(conn, &seen, getSKey, forceEncryption, log)
 		if err != nil {
 			return
 		}
-		log.Debugf("Encryption handshake is successful. Selected cipher: %s", cipher)
-		conn = mseConn
 		peerExtensions, infoHash, err = readHandshake1(conn)
 	}
 	if err != nil {
 		return
 	}
-
-	if forceEncryption && !isEncrypted {
+	if forceEncryption && !encrypted {
 		err = errNotEncrypted
 		return
 	}
 
-	ourID, ourExtensions, ok := lookup(infoHash)
-	if !ok {
+	var ourID [20]byte
+	var ourExtensions [8]byte
+	var ok bool
+	if ourID, ourExtensions, ok = lookup(infoHash); !ok {
 		err = errInvalidInfoHash
 		return
 	}
-	err = writeHandshake(conn, infoHash, ourID, ourExtensions)
-	if err != nil {
+	if err = writeHandshake(conn, infoHash, ourID, ourExtensions); err != nil {
 		return
 	}
-	peerID, err = readHandshake2(conn)
-	if err != nil {
+	if peerID, err = readHandshake2(conn); err != nil {
 		return
 	}
 	if peerID == ourID {
@@ -108,4 +88,31 @@ func AcceptRouted(
 	}
 	encConn = conn
 	return
+}
+
+// upgradeToMSE replays the buffered bytes into an MSE handshake and returns
+// the encrypted connection with the negotiated cipher.
+func upgradeToMSE(conn net.Conn, seen *bytes.Buffer, getSKey func([20]byte) []byte, forceEncryption bool, log logger.Logger) (net.Conn, mse.CryptoMethod, bool, error) {
+	replayed := &rwConn{readWriter{io.MultiReader(seen, conn), conn}, conn}
+	mseConn := mse.WrapConn(replayed)
+	var cipher mse.CryptoMethod
+	encrypted := false
+	err := mseConn.HandshakeIncoming(
+		getSKey,
+		func(provided mse.CryptoMethod) (selected mse.CryptoMethod) {
+			// RC4 when offered; plaintext only when not forced.
+			if provided&mse.RC4 != 0 {
+				selected = mse.RC4
+				encrypted = true
+			} else if (provided&mse.PlainText != 0) && !forceEncryption {
+				selected = mse.PlainText
+			}
+			cipher = selected
+			return
+		})
+	if err != nil {
+		return nil, cipher, false, err
+	}
+	log.Debugf("Encryption handshake is successful. Selected cipher: %s", cipher)
+	return mseConn, cipher, encrypted, nil
 }
