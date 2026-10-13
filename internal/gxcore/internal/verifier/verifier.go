@@ -12,6 +12,11 @@ type Verifier struct {
 	Bitfield *bitfield.Bitfield
 	Error    error
 
+	// Skip, when set, marks pieces whose bytes are already known-verified (for
+	// instance the pieces a swarm merge just re-verified against this torrent's
+	// own hashes): Run sets their bit without re-reading and re-hashing them.
+	Skip func(uint32) bool
+
 	closeC chan struct{}
 	doneC  chan struct{}
 }
@@ -59,6 +64,16 @@ func (v *Verifier) Run(pieces []piece.Piece, progressC chan Progress, resultC ch
 	hash := sha1.New()
 	var numOK uint32
 	for _, p := range pieces {
+		if v.Skip != nil && v.Skip(p.Index) {
+			v.Bitfield.Set(p.Index)
+			numOK++
+			select {
+			case progressC <- Progress{Checked: p.Index + 1}:
+			case <-v.closeC:
+				return
+			}
+			continue
+		}
 		buf = buf[:p.Length]
 		_, v.Error = p.Data.ReadAt(buf, 0)
 		if v.Error != nil {

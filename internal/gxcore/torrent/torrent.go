@@ -251,6 +251,12 @@ type torrent struct {
 	// Fase 1) without going through this torrent's run loop. See localmerge.go.
 	localData atomic.Pointer[localDataSnapshot]
 
+	// mergedPieces are the pieces the swarm merge just re-verified in this run
+	// (see localmerge.go). The verifier skips them: their bytes were checked
+	// against this torrent's own hashes, so re-reading and re-hashing them would
+	// only duplicate work. Cleared by startVerifier after it is consumed.
+	mergedPieces map[uint32]bool
+
 	// Metrics
 	downloadSpeed   metrics.Meter
 	uploadSpeed     metrics.Meter

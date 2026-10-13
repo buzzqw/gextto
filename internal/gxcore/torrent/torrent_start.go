@@ -74,6 +74,14 @@ func (t *torrent) startVerifier() {
 		t.crash("zero length pieces")
 	}
 	t.verifier = verifier.New()
+	// Pieces the swarm merge already re-verified need no second read+hash: hand
+	// the set to the verifier and clear it, so a later manual re-check verifies
+	// everything.
+	if len(t.mergedPieces) > 0 {
+		merged := t.mergedPieces
+		t.mergedPieces = nil
+		t.verifier.Skip = func(i uint32) bool { return merged[i] }
+	}
 	go t.verifier.Run(t.pieces, t.verifierProgressC, t.verifierResultC)
 }
 

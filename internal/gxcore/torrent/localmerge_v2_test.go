@@ -93,6 +93,9 @@ func TestPrefillV2MergesDifferentLayout(t *testing.T) {
 	if got := dst.prefillFrom([]*Torrent{{torrent: src}}); got != int(dstInfo.NumPieces) {
 		t.Fatalf("merged %d pieces, want %d", got, dstInfo.NumPieces)
 	}
+	if len(dst.mergedPieces) != int(dstInfo.NumPieces) {
+		t.Fatalf("mergedPieces = %d, want %d (the verifier must skip them)", len(dst.mergedPieces), dstInfo.NumPieces)
+	}
 	out := make([]byte, len(content))
 	if _, err := filesDst[0].Storage.ReadAt(out, 0); err != nil {
 		t.Fatal(err)

@@ -132,6 +132,7 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 	// Phase 2: the same-file-different-layout case (BitTorrent v2), matched by
 	// the per-file Merkle root instead of the piece index.
 	merged += t.prefillV2From(candidates, mergedIdx)
+	t.mergedPieces = mergedIdx
 	if merged > 0 && t.log != nil {
 		t.log.Infof("swarm merge: reused %d piece(s) from local data", merged)
 	}
