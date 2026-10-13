@@ -265,32 +265,35 @@ func (s *Socket) reset(addr net.Addr, ackNr, connId uint16) {
 	go s.writeTo(b, addr)
 }
 
-// newConnID returns a recv_id that is free for remoteAddr: it picks an id not
-// used by an existing connection's recv_id or the neighbouring ids (which the
-// remote would use), so it also works when dialling our own Socket.
+// connIDFree reports whether id is usable as a recv_id for remoteAddr: it must
+// not collide with an existing connection's recv_id, nor with its neighbours
+// (the remote would use id-1 as its send_id when dialling our own Socket).
+func (s *Socket) connIDFree(remoteAddr resolvedAddrStr, id uint16) bool {
+	if _, used := s.conns[connKey{remoteAddr, id}]; used {
+		return false
+	}
+	if _, used := s.conns[connKey{remoteAddr, id + 1}]; used {
+		return false
+	}
+	if _, used := s.conns[connKey{remoteAddr, id - 1}]; used {
+		return false
+	}
+	return true
+}
+
+// newConnID returns a recv_id free for remoteAddr. It probes from a random
+// point and stops at the first free id, which is O(1) with the handful of
+// connections per address a socket really has, and allocates nothing. The
+// previous implementation built a 64K-entry table per dial (half a megabyte)
+// to pick a random free id.
 func (s *Socket) newConnID(remoteAddr resolvedAddrStr) (id uint16) {
-	// Rather than shuffling a slice of every id, keep an implicit free list:
-	// ids holds the untried ids, 0 meaning "the value is its index", non-zero
-	// meaning "value-1 is the id".
-	var idsBack [0x10000]int
-	ids := idsBack[:]
-	for len(ids) != 0 {
-		i := rand.Intn(len(ids))
-		id = uint16(ids[i])
-		if id == 0 {
-			id = uint16(i)
-		} else {
-			id--
-		}
-		_, usedRecv := s.conns[connKey{remoteAddr, id}]
-		_, usedAbove := s.conns[connKey{remoteAddr, id + 1}]
-		_, usedBelow := s.conns[connKey{remoteAddr, id - 1}]
-		if !usedRecv && !usedAbove && !usedBelow {
+	const range16 = 1 << 16
+	start := uint16(rand.Intn(range16))
+	for i := 0; i < range16; i++ {
+		id = start + uint16(i)
+		if s.connIDFree(remoteAddr, id) {
 			return id
 		}
-		// Remove the tried id from the free list by moving the last one in.
-		ids[i] = len(ids)
-		ids = ids[:len(ids)-1]
 	}
 	return 0
 }
