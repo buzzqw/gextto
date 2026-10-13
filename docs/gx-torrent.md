@@ -702,8 +702,7 @@ reloaded when it changes on disk (size or mtime, checked every 10
 minutes). The box shows loaded rules, time and path of the load,
 next refresh and any error; **Load now** immediately applies the
 value of the field (even unsaved) without saving the rest of the page
-(`POST /ui/ipfilter` with `return=settings`). Before this change a URL
-written in the settings was not loaded at startup.
+(`POST /ui/ipfilter` with `return=settings`).
 
 **Optimisation** is the equivalent of Gextto's *Optimise* button, divided
 into three actions (`POST /ui/optimize` with `optimize=queue|cache|bandwidth`), each
@@ -744,7 +743,7 @@ example:
   Off by default, also in managed mode: those URLs come from the torrent's
   data (even from an untrusted feed) and without this limit they could make
   the client contact the router, the NAS or other internal services (SSRF). See
-  `docs/bep.md`, *Revision of 2026-10-12*;
+  `docs/bep.md`;
 - `GX_TORRENT_LANG`, `GX_TORRENT_MODE`, `GX_TORRENT_LOG_FILE`, `GX_TORRENT_DEBUG`,
   `GX_TORRENT_NOTIFY_URL` (webhook for feed notifications);
 - `GX_TORRENT_MMAP` (opt-in mmap storage, Linux: flag `-mmap`).
@@ -1154,6 +1153,17 @@ using fixed values.
   `fallocate`; files excluded from the selection remain sparse, and on tmpfs (RAM
   disk) they always remain sparse: reserving them would immediately take their whole
   size from the RAM.
+- **Disk guard** (`min_free_mb` in the queue config, default 1024 MiB, 0 = off;
+  settings page *Pause downloads below free space*; Gextto pushes its
+  `min_free_space_gb` when set): every 15 s the daemon reads the free space of
+  each storage folder of the unfinished torrents (outside its lock, walking up
+  to the nearest existing folder). Below the threshold the downloads of that
+  folder are stopped and flagged `disk_wait` in the API (state `paused`, shown
+  as *waiting for disk space* on the daemon page); they resume when the folder
+  has the threshold plus a slack (10%, at least 256 MiB), so it does not flap
+  at the limit. Seeding goes on. With preallocation on the guard stays off: the
+  files are reserved in full when the torrent starts. A folder whose free space
+  cannot be read never blocks.
 - **`-mmap`** (experimental, Linux): the torrent's files are served from a
   **shared memory mapping** instead of with `read`/`write`. Piece writes
   become copies into the page cache (asynchronous kernel writeback) and
@@ -1206,8 +1216,8 @@ the engine saves every torrent in `DataDir/<id>` and at removal always runs
 - removing a torrent deletes only the symlink. Data is deleted only with
   `delete_files=1`, and only the torrent's file or folder, never the
   whole destination or other files;
-- an old real folder in place of the symlink (previous layout) is
-  moved to `DATA/orphaned/<id>` before removal, never deleted;
+- a real folder left in place of the symlink is moved to
+  `DATA/orphaned/<id>` before removal, never deleted;
 - destinations must be absolute paths; the flag `-allowed-roots`
   (standalone use only, Gextto does not set it) can restrict them.
 
@@ -1464,6 +1474,9 @@ Keys accepted by `POST /api/v1/config`:
   ≤ 0 = adaptive);
 - `auto` (self-management: dynamic queue and adaptive cache);
 - `sequential` (default for torrents added afterwards).
+- `min_free_mb` (disk guard threshold in MiB, 0 = off; see *Disk cache, preallocation
+  and mmap storage*). Torrents paused by it carry `disk_wait: true` in
+  `GET /api/v1/torrents`.
 
 ## API availability (snapshot and lock)
 

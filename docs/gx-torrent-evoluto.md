@@ -124,17 +124,16 @@ gx-torrent is a pure-Go daemon (`CGO_ENABLED=0` build) with the **gx-core** engi
 **reattaches it across restarts** via `fingerprint`. The daemon is already usable on its own
 (`gx-torrent -listen … -data …`), even as a standalone client.
 
-| Layer | Where | What already exists | Size (2026-10-11) |
-| --- | --- | --- | --- |
-| Engine | `internal/gxcore`, `internal/dht`, `anacrolix/utp` | single port, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, hot web seeds and trackers, per-torrent limits, graduated file priority, windowed streaming, multi-format IP filter, proxy, VPN killswitch, preallocation, batched durability, opt-in mmap, hot-adjustable cache | 44 areas |
-| Daemon | `cmd/gx-torrent` | dynamic queue with slots, seed ratio/days per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, state in `state.json` | 12,573 lines (20,742 with tests) |
-| API | `cmd/gx-torrent/api.go` | REST v1 with `X-Gx-Token` header: health, stats, portcheck, torrents, add, actions, config, ipfilter | 706 lines |
-| UI | `cmd/gx-torrent/ui.go` | table, filters by state, tabbed detail (general, files, peers, trackers, pieces), group actions, six languages | 1,562 lines; assets in `internal/webui/assets` (`embed.FS`) |
-| Adapter | `gxtorrent_engine.go`, `gxtorrent_runtime.go` | `TorrentEngine` contract, `capabilityLevels` matrix, launch in a systemd scope | 1,801 + 728 lines |
+| Layer | Where | What already exists |
+| --- | --- | --- |
+| Engine | `internal/gxcore`, `internal/dht`, `anacrolix/utp` | single port, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, hot web seeds and trackers, per-torrent limits, graduated file priority, windowed streaming, multi-format IP filter, proxy, VPN killswitch, preallocation, batched durability, opt-in mmap, hot-adjustable cache |
+| Daemon | `cmd/gx-torrent` | dynamic queue with slots, seed ratio/days per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, state in `state.json` |
+| API | `cmd/gx-torrent/api.go` | REST v1 with `X-Gx-Token` header: health, stats, portcheck, torrents, add, actions, config, ipfilter |
+| UI | `cmd/gx-torrent/ui.go` | table, filters by state, tabbed detail (general, files, peers, trackers, pieces), group actions, six languages; assets in `internal/webui/assets` (`embed.FS`) |
+| Adapter | `gxtorrent_engine.go`, `gxtorrent_runtime.go` | `TorrentEngine` contract, `capabilityLevels` matrix, launch in a systemd scope |
 
-Raw measurements, as a basis for requirement 2: `bin/gx-torrent` weighs **13.7 MB**; the
-daemon in operation on this machine uses **~307 MB of RSS** and 10 threads, almost
-all of them piece cache.
+The inventory of the engine's areas and their files is in
+[`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md).
 
 Things currently tied **only** to Gextto: `-orphan-timeout`, `-fingerprint`,
 `-gextto-log`, `-ipfilter-source`. In **standalone** the settings live in
@@ -151,7 +150,7 @@ sovereign.
 
 | Function | Today in Gextto | In gx-torrent | Where it lives |
 | --- | --- | --- | --- |
-| Login, sessions, password | UI v2 (`authEnabledSetting`, argon2/bcrypt) | done (`standalone_auth.go`: bcrypt login, sessions, LAN bypass) | `internal/webui` + `internal/auth` |
+| Login, sessions, password | UI v2 (`authEnabledSetting`, bcrypt) | done (`standalone_auth.go`: bcrypt login, sessions, LAN bypass) | `internal/webui` + `internal/auth` |
 | Persistent settings from the UI | `uiweb_v2_settings*` | done (`settings.json`, page `/ui/settings`) | `settings.json` + `internal/settings` |
 | First-run wizard | `uiweb_v2_setup.go` (527 lines, 5 steps: Access, Folders, Sources, First title, Activate) | done (`cmd/gx-torrent/setup.go`, `internal/webui/assets/setup.html`) | `internal/webui/setup` |
 | Categories, tags, path per category | yes | done (`cmd/gx-torrent/ui_categories.go`) | `internal/gxcore` |
@@ -182,15 +181,6 @@ dragging all of Gextto along. They have been **extracted into `internal/rss` and
   **graduated file priority (done, §4.11)** and disk I/O (**opt-in mmap + batched
   durability done, §5.4; contiguous writes not necessary without measurements**). These are
   "cherry-picks" (§11), not blockers.
-
-### 4.3 Technical debt (resolved)
-
-- The reusable packages have been extracted from `cmd/gx-torrent`: the queue logic
-  in `internal/queue`, the web layer and the assets in `internal/webui`, RSS and
-  Torznab in `internal/rss` and `internal/torznab`.
-- The UI assets live in `internal/webui/assets` behind `embed.FS` and the
-  template of `ui.go` is compiled **lazily** at first use (`sync.Once`), not
-  in Go strings at startup.
 
 ---
 
@@ -493,8 +483,6 @@ also applies to all subsequent phases: **every commit must leave Gextto
 unchanged**.
 
 ### 12.1 Implementation status
-
-Updated to 2026-10-11.
 
 **Agreed next items** (in order of work), then we will talk again about the remaining
 points:
