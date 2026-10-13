@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// newRoutingTable starts an empty table: tree, address book and subnet
+// counters.
 func newRoutingTable(log *DebugLogger) *routingTable {
 	return &routingTable{
 		nTree:       &nTree{},
@@ -16,39 +18,36 @@ func newRoutingTable(log *DebugLogger) *routingTable {
 	}
 }
 
+// routingTable pairs the Kademlia id tree with an address book, the
+// neighborhood boundary, and the anti-Sybil per-subnet accounting.
 type routingTable struct {
 	*nTree
-	// addresses is a map of UDP addresses in host:port format and
-	// remoteNodes. A string is used because it's not possible to create
-	// a map using net.UDPAddr
-	// as a key.
+	// addresses maps "host:port" strings to nodes (net.UDPAddr is no map key).
 	addresses map[string]*remoteNode
 
-	// Neighborhood.
-	nodeId       string // This shouldn't be here. Move neighborhood upkeep one level up?
+	// Neighborhood tracking.
+	nodeId       string
 	boundaryNode *remoteNode
-	// How many prefix bits are shared between boundaryNode and nodeId.
+	// proximity counts the prefix bits shared by boundaryNode and nodeId.
 	proximity int
 
-	// maxPerSubnet caps routing-table nodes per /24 (v4) or /48 (v6); 0 = off.
+	// maxPerSubnet caps tree nodes per /24 (v4) or /48 (v6); 0 disables.
 	maxPerSubnet int
-	// subnetNodes counts, per subnet key, how many nodes currently occupy a
-	// routing-tree slot. It is maintained incrementally (insert/update/kill) so
-	// subnetAtCap is O(1) instead of scanning every address.
+	// subnetNodes counts tree occupants per subnet key, maintained
+	// incrementally so cap checks stay O(1).
 	subnetNodes map[string]int
 
 	log *DebugLogger
 }
 
-// hasSubnetSlot reports whether node occupies a routing-tree slot (the
-// invariant the incremental counter mirrors).
+// hasSubnetSlot tells whether node holds a tree slot (the invariant the
+// counter mirrors): live, identified, addressed, and subnetted.
 func (r *routingTable) hasSubnetSlot(n *remoteNode) bool {
 	return n != nil && !n.noTree && !bogusId(n.id) && n.address.IP != nil && subnetKey(n.address.IP) != ""
 }
 
-// trackSubnet adds or removes node from the per-subnet counter. It is
-// idempotent (guarded by node.countedSubnet) and must be called exactly when a
-// node gains or loses its routing-tree slot.
+// trackSubnet moves node into (add) or out of the subnet counter.
+// Idempotent via countedSubnet; call exactly on slot gain/loss.
 func (r *routingTable) trackSubnet(n *remoteNode, add bool) {
 	key := subnetKey(n.address.IP)
 	if key == "" {
@@ -74,10 +73,9 @@ func (r *routingTable) trackSubnet(n *remoteNode, add bool) {
 	}
 }
 
-// subnetAtCap reports whether adding a node with this IP would exceed the
-// per-subnet cap. counted says whether the node being inserted or updated is
-// already part of subnetNodes (an update of an existing node), so its own slot
-// does not count against itself. Always false when the cap is disabled.
+// subnetAtCap reports a full subnet for ip. counted marks an already-slotted
+// node under update, whose own slot must not count against itself. False
+// with the cap off.
 func (r *routingTable) subnetAtCap(ip net.IP, counted bool) bool {
 	if r.maxPerSubnet <= 0 {
 		return false
@@ -93,8 +91,9 @@ func (r *routingTable) subnetAtCap(ip net.IP, counted bool) bool {
 	return n >= r.maxPerSubnet
 }
 
-// hostPortToNode finds a node based on the specified hostPort specification,
-// which should be a UDP address in the form "host:port".
+// hostPortToNode resolves hostPort ("host:port", DNS allowed) into the known
+// node, address string and presence. Empty input is a programming bug and
+// panics; nil table entries and empty resolutions error.
 func (r *routingTable) hostPortToNode(hostPort string, port string) (node *remoteNode, addr string, existed bool, err error) {
 	if hostPort == "" {
 		panic("programming error: hostPortToNode received a nil hostPort")
@@ -113,10 +112,13 @@ func (r *routingTable) hostPortToNode(hostPort string, port string) (node *remot
 	return n, address.String(), existed, nil
 }
 
+// length counts address-book entries.
 func (r *routingTable) length() int {
 	return len(r.addresses)
 }
 
+// reachableNodes exports the reachable, identified nodes for persistence,
+// publishing the count per local id as an expvar gauge.
 func (r *routingTable) reachableNodes() (tbl map[string][]byte) {
 	tbl = make(map[string][]byte)
 	for addr, r := range r.addresses {
@@ -130,21 +132,20 @@ func (r *routingTable) reachableNodes() (tbl map[string][]byte) {
 	}
 
 	hexId := fmt.Sprintf("%x", r.nodeId)
-	// This creates a new expvar everytime, but the alternative is too
-	// bothersome (get the current value, type cast it, ensure it
-	// exists..). Also I'm not using NewInt because I don't want to publish
-	// the value.
+	// A fresh expvar per call: simpler than fetching, casting and ensuring
+	// the published value, and deliberately not a NewInt gauge.
 	v := new(expvar.Int)
 	v.Set(int64(len(tbl)))
 	reachableNodes.Set(hexId, v)
 	return
-
 }
 
+// numNodes counts address-book entries.
 func (r *routingTable) numNodes() int {
 	return len(r.addresses)
 }
 
+// isValidAddr requires a non-empty host:port.
 func isValidAddr(addr string) bool {
 	if addr == "" {
 		return false
@@ -155,8 +156,9 @@ func isValidAddr(addr string) bool {
 	return true
 }
 
-// update the existing routingTable entry for this node by setting its correct
-// infohash id. Gives an error if the node was not found.
+// update re-identifies a known node: capped subnets keep the address-book
+// entry id-labelled but slotless (noTree), so it is neither re-discovered
+// in a loop nor counted; others enter the tree and the counter.
 func (r *routingTable) update(node *remoteNode, proto string) error {
 	_, addr, existed, err := r.hostPortToNode(node.address.String(), proto)
 	if err != nil {
@@ -170,9 +172,6 @@ func (r *routingTable) update(node *remoteNode, proto string) error {
 	}
 	if node.id != "" {
 		if r.subnetAtCap(node.address.IP, node.countedSubnet) {
-			// The subnet is at the cap: keep the node in the address book but
-			// deny it a tree slot, so it is not re-discovered and re-processed
-			// in a loop.
 			totalNodesCapped.Add(1)
 			r.trackSubnet(node, false)
 			node.noTree = true
@@ -188,8 +187,10 @@ func (r *routingTable) update(node *remoteNode, proto string) error {
 	return nil
 }
 
-// insert the provided node into the routing table. Gives an error if another
-// node already existed with that address.
+// insert admits a node: port-less and unspecified addresses refuse, known
+// addresses report success without duplicating, capped subnets stay
+// slotless in the book, and identified, uncapped nodes join the tree and
+// the counters.
 func (r *routingTable) insert(node *remoteNode, proto string) error {
 	if node.address.Port == 0 {
 		return fmt.Errorf("routingTable.insert() got a node with Port=0")
@@ -206,20 +207,15 @@ func (r *routingTable) insert(node *remoteNode, proto string) error {
 
 	}
 	if existed {
-		return nil // fmt.Errorf("node already existed in routing table: %v", node.address.String())
+		return nil
 	}
 	if !bogusId(node.id) && r.subnetAtCap(node.address.IP, node.countedSubnet) {
-		// The subnet is already at the cap: keep the node in the address book
-		// but deny it a tree slot (noTree), so it is not re-processed in a
-		// loop and does not count towards the cap itself.
 		totalNodesCapped.Add(1)
 		node.noTree = true
 	}
 	r.addresses[addr] = node
 	knownNodes.Store(int64(len(r.addresses)))
-	// We don't know the ID of all nodes.
 	if !bogusId(node.id) && !node.noTree {
-		// recursive version of node insertion.
 		r.nTree.insert(node)
 		totalNodes.Add(1)
 		r.trackSubnet(node, true)
@@ -227,10 +223,8 @@ func (r *routingTable) insert(node *remoteNode, proto string) error {
 	return nil
 }
 
-// getOrCreateNode returns a node for hostPort, which can be an IP:port or
-// Host:port, which will be resolved if possible.  Preferably return an entry
-// that is already in the routing table, but create a new one otherwise, thus
-// being idempotent.
+// getOrCreateNode returns the known node for hostPort (IP:port or DNS,
+// resolved when new), creating and inserting it when absent: idempotent.
 func (r *routingTable) getOrCreateNode(id string, hostPort string, proto string) (node *remoteNode, err error) {
 	node, addr, existed, err := r.hostPortToNode(hostPort, proto)
 	if err != nil {
@@ -247,6 +241,8 @@ func (r *routingTable) getOrCreateNode(id string, hostPort string, proto string)
 	return node, r.insert(node, proto)
 }
 
+// kill drops a node from book, counters and tree, resets the neighborhood
+// boundary when it dies, and marks its contacts dead in the peer store.
 func (r *routingTable) kill(n *remoteNode, p *peerStore) {
 	r.trackSubnet(n, false)
 	delete(r.addresses, n.address.String())
@@ -260,52 +256,49 @@ func (r *routingTable) kill(n *remoteNode, p *peerStore) {
 	p.killContact(decodeCompactPeerAddr(n.addressBinaryFormat))
 }
 
+// resetNeighborhoodBoundary promotes the most distant known neighbor to
+// boundary, recomputing proximity (zeroed when neighborless).
 func (r *routingTable) resetNeighborhoodBoundary() {
 	r.proximity = 0
-	// Try to find a distant one within the neighborhood and promote it as
-	// the most distant node in the neighborhood.
 	neighbors := r.lookup(InfoHash(r.nodeId))
 	if len(neighbors) > 0 {
 		r.boundaryNode = neighbors[len(neighbors)-1]
 		r.proximity = commonBits(r.nodeId, r.boundaryNode.id)
 	}
-
 }
 
+// cleanup sweeps the address book: mismatched or empty addresses die;
+// reachable nodes with no queries queue a ping, stale ones (2 missed
+// cycles) die, fresh ones rest; unreachable nodes past the pending cap die.
+// Survivors needing probes return in needPing. Timed in debug (a few
+// thousand nodes sweep in tens of ms).
 func (r *routingTable) cleanup(cleanupPeriod time.Duration, p *peerStore) (needPing []*remoteNode) {
 	needPing = make([]*remoteNode, 0, 10)
 	t0 := time.Now()
-	// Needs some serious optimization.
 	for addr, n := range r.addresses {
-		if addr != n.address.String() {
+		switch {
+		case addr != n.address.String():
 			(*r.log).Debugf("cleanup: node address mismatches: %v != %v. Deleting node", addr, n.address.String())
 			r.kill(n, p)
 			continue
-		}
-		if addr == "" {
+		case addr == "":
 			(*r.log).Debugf("cleanup: found empty address for node %x. Deleting node", n.id)
 			r.kill(n, p)
 			continue
-		}
-		if n.reachable {
+		case n.reachable:
 			if len(n.pendingQueries) == 0 {
 				goto PING
 			}
-			// Tolerate 2 cleanup cycles.
 			if time.Since(n.lastResponseTime) > cleanupPeriod*2+(cleanupPeriod/15) {
 				(*r.log).Debugf("DHT: Old node seen %v ago. Deleting", time.Since(n.lastResponseTime))
 				r.kill(n, p)
 				continue
 			}
 			if time.Since(n.lastResponseTime).Nanoseconds() < cleanupPeriod.Nanoseconds()/2 {
-				// Seen recently. Don't need to ping.
 				continue
 			}
-
-		} else {
-			// Not reachable.
+		default:
 			if len(n.pendingQueries) > maxNodePendingQueries {
-				// Didn't reply to 2 consecutive queries.
 				(*r.log).Debugf("DHT: Node never replied to ping. Deleting. %v", n.address)
 				r.kill(n, p)
 				continue
@@ -314,17 +307,12 @@ func (r *routingTable) cleanup(cleanupPeriod time.Duration, p *peerStore) (needP
 	PING:
 		needPing = append(needPing, n)
 	}
-	duration := time.Since(t0)
-	// If this pauses the server for too long I may have to segment the cleanup.
-	// 2000 nodes: it takes ~12ms
-	// 4000 nodes: ~24ms.
-	(*r.log).Debugf("DHT: Routing table cleanup took %v\n", duration)
+	(*r.log).Debugf("DHT: Routing table cleanup took %v\n", time.Since(t0))
 	return needPing
 }
 
-// neighborhoodUpkeep will update the routingtable if the node n is closer than
-// the 8 nodes in our neighborhood, by replacing the least close one
-// (boundary). n.id is assumed to have length 20.
+// neighborhoodUpkeep absorbs node n when neighborless, underpopulated, or
+// strictly closer than the boundary (zero shared bits do not qualify).
 func (r *routingTable) neighborhoodUpkeep(n *remoteNode, proto string, p *peerStore) {
 	if r.boundaryNode == nil {
 		r.addNewNeighbor(n, false, proto, p)
@@ -336,7 +324,6 @@ func (r *routingTable) neighborhoodUpkeep(n *remoteNode, proto string, p *peerSt
 	}
 	cmp := commonBits(r.nodeId, n.id)
 	if cmp == 0 {
-		// Not significantly better.
 		return
 	}
 	if cmp > r.proximity {
@@ -345,13 +332,14 @@ func (r *routingTable) neighborhoodUpkeep(n *remoteNode, proto string, p *peerSt
 	}
 }
 
+// addNewNeighbor inserts n, displacing the boundary (which recomputes it)
+// or recomputing it directly; insert failures only log.
 func (r *routingTable) addNewNeighbor(n *remoteNode, displaceBoundary bool, proto string, p *peerStore) {
 	if err := r.insert(n, proto); err != nil {
 		(*r.log).Debugf("addNewNeighbor error: %v", err)
 		return
 	}
 	if displaceBoundary && r.boundaryNode != nil {
-		// This will also take care of setting a new boundary.
 		r.kill(r.boundaryNode, p)
 	} else {
 		r.resetNeighborhoodBoundary()
@@ -359,10 +347,9 @@ func (r *routingTable) addNewNeighbor(n *remoteNode, displaceBoundary bool, prot
 	(*r.log).Debugf("New neighbor added %s with proximity %d", decodeCompactPeerAddr(n.addressBinaryFormat), r.proximity)
 }
 
-// pingSlowly pings the remote nodes in needPing, distributing the pings
-// throughout an interval of cleanupPeriod, to avoid network traffic bursts. It
-// doesn't really send the pings, but signals to the main goroutine that it
-// should ping the nodes, using the pingRequest channel.
+// pingSlowly spaces probe signals over the cleanup period (minus a minute)
+// so pings do not burst. Sends honor stop: after Run exits nobody reads
+// pingRequest, and a bare send would wedge Stop forever.
 func pingSlowly(pingRequest chan *remoteNode, needPing []*remoteNode, cleanupPeriod time.Duration, stop chan bool) {
 	if len(needPing) == 0 {
 		return
@@ -370,9 +357,6 @@ func pingSlowly(pingRequest chan *remoteNode, needPing []*remoteNode, cleanupPer
 	duration := cleanupPeriod - (1 * time.Minute)
 	perPingWait := duration / time.Duration(len(needPing))
 	for _, r := range needPing {
-		// The send must also honor stop: once the run loop has exited nobody
-		// reads pingRequest, so a bare send would block forever and Stop() would
-		// never return (wg.Wait would hang).
 		select {
 		case pingRequest <- r:
 		case <-stop:
@@ -387,18 +371,13 @@ func pingSlowly(pingRequest chan *remoteNode, needPing []*remoteNode, cleanupPer
 }
 
 var (
-	// totalKilledNodes is a monotonically increasing counter of times nodes were killed from
-	// the routing table. If a node is later added to the routing table and killed again, it is
-	// counted twice.
+	// totalKilledNodes counts routing-table kills, repeats included.
 	totalKilledNodes = expvar.NewInt("totalKilledNodes")
-	// totalNodes is a monotonically increasing counter of times nodes were added to the routing
-	// table. If a node is removed then later added again, it is counted twice.
+	// totalNodes counts routing-table admissions, repeats included.
 	totalNodes = expvar.NewInt("totalNodes")
-	// totalNodesCapped counts nodes kept out of the ID tree because their
-	// subnet already had MaxNodesPerSubnet entries (0 cap = never fires).
+	// totalNodesCapped counts nodes denied a tree slot by the subnet cap
+	// (never fires with the cap off).
 	totalNodesCapped = expvar.NewInt("totalNodesCapped")
-	// reachableNodes is the count of all reachable nodes from a particular DHT node. The map
-	// key is the local node's infohash. The value is a gauge with the count of reachable nodes
-	// at the latest time the routing table was persisted on disk.
+	// reachableNodes gauges reachable nodes per local id at last persist.
 	reachableNodes = expvar.NewMap("reachableNodes")
 )
