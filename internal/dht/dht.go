@@ -673,7 +673,7 @@ func (d *DHT) processPacket(p packetType) {
 		d.DebugLogger.Debugf("Node exceeded rate limiter. Dropping packet.")
 		return
 	}
-	if p.b[0] != 'd' {
+	if len(p.b) == 0 || p.b[0] != 'd' {
 		// Malformed DHT packet. There are protocol extensions out
 		// there that we don't support or understand.
 		d.DebugLogger.Debugf("Malformed DHT packet.")
@@ -685,134 +685,143 @@ func (d *DHT) processPacket(p packetType) {
 		return
 	}
 	switch {
-	// Response.
 	case r.Y == "r":
-		d.DebugLogger.Debugf("DHT processing response from %x", r.R.Id)
-		if bogusId(r.R.Id) {
-			d.DebugLogger.Debugf("DHT received packet with bogus node id %x", r.R.Id)
-			return
-		}
-		if r.R.Id == d.nodeId {
-			d.DebugLogger.Debugf("DHT received reply from self, id %x", r.A.Id)
-			return
-		}
-		// BEP 42: the responder tells us our external IP; adopt a secure node
-		// ID for it once, if the external IP was not configured at startup.
-		d.noteExternalIP(r.R.IP)
-		node, addr, existed, err := d.routingTable.hostPortToNode(p.raddr.String(), d.config.UDPProto)
-		if err != nil {
-			d.DebugLogger.Debugf("DHT readResponse error processing response: %v", err)
-			return
-		}
-		if !existed {
-			d.DebugLogger.Debugf("DHT: Received reply from a host we don't know: %v", p.raddr)
-			if d.routingTable.length() < d.config.MaxNodes {
-				d.ping(addr)
-			}
-			return
-		}
-		// Fix the node ID.
-		if node.id == "" {
-			node.id = r.R.Id
-			d.routingTable.update(node, d.config.UDPProto)
-		}
-		if node.id != r.R.Id {
-			d.DebugLogger.Debugf("DHT: Node changed IDs %x => %x", node.id, r.R.Id)
-		}
-		if query, ok := node.pendingQueries[r.T]; ok {
-			d.DebugLogger.Debugf("DHT: Received reply to %v", query.Type)
-			if !node.reachable {
-				node.reachable = true
-				totalNodesReached.Add(1)
-			}
-			node.lastResponseTime = time.Now()
-			// The reply answers a query we sent: trust its "ip" field enough to
-			// note our reflected external address (and the NAT mapping type).
-			// BEP 42 puts "ip" at the top level; early gx-core builds put it
-			// inside "r", still read as a fallback.
-			reflected := r.IP
-			if reflected == "" {
-				reflected = r.R.IP
-			}
-			recordReflected(reflected, p.raddr.IP)
-			node.pastQueries[r.T] = query
-			d.routingTable.neighborhoodUpkeep(node, d.config.UDPProto, d.peerStore)
-
-			// If this is the first host added to the routing table, attempt a
-			// recursive lookup of our own address, to build our neighborhood ASAP.
-			if d.needMoreNodes() {
-				d.DebugLogger.Debugf("DHT: need more nodes")
-				d.findNode(d.nodeId)
-			}
-			d.exploredNeighborhood = true
-
-			switch query.Type {
-			case "ping":
-				// Served its purpose, nothing else to be done.
-				totalRecvPingReply.Add(1)
-			case "get_peers":
-				d.DebugLogger.Debugf("DHT: got get_peers response")
-				d.processGetPeerResults(node, r)
-			case "find_node":
-				d.DebugLogger.Debugf("DHT: got find_node response")
-				d.processFindNodeResults(node, r)
-			case "announce_peer":
-				// Nothing to do. In the future, update counters.
-			case "get", "put":
-				// BEP 44 outbound: a reply to our own get/put.
-				d.handleBep44Reply(node, p, query)
-			default:
-				d.DebugLogger.Debugf("DHT: Unknown query type: %v from %v", query.Type, addr)
-			}
-			delete(node.pendingQueries, r.T)
-		} else {
-			d.DebugLogger.Debugf("DHT: Unknown query id: %v", r.T)
-		}
+		d.handleResponsePacket(p, r)
 	case r.Y == "q":
-		if r.A.Id == d.nodeId {
-			d.DebugLogger.Debugf("DHT received packet from self, id %x", r.A.Id)
-			return
-		}
-		// BEP 43: a read-only node does not answer queries.
-		if d.config.ReadOnly {
-			return
-		}
-		node, addr, existed, err := d.routingTable.hostPortToNode(p.raddr.String(), d.config.UDPProto)
-		if err != nil {
-			d.DebugLogger.Debugf("Error readResponse error processing query: %v", err)
-			return
-		}
-		// BEP 43: never add a read-only sender to the routing table (it would
-		// waste a ping and cause it more traffic).
-		if !existed && r.Ro != 1 {
-			// Another candidate for the routing table. See if it's reachable.
-			if d.routingTable.length() < d.config.MaxNodes {
-				d.ping(addr)
-			}
-		}
-		d.DebugLogger.Debugf("DHT processing %v request", r.Q)
-		switch r.Q {
-		case "ping":
-			totalRecvPing.Add(1)
-			d.replyPing(p.raddr, r)
-		case "get_peers":
-			// totalRecvGetPeers is counted in replyGetPeers.
-			d.replyGetPeers(p.raddr, r)
-		case "find_node":
-			// totalRecvFindNode is counted in replyFindNode.
-			d.replyFindNode(p.raddr, r)
-		case "announce_peer":
-			totalRecvAnnouncePeer.Add(1)
-			d.replyAnnouncePeer(p.raddr, node, r)
-		case "get":
-			d.replyGet(p.raddr, p.b)
-		case "put":
-			d.replyPut(p.raddr, p.b)
-		default:
-			d.DebugLogger.Debugf("DHT: non-implemented handler for type %v", r.Q)
-		}
+		d.handleQueryPacket(p, r)
 	default:
 		d.DebugLogger.Debugf("DHT: Bogus DHT query from %v.", p.raddr)
+	}
+}
+
+// handleResponsePacket routes a reply: sender bookkeeping (BEP 42 reflected
+// address, id fix-ups, reachability, neighborhood), then dispatch by the
+// answered query kind. Unknown senders get one ping when the table has room.
+func (d *DHT) handleResponsePacket(p packetType, r responseType) {
+	d.DebugLogger.Debugf("DHT processing response from %x", r.R.Id)
+	if bogusId(r.R.Id) {
+		d.DebugLogger.Debugf("DHT received packet with bogus node id %x", r.R.Id)
+		return
+	}
+	if r.R.Id == d.nodeId {
+		d.DebugLogger.Debugf("DHT received reply from self, id %x", r.A.Id)
+		return
+	}
+	// BEP 42: the responder tells us our external IP; adopt a secure node
+	// ID for it once, if the external IP was not configured at startup.
+	d.noteExternalIP(r.R.IP)
+	node, addr, existed, err := d.routingTable.hostPortToNode(p.raddr.String(), d.config.UDPProto)
+	if err != nil {
+		d.DebugLogger.Debugf("DHT readResponse error processing response: %v", err)
+		return
+	}
+	if !existed {
+		d.DebugLogger.Debugf("DHT: Received reply from a host we don't know: %v", p.raddr)
+		if d.routingTable.length() < d.config.MaxNodes {
+			d.ping(addr)
+		}
+		return
+	}
+	// Fix the node ID.
+	if node.id == "" {
+		node.id = r.R.Id
+		d.routingTable.update(node, d.config.UDPProto)
+	}
+	if node.id != r.R.Id {
+		d.DebugLogger.Debugf("DHT: Node changed IDs %x => %x", node.id, r.R.Id)
+	}
+	if query, ok := node.pendingQueries[r.T]; ok {
+		d.DebugLogger.Debugf("DHT: Received reply to %v", query.Type)
+		d.absorbReply(node, addr, p, r, query)
+	} else {
+		d.DebugLogger.Debugf("DHT: Unknown query id: %v", r.T)
+	}
+}
+
+// absorbReply folds one answered query into the node: reachability,
+// reflected address (BEP 42), neighborhood, table refill, then dispatch by
+// query kind.
+func (d *DHT) absorbReply(node *remoteNode, addr string, p packetType, r responseType, query *queryType) {
+	if !node.reachable {
+		node.reachable = true
+		totalNodesReached.Add(1)
+	}
+	node.lastResponseTime = time.Now()
+	reflected := r.IP
+	if reflected == "" {
+		reflected = r.R.IP
+	}
+	recordReflected(reflected, p.raddr.IP)
+	node.pastQueries[r.T] = query
+	d.routingTable.neighborhoodUpkeep(node, d.config.UDPProto, d.peerStore)
+
+	// First host in the table: look ourselves up recursively to build the
+	// neighborhood ASAP.
+	if d.needMoreNodes() {
+		d.DebugLogger.Debugf("DHT: need more nodes")
+		d.findNode(d.nodeId)
+	}
+	d.exploredNeighborhood = true
+
+	switch query.Type {
+	case "ping":
+		totalRecvPingReply.Add(1)
+	case "get_peers":
+		d.DebugLogger.Debugf("DHT: got get_peers response")
+		d.processGetPeerResults(node, r)
+	case "find_node":
+		d.DebugLogger.Debugf("DHT: got find_node response")
+		d.processFindNodeResults(node, r)
+	case "announce_peer":
+		// Nothing to do. In the future, update counters.
+	case "get", "put":
+		// BEP 44 outbound: a reply to our own get/put.
+		d.handleBep44Reply(node, p, query)
+	default:
+		d.DebugLogger.Debugf("DHT: Unknown query type: %v from %v", query.Type, addr)
+	}
+	delete(node.pendingQueries, r.T)
+}
+
+// handleQueryPacket answers an inbound query: self-messages drop,
+// read-only nodes stay silent (BEP 43), unknown senders get one reachability
+// ping (unless read-only flagged), then dispatch by query kind.
+func (d *DHT) handleQueryPacket(p packetType, r responseType) {
+	if r.A.Id == d.nodeId {
+		d.DebugLogger.Debugf("DHT received packet from self, id %x", r.A.Id)
+		return
+	}
+	if d.config.ReadOnly {
+		return
+	}
+	node, addr, existed, err := d.routingTable.hostPortToNode(p.raddr.String(), d.config.UDPProto)
+	if err != nil {
+		d.DebugLogger.Debugf("Error readResponse error processing query: %v", err)
+		return
+	}
+	if !existed && r.Ro != 1 {
+		if d.routingTable.length() < d.config.MaxNodes {
+			d.ping(addr)
+		}
+	}
+	d.DebugLogger.Debugf("DHT processing %v request", r.Q)
+	switch r.Q {
+	case "ping":
+		totalRecvPing.Add(1)
+		d.replyPing(p.raddr, r)
+	case "get_peers":
+		d.replyGetPeers(p.raddr, r)
+	case "find_node":
+		d.replyFindNode(p.raddr, r)
+	case "announce_peer":
+		totalRecvAnnouncePeer.Add(1)
+		d.replyAnnouncePeer(p.raddr, node, r)
+	case "get":
+		d.replyGet(p.raddr, p.b)
+	case "put":
+		d.replyPut(p.raddr, p.b)
+	default:
+		d.DebugLogger.Debugf("DHT: non-implemented handler for type %v", r.Q)
 	}
 }
 
