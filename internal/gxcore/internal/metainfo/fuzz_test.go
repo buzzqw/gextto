@@ -24,3 +24,25 @@ func FuzzMetaInfoNew(f *testing.F) {
 		_, _ = New(bytes.NewReader(b))
 	})
 }
+
+// FuzzParseFileTree feeds arbitrary bytes to the BEP 52 "file tree" parser.
+func FuzzParseFileTree(f *testing.F) {
+	f.Add([]byte("d4:name1:x4:lengthi0ee"))
+	f.Add([]byte("d0:d4:name1:x4:lengthi1eeee"))
+	f.Add([]byte("de"))
+	f.Fuzz(func(t *testing.T, b []byte) {
+		_, _ = ParseFileTree(b)
+	})
+}
+
+// FuzzParseInfo feeds arbitrary bytes to the info-dictionary parser, including
+// the v2 and piece-layer paths.
+func FuzzParseInfo(f *testing.F) {
+	f.Add([]byte("d4:name1:x11:piece lengthi16384e6:pieces20:aaaaaaaaaaaaaaaaaaaae"))
+	f.Add([]byte("d4:name1:x4:lengthi0ee"))
+	f.Add([]byte("de"))
+	f.Fuzz(func(t *testing.T, b []byte) {
+		_, _ = ParseInfo(b, true, true, nil)
+		_, _ = DecodePieceLayers(b)
+	})
+}

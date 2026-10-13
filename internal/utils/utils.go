@@ -482,7 +482,18 @@ func TorrentName(bytes []byte) (string, bool) {
 	return "", false
 }
 
+// maxBencodeDepth bounds the recursion of bencodeValueEnd so a deeply nested
+// (hostile) .torrent cannot overflow the stack.
+const maxBencodeDepth = 64
+
 func bencodeValueEnd(bytes []byte, start int) (int, bool) {
+	return bencodeValueEndDepth(bytes, start, 0)
+}
+
+func bencodeValueEndDepth(bytes []byte, start, depth int) (int, bool) {
+	if depth > maxBencodeDepth {
+		return 0, false
+	}
 	if start >= len(bytes) {
 		return 0, false
 	}
@@ -496,7 +507,7 @@ func bencodeValueEnd(bytes []byte, start int) (int, bool) {
 	case bytes[start] == 'l':
 		index := start + 1
 		for index < len(bytes) && bytes[index] != 'e' {
-			next, ok := bencodeValueEnd(bytes, index)
+			next, ok := bencodeValueEndDepth(bytes, index, depth+1)
 			if !ok {
 				return 0, false
 			}
@@ -509,11 +520,11 @@ func bencodeValueEnd(bytes []byte, start int) (int, bool) {
 	case bytes[start] == 'd':
 		index := start + 1
 		for index < len(bytes) && bytes[index] != 'e' {
-			next, ok := bencodeValueEnd(bytes, index)
+			next, ok := bencodeValueEndDepth(bytes, index, depth+1)
 			if !ok {
 				return 0, false
 			}
-			next, ok = bencodeValueEnd(bytes, next)
+			next, ok = bencodeValueEndDepth(bytes, next, depth+1)
 			if !ok {
 				return 0, false
 			}
@@ -529,7 +540,7 @@ func bencodeValueEnd(bytes []byte, start int) (int, bool) {
 			return 0, false
 		}
 		length, err := strconv.Atoi(string(bytes[start:colon]))
-		if err != nil {
+		if err != nil || length < 0 || length > len(bytes)-colon-1 {
 			return 0, false
 		}
 		return colon + 1 + length, true
