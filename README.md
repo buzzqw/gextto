@@ -155,7 +155,10 @@ with a 75%-complete source, 25% of the file came from the network instead of
 
 **Network.** TCP and uTP (BEP 29) in parallel with automatic fallback on a
 single port — one UDP socket carries uTP and DHT, handshakes routed by
-info-hash. Full `ut_holepunch` (BEP 55) across NATs, as client and relay.
+info-hash. uTP retransmission adapts to the link: a 5 ms latency floor stops
+sub-millisecond RTO storms on fast paths, and a per-connection backoff retries
+a silent or congested peer with growing patience (measured: half the resends).
+Full `ut_holepunch` (BEP 55) across NATs, as client and relay.
 UPnP, NAT-PMP and **PCP** (RFC 6887); a port check that also reads the
 external port seen by the DHT (cone vs symmetric NAT); SOCKS5 and HTTP CONNECT
 proxies; an interface-binding killswitch (`outgoing-interface`) that keeps all

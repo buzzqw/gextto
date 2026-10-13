@@ -158,8 +158,11 @@ I torrent privati non vengono mai mescolati (BEP 27).
 
 **Rete.** TCP e uTP (BEP 29) in parallelo con fallback automatico su una sola
 porta — un unico socket UDP porta uTP e DHT, con handshake instradati per
-info-hash. `ut_holepunch` completo (BEP 55) attraverso i NAT, come client e
-come relay. UPnP, NAT-PMP e **PCP** (RFC 6887); test della porta che legge
+info-hash. La ritrasmissione uTP si adatta al collegamento: un pavimento di
+latenza di 5 ms evita le tempeste di RTO sub-millisecondo sui percorsi veloci,
+e un backoff per connessione riprova un peer silenzioso o congestionato con
+pazienza crescente (misurato: metà delle ritrasmissioni). `ut_holepunch`
+completo (BEP 55) attraverso i NAT, come client e come relay. UPnP, NAT-PMP e **PCP** (RFC 6887); test della porta che legge
 anche la porta esterna vista dal DHT (NAT cone o simmetrico); proxy SOCKS5 e
 HTTP CONNECT; killswitch legato all'interfaccia (`outgoing-interface`) che
 tiene tutto il traffico BitTorrent sulla VPN. Il DHT (`internal/dht`) copre
