@@ -180,6 +180,24 @@ engine logger is `internal/gxcore/logging` and the backoff is
 of the derived components have been restored in their respective `LICENSE` files and
 collected in `THIRD-PARTY-NOTICES`; the network identity is `"gx-core " + Version`.
 
+**Done (2026-10-13): full in-tree rewrite.** Every file of `internal/gxcore`
+(~130 files, ex rain v2.4.2) and `internal/dht` (8 files, ex nictuku/dht) was
+rewritten in this repository — structure, comments and logic re-expressed with
+APIs, wire formats and behaviours preserved — in stacked branches
+(`de-rain`, `original-a`, `original-b`, `original-c`, `original-d`), each
+verified with `make test` green before push. Measured against the upstream
+bases (import paths normalised): zero byte-identical files remain; residual
+line matches are protocol-mandated formats (BEP wire layouts, bencode tags,
+API shapes) and compatibility-kept strings (error/log texts, resume-DB and
+flag spellings), plus algorithm bodies where any correct Go implementation
+converges. On that basis the per-component `LICENSE` files
+(`internal/gxcore/LICENSE`, `internal/dht/LICENSE`) were removed and
+`NOTICE`, `THIRD-PARTY-NOTICES` (now linked-libraries only), READMEs,
+`ARCHITECTURE.md`, `AGENTS.md` and the engine docs updated; the provenance
+record stays here and in git history. Wire-critical equivalences were proved
+by execution where it mattered most (old<->new MSE handshake cross-check over
+net.Pipe, fast-set byte identity, resume-DB and RPC shapes byte-identical).
+
 ### 1.6 In-depth performance check (CPU and RAM)
 
 **Point.** Periodically carry out an in-depth performance check

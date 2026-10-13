@@ -208,7 +208,7 @@ provides the stubs (`//go:build !cgo`), `libtorrent.go` stays unchanged and
 | `internal/tui` | terminal client (TUI). |
 | `internal/auth` | access control of the standalone daemon: password hashing and login sessions (`/ui/login`); the managed mode does not use it. |
 | `internal/dht` | DHT implementation, a module of its own under the main module. |
-| `internal/gxcore` | gx-core torrent engine (the `gx-torrent` binary): our code with portions derived from MIT/BSD projects. |
+| `internal/gxcore` | gx-core torrent engine (the `gx-torrent` binary): our original code (early versions built on MIT/BSD bases, since rewritten). |
 | `internal/queue` | manager of the gx-torrent queue (which torrents to run). |
 | `internal/rss` | parsing of RSS/Atom/Torznab feeds and HTML listings (ext.to, TorrentGalaxy: `listing.go`), ordered rules and episode filter. |
 | `internal/settings` | persistent key/value store of the gx-torrent standalone mode. |

@@ -55,8 +55,8 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 
 ## Motore gx-core (`internal/gxcore`)
 - `internal/gxcore` è il **motore** di gx-core (il binario `gx-torrent`), codice
-  nostro con porzioni derivate da progetti MIT/BSD (vedi
-  `internal/gxcore/LICENSE` e `internal/dht/LICENSE`), parte del modulo
+  nostro originale, scritto in questo repository (le basi permissive
+  iniziali sono state riscritte file per file), parte del modulo
   principale come `github.com/buzzqw/gextto/internal/gxcore`. Lo usano
   `cmd/gx-torrent` e i test.
 - Panoramica e inventario delle funzionalità del motore:

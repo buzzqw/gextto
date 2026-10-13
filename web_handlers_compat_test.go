@@ -318,8 +318,10 @@ func TestThirdPartyNoticesMatchGoMod(t *testing.T) {
 		}
 	}
 	notices := uiThirdPartyText
-	if !strings.Contains(notices, "Boost Software License") || !strings.Contains(notices, "internal/gxcore") {
-		t.Fatal("THIRD-PARTY-NOTICES lost the Boost or gx-core section")
+	// In-tree engine code (internal/gxcore, internal/dht) is original and
+	// needs no section; the linked distributions must keep theirs.
+	if !strings.Contains(notices, "Boost Software License") || !strings.Contains(notices, "libtorrent-rasterbar") {
+		t.Fatal("THIRD-PARTY-NOTICES lost the Boost or libtorrent section")
 	}
 	checked := 0
 	lines := strings.Split(notices, "\n")

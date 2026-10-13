@@ -6,11 +6,16 @@ See LICENSE for the complete licence text.
 
 Third-party components
 ----------------------
-Gextto includes code derived from permissively licensed projects (gx-core in
-internal/gxcore, MIT; the DHT in internal/dht, BSD-3-Clause and MIT) and links
-third-party Go modules; the optional GEXTTO_LIBTORRENT=1 build also links
-libtorrent-rasterbar (BSD-3-Clause) and Boost (Boost Software License 1.0).
+Gextto links third-party Go modules; the optional GEXTTO_LIBTORRENT=1 build
+also links libtorrent-rasterbar (BSD-3-Clause) and Boost (Boost Software
+License 1.0).
 
 THIRD-PARTY-NOTICES lists every one of them with its copyright notice and
 licence text. It ships in every package and is shown on the Licence page of
 the web interface.
+
+Provenance: gx-core (internal/gxcore) and the DHT (internal/dht) were
+historically developed from permissively licensed bases and have since been
+rewritten file by file in this tree (see docs/evoluzione.md, section 1.5);
+only protocol-mandated formats (BEP wire layouts, API shapes) coincide. The
+full history is in git.
