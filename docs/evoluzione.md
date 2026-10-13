@@ -304,12 +304,10 @@ samples the uTP counters; one run each:
 
 Real uTP peers connect, both downloads complete, `utp_syn_drops` stays 0 (the
 50-SYN backlog bound never binds) and the resend counters show loss on a noisy
-swarm without a storm. The first run also exposed a counter bug: `utp_dial_errors`
-mixed the race cancellations with the real failures (284 of 342). A dial
-cancelled because TCP won the race is now a dial, not an error
-(`TestCancelledDialIsNotADialError`), so the field is again the UDP-reachability
-diagnostic the UI warns on; the residual errors are real uTP dial timeouts
-(peers behind UDP-blocking firewalls), harmless while accepts flow.
+swarm without a storm. After the transport was rewritten as our own code the
+same harness re-validated it: Big Buck Bunny 276 MB in 90 s (75 peers, 23 uTP,
+0 SYN drops), Debian netinst 793 MB in 180 s (80 peers, 18 uTP, 0 SYN drops),
+Ubuntu 24.04 1.08 GB in 180 s (85 peers, 31 uTP, 0 SYN drops).
 
 DHT on the public network (`make measure-dht`, 4 min): **4262 nodes**, 21.9%
 query success, 875 reflected pings, 2 peers found from a cold start.
