@@ -1,11 +1,10 @@
 // Package utp isolates the uTP transport (BEP 29) behind Gextto's own API.
 //
-// The socket implementation is currently provided by
-// github.com/anacrolix/utp; the engine (internal/gxcore) only talks to the
-// Socket type below, so the implementation can be tuned or replaced without
-// touching call sites. The package also exports basic counters (dials,
-// accepts and their errors) as the foundation for smarter peer-racing and
-// LEDBAT tuning.
+// The socket implementation is vendored in-tree (internal/utp/upstream,
+// MPL-2.0, from github.com/anacrolix/utp v0.2.0) so it can be tuned and
+// instrumented; the engine (internal/gxcore) only talks to the Socket type
+// below. The package also exports basic counters (dials, accepts and their
+// errors) as the foundation for smarter peer-racing and LEDBAT tuning.
 package utp
 
 import (
@@ -14,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	autp "github.com/anacrolix/utp"
+	aup "github.com/buzzqw/gextto/internal/utp/upstream"
 )
 
 // Stats snapshots socket activity since creation.
@@ -29,7 +28,7 @@ type Stats struct {
 // uTP packets to child uTP conns, and doubles as the net.PacketConn shared
 // with the DHT on the single port.
 type Socket struct {
-	inner        *autp.Socket
+	inner        *aup.Socket
 	dials        atomic.Uint64
 	accepts      atomic.Uint64
 	dialErrors   atomic.Uint64
@@ -43,7 +42,7 @@ var (
 
 // NewSocketFromPacketConn builds a Socket over pc, like the wrapped library.
 func NewSocketFromPacketConn(pc net.PacketConn) (*Socket, error) {
-	inner, err := autp.NewSocketFromPacketConn(pc)
+	inner, err := aup.NewSocketFromPacketConn(pc)
 	if err != nil {
 		return nil, err
 	}
