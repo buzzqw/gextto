@@ -43,7 +43,7 @@ binario per componente, nessuna dipendenza C, sei lingue nell'interfaccia.
   motore tiene i peer che consegnano e riusa i dati già su disco. Nessuna
   taratura manuale.
 - **Si può controllare.** Go puro senza CGO, un processo sorvegliato per
-  componente, circa 1.600 funzioni di test e controlli di accessibilità con
+  componente, circa 1.780 funzioni di test e controlli di accessibilità con
   axe-core.
 
 ### In breve

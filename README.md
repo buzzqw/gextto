@@ -41,7 +41,7 @@ no C dependencies, six interface languages.
   the line; downloads pause before the disk fills up; the engine keeps the
   peers that deliver and reuses data already on disk. No manual tuning needed.
 - **It is easy to audit.** Pure Go with zero CGO, a single supervised process
-  per component, about 1,600 test functions, and accessibility checks with
+  per component, over 1,750 test functions, and accessibility checks with
   axe-core.
 
 ### At a glance

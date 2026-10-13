@@ -626,7 +626,7 @@ prestazioni, Seed e completamento), **Dove salvare** (Libreria e rinomina,
 Archivio e spazio) e **Sistema** (Manutenzione automatica, Notifiche, Accesso e
 servizi, Diagnostica e traduzioni). Le modifiche non salvate sono
 evidenziate con la barra “Salva tutte”. L'elenco completo di ogni voce, tab per
-tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
+tab, è nell'[Appendice A](#appendice-a-riferimento-configurazione).
 
 - **Sorgenti** — lista feed RSS, indexer (Jackett/Prowlarr) con pulsante
   *Verifica*, URL FlareSolverr + test, motori web, filtri contenuto, blacklist.
@@ -904,7 +904,7 @@ backfill si mette in pausa da solo.
 
 ## 8. Integrazioni
 
-L'elenco completo dei campi e delle azioni è nell'[Appendice B](#appendice-b-riferimento--integrazioni).
+L'elenco completo dei campi e delle azioni è nell'[Appendice B](#appendice-b-riferimento-integrazioni).
 
 - **Simkl** — credenziali, flusso PIN, import watchlist, calendario e segna come
   visto.
@@ -940,7 +940,7 @@ token o password negli argomenti se il comando finisce nei log del sistema.
 
 ## 9. Manutenzione
 
-L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-c-riferimento--manutenzione).
+L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-c-riferimento-manutenzione).
 
 - **Aggiornamenti** — versione installata e canale, ultima versione pubblicata e
   l'elenco delle novità (i commit successivi a quello installato, con il link a

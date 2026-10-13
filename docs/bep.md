@@ -138,5 +138,6 @@ Status legend: **yes** = implemented and tested; **partial** = only a part;
 ## Maintenance
 
 Update this table on every new BEP implemented or excluded, together with the
-linked documents (`GEXTTO.md`, `gx-torrent.md`, `evoluzione.md`); an entry
+linked documents ([`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md),
+[`gx-torrent.md`](gx-torrent.md), [`evoluzione.md`](evoluzione.md)); an entry
 given as absent must be closed or reclassified when the code implements it.

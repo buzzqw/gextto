@@ -47,6 +47,8 @@ Code:
 - [Web interface](#web-interface)
   - [Network exposure](#network-exposure)
 - [Standalone use](#standalone-use)
+  - [Reverse proxy and allowed hosts](#reverse-proxy-and-allowed-hosts)
+  - [Container](#container)
   - [Feed archive](#feed-archive)
 - [Network](#network)
 - [uTP and LSD](#utp-and-lsd)
@@ -68,9 +70,11 @@ Code:
 - [Super-seeding (BEP 16)](#super-seeding-bep-16)
 - [Writes to the state disk](#writes-to-the-state-disk)
 - [Bandwidth limits](#bandwidth-limits)
+  - [Auto-speed on latency (anti-bufferbloat)](#auto-speed-on-latency-anti-bufferbloat)
 - [REST API (v1)](#rest-api-v1)
 - [API availability (snapshot and lock)](#api-availability-snapshot-and-lock)
 - [Known limits (engine)](#known-limits-engine)
+  - [IPv6](#ipv6)
 - [Tests](#tests)
 
 ## Startup
@@ -277,9 +281,10 @@ gx-torrent [-listen 0.0.0.0:8890] [-data ~/.local/share/gx-torrent]
            [-outgoing-interface wg0] [-proxy socks5://host:port]
            [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-utp] [-no-holepunch]
            [-no-lsd] [-no-upnp] [-no-natpmp] [-dht-bootstrap host:port,...]
+           [-dht-read-only] [-web-sources-allow-private]
            [-ipfilter FILE] [-ipfilter-trackers=true] [-lang it]
-           [-mode managed|standalone] [-log-file FILE] [-insecure]
-           [-debug] [-version]
+           [-mode managed|standalone] [-notify-url URL] [-mmap]
+           [-log-file FILE] [-insecure] [-debug] [-version]
 ```
 
 `-mode` chooses how the daemon runs. Without the flag: **managed** if there is
@@ -1540,7 +1545,7 @@ token is set.
 | `POST /api/v1/create-torrent` | JSON `path`/`name`/`trackers`/`webseeds`/`private`/`piece_length`/`comment`: creates a `.torrent` from a file or folder of the server and returns it as a download (mktorrent-style). `piece_length` (multiple of 16 KiB, 0 = automatic) is limited to 16 MiB so as not to turn an arbitrary value into a huge allocation |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | removal |
 | `POST /api/v1/torrents/{hash}/{action}` | see list below |
-| `GET /api/v1/torrents/{hash}/files\|peers\|trackers\|pieces\|torrent-file\|scrape\|dhtscrape\|collections` | inspection (files include `priority`; `pieces` reports the status intervals; `scrape` queries the trackers for seeders/leechers, BEP 48; `dhtscrape` estimates the swarm from the DHT, BEP 33; `collections` reports the BEP 38 hints — `collections`, `similar` in hex and the local torrents that share a hint) |
+| `GET /api/v1/torrents/{hash}/{what}` | inspection with `{what}` in `files`, `peers`, `trackers`, `pieces`, `torrent-file`, `scrape`, `dhtscrape`, `collections` (files include `priority`; `pieces` reports the status intervals; `scrape` queries the trackers for seeders/leechers, BEP 48; `dhtscrape` estimates the swarm from the DHT, BEP 33; `collections` reports the BEP 38 hints — `collections`, `similar` in hex and the local torrents that share a hint) |
 | `POST /api/v1/pins/clear` | removes all pins |
 | `POST /api/v1/ipfilter` | reloads the IP filter (optional `path`) |
 | `GET /api/v1/config` | configuration and effective slots |

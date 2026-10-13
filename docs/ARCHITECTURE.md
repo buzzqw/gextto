@@ -213,6 +213,7 @@ provides the stubs (`//go:build !cgo`), `libtorrent.go` stays unchanged and
 | `internal/rss` | parsing of RSS/Atom/Torznab feeds and HTML listings (ext.to, TorrentGalaxy: `listing.go`), ordered rules and episode filter. |
 | `internal/settings` | persistent key/value store of the gx-torrent standalone mode. |
 | `internal/torznab` | client for Torznab indexers (Jackett, Prowlarr and similar). |
+| `internal/utp` | BEP 29 uTP socket and transport implementation in pure Go (EUPL-1.2). |
 | `internal/webui` | templates and embedded assets of the gx-torrent daemon UI (see §7). |
 
 ## 6. The gx-torrent daemon (`cmd/gx-torrent`)
@@ -237,11 +238,22 @@ one.
 | `ipfilter_refresh.go` | IP filter from a file or URL: loading at startup, periodic update, status. |
 | `optimize.go` | one-click optimisation (queue, cache, bandwidth) and measured peak status. |
 | `ui_browse.go` | server-side folder picker. |
+| `ui_wanted.go` | Wanted page: item cards, status badges and episode manager modal. |
+| `diskguard.go` | free space guard: unfinished downloads pause before the disk fills up. |
+| `autospeed.go` | ping/latency auto-speed (anti-bufferbloat) upload bandwidth regulation. |
+| `flaresolverr.go` | FlareSolverr integration for Cloudflare challenge clearance. |
+| `notify.go` | webhook notifications on rule matches and feed errors. |
+| `portmap.go`, `pcp.go` | port forwarding via UPnP, NAT-PMP and PCP (RFC 6887). |
+| `bep38.go` | BEP 38 hints (`similar`/`collections`) and discovery of local swarm merge candidates. |
+| `schedule.go` | bandwidth scheduler by day of week and time range. |
+| `stream.go` | media streaming server with HTTP Range requests. |
+| `standalone_auth.go` | standalone session tokens, password hashing and login management. |
+| `tracker_health.go` | tracker failure tracking and retry delay management. |
 
 ## 7. Assets embedded in the binary (`go:embed`)
 
 - `uiweb/v2/templates/*.html`, `uiweb/v2/static/*` — Gextto's web UI.
-- `internal/webui/assets/*` — gx-torrent daemon UI (`ui.tmpl`, `login.html`, `setup.html`, `rss.html`, `settings.html`, `archive.html`, `token.html`, `favicon.svg`).
+- `internal/webui/assets/*` — gx-torrent daemon UI (`ui.tmpl`, `login.html`, `setup.html`, `rss.html`, `settings.html`, `archive.html`, `token.html`, `wanted.html`, `theme.css`, `common.js`, `icons.svg`, `favicon.svg`).
 - `docs/MANUAL.it.md`, `docs/MANUAL.en.md` — manual shown in the UI.
 - `internal_translations*.yml` — translations.
 - `LICENSE` — licence served by the app.

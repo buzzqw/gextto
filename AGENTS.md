@@ -31,7 +31,7 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - Daemon Go per acquisizione media e archiviazione. Il package principale è
   nella root; il `main` è in `cmd/gexttod`.
 - UI server-side in `uiweb/v2` (SSR + HTMX), i18n it/en/de/fr/es/pl. I test
-  end2end dell'UI sono Playwright (Node) in `uiweb/v2/end2end`, non Go.
+  end2end dell'UI sono Playwright (Node) in `uiweb/end2end`, non Go.
 - **Motori torrent**: `gx-torrent` (default, Go puro), libtorrent integrato
   (fallback automatico), qBittorrent-nox esterno. Contratto in
   `torrent_engine.go`; adapter `gxtorrent_engine.go`/`gxtorrent_runtime.go`,
@@ -285,11 +285,7 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   tabelle di stato, capacità e conteggi (righe, test, versioni, percorsi) vanno
   riallineati quando cambiano. Vale anche per il lavoro non visibile all'utente
   (motore, coda, DHT, storage): quei documenti sono il posto dove resta tracciato.
-- **`docs/evoluzione.md` tiene traccia delle evoluzioni, non dei bug.** Il documento
-  registra backlog, migliorie realizzate e misure (passato e futuro del prodotto):
-  i bug risolti restano nella storia git, non nel documento. Niente cronache di
-  fix, log di review per-commit o dettagli superati dal codice: solo cosa è
-  previsto, cosa è stato fatto per far evolvere il prodotto e i numeri misurati.
+- **`docs/evoluzione.md` è uno dei documenti più lavorati del repository e tiene traccia solo delle evoluzioni, MAI dei bug.** Il documento è la sede esclusiva per: (1) **lo storico delle migliorie realizzate** e delle misurazioni effettuate; (2) **il futuro delle migliorie da fare** (backlog attivo, direttrici strategiche, backlog smartness e roadmap). Non è un bug tracker né un changelog di problemi risolti: niente cronache di fix, bug risolti, log di review per-commit o dettagli superati dal codice (che appartengono esclusivamente alla storia dei commit git): solo cosa è previsto, cosa è stato fatto per far evolvere il prodotto e i numeri misurati.
 - Quando aggiungi o sposti documenti, aggiorna l'indice `docs/README.md`.
 
 ## Accessibilità dell'interfaccia

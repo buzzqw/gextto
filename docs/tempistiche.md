@@ -50,12 +50,12 @@ Count (2026-10-13):
 
 | | |
 |--|--|
-| Go test functions | **~1745** |
-| Go benchmarks | 25 |
-| `_test.go` files | **~322** |
-| Go packages | 80, of which **~49 with tests** |
+| Go test functions | **~1787** |
+| Go benchmarks | 26 |
+| `_test.go` files | **~334** |
+| Go packages | 83, of which **~54 with tests** |
 | Separate module `internal/dht` | tested by `make test-dht` (outside `go test ./...`) |
-| Playwright end2end tests (`uiweb/end2end`) | 51 |
+| Playwright end2end tests (`uiweb/end2end`) | 63 |
 
 Local times (`-count=1`, so **not cached**):
 

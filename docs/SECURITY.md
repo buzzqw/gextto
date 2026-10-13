@@ -45,7 +45,7 @@ interface.
   accepted besides IP literals and `localhost`). With a proxy and no declared
   `trusted-proxies`, a loopback peer carrying forwarding headers is **not**
   treated as local, so a forwarded Internet client must log in; see
-  `docs/gx-torrent.md`, *Uso standalone → Reverse proxy e host ammessi*.
+  `docs/gx-torrent.md`, *Standalone use → Reverse proxy and allowed hosts*.
 - **Use TLS for remote access**: Gextto serves plain HTTP. Put a reverse proxy
   with a certificate (or a VPN) in front of it, otherwise passwords and keys
   travel in clear text.

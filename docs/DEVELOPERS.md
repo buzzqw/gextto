@@ -111,7 +111,7 @@ translated with the bundled catalogs `internal_translations.yml` (English),
 `_de`, `_fr`, `_es` and `_pl`, whose keys are the Italian strings. Every new
 text needs an entry in all five catalogs (a test checks that they share the
 same keys). Texts built outside the templates use `uiText(s, "…")`. The TUI has
-its own Italian/English catalog in `internal/tui/i18n.go`; daemon log lines are
+its own six-language catalog (IT, EN, DE, FR, ES, PL) in `internal/tui/i18n.go`; daemon log lines are
 English only.
 
 ## Database changes

@@ -32,7 +32,7 @@ features in [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md).
 10. ["Better than qBittorrent" requirement](#10-better-than-qbittorrent-requirement)
 11. [Cherry-picking from the engine and licences](#11-cherry-picking-from-the-engine-and-licences)
 12. [Roadmap and gates](#12-roadmap-and-gates)
-13. [Requirements → solution](#13-requirements--solution)
+13. [Requirements → solution](#13-requirements-solution)
 14. [Risks and mitigations](#14-risks-and-mitigations)
 15. [Open questions](#15-open-questions)
 16. [References](#16-references)
@@ -637,7 +637,7 @@ Implemented:
   `uninstall-service.ps1`, `README.txt`); `build-release.sh` generates it in the
   pure-Go variant and `release.yml`/`continuous.yml` publish it
   (`dist/gx-torrent-windows-*`). See `gx-torrent.md`, *Standalone use →
-  Windows installation*.
+  Platforms*.
 
 **Clarification (agreed):** the standalone package is **the same binary**
 that Gextto uses as engine (golden rule: a single code base). The CI does not build
@@ -656,7 +656,7 @@ To be verified: the first run in CI on **Debian 12 / Ubuntu 22.04**
 | --- | --- | --- | --- |
 | 1. Gextto compatibility | a single engine; frozen v1 API; managed mode with standalone functions switched off; stable `fingerprint` | F0 | v1 API contract tests; `make test`; zero daemon restarts for UI saves |
 | 2. Efficiency | lazy startup of the modules; adaptive cache; measurements against qbittorrent-nox | F1, F4 | the 4 metrics of §10 |
-| 3. UI on par with qBittorrent | `embed.FS` assets, settings from the UI, categories/tags, RSS, search, charts, phone, dark theme | F2, F3 | qBittorrent checklist + Playwright tests (like `uiweb/v2/end2end`) |
+| 3. UI on par with qBittorrent | `embed.FS` assets, settings from the UI, categories/tags, RSS, search, charts, phone, dark theme | F2, F3 | qBittorrent checklist + Playwright tests (like `uiweb/end2end`) |
 | 4. Wizard | language, folders, access (LAN without password default yes + 3 protections), ports + port test, Jackett/Prowlarr/MIRCrew indexers | F1 | setup from scratch in less than 5 minutes |
 | 5. Engine as own code | cherry-pick by value from anacrolix/libtorrent; licences respected | F4 | before/after measurement for every porting; engine inventory |
 
@@ -669,7 +669,7 @@ To be verified: the first run in CI on **Debian 12 / Ubuntu 22.04**
 | Regression in the Gextto path | downloads blocked on the main installation | v1 API contract tests; `fingerprint` independent of `settings.json`; standalone functions switched off in managed |
 | Two masters of the same queue | torrents moved twice, limits overwritten | mode decided at startup, never changed while running |
 | LAN without password exploited | an external site adds or deletes torrents from the user's browser | `Origin` and `Host` check, LAN read from the socket, `X-Forwarded-For` only from declared proxies |
-| UI growing into a Go string | slow changes, visual regressions | assets in `embed.FS` and Playwright tests like those of `uiweb/v2/end2end` |
+| UI growing into a Go string | slow changes, visual regressions | assets in `embed.FS` and Playwright tests like those of `uiweb/end2end` |
 | Costly porting from the engine | IPv6 and v2 touch DHT, trackers, picker, storage | one porting at a time, with engine tests and before/after measurement |
 | Licences | MPL code inside EUPL files | done: `internal/utp` is our own rewrite of BEP 29 (no MPL component); future anacrolix work is rewritten, not copied |
 | Porting from other engines | any fixes from others are lost | check their commits by hand once a quarter |

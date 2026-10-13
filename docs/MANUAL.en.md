@@ -614,7 +614,7 @@ Queues and performance, Seeding and completion), **Where to store** (Library and
 renaming, Archive and space) and **System** (Automatic maintenance,
 Notifications, Access and services, Diagnostics and translations). Unsaved changes are
 highlighted with a “Save all” bar. The complete per-tab list of every entry is in
-[Appendix A](#appendix-a-reference--configuration).
+[Appendix A](#appendix-a-reference-configuration).
 
 - **Sources** — RSS feed list, indexers (Jackett/Prowlarr) with a *Verify*
   button, FlareSolverr URL + test, web engines, content filters, blacklist.
@@ -878,7 +878,7 @@ scan). If `ffprobe` is missing, the backfill pauses by itself.
 
 ## 8. Integrations
 
-The complete list of fields and actions is in [Appendix B](#appendix-b-reference--integrations).
+The complete list of fields and actions is in [Appendix B](#appendix-b-reference-integrations).
 
 - **Simkl** — credentials, PIN flow, watchlist import, calendar and mark-watched.
 - **Jellyfin / Plex** — server URL + token and a library refresh button.
@@ -912,7 +912,7 @@ arguments if the command may be recorded in system logs.
 
 ## 9. Maintenance
 
-The complete list of actions and parameters is in [Appendix C](#appendix-c-reference--maintenance).
+The complete list of actions and parameters is in [Appendix C](#appendix-c-reference-maintenance).
 
 - **Updates** — installed version and channel, latest published version and
   what changed (the commits after the installed one, linked to GitHub). **Check
