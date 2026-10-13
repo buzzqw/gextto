@@ -663,9 +663,7 @@ The **feeds** have a table with status (*active*/*disabled*, *adds paused*), **l
 with items, new and added or the error shown at the right end of the name row (so
 it does not take a line of its own), and per row the buttons **↻ Reload** (to the left of
 *Remove*: reads that feed immediately and refreshes the row), **Edit** (the form is filled,
-including the *Feed options*: folder, include/exclude, category, path, pause, disabled;
-a feed can also be a **Torznab search query** run periodically on the indexers
-instead of a URL),
+including the *Feed options*: folder, include/exclude, category, path, pause, disabled),
 **Enable/Disable** and **Remove**. An **RSS options** box sets
 the refresh interval (minutes) and the archive retention (days)
 and shows the time of the next automatic check. The **rule editor** has

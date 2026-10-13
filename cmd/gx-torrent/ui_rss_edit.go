@@ -243,7 +243,7 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 			All:      r.FormValue("all") != "",
 		}
 		if feed.URL == "" && feed.Search == "" {
-			d.renderRSS(w, r, "Give the feed an RSS URL or a search query.")
+			d.renderRSS(w, r, "Give the feed an RSS URL.")
 			return
 		}
 		if feed.URL != "" && !validIndexerURL(feed.URL) {

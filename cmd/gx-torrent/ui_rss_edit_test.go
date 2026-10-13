@@ -236,23 +236,6 @@ func TestUIRssSearchFeedCanBeAdded(t *testing.T) {
 	}
 }
 
-// TestUIRssPageOffersSearchQueryField checks the feed editor exposes the Torznab
-// search field, so a periodic indexer query can be created from the UI (the
-// backend already supported "search" but the form hid it).
-func TestUIRssPageOffersSearchQueryField(t *testing.T) {
-	d := standaloneTestDaemon(t, "", true)
-	d.opts.Settings.Set(setupCompleteKey, "true")
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/ui/rss", nil)
-	d.handleUIRss(rec, req)
-	body := rec.Body.String()
-	for _, want := range []string{`name="search"`, "Search query (Torznab)"} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("the RSS page is missing %q", want)
-		}
-	}
-}
-
 // TestAddFormOffersFolderPickerInStandalone checks the add-torrent dialog's
 // "Save to" field carries a Browse button and the shared picker dialog in
 // standalone, matching the /ui/browse-dir endpoint that managed mode refuses.
