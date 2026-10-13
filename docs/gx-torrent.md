@@ -1,4 +1,4 @@
-# gx-torrent: the alternative torrent engine in pure Go
+# gx-torrent: the default torrent engine in pure Go
 
 `gx-torrent` is a small BitTorrent daemon written in pure Go on top of the
 **gx-core** engine (`internal/gxcore`). It is the default engine of
@@ -13,7 +13,7 @@ automatic fallback if gx-torrent does not start.
 
 The gx-core engine lives in `internal/gxcore`. Its features are
 described in `internal/gxcore/GEXTTO.md`: single port, outgoing interface,
-proxy, IP filter, file selection and some fixes. The **state of
+proxy, IP filter and file selection. The **state of
 compliance with the BitTorrent specifications (BEP)** and the roadmap are in
 [BEP compliance](bep.md).
 
@@ -31,7 +31,7 @@ Code:
 | `cmd/gx-torrent/selection.go` | file selection |
 | `cmd/gx-torrent/cache.go` | adaptive cache (available RAM, load, storage type) |
 | `cmd/gx-torrent/stream.go` | HTTP streaming (Range) with piece readahead |
-| `cmd/gx-torrent/ui.go` | daemon web page (summary, table, detail, actions) |
+| `cmd/gx-torrent/ui.go` | daemon web pages, live fragments and actions |
 | `cmd/gx-torrent/i18n.go` | web page translations (it/en/de/fr/es/pl) |
 | `cmd/gx-torrent/lsd.go` | local network discovery (BEP 14) |
 | `cmd/gx-torrent/tracker_health.go` | removal of trackers that never responded |
@@ -53,6 +53,7 @@ Code:
 - [File selection and priorities](#file-selection-and-priorities)
 - [Sequential download (streaming)](#sequential-download-streaming)
 - [BitTorrent v2 torrents](#bittorrent-v2-torrents)
+- [Local data reuse (Swarm Merging)](#local-data-reuse-swarm-merging)
 - [Statistics](#statistics)
 - [Piece diagnostics](#piece-diagnostics)
 - [HTTP streaming (HTTP Range)](#http-streaming-http-range)
@@ -1007,7 +1008,7 @@ qBittorrent-compatible API uses its 0/1/6/7 scale.
   `so=0,2,4-7`), the engine immediately downloads only those files and as soon as the
   metadata arrives the daemon records the choice as normal priorities: the files tab
   shows the same excluded files and they can be changed as always.
-- If the magnet carries `ws=` (BEP 53, web seed), the web seeds are added to the
+- If the magnet carries `ws=` (web seed, Magnet URI convention), the web seeds are added to the
   torrent and remain even after a restart.
 - If the magnet carries `dht=` (bootstrap DHT node), the node is added to the
   session's DHT.
@@ -1259,7 +1260,7 @@ a download at 20% from `/dev/shm` to the disk.
 
 ## On-disk layout and data safety
 
-the engine saves every torrent in `DataDir/<id>` and at removal always runs
+The engine saves every torrent in `DataDir/<id>` and at removal always runs
 `os.RemoveAll(DataDir/<id>)`. For this reason gx-torrent:
 
 - **always** creates `DATA/links/<id>` as a symlink towards the real
@@ -1306,7 +1307,7 @@ It survives restarts together with the engine database (`DATA/session.db`).
 
 ## Self-managed queue
 
-the engine does not have a queue: the daemon itself manages it, every 3 seconds (and immediately
+The engine does not have a queue: the daemon itself manages it, every 3 seconds (and immediately
 after every command), with the same policy that Gextto applies to libtorrent.
 
 - **Slots.** Active downloads (`active_downloads`) start in order of

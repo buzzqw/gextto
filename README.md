@@ -334,7 +334,7 @@ drives as its engine.
 Open `http://<host>:8890/` for the setup wizard (language, folders with a
 server-side picker, port test, limits, login, indexers); it prints the
 address to open at startup. Full reference: the [gx-torrent technical
-document](docs/gx-torrent.md) (Italian).
+document](docs/gx-torrent.md).
 
 ## First safe run
 
@@ -411,7 +411,7 @@ testing is still required. Scope and limits:
 | HTTP integrations | [API reference](docs/API.md) |
 | Move an existing installation | [Migration guide](docs/MIGRATION.md) |
 | Terminal client | [TUI reference](docs/tui.md) |
-| gx-torrent engine and standalone client | [gx-torrent technical document](docs/gx-torrent.md) (Italian) |
+| gx-torrent engine and standalone client | [gx-torrent technical document](docs/gx-torrent.md) |
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |
 | Accessibility scope and testing | [Accessibility analysis](docs/evoluzione.md#8-accessibility) |
