@@ -27,9 +27,9 @@ type SessionStats struct {
 	// since start; UTPDialErrors/UTPAcceptErrors count their failures.
 	// They diagnose transport health (firewalled UDP, CGNAT) where the
 	// peer-level counters alone cannot.
-	UTPDials       int64
-	UTPAccepts     int64
-	UTPDialErrors  int64
+	UTPDials        int64
+	UTPAccepts      int64
+	UTPDialErrors   int64
 	UTPAcceptErrors int64
 	// DHTStats are the DHT counters (nodes, peers found, traffic).
 	DHTStats map[string]int64
