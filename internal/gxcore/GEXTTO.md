@@ -18,6 +18,7 @@ Engine tests (they run inside this module):
 - `internal/peerconn/peerwriter/peerwriter_test.go` — the dedup window of the served requests stays bounded and evicts the oldest;
 - `internal/piececache/cache_test.go` — lazy TTL expiry and sweeper, reload after expiry, size-based eviction and concurrent use;
 - `internal/bitfield/bitfield_test.go` — `Count` with hardware popcount equal to the bit-by-bit count, including across word boundaries;
+- `internal/bencodecheck/bencodecheck_test.go` — the screen in front of zeebo/bencode: a declared string length beyond the input and over-deep nesting are refused, valid bencode (with trailing bytes) passes;
 - `internal/piecepicker/sequential_skip_test.go` — the pieces of excluded files are
   never chosen, not even in sequential mode or from the "file edge" path;
 - `internal/bandwidth/limiter_test.go` — the limit changes on the fly;

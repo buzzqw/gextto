@@ -719,6 +719,11 @@ archivio; è sostituibile solo il piano di trasferimento, scelto in
 quindi il passaggio è una migrazione controllata, non due client sugli stessi
 dati.
 
+Il nucleo del motore predefinito, **`gx-core`** (`internal/gxcore`), e il DHT
+(`internal/dht`) sono codice originale scritto in questo repository, quindi
+coperti dalla stessa licenza EUPL-1.2 di Gextto (vedi la pagina *Licenza*
+dell'interfaccia web).
+
 - **gx-torrent** (predefinito) — demone BitTorrent in Go puro, avviato e
   sorvegliato da Gextto in un processo separato; non richiede
   `libtorrent-rasterbar`. Imposta **URL Web API**, **indirizzo di ascolto**

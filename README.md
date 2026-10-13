@@ -100,7 +100,7 @@ Gextto keeps the control plane (queue, scoring, post-processing, archiving) and 
 
 **gx-torrent** is the default engine and compiles as **pure Go** (`CGO_ENABLED=0`) with zero C/C++ dependencies. It runs as a separate supervised process, survives orchestrator restarts and updates (Gextto re-attaches to it when binary and options match), provides its own web interface, and receives protocol innovations first.
 
-Its engine core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementation developed in this repository. For those who know BitTorrent, this is what is inside.
+Its engine core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementation developed in this repository. `gx-core` and the DHT (`internal/dht`) are original code written from scratch in this tree — no third-party-derived code, and no third-party rate-limiter or UUID helpers (see [`THIRD-PARTY-NOTICES`](THIRD-PARTY-NOTICES) for the provenance) — so the whole engine is covered by the same EUPL-1.2 licence as the rest of Gextto. For those who know BitTorrent, this is what is inside.
 
 #### Protocol
 
@@ -461,7 +461,7 @@ any copyrighted content.
 
 ## License
 
-Gextto is licensed under the [EUPL-1.2](LICENSE). See
+Gextto is licensed under the [EUPL-1.2](LICENSE). The engine core (`gx-core`, `internal/gxcore`) and the DHT (`internal/dht`) are our own code, so they carry the same EUPL-1.2 licence. See
 [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES) for the copyright notices and licence
-texts of the bundled and optional third-party components (also shown on the
+texts of the third-party libraries Gextto links (also shown on the
 *Licence* page of the web interface).

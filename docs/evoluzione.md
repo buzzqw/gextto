@@ -183,6 +183,21 @@ record stays here and in git history. Wire-critical equivalences were proved
 by execution where it mattered most (old<->new MSE handshake cross-check over
 net.Pipe, fast-set byte identity, resume-DB and RPC shapes byte-identical).
 
+**Done (2026-10-13): dependency decoupling (`own-deps`).** The last
+third-party-derived helpers were replaced with our own code: the rate limiter
+is a token bucket in `internal/gxcore/internal/bandwidth`, the torrent id is a
+version-1 UUID minted in `internal/gxcore/torrent/torrent_id.go` (timestamp +
+random, RFC 4122 layout) instead of `gofrs/uuid`, and the dead
+`internal/gxcore/internal/jsonutil` was deleted. `go.mod` lost
+`github.com/juju/ratelimit` (**LGPL-3.0**), `github.com/gofrs/uuid`,
+`github.com/fatih/structs` and `github.com/hokaccha/go-prettyjson` (four direct
+dependencies) plus the indirect `github.com/fatih/color` and
+`github.com/mattn/go-colorable`; `THIRD-PARTY-NOTICES` dropped the gofrs and
+juju sections and now lists linked libraries only. The replacements are
+behaviour-equivalent (the bucket keeps the same refill/debt semantics, the id
+keeps unique-and-well-formed); their tests (`torrent_id_test.go`) and the full
+suite are green.
+
 ### 1.6 In-depth performance check (CPU and RAM)
 
 **Point.** Periodically carry out an in-depth performance check
@@ -252,6 +267,35 @@ The last row is the new Swarm Merging Phase 2 (§9.2): matching 16 unrelated v2
 candidates costs ~1.6 µs once per torrent (one small map per candidate), and the
 picker/peer/piece-write paths are not touched, so the merge cannot affect
 seeding or download throughput.
+
+**Sixth round (2026-10-13, Intel N97) — original engine rewrite and dependency
+decoupling.** The full in-tree rewrite of `internal/gxcore`/`internal/dht` and
+the `own-deps` replacements (§1.5) were compared with `benchstat` against the
+pre-merge `main` (`57d0a89`), over the **54 engine benchmarks**, `-count=6`:
+
+| Benchmark | before | after | delta |
+|---|---|---|---|
+| `BenchmarkHasAnyNotIn` | 3.77 ns/op | **3.15 ns/op** | −16% |
+| `BenchmarkBlocked` | 20.9 ns/op | **18.8 ns/op** | −10% |
+| `BenchmarkPickerRarestSteady` | 115.6 µs | 105.5 µs | ~ |
+| `BenchmarkPickerRarestShuffled` | 1.071 ms | 1.057 ms | ~ |
+| `BenchmarkStorageWrite` / `StorageWriteMmap` | 45.7 / 35.7 µs | 46.2 / 35.7 µs | ~ |
+| `BenchmarkTickUnchokeSeeding` | 1.266 µs | 1.266 µs | ~ |
+| `BenchmarkRequestRelease` | 1.762 µs | 1.761 µs | ~ |
+| `BenchmarkUpdateInterestNothingWanted` | 2.787 µs | 2.794 µs | ~ |
+| `BenchmarkPrefillFromUnrelatedV2` | 1.487 µs | 1.488 µs | ~ |
+
+`B/op` and `allocs/op` are identical everywhere: the rewrite adds no allocation
+on the hot paths. The one real regression the comparison surfaced was
+`HasAnyNotIn`: the rewrite had routed it through a `scanWords` helper whose
+callback closures doubled the cost (3.8 → 7.6 ns); the loop is inlined again and
+now lands 16% under the base. The three benchmarks that a single pass had shown
++13…17% slower (picker file-edge scan, interest update, prefill) are **run-to-run
+drift**: re-measured interleaved base/new (`-count=20` each) they are
+statistically equal (p ≥ 0.15). Footprint at ~29 min uptime, real 34 MB blocklist
+and 4 active torrents: `gexttod` RSS 113 MB (RssAnon 89 MB), `gx-torrent` RSS
+165 MB (RssAnon 150 MB) — workload-dependent (peers/active pieces), within the
+range of the earlier rounds, and no new steady-state allocation was introduced.
 
 ---
 
@@ -1090,7 +1134,7 @@ here; the implemented ones are dated, the others are a proposal to be agreed.
 | 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.4 | medium | medium | **measured + instrumented (2026-10-13)**: `peers_confirmed_multi` counts peers reported by ≥2 distinct nodes; the full rewrite awaits data, see §10.2 |
 | 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | Phase 2 | medium | low | **done (2026-10-13)**: `merged_pieces`/`merged_bytes` in the engine session stats → daemon API → Gextto «Riuso locale» |
 | 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.6 | high | high | **done (2026-10-13)**: write ring buffer + 2 pieces per peer; measured ×1.75 (3.85→6.76 MiB/s at RTT 50 ms; window-sharing fix in `afc65f8`), details in §6.4/§10.3 |
-| 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | the fuzzing pass | medium/high | low | **done**: `internal/utils/utils.go` (length bounded, recursion depth ≤64); `internal/dht/bencode.go` `validBencode` screens DHT packets before bencode-go |
+| 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | the fuzzing pass | medium/high | low | **done (2026-10-13, extended)**: `internal/utils/utils.go` (length bounded, recursion depth ≤64) and `internal/dht/bencode.go` `validBencode` cover DHT packets; a shared `internal/gxcore/internal/bencodecheck` now screens every engine path that hands untrusted bytes to zeebo/bencode — which allocates a declared string length up front — so a tiny crafted input cannot ask for gigabytes and OOM-kill the daemon: the `.torrent`/file-tree/piece-layer parsers (`metainfo`), the BEP 10 extension messages (`peerprotocol`) and the HTTP/UDP tracker replies (`httptracker`, `udptracker`). The fuzzer found it in `metainfo` and `httptracker` |
 | 10 | Merge: **no double verification** — the pieces the merge just re-verified are handed to the verifier as already done | Phase 2 analysis | medium (no re-read and re-hash of the reused bytes) | low | **done (2026-10-13)**: `Verifier.Skip`, cleared after the allocation-time check |
 | 11 | Merge **off the run loop**: the copy ran synchronously in the torrent goroutine, so `Stats`/`Stop` and every command on that torrent hung for the whole merge (minutes for tens of GB, the daemon API with them) | review of the night commits | high | low | **done (2026-10-13)**: `mergeCandidates` (no I/O) in the run loop, the copy in `Verifier.Prepare` (cancellable, snapshot of the deselected pieces) |
 | 12 | Merge on **empty storage**: the verifier hashed every non-merged piece of files just created (holes) | same review | medium (no read+SHA-1 of the whole torrent after a partial merge) | low | **done (2026-10-13)**: `Verifier.Only` restricts the check to the merged pieces when no file existed |

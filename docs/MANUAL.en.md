@@ -701,6 +701,11 @@ and archive; only the transfer plane is pluggable, chosen in
 time, so switching is a controlled migration, not two clients working on the
 same data.
 
+The default engine's core, **`gx-core`** (`internal/gxcore`), and the DHT
+(`internal/dht`) are original code written in this repository, so they are
+covered by the same EUPL-1.2 licence as Gextto (see the *Licence* page of the
+web interface).
+
 - **gx-torrent** (default) — a pure-Go BitTorrent daemon, started and supervised
   by Gextto in a separate process; it needs no `libtorrent-rasterbar`. Set the
   **Web API URL**, the **listen address** (default `127.0.0.1:8890`: web page

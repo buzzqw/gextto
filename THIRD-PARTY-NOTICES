@@ -6,9 +6,11 @@ LICENSE). Its source and binaries also include the components listed below,
 each under its own licence. This file reproduces their copyright notices and
 licence texts, as those licences require.
 
-It lists the third-party libraries imported or linked; Gextto's own code,
-including internal/gxcore and internal/dht (rewritten in-tree, see NOTICE),
-is EUPL-1.2.
+It lists the third-party libraries imported or linked. Gextto's own code,
+including the engine `internal/gxcore` and the DHT `internal/dht`, is EUPL-1.2:
+both were developed in this repository (early versions from permissively
+licensed bases, since rewritten file by file in-tree), so only protocol-
+mandated formats coincide.
 
 Generated from the modules actually linked into the binaries (go list -deps
 ./cmd/gexttod ./cmd/gx-torrent) and the libtorrent distribution. Regenerate

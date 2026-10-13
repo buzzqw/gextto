@@ -101,7 +101,7 @@ Gextto conserva il piano di controllo (coda, punteggi, post-processing, archivio
 
 **gx-torrent** è il motore predefinito ed è compilato in **Go puro** (`CGO_ENABLED=0`), senza alcuna dipendenza C/C++. Gira in un processo separato sorvegliato da Gextto, sopravvive ai riavvii e agli aggiornamenti dell'orchestratore (Gextto lo riaggancia se binario e opzioni coincidono), dispone di una propria interfaccia web ed è dove arrivano per prime le innovazioni di protocollo.
 
-Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un'implementazione BitTorrent sviluppata in questo repository. Per chi conosce BitTorrent, ecco cosa c'è dentro.
+Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un'implementazione BitTorrent sviluppata in questo repository. `gx-core` e il DHT (`internal/dht`) sono codice originale scritto da zero in questo albero — nessun codice derivato da terzi e nessun rate limiter o helper UUID di terze parti (provenienza in [`THIRD-PARTY-NOTICES`](THIRD-PARTY-NOTICES)) — quindi l'intero motore ricade nella stessa licenza EUPL-1.2 del resto di Gextto. Per chi conosce BitTorrent, ecco cosa c'è dentro.
 
 #### Protocollo
 
@@ -469,7 +469,7 @@ distribuisce contenuti protetti da copyright.
 
 ## Licenza
 
-Gextto è distribuito con [EUPL-1.2](LICENSE). Le note di copyright e i testi di
-licenza dei componenti di terze parti (inclusi e opzionali) sono in
+Gextto è distribuito con [EUPL-1.2](LICENSE). Il nucleo del motore (`gx-core`, `internal/gxcore`) e il DHT (`internal/dht`) sono codice nostro, quindi valgono la stessa licenza EUPL-1.2. Le note di copyright e i testi di
+licenza delle librerie di terze parti che Gextto collega sono in
 [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES), mostrato anche nella pagina
 *Licenza* dell'interfaccia web.
