@@ -55,7 +55,7 @@ func (s *Session) acceptUTP() {
 			}
 			return
 		}
-		conn := netx.TrackUTP(&netx.UTPConn{Conn: raw})
+		conn := netx.TrackUTP(netx.NewUTPConn(raw))
 		netx.IncomingUTP.Add(1)
 		addr, ok := conn.RemoteAddr().(*net.TCPAddr)
 		if !ok || (s.config.BlocklistEnabledForIncomingConnections && s.blocklist != nil && s.blocklist.Blocked(addr.IP)) {

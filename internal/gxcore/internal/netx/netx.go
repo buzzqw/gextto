@@ -345,7 +345,7 @@ func DialPeer(ctx context.Context, base net.Dialer, network, addr string) (net.C
 			return nil, err
 		}
 		OutgoingUTP.Add(1)
-		return TrackUTP(&UTPConn{Conn: conn}), nil
+		return TrackUTP(NewUTPConn(conn)), nil
 	}
 	if base.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -375,7 +375,7 @@ func DialPeer(ctx context.Context, base net.Dialer, network, addr string) (net.C
 		}
 		conn, err := dial(raceCtx)
 		if err == nil && wrap {
-			conn = TrackUTP(&UTPConn{Conn: conn})
+			conn = TrackUTP(NewUTPConn(conn))
 		}
 		results <- result{conn, err}
 	}
@@ -428,9 +428,20 @@ func DialPeer(ctx context.Context, base net.Dialer, network, addr string) (net.C
 }
 
 // UTPConn presents a uTP connection with TCP addresses: the rest of the engine
-// keys peers by *net.TCPAddr.
+// keys peers by *net.TCPAddr. The converted addresses are snapshotted once at
+// wrap time: RemoteAddr/LocalAddr sit on hot paths (handshake, peer setup,
+// logging, stats) and must not convert and allocate per call.
 type UTPConn struct {
 	net.Conn
+	remote net.Addr
+	local  net.Addr
+}
+
+// NewUTPConn wraps a connected uTP conn, snapshotting its TCP-view
+// addresses. The peer address of a connection never changes, so the snapshot
+// stays valid for the conn's life.
+func NewUTPConn(raw net.Conn) *UTPConn {
+	return &UTPConn{Conn: raw, remote: tcpAddrOf(raw.RemoteAddr()), local: tcpAddrOf(raw.LocalAddr())}
 }
 
 func tcpAddrOf(addr net.Addr) net.Addr {
@@ -446,11 +457,11 @@ func tcpAddrOf(addr net.Addr) net.Addr {
 	return addr
 }
 
-// RemoteAddr returns the peer address as *net.TCPAddr.
-func (c *UTPConn) RemoteAddr() net.Addr { return tcpAddrOf(c.Conn.RemoteAddr()) }
+// RemoteAddr returns the peer address as *net.TCPAddr (snapshotted).
+func (c *UTPConn) RemoteAddr() net.Addr { return c.remote }
 
-// LocalAddr returns the local address as *net.TCPAddr.
-func (c *UTPConn) LocalAddr() net.Addr { return tcpAddrOf(c.Conn.LocalAddr()) }
+// LocalAddr returns the local address as *net.TCPAddr (snapshotted).
+func (c *UTPConn) LocalAddr() net.Addr { return c.local }
 
 // IsUTP reports whether a connection runs over uTP.
 func IsUTP(conn net.Conn) bool {

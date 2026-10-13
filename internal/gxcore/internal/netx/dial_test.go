@@ -15,6 +15,37 @@ func resetDialPrefs() {
 	prefMu.Unlock()
 }
 
+// stubAddrConn returns a conn with UDP addresses, like a uTP conn.
+func stubAddrConn() net.Conn {
+	a, b := net.Pipe()
+	go func() {
+		_ = b.Close()
+	}()
+	return &udpAddrConn{Conn: a}
+}
+
+type udpAddrConn struct {
+	net.Conn
+}
+
+func (c *udpAddrConn) RemoteAddr() net.Addr {
+	return &net.UDPAddr{IP: net.ParseIP("203.0.113.7"), Port: 51413}
+}
+
+func (c *udpAddrConn) LocalAddr() net.Addr {
+	return &net.UDPAddr{IP: net.ParseIP("192.0.2.1"), Port: 6881}
+}
+
+func BenchmarkUTPConnRemoteAddr(b *testing.B) {
+	c := TrackUTP(NewUTPConn(stubAddrConn()))
+	defer c.Close()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = c.RemoteAddr().String()
+	}
+}
+
 // pipeDialer is an instant-success uTP dialer counting its invocations.
 func pipeDialer(calls *atomic.Int64) func(context.Context, string) (net.Conn, error) {
 	return func(_ context.Context, _ string) (net.Conn, error) {

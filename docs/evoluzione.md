@@ -575,6 +575,7 @@ recorded in `GEXTTO.md`; targeted tests; with a visible effect also both UIs and
 | **Drop the worst connection** (deterministic order) | anacrolix `worse-conns.go` | done |
 | **uTP behind `internal/utp`** (isolation) | anacrolix `utp` | in progress (`exp/utp-intree`): the engine talks to our `Socket` (dial/accept counters, `net.PacketConn` for the shared DHT socket); implementation still anacrolix, swappable |
 | **uTP dial preference** (fewer wasted dials) | own (`internal/netx`) | in progress (`exp/utp-intree`): per-host memory of race winners (≥4 races, ≥75% share, decayed past 64); the winner gets a 150 ms head start, the loser still races delayed so single-transport peers connect. Steady state: 1 raced dial per peer instead of 2 (`TestDialPeerSkipsLoserWhenPreferredWins` asserts zero loser dials; `TestDialPeerFallsBackToDelayedLeg` keeps the fallback) |
+| **`UTPConn` address snapshot** (fewer allocs) | own (`internal/netx`) | in progress (`exp/utp-intree`): TCP-view addrs converted once at wrap (`NewUTPConn`) instead of per `RemoteAddr()` call. `BenchmarkUTPConnRemoteAddr`: 259→113 ns/op, 152→40 B/op, 6→3 allocs/op (rest is `String()`); Intel N97 |
 
 ### 4.4 DHT: hardening and multi-path
 
