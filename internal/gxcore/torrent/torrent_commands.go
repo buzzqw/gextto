@@ -14,9 +14,13 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-// sendCommand sends f to the torrent's run loop, where it executes on the
-// run() goroutine. It gives up and returns false if the torrent is closed
-// first.
+// ---------------------------------------------------------------------------
+// Run-loop plumbing: every public method below executes on the torrent's own
+// goroutine through these two helpers.
+// ---------------------------------------------------------------------------
+
+// sendCommand runs f on the run loop, reporting false when the torrent
+// closed first.
 func (t *torrent) sendCommand(f func()) bool {
 	select {
 	case t.commandC <- f:
@@ -26,13 +30,13 @@ func (t *torrent) sendCommand(f func()) bool {
 	}
 }
 
-// query runs f on the torrent's run loop and returns what it produced.
-// It returns the zero value if the torrent is closed first.
-//
-// It is a function rather than a method because methods cannot be generic.
+// query runs f on the run loop and returns its result, or the zero value
+// when the torrent closed first. Free function (not a method) because
+// methods cannot introduce type parameters. The buffered reply channel keeps
+// the run loop from ever waiting on the caller.
 func query[T any](t *torrent, f func() T) T {
 	var zero T
-	resp := make(chan T, 1) // buffered, so the run loop never waits on the caller
+	resp := make(chan T, 1)
 	if !t.sendCommand(func() { resp <- f() }) {
 		return zero
 	}
@@ -44,60 +48,68 @@ func query[T any](t *torrent, f func() T) T {
 	}
 }
 
-// Start downloading.
-// After all files are downloaded, seeding continues until the torrent is stopped.
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+
+// Start downloads (seeding continues after completion until Stop).
 func (t *torrent) Start() {
 	t.sendCommand(t.start)
 }
 
-// Stop downloading and seeding.
-// Stop closes all peer connections.
+// Stop halts downloading and seeding, closing every peer connection.
 func (t *torrent) Stop() {
 	t.sendCommand(func() { t.stop(nil) })
 }
 
-// Announce torrent to trackers and DHT manually.
+// Announce asks trackers and DHT for peers right now.
 func (t *torrent) Announce() {
 	t.sendCommand(func() { t.setNeedMorePeers(true) })
 }
 
-// Verify pieces by checking files.
+// Verify re-checks the files against the piece hashes.
 func (t *torrent) Verify() {
 	t.sendCommand(t.handleVerifyCommand)
 }
 
-// Close this torrent and release all resources.
-// Close must be called before discarding the torrent.
+// Close releases every resource. Call it before dropping the torrent.
 func (t *torrent) Close() {
 	close(t.closeC)
 	<-t.doneC
 }
 
+// NotifyClose fires when the torrent closes.
 func (t *torrent) NotifyClose() <-chan struct{} {
 	return t.closeC
 }
 
+// NotifyComplete fires on download completion.
 func (t *torrent) NotifyComplete() <-chan struct{} {
 	return t.completeC
 }
 
+// NotifyMetadata fires once the info dict arrives.
 func (t *torrent) NotifyMetadata() <-chan struct{} {
 	return t.completeMetadataC
 }
 
-// NotifyError returns the channel that carries the error that stopped the
-// torrent. It is nil unless the torrent is running, because start() creates the
-// channel and stop() drops it, so this has to be read on the run loop.
+// NotifyError carries the stopping error. Read it on the run loop: the
+// channel exists only while running (start creates it, stop drops it).
 func (t *torrent) NotifyError() <-chan error {
 	return query(t, func() chan error { return t.errC })
 }
 
-// NotifyListen returns a new channel that is signalled after torrent has started to listen on peer port.
-// NotifyListen must be called after calling Start().
+// NotifyListen fires with the peer port once listening. Call after Start.
 func (t *torrent) NotifyListen() <-chan int {
 	return query(t, func() chan int { return t.portC })
 }
 
+// ---------------------------------------------------------------------------
+// Data access
+// ---------------------------------------------------------------------------
+
+// Magnet exports the magnet link. Private torrents refuse (they must not
+// leak into the DHT swarm).
 func (t *torrent) Magnet() (string, error) {
 	if t.info() != nil && t.info().Private {
 		return "", errors.New("torrent is private")
@@ -111,6 +123,7 @@ func (t *torrent) Magnet() (string, error) {
 	return m.String(), nil
 }
 
+// Torrent exports the .torrent, preserving layers and BEP 38 hints.
 func (t *torrent) Torrent() ([]byte, error) {
 	if t.info() == nil {
 		return nil, errors.New("torrent metadata not ready")
@@ -122,6 +135,7 @@ func (t *torrent) Torrent() ([]byte, error) {
 	return metainfo.NewBytesWithHints(t.info().Bytes, t.getTieredTrackers(), webseeds, t.pieceLayers, "", t.info().Collections, t.info().Similar)
 }
 
+// getTieredTrackers groups tracker URLs back into tiers.
 func (t *torrent) getTieredTrackers() [][]string {
 	var trackers [][]string
 	for _, tr := range t.trackers {
@@ -138,25 +152,30 @@ func (t *torrent) getTieredTrackers() [][]string {
 	return trackers
 }
 
-// Stats returns statistics about the Torrent.
+// Stats snapshots the torrent.
 func (t *torrent) Stats() Stats {
 	return query(t, t.stats)
 }
 
+// ---------------------------------------------------------------------------
+// Swarm membership
+// ---------------------------------------------------------------------------
+
+// AddPeers queues manual peers.
 func (t *torrent) AddPeers(peers []*net.TCPAddr) {
 	t.sendCommand(func() { t.handleNewPeers(peers, peersource.Manual) })
 }
 
+// AddTrackers announces to additional trackers.
 func (t *torrent) AddTrackers(trackers []tracker.Tracker) {
 	t.sendCommand(func() { t.handleNewTrackers(trackers) })
 }
 
-// unlimitedUnchokedPeers is used when the per-torrent upload slots are set to
-// "unlimited".
+// unlimitedUnchokedPeers emulates "unlimited" upload slots.
 const unlimitedUnchokedPeers = 1000
 
-// applyMaxUploads sets the unchoker slots from maxUploads: zero
-// unchokes every interested peer. It runs in the torrent goroutine.
+// applyMaxUploads maps maxUploads onto unchoker slots (zero = everyone).
+// Runs on the torrent goroutine.
 func (t *torrent) applyMaxUploads() {
 	if t.unchoker == nil {
 		return
@@ -168,8 +187,8 @@ func (t *torrent) applyMaxUploads() {
 	t.unchoker.SetNumUnchoked(t.maxUploads)
 }
 
-// setOrder changes the piece order at runtime and persists it.
-// It runs in the torrent goroutine.
+// setOrder switches the piece order live and persists it. Runs on the
+// torrent goroutine.
 func (t *torrent) setOrder(sequential, firstLast bool) {
 	t.sequential = sequential
 	t.firstLast = firstLast
@@ -179,8 +198,7 @@ func (t *torrent) setOrder(sequential, firstLast bool) {
 	t.persistOrder()
 }
 
-// persistOrder stores the piece order flags in the resume database, so a
-// runtime change survives a session reload.
+// persistOrder stores the order flags in resume, surviving reloads.
 func (t *torrent) persistOrder() {
 	_ = t.session.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.id))
@@ -194,17 +212,21 @@ func (t *torrent) persistOrder() {
 	})
 }
 
-// TrackerStatus is status of the Tracker.
+// ---------------------------------------------------------------------------
+// Tracker view
+// ---------------------------------------------------------------------------
+
+// TrackerStatus is a tracker's contact state.
 type TrackerStatus int
 
 const (
-	// NotContactedYet indicates that no announce request has been made to the tracker.
+	// NotContactedYet means no announce went out yet.
 	NotContactedYet TrackerStatus = iota
-	// Contacting the tracker. Sending request or waiting response from the tracker.
+	// Contacting means a request is in flight.
 	Contacting
-	// Working indicates that the tracker has responded as expected.
+	// Working answered as expected.
 	Working
-	// NotWorking indicates that the tracker didn't respond or returned an error.
+	// NotWorking failed or errored.
 	NotWorking
 )
 
@@ -218,7 +240,7 @@ func trackerStatusToString(s TrackerStatus) string {
 	return m[s]
 }
 
-// Tracker is a server that tracks the peers of torrents.
+// Tracker is one tracker's live status.
 type Tracker struct {
 	URL          string
 	Status       TrackerStatus
@@ -230,11 +252,17 @@ type Tracker struct {
 	NextAnnounce time.Time
 }
 
+// Trackers snapshots every tracker's status.
 func (t *torrent) Trackers() []Tracker {
 	return query(t, t.getTrackers)
 }
 
-// Peer is a remote peer that is connected and completed protocol handshake.
+// ---------------------------------------------------------------------------
+// Peer and webseed views
+// ---------------------------------------------------------------------------
+
+// Peer is a handshaked connection: origin, choke/interest both ways,
+// speeds, encryption, and v2-relevant progress.
 type Peer struct {
 	ID                 [20]byte
 	Client             string
@@ -252,44 +280,44 @@ type Peer struct {
 	EncryptedStream    bool
 	DownloadSpeed      int
 	UploadSpeed        int
-	// UTP is set for peers connected over uTP.
+	// UTP marks uTP connections.
 	UTP bool
-	// Progress (0-1) and Seed come from the peer's bitfield.
+	// Progress (0-1) and Seed derive from the peer's bitfield.
 	Progress float64
 	Seed     bool
 }
 
-// PeerSource indicates that how the peer is found.
+// PeerSource tells how a peer was found.
 type PeerSource int
 
 const (
-	// SourceTracker indicates that the peer is found from one of the trackers.
+	// SourceTracker came from a tracker announce.
 	SourceTracker PeerSource = iota
-	// SourceDHT indicates that the peer is found from Decentralised Hash Table.
+	// SourceDHT came from the DHT.
 	SourceDHT
-	// SourcePEX indicates that the peer is found from another peer.
+	// SourcePEX was gossiped by a peer.
 	SourcePEX
-	// SourceIncoming indicates that the peer found us.
+	// SourceIncoming dialed us.
 	SourceIncoming
-	// SourceManual indicates that the peer is added manually via AddPeer method.
+	// SourceManual was added via AddPeer.
 	SourceManual
-	// SourceHolepunch indicates that the peer was reached via a BEP 55
-	// holepunch rendezvous.
+	// SourceHolepunch arrived via a BEP 55 rendezvous.
 	SourceHolepunch
 )
 
+// Peers snapshots the connected peers.
 func (t *torrent) Peers() []Peer {
 	return query(t, t.getPeers)
 }
 
-// Webseed is a HTTP source defined in Torrent.
-// Client can download from these sources along with peers from the swarm.
+// Webseed is one HTTP source: URL, last error and live speed.
 type Webseed struct {
 	URL           string
 	Error         error
 	DownloadSpeed int
 }
 
+// Webseeds snapshots the webseed sources.
 func (t *torrent) Webseeds() []Webseed {
 	return query(t, t.getWebseeds)
 }

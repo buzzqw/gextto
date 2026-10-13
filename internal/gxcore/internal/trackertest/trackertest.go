@@ -1,7 +1,6 @@
-// Package trackertest provides minimal in-memory BitTorrent trackers for use
-// in tests. It speaks just enough of the HTTP (BEP 3) and UDP (BEP 15) announce
-// protocols to exercise the engine's tracker clients and end-to-end download flow,
-// without pulling in an external tracker implementation.
+// Package trackertest serves minimal in-memory trackers for the engine's own
+// tests: just enough HTTP (BEP 3) and UDP (BEP 15) announce protocol to run
+// the tracker clients and end-to-end downloads, with no external tracker.
 package trackertest
 
 import (
@@ -16,12 +15,12 @@ import (
 	"github.com/zeebo/bencode"
 )
 
-// announceInterval is the interval advertised to clients in announce responses.
+// announceInterval is the interval advertised in announce replies.
 const announceInterval = time.Minute
 
-// peerStore keeps the set of peers seen for each info hash. A peer is keyed by
-// its compact (IP+port) form so a re-announce updates the same entry. It is
-// safe for concurrent use.
+// peerStore remembers one swarm per info hash, keyed by compact peer so a
+// re-announce refreshes the same entry. Mutex-guarded for the serving
+// goroutines.
 type peerStore struct {
 	mu    sync.Mutex
 	peers map[[20]byte]map[tracker.CompactPeer]struct{}
@@ -31,9 +30,9 @@ func newPeerStore() *peerStore {
 	return &peerStore{peers: make(map[[20]byte]map[tracker.CompactPeer]struct{})}
 }
 
-// announce records the announcing peer (or removes it on a "stopped" event),
-// then returns up to numWant other peers in the swarm, excluding the announcer
-// itself. A numWant <= 0 means no limit.
+// announce upserts the announcer (or removes it on stopped) and returns up
+// to numWant other swarm members, never the announcer itself. numWant <= 0
+// means uncapped.
 func (s *peerStore) announce(infoHash [20]byte, self tracker.CompactPeer, stopped bool, numWant int) []tracker.CompactPeer {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -48,7 +47,6 @@ func (s *peerStore) announce(infoHash [20]byte, self tracker.CompactPeer, stoppe
 	} else {
 		swarm[self] = struct{}{}
 	}
-
 	var result []tracker.CompactPeer
 	for p := range swarm {
 		if p == self {
@@ -62,8 +60,8 @@ func (s *peerStore) announce(infoHash [20]byte, self tracker.CompactPeer, stoppe
 	return result
 }
 
-// compactPeer builds a CompactPeer from an IP address and port. The bool is
-// false when the address is not IPv4, in which case the caller ignores it.
+// compactPeer folds an address into compact form; false means non-IPv4,
+// which the callers reject.
 func compactPeer(ip net.IP, port int) (tracker.CompactPeer, bool) {
 	v4 := ip.To4()
 	if v4 == nil {
@@ -72,7 +70,7 @@ func compactPeer(ip net.IP, port int) (tracker.CompactPeer, bool) {
 	return tracker.NewCompactPeer(&net.TCPAddr{IP: v4, Port: port}), true
 }
 
-// encodeCompactPeers concatenates the 6-byte compact form of each peer.
+// encodeCompactPeers concatenates compact peers into one blob.
 func encodeCompactPeers(peers []tracker.CompactPeer) []byte {
 	b := make([]byte, 0, len(peers)*6)
 	for _, p := range peers {
@@ -82,15 +80,14 @@ func encodeCompactPeers(peers []tracker.CompactPeer) []byte {
 	return b
 }
 
-// HTTPTracker is an HTTP BitTorrent tracker (BEP 3) for use in tests.
+// HTTPTracker is a BEP 3 test tracker serving /announce. Stop it with Close.
 type HTTPTracker struct {
 	store  *peerStore
 	server *http.Server
 	doneC  chan struct{}
 }
 
-// NewHTTP starts an HTTP tracker listening on addr (e.g. "127.0.0.1:5000"). It
-// serves /announce; the returned tracker must be stopped with Close.
+// NewHTTP listens on addr (e.g. "127.0.0.1:0" for an ephemeral port).
 func NewHTTP(addr string) (*HTTPTracker, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -114,7 +111,7 @@ func NewHTTP(addr string) (*HTTPTracker, error) {
 	return t, nil
 }
 
-// Close stops the HTTP tracker and waits for the serving goroutine to exit.
+// Close shuts the tracker down and waits for the serving goroutine.
 func (t *HTTPTracker) Close() error {
 	err := t.server.Close()
 	<-t.doneC
@@ -137,7 +134,6 @@ func (t *HTTPTracker) handleAnnounce(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid port", http.StatusBadRequest)
 		return
 	}
-	port := int(port64)
 	numWant, _ := strconv.Atoi(q.Get("numwant"))
 	stopped := q.Get("event") == "stopped"
 
@@ -146,43 +142,39 @@ func (t *HTTPTracker) handleAnnounce(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	self, ok := compactPeer(net.ParseIP(host), port)
+	self, ok := compactPeer(net.ParseIP(host), int(port64))
 	if !ok {
 		http.Error(w, "non-IPv4 peer", http.StatusBadRequest)
 		return
 	}
-
 	peers := t.store.announce(infoHash, self, stopped, numWant)
-
-	resp := httpAnnounceResponse{
+	w.Header().Set("Content-Type", "text/plain")
+	_ = bencode.NewEncoder(w).Encode(httpAnnounceResponse{
 		Interval: int(announceInterval / time.Second),
 		Peers:    encodeCompactPeers(peers),
-	}
-	w.Header().Set("Content-Type", "text/plain")
-	_ = bencode.NewEncoder(w).Encode(resp)
+	})
 }
 
-// BEP 15 (UDP tracker) protocol constants.
+// UDP tracker protocol numbers (BEP 15).
 const (
 	udpProtocolID  = 0x41727101980
 	actionConnect  = 0
 	actionAnnounce = 1
 	actionError    = 3
 	eventStopped   = 3
-	// udpConnectionID is the (arbitrary) connection id handed to clients in the
-	// connect response and echoed back in the announce request.
+	// udpConnectionID is the arbitrary session id handed out in connect
+	// replies and echoed in announces.
 	udpConnectionID = 0x27101980
 )
 
-// UDPTracker is a UDP BitTorrent tracker (BEP 15) for use in tests.
+// UDPTracker is a BEP 15 test tracker. Stop it with Close.
 type UDPTracker struct {
 	store *peerStore
 	conn  *net.UDPConn
 	doneC chan struct{}
 }
 
-// NewUDP starts a UDP tracker listening on addr (e.g. "127.0.0.1:5000"). The
-// returned tracker must be stopped with Close.
+// NewUDP listens on addr (e.g. "127.0.0.1:0" for an ephemeral port).
 func NewUDP(addr string) (*UDPTracker, error) {
 	udpAddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
@@ -201,7 +193,7 @@ func NewUDP(addr string) (*UDPTracker, error) {
 	return t, nil
 }
 
-// Close stops the UDP tracker and waits for the serving goroutine to exit.
+// Close shuts the tracker down and waits for the serving goroutine.
 func (t *UDPTracker) Close() error {
 	err := t.conn.Close()
 	<-t.doneC
@@ -220,14 +212,14 @@ func (t *UDPTracker) serve() {
 	}
 }
 
+// handle dispatches one datagram: connection id (8), action (4),
+// transaction id (4), then the action body.
 func (t *UDPTracker) handle(req []byte, addr *net.UDPAddr) {
-	// Every request begins with: connection_id (8) action (4) transaction_id (4).
 	if len(req) < 16 {
 		return
 	}
 	action := binary.BigEndian.Uint32(req[8:12])
 	transactionID := binary.BigEndian.Uint32(req[12:16])
-
 	switch action {
 	case actionConnect:
 		if binary.BigEndian.Uint64(req[0:8]) != udpProtocolID {
@@ -246,9 +238,10 @@ func (t *UDPTracker) handle(req []byte, addr *net.UDPAddr) {
 	}
 }
 
+// handleAnnounce serves a 98-byte announce body (info_hash at [16:36],
+// event at [80:84], num_want at [92:96], port at [96:98]). The request IP
+// field is zero in engine requests, so the source IP identifies the peer.
 func (t *UDPTracker) handleAnnounce(req []byte, addr *net.UDPAddr, transactionID uint32) {
-	// Announce request layout (BEP 15), 98 bytes before optional extensions:
-	//   [16:36] info_hash, [80:84] event, [92:96] num_want, [96:98] port.
 	if len(req) < 98 {
 		t.writeError(addr, transactionID, "short announce")
 		return
@@ -256,18 +249,15 @@ func (t *UDPTracker) handleAnnounce(req []byte, addr *net.UDPAddr, transactionID
 	var infoHash [20]byte
 	copy(infoHash[:], req[16:36])
 	event := binary.BigEndian.Uint32(req[80:84])
-	numWant := int32(binary.BigEndian.Uint32(req[92:96]))
+	numWant := int(binary.BigEndian.Uint32(req[92:96]))
 	port := int(binary.BigEndian.Uint16(req[96:98]))
 
-	// The IP field ([84:88]) is 0 in the engine's requests, so use the source IP.
 	self, ok := compactPeer(addr.IP, port)
 	if !ok {
 		t.writeError(addr, transactionID, "non-IPv4 peer")
 		return
 	}
-
-	peers := t.store.announce(infoHash, self, event == eventStopped, int(numWant))
-
+	peers := t.store.announce(infoHash, self, event == eventStopped, numWant)
 	compact := encodeCompactPeers(peers)
 	resp := make([]byte, 20+len(compact))
 	binary.BigEndian.PutUint32(resp[0:4], actionAnnounce)

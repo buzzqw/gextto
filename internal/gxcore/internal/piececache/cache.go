@@ -9,8 +9,10 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
-// Cache is a LRU piece cache of certain size.
-// Items in the cache are expired after the defined TTL.
+// Cache is a size-bounded LRU of read blocks with lazy TTL expiry: a single
+// periodic sweeper reaps expired items instead of one timer per block.
+// Concurrent loads of the same key share one loader call; oversized values
+// bypass the cache but are still served.
 type Cache struct {
 	size, maxSize int64
 	ttl           time.Duration
@@ -26,10 +28,11 @@ type Cache struct {
 	NumLoadedBytes metrics.Meter
 }
 
-// Loader is a function that loads data from a piece.
+// Loader fetches a block from storage on a cache miss.
 type Loader func() ([]byte, error)
 
-// sweepEvery is how often expired items are swept, derived from the TTL
+// sweepEvery derives the sweeper period from the TTL, floored and capped so
+// tiny TTLs do not spin and huge ones still reap.
 func sweepEvery(ttl time.Duration) time.Duration {
 	d := ttl / 2
 	if d < 10*time.Millisecond {
@@ -41,7 +44,8 @@ func sweepEvery(ttl time.Duration) time.Duration {
 	return d
 }
 
-// New returns new Cache.
+// New starts a cache of maxSize bytes, TTL per item, parallelReads concurrent
+// loads.
 func New(maxSize int64, ttl time.Duration, parallelReads uint) *Cache {
 	c := &Cache{
 		maxSize:        maxSize,
@@ -58,8 +62,7 @@ func New(maxSize int64, ttl time.Duration, parallelReads uint) *Cache {
 	return c
 }
 
-// sweepLoop drops expired items periodically. One timer for the whole cache
-// instead of one time.Timer per cached block.
+// sweepLoop reaps expired items on the derived period.
 func (c *Cache) sweepLoop() {
 	t := time.NewTicker(sweepEvery(c.ttl))
 	defer t.Stop()
@@ -73,6 +76,8 @@ func (c *Cache) sweepLoop() {
 	}
 }
 
+// sweep drops every expired heap member. Index -1 items (loading or already
+// removed) are skipped by removeItem's guard.
 func (c *Cache) sweep() {
 	now := time.Now()
 	c.m.Lock()
@@ -84,14 +89,11 @@ func (c *Cache) sweep() {
 		}
 	}
 	for _, i := range expired {
-		if i.index != -1 {
-			c.removeItem(i)
-		}
+		c.removeItem(i)
 	}
 }
 
-// Close the cache and release all resources. It drops all cached items,
-// stopping their expiry timers, then stops the metrics meters.
+// Close stops the sweeper, drops everything and stops the meters.
 func (c *Cache) Close() {
 	close(c.stopC)
 	c.Clear()
@@ -101,7 +103,7 @@ func (c *Cache) Close() {
 	c.NumLoadedBytes.Stop()
 }
 
-// Clear the cache. Drops all items in cache.
+// Clear drops all items at once.
 func (c *Cache) Clear() {
 	c.m.Lock()
 	c.items = make(map[string]*item)
@@ -110,31 +112,31 @@ func (c *Cache) Clear() {
 	c.m.Unlock()
 }
 
-// Len returns the number of items in the cache. Items may be in different sizes.
+// Len counts the cached items (of varying sizes).
 func (c *Cache) Len() int {
 	c.m.RLock()
 	defer c.m.RUnlock()
 	return len(c.items)
 }
 
-// LoadsActive returns the number of active Loader calls.
+// LoadsActive counts the running loader calls.
 func (c *Cache) LoadsActive() int {
-	return (c.sem.Len())
+	return c.sem.Len()
 }
 
-// LoadsWaiting returns the number of waiting Loader calls.
+// LoadsWaiting counts the queued loader calls.
 func (c *Cache) LoadsWaiting() int {
-	return (c.sem.Waiting())
+	return c.sem.Waiting()
 }
 
-// Size returns the total size of the items in the cache.
+// Size totals the cached bytes.
 func (c *Cache) Size() int64 {
 	c.m.RLock()
 	defer c.m.RUnlock()
 	return c.size
 }
 
-// Utilization is a number between 0 and 100 that returns the hit-ratio of the cache.
+// Utilization is the cache hit ratio in percent.
 func (c *Cache) Utilization() int {
 	total := c.NumTotal.Rate1()
 	if total == 0 {
@@ -143,43 +145,36 @@ func (c *Cache) Utilization() int {
 	return int((100 * c.NumCached.Rate1()) / total)
 }
 
-// Get item with the key from cache. If item is not in cache, load by calling `loader` func and put into the cache.
+// Get serves key from the cache, loading and storing on a miss.
 func (c *Cache) Get(key string, loader Loader) ([]byte, error) {
-	i := c.getItem(key)
-	return c.getValue(i, loader)
+	return c.getValue(c.claim(key), loader)
 }
 
-func (c *Cache) getItem(key string) *item {
+// claim returns the resident item (counting the hit), or registers a fresh
+// loading placeholder. Expired residents are dropped so the caller reloads;
+// loading placeholders (index -1) survive.
+func (c *Cache) claim(key string) *item {
 	c.m.Lock()
 	defer c.m.Unlock()
-
 	c.NumTotal.Mark(1)
-
-	i, ok := c.items[key]
-	if ok {
-		// Drop an expired item so the caller reloads it (lazy TTL
-		// instead of a per-item timer). Items still loading have index -1 and
-		// are kept.
-		if i.index != -1 && time.Now().After(i.expireAt) {
-			c.removeItem(i)
-			i = nil
+	if i, ok := c.items[key]; ok {
+		if i.index == -1 || !time.Now().After(i.expireAt) {
+			c.NumCached.Mark(1)
+			return i
 		}
+		c.removeItem(i)
 	}
-	if i != nil {
-		c.NumCached.Mark(1)
-		return i
-	}
-	// index -1 marks an item that is not in the access list yet; the zero value
-	// (0) would look like it sits at the head of the heap.
-	i = &item{key: key, index: -1}
+	i := &item{key: key, index: -1}
 	c.items[key] = i
 	return i
 }
 
+// getValue serves a claimed item: loaded ones refresh their access time
+// (hits), others run the loader under the read semaphore exactly once even
+// under concurrent Gets of the same key (the item mutex serializes them).
 func (c *Cache) getValue(i *item, loader Loader) ([]byte, error) {
 	i.Lock()
 	defer i.Unlock()
-
 	if i.loaded {
 		if i.err != nil {
 			return nil, i.err
@@ -187,56 +182,47 @@ func (c *Cache) getValue(i *item, loader Loader) ([]byte, error) {
 		c.updateAccessTime(i)
 		return i.value, nil
 	}
-
 	c.sem.Wait()
 	i.value, i.err = loader()
 	c.sem.Signal()
 	i.loaded = true
 	c.NumLoad.Mark(1)
 	c.NumLoadedBytes.Mark(int64(len(i.value)))
-
-	return c.handleNewItem(i)
+	return c.storeNew(i)
 }
 
-func (c *Cache) handleNewItem(i *item) ([]byte, error) {
+// storeNew files a freshly loaded item: failures and superseded placeholders
+// are dropped (but still served), oversized values bypass, the rest evict
+// LRU room and join the heap with a fresh TTL.
+func (c *Cache) storeNew(i *item) ([]byte, error) {
 	c.m.Lock()
 	defer c.m.Unlock()
-
 	if i.err != nil {
 		if c.items[i.key] == i {
 			delete(c.items, i.key)
 		}
 		return nil, i.err
 	}
-
-	// The item was evicted or replaced while loading: return the
-	// data but do not cache a stale copy under the key.
 	if c.items[i.key] != i {
 		return i.value, nil
 	}
-
-	// Do not cache values larger than cache size.
 	if int64(len(i.value)) > c.maxSize {
 		delete(c.items, i.key)
 		return i.value, nil
 	}
-
 	c.makeRoom(i)
-
 	c.size += int64(len(i.value))
-
 	i.lastAccessed = time.Now()
 	i.expireAt = i.lastAccessed.Add(c.ttl)
 	heap.Push(&c.accessList, i)
-
 	return i.value, nil
 }
 
+// updateAccessTime refreshes recency and TTL, re-sinking the heap entry.
+// Items the sweeper removed meanwhile (index -1) are left alone.
 func (c *Cache) updateAccessTime(i *item) {
 	c.m.Lock()
 	defer c.m.Unlock()
-
-	// The item may have been removed by the sweeper while it was in use.
 	if i.index == -1 {
 		return
 	}
@@ -245,15 +231,16 @@ func (c *Cache) updateAccessTime(i *item) {
 	heap.Fix(&c.accessList, i.index)
 }
 
+// makeRoom evicts LRU items until value i fits.
 func (c *Cache) makeRoom(i *item) {
 	for c.maxSize-c.size < int64(len(i.value)) {
-		i := c.accessList[0]
-		c.removeItem(i)
+		c.removeItem(c.accessList[0])
 	}
 }
 
+// removeItem unlinks i idempotently: already-removed or replaced items are
+// no-ops.
 func (c *Cache) removeItem(i *item) {
-	// Idempotent: the item may already have been removed or replaced.
 	if i.index == -1 || c.items[i.key] != i {
 		return
 	}
@@ -262,8 +249,7 @@ func (c *Cache) removeItem(i *item) {
 	c.size -= int64(len(i.value))
 }
 
-// SetMaxSize changes the cache size, evicting the least recently used items
-// that no longer fit (the read cache is retuned at runtime).
+// SetMaxSize retunes the capacity live, evicting the LRU overflow.
 func (c *Cache) SetMaxSize(maxSize int64) {
 	c.m.Lock()
 	defer c.m.Unlock()
