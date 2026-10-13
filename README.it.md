@@ -205,7 +205,7 @@ tempo reale (`/ui/events`).
 | Motore | Dove gira | Quando sceglierlo |
 |---|---|---|
 | gx-torrent (predefinito) | Processo Go separato e sorvegliato | Go puro, autonomo, sviluppo attivo. v1, ibridi e solo-v2, DHT e cifratura MSE/PE; anche autonomo su Linux e Windows; niente WebTorrent/WebRTC |
-| qBittorrent-nox | Demone esterno via Web API | Hai già qBittorrent-nox o preferisci la sua UI. Servono mappature percorsi e un processo in più |
+| qBittorrent-nox | Demone esterno via Web API | Hai già qBittorrent-nox o preferisci la sua UI. Servono mappature percorsi e un processo in più ([guida alla configurazione](docs/qbittorrent-nox.md)) |
 | libtorrent (build opzionale) | Nel processo di Gextto, **solo se compilato** (`make build-libtorrent`) | Controlli avanzati o compatibilità di libtorrent; anche fallback automatico. Un crash coinvolge anche Gextto |
 
 Le statistiche del motore attivo — torrent per stato, velocità e slot,
@@ -249,7 +249,8 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 Installa in `/opt/gextto`, tiene i dati in `/var/lib/gextto` ed espone la UI
 sulla porta 5000. Il motore predefinito `gx-torrent` (Go puro) è installato
 accanto a `gexttod` e avviato in modalità gestita. Il pacchetto è Go puro —
-null'altro da installare. In alternativa, un qBittorrent-nox esterno; il
+null'altro da installare. In alternativa, un qBittorrent-nox esterno
+([guida alla configurazione](docs/qbittorrent-nox.md)); il
 motore libtorrent richiede una build propria (vedi sotto).
 
 Prima di toccare il sistema l'installer avvia una volta il programma
@@ -400,6 +401,7 @@ tastiera e tecnologie assistive. Ambito e limiti:
 | Migrare un'installazione | [Guida migrazione](docs/MIGRATION.md) |
 | Client da terminale | [Riferimento TUI](docs/tui.md) |
 | Motore gx-torrent e client autonomo | [Documento tecnico di gx-torrent](docs/gx-torrent.md) |
+| Backend qBittorrent-nox | [Guida alla configurazione](docs/qbittorrent-nox.md) |
 | Compilare o contribuire | [Manuale sviluppatori](docs/DEVELOPERS.md) |
 | Rete e protezione dati | [Politica di sicurezza](docs/SECURITY.md) |
 | Ambito e test accessibilità | [Analisi accessibilità](docs/evoluzione.md#8-accessibility) |

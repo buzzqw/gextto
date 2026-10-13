@@ -199,7 +199,7 @@ resume data, live Server-Sent Events (`/ui/events`).
 | Engine | Where it runs | When to pick it |
 |---|---|---|
 | gx-torrent (default) | Separate supervised Go process | Pure Go, self-contained, active development. v1, hybrid and v2-only, DHT and MSE/PE; also standalone on Linux and Windows; no WebTorrent/WebRTC |
-| qBittorrent-nox | External daemon via its Web API | You already run qBittorrent-nox or prefer its UI. Needs path mappings and an extra process |
+| qBittorrent-nox | External daemon via its Web API | You already run qBittorrent-nox or prefer its UI. Needs path mappings and an extra process ([setup guide](docs/qbittorrent-nox.md)) |
 | libtorrent (optional build) | Inside Gextto's process, **only if compiled in** (`make build-libtorrent`) | Advanced libtorrent controls or compatibility; also the automatic fallback. A crash takes Gextto down too |
 
 Engine statistics — torrents by state, speed and queue slots, port/router,
@@ -243,7 +243,7 @@ It installs to `/opt/gextto`, keeps service data in `/var/lib/gextto`, and
 serves the UI on port 5000. The default engine `gx-torrent` (pure Go) is
 installed alongside `gexttod` and started in managed mode. The release package
 is pure Go — nothing else to install. An external qBittorrent-nox can be used
-instead; the libtorrent engine needs your own build (see below).
+instead ([setup guide](docs/qbittorrent-nox.md)); the libtorrent engine needs your own build (see below).
 
 The installer first runs the downloaded program once: a missing library or an
 old glibc is reported immediately instead of leaving a service that never
@@ -392,6 +392,7 @@ testing is still required. Scope and limits:
 | Move an existing installation | [Migration guide](docs/MIGRATION.md) |
 | Terminal client | [TUI reference](docs/tui.md) |
 | gx-torrent engine and standalone client | [gx-torrent technical document](docs/gx-torrent.md) |
+| qBittorrent-nox backend | [Setup guide](docs/qbittorrent-nox.md) |
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |
 | Accessibility scope and testing | [Accessibility analysis](docs/evoluzione.md#8-accessibility) |
