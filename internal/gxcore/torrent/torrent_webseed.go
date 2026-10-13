@@ -26,6 +26,12 @@ func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 		t.startPieceDownloaders()
 		return
 	}
+	if t.verifier != nil {
+		// A verification or swarm merge is exclusive: the piece's truth is
+		// being recomputed, so a webseed result is stale by definition.
+		t.discardStaleWebseedPiece(msg)
+		return
+	}
 	if piece := &t.pieces[msg.Index]; piece.Done || piece.Writing {
 		t.discardStaleWebseedPiece(msg)
 		return

@@ -81,9 +81,18 @@ func (t *torrent) handleVerificationDone(ve *verifier.Verifier) {
 		t.stopAndSetStoppedOnComplete()
 		return
 	}
+	// Only now does this torrent have verified pieces to lend: wake the
+	// siblings that were downloading before its data was known.
+	t.notifySiblings()
 	t.processQueuedMessages()
 	t.addFixedPeers()
 	t.startAcceptor()
 	t.startAnnouncers()
 	t.startPieceDownloaders()
+	// A sibling's new data may have arrived while this check/merge ran: merge
+	// it now that the pipeline is quitting the exclusive window.
+	if t.mergeRecheck {
+		t.mergeRecheck = false
+		t.handleLaterMergeRequest()
+	}
 }

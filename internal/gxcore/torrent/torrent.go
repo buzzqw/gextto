@@ -210,6 +210,23 @@ type torrent struct {
 	// mergeOut receives the merge result from the verifier goroutine; the run
 	// loop reads it once the verifier is done (handleVerificationDone).
 	mergeOut *mergeResult
+	// laterMergeC is a coalescing wake-up: a sibling that has just published
+	// new local data pings it so this torrent can merge it too, when it is
+	// already downloading (the allocation-time merge only saw the siblings
+	// that existed then). Run loop only. See localmerge.go.
+	laterMergeC chan struct{}
+	// mergeWaiting/mergePending hold a later merge that is draining the
+	// in-flight piece writes before it can run (a piece adopting mid-merge
+	// would be lost by the verifier's bitfield swap). mergeRecheck re-runs the
+	// candidate scan after a verification/merge that a request arrived during.
+	// Run loop only.
+	mergeWaiting bool
+	mergePending []*Torrent
+	mergeRecheck bool
+	// notifyCount is the verified-piece count at the last sibling wake-up: a
+	// torrent only notifies when it has gained verified pieces since, so two
+	// torrents cannot ping each other forever with no-op merges. Run loop only.
+	notifyCount uint32
 
 	// skipBits marks deselected-file pieces (nil when none): interest and
 	// usefulness ignore them. Run loop only.
@@ -385,6 +402,7 @@ func newTorrent(
 		bytesWasted:               metrics.NewCounter(),
 		seededFor:                 metrics.NewCounter(),
 		ramNotifyC:                make(chan *peer.Peer),
+		laterMergeC:               make(chan struct{}, 1),
 		webseedClient:             &s.webseedClient,
 		webseedSources:            ws,
 		webseedPieceResultC:       suspendchan.New[*urldownloader.PieceResult](0),

@@ -164,3 +164,49 @@ func TestDaemonSwarmMergeResumePath(t *testing.T) {
 		t.Fatal("a.bin does not contain the reused content")
 	}
 }
+
+// TestDaemonSwarmMergeLaterSibling proves the merge triggered when a sibling
+// appears *after* the destination allocated: A is added first (nothing to reuse
+// yet, so it only allocates empty storage and starts downloading), then B with
+// the same content on disk is added. B publishes its data, A is woken and
+// completes from it, with no peer.
+func TestDaemonSwarmMergeLaterSibling(t *testing.T) {
+	d := newTestDaemon(t)
+	dir := t.TempDir()
+	content := make([]byte, 200_000)
+	if _, err := rand.Read(content); err != nil {
+		t.Fatal(err)
+	}
+
+	// A first, with no sibling in the session.
+	dataA, hashA := makeTorrentContent(t, "a.bin", content)
+	if _, _, err := d.add(addRequest{TorrentData: dataA, Destination: dir, SeedRatio: -1, SeedDays: -1}); err != nil {
+		t.Fatalf("add A: %v", err)
+	}
+	waitFor(t, "A to allocate", func() bool { return stateOf(d, hashA) == "downloading" })
+
+	// B: same content already on disk under another name, added afterwards.
+	if err := os.WriteFile(filepath.Join(dir, "b.bin"), content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dataB, hashB := makeTorrentContent(t, "b.bin", content)
+	if _, _, err := d.add(addRequest{TorrentData: dataB, Destination: dir, SeedRatio: -1, SeedDays: -1}); err != nil {
+		t.Fatalf("add B: %v", err)
+	}
+	waitFor(t, "B seeded", func() bool {
+		info, ok := findInfo(d, hashB)
+		return ok && info.TotalSize > 0 && info.TotalDone == info.TotalSize
+	})
+	waitFor(t, "A completed via the later-sibling merge", func() bool {
+		info, ok := findInfo(d, hashA)
+		return ok && info.TotalSize > 0 && info.TotalDone == info.TotalSize
+	})
+
+	got, err := os.ReadFile(filepath.Join(dir, "a.bin"))
+	if err != nil {
+		t.Fatalf("read a.bin: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Fatal("a.bin does not contain the reused content")
+	}
+}

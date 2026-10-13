@@ -8,8 +8,10 @@ import (
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/allocator"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/merkle"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/piecepicker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/verifier"
 )
 
@@ -186,5 +188,98 @@ func TestResumeMergeReusesPartialBlocks(t *testing.T) {
 	}
 	if !bytes.Equal(got, content[:block]) {
 		t.Fatal("the reused block is not on the destination storage")
+	}
+}
+
+// TestNotifySiblingsOnlyOnNewPieces: a torrent wakes its siblings only when it
+// has gained verified pieces, so two incomplete torrents cannot ping each other
+// forever with merges that reuse nothing.
+func TestNotifySiblingsOnlyOnNewPieces(t *testing.T) {
+	b := &torrent{laterMergeC: make(chan struct{}, 1)}
+	a := &torrent{session: &Session{torrents: map[string]*Torrent{"b": {torrent: b}}}}
+	a.bitfield = bitfield.New(4)
+
+	// Nothing verified: no wake-up.
+	a.notifySiblings()
+	if len(b.laterMergeC) != 0 {
+		t.Fatal("notified with no verified piece")
+	}
+
+	a.bitfield.Set(0)
+	a.notifySiblings()
+	if len(b.laterMergeC) != 1 {
+		t.Fatal("no wake-up after the first verified piece")
+	}
+	<-b.laterMergeC
+
+	// Same count: no repeated wake-up.
+	a.notifySiblings()
+	if len(b.laterMergeC) != 0 {
+		t.Fatal("notified without gaining a piece")
+	}
+
+	a.bitfield.Set(1)
+	a.notifySiblings()
+	if len(b.laterMergeC) != 1 {
+		t.Fatal("no wake-up after a new verified piece")
+	}
+}
+
+// TestLaterMergeRequestQueuesAndDrains: a downloading torrent woken by a
+// sibling's new data queues a later merge, waiting for the in-flight piece
+// writes to drain first (an adoption during the verifier's bitfield swap would
+// be lost), and merges the sibling once it can.
+func TestLaterMergeRequestQueuesAndDrains(t *testing.T) {
+	const pieceLength = 16384
+	content := make([]byte, pieceLength*3)
+	if _, err := rand.Read(content); err != nil {
+		t.Fatal(err)
+	}
+	info := testInfoBytes(t, content, pieceLength)
+
+	// B holds the full content and reports every piece as verified.
+	filesB := testFiles(t, t.TempDir(), info)
+	if _, err := filesB[0].Storage.WriteAt(content, 0); err != nil {
+		t.Fatal(err)
+	}
+	bfB := bitfield.New(info.NumPieces)
+	for i := uint32(0); i < info.NumPieces; i++ {
+		bfB.Set(i)
+	}
+	b := &torrent{pieces: piece.NewPieces(info, filesB), bitfield: bfB}
+	b.setInfo(info)
+	b.publishLocalData()
+
+	// A is downloading: a non-nil errC (running), the picker up, empty storage.
+	filesA := testFiles(t, t.TempDir(), info)
+	a := &torrent{id: "a", errC: make(chan error, 1), pieces: piece.NewPieces(info, filesA), log: logger.New("test")}
+	a.setInfo(info)
+	a.bitfield = bitfield.New(info.NumPieces)
+	a.piecePicker = piecepicker.New(a.pieces, 0, nil, false, false)
+	a.verifierProgressC = make(chan verifier.Progress)
+	a.verifierResultC = make(chan *verifier.Verifier)
+	a.session = &Session{torrents: map[string]*Torrent{"b": {torrent: b}}}
+
+	// With a piece write in flight, the request is queued, not started.
+	a.pendingWrites = 1
+	a.handleLaterMergeRequest()
+	if !a.mergeWaiting || a.verifier != nil {
+		t.Fatalf("mergeWaiting=%v verifier=%v, want queued and not running", a.mergeWaiting, a.verifier != nil)
+	}
+	if len(a.mergePending) != 1 {
+		t.Fatalf("mergePending = %d, want 1 candidate", len(a.mergePending))
+	}
+
+	// Once the write drains, the merge starts.
+	a.pendingWrites = 0
+	a.maybeStartDeferredMerge()
+	if a.verifier == nil {
+		t.Fatal("the merge did not start after the drain")
+	}
+	ve := awaitVerifier(t, a)
+	for i := uint32(0); i < info.NumPieces; i++ {
+		if !ve.Bitfield.Test(i) {
+			t.Fatalf("piece %d not set after the later merge", i)
+		}
 	}
 }

@@ -52,6 +52,9 @@ func (t *torrent) run() {
 			t.startPieceDownloaderForWebseed(src)
 		case pw := <-t.pieceWriterResultC:
 			t.handlePieceWriteDone(pw)
+			t.maybeStartDeferredMerge()
+		case <-t.laterMergeC:
+			t.handleLaterMergeRequest()
 		case now := <-t.seedDurationTicker.C:
 			t.updateSeedDuration(now)
 		case pe := <-t.peerSnubbedC:

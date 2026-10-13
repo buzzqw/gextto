@@ -40,8 +40,10 @@ type localDataSnapshot struct {
 	pieceLength uint32
 }
 
-// publishLocalData records the snapshot once the pieces are built. It is called
-// from the run loop in handleAllocationDone.
+// publishLocalData records the snapshot once the pieces are built and wakes
+// the sibling torrents, so one that is already downloading can merge the newly
+// published data too (the allocation-time merge only saw the then-present
+// siblings). It is called from the run loop in handleAllocationDone.
 func (t *torrent) publishLocalData() {
 	if t.info() == nil || len(t.pieces) == 0 {
 		return
@@ -52,6 +54,85 @@ func (t *torrent) publishLocalData() {
 		length:      t.info().Length,
 		pieceLength: t.info().PieceLength,
 	})
+	t.notifySiblings()
+}
+
+// notifySiblings pings every other torrent of the session, best effort: the
+// buffered per-torrent channel coalesces bursts and never blocks the publisher.
+// It only fires when this torrent has gained verified pieces since the last
+// time, so two incomplete torrents cannot ping each other forever with merges
+// that yield nothing.
+func (t *torrent) notifySiblings() {
+	if t.session == nil || t.bitfield == nil {
+		return
+	}
+	count := t.bitfield.Count()
+	if count == 0 || count == t.notifyCount {
+		return
+	}
+	t.notifyCount = count
+	for _, other := range t.session.ListTorrents() {
+		if other == nil || other.torrent == t {
+			continue
+		}
+		select {
+		case other.torrent.laterMergeC <- struct{}{}:
+		default:
+		}
+	}
+}
+
+// handleLaterMergeRequest reacts to a sibling's new local data: a torrent that
+// is already downloading scans the candidates and queues a merge, so it reuses
+// content that appeared after its own allocation. Runs on the run loop.
+func (t *torrent) handleLaterMergeRequest() {
+	if t.info() == nil || t.pieces == nil || t.piecePicker == nil || t.bitfield == nil {
+		return
+	}
+	if t.status() != Downloading || t.wantedComplete() {
+		return
+	}
+	if t.mergeWaiting || t.verifier != nil {
+		// A merge (or a verification) is in flight: re-check when it ends.
+		t.mergeRecheck = true
+		return
+	}
+	candidates := t.mergeCandidates(t.session.ListTorrents())
+	if len(candidates) == 0 {
+		return
+	}
+	t.mergePending = candidates
+	t.mergeWaiting = true
+	t.maybeStartDeferredMerge()
+}
+
+// maybeStartDeferredMerge starts a queued later merge once no piece write is
+// still in flight: an adoption during the verifier's bitfield swap would be
+// dropped, so the writes must be drained first (no new one starts while the
+// verifier is up: status() turns Verifying). Runs on the run loop.
+func (t *torrent) maybeStartDeferredMerge() {
+	if !t.mergeWaiting || t.pendingWrites > 0 {
+		return
+	}
+	t.mergeWaiting = false
+	candidates := t.mergePending
+	t.mergePending = nil
+	if len(candidates) == 0 || t.status() != Downloading {
+		return
+	}
+	t.startLaterMerge(candidates)
+}
+
+// startLaterMerge runs the merge on an already-downloading torrent: it cancels
+// the in-flight piece fetches (webseeds included) so nothing adopts while the
+// verifier swaps the bitfield, then merges with the current bitfield as the
+// already-verified set (no piece is re-read or re-hashed).
+// handleVerificationDone restarts the fetch pipeline at the end. Run loop only.
+func (t *torrent) startLaterMerge(candidates []*Torrent) {
+	t.stopPiecedownloaders()
+	t.stopWebseedDownloads()
+	resume := append([]byte(nil), t.bitfield.Bytes()...)
+	t.startMergeVerifier(candidates, false, resume)
 }
 
 // haveBits returns a copy of the verified piece bitfield, or nil when the
