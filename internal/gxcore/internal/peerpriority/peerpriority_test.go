@@ -20,3 +20,14 @@ func TestCalculateCommutesAndSeparatesIPv6(t *testing.T) {
 		t.Fatal("distinct IPv6 peers must not share a priority")
 	}
 }
+
+// port16 clamps an out-of-range port instead of wrapping it, so a mis-parsed
+// value never fabricates a different 16-bit port on the wire.
+func TestPort16Clamps(t *testing.T) {
+	cases := map[int]uint16{-1: 0, 0: 0, 80: 80, 65535: 65535, 65536: 65535, 1 << 20: 65535}
+	for in, want := range cases {
+		if got := port16(in); got != want {
+			t.Fatalf("port16(%d) = %d, want %d", in, got, want)
+		}
+	}
+}

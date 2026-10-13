@@ -35,8 +35,8 @@ func Calculate(a, b *net.TCPAddr) Priority {
 func priorityInputs(a, b *net.TCPAddr) (first, second []byte) {
 	if a.IP.Equal(b.IP) {
 		var ports [4]byte
-		binary.BigEndian.PutUint16(ports[0:2], uint16(a.Port))
-		binary.BigEndian.PutUint16(ports[2:4], uint16(b.Port))
+		binary.BigEndian.PutUint16(ports[0:2], port16(a.Port))
+		binary.BigEndian.PutUint16(ports[2:4], port16(b.Port))
 		return ports[0:2], ports[2:4]
 	}
 	if a4, b4 := a.IP.To4(), b.IP.To4(); a4 != nil && b4 != nil {
@@ -46,6 +46,20 @@ func priorityInputs(a, b *net.TCPAddr) (first, second []byte) {
 	fullA := append(append([]byte{}, a.IP...), byte(a.Port>>8), byte(a.Port))
 	fullB := append(append([]byte{}, b.IP...), byte(b.Port>>8), byte(b.Port))
 	return fullA, fullB
+}
+
+// port16 converts a TCP port to its 16-bit wire value. A net.TCPAddr.Port is
+// always in range, but the value can originate from a parsed string; clamping
+// keeps the conversion total and explicit instead of truncating silently.
+func port16(p int) uint16 {
+	switch {
+	case p < 0:
+		return 0
+	case p > 0xffff:
+		return 0xffff
+	default:
+		return uint16(p)
+	}
 }
 
 // subnetMask picks the BEP 40 mask by closeness: /16 strangers share only

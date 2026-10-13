@@ -83,6 +83,12 @@ func (r *logRingBuffer) Write(p []byte) (int, error) {
 func (r *logRingBuffer) tail(n int) []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	// n comes from a query parameter (strconv.Atoi on ?lines=): bound it by the
+	// ring size before it sizes the allocation, so the make is provably capped
+	// (CodeQL: uncontrolled allocation size).
+	if n > len(r.lines) {
+		n = len(r.lines)
+	}
 	count := r.next
 	if r.full {
 		count = len(r.lines)
