@@ -421,15 +421,22 @@ func uiPeerErrors(counts map[string]int64) string {
 	return strings.Join(parts, " · ")
 }
 
-// uiUTPSocketSummary renders the uTP socket dial/accept counters for the
-// status bar, or ("", false) while the socket never dialled nor accepted.
-func uiUTPSocketSummary(dials, accepts, dialErrs, acceptErrs int64) (string, bool) {
+// uiUTPSocketSummary renders the uTP socket counter summary for the status
+// bar, or ("", false) while the socket never dialled nor accepted. Resends and
+// dropped SYNs are the congestion/burst signals and appear only when non-zero.
+func uiUTPSocketSummary(dials, accepts, dialErrs, acceptErrs, resendsTimeout, resendsFast, synDrops int64) (string, bool) {
 	if dials <= 0 && accepts <= 0 {
 		return "", false
 	}
 	out := fmt.Sprintf("%d dial / %d accept", dials, accepts)
 	if dialErrs+acceptErrs > 0 {
 		out += fmt.Sprintf(" · errors: %d dial, %d accept", dialErrs, acceptErrs)
+	}
+	if resendsTimeout+resendsFast > 0 {
+		out += fmt.Sprintf(" · resends: %d RTO, %d fast", resendsTimeout, resendsFast)
+	}
+	if synDrops > 0 {
+		out += fmt.Sprintf(" · SYN drops: %d", synDrops)
 	}
 	return out, true
 }
@@ -1264,7 +1271,9 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 	}
 	page.UTPSocket, _ = uiUTPSocketSummary(
 		stats.Session["utp_dials"], stats.Session["utp_accepts"],
-		stats.Session["utp_dial_errors"], stats.Session["utp_accept_errors"])
+		stats.Session["utp_dial_errors"], stats.Session["utp_accept_errors"],
+		stats.Session["utp_resends_timeout"], stats.Session["utp_resends_fast"],
+		stats.Session["utp_syn_drops"])
 	page.CPUPercent, page.ProcRSS = d.processUsage(time.Now())
 	switch {
 	case stats.PortMapping.Method != "":

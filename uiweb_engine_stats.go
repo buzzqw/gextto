@@ -187,11 +187,12 @@ func uiMergeReuseRow(session map[string]any) (string, bool) {
 	return row, true
 }
 
-// uiUTPSocketRow renders the uTP socket dial/accept counters, hidden while
-// the socket never dialled nor accepted. Socket errors warn only when
-// nothing was ever accepted: persistent dial errors with zero accepts point
-// at firewalled UDP (or CGNAT), where uTP cannot work and TCP carries
-// everything; with accepts flowing the errors are noise.
+// uiUTPSocketRow renders the uTP socket counters, hidden while the socket
+// never dialled nor accepted. Socket errors warn only when nothing was ever
+// accepted: persistent dial errors with zero accepts point at firewalled UDP
+// (or CGNAT), where uTP cannot work and TCP carries everything; with accepts
+// flowing the errors are noise. RTO/fast resends and dropped SYNs are the
+// congestion/burst signals, shown only when they actually happened.
 func uiUTPSocketRow(session map[string]any) (string, bool, bool) {
 	dials := engineNum(session, "utp_dials")
 	accepts := engineNum(session, "utp_accepts")
@@ -203,6 +204,12 @@ func uiUTPSocketRow(session map[string]any) (string, bool, bool) {
 	row := fmt.Sprintf("socket: %d dial / %d accept", dials, accepts)
 	if dialErrs+acceptErrs > 0 {
 		row += fmt.Sprintf(" · errori %d dial / %d accept", dialErrs, acceptErrs)
+	}
+	if tmo, fast := engineNum(session, "utp_resends_timeout"), engineNum(session, "utp_resends_fast"); tmo+fast > 0 {
+		row += fmt.Sprintf(" · resend RTO %d / fast %d", tmo, fast)
+	}
+	if drops := engineNum(session, "utp_syn_drops"); drops > 0 {
+		row += fmt.Sprintf(" · SYN scartati %d", drops)
 	}
 	return row, true, dialErrs > 0 && accepts == 0
 }

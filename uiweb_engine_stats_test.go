@@ -58,4 +58,15 @@ func TestUIUTPSocketRow(t *testing.T) {
 	if !warn {
 		t.Fatalf("dial errors without accepts must warn: %q", blocked)
 	}
+	withResends, _, _ := uiUTPSocketRow(map[string]any{
+		"utp_dials": int64(10), "utp_accepts": int64(3),
+		"utp_resends_timeout": int64(5), "utp_resends_fast": int64(2), "utp_syn_drops": int64(4),
+	})
+	if !strings.Contains(withResends, "resend RTO 5 / fast 2") || !strings.Contains(withResends, "SYN scartati 4") {
+		t.Fatalf("row = %q, want the resend and SYN-drop counts", withResends)
+	}
+	quiet, _, _ := uiUTPSocketRow(map[string]any{"utp_dials": int64(10), "utp_accepts": int64(3)})
+	if strings.Contains(quiet, "resend") || strings.Contains(quiet, "SYN") {
+		t.Fatalf("row = %q, must hide the counters when zero", quiet)
+	}
 }
