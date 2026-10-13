@@ -147,9 +147,10 @@ type torrent struct {
 	unchoker *unchoker.Unchoker
 
 	// Active piece downloads are kept in this map.
-	pieceDownloaders        map[*peer.Peer]*piecedownloader.PieceDownloader
-	pieceDownloadersSnubbed map[*peer.Peer]*piecedownloader.PieceDownloader
-	pieceDownloadersChoked  map[*peer.Peer]*piecedownloader.PieceDownloader
+	// pieceDownloaders holds, per peer, the pieces it is downloading right now,
+	// keyed by piece index. A peer may have more than one (multi-piece
+	// pipelining), bounded by maxPiecesPerPeer. Touched only from the run loop.
+	pieceDownloaders map[*peer.Peer]map[uint32]*piecedownloader.PieceDownloader
 
 	// When a peer has snubbed us, a message sent to this channel.
 	peerSnubbedC chan *peer.Peer
@@ -398,9 +399,7 @@ func newTorrent(
 		peers:                     make(map[*peer.Peer]struct{}),
 		incomingPeers:             make(map[*peer.Peer]struct{}),
 		outgoingPeers:             make(map[*peer.Peer]struct{}),
-		pieceDownloaders:          make(map[*peer.Peer]*piecedownloader.PieceDownloader),
-		pieceDownloadersSnubbed:   make(map[*peer.Peer]*piecedownloader.PieceDownloader),
-		pieceDownloadersChoked:    make(map[*peer.Peer]*piecedownloader.PieceDownloader),
+		pieceDownloaders:          make(map[*peer.Peer]map[uint32]*piecedownloader.PieceDownloader),
 		peerSnubbedC:              make(chan *peer.Peer),
 		infoDownloaders:           make(map[*peer.Peer]*infodownloader.InfoDownloader),
 		infoDownloadersSnubbed:    make(map[*peer.Peer]*infodownloader.InfoDownloader),

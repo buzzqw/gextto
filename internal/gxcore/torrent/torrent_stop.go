@@ -218,7 +218,9 @@ func (t *torrent) stopInfoDownloaders() {
 
 func (t *torrent) stopPiecedownloaders() {
 	t.log.Debugln("stopping piece downloaders")
-	for _, pd := range t.pieceDownloaders {
-		t.closePieceDownloader(pd)
+	for _, m := range t.pieceDownloaders {
+		for _, pd := range m {
+			t.closePieceDownloader(pd)
+		}
 	}
 }

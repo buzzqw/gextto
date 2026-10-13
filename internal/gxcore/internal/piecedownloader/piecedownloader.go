@@ -130,9 +130,12 @@ func (d *PieceDownloader) CancelPending() {
 	}
 }
 
-// RequestBlocks is called to request remaining blocks of the piece up to `queueLength`.
-func (d *PieceDownloader) RequestBlocks(queueLength int) {
+// RequestBlocks is called to request remaining blocks of the piece up to
+// `queueLength`. It returns how many new requests were sent, so a caller can
+// share one in-flight budget across several of a peer's pieces.
+func (d *PieceDownloader) RequestBlocks(queueLength int) int {
 	remaining := d.remaining
+	requested := 0
 	for _, begin := range remaining {
 		if len(d.pending) >= queueLength {
 			break
@@ -146,7 +149,9 @@ func (d *PieceDownloader) RequestBlocks(queueLength int) {
 		}
 		d.remaining = d.remaining[1:]
 		d.pending[begin] = struct{}{}
+		requested++
 	}
+	return requested
 }
 
 // Done returns true if all blocks of the piece has been downloaded.

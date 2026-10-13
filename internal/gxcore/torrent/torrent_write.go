@@ -104,10 +104,13 @@ func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 		}
 
 		for _, pe := range t.piecePicker.RequestedPeers(pw.Piece.Index) {
-			pd2 := t.pieceDownloaders[pe]
+			pd2 := t.pieceDownloaders[pe][pw.Piece.Index]
+			if pd2 == nil {
+				continue
+			}
 			t.closePieceDownloader(pd2)
 			pd2.CancelPending()
-			t.startPieceDownloaderFor(pe)
+			t.fillPeerDownloads(pe)
 		}
 	}
 

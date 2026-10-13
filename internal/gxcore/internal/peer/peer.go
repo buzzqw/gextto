@@ -55,6 +55,13 @@ type Peer struct {
 
 	Downloading bool
 
+	// ConcurrentPieces is how many pieces this peer is downloading right now,
+	// and MaxConcurrentPieces caps it (multi-piece pipelining: a peer with a
+	// small piece keeps the request pipe full by working on a second piece).
+	// Both are touched only from the torrent goroutine.
+	ConcurrentPieces    int
+	MaxConcurrentPieces int
+
 	// RequestQueue is the adaptive number of block requests kept in flight for
 	// this peer. It starts at DefaultRequestsOut (or the peer's
 	// reqq) and grows towards MaxRequestsOut while the peer delivers; a choke

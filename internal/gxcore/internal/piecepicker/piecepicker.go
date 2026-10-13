@@ -426,8 +426,14 @@ func (p *PiecePicker) PickFor(pe *peer.Peer) (pp *piece.Piece, allowedFast bool)
 }
 
 func (p *PiecePicker) findPiece(pe *peer.Peer) (mp *myPiece, allowedFast bool) {
-	// Peer is allowed to download only one piece at a time
-	if pe.Downloading {
+	// A peer may download more than one piece at a time (multi-piece
+	// pipelining), bounded by MaxConcurrentPieces; the single-piece behaviour is
+	// the historical default (MaxConcurrentPieces <= 1).
+	if pe.MaxConcurrentPieces > 1 {
+		if pe.ConcurrentPieces >= pe.MaxConcurrentPieces {
+			return nil, false
+		}
+	} else if pe.Downloading {
 		return nil, false
 	}
 	if p.downloadingWebseed() {
@@ -590,7 +596,7 @@ func (p *PiecePicker) pickEndgame(pe *peer.Peer) *myPiece {
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
 		}
-		if mp.Requested.Len() < p.maxDuplicateDownload && mp.Having.Has(pe) {
+		if mp.Requested.Len() < p.maxDuplicateDownload && mp.Having.Has(pe) && !mp.Requested.Has(pe) {
 			return mp
 		}
 	}
@@ -610,7 +616,7 @@ func (p *PiecePicker) pickStalled(pe *peer.Peer) *myPiece {
 		if mp.RunningDownloads() > 0 {
 			continue
 		}
-		if mp.Requested.Len() < p.maxDuplicateDownload && mp.Having.Has(pe) {
+		if mp.Requested.Len() < p.maxDuplicateDownload && mp.Having.Has(pe) && !mp.Requested.Has(pe) {
 			return mp
 		}
 	}

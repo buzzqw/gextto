@@ -33,7 +33,7 @@ func (t *torrent) closePeer(pe *peer.Peer) {
 	}
 	pe.Close()
 	pe.Closed = true
-	if pd, ok := t.pieceDownloaders[pe]; ok {
+	for _, pd := range t.pieceDownloaders[pe] {
 		t.closePieceDownloader(pd)
 	}
 	if id, ok := t.infoDownloaders[pe]; ok {
@@ -73,17 +73,24 @@ func (t *torrent) closeWebseedDownloader(src *webseedsource.WebseedSource) {
 
 func (t *torrent) closePieceDownloader(pd *piecedownloader.PieceDownloader) {
 	pe := pd.Peer.(*peer.Peer)
-	_, open := t.pieceDownloaders[pe]
-	if !open {
+	m := t.pieceDownloaders[pe]
+	if m == nil {
 		return
 	}
-	delete(t.pieceDownloaders, pe)
-	delete(t.pieceDownloadersSnubbed, pe)
-	delete(t.pieceDownloadersChoked, pe)
+	if _, ok := m[pd.Piece.Index]; !ok {
+		return
+	}
+	delete(m, pd.Piece.Index)
+	if len(m) == 0 {
+		delete(t.pieceDownloaders, pe)
+		pe.Downloading = false
+	}
+	if pe.ConcurrentPieces > 0 {
+		pe.ConcurrentPieces--
+	}
 	if t.piecePicker != nil {
 		t.piecePicker.HandleCancelDownload(pe, pd.Piece.Index)
 	}
-	pe.Downloading = false
 	if t.session.ram != nil {
 		t.session.ram.Release(int64(t.info().PieceLength))
 	}

@@ -57,8 +57,7 @@ func TestSnubResetsRequestQueue(t *testing.T) {
 	if pe.RequestQueue <= 50 {
 		t.Fatalf("queue must be deeper than the base before the snub, got %d", pe.RequestQueue)
 	}
-	tr.pieceDownloaders = map[*peer.Peer]*piecedownloader.PieceDownloader{pe: {}}
-	tr.pieceDownloadersSnubbed = map[*peer.Peer]*piecedownloader.PieceDownloader{}
+	tr.pieceDownloaders = map[*peer.Peer]map[uint32]*piecedownloader.PieceDownloader{pe: {0: {}}}
 	tr.handlePeerSnubbed(pe)
 	if pe.RequestQueue != 50 {
 		t.Fatalf("snub must reset the request queue to the base, got %d", pe.RequestQueue)

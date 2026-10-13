@@ -143,10 +143,20 @@ func (t *torrent) stats() Stats {
 	s.MetadataDownloads.Total = len(t.infoDownloaders)
 	s.MetadataDownloads.Snubbed = len(t.infoDownloadersSnubbed)
 	s.MetadataDownloads.Running = len(t.infoDownloaders) - len(t.infoDownloadersSnubbed)
-	s.Downloads.Total = len(t.pieceDownloaders)
-	s.Downloads.Snubbed = len(t.pieceDownloadersSnubbed)
-	s.Downloads.Choked = len(t.pieceDownloadersChoked)
-	s.Downloads.Running = len(t.pieceDownloaders) - len(t.pieceDownloadersChoked) - len(t.pieceDownloadersSnubbed)
+	s.Downloads.Total = 0
+	s.Downloads.Snubbed = 0
+	s.Downloads.Choked = 0
+	for pe, m := range t.pieceDownloaders {
+		n := len(m)
+		s.Downloads.Total += n
+		switch {
+		case pe.PeerChoking:
+			s.Downloads.Choked += n
+		case pe.Snubbed:
+			s.Downloads.Snubbed += n
+		}
+	}
+	s.Downloads.Running = s.Downloads.Total - s.Downloads.Choked - s.Downloads.Snubbed
 	s.Pieces.Available = t.avaliablePieceCount()
 	s.Bytes.Downloaded = t.bytesDownloaded.Count()
 	s.Bytes.Uploaded = t.bytesUploaded.Count()

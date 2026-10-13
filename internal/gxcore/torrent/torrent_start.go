@@ -197,8 +197,16 @@ func (t *torrent) startPieceDownloaders() {
 		}
 	}
 	for pe := range t.peers {
-		if !pe.Downloading {
-			t.startPieceDownloaderFor(pe)
+		t.fillPeerDownloads(pe)
+	}
+}
+
+// fillPeerDownloads starts pieces for the peer until it reaches the
+// multi-piece cap (maxPiecesPerPeer) or no piece is available.
+func (t *torrent) fillPeerDownloads(pe *peer.Peer) {
+	for len(t.pieceDownloaders[pe]) < maxPiecesPerPeer {
+		if !t.startPieceDownloaderFor(pe) {
+			return
 		}
 	}
 }
@@ -238,44 +246,75 @@ func (t *torrent) startWebseedDownloader(sp *piecepicker.WebseedDownloadSpec) {
 	go ud.Run(t.webseedClient, t.pieces, len(t.info().Files) > 1, t.webseedPieceResultC.SendC(), t.piecePool, t.session.config.WebseedResponseBodyReadTimeout)
 }
 
-func (t *torrent) startPieceDownloaderFor(pe *peer.Peer) {
+// maxPiecesPerPeer is how many pieces of one torrent a peer may download at the
+// same time. Above one, a peer whose current piece has fewer blocks than its
+// request budget keeps the pipe full on a second piece instead of idling; the
+// service is still bounded by the shared request budget and by the RAM reserved
+// per piece.
+const maxPiecesPerPeer = 2
+
+func (t *torrent) startPieceDownloaderFor(pe *peer.Peer) bool {
 	if t.status() != Downloading {
-		return
+		return false
+	}
+	if len(t.pieceDownloaders[pe]) >= maxPiecesPerPeer {
+		return false
+	}
+	if pe.MaxConcurrentPieces == 0 {
+		pe.MaxConcurrentPieces = maxPiecesPerPeer
 	}
 	if t.session.ram == nil {
-		t.startSinglePieceDownloader(pe)
-		return
+		return t.startSinglePieceDownloader(pe)
 	}
 	ok := t.session.ram.Request(t.id, pe, int64(t.info().PieceLength), t.ramNotifyC, pe.Done())
-	if ok {
-		t.startSinglePieceDownloader(pe)
+	if !ok {
+		return false
 	}
+	return t.startSinglePieceDownloader(pe)
 }
 
-func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) {
-	var started bool
+func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) (started bool) {
 	defer func() {
 		if !started && t.session.ram != nil {
 			t.session.ram.Release(int64(t.info().PieceLength))
 		}
 	}()
 	if t.status() != Downloading {
-		return
+		return false
 	}
 	pi, allowedFast := t.piecePicker.PickFor(pe)
 	if pi == nil {
-		return
+		return false
 	}
 	pd := piecedownloader.New(pi, pe, allowedFast, t.piecePool.Get(int(pi.Length)))
-	if _, ok := t.pieceDownloaders[pe]; ok {
-		t.crash("peer already has a piece downloader")
+	if m := t.pieceDownloaders[pe]; m != nil {
+		if _, ok := m[pi.Index]; ok {
+			t.crash("peer already has a piece downloader for this piece")
+		}
 	}
 	t.log.Debugf("requesting piece #%d from peer %s", pi.Index, pe.IP())
-	t.pieceDownloaders[pe] = pd
+	if t.pieceDownloaders[pe] == nil {
+		t.pieceDownloaders[pe] = make(map[uint32]*piecedownloader.PieceDownloader)
+	}
+	t.pieceDownloaders[pe][pi.Index] = pd
+	pe.ConcurrentPieces++
 	pe.Downloading = true
-	pd.RequestBlocks(t.maxAllowedRequests(pe))
+	t.requestBlocks(pe)
 	pe.ResetSnubTimer()
-	started = true
+	return true
+}
+
+// requestBlocks refills the peer's in-flight block requests across all of its
+// pieces, sharing one budget (maxAllowedRequests) between them so multi-piece
+// pipelining does not multiply the in-flight window.
+func (t *torrent) requestBlocks(pe *peer.Peer) {
+	budget := t.maxAllowedRequests(pe)
+	for _, pd := range t.pieceDownloaders[pe] {
+		if budget <= 0 {
+			break
+		}
+		budget -= pd.RequestBlocks(budget)
+	}
 }
 
 func (t *torrent) maxAllowedRequests(pe *peer.Peer) int {

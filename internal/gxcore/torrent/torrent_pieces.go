@@ -71,9 +71,11 @@ func (t *torrent) checkCompletion() bool {
 		}
 	}
 	t.addrList.Reset()
-	for _, pd := range t.pieceDownloaders {
-		t.closePieceDownloader(pd)
-		pd.CancelPending()
+	for _, m := range t.pieceDownloaders {
+		for _, pd := range m {
+			t.closePieceDownloader(pd)
+			pd.CancelPending()
+		}
 	}
 	t.piecePicker = nil
 	t.updateSeedDuration(time.Now())

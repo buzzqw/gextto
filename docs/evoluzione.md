@@ -1172,7 +1172,7 @@ Sources: [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md),
 | Area | libtorrent | gx-core today | Gap |
 | --- | --- | --- | --- |
 | Choking / seeding | rate-based choking, anti-leech, peer classes | speed-based + optimistic, deterministic harness (`unchoker/sim_test.go`) | quality algorithms absent; measurements **local only** (§6.6) |
-| Pipelining | multi-piece per peer, ring buffer | adaptive queue (50→250), one piece per peer; write bounded to 4 pieces per torrent (`maxPendingWrites`, 2026-10-13) | 10 Gbps given as "to be measured" (`bep.md` §6); **no harness** |
+| Pipelining | multi-piece per peer, ring buffer | adaptive queue (50→250), **2 pieces per peer** with a shared request budget, write bounded to 4 pieces per torrent (`maxPendingWrites`), 2026-10-13: ×1.75 at RTT 50 ms | 10 Gbps given as "to be measured" (`bep.md` §6) |
 | Disk I/O | mmap, pluggable storage, O_DIRECT/AIO, contiguous writes + hash on a pool | **`O_SYNC` removed, `fdatasync`, mmap opt-in (2026-10-12)**; O_DIRECT/io_uring/explicit contiguous remain absent (analysis: the page cache already coalesces and Go already overlaps I/O) | reduced (§5.4) |
 | File priority | graduated 0–7 | **done (0 = skip, 1..4 = normal, 5..7 = high)**; `capabilityLevels.file_priorities = full`; measurement with mixed files to do (§4.11) | closed (residual measurement) |
 | DHT | multi-path, active anti-Sybil | BEP 5/32/33/42/43/44/46, dedup; cap and multi-path off | hardening **not active** (§4.10) |
@@ -1717,10 +1717,25 @@ of 4 MiB, a single leecher:
 **Confirmation (2026-10-13):** the same run reproduces it exactly (`shallow` 300 KiB/s
 in 13.7 s, `default` 3850 KiB/s in 1.06 s, ~12.8×), so the adaptive queue is stable.
 **Ceiling read from the numbers:** with 256 KiB pieces (16 blocks) a queue of ≤250 is
-bounded by the piece's block count, and the `default` run is already at the ceiling;
-the next lever for high-bandwidth-delay links is therefore **multi-piece per peer**
-(the engine currently gives a peer one piece at a time), which is why idea #8 of §16
-is measured against this baseline before any change.
+bounded by the piece's block count, and the `default` run was already at the ceiling;
+the next lever for high-bandwidth-delay links was therefore **multi-piece per peer**.
+
+**Multi-piece per peer (done, 2026-10-13).** A peer may now download up to
+`maxPiecesPerPeer` (2) pieces at once (`peer.ConcurrentPieces`/`MaxConcurrentPieces`,
+`fillPeerDownloads`, one `pieceDownloaders[peer][index]` map per peer), sharing a
+single in-flight request budget across the pieces (`torrent.requestBlocks`); the
+picker never returns a piece the peer already requests. Re-running the same
+latency harness shows the ceiling moving:
+
+| Profile | single piece (before) | multi-piece (after) |
+| --- | --- | --- |
+| `shallow` def=1/max=1 | 302 KiB/s | **594 KiB/s** (×1.97) |
+| `default` def=50/max=250 | 3853 KiB/s | **6756 KiB/s** (×1.75) |
+
+So the adaptive queue plus multi-piece roughly doubles the throughput at RTT
+50 ms with 256 KiB pieces, where the single-piece block count was the limit.
+The write ring buffer (§16.3) is what keeps the disk from becoming the new
+bottleneck while more pieces are in flight.
 **Choking** is isolated by the deterministic bench (`internal/unchoker/sim_test.go`,
 in `make test-engine`), which drives the real `Unchoker` with synthetic peers and fixes
 fairness, slots and optimistic rotation; the end-to-end seed is in §6.4/§6.6.
@@ -2580,7 +2595,7 @@ here; the implemented ones are dated, the others are a proposal to be agreed.
 | 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | the O(1) counter removed the cost argument | medium | medium | **partial**: `subnet_cap_hint` (the suggested cap from the live concentration) is exposed in `Stats()`; automatic enforcement not pursued (a /24 can be legitimate CGNAT/mobile) |
 | 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.10 | medium | medium | **measured (2026-10-13)**, see §16.2; no speculative code |
 | 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | Phase 2 | medium | low | **done (2026-10-13)**: `merged_pieces`/`merged_bytes` in the engine session stats → daemon API → Gextto «Riuso locale» |
-| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.12 | high | high | **measured**, see §6 and the plan in §16.3 |
+| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.12 | high | high | **done (2026-10-13)**: write ring buffer + 2 pieces per peer; measured ×1.75 (3.85→6.76 MiB/s at RTT 50 ms), details in §6.4/§16.3 |
 | 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | the fuzzing pass | medium/high | low | **done**: `internal/utils/utils.go` (length bounded, recursion depth ≤64); `internal/dht/bencode.go` `validBencode` screens DHT packets before bencode-go |
 | 10 | Merge: **no double verification** — the pieces the merge just re-verified are handed to the verifier as already done | Phase 2 analysis | medium (no re-read and re-hash of the reused bytes) | low | **done (2026-10-13)**: `Verifier.Skip`, cleared after the allocation-time check |
 
@@ -2680,9 +2695,21 @@ the disk parallelism globally; the per-torrent bound limits the in-flight piece
 buffers. Tests: `torrent_writering_test.go` (suspend at the cap, resume below,
 no underflow), the full `cmd/gx-torrent` e2e suite and `-race` on the transfer
 tests. **Measurement:** `make measure-seeding` on loopback is **equivalent** to
-before the change (the disk is not the bottleneck there, so the overlap does not
-show); the expected gain is on slow storage and is the reason it is a prerequisite
-for the multi-piece steps 1–2, which remain to do.
+before the change (the disk is not the bottleneck there); the expected gain is on
+slow storage and is the reason it is a prerequisite for the multi-piece steps.
+
+**Multi-piece per peer (done, 2026-10-13).** Steps 1–2 of the plan are in: a peer
+downloads up to `maxPiecesPerPeer` (2) pieces at once. `pieceDownloaders` is now
+a per-peer map keyed by piece index (`torrent.go`, `closePieceDownloader`,
+`handlePieceMessage` look the piece up by `msg.Index`), `peer.ConcurrentPieces`/
+`MaxConcurrentPieces` gate the picker (`findPiece`), and the in-flight budget is
+shared across a peer's pieces (`torrent.requestBlocks`, `RequestBlocks` now
+returns the count sent). `fillPeerDownloads` tops a peer up to the cap on
+Have/Bitfield/HaveAll/Unchoke/completion. Fixed while doing it:
+`pickEndgame`/`pickStalled` could hand a peer a piece it was already requesting.
+**Measurement (the same latency harness):** `default` **3853 → 6756 KiB/s**
+(×1.75), `shallow` 302 → 594 KiB/s (×1.97) at RTT 50 ms with 256 KiB pieces.
+Tests: e2e suite + `-race` on the transfer tests, `piecedownloader` budget test.
 
 ---
 

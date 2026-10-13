@@ -15,11 +15,9 @@ import (
 // negotiated, so there is no outstanding download to cancel here).
 func TestHandleDontHaveClearsPeerBitfield(t *testing.T) {
 	tr := &torrent{
-		bitfield:                bitfield.New(2),
-		pieces:                  []piece.Piece{{Index: 0}, {Index: 1}},
-		pieceDownloaders:        map[*peer.Peer]*piecedownloader.PieceDownloader{},
-		pieceDownloadersSnubbed: map[*peer.Peer]*piecedownloader.PieceDownloader{},
-		pieceDownloadersChoked:  map[*peer.Peer]*piecedownloader.PieceDownloader{},
+		bitfield:         bitfield.New(2),
+		pieces:           []piece.Piece{{Index: 0}, {Index: 1}},
+		pieceDownloaders: map[*peer.Peer]map[uint32]*piecedownloader.PieceDownloader{},
 	}
 	tr.setInfo(&metainfo.Info{NumPieces: 2})
 	pe := &peer.Peer{Bitfield: bitfield.New(2)}
@@ -34,11 +32,9 @@ func TestHandleDontHaveClearsPeerBitfield(t *testing.T) {
 // (the interest is re-evaluated after the message).
 func TestHandleDontHaveWithoutPeerBitfield(t *testing.T) {
 	tr := &torrent{
-		bitfield:                bitfield.New(2),
-		pieces:                  []piece.Piece{{Index: 0}, {Index: 1}},
-		pieceDownloaders:        map[*peer.Peer]*piecedownloader.PieceDownloader{},
-		pieceDownloadersSnubbed: map[*peer.Peer]*piecedownloader.PieceDownloader{},
-		pieceDownloadersChoked:  map[*peer.Peer]*piecedownloader.PieceDownloader{},
+		bitfield:         bitfield.New(2),
+		pieces:           []piece.Piece{{Index: 0}, {Index: 1}},
+		pieceDownloaders: map[*peer.Peer]map[uint32]*piecedownloader.PieceDownloader{},
 	}
 	tr.setInfo(&metainfo.Info{NumPieces: 2})
 	tr.handleDontHave(&peer.Peer{}, peerprotocol.DontHaveMessage{Index: 0})

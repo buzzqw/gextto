@@ -244,7 +244,7 @@ func (t *torrent) processQueuedMessages() {
 
 func (t *torrent) handlePeerSnubbed(pe *peer.Peer) {
 	// Mark slow peer as snubbed to skip that peer in piece picker
-	if pd, ok := t.pieceDownloaders[pe]; ok {
+	if m := t.pieceDownloaders[pe]; len(m) > 0 {
 		// Snub timer is already stopped on choke message but may fire anyway.
 		if pe.PeerChoking {
 			return
@@ -253,9 +253,10 @@ func (t *torrent) handlePeerSnubbed(pe *peer.Peer) {
 		// A peer that stopped delivering must not keep a deep request queue: it
 		// is lowered to the base, as resetRequestQueue does after a choke.
 		t.resetRequestQueue(pe)
-		t.pieceDownloadersSnubbed[pe] = pd
 		if t.piecePicker != nil {
-			t.piecePicker.HandleSnubbed(pe, pd.Piece.Index)
+			for _, pd := range m {
+				t.piecePicker.HandleSnubbed(pe, pd.Piece.Index)
+			}
 		}
 		t.startPieceDownloaders()
 	} else if id, ok := t.infoDownloaders[pe]; ok {

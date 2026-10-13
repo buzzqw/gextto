@@ -41,13 +41,8 @@ func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
 	t.downloadSpeed.Mark(l)
 	t.bytesDownloaded.Inc(l)
 	t.session.metrics.SpeedDownload.Mark(l)
-	pd, ok := t.pieceDownloaders[pe]
-	if !ok {
-		t.bytesWasted.Inc(l)
-		msg.Buffer.Release()
-		return
-	}
-	if pd.Piece.Index != msg.Index {
+	pd := t.pieceDownloaders[pe][msg.Index]
+	if pd == nil {
 		t.bytesWasted.Inc(l)
 		msg.Buffer.Release()
 		return
@@ -93,7 +88,7 @@ func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
 		pe := pd.Peer.(*peer.Peer)
 		if pd.AllowedFast || !pe.PeerChoking {
 			t.boostRequestQueue(pe)
-			pd.RequestBlocks(t.maxAllowedRequests(pe))
+			t.requestBlocks(pe)
 			pe.ResetSnubTimer()
 		}
 		return
@@ -108,7 +103,7 @@ func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
 	piece.Writing = true
 
 	// Request next piece while writing the completed piece, being optimistic about hash check.
-	t.startPieceDownloaderFor(pe)
+	t.fillPeerDownloads(pe)
 
 	// Bound the write ring buffer: the network keeps flowing while up to
 	// maxPendingWrites pieces are written. The picker skips a piece in Writing,
@@ -144,7 +139,7 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 			t.piecePicker.HandleHave(pe, msg.Index)
 		}
 		t.updateInterestedState(pe)
-		t.startPieceDownloaderFor(pe)
+		t.fillPeerDownloads(pe)
 	case peerprotocol.BitfieldMessage:
 		// Save bitfield messages while we don't have info yet.
 		if t.pieces == nil || t.bitfield == nil {
@@ -176,7 +171,7 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 			}
 		}
 		t.updateInterestedState(pe)
-		t.startPieceDownloaderFor(pe)
+		t.fillPeerDownloads(pe)
 	case peerprotocol.HaveAllMessage:
 		if t.pieces == nil || t.bitfield == nil {
 			pe.Messages = append(pe.Messages, msg)
@@ -188,7 +183,7 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 			}
 		}
 		t.updateInterestedState(pe)
-		t.startPieceDownloaderFor(pe)
+		t.fillPeerDownloads(pe)
 	case peerprotocol.HaveNoneMessage:
 	case peerprotocol.AllowedFastMessage:
 		if t.pieces == nil || t.bitfield == nil {
@@ -206,36 +201,36 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		}
 	case peerprotocol.UnchokeMessage:
 		pe.PeerChoking = false
-		pd, ok := t.pieceDownloaders[pe]
-		if !ok {
-			t.startPieceDownloaderFor(pe)
+		if len(t.pieceDownloaders[pe]) == 0 {
+			t.fillPeerDownloads(pe)
 			break
 		}
-		if pd.AllowedFast {
-			break
-		}
-		delete(t.pieceDownloadersChoked, pd.Peer.(*peer.Peer))
-		pd.RequestBlocks(t.maxAllowedRequests(pe))
 		pe.ResetSnubTimer()
+		t.requestBlocks(pe)
+		t.fillPeerDownloads(pe)
 		if t.piecePicker != nil {
-			t.piecePicker.HandleUnchoke(pe, pd.Piece.Index)
+			for _, pd := range t.pieceDownloaders[pe] {
+				if pd.AllowedFast {
+					continue
+				}
+				t.piecePicker.HandleUnchoke(pe, pd.Piece.Index)
+			}
 		}
 	case peerprotocol.ChokeMessage:
 		pe.PeerChoking = true
 		t.resetRequestQueue(pe)
-		pd, ok := t.pieceDownloaders[pe]
-		if !ok {
+		if len(t.pieceDownloaders[pe]) == 0 {
 			break
 		}
-		if pd.AllowedFast {
-			break
-		}
-		pd.Choked()
 		pe.StopSnubTimer()
-		t.pieceDownloadersChoked[pe] = pd
-		delete(t.pieceDownloadersSnubbed, pe)
 		if t.piecePicker != nil {
-			t.piecePicker.HandleChoke(pe, pd.Piece.Index)
+			for _, pd := range t.pieceDownloaders[pe] {
+				if pd.AllowedFast {
+					continue
+				}
+				pd.Choked()
+				t.piecePicker.HandleChoke(pe, pd.Piece.Index)
+			}
 		}
 		t.startPieceDownloaders()
 	case peerprotocol.InterestedMessage:
@@ -301,14 +296,11 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 			t.closePeer(pe)
 			break
 		}
-		pd, ok := t.pieceDownloaders[pe]
-		if !ok {
+		pd := t.pieceDownloaders[pe][msg.Index]
+		if pd == nil {
 			break
 		}
-		if pd.Piece.Index != msg.Index {
-			break
-		}
-		ok = pd.Rejected(msg.Begin, msg.Length)
+		ok := pd.Rejected(msg.Begin, msg.Length)
 		if !ok {
 			pe.Logger().Errorln("invalid reject index:", msg.Index, "begin:", msg.Begin, "length:", msg.Length)
 			t.closePeer(pe)
@@ -463,7 +455,7 @@ func (t *torrent) handleDontHave(pe *peer.Peer, msg peerprotocol.DontHaveMessage
 	if pe.FastEnabled {
 		return
 	}
-	if pd, ok := t.pieceDownloaders[pe]; ok && pd.Piece.Index == msg.Index {
+	if pd := t.pieceDownloaders[pe][msg.Index]; pd != nil {
 		t.closePieceDownloader(pd)
 		t.startPieceDownloaders()
 	}
