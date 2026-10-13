@@ -4,8 +4,7 @@ Times measured on a real reference machine, to give an order of magnitude to
 whoever contributes to or evaluates the project. They are **indicative**: they
 depend on the hardware, and GitHub runners have fewer cores than this machine.
 
-Times measured on **2026-10-12**, code at commit `07be7a2`; the counts in
-*Tests* are a snapshot refreshed on **2026-10-13**.
+Times measured on **2026-10-13**, code at commit `ef2c1fc`.
 
 ## Reference machine
 
@@ -50,20 +49,22 @@ Count (2026-10-13):
 
 | | |
 |--|--|
-| Go test functions | **~1787** |
-| Go benchmarks | 26 |
-| `_test.go` files | **~334** |
-| Go packages | 83, of which **~54 with tests** |
+| Go test functions | **~1788** |
+| Go benchmarks | 28 |
+| `_test.go` files | **~337** |
+| Go packages | 82, of which **~53 with tests** |
 | Separate module `internal/dht` | tested by `make test-dht` (outside `go test ./...`) |
 | Playwright end2end tests (`uiweb/end2end`) | 63 |
 
-Local times (`-count=1`, so **not cached**):
+Local times (`-count=1`, so **not cached**; "cold cache" means `go clean -cache`
+first, i.e. the whole suite is recompiled):
 
 | Round | Command | Time |
 |-------|---------|------|
-| Go tests, default engine (pure Go) | `CGO_ENABLED=0 go test -count=1 ./...` | **~96 s** |
+| Go tests, default engine (pure Go), cold build cache | `go clean -cache && CGO_ENABLED=0 go test -count=1 ./...` | **~98 s** |
+| Go tests, default engine (pure Go), warm build cache | `CGO_ENABLED=0 go test -count=1 ./...` | **~46 s** |
 | Go tests with libtorrent | `CGO_ENABLED=1 go test -count=1 ./...` | **~104 s** |
-| Full guard round (`make test`) | `make test` | **~47 s** (warm cache) |
+| Full guard round (`make test`) | `make test` | **~48 s** (warm cache) |
 
 The `make test` round is `check-ui-settings-index` + `installer-selftest` +
 `test-dht` + `go test ./...`; the scripts together cost **< 1 s**
@@ -98,8 +99,9 @@ Wall times of the whole run (jobs usually run in parallel), from recent runs on
 
 - Build: `go clean -cache` before the cold measurement; `time make …` for the
   others; the incremental measurement appends a line to a file and restores it.
-- Tests: `go test -count=1 ./...` (no cache), once with `CGO_ENABLED=0` and once
-  with `CGO_ENABLED=1`.
+- Tests: `go test -count=1 ./...` (no test cache), once with `CGO_ENABLED=0`
+  and once with `CGO_ENABLED=1`; the cold figure also does `go clean -cache`
+  first, so the whole suite and its test binaries are recompiled.
 - CI: `gh run view <id> --json jobs` on the most recent runs of `main`, with the
   duration of each job (`completedAt - startedAt`) and the wall time of the run
   (`updatedAt - createdAt`).
