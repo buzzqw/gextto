@@ -574,6 +574,7 @@ recorded in `GEXTTO.md`; targeted tests; with a visible effect also both UIs and
 | **Global in-flight budget — liveness** | anacrolix `MaxUnverifiedBytes`/`alloclim` | done |
 | **Drop the worst connection** (deterministic order) | anacrolix `worse-conns.go` | done |
 | **uTP behind `internal/utp`** (isolation) | anacrolix `utp` | in progress (`exp/utp-intree`): the engine talks to our `Socket` (dial/accept counters, `net.PacketConn` for the shared DHT socket); implementation still anacrolix, swappable |
+| **uTP dial preference** (fewer wasted dials) | own (`internal/netx`) | in progress (`exp/utp-intree`): per-host memory of race winners (≥4 races, ≥75% share, decayed past 64); the winner gets a 150 ms head start, the loser still races delayed so single-transport peers connect. Steady state: 1 raced dial per peer instead of 2 (`TestDialPeerSkipsLoserWhenPreferredWins` asserts zero loser dials; `TestDialPeerFallsBackToDelayedLeg` keeps the fallback) |
 
 ### 4.4 DHT: hardening and multi-path
 
