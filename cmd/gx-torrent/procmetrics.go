@@ -5,24 +5,38 @@ package main
 
 import "time"
 
-// processUsage returns the CPU load (percent, measured since the previous
-// sample) and the current resident memory of the gx-torrent process. The first
-// call has no previous sample, so the CPU percent is 0.
+// processUsage returns the CPU load (percent of one core) and the current
+// resident memory of the gx-torrent process.
+//
+// The CPU figure is a short average, not an instant: a render closer than a
+// second to the previous one has too little CPU time to be meaningful and would
+// spike on any burst, so it reuses the previous value, and each accepted sample
+// is smoothed into a moving average. A multi-core machine can legitimately read
+// above 100% (two busy cores = ~200%).
 func (d *Daemon) processUsage(now time.Time) (cpuPercent float64, rssBytes int64) {
 	rssBytes = processMemoryBytes()
 	cpu := processCPUTime()
 
 	d.procSampleMu.Lock()
 	defer d.procSampleMu.Unlock()
-	if !d.procLastAt.IsZero() {
-		if elapsed := now.Sub(d.procLastAt).Seconds(); elapsed > 0 {
-			cpuPercent = float64(cpu-d.procLastCPU) / float64(time.Second) / elapsed * 100
-		}
+	// The first sample only sets the baseline.
+	if d.procLastAt.IsZero() {
+		d.procLastCPU, d.procLastAt = cpu, now
+		return 0, rssBytes
 	}
-	d.procLastCPU = cpu
-	d.procLastAt = now
-	if cpuPercent < 0 {
-		cpuPercent = 0
+	elapsed := now.Sub(d.procLastAt).Seconds()
+	if elapsed < 1 {
+		return d.procLastPct, rssBytes
 	}
-	return cpuPercent, rssBytes
+	instant := float64(cpu-d.procLastCPU) / float64(time.Second) / elapsed * 100
+	if instant < 0 {
+		instant = 0
+	}
+	if d.procHavePct {
+		instant = d.procLastPct*0.6 + instant*0.4
+	}
+	d.procLastPct = instant
+	d.procHavePct = true
+	d.procLastCPU, d.procLastAt = cpu, now
+	return instant, rssBytes
 }

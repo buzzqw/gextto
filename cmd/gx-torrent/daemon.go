@@ -277,6 +277,8 @@ type Daemon struct {
 	procSampleMu sync.Mutex
 	procLastCPU  time.Duration
 	procLastAt   time.Time
+	procLastPct  float64
+	procHavePct  bool
 
 	// snapshot is the last published torrent view list. The REST list and the
 	// web page read it without d.mu, so a slow per-torrent call — a torrent run

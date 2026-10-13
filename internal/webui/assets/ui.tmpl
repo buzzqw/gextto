@@ -845,7 +845,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
 {{end}}{{define "status"}}
     <span class="hide-m" data-down="{{.DownRateRaw}}" data-up="{{.UpRateRaw}}" data-down-s="{{.DownloadRate}}" data-up-s="{{.UploadRate}}" title="Downloaded / uploaded since start"><span>Totals</span> <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
     <span class="disk" title="Free space on the download folder"><svg class="i"><use href="#i-disk"/></svg><span>Free space</span> <b>{{bytes .DiskFree}}</b><span class="subtle">/ {{bytes .DiskTotal}}</span></span>
-    <span class="hide-m" title="CPU load and resident memory of the gx-torrent process itself"><span>Process</span> <b>{{percent .CPUPercent}}%</b> · <b>{{bytes .ProcRSS}}</b></span>
+    <span class="hide-m" title="CPU load (percent of one core, short average) and resident memory of the gx-torrent process itself"><span>Process</span> <b>{{percent .CPUPercent}}%</b> · <b>{{bytes .ProcRSS}}</b></span>
     <span title="Nodes in the DHT routing table">DHT <b>{{if .DHT}}{{.DHTNodes}}{{else}}<span>off</span>{{end}}</b></span>
     <span {{if .PortReachable}}title="The peer port is reachable from the internet (router mapping or incoming peers)"{{else}}title="No router mapping and no incoming peer yet: the peer port may be closed"{{end}}><span class="dot {{if .PortReachable}}ok{{else}}bad{{end}}" aria-hidden="true"></span><span>Port</span> <b>{{.PeerPort}}</b> {{if .PortOpen}}<span class="subtle">{{.Router}}{{if .ExternalIP}} · {{.ExternalIP}}{{end}}</span>{{else}}<span class="subtle">not open</span>{{end}}</span>
     <span class="hide-m" title="Incoming peer connections since start"><span>Incoming</span> <b>{{.IncomingConns}}</b></span>
