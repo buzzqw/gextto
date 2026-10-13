@@ -21,24 +21,29 @@ type Event struct {
 	closed bool
 }
 
-// C returns a channel that is closed when the event is set.
+// C returns a channel that is closed when the event is set. The channel is
+// created lazily, so an event nobody waits on (the common case: the per-send
+// acked flag) allocates nothing when it is Set.
 func (e *Event) C() <-chan struct{} {
 	if e.ch == nil {
 		e.ch = make(chan struct{})
+		if e.closed {
+			close(e.ch)
+		}
 	}
 	return e.ch
 }
 
-// Set turns the event on and reports whether this was the first Set.
+// Set turns the event on and reports whether this was the first Set. It only
+// allocates when a waiter already holds the channel.
 func (e *Event) Set() (first bool) {
 	if e.closed {
 		return false
 	}
-	if e.ch == nil {
-		e.ch = make(chan struct{})
-	}
-	close(e.ch)
 	e.closed = true
+	if e.ch != nil {
+		close(e.ch)
+	}
 	return true
 }
 
