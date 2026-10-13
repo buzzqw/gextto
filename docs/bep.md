@@ -193,6 +193,13 @@ stay narrow and the tables remain readable.
 the detail is in the note above, in [`gx-torrent.md`](gx-torrent.md)
 (*Local data reuse*) and in [`evoluzione.md`](evoluzione.md) §9.2/§10.1.
 
+**Beyond the BEPs.** Extensions that are *not* part of the BEP catalogue — the
+WebSocket tracker (`ws://`/`wss://`), WebTorrent/WebRTC peers, the v1
+cross-layout swarm merge and decentralized feeds on BEP 46 — are analysed, with
+what they are and how they would be implemented, in
+[`beyond-bep.md`](beyond-bep.md). They do not change the tables above: `bep.md`
+stays the BEP-only source of truth.
+
 ## Maintenance
 
 Update this table on every new BEP implemented or excluded, together with the
