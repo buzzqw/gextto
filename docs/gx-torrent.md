@@ -901,6 +901,11 @@ RPC server is disabled.
 - **uTP** (`libtorrent_utp`, active by default) uses the same UDP port as the
   peers, shared with the DHT as in libtorrent.
   - Outgoing, uTP and TCP are attempted together and the first to connect wins.
+    The per-host recent winner (≥4 races, ≥75% share) gets a 150 ms head start,
+    so at steady state one dial per peer is enough; the loser still races
+    delayed and single-transport peers connect anyway. Socket dials/accepts
+    and their errors are counted (`utp_dials`, `utp_accepts`,
+    `utp_dial_errors`, `utp_accept_errors` in `GET /api/v1/stats`).
   - Incoming, the handshake is routed as for TCP.
   - The peer list indicates which ones are connected over uTP.
   - With a proxy uTP is off; with the outgoing interface the UDP socket is
@@ -1119,7 +1124,7 @@ With gx-torrent it shows:
 - version and torrents by status;
 - speed and queue slots;
 - port and opening on the router (in red if unsuccessful);
-- DHT (nodes), uTP (uTP and TCP connections), LSD (peers found);
+- DHT (nodes), uTP (uTP and TCP connections, plus socket dials/accepts and errors), LSD (peers found);
 - incoming connections and disk I/O (jobs in queue, total reads/writes);
 - encryption, proxy, IP filter rules;
 - disk and cache, session totals.
