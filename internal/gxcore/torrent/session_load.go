@@ -12,6 +12,8 @@ import (
 	"go.etcd.io/bbolt"
 )
 
+// loadExistingTorrents revives every resume record, collecting the invalid
+// ids on the side. Started torrents restart right away when configured.
 func (s *Session) loadExistingTorrents(ids []string) {
 	var loaded int
 	var started []*Torrent
@@ -36,9 +38,11 @@ func (s *Session) loadExistingTorrents(ids []string) {
 	}
 }
 
+// parseInfo decodes a stored info dict of the given resume version (UTF-8
+// keys and padding visibility evolved across versions) and caps the piece
+// count against hostile records.
 func (s *Session) parseInfo(b []byte, version int, layers map[string][]byte) (*metainfo.Info, error) {
-	var useUTF8Keys bool
-	var hidePaddings bool
+	var useUTF8Keys, hidePaddings bool
 	switch version {
 	case 1:
 	case 2:
@@ -59,6 +63,10 @@ func (s *Session) parseInfo(b []byte, version int, layers map[string][]byte) (*m
 	return i, nil
 }
 
+// loadExistingTorrent rebuilds one torrent from its resume spec: info dict
+// plus piece layers, saved bitfield, storage, trackers, stats and flags. A
+// corrupt leg aborts the torrent but keeps its started flag, so the caller
+// still knows it wanted to run.
 func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, err error) {
 	spec, err := s.resumer.Read(id)
 	if err != nil {
@@ -131,14 +139,13 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	return
 }
 
-// CleanDatabase removes invalid records in the database.
-// Normally you don't need to call this.
+// CleanDatabase drops the records of torrents that failed to load.
+// Rarely needed; invalid ids accumulate only across crashes mid-write.
 func (s *Session) CleanDatabase() error {
 	err := s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(torrentsBucket)
 		for _, id := range s.invalidTorrentIDs {
-			err := b.DeleteBucket([]byte(id))
-			if err != nil {
+			if err := b.DeleteBucket([]byte(id)); err != nil {
 				return err
 			}
 		}
@@ -151,8 +158,9 @@ func (s *Session) CleanDatabase() error {
 	return nil
 }
 
-// CompactDatabase rewrites the database using existing torrent records to a new file.
-// Normally you don't need to call this.
+// CompactDatabase rewrites the live torrent records into a fresh file,
+// skipping metadata-less torrents. Rarely needed; it reclaims space after
+// mass removals.
 func (s *Session) CompactDatabase(output string) error {
 	db, err := bbolt.Open(output, 0600, nil)
 	if err != nil {
@@ -197,8 +205,7 @@ func (s *Session) CompactDatabase(output string) error {
 			FirstLast:         t.torrent.firstLast,
 			SuperSeeding:      t.torrent.superSeeding,
 		}
-		err = res.Write(t.torrent.id, spec)
-		if err != nil {
+		if err := res.Write(t.torrent.id, spec); err != nil {
 			return err
 		}
 	}
