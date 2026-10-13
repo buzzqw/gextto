@@ -16,7 +16,7 @@ dell'app segue la lingua selezionata nell'intestazione.
 ## Come usare questa guida
 
 Gextto è un demone unico: ricerca le sorgenti, valuta le release, gestisce
-libtorrent, rinomina i file e li archivia. Non è necessario avviare componenti
+il motore torrent attivo, rinomina i file e li archivia. Non è necessario avviare componenti
 separati per il funzionamento normale.
 
 L'interfaccia web funziona anche da telefono: sotto i 900 px il layout diventa
@@ -61,7 +61,7 @@ npm ci
 npm run test:a11y
 ```
 
-La suite corrente esegue 12 controlli axe-core/Playwright sulle sezioni
+La suite corrente esegue 13 controlli axe-core/Playwright sulle sezioni
 principali, compresi dialoghi, ordinamento da tastiera, polling e reflow a 320
 px. Il risultato non è una dichiarazione di conformità WCAG o normativa: per
 un'attestazione servono anche audit manuale con screen reader, tastiera,
@@ -74,7 +74,7 @@ Il manuale distingue sempre tra:
 - **ricerca manuale**: serve a ispezionare risultati e accodare una scelta;
 - **ciclo automatico**: cerca i titoli monitorati e decide cosa scaricare;
 - **archivio**: i file già importati o archiviati nella libreria;
-- **sessione torrent**: i download ancora gestiti da libtorrent.
+- **sessione torrent**: i download ancora gestiti dal motore torrent attivo.
 
 ### Checklist iniziale
 

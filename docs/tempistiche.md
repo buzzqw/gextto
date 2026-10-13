@@ -4,7 +4,8 @@ Times measured on a real reference machine, to give an order of magnitude to
 whoever contributes to or evaluates the project. They are **indicative**: they
 depend on the hardware, and GitHub runners have fewer cores than this machine.
 
-Measured on **2026-10-12**, code at commit `07be7a2`.
+Times measured on **2026-10-12**, code at commit `07be7a2`; the counts in
+*Tests* are a snapshot refreshed on **2026-10-13**.
 
 ## Reference machine
 
@@ -45,14 +46,14 @@ Notes:
 
 ## Tests
 
-Count (2026-10-12):
+Count (2026-10-13):
 
 | | |
 |--|--|
-| Go test functions | **1656** |
-| Go benchmarks | 16 |
-| `_test.go` files | 289 |
-| Go packages | 79, of which **44 with tests** |
+| Go test functions | **~1745** |
+| Go benchmarks | 25 |
+| `_test.go` files | **~322** |
+| Go packages | 80, of which **~49 with tests** |
 | Separate module `internal/dht` | tested by `make test-dht` (outside `go test ./...`) |
 | Playwright end2end tests (`uiweb/end2end`) | 51 |
 

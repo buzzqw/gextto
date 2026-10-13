@@ -307,4 +307,4 @@ change. The old `/ui` route is no longer available. For operational checks use
 | GET | `/feed/calendar.ics` |
 | GET | `/magnet` |
 
-Total routes: 269
+Total routes: 273

@@ -51,9 +51,11 @@ vedi [Sicurezza](SECURITY.md).
 
 ## Backend torrent
 
-- **libtorrent integrato**: predefinito, senza servizio esterno;
-- **qBittorrent-nox**: utile quando il motore torrent deve vivere separato;
-  compatibilità e prestazioni.
+- **gx-torrent**: predefinito — il motore in Go puro incluso, senza servizio
+  esterno;
+- **libtorrent integrato**: il motore libtorrent compilato dentro Gextto
+  (richiede la variante di build con libtorrent);
+- **qBittorrent-nox**: utile quando il motore torrent deve vivere separato.
 
 Un torrent appartiene a un solo backend alla volta. Prima di cambiarlo metti in
 pausa i download, esegui il preflight e verifica percorsi condivisi o mappature

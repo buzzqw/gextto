@@ -30,7 +30,7 @@ the torrent backends and where to make common changes, see
 
 ## Requirements and build
 
-Install Go 1.26 or newer. The default build is **pure Go** and needs no
+Install Go 1.26.8 or newer (the version in `go.mod`). The default build is **pure Go** and needs no
 libtorrent: `gx-torrent`, the default engine, is a pure-Go daemon built next to
 `gexttod`. To include the embedded **libtorrent** engine, also install a C++17
 toolchain and the `libtorrent-rasterbar` development headers, then build with
@@ -127,7 +127,7 @@ Run these checks before a commit:
 
 ```bash
 gofmt -w changed.go
-make test                 # pure Go: check-ui + installer self-test + CGO_ENABLED=0 go test ./...
+make test                 # pure Go: check-ui + installer self-test + test-dht + CGO_ENABLED=0 go test ./...
 make test-engine            # tests of the gx-core engine
 make test-ui              # UI end2end (Playwright): pages, mobile, a11y (needs Node + a browser)
 CGO_ENABLED=1 go test -race ./...   # race detector needs cgo (and the libtorrent headers)

@@ -16,7 +16,7 @@ selected in its header.
 ## How to use this guide
 
 Gextto is a single daemon: it searches sources, evaluates releases, manages
-libtorrent, renames files and archives them. Normal operation does not require
+the active torrent engine, renames files and archives them. Normal operation does not require
 separate orchestrator processes.
 
 The web interface works on a phone too: below 900 px the shell switches to a
@@ -60,7 +60,7 @@ npm ci
 npm run test:a11y
 ```
 
-The current suite runs 12 axe-core/Playwright checks on the main sections,
+The current suite runs 13 axe-core/Playwright checks on the main sections,
 including dialogs, keyboard sorting, polling and 320 px reflow. This result is
 not a WCAG or legal-compliance declaration: an attestation also requires manual
 screen-reader, keyboard, magnification and assistive-technology testing, plus
@@ -73,7 +73,7 @@ This manual distinguishes between:
 - **manual search**: inspect results and queue one choice;
 - **automatic cycle**: search monitored titles and decide what to download;
 - **archive**: files already imported or stored in the library;
-- **torrent session**: downloads still managed by libtorrent.
+- **torrent session**: downloads still managed by the active torrent engine.
 
 ### First-run checklist
 

@@ -49,9 +49,11 @@ Do not expose the administrative port directly to the Internet. See
 
 ## Torrent backends
 
-- **Embedded libtorrent**: the default, with no external service;
-- **qBittorrent-nox**: useful when the torrent engine should run separately;
-  before using it in production.
+- **gx-torrent**: the default — the bundled pure-Go engine, with no external
+  service;
+- **Embedded libtorrent**: the libtorrent engine compiled into Gextto (needs the
+  libtorrent build variant);
+- **qBittorrent-nox**: useful when the torrent engine should run separately.
 
 A torrent belongs to one backend at a time. Pause downloads before switching,
 run the backend preflight, and verify shared paths or NAS mappings.
