@@ -3,9 +3,19 @@ package torrent
 import (
 	"bytes"
 	"crypto/sha1"
+	"sync/atomic"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
+)
+
+// mergedPiecesTotal and mergedBytesTotal count, since start, the pieces and
+// bytes reused from other local torrents by Swarm Merging. They feed
+// SessionStats.MergedPieces/MergedBytes and are therefore visible in the
+// daemon's session stats and in Gextto.
+var (
+	mergedPiecesTotal atomic.Int64
+	mergedBytesTotal  atomic.Int64
 )
 
 // Swarm Merging, Fase 1 (docs/evoluzione.md §15.2): reuse the pieces of another
@@ -133,6 +143,14 @@ func (t *torrent) prefillFrom(candidates []*Torrent) int {
 	// the per-file Merkle root instead of the piece index.
 	merged += t.prefillV2From(candidates, mergedIdx)
 	t.mergedPieces = mergedIdx
+	if merged > 0 {
+		var mergedBytes int64
+		for idx := range mergedIdx {
+			mergedBytes += int64(t.pieces[idx].Length)
+		}
+		mergedPiecesTotal.Add(int64(merged))
+		mergedBytesTotal.Add(mergedBytes)
+	}
 	if merged > 0 && t.log != nil {
 		t.log.Infof("swarm merge: reused %d piece(s) from local data", merged)
 	}

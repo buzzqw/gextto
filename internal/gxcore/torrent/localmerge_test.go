@@ -84,11 +84,18 @@ func TestPrefillLocalDataReusesIdenticalLayout(t *testing.T) {
 	a := &torrent{pieces: piece.NewPieces(info, filesA)}
 	a.setInfo(info)
 
+	beforePieces, beforeBytes := mergedPiecesTotal.Load(), mergedBytesTotal.Load()
 	if got := a.prefillFrom([]*Torrent{{torrent: b}}); got != int(info.NumPieces) {
 		t.Fatalf("merged %d pieces, want %d", got, info.NumPieces)
 	}
 	if len(a.mergedPieces) != int(info.NumPieces) {
 		t.Fatalf("mergedPieces = %d, want %d (the verifier must skip them)", len(a.mergedPieces), info.NumPieces)
+	}
+	if got := mergedPiecesTotal.Load() - beforePieces; got != int64(info.NumPieces) {
+		t.Fatalf("session merged pieces += %d, want %d", got, info.NumPieces)
+	}
+	if got := mergedBytesTotal.Load() - beforeBytes; got != info.Length {
+		t.Fatalf("session merged bytes += %d, want %d", got, info.Length)
 	}
 	got := make([]byte, len(content))
 	if _, err := filesA[0].Storage.ReadAt(got, 0); err != nil {

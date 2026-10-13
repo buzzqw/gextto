@@ -102,6 +102,11 @@ type SessionStats struct {
 	// StorageErrors is the number of piece writes that failed at the storage
 	// layer (full disk, unwritable file, broken mount) since start.
 	StorageErrors int64
+
+	// MergedPieces and MergedBytes are the pieces and bytes that Swarm Merging
+	// reused from other local torrents since start (no network involved).
+	MergedPieces int64
+	MergedBytes  int64
 }
 
 // Stats returns current statistics about the Session.
@@ -119,6 +124,8 @@ func (s *Session) Stats() SessionStats {
 	out.ReadOpsTotal = s.metrics.ReadsPerSecond.Count()
 	out.WriteOpsTotal = s.metrics.WritesPerSecond.Count()
 	out.StorageErrors = s.storageErrors.Load()
+	out.MergedPieces = mergedPiecesTotal.Load()
+	out.MergedBytes = mergedBytesTotal.Load()
 	out.UTP = s.utpSocket != nil
 	out.DHT = s.config.DHTEnabled
 	out.PeerWireDownloaded = peerconn.WireBytesRead.Load()

@@ -1027,6 +1027,8 @@ func TestGxSessionStatsMapping(t *testing.T) {
 		"read_ops_total":         7,
 		"write_ops_total":        8,
 		"read_cache_hit_percent": 42,
+		"merged_pieces":          12,
+		"merged_bytes":           4096,
 	}
 	got := gxSessionStats(in)
 	want := map[string]int64{
@@ -1040,6 +1042,8 @@ func TestGxSessionStatsMapping(t *testing.T) {
 		"disk.num_read_ops":            7,
 		"disk.num_write_ops":           8,
 		"read_cache_hit_percent":       42,
+		"merged_pieces":                12,
+		"merged_bytes":                 4096,
 	}
 	for key, value := range want {
 		if got[key] != value {

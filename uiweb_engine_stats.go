@@ -158,7 +158,21 @@ func uiGxEngineStats(engine TorrentEngine) uiEngineStats {
 	add("Totali sessione", fmt.Sprintf("scaricati %s · inviati %s · overhead protocollo %s · peer connessi %d",
 		logging.HumanBytesI64(engineNum(session, "bytes_downloaded")), logging.HumanBytesI64(engineNum(session, "bytes_uploaded")),
 		logging.HumanBytesI64(engineNum(session, "protocol_overhead_bytes")), engineNum(stats, "peers")), false)
+	if v, ok := uiMergeReuseRow(session); ok {
+		add("Riuso locale", v, false)
+	}
 	return out
+}
+
+// uiMergeReuseRow renders the Swarm Merging local-reuse row from the session
+// counters, or ("", false) when nothing was reused (the row is then hidden).
+func uiMergeReuseRow(session map[string]any) (string, bool) {
+	pieces := engineNum(session, "merged_pieces")
+	if pieces <= 0 {
+		return "", false
+	}
+	return fmt.Sprintf("%d pezzi · %s riusati da altri torrent (senza rete)",
+		pieces, logging.HumanBytesI64(engineNum(session, "merged_bytes"))), true
 }
 
 func uiEmbeddedEngineStats(s *AppState, engine TorrentEngine) uiEngineStats {

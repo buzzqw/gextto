@@ -2195,6 +2195,8 @@ func (d *Daemon) stats() daemonStats {
 			"read_ops_total":           s.ReadOpsTotal,
 			"write_ops_total":          s.WriteOpsTotal,
 			"storage_errors":           s.StorageErrors,
+			"merged_pieces":            s.MergedPieces,
+			"merged_bytes":             s.MergedBytes,
 			"disk_queue_depth":         int64(s.ReadsActive + s.ReadsPending + s.WritesActive + s.WritesPending),
 			"peer_wire_downloaded":     s.PeerWireDownloaded,
 			"peer_wire_uploaded":       s.PeerWireUploaded,
