@@ -8,6 +8,24 @@ import (
 	"time"
 )
 
+// TestShouldLogQueueCounts checks the "📊 Downloads" logging rule: the first
+// dynamic tick after start is skipped (transient counts) and a line is logged
+// only when the triple changes.
+func TestShouldLogQueueCounts(t *testing.T) {
+	if shouldLogQueueCounts(1, "4/0/4", "") {
+		t.Fatal("the first tick (unsynced counts) must not be logged")
+	}
+	if !shouldLogQueueCounts(2, "2/0/2", "") {
+		t.Fatal("the first stable state must be logged")
+	}
+	if shouldLogQueueCounts(3, "2/0/2", "2/0/2") {
+		t.Fatal("an unchanged triple must not be logged again")
+	}
+	if !shouldLogQueueCounts(4, "1/0/3", "2/0/2") {
+		t.Fatal("a changed triple must be logged")
+	}
+}
+
 func TestCompletedArchivePresentAcceptsPersistedFullPayload(t *testing.T) {
 	db, _, view, _, processed := seedTestSetup(t)
 	path, present := bg_completedArchivePresent(db, view.Hash, view.TotalSize)

@@ -594,6 +594,15 @@ func bg_completedArchivePresent(db *Database, hash string, totalSize int64) (str
 
 // ---------------------------------------------------------------------------
 // torrent_event_worker
+// shouldLogQueueCounts reports whether the "📊 Downloads" line must be logged:
+// never on the first dynamic tick after start (its snapshot is not yet synced,
+// so the counts are transient) and only when the transferring/stuck/waiting
+// triple changed. Without the first-tick guard every restart printed two
+// near-identical lines with different counts.
+func shouldLogQueueCounts(tick int, counts, last string) bool {
+	return tick > 1 && counts != last
+}
+
 // ---------------------------------------------------------------------------
 
 // torrentEventWorker implements `torrent_event_worker`: it drives the
@@ -647,6 +656,9 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	lastResumeSave := time.Now()
 	// lastQueueCounts is the last logged "transferring/stuck/waiting" triple.
 	lastQueueCounts := ""
+	// queueTicks counts the dynamic ticks: the first runs right after start on
+	// an unsynced snapshot and its counts are transient, so its log is skipped.
+	queueTicks := 0
 	lastSpeedPolicy := time.Now().Add(-60 * time.Second)
 	var lastSpeed *bg_speedPair
 	lastDebugLog := time.Now().Add(-300 * time.Second)
@@ -814,6 +826,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			lastMetadataPromotion = now
 		}
 		if now.Sub(lastDynamicAdjustment) >= 90*time.Second {
+			queueTicks++
 			effectiveDownloadKib, _ := bg_currentSpeedLimits(cfg)
 			torrents.AdjustQueue(cfg, effectiveDownloadKib)
 			// Queue visibility: log when the counts shown in the line change, not
@@ -855,12 +868,13 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				rateKib += torrent.DownloadRate
 			}
 			counts := fmt.Sprintf("%d/%d/%d", transferring, idle, queued)
-			if counts != lastQueueCounts {
+			// Skip the first tick after start: the engine has not finished syncing
+			// and resumed torrents read as paused, so that triple is transient
+			// (e.g. "4 waiting" then "2"). Logging it made every restart print two
+			// near-identical lines with different counts.
+			if shouldLogQueueCounts(queueTicks, counts, lastQueueCounts) {
 				rateKib /= 1024
 				speed := fmt.Sprintf("speed %d KB/s", rateKib)
-				if effectiveDownloadKib > 0 {
-					speed += fmt.Sprintf(" (limit %d KB/s)", effectiveDownloadKib)
-				}
 				// "Active" means really transferring: a download stuck at 0 B/s
 				// is counted apart, not as active. Naming the stuck ones (with
 				// their real progress) tells a partially downloaded torrent
@@ -873,7 +887,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 						extra = fmt.Sprintf(" +%d", len(shown)-3)
 						shown = shown[:3]
 					}
-					line += " · in stallo: " + strings.Join(shown, ", ") + extra
+					line += " · stuck: " + strings.Join(shown, ", ") + extra
 				}
 				logging.Info(line)
 				lastQueueCounts = counts
