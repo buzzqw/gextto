@@ -1,9 +1,12 @@
-# Gextto — EXpert Torrent Transfer Orchestrator
+# Gextto — Expert Torrent Transfer Orchestrator
 
 **Tell Gextto what you want to watch. It finds the best release, downloads it,
-checks it, names it and files it in your library — then keeps looking for a
-better copy.** One self-hosted daemon, a fast web UI, and its own BitTorrent
-engine written from scratch in pure Go.
+verifies it, names it and shelves it in your library — then keeps watching for
+a better copy.**
+
+Gextto is a self-hosted media automation daemon with a fast web UI and its own
+BitTorrent engine, written from scratch in pure Go. One binary per component,
+no C dependencies, six interface languages.
 
 [![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-pure%2C%20zero%20CGO-00ADD8?logo=go)
@@ -18,27 +21,28 @@ engine written from scratch in pure Go.
 
 ## Why Gextto
 
-- **It decides like an expert, and tells you why.** Every candidate release is
+- **It decides like an expert, and explains itself.** Every candidate release is
   scored on resolution, source, codec, audio, HDR/Dolby Vision, language and
-  size; the winner is downloaded, and every rejected one keeps the exact reason
-  in the log. Upgrades stop once the file is good enough.
-- **It never loses your library.** Hardlinks instead of copies while seeding,
-  a guard that tells an unmounted NAS from a deleted file, a recycle bin for
-  replaced files, moves that resume after a restart.
-- **It has its own engine.** `gx-core` is a BitTorrent implementation built for
-  this project: BitTorrent v2, uTP, NAT holepunching, IPv6 DHT, streaming —
-  in a process with a far smaller memory footprint than qBittorrent (measured in
-  *Resource footprint* below).
-- **It also works without Gextto.** The same engine ships as
-  **[gx-torrent](https://github.com/buzzqw/gextto/releases)**, a
-  standalone client for Linux and Windows with a full web UI, a qBittorrent-
-  compatible API for Sonarr/Radarr, and an RSS manager on par with the best.
-- **It runs itself.** The engine adapts its queue, cache and upload to the
-  machine and the line, pauses downloads before the disk fills up, keeps the
-  peers that deliver and reuses what is already on disk — no tuning needed.
-- **It is honest software.** Pure Go, no C dependencies, one binary per
-  component, about 1,600 test functions, accessibility checked with axe-core,
-  six interface languages.
+  size. The winner is downloaded; every rejected candidate keeps the exact
+  reason in the log. Upgrades stop once the file is good enough.
+- **It protects your library.** Completed files enter the library as hardlinks
+  while seeding, a mount guard tells an unmounted NAS apart from a deleted
+  file, replaced files go to a recycle bin, and interrupted moves resume after
+  a restart.
+- **It ships its own engine.** `gx-core` is a BitTorrent implementation built
+  for this project — BitTorrent v2, uTP, NAT holepunching, IPv6 DHT,
+  streaming — running in a process far lighter than qBittorrent (see
+  *Resource footprint*).
+- **It doubles as a standalone client.** The same engine ships as
+  **[gx-torrent](https://github.com/buzzqw/gextto/releases)**, a complete
+  client for Linux and Windows with its own web UI, a qBittorrent-compatible
+  API for Sonarr/Radarr, and an RSS suite on par with the best.
+- **It tunes itself.** Queue, disk cache and upload adapt to the machine and
+  the line; downloads pause before the disk fills up; the engine keeps the
+  peers that deliver and reuses data already on disk. No manual tuning needed.
+- **It is easy to audit.** Pure Go with zero CGO, a single supervised process
+  per component, about 1,600 test functions, and accessibility checks with
+  axe-core.
 
 ### At a glance
 
@@ -47,7 +51,7 @@ engine written from scratch in pure Go.
 | **Engine memory** | ~25 MB idle, ~100 MB at 100 MB/s with 50 torrents (qBittorrent-nox: up to ~5 GB) |
 | **Protocol** | BitTorrent v1, v2 and hybrid (BEP 52) · 34 BEPs implemented and tested ([list](docs/bep.md)) |
 | **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP proxy · VPN killswitch |
-| **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr) · RSS · web search · anti-stall replacement |
+| **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr) · RSS · web search · stuck-download replacement |
 | **Integrations** | Jellyfin, Plex, Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
 | **Interfaces** | Web UI (SSR + HTMX, installable PWA) · terminal TUI over SSH · JSON API |
 | **Build** | Pure Go (`CGO_ENABLED=0`) · optional libtorrent engine · Linux x86_64/aarch64 · gx-torrent also on Windows |
@@ -58,13 +62,13 @@ engine written from scratch in pure Go.
 │  Decision Engine · Parse & Scoring · Multi-Indexer · Post-Processing   │
 │  Server-Side UI (HTMX + SSR) · Terminal TUI · Media Integrations       │
 └───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Engine contract (torrent_engine.go)
+                                     │ Engine contract (torrent_engine.go)
 ┌───────────────────────────────────▼────────────────────────────────────┐
 │                  gx-torrent (Managed / Standalone Daemon)              │
 │  Web UI · qBittorrent Web API v2 · RSS rules, archive, wanted titles   │
 │  Linux Service (systemd) and Native Windows Service (NTFS Junctions)   │
 └───────────────────────────────────┬────────────────────────────────────┘
-                                    │
+                                     │
 ┌───────────────────────────────────▼────────────────────────────────────┐
 │                    gx-core Engine (internal/gxcore)                    │
 │  BitTorrent v1 / v2 (BEP 52 Merkle) · uTP (BEP 29) · Holepunch (BEP 55)│
@@ -72,310 +76,294 @@ engine written from scratch in pure Go.
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-## What Gextto offers
+## Features
 
-### 🎯 Intelligent Automation & Decision Engine
-- **Quality-aware scoring:** deterministically scores releases by evaluating quality, source, codec, audio, HDR/DV, language, and file size. It protects higher-grade existing library files and records the exact reason for any rejected candidate in logs. An optional ceiling stops upgrades once a file is good enough; `ffprobe` can analyze archived media to enrich decisions.
-- **Comics:** writes standard `ComicInfo.xml` metadata for CBZ comic archives (Komga, Kavita, and readers).
-- **Stuck download mitigation (Anti-Stall):** downloads that stop making progress (no bytes for a while) or magnets waiting indefinitely for metadata can be superseded by a valid alternative after a configurable window (*Configuration → Quality and upgrades → Stuck downloads*), while the original torrent continues trying in the background. A release given up on is blocklisted, so the next search picks another version instead of the same dead one.
+### Release scoring and automation
 
-### 🛡️ Library Integrity & Storage Safety
-- **Zero-space hardlinks during seeding:** when downloads and media libraries share the same filesystem, newly completed files enter the library instantly as hardlinks, avoiding duplicate disk usage during seeding.
-- **NAS and mount-point guard:** instantly recognizes an unmounted network share (NAS), preventing missing files from being mistaken for deletions; features transparent automated retries for transient disk full/network timeouts and automatically resumes interrupted file moves on restart.
-- **Recycle bin safety:** replaced files from true quality upgrades, and the files of a torrent removed "with data", are moved to the configured Trash before deletion. The torrent leaves the engine first (no file held open on NFS) and a copy across filesystems runs in the background, so the page answers at once.
+- **Quality-aware scoring.** Each candidate is scored deterministically on
+  quality, source, codec, audio, HDR/Dolby Vision, language and size.
+  Higher-grade library files are protected, rejections are logged with the
+  reason, and an optional ceiling stops upgrades once a file is good enough.
+  `ffprobe` can analyse archived media to inform decisions.
+- **TV, movies, comics.** Standard `ComicInfo.xml` metadata is written for CBZ
+  archives (Komga, Kavita, readers).
+- **Stuck-download recovery.** Downloads that stop progressing, or magnets
+  stuck waiting for metadata, are superseded by a valid alternative after a
+  configurable window (*Configuration → Quality and upgrades → Stuck
+  downloads*). The original keeps trying in the background; the abandoned
+  release is blocklisted so the next search picks a different one.
 
-### 🔌 Sources, Integrations & Operations
-- **Flexible sources:** RSS feeds, HTML listings (ext.to, TorrentGalaxy, Corsaro), Torznab indexers (Jackett, Prowlarr), dedicated web search engines, and optional FlareSolverr integration.
-- **Notifications & Media Servers:** dispatches alerts via Telegram, e-mail, or webhooks (Discord, Slack, ntfy, Gotify, Pushover), including daemon restarts and engine warnings; sends targeted folder-level library refreshes to Jellyfin and Plex, and provides an iCal calendar feed of library arrivals and air dates.
-- **Full lifecycle traceability:** every download carries a unique **Acquisition ID** preserved across search, selection, transfer, post-processing, and archiving logs; the dashboard **To check** panel aggregates edge cases, and threshold alerts warn if an indexer fails consecutively or slows down.
-- **Server-Side UI (HTMX + SSR) & Native TUI:** responsive web UI installable as a mobile PWA, fully keyboard-navigable and verified with axe-core for accessibility; tables that fit the window at any text size; a single **Theme** picker with 20+ contrast-checked themes (dark, light, cream and the classic Nord, Dracula, Solarized, Gruvbox, Catppuccin, Tokyo Night, GitHub, High contrast…) plus **custom themes** built from four colours (background, panels, text, accent) and saved by name on the server, so they follow you to every device; full terminal TUI for direct management via SSH. Available in 6 languages (IT, EN, DE, FR, ES, PL).
+### Library safety
 
-The web UI is available at `http://<host>:5000/`. The [English manual](docs/MANUAL.en.md) and [manuale italiano](docs/MANUAL.it.md) cover setup and every section of the UI.
+- **Hardlinks while seeding.** When downloads and library share a filesystem,
+  completed files appear in the library instantly as hardlinks — no duplicate
+  disk usage during seeding.
+- **NAS and mount guard.** An unmounted share is never mistaken for deleted
+  files. Transient failures (disk full, network timeouts) retry transparently
+  and interrupted moves resume on restart.
+- **Recycle bin.** Files replaced by a true quality upgrade, and data of a
+  torrent removed "with data", move to the configured trash first. The torrent
+  leaves the engine before any file is touched (nothing held open on NFS) and
+  cross-filesystem copies run in the background, so the page answers at once.
 
-## Torrent engines & the gx-core Engine
+### Sources, integrations and control
 
-Gextto keeps the control plane (queue, scoring, post-processing, archiving) and swaps only the transfer engine in *Configuration → Torrent engine*. One engine runs at a time: switching is a clean, coordinated migration without I/O conflicts or multiple daemons competing for the same files.
+- **Sources.** RSS feeds, HTML listings (ext.to, TorrentGalaxy, Corsaro),
+  Torznab indexers (Jackett, Prowlarr), dedicated web search, optional
+  FlareSolverr.
+- **Notifications and media servers.** Telegram, e-mail, webhooks (Discord,
+  Slack, ntfy, Gotify, Pushover) including daemon restarts and engine
+  warnings; folder-level refreshes for Jellyfin and Plex; an iCal feed of
+  library arrivals and air dates.
+- **Traceability.** Every download carries a unique **Acquisition ID** across
+  search, selection, transfer, post-processing and archive logs. The dashboard
+  **To check** panel collects edge cases; threshold alerts warn when an
+  indexer fails repeatedly or slows down.
+- **Interfaces.** Responsive web UI installable as a mobile PWA, fully
+  keyboard-navigable and axe-core checked; a single **Theme** picker with 20+
+  contrast-checked themes plus custom server-side themes that follow you to
+  every device; a full terminal TUI for SSH management. Six languages (IT, EN,
+  DE, FR, ES, PL).
 
-### gx-core & gx-torrent (Default and recommended)
+The web UI listens on `http://<host>:5000/`. Setup and every UI section are
+covered by the [English manual](docs/MANUAL.en.md) and the
+[manuale italiano](docs/MANUAL.it.md).
 
-**gx-torrent** is the default engine and compiles as **pure Go** (`CGO_ENABLED=0`) with zero C/C++ dependencies. It runs as a separate supervised process, survives orchestrator restarts and updates (Gextto re-attaches to it when binary and options match), provides its own web interface, and receives protocol innovations first.
+## Torrent engine
 
-Its engine core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementation developed in this repository. `gx-core` and the DHT (`internal/dht`) are original code written from scratch in this tree — no third-party-derived code, and no third-party rate-limiter or UUID helpers (see [`THIRD-PARTY-NOTICES`](THIRD-PARTY-NOTICES) for the provenance) — so the whole engine is covered by the same EUPL-1.2 licence as the rest of Gextto. For those who know BitTorrent, this is what is inside.
+Gextto keeps the control plane (queue, scoring, post-processing, archiving)
+and delegates transfers to one selectable engine (*Configuration → Torrent
+engine*). A single engine runs at a time; switching is a clean, coordinated
+migration with no I/O conflicts.
 
-#### Protocol
+### gx-core and gx-torrent (default, recommended)
 
-- **BitTorrent v1, v2 and hybrids (BEP 52):** v1, v2-only and hybrid torrents from both `.torrent` files and magnet links (`urn:btmh:`), with the per-file piece layout (no cross-file padding blocks), SHA-256 Merkle tree verification and `piece layers` fetched from peers (`hash request`, `hashes`, `hash reject`).
-- **34 BEPs implemented and tested — [`docs/bep.md`](docs/bep.md) is the source of truth:** core wire (BEP 3), reserved bits (4), Fast Extension (6), `ut_metadata` from a magnet (9), Extension Protocol (10), Peer Exchange `ut_pex` with IPv4 and IPv6 `added6`/`dropped6` (11), multitracker `announce-list` (12), Local Service Discovery over IPv4/IPv6 (14), super-seeding (16), Web Seeds with HTTP Range (19), peer-ID conventions (20), partial seeds `upload_only`/`event=paused` (21), compact peer lists (23), the tracker external-IP field (24), private torrents (27), torrent file hints `similar`/`collections` (38), canonical peer priority (40), padding files (47) and `lt_donthave` (54); trackers: IPv6 `peers6` (7), UDP tracker (15), UDP extensions `URLData` (41), failure retry `retry in`/`never` (31) and scrape (48); DHT: mainline (5), IPv6 (32), DHT scrape (33), secure node IDs (42), read-only nodes (43) and the K/V store with its outbound `get`/`put` client (44), plus mutable-item magnet updates `urn:btpk:` (46); plus BitTorrent v2 (52) and the magnet `so=` selection (53). Deprecated or niche BEPs and WebTorrent/I2P are out of scope, with the rationale in the same document.
-- **Local-Data Hints (BEP 38) and swarm merging:** reads a torrent's `similar`/`collections` hints, keeps them on export and points out the other local torrents sharing a hint (`GET /api/v1/torrents/{hash}/collections`); when another torrent holds the exact same content layout its verified pieces are re-hashed and reused, so a re-pack or a seeder-less torrent completes without downloading that data again. Private torrents are never mixed (BEP 27).
-- **Super-seeding (BEP 16) & deterministic choking:** an unchoker simulation harness tunes throughput and fairness; super-seeding spreads a new torrent piece by piece.
+**gx-torrent** is the default engine: pure Go (`CGO_ENABLED=0`), no C/C++
+dependencies, running as a separate supervised process that survives
+orchestrator restarts and updates (Gextto re-attaches when binary and options
+match). It has its own web interface and receives protocol work first.
 
-#### Network and NAT
+Its core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementation
+developed in this repository. `gx-core` and the DHT (`internal/dht`) are
+original code written from scratch in this tree — no third-party-derived code,
+no third-party rate-limiter or UUID helpers (provenance in
+[`THIRD-PARTY-NOTICES`](THIRD-PARTY-NOTICES)) — and carry the same EUPL-1.2
+licence as the rest of Gextto.
 
-- **uTP (BEP 29) on a single port:** TCP and uTP in parallel with automatic fallback; one UDP socket carries both uTP and the DHT, routing handshakes by info-hash, so every swarm advertises the same port.
-- **Holepunching (BEP 55):** the full `ut_holepunch` extension opens direct uTP connections across NATs without router configuration, as client and as relay for other peers.
-- **Port mapping and diagnostics:** UPnP, NAT-PMP and **PCP** (RFC 6887), a port check that also reads the external port the DHT sees (cone vs symmetric NAT), SOCKS5 and HTTP CONNECT proxies, and an interface-binding killswitch (`outgoing-interface`) that keeps all BitTorrent traffic on the VPN.
-- **DHT subsystem (`internal/dht`):** mainline (BEP 5), dual-stack IPv6 (32), scrape (33), secure node IDs with CRC32C (42), read-only mode (43, off by default: a full client should serve the DHT it uses), signed immutable/mutable K/V storage with an outbound `get`/`put` client (44), `urn:btpk:` magnet updates (46).
+**Protocol.** BitTorrent v1, v2-only and hybrid (BEP 52) from `.torrent` files
+and magnet links (`urn:btmh:`), with per-file piece layout, SHA-256 Merkle
+verification and `piece layers` fetched from peers. **34 BEPs, implemented and
+tested — [`docs/bep.md`](docs/bep.md) is the source of truth** — covering the
+wire protocol, Fast Extension, `ut_metadata`, Extension Protocol, PEX with
+IPv6, multitracker, LSD, super-seeding, Web Seeds, partial seeds, compact
+peers, private torrents, local-data hints (BEP 38), peer priority, padding,
+`lt_donthave`, IPv6/UDP trackers with extensions, retry and scrape, and the
+DHT suite (mainline, IPv6, scrape, secure node IDs, read-only nodes, K/V
+store, `urn:btpk:` updates) plus v2 and magnet `so=` selection. Deprecated or
+niche BEPs and WebTorrent/I2P are out of scope, with rationale in the same
+document.
 
-#### Self-management: it runs itself
+**Local reuse.** A torrent's `similar`/`collections` hints (BEP 38) are kept on
+export and matched against local torrents
+(`GET /api/v1/torrents/{hash}/collections`). Pieces another local torrent
+already verified — same layout, or the same BitTorrent v2 file under a
+different piece size — are copied and re-checked in the background instead of
+downloaded; partially available sources contribute their verified 16 KiB
+blocks and only the rest comes from the network (on the Debian and Arch ISOs
+with a 75%-complete source, 25% of the file came from the network instead of
+100%). Private torrents are never mixed (BEP 27).
 
-- **Queue that adapts:** the number of active downloads follows the measured throughput (dynamic queue), slow torrents stop counting against the slots and a download that moves no data is set aside so another one can run.
-- **Cache and bandwidth that follow the machine:** the disk cache is resized from the free RAM, the active torrents and the disk type (HDD, SSD, NFS); latency auto-speed lowers the upload before the line saturates (anti-bufferbloat), so browsing and calls stay smooth.
-- **Disk guard:** when a download folder drops below the free-space threshold (1 GiB by default, Gextto's *minimum free space* when set) the unfinished downloads there pause by themselves and resume when space returns; seeding goes on and nothing ends in a write error.
-- **Peers worth keeping:** each peer's request queue grows with what it delivers and a fast peer works on two pieces at once; when a torrent is at its connection cap the useless and slowest connection is dropped (never a random one) to make room for a fresh one; pieces of deselected files never make a peer "interesting".
-- **Local reuse before the network:** pieces another local torrent already verified (same layout, or the same BitTorrent v2 file even with a different piece size) are copied and checked in the background instead of downloaded; when the other torrent has only part of the file, its verified 16 KiB blocks are reused and only the missing ones come from peers (on the Debian and Arch ISOs with a source 75% complete, 25% of the file came from the network instead of 100%); a peer sending corrupt data is banned from the whole session.
+**Network.** TCP and uTP (BEP 29) in parallel with automatic fallback on a
+single port — one UDP socket carries uTP and DHT, handshakes routed by
+info-hash. Full `ut_holepunch` (BEP 55) across NATs, as client and relay.
+UPnP, NAT-PMP and **PCP** (RFC 6887); a port check that also reads the
+external port seen by the DHT (cone vs symmetric NAT); SOCKS5 and HTTP CONNECT
+proxies; an interface-binding killswitch (`outgoing-interface`) that keeps all
+BitTorrent traffic on the VPN. The DHT (`internal/dht`) covers mainline IPv6,
+scrape, CRC32C secure node IDs, read-only mode (off by default) and the signed
+K/V store with outbound `get`/`put`.
 
-#### Disk, memory and CPU
+**Self-management.** The active-download count follows measured throughput
+(dynamic queue); slow torrents stop occupying slots and stalled ones step
+aside. The disk cache is sized from free RAM, active torrents and disk type
+(HDD, SSD, NFS); latency auto-speed trims upload before the line saturates.
+When a download folder drops below the free-space threshold (1 GiB by
+default), unfinished downloads there pause and resume on their own — seeding
+continues, nothing ends in a write error. Each peer's request queue grows with
+what it delivers, a fast peer works on two pieces at once, and at the
+connection cap the useless, slowest connection is dropped — never a random
+one. Pieces of deselected files never count a peer as interesting.
 
-- **No giant cache by design:** pieces are written through and the reclaimable OS page cache does the coalescing; a read cache with lazy expiry and a write limiter sized from the RAM and the disk type (HDD, SSD, NFS) keep the footprint in tens of MB.
-- **Batched durability:** `fdatasync` before the resume bitfield is persisted, never `O_SYNC` per write; sparse files and `fallocate` preallocation (tmpfs-safe); RAM-disk temp folders; an opt-in mmap storage on Linux (`-mmap`).
-- **Zero-alloc hot paths:** MSE/PE RC4 runs in place inside the network buffer (no per-block heap allocation), bitfields are counted with `math/bits.OnesCount64`, and the per-peer request queue depth adapts to each peer's delivery speed.
-- **IP blocklist in microseconds:** CIDR, ranges, P2P and eMule formats merged into sorted intervals and searched by binary search with zero allocations; a URL list is re-downloaded on a schedule.
+**Footprint by design.** Pieces are written through; the reclaimable OS page
+cache does the coalescing, so there is no gigabyte-sized in-process cache. A
+read cache with lazy expiry and a write limiter sized from RAM and disk type
+keep usage in the tens of MB. `fdatasync` is batched before the resume
+bitfield is persisted (never `O_SYNC` per write); sparse files, `fallocate`
+preallocation, RAM-disk temp folders, and an opt-in mmap mode on Linux
+(`-mmap`). Hot paths avoid allocations (in-place MSE/PE RC4, word-wise
+bitfield counts, adaptive per-peer queue depth). The IP blocklist (CIDR,
+ranges, P2P, eMule) is merged into sorted intervals and binary-searched with
+zero allocations; URL lists refresh on a schedule.
 
-#### Streaming, safety and operations
-
-- **Streaming:** the piece picker separates the player's window (`SetStreamWindow`) from the readahead horizon (`SetReadaheadWindow`), and per-file priorities (0 = skip, 1–4 normal, 5–7 high) are applied live; MKV/MP4 are served to the browser or VLC with HTTP Range.
-- **LAN protection:** web seeds and magnet `xs=`/`as=` sources come from torrent data, so by default they cannot reach private addresses (router, NAS, other LAN services): the check is on the resolved IP, immune to DNS rebinding, and can be relaxed for a LAN web seed.
-- **Swarm protection:** strict BEP 27 private torrents (no DHT, PEX or LSD), a 30-minute quarantine for peers sending corrupt blocks, trackers dropped after `never` (BEP 31) or a long failure, per-piece diagnostics, resume data in BoltDB, live Server-Sent Events (`/ui/events`).
-- **Everywhere:** Gextto's internal engine or a standalone client with its own web UI and qBittorrent-compatible API, as a systemd service on Linux and a native Windows service on Windows (amd64/arm64).
+**Streaming and safety.** The picker separates the player window
+(`SetStreamWindow`) from the readahead horizon (`SetReadaheadWindow`); per-file
+priorities apply live and MKV/MP4 are served over HTTP Range. Web seeds and
+magnet `xs=`/`as=` sources default to no private-address access (checked on
+the resolved IP, rebinding-safe). Strict BEP 27 private torrents (no DHT, PEX
+or LSD), 30-minute quarantine for corrupt-sending peers, trackers dropped
+after BEP 31 `never` or prolonged failure, per-piece diagnostics, BoltDB
+resume data, live Server-Sent Events (`/ui/events`).
 
 ### Engine comparison
 
-The table below sums up the alternatives to the default; how to include
-libtorrent is under *Install from source*.
-
 | Engine | Where it runs | When to pick it |
 |---|---|---|
-| gx-torrent (default) | Separate supervised Go process | The default: pure Go, self-contained, active development. BitTorrent v1, hybrid and v2-only (BEP 52, `.torrent` and magnet), DHT (IPv6, security BEP 42, read-only, scrape) and MSE/PE encryption; also usable on its own on Linux and Windows (see *gx-torrent as a standalone client*); no WebTorrent/WebRTC |
-| qBittorrent-nox | External daemon, driven through its Web API | You already run qBittorrent-nox or prefer its own UI. Needs path mappings and an extra process |
-| libtorrent (optional build) | Inside Gextto's process; **only if you compiled it in** (`make build-libtorrent`) | You need libtorrent's advanced controls or its compatibility; also the automatic fallback. A crash takes Gextto down too |
+| gx-torrent (default) | Separate supervised Go process | Pure Go, self-contained, active development. v1, hybrid and v2-only, DHT and MSE/PE; also standalone on Linux and Windows; no WebTorrent/WebRTC |
+| qBittorrent-nox | External daemon via its Web API | You already run qBittorrent-nox or prefer its UI. Needs path mappings and an extra process |
+| libtorrent (optional build) | Inside Gextto's process, **only if compiled in** (`make build-libtorrent`) | Advanced libtorrent controls or compatibility; also the automatic fallback. A crash takes Gextto down too |
 
-How to include libtorrent: see *Install from source* below.
-
-The active engine's statistics — torrents by state, speed and queue slots,
-port/router, DHT/uTP/LSD, encryption, proxy, IP filter, cache, **incoming
-connections** and **disk I/O** (queue, read/write totals) with session totals —
-are in the **Health → Torrent engine** panel (`/?view=health`); the same
-counters are in the daemon's `GET /api/v1/stats` and in
-`GET /api/libtorrent/session-stats`.
+Engine statistics — torrents by state, speed and queue slots, port/router,
+DHT/uTP/LSD, encryption, proxy, IP filter, cache, **incoming connections** and
+**disk I/O** — are in **Health → Torrent engine** (`/?view=health`), in the
+daemon's `GET /api/v1/stats`, and in `GET /api/libtorrent/session-stats`.
 
 ## Resource footprint
 
-Gextto is designed to remain lightweight while idle: it is one daemon (plus the
-small supervised `gx-torrent` process when that engine is active), uses bounded
-concurrency for source and background work, and backs off failing providers
-instead of retrying continuously. Actual CPU and memory use depend on monitored
-titles, sources, active torrents and archive scans; treat any machine-specific
-measurement as indicative, not a guarantee.
+Gextto stays light when idle: one daemon (plus the small supervised
+`gx-torrent` process when that engine is active), bounded concurrency for
+sources and background work, backoff instead of tight retry loops against
+failing providers. CPU and memory depend on monitored titles, sources, active
+torrents and archive scans; single-machine numbers are indicative.
 
-**Torrent engine memory, measured.** With 50 real torrents and ~100 MB/s of
-downloads on a 16 GB machine, the engine footprint differs sharply:
+**Engine memory, measured** — 50 real torrents, ~100 MB/s on a 16 GB machine:
 
 | Engine | Idle (torrents loaded) | Peak while transferring |
 |---|---:|---:|
 | gx-torrent | ~25 MB | ~100 MB |
 | qBittorrent-nox | ~40 MB | ~5 GB |
-| libtorrent (in Gextto's process, optional build) | ~0.5 GB | 3–5 GB |
+| libtorrent (in-process, optional build) | ~0.5 GB | 3–5 GB |
 
-libtorrent and qBittorrent keep a large in-process disk cache (GBs of anonymous
-memory). gx-torrent has **no large in-process write-back cache by design**: it
-writes pieces through and lets the reclaimable OS page cache do the coalescing,
-so its own footprint stays in the tens/hundreds of MB even under load; it does
-not hold data in RAM just to sit on it. Numbers vary with torrents, peers and
-storage; on HDD/NFS Gextto gives gx-torrent a larger buffer, used only when the
-writes fall behind the download.
+libtorrent and qBittorrent keep a large in-process disk cache (GBs of
+anonymous memory). gx-torrent writes pieces through and leaves coalescing to
+the reclaimable OS page cache, so its footprint stays in the tens/hundreds of
+MB under load. Values vary with torrents, peers and storage; on HDD/NFS
+Gextto grants gx-torrent a larger buffer, used only when writes lag behind
+downloads.
 
 ## Install on Linux
 
-The official installer targets 64-bit Linux systems (x86_64 or aarch64) with
-systemd: Debian 12+, Ubuntu 22.04+, Fedora, openSUSE Leap 15.6+/Tumbleweed and
-Arch Linux. Run it as root:
+For 64-bit Linux with systemd: Debian 12+, Ubuntu 22.04+, Fedora, openSUSE
+Leap 15.6+/Tumbleweed, Arch. Run as root:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
 
-It installs the program in `/opt/gextto`, stores service data in
-`/var/lib/gextto`, and exposes the UI on port 5000. The default torrent engine,
-`gx-torrent` (pure Go), is installed next to `gexttod` and started in managed
-mode. The release package is **pure Go**: nothing else must be installed. An
-external qBittorrent-nox can be used instead; the libtorrent engine needs a build
-of your own (`make build-libtorrent`, see below).
+It installs to `/opt/gextto`, keeps service data in `/var/lib/gextto`, and
+serves the UI on port 5000. The default engine `gx-torrent` (pure Go) is
+installed alongside `gexttod` and started in managed mode. The release package
+is pure Go — nothing else to install. An external qBittorrent-nox can be used
+instead; the libtorrent engine needs your own build (see below).
 
-Before touching the system the installer runs the downloaded program once: a
-missing library or a too-old glibc is reported right away instead of leaving a
-service that never starts. By default the service runs as **the local user who
-runs the installer**, so it can create folders in your library without extra
-permissions; `--user gextto` uses the isolated, login-less system account
-instead. When the library lives on a NAS owned by another user,
-`--media-group <group>` adds the service user to that group.
+The installer first runs the downloaded program once: a missing library or an
+old glibc is reported immediately instead of leaving a service that never
+starts. By default the service runs as **the local user invoking the
+installer**, so it can write to your library without extra permissions;
+`--user gextto` uses the isolated login-less system account instead. For a
+library on someone else's NAS, `--media-group <group>` adds the service user
+to that group.
 
 > [!IMPORTANT]
-> Gextto is meant for a trusted network: by default the web UI and the API are
-> open. If you reach it from outside, turn on the optional login
-> (*Configuration → Access and services*; the local network stays free) and still use HTTPS
-> through a reverse proxy or a VPN. Read the [security policy](docs/SECURITY.md)
+> Gextto is meant for a trusted network: the web UI and API are open by
+> default. For access from outside, enable the optional login
+> (*Configuration → Access and services*; the LAN stays free) and still use
+> HTTPS via reverse proxy or VPN. Read the [security policy](docs/SECURITY.md)
 > before exposing it remotely.
 
 ### Install from source
 
-Go 1.26.8+ is required; the default build is **pure Go**. Only to include the
-optional **libtorrent** engine, also install a C++17 compiler and the
-libtorrent-rasterbar development headers. The
-normal build embeds the web UI; no separate frontend build is required. See the
-[developer manual](docs/DEVELOPERS.md).
+Go 1.26.8+ required; the default build is **pure Go**. Only the optional
+**libtorrent** engine additionally needs a C++17 compiler and the
+libtorrent-rasterbar headers. The web UI is embedded — no frontend build
+needed. See the [developer manual](docs/DEVELOPERS.md).
 
 ```bash
 make build                 # pure Go (default), with gx-torrent
 make build-libtorrent      # also link the optional libtorrent engine
 ```
 
-`make build` increments the **committed** build number (`build_number`, the same
-source shared with CI, so the checkout and the released version show the same
-`1.1.<n>`) and writes the versioned daemon
-to `bin/gexttod`, plus the pure-Go `gx-torrent` engine next to it. To rebuild
-without incrementing the number, use `make fast` (or `make fast-libtorrent` for
-the libtorrent variant). To build **only** the
-`gx-torrent` daemon, use `make gx-torrent`. Verify the exact binary, product
-version, build number and, if linked, the libtorrent version with:
-
-```bash
-./bin/gexttod --version
-```
-
-The `gx-torrent` daemon keeps its **own** build counter, separate from Gextto's:
-`make build` and `make gx-torrent` advance `gx-torrent.build_number` (through
-`scripts/next-gx-build-number.sh`) only when its code actually changes. That
-number is what `./bin/gx-torrent --version` and the daemon's `/api/v1/health`
-report as `1.1.<n>`.
+`make build` increments the **committed** build number (`build_number`, shared
+with CI so checkout and release show the same `1.1.<n>`) and writes `gexttod`
+plus the pure-Go `gx-torrent` to `bin/`. `make fast` rebuilds without
+incrementing; `make gx-torrent` builds only the daemon. Check the result with
+`./bin/gexttod --version`. The `gx-torrent` daemon has its **own** build
+counter, advanced only when its code changes; `./bin/gx-torrent --version`
+and `/api/v1/health` report it as `1.1.<n>`.
 
 ## gx-torrent as a standalone client
 
-gx-torrent is also a complete BitTorrent client on its own, usable without
-Gextto in the same way as `qbittorrent-nox` or `transmission-daemon`. It is
-**the same binary** Gextto drives as its engine, not a separate product:
+gx-torrent is also a complete client usable without Gextto, like
+`qbittorrent-nox` or `transmission-daemon`. It is **the same binary** Gextto
+drives as its engine.
 
-- **Drop-in Compatibility with the `*arr` ecosystem:** implements the
-  **qBittorrent Web API v2** (`/api/v2/...`), seamlessly integrating with Sonarr,
-  Radarr, Lidarr, Readarr, and third-party mobile torrent managers.
-- **Native JSON API and login:** exposes its own JSON API (`/api/v1/...`), the
-  same one Gextto drives it with, plus a sign-in page (`/ui/login`) when
-  standalone authentication is enabled.
-- **Standalone Web UI & Setup Wizard:** a modern web UI in the spirit of
-  VueTorrent and Flood, with light and dark themes: side bar with status,
-  category and tag filters and a live transfer graph, a dense sortable list with
-  multi-selection, context menu and keyboard shortcuts, the torrent detail in a
-  side panel, drag-and-drop of `.torrent` files and pasted magnets, cards on a
-  phone, every page checked with axe-core. It also brings real-time
-  diagnostics, categories and tags, and multi-indexer
-  search that reads the local **archive** first (fed by the RSS feeds and by the
-  indexers for the monitored titles) and queries the configured indexers
-  (Jackett, Prowlarr, MIRCrew) live only on demand, each indexer linked to its
-  own web page. Every indexer takes its plain base address, exactly as in Gextto:
-  Jackett's aggregate Torznab path, Prowlarr's aggregate search API and a direct
-  Torznab service's `/api` are worked out for you.
-- **An RSS & Automation Suite on par with qBittorrent and Deluge/YaRSS2:**
-  - **Dedicated pages:** **Wanted** (`/ui/wanted`) shows a card per series or movie with its missing episodes, what was taken and when it was last searched, and adds titles with a guided dialog (search how the title is named in the archive and indexers, pick it, then seasons, language and quality); **RSS & Indexers** (`/ui/rss`) splits feeds, rules, indexers and options into tabs of cards, with a rule editor organised in *which items* / *what to do* and the preview of the matches next to it.
-  - **Feeds & Indexers:** feeds are RSS URLs or HTML listings (ext.to, TorrentGalaxy uploader pages), with last check, item count, new and added counters, instant **Check feeds** feedback (`✓ N feeds checked: X new · Y added`), and per-row reload; Torznab indexer presets (Jackett, Prowlarr) with live testing, plus an optional **FlareSolverr URL** to pass feeds and indexers behind a Cloudflare challenge.
-  - **Automation rules:** ordered PASS/FAIL rules (include/exclude, regex, size, seeders, age, episode filter, smart episode, *download once*, cooldown) with save path, category, tags and flags, editable in place with **live match previews**.
-  - **Wanted list & Gap search:** tracks wanted series/movies with language and quality dropdowns (up to 2160p 4K+), gap searches missing episodes, with manual one-click search for all or single titles and instant visual status. Feeds **grow the archive**, and the indexers are queried only for the monitored titles and the gaps (their results are archived too), so searches read the **archive** and answer at once; a feed with no rule and no include/exclude downloads nothing (use the *take everything* flag to follow one in full), and a live query is one checkbox away (*Search indexers too*).
-- **Archive:** every item the feeds ever returned is kept in a local database
-  (deduplicated by info-hash) and searchable — words, phrases in quotes,
-  `-excluded` words, per feed, downloaded only, sorted by date, seeders, size or
-  title — with resolution and episode badges, add, copy magnet and delete. A
-  search over 100,000 releases takes ~7 ms. A **search the indexers too** option
-  queries the configured Jackett/Prowlarr indexers live, so a release an indexer
-  has but the feeds never returned shows up and can be added straight away.
-- **Bandwidth Control:** global and per-torrent speed limits, a daily bandwidth
-  scheduler, and a **latency auto-speed** that lowers the upload when the
-  round-trip latency rises, to keep the line responsive (anti-bufferbloat).
-- **One-click optimization:** *Optimize queue* (3 downloads, 3 seeds, dynamic
-  queue between 1 and 10 slots), *Optimize cache* (sized from the RAM and the
-  disk) and *Optimize bandwidth* (upload at 80% of the measured peak, latency
-  auto-speed on), like Gextto's own *Optimize*.
-- **IP filter that stays current:** a local file or a URL (P2P, eMule, CIDR,
-  plain or gzip), loaded on demand with *Load now*, re-downloaded every N hours
-  and shown with its rule count, load time and next update. The peer-port tile
-  turns green when the port is reachable.
-- **Cross-Platform Architecture:**
-  - **Linux (x86_64, aarch64):** standalone `tar.gz` package, bundled systemd unit
-    (user or system service), and unprivileged Docker container (`Dockerfile`).
-  - **Native Windows (amd64, arm64):** runs as a **native Windows service**
-    (details in *Windows* below).
+- **`*arr` ready.** qBittorrent Web API v2 (`/api/v2/...`) for Sonarr, Radarr,
+  Lidarr, Readarr and mobile managers, plus its own JSON API (`/api/v1/...`)
+  and sign-in page.
+- **Modern web UI.** Light and dark themes in the spirit of VueTorrent/Flood:
+  sidebar with status/category/tag filters and a live transfer graph, dense
+  sortable multi-select list with context menu and keyboard shortcuts, torrent
+  detail in a side panel, drag-and-drop of `.torrent` files and pasted
+  magnets, phone-friendly cards. Every page axe-core checked.
+- **RSS and automation.** A **Wanted** page (cards per title with missing
+  episodes, guided add dialog) and an **RSS & Indexers** page (feeds, rules,
+  indexers, options as tabbed cards; rule editor split into *which items* /
+  *what to do* with live match preview). Ordered PASS/FAIL rules, per-row
+  reload, live indexer tests, optional FlareSolverr, and a local **archive**
+  of everything feeds returned (100,000 releases searchable in ~7 ms, with an
+  option to query Jackett/Prowlarr live).
+- **Operations.** Global and per-torrent limits, daily scheduler, latency
+  auto-speed (anti-bufferbloat), one-click queue/cache/bandwidth optimisation,
+  URL or file IP filter with scheduled refresh, categories and tags,
+  real-time diagnostics.
+- **Platforms.** Linux x86_64/aarch64 (`gx-torrent-linux-<arch>.tar.gz`, systemd
+  unit or `run.sh`, unprivileged Docker image) and native Windows service
+  amd64/arm64 (`gx-torrent-windows-<arch>.zip`, `install-service.ps1`,
+  junction-based linking — no symlink privilege needed). Gextto itself stays
+  Linux-only.
 
-Every release publishes dedicated packages next to Gextto's:
-
-| Platform | Package | How it runs |
-|---|---|---|
-| Linux (x86_64, aarch64) | `gx-torrent-linux-<arch>.tar.gz` | `run.sh` or the bundled systemd unit |
-| Windows (amd64, arm64) | `gx-torrent-windows-<arch>.zip` | Native Windows service, installed by `install-service.ps1` |
-| Container | `Dockerfile` in the repository root | Unprivileged user, data in `/data`, UI on port 8080 |
-
-**Windows.** Extract the zip and run `install-service.ps1` from an **elevated**
-PowerShell: it registers and starts the `gx-torrent` service (automatic start),
-with data and log in `%ProgramData%\gx-torrent`. `uninstall-service.ps1` removes
-it; the bundled `README.txt` also documents the `sc create` alternative. On
-Windows gx-torrent uses the native APIs for memory, disk type, free space and
-the default gateway (UPnP/NAT-PMP), and links each torrent into place with a
-**junction**, so it needs neither the symbolic-link privilege nor Developer
-Mode. Only gx-torrent runs on Windows; Gextto itself remains Linux-only.
-
-**First run.** Open `http://<host>:8890/`: at startup the daemon already prints
-the addresses to open (`web UI: http://<lan-ip>:8890/` and
-`http://127.0.0.1:8890/`), so there is no need to look up the IP. The wizard guides you through
-language, download and temporary folders (with a **folder picker** browsing the
-server; both are pre-filled with two subfolders of the daemon's own directory —
-`download`/its word in the chosen language and `download-temp` — ready to accept
-or change), peer port with a reachability test, global bandwidth limits, user and
-password, LAN access and optional indexers. Choosing Prowlarr or Jackett fills
-the indexer URL with its usual local address and port (still editable); any
-other Torznab service is added as a custom type. The page links to
-**RSS & indexers**, where the *Wanted* list (the titles to look for, searched
-across the indexers and the configured feeds, with the missing episodes fetched
-again) and the feeds, rules and indexers are managed without hand-editing JSON —
-to the **Archive** of everything the feeds found, and to **Settings**, the client panel: folders,
-network and ports, IP filter, protocols (encryption, DHT/uTP/LSD…), queue and
-cache, one-click optimization, bandwidth and the daily scheduler, language and
-notifications. On a desktop session the browser opens on the wizard
-by itself; on a headless server or a Windows service the log prints the address
-to open.
-
-The full reference (flags, `settings.json`, API, platform notes) is the
-[gx-torrent technical document](docs/gx-torrent.md) (Italian).
+Open `http://<host>:8890/` for the setup wizard (language, folders with a
+server-side picker, port test, limits, login, indexers); it prints the
+address to open at startup. Full reference: the [gx-torrent technical
+document](docs/gx-torrent.md) (Italian).
 
 ## First safe run
 
 1. Open `http://<server>:5000`: the first visit starts the **setup wizard**
-   (password, folders with a permission check, indexer and TMDB, first title,
-   activation). You can skip it and reopen it from `/?view=setup`.
-2. Configure storage paths, one source, and TMDB/TVDB credentials if needed.
-3. Keep **dry-run** enabled; add one test title and run a manual search or
-   cycle.
-4. Check **Health** and **Logs**, including filesystem permissions and source
-   results.
-5. Enable active mode only after the outcome is correct.
+   (password, folders with permission check, indexer and TMDB, first title,
+   activation). Skippable, reopenable at `/?view=setup`.
+2. Set storage paths, one source, and TMDB/TVDB credentials if needed.
+3. Keep **dry-run** on; add one test title and run a manual search or cycle.
+4. Check **Health** and **Logs**, including permissions and source results.
+5. Enable active mode only when the outcome is correct.
 
-The detailed setup checklist, NAS guidance and troubleshooting are in the
-[user manual](docs/MANUAL.en.md).
+NAS setup and troubleshooting: the [user manual](docs/MANUAL.en.md).
 
 ## Update and uninstall
 
-With the official installation, when a new version is published an **Update
-available** button appears above **Donate**: *Maintenance → Updates* shows the
-installed version, what changed (the commits) and an **Update now** button. A
-database backup is taken first; if the new version does not start, the previous
-one comes back by itself. The check (a small request to GitHub every 6 hours)
-can be turned off in *Configuration → System → Updates*.
+With the official install, an **Update available** button appears above
+**Donate** when a release is published: *Maintenance → Updates* shows the
+installed version, the changes, and an **Update now** button. A database
+backup is taken first; if the new version fails to start, the previous one is
+restored automatically. The check (a small GitHub request every 6 hours) can
+be disabled in *Configuration → System → Updates*.
 
-Alternatively, run the installer again. It verifies the release
-checksum when published, replaces the binary atomically, restarts the service
-and, if the new version fails to start, rolls back to the previous one. Data and
-configuration are left untouched.
+Or re-run the installer: it verifies the checksum, replaces the binary
+atomically, restarts the service, and rolls back on failure. Data and
+configuration are untouched.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
-
-The installer also accepts these options:
 
 ```bash
 sudo bash install.sh --help       # all options
@@ -385,10 +373,8 @@ sudo bash install.sh --uninstall --purge   # also remove the data directory
 ```
 
 Environment overrides (`GEXTTO_DATA_DIR`, `GEXTTO_PORT`, `GEXTTO_USER`, …) stay
-supported. `GEXTTO_LOCAL_ARCHIVE=/path/gextto-linux-x86_64.tar.gz` installs from
-a local payload (offline or CI).
-
-For a source checkout:
+supported. `GEXTTO_LOCAL_ARCHIVE=/path/gextto-linux-x86_64.tar.gz` installs
+from a local payload (offline or CI). From a source checkout:
 
 ```bash
 git pull --ff-only
@@ -396,16 +382,14 @@ git pull --ff-only
 curl -fsS http://127.0.0.1:5000/api/health
 ```
 
-The source update script runs the versioned build, restarts the detected
-service and leaves the data directory and configuration untouched. Use
-`./scripts/update.sh --no-restart` when the restart must be performed manually.
+(`--no-restart` leaves the restart to you.)
 
 ## Accessibility
 
-The web UI includes keyboard navigation, accessible names for controls, focus
-management in dialogs, semantic sortable tables, live announcements for dynamic
-updates, responsive reflow and improved light-theme contrast. Accessibility
-regressions are checked with axe-core and Playwright:
+The web UI offers keyboard navigation, accessible control names, dialog focus
+management, semantic sortable tables, live announcements, responsive reflow
+and improved light-theme contrast. Regressions are covered by axe-core and
+Playwright:
 
 ```bash
 cd uiweb/end2end
@@ -413,11 +397,10 @@ npm ci
 npm run test:a11y
 ```
 
-The current automated suite covers the main UI sections with 13 accessibility
-tests. This is not, by itself, a legal accessibility certification: manual
-screen-reader, keyboard and assistive-technology testing is still required.
-See the [accessibility analysis](docs/evoluzione.md#13-accessibility) for scope and known
-limitations.
+The suite currently covers the main sections with 13 tests. That is not a
+legal certification: manual screen-reader, keyboard and assistive-technology
+testing is still required. Scope and limits:
+[accessibility analysis](docs/evoluzione.md#8-accessibility).
 
 ## Documentation
 
@@ -431,37 +414,36 @@ limitations.
 | gx-torrent engine and standalone client | [gx-torrent technical document](docs/gx-torrent.md) (Italian) |
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |
-| Accessibility scope and testing | [Accessibility analysis](docs/evoluzione.md#13-accessibility) |
+| Accessibility scope and testing | [Accessibility analysis](docs/evoluzione.md#8-accessibility) |
 
-For the full documentation tree, start from the [documentation index](docs/README.md).
+Full tree: the [documentation index](docs/README.md).
 
 ## Support the project
 
-If Gextto is useful to you and you would like to support its development, you
-can make a contribution via PayPal. Thank you! A **Donate** button is also
-always visible in the UI, at the bottom right.
+If Gextto is useful and you would like to support its development, a PayPal
+donation is welcome — thank you. A **Donate** button is also always visible in
+the UI, bottom right.
 
 [![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-0070BA.svg?logo=paypal)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project)
 
-## ⚖️ Legal & fair use
+## Legal and fair use
 
-Gextto is a **download automation tool**. It does not host, index, or distribute
-any copyrighted content.
+Gextto is a **download automation tool**. It does not host, index or
+distribute any copyrighted content.
 
-- Gextto connects to **indexers you configure** (Jackett, Prowlarr, public RSS
-  feeds). It has no built-in index.
-- What you download is **entirely your responsibility**. Use Gextto only for
-  content you have the right to access — public domain, Creative Commons, or
-  media you own.
-- BitTorrent, and the engines Gextto drives, are a neutral technology. Gextto does not
-  encourage or facilitate piracy.
-- This project is released under the **EUPL 1.2** open-source license.
-
-> *"With great automation comes great responsibility."*
+- It connects to **indexers you configure** (Jackett, Prowlarr, public RSS
+  feeds). It ships no index of its own.
+- What you download is **your responsibility**. Use Gextto only for content
+  you have the right to access — public domain, Creative Commons, or media
+  you own.
+- BitTorrent and the engines Gextto drives are neutral technology; this
+  project does not encourage or facilitate piracy.
+- Released under the **EUPL 1.2** open-source licence.
 
 ## License
 
-Gextto is licensed under the [EUPL-1.2](LICENSE). The engine core (`gx-core`, `internal/gxcore`) and the DHT (`internal/dht`) are our own code, so they carry the same EUPL-1.2 licence. See
-[THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES) for the copyright notices and licence
-texts of the third-party libraries Gextto links (also shown on the
-*Licence* page of the web interface).
+Gextto is licensed under the [EUPL-1.2](LICENSE). The engine core (`gx-core`,
+`internal/gxcore`) and the DHT (`internal/dht`) are original code in this
+repository under the same licence. See [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES)
+for the copyright and licence texts of linked third-party libraries (also on
+the web UI *Licence* page).
