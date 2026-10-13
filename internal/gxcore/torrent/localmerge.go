@@ -396,20 +396,20 @@ const maxV1VerifyFailures = 64
 // v1FilesMatch reports whether two v1 torrents share a file of the same path
 // and length: the metadata identity a cross-layout v1 reuse starts from. It is
 // a heuristic (the content is checked per piece before writing), unlike the
-// cryptographic per-file Merkle root of v2.
+// cryptographic per-file Merkle root of v2. A nested scan instead of a map
+// keeps the merge candidate filter allocation-free on the one-shot paths.
 func v1FilesMatch(a, b *metainfo.Info) bool {
-	bl := make(map[string]int64, len(b.Files))
-	for i := range b.Files {
-		if !b.Files[i].Padding {
-			bl[b.Files[i].Path] = b.Files[i].Length
-		}
-	}
 	for i := range a.Files {
 		if a.Files[i].Padding {
 			continue
 		}
-		if length, ok := bl[a.Files[i].Path]; ok && length == a.Files[i].Length {
-			return true
+		for j := range b.Files {
+			if b.Files[j].Padding {
+				continue
+			}
+			if a.Files[i].Path == b.Files[j].Path && a.Files[i].Length == b.Files[j].Length {
+				return true
+			}
 		}
 	}
 	return false
