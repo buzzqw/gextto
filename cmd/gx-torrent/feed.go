@@ -217,12 +217,16 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 			continue
 		}
 		search := strings.TrimSpace(feed.Search)
+		dht := isDHTFeed(feed.URL)
 		if strings.TrimSpace(feed.URL) == "" && search == "" {
 			continue
 		}
 		source := feed.URL
-		if search != "" {
+		switch {
+		case search != "":
 			source = "search:" + search
+		case dht:
+			source = feed.URL // dht://… is its own source label
 		}
 		name := feed.Name
 		if name == "" {
@@ -231,13 +235,18 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 		timeout := feedRequestTimeout
 		if search != "" {
 			timeout = indexerSearchTimeout
+		} else if dht {
+			timeout = dhtFeedTimeout
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		var items []rss.Item
 		var err error
-		if search != "" {
+		switch {
+		case dht:
+			items, err = d.fetchDHTFeedItems(feed.URL)
+		case search != "":
 			items, err = d.searchFeed(ctx, name, search)
-		} else {
+		default:
 			items, err = d.fetchFeedItems(ctx, client, feed.URL, name)
 		}
 		cancel()

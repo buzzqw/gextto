@@ -66,6 +66,12 @@ func validIndexerURL(raw string) bool {
 	return parsed.Host != ""
 }
 
+// validFeedURL reports whether raw is a usable feed source: an absolute http(s)
+// URL, or a BEP 46 DHT feed (dht://<pubkey-hex>[?salt=<hex>]).
+func validFeedURL(raw string) bool {
+	return validIndexerURL(raw) || isDHTFeed(raw)
+}
+
 // saveIndexers/feeds persist one settings array, reporting a user-facing error.
 func (d *Daemon) saveIndexers(list []torznab.Indexer) error {
 	raw, err := json.Marshal(list)
@@ -246,8 +252,8 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 			d.renderRSS(w, r, "Give the feed an RSS URL.")
 			return
 		}
-		if feed.URL != "" && !validIndexerURL(feed.URL) {
-			d.renderRSS(w, r, "The feed URL must start with http:// or https://.")
+		if feed.URL != "" && !validFeedURL(feed.URL) {
+			d.renderRSS(w, r, "The feed URL must start with http://, https:// or dht://.")
 			return
 		}
 		if index, err := parseFormIndex(r.FormValue("index")); err == nil && index >= 0 {

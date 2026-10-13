@@ -40,6 +40,7 @@ func (d *Daemon) routes() http.Handler {
 	api.HandleFunc("GET /api/v1/config", d.handleGetConfig)
 	api.HandleFunc("POST /api/v1/config", d.handleSetConfig)
 	api.HandleFunc("POST /api/v1/create-torrent", d.handleCreateTorrent)
+	api.HandleFunc("GET /api/v1/dht-feed", d.handleDHTFeed)
 
 	root := http.NewServeMux()
 	// The API keeps the token middleware; the read-only page below is served

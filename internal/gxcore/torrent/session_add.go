@@ -416,19 +416,100 @@ func resolvePeers(peers []string) []*net.TCPAddr {
 // bep46ResolveTimeout bounds the DHT lookup of a BEP 46 magnet.
 const bep46ResolveTimeout = 8 * time.Second
 
-// bep46InfoHash extracts the 20-byte binary "ih" from a BEP 46 item value.
+// bep46InfoHash extracts the 20-byte binary "ih" from a BEP 46 item value
+// (the single-torrent form, or the first item of a feed).
 func bep46InfoHash(value interface{}) ([20]byte, error) {
+	items, err := bep46Feed(value)
+	if err != nil {
+		return [20]byte{}, err
+	}
+	if len(items) == 0 {
+		return [20]byte{}, errors.New("BEP 46: the DHT item lists no torrent")
+	}
+	return items[0].InfoHash, nil
+}
+
+// DHTFeedItem is one entry of a BEP 46 feed: a torrent's info hash and an
+// optional display name.
+type DHTFeedItem struct {
+	InfoHash [20]byte
+	Name     string
+}
+
+// bep46Feed decodes a BEP 46 mutable item value into a list of torrents. It
+// accepts both the original single-torrent form ({"ih": <20 bytes>}) and a
+// feed ({"items": [{"ih": <20 bytes>, "name": "..."}, ...]}), so a magnet's
+// "xs=urn:btpk:" keeps working and the same key can also carry a subscription
+// channel. The value is untrusted: an entry without a 20-byte "ih" is skipped.
+func bep46Feed(value interface{}) ([]DHTFeedItem, error) {
 	m, ok := value.(map[string]interface{})
 	if !ok {
-		return [20]byte{}, errors.New("BEP 46: the DHT item value is not a dictionary")
+		return nil, errors.New("BEP 46: the DHT item value is not a dictionary")
 	}
-	ih, ok := m["ih"].(string)
+	if ih, ok := m["ih"]; ok {
+		item, err := bep46FeedItem(ih, m["name"])
+		if err != nil {
+			return nil, err
+		}
+		return []DHTFeedItem{item}, nil
+	}
+	raw, ok := m["items"].([]interface{})
+	if !ok {
+		return nil, errors.New("BEP 46: the DHT item has no \"ih\" and no \"items\"")
+	}
+	items := make([]DHTFeedItem, 0, len(raw))
+	for _, e := range raw {
+		em, ok := e.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		item, err := bep46FeedItem(em["ih"], em["name"])
+		if err != nil {
+			continue // one malformed entry must not drop the whole feed
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+// bep46FeedItem validates one feed entry.
+func bep46FeedItem(rawIH, rawName interface{}) (DHTFeedItem, error) {
+	ih, ok := rawIH.(string)
 	if !ok || len(ih) != 20 {
-		return [20]byte{}, errors.New("BEP 46: the DHT item has no 20-byte \"ih\"")
+		return DHTFeedItem{}, errors.New("BEP 46: an item has no 20-byte \"ih\"")
 	}
-	var h [20]byte
-	copy(h[:], ih)
-	return h, nil
+	var item DHTFeedItem
+	copy(item.InfoHash[:], ih)
+	if name, ok := rawName.(string); ok {
+		item.Name = name
+	}
+	return item, nil
+}
+
+// ResolveDHTFeed fetches a BEP 46 feed (the mutable item addressed by the given
+// ed25519 key and optional salt) from the DHT and returns its torrents. It
+// requires an enabled DHT; seq, when non-nil, is our last seen sequence (the
+// responder may then answer without the value). The DHT client verifies the
+// signature before the value is accepted.
+func (s *Session) ResolveDHTFeed(pub ed25519.PublicKey, salt []byte, seq *int64, timeout time.Duration) ([]DHTFeedItem, int64, error) {
+	if s.dht == nil {
+		return nil, 0, errors.New("the DHT is disabled")
+	}
+	if len(pub) != ed25519.PublicKeySize {
+		return nil, 0, errors.New("BEP 46: invalid ed25519 public key")
+	}
+	if timeout <= 0 {
+		timeout = bep46ResolveTimeout
+	}
+	item, err := s.dht.GetMutable(pub, salt, seq, timeout)
+	if err != nil {
+		return nil, 0, fmt.Errorf("BEP 46: cannot resolve the DHT item: %w", err)
+	}
+	items, err := bep46Feed(item.Value)
+	if err != nil {
+		return nil, item.Seq, err
+	}
+	return items, item.Seq, nil
 }
 
 // add reserves an id, a port and the storage for a new torrent, unwinding
