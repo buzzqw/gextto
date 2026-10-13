@@ -181,7 +181,7 @@ dragging all of Gextto along. They have been **extracted into `internal/rss` and
   choking (deterministic bench, §6), reader with readahead for streaming (**done**),
   **graduated file priority (done, §4.5)** and disk I/O (**opt-in mmap + batched
   durability done, §5; contiguous writes not necessary without measurements**). These are
-  "cherry-picks" (§11), not blockers.
+  "cherry-picks" (§4.3), not blockers.
 
 ---
 
@@ -435,7 +435,7 @@ to be verified against the libraries' code before each porting.
 | 5 | BitTorrent v2 and hybrids | anacrolix | v2-only torrents already in circulation; merkle per file is needed | high |
 | 6 | Rate-based choking and anti-leech | libtorrent | seeding quality; to be validated with the `unchoker/sim_test.go` harness | medium |
 | 7 | Disk I/O: writing in contiguous blocks, hashing on a pool | libtorrent | CPU and disk wear on slow NAS | **mmap + `fdatasync` done (§5 of `evoluzione.md`); contiguous/pool hashing not necessary without measurements** |
-| 8 | Share mode | libtorrent | already discarded for Gextto (§4.1, decision 2); for the standalone it counts as an option | low |
+| 8 | Share mode | libtorrent | already discarded for Gextto (§4.1: share mode skipped); for the standalone it counts as an option | low |
 | 9 | WebTorrent | anacrolix | niche | high |
 
 **Agreed shortlist (2026-10-10) for taking from anacrolix:** reader with
@@ -494,9 +494,9 @@ points:
 | F4 — IPv6: dual-stack sockets (TCP peer + UDP uTP/DHT), v6 resolution and addresses, tracker compact **`peers6`** (BEP 7), **PEX `added6`/`dropped6`** (BEP 11), v6 **UDP** trackers, `yourip` v6, v6 CIDR **blocklist**, **v6 DHT discovery** (BEP 32: library dual-stack, `want`, split `nodes`/`nodes6`) | §14, §4.1 | done (LSD v6 included) |
 | F4 — BitTorrent v2 (BEP 52) | §11, §4.1 | **Done**: v2-only from `.torrent` and from **magnet** (`urn:btmh:`). v2 parsing, **per-file pieces** model (shorter queue), verification via SHA-256 **Merkle node**, identity truncated to 20 bytes, v2 reserved bit in the handshake, fetch of `piece layers` from peers with `hash request`/`hashes`/`hash reject`, end-to-end seed/leech tests (`.torrent` and magnet) |
 | F0 — opt-in RSS/CPU harness against qbittorrent-nox | §8.2 | done (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
-| F2 — bandwidth scheduler (alternative limits by schedule) | §14.3 | done |
-| F2 — torrent table virtualisation | §14.3 | done (rendering window `?rows=` + *Show more*) |
-| F4 — smart ban (bans the peer that sends blocks of a failed piece) | §14.4 | done (base in the engine + extension: session ban with expiry) |
+| F2 — bandwidth scheduler (alternative limits by schedule) | §12 | done |
+| F2 — torrent table virtualisation | §12 | done (rendering window `?rows=` + *Show more*) |
+| F4 — smart ban (bans the peer that sends blocks of a failed piece) | §12 | done (base in the engine + extension: session ban with expiry) |
 | F2 — complete RSS manager (ordered PASS/FAIL rules, numeric filters, smart-episode, actions, pages `/ui/rss` and `/ui/wanted`, webhook notifications on match/error) | §12.2 | done |
 | F2 — guided RSS/UI: feed editor (only name and source URL, without series/filter parameters that live in *Wanted* and rules) and indexers with presets (`ui_rss_edit.go`, `uiIndexerPresets`), ordered rules with up/down/disable, `episode_filter` in qBittorrent style (`internal/rss/episode_filter.go`), `ignore_days` cooldown (`internal/rss/rules.go`), smart-episode REPACK/PROPER (`cmd/gx-torrent/feed.go`), **Wanted list & page `/ui/wanted`** with quality dropdown, episode log, gap search and instant on-demand search (`cmd/gx-torrent/wanted.go`; suggestions `GET /ui/rss-suggest`/`GET /ui/wanted-search`), **Check feeds** button with real-time feedback, page `/ui/settings` (folders, network and ports, protocols, queue and cache, bandwidth, scheduler, language, notifications), folder selector `/ui/browse-dir` in the wizard | §12.2 | done |
 | CI — publish the standalone gx-torrent (artefact/release usable as qbittorrent-nox) | §12.3 | done |

@@ -163,7 +163,7 @@ func recordReflected(raw string, observerIP net.IP) {
 
 // Routing-table composition, recomputed periodically by the run loop and read
 // by Stats(). Used to make Sybil concentration visible before deciding whether
-// to enforce a cap (see docs/evoluzione.md 4.10).
+// to enforce a cap (see docs/evoluzione.md §4.4).
 var (
 	subnetShareMax  atomic.Int64
 	nodesInsecureID atomic.Int64

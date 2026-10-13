@@ -120,32 +120,7 @@ render appears on the next render (no stale cache).
 - **Cache cap on slow storage (NFS)** — superseded: the cache self-regulates
   (`cmd/gx-torrent/cache.go`, tuner `cacheSizes`).
 
-### 1.4 UI/i18n micro-optimisations (done, measured on 2026-10-10)
-
-Follow-up to commits `06c9128`/`6cf568e`/`7f43b44`. None of them is a bottleneck:
-they are to be taken only as refinements, with the numbers below.
-
-| # | Item | Measurement (local disk, `CGO_ENABLED=0 go test`) | Expected gain |
-|---|---|---|---|
-| 1 | Writability probe in the chrome | `stat`+`write_probe` (create+fsync+delete): **~15.6 µs/op** (200 iterations); whole `uiShellChromeFrom` **~164 µs/op** → the probe is ~10% of the chrome under test | ~15 µs/render, no fsync per render; on an NFS datadir it would be worth milliseconds |
-| 2 | Dictionary cache identity test | reuse confirmed: two `Dictionary("de")` = **same pointer** | test quality only, no runtime effect |
-| 3 | i18n client memo for `AppState` | **+1 entry per state**, ~**2.4 KB/entry** (20 states → 20 entries, 47,240 bytes) | nil in production (1 entry); cleanup only for tests |
-
-1. **Writability probe cached in the chrome. Done.** `uiShellChromeFrom` now
-   uses `dataDirWritable` (`uiweb_shell.go`), which reuses the outcome for
-   `dataDirWritableTTL` (30 s): no `create+fsync+delete` on every page,
-   partial and SSE tick. Test `TestDataDirWritableCache` (reuse within the TTL,
-   recomputation after).
-2. **Dictionary cache identity test. Done.**
-   `TestDictionaryCacheAndInvalidate` compares identity with
-   `reflect.ValueOf(first).Pointer() == reflect.ValueOf(second).Pointer()`: a
-   rebuild on every call now fails.
-3. **Cleanup of `v2ClientI18nMemo`. Done.** `resetV2ClientI18nMemo()`
-   (`uiweb_v2_client_i18n.go`) empties the cache; `newTestAppState` calls it, so
-   tests do not accumulate entries (in production only one remains). Test
-   `TestV2ClientI18nMemoIsReset`.
-
-### 1.5 Engine presented as our own code (done)
+### 1.4 Engine presented as our own code (done)
 
 **Rule.** gx-core is our engine and we present it as such: the
 documentation does not advertise the origin of the code. The only attribution is
@@ -198,7 +173,7 @@ behaviour-equivalent (the bucket keeps the same refill/debt semantics, the id
 keeps unique-and-well-formed); their tests (`torrent_id_test.go`) and the full
 suite are green.
 
-### 1.6 In-depth performance check (CPU and RAM)
+### 1.5 In-depth performance check (CPU and RAM)
 
 **Point.** Periodically carry out an in-depth performance check
 of the application and the engine, optimising CPU and RAM. Constraint: every
@@ -210,7 +185,7 @@ footprint of the daemon and of `gx-torrent` (RSS, goroutines, allocations),
 `make measure-seeding` for seeding. Record the numbers here.
 
 **First round (2026-10-11, Intel N97).** Network identity and dependencies
-replaced with our own code (§1.5) with no regressions. Optimisation
+replaced with our own code (§1.4) with no regressions. Optimisation
 applied: the engine logger discards records below the handler threshold
 **before** formatting them, so at WARNING (normal daemon use) the
 `Debugf`/`Infof` calls on the hot paths no longer allocate the message. Micro-benchmark
@@ -270,7 +245,7 @@ seeding or download throughput.
 
 **Sixth round (2026-10-13, Intel N97) — original engine rewrite and dependency
 decoupling.** The full in-tree rewrite of `internal/gxcore`/`internal/dht` and
-the `own-deps` replacements (§1.5) were compared with `benchstat` against the
+the `own-deps` replacements (§1.4) were compared with `benchstat` against the
 pre-merge `main` (`57d0a89`), over the **54 engine benchmarks**, `-count=6`:
 
 | Benchmark | before | after | delta |
@@ -623,7 +598,7 @@ with a routing table as a bucket-less binary tree; compared with Tixati the gap 
 | Disk I/O | `O_SYNC` removed, `fdatasync`, mmap opt-in | O_DIRECT/io_uring/contiguous writes absent (not justified by a measurement) |
 | File priority | graduated 0–7 | closed (residual measurement) |
 | DHT | BEP 5/32/33/42/43/44/46, dedup | hardening not active, multi-path unproven |
-| v2 / merge | v2 download, merge phases 1–2 | v2 seed only whole files (`hash reject`); per-block reuse is a plan (§9.2) |
+| v2 / merge | v2 download, merge phases 1–3 (§9.2, §10.1) | v2 seed serves block-layer hashes only for whole files (`hash reject` otherwise) |
 | Adversarial robustness | snub, session ban with TTL, IP filter | less battle-tested than libtorrent |
 
 Out of scope by choice (in `bep.md`): BEP 8/17/18/22/26/28/30/34/35/45/50/51,
@@ -792,27 +767,12 @@ So the adaptive queue plus multi-piece roughly doubles the throughput at RTT
 The write ring buffer (§10.3) is what keeps the disk from becoming the new
 bottleneck while more pieces are in flight.
 
-**Correction (2026-10-13, commit `afc65f8`).** The `shallow` ×1.97 above was an
-artifact: `RequestBlocks` capped each piece's *own* pending count, so with two
-pieces a peer kept up to 2×`MaxRequestsOut` requests in flight (2 at max=1). Now
-the budget is shared for real (pending requests are subtracted first) and the
-extra piece opens only when the window has room its pieces cannot fill
-(`pipeHasRoom`). Same harness, two runs each, before (`f99cfe8`) → after:
-
-| Profile | before | after |
-| --- | --- | --- |
-| `shallow` def=1/max=1 | 590–594 KiB/s | 301 KiB/s (window of 1 respected again) |
-| `default` def=50/max=250 | 6739–6776 KiB/s | 6733–6752 KiB/s (equivalent) |
-
-Peak RSS of the harness process 32.2 → 33.7–34.2 MiB (the `shallow` run lasts
-twice as long); `measure-seeding` (4 leechers) identical (seeder 1.00x corpus,
-RSS 32.6 → 32.5 MiB, CPU 6.3 → 6.4 s; the loopback mesh completes only one
-leecher in both runs, the known instability above). Benchmarks `piecepicker` and
-`filestorage` (`-count=3`, incl. `MmapSyncRanged` after the `markDirty` change)
-within noise, 0 new allocations.
-**Choking** is isolated by the deterministic bench (`internal/unchoker/sim_test.go`,
-in `make test-engine`), which drives the real `Unchoker` with synthetic peers and fixes
-fairness, slots and optimistic rotation; the end-to-end seed is in §6.4/§6.6.
+**Follow-up `afc65f8`.** The ×1.97 above was an artifact (per-piece caps let a
+peer hold 2× the window); the budget is now shared across a peer's pieces and
+the extra piece opens only when the window has room (`pipeHasRoom`), one queued
+RAM request per peer, endgame duplicates cancelled on write (see §10.3).
+Corrected numbers: `shallow` 301 KiB/s (window of 1 respected),
+`default` ~6.75 MiB/s, RAM/CPU equivalent.
 
 Seeder + N leechers on loopback with distinct `127.0.0.x` IPs (the engine refuses two
 connections from the same IP). Default: every leecher only towards the seeder — the
@@ -883,15 +843,10 @@ bottleneck compared with libtorrent at this load. The isolation of the two
 algorithms is in §6.4 (in-process latency proxy for pipelining, deterministic
 bench for choking); real `tc netem` is not needed.
 
-**DHT cold start — improved (2026-10-12).** The same torrent **without
-trackers** (DHT only from the magnet) was resolved after **~75 s**: the cause was
-`DHTMinAnnounceInterval` at **1 minute**, used as the retry interval
-while the torrent looks for peers (the announce starts immediately, then waits this
-interval). Brought to **15 s**. The same test now obtains the metadata in
-**~49 s** with 12 peers (before ~75 s, 2 peers). The remaining time is the filling
-of the DHT routing table (~30 s cold), not the lookup: the `internal/dht` harness
-finds ~108 peers for the same infohash in ~30 s. The cold DHT is
-therefore not broken, it was **slow to retry**.
+**DHT cold start.** The peer-search retry while a torrent looks for peers uses a
+**15 s** interval (`DHTMinAnnounceInterval`); the Ubuntu torrent over DHT-only
+resolves its metadata in ~49 s with 12 peers. The remaining time is the
+routing-table fill (~30 s cold), not the lookup.
 
 ---
 
@@ -990,9 +945,9 @@ usable for tables/tabs/progress/errors; no regression on desktop and mobile.
 
 Ex comparative analysis with **BiglyBT** (Java client, heir of Azureus/Vuze). The
 majority of its capabilities are **application-level or historical** (chat/friends, Vuze
-DDB, media server, plugins, WebTorrent) and must not be ported. Only two
-truly interesting *core* functions remain for gx-core: both are **backlog**, not
-work done; here is the plan, with the hooks already present in the code.
+DDB, media server, plugins, WebTorrent) and must not be ported. Two *core*
+functions were worth porting; both are **done**, with the plan and the
+measurements kept below as the record.
 
 ### 9.1 Ping-Based Auto-Speed (anti-bufferbloat) — done
 
@@ -1136,14 +1091,13 @@ here; the implemented ones are dated, the others are a proposal to be agreed.
 | 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.6 | high | high | **done (2026-10-13)**: write ring buffer + 2 pieces per peer; measured ×1.75 (3.85→6.76 MiB/s at RTT 50 ms; window-sharing fix in `afc65f8`), details in §6.4/§10.3 |
 | 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | the fuzzing pass | medium/high | low | **done (2026-10-13, extended)**: `internal/utils/utils.go` (length bounded, recursion depth ≤64) and `internal/dht/bencode.go` `validBencode` cover DHT packets; a shared `internal/gxcore/internal/bencodecheck` now screens every engine path that hands untrusted bytes to zeebo/bencode — which allocates a declared string length up front — so a tiny crafted input cannot ask for gigabytes and OOM-kill the daemon: the `.torrent`/file-tree/piece-layer parsers (`metainfo`), the BEP 10 extension messages (`peerprotocol`) and the HTTP/UDP tracker replies (`httptracker`, `udptracker`). The fuzzer found it in `metainfo` and `httptracker` |
 | 10 | Merge: **no double verification** — the pieces the merge just re-verified are handed to the verifier as already done | Phase 2 analysis | medium (no re-read and re-hash of the reused bytes) | low | **done (2026-10-13)**: `Verifier.Skip`, cleared after the allocation-time check |
-| 11 | Merge **off the run loop**: the copy ran synchronously in the torrent goroutine, so `Stats`/`Stop` and every command on that torrent hung for the whole merge (minutes for tens of GB, the daemon API with them) | review of the night commits | high | low | **done (2026-10-13)**: `mergeCandidates` (no I/O) in the run loop, the copy in `Verifier.Prepare` (cancellable, snapshot of the deselected pieces) |
-| 12 | Merge on **empty storage**: the verifier hashed every non-merged piece of files just created (holes) | same review | medium (no read+SHA-1 of the whole torrent after a partial merge) | low | **done (2026-10-13)**: `Verifier.Only` restricts the check to the merged pieces when no file existed |
-| 13 | **Word-wise interest** and deselected files: `updateInterestedState` scanned the bitfield bit by bit for every peer at every completed piece, and pieces of deselected files made a peer interesting | same review | high (run-loop CPU on large torrents) | low | **done (2026-10-13)**: `HasAnyOutside` + `skipBits`, 231 → 2.8 µs per peer on 100k pieces (×80), 0 alloc |
-| 14 | **Smarter eviction**: a partial seed kept peers that only had deselected pieces, and a fresh connection could be dropped as useless at the next tick and redialled (churn) | same review | medium | low | **done (2026-10-13)**: `peerUseful` uses the wanted set, keeps only interested peers when seeding, 30 s grace (`newPeerGrace`) |
-| 15 | DHT multi-path **per subnet**: the confirmation counted reporters per address, so a Sybil host or /24 confirmed its own peers | same review | medium (the §10.2 datum was inflatable) | low | **done (2026-10-13)**: `reporterKey` |
-| 16 | **mmap fault guard**: with `-mmap`, a full disk or a truncated file raised SIGBUS and crashed the whole daemon | same review | high for `-mmap` users | low | **done (2026-10-13)**: `recoverFault`, I/O error on the torrent; write bench equivalent (36.3–38.0 → 35.9–37.5 µs), 0 alloc |
-| 17 | **Disk guard** in gx-torrent: downloads on a folder below the free-space threshold pause and resume by themselves, seeding goes on (Gextto only refused to *start* downloads) | user request after the review | high (no write errors, no torrents in error on a full disk) | low | **done (2026-10-13)**: `diskguard.go`, `min_free_mb` (default 1 GiB), daemon setting + badge, pushed from Gextto's `min_free_space_gb` |
-| 18 | **Wanted state hygiene**: the per-title search timestamps of removed titles stayed in the state file forever | same | low | low | **done (2026-10-13)**: `pruneWantedTimers` (the taken ledger is kept, so a re-added title is not downloaded again) |
+| 11 | Merge **off the run loop**: the copy ran synchronously in the torrent goroutine, so `Stats`/`Stop` and every command on that torrent hung for the whole merge (minutes for tens of GB, the daemon API with them) | merge blocked the run loop | high | low | **done (2026-10-13)**: `mergeCandidates` (no I/O) in the run loop, the copy in `Verifier.Prepare` (cancellable, snapshot of the deselected pieces) |
+| 12 | Merge on **empty storage**: the verifier hashed every non-merged piece of files just created (holes) | partial merge re-hashed holes | medium (no read+SHA-1 of the whole torrent after a partial merge) | low | **done (2026-10-13)**: `Verifier.Only` restricts the check to the merged pieces when no file existed |
+| 13 | **Word-wise interest** and deselected files: `updateInterestedState` scanned the bitfield bit by bit for every peer at every completed piece, and pieces of deselected files made a peer interesting | bit-by-bit interest scan | high (run-loop CPU on large torrents) | low | **done (2026-10-13)**: `HasAnyOutside` + `skipBits`, 231 → 2.8 µs per peer on 100k pieces (×80), 0 alloc |
+| 14 | **Smarter eviction**: a partial seed kept peers that only had deselected pieces, and a fresh connection could be dropped as useless at the next tick and redialled (churn) | useless-peer churn | medium | low | **done (2026-10-13)**: `peerUseful` uses the wanted set, keeps only interested peers when seeding, 30 s grace (`newPeerGrace`) |
+| 15 | **mmap fault guard**: with `-mmap`, a full disk or a truncated file raised SIGBUS and crashed the whole daemon | SIGBUS crash under `-mmap` | high for `-mmap` users | low | **done (2026-10-13)**: `recoverFault`, I/O error on the torrent; write bench equivalent (36.3–38.0 → 35.9–37.5 µs), 0 alloc |
+| 16 | **Disk guard** in gx-torrent: downloads on a folder below the free-space threshold pause and resume by themselves, seeding goes on (Gextto only refused to *start* downloads) | user request | high (no write errors, no torrents in error on a full disk) | low | **done (2026-10-13)**: `diskguard.go`, `min_free_mb` (default 1 GiB), daemon setting + badge, pushed from Gextto's `min_free_space_gb` |
+| 17 | **Wanted state hygiene**: the per-title search timestamps of removed titles stayed in the state file forever | state-file growth | low | low | **done (2026-10-13)**: `pruneWantedTimers` (the taken ledger is kept, so a re-added title is not downloaded again) |
 
 The criterion is the same as §4.8/§9.3: one item = one commit, measurement
 before/after for anything on a data path, both UIs and i18n for anything visible

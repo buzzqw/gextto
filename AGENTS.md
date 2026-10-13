@@ -285,6 +285,11 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   tabelle di stato, capacità e conteggi (righe, test, versioni, percorsi) vanno
   riallineati quando cambiano. Vale anche per il lavoro non visibile all'utente
   (motore, coda, DHT, storage): quei documenti sono il posto dove resta tracciato.
+- **`docs/evoluzione.md` tiene traccia delle evoluzioni, non dei bug.** Il documento
+  registra backlog, migliorie realizzate e misure (passato e futuro del prodotto):
+  i bug risolti restano nella storia git, non nel documento. Niente cronache di
+  fix, log di review per-commit o dettagli superati dal codice: solo cosa è
+  previsto, cosa è stato fatto per far evolvere il prodotto e i numeri misurati.
 - Quando aggiungi o sposti documenti, aggiorna l'indice `docs/README.md`.
 
 ## Accessibilità dell'interfaccia
