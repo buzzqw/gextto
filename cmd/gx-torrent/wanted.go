@@ -502,6 +502,38 @@ func formatEpisodeRanges(eps []wantedEpisode, max int) string {
 	return out
 }
 
+// formatHaveEpisodes renders what the operator has for a series: a season with
+// no missing episode collapses to its season alone ("S01"), a season with gaps
+// lists the downloaded episodes ("S03E01–E03"). It reads taken (all the episodes
+// downloaded) and missing (seen but not downloaded) so a season is "collapsed"
+// only when nothing seen for it is missing.
+func formatHaveEpisodes(taken, missing []wantedEpisode, max int) string {
+	missingSeason := map[int]bool{}
+	for _, ep := range missing {
+		missingSeason[ep.season] = true
+	}
+	bySeason := map[int][]wantedEpisode{}
+	var seasons []int
+	for _, ep := range taken {
+		if _, ok := bySeason[ep.season]; !ok {
+			seasons = append(seasons, ep.season)
+		}
+		bySeason[ep.season] = append(bySeason[ep.season], ep)
+	}
+	sort.Ints(seasons)
+	parts := make([]string, 0, len(seasons))
+	for _, season := range seasons {
+		if !missingSeason[season] {
+			parts = append(parts, fmt.Sprintf("S%02d", season))
+			continue
+		}
+		if ranges := formatEpisodeRanges(bySeason[season], max); ranges != "" {
+			parts = append(parts, ranges)
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
 // wantedMissing lists the episodes seen but not downloaded, inside the wanted
 // seasons, ordered by season then episode.
 func (d *Daemon) wantedMissing(w wantedEntry) []wantedEpisode {

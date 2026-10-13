@@ -553,10 +553,12 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		b.WriteString(`<div class="item-status">`)
 		var statusParts []string
 		if w.kind() != "movie" {
-			if have := d.wantedTakenEpisodes(w); len(have) > 0 {
-				statusParts = append(statusParts, `<span class="ok" title="Episodes downloaded for this title">Have</span> `+formatEpisodeRanges(have, wantedEpisodeListMax))
+			have := d.wantedTakenEpisodes(w)
+			missing := d.wantedMissing(w)
+			if len(have) > 0 {
+				statusParts = append(statusParts, `<span class="ok" title="Episodes downloaded for this title">Have</span> `+formatHaveEpisodes(have, missing, wantedEpisodeListMax))
 			}
-			if missing := d.wantedMissing(w); len(missing) > 0 {
+			if len(missing) > 0 {
 				statusParts = append(statusParts, `<span class="warn" title="Episodes seen but not downloaded">Missing</span> `+formatEpisodeRanges(missing, wantedEpisodeListMax))
 			}
 		} else if taken > 0 {

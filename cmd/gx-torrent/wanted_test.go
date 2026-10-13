@@ -110,8 +110,8 @@ func TestWantedSeenTakenMissing(t *testing.T) {
 }
 
 // TestWantedRowListsHaveAndMissing checks the wanted row shows which episodes
-// were taken (Have) and which were seen but not downloaded (Missing), with no
-// bare count and no "series complete" claim.
+// were taken (Have) and which were seen but not downloaded (Missing): a season
+// with no gap collapses to its season, a gap lists the episodes.
 func TestWantedRowListsHaveAndMissing(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
 	d.opts.Settings.Set(setupCompleteKey, "true")
@@ -123,17 +123,33 @@ func TestWantedRowListsHaveAndMissing(t *testing.T) {
 	if strings.Contains(row, "Nothing missing") || strings.Contains(row, "<span>taken</span>") {
 		t.Fatalf("the wanted row must list the episodes, not a count: %s", row)
 	}
-	if !strings.Contains(row, `>Have</span> S01E01`) {
-		t.Fatalf("the wanted row must list the episodes taken: %s", row)
+	// A season with no gap collapses to its season alone.
+	if !strings.Contains(row, `>Have</span> S01`) || strings.Contains(row, ">Missing</span>") {
+		t.Fatalf("a complete season must collapse and show no gap: %s", row)
 	}
-	// An episode seen but not taken is listed under Missing.
+	// A seen-but-not-taken episode opens a gap: Have lists the episodes held,
+	// Missing flags the episode seen but not downloaded.
 	d.recordWantedSeen(w, 1, 2)
 	row = d.uiWantedRowsHTML()
-	if !strings.Contains(row, `>Missing</span> S01E02`) {
-		t.Fatalf("the missing episode must be listed: %s", row)
+	if !strings.Contains(row, `>Have</span> S01E01`) || !strings.Contains(row, `>Missing</span> S01E02`) {
+		t.Fatalf("the gap must be listed: %s", row)
 	}
-	if !strings.Contains(row, `>Have</span> S01E01`) {
-		t.Fatalf("the taken episode must stay listed: %s", row)
+}
+
+// TestFormatHaveEpisodes checks that complete seasons collapse and seasons with
+// a gap list their episodes.
+func TestFormatHaveEpisodes(t *testing.T) {
+	if got := formatHaveEpisodes(
+		[]wantedEpisode{{1, 1}, {1, 2}, {1, 3}}, nil, 24); got != "S01" {
+		t.Fatalf("complete season = %q, want S01", got)
+	}
+	if got := formatHaveEpisodes(
+		[]wantedEpisode{{1, 1}, {1, 2}, {1, 3}}, []wantedEpisode{{1, 5}}, 24); got != "S01E01–E03" {
+		t.Fatalf("season with a gap = %q, want S01E01–E03", got)
+	}
+	if got := formatHaveEpisodes(
+		[]wantedEpisode{{1, 1}, {1, 2}, {2, 1}, {2, 2}}, []wantedEpisode{{2, 3}}, 24); got != "S01, S02E01–E02" {
+		t.Fatalf("mixed seasons = %q, want S01, S02E01–E02", got)
 	}
 }
 
