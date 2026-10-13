@@ -1029,6 +1029,7 @@ func TestGxSessionStatsMapping(t *testing.T) {
 		"read_cache_hit_percent": 42,
 		"merged_pieces":          12,
 		"merged_bytes":           4096,
+		"merged_partial_pieces":  1,
 	}
 	got := gxSessionStats(in)
 	want := map[string]int64{
@@ -1044,6 +1045,7 @@ func TestGxSessionStatsMapping(t *testing.T) {
 		"read_cache_hit_percent":       42,
 		"merged_pieces":                12,
 		"merged_bytes":                 4096,
+		"merged_partial_pieces":        1,
 	}
 	for key, value := range want {
 		if got[key] != value {

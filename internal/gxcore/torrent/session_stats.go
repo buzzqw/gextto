@@ -107,6 +107,10 @@ type SessionStats struct {
 	// reused from other local torrents since start (no network involved).
 	MergedPieces int64
 	MergedBytes  int64
+	// MergedPartialPieces counts the destination pieces Phase 2 could not reuse
+	// only because the source was partially verified: the measurement basis for
+	// the block-granularity Phase 3.
+	MergedPartialPieces int64
 }
 
 // Stats returns current statistics about the Session.
@@ -126,6 +130,7 @@ func (s *Session) Stats() SessionStats {
 	out.StorageErrors = s.storageErrors.Load()
 	out.MergedPieces = mergedPiecesTotal.Load()
 	out.MergedBytes = mergedBytesTotal.Load()
+	out.MergedPartialPieces = partialSourcePieces.Load()
 	out.UTP = s.utpSocket != nil
 	out.DHT = s.config.DHTEnabled
 	out.PeerWireDownloaded = peerconn.WireBytesRead.Load()

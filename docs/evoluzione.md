@@ -2575,18 +2575,100 @@ here; the implemented ones are dated, the others are a proposal to be agreed.
 |---|---|---|---|---|---|
 | 1 | **Continuous fuzzing** of every network-facing parser, with the found inputs kept as seeds, run by hand or in a nightly job | the `.torrent` scanner panic was found in minutes | high (a DoS caught before a release) | low | **done**: `make fuzz-smoke` (`FUZZ_TIME=2m`), the seeds are committed under `testdata/fuzz`; a CI job is proposed |
 | 2 | **Merge: read and write each reused piece once** across all candidates; a later candidate only fills the gaps a previous one could not | Phase 2 analysis | medium (no duplicate I/O when several torrents hold the same content) | low | **done (2026-10-13)**: `mergedIdx` shared by Phase 1 and Phase 2 |
-| 3 | Merge: order the candidates by **reusable bytes** so the richest source is read first | Phase 2 | low | low | idea |
-| 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | Phase 2 | high (revives more seedless torrents) | high | idea |
-| 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | the O(1) counter removed the cost argument | medium | medium | **partial**: `subnet_cap_hint` (the suggested cap from the live concentration) is exposed in `Stats()`; automatic enforcement still an idea |
-| 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.10 | medium | medium | idea (needs the real-swarm measurement) |
+| 3 | Merge: order the candidates by **reusable bytes** so the richest source is read first | Phase 2 | low | low | **closed (2026-10-13, reason):** superseded by the dedupe (#2) — ordering changes only *which* source provides a piece, not the work; no measurable gain, so no speculative code |
+| 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | Phase 2 | high (revives more seedless torrents) | high | **plan** in §16.1 |
+| 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | the O(1) counter removed the cost argument | medium | medium | **partial**: `subnet_cap_hint` (the suggested cap from the live concentration) is exposed in `Stats()`; automatic enforcement not pursued (a /24 can be legitimate CGNAT/mobile) |
+| 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.10 | medium | medium | **measured (2026-10-13)**, see §16.2; no speculative code |
 | 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | Phase 2 | medium | low | **done (2026-10-13)**: `merged_pieces`/`merged_bytes` in the engine session stats → daemon API → Gextto «Riuso locale» |
-| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.12 | high | high | measured, see §6 |
+| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.12 | high | high | **measured**, see §6 and the plan in §16.3 |
 | 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | the fuzzing pass | medium/high | low | **done**: `internal/utils/utils.go` (length bounded, recursion depth ≤64); `internal/dht/bencode.go` `validBencode` screens DHT packets before bencode-go |
 | 10 | Merge: **no double verification** — the pieces the merge just re-verified are handed to the verifier as already done | Phase 2 analysis | medium (no re-read and re-hash of the reused bytes) | low | **done (2026-10-13)**: `Verifier.Skip`, cleared after the allocation-time check |
 
 The criterion is the same as §4.5/§15.3: one item = one commit, measurement
 before/after for anything on a data path, both UIs and i18n for anything visible
 to the user, and the reference documents kept aligned.
+
+### 16.1 Merge Phase 3 — block-granularity reuse (plan)
+
+Phase 2 reuses a destination piece only when **every** source piece overlapping
+it is verified; otherwise the whole piece is skipped. Phase 3 would reuse at
+**16 KiB block** granularity, verified against the file's BEP 52 Merkle tree
+(`internal/merkle`: `LeafHashes`, `Root`, `PieceLevel`, `VerifyHashes`).
+
+Why it is large (and why it is not attempted as part of a single night):
+
+- the destination must start tracking **block-level availability** (which 16 KiB
+  blocks of a piece are present), not just a piece bitfield, because the
+  remaining blocks must still be requested from peers;
+- the picker and the piece downloader must be able to request a **subset** of a
+  piece's blocks and complete it from the network, verifying each block against
+  the Merkle leaf;
+- the write path must assemble a piece from mixed sources (local merge + network)
+  before the whole-piece `VerifyV2`.
+
+Decision gate: implement only with a measurement that shows partial-source reuse
+happens often enough on real libraries. The counter is now in place:
+`partialSourcePieces` counts every destination piece Phase 2 skipped although at
+least one of its overlapping source pieces was verified, exposed as
+`merged_partial_pieces` next to `merged_pieces`/`merged_bytes` (Gextto «Riuso
+locale» shows it as `· N saltati per sorgente parziale`). Without that datum
+showing a real frequency, Phase 3 stays an idea (avoids speculative code).
+
+### 16.2 DHT multi-path — measurement and plan
+
+The iterative lookup already fans out to the ~8 closest nodes and re-enqueues
+while peers are still needed; the missing part is **confirmation across paths**
+(prefer a peer seen from ≥2 independent paths) to resist a node that lies or
+swallows results. Design sketch: an explicit per-lookup state machine like the
+BEP 44 one (`bep44_client.go`), with the reporters of each candidate peer
+tracked, a bounded fan-out and a deadline; expose `peers_confirmed_multi` and
+`lookup_paths` in `Stats()` (they surface as `dht_<key>` with no UI work).
+
+Per the repo rule this is gated by the real-swarm measurement
+(`make measure-dht`): query-out/reply-in and peers found set the baseline.
+
+**Measurement (2026-10-13, 3 minutes, public DHT):** nodes settled at ~254 from
+a peak of ~536 (stale nodes cleaned), **`subnet_share_max` = 8** (below the hint
+threshold of 16, so no cap is suggested), `nodes_insecure_id` ≈ 40 %, `capped` =
+0, `queries_out` 2899 / `replies_in` 834 (**≈ 29 % reply success**), `dropped`
+1290 (rate limit), **`reflected_observations` 619** (the sending side of the BEP
+42 `ip` field works: observers now report our address) and `peers_found` 0 (the
+probe used a random info-hash).
+
+**Read:** the routing table is **not concentrated** and the anti-Sybil cap is not
+triggered, so the concentration lever is already sufficient; the ~71 % of
+unanswered queries are nodes that do not reply, not proof of poisoning. There is
+therefore **no data yet that justifies a multi-path lookup**: the next step is the
+instrumentation (reporters per candidate peer, `peers_confirmed_multi`), not the
+rewrite. This matches the "measure first" rule.
+
+### 16.3 Multi-piece pipelining — measurement and plan
+
+The measured baseline (§6.4, 2026-10-13) is ~12.8× from the adaptive queue at
+RTT 50 ms, and it also shows the ceiling: with 256 KiB pieces (16 blocks) the
+queue cannot exceed the piece's block count, so multi-piece per peer is the next
+lever for high-bandwidth-delay links.
+
+Minimal change set (each step one commit, tests + `measure-pipeline` before/after):
+
+1. peer ↔ piece: `torrent.pieceDownloaders` from `map[*peer.Peer]*PieceDownloader`
+   to a per-peer collection keyed by piece index (`pieceDownloadersSnubbed/Choked`
+   too);
+2. picker: `findPiece` must allow a second piece for a peer up to a small cap
+   (`pe.MaxConcurrentPieces`, default 2), with the in-flight request budget shared
+   across the peer's pieces (`piecedownloader.RequestBlocks` takes the remaining
+   budget);
+3. handler: `handlePieceMessage` looks the downloader up by `msg.Index`, and the
+   completion branch stops suspending all piece messages, replaced by a **bounded
+   write queue** (the current `pieceWriterResultC` single slot and the
+   `pieceMessagesC.Suspend()` exist to keep one write per torrent);
+4. resource manager: reserve RAM per in-flight piece (already per piece) and cap
+   the total per peer;
+5. measurement: `measure-pipeline` at 256 KiB pieces and RTT 50 ms must exceed the
+   single-piece ceiling; guard against RAM regressions.
+
+Risk is concentrated in steps 3–4 (concurrency and RAM), so they land last and
+only with the harness showing the gain.
 
 ---
 

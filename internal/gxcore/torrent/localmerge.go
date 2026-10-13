@@ -16,6 +16,11 @@ import (
 var (
 	mergedPiecesTotal atomic.Int64
 	mergedBytesTotal  atomic.Int64
+	// partialSourcePieces counts the destination pieces that Phase 2 could not
+	// reuse only because the source was partially verified (some, not all, of
+	// the overlapping source pieces were available). It is the datum that
+	// decides whether Phase 3 (block-granularity reuse) is worth its cost.
+	partialSourcePieces atomic.Int64
 )
 
 // Swarm Merging, Fase 1 (docs/evoluzione.md §15.2): reuse the pieces of another
@@ -257,7 +262,11 @@ func (t *torrent) mergeV2Files(src *torrent, sinfo *metainfo.Info, snap *localDa
 				*bufp = make([]byte, n)
 			}
 			buf := (*bufp)[:n]
-			if !copyV2PieceFromSource(buf, dst.Data[0].Offset, snap, sstart, sinfo, have, tmpp) {
+			ok, partial := copyV2PieceFromSource(buf, dst.Data[0].Offset, snap, sstart, sinfo, have, tmpp)
+			if partial {
+				partialSourcePieces.Add(1)
+			}
+			if !ok {
 				continue
 			}
 			if !verifyPieceBytes(dst, buf) {
@@ -277,40 +286,50 @@ func (t *torrent) mergeV2Files(src *torrent, sinfo *metainfo.Info, snap *localDa
 // destination piece's file-local range [dOff, dOff+len(dst)). The source pieces
 // that overlap the range must be verified by the source torrent (bitfield bit
 // set), which is what makes the copied bytes trustworthy; the caller then
-// re-verifies the assembled destination piece against its own hash.
-func copyV2PieceFromSource(dst []byte, dOff int64, snap *localDataSnapshot, sstart int, sinfo *metainfo.Info, have []byte, tmpp *[]byte) bool {
+// re-verifies the assembled destination piece against its own hash. It returns
+// ok=true only when every overlapping source piece was available, and
+// partial=true when at least one but not all were (the case Phase 3 would
+// recover at block granularity).
+func copyV2PieceFromSource(dst []byte, dOff int64, snap *localDataSnapshot, sstart int, sinfo *metainfo.Info, have []byte, tmpp *[]byte) (ok, partial bool) {
 	srcPL := int64(sinfo.PieceLength)
 	if srcPL <= 0 {
-		return false
+		return false, false
 	}
 	end := dOff + int64(len(dst))
+	verified, needed := 0, 0
 	for off := dOff; off < end; {
 		k := int(off / srcPL)
 		g := sstart + k
-		if g < 0 || g >= len(snap.pieces) || !bitSet(have, g) {
-			return false
+		segStart := int64(k) * srcPL
+		hi := min(end, segStart+srcPL)
+		if g < 0 || g >= len(snap.pieces) {
+			return false, verified > 0
+		}
+		needed++
+		if !bitSet(have, g) {
+			off = hi
+			continue
 		}
 		sp := &snap.pieces[g]
 		if len(sp.Data) == 0 || sp.Length == 0 {
-			return false
+			return false, verified > 0
 		}
 		if cap(*tmpp) < int(sp.Length) {
 			*tmpp = make([]byte, sp.Length)
 		}
 		tmp := (*tmpp)[:sp.Length]
 		if _, err := sp.Data.ReadAt(tmp, 0); err != nil {
-			return false
+			return false, verified > 0
 		}
-		segStart := int64(k) * srcPL
 		lo := max(off, segStart)
-		hi := min(end, segStart+int64(sp.Length))
-		if hi <= lo {
-			return false
-		}
 		copy(dst[lo-dOff:hi-dOff], tmp[lo-segStart:hi-segStart])
+		verified++
 		off = hi
 	}
-	return len(dst) > 0
+	if needed == 0 {
+		return false, false
+	}
+	return verified == needed, verified > 0 && verified < needed
 }
 
 // verifyPieceBytes checks a piece's bytes against its hash: the SHA-1 of the

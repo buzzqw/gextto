@@ -136,6 +136,44 @@ func TestPrefillV2RequiresVerifiedSourcePieces(t *testing.T) {
 	}
 }
 
+// TestPrefillV2CountsPartialSourcePieces: a destination piece that overlaps a
+// verified source piece and an unverified one is skipped, and counted as a
+// partial-source miss (the datum behind the Phase 3 decision).
+func TestPrefillV2CountsPartialSourcePieces(t *testing.T) {
+	block := merkle.BlockSize
+	content := make([]byte, 4*block)
+	for i := range content {
+		content[i] = byte(i*7 + 5)
+	}
+	specs := []v2FileSpec{{name: "a.bin", data: content}}
+
+	// Source: one block per piece, only piece 0 verified.
+	srcInfo := testV2Info(t, block, specs)
+	filesSrc := testFiles(t, t.TempDir(), srcInfo)
+	if _, err := filesSrc[0].Storage.WriteAt(content, 0); err != nil {
+		t.Fatal(err)
+	}
+	bf := bitfield.New(srcInfo.NumPieces)
+	bf.Set(0)
+	src := &torrent{pieces: piece.NewPieces(srcInfo, filesSrc), bitfield: bf}
+	src.setInfo(srcInfo)
+	src.publishLocalData()
+
+	// Destination: two blocks per piece, so piece 0 straddles source pieces 0
+	// (verified) and 1 (not verified).
+	dstInfo := testV2Info(t, 2*block, specs)
+	dst := &torrent{pieces: piece.NewPieces(dstInfo, testFiles(t, t.TempDir(), dstInfo))}
+	dst.setInfo(dstInfo)
+
+	before := partialSourcePieces.Load()
+	if got := dst.prefillFrom([]*Torrent{{torrent: src}}); got != 0 {
+		t.Fatalf("merged %d pieces, want 0", got)
+	}
+	if got := partialSourcePieces.Load() - before; got != 1 {
+		t.Fatalf("partial-source pieces += %d, want 1", got)
+	}
+}
+
 // Files with different content have different Merkle roots: nothing is reused.
 func TestPrefillV2SkipsDifferentFiles(t *testing.T) {
 	block := merkle.BlockSize

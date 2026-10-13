@@ -171,8 +171,12 @@ func uiMergeReuseRow(session map[string]any) (string, bool) {
 	if pieces <= 0 {
 		return "", false
 	}
-	return fmt.Sprintf("%d pezzi · %s riusati da altri torrent (senza rete)",
-		pieces, logging.HumanBytesI64(engineNum(session, "merged_bytes"))), true
+	row := fmt.Sprintf("%d pezzi · %s riusati da altri torrent (senza rete)",
+		pieces, logging.HumanBytesI64(engineNum(session, "merged_bytes")))
+	if partial := engineNum(session, "merged_partial_pieces"); partial > 0 {
+		row += fmt.Sprintf(" · %d saltati per sorgente parziale", partial)
+	}
+	return row, true
 }
 
 func uiEmbeddedEngineStats(s *AppState, engine TorrentEngine) uiEngineStats {
