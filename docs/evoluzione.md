@@ -288,6 +288,24 @@ lenient decoder **2.22–2.29 ms/op, 642.8 kB/op, 17179 allocs/op**: equivalent,
 no regression. Prowlarr's aggregate search is read as JSON (one
 `json.Unmarshal` into a slice of small structs), outside the XML path.
 
+**Fifth round (2026-10-13, Intel N97) — hot paths and the Phase 2 merge.** With
+the machine not idle, so the absolute numbers are higher than the earlier rounds
+but the same order; they confirm no regression on the paths touched by the v2
+swarm merge and the parser fuzzing:
+
+| Benchmark | Result | Note |
+|---|---|---|
+| `BenchmarkPickerRarestSteady` | **143.5 µs/op, 0 B/op, 0 allocs/op** | piece picker, steady state unchanged (round 2: ~102 µs) |
+| `BenchmarkTickUnchokeSeeding` | **1.64 µs/op, 896 B/op, 1 alloc/op** | unchoker tick (round 2: ~1.3 µs) |
+| `BenchmarkBlocked` | **37.7 ns/op, 0 B/op, 0 allocs/op** | IP filter lookup (round 2: 18.6 ns; load-dependent) |
+| `BenchmarkEngineLoggerFiltered` vs `Forwarded` | **175 vs 730 ns/op, 3 vs 6 allocs/op** | the below-threshold fast path still avoids the message formatting |
+| `BenchmarkPrefillFromUnrelatedV2` | **1.58 µs/op, 128 B/op, 16 allocs/op** (16 candidates) | one-shot cost of the Phase 2 merge scan at allocation, **no steady-state path** |
+
+The last row is the new Swarm Merging Phase 2 (§15.2): matching 16 unrelated v2
+candidates costs ~1.6 µs once per torrent (one small map per candidate), and the
+picker/peer/piece-write paths are not touched, so the merge cannot affect
+seeding or download throughput.
+
 ---
 
 ## 2. Gextto improvements implemented

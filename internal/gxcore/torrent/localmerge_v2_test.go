@@ -27,7 +27,7 @@ func v2Concat(l [][32]byte) []byte {
 
 // testV2Info builds a v2-only info dictionary for the given files and piece
 // length, with the piece layers attached (as a .torrent would carry them).
-func testV2Info(t *testing.T, pieceLength int, specs []v2FileSpec) *metainfo.Info {
+func testV2Info(t testing.TB, pieceLength int, specs []v2FileSpec) *metainfo.Info {
 	t.Helper()
 	tree := map[string]any{}
 	layers := map[string][]byte{}
@@ -184,5 +184,39 @@ func TestPrefillV2RespectsPrivacy(t *testing.T) {
 	dst.setInfo(dstInfo)
 	if got := dst.prefillFrom([]*Torrent{{torrent: src}}); got != 0 {
 		t.Fatalf("merged %d pieces from a private swarm, want 0", got)
+	}
+}
+
+// BenchmarkPrefillFromUnrelatedV2 measures the one-shot allocation-time cost of
+// the Phase 2 scan when no file matches: it is a price every torrent pays once,
+// with no steady-state (picker, peer, piece-write) path involved.
+func BenchmarkPrefillFromUnrelatedV2(b *testing.B) {
+	block := merkle.BlockSize
+	dstData := bytes.Repeat([]byte{0x01}, 4*block)
+	dstInfo := testV2Info(b, block, []v2FileSpec{{name: "a.bin", data: dstData}})
+	dst := &torrent{pieces: piece.NewPieces(dstInfo, testFiles(b, b.TempDir(), dstInfo))}
+	dst.setInfo(dstInfo)
+
+	const n = 16
+	cands := make([]*Torrent, 0, n)
+	for i := 0; i < n; i++ {
+		data := bytes.Repeat([]byte{byte(i + 2)}, 4*block)
+		si := testV2Info(b, 2*block, []v2FileSpec{{name: "a.bin", data: data}})
+		files := testFiles(b, b.TempDir(), si)
+		bf := bitfield.New(si.NumPieces)
+		for k := uint32(0); k < si.NumPieces; k++ {
+			bf.Set(k)
+		}
+		s := &torrent{pieces: piece.NewPieces(si, files), bitfield: bf}
+		s.setInfo(si)
+		s.publishLocalData()
+		cands = append(cands, &Torrent{torrent: s})
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if got := dst.prefillFrom(cands); got != 0 {
+			b.Fatalf("merged %d pieces, want 0", got)
+		}
 	}
 }

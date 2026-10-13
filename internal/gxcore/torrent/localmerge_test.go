@@ -41,7 +41,7 @@ func testInfoBytes(t *testing.T, content []byte, pieceLength int) *metainfo.Info
 }
 
 // testFiles opens one storage file per info file under root.
-func testFiles(t *testing.T, root string, info *metainfo.Info) []allocator.File {
+func testFiles(t testing.TB, root string, info *metainfo.Info) []allocator.File {
 	t.Helper()
 	sto, err := filestorage.New(root, 0o644)
 	if err != nil {
