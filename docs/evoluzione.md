@@ -632,12 +632,16 @@ with a routing table as a bucket-less binary tree; compared with Tixati the gap 
   scope (the info-hash), so a token from one swarm is not reused on another.
 - **Anti-Sybil cap per subnet** (`Config.MaxNodesPerSubnet`, default 0 = off):
   implemented with an **O(1) counter**; nodes beyond the threshold stay in the
-  address book with `noTree`, and `subnet_cap_hint` *advises* a value. **Enforcement
-  is off by default** (BEP 42 is not universal; CGNAT/mobile share subnets) — the
-  remaining step is to **measure the enforcement** on a real swarm to pick the threshold.
+  address book with `noTree`, and `subnet_cap_hint` *advises* a value.
+  **Measured 2026-10-14** (5 min, real info-hash): `subnet_share_max` **4–7**,
+  `nodes_capped` **0** — no node exceeds any candidate threshold (8/16/24), so
+  enforcement would be a no-op and CGNAT/mobile legitimately share subnets.
+  **Decision: keep it as a hint, off by default.**
 - **Multi-path lookup**: design only (`get_peers` on several branches in parallel,
   peers preferred when confirmed by ≥2 paths). The routing table already deduplicates
-  repeated queries; the gain of a full multi-path is **not proven** → measure first.
+  repeated queries, and the two real measurements (random and real info-hash) gave
+  **`peers_confirmed_multi` 0**: the gain is **not proven**, so the rewrite is
+  **closed with data** (§10.2).
 - **Harness**: `make measure-dht` (`GX_MEASURE_DHT=5m`,
   `GX_MEASURE_DHT_INFOHASH=<40 hex>`, opt-in, outside CI). On the public DHT we
   measured ~740 known nodes, `subnet_share_max` 14, `nodes_insecure_id` ≈42%, and
@@ -1343,6 +1347,16 @@ bounded fan-out and a deadline, like `bep44_client.go`). Tests:
 `TestPeerConfirmCountsDistinctReporters`, `TestPeerConfirmIsBounded`,
 `TestPeerConfirmExpiry`, `TestReporterKeyIsTheSubnet`.
 
+**Second measurement (2026-10-14, 5 minutes, real Debian info-hash
+`7acf8fb5…`):** nodes ~296 (peak 525), `subnet_share_max` 4–7, `nodes_insecure_id`
+≈ 42 %, `nodes_capped` 0, queries_out 4703 / replies_in 1670 (35.5 %),
+`reflected_observations` 1063, **`peers_found` 0**, **`peers_confirmed_multi` 0**.
+Same read as the first run, on a populated info-hash rather than a random one:
+the routing table is not concentrated and **no peer was confirmed by two
+distinct subnets**, so there is still **no evidence to justify a multi-path
+rewrite**. The item is therefore **closed with data** (a controlled adversarial
+swarm would be the only next step, and it is out of scope for a home client).
+
 ### 10.3 Multi-piece pipelining — measurement and outcome
 
 The measured baseline (§6.4, 2026-10-13) is ~12.8× from the adaptive queue at
@@ -1513,5 +1527,71 @@ campaign (WP4a). Explicit decisions: WP2 external DHT (close), WP3-B cap
 One WP = its own commits, measurement recorded **before and after** in this
 document; the reference docs updated with each change (`bep.md` for 4d,
 `gx-torrent.md`, [`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md)).
+
+### 11.1 Results — first run (2026-10-14, Intel N97, public torrents/DHT)
+
+**WP0.** `scripts/measure-baseline.sh` added: it runs the cheap harnesses
+(benchmarks, local swarm, pipelining) and the network ones when their env is
+set, and writes a dated baseline. First baseline stored from the branch.
+
+**WP1 (performance).** The baseline surfaced a regression introduced by the v1
+cross-layout filter: `BenchmarkMergeCandidatesUnrelated` **1360 → 375 ns/op,
+0 allocs/op** after replacing a per-candidate map with a nested scan (was
+~98 ns before the v1 work; the remaining cost is the per-candidate file scan
+the feature needs, on one-shot paths only). No other hotspot appeared.
+
+**WP2 (real swarm).** `make measure-realswarm` on the Debian 13.7 netinst
+torrent, 2 minutes: download **completed to 100 %**, peers **peak 80**
+(uTP peak 26), connections uTP 53 / TCP 118 out, 6 in; uTP socket **dials 265
+(91 errors)**, accepts 6 (0 errors), **resends RTO 1211, fast 0**, **SYN drops
+0**. The engine finishes a real swarm; the uTP dial error rate (91/265 ≈ 34 %)
+is the expected cost of racing uTP against TCP-only peers and is worth a closer
+look in a later round, not a regression. **External DHT: closed** (keep the own
+module: per-torrent traversal + dual-stack/shared-socket patches).
+
+**WP3 (DHT, 5 minutes, real Debian info-hash).** nodes settled ~296 from a
+peak of 525, **`subnet_share_max` 4–7** (below the hint threshold of 16),
+`nodes_insecure_id` ≈ 42 %, **`nodes_capped` 0**, queries_out 4703 / replies_in
+1670 (**35.5 % reply success**), dropped 1273, **`reflected_observations` 1063**
+(BEP 42 `ip` sending works), **`peers_found` 0**, **`peers_confirmed_multi` 0**.
+
+- **WP3-B anti-Sybil cap: keep as a hint, off.** With `subnet_share_max` ≤ 7 no
+  node exceeds any candidate threshold (8/16/24), so enforcement would be a
+  no-op (`nodes_capped` 0); CGNAT/mobile legitimately share subnets. No code.
+- **WP3-C multi-path: closed with data.** `peers_confirmed_multi` 0 and a low
+  concentration give **no evidence** for a multi-path rewrite; the routing table
+  is not concentrated and the unanswered queries are silent nodes, not poisoning
+  (see §10.2). No rewrite.
+
+**WP4a (choking/seeding campaign).** Local evidence is healthy: without mesh the
+seeders uploads 3.00× the corpus (3 pure leechers), and **with mesh the leechers
+reciprocate** — they upload **2.52 MB** among themselves and the seeders upload
+drops to **1.84×** the corpus (−39 %). A real-swarm comparison against
+libtorrent/qBittorrent (same policy, same public torrent, metrics: upload
+efficiency, reciprocation, first-block time, stall rate) **remains the gate**
+for any choking change — not implemented.
+
+**WP4b (10 Gbps pipelining).** The local latency harness tops out at
+**~162 MB/s** for a single peer pair (deep profile); 10 Gbps (1.25 GB/s) needs a
+multi-peer swarm and a fast link, neither available here. Multi-piece is already
+in (§10.3); no further change justified by these numbers.
+
+**WP4c (disk I/O).** `BenchmarkStorageWrite` **~5.8 GB/s** buffered and
+**~7.4 GB/s** mmap (ranged mmap sync ~29 GB/s, page cache), far above any
+network speed: the disk is **not** the bottleneck, so `O_DIRECT`/`io_uring` are
+**not justified**. Closed with data.
+
+**WP4d (v2 partial-file hash serving).** Implemented: `servePartialBlockHashes`
++ `blockLeavesRange` in `torrent_hashrequest.go`; tests verify the reply against
+the file root (`torrent_hashrequest_serve_test.go`).
+
+**WP4e (adversarial).** Hostile hash-request headers (bogus root, bad length,
+huge proof, overflow) are refused without panic; the WebSocket frame fuzzer is
+in `make fuzz-smoke`.
+
+**Decision summary:** external DHT → **close**; anti-Sybil cap → **hint only**;
+multi-path → **close with data**; choking → **gated on a real-swarm campaign**;
+10 Gbps → **close with data**; disk I/O → **close with data**; **v2 partial-file
+hash serving → done**.
 
 
