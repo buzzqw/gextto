@@ -253,8 +253,7 @@ func TestMergeCandidatesCheapFilter(t *testing.T) {
 	}
 }
 
-// TestMergeStopsWhenClosed: a merge whose stop channel is closed copies
-// nothing, so stopping a torrent never waits for a whole merge.
+// TestMergeStopsWhenClosed: a merge whose stop channel is closed copies// nothing, so stopping a torrent never waits for a whole merge.
 func TestMergeStopsWhenClosed(t *testing.T) {
 	content := make([]byte, 40000)
 	if _, err := rand.Read(content); err != nil {
@@ -285,5 +284,136 @@ func TestMergeStopsWhenClosed(t *testing.T) {
 	skip[1] = true
 	if n := a.mergeFrom([]*Torrent{{torrent: b}}, skip, nil).merged; n != int(info.NumPieces)-1 {
 		t.Fatalf("merged %d, want %d (piece 1 skipped by the snapshot)", n, info.NumPieces-1)
+	}
+}
+
+// TestPrefillV1MergesDifferentLayout: two v1 torrents of the same file with a
+// different piece length share the content (the v1 cross-layout pass). Every
+// destination piece is checked against its own hash before it is written.
+func TestPrefillV1MergesDifferentLayout(t *testing.T) {
+	content := make([]byte, 40000)
+	if _, err := rand.Read(content); err != nil {
+		t.Fatal(err)
+	}
+	srcInfo := testInfoBytes(t, content, 16384) // 3 pieces
+	dstInfo := testInfoBytes(t, content, 10000) // 4 pieces, different layout
+	if srcInfo.NumPieces == dstInfo.NumPieces {
+		t.Fatal("the test needs two different layouts")
+	}
+
+	filesSrc := testFiles(t, t.TempDir(), srcInfo)
+	if _, err := filesSrc[0].Storage.WriteAt(content, 0); err != nil {
+		t.Fatal(err)
+	}
+	bf := bitfield.New(srcInfo.NumPieces)
+	for i := uint32(0); i < srcInfo.NumPieces; i++ {
+		bf.Set(i)
+	}
+	src := &torrent{pieces: piece.NewPieces(srcInfo, filesSrc), bitfield: bf}
+	src.setInfo(srcInfo)
+	src.publishLocalData()
+
+	filesDst := testFiles(t, t.TempDir(), dstInfo)
+	dst := &torrent{pieces: piece.NewPieces(dstInfo, filesDst)}
+	dst.setInfo(dstInfo)
+
+	if got := dst.prefillFrom([]*Torrent{{torrent: src}}); got != int(dstInfo.NumPieces) {
+		t.Fatalf("merged %d pieces, want %d (v1 cross-layout)", got, dstInfo.NumPieces)
+	}
+	got := make([]byte, len(content))
+	if _, err := filesDst[0].Storage.ReadAt(got, 0); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Fatal("the v1 cross-layout reuse did not reproduce the content")
+	}
+}
+
+// TestPrefillV1PartialSourceSkipsStraddlingPiece: v1 has no per-block hash, so
+// a destination piece that straddles verified and unverified source pieces is
+// not reused at all (no partial blocks written).
+func TestPrefillV1PartialSourceSkipsStraddlingPiece(t *testing.T) {
+	content := make([]byte, 40000)
+	if _, err := rand.Read(content); err != nil {
+		t.Fatal(err)
+	}
+	srcInfo := testInfoBytes(t, content, 16384) // pieces at 0, 16384, 32768
+	dstInfo := testInfoBytes(t, content, 10000) // pieces at 0,10000,20000,30000
+
+	filesSrc := testFiles(t, t.TempDir(), srcInfo)
+	if _, err := filesSrc[0].Storage.WriteAt(content, 0); err != nil {
+		t.Fatal(err)
+	}
+	bf := bitfield.New(srcInfo.NumPieces)
+	bf.Set(0) // only the first source piece is verified
+	src := &torrent{pieces: piece.NewPieces(srcInfo, filesSrc), bitfield: bf}
+	src.setInfo(srcInfo)
+	src.publishLocalData()
+
+	filesDst := testFiles(t, t.TempDir(), dstInfo)
+	dst := &torrent{pieces: piece.NewPieces(dstInfo, filesDst)}
+	dst.setInfo(dstInfo)
+
+	// Destination piece 0 ([0,10000)) is fully inside source piece 0: reused.
+	// Piece 1 ([10000,20000)) straddles verified source piece 0 and unverified
+	// source piece 1: not reused.
+	if got := dst.prefillFrom([]*Torrent{{torrent: src}}); got != 1 {
+		t.Fatalf("merged %d whole pieces, want 1", got)
+	}
+	if _, ok := dst.partialBlocks[1]; ok {
+		t.Fatal("v1 must not write partial blocks")
+	}
+	buf := make([]byte, 10000)
+	if _, err := dst.pieces[0].Data.ReadAt(buf, 0); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(buf, content[:10000]) {
+		t.Fatal("reused v1 piece 0 is wrong")
+	}
+}
+
+// TestPrefillV1WrongMetadataMatchIsSafe: same path and length but different
+// content must not write anything (the destination hash rejects it).
+func TestPrefillV1WrongMetadataMatchIsSafe(t *testing.T) {
+	a := make([]byte, 40000)
+	b := make([]byte, 40000)
+	if _, err := rand.Read(a); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rand.Read(b); err != nil {
+		t.Fatal(err)
+	}
+	srcInfo := testInfoBytes(t, a, 16384)
+	dstInfo := testInfoBytes(t, b, 10000)
+
+	filesSrc := testFiles(t, t.TempDir(), srcInfo)
+	if _, err := filesSrc[0].Storage.WriteAt(a, 0); err != nil {
+		t.Fatal(err)
+	}
+	bf := bitfield.New(srcInfo.NumPieces)
+	for i := uint32(0); i < srcInfo.NumPieces; i++ {
+		bf.Set(i)
+	}
+	src := &torrent{pieces: piece.NewPieces(srcInfo, filesSrc), bitfield: bf}
+	src.setInfo(srcInfo)
+	src.publishLocalData()
+
+	filesDst := testFiles(t, t.TempDir(), dstInfo)
+	// Seed the destination with its own content: a wrong metadata match must
+	// leave it untouched.
+	if _, err := filesDst[0].Storage.WriteAt(b, 0); err != nil {
+		t.Fatal(err)
+	}
+	dst := &torrent{pieces: piece.NewPieces(dstInfo, filesDst)}
+	dst.setInfo(dstInfo)
+	if merged := dst.prefillFrom([]*Torrent{{torrent: src}}); merged != 0 {
+		t.Fatalf("merged %d pieces from a different content, want 0", merged)
+	}
+	got := make([]byte, len(b))
+	if _, err := filesDst[0].Storage.ReadAt(got, 0); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, b) {
+		t.Fatal("the destination storage changed")
 	}
 }

@@ -183,7 +183,19 @@ func (t *torrent) mergeCandidates(list []*Torrent) []*Torrent {
 			continue
 		}
 		oinfo := other.torrent.info()
-		if !info.V2 || oinfo == nil || !oinfo.V2 || oinfo.Private {
+		if oinfo == nil || oinfo.Private {
+			continue
+		}
+		// v1 with a different layout: a candidate when a file of the same path
+		// and length exists on both sides (the reuse is then verified against
+		// this torrent's own piece hashes before writing).
+		if !info.V2 && !oinfo.V2 {
+			if v1FilesMatch(info, oinfo) && other.torrent.hasBitfield() {
+				out = append(out, other)
+			}
+			continue
+		}
+		if !info.V2 || !oinfo.V2 {
 			continue
 		}
 		if roots == nil {
@@ -312,6 +324,9 @@ candidates:
 	// Phase 2: the same-file-different-layout case (BitTorrent v2), matched by
 	// the per-file Merkle root instead of the piece index.
 	if !stopped(stop) {
+		merged += t.prefillV1From(candidates, mergedIdx, skip, stop)
+	}
+	if !stopped(stop) {
 		merged += t.prefillV2From(candidates, mergedIdx, partial, skip, stop)
 	}
 	// A piece a later candidate covered whole needs no block-level reuse.
@@ -370,6 +385,199 @@ func bitSet(bits []byte, i int) bool {
 		return false
 	}
 	return bits[byteIndex]&(1<<(7-uint(i)%8)) != 0
+}
+
+// maxV1VerifyFailures bounds the wasted work of a heuristic v1 cross-layout
+// match: after this many whole-piece hash failures the candidate is abandoned
+// (its content did not match the metadata match). The full data set is never
+// read twice for a wrong match.
+const maxV1VerifyFailures = 64
+
+// v1FilesMatch reports whether two v1 torrents share a file of the same path
+// and length: the metadata identity a cross-layout v1 reuse starts from. It is
+// a heuristic (the content is checked per piece before writing), unlike the
+// cryptographic per-file Merkle root of v2.
+func v1FilesMatch(a, b *metainfo.Info) bool {
+	bl := make(map[string]int64, len(b.Files))
+	for i := range b.Files {
+		if !b.Files[i].Padding {
+			bl[b.Files[i].Path] = b.Files[i].Length
+		}
+	}
+	for i := range a.Files {
+		if a.Files[i].Padding {
+			continue
+		}
+		if length, ok := bl[a.Files[i].Path]; ok && length == a.Files[i].Length {
+			return true
+		}
+	}
+	return false
+}
+
+// srcSeg is one file section of a source piece: which source piece holds it,
+// where in that piece, the file range it covers and its length.
+type srcSeg struct {
+	piece    uint32
+	pieceOff int64 // start of the section within the source piece
+	fileOff  int64 // start of the section within the file
+	length   int64
+}
+
+// sourceV1Segments indexes a source torrent's verified-piece sections by file
+// path, so a destination file range can be mapped onto source pieces.
+func sourceV1Segments(snap *localDataSnapshot) map[string][]srcSeg {
+	segs := make(map[string][]srcSeg)
+	for pi := range snap.pieces {
+		p := &snap.pieces[pi]
+		var off int64
+		for si := range p.Data {
+			s := &p.Data[si]
+			if !s.Padding && s.Name != "" {
+				segs[s.Name] = append(segs[s.Name], srcSeg{piece: uint32(pi), pieceOff: off, fileOff: s.Offset, length: s.Length})
+			}
+			off += s.Length
+		}
+	}
+	return segs
+}
+
+// prefillV1From is the v1 cross-layout pass (§9.2, Phase 4): it reuses a
+// torrent whose file paths and lengths match but whose piece length differs.
+// Every destination piece is assembled from verified source pieces and checked
+// against its own hash before writing, so a wrong metadata match only wastes
+// reads and never writes. Unlike v2 there is no per-block hash to trust, so
+// only fully covered pieces are reused (no Phase 3 blocks for v1).
+func (t *torrent) prefillV1From(candidates []*Torrent, mergedIdx map[uint32]bool, skip []bool, stop <-chan struct{}) int {
+	info := t.info()
+	if info == nil || info.V2 || info.Private || len(t.pieces) == 0 {
+		return 0
+	}
+	merged := 0
+	var buf []byte
+	for _, other := range candidates {
+		if other == nil || other.torrent == t {
+			continue
+		}
+		oinfo := other.torrent.info()
+		if oinfo == nil || oinfo.V2 || oinfo.Private {
+			continue
+		}
+		snap := other.torrent.localData.Load()
+		if snap == nil || len(snap.pieces) == 0 || snap.private {
+			continue
+		}
+		// An identical layout is Phase 1's job.
+		if snap.pieceLength == info.PieceLength && snap.length == info.Length {
+			continue
+		}
+		have := other.torrent.haveBits()
+		if len(have) == 0 {
+			continue
+		}
+		merged += t.mergeV1Files(oinfo, snap, have, mergedIdx, skip, stop, &buf)
+	}
+	return merged
+}
+
+// mergeV1Files reuses the destination pieces fully covered by verified source
+// pieces whose file paths and lengths match.
+func (t *torrent) mergeV1Files(sinfo *metainfo.Info, snap *localDataSnapshot, have []byte, mergedIdx map[uint32]bool, skip []bool, stop <-chan struct{}, bufp *[]byte) int {
+	segs := sourceV1Segments(snap)
+	if len(segs) == 0 {
+		return 0
+	}
+	srcLen := make(map[string]int64, len(sinfo.Files))
+	for i := range sinfo.Files {
+		if !sinfo.Files[i].Padding {
+			srcLen[sinfo.Files[i].Path] = sinfo.Files[i].Length
+		}
+	}
+	info := t.info()
+	dstLen := make(map[string]int64, len(info.Files))
+	for i := range info.Files {
+		if !info.Files[i].Padding {
+			dstLen[info.Files[i].Path] = info.Files[i].Length
+		}
+	}
+	merged := 0
+	failures := 0
+	for i := range t.pieces {
+		dst := &t.pieces[i]
+		if dst.Done || skipped(dst, skip) || mergedIdx[dst.Index] || len(dst.Data) == 0 {
+			continue
+		}
+		if stopped(stop) {
+			return merged
+		}
+		n := int(dst.Length)
+		if n <= 0 {
+			continue
+		}
+		if cap(*bufp) < n {
+			*bufp = make([]byte, n)
+		}
+		buf := (*bufp)[:n]
+		clear(buf)
+		if !copyV1PieceFromSource(buf, dst, segs, snap, have, srcLen, dstLen) {
+			continue
+		}
+		if !verifyPieceBytes(dst, buf) {
+			// The metadata match was wrong for this piece: the local bytes are
+			// not trusted, nothing is written. Abandon a candidate that keeps
+			// failing so a false match cannot read the whole source.
+			if failures++; failures >= maxV1VerifyFailures {
+				return merged
+			}
+			continue
+		}
+		if _, err := dst.Data.Write(buf); err != nil {
+			continue
+		}
+		mergedIdx[dst.Index] = true
+		merged++
+	}
+	return merged
+}
+
+// copyV1PieceFromSource fills dst from the source pieces covering each of the
+// destination piece's file sections. It reports true only when every
+// non-padding byte came from a verified source piece of a file with the same
+// path and length; otherwise dst is left untouched (v1 has no per-block hash
+// to justify a partial reuse).
+func copyV1PieceFromSource(dst []byte, dp *piece.Piece, segs map[string][]srcSeg, snap *localDataSnapshot, have []byte, srcLen, dstLen map[string]int64) bool {
+	var total, covered int64
+	var pos int64 // piece-relative offset of the current section
+	for si := range dp.Data {
+		sec := &dp.Data[si]
+		if sec.Padding {
+			pos += sec.Length
+			continue
+		}
+		total += sec.Length
+		if srcLen[sec.Name] != dstLen[sec.Name] || dstLen[sec.Name] == 0 {
+			return false // a file we cannot match: never a full piece
+		}
+		lo0, hi0 := sec.Offset, sec.Offset+sec.Length
+		for _, sg := range segs[sec.Name] {
+			lo := max(lo0, sg.fileOff)
+			hi := min(hi0, sg.fileOff+sg.length)
+			if lo >= hi || !bitSet(have, int(sg.piece)) {
+				continue
+			}
+			sp := &snap.pieces[sg.piece]
+			if len(sp.Data) == 0 || sp.Length == 0 {
+				return false
+			}
+			dstStart := pos + (lo - lo0)
+			if _, err := sp.Data.ReadAt(dst[dstStart:dstStart+(hi-lo)], sg.pieceOff+(lo-sg.fileOff)); err != nil {
+				return false
+			}
+			covered += hi - lo
+		}
+		pos += sec.Length
+	}
+	return total > 0 && covered == total
 }
 
 // prefillV2From is the Phase 2 pass over the same candidate set (Swarm Merging,

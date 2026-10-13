@@ -99,6 +99,7 @@ fuzz-smoke:
 	  "internal/gxcore/internal/peerprotocol:FuzzExtensionMessageUnmarshal FuzzHolepunchUnmarshal FuzzHashRequestHeader" \
 	  "internal/gxcore/internal/tracker:FuzzDecodePeersCompact" \
 	  "internal/gxcore/internal/tracker/httptracker:FuzzParsePeersDictionary" \
+	  "internal/gxcore/internal/tracker/wstracker:FuzzWSReadMessage" \
 	  "internal/gxcore/internal/btconn:FuzzReadHandshake" \
 	  "internal/gxcore/internal/mse:FuzzHandshakeIncoming" \
 	  "internal/utp/transport:FuzzHeaderUnmarshal"; do \
