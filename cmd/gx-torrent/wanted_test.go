@@ -241,3 +241,31 @@ func TestUIWantedPageAndPollEndpoints(t *testing.T) {
 		t.Fatalf("pollRes not OK: %+v", pollRes)
 	}
 }
+
+// TestPruneWantedTimers: the search timestamps of a removed title are dropped,
+// those of a listed title and the episode ledgers are kept.
+func TestPruneWantedTimers(t *testing.T) {
+	d := newTestDaemon(t)
+	d.mu.Lock()
+	d.state.WantedSearchLast = map[string]int64{"Reacher": 1, "Gone": 2}
+	d.state.WantedGapLast = map[string]int64{"Reacher": 1, "Gone": 2}
+	d.state.WantedTaken = map[string]smartEpisodes{wantedKey("Gone", 1): {}}
+	d.mu.Unlock()
+
+	d.pruneWantedTimers([]wantedEntry{{Name: " Reacher "}})
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if _, ok := d.state.WantedSearchLast["Gone"]; ok {
+		t.Fatal("removed title kept its indexer timestamp")
+	}
+	if _, ok := d.state.WantedGapLast["Gone"]; ok {
+		t.Fatal("removed title kept its gap timestamp")
+	}
+	if d.state.WantedSearchLast["Reacher"] != 1 || d.state.WantedGapLast["Reacher"] != 1 {
+		t.Fatal("a listed title lost its timestamps")
+	}
+	if len(d.state.WantedTaken) != 1 {
+		t.Fatal("the taken ledger must survive (no re-download on re-add)")
+	}
+}

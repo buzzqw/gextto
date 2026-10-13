@@ -587,7 +587,7 @@ world — and for the **gap search**; what comes back is **archived**, so the ne
 search and the next cycle read it from the archive instead of asking the indexer
 again. It keeps a **record** (in the state file) of what has appeared and what has
 been downloaded, shows the **missing** ones in the table and
-**searches again** (gap search, with query `Title SxxEyy`) until it finds them.
+**searches again** (gap search, with query `Title SxxEyy`) until it finds them. When a title is removed, its search timestamps are dropped from the state file at the next cycle; the record of the episodes already taken is kept, so re-adding the title does not download them again.
 For a **movie** it takes one release and does not look for others. The list does
 not create feeds or rules: the feeds grow the archive, the wanted titles turn it
 into downloads, so language and quality apply in AND and feeds remain free for

@@ -294,7 +294,15 @@ func (d *Daemon) pollWantedTitles(ctx context.Context, onlyName string) wantedPo
 // executes the gap search for missing episodes. The caller must hold feedPollMu.
 func (d *Daemon) pollWantedLocked(ctx context.Context, onlyName string) wantedPollResult {
 	wanteds := d.wantedList()
+	if onlyName == "" {
+		d.pruneWantedTimers(wanteds)
+	}
 	if len(wanteds) == 0 {
+		d.mu.Lock()
+		if d.dirty {
+			d.saveLocked()
+		}
+		d.mu.Unlock()
 		return wantedPollResult{OK: true}
 	}
 	now := time.Now()
@@ -583,6 +591,27 @@ func (d *Daemon) markWantedGap(name string, now time.Time) {
 	}
 	d.state.WantedGapLast[strings.TrimSpace(name)] = now.Unix()
 	d.dirty = true
+}
+
+// pruneWantedTimers drops the per-title search timestamps (indexer and gap
+// search) of titles no longer in the wanted list, so removed titles do not
+// stay in the state file forever. The seen/taken episode ledgers are kept on
+// purpose: re-adding a title must not download its episodes again.
+func (d *Daemon) pruneWantedTimers(list []wantedEntry) {
+	keep := make(map[string]bool, len(list))
+	for _, w := range list {
+		keep[strings.TrimSpace(w.Name)] = true
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for _, m := range []map[string]int64{d.state.WantedSearchLast, d.state.WantedGapLast} {
+		for name := range m {
+			if !keep[name] {
+				delete(m, name)
+				d.dirty = true
+			}
+		}
+	}
 }
 
 // wantedIndexerDue reports whether the per-title indexer search is due. It is
