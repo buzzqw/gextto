@@ -165,7 +165,10 @@ FUZZ_TIME=2m make fuzz-smoke   # a serious pass
 
 A crashing input is written under `testdata/fuzz/<Target>/`: fix the code and
 commit the input as a regression seed. `.github/workflows/fuzz.yml` runs the same
-check nightly (2m per target) and uploads the failing inputs as an artifact.
+check nightly (2m per target), on a push that touches an engine/parser path (30s)
+and on demand from the Actions tab, uploading the failing inputs as an artifact.
+Each target is retried once, so a spurious `context deadline exceeded` from the
+Go fuzzer shutting down under load does not fail the run (a real crash repeats).
 
 ## Build cache
 

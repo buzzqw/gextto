@@ -76,11 +76,19 @@ test-dht:
 # Not part of `make test`; run it by hand or in a nightly job. Override the
 # per-target time with FUZZ_TIME=2m. See docs/evoluzione.md §10.
 FUZZ_TIME ?= 30s
+# Each target runs once and, if it fails, once more. The Go fuzzing engine
+# occasionally ends a target with a spurious "context deadline exceeded" when
+# -fuzztime elapses on a loaded machine (a shutdown race, not a finding); a real
+# crash reproduces on the retry, so the retry does not hide one.
 fuzz-smoke:
 	@set -e; \
+	fuzzrun() { \
+		name="$$1"; shift; \
+		echo "fuzz $$name"; \
+		"$$@" || { echo "retry $$name (transient fuzzer shutdown?)"; "$$@"; }; \
+	}; \
 	for t in FuzzDecodeBencode FuzzReadResponse FuzzValidBencode FuzzParseNodesString; do \
-		echo "fuzz dht/$$t"; \
-		(cd internal/dht && go test -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZ_TIME) .); \
+		(cd internal/dht && fuzzrun "dht/$$t" go test -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZ_TIME) .); \
 	done; \
 	for spec in \
 	  "internal/utils:FuzzTorrentBytes FuzzMagnetParsing" \
@@ -95,12 +103,10 @@ fuzz-smoke:
 	  "internal/gxcore/internal/mse:FuzzHandshakeIncoming"; do \
 		dir="$${spec%%:*}"; names="$${spec##*:}"; \
 		for t in $$names; do \
-			echo "fuzz $$dir/$$t"; \
-			go test -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZ_TIME) ./$$dir/; \
+			fuzzrun "$$dir/$$t" go test -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZ_TIME) ./$$dir/; \
 		done; \
 	done; \
-	echo "fuzz . / FuzzParseRelease"; \
-	go test -run '^$$' -fuzz '^FuzzParseRelease$$' -fuzztime $(FUZZ_TIME) .
+	fuzzrun ". / FuzzParseRelease" go test -run '^$$' -fuzz '^FuzzParseRelease$$' -fuzztime $(FUZZ_TIME) .
 
 # Race detector run (technical review, phase 0). Kept separate from `test` so it
 # can stay non-blocking until the shared state has been audited.

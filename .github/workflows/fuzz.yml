@@ -1,19 +1,32 @@
 name: Fuzz
 
-# Nightly fuzzing of every network-facing parser (make fuzz-smoke): the DHT,
-# bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE and the peer-wire
-# handshake. Kept off the push path: it is long, and a failure does not block a
-# merge. The Go fuzzer writes a crashing input to testdata/fuzz/<Target>/; on a
-# failure it is uploaded as an artifact so it can be committed as a regression
-# seed (docs/evoluzione.md, section 10 item 1: a screen caught a .torrent DoS
-# before a release). See scripts/README or docs/DEVELOPERS.md for local runs.
-#
-# Manual run: Actions → Fuzz → Run workflow (optionally set fuzz_time, e.g. 5m
-# for a deeper pass; the default is 2m per target).
+# Fuzzing of every network-facing parser (make fuzz-smoke): the DHT, bencode,
+# magnet, BEP 10/52, tracker, Torznab, RSS, MSE and the peer-wire handshake.
+# Triggers, chosen so it never runs while someone is working on this machine:
+#   - nightly (03:41 UTC), a 2m pass per target;
+#   - on a push to main that touches an engine or parser path, a 30s pass (a
+#     quick check, not a replacement for the nightly one);
+#   - on demand from the Actions tab, with a custom per-target time.
+# Kept off the general CI so a fuzzing failure does not block a merge. On a
+# failure the Go fuzzer's crashing input (testdata/fuzz/<Target>/) is uploaded
+# so it can be committed as a regression seed (docs/evoluzione.md section 10).
 
 on:
   schedule:
-    - cron: "41 3 * * *" # every day at 03:41 UTC
+    - cron: "41 3 * * *" # every night at 03:41 UTC
+  push:
+    branches: [main]
+    paths:
+      - "internal/gxcore/**"
+      - "internal/dht/**"
+      - "internal/utils/**"
+      - "internal/rss/**"
+      - "internal/torznab/**"
+      - "cmd/gx-torrent/**"
+      - "go.mod"
+      - "go.sum"
+      - "Makefile"
+      - ".github/workflows/fuzz.yml"
   workflow_dispatch:
     inputs:
       fuzz_time:
@@ -42,8 +55,10 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      # Manual runs use the input; the nightly uses 2m; an impactful push uses a
+      # quick 30s pass.
       - name: Fuzz every network-facing parser
-        run: make fuzz-smoke FUZZ_TIME=${{ github.event.inputs.fuzz_time || '2m' }}
+        run: make fuzz-smoke FUZZ_TIME=${{ github.event.inputs.fuzz_time || (github.event_name == 'schedule' && '2m' || '30s') }}
 
       # The Go fuzzer writes a crashing input to testdata/fuzz/<Target>/; keep it
       # so it can be fixed and committed as a seed.
