@@ -543,36 +543,38 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			b.WriteString(`<div class="chips">` + chips.String() + `</div>`)
 		}
 
-		// Progress: what is missing (series), what was taken, when it was last
-		// searched on the indexers.
+		// Progress: the episodes taken (what the operator has) and, when there
+		// are some, the episodes seen but not downloaded (what is missing). The
+		// series is only as complete as the episodes seen so far, so we never
+		// claim that "nothing is missing": that read as a false "complete".
 		b.WriteString(`<div class="item-status">`)
+		var statusParts []string
 		if w.kind() != "movie" {
-			missing := d.wantedMissing(w)
-			if len(missing) == 0 && taken == 0 {
-				b.WriteString(`<span class="muted">Not found yet</span>`)
-			} else if len(missing) == 0 {
-				b.WriteString(`<span class="ok">✓ <span>Nothing missing</span></span>`)
-			} else {
-				b.WriteString(`<span class="warn"><span>Missing</span> ` + strconv.Itoa(len(missing)) + `:</span> `)
+			if missing := d.wantedMissing(w); len(missing) > 0 {
+				var m strings.Builder
+				m.WriteString(`<span class="warn"><span>Missing</span> ` + strconv.Itoa(len(missing)) + `:</span> `)
 				for i, ep := range missing {
 					if i == 12 {
-						b.WriteString(`<span class="chip warn">+` + strconv.Itoa(len(missing)-12) + `</span>`)
+						m.WriteString(`<span class="chip warn">+` + strconv.Itoa(len(missing)-12) + `</span>`)
 						break
 					}
-					b.WriteString(`<span class="chip warn">` + fmt.Sprintf("S%02dE%02d", ep.season, ep.episode) + `</span> `)
+					m.WriteString(`<span class="chip warn">` + fmt.Sprintf("S%02dE%02d", ep.season, ep.episode) + `</span> `)
 				}
+				statusParts = append(statusParts, m.String())
+			}
+			if taken > 0 {
+				statusParts = append(statusParts, `<span title="Episodes downloaded for this title">`+strconv.Itoa(taken)+` <span>taken</span></span>`)
 			}
 		} else if taken > 0 {
-			b.WriteString(`<span class="ok">✓ <span>Downloaded</span></span>`)
-		} else {
-			b.WriteString(`<span class="muted">Not found yet</span>`)
+			statusParts = append(statusParts, `<span class="ok">✓ <span>Downloaded</span></span>`)
 		}
-		if w.kind() != "movie" && taken > 0 {
-			b.WriteString(` · <span title="Episodes downloaded for this title">` + strconv.Itoa(taken) + ` <span>taken</span></span>`)
+		if len(statusParts) == 0 {
+			statusParts = append(statusParts, `<span class="muted">Not found yet</span>`)
 		}
 		if !lastSearch.IsZero() {
-			b.WriteString(` · <span title="Last search on the indexers"><span>searched</span> ` + lastSearch.Format("02/01 15:04") + `</span>`)
+			statusParts = append(statusParts, `<span title="Last search on the indexers"><span>searched</span> `+lastSearch.Format("02/01 15:04")+`</span>`)
 		}
+		b.WriteString(strings.Join(statusParts, ` · `))
 		b.WriteString(`</div><div class="item-status" data-wanted-status="` + idx + `" aria-live="polite"></div></div><div class="item-actions">`)
 
 		b.WriteString(`<button type="button" class="sm" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="Search this title now"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search</button>`)

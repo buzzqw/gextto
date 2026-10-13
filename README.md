@@ -284,7 +284,8 @@ and `/api/v1/health` report it as `1.1.<n>`.
 
 gx-torrent is also a complete client usable without Gextto, like
 `qbittorrent-nox` or `transmission-daemon`. It is **the same binary** Gextto
-drives as its engine.
+drives as its engine. In short, it is a **simpler, reduced version of Gextto**:
+fewer features, but all the ones a standalone client needs.
 
 - **`*arr` ready.** qBittorrent Web API v2 (`/api/v2/...`) for Sonarr, Radarr,
   Lidarr, Readarr and mobile managers, plus its own JSON API (`/api/v1/...`)

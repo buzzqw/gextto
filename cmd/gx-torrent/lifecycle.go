@@ -33,6 +33,74 @@ const (
 // chosen with -log-file.
 var logOutput io.Writer = os.Stderr
 
+// logFilePath is the rotating file setupLogFile opened, if any (empty = stderr).
+var logFilePath string
+
+// logRing keeps the most recent daemon log lines so the web page can show what
+// the daemon is doing, regardless of where the log is written (stderr or file).
+var logRing = newLogRingBuffer(4000)
+
+func init() {
+	// Always keep the ring fed, also when the log goes to stderr only.
+	logOutput = io.MultiWriter(os.Stderr, logRing)
+	log.SetOutput(logOutput)
+}
+
+// logRingBuffer is a small, thread-safe ring of the most recent log lines,
+// written by the log tee and read by the web page.
+type logRingBuffer struct {
+	mu    sync.Mutex
+	lines []string
+	next  int
+	full  bool
+}
+
+func newLogRingBuffer(max int) *logRingBuffer {
+	if max < 1 {
+		max = 1
+	}
+	return &logRingBuffer{lines: make([]string, max)}
+}
+
+func (r *logRingBuffer) Write(p []byte) (int, error) {
+	text := strings.TrimRight(string(p), "\n")
+	if text == "" {
+		return len(p), nil
+	}
+	r.mu.Lock()
+	for _, line := range strings.Split(text, "\n") {
+		r.lines[r.next] = line
+		r.next = (r.next + 1) % len(r.lines)
+		if r.next == 0 {
+			r.full = true
+		}
+	}
+	r.mu.Unlock()
+	return len(p), nil
+}
+
+// tail returns the last n lines, oldest first.
+func (r *logRingBuffer) tail(n int) []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	count := r.next
+	if r.full {
+		count = len(r.lines)
+	}
+	if n > count {
+		n = count
+	}
+	if n <= 0 {
+		return []string{}
+	}
+	out := make([]string, 0, n)
+	start := (r.next - n + len(r.lines)) % len(r.lines)
+	for i := 0; i < n; i++ {
+		out = append(out, r.lines[(start+i)%len(r.lines)])
+	}
+	return out
+}
+
 // setupLogFile sends the daemon log and the engine's log to a rotating file.
 func setupLogFile(path string) {
 	path = strings.TrimSpace(path)
@@ -44,8 +112,9 @@ func setupLogFile(path string) {
 		abs = path
 	}
 	writer := logging.NewRotatingWriter(filepath.Dir(abs), filepath.Base(abs), logMaxBytes, logMaxFiles)
-	logOutput = writer
-	log.SetOutput(writer)
+	logOutput = io.MultiWriter(writer, logRing)
+	log.SetOutput(logOutput)
+	logFilePath = abs
 }
 
 // engineLogHandler keeps the engine's own log to warnings, or everything with -debug.

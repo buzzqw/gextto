@@ -94,12 +94,18 @@ fieldset .muted{font-size:13px}
 </fieldset>
 <fieldset id="optimize">
   <legend>Optimization</legend>
-  <p class="muted">One click puts a part of the engine on values that work well; each button changes only its own settings.</p>
+  <p class="muted">One click puts the queue, the disk cache and the bandwidth on values that work well.</p>
   <div class="actions">
-    <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="queue" title="3 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not counted">Optimize queue</button>
-    <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="cache" title="Disk cache back to automatic: sized from the RAM and the disk type, adapted while running">Optimize cache</button>
-    <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="bandwidth" title="Download unlimited, upload at 80% of the highest upload measured, latency auto-speed on">Optimize bandwidth</button>
+    <button type="button" class="primary sm" data-formaction="/ui/optimize" data-optimize="all" title="Set the queue, the disk cache and the bandwidth to values that work well; the upload cap needs some measured traffic">Optimize</button>
   </div>
+  <details class="more">
+    <summary>Advanced</summary>
+    <div class="actions">
+      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="queue" title="3 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not counted">Optimize queue</button>
+      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="cache" title="Disk cache back to automatic: sized from the RAM and the disk type, adapted while running">Optimize cache</button>
+      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="bandwidth" title="Download unlimited, upload at 80% of the highest upload measured, latency auto-speed on">Optimize bandwidth</button>
+    </div>
+  </details>
   <p class="muted">{{OPT_STATUS}}</p>
 </fieldset>
 <fieldset>

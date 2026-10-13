@@ -253,7 +253,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <span class="selinfo" id="selinfo" aria-live="polite"></span>
       <div class="right">
         {{if .SearchEnabled}}<button type="button" class="ghost" id="btn-search" title="Search configured Torznab indexers for releases"><svg class="i"><use href="#i-search"/></svg><span class="lbl">Search indexers</span></button>{{end}}
-        {{if .GexttoLog}}<button type="button" class="ghost" id="btn-log" aria-pressed="false" title="Switch to live server log view"><svg class="i"><use href="#i-log"/></svg><span class="lbl">Gextto log</span></button>{{end}}
+        {{if or .Standalone .GexttoLog}}<button type="button" class="ghost" id="btn-log" aria-pressed="false" data-log-url="{{if .Standalone}}/ui/log{{else}}/ui/gextto-log{{end}}" title="Switch to live server log view"><svg class="i"><use href="#i-log"/></svg><span class="lbl">{{if .Standalone}}Log{{else if .GexttoLog}}Gextto log{{end}}</span></button>{{end}}
         <button type="button" class="ghost" id="btn-tools" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" title="IP filter, create a .torrent, feeds"><svg class="i"><use href="#i-tools"/></svg><span class="lbl">Tools</span></button>
       </div>
     </div>
@@ -266,7 +266,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <div id="drawer-body"></div>
       </aside>
     </div>
-    {{if .GexttoLog}}
+    {{if or .Standalone .GexttoLog}}
     <div id="pane-log" class="logpane" hidden>
       <div class="logbar">
         <label class="chk">Lines <select id="log-lines" title="Number of recent log lines to display"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
@@ -655,7 +655,7 @@ function showLog(on){
   var btn=$('#btn-log');if(!btn)return;btn.setAttribute('aria-pressed',on?'true':'false');
   $('#pane-torrents').hidden=on;$('#pane-log').hidden=!on;if(on)loadLog();
 }
-function loadLog(){var n=$('#log-lines').value;$('#log-info').textContent=t('loading…');fetch('/ui/gextto-log?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(x){throw new Error(x);});}).then(function(d){window.__log=d.lines||[];$('#log-info').textContent=d.path+' · '+(d.lines||[]).length+' '+t('lines')+' · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){$('#log-view').textContent=t('Cannot read the Gextto log:')+' '+e.message;$('#log-info').textContent='';});}
+function loadLog(){var n=$('#log-lines').value,url=($('#btn-log')&&$('#btn-log').getAttribute('data-log-url'))||'/ui/gextto-log';$('#log-info').textContent=t('loading…');fetch(url+'?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(x){throw new Error(x);});}).then(function(d){window.__log=d.lines||[];$('#log-info').textContent=(d.path?d.path+' · ':'')+(d.lines||[]).length+' '+t('lines')+' · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){$('#log-view').textContent=t('Cannot read the log:')+' '+e.message;$('#log-info').textContent='';});}
 function renderLog(scroll){var view=$('#log-view'),q=($('#log-filter').value||'').toLowerCase(),nodebug=$('#log-nodebug').checked,frag=document.createDocumentFragment();(window.__log||[]).forEach(function(line){if(nodebug&&/\sDEBUG\s/.test(line))return;if(q&&line.toLowerCase().indexOf(q)<0)return;var row=document.createElement('div');if(/\s(ERROR|FATAL)\s/.test(line))row.className='error';else if(/\sWARN(ING)?\s/.test(line))row.className='warn';else if(/\sDEBUG\s/.test(line))row.className='debug';row.textContent=line;frag.appendChild(row);});view.textContent='';view.appendChild(frag);if(scroll!==false)view.scrollTop=view.scrollHeight;}
 
 // ---------- add ----------
@@ -845,6 +845,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
 {{end}}{{define "status"}}
     <span class="hide-m" data-down="{{.DownRateRaw}}" data-up="{{.UpRateRaw}}" data-down-s="{{.DownloadRate}}" data-up-s="{{.UploadRate}}" title="Downloaded / uploaded since start"><span>Totals</span> <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
     <span class="disk" title="Free space on the download folder"><svg class="i"><use href="#i-disk"/></svg><span>Free space</span> <b>{{bytes .DiskFree}}</b><span class="subtle">/ {{bytes .DiskTotal}}</span></span>
+    <span class="hide-m" title="CPU load and resident memory of the gx-torrent process itself"><span>Process</span> <b>{{percent .CPUPercent}}%</b> · <b>{{bytes .ProcRSS}}</b></span>
     <span title="Nodes in the DHT routing table">DHT <b>{{if .DHT}}{{.DHTNodes}}{{else}}<span>off</span>{{end}}</b></span>
     <span {{if .PortReachable}}title="The peer port is reachable from the internet (router mapping or incoming peers)"{{else}}title="No router mapping and no incoming peer yet: the peer port may be closed"{{end}}><span class="dot {{if .PortReachable}}ok{{else}}bad{{end}}" aria-hidden="true"></span><span>Port</span> <b>{{.PeerPort}}</b> {{if .PortOpen}}<span class="subtle">{{.Router}}{{if .ExternalIP}} · {{.ExternalIP}}{{end}}</span>{{else}}<span class="subtle">not open</span>{{end}}</span>
     <span class="hide-m" title="Incoming peer connections since start"><span>Incoming</span> <b>{{.IncomingConns}}</b></span>

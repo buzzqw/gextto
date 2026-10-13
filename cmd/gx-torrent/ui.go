@@ -88,6 +88,10 @@ type uiPageData struct {
 	LSDPeers      int64
 	DiskFree      int64
 	DiskTotal     int64
+	// CPUPercent and ProcRSS are the gx-torrent process' own CPU load (percent
+	// since the previous render) and resident memory.
+	CPUPercent float64
+	ProcRSS    int64
 
 	CountAll     int
 	CountDown    int
@@ -378,6 +382,19 @@ func (d *Daemon) handleUIGexttoLog(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{"path": d.opts.GexttoLog, "lines": tail})
+}
+
+// handleUILog returns the tail of the daemon's own recent log lines for the
+// standalone log view. It reads the in-memory ring, so it works whether the log
+// goes to stderr or to the rotating file.
+func (d *Daemon) handleUILog(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	lines, _ := strconv.Atoi(r.URL.Query().Get("lines"))
+	lines = min(max(lines, 50), 5000)
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{"path": logFilePath, "lines": logRing.tail(lines)})
 }
 
 // handleUIPortCheck renders the "Test porte" result for the status bar: a
@@ -1229,6 +1246,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		DiskFree:       stats.DiskFreeBytes,
 		DiskTotal:      stats.DiskTotalBytes,
 	}
+	page.CPUPercent, page.ProcRSS = d.processUsage(time.Now())
 	switch {
 	case stats.PortMapping.Method != "":
 		page.PortOpen = true

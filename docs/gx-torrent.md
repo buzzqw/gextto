@@ -7,7 +7,9 @@ runs in a separate process and is controlled via REST (`127.0.0.1:8890` when
 Gextto manages it, `0.0.0.0:8890` in standalone), where it also exposes an
 operational web page openable from the browser (managed: only from this server,
 see *Web interface* to open it to the LAN; standalone: already reachable from
-another PC on the LAN). The embedded
+another PC on the LAN). In short, as a standalone client it is a **simpler,
+reduced version of Gextto** — fewer features, but all the ones needed to run
+without it. The embedded
 libtorrent engine remains selectable — on builds that include it — and acts as an
 automatic fallback if gx-torrent does not start.
 
@@ -169,7 +171,8 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   two-minute **transfer graph**; a **toolbar** acting on the selection
   (resume, pause, recheck, reannounce, top, remove) plus *Tools* (IP filter,
   create `.torrent`, check feeds, test ports); the status bar at the bottom
-  with totals, free space, DHT, port reachability, incoming connections, IP
+  with totals, free space, the **CPU load and resident memory of the gx-torrent
+  process itself**, DHT, port reachability, incoming connections, IP
   filter, encryption.
 - **Table**: one row per torrent (name with category chip and folder, size,
   progress bar coloured by state, readable state badge, speeds, ETA,
@@ -206,9 +209,12 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   `GET /api/v1/portcheck`). With DHT active the result also shows the
   **reflected port** that the DHT nodes see for us (`reflected_port` field, from
   the `ip` field of BEP 42) and the deduced **NAT type** (`nat_mapping`).
-- ***Gextto log*** (toolbar, managed): the last lines of `gextto.log` (200–2000),
-  read only when you open it or press *Reload*, with text filter, DEBUG hidden by
-  default and warnings/errors coloured.
+- ***Log*** (toolbar): the last lines of the daemon's own log (200–2000), read
+  only when you open it or press *Reload*, with text filter, DEBUG hidden by
+  default and warnings/errors coloured. In standalone it reads the in-memory ring
+  of the daemon's recent lines, so it works whether the log goes to stderr or to
+  the rotating file already open in a terminal. In managed, when the daemon is
+  launched next to Gextto, the same button shows *gextto.log*.
 - **Large lists** (standalone only): the table renders at most `?rows=` torrents
   (default 300) and shows *Showing X of Y · Show more* to widen the window; in
   managed it always renders all torrents.
@@ -229,8 +235,10 @@ The standalone pages follow the same structure:
   The options tab holds the refresh interval, the archive retention,
   FlareSolverr (with its test) and the advanced JSON.
 - **Wanted** (`/ui/wanted`): a card per title with type, state, filters as
-  chips, the **missing episodes**, how many were taken and when it was last
-  searched, plus search now / edit / pause / remove. *Add title* is a guided
+  chips, the **missing episodes** (seen but not downloaded), how many episodes
+  were **taken** and when it was last
+  searched; the card never claims a series is "complete" (it is only as complete
+  as the episodes seen so far), plus search now / edit / pause / remove. *Add title* is a guided
   dialog: series or movie, the title with a search that shows how it is named in
   the archive, feeds and indexers (pick one to use it), then seasons, language
   (with quick picks) and quality, and the other options folded away.
@@ -758,9 +766,10 @@ next refresh and any error; **Load now** immediately applies the
 value of the field (even unsaved) without saving the rest of the page
 (`POST /ui/ipfilter` with `return=settings`).
 
-**Optimisation** is the equivalent of Gextto's *Optimise* button, divided
-into three actions (`POST /ui/optimize` with `optimize=queue|cache|bandwidth`), each
-of which changes only its own settings: **queue** = Gextto's base (3
+**Optimisation** is the equivalent of Gextto's *Optimise* button: a single
+**Optimize** button runs all three actions (`POST /ui/optimize` with
+`optimize=all`), each of which changes only its own settings: **queue** =
+Gextto's base (3
 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not
 counted, self-management active); **cache** = automatic again (sized
 on RAM and disk type, TTL 300 s); **bandwidth** = unlimited download and upload
@@ -769,7 +778,8 @@ the download ACKs), with auto-speed on latency active and a minimum of a tenth
 of the limit. If not enough upload has been measured yet (less than 50 KiB/s)
 the action refuses with an explanation; if the upload was already at the current limit the
 line capacity is unknown: the limit stays and only auto-speed is activated.
-The box shows the measured ↓/↑ peaks.
+The box shows the measured ↓/↑ peaks. The three individual actions stay
+available under *Advanced* (`optimize=queue|cache|bandwidth`).
 
 On the **Torrents** page in standalone the *cache r/w* and *I/O
 ops r/w* tiles do not appear (diagnostics useful to Gextto, not to the client's

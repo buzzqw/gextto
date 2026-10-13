@@ -109,6 +109,31 @@ func TestWantedSeenTakenMissing(t *testing.T) {
 	}
 }
 
+// TestWantedRowShowsTakenNotComplete checks the wanted row never claims a
+// series is complete ("Nothing missing") when only some episodes were taken: it
+// shows what was taken and lists what was seen but not downloaded.
+func TestWantedRowShowsTakenNotComplete(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Show","kind":"series","seasons":"1+"}]`)
+	w := d.wantedList()[0]
+	d.recordWantedSeen(w, 1, 1)
+	d.recordWantedTaken(w, 1, 1)
+	row := d.uiWantedRowsHTML()
+	if strings.Contains(row, "Nothing missing") {
+		t.Fatal("the wanted row must not claim the series is complete")
+	}
+	if !strings.Contains(row, ">1 <span>taken</span>") {
+		t.Fatalf("the wanted row must show the taken count: %s", row)
+	}
+	// An episode seen but not taken is listed as missing.
+	d.recordWantedSeen(w, 1, 2)
+	row = d.uiWantedRowsHTML()
+	if !strings.Contains(row, "S01E02") {
+		t.Fatalf("the missing episode must be listed: %s", row)
+	}
+}
+
 // TestPollFeedsDrivesWantedWithoutFeeds guards the wanted engine running even
 // when no RSS feed is configured: the wanted list searches the indexers
 // directly, so pollFeeds must not return early and skip pollWanted.
