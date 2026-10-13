@@ -18,7 +18,7 @@ needs.
 | [Developers](DEVELOPERS.md) | Build, tests and contributor conventions. |
 | [Build and test times](tempistiche.md) | What builds and the test suite cost on a real machine, and how long CI takes. |
 | [Architecture](ARCHITECTURE.md) | Map of the code folders and files. |
-| [Design choices, improvements and evolution](evoluzione.md) | Backlog, implemented improvements, gx-torrent plans, measurements, reviews and strategic direction. |
+| [Design choices, improvements and evolution](evoluzione.md) | Active backlog, implemented improvements, measurements and strategic direction for Gextto and the gx-torrent / gx-core engine. |
 | [gx-torrent engine](gx-torrent.md) | Technical document of the pure-Go torrent engine (gx-core, daemon, adapter). |
 | [BEP compliance](bep.md) | Which BitTorrent specifications (BEPs) the engine supports, which are missing and the roadmap. |
 | [gx-torrent evolved (gx-nox)](gx-torrent-evoluto.md) | Analysis and decision: gx-torrent as a standalone torrent client (one binary, two modes). |
