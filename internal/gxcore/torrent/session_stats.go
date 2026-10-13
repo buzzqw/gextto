@@ -23,6 +23,14 @@ type SessionStats struct {
 	// UTP and DHT report whether they are active.
 	UTP bool
 	DHT bool
+	// UTPDials/UTPAccepts count the socket-level uTP dials and accepts
+	// since start; UTPDialErrors/UTPAcceptErrors count their failures.
+	// They diagnose transport health (firewalled UDP, CGNAT) where the
+	// peer-level counters alone cannot.
+	UTPDials       int64
+	UTPAccepts     int64
+	UTPDialErrors  int64
+	UTPAcceptErrors int64
 	// DHTStats are the DHT counters (nodes, peers found, traffic).
 	DHTStats map[string]int64
 
@@ -121,6 +129,13 @@ func (s *Session) Stats() SessionStats {
 	out.MergedBytes = mergedBytesTotal.Load()
 	out.MergedPartialPieces = partialSourcePieces.Load()
 	out.UTP = s.utpSocket != nil
+	if s.utpSocket != nil {
+		ust := s.utpSocket.Stats()
+		out.UTPDials = int64(ust.Dials)
+		out.UTPAccepts = int64(ust.Accepts)
+		out.UTPDialErrors = int64(ust.DialErrors)
+		out.UTPAcceptErrors = int64(ust.AcceptErrors)
+	}
 	out.DHT = s.config.DHTEnabled
 	out.PeerWireDownloaded = peerconn.WireBytesRead.Load()
 	out.PeerWireUploaded = peerconn.WireBytesWritten.Load()
