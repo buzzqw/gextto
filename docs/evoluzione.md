@@ -20,6 +20,7 @@ plan in [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md).
 8. [Accessibility](#8-accessibility)
 9. [High-value extensions from the comparison with BiglyBT](#9-high-value-extensions-from-the-comparison-with-biglybt)
 10. [Smartness backlog: ideas from the 2026-10-13 night](#10-smartness-backlog-ideas-from-the-2026-10-13-night)
+11. [Open-items resolution program](#11-open-items-resolution-program-proposal-2026-10-14)
 
 ---
 
@@ -33,9 +34,8 @@ Ex `docs/da-fare.md`. Restored on 08-10-2026: it had ended up in
 > recurring checks below are green, the next discussion is **what is open and
 > what is desired** in this document: go through §1 (active backlog), §3
 > (strategic direction) and §10 (smartness backlog), confirm or drop each
-> open item, and pick the desired next work. To be held at the end of the
-> checks, with the results of the just-landed work (`beyond-bep.md` §3/§5/§6:
-> WebSocket tracker, v1 cross-layout merge, DHT feeds) as the starting point.
+> open item, and pick the desired next work. The outcome is §11 (open-items
+> resolution program), a measurement-gated plan for the selected items.
 
 **Recurring checks (at every cycle close).** `make test` (`check-ui` +
 `installer-test` + `test-dht` + `CGO_ENABLED=0 go test ./...`), `make test-engine`
@@ -1408,5 +1408,110 @@ the protocol extensions outside the BEP catalogue. Implemented **2026-10-14**:
   and verified against each destination piece's hash before writing. No
   per-block reuse for v1 (no per-block hash), and a candidate is dropped after
   64 failed verifications.
+
+---
+
+## 11. Open-items resolution program (proposal, 2026-10-14)
+
+Proposal under discussion. Scope: the open items selected for the next phase —
+§1.5 (periodic performance check), §4.3 (cherry-picks/follow-ups), §4.4 and
+§10.2 (DHT hardening and multi-path), §4.6 (quality gaps vs libtorrent) and the
+§10 smartness backlog. Everything else in this document is done or closed.
+
+**Diagnosis.** The items are not independent: almost all of them are
+**implemented or designed but not validated on a real swarm**, or they need a
+**go/no-go decided on data** (the DHT levers, the choking algorithm, the disk
+I/O). Per `AGENTS.md` there is **no speculative code**: implement only what a
+measurement justifies; otherwise close the item with the recorded data (as was
+done for the merge candidate ordering, §10 item 3). The program therefore turns
+each item into a measured experiment with an explicit **gate** and **decision**.
+
+### WP0 — Real-swarm harness (enabler)
+
+- **Objective:** one reproducible baseline every other gate can compare against.
+- **Method:** keep `make measure-realswarm` / `measure-dht` / `measure-pipeline`
+  / `measure-seeding`; add `scripts/measure-baseline.sh` that runs the cheap ones
+  and writes a dated summary (throughput, uTP resends, DHT reply rate, peers
+  found) to `evoluzione.md`; fix a public test torrent (Ubuntu/Debian) and a DHT
+  info-hash for reproducibility.
+- **Gate:** baseline recorded. **Deliverable:** script + baseline entry.
+  **Effort** 0.5 day, **risk** none.
+
+### WP1 — Performance round (§1.5)
+
+- **Method (idle machine):** `go test -bench … -benchmem`; `pprof` CPU/heap on
+  `gexttod` and `gx-torrent` during a real transfer; RSS and goroutine counts;
+  `make measure-seeding`.
+- **Gate/decision:** code changes only for a **measured** hotspot; otherwise
+  record "no regression, no change".
+- **Deliverable:** a "Performance round N" entry with the numbers.
+  **Effort** 0.5–1 day, **risk** none.
+
+### WP2 — Real-swarm validation of built features (§4.3) + close decisions
+
+- **Items:** the **adaptive request queue** (pipelining) and the **uTP adaptive
+  RTO** validated on a live torrent with `make measure-realswarm` (healthy paths
+  keep the resend counters low, throughput not regressed); **graduated file
+  priority** measured locally with mixed priorities.
+- **Decision:** **external DHT — close** (our own module keeps the dual-stack
+  and shared-socket patches and the per-torrent traversal model that a dependency
+  would drop).
+- **Deliverable:** measurement records + the external-DHT decision.
+  **Effort** 0.5 day, **risk** low.
+
+### WP3 — DHT cluster (§10.2, §4.4, §10 items 5–6)
+
+- **A — data.** `make measure-dht` on a **real active info-hash** (not a random
+  one) long enough that `peers_found` and `peers_confirmed_multi` are
+  non-trivial; record reply rate, `subnet_share_max`, `nodes_insecure_id`,
+  `subnet_cap_hint`.
+- **B — anti-Sybil cap.** Run with `MaxNodesPerSubnet` at candidate thresholds
+  (8/16/24); **enforce only if** it does not lower `peers_found` while lowering
+  the concentration; otherwise keep the hint (close).
+- **C — multi-path.** Decision gate on the confirmed-multi share and on connect
+  success by confirmation. If justified, implement a **bounded per-lookup state
+  machine** (like `bep44_client.go`) with a fan-out and a deadline and expose
+  `lookup_paths`; else close with data.
+- **Deliverable:** records + either the enforcement / state machine (with tests)
+  or two "closed with data" notes. **Effort** measurement 0.5–1 day;
+  implementation 2–4 days if justified. **Risk** medium (DHT correctness).
+
+### WP4 — Quality gaps vs libtorrent (§4.6)
+
+- **4a Choking/seeding campaign.** On a real swarm, gx-torrent vs
+  libtorrent/qBittorrent with the same policy on the same public torrent;
+  metrics: upload efficiency while seeding, reciprocation, first-block time,
+  stall rate. **Gate:** implement an improved choking algorithm only if a gap
+  shows.
+- **4b 10 Gbps pipelining.** Extend `measure-pipeline` / the latency harness to
+  deeper queues and higher rates; multi-piece is already in; implement more only
+  if the measured ceiling is below target.
+- **4c Disk I/O (O_DIRECT/io_uring).** Measure the disk path (`measure-seeding`
+  + a slow-storage harness); implement only if the disk is the bottleneck.
+- **4d v2 seed: block-layer hashes for a partial file.** Today `serveHashes`
+  refuses (`hash reject`) a `base=0` request unless the **whole** file is present
+  (`v2BlockTree`). Implement serving **only the requested leaf range**, computing
+  each leaf from the downloaded pieces and still rejecting a leaf whose piece is
+  missing; the upper layers come from the attached `piece layers`. Tests: unit
+  (partial file, missing piece, out-of-range, tail) + interop with a libtorrent
+  leecher. This is a **clear feature gap**, so it is implemented regardless.
+- **4e Adversarial robustness.** Test-only harness: a lying peer, a bogus
+  bitfield, a `hash request` flood; the existing smart ban and the fuzz targets
+  are the control.
+- **Deliverable:** campaign records + 4d (code/tests/docs) + 4e tests.
+  **Effort** campaign 1 day, 4d 2–3 days, 4e 0.5 day. **Risk** 4d medium
+  (protocol), the rest low.
+
+### Sequence and decision points
+
+**WP0 → WP1 → WP2 → WP3 (A→B→C) → WP4.** Cheap "close with data" first
+(WP1/WP2), then the DHT cluster (WP3), then the one clear feature (WP4d) and the
+campaign (WP4a). Explicit decisions: WP2 external DHT (close), WP3-B cap
+(enforce/hint), WP3-C multi-path (implement/close), WP4a choking
+(implement/close), WP4b/4c (implement only if measured), WP4d (always).
+
+One WP = its own commits, measurement recorded **before and after** in this
+document; the reference docs updated with each change (`bep.md` for 4d,
+`gx-torrent.md`, [`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md)).
 
 
