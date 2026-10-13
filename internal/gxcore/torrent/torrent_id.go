@@ -8,13 +8,10 @@ import (
 
 // uuidEpochOffset is the seconds between the RFC 4122 epoch (1582-10-15
 // UTC) and the Unix epoch. V1 timestamps count 100ns ticks since the former;
-// Unix times count seconds since the latter.
+// Unix times count seconds since the latter. A time.Duration cannot span 444
+// years (int64 nanoseconds overflow), so the id minting below works in
+// uint64 seconds instead.
 const uuidEpochOffset = uint64(12219292800)
-
-// uuidEpoch reconstructs the RFC 4122 base for tests and diagnostics.
-// A time.Duration cannot span 444 years (int64 nanoseconds overflow), so the
-// id minting below works in uint64 seconds instead.
-var uuidEpoch = time.Date(1582, time.October, 15, 0, 0, 0, 0, time.UTC)
 
 // newTorrentID mints a version-1 (timestamp + random) UUID used as the
 // internal torrent id. Uniqueness — not secrecy or ordering — is the only
