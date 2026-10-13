@@ -23,20 +23,20 @@ var (
 	errZeroPieces       = errors.New("torrent has zero pieces")
 	errPieceLength      = errors.New("piece length must be multiple of 16K")
 	errPieceLengthBig   = errors.New("piece length is too large")
-	// ErrV2Only marks a BitTorrent v2-only torrent (BEP 52): it has a
-	// "meta version" of 2 and a "file tree" but no v1 "pieces".
+	// ErrV2Only marks a v2-only torrent (BEP 52): meta version 2 with a file
+	// tree but no v1 pieces.
 	ErrV2Only = errors.New("torrent is BitTorrent v2 only")
-	// ErrUnknownMetaVersion marks a torrent created with a newer, unsupported
-	// "meta version".
+	// ErrUnknownMetaVersion marks a newer, unsupported meta version.
 	ErrUnknownMetaVersion = errors.New("unsupported meta version")
 )
 
-// maxPieceLength bounds a requested piece size. The largest standard v1 piece
-// is 16 MiB and calculatePieceLength never exceeds it; the cap keeps a crafted
-// create-torrent request from forcing an oversized buffer allocation.
+// maxPieceLength caps a requested piece size: the standard v1 ceiling is
+// 16 MiB and the calculator never exceeds it, so a crafted create-torrent
+// request cannot force a giant hash buffer.
 const maxPieceLength = 16 << 20
 
-// Info contains information about torrent.
+// Info is the decoded info dictionary: piece layout, files, hashes and the
+// v2/BEP 38 extensions.
 type Info struct {
 	PieceLength uint32
 	Name        string
@@ -47,32 +47,28 @@ type Info struct {
 	Bytes       []byte
 	Private     bool
 	Files       []File
-	// MetaVersion is the BEP 52 "meta version" (0 when absent, i.e. v1).
+	// MetaVersion is the BEP 52 meta version (0 when absent, i.e. v1).
 	MetaVersion int64
-	// V2Hash is the SHA-256 of the info dictionary when MetaVersion >= 2.
-	// The handshake and tracker use its first 20 bytes.
+	// V2Hash is the SHA-256 of the info dict when MetaVersion >= 2; the
+	// handshake and tracker use its first 20 bytes.
 	V2Hash [32]byte
-	// HasV2 reports whether the info dictionary carried a "meta version".
+	// HasV2 reports a meta version or file tree in the dict.
 	HasV2 bool
-	// V2Files are the files of the BEP 52 "file tree", in tree order. Only set
-	// by NewV2Info.
+	// V2Files are the BEP 52 file-tree files in tree order (NewV2Info only).
 	V2Files []V2File
-	// V2 marks a BitTorrent v2 torrent: pieces are built per file (shorter tail
-	// pieces, no padding) and verified with a SHA-256 merkle node.
+	// V2 marks v2 torrents: per-file pieces with short tails, no padding,
+	// SHA-256 merkle verification.
 	V2 bool
-	// PieceHashLen is the length in bytes of one piece hash (0 = 20, SHA-1).
-	// It is 32 for a BitTorrent v2 torrent (SHA-256).
+	// PieceHashLen is one hash's bytes (0 = 20 SHA-1; 32 = v2 SHA-256).
 	PieceHashLen uint32
-	// Collections is the BEP 38 "collections" list: identifiers of the groups
-	// the torrent belongs to, merged from the info and top-level dictionaries.
+	// Collections/Similar are the BEP 38 hints, merged from info and
+	// top-level dicts.
 	Collections []string
-	// Similar is the BEP 38 "similar" list: info hashes of torrents that might
-	// share files, merged from the info and top-level dictionaries.
-	Similar [][20]byte
-	pieces  []byte
+	Similar     [][20]byte
+	pieces      []byte
 }
 
-// File represents a file inside a Torrent.
+// File is one torrent file.
 type File struct {
 	Length int64
 	Path   string
@@ -80,6 +76,7 @@ type File struct {
 	Padding bool
 }
 
+// file is the bencoded file entry.
 type file struct {
 	Length   int64    `bencode:"length"`
 	Path     []string `bencode:"path"`
@@ -87,18 +84,19 @@ type file struct {
 	Attr     string   `bencode:"attr"`
 }
 
+// isPadding reports BEP 47 pad files and the BitComet out-of-spec
+// "_____padding_file" convention.
 func (f *file) isPadding() bool {
-	// BEP 0047
 	if strings.ContainsRune(f.Attr, 'p') {
 		return true
 	}
-	// BitComet convention that do not conform BEP 0047
 	if len(f.Path) > 0 && strings.HasPrefix(f.Path[len(f.Path)-1], "_____padding_file") {
 		return true
 	}
 	return false
 }
 
+// infoType is the bencoded info dictionary shape.
 type infoType struct {
 	PieceLength uint32             `bencode:"piece length"`
 	Pieces      []byte             `bencode:"pieces"`
@@ -110,11 +108,12 @@ type infoType struct {
 	// BEP 52 (BitTorrent v2)
 	MetaVersion int64              `bencode:"meta version"`
 	FileTree    bencode.RawMessage `bencode:"file tree"`
-	// BEP 38 hints, when they live inside the info dictionary.
+	// BEP 38 hints inside the info dict.
 	Collections []string `bencode:"collections"`
 	Similar     []string `bencode:"similar"`
 }
 
+// overrideUTF8Keys prefers the utf-8 path spellings when present.
 func (ib *infoType) overrideUTF8Keys() {
 	if len(ib.NameUTF8) > 0 {
 		ib.Name = ib.NameUTF8
@@ -126,13 +125,13 @@ func (ib *infoType) overrideUTF8Keys() {
 	}
 }
 
-// NewInfo returns info from bencoded bytes in b.
+// NewInfo decodes b into an Info: v1, hybrid or (via ErrV2Only) v2-only.
+// Validation runs meta-version first, then piece data, then file names.
 func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 	var ib infoType
 	if err := bencode.DecodeBytes(b, &ib); err != nil {
 		return nil, err
 	}
-	// BEP 52: the meta version is checked first, before any other validation.
 	if ib.MetaVersion > 2 {
 		return nil, ErrUnknownMetaVersion
 	}
@@ -152,10 +151,9 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 	if utf8 {
 		ib.overrideUTF8Keys()
 	}
-	// ".." is not allowed in file names
 	for _, file := range ib.Files {
-		for _, path := range file.Path {
-			if strings.TrimSpace(path) == ".." {
+		for _, part := range file.Path {
+			if strings.TrimSpace(part) == ".." {
 				return nil, fmt.Errorf("invalid file name: %q", filepath.Join(file.Path...))
 			}
 		}
@@ -168,8 +166,6 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 		Private:     parsePrivateField(ib.Private),
 		MetaVersion: ib.MetaVersion,
 		HasV2:       ib.MetaVersion != 0 || len(ib.FileTree) > 0,
-		// BEP 38 hints, when they live inside the info dictionary. The
-		// top-level ones are merged by MetaInfo.New after this returns.
 		Collections: normalizeCollections(ib.Collections),
 		Similar:     normalizeSimilar(ib.Similar),
 	}
@@ -184,75 +180,69 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 	} else {
 		i.Length = ib.Length
 	}
-	totalPieceDataLength := int64(i.PieceLength) * int64(i.NumPieces)
-	delta := totalPieceDataLength - i.Length
-	if delta >= int64(i.PieceLength) || delta < 0 {
+	if delta := int64(i.PieceLength)*int64(i.NumPieces) - i.Length; delta >= int64(i.PieceLength) || delta < 0 {
 		return nil, errInvalidPieceData
 	}
 	i.Bytes = b
 
-	// calculate info hash
-	hash := sha1.New()
-	_, _ = hash.Write(b)
-	copy(i.Hash[:], hash.Sum(nil))
-	// BEP 52: a v2 (or hybrid) torrent hashes the same info dictionary with
-	// SHA-256; the handshake and tracker use its first 20 bytes.
+	i.Hash = sha1.Sum(b)
 	if i.HasV2 {
 		i.V2Hash = sha256.Sum256(b)
 	}
-
-	// name field is optional
 	if ib.Name != "" {
 		i.Name = ib.Name
 	} else {
 		i.Name = hex.EncodeToString(i.Hash[:])
 	}
-
-	// construct files
-	if multiFile {
-		i.Files = make([]File, len(ib.Files))
-		uniquePaths := make(map[string]any, len(ib.Files))
-		for j, f := range ib.Files {
-			parts := make([]string, 0, len(f.Path)+1)
-			parts = append(parts, cleanName(i.Name))
-			for _, p := range f.Path {
-				parts = append(parts, cleanName(p))
-			}
-			joinedPath := filepath.Join(parts...)
-			isPadding := pad && f.isPadding()
-			// Padding files are never written to disk, so conflicting paths
-			// are harmless. BEP 47 even recommends that pad files share the
-			// same ".pad/<length>" path, so duplicates are common.
-			if !isPadding {
-				if _, ok := uniquePaths[joinedPath]; ok {
-					return nil, fmt.Errorf("duplicate file name: %q", joinedPath)
-				}
-				uniquePaths[joinedPath] = nil
-			}
-			i.Files[j] = File{
-				Path:    joinedPath,
-				Length:  f.Length,
-				Padding: isPadding,
-			}
-		}
-	} else {
-		i.Files = []File{{Path: cleanName(i.Name), Length: i.Length}}
+	if err := i.buildFiles(ib.Files, multiFile, pad); err != nil {
+		return nil, err
 	}
 	return &i, nil
 }
 
-func cleanName(s string) string {
-	return cleanNameN(s, 255)
+// buildFiles maps the bencoded entries onto cleaned storage paths, rejecting
+// duplicate non-padding paths (pad files legitimately share ".pad/<length>"
+// per BEP 47).
+func (i *Info) buildFiles(entries []file, multiFile, pad bool) error {
+	if !multiFile {
+		i.Files = []File{{Path: cleanName(i.Name), Length: i.Length}}
+		return nil
+	}
+	i.Files = make([]File, len(entries))
+	uniquePaths := make(map[string]any, len(entries))
+	for j, f := range entries {
+		parts := make([]string, 0, len(f.Path)+1)
+		parts = append(parts, cleanName(i.Name))
+		for _, p := range f.Path {
+			parts = append(parts, cleanName(p))
+		}
+		joinedPath := filepath.Join(parts...)
+		isPadding := pad && f.isPadding()
+		if !isPadding {
+			if _, ok := uniquePaths[joinedPath]; ok {
+				return fmt.Errorf("duplicate file name: %q", joinedPath)
+			}
+			uniquePaths[joinedPath] = nil
+		}
+		i.Files[j] = File{
+			Path:    joinedPath,
+			Length:  f.Length,
+			Padding: isPadding,
+		}
+	}
+	return nil
 }
 
-func cleanNameN(s string, maxLen int) string {
+// cleanName sanitizes one path segment for storage: valid UTF-8, bounded
+// length with the extension kept, invalid sequences stripped, no separators.
+func cleanName(s string) string {
 	s = strings.ToValidUTF8(s, string(unicode.ReplacementChar))
-	s = trimName(s, maxLen)
+	s = trimName(s, 255)
 	s = strings.ToValidUTF8(s, "")
 	return replaceSeparator(s)
 }
 
-// trimName trims the file name that it won't exceed 255 characters while keeping the extension.
+// trimName caps length keeping the extension when it fits.
 func trimName(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
@@ -264,6 +254,7 @@ func trimName(s string, maxLen int) string {
 	return s[:maxLen-len(ext)] + ext
 }
 
+// replaceSeparator neutralizes embedded slashes.
 func replaceSeparator(s string) string {
 	return strings.Map(func(r rune) rune {
 		if r == '/' {
@@ -273,45 +264,29 @@ func replaceSeparator(s string) string {
 	}, s)
 }
 
+// parsePrivateField reads the loosely-typed private flag: missing is false,
+// integers test non-zero, strings test non-empty and non-"0", undecodable
+// values default to private (fail closed).
 func parsePrivateField(s bencode.RawMessage) bool {
 	if len(s) == 0 {
 		return false
 	}
 	var intVal int64
-	err := bencode.DecodeBytes(s, &intVal)
-	if err == nil {
+	if err := bencode.DecodeBytes(s, &intVal); err == nil {
 		return intVal != 0
 	}
 	var stringVal string
-	err = bencode.DecodeBytes(s, &stringVal)
-	if err != nil {
+	if err := bencode.DecodeBytes(s, &stringVal); err != nil {
 		return true
 	}
 	return stringVal != "" && stringVal != "0"
 }
 
-// NewInfoBytes creates a new Info dictionary by reading and hashing the files on the disk.
+// NewInfoBytes hashes the files on disk into an info dict.
 func NewInfoBytes(root string, paths []string, private bool, pieceLength uint32, name string, log logger.Logger) ([]byte, error) {
-	var singleFileTorrent bool
-	switch len(paths) {
-	case 0:
-		return nil, errors.New("no path specified")
-	case 1:
-		if name == "" {
-			name = filepath.Base(paths[0])
-		}
-		fi, err := os.Stat(paths[0])
-		if err != nil {
-			return nil, err
-		}
-		singleFileTorrent = !fi.IsDir()
-	default:
-		if root == "" {
-			return nil, errors.New("no root specified")
-		}
-		if name == "" {
-			return nil, errors.New("no name specified")
-		}
+	single, err := resolveCreationLayout(root, paths, &name)
+	if err != nil {
+		return nil, err
 	}
 	totalLength, err := findTotalLength(paths)
 	if err != nil {
@@ -326,12 +301,63 @@ func NewInfoBytes(root string, paths []string, private bool, pieceLength uint32,
 	} else if pieceLength%(16<<10) != 0 {
 		return nil, errPieceLength
 	}
-	// pieceLength is user-provided (create-torrent API) and feeds the hash
-	// buffer below, so an oversized value must not turn into a multi-gigabyte
-	// allocation. calculatePieceLength already stays within maxPieceLength.
 	if pieceLength > maxPieceLength {
 		return nil, errPieceLengthBig
 	}
+	files, pieces, err := hashFiles(root, paths, pieceLength, log)
+	if err != nil {
+		return nil, err
+	}
+	b := struct {
+		Name        string `bencode:"name"`
+		Private     bool   `bencode:"private"`
+		PieceLength uint32 `bencode:"piece length"`
+		Pieces      []byte `bencode:"pieces"`
+		Length      int64  `bencode:"length,omitempty"` // Single File Mode
+		Files       []file `bencode:"files,omitempty"`  // Multiple File mode
+	}{
+		Name:        name,
+		Private:     private,
+		PieceLength: pieceLength,
+		Pieces:      pieces,
+	}
+	if single {
+		b.Length = totalLength
+	} else {
+		b.Files = files
+	}
+	return bencode.EncodeBytes(b)
+}
+
+// resolveCreationLayout validates the creation arguments and defaults the
+// name, reporting whether the result is a single-file torrent.
+func resolveCreationLayout(root string, paths []string, name *string) (bool, error) {
+	switch len(paths) {
+	case 0:
+		return false, errors.New("no path specified")
+	case 1:
+		if *name == "" {
+			*name = filepath.Base(paths[0])
+		}
+		fi, err := os.Stat(paths[0])
+		if err != nil {
+			return false, err
+		}
+		return !fi.IsDir(), nil
+	default:
+		if root == "" {
+			return false, errors.New("no root specified")
+		}
+		if *name == "" {
+			return false, errors.New("no name specified")
+		}
+		return false, nil
+	}
+}
+
+// hashFiles walks every path, hashing the concatenated bytes into piece
+// hashes and collecting the file entries.
+func hashFiles(root string, paths []string, pieceLength uint32, log logger.Logger) ([]file, []byte, error) {
 	buf := make([]byte, pieceLength)
 	offset := 0
 	remaining := func() []byte { return buf[offset:] }
@@ -370,53 +396,31 @@ func NewInfoBytes(root string, paths []string, private bool, pieceLength uint32,
 				if err != nil {
 					return err
 				}
-				// buffer finished, calculate piece hash and append to pieces
 				_, _ = hash.Write(buf)
 				pieces = hash.Sum(pieces)
 				hash.Reset()
 				offset = 0
 			}
 		}
-		err = filepath.Walk(path, visit)
-		if err != nil {
-			return nil, err
+		if err := filepath.Walk(path, visit); err != nil {
+			return nil, nil, err
 		}
 	}
-	// hash remaining buffer
 	if offset > 0 {
 		_, _ = hash.Write(buf[:offset])
 		pieces = hash.Sum(pieces)
 	}
-	b := struct {
-		Name        string `bencode:"name"`
-		Private     bool   `bencode:"private"`
-		PieceLength uint32 `bencode:"piece length"`
-		Pieces      []byte `bencode:"pieces"`
-		Length      int64  `bencode:"length,omitempty"` // Single File Mode
-		Files       []file `bencode:"files,omitempty"`  // Multiple File mode
-	}{
-		Name:        name,
-		Private:     private,
-		PieceLength: pieceLength,
-		Pieces:      pieces,
-	}
-	if singleFileTorrent {
-		b.Length = totalLength
-	} else {
-		b.Files = files
-	}
-	return bencode.EncodeBytes(b)
+	return files, pieces, nil
 }
 
-// PieceHash returns the hash of a piece at index.
+// PieceHash returns piece index's hash bytes.
 func (i *Info) PieceHash(index uint32) []byte {
 	n := i.hashLen()
 	begin := index * n
-	end := begin + n
-	return i.pieces[begin:end]
+	return i.pieces[begin : begin+n]
 }
 
-// hashLen is the length of one piece hash: 20 (SHA-1) unless set for v2.
+// hashLen is one hash's bytes: 20 SHA-1 unless set for v2.
 func (i *Info) hashLen() uint32 {
 	if i.PieceHashLen > 0 {
 		return i.PieceHashLen
@@ -443,6 +447,8 @@ func findTotalLength(paths []string) (n int64, err error) {
 	return
 }
 
+// calculatePieceLength targets ~2000 pieces between 32 KiB and 16 MiB,
+// rounded up to a power of two.
 func calculatePieceLength(totalLength int64) uint32 {
 	const maxPieces = 2000
 	pieceLength := totalLength / maxPieces
@@ -452,7 +458,6 @@ func calculatePieceLength(totalLength int64) uint32 {
 	case pieceLength > 16<<20:
 		return 16 << 20
 	default:
-		// round to next power of 2
 		v := uint32(pieceLength)
 		v--
 		v |= v >> 1
