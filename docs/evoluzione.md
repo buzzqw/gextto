@@ -925,6 +925,18 @@ not active**, because BEP 42 is not applied everywhere and a per-/24 cap would p
 legitimate nodes behind CGNAT/mobile. Tests: `TestSubnetKey`,
 `TestTableMetricsConcentration`.
 
+**Cap cost — done (2026-10-13).** The per-subnet cap used to be enforced with a
+full scan of the address book on every insert/update (`subnetAtCap`). It is now
+backed by an **incremental per-subnet counter** (`subnetNodes` in
+`routing_table.go`), maintained on exactly the transitions that give or take a
+routing-tree slot (`insert`/`update`/`kill`, guarded by a per-node
+`countedSubnet` flag), so `subnetAtCap` is **O(1)**. The enforcement policy is
+unchanged (still off by default): the change only removes the cost that was one
+of the reasons to keep it off, so enabling `MaxNodesPerSubnet` is now free on the
+insert path. Test: `TestSubnetCounterTracksInsertUpdateKill` keeps the counter in
+sync with a brute-force recount across insert, update (an unknown node later
+identified) and kill.
+
 **Measurement harness — done (2026-10-11).** `make measure-dht`
 (`GX_MEASURE_DHT=5m`, `GX_MEASURE_DHT_INTERVAL=10s`; `internal/dht/measure_test.go`,
 opt-in and outside CI) starts a real node against the public DHT and prints,

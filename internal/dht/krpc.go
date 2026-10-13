@@ -37,7 +37,10 @@ type remoteNode struct {
 	// tree slot because its subnet was at the anti-Sybil cap. Keeping it avoids
 	// re-discovering and re-processing it in a loop.
 	noTree bool
-	log    *DebugLogger
+	// countedSubnet is true while this node is included in the routing table's
+	// incremental per-subnet counter, so insert/update/kill can keep it in sync.
+	countedSubnet bool
+	log           *DebugLogger
 }
 
 func newRemoteNode(addr net.UDPAddr, id string, log *DebugLogger) *remoteNode {

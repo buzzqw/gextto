@@ -9,9 +9,10 @@ import (
 
 func newRoutingTable(log *DebugLogger) *routingTable {
 	return &routingTable{
-		nTree:     &nTree{},
-		addresses: make(map[string]*remoteNode),
-		log:       log,
+		nTree:       &nTree{},
+		addresses:   make(map[string]*remoteNode),
+		subnetNodes: make(map[string]int),
+		log:         log,
 	}
 }
 
@@ -31,14 +32,53 @@ type routingTable struct {
 
 	// maxPerSubnet caps routing-table nodes per /24 (v4) or /48 (v6); 0 = off.
 	maxPerSubnet int
+	// subnetNodes counts, per subnet key, how many nodes currently occupy a
+	// routing-tree slot. It is maintained incrementally (insert/update/kill) so
+	// subnetAtCap is O(1) instead of scanning every address.
+	subnetNodes map[string]int
 
 	log *DebugLogger
 }
 
-// subnetAtCap reports whether inserting a node with this IP would exceed the
-// per-subnet cap. exclude is skipped when counting (the node being inserted or
-// updated). Always false when the cap is disabled.
-func (r *routingTable) subnetAtCap(ip net.IP, exclude *remoteNode) bool {
+// hasSubnetSlot reports whether node occupies a routing-tree slot (the
+// invariant the incremental counter mirrors).
+func (r *routingTable) hasSubnetSlot(n *remoteNode) bool {
+	return n != nil && !n.noTree && !bogusId(n.id) && n.address.IP != nil && subnetKey(n.address.IP) != ""
+}
+
+// trackSubnet adds or removes node from the per-subnet counter. It is
+// idempotent (guarded by node.countedSubnet) and must be called exactly when a
+// node gains or loses its routing-tree slot.
+func (r *routingTable) trackSubnet(n *remoteNode, add bool) {
+	key := subnetKey(n.address.IP)
+	if key == "" {
+		n.countedSubnet = false
+		return
+	}
+	if add {
+		if !n.countedSubnet {
+			r.subnetNodes[key]++
+			n.countedSubnet = true
+		}
+		return
+	}
+	if !n.countedSubnet {
+		return
+	}
+	n.countedSubnet = false
+	if r.subnetNodes[key] > 0 {
+		r.subnetNodes[key]--
+		if r.subnetNodes[key] == 0 {
+			delete(r.subnetNodes, key)
+		}
+	}
+}
+
+// subnetAtCap reports whether adding a node with this IP would exceed the
+// per-subnet cap. counted says whether the node being inserted or updated is
+// already part of subnetNodes (an update of an existing node), so its own slot
+// does not count against itself. Always false when the cap is disabled.
+func (r *routingTable) subnetAtCap(ip net.IP, counted bool) bool {
 	if r.maxPerSubnet <= 0 {
 		return false
 	}
@@ -46,14 +86,9 @@ func (r *routingTable) subnetAtCap(ip net.IP, exclude *remoteNode) bool {
 	if key == "" {
 		return false
 	}
-	n := 0
-	for _, node := range r.addresses {
-		if node == exclude || node.noTree || node.address.IP == nil || bogusId(node.id) {
-			continue
-		}
-		if subnetKey(node.address.IP) == key {
-			n++
-		}
+	n := r.subnetNodes[key]
+	if counted {
+		n--
 	}
 	return n >= r.maxPerSubnet
 }
@@ -134,17 +169,19 @@ func (r *routingTable) update(node *remoteNode, proto string) error {
 		return fmt.Errorf("node missing from the routing table: %v", node.address.String())
 	}
 	if node.id != "" {
-		if r.subnetAtCap(node.address.IP, node) {
+		if r.subnetAtCap(node.address.IP, node.countedSubnet) {
 			// The subnet is at the cap: keep the node in the address book but
 			// deny it a tree slot, so it is not re-discovered and re-processed
 			// in a loop.
 			totalNodesCapped.Add(1)
+			r.trackSubnet(node, false)
 			node.noTree = true
 			r.addresses[addr].id = node.id
 			return nil
 		}
 		node.noTree = false
 		r.nTree.insert(node)
+		r.trackSubnet(node, true)
 		totalNodes.Add(1)
 		r.addresses[addr].id = node.id
 	}
@@ -171,7 +208,7 @@ func (r *routingTable) insert(node *remoteNode, proto string) error {
 	if existed {
 		return nil // fmt.Errorf("node already existed in routing table: %v", node.address.String())
 	}
-	if !bogusId(node.id) && r.subnetAtCap(node.address.IP, node) {
+	if !bogusId(node.id) && r.subnetAtCap(node.address.IP, node.countedSubnet) {
 		// The subnet is already at the cap: keep the node in the address book
 		// but deny it a tree slot (noTree), so it is not re-processed in a
 		// loop and does not count towards the cap itself.
@@ -185,6 +222,7 @@ func (r *routingTable) insert(node *remoteNode, proto string) error {
 		// recursive version of node insertion.
 		r.nTree.insert(node)
 		totalNodes.Add(1)
+		r.trackSubnet(node, true)
 	}
 	return nil
 }
@@ -210,6 +248,7 @@ func (r *routingTable) getOrCreateNode(id string, hostPort string, proto string)
 }
 
 func (r *routingTable) kill(n *remoteNode, p *peerStore) {
+	r.trackSubnet(n, false)
 	delete(r.addresses, n.address.String())
 	knownNodes.Store(int64(len(r.addresses)))
 	r.nTree.cut(InfoHash(n.id), 0)

@@ -165,5 +165,8 @@ The DHT lives in `internal/dht` (a module of its own). Features:
   §4.10); `Config.MaxNodesPerSubnet` applies an optional cap per /24 (/48 v6),
   **disabled by default**, with the `nodes_capped` counter; nodes beyond the threshold
   remain known but outside the tree (`noTree`), so as not to re-discover them in a loop.
+  The cap is enforced through an **incremental per-subnet counter** (`subnetNodes`,
+  O(1) per insert/update, kept in sync on insert/update/kill), not a scan of the
+  address book.
 
 uTP uses the `github.com/anacrolix/utp` library as a dependency.
