@@ -20,6 +20,14 @@
 .quick{display:flex;gap:6px;flex-wrap:wrap}
 .quick button{height:24px;padding:0 9px;font-size:12px;border-radius:99px}
 .quick button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-soft-fg);border-color:transparent}
+.epgrid{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.eprow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.eprow .epseason{width:44px;color:var(--muted);font-variant-numeric:tabular-nums}
+.epchip{height:26px;min-width:44px;padding:0 8px;font-size:12px;border-radius:6px;margin:0}
+.epchip.have{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.epchip.miss{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.epadd{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:8px 0}
+.epadd .field{width:96px}
 </style>
 </head>
 <body>
@@ -106,6 +114,17 @@
         </div>
         <div class="checks"><label class="chk"><input type="checkbox" name="paused" value="1" title="Add matched torrents in paused state"> Paused</label></div>
       </details>
+      <details class="more" id="wanted-episodes-mgr" hidden>
+        <summary>Episodes</summary>
+        <p class="hint">Mark what you already have and what is missing; missing episodes are searched again.</p>
+        <div class="epgrid" id="wanted-episodes-body" aria-live="polite"></div>
+        <div class="epadd">
+          <label class="field">Season<input type="number" min="0" id="wanted-ep-season" title="Season number"></label>
+          <label class="field">Episode<input type="number" min="1" id="wanted-ep-episode" title="Episode number"></label>
+          <button type="button" id="wanted-ep-add" title="Add the episode as missing, so it is searched">Add as missing</button>
+          <button type="button" id="wanted-ep-force" title="Search the indexers now for the missing episodes"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Force download missing</button>
+        </div>
+      </details>
     </div>
     <div class="dlg-foot">
       <button type="button" data-close title="Close without saving">Cancel</button>
@@ -149,11 +168,46 @@ function openEditor(data,index){
     $('#wanted-more').open=!!(data.exclude||data.episode||data.category||data.savepath||data.paused==='true');
   }
   var editing=index!==undefined;
+  // The episode manager only exists for a saved series.
+  var mgr=$('#wanted-episodes-mgr');
+  if(editing&&(data.kind||'series')!=='movie'){mgr.hidden=false;mgr.open=true;loadEpisodes(index);}
+  else{mgr.hidden=true;mgr.open=false;currentIndex=null;$('#wanted-episodes-body').textContent='';}
   $('#dlg-wanted-title').textContent=editing?t('Edit title'):t('Add title');$('#wanted-submit').textContent=editing?t('Save wanted'):t('Add wanted');
   syncKind();syncLang();openDialog(dlg);form.elements.name.focus();
 }
 $('#add-wanted').addEventListener('click',function(){openEditor(null);});
 $$('[data-wanted-edit]').forEach(function(btn){btn.addEventListener('click',function(){var d={};['name','kind','seasons','language','quality','exclude','episode','category','savepath','paused'].forEach(function(k){d[k]=btn.getAttribute('data-'+k)||'';});openEditor(d,btn.getAttribute('data-index'));});});
+
+// Episode manager: what is present, what is missing, and force a new search.
+var currentIndex=null;
+function renderEpisodes(list){
+  var box=$('#wanted-episodes-body');box.textContent='';
+  var bySeason={},seasons=[];
+  (list||[]).forEach(function(e){if(!bySeason[e.season]){bySeason[e.season]=[];seasons.push(e.season);}bySeason[e.season].push(e);});
+  seasons.sort(function(a,b){return a-b;});
+  seasons.forEach(function(s){
+    var row=document.createElement('div');row.className='eprow';
+    var lab=document.createElement('span');lab.className='epseason';lab.textContent='S'+String(s).padStart(2,'0');row.appendChild(lab);
+    bySeason[s].forEach(function(e){
+      var b=document.createElement('button');b.type='button';b.className='epchip '+(e.have?'have':'miss');
+      b.textContent='E'+String(e.episode).padStart(2,'0');
+      b.title=e.have?t('Downloaded: click to mark it missing'):t('Missing: click to mark it downloaded');
+      b.onclick=function(){episodeOp(s,e.episode,e.have?'missing':'have');};row.appendChild(b);
+    });
+    box.appendChild(row);
+  });
+  if(!seasons.length){var p=document.createElement('p');p.className='hint';p.textContent=t('No episodes known yet.');box.appendChild(p);}
+}
+function loadEpisodes(index){
+  currentIndex=index;
+  fetch('/ui/wanted-episodes?index='+encodeURIComponent(index),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(res){renderEpisodes(res.episodes||[]);}).catch(function(){var box=$('#wanted-episodes-body');if(box)box.textContent=t('Error');});
+}
+function episodeOp(season,episode,op){
+  var f=new URLSearchParams();f.set('op',op);f.set('index',currentIndex);f.set('season',season);f.set('episode',episode);
+  fetch('/ui/wanted-episodes',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});}).then(function(res){renderEpisodes(res.episodes||[]);}).catch(function(e){toast(t('Error')+': '+(e.message||''),true);});
+}
+$('#wanted-ep-add').addEventListener('click',function(){var s=$('#wanted-ep-season').value,e=$('#wanted-ep-episode').value;if(s===''||e===''){toast(t('Enter a season and an episode'),true);return;}episodeOp(s,e,'add');$('#wanted-ep-episode').value='';});
+$('#wanted-ep-force').addEventListener('click',function(){if(currentIndex===null)return;poll(form.elements.name.value.trim(),null,this);});
 
 // Typeahead from the archive.
 (function(){var input=$('#wanted-name'),list=$('#series-list'),timer=null;input.addEventListener('input',function(){clearTimeout(timer);var q=input.value.trim();if(q.length<2)return;timer=setTimeout(function(){fetch('/ui/rss-suggest?q='+encodeURIComponent(q),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){list.innerHTML='';(names||[]).forEach(function(n){var o=document.createElement('option');o.value=n;list.appendChild(o);});}).catch(function(){});},300);});})();

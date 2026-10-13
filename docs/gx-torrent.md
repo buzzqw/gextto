@@ -240,7 +240,10 @@ The standalone pages follow the same structure:
   (`S03E01–E03`), **Missing** highlights the episodes seen but not downloaded.
   The card lists episodes, never a bare count nor a false "complete" (a season
   is only as complete as the episodes seen so far), plus search now / edit /
-  pause / remove. *Add title* is a guided
+  pause / remove. The *Edit* dialog has an **Episodes** manager: it lists the
+  known episodes per season, a click marks one **downloaded** or **missing**, an
+  episode can be added as missing, and **Force download missing** searches the
+  indexers again for what is missing. *Add title* is a guided
   dialog: series or movie, the title with a search that shows how it is named in
   the archive, feeds and indexers (pick one to use it), then seasons, language
   (with quick picks) and quality, and the other options folded away.

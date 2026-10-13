@@ -295,8 +295,9 @@ fewer features, but all the ones a standalone client needs.
   sortable multi-select list with context menu and keyboard shortcuts, torrent
   detail in a side panel, drag-and-drop of `.torrent` files and pasted
   magnets, phone-friendly cards. Every page axe-core checked.
-- **RSS and automation.** A **Wanted** page (cards per title with missing
-  episodes, guided add dialog) and an **RSS & Indexers** page (feeds, rules,
+- **RSS and automation.** A **Wanted** page (cards per title with Have/Missing
+  episodes, an episode manager to mark what you have or miss and force a new
+  search, guided add dialog) and an **RSS & Indexers** page (feeds, rules,
   indexers, options as tabbed cards; rule editor split into *which items* /
   *what to do* with live match preview). Ordered PASS/FAIL rules, per-row
   reload, live indexer tests, optional FlareSolverr, and a local **archive**

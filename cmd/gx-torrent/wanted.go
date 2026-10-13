@@ -419,6 +419,43 @@ func (d *Daemon) wantedTaken(name string, season, episode int) bool {
 	return ok
 }
 
+// setWantedTaken marks an episode as downloaded (have) or not (missing), from
+// the episode manager of the wanted page.
+func (d *Daemon) setWantedTaken(name string, season, episode int, have bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.state.WantedTaken == nil {
+		d.state.WantedTaken = map[string]smartEpisodes{}
+	}
+	key := wantedKey(name, season)
+	if d.state.WantedTaken[key] == nil {
+		d.state.WantedTaken[key] = smartEpisodes{}
+	}
+	token := strconv.Itoa(episode)
+	if have {
+		d.state.WantedTaken[key][token] = time.Now().Unix()
+	} else {
+		delete(d.state.WantedTaken[key], token)
+	}
+	d.dirty = true
+}
+
+// addWantedSeen records an episode as known, so it counts as missing (and gets
+// searched) even if it never appeared in a feed. From the episode manager.
+func (d *Daemon) addWantedSeen(name string, season, episode int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.state.WantedSeen == nil {
+		d.state.WantedSeen = map[string]smartEpisodes{}
+	}
+	key := wantedKey(name, season)
+	if d.state.WantedSeen[key] == nil {
+		d.state.WantedSeen[key] = smartEpisodes{}
+	}
+	d.state.WantedSeen[key][strconv.Itoa(episode)] = time.Now().Unix()
+	d.dirty = true
+}
+
 // wantedTakenEpisodes lists the episodes downloaded for a wanted title, inside
 // its seasons, ordered by season then episode. It is what the operator "has",
 // the counterpart of wantedMissing.

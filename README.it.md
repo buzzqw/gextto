@@ -304,7 +304,8 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
   scorciatoie, dettaglio in un pannello laterale, trascinamento dei `.torrent`
   e magnet incollati, schede su telefono. Ogni pagina verificata con axe-core.
 - **RSS e automazione.** Pagina **Cercati** (schede per titolo con episodi
-  mancanti, finestra guidata di aggiunta) e pagina **RSS & Indexer** (feed,
+  Have/Missing, gestore puntate per segnare cosa hai o manca e forzare una nuova
+  ricerca, finestra guidata di aggiunta) e pagina **RSS & Indexer** (feed,
   regole, indexer, opzioni a schede; editor diviso in *quali elementi* / *cosa
   fare* con anteprima dal vivo). Regole PASS/FAIL ordinate, ricarica per riga,
   test indexer in tempo reale, FlareSolverr opzionale e un **archivio** locale
