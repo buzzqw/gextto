@@ -1172,7 +1172,7 @@ Sources: [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md),
 | Area | libtorrent | gx-core today | Gap |
 | --- | --- | --- | --- |
 | Choking / seeding | rate-based choking, anti-leech, peer classes | speed-based + optimistic, deterministic harness (`unchoker/sim_test.go`) | quality algorithms absent; measurements **local only** (§6.6) |
-| Pipelining | multi-piece per peer, ring buffer | adaptive queue (50→250), one piece per peer | 10 Gbps given as "to be measured" (`bep.md` §6); **no harness** |
+| Pipelining | multi-piece per peer, ring buffer | adaptive queue (50→250), one piece per peer; write bounded to 4 pieces per torrent (`maxPendingWrites`, 2026-10-13) | 10 Gbps given as "to be measured" (`bep.md` §6); **no harness** |
 | Disk I/O | mmap, pluggable storage, O_DIRECT/AIO, contiguous writes + hash on a pool | **`O_SYNC` removed, `fdatasync`, mmap opt-in (2026-10-12)**; O_DIRECT/io_uring/explicit contiguous remain absent (analysis: the page cache already coalesces and Go already overlaps I/O) | reduced (§5.4) |
 | File priority | graduated 0–7 | **done (0 = skip, 1..4 = normal, 5..7 = high)**; `capabilityLevels.file_priorities = full`; measurement with mixed files to do (§4.11) | closed (residual measurement) |
 | DHT | multi-path, active anti-Sybil | BEP 5/32/33/42/43/44/46, dedup; cap and multi-path off | hardening **not active** (§4.10) |
@@ -2669,6 +2669,20 @@ Minimal change set (each step one commit, tests + `measure-pipeline` before/afte
 
 Risk is concentrated in steps 3–4 (concurrency and RAM), so they land last and
 only with the harness showing the gain.
+
+**Progress (2026-10-13).** The stop-the-world "one write per torrent" has been
+replaced by a **bounded per-torrent write ring buffer**: `beginPieceWrite`/
+`endPieceWrite` (`torrent_write.go`) suspend the piece channels only once
+`maxPendingWrites` (4) pieces are being written, so the network keeps flowing
+while pieces are written. The picker already skips a piece marked `Writing`, so a
+piece is never written twice, and `Config.ParallelWrites` (`semWrite`) still caps
+the disk parallelism globally; the per-torrent bound limits the in-flight piece
+buffers. Tests: `torrent_writering_test.go` (suspend at the cap, resume below,
+no underflow), the full `cmd/gx-torrent` e2e suite and `-race` on the transfer
+tests. **Measurement:** `make measure-seeding` on loopback is **equivalent** to
+before the change (the disk is not the bottleneck there, so the overlap does not
+show); the expected gain is on slow storage and is the reason it is a prerequisite
+for the multi-piece steps 1–2, which remain to do.
 
 ---
 

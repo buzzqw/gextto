@@ -15,11 +15,40 @@ import (
 // the whole session (libtorrent-style smart ban).
 const sessionBanTTL = 30 * time.Minute
 
+// maxPendingWrites bounds how many pieces of one torrent may be written at the
+// same time. Config.ParallelWrites (the session's semWrite) still caps the disk
+// parallelism globally; this per-torrent bound limits the in-flight piece
+// buffers (RAM). With it above 1 the network keeps flowing while pieces are
+// written, instead of the old stop-the-world "one write per torrent". The picker
+// skips a piece marked Writing, so no piece is ever written twice.
+const maxPendingWrites = 4
+
+// beginPieceWrite records a piece write in flight and suspends the piece
+// channels once the ring buffer is full.
+func (t *torrent) beginPieceWrite() {
+	t.pendingWrites++
+	if t.pendingWrites >= maxPendingWrites {
+		t.pieceMessagesC.Suspend()
+		t.webseedPieceResultC.Suspend()
+	}
+}
+
+// endPieceWrite records a finished piece write and resumes the piece channels
+// when the ring buffer has room again.
+func (t *torrent) endPieceWrite() {
+	if t.pendingWrites > 0 {
+		t.pendingWrites--
+	}
+	if t.pendingWrites < maxPendingWrites {
+		t.pieceMessagesC.Resume()
+		t.webseedPieceResultC.Resume()
+	}
+}
+
 func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 	pw.Piece.Writing = false
 
-	t.pieceMessagesC.Resume()
-	t.webseedPieceResultC.Resume()
+	t.endPieceWrite()
 
 	pw.Buffer.Release()
 

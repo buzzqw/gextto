@@ -257,6 +257,12 @@ type torrent struct {
 	// only duplicate work. Cleared by startVerifier after it is consumed.
 	mergedPieces map[uint32]bool
 
+	// pendingWrites is the number of pieces of this torrent whose write to disk
+	// is in flight. It bounds the write ring buffer (maxPendingWrites): above 0
+	// the network keeps flowing while a piece is written, instead of the old
+	// "one write per torrent" stop-the-world. Touched only from the run loop.
+	pendingWrites int
+
 	// Metrics
 	downloadSpeed   metrics.Meter
 	uploadSpeed     metrics.Meter

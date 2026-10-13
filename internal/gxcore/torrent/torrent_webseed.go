@@ -74,9 +74,9 @@ func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 	}
 	piece.Writing = true
 
-	// Prevent receiving piece messages to avoid more than 1 write per torrent.
-	t.pieceMessagesC.Suspend()
-	t.webseedPieceResultC.Suspend()
+	// Bound the write ring buffer: the network keeps flowing while up to
+	// maxPendingWrites pieces are written.
+	t.beginPieceWrite()
 
 	pw := piecewriter.New(piece, msg.Downloader, msg.Buffer)
 	go pw.Run(t.pieceWriterResultC, t.doneC, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)

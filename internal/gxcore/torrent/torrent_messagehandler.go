@@ -110,9 +110,10 @@ func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
 	// Request next piece while writing the completed piece, being optimistic about hash check.
 	t.startPieceDownloaderFor(pe)
 
-	// Prevent receiving piece messages to avoid more than 1 write per torrent.
-	t.pieceMessagesC.Suspend()
-	t.webseedPieceResultC.Suspend()
+	// Bound the write ring buffer: the network keeps flowing while up to
+	// maxPendingWrites pieces are written. The picker skips a piece in Writing,
+	// so a piece is never written twice.
+	t.beginPieceWrite()
 
 	pw := piecewriter.New(piece, pe, pd.Buffer)
 	go pw.Run(t.pieceWriterResultC, t.doneC, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
