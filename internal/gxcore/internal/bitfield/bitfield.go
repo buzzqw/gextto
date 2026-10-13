@@ -108,9 +108,22 @@ func (b *Bitfield) All() bool {
 // HasAnyNotIn reports a piece b holds that other lacks — i.e. whether a
 // peer still advertises something wanted. Both sides must share the length
 // (same torrent guarantees it); the shorter backing store bounds the scan.
+// The loops are inlined: the per-word/byte predicate is trivial and a
+// callback would double the cost in this hot path.
 func (b *Bitfield) HasAnyNotIn(other *Bitfield) bool {
-	return scanWords(b.bytes, other.bytes, func(x, y uint64) bool { return x&^y != 0 },
-		func(x, y byte) bool { return x&^y != 0 })
+	n := min(len(b.bytes), len(other.bytes))
+	i := 0
+	for ; i+8 <= n; i += 8 {
+		if binary.LittleEndian.Uint64(b.bytes[i:])&^binary.LittleEndian.Uint64(other.bytes[i:]) != 0 {
+			return true
+		}
+	}
+	for ; i < n; i++ {
+		if b.bytes[i]&^other.bytes[i] != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // HasAnyOutside reports a piece the peer (b) holds that is neither held nor
@@ -130,24 +143,6 @@ func (b *Bitfield) HasAnyOutside(have, skip *Bitfield) bool {
 	}
 	for ; i < n; i++ {
 		if b.bytes[i]&^(have.bytes[i]|skip.bytes[i]) != 0 {
-			return true
-		}
-	}
-	return false
-}
-
-// scanWords walks two stores a word at a time, then byte by byte, reporting
-// the first position where word and byte predicates agree.
-func scanWords(x, y []byte, word func(uint64, uint64) bool, single func(byte, byte) bool) bool {
-	n := min(len(x), len(y))
-	i := 0
-	for ; i+8 <= n; i += 8 {
-		if word(binary.LittleEndian.Uint64(x[i:]), binary.LittleEndian.Uint64(y[i:])) {
-			return true
-		}
-	}
-	for ; i < n; i++ {
-		if single(x[i], y[i]) {
 			return true
 		}
 	}
