@@ -955,8 +955,9 @@ func uiTorrentBackendOptions(value string) []uiFormOption {
 	if value == "" {
 		value = DefaultTorrentBackend
 	}
-	if strings.EqualFold(value, "anacrolix") {
-		// Removed backend: at runtime it is normalised to the embedded engine.
+	if !isKnownTorrentBackend(strings.ToLower(value)) {
+		// A removed or unknown backend is normalised to the embedded engine at
+		// runtime (TorrentBackendName); show the same here.
 		value = BackendEmbedded
 	}
 	options := []uiFormOption{}

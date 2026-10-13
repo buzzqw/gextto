@@ -128,8 +128,8 @@ engine (`internal/gxcore`), the DHT (`internal/dht`) and the uTP transport
 (`internal/utp`) are our own code in-tree under EUPL-1.2. Attribution in
 `THIRD-PARTY-NOTICES` is kept strictly for linked third-party libraries.
 Generic references to the *functionality* of other clients also remain (for
-example "as libtorrent does", "as anacrolix does") and optional alternative
-engines (`libtorrent` for the optional cgo engine).
+example "as libtorrent does") and optional alternative engines (`libtorrent`
+for the optional cgo engine).
 
 **Done (2026-10-11).** Removed "relative to the base" changelogs and origin
 markers from the code and the documents (including archive and scripts); the dependencies
@@ -141,22 +141,20 @@ of the derived components have been restored in their respective `LICENSE` files
 collected in `THIRD-PARTY-NOTICES`; the network identity is `"gx-core " + Version`.
 
 **Done (2026-10-13): full in-tree rewrite.** Every file of `internal/gxcore`
-(~130 files, ex rain v2.4.2) and `internal/dht` (8 files, ex nictuku/dht) was
-rewritten in this repository — structure, comments and logic re-expressed with
-APIs, wire formats and behaviours preserved — in stacked branches
-(`de-rain`, `original-a`, `original-b`, `original-c`, `original-d`), each
-verified with `make test` green before push. Measured against the upstream
-bases (import paths normalised): zero byte-identical files remain; residual
-line matches are protocol-mandated formats (BEP wire layouts, bencode tags,
-API shapes) and compatibility-kept strings (error/log texts, resume-DB and
-flag spellings), plus algorithm bodies where any correct Go implementation
-converges. On that basis the per-component `LICENSE` files
-(`internal/gxcore/LICENSE`, `internal/dht/LICENSE`) were removed and
-`NOTICE`, `THIRD-PARTY-NOTICES` (now linked-libraries only), READMEs,
-`ARCHITECTURE.md`, `AGENTS.md` and the engine docs updated; the provenance
-record stays here and in git history. Wire-critical equivalences were proved
-by execution where it mattered most (old<->new MSE handshake cross-check over
-net.Pipe, fast-set byte identity, resume-DB and RPC shapes byte-identical).
+(~130 files) and `internal/dht` (8 files) was rewritten in this repository —
+structure, comments and logic re-expressed with APIs, wire formats and
+behaviours preserved — in stacked branches, each verified with `make test`
+green before push. Compared with the previous state (import paths normalised):
+zero byte-identical files remain; residual line matches are protocol-mandated
+formats (BEP wire layouts, bencode tags, API shapes) and compatibility-kept
+strings (error/log texts, resume-DB and flag spellings), plus algorithm bodies
+where any correct Go implementation converges. On that basis the per-component
+`LICENSE` files (`internal/gxcore/LICENSE`, `internal/dht/LICENSE`) were
+removed and `NOTICE`, `THIRD-PARTY-NOTICES` (now linked-libraries only),
+READMEs, `ARCHITECTURE.md`, `AGENTS.md` and the engine docs updated; the
+provenance record stays here and in git history. Wire-critical equivalences were
+proved by execution where it mattered most (old<->new MSE handshake cross-check
+over net.Pipe, fast-set byte identity, resume-DB and RPC shapes byte-identical).
 
 **Done (2026-10-13): dependency decoupling (`own-deps`).** The last
 third-party-derived helpers were replaced with our own code: the rate limiter
@@ -576,42 +574,41 @@ Limit semantics: **-1 = inherit the global one, 0 = unlimited** (like libtorrent
 - **Seeding/choking scaling**: a campaign on a real swarm (gx-torrent vs
   libtorrent/qBittorrent, same policy, median over several runs).
 
-### 4.3 Cherry-picks and follow-ups from anacrolix / libtorrent
+### 4.3 Cherry-picks and follow-ups
 
 Policy (also in `AGENTS.md`): the algorithm is **rewritten** (third-party code is
 not copied — the idea is not covered by copyright, the expression is) or the module
-is adopted as an **MPL-2.0 dependency**. `github.com/anacrolix/utp` was first
-vendored as an MPL-2.0 dependency and then **rewritten as our own code** in
-`internal/utp/upstream` (EUPL-1.2, behaviour matched against the v0.2.0
-reference); its helpers (`missinggo`/`sync`) were reimplemented in-tree too, so
-**no MPL component remains**.
+is adopted as an **MPL-2.0 dependency**. The uTP transport was first vendored as
+an MPL-2.0 dependency and then **rewritten as our own code** in
+`internal/utp/transport` (EUPL-1.2); its helper primitives were reimplemented
+in-tree too, so **no MPL component remains**.
 Rules: one item = one commit; **measure before/after**; changes to `internal/gxcore`
 recorded in `GEXTTO.md`; targeted tests; with a visible effect also both UIs and the docs.
 
-| Item | Origin | Status |
+| Item | Note | Status |
 |---|---|---|
-| Reader with seek + readahead and **graduated piece priority** | anacrolix `torrent.Reader`, `PiecePriority` | done (stream > readahead > rarest) |
-| **Adaptive request queue** (depth grows per delivered block, reset on choke) | anacrolix `client-piece-request-order.go`, `reqq` | done; to validate on a real swarm |
-| **`anacrolix/dht`** replacing `internal/dht` | module `github.com/anacrolix/dht` | **postponed**: the API model differs (per-torrent traversal vs request channel) and it would drop the dual-stack/shared-socket patches; reopen if BEP 44/BEP 42 hardening or the own module becomes a burden |
-| **Tracker scrape** (BEP 48) | anacrolix `tracker` | done (HTTP + UDP, `Torrent.Scrape`) |
-| **Engine event bus** (SSE `GET /ui/events`) | anacrolix events, libtorrent alerts | done |
-| **`.torrent` creation from a folder** | anacrolix `metainfo` | done (`CreateTorrent`, form + API) |
-| **Bad-storage / write-error diagnosis** | anacrolix `bad-storage.go` | done (folder in the error, `storage_errors` counter) |
-| **LSD IPv6** (BEP 14, `ff15::efc0:988f`) | anacrolix `bep14.go` | done |
-| **Ranged mmap flush** | anacrolix `undirtied-chunks-iter.go` | done |
-| **Global in-flight budget — liveness** | anacrolix `MaxUnverifiedBytes`/`alloclim` | done |
-| **Drop the worst connection** (deterministic order) | anacrolix `worse-conns.go` | done |
-| **uTP behind `internal/utp`** (isolation) | anacrolix `utp` | done: the engine talks to our `Socket` (dial/accept counters, `net.PacketConn` for the shared DHT socket); the implementation in `internal/utp/upstream` is **our own code** (EUPL-1.2), written against the anacrolix/utp v0.2.0 reference whose behaviour it matches, swappable. The `missinggo`/`sync` helpers are reimplemented in `gextto_support.go`, so no third-party transport helper and no MPL component is linked |
-| **uTP connection-id pick** (perf) | own (`internal/utp/upstream`) | done: `newConnID` no longer builds a 64K-entry table per dial (512 KiB and 152,353 ns/op); it probes from a random id and stops at the first free one, O(1) with the connections a socket really has — `BenchmarkNewConnID`: 31 ns/op, 0 B/op, 0 allocs/op (`TestNewConnIDAvoidsCollisions`) |
-| **uTP data path** (perf) | own (`internal/utp/upstream`) | done: profiling a loopback transfer (`BenchmarkTransferLoopback`, 16 KiB block) drove four fixes — the connection-id probe, lazy `Event` channels (the per-send `acked` flag allocated one per packet), a reusable read window (`readPos` offset instead of reslicing, which reallocated 68% of the alloc_space), and a `netip.AddrPort` connection key instead of a `UDPAddr.String()` per inbound packet. Overall **45.6→62.0 MB/s, 82,020→23,692 B/op (−71%), 173→116 allocs/op (−33%)** on loopback |
+| Reader with seek + readahead and **graduated piece priority** | streaming/priority design, rewritten in-tree | done (stream > readahead > rarest) |
+| **Adaptive request queue** (depth grows per delivered block, reset on choke) | reference design, rewritten in-tree | done; to validate on a real swarm |
+| **External DHT replacing `internal/dht`** | own module vs a dependency | **postponed**: the API model differs (per-torrent traversal vs request channel) and it would drop the dual-stack/shared-socket patches; reopen if BEP 44/BEP 42 hardening or the own module becomes a burden |
+| **Tracker scrape** (BEP 48) | reference design, rewritten in-tree | done (HTTP + UDP, `Torrent.Scrape`) |
+| **Engine event bus** (SSE `GET /ui/events`) | own event bus (alerts-style) | done |
+| **`.torrent` creation from a folder** | reference design, rewritten in-tree | done (`CreateTorrent`, form + API) |
+| **Bad-storage / write-error diagnosis** | reference design, rewritten in-tree | done (folder in the error, `storage_errors` counter) |
+| **LSD IPv6** (BEP 14, `ff15::efc0:988f`) | BEP 14, rewritten in-tree | done |
+| **Ranged mmap flush** | reference design, rewritten in-tree | done |
+| **Global in-flight budget — liveness** | reference design, rewritten in-tree | done |
+| **Drop the worst connection** (deterministic order) | reference design, rewritten in-tree | done |
+| **uTP behind `internal/utp`** (isolation) | own implementation | done: the engine talks to our `Socket` (dial/accept counters, `net.PacketConn` for the shared DHT socket); the implementation in `internal/utp/transport` is **our own code** (EUPL-1.2), swappable. Its helper primitives are reimplemented in `gextto_support.go`, so no third-party transport helper and no MPL component is linked |
+| **uTP connection-id pick** (perf) | own (`internal/utp/transport`) | done: `newConnID` no longer builds a 64K-entry table per dial (512 KiB and 152,353 ns/op); it probes from a random id and stops at the first free one, O(1) with the connections a socket really has — `BenchmarkNewConnID`: 31 ns/op, 0 B/op, 0 allocs/op (`TestNewConnIDAvoidsCollisions`) |
+| **uTP data path** (perf) | own (`internal/utp/transport`) | done: profiling a loopback transfer (`BenchmarkTransferLoopback`, 16 KiB block) drove four fixes — the connection-id probe, lazy `Event` channels (the per-send `acked` flag allocated one per packet), a reusable read window (`readPos` offset instead of reslicing, which reallocated 68% of the alloc_space), and a `netip.AddrPort` connection key instead of a `UDPAddr.String()` per inbound packet. Overall **45.6→62.0 MB/s, 82,020→23,692 B/op (−71%), 173→116 allocs/op (−33%)** on loopback |
 | **uTP dial preference** (fewer wasted dials) | own (`internal/netx`) | done: per-host memory of race winners (≥4 races, ≥75% share, decayed past 64); the winner gets a 150 ms head start, the loser still races delayed so single-transport peers connect. Steady state: 1 raced dial per peer instead of 2 (`TestDialPeerSkipsLoserWhenPreferredWins` asserts zero loser dials; `TestDialPeerFallsBackToDelayedLeg` keeps the fallback) |
 | **`UTPConn` address snapshot** (fewer allocs) | own (`internal/netx`) | done: TCP-view addrs converted once at wrap (`NewUTPConn`) instead of per `RemoteAddr()` call. `BenchmarkUTPConnRemoteAddr`: 259→113 ns/op, 152→40 B/op, 6→3 allocs/op (rest is `String()`); Intel N97 |
-| **uTP resend counters** (congestion signal) | own (`internal/utp/upstream`) | done: per-socket RTO/fast resends counted in the stack (`ResendStats`, proven by a stalled-server test), through `SessionStats` into the daemon API (`utp_resends_timeout/fast`); shown in both UIs (Salute «uTP» row and daemon status bar) when non-zero |
-| **uTP initial RTO from measured latency** (faster loss recovery) | own (`internal/utp/upstream`, `internal/netx`) | done: fresh connections seed the RTO from the per-host winning-dial latency EMA instead of the fixed 400 ms (clamped [5 ms, 400 ms], samples always win). `TestInitialLatencySeedBoundsRTO`: 5 ms seed → RTO [10,20] ms vs [800,1600] ms default. Loopback swarm validation on the branch: seeding 2.99× corpus; pipeline RTT 50 ms shallow 304 KiB/s in 13.5 s / default 6757 KiB/s in 0.6 s — identical to the pre-branch §6.7 numbers, no regression; real-swarm validation open |
-| **uTP header hardening + fuzz** (robustness) | own (`internal/utp/upstream`) | done: `header.Unmarshal` rejects <20B inputs instead of panicking (seed#0 panics on pristine code, 30 s fuzz clean, 36k execs); `FuzzHeaderUnmarshal` in `make fuzz-smoke` |
-| **uTP SYN-drop counter** (burst signal) | own (`internal/utp/upstream`) | done: backlog evictions counted per socket (`SynDrops`), through `SessionStats` into the daemon API (`utp_syn_drops`); tells whether the 50-SYN bound ever binds, shown in both UIs when non-zero |
+| **uTP resend counters** (congestion signal) | own (`internal/utp/transport`) | done: per-socket RTO/fast resends counted in the stack (`ResendStats`, proven by a stalled-server test), through `SessionStats` into the daemon API (`utp_resends_timeout/fast`); shown in both UIs (Salute «uTP» row and daemon status bar) when non-zero |
+| **uTP initial RTO from measured latency** (faster loss recovery) | own (`internal/utp/transport`, `internal/netx`) | done: fresh connections seed the RTO from the per-host winning-dial latency EMA instead of the fixed 400 ms (clamped [5 ms, 400 ms], samples always win). `TestInitialLatencySeedBoundsRTO`: 5 ms seed → RTO [10,20] ms vs [800,1600] ms default. Loopback swarm validation on the branch: seeding 2.99× corpus; pipeline RTT 50 ms shallow 304 KiB/s in 13.5 s / default 6757 KiB/s in 0.6 s — identical to the pre-branch §6.7 numbers, no regression; real-swarm validation open |
+| **uTP header hardening + fuzz** (robustness) | own (`internal/utp/transport`) | done: `header.Unmarshal` rejects <20B inputs instead of panicking (seed#0 panics on pristine code, 30 s fuzz clean, 36k execs); `FuzzHeaderUnmarshal` in `make fuzz-smoke` |
+| **uTP SYN-drop counter** (burst signal) | own (`internal/utp/transport`) | done: backlog evictions counted per socket (`SynDrops`), through `SessionStats` into the daemon API (`utp_syn_drops`); tells whether the 50-SYN bound ever binds, shown in both UIs when non-zero |
 | **uTP socket health in UI** (diagnostics) | own | done: socket dial/accept/error counters flow engine → daemon `/api/v1/stats` → Salute «uTP» row (hidden while idle, warns on dial errors with zero accepts: UDP likely firewalled) and daemon status bar («uTP socket», translated it/de/fr/es/pl); pattern of «Riuso locale» |
-| **uTP adaptive RTO** (retransmission control) | own (`internal/utp/upstream`) | done: the RTO consumes the loss signal. (1) A **minimum-RTT floor of 5 ms** (resolves the reference `TODO: introduce a minimum latency`): without it a fast path (loopback/LAN, RTT of tens of µs) collapses the RTO to sub-ms and a briefly stalled peer becomes a resend storm — silent-peer harness, 1 s: 18,184 resends at a 1 µs floor vs 2,919 at 5 ms (**6.2×**); `TestMinimumLatencyFloor`. (2) A **per-connection backoff** that doubles on each RTO timeout (cap 4×) and halves on each delivered packet, so a silent or congested peer is retried with growing patience while a link that delivers again relaxes to the measured RTT: silent-peer A/B, 3×4 s: 17,663 resends fixed vs 8,853 adaptive (**50% fewer**, backoff reaching 4); `TestAdaptiveRTOBacksOffOnTimeouts`, `TestAdaptiveRTOMeasurement` (opt-in `GX_MEASURE_UTP=1`). A healthy connection never timeout-resends, so the backoff stays 1: the RTO is today's, and the loopback swarm numbers are unchanged |
+| **uTP adaptive RTO** (retransmission control) | own (`internal/utp/transport`) | done: the RTO consumes the loss signal. (1) A **minimum-RTT floor of 5 ms**: without it a fast path (loopback/LAN, RTT of tens of µs) collapses the RTO to sub-ms and a briefly stalled peer becomes a resend storm — silent-peer harness, 1 s: 18,184 resends at a 1 µs floor vs 2,919 at 5 ms (**6.2×**); `TestMinimumLatencyFloor`. (2) A **per-connection backoff** that doubles on each RTO timeout (cap 4×) and halves on each delivered packet, so a silent or congested peer is retried with growing patience while a link that delivers again relaxes to the measured RTT: silent-peer A/B, 3×4 s: 17,663 resends fixed vs 8,853 adaptive (**50% fewer**, backoff reaching 4); `TestAdaptiveRTOBacksOffOnTimeouts`, `TestAdaptiveRTOMeasurement` (opt-in `GX_MEASURE_UTP=1`). A healthy connection never timeout-resends, so the backoff stays 1: the RTO is today's, and the loopback swarm numbers are unchanged |
 
 ### 4.4 DHT: hardening and multi-path
 

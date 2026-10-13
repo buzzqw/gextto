@@ -1,4 +1,4 @@
-package upstream
+package transport
 
 // GEXTTO: our own uTP (BEP 29) code; see doc.go. addr presents a uTP connection's underlying
 // socket address, tagged with the "utp/" network so it can be told apart from a

@@ -1654,7 +1654,7 @@ peers (18-byte contacts).
 Only the LSD announcement over **IPv6** is missing in networks where v6 multicast is not
 available: if the v6 listener does not open, the LSD stays active on IPv4. In the
 other cases the LSD also announces and listens on the group `[ff15::efc0:988f]:6771`
-(like anacrolix).
+(the BEP 14 multicast group).
 
 ## Tests
 

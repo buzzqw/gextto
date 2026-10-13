@@ -62,7 +62,7 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - Panoramica e inventario delle funzionalità del motore:
   `internal/gxcore/GEXTTO.md`.
 - Il DHT vive in `internal/dht`, un modulo a sé sotto il modulo principale.
-- Analisi delle lacune rispetto a libtorrent/qBittorrent/anacrolix e piano di
+- Analisi delle lacune rispetto a libtorrent e qBittorrent e piano di
   miglioramento: **`docs/evoluzione.md`** (§4–§7); evoluzione verso client
   standalone (gx-core): **`docs/gx-torrent-evoluto.md`**.
 

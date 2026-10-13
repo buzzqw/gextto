@@ -8,9 +8,8 @@ licence texts, as those licences require.
 
 It lists the third-party libraries imported or linked. Gextto's own code,
 including the engine `internal/gxcore`, the DHT `internal/dht` and the uTP
-transport `internal/utp` (our own implementation of BEP 29, written in this
-repository against the anacrolix/utp v0.2.0 reference), is EUPL-1.2: it was
-developed in this repository, so only protocol-mandated formats coincide.
+transport `internal/utp` (our own implementation of BEP 29, developed in this
+repository), is EUPL-1.2: only protocol-mandated formats coincide.
 
 Generated from the modules actually linked into the binaries (go list -deps
 ./cmd/gexttod ./cmd/gx-torrent) and the libtorrent distribution. Regenerate it

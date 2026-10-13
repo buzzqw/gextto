@@ -1,4 +1,4 @@
-package upstream
+package transport
 
 // GEXTTO: our own uTP (BEP 29) code; see doc.go.
 // Socket multiplexes a net.PacketConn: it reads datagrams once and dispatches

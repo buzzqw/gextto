@@ -166,19 +166,19 @@ func TestSelectTorrentEngineBackends(t *testing.T) {
 	if _, _, err := selectTorrentEngine(&cfg, nil); err == nil {
 		t.Fatal("qbittorrent without url must be refused")
 	}
-	// Removed backend values fall back to the embedded implementation.
+	// A removed/unknown backend value falls back to the embedded implementation.
 	cfg2 := DefaultConfig()
-	cfg2.Settings["torrent_backend"] = "anacrolix"
+	cfg2.Settings["torrent_backend"] = "removed-backend"
 	engine, _, err = selectTorrentEngine(&cfg2, nil)
 	if TorrentBackendName(&cfg2) != BackendEmbedded {
-		t.Fatalf("legacy anacrolix selection must fall back to embedded")
+		t.Fatalf("removed backend selection must fall back to embedded")
 	}
 	if LibtorrentCompiled() {
 		if err != nil || engine != nil {
-			t.Fatalf("legacy anacrolix selection must fall back to embedded: engine=%v err=%v", engine, err)
+			t.Fatalf("removed backend selection must fall back to embedded: engine=%v err=%v", engine, err)
 		}
 	} else if err == nil {
-		t.Fatal("legacy anacrolix -> embedded must be refused without libtorrent")
+		t.Fatal("removed backend -> embedded must be refused without libtorrent")
 	}
 }
 

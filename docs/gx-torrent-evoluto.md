@@ -48,7 +48,7 @@ in charge). "gx-nox" can remain the **public name** of the standalone mode, but 
 second project.
 
 The decisive reason is not the initial effort, it is **requirement 5** (in
-prospect: cherry-picking by value from libtorrent/anacrolix). That path
+prospect: cherry-picking by value from libtorrent). That path
 turns the engine into your own code: with two projects there would be **two
 divergences of the same engine**, and every porting would have to be done twice.
 Sooner or later `gx-torrent` would fall behind and Gextto would end up with the
@@ -100,7 +100,7 @@ Gextto path must be rejected or put behind a flag.
 | 2 | Effective, powerful, frugal client, better than qbittorrent-nox | goal | measurements against qbittorrent-nox; no features that consume when unused |
 | 3 | Excellent web interface, as easy and complete as qBittorrent | goal | UI as an application (assets, settings, categories/tags, RSS, search), not an operational page |
 | 4 | First-run wizard | goal | language, folders, password, LAN without password (default yes), ports + port test, Jackett/Prowlarr/MIRCrew indexers |
-| 5 | In prospect, cherry-pick by value from anacrolix/libtorrent | direction | engine treated as own code; a single engine shared by the two uses |
+| 5 | In prospect, cherry-pick by value from libtorrent | direction | engine treated as own code; a single engine shared by the two uses |
 
 ### 2.3 Evaluation criteria
 
@@ -410,7 +410,7 @@ most for a standalone, IPv6 and BitTorrent v2, are **closed** (see §12);
 everything else is quality that is brought in **one algorithm at a time**, measuring before and after. Memory considerations,
 to be verified against the libraries' code before each porting.
 
-| Area | gx-torrent (gx-core engine) | anacrolix/torrent | libtorrent 2.0 | qbittorrent-nox |
+| Area | gx-torrent (gx-core engine) | Go reference client | libtorrent 2.0 | qbittorrent-nox |
 | --- | --- | --- | --- | --- |
 | Language, licence | Go, EUPL-1.2 | Go, MPL-2.0 | C++, BSD-3 | C++/Qt, GPL-2+ |
 | IPv6 | yes (dual-stack, DHT BEP 32, LSD v6 included) | yes | yes | yes |
@@ -428,19 +428,19 @@ to be verified against the libraries' code before each porting.
 
 | # | Feature | Source | Why | Cost |
 | --- | --- | --- | --- | --- |
-| 1 | IPv6 (listener, DHT BEP 32, trackers, PEX) | anacrolix, libtorrent | without IPv6 there is no parity with qBittorrent; many home peers are reachable only over v6 | high |
-| 2 | Smart ban — **extension** (global and timed ban) | libtorrent, anacrolix | the engine **already banned** the peer that sends a corrupt piece in the single torrent (`bannedPeerIPs`); now the ban is **per session, with expiry** (`Session.BanIP`, 30 min) and applies to all torrents and connection points | done |
-| 3 | Adaptive request queue depth | libtorrent, anacrolix | speed on distant peers depends on how many requests are in flight; now the depth grows by one per delivered block (`RequestQueue`) | done |
-| 4 | Reader with readahead for streaming | anacrolix | the prefetch has priority over rarest-first (`SetFileReadaheadWindow`), instead of waiting by polling (200 ms, 2 min timeout) | done |
-| 5 | BitTorrent v2 and hybrids | anacrolix | v2-only torrents already in circulation; merkle per file is needed | high |
+| 1 | IPv6 (listener, DHT BEP 32, trackers, PEX) | libtorrent, reference clients | without IPv6 there is no parity with qBittorrent; many home peers are reachable only over v6 | high |
+| 2 | Smart ban — **extension** (global and timed ban) | libtorrent, reference clients | the engine **already banned** the peer that sends a corrupt piece in the single torrent (`bannedPeerIPs`); now the ban is **per session, with expiry** (`Session.BanIP`, 30 min) and applies to all torrents and connection points | done |
+| 3 | Adaptive request queue depth | libtorrent, reference clients | speed on distant peers depends on how many requests are in flight; now the depth grows by one per delivered block (`RequestQueue`) | done |
+| 4 | Reader with readahead for streaming | reference clients | the prefetch has priority over rarest-first (`SetFileReadaheadWindow`), instead of waiting by polling (200 ms, 2 min timeout) | done |
+| 5 | BitTorrent v2 and hybrids | reference clients | v2-only torrents already in circulation; merkle per file is needed | high |
 | 6 | Rate-based choking and anti-leech | libtorrent | seeding quality; to be validated with the `unchoker/sim_test.go` harness | medium |
 | 7 | Disk I/O: writing in contiguous blocks, hashing on a pool | libtorrent | CPU and disk wear on slow NAS | **mmap + `fdatasync` done (§5 of `evoluzione.md`); contiguous/pool hashing not necessary without measurements** |
 | 8 | Share mode | libtorrent | already discarded for Gextto (§4.1: share mode skipped); for the standalone it counts as an option | low |
-| 9 | WebTorrent | anacrolix | niche | high |
+| 9 | WebTorrent | reference clients | niche | high |
 
-**Agreed shortlist (2026-10-10) for taking from anacrolix:** reader with
+**Agreed shortlist (2026-10-10):** reader with
 seek and readahead + **graduated piece priority**, **adaptive request queue**,
-`anacrolix/dht` as a dependency (BEP 42/43/44), **tracker scrape**. Detail,
+an external DHT as a dependency (BEP 42/43/44), **tracker scrape**. Detail,
 ways of taking (rewrite vs dependency) and verifications in
 [`evoluzione.md` §4.3](evoluzione.md). Items 3 and 4 of the table above are
 included; **scrape** is already implemented. Four other points (event bus,
@@ -449,12 +449,11 @@ included; **scrape** is already implemented. Four other points (event bus,
 
 ### 11.2 Licences
 
-Gextto is **EUPL-1.2**. From **libtorrent** (BSD-3) code can be ported with
-attribution. From **anacrolix** (MPL-2.0), copied code would stay MPL file by
-file, so the algorithm is **rewritten** instead: `internal/utp` (uTP/BEP 29) is
-our own code, written against the anacrolix/utp v0.2.0 reference, and the
-`missinggo`/`sync` helpers it used are reimplemented in-tree — no MPL component
-remains. From **qBittorrent**
+Gextto is **EUPL-1.2**. From **libtorrent** (BSD-3-Clause) code can be ported
+with attribution. For components under **MPL-2.0**, copied code would stay MPL
+file by file, so the algorithm is **rewritten** instead: `internal/utp`
+(uTP/BEP 29) is our own code and the helper primitives it needed are
+reimplemented in-tree — no MPL component remains. From **qBittorrent**
 (GPL) nothing is copied; reimplementing its Web API protocol is lawful.
 
 ### 11.3 Engine as own code
@@ -658,7 +657,7 @@ To be verified: the first run in CI on **Debian 12 / Ubuntu 22.04**
 | 2. Efficiency | lazy startup of the modules; adaptive cache; measurements against qbittorrent-nox | F1, F4 | the 4 metrics of §10 |
 | 3. UI on par with qBittorrent | `embed.FS` assets, settings from the UI, categories/tags, RSS, search, charts, phone, dark theme | F2, F3 | qBittorrent checklist + Playwright tests (like `uiweb/end2end`) |
 | 4. Wizard | language, folders, access (LAN without password default yes + 3 protections), ports + port test, Jackett/Prowlarr/MIRCrew indexers | F1 | setup from scratch in less than 5 minutes |
-| 5. Engine as own code | cherry-pick by value from anacrolix/libtorrent; licences respected | F4 | before/after measurement for every porting; engine inventory |
+| 5. Engine as own code | cherry-pick by value from libtorrent; licences respected | F4 | before/after measurement for every porting; engine inventory |
 
 ---
 
@@ -671,7 +670,7 @@ To be verified: the first run in CI on **Debian 12 / Ubuntu 22.04**
 | LAN without password exploited | an external site adds or deletes torrents from the user's browser | `Origin` and `Host` check, LAN read from the socket, `X-Forwarded-For` only from declared proxies |
 | UI growing into a Go string | slow changes, visual regressions | assets in `embed.FS` and Playwright tests like those of `uiweb/end2end` |
 | Costly porting from the engine | IPv6 and v2 touch DHT, trackers, picker, storage | one porting at a time, with engine tests and before/after measurement |
-| Licences | MPL code inside EUPL files | done: `internal/utp` is our own rewrite of BEP 29 (no MPL component); future anacrolix work is rewritten, not copied |
+| Licences | MPL code inside EUPL files | done: `internal/utp` is our own rewrite of BEP 29 (no MPL component); future third-party work is rewritten, not copied |
 | Porting from other engines | any fixes from others are lost | check their commits by hand once a quarter |
 | Extraction of RSS/search from the root package | broad refactor, possible instability in Gextto | extract into `internal/` with constant behaviour, with the existing tests as a safety net |
 

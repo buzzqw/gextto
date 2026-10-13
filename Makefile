@@ -101,7 +101,7 @@ fuzz-smoke:
 	  "internal/gxcore/internal/tracker/httptracker:FuzzParsePeersDictionary" \
 	  "internal/gxcore/internal/btconn:FuzzReadHandshake" \
 	  "internal/gxcore/internal/mse:FuzzHandshakeIncoming" \
-	  "internal/utp/upstream:FuzzHeaderUnmarshal"; do \
+	  "internal/utp/transport:FuzzHeaderUnmarshal"; do \
 		dir="$${spec%%:*}"; names="$${spec##*:}"; \
 		for t in $$names; do \
 			fuzzrun "$$dir/$$t" go test -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZ_TIME) ./$$dir/; \

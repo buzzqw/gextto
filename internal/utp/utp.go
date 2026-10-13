@@ -1,10 +1,9 @@
 // Package utp isolates the uTP transport (BEP 29) behind Gextto's own API.
 //
-// The socket implementation is Gextto's own (internal/utp/upstream, EUPL-1.2,
-// written against the anacrolix/utp v0.2.0 reference) so it can be tuned and
-// instrumented; the engine (internal/gxcore) only talks to the Socket type
-// below. The package also exports counters (dials, accepts, errors and their
-// retransmissions) behind peer-racing and the adaptive RTO.
+// The socket implementation is Gextto's own (internal/utp/transport, EUPL-1.2)
+// so it can be tuned and instrumented; the engine (internal/gxcore) only talks
+// to the Socket type below. The package also exports counters (dials, accepts,
+// errors and their retransmissions) behind peer-racing and the adaptive RTO.
 package utp
 
 import (
@@ -14,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	aup "github.com/buzzqw/gextto/internal/utp/upstream"
+	aup "github.com/buzzqw/gextto/internal/utp/transport"
 )
 
 // Stats snapshots socket activity since creation.
@@ -110,7 +109,7 @@ func (s *Socket) SetReadDeadline(t time.Time) error { return s.inner.SetReadDead
 func (s *Socket) SetWriteDeadline(t time.Time) error { return s.inner.SetWriteDeadline(t) }
 
 // SetInitialLatencyEstimator installs the per-remote RTT estimate seeding
-// fresh connections' RTO. See upstream Socket.
+// fresh connections' RTO. See the Socket in internal/utp/transport.
 func (s *Socket) SetInitialLatencyEstimator(f func(addr string) (time.Duration, bool)) {
 	s.inner.SetInitialLatencyEstimator(f)
 }

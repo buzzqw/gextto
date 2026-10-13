@@ -1,4 +1,4 @@
-package upstream
+package transport
 
 // GEXTTO: our own uTP (BEP 29) code; see doc.go.
 // Conn is one uTP stream. A Socket owns its Conns and dispatches packets to and

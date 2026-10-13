@@ -1,4 +1,4 @@
-package upstream
+package transport
 
 // GEXTTO: our own uTP (BEP 29) code; see doc.go.
 // Package-level constants, sentinel errors and the tiny helpers that do not

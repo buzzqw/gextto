@@ -1,4 +1,4 @@
-package upstream
+package transport
 
 // GEXTTO: our own uTP (BEP 29) code; see doc.go. packetConnNopCloser wraps a net.PacketConn so a
 // Socket can use it without owning its Close (see

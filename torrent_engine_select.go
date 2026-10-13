@@ -212,8 +212,10 @@ func ShutdownEmbedded(s *AppState, cfg *Config) error {
 // ConfigureTorrentEngine installs the engine selected by the current settings.
 // It is called at startup and whenever the backend settings change.
 func ConfigureTorrentEngine(s *AppState, cfg *Config) error {
-	if cfg != nil && strings.EqualFold(strings.TrimSpace(cfg.Settings["torrent_backend"]), "anacrolix") {
-		logging.Warn("torrent backend anacrolix has been removed; falling back to embedded libtorrent")
+	if cfg != nil {
+		if raw := strings.ToLower(strings.TrimSpace(cfg.Settings["torrent_backend"])); raw != "" && !isKnownTorrentBackend(raw) {
+			logging.Warn("unknown torrent backend saved in the settings; falling back to embedded libtorrent", "backend", raw)
+		}
 	}
 	engine, note, err := selectTorrentEngine(cfg, s.notifier)
 	if err != nil {

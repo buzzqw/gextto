@@ -1,4 +1,4 @@
-package upstream
+package transport
 
 // BenchmarkTransferLoopback drives a real uTP transfer between two sockets on
 // loopback and reports throughput and allocations, so the read/write paths can
