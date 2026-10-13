@@ -203,8 +203,8 @@ GEXTTO_URL=http://host:5000 /opt/gextto/gexttod tui
 ```
 
 The options are `--url`/`-u` and `--lang`/`-l`; the URL environment variable is
-`GEXTTO_URL`. The seven tabs
-are Status, Torrents, Logs, Health, Archive, Missing and Blocklist. Full key,
+`GEXTTO_URL`. The nine tabs
+are Status, Torrents, Logs, Health, Archive, Missing, Blocklist, Library and Maintenance. Full key,
 prompt and action documentation is in [`docs/tui.md`](tui.md).
 
 **Installation and updating.** Every push to `main` publishes a tested
@@ -608,8 +608,11 @@ are using the API directly.
 
 ## 7. Configuration
 
-Tabs: **Daemon, Sources, libtorrent, Torrent engine, Scores, Rename, Advanced,
-Acquisition, Notifications, Paths, Translations**. Unsaved changes are
+The page is split into four areas: **What to look for** (General, Sources,
+Quality and upgrades), **How to download** (Torrent engine, Speed and network,
+Queues and performance, Seeding and completion), **Where to store** (Library and
+renaming, Archive and space) and **System** (Automatic maintenance,
+Notifications, Access and services, Diagnostics and translations). Unsaved changes are
 highlighted with a “Save all” bar. The complete per-tab list of every entry is in
 [Appendix A](#appendix-a-reference--configuration).
 
@@ -625,7 +628,7 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   If you move a torrent's storage to a folder that **already holds the data**,
   it is not rejected: Gextto associates the torrent with the existing files and
   re-checks them (seeds) instead of re-downloading. **Preallocate disk space**
-  (on by default) reserves the full size of every new
+  (off by default) reserves the full size of every new
   torrent up front: it avoids fragmentation on NAS/HDD and surfaces "no space"
   immediately; it can be turned off per torrent in the add form. **Copy .torrent
   files to** names a folder where Gextto copies the `.torrent` of every started
@@ -1060,7 +1063,7 @@ the others.
 
 ### TUI: quick usage
 
-In the TUI, `1`-`7` or `Tab` switch tabs, `r` refreshes and `?` opens help. In
+In the TUI, `1`-`9` or `Tab` switch tabs, `r` refreshes and `?` opens help. In
 **Logs**, `/` filters lines and `f` enables or pauses follow; when paused, the
 viewport remains fixed while new log lines arrive. Archive, Missing and
 Blocklist support arrow/page scrolling and selection. See [`docs/tui.md`](tui.md)
@@ -1356,7 +1359,7 @@ Recalculate scores* after changing weights.
 | Setting | What it does |
 |---|---|
 | Min score difference for upgrade | Minimum score difference to replace a file with a better upgrade. |
-| Stop upgrading above this score | Upgrade ceiling: once the library file scores at least this much it is no longer replaced by better releases; only a REPACK or PROPER, which fixes a defective release, is still accepted. With the default scores: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. It adds to the minimum difference: that one says *by how much* a release must improve, this one *up to where*. To stop upgrades for a single title use “No upgrades” on its page. “Why not this one?” says when a release is skipped because of this ceiling. *(0 = never)* |
+| Stop upgrading above this score | Upgrade ceiling: once the library file scores at least this much it is no longer replaced by better releases; only a REPACK or PROPER, which fixes a defective release, is still accepted. With the default scores: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. It adds to the minimum difference: that one says *by how much* a release must improve, this one *up to where*. To stop upgrades for a single title use “No upgrades” on its page. “Why not this one?” says when a release is skipped because of this ceiling. *(0 = always upgrade: no ceiling)* |
 | Replace versions already archived | Replaces lower versions already archived with better upgrades. |
 | Min score difference for cleanup | Minimum score difference to replace an existing file with a better one (cleanup). |
 

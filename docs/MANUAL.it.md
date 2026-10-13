@@ -202,8 +202,8 @@ GEXTTO_URL=http://host:5000 /opt/gextto/gexttod tui
 ```
 
 Le opzioni sono `--url`/`-u` e `--lang`/`-l`; la variabile d'ambiente per l'URL è
-`GEXTTO_URL`. Le sette schede sono Stato,
-Torrent, Log, Salute, Archivio, Mancanti e Blocklist. La guida completa dei tasti,
+`GEXTTO_URL`. Le nove schede sono Stato,
+Torrent, Log, Salute, Archivio, Mancanti, Blocklist, Libreria e Manutenzione. La guida completa dei tasti,
 dei prompt e delle azioni è in [`docs/tui.md`](tui.md).
 
 **Installazione e aggiornamento.** A ogni push su `main` viene pubblicato un
@@ -620,8 +620,11 @@ manualmente il JSON se non stai usando direttamente l'API.
 
 ## 7. Configurazione
 
-Tab: **Daemon, Sorgenti, libtorrent, Motore torrent, Punteggi, Rinomina, Avanzate,
-Acquisizione, Notifiche, Percorsi, Traduzioni**. Le modifiche non salvate sono
+La pagina è divisa in quattro aree: **Cosa cercare** (Generale, Sorgenti,
+Qualità e upgrade), **Come scaricare** (Motore torrent, Velocità e rete, Code e
+prestazioni, Seed e completamento), **Dove salvare** (Libreria e rinomina,
+Archivio e spazio) e **Sistema** (Manutenzione automatica, Notifiche, Accesso e
+servizi, Diagnostica e traduzioni). Le modifiche non salvate sono
 evidenziate con la barra “Salva tutte”. L'elenco completo di ogni voce, tab per
 tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
 
@@ -637,7 +640,7 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   aggiornamenti. Se sposti lo storage di un torrent in una cartella che
   **contiene già i dati**, non viene rifiutato: Gextto associa il torrent ai file
   esistenti e li ricontrolla (seed) invece di riscaricarli. L'opzione
-  **Prealloca lo spazio su disco** (attiva di default)
+  **Prealloca lo spazio su disco** (spenta di default)
   riserva subito l'intera dimensione di ogni nuovo torrent: evita la
   frammentazione su NAS/HDD e fa emergere subito la mancanza di spazio; puoi
   disattivarla per singolo torrent quando lo aggiungi a mano. **Copia i file
@@ -1095,7 +1098,7 @@ la pulizia degli altri.
 
 ### TUI: uso rapido
 
-Nella TUI `1`-`7` o `Tab` cambiano scheda, `r` aggiorna e `?` apre l'aiuto.
+Nella TUI `1`-`9` o `Tab` cambiano scheda, `r` aggiorna e `?` apre l'aiuto.
 Nella scheda **Log**, `/` filtra le righe e `f` attiva o ferma il follow; quando
 il follow è fermo la posizione resta congelata anche se arrivano nuovi log.
 Archivio, Mancanti e Blocklist dispongono di selezione e scrolling con le frecce
@@ -1399,7 +1402,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | Impostazione | Cosa fa |
 |---|---|
 | Differenza minima score per upgrade | Differenza minima di punteggio per sostituire un file con un upgrade migliore. |
-| Smetti di migliorare oltre questo punteggio | Tetto agli upgrade: quando il file in libreria ha almeno questo punteggio non viene più sostituito da release migliori; resta accettato solo un REPACK o PROPER, che corregge una release difettosa. Riferimenti con i punteggi predefiniti: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. Si somma alla differenza minima: la prima dice *di quanto* deve migliorare, questa *fino a dove*. Per fermare del tutto gli upgrade di un solo titolo c'è «Niente upgrade» nella sua scheda. «Perché non questa?» indica quando una release è scartata per questa soglia. *(0 = mai)* |
+| Smetti di migliorare oltre questo punteggio | Tetto agli upgrade: quando il file in libreria ha almeno questo punteggio non viene più sostituito da release migliori; resta accettato solo un REPACK o PROPER, che corregge una release difettosa. Riferimenti con i punteggi predefiniti: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. Si somma alla differenza minima: la prima dice *di quanto* deve migliorare, questa *fino a dove*. Per fermare del tutto gli upgrade di un solo titolo c'è «Niente upgrade» nella sua scheda. «Perché non questa?» indica quando una release è scartata per questa soglia. *(0 = migliora sempre: nessun tetto)* |
 | Sostituisci le versioni già archiviate | Sostituisce versioni inferiori già archiviate con upgrade migliori. |
 | Differenza minima score per cleanup | Differenza minima di punteggio per sostituire un file esistente con uno migliore (cleanup). |
 
