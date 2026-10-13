@@ -17,17 +17,19 @@ import (
 )
 
 const (
-	// MaxBlockSize allowed in "request" messages.
+	// MaxBlockSize caps a single request's block.
 	MaxBlockSize = 16 * 1024
-	// time to wait for a message. peer must send keep-alive messages to keep connection alive.
+	// readTimeout bounds idleness: peers must keepalive within it.
 	readTimeout = 2 * time.Minute
-	// length + msgid + requestmsg
+	// readBufferSize frames the common fixed head: length + id + request.
 	readBufferSize = 4 + 1 + 12
 )
 
+// blockPool recycles piece-block buffers across connections.
 var blockPool = bufferpool.New(piece.BlockSize)
 
-// PeerReader is used for reading and parsing messages from a net.Conn.
+// PeerReader parses peer wire messages off a connection, enforcing size caps
+// before allocating and throttling block intake through the read limiter.
 type PeerReader struct {
 	conn         net.Conn
 	r            io.Reader
@@ -40,9 +42,8 @@ type PeerReader struct {
 	doneC        chan struct{}
 }
 
-// New returns a new PeerReader by wrapping a net.Conn.
-// maxMsgSize is the largest message length accepted from the peer; larger
-// messages are rejected before allocating a buffer for them.
+// New wraps conn; maxMsgSize bounds any single message before its buffer is
+// allocated, closing the hostile-allocation hole on variable-length messages.
 func New(conn net.Conn, l logger.Logger, pieceTimeout time.Duration, maxMsgSize int, b *bandwidth.Limiter) *PeerReader {
 	return &PeerReader{
 		conn:         conn,
@@ -57,22 +58,25 @@ func New(conn net.Conn, l logger.Logger, pieceTimeout time.Duration, maxMsgSize 
 	}
 }
 
-// Messages returns a channel. All messages read by this PeerReader is sent to this channel.
+// Messages streams the parsed messages.
 func (p *PeerReader) Messages() <-chan any {
 	return p.messages
 }
 
-// Stop the read loop.
+// Stop ends the read loop; Done closes when it exited.
 func (p *PeerReader) Stop() {
 	close(p.stopC)
 }
 
-// Done returns a channel that is closed when the read loop exists.
+// Done closes when the read loop exits.
 func (p *PeerReader) Done() chan struct{} {
 	return p.doneC
 }
 
-// Run the read loop.
+// Run reads length-prefixed messages until error or Stop. Routine endings
+// (peer hangup, truncation, throttled stop, network errors, or a stop while
+// an error is pending) stay quiet; block-size violations log at debug;
+// anything else logs as an error.
 func (p *PeerReader) Run() {
 	defer close(p.doneC)
 
@@ -80,17 +84,20 @@ func (p *PeerReader) Run() {
 	defer func() {
 		if err == nil {
 			return
-		} else if err == io.EOF { // peer closed the connection
+		}
+		switch {
+		case err == io.EOF:
 			return
-		} else if err == io.ErrUnexpectedEOF {
+		case err == io.ErrUnexpectedEOF:
 			return
-		} else if err == errStoppedWhileWaitingBucket {
+		case err == errStoppedWhileWaitingBucket:
 			return
-		} else if _, ok := err.(*net.OpError); ok {
+		}
+		if _, ok := err.(*net.OpError); ok {
 			return
 		}
 		select {
-		case <-p.stopC: // don't log error if peer is stopped
+		case <-p.stopC:
 		default:
 			if _, ok := err.(*blockSizeError); ok {
 				p.log.Debug(err)
@@ -101,217 +108,32 @@ func (p *PeerReader) Run() {
 	}()
 
 	for {
-		err = p.conn.SetReadDeadline(time.Now().Add(readTimeout))
-		if err != nil {
+		if err = p.conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
 			return
 		}
-
 		var length uint32
-		// p.log.Debug("Reading message...")
-		err = binary.Read(p.r, binary.BigEndian, &length)
-		if err != nil {
+		if err = binary.Read(p.r, binary.BigEndian, &length); err != nil {
 			return
 		}
-		// p.log.Debugf("Received message of length: %d", length)
-
-		if length == 0 { // keep-alive message
+		if length == 0 {
 			p.log.Debug("Received message of type \"keep alive\"")
 			continue
 		}
-
 		var id peerprotocol.MessageID
-		err = binary.Read(p.r, binary.BigEndian, &id)
-		if err != nil {
+		if err = binary.Read(p.r, binary.BigEndian, &id); err != nil {
 			return
 		}
 		length--
-
-		// p.log.Debugf("Received message of type: %q", id)
-
-		// Reject oversized messages before allocating a buffer for them. The
-		// remaining variable-length messages (bitfield, extension) size a buffer
-		// directly from this attacker-controlled length, so without this an
-		// untrusted peer could force an arbitrarily large allocation.
 		if int64(length) > int64(p.maxMsgSize) {
 			err = fmt.Errorf("received message larger than allowed (%d > %d)", length, p.maxMsgSize)
 			return
 		}
-
 		var msg any
-
-		switch id {
-		case peerprotocol.Choke:
-			p.log.Debug("Received Choke")
-			msg = peerprotocol.ChokeMessage{}
-		case peerprotocol.Unchoke:
-			p.log.Debug("Received Unchoke")
-			msg = peerprotocol.UnchokeMessage{}
-		case peerprotocol.Interested:
-			p.log.Debug("Received Interested")
-			msg = peerprotocol.InterestedMessage{}
-		case peerprotocol.NotInterested:
-			p.log.Debug("Received NotInterested")
-			msg = peerprotocol.NotInterestedMessage{}
-		case peerprotocol.Have:
-			var hm peerprotocol.HaveMessage
-			err = binary.Read(p.r, binary.BigEndian, &hm)
-			if err != nil {
-				return
-			}
-			msg = hm
-		case peerprotocol.Bitfield:
-			var bm peerprotocol.BitfieldMessage
-			bm.Data = make([]byte, length)
-			_, err = io.ReadFull(p.r, bm.Data)
-			if err != nil {
-				return
-			}
-			msg = bm
-		case peerprotocol.Request:
-			var rm peerprotocol.RequestMessage
-			err = binary.Read(p.r, binary.BigEndian, &rm)
-			if err != nil {
-				return
-			}
-			// p.log.Debugf("Received Request: %+v", rm)
-
-			if rm.Length > MaxBlockSize {
-				err = &blockSizeError{
-					messageID:  id,
-					got:        rm.Length,
-					allowedMax: MaxBlockSize,
-				}
-				return
-			}
-			msg = rm
-		case peerprotocol.Reject:
-			var rm peerprotocol.RejectMessage
-			err = binary.Read(p.r, binary.BigEndian, &rm)
-			if err != nil {
-				return
-			}
-			p.log.Debugf("Received Reject: %+v", rm)
-			msg = rm
-		case peerprotocol.Cancel:
-			var cm peerprotocol.CancelMessage
-			err = binary.Read(p.r, binary.BigEndian, &cm)
-			if err != nil {
-				return
-			}
-			msg = cm
-		case peerprotocol.Piece:
-			var pm peerprotocol.PieceMessage
-			err = binary.Read(p.r, binary.BigEndian, &pm)
-			if err != nil {
-				return
-			}
-			length -= 8
-			if length > piece.BlockSize {
-				err = &blockSizeError{
-					messageID:  id,
-					got:        length,
-					allowedMax: piece.BlockSize,
-				}
-				return
-			}
-			var buf bufferpool.Buffer
-			buf, err = p.readPiece(length)
-			if err != nil {
-				return
-			}
-			msg = Piece{PieceMessage: pm, Buffer: buf}
-		case peerprotocol.HaveAll:
-			msg = peerprotocol.HaveAllMessage{}
-		case peerprotocol.HaveNone:
-			msg = peerprotocol.HaveNoneMessage{}
-		case peerprotocol.AllowedFast:
-			var am peerprotocol.AllowedFastMessage
-			err = binary.Read(p.r, binary.BigEndian, &am)
-			if err != nil {
-				return
-			}
-			msg = am
-		case peerprotocol.Port:
-			var pm peerprotocol.PortMessage
-			err = binary.Read(p.r, binary.BigEndian, &pm)
-			if err != nil {
-				return
-			}
-			msg = pm
-		case peerprotocol.Extension:
-			buf := make([]byte, length)
-			_, err = io.ReadFull(p.r, buf)
-			if err != nil {
-				return
-			}
-			var em peerprotocol.ExtensionMessage
-			err = em.UnmarshalBinary(buf)
-			if err != nil {
-				return
-			}
-			msg = em.Payload
-		case peerprotocol.HashRequest:
-			if length != peerprotocol.HashRequestHeaderSize {
-				err = fmt.Errorf("invalid hash request size: %d", length)
-				return
-			}
-			var hm peerprotocol.HashRequestMessage
-			buf := make([]byte, length)
-			_, err = io.ReadFull(p.r, buf)
-			if err != nil {
-				return
-			}
-			if err = hm.UnmarshalBinary(buf); err != nil {
-				return
-			}
-			msg = hm
-		case peerprotocol.HashReject:
-			if length != peerprotocol.HashRequestHeaderSize {
-				err = fmt.Errorf("invalid hash reject size: %d", length)
-				return
-			}
-			var hm peerprotocol.HashRejectMessage
-			buf := make([]byte, length)
-			_, err = io.ReadFull(p.r, buf)
-			if err != nil {
-				return
-			}
-			if err = hm.UnmarshalBinary(buf); err != nil {
-				return
-			}
-			msg = hm
-		case peerprotocol.Hashes:
-			if length < peerprotocol.HashRequestHeaderSize ||
-				(length-peerprotocol.HashRequestHeaderSize)%peerprotocol.HashSize != 0 {
-				err = fmt.Errorf("invalid hashes size: %d", length)
-				return
-			}
-			buf := make([]byte, length)
-			_, err = io.ReadFull(p.r, buf)
-			if err != nil {
-				return
-			}
-			var hm peerprotocol.HashesMessage
-			if err = hm.HashRequestHeader.UnmarshalBinary(buf[:peerprotocol.HashRequestHeaderSize]); err != nil {
-				return
-			}
-			tail := buf[peerprotocol.HashRequestHeaderSize:]
-			hm.Hashes = make([][peerprotocol.HashSize]byte, len(tail)/peerprotocol.HashSize)
-			for i := range hm.Hashes {
-				copy(hm.Hashes[i][:], tail[i*peerprotocol.HashSize:])
-			}
-			msg = hm
-		default:
-			p.log.Debugf("unhandled message type: %s", id)
-			p.log.Debugln("Discarding", length, "bytes...")
-			_, err = io.CopyN(io.Discard, p.r, int64(length))
-			if err != nil {
-				return
-			}
-			continue
+		if msg, err = p.parseMessage(id, length); err != nil {
+			return
 		}
 		if msg == nil {
-			panic("msg unset")
+			continue // unknown type, already discarded
 		}
 		select {
 		case p.messages <- msg:
@@ -321,6 +143,173 @@ func (p *PeerReader) Run() {
 	}
 }
 
+// parseMessage decodes one message body of the given id and remaining
+// length. Unknown ids are discarded inline and reported as (nil, nil).
+func (p *PeerReader) parseMessage(id peerprotocol.MessageID, length uint32) (any, error) {
+	var err error
+	switch id {
+	case peerprotocol.Choke:
+		p.log.Debug("Received Choke")
+		return peerprotocol.ChokeMessage{}, nil
+	case peerprotocol.Unchoke:
+		p.log.Debug("Received Unchoke")
+		return peerprotocol.UnchokeMessage{}, nil
+	case peerprotocol.Interested:
+		p.log.Debug("Received Interested")
+		return peerprotocol.InterestedMessage{}, nil
+	case peerprotocol.NotInterested:
+		p.log.Debug("Received NotInterested")
+		return peerprotocol.NotInterestedMessage{}, nil
+	case peerprotocol.Have:
+		var hm peerprotocol.HaveMessage
+		if err = binary.Read(p.r, binary.BigEndian, &hm); err != nil {
+			return nil, err
+		}
+		return hm, nil
+	case peerprotocol.Bitfield:
+		var bm peerprotocol.BitfieldMessage
+		bm.Data = make([]byte, length)
+		if _, err = io.ReadFull(p.r, bm.Data); err != nil {
+			return nil, err
+		}
+		return bm, nil
+	case peerprotocol.Request:
+		var rm peerprotocol.RequestMessage
+		if err = binary.Read(p.r, binary.BigEndian, &rm); err != nil {
+			return nil, err
+		}
+		if rm.Length > MaxBlockSize {
+			return nil, &blockSizeError{messageID: id, got: rm.Length, allowedMax: MaxBlockSize}
+		}
+		return rm, nil
+	case peerprotocol.Reject:
+		var rm peerprotocol.RejectMessage
+		if err = binary.Read(p.r, binary.BigEndian, &rm); err != nil {
+			return nil, err
+		}
+		p.log.Debugf("Received Reject: %+v", rm)
+		return rm, nil
+	case peerprotocol.Cancel:
+		var cm peerprotocol.CancelMessage
+		if err = binary.Read(p.r, binary.BigEndian, &cm); err != nil {
+			return nil, err
+		}
+		return cm, nil
+	case peerprotocol.Piece:
+		return p.parsePiece(length)
+	case peerprotocol.HaveAll:
+		return peerprotocol.HaveAllMessage{}, nil
+	case peerprotocol.HaveNone:
+		return peerprotocol.HaveNoneMessage{}, nil
+	case peerprotocol.AllowedFast:
+		var am peerprotocol.AllowedFastMessage
+		if err = binary.Read(p.r, binary.BigEndian, &am); err != nil {
+			return nil, err
+		}
+		return am, nil
+	case peerprotocol.Port:
+		var pm peerprotocol.PortMessage
+		if err = binary.Read(p.r, binary.BigEndian, &pm); err != nil {
+			return nil, err
+		}
+		return pm, nil
+	case peerprotocol.Extension:
+		buf := make([]byte, length)
+		if _, err = io.ReadFull(p.r, buf); err != nil {
+			return nil, err
+		}
+		var em peerprotocol.ExtensionMessage
+		if err = em.UnmarshalBinary(buf); err != nil {
+			return nil, err
+		}
+		return em.Payload, nil
+	case peerprotocol.HashRequest:
+		return p.parseHashMessage(length, false, false)
+	case peerprotocol.HashReject:
+		return p.parseHashMessage(length, true, false)
+	case peerprotocol.Hashes:
+		return p.parseHashMessage(length, false, true)
+	default:
+		p.log.Debugf("unhandled message type: %s", id)
+		p.log.Debugln("Discarding", length, "bytes...")
+		if _, err = io.CopyN(io.Discard, p.r, int64(length)); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+}
+
+// parsePiece decodes a piece message: 8-byte header plus the block payload,
+// capped at the wire block size and read through the throttle.
+func (p *PeerReader) parsePiece(length uint32) (any, error) {
+	var pm peerprotocol.PieceMessage
+	if err := binary.Read(p.r, binary.BigEndian, &pm); err != nil {
+		return nil, err
+	}
+	length -= 8
+	if length > piece.BlockSize {
+		return nil, &blockSizeError{messageID: peerprotocol.Piece, got: length, allowedMax: piece.BlockSize}
+	}
+	buf, err := p.readPiece(length)
+	if err != nil {
+		return nil, err
+	}
+	return Piece{PieceMessage: pm, Buffer: buf}, nil
+}
+
+// parseHashMessage decodes the v2 hash-transfer messages (BEP 52): a fixed
+// header for request/reject, header plus a whole number of hashes for
+// hashes. Malformed sizes are protocol errors.
+func (p *PeerReader) parseHashMessage(length uint32, reject, withHashes bool) (any, error) {
+	if !withHashes {
+		if length != peerprotocol.HashRequestHeaderSize {
+			kind := "invalid hash request size: %d"
+			if reject {
+				kind = "invalid hash reject size: %d"
+			}
+			return nil, fmt.Errorf(kind, length)
+		}
+		buf := make([]byte, length)
+		if _, err := io.ReadFull(p.r, buf); err != nil {
+			return nil, err
+		}
+		if reject {
+			var hm peerprotocol.HashRejectMessage
+			if err := hm.UnmarshalBinary(buf); err != nil {
+				return nil, err
+			}
+			return hm, nil
+		}
+		var hm peerprotocol.HashRequestMessage
+		if err := hm.UnmarshalBinary(buf); err != nil {
+			return nil, err
+		}
+		return hm, nil
+	}
+	if length < peerprotocol.HashRequestHeaderSize ||
+		(length-peerprotocol.HashRequestHeaderSize)%peerprotocol.HashSize != 0 {
+		return nil, fmt.Errorf("invalid hashes size: %d", length)
+	}
+	buf := make([]byte, length)
+	if _, err := io.ReadFull(p.r, buf); err != nil {
+		return nil, err
+	}
+	var hm peerprotocol.HashesMessage
+	if err := hm.HashRequestHeader.UnmarshalBinary(buf[:peerprotocol.HashRequestHeaderSize]); err != nil {
+		return nil, err
+	}
+	tail := buf[peerprotocol.HashRequestHeaderSize:]
+	hm.Hashes = make([][peerprotocol.HashSize]byte, len(tail)/peerprotocol.HashSize)
+	for i := range hm.Hashes {
+		copy(hm.Hashes[i][:], tail[i*peerprotocol.HashSize:])
+	}
+	return hm, nil
+}
+
+// readPiece streams length payload bytes into a pooled buffer under the read
+// throttle and the piece deadline. A timed-out partial block keeps the bytes
+// and continues; a timed-out empty read disconnects. Stops release the
+// buffer instead of leaking it.
 func (p *PeerReader) readPiece(length uint32) (buf bufferpool.Buffer, err error) {
 	buf = blockPool.Get(int(length))
 	defer func() {
@@ -329,7 +318,7 @@ func (p *PeerReader) readPiece(length uint32) (buf bufferpool.Buffer, err error)
 		}
 	}()
 
-	var n, m int
+	var n int
 	for {
 		if d := p.bucket.Take(int64(length)); d > 0 {
 			select {
@@ -339,33 +328,28 @@ func (p *PeerReader) readPiece(length uint32) (buf bufferpool.Buffer, err error)
 				return
 			}
 		}
-
-		err = p.conn.SetReadDeadline(time.Now().Add(p.pieceTimeout))
-		if err != nil {
+		if err = p.conn.SetReadDeadline(time.Now().Add(p.pieceTimeout)); err != nil {
 			return
 		}
-		n, err = io.ReadFull(p.r, buf.Data[m:])
+		var m int
+		m, err = io.ReadFull(p.r, buf.Data[n:])
+		n += m
 		if err != nil {
 			if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
-				// Peer didn't send the full block in allowed time.
 				if n > 0 {
-					// Some bytes received, peer appears to be slow, keep receiving the rest.
-					m += n
-					continue
+					continue // slow peer: keep the bytes, read the rest
 				}
-				// Disconnect if no bytes received.
-				return
+				return // silent peer: disconnect
 			}
-			// Error other than timeout
 			return
 		}
-		// Received full block.
 		return
 	}
 }
 
 var errStoppedWhileWaitingBucket = errors.New("peer reader stopped while waiting for bucket")
 
+// blockSizeError rejects an overlong block or request.
 type blockSizeError struct {
 	messageID  peerprotocol.MessageID
 	got        uint32
