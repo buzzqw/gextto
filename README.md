@@ -15,7 +15,7 @@ no C dependencies, six interface languages.
 ![Languages](https://img.shields.io/badge/UI-IT%20%C2%B7%20EN%20%C2%B7%20DE%20%C2%B7%20FR%20%C2%B7%20ES%20%C2%B7%20PL-lightgrey)
 
 > **Italiano:** [README.it.md](README.it.md) · **Manual:**
-> [English](docs/MANUAL.en.md) · **Issues:**
+> [English](docs/MANUAL.en.md) · [italiano](docs/MANUAL.it.md) · **Issues:**
 > [bugs and feature requests](https://github.com/buzzqw/gextto/issues) ·
 > **Contribute:** [developer guide](docs/DEVELOPERS.md)
 

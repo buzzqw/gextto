@@ -15,7 +15,7 @@ binario per componente, nessuna dipendenza C, sei lingue nell'interfaccia.
 ![Lingue](https://img.shields.io/badge/UI-IT%20%C2%B7%20EN%20%C2%B7%20DE%20%C2%B7%20FR%20%C2%B7%20ES%20%C2%B7%20PL-lightgrey)
 
 > **English:** [README.md](README.md) · **Manuale:**
-> [italiano](docs/MANUAL.it.md) · **Segnalazioni e proposte:**
+> [italiano](docs/MANUAL.it.md) · [English](docs/MANUAL.en.md) · **Segnalazioni e proposte:**
 > [GitHub Issues](https://github.com/buzzqw/gextto/issues) ·
 > **Contribuire:** [guida sviluppatori](docs/DEVELOPERS.md)
 
