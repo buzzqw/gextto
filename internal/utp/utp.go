@@ -9,6 +9,7 @@ package utp
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync/atomic"
 	"time"
@@ -55,11 +56,14 @@ func NewSocketFromPacketConn(pc net.PacketConn) (*Socket, error) {
 	return &Socket{inner: inner}, nil
 }
 
-// DialContext opens an outbound uTP connection.
+// DialContext opens an outbound uTP connection. A dial cancelled by the peer
+// race (TCP won) or by shutdown is not a failure and does not count as a dial
+// error: only a real error (no SYN-ACK within the timeout, socket error) does,
+// so the counter stays a UDP-reachability diagnostic.
 func (s *Socket) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	s.dials.Add(1)
 	c, err := s.inner.DialContext(ctx, network, addr)
-	if err != nil {
+	if err != nil && !errors.Is(err, context.Canceled) {
 		s.dialErrors.Add(1)
 	}
 	return c, err

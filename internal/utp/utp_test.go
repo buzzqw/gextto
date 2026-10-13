@@ -2,6 +2,7 @@ package utp
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -93,5 +94,35 @@ func TestSocketLoopbackEcho(t *testing.T) {
 	}
 	if st.SynDrops != 0 {
 		t.Fatalf("fresh socket syn drops: %+v", st)
+	}
+}
+
+// A dial cancelled by the peer race (TCP won) or by shutdown is not a uTP
+// failure: it counts as a dial but not as a dial error, so utp_dial_errors
+// stays the UDP-reachability diagnostic instead of tracking lost races.
+func TestCancelledDialIsNotADialError(t *testing.T) {
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := NewSocketFromPacketConn(pc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.CloseNow()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := s.DialContext(ctx, "udp", "127.0.0.1:1"); err == nil {
+		t.Fatal("a cancelled dial must fail")
+	} else if !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled dial error = %v, want context.Canceled", err)
+	}
+	st := s.Stats()
+	if st.Dials != 1 {
+		t.Fatalf("dials = %d, want 1", st.Dials)
+	}
+	if st.DialErrors != 0 {
+		t.Fatalf("a cancelled dial counted as an error: %+v", st)
 	}
 }
