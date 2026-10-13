@@ -1736,6 +1736,25 @@ So the adaptive queue plus multi-piece roughly doubles the throughput at RTT
 50 ms with 256 KiB pieces, where the single-piece block count was the limit.
 The write ring buffer (§16.3) is what keeps the disk from becoming the new
 bottleneck while more pieces are in flight.
+
+**Correction (2026-10-13, commit `afc65f8`).** The `shallow` ×1.97 above was an
+artifact: `RequestBlocks` capped each piece's *own* pending count, so with two
+pieces a peer kept up to 2×`MaxRequestsOut` requests in flight (2 at max=1). Now
+the budget is shared for real (pending requests are subtracted first) and the
+extra piece opens only when the window has room its pieces cannot fill
+(`pipeHasRoom`). Same harness, two runs each, before (`f99cfe8`) → after:
+
+| Profile | before | after |
+| --- | --- | --- |
+| `shallow` def=1/max=1 | 590–594 KiB/s | 301 KiB/s (window of 1 respected again) |
+| `default` def=50/max=250 | 6739–6776 KiB/s | 6733–6752 KiB/s (equivalent) |
+
+Peak RSS of the harness process 32.2 → 33.7–34.2 MiB (the `shallow` run lasts
+twice as long); `measure-seeding` (4 leechers) identical (seeder 1.00x corpus,
+RSS 32.6 → 32.5 MiB, CPU 6.3 → 6.4 s; the loopback mesh completes only one
+leecher in both runs, the known instability above). Benchmarks `piecepicker` and
+`filestorage` (`-count=3`, incl. `MmapSyncRanged` after the `markDirty` change)
+within noise, 0 new allocations.
 **Choking** is isolated by the deterministic bench (`internal/unchoker/sim_test.go`,
 in `make test-engine`), which drives the real `Unchoker` with synthetic peers and fixes
 fairness, slots and optimistic rotation; the end-to-end seed is in §6.4/§6.6.
@@ -2595,7 +2614,7 @@ here; the implemented ones are dated, the others are a proposal to be agreed.
 | 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | the O(1) counter removed the cost argument | medium | medium | **partial**: `subnet_cap_hint` (the suggested cap from the live concentration) is exposed in `Stats()`; automatic enforcement not pursued (a /24 can be legitimate CGNAT/mobile) |
 | 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.10 | medium | medium | **measured + instrumented (2026-10-13)**: `peers_confirmed_multi` counts peers reported by ≥2 distinct nodes; the full rewrite awaits data, see §16.2 |
 | 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | Phase 2 | medium | low | **done (2026-10-13)**: `merged_pieces`/`merged_bytes` in the engine session stats → daemon API → Gextto «Riuso locale» |
-| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.12 | high | high | **done (2026-10-13)**: write ring buffer + 2 pieces per peer; measured ×1.75 (3.85→6.76 MiB/s at RTT 50 ms), details in §6.4/§16.3 |
+| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.12 | high | high | **done (2026-10-13)**: write ring buffer + 2 pieces per peer; measured ×1.75 (3.85→6.76 MiB/s at RTT 50 ms; window-sharing fix in `afc65f8`), details in §6.4/§16.3 |
 | 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | the fuzzing pass | medium/high | low | **done**: `internal/utils/utils.go` (length bounded, recursion depth ≤64); `internal/dht/bencode.go` `validBencode` screens DHT packets before bencode-go |
 | 10 | Merge: **no double verification** — the pieces the merge just re-verified are handed to the verifier as already done | Phase 2 analysis | medium (no re-read and re-hash of the reused bytes) | low | **done (2026-10-13)**: `Verifier.Skip`, cleared after the allocation-time check |
 
@@ -2721,6 +2740,11 @@ Have/Bitfield/HaveAll/Unchoke/completion. Fixed while doing it:
 **Measurement (the same latency harness):** `default` **3853 → 6756 KiB/s**
 (×1.75), `shallow` 302 → 594 KiB/s (×1.97) at RTT 50 ms with 256 KiB pieces.
 Tests: e2e suite + `-race` on the transfer tests, `piecedownloader` budget test.
+**Follow-up (`afc65f8`):** shared budget fixed (the old one doubled the window,
+see §6.4 *Correction*), extra piece only when the pipe has room, one queued RAM
+request per peer, endgame duplicates cancelled as soon as a copy starts writing
+(peer and webseed), `markDirty` widened for out-of-order writes. `default` at
+RTT 50 ms unchanged (~6.75 MiB/s), RAM and CPU equivalent.
 
 ---
 
