@@ -234,12 +234,15 @@ swarm merge and the parser fuzzing:
 | `BenchmarkTickUnchokeSeeding` | **1.64 µs/op, 896 B/op, 1 alloc/op** | unchoker tick (round 2: ~1.3 µs) |
 | `BenchmarkBlocked` | **37.7 ns/op, 0 B/op, 0 allocs/op** | IP filter lookup (round 2: 18.6 ns; load-dependent) |
 | `BenchmarkEngineLoggerFiltered` vs `Forwarded` | **175 vs 730 ns/op, 3 vs 6 allocs/op** | the below-threshold fast path still avoids the message formatting |
-| `BenchmarkPrefillFromUnrelatedV2` | **1.58 µs/op, 128 B/op, 16 allocs/op** (16 candidates) | one-shot cost of the Phase 2 merge scan at allocation, **no steady-state path** |
+| `BenchmarkPrefillFromUnrelatedV2` | **1.58 µs/op, 128 B/op, 16 allocs/op** (16 candidates) | one-shot cost of the Phase 2 merge scan (allocation, resume, later trigger), **no steady-state path** |
 
 The last row is the new Swarm Merging Phase 2 (§9.2): matching 16 unrelated v2
 candidates costs ~1.6 µs once per torrent (one small map per candidate), and the
 picker/peer/piece-write paths are not touched, so the merge cannot affect
-seeding or download throughput.
+seeding or download throughput. The cheap candidate filter that the resume and
+later-trigger paths pay when nothing is reusable is
+`BenchmarkMergeCandidatesUnrelated`: **~98 ns/op, 0 allocs/op** over 32
+unrelated torrents (see §10.1).
 
 **Sixth round (2026-10-13, Intel N97) — original engine rewrite and dependency
 decoupling.** The full in-tree rewrite of `internal/gxcore`/`internal/dht` and
@@ -1043,7 +1046,7 @@ data path; with auto-speed **off** nothing changes (no regression).
 **Possible follow-up.** Gextto-side (managed) version: Gextto measures the RTT and
 modulates the limits via `SetLimits`, so the option also applies to managed engines.
 
-### 9.2 Swarm Merging (file sharing between torrents) — Phases 1, 2 and 3 done
+### 9.2 Swarm Merging (file sharing between torrents) — Phases 1–3, resume path and later trigger done
 
 **Idea.** Make different swarms that contain **the same file** collaborate,
 reusing the pieces already present in another torrent A instead of re-downloading them:
@@ -1054,9 +1057,11 @@ gx-core it is missing on v1; in v2 the intrinsic protocol deduplication already 
 `FileSection{File, Offset, Length, Padding}` points to a file+**absolute** offset
 (`internal/filesection/section.go`): writing a piece is `File.WriteAt(buf, off)`.
 The **BEP 38** hints (`similar`/`collections`) are already read and merged
-(`internal/gxcore/internal/metainfo/bep38.go`) and the local torrents that
-share them are already found (`cmd/gx-torrent/bep38.go`): it is the discovery of the
-candidates, the starting point of the merge.
+(`internal/metainfo/bep38.go`) and the local torrents that
+share them are already found (`cmd/gx-torrent/bep38.go`). The merge does **not**
+drive its candidates from them, though: it matches by **structure** (an
+identical piece layout, or an equal v2 per-file Merkle root), which is what makes
+the reuse safe; the hints are the *reporting* side of the BEP.
 The verification already exists (`Piece.VerifyHash` v1, `Piece.VerifyV2` v2); in v2
 `metainfo.V2Files[fi].Root` is the **per-file identity**, and `internal/merkle`
 provides the 16 KiB leaves for the **per-block** verification. The problem is not the

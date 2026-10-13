@@ -47,8 +47,8 @@ stay narrow and the tables remain readable.
 > (an identical piece layout, or an equal v2 per-file Merkle root): matching on
 > the identity of the bytes is what makes the reuse safe. Phases 1–3 are done
 > (`evoluzione.md` §9.2 and §10.1), including block-granularity reuse, the
-> resume path and the re-trigger when a sibling appears after the allocation;
-> see [Remaining items](#remaining-items-and-roadmap), item 3.
+> resume path and the re-trigger when a sibling appears after the allocation.
+> The daemon's BEP 38 view is `GET /api/v1/torrents/{hash}/collections`.
 >
 > **BEP 54 (`lt_donthave`).** Implemented on the **reception** side and
 > advertised in the BEP 10 handshake: a peer that drops a piece it had
@@ -188,17 +188,10 @@ stay narrow and the tables remain readable.
 2. **10 Gbps throughput (pipelining)**: the adaptive request queue already
    exists; every change must be **measured before and after** (CPU, RAM,
    throughput), as per the performance rule in `AGENTS.md`.
-3. **BEP 38 — `similar`/`collections`.** The hints are read from the
-   info dictionary **and** from the top level (merged, deduplicated), re-emitted
-   in the `.torrent` export and shown together with the local torrents that
-   share a hint (API `GET /api/v1/torrents/{hash}/collections`, daemon
-   page, detail in Gextto). The **reuse of the shared data** — the real gain of
-   the BEP — is **Swarm Merging** (`evoluzione.md` §9.2), and it is **done**:
-   Phases 1–3 reuse whole pieces of an identical layout, whole identical v2
-   files with a different piece length, and 16 KiB blocks of a partially
-   verified source; the merge runs on the **resume path** and is **re-triggered
-   when a sibling publishes its data after the allocation**, so neither a
-   restart nor the order in which the torrents are added loses the reuse.
+
+**BEP 38 is complete** (hints, block reuse at allocation/resume/later trigger):
+the detail is in the note above, in [`gx-torrent.md`](gx-torrent.md)
+(*Local data reuse*) and in [`evoluzione.md`](evoluzione.md) §9.2/§10.1.
 
 ## Maintenance
 

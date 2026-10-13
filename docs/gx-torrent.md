@@ -1142,7 +1142,7 @@ Merging is **disabled if one side is a private torrent** (BEP 27): mixing
 private swarms violates the tracker rules. It is independent of the **BEP 38**
 hints, which serve to *report* the candidates.
 
-Two levels:
+The merge has three phases:
 
 - **Phase 1 — identical layout.** Same `piece length`, same length and same
   hashes at the same indices: the pieces are directly interchangeable and are
