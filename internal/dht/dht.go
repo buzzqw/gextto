@@ -510,30 +510,7 @@ func (d *DHT) loop() {
 		case addr := <-d.remoteNodeAcquaintance:
 			d.helloFromPeer(addr)
 		case req := <-d.peersRequest:
-			// torrent server is asking for more peers for infoHash.  Ask the closest
-			// nodes for directions. The goroutine will write into the
-			// PeersNeededResults channel.
-
-			// Drain all requests sitting in the channel and de-dupe them.
-			m := map[InfoHash]announceOptions{req.ih: req.options}
-		P:
-			for {
-				select {
-				case req = <-d.peersRequest:
-					m[req.ih] = req.options
-				default:
-					// Channel drained.
-					break P
-				}
-			}
-			// Process each unique infohash for which there were requests.
-			for ih, options := range m {
-				if options.announce {
-					d.peerStore.addLocalDownload(ih, options.port)
-				}
-
-				d.getPeers(ih) // I might have enough peers in the peerstore, but no seeds
-			}
+			d.servePeersRequests(req)
 
 		case ih := <-d.removeInfoHash:
 			d.peerStore.removeLocalDownload(ih)
@@ -546,33 +523,18 @@ func (d *DHT) loop() {
 		case id := <-d.bep44Done:
 			d.finishBep44(id)
 		case req := <-d.nodesRequest:
-			m := map[InfoHash]bool{req.ih: true}
-		L:
-			for {
-				select {
-				case req = <-d.nodesRequest:
-					m[req.ih] = true
-				default:
-					// Channel drained.
-					break L
-				}
-			}
-			for ih := range m {
-				d.findNode(string(ih))
-			}
+			d.serveNodesRequests(req)
 
 		case p := <-socketChan:
 			totalRecv.Add(1)
-			if d.config.RateLimit > 0 {
-				if tokenBucket > 0 {
-					d.processPacket(p)
-					tokenBucket -= 1
-				} else {
-					// TODO In the future it might be better to avoid dropping things like ping replies.
-					totalDroppedPackets.Add(1)
-				}
+			if d.config.RateLimit > 0 && tokenBucket <= 0 {
+				// TODO In the future it might be better to avoid dropping things like ping replies.
+				totalDroppedPackets.Add(1)
 			} else {
 				d.processPacket(p)
+				if d.config.RateLimit > 0 {
+					tokenBucket--
+				}
 			}
 			bytesArena.Push(p.b)
 
@@ -581,20 +543,7 @@ func (d *DHT) loop() {
 				tokenBucket += d.config.RateLimit / 10
 			}
 		case <-cleanupTicker:
-			ms, ins := d.tableMetrics()
-			subnetShareMax.Store(int64(ms))
-			nodesInsecureID.Store(int64(ins))
-			subnetCapHintValue.Store(int64(subnetCapHint(ms, d.routingTable.maxPerSubnet)))
-			d.expirePeerConfirm(time.Now())
-			needPing := d.routingTable.cleanup(d.config.CleanupPeriod, d.peerStore)
-			d.wg.Add(1)
-			go func() {
-				defer d.wg.Done()
-				pingSlowly(d.pingRequest, needPing, d.config.CleanupPeriod, d.stop)
-			}()
-			if d.needMoreNodes() {
-				d.bootstrap()
-			}
+			d.runCleanupTick()
 		case node := <-d.pingRequest:
 			d.pingNode(node)
 		case <-secretRotateTicker:
@@ -602,12 +551,77 @@ func (d *DHT) loop() {
 		case d.portRequest <- d.config.Port:
 			continue
 		case <-saveTicker:
-			tbl := d.routingTable.reachableNodes()
-			if len(tbl) > 5 {
-				d.store.Remotes = tbl
-				saveStore(*d.store)
-			}
+			d.persistRoutingTable()
 		}
+	}
+}
+
+// servePeersRequests drains the queued peer searches, de-dupes them by info
+// hash, registers local downloads, and launches one lookup each. A lookup
+// may already hold peers without seeds — it still runs.
+func (d *DHT) servePeersRequests(first ihReq) {
+	m := map[InfoHash]announceOptions{first.ih: first.options}
+	for {
+		select {
+		case req := <-d.peersRequest:
+			m[req.ih] = req.options
+		default:
+			goto drained
+		}
+	}
+drained:
+	for ih, options := range m {
+		if options.announce {
+			d.peerStore.addLocalDownload(ih, options.port)
+		}
+		d.getPeers(ih)
+	}
+}
+
+// serveNodesRequests drains queued find-node targets, de-duped, and
+// launches one search each.
+func (d *DHT) serveNodesRequests(first ihReq) {
+	m := map[InfoHash]bool{first.ih: true}
+	for {
+		select {
+		case req := <-d.nodesRequest:
+			m[req.ih] = true
+		default:
+			goto drained
+		}
+	}
+drained:
+	for ih := range m {
+		d.findNode(string(ih))
+	}
+}
+
+// runCleanupTick publishes the table metrics, expires peer confirmations,
+// pings the stale set off-loop, and re-bootstraps a thin table.
+func (d *DHT) runCleanupTick() {
+	ms, ins := d.tableMetrics()
+	subnetShareMax.Store(int64(ms))
+	nodesInsecureID.Store(int64(ins))
+	subnetCapHintValue.Store(int64(subnetCapHint(ms, d.routingTable.maxPerSubnet)))
+	d.expirePeerConfirm(time.Now())
+	needPing := d.routingTable.cleanup(d.config.CleanupPeriod, d.peerStore)
+	d.wg.Add(1)
+	go func() {
+		defer d.wg.Done()
+		pingSlowly(d.pingRequest, needPing, d.config.CleanupPeriod, d.stop)
+	}()
+	if d.needMoreNodes() {
+		d.bootstrap()
+	}
+}
+
+// persistRoutingTable snapshots reachable nodes to disk once the table is
+// worth keeping.
+func (d *DHT) persistRoutingTable() {
+	tbl := d.routingTable.reachableNodes()
+	if len(tbl) > 5 {
+		d.store.Remotes = tbl
+		saveStore(*d.store)
 	}
 }
 
