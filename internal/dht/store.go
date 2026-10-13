@@ -3,37 +3,35 @@ package dht
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"strings"
 )
 
-// dhtStore is used to persist the routing table on disk.
+// dhtStore persists the node id and the routing table across restarts. It is
+// only active with SaveRoutingTable: the engine leaves it off (ephemeral
+// nodes), so these paths run solely for standalone users who opt in.
 type dhtStore struct {
-	// The rest of the stack uses string, but that confuses the json
-	// Marshaller. []byte is more correct anyway.
+	// Id is []byte rather than string: the JSON marshaller mangles strings.
 	Id      []byte
 	Port    int
 	Remotes map[string][]byte // Key: IP, Value: node ID.
-	path    string            // Empty if the store is disabled.
+	path    string            // Empty disables persistence.
 }
 
-// mkdirStore() creates a directory to load and save the configuration from.
-// Uses ~/.taipeitorrent if $HOME is set, otherwise falls back to
-// /var/run/taipeitorrent.
+// mkdirStore ensures the state directory: ~/.taipeitorrent under $HOME,
+// /var/run/taipeitorrent without it. The legacy directory name is kept so
+// pre-existing state keeps loading.
 func mkdirStore() string {
 	dir := "/var/run/taipeitorrent"
-	env := os.Environ()
-	for _, e := range env {
-		if strings.HasPrefix(e, "HOME=") {
-			dir = strings.SplitN(e, "=", 2)[1]
-			dir = path.Join(dir, ".taipeitorrent")
+	for _, e := range os.Environ() {
+		if rest, ok := strings.CutPrefix(e, "HOME="); ok {
+			dir = path.Join(rest, ".taipeitorrent")
 		}
 	}
 	// Ignore errors.
-	os.MkdirAll(dir, 0750)
+	_ = os.MkdirAll(dir, 0750)
 
 	if s, err := os.Stat(dir); err != nil {
 		log.Fatal("stat config dir", err)
@@ -43,60 +41,53 @@ func mkdirStore() string {
 	return dir
 }
 
+// openStore loads the state for port when enabled, tolerating a missing or
+// corrupt file with a fresh store.
 func openStore(port int, enabled bool) (cfg *dhtStore) {
 	// TODO: File locking.
 	cfg = &dhtStore{Port: port}
-	if enabled {
-		cfg.path = mkdirStore()
-
-		// If a node is running in port 30610, the config should be in
-		// ~/.taipeitorrent/dht-36010
-		p := fmt.Sprintf("%v-%v", path.Join(cfg.path, "dht"), port)
-		f, err := os.Open(p)
-		if err != nil {
-			// log.Println(err)
-			return cfg
-		}
-		defer f.Close()
-
-		if err = json.NewDecoder(f).Decode(cfg); err != nil {
-			log.Println(err)
-		}
+	if !enabled {
+		return cfg
 	}
-	return
+	cfg.path = mkdirStore()
+
+	p := fmt.Sprintf("%v-%v", path.Join(cfg.path, "dht"), port)
+	f, err := os.Open(p)
+	if err != nil {
+		return cfg
+	}
+	defer f.Close()
+
+	if err = json.NewDecoder(f).Decode(cfg); err != nil {
+		log.Println(err)
+	}
+	return cfg
 }
 
-// saveStore tries to safe the provided config in a safe way.
+// saveStore atomically replaces the state file via temp-file rename (atomic
+// on Linux; best-effort remove-and-retry on Windows). Disabled stores are a
+// no-op.
 func saveStore(s dhtStore) {
 	if s.path == "" {
 		return
 	}
-	tmp, err := ioutil.TempFile(s.path, "taipeitorrent")
+	tmp, err := os.CreateTemp(s.path, "taipeitorrent")
 	if err != nil {
 		log.Println("saveStore tempfile:", err)
 		return
 	}
 	err = json.NewEncoder(tmp).Encode(s)
-	// The file has to be closed already otherwise it can't be renamed on
-	// Windows.
+	// Closed before rename: Windows cannot rename open files.
 	tmp.Close()
 	if err != nil {
 		log.Println("saveStore json encoding:", err)
 		return
 	}
 
-	// Write worked, so replace the existing file. That's atomic in Linux, but
-	// not on Windows.
 	p := fmt.Sprintf("%v-%v", s.path+"/dht", s.Port)
 	if err := os.Rename(tmp.Name(), p); err != nil {
-		// if os.IsExist(err) {
-		// Not working for Windows:
-		// http://code.google.com/p/go/issues/detail?id=3828
-
-		// It's not possible to atomically rename files on Windows, so I
-		// have to delete it and try again. If the program crashes between
-		// the unlink and the rename operation, it loses the configuration,
-		// unfortunately.
+		// Non-atomic fallback (see the Windows note above): unlink, retry,
+		// and accept the crash window between the two.
 		if err := os.Remove(p); err != nil {
 			log.Println("saveStore failed to remove the existing config:", err)
 			return
@@ -105,10 +96,5 @@ func saveStore(s dhtStore) {
 			log.Println("saveStore failed to rename file after deleting the original config:", err)
 			return
 		}
-		// } else {
-		// 	log.Println("saveStore failed when replacing existing config:", err)
-		// }
-	} else {
-		// log.Println("Saved DHT routing table to the filesystem.")
 	}
 }
