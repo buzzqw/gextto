@@ -112,7 +112,7 @@ func (t *torrent) punishCorruptSource(pw *piecewriter.PieceWriter) {
 // advance, duplicate-fetch cancellation, and the completion check.
 func (t *torrent) adoptVerifiedPiece(pw *piecewriter.PieceWriter) {
 	index := pw.Piece.Index
-	t.pieces[index].Done = true
+	pw.Piece.Done = true
 	if t.bitfield.Test(index) {
 		t.crash(fmt.Sprintf("already have the piece #%d", index))
 	}
