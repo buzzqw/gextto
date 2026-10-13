@@ -19,6 +19,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	pprofsync "github.com/anacrolix/sync"
@@ -48,6 +49,12 @@ const (
 	// This prevents spamming a state packet for every packet received, and
 	// non-state packets that are being sent also fill the role.
 	pendingSendStateDelay = 500 * time.Microsecond
+
+	// GEXTTO: adaptive RTO. A connection whose packets keep timing out backs
+	// its RTO off (doubling up to this cap) so it stops hammering a congested
+	// or stalled peer; a delivered packet relaxes it back toward the measured
+	// RTT. See Conn.resendTimeout/noteRTOTimeout/noteDelivery.
+	maxRTOBackoff = 4
 )
 
 var (
@@ -100,11 +107,32 @@ var (
 	sockets                    = map[*Socket]struct{}{}
 	logLevel                   = 0
 	artificialPacketDropChance = 0.0
+
+	// GEXTTO: adaptiveRTO gates the loss-driven RTO backoff (see Conn.
+	// resendTimeout). It is a variable so tests and the measurement harness
+	// can A/B the change; production leaves it true. Atomic because the
+	// harness flips it while socket goroutines run.
+	adaptiveRTO atomic.Bool
+
+	// GEXTTO: minimum RTT assumed for the RTO, in nanoseconds, resolving the
+	// vendored "TODO: introduce a minimum latency". Fast paths (loopback, LAN)
+	// measure tens of microseconds; without the floor the RTO goes
+	// sub-millisecond and a briefly stalled peer triggers a resend storm.
+	// Matches the seed's 5 ms floor. Atomic so the harness can A/B it.
+	minLatencyNanos atomic.Int64
 )
+
+// GEXTTO: minLatencyDuration is the minimum RTT assumed when computing the RTO.
+func minLatencyDuration() time.Duration { return time.Duration(minLatencyNanos.Load()) }
 
 func init() {
 	logLevel, _ = strconv.Atoi(os.Getenv("GO_UTP_LOGGING"))
 	fmt.Sscanf(os.Getenv("GO_UTP_PACKET_DROP"), "%f", &artificialPacketDropChance)
+	// GEXTTO: the adaptive RTO is on by default; the measurement harness and
+	// the A/B test turn it off explicitly.
+	adaptiveRTO.Store(true)
+	// GEXTTO: the RTO never assumes an RTT below 5 ms.
+	minLatencyNanos.Store(int64(5 * time.Millisecond))
 }
 
 var (

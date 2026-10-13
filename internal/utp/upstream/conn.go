@@ -48,6 +48,12 @@ type Conn struct {
 	connDeadlines
 	latencies []time.Duration
 
+	// GEXTTO: adaptive RTO backoff (1..maxRTOBackoff). It doubles on each
+	// RTO-driven resend and halves on each delivered packet, so a stalled or
+	// congested peer is retried with growing patience while a link that
+	// recovers is probed at the measured RTT again quickly. See resendTimeout.
+	rtoBackoff uint32
+
 	// We need to send state packet.
 	pendingSendState              bool
 	sendPendingSendSendStateTimer *time.Timer
@@ -220,13 +226,20 @@ func (c *Conn) write(_type st, connID uint16, payload []byte, seqNr uint16) (n i
 	return
 }
 
-// TODO: Introduce a minimum latency.
+// GEXTTO: the vendored TODO "introduce a minimum latency" is resolved here.
+// The sampled RTT on fast paths (loopback, LAN) can be tens of microseconds,
+// which makes the RTO sub-millisecond and turns a briefly stalled peer into a
+// resend storm. The floor is the same 5 ms the seed already guarantees, so a
+// real WAN path (RTT ≫ 5 ms) is unaffected.
 func (c *Conn) latency() (ret time.Duration) {
 	if len(c.latencies) != 0 {
 		for _, l := range c.latencies {
 			ret += l
 		}
 		ret = (ret + time.Duration(len(c.latencies)) - 1) / time.Duration(len(c.latencies))
+		if ret < minLatencyDuration() {
+			ret = minLatencyDuration()
+		}
 		return
 	}
 	// GEXTTO: seed from the measured per-remote latency when available, so
@@ -275,6 +288,7 @@ func (c *Conn) ack(nr uint16) {
 		c.cur_window -= s.payloadSize
 		c.updateCanWrite()
 		c.addLatency(latency)
+		c.noteDelivery()
 	}
 	// Trim sends that aren't needed anymore.
 	for len(c.unackedSends) != 0 {
@@ -316,7 +330,47 @@ func (c *Conn) seqSend(seqNr uint16) *send {
 func (c *Conn) resendTimeout() time.Duration {
 	l := c.latency()
 	ret := missinggo.JitterDuration(3*l, l)
+	// GEXTTO: loss-driven backoff. Each RTO timeout is the congestion signal
+	// (the same one the socket counters expose) and makes this connection more
+	// patient, up to maxRTOBackoff, which cuts retransmission volume to a
+	// stalled or congested peer. A delivered packet halves it back
+	// (noteDelivery), so a link that recovers is probed at the measured RTT
+	// again quickly; a healthy connection never timeout-resends and keeps
+	// backoff 1, i.e. today's behaviour.
+	if c.rtoBackoff > 1 {
+		ret *= time.Duration(c.rtoBackoff)
+	}
 	return ret
+}
+
+// GEXTTO: noteRTOTimeout records an RTO-driven resend on this connection and
+// backs its RTO off (doubling, capped at maxRTOBackoff). Called from
+// send.timeoutResend under mu.
+func (c *Conn) noteRTOTimeout() {
+	if !adaptiveRTO.Load() {
+		return
+	}
+	switch {
+	case c.rtoBackoff == 0:
+		c.rtoBackoff = 1
+	case c.rtoBackoff < maxRTOBackoff:
+		c.rtoBackoff *= 2
+		if c.rtoBackoff > maxRTOBackoff {
+			c.rtoBackoff = maxRTOBackoff
+		}
+	}
+}
+
+// GEXTTO: noteDelivery records a first ACK and relaxes the adaptive RTO
+// backoff by half (floor 1), so a connection that delivers again stops paying
+// the patience accumulated during a stall. Called from Conn.ack under mu.
+func (c *Conn) noteDelivery() {
+	if !adaptiveRTO.Load() {
+		return
+	}
+	if c.rtoBackoff > 1 {
+		c.rtoBackoff /= 2
+	}
 }
 
 func (c *Conn) ackSkipped(seqNr uint16) {

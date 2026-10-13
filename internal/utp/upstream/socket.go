@@ -354,6 +354,8 @@ func (s *Socket) newConn(addr net.Addr) (c *Conn) {
 		socket:           s,
 		remoteSocketAddr: addr,
 		created:          time.Now(),
+		// GEXTTO: adaptive RTO starts at the measured-behaviour multiplier.
+		rtoBackoff: 1,
 	}
 	c.sendPendingSendSendStateTimer = missinggo.StoppedFuncTimer(c.sendPendingSendStateTimerCallback)
 	c.packetReadTimeoutTimer = time.AfterFunc(packetReadTimeout, c.receivePacketTimeoutCallback)
