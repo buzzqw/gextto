@@ -4,6 +4,10 @@ import (
 	"github.com/zeebo/bencode"
 )
 
+// announceResponse mirrors the bencoded dictionary of an HTTP announce
+// reply (BEP 23). Keys use the tracker's own spellings, including the
+// spaced "failure reason" / "min interval" forms; Peers may arrive in
+// compact binary or dictionary-list form, hence RawMessage.
 type announceResponse struct {
 	FailureReason  string             `bencode:"failure reason"`
 	RetryIn        string             `bencode:"retry in"`

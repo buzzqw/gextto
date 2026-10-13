@@ -9,7 +9,9 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
-// PieceWriter writes the data in the buffer to disk.
+// PieceWriter verifies one downloaded piece buffer and persists it. HashOK
+// and Error report the outcome on resultC; the buffer itself is owned by the
+// caller.
 type PieceWriter struct {
 	Piece  *piece.Piece
 	Source any
@@ -19,7 +21,7 @@ type PieceWriter struct {
 	Error  error
 }
 
-// New returns new PieceWriter for a given piece.
+// New binds a piece and its downloaded bytes to a writer.
 func New(p *piece.Piece, source any, buf bufferpool.Buffer) *PieceWriter {
 	return &PieceWriter{
 		Piece:  p,
@@ -28,7 +30,9 @@ func New(p *piece.Piece, source any, buf bufferpool.Buffer) *PieceWriter {
 	}
 }
 
-// Run checks the hash, then writes the data in the buffer to the disk.
+// Run hashes the buffer (SHA-1 for v1, Merkle for v2) and, on a match,
+// writes it to storage under the write-slot semaphore. Meters and result
+// delivery mirror the surrounding pipeline's accounting.
 func (w *PieceWriter) Run(resultC chan *PieceWriter, closeC chan struct{}, writesPerSecond, writeBytesPerSecond metrics.Meter, sem *semaphore.Semaphore) {
 	w.HashOK = w.Piece.VerifyHash(w.Buffer.Data, sha1.New())
 	if w.Piece.V2 {

@@ -1,29 +1,31 @@
-// Package storage contains an interface for reading and writing files in a torrent.
+// Package storage defines how the engine reads and writes torrent files:
+// a Storage opens named files, a Provider hands out one Storage per torrent.
 package storage
 
 import "io"
 
-// Storage is an interface for reading/writing torrent files.
+// Storage opens and locates the files of one torrent.
 type Storage interface {
-	// Open a file. If the file does not exist, it will be created.
+	// Open returns the file, creating it when missing. exists reports
+	// whether the file was already there.
 	Open(name string, size int64) (f File, exists bool, err error)
-	// RootDir is the absolute path of the storage root.
+	// RootDir is the absolute storage root.
 	RootDir() string
 }
 
-// File interface for reading/writing torrent data.
+// File reads, writes and persists torrent bytes.
 type File interface {
 	io.ReaderAt
 	io.WriterAt
 	io.Closer
-	// Sync flushes the file's data to stable storage. The engine calls it
-	// before persisting the resume bitfield so a bit that survives a crash
-	// always refers to data already on disk.
+	// Sync flushes data to stable storage. The engine syncs before
+	// persisting the resume bitfield, so a bit that survives a crash always
+	// refers to bytes already on disk.
 	Sync() error
 }
 
-// Provider is a torrent storage provider.
+// Provider issues one Storage per torrent id.
 type Provider interface {
-	// GetStorage returns a storage for a torrent.
+	// GetStorage returns the storage for a torrent.
 	GetStorage(torrentID string) (Storage, error)
 }
