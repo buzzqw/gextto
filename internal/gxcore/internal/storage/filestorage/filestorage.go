@@ -1,4 +1,5 @@
-// Package filestorage implements Storage interface that uses files on disk as storage.
+// Package filestorage stores torrent files on disk: plain OS files with
+// fdatasync durability, or shared memory mappings on Linux, under one root.
 package filestorage
 
 import (
@@ -9,104 +10,105 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 )
 
-// FileStorage implements Storage interface for saving files on disk.
+// FileStorage opens torrent files under a root directory.
 type FileStorage struct {
 	// Preallocate reserves the full size of new files.
 	Preallocate bool
-	// Mmap serves the files from a shared memory mapping (Linux): writes are
-	// memcpy into the page cache, with the kernel writeback asynchronous, and
-	// reads avoid a syscall. It falls back to plain OS files elsewhere or when
-	// the mapping cannot be created.
+	// Mmap serves files from a shared mapping (Linux, with plain-file
+	// fallback elsewhere or when the mapping fails).
 	Mmap bool
 	dest string
 	perm fs.FileMode
 }
 
-// New returns a new FileStorage at the destination.
+// New roots a storage at dest.
 func New(dest string, perm fs.FileMode) (*FileStorage, error) {
-	var err error
-	dest, err = filepath.Abs(dest)
+	abs, err := filepath.Abs(dest)
 	if err != nil {
 		return nil, err
 	}
-	return &FileStorage{dest: dest, perm: perm}, nil
+	return &FileStorage{dest: abs, perm: perm}, nil
 }
 
 var _ storage.Storage = (*FileStorage)(nil)
 
-// Open a file.
+// Open opens name under the root, creating parents and the file as needed.
+// New files are preallocated or sparsely truncated per configuration;
+// existing files of the wrong size are resized. Writes stay un-synced: the
+// engine batches durability into storage.File.Sync at resume-bitfield time.
 func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool, err error) {
-	name = filepath.Clean(name)
-
-	// All files are saved under dest.
-	name = filepath.Join(s.dest, name)
-
-	// Create containing dir if not exists.
-	err = os.MkdirAll(filepath.Dir(name), os.ModeDir|s.perm)
-	if err != nil {
-		return
+	name = filepath.Join(s.dest, filepath.Clean(name))
+	if err = os.MkdirAll(filepath.Dir(name), os.ModeDir|s.perm); err != nil {
+		return nil, false, err
 	}
-
-	// Make sure OS file is closed in case of any error, and wrap the result:
-	// mmap-backed when requested (Linux), otherwise fdatasync-backed.
-	var of *os.File
+	of, opened, err := s.openFile(name, size)
+	if err != nil {
+		return nil, false, err
+	}
 	defer func() {
-		if err == nil && of != nil {
-			err = disableReadAhead(of)
-		}
 		if err != nil {
-			if of != nil {
-				_ = of.Close()
-			}
+			_ = of.Close()
+			f = nil
 			return
 		}
-		if of != nil {
-			f = s.wrap(of, size)
+		if rerr := disableReadAhead(of); rerr != nil {
+			_ = of.Close()
+			err = rerr
+			f = nil
+			return
 		}
+		f = s.wrap(of, size)
 	}()
+	return nil, opened, nil
+}
 
-	// Open OS file. Data is NOT written with O_SYNC: the engine batches the
-	// durability with storage.File.Sync() when it persists the resume bitfield
-	// (see torrent.syncPieces), so a set bit always refers to synced data.
-	var mode = s.perm &^ 0111
-	openFlags := os.O_RDWR
-	openFlags = applyNoAtimeFlag(openFlags)
-	of, err = os.OpenFile(name, openFlags, mode)
-	if os.IsNotExist(err) {
-		openFlags |= os.O_CREATE
-		of, err = os.OpenFile(name, openFlags, mode)
-		if err != nil {
-			return
-		}
-		if s.Preallocate {
-			err = preallocate(of, size)
-		} else {
-			err = of.Truncate(size)
-		}
-		return
+// openFile opens the OS file, creating and sizing it on first sight.
+func (s *FileStorage) openFile(name string, size int64) (*os.File, bool, error) {
+	mode := s.perm &^ 0111
+	flags := applyNoAtimeFlag(os.O_RDWR)
+	of, err := os.OpenFile(name, flags, mode)
+	if err == nil {
+		return s.adoptExisting(of, size)
+	}
+	if !os.IsNotExist(err) {
+		return nil, false, err
+	}
+	of, err = os.OpenFile(name, flags|os.O_CREATE, mode)
+	if err != nil {
+		return nil, false, err
+	}
+	if s.Preallocate {
+		err = preallocate(of, size)
+	} else {
+		err = of.Truncate(size)
 	}
 	if err != nil {
-		return
+		_ = of.Close()
+		return nil, false, err
 	}
-	exists = true
+	return of, false, nil
+}
+
+// adoptExisting resizes an existing file that drifted from the expected size.
+func (s *FileStorage) adoptExisting(of *os.File, size int64) (*os.File, bool, error) {
 	fi, err := of.Stat()
 	if err != nil {
-		return
+		_ = of.Close()
+		return nil, false, err
 	}
 	if fi.Size() != size {
 		err = of.Truncate(size)
 	}
-	return
+	return of, true, err
 }
 
-// RootDir is the root of opened storage file.
+// RootDir returns the storage root.
 func (s *FileStorage) RootDir() string {
 	return s.dest
 }
 
-// wrap returns the storage.File for an opened OS file: an mmap-backed file when
-// Mmap is set (Linux; it falls back to the OS file elsewhere or on failure),
-// otherwise a plain OS file whose Sync uses fdatasync.
+// wrap backs an opened file with a memory mapping when configured (Linux,
+// sized mappings only), else with a plain fdatasync file.
 func (s *FileStorage) wrap(of *os.File, size int64) storage.File {
 	if s.Mmap && size > 0 && size <= int64(maxInt()) {
 		if data, err := mapFile(of, int(size)); err == nil {

@@ -2,41 +2,41 @@ package verifier
 
 import (
 	"crypto/sha1"
+	"hash"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
 
-// Verifier verifies the pieces on disk.
+// Verifier hashes every piece on disk into a bitfield. It runs on its own
+// goroutine: Run blocks until done, Close aborts mid-run.
 type Verifier struct {
 	Bitfield *bitfield.Bitfield
 	Error    error
 
-	// Skip, when set, marks pieces whose bytes are already known-verified (for
-	// instance the pieces a swarm merge just re-verified against this torrent's
-	// own hashes): Run sets their bit without re-reading and re-hashing them.
+	// Skip marks pieces already known-verified (e.g. just re-verified by a
+	// swarm merge against this torrent's own hashes): their bit is set
+	// without re-reading or re-hashing.
 	Skip func(uint32) bool
-	// Only, when set, restricts the check to the pieces it accepts: the others
-	// are left unset without being read. It is for storage created empty in
-	// this run, where nothing but the pieces written before the check (a swarm
-	// merge) can be valid, so hashing the rest would only read holes.
+	// Only restricts the check to accepted pieces; the rest stay unset and
+	// unread. For storage created empty this run nothing but pre-written
+	// pieces (a merge) can be valid, so hashing the holes is skipped.
 	Only func(uint32) bool
-	// Prepare, when set, runs first in the verifier goroutine, so slow work
-	// that must precede the check (the swarm merge reads, hashes and writes
-	// whole pieces) stays off the torrent's run loop. It may set Skip and Only;
-	// stop is closed when the verifier is closed and Prepare should return.
+	// Prepare runs first on the verifier goroutine for slow preamble work
+	// (the merge's reads, hashes and writes) that must stay off the run
+	// loop. It may set Skip and Only; stop closes when Close is called.
 	Prepare func(stop <-chan struct{})
 
 	closeC chan struct{}
 	doneC  chan struct{}
 }
 
-// Progress information about the verification.
+// Progress reports the latest checked piece index (1-based count).
 type Progress struct {
 	Checked uint32
 }
 
-// New returns a new Verifier.
+// New prepares a verifier; run it with Run.
 func New() *Verifier {
 	return &Verifier{
 		closeC: make(chan struct{}),
@@ -44,16 +44,16 @@ func New() *Verifier {
 	}
 }
 
-// Close the verifier.
+// Close aborts the run and waits for it to unwind.
 func (v *Verifier) Close() {
 	close(v.closeC)
 	<-v.doneC
 }
 
-// Run and verify all pieces of the torrent.
+// Run checks every piece, reporting progress per piece and delivering
+// itself on resultC — unless closed first, in which case nobody is sent.
 func (v *Verifier) Run(pieces []piece.Piece, progressC chan Progress, resultC chan *Verifier) {
 	defer close(v.doneC)
-
 	defer func() {
 		select {
 		case resultC <- v:
@@ -70,15 +70,9 @@ func (v *Verifier) Run(pieces []piece.Piece, progressC chan Progress, resultC ch
 		default:
 		}
 	}
-	// The buffer is sized to the largest piece: in v2 the pieces have different
-	// lengths (per-file tails), so the first piece is not necessarily the widest.
-	maxLen := 0
-	for _, p := range pieces {
-		if int(p.Length) > maxLen {
-			maxLen = int(p.Length)
-		}
-	}
-	buf := make([]byte, maxLen)
+	// One buffer sized to the widest piece: v2 pieces vary (per-file
+	// tails), so the first piece is not necessarily the largest.
+	buf := make([]byte, widestPiece(pieces))
 	hash := sha1.New()
 	var numOK uint32
 	for _, p := range pieces {
@@ -88,31 +82,52 @@ func (v *Verifier) Run(pieces []piece.Piece, progressC chan Progress, resultC ch
 		if v.Skip != nil && v.Skip(p.Index) {
 			v.Bitfield.Set(p.Index)
 			numOK++
-			select {
-			case progressC <- Progress{Checked: p.Index + 1}:
-			case <-v.closeC:
+			if !v.report(progressC, p.Index+1) {
 				return
 			}
 			continue
 		}
 		buf = buf[:p.Length]
-		_, v.Error = p.Data.ReadAt(buf, 0)
-		if v.Error != nil {
+		if _, v.Error = p.Data.ReadAt(buf, 0); v.Error != nil {
 			return
 		}
-		ok := p.VerifyHash(buf, hash)
-		if p.V2 {
-			ok = p.VerifyV2(buf)
-		}
-		if ok {
+		if ok := v.checkPiece(&p, buf, hash); ok {
 			v.Bitfield.Set(p.Index)
 			numOK++
 		}
-		select {
-		case progressC <- Progress{Checked: p.Index + 1}:
-		case <-v.closeC:
+		if !v.report(progressC, p.Index+1) {
 			return
 		}
 		hash.Reset()
+	}
+}
+
+// widestPiece returns the largest piece length for the shared read buffer.
+func widestPiece(pieces []piece.Piece) int {
+	maxLen := 0
+	for _, p := range pieces {
+		if int(p.Length) > maxLen {
+			maxLen = int(p.Length)
+		}
+	}
+	return maxLen
+}
+
+// checkPiece hashes buf: SHA-1 for v1, Merkle verification for v2 pieces.
+func (v *Verifier) checkPiece(p *piece.Piece, buf []byte, hash hash.Hash) bool {
+	ok := p.VerifyHash(buf, hash)
+	if p.V2 {
+		ok = p.VerifyV2(buf)
+	}
+	return ok
+}
+
+// report publishes one progress step; false means closed meanwhile.
+func (v *Verifier) report(progressC chan Progress, checked uint32) bool {
+	select {
+	case progressC <- Progress{Checked: checked}:
+		return true
+	case <-v.closeC:
+		return false
 	}
 }
