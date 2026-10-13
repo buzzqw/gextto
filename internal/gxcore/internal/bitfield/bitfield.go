@@ -128,6 +128,28 @@ func (b *Bitfield) HasAnyNotIn(other *Bitfield) bool {
 	return false
 }
 
+// HasAnyOutside reports whether b has a bit set where neither have nor skip
+// has it: a piece the peer (b) holds that we miss and want. skip may be nil.
+// Same length contract as HasAnyNotIn; it runs a word at a time.
+func (b *Bitfield) HasAnyOutside(have, skip *Bitfield) bool {
+	if skip == nil {
+		return b.HasAnyNotIn(have)
+	}
+	n := min(len(b.bytes), len(have.bytes), len(skip.bytes))
+	i := 0
+	for ; i+8 <= n; i += 8 {
+		if binary.LittleEndian.Uint64(b.bytes[i:])&^(binary.LittleEndian.Uint64(have.bytes[i:])|binary.LittleEndian.Uint64(skip.bytes[i:])) != 0 {
+			return true
+		}
+	}
+	for ; i < n; i++ {
+		if b.bytes[i]&^(have.bytes[i]|skip.bytes[i]) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (b *Bitfield) checkIndex(i uint32) {
 	if i >= b.Len() {
 		panic("index out of bound")

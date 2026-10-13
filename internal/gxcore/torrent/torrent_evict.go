@@ -65,18 +65,29 @@ func (t *torrent) rankFor(pe *peer.Peer) peerRank {
 	}
 }
 
+// newPeerGrace is how long a fresh connection counts as useful whatever it
+// advertised: bitfield, interest and unchoke take a few round trips, and
+// judging earlier would drop a just-dialled peer at the next tick and dial
+// again in a loop.
+const newPeerGrace = 30 * time.Second
+
 // peerUseful reports whether keeping the peer can still buy us something. A peer
-// we cannot judge (no bitfield yet, e.g. still handshaking) is kept: dropping it
-// would only churn the connection.
+// we cannot judge (no bitfield yet, e.g. still handshaking, or connected less
+// than newPeerGrace ago) is kept: dropping it would only churn the connection.
 func (t *torrent) peerUseful(pe *peer.Peer) bool {
 	if pe.PeerInterested || pe.Downloading {
 		return true
 	}
-	if pe.Bitfield == nil || t.bitfield == nil {
+	if pe.Bitfield == nil || t.bitfield == nil || time.Since(pe.ConnectedAt) < newPeerGrace {
 		return true
 	}
-	// True when the peer advertises at least one piece we do not have yet.
-	return pe.Bitfield.HasAnyNotIn(t.bitfield)
+	// A full or partial seed wants nothing: only the peer's interest counts.
+	if t.completed {
+		return false
+	}
+	// True when the peer advertises a piece we miss and want (pieces of
+	// deselected files do not count).
+	return t.peerHasWanted(pe)
 }
 
 // peerPriority returns the canonical BEP 40 priority of the peer to us, or 0

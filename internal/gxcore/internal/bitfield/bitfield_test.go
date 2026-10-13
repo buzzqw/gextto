@@ -96,3 +96,25 @@ func BenchmarkHasAnyNotIn(b *testing.B) {
 		}
 	}
 }
+
+// TestHasAnyOutside: a bit counts only when neither have nor skip holds it,
+// both in the word-wise part and in the byte tail.
+func TestHasAnyOutside(t *testing.T) {
+	for _, n := range []uint32{5, 64, 130} {
+		peer, have, skip := New(n), New(n), New(n)
+		last := n - 1
+		peer.Set(last)
+		if !peer.HasAnyOutside(have, nil) || !peer.HasAnyOutside(have, skip) {
+			t.Fatalf("n=%d: wanted bit not seen", n)
+		}
+		skip.Set(last)
+		if peer.HasAnyOutside(have, skip) {
+			t.Fatalf("n=%d: skipped bit counted", n)
+		}
+		skip.Clear(last)
+		have.Set(last)
+		if peer.HasAnyOutside(have, skip) {
+			t.Fatalf("n=%d: bit we have counted", n)
+		}
+	}
+}

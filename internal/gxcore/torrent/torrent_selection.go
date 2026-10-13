@@ -5,7 +5,9 @@ package torrent
 import (
 	"path/filepath"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage/filestorage"
@@ -234,13 +236,30 @@ func (t *torrent) partsStorage(skip []bool) storage.Storage {
 func (t *torrent) applySkippedPieces() {
 	skip := t.skippedPieces(t.skippedInfoFiles())
 	prio := t.piecePriorities()
+	t.skipBits = nil
 	for i := range t.pieces {
 		t.pieces[i].Skip = skip != nil && skip[i]
+		if t.pieces[i].Skip {
+			if t.skipBits == nil {
+				t.skipBits = bitfield.New(uint32(len(t.pieces)))
+			}
+			t.skipBits.Set(uint32(i))
+		}
 		t.pieces[i].Priority = piece.PriorityNormal
 		if prio != nil {
 			t.pieces[i].Priority = prio[i]
 		}
 	}
+}
+
+// peerHasWanted reports whether the peer advertises a piece we miss and want
+// (not in a deselected file). It runs a word at a time over the bitfields, so
+// it is cheap enough for every peer at every completed piece.
+func (t *torrent) peerHasWanted(pe *peer.Peer) bool {
+	if pe.Bitfield == nil || t.bitfield == nil {
+		return false
+	}
+	return pe.Bitfield.HasAnyOutside(t.bitfield, t.skipBits)
 }
 
 // wantedComplete reports whether every wanted piece is downloaded.

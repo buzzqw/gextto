@@ -258,6 +258,11 @@ type torrent struct {
 	// only duplicate work. Cleared by startVerifier after it is consumed.
 	mergedPieces map[uint32]bool
 
+	// skipBits marks the pieces of deselected files (nil when none is), kept by
+	// applySkippedPieces: interest and peer usefulness ignore those pieces.
+	// Touched only from the run loop.
+	skipBits *bitfield.Bitfield
+
 	// pendingWrites is the number of pieces of this torrent whose write to disk
 	// is in flight. It bounds the write ring buffer (maxPendingWrites): above 0
 	// the network keeps flowing while a piece is written, instead of the old

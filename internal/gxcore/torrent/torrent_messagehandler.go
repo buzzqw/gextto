@@ -410,18 +410,9 @@ func (t *torrent) updateInterestedState(pe *peer.Peer) {
 	if t.pieces == nil || t.bitfield == nil {
 		return
 	}
-	interested := false
-	// A peer that sent no bitfield/have yet has nothing we can want.
-	if !t.completed && pe.Bitfield != nil {
-		for i := uint32(0); i < t.bitfield.Len(); i++ {
-			weHave := t.bitfield.Test(i)
-			peerHave := pe.Bitfield.Test(i)
-			if !weHave && peerHave {
-				interested = true
-				break
-			}
-		}
-	}
+	// A peer that sent no bitfield/have yet has nothing we can want; pieces of
+	// deselected files do not count.
+	interested := !t.completed && t.peerHasWanted(pe)
 	if !pe.ClientInterested && interested {
 		pe.ClientInterested = true
 		msg := peerprotocol.InterestedMessage{}
