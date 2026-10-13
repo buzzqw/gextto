@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-dht measure-merge3 cache-refresh
+.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-dht measure-merge3 cache-refresh
 
 all: build
 
@@ -136,6 +136,16 @@ measure-seeding:
 # GX_MEASURE_LEECHERS=N. See docs/evoluzione.md (section 6).
 measure-pipeline:
 	GX_MEASURE_PIPELINE=1 go test ./cmd/gx-torrent/ -run MeasurePipelining -v -count=1
+
+# Real-swarm uTP/RTO validation (opt-in, outside CI): downloads a public torrent
+# with the DHT, the trackers and uTP enabled, sampling the uTP socket counters
+# while peers connect (healthy control paths must keep the resend counters low).
+# GX_MEASURE_REAL=<torrent file> is required; GX_MEASURE_REAL_SECONDS sets the
+# window (default 120). See docs/evoluzione.md (section 6).
+measure-realswarm:
+	GX_MEASURE_REAL=$${GX_MEASURE_REAL:?set GX_MEASURE_REAL=<public torrent file>} \
+	  GX_MEASURE_REAL_SECONDS=$${GX_MEASURE_REAL_SECONDS:-120} \
+	  go test ./cmd/gx-torrent/ -run MeasureRealSwarm -v -count=1 -timeout 20m
 
 # Swarm merge Phase 3 on real data (opt-in, outside CI): public ISOs fetched
 # over BitTorrent and two v2 torrents of each with different piece lengths

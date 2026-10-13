@@ -292,6 +292,32 @@ a duplicate IP (1.00× corpus). Each leecher now creates its connection before
 the next daemon replaces that setting, which restores the intended swarm
 (3.00×, the §6.6 number).
 
+**Eighth round (2026-10-13, Intel N97) — real-swarm control path and adaptive
+RTO.** The new public-swarm harness (`make measure-realswarm`) downloads a
+well-seeded public torrent with the DHT, the trackers and uTP enabled and
+samples the uTP counters; one run each:
+
+| Torrent (window) | Result | Peers peak (uTP) | utp out/in | uTP socket |
+|---|---|---|---|---|
+| Big Buck Bunny 276 MB (180 s) | completed, seeding | 76 (37) | 58 / 57 | dials 342, accepts 57, RTO resends 2563, fast 557, SYN drops 0 |
+| Debian netinst 793 MB (180 s) | completed, seeding | 80 (25) | 49 / 14 | dials 277, accepts 14, RTO resends 932, fast 41, SYN drops 0 |
+
+Real uTP peers connect, both downloads complete, `utp_syn_drops` stays 0 (the
+50-SYN backlog bound never binds) and the resend counters show loss on a noisy
+swarm without a storm. The first run also exposed a counter bug: `utp_dial_errors`
+mixed the race cancellations with the real failures (284 of 342). A dial
+cancelled because TCP won the race is now a dial, not an error
+(`TestCancelledDialIsNotADialError`), so the field is again the UDP-reachability
+diagnostic the UI warns on; the residual errors are real uTP dial timeouts
+(peers behind UDP-blocking firewalls), harmless while accepts flow.
+
+DHT on the public network (`make measure-dht`, 4 min): **4262 nodes**, 21.9%
+query success, 875 reflected pings, 2 peers found from a cold start.
+
+The adaptive RTO itself was measured on the silent-peer harness (§4.3): the
+minimum-RTT floor removes a 6.2× resend storm and the per-connection backoff
+sends **50% fewer** resends than the fixed backoff.
+
 ---
 
 ## 2. Gextto improvements implemented
@@ -761,6 +787,15 @@ local swarm at different depths (`shallow` def=4/max=4, `default` 50/250,
 (`MaxRequestsOut`/`DefaultRequestsOut`). **Declared limitation:** on loopback the RTT
 is ~0, so the depth is not the bottleneck and the profiles give almost identical
 numbers (~200 ms, ~40 MB/s with 1 leecher).
+
+**Real swarm.** `cmd/gx-torrent/measure_realswarm_test.go` (opt-in,
+`make measure-realswarm GX_MEASURE_REAL=<public.torrent>`) downloads a **public
+torrent** with the DHT, the trackers and uTP enabled
+(`GX_MEASURE_REAL_SECONDS` sets the window, default 120 s) and reports peak peers,
+the uTP peer split and the uTP socket counters. It is the control-path check the
+local swarm cannot give: real uTP peers connect, and on healthy connections the
+RTO must not fire, so the resend counters stay low and the adaptive backoff stays
+at 1. A run that sees no peer at all fails, so it cannot pass hollow.
 
 **Isolation with latency (done, 2026-10-12).**
 `TestMeasurePipeliningLatency` puts an **in-process latency proxy** in front of the
