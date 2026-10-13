@@ -18,7 +18,7 @@ import (
 	"github.com/zeebo/bencode"
 )
 
-// HTTPTracker is a torrent tracker that talks HTTP.
+// HTTPTracker announces and scrapes over HTTP (BEP 3/23/48).
 type HTTPTracker struct {
 	rawURL            string
 	log               logger.Logger
@@ -31,7 +31,7 @@ type HTTPTracker struct {
 
 var _ tracker.Tracker = (*HTTPTracker)(nil)
 
-// New returns a new HTTPTracker.
+// New binds a tracker URL to the shared transport.
 func New(rawURL string, u *url.URL, timeout time.Duration, t *http.Transport, userAgent string, maxResponseLength int64) *HTTPTracker {
 	return &HTTPTracker{
 		rawURL:            rawURL,
@@ -46,15 +46,60 @@ func New(rawURL string, u *url.URL, timeout time.Duration, t *http.Transport, us
 	}
 }
 
-// URL returns the URL string of the tracker.
+// URL returns the configured tracker URL.
 func (t *HTTPTracker) URL() string {
 	return t.rawURL
 }
 
-// Announce the torrent by doing a GET request to the tracker.
+// Announce reports progress and collects peers. The query spells info_hash
+// and peer_id first: some private trackers reject any other order, which is
+// why url.Values is not used here.
 func (t *HTTPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest) (*tracker.AnnounceResponse, error) {
-	// Some private trackers require that first two parameters be info_hash and peer_id.
-	// This is the reason we don't use url.Values to encode query params.
+	query := t.announceQuery(req)
+	t.log.Debugf("making request to: %q", query)
+
+	code, header, body, err := t.fetch(ctx, query)
+	if uerr, ok := err.(*url.Error); ok && uerr.Err == context.Canceled {
+		return nil, context.Canceled
+	}
+	if err != nil {
+		return nil, err
+	}
+	t.log.Debugf("read %d bytes from body", len(body))
+
+	var response announceResponse
+	if err := bencode.DecodeBytes(body, &response); err != nil {
+		if code != 200 {
+			return nil, &StatusError{Code: code, Header: header, Body: string(body)}
+		}
+		return nil, tracker.ErrDecode
+	}
+	if response.FailureReason != "" {
+		return nil, tracker.NewError(response.FailureReason, response.RetryIn)
+	}
+	if response.TrackerID != "" {
+		t.trackerID = response.TrackerID
+	}
+	peers, err := decodeAnnouncePeers(response)
+	if err != nil {
+		return nil, err
+	}
+	t.log.Debugf("got %d peers", len(peers))
+	peers = filterExternalIP(peers, response.ExternalIP)
+
+	return &tracker.AnnounceResponse{
+		Interval:       time.Duration(response.Interval) * time.Second,
+		MinInterval:    time.Duration(response.MinInterval) * time.Second,
+		Leechers:       response.Incomplete,
+		Seeders:        response.Complete,
+		Peers:          peers,
+		WarningMessage: response.WarningMessage,
+	}, nil
+}
+
+// announceQuery renders the announce URL with the tracker's required
+// parameter order.
+func (t *HTTPTracker) announceQuery(req tracker.AnnounceRequest) string {
 	var sb strings.Builder
 	sb.WriteString(t.rawURL)
 	if strings.ContainsRune(t.rawURL, '?') {
@@ -77,7 +122,6 @@ func (t *HTTPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest)
 	sb.WriteString("&no_peer_id=1")
 	sb.WriteString("&numwant=")
 	sb.WriteString(strconv.Itoa(req.NumWant))
-
 	if req.Event != tracker.EventNone {
 		sb.WriteString("&event=")
 		sb.WriteString(req.Event.String())
@@ -88,84 +132,44 @@ func (t *HTTPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest)
 	}
 	sb.WriteString("&key=")
 	sb.WriteString(hex.EncodeToString(req.Torrent.PeerID[16:20]))
+	return sb.String()
+}
 
-	t.log.Debugf("making request to: %q", sb.String())
-
-	code, header, body, err := t.fetch(ctx, sb.String())
-	if uerr, ok := err.(*url.Error); ok && uerr.Err == context.Canceled {
-		return nil, context.Canceled
-	}
-	if err != nil {
-		return nil, err
-	}
-	t.log.Debugf("read %d bytes from body", len(body))
-
-	var response announceResponse
-	err = bencode.DecodeBytes(body, &response)
-	if err != nil {
-		if code != 200 {
-			return nil, &StatusError{
-				Code:   code,
-				Header: header,
-				Body:   string(body),
-			}
-		}
-		return nil, tracker.ErrDecode
-	}
-
-	if response.FailureReason != "" {
-		return nil, tracker.NewError(response.FailureReason, response.RetryIn)
-	}
-
-	if response.TrackerID != "" {
-		t.trackerID = response.TrackerID
-	}
-
-	// Peers may be in binary or dictionary model.
+// decodeAnnouncePeers parses the peers leg in all its shapes: compact
+// binary, dictionary list, plus the BEP 7 IPv6 tail.
+func decodeAnnouncePeers(response announceResponse) ([]*net.TCPAddr, error) {
 	var peers []*net.TCPAddr
 	if len(response.Peers) > 0 {
+		var err error
 		if response.Peers[0] == 'l' {
 			peers, err = parsePeersDictionary(response.Peers)
 		} else {
 			var b []byte
-			err = bencode.DecodeBytes(response.Peers, &b)
-			if err != nil {
+			if err = bencode.DecodeBytes(response.Peers, &b); err != nil {
 				return nil, tracker.ErrDecode
 			}
 			peers, err = tracker.DecodePeersCompact(b)
 		}
+		if err != nil {
+			return nil, err
+		}
 	}
-	if err != nil {
-		return nil, err
-	}
-	// BEP 7: the tracker may also return compact IPv6 peers in "peers6".
 	if len(response.Peers6) > 0 {
 		var b6 []byte
-		if derr := bencode.DecodeBytes(response.Peers6, &b6); derr != nil {
+		if err := bencode.DecodeBytes(response.Peers6, &b6); err != nil {
 			return nil, tracker.ErrDecode
 		}
-		p6, derr := tracker.DecodePeersCompact6(b6)
-		if derr != nil {
-			return nil, derr
+		p6, err := tracker.DecodePeersCompact6(b6)
+		if err != nil {
+			return nil, err
 		}
 		peers = append(peers, p6...)
 	}
-	t.log.Debugf("got %d peers", len(peers))
-
-	// Remove our own address from the peer list.
-	peers = filterExternalIP(peers, response.ExternalIP)
-
-	return &tracker.AnnounceResponse{
-		Interval:       time.Duration(response.Interval) * time.Second,
-		MinInterval:    time.Duration(response.MinInterval) * time.Second,
-		Leechers:       response.Incomplete,
-		Seeders:        response.Complete,
-		Peers:          peers,
-		WarningMessage: response.WarningMessage,
-	}, nil
+	return peers, nil
 }
 
-// fetch performs the GET and reads the body, capped at maxResponseLength.
+// fetch GETs rawURL and returns status, headers and the body capped at
+// maxResponseLength.
 func (t *HTTPTracker) fetch(ctx context.Context, rawURL string) (int, http.Header, []byte, error) {
 	httpReq, err := http.NewRequest(http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -181,16 +185,14 @@ func (t *HTTPTracker) fetch(ctx context.Context, rawURL string) (int, http.Heade
 	t.log.Debugf("tracker responded %d with %d bytes body", resp.StatusCode, resp.ContentLength)
 	defer resp.Body.Close()
 	if resp.ContentLength > t.maxResponseLength {
-		return 0, resp.Header, nil, fmt.Errorf("tracker respsonse too large: %d", resp.ContentLength)
+		return 0, resp.Header, nil, fmt.Errorf("tracker response too large: %d", resp.ContentLength)
 	}
-	r := io.LimitReader(resp.Body, t.maxResponseLength)
-	data, err := io.ReadAll(r)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, t.maxResponseLength))
 	return resp.StatusCode, resp.Header, data, err
 }
 
-// Scrape asks the tracker for swarm statistics (BEP 48). The scrape URL is the
-// announce URL with its final path segment switched from "announce" to
-// "scrape", keeping any passkey in the query.
+// Scrape fetches swarm totals (BEP 48): the announce URL with its last path
+// segment switched to "scrape", passkeys in the query preserved.
 func (t *HTTPTracker) Scrape(ctx context.Context, req tracker.ScrapeRequest) (*tracker.ScrapeResponse, error) {
 	su := scrapeURL(t.rawURL)
 	var sb strings.Builder
@@ -212,8 +214,7 @@ func (t *HTTPTracker) Scrape(ctx context.Context, req tracker.ScrapeRequest) (*t
 	}
 
 	var response scrapeResponse
-	err = bencode.DecodeBytes(body, &response)
-	if err != nil {
+	if err := bencode.DecodeBytes(body, &response); err != nil {
 		if code != 200 {
 			return nil, &StatusError{Code: code, Header: header, Body: string(body)}
 		}
@@ -224,8 +225,8 @@ func (t *HTTPTracker) Scrape(ctx context.Context, req tracker.ScrapeRequest) (*t
 	}
 	file, ok := response.Files[string(req.Torrent.InfoHash[:])]
 	if !ok {
-		// Some trackers answer with a single entry even if the binary key is
-		// not reusable; accept the only element in that case.
+		// Some trackers answer a single entry under an unreusable binary
+		// key; accept it when it is the only one.
 		if len(response.Files) == 1 {
 			for _, f := range response.Files {
 				file, ok = f, true
@@ -242,7 +243,7 @@ func (t *HTTPTracker) Scrape(ctx context.Context, req tracker.ScrapeRequest) (*t
 	}, nil
 }
 
-// scrapeURL maps an announce URL to its scrape URL (BEP 48).
+// scrapeURL rewrites an announce URL into its scrape sibling.
 func scrapeURL(rawURL string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -259,9 +260,8 @@ func scrapeURL(rawURL string) string {
 	return u.String()
 }
 
-// filterExternalIP returns peers with any entry matching the client's own
-// external IP (as reported by the tracker) removed, so the client does not try
-// to connect to itself. It filters in place, preserving order.
+// filterExternalIP drops peers matching our own tracker-reported external
+// IP, in place and order-preserving, so we never dial ourselves.
 func filterExternalIP(peers []*net.TCPAddr, externalIP []byte) []*net.TCPAddr {
 	if len(externalIP) == 0 {
 		return peers
@@ -275,9 +275,8 @@ func filterExternalIP(peers []*net.TCPAddr, externalIP []byte) []*net.TCPAddr {
 	return kept
 }
 
-// percentEscape puts `%` before every byte.
-// Some trackers don't like the output of url.QueryEscape function because it may skip encoding safe characters.
-// This function escapes every byte explicitly.
+// percentEscape escapes every byte as %XX: some trackers reject
+// url.QueryEscape output, which leaves "safe" characters bare.
 func percentEscape(b [20]byte) string {
 	var sb strings.Builder
 	sb.Grow(60)
@@ -290,20 +289,18 @@ func percentEscape(b [20]byte) string {
 	return sb.String()
 }
 
+// parsePeersDictionary decodes the non-compact peer list form.
 func parsePeersDictionary(b bencode.RawMessage) ([]*net.TCPAddr, error) {
 	var peers []struct {
 		IP   string `bencode:"ip"`
 		Port uint16 `bencode:"port"`
 	}
-	err := bencode.DecodeBytes(b, &peers)
-	if err != nil {
+	if err := bencode.DecodeBytes(b, &peers); err != nil {
 		return nil, tracker.ErrDecode
 	}
-
 	addrs := make([]*net.TCPAddr, len(peers))
 	for i, p := range peers {
-		pe := &net.TCPAddr{IP: net.ParseIP(p.IP), Port: int(p.Port)}
-		addrs[i] = pe
+		addrs[i] = &net.TCPAddr{IP: net.ParseIP(p.IP), Port: int(p.Port)}
 	}
-	return addrs, err
+	return addrs, nil
 }
