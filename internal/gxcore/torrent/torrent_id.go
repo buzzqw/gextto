@@ -6,17 +6,21 @@ import (
 	"time"
 )
 
-// uuidEpochOffset bridges the RFC 4122 epoch (1582-10-15 UTC) and the Unix
-// epoch in seconds. V1 timestamps count 100ns ticks since the former; a
-// time.Duration cannot span 444 years (int64 nanoseconds overflow), so the
-// minting below works in uint64 seconds instead.
+// uuidEpochOffset is the seconds between the RFC 4122 epoch (1582-10-15
+// UTC) and the Unix epoch. V1 timestamps count 100ns ticks since the former;
+// Unix times count seconds since the latter.
 const uuidEpochOffset = uint64(12219292800)
 
-// newTorrentID mints a version-1 (timestamp + random) UUID for the internal
-// torrent id. Uniqueness — not secrecy or ordering — is the requirement:
-// ids key the session map and name the storage directory. The layout follows
-// RFC 4122 (version nibble 1, variant bits 10) so UUID tooling keeps parsing
-// them.
+// uuidEpoch reconstructs the RFC 4122 base for tests and diagnostics.
+// A time.Duration cannot span 444 years (int64 nanoseconds overflow), so the
+// id minting below works in uint64 seconds instead.
+var uuidEpoch = time.Date(1582, time.October, 15, 0, 0, 0, 0, time.UTC)
+
+// newTorrentID mints a version-1 (timestamp + random) UUID used as the
+// internal torrent id. Uniqueness — not secrecy or ordering — is the only
+// requirement: ids key the session map and name the storage directory.
+// The layout follows RFC 4122 (version nibble 1, variant bits 10) so any
+// UUID tooling keeps parsing them.
 func newTorrentID() ([16]byte, error) {
 	var id [16]byte
 	var rnd [10]byte
@@ -34,4 +38,13 @@ func newTorrentID() ([16]byte, error) {
 	copy(id[10:], rnd[2:])
 	id[10] |= 0x01
 	return id, nil
+}
+
+// torrentIDTime recovers the wall-clock time embedded in an id.
+func torrentIDTime(id [16]byte) time.Time {
+	ticks := uint64(binary.BigEndian.Uint16(id[6:8])&0x0fff)<<48 |
+		uint64(binary.BigEndian.Uint16(id[4:6]))<<32 |
+		uint64(binary.BigEndian.Uint32(id[0:4]))
+	secs := ticks / 10000000
+	return time.Unix(int64(secs-uuidEpochOffset), int64(ticks%10000000)*100).UTC()
 }
