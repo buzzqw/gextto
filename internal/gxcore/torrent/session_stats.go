@@ -31,6 +31,12 @@ type SessionStats struct {
 	UTPAccepts      int64
 	UTPDialErrors   int64
 	UTPAcceptErrors int64
+	// UTPResendsTimeout counts RTO-driven packet resends (loss/congestion
+	// signal); UTPResendsFast counts selective-ACK fast resends. Fed by the
+	// vendored stack, kept for the future adaptive RTO; not shown in the
+	// UIs yet.
+	UTPResendsTimeout int64
+	UTPResendsFast    int64
 	// DHTStats are the DHT counters (nodes, peers found, traffic).
 	DHTStats map[string]int64
 
@@ -135,6 +141,8 @@ func (s *Session) Stats() SessionStats {
 		out.UTPAccepts = int64(ust.Accepts)
 		out.UTPDialErrors = int64(ust.DialErrors)
 		out.UTPAcceptErrors = int64(ust.AcceptErrors)
+		out.UTPResendsTimeout = int64(ust.ResendsTimeout)
+		out.UTPResendsFast = int64(ust.ResendsFast)
 	}
 	out.DHT = s.config.DHTEnabled
 	out.PeerWireDownloaded = peerconn.WireBytesRead.Load()
