@@ -74,7 +74,7 @@ test-dht:
 # seed corpus; this actually fuzzes, so a panic on hostile input surfaces before
 # a release (the pass of 2026-10-13 found a .torrent scanner panic in minutes).
 # Not part of `make test`; run it by hand or in a nightly job. Override the
-# per-target time with FUZZ_TIME=2m. See docs/evoluzione.md §16.
+# per-target time with FUZZ_TIME=2m. See docs/evoluzione.md §10.
 FUZZ_TIME ?= 30s
 fuzz-smoke:
 	@set -e; \

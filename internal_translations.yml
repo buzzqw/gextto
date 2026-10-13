@@ -1891,7 +1891,7 @@ eng:
 
   # English translations for the strings that were missing from this
   # catalog. Generated once to close the gap with the de/fr/es/pl
-  # catalogs; see docs/evoluzione.md, section 8.2. Keep this catalog
+  # catalogs. Keep this catalog
   # complete: TestBundledCatalogsShareKeys enforces it.
   "(download completati)": "(downloads completed)"
   "(download in corso)": "(download in progress)"
