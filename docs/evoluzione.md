@@ -123,13 +123,13 @@ render appears on the next render (no stale cache).
 ### 1.4 Engine presented as our own code (done)
 
 **Rule.** gx-core is our engine and we present it as such: the
-documentation does not advertise the origin of the code. The only attribution is
-the one **required by the permissive licences** of the derived components, in the files
-`internal/gxcore/LICENSE` (MIT) and `internal/dht/LICENSE` (BSD-3) and in
-`THIRD-PARTY-NOTICES`. Generic references to the *functionality*
-of other clients also remain (for example "as libtorrent does", "as anacrolix does") and the
-normal third-party dependencies, with their import and their licence
-(`github.com/anacrolix/utp` for uTP, `libtorrent` for the alternative engine).
+documentation does not advertise any external origin of the code. The entire
+engine (`internal/gxcore`), the DHT (`internal/dht`) and the uTP transport
+(`internal/utp`) are our own code in-tree under EUPL-1.2. Attribution in
+`THIRD-PARTY-NOTICES` is kept strictly for linked third-party libraries.
+Generic references to the *functionality* of other clients also remain (for
+example "as libtorrent does", "as anacrolix does") and optional alternative
+engines (`libtorrent` for the optional cgo engine).
 
 **Done (2026-10-11).** Removed "relative to the base" changelogs and origin
 markers from the code and the documents (including archive and scripts); the dependencies
@@ -605,6 +605,7 @@ recorded in `GEXTTO.md`; targeted tests; with a visible effect also both UIs and
 | **Drop the worst connection** (deterministic order) | anacrolix `worse-conns.go` | done |
 | **uTP behind `internal/utp`** (isolation) | anacrolix `utp` | done: the engine talks to our `Socket` (dial/accept counters, `net.PacketConn` for the shared DHT socket); the implementation in `internal/utp/upstream` is **our own code** (EUPL-1.2), written against the anacrolix/utp v0.2.0 reference whose behaviour it matches, swappable. The `missinggo`/`sync` helpers are reimplemented in `gextto_support.go`, so no third-party transport helper and no MPL component is linked |
 | **uTP connection-id pick** (perf) | own (`internal/utp/upstream`) | done: `newConnID` no longer builds a 64K-entry table per dial (512 KiB and 152,353 ns/op); it probes from a random id and stops at the first free one, O(1) with the connections a socket really has — `BenchmarkNewConnID`: 31 ns/op, 0 B/op, 0 allocs/op (`TestNewConnIDAvoidsCollisions`) |
+| **uTP data path** (perf) | own (`internal/utp/upstream`) | done: profiling a loopback transfer (`BenchmarkTransferLoopback`, 16 KiB block) drove four fixes — the connection-id probe, lazy `Event` channels (the per-send `acked` flag allocated one per packet), a reusable read window (`readPos` offset instead of reslicing, which reallocated 68% of the alloc_space), and a `netip.AddrPort` connection key instead of a `UDPAddr.String()` per inbound packet. Overall **45.6→62.0 MB/s, 82,020→23,692 B/op (−71%), 173→116 allocs/op (−33%)** on loopback |
 | **uTP dial preference** (fewer wasted dials) | own (`internal/netx`) | done: per-host memory of race winners (≥4 races, ≥75% share, decayed past 64); the winner gets a 150 ms head start, the loser still races delayed so single-transport peers connect. Steady state: 1 raced dial per peer instead of 2 (`TestDialPeerSkipsLoserWhenPreferredWins` asserts zero loser dials; `TestDialPeerFallsBackToDelayedLeg` keeps the fallback) |
 | **`UTPConn` address snapshot** (fewer allocs) | own (`internal/netx`) | done: TCP-view addrs converted once at wrap (`NewUTPConn`) instead of per `RemoteAddr()` call. `BenchmarkUTPConnRemoteAddr`: 259→113 ns/op, 152→40 B/op, 6→3 allocs/op (rest is `String()`); Intel N97 |
 | **uTP resend counters** (congestion signal) | own (`internal/utp/upstream`) | done: per-socket RTO/fast resends counted in the stack (`ResendStats`, proven by a stalled-server test), through `SessionStats` into the daemon API (`utp_resends_timeout/fast`); shown in both UIs (Salute «uTP» row and daemon status bar) when non-zero |
