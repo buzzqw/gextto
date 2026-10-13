@@ -235,10 +235,10 @@ The standalone pages follow the same structure:
   The options tab holds the refresh interval, the archive retention,
   FlareSolverr (with its test) and the advanced JSON.
 - **Wanted** (`/ui/wanted`): a card per title with type, state, filters as
-  chips, the **missing episodes** (seen but not downloaded), how many episodes
-  were **taken** and when it was last
-  searched; the card never claims a series is "complete" (it is only as complete
-  as the episodes seen so far), plus search now / edit / pause / remove. *Add title* is a guided
+  chips, and for a series the episodes actually downloaded (**Have**,
+  `S01E01–E05`) together with the ones seen but not downloaded (**Missing**);
+  the card lists episodes, never claims a series is "complete" (it is only as
+  complete as the episodes seen so far), plus search now / edit / pause / remove. *Add title* is a guided
   dialog: series or movie, the title with a search that shows how it is named in
   the archive, feeds and indexers (pick one to use it), then seasons, language
   (with quick picks) and quality, and the other options folded away.
@@ -663,7 +663,9 @@ The **feeds** have a table with status (*active*/*disabled*, *adds paused*), **l
 with items, new and added or the error shown at the right end of the name row (so
 it does not take a line of its own), and per row the buttons **↻ Reload** (to the left of
 *Remove*: reads that feed immediately and refreshes the row), **Edit** (the form is filled,
-including the *Feed options*: folder, include/exclude, category, path, pause, disabled),
+including the *Feed options*: folder, include/exclude, category, path, pause, disabled;
+a feed can also be a **Torznab search query** run periodically on the indexers
+instead of a URL),
 **Enable/Disable** and **Remove**. An **RSS options** box sets
 the refresh interval (minutes) and the archive retention (days)
 and shows the time of the next automatic check. The **rule editor** has

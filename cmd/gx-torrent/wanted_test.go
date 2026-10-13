@@ -109,10 +109,10 @@ func TestWantedSeenTakenMissing(t *testing.T) {
 	}
 }
 
-// TestWantedRowShowsTakenNotComplete checks the wanted row never claims a
-// series is complete ("Nothing missing") when only some episodes were taken: it
-// shows what was taken and lists what was seen but not downloaded.
-func TestWantedRowShowsTakenNotComplete(t *testing.T) {
+// TestWantedRowListsHaveAndMissing checks the wanted row shows which episodes
+// were taken (Have) and which were seen but not downloaded (Missing), with no
+// bare count and no "series complete" claim.
+func TestWantedRowListsHaveAndMissing(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
 	d.opts.Settings.Set(setupCompleteKey, "true")
 	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Show","kind":"series","seasons":"1+"}]`)
@@ -120,17 +120,36 @@ func TestWantedRowShowsTakenNotComplete(t *testing.T) {
 	d.recordWantedSeen(w, 1, 1)
 	d.recordWantedTaken(w, 1, 1)
 	row := d.uiWantedRowsHTML()
-	if strings.Contains(row, "Nothing missing") {
-		t.Fatal("the wanted row must not claim the series is complete")
+	if strings.Contains(row, "Nothing missing") || strings.Contains(row, "<span>taken</span>") {
+		t.Fatalf("the wanted row must list the episodes, not a count: %s", row)
 	}
-	if !strings.Contains(row, ">1 <span>taken</span>") {
-		t.Fatalf("the wanted row must show the taken count: %s", row)
+	if !strings.Contains(row, `>Have</span> S01E01`) {
+		t.Fatalf("the wanted row must list the episodes taken: %s", row)
 	}
-	// An episode seen but not taken is listed as missing.
+	// An episode seen but not taken is listed under Missing.
 	d.recordWantedSeen(w, 1, 2)
 	row = d.uiWantedRowsHTML()
-	if !strings.Contains(row, "S01E02") {
+	if !strings.Contains(row, `>Missing</span> S01E02`) {
 		t.Fatalf("the missing episode must be listed: %s", row)
+	}
+	if !strings.Contains(row, `>Have</span> S01E01`) {
+		t.Fatalf("the taken episode must stay listed: %s", row)
+	}
+}
+
+// TestFormatEpisodeRanges checks the Have/Missing episode compaction.
+func TestFormatEpisodeRanges(t *testing.T) {
+	eps := []wantedEpisode{{1, 1}, {1, 2}, {1, 3}, {1, 5}, {2, 1}}
+	if got := formatEpisodeRanges(eps, 24); got != "S01E01–E03, S01E05, S02E01" {
+		t.Fatalf("ranges = %q", got)
+	}
+	// The cap keeps at most max episodes and marks the rest.
+	many := make([]wantedEpisode, 0, 30)
+	for i := 1; i <= 30; i++ {
+		many = append(many, wantedEpisode{1, i})
+	}
+	if got := formatEpisodeRanges(many, 24); got != "S01E01–E24 +6" {
+		t.Fatalf("capped ranges = %q", got)
 	}
 }
 

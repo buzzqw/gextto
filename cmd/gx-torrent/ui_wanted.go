@@ -13,7 +13,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"html"
 	"net/http"
 	"regexp"
@@ -25,6 +24,10 @@ import (
 	"github.com/buzzqw/gextto/internal/rss"
 	"github.com/buzzqw/gextto/internal/webui/assets"
 )
+
+// wantedEpisodeListMax bounds how many episodes the Have/Missing list of a
+// wanted row shows before a trailing "+N".
+const wantedEpisodeListMax = 24
 
 // handleUIWanted adds, edits, pauses/resumes or removes one wanted title.
 func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
@@ -501,7 +504,7 @@ func (d *Daemon) uiWantedRowsHTML() string {
 	var b strings.Builder
 	for index, w := range list {
 		idx := strconv.Itoa(index)
-		taken, lastSearch := d.wantedProgress(w)
+		taken, _ := d.wantedProgress(w)
 		icon, kindLabel := "i-tv", "Series"
 		if w.kind() == "movie" {
 			icon, kindLabel = "i-film", "Movie"
@@ -543,36 +546,24 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			b.WriteString(`<div class="chips">` + chips.String() + `</div>`)
 		}
 
-		// Progress: the episodes taken (what the operator has) and, when there
-		// are some, the episodes seen but not downloaded (what is missing). The
-		// series is only as complete as the episodes seen so far, so we never
-		// claim that "nothing is missing": that read as a false "complete".
+		// What the operator has and what is missing for a series, honestly: the
+		// episodes downloaded (Have) and the ones seen but not taken (Missing).
+		// No bare count and no "nothing missing" claim: a series is only as
+		// complete as the episodes seen so far.
 		b.WriteString(`<div class="item-status">`)
 		var statusParts []string
 		if w.kind() != "movie" {
-			if missing := d.wantedMissing(w); len(missing) > 0 {
-				var m strings.Builder
-				m.WriteString(`<span class="warn"><span>Missing</span> ` + strconv.Itoa(len(missing)) + `:</span> `)
-				for i, ep := range missing {
-					if i == 12 {
-						m.WriteString(`<span class="chip warn">+` + strconv.Itoa(len(missing)-12) + `</span>`)
-						break
-					}
-					m.WriteString(`<span class="chip warn">` + fmt.Sprintf("S%02dE%02d", ep.season, ep.episode) + `</span> `)
-				}
-				statusParts = append(statusParts, m.String())
+			if have := d.wantedTakenEpisodes(w); len(have) > 0 {
+				statusParts = append(statusParts, `<span class="ok" title="Episodes downloaded for this title">Have</span> `+formatEpisodeRanges(have, wantedEpisodeListMax))
 			}
-			if taken > 0 {
-				statusParts = append(statusParts, `<span title="Episodes downloaded for this title">`+strconv.Itoa(taken)+` <span>taken</span></span>`)
+			if missing := d.wantedMissing(w); len(missing) > 0 {
+				statusParts = append(statusParts, `<span class="warn" title="Episodes seen but not downloaded">Missing</span> `+formatEpisodeRanges(missing, wantedEpisodeListMax))
 			}
 		} else if taken > 0 {
 			statusParts = append(statusParts, `<span class="ok">✓ <span>Downloaded</span></span>`)
 		}
 		if len(statusParts) == 0 {
 			statusParts = append(statusParts, `<span class="muted">Not found yet</span>`)
-		}
-		if !lastSearch.IsZero() {
-			statusParts = append(statusParts, `<span title="Last search on the indexers"><span>searched</span> `+lastSearch.Format("02/01 15:04")+`</span>`)
 		}
 		b.WriteString(strings.Join(statusParts, ` · `))
 		b.WriteString(`</div><div class="item-status" data-wanted-status="` + idx + `" aria-live="polite"></div></div><div class="item-actions">`)

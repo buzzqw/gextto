@@ -419,6 +419,89 @@ func (d *Daemon) wantedTaken(name string, season, episode int) bool {
 	return ok
 }
 
+// wantedTakenEpisodes lists the episodes downloaded for a wanted title, inside
+// its seasons, ordered by season then episode. It is what the operator "has",
+// the counterpart of wantedMissing.
+func (d *Daemon) wantedTakenEpisodes(w wantedEntry) []wantedEpisode {
+	d.mu.Lock()
+	taken := map[string]smartEpisodes{}
+	for key, eps := range d.state.WantedTaken {
+		taken[key] = eps
+	}
+	d.mu.Unlock()
+
+	prefix := strings.TrimSpace(w.Name) + "\x00"
+	seen := map[string]bool{}
+	var out []wantedEpisode
+	for key, eps := range taken {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		season, err := strconv.Atoi(strings.TrimPrefix(key, prefix))
+		if err != nil || !seasonAllowed(w.Seasons, season) {
+			continue
+		}
+		for token := range eps {
+			episode, err := strconv.Atoi(strings.SplitN(token, "-", 2)[0])
+			if err != nil {
+				continue
+			}
+			ep := fmt.Sprintf("%d-%d", season, episode)
+			if seen[ep] {
+				continue
+			}
+			seen[ep] = true
+			out = append(out, wantedEpisode{season: season, episode: episode})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].season != out[j].season {
+			return out[i].season < out[j].season
+		}
+		return out[i].episode < out[j].episode
+	})
+	return out
+}
+
+// formatEpisodeRanges compacts a sorted episode list into ranges, e.g.
+// "S01E01–E05, S02E01". At most max episodes are listed; any more becomes a
+// trailing "+N" so a long-running series does not flood the row.
+func formatEpisodeRanges(eps []wantedEpisode, max int) string {
+	var parts []string
+	shown := 0
+	for i := 0; i < len(eps) && shown < max; {
+		start := eps[i]
+		j := i
+		for j+1 < len(eps) && eps[j+1].season == start.season && eps[j+1].episode == eps[j].episode+1 {
+			j++
+		}
+		run := j - i + 1
+		if shown+run > max {
+			// Only part of this run fits.
+			fit := max - shown
+			if fit == 1 {
+				parts = append(parts, fmt.Sprintf("S%02dE%02d", start.season, start.episode))
+			} else {
+				parts = append(parts, fmt.Sprintf("S%02dE%02d–E%02d", start.season, start.episode, start.episode+fit-1))
+			}
+			shown += fit
+			break
+		}
+		if run == 1 {
+			parts = append(parts, fmt.Sprintf("S%02dE%02d", start.season, start.episode))
+		} else {
+			parts = append(parts, fmt.Sprintf("S%02dE%02d–E%02d", start.season, start.episode, eps[j].episode))
+		}
+		shown += run
+		i = j + 1
+	}
+	out := strings.Join(parts, ", ")
+	if shown < len(eps) {
+		out += " +" + strconv.Itoa(len(eps)-shown)
+	}
+	return out
+}
+
 // wantedMissing lists the episodes seen but not downloaded, inside the wanted
 // seasons, ordered by season then episode.
 func (d *Daemon) wantedMissing(w wantedEntry) []wantedEpisode {
