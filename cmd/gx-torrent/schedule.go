@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -17,16 +18,67 @@ const (
 	scheduleEndKey     = "schedule-end"
 	scheduleDLKey      = "schedule-download"
 	scheduleULKey      = "schedule-upload"
+	// scheduleDaysKey holds the weekdays the window applies to, as a
+	// comma-separated list of time.Weekday numbers (0=Sunday..6=Saturday). An
+	// empty value means every day, so settings written before this option keep
+	// working unchanged.
+	scheduleDaysKey = "schedule-days"
 )
 
+// scheduleDaysSet parses the stored weekday list into a per-weekday flag. An
+// empty (or missing) value means every day.
+func scheduleDaysSet(raw string) [7]bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return [7]bool{true, true, true, true, true, true, true}
+	}
+	var days [7]bool
+	for _, part := range strings.Split(raw, ",") {
+		if n, err := strconv.Atoi(strings.TrimSpace(part)); err == nil && n >= 0 && n <= 6 {
+			days[n] = true
+		}
+	}
+	return days
+}
+
+// scheduleDaysSelected counts the days the schedule applies to.
+func scheduleDaysSelected(days [7]bool) int {
+	count := 0
+	for _, on := range days {
+		if on {
+			count++
+		}
+	}
+	return count
+}
+
+// formatScheduleDays canonicalizes the flags for storage: an all-days (or
+// all-off) selection collapses to "", the compact "every day" value.
+func formatScheduleDays(days [7]bool) string {
+	parts := make([]string, 0, 7)
+	for n := 0; n < 7; n++ {
+		if days[n] {
+			parts = append(parts, strconv.Itoa(n))
+		}
+	}
+	if len(parts) == 7 {
+		return ""
+	}
+	return strings.Join(parts, ",")
+}
+
 // scheduledSpeedLimits returns the alternate limits and whether the window is
-// active at now. A disabled or invalid schedule is never active.
+// active at now. A disabled or invalid schedule is never active; the window
+// applies only on the selected weekdays.
 func (d *Daemon) scheduledSpeedLimits(now time.Time) (download, upload int64, active bool) {
 	settings := d.opts.Settings
 	if settings == nil {
 		return 0, 0, false
 	}
 	if strings.ToLower(strings.TrimSpace(settings.Get(scheduleEnabledKey, "false"))) != "true" {
+		return 0, 0, false
+	}
+	if !scheduleDaysSet(settings.Get(scheduleDaysKey, ""))[int(now.Weekday())] {
 		return 0, 0, false
 	}
 	start, okStart := parseClock(settings.Get(scheduleStartKey, ""))

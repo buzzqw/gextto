@@ -218,6 +218,10 @@ label { color: var(--muted); }
 label.chk { display: inline-flex; align-items: center; gap: 8px; color: var(--text); cursor: pointer; }
 .field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
 .field > input, .field > select, .field > textarea { width: 100%; }
+/* A path field with its Browse… button next to it (wizard and add form). */
+.field-row { display: flex; gap: 8px; align-items: center; }
+.field-row > input { flex: 1 1 auto; min-width: 0; width: auto; }
+.field-row > button { width: auto; margin: 0; height: 34px; white-space: nowrap; }
 
 /* ---------- surfaces ---------- */
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
@@ -280,6 +284,21 @@ dialog .dlg-head { display: flex; align-items: center; gap: 10px; padding: 16px 
 dialog .dlg-head h2 { margin: 0; font-size: 16px; flex: 1; }
 dialog .dlg-body { padding: 8px 18px 4px; display: flex; flex-direction: column; gap: 12px; overflow: auto; }
 dialog .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px 16px; }
+
+/* ---------- folder picker ----------
+   A modal dialog opened by any .browse button (setup wizard, add-torrent form).
+   It is a native <dialog> so it stacks above another open modal; the listing
+   and the navigation live in common.js (see window.gx.picker). */
+dialog.picker { width: min(640px, calc(100vw - 32px)); padding: 16px; gap: 10px; }
+.picker-head { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.picker-head code { color: var(--accent); word-break: break-all; font-size: 13px; }
+.picker-head button { width: auto; margin: 0; }
+.picker-list { display: flex; flex-direction: column; gap: 4px; max-height: 52vh; overflow: auto; }
+.picker-list button.dir { width: 100%; margin: 0; justify-content: flex-start; font-weight: 400; }
+.picker-list p { margin: 0; }
+.picker-foot { display: flex; gap: 8px; justify-content: space-between; margin-top: 2px; }
+.picker-foot button { width: auto; margin: 0; }
+.picker-foot button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 
 /* ---------- menus ---------- */
 .menu {
@@ -352,6 +371,8 @@ ul.items { list-style: none; margin: 0; padding: 0; background: var(--surface); 
 .item-title .name { font-weight: 600; font-size: 14.5px; }
 .item-title .name a { color: var(--text); text-decoration: none; }
 .item-title .name a:hover { color: var(--accent); text-decoration: underline; }
+/* A status tucked at the right end of the title row (feed last check). */
+.item-title > .item-status { margin-left: auto; text-align: right; }
 .item-sub { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-sub.mono { display: block; }
 .item-status { font-size: 12.5px; color: var(--muted); }

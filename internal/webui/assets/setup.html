@@ -21,19 +21,6 @@ button.secondary{margin-top:8px}
 h3{margin:22px 0 0;font-size:12px;color:var(--subtle);text-transform:uppercase;letter-spacing:.05em}
 .chk{flex-direction:row;align-items:center;gap:8px;font-size:14px}.chk input{width:auto}
 .m{color:var(--muted)}
-.field-row{display:flex;gap:8px;align-items:center}
-.field-row input{flex:1 1 auto;min-width:0}
-.field-row button{width:auto;margin:0;height:34px;white-space:nowrap}
-.overlay{position:fixed;inset:0;background:rgba(8,12,20,.55);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:50}
-.picker{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:min(640px,100%);padding:16px;box-shadow:var(--shadow-lg)}
-.picker-head{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
-.picker-head code{color:var(--accent);word-break:break-all;font-size:13px}
-.picker-head button{width:auto;margin:0}
-.picker-list{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow:auto}
-.picker-list button.dir{width:100%;margin:0;justify-content:flex-start;font-weight:400}
-.picker-foot{display:flex;gap:8px;justify-content:space-between;margin-top:12px}
-.picker-foot button{width:auto;margin:0}
-.picker-foot button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
 </style></head>
 <body><form method="post" action="/ui/setup">
 <h2>gx-torrent setup</h2>
@@ -76,16 +63,14 @@ h3{margin:22px 0 0;font-size:12px;color:var(--subtle);text-transform:uppercase;l
 <button type="submit" title="Complete setup and start using gx-torrent">Finish setup</button>
 <!--ERROR-->
 </form>
-<div id="browse-overlay" class="overlay" style="display:none">
-  <div class="picker">
-    <div class="picker-head"><code id="browse-path"></code><button type="button" onclick="closeBrowse()" title="Cancel folder selection">Cancel</button></div>
-    <div class="picker-list" id="browse-list"></div>
-    <div class="picker-foot">
-      <button type="button" onclick="browseUp()" title="Navigate to parent directory">↑ Parent</button>
-      <button type="button" class="primary" onclick="browseChoose()" title="Select the current directory as destination folder">Choose this folder</button>
-    </div>
+<dialog id="browse-overlay" class="picker" data-browse-endpoint="/ui/browse-dir" aria-label="Choose an existing folder on the server">
+  <div class="picker-head"><code id="browse-path"></code><button type="button" data-picker-close title="Cancel folder selection">Cancel</button></div>
+  <div class="picker-list" id="browse-list"></div>
+  <div class="picker-foot">
+    <button type="button" data-picker-up title="Navigate to parent directory">↑ Parent</button>
+    <button type="button" class="primary" data-picker-choose title="Select the current directory as destination folder">Choose this folder</button>
   </div>
-</div>
+</dialog>
 <script>
 document.getElementById('ptest').addEventListener('click', function () {
   var out = document.getElementById('presult');
@@ -124,38 +109,7 @@ document.getElementById('ptest').addEventListener('click', function () {
   });
 })();
 // Folder picker: /ui/browse-dir lists the daemon machine's directories.
-var browseTarget = null, browsePath = '', browseParent = '';
-function openBrowse(id) {
-  browseTarget = id;
-  document.getElementById('browse-overlay').style.display = 'flex';
-  browseGo(document.getElementById(id).value || '');
-}
-function closeBrowse() { document.getElementById('browse-overlay').style.display = 'none'; }
-function browseGo(path) {
-  var out = document.getElementById('browse-list');
-  out.textContent = '…';
-  fetch('/ui/browse-dir?path=' + encodeURIComponent(path), {cache: 'no-store'}).then(function (r) { return r.json(); }).then(function (j) {
-    browsePath = j.path || '';
-    browseParent = j.parent || '';
-    document.getElementById('browse-path').textContent = browsePath;
-    out.innerHTML = '';
-    if (j.error) { var e = document.createElement('p'); e.className = 'm err'; e.textContent = j.error; out.appendChild(e); }
-    (j.dirs || []).forEach(function (d) {
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'dir'; b.textContent = d.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || d; b.title = d;
-      b.addEventListener('click', function () { browseGo(d); });
-      out.appendChild(b);
-    });
-  }).catch(function () { out.textContent = '—'; });
-}
-function browseUp() { if (browseParent) { browseGo(browseParent); } }
-function browseChoose() {
-  if (browseTarget && browsePath) { document.getElementById(browseTarget).value = browsePath; }
-  closeBrowse();
-}
-Array.prototype.forEach.call(document.querySelectorAll('.browse'), function (b) {
-  b.addEventListener('click', function () { openBrowse(b.getAttribute('data-target')); });
-});
+// Shared by every page, see common.js (window.gx.picker).
 function ensureTooltips(root) {
   root = root || document;
   var nodes = root.querySelectorAll ? root.querySelectorAll('button,a.btn,input:not([type="hidden"]),select,textarea') : [];

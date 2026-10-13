@@ -57,6 +57,95 @@
   window.gx.toast = toast;
   window.gx.theme = { read: read, apply: apply, cycle: cycle };
 
+  // ---------- folder picker ----------
+  // A modal <dialog id="browse-overlay" class="picker"> lists the daemon
+  // machine's directories (`/ui/browse-dir`, standalone only) so the operator
+  // picks a folder instead of typing it. Any <button class="browse"
+  // data-target="fieldId"> opens it and writes the chosen path back into that
+  // field. It is a native dialog, so it stacks above an already open modal
+  // (the add-torrent form) that a plain overlay could not.
+  (function () {
+    var overlay = null, listEl = null, pathEl = null;
+    var target = null, current = "", parent = "", endpoint = "/ui/browse-dir";
+
+    function ensure() {
+      if (overlay && overlay.isConnected) return true;
+      overlay = document.getElementById("browse-overlay");
+      if (!overlay) return false;
+      listEl = document.getElementById("browse-list");
+      pathEl = document.getElementById("browse-path");
+      var ep = overlay.getAttribute("data-browse-endpoint");
+      if (ep) endpoint = ep;
+      return true;
+    }
+    function field(id) { return id ? document.getElementById(id) : null; }
+
+    function open(id) {
+      if (id) target = id;
+      if (!ensure()) return;
+      var input = field(target);
+      if (typeof overlay.showModal === "function") {
+        if (!overlay.open) overlay.showModal();
+      } else {
+        overlay.setAttribute("open", "");
+      }
+      var close = overlay.querySelector("[data-picker-close]");
+      if (close) close.focus();
+      go(input ? input.value : "");
+    }
+    function close() {
+      if (!overlay) return;
+      if (typeof overlay.close === "function" && overlay.open) overlay.close();
+      else overlay.removeAttribute("open");
+    }
+    function go(path) {
+      if (!listEl) return;
+      listEl.textContent = "…";
+      fetch(endpoint + "?path=" + encodeURIComponent(path || ""), { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          current = j.path || "";
+          parent = j.parent || "";
+          if (pathEl) pathEl.textContent = current;
+          listEl.textContent = "";
+          if (j.error) {
+            var e = document.createElement("p");
+            e.className = "err";
+            e.textContent = j.error;
+            listEl.appendChild(e);
+          }
+          (j.dirs || []).forEach(function (d) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.className = "dir";
+            b.textContent = d.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || d;
+            b.title = d;
+            b.addEventListener("click", function () { go(d); });
+            listEl.appendChild(b);
+          });
+        })
+        .catch(function () { listEl.textContent = "—"; });
+    }
+    function up() { if (parent) go(parent); }
+    function choose() {
+      var input = field(target);
+      if (input && current) input.value = current;
+      close();
+    }
+
+    window.gx.picker = { open: open, close: close, go: go, up: up, choose: choose };
+
+    document.addEventListener("click", function (e) {
+      var el = e.target;
+      if (!el || !el.closest) return;
+      var browse = el.closest(".browse");
+      if (browse) { e.preventDefault(); open(browse.getAttribute("data-target")); return; }
+      if (el.closest("[data-picker-close]")) { close(); return; }
+      if (el.closest("[data-picker-up]")) { go(parent); return; }
+      if (el.closest("[data-picker-choose]")) { choose(); return; }
+    });
+  })();
+
   document.addEventListener("click", function (e) {
     var btn = e.target.closest && e.target.closest("[data-theme-switch]");
     if (btn) { e.preventDefault(); cycle(); }

@@ -181,14 +181,19 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   remove, `P` to pause/resume, `N` to add, Ctrl+A). Columns give way as the list
   narrows; on a phone the rows become cards. The list refreshes every 2 seconds
   (and at once on engine events) without losing selection, focus or scroll.
+  The periodic refresh swaps only the rows: the table header, and with it the
+  **select-all** checkbox, is never replaced, so a click is never lost to a
+  refresh landing between the press and the release.
 - **Add** in a dialog: several magnet links or `.torrent` URLs (one per line)
   and several files at once, destination (suggested from the existing save
-  paths), category (standalone) and the options (paused, top, sequential,
+  paths, with a *Browse* folder picker in standalone: `GET /ui/browse-dir` lists
+  the daemon machine's directories so the path is chosen instead of typed),
+  category (standalone) and the options (paused, top, sequential,
   first/last, super-seeding). A `.torrent` dropped anywhere on the page or a
   magnet pasted outside a field opens it pre-filled.
 - **Remove** asks in a dialog whether to delete the files too.
-- **Per-torrent detail** in a side panel next to the list (full screen on a
-  phone), with tabs: *General* (actions, data, pieces, space, dates, pin, speed,
+- **Per-torrent detail** in a panel below the list (like qBittorrent; full width
+  on a phone), with tabs: *General* (actions, data, pieces, space, dates, pin, speed,
   connection, upload and seed limits, super-seeding, move, category and tags,
   **web seeds**), *Files* (priority and **HTTP streaming** with ▶), *Peers*
   (connection flags, transport, encryption), *Trackers* (status, swarm, add and
@@ -522,7 +527,7 @@ rules, for example
 `[{"name":"Serie","url":"http://…rss","folder":"serie","include":"1080p,ita","exclude":"cam","category":"tv","savepath":"/srv/tv"}]`.
 Each feed can have an optional `folder` (group) to organise it in the
 feeds box, which groups them.
-A worker (every `feed-interval-secs`, default 15 minutes, editable from the
+A worker (every `feed-interval-secs`, default 180 minutes, editable from the
 RSS page in minutes) downloads every active feed, applies `include`/`exclude` on the
 title and adds magnets and `.torrent`s not seen yet (the list of already added
 items is persisted, so a restart does not re-propose them). `disabled: true`
@@ -647,7 +652,8 @@ and indexers behind a Cloudflare challenge are then fetched through it (the
 direct request is tried first, FlareSolverr is the fallback, and local/LAN hosts
 are never retried there), like Gextto does.
 The **feeds** have a table with status (*active*/*disabled*, *adds paused*), **last check**
-with items, new and added or the error, and per row the buttons **↻ Reload** (to the left of
+with items, new and added or the error shown at the right end of the name row (so
+it does not take a line of its own), and per row the buttons **↻ Reload** (to the left of
 *Remove*: reads that feed immediately and refreshes the row), **Edit** (the form is filled,
 including the *Feed options*: folder, include/exclude, category, path, pause, disabled),
 **Enable/Disable** and **Remove**. An **RSS options** box sets
@@ -699,7 +705,11 @@ A **Search in indexers too** checkbox makes the configured Torznab **indexers**
 shows the results in a separate section with indexer and publication date and
 an *Add* button: so also what the feeds have not yet
 returned appears, i.e. the case where an indexer has the release but the feed's
-RSS does not.
+RSS does not. The live answers are filtered to the titles carrying **every**
+search term (the same rule as the local section), because an indexer may answer
+loosely with loosely related items, and they are **archived**, so the next local
+search finds them without querying the indexers again. Toggling the checkbox
+does not start a search by itself: press *Search* (or type) as usual.
 
 The automatic retention is `archive-days` (default 180, `0` = keep
 everything), with a cap of 200,000 items; the pruning runs at the end of every complete
@@ -719,7 +729,10 @@ The **bandwidth scheduler** (standalone) applies alternative global limits in a
 daily time window, like qBittorrent: with `schedule-enabled` active and
 `schedule-start`/`schedule-end` (`HH:MM`, also across midnight) the
 daemon uses `schedule-download`/`schedule-upload` (KiB/s) inside the window and the
-normal limits outside. The limits change on the fly, without reopening the session.
+normal limits outside. The window can be restricted to some weekdays with
+`schedule-days` (a comma-separated list of `time.Weekday` numbers, 0=Sunday;
+empty means every day), set from the *Active days* checkboxes of the page. The
+limits change on the fly, without reopening the session.
 It is configured from the **`/ui/settings`** page (*Settings* link in the
 bar of every page), which in **standalone** is the client's complete panel:
 **Folders** (download, temporary), **Network** (listen address, peer port

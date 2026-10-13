@@ -53,7 +53,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
   <div class="panel-head">
     <h2>Feeds</h2>
     <button type="button" class="primary" id="new-feed" title="Add an RSS feed"><svg class="i"><use href="/assets/icons.svg#i-plus"/></svg>New feed</button>
-    <p class="hint">A feed is an RSS URL, or the page of an ext.to or TorrentGalaxy listing. Its items are fetched periodically, kept in the archive and evaluated by rules and wanted titles.</p>
+    <p class="hint">A feed is an RSS URL, the page of an ext.to or TorrentGalaxy listing, or a Torznab search query run on every configured indexer. Its items are fetched periodically, kept in the archive and evaluated by rules and wanted titles.</p>
   </div>
   <ul class="items" id="feed-list">{{FEEDROWS}}</ul>
 </section>
@@ -108,7 +108,8 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <div class="dlg-body">
       <div class="fsec">
         <label class="field">Name<input type="text" name="name" placeholder="Feed name" autocomplete="off" required title="Feed name"></label>
-        <label class="field">Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off" required title="RSS feed URL, or the page of an ext.to or TorrentGalaxy listing"></label>
+        <label class="field">Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off" title="RSS feed URL, or the page of an ext.to or TorrentGalaxy listing"></label>
+        <label class="field">Search query (Torznab)<input type="text" name="search" placeholder="Serie S02" autocomplete="off" title="Instead of a URL, a Torznab search run on every configured indexer at each refresh; its results enter the archive like a feed's"></label>
         <label class="field">Folder<input type="text" name="folder" placeholder="tv" autocomplete="off" title="Group shown next to the feed name"></label>
       </div>
       <div class="fsec">
@@ -278,7 +279,7 @@ $('#feednames').innerHTML=FEEDNAMES.map(function(n){var o=document.createElement
 var feedForm=$('#feed-form');
 function editFeed(feed,index){
   feedForm.reset();$('#feed-index').value=index===undefined?'':index;
-  ['name','url','folder','include','exclude','category','savepath'].forEach(function(n){feedForm.elements[n].value=feed[n]||'';});
+  ['name','url','search','folder','include','exclude','category','savepath'].forEach(function(n){feedForm.elements[n].value=feed[n]||'';});
   ['paused','disabled','all'].forEach(function(n){feedForm.elements[n].checked=!!feed[n];});
   var editing=index!==undefined;
   $('#dlg-feed-title').textContent=editing?t('Edit feed'):t('New feed');$('#feed-submit').textContent=editing?t('Save feed'):t('Add feed');

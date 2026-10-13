@@ -10,6 +10,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"html"
 	"net/http"
 	"net/url"
@@ -102,6 +103,13 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	if !ulSet {
 		scheduleUL = int64FromSetting(store.Get(scheduleULKey, "0"))
 	}
+	days := parseScheduleDayForm(r.Form["schedule-day"])
+	// The day group carries a marker so a form posted without it (an older
+	// client) keeps the stored days instead of clearing them.
+	daysProvided := r.FormValue("schedule-days-form") == "1"
+	if !daysProvided {
+		days = scheduleDaysSet(store.Get(scheduleDaysKey, ""))
+	}
 	if enabled {
 		startMinute, okStart := parseClock(start)
 		endMinute, okEnd := parseClock(end)
@@ -113,12 +121,19 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 			d.renderSettings(w, r, "The scheduler start and end must differ.", true)
 			return
 		}
+		if scheduleDaysSelected(days) == 0 {
+			d.renderSettings(w, r, "Select at least one day for the scheduler window.", true)
+			return
+		}
 	}
 	store.Set(scheduleEnabledKey, strconv.FormatBool(enabled))
 	store.Set(scheduleStartKey, start)
 	store.Set(scheduleEndKey, end)
 	store.Set(scheduleDLKey, strconv.FormatInt(scheduleDL, 10))
 	store.Set(scheduleULKey, strconv.FormatInt(scheduleUL, 10))
+	if daysProvided {
+		store.Set(scheduleDaysKey, formatScheduleDays(days))
+	}
 
 	// Latency auto-speed (settings.json, applied at once). It needs a positive
 	// upload ceiling (global or scheduled) to have something to lower.
@@ -165,6 +180,18 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	d.applyScheduleNow()
 	http.Redirect(w, r, uiSettingsPath+"?msg="+url.QueryEscape("Settings saved")+"&ok=1", http.StatusSeeOther)
+}
+
+// parseScheduleDayForm reads the day checkboxes (weekday numbers, 0=Sunday) into
+// a per-weekday set.
+func parseScheduleDayForm(values []string) [7]bool {
+	var days [7]bool
+	for _, value := range values {
+		if n, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && n >= 0 && n <= 6 {
+			days[n] = true
+		}
+	}
+	return days
 }
 
 // parseFormKib reads a non-negative KiB/s value; ok is false when the field is
@@ -253,6 +280,10 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{SCHED_DL}}", strconv.FormatInt(int64FromSetting(store.Get(scheduleDLKey, "0")), 10))
 	repl("{{SCHED_UL}}", strconv.FormatInt(int64FromSetting(store.Get(scheduleULKey, "0")), 10))
 	repl("{{SCHED_ENABLED}}", checkedIf(boolSetting(scheduleEnabledKey)))
+	schedDays := scheduleDaysSet(store.Get(scheduleDaysKey, ""))
+	for n := 0; n < 7; n++ {
+		repl(fmt.Sprintf("{{SCHED_DAY_%d}}", n), checkedIf(schedDays[n]))
+	}
 	repl("{{AUTOSPEED_ENABLED}}", checkedIf(boolSetting(autospeedEnabledKey)))
 	repl("{{AUTOSPEED_TARGET}}", get(autospeedTargetKey))
 	autoSpeedMin := int64FromSetting(store.Get(autospeedMinKey, strconv.Itoa(autoSpeedDefaultMinKiB)))

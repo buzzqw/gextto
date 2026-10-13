@@ -415,6 +415,24 @@ func (q archiveQuery) matchIdx(rec archiveIdxView) bool {
 	return true
 }
 
+// matchTitle reports whether a release title satisfies the query's include and
+// exclude terms, with the same normalization the archive search uses. The live
+// indexer search reuses it so the two Archive sections agree on what matches.
+func (q archiveQuery) matchTitle(title string) bool {
+	norm := []byte(normalizeArchiveText(title))
+	for _, term := range q.include {
+		if !bytes.Contains(norm, term) {
+			return false
+		}
+	}
+	for _, term := range q.exclude {
+		if bytes.Contains(norm, term) {
+			return false
+		}
+	}
+	return true
+}
+
 // archivePage is one page of search results.
 type archivePage struct {
 	Items []archiveEntry `json:"items"`
