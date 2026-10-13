@@ -577,6 +577,7 @@ func (d *DHT) loop() {
 			ms, ins := d.tableMetrics()
 			subnetShareMax.Store(int64(ms))
 			nodesInsecureID.Store(int64(ins))
+			subnetCapHintValue.Store(int64(subnetCapHint(ms, d.routingTable.maxPerSubnet)))
 			needPing := d.routingTable.cleanup(d.config.CleanupPeriod, d.peerStore)
 			d.wg.Add(1)
 			go func() {
@@ -1331,6 +1332,11 @@ var (
 // knownNodes is the routing table size, readable from any goroutine.
 var knownNodes atomic.Int64
 
+// subnetCapHintValue is the suggested Config.MaxNodesPerSubnet from the live
+// routing-table concentration (0 = nothing to suggest), published by the run
+// loop and exposed in Stats().
+var subnetCapHintValue atomic.Int64
+
 // Stats returns the DHT counters. It feeds SessionStats.DHTStats, so the keys
 // are exposed by the daemon as "dht_<key>" (API and web page).
 func Stats() map[string]int64 {
@@ -1379,5 +1385,9 @@ func Stats() map[string]int64 {
 		"subnet_share_max":  subnetShareMax.Load(),
 		"nodes_insecure_id": nodesInsecureID.Load(),
 		"nodes_capped":      totalNodesCapped.Value(),
+		// subnet_cap_hint is a suggested Config.MaxNodesPerSubnet derived from
+		// subnet_share_max (0 = nothing to suggest, e.g. the cap is already
+		// set). The engine never enables the cap by itself.
+		"subnet_cap_hint": subnetCapHintValue.Load(),
 	}
 }

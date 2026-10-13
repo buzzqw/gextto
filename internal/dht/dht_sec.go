@@ -216,6 +216,22 @@ func (d *DHT) tableMetrics() (maxShare, insecure int) {
 	return maxShare, insecure
 }
 
+// subnetCapHintMinShare is the routing-table subnet concentration at which the
+// engine starts suggesting a per-subnet cap; below it the table looks normal.
+const subnetCapHintMinShare = 16
+
+// subnetCapHint returns a suggested Config.MaxNodesPerSubnet from the observed
+// concentration, or 0 when there is nothing to suggest: the cap is already
+// configured, or no subnet concentrated. It is a read-only recommendation: the
+// engine never enables the cap by itself, because BEP 42 is not universal and
+// CGNAT/mobile legitimately share subnets (docs/evoluzione.md §4.10).
+func subnetCapHint(maxShare, maxPerSubnet int) int {
+	if maxPerSubnet > 0 || maxShare < subnetCapHintMinShare {
+		return 0
+	}
+	return maxShare
+}
+
 // noteExternalIP adopts the external IP a remote node reports for us (BEP 42
 // "ip" field, 4/16 bytes plus a 2-byte port) and, once, regenerates a node ID
 // secure for it. Only used when the external IP was not configured at startup.

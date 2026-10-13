@@ -17,7 +17,7 @@ func TestStatsExposesDiagnostics(t *testing.T) {
 		"reflected_port",
 		"reflected_observations", "nat_mapping",
 		"nodes_capped",
-		"subnet_share_max", "nodes_insecure_id",
+		"subnet_share_max", "nodes_insecure_id", "subnet_cap_hint",
 	} {
 		v, ok := s[key]
 		if !ok {

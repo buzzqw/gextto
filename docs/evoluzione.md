@@ -938,6 +938,14 @@ insert path. Test: `TestSubnetCounterTracksInsertUpdateKill` keeps the counter i
 sync with a brute-force recount across insert, update (an unknown node later
 identified) and kill.
 
+**Suggested cap — done (2026-10-13).** With the counter the engine can also
+*advise*: `subnet_cap_hint` (in `Stats()`, therefore `dht_subnet_cap_hint` in the
+daemon) is a `MaxNodesPerSubnet` suggestion derived from the live
+`subnet_share_max` (0 when the cap is already configured or the table is not
+concentrated, threshold 16). It is read-only: the engine never enables the cap by
+itself, because BEP 42 is not universal and CGNAT/mobile share subnets. Test:
+`TestSubnetCapHint`.
+
 **Measurement harness — done (2026-10-11).** `make measure-dht`
 (`GX_MEASURE_DHT=5m`, `GX_MEASURE_DHT_INTERVAL=10s`; `internal/dht/measure_test.go`,
 opt-in and outside CI) starts a real node against the public DHT and prints,
@@ -2553,7 +2561,7 @@ here; the implemented ones are dated, the others are a proposal to be agreed.
 | 2 | **Merge: read and write each reused piece once** across all candidates; a later candidate only fills the gaps a previous one could not | Phase 2 analysis | medium (no duplicate I/O when several torrents hold the same content) | low | **done (2026-10-13)**: `mergedIdx` shared by Phase 1 and Phase 2 |
 | 3 | Merge: order the candidates by **reusable bytes** so the richest source is read first | Phase 2 | low | low | idea |
 | 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | Phase 2 | high (revives more seedless torrents) | high | idea |
-| 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | the O(1) counter removed the cost argument | medium | medium | idea |
+| 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | the O(1) counter removed the cost argument | medium | medium | **partial**: `subnet_cap_hint` (the suggested cap from the live concentration) is exposed in `Stats()`; automatic enforcement still an idea |
 | 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | §4.10 | medium | medium | idea (needs the real-swarm measurement) |
 | 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | Phase 2 | medium | low | idea |
 | 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | §4.12 | high | high | measured, see §6 |

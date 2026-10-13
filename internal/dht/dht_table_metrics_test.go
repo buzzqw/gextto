@@ -160,3 +160,16 @@ func TestSubnetCounterTracksInsertUpdateKill(t *testing.T) {
 		t.Fatalf("1.2.3.0 count = %d, want 1 after kill", d.routingTable.subnetNodes["1.2.3.0"])
 	}
 }
+
+// TestSubnetCapHint: the engine suggests a cap only from a genuinely
+// concentrated table and never overrides an already configured one.
+func TestSubnetCapHint(t *testing.T) {
+	cases := []struct{ share, cap, want int }{
+		{0, 0, 0}, {15, 0, 0}, {16, 0, 16}, {40, 0, 40}, {40, 8, 0},
+	}
+	for _, c := range cases {
+		if got := subnetCapHint(c.share, c.cap); got != c.want {
+			t.Errorf("subnetCapHint(%d, %d) = %d, want %d", c.share, c.cap, got, c.want)
+		}
+	}
+}
