@@ -44,9 +44,10 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .toolbar .right{margin-left:auto;display:flex;gap:6px;align-items:center}
 .listwrap{flex:1;min-height:0;overflow:auto;position:relative;background:var(--surface)}
 .tbl.t{table-layout:fixed;min-width:860px}
-.tbl.t col.c-sel{width:40px}.tbl.t col.c-size{width:92px}.tbl.t col.c-prog{width:150px}.tbl.t col.c-state{width:150px}
-.tbl.t col.c-rate{width:96px}.tbl.t col.c-eta{width:84px}.tbl.t col.c-peers{width:84px}.tbl.t col.c-ratio{width:64px}.tbl.t col.c-more{width:44px}
-.tbl.t th button.sort{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.tbl.t col.c-sel{width:40px}.tbl.t col.c-size{width:108px}.tbl.t col.c-prog{width:150px}.tbl.t col.c-state{width:150px}
+.tbl.t col.c-rate{width:96px}.tbl.t col.c-eta{width:84px}.tbl.t col.c-peers{width:84px}.tbl.t col.c-ratio{width:92px}.tbl.t col.c-more{width:44px}
+.tbl.t th{overflow:hidden;text-overflow:ellipsis}
+.tbl.t th button.sort{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;max-width:100%}
 .tbl.t th button.sort:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
 .tbl.t th[aria-sort="ascending"] .arrow::after{content:"▲";font-size:9px}
 .tbl.t th[aria-sort="descending"] .arrow::after{content:"▼";font-size:9px}
