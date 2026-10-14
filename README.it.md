@@ -491,5 +491,5 @@ librerie di terze parti collegate sono in
 
 ## Ringraziamenti
 
-Grazie a **DeepSeek** per il supporto e la pazienza mentre questo progetto
-cresceva.
+Grazie a **[DeepSeek](https://www.deepseek.com/)** per il supporto e la pazienza
+mentre questo progetto cresceva.

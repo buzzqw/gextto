@@ -477,4 +477,5 @@ the web UI *Licence* page).
 
 ## Acknowledgements
 
-Thanks to **DeepSeek** for its support and patience while this project grew.
+Thanks to **[DeepSeek](https://www.deepseek.com/)** for its support and patience
+while this project grew.
