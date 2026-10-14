@@ -123,3 +123,24 @@ func TestUIGxEngineStatsAllTimeTotals(t *testing.T) {
 		}
 	}
 }
+
+// TestUIGxEngineStatsAllTimeKeysReachTheRuntimeDictionary: the all-time labels
+// go through the same whole-text-node translation as the rest of the panel, so
+// the runtime dictionary of every language must carry them.
+func TestUIGxEngineStatsAllTimeKeysReachTheRuntimeDictionary(t *testing.T) {
+	state := newTestAppState(t)
+	if _, err := state.i18n.SeedDefaultTranslations(); err != nil {
+		t.Fatal(err)
+	}
+	for _, lang := range []string{"en", "de", "fr", "es", "pl"} {
+		dict := v2Dictionary(state, lang)
+		if dict == nil {
+			t.Fatalf("no runtime dictionary for %s", lang)
+		}
+		for _, key := range []string{"Scaricato in totale", "Inviato in totale", "Rapporto totale"} {
+			if dict[key] == "" {
+				t.Errorf("%s dictionary is missing %q", lang, key)
+			}
+		}
+	}
+}
