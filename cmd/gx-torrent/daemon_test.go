@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
+	"github.com/buzzqw/gextto/internal/settings"
 )
 
 // bencode encodes the few types a test torrent needs.
@@ -100,6 +101,13 @@ func newTestDaemon(t *testing.T) *Daemon {
 
 func newTestDaemonWith(t *testing.T, network NetworkOptions) *Daemon {
 	t.Helper()
+	return newTestDaemonFull(t, network, nil)
+}
+
+// newTestDaemonFull is newTestDaemonWith with a standalone settings store, set
+// before the run loop starts (so no goroutine reads the field concurrently).
+func newTestDaemonFull(t *testing.T, network NetworkOptions, store *settings.Store) *Daemon {
+	t.Helper()
 	// Touch t.TempDir first: its cleanup (removing the whole per-test temp tree)
 	// is registered on the first call, so registering the daemon close after it
 	// makes the close run first (cleanups run LIFO). The daemon's own data lives
@@ -117,6 +125,7 @@ func newTestDaemonWith(t *testing.T, network NetworkOptions) *Daemon {
 		DBPath:      filepath.Join(data, "session.db"),
 		StatePath:   filepath.Join(data, "state.json"),
 		Network:     network,
+		Settings:    store,
 		Debug:       os.Getenv("GX_TEST_DEBUG") == "1",
 		Tick:        50 * time.Millisecond,
 		ProbeWindow: time.Minute,
