@@ -867,7 +867,8 @@ session.
 It is configured from the **`/ui/settings`** page (*Settings* link in the
 bar of every page), which in **standalone** is the client's complete panel:
 **Folders** (download, temporary, watch folders for `.torrent` files, like
-qBittorrent's `scan_dirs`), **Network** (listen address, peer port
+qBittorrent's `scan_dirs`, and the two **export** folders where the `.torrent` is
+copied on add and on completion), **Network** (listen address, peer port
 range, incoming/outgoing interface, proxy, token), **IP filter** (below),
 **Protocols** (encryption, DHT/PEX/uTP/holepunch/LSD/UPnP/NAT-PMP, bootstrap nodes,
 DHT read-only), **Queue and cache** (active downloads/seeds, active limit, disk
@@ -1720,6 +1721,14 @@ The per-torrent limits (`SetLimits` with ratio and days) are saved by the
 daemon and reported in the list (`-1` = global, `0` = infinite). Gextto's
 `EnforceSeedPolicy` applies them, as for the other engines: pause at the end of seeding,
 then move or remove.
+
+In **standalone** the daemon also enforces the **global** seeding limits
+(Settings, *Seeding limits*): a seeding torrent whose per-torrent limit is
+`global` is paused (or removed keeping the files, per *Remove instead of
+pausing*) when it reaches the configured share ratio (`max-ratio`) or seeding
+time (`max-seeding-time`, in minutes). A per-torrent limit always wins over the
+global one, and `0` means infinite. These are the qBittorrent `max_ratio` /
+`max_seeding_time` preferences.
 
 ## Super-seeding (BEP 16)
 

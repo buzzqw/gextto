@@ -47,6 +47,8 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <div class="grid">
     <label>Download folder<span class="field-row"><input type="text" id="download-dir" name="download-dir" value="{{DOWNLOAD_DIR}}" placeholder="/srv/downloads" autocomplete="off" title="Main folder for completed downloads"><button type="button" class="browse" data-target="download-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
     <label>Temporary folder for incomplete files<span class="field-row"><input type="text" id="temp-dir" name="temp-dir" value="{{TEMP_DIR}}" autocomplete="off" title="Temporary folder for incomplete downloads"><button type="button" class="browse" data-target="temp-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
+    <label>Export .torrent on add<span class="field-row"><input type="text" id="export-dir" name="export-dir" value="{{EXPORT_DIR}}" autocomplete="off" title="Copy each added torrent's .torrent file to this folder (empty = off)"><button type="button" class="browse" data-target="export-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
+    <label>Export .torrent on completion<span class="field-row"><input type="text" id="export-dir-fin" name="export-dir-fin" value="{{EXPORT_FIN_DIR}}" autocomplete="off" title="Copy the .torrent file of each completed torrent to this folder (empty = off)"><button type="button" class="browse" data-target="export-dir-fin" title="Choose an existing folder on the server">Browse…</button></span></label>
   </div>
 </fieldset>
 <fieldset>
@@ -155,6 +157,16 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   </table>
   </div>
   <p class="muted">Every day has its own window and limits (0 = unlimited). Inside the window of an active day its limits apply; outside, the global limits above. A window may cross midnight: it then belongs to the day it starts on (Friday 23:00–07:00 covers Saturday morning too).</p>
+</fieldset>
+<fieldset>
+  <legend>Seeding limits</legend>
+  <label class="chk"><input type="checkbox" name="max-ratio-enabled" value="1"{{MAX_RATIO_ON}} title="Stop seeding a torrent that reaches the share ratio below, unless the torrent has its own limit"> Enable the share-ratio limit</label>
+  <div class="grid">
+    <label>Share ratio<input type="number" min="0" step="0.1" name="max-ratio" value="{{MAX_RATIO}}" title="Global share ratio: seeding stops when a torrent uploads this many times its own size (0 = never stop)"></label>
+    <label class="chk"><input type="checkbox" name="max-ratio-remove" value="1"{{MAX_RATIO_REMOVE}} title="Remove the torrent (keeping the files) instead of pausing it when a limit is reached"> Remove instead of pausing</label>
+  </div>
+  <label class="chk"><input type="checkbox" name="max-seeding-time-enabled" value="1"{{MAX_TIME_ON}} title="Stop seeding a torrent after the time below, unless the torrent has its own limit"> Enable the seeding-time limit</label>
+  <label>Seeding time (minutes)<input type="number" min="0" name="max-seeding-time" value="{{MAX_TIME}}" title="Global seeding time in minutes (0 = never stop)"></label>
 </fieldset>
 <fieldset>
   <legend>Latency auto-speed</legend>

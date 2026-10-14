@@ -1151,6 +1151,7 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 			scanDirs[folder] = dest
 		}
 	}
+	exportDir, exportFinDir := d.exportDirs()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"locale":                         d.opts.Lang,
 		"save_path":                      d.downloadDir(),
@@ -1186,10 +1187,11 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		"max_connec_per_torrent":         0,
 		"max_uploads":                    0,
 		"max_uploads_per_torrent":        0,
-		"max_ratio_enabled":              false,
-		"max_ratio":                      -1,
-		"max_seeding_time_enabled":       false,
-		"max_seeding_time":               -1,
+		"max_ratio_enabled":              d.settingBool(maxRatioEnabledKey, false),
+		"max_ratio":                      d.settingFloat(maxRatioKey, -1),
+		"max_ratio_act":                  d.settingInt(maxRatioActKey, 0),
+		"max_seeding_time_enabled":       d.settingBool(maxSeedingTimeEnabledKey, false),
+		"max_seeding_time":               d.settingInt(maxSeedingTimeKey, -1),
 		"scheduler_enabled":              d.settingBool(scheduleEnabledKey, false),
 		"proxy_type":                     proxyType,
 		"anonymous_mode":                 false,
@@ -1197,7 +1199,8 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		"ip_filter_path":                 stats.IPFilterPath,
 		"ip_filter_trackers":             d.settingBool("ipfilter-trackers", true),
 		"rss_refresh_interval":           d.rssRefreshMinutes(),
-		"export_dir":                     "",
+		"export_dir":                     exportDir,
+		"export_dir_fin":                 exportFinDir,
 		"scan_dirs":                      scanDirs,
 		"save_resume_data_interval":      60,
 	})
@@ -1506,6 +1509,57 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 					}
 				}
 				d.opts.Settings.Set(watchFoldersSettingKey, strings.Join(lines, "\n"))
+				changed = true
+			}
+		}
+		// export_dir / export_dir_fin (qBittorrent): where to copy the .torrent.
+		for _, m := range []struct{ pref, key string }{
+			{"export_dir", exportDirKey},
+			{"export_dir_fin", exportFinDirKey},
+		} {
+			v, ok := prefs[m.pref]
+			if !ok {
+				continue
+			}
+			var path string
+			if json.Unmarshal(v, &path) == nil {
+				d.opts.Settings.Set(m.key, strings.TrimSpace(path))
+				changed = true
+			}
+		}
+		// Global seeding limits (qBittorrent max_ratio / max_seeding_time).
+		for _, b := range []struct{ pref, key string }{
+			{"max_ratio_enabled", maxRatioEnabledKey},
+			{"max_seeding_time_enabled", maxSeedingTimeEnabledKey},
+		} {
+			v, ok := prefs[b.pref]
+			if !ok {
+				continue
+			}
+			var on bool
+			if json.Unmarshal(v, &on) == nil {
+				d.opts.Settings.Set(b.key, strconv.FormatBool(on))
+				changed = true
+			}
+		}
+		if v, ok := prefs["max_ratio"]; ok {
+			var ratio float64
+			if json.Unmarshal(v, &ratio) == nil {
+				d.opts.Settings.Set(maxRatioKey, strconv.FormatFloat(ratio, 'f', -1, 64))
+				changed = true
+			}
+		}
+		if v, ok := prefs["max_ratio_act"]; ok {
+			var act int
+			if json.Unmarshal(v, &act) == nil {
+				d.opts.Settings.Set(maxRatioActKey, strconv.Itoa(act))
+				changed = true
+			}
+		}
+		if v, ok := prefs["max_seeding_time"]; ok {
+			var minutes int
+			if json.Unmarshal(v, &minutes) == nil {
+				d.opts.Settings.Set(maxSeedingTimeKey, strconv.Itoa(minutes))
 				changed = true
 			}
 		}

@@ -156,6 +156,22 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	store.Set(autospeedTargetKey, autoTarget)
 	store.Set(autospeedMinKey, strconv.FormatInt(autoMin, 10))
 
+	// Global seeding limits (settings.json, enforced by the queue tick). The
+	// per-torrent limits set through the API always win.
+	store.Set(maxRatioEnabledKey, strconv.FormatBool(formBool(r, "max-ratio-enabled")))
+	if v, err := strconv.ParseFloat(strings.TrimSpace(r.FormValue("max-ratio")), 64); err == nil && v >= 0 {
+		store.Set(maxRatioKey, strconv.FormatFloat(v, 'f', -1, 64))
+	}
+	act := "0"
+	if formBool(r, "max-ratio-remove") {
+		act = "1"
+	}
+	store.Set(maxRatioActKey, act)
+	store.Set(maxSeedingTimeEnabledKey, strconv.FormatBool(formBool(r, "max-seeding-time-enabled")))
+	if v, err := strconv.Atoi(strings.TrimSpace(r.FormValue("max-seeding-time"))); err == nil && v >= 0 {
+		store.Set(maxSeedingTimeKey, strconv.Itoa(v))
+	}
+
 	// Alternative limits and the manual toggle (settings.json, applied at once).
 	altDL, altUL, _ := d.altSpeedSettings()
 	if v, ok := parseFormKib(r.FormValue("alt-speed-download")); ok && v != altDL {
@@ -175,7 +191,7 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	for _, key := range []string{
 		"download-dir", "temp-dir", "listen", "peer-ports", "listen-interface",
 		"outgoing-interface", "proxy", "token", "ipfilter", "dht-bootstrap",
-		"watch-folders",
+		"watch-folders", "export-dir", "export-dir-fin",
 		"notify-url", "lang", notifyWebhookTokenKey, notifyWebhookUserKey,
 		notifyTelegramTokenKey, notifyTelegramChatKey, notifyEmailSMTPKey,
 		notifyEmailFromKey, notifyEmailToKey,
@@ -419,6 +435,13 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 
 	repl("{{DOWNLOAD_DIR}}", get("download-dir"))
 	repl("{{TEMP_DIR}}", get("temp-dir"))
+	repl("{{EXPORT_DIR}}", get("export-dir"))
+	repl("{{EXPORT_FIN_DIR}}", get("export-dir-fin"))
+	repl("{{MAX_RATIO_ON}}", checkedIf(boolSetting(maxRatioEnabledKey)))
+	repl("{{MAX_RATIO}}", strconv.FormatFloat(d.settingFloat(maxRatioKey, -1), 'f', -1, 64))
+	repl("{{MAX_RATIO_REMOVE}}", checkedIf(d.settingInt(maxRatioActKey, 0) == 1))
+	repl("{{MAX_TIME_ON}}", checkedIf(boolSetting(maxSeedingTimeEnabledKey)))
+	repl("{{MAX_TIME}}", strconv.Itoa(d.settingInt(maxSeedingTimeKey, -1)))
 	repl("{{WATCH_FOLDERS}}", get("watch-folders"))
 	repl("{{LISTEN}}", get("listen"))
 	repl("{{PEER_PORTS}}", get("peer-ports"))

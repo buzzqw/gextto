@@ -128,6 +128,10 @@ type torrentMeta struct {
 	// (standalone mode). They do not affect the transfer.
 	Category string   `json:"category,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
+	// ExportedTorrent/ExportedFin mark the export_dir/export_dir_fin copies, so
+	// the tick does not repeat them.
+	ExportedTorrent bool `json:"exported_torrent,omitempty"`
+	ExportedFin     bool `json:"exported_fin,omitempty"`
 }
 
 type persistedState struct {
@@ -965,6 +969,7 @@ func (d *Daemon) tick(now time.Time) {
 	activeDownloads, activeSeeds := 0, 0
 	var pendingStops []*torrent.Torrent
 	var pendingSelectOnly []selectOnlyJob
+	var pendingRemovals []string
 	for _, t := range torrents {
 		id := t.ID()
 		stats, ok := statsOf[id]
@@ -993,6 +998,24 @@ func (d *Daemon) tick(now time.Time) {
 			// over files already on disk completes at its first check.
 			if stats.Bytes.Downloaded > 0 {
 				d.notify("download_complete", map[string]any{"name": stats.Name, "hash": id})
+			}
+		}
+		// export_dir / export_dir_fin: copy the .torrent once the metadata is
+		// known and again on completion.
+		d.maybeExport(t, meta, stats, complete)
+		// Global seeding limits: pause (or remove) a seeding torrent that
+		// reached the configured share ratio or seeding time.
+		if complete && running {
+			if remove, reached := d.seedLimitReached(meta, stats); reached {
+				logf("%s reached the seeding limit", stats.Name)
+				if remove {
+					pendingRemovals = append(pendingRemovals, id)
+				} else {
+					meta.UserPaused = true
+					d.dirty = true
+					pendingStops = append(pendingStops, t)
+					running = false
+				}
 			}
 		}
 		if !running && stats.Error != nil && meta.Error == "" && !d.moving[id] {
@@ -1146,6 +1169,11 @@ func (d *Daemon) tick(now time.Time) {
 	}
 	for _, job := range pendingSelectOnly {
 		d.applySelectOnly(job.id, job.wanted)
+	}
+	for _, id := range pendingRemovals {
+		if err := d.remove(id, false); err != nil {
+			logf("seed limit remove %s: %v", id, err)
+		}
 	}
 	// Watch folders (standalone): scan and add dropped .torrent files.
 	d.maybeScanWatchFolders(now)
