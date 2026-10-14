@@ -1136,6 +1136,18 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		// full proxy setting to itself.
 		proxyType = 5
 	}
+	scanDirs := map[string]any{}
+	for _, pair := range d.watchFolders() {
+		folder, dest := pair[0], pair[1]
+		switch {
+		case dest == folder:
+			scanDirs[folder] = 0
+		case dest == "" || dest == d.downloadDir():
+			scanDirs[folder] = 1
+		default:
+			scanDirs[folder] = dest
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"locale":                         d.opts.Lang,
 		"save_path":                      d.downloadDir(),
@@ -1183,7 +1195,7 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		"ip_filter_trackers":             d.settingBool("ipfilter-trackers", true),
 		"rss_refresh_interval":           d.rssRefreshMinutes(),
 		"export_dir":                     "",
-		"scan_dirs":                      map[string]any{},
+		"scan_dirs":                      scanDirs,
 		"save_resume_data_interval":      60,
 	})
 }
@@ -1461,6 +1473,36 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 			var on bool
 			if json.Unmarshal(v, &on) == nil {
 				d.opts.Settings.Set(altSpeedEnabledKey, strconv.FormatBool(on))
+				changed = true
+			}
+		}
+		// scan_dirs (qBittorrent): folder -> 0 (the folder itself), 1 (default
+		// save path) or a path; mapped onto the watch-folders list.
+		if v, ok := prefs["scan_dirs"]; ok {
+			var dirs map[string]json.RawMessage
+			if json.Unmarshal(v, &dirs) == nil {
+				lines := make([]string, 0, len(dirs))
+				for folder, raw := range dirs {
+					folder = strings.TrimSpace(folder)
+					if folder == "" {
+						continue
+					}
+					dest := ""
+					var path string
+					var mode int
+					switch {
+					case json.Unmarshal(raw, &path) == nil:
+						dest = path
+					case json.Unmarshal(raw, &mode) == nil && mode == 0:
+						dest = folder
+					}
+					if dest == "" {
+						lines = append(lines, folder)
+					} else {
+						lines = append(lines, folder+"="+dest)
+					}
+				}
+				d.opts.Settings.Set(watchFoldersSettingKey, strings.Join(lines, "\n"))
 				changed = true
 			}
 		}

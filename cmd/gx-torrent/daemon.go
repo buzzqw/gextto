@@ -262,6 +262,10 @@ type Daemon struct {
 	qbitCreateMu  sync.Mutex
 	qbitCreateSeq int
 	qbitCreate    map[string]*qbitCreateTask
+	// watchLast/watchRunning drive the standalone watch-folders scan (off when
+	// no folder is configured); watchLast is touched only by the serial tick.
+	watchLast    time.Time
+	watchRunning atomic.Bool
 	// secMu caches the parsed security lists (trusted-proxies, allowed-hosts).
 	// They are read on every request but only change when settings.json is
 	// rewritten, so the raw setting string is the cache key.
@@ -1137,6 +1141,8 @@ func (d *Daemon) tick(now time.Time) {
 	for _, job := range pendingSelectOnly {
 		d.applySelectOnly(job.id, job.wanted)
 	}
+	// Watch folders (standalone): scan and add dropped .torrent files.
+	d.maybeScanWatchFolders(now)
 }
 
 // applySwarmLocked records the peer count sampled this tick and, once a minute,

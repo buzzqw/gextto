@@ -50,6 +50,10 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   </div>
 </fieldset>
 <fieldset>
+  <legend>Watch folders</legend>
+  <label>Folders to watch for .torrent files (one per line)<textarea name="watch-folders" rows="3" spellcheck="false" autocomplete="off" title="Folders scanned for .torrent files to add automatically; each line is a folder, or folder=destination to pick where its torrents are saved. The .torrent is removed after a successful add. Empty disables the feature.">{{WATCH_FOLDERS}}</textarea></label>
+</fieldset>
+<fieldset>
   <legend>Network</legend>
   <div class="grid">
     <label>Web UI / API listen address<input type="text" name="listen" value="{{LISTEN}}" placeholder="0.0.0.0:8890" autocomplete="off" title="IP address and port for the web interface and API"></label>

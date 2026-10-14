@@ -854,7 +854,8 @@ until the table is saved. The limits change on the fly, without reopening the
 session.
 It is configured from the **`/ui/settings`** page (*Settings* link in the
 bar of every page), which in **standalone** is the client's complete panel:
-**Folders** (download, temporary), **Network** (listen address, peer port
+**Folders** (download, temporary, watch folders for `.torrent` files, like
+qBittorrent's `scan_dirs`), **Network** (listen address, peer port
 range, incoming/outgoing interface, proxy, token), **IP filter** (below),
 **Protocols** (encryption, DHT/PEX/uTP/holepunch/LSD/UPnP/NAT-PMP, bootstrap nodes,
 DHT read-only), **Queue and cache** (active downloads/seeds, active limit, disk
@@ -862,7 +863,11 @@ cache, preallocation, sequential), **Optimisation** (below), **bandwidth**
 (global limits, alternative limits and their manual toggle) and
 **scheduler**, **language** and **notifications** (below). Bandwidth, scheduler and
 queue limits apply immediately; folders, network and protocols apply **from
-the next startup**. The **DHT read-only (BEP 43)** stays off by default: a
+the next startup**. The **watch folders** are scanned every 30 seconds: each
+`.torrent` found is added (to the folder's destination, or the default download
+folder) and removed after a successful add; a line is `folder` or
+`folder=destination`, and the qBittorrent `scan_dirs` preference maps onto the
+same list. The **DHT read-only (BEP 43)** stays off by default: a
 read-only node does not respond to queries and asks not to be entered into
 others' tables, useful for nodes with little bandwidth or behind symmetric NAT,
 but a complete client that uses the DHT must also serve it (it is also the choice of

@@ -175,6 +175,7 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	for _, key := range []string{
 		"download-dir", "temp-dir", "listen", "peer-ports", "listen-interface",
 		"outgoing-interface", "proxy", "token", "ipfilter", "dht-bootstrap",
+		"watch-folders",
 		"notify-url", "lang", notifyWebhookTokenKey, notifyWebhookUserKey,
 		notifyTelegramTokenKey, notifyTelegramChatKey, notifyEmailSMTPKey,
 		notifyEmailFromKey, notifyEmailToKey,
@@ -418,6 +419,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 
 	repl("{{DOWNLOAD_DIR}}", get("download-dir"))
 	repl("{{TEMP_DIR}}", get("temp-dir"))
+	repl("{{WATCH_FOLDERS}}", get("watch-folders"))
 	repl("{{LISTEN}}", get("listen"))
 	repl("{{PEER_PORTS}}", get("peer-ports"))
 	repl("{{LISTEN_IFACE}}", get("listen-interface"))
