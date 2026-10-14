@@ -156,6 +156,13 @@ type dlnaDirListing struct {
 	dirs   []string
 	folder dlnaFolder // items' fileIndex points into names
 	names  []string
+	// images are the artwork images of the directory (lowercased name ->
+	// name); folderArt is the folder's image and itemArt the image of each
+	// video by file name, both as paths relative to the library root, since a
+	// season folder takes its poster from the series folder (dlna_art.go).
+	images    map[string]string
+	folderArt string
+	itemArt   map[string]string
 }
 
 // excluded reports whether an absolute path is (inside) an excluded folder.
@@ -222,6 +229,7 @@ func (s *dlnaServer) scanLibDir(n int, rel string) (*dlnaDirListing, bool) {
 	}
 	listing := &dlnaDirListing{}
 	var files []dlnaFile
+	images := map[string]string{} // lowercased name -> name
 	for _, e := range entries {
 		name := e.Name()
 		if dlnaSkipName(name) {
@@ -234,7 +242,8 @@ func (s *dlnaServer) scanLibDir(n int, rel string) (*dlnaDirListing, bool) {
 		isDir := e.IsDir()
 		mime := mediaContentType(name)
 		wanted := dlnaPlayable(mime) || dlnaSubtitleKind(mime) != ""
-		if !isDir && !wanted && e.Type()&fs.ModeSymlink == 0 {
+		art := dlnaArtImage(name)
+		if !isDir && !wanted && !art && e.Type()&fs.ModeSymlink == 0 {
 			continue
 		}
 		info, err := r.Stat(childRel) // follows a symlink, but only inside the root
@@ -247,10 +256,14 @@ func (s *dlnaServer) scanLibDir(n int, rel string) (*dlnaDirListing, bool) {
 		case info.Mode().IsRegular() && wanted:
 			listing.names = append(listing.names, name)
 			files = append(files, dlnaFile{path: name, length: info.Size()})
+		case info.Mode().IsRegular() && art:
+			images[strings.ToLower(name)] = name
 		}
 	}
 	sort.Slice(listing.dirs, func(a, b int) bool { return strings.ToLower(listing.dirs[a]) < strings.ToLower(listing.dirs[b]) })
 	listing.folder, _ = dlnaFolderFor("", "", files)
+	listing.images = images
+	listing.assignArt(rel, s.seasonArt(n, rel))
 	return listing, true
 }
 
@@ -259,8 +272,13 @@ func (s *dlnaServer) writeLibItem(b *strings.Builder, n int, dirRel string, list
 	urlOf := func(index int) string {
 		return dlnaLibURL(base, n, path.Join(dirRel, listing.names[index]))
 	}
-	id := dlnaLibID(n, path.Join(dirRel, listing.names[e.fileIndex]))
-	writeItemAt(b, e, id, dlnaLibID(n, dirRel), urlOf)
+	name := listing.names[e.fileIndex]
+	id := dlnaLibID(n, path.Join(dirRel, name))
+	art := ""
+	if a := listing.itemArt[name]; a != "" {
+		art = dlnaArtURL(base, n, a)
+	}
+	writeItemAt(b, e, id, dlnaLibID(n, dirRel), art, urlOf)
 }
 
 // dlnaLibURL is the media URL of a library file: /lib/<n>/<escaped path>.
@@ -272,10 +290,24 @@ func dlnaLibURL(base string, n int, rel string) string {
 	return base + "/lib/" + strconv.Itoa(n) + "/" + strings.Join(parts, "/")
 }
 
-func writeLibContainer(b *strings.Builder, id, parent, title string) {
+// writeLibContainer renders a library folder; artURL is its image ("" none).
+func writeLibContainer(b *strings.Builder, id, parent, title, artURL string) {
 	b.WriteString(`<container id="` + xmlEscape(id) + `" parentID="` + xmlEscape(parent) +
 		`" restricted="1" searchable="0"><dc:title>` + xmlEscape(title) +
-		`</dc:title><upnp:class>object.container.storageFolder</upnp:class></container>`)
+		`</dc:title><upnp:class>object.container.storageFolder</upnp:class>`)
+	writeAlbumArt(b, artURL)
+	b.WriteString(`</container>`)
+}
+
+// libFolderArtURL is the artwork URL of a library folder: /art/<n>/<dir>/.
+// Whether the folder has an image is only known once it is read, so a
+// subfolder always gets the URL and answers 404 when it has none: reading
+// every subfolder to list a parent would cost a directory scan each.
+func libFolderArtURL(base string, n int, rel string) string {
+	if rel == "" {
+		return base + "/art/" + strconv.Itoa(n) + "/"
+	}
+	return dlnaArtURL(base, n, rel) + "/"
 }
 
 // browseLib answers a Browse on a library object (lib:<n>[/<rel>]).
@@ -321,7 +353,11 @@ func (s *dlnaServer) browseLib(objectID, flag string, start, count int, base str
 		if rel != "" {
 			title = path.Base(rel)
 		}
-		writeLibContainer(&b, objectID, libParentID(n, rel), title)
+		art := ""
+		if listing.folderArt != "" {
+			art = libFolderArtURL(base, n, rel)
+		}
+		writeLibContainer(&b, objectID, libParentID(n, rel), title, art)
 		return finish(1, 1)
 	case "BrowseDirectChildren":
 		items := listing.folder.items
@@ -334,7 +370,8 @@ func (s *dlnaServer) browseLib(objectID, flag string, start, count int, base str
 		for i := start; i < end; i++ {
 			if i < len(listing.dirs) {
 				name := listing.dirs[i]
-				writeLibContainer(&b, dlnaLibID(n, path.Join(rel, name)), objectID, name)
+				child := path.Join(rel, name)
+				writeLibContainer(&b, dlnaLibID(n, child), objectID, name, libFolderArtURL(base, n, child))
 			} else {
 				s.writeLibItem(&b, n, rel, listing, items[i-len(listing.dirs)], base)
 			}

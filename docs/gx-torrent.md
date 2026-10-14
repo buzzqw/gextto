@@ -1235,6 +1235,25 @@ UDP 1900 on the same interface.
   pages a folder with several Browse calls); a folder that is not mounted yet
   is an empty container. On a real NFS archive the 125 series folders list in
   about 0.5 s on the first read.
+- **Artwork** (`dlna_art.go`): library videos and folders carry
+  `upnp:albumArtURI` (`JPEG_TN` 160×160, then `JPEG_SM` 640×480) built from
+  the images Jellyfin, Kodi and Emby keep beside the media. A video takes
+  `<stem>-thumb`, `-poster`, `-landscape`, a same-name image, `-fanart`,
+  `-backdrop` (`.jpg`/`.jpeg`/`.png`), else its folder's image; a folder takes
+  `folder`, `poster`, `cover`, `thumb`, `landscape`, `fanart`, `backdrop`. A
+  season folder (`Season 01`, `Stagione 1`, `S01`, `Specials`, …) without its
+  own image takes Jellyfin's `season01-poster` (`season-specials-poster`) from
+  the series folder, else the series poster. `/art/<n>/<path>` serves an
+  artwork image of a listed library directory and `/art/<n>/<dir>/` a folder's
+  image (a subfolder always gets the URL and answers 404 without one, so a
+  parent listing does not read every subfolder); `?pn=` picks the profile.
+  The image is scaled with the standard library (box filter; a decoded JPEG is
+  averaged directly on its YCbCr planes), re-encoded as JPEG q85 (one that
+  already fits is served as is) and cached in memory (LRU, 8 MB, keyed on size
+  and mtime so a changed image is redone); at most two decodes run at once and
+  a header over 40 Mpixel or a file over 32 MB is refused before decoding. A
+  1080p still becomes a `JPEG_SM` in ~34 ms with 4.1 MB allocated. Torrent
+  items have no artwork.
 - **Listing**: the root holds one container per completed torrent with at least
   one playable (video/audio) file, sorted by name; a container lists its files
   sorted by path. **Subtitles** (`.srt`, `.vtt`) are not items: one with the
@@ -1262,7 +1281,8 @@ UDP 1900 on the same interface.
   start/stop/restart, each M-SEARCH, each Browse and each played file, all
   throttled to once per client and object per minute (a player issues a Range
   request per seek).
-- **Not covered**: transcoding, thumbnails, search, and the Microsoft
+- **Not covered**: transcoding, frames extracted from the video (artwork comes
+  only from existing images), search, and the Microsoft
   `X_MS_MediaReceiverRegistrar` that Xbox/Windows Media Player require.
 
 The media `Content-Type` comes from the file extension (`video/mp4`,

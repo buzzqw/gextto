@@ -197,6 +197,8 @@ type dlnaServer struct {
 	libRoots []dlnaLibRoot
 	exclude  []string
 	dlnaDirCacheState
+	// art caches the scaled artwork thumbnails (dlna_art.go).
+	art *dlnaArtCache
 }
 
 // logSearch logs an M-SEARCH, at most once per source address per minute.
@@ -239,6 +241,7 @@ func (d *Daemon) startDLNA() (*dlnaServer, error) {
 		base:     "http://" + net.JoinHostPort(ip.String(), strconv.Itoa(addr.Port)),
 		closeC:   make(chan struct{}),
 		libRoots: dlnaLibRoots(d.dlnaFolders()),
+		art:      newDLNAArtCache(),
 	}
 	for _, ex := range d.opts.DLNAExclude {
 		if abs, err := filepath.Abs(ex); err == nil {
@@ -274,6 +277,7 @@ func (s *dlnaServer) handler() http.Handler {
 	mux.HandleFunc("UNSUBSCRIBE /event/{service}", s.handleUnsubscribe)
 	mux.HandleFunc("GET /res/{hash}/{file}", s.handleMedia) // GET also matches HEAD
 	mux.HandleFunc("GET /lib/{n}/{path...}", s.handleLibMedia)
+	mux.HandleFunc("GET /art/{n}/{path...}", s.handleLibArt)
 	return dlnaLANOnly(mux)
 }
 
@@ -621,15 +625,17 @@ func writeFolder(b *strings.Builder, f dlnaFolder, parent string) {
 // writeItem renders a torrent file as a DIDL item.
 func writeItem(b *strings.Builder, e dlnaEntry, base string) {
 	writeItemAt(b, e, dlnaEntryKey(e.hash, e.fileIndex), dlnaContainerID(e.hash),
-		func(index int) string { return mediaURL(base, e.hash, index) })
+		"", func(index int) string { return mediaURL(base, e.hash, index) })
 }
 
 // writeItemAt renders one playable file with its id, its parent and the URL
-// of a file index (the media itself and its subtitles).
-func writeItemAt(b *strings.Builder, e dlnaEntry, id, parent string, urlOf func(int) string) {
+// of a file index (the media itself and its subtitles); artURL is its image
+// ("" none).
+func writeItemAt(b *strings.Builder, e dlnaEntry, id, parent, artURL string, urlOf func(int) string) {
 	fmt.Fprintf(b, `<item id="%s" parentID="%s" restricted="1"><dc:title>%s</dc:title><upnp:class>%s</upnp:class>`,
 		xmlEscape(id), xmlEscape(parent),
 		xmlEscape(strings.TrimSuffix(path.Base(e.name), path.Ext(e.name))), e.didlClass())
+	writeAlbumArt(b, artURL)
 	fmt.Fprintf(b, `<res protocolInfo="http-get:*:%s:%s" size="%d">%s</res>`,
 		e.mime, dlnaFeatures, e.size, xmlEscape(urlOf(e.fileIndex)))
 	for _, s := range e.subs {
@@ -764,7 +770,7 @@ func (s *dlnaServer) browseObject(lib *dlnaLibrary, objectID, flag string, start
 		returned := 0
 		for i := start; i < end; i++ {
 			if i < len(s.libRoots) {
-				writeLibContainer(&b, dlnaLibID(i, ""), dlnaRootID, s.libRoots[i].name)
+				writeLibContainer(&b, dlnaLibID(i, ""), dlnaRootID, s.libRoots[i].name, "")
 			} else {
 				torrents(&b)
 			}

@@ -359,7 +359,11 @@ inferior to the archived file.
   DLNA/UPnP server*): TVs and consoles on the local network see the **completed**
   media with no path to configure, and the **library folders** too (the
   archive on the NAS: series and movies, browsable by folder; option
-  *gx-torrent — DLNA: library folders*, empty = automatic); `.srt`/`.vtt` subtitles named like a video
+  *gx-torrent — DLNA: library folders*, empty = automatic). Videos and
+  folders show the **posters and thumbnails** already next to the files, in the
+  Jellyfin, Kodi and Emby layout (`episode-thumb.jpg`, `movie-poster.jpg`,
+  `folder.jpg`, `poster.jpg`, the season posters `season01-poster.jpg`): they are
+  scaled on the fly and nothing is written to the library. `.srt`/`.vtt` subtitles named like a video
   are attached to it. It is off by default and has no authentication, so it
   answers **only** devices on the local network (requests from public addresses
   are refused) and serves only the listed media. The gx-torrent settings page

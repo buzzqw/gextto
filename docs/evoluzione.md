@@ -1646,9 +1646,15 @@ the NAS is shown beside the torrents as a browsable folder tree (Gextto passes
 its archive root and series archive folders automatically, trash excluded),
 read through `os.Root` (no `..`/symlink escape), NAS system folders skipped,
 listings cached 30 s; on the real NFS archive 125 series list in ~0.5 s and a
-5 GB 2160p episode streams by Range. Verified end to end against a real daemon (SSDP
+5 GB 2160p episode streams by Range. **Artwork** (`dlna_art.go`): videos and
+folders carry `upnp:albumArtURI` (`JPEG_TN` + `JPEG_SM`) from the Jellyfin/Kodi
+images beside the media (`-thumb`, `-poster`, `folder.jpg`, season posters
+`season01-poster.jpg` in the series folder), scaled in Go with a box filter and
+an LRU cache of 8 MB; measured on a 1080p still → `JPEG_SM`: 34 ms, 4.1 MB
+allocated (12.4 MB before averaging the JPEG YCbCr planes directly instead of
+converting to RGBA). Verified end to end against a real daemon (SSDP
 discovery, Browse, Range 206, a non-offered file refused). Open: transcoding,
-thumbnails, search, Xbox/WMP (`X_MS_MediaReceiverRegistrar`).
+frames extracted from the video (no ffmpeg), search, Xbox/WMP (`X_MS_MediaReceiverRegistrar`).
 
 ### 12.3 Choking/seeding campaign
 

@@ -361,7 +361,11 @@ bloccata, già presente o inferiore al file archiviato.
   DLNA/UPnP*): TV e console sulla rete locale vedono i media **completati** senza
   configurare percorsi, e anche le **cartelle della libreria** (l'archivio sul
   NAS: serie e film, navigabili per cartelle; opzione *gx-torrent — DLNA:
-  cartelle della libreria*, vuota = automatico); i sottotitoli `.srt`/`.vtt` con lo stesso nome del video
+  cartelle della libreria*, vuota = automatico). Video e cartelle mostrano le
+  **locandine e miniature** già presenti accanto ai file, nel formato di
+  Jellyfin, Kodi ed Emby (`episodio-thumb.jpg`, `film-poster.jpg`, `folder.jpg`,
+  `poster.jpg`, le locandine di stagione `season01-poster.jpg`): vengono
+  ridimensionate al volo, senza scrivere nulla nella libreria. I sottotitoli `.srt`/`.vtt` con lo stesso nome del video
   vengono agganciati al video. È disattivato di default e non ha autenticazione:
   per questo risponde **solo** ai dispositivi della rete locale (le richieste da
   indirizzi pubblici sono rifiutate) e serve solo i media elencati. Nella pagina

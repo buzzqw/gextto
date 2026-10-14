@@ -136,7 +136,7 @@ func TestDLNALibraryServableFilesAndUpdateID(t *testing.T) {
 }
 
 func dlnaTestServer() *dlnaServer {
-	return &dlnaServer{name: "Casa", uuid: "uuid:test", base: "http://1.2.3.4:8200", d: &Daemon{}, browse: dlnaTestFolders}
+	return &dlnaServer{name: "Casa", uuid: "uuid:test", base: "http://1.2.3.4:8200", d: &Daemon{}, browse: dlnaTestFolders, art: newDLNAArtCache()}
 }
 
 func TestDLNARootDesc(t *testing.T) {
