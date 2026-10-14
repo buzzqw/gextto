@@ -34,6 +34,7 @@ change. The old `/ui` route is no longer available. For operational checks use
 | Method | Path |
 |---|---|
 | GET | `/` |
+| POST | `/api/access/generate-key` |
 | GET | `/api/acquisitions` |
 | GET | `/api/archive` |
 | POST | `/api/archive/add` |

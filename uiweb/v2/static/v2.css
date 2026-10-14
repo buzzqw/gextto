@@ -1578,7 +1578,7 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   box-shadow: var(--v2-shadow);
 }
 .settings-group-actions { margin-top: 12px; }
-
+.settings-group-links { margin-bottom: 12px; }
 @media (max-width: 900px) {
   .settings-layout { grid-template-columns: 1fr; gap: 12px; }
   .settings-nav { position: static; max-height: none; overflow: visible; }

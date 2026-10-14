@@ -145,7 +145,9 @@ signed cookie valid 30 days, a new password closes the sessions) or use the API 
 exempt by default; behind a reverse proxy the forwarded addresses count
 (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`). Five wrong passwords block the IP for
 one minute; without a password or key the check stays open with a warning in the
-log, and `GEXTTO_AUTH_DISABLE=1` gets back in.
+log, and `GEXTTO_AUTH_DISABLE=1` gets back in. Both secrets (the API key and the
+gx-torrent token) can be generated and copied from *Access and services → API
+keys*; what they are and how to use them is in [`api-keys.md`](api-keys.md).
 
 **Media servers and notifications.** After an import Jellyfin receives
 `/Library/Media/Updated` with the folder and Plex

@@ -1803,6 +1803,11 @@ VPN) puoi chiedere il login a chi non è in rete locale.
 | Chiave API (script, TUI, calendario) | Per gli accessi senza browser: header `X-Api-Key: <chiave>` oppure `?apikey=<chiave>` nell'indirizzo. La TUI la legge dalla variabile `GEXTTO_API_KEY`. |
 | gx-torrent — token di accesso (pagina e API in LAN) | Nella scheda **Accesso**: segreto condiviso richiesto dalla pagina e dall'API; obbligatorio se il demone ascolta in rete (non visualizzato). |
 
+I due segreti si generano dalla riga stessa: **Genera** crea un valore casuale
+lungo e lo salva, **Copia** lo mette negli appunti. Per il token di gx-torrent
+serve poi riavviare il demone perché venga applicato. Cosa sono e come si usano
+è spiegato in [Chiavi di accesso](api-keys.it.md).
+
 **Servizi metadati**
 
 | Impostazione | Cosa fa |

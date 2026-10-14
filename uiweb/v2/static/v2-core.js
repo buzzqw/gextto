@@ -750,6 +750,63 @@
     area.remove();
   }
 
+  // setGenerateStatus writes the feedback of the access-key generator next to
+  // the row. The target is a role="status" element, so it is announced too.
+  function setGenerateStatus(key, message, isError) {
+    var status = document.getElementById("gen-status-" + key);
+    if (!status) return;
+    status.textContent = message || "";
+    status.classList.toggle("err", !!isError);
+  }
+
+  // generateAccessKey asks the server for a fresh random access secret, shows it
+  // in the row (revealed so it can be read and copied) and reports the result.
+  // The value is already stored server-side; copying is a separate button.
+  function generateAccessKey(button, key) {
+    if (!key) return;
+    button.disabled = true;
+    setGenerateStatus(key, "");
+    fetch("/api/access/generate-key", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: key })
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (data) {
+        if (!response.ok || !data || !data.value) throw new Error((data && data.error) || "failed");
+        return data;
+      });
+    }).then(function (data) {
+      var input = document.getElementById("input-" + key);
+      if (input) {
+        input.type = "text";
+        input.value = data.value;
+        input.focus();
+        if (input.select) input.select();
+      }
+      if (data.restart_required) {
+        setGenerateStatus(key, t("Token generato: copialo e riavvia gx-torrent."), false);
+      } else {
+        setGenerateStatus(key, t("Chiave generata: copiala ora."), false);
+      }
+    }).catch(function () {
+      setGenerateStatus(key, t("Generazione non riuscita."), true);
+    }).then(function () {
+      button.disabled = false;
+    });
+  }
+
+  // copyGeneratedKey copies the value currently shown in a generated-secret row.
+  function copyGeneratedKey(button, key) {
+    var input = key ? document.getElementById("input-" + key) : null;
+    var value = input ? String(input.value || "") : "";
+    if (!value) {
+      setGenerateStatus(key, t("Genera prima la chiave."), true);
+      return;
+    }
+    copyText(value, button);
+  }
+
   document.addEventListener("change", function (event) {
     if (event.target.matches && event.target.matches("[data-v2-create-folder]")) {
       var cfScope = event.target.closest("form") || event.target.closest(".modal");
@@ -1119,6 +1176,18 @@
         scope.querySelector('[name="value"]')
       );
       if (input) openFolderBrowser(input);
+      return;
+    }
+    var generate = event.target.closest && event.target.closest("[data-v2-generate]");
+    if (generate) {
+      event.preventDefault();
+      generateAccessKey(generate, generate.getAttribute("data-v2-generate") || "");
+      return;
+    }
+    var copyField = event.target.closest && event.target.closest("[data-v2-copy-field]");
+    if (copyField) {
+      event.preventDefault();
+      copyGeneratedKey(copyField, copyField.getAttribute("data-v2-copy-field") || "");
       return;
     }
     var copy = event.target.closest && event.target.closest("[data-v2-copy]");

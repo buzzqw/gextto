@@ -1888,6 +1888,18 @@ func (field v2Field) Browse() bool {
 	return false
 }
 
+// Generatable reports whether the row offers the «Genera»/«Copia» buttons that
+// fill an access secret with a fresh random value. Only the two access secrets
+// the operator has to paste somewhere (the Gextto API key and the gx-torrent
+// token) can be generated.
+func (field v2Field) Generatable() bool {
+	switch field.Key {
+	case "auth_api_key", "gxtorrent_token":
+		return true
+	}
+	return false
+}
+
 // Resettable reports whether the row offers «Predefinito»: whenever the field
 // has a registered default (even an empty one), so the button is available on
 // every resetting field and a user who changed something can always restore it.
@@ -1911,12 +1923,36 @@ type v2SettingGroup struct {
 	Hint      string
 	Fields    []v2Field
 	Buttons   []v2Button
+	Links     []v2Link
 	Grid      bool
 	Collapsed bool
 	// Inactive marks a whole panel that the active torrent engine ignores.
 	Inactive bool
 	// ID is the anchor of the panel, used by the section's group index.
 	ID string
+}
+
+// v2Link is one external link shown under a settings group (documentation on
+// GitHub, for instance).
+type v2Link struct {
+	Label string
+	Href  string
+	Hint  string
+}
+
+// accessKeysManualLink points at the document that explains the two access
+// secrets (the Gextto API key and the gx-torrent token) on GitHub. The Italian
+// UI opens the Italian edition, every other language the English one.
+func accessKeysManualLink(s *AppState) v2Link {
+	href := "https://github.com/buzzqw/gextto/blob/main/docs/api-keys.md"
+	if strings.HasPrefix(strings.ToLower(v2Language(s)), "it") {
+		href = "https://github.com/buzzqw/gextto/blob/main/docs/api-keys.it.md"
+	}
+	return v2Link{
+		Label: "Cosa sono le chiavi API (documento su GitHub)",
+		Href:  href,
+		Hint:  "A cosa servono la chiave API di Gextto e il token di gx-torrent, e come usarli.",
+	}
 }
 
 // v2Fields wraps raw settings fields with the transient save status.
@@ -2028,6 +2064,9 @@ func v2SettingsViewFrom(s *AppState, tab, highlight string) v2SettingsView {
 	unused := v2SettingGroup{Title: "Non usate dal motore attivo", Collapsed: true, Inactive: true}
 	for _, group := range page.Groups {
 		converted := v2SettingGroup{Title: group.Title, Hint: group.Hint, Grid: group.Grid, Collapsed: group.Collapsed, Buttons: buttons(group.Buttons)}
+		if page.ActiveID == "access" && group.Title == "Chiavi API" {
+			converted.Links = []v2Link{accessKeysManualLink(s)}
+		}
 		allDisabled := len(group.Fields) > 0
 		for _, field := range group.Fields {
 			allDisabled = allDisabled && field.Disabled
