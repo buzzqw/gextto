@@ -207,6 +207,146 @@ func mustGet(t *testing.T, url string) *http.Response {
 	return resp
 }
 
+// TestQbitPreferencesSurface checks that the preferences document carries the
+// keys qBittorrent clients read.
+func TestQbitPreferencesSurface(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	var prefs map[string]any
+	getJSONInto(t, srv.URL+"/api/v2/app/preferences", &prefs)
+	for _, key := range []string{
+		"save_path", "temp_path", "temp_path_enabled", "listen_port", "dht", "pex",
+		"lsd", "upnp", "encryption", "bittorrent_protocol", "queueing_enabled",
+		"max_active_downloads", "max_active_uploads", "max_active_torrents",
+		"dont_count_slow_torrents", "slow_torrent_dl_rate_threshold",
+		"dl_limit", "up_limit", "max_connec", "scheduler_enabled",
+		"ip_filter_enabled", "ip_filter_trackers", "rss_refresh_interval",
+		"save_resume_data_interval", "scan_dirs",
+	} {
+		if _, ok := prefs[key]; !ok {
+			t.Errorf("preferences missing key %q", key)
+		}
+	}
+}
+
+// TestV1ExtraReadEndpoints covers the additive v1 read surface: the webseeds
+// resource, the single-torrent resource and the list paging.
+func TestV1ExtraReadEndpoints(t *testing.T) {
+	d := newTestDaemon(t)
+	d.opts.Token = "test-token"
+	src := t.TempDir()
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 20_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitListed(t, d, hash)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	get := func(path string, out any) int {
+		req, err := http.NewRequest(http.MethodGet, srv.URL+path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("X-Gx-Token", "test-token")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if out != nil && resp.StatusCode == http.StatusOK {
+			if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+				t.Fatalf("GET %s: %v", path, err)
+			}
+		}
+		return resp.StatusCode
+	}
+
+	var seeds []webseedInfo
+	if code := get("/api/v1/torrents/"+hash+"/webseeds", &seeds); code != http.StatusOK {
+		t.Fatalf("webseeds: status %d", code)
+	}
+	if len(seeds) != 0 {
+		t.Fatalf("webseeds = %+v, want empty", seeds)
+	}
+
+	var one torrentInfo
+	if code := get("/api/v1/torrents/"+hash, &one); code != http.StatusOK {
+		t.Fatalf("single torrent: status %d", code)
+	}
+	if !strings.EqualFold(one.Hash, hash) {
+		t.Fatalf("single torrent hash = %q, want %q", one.Hash, hash)
+	}
+	if code := get("/api/v1/torrents/deadbeef", nil); code != http.StatusNotFound {
+		t.Fatalf("unknown single torrent: status %d, want 404", code)
+	}
+
+	var paged []torrentInfo
+	if code := get("/api/v1/torrents?limit=1", &paged); code != http.StatusOK {
+		t.Fatalf("limit=1: status %d", code)
+	}
+	if len(paged) != 1 {
+		t.Fatalf("limit=1 returned %d, want 1", len(paged))
+	}
+	var none []torrentInfo
+	if code := get("/api/v1/torrents?offset=100", &none); code != http.StatusOK {
+		t.Fatalf("offset=100: status %d", code)
+	}
+	if len(none) != 0 {
+		t.Fatalf("offset=100 returned %d, want 0", len(none))
+	}
+}
+
+type qbitSyncPayload struct {
+	RID             int64                  `json:"rid"`
+	FullUpdate      bool                   `json:"full_update"`
+	Torrents        map[string]qbitTorrent `json:"torrents"`
+	TorrentsRemoved []string               `json:"torrents_removed"`
+}
+
+func qbitSyncCall(t *testing.T, base, rid string) qbitSyncPayload {
+	t.Helper()
+	url := base + "/api/v2/sync/maindata"
+	if rid != "" {
+		url += "?rid=" + rid
+	}
+	var payload qbitSyncPayload
+	getJSONInto(t, url, &payload)
+	return payload
+}
+
+// TestQbitSyncIncremental checks that sync/maindata answers a full snapshot on a
+// first/stale rid and only the diff when the client echoes the last rid.
+func TestQbitSyncIncremental(t *testing.T) {
+	d := newTestDaemon(t)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	first := qbitSyncCall(t, srv.URL, "")
+	if !first.FullUpdate || first.RID == 0 {
+		t.Fatalf("first sync: %+v", first)
+	}
+	src := t.TempDir()
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 40_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitListed(t, d, hash)
+	second := qbitSyncCall(t, srv.URL, strconv.FormatInt(first.RID, 10))
+	if second.FullUpdate {
+		t.Fatalf("second poll must be incremental")
+	}
+	if _, ok := second.Torrents[strings.ToLower(hash)]; !ok {
+		t.Fatalf("incremental diff misses the new torrent: %+v", second.Torrents)
+	}
+	// A stale rid gets a full update again.
+	if third := qbitSyncCall(t, srv.URL, "0"); !third.FullUpdate {
+		t.Fatalf("stale rid must be a full update")
+	}
+}
+
 // TestQbitTorrentsInfoCategoryTagAndState exercises the filters end to end:
 // category, tag, state filter and the empty-category/empty-tag meaning.
 func TestQbitTorrentsInfoCategoryTagAndState(t *testing.T) {

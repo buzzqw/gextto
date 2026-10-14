@@ -188,7 +188,7 @@ func TestQbitSetPreferences(t *testing.T) {
 	srv := httptest.NewServer(d.routesQbit())
 	defer srv.Close()
 
-	body := `{"dl_limit":2097152,"up_limit":1048576,"queueing_enabled":false,"disk_cache":512}`
+	body := `{"dl_limit":2048,"up_limit":1024,"queueing_enabled":false,"disk_cache":512,"max_active_downloads":7}`
 	resp, err := http.PostForm(srv.URL+"/api/v2/app/setPreferences", url.Values{"json": {body}})
 	if err != nil {
 		t.Fatal(err)
@@ -199,13 +199,17 @@ func TestQbitSetPreferences(t *testing.T) {
 	}
 	d.mu.Lock()
 	dl, up := d.state.Config.SpeedLimitDownload, d.state.Config.SpeedLimitUpload
+	active := d.state.Config.ActiveDownloads
 	d.mu.Unlock()
 	if dl != 2048 || up != 1024 {
 		t.Fatalf("global limits = %d/%d KiB, want 2048/1024", dl, up)
 	}
+	if active != 7 {
+		t.Fatalf("max_active_downloads = %d, want 7", active)
+	}
 
-	// A positive but tiny limit rounds up to 1 KiB, not 0 (which means unlimited).
-	resp2, err := http.PostForm(srv.URL+"/api/v2/app/setPreferences", url.Values{"json": {`{"dl_limit":512}`}})
+	// -1 means "no limit": the daemon stores 0 (unlimited).
+	resp2, err := http.PostForm(srv.URL+"/api/v2/app/setPreferences", url.Values{"json": {`{"dl_limit":-1}`}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,8 +217,8 @@ func TestQbitSetPreferences(t *testing.T) {
 	d.mu.Lock()
 	small := d.state.Config.SpeedLimitDownload
 	d.mu.Unlock()
-	if small != 1 {
-		t.Fatalf("small global limit = %d KiB, want 1", small)
+	if small != 0 {
+		t.Fatalf("unlimited global limit = %d KiB, want 0", small)
 	}
 }
 

@@ -540,7 +540,13 @@ piece diagnostics; `torrents/webseeds` lists the HTTP sources;
 `torrents/downloadLimit`/`uploadLimit` read the per-torrent limits;
 `transfer/speedLimitsMode` reports whether the scheduled alternative limits are
 active; `app/networkInterfaceList`/`networkInterfaceAddressList` list the
-interfaces; `log/main` and `log/peers` read the daemon log. The API uses the
+interfaces; `log/main` and `log/peers` read the daemon log. `sync/maindata`
+answers **incrementally**: when the client echoes the last `rid` it receives
+only the changed torrents/categories/tags and the removed entries, otherwise a
+full snapshot. `app/preferences` returns the preferences the clients read
+(save/temp path, port, DHT/PEX/LSD/UPnP, encryption, protocol, queue and cache
+knobs, global limits in KiB/s, IP filter, RSS interval) and `setPreferences`
+applies the global limits (KiB/s, `-1` = no limit) and the queue knobs. The API uses the
 same access criteria as the page: without a password it is open, otherwise the LAN bypass
 is needed (if `local-bypass` is active) or a session (`SID` qBittorrent or `gx_session`
 of the page). In managed it is **not** exposed: only Gextto commands.
@@ -1760,13 +1766,14 @@ token is set.
 | `GET /api/v1/health` | status and version |
 | `GET /api/v1/stats` | counters: downloading, seeding, queued, stalled, slow, speeds, peers, effective slots |
 | `GET /api/v1/portcheck` | port test: the peer port is listening and the router forwards it |
-| `GET /api/v1/torrents` | full list (progress %, sizes, speeds, peers, swarm, status, path, seed limits, queue flags) |
+| `GET /api/v1/torrents` | full list (progress %, sizes, speeds, peers, swarm, status, path, seed limits, queue flags). Optional `?limit=`/`?offset=` page the list (the offset may be negative, counted from the end); without them the response is unchanged |
+| `GET /api/v1/torrents/{hash}` | the published view of one torrent (cheap polling). Additive: the list and the `{hash}/{what}` resources are unchanged |
 | `POST /api/v1/add` | form fields: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `super_seeding`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Responds `{hash, existing}` |
 | `POST /api/v1/add-file` | multipart `torrent` plus the same fields |
 | `POST /api/v1/create-torrent` | JSON `path`/`name`/`trackers`/`webseeds`/`private`/`piece_length`/`comment`: creates a `.torrent` from a file or folder of the server and returns it as a download (mktorrent-style). `piece_length` (multiple of 16 KiB, 0 = automatic) is limited to 16 MiB so as not to turn an arbitrary value into a huge allocation |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | removal |
 | `POST /api/v1/torrents/{hash}/{action}` | see list below |
-| `GET /api/v1/torrents/{hash}/{what}` | inspection with `{what}` in `files`, `peers`, `trackers`, `pieces`, `torrent-file`, `scrape`, `dhtscrape`, `collections` (files include `priority`; `pieces` reports the status intervals; `scrape` queries the trackers for seeders/leechers, BEP 48; `dhtscrape` estimates the swarm from the DHT, BEP 33; `collections` reports the BEP 38 hints — `collections`, `similar` in hex and the local torrents that share a hint) |
+| `GET /api/v1/torrents/{hash}/{what}` | inspection with `{what}` in `files`, `peers`, `trackers`, `webseeds`, `pieces`, `torrent-file`, `scrape`, `dhtscrape`, `collections` (files include `priority`; `webseeds` lists the HTTP sources; `pieces` reports the status intervals; `scrape` queries the trackers for seeders/leechers, BEP 48; `dhtscrape` estimates the swarm from the DHT, BEP 33; `collections` reports the BEP 38 hints — `collections`, `similar` in hex and the local torrents that share a hint) |
 | `POST /api/v1/pins/clear` | removes all pins |
 | `POST /api/v1/ipfilter` | reloads the IP filter (optional `path`) |
 | `GET /api/v1/config` | configuration and effective slots |

@@ -30,6 +30,7 @@ func (d *Daemon) routes() http.Handler {
 	api.HandleFunc("GET /api/v1/stats", d.handleStats)
 	api.HandleFunc("GET /api/v1/portcheck", d.handlePortCheck)
 	api.HandleFunc("GET /api/v1/torrents", d.handleList)
+	api.HandleFunc("GET /api/v1/torrents/{hash}", d.handleGetTorrent)
 	api.HandleFunc("POST /api/v1/add", d.handleAdd)
 	api.HandleFunc("POST /api/v1/add-file", d.handleAddFile)
 	api.HandleFunc("DELETE /api/v1/torrents/{hash}", d.handleRemove)
@@ -263,11 +264,58 @@ func (d *Daemon) checkPort(targetPort int) portCheck {
 	return pc
 }
 
-func (d *Daemon) handleList(w http.ResponseWriter, _ *http.Request) {
+func (d *Daemon) handleList(w http.ResponseWriter, r *http.Request) {
 	// Serve the published snapshot: the read path never touches a torrent run
 	// loop, so a torrent blocked on a slow network mount cannot make the API
 	// time out and look like a dead daemon to Gextto.
-	writeJSON(w, http.StatusOK, d.snapshotViews())
+	//
+	// The optional ?limit= / ?offset= page the list so a caller with many
+	// torrents does not serialize them all; without the parameters the response
+	// is unchanged.
+	q := r.URL.Query()
+	views := d.snapshotViews()
+	views = pageSlice(views, q.Get("limit"), q.Get("offset"))
+	writeJSON(w, http.StatusOK, views)
+}
+
+// handleGetTorrent returns a single torrent's published view (cheap polling of
+// one torrent). Additive to the v1 API: the list and the {hash}/{what}
+// resources are unchanged.
+func (d *Daemon) handleGetTorrent(w http.ResponseWriter, r *http.Request) {
+	hash := strings.ToLower(strings.TrimSpace(r.PathValue("hash")))
+	for _, v := range d.snapshotViews() {
+		if strings.ToLower(v.Hash) == hash {
+			writeJSON(w, http.StatusOK, v)
+			return
+		}
+	}
+	writeError(w, http.StatusNotFound, errNotFound)
+}
+
+// pageSlice applies the optional limit/offset query parameters to a list. A
+// negative offset counts from the end, like qBittorrent. Without parameters the
+// list is returned unchanged.
+func pageSlice[T any](list []T, limitRaw, offsetRaw string) []T {
+	if offsetRaw = strings.TrimSpace(offsetRaw); offsetRaw != "" {
+		if offset, err := strconv.Atoi(offsetRaw); err == nil && offset != 0 {
+			if offset < 0 {
+				offset = len(list) + offset
+			}
+			if offset < 0 {
+				offset = 0
+			}
+			if offset > len(list) {
+				offset = len(list)
+			}
+			list = list[offset:]
+		}
+	}
+	if limitRaw = strings.TrimSpace(limitRaw); limitRaw != "" {
+		if limit, err := strconv.Atoi(limitRaw); err == nil && limit >= 0 && limit < len(list) {
+			list = list[:limit]
+		}
+	}
+	return list
 }
 
 func (d *Daemon) handleAdd(w http.ResponseWriter, r *http.Request) {
@@ -465,6 +513,12 @@ type scrapeInfo struct {
 	Error      string `json:"error,omitempty"`
 }
 
+// webseedInfo is one HTTP source of a torrent.
+type webseedInfo struct {
+	URL   string `json:"url"`
+	Error string `json:"error,omitempty"`
+}
+
 // pieceRun is a compact run of consecutive pieces sharing a state. End is
 // inclusive, matching the Gextto piece-diagnostics contract.
 type pieceRun struct {
@@ -584,6 +638,16 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 		info := d.collectionsLocked(t)
 		d.mu.Unlock()
 		writeJSON(w, http.StatusOK, info)
+	case "webseeds":
+		out := []webseedInfo{}
+		for _, ws := range t.Webseeds() {
+			seed := webseedInfo{URL: ws.URL}
+			if ws.Error != nil {
+				seed.Error = ws.Error.Error()
+			}
+			out = append(out, seed)
+		}
+		writeJSON(w, http.StatusOK, out)
 	case "pieces":
 		states, ready := t.PieceStates()
 		if !ready {

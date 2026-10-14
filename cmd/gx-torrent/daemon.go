@@ -249,6 +249,11 @@ type Daemon struct {
 	// qbitRID is the qBittorrent /sync/maindata response id: it only has to move
 	// forward so third-party WebUIs (VueTorrent, Shift) see a fresh snapshot.
 	qbitRID atomic.Int64
+	// qbitSync carries the state needed to answer sync/maindata incrementally
+	// (the last snapshot and the rid it was sent with).
+	qbitSyncMu   sync.Mutex
+	qbitLastRID  int64
+	qbitSnapshot *qbitSyncState
 	// secMu caches the parsed security lists (trusted-proxies, allowed-hosts).
 	// They are read on every request but only change when settings.json is
 	// rewritten, so the raw setting string is the cache key.

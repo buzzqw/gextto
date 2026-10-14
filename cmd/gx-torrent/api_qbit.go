@@ -369,26 +369,7 @@ func qbitSortTorrents(list []qbitTorrent, key string, reverse bool) {
 // qbitPage applies the optional "limit" and "offset" parameters (offset may be
 // negative, counted from the end, like qBittorrent).
 func qbitPage(list []qbitTorrent, limitRaw, offsetRaw string) []qbitTorrent {
-	if offsetRaw != "" {
-		if offset, err := strconv.Atoi(strings.TrimSpace(offsetRaw)); err == nil && offset != 0 {
-			if offset < 0 {
-				offset = len(list) + offset
-			}
-			if offset < 0 {
-				offset = 0
-			}
-			if offset > len(list) {
-				offset = len(list)
-			}
-			list = list[offset:]
-		}
-	}
-	if limitRaw != "" {
-		if limit, err := strconv.Atoi(strings.TrimSpace(limitRaw)); err == nil && limit >= 0 && limit < len(list) {
-			list = list[:limit]
-		}
-	}
-	return list
+	return pageSlice(list, limitRaw, offsetRaw)
 }
 
 // qbitHashFilter returns the set of requested info hashes (lowercase) from the
@@ -1040,17 +1021,121 @@ func (d *Daemon) handleQbitDefaultSavePath(w http.ResponseWriter, _ *http.Reques
 	qbitText(w, http.StatusOK, d.downloadDir())
 }
 
+// qbitPrefLimitOut renders a global limit in the qBittorrent preferences unit
+// (KiB/s, -1 = no limit) from the daemon's own encoding (KiB/s, 0 = unlimited).
+func qbitPrefLimitOut(kib int64) int64 {
+	if kib <= 0 {
+		return -1
+	}
+	return kib
+}
+
+// qbitEncryptionMode maps the daemon's encryption (0 off, 1 prefer, 2 forced)
+// onto qBittorrent's (0 prefer, 1 force on, 2 force off).
+func qbitEncryptionMode(gx int) int {
+	switch gx {
+	case 0:
+		return 2
+	case 2:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// qbitProtocol maps the uTP switch onto qBittorrent's bittorrent_protocol
+// (0 TCP+uTP, 1 TCP, 2 uTP).
+func qbitProtocol(utp bool) int {
+	if utp {
+		return 0
+	}
+	return 1
+}
+
+// settingBool reads a standalone boolean setting (settings.json), with a
+// fallback when it is unset or unparsable.
+func (d *Daemon) settingBool(key string, fallback bool) bool {
+	if d.opts.Settings == nil {
+		return fallback
+	}
+	switch strings.ToLower(strings.TrimSpace(d.opts.Settings.Get(key, ""))) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
+}
+
+// rssRefreshMinutes reports the feed refresh interval in minutes (qBittorrent's
+// rss_refresh_interval unit); 0 when no feed interval is configured.
+func (d *Daemon) rssRefreshMinutes() int {
+	if d.opts.Settings == nil {
+		return 0
+	}
+	raw := strings.TrimSpace(d.opts.Settings.Get(feedIntervalKey, ""))
+	if secs, err := strconv.Atoi(raw); err == nil && secs > 0 {
+		return (secs + 59) / 60
+	}
+	return 0
+}
+
 func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 	stats := d.stats()
+	cfg, _, _ := d.config()
+	proxyType := -1
+	if stats.Proxy {
+		// The clients only need to know a proxy is in use; the daemon keeps the
+		// full proxy setting to itself.
+		proxyType = 5
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"save_path":            d.downloadDir(),
-		"temp_path":            d.opts.PartsDir,
-		"listen_port":          stats.PeerPort,
-		"dht":                  stats.DHT,
-		"pex":                  true,
-		"upnp":                 true,
-		"max_connec":           stats.Session["max_peer_dial"] + stats.Session["max_peer_accept"],
-		"start_paused_enabled": false,
+		"locale":                         d.opts.Lang,
+		"save_path":                      d.downloadDir(),
+		"temp_path":                      d.opts.PartsDir,
+		"temp_path_enabled":              d.opts.PartsDir != "",
+		"create_subfolder_enabled":       true,
+		"start_paused_enabled":           false,
+		"preallocate_all":                cfg.Preallocate,
+		"incomplete_files_ext":           false,
+		"listen_port":                    stats.PeerPort,
+		"random_port":                    false,
+		"dht":                            stats.DHT,
+		"pex":                            !d.settingBool("no-pex", false),
+		"lsd":                            !d.settingBool("no-lsd", false),
+		"upnp":                           !d.settingBool("no-upnp", false),
+		"encryption":                     qbitEncryptionMode(stats.Encryption),
+		"bittorrent_protocol":            qbitProtocol(stats.UTP),
+		"limit_utp_rate":                 true,
+		"queueing_enabled":               true,
+		"max_active_downloads":           cfg.ActiveDownloads,
+		"max_active_uploads":             cfg.ActiveSeeds,
+		"max_active_torrents":            cfg.ActiveLimit,
+		"dont_count_slow_torrents":       cfg.DontCountSlow,
+		"slow_torrent_dl_rate_threshold": int(cfg.SlowRate),
+		"slow_torrent_ul_rate_threshold": int(cfg.SlowRate),
+		"slow_torrent_inactive_timer":    int(cfg.SlowAfterSecs),
+		"dl_limit":                       qbitPrefLimitOut(cfg.SpeedLimitDownload),
+		"up_limit":                       qbitPrefLimitOut(cfg.SpeedLimitUpload),
+		"max_connec":                     cfg.MaxPeerDial + cfg.MaxPeerAccept,
+		"max_connec_per_torrent":         0,
+		"max_uploads":                    0,
+		"max_uploads_per_torrent":        0,
+		"max_ratio_enabled":              false,
+		"max_ratio":                      -1,
+		"max_seeding_time_enabled":       false,
+		"max_seeding_time":               -1,
+		"scheduler_enabled":              d.settingBool(scheduleEnabledKey, false),
+		"proxy_type":                     proxyType,
+		"anonymous_mode":                 false,
+		"ip_filter_enabled":              stats.IPFilterRules > 0,
+		"ip_filter_path":                 stats.IPFilterPath,
+		"ip_filter_trackers":             d.settingBool("ipfilter-trackers", true),
+		"rss_refresh_interval":           d.rssRefreshMinutes(),
+		"export_dir":                     "",
+		"scan_dirs":                      map[string]any{},
+		"save_resume_data_interval":      60,
 	})
 }
 
@@ -1244,9 +1329,9 @@ func (d *Daemon) handleQbitSetUploadLimit(w http.ResponseWriter, r *http.Request
 }
 
 // handleQbitSetPreferences applies the qBittorrent preferences that map onto the
-// daemon's own settings (the global download/upload limits). Everything else
-// (queueing_enabled, disk_cache, ...) is accepted and ignored: the daemon
-// manages its queue and cache itself.
+// daemon's own settings and queue: the global download/upload limits (KiB/s,
+// -1 = no limit) and the queue knobs. Everything else (disk_cache, scan_dirs,
+// ...) is accepted and ignored: the daemon manages its cache and queue itself.
 func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request) {
 	raw := strings.TrimSpace(r.FormValue("json"))
 	if raw == "" {
@@ -1258,6 +1343,9 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
+	patch := map[string]json.RawMessage{}
+	// qBittorrent sends the global limits in KiB/s with -1 meaning "no limit";
+	// the daemon stores KiB/s with 0 meaning unlimited.
 	for _, m := range []struct{ pref, config string }{
 		{"dl_limit", "speed_limit_download"},
 		{"up_limit", "speed_limit_upload"},
@@ -1266,11 +1354,35 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 		if !ok {
 			continue
 		}
-		var limit int64
-		if json.Unmarshal(v, &limit) != nil || limit < 0 {
+		var kib int64
+		if json.Unmarshal(v, &kib) != nil {
 			continue
 		}
-		if err := d.qbitSetSpeedLimit(m.config, strconv.FormatInt(limit, 10)); err != nil {
+		if kib < 0 {
+			kib = 0
+		}
+		encoded, err := json.Marshal(kib)
+		if err != nil {
+			continue
+		}
+		patch[m.config] = encoded
+	}
+	// Queue knobs the daemon exposes at runtime (same value, same unit).
+	for _, m := range []struct{ pref, config string }{
+		{"max_active_downloads", "active_downloads"},
+		{"max_active_uploads", "active_seeds"},
+		{"max_active_torrents", "active_limit"},
+		{"dont_count_slow_torrents", "dont_count_slow"},
+		{"slow_torrent_dl_rate_threshold", "slow_rate"},
+		{"slow_torrent_ul_rate_threshold", "slow_rate"},
+		{"slow_torrent_inactive_timer", "slow_after_secs"},
+	} {
+		if v, ok := prefs[m.pref]; ok {
+			patch[m.config] = v
+		}
+	}
+	if len(patch) > 0 {
+		if _, err := d.setConfig(patch); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -1317,10 +1429,17 @@ func (d *Daemon) handleQbitSetShareLimits(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleQbitSync answers /api/v2/sync/maindata. It always sends a full snapshot
-// (no incremental diff); rid only has to move forward so clients that compare it
-// see each poll as a new revision.
-func (d *Daemon) handleQbitSync(w http.ResponseWriter, _ *http.Request) {
+// qbitSyncState is the last full snapshot sent through sync/maindata; the next
+// poll builds its diff from it.
+type qbitSyncState struct {
+	torrents   map[string]qbitTorrent
+	categories map[string]qbitCategory
+	tags       map[string]struct{}
+}
+
+// qbitCurrentSyncState reads the current published state (the same data the
+// full snapshot sends).
+func (d *Daemon) qbitCurrentSyncState() *qbitSyncState {
 	views := d.snapshotViews()
 	torrents := make(map[string]qbitTorrent, len(views))
 	for _, v := range views {
@@ -1330,21 +1449,121 @@ func (d *Daemon) handleQbitSync(w http.ResponseWriter, _ *http.Request) {
 	for name, savePath := range d.categoriesSnapshot() {
 		categories[name] = qbitCategory{Name: name, SavePath: savePath}
 	}
+	tags := map[string]struct{}{}
+	for _, tag := range d.tagsSnapshot() {
+		tags[tag] = struct{}{}
+	}
+	return &qbitSyncState{torrents: torrents, categories: categories, tags: tags}
+}
+
+func qbitTagsList(set map[string]struct{}) []string {
+	out := make([]string, 0, len(set))
+	for tag := range set {
+		out = append(out, tag)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// qbitServerState is the global transfer snapshot qBittorrent clients read from
+// server_state (both of sync/maindata and transfer/info).
+func qbitServerState(stats daemonStats) map[string]any {
+	return map[string]any{
+		"dl_info_speed":          stats.DownloadRate,
+		"up_info_speed":          stats.UploadRate,
+		"dl_info_data":           stats.Session["bytes_downloaded"],
+		"up_info_data":           stats.Session["bytes_uploaded"],
+		"dht_nodes":              stats.Session["dht_nodes"],
+		"connection_status":      "connected",
+		"free_space_on_disk":     stats.DiskFreeBytes,
+		"queued_io_jobs":         0,
+		"queueing":               true,
+		"global_ratio":           strconv.FormatFloat(stats.Ratio, 'f', 2, 64),
+		"total_peer_connections": stats.Peers,
+	}
+}
+
+// handleQbitSync answers /api/v2/sync/maindata. When the client echoes the rid
+// of the previous reply it receives only what changed (torrents, categories,
+// tags and the removed entries); otherwise it receives a full snapshot. rid
+// always advances.
+func (d *Daemon) handleQbitSync(w http.ResponseWriter, r *http.Request) {
+	clientRID := int64(0)
+	if raw := strings.TrimSpace(r.URL.Query().Get("rid")); raw != "" {
+		if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			clientRID = v
+		}
+	}
+	current := d.qbitCurrentSyncState()
 	stats := d.stats()
-	writeJSON(w, http.StatusOK, map[string]any{
-		"rid":              d.qbitRID.Add(1),
-		"full_update":      true,
-		"torrents":         torrents,
-		"torrents_removed": []string{},
-		"categories":       categories,
-		"tags":             d.tagsSnapshot(),
-		"server_state": map[string]any{
-			"dl_info_speed":     stats.DownloadRate,
-			"up_info_speed":     stats.UploadRate,
-			"dl_info_data":      stats.Session["bytes_downloaded"],
-			"up_info_data":      stats.Session["bytes_uploaded"],
-			"dht_nodes":         stats.Session["dht_nodes"],
-			"connection_status": "connected",
-		},
-	})
+
+	d.qbitSyncMu.Lock()
+	prev := d.qbitSnapshot
+	full := prev == nil || clientRID != d.qbitLastRID
+	rid := d.qbitRID.Add(1)
+	d.qbitSnapshot = current
+	d.qbitLastRID = rid
+	d.qbitSyncMu.Unlock()
+
+	payload := map[string]any{
+		"rid":          rid,
+		"full_update":  full,
+		"server_state": qbitServerState(stats),
+	}
+	if full {
+		payload["torrents"] = current.torrents
+		payload["torrents_removed"] = []string{}
+		payload["categories"] = current.categories
+		payload["tags"] = qbitTagsList(current.tags)
+		writeJSON(w, http.StatusOK, payload)
+		return
+	}
+
+	changed := map[string]qbitTorrent{}
+	for hash, t := range current.torrents {
+		if old, ok := prev.torrents[hash]; !ok || old != t {
+			changed[hash] = t
+		}
+	}
+	removedTorrents := []string{}
+	for hash := range prev.torrents {
+		if _, ok := current.torrents[hash]; !ok {
+			removedTorrents = append(removedTorrents, hash)
+		}
+	}
+	changedCategories := map[string]qbitCategory{}
+	for name, cat := range current.categories {
+		if old, ok := prev.categories[name]; !ok || old != cat {
+			changedCategories[name] = cat
+		}
+	}
+	removedCategories := []string{}
+	for name := range prev.categories {
+		if _, ok := current.categories[name]; !ok {
+			removedCategories = append(removedCategories, name)
+		}
+	}
+	addedTags := []string{}
+	for tag := range current.tags {
+		if _, ok := prev.tags[tag]; !ok {
+			addedTags = append(addedTags, tag)
+		}
+	}
+	removedTags := []string{}
+	for tag := range prev.tags {
+		if _, ok := current.tags[tag]; !ok {
+			removedTags = append(removedTags, tag)
+		}
+	}
+	sort.Strings(removedTorrents)
+	sort.Strings(removedCategories)
+	sort.Strings(addedTags)
+	sort.Strings(removedTags)
+	payload["torrents"] = changed
+	payload["torrents_removed"] = removedTorrents
+	payload["categories"] = changedCategories
+	payload["categories_removed"] = removedCategories
+	payload["tags"] = addedTags
+	payload["tags_removed"] = removedTags
+	writeJSON(w, http.StatusOK, payload)
 }
