@@ -21,6 +21,7 @@ plan in [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md).
 9. [High-value extensions from the comparison with BiglyBT](#9-high-value-extensions-from-the-comparison-with-biglybt)
 10. [Smartness backlog: ideas from the 2026-10-13 night](#10-smartness-backlog-ideas-from-the-2026-10-13-night)
 11. [Open-items resolution program](#11-open-items-resolution-program-proposal-2026-10-14)
+12. [Web streaming, DLNA media server and the choking/seeding campaign](#12-web-streaming-dlna-media-server-and-the-chokingseeding-campaign-2026-10-14)
 
 ---
 
@@ -1603,5 +1604,56 @@ in `make fuzz-smoke`.
 multi-path → **close with data**; choking → **gated on a real-swarm campaign**;
 10 Gbps → **close with data**; disk I/O → **close with data**; **v2 partial-file
 hash serving → done**.
+
+---
+
+## 12. Web streaming, DLNA media server and the choking/seeding campaign (2026-10-14)
+
+### 12.1 Web streaming (improved)
+
+`cmd/gx-torrent/stream.go` (the endpoint Gextto redirects to) now:
+
+- sends the **Content-Type from the file extension** (`video/mp4`,
+  `video/x-matroska`, `audio/flac`, …) plus `Content-Disposition: inline`, so a
+  browser plays the stream instead of downloading it, and answers **HEAD**;
+- keeps a shared **serveTorrentFile** core, reused by the UI player and by the
+  DLNA server;
+- refcounts the concurrent streams per torrent (`beginStream`/`endStream`), so a
+  player closing does not clear the engine stream window another still needs.
+
+Tests: `TestMediaContentType`, `TestSanitizeFilename`, `TestStreamRefcount`,
+`TestParseByteRange`. No data-path change.
+
+### 12.2 DLNA/UPnP media server (new)
+
+`cmd/gx-torrent/dlna.go` + `dlna_ssdp.go`: an **opt-in** DLNA/UPnP AV media
+server that exposes the **completed** torrents' media to a TV/console on the
+LAN. SSDP (M-SEARCH replies, alive/byebye) + ContentDirectory:1 (`Browse`,
+`GetSystemUpdateID`, `GetSortCapabilities`) + ConnectionManager:1
+(`GetProtocolInfo`); media served with HTTP Range by the shared core. Off by
+default; LAN only, no authentication. Settings `dlna-enabled`, `dlna-listen`,
+`dlna-name`: the **daemon page** in standalone, the **Gextto** options
+`gxtorrent_dlna*` in managed (passed as flags/env), tooltips and six languages,
+manuals updated (Appendix A + a prose note). Tests: DIDL for root/container,
+device description, SOAP Browse, SSDP parse/match/reply, a rejected media path.
+
+### 12.3 Choking/seeding campaign
+
+- **Local reciprocation.** Without mesh the seeder uploads **3.00×** the corpus
+  (3 pure leechers). With mesh the leechers **reciprocate** (2.52 MB uploaded
+  among themselves) and the seeder's upload drops to **1.84×** (−39 %).
+- **Controlled vs libtorrent.** `TestMeasureChokingLibtorrent` (`scripts/
+  libtorrent-leech.py`): our seeder serves a real **libtorrent** leecher on
+  loopback — **48 MiB uploaded (100 % of the file) in 4.84 s** (~10.4 MB/s), the
+  leecher verified complete.
+- **Real swarm.** `TestMeasureChokingRealSwarm` seeds the Debian ISO for 3 min:
+  **0 peers**, because seeding needs an **inbound** port and this host is
+  behind NAT with no reachable port (the earlier download run found 80 peers
+  outbound). The harness is kept for a host with a reachable port.
+
+**Decision: no choking change.** Reciprocation works locally and an external
+libtorrent client is served well; the only missing datum (a real swarm where
+peers download *from* us) is blocked by the test host's NAT, not by the
+algorithm. The campaign stays as the gate for any future change.
 
 
