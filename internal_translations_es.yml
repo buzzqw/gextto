@@ -52,13 +52,8 @@ spa:
   720p-1080p: 720p-1080p
   <480p: <480p
   <720p: <720p
-  '@libtorrent_enabled = yes': '@libtorrent_enabled = yes'
   A fine download sposta automaticamente i file nel 'Percorso Archivio' se lo hai configurato per quella serie.: Al finalizar la descarga, mueve
     automáticamente los archivos a la 'Ruta del Archivo' si lo has configurado para esa serie.
-  ? A fine download sposta automaticamente i file nel 'Percorso Archivio' se lo hai configurato per quella serie. Funziona solo con il client
-    libtorrent integrato.
-  : Al finalizar la descarga, mueve automáticamente los archivos a la 'Ruta del Archivo' si lo has configurado para esa serie. Funciona solo con
-    el cliente libtorrent integrado.
   A quanti utenti in contemporanea inviare i dati.: A cuántos usuarios enviar datos simultáneamente.
   A+: A+
   ANALYZE: ANALYZE
@@ -296,7 +291,6 @@ spa:
   : Activa la limpieza periódica de datos técnicos e historial. No elimina archivos de la biblioteca ni versiones de archivos.
   Attiva log dettagliati e diagnostiche periodiche (RAM, torrent, loop) per il debug.: Habilite registros detallados y diagnósticos periódicos
     (RAM, torrents, bucles) para la depuración.
-  Attiva o disattiva del tutto il client libtorrent integrato.: Habilite o deshabilite por completo el cliente libtorrent integrado.
   Attiva o disattiva il daemon gextto (i cicli automatici e i download): Habilitar o deshabilitar el demonio gextto (bucles y descargas automáticas)
   Attiva o disattiva il download automatico del weekly pack: Activar o desactivar la descarga automática del pack semanal
   Attiva o disattiva il super seeding (initial seeding): Habilitar o deshabilitar la súper siembra (siembra inicial)
@@ -436,7 +430,6 @@ spa:
   Caricamento…: Cargando…
   Caricate {count} regole: Cargar reglas {count}
   Caricato: Cargado
-  Caricato (Seed) dall'avvio di libtorrent: Subido (Seed) desde el inicio de libtorrent
   Cartella Backup: Carpeta de Copia de Seguridad
   Cartella Incoming: Carpeta de Entrada
   Cartella NAS in cui archiviare definitivamente i file di questa categoria.: Carpeta NAS en la que archivar permanentemente los archivos de esta
@@ -552,8 +545,6 @@ spa:
   'Chiave API TMDB: serve per titoli episodi, poster e metadati.': 'Clave API TMDB: se utiliza para títulos de episodios, carteles y metadatos.'
   'Chiave API TVDB: serve per ricerca serie e metadati.': 'Clave API TVDB: utilizada para búsqueda de series y metadatos.'
   Chiave API v4 di TheTVDB per ricerca serie e metadati.: La clave TVDB API v4 para búsqueda de series y metadatos.
-  ? Chiavi libtorrent applicate alla sessione, una per riga nel formato chiave=valore. Solo le chiavi riconosciute vengono applicate.
-  : Claves de Libtorrent aplicadas a la sesión, una por línea en formato clave=valor. Sólo se aplican claves reconocidas.
   Chiudi: Cerrar
   ? 'Cicli di ricerca: conserva solo le statistiche di ogni ciclo (release analizzate, candidate, download avviati, gap riempiti ed errori). Con
     200, quando arriva il 201° ciclo vengono eliminati solo i contatori del ciclo più vecchio, non la release.'
@@ -665,8 +656,6 @@ spa:
   Controlla questa cartella ogni 15 secondi. Se disattivata, il percorso resta salvato ma non viene importato nulla.: Revise esta carpeta cada
     15 segundos. Si está desactivado, la ruta permanece guardada pero no se importa nada.
   Controlla servizi...: Comprobando servicios...
-  Controlla su GitHub se esiste una versione di libtorrent più recente di quella installata: Verifique en GitHub si hay una versión de libtorrent
-    más nueva que la instalada
   ? Controlla subito getcomics.org per nuovi fumetti monitorati e weekly pack, ignorando il timer settimanale. Non tocca serie TV né film.
   : Comprueba getcomics.org ahora en busca de nuevos cómics monitorizados y packs semanales, ignorando el temporizador semanal. No afecta a series
     de TV ni a películas.
@@ -694,10 +683,6 @@ spa:
   Cosa rimuovere quando premi Rimuovi: Qué eliminar al presionar Eliminar
   Costringe EXTTO ad accettare solo release che includano questa lingua nei metadati.: Fuerza a EXTTO a aceptar solo las versiones que incluyan
     este idioma en los metadatos.
-  ? 'Costringe libtorrent a comunicare SOLAMENTE su una specifica scheda di rete. Esempio vitale: inserisci ''tun0'' o ''wg0'' se usi OpenVPN/Wireguard.
-    Se la VPN cade, libtorrent bloccherà tutto impedendo perdite IP reali (IP Leak).'
-  : 'Fuerza a libtorrent a comunicarse ÚNICAMENTE en una interfaz de red específica. Ejemplo vital: ingresa ''tun0'' o ''wg0'' si usas OpenVPN/Wireguard.
-    Si la VPN cae, libtorrent bloqueará todo, evitando fugas de IP reales (IP Leak).'
   Crea Nuova: Crear Nueva
   Crea cartella: Crear carpeta
   Crea e usa: Crear y utilizar
@@ -784,7 +769,6 @@ spa:
     un archivo en los registros.
   Dimensione: Tamaño
   Dimensione della cache disco in blocchi (-1 = automatico).: Tamaño de caché de disco en bloques (-1 = automático).
-  Dimensione della coda degli alert di libtorrent.: Tamaño de la cola de alertas de libtorrent.
   Dimensione dopo: Tamaño después
   ? Dimensione massima di un singolo torrent ammesso sul RAM disk (in GB). Oltre questo valore il download va direttamente su disco.
   : Tamaño máximo de un único torrent permitido en el disco RAM (en GB). Por encima de este valor, la descarga va directamente al disco.
@@ -820,10 +804,6 @@ spa:
   ? Dopo il download rinomina i file nel formato scelto sotto, usando i titoli ufficiali TMDB. Richiede tmdb_api_key configurata.
   : Después de descargar, renombra los archivos en el formato elegido a continuación, utilizando los títulos oficiales de TMDB. Requiere tmdb_api_key
     configurada.
-  ? Dopo il download rinomina i file nel formato scelto sotto, usando i titoli ufficiali TMDB. Richiede tmdb_api_key configurata. Funziona solo
-    con il client libtorrent integrato.
-  : Después de descargar, renombra los archivos en el formato elegido a continuación, utilizando los títulos oficiales de TMDB. Requiere tmdb_api_key
-    configurada. Funciona solo con el cliente libtorrent integrado.
   ? Dopo l'importazione riuscita elimina il file sorgente. Se disattivata, il file viene rinominato con estensione .imported per evitare nuovi
     tentativi.
   : Después de una importación exitosa, elimine el archivo fuente. Si se desactiva, el archivo pasa a llamarse con la extensión .imported para
@@ -1005,7 +985,6 @@ spa:
   Errore di Lettura: Error de Lectura
   Errore di Rete: Error de Red
   Errore di comunicazione col server: Error de comunicación con el servidor
-  Errore di comunicazione con libtorrent: Error de comunicación con libtorrent
   Errore di connessione: Error de conexión
   Errore di connessione al server: Error de conexión al servidor
   Errore di rete: Error de red
@@ -1444,10 +1423,6 @@ spa:
     il motore.
   : El sondeo está limitado a 250–60000 ms y también se utiliza para reintentar cuando qBittorrent no responde. Presione Probar conexión antes
     de aplicar el motor.
-  ? Il test verifica solo la disponibilità locale del bind. Non può confermare da solo l'apertura sul router/firewall o la raggiungibilità da
-    Internet; una porta occupata dal listener libtorrent è normale quando il servizio è attivo.
-  : La prueba sólo comprueba la disponibilidad local de la encuadernación. No puede confirmar por sí solo la apertura en el enrutador/firewall
-    o la accesibilidad desde Internet; un puerto ocupado por el oyente libtorrent es normal cuando el servicio está activo.
   Il titolo esatto della serie: El título exacto de la serie
   Il token segreto impostato in aria2c per accedere alla porta RPC.: El token secreto establecido en aria2c para acceder al puerto RPC.
   Il torrent esce dalla sessione e la release va in blocklist.: El torrent sale de la sesión y la liberación pasa a la lista de bloqueo.
@@ -1483,11 +1458,6 @@ spa:
   Impostazioni backup: Configuración de copia de seguridad
   Impostazioni backup salvate: Configuración de copia de seguridad guardada
   Impostazioni backup salvate!: ¡Ajustes de copia de seguridad guardados!
-  Impostazioni libtorrent applicate: Configuración de Libtorrent aplicada
-  Impostazioni libtorrent avanzate: Configuración avanzada de libtorrent
-  ? Impostazioni libtorrent avanzate, una per riga nel formato chiave=valore (es. max_peerlist_size=4000). Solo le chiavi riconosciute vengono
-    applicate.
-  : Configuración avanzada de libtorrent, una por línea en formato clave=valor (por ejemplo, max_peerlist_size=4000). Sólo se aplican claves reconocidas.
   Impostazioni salvate: Configuraciones guardadas
   Impostazioni weekly pack salvate!: ¡Ajustes de pack semanal guardados!
   Impostazioni → Giorni Retention Cestino: Ajustes → Días Retención Papelera
@@ -1597,8 +1567,6 @@ spa:
   ? Intervallo tra le ricerche automatiche di serie e film, in secondi (21600 = 6 ore). I fumetti seguono il proprio intervallo settimanale.
   : Intervalo entre búsquedas automáticas de series y películas, en segundos (21600 = 6 horas). Los cómics siguen su propio intervalo semanal.
   Invia backup su Telegram: Enviar copia de seguridad a Telegram
-  Invia i parametri aggiornati all'istanza libtorrent attualmente in corsa in background. Non salva su file config.ini.: Envía los parámetros
-    actualizados a la instancia de libtorrent que se está ejecutando en segundo plano. No guarda en el archivo config.ini.
   Invia i selezionati al client torrent: Enviar seleccionados al cliente torrent
   Invia il file ZIP via Telegram al termine: Enviar archivo ZIP vía Telegram al finalizar
   Invia la tua presenza a TUTTI i tracker della lista invece che ad uno solo, massimizzando l'elenco di fonti trovate.: Envía tu presencia a TODOS
@@ -1614,7 +1582,6 @@ spa:
   Inviati: Enviados
   Inviato: Enviado
   Inviato a Transmission: Enviado a Transmission
-  Inviato a libtorrent: Enviado a libtorrent
   Inviato a qBittorrent: Enviado a qBittorrent
   Inviato al client!: ¡Enviado al cliente!
   Invio fallito: Envío fallido
@@ -1661,8 +1628,6 @@ spa:
   ? Le lingue obbligatorie devono essere tutte presenti. Le lingue facoltative aumentano la priorità senza scartare il torrent.
   : Todos los idiomas obligatorios deben estar presentes. Los idiomas opcionales aumentan la prioridad sin descartar el torrent.
   Le notifiche di: Las notificaciones de
-  ? Le notifiche di completamento download sono supportate e funzionano esclusivamente se utilizzi il client integrato libtorrent.
-  : Las notificaciones de finalización de descarga son compatibles y funcionan <strong>exclusivamente</strong> si usas el cliente integrado <strong>libtorrent</strong>.
   ? Le parole vengono combinate in OR. Premi sempre prima Anteprima per vedere quanti elementi verrebbero rimossi. La pulizia copre anche le release
     'viste nei feed'.
   : Las palabras se combinan en OR. Presione siempre Vista previa primero para ver cuántos elementos se eliminarán. La limpieza también cubre
@@ -1688,7 +1653,6 @@ spa:
   Libero: Libre
   Libreria: Biblioteca
   Libreria, stagioni, episodi, editor e redownload.: Biblioteca, temporadas, episodios, editor y recarga.
-  Libtorrent: Libretorrent
   Licenza: Licencia
   Licenza EUPL-1.2. Il testo completo della licenza è riportato qui sotto.: Licencia EUPL-1.2. El texto completo de la licencia se muestra a continuación.
   Licenza EUPL-1.2. Vedi il file LICENSE nel repository.: Licencia EUPL-1.2. Vea el archivo de LICENCIA en el repositorio.
@@ -1716,7 +1680,6 @@ spa:
   Limiti: Límites
   Limiti aggiornati: Límites actualizados
   Limiti applicati: Límites aplicados
-  Limiti applicati a libtorrent e salvati: Límites aplicados a libtorrent y guardados
   Limiti globali di banda e fasce orarie. Le modifiche si applicano entro un minuto, senza riavvio.: Límites de ancho de banda global y franjas
     horarias. Los cambios entran en vigor en un minuto, sin necesidad de reiniciar.
   Limiti inviati a Transmission: Límites enviados a Transmission
@@ -2419,7 +2382,6 @@ spa:
     reiniciar.'
   RAM disk da usare per i download in corso, se disponibile.: Disco RAM para usar en descargas en curso, si está disponible.
   RAM disk e porte: Disco RAM y puertos
-  RAM disk libtorrent: Disco RAM libtorrent
   RAM processo: RAM de proceso
   RAM residente del processo Gextto: RAM residente del proceso Gextto
   RATIO: RATIO
@@ -2505,8 +2467,6 @@ spa:
   Revoca: Revocación
   Rialloca i file: Reasignar archivos
   Riapplica Settings (senza salvare): Reaplicar Ajustes (sin guardar)
-  Riapplica subito le impostazioni libtorrent alla sessione attiva: Vuelva a aplicar inmediatamente la configuración de libtorrent a la sesión
-    activa
   Riattiva: Reactivar
   Riattiva alle: Reactivar en
   Riattivato: Reactivado
@@ -2772,8 +2732,6 @@ spa:
   Scarica a partire dal: Descargar a partir de
   Scarica automaticamente da: Descargar automáticamente desde
   Scarica di nuovo questo weekly pack: Descarga este pack semanal nuevamente
-  Scarica ed esamina la blocklist per applicare subito i divieti IP in libtorrent.: Descarga y examina la lista negra (blocklist) para aplicar
-    las prohibiciones de IP en libtorrent de inmediato.
   ? 'Scarica i 5 file qui sotto, mettili nella stessa cartella e lancia install.sh dal terminale. Da quel momento ogni click su un link magnet:
     o su un file .torrent nel browser invierà automaticamente il download a EXTTO.'
   : 'Descarga los 5 archivos a continuación, ponlos en la misma carpeta y ejecuta install.sh desde la terminal. A partir de ese momento, cada
@@ -2786,8 +2744,6 @@ spa:
     i metadati.
   : Descargue torrents que se encuentren dentro del umbral en la RAM; Los archivos más grandes o con espacio insuficiente se mueven al disco a
     medida que llegan los metadatos.
-  Scarica o aggiorna l'ultima build statica qBittorrent con libtorrent 2.x nella cartella privata di Gextto.: Descargue o actualice la última
-    versión estática de qBittorrent con libtorrent 2.x en su carpeta privada de Gextto.
   Scarica o ricarica la lista IP filter e applicala alla sessione: Descargue o vuelva a cargar la lista de filtros IP y aplíquela al
   Scarica qBittorrent v2: sesión Descargar qBittorrent v2
   'Scarica solo i metadati e metti in pausa: utile per valutare la release prima di partire': 'Descargue solo los metadatos y haga una pausa:
@@ -2800,7 +2756,6 @@ spa:
   Scaricamento...: Descargando...
   Scaricati: Descargadas
   Scaricato: Descargado
-  Scaricato dall'avvio di libtorrent: Descargado desde el inicio de libtorrent
   Scarichi: Descargas
   Scarico: Descarga
   ? Scarta le versioni di qualità inferiore. Usa &lt;720p per accettare anche risoluzioni basse (480p, ecc.). Usa 'any' per nessun filtro.
@@ -2809,8 +2764,6 @@ spa:
   Scegli Film visti o Serie viste per consultare lo storico dei feed.: Elija Películas vistas o Series vistas para consultar el historial de feeds.
   Scegli il Client Torrent (interno o esterno) che verrà utilizzato per scaricare i file.: Elige el Cliente Torrent (interno o externo) que se
     utilizará para descargar los archivos.
-  Scegli il client. Libtorrent è raccomandato in quanto nativamente integrato nel demone EXTTO.: Elige el cliente. Libtorrent se recomienda porque
-    está integrado nativamente en el demonio EXTTO.
   ? Scegli il film corretto. Verranno aggiornati solo titolo, anno, trama, locandina e ID del provider; scaricamenti e impostazioni restano invariati.
   : Elige la película correcta. Sólo se actualizará el título, año, trama, cartel e ID del proveedor; las descargas y la configuración permanecen
     sin cambios.
@@ -2881,8 +2834,6 @@ spa:
     reemplazará el archivo ya archivado para esta serie
   Se disattivo, una release migliore non sostituirà mai il file già archiviato per questo film: Si lo desactivo, una versión mejor nunca reemplazará
     el archivo ya archivado para esta película
-  'Se impostata, libtorrent usa solo questa scheda: nessun traffico fuori dalla VPN.': 'Si está configurado, libtorrent usa solo esta pestaña:
-    no hay tráfico fuera de la VPN.'
   Se impostato su Sì, i nuovi magnet inviati da Extto rimarranno fermi in attesa di un tuo avvio manuale.: Si se establece en Sí, los nuevos magnets
     enviados por Extto permanecerán en pausa a la espera de que los inicies manualmente.
   ? Se indicata, salva i file parziali su un disco separato (es. NVMe) spostandoli solo a completamento per evitare usura meccanica. Lascia vuoto
@@ -3006,7 +2957,6 @@ spa:
   Sessione torrent: Sesión de torrent
   Sessione torrent in tempo reale: Sesión de torrent en tiempo real
   Settimanale (168h): Semanal (168h)
-  Settings libtorrent salvati e applicati: Ajustes libtorrent guardados y aplicados
   Settings riapplicati alla sessione: Ajustes reaplicados a la sesión
   Sfoglia: Explorar
   Sfoglia cartelle: Explorar carpetas
@@ -3266,8 +3216,6 @@ spa:
   Test FTP: Prueba FTP
   Test FlareSolverr in corso…: Probando FlareSolverr en progreso…
   Test completato: Prueba completada
-  'Test locale delle porte libtorrent: verifica se il sistema può ascoltare su ogni porta dell''intervallo indicato.': 'Prueba de puerto libtorrent
-    local: prueba si el sistema puede escuchar en cada puerto en el rango dado.'
   Test notifica: Notificación de prueba
   Test porte torrent: Probar puertos torrent
   Test query sulle sorgenti, porte e notifiche: Consultas de prueba sobre fuentes, puertos y notificaciones
@@ -3305,10 +3253,6 @@ spa:
   Titolo, fonte o S09E11…: Título, fuente o S09E11…
   Togli la spunta per sospendere temporaneamente il download di nuovi episodi.: Desmarca la casilla para suspender temporalmente la descarga de
     nuevos episodios.
-  ? 'Toglie dalla coda libtorrent i torrent completati che hanno già raggiunto i limiti di seed (ratio/tempo). Esclude il seed infinito e non
-    cancella l''archivio NAS: i torrent escono dalla Sessione e passano allo Storico download.'
-  : 'Elimina los torrents completados que ya han alcanzado los límites de inicialización (proporción/tiempo) de la cola de libtorrent. Excluye
-    la semilla infinita y no elimina el archivo NAS: los torrents abandonan la Sesión y van al Historial de descargas.'
   Token API Gextto: Token API de Gextto
   Token Bot: Token Bot
   Token Plex: Fichas Plex
@@ -3348,7 +3292,6 @@ spa:
   Torrent e file eliminati: Torrent y archivos eliminados
   Torrent fissato in cima: Torrent fijo en la parte superior
   Torrent in sessione: Torrente en sesión
-  Torrent inviato a libtorrent: Torrent enviado a libtorrent
   Torrent inviato al client, download in corso: Torrent enviado al cliente, descargando
   Torrent nella sessione: Torrente en sesión
   Torrent più grandi di questo valore vanno direttamente su disco, anche se c'è spazio nel RAM disk.: Los torrents más grandes que este valor
@@ -3712,11 +3655,6 @@ spa:
   libera: gratis
   libere localmente: gratis localmente
   liberi: libres
-  libtorrent: libtorrent
-  'libtorrent 2.x · installato: {installed} · ultima versione: {latest}': 'libtorrent 2.x · instalado: {installed} · última versión: {latest}'
-  'libtorrent 2.x · ultima versione: {latest}': 'libtorrent 2.x · última versión: {latest}'
-  libtorrent integrato: libtorrent incorporado
-  libtorrent non attivo.: libtorrent no está activo.
   magnet al client: magnets al cliente
   magnet copiati (uno per riga): magnets copiados (uno por línea)
   magnet:?xt=urn:btih:… / urn:btmh:1220… oppure https://…/file.torrent: imán:?xt=urn:btih:… / urn:btmh:1220… o https://…/file.torrent
@@ -3807,7 +3745,6 @@ spa:
   selezionati: seleccionados
   serie: serie
   serie TV?: series de TV?
-  solo libtorrent integrato: solo cliente libtorrent integrado
   sono già monitorate in EXTTO. Seleziona quelle nuove e clicca: ya están monitoreadas en EXTTO. Selecciona las nuevas y haz clic en
   sono supportate e funzionano: son compatibles y funcionan
   sorgente: fuente
@@ -4086,7 +4023,6 @@ spa:
   "gx-torrent — token di accesso (pagina e API in LAN)": "gx-torrent — token de acceso (página y API en la LAN)"
   "impostato — lascia vuoto per non cambiarlo": "configurado — déjalo vacío para no cambiarlo"
   "impostazioni": "ajustes"
-  "libtorrent integrato — client abilitato": "libtorrent integrado — cliente activado"
   "modificato": "modificado"
   "nessun giorno = mai attiva": "ningún día = nunca activa"
   "non impostato": "sin configurar"
@@ -4157,7 +4093,6 @@ spa:
   "I torrent che non trasferiscono dati non consumano uno slot attivo.": "Los torrents que no transfieren datos no ocupan una ranura activa."
   "Ignora le release più vecchie di N giorni (0 = nessun limite). Le release senza data sono considerate pubblicate oggi.": "Ignora las releases con más de N días (0 = sin límite). Las releases sin fecha cuentan como publicadas hoy."
   "Il nome deve corrispondere al tag finale della release (es. TBK). Il punteggio viene sommato allo score tecnico; sono ammessi anche valori negativi.": "El nombre debe coincidir con la etiqueta final de la release (p. ej. TBK). La puntuación se suma a la técnica; se admiten valores negativos."
-  "Impostazioni libtorrent avanzate, una per riga nel formato chiave=valore.": "Ajustes avanzados de libtorrent, uno por línea como clave=valor."
   "Indica dove il motore torrent accetta connessioni: 0.0.0.0:6881-6891 per tutte le interfacce, 127.0.0.1:6881 solo in locale, oppure wg0:6881/tun0:6881 per una VPN. Il valore proposto va bene nella maggior parte dei casi.": "Dónde acepta el motor torrent conexiones: 0.0.0.0:6881-6891 para todas las interfaces, 127.0.0.1:6881 solo en local, o wg0:6881/tun0:6881 para una VPN. El valor propuesto vale en la mayoría de los casos."
   "Indirizzo di ascolto del demone. Predefinito 127.0.0.1:8890, cioè solo questo server: pagina web e API non escono in LAN. Per esporle in LAN usa 0.0.0.0:8890 e imposta gxtorrent_token (senza token Gextto avvia il demone in -insecure e lo segnala nel log). Il traffico peer usa sempre la porta singola/le torrent_port_*.": "Dirección de escucha del demonio. Por defecto 127.0.0.1:8890, es decir solo este servidor: la página web y la API no salen a la LAN. Para exponerlas en la LAN usa 0.0.0.0:8890 y define gxtorrent_token (sin token, Gextto inicia el demonio en -insecure y lo registra). El tráfico de pares usa siempre el puerto único/torrent_port_*."
   "Inglese (Regno Unito)": "Inglés (Reino Unido)"
@@ -4196,7 +4131,6 @@ spa:
   "Pulisci i risultati già archiviati": "Limpiar los resultados ya archivados"
   "Punteggio": "Puntuación"
   "Regole tag → cartella": "Reglas etiqueta → carpeta"
-  "Riapplica subito le impostazioni libtorrent alla sessione attiva.": "Vuelve a aplicar enseguida los ajustes de libtorrent a la sesión activa."
   "Ricerca nel catalogo": "Búsqueda en el catálogo"
   "Riserva subito tutto lo spazio su disco prima di iniziare il download.": "Reserva todo el espacio en disco antes de empezar la descarga."
   "Ritarda l'avvio dei download dei film di questo numero di minuti. 0 avvia subito.": "Retrasa el inicio de las descargas de películas estos minutos. 0 empieza enseguida."
@@ -4242,7 +4176,6 @@ spa:
   "Verifica il motore configurato e indica se serve un riavvio.": "Comprueba el motor configurado e indica si hace falta reiniciar."
   "Verifica la connessione al qBittorrent-nox configurato.": "Comprueba la conexión con el qBittorrent-nox configurado."
   "gx-torrent (predefinito)": "gx-torrent (predeterminado)"
-  "libtorrent (integrato)": "libtorrent (integrado)"
   "scarica e applica subito": "descargar y aplicar ahora"
   "Stato provider": "Estado de los proveedores"
   "Solo modificate": "Solo modificadas"
