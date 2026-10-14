@@ -73,7 +73,8 @@ type uiPageData struct {
 	// status bar, empty while the socket never dialled nor accepted.
 	UTPSocket string
 	// UpdateAvailable lights the status bar's update indicator (standalone,
-	// after a check found a newer gx-torrent); UpdateDate is its build day.
+	// after a check found a newer gx-torrent); UpdateDate is its version, or
+	// its build day with an older manifest.
 	UpdateAvailable bool
 	UpdateDate      string
 	DHT             bool
@@ -1283,6 +1284,9 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 	if d.opts.Mode == ModeStandalone {
 		update := d.updateStatus()
 		page.UpdateAvailable, page.UpdateDate = update.Available && !update.Applying, update.LatestDate
+		if update.LatestVersion != "" {
+			page.UpdateDate = update.LatestVersion
+		}
 	}
 	switch {
 	case stats.PortMapping.Method != "":

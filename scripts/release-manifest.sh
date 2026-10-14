@@ -64,6 +64,9 @@ while read -r sha; do
   [[ -n "$sha" ]] && GX_COMMITS[$sha]=1
 done < <(git -C "$ROOT" log -n "$COMMITS" --format='%H' "$COMMIT" -- "${GX_PATHS[@]}" 2>/dev/null || true)
 GX_COMMIT="$(git -C "$ROOT" log -n 1 --format='%H' "$COMMIT" -- "${GX_PATHS[@]}" 2>/dev/null || true)"
+# gx-core's own build number (committed, see scripts/next-gx-build-number.sh).
+GX_BUILD="${GEXTTO_GX_BUILD:-$(tr -dc '0-9' < "$ROOT/gx-torrent.build_number" 2>/dev/null || true)}"
+[[ "$GX_BUILD" =~ ^[0-9]+$ ]] || GX_BUILD=0
 
 # json_escape quotes a string for JSON (backslash, quote, control characters).
 json_escape() {
@@ -87,6 +90,8 @@ json_escape() {
   printf '  "commit": %s,\n' "$(json_escape "$COMMIT")"
   printf '  "built_at": %s,\n' "$(json_escape "$BUILT_AT")"
   printf '  "gx_torrent_commit": %s,\n' "$(json_escape "$GX_COMMIT")"
+  printf '  "gx_version": %s,\n' "$(json_escape "1.1.$GX_BUILD")"
+  printf '  "gx_build": %s,\n' "$GX_BUILD"
   printf '  "commits": ['
   first=1
   # A shallow checkout lists only what it has: the update check treats a

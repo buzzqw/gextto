@@ -5,9 +5,10 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 
 ## Regole commit e PR
 - Autore dei commit: `buzzqw <azanzani@gmail.com>`.
-- Non committare `gx-torrent.build_number`, `bin/` né directory dati (`data/`,
-  `gextto-data/`). `build_number` invece **è committato**: è la sorgente unica
-  del numero di build condivisa tra checkout e CI (vedi *Build e test*).
+- Non committare `bin/` né directory dati (`data/`, `gextto-data/`).
+  `build_number` e `gx-torrent.build_number` invece **sono committati**: sono
+  le sorgenti uniche dei numeri di build di Gextto e di gx-core, condivise tra
+  checkout e CI (vedi *Build e test*).
 - **Committa e pusha spesso**: cambiamenti piccoli e verificati si committano e
   si spingono su `origin/main` subito, senza accumulare lavoro non pushato.
 - **Non committare né pushare se i test non passano tutti**: esegui la suite
@@ -83,12 +84,17 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   la versione installata ha lo **stesso** `1.1.<n>` del checkout. Per far
   avanzare il numero si fa `make build` e si committa il file aggiornato. Dopo
   un `git pull` che cambia `build_number`, ricompila per allineare il badge.
-- Il demone ha un **numero di build proprio** (`gx-torrent.build_number`, non
-  committato), separato da quello di Gextto: cresce di uno a ogni build reale di
-  gx-torrent (`scripts/next-gx-build-number.sh`, usato da `make build` e da
-  `make gx-torrent`) e resta invariato quando gx-torrent non viene ricostruito.
-  È ciò che `gx-torrent --version`, `/api/v1/health` e la sua pagina web
-  riportano come `1.1.<n>`; la UI di Gextto continua a usare `1.1.<build>`.
+- gx-core (il demone) ha un **numero di build proprio**
+  (`gx-torrent.build_number`, **committato**), separato da quello di Gextto:
+  cresce di uno a ogni build reale di gx-torrent fatta con `make build` o
+  `make gx-torrent` (`scripts/next-gx-build-number.sh` con
+  `GEXTTO_BUMP_BUILD=1`) e resta invariato quando gx-torrent non viene
+  ricostruito. La CI e `build-release.sh` **leggono** il valore committato
+  senza incrementarlo, così la release ha lo stesso `1.1.<n>` del checkout;
+  `release.json` lo pubblica come `gx_version`/`gx_build`. Dopo una build che
+  ricompila gx-torrent si committa anche `gx-torrent.build_number`. È ciò che
+  `gx-torrent --version`, `/api/v1/health` e la sua pagina web riportano come
+  `1.1.<n>`; la UI di Gextto continua a usare `1.1.<build>`.
 - `make gx-torrent` — solo il demone (`CGO_ENABLED=0`), con lo stesso numero di
   build proprio.
 - Non usare `go build ./cmd/gx-torrent/` dalla root: scrive un binario

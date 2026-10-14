@@ -114,19 +114,20 @@ func (u *gxUpdater) httpClient() *http.Client {
 type gxUpdateStatus struct {
 	Version, Commit, BuiltAt, Channel string
 	// Reason is why updates are off here ("" = they work).
-	Reason       string
-	CanApply     bool // the platform can install by itself (Linux)
-	CheckEnabled bool
-	Hours        int
-	CheckedAt    time.Time
-	Err          string
-	Available    bool
-	Complete     bool
-	Changes      []updatecheck.Commit
-	Latest       string // newest gx-torrent commit of the release
-	LatestDate   string
-	Applying     bool
-	ApplyErr     string
+	Reason        string
+	CanApply      bool // the platform can install by itself (Linux)
+	CheckEnabled  bool
+	Hours         int
+	CheckedAt     time.Time
+	Err           string
+	Available     bool
+	Complete      bool
+	Changes       []updatecheck.Commit
+	Latest        string // newest gx-torrent commit of the release
+	LatestDate    string
+	LatestVersion string // gx-core version of the release ("" in older manifests)
+	Applying      bool
+	ApplyErr      string
 }
 
 // updateAsset is the standalone archive of this platform ("" = none).
@@ -186,6 +187,7 @@ func (d *Daemon) updateStatus() gxUpdateStatus {
 	if m != nil && st.Reason == "" {
 		st.Available, st.Changes, st.Complete = updatecheck.Changes(st.Commit, m, true)
 		st.Latest = m.GxCommit
+		st.LatestVersion = m.GxVersion
 		for _, c := range m.Commits {
 			if c.Sha == m.GxCommit {
 				st.LatestDate = c.Day()
@@ -650,7 +652,11 @@ func (d *Daemon) updateSectionHTML() string {
 	}
 	switch {
 	case st.Available:
-		b.WriteString(`<p role="status"><span class="badge b-downloading">New version</span> <code>` + esc(shortCommit(st.Latest)) + `</code> ` + esc(st.LatestDate) + `</p>`)
+		latest := ""
+		if st.LatestVersion != "" {
+			latest = `<strong>` + esc(st.LatestVersion) + `</strong> · `
+		}
+		b.WriteString(`<p role="status"><span class="badge b-downloading">New version</span> ` + latest + `<code>` + esc(shortCommit(st.Latest)) + `</code> ` + esc(st.LatestDate) + `</p>`)
 		if len(st.Changes) > 0 {
 			b.WriteString(`<p class="muted">What changes:</p>` + updateChangesHTML(st.Changes))
 		}

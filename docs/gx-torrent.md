@@ -83,9 +83,10 @@ Code:
 1. `make build` (or `scripts/build-daemon.sh`) compiles `bin/gx-torrent` alongside
    `bin/gexttod`; `make gx-torrent` compiles only the daemon. The package, `install.sh`
    and `gexttod --update` install `gx-torrent` alongside `gexttod`. The daemon has
-   its **own build number** (`gx-torrent.build_number`), independent of
-   Gextto's: it increases by one at every recompilation and stays unchanged
-   when the build does not touch it. It is the `1.1.<n>` version reported by
+   its **own build number** (`gx-torrent.build_number`, committed), independent
+   of Gextto's: it increases by one at every local recompilation and stays
+   unchanged when the build does not touch it; CI reads the committed value, so
+   the published daemon has the same number (`gx_version` in `release.json`). It is the `1.1.<n>` version reported by
    `gx-torrent --version`, by its web page and by `/api/v1/health`.
 2. `gx-torrent` is the default engine of a new installation: there is no need to
    choose it. To use embedded libtorrent instead, set *Torrent engine* to

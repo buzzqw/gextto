@@ -39,7 +39,6 @@ docs/archive/pro-terra.md
 docs/archive/gx-torrent-v2.md
 
 # The gx-torrent daemon's own build number (independent from gextto's).
-gx-torrent.build_number
 
 # Local configuration and secrets
 *.db
