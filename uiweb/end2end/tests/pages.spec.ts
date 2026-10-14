@@ -294,3 +294,29 @@ test("Salute affianca Motore torrent e Stato provider", async ({ page }) => {
   expect(Math.abs(e!.y - p!.y)).toBeLessThan(60);
   expect(p!.x).toBeGreaterThan(e!.x + e!.width - 5);
 });
+
+test("il filtro del log funziona anche con lo scorrimento fermo", async ({ page }) => {
+  await page.goto("/?view=logs");
+  const view = page.locator("#v2-logs-view");
+  const count = page.locator("#v2-logs-count");
+  const follow = page.locator("[data-v2-logs-follow]");
+  await expect(view).toBeVisible();
+  await expect(count).not.toHaveText("0");
+
+  // Pause the automatic follow: its label flips whatever the interface language.
+  const before = await follow.innerText();
+  await follow.click();
+  await expect(follow).not.toHaveText(before);
+
+  // The filter must still be applied while paused: a term that matches nothing
+  // empties the view and the line count. Before the fix every response was
+  // treated as a poll and dropped, so the filter looked broken until a reload.
+  await page.fill("#v2-log-filter", "nessuna-riga-corrisponde-zzz");
+  await expect(count).toHaveText("0");
+  await expect(view).not.toContainText("INFO");
+
+  // Clearing the filter brings the lines and the count back.
+  await page.fill("#v2-log-filter", "");
+  await expect(count).not.toHaveText("0");
+});
+

@@ -1283,7 +1283,13 @@
   document.addEventListener("htmx:beforeSwap", function (event) {
     var target = event.detail && event.detail.target;
     if (!target || target.id !== "v2-logs-view") return;
-    var trig = event.detail && event.detail.triggeringEvent;
+    // htmx exposes `triggeringEvent` on the request config, not on the swap
+    // detail: reading it from the detail made every response look like the
+    // automatic poll, so pausing the follow dropped the next filter result
+    // (the filter stopped working until the page was reloaded). A real poll
+    // arrives with no triggering event; anything the user did (typing, Filtra)
+    // carries its event and must always be swapped.
+    var trig = event.detail && event.detail.requestConfig && event.detail.requestConfig.triggeringEvent;
     var isPolling = !trig || trig.type === "hx:poll:trigger";
     if (isPolling && !canPollLogs()) {
       if (event.detail) event.detail.shouldSwap = false;
