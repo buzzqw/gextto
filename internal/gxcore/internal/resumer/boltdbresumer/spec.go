@@ -34,7 +34,12 @@ type Spec struct {
 	FirstLast         bool
 	// SuperSeeding arms BEP 16 super-seeding.
 	SuperSeeding bool
-	Version      int
+	// FilePaths overrides the on-disk storage paths of info.Files, in order,
+	// when a file or folder was renamed (qBittorrent renameFile/renameFolder).
+	// Nil when no rename happened. The info dict itself is never changed (its
+	// hash must stay the original).
+	FilePaths []string
+	Version   int
 }
 
 // jsonSpec is the JSON projection of Spec. Raw bytes ride base64-encoded,

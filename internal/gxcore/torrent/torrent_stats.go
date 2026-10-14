@@ -175,7 +175,7 @@ func (t *torrent) stats() Stats {
 		s.PieceLength = t.info().PieceLength
 		s.Pieces.Total = t.info().NumPieces
 	} else {
-		s.Name = t.name
+		s.Name = t.Name()
 	}
 	s.Name = stringutil.Printable(s.Name)
 	if t.bitfield != nil {

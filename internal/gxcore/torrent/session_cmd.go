@@ -23,7 +23,7 @@ func (s *Session) runOnCompleteCmd(torrent *torrent) {
 		"GX_TORRENT_DIR="+torrent.Dir(),
 		"GX_TORRENT_HASH="+hex.EncodeToString(torrent.infoHash[:]),
 		"GX_TORRENT_ID="+torrent.id,
-		"GX_TORRENT_NAME="+torrent.name)
+		"GX_TORRENT_NAME="+torrent.Name())
 
 	s.log.Debugf("executing completion hook for torrent %s: %s", torrent.id, cmd.String())
 	if err := cmd.Run(); err != nil {

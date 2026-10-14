@@ -57,6 +57,9 @@ type torrent struct {
 	rawTrackers [][]string
 	fixedPeers  []string
 	name        string
+	// nameMu guards the display name: it can change at runtime (a rename) and
+	// is read from several goroutines.
+	nameMu sync.RWMutex
 
 	// hasV2Hint remembers a btmh-identified magnet while its info dict is
 	// unknown; Info.HasV2 rules once known.
@@ -105,6 +108,10 @@ type torrent struct {
 	files       []allocator.File
 	pieces      []piece.Piece
 	piecePicker *piecepicker.PiecePicker
+	// filePaths is the persisted override of the storage paths (nil = none),
+	// written to the resume on the full-spec writes and applied to the info
+	// before allocation. Set by the resume loader and by the rename methods.
+	filePaths []string
 
 	// Peer pumps and registries.
 	peerDisconnectedC chan *peer.Peer
@@ -474,7 +481,17 @@ func (t *torrent) getPeersForUnchoker() []unchoker.Peer {
 
 // Name is the display name.
 func (t *torrent) Name() string {
+	t.nameMu.RLock()
+	defer t.nameMu.RUnlock()
 	return t.name
+}
+
+// setName replaces the display name (a qBittorrent rename). It is safe to call
+// off the run loop: the mutex guards every reader.
+func (t *torrent) setName(name string) {
+	t.nameMu.Lock()
+	t.name = name
+	t.nameMu.Unlock()
 }
 
 // info reads the published metadata (nil for magnets in flight). Every

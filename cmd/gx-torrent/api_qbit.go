@@ -102,6 +102,9 @@ func (d *Daemon) routesQbit() http.Handler {
 	// Write endpoints: peers, category editing, piece priority, queue priority
 	// and a clean shutdown.
 	mux.HandleFunc("POST /api/v2/torrents/addPeers", d.handleQbitAddPeers)
+	mux.HandleFunc("POST /api/v2/torrents/rename", d.handleQbitRename)
+	mux.HandleFunc("POST /api/v2/torrents/renameFile", d.handleQbitRenameFile)
+	mux.HandleFunc("POST /api/v2/torrents/renameFolder", d.handleQbitRenameFolder)
 	mux.HandleFunc("POST /api/v2/transfer/banPeers", d.handleQbitBanPeers)
 	mux.HandleFunc("POST /api/v2/torrents/editCategory", d.handleQbitEditCategory)
 	mux.HandleFunc("POST /api/v2/torrents/toggleFirstLastPiecePrio", d.handleQbitToggleFirstLast)

@@ -391,6 +391,12 @@ func (d *Daemon) handleAction(w http.ResponseWriter, r *http.Request) {
 		err = d.setPin(hash, formBool(r, "pinned"))
 	case "top":
 		err = d.moveToTop(hash)
+	case "rename":
+		err = d.renameTorrent(hash, r.FormValue("name"))
+	case "rename-file":
+		err = d.renameFile(hash, r.FormValue("old"), r.FormValue("new"))
+	case "rename-folder":
+		err = d.renameFolder(hash, r.FormValue("old"), r.FormValue("new"))
 	case "move":
 		err = d.move(hash, r.FormValue("destination"), false)
 	case "associate":

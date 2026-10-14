@@ -77,6 +77,20 @@ type File struct {
 	Padding bool
 }
 
+// SetFilePaths overrides the storage paths of the files, in order, when the
+// list matches the file count. It returns false otherwise. Used by the resume
+// loader to apply a persisted rename (qBittorrent renameFile/renameFolder):
+// the info dict is untouched, so the info hash stays the original.
+func (i *Info) SetFilePaths(paths []string) bool {
+	if len(paths) != len(i.Files) {
+		return false
+	}
+	for j := range i.Files {
+		i.Files[j].Path = paths[j]
+	}
+	return true
+}
+
 // file is the bencoded file entry.
 type file struct {
 	Length   int64    `bencode:"length"`

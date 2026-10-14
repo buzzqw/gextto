@@ -43,6 +43,7 @@ var Keys = struct {
 	Sequential        []byte
 	FirstLast         []byte
 	SuperSeeding      []byte
+	FilePaths         []byte
 	Version           []byte
 }{
 	InfoHash:          []byte("info_hash"),
@@ -67,6 +68,7 @@ var Keys = struct {
 	Sequential:        []byte("sequential"),
 	FirstLast:         []byte("first_last"),
 	SuperSeeding:      []byte("super_seeding"),
+	FilePaths:         []byte("file_paths"),
 	Version:           []byte("version"),
 }
 
@@ -106,6 +108,10 @@ func (r *Resumer) Write(torrentID string, spec *Spec) error {
 	if err != nil {
 		return err
 	}
+	filePaths, err := json.Marshal(spec.FilePaths)
+	if err != nil {
+		return err
+	}
 	version := LatestVersion
 	if spec.Version != 0 {
 		version = spec.Version
@@ -136,6 +142,7 @@ func (r *Resumer) Write(torrentID string, spec *Spec) error {
 		_ = b.Put(Keys.Sequential, []byte(strconv.FormatBool(spec.Sequential)))
 		_ = b.Put(Keys.FirstLast, []byte(strconv.FormatBool(spec.FirstLast)))
 		_ = b.Put(Keys.SuperSeeding, []byte(strconv.FormatBool(spec.SuperSeeding)))
+		_ = b.Put(Keys.FilePaths, filePaths)
 		_ = b.Put(Keys.Version, []byte(strconv.Itoa(version)))
 		return nil
 	})
@@ -178,6 +185,24 @@ func (r *Resumer) WriteBitfield(torrentID string, value []byte) error {
 func (r *Resumer) WriteStarted(torrentID string, value bool) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.Started, []byte(strconv.FormatBool(value)))
+	})
+}
+
+// WriteFilePaths replaces only the file-path override list (nil/empty clears it).
+func (r *Resumer) WriteFilePaths(torrentID string, paths []string) error {
+	raw, err := json.Marshal(paths)
+	if err != nil {
+		return err
+	}
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
+		return b.Put(Keys.FilePaths, raw)
+	})
+}
+
+// WriteName replaces only the display name (a qBittorrent rename).
+func (r *Resumer) WriteName(torrentID, name string) error {
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
+		return b.Put(Keys.Name, []byte(name))
 	})
 }
 
@@ -258,6 +283,11 @@ func (r *Resumer) Read(torrentID string) (spec *Spec, err error) {
 		spec.Info = copied(b, Keys.Info)
 		spec.PieceLayers = copied(b, Keys.PieceLayers)
 		spec.Bitfield = copied(b, Keys.Bitfield)
+		if v := b.Get(Keys.FilePaths); v != nil {
+			if err := json.Unmarshal(v, &spec.FilePaths); err != nil {
+				return err
+			}
+		}
 		if v := b.Get(Keys.AddedAt); v != nil {
 			if spec.AddedAt, err = time.Parse(time.RFC3339, string(v)); err != nil {
 				return err

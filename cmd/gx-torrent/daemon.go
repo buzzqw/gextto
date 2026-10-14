@@ -235,8 +235,11 @@ type Daemon struct {
 	dyn            queue.Dynamic
 	limits         queue.Limits
 	restartPending bool
-	dirty          bool
-	startedAt      time.Time
+	// pendingRename, when set, is applied between closing and reopening the
+	// session: the on-disk moves and the persisted new paths of a rename.
+	pendingRename *pendingRename
+	dirty         bool
+	startedAt     time.Time
 	// lastPeerNoiseReport rate-limits the periodic peer/tracker error summary.
 	lastPeerNoiseReport time.Time
 	// trackers drops trackers that never work (see tracker_health.go).
@@ -614,6 +617,9 @@ func (d *Daemon) restartSessionLocked() {
 		}
 		d.session = nil
 	}
+	// A pending rename runs now, with every storage file closed: the moves are
+	// rolled back on failure and the new paths persisted only when they succeed.
+	d.applyPendingRename()
 	if err := d.openSessionLocked(); err != nil {
 		logf("cannot reopen the session: %v", err)
 		d.restartPending = true

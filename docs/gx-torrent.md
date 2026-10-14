@@ -550,8 +550,11 @@ knobs, global limits in KiB/s, IP filter, RSS interval) and `setPreferences`
 applies the global limits (KiB/s, `-1` = no limit) and the queue knobs. The
 **write side** covers `torrents/addPeers`, `transfer/banPeers`,
 `torrents/editCategory`, `torrents/toggleFirstLastPiecePrio`, the queue
-priorities (`increasePrio`, `decreasePrio`, `topPrio`, `bottomPrio`) and
-`app/shutdown` (a clean stop, standalone only). The **search API**
+priorities (`increasePrio`, `decreasePrio`, `topPrio`, `bottomPrio`), the
+renames (`rename`, `renameFile`, `renameFolder`) and `app/shutdown` (a clean
+stop, standalone only). A rename closes the session (so the files are closed),
+moves the content on disk with a rollback on failure, persists the new paths in
+the resume and reopens: the `.torrent` identity is never changed. The **search API**
 (`search/plugins`, `start`, `status`, `results`, `stop`, `delete`) is mapped
 onto the configured Torznab indexers, which are exposed as the "plugins";
 `installPlugin`/`uninstallPlugin`/`enablePlugin`/`updatePlugins` are accepted
@@ -1814,6 +1817,9 @@ Actions available on `POST /api/v1/torrents/{hash}/{action}`:
 - `pause`, `resume`, `verify`, `reannounce`;
 - `restart` (with `probe_secs`), `park`, `unpark`;
 - `pin` (with `pinned=1/0`), `top`;
+- `rename` (with `name`: renames the torrent, content root and display name),
+  `rename-file` and `rename-folder` (with `old` and `new`: renames a file or a
+  folder of the torrent);
 - `move` and `associate` (with `destination`);
 - `seed-limits` (`seed_ratio`, `seed_days`, `download_limit`, `upload_limit` in KiB/s: -1 global, 0 unlimited);
 - `conn-limits` (`max_connections`, `max_uploads`: -1 and 0 = no per-torrent cap);

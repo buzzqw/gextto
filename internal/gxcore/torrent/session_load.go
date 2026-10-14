@@ -85,6 +85,9 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 		}
 		info = info2
 		private = info.Private
+		// A persisted rename (qBittorrent renameFile/renameFolder) overrides the
+		// storage paths before allocation.
+		info.SetFilePaths(spec.FilePaths)
 		if len(spec.Bitfield) > 0 {
 			bf3, err3 := bitfield.NewBytes(spec.Bitfield, info.NumPieces)
 			if err3 != nil {
@@ -132,6 +135,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	t.rawTrackers = spec.Trackers
 	t.rawWebseedSources = spec.URLList
 	t.pieceLayers = layers
+	t.filePaths = append([]string(nil), spec.FilePaths...)
 	go s.checkTorrent(t)
 	delete(s.availablePorts, spec.Port)
 
@@ -186,7 +190,7 @@ func (s *Session) CompactDatabase(output string) error {
 		spec := &boltdbresumer.Spec{
 			InfoHash:          t.torrent.InfoHash(),
 			Port:              t.torrent.port,
-			Name:              t.torrent.name,
+			Name:              t.torrent.Name(),
 			Trackers:          t.torrent.rawTrackers,
 			URLList:           t.torrent.rawWebseedSources,
 			FixedPeers:        t.torrent.fixedPeers,
@@ -204,6 +208,7 @@ func (s *Session) CompactDatabase(output string) error {
 			Sequential:        t.torrent.sequential,
 			FirstLast:         t.torrent.firstLast,
 			SuperSeeding:      t.torrent.superSeeding,
+			FilePaths:         t.torrent.filePaths,
 		}
 		if err := res.Write(t.torrent.id, spec); err != nil {
 			return err

@@ -130,3 +130,43 @@ func (d *Daemon) handleQbitToggleSpeedLimitsMode(w http.ResponseWriter, _ *http.
 	d.applyScheduleNow()
 	w.WriteHeader(http.StatusOK)
 }
+
+// handleQbitRename renames a torrent (display name and content root).
+func (d *Daemon) handleQbitRename(w http.ResponseWriter, r *http.Request) {
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	name := strings.TrimSpace(r.FormValue("name"))
+	if hash == "" || name == "" {
+		http.Error(w, "hash and name are required", http.StatusBadRequest)
+		return
+	}
+	if err := d.renameTorrent(hash, name); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleQbitRenameFile renames one file, or a folder (same prefix semantics).
+func (d *Daemon) handleQbitRenameFile(w http.ResponseWriter, r *http.Request) {
+	d.qbitRenamePath(w, r, d.renameFile)
+}
+
+// handleQbitRenameFolder renames a folder.
+func (d *Daemon) handleQbitRenameFolder(w http.ResponseWriter, r *http.Request) {
+	d.qbitRenamePath(w, r, d.renameFolder)
+}
+
+func (d *Daemon) qbitRenamePath(w http.ResponseWriter, r *http.Request, apply func(hash, oldPath, newPath string) error) {
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	oldPath := strings.TrimSpace(r.FormValue("oldPath"))
+	newPath := strings.TrimSpace(r.FormValue("newPath"))
+	if hash == "" || oldPath == "" || newPath == "" {
+		http.Error(w, "hash, oldPath and newPath are required", http.StatusBadRequest)
+		return
+	}
+	if err := apply(hash, oldPath, newPath); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
