@@ -175,17 +175,20 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   status filters and their counts (all, downloading, seeding, *active*, paused,
   stalled, moving, error), the **categories** and **tags** with counts, and a
   two-minute **transfer graph**; a **toolbar** acting on the selection
-  (resume, pause, recheck, reannounce, top, remove) plus *Tools* (IP filter,
+  (resume, pause, recheck, reannounce, top, move up/down, remove) plus *Tools* (IP filter,
   create `.torrent`, check feeds, test ports); the status bar at the bottom
   with totals, free space, the **CPU load and resident memory of the gx-torrent
   process itself**, DHT, port reachability, incoming connections, IP
-  filter, encryption.
+  filter, encryption, and the **alternative-limits toggle** (standalone: the
+  qBittorrent speed-limit button — the scheduler's window or the configured
+  alternative limits).
 - **Table**: one row per torrent (name with category chip and folder, size,
   progress bar coloured by state, readable state badge, speeds, ETA,
   seeds/peers, ratio), sortable columns (the order and the filters are
   remembered), click / Ctrl-click / Shift-click selection, a **context menu**
   (right click, the ⋯ button or the menu key: details, resume, pause, recheck,
-  reannounce, top, category and tags, copy magnet, export `.torrent`, remove)
+  reannounce, top, move up/down, rename (standalone), category and tags, copy
+  magnet, export `.torrent`, remove)
   and keyboard navigation (arrows, Space to select, Enter for the detail, Del to
   remove, `P` to pause/resume, `N` to add, Ctrl+A). Columns give way as the list
   narrows; on a phone the rows become cards. The list refreshes every 2 seconds
@@ -204,7 +207,7 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
 - **Per-torrent detail** in a panel below the list (like qBittorrent; full width
   on a phone), with tabs: *General* (actions, data, pieces, space, dates, pin, speed,
   connection, upload and seed limits, super-seeding, move, category and tags,
-  **web seeds**), *Files* (priority and **HTTP streaming** with ▶), *Peers*
+  **web seeds**), *Files* (priority, **rename** and **HTTP streaming** with ▶), *Peers*
   (connection flags, transport, encryption), *Trackers* (status, swarm, add and
   **remove**), *Pieces* (coloured map). Peers, trackers and pieces refresh while
   the panel is open; the forms save in place, without reloading the page.

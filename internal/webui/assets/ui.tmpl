@@ -80,6 +80,8 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .statusbar .sb-update{display:inline-flex;align-items:center;color:var(--text);font-weight:600;text-decoration:none;border:1px solid var(--warn);border-radius:999px;padding:1px 9px}.statusbar .sb-update:hover,.statusbar .sb-update:focus-visible{background:var(--warn-soft)}
 .statusbar .disk{display:inline-flex;align-items:center;gap:6px}
 .statusbar .disk .progress{width:70px}
+.statusbar .sb-alt{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:999px;padding:1px 9px;cursor:pointer;font:inherit}
+.statusbar .sb-alt[aria-checked=true]{border-color:var(--warn);color:var(--text);background:var(--warn-soft)}
 .drawer{flex:none;height:clamp(220px,46vh,520px);border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;min-height:0}
 .drawer[hidden]{display:none}
 .drawer .dhead{display:flex;align-items:flex-start;gap:10px;padding:14px 16px 8px}
@@ -292,7 +294,10 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <button type="button" role="menuitem" data-act="verify" title="Recheck data on disk"><svg class="i"><use href="#i-check"/></svg>Recheck</button>
   <button type="button" role="menuitem" data-act="reannounce" title="Reannounce to trackers"><svg class="i"><use href="#i-signal"/></svg>Reannounce</button>
   <button type="button" role="menuitem" data-act="top" title="Move to the top of the queue"><svg class="i"><use href="#i-top"/></svg>Move to top</button>
+  <button type="button" role="menuitem" data-act="up" title="Move up in the queue"><svg class="i"><use href="#i-up"/></svg>Move up</button>
+  <button type="button" role="menuitem" data-act="down" title="Move down in the queue"><svg class="i"><use href="#i-down"/></svg>Move down</button>
   <hr>
+  {{if .Standalone}}<button type="button" role="menuitem" data-act="rename" title="Rename this torrent's name and content folder"><svg class="i"><use href="#i-edit"/></svg>Rename…</button>{{end}}
   {{if .Standalone}}<button type="button" role="menuitem" data-act="category" title="Category assigned to this torrent for organization and filtering"><svg class="i"><use href="#i-tag"/></svg>Category and tags…</button>{{end}}
   <button type="button" role="menuitem" data-act="magnet" title="Copy magnet URI with info hash and trackers to clipboard"><svg class="i"><use href="#i-copy"/></svg>Copy magnet</button>
   <button type="button" role="menuitem" data-act="export" title="Export and download the .torrent metainfo file"><svg class="i"><use href="#i-file"/></svg>Export .torrent</button>
@@ -347,6 +352,36 @@ body{display:flex;flex-direction:column;overflow:hidden}
     <div class="dlg-foot">
       <button type="button" data-close title="Close without removing">Cancel</button>
       <button type="submit" class="danger solid" title="Remove the selected torrents">Remove</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-rename" aria-labelledby="dlg-rename-title">
+  <form method="post" action="/ui/rename" id="form-rename">
+    <div class="dlg-head"><h2 id="dlg-rename-title">Rename torrent</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-body">
+      <input type="hidden" name="hash">
+      <label class="field">New name<input type="text" name="name" autocomplete="off" required title="The torrent's new name; the content folder is renamed too"></label>
+      <p class="muted" style="margin:0;font-size:12.5px">The downloaded content is renamed on disk; the torrent keeps its info hash.</p>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" data-close title="Close without renaming">Cancel</button>
+      <button type="submit" class="primary" title="Rename this torrent">Rename</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-rename-file" aria-labelledby="dlg-rename-file-title">
+  <form method="post" action="/ui/rename-file" id="form-rename-file">
+    <div class="dlg-head"><h2 id="dlg-rename-file-title">Rename file</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-body">
+      <input type="hidden" name="hash">
+      <input type="hidden" name="old">
+      <label class="field">New path<input type="text" name="new" autocomplete="off" required title="The new path of the file inside the torrent (folders are allowed)"></label>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" data-close title="Close without renaming">Cancel</button>
+      <button type="submit" class="primary" title="Rename this file">Rename</button>
     </div>
   </form>
 </dialog>
@@ -597,6 +632,10 @@ function editCategory(hashes){
   var dlg=$('#dlg-cat'),r=rows().find(function(x){return x.dataset.hash===hashes[0];});
   dlg._hashes=hashes;$('input[name=category]',dlg).value=r?r.dataset.cat:'';$('input[name=tags]',dlg).value=r?r.dataset.tags.split(',').join(', '):'';openDialog(dlg);
 }
+function renameTorrentDialog(hashes){
+  var dlg=$('#dlg-rename'),r=rows().find(function(x){return x.dataset.hash===hashes[0];});
+  if(!r)return;$('input[name=hash]',dlg).value=r.dataset.hash;$('input[name=name]',dlg).value=r.dataset.name;openDialog(dlg);
+}
 function act(op,hashes){
   switch(op){
     case 'details':openDetail(hashes[0]);break;
@@ -604,6 +643,7 @@ function act(op,hashes){
     case 'magnet':copyMagnet(hashes[0]);break;
     case 'export':window.location.href='/ui/torrent-file?hash='+encodeURIComponent(hashes[0]);break;
     case 'category':editCategory(hashes);break;
+    case 'rename':renameTorrentDialog(hashes);break;
     default:bulk(op,hashes);
   }
 }
@@ -629,7 +669,7 @@ function rowMenu(row,x,y,from){
   if(!state.selected.has(row.dataset.hash))select(row.dataset.hash,'only');
   var menu=$('#row-menu');menu._hashes=selHashes();
   var one=menu._hashes.length===1;
-  $$('[data-act=details],[data-act=magnet],[data-act=export]',menu).forEach(function(b){b.hidden=!one;});
+  $$('[data-act=details],[data-act=magnet],[data-act=export],[data-act=rename]',menu).forEach(function(b){b.hidden=!one;});
   openMenu(menu,x,y,from||row);
 }
 
@@ -685,6 +725,8 @@ document.addEventListener('click',function(e){
   var b=el.closest('[data-bulk]');if(b){if(b.getAttribute('aria-disabled')==='true'){toast(t('Select at least one torrent'),true);return;}if(b.dataset.bulk==='remove-ask')askRemove();else bulk(b.dataset.bulk);return;}
   var mi=el.closest('#row-menu [data-act]');if(mi){var hs=$('#row-menu')._hashes||[];closeMenu();act(mi.dataset.act,hs);return;}
   var ti=el.closest('#tools-menu [data-tool]');if(ti){closeMenu();tool(ti.dataset.tool);return;}
+  var alt=el.closest('[data-alt-speed]');if(alt){post('/ui/alt-speed',new URLSearchParams()).then(function(res){report(res);refresh();});return;}
+  var rf=el.closest('[data-rename-file]');if(rf){var frf=$('#dlg-rename-file');$('input[name=hash]',frf).value=rf.dataset.hash;$('input[name=old]',frf).value=rf.dataset.renameFile;$('input[name=new]',frf).value=rf.dataset.renameFile;openDialog(frf);return;}
   var st=el.closest('#side [data-status]');if(st){state.filter.status=st.dataset.status;store.set('filter',state.filter);applyFilters();return;}
   var cb=el.closest('#side [data-catbtn]');if(cb){var v=cb.dataset.cat;state.filter.cat=state.filter.cat===v?null:v;store.set('filter',state.filter);applyFilters();return;}
   var tg=el.closest('#side [data-tag]');if(tg){state.filter.tag=state.filter.tag===tg.dataset.tag?null:tg.dataset.tag;store.set('filter',state.filter);applyFilters();return;}
@@ -845,6 +887,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
     </section>
     {{end}}
 {{end}}{{define "status"}}
+    {{if .Standalone}}<button type="button" class="sb-alt" role="switch" aria-checked="{{if .AltSpeed}}true{{else}}false{{end}}" data-alt-speed title="Toggle the alternative speed limits (the scheduler's window or the configured alternative limits)"><svg class="i"><use href="#i-clock"/></svg>Alternative limits</button>{{end}}
     {{if .UpdateAvailable}}<a class="sb-update" href="/ui/settings#maintenance" title="A new version of gx-torrent is available: open Settings, Maintenance to see the changes and install it"><span class="dot warn" aria-hidden="true"></span><span>Update available</span>{{if .UpdateDate}} <span class="subtle">{{.UpdateDate}}</span>{{end}}</a>{{end}}
     <span class="hide-m" data-down="{{.DownRateRaw}}" data-up="{{.UpRateRaw}}" data-down-s="{{.DownloadRate}}" data-up-s="{{.UploadRate}}" title="Downloaded / uploaded since start"><span>Totals</span> <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
     <span class="disk" title="Free space on the download folder"><svg class="i"><use href="#i-disk"/></svg><span>Free space</span> <b>{{bytes .DiskFree}}</b><span class="subtle">/ {{bytes .DiskTotal}}</span></span>
@@ -1018,7 +1061,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
           <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="files"><input type="hidden" name="index" value="{{.Index}}">
           <select name="priority" aria-label="Priority" title="Download priority for this file (Skip, Normal, High, Maximum)" onchange="this.form.requestSubmit()"><option value="0"{{if eq .Priority 0}} selected{{end}}>Skip</option><option value="4"{{if eq .Priority 4}} selected{{end}}>Normal</option><option value="6"{{if eq .Priority 6}} selected{{end}}>High</option><option value="7"{{if eq .Priority 7}} selected{{end}}>Maximum</option></select>
         </form></td>
-        <td><a class="btn ghost icon sm" href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" aria-label="Stream" title="Stream this file with HTTP Range; the pieces of the window are downloaded first"><svg class="i"><use href="#i-play"/></svg></a></td>
+        <td><a class="btn ghost icon sm" href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" aria-label="Stream" title="Stream this file with HTTP Range; the pieces of the window are downloaded first"><svg class="i"><use href="#i-play"/></svg></a>{{if $.Standalone}}<button type="button" class="btn ghost icon sm" data-rename-file="{{.Path}}" data-hash="{{$.Hash}}" aria-label="Rename file" title="Rename this file"><svg class="i"><use href="#i-edit"/></svg></button>{{end}}</td>
       </tr>
     {{end}}
     </tbody>

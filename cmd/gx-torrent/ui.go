@@ -77,13 +77,16 @@ type uiPageData struct {
 	// its build day with an older manifest.
 	UpdateAvailable bool
 	UpdateDate      string
-	DHT             bool
-	DHTNodes        int64
-	UTP             bool
-	Encryption      string
-	Proxy           bool
-	IPFilter        int
-	IPFilterPath    string
+	// AltSpeed lights the alternative-limits toggle in the status bar
+	// (standalone): the scheduler's window or the manual toggle.
+	AltSpeed     bool
+	DHT          bool
+	DHTNodes     int64
+	UTP          bool
+	Encryption   string
+	Proxy        bool
+	IPFilter     int
+	IPFilterPath string
 	// IPFilterSource prefills the IP filter field with Gextto's setting.
 	IPFilterSource string
 	// GexttoLog enables the Gextto log tab.
@@ -602,6 +605,10 @@ func (d *Daemon) handleUIBulk(w http.ResponseWriter, r *http.Request) {
 			err = d.reannounce(hash)
 		case "top":
 			err = d.moveToTop(hash)
+		case "up":
+			err = d.shiftPriority(hash, true)
+		case "down":
+			err = d.shiftPriority(hash, false)
 		case "remove":
 			err = d.remove(hash, false)
 		case "remove-files":
@@ -629,6 +636,58 @@ func (d *Daemon) handleUIRemove(w http.ResponseWriter, r *http.Request) {
 	deleteFiles := formBool(r, "delete_files") || formBool(r, "files")
 	err := d.remove(hash, deleteFiles)
 	d.uiDone(w, r, "Torrent removed", err)
+}
+
+// handleUIRename renames a torrent: its display name and content root.
+func (d *Daemon) handleUIRename(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	name := strings.TrimSpace(r.FormValue("name"))
+	var err error
+	if hash == "" || name == "" {
+		err = fmt.Errorf("a name is required")
+	} else {
+		err = d.renameTorrent(hash, name)
+	}
+	d.uiDone(w, r, "Renamed", err)
+}
+
+// handleUIRenameFile renames one file of a torrent (from the Files tab).
+func (d *Daemon) handleUIRenameFile(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	oldPath := strings.TrimSpace(r.FormValue("old"))
+	newPath := strings.TrimSpace(r.FormValue("new"))
+	var err error
+	if hash == "" || oldPath == "" || newPath == "" {
+		err = fmt.Errorf("hash, old and new are required")
+	} else {
+		err = d.renameFile(hash, oldPath, newPath)
+	}
+	d.uiDoneDetail(w, r, hash, "files", "File renamed", err)
+}
+
+// handleUIAltSpeed toggles the manual alternative speed limits (the qBittorrent
+// speed-limit button).
+func (d *Daemon) handleUIAltSpeed(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	if d.opts.Settings == nil {
+		d.uiDone(w, r, "", fmt.Errorf("not available"))
+		return
+	}
+	_, _, manual := d.altSpeedSettings()
+	d.opts.Settings.Set(altSpeedEnabledKey, strconv.FormatBool(!manual))
+	err := d.opts.Settings.Save()
+	d.applyScheduleNow()
+	d.uiDone(w, r, "Alternative limits toggled", err)
 }
 
 // uiBuildAddRequest builds one add request from an add form: an uploaded
@@ -1131,6 +1190,10 @@ func uiActionMessage(op string) string {
 		return "Reannounce sent"
 	case "top":
 		return "Moved to the top of the queue"
+	case "up":
+		return "Moved up in the queue"
+	case "down":
+		return "Moved down in the queue"
 	case "remove":
 		return "removed (files kept)"
 	case "remove-files":
@@ -1284,6 +1347,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 	if d.opts.Mode == ModeStandalone {
 		update := d.updateStatus()
 		page.UpdateAvailable, page.UpdateDate = update.Available && !update.Applying, update.LatestDate
+		page.AltSpeed = d.altSpeedActive(time.Now())
 		if update.LatestVersion != "" {
 			page.UpdateDate = update.LatestVersion
 		}
