@@ -249,7 +249,7 @@
     <div class="metric mint"><span class="metric-sub">Serie TV / Film</span><strong>{{.SeriesConfigured}} / {{.MoviesConfigured}}</strong></div>
     <div class="metric amber"><span class="metric-sub">Spazio libero</span><strong>{{bytesU .FreeSpace}}</strong><small class="muted" title="Cestino">{{bytesU .TrashBytes}}</small></div>
     <div class="metric blue"><span class="metric-sub">Magnet in archivio</span><strong>{{.ArchiveTotal}}</strong><small class="muted" title="Visti nei feed">{{.SeenGroups}}</small></div>
-    <div class="metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">{{if .EngineVersion}}gx-core {{.EngineVersion}}{{else}}libtorrent {{.LibtorrentVersion}}{{end}}</small></div>
+    <div class="metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">{{if .EngineVersion}}gx-core {{.EngineVersion}}{{end}}</small></div>
   </div>
 
   <div class="panel dashboard-cycle-panel">

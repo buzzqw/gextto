@@ -16,10 +16,10 @@ func validateBackendSetting(key, value string) error {
 	switch key {
 	case "torrent_backend":
 		switch raw {
-		case "", BackendEmbedded, BackendQbittorrent, BackendGxTorrent:
+		case "", BackendQbittorrent, BackendGxTorrent:
 			return nil
 		default:
-			return fmt.Errorf("torrent_backend must be embedded, qbittorrent or gx-torrent")
+			return fmt.Errorf("torrent_backend must be qbittorrent or gx-torrent")
 		}
 	case "qbittorrent_url", "gxtorrent_url":
 		if raw == "" {

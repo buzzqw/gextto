@@ -14,55 +14,6 @@ import (
 // Tests ported from the remaining reference scenarios that need a config
 // database, a torrent_meta row or an HTTP round-trip.
 
-func TestEffectiveListenInterfacesBindsKillswitch(t *testing.T) {
-	settings := DefaultLibtorrentSettings()
-	settings.PortMin = 6881
-	if got := effectiveListenInterfaces(&settings); got != "" {
-		t.Fatalf("no interface -> %q, want empty", got)
-	}
-	settings.ListenInterfaces = "wg0"
-	if got := effectiveListenInterfaces(&settings); got != "wg0:6881" {
-		t.Fatalf("bare interface -> %q, want wg0:6881", got)
-	}
-	settings.ListenInterfaces = ""
-	settings.OutgoingInterface = "tun0"
-	if got := effectiveListenInterfaces(&settings); got != "tun0:6881" {
-		t.Fatalf("outgoing interface -> %q, want tun0:6881", got)
-	}
-	settings.ListenInterfaces = "0.0.0.0:6881-6891"
-	if got := effectiveListenInterfaces(&settings); got != "0.0.0.0:6881-6891" {
-		t.Fatalf("explicit port changed -> %q", got)
-	}
-}
-
-func TestReadsImportedBandwidthLimitsWithoutChangingUnits(t *testing.T) {
-	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "gextto_config.db")
-	db, err := OpenConfigDB(dbPath)
-	if err != nil {
-		t.Fatalf("open config db: %v", err)
-	}
-	if _, err := db.Exec("CREATE TABLE torrent_limits (info_hash TEXT PRIMARY KEY, dl_bytes INTEGER, ul_bytes INTEGER)"); err != nil {
-		t.Fatalf("schema: %v", err)
-	}
-	if _, err := db.Exec("INSERT INTO torrent_limits VALUES (?1,?2,?3)", "abc123", int64(1_572_864), int64(-1)); err != nil {
-		t.Fatalf("insert: %v", err)
-	}
-	db.Close()
-
-	client := &LibtorrentClient{configDB: dbPath}
-	download, upload, ok, err := client.storedLimits("abc123")
-	if err != nil || !ok {
-		t.Fatalf("storedLimits ok=%v err=%v", ok, err)
-	}
-	if download != 1_572_864 || upload != -1 {
-		t.Fatalf("limits = (%d,%d), byte units must be preserved", download, upload)
-	}
-	if _, _, ok, _ := client.storedLimits("missing"); ok {
-		t.Fatal("missing hash reported as present")
-	}
-}
-
 func TestRamdiskSettingsReadFromConfigDB(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Settings = map[string]string{

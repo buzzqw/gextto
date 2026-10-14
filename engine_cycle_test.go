@@ -14,9 +14,40 @@ import (
 // newCycleState returns the shared fixture used by the cycle tests. It is the
 // same hermetic AppState as the web API tests: temporary databases, no feeds,
 // no indexers, no series/movies/comics and DryRun enabled.
+// fakeAddEngine accepts every add and lists nothing: the cycle tests need an
+// engine whose adds succeed without a real daemon or a dry-run libtorrent
+// session (the embedded engine is gone).
+type fakeAddEngine struct{ nullEngine }
+
+func (fakeAddEngine) Name() string { return "test" }
+
+func (fakeAddEngine) Add(string, *Config) (bool, error) { return true, nil }
+func (fakeAddEngine) AddWithPath(string, *Config, *string) (bool, error) {
+	return true, nil
+}
+func (fakeAddEngine) AddWithOptions(string, *Config, *string, AddOptions) (bool, error) {
+	return true, nil
+}
+func (fakeAddEngine) AddFileWithPath(string, *Config, *string) (bool, error) { return true, nil }
+
+func (fakeAddEngine) AddTorrentFile(string, string) (*string, error) {
+	hash := "fake"
+	return &hash, nil
+}
+func (fakeAddEngine) AddTorrentFileEx(string, string, AddOptions) (*string, error) {
+	hash := "fake"
+	return &hash, nil
+}
+func (fakeAddEngine) AddTorrentFileWithOptions(string, *Config, *string, AddOptions) (*string, error) {
+	hash := "fake"
+	return &hash, nil
+}
+
 func newCycleState(t *testing.T) *AppState {
 	t.Helper()
-	return newTestAppState(t)
+	state := newTestAppState(t)
+	state.setActiveEngine(fakeAddEngine{})
+	return state
 }
 
 // TestCycleFullNoSourcesIsNoOp runs a full cycle with an empty configuration.

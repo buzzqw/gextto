@@ -297,7 +297,6 @@ func TestUIEngineLabelsMatchBackend(t *testing.T) {
 	cases := map[string]string{
 		BackendGxTorrent:   "gx-torrent",
 		BackendQbittorrent: "qBittorrent-nox",
-		BackendEmbedded:    "libtorrent integrato",
 	}
 	for backend, want := range cases {
 		if got := uiBackendLabel(backend); got != want {
@@ -377,10 +376,6 @@ func TestV2DetailCapsPerEngine(t *testing.T) {
 	qb := v2DetailCapsFor(BackendQbittorrent)
 	if !qb.SuperSeeding || qb.WebSeeds || !qb.RateLimits || qb.Connections || !qb.FileLevels {
 		t.Fatalf("qBittorrent capabilities: %+v", qb)
-	}
-	lt := v2DetailCapsFor(BackendEmbedded)
-	if !lt.SuperSeeding || !lt.WebSeeds || !lt.RateLimits || !lt.Connections || !lt.FileLevels {
-		t.Fatalf("libtorrent supports everything: %+v", lt)
 	}
 	if v2SwarmLabel(-1, -1) != "n/d" || v2SwarmLabel(3, 7) != "3 / 7" {
 		t.Fatal("swarm label")

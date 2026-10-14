@@ -45,9 +45,9 @@ func alternativeBackendActive(cfg *Config) bool {
 	}
 }
 
-// selectTorrentEngine builds the configured backend. A nil engine means the
-// embedded libtorrent adapter. The second return value is a human-readable
-// note (empty on the happy path), and an error means activation was refused.
+// selectTorrentEngine builds the configured backend. The second return value is
+// a human-readable note (empty on the happy path), and an error means activation
+// was refused.
 func selectTorrentEngine(cfg *Config, notifier *Notifier) (TorrentEngine, string, error) {
 	if TorrentBackendName(cfg) != BackendGxTorrent {
 		gxStopLeftoverDaemon(cfg)
@@ -75,7 +75,8 @@ func selectTorrentEngine(cfg *Config, notifier *Notifier) (TorrentEngine, string
 			return engine, note, nil
 		}
 		return engine, "", nil
-	case BackendGxTorrent:
+	default:
+		// gx-torrent is the only other backend, and the default.
 		engine, err := newGxTorrentEngine(cfg, notifier)
 		if err != nil {
 			return nil, "", err
@@ -86,13 +87,6 @@ func selectTorrentEngine(cfg *Config, notifier *Notifier) (TorrentEngine, string
 			return engine, note, nil
 		}
 		return engine, "", nil
-	case BackendEmbedded:
-		if !LibtorrentCompiled() {
-			return nil, "", fmt.Errorf("libtorrent integrato non incluso in questa build (compila con make build-libtorrent)")
-		}
-		return nil, "", nil
-	default:
-		return nil, "", nil
 	}
 }
 
@@ -198,23 +192,12 @@ func ShutdownTorrentEngine(s *AppState) error {
 	return nil
 }
 
-// ShutdownEmbedded closes the embedded libtorrent client currently held by the
-// state. It must be used instead of a startup-local pointer because NewAppState
-// may replace the client with a fallback when an alternative backend fails to
-// activate.
-func ShutdownEmbedded(s *AppState, cfg *Config) error {
-	if s == nil || s.torrents == nil {
-		return nil
-	}
-	return s.torrents.Shutdown(cfg)
-}
-
 // ConfigureTorrentEngine installs the engine selected by the current settings.
 // It is called at startup and whenever the backend settings change.
 func ConfigureTorrentEngine(s *AppState, cfg *Config) error {
 	if cfg != nil {
 		if raw := strings.ToLower(strings.TrimSpace(cfg.Settings["torrent_backend"])); raw != "" && !isKnownTorrentBackend(raw) {
-			logging.Warn("unknown torrent backend saved in the settings; falling back to embedded libtorrent", "backend", raw)
+			logging.Warn("unknown torrent backend saved in the settings; using gx-torrent", "backend", raw)
 		}
 	}
 	engine, note, err := selectTorrentEngine(cfg, s.notifier)
@@ -225,16 +208,6 @@ func ConfigureTorrentEngine(s *AppState, cfg *Config) error {
 	if note != "" {
 		logging.Warn("torrent backend note", "note", note)
 	}
-	active := TorrentBackendName(cfg)
-	if engine == nil {
-		// The configured name `embedded` is an implementation detail. The
-		// actual engine is libtorrent, so expose the concrete backend and the
-		// linked library version in the startup log.
-		logging.Debug("torrent backend selected",
-			"backend", "libtorrent",
-			"version", LibtorrentVersion())
-		return nil
-	}
-	logging.Debug("torrent engine selected", "engine", active)
+	logging.Debug("torrent engine selected", "engine", TorrentBackendName(cfg))
 	return nil
 }

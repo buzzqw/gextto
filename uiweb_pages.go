@@ -874,33 +874,6 @@ var uiManagedSetting = map[string]bool{
 	"torrent_cache_size":       true,
 }
 
-// uiLibtorrentEngineOnlySettings lists the options read only by the embedded
-// libtorrent session (see libtorrent.go). Seed, stall, queue, speed, directory
-// and RAM-disk options are intentionally excluded: the automation layer applies
-// those with every engine, so they must stay editable.
-//
-// The network, queue and cache options are excluded too: gx-torrent reads the
-// same libtorrent_* keys (gxNetworkArgs and gxQueuePolicy), so they must stay
-// editable whichever engine is selected. Only knobs specific to the libtorrent
-// settings_pack remain listed here.
-var uiLibtorrentEngineOnlySettings = map[string]bool{
-	"libtorrent_enabled":                           true,
-	"libtorrent_auto_optimize":                     true,
-	"libtorrent_extra_settings":                    true,
-	"libtorrent_aio_threads":                       true,
-	"libtorrent_alert_queue_size":                  true,
-	"libtorrent_allow_multiple_connections_per_ip": true,
-	"libtorrent_announce_interval":                 true,
-	"libtorrent_announce_to_all_tiers":             true,
-	"libtorrent_announce_to_all_trackers":          true,
-	"libtorrent_connections_limit":                 true,
-	"libtorrent_half_open_limit":                   true,
-	"libtorrent_max_uploads_per_torrent":           true,
-	"libtorrent_prefer_rc4":                        true,
-	"libtorrent_torrent_connect_boost":             true,
-	"libtorrent_upload_slots_limit":                true,
-}
-
 // uiSettingAllowedBackends lists the torrent engines a setting applies to. A
 // nil/empty result means every engine.
 func uiSettingAllowedBackends(key string) []string {
@@ -909,8 +882,6 @@ func uiSettingAllowedBackends(key string) []string {
 		return []string{BackendQbittorrent}
 	case strings.HasPrefix(key, "gxtorrent_"):
 		return []string{BackendGxTorrent}
-	case uiLibtorrentEngineOnlySettings[key]:
-		return []string{BackendEmbedded}
 	}
 	return nil
 }
@@ -977,21 +948,15 @@ func uiTorrentBackendOptions(value string) []uiFormOption {
 		value = DefaultTorrentBackend
 	}
 	if !isKnownTorrentBackend(strings.ToLower(value)) {
-		// A removed or unknown backend is normalised to the embedded engine at
-		// runtime (TorrentBackendName); show the same here.
-		value = BackendEmbedded
+		// A removed or unknown backend is normalised to gx-torrent at runtime
+		// (TorrentBackendName); show the same here.
+		value = BackendGxTorrent
 	}
-	options := []uiFormOption{}
-	// The embedded libtorrent engine only exists in a build compiled with it;
-	// when it is absent the option is not offered.
-	if LibtorrentCompiled() {
-		options = append(options, uiFormOption{Value: BackendEmbedded, Label: "libtorrent (integrato)", Selected: value == BackendEmbedded})
+	options := []uiFormOption{
+		{Value: BackendQbittorrent, Label: uiBackendLabel(BackendQbittorrent), Selected: value == BackendQbittorrent},
+		{Value: BackendGxTorrent, Label: "gx-torrent (predefinito)", Selected: value == BackendGxTorrent},
 	}
-	options = append(options,
-		uiFormOption{Value: BackendQbittorrent, Label: uiBackendLabel(BackendQbittorrent), Selected: value == BackendQbittorrent},
-		uiFormOption{Value: BackendGxTorrent, Label: "gx-torrent (predefinito)", Selected: value == BackendGxTorrent},
-	)
-	if value != BackendQbittorrent && value != BackendGxTorrent && !(LibtorrentCompiled() && value == BackendEmbedded) {
+	if value != BackendQbittorrent && value != BackendGxTorrent {
 		options = append([]uiFormOption{{Value: value, Label: value + " (non valido)", Selected: true}}, options...)
 		for index := 1; index < len(options); index++ {
 			options[index].Selected = false

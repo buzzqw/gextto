@@ -63,30 +63,25 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"gxtorrent_dlna_folders":           {Zero: "vuoto = automatico (archivio)", DependsOn: "gxtorrent_dlna"},
 
 	// Velocità e rete
-	"torrent_dl_limit":             {Unit: "KiB/s", Zero: "0 = illimitato"},
-	"torrent_ul_limit":             {Unit: "KiB/s", Zero: "0 = illimitato"},
-	"torrent_sched_start":          {Kind: "time", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_end":            {Kind: "time", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_days":           {Kind: "days", Zero: "nessun giorno = mai attiva", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_week":           {Kind: "week", Zero: "ogni giorno ha fascia e limiti propri (0 = illimitato); una fascia oltre la mezzanotte appartiene al giorno in cui inizia", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_dl_limit":       {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_ul_limit":       {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
-	"libtorrent_announce_interval": {Unit: "secondi"},
+	"torrent_dl_limit":       {Unit: "KiB/s", Zero: "0 = illimitato"},
+	"torrent_ul_limit":       {Unit: "KiB/s", Zero: "0 = illimitato"},
+	"torrent_sched_start":    {Kind: "time", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_end":      {Kind: "time", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_days":     {Kind: "days", Zero: "nessun giorno = mai attiva", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_week":     {Kind: "week", Zero: "ogni giorno ha fascia e limiti propri (0 = illimitato); una fascia oltre la mezzanotte appartiene al giorno in cui inizia", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_dl_limit": {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_ul_limit": {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
 	// Ricerca peer e tracker
 	"torrent_holepunch": {DependsOn: "torrent_utp"},
 
 	// Code e prestazioni
 	"torrent_dynamic_queue_min":           {DependsOn: "torrent_dynamic_queue"},
 	"torrent_dynamic_queue_max":           {DependsOn: "torrent_dynamic_queue"},
-	"libtorrent_upload_slots_limit":       {Zero: "-1 = auto"},
-	"libtorrent_half_open_limit":          {Zero: "-1 = auto"},
 	"torrent_max_connections_per_torrent": {Zero: "-1 = illimitato"},
-	"libtorrent_max_uploads_per_torrent":  {Zero: "-1 = illimitato"},
 	"torrent_ramdisk_dir":                 {DependsOn: "torrent_ramdisk_enabled"},
 	"torrent_ramdisk_threshold_gb":        {Unit: "GB", DependsOn: "torrent_ramdisk_enabled"},
 	"torrent_ramdisk_margin_gb":           {Unit: "GB", DependsOn: "torrent_ramdisk_enabled"},
 	"torrent_ramdisk_min_free_bytes":      {Unit: "byte", Zero: "0 = usa il margine", DependsOn: "torrent_ramdisk_enabled"},
-	"libtorrent_aio_threads":              {Zero: "-1 = auto"},
 	"torrent_cache_size":                  {Unit: "blocchi", Zero: "-1 = auto"},
 	"torrent_cache_expiry":                {Unit: "secondi"},
 

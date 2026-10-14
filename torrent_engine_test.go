@@ -3,7 +3,6 @@ package gextto
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -91,14 +90,11 @@ func TestCapabilityParityIsComplete(t *testing.T) {
 		t.Fatal("empty capability parity")
 	}
 	for capability, row := range parity {
-		for _, backend := range []string{BackendEmbedded, BackendQbittorrent} {
+		for _, backend := range []string{BackendQbittorrent, BackendGxTorrent} {
 			if strings.TrimSpace(row[backend]) == "" {
 				t.Fatalf("capability %q missing backend %q", capability, backend)
 			}
 		}
-	}
-	if CapabilityMatrix(BackendEmbedded)["list"] != "full" {
-		t.Fatal("embedded list must be full")
 	}
 	if CapabilityMatrix(BackendQbittorrent)["sync"] != "full" {
 		t.Fatal("qbittorrent sync must be full")
@@ -109,7 +105,7 @@ func TestCapabilityParityIsComplete(t *testing.T) {
 // capability is available exactly when its level is full or partial, never when
 // it is none. It also pins the two levels fixed to match the adapters.
 func TestCapabilitiesBooleanMatchesLevels(t *testing.T) {
-	for _, backend := range []string{BackendEmbedded, BackendQbittorrent, BackendGxTorrent} {
+	for _, backend := range []string{BackendQbittorrent, BackendGxTorrent} {
 		boolcaps := capabilitiesFor(backend)
 		for name, level := range CapabilityMatrix(backend) {
 			want := level == "full" || level == "partial"
@@ -130,12 +126,7 @@ func TestCapabilitiesBooleanMatchesLevels(t *testing.T) {
 	}
 }
 
-// TestSyncCapabilityMatchesImplementations keeps the `sync` level aligned with
-// the torrentSessionSyncer interface: the embedded engine has no SyncStats.
 func TestSyncCapabilityMatchesImplementations(t *testing.T) {
-	if CapabilityMatrix(BackendEmbedded)["sync"] != "none" {
-		t.Fatal("the embedded engine has no SyncStats: sync must be none")
-	}
 	for _, backend := range []string{BackendQbittorrent, BackendGxTorrent} {
 		if CapabilityMatrix(backend)["sync"] == "none" {
 			t.Fatalf("%s implements SyncStats: sync must not be none", backend)
@@ -144,73 +135,22 @@ func TestSyncCapabilityMatchesImplementations(t *testing.T) {
 }
 
 func TestSelectTorrentEngineBackends(t *testing.T) {
-	// embedded -> nil engine (the adapter is built on demand), but only when
-	// libtorrent is compiled in; a pure-Go build refuses it.
-	cfg := DefaultConfig()
-	cfg.Settings["torrent_backend"] = BackendEmbedded
-	engine, _, err := selectTorrentEngine(&cfg, nil)
-	if LibtorrentCompiled() {
-		if err != nil || engine != nil {
-			t.Fatalf("embedded select = %v, %v", engine, err)
-		}
-	} else if err == nil {
-		t.Fatal("embedded must be refused in a build without libtorrent")
-	}
 	// A fresh installation with no saved backend uses gx-torrent.
 	cfgDefault := DefaultConfig()
 	if got := TorrentBackendName(&cfgDefault); got != BackendGxTorrent {
 		t.Fatalf("fresh install default backend = %q, want %q", got, BackendGxTorrent)
 	}
 	// qbittorrent without a URL is refused.
+	cfg := DefaultConfig()
 	cfg.Settings["torrent_backend"] = BackendQbittorrent
 	if _, _, err := selectTorrentEngine(&cfg, nil); err == nil {
 		t.Fatal("qbittorrent without url must be refused")
 	}
-	// A removed/unknown backend value falls back to the embedded implementation.
+	// A removed/unknown backend value falls back to gx-torrent.
 	cfg2 := DefaultConfig()
 	cfg2.Settings["torrent_backend"] = "removed-backend"
-	engine, _, err = selectTorrentEngine(&cfg2, nil)
-	if TorrentBackendName(&cfg2) != BackendEmbedded {
-		t.Fatalf("removed backend selection must fall back to embedded")
-	}
-	if LibtorrentCompiled() {
-		if err != nil || engine != nil {
-			t.Fatalf("removed backend selection must fall back to embedded: engine=%v err=%v", engine, err)
-		}
-	} else if err == nil {
-		t.Fatal("removed backend -> embedded must be refused without libtorrent")
-	}
-}
-
-func TestAlternativeBackendSuppressesEmbeddedSession(t *testing.T) {
-	dir := t.TempDir()
-	cfg := DefaultConfig()
-	cfg.DataDir = dir
-	cfg.StateDir = filepath.Join(dir, "state")
-	cfg.LibtorrentDir = filepath.Join(dir, "downloads")
-	cfg.LibtorrentTempDir = nil
-	if err := os.MkdirAll(cfg.LibtorrentDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	cfg.DryRun = false
-	cfg.LibtorrentEnabled = true
-	cfg.Settings["torrent_backend"] = BackendEmbedded
-
-	if alternativeBackendActive(&cfg) {
-		t.Fatal("embedded backend must not suppress the libtorrent session")
-	}
-	cfg.Settings["torrent_backend"] = BackendQbittorrent
-	cfg.Settings["qbittorrent_url"] = "http://127.0.0.1:1"
-	if !alternativeBackendActive(&cfg) {
-		t.Fatal("expected the qbittorrent backend to suppress the embedded session")
-	}
-	client, err := NewLibtorrentClient(&cfg)
-	if err != nil {
-		t.Fatalf("NewLibtorrentClient: %v", err)
-	}
-	defer client.Shutdown(&cfg)
-	if !client.DryRun {
-		t.Fatal("the embedded libtorrent session must be session-less with an alternative backend")
+	if TorrentBackendName(&cfg2) != BackendGxTorrent {
+		t.Fatal("a removed backend must fall back to gx-torrent")
 	}
 }
 
@@ -278,16 +218,12 @@ func TestTorrentBackendAndListUseActiveEngine(t *testing.T) {
 	}
 }
 
-// TestTorrentBackendOptionsGateLibtorrent pins that the embedded engine is only
-// offered when the binary is compiled with libtorrent.
-func TestTorrentBackendOptionsGateLibtorrent(t *testing.T) {
-	embedded := false
+// TestTorrentBackendOptionsHaveNoEmbedded pins that the embedded engine is no
+// longer offered as a backend option.
+func TestTorrentBackendOptionsHaveNoEmbedded(t *testing.T) {
 	for _, option := range uiTorrentBackendOptions("") {
-		if option.Value == BackendEmbedded {
-			embedded = true
+		if option.Value == "embedded" {
+			t.Fatal("the embedded engine must not be offered")
 		}
-	}
-	if embedded != LibtorrentCompiled() {
-		t.Fatalf("embedded option present=%v, LibtorrentCompiled=%v", embedded, LibtorrentCompiled())
 	}
 }

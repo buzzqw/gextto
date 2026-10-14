@@ -924,15 +924,13 @@ func applyIPFilter(ctx context.Context, s *AppState) (int, string, error) {
 	var loader interface {
 		LoadIPFilter(path string) (int, error)
 	}
-	if embedded, err := s.requireEmbedded("ip_filter"); err == nil {
-		loader = embedded
-	} else if active, ok := s.activeEngine().(interface {
+	active, ok := s.activeEngine().(interface {
 		LoadIPFilter(path string) (int, error)
-	}); ok {
-		loader = active
-	} else {
-		return 0, "", err
+	})
+	if !ok {
+		return 0, "", fmt.Errorf("the active engine does not support the IP filter")
 	}
+	loader = active
 	cfg := latestConfig(s)
 	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
 	if target == "" {
@@ -1472,11 +1470,6 @@ func SetTorrentLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 			if _, err := s.activeEngine().SetMaxUploads(hash, int(maxUploads)); err != nil {
 				jsonError(w, http.StatusBadRequest, err.Error())
 				return
-			}
-		}
-		if s.torrent_engine == nil {
-			if err := s.torrents.SaveConnLimits(hash, maxConnections, maxUploads); err != nil {
-				logging.Warn("cannot persist torrent connection limits", "hash", hash, "error", err)
 			}
 		}
 	}

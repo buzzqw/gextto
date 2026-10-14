@@ -89,14 +89,12 @@ func planEngineFallback(current string, qbittorrentInstalled, externalQbittorren
 
 // engineFallbackSecondary is the engine to use when the primary target cannot be
 // prepared (the qBittorrent download failed or its configuration could not be
-// written): the embedded libtorrent when the build has it, otherwise recovery.
-// It never returns the engine that just failed, to avoid an immediate retry.
-func engineFallbackSecondary(current string, libtorrentCompiled bool) engineFallbackPlan {
+// written): gx-torrent unless it is the engine that just failed, otherwise
+// recovery. It never returns the engine that just failed, to avoid an immediate
+// retry.
+func engineFallbackSecondary(current string) engineFallbackPlan {
 	if current != BackendGxTorrent {
 		return engineFallbackPlan{Backend: BackendGxTorrent}
-	}
-	if libtorrentCompiled {
-		return engineFallbackPlan{Backend: BackendEmbedded}
 	}
 	return engineFallbackPlan{Backend: BackendRecovery}
 }
@@ -241,7 +239,7 @@ func applyEngineFallback(ctx context.Context, cfg *Config, current string, notif
 		cancel()
 		if err != nil {
 			logging.Error("fallback motore: download qBittorrent-nox non riuscito", "error", err.Error())
-			plan = engineFallbackSecondary(current, LibtorrentCompiled())
+			plan = engineFallbackSecondary(current)
 			if plan.Backend == BackendRecovery {
 				engineFallbackNotify(notifier, "engine_recovery", map[string]any{"from": current, "reason": err.Error()})
 				return false
@@ -255,7 +253,7 @@ func applyEngineFallback(ctx context.Context, cfg *Config, current string, notif
 	if plan.Backend == BackendQbittorrent && plan.Managed {
 		if err := persistManagedQbittorrent(cfg); err != nil {
 			logging.Error("fallback motore: configurazione qBittorrent gestito non riuscita", "error", err.Error())
-			plan = engineFallbackSecondary(current, LibtorrentCompiled())
+			plan = engineFallbackSecondary(current)
 			if plan.Backend == BackendRecovery {
 				engineFallbackNotify(notifier, "engine_recovery", map[string]any{"from": current, "reason": err.Error()})
 				return false

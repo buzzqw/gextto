@@ -114,22 +114,6 @@ func runDaemon(dryRun bool, configOption *string) error {
 	}
 	defer comics.Close()
 	engine := gextto.NewEngine().WithDB(db)
-	// The embedded libtorrent engine is opt-in: it exists only in a build
-	// compiled with libtorrent. If a saved `torrent_backend=embedded` is not
-	// available, start with the pure-Go gx-torrent engine instead of refusing
-	// to run. The saved setting is left untouched, so the choice returns when a
-	// libtorrent build is installed.
-	if !gextto.LibtorrentCompiled() && strings.EqualFold(gextto.TorrentBackendName(&cfg), gextto.BackendEmbedded) {
-		logging.Warn("libtorrent integrato non incluso in questa build: avvio con gx-torrent", "richiesto", gextto.BackendEmbedded)
-		if cfg.Settings == nil {
-			cfg.Settings = map[string]string{}
-		}
-		cfg.Settings["torrent_backend"] = gextto.BackendGxTorrent
-	}
-	torrents, err := gextto.NewLibtorrentClient(&cfg)
-	if err != nil {
-		return err
-	}
 	i18n, err := gextto.OpenI18nDb(filepath.Join(cfg.DataDir, constants.DefaultConfigFile))
 	if err != nil {
 		return err
@@ -190,7 +174,6 @@ func runDaemon(dryRun bool, configOption *string) error {
 		archive,
 		comics,
 		engine,
-		torrents,
 		gextto.FromConfig(&cfg),
 		gextto.NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage()),
 	)
@@ -198,9 +181,6 @@ func runDaemon(dryRun bool, configOption *string) error {
 	serveErr := gextto.Serve(state)
 	if shutdownErr := gextto.ShutdownTorrentEngine(state); shutdownErr != nil {
 		logging.Error("torrent engine shutdown failed", "error", shutdownErr)
-	}
-	if shutdownErr := gextto.ShutdownEmbedded(state, &cfg); shutdownErr != nil {
-		logging.Error("libtorrent shutdown did not save all fastresume data", "error", shutdownErr)
 	}
 	logCheckpoint("series", db.Checkpoint)
 	logCheckpoint("archive", archive.Checkpoint)

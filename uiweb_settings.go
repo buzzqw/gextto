@@ -156,7 +156,6 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "qbittorrent_request_timeout_secs", Label: "qBittorrent-nox — timeout richieste", Tab: "backend", Group: "qBittorrent-nox"},
 	{Key: "qbittorrent_poll_interval_ms", Label: "qBittorrent-nox — intervallo polling", Tab: "backend", Group: "qBittorrent-nox"},
 	{Key: "qbittorrent_path_mappings", Label: "qBittorrent-nox — mappatura percorsi", Tab: "backend", Group: "qBittorrent-nox"},
-	{Key: "libtorrent_enabled", Label: "libtorrent integrato — client abilitato", Tab: "backend", Group: "libtorrent integrato"},
 
 	// --- Velocità e rete ----------------------------------------------------
 	{Key: "torrent_dl_limit", Label: "Limite download globale", Tab: "libtorrent", Group: "Limiti di velocità"},
@@ -180,16 +179,11 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "torrent_utp", Label: "uTP", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
 	{Key: "torrent_holepunch", Label: "Holepunching (BEP 55)", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
 	{Key: "torrent_dht_bootstrap_nodes", Label: "Nodi bootstrap DHT", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
-	{Key: "libtorrent_announce_to_all_trackers", Label: "Annuncia a tutti i tracker", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
-	{Key: "libtorrent_announce_to_all_tiers", Label: "Annuncia a tutti i tier", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
-	{Key: "libtorrent_announce_interval", Label: "Intervallo announce", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
 	{Key: "torrent_encryption", Label: "Cifratura", Tab: "libtorrent", Group: "Cifratura e filtro IP"},
-	{Key: "libtorrent_prefer_rc4", Label: "Preferisci RC4", Tab: "libtorrent", Group: "Cifratura e filtro IP"},
 	{Key: "torrent_apply_ip_filter", Label: "Applica IP filter", Tab: "libtorrent", Group: "Cifratura e filtro IP"},
 	{Key: "torrent_ipfilter_url", Label: "IP filter (file/URL)", Tab: "libtorrent", Group: "Cifratura e filtro IP"},
 
 	// --- Code e prestazioni -------------------------------------------------
-	{Key: "libtorrent_auto_optimize", Label: "Ottimizzazione continua (periodica)", Tab: "performance", Group: "Coda e slot"},
 	{Key: "torrent_dynamic_queue", Label: "Auto-gestione dinamica coda e risorse", Tab: "performance", Group: "Coda e slot"},
 	{Key: "torrent_dynamic_queue_min", Label: "Slot download dinamici minimi", Tab: "performance", Group: "Coda e slot"},
 	{Key: "torrent_dynamic_queue_max", Label: "Slot download dinamici massimi", Tab: "performance", Group: "Coda e slot"},
@@ -200,23 +194,14 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "torrent_sequential", Label: "Download sequenziale", Tab: "performance", Group: "Modalità di download"},
 	{Key: "torrent_first_last", Label: "Prima/ultima parte dei file", Tab: "performance", Group: "Modalità di download"},
 	{Key: "torrent_preallocate", Label: "Prealloca lo spazio su disco", Tab: "performance", Group: "Modalità di download"},
-	{Key: "libtorrent_connections_limit", Label: "Limite connessioni totali", Tab: "performance", Group: "Connessioni"},
-	{Key: "libtorrent_upload_slots_limit", Label: "Slot upload", Tab: "performance", Group: "Connessioni"},
-	{Key: "libtorrent_half_open_limit", Label: "Half-open limit", Tab: "performance", Group: "Connessioni"},
 	{Key: "torrent_max_connections_per_torrent", Label: "Connessioni max per torrent", Tab: "performance", Group: "Connessioni"},
-	{Key: "libtorrent_max_uploads_per_torrent", Label: "Upload max per torrent", Tab: "performance", Group: "Connessioni"},
-	{Key: "libtorrent_allow_multiple_connections_per_ip", Label: "Più connessioni per IP", Tab: "performance", Group: "Connessioni"},
-	{Key: "libtorrent_torrent_connect_boost", Label: "Connect boost", Tab: "performance", Group: "Connessioni"},
 	{Key: "torrent_ramdisk_enabled", Label: "Usa il RAM disk", Tab: "performance", Group: "RAM disk"},
 	{Key: "torrent_ramdisk_dir", Label: "Cartella RAM disk", Tab: "performance", Group: "RAM disk"},
 	{Key: "torrent_ramdisk_threshold_gb", Label: "Dimensione massima per torrent", Tab: "performance", Group: "RAM disk"},
 	{Key: "torrent_ramdisk_margin_gb", Label: "Margine libero da mantenere", Tab: "performance", Group: "RAM disk"},
 	{Key: "torrent_ramdisk_min_free_bytes", Label: "Spazio minimo libero", Tab: "performance", Group: "RAM disk"},
-	{Key: "libtorrent_aio_threads", Label: "Thread AIO disco", Tab: "performance", Group: "Per esperti"},
 	{Key: "torrent_cache_size", Label: "Cache disco", Tab: "performance", Group: "Per esperti"},
 	{Key: "torrent_cache_expiry", Label: "Scadenza cache", Tab: "performance", Group: "Per esperti"},
-	{Key: "libtorrent_alert_queue_size", Label: "Coda alert", Tab: "performance", Group: "Per esperti"},
-	{Key: "libtorrent_extra_settings", Label: "Impostazioni libtorrent avanzate", Tab: "performance", Group: "Per esperti"},
 
 	// --- Seed e completamento -----------------------------------------------
 	{Key: "torrent_seed_ratio", Label: "Seed ratio globale", Tab: "seeding", Group: "Seed"},
@@ -310,7 +295,6 @@ var uiSettingGroupByKey = func() map[string]string {
 // uiSettingSearchTerms contains common concepts that are useful when searching
 // for a setting but are intentionally not repeated in its visible label.
 var uiSettingSearchTerms = map[string]string{
-	"libtorrent_auto_optimize":            "memoria memo memory ram cache buffer ottimizzazione optimization risorse resources",
 	"torrent_dynamic_queue":               "memoria memo memory ram coda queue risorse resources",
 	"torrent_dynamic_queue_min":           "memoria memo memory ram coda queue risorse resources",
 	"torrent_dynamic_queue_max":           "memoria memo memory ram coda queue risorse resources",
@@ -320,15 +304,12 @@ var uiSettingSearchTerms = map[string]string{
 	"torrent_active_limit":                "memoria memo memory ram coda queue risorse resources",
 	"torrent_cache_size":                  "memoria memo memory ram cache buffer disco disk",
 	"torrent_cache_expiry":                "memoria memo memory ram cache buffer disco disk",
-	"libtorrent_aio_threads":              "memoria memo memory ram buffer disco disk thread threads",
 	"torrent_ramdisk_enabled":             "memoria memo memory ram ramdisk tmpfs",
 	"torrent_ramdisk_threshold_gb":        "memoria memo memory ram ramdisk tmpfs spazio space",
 	"torrent_ramdisk_margin_gb":           "memoria memo memory ram ramdisk tmpfs spazio space",
 	"torrent_ramdisk_min_free_bytes":      "memoria memo memory ram ramdisk tmpfs spazio space",
 	"torrent_preallocate":                 "memoria memo memory ram spazio space disco disk",
-	"libtorrent_connections_limit":        "memoria memo memory ram risorse resources connessioni connections",
 	"torrent_max_connections_per_torrent": "memoria memo memory ram risorse resources connessioni connections",
-	"libtorrent_max_uploads_per_torrent":  "memoria memo memory ram risorse resources upload",
 	"min_free_space_gb":                   "memoria memo memory ram spazio space disco disk",
 	// Words of the labels used before the reorganization.
 	"active":                        "attivo daemon",
@@ -346,7 +327,6 @@ var uiSettingSearchTerms = map[string]string{
 	"trash_retention_days":          "trash",
 	"cleanup_action":                "cleanup azione trash",
 	"cleanup_upgrades":              "cleanup upgrade",
-	"libtorrent_enabled":            "client abilitato",
 	"torrent_dl_limit":              "velocità download",
 	"torrent_ul_limit":              "velocità upload",
 }

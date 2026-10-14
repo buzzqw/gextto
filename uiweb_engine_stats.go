@@ -102,13 +102,14 @@ func uiEngineStatsFrom(s *AppState) uiEngineStats {
 		return uiEngineStats{Error: "motore torrent non disponibile"}
 	}
 	engine := s.activeEngine()
+	if engine == nil {
+		return uiEngineStats{Backend: "-", Error: "nessun motore torrent attivo"}
+	}
 	switch engine.Name() {
-	case BackendGxTorrent:
-		return uiGxEngineStats(engine)
 	case BackendQbittorrent:
 		return uiQbitEngineStats(engine)
 	default:
-		return uiEmbeddedEngineStats(s, engine)
+		return uiGxEngineStats(engine)
 	}
 }
 
@@ -238,38 +239,6 @@ func uiUTPSocketRow(session map[string]any) (string, bool, bool) {
 		row += fmt.Sprintf(" · SYN scartati %d", drops)
 	}
 	return row, true, dialErrs > 0 && accepts == 0
-}
-
-func uiEmbeddedEngineStats(s *AppState, engine TorrentEngine) uiEngineStats {
-	out := uiEngineStats{Backend: "libtorrent " + LibtorrentVersion()}
-	stats := engine.Stats()
-	add := func(label, value string) {
-		out.Rows = append(out.Rows, uiEngineRow{Label: label, Value: value})
-	}
-	add("Torrent", fmt.Sprintf("%d · in download %d · in seed %d · in coda %d · bloccati %d",
-		engineNum(stats, "count"), engineNum(stats, "downloading"), engineNum(stats, "seeding"),
-		engineNum(stats, "queued"), engineNum(stats, "stalled")))
-	client, err := s.requireEmbedded("session_stats")
-	if err != nil || client == nil {
-		return out
-	}
-	counters, err := client.SessionStats()
-	if err != nil || len(counters) == 0 {
-		return out
-	}
-	get := func(name string) int64 { return counters[name] }
-	add("DHT", fmt.Sprintf("%d nodi", get("dht.dht_nodes")))
-	add("Peer", fmt.Sprintf("TCP %d · uTP %d", get("peer.num_tcp_peers"), get("peer.num_utp_peers")))
-	incoming := "nessuna finora (porta forse chiusa sul router)"
-	if get("net.has_incoming_connections") > 0 {
-		incoming = "sì"
-	}
-	add("Connessioni in entrata", incoming)
-	add("Disco", fmt.Sprintf("job in coda %d · letture %d · scritture %d", get("disk.queued_disk_jobs"),
-		get("disk.num_read_ops"), get("disk.num_write_ops")))
-	add("Totali sessione", fmt.Sprintf("scaricati %s · inviati %s",
-		logging.HumanBytesI64(get("net.recv_payload_bytes")), logging.HumanBytesI64(get("net.sent_payload_bytes"))))
-	return out
 }
 
 func uiQbitEngineStats(engine TorrentEngine) uiEngineStats {

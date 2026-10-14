@@ -58,10 +58,9 @@ type uiNavGroup struct {
 
 // uiDashboardData is the view-model of the dashboard partial.
 type uiDashboardData struct {
-	Active            bool
-	DryRun            bool
-	Backend           string
-	LibtorrentVersion string
+	Active  bool
+	DryRun  bool
+	Backend string
 	// EngineVersion is the gx-core version of the gx-torrent daemon.
 	EngineVersion   string
 	Torrents        int
@@ -313,14 +312,18 @@ func uiIsSystemPage(view string) bool {
 func uiDashboardDataFrom(s *AppState) uiDashboardData {
 	cfg := latestConfig(s)
 	engine := s.activeEngine()
-	views := engine.List()
+	var views []models.TorrentView
+	backend := "-"
+	if engine != nil {
+		views = engine.List()
+		backend = uiBackendLabel(engine.Name())
+	}
 	data := uiDashboardData{
-		Active:            cfg.Active,
-		DryRun:            cfg.DryRun,
-		Backend:           uiBackendLabel(engine.Name()),
-		LibtorrentVersion: LibtorrentVersion(),
-		Torrents:          len(views),
-		UpdatedAt:         uiNowClock(),
+		Active:    cfg.Active,
+		DryRun:    cfg.DryRun,
+		Backend:   backend,
+		Torrents:  len(views),
+		UpdatedAt: uiNowClock(),
 	}
 	if gx, ok := engine.(*gxTorrentEngine); ok {
 		data.EngineVersion = gx.DaemonVersion()

@@ -87,17 +87,12 @@ func newTestAppState(t *testing.T) *AppState {
 		t.Fatalf("write test config: %v", err)
 	}
 
-	// Pin the embedded backend so the tests never depend on a real gx-torrent
-	// answering on 127.0.0.1:8890 (the installation default is gx-torrent).
+	// Use an unreachable qBittorrent backend: the tests must never depend on a
+	// real gx-torrent answering on 127.0.0.1:8890 (the installation default).
 	// Only the in-memory configuration is set: writing it to the config DB
 	// would create gextto_config.db and confuse the maintenance widget tests.
-	cfg.Settings["torrent_backend"] = BackendEmbedded
-
-	torrents := &LibtorrentClient{
-		DryRun:   true,
-		torrents: make(map[string]models.TorrentView),
-		removed:  make(map[string]time.Time),
-	}
+	cfg.Settings["torrent_backend"] = BackendQbittorrent
+	cfg.Settings["qbittorrent_url"] = "http://127.0.0.1:1"
 
 	state := NewAppState(
 		&cfg,
@@ -107,7 +102,6 @@ func newTestAppState(t *testing.T) *AppState {
 		archive,
 		comics,
 		engine,
-		torrents,
 		FromConfig(&cfg),
 		NewTmdbClientWithLanguage(nil, "it-IT"),
 	)

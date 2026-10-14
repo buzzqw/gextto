@@ -1367,9 +1367,9 @@ type v2DetailCaps struct {
 func v2DetailCapsFor(backend string) v2DetailCaps {
 	matrix := CapabilityMatrix(backend)
 	if len(matrix) == 0 {
-		// Unknown/empty backend: keep the historical default (the embedded
-		// engine) instead of hiding every control.
-		matrix = CapabilityMatrix(BackendEmbedded)
+		// Unknown/empty backend: keep the historical default (gx-torrent)
+		// instead of hiding every control.
+		matrix = CapabilityMatrix(BackendGxTorrent)
 	}
 	available := func(name string) bool {
 		level := matrix[name]

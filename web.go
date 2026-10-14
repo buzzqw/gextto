@@ -532,9 +532,7 @@ type AppState struct {
 	archive     *Archive
 	comics      *ComicsDb
 	engine      *Engine
-	torrents    *LibtorrentClient
-	// torrent_engine is the active transfer engine. When nil the daemon uses
-	// the embedded libtorrent adapter (see activeEngine in torrent_engine.go).
+	// torrent_engine is the active transfer engine; nil until one is selected.
 	// engine_mu guards it because the backend can be switched at runtime while
 	// the background worker reads it.
 	engine_mu      sync.RWMutex

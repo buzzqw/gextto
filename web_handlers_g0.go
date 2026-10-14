@@ -1830,48 +1830,7 @@ func OptimizeLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppSt
 		})
 		return
 	}
-	client, err := s.requireEmbedded("optimize_settings")
-	if err != nil {
-		jsonError(w, http.StatusConflict, err.Error())
-		return
-	}
-	cfg := latestConfig(s)
-	optimization := gh0_libtorrentOptimizationFor(cfg)
-	for _, change := range optimization.changes {
-		if err := SaveSetting(s.cfg.DataDir, change.key, change.value); err != nil {
-			jsonError(w, http.StatusInternalServerError, fmt.Sprintf("%s: %s", change.key, err.Error()))
-			return
-		}
-	}
-	optimized := latestConfig(s)
-	if _, err := client.ApplySettings(optimized); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	jsonStatus(w, http.StatusOK, map[string]any{
-		"ok":      true,
-		"applied": true,
-		"hardware": map[string]any{
-			"memory_mb": optimization.memoryMB,
-		},
-		"settings": map[string]any{
-			"active_downloads":         3,
-			"active_seeds":             3,
-			"active_limit":             5,
-			"dynamic_queue":            true,
-			"dynamic_queue_min":        1,
-			"dynamic_queue_max":        10,
-			"dont_count_slow_torrents": true,
-			"cache_blocks":             optimization.cacheSize,
-			"cache_mb":                 optimization.cacheMB,
-			"queue_mb":                 optimization.queueMB,
-			"send_buffer_kb":           optimization.sendBufferKB,
-			"peer_list":                optimization.peerList,
-		},
-		"explanation":                 fmt.Sprintf("Base: 3 download, 3 seed, limite 5. Coda dinamica: active_downloads tra 1 e 10, a passi di uno, dopo campioni coerenti e con raffreddamento di 10 minuti. I torrent senza trasferimento non contano negli slot attivi. RAM rilevata: %d MB; cache: automatica libtorrent (-1), coda disco: %d MB, send-buffer: %d KiB, peer-list: %d. Connessioni e limiti globali di banda lasciati invariati.", optimization.memoryMB, optimization.queueMB, optimization.sendBufferKB, optimization.peerList),
-		"bandwidth_limits_preserved":  true,
-		"connections_limit_preserved": true,
-	})
+	jsonError(w, http.StatusConflict, "no active torrent engine supports the optimization")
 }
 
 // ---------------------------------------------------------------------------

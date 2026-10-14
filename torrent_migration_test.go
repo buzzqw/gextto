@@ -13,21 +13,22 @@ import (
 
 func TestMigrationPlanEmptyEngine(t *testing.T) {
 	state := newTestAppState(t)
-	plan := BuildMigrationPlan(state, state.cfg, BackendEmbedded)
+	state.cfg.Settings["torrent_backend"] = BackendGxTorrent
+	plan := BuildMigrationPlan(state, state.cfg, BackendGxTorrent)
 	if !plan.Ready {
-		t.Fatalf("embedded plan not ready: %+v", plan.Warnings)
+		t.Fatalf("gx-torrent plan not ready: %+v", plan.Warnings)
 	}
 	if len(plan.Items) != 0 {
 		t.Fatalf("items = %d, want 0", len(plan.Items))
 	}
-	if plan.FromBackend != BackendEmbedded || plan.ToBackend != BackendEmbedded {
+	if plan.FromBackend != BackendGxTorrent || plan.ToBackend != BackendGxTorrent {
 		t.Fatalf("plan = %+v", plan)
 	}
 }
 
 func TestMigrationManifestPersistAndLoad(t *testing.T) {
 	state := newTestAppState(t)
-	plan := BuildMigrationPlan(state, state.cfg, BackendEmbedded)
+	plan := BuildMigrationPlan(state, state.cfg, BackendGxTorrent)
 	path, err := PersistMigrationManifest(state.cfg, plan)
 	if err != nil {
 		t.Fatalf("PersistMigrationManifest: %v", err)
@@ -39,7 +40,7 @@ func TestMigrationManifestPersistAndLoad(t *testing.T) {
 	if err != nil || loaded == nil {
 		t.Fatalf("LoadMigrationManifest = %+v, %v", loaded, err)
 	}
-	if loaded.ToBackend != BackendEmbedded {
+	if loaded.ToBackend != BackendGxTorrent {
 		t.Fatalf("loaded = %+v", loaded)
 	}
 	_ = os.Remove(path)
@@ -51,6 +52,7 @@ func TestMigrationManifestPersistAndLoad(t *testing.T) {
 func TestMigrationPlanRejectsIncompleteTarget(t *testing.T) {
 	state := newTestAppState(t)
 	// qBittorrent without a URL must not be marked ready.
+	delete(state.cfg.Settings, "qbittorrent_url")
 	plan := BuildMigrationPlan(state, state.cfg, BackendQbittorrent)
 	if plan.Ready {
 		t.Fatal("qbittorrent plan must not be ready without a URL")
@@ -87,7 +89,7 @@ func TestMigrationPlanListsManagedTorrents(t *testing.T) {
 	}
 	state.setActiveEngine(engine)
 
-	plan := BuildMigrationPlan(state, cfg, BackendEmbedded)
+	plan := BuildMigrationPlan(state, cfg, BackendGxTorrent)
 	if len(plan.Items) != 1 || plan.Items[0].Hash != "abc" {
 		t.Fatalf("plan items = %+v", plan.Items)
 	}
@@ -125,7 +127,7 @@ func TestImportMigrationManifest(t *testing.T) {
 	}
 	savePath := t.TempDir()
 	manifest := MigrationManifest{
-		FromBackend: BackendEmbedded,
+		FromBackend: BackendGxTorrent,
 		ToBackend:   BackendQbittorrent,
 		CreatedAt:   time.Now().UTC().Format(time.RFC3339),
 		Items: []MigrationItem{{

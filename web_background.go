@@ -611,8 +611,6 @@ func shouldLogQueueCounts(tick int, counts, last string) bool {
 // seed/cleanup policy once per tick.
 func torrentEventWorker(configPath string, fallback *Config, state *AppState, db *Database, comics *ComicsDb, eventLog *EventLog) {
 	torrents := state.activeEngine()
-	// Optional libtorrent-only hooks: nil for any other backend.
-	extras, _ := torrents.(torrentEngineEmbeddedExtras)
 	moveRequests := map[string]struct{}{}
 	// Hashes whose final "completed" notification was already sent by this
 	// worker: a later storage_moved/torrent_finished for the same torrent must not
@@ -651,9 +649,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	// tmpfs forever. `ramdiskAttempts` rate-limits retries per hash.
 	ramdiskAttempts := map[string]time.Time{}
 	lastRamdiskCheck := time.Now().Add(-120 * time.Second)
-	lastMetadataPromotion := time.Now().Add(-30 * time.Second)
 	lastDynamicAdjustment := time.Now().Add(-90 * time.Second)
-	lastResumeSave := time.Now()
 	// lastQueueCounts is the last logged "transferring/stuck/waiting" triple.
 	lastQueueCounts := ""
 	// queueTicks counts the dynamic ticks: the first runs right after start on
@@ -692,11 +688,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		if torrent.State == "seeding" {
 			continue
 		}
-		// Skip a torrent that was already re-checked recently: re-reading a
-		// multi-gigabyte pack from the NAS is expensive and gives the same result.
-		if extras != nil && extras.recentlyRechecked(torrent.Hash, recheckGuardWindow) {
-			continue
-		}
 		status, statusErr := db.TorrentStatus(torrent.Hash)
 		if statusErr == nil && status != nil && *status == "completed" {
 			continue
@@ -723,7 +714,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		// diverge on which transfer plane they drive.
 		if active := state.activeEngine(); active != torrents {
 			torrents = active
-			extras, _ = torrents.(torrentEngineEmbeddedExtras)
 			logging.Info("torrent event worker switched backend", "backend", torrents.Name())
 		}
 		// A long re-check (a large pack on the NAS) gets one line when it starts
@@ -803,28 +793,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			}
 			lastConfigReload = now
 		}
-		if extras != nil && now.Sub(lastResumeSave) >= resumeSaveInterval {
-			if requested := extras.RequestResumeSave(); requested < 0 {
-				logging.Debug("periodic resume save request failed")
-			} else if requested > 0 {
-				logging.Debug("periodic resume save requested", "torrents", requested)
-			}
-			lastResumeSave = now
-		}
-		if now.Sub(lastMetadataPromotion) >= 30*time.Second {
-			// Torrents without metadata that were just promoted lose
-			// `auto_managed`; when metadata arrives it must be re-armed, even if
-			// the alert was lost (e.g. fastresume restore). These hooks are
-			// libtorrent-specific; other backends handle metadata themselves.
-			if extras != nil {
-				extras.PromoteMetadata()
-				rearmed := extras.EnsureAutoManaged()
-				if rearmed > 0 {
-					logging.Info("auto-managed flag restored on running torrents", "rearmed", rearmed)
-				}
-			}
-			lastMetadataPromotion = now
-		}
 		if now.Sub(lastDynamicAdjustment) >= 90*time.Second {
 			queueTicks++
 			effectiveDownloadKib, _ := bg_currentSpeedLimits(cfg)
@@ -834,11 +802,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			// re-logged the same counts twice per stall probe (resumed, then
 			// parked again ten minutes later).
 			snapshot := torrents.List()
-			// Apply add-time options that need metadata (first/last pieces) or that
-			// pause as soon as metadata arrives (metadata-only adds).
-			if extras != nil {
-				extras.EnforceDeferredOptions(snapshot)
-			}
 			queued := 0
 			transferring := 0
 			idle := 0
@@ -1551,10 +1514,6 @@ func bg_applyLibtorrentOptimization(s *AppState) (bool, uint64, error) {
 		if err := SaveSetting(s.cfg.DataDir, change.key, change.value); err != nil {
 			return false, optimization.memoryMB, fmt.Errorf("%s: %w", change.key, err)
 		}
-	}
-	optimized := latestConfig(s)
-	if _, err := s.torrents.ApplySettings(optimized); err != nil {
-		return false, optimization.memoryMB, err
 	}
 	return true, optimization.memoryMB, nil
 }

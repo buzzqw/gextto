@@ -65,7 +65,7 @@ func TestPlanEngineFallback(t *testing.T) {
 		{"gx-torrent not installed downloads managed qBittorrent", BackendGxTorrent, false, false, BackendQbittorrent, true, true},
 		{"gx-torrent already installed reuses qBittorrent", BackendGxTorrent, true, false, BackendQbittorrent, false, true},
 		{"external qBittorrent is used as is", BackendGxTorrent, false, true, BackendQbittorrent, false, false},
-		{"embedded goes to qBittorrent", BackendEmbedded, true, false, BackendQbittorrent, false, true},
+		{"unknown backend goes to qBittorrent", "embedded", true, false, BackendQbittorrent, false, true},
 		{"qBittorrent goes back to gx-torrent", BackendQbittorrent, true, false, BackendGxTorrent, false, false},
 		{"qBittorrent with external config goes back to gx-torrent", BackendQbittorrent, false, true, BackendGxTorrent, false, false},
 	}
@@ -80,21 +80,17 @@ func TestPlanEngineFallback(t *testing.T) {
 }
 
 func TestEngineFallbackSecondary(t *testing.T) {
-	// Without libtorrent the secondary of a failed gx-torrent is recovery.
-	if plan := engineFallbackSecondary(BackendGxTorrent, false); plan.Backend != BackendRecovery {
-		t.Fatalf("secondary without libtorrent = %q, want recovery", plan.Backend)
-	}
-	// With libtorrent the embedded engine is the last resort.
-	if plan := engineFallbackSecondary(BackendGxTorrent, true); plan.Backend != BackendEmbedded {
-		t.Fatalf("secondary with libtorrent = %q, want embedded", plan.Backend)
+	// The secondary of a failed gx-torrent is recovery (no other engine).
+	if plan := engineFallbackSecondary(BackendGxTorrent); plan.Backend != BackendRecovery {
+		t.Fatalf("secondary of gx-torrent = %q, want recovery", plan.Backend)
 	}
 	// A failed qBittorrent always falls back to gx-torrent.
-	if plan := engineFallbackSecondary(BackendQbittorrent, true); plan.Backend != BackendGxTorrent {
+	if plan := engineFallbackSecondary(BackendQbittorrent); plan.Backend != BackendGxTorrent {
 		t.Fatalf("secondary of qBittorrent = %q, want gx-torrent", plan.Backend)
 	}
 	// The engine that just failed must never be the secondary.
-	if plan := engineFallbackSecondary(BackendEmbedded, true); plan.Backend == BackendEmbedded {
-		t.Fatal("the embedded engine must not fall back to itself")
+	if plan := engineFallbackSecondary(BackendGxTorrent); plan.Backend == BackendGxTorrent {
+		t.Fatal("gx-torrent must not fall back to itself")
 	}
 }
 
@@ -189,18 +185,8 @@ func TestApplyEngineFallbackRecoveryWhenDownloadFails(t *testing.T) {
 	})
 
 	switched := applyEngineFallback(context.Background(), &cfg, BackendGxTorrent, nil)
-	if LibtorrentCompiled() {
-		// A build with libtorrent falls back to the embedded engine.
-		if !switched {
-			t.Fatal("a libtorrent build must fall back to the embedded engine")
-		}
-		if got := readSettingValue(t, cfg.DataDir, "torrent_backend"); got != BackendEmbedded {
-			t.Fatalf("torrent_backend = %q, want embedded", got)
-		}
-		return
-	}
 	if switched {
-		t.Fatal("without libtorrent a failed download must not switch")
+		t.Fatal("a failed download must not switch when no alternative engine is available")
 	}
 	if restarts != 0 {
 		t.Fatalf("restarts = %d, want 0 in recovery", restarts)

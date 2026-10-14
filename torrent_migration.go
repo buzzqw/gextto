@@ -62,6 +62,11 @@ func BuildMigrationPlan(s *AppState, cfg *Config, target string) MigrationManife
 		cfg = latestConfig(s)
 	}
 	source := ActiveTorrentBackend(s).Name()
+	if source == "none" {
+		// No engine is active (a refused activation): the source is the
+		// configured backend.
+		source = TorrentBackendName(cfg)
+	}
 	plan := MigrationManifest{
 		FromBackend: source,
 		ToBackend:   target,
@@ -101,8 +106,6 @@ func BuildMigrationPlan(s *AppState, cfg *Config, target string) MigrationManife
 	sort.Slice(plan.Items, func(i, j int) bool { return plan.Items[i].Hash < plan.Items[j].Hash })
 
 	switch target {
-	case BackendEmbedded:
-		// Always available.
 	case BackendGxTorrent:
 		// Runs on this machine and shares Gextto's paths: only the resolved
 		// settings must be valid (the binary is started by managed mode).
@@ -270,7 +273,7 @@ func TorrentMigrationPlan(w http.ResponseWriter, r *http.Request, s *AppState) {
 		target = TorrentBackendName(cfg)
 	}
 	if target == "" {
-		target = BackendEmbedded
+		target = BackendGxTorrent
 	}
 	plan := BuildMigrationPlan(s, cfg, target)
 	persist := input.Persist == nil || *input.Persist

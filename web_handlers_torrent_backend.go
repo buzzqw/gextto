@@ -49,8 +49,8 @@ func ActiveTorrentBackend(s *AppState) TorrentBackend {
 // TorrentBackendName returns the configured backend. A missing or empty
 // `torrent_backend` selects DefaultTorrentBackend (gx-torrent for a fresh
 // installation); a value that was saved but is unknown (a backend removed in a
-// previous release) is normalised to the embedded libtorrent engine so existing
-// installations keep transfering after an upgrade.
+// previous release, including the old `embedded`) is normalised to gx-torrent
+// so existing installations keep transferring after an upgrade.
 func TorrentBackendName(cfg *Config) string {
 	value := DefaultTorrentBackend
 	if cfg != nil {
@@ -64,21 +64,17 @@ func TorrentBackendName(cfg *Config) string {
 	switch value {
 	case BackendQbittorrent:
 		return BackendQbittorrent
-	case BackendGxTorrent:
-		return BackendGxTorrent
 	default:
-		// embedded, or an unknown/removed backend saved by an older install.
-		return BackendEmbedded
+		return BackendGxTorrent
 	}
 }
 
 // isKnownTorrentBackend reports whether value (already lower-cased and
 // trimmed) names a backend this build knows. Anything else is a removed or
-// unrecognised value, which TorrentBackendName normalises to the embedded
-// engine.
+// unrecognised value, which TorrentBackendName normalises to gx-torrent.
 func isKnownTorrentBackend(value string) bool {
 	switch value {
-	case BackendQbittorrent, BackendGxTorrent, BackendEmbedded:
+	case BackendQbittorrent, BackendGxTorrent:
 		return true
 	}
 	return false
@@ -256,7 +252,7 @@ func TorrentBackendPortCheck(w http.ResponseWriter, r *http.Request, s *AppState
 func TorrentBackendPreflight(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	configured := TorrentBackendName(cfg)
-	if configured == BackendEmbedded {
+	if configured == BackendGxTorrent {
 		jsonResponse(w, QbittorrentPreflight{OK: true, Connected: true})
 		return
 	}
