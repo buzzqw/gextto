@@ -191,7 +191,7 @@ type uiSettingsPage struct {
 	ListEditors     []uiListEditor
 	SearchIndexJSON string
 	// Actions is an optional toolbar of API buttons shown at the top of the
-	// tab (e.g. Ottimizza / Applica ora in Libtorrent).
+	// tab (e.g. Ottimizza on the performance tab).
 	Actions *uiActionSection
 	// EditorsFirst renders the structured editors (the feed editor) before the
 	// plain fields, the order extto/rextto use on the Sorgenti tab.
@@ -403,10 +403,10 @@ type uiSearchEntry struct {
 // tuning. They render as "Auto" instead of an editable value.
 func gxAutoManagedKey(key string) bool {
 	switch key {
-	case "libtorrent_active_downloads", "libtorrent_active_seeds", "libtorrent_active_limit",
-		"libtorrent_dont_count_slow_torrents",
-		"libtorrent_dynamic_queue", "libtorrent_dynamic_queue_min", "libtorrent_dynamic_queue_max",
-		"libtorrent_cache_size", "libtorrent_cache_expiry":
+	case "torrent_active_downloads", "torrent_active_seeds", "torrent_active_limit",
+		"torrent_dont_count_slow_torrents",
+		"torrent_dynamic_queue", "torrent_dynamic_queue_min", "torrent_dynamic_queue_max",
+		"torrent_cache_size", "torrent_cache_expiry":
 		return true
 	}
 	return false
@@ -553,15 +553,6 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		ActiveID: active,
 		Fields:   fieldsByTab[active],
 	}
-	// With the continuous optimization on, the queue/cache fields are handled
-	// by Rextto/Gextto: show them as "Auto" (read-only), like rextto does.
-	if active == "performance" && settingsBool(cfg, "libtorrent_auto_optimize", false) {
-		for index := range page.Fields {
-			if uiManagedSetting[page.Fields[index].Key] {
-				page.Fields[index].Managed = true
-			}
-		}
-	}
 	// The transfer backend is a fixed choice: render it as a select instead of
 	// a free-text box.
 	if active == "backend" {
@@ -604,7 +595,6 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	page.ShowI18n = active == "system"
 	page.ListEditors = uiSettingsTabEditors(active)
 	page.ShowEditors = len(page.ListEditors) > 0
-	applyNow := uiActionButton{Label: "Applica ora", Method: "POST", Path: "/api/torrents/apply_settings", Body: "{}", Hint: "Riapplica subito le impostazioni libtorrent alla sessione attiva."}
 	switch active {
 	case "sources":
 		// The Indexer Torznab editor and FlareSolverr live only in Integrazioni
@@ -612,12 +602,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		// settings, so the same form is not shown twice.
 		page.EditorsFirst = true
 		page.CheckboxGroups = uiSourcesCheckboxGroups(cfg)
-	case "libtorrent":
-		page.Actions = &uiActionSection{
-			Label:   "Applica alla sessione",
-			Hint:    "Le impostazioni salvate valgono dal ciclo successivo; «Applica ora» le riapplica subito alla sessione attiva.",
-			Buttons: []uiActionButton{applyNow},
-		}
+	case "network":
 		for index := range page.Groups {
 			if page.Groups[index].Title == "Porte e interfacce" {
 				page.Groups[index].Hint = "Porta peer usata dal motore torrent. «Test porte» verifica che sia in ascolto e inoltrata dal router (disponibile con gx-torrent)."
@@ -632,7 +617,6 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 			Hint:  "Ottimizza calcola cache e buffer in base alla RAM e adatta la coda dinamica durante il funzionamento. Con l'ottimizzazione continua attiva i campi Download attivi, Seed attivi, Limite torrent attivi e Cache disco sono gestiti automaticamente (Auto).",
 			Buttons: []uiActionButton{
 				{Label: "Ottimizza", Class: "primary", Method: "POST", Path: "/api/torrents/optimize_settings", Body: "{}", Hint: "Applica una base sicura e suggerisce cache e buffer in base alla RAM."},
-				applyNow,
 			},
 		}
 	}
@@ -828,8 +812,8 @@ func uiHideDependentFields(fields []uiSettingField) {
 // settings, superseded in the page by libtorrent_sched_week. They are still
 // read as the fallback of an unsaved per-day schedule (speedScheduleWeek).
 var uiSchedSingleWindowKeys = map[string]bool{
-	"libtorrent_sched_start": true, "libtorrent_sched_end": true, "libtorrent_sched_days": true,
-	"libtorrent_sched_dl_limit": true, "libtorrent_sched_ul_limit": true,
+	"torrent_sched_start": true, "torrent_sched_end": true, "torrent_sched_days": true,
+	"torrent_sched_dl_limit": true, "torrent_sched_ul_limit": true,
 }
 
 // uiSettingsTabEditors returns the structured list editors shown on a tab.
@@ -865,42 +849,6 @@ var uiSettingsEditorSearchEntries = []uiSearchEntry{
 	{Key: "", Label: "Traduzioni", Tab: "system"},
 }
 
-// uiManagedSetting lists the settings the continuous optimization drives: with
-// `libtorrent_auto_optimize` on they render as "Auto" and cannot be edited.
-var uiManagedSetting = map[string]bool{
-	"libtorrent_active_downloads": true,
-	"libtorrent_active_seeds":     true,
-	"libtorrent_active_limit":     true,
-	"libtorrent_cache_size":       true,
-}
-
-// uiLibtorrentEngineOnlySettings lists the options read only by the embedded
-// libtorrent session (see libtorrent.go). Seed, stall, queue, speed, directory
-// and RAM-disk options are intentionally excluded: the automation layer applies
-// those with every engine, so they must stay editable.
-//
-// The network, queue and cache options are excluded too: gx-torrent reads the
-// same libtorrent_* keys (gxNetworkArgs and gxQueuePolicy), so they must stay
-// editable whichever engine is selected. Only knobs specific to the libtorrent
-// settings_pack remain listed here.
-var uiLibtorrentEngineOnlySettings = map[string]bool{
-	"libtorrent_enabled":                           true,
-	"libtorrent_auto_optimize":                     true,
-	"libtorrent_extra_settings":                    true,
-	"libtorrent_aio_threads":                       true,
-	"libtorrent_alert_queue_size":                  true,
-	"libtorrent_allow_multiple_connections_per_ip": true,
-	"libtorrent_announce_interval":                 true,
-	"libtorrent_announce_to_all_tiers":             true,
-	"libtorrent_announce_to_all_trackers":          true,
-	"libtorrent_connections_limit":                 true,
-	"libtorrent_half_open_limit":                   true,
-	"libtorrent_max_uploads_per_torrent":           true,
-	"libtorrent_prefer_rc4":                        true,
-	"libtorrent_torrent_connect_boost":             true,
-	"libtorrent_upload_slots_limit":                true,
-}
-
 // uiSettingAllowedBackends lists the torrent engines a setting applies to. A
 // nil/empty result means every engine.
 func uiSettingAllowedBackends(key string) []string {
@@ -909,8 +857,6 @@ func uiSettingAllowedBackends(key string) []string {
 		return []string{BackendQbittorrent}
 	case strings.HasPrefix(key, "gxtorrent_"):
 		return []string{BackendGxTorrent}
-	case uiLibtorrentEngineOnlySettings[key]:
-		return []string{BackendEmbedded}
 	}
 	return nil
 }
@@ -928,7 +874,7 @@ func uiBackendAllows(allowed []string, backend string) bool {
 }
 
 // uiActiveTorrentBackend returns the configured transfer backend, defaulting to
-// the embedded engine.
+// gx-torrent.
 func uiActiveTorrentBackend(cfg *Config) string {
 	return TorrentBackendName(cfg)
 }
@@ -977,21 +923,15 @@ func uiTorrentBackendOptions(value string) []uiFormOption {
 		value = DefaultTorrentBackend
 	}
 	if !isKnownTorrentBackend(strings.ToLower(value)) {
-		// A removed or unknown backend is normalised to the embedded engine at
-		// runtime (TorrentBackendName); show the same here.
-		value = BackendEmbedded
+		// A removed or unknown backend is normalised to gx-torrent at runtime
+		// (TorrentBackendName); show the same here.
+		value = BackendGxTorrent
 	}
-	options := []uiFormOption{}
-	// The embedded libtorrent engine only exists in a build compiled with it;
-	// when it is absent the option is not offered.
-	if LibtorrentCompiled() {
-		options = append(options, uiFormOption{Value: BackendEmbedded, Label: "libtorrent (integrato)", Selected: value == BackendEmbedded})
+	options := []uiFormOption{
+		{Value: BackendQbittorrent, Label: uiBackendLabel(BackendQbittorrent), Selected: value == BackendQbittorrent},
+		{Value: BackendGxTorrent, Label: "gx-torrent (predefinito)", Selected: value == BackendGxTorrent},
 	}
-	options = append(options,
-		uiFormOption{Value: BackendQbittorrent, Label: uiBackendLabel(BackendQbittorrent), Selected: value == BackendQbittorrent},
-		uiFormOption{Value: BackendGxTorrent, Label: "gx-torrent (predefinito)", Selected: value == BackendGxTorrent},
-	)
-	if value != BackendQbittorrent && value != BackendGxTorrent && !(LibtorrentCompiled() && value == BackendEmbedded) {
+	if value != BackendQbittorrent && value != BackendGxTorrent {
 		options = append([]uiFormOption{{Value: value, Label: value + " (non valido)", Selected: true}}, options...)
 		for index := 1; index < len(options); index++ {
 			options[index].Selected = false
@@ -1132,7 +1072,7 @@ func uiSettingFieldBase(key, label, value string) uiSettingField {
 			{Value: "delete", Label: "Elimina definitivamente", Selected: selected == "delete"},
 		}
 	}
-	if key == "libtorrent_encryption" {
+	if key == "torrent_encryption" {
 		selected := strings.TrimSpace(value)
 		if selected != "0" && selected != "2" {
 			selected = "1"
@@ -1144,7 +1084,7 @@ func uiSettingFieldBase(key, label, value string) uiSettingField {
 			{Value: "2", Label: "Forzata", Selected: selected == "2"},
 		}
 	}
-	if key == "libtorrent_outgoing_interface" {
+	if key == "torrent_outgoing_interface" {
 		selected := strings.TrimSpace(value)
 		field.Kind = "select"
 		field.Options = []uiFormOption{{

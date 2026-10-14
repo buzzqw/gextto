@@ -16,10 +16,10 @@ func validateBackendSetting(key, value string) error {
 	switch key {
 	case "torrent_backend":
 		switch raw {
-		case "", BackendEmbedded, BackendQbittorrent, BackendGxTorrent:
+		case "", BackendQbittorrent, BackendGxTorrent:
 			return nil
 		default:
-			return fmt.Errorf("torrent_backend must be embedded, qbittorrent or gx-torrent")
+			return fmt.Errorf("torrent_backend must be qbittorrent or gx-torrent")
 		}
 	case "qbittorrent_url", "gxtorrent_url":
 		if raw == "" {
@@ -101,12 +101,12 @@ func validateBackendInteger(key, raw string, min, max int64) error {
 
 // pathSettings are the configuration keys that hold filesystem paths.
 var pathSettings = map[string]bool{
-	"trash_path":                  true,
-	"archive_root":                true,
-	"libtorrent_dir":              true,
-	"libtorrent_temp_dir":         true,
-	"libtorrent_torrent_copy_dir": true,
-	"libtorrent_ramdisk_dir":      true,
+	"trash_path":          true,
+	"archive_root":        true,
+	"torrent_dir":         true,
+	"torrent_temp_dir":    true,
+	"torrent_copy_dir":    true,
+	"torrent_ramdisk_dir": true,
 }
 
 // validatePathSetting rejects path values that are unsafe for the role they
@@ -132,7 +132,7 @@ func validatePathSetting(key, value string, cfg *Config) error {
 	if cfg == nil {
 		return nil
 	}
-	for _, critical := range []string{cfg.DataDir, cfg.StateDir, cfg.LibtorrentDir} {
+	for _, critical := range []string{cfg.DataDir, cfg.StateDir, cfg.DownloadDir} {
 		if strings.TrimSpace(critical) == "" {
 			continue
 		}

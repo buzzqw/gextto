@@ -1367,9 +1367,9 @@ type v2DetailCaps struct {
 func v2DetailCapsFor(backend string) v2DetailCaps {
 	matrix := CapabilityMatrix(backend)
 	if len(matrix) == 0 {
-		// Unknown/empty backend: keep the historical default (the embedded
-		// engine) instead of hiding every control.
-		matrix = CapabilityMatrix(BackendEmbedded)
+		// Unknown/empty backend: keep the historical default (gx-torrent)
+		// instead of hiding every control.
+		matrix = CapabilityMatrix(BackendGxTorrent)
 	}
 	available := func(name string) bool {
 		level := matrix[name]
@@ -1404,7 +1404,7 @@ func v2DetailBackendLabel(backend string) string {
 	case BackendQbittorrent:
 		return "qBittorrent-nox"
 	default:
-		return "libtorrent"
+		return backend
 	}
 }
 
@@ -1882,7 +1882,7 @@ func (field v2Field) DescribedBy() string {
 // Browse reports whether the field is a server folder with a «Sfoglia» picker.
 func (field v2Field) Browse() bool {
 	switch field.Key {
-	case "archive_root", "trash_path", "libtorrent_dir", "libtorrent_temp_dir", "libtorrent_torrent_copy_dir", "libtorrent_ramdisk_dir":
+	case "archive_root", "trash_path", "torrent_dir", "torrent_temp_dir", "torrent_copy_dir", "torrent_ramdisk_dir":
 		return true
 	}
 	return false

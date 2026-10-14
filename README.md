@@ -127,8 +127,7 @@ an activation refused at startup — Gextto does not just stop. It walks a chain
 and persists the choice: first the **managed qBittorrent-nox**, downloaded on
 demand from the `userdocs/qbittorrent-nox-static` releases (the last libtorrent
 v2 build, SHA-256 verified) and started with a private profile — or an external
-qBittorrent you already run; then the optional embedded libtorrent, on a build
-that includes it; finally a recovery state where the transfers stay stopped and
+qBittorrent you already run; finally a recovery state where the transfers stay stopped and
 the UI stays up so you can intervene. Before switching engines it tries the
 cheapest fix: an updated `gx-torrent` that fails to start is rolled back to the
 previous binary. A cooldown prevents two crashing engines from ping-ponging, and
@@ -237,13 +236,12 @@ resume storage, and real-time Server-Sent Events (`/ui/events`).
 |---|---|---|
 | gx-torrent (default) | Separate supervised Go process | Pure Go, self-contained, active development. v1, hybrid and v2-only, DHT and MSE/PE; also standalone on Linux and Windows; no WebTorrent/WebRTC |
 | qBittorrent-nox | External daemon via its Web API, or one Gextto downloads and runs privately | You already run qBittorrent-nox or prefer its UI. Needs path mappings and an extra process ([setup guide](docs/qbittorrent-nox.md)); also the first step of the automatic fallback, downloaded on demand |
-| libtorrent (no longer shipped) | Inside Gextto's process, **only in a custom build** (`make build-libtorrent`); releases are pure Go | Advanced libtorrent controls or compatibility; one step of the automatic fallback. A crash takes Gextto down too. Being removed |
 
 Engine statistics — torrents by state, speed and queue slots, port/router,
 DHT/uTP/LSD, encryption, proxy, IP filter, cache, **incoming connections**,
 **disk I/O** and the **all-time downloaded/uploaded totals** (kept across
 restarts) — are in **Health → Torrent engine** (`/?view=health`), in the
-daemon's `GET /api/v1/stats`, and in `GET /api/libtorrent/session-stats`.
+daemon's `GET /api/v1/stats`, and in `GET /api/torrents/session-stats`.
 
 ## Resource footprint
 
@@ -259,9 +257,8 @@ torrents and archive scans; single-machine numbers are indicative.
 |---|---:|---:|
 | gx-torrent | ~25 MB | ~100 MB |
 | qBittorrent-nox | ~40 MB | ~5 GB |
-| libtorrent (in-process, optional build) | ~0.5 GB | 3–5 GB |
 
-libtorrent and qBittorrent keep a large in-process disk cache (GBs of
+qBittorrent keeps a large in-process disk cache (GBs of
 anonymous memory). gx-torrent writes pieces through and leaves coalescing to
 the reclaimable OS page cache, so its footprint stays in the tens/hundreds of
 MB under load. Values vary with torrents, peers and storage; on HDD/NFS
@@ -281,8 +278,7 @@ It installs to `/opt/gextto`, keeps service data in `/var/lib/gextto`, and
 serves the UI on port 5000. The engine `gx-torrent` (pure Go) is
 installed alongside `gexttod` and started in managed mode. The release package
 is pure Go — nothing else to install. An external qBittorrent-nox can be used
-instead ([setup guide](docs/qbittorrent-nox.md)); the embedded libtorrent
-engine is no longer shipped (see below).
+instead ([setup guide](docs/qbittorrent-nox.md)).
 
 The installer first runs the downloaded program once: a missing library or an
 old glibc is reported immediately instead of leaving a service that never

@@ -98,7 +98,7 @@ func seedTestSetup(t *testing.T) (*Database, *Config, models.TorrentView, string
 	}
 
 	cfg := DefaultConfig()
-	cfg.Libtorrent.SeedRatio = 0.5
+	cfg.Transfer.SeedRatio = 0.5
 	cfg.Settings = map[string]string{}
 
 	view := models.TorrentView{
@@ -125,7 +125,7 @@ func TestRemoveSeededCompletedHonorsAutoRemove(t *testing.T) {
 	db, cfg, view, source, processed := seedTestSetup(t)
 
 	session := &stubTorrentSession{list: []models.TorrentView{view}}
-	cfg.Libtorrent.AutoRemoveCompleted = false
+	cfg.Transfer.AutoRemoveCompleted = false
 	RemoveSeededCompleted(cfg, session, db, map[string]struct{}{})
 	if len(session.removed) != 0 {
 		t.Fatalf("auto_remove_completed=false removed torrents: %v", session.removed)
@@ -134,7 +134,7 @@ func TestRemoveSeededCompletedHonorsAutoRemove(t *testing.T) {
 		t.Fatalf("source must be kept when move_episodes is off: %v", err)
 	}
 
-	cfg.Libtorrent.AutoRemoveCompleted = true
+	cfg.Transfer.AutoRemoveCompleted = true
 	session = &stubTorrentSession{list: []models.TorrentView{view}}
 	RemoveSeededCompleted(cfg, session, db, map[string]struct{}{})
 	if len(session.removed) != 1 || session.removed[0] != seedTestHash {
@@ -151,7 +151,7 @@ func TestRemoveSeededCompletedHonorsAutoRemove(t *testing.T) {
 // torrent stays listed.
 func TestRemoveSeededCompletedKeepsSourceBeforeArchive(t *testing.T) {
 	db, cfg, view, source, _ := seedTestSetup(t)
-	cfg.Libtorrent.AutoRemoveCompleted = false
+	cfg.Transfer.AutoRemoveCompleted = false
 	cfg.Settings["move_episodes"] = "true"
 
 	session := &stubTorrentSession{list: []models.TorrentView{view}}
@@ -225,7 +225,7 @@ func TestDetachCompletedArchivedSinglesHonorsAutoRemove(t *testing.T) {
 	if err := os.Remove(source); err != nil {
 		t.Fatal(err)
 	}
-	cfg.Libtorrent.AutoRemoveCompleted = false
+	cfg.Transfer.AutoRemoveCompleted = false
 	session := &stubTorrentSession{list: []models.TorrentView{view}}
 	DetachCompletedArchivedSingles(cfg, session, db)
 	if len(session.removed) != 0 {
@@ -259,9 +259,9 @@ func TestEnforceSeedPolicyArchivesAtSeedEnd(t *testing.T) {
 // and is not the release's configured archive destination.
 func TestEnforceSeedPolicyMovesRamdiskSourceDirectlyToArchive(t *testing.T) {
 	db, cfg, view, source, processed := seedTestSetup(t)
-	cfg.Settings["libtorrent_ramdisk_enabled"] = "yes"
-	cfg.Settings["libtorrent_ramdisk_dir"] = filepath.Dir(source)
-	cfg.LibtorrentDir = filepath.Join(t.TempDir(), "downloads")
+	cfg.Settings["torrent_ramdisk_enabled"] = "yes"
+	cfg.Settings["torrent_ramdisk_dir"] = filepath.Dir(source)
+	cfg.DownloadDir = filepath.Join(t.TempDir(), "downloads")
 	library := filepath.Dir(processed)
 	cfg.ArchiveRoot = &library
 	if err := db.MarkTorrentCompleted(seedTestHash, source, 5); err != nil {
@@ -281,10 +281,10 @@ func TestEnforceSeedPolicyMovesRamdiskSourceDirectlyToArchive(t *testing.T) {
 // not be moved into the archive as a second copy in a subfolder.
 func TestEnforceSeedPolicyRamdiskSkipsArchiveWhenAlreadyCopied(t *testing.T) {
 	db, cfg, view, source, processed := seedTestSetup(t)
-	cfg.Settings["libtorrent_ramdisk_enabled"] = "yes"
-	cfg.Settings["libtorrent_ramdisk_dir"] = filepath.Dir(source)
+	cfg.Settings["torrent_ramdisk_enabled"] = "yes"
+	cfg.Settings["torrent_ramdisk_dir"] = filepath.Dir(source)
 	downloads := filepath.Join(t.TempDir(), "downloads")
-	cfg.LibtorrentDir = downloads
+	cfg.DownloadDir = downloads
 	library := filepath.Dir(processed)
 	cfg.ArchiveRoot = &library
 
@@ -299,9 +299,9 @@ func TestEnforceSeedPolicyRamdiskSkipsArchiveWhenAlreadyCopied(t *testing.T) {
 // was populated before a restart interrupted the storage_moved event.
 func TestEnforceSeedPolicyAssociatesExistingArchive(t *testing.T) {
 	db, cfg, view, source, processed := seedTestSetup(t)
-	cfg.Settings["libtorrent_ramdisk_enabled"] = "yes"
-	cfg.Settings["libtorrent_ramdisk_dir"] = filepath.Dir(source)
-	cfg.LibtorrentDir = filepath.Join(t.TempDir(), "downloads")
+	cfg.Settings["torrent_ramdisk_enabled"] = "yes"
+	cfg.Settings["torrent_ramdisk_dir"] = filepath.Dir(source)
+	cfg.DownloadDir = filepath.Join(t.TempDir(), "downloads")
 	library := filepath.Dir(processed)
 	cfg.ArchiveRoot = &library
 	target := filepath.Join(library, filepath.Base(source))
@@ -414,7 +414,7 @@ func TestRemoveSeededCompletedRecognizesArchivedNasCopy(t *testing.T) {
 	view.State = "paused"
 
 	session := &stubTorrentSession{list: []models.TorrentView{view}}
-	cfg.Libtorrent.AutoRemoveCompleted = true
+	cfg.Transfer.AutoRemoveCompleted = true
 	RemoveSeededCompleted(cfg, session, db, map[string]struct{}{})
 	if len(session.removed) != 1 || session.removed[0] != seedTestHash {
 		t.Fatalf("archived torrent with 0 local progress must be recognized as completed and removed, got: %v", session.removed)
@@ -439,7 +439,7 @@ func TestTeVeSeedsForever(t *testing.T) {
 	if !tev_seedsForever(&cfg, session, seedTestHash) {
 		t.Fatal("no per-torrent and no global limit must mean infinite seed")
 	}
-	cfg.Libtorrent.SeedRatio = 1.5
+	cfg.Transfer.SeedRatio = 1.5
 	if tev_seedsForever(&cfg, session, seedTestHash) {
 		t.Fatal("global ratio limit must make the policy finite")
 	}

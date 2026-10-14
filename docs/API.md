@@ -129,8 +129,7 @@ change. The old `/ui` route is no longer available. For operational checks use
 | POST | `/api/jobs/{id}/cancel` |
 | GET | `/api/last_cycle` |
 | GET | `/api/last_cycles` |
-| POST | `/api/libtorrent/check-update` |
-| GET | `/api/libtorrent/session-stats` |
+| GET | `/api/torrents/session-stats` |
 | GET | `/api/license` |
 | POST | `/api/log-level` |
 | GET | `/api/log_level` |
@@ -246,7 +245,6 @@ change. The old `/ui` route is no longer available. For operational checks use
 | GET | `/api/torrents` |
 | POST | `/api/torrents` |
 | POST | `/api/torrents/add` |
-| POST | `/api/torrents/apply_settings` |
 | GET | `/api/torrents/history` |
 | GET | `/api/torrents/ipfilter_status` |
 | POST | `/api/torrents/ipfilter_update` |
@@ -263,11 +261,9 @@ change. The old `/ui` route is no longer available. For operational checks use
 | POST | `/api/torrents/unpin` |
 | DELETE | `/api/torrents/{hash}` |
 | GET | `/api/torrents/{hash}` |
-| POST | `/api/torrents/{hash}/dht-announce` |
 | GET | `/api/torrents/{hash}/export.torrent` |
 | GET | `/api/torrents/{hash}/files` |
 | POST | `/api/torrents/{hash}/files/priority` |
-| POST | `/api/torrents/{hash}/flags` |
 | POST | `/api/torrents/{hash}/limits` |
 | GET | `/api/torrents/{hash}/magnet` |
 | POST | `/api/torrents/{hash}/mark_failed` |
@@ -282,14 +278,11 @@ change. The old `/ui` route is no longer available. For operational checks use
 | POST | `/api/torrents/{hash}/remove` |
 | POST | `/api/torrents/{hash}/restart` |
 | POST | `/api/torrents/{hash}/resume` |
-| POST | `/api/torrents/{hash}/scrape` |
-| POST | `/api/torrents/{hash}/share-mode` |
 | POST | `/api/torrents/{hash}/storage` |
 | GET | `/api/torrents/{hash}/stream` |
 | POST | `/api/torrents/{hash}/super-seeding` |
 | GET | `/api/torrents/{hash}/trackers` |
 | POST | `/api/torrents/{hash}/trackers` |
-| POST | `/api/torrents/{hash}/upload-mode` |
 | POST | `/api/torrents/{hash}/web-seeds` |
 | GET | `/api/torrents/{hash}/why` |
 | GET | `/api/trash` |

@@ -47,8 +47,8 @@ cmd/gexttod/main.go  →  gextto.Parse(args)
   ├── daemon command  →  runDaemon(...)                 (cmd/gexttod/main.go)
   │                       →  LoadConfig → PrepareDirs
   │                       →  OpenDatabase / OpenArchive / OpenComicsDb / OpenI18nDb
-  │                       →  NewLibtorrentClient(...)
   │                       →  NewAppState(...)           (appstate.go)
+  │                          → ConfigureTorrentEngine   (torrent_engine_select.go)
   │                       →  Serve(...)                 (web_serve.go)
   └── --update        →  gextto.Run(...)                (update.go)
 ```
@@ -61,13 +61,10 @@ build via `scripts/next-gx-build-number.sh` and lives in
 incrementing, so a release carries the checkout's number (`gx_version` in
 `release.json`).
 
-The default build is in **pure Go** (gx-torrent, no libtorrent). The
-**C++ bridge** for libtorrent is **opt-in**: it is the pair in the root
-`libtorrent_bridge.cpp` (compiled by cgo) + `libtorrent_bridge.h` (header),
-included only with `CGO_ENABLED=1` (`make build-libtorrent`,
-`GEXTTO_LIBTORRENT=1 scripts/build-daemon.sh`). Without cgo, `libtorrent_nocgo.go`
-provides the stubs (`//go:build !cgo`), `libtorrent.go` stays unchanged and
-`LibtorrentCompiled()` distinguishes the two builds.
+The build is in **pure Go**: `gexttod` and the `gx-torrent` daemon, with no C or
+C++ dependency (`CGO_ENABLED=0`). `gx-torrent` is the default engine and the
+standalone client; the only other backend is the external/managed
+qBittorrent-nox.
 
 ## 3. Main package: files by area
 
@@ -133,9 +130,8 @@ provides the stubs (`//go:build !cgo`), `libtorrent.go` stays unchanged and
 |---|---|
 | `torrent_engine.go` | the `TorrentEngine` contract between Gextto and the engine. |
 | `torrent_engine_select.go` | backend selection from `torrent_backend` + preflight. |
-| `engine_fallback.go` | the engine-agnostic fallback chain (managed qBittorrent-nox downloaded on demand → embedded libtorrent → recovery), its cooldown and the `GEXTTO_ENGINE` override. |
+| `engine_fallback.go` | the engine-agnostic fallback chain (managed qBittorrent-nox downloaded on demand → recovery), its cooldown and the `GEXTTO_ENGINE` override. |
 | `gxtorrent_engine.go` + `gxtorrent_runtime.go` + `cmd/gx-torrent/` | **gx-torrent** backend (pure Go, default): REST adapter, startup and supervision of the daemon, which uses the gx-core engine in `internal/gxcore`. The same daemon also runs on its own (standalone) on Linux and Windows; the platform layer is in `cmd/gx-torrent/*_linux.go` / `*_windows.go` / `*_other.go` (memory, disk class, gateway, data folder, link/junction, cross-volume move, browser opening, Windows service in `service_windows.go`). |
-| `libtorrent.go` + `libtorrent_cgo.go` + `libtorrent_bridge.cpp/.h` + `libtorrent_nocgo.go` | libtorrent backend (C++/cgo), **optional at build time** (`GEXTTO_LIBTORRENT=1`; `LibtorrentCompiled()`): in a pure Go build the `libtorrent_nocgo.go` stub applies and the backend is not selectable; when compiled it is one step of the fallback chain in `engine_fallback.go`. |
 | `qbittorrent_engine.go` + `qbittorrent_runtime.go` | qBittorrent backend: adapter, supervision, and the private managed runtime (download of the `userdocs/qbittorrent-nox-static` build, SHA-256 verified). |
 | `torrent_migration.go` | preparation of the migration between backends. |
 | `torrent_removal.go` | recording of manual removals. |
@@ -149,7 +145,7 @@ provides the stubs (`//go:build !cgo`), `libtorrent.go` stays unchanged and
 | `web_handlers_core.go` | core handlers, log streaming, middleware. |
 | `web_handlers_g0.go` … `web_handlers_g7.go` | groups of handlers ported from the reference project. |
 | `web_handlers_compat.go` | compatibility/diagnostics endpoints. |
-| `web_handlers_jobs.go`, `web_handlers_libtorrent.go`, `web_handlers_torrent_backend.go`, `web_handlers_torrent_diag.go` | specific handlers (jobs, libtorrent, backend, diagnostics). |
+| `web_handlers_jobs.go`, `web_handlers_torrent_backend.go`, `web_handlers_torrent_diag.go` | specific handlers (jobs, backend, diagnostics). |
 | `web_handlers_series.go`, `web_handlers_torrent_stream.go` | series handlers (`/api/series/{name}`) and redirect to the streaming of the gx-torrent daemon, with the token added server-side. |
 | `web_torrent_events.go` | event machine of the torrent lifecycle. |
 | `web_background.go` | long-running background workers. |
@@ -190,7 +186,7 @@ provides the stubs (`//go:build !cgo`), `libtorrent.go` stays unchanged and
   to split the huge handler table into manageable files.
 - `uiweb_v2_*.go`: everything related to **UI v2** (SSR + HTMX). `uiweb_*.go`
   without `_v2` is the shared layer (view-model and formatters) used by UI v2.
-- `libtorrent_*`, `gxtorrent_*`, `qbittorrent_*`: the torrent backends.
+- `gxtorrent_*`, `qbittorrent_*`: the torrent backends.
 - `*_test.go`: tests next to the file they verify.
 - The private helpers of a group use the group prefix (`gh2_...`,
   `gh3_...`, `bg_...`) to avoid collisions between files of the same package.
@@ -276,14 +272,9 @@ If you modify these files **you need to recompile** the binary to see them.
 | Add a setting | `config.go` + `uiweb_settings.go` (section and `Group`) + `uiweb_settings_meta.go` (unit, special value, dependency) + `uiweb_settings_defaults.go` + `uiweb_tooltips.go` + `internal_translations*.yml` catalogues |
 | Touch search/sources | `engine.go`, `rss.go`, `websearch.go`, `indexer_health.go` |
 | Touch a torrent engine | `torrent_engine*.go` and the specific backend |
-| Change the C++ bridge | `libtorrent_bridge.cpp` + `libtorrent_bridge.h` (root), `libtorrent_cgo.go` |
 
 ## 9. Maintenance notes
 
-- **A single copy of the C++ bridge.** `libtorrent_bridge.cpp` is the only file
-  compiled by cgo; the header must stay next to it in the root. Do not
-  recreate "reference" copies in subfolders: cgo does **not** compile files
-  outside the package folder and the copies diverge silently.
 - **Gextto's logic stays in a single main package.** New shared modules
   go in `internal/`; any split of the main package
   must be done in phases, with builds and tests green at every step.

@@ -180,8 +180,7 @@ from an active torrent manually: use the torrent-session actions.
 The daemon is normally run by the systemd service. When invoked directly it
 understands:
 
-- `gexttod --version` — installed version, build number, release marker and
-  bundled libtorrent;
+- `gexttod --version` — installed version, build number and release marker;
 - `gexttod --help` — usage summary;
 - `gexttod --update` — download and install the latest payload of the installed
   channel (continuous or stable); the previous version is kept as
@@ -209,7 +208,7 @@ prompt and action documentation is in [`docs/tui.md`](tui.md).
 
 **Installation and updating.** Every push to `main` publishes a tested
 `continuous` Linux payload. The official installer downloads that payload,
-verifies its SHA-256 checksum and installs it without compiling Go or C++ on the
+verifies its SHA-256 checksum and installs it without compiling anything on the
 target server:
 
 ```bash
@@ -369,7 +368,7 @@ inferior to the archived file.
   are refused) and serves only the listed media. The gx-torrent settings page
   shows the address it runs on.
 - When you use **Move storage**, the log records the request, destination and
-  command acceptance; the final outcome is written when libtorrent completes or
+  command acceptance; the final outcome is written when the engine completes or
   rejects the move. With **Check**, the log distinguishes command start from
   completion and includes state and verified bytes.
 - **Download history** lists finished downloads (native completions and
@@ -380,7 +379,7 @@ inferior to the archived file.
 ### Stalled torrents
 
 When a torrent stops increasing its completed-byte count for the configured
-period, it enters **stalled** state. Gextto pauses it in libtorrent too, so it no
+period, it enters **stalled** state. Gextto pauses it in the engine too, so it no
 longer occupies an active slot. It remains in the session and is resumed and
 reannounced on the next retry. The values are under *Configuration → Seeding and completion → Stalled
 torrents*:
@@ -636,8 +635,9 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   `/api/v2.0/indexers/all/results/torznab/api`. The health check uses `t=caps`
   with the same key, so it checks the API rather than only Jackett's home page.
   Results may identify the source as `jackett:TrackerName`.
-- **libtorrent** — connections/performance, protocols/trackers, security,
-  RAM disk and ports, speed limits and scheduler; apply/optimise/update check.
+- **Speed, network and performance** — connections/performance,
+  protocols/trackers, security, RAM disk and ports, speed limits and scheduler;
+  apply and optimise.
   If you move a torrent's storage to a folder that **already holds the data**,
   it is not rejected: Gextto associates the torrent with the existing files and
   re-checks them (seeds) instead of re-downloading. **Preallocate disk space**
@@ -709,7 +709,7 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
     The interface translates strings at runtime and falls back to the Italian
     source when a translation is missing.
 
-### Torrent engine (gx-torrent, qBittorrent-nox, optional libtorrent)
+### Torrent engine (gx-torrent, qBittorrent-nox)
 
 Gextto always keeps its own database, queue, scoring, post-processing, renaming
 and archive; only the transfer plane is pluggable, chosen in
@@ -719,10 +719,10 @@ same data.
 
 If the active engine cannot stay up, Gextto switches to another engine by
 itself: first **qBittorrent-nox** (downloaded on demand and started with a
-private profile, or the external one already configured), then the built-in
-**libtorrent** when the build includes it, and finally a **recovery** state with
-the transfers stopped and the UI still reachable. An updated `gx-torrent` that
-will not start is restored to the previous binary first.
+private profile, or the external one already configured), and finally a
+**recovery** state with the transfers stopped and the UI still reachable. An
+updated `gx-torrent` that will not start is restored to the previous binary
+first.
 
 The default engine's core, **`gx-core`** (`internal/gxcore`), and the DHT
 (`internal/dht`) are original code written in this repository, so they are
@@ -730,7 +730,7 @@ covered by the same EUPL-1.2 licence as Gextto (see the *Licence* page of the
 web interface).
 
 - **gx-torrent** (default) — a pure-Go BitTorrent daemon, started and supervised
-  by Gextto in a separate process; it needs no `libtorrent-rasterbar`. Set the
+  by Gextto in a separate process; it has no C/C++ dependency. Set the
   **Web API URL**, the **listen address** (default `127.0.0.1:8890`: web page
   and API on this host only; use `0.0.0.0:8890` **and a token** to expose them
   on the LAN), **token** and **proxy**. At that address it also serves an
@@ -745,8 +745,7 @@ web interface).
   SSD) and applies it in place, like the speed limits, without dropping peers;
   an **IP filter** downloaded from a URL refreshes once a day; at boot it is
   downloaded again only when the cached copy is older than 24 hours. If the daemon cannot stay up (6 abnormal starts
-  in 10 minutes) Gextto falls back to libtorrent by itself, when it is
-  compiled in. It supports
+  in 10 minutes) Gextto falls back to qBittorrent-nox by itself. It supports
   **sequential download** and **first/last piece** priority (set when adding a
   torrent, or for every new torrent in *Configuration → Queues and performance →
   Download mode*; they apply to new torrents). A magnet that carries the `so=`
@@ -754,11 +753,6 @@ web interface).
   web seeds and `dht=` adds a DHT bootstrap node. It supports
   **v2-only** torrents (BEP 52), both from a `.torrent` and from a magnet link;
   it does not support WebTorrent/WebRTC.
-- **libtorrent (no longer shipped)** — the libtorrent session inside Gextto's own
-  process, available **only if you built Gextto with it**
-  (`make build-libtorrent`); release packages do not include it and the engine is
-  being removed. Every
-  *libtorrent* setting applies.
 - **qBittorrent-nox** — Gextto drives an existing qBittorrent-nox through its Web
   API. Set the URL, user/password, category, tag and poll interval, and the
   `local=remote` **path mappings** whenever the two processes see different
@@ -767,11 +761,11 @@ web interface).
   the wrong folder. **Managed mode** downloads the latest qBittorrent-nox static
   release, installs it in the application folder (next to `gexttod`), starts and
   stops it with the service and updates it with backup and rollback; a watchdog
-  restarts it after an unexpected exit and, after repeated crashes, falls back to
-  the embedded engine. If qBittorrent is down at startup, Gextto keeps retrying
+  restarts it after an unexpected exit and, after repeated crashes, runs the
+  engine fallback chain. If qBittorrent is down at startup, Gextto keeps retrying
   instead of failing.
 If the saved configuration selects a backend that is no longer supported,
-Gextto falls back to the embedded engine and logs a warning.
+Gextto falls back to gx-torrent and logs a warning.
 
 The configuration tile shows the active engine, its status and a
 reachability/path test, so you can validate a backend before switching. The
@@ -784,22 +778,18 @@ is active, the **Downloads** screen and every automation stay the same.
 ### Performance: RAM and CPU
 
 The daemon's own logic is negligible; the transfer cost is almost entirely the
-engine while it has torrents in the session. With **embedded libtorrent** it
-lives in Gextto's own process; with an external engine (**gx-torrent** or
-**qBittorrent-nox**) it lives in its own process. To lower RAM and CPU:
+engine while it has torrents in the session, and with an external engine
+(**gx-torrent** or **qBittorrent-nox**) it lives in its own process. To lower RAM
+and CPU:
 
-- **RAM** — with libtorrent the values that matter are the **disk cache**
-  (`cache_size`, 16 KiB blocks) and `max_queued_disk_bytes`; the **Optimise**
-  button (or *continuous optimisation*) sizes them to the host RAM. With
-  **gx-torrent** the cache is automatic (1/32 read, 1/16 write of the RAM) and
-  Gextto re-asserts it every 15 minutes, so there is nothing to tune. The values
-  suggested by `/api/system/lt_mem_suggest` work too. The daemon returns memory to the OS
-  (`malloc_trim`) after completions, after every cycle and every 15 minutes, so
-  the RSS does not stay at the download peak.
+- **RAM** — with **gx-torrent** the cache is automatic (1/32 read, 1/16 write of
+  the RAM) and Gextto re-asserts it every 15 minutes, so there is nothing to
+  tune; a non-default *Disk cache* value is a manual override. The daemon returns
+  memory to the OS (`malloc_trim`) after completions, after every cycle and every
+  15 minutes, so the RSS does not stay at the download peak.
 - **CPU** — enable the **dynamic queue** and *Do not count slow torrents in
   active slots*: zero-rate torrents do not hold a slot and **stalled** ones are
-  paused and retried instead of spinning. If CPU is busy, lower
-  `connections_limit` and `aio_threads`. Fewer active torrents — and no "dead"
+  paused and retried instead of spinning. Fewer active torrents — and no "dead"
   torrent without seeders — mean less DHT/tracker churn.
 - **Diagnosis** — `GET /api/torrents/{hash}/why` explains why a torrent is not
   downloading (`dead_swarm`, `no_peers`, `no_connected_seed`, `stalled`, …);
@@ -1018,7 +1008,7 @@ similar) follow the new name when possible.
 ### Backups: what they protect and what they do not
 
 A Gextto backup protects databases and configuration. It does not contain videos,
-media archives or the complete libtorrent session state. Before restoring:
+media archives or the complete torrent session state. Before restoring:
 
 1. stop or pause automatic cycles;
 2. keep a copy of the current database;
@@ -1124,8 +1114,8 @@ Besides download events, Gextto notifies service problems:
 - **gx-torrent** — unexpected exit of the managed daemon, restart after the
   exit, restoring the previous binary after an update that will not start,
   a live daemon that stops answering, and the automatic switch to another
-  engine (qBittorrent-nox first, downloaded on demand, then libtorrent when
-  compiled in, finally recovery with the transfers stopped);
+  engine (qBittorrent-nox first, downloaded on demand, finally recovery with the
+  transfers stopped);
 - **health problems** — when the health check finds a problem and when it is
   healthy again.
 
@@ -1413,7 +1403,7 @@ Recalculate scores* after changing weights.
 
 | Setting | What it does |
 |---|---|
-| Torrent engine | Active torrent engine (gx-torrent, built-in libtorrent or qBittorrent-nox). |
+| Torrent engine | Active torrent engine (gx-torrent or qBittorrent-nox). |
 
 **gx-torrent**
 
@@ -1443,12 +1433,6 @@ Recalculate scores* after changing weights.
 | qBittorrent-nox — request timeout | Timeout in seconds for HTTP requests to qBittorrent-nox. *(Unit: seconds)* |
 | qBittorrent-nox — polling interval | Interval in milliseconds between torrent status reads. *(Unit: ms)* |
 | qBittorrent-nox — path mapping | Path mapping between Gextto and qBittorrent-nox, one per line (local=remote). |
-
-**built-in libtorrent**
-
-| Setting | What it does |
-|---|---|
-| built-in libtorrent — client enabled | Enable or completely disable the built-in libtorrent client. |
 
 **Actions**
 
@@ -1484,9 +1468,9 @@ Recalculate scores* after changing weights.
 
 | Setting | What it does |
 |---|---|
-| Min port | Minimum libtorrent session port (requires service restart). |
-| Max port | Maximum libtorrent session port (requires service restart). |
-| Listen interfaces | Where libtorrent accepts connections: 0.0.0.0:6881-6891 for all interfaces, 127.0.0.1:6881 local only, or wg0:6881/tun0:6881 for a VPN. The suggested value works in most cases. |
+| Min port | Minimum torrent session port (requires service restart). |
+| Max port | Maximum torrent session port (requires service restart). |
+| Listen interfaces | Where the engine accepts connections: 0.0.0.0:6881-6891 for all interfaces, 127.0.0.1:6881 local only, or wg0:6881/tun0:6881 for a VPN. The suggested value works in most cases. |
 | Outgoing interface | VPN killswitch: interface used for all outgoing BitTorrent traffic. |
 | Test ports | Checks that the peer port is listening and that the router forwards it (the message says "open", "listening but not forwarded" or "closed"). Available with the **gx-torrent** engine. |
 
@@ -1502,16 +1486,12 @@ Recalculate scores* after changing weights.
 | uTP | Enable the uTP (UDP) protocol in addition to TCP. |
 | Holepunching (BEP 55) | Opens a direct connection to peers behind NAT through a relaying peer (BEP 55). Requires uTP. |
 | DHT bootstrap nodes | Initial DHT nodes (host:port separated by comma). |
-| Announce to all trackers | Announce to all trackers, not just the first of each tier. |
-| Announce to all tiers | Announce to all tiers, not just the first. |
-| Announce interval | Minimum interval (seconds) between two announces to the same tracker. *(Unit: seconds)* |
 
 **Encryption and IP filter**
 
 | Setting | What it does |
 |---|---|
 | Encryption | Encryption policy: 0 disabled, 1 enabled, 2 forced. |
-| Prefer RC4 | Prefers RC4 encryption on connections. |
 | Apply IP filter | Apply the IP filter to trackers as well. |
 | IP filter (file/URL) | Local file or URL of the IP blocklist. |
 
@@ -1519,7 +1499,6 @@ Recalculate scores* after changing weights.
 
 | Setting | What it does |
 |---|---|
-| Apply now | Re-applies the settings to the active session right away (otherwise they apply from the next cycle). |
 | IP filter → Load / update now | Downloads the list from the configured URL (or uses the local file) and applies it to the active engine right away, gx-torrent included. |
 
 #### Queues and performance
@@ -1530,7 +1509,6 @@ Recalculate scores* after changing weights.
 
 | Setting | What it does |
 |---|---|
-| Continuous optimization (periodic) | Periodically applies cache, buffer and queue optimization based on resources. |
 | Automatic queue and resource management | Automatically adjusts how many torrents are active based on load. |
 | Minimum dynamic download slots | Minimum number of dynamic downloads. The queue changes by at most one at a time. Shown only while «Automatic queue and resource management» is on. |
 | Maximum dynamic download slots | Maximum number of dynamic downloads. Consecutive consistent samples are required before increasing the queue. Shown only while «Automatic queue and resource management» is on. |
@@ -1551,13 +1529,7 @@ Recalculate scores* after changing weights.
 
 | Setting | What it does |
 |---|---|
-| Total connections limit | Maximum simultaneous peer connections at session level. |
-| Upload slots | Number of unchoked upload peers (-1 = automatic). *(-1 = auto)* |
-| Half-open limit | Maximum half-open connections (-1 = automatic). *(-1 = auto)* |
 | Max connections per torrent | Connection limit per torrent (-1 = unlimited). *(-1 = unlimited)* |
-| Max uploads per torrent | Upload limit per torrent (-1 = unlimited). *(-1 = unlimited)* |
-| Multiple connections per IP | Allows multiple connections from the same IP address. |
-| Connect boost | Number of extra connection attempts when the torrent starts. |
 
 **RAM disk**
 
@@ -1588,18 +1560,14 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 
 | Setting | What it does |
 |---|---|
-| Disk AIO threads | Dedicated threads for disk operations (-1 = automatic). *(-1 = auto)* |
 | Disk cache | Disk cache size in blocks (-1 = automatic). *(Unit: blocks; -1 = auto)* |
 | Cache expiry | Seconds of inactivity after which a block leaves the cache. *(Unit: seconds)* |
-| Alert queue | Libtorrent alert queue size. |
-| Advanced libtorrent settings | Advanced libtorrent settings, one per line in key=value format. |
 
 **Actions**
 
 | Setting | What it does |
 |---|---|
-| Optimize | Computes cache and buffers from the RAM; with continuous optimization the queue and cache fields become *Auto*. |
-| Apply now | Re-applies the settings to the active session right away. |
+| Optimize | Computes cache and buffers from the RAM. |
 
 #### Seeding and completion
 

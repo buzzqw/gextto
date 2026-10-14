@@ -233,7 +233,7 @@ func TestArchiveAndRemoveTorrentEpisodeMovesAndRenames(t *testing.T) {
 	}
 
 	cfg := DefaultConfig()
-	cfg.LibtorrentDir = downloadDir
+	cfg.DownloadDir = downloadDir
 	cfg.Series = append(cfg.Series, SeriesConfig{
 		Name:        "TestShow",
 		Enabled:     true,
@@ -333,7 +333,7 @@ func TestArchiveAndRemoveTorrentFinalizesUnrenamedArchivedCopy(t *testing.T) {
 	s := &AppState{torrent_engine: engine, db: db}
 
 	cfg := DefaultConfig()
-	cfg.LibtorrentDir = archiveDir
+	cfg.DownloadDir = archiveDir
 	cfg.RenameEpisodes = true
 	cfg.Series = append(cfg.Series, SeriesConfig{Name: "TestShow", Enabled: true, ArchivePath: archiveDir})
 

@@ -738,19 +738,19 @@ func (e *gxTorrentEngine) ensureTorrentFile(hash string) {
 }
 
 // torrentCopyDir is the optional folder Gextto keeps the `.torrent` copies in
-// (libtorrent_torrent_copy_dir); empty means none.
+// (torrent_copy_dir); empty means none.
 func (e *gxTorrentEngine) torrentCopyDir() string {
 	if e.cfg == nil {
 		return ""
 	}
-	if dir := e.cfg.LibtorrentTorrentCopyDir(); dir != nil {
+	if dir := e.cfg.TorrentCopyDir(); dir != nil {
 		return strings.TrimSpace(*dir)
 	}
 	return ""
 }
 
 // copyTorrentToConfiguredDir mirrors a `.torrent` copy into the operator's
-// configured folder, so gx-torrent behaves like the embedded engine there.
+// configured folder.
 func (e *gxTorrentEngine) copyTorrentToConfiguredDir(hash, source string) {
 	dir := e.torrentCopyDir()
 	if dir == "" || !fileExists(source) {
@@ -774,8 +774,8 @@ func (e *gxTorrentEngine) cachedName(hash string) string {
 }
 
 // gxTorrentCopyName is the recognisable name of a .torrent copy in the
-// operator's folder: the torrent name (as the embedded engine does), read from
-// the file when the session does not know it yet, the hash as a last resort.
+// operator's folder: the torrent name, read from the file when the session does
+// not know it yet, the hash as a last resort.
 func gxTorrentCopyName(source, name, hash string) string {
 	if strings.TrimSpace(name) == "" || strings.EqualFold(strings.TrimSpace(name), hash) {
 		if data, err := os.ReadFile(source); err == nil {
@@ -936,7 +936,7 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		}
 		return int(value)
 	}
-	lt := cfg.Libtorrent
+	lt := cfg.Transfer
 	// gx-torrent's own self-management: dynamic queue and adaptive cache, on by
 	// default. Disabling it makes the daemon use static slot limits and a static
 	// RAM-based cache; the manual per-value settings still apply.
@@ -952,7 +952,7 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		"dynamic_max":      clamp(lt.DynamicQueueMax),
 		"cache_mb":         gxCacheMB(lt.CacheSize),
 		"cache_ttl_secs":   max(lt.CacheExpiry, 10),
-		"preallocate":      cfg.LibtorrentPreallocate(),
+		"preallocate":      cfg.TorrentPreallocate(),
 	}
 	// Disk guard: Gextto's minimum free space also pauses the daemon's running
 	// downloads below it. Not set (0) keeps the daemon's own default, so the
@@ -1408,8 +1408,8 @@ func (e *gxTorrentEngine) SetFilePriorities(hash string, priorities []int32) (bo
 	return true, nil
 }
 
-// SetTrackers replaces the torrent's tracker list (the engine: an
-// empty list removes every tracker), like the embedded engine.
+// SetTrackers replaces the torrent's tracker list (an empty list removes every
+// tracker).
 func (e *gxTorrentEngine) SetTrackers(hash string, trackers []TrackerEntry) (bool, error) {
 	var urls []string
 	seen := map[string]struct{}{}
@@ -1586,8 +1586,8 @@ func (e *gxTorrentEngine) TorrentFilePath(hash string) (string, bool) {
 // ---------------------------------------------------------------------------
 
 func (e *gxTorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) string {
-	// Delegate to the shared helper so gx-torrent stages downloads exactly like
-	// the embedded engine: an explicit valid path wins, otherwise the configured
+	// Delegate to the shared helper so gx-torrent stages downloads the same way
+	// as the other engines: an explicit valid path wins, otherwise the configured
 	// temp/incomplete dir, then the final download dir. The RAM disk is never an
 	// implicit default (an unknown-size add must not start on the tmpfs).
 	use := cfg
@@ -1648,8 +1648,8 @@ func (e *gxTorrentEngine) AddWithPath(magnet string, cfg *Config, preferredPath 
 	return e.AddWithOptions(magnet, cfg, preferredPath, AddOptions{})
 }
 
-// AddWithOptions adds a magnet. Like the embedded engine it returns false
-// when the torrent is already in the session.
+// AddWithOptions adds a magnet. It returns false when the torrent is already in
+// the session.
 func (e *gxTorrentEngine) AddWithOptions(magnet string, cfg *Config, preferredPath *string, options AddOptions) (bool, error) {
 	if strings.TrimSpace(magnet) == "" {
 		return false, nil
@@ -1785,7 +1785,7 @@ func (e *gxTorrentEngine) LoadIPFilter(path string) (int, error) {
 }
 
 // SessionStats returns the daemon's session counters (GET
-// /api/libtorrent/session-stats). The engine has fewer counters than libtorrent.
+// /api/torrents/session-stats). The engine has fewer counters than libtorrent.
 func (e *gxTorrentEngine) SessionStats() (map[string]int64, error) {
 	var stats struct {
 		Session map[string]int64 `json:"session"`
@@ -1797,7 +1797,7 @@ func (e *gxTorrentEngine) SessionStats() (map[string]int64, error) {
 }
 
 // gxSessionStats maps the daemon's session counters to libtorrent's counter
-// names, so /api/libtorrent/session-stats reads the same whichever engine is
+// names, so /api/torrents/session-stats reads the same whichever engine is
 // active, and keeps the gx-torrent-specific counters alongside. Pure, so it is
 // easy to test.
 func gxSessionStats(session map[string]int64) map[string]int64 {

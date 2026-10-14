@@ -2,10 +2,10 @@ package gextto
 
 // Torrent backend abstraction and the qBittorrent connectivity endpoints.
 //
-// The daemon is normally driven by the embedded libtorrent engine (the
-// official backend). `torrent_backend=qbittorrent` switches the transfer plane
-// to qBittorrent-nox through the adapter in qbittorrent_engine.go, while Gextto
-// keeps ownership of the queue, the automation and the post-processing.
+// Gextto drives gx-torrent by default; `torrent_backend=qbittorrent` switches
+// the transfer plane to qBittorrent-nox through the adapter in
+// qbittorrent_engine.go, while Gextto keeps ownership of the queue, the
+// automation and the post-processing.
 //
 // These endpoints expose the active backend, the explicit capability matrix and
 // the mandatory activation preflight (connectivity + path mapping).
@@ -28,10 +28,9 @@ type TorrentBackend interface {
 	Capabilities() map[string]bool
 }
 
-// torrentSessionSyncer is implemented by the external backends that expose their
-// poll/sync diagnostics (the capability matrix marks `sync` as `none` for the
-// embedded engine). Using the interface keeps a single mechanism instead of a
-// concrete type switch per engine.
+// torrentSessionSyncer is implemented by the engines that expose their
+// poll/sync diagnostics. Using the interface keeps a single mechanism instead of
+// a concrete type switch per engine.
 type torrentSessionSyncer interface {
 	SyncStats() map[string]any
 }
@@ -49,8 +48,8 @@ func ActiveTorrentBackend(s *AppState) TorrentBackend {
 // TorrentBackendName returns the configured backend. A missing or empty
 // `torrent_backend` selects DefaultTorrentBackend (gx-torrent for a fresh
 // installation); a value that was saved but is unknown (a backend removed in a
-// previous release) is normalised to the embedded libtorrent engine so existing
-// installations keep transfering after an upgrade.
+// previous release, including the old `embedded`) is normalised to gx-torrent
+// so existing installations keep transferring after an upgrade.
 func TorrentBackendName(cfg *Config) string {
 	value := DefaultTorrentBackend
 	if cfg != nil {
@@ -64,21 +63,17 @@ func TorrentBackendName(cfg *Config) string {
 	switch value {
 	case BackendQbittorrent:
 		return BackendQbittorrent
-	case BackendGxTorrent:
-		return BackendGxTorrent
 	default:
-		// embedded, or an unknown/removed backend saved by an older install.
-		return BackendEmbedded
+		return BackendGxTorrent
 	}
 }
 
 // isKnownTorrentBackend reports whether value (already lower-cased and
 // trimmed) names a backend this build knows. Anything else is a removed or
-// unrecognised value, which TorrentBackendName normalises to the embedded
-// engine.
+// unrecognised value, which TorrentBackendName normalises to gx-torrent.
 func isKnownTorrentBackend(value string) bool {
 	switch value {
-	case BackendQbittorrent, BackendGxTorrent, BackendEmbedded:
+	case BackendQbittorrent, BackendGxTorrent:
 		return true
 	}
 	return false
@@ -256,7 +251,7 @@ func TorrentBackendPortCheck(w http.ResponseWriter, r *http.Request, s *AppState
 func TorrentBackendPreflight(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	configured := TorrentBackendName(cfg)
-	if configured == BackendEmbedded {
+	if configured == BackendGxTorrent {
 		jsonResponse(w, QbittorrentPreflight{OK: true, Connected: true})
 		return
 	}

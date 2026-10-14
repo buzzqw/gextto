@@ -16,8 +16,8 @@ import (
 
 func TestSeedLimitsReachedMatchesPolicy(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Libtorrent.SeedRatio = 0.5
-	cfg.Libtorrent.SeedTimeDays = 1
+	cfg.Transfer.SeedRatio = 0.5
+	cfg.Transfer.SeedTimeDays = 1
 
 	// Uses the global ratio (per-torrent -1) and reaches it.
 	torrent := &models.TorrentView{
@@ -188,25 +188,6 @@ func TestParseSeasonEpisodeFromArchiveFilenames(t *testing.T) {
 	}
 }
 
-func TestLibtorrentVersionComparison(t *testing.T) {
-	if newer := gh4_versionIsNewer("2.0.11", "2.0.9"); !newer {
-		t.Fatal("2.0.11 should be newer than 2.0.9")
-	}
-	if newer := gh4_versionIsNewer("2.0.9", "2.0.11"); newer {
-		t.Fatal("2.0.9 is not newer than 2.0.11")
-	}
-	if newer := gh4_versionIsNewer("2.0.11", "2.0.11"); newer {
-		t.Fatal("equal versions are not newer")
-	}
-	if newer := gh4_versionIsNewer("2.1", "2.0.11"); !newer {
-		t.Fatal("2.1 should be newer than 2.0.11")
-	}
-	parts := gh4_versionParts("v2.0.11.0")
-	if len(parts) != 4 || parts[0] != 2 || parts[3] != 0 {
-		t.Fatalf("version parts = %v", parts)
-	}
-}
-
 func TestSortCalendarItemsByAirDate(t *testing.T) {
 	item := func(date string) any {
 		return map[string]any{"episode": map[string]any{"air_date": date}}
@@ -221,19 +202,6 @@ func TestSortCalendarItemsByAirDate(t *testing.T) {
 	for index := range want {
 		if dates[index] != want[index] {
 			t.Fatalf("sorted dates = %v, want %v", dates, want)
-		}
-	}
-}
-
-func TestExtraSettingsLinesParseTypes(t *testing.T) {
-	lines := extraSettingsLines("max_uploads=12\nenable_dht=true\nbind=\"x\"\n# comment\nnoequals\nempty=\npeer=off")
-	want := []string{"i:max_uploads=12", "b:enable_dht=1", "s:bind=\"x\"", "b:peer=0"}
-	if len(lines) != len(want) {
-		t.Fatalf("lines = %v, want %v", lines, want)
-	}
-	for index := range want {
-		if lines[index] != want[index] {
-			t.Fatalf("line %d = %q, want %q", index, lines[index], want[index])
 		}
 	}
 }
@@ -326,33 +294,6 @@ func containsSubstring(haystack, needle string) bool {
 		}
 	}
 	return false
-}
-
-func TestPerTorrentSeedLimitsLowercaseHashes(t *testing.T) {
-	dir := t.TempDir()
-	client := &LibtorrentClient{stateDir: dir}
-	// A file written with uppercase keys must be read back lowercase.
-	if err := os.WriteFile(client.seedLimitsPath(), []byte(`{"ABC123":{"ratio":1.5,"days":2}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	limits, err := client.seedLimits()
-	if err != nil {
-		t.Fatalf("seedLimits: %v", err)
-	}
-	if _, ok := limits["abc123"]; !ok {
-		t.Fatalf("limits = %v, want lowercase key", limits)
-	}
-	// Saving normalises the hash to lowercase too.
-	if err := client.saveSeedLimit("DEADBEEF", 0.5, -1); err != nil {
-		t.Fatalf("saveSeedLimit: %v", err)
-	}
-	raw, err := os.ReadFile(client.seedLimitsPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(raw), "deadbeef") || strings.Contains(string(raw), "DEADBEEF") {
-		t.Fatalf("seed limits not stored lowercase: %s", raw)
-	}
 }
 
 func TestMagnetFeedBuildsRSSWithEscapedMagnets(t *testing.T) {

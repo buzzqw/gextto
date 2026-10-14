@@ -368,18 +368,6 @@ func gh5_collectWatchlistEntries(value any, out *[]gh5_watchlistTitle) {
 // Handlers
 // ---------------------------------------------------------------------------
 
-// ApplyLibtorrentSettings implements `apply_libtorrent_settings`.
-func ApplyLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
-	client, err := s.requireEmbedded("apply_settings")
-	if err != nil {
-		jsonError(w, http.StatusConflict, err.Error())
-		return
-	}
-	cfg := latestConfig(s)
-	result, err := client.ApplySettings(cfg)
-	gh5_torrentAction(w, result, err)
-}
-
 // BlocklistEntries implements `blocklist_entries`.
 func BlocklistEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	items, err := s.db.BlocklistEntries(500)
@@ -1481,13 +1469,9 @@ func SetSuperSeeding(w http.ResponseWriter, r *http.Request, s *AppState) {
 	type superSeeder interface {
 		SetSuperSeeding(hash string, enabled bool) (bool, error)
 	}
-	var client superSeeder
-	if embedded, err := s.requireEmbedded("super_seeding"); err == nil {
-		client = embedded
-	} else if engine, ok := s.activeEngine().(superSeeder); ok {
-		client = engine
-	} else {
-		jsonError(w, http.StatusConflict, err.Error())
+	client, ok := s.activeEngine().(superSeeder)
+	if !ok {
+		jsonError(w, http.StatusConflict, "the active engine does not support super-seeding")
 		return
 	}
 	hash := pathParam(r, "hash")

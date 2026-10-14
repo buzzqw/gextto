@@ -95,11 +95,11 @@ func TestDecodeJSON(t *testing.T) {
 }
 
 func TestNewAppStateWiresCollaborators(t *testing.T) {
-	// Pin the embedded engine: the empty Config has no torrent_backend, whose
-	// install default is gx-torrent, and the test must not reach a real
-	// gx-torrent on 127.0.0.1:8890.
-	cfg := &Config{Settings: map[string]string{"torrent_backend": BackendEmbedded}}
-	state := NewAppState(cfg, "gextto.json", nil, nil, nil, nil, nil, nil, nil, nil)
+	// Pin an unreachable qBittorrent backend: the empty Config has no
+	// torrent_backend, whose install default is gx-torrent, and the test must
+	// not reach a real gx-torrent on 127.0.0.1:8890.
+	cfg := &Config{Settings: map[string]string{"torrent_backend": BackendQbittorrent, "qbittorrent_url": "http://127.0.0.1:1"}}
+	state := NewAppState(cfg, "gextto.json", nil, nil, nil, nil, nil, nil, nil)
 	if state == nil {
 		t.Fatal("nil state")
 	}

@@ -56,7 +56,6 @@ func TestV2DetailCapsFollowCapabilityMatrix(t *testing.T) {
 	want := map[string]v2DetailCaps{
 		BackendGxTorrent:   {SuperSeeding: true, WebSeeds: true, Pieces: true, RateLimits: true, Connections: true, FileLevels: true},
 		BackendQbittorrent: {SuperSeeding: true, WebSeeds: false, Pieces: false, RateLimits: true, Connections: false, FileLevels: true},
-		BackendEmbedded:    {SuperSeeding: true, WebSeeds: true, Pieces: false, RateLimits: true, Connections: true, FileLevels: true},
 	}
 	for backend, expected := range want {
 		got := v2DetailCapsFor(backend)
@@ -543,7 +542,7 @@ func TestV2DetailAndRemoveFragmentsRender(t *testing.T) {
 
 func TestV2TorrentOnRamdisk(t *testing.T) {
 	ramdisk := t.TempDir()
-	cfg := &Config{Settings: map[string]string{"libtorrent_ramdisk_dir": ramdisk}}
+	cfg := &Config{Settings: map[string]string{"torrent_ramdisk_dir": ramdisk}}
 	if !v2TorrentOnRamdisk(filepath.Join(ramdisk, "payload"), cfg) {
 		t.Fatal("RAM disk payload not detected")
 	}
@@ -574,7 +573,7 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 	if !strings.Contains(css, ".v2-topbar-sticky .top-actions") || !strings.Contains(css, "flex-wrap: wrap") {
 		t.Fatalf("topbar compact layout missing")
 	}
-	code, body = v2Request(t, server, http.MethodGet, "/?view=settings&tab=libtorrent", nil)
+	code, body = v2Request(t, server, http.MethodGet, "/?view=settings&tab=network", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Auto (interfaccia predefinita)") || !strings.Contains(body, `name="value"`) {
 		t.Fatalf("outgoing interface select -> %d", code)
 	}
@@ -585,7 +584,7 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 		t.Fatalf("IP filter status -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=settings&tab=paths", nil)
-	if code != http.StatusOK || !strings.Contains(body, `data-v2-browse-for="libtorrent_dir"`) {
+	if code != http.StatusOK || !strings.Contains(body, `data-v2-browse-for="torrent_dir"`) {
 		t.Fatalf("path folder browser -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=settings&tab=rename", nil)
@@ -1474,7 +1473,7 @@ func TestGxAutoMarksCacheAndQueueManaged(t *testing.T) {
 			managed[f.Key] = f.Managed
 		}
 	}
-	for _, key := range []string{"libtorrent_cache_size", "libtorrent_active_downloads", "libtorrent_dynamic_queue"} {
+	for _, key := range []string{"torrent_cache_size", "torrent_active_downloads", "torrent_dynamic_queue"} {
 		if !managed[key] {
 			t.Fatalf("setting %q must be managed (Auto) with gx-torrent self-management on", key)
 		}

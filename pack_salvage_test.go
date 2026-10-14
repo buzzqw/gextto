@@ -58,7 +58,7 @@ func TestMonitorStalledSalvagesCompletePackEpisodes(t *testing.T) {
 		}
 	}
 	cfg := DefaultConfig()
-	cfg.Settings = map[string]string{"libtorrent_dead_swarm_giveup_min": "4320"}
+	cfg.Settings = map[string]string{"torrent_dead_swarm_giveup_min": "4320"}
 	cfg.ArchiveRoot = &library
 	cfg.CleanupAction = "delete"
 

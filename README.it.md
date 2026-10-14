@@ -132,7 +132,7 @@ fermarsi. Percorre una catena e persiste la scelta: prima il
 **qBittorrent-nox gestito**, scaricato al momento dalle release di
 `userdocs/qbittorrent-nox-static` (l'ultima build libtorrent v2, verificata con
 SHA-256) e avviato con un profilo privato — oppure un qBittorrent esterno già
-tuo; poi il libtorrent integrato opzionale, se la build lo include; infine uno
+tuo; infine uno
 stato di recovery in cui i trasferimenti restano fermi e la UI resta
 raggiungibile per intervenire. Prima di cambiare motore tenta la soluzione più
 economica: un `gx-torrent` aggiornato che non parte viene ripristinato alla
@@ -248,14 +248,13 @@ resume transazionale su BoltDB e flusso di Server-Sent Events in tempo reale
 |---|---|---|
 | gx-torrent (predefinito) | Processo Go separato e sorvegliato | Go puro, autonomo, sviluppo attivo. v1, ibridi e solo-v2, DHT e cifratura MSE/PE; anche autonomo su Linux e Windows; niente WebTorrent/WebRTC |
 | qBittorrent-nox | Demone esterno via Web API, oppure uno che Gextto scarica e avvia in privato | Hai già qBittorrent-nox o preferisci la sua UI. Servono mappature percorsi e un processo in più ([guida alla configurazione](docs/qbittorrent-nox.md)); è anche il primo passo del fallback automatico, scaricato al momento |
-| libtorrent (non più spedito) | Nel processo di Gextto, **solo in una build propria** (`make build-libtorrent`); le release sono Go puro | Controlli avanzati o compatibilità di libtorrent; un passo del fallback automatico. Un crash coinvolge anche Gextto. In fase di rimozione |
 
 Le statistiche del motore attivo — torrent per stato, velocità e slot,
 porta/router, DHT/uTP/LSD, cifratura, proxy, filtro IP, cache, **connessioni
 in entrata**, **I/O disco** e i **totali di sempre** scaricati/inviati
 (mantenuti tra i riavvii) — sono in **Salute → Motore torrent**
 (`/?view=health`), in `GET /api/v1/stats` del demone e in
-`GET /api/libtorrent/session-stats`.
+`GET /api/torrents/session-stats`.
 
 ## Uso delle risorse
 
@@ -271,9 +270,8 @@ e scansioni; i numeri su una singola macchina sono indicativi.
 |---|---:|---:|
 | gx-torrent | ~25 MB | ~100 MB |
 | qBittorrent-nox | ~40 MB | ~5 GB |
-| libtorrent (in-process, build opzionale) | ~0,5 GB | 3–5 GB |
 
-libtorrent e qBittorrent tengono una grande cache disco in-process (GB di
+qBittorrent tiene una grande cache disco in-process (GB di
 memoria anonima). gx-torrent scrive i pezzi in streaming e lascia
 l'accorpamento alla page cache reclamabile del kernel, così l'impronta resta
 nelle decine/centinaia di MB sotto carico. I valori variano con torrent, peer
@@ -293,8 +291,7 @@ Installa in `/opt/gextto`, tiene i dati in `/var/lib/gextto` ed espone la UI
 sulla porta 5000. Il motore `gx-torrent` (Go puro) è installato
 accanto a `gexttod` e avviato in modalità gestita. Il pacchetto è Go puro —
 null'altro da installare. In alternativa, un qBittorrent-nox esterno
-([guida alla configurazione](docs/qbittorrent-nox.md)); il
-motore libtorrent integrato non viene più spedito (vedi sotto).
+([guida alla configurazione](docs/qbittorrent-nox.md)).
 
 Prima di toccare il sistema l'installer avvia una volta il programma
 scaricato: librerie mancanti o glibc troppo vecchia vengono segnalate subito,

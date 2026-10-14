@@ -15,9 +15,7 @@ Times measured on **2026-10-13**, code at commit `ef2c1fc`.
 | RAM | 15 GiB (no swap) |
 | Disk | NVMe Lexar NM620 256 GB (ext4) |
 | Go | 1.27.1 |
-| C/C++ | gcc/g++ 14.2 (needed for the libtorrent variant) |
 | Docker | 29.9 |
-| libtorrent | rasterbar 2.0.11 (`libtorrent-rasterbar-dev` installed) |
 
 **CI runners**: GitHub Actions `ubuntu-24.04` (x86_64) and `windows-latest`, with
 **2 vCPUs** per runner. Linux releases are built in the `ubuntu:22.04` container
@@ -28,7 +26,6 @@ Times measured on **2026-10-13**, code at commit `ef2c1fc`.
 | Operation | Command | Time |
 |-----------|---------|------|
 | Everything from scratch (**cold** Go cache; `gexttod` + `gx-torrent`) | `go clean -cache && make build` | **~35 s** |
-| Variant with the embedded **libtorrent** (cgo) | `make build-libtorrent` | **~30 s** |
 | Incremental: one change to a package + relink | `make fast` | **~6 s** |
 | Only the `gx-torrent` daemon, one change | `make gx-torrent` | **~1.5 s** |
 | Nothing to do (warm cache) | `make fast` | **< 1 s** |
@@ -38,8 +35,6 @@ Notes:
 - `make build` is **pure Go** (`CGO_ENABLED=0`); it is also the only target that
   increments `build_number`, and it rebuilds `gx-torrent` **only when its code
   changed** (hash comparison, `bin/gx-torrent.code-sha256`).
-- `make build-libtorrent` (`CGO_ENABLED=1`) adds the compilation of the C++
-  bridge to libtorrent; libtorrent's deprecation warnings are normal.
 - Most of the time goes to the `internal/gxcore` engine: the `gx-torrent` binary
   alone recompiles in a few seconds when its dependencies are already cached.
 
@@ -63,7 +58,6 @@ first, i.e. the whole suite is recompiled):
 |-------|---------|------|
 | Go tests, default engine (pure Go), cold build cache | `go clean -cache && CGO_ENABLED=0 go test -count=1 ./...` | **~98 s** |
 | Go tests, default engine (pure Go), warm build cache | `CGO_ENABLED=0 go test -count=1 ./...` | **~46 s** |
-| Go tests with libtorrent | `CGO_ENABLED=1 go test -count=1 ./...` | **~104 s** |
 | Full guard round (`make test`) | `make test` | **~48 s** (warm cache) |
 
 The `make test` round is `check-ui-settings-index` + `installer-selftest` +
@@ -83,8 +77,8 @@ Wall times of the whole run (jobs usually run in parallel), from recent runs on
 
 | Workflow | When | Wall | Main jobs (seconds) |
 |----------|------|------|---------------------|
-| `ci.yml` | push and PR | **~4.5–8 min** (263–477 s) | *vet and test (x86_64)* 166–226 · *embedded libtorrent (x86_64)* 175–474 · *race detector* 375 (non-blocking) · *gx-torrent platform tests (Windows)* 45 · *service install (Windows)* 69 (non-blocking) · *container image* 44 |
-| `continuous.yml` | push to `main` | **~4 min** (243–259 s) | *test* 122 · *package (x86_64/aarch64 × go/libtorrent)* 74–101, in parallel · *publish* 11 |
+| `ci.yml` | push and PR | **~4.5–8 min** (263–477 s) | *vet and test (x86_64)* 166–226 · *race detector* 375 (non-blocking) · *gx-torrent platform tests (Windows)* 45 · *service install (Windows)* 69 (non-blocking) · *container image* 44 |
+| `continuous.yml` | push to `main` | **~4 min** (243–259 s) | *test* 122 · *package (x86_64/aarch64)* 74–101, in parallel · *publish* 11 |
 | `codeql.yml` | push, PR and weekly | **~3.5 min** | *analyze (go)* 203 |
 | `release.yml` | tag | — (no recent run to measure) | *test* + matrix *package (`{x86_64,aarch64}`)* in the `ubuntu:22.04` container, with the Windows packages alongside |
 
@@ -99,9 +93,9 @@ Wall times of the whole run (jobs usually run in parallel), from recent runs on
 
 - Build: `go clean -cache` before the cold measurement; `time make …` for the
   others; the incremental measurement appends a line to a file and restores it.
-- Tests: `go test -count=1 ./...` (no test cache), once with `CGO_ENABLED=0`
-  and once with `CGO_ENABLED=1`; the cold figure also does `go clean -cache`
-  first, so the whole suite and its test binaries are recompiled.
+- Tests: `go test -count=1 ./...` (no test cache) with `CGO_ENABLED=0`; the cold
+  figure also does `go clean -cache` first, so the whole suite and its test
+  binaries are recompiled.
 - CI: `gh run view <id> --json jobs` on the most recent runs of `main`, with the
   duration of each job (`completedAt - startedAt`) and the wall time of the run
   (`updatedAt - createdAt`).
@@ -110,7 +104,6 @@ To reproduce:
 
 ```bash
 go clean -cache && time make build            # pure build from scratch
-time make build-libtorrent                    # libtorrent variant (cgo)
 time (CGO_ENABLED=0 go test -count=1 ./...)   # uncached Go suite
 time make test                                # guard round (warm cache)
 ```

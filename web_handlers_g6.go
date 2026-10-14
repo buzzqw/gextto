@@ -165,10 +165,10 @@ const (
 // is overriding right now.
 func speedPolicy(cfg *Config) (download, upload int64, source string, tempShadowed bool) {
 	now := time.Now().Unix()
-	tempUntil := gh6_parseSettingInt(cfg, "libtorrent_temp_limit_until")
-	tempEnabled := gh6_truthySetting(cfg.Settings["libtorrent_temp_limit_enabled"])
-	tempDownload := gh6_parseSettingInt(cfg, "libtorrent_temp_dl_limit")
-	tempUpload := gh6_parseSettingInt(cfg, "libtorrent_temp_ul_limit")
+	tempUntil := gh6_parseSettingInt(cfg, "torrent_temp_limit_until")
+	tempEnabled := gh6_truthySetting(cfg.Settings["torrent_temp_limit_enabled"])
+	tempDownload := gh6_parseSettingInt(cfg, "torrent_temp_dl_limit")
+	tempUpload := gh6_parseSettingInt(cfg, "torrent_temp_ul_limit")
 	if tempEnabled && tempUntil > now {
 		return tempDownload, tempUpload, speedSourceTemp, false
 	}
@@ -179,7 +179,7 @@ func speedPolicy(cfg *Config) (download, upload int64, source string, tempShadow
 	if tempKeep {
 		return tempDownload, tempUpload, speedSourceTempKeep, false
 	}
-	return max(cfg.Libtorrent.DownloadLimitKib, 0), max(cfg.Libtorrent.UploadLimitKib, 0), speedSourceBase, false
+	return max(cfg.Transfer.DownloadLimitKib, 0), max(cfg.Transfer.UploadLimitKib, 0), speedSourceBase, false
 }
 
 func gh6_currentSpeedLimits(cfg *Config) (int64, int64) {
@@ -750,7 +750,7 @@ func ExplainRelease(w http.ResponseWriter, r *http.Request, s *AppState) {
 // IpfilterStatus implements `ipfilter_status`.
 func IpfilterStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+	target := strings.TrimSpace(cfg.Transfer.IpFilterPath)
 	cached := filepath.Join(cfg.DataDir, "ipfilter.dat")
 	isURL := strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://")
 	path := cached
@@ -1327,10 +1327,10 @@ func SetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		enabled = "0"
 	}
 	pairs := [][2]string{
-		{"libtorrent_temp_dl_limit", strconv.FormatInt(download, 10)},
-		{"libtorrent_temp_ul_limit", strconv.FormatInt(upload, 10)},
-		{"libtorrent_temp_limit_enabled", enabled},
-		{"libtorrent_temp_limit_until", strconv.FormatInt(until, 10)},
+		{"torrent_temp_dl_limit", strconv.FormatInt(download, 10)},
+		{"torrent_temp_ul_limit", strconv.FormatInt(upload, 10)},
+		{"torrent_temp_limit_enabled", enabled},
+		{"torrent_temp_limit_until", strconv.FormatInt(until, 10)},
 	}
 	for _, pair := range pairs {
 		if err := saveConfigSetting(s.cfg.DataDir, pair[0], pair[1]); err != nil {
@@ -1356,8 +1356,8 @@ func SetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 func GetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	now := time.Now().Unix()
-	until := gh6_parseSettingInt(cfg, "libtorrent_temp_limit_until")
-	tempActive := gh6_truthySetting(cfg.Settings["libtorrent_temp_limit_enabled"]) && (until == 0 || until > now)
+	until := gh6_parseSettingInt(cfg, "torrent_temp_limit_until")
+	tempActive := gh6_truthySetting(cfg.Settings["torrent_temp_limit_enabled"]) && (until == 0 || until > now)
 	remaining := int64(0)
 	if tempActive && until > 0 {
 		remaining = until - now
@@ -1372,17 +1372,17 @@ func GetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"download_kib":       download,
 		"upload_kib":         upload,
 		"temp_active":        tempActive,
-		"temp_download_kib":  gh6_parseSettingInt(cfg, "libtorrent_temp_dl_limit"),
-		"temp_upload_kib":    gh6_parseSettingInt(cfg, "libtorrent_temp_ul_limit"),
+		"temp_download_kib":  gh6_parseSettingInt(cfg, "torrent_temp_dl_limit"),
+		"temp_upload_kib":    gh6_parseSettingInt(cfg, "torrent_temp_ul_limit"),
 		"temp_until":         until,
 		"temp_remaining_sec": remaining,
 		"sched_active":       schedActive,
 		"sched_download_kib": schedDownload,
 		"sched_upload_kib":   schedUpload,
-		"base_download_kib":  max(cfg.Libtorrent.DownloadLimitKib, 0),
-		"base_upload_kib":    max(cfg.Libtorrent.UploadLimitKib, 0),
+		"base_download_kib":  max(cfg.Transfer.DownloadLimitKib, 0),
+		"base_upload_kib":    max(cfg.Transfer.UploadLimitKib, 0),
 		// Shown next to the limits on the TUI downloads tab.
-		"auto_remove_completed": cfg.Libtorrent.AutoRemoveCompleted,
+		"auto_remove_completed": cfg.Transfer.AutoRemoveCompleted,
 	})
 }
 

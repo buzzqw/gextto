@@ -12,54 +12,41 @@ import (
 // the Configurazione page was reorganized into areas (146 options, plus the
 // 27 score weights). Every one of them must still be on the page.
 var uiSettingsKeysBeforeReorganization = []string{
-	"refresh_interval", "max_release_age_days", "gap_fill_max_per_series", "gap_filling",
-	"gap_deep_interval_hours", "gap_deep_max_per_cycle", "cycle_title_search", "active", "blacklist",
-	"libtorrent_enabled", "libtorrent_dynamic_queue", "libtorrent_auto_optimize", "libtorrent_preallocate",
-	"libtorrent_dynamic_queue_min", "libtorrent_dynamic_queue_max", "libtorrent_dont_count_slow_torrents",
-	"libtorrent_stall_after_min", "libtorrent_stall_retry_min", "libtorrent_stall_giveup_min",
-	"libtorrent_dead_swarm_giveup_min", "libtorrent_sequential", "libtorrent_active_downloads",
-	"libtorrent_active_seeds", "libtorrent_active_limit", "libtorrent_seed_ratio", "libtorrent_seed_time",
-	"libtorrent_seed_time_days", "auto_remove_completed", "libtorrent_connections_limit",
-	"libtorrent_upload_slots_limit", "libtorrent_half_open_limit", "libtorrent_max_connections_per_torrent",
-	"libtorrent_max_uploads_per_torrent", "libtorrent_aio_threads", "libtorrent_cache_size",
-	"libtorrent_cache_expiry", "libtorrent_alert_queue_size", "libtorrent_dht", "libtorrent_pex",
-	"libtorrent_lsd", "libtorrent_upnp", "libtorrent_natpmp", "libtorrent_utp", "libtorrent_prefer_rc4",
-	"libtorrent_announce_to_all_trackers", "libtorrent_announce_to_all_tiers",
-	"libtorrent_allow_multiple_connections_per_ip", "libtorrent_announce_interval",
-	"libtorrent_torrent_connect_boost", "libtorrent_dht_bootstrap_nodes", "libtorrent_encryption",
-	"libtorrent_apply_ip_filter", "libtorrent_ipfilter_url", "libtorrent_listen_interfaces",
-	"libtorrent_outgoing_interface", "libtorrent_ramdisk_dir", "libtorrent_ramdisk_enabled",
-	"libtorrent_ramdisk_threshold_gb", "libtorrent_ramdisk_margin_gb", "libtorrent_ramdisk_min_free_bytes",
-	"libtorrent_port_min", "libtorrent_port_max", "libtorrent_dl_limit", "libtorrent_ul_limit",
-	"libtorrent_sched_enabled", "libtorrent_sched_start", "libtorrent_sched_end", "libtorrent_sched_days",
-	"libtorrent_sched_dl_limit", "libtorrent_sched_ul_limit", "libtorrent_extra_settings", "torrent_backend",
-	"qbittorrent_url", "qbittorrent_username", "qbittorrent_password", "qbittorrent_category", "qbittorrent_tag",
-	"qbittorrent_request_timeout_secs", "qbittorrent_poll_interval_ms", "qbittorrent_path_mappings",
-	"qbittorrent_managed", "gxtorrent_url", "gxtorrent_listen", "gxtorrent_request_timeout_secs",
-	"gxtorrent_poll_interval_ms", "gxtorrent_proxy", "gxtorrent_auto", "rename_episodes", "tvdb_language",
-	"tmdb_language", "default_language", "cleanup_upgrades", "movies_flat_files", "cleanup_min_score_diff",
-	"upgrade_min_score_diff", "upgrade_until_score", "tmdb_api_key", "tvdb_api_key", "min_free_space_gb",
-	"trash_retention_days", "archive_cleanup_enabled", "archive_max_age_days", "archive_keep_min",
-	"stop_on_old_page_threshold", "rename_verify_interval", "auth_enabled", "auth_local_bypass", "auth_username",
-	"auth_password", "auth_api_key", "gxtorrent_token", "move_episodes", "hardlink_seeding", "debug_enabled",
-	"delay_torrent_minutes", "delay_movies_minutes", "delay_bypass_score", "housekeeping_enabled",
-	"housekeeping_interval_hours", "housekeeping_retain_cycles", "housekeeping_seen_days",
-	"housekeeping_history_days", "housekeeping_error_age_days", "housekeeping_gap_log_days",
-	"housekeeping_upgrade_backup_days", "media_info_backfill_enabled", "media_info_backfill_interval_minutes",
-	"media_info_backfill_batch", "temp_orphan_cleanup_enabled", "temp_orphan_min_age_days", "notify_telegram",
-	"telegram_bot_token", "telegram_chat_id", "notify_webhook_url", "notify_webhook_secret", "notify_webhook_format", "notify_webhook_token", "notify_webhook_user", "notify_email",
-	"email_smtp", "email_from", "email_to", "email_password", "archive_root", "trash_path", "cleanup_action",
-	"libtorrent_dir", "libtorrent_temp_dir", "libtorrent_torrent_copy_dir",
+	"refresh_interval", "max_release_age_days", "gap_fill_max_per_series", "gap_filling", "gap_deep_interval_hours", "gap_deep_max_per_cycle",
+	"cycle_title_search", "active", "blacklist", "torrent_dynamic_queue", "torrent_preallocate", "torrent_dynamic_queue_min",
+	"torrent_dynamic_queue_max", "torrent_dont_count_slow_torrents", "torrent_stall_after_min", "torrent_stall_retry_min",
+	"torrent_stall_giveup_min", "torrent_dead_swarm_giveup_min", "torrent_sequential", "torrent_active_downloads", "torrent_active_seeds",
+	"torrent_active_limit", "torrent_seed_ratio", "torrent_seed_time", "torrent_seed_time_days", "auto_remove_completed",
+	"torrent_max_connections_per_torrent", "torrent_cache_size", "torrent_cache_expiry", "torrent_dht", "torrent_pex", "torrent_lsd",
+	"torrent_upnp", "torrent_natpmp", "torrent_utp", "torrent_dht_bootstrap_nodes", "torrent_encryption", "torrent_apply_ip_filter",
+	"torrent_ipfilter_url", "torrent_listen_interfaces", "torrent_outgoing_interface", "torrent_ramdisk_dir", "torrent_ramdisk_enabled",
+	"torrent_ramdisk_threshold_gb", "torrent_ramdisk_margin_gb", "torrent_ramdisk_min_free_bytes", "torrent_port_min", "torrent_port_max",
+	"torrent_dl_limit", "torrent_ul_limit", "torrent_sched_enabled", "torrent_sched_start", "torrent_sched_end", "torrent_sched_days",
+	"torrent_sched_dl_limit", "torrent_sched_ul_limit", "torrent_backend", "qbittorrent_url", "qbittorrent_username", "qbittorrent_password",
+	"qbittorrent_category", "qbittorrent_tag", "qbittorrent_request_timeout_secs", "qbittorrent_poll_interval_ms",
+	"qbittorrent_path_mappings", "qbittorrent_managed", "gxtorrent_url", "gxtorrent_listen", "gxtorrent_request_timeout_secs",
+	"gxtorrent_poll_interval_ms", "gxtorrent_proxy", "gxtorrent_auto", "rename_episodes", "tvdb_language", "tmdb_language",
+	"default_language", "cleanup_upgrades", "movies_flat_files", "cleanup_min_score_diff", "upgrade_min_score_diff", "upgrade_until_score",
+	"tmdb_api_key", "tvdb_api_key", "min_free_space_gb", "trash_retention_days", "archive_cleanup_enabled", "archive_max_age_days",
+	"archive_keep_min", "stop_on_old_page_threshold", "rename_verify_interval", "auth_enabled", "auth_local_bypass", "auth_username",
+	"auth_password", "auth_api_key", "gxtorrent_token", "move_episodes", "hardlink_seeding", "debug_enabled", "delay_torrent_minutes",
+	"delay_movies_minutes", "delay_bypass_score", "housekeeping_enabled", "housekeeping_interval_hours", "housekeeping_retain_cycles",
+	"housekeeping_seen_days", "housekeeping_history_days", "housekeeping_error_age_days", "housekeeping_gap_log_days",
+	"housekeeping_upgrade_backup_days", "media_info_backfill_enabled", "media_info_backfill_interval_minutes", "media_info_backfill_batch",
+	"temp_orphan_cleanup_enabled", "temp_orphan_min_age_days", "notify_telegram", "telegram_bot_token", "telegram_chat_id",
+	"notify_webhook_url", "notify_webhook_secret", "notify_webhook_format", "notify_webhook_token", "notify_webhook_user", "notify_email",
+	"email_smtp", "email_from", "email_to", "email_password", "archive_root", "trash_path", "cleanup_action", "torrent_dir",
+	"torrent_temp_dir", "torrent_copy_dir",
 }
 
 // TestSettingsEveryPreviousOptionIsStillAvailable counts the options and
 // checks that each one is rendered, editable, in the section the index
 // assigns it to.
 func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
-	if got := len(uiSettingsKeysBeforeReorganization); got != 149 {
-		t.Fatalf("frozen list has %d keys, want 149", got)
+	if got := len(uiSettingsKeysBeforeReorganization); got != 134 {
+		t.Fatalf("frozen list has %d keys, want 134", got)
 	}
-	if got := len(uiSettingsIndex); got != 161 {
+	if got := len(uiSettingsIndex); got != 146 {
 		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default, the 4 DLNA media server options, the update check interval and the per-day speed schedule", got)
 	}
 	if got := len(uiScoreSettingDefs); got != 27 {
@@ -99,8 +86,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		}
 		found++
 	}
-	if found != 188 {
-		t.Fatalf("rendered %d options, want 188", found)
+	if found != 173 {
+		t.Fatalf("rendered %d options, want 173", found)
 	}
 
 	// Editors, panels and actions without a single key.
@@ -108,8 +95,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		"sources":     {"Feed RSS", "Motori web", "Filtri contenuto esclusi", "Filtri per sorgente", "Cartelle osservate", "Pulisci i risultati già archiviati"},
 		"scores":      {"Gruppi custom", "Aggiungi gruppo"},
 		"backend":     {"Applica motore", "Installa / Ottimizza qBittorrent-nox", "Stato qBittorrent-nox", "Test connessione"},
-		"libtorrent":  {"Applica ora", "v2-ipfilter-panel", "Carica / aggiorna ora"},
-		"performance": {"Ottimizza", "Applica ora"},
+		"network":     {"v2-ipfilter-panel", "Carica / aggiorna ora"},
+		"performance": {"Ottimizza"},
 		"rename":      {"Composizione del nome", "Regole tag → cartella"},
 		"notify":      {"Hook eventi"},
 		"system":      {"v2-i18n-table", "Esporta YAML", "Importa YAML"},
@@ -171,20 +158,20 @@ func TestSettingsRowsControlsAndAccessibility(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	_, body := v2Request(t, server, http.MethodGet, "/settings/body?tab=libtorrent", nil)
+	_, body := v2Request(t, server, http.MethodGet, "/settings/body?tab=network", nil)
 	for _, marker := range []string{
 		// Time pickers and one checkbox per weekday.
-		`type="time" name="value" id="input-libtorrent_sched_start"`,
-		`class="setting-days" role="group" aria-labelledby="label-libtorrent_sched_days"`,
+		`type="time" name="value" id="input-torrent_sched_start"`,
+		`class="setting-days" role="group" aria-labelledby="label-torrent_sched_days"`,
 		// Units and special values outside the label.
-		`<span class="setting-unit" id="unit-libtorrent_dl_limit">KiB/s</span>`,
-		`<small class="setting-zero" id="zero-libtorrent_dl_limit">0 = illimitato</small>`,
-		`aria-describedby="hint-libtorrent_dl_limit unit-libtorrent_dl_limit zero-libtorrent_dl_limit"`,
+		`<span class="setting-unit" id="unit-torrent_dl_limit">KiB/s</span>`,
+		`<small class="setting-zero" id="zero-torrent_dl_limit">0 = illimitato</small>`,
+		`aria-describedby="hint-torrent_dl_limit unit-torrent_dl_limit zero-torrent_dl_limit"`,
 		// Switches and named save buttons.
-		`role="switch" name="value" id="input-libtorrent_dht"`,
-		`aria-labelledby="save-libtorrent_dht label-libtorrent_dht"`,
+		`role="switch" name="value" id="input-torrent_dht"`,
+		`aria-labelledby="save-torrent_dht label-torrent_dht"`,
 		// The schedule rows hide while the schedule is off.
-		`data-v2-depends-on="libtorrent_sched_enabled" hidden`,
+		`data-v2-depends-on="torrent_sched_enabled" hidden`,
 	} {
 		if !strings.Contains(body, marker) {
 			t.Errorf("libtorrent tab lacks %s", marker)
@@ -194,8 +181,7 @@ func TestSettingsRowsControlsAndAccessibility(t *testing.T) {
 		t.Fatalf("developer jargon or inert icon still shown")
 	}
 
-	// IP filter switch and URL share one panel now; with gx-torrent the
-	// libtorrent-only RC4 preference moves to the closed «unused» panel.
+	// IP filter switch and URL share one panel now.
 	panel := func(title string) string {
 		start := strings.Index(body, "<h3>"+title+"</h3>")
 		if start < 0 {
@@ -207,32 +193,29 @@ func TestSettingsRowsControlsAndAccessibility(t *testing.T) {
 		}
 		return rest
 	}
-	for _, key := range []string{"libtorrent_encryption", "libtorrent_apply_ip_filter", "libtorrent_ipfilter_url"} {
+	for _, key := range []string{"torrent_encryption", "torrent_apply_ip_filter", "torrent_ipfilter_url"} {
 		if !strings.Contains(panel("Cifratura e filtro IP"), `id="v2-setting-`+key+`"`) {
 			t.Errorf("%s is not in the Cifratura e filtro IP panel", key)
 		}
 	}
-	if unused := panel("Non usate dal motore attivo"); !strings.Contains(unused, `id="v2-setting-libtorrent_prefer_rc4"`) || !strings.Contains(unused, "Non attivo con il motore") || !strings.Contains(unused, "tornano attive cambiando motore") {
-		t.Errorf("libtorrent-only option must be in the closed unused panel: %s", unused)
-	}
 
 	// Weekdays are saved back as the "0,1,4" list the scheduler reads.
-	code, saved := v2Request(t, server, http.MethodPost, "/settings/save", url.Values{"key": {"libtorrent_sched_days"}, "value": {"4", "0", "9", "2"}})
+	code, saved := v2Request(t, server, http.MethodPost, "/settings/save", url.Values{"key": {"torrent_sched_days"}, "value": {"4", "0", "9", "2"}})
 	if code != http.StatusOK || !strings.Contains(saved, "salvata") {
 		t.Fatalf("days save -> %d: %s", code, saved)
 	}
-	if got := latestConfig(state).Settings["libtorrent_sched_days"]; got != "0,2,4" {
+	if got := latestConfig(state).Settings["torrent_sched_days"]; got != "0,2,4" {
 		t.Fatalf("days stored as %q, want 0,2,4", got)
 	}
 	// A switch posts its value first and the hidden "off" value after it.
-	if _, saved = v2Request(t, server, http.MethodPost, "/settings/save", url.Values{"key": {"libtorrent_dht"}, "value": {"false"}}); latestConfig(state).Settings["libtorrent_dht"] != "false" {
+	if _, saved = v2Request(t, server, http.MethodPost, "/settings/save", url.Values{"key": {"torrent_dht"}, "value": {"false"}}); latestConfig(state).Settings["torrent_dht"] != "false" {
 		t.Fatalf("switch off not saved: %s", saved)
 	}
 	// A value different from the default is marked and can be restored.
 	if !strings.Contains(saved, `class="setting-badge">modificato`) || !strings.Contains(saved, `data-v2-reset="true"`) {
 		t.Fatalf("modified switch must show its default: %s", saved)
 	}
-	if _, saved = v2Request(t, server, http.MethodPost, "/settings/save", url.Values{"key": {"libtorrent_dht"}, "value": {"true", "false"}}); latestConfig(state).Settings["libtorrent_dht"] != "true" || strings.Contains(saved, "setting-badge\">modificato") {
+	if _, saved = v2Request(t, server, http.MethodPost, "/settings/save", url.Values{"key": {"torrent_dht"}, "value": {"true", "false"}}); latestConfig(state).Settings["torrent_dht"] != "true" || strings.Contains(saved, "setting-badge\">modificato") {
 		t.Fatalf("switch on not saved or still marked modified: %s", saved)
 	}
 	// The «Predefinito» button must be available on every resetting field, even
@@ -252,11 +235,11 @@ func TestSettingsEnginePanelsAndUnusedOptions(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	// gx-torrent is the default engine: its panel is open, qBittorrent-nox's
-	// and the integrated libtorrent's are closed.
+	// is closed.
 	_, body := v2Request(t, server, http.MethodGet, "/settings/body?tab=backend", nil)
 	open := strings.Index(body, "<h3>gx-torrent</h3>")
 	closed := strings.Index(body, `<summary class="panel-head"><h3>qBittorrent-nox</h3>`)
-	if open < 0 || closed < 0 || !strings.Contains(body, `<summary class="panel-head"><h3>libtorrent integrato</h3>`) {
+	if open < 0 || closed < 0 {
 		t.Fatalf("engine panels not split by active engine: %s", body)
 	}
 	// The action buttons reopen the same section.

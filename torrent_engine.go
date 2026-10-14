@@ -6,14 +6,12 @@ package gextto
 // Gextto stays the owner of the queue, the automation and the post-processing;
 // the engine only provides the transfer plan. Two implementations exist:
 //
-//   - embeddedEngine  — the official libtorrent backend (default, unchanged);
+//   - gxTorrentEngine   — the native gx-torrent daemon (the default engine);
 //   - qbittorrentEngine — an adapter over the qBittorrent-nox Web API.
 //
-// The refactor is deliberately behavior-preserving: `embeddedEngine` embeds the
-// existing *LibtorrentClient, so every promoted method behaves exactly as
-// before. The abstraction exists to let the daemon select a different engine
-// without changing the HTTP contract or the automation policy (see
-// the backend-specific implementation notes).
+// The abstraction keeps the daemon able to select a different engine without
+// changing the HTTP contract or the automation policy (see the backend-specific
+// implementation notes).
 
 import (
 	"errors"
@@ -22,7 +20,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/qbittorrent"
@@ -82,8 +79,7 @@ type TorrentEngine interface {
 
 	Stats() map[string]any
 	// AdjustQueue enforces Gextto's active-download slots on the backend. The
-	// embedded engine applies libtorrent's dynamic queue; the external engines
-	// implement the same policy with pause/start.
+	// engines implement the same policy with pause/start.
 	AdjustQueue(cfg *Config, effectiveDownloadKib int64)
 
 	Add(magnet string, cfg *Config) (bool, error)
@@ -125,31 +121,15 @@ func (e ErrCapabilityUnavailable) Error() string {
 	return fmt.Sprintf("torrent backend %q does not support %q", e.Backend, e.Capability)
 }
 
-// embeddedEngine adapts the libtorrent client to TorrentEngine. Because it
-// embeds the concrete client, every method is promoted unchanged: switching the
-// default path through this adapter cannot alter behavior.
-type embeddedEngine struct{ *LibtorrentClient }
-
-func (embeddedEngine) Name() string { return BackendEmbedded }
-
-func (embeddedEngine) Capabilities() map[string]bool {
-	return capabilitiesFor(BackendEmbedded)
-}
-
-var _ TorrentEngine = embeddedEngine{}
-
 // Backend identifiers accepted by `torrent_backend`.
 const (
-	BackendEmbedded    = "embedded"
 	BackendQbittorrent = "qbittorrent"
 	BackendGxTorrent   = "gx-torrent"
 )
 
 // DefaultTorrentBackend is the engine a fresh installation uses when no
 // `torrent_backend` has ever been saved. gx-torrent is the default since it is
-// pure Go, needs no libtorrent-rasterbar and runs in its own supervised process;
-// `embedded` (libtorrent) stays available and remains the automatic fallback
-// when gx-torrent cannot be activated.
+// pure Go and runs in its own supervised process.
 const DefaultTorrentBackend = BackendGxTorrent
 
 // capabilityLevels is the single source of truth for the parity matrix. It is
@@ -160,17 +140,6 @@ const DefaultTorrentBackend = BackendGxTorrent
 // "NAS per categoria" rules), not an engine feature: they work with every
 // backend, provided the UI/API path, so all of them report "full".
 var capabilityLevels = map[string]map[string]string{
-	BackendEmbedded: {
-		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
-		"recheck": "full", "move": "full", "limits": "full", "files": "full", "peers": "full",
-		"trackers": "full", "events": "full", "stats": "full", "sequential": "full",
-		"first_last": "full", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
-		"piece_diagnostics": "none", "categories": "full", "tags": "full", "sync": "none",
-		"super_seeding": "full",
-		"connections":   "full", "file_priorities": "full",
-		"ip_filter": "full", "session_stats": "full", "web_seeds": "full",
-		"holepunch": "none",
-	},
 	BackendQbittorrent: {
 		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
 		"recheck": "full", "move": "full", "limits": "full", "files": "full", "peers": "full",
@@ -256,40 +225,39 @@ func CapabilityParity() map[string]map[string]string {
 	return out
 }
 
-// activeEngine returns the engine currently driving the daemon. When no
-// alternative engine was installed at startup (or after a settings change), the
-// embedded libtorrent adapter is returned, preserving the historic behavior.
+// activeEngine returns the engine currently driving the daemon. When no backend
+// could be activated it returns the placeholder engine, so the UI and the
+// automation keep working while the transfers are stopped.
 func (s *AppState) activeEngine() TorrentEngine {
 	if s == nil {
-		return embeddedEngine{nil}
+		return nullEngine{}
 	}
 	s.engine_mu.RLock()
 	engine := s.torrent_engine
 	s.engine_mu.RUnlock()
-	if engine != nil {
-		return engine
+	if engine == nil {
+		return nullEngine{}
 	}
-	return embeddedEngine{s.torrents}
+	return engine
 }
 
-// setActiveEngine installs an alternative engine. A nil engine restores the
-// embedded libtorrent backend.
+// setActiveEngine installs the engine selected from the settings.
 func (s *AppState) setActiveEngine(engine TorrentEngine) {
 	s.engine_mu.Lock()
 	s.torrent_engine = engine
 	s.engine_mu.Unlock()
 }
 
-// hasTorrentEngine reports whether any engine (embedded or alternative) is
-// wired. It guards handlers that must not dereference a nil embedded client in
-// a partially constructed AppState (route smoke tests).
+// hasTorrentEngine reports whether an engine is wired. It guards handlers that
+// must not dereference a nil engine in a partially constructed AppState (route
+// smoke tests).
 func (s *AppState) hasTorrentEngine() bool {
 	if s == nil {
 		return false
 	}
 	s.engine_mu.RLock()
 	defer s.engine_mu.RUnlock()
-	return s.torrent_engine != nil || s.torrents != nil
+	return s.torrent_engine != nil
 }
 
 // ---------------------------------------------------------------------------
@@ -410,37 +378,6 @@ func ValidatePathMappings(mappings []PathMapping, required []string) error {
 		return fmt.Errorf("path %q is not covered by backend_path_mappings", cleaned)
 	}
 	return nil
-}
-
-// torrentEngineEmbeddedExtras are the libtorrent-only operations the worker
-// uses. A non-embedded backend simply does not implement them and the
-// corresponding blocks are skipped: the queue and metadata machinery are
-// Gextto's, but only the embedded engine exposes them in-process.
-type torrentEngineEmbeddedExtras interface {
-	PromoteMetadata()
-	EnsureAutoManaged() int
-	EnforceDeferredOptions(torrents []models.TorrentView)
-	recentlyRechecked(hash string, window time.Duration) bool
-	RequestResumeSave() int
-}
-
-// requireEmbedded returns the embedded libtorrent client when it is the active
-// backend. When another engine is active it returns an explicit capability
-// error so libtorrent-only endpoints never act on the wrong session.
-func (s *AppState) requireEmbedded(capability string) (*LibtorrentClient, error) {
-	if s == nil {
-		return nil, backendCapabilityError(BackendEmbedded, capability)
-	}
-	s.engine_mu.RLock()
-	engine := s.torrent_engine
-	s.engine_mu.RUnlock()
-	if engine != nil {
-		return nil, backendCapabilityError(engine.Name(), capability)
-	}
-	if s.torrents == nil {
-		return nil, backendCapabilityError(BackendEmbedded, capability)
-	}
-	return s.torrents, nil
 }
 
 // backendCapabilityError builds the canonical explicit "unsupported" error.

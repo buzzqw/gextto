@@ -22,11 +22,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Install native dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libtorrent-rasterbar-dev
-
       - name: Test
         run: make test
 
@@ -35,7 +30,7 @@ jobs:
 
   # Built on Ubuntu 22.04 (glibc 2.35) so the archive runs on every supported
   # distribution. See scripts/build-release.sh. The release is pure Go
-  # (gx-torrent engine): the embedded libtorrent variant is no longer shipped.
+  # (gx-torrent engine).
   package:
     name: package (${{ matrix.arch }})
     needs: test

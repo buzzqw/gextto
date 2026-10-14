@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -74,31 +72,20 @@ func normalizeJSONScalar(value any) string {
 	}
 }
 
-func TestAddOptionsPreallocationAndStopFlags(t *testing.T) {
-	opts := AddOptions{Preallocate: true, StopWhenReady: true}
-	flags := opts.Flags()
-	if flags&(1<<4) == 0 {
-		t.Fatalf("preallocate flag bit missing: %b", flags)
-	}
-	if flags&(1<<5) == 0 {
-		t.Fatalf("stop-when-ready flag bit missing: %b", flags)
-	}
-}
-
-func TestLibtorrentPreallocateDefaultsToTrue(t *testing.T) {
+func TestTorrentPreallocateDefaultsToTrue(t *testing.T) {
 	cfg := DefaultConfig()
 	if cfg.Settings == nil {
 		cfg.Settings = map[string]string{}
 	}
-	if !cfg.LibtorrentPreallocate() {
+	if !cfg.TorrentPreallocate() {
 		t.Fatal("preallocation must default to true")
 	}
-	cfg.Settings["libtorrent_preallocate"] = "false"
-	if cfg.LibtorrentPreallocate() {
+	cfg.Settings["torrent_preallocate"] = "false"
+	if cfg.TorrentPreallocate() {
 		t.Fatal("explicit false ignored")
 	}
-	cfg.Settings["libtorrent_preallocate"] = "yes"
-	if !cfg.LibtorrentPreallocate() {
+	cfg.Settings["torrent_preallocate"] = "yes"
+	if !cfg.TorrentPreallocate() {
 		t.Fatal("explicit yes must enable preallocation")
 	}
 }
@@ -140,50 +127,17 @@ func TestTorrentWhyEndpointUnknownHash(t *testing.T) {
 	}
 }
 
-func TestCopyTorrentFileHonoursSetting(t *testing.T) {
-	dir := t.TempDir()
-	client := &LibtorrentClient{configDB: filepath.Join(dir, "gextto_config.db"), stateDir: dir}
-	client.torrents = map[string]models.TorrentView{"abc": {Hash: "abc", Name: "My Torrent"}}
-
-	// Without the setting nothing is copied.
-	source := filepath.Join(dir, "src.torrent")
-	if err := os.WriteFile(source, []byte("torrent"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	client.copyTorrentFile("abc", source)
-	outDir := filepath.Join(dir, "torrents")
-	if _, err := os.Stat(outDir); !os.IsNotExist(err) {
-		t.Fatalf("copy happened without the setting: %v", err)
-	}
-
-	// With the setting the .torrent is copied under the display name.
-	if err := SaveSetting(dir, "libtorrent_torrent_copy_dir", outDir); err != nil {
-		t.Fatal(err)
-	}
-	client.copyTorrentFile("abc", source)
-	target := filepath.Join(outDir, "My Torrent.torrent")
-	if data, err := os.ReadFile(target); err != nil || string(data) != "torrent" {
-		t.Fatalf("torrent not copied to %s: %v %q", target, err, data)
-	}
-}
-
-func TestLibtorrentSessionStatsEndpoint(t *testing.T) {
+func TestTorrentSessionStatsEndpoint(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	code, _, body := webGet(t, server, "/api/libtorrent/session-stats")
-	if code != http.StatusOK {
+	// The test backend (qBittorrent, unreachable) does not expose session
+	// statistics, so the endpoint answers with an explicit capability conflict
+	// instead of fabricated data.
+	code, _, body := webGet(t, server, "/api/torrents/session-stats")
+	if code != http.StatusConflict {
 		t.Fatalf("session-stats -> %d: %s", code, body)
-	}
-	var result struct {
-		OK bool `json:"ok"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		t.Fatalf("decode: %v (%s)", err, body)
-	}
-	if !result.OK {
-		t.Fatalf("session-stats not ok: %s", body)
 	}
 }
 

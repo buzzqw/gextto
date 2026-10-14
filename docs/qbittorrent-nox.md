@@ -117,7 +117,7 @@ With **Downloaded and updated by Gextto** on, Gextto downloads the latest
 qBittorrent-nox static release, installs it next to `gexttod`, and starts/stops
 it together with the service; updates are applied with backup and rollback, and
 a watchdog restarts it after an unexpected exit (after repeated crashes Gextto
-falls back to the embedded engine). If qBittorrent is down at startup, Gextto
+runs the engine fallback chain). If qBittorrent is down at startup, Gextto
 keeps retrying instead of failing.
 
 In managed mode you do not set the URL to a service you started yourself: Gextto

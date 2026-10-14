@@ -63,7 +63,7 @@ with a SQLite database, an integrated torrent engine and a server-rendered web U
   published, not hidden.
 
 **Where Gextto is ahead or on par:** series, movies **and comics** in a single
-daemon; the torrent engine integrated (gx-torrent in pure Go, libtorrent or
+daemon; the torrent engine integrated (gx-torrent in pure Go, or
 qBittorrent-nox, §6); explainability of the choices; search also from web engines;
 lightness (a Go binary and SQLite against a .NET stack); simplicity (health, backup
 and maintenance built in).
@@ -306,8 +306,7 @@ Recorded with the reason, so the ground is not re-covered:
 `gxtorrent_engine.go` — REST, web page, self-managed queue, the `TorrentEngine`
 contract with Gextto). The per-capability state lives in `capabilityLevels`
 (`torrent_engine.go`), the single source of truth for the UI: an operation a backend
-does not have is refused with `ErrCapabilityUnavailable`, and only the embedded
-engine's own blocks use `requireEmbedded`.
+does not have is refused with `ErrCapabilityUnavailable`.
 
 Around every engine Gextto provides queue/slots, stalled/retry, seed policy, RSS,
 search, categories/tags, the bandwidth scheduler, post-processing, moves and the RAM
@@ -478,22 +477,20 @@ justifies it, otherwise it is closed with the recorded data. Most of what remain
 **implemented or designed but not validated on a real swarm**, or needs a **go/no-go
 decided on data**, so every item carries the gate it waits for.
 
-**The engine fallback, and what removing libtorrent costs.** `gx-torrent` is the
-engine; the embedded libtorrent is **no longer shipped** in releases — it survives
-only in a custom build made with `GEXTTO_LIBTORRENT=1` (`LibtorrentCompiled()`) and
-is in the process of removal. The fallback no longer
-depends on it (`engine_fallback.go`). When the active engine fails — a crash budget spent, or
-an activation refused at startup — Gextto walks a chain and persists the choice:
+**The engine fallback.** There are two selectable engines: **`gx-torrent`**, the
+engine of this project, and **qBittorrent-nox** (external or managed). The
+libtorrent engine Gextto used to embed is **gone**: it is not built and not
+shipped, and the transfer settings are engine-neutral (`torrent_*`). When the
+active engine fails — a crash budget spent, or an activation refused at startup —
+Gextto walks a chain and persists the choice (`engine_fallback.go`):
 
 1. **qBittorrent.** The managed runtime is downloaded on demand from
    [`userdocs/qbittorrent-nox-static`](https://github.com/userdocs/qbittorrent-nox-static)
    (the last libtorrent **v2** build for the architecture, SHA-256 verified against the
    GitHub digest), configured with a private profile under the application directory and
    started by Gextto; an operator who points Gextto at an **external** qBittorrent gets that
-   one used as is, with nothing to download. This is the safety net that does not need
-   libtorrent.
-2. **the embedded libtorrent**, only on a build that includes it.
-3. **recovery**: no alternative is available, so the transfers stay stopped, the UI stays up
+   one used as is, with nothing to download.
+2. **recovery**: no alternative is available, so the transfers stay stopped, the UI stays up
    and the operator is notified.
 
 Before the engine handover the supervisor tries the cheapest fix: if the updater kept
@@ -505,40 +502,6 @@ cooldown (`DATA_DIR/engine-fallback.json`, 30 minutes) stops the chain from ping
 between two engines that both crash: within the window it goes straight to recovery.
 `GEXTTO_ENGINE` forces the engine for one run, so a service whose saved backend is broken is
 recovered from a shell without editing the database.
-
-**Removing libtorrent entirely** is an open item, staged so the removal never opens a window
-without a fallback. The cost, measured on the current tree:
-
-- **engine**: `libtorrent_bridge.cpp` (1721) + `.h` (237) + `libtorrent_cgo.go` (608) +
-  `libtorrent_nocgo.go` (195) go away; `libtorrent.go` (2842) is a **split**, not a delete:
-  about half its free functions are Gextto-level policy used by every engine
-  (`FreeSpaceBytes`, `RamdiskFits*`, `PathOnRamdisk`, `RamdiskPendingBytes`,
-  `automaticDownloadPath`, `preferredDownloadPath`, `resolveSavePath`, `CompletionPath`) and
-  must be relocated. The cgo tests (`libtorrent_test.go`, `_transfer`, `_archived`,
-  `_session_guard`, ~990 lines) go away.
-- **adapter surface**: 13 `requireEmbedded(...)` call sites in 8 files; `session_stats`,
-  `ip_filter`, `super_seeding`, `apply_settings`, `optimize_settings` already have a
-  gx-torrent equivalent and only need re-routing, `scrape` and `dht_announce` exist in the
-  daemon but are not wired to `TorrentEngine`, and `upload_mode`/`share_mode`/`torrent_flags`
-  are libtorrent-only concepts that would be dropped.
-- **selection**: `BackendEmbedded`, `embeddedEngine`, its row in `capabilityLevels`, and the
-  `torrent_backend=embedded` **migration** for existing installations (`TorrentBackendName`
-  normalises unknown values to embedded today).
-- **build/release/CI**: the `build-libtorrent`/`fast-libtorrent`/`test-libtorrent`/`test-real`
-  targets, `build-daemon.sh`, the two-variant release matrix and `install.sh --libtorrent`,
-  `THIRD-PARTY-NOTICES`.
-- **settings/UI/i18n**: the 15 `uiLibtorrentEngineOnlySettings` keys plus their tooltips,
-  catalogue entries, manual rows and Appendix A, and the settings-count test.
-- **docs**: 12 documents mention libtorrent.
-
-Staged plan and effort: **(1)** stop shipping the `libtorrent` variant from
-release/CI/`install.sh`, keeping the code — done, the release is pure Go; **(2)** remove the
-backend, re-route the handlers and
-migrate `torrent_backend` (~3–6 days); **(3)** clean Makefile, workflows, scripts, docs
-(~1–2 days). Total ≈ 4–8 person-days remaining. Gate: the stock is only cut once the replacement
-fallback is validated with a cross-engine conformance run (the same controlled torrent on
-gx-torrent and on the managed qBittorrent, asserting completion, piece integrity, resume,
-move and seed), so the removal cannot leave a single engine without a parachute.
 
 **Waiting for a measurement or a host.**
 

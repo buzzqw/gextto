@@ -61,13 +61,6 @@ type gh0_backfillMediaInfoInput struct {
 // small generic helpers
 // ---------------------------------------------------------------------------
 
-func gh0_derefStr(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
-}
-
 func gh0_derefI64(value *int64) int64 {
 	if value == nil {
 		return 0
@@ -962,7 +955,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	comicDir, hasComicDir := ComicDownloadDir(cfg)
-	target := cfg.LibtorrentDir
+	target := cfg.DownloadDir
 	if strings.TrimSpace(input.SavePath) == "" {
 		if hasComicDir {
 			target = comicDir
@@ -971,7 +964,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		target = strings.TrimSpace(input.SavePath)
 	}
 	allowed := pathStartsWith(target, cfg.DataDir) ||
-		pathStartsWith(target, cfg.LibtorrentDir) ||
+		pathStartsWith(target, cfg.DownloadDir) ||
 		(hasComicDir && pathStartsWith(target, comicDir)) ||
 		gh0_anyPathStartsWith(target, monitoredPaths)
 	if !allowed {
@@ -1699,100 +1692,17 @@ func JellyfinRefresh(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 // ---------------------------------------------------------------------------
-// optimize_libtorrent_settings
+// memory detection
 // ---------------------------------------------------------------------------
 
-type gh0_libtorrentChange struct {
-	key   string
-	value string
+// gh0_memoryMBFor returns the detected physical memory in MiB (0 when unknown).
+// Used to size the qBittorrent disk cache proportionally to the RAM.
+func gh0_memoryMBFor(*Config) uint64 {
+	total, _ := memory_info()
+	return total / (1024 * 1024)
 }
 
-type gh0_libtorrentOptimization struct {
-	changes      []gh0_libtorrentChange
-	memoryMB     uint64
-	cacheSize    int64
-	cacheMB      int64
-	queueMB      int64
-	sendBufferKB int64
-	peerList     int64
-}
-
-func gh0_libtorrentOptimizationFor(cfg *Config) gh0_libtorrentOptimization {
-	trash := filepath.Join(cfg.DataDir, "trash")
-	if cfg.TrashPath != nil {
-		trash = *cfg.TrashPath
-	}
-	var ramdisk *string
-	if value, ok := cfg.Settings["libtorrent_ramdisk_dir"]; ok {
-		copied := value
-		ramdisk = &copied
-	}
-	health := CheckWithPaths(&HealthPaths{
-		DataDir:      cfg.DataDir,
-		TrashPath:    trash,
-		DownloadPath: cfg.LibtorrentDir,
-		ArchiveRoot:  gh0_derefStr(cfg.ArchiveRoot),
-		RamdiskPath:  gh0_derefStr(ramdisk),
-	})
-	memoryMB := health.MemoryTotalBytes / (1024 * 1024)
-
-	var queueMB, sendBufferKB, peerList int64
-	if memoryMB > 0 && memoryMB < 2048 {
-		queueMB, sendBufferKB, peerList = 8, 256, 100
-	} else if memoryMB < 4096 {
-		queueMB, sendBufferKB, peerList = 32, 512, 200
-	} else if memoryMB < 8192 {
-		queueMB, sendBufferKB, peerList = 64, 1024, 300
-	} else if memoryMB < 16384 {
-		queueMB, sendBufferKB, peerList = 64, 1024, 500
-	} else {
-		queueMB, sendBufferKB, peerList = 128, 2048, 500
-	}
-	cacheSize := int64(-1)
-	cacheMB := int64(-1)
-	activeDownloads := 3
-	activeSeeds := 3
-	activeLimit := 5
-
-	extraSettings := []string{}
-	if raw, ok := cfg.Settings["libtorrent_extra_settings"]; ok && raw != "" {
-		for _, line := range strings.Split(raw, "\n") {
-			key := strings.TrimSpace(strings.SplitN(line, "=", 2)[0])
-			if key == "max_queued_disk_bytes" || key == "send_buffer_watermark" || key == "max_peerlist_size" {
-				continue
-			}
-			extraSettings = append(extraSettings, line)
-		}
-	}
-	extraSettings = append(extraSettings,
-		fmt.Sprintf("max_queued_disk_bytes=%d", queueMB*1024*1024),
-		fmt.Sprintf("send_buffer_watermark=%d", sendBufferKB*1024),
-		fmt.Sprintf("max_peerlist_size=%d", peerList),
-	)
-	changes := []gh0_libtorrentChange{
-		{"libtorrent_active_downloads", strconv.Itoa(activeDownloads)},
-		{"libtorrent_active_seeds", strconv.Itoa(activeSeeds)},
-		{"libtorrent_active_limit", strconv.Itoa(activeLimit)},
-		{"libtorrent_dynamic_queue", "yes"},
-		{"libtorrent_dynamic_queue_min", "1"},
-		{"libtorrent_dynamic_queue_max", "10"},
-		{"libtorrent_dont_count_slow_torrents", "yes"},
-		{"libtorrent_cache_size", strconv.FormatInt(cacheSize, 10)},
-		{"libtorrent_cache_expiry", "300"},
-		{"libtorrent_extra_settings", strings.Join(extraSettings, "\n")},
-	}
-	return gh0_libtorrentOptimization{
-		changes:      changes,
-		memoryMB:     memoryMB,
-		cacheSize:    cacheSize,
-		cacheMB:      cacheMB,
-		queueMB:      queueMB,
-		sendBufferKB: sendBufferKB,
-		peerList:     peerList,
-	}
-}
-
-func OptimizeLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
+func OptimizeTransferSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// On qBittorrent the same operational goal is expressed with the backend's
 	// own MiB-based disk cache preferences.
 	if qb, ok := s.activeEngine().(*qbittorrentEngine); ok {
@@ -1812,7 +1722,7 @@ func OptimizeLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppSt
 	}
 	// gx-torrent: the cache goes back to automatic (sized from the RAM).
 	if gx, ok := s.activeEngine().(*gxTorrentEngine); ok {
-		if err := SaveSetting(s.cfg.DataDir, "libtorrent_cache_size", "-1"); err != nil {
+		if err := SaveSetting(s.cfg.DataDir, "torrent_cache_size", "-1"); err != nil {
 			jsonError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -1830,48 +1740,7 @@ func OptimizeLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppSt
 		})
 		return
 	}
-	client, err := s.requireEmbedded("optimize_settings")
-	if err != nil {
-		jsonError(w, http.StatusConflict, err.Error())
-		return
-	}
-	cfg := latestConfig(s)
-	optimization := gh0_libtorrentOptimizationFor(cfg)
-	for _, change := range optimization.changes {
-		if err := SaveSetting(s.cfg.DataDir, change.key, change.value); err != nil {
-			jsonError(w, http.StatusInternalServerError, fmt.Sprintf("%s: %s", change.key, err.Error()))
-			return
-		}
-	}
-	optimized := latestConfig(s)
-	if _, err := client.ApplySettings(optimized); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	jsonStatus(w, http.StatusOK, map[string]any{
-		"ok":      true,
-		"applied": true,
-		"hardware": map[string]any{
-			"memory_mb": optimization.memoryMB,
-		},
-		"settings": map[string]any{
-			"active_downloads":         3,
-			"active_seeds":             3,
-			"active_limit":             5,
-			"dynamic_queue":            true,
-			"dynamic_queue_min":        1,
-			"dynamic_queue_max":        10,
-			"dont_count_slow_torrents": true,
-			"cache_blocks":             optimization.cacheSize,
-			"cache_mb":                 optimization.cacheMB,
-			"queue_mb":                 optimization.queueMB,
-			"send_buffer_kb":           optimization.sendBufferKB,
-			"peer_list":                optimization.peerList,
-		},
-		"explanation":                 fmt.Sprintf("Base: 3 download, 3 seed, limite 5. Coda dinamica: active_downloads tra 1 e 10, a passi di uno, dopo campioni coerenti e con raffreddamento di 10 minuti. I torrent senza trasferimento non contano negli slot attivi. RAM rilevata: %d MB; cache: automatica libtorrent (-1), coda disco: %d MB, send-buffer: %d KiB, peer-list: %d. Connessioni e limiti globali di banda lasciati invariati.", optimization.memoryMB, optimization.queueMB, optimization.sendBufferKB, optimization.peerList),
-		"bandwidth_limits_preserved":  true,
-		"connections_limit_preserved": true,
-	})
+	jsonError(w, http.StatusConflict, "no active torrent engine supports the optimization")
 }
 
 // ---------------------------------------------------------------------------

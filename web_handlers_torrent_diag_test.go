@@ -55,7 +55,7 @@ func TestTorrentSelectiveEndpoint(t *testing.T) {
 	t.Cleanup(server.Close)
 	fake.setTorrents([]qbittorrent.Torrent{{
 		Hash: "abc", Name: "movie", State: "downloading", Progress: 0.5, Size: 100,
-		SavePath: state.cfg.LibtorrentDir,
+		SavePath: state.cfg.DownloadDir,
 	}})
 	cfg := state.cfg
 	cfg.Settings["torrent_backend"] = BackendQbittorrent

@@ -319,7 +319,7 @@ func tev_scheduleStorageMoveRetry(retries map[string]StorageMoveRetry, hash, des
 }
 
 // storageMoveReporter is implemented by engines that can say which torrents
-// are still moving their files (the embedded libtorrent).
+// are still moving their files.
 type storageMoveReporter interface {
 	MovingStorage() (map[string]string, bool)
 }
@@ -511,7 +511,7 @@ func DetachCompletedArchivedSingles(cfg *Config, torrents TorrentSession, db *Da
 	// Completed singles stay in the session (shown as completed) unless the
 	// user asked for automatic removal; this recovery pass must not remove
 	// them behind the user's back.
-	if cfg != nil && !cfg.Libtorrent.AutoRemoveCompleted {
+	if cfg != nil && !cfg.Transfer.AutoRemoveCompleted {
 		return
 	}
 	for _, torrent := range torrents.List() {
@@ -556,12 +556,12 @@ func DetachCompletedArchivedSingles(cfg *Config, torrents TorrentSession, db *Da
 
 // tev_configuredStallGiveupMinutes implements `configured_stall_giveup_minutes`.
 func tev_configuredStallGiveupMinutes(cfg *Config) float64 {
-	if value, ok := cfg.Settings["libtorrent_stall_giveup_min"]; ok {
+	if value, ok := cfg.Settings["torrent_stall_giveup_min"]; ok {
 		if parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil {
 			return parsed
 		}
 	}
-	if value, ok := cfg.Settings["libtorrent_stall_timeout_min"]; ok {
+	if value, ok := cfg.Settings["torrent_stall_timeout_min"]; ok {
 		if parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil {
 			if parsed > 0 {
 				if parsed > 10080 {
@@ -637,7 +637,7 @@ func tev_scheduleStallRetry(entry *StallWatch, now time.Time, base time.Duration
 // expires the gap is retried immediately.
 func tev_stallGiveupWindow(cfg *Config, torrent *models.TorrentView) (time.Duration, float64, bool) {
 	minutes := tev_configuredStallGiveupMinutes(cfg)
-	if deadSwarm := tev_settingFloatOr(cfg, "libtorrent_dead_swarm_giveup_min", 4320.0); deadSwarm > 0 {
+	if deadSwarm := tev_settingFloatOr(cfg, "torrent_dead_swarm_giveup_min", 4320.0); deadSwarm > 0 {
 		if code, _, _ := DiagnoseTorrent(torrent); code == "dead_swarm" {
 			minutes = deadSwarm
 		}
@@ -650,8 +650,8 @@ func tev_stallGiveupWindow(cfg *Config, torrent *models.TorrentView) (time.Durat
 
 // MonitorStalled implements `monitor_stalled`.
 func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, watch map[string]StallWatch) {
-	stallAfterMinutes := tev_settingFloatOr(cfg, "libtorrent_stall_after_min", 60.0)
-	retryMinutes := tev_settingFloatOr(cfg, "libtorrent_stall_retry_min", 60.0)
+	stallAfterMinutes := tev_settingFloatOr(cfg, "torrent_stall_after_min", 60.0)
+	retryMinutes := tev_settingFloatOr(cfg, "torrent_stall_retry_min", 60.0)
 	if stallAfterMinutes <= 0 {
 		clear(watch)
 		return
@@ -892,7 +892,7 @@ func tev_metadataRetryWarningDue(lastWarning, now time.Time) bool {
 // MonitorMetadata implements `monitor_metadata`. The retry cadence and give-up
 // policy are intentionally unchanged; only the repeated warning is rate-limited.
 func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, waitStart, firstSeen, lastWarning map[string]time.Time) {
-	giveupMinutes := tev_settingFloatOr(cfg, "libtorrent_metadata_giveup_min", 1440.0)
+	giveupMinutes := tev_settingFloatOr(cfg, "torrent_metadata_giveup_min", 1440.0)
 	if giveupMinutes <= 0 {
 		clear(waitStart)
 		clear(firstSeen)
@@ -1010,8 +1010,8 @@ func tev_needsInfiniteSeedResume(torrent *models.TorrentView) bool {
 // deferred until "end of seed" would then never happen, so the caller should
 // import the file immediately instead.
 func tev_seedsForever(cfg *Config, torrents TorrentSession, hash string) bool {
-	globalSet := cfg != nil && (cfg.Libtorrent.SeedRatio > 0.0 ||
-		cfg.Libtorrent.SeedTimeDays > 0 || cfg.Libtorrent.SeedTimeMinutes > 0)
+	globalSet := cfg != nil && (cfg.Transfer.SeedRatio > 0.0 ||
+		cfg.Transfer.SeedTimeDays > 0 || cfg.Transfer.SeedTimeMinutes > 0)
 	for _, torrent := range torrents.List() {
 		if !strings.EqualFold(torrent.Hash, hash) {
 			continue
@@ -1043,8 +1043,8 @@ func seedLimitsForTorrent(cfg *Config, seedRatio float64, seedDays int64) (ratio
 	if seedRatio > 0 {
 		value := seedRatio
 		ratio = &value
-	} else if seedRatio < 0 && cfg != nil && cfg.Libtorrent.SeedRatio > 0 {
-		value := cfg.Libtorrent.SeedRatio
+	} else if seedRatio < 0 && cfg != nil && cfg.Transfer.SeedRatio > 0 {
+		value := cfg.Transfer.SeedRatio
 		ratio = &value
 	}
 	if seedDays > 0 {
@@ -1052,11 +1052,11 @@ func seedLimitsForTorrent(cfg *Config, seedRatio float64, seedDays int64) (ratio
 		timeLimit = &value
 	} else if seedDays < 0 && cfg != nil {
 		switch {
-		case cfg.Libtorrent.SeedTimeDays > 0:
-			value := cfg.Libtorrent.SeedTimeDays * 86_400
+		case cfg.Transfer.SeedTimeDays > 0:
+			value := cfg.Transfer.SeedTimeDays * 86_400
 			timeLimit = &value
-		case cfg.Libtorrent.SeedTimeMinutes > 0:
-			value := cfg.Libtorrent.SeedTimeMinutes * 60
+		case cfg.Transfer.SeedTimeMinutes > 0:
+			value := cfg.Transfer.SeedTimeMinutes * 60
 			timeLimit = &value
 		}
 	}
@@ -1067,17 +1067,17 @@ func seedLimitsForTorrent(cfg *Config, seedRatio float64, seedDays int64) (ratio
 func tev_seedLimitsReached(cfg *Config, torrent *models.TorrentView) (bool, bool) {
 	globalRatio := 0.0
 	globalRatioSet := false
-	if cfg.Libtorrent.SeedRatio > 0.0 {
-		globalRatio = cfg.Libtorrent.SeedRatio
+	if cfg.Transfer.SeedRatio > 0.0 {
+		globalRatio = cfg.Transfer.SeedRatio
 		globalRatioSet = true
 	}
 	globalTime := int64(0)
 	globalTimeSet := false
-	if cfg.Libtorrent.SeedTimeDays > 0 {
-		globalTime = tev_saturatingMulInt64(cfg.Libtorrent.SeedTimeDays, 86_400)
+	if cfg.Transfer.SeedTimeDays > 0 {
+		globalTime = tev_saturatingMulInt64(cfg.Transfer.SeedTimeDays, 86_400)
 		globalTimeSet = true
-	} else if cfg.Libtorrent.SeedTimeMinutes > 0 {
-		globalTime = tev_saturatingMulInt64(cfg.Libtorrent.SeedTimeMinutes, 60)
+	} else if cfg.Transfer.SeedTimeMinutes > 0 {
+		globalTime = tev_saturatingMulInt64(cfg.Transfer.SeedTimeMinutes, 60)
 		globalTimeSet = true
 	}
 	ratioLimit := 0.0
@@ -1186,7 +1186,7 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 		if !archivedCopy {
 			continue
 		}
-		if !cfg.Libtorrent.AutoRemoveCompleted {
+		if !cfg.Transfer.AutoRemoveCompleted {
 			// The user wants completed torrents to stay listed (shown as
 			// completed) and to clear them manually with "Pulisci completati".
 			continue
@@ -1292,22 +1292,22 @@ func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, db *Database, to
 		inRamdisk = PathOnRamdisk(current, *ramdisk)
 	}
 	inTemp := false
-	if cfg.LibtorrentTempDir != nil {
-		inTemp = SamePath(current, *cfg.LibtorrentTempDir)
+	if cfg.DownloadTempDir != nil {
+		inTemp = SamePath(current, *cfg.DownloadTempDir)
 	}
 	if !inRamdisk && !inTemp {
 		return false
 	}
 	// A torrent that seeded from RAM/tmp must be moved directly to its
-	// configured archive destination when one exists. LibtorrentDir is only the
+	// configured archive destination when one exists. DownloadDir is only the
 	// work/download directory and is the fallback for releases without an
-	// archive destination. Moving to LibtorrentDir first makes the completion
+	// archive destination. Moving to DownloadDir first makes the completion
 	// handler scan the whole work tree (including unrelated backups) and leaves
 	// the completed file outside its library.
 	// A release whose library copy is already in place (a season pack or copy
 	// mode import) only has to leave RAM/tmp: moving its torrent tree into the
 	// archive would add a second copy as a subfolder of the series.
-	destination := cfg.LibtorrentDir
+	destination := cfg.DownloadDir
 	if db != nil && !tev_completedSourceDisposable(db, torrent.Hash, current) {
 		if meta, err := db.TorrentMeta(torrent.Hash); err == nil && meta != nil {
 			if configured, ok := ConfiguredDestinationFor(&meta.Release, cfg); ok && strings.TrimSpace(configured) != "" {
@@ -1527,9 +1527,9 @@ func tev_ramdiskRelocation(cfg *Config, torrents TorrentSession, hash, savePath 
 		return "", "", false
 	} else {
 		reason := err.Error()
-		destination := cfg.LibtorrentDir
-		if cfg.LibtorrentTempDir != nil {
-			destination = *cfg.LibtorrentTempDir
+		destination := cfg.DownloadDir
+		if cfg.DownloadTempDir != nil {
+			destination = *cfg.DownloadTempDir
 		}
 		if SamePath(savePath, destination) {
 			return "", "", false
@@ -1836,19 +1836,19 @@ func ReconcileRamdisk(cfg *Config, torrents TorrentSession, attempts map[string]
 func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, seedCopyWarnings map[string]time.Time) {
 	ratioLimit := 0.0
 	ratioLimitSet := false
-	if cfg.Libtorrent.SeedRatio > 0.0 {
-		ratioLimit = cfg.Libtorrent.SeedRatio
+	if cfg.Transfer.SeedRatio > 0.0 {
+		ratioLimit = cfg.Transfer.SeedRatio
 		ratioLimitSet = true
 	}
 	// legacy semantics: days is the authoritative long-duration setting;
 	// minutes remains as a backward-compatible fallback for sub-day limits.
 	timeLimit := int64(0)
 	timeLimitSet := false
-	if cfg.Libtorrent.SeedTimeDays > 0 {
-		timeLimit = tev_saturatingMulInt64(cfg.Libtorrent.SeedTimeDays, 86_400)
+	if cfg.Transfer.SeedTimeDays > 0 {
+		timeLimit = tev_saturatingMulInt64(cfg.Transfer.SeedTimeDays, 86_400)
 		timeLimitSet = true
-	} else if cfg.Libtorrent.SeedTimeMinutes > 0 {
-		timeLimit = tev_saturatingMulInt64(cfg.Libtorrent.SeedTimeMinutes, 60)
+	} else if cfg.Transfer.SeedTimeMinutes > 0 {
+		timeLimit = tev_saturatingMulInt64(cfg.Transfer.SeedTimeMinutes, 60)
 		timeLimitSet = true
 	}
 	// An infinite-seed override means the torrent must keep seeding: if a
@@ -1982,7 +1982,7 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 		if seedReason != "" {
 			logging.Info(fmt.Sprintf("⏸️ %s", seedFinishedLead(torrent.Name, &seedReason)), "hash", torrent.Hash)
 		}
-		if cfg.Libtorrent.AutoRemoveCompleted {
+		if cfg.Transfer.AutoRemoveCompleted {
 			if !tev_completedSourceDisposable(db, torrent.Hash, torrent.SavePath) {
 				if tev_seedCopyWarningDue(seedCopyWarnings, torrent.Hash) {
 					logging.Debug("seed limit reached but archived copy is not verified; keeping torrent files",
@@ -2529,7 +2529,7 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	// the release replaced existing files, one combined "updated" line is
 	// emitted instead of the import line plus one line per removed file.
 	logLibraryImport(cfg, event.Hash, logTarget(release), size, processedPath, suffix, replaced)
-	if !preserveSource && cfg.Libtorrent.AutoRemoveCompleted && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
+	if !preserveSource && cfg.Transfer.AutoRemoveCompleted && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
 		removed, err := torrents.Remove(event.Hash, false)
 		if err != nil {
 			logging.Warn("renamed torrent removal failed",
@@ -3039,7 +3039,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		moved, err := torrents.MoveStorage(event.Hash, destination)
 		if err != nil {
 			delete(moveRequests, event.Hash)
-			fallbackDestination := cfg.LibtorrentDir
+			fallbackDestination := cfg.DownloadDir
 			if alternative, ok := DestinationFor(&release, cfg); ok {
 				fallbackDestination = alternative
 			}
@@ -3085,7 +3085,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		} else {
 			statusNow, _ := db.TorrentStatus(event.Hash)
 			if wasPostSeedMove || (statusNow != nil && *statusNow == "completed") {
-				value := cfg.LibtorrentDir
+				value := cfg.DownloadDir
 				destination = &value
 			}
 		}

@@ -633,7 +633,7 @@ func PinTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := strings.ToLower(input.Hash)
 	result, err := s.activeEngine().SetPin(hash, true)
 	if err == nil {
-		_ = SaveSetting(s.cfg.DataDir, "libtorrent_pinned_hash", hash)
+		_ = SaveSetting(s.cfg.DataDir, "torrent_pinned_hash", hash)
 	}
 	status, value := gh2_torrentAction(result, err)
 	jsonStatus(w, status, value)
@@ -811,7 +811,7 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	startPaused := input.StartPaused
 	noRename := input.NoRename
-	preallocate := cfg.LibtorrentPreallocate()
+	preallocate := cfg.TorrentPreallocate()
 	if input.Preallocate != nil {
 		preallocate = *input.Preallocate
 	}
@@ -878,8 +878,8 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	dir := filepath.Join(cfg.DataDir, "incomplete")
-	if cfg.LibtorrentTempDir != nil {
-		dir = *cfg.LibtorrentTempDir
+	if cfg.DownloadTempDir != nil {
+		dir = *cfg.DownloadTempDir
 	}
 	_ = os.MkdirAll(dir, 0o755)
 	path := filepath.Join(dir, fmt.Sprintf("upload-%s.torrent", backupUUID()))
@@ -887,7 +887,7 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	preferredPath := cfg.LibtorrentDir
+	preferredPath := cfg.DownloadDir
 	if input.SavePath != nil && strings.TrimSpace(*input.SavePath) != "" {
 		preferredPath = strings.TrimSpace(*input.SavePath)
 	}
@@ -1030,7 +1030,7 @@ func SetSequential(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if input.Enabled {
 		value = "true"
 	}
-	_ = SaveSetting(s.cfg.DataDir, "libtorrent_sequential", value)
+	_ = SaveSetting(s.cfg.DataDir, "torrent_sequential", value)
 	result, err := s.activeEngine().SetSequential(input.Enabled)
 	status, response := gh2_torrentAction(result, err)
 	jsonStatus(w, status, response)

@@ -177,8 +177,8 @@ func ParseSourceFilters(raw string) []SourceFilter {
 	return filters
 }
 
-// LibtorrentSettings mirrors the libtorrent session configuration.
-type LibtorrentSettings struct {
+// TransferSettings mirrors the libtorrent session configuration.
+type TransferSettings struct {
 	PortMin          uint16  `json:"port_min"`
 	PortMax          uint16  `json:"port_max"`
 	DownloadLimitKib int64   `json:"download_limit_kib"`
@@ -229,9 +229,9 @@ type LibtorrentSettings struct {
 	DhtBootstrapNodes string `json:"dht_bootstrap_nodes"`
 }
 
-// DefaultLibtorrentSettings implements `impl Default for LibtorrentSettings`.
-func DefaultLibtorrentSettings() LibtorrentSettings {
-	return LibtorrentSettings{
+// DefaultTransferSettings implements `impl Default for TransferSettings`.
+func DefaultTransferSettings() TransferSettings {
+	return TransferSettings{
 		PortMin:                       6881,
 		PortMax:                       6891,
 		DownloadLimitKib:              0,
@@ -280,9 +280,9 @@ func DefaultLibtorrentSettings() LibtorrentSettings {
 
 // UnmarshalJSON overlays the present JSON keys on top of the defaults, so
 // an omitted field keeps its documented default instead of the Go zero value.
-func (s *LibtorrentSettings) UnmarshalJSON(data []byte) error {
-	*s = DefaultLibtorrentSettings()
-	type alias LibtorrentSettings
+func (s *TransferSettings) UnmarshalJSON(data []byte) error {
+	*s = DefaultTransferSettings()
+	type alias TransferSettings
 	return json.Unmarshal(data, (*alias)(s))
 }
 
@@ -332,14 +332,13 @@ type Config struct {
 	// whose download is stuck: after this many minutes without progress an
 	// alternative scoring up to ScoreDrop points less may be started, while the
 	// stuck torrent stays in the session. 0 disables either half.
-	StallAlternativeAfterMin  int64              `json:"stall_alternative_after_min"`
-	StallAlternativeScoreDrop int64              `json:"stall_alternative_score_drop"`
-	CleanupAction             string             `json:"cleanup_action"`
-	LibtorrentEnabled         bool               `json:"libtorrent_enabled"`
-	Libtorrent                LibtorrentSettings `json:"libtorrent"`
-	LibtorrentDir             string             `json:"libtorrent_dir"`
-	LibtorrentTempDir         *string            `json:"libtorrent_temp_dir"`
-	StateDir                  string             `json:"state_dir"`
+	StallAlternativeAfterMin  int64            `json:"stall_alternative_after_min"`
+	StallAlternativeScoreDrop int64            `json:"stall_alternative_score_drop"`
+	CleanupAction             string           `json:"cleanup_action"`
+	Transfer                  TransferSettings `json:"transfer"`
+	DownloadDir               string           `json:"torrent_dir"`
+	DownloadTempDir           *string          `json:"torrent_temp_dir"`
+	StateDir                  string           `json:"state_dir"`
 }
 
 const defaultRenameFormatValue = "base"
@@ -761,8 +760,8 @@ func DefaultConfig() Config {
 	trashPath := filepath.Join(dataDir, "trash")
 	return Config{
 		StateDir:                  filepath.Join(dataDir, constants.DefaultStateDir),
-		LibtorrentDir:             filepath.Join(dataDir, "downloads"),
-		LibtorrentTempDir:         &libtorrentTempDir,
+		DownloadDir:               filepath.Join(dataDir, "downloads"),
+		DownloadTempDir:           &libtorrentTempDir,
 		ArchiveRoot:               nil,
 		TrashPath:                 &trashPath,
 		NotifyTelegram:            false,
@@ -803,8 +802,7 @@ func DefaultConfig() Config {
 		FlaresolverrURL:           nil,
 		TmdbAPIKey:                nil,
 		RenameEpisodes:            false,
-		LibtorrentEnabled:         true,
-		Libtorrent:                DefaultLibtorrentSettings(),
+		Transfer:                  DefaultTransferSettings(),
 		RenameFormat:              defaultRenameFormatValue,
 		RenameTemplate:            defaultRenameTemplateValue,
 	}
@@ -836,8 +834,8 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	if _, ok := raw["rename_template"]; !ok {
 		c.RenameTemplate = defaultRenameTemplateValue
 	}
-	if _, ok := raw["libtorrent"]; !ok {
-		c.Libtorrent = DefaultLibtorrentSettings()
+	if _, ok := raw["transfer"]; !ok {
+		c.Transfer = DefaultTransferSettings()
 	}
 	return nil
 }
@@ -1030,7 +1028,7 @@ func (c *Config) TvdbLanguage() string {
 
 // RamdiskDir returns the configured RAM disk directory, when non-empty.
 func (c *Config) RamdiskDir() *string {
-	return configPathSetting(mapValue(c.Settings, "libtorrent_ramdisk_dir"))
+	return configPathSetting(mapValue(c.Settings, "torrent_ramdisk_dir"))
 }
 
 // RamdiskEnabled is true when the RAM disk download tier is active. A
@@ -1038,7 +1036,7 @@ func (c *Config) RamdiskDir() *string {
 // explicitly falsy.
 func (c *Config) RamdiskEnabled() bool {
 	explicitlyOff := false
-	if value, ok := c.Settings["libtorrent_ramdisk_enabled"]; ok {
+	if value, ok := c.Settings["torrent_ramdisk_enabled"]; ok {
 		switch strings.ToLower(strings.TrimSpace(value)) {
 		case "", "no", "false", "0":
 			explicitlyOff = true
@@ -1047,12 +1045,12 @@ func (c *Config) RamdiskEnabled() bool {
 	return !explicitlyOff && c.RamdiskDir() != nil
 }
 
-// LibtorrentPreallocate reports whether new downloads reserve their full size
+// TorrentPreallocate reports whether new downloads reserve their full size
 // on disk up front (`storage_mode_allocate`) instead of growing sparsely.
 // Default true: it avoids fragmentation on NAS/HDD and surfaces "no space"
 // immediately. It can be overridden per add.
-func (c *Config) LibtorrentPreallocate() bool {
-	value, ok := c.Settings["libtorrent_preallocate"]
+func (c *Config) TorrentPreallocate() bool {
+	value, ok := c.Settings["torrent_preallocate"]
 	if !ok {
 		return true
 	}
@@ -1063,28 +1061,28 @@ func (c *Config) LibtorrentPreallocate() bool {
 	return true
 }
 
-// LibtorrentTorrentCopyDir is the optional folder where the `.torrent` file of
+// TorrentCopyDir is the optional folder where the `.torrent` file of
 // every started torrent is copied (empty disables the copy).
-func (c *Config) LibtorrentTorrentCopyDir() *string {
-	return configPathSetting(mapValue(c.Settings, "libtorrent_torrent_copy_dir"))
+func (c *Config) TorrentCopyDir() *string {
+	return configPathSetting(mapValue(c.Settings, "torrent_copy_dir"))
 }
 
 // RamdiskThresholdBytes is the maximum size (bytes) for a single torrent
 // admitted to the RAM disk.
 func (c *Config) RamdiskThresholdBytes() uint64 {
-	return gibSetting(c.Settings, "libtorrent_ramdisk_threshold_gb", 3.5)
+	return gibSetting(c.Settings, "torrent_ramdisk_threshold_gb", 3.5)
 }
 
 // RamdiskMarginBytes is the free space (bytes) to keep on the RAM disk after a
 // download finishes.
 func (c *Config) RamdiskMarginBytes() uint64 {
-	return gibSetting(c.Settings, "libtorrent_ramdisk_margin_gb", 0.5)
+	return gibSetting(c.Settings, "torrent_ramdisk_margin_gb", 0.5)
 }
 
 // RamdiskMinFreeBytes is the explicit free-space floor in bytes; `0` derives it
 // from the margin.
 func (c *Config) RamdiskMinFreeBytes() uint64 {
-	if value, ok := c.Settings["libtorrent_ramdisk_min_free_bytes"]; ok {
+	if value, ok := c.Settings["torrent_ramdisk_min_free_bytes"]; ok {
 		if parsed, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64); err == nil {
 			return parsed
 		}
@@ -1914,6 +1912,60 @@ func (c *Config) ReleaseDeniedReason(release *models.Release) string {
 	return ""
 }
 
+// libtorrentOnlyKeys are the settings read only by the embedded libtorrent
+// engine. They are not migrated to `torrent_*`: the engine and its settings go
+// away together.
+var libtorrentOnlyKeys = map[string]bool{
+	"libtorrent_aio_threads":                       true,
+	"libtorrent_alert_queue_size":                  true,
+	"libtorrent_allow_multiple_connections_per_ip": true,
+	"libtorrent_announce_interval":                 true,
+	"libtorrent_announce_to_all_tiers":             true,
+	"libtorrent_announce_to_all_trackers":          true,
+	"libtorrent_auto_optimize":                     true,
+	"libtorrent_connections_limit":                 true,
+	"libtorrent_enabled":                           true,
+	"libtorrent_extra_settings":                    true,
+	"libtorrent_half_open_limit":                   true,
+	"libtorrent_max_uploads_per_torrent":           true,
+	"libtorrent_prefer_rc4":                        true,
+	"libtorrent_torrent_connect_boost":             true,
+	"libtorrent_upload_slots_limit":                true,
+}
+
+// migrateLibtorrentKeys renames the transfer settings that used to be prefixed
+// `libtorrent_` to the engine-neutral `torrent_` prefix: the knobs never
+// belonged to libtorrent alone (gx-torrent reads the same ones), and the
+// embedded engine is being removed. The rename happens once, in place, so a
+// database written by an older version keeps its values. A value already
+// present under the new name wins; the stale row is dropped either way.
+func migrateLibtorrentKeys(conn *sql.DB, cfg *Config) error {
+	for key, value := range cfg.Settings {
+		if !strings.HasPrefix(key, "libtorrent_") || libtorrentOnlyKeys[key] {
+			continue
+		}
+		renamed := "torrent_" + strings.TrimPrefix(key, "libtorrent_")
+		if renamed == "torrent_torrent_copy_dir" {
+			// The old name carried "torrent" twice (libtorrent_torrent_copy_dir);
+			// the neutral name keeps it once.
+			renamed = "torrent_copy_dir"
+		}
+		if _, exists := cfg.Settings[renamed]; exists {
+			delete(cfg.Settings, key)
+			if _, err := conn.Exec("DELETE FROM settings WHERE key = ?1", key); err != nil {
+				return err
+			}
+			continue
+		}
+		cfg.Settings[renamed] = value
+		delete(cfg.Settings, key)
+		if _, err := conn.Exec("UPDATE settings SET key = ?1 WHERE key = ?2", renamed, key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // loadConfigDB overlays the settings stored in `gextto_config.db`, the legacy
 // series database and the movies table on top of this configuration.
 func (c *Config) loadConfigDB() error {
@@ -1952,6 +2004,9 @@ func (c *Config) loadConfigDB() error {
 		if _, err := conn.Exec("DELETE FROM settings WHERE key = ?1", "api_token"); err != nil {
 			return err
 		}
+	}
+	if err := migrateLibtorrentKeys(conn, c); err != nil {
+		return err
 	}
 	if value, ok := c.Settings["url"]; ok {
 		var feeds []string
@@ -2270,56 +2325,55 @@ func (c *Config) loadConfigDB() error {
 	} else {
 		c.CleanupAction = "move"
 	}
-	c.LibtorrentEnabled = boolSettingOr(c.Settings, "libtorrent_enabled", true)
-	c.Libtorrent = LibtorrentSettings{
-		PortMin:                       numberSettingUint16(c.Settings, "libtorrent_port_min", 6881),
-		PortMax:                       numberSettingUint16(c.Settings, "libtorrent_port_max", 6891),
-		DownloadLimitKib:              numberSettingInt(c.Settings, "libtorrent_dl_limit", 0),
-		UploadLimitKib:                numberSettingInt(c.Settings, "libtorrent_ul_limit", 0),
-		SeedRatio:                     numberSettingFloat(c.Settings, "libtorrent_seed_ratio", 0.0),
-		SeedTimeMinutes:               numberSettingInt(c.Settings, "libtorrent_seed_time", 0),
-		SeedTimeDays:                  numberSettingInt(c.Settings, "libtorrent_seed_time_days", 0),
-		ActiveDownloads:               numberSettingInt(c.Settings, "libtorrent_active_downloads", 3),
-		ActiveSeeds:                   numberSettingInt(c.Settings, "libtorrent_active_seeds", 3),
-		ActiveLimit:                   numberSettingInt(c.Settings, "libtorrent_active_limit", 5),
-		Dht:                           boolSettingOr(c.Settings, "libtorrent_dht", true),
-		Pex:                           boolSettingOr(c.Settings, "libtorrent_pex", true),
-		Lsd:                           boolSettingOr(c.Settings, "libtorrent_lsd", true),
-		Upnp:                          boolSettingOr(c.Settings, "libtorrent_upnp", true),
-		Natpmp:                        boolSettingOr(c.Settings, "libtorrent_natpmp", true),
-		DynamicQueue:                  boolSettingOr(c.Settings, "libtorrent_dynamic_queue", false),
-		DynamicQueueMin:               numberSettingInt(c.Settings, "libtorrent_dynamic_queue_min", 1),
-		DynamicQueueMax:               numberSettingInt(c.Settings, "libtorrent_dynamic_queue_max", 10),
-		DontCountSlowTorrents:         boolSettingOr(c.Settings, "libtorrent_dont_count_slow_torrents", true),
+	c.Transfer = TransferSettings{
+		PortMin:                       numberSettingUint16(c.Settings, "torrent_port_min", 6881),
+		PortMax:                       numberSettingUint16(c.Settings, "torrent_port_max", 6891),
+		DownloadLimitKib:              numberSettingInt(c.Settings, "torrent_dl_limit", 0),
+		UploadLimitKib:                numberSettingInt(c.Settings, "torrent_ul_limit", 0),
+		SeedRatio:                     numberSettingFloat(c.Settings, "torrent_seed_ratio", 0.0),
+		SeedTimeMinutes:               numberSettingInt(c.Settings, "torrent_seed_time", 0),
+		SeedTimeDays:                  numberSettingInt(c.Settings, "torrent_seed_time_days", 0),
+		ActiveDownloads:               numberSettingInt(c.Settings, "torrent_active_downloads", 3),
+		ActiveSeeds:                   numberSettingInt(c.Settings, "torrent_active_seeds", 3),
+		ActiveLimit:                   numberSettingInt(c.Settings, "torrent_active_limit", 5),
+		Dht:                           boolSettingOr(c.Settings, "torrent_dht", true),
+		Pex:                           boolSettingOr(c.Settings, "torrent_pex", true),
+		Lsd:                           boolSettingOr(c.Settings, "torrent_lsd", true),
+		Upnp:                          boolSettingOr(c.Settings, "torrent_upnp", true),
+		Natpmp:                        boolSettingOr(c.Settings, "torrent_natpmp", true),
+		DynamicQueue:                  boolSettingOr(c.Settings, "torrent_dynamic_queue", false),
+		DynamicQueueMin:               numberSettingInt(c.Settings, "torrent_dynamic_queue_min", 1),
+		DynamicQueueMax:               numberSettingInt(c.Settings, "torrent_dynamic_queue_max", 10),
+		DontCountSlowTorrents:         boolSettingOr(c.Settings, "torrent_dont_count_slow_torrents", true),
 		AutoRemoveCompleted:           configBoolSetting(mapValue(c.Settings, "auto_remove_completed")),
 		ConnectionsLimit:              numberSettingInt(c.Settings, "libtorrent_connections_limit", 200),
 		UploadSlotsLimit:              numberSettingInt(c.Settings, "libtorrent_upload_slots_limit", -1),
 		HalfOpenLimit:                 numberSettingInt(c.Settings, "libtorrent_half_open_limit", -1),
 		AlertQueueSize:                numberSettingInt(c.Settings, "libtorrent_alert_queue_size", 1000),
-		MaxConnectionsPerTorrent:      numberSettingInt(c.Settings, "libtorrent_max_connections_per_torrent", -1),
+		MaxConnectionsPerTorrent:      numberSettingInt(c.Settings, "torrent_max_connections_per_torrent", -1),
 		MaxUploadsPerTorrent:          numberSettingInt(c.Settings, "libtorrent_max_uploads_per_torrent", -1),
 		AioThreads:                    numberSettingInt(c.Settings, "libtorrent_aio_threads", -1),
-		CacheSize:                     numberSettingInt(c.Settings, "libtorrent_cache_size", -1),
-		CacheExpiry:                   numberSettingInt(c.Settings, "libtorrent_cache_expiry", 300),
+		CacheSize:                     numberSettingInt(c.Settings, "torrent_cache_size", -1),
+		CacheExpiry:                   numberSettingInt(c.Settings, "torrent_cache_expiry", 300),
 		AnnounceInterval:              numberSettingInt(c.Settings, "libtorrent_announce_interval", 1800),
 		TorrentConnectBoost:           numberSettingInt(c.Settings, "libtorrent_torrent_connect_boost", 50),
-		Utp:                           boolSettingOr(c.Settings, "libtorrent_utp", true),
-		Holepunch:                     boolSettingOr(c.Settings, "libtorrent_holepunch", true),
+		Utp:                           boolSettingOr(c.Settings, "torrent_utp", true),
+		Holepunch:                     boolSettingOr(c.Settings, "torrent_holepunch", true),
 		PreferRc4:                     configBoolSetting(mapValue(c.Settings, "libtorrent_prefer_rc4")),
 		AnnounceToAllTrackers:         configBoolSetting(mapValue(c.Settings, "libtorrent_announce_to_all_trackers")),
 		AnnounceToAllTiers:            configBoolSetting(mapValue(c.Settings, "libtorrent_announce_to_all_tiers")),
 		AllowMultipleConnectionsPerIp: boolSettingOr(c.Settings, "libtorrent_allow_multiple_connections_per_ip", true),
-		ApplyIpFilter:                 boolSettingOr(c.Settings, "libtorrent_apply_ip_filter", true),
-		Encryption:                    numberSettingInt(c.Settings, "libtorrent_encryption", 1),
-		IpFilterPath:                  settingOrDefault(c.Settings, "libtorrent_ipfilter_url", ""),
-		ListenInterfaces:              settingOrDefault(c.Settings, "libtorrent_listen_interfaces", ""),
-		OutgoingInterface:             settingOrDefault(c.Settings, "libtorrent_outgoing_interface", ""),
-		DhtBootstrapNodes:             settingOrDefault(c.Settings, "libtorrent_dht_bootstrap_nodes", ""),
+		ApplyIpFilter:                 boolSettingOr(c.Settings, "torrent_apply_ip_filter", true),
+		Encryption:                    numberSettingInt(c.Settings, "torrent_encryption", 1),
+		IpFilterPath:                  settingOrDefault(c.Settings, "torrent_ipfilter_url", ""),
+		ListenInterfaces:              settingOrDefault(c.Settings, "torrent_listen_interfaces", ""),
+		OutgoingInterface:             settingOrDefault(c.Settings, "torrent_outgoing_interface", ""),
+		DhtBootstrapNodes:             settingOrDefault(c.Settings, "torrent_dht_bootstrap_nodes", ""),
 	}
-	if value := configPathSetting(mapValue(c.Settings, "libtorrent_dir")); value != nil {
-		c.LibtorrentDir = *value
+	if value := configPathSetting(mapValue(c.Settings, "torrent_dir")); value != nil {
+		c.DownloadDir = *value
 	}
-	c.LibtorrentTempDir = configPathSetting(mapValue(c.Settings, "libtorrent_temp_dir"))
+	c.DownloadTempDir = configPathSetting(mapValue(c.Settings, "torrent_temp_dir"))
 	return nil
 }
 
@@ -2397,9 +2451,6 @@ func (c *Config) FromEnv() {
 	}
 	if value, ok := os.LookupEnv("GEXTTO_DRY_RUN"); ok {
 		c.DryRun = value != "0"
-	}
-	if value, ok := os.LookupEnv("GEXTTO_LIBTORRENT"); ok {
-		c.LibtorrentEnabled = value == "1"
 	}
 }
 
@@ -2575,13 +2626,13 @@ func boolToInt(value bool) int64 {
 
 // PrepareDirs creates the runtime directories.
 func (c *Config) PrepareDirs() error {
-	for _, path := range []string{c.DataDir, c.StateDir, c.LibtorrentDir} {
+	for _, path := range []string{c.DataDir, c.StateDir, c.DownloadDir} {
 		if err := os.MkdirAll(path, 0o755); err != nil {
 			return err
 		}
 	}
-	if c.LibtorrentTempDir != nil {
-		if err := os.MkdirAll(*c.LibtorrentTempDir, 0o755); err != nil {
+	if c.DownloadTempDir != nil {
+		if err := os.MkdirAll(*c.DownloadTempDir, 0o755); err != nil {
 			return err
 		}
 	}

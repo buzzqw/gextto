@@ -611,8 +611,6 @@ func shouldLogQueueCounts(tick int, counts, last string) bool {
 // seed/cleanup policy once per tick.
 func torrentEventWorker(configPath string, fallback *Config, state *AppState, db *Database, comics *ComicsDb, eventLog *EventLog) {
 	torrents := state.activeEngine()
-	// Optional libtorrent-only hooks: nil for any other backend.
-	extras, _ := torrents.(torrentEngineEmbeddedExtras)
 	moveRequests := map[string]struct{}{}
 	// Hashes whose final "completed" notification was already sent by this
 	// worker: a later storage_moved/torrent_finished for the same torrent must not
@@ -651,9 +649,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	// tmpfs forever. `ramdiskAttempts` rate-limits retries per hash.
 	ramdiskAttempts := map[string]time.Time{}
 	lastRamdiskCheck := time.Now().Add(-120 * time.Second)
-	lastMetadataPromotion := time.Now().Add(-30 * time.Second)
 	lastDynamicAdjustment := time.Now().Add(-90 * time.Second)
-	lastResumeSave := time.Now()
 	// lastQueueCounts is the last logged "transferring/stuck/waiting" triple.
 	lastQueueCounts := ""
 	// queueTicks counts the dynamic ticks: the first runs right after start on
@@ -692,11 +688,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		if torrent.State == "seeding" {
 			continue
 		}
-		// Skip a torrent that was already re-checked recently: re-reading a
-		// multi-gigabyte pack from the NAS is expensive and gives the same result.
-		if extras != nil && extras.recentlyRechecked(torrent.Hash, recheckGuardWindow) {
-			continue
-		}
 		status, statusErr := db.TorrentStatus(torrent.Hash)
 		if statusErr == nil && status != nil && *status == "completed" {
 			continue
@@ -723,7 +714,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		// diverge on which transfer plane they drive.
 		if active := state.activeEngine(); active != torrents {
 			torrents = active
-			extras, _ = torrents.(torrentEngineEmbeddedExtras)
 			logging.Info("torrent event worker switched backend", "backend", torrents.Name())
 		}
 		// A long re-check (a large pack on the NAS) gets one line when it starts
@@ -803,28 +793,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			}
 			lastConfigReload = now
 		}
-		if extras != nil && now.Sub(lastResumeSave) >= resumeSaveInterval {
-			if requested := extras.RequestResumeSave(); requested < 0 {
-				logging.Debug("periodic resume save request failed")
-			} else if requested > 0 {
-				logging.Debug("periodic resume save requested", "torrents", requested)
-			}
-			lastResumeSave = now
-		}
-		if now.Sub(lastMetadataPromotion) >= 30*time.Second {
-			// Torrents without metadata that were just promoted lose
-			// `auto_managed`; when metadata arrives it must be re-armed, even if
-			// the alert was lost (e.g. fastresume restore). These hooks are
-			// libtorrent-specific; other backends handle metadata themselves.
-			if extras != nil {
-				extras.PromoteMetadata()
-				rearmed := extras.EnsureAutoManaged()
-				if rearmed > 0 {
-					logging.Info("auto-managed flag restored on running torrents", "rearmed", rearmed)
-				}
-			}
-			lastMetadataPromotion = now
-		}
 		if now.Sub(lastDynamicAdjustment) >= 90*time.Second {
 			queueTicks++
 			effectiveDownloadKib, _ := bg_currentSpeedLimits(cfg)
@@ -834,11 +802,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			// re-logged the same counts twice per stall probe (resumed, then
 			// parked again ten minutes later).
 			snapshot := torrents.List()
-			// Apply add-time options that need metadata (first/last pieces) or that
-			// pause as soon as metadata arrives (metadata-only adds).
-			if extras != nil {
-				extras.EnforceDeferredOptions(snapshot)
-			}
 			queued := 0
 			transferring := 0
 			idle := 0
@@ -934,7 +897,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			logging.Debug("debug diagnostics", "resident_kb", bg_residentKB(), "torrents", len(torrents.List()))
 		}
 		var pinned *string
-		if value, ok := cfg.Settings["libtorrent_pinned_hash"]; ok {
+		if value, ok := cfg.Settings["torrent_pinned_hash"]; ok {
 			trimmed := strings.ToLower(strings.TrimSpace(value))
 			if trimmed != "" {
 				pinned = &trimmed
@@ -960,7 +923,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			}
 		}
 		sequential := false
-		if value, ok := cfg.Settings["libtorrent_sequential"]; ok {
+		if value, ok := cfg.Settings["torrent_sequential"]; ok {
 			sequential = settingTruthy(value)
 		}
 		if lastSequential == nil || *lastSequential != sequential {
@@ -972,7 +935,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		}
 		// A plain flag on the engine: re-applying it each pass also covers a
 		// switch of the active engine.
-		torrents.SetFirstLastDefault(settingTruthy(cfg.Settings["libtorrent_first_last"]))
+		torrents.SetFirstLastDefault(settingTruthy(cfg.Settings["torrent_first_last"]))
 		MonitorMetadata(cfg, torrents, db, notifier, metadataWaitStart, metadataFirstSeen, metadataLastWarning)
 		MonitorStalled(cfg, torrents, db, notifier, stallWaitStart)
 		if now.Sub(lastRamdiskCheck) >= 30*time.Second {
@@ -1253,7 +1216,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			// Only when the user asked for automatic removal: with the setting
 			// off the torrent is paused and stays listed as completed, and the
 			// user clears it with "Pulisci completati".
-			if processed && cfg.Libtorrent.AutoRemoveCompleted && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
+			if processed && cfg.Transfer.AutoRemoveCompleted && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
 				isPack := false
 				if meta, err := db.TorrentMeta(event.Hash); err == nil && meta != nil {
 					isPack = meta.Release.IsPack
@@ -1528,45 +1491,11 @@ func bg_residentKB() uint64 {
 }
 
 // ---------------------------------------------------------------------------
-// apply_libtorrent_optimization
-// ---------------------------------------------------------------------------
-
-// bg_applyLibtorrentOptimization applies the optimization only when a value
-// changed, so the continuous worker does not rewrite the config every tick.
-// It returns (changed, detected memory MB).
-func bg_applyLibtorrentOptimization(s *AppState) (bool, uint64, error) {
-	cfg := latestConfig(s)
-	optimization := gh0_libtorrentOptimizationFor(cfg)
-	changed := false
-	for _, change := range optimization.changes {
-		if cfg.Settings[change.key] != change.value {
-			changed = true
-			break
-		}
-	}
-	if !changed {
-		return false, optimization.memoryMB, nil
-	}
-	for _, change := range optimization.changes {
-		if err := SaveSetting(s.cfg.DataDir, change.key, change.value); err != nil {
-			return false, optimization.memoryMB, fmt.Errorf("%s: %w", change.key, err)
-		}
-	}
-	optimized := latestConfig(s)
-	if _, err := s.torrents.ApplySettings(optimized); err != nil {
-		return false, optimization.memoryMB, err
-	}
-	return true, optimization.memoryMB, nil
-}
-
-// ---------------------------------------------------------------------------
 // optimize_worker
 // ---------------------------------------------------------------------------
 
-// optimizeWorker implements `optimize_worker`. For gx-torrent it re-asserts the
-// engine's own optimization (cache sized from the RAM, queue policy) every
-// period; for the embedded engine it runs the libtorrent optimization when
-// `libtorrent_auto_optimize` is enabled.
+// optimizeWorker implements `optimize_worker`: it re-asserts the engine's own
+// optimization (cache sized from the RAM, queue policy) every period.
 func optimizeWorker(state *AppState) {
 	const optimizePeriod = 15 * time.Minute
 	for {
@@ -1576,25 +1505,12 @@ func optimizeWorker(state *AppState) {
 		// gx-torrent owns its cache sizing: the daemon keeps it automatic
 		// (1/32 read, 1/16 write of the RAM). Re-assert the policy periodically
 		// so a machine/RAM change or a settings edit is re-applied; this is the
-		// gx-torrent continuous optimization and is always on.
+		// gx-torrent continuous optimization and is always on. qBittorrent owns
+		// its own cache, tuned by the managed runtime.
 		if gx, ok := state.activeEngine().(*gxTorrentEngine); ok {
 			if _, err := gx.ApplyOptimization(latestConfig(state)); err != nil {
 				logging.Debug("gx-torrent continuous optimization failed", "error", err.Error())
 			}
-			continue
-		}
-		// Read-only use: the shared cached configuration is enough.
-		enabled := settingTruthy(latestConfig(state).Settings["libtorrent_auto_optimize"])
-		if !enabled {
-			continue
-		}
-		changed, memoryMB, err := bg_applyLibtorrentOptimization(state)
-		if err != nil {
-			logging.Warn("libtorrent continuous optimization failed", "error", err)
-		} else if changed {
-			logging.Info("libtorrent continuous optimization applied", "memory_mb", memoryMB)
-		} else {
-			logging.Debug("libtorrent continuous optimization: values already optimal")
 		}
 	}
 }
@@ -1618,7 +1534,7 @@ func ipFilterRefreshWorker(state *AppState) {
 			return
 		}
 		cfg := latestConfig(state)
-		if cfg == nil || strings.TrimSpace(cfg.Libtorrent.IpFilterPath) == "" {
+		if cfg == nil || strings.TrimSpace(cfg.Transfer.IpFilterPath) == "" {
 			continue
 		}
 		if _, ok := state.activeEngine().(interface {
@@ -1699,10 +1615,10 @@ func bg_dirHasFiles(dir string) bool {
 // active torrent directories and too-recent ones, so a just-started download is
 // not disturbed.
 func bg_cleanupEmptyTempDirs(cfg *Config, torrents TorrentSession) {
-	if cfg.LibtorrentTempDir == nil {
+	if cfg.DownloadTempDir == nil {
 		return
 	}
-	temp := *cfg.LibtorrentTempDir
+	temp := *cfg.DownloadTempDir
 	live := torrents.List()
 	active := map[string]struct{}{}
 	activePaths := make([]string, 0, len(live))
@@ -2019,7 +1935,7 @@ func formatScheduledCycleTime(now, due time.Time) string {
 
 func cycleWorker(state *AppState) {
 	// Cancelled on shutdown so a cycle in progress releases the torrent engine
-	// before ShutdownEmbedded destroys the native session.
+	// before the daemon tears it down.
 	ctx, cancel := state.BackgroundContext()
 	defer cancel()
 	lastRenameCheck := time.Now().Add(-6 * time.Hour)

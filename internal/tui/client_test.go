@@ -77,7 +77,7 @@ func TestClientReadsEndpoints(t *testing.T) {
 		case r.URL.Path == "/api/config":
 			writeJSON(t, w, map[string]any{
 				"active": true, "dry_run": false, "refresh_secs": 5, "default_language": "en",
-				"libtorrent": map[string]any{"download_limit_kib": 100, "upload_limit_kib": 50},
+				"transfer": map[string]any{"download_limit_kib": 100, "upload_limit_kib": 50},
 			})
 		case r.URL.Path == "/api/torrent-events":
 			writeJSON(t, w, []map[string]any{{"kind": "completed", "hash": "abc", "name": "Example"}})
@@ -124,7 +124,7 @@ func TestClientReadsEndpoints(t *testing.T) {
 		t.Fatalf("Stats: %v %+v", err, stats)
 	}
 	config, err := client.Config(ctx)
-	if err != nil || config.RefreshSecs != 5 || config.Libtorrent.DownloadLimitKib != 100 {
+	if err != nil || config.RefreshSecs != 5 || config.Transfer.DownloadLimitKib != 100 {
 		t.Fatalf("Config: %v %+v", err, config)
 	}
 	events, err := client.Events(ctx)

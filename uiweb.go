@@ -58,10 +58,9 @@ type uiNavGroup struct {
 
 // uiDashboardData is the view-model of the dashboard partial.
 type uiDashboardData struct {
-	Active            bool
-	DryRun            bool
-	Backend           string
-	LibtorrentVersion string
+	Active  bool
+	DryRun  bool
+	Backend string
 	// EngineVersion is the gx-core version of the gx-torrent daemon.
 	EngineVersion   string
 	Torrents        int
@@ -313,14 +312,18 @@ func uiIsSystemPage(view string) bool {
 func uiDashboardDataFrom(s *AppState) uiDashboardData {
 	cfg := latestConfig(s)
 	engine := s.activeEngine()
-	views := engine.List()
+	var views []models.TorrentView
+	backend := "-"
+	if engine != nil {
+		views = engine.List()
+		backend = uiBackendLabel(engine.Name())
+	}
 	data := uiDashboardData{
-		Active:            cfg.Active,
-		DryRun:            cfg.DryRun,
-		Backend:           uiBackendLabel(engine.Name()),
-		LibtorrentVersion: LibtorrentVersion(),
-		Torrents:          len(views),
-		UpdatedAt:         uiNowClock(),
+		Active:    cfg.Active,
+		DryRun:    cfg.DryRun,
+		Backend:   backend,
+		Torrents:  len(views),
+		UpdatedAt: uiNowClock(),
 	}
 	if gx, ok := engine.(*gxTorrentEngine); ok {
 		data.EngineVersion = gx.DaemonVersion()
@@ -389,13 +392,13 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 		trash = *s.cfg.TrashPath
 	}
 	ramdisk := ""
-	if value, ok := s.cfg.Settings["libtorrent_ramdisk_dir"]; ok {
+	if value, ok := s.cfg.Settings["torrent_ramdisk_dir"]; ok {
 		ramdisk = value
 	}
 	health := CheckWithPaths(&HealthPaths{
 		DataDir:      s.cfg.DataDir,
 		TrashPath:    trash,
-		DownloadPath: s.cfg.LibtorrentDir,
+		DownloadPath: s.cfg.DownloadDir,
 		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
 	})
@@ -437,13 +440,13 @@ func uiHealthPathsFrom(s *AppState) *HealthPaths {
 		trash = *s.cfg.TrashPath
 	}
 	ramdisk := ""
-	if value, ok := s.cfg.Settings["libtorrent_ramdisk_dir"]; ok {
+	if value, ok := s.cfg.Settings["torrent_ramdisk_dir"]; ok {
 		ramdisk = value
 	}
 	return &HealthPaths{
 		DataDir:      s.cfg.DataDir,
 		TrashPath:    trash,
-		DownloadPath: s.cfg.LibtorrentDir,
+		DownloadPath: s.cfg.DownloadDir,
 		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
 	}

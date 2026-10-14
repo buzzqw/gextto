@@ -678,7 +678,7 @@ func gh7_setting_key_allowed(key string) bool {
 		return false
 	}
 	for _, prefix := range []string{
-		"libtorrent_", "delay_", "housekeeping_", "media_info_", "score_", "tvdb_",
+		"torrent_", "libtorrent_", "delay_", "housekeeping_", "media_info_", "score_", "tvdb_",
 		"simkl_", "backup_", "notify_", "jellyfin_", "plex_", "gxtorrent_",
 	} {
 		if strings.HasPrefix(key, prefix) {
@@ -690,8 +690,8 @@ func gh7_setting_key_allowed(key string) bool {
 		"content_filters", "max_release_age_days", "gap_fill_max_per_series",
 		"gap_filling", "gap_deep_interval_hours", "gap_deep_max_per_cycle", "flaresolverr_url",
 		"tmdb_api_key", "tmdb_language", "default_language", "rename_episodes", "rename_format",
-		"rename_template", "archive_root", "trash_path", "libtorrent_dir",
-		"libtorrent_temp_dir", "libtorrent_ramdisk_dir", "libtorrent_extra_settings",
+		"rename_template", "archive_root", "trash_path", "torrent_dir",
+		"torrent_temp_dir", "torrent_ramdisk_dir", "libtorrent_extra_settings",
 		"cleanup_upgrades", "cleanup_min_score_diff", "upgrade_min_score_diff", "upgrade_until_score", "cleanup_action", "dry_run",
 		"min_free_space_gb", "trash_retention_days", "archive_cleanup_enabled",
 		"archive_max_age_days", "archive_keep_min", "stop_on_old_page_threshold", "debug_enabled",
@@ -806,7 +806,7 @@ func BrowserHandlerDownload(w http.ResponseWriter, r *http.Request, s *AppState)
 func ComicCycle(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	client := NewGetComicsClient()
-	defaultRoot := cfg.LibtorrentDir
+	defaultRoot := cfg.DownloadDir
 	if s.cycle_lock != nil {
 		s.cycle_lock.Lock()
 		defer s.cycle_lock.Unlock()
@@ -924,17 +924,15 @@ func applyIPFilter(ctx context.Context, s *AppState) (int, string, error) {
 	var loader interface {
 		LoadIPFilter(path string) (int, error)
 	}
-	if embedded, err := s.requireEmbedded("ip_filter"); err == nil {
-		loader = embedded
-	} else if active, ok := s.activeEngine().(interface {
+	active, ok := s.activeEngine().(interface {
 		LoadIPFilter(path string) (int, error)
-	}); ok {
-		loader = active
-	} else {
-		return 0, "", err
+	})
+	if !ok {
+		return 0, "", fmt.Errorf("the active engine does not support the IP filter")
 	}
+	loader = active
 	cfg := latestConfig(s)
-	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+	target := strings.TrimSpace(cfg.Transfer.IpFilterPath)
 	if target == "" {
 		return 0, "", fmt.Errorf("nessun IP filter configurato")
 	}
@@ -994,8 +992,8 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	cfg := latestConfig(s)
 	destination := strings.TrimSpace(input.Path)
-	allowed := gh7_path_starts_with(destination, cfg.LibtorrentDir) ||
-		(cfg.LibtorrentTempDir != nil && gh7_path_starts_with(destination, *cfg.LibtorrentTempDir)) ||
+	allowed := gh7_path_starts_with(destination, cfg.DownloadDir) ||
+		(cfg.DownloadTempDir != nil && gh7_path_starts_with(destination, *cfg.DownloadTempDir)) ||
 		(cfg.ArchiveRoot != nil && gh7_path_starts_with(destination, *cfg.ArchiveRoot)) ||
 		gh7_isConfiguredArchive(cfg, s.db, hash, destination)
 	if !allowed {
@@ -1472,11 +1470,6 @@ func SetTorrentLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 			if _, err := s.activeEngine().SetMaxUploads(hash, int(maxUploads)); err != nil {
 				jsonError(w, http.StatusBadRequest, err.Error())
 				return
-			}
-		}
-		if s.torrent_engine == nil {
-			if err := s.torrents.SaveConnLimits(hash, maxConnections, maxUploads); err != nil {
-				logging.Warn("cannot persist torrent connection limits", "hash", hash, "error", err)
 			}
 		}
 	}

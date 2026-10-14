@@ -60,9 +60,9 @@ func newTestAppState(t *testing.T) *AppState {
 	cfg := DefaultConfig()
 	cfg.DataDir = dir
 	cfg.StateDir = filepath.Join(dir, "state")
-	cfg.LibtorrentDir = filepath.Join(dir, "downloads")
+	cfg.DownloadDir = filepath.Join(dir, "downloads")
 	libtorrentTemp := filepath.Join(dir, "incomplete")
-	cfg.LibtorrentTempDir = &libtorrentTemp
+	cfg.DownloadTempDir = &libtorrentTemp
 	trash := filepath.Join(dir, "trash")
 	cfg.TrashPath = &trash
 	cfg.DryRun = true
@@ -72,13 +72,13 @@ func newTestAppState(t *testing.T) *AppState {
 	// back to `./data` (which would make the tests depend on the environment).
 	configPath := filepath.Join(dir, "gextto.json")
 	configJSON, err := json.Marshal(map[string]any{
-		"data_dir":            dir,
-		"state_dir":           filepath.Join(dir, "state"),
-		"libtorrent_dir":      filepath.Join(dir, "downloads"),
-		"libtorrent_temp_dir": filepath.Join(dir, "incomplete"),
-		"trash_path":          filepath.Join(dir, "trash"),
-		"dry_run":             true,
-		"active":              false,
+		"data_dir":         dir,
+		"state_dir":        filepath.Join(dir, "state"),
+		"torrent_dir":      filepath.Join(dir, "downloads"),
+		"torrent_temp_dir": filepath.Join(dir, "incomplete"),
+		"trash_path":       filepath.Join(dir, "trash"),
+		"dry_run":          true,
+		"active":           false,
 	})
 	if err != nil {
 		t.Fatalf("marshal test config: %v", err)
@@ -87,17 +87,12 @@ func newTestAppState(t *testing.T) *AppState {
 		t.Fatalf("write test config: %v", err)
 	}
 
-	// Pin the embedded backend so the tests never depend on a real gx-torrent
-	// answering on 127.0.0.1:8890 (the installation default is gx-torrent).
+	// Use an unreachable qBittorrent backend: the tests must never depend on a
+	// real gx-torrent answering on 127.0.0.1:8890 (the installation default).
 	// Only the in-memory configuration is set: writing it to the config DB
 	// would create gextto_config.db and confuse the maintenance widget tests.
-	cfg.Settings["torrent_backend"] = BackendEmbedded
-
-	torrents := &LibtorrentClient{
-		DryRun:   true,
-		torrents: make(map[string]models.TorrentView),
-		removed:  make(map[string]time.Time),
-	}
+	cfg.Settings["torrent_backend"] = BackendQbittorrent
+	cfg.Settings["qbittorrent_url"] = "http://127.0.0.1:1"
 
 	state := NewAppState(
 		&cfg,
@@ -107,7 +102,6 @@ func newTestAppState(t *testing.T) *AppState {
 		archive,
 		comics,
 		engine,
-		torrents,
 		FromConfig(&cfg),
 		NewTmdbClientWithLanguage(nil, "it-IT"),
 	)
@@ -526,35 +520,35 @@ func TestTempLimitsReportTheSpeedPolicyInForce(t *testing.T) {
 
 func TestSpeedPolicyScheduleBeatsTemporaryLimitWithoutExpiry(t *testing.T) {
 	cfg := &Config{Settings: map[string]string{
-		"libtorrent_sched_enabled":      "true",
-		"libtorrent_sched_days":         "0,1,2,3,4,5,6",
-		"libtorrent_sched_start":        "00:00",
-		"libtorrent_sched_end":          "23:59",
-		"libtorrent_sched_dl_limit":     "8000",
-		"libtorrent_sched_ul_limit":     "1000",
-		"libtorrent_temp_limit_enabled": "1",
-		"libtorrent_temp_limit_until":   "0",
-		"libtorrent_temp_dl_limit":      "3000",
-		"libtorrent_temp_ul_limit":      "200",
+		"torrent_sched_enabled":      "true",
+		"torrent_sched_days":         "0,1,2,3,4,5,6",
+		"torrent_sched_start":        "00:00",
+		"torrent_sched_end":          "23:59",
+		"torrent_sched_dl_limit":     "8000",
+		"torrent_sched_ul_limit":     "1000",
+		"torrent_temp_limit_enabled": "1",
+		"torrent_temp_limit_until":   "0",
+		"torrent_temp_dl_limit":      "3000",
+		"torrent_temp_ul_limit":      "200",
 	}}
-	cfg.Libtorrent.DownloadLimitKib = 500
-	cfg.Libtorrent.UploadLimitKib = 50
+	cfg.Transfer.DownloadLimitKib = 500
+	cfg.Transfer.UploadLimitKib = 50
 	if dl, ul, source, shadowed := speedPolicy(cfg); dl != 8000 || ul != 1000 || source != speedSourceSchedule || !shadowed {
 		t.Fatalf("permanent temp in schedule window = %d/%d %s shadowed=%v", dl, ul, source, shadowed)
 	}
 
-	cfg.Settings["libtorrent_temp_limit_until"] = strconv.FormatInt(time.Now().Unix()+600, 10)
+	cfg.Settings["torrent_temp_limit_until"] = strconv.FormatInt(time.Now().Unix()+600, 10)
 	if dl, ul, source, _ := speedPolicy(cfg); dl != 3000 || ul != 200 || source != speedSourceTemp {
 		t.Fatalf("temp with expiry in schedule window = %d/%d %s", dl, ul, source)
 	}
 
-	cfg.Settings["libtorrent_temp_limit_until"] = "0"
-	cfg.Settings["libtorrent_sched_enabled"] = "false"
+	cfg.Settings["torrent_temp_limit_until"] = "0"
+	cfg.Settings["torrent_sched_enabled"] = "false"
 	if dl, ul, source, _ := speedPolicy(cfg); dl != 3000 || ul != 200 || source != speedSourceTempKeep {
 		t.Fatalf("permanent temp outside schedule = %d/%d %s", dl, ul, source)
 	}
 
-	cfg.Settings["libtorrent_temp_limit_enabled"] = "0"
+	cfg.Settings["torrent_temp_limit_enabled"] = "0"
 	if dl, ul, source, _ := speedPolicy(cfg); dl != 500 || ul != 50 || source != speedSourceBase {
 		t.Fatalf("base = %d/%d %s", dl, ul, source)
 	}

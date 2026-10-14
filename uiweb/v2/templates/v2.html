@@ -249,7 +249,7 @@
     <div class="metric mint"><span class="metric-sub">Serie TV / Film</span><strong>{{.SeriesConfigured}} / {{.MoviesConfigured}}</strong></div>
     <div class="metric amber"><span class="metric-sub">Spazio libero</span><strong>{{bytesU .FreeSpace}}</strong><small class="muted" title="Cestino">{{bytesU .TrashBytes}}</small></div>
     <div class="metric blue"><span class="metric-sub">Magnet in archivio</span><strong>{{.ArchiveTotal}}</strong><small class="muted" title="Visti nei feed">{{.SeenGroups}}</small></div>
-    <div class="metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">{{if .EngineVersion}}gx-core {{.EngineVersion}}{{else}}libtorrent {{.LibtorrentVersion}}{{end}}</small></div>
+    <div class="metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">{{if .EngineVersion}}gx-core {{.EngineVersion}}{{end}}</small></div>
   </div>
 
   <div class="panel dashboard-cycle-panel">
@@ -743,7 +743,7 @@
     {{if .I18n}}{{template "v2_i18n_editor" .I18n}}{{end}}
     {{if and (not .Groups) (not .I18n) (not .ShowFeeds) .Empty}}<p class="muted">{{.Empty}}</p>{{end}}
     {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
-    {{if eq .ActiveID "libtorrent"}}{{template "v2_ipfilter_action" .}}{{end}}
+    {{if eq .ActiveID "network"}}{{template "v2_ipfilter_action" .}}{{end}}
   </div>
   {{if .Highlight}}<script>(function(){var e=document.getElementById('v2-setting-{{.Highlight}}');if(!e)return;e.hidden=false;var d=e.closest('details');if(d)d.open=true;try{if(location.hash!=='#v2-setting-{{.Highlight}}'){history.replaceState(null,'','#v2-setting-{{.Highlight}}');}}catch(_){}var still=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;e.scrollIntoView({block:'center',behavior:still?'auto':'smooth'});var c=e.querySelector('input:not([type=hidden]),select,textarea');if(c)c.focus({preventScroll:true});e.classList.add('setting-flash');setTimeout(function(){e.classList.remove('setting-flash');},2500);})();</script>{{end}}
 </div>

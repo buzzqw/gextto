@@ -2,18 +2,18 @@
 
 `gx-torrent` is a small BitTorrent daemon written in pure Go on top of the
 **gx-core** engine (`internal/gxcore`). It is the default engine of
-Gextto (`torrent_backend = gx-torrent`): it does not require `libtorrent-rasterbar`,
+Gextto (`torrent_backend = gx-torrent`): it has no C/C++ dependency,
 runs in a separate process and is controlled via REST (`127.0.0.1:8890` when
 Gextto manages it, `0.0.0.0:8890` in standalone), where it also exposes an
 operational web page openable from the browser (managed: only from this server,
 see *Web interface* to open it to the LAN; standalone: already reachable from
 another PC on the LAN). In short, as a standalone client it is a **simpler,
 reduced version of Gextto** — fewer features, but all the ones needed to run
-without it. The embedded
-libtorrent engine remains selectable — on builds that include it — and is one step
-of the automatic fallback when gx-torrent does not start: Gextto first tries the
-managed qBittorrent-nox (downloaded on demand), then libtorrent, then a recovery
-state (see `engine_fallback.go` and the Gextto manual).
+without it. Gextto has one other selectable engine,
+qBittorrent-nox (external or managed): it is the automatic fallback when
+gx-torrent does not start — Gextto tries the managed qBittorrent-nox (downloaded
+on demand) and, as a last resort, a recovery state with the transfers stopped
+(see `engine_fallback.go` and the Gextto manual).
 
 The gx-core engine lives in `internal/gxcore`. Its features are
 described in `internal/gxcore/GEXTTO.md`: single port, outgoing interface,
@@ -91,16 +91,15 @@ Code:
    the published daemon has the same number (`gx_version` in `release.json`). It is the `1.1.<n>` version reported by
    `gx-torrent --version`, by its web page and by `/api/v1/health`.
 2. `gx-torrent` is the default engine of a new installation: there is no need to
-   choose it. To use embedded libtorrent instead, set *Torrent engine* to
-   `embedded` and restart. A configuration that has already saved an engine stays
-   as it was: the new default applies only to new installations.
+   choose it. A configuration that has already saved an engine stays as it was:
+   the default applies only to new installations.
 3. Gextto **always starts and supervises** the daemon when gx-torrent is the active
    engine:
    - data in `DATA_DIR/gx-torrent`;
    - log in `DATA_DIR/gx-torrent/gx-torrent.log`, written by the daemon itself and
      rotated at 5 MB keeping 4 files; errors of individual peers (expired
      handshakes, resets) and of failed announces are at debug level;
-   - default download folder equal to libtorrent's;
+   - default download folder equal to Gextto's configured download folder;
    - the daemon is restarted if it exits;
    - **it stays up when Gextto restarts** (for example for an
      update): under systemd it starts in its own scope
@@ -121,8 +120,8 @@ Code:
      the fallback chain (`engine_fallback.go`). It first restores `gx-torrent.prev`
      when the updater kept one, then hands the transfers to the managed
      qBittorrent-nox (downloaded on demand, or an external one already configured),
-     then to the `embedded` engine on a build that includes it, and finally to a
-     recovery state with the transfers stopped and the UI up. Only when no
+     and finally to a recovery state with the transfers stopped and the UI up.
+     Only when no
      alternative is available does it continue with gx-torrent in **safe mode**
      (without uTP or holepunch) and growing waits between attempts (1 m, 5 m,
      15 m, 1 h). A clean shutdown (restart of Gextto or of the service, for
@@ -147,7 +146,8 @@ Settings (*Torrent engine* tab, *gx-torrent* group):
 | `gxtorrent_poll_interval_ms` | `1500` | minimum interval between two state reads (250–60000) |
 | `gxtorrent_proxy` | empty | proxy for gx-torrent: `socks5://[user:password@]host:port` or `http://host:port`. Peers, HTTP trackers and web seeds go through the proxy; DHT and UDP trackers are turned off. It travels in the daemon's environment, not on the command line |
 
-The queue and bandwidth settings remain those of the *libtorrent* section:
+The queue and bandwidth settings remain those of the *Speed and network* and
+*Queues and performance* tabs:
 
 - active downloads and seeds, total limit;
 - "don't count slow torrents";
@@ -997,10 +997,10 @@ Some flags are internal (`-insecure`, `-version`, `-fingerprint`,
 `-orphan-timeout`, `-ipfilter-source`, `-gextto-log`): only Gextto uses them to
 start, re-attach and supervise the daemon.
 
-Gextto, in managed mode, passes these values itself from the *libtorrent*
+Gextto, in managed mode, passes these values itself from the *torrent*
 settings (ports, interfaces, encryption, DHT, PEX, uTP, LSD, UPnP, NAT-PMP,
 IP filter, DHT bootstrap nodes) and from the `gxtorrent_proxy` setting. The global
-connection limit (`libtorrent_connections_limit`) is split between the engine's
+connection budget is split between the engine's
 outgoing dials and incoming accepts. Proxy and token travel in the environment,
 not on the command line. Changes apply from the restart of gextto.
 
@@ -1031,8 +1031,8 @@ RPC server is disabled.
   - Outcome and external address are in `GET /api/v1/stats` (`port_mapping`).
   - If none of the three works, the log says to open the port by hand.
 - **Listening interface**: `-listen-interface` accepts an IP or an interface
-  name. From gextto it comes from `libtorrent_listen_interfaces`
-  (e.g. `wg0:51413`), which takes precedence over `libtorrent_port_min/max`.
+  name. From gextto it comes from `torrent_listen_interfaces`
+  (e.g. `wg0:51413`), which takes precedence over `torrent_port_min/max`.
 - **Outgoing interface (VPN killswitch).** With `-outgoing-interface wg0`
   peers, trackers, web seeds and DHT go out only from that interface. If it has no
   address, nothing goes out until it returns.
@@ -1044,7 +1044,7 @@ RPC server is disabled.
   - DHT and UDP trackers are turned off, because they cannot go through a TCP
     proxy and otherwise would go out.
   - Incoming connections stay direct on the single port.
-- **Encryption** (`libtorrent_encryption`):
+- **Encryption** (`torrent_encryption`):
   - 0: outgoing connections are in the clear;
   - 1: encryption is tried, with a fallback in the clear;
   - 2: mandatory encryption incoming and outgoing.
@@ -1054,7 +1054,7 @@ RPC server is disabled.
     ≥ 128 allow traffic; IPv6 rules in CIDR form are applied
     (ranges/P2P/eMule remain IPv4 only).
   - The filter applies to incoming and outgoing peers, and to trackers if
-    `libtorrent_apply_ip_filter` is active.
+    `torrent_apply_ip_filter` is active.
   - gextto's "Update IP filter" button also works with gx-torrent:
     it downloads the list if it is a URL and reloads it in the daemon.
   - The file is **updated at the startup of the service** and then **once a
@@ -1108,7 +1108,7 @@ RPC server is disabled.
 
 ## uTP and LSD
 
-- **uTP** (`libtorrent_utp`, active by default) uses the same UDP port as the
+- **uTP** (`torrent_utp`, active by default) uses the same UDP port as the
   peers, shared with the DHT as in libtorrent.
   - Outgoing, uTP and TCP are attempted together and the first to connect wins.
     The per-host recent winner (≥4 races, ≥75% share) gets a 150 ms head start,
@@ -1132,7 +1132,7 @@ RPC server is disabled.
   - The peer list indicates which ones are connected over uTP.
   - With a proxy uTP is off; with the outgoing interface the UDP socket is
     bound to the VPN's IP.
-- **LSD**, local network discovery (BEP 14, `libtorrent_lsd`).
+- **LSD**, local network discovery (BEP 14, `torrent_lsd`).
   - Multicast announcements on 239.192.152.143:6771 (IPv4) and, if available,
     `[ff15::efc0:988f]:6771` (IPv6) every 5 minutes for every active non-private
     torrent.
@@ -1149,7 +1149,7 @@ libtorrent; it is not libtorrent's proprietary DHT-node relay.
 
 - It is activated with the **Holepunching (BEP 55)** setting in *Configuration →
   Torrent engine → Peer and tracker discovery* (active by default). It requires uTP
-  (`libtorrent_utp`): without uTP (or with a proxy) it is off, because the "hole" is
+  (`torrent_utp`): without uTP (or with a proxy) it is off, because the "hole" is
   opened on the UDP mappings. On the daemon the flag is `-no-holepunch`
   (`GX_TORRENT_NO_HOLEPUNCH=1`).
 - When a direct dial fails, gx-torrent asks a connected peer
@@ -1260,8 +1260,8 @@ health of the swarm, so it remains **optional and off by default**.
   *first/last* checkboxes), with `sequential=1` / `first_last=1` on
   `POST /api/v1/add`, or from Gextto's `AddOptions.Sequential` /
   `AddOptions.FirstLast` fields (settings *Sequential download*,
-  `libtorrent_sequential`, and *First/last part of files*,
-  `libtorrent_first_last`, besides the add form checkboxes).
+  `torrent_sequential`, and *First/last part of files*,
+  `torrent_first_last`, besides the add form checkboxes).
 - `first_last` downloads the edges of each file first and then continues
   **rarest-first**: it is independent of the sequential order and useful for
   streaming without giving up the health of the swarm.
@@ -1471,14 +1471,8 @@ With gx-torrent it shows:
 - encryption, proxy, IP filter rules;
 - disk and cache, session totals.
 
-With libtorrent it shows:
-
-- torrents by status;
-- DHT nodes, TCP and uTP peers;
-- incoming connections, disk jobs, totals.
-
 The same data are in `GET /api/v1/stats` of the daemon and in
-`GET /api/libtorrent/session-stats` of gextto. Shared counters use the
+`GET /api/torrents/session-stats` of gextto. Shared counters use the
 **libtorrent names** also for gx-torrent (`net.recv_payload_bytes`,
 `peer.num_tcp_peers`, `disk.num_read_ops`, …), so the endpoint is uniform; the
 engine-specific counters (cache, disk speed, DHT traffic) remain
@@ -1546,11 +1540,11 @@ has a **▶** button, and the daemon page has it in the **Files** tab.
 
 ## Disk cache, preallocation and mmap storage
 
-gextto's libtorrent settings also apply to gx-torrent, but gx-torrent's cache
+gextto's torrent settings also apply to gx-torrent, but gx-torrent's cache
 is **adaptive**: the daemon recomputes it from the real load instead of
 using fixed values.
 
-- **`libtorrent_cache_size` = -1** (default): **adaptive cache**. The daemon
+- **`torrent_cache_size` = -1** (default): **adaptive cache**. The daemon
   recomputes it every 3 minutes from:
   - **available RAM** (`MemAvailable`, reclaimable memory), not the total
     RAM: on a busy server the cache deflates by itself;
@@ -1566,10 +1560,10 @@ using fixed values.
     and the real write/coalescing cache is done by the kernel. The policy serves
     above all not to oversize when the load is low and to give more
     read cache during seeding.
-- **`libtorrent_cache_size` > 0**: **manual override**; the indicated size
+- **`torrent_cache_size` > 0**: **manual override**; the indicated size
   (16 KiB blocks) applies to reading and writing and the adaptive policy is silent.
-- **`libtorrent_cache_expiry`**: after how long a block in the cache expires.
-- **`libtorrent_preallocate`**: new files are reserved in full with
+- **`torrent_cache_expiry`**: after how long a block in the cache expires.
+- **`torrent_preallocate`**: new files are reserved in full with
   `fallocate`; files excluded from the selection remain sparse, and on tmpfs (RAM
   disk) they always remain sparse: reserving them would immediately take their whole
   size from the RAM.
@@ -1611,7 +1605,7 @@ copies the files and resumes from the point it was at. It is proven by a test th
 a download at 20% from `/dev/shm` to the disk.
 
 - The `.torrent` copies in the folder chosen by the operator
-  (`libtorrent_torrent_copy_dir`) take the torrent's name, as with
+  (`torrent_copy_dir`) take the torrent's name, as with
   libtorrent; the old `<hash>.torrent` copies are renamed at startup.
 - A downloading torrent that does not yet have any verified piece is
   moved without copying its empty files: they are recreated in the
@@ -1682,7 +1676,7 @@ It survives restarts together with the engine database (`DATA/session.db`).
 ## Self-managed queue
 
 The engine does not have a queue: the daemon itself manages it, every 3 seconds (and immediately
-after every command), with the same policy that Gextto applies to libtorrent.
+after every command), with the same policy that Gextto applies to its engines.
 
 - **Slots.** Active downloads (`active_downloads`) start in order of
   queue position. Seeds (`active_seeds`) have their own slots.
@@ -1708,7 +1702,7 @@ after every command), with the same policy that Gextto applies to libtorrent.
 - **Pin and probe.** Torrents with pin and those in probe (see below) always
   run and do not occupy slots.
 - **Dynamic queue** (`dynamic_queue`, with minimum and maximum). It is the same logic
-  as the libtorrent bridge:
+  Gextto applies to the other engines:
   - it narrows the slots if the global download limit stays saturated (≥ 90%)
     for ten minutes;
   - it widens them quickly if the bandwidth stays unused (≤ 70%) and there are
@@ -1748,7 +1742,7 @@ row (`sched.*` keys of its catalog).
 The long-term management of stalls remains in Gextto (`MonitorStalled`),
 identical for all engines:
 
-1. after `libtorrent_stall_after_min` without progress Gextto calls
+1. after `torrent_stall_after_min` without progress Gextto calls
    `MarkStalled`, i.e. the `park` action (stopped, out of the queue, `stalled` state);
 2. the attempts follow the backoff 1 h → 3 h → 6 h → 12 h → 24 h and use
    `Restart`, i.e. the `restart` action: the torrent runs out of the queue for a

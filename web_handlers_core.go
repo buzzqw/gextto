@@ -339,14 +339,14 @@ func HealthApi(w http.ResponseWriter, r *http.Request, s *AppState) {
 		archiveRoot = *s.cfg.ArchiveRoot
 	}
 	ramdiskPath := ""
-	if value, ok := s.cfg.Settings["libtorrent_ramdisk_dir"]; ok && value != "" {
+	if value, ok := s.cfg.Settings["torrent_ramdisk_dir"]; ok && value != "" {
 		ramdiskPath = value
 	}
 	healthCheckLimiter <- struct{}{}
 	report := CheckWithPaths(&HealthPaths{
 		DataDir:      dataDir,
 		TrashPath:    trashPath,
-		DownloadPath: s.cfg.LibtorrentDir,
+		DownloadPath: s.cfg.DownloadDir,
 		ArchiveRoot:  archiveRoot,
 		RamdiskPath:  ramdiskPath,
 	})
@@ -829,12 +829,12 @@ func settingsParseUint(cfg *Config, key string, fallback int) int {
 
 // coreStallGiveupMinutes implements `configured_stall_giveup_minutes`.
 func coreStallGiveupMinutes(cfg *Config) float64 {
-	if value, ok := cfg.Settings["libtorrent_stall_giveup_min"]; ok {
+	if value, ok := cfg.Settings["torrent_stall_giveup_min"]; ok {
 		if minutes, err := strconv.ParseFloat(value, 64); err == nil {
 			return minutes
 		}
 	}
-	if value, ok := cfg.Settings["libtorrent_stall_timeout_min"]; ok {
+	if value, ok := cfg.Settings["torrent_stall_timeout_min"]; ok {
 		if minutes, err := strconv.ParseFloat(value, 64); err == nil {
 			if minutes > 0 {
 				if minutes < 10080 {
@@ -890,71 +890,14 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		tmdbAPIKey = *cfg.TmdbAPIKey
 	}
 
-	libtorrent := map[string]any{
-		"enabled":                           cfg.LibtorrentEnabled,
-		"version":                           LibtorrentVersion(),
-		"active_downloads":                  cfg.Libtorrent.ActiveDownloads,
-		"active_seeds":                      cfg.Libtorrent.ActiveSeeds,
-		"active_limit":                      cfg.Libtorrent.ActiveLimit,
-		"seed_ratio":                        cfg.Libtorrent.SeedRatio,
-		"seed_time_minutes":                 cfg.Libtorrent.SeedTimeMinutes,
-		"seed_time_days":                    cfg.Libtorrent.SeedTimeDays,
-		"download_limit_kib":                cfg.Libtorrent.DownloadLimitKib,
-		"upload_limit_kib":                  cfg.Libtorrent.UploadLimitKib,
-		"dynamic_queue":                     cfg.Libtorrent.DynamicQueue,
-		"dynamic_queue_min":                 cfg.Libtorrent.DynamicQueueMin,
-		"dynamic_queue_max":                 cfg.Libtorrent.DynamicQueueMax,
-		"dont_count_slow_torrents":          cfg.Libtorrent.DontCountSlowTorrents,
-		"stall_after_min":                   settingsOr(cfg, "libtorrent_stall_after_min", "60"),
-		"stall_retry_min":                   settingsOr(cfg, "libtorrent_stall_retry_min", "60"),
-		"stall_giveup_min":                  strconv.FormatFloat(coreStallGiveupMinutes(cfg), 'f', -1, 64),
-		"auto_remove_completed":             cfg.Libtorrent.AutoRemoveCompleted,
-		"dht":                               cfg.Libtorrent.Dht,
-		"pex":                               cfg.Libtorrent.Pex,
-		"lsd":                               cfg.Libtorrent.Lsd,
-		"upnp":                              cfg.Libtorrent.Upnp,
-		"natpmp":                            cfg.Libtorrent.Natpmp,
-		"connections_limit":                 cfg.Libtorrent.ConnectionsLimit,
-		"upload_slots_limit":                cfg.Libtorrent.UploadSlotsLimit,
-		"half_open_limit":                   cfg.Libtorrent.HalfOpenLimit,
-		"alert_queue_size":                  cfg.Libtorrent.AlertQueueSize,
-		"max_connections_per_torrent":       cfg.Libtorrent.MaxConnectionsPerTorrent,
-		"max_uploads_per_torrent":           cfg.Libtorrent.MaxUploadsPerTorrent,
-		"aio_threads":                       cfg.Libtorrent.AioThreads,
-		"cache_size":                        cfg.Libtorrent.CacheSize,
-		"cache_expiry":                      cfg.Libtorrent.CacheExpiry,
-		"announce_interval":                 cfg.Libtorrent.AnnounceInterval,
-		"torrent_connect_boost":             cfg.Libtorrent.TorrentConnectBoost,
-		"utp":                               cfg.Libtorrent.Utp,
-		"prefer_rc4":                        cfg.Libtorrent.PreferRc4,
-		"announce_to_all_trackers":          cfg.Libtorrent.AnnounceToAllTrackers,
-		"announce_to_all_tiers":             cfg.Libtorrent.AnnounceToAllTiers,
-		"allow_multiple_connections_per_ip": cfg.Libtorrent.AllowMultipleConnectionsPerIp,
-		"apply_ip_filter":                   cfg.Libtorrent.ApplyIpFilter,
-		"encryption":                        cfg.Libtorrent.Encryption,
-		"ip_filter_path":                    cfg.Libtorrent.IpFilterPath,
-		"listen_interfaces":                 cfg.Libtorrent.ListenInterfaces,
-		"outgoing_interface":                cfg.Libtorrent.OutgoingInterface,
-		"dht_bootstrap_nodes":               cfg.Libtorrent.DhtBootstrapNodes,
-		"port_min":                          cfg.Libtorrent.PortMin,
-		"port_max":                          cfg.Libtorrent.PortMax,
-		"ramdisk_enabled":                   cfg.RamdiskEnabled(),
-		"ramdisk_threshold_gb":              settingsOr(cfg, "libtorrent_ramdisk_threshold_gb", "3.5"),
-		"ramdisk_margin_gb":                 settingsOr(cfg, "libtorrent_ramdisk_margin_gb", "0.5"),
-		"ramdisk_min_free_bytes":            settingsOr(cfg, "libtorrent_ramdisk_min_free_bytes", ""),
-		"auto_optimize":                     settingsOr(cfg, "libtorrent_auto_optimize", "false"),
-		"preallocate":                       cfg.LibtorrentPreallocate(),
-		"torrent_copy_dir":                  settingsOr(cfg, "libtorrent_torrent_copy_dir", ""),
-	}
-
 	paths := map[string]any{
-		"data_dir":               cfg.DataDir,
-		"libtorrent_dir":         cfg.LibtorrentDir,
-		"libtorrent_temp_dir":    cfg.LibtorrentTempDir,
-		"libtorrent_ramdisk_dir": settingsOrNil(cfg, "libtorrent_ramdisk_dir"),
-		"state_dir":              cfg.StateDir,
-		"archive_root":           cfg.ArchiveRoot,
-		"trash_path":             cfg.TrashPath,
+		"data_dir":            cfg.DataDir,
+		"torrent_dir":         cfg.DownloadDir,
+		"torrent_temp_dir":    cfg.DownloadTempDir,
+		"torrent_ramdisk_dir": settingsOrNil(cfg, "torrent_ramdisk_dir"),
+		"state_dir":           cfg.StateDir,
+		"archive_root":        cfg.ArchiveRoot,
+		"trash_path":          cfg.TrashPath,
 	}
 
 	jsonResponse(w, map[string]any{
@@ -976,20 +919,20 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"gap_filling":                          settingsBool(cfg, "gap_filling", true),
 		"gap_deep_interval_hours":              settingsParseInt(cfg, "gap_deep_interval_hours", 6),
 		"gap_deep_max_per_cycle":               settingsParseUint(cfg, "gap_deep_max_per_cycle", 5),
-		"libtorrent_sched_enabled":             settingsOr(cfg, "libtorrent_sched_enabled", "false"),
-		"libtorrent_sequential":                settingsOr(cfg, "libtorrent_sequential", "false"),
-		"libtorrent_first_last":                settingsOr(cfg, "libtorrent_first_last", "false"),
+		"torrent_sched_enabled":                settingsOr(cfg, "torrent_sched_enabled", "false"),
+		"torrent_sequential":                   settingsOr(cfg, "torrent_sequential", "false"),
+		"torrent_first_last":                   settingsOr(cfg, "torrent_first_last", "false"),
 		"libtorrent_extra_settings":            settingsOr(cfg, "libtorrent_extra_settings", ""),
-		"libtorrent_sched_start":               settingsOr(cfg, "libtorrent_sched_start", "23:00"),
-		"libtorrent_sched_end":                 settingsOr(cfg, "libtorrent_sched_end", "08:00"),
-		"libtorrent_sched_days":                settingsOr(cfg, "libtorrent_sched_days", ""),
-		"libtorrent_sched_dl_limit":            settingsOr(cfg, "libtorrent_sched_dl_limit", "0"),
-		"libtorrent_sched_ul_limit":            settingsOr(cfg, "libtorrent_sched_ul_limit", "0"),
-		"libtorrent_sched_week":                settingsOr(cfg, "libtorrent_sched_week", ""),
-		"libtorrent_temp_dl_limit":             settingsOr(cfg, "libtorrent_temp_dl_limit", "0"),
-		"libtorrent_temp_ul_limit":             settingsOr(cfg, "libtorrent_temp_ul_limit", "0"),
-		"libtorrent_temp_limit_enabled":        settingsOr(cfg, "libtorrent_temp_limit_enabled", "0"),
-		"libtorrent_temp_limit_until":          settingsOr(cfg, "libtorrent_temp_limit_until", "0"),
+		"torrent_sched_start":                  settingsOr(cfg, "torrent_sched_start", "23:00"),
+		"torrent_sched_end":                    settingsOr(cfg, "torrent_sched_end", "08:00"),
+		"torrent_sched_days":                   settingsOr(cfg, "torrent_sched_days", ""),
+		"torrent_sched_dl_limit":               settingsOr(cfg, "torrent_sched_dl_limit", "0"),
+		"torrent_sched_ul_limit":               settingsOr(cfg, "torrent_sched_ul_limit", "0"),
+		"torrent_sched_week":                   settingsOr(cfg, "torrent_sched_week", ""),
+		"torrent_temp_dl_limit":                settingsOr(cfg, "torrent_temp_dl_limit", "0"),
+		"torrent_temp_ul_limit":                settingsOr(cfg, "torrent_temp_ul_limit", "0"),
+		"torrent_temp_limit_enabled":           settingsOr(cfg, "torrent_temp_limit_enabled", "0"),
+		"torrent_temp_limit_until":             settingsOr(cfg, "torrent_temp_limit_until", "0"),
 		"score_settings":                       scoreSettings,
 		"flaresolverr_configured":              cfg.FlaresolverrURL != nil,
 		"tmdb_configured":                      cfg.TmdbAPIKey != nil,
@@ -1059,7 +1002,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"feed_max_pages":                       strconv.Itoa(cfg.FeedMaxPages()),
 		"cleanup_upgrades":                     cfg.CleanupUpgrades,
 		"cleanup_action":                       cfg.CleanupAction,
-		"auto_remove_completed":                cfg.Libtorrent.AutoRemoveCompleted,
+		"auto_remove_completed":                cfg.Transfer.AutoRemoveCompleted,
 		"rename_format":                        cfg.RenameFormat,
 		"rename_template":                      cfg.RenameTemplate,
 		"rename_episodes":                      cfg.RenameEpisodes,
@@ -1076,8 +1019,11 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"qbittorrent_managed":              settingsBoolString(cfg, "qbittorrent_managed", false),
 		"qbittorrent_managed_binary":       qbittorrentManagedBinary(cfg),
 		"qbittorrent_password_configured":  settingsNonEmpty(cfg, "qbittorrent_password"),
-		"libtorrent":                       libtorrent,
 		"paths":                            paths,
+		"transfer": map[string]any{
+			"download_limit_kib": cfg.Transfer.DownloadLimitKib,
+			"upload_limit_kib":   cfg.Transfer.UploadLimitKib,
+		},
 	})
 }
 

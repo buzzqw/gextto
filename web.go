@@ -238,11 +238,11 @@ func SaveRamdiskSettings(dataDir string, path string) (map[string]any, error) {
 		key   string
 		value string
 	}{
-		{"libtorrent_ramdisk_dir", path},
-		{"libtorrent_ramdisk_enabled", "yes"},
-		{"libtorrent_ramdisk_threshold_gb", jsonStringField(recommendation, "threshold_gb", "3.5")},
-		{"libtorrent_ramdisk_margin_gb", jsonStringField(recommendation, "margin_gb", "0.5")},
-		{"libtorrent_ramdisk_min_free_bytes", "0"},
+		{"torrent_ramdisk_dir", path},
+		{"torrent_ramdisk_enabled", "yes"},
+		{"torrent_ramdisk_threshold_gb", jsonStringField(recommendation, "threshold_gb", "3.5")},
+		{"torrent_ramdisk_margin_gb", jsonStringField(recommendation, "margin_gb", "0.5")},
+		{"torrent_ramdisk_min_free_bytes", "0"},
 	}
 	for _, step := range steps {
 		if err := saveConfigSetting(dataDir, step.key, step.value); err != nil {
@@ -532,9 +532,7 @@ type AppState struct {
 	archive     *Archive
 	comics      *ComicsDb
 	engine      *Engine
-	torrents    *LibtorrentClient
-	// torrent_engine is the active transfer engine. When nil the daemon uses
-	// the embedded libtorrent adapter (see activeEngine in torrent_engine.go).
+	// torrent_engine is the active transfer engine; nil until one is selected.
 	// engine_mu guards it because the backend can be switched at runtime while
 	// the background worker reads it.
 	engine_mu      sync.RWMutex

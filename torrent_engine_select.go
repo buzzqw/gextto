@@ -4,8 +4,8 @@ package gextto
 // engine, with the mandatory preflight that protects the filesystem: a backend
 // is never activated when a path it may be asked to use cannot be translated.
 //
-// `gx-torrent` is the default (DefaultTorrentBackend); embedded libtorrent is
-// the automatic fallback. Selecting qBittorrent is opt-in
+// `gx-torrent` is the default (DefaultTorrentBackend); qBittorrent is the
+// alternative selected by the fallback chain. Selecting qBittorrent is opt-in
 // and non-destructive: if the connectivity preflight fails the adapter is still
 // installed (it degrades to an empty/stale view), but a path-mapping failure
 // refuses activation because it could relocate files to the wrong place.
@@ -21,33 +21,9 @@ import (
 	"github.com/buzzqw/gextto/internal/qbittorrent"
 )
 
-// alternativeBackendActive reports whether a non-embedded backend will be
-// activated at startup. It mirrors selectTorrentEngine's validation (without
-// the connectivity probe) so NewLibtorrentClient can suppress its session
-// exactly when the alternative engine will really take over.
-func alternativeBackendActive(cfg *Config) bool {
-	if cfg == nil {
-		return false
-	}
-	switch TorrentBackendName(cfg) {
-	case BackendQbittorrent:
-		settings, err := qbittorrentSettingsFromConfig(cfg)
-		if err != nil || settings.Client.BaseURL == "" {
-			return false
-		}
-		return validateBackendMappings(settings.Mappings, requiredBackendPaths(cfg)) == nil
-	case BackendGxTorrent:
-		// gx-torrent runs on this machine and shares Gextto's paths.
-		_, err := gxTorrentSettingsFromConfig(cfg)
-		return err == nil
-	default:
-		return false
-	}
-}
-
-// selectTorrentEngine builds the configured backend. A nil engine means the
-// embedded libtorrent adapter. The second return value is a human-readable
-// note (empty on the happy path), and an error means activation was refused.
+// selectTorrentEngine builds the configured backend. The second return value is
+// a human-readable note (empty on the happy path), and an error means activation
+// was refused.
 func selectTorrentEngine(cfg *Config, notifier *Notifier) (TorrentEngine, string, error) {
 	if TorrentBackendName(cfg) != BackendGxTorrent {
 		gxStopLeftoverDaemon(cfg)
@@ -75,7 +51,8 @@ func selectTorrentEngine(cfg *Config, notifier *Notifier) (TorrentEngine, string
 			return engine, note, nil
 		}
 		return engine, "", nil
-	case BackendGxTorrent:
+	default:
+		// gx-torrent is the only other backend, and the default.
 		engine, err := newGxTorrentEngine(cfg, notifier)
 		if err != nil {
 			return nil, "", err
@@ -86,21 +63,14 @@ func selectTorrentEngine(cfg *Config, notifier *Notifier) (TorrentEngine, string
 			return engine, note, nil
 		}
 		return engine, "", nil
-	case BackendEmbedded:
-		if !LibtorrentCompiled() {
-			return nil, "", fmt.Errorf("libtorrent integrato non incluso in questa build (compila con make build-libtorrent)")
-		}
-		return nil, "", nil
-	default:
-		return nil, "", nil
 	}
 }
 
 // requiredBackendPaths lists the Gextto paths a backend may be asked to use.
 func requiredBackendPaths(cfg *Config) []string {
-	paths := []string{cfg.LibtorrentDir}
-	if cfg.LibtorrentTempDir != nil {
-		paths = append(paths, *cfg.LibtorrentTempDir)
+	paths := []string{cfg.DownloadDir}
+	if cfg.DownloadTempDir != nil {
+		paths = append(paths, *cfg.DownloadTempDir)
 	}
 	if ramdisk := cfg.RamdiskDir(); ramdisk != nil {
 		paths = append(paths, *ramdisk)
@@ -188,8 +158,7 @@ func PreflightQbittorrentWith(settings qbittorrentSettings) QbittorrentPreflight
 }
 
 // ShutdownTorrentEngine releases the active engine when it owns process-level
-// resources. The embedded engine is closed
-// by the daemon through LibtorrentClient.Shutdown.
+// resources (the managed qBittorrent process, the gx-torrent daemon adoption).
 func ShutdownTorrentEngine(s *AppState) error {
 	engine := s.activeEngine()
 	if closer, ok := engine.(interface{ Close() error }); ok {
@@ -198,23 +167,12 @@ func ShutdownTorrentEngine(s *AppState) error {
 	return nil
 }
 
-// ShutdownEmbedded closes the embedded libtorrent client currently held by the
-// state. It must be used instead of a startup-local pointer because NewAppState
-// may replace the client with a fallback when an alternative backend fails to
-// activate.
-func ShutdownEmbedded(s *AppState, cfg *Config) error {
-	if s == nil || s.torrents == nil {
-		return nil
-	}
-	return s.torrents.Shutdown(cfg)
-}
-
 // ConfigureTorrentEngine installs the engine selected by the current settings.
 // It is called at startup and whenever the backend settings change.
 func ConfigureTorrentEngine(s *AppState, cfg *Config) error {
 	if cfg != nil {
 		if raw := strings.ToLower(strings.TrimSpace(cfg.Settings["torrent_backend"])); raw != "" && !isKnownTorrentBackend(raw) {
-			logging.Warn("unknown torrent backend saved in the settings; falling back to embedded libtorrent", "backend", raw)
+			logging.Warn("unknown torrent backend saved in the settings; using gx-torrent", "backend", raw)
 		}
 	}
 	engine, note, err := selectTorrentEngine(cfg, s.notifier)
@@ -225,16 +183,6 @@ func ConfigureTorrentEngine(s *AppState, cfg *Config) error {
 	if note != "" {
 		logging.Warn("torrent backend note", "note", note)
 	}
-	active := TorrentBackendName(cfg)
-	if engine == nil {
-		// The configured name `embedded` is an implementation detail. The
-		// actual engine is libtorrent, so expose the concrete backend and the
-		// linked library version in the startup log.
-		logging.Debug("torrent backend selected",
-			"backend", "libtorrent",
-			"version", LibtorrentVersion())
-		return nil
-	}
-	logging.Debug("torrent engine selected", "engine", active)
+	logging.Debug("torrent engine selected", "engine", TorrentBackendName(cfg))
 	return nil
 }

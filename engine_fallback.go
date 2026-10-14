@@ -4,15 +4,13 @@ package gextto
 // active torrent engine cannot stay up: a crash loop, or an activation refused
 // at startup.
 //
-// The historic safety net was the embedded libtorrent engine, optional at build
-// time and the candidate for removal. The chain therefore does not depend on it:
+// The chain therefore does not depend on the removed embedded engine:
 //
 //  1. the qBittorrent engine — the managed runtime is downloaded on demand from
 //     the userdocs/qbittorrent-nox-static releases (the last libtorrent v2
 //     build), configured with a private profile and started by Gextto; an
 //     operator-configured external qBittorrent is used as is instead;
-//  2. the embedded libtorrent engine, only when this build includes it;
-//  3. recovery: no alternative is available, the transfers stay stopped, the UI
+//  2. recovery: no alternative is available, the transfers stay stopped, the UI
 //     stays up and the operator is notified.
 //
 // Every switch is logged, notified and persisted, so it survives the service
@@ -57,8 +55,8 @@ const (
 
 // engineFallbackPlan is the pure decision of the chain.
 type engineFallbackPlan struct {
-	// Backend is the target engine (BackendGxTorrent, BackendQbittorrent,
-	// BackendEmbedded) or BackendRecovery when nothing is available.
+	// Backend is the target engine (BackendGxTorrent or BackendQbittorrent), or
+	// BackendRecovery when nothing is available.
 	Backend string
 	// Download means the managed qBittorrent runtime must be fetched first.
 	Download bool
@@ -69,8 +67,8 @@ type engineFallbackPlan struct {
 // planEngineFallback chooses the next engine after `current` failed. It never
 // touches the network or the filesystem: the caller supplies whether the
 // managed qBittorrent runtime is already installed and whether the operator
-// brought their own qBittorrent. A build without libtorrent still prefers
-// qBittorrent, which is the reason the chain exists.
+// brought their own qBittorrent. qBittorrent is the only alternative to
+// gx-torrent, which is the reason the chain exists.
 func planEngineFallback(current string, qbittorrentInstalled, externalQbittorrent bool) engineFallbackPlan {
 	switch {
 	case externalQbittorrent && current != BackendQbittorrent:
@@ -81,22 +79,20 @@ func planEngineFallback(current string, qbittorrentInstalled, externalQbittorren
 		// qBittorrent is the one that failed: go back to gx-torrent.
 		return engineFallbackPlan{Backend: BackendGxTorrent}
 	default:
-		// gx-torrent (or the embedded engine) failed: the managed qBittorrent,
-		// downloaded on demand when it is not installed yet.
+		// gx-torrent failed: the managed qBittorrent, downloaded on demand when
+		// it is not installed yet.
 		return engineFallbackPlan{Backend: BackendQbittorrent, Download: !qbittorrentInstalled, Managed: true}
 	}
 }
 
 // engineFallbackSecondary is the engine to use when the primary target cannot be
 // prepared (the qBittorrent download failed or its configuration could not be
-// written): the embedded libtorrent when the build has it, otherwise recovery.
-// It never returns the engine that just failed, to avoid an immediate retry.
-func engineFallbackSecondary(current string, libtorrentCompiled bool) engineFallbackPlan {
+// written): gx-torrent unless it is the engine that just failed, otherwise
+// recovery. It never returns the engine that just failed, to avoid an immediate
+// retry.
+func engineFallbackSecondary(current string) engineFallbackPlan {
 	if current != BackendGxTorrent {
 		return engineFallbackPlan{Backend: BackendGxTorrent}
-	}
-	if libtorrentCompiled {
-		return engineFallbackPlan{Backend: BackendEmbedded}
 	}
 	return engineFallbackPlan{Backend: BackendRecovery}
 }
@@ -241,7 +237,7 @@ func applyEngineFallback(ctx context.Context, cfg *Config, current string, notif
 		cancel()
 		if err != nil {
 			logging.Error("fallback motore: download qBittorrent-nox non riuscito", "error", err.Error())
-			plan = engineFallbackSecondary(current, LibtorrentCompiled())
+			plan = engineFallbackSecondary(current)
 			if plan.Backend == BackendRecovery {
 				engineFallbackNotify(notifier, "engine_recovery", map[string]any{"from": current, "reason": err.Error()})
 				return false
@@ -255,7 +251,7 @@ func applyEngineFallback(ctx context.Context, cfg *Config, current string, notif
 	if plan.Backend == BackendQbittorrent && plan.Managed {
 		if err := persistManagedQbittorrent(cfg); err != nil {
 			logging.Error("fallback motore: configurazione qBittorrent gestito non riuscita", "error", err.Error())
-			plan = engineFallbackSecondary(current, LibtorrentCompiled())
+			plan = engineFallbackSecondary(current)
 			if plan.Backend == BackendRecovery {
 				engineFallbackNotify(notifier, "engine_recovery", map[string]any{"from": current, "reason": err.Error()})
 				return false

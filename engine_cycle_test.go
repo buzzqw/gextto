@@ -14,9 +14,40 @@ import (
 // newCycleState returns the shared fixture used by the cycle tests. It is the
 // same hermetic AppState as the web API tests: temporary databases, no feeds,
 // no indexers, no series/movies/comics and DryRun enabled.
+// fakeAddEngine accepts every add and lists nothing: the cycle tests need an
+// engine whose adds succeed without a real daemon or a dry-run libtorrent
+// session (the embedded engine is gone).
+type fakeAddEngine struct{ nullEngine }
+
+func (fakeAddEngine) Name() string { return "test" }
+
+func (fakeAddEngine) Add(string, *Config) (bool, error) { return true, nil }
+func (fakeAddEngine) AddWithPath(string, *Config, *string) (bool, error) {
+	return true, nil
+}
+func (fakeAddEngine) AddWithOptions(string, *Config, *string, AddOptions) (bool, error) {
+	return true, nil
+}
+func (fakeAddEngine) AddFileWithPath(string, *Config, *string) (bool, error) { return true, nil }
+
+func (fakeAddEngine) AddTorrentFile(string, string) (*string, error) {
+	hash := "fake"
+	return &hash, nil
+}
+func (fakeAddEngine) AddTorrentFileEx(string, string, AddOptions) (*string, error) {
+	hash := "fake"
+	return &hash, nil
+}
+func (fakeAddEngine) AddTorrentFileWithOptions(string, *Config, *string, AddOptions) (*string, error) {
+	hash := "fake"
+	return &hash, nil
+}
+
 func newCycleState(t *testing.T) *AppState {
 	t.Helper()
-	return newTestAppState(t)
+	state := newTestAppState(t)
+	state.setActiveEngine(fakeAddEngine{})
+	return state
 }
 
 // TestCycleFullNoSourcesIsNoOp runs a full cycle with an empty configuration.
@@ -55,7 +86,7 @@ func TestCycleFullNoSourcesIsNoOp(t *testing.T) {
 func TestCycleSkipsDownloadsWhenConfiguredFreeSpaceCannotBeRead(t *testing.T) {
 	state := newCycleState(t)
 	cfg := *state.cfg
-	cfg.LibtorrentDir = "\x00unreadable-download-volume"
+	cfg.DownloadDir = "\x00unreadable-download-volume"
 	cfg.Settings = map[string]string{"min_free_space_gb": "1"}
 
 	stats, err := RunCycle(context.Background(), &cfg, state.engine, state.db, state.archive, state.comics, state.notifier, state.activeEngine())
@@ -407,10 +438,10 @@ func TestDownloadPathFreeSpaceFloorUsesRamdiskBudget(t *testing.T) {
 	ramdisk := t.TempDir()
 	other := t.TempDir()
 	cfg.Settings = map[string]string{
-		"min_free_space_gb":            "250",
-		"libtorrent_ramdisk_dir":       ramdisk,
-		"libtorrent_ramdisk_enabled":   "yes",
-		"libtorrent_ramdisk_margin_gb": "0.5",
+		"min_free_space_gb":         "250",
+		"torrent_ramdisk_dir":       ramdisk,
+		"torrent_ramdisk_enabled":   "yes",
+		"torrent_ramdisk_margin_gb": "0.5",
 	}
 	global := uint64(250) * 1024 * 1024 * 1024
 
@@ -418,7 +449,7 @@ func TestDownloadPathFreeSpaceFloorUsesRamdiskBudget(t *testing.T) {
 		t.Fatalf("ramdisk floor = %v, want margin %d", got, cfg.RamdiskMarginBytes())
 	}
 
-	cfg.Settings["libtorrent_ramdisk_min_free_bytes"] = "1048576"
+	cfg.Settings["torrent_ramdisk_min_free_bytes"] = "1048576"
 	if got := downloadPathFreeSpaceFloor(&cfg, ramdisk, &global); got == nil || *got != 1048576 {
 		t.Fatalf("ramdisk explicit floor = %v, want 1048576", got)
 	}

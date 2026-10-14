@@ -38,10 +38,6 @@ func VersionString() string {
 	if marker, ok := updateInstalledMarker(); ok {
 		value += fmt.Sprintf(" [%s]", marker)
 	}
-	libtorrent := LibtorrentVersion()
-	if libtorrent != "" {
-		value += fmt.Sprintf(" · libtorrent %s", libtorrent)
-	}
 	return value
 }
 

@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -252,63 +251,6 @@ func gh4_versionIsNewer(candidate, current string) bool {
 		}
 	}
 	return false
-}
-
-// gh4_fetchLatestLibtorrentRelease mirrors the web module `fetch_latest_libtorrent_release`.
-func gh4_fetchLatestLibtorrentRelease() (string, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
-	request, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/arvidn/libtorrent/releases/latest", nil)
-	if err != nil {
-		return "", err
-	}
-	request.Header.Set("User-Agent", "gextto-libtorrent-check")
-	request.Header.Set("Accept", "application/vnd.github+json")
-	response, err := client.Do(request)
-	if err != nil {
-		return "", err
-	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", fmt.Errorf("GitHub ha risposto %s", response.Status)
-	}
-	var value map[string]any
-	if err := json.NewDecoder(response.Body).Decode(&value); err != nil {
-		return "", err
-	}
-	tag, _ := value["tag_name"].(string)
-	tag = strings.TrimPrefix(strings.TrimSpace(tag), "v")
-	if tag == "" {
-		return "", fmt.Errorf("risposta GitHub senza tag_name")
-	}
-	return tag, nil
-}
-
-// gh4_libtorrentAptCandidate mirrors the web module `libtorrent_apt_candidate`.
-func gh4_libtorrentAptCandidate() *string {
-	for _, packageName := range []string{
-		"libtorrent-rasterbar-dev",
-		"libtorrent-rasterbar2.0t64",
-		"libtorrent-rasterbar2.0",
-	} {
-		command := exec.Command("apt-cache", "policy", packageName)
-		command.Env = append(os.Environ(), "LC_ALL=C")
-		output, err := command.Output()
-		if err != nil {
-			continue
-		}
-		for _, line := range strings.Split(string(output), "\n") {
-			trimmed := strings.TrimSpace(line)
-			if !strings.HasPrefix(trimmed, "Candidate:") {
-				continue
-			}
-			candidate := strings.TrimSpace(strings.TrimPrefix(trimmed, "Candidate:"))
-			if candidate != "" && candidate != "(none)" {
-				value := candidate
-				return &value
-			}
-		}
-	}
-	return nil
 }
 
 // gh4_torrentDisplayName mirrors the web module `torrent_display_name`.
@@ -698,7 +640,7 @@ func AddTorrentHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	preallocate := cfg.LibtorrentPreallocate()
+	preallocate := cfg.TorrentPreallocate()
 	if input.Preallocate != nil {
 		preallocate = *input.Preallocate
 	}
@@ -962,30 +904,6 @@ func Gaps(w http.ResponseWriter, r *http.Request, s *AppState) {
 		})
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "count": len(result), "items": result})
-}
-
-// LibtorrentCheckUpdate implements `libtorrent_check_update`.
-func LibtorrentCheckUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
-	installed := LibtorrentVersion()
-	latest, err := gh4_fetchLatestLibtorrentRelease()
-	if err != nil {
-		jsonStatus(w, http.StatusBadGateway, map[string]any{
-			"ok":        false,
-			"installed": installed,
-			"error":     err.Error(),
-		})
-		return
-	}
-	aptCandidate := gh4_libtorrentAptCandidate()
-	updateAvailable := gh4_versionIsNewer(latest, installed)
-	jsonStatus(w, http.StatusOK, map[string]any{
-		"ok":               true,
-		"installed":        installed,
-		"latest":           latest,
-		"apt_candidate":    aptCandidate,
-		"update_available": updateAvailable,
-		"releases_url":     "https://github.com/arvidn/libtorrent/releases",
-	})
 }
 
 // MarkTorrentFailed implements `mark_torrent_failed`.
@@ -1311,11 +1229,11 @@ func SetSpeedLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if upload < 0 {
 		upload = 0
 	}
-	if err := SaveSetting(s.cfg.DataDir, "libtorrent_dl_limit", strconv.FormatInt(download, 10)); err != nil {
+	if err := SaveSetting(s.cfg.DataDir, "torrent_dl_limit", strconv.FormatInt(download, 10)); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	_ = SaveSetting(s.cfg.DataDir, "libtorrent_ul_limit", strconv.FormatInt(upload, 10))
+	_ = SaveSetting(s.cfg.DataDir, "torrent_ul_limit", strconv.FormatInt(upload, 10))
 	if _, err := s.activeEngine().SetGlobalSpeedLimits(download, upload); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return

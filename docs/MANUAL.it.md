@@ -179,8 +179,7 @@ file di un torrent ancora attivo: usa le azioni della sessione torrent.
 Il demone gira normalmente nel servizio systemd. Eseguito direttamente
 comprende:
 
-- `gexttod --version` — versione installata, build number, marker di release e
-  libtorrent inclusa;
+- `gexttod --version` — versione installata, build number e marker di release;
 - `gexttod --help` — riepilogo d'uso;
 - `gexttod --update` — scarica e installa l'ultimo payload del canale installato
   (continuous o stabile); tiene la versione precedente in `gexttod.prev` e la
@@ -208,7 +207,7 @@ dei prompt e delle azioni è in [`docs/tui.md`](tui.md).
 
 **Installazione e aggiornamento.** A ogni push su `main` viene pubblicato un
 payload Linux `continuous` testato. L'installer ufficiale lo scarica, verifica il
-checksum SHA-256 e lo installa senza compilare Go o C++ sul server:
+checksum SHA-256 e lo installa senza compilare nulla sul server:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
@@ -371,7 +370,7 @@ bloccata, già presente o inferiore al file archiviato.
   indirizzi pubblici sono rifiutate) e serve solo i media elencati. Nella pagina
   delle impostazioni di gx-torrent compare l'indirizzo su cui è attivo.
 - Quando usi **Sposta storage**, il log registra richiesta, destinazione e
-  accettazione del comando; l'esito finale viene scritto quando libtorrent
+  accettazione del comando; l'esito finale viene scritto quando il motore
   completa o rifiuta lo spostamento. Con **Check** il log distingue comando
   avviato e controllo terminato, includendo stato e byte verificati.
 - **Storico download**: elenca i download conclusi (nativi e migrati). Colonne:
@@ -382,7 +381,7 @@ bloccata, già presente o inferiore al file archiviato.
 ### Torrent stalled
 
 Quando un torrent non aumenta i byte completati per il tempo configurato, passa
-allo stato **stalled**: Gextto lo mette in pausa anche in libtorrent, quindi non
+allo stato **stalled**: Gextto lo mette in pausa anche nel motore, quindi non
 occupa più gli slot attivi. Il torrent resta nella sessione; al tentativo
 successivo viene ripreso e riannunciato. I valori sono in *Configurazione →
 Seed e completamento → Torrent bloccati*:
@@ -648,9 +647,9 @@ tab, è nell'[Appendice A](#appendice-a-riferimento-configurazione).
   `/api/v2.0/indexers/all/results/torznab/api`. Il controllo di salute usa
   `t=caps` con la stessa API key, quindi verifica l'API e non soltanto la home di
   Jackett. Nei risultati la sorgente può apparire come `jackett:NomeTracker`.
-- **libtorrent** — connessioni/prestazioni, protocolli/tracker, sicurezza,
-  RAM disk e porte, limiti di velocità e scheduler; applica/ottimizza/verifica
-  aggiornamenti. Se sposti lo storage di un torrent in una cartella che
+- **Velocità, rete e prestazioni** — connessioni/prestazioni,
+  protocolli/tracker, sicurezza, RAM disk e porte, limiti di velocità e
+  scheduler; applica e ottimizza. Se sposti lo storage di un torrent in una cartella che
   **contiene già i dati**, non viene rifiutato: Gextto associa il torrent ai file
   esistenti e li ricontrolla (seed) invece di riscaricarli. L'opzione
   **Prealloca lo spazio su disco** (spenta di default)
@@ -727,7 +726,7 @@ tab, è nell'[Appendice A](#appendice-a-riferimento-configurazione).
   selettore in alto. La UI traduce le stringhe a runtime e, se manca una
   traduzione, mostra la sorgente italiana.
 
-### Motore torrent (gx-torrent, qBittorrent-nox, libtorrent opzionale)
+### Motore torrent (gx-torrent, qBittorrent-nox)
 
 Gextto possiede sempre database, coda, punteggi, post-processing, rinomina e
 archivio; è sostituibile solo il piano di trasferimento, scelto in
@@ -737,10 +736,10 @@ dati.
 
 Se il motore attivo non riesce a restare in piedi Gextto passa da solo a un
 altro motore: prima **qBittorrent-nox** (scaricato al momento e avviato con
-profilo privato, oppure quello esterno già configurato), poi il **libtorrent**
-integrato se la build lo include, infine uno stato di **recovery** con i
-trasferimenti fermi e la UI raggiungibile. Un demone `gx-torrent` aggiornato che
-non parte viene prima ripristinato alla versione precedente.
+profilo privato, oppure quello esterno già configurato), infine uno stato di
+**recovery** con i trasferimenti fermi e la UI raggiungibile. Un demone
+`gx-torrent` aggiornato che non parte viene prima ripristinato alla versione
+precedente.
 
 Il nucleo del motore predefinito, **`gx-core`** (`internal/gxcore`), e il DHT
 (`internal/dht`) sono codice originale scritto in questo repository, quindi
@@ -748,8 +747,7 @@ coperti dalla stessa licenza EUPL-1.2 di Gextto (vedi la pagina *Licenza*
 dell'interfaccia web).
 
 - **gx-torrent** (predefinito) — demone BitTorrent in Go puro, avviato e
-  sorvegliato da Gextto in un processo separato; non richiede
-  `libtorrent-rasterbar`. Imposta **URL Web API**, **indirizzo di ascolto**
+  sorvegliato da Gextto in un processo separato; non ha dipendenze C/C++. Imposta **URL Web API**, **indirizzo di ascolto**
   (predefinito `127.0.0.1:8890`: pagina web e API solo su questo server; usa
   `0.0.0.0:8890` **e un token** per aprirle in LAN), **token** e **proxy**. All'indirizzo configurato apre anche una **pagina
   web operativa** (aggiungi magnet, pausa/riprendi, verifica, riannuncia, coda,
@@ -765,7 +763,7 @@ dell'interfaccia web).
   IP** scaricato da un URL si aggiorna una volta al giorno; all'avvio si
   riscarica solo se la copia in cache ha più di 24 ore. Se il demone non
   riesce a restare attivo (6 avvii anomali in 10 minuti) Gextto torna da solo a
-  libtorrent, se è compilato. Supporta il **download sequenziale** e la **prima/ultima parte**
+  qBittorrent-nox. Supporta il **download sequenziale** e la **prima/ultima parte**
   dei file (si impostano all'aggiunta, o per tutti i nuovi torrent in
   *Configurazione → Code e prestazioni → Modalità di download*; valgono per i torrent
   nuovi). Un magnet con il parametro `so=` (BEP 53) scarica da subito solo i file
@@ -773,11 +771,6 @@ dell'interfaccia web).
   Supporta i torrent **solo-v2** (BEP 52),
   sia da `.torrent` sia da
   magnet; non supporta WebTorrent/WebRTC.
-- **libtorrent (non più spedito)** — la sessione libtorrent nello stesso processo
-  di Gextto, presente **solo se hai compilato Gextto con libtorrent**
-  (`make build-libtorrent`); i pacchetti di release non la includono e il motore
-  è in fase di rimozione. Valgono
-  tutte le voci *libtorrent*.
 - **qBittorrent-nox** — Gextto pilota un qBittorrent-nox esistente tramite la sua
   Web API. Imposta URL, utente/password, categoria, tag e intervallo di polling, e
   le **mappature percorsi** `locale=remoto` quando i due processi vedono percorsi
@@ -787,10 +780,10 @@ dell'interfaccia web).
   scarica l'ultima release statica di qBittorrent-nox, la installa nella cartella
   dell'applicazione (accanto a `gexttod`), la avvia/ferma col servizio e la
   aggiorna con backup e rollback; un watchdog la riavvia dopo un'uscita inattesa
-  e, dopo ripetuti crash, torna al motore integrato. Se qBittorrent è spento
+  e, dopo ripetuti crash, esegue la catena di fallback tra i motori. Se qBittorrent è spento
   all'avvio, Gextto continua a riprovare invece di fallire.
 Se la configurazione salvata seleziona un backend non più supportato, Gextto
-torna al motore integrato e registra un avviso nel log.
+torna a gx-torrent e registra un avviso nel log.
 
 Il riquadro di configurazione mostra il motore attivo, il suo stato e un test di
 raggiungibilità/percorsi, così puoi validare un backend prima di passare. Il
@@ -804,24 +797,21 @@ identiche.
 ### Prestazioni: RAM e CPU
 
 La logica del daemon è trascurabile; il costo del trasferimento è quasi tutto
-del motore finché ha torrent in sessione. Con **libtorrent integrato** vive nello
-stesso processo di Gextto; con un motore esterno (**gx-torrent** o
-**qBittorrent-nox**) vive nel suo processo. Per ridurre RAM e CPU:
+del motore finché ha torrent in sessione, e con un motore esterno
+(**gx-torrent** o **qBittorrent-nox**) vive nel suo processo. Per ridurre RAM e
+CPU:
 
-- **RAM** — con libtorrent i valori che contano sono la **cache disco**
-  (`cache_size`, blocchi da 16 KiB) e `max_queued_disk_bytes`; il pulsante
-  **Ottimizza** (o *Ottimizzazione continua*) li dimensiona in base alla RAM.
-  Con **gx-torrent** la cache è **adattiva**: il demone la ricalcola da memoria
-  disponibile, download/seed attivi e tipo di storage (più grande su HDD/NFS,
-  piccola su SSD). Un valore di `libtorrent_cache_size` maggiore di zero è un
+- **RAM** — con **gx-torrent** la cache è **adattiva**: il demone la ricalcola da
+  memoria disponibile, download/seed attivi e tipo di storage (più grande su
+  HDD/NFS, piccola su SSD), e Gextto la riafferma ogni 15 minuti, quindi non c'è
+  nulla da tarare. Un valore di `torrent_cache_size` maggiore di zero è un
   override manuale. Il daemon libera
   la memoria al sistema (`malloc_trim`) dopo i completamenti, dopo ogni ciclo e
   ogni 15 minuti, così l'RSS non resta al picco del download.
 - **CPU** — attiva la **coda dinamica** e *Non contare i torrent fermi negli
   slot attivi*: i torrent a 0 B/s non occupano slot e quelli **stalled** vengono
-  messi in pausa e ritentati invece di girare a vuoto. Se la CPU è occupata,
-  riduci `connections_limit` e `aio_threads`. Meno torrent attivi — e nessun
-  torrent "morto" senza seeder — significano meno traffico DHT/tracker.
+  messi in pausa e ritentati invece di girare a vuoto. Meno torrent attivi — e
+  nessun torrent "morto" senza seeder — significano meno traffico DHT/tracker.
 - **Diagnosi** — `GET /api/torrents/{hash}/why` spiega perché un torrent non
   scarica (`dead_swarm`, `no_peers`, `no_connected_seed`, `stalled`, …); *Salute*
   mostra RAM/CPU reali del processo e della sessione.
@@ -1051,7 +1041,7 @@ possibile.
 ### Backup: cosa protegge e cosa no
 
 Un backup di Gextto protegge database e configurazione. Non contiene i video,
-gli archivi multimediali né lo stato completo della sessione libtorrent. Prima di
+gli archivi multimediali né lo stato completo della sessione torrent. Prima di
 un ripristino:
 
 1. ferma o metti in pausa i cicli automatici;
@@ -1161,8 +1151,8 @@ Oltre agli eventi di download, Gextto notifica i problemi del servizio:
 - **gx-torrent** — uscita inattesa del demone gestito, riavvio dopo l'uscita,
   ripristino del binario precedente dopo un aggiornamento che non parte,
   demone attivo ma che non risponde più, e passaggio automatico a un altro
-  motore (prima qBittorrent-nox, scaricato al momento, poi libtorrent se
-  compilato, infine recovery con i trasferimenti fermi);
+  motore (prima qBittorrent-nox, scaricato al momento, infine recovery con i
+  trasferimenti fermi);
 - **problemi di salute** — quando il controllo di salute rileva un problema e
   quando torna operativo.
 
@@ -1457,7 +1447,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 
 | Impostazione | Cosa fa |
 |---|---|
-| Motore torrent | Motore torrent attivo (gx-torrent, libtorrent integrato o qBittorrent-nox). |
+| Motore torrent | Motore torrent attivo (gx-torrent o qBittorrent-nox). |
 
 **gx-torrent**
 
@@ -1487,12 +1477,6 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | qBittorrent-nox — timeout richieste | Timeout in secondi delle richieste HTTP verso qBittorrent-nox. *(Unità: secondi)* |
 | qBittorrent-nox — intervallo polling | Intervallo in millisecondi tra due letture dello stato dei torrent. *(Unità: ms)* |
 | qBittorrent-nox — mappatura percorsi | Mappatura dei percorsi tra Gextto e qBittorrent-nox, una per riga (locale=remoto). |
-
-**libtorrent integrato**
-
-| Impostazione | Cosa fa |
-|---|---|
-| libtorrent integrato — client abilitato | Attiva o disattiva del tutto il client libtorrent integrato. |
 
 **Azioni**
 
@@ -1528,9 +1512,9 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 
 | Impostazione | Cosa fa |
 |---|---|
-| Porta minima | Porta minima della sessione libtorrent (richiede il riavvio del servizio). |
-| Porta massima | Porta massima della sessione libtorrent (richiede il riavvio del servizio). |
-| Interfacce listen | Indica dove libtorrent accetta connessioni: 0.0.0.0:6881-6891 per tutte le interfacce, 127.0.0.1:6881 solo in locale, oppure wg0:6881/tun0:6881 per una VPN. Il valore proposto va bene nella maggior parte dei casi. |
+| Porta minima | Porta minima della sessione torrent (richiede il riavvio del servizio). |
+| Porta massima | Porta massima della sessione torrent (richiede il riavvio del servizio). |
+| Interfacce listen | Indica dove il motore accetta connessioni: 0.0.0.0:6881-6891 per tutte le interfacce, 127.0.0.1:6881 solo in locale, oppure wg0:6881/tun0:6881 per una VPN. Il valore proposto va bene nella maggior parte dei casi. |
 | Interfaccia uscente | Killswitch VPN: interfaccia usata per tutto il traffico BitTorrent in uscita. |
 | Test porte | Verifica che la porta peer sia in ascolto e che il router la inoltri (il messaggio dice "aperta", "in ascolto ma non inoltrata" o "chiusa"). Disponibile con il motore **gx-torrent**. |
 
@@ -1546,16 +1530,12 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | uTP | Abilita il protocollo uTP (UDP) oltre a TCP. |
 | Holepunching (BEP 55) | Apre una connessione diretta ai peer dietro NAT tramite un peer che fa da relè (BEP 55). Richiede uTP. |
 | Nodi bootstrap DHT | Nodi DHT iniziali (host:porta separati da virgola). |
-| Annuncia a tutti i tracker | Annuncia a tutti i tracker, non solo al primo di ogni tier. |
-| Annuncia a tutti i tier | Annuncia a tutti i tier, non solo al primo. |
-| Intervallo announce | Intervallo minimo (secondi) tra due announce allo stesso tracker. *(Unità: secondi)* |
 
 **Cifratura e filtro IP**
 
 | Impostazione | Cosa fa |
 |---|---|
 | Cifratura | Politica di cifratura: 0 disabilitata, 1 abilitata, 2 forzata. |
-| Preferisci RC4 | Preferisce la cifratura RC4 sulle connessioni. |
 | Applica IP filter | Applica il filtro IP anche ai tracker. |
 | IP filter (file/URL) | File locale o URL della lista IP da bloccare. |
 
@@ -1563,7 +1543,6 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 
 | Impostazione | Cosa fa |
 |---|---|
-| Applica ora | Riapplica subito le impostazioni alla sessione attiva (altrimenti valgono dal ciclo successivo). |
 | Filtro IP → Carica / aggiorna ora | Scarica la lista dall'URL configurato (o usa il file locale) e la applica subito al motore attivo, gx-torrent compreso. |
 
 #### Code e prestazioni
@@ -1574,7 +1553,6 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 
 | Impostazione | Cosa fa |
 |---|---|
-| Ottimizzazione continua (periodica) | Applica periodicamente l'ottimizzazione di cache, buffer e coda in base alle risorse. |
 | Auto-gestione dinamica coda e risorse | Regola automaticamente quanti torrent sono attivi in base al carico. |
 | Slot download dinamici minimi | Numero minimo di download dinamici. La coda cambia al massimo di uno per volta. Compare solo con «Auto-gestione dinamica coda e risorse» attivo. |
 | Slot download dinamici massimi | Numero massimo di download dinamici. Servono campioni consecutivi coerenti prima di aumentare la coda. Compare solo con «Auto-gestione dinamica coda e risorse» attivo. |
@@ -1595,13 +1573,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 
 | Impostazione | Cosa fa |
 |---|---|
-| Limite connessioni totali | Numero massimo di connessioni peer simultanee a livello di sessione. |
-| Slot upload | Numero di peer non bloccati in upload (-1 = automatico). *(-1 = auto)* |
-| Half-open limit | Numero massimo di connessioni in fase di apertura (-1 = automatico). *(-1 = auto)* |
 | Connessioni max per torrent | Limite di connessioni per singolo torrent (-1 = illimitato). *(-1 = illimitato)* |
-| Upload max per torrent | Limite di upload per singolo torrent (-1 = illimitato). *(-1 = illimitato)* |
-| Più connessioni per IP | Permette più connessioni dallo stesso indirizzo IP. |
-| Connect boost | Numero di tentativi di connessione extra all'avvio del torrent. |
 
 **RAM disk**
 
@@ -1633,18 +1605,14 @@ spazio del `tmpfs`, come prima.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Thread AIO disco | Thread dedicati alle operazioni su disco (-1 = automatico). *(-1 = auto)* |
 | Cache disco | Dimensione della cache disco in blocchi (-1 = automatico). *(Unità: blocchi; -1 = auto)* |
 | Scadenza cache | Secondi di inattività dopo cui un blocco esce dalla cache. *(Unità: secondi)* |
-| Coda alert | Dimensione della coda degli alert di libtorrent. |
-| Impostazioni libtorrent avanzate | Impostazioni libtorrent avanzate, una per riga nel formato chiave=valore. |
 
 **Azioni**
 
 | Impostazione | Cosa fa |
 |---|---|
-| Ottimizza | Calcola cache e buffer in base alla RAM; con l'ottimizzazione continua i campi di coda e cache diventano *Auto*. |
-| Applica ora | Riapplica subito le impostazioni alla sessione attiva. |
+| Ottimizza | Calcola cache e buffer in base alla RAM. |
 
 #### Seed e completamento
 
