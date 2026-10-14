@@ -148,8 +148,8 @@ e aggiornamenti dell'orchestratore (Gextto lo riaggancia se binario e opzioni
 coincidono). Ha una propria interfaccia web ed è dove arriva per primo il
 lavoro di protocollo.
 
-Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un'implementazione
-BitTorrent sviluppata in questo repository. `gx-core` e il DHT
+Il suo nucleo, **`gx-core`** (`internal/gxcore`), è il motore BitTorrent nativo
+di Gextto, sviluppato in questo repository. `gx-core` e il DHT
 (`internal/dht`) sono codice originale scritto da zero in questo albero —
 nessun codice derivato da terzi, nessun rate limiter o helper UUID di terze
 parti (provenienza in [`THIRD-PARTY-NOTICES`](THIRD-PARTY-NOTICES)) — con la

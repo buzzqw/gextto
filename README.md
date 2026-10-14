@@ -142,7 +142,7 @@ dependencies, running as a separate supervised process that survives
 orchestrator restarts and updates (Gextto re-attaches when binary and options
 match). It has its own web interface and receives protocol work first.
 
-Its core, **`gx-core`** (`internal/gxcore`), is a BitTorrent implementation
+Its core, **`gx-core`** (`internal/gxcore`), is Gextto's native BitTorrent engine,
 developed in this repository. `gx-core` and the DHT (`internal/dht`) are
 original code written from scratch in this tree — no third-party-derived code,
 no third-party rate-limiter or UUID helpers (provenance in
