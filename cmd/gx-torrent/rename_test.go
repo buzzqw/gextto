@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // TestDaemonRenameFile renames a single-file torrent's file: the on-disk move
@@ -76,6 +77,16 @@ func TestDaemonRenameTorrent(t *testing.T) {
 	if tor.Name() != "New.Name" {
 		t.Fatalf("name = %q, want New.Name", tor.Name())
 	}
+	// The list (what the page and the APIs show) follows the rename too.
+	listed := ""
+	for _, info := range d.list() {
+		if info.Hash == hash {
+			listed = info.Name
+		}
+	}
+	if listed != "New.Name" {
+		t.Fatalf("listed name = %q, want New.Name", listed)
+	}
 	files, err := tor.Files()
 	if err != nil {
 		t.Fatal(err)
@@ -140,5 +151,88 @@ func TestQbitRenameEndpoints(t *testing.T) {
 	}
 	if code := post("/api/v2/torrents/rename", url.Values{"hash": {hash}, "name": {"NewName"}}); code != http.StatusOK {
 		t.Fatalf("rename: %d", code)
+	}
+}
+
+// TestExecuteRenameMovesNeverOverwrites: a target that already exists outside
+// the torrent refuses the whole rename and nothing moves.
+func TestExecuteRenameMovesNeverOverwrites(t *testing.T) {
+	dir := t.TempDir()
+	a, b := filepath.Join(dir, "a"), filepath.Join(dir, "b")
+	c, d := filepath.Join(dir, "c"), filepath.Join(dir, "d")
+	for _, p := range []string{a, c, d} {
+		if err := os.WriteFile(p, []byte(p), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// a→b is fine, c→d would overwrite an unrelated file.
+	if err := executeRenameMoves([]absRename{{old: a, new: b}, {old: c, new: d}}); err == nil {
+		t.Fatal("a rename onto an existing file must be refused")
+	}
+	if _, err := os.Stat(a); err != nil {
+		t.Fatalf("the first move must not have happened: %v", err)
+	}
+	if got, _ := os.ReadFile(d); string(got) != d {
+		t.Fatalf("the existing target was touched: %q", got)
+	}
+}
+
+// TestPayloadGoneFollowsRenamedRoot: after a rename the payload check looks
+// for the renamed content root, not the original name.
+func TestPayloadGoneFollowsRenamedRoot(t *testing.T) {
+	d := newTestDaemon(t)
+	src := t.TempDir()
+	data := makeTorrent(t, src, "movie.bin", 30_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitListed(t, d, hash)
+	if err := d.renameFile(hash, "movie.bin", "other.bin"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the renamed file on disk", func() bool {
+		_, err := os.Stat(filepath.Join(src, "other.bin"))
+		return err == nil
+	})
+	waitFor(t, "the reloaded torrent", func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		tor, _ := d.findLocked(hash)
+		return tor != nil && contentRoot(tor) == "other.bin"
+	})
+	d.mu.Lock()
+	tor, meta := d.findLocked(hash)
+	d.mu.Unlock()
+	done := *meta
+	done.CompletedAt = time.Now()
+	done.SavePath = src
+	if err := errPayloadGone(tor, &done); err != nil {
+		t.Fatalf("payload reported gone after a rename: %v", err)
+	}
+}
+
+// TestDaemonRenameRefusesExistingTarget: a clash with a file already on disk is
+// reported to the caller at once, and nothing is queued.
+func TestDaemonRenameRefusesExistingTarget(t *testing.T) {
+	d := newTestDaemon(t)
+	src := t.TempDir()
+	data := makeTorrent(t, src, "movie.bin", 10_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitListed(t, d, hash)
+	if err := os.WriteFile(filepath.Join(src, "taken.bin"), []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.renameFile(hash, "movie.bin", "taken.bin"); err == nil {
+		t.Fatal("a rename onto an unrelated existing file must be refused")
+	}
+	d.mu.Lock()
+	pending := d.pendingRename
+	d.mu.Unlock()
+	if pending != nil {
+		t.Fatalf("a refused rename was queued: %+v", pending)
 	}
 }

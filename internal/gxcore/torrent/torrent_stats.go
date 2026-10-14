@@ -170,6 +170,9 @@ func (t *torrent) stats() Stats {
 		s.Bytes.Selected, s.Bytes.SelectedCompleted = t.selectedBytes()
 
 		s.Name = t.info().Name
+		if n := t.renamedName(); n != "" {
+			s.Name = n
+		}
 		s.Private = t.info().Private
 		s.FileCount = len(t.info().Files)
 		s.PieceLength = t.info().PieceLength

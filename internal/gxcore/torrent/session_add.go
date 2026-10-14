@@ -48,6 +48,13 @@ type AddTorrentOptions struct {
 	SelectOnly []int
 }
 
+// ValidateTorrentFile reports whether data is a .torrent file the session would
+// accept, without adding it (v1, hybrid or v2-only metainfo).
+func ValidateTorrentFile(data []byte) error {
+	_, err := metainfo.New(bytes.NewReader(data))
+	return err
+}
+
 // AddTorrent adds a torrent from .torrent metainfo, starting it unless told
 // otherwise. A nil opt means defaults.
 func (s *Session) AddTorrent(r io.Reader, opt *AddTorrentOptions) (*Torrent, error) {

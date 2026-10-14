@@ -136,6 +136,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	t.rawWebseedSources = spec.URLList
 	t.pieceLayers = layers
 	t.filePaths = append([]string(nil), spec.FilePaths...)
+	t.displayName = spec.DisplayName
 	go s.checkTorrent(t)
 	delete(s.availablePorts, spec.Port)
 
@@ -190,7 +191,8 @@ func (s *Session) CompactDatabase(output string) error {
 		spec := &boltdbresumer.Spec{
 			InfoHash:          t.torrent.InfoHash(),
 			Port:              t.torrent.port,
-			Name:              t.torrent.Name(),
+			Name:              t.torrent.name,
+			DisplayName:       t.torrent.renamedName(),
 			Trackers:          t.torrent.rawTrackers,
 			URLList:           t.torrent.rawWebseedSources,
 			FixedPeers:        t.torrent.fixedPeers,

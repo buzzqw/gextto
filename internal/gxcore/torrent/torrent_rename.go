@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resumer/boltdbresumer"
 	"go.etcd.io/bbolt"
 )
@@ -101,7 +102,34 @@ func (t *torrent) planRename(oldPath, newPath string) (RenamePlan, error) {
 	if !matched {
 		return RenamePlan{}, fmt.Errorf("no file or folder at %q", oldPath)
 	}
+	if err := checkPathCollisions(info.Files, paths); err != nil {
+		return RenamePlan{}, err
+	}
 	return RenamePlan{Moves: moves, Paths: paths}, nil
+}
+
+// checkPathCollisions refuses a path list where two files would share a path,
+// or where a file would sit where another needs a folder (a/b next to a/b/c):
+// on disk the second move would overwrite or fail half-way.
+func checkPathCollisions(files []metainfo.File, paths []string) error {
+	seen := make(map[string]struct{}, len(paths))
+	for i, p := range paths {
+		if files[i].Padding {
+			continue
+		}
+		if _, dup := seen[p]; dup {
+			return fmt.Errorf("%q is already used by another file of the torrent", p)
+		}
+		seen[p] = struct{}{}
+	}
+	for p := range seen {
+		for dir := path.Dir(p); dir != "."; dir = path.Dir(dir) {
+			if _, clash := seen[dir]; clash {
+				return fmt.Errorf("%q is a file of the torrent and cannot become a folder", dir)
+			}
+		}
+	}
+	return nil
 }
 
 // planRenameTorrent renames the display name and the content root.
@@ -146,7 +174,7 @@ func PersistRename(dbPath, torrentID string, paths []string, name string) error 
 		return err
 	}
 	if name != "" {
-		return res.WriteName(torrentID, name)
+		return res.WriteDisplayName(torrentID, name)
 	}
 	return nil
 }

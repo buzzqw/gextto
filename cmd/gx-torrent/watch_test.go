@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 )
 
 func TestWatchFoldersParsing(t *testing.T) {
@@ -40,7 +41,26 @@ func TestWatchFoldersScan(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// A file not yet settled (it may still be being copied) waits.
 	d.scanWatchFolders([][2]string{{watchDir, dest}})
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("a freshly written .torrent must wait for the next scan: %v", err)
+	}
+	// A corrupt .torrent is set aside, not retried at every scan.
+	bad := filepath.Join(watchDir, "broken.torrent")
+	if err := os.WriteFile(bad, []byte("not bencode"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-time.Minute)
+	for _, p := range []string{file, bad} {
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d.scanWatchFolders([][2]string{{watchDir, dest}})
+	if _, err := os.Stat(bad + watchInvalidSuffix); err != nil {
+		t.Fatalf("the corrupt .torrent was not renamed aside: %v", err)
+	}
 
 	if _, err := os.Stat(file); !os.IsNotExist(err) {
 		t.Fatalf("the .torrent was not removed after adding (err=%v)", err)

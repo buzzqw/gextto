@@ -57,9 +57,11 @@ type torrent struct {
 	rawTrackers [][]string
 	fixedPeers  []string
 	name        string
-	// nameMu guards the display name: it can change at runtime (a rename) and
-	// is read from several goroutines.
-	nameMu sync.RWMutex
+	// displayName is the rename override (qBittorrent torrents/rename), empty
+	// when the torrent was never renamed. nameMu guards it: it is read from
+	// several goroutines.
+	displayName string
+	nameMu      sync.RWMutex
 
 	// hasV2Hint remembers a btmh-identified magnet while its info dict is
 	// unknown; Info.HasV2 rules once known.
@@ -479,19 +481,20 @@ func (t *torrent) getPeersForUnchoker() []unchoker.Peer {
 	return peers
 }
 
-// Name is the display name.
+// Name is the display name: the rename override when there is one, otherwise
+// the name the torrent was added with.
 func (t *torrent) Name() string {
-	t.nameMu.RLock()
-	defer t.nameMu.RUnlock()
+	if n := t.renamedName(); n != "" {
+		return n
+	}
 	return t.name
 }
 
-// setName replaces the display name (a qBittorrent rename). It is safe to call
-// off the run loop: the mutex guards every reader.
-func (t *torrent) setName(name string) {
-	t.nameMu.Lock()
-	t.name = name
-	t.nameMu.Unlock()
+// renamedName is the rename override, "" when the torrent was never renamed.
+func (t *torrent) renamedName() string {
+	t.nameMu.RLock()
+	defer t.nameMu.RUnlock()
+	return t.displayName
 }
 
 // info reads the published metadata (nil for magnets in flight). Every

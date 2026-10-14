@@ -39,7 +39,11 @@ type Spec struct {
 	// Nil when no rename happened. The info dict itself is never changed (its
 	// hash must stay the original).
 	FilePaths []string
-	Version   int
+	// DisplayName overrides the shown name after a torrent rename (qBittorrent
+	// torrents/rename). Empty when the torrent was never renamed: the name then
+	// follows the metadata.
+	DisplayName string
+	Version     int
 }
 
 // jsonSpec is the JSON projection of Spec. Raw bytes ride base64-encoded,
@@ -70,6 +74,11 @@ type jsonSpec struct {
 	PieceLayers string
 	Bitfield    string
 	SeededFor   int64
+
+	// Rename overrides, appended last and omitted when unset so the payload of
+	// a never-renamed torrent is unchanged.
+	FilePaths   []string `json:",omitempty"`
+	DisplayName string   `json:",omitempty"`
 }
 
 // MarshalJSON implements json.Marshaler.
@@ -98,6 +107,8 @@ func (s Spec) MarshalJSON() ([]byte, error) {
 		PieceLayers: base64.StdEncoding.EncodeToString(s.PieceLayers),
 		Bitfield:    base64.StdEncoding.EncodeToString(s.Bitfield),
 		SeededFor:   int64(s.SeededFor),
+		FilePaths:   s.FilePaths,
+		DisplayName: s.DisplayName,
 	})
 }
 
@@ -139,5 +150,7 @@ func (s *Spec) UnmarshalJSON(b []byte) error {
 	s.FirstLast = j.FirstLast
 	s.SuperSeeding = j.SuperSeeding
 	s.Version = j.Version
+	s.FilePaths = j.FilePaths
+	s.DisplayName = j.DisplayName
 	return nil
 }

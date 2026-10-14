@@ -4,13 +4,18 @@ package main
 // the daemon scans the configured folders, adds the .torrent files it finds and
 // removes them on success. It is off when no folder is configured, and the scan
 // runs from the queue tick in a short-lived goroutine, so it costs nothing when
-// unused. In managed mode Gextto owns the additions, so it never runs.
+// unused. In managed mode Gextto owns the additions, so it never runs. A file
+// that is not a valid .torrent is renamed to "<name>.invalid", so it is not
+// retried at every scan; a file modified in the last few seconds waits for the
+// next scan, because it may still be being written.
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
 const (
@@ -19,6 +24,11 @@ const (
 	// filesystem events; a 30 s poll is simpler and good enough for a drop
 	// folder.
 	watchInterval = 30 * time.Second
+	// watchInvalidSuffix marks a dropped file that is not a valid .torrent.
+	watchInvalidSuffix = ".invalid"
+	// watchSettle is how old a dropped file must be before it is read: a
+	// younger one may still be being copied.
+	watchSettle = 5 * time.Second
 )
 
 // watchFolders returns the configured (folder, destination) pairs. Each line is
@@ -88,8 +98,19 @@ func (d *Daemon) scanWatchFolders(folders [][2]string) {
 				continue
 			}
 			full := filepath.Join(folder, entry.Name())
+			if fi, err := entry.Info(); err != nil || time.Since(fi.ModTime()) < watchSettle {
+				continue
+			}
 			data, err := os.ReadFile(full)
 			if err != nil || len(data) == 0 {
+				continue
+			}
+			if err := torrent.ValidateTorrentFile(data); err != nil {
+				if rerr := os.Rename(full, full+watchInvalidSuffix); rerr != nil {
+					logf("watch folder %s: %s is not a valid .torrent (%v) and cannot be set aside: %v", folder, entry.Name(), err, rerr)
+				} else {
+					logf("watch folder %s: %s is not a valid .torrent (%v): renamed to %s", folder, entry.Name(), err, entry.Name()+watchInvalidSuffix)
+				}
 				continue
 			}
 			if _, _, err := d.add(addRequest{TorrentData: data, Destination: dest}); err != nil {

@@ -1679,10 +1679,11 @@ func (d *Daemon) pause(key string) error {
 // longer at its save path (archived and renamed, or deleted): the engine would
 // re-create every file empty there, in the middle of the library.
 func errPayloadGone(t *torrent.Torrent, meta *torrentMeta) error {
-	if meta.CompletedAt.IsZero() || t.Name() == "" {
+	root := contentRoot(t)
+	if meta.CompletedAt.IsZero() || root == "" {
 		return nil
 	}
-	path := filepath.Join(meta.SavePath, t.Name())
+	path := filepath.Join(meta.SavePath, root)
 	if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("the downloaded data is no longer in %s", path)
 	}

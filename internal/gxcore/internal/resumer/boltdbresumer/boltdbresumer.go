@@ -44,6 +44,7 @@ var Keys = struct {
 	FirstLast         []byte
 	SuperSeeding      []byte
 	FilePaths         []byte
+	DisplayName       []byte
 	Version           []byte
 }{
 	InfoHash:          []byte("info_hash"),
@@ -69,6 +70,7 @@ var Keys = struct {
 	FirstLast:         []byte("first_last"),
 	SuperSeeding:      []byte("super_seeding"),
 	FilePaths:         []byte("file_paths"),
+	DisplayName:       []byte("display_name"),
 	Version:           []byte("version"),
 }
 
@@ -143,6 +145,7 @@ func (r *Resumer) Write(torrentID string, spec *Spec) error {
 		_ = b.Put(Keys.FirstLast, []byte(strconv.FormatBool(spec.FirstLast)))
 		_ = b.Put(Keys.SuperSeeding, []byte(strconv.FormatBool(spec.SuperSeeding)))
 		_ = b.Put(Keys.FilePaths, filePaths)
+		_ = b.Put(Keys.DisplayName, []byte(spec.DisplayName))
 		_ = b.Put(Keys.Version, []byte(strconv.Itoa(version)))
 		return nil
 	})
@@ -199,10 +202,11 @@ func (r *Resumer) WriteFilePaths(torrentID string, paths []string) error {
 	})
 }
 
-// WriteName replaces only the display name (a qBittorrent rename).
-func (r *Resumer) WriteName(torrentID, name string) error {
+// WriteDisplayName replaces only the display-name override (a qBittorrent
+// torrent rename). The original name stays under Keys.Name.
+func (r *Resumer) WriteDisplayName(torrentID, name string) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
-		return b.Put(Keys.Name, []byte(name))
+		return b.Put(Keys.DisplayName, []byte(name))
 	})
 }
 
@@ -266,6 +270,9 @@ func (r *Resumer) Read(torrentID string) (spec *Spec, err error) {
 		}
 		if v := b.Get(Keys.Name); v != nil {
 			spec.Name = string(v)
+		}
+		if v := b.Get(Keys.DisplayName); v != nil {
+			spec.DisplayName = string(v)
 		}
 		if err := readTrackers(b, spec); err != nil {
 			return err

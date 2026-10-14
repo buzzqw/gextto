@@ -557,7 +557,13 @@ priorities (`increasePrio`, `decreasePrio`, `topPrio`, `bottomPrio`), the
 renames (`rename`, `renameFile`, `renameFolder`) and `app/shutdown` (a clean
 stop, standalone only). A rename closes the session (so the files are closed),
 moves the content on disk with a rollback on failure, persists the new paths in
-the resume and reopens: the `.torrent` identity is never changed. The **search API**
+the resume and reopens: the `.torrent` identity is never changed. A rename that
+would make two files share a path, turn a file into a folder or land on a file
+already on disk (not part of the torrent) is refused before anything moves. The
+new display name is kept as an override (`display_name` in the resume) on top
+of the metadata name, so the list, the qBittorrent API and the completion hook
+show it after every restart; the "data still there" check follows the renamed
+content root. The **search API**
 (`search/plugins`, `start`, `status`, `results`, `stop`, `delete`) is mapped
 onto the configured Torznab indexers, which are exposed as the "plugins";
 `installPlugin`/`uninstallPlugin`/`enablePlugin`/`updatePlugins` are accepted
@@ -871,7 +877,10 @@ cache, preallocation, sequential), **Optimisation** (below), **bandwidth**
 queue limits apply immediately; folders, network and protocols apply **from
 the next startup**. The **watch folders** are scanned every 30 seconds: each
 `.torrent` found is added (to the folder's destination, or the default download
-folder) and removed after a successful add; a line is `folder` or
+folder) and removed after a successful add; a file that is not a valid
+`.torrent` is renamed to `<name>.invalid` (so it is not retried at every scan),
+and a file modified in the last 5 seconds waits for the next scan because it may
+still be being copied; a line is `folder` or
 `folder=destination`, and the qBittorrent `scan_dirs` preference maps onto the
 same list. The **DHT read-only (BEP 43)** stays off by default: a
 read-only node does not respond to queries and asks not to be entered into
