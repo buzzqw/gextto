@@ -1,8 +1,8 @@
 package gextto
 
 // uiweb_engine_stats.go builds the "Motore torrent" panel of the Salute page:
-// the live state of the active transfer engine (gx-torrent, libtorrent or
-// qBittorrent) in a few readable rows.
+// the live state of the active transfer engine (gx-torrent or qBittorrent) in a
+// few readable rows.
 
 import (
 	"fmt"

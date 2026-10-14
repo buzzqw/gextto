@@ -4,8 +4,8 @@
 # When the build cache (GOCACHE, normally ~/.cache/go-build) grows past a
 # threshold, wipe it and immediately rebuild the packages and run the test
 # suite, so a clean and warm cache is left behind instead of a cold one. The
-# cache mainly balloons with CGO builds (the embedded libtorrent engine), which
-# leave many large entries that are never reused.
+# cache grows with every dependency rebuild, which leaves many large entries
+# that are never reused.
 #
 #   scripts/refresh-build-cache.sh              # check and, if over the limit, clean + rebuild + test
 #   scripts/refresh-build-cache.sh --dry-run    # only report the size and the decision

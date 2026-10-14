@@ -2238,7 +2238,7 @@ pol:
   Porta del proxy (0 = nessun proxy).: Port proxy (0 = brak proxy).
   Porta del proxy (es. 1080 per socks5): Port proxy (np. 1080 dla skarpet5)
   Porta massima: Maksymalny port
-  Porta massima della sessione libtorrent (richiede il riavvio del servizio).: Maksymalny port sesji libtorrent (wymaga ponownego uruchomienia
+  Porta massima della sessione torrent (richiede il riavvio del servizio).: Maksymalny port sesji torrent (wymaga ponownego uruchomienia
     usługi).
   Porta massima.: Maksymalny port.
   Porta max: Maksymalny port
@@ -2246,7 +2246,7 @@ pol:
   Porta minima: Minimalny port
   Porta minima TCP/UDP per ricevere connessioni. Ricorda di aprire questa porta sul router (Port Forwarding).: Minimalny port TCP/UDP do odbierania
     połączeń. Pamiętaj, aby otworzyć ten port w routerze (przekierowanie portów).
-  Porta minima della sessione libtorrent (richiede il riavvio del servizio).: Minimalny port sesji libtorrent (wymaga ponownego uruchomienia usługi).
+  Porta minima della sessione torrent (richiede il riavvio del servizio).: Minimalny port sesji torrent (wymaga ponownego uruchomienia usługi).
   Porta non aperta - controlla firewall o abilita UPnP: Port nie jest otwarty – sprawdź zaporę sieciową lub włącz UPnP
   Porta non aperta — controlla firewall o abilita UPnP: Port nie jest otwarty — sprawdź zaporę lub włącz UPnP
   Porte di Rete EXTTO (Richiede Riavvio Globale): Porty sieciowe EXTTO (wymaga globalnego ponownego uruchomienia)
@@ -3184,7 +3184,7 @@ pol:
   "Motore torrent gx-torrent attivo e raggiungibile.": "Silnik torrent gx-torrent działa i jest osiągalny."
   "Nessuna azione necessaria. Apri la sua pagina web dal link.": "Nie są wymagane żadne działania. Otwórz jego stronę internetową z linku."
   "Motore torrent gx-torrent non raggiungibile.": "Silnik torrent gx-torrent jest nieosiągalny."
-  "Il demone è avviato e sorvegliato da Gextto: controlla l'indirizzo gxtorrent_url e i log. Se non riparte, Gextto torna a libtorrent.": "Demon jest uruchamiany i nadzorowany przez Gextto: sprawdź adres gxtorrent_url i logi. Jeśli nie uruchomi się ponownie, Gextto wróci do libtorrent."
+  "Il demone è avviato e sorvegliato da Gextto: controlla l'indirizzo gxtorrent_url e i log. Se non riparte, Gextto passa a qBittorrent.": "Demon jest uruchamiany i nadzorowany przez Gextto: sprawdź adres gxtorrent_url i logi. Jeśli nie uruchomi się ponownie, Gextto przełączy się na qBittorrent."
   "Servizio mircrew-indexer non raggiungibile.": "Usługa mircrew-indexer jest nieosiągalna."
   "Avvia il servizio (systemctl --user start mircrew-indexer) e verifica URL/porta dell’indexer.": "Uruchom usługę (systemctl --user start mircrew-indexer) i sprawdź URL/port indeksera."
   "Apri la web UI del servizio e controlla la API key dell’indexer.": "Otwórz interfejs WWW usługi i sprawdź klucz API indeksera."
@@ -4152,8 +4152,8 @@ pol:
   "Ignora le release più vecchie di N giorni (0 = nessun limite). Le release senza data sono considerate pubblicate oggi.": "Pomija wydania starsze niż N dni (0 = bez limitu). Wydania bez daty uznaje się za opublikowane dziś."
   "Il nome deve corrispondere al tag finale della release (es. TBK). Il punteggio viene sommato allo score tecnico; sono ammessi anche valori negativi.": "Nazwa musi odpowiadać końcowemu tagowi wydania (np. TBK). Punkty dodaje się do wyniku technicznego; dozwolone są wartości ujemne."
   "Impostazioni libtorrent avanzate, una per riga nel formato chiave=valore.": "Zaawansowane ustawienia libtorrent, jedno na wiersz jako klucz=wartość."
-  "Indica dove libtorrent accetta connessioni: 0.0.0.0:6881-6891 per tutte le interfacce, 127.0.0.1:6881 solo in locale, oppure wg0:6881/tun0:6881 per una VPN. Il valore proposto va bene nella maggior parte dei casi.": "Gdzie libtorrent przyjmuje połączenia: 0.0.0.0:6881-6891 dla wszystkich interfejsów, 127.0.0.1:6881 tylko lokalnie lub wg0:6881/tun0:6881 dla VPN. Proponowana wartość pasuje w większości przypadków."
-  "Indirizzo di ascolto del demone. Predefinito 127.0.0.1:8890, cioè solo questo server: pagina web e API non escono in LAN. Per esporle in LAN usa 0.0.0.0:8890 e imposta gxtorrent_token (senza token Gextto avvia il demone in -insecure e lo segnala nel log). Il traffico peer usa sempre la porta singola/le libtorrent_port_*.": "Adres nasłuchu demona. Domyślnie 127.0.0.1:8890, czyli tylko ten serwer: strona i API nie wychodzą do LAN. Aby udostępnić je w LAN, użyj 0.0.0.0:8890 i ustaw gxtorrent_token (bez tokena Gextto uruchamia demon z -insecure i zapisuje to w logu). Ruch peerów zawsze korzysta z pojedynczego portu/libtorrent_port_*."
+  "Indica dove il motore torrent accetta connessioni: 0.0.0.0:6881-6891 per tutte le interfacce, 127.0.0.1:6881 solo in locale, oppure wg0:6881/tun0:6881 per una VPN. Il valore proposto va bene nella maggior parte dei casi.": "Gdzie silnik torrent przyjmuje połączenia: 0.0.0.0:6881-6891 dla wszystkich interfejsów, 127.0.0.1:6881 tylko lokalnie lub wg0:6881/tun0:6881 dla VPN. Proponowana wartość pasuje w większości przypadków."
+  "Indirizzo di ascolto del demone. Predefinito 127.0.0.1:8890, cioè solo questo server: pagina web e API non escono in LAN. Per esporle in LAN usa 0.0.0.0:8890 e imposta gxtorrent_token (senza token Gextto avvia il demone in -insecure e lo segnala nel log). Il traffico peer usa sempre la porta singola/le torrent_port_*.": "Adres nasłuchu demona. Domyślnie 127.0.0.1:8890, czyli tylko ten serwer: strona i API nie wychodzą do LAN. Aby udostępnić je w LAN, użyj 0.0.0.0:8890 i ustaw gxtorrent_token (bez tokena Gextto uruchamia demon z -insecure i zapisuje to w logu). Ruch peerów zawsze korzysta z pojedynczego portu/torrent_port_*."
   "Inglese (Regno Unito)": "Angielski (Wielka Brytania)"
   "Inglese (USA)": "Angielski (USA)"
   "Installa / Ottimizza qBittorrent-nox": "Zainstaluj / Optymalizuj qBittorrent-nox"
@@ -4170,7 +4170,7 @@ pol:
   "Mappatura dei percorsi tra Gextto e qBittorrent-nox, una per riga (locale=remoto).": "Mapowanie ścieżek między Gextto a qBittorrent-nox, jedno na wiersz (lokalna=zdalna)."
   "Minuti tra due passaggi del backfill MediaInfo.": "Minuty między dwoma przebiegami uzupełniania MediaInfo."
   "Mostra dove è installato qBittorrent-nox e se c'è un aggiornamento.": "Pokazuje, gdzie zainstalowano qBittorrent-nox i czy jest aktualizacja."
-  "Motore torrent attivo (gx-torrent predefinito, qBittorrent-nox o libtorrent integrato se compilato).": "Aktywny silnik torrent (domyślnie gx-torrent, qBittorrent-nox lub wbudowany libtorrent, jeśli skompilowany)."
+  "Motore torrent attivo (gx-torrent predefinito oppure qBittorrent-nox).": "Aktywny silnik torrent (domyślnie gx-torrent lub qBittorrent-nox)."
   "Nessun gruppo personalizzato configurato.": "Brak skonfigurowanych własnych grup."
   "Numero di statistiche dei cicli di ricerca da conservare.": "Liczba zachowywanych statystyk cykli wyszukiwania."
   "Numero massimo di file analizzati in ogni passaggio MediaInfo.": "Maksymalna liczba plików analizowanych w każdym przebiegu MediaInfo."
@@ -4412,7 +4412,7 @@ pol:
   "Download in corso.": "Pobieranie w toku."
   "In attesa dei metadati.": "Oczekiwanie na metadane."
   "Download completo.": "Pobieranie zakończone."
-  "libtorrent ha riportato un errore.": "Silnik torrent zgłosił błąd."
+  "Il motore torrent ha riportato un errore.": "Silnik torrent zgłosił błąd."
   "Ricerche": "Wyszukiwania"
   "Durata": "Czas trwania"
   "Errori": "Błędy"

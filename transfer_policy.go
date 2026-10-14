@@ -393,7 +393,7 @@ func DiagnoseTorrent(torrent *models.TorrentView) (code, reason, hint string) {
 	case !torrent.HasMetadata:
 		return "metadata", "In attesa dei metadati.", "Nessun peer ha ancora fornito l'elenco dei file: serve almeno un peer (anche leecher) o un web seed."
 	case strings.TrimSpace(torrent.Error) != "":
-		return "error", "libtorrent ha riportato un errore.", torrent.Error
+		return "error", "Il motore torrent ha riportato un errore.", torrent.Error
 	// A stalled torrent is paused, so it has no peers: check the stall reasons
 	// before the "no peers" case.
 	case torrent.Stalled && torrent.NumSeeds == 0 && torrent.NumComplete <= 0:

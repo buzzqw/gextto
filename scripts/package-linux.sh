@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Build the standalone Linux archive consumed by the installer and by
-# `gexttod --update`. The Go binary embeds the server-rendered web UI, so the archive
-# ships the daemon, the bundled libtorrent shared libraries, a launcher, a short
-# README and the licence notices. Layout:
-#   gexttod  gx-torrent  run.sh  lib/  README.md  VERSION  LICENSE  THIRD-PARTY-NOTICES
+# `gexttod --update`. The build is pure Go and the binary embeds the
+# server-rendered web UI, so the archive ships the daemon, the gx-torrent
+# daemon, a launcher, a short README and the licence notices. Layout:
+#   gexttod  gx-torrent  run.sh  README.md  VERSION  LICENSE  THIRD-PARTY-NOTICES
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -46,35 +46,18 @@ trap 'rm -rf "$STAGE"' EXIT
 cp "$BINARY" "$STAGE/gexttod"
 chmod +x "$STAGE/gexttod"
 # gx-torrent is the default torrent engine: the archive must ship it next to
-# gexttod or a fresh install would fall back to libtorrent. build-daemon.sh
-# builds it by default; refuse to package without it unless explicitly allowed.
+# gexttod or a fresh install would have no engine to run. build-daemon.sh builds
+# it by default; refuse to package without it unless explicitly allowed.
 GX_BINARY="$(dirname "$BINARY")/gx-torrent"
 if [[ -x "$GX_BINARY" ]]; then
   cp "$GX_BINARY" "$STAGE/gx-torrent"
   chmod +x "$STAGE/gx-torrent"
 elif [[ "${GEXTTO_ALLOW_MISSING_GXTORRENT:-0}" == "1" ]]; then
-  echo "warning: gx-torrent not found next to $BINARY; the archive will only run with embedded libtorrent" >&2
+  echo "warning: gx-torrent not found next to $BINARY; the archive needs it to transfer" >&2
 else
   echo "error: gx-torrent binary not found at $GX_BINARY" >&2
   echo "       build it with scripts/build-daemon.sh, or set GEXTTO_ALLOW_MISSING_GXTORRENT=1 to package without it" >&2
   exit 1
-fi
-mkdir -p "$STAGE/lib"
-
-# Bundle the libtorrent shared libraries next to the executable: the daemon is
-# linked with an $ORIGIN/lib rpath, so it runs straight from the archive.
-LIBDIR="$(pkg-config --variable=libdir libtorrent-rasterbar 2>/dev/null || echo /usr/lib)"
-LIBTORRENT="libtorrent-rasterbar.so"
-BUNDLED_LIB=0
-for candidate in "$LIBDIR/$LIBTORRENT" "/usr/lib/$LIBTORRENT" "/usr/lib/x86_64-linux-gnu/$LIBTORRENT" "/usr/local/lib/$LIBTORRENT"; do
-  if [[ -e "$candidate" ]]; then
-    cp -a "$candidate"* "$STAGE/lib/" 2>/dev/null || true
-    BUNDLED_LIB=1
-    break
-  fi
-done
-if [[ "$BUNDLED_LIB" == "0" ]]; then
-  echo "warning: $LIBTORRENT not found; the archive only runs where libtorrent is installed system-wide" >&2
 fi
 
 cat > "$STAGE/run.sh" <<'RUN'
@@ -82,7 +65,6 @@ cat > "$STAGE/run.sh" <<'RUN'
 # Launch gextto from an extracted archive or install it as a system service.
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
-export LD_LIBRARY_PATH="$DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export GEXTTO_DATA_DIR="${GEXTTO_DATA_DIR:-$DIR/data}"
 
 if [[ -t 0 && $# -eq 0 ]]; then

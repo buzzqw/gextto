@@ -11,7 +11,7 @@ import (
 // requestServiceActionLater schedules a systemd action on the gextto service
 // shortly after the caller returns. The HTTP handler has its own response-then-
 // restart path; this helper is used by the qBittorrent watchdog so a failed
-// managed runtime can switch back to libtorrent with a clean restart.
+// managed runtime can switch back to gx-torrent with a clean restart.
 func requestServiceActionLater(action string) {
 	verb := "restart"
 	switch action {

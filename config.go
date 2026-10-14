@@ -202,27 +202,15 @@ type TransferSettings struct {
 	DontCountSlowTorrents bool `json:"dont_count_slow_torrents"`
 	AutoRemoveCompleted   bool `json:"auto_remove_completed"`
 	// Extended session settings.
-	ConnectionsLimit              int64  `json:"connections_limit"`
-	UploadSlotsLimit              int64  `json:"upload_slots_limit"`
-	HalfOpenLimit                 int64  `json:"half_open_limit"`
-	AlertQueueSize                int64  `json:"alert_queue_size"`
-	MaxConnectionsPerTorrent      int64  `json:"max_connections_per_torrent"`
-	MaxUploadsPerTorrent          int64  `json:"max_uploads_per_torrent"`
-	AioThreads                    int64  `json:"aio_threads"`
-	CacheSize                     int64  `json:"cache_size"`
-	CacheExpiry                   int64  `json:"cache_expiry"`
-	AnnounceInterval              int64  `json:"announce_interval"`
-	TorrentConnectBoost           int64  `json:"torrent_connect_boost"`
-	Utp                           bool   `json:"utp"`
-	Holepunch                     bool   `json:"holepunch"`
-	PreferRc4                     bool   `json:"prefer_rc4"`
-	AnnounceToAllTrackers         bool   `json:"announce_to_all_trackers"`
-	AnnounceToAllTiers            bool   `json:"announce_to_all_tiers"`
-	AllowMultipleConnectionsPerIp bool   `json:"allow_multiple_connections_per_ip"`
-	ApplyIpFilter                 bool   `json:"apply_ip_filter"`
-	Encryption                    int64  `json:"encryption"`
-	IpFilterPath                  string `json:"ip_filter_path"`
-	ListenInterfaces              string `json:"listen_interfaces"`
+	ConnectionsLimit int64  `json:"connections_limit"`
+	CacheSize        int64  `json:"cache_size"`
+	CacheExpiry      int64  `json:"cache_expiry"`
+	Utp              bool   `json:"utp"`
+	Holepunch        bool   `json:"holepunch"`
+	ApplyIpFilter    bool   `json:"apply_ip_filter"`
+	Encryption       int64  `json:"encryption"`
+	IpFilterPath     string `json:"ip_filter_path"`
+	ListenInterfaces string `json:"listen_interfaces"`
 	// Interfaccia forzata per il traffico in uscita (killswitch VPN). Quando è
 	// impostata, libtorrent annuncia e si connette solo da questa scheda.
 	OutgoingInterface string `json:"outgoing_interface"`
@@ -232,49 +220,37 @@ type TransferSettings struct {
 // DefaultTransferSettings implements `impl Default for TransferSettings`.
 func DefaultTransferSettings() TransferSettings {
 	return TransferSettings{
-		PortMin:                       6881,
-		PortMax:                       6891,
-		DownloadLimitKib:              0,
-		UploadLimitKib:                0,
-		SeedRatio:                     0.0,
-		SeedTimeMinutes:               0,
-		SeedTimeDays:                  0,
-		ActiveDownloads:               3,
-		ActiveSeeds:                   3,
-		ActiveLimit:                   5,
-		Dht:                           true,
-		Pex:                           true,
-		Lsd:                           true,
-		Upnp:                          true,
-		Natpmp:                        true,
-		DynamicQueue:                  false,
-		DynamicQueueMin:               1,
-		DynamicQueueMax:               10,
-		DontCountSlowTorrents:         true,
-		AutoRemoveCompleted:           false,
-		ConnectionsLimit:              200,
-		UploadSlotsLimit:              -1,
-		HalfOpenLimit:                 -1,
-		AlertQueueSize:                1000,
-		MaxConnectionsPerTorrent:      -1,
-		MaxUploadsPerTorrent:          -1,
-		AioThreads:                    -1,
-		CacheSize:                     -1,
-		CacheExpiry:                   300,
-		AnnounceInterval:              1800,
-		TorrentConnectBoost:           50,
-		Utp:                           true,
-		Holepunch:                     true,
-		PreferRc4:                     false,
-		AnnounceToAllTrackers:         false,
-		AnnounceToAllTiers:            false,
-		AllowMultipleConnectionsPerIp: true,
-		ApplyIpFilter:                 true,
-		Encryption:                    1,
-		IpFilterPath:                  "",
-		ListenInterfaces:              "",
-		OutgoingInterface:             "",
-		DhtBootstrapNodes:             "",
+		PortMin:               6881,
+		PortMax:               6891,
+		DownloadLimitKib:      0,
+		UploadLimitKib:        0,
+		SeedRatio:             0.0,
+		SeedTimeMinutes:       0,
+		SeedTimeDays:          0,
+		ActiveDownloads:       3,
+		ActiveSeeds:           3,
+		ActiveLimit:           5,
+		Dht:                   true,
+		Pex:                   true,
+		Lsd:                   true,
+		Upnp:                  true,
+		Natpmp:                true,
+		DynamicQueue:          false,
+		DynamicQueueMin:       1,
+		DynamicQueueMax:       10,
+		DontCountSlowTorrents: true,
+		AutoRemoveCompleted:   false,
+		ConnectionsLimit:      200,
+		CacheSize:             -1,
+		CacheExpiry:           300,
+		Utp:                   true,
+		Holepunch:             true,
+		ApplyIpFilter:         true,
+		Encryption:            1,
+		IpFilterPath:          "",
+		ListenInterfaces:      "",
+		OutgoingInterface:     "",
+		DhtBootstrapNodes:     "",
 	}
 }
 
@@ -756,12 +732,12 @@ func DefaultConfig() Config {
 	if !ok {
 		engineListen = constants.DefaultEngineListen
 	}
-	libtorrentTempDir := filepath.Join(dataDir, "incomplete")
+	incompleteDir := filepath.Join(dataDir, "incomplete")
 	trashPath := filepath.Join(dataDir, "trash")
 	return Config{
 		StateDir:                  filepath.Join(dataDir, constants.DefaultStateDir),
 		DownloadDir:               filepath.Join(dataDir, "downloads"),
-		DownloadTempDir:           &libtorrentTempDir,
+		DownloadTempDir:           &incompleteDir,
 		ArchiveRoot:               nil,
 		TrashPath:                 &trashPath,
 		NotifyTelegram:            false,
@@ -1923,7 +1899,6 @@ var libtorrentOnlyKeys = map[string]bool{
 	"libtorrent_announce_to_all_tiers":             true,
 	"libtorrent_announce_to_all_trackers":          true,
 	"libtorrent_auto_optimize":                     true,
-	"libtorrent_connections_limit":                 true,
 	"libtorrent_enabled":                           true,
 	"libtorrent_extra_settings":                    true,
 	"libtorrent_half_open_limit":                   true,
@@ -2326,49 +2301,37 @@ func (c *Config) loadConfigDB() error {
 		c.CleanupAction = "move"
 	}
 	c.Transfer = TransferSettings{
-		PortMin:                       numberSettingUint16(c.Settings, "torrent_port_min", 6881),
-		PortMax:                       numberSettingUint16(c.Settings, "torrent_port_max", 6891),
-		DownloadLimitKib:              numberSettingInt(c.Settings, "torrent_dl_limit", 0),
-		UploadLimitKib:                numberSettingInt(c.Settings, "torrent_ul_limit", 0),
-		SeedRatio:                     numberSettingFloat(c.Settings, "torrent_seed_ratio", 0.0),
-		SeedTimeMinutes:               numberSettingInt(c.Settings, "torrent_seed_time", 0),
-		SeedTimeDays:                  numberSettingInt(c.Settings, "torrent_seed_time_days", 0),
-		ActiveDownloads:               numberSettingInt(c.Settings, "torrent_active_downloads", 3),
-		ActiveSeeds:                   numberSettingInt(c.Settings, "torrent_active_seeds", 3),
-		ActiveLimit:                   numberSettingInt(c.Settings, "torrent_active_limit", 5),
-		Dht:                           boolSettingOr(c.Settings, "torrent_dht", true),
-		Pex:                           boolSettingOr(c.Settings, "torrent_pex", true),
-		Lsd:                           boolSettingOr(c.Settings, "torrent_lsd", true),
-		Upnp:                          boolSettingOr(c.Settings, "torrent_upnp", true),
-		Natpmp:                        boolSettingOr(c.Settings, "torrent_natpmp", true),
-		DynamicQueue:                  boolSettingOr(c.Settings, "torrent_dynamic_queue", false),
-		DynamicQueueMin:               numberSettingInt(c.Settings, "torrent_dynamic_queue_min", 1),
-		DynamicQueueMax:               numberSettingInt(c.Settings, "torrent_dynamic_queue_max", 10),
-		DontCountSlowTorrents:         boolSettingOr(c.Settings, "torrent_dont_count_slow_torrents", true),
-		AutoRemoveCompleted:           configBoolSetting(mapValue(c.Settings, "auto_remove_completed")),
-		ConnectionsLimit:              numberSettingInt(c.Settings, "libtorrent_connections_limit", 200),
-		UploadSlotsLimit:              numberSettingInt(c.Settings, "libtorrent_upload_slots_limit", -1),
-		HalfOpenLimit:                 numberSettingInt(c.Settings, "libtorrent_half_open_limit", -1),
-		AlertQueueSize:                numberSettingInt(c.Settings, "libtorrent_alert_queue_size", 1000),
-		MaxConnectionsPerTorrent:      numberSettingInt(c.Settings, "torrent_max_connections_per_torrent", -1),
-		MaxUploadsPerTorrent:          numberSettingInt(c.Settings, "libtorrent_max_uploads_per_torrent", -1),
-		AioThreads:                    numberSettingInt(c.Settings, "libtorrent_aio_threads", -1),
-		CacheSize:                     numberSettingInt(c.Settings, "torrent_cache_size", -1),
-		CacheExpiry:                   numberSettingInt(c.Settings, "torrent_cache_expiry", 300),
-		AnnounceInterval:              numberSettingInt(c.Settings, "libtorrent_announce_interval", 1800),
-		TorrentConnectBoost:           numberSettingInt(c.Settings, "libtorrent_torrent_connect_boost", 50),
-		Utp:                           boolSettingOr(c.Settings, "torrent_utp", true),
-		Holepunch:                     boolSettingOr(c.Settings, "torrent_holepunch", true),
-		PreferRc4:                     configBoolSetting(mapValue(c.Settings, "libtorrent_prefer_rc4")),
-		AnnounceToAllTrackers:         configBoolSetting(mapValue(c.Settings, "libtorrent_announce_to_all_trackers")),
-		AnnounceToAllTiers:            configBoolSetting(mapValue(c.Settings, "libtorrent_announce_to_all_tiers")),
-		AllowMultipleConnectionsPerIp: boolSettingOr(c.Settings, "libtorrent_allow_multiple_connections_per_ip", true),
-		ApplyIpFilter:                 boolSettingOr(c.Settings, "torrent_apply_ip_filter", true),
-		Encryption:                    numberSettingInt(c.Settings, "torrent_encryption", 1),
-		IpFilterPath:                  settingOrDefault(c.Settings, "torrent_ipfilter_url", ""),
-		ListenInterfaces:              settingOrDefault(c.Settings, "torrent_listen_interfaces", ""),
-		OutgoingInterface:             settingOrDefault(c.Settings, "torrent_outgoing_interface", ""),
-		DhtBootstrapNodes:             settingOrDefault(c.Settings, "torrent_dht_bootstrap_nodes", ""),
+		PortMin:               numberSettingUint16(c.Settings, "torrent_port_min", 6881),
+		PortMax:               numberSettingUint16(c.Settings, "torrent_port_max", 6891),
+		DownloadLimitKib:      numberSettingInt(c.Settings, "torrent_dl_limit", 0),
+		UploadLimitKib:        numberSettingInt(c.Settings, "torrent_ul_limit", 0),
+		SeedRatio:             numberSettingFloat(c.Settings, "torrent_seed_ratio", 0.0),
+		SeedTimeMinutes:       numberSettingInt(c.Settings, "torrent_seed_time", 0),
+		SeedTimeDays:          numberSettingInt(c.Settings, "torrent_seed_time_days", 0),
+		ActiveDownloads:       numberSettingInt(c.Settings, "torrent_active_downloads", 3),
+		ActiveSeeds:           numberSettingInt(c.Settings, "torrent_active_seeds", 3),
+		ActiveLimit:           numberSettingInt(c.Settings, "torrent_active_limit", 5),
+		Dht:                   boolSettingOr(c.Settings, "torrent_dht", true),
+		Pex:                   boolSettingOr(c.Settings, "torrent_pex", true),
+		Lsd:                   boolSettingOr(c.Settings, "torrent_lsd", true),
+		Upnp:                  boolSettingOr(c.Settings, "torrent_upnp", true),
+		Natpmp:                boolSettingOr(c.Settings, "torrent_natpmp", true),
+		DynamicQueue:          boolSettingOr(c.Settings, "torrent_dynamic_queue", false),
+		DynamicQueueMin:       numberSettingInt(c.Settings, "torrent_dynamic_queue_min", 1),
+		DynamicQueueMax:       numberSettingInt(c.Settings, "torrent_dynamic_queue_max", 10),
+		DontCountSlowTorrents: boolSettingOr(c.Settings, "torrent_dont_count_slow_torrents", true),
+		AutoRemoveCompleted:   configBoolSetting(mapValue(c.Settings, "auto_remove_completed")),
+		ConnectionsLimit:      numberSettingInt(c.Settings, "torrent_connections_limit", 200),
+		CacheSize:             numberSettingInt(c.Settings, "torrent_cache_size", -1),
+		CacheExpiry:           numberSettingInt(c.Settings, "torrent_cache_expiry", 300),
+		Utp:                   boolSettingOr(c.Settings, "torrent_utp", true),
+		Holepunch:             boolSettingOr(c.Settings, "torrent_holepunch", true),
+		ApplyIpFilter:         boolSettingOr(c.Settings, "torrent_apply_ip_filter", true),
+		Encryption:            numberSettingInt(c.Settings, "torrent_encryption", 1),
+		IpFilterPath:          settingOrDefault(c.Settings, "torrent_ipfilter_url", ""),
+		ListenInterfaces:      settingOrDefault(c.Settings, "torrent_listen_interfaces", ""),
+		OutgoingInterface:     settingOrDefault(c.Settings, "torrent_outgoing_interface", ""),
+		DhtBootstrapNodes:     settingOrDefault(c.Settings, "torrent_dht_bootstrap_nodes", ""),
 	}
 	if value := configPathSetting(mapValue(c.Settings, "torrent_dir")); value != nil {
 		c.DownloadDir = *value

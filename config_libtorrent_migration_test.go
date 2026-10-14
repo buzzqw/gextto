@@ -20,12 +20,13 @@ func TestMigrateLibtorrentKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 	seed := map[string]string{
-		"libtorrent_dir":         "/downloads",
-		"libtorrent_ramdisk_dir": "/mnt/ram",
-		"libtorrent_dht":         "false",
-		"libtorrent_enabled":     "true", // engine-only: must stay untouched
-		"libtorrent_sequential":  "false",
-		"torrent_sequential":     "true", // already renamed: this value wins
+		"libtorrent_dir":               "/downloads",
+		"libtorrent_ramdisk_dir":       "/mnt/ram",
+		"libtorrent_dht":               "false",
+		"libtorrent_connections_limit": "150",  // still used by gx-torrent: must be renamed
+		"libtorrent_enabled":           "true", // engine-only: must stay untouched
+		"libtorrent_sequential":        "false",
+		"torrent_sequential":           "true", // already renamed: this value wins
 	}
 	for key, value := range seed {
 		if err := sqlExec(conn, "INSERT INTO settings(key,value) VALUES (?1,?2)", key, value); err != nil {
@@ -42,9 +43,10 @@ func TestMigrateLibtorrentKeys(t *testing.T) {
 	}
 
 	for old, want := range map[string]string{
-		"torrent_dir":         "/downloads",
-		"torrent_ramdisk_dir": "/mnt/ram",
-		"torrent_dht":         "false",
+		"torrent_dir":               "/downloads",
+		"torrent_ramdisk_dir":       "/mnt/ram",
+		"torrent_dht":               "false",
+		"torrent_connections_limit": "150",
 	} {
 		if got := cfg.Settings[old]; got != want {
 			t.Fatalf("%s = %q, want %q", old, got, want)
@@ -56,7 +58,7 @@ func TestMigrateLibtorrentKeys(t *testing.T) {
 	if cfg.Settings["torrent_sequential"] != "true" {
 		t.Fatalf("torrent_sequential = %q, want the already-present value to win", cfg.Settings["torrent_sequential"])
 	}
-	for _, gone := range []string{"libtorrent_dir", "libtorrent_ramdisk_dir", "libtorrent_dht", "libtorrent_sequential"} {
+	for _, gone := range []string{"libtorrent_dir", "libtorrent_ramdisk_dir", "libtorrent_dht", "libtorrent_sequential", "libtorrent_connections_limit"} {
 		if _, ok := cfg.Settings[gone]; ok {
 			t.Fatalf("%s must be gone from the settings", gone)
 		}

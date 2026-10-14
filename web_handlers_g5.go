@@ -865,7 +865,7 @@ func gh5_gxTorrentServiceStatus(publicBase string, s *AppState, r *http.Request,
 		entry.Level = 1
 		entry.LastError = "gx-torrent non risponde"
 		entry.UserMessage = "Motore torrent gx-torrent non raggiungibile."
-		entry.SuggestedAction = "Il demone è avviato e sorvegliato da Gextto: controlla l'indirizzo gxtorrent_url e i log. Se non riparte, Gextto torna a libtorrent."
+		entry.SuggestedAction = "Il demone è avviato e sorvegliato da Gextto: controlla l'indirizzo gxtorrent_url e i log. Se non riparte, Gextto passa a qBittorrent."
 	}
 	return entry
 }

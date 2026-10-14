@@ -743,9 +743,9 @@ func uiSettingAutoLabel(key string) string {
 	return key
 }
 
-// uiSettingGroupTitle assigns a setting to a labelled group. The libtorrent tab
-// is the only one large enough to need sub-groups; the others render a single
-// panel with the tab name.
+// uiSettingGroupTitle assigns a setting to a labelled group. A tab large enough
+// to need sub-groups (Velocità e rete, Code e prestazioni) uses them; the others
+// render a single panel with the tab name.
 func uiSettingGroupTitle(tab, key string) string {
 	if group := uiSettingGroupByKey[key]; group != "" {
 		return group

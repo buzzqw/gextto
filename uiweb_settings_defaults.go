@@ -112,8 +112,8 @@ var uiSettingDefaults = map[string]string{
 	"torrent_sched_week":                  "",
 
 	// --- Motore torrent (backend) ------------------------------------------
-	// gx-torrent è il default di installazione; il motore integrato libtorrent
-	// resta selezionabile e fa da fallback automatico.
+	// gx-torrent è il default di installazione; qBittorrent-nox resta
+	// selezionabile e fa da fallback automatico.
 	"torrent_backend":                  "gx-torrent",
 	"qbittorrent_url":                  "http://127.0.0.1:8080",
 	"gxtorrent_url":                    "http://127.0.0.1:8890",

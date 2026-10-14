@@ -32,7 +32,7 @@ const ArchiveStem = "gextto-linux"
 
 // VersionString returns the installed version, including the release marker
 // written next to the executable by the installer (when present) and the
-// bundled libtorrent.
+// compiled-in build and commit.
 func VersionString() string {
 	value := fmt.Sprintf("%s %s (build %s)", constants.AppName, constants.Version, constants.Build)
 	if marker, ok := updateInstalledMarker(); ok {

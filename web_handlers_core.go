@@ -922,7 +922,6 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"torrent_sched_enabled":                settingsOr(cfg, "torrent_sched_enabled", "false"),
 		"torrent_sequential":                   settingsOr(cfg, "torrent_sequential", "false"),
 		"torrent_first_last":                   settingsOr(cfg, "torrent_first_last", "false"),
-		"libtorrent_extra_settings":            settingsOr(cfg, "libtorrent_extra_settings", ""),
 		"torrent_sched_start":                  settingsOr(cfg, "torrent_sched_start", "23:00"),
 		"torrent_sched_end":                    settingsOr(cfg, "torrent_sched_end", "08:00"),
 		"torrent_sched_days":                   settingsOr(cfg, "torrent_sched_days", ""),

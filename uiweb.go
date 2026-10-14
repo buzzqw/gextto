@@ -924,9 +924,13 @@ func uiBackendLabel(name string) string {
 		return "qBittorrent-nox"
 	case BackendGxTorrent:
 		return "gx-torrent"
-	default:
-		return "libtorrent integrato"
 	}
+	// Unknown or disabled engine (the recovery placeholder): show the raw
+	// identifier instead of naming a removed engine.
+	if trimmed := strings.TrimSpace(name); trimmed != "" {
+		return trimmed
+	}
+	return "—"
 }
 
 func uiNowClock() string {

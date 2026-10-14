@@ -531,7 +531,7 @@ func (e *gxTorrentEngine) notifyEvent(event string, data map[string]any) {
 }
 
 // gxUnstablePauses are the waits before trying gx-torrent again, one per
-// exhausted crash budget, on a build without libtorrent.
+// exhausted crash budget, when no other engine is available.
 var gxUnstablePauses = []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, time.Hour}
 
 // gxUnstablePause returns the wait after the n-th exhausted crash budget
@@ -568,9 +568,8 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 	// budgetExhausted reacts to an exhausted crash budget and reports whether
 	// the supervisor must stop. It first tries the cheapest fix — restoring the
 	// previous gx-torrent binary when the updater kept one — then hands the
-	// transfers to another engine when one can be made to work: the chain
-	// prefers the managed qBittorrent-nox, downloaded on demand, and keeps
-	// libtorrent as a last resort on a build that includes it (see
+	// transfers to qBittorrent when it can be made to work: the chain prefers
+	// the managed qBittorrent-nox, downloaded on demand (see
 	// engine_fallback.go). Only when no alternative is available does it keep
 	// gx-torrent in safe mode with growing pauses, instead of restarting the
 	// service in a loop.

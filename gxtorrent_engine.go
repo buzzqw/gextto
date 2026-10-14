@@ -50,8 +50,8 @@ type gxTorrentSettings struct {
 	PollInterval time.Duration
 	Managed      bool
 	// SafeMode starts the managed daemon without uTP and holepunching. The
-	// supervisor sets it on a build without libtorrent when gx-torrent keeps
-	// crashing, since there is no other engine to hand the transfers to.
+	// supervisor sets it when gx-torrent keeps crashing and no other engine can
+	// take over the transfers.
 	SafeMode bool
 	stateDir string
 	dataDir  string

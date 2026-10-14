@@ -2599,7 +2599,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 	// a transient error cannot silently stop an acquisition.
 	switch event.Kind {
 	case "tracker_error":
-		logging.Debug("libtorrent tracker error",
+		logging.Debug("torrent tracker error",
 			"hash", event.Hash, "name", event.Name, "message", event.Message)
 		return false, nil
 	case "hash_failed":
