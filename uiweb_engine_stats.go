@@ -55,6 +55,25 @@ func engineBool(values map[string]any, key string) bool {
 	return value
 }
 
+// engineFloat reads a fractional counter (a ratio) from the engine's stats map.
+func engineFloat(values map[string]any, key string) float64 {
+	switch v := values[key].(type) {
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	case int:
+		return float64(v)
+	case int32:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case uint64:
+		return float64(v)
+	}
+	return 0
+}
+
 func engineMap(values map[string]any, key string) map[string]any {
 	value, _ := values[key].(map[string]any)
 	if value == nil {
@@ -164,6 +183,13 @@ func uiGxEngineStats(engine TorrentEngine) uiEngineStats {
 	add("Totali sessione", fmt.Sprintf("scaricati %s · inviati %s · overhead protocollo %s · peer connessi %d",
 		logging.HumanBytesI64(engineNum(session, "bytes_downloaded")), logging.HumanBytesI64(engineNum(session, "bytes_uploaded")),
 		logging.HumanBytesI64(engineNum(session, "protocol_overhead_bytes")), engineNum(stats, "peers")), false)
+	// All-time totals, kept across restarts: one row per value, so every label
+	// is a catalog key and the value is only a number with a unit.
+	if lifetime := engineMap(stats, "lifetime"); len(lifetime) > 0 {
+		add("Scaricato in totale", logging.HumanBytesI64(engineNum(lifetime, "downloaded_bytes")), false)
+		add("Inviato in totale", logging.HumanBytesI64(engineNum(lifetime, "uploaded_bytes")), false)
+		add("Rapporto totale", fmt.Sprintf("%.2f", engineFloat(lifetime, "ratio")), false)
+	}
 	if v, ok := uiMergeReuseRow(session); ok {
 		add("Riuso locale", v, false)
 	}

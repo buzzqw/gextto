@@ -238,7 +238,8 @@ resume transazionale su BoltDB e flusso di Server-Sent Events in tempo reale
 
 Le statistiche del motore attivo — torrent per stato, velocità e slot,
 porta/router, DHT/uTP/LSD, cifratura, proxy, filtro IP, cache, **connessioni
-in entrata** e **I/O disco** — sono in **Salute → Motore torrent**
+in entrata**, **I/O disco** e i **totali di sempre** scaricati/inviati
+(mantenuti tra i riavvii) — sono in **Salute → Motore torrent**
 (`/?view=health`), in `GET /api/v1/stats` del demone e in
 `GET /api/libtorrent/session-stats`.
 

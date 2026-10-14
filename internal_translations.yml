@@ -4457,3 +4457,6 @@ eng:
   "gx-torrent — DLNA: cartelle della libreria": "gx-torrent — DLNA: library folders"
   "Cartelle della libreria (es. l'archivio sul NAS) mostrate dal media server DLNA accanto ai torrent, navigabili per cartelle; separale con ;. Vuoto = automatico: la cartella archivio e le cartelle che contengono gli archivi delle serie. Sola lettura; il cestino, le cartelle nascoste e quelle di sistema del NAS sono escluse.": "Library folders (e.g. the archive on the NAS) the DLNA media server shows beside the torrents, browsable by folder; separate them with ;. Empty = automatic: the archive folder and the folders holding the series archives. Read only; the trash, hidden folders and NAS system folders are excluded."
   "vuoto = automatico (archivio)": "empty = automatic (archive)"
+  "Scaricato in totale": "Downloaded in total"
+  "Inviato in totale": "Uploaded in total"
+  "Rapporto totale": "All-time ratio"

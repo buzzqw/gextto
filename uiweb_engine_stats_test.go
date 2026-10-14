@@ -70,3 +70,56 @@ func TestUIUTPSocketRow(t *testing.T) {
 		t.Fatalf("row = %q, must hide the counters when zero", quiet)
 	}
 }
+
+// fakeStatsEngine feeds a canned /api/v1/stats map to the engine panel; the
+// embedded nil interface panics on any method the panel does not use.
+type fakeStatsEngine struct {
+	TorrentEngine
+	stats map[string]any
+}
+
+func (fakeStatsEngine) Name() string { return BackendGxTorrent }
+
+func (f fakeStatsEngine) Stats() map[string]any { return f.stats }
+
+// TestUIGxEngineStatsAllTimeTotals: the panel shows the all-time totals when
+// the daemon reports them (and only then), and every label it renders is a
+// catalog entry, so it is translated in the six languages.
+func TestUIGxEngineStatsAllTimeTotals(t *testing.T) {
+	engine := fakeStatsEngine{stats: map[string]any{
+		"session_loaded": true,
+		"lifetime": map[string]any{
+			"downloaded_bytes": float64(3 << 40),
+			"uploaded_bytes":   float64(1 << 40),
+			"ratio":            0.3333,
+		},
+	}}
+	rows := map[string]string{}
+	for _, row := range uiGxEngineStats(engine).Rows {
+		rows[row.Label] = row.Value
+	}
+	if !strings.Contains(rows["Scaricato in totale"], "3.0") {
+		t.Fatalf("downloaded row = %q", rows["Scaricato in totale"])
+	}
+	if rows["Inviato in totale"] == "" {
+		t.Fatalf("uploaded row missing: %+v", rows)
+	}
+	if rows["Rapporto totale"] != "0.33" {
+		t.Fatalf("ratio row = %q, want 0.33", rows["Rapporto totale"])
+	}
+
+	keys := i18nCatalogKeys(t)
+	for _, key := range []string{"Scaricato in totale", "Inviato in totale", "Rapporto totale"} {
+		if !keys[key] {
+			t.Errorf("no catalog entry for %q", key)
+		}
+	}
+
+	// A daemon that predates the lifetime counters shows no all-time row.
+	old := fakeStatsEngine{stats: map[string]any{"session_loaded": true}}
+	for _, row := range uiGxEngineStats(old).Rows {
+		if row.Label == "Rapporto totale" || row.Label == "Scaricato in totale" || row.Label == "Inviato in totale" {
+			t.Fatalf("all-time row shown without lifetime data: %+v", row)
+		}
+	}
+}

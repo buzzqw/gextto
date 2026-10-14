@@ -5141,3 +5141,6 @@ fra:
   "gx-torrent — DLNA: cartelle della libreria": "gx-torrent — DLNA : dossiers de la médiathèque"
   "Cartelle della libreria (es. l'archivio sul NAS) mostrate dal media server DLNA accanto ai torrent, navigabili per cartelle; separale con ;. Vuoto = automatico: la cartella archivio e le cartelle che contengono gli archivi delle serie. Sola lettura; il cestino, le cartelle nascoste e quelle di sistema del NAS sono escluse.": "Dossiers de la médiathèque (par ex. l'archive sur le NAS) que le serveur multimédia DLNA présente à côté des torrents, navigables par dossier ; séparez-les par ;. Vide = automatique : le dossier d'archive et les dossiers contenant les archives des séries. Lecture seule ; la corbeille, les dossiers cachés et les dossiers système du NAS sont exclus."
   "vuoto = automatico (archivio)": "vide = automatique (archive)"
+  "Scaricato in totale": "Téléchargé au total"
+  "Inviato in totale": "Envoyé au total"
+  "Rapporto totale": "Ratio total"

@@ -227,8 +227,9 @@ resume storage, and real-time Server-Sent Events (`/ui/events`).
 | libtorrent (optional build) | Inside Gextto's process, **only if compiled in** (`make build-libtorrent`) | Advanced libtorrent controls or compatibility; also the automatic fallback. A crash takes Gextto down too |
 
 Engine statistics — torrents by state, speed and queue slots, port/router,
-DHT/uTP/LSD, encryption, proxy, IP filter, cache, **incoming connections** and
-**disk I/O** — are in **Health → Torrent engine** (`/?view=health`), in the
+DHT/uTP/LSD, encryption, proxy, IP filter, cache, **incoming connections**,
+**disk I/O** and the **all-time downloaded/uploaded totals** (kept across
+restarts) — are in **Health → Torrent engine** (`/?view=health`), in the
 daemon's `GET /api/v1/stats`, and in `GET /api/libtorrent/session-stats`.
 
 ## Resource footprint

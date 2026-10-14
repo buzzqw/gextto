@@ -5148,3 +5148,6 @@ deu:
   "gx-torrent — DLNA: cartelle della libreria": "gx-torrent — DLNA: Bibliotheksordner"
   "Cartelle della libreria (es. l'archivio sul NAS) mostrate dal media server DLNA accanto ai torrent, navigabili per cartelle; separale con ;. Vuoto = automatico: la cartella archivio e le cartelle che contengono gli archivi delle serie. Sola lettura; il cestino, le cartelle nascoste e quelle di sistema del NAS sono escluse.": "Bibliotheksordner (z. B. das Archiv auf dem NAS), die der DLNA-Medienserver neben den Torrents ordnerweise durchsuchbar zeigt; mit ; trennen. Leer = automatisch: der Archivordner und die Ordner mit den Serienarchiven. Nur lesend; Papierkorb, versteckte Ordner und NAS-Systemordner sind ausgeschlossen."
   "vuoto = automatico (archivio)": "leer = automatisch (Archiv)"
+  "Scaricato in totale": "Insgesamt geladen"
+  "Inviato in totale": "Insgesamt hochgeladen"
+  "Rapporto totale": "Gesamtverhältnis"
