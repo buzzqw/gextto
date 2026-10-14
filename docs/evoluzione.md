@@ -446,18 +446,13 @@ the code is advertised. The whole engine (`internal/gxcore`), the DHT (`internal
 and the uTP transport (`internal/utp`) are original code in-tree under EUPL-1.2, and the
 per-component `LICENSE` files are gone: `THIRD-PARTY-NOTICES` lists linked third-party
 libraries only. The peer ID prefix is `-GX` and the network identity is
-`"gx-core " + Version`. Generic references to the *functionality* of other clients
-remain (for example "as libtorrent does"), as do the optional alternative engines
-(libtorrent behind cgo).
+`"gx-core " + Version`.
 
-No dependency does the work of the engine: the rate limiter is a token bucket in
-`internal/gxcore/internal/bandwidth`, the torrent id a version-1 UUID minted in
-`internal/gxcore/torrent/torrent_id.go`, the logger `internal/gxcore/logging`, the
-backoff `internal/gxcore/internal/backoff`, the DHT address decoding and throttle our
-own. `go.mod` carries none of the engine's old helpers (`juju/ratelimit`
-**LGPL-3.0**, `gofrs/uuid`, `fatih/structs`, `hokaccha/go-prettyjson`); the
-replacements are behaviour-equivalent (the token bucket keeps the same refill/debt
-semantics, the id stays unique and well-formed).
+Nothing does the engine's work from outside the repository: the rate limiter is a token
+bucket in `internal/gxcore/internal/bandwidth`, the torrent id a version-1 UUID minted
+in `internal/gxcore/torrent/torrent_id.go`, the logger `internal/gxcore/logging`, the
+backoff `internal/gxcore/internal/backoff`, the uTP transport and the DHT address
+decoding and throttle our own.
 
 Every file of `internal/gxcore` (~130) and `internal/dht` (8) is rewritten in this
 repository with APIs, wire formats and behaviours preserved. What still matches the old
@@ -470,12 +465,9 @@ the git history.
 
 **Policy for anything adopted from elsewhere** (also in `AGENTS.md`): an algorithm is
 **rewritten** — third-party code is not copied, the idea is not covered by copyright
-while the expression is — or the module is adopted as an **MPL-2.0 dependency**. The uTP
-transport was first vendored as an MPL-2.0 dependency and then rewritten as our own code
-in `internal/utp/transport`, with its helper primitives reimplemented in-tree
-(`gextto_support.go`), so **no MPL component remains**. The engine talks to our own uTP
-`Socket` — dial and accept counters, a `net.PacketConn` facade for the shared DHT
-socket — so the transport stays isolated and swappable.
+while the expression is — or the module is adopted as an **MPL-2.0 dependency**. The
+engine talks to the uTP `Socket` — dial and accept counters, a `net.PacketConn` facade
+for the shared DHT socket — so the transport stays isolated and swappable.
 
 ---
 
