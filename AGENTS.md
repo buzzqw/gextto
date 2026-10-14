@@ -11,11 +11,20 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   checkout e CI (vedi *Build e test*).
 - **Committa e pusha spesso**: cambiamenti piccoli e verificati si committano e
   si spingono su `origin/main` subito, senza accumulare lavoro non pushato.
-- **Non committare né pushare se i test non passano tutti**: esegui la suite
-  (`make test`, che include `check-ui`, `installer-test`, `test-dht` e
-  `go test ./...`) e procedi solo se è **completamente verde**. Se un test
-  fallisce, prima lo si sistema. Non c'è bisogno di far girare tutta la suite di
-  test se la modifica riguarda esclusivamente la documentazione (es. file `.md`).
+- **Non committare né pushare se i test non passano tutti**: esegui `make test`
+  (che include `check-ui`, `installer-test`, `test-dht` e `go test ./...`) e
+  `make vet` e, **quando la modifica tocca la UI, anche `make test-ui`** (la
+  suite Playwright end2end in `uiweb/end2end`: è fuori da `make test` perché
+  richiede Node e un browser, ma è la stessa che gira in CI). Se la modifica
+  tocca build o impacchettamento, prova anche `scripts/build-release.sh` o gli
+  script `package-*` coinvolti. Procedi solo se è **completamente verde**. Se un
+  test fallisce, prima lo si sistema. Non c'è bisogno di far girare tutta la
+  suite di test se la modifica riguarda esclusivamente la documentazione (es.
+  file `.md`).
+- **Lo stato della CI è a richiesta.** Il controllo `gh run list` è lento: non
+  va interrogato a ogni ciclo, ma solo quando l'utente lo chiede (o al bisogno).
+  Questo non esonera dall'eseguire **in locale** gli stessi controlli della CI
+  (sopra): verde in locale non basta se non si sono lanciati tutti.
 - **Riferisci sempre le azioni sull'ambiente.** Ogni volta che committi, pushi,
   ricompili (`make build`, `make gx-torrent`, …) o riavvii il servizio
   (`systemctl --user restart gextto`), **avvisa esplicitamente** nel messaggio,
@@ -124,9 +133,16 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   (vedi `docs/gx-torrent.md`, *Standalone use → Platforms*).
 - `make test` — `check-ui` + `installer-test` + `test-dht` +
   `CGO_ENABLED=0 go test ./...` (Go puro).
+- `make test-ui` — suite end2end Playwright della UI (`uiweb/end2end`): costruisce
+  il daemon, lo avvia in dry-run e pilota l'interfaccia reale in un browser
+  (pagine, mobile, i18n, accessibilità axe). **Non fa parte di `make test`**
+  (serve Node e un browser) ma la CI la esegue: va lanciata quando la modifica
+  tocca la UI (`uiweb/v2`, template, JS/CSS, i18n, route v2/`/settings`).
 - **Giro di controllo a ogni chiusura di ciclo** (motore o demone): `make test`,
-  `make test-engine` e `make vet`, più gli invarianti qui sotto. Il resto della
-  verifica obbligatoria (TUI, performance) è nei punti seguenti.
+  `make test-engine`, `make vet` e — quando la UI è toccata — `make test-ui`, più
+  gli invarianti qui sotto. Il resto della verifica obbligatoria (TUI,
+  performance) è nei punti seguenti. Lo stato della CI non si interroga a ogni
+  ciclo: `gh run list` è lento e va lanciato **a richiesta**.
 - `make fuzz-smoke` — fuzzing breve dei parser esposti alla rete (DHT, bencode
   `.torrent`, magnet, extension BEP 10, file tree BEP 52, tracker, Torznab, RSS,
   MSE), `FUZZ_TIME` secondi per target (default 30s, es. `FUZZ_TIME=2m` per un
