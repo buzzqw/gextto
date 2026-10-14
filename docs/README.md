@@ -23,7 +23,7 @@ needs.
 | [gx-torrent engine](gx-torrent.md) | Technical document of the pure-Go torrent engine (gx-core, daemon, adapter). |
 | [BEP compliance](bep.md) | Which BitTorrent specifications (BEPs) the engine supports, which are missing and the roadmap. |
 | [Beyond the BEPs](beyond-bep.md) | Analysis of the protocol extensions outside the BEP catalogue (WebSocket tracker, WebTorrent/WebRTC, v1 cross-layout merge, BEP 46 feeds) and how they would be implemented. |
-| [gx-torrent evolved (gx-nox)](gx-torrent-evoluto.md) | Analysis and decision: gx-torrent as a standalone torrent client (one binary, two modes). |
+| [gx-core](gx-core.md) | The standalone torrent client (the `gx-torrent` binary used without Gextto): modes, security, packaging, what is still open. |
 | [Archive](archive/README.md) | Historical reports and plans, no longer maintained. |
 
 > [!NOTE]

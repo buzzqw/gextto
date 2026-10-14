@@ -63,7 +63,7 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - Il DHT vive in `internal/dht`, un modulo a sé sotto il modulo principale.
 - Analisi delle lacune rispetto a libtorrent e qBittorrent e piano di
   miglioramento: **`docs/evoluzione.md`** (§6–§7); evoluzione verso client
-  standalone (gx-core): **`docs/gx-torrent-evoluto.md`**.
+  standalone (gx-core): **`docs/gx-core.md`**.
 
 ## Build e test
 - `make build` — incrementa `build_number` (committato) e compila
@@ -293,7 +293,7 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - **Ogni evoluzione, miglioria o altro lavoro aggiorna anche i documenti di
   riferimento**, non solo il codice. In particolare: `docs/evoluzione.md`
   (stato, lacune e punti aperti), `docs/measurements.md` (le misure e le verifiche),
-  `docs/gx-torrent-evoluto.md` (evoluzione del demone),
+  `docs/gx-core.md` (il client standalone gx-core),
   `internal/gxcore/GEXTTO.md` (motore gx-core),
   `docs/gx-torrent.md` (documento tecnico del demone), `docs/bep.md` (conformità
   BEP), `docs/ARCHITECTURE.md`, `README.md`/`README.it.md` e l'indice

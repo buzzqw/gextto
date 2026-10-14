@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// TestManagedFootprintIsBounded is the F0 guard (docs/gx-torrent-evoluto.md
+// TestManagedFootprintIsBounded is the F0 guard (docs/gx-core.md
 // §8.2). In managed mode the daemon must stay lean and must not start work of
 // its own: a standalone module that wakes up (ticker, poller, DB) when Gextto
 // is driving the daemon would show up here as extra goroutines or a goroutine

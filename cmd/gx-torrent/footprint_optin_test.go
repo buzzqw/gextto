@@ -1,6 +1,6 @@
 package main
 
-// footprint_optin_test.go is the opt-in footprint harness (docs/gx-torrent-evoluto.md
+// footprint_optin_test.go is the opt-in footprint harness (docs/gx-core.md
 // §8.2). It is skipped unless GX_FOOTPRINT=1: it starts the built daemon and
 // measures RSS at rest, thread count, startup time and idle CPU, comparing them
 // with a committed baseline. Run it by hand:

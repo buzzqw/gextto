@@ -5,7 +5,7 @@ package main
 // expectations: if a future refactor renames or drops one of them, this test
 // fails. Additive fields are allowed (the adapter ignores unknown keys), so the
 // daemon may grow; removals and renames may not. It is the frozen contract of
-// F0 (see docs/gx-torrent-evoluto.md).
+// F0 (see docs/gx-core.md).
 
 import (
 	"encoding/json"

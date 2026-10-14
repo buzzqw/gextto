@@ -7,8 +7,8 @@ in the git history, and the problems that have been solved are not recorded here
 
 The technical reference of the engine is [`gx-torrent.md`](gx-torrent.md), its BEP
 compliance [`bep.md`](bep.md), the engine inventory
-[`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) and the standalone plan
-[`gx-torrent-evoluto.md`](gx-torrent-evoluto.md).
+[`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) and the standalone client
+[`gx-core.md`](gx-core.md).
 
 ## Index
 
