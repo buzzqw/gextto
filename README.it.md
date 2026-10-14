@@ -432,7 +432,7 @@ flussi, dialoghi e navigazione, di cui 13 dedicati specificamente alle verifiche
 di accessibilità WCAG con axe-core sulle sezioni principali. Non è una
 certificazione legale: restano necessari test manuali con screen reader,
 tastiera e tecnologie assistive. Ambito e limiti:
-[analisi di accessibilità](docs/evoluzione.md#8-accessibility).
+[verifica di accessibilità](docs/evoluzione.md#13-accessibility-verification).
 
 ## Documentazione
 
@@ -441,7 +441,7 @@ tastiera e tecnologie assistive. Ambito e limiti:
 | Usare il servizio | [Manuale italiano](docs/MANUAL.it.md) · [English manual](docs/MANUAL.en.md) |
 | Architettura e design | [Architettura](docs/ARCHITECTURE.md) |
 | Specifiche BitTorrent (BEP) | [Conformità BEP](docs/bep.md) |
-| Evoluzione tecnica e roadmap | [Evoluzione e roadmap](docs/evoluzione.md) |
+| Stato tecnico, misure e backlog | [Stato, misure e backlog](docs/evoluzione.md) |
 | NAS, reverse proxy, ripristino | [Guida avanzata](docs/ADVANCED.it.md) |
 | Integrazioni HTTP | [Riferimento API](docs/API.md) |
 | Migrare un'installazione | [Guida migrazione](docs/MIGRATION.md) |
@@ -450,7 +450,7 @@ tastiera e tecnologie assistive. Ambito e limiti:
 | Backend qBittorrent-nox | [Guida alla configurazione](docs/qbittorrent-nox.md) |
 | Compilare o contribuire | [Manuale sviluppatori](docs/DEVELOPERS.md) |
 | Rete e protezione dati | [Politica di sicurezza](docs/SECURITY.md) |
-| Ambito e test accessibilità | [Analisi accessibilità](docs/evoluzione.md#8-accessibility) |
+| Ambito e test accessibilità | [Verifica di accessibilità](docs/evoluzione.md#13-accessibility-verification) |
 
 Struttura completa: l'[indice della documentazione](docs/README.md).
 

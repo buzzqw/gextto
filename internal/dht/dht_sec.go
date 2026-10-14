@@ -163,7 +163,7 @@ func recordReflected(raw string, observerIP net.IP) {
 
 // Routing-table composition, recomputed periodically by the run loop and read
 // by Stats(). Used to make Sybil concentration visible before deciding whether
-// to enforce a cap (see docs/evoluzione.md §4.4).
+// to enforce a cap (see docs/evoluzione.md §11).
 var (
 	subnetShareMax  atomic.Int64
 	nodesInsecureID atomic.Int64
@@ -224,7 +224,7 @@ const subnetCapHintMinShare = 16
 // concentration, or 0 when there is nothing to suggest: the cap is already
 // configured, or no subnet concentrated. It is a read-only recommendation: the
 // engine never enables the cap by itself, because BEP 42 is not universal and
-// CGNAT/mobile legitimately share subnets (docs/evoluzione.md §4.4).
+// CGNAT/mobile legitimately share subnets (docs/evoluzione.md §11).
 func subnetCapHint(maxShare, maxPerSubnet int) int {
 	if maxPerSubnet > 0 || maxShare < subnetCapHintMinShare {
 		return 0

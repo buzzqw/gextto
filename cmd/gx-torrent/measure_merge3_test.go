@@ -1,7 +1,7 @@
 package main
 
 // measure_merge3_test.go measures the swarm merge Phase 3 (block-granularity
-// reuse, docs/evoluzione.md §10.1) on real data: a public ISO and two v2
+// reuse, docs/evoluzione.md §12) on real data: a public ISO and two v2
 // torrents of it with different piece lengths, prepared by
 // scripts/phase3-env.sh. Opt-in, outside CI:
 //

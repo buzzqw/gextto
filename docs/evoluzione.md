@@ -38,11 +38,6 @@ compliance [`bep.md`](bep.md), the engine inventory
 
 14. [Open items and the measurement-gated program](#14-open-items-and-the-measurement-gated-program)
 
-> [!NOTE]
-> The document is being reorganised into these four parts. Until the pass is
-> complete, the sections marked *(in migration)* still carry the earlier structure:
-> each of them states what has still to be merged.
-
 ---
 
 ## Part I — What Gextto is
@@ -412,8 +407,12 @@ limits through `SetLimits` (§14).
 WebTorrent/bittorrent-tracker protocol, dialled through the same egress as the HTTP
 tracker — proxy, resolver, blocklist), **DHT feeds** (a `dht://<pubkey-hex>[?salt=]` URL
 becomes a normal feed source resolved to magnets, so rules, archive, dedup and add are
-reused; `GET /api/v1/dht-feed` resolves one for external consumers) and the v1
-cross-layout merge above. Caveats: the reference `bittorrent-tracker` returns only
+reused; `GET /api/v1/dht-feed` resolves one for external consumers), **v2 partial-file
+hash serving** (BEP 52: `serveHashes` answers the requested leaf range, computing each
+leaf from the downloaded pieces and rejecting a leaf whose piece is missing, so a
+partially downloaded v2 file can serve block hashes too; a request is capped at 512
+hashes so the leaves read on the torrent loop stay bounded) and the v1 cross-layout
+merge above. Caveats: the reference `bittorrent-tracker` returns only
 WebRTC peers to a WebSocket client, so a native client gets no TCP peers there — the
 real unlock would be WebRTC, which is not done — and only the **resolver** side of BEP 46
 exists, not the publisher (signing).
@@ -426,8 +425,7 @@ exists, not the publisher (signing).
 | Pipelining | adaptive queue (50→250), two pieces per peer with a shared budget, writes bounded to 4 pieces/torrent | the 10 Gbps "to be measured" (§14) |
 | Disk I/O | `O_SYNC` removed, `fdatasync`, mmap opt-in | O_DIRECT/io_uring/contiguous writes absent (not justified by a measurement) |
 | DHT | BEP 5/32/33/42/43/44/46, dedup | hardening not active, multi-path unproven (§11) |
-| v2 / merge | v2 download, merge phases 1–4 | v2 seed serves block-layer hashes only for whole files (`hash reject` otherwise) |
-| Adversarial robustness | snub, session ban with TTL, IP filter | less battle-tested than libtorrent |
+| Adversarial robustness | snub, session ban with TTL, IP filter, hostile hash-request headers (bogus root, bad length, huge proof, overflow) refused without a panic | less battle-tested than libtorrent |
 
 Wishlist, outside those: **WebTorrent/WebRTC** (niche, a lot of work) and alternative
 storages (blob, bolt, sqlite: not needed). Postponed: **replacing `internal/dht` with an
@@ -606,6 +604,19 @@ equal (p ≥ 0.15). The `uTP` connection-id probe and the word-wise interest upd
 (`HasAnyOutside` + `skipBits`, 231 → **2.8 µs** per peer on 100k pieces, ×80, 0 alloc)
 are the two places where the rewrite is measurably faster.
 
+**The v1 cross-layout filter has a cost of its own.** Replacing a per-candidate map
+with a nested scan had pushed `BenchmarkMergeCandidatesUnrelated` from ~98 to
+**1360 ns/op**; the scan is now nested only while `len(a)*len(b) <= 1024` (lengths
+compared before paths) and larger packs index the smaller torrent in a map:
+**375 → 265 ns/op, still 0 allocs**. `BenchmarkV1FilesMatchNoMatch` (unrelated torrents
+with the same file length): 8 files 290 → 278 ns, 64 files 18.2 → 3.4 µs, 2000 files
+17.3 ms → **0.13 ms** (109 KB, 9 allocs).
+
+**The disk is far from being the bottleneck.** `BenchmarkStorageWrite` gives
+**~5.8 GB/s** buffered and **~7.4 GB/s** mmap (ranged mmap sync ~29 GB/s through the
+page cache), far above any network speed, which is why `O_DIRECT` and `io_uring` are
+not justified.
+
 **Footprint.** The IP filter stores the IPv4 rules, like the IPv6 ones, as **sorted and
 merged intervals** with binary search; the pointer-based segment tree
 (`internal/blocklist/stree`) is gone. With the Aetherinox blocklist (34 MB,
@@ -762,6 +773,14 @@ drops). Real uTP peers connect, the downloads complete and `utp_syn_drops` stays
 50-SYN backlog bound never binds); the resends show loss on a noisy swarm without a
 storm — Big Buck Bunny dials 342, accepts 57, RTO resends 2563, fast 557; Debian dials
 277, accepts 14, RTO resends 932, fast 41.
+
+**Validation on a live torrent (2026-10-14).** `make measure-realswarm` on the Debian
+13.7 netinst torrent, 2 minutes: the download **completes to 100%**, peers peak **80**
+(uTP peak 26), connections out 53 uTP / 118 TCP and 6 in, uTP socket **dials 265 (91
+errors)**, accepts 6 (0 errors), **RTO resends 1211, fast 0, SYN drops 0**. The engine
+finishes a real swarm, and a healthy path never timeout-resends; the dial error rate
+(~34%) is the expected cost of racing uTP against TCP-only peers and is worth a closer
+look in a later round, not a regression.
 
 **Choking campaign, controlled against libtorrent.** Our seeder serves a real
 libtorrent leecher on loopback: **48 MiB uploaded (100% of the file) in 4.84 s**
@@ -926,181 +945,69 @@ usable for tables/tabs/progress/errors; no regression on desktop and mobile.
 
 ## 14. Open items and the measurement-gated program
 
-*(in migration: already the open-items program; the results move to the measurement sections)*
+**Rule.** There is no speculative code: an item is implemented only when a measurement
+justifies it, otherwise it is closed with the recorded data. Most of what remains is
+**implemented or designed but not validated on a real swarm**, or needs a **go/no-go
+decided on data**, so every item carries the gate it waits for.
 
-Proposal under discussion. Scope: the open items selected for the next phase —
-§1.5 (periodic performance check), §4.3 (cherry-picks/follow-ups), §4.4 and
-§10.2 (DHT hardening and multi-path), §4.6 (quality gaps vs libtorrent) and the
-§10 smartness backlog. Everything else in this document is done or closed.
+**Waiting for a measurement or a host.**
 
-**Diagnosis.** The items are not independent: almost all of them are
-**implemented or designed but not validated on a real swarm**, or they need a
-**go/no-go decided on data** (the DHT levers, the choking algorithm, the disk
-I/O). Per `AGENTS.md` there is **no speculative code**: implement only what a
-measurement justifies; otherwise close the item with the recorded data (as was
-done for the merge candidate ordering, §10 item 3). The program therefore turns
-each item into a measured experiment with an explicit **gate** and **decision**.
+- **Choking on a real swarm.** The controlled evidence is healthy (§10): a real
+  libtorrent leecher is served at full speed on loopback and reciprocation works
+  (leechers exchange 2.52 MB, the seed's upload drops to 1.84×). What is missing is a
+  swarm where peers download *from* us, which needs a host with a **reachable inbound
+  port** (this one is behind a NAT: the seeding harness finds 0 peers). Gate: a campaign
+  against libtorrent/qBittorrent on the same public torrent with the same policy and
+  metrics (upload efficiency while seeding, reciprocation, first-block time, stall
+  rate). Only a gap would justify touching `internal/unchoker`.
+- **The uTP dial error rate.** In the live run 91 of 265 dials failed: expected when
+  racing uTP against TCP-only peers, but worth a closer look in a later round.
+- **Graduated file priority (0–7)** with mixed-priority files: so far measured only
+  indirectly.
+- **DLNA**: transcoding, frames extracted from the video (no ffmpeg), search and
+  Xbox/WMP (`X_MS_MediaReceiverRegistrar`) are missing; browsing, Range playback,
+  subtitles, library folders and artwork are in place (§3).
+- **Auto-speed on the Gextto side**: today it exists only standalone; a managed version
+  would have Gextto measure the RTT and modulate the limits through `SetLimits` (§6).
+- **DHT feeds**: the resolver exists, the **publisher** side (signing a feed) does not,
+  and the BEP 44 outgoing client has no consumer yet (§11).
+- **WebTorrent/WebRTC**: the WebSocket tracker's practical value stays limited until
+  WebRTC is done, since the reference tracker serves only WebRTC peers to a WebSocket
+  client (§6).
+- **10 Gbps pipelining**: the local single-pair ceiling is ~162 MB/s (multi-piece
+  included); measuring further needs a multi-peer swarm on a fast link, neither
+  available here.
 
-### WP0 — Real-swarm harness (enabler)
+**Closing the gap with Sonarr/Radarr** (§1), by value per effort, each after a study and
+without copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
 
-- **Objective:** one reproducible baseline every other gate can compare against.
-- **Method:** keep `make measure-realswarm` / `measure-dht` / `measure-pipeline`
-  / `measure-seeding`; add `scripts/measure-baseline.sh` that runs the cheap ones
-  and writes a dated summary (throughput, uTP resends, DHT reply rate, peers
-  found) to `evoluzione.md`; fix a public test torrent (Ubuntu/Debian) and a DHT
-  info-hash for reproducibility.
-- **Gate:** baseline recorded. **Deliverable:** script + baseline entry.
-  **Effort** 0.5 day, **risk** none.
+- **Named profiles on the Gextto model**: the global policy becomes "Default", each
+  combination of overrides a generated profile, with an automatic migration from the
+  per-title data (`series.quality/language/subtitle/exclude`, `movies_config.*`).
+  Reproducing the *Sonarr* semantics (ordered qualities, cutoff, custom formats) costs
+  more; custom formats (a regex engine plus its UI) would be evaluated separately.
+- **A `/api/v3` subset for Jellyseerr** (`system/status`, `qualityprofile`,
+  `languageprofile`, `rootfolder`, `tag`, `series/lookup` + `POST series`,
+  `movie/lookup` + `POST movie`, `queue`), after named profiles, root folders and tags,
+  and tested against a real Jellyseerr; full compatibility is not realistic.
+- **Import and rename edge cases** (multi-episode, specials, daily, manual import with
+  matching and replacement): study the behaviour and reimplement it, building our own
+  corpus from real names.
 
-### WP1 — Performance round (§1.5)
+**Closed with data**, so the ground is not re-covered: replacing `internal/dht` with an
+external DHT (the API model differs and it would drop the dual-stack/shared-socket
+patches); **enforcing** the anti-Sybil cap (no node exceeds any candidate threshold, so
+it stays a hint, off by default); the **multi-path `get_peers`** rewrite
+(`peers_confirmed_multi` was 0 in both real measurements); **ordering the merge
+candidates by reusable bytes** (superseded by the dedup, no measurable gain);
+`O_DIRECT`/`io_uring` (the disk is not the bottleneck); a write-back cache in the engine
+(`write_cache=0`); a UI benchmark as a CI performance test (SSR rendering is ~1–3 ms per
+page).
 
-- **Method (idle machine):** `go test -bench … -benchmem`; `pprof` CPU/heap on
-  `gexttod` and `gx-torrent` during a real transfer; RSS and goroutine counts;
-  `make measure-seeding`.
-- **Gate/decision:** code changes only for a **measured** hotspot; otherwise
-  record "no regression, no change".
-- **Deliverable:** a "Performance round N" entry with the numbers.
-  **Effort** 0.5–1 day, **risk** none.
-
-### WP2 — Real-swarm validation of built features (§4.3) + close decisions
-
-- **Items:** the **adaptive request queue** (pipelining) and the **uTP adaptive
-  RTO** validated on a live torrent with `make measure-realswarm` (healthy paths
-  keep the resend counters low, throughput not regressed); **graduated file
-  priority** measured locally with mixed priorities.
-- **Decision:** **external DHT — close** (our own module keeps the dual-stack
-  and shared-socket patches and the per-torrent traversal model that a dependency
-  would drop).
-- **Deliverable:** measurement records + the external-DHT decision.
-  **Effort** 0.5 day, **risk** low.
-
-### WP3 — DHT cluster (§10.2, §4.4, §10 items 5–6)
-
-- **A — data.** `make measure-dht` on a **real active info-hash** (not a random
-  one) long enough that `peers_found` and `peers_confirmed_multi` are
-  non-trivial; record reply rate, `subnet_share_max`, `nodes_insecure_id`,
-  `subnet_cap_hint`.
-- **B — anti-Sybil cap.** Run with `MaxNodesPerSubnet` at candidate thresholds
-  (8/16/24); **enforce only if** it does not lower `peers_found` while lowering
-  the concentration; otherwise keep the hint (close).
-- **C — multi-path.** Decision gate on the confirmed-multi share and on connect
-  success by confirmation. If justified, implement a **bounded per-lookup state
-  machine** (like `bep44_client.go`) with a fan-out and a deadline and expose
-  `lookup_paths`; else close with data.
-- **Deliverable:** records + either the enforcement / state machine (with tests)
-  or two "closed with data" notes. **Effort** measurement 0.5–1 day;
-  implementation 2–4 days if justified. **Risk** medium (DHT correctness).
-
-### WP4 — Quality gaps vs libtorrent (§4.6)
-
-- **4a Choking/seeding campaign.** On a real swarm, gx-torrent vs
-  libtorrent/qBittorrent with the same policy on the same public torrent;
-  metrics: upload efficiency while seeding, reciprocation, first-block time,
-  stall rate. **Gate:** implement an improved choking algorithm only if a gap
-  shows.
-- **4b 10 Gbps pipelining.** Extend `measure-pipeline` / the latency harness to
-  deeper queues and higher rates; multi-piece is already in; implement more only
-  if the measured ceiling is below target.
-- **4c Disk I/O (O_DIRECT/io_uring).** Measure the disk path (`measure-seeding`
-  + a slow-storage harness); implement only if the disk is the bottleneck.
-- **4d v2 seed: block-layer hashes for a partial file.** Today `serveHashes`
-  refuses (`hash reject`) a `base=0` request unless the **whole** file is present
-  (`v2BlockTree`). Implement serving **only the requested leaf range**, computing
-  each leaf from the downloaded pieces and still rejecting a leaf whose piece is
-  missing; the upper layers come from the attached `piece layers`. Tests: unit
-  (partial file, missing piece, out-of-range, tail) + interop with a libtorrent
-  leecher. This is a **clear feature gap**, so it is implemented regardless.
-- **4e Adversarial robustness.** Test-only harness: a lying peer, a bogus
-  bitfield, a `hash request` flood; the existing smart ban and the fuzz targets
-  are the control.
-- **Deliverable:** campaign records + 4d (code/tests/docs) + 4e tests.
-  **Effort** campaign 1 day, 4d 2–3 days, 4e 0.5 day. **Risk** 4d medium
-  (protocol), the rest low.
-
-### Sequence and decision points
-
-**WP0 → WP1 → WP2 → WP3 (A→B→C) → WP4.** Cheap "close with data" first
-(WP1/WP2), then the DHT cluster (WP3), then the one clear feature (WP4d) and the
-campaign (WP4a). Explicit decisions: WP2 external DHT (close), WP3-B cap
-(enforce/hint), WP3-C multi-path (implement/close), WP4a choking
-(implement/close), WP4b/4c (implement only if measured), WP4d (always).
-
-One WP = its own commits, measurement recorded **before and after** in this
-document; the reference docs updated with each change (`bep.md` for 4d,
-`gx-torrent.md`, [`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md)).
-
-### 11.1 Results — first run (2026-10-14, Intel N97, public torrents/DHT)
-
-**WP0.** `scripts/measure-baseline.sh` added: it runs the cheap harnesses
-(benchmarks, local swarm, pipelining) and the network ones when their env is
-set, and writes a dated baseline. First baseline stored from the branch.
-
-**WP1 (performance).** The baseline surfaced a regression introduced by the v1
-cross-layout filter: `BenchmarkMergeCandidatesUnrelated` **1360 → 375 ns/op,
-0 allocs/op** after replacing a per-candidate map with a nested scan (was
-~98 ns before the v1 work; the remaining cost is the per-candidate file scan
-the feature needs, on one-shot paths only). The nested scan is quadratic, so
-it is kept only up to `len(a)*len(b) <= 1024` (lengths compared before paths);
-larger packs index the smaller torrent in a map. `BenchmarkV1FilesMatchNoMatch`
-(unrelated torrents, same file length): 8 files **290 → 278 ns**, 64 files
-**18.2 → 3.4 µs**, 2000 files **17.3 ms → 0.13 ms** (109 KB, 9 allocs);
-`BenchmarkMergeCandidatesUnrelated` **375 → 265 ns/op**, still 0 allocs. No
-other hotspot appeared.
-
-**WP2 (real swarm).** `make measure-realswarm` on the Debian 13.7 netinst
-torrent, 2 minutes: download **completed to 100 %**, peers **peak 80**
-(uTP peak 26), connections uTP 53 / TCP 118 out, 6 in; uTP socket **dials 265
-(91 errors)**, accepts 6 (0 errors), **resends RTO 1211, fast 0**, **SYN drops
-0**. The engine finishes a real swarm; the uTP dial error rate (91/265 ≈ 34 %)
-is the expected cost of racing uTP against TCP-only peers and is worth a closer
-look in a later round, not a regression. **External DHT: closed** (keep the own
-module: per-torrent traversal + dual-stack/shared-socket patches).
-
-**WP3 (DHT, 5 minutes, real Debian info-hash).** nodes settled ~296 from a
-peak of 525, **`subnet_share_max` 4–7** (below the hint threshold of 16),
-`nodes_insecure_id` ≈ 42 %, **`nodes_capped` 0**, queries_out 4703 / replies_in
-1670 (**35.5 % reply success**), dropped 1273, **`reflected_observations` 1063**
-(BEP 42 `ip` sending works), **`peers_found` 0**, **`peers_confirmed_multi` 0**.
-
-- **WP3-B anti-Sybil cap: keep as a hint, off.** With `subnet_share_max` ≤ 7 no
-  node exceeds any candidate threshold (8/16/24), so enforcement would be a
-  no-op (`nodes_capped` 0); CGNAT/mobile legitimately share subnets. No code.
-- **WP3-C multi-path: closed with data.** `peers_confirmed_multi` 0 and a low
-  concentration give **no evidence** for a multi-path rewrite; the routing table
-  is not concentrated and the unanswered queries are silent nodes, not poisoning
-  (see §10.2). No rewrite.
-
-**WP4a (choking/seeding campaign).** Local evidence is healthy: without mesh the
-seeders uploads 3.00× the corpus (3 pure leechers), and **with mesh the leechers
-reciprocate** — they upload **2.52 MB** among themselves and the seeders upload
-drops to **1.84×** the corpus (−39 %). A real-swarm comparison against
-libtorrent/qBittorrent (same policy, same public torrent, metrics: upload
-efficiency, reciprocation, first-block time, stall rate) **remains the gate**
-for any choking change — not implemented.
-
-**WP4b (10 Gbps pipelining).** The local latency harness tops out at
-**~162 MB/s** for a single peer pair (deep profile); 10 Gbps (1.25 GB/s) needs a
-multi-peer swarm and a fast link, neither available here. Multi-piece is already
-in (§10.3); no further change justified by these numbers.
-
-**WP4c (disk I/O).** `BenchmarkStorageWrite` **~5.8 GB/s** buffered and
-**~7.4 GB/s** mmap (ranged mmap sync ~29 GB/s, page cache), far above any
-network speed: the disk is **not** the bottleneck, so `O_DIRECT`/`io_uring` are
-**not justified**. Closed with data.
-
-**WP4d (v2 partial-file hash serving).** Implemented: `servePartialBlockHashes`
-+ `blockLeavesRange` in `torrent_hashrequest.go`; tests verify the reply against
-the file root and, for every servable request (zero padding past the end of the
-file included), compare it byte-for-byte with the full block tree
-(`torrent_hashrequest_serve_test.go`). The same path answers a complete file
-while its block tree is still being built, and a request is capped at 512
-hashes so the leaves read on the torrent loop stay bounded.
-
-**WP4e (adversarial).** Hostile hash-request headers (bogus root, bad length,
-huge proof, overflow) are refused without panic; the WebSocket frame fuzzer is
-in `make fuzz-smoke`.
-
-**Decision summary:** external DHT → **close**; anti-Sybil cap → **hint only**;
-multi-path → **close with data**; choking → **gated on a real-swarm campaign**;
-10 Gbps → **close with data**; disk I/O → **close with data**; **v2 partial-file
-hash serving → done**.
+**Where the current round landed (2026-10-14, Intel N97, public torrents and DHT).**
+`scripts/measure-baseline.sh` runs the cheap harnesses — and the network ones when their
+environment is set — and writes a dated baseline, which is the reference the next round
+compares against. That round found and fixed the v1-filter regression, implemented the
+v2 partial-file hash serving (§6) and closed the DHT questions with the numbers now in
+§9, §10 and §11. What remains is the real-swarm choking campaign, which needs the host
+with a reachable inbound port, and whatever that campaign justifies.

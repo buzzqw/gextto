@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # measure-baseline.sh — one reproducible baseline of the cheap harnesses of the
-# gx-core engine, so a change can be compared against it (docs/evoluzione.md §11,
+# gx-core engine, so a change can be compared against it (docs/evoluzione.md §14,
 # WP0/WP1). Local by default; the network harnesses run only when their
 # environment is set, because they need a public torrent or the live DHT.
 #

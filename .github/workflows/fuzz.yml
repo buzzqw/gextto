@@ -9,7 +9,7 @@ name: Fuzz
 #   - on demand from the Actions tab, with a custom per-target time.
 # Kept off the general CI so a fuzzing failure does not block a merge. On a
 # failure the Go fuzzer's crashing input (testdata/fuzz/<Target>/) is uploaded
-# so it can be committed as a regression seed (docs/evoluzione.md section 10).
+# so it can be committed as a regression seed (docs/evoluzione.md section 6).
 
 on:
   schedule:

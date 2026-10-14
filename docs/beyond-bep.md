@@ -247,7 +247,7 @@ because Phase 2 matches files by their BEP 52 per-file Merkle root. This item
 extends reuse to v1 with a different layout.
 
 **Why it matters here.** It is the last frontier of the feature just completed
-(`evoluzione.md` §9.2): more pairs of torrents could be "revived" without a
+(`evoluzione.md` §6): more pairs of torrents could be "revived" without a
 seeder (a re-release with a different piece size, a re-pack, an old media
 `.torrent` against a new one).
 
@@ -299,7 +299,7 @@ sub-piece span without an independent hash.
 **Tests / measurement / docs.** Unit tests for the v1 different-layout reuse
 (whole and partial), a false-match test that must end with the piece downloaded
 whole and no corruption, and an end-to-end daemon case; a real-data measurement
-like the Phase 3 harness if the feature lands. Update `evoluzione.md` §9.2 and
+like the Phase 3 harness if the feature lands. Update `evoluzione.md` §6 and
 [`gx-torrent.md`](gx-torrent.md).
 
 **Effort/risk.** Medium-high. The **risk is wasted work, not correctness**: the

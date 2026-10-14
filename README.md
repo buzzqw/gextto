@@ -419,7 +419,7 @@ navigation, dialogs and workflows, with 13 tests dedicated specifically to
 axe-core WCAG accessibility audits on the main sections. That is not a legal
 certification: manual screen-reader, keyboard and assistive-technology testing
 is still required. Scope and limits:
-[accessibility analysis](docs/evoluzione.md#8-accessibility).
+[accessibility verification](docs/evoluzione.md#13-accessibility-verification).
 
 ## Documentation
 
@@ -428,7 +428,7 @@ is still required. Scope and limits:
 | Operate the service | [English manual](docs/MANUAL.en.md) · [Manuale italiano](docs/MANUAL.it.md) |
 | Architecture and design | [Architecture](docs/ARCHITECTURE.md) |
 | BitTorrent specifications (BEPs) | [BEP compliance](docs/bep.md) |
-| Technical evolution and roadmap | [Evolution and roadmap](docs/evoluzione.md) |
+| Technical state, measurements and backlog | [State, measurements and backlog](docs/evoluzione.md) |
 | NAS, reverse proxy, recovery | [Advanced guide](docs/ADVANCED.en.md) |
 | HTTP integrations | [API reference](docs/API.md) |
 | Move an existing installation | [Migration guide](docs/MIGRATION.md) |
@@ -437,7 +437,7 @@ is still required. Scope and limits:
 | qBittorrent-nox backend | [Setup guide](docs/qbittorrent-nox.md) |
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |
-| Accessibility scope and testing | [Accessibility analysis](docs/evoluzione.md#8-accessibility) |
+| Accessibility scope and testing | [Accessibility verification](docs/evoluzione.md#13-accessibility-verification) |
 
 Full tree: the [documentation index](docs/README.md).
 

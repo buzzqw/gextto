@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # phase3-env.sh prepares the real-data environment for the swarm merge Phase 3
-# (block-granularity reuse, docs/evoluzione.md §10.1) and its measurement
+# (block-granularity reuse, docs/evoluzione.md §12) and its measurement
 # (cmd/gx-torrent TestMeasureMergePhase3).
 #
 # 1. Downloads public ISOs over BitTorrent (Debian netinst, Arch Linux) with

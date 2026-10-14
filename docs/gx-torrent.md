@@ -1273,14 +1273,14 @@ The merge has three phases:
   two torrents use a **different piece length**: the destination piece's bytes
   are reassembled from the source's verified pieces and **each destination piece
   is verified against its own hash** before it is written. There is no v1
-  different-layout heuristic (§9.2 of [`evoluzione.md`](evoluzione.md)).
+  different-layout heuristic (§6 of [`evoluzione.md`](evoluzione.md)).
 - **Phase 3 — v2, 16 KiB blocks.** When the source has verified only part of
   the source pieces a destination piece spans, the verified blocks are written
   and only the missing blocks are requested from peers; the piece is verified
   whole once complete. If that check fails, the local blocks are dropped and
   the piece is downloaded whole (the peer is not banned for it). Measured on
   the Debian and Arch ISOs with a source 75% complete: 25% of the file from the
-  network instead of 100% (§10.1 of [`evoluzione.md`](evoluzione.md), harness
+  network instead of 100% (§12 of [`evoluzione.md`](evoluzione.md), harness
   `scripts/phase3-env.sh` + `TestMeasureMergePhase3`).
 - **Phase 4 — v1, a different piece length.** Two **v1** torrents matched by
   file **path and length** share **whole** pieces even when their piece grids
@@ -1921,7 +1921,7 @@ other cases the LSD also announces and listens on the group `[ff15::efc0:988f]:6
   - loading of the IP filter.
   - (opt-in, `GX_MEASURE=1` / `make measure-seeding`) the seeding/choking measurement
     on a local swarm, with bytes and times per peer: method and metrics in
-    `docs/evoluzione.md` (§6).
+    `docs/evoluzione.md` (§8).
 - `go test ./internal/blocklist` in `internal/gxcore` covers the formats of the
   IP filter.
 - `make test-engine` also covers the deterministic choking harness
