@@ -53,6 +53,9 @@ type logRingBuffer struct {
 	lines []string
 	next  int
 	full  bool
+	// count is the total number of lines ever written; ids are assigned from it
+	// so the qBittorrent log API can filter by last_known_id.
+	count int64
 }
 
 func newLogRingBuffer(max int) *logRingBuffer {
@@ -74,6 +77,7 @@ func (r *logRingBuffer) Write(p []byte) (int, error) {
 		if r.next == 0 {
 			r.full = true
 		}
+		r.count++
 	}
 	r.mu.Unlock()
 	return len(p), nil
@@ -103,6 +107,30 @@ func (r *logRingBuffer) tail(n int) []string {
 	start := (r.next - n + len(r.lines)) % len(r.lines)
 	for i := 0; i < n; i++ {
 		out = append(out, r.lines[(start+i)%len(r.lines)])
+	}
+	return out
+}
+
+// logEntry is one log line with the monotonic id the qBittorrent log API uses
+// for its last_known_id filter.
+type logEntry struct {
+	ID   int64
+	Text string
+}
+
+// tailEntries returns the last n lines with their ids, oldest first.
+func (r *logRingBuffer) tailEntries(n int) []logEntry {
+	lines := r.tail(n)
+	if len(lines) == 0 {
+		return []logEntry{}
+	}
+	r.mu.Lock()
+	count := r.count
+	r.mu.Unlock()
+	base := count - int64(len(lines)) + 1
+	out := make([]logEntry, len(lines))
+	for i, line := range lines {
+		out[i] = logEntry{ID: base + int64(i), Text: line}
 	}
 	return out
 }

@@ -325,6 +325,22 @@ func (t *Torrent) PieceStates() ([]string, bool) {
 	return states, states != nil
 }
 
+// PieceHashes returns the per-piece hashes (hex) in index order. Nil when the
+// metadata has not arrived yet. Used by the qBittorrent API's pieceHashes.
+func (t *Torrent) PieceHashes() []string {
+	return query(t.torrent, func() []string {
+		pieces := t.torrent.pieces
+		if len(pieces) == 0 {
+			return nil
+		}
+		out := make([]string, len(pieces))
+		for i := range pieces {
+			out[i] = hex.EncodeToString(pieces[i].Hash)
+		}
+		return out
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------

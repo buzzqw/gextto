@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -80,6 +81,21 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/app/setPreferences", d.handleQbitSetPreferences)
 	mux.HandleFunc("POST /api/v2/torrents/setShareLimits", d.handleQbitSetShareLimits)
 	mux.HandleFunc("GET /api/v2/sync/torrentPeers", d.handleQbitTorrentPeers)
+	// Read-side endpoints added for the qBittorrent API surface: piece
+	// diagnostics, web seeds, the per-torrent limits in reading, the
+	// alternative-limits state, the network interfaces and the logs.
+	mux.HandleFunc("GET /api/v2/torrents/pieceStates", d.handleQbitPieceStates)
+	mux.HandleFunc("GET /api/v2/torrents/pieceHashes", d.handleQbitPieceHashes)
+	mux.HandleFunc("GET /api/v2/torrents/webseeds", d.handleQbitWebseeds)
+	mux.HandleFunc("GET /api/v2/torrents/downloadLimit", d.handleQbitTorrentDownloadLimits)
+	mux.HandleFunc("POST /api/v2/torrents/downloadLimit", d.handleQbitTorrentDownloadLimits)
+	mux.HandleFunc("GET /api/v2/torrents/uploadLimit", d.handleQbitTorrentUploadLimits)
+	mux.HandleFunc("POST /api/v2/torrents/uploadLimit", d.handleQbitTorrentUploadLimits)
+	mux.HandleFunc("GET /api/v2/transfer/speedLimitsMode", d.handleQbitSpeedLimitsMode)
+	mux.HandleFunc("GET /api/v2/app/networkInterfaceList", d.handleQbitNetworkInterfaceList)
+	mux.HandleFunc("GET /api/v2/app/networkInterfaceAddressList", d.handleQbitNetworkInterfaceAddressList)
+	mux.HandleFunc("GET /api/v2/log/main", d.handleQbitLogMain)
+	mux.HandleFunc("GET /api/v2/log/peers", d.handleQbitLogPeers)
 	return d.qbitAuth(mux)
 }
 
@@ -160,38 +176,59 @@ func (d *Daemon) handleQbitTransferInfo(w http.ResponseWriter, _ *http.Request) 
 
 // qbitTorrent is the subset of the qBittorrent torrent object the clients read.
 type qbitTorrent struct {
-	Hash         string  `json:"hash"`
-	Name         string  `json:"name"`
-	Size         int64   `json:"size"`
-	TotalSize    int64   `json:"total_size"`
-	Progress     float64 `json:"progress"`
-	DLRate       int64   `json:"dlspeed"`
-	ULRate       int64   `json:"upspeed"`
-	State        string  `json:"state"`
-	SavePath     string  `json:"save_path"`
-	ContentPath  string  `json:"content_path"`
-	Category     string  `json:"category"`
-	Tags         string  `json:"tags"`
-	NumSeeds     int     `json:"num_seeds"`
-	NumLeechs    int     `json:"num_leechs"`
-	Ratio        float64 `json:"ratio"`
-	ETA          int64   `json:"eta"`
-	AddedOn      int64   `json:"added_on"`
-	CompletionOn int64   `json:"completion_on"`
-	AmountLeft   int64   `json:"amount_left"`
-	Downloaded   int64   `json:"downloaded"`
-	Uploaded     int64   `json:"uploaded"`
-	Priority     int     `json:"priority"`
-	SeqDL        bool    `json:"seq_dl"`
-	FLPiecePrio  bool    `json:"f_l_piece_prio"`
-	ForceStart   bool    `json:"force_start"`
-	AutoTMM      bool    `json:"auto_tmm"`
-	MagnetURI    string  `json:"magnet_uri"`
+	Hash          string  `json:"hash"`
+	Name          string  `json:"name"`
+	Size          int64   `json:"size"`
+	TotalSize     int64   `json:"total_size"`
+	Progress      float64 `json:"progress"`
+	DLRate        int64   `json:"dlspeed"`
+	ULRate        int64   `json:"upspeed"`
+	State         string  `json:"state"`
+	SavePath      string  `json:"save_path"`
+	ContentPath   string  `json:"content_path"`
+	Category      string  `json:"category"`
+	Tags          string  `json:"tags"`
+	NumSeeds      int     `json:"num_seeds"`
+	NumLeechs     int     `json:"num_leechs"`
+	NumComplete   int     `json:"num_complete"`
+	NumIncomplete int     `json:"num_incomplete"`
+	Ratio         float64 `json:"ratio"`
+	ETA           int64   `json:"eta"`
+	AddedOn       int64   `json:"added_on"`
+	CompletionOn  int64   `json:"completion_on"`
+	AmountLeft    int64   `json:"amount_left"`
+	Downloaded    int64   `json:"downloaded"`
+	Uploaded      int64   `json:"uploaded"`
+	// DownloadedSession/UploadedSession: the daemon does not keep a separate
+	// per-session counter, so they mirror the lifetime counters rather than
+	// reporting a misleading zero.
+	DownloadedSession int64   `json:"downloaded_session"`
+	UploadedSession   int64   `json:"uploaded_session"`
+	Completed         int64   `json:"completed"`
+	Tracker           string  `json:"tracker"`
+	DLimit            int64   `json:"dl_limit"`
+	ULimit            int64   `json:"up_limit"`
+	SeedingTime       int64   `json:"seeding_time"`
+	TimeActive        int64   `json:"time_active"`
+	TotalWasted       int64   `json:"total_wasted"`
+	Availability      float64 `json:"availability"`
+	Priority          int     `json:"priority"`
+	SeqDL             bool    `json:"seq_dl"`
+	FLPiecePrio       bool    `json:"f_l_piece_prio"`
+	ForceStart        bool    `json:"force_start"`
+	AutoTMM           bool    `json:"auto_tmm"`
+	MagnetURI         string  `json:"magnet_uri"`
 }
 
 func (d *Daemon) handleQbitTorrentsInfo(w http.ResponseWriter, r *http.Request) {
 	views := d.snapshotViews()
 	wanted := d.qbitHashFilter(r)
+	q := r.URL.Query()
+	filter := strings.ToLower(strings.TrimSpace(q.Get("filter")))
+	hasCategory := q.Has("category")
+	category := strings.TrimSpace(q.Get("category"))
+	hasTag := q.Has("tag")
+	tag := strings.TrimSpace(q.Get("tag"))
 	out := make([]qbitTorrent, 0, len(views))
 	for _, v := range views {
 		if wanted != nil {
@@ -199,9 +236,159 @@ func (d *Daemon) handleQbitTorrentsInfo(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 		}
+		if filter != "" && filter != "all" && !qbitMatchFilter(filter, v) {
+			continue
+		}
+		if hasCategory {
+			// An empty "category" means "without category", like qBittorrent.
+			if category == "" {
+				if v.Category != "" {
+					continue
+				}
+			} else if v.Category != category {
+				continue
+			}
+		}
+		if hasTag {
+			if tag == "" {
+				if len(v.Tags) > 0 {
+					continue
+				}
+			} else if !qbitHasTag(v.Tags, tag) {
+				continue
+			}
+		}
 		out = append(out, qbitView(v))
 	}
+	qbitSortTorrents(out, q.Get("sort"), formBool(r, "reverse"))
+	qbitPage(out, q.Get("limit"), q.Get("offset"))
 	writeJSON(w, http.StatusOK, out)
+}
+
+// qbitMatchFilter implements the "filter" parameter of /torrents/info against a
+// torrent's published view.
+func qbitMatchFilter(filter string, v torrentInfo) bool {
+	state := qbitStateFor(v)
+	switch filter {
+	case "downloading":
+		return state == "downloading" || state == "metaDL" || state == "forcedDL" ||
+			state == "stalledDL" || state == "allocating" || state == "checkingDL" || state == "queuedDL"
+	case "seeding":
+		return state == "uploading" || state == "forcedUP" || state == "stalledUP" ||
+			state == "queuedUP" || state == "checkingUP"
+	case "completed":
+		return v.HasMetadata && v.TotalSize > 0 && v.TotalDone >= v.TotalSize
+	case "stopped", "paused":
+		return state == "pausedDL" || state == "pausedUP"
+	case "running":
+		return state != "pausedDL" && state != "pausedUP" && state != "error" && state != "unknown"
+	case "active":
+		return v.DownloadRate > 0 || v.UploadRate > 0
+	case "inactive":
+		return v.DownloadRate <= 0 && v.UploadRate <= 0
+	case "stalled":
+		return state == "stalledDL" || state == "stalledUP"
+	case "stalled_uploading", "stalled_up":
+		return state == "stalledUP"
+	case "stalled_downloading", "stalled_dl":
+		return state == "stalledDL"
+	case "errored", "error":
+		return state == "error"
+	default:
+		return true
+	}
+}
+
+func qbitHasTag(tags []string, tag string) bool {
+	for _, t := range tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
+// qbitSortTorrents orders the list by a qBittorrent sort key (any field name of
+// the torrent object). Unknown keys leave the order unchanged.
+func qbitSortTorrents(list []qbitTorrent, key string, reverse bool) {
+	if key == "" {
+		return
+	}
+	less := func(a, b qbitTorrent) bool {
+		switch key {
+		case "name":
+			return strings.ToLower(a.Name) < strings.ToLower(b.Name)
+		case "size", "total_size":
+			return a.TotalSize < b.TotalSize
+		case "progress":
+			return a.Progress < b.Progress
+		case "dlspeed":
+			return a.DLRate < b.DLRate
+		case "upspeed":
+			return a.ULRate < b.ULRate
+		case "ratio":
+			return a.Ratio < b.Ratio
+		case "eta":
+			return a.ETA < b.ETA
+		case "added_on":
+			return a.AddedOn < b.AddedOn
+		case "completion_on":
+			return a.CompletionOn < b.CompletionOn
+		case "num_seeds":
+			return a.NumSeeds < b.NumSeeds
+		case "num_leechs":
+			return a.NumLeechs < b.NumLeechs
+		case "state":
+			return a.State < b.State
+		case "category":
+			return a.Category < b.Category
+		case "hash":
+			return a.Hash < b.Hash
+		case "time_active":
+			return a.TimeActive < b.TimeActive
+		case "seeding_time":
+			return a.SeedingTime < b.SeedingTime
+		case "downloaded":
+			return a.Downloaded < b.Downloaded
+		case "uploaded":
+			return a.Uploaded < b.Uploaded
+		case "amount_left":
+			return a.AmountLeft < b.AmountLeft
+		default:
+			return false
+		}
+	}
+	sort.SliceStable(list, func(i, j int) bool {
+		if reverse {
+			return less(list[j], list[i])
+		}
+		return less(list[i], list[j])
+	})
+}
+
+// qbitPage applies the optional "limit" and "offset" parameters (offset may be
+// negative, counted from the end, like qBittorrent).
+func qbitPage(list []qbitTorrent, limitRaw, offsetRaw string) []qbitTorrent {
+	if offsetRaw != "" {
+		if offset, err := strconv.Atoi(strings.TrimSpace(offsetRaw)); err == nil && offset != 0 {
+			if offset < 0 {
+				offset = len(list) + offset
+			}
+			if offset < 0 {
+				offset = 0
+			}
+			if offset > len(list) {
+				offset = len(list)
+			}
+			list = list[offset:]
+		}
+	}
+	if limitRaw != "" {
+		if limit, err := strconv.Atoi(strings.TrimSpace(limitRaw)); err == nil && limit >= 0 && limit < len(list) {
+			list = list[:limit]
+		}
+	}
+	return list
 }
 
 // qbitHashFilter returns the set of requested info hashes (lowercase) from the
@@ -237,34 +424,100 @@ func qbitView(v torrentInfo) qbitTorrent {
 	if eta <= 0 || eta > qbitUnknownETA {
 		eta = qbitUnknownETA
 	}
-	return qbitTorrent{
-		Hash:         strings.ToLower(v.Hash),
-		Name:         v.Name,
-		Size:         v.TotalSize,
-		TotalSize:    v.TotalSize,
-		Progress:     v.Progress / 100,
-		DLRate:       v.DownloadRate,
-		ULRate:       v.UploadRate,
-		State:        qbitState(v.State),
-		SavePath:     v.SavePath,
-		ContentPath:  filepath.Join(v.SavePath, v.Name),
-		Category:     v.Category,
-		Tags:         strings.Join(v.Tags, ", "),
-		NumSeeds:     v.NumSeeds,
-		NumLeechs:    v.NumPeers,
-		Ratio:        ratioOf(v),
-		ETA:          eta,
-		AddedOn:      v.AddedAt,
-		CompletionOn: v.CompletedAt,
-		AmountLeft:   v.TotalSize - v.TotalDone,
-		Downloaded:   v.Downloaded,
-		Uploaded:     v.Uploaded,
-		Priority:     0,
-		SeqDL:        v.Sequential,
-		FLPiecePrio:  v.FirstLast,
-		ForceStart:   v.Pinned,
-		AutoTMM:      false,
+	availability := -1.0
+	if v.PiecesTotal > 0 {
+		availability = float64(v.PiecesAvailable) / float64(v.PiecesTotal)
 	}
+	return qbitTorrent{
+		Hash:              strings.ToLower(v.Hash),
+		Name:              v.Name,
+		Size:              v.TotalSize,
+		TotalSize:         v.TotalSize,
+		Progress:          v.Progress / 100,
+		DLRate:            v.DownloadRate,
+		ULRate:            v.UploadRate,
+		State:             qbitStateFor(v),
+		SavePath:          v.SavePath,
+		ContentPath:       filepath.Join(v.SavePath, v.Name),
+		Category:          v.Category,
+		Tags:              strings.Join(v.Tags, ", "),
+		NumSeeds:          v.NumSeeds,
+		NumLeechs:         v.NumPeers,
+		NumComplete:       v.NumComplete,
+		NumIncomplete:     v.NumIncomplete,
+		Ratio:             ratioOf(v),
+		ETA:               eta,
+		AddedOn:           v.AddedAt,
+		CompletionOn:      v.CompletedAt,
+		AmountLeft:        v.TotalSize - v.TotalDone,
+		Downloaded:        v.Downloaded,
+		Uploaded:          v.Uploaded,
+		DownloadedSession: v.Downloaded,
+		UploadedSession:   v.Uploaded,
+		Completed:         v.TotalDone,
+		Tracker:           v.CurrentTracker,
+		DLimit:            qbitTorrentLimitOut(v.DownloadLimitKib),
+		ULimit:            qbitTorrentLimitOut(v.UploadLimitKib),
+		SeedingTime:       v.SeedingSeconds,
+		TimeActive:        v.ActiveSeconds,
+		TotalWasted:       v.Wasted,
+		Availability:      availability,
+		Priority:          0,
+		SeqDL:             v.Sequential,
+		FLPiecePrio:       v.FirstLast,
+		ForceStart:        v.Pinned,
+		AutoTMM:           false,
+	}
+}
+
+// qbitTorrentLimitOut renders a per-torrent limit for torrents/info: bytes per
+// second when set, -1 when the torrent follows the global limit (qBittorrent
+// reports -1 for "unlimited/global").
+func qbitTorrentLimitOut(kib int64) int64 {
+	if kib > 0 {
+		return kib * 1024
+	}
+	return -1
+}
+
+// qbitStateFor refines qbitState with the view's progress and flags, so clients
+// see the richer qBittorrent states (metaDL, forcedDL/UP, stalledUP, pausedUP,
+// checkingUP), not just the base ones.
+func qbitStateFor(v torrentInfo) string {
+	done := v.HasMetadata && v.TotalSize > 0 && v.TotalDone >= v.TotalSize
+	switch v.State {
+	case "downloading":
+		if v.Pinned {
+			return "forcedDL"
+		}
+		return "downloading"
+	case "downloading_metadata":
+		if v.Pinned {
+			return "forcedMetaDL"
+		}
+		return "metaDL"
+	case "seeding":
+		if v.Pinned {
+			return "forcedUP"
+		}
+		return "uploading"
+	case "paused":
+		if done {
+			return "pausedUP"
+		}
+		return "pausedDL"
+	case "stalled":
+		if done {
+			return "stalledUP"
+		}
+		return "stalledDL"
+	case "checking_files":
+		if done {
+			return "checkingUP"
+		}
+		return "checkingDL"
+	}
+	return qbitState(v.State)
 }
 
 // qbitState maps the daemon's state to the qBittorrent names the clients

@@ -525,8 +525,22 @@ and `torrents/reannounce|setLocation` (plus the 5.x aliases `stop`/`start`),
 `torrents/toggleSequentialDownload|setSuperSeeding|addTrackers|removeTrackers|editTracker|filePrio|export|setForceStart|setAutoManagement|setDownloadLimit|setUploadLimit|setShareLimits`,
 `transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit`, `sync/maindata` (with incremental `rid`) and
 `sync/torrentPeers` (which reports `rid: 0`), and `content_path` in
-`torrents/info`, as Sonarr and Radarr read). The API uses the same access
-criteria as the page: without a password it is open, otherwise the LAN bypass
+`torrents/info`, as Sonarr and Radarr read).
+
+The **read side** also covers what the WebUI alternatives and the mobile apps
+need: `torrents/info` accepts the `filter`, `category`, `tag`, `sort`,
+`reverse`, `limit`, `offset` and `hashes` parameters and carries the richer
+fields (`tracker`, `completed`, `dl_limit`/`up_limit`, `seeding_time`,
+`time_active`, `num_complete`/`num_incomplete`, `availability`,
+`downloaded_session`/`uploaded_session`, `total_wasted`) with the fuller
+qBittorrent states (`metaDL`, `forcedDL`/`forcedUP`, `stalledUP`, `pausedUP`,
+`checkingUP`); `torrents/pieceStates` and `torrents/pieceHashes` expose the
+piece diagnostics; `torrents/webseeds` lists the HTTP sources;
+`torrents/downloadLimit`/`uploadLimit` read the per-torrent limits;
+`transfer/speedLimitsMode` reports whether the scheduled alternative limits are
+active; `app/networkInterfaceList`/`networkInterfaceAddressList` list the
+interfaces; `log/main` and `log/peers` read the daemon log. The API uses the
+same access criteria as the page: without a password it is open, otherwise the LAN bypass
 is needed (if `local-bypass` is active) or a session (`SID` qBittorrent or `gx_session`
 of the page). In managed it is **not** exposed: only Gextto commands.
 Compatibility is verified by tests using Gextto's qBittorrent client
