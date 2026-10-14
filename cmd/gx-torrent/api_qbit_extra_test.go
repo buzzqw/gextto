@@ -94,11 +94,24 @@ func TestQbitPieceStatesAndHashes(t *testing.T) {
 	srv := httptest.NewServer(d.routesQbit())
 	defer srv.Close()
 
+	// The pieces appear once the torrent is allocated: poll until they do, then
+	// the two endpoints must agree on their count.
 	var states []int
-	getJSONInto(t, srv.URL+"/api/v2/torrents/pieceStates?hash="+hash, &states)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		states = nil
+		getJSONInto(t, srv.URL+"/api/v2/torrents/pieceStates?hash="+hash, &states)
+		if len(states) > 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 	var hashes []string
 	getJSONInto(t, srv.URL+"/api/v2/torrents/pieceHashes?hash="+hash, &hashes)
-	if len(states) == 0 || len(states) != len(hashes) {
+	if len(states) == 0 {
+		t.Fatal("piece states never became available")
+	}
+	if len(states) != len(hashes) {
 		t.Fatalf("pieceStates=%d pieceHashes=%d", len(states), len(hashes))
 	}
 	for _, s := range states {

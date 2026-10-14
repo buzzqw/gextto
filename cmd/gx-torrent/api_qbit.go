@@ -107,6 +107,17 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/torrents/topPrio", d.handleQbitTopPrio)
 	mux.HandleFunc("POST /api/v2/torrents/bottomPrio", d.handleQbitBottomPrio)
 	mux.HandleFunc("POST /api/v2/app/shutdown", d.handleQbitShutdown)
+	// Search API, mapped onto the configured Torznab indexers.
+	mux.HandleFunc("GET /api/v2/search/plugins", d.handleQbitSearchPlugins)
+	mux.HandleFunc("POST /api/v2/search/start", d.handleQbitSearchStart)
+	mux.HandleFunc("GET /api/v2/search/status", d.handleQbitSearchStatus)
+	mux.HandleFunc("GET /api/v2/search/results", d.handleQbitSearchResults)
+	mux.HandleFunc("POST /api/v2/search/stop", d.handleQbitSearchStop)
+	mux.HandleFunc("POST /api/v2/search/delete", d.handleQbitSearchDelete)
+	mux.HandleFunc("POST /api/v2/search/installPlugin", d.handleQbitSearchPluginManage)
+	mux.HandleFunc("POST /api/v2/search/uninstallPlugin", d.handleQbitSearchPluginManage)
+	mux.HandleFunc("POST /api/v2/search/enablePlugin", d.handleQbitSearchPluginManage)
+	mux.HandleFunc("POST /api/v2/search/updatePlugins", d.handleQbitSearchPluginManage)
 	return d.qbitAuth(mux)
 }
 

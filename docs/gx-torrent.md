@@ -550,7 +550,12 @@ applies the global limits (KiB/s, `-1` = no limit) and the queue knobs. The
 **write side** covers `torrents/addPeers`, `transfer/banPeers`,
 `torrents/editCategory`, `torrents/toggleFirstLastPiecePrio`, the queue
 priorities (`increasePrio`, `decreasePrio`, `topPrio`, `bottomPrio`) and
-`app/shutdown` (a clean stop, standalone only). The API uses the
+`app/shutdown` (a clean stop, standalone only). The **search API**
+(`search/plugins`, `start`, `status`, `results`, `stop`, `delete`) is mapped
+onto the configured Torznab indexers, which are exposed as the "plugins";
+`installPlugin`/`uninstallPlugin`/`enablePlugin`/`updatePlugins` are accepted
+and ignored (indexers are configured from `/ui/rss` or `settings.json`, there
+is no plugin model). The API uses the
 same access criteria as the page: without a password it is open, otherwise the LAN bypass
 is needed (if `local-bypass` is active) or a session (`SID` qBittorrent or `gx_session`
 of the page). In managed it is **not** exposed: only Gextto commands.

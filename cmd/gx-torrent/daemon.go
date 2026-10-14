@@ -254,6 +254,10 @@ type Daemon struct {
 	qbitSyncMu   sync.Mutex
 	qbitLastRID  int64
 	qbitSnapshot *qbitSyncState
+	// qbitSearch holds the in-memory qBittorrent search jobs (search/start etc.).
+	qbitSearchMu  sync.Mutex
+	qbitSearchSeq int
+	qbitSearch    map[int]*qbitSearchJob
 	// secMu caches the parsed security lists (trusted-proxies, allowed-hosts).
 	// They are read on every request but only change when settings.json is
 	// rewritten, so the raw setting string is the cache key.
