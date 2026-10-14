@@ -1018,7 +1018,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
     <label>Upload limit KiB/s<input type="number" name="upload_limit" value="{{.UploadLimitKib}}" title="Maximum upload speed limit for this torrent in KiB/s (0 = unlimited)"></label>
     <label>Max connections<input type="number" name="max_connections" value="{{.MaxConnections}}" title="Maximum number of simultaneous peer connections for this torrent (0 = default)"></label>
     <label>Max uploads<input type="number" name="max_uploads" value="{{.MaxUploads}}" title="Maximum number of simultaneous active upload slots for this torrent (0 = default)"></label>
-    <label>Seed ratio<input type="number" step="0.01" name="seed_ratio" value="{{.SeedRatio}}" title="Target upload/download ratio to reach before stopping seed (0 = unlimited)"></label>
+    <label>Seed ratio<input type="number" step="any" name="seed_ratio" value="{{.SeedRatio}}" title="Target upload/download ratio to reach before stopping seed (0 = unlimited)"></label>
     <label>Seed days<input type="number" name="seed_days" value="{{.SeedDays}}" title="Maximum seeding time in days before stopping seed (0 = unlimited)"></label>
     <div><button type="submit" class="primary" title="Apply speed limits and seeding targets to this torrent">Save limits</button></div>
   </form>
