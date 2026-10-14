@@ -1,50 +1,315 @@
 # Improvements and evolution of Gextto and gx-torrent
 
-Single working document for the **state, the measurements and the backlog** of
-Gextto and of the gx-torrent / gx-core engine: what exists today, the numbers
-behind the choices and what is planned next — not the problems that have been
-solved (those stay in the git history). The current state of the engine
-is in [`gx-torrent.md`](gx-torrent.md), [`bep.md`](bep.md) and
-[`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md); the standalone
-plan in [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md).
+Single working document for **what Gextto and gx-torrent are, what is measured and
+what is next**: the capabilities as they exist today, the numbers behind the choices
+and the open items with their gate. Not the story of how we got here (the git history
+keeps it), nor the chronicle of the problems that have been solved.
+
+The technical reference of the engine is [`gx-torrent.md`](gx-torrent.md), its BEP
+compliance [`bep.md`](bep.md), the engine inventory
+[`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) and the standalone plan
+[`gx-torrent-evoluto.md`](gx-torrent-evoluto.md).
 
 ## Index
 
-1. [State and open items](#1-state-and-open-items)
-2. [Gextto improvements implemented](#2-gextto-improvements-implemented)
-3. [Strategic direction](#3-strategic-direction)
-4. [gx-torrent: gaps and improvement plan](#4-gx-torrent-gaps-and-improvement-plan)
-5. [gx-torrent: performance optimisations](#5-gx-torrent-performance-optimisations)
-6. [gx-torrent: choking and seeding measurements](#6-gx-torrent-choking-and-seeding-measurements)
-7. [Holepunching: test harness](#7-holepunching-test-harness)
-8. [Accessibility](#8-accessibility)
-9. [High-value extensions from the comparison with BiglyBT](#9-high-value-extensions-from-the-comparison-with-biglybt)
-10. [Smartness backlog: ideas from the 2026-10-13 night](#10-smartness-backlog-ideas-from-the-2026-10-13-night)
-11. [Open-items resolution program](#11-open-items-resolution-program-proposal-2026-10-14)
-12. [Web streaming, DLNA media server and the choking/seeding campaign](#12-web-streaming-dlna-media-server-and-the-chokingseeding-campaign-2026-10-14)
+**I. What Gextto is**
+
+1. [Positioning and strategic direction](#1-positioning-and-strategic-direction)
+2. [Acquisition and library](#2-acquisition-and-library)
+3. [Product surface](#3-product-surface)
+4. [Indexers: the manager as the single source](#4-indexers-the-manager-as-the-single-source)
+5. [What Gextto deliberately does not do](#5-what-gextto-deliberately-does-not-do)
+
+**II. The engine (gx-torrent / gx-core)**
+
+6. [What the engine has and what is missing](#6-what-the-engine-has-and-what-is-missing)
+7. [The engine is our own code](#7-the-engine-is-our-own-code)
+
+**III. Measurements**
+
+8. [Measurement harnesses](#8-measurement-harnesses)
+9. [Benchmarks and footprint](#9-benchmarks-and-footprint)
+10. [Swarm: seeding, choking, pipelining](#10-swarm-seeding-choking-pipelining)
+11. [DHT](#11-dht)
+12. [Merge on real data](#12-merge-on-real-data)
+13. [Accessibility verification](#13-accessibility-verification)
+
+**IV. What is next**
+
+14. [Open items and the measurement-gated program](#14-open-items-and-the-measurement-gated-program)
+
+> [!NOTE]
+> The document is being reorganised into these four parts. Until the pass is
+> complete, the sections marked *(in migration)* still carry the earlier structure:
+> each of them states where its content is going.
 
 ---
 
-## 1. State and open items
+## Part I — What Gextto is
 
-What Gextto and gx-torrent have today on the observability, measurement, decision,
-engine-identity and performance fronts, with the numbers measured so far. The open
-items picked for the next phase are in §11; the strategic direction is §3.
+### 1. Positioning and strategic direction
 
-### 1.1 Observability: metrics over time
+Gextto acquires, renames and archives series, movies and comics: a single Go daemon
+with a SQLite database, an integrated torrent engine and a server-rendered web UI.
 
-The observability data is stored in the database and shown in *Health*, without
-Prometheus: the **Searches** panel with the duration and the outcome of every source
-cycle by cycle (and a warning — in the log and as a notification — when a source
-keeps failing, when a search takes too long or when no cycle completes cleanly for
-three intervals), the **Title queue** panel with the titles waiting, since when and
-until when, for series and movies, and **Failed imports** per day. The indexer health
-is in *Sources*. The panels refresh themselves every 60 s.
+- **For new installations, not a drop-in replacement for Sonarr/Radarr**: no import
+  of their databases, no in-place migration, no rollback. It is not an `*arr` under
+  another name.
+- **Toward the indexer managers, not instead of them** (Jackett/Prowlarr): Gextto
+  consumes the manager's aggregate search and does not duplicate the indexer list
+  (§4).
+- **Field**: whoever has a server with a media server (Jellyfin/Plex) and wants
+  "find, download, rename, archive" from a single daemon; very likely they already
+  have Jackett or Prowlarr.
+- **Selection policy**: global defaults (resolution, source, codec, audio, HDR,
+  language, size) plus **per-title overrides and exclusions** plus
+  **explainability** — the explanation API says why a release is accepted, rejected
+  or preferred ("Why not this one?" in the UI). No quality profiles and no
+  custom-format regex engine like `*arr`: those are the most complex — and the most
+  misconfigured — part of that model.
+- **Non-goals**: `*arr` `/api/v3` compatibility and the quality-profile/
+  custom-format semantics; multi-user authentication (remote exposure goes through
+  a reverse proxy, `docs/SECURITY.md`). The differences with Sonarr/Radarr are
+  published, not hidden.
 
-**Download history.** Log lines about a torrent carry `acq: <id>` (a short ID derived
+**Where Gextto is ahead or on par:** series, movies **and comics** in a single
+daemon; the torrent engine integrated (gx-torrent in pure Go, libtorrent or
+qBittorrent-nox, §6); explainability of the choices; search also from web engines;
+lightness (a Go binary and SQLite against a .NET stack); simplicity (health, backup
+and maintenance built in).
+
+**Honest snapshot against Sonarr/Radarr** (2026-10): they are better at
+**selection** (profiles, custom formats, delay profiles, a profile per series and
+per movie), at the **edge cases of import and rename** (multi-episode, specials,
+daily, manual import with matching and replacement) and at the **ecosystem/API**
+(Overseerr/Jellyseerr speak `/api/v3`). Gextto is better at single scope,
+integrated engine, explainability, footprint and simplicity. The verdict is
+unchanged: **an alternative for new installations**, without claiming parity. What
+it would take to close each gap is in §14.
+
+**Differences that are choices, not gaps:** indexers through an external manager
+(cleaner and safer separation) and **no usenet** (torrent, HTTP and web seed; in the
+Italian context usenet is marginal).
+
+### 2. Acquisition and library
+
+**Hardlinks instead of copies during seeding** (`hardlink.go`, `hardlink_seeding`,
+on by default). Episodes in a folder, season packs and episodes in copy mode enter
+the library as hardlinks: the link is created with a hidden name and then renamed,
+so the torrent file is never touched. When the link is impossible (different
+filesystems, RAM disk, shares without hardlinks) the file is copied as before, with
+a log line per pair of disks. The two names are peers, not like symlinks: deleting
+the name in the download leaves the archive intact (only the seed is interrupted),
+and the data disappears only by deleting both. Movies are not involved: they are
+already moved with the torrent, so there is no copy.
+
+**Upgrades** (`upgrade_until.go`, `upgrade_until_score`, 0 = off): with a score at
+or above the threshold the copy is no longer replaced; REPACK and PROPER are always
+accepted. It applies to the cycle, missing episodes, season packs and movies, and
+"Why not this one?" lists the rejections by threshold. Reference scores: 1080p
+WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p ≈ 2480. The minimum
+difference (`upgrade_min_score_diff`) remains, deciding *by how much* a release must
+improve against *up to where* it is accepted, and the per-title "No upgrade" block
+is in the series tab.
+
+**What counts as missing**: an episode with an active torrent — added by hand, from
+a watched folder or from the phone — and a season with a season pack in progress are
+not missing, neither in the cycle nor in the series tab; a download in error makes
+them missing again.
+
+**Comics** (`comicinfo.go`): in CBZ files downloaded directly over HTTP or Mega,
+`ComicInfo.xml` is added with series, number and year from the GetComics title.
+Files that already have it, CBR files and comics arriving by torrent (being seeded)
+are left untouched, and an error never compromises the download.
+
+### 3. Product surface
+
+**Web UI, TUI and languages.** The web UI is server-rendered with HTMX (`uiweb/v2`)
+and has a terminal client (`gexttod tui`). Six languages — it/en/de/fr/es/pl — cover
+the web UI (chrome, labels, tooltips, hints, server-side messages and the strings
+the client JS generates), the API/HTMX errors shown to the user, the notifications,
+the TUI and the gx-torrent web page (the language is passed by Gextto with `-lang`
+and `?lang=xx`). Daemon logs stay **in English by choice**; API error strings not
+shown to the user may stay in the original language. Guard: `TestUIIsTranslatable`
+fails if a UI string or a `uiText` literal is not a key of the catalogues (with an
+explicit allowlist); `TestClientI18nKeysTranslated` covers the client keys.
+
+**Accessibility.** Reference **WCAG 2.1 AA** (compatible 2.2 practices). The
+interface is **partially accessible**, with an automated baseline that passes but is
+not a WCAG/EN 301 549 certification. What is in place: language via the `lang`
+attribute, landmarks (skip-nav, `aside`/`nav`/`header`/`main`), `aria-current`;
+accessible names (not only placeholder or tooltip) and labels on icon controls;
+dialogs with focus inside, Tab/Shift+Tab trap, Escape and focus restore;
+keyboard-sortable headers with `aria-sort`; focus preserved under polling; visible
+focus; tables with caption and scope (also dynamic); progressbar with a value; ARIA
+for tabs, dialogs and landmarks; live regions for states, errors, notifications and
+async work; decorative symbols never instead of text; settings search with synonyms
+(`memo`, `memory`, `RAM`, `cache`); light-theme contrasts darkened where needed;
+mobile reflow with internal table scroll; reduced motion respected. The method and
+what still needs manual validation are in §13.
+
+**Access and security** (`auth.go`, *Configuration → Access*): authentication is
+**off by default**. When on, anyone not on the LAN must log in (bcrypt password, a
+signed cookie valid 30 days, a new password closes the sessions) or use the API key
+(`X-Api-Key` or `?apikey=`; the TUI takes it from `GEXTTO_API_KEY`). The LAN is
+exempt by default; behind a reverse proxy the forwarded addresses count
+(`X-Forwarded-For`, `X-Real-IP`, `Forwarded`). Five wrong passwords block the IP for
+one minute; without a password or key the check stays open with a warning in the
+log, and `GEXTTO_AUTH_DISABLE=1` gets back in.
+
+**Media servers and notifications.** After an import Jellyfin receives
+`/Library/Media/Updated` with the folder and Plex
+`/library/sections/{id}/refresh?path=` for the section that contains it
+(`media_refresh.go`); the requests during a refresh are merged. Unknown folder, no
+Plex section or server refusal fall back to a full refresh as before, and the manual
+buttons remain complete. `jellyfin_path_mappings` / `plex_path_mappings` map paths
+per server for Docker. Notifications (Telegram, email, webhook) are translated, and
+the webhook also speaks **Discord, Slack, ntfy, Gotify and Pushover** through a
+format selector (`notify_webhook_format`).
+
+**Calendar** (`calendar_ics.go`, `GET /feed/calendar.ics`, linked in Integrations).
+For the Italian audience, where a series is dubbed months or years later, it
+distinguishes three dates: 📥 **arrived in the library** in the last 30 days (day of
+arrival), 📺 **original air date** from TMDB for the current season (✓ if already in
+the library) and 🎬 **Italian release of movies** from TMDB (digital → home video →
+cinema), with a declared fallback to the original date. The "Upcoming releases" tile
+of the Dashboard declares that it shows the original air date.
+
+**Health and history.** The observability data is stored in the database and shown
+in *Health*, without Prometheus: the **Searches** panel with the duration and the
+outcome of every source cycle by cycle (and a warning — in the log and as a
+notification — when a source keeps failing, when a search takes too long or when no
+cycle completes cleanly for three intervals), the **Title queue** panel with the
+titles waiting, since when and until when, for series and movies, and **Failed
+imports** per day; the panels refresh themselves every 60 s and the indexer health
+is in *Sources*. Log lines about a torrent carry `acq: <id>` (a short ID derived
 from the hash, which stays hidden) and end up in `acquisition_events`: *History* tab
 in the torrent detail, 📜 per episode and a panel in the series page, API
-`/api/acquisitions` (`acquisition.go`).
+`/api/acquisitions`. A replacement produces a single line in the log —
+`♻️ FBI S03E01 updated (1.4 GB): … · previous version «…» moved to the trash` —
+while a normal addition stays `📁 … added to the library …`. The **Downloading**
+entry in the bar shows the ongoing downloads (unfinished torrents plus active HTTP,
+not seeds), refreshed every 5 s, and on the phone it is a counter on the icon.
+
+**First start and settings.** The guided first-start procedure
+(`/?view=setup`, `uiweb_v2_setup.go`) uses TMDB or TVDB and asks for the language at
+the first step. Every non-secret setting with a registered default (even empty)
+shows ↺ next to "Save": it fills the field with the default and the user confirms by
+saving; the value is shown next to it when compact (`Resettable`/`DefaultInline` in
+`uiweb_v2.go`, `HasDefault` in `uiweb_pages.go`). Excluded: fields disabled for the
+active engine, handled by auto-tuning, secrets, or without a default.
+
+**Streaming and DLNA.** Web streaming (`cmd/gx-torrent/stream.go`, the endpoint
+Gextto redirects to) sends the **Content-Type from the file extension**
+(`video/mp4`, `video/x-matroska`, `audio/flac`, …) with
+`Content-Disposition: inline`, so a browser plays instead of downloading, and
+answers HEAD; a shared `serveTorrentFile` core is reused by the UI player and by the
+DLNA server, and the concurrent streams are refcounted per file
+(`beginStream`/`endStream`) so a player closing does not clear the window another
+reader of the same file still needs. The **DLNA/UPnP AV server**
+(`cmd/gx-torrent/dlna.go`, `dlna_ssdp.go`) is **opt-in** and exposes the completed
+torrents' media to a TV or console on the LAN: SSDP (M-SEARCH replies, alive at
+start and every 15 min, byebye), ContentDirectory:1 (`Browse`, BrowseMetadata,
+BrowseDirectChildren, paging, content-derived `SystemUpdateID`), ConnectionManager:1
+and GENA `SUBSCRIBE` with the initial event; media are served with HTTP Range by the
+shared core plus the DLNA `contentFeatures`/`transferMode` headers, and subtitles
+with the same name as the video are attached (`res` + `sec:CaptionInfoEx`). It is
+**LAN-only by construction** (HTTP and SSDP from a non-local address are refused)
+and `/res` serves only the files the listing offers. Settings `dlna-enabled`,
+`dlna-listen`, `dlna-name`, in the daemon page when standalone (with the running URL
+shown) and as Gextto options (`gxtorrent_dlna*`) when managed; an address or name
+change restarts the server. **Library folders** (`dlna_library.go`) show the NAS
+archive beside the torrents as a browsable tree (Gextto passes its archive root and
+the series folders automatically, trash excluded), read through `os.Root` with no
+`..`/symlink escape, skipping the NAS system folders, with listings cached 30 s: on
+the real NFS archive 125 series list in ~0.5 s and a 5 GB 2160p episode streams by
+Range. **Artwork** (`dlna_art.go`): videos and folders carry `upnp:albumArtURI`
+(`JPEG_TN` + `JPEG_SM`) from the Jellyfin/Kodi images beside the media (`-thumb`,
+`-poster`, `folder.jpg`, season posters `season01-poster.jpg`), scaled in Go with a
+box filter and an 8 MB LRU cache. Open in §14: transcoding, frames extracted from
+the video (no ffmpeg), search, Xbox/WMP (`X_MS_MediaReceiverRegistrar`).
+
+**In-app updates.** gx-torrent standalone
+(`cmd/gx-torrent/update.go`, `internal/updatecheck`) updates itself from *Settings →
+Maintenance*: a timer (`update-check-hours`, default 6) or **Check for updates**
+reads `release.json`, where the commits that touch the daemon's code are flagged
+(`"gx"`, `gx_torrent_commit`), so only real daemon changes are offered. **Update**
+downloads the archive, verifies SHA-256, test-runs the binary, swaps it keeping
+`.prev`, re-executes in place (same PID) and shows the new commits in a popup; three
+failed starts restore `.prev`. It is off when managed by Gextto and for local builds
+(the release channel is stamped only by `build-release.sh`). Gextto has the same
+check period as a setting (`update_check_hours`, default 6), one button that reads
+**Check for updates** and becomes **Update**, and after an update a **Gextto
+updated** popup with the commits it brought (`update-notes.json`).
+
+### 4. Indexers: the manager as the single source
+
+Gextto treats the manager (**Jackett/Prowlarr**) as **a single aggregated source**
+and does not import its list of indexers: the manager is the only source of truth for
+indexers, categories, credentials, FlareSolverr and rate limits.
+
+- The manager type can be **declared** (`manager` in `config.go` and the UI) instead
+  of inferred from URL, port or name; the inference remains as fallback.
+- A **timeout per source** keeps a single request below the search budget, and the
+  manager's health (Prowlarr `indexerstatus`) is shown in *Sources*: a broken or
+  disabled indexer is visible instead of giving zero results in silence
+  (`indexer_health.go`).
+- **Categories were removed**: an aggregate serves both series and movies, so a
+  static category per indexer is useless or harmful (a TV query with the "movie"
+  category returns nothing).
+- A prototype that duplicated the indexer list was built, measured and **reverted**:
+  no stability gain, only configuration drift.
+- Prowlarr's search API **ignores** season/episode and external-id (measured): they
+  are not forwarded, and `type` has no observed effect either. **Jackett's** indexer
+  list is not reachable with the Torznab key (its API redirects to the login), which
+  is irrelevant since only the aggregate is needed; Jackett exposes Torznab at
+  `/api/v2.0/indexers/all/results/torznab/api` instead of the generic `/api` (404),
+  and `internal/torznab` infers the right one from the `:9117` port or from the
+  name, with an automatic fallback on 404, shared between Gextto and gx-torrent.
+
+**Measurements (same library, same host).** The numbers behind the choices:
+
+| Scenario | Latency | Results |
+|---|---|---|
+| Aggregate with a broken indexer enabled | 60 s (timeout) | 0 |
+| Healthy indexer called directly | 0.25–2.4 s | 40–100 |
+| Aggregate after disabling the broken one in the manager | 2–4 s | 156–240 |
+
+**FlareSolverr.** Persistent sessions per domain, with a short TTL and destruction,
+instead of a browser per request; when the mode is not supported it falls back to
+stateless. It is **never used for the indexer managers**: Jackett and Prowlarr handle
+Cloudflare on their own, and a 403 or network error there is reported as it is
+instead of wasting 20–30 s masking the cause. `solution.status` is respected: a page
+"solved but in error" is not interpreted as content.
+
+### 5. What Gextto deliberately does not do
+
+Recorded with the reason, so the ground is not re-covered:
+
+- **`*arr` `/api/v3` compatibility**, quality profiles and custom formats: the
+  differences are published instead (§1); what a partial compatibility would require
+  is in §14.
+- **Multi-user authentication**: remote exposure is the reverse proxy's job
+  (`docs/SECURITY.md`).
+- **Usenet**: torrent, HTTP and web seed; in the Italian context usenet is marginal.
+- **Write-back cache in the engine**: the measurement gives `write_cache=0` (storage
+  and download stay in step), so there would be no gain; to be reopened only with
+  storage genuinely slower than the network.
+- **Specialist fields in the add form**: no request, it would be preventive fluff.
+- **A UI benchmark as a performance test in CI**: SSR rendering costs ~1–3 ms/page,
+  it is not a problem.
+- **A cache cap on slow storage (NFS)**: the cache self-regulates
+  (`cmd/gx-torrent/cache.go`, tuner `cacheSizes`).
+- **Trakt**: deliberately removed (`TestTraktIntegrationRoutesRemoved`).
+- Already present, listed because they were asked for: webhook HMAC, event hook,
+  title aliases, blocklist, delay profiles, season packs, subtitles in the score,
+  Discover/Popular TMDB.
+
+---
+
+## Open: state and measurements to redistribute
+
+*(in migration: the observability state and the decisions in force are already in §3 and §5; what remains here goes to §7–§12.)*
 
 ### 1.2 Measurement harnesses
 
@@ -63,36 +328,6 @@ Available outside CI, to decide with numbers:
 - `make measure-merge3` — Swarm Merging Phase 3 on real ISOs (§10.1);
 - `make measure-dht` — the **public DHT**: routing-table fill and query success
   (`GX_MEASURE_DHT=5m`), the basis of the anti-Sybil and multi-path numbers (§4.4).
-
-### 1.3 Decisions in force
-
-- **Six languages everywhere:** it/en/de/fr/es/pl across the web UI (chrome, labels,
-  tooltips, hints, server-side messages and the strings the client JS generates), the
-  API/HTMX errors shown to the user, the notifications (Telegram/email/webhook), the
-  TUI and the gx-torrent web page (the language is passed by Gextto with `-lang` and
-  `?lang=xx`). Daemon logs stay **in English by choice**; API error strings not shown
-  to the user may stay in the original language. Guard: `TestUIIsTranslatable` fails
-  if a UI string or a `uiText` literal is not a key of the catalogues (with an
-  explicit allowlist); `TestClientI18nKeysTranslated` covers the client keys.
-- **First-start wizard (onboarding)** at `/?view=setup` (`uiweb_v2_setup.go`): TMDB or
-  TVDB as the source, with the language chosen at the first step.
-- **"Default" button on every setting.** Every non-secret field with a registered
-  default (even empty) shows ↺ next to "Save": it fills the field with the default and
-  the user confirms by saving; the value is shown next to it if compact
-  (`Resettable`/`DefaultInline` in `uiweb_v2.go`, `HasDefault` in `uiweb_pages.go`).
-  Excluded: fields disabled for the active engine, handled by auto-tuning, secrets,
-  without a default.
-- **One line per replacement in the upgrade logs:** `♻️ FBI S03E01 updated (1.4 GB):
-  … · previous version «…» moved to the trash`; a normal addition stays `📁 … added to
-  the library …`.
-- **Deliberately not in the product** — the reasons are recorded so the ground is not
-  re-covered: a **write-back cache** in the engine (measured `write_cache=0`: storage
-  and download are in step, so there would be no gain; reopen only with storage
-  genuinely slower than the network); **specialist fields** in the add form (no
-  request, it would be preventive fluff); a **UI benchmark as a performance test in CI**
-  (SSR rendering costs ~1–3 ms/page, it is not a problem); a **cache cap on slow
-  storage (NFS)** (the cache self-regulates, `cmd/gx-torrent/cache.go`, tuner
-  `cacheSizes`).
 
 ### 1.4 The engine is presented as our own code
 
@@ -211,224 +446,9 @@ the whole answer unreadable), and the cost is nil: on a 100-item answer, strict
 
 ---
 
-## 2. Gextto improvements implemented
+## 6. What the engine has and what is missing
 
-**All approved and implemented.** Comparison with
-Sonarr/Radarr (series/movies), Mylar3/Kapowarr
-(comics), Bazarr (subtitles), Prowlarr (indexers).
-
-| # | Proposal | Decision | Commit |
-|---|---|---|---|
-| 1 | Hardlink instead of copy during seeding | yes, with an anti-loss guarantee | `20b28eb` |
-| 2 | Targeted refresh of Jellyfin and Plex | yes | `1bfaad4` |
-| 3 | "upgrade until" threshold | yes, in addition to the minimum difference | `95f6f97` |
-| 4 | Optional authentication | yes, off by default, LAN exempt | `7dae752` |
-| 5 | iCal calendar | yes, with declared Italian dates | `e78bcc2`, `a919fcd` |
-| 6 | `ComicInfo.xml` in comics | yes | `6a7f739` |
-| 7 | Missing: exclude episodes being downloaded | yes | `e815180` |
-| 8 | Badge of active downloads in the bar | yes | `893bc94`, `42db4b2` |
-| 8.1 | Translations of the new elements in all languages | owner's request | `698efbf` |
-| 9 | Documentation update | owner's request | final `docs:` commit |
-
-### 2.1 Hardlink instead of copy during seeding
-
-- **Before**: a file being seeded was copied into the library (space used twice).
-- **Now** (`hardlink.go`, `hardlink_seeding`, active by default): episodes in a folder,
-  season packs and episodes in copy mode enter the library as hardlinks. The
-  link is created with a hidden name and then renamed: the torrent file is never
-  touched. If the link is not possible (different filesystems, RAM disk,
-  shares without hardlinks) it is copied as before, with a log line per
-  pair of disks.
-- **Safety**: the two names are peers (not like symlinks). Deleting the
-  name in the download leaves the archive intact (only the seed is interrupted); the
-  data disappears only by deleting both. Verified with tests.
-- Movies are not involved: they are already moved with the torrent (no copy).
-
-### 2.2 Targeted refresh of Jellyfin and Plex
-
-- **Now** (`media_refresh.go`): after an import Jellyfin receives
-  `/Library/Media/Updated` with the folder and Plex
-  `/library/sections/{id}/refresh?path=` for the section that contains it. The
-  requests during a refresh are merged. Unknown folder, no
-  Plex section or server refusal → full refresh as before.
-- `jellyfin_path_mappings` / `plex_path_mappings` mappings per server in Docker.
-  The manual buttons remain complete.
-
-### 2.3 "upgrade until" threshold
-
-- **Now** (`upgrade_until.go`, `upgrade_until_score`, 0 = off): with a score
-  ≥ threshold the copy is no longer replaced; REPACK and PROPER remain accepted.
-  It applies to the cycle, missing episodes, season packs and movies. "Why not this one?" indicates the
-  rejects by threshold. References: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL
-  H.265 DD+ ≈ 1480, 2160p ≈ 2480.
-- The minimum difference (`upgrade_min_score_diff`) remains (*by how much* it must
-  improve vs *up to where*). The per-title block ("No upgrade") is also
-  in the web series tab.
-
-### 2.4 Optional authentication
-
-- **Now** (`auth.go`, *Configuration → Access*): off by default. On: anyone
-  not on the LAN must log in (bcrypt password, signed cookie valid 30 days, a new
-  password closes the sessions) or use the API key (`X-Api-Key` or `?apikey=`; the
-  TUI takes it from `GEXTTO_API_KEY`).
-- LAN exempt by default. Behind a reverse proxy the forwarded addresses count
-  (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`).
-- 5 wrong passwords = IP block for 1 minute. Without a password or key the
-  check remains open (warning in the log). `GEXTTO_AUTH_DISABLE=1` to get back in.
-
-### 2.5 iCal calendar
-
-- **Now** (`calendar_ics.go`, `GET /feed/calendar.ics`, link in Integrations).
-  For the Italian audience (series dubbed months/years later) it distinguishes:
-  - 📥 **arrived in the library** in the last 30 days (day of arrival);
-  - 📺 **original air date** TMDB of the current season (✓ if in the library);
-  - 🎬 **Italian release of movies** TMDB (digital → home video → cinema), with a
-    declared fallback to the original date.
-- The "Upcoming releases" tile of the Dashboard declares that it is the original
-  air date.
-
-### 2.6 Comics: `ComicInfo.xml`
-
-- **Now** (`comicinfo.go`): in CBZ files downloaded directly (HTTP, Mega)
-  `ComicInfo.xml` is added with series/number/year from the GetComics title. Not
-  touched: files that already have it, CBR, comics via torrent (being seeded). An error
-  never compromises the download.
-
-### 2.7 Missing without episodes already being downloaded
-
-- Episodes with an active torrent (even added by hand, from a watched folder or
-  phone) and seasons with a season pack in progress are no longer missing, either in the
-  cycle or in the series tab. A download in error makes them missing again.
-
-### 2.8 Badge of ongoing downloads
-
-- The "Downloading" entry shows the ongoing downloads (unfinished torrents + active HTTP,
-  not seeds), every 5 s; on the phone it is a counter on the icon.
-
-### 2.9 Excluded because already present or deliberately removed
-
-Webhook HMAC, event hook, title aliases, blocklist, delays (delay profile), season
-packs, subtitles in the score, Discover/Popular TMDB: already present.
-Trakt: deliberately removed (`TestTraktIntegrationRoutesRemoved`).
-
----
-
-## 3. Strategic direction
-
-### 3.1 Positioning
-
-- Gextto is for **new installations**, not a drop-in for Sonarr/Radarr: no
-  import of their databases, no in-place migration, no rollback.
-- Integration **towards** the indexer managers (Jackett/Prowlarr), not
-  duplicating them inside Gextto.
-- **Non-goal**: `*arr` / `/api/v3` API compatibility; quality profile and custom
-  format; multi-user authentication (remote exposure goes through the reverse
-  proxy in `docs/SECURITY.md`). The differences are published, not hidden.
-- Target: whoever has a server + media server (Jellyfin/Plex) and wants "find,
-  download, rename, archive" with a single daemon; very likely they already have
-  Jackett or Prowlarr.
-
-### 3.2 Indexer managers (Jackett/Prowlarr)
-
-Gextto treats the manager as **a single aggregated source** and does not import its
-list of indexers: the manager is the only source of truth for indexers,
-categories, credentials, FlareSolverr and rate limits.
-
-Measurements (same library, same host):
-
-| Scenario | Latency | Results |
-|---|---|---|
-| Aggregate with a broken indexer enabled | 60 s (timeout) | 0 |
-| Healthy indexer called directly | 0.25–2.4 s | 40–100 |
-| Aggregate after disabling the broken one in the manager | 2–4 s | 156–240 |
-
-Consequences (all implemented):
-
-- a prototype that duplicated the indexer list was built, measured and
-  **reverted**: no stability gain, only configuration drift;
-- the **categories** were removed: an aggregate serves series and movies, a
-  static category per indexer is useless or harmful (TV query with the "movie"
-  category → zero results);
-- the manager type can be **declared** (`manager` in `config.go` and the UI)
-  instead of inferred from URL/port/name (the fallback remains);
-- the manager's health (Prowlarr `indexerstatus`) is in Sources: a
-  broken/disabled indexer is visible instead of giving zero results in silence
-  (`indexer_health.go`);
-- a **timeout per source** limits a single request below the search budget;
-- Prowlarr's search API **ignores** season/episode and external-id
-  (measured): they are not forwarded; `type` also has no observed effect;
-- **Jackett's** indexer list **is not reachable** with the Torznab key (its
-  API responds with a redirect to the login): irrelevant, only the aggregate is needed.
-  Jackett exposes Torznab at `/api/v2.0/indexers/all/results/torznab/api` instead of the
-  generic `/api` (which responds 404): `internal/torznab` infers it from the `:9117` port
-  or from the name with an automatic fallback on 404, shared between Gextto and `gx-torrent`.
-
-### 3.3 FlareSolverr
-
-- **Persistent sessions** per domain, with a short TTL and destruction, instead of a
-  browser per request; if not supported → stateless mode.
-- **Never for indexer managers**: Jackett/Prowlarr handle Cloudflare on their
-  own; a 403 or network error there is reported as it is instead of wasting
-  20–30 s masking the cause.
-- `solution.status` is respected: a page "solved but in error" is not interpreted
-  as content.
-
-### 3.4 Selection policy
-
-Gextto does **not** implement quality profiles, custom formats or a regex/score engine
-like `*arr`. Instead it chooses global defaults (resolution, source, codec,
-audio, HDR, language, size constraints) + **per-title overrides and exclusions** +
-**explainability** (the explanation API says why a release is
-accepted/rejected/preferred). Reason: profiles are the most complex part —
-and the most misconfigured — of the `*arr` model.
-
-### 3.5 Comparison with Sonarr/Radarr (honest snapshot, 2026-10)
-
-**Where Sonarr/Radarr are ahead:**
-
-- **Quality profiles and custom formats**: score per resolution/source/type/
-  release group (even regex), delay profile, different profiles per series and movie.
-  Gextto has a single policy + "upgrade until" + per-title override: easier,
-  less powerful for fine rules. *Feasibility:* giving **names to profiles on the Gextto
-  model** is a medium step (the global one becomes "Default", each combination of
-  overrides a generated profile, automatic migration from the per-title data in
-  `series.quality/language/subtitle/exclude` and `movies_config.*`). Reproducing the
-  **Sonarr semantics** (ordered qualities + cutoff + custom format) is more expensive;
-  custom formats (regex engine + UI) must be evaluated separately.
-- **Maturity of import and rename**: multi-episode, specials,
-  daily, manual import with matching and replacement. *Feasibility:* study the
-  behaviour and reimplement it; Sonarr is GPLv3, Gextto EUPL 1.2: **no
-  code or test files are copied**, we build our own corpus from real
-  names.
-- **Ecosystem and API**: `/api/v3` consumed by Overseerr/Jellyseerr; Gextto does not
-  expose it. *Feasibility:* full compatibility is not realistic; a
-  **subset** for Jellyseerr is (`system/status`, `qualityprofile`,
-  `languageprofile`, `rootfolder`, `tag`, `series/lookup` + `POST series`,
-  `movie/lookup` + `POST movie`, `queue`) — but after named profiles, root folder
-  and tags, and tested with a real Jellyseerr.
-- **Notifications**: *done* — the webhook also speaks **Discord, Slack, ntfy, Gotify
-  and Pushover** via a format selector (`notify_webhook_format`); the more esoteric
-  providers remain.
-- **Import of existing libraries**: partial in Gextto, not a priority.
-- **Community, wiki, Docker, cadence**: a matter of time, not architecture.
-
-**Differences that are choices, not gaps:** indexers via an external manager
-(cleaner and safer separation); **no usenet** (torrent, HTTP, web seed;
-in the Italian context usenet is marginal).
-
-**Where Gextto is ahead (or on par):** all in one (series, movies **and comics**) in a
-single daemon; integrated torrent engine (gx-torrent pure Go, libtorrent or
-qBittorrent-nox); explainability; search also from web engines; lightness (a
-Go binary + SQLite vs .NET); simplicity (health, backup, maintenance integrated).
-
-**Verdict:** Sonarr/Radarr remain better at selection (profiles/custom
-formats), import edge cases and ecosystem/API. Gextto is better at single
-scope, integrated engine, explainability, footprint and simplicity. Correct position:
-**an alternative for new installations**, without claiming parity.
-
----
-
-## 4. gx-torrent: gaps and improvement plan
+*(in migration: the capability tables and the gaps move into §6 (state) and §14 (what is next))*
 
 `gx-torrent` is the BitTorrent engine in **pure Go**: the **gx-core engine**
 (`internal/gxcore`) plus the **daemon and adapter** (`cmd/gx-torrent`,
@@ -605,7 +625,9 @@ WebTorrent, native I2P (reachable via a SOCKS5/HTTP proxy).
 
 ---
 
-## 5. gx-torrent: performance optimisations
+## 9. Benchmarks and footprint
+
+*(in migration: the table of optimisations in place joins the benchmarks of §9)*
 
 Items ordered by **expected value = (impact × certainty) / (effort × risk)**, one
 item = one commit.
@@ -647,7 +669,9 @@ engine, a feature of its own).
 
 ---
 
-## 6. gx-torrent: choking and seeding measurements
+## 10. Swarm: seeding, choking, pipelining
+
+*(in migration: the harness and its method move to §8, the results stay in §10)*
 
 Measurement of the seeding/choking quality (§4.1). Underlying rule: **measure
 first**, then decide whether to touch the engine core.
@@ -818,7 +842,9 @@ routing-table fill (~30 s cold), not the lookup.
 
 ---
 
-## 7. Holepunching: test harness
+## 8. Measurement harnesses
+
+*(in migration: the holepunch harness is one of the harnesses of §8)*
 
 Support for `scripts/holepunch-netns-test.sh` (engine behaviour in
 `docs/gx-torrent.md`).
@@ -863,16 +889,7 @@ engine (in a real swarm the peers are on different IPs).
 
 ---
 
-## 8. Accessibility
-
-Reference: **WCAG 2.1 AA** (compatible 2.2 practices), checked on `uiweb/v2`
-with manual tests plus the automatic ones in `uiweb/end2end/`.
-
-**State**: **partially accessible** interface with a greatly improved automated
-baseline; the automatic checks pass but they are not a WCAG/EN 301 549/legal
-certification. A formal conclusion requires manual tests with keyboard,
-screen reader, magnification and assistive technologies on supported browsers and
-devices.
+## 13. Accessibility verification
 
 **Method**: static review (HTML/CSS/JS), semantics/names/ARIA/focus,
 responsive layout/visible focus/reduced-motion, light/dark theme contrast, axe-core
@@ -908,7 +925,9 @@ usable for tables/tabs/progress/errors; no regression on desktop and mobile.
 
 ---
 
-## 9. High-value extensions from the comparison with BiglyBT
+## Open: extensions from the BiglyBT comparison
+
+*(in migration: the two extensions move to §6, the merge measurements to §12, what remains open to §14)*
 
 Comparative analysis with **BiglyBT** (Java client, heir of Azureus/Vuze). The
 majority of its capabilities are **application-level or historical** (chat/friends, Vuze
@@ -1092,7 +1111,9 @@ accessibility and i18n.
 
 ---
 
-## 10. Smartness backlog: ideas from the 2026-10-13 night
+## Open: smartness ideas
+
+*(in migration: the realised ideas move to §6, their measurements to §10/§11/§12, the open ones to §14)*
 
 The night session (parser fuzzing, Swarm Merging Phase 2, the DHT anti-Sybil
 counter, the performance round) produced ideas that would make Gextto, gx-torrent
@@ -1323,7 +1344,9 @@ the protocol extensions outside the BEP catalogue. Implemented:
 
 ---
 
-## 11. Open-items resolution program (proposal, 2026-10-14)
+## 14. Open items and the measurement-gated program
+
+*(in migration: already the open-items program; the results move to the measurement sections)*
 
 Proposal under discussion. Scope: the open items selected for the next phase —
 §1.5 (periodic performance check), §4.3 (cherry-picks/follow-ups), §4.4 and
@@ -1504,75 +1527,9 @@ hash serving → done**.
 
 ---
 
-## 12. Web streaming, DLNA media server and the choking/seeding campaign (2026-10-14)
+## Open: choking/seeding campaign
 
-### 12.1 Web streaming (improved)
-
-`cmd/gx-torrent/stream.go` (the endpoint Gextto redirects to) now:
-
-- sends the **Content-Type from the file extension** (`video/mp4`,
-  `video/x-matroska`, `audio/flac`, …) plus `Content-Disposition: inline`, so a
-  browser plays the stream instead of downloading it, and answers **HEAD**;
-- keeps a shared **serveTorrentFile** core, reused by the UI player and by the
-  DLNA server;
-- refcounts the concurrent streams **per file** (`beginStream`/`endStream`;
-  the engine windows are per file), so a player closing does not clear the
-  stream window another reader of the same file still needs; a HEAD probe does
-  not touch the windows, and `Content-Disposition` is RFC 6266-encoded.
-
-Tests: `TestMediaContentType`, `TestContentDisposition`, `TestStreamRefcount`,
-`TestParseByteRange`. No data-path change.
-
-### 12.2 DLNA/UPnP media server (new)
-
-`cmd/gx-torrent/dlna.go` + `dlna_ssdp.go`: an **opt-in** DLNA/UPnP AV media
-server that exposes the **completed** torrents' media to a TV/console on the
-LAN. SSDP (M-SEARCH replies, alive at start and every 15 min, byebye) +
-ContentDirectory:1 (`Browse` with BrowseMetadata/BrowseDirectChildren and
-paging, a content-derived `SystemUpdateID`) + ConnectionManager:1 + GENA
-`SUBSCRIBE` with the initial event; media served with HTTP Range by the shared
-core plus the DLNA `contentFeatures`/`transferMode` headers; subtitles attached
-to the video with the same name (`res` + `sec:CaptionInfoEx`). Off by default,
-no authentication, **LAN-only by construction** (HTTP and SSDP from a
-non-local address are refused) and `/res` serves only the files the listing
-offers. Settings `dlna-enabled`, `dlna-listen`, `dlna-name`: the **daemon
-page** in standalone (with the running URL shown), the **Gextto** options
-`gxtorrent_dlna*` in managed (passed as flags/env); an address or name change
-restarts the server. **Library folders** (`dlna_library.go`): the archive on
-the NAS is shown beside the torrents as a browsable folder tree (Gextto passes
-its archive root and series archive folders automatically, trash excluded),
-read through `os.Root` (no `..`/symlink escape), NAS system folders skipped,
-listings cached 30 s; on the real NFS archive 125 series list in ~0.5 s and a
-5 GB 2160p episode streams by Range. **Artwork** (`dlna_art.go`): videos and
-folders carry `upnp:albumArtURI` (`JPEG_TN` + `JPEG_SM`) from the Jellyfin/Kodi
-images beside the media (`-thumb`, `-poster`, `folder.jpg`, season posters
-`season01-poster.jpg` in the series folder), scaled in Go with a box filter and
-an LRU cache of 8 MB; measured on a 1080p still → `JPEG_SM`: 34 ms, 4.1 MB
-allocated (12.4 MB before averaging the JPEG YCbCr planes directly instead of
-converting to RGBA). Verified end to end against a real daemon (SSDP
-discovery, Browse, Range 206, a non-offered file refused). Open: transcoding,
-frames extracted from the video (no ffmpeg), search, Xbox/WMP (`X_MS_MediaReceiverRegistrar`).
-
-### 12.2b In-app updates for gx-torrent and Gextto (new)
-
-**gx-torrent standalone** (`cmd/gx-torrent/update.go`, `internal/updatecheck`)
-updates itself from *Settings → Maintenance*: a timer (`update-check-hours`,
-default 6) or **Check for updates** reads `release.json`; the manifest now
-flags the commits that touch the daemon's code (`"gx"`, `gx_torrent_commit`),
-so only real daemon changes are offered. **Update** downloads the release
-archive, verifies SHA-256, test-runs the binary, swaps it (keeping `.prev`),
-re-executes in place (same PID) and shows the new commits in a popup; three
-failed starts restore `.prev`. Off when managed by Gextto and for local builds
-(release channel stamped only by `build-release.sh`). Verified end to end with
-two real binaries and a local release: check → **Update** → restart in the
-same process (1.1.500 → 1.1.501, PID unchanged) → popup → confirmed after 30 s
-→ "up to date".
-
-**Gextto**: the check period is a setting (`update_check_hours`, default 6),
-the panel has one button that reads **Check for updates** and becomes
-**Update**, and the version that comes after an update shows a **Gextto
-updated** popup with the commits it brought (`update-notes.json`, written when
-the update is requested).
+*(in migration: the streaming, DLNA and in-app update parts are already in §3; the campaign goes to §10.)*
 
 ### 12.3 Choking/seeding campaign
 
@@ -1592,5 +1549,3 @@ the update is requested).
 libtorrent client is served well; the only missing datum (a real swarm where
 peers download *from* us) is blocked by the test host's NAT, not by the
 algorithm. The campaign stays as the gate for any future change.
-
-
