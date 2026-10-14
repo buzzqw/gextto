@@ -23,6 +23,11 @@ func TestAPIDocumentationMatchesRouter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Only the Gextto table is checked here: the gx-torrent daemon routes that
+	// follow are guarded by the daemon's own test.
+	if idx := strings.Index(string(contents), "## gx-torrent daemon routes"); idx >= 0 {
+		contents = contents[:idx]
+	}
 	for _, line := range strings.Split(string(contents), "\n") {
 		parts := strings.Split(line, "`")
 		if len(parts) != 3 || !strings.HasPrefix(parts[0], "| ") || !strings.HasSuffix(parts[2], " |") {

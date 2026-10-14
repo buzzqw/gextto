@@ -1858,7 +1858,9 @@ settings page shows the measured latency and the current cap.
 ## REST API (v1)
 
 All requests require `X-Gx-Token` (or `Authorization: Bearer`) if the
-token is set.
+token is set. The complete route tables of `/api/v1` and of the
+qBittorrent-compatible `/api/v2` are in [`API.md`](API.md); this section
+describes the payloads of the v1 resources.
 
 | Method and path | Description |
 |---|---|
