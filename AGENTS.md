@@ -128,10 +128,13 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   da `mountPointReparseData` (`junction.go`), testato anche su Linux. Gextto intero (`cmd/gexttod`) **non** è Windows:
   TUI, gestione processi/systemd, metadati fs e installer/updater sono Unix
   (vedi `docs/gx-torrent.md`, *Standalone use → Platforms*).
-- `make test` — `check-ui-settings-index` + `installer-selftest` +
+- `make test` — `check-ui` + `installer-test` + `test-dht` +
   `CGO_ENABLED=0 go test ./...` (Go puro; i test del motore libtorrent sono dietro
   `//go:build cgo`). `make test-libtorrent` (`CGO_ENABLED=1 go test ./...`) esegue
   anche quelli e richiede libtorrent.
+- **Giro di controllo a ogni chiusura di ciclo** (motore o demone): `make test`,
+  `make test-engine` e `make vet`, più gli invarianti qui sotto. Il resto della
+  verifica obbligatoria (TUI, performance) è nei punti seguenti.
 - `make fuzz-smoke` — fuzzing breve dei parser esposti alla rete (DHT, bencode
   `.torrent`, magnet, extension BEP 10, file tree BEP 52, tracker, Torznab, RSS,
   MSE), `FUZZ_TIME` secondi per target (default 30s, es. `FUZZ_TIME=2m` per un
@@ -292,7 +295,7 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   tabelle di stato, capacità e conteggi (righe, test, versioni, percorsi) vanno
   riallineati quando cambiano. Vale anche per il lavoro non visibile all'utente
   (motore, coda, DHT, storage): quei documenti sono il posto dove resta tracciato.
-- **`docs/evoluzione.md` è uno dei documenti più lavorati del repository e tiene traccia solo delle evoluzioni, MAI dei bug.** Il documento è la sede esclusiva per: (1) **lo storico delle migliorie realizzate** e delle misurazioni effettuate; (2) **il futuro delle migliorie da fare** (backlog attivo, direttrici strategiche, backlog smartness e roadmap). Non è un bug tracker né un changelog di problemi risolti: niente cronache di fix, bug risolti, log di review per-commit o dettagli superati dal codice (che appartengono esclusivamente alla storia dei commit git): solo cosa è previsto, cosa è stato fatto per far evolvere il prodotto e i numeri misurati.
+- **`docs/evoluzione.md` è uno dei documenti più lavorati del repository e tiene traccia solo delle evoluzioni, MAI dei bug.** Il documento è la sede esclusiva per: (1) **lo stato attuale e le misurazioni effettuate** di Gextto, del demone e del motore (cosa c'è oggi, con i numeri misurati e il perché delle scelte); (2) **il futuro delle migliorie da fare** (backlog attivo, direttrici strategiche, backlog smartness e roadmap). **Si scrive in termini di _cosa c'è_, non di cosa è stato fatto**: niente cronache di fix, di implementazioni («aggiunto», date di completamento, hash di commit), log di review per-commit o dettagli superati dal codice — quelli appartengono esclusivamente alla storia dei commit git. Restano invece le **misurazioni** (con macchina e data della misura, che ne fanno parte) e le **decisioni**, con la loro motivazione.
 - Quando aggiungi o sposti documenti, aggiorna l'indice `docs/README.md`.
 
 ## Accessibilità dell'interfaccia
