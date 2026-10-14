@@ -130,6 +130,7 @@ func (s *dlnaServer) ssdpLoop(conn net.PacketConn) {
 		if !ok {
 			continue
 		}
+		s.logSearch(fromAddr.IP.String(), st)
 		out, err := net.DialUDP("udp4", nil, fromAddr)
 		if err != nil {
 			continue

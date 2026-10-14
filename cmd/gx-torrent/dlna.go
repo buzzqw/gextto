@@ -132,6 +132,34 @@ type dlnaServer struct {
 	ssdpDst *net.UDPAddr
 	closeC  chan struct{}
 	once    sync.Once
+	// seen records the last SSDP search logged per source address, so a chatty
+	// control point does not fill the log.
+	seenMu sync.Mutex
+	seen   map[string]time.Time
+}
+
+// logActivity records one DLNA action in the daemon log.
+func (s *dlnaServer) logActivity(format string, args ...any) {
+	logf("DLNA: "+format, args...)
+}
+
+// logSearch logs an M-SEARCH, at most once per source address per minute.
+func (s *dlnaServer) logSearch(ip, st string) {
+	now := time.Now()
+	s.seenMu.Lock()
+	if s.seen == nil {
+		s.seen = map[string]time.Time{}
+	}
+	if last, ok := s.seen[ip]; ok && now.Sub(last) < time.Minute {
+		s.seenMu.Unlock()
+		return
+	}
+	if len(s.seen) > 256 {
+		s.seen = map[string]time.Time{}
+	}
+	s.seen[ip] = now
+	s.seenMu.Unlock()
+	logf("DLNA: search from %s for %s", ip, st)
 }
 
 // startDLNA binds the HTTP listener and the SSDP socket and starts both.
@@ -236,6 +264,11 @@ func (s *dlnaServer) handleMedia(w http.ResponseWriter, r *http.Request) {
 	if t == nil || meta == nil {
 		http.NotFound(w, r)
 		return
+	}
+	if rangeHeader := strings.TrimSpace(r.Header.Get("Range")); rangeHeader != "" {
+		s.logActivity("serve %s file %d (%s)", hash, fileIndex, rangeHeader)
+	} else {
+		s.logActivity("serve %s file %d (whole file)", hash, fileIndex)
 	}
 	d.serveTorrentFile(w, r, hash, t, meta, fileIndex)
 }
@@ -440,6 +473,7 @@ func (s *dlnaServer) handleContentDirControl(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		didl, count, updateID := s.browseDIDL(strings.TrimSpace(env.Body.Browse.ObjectID))
+		s.logActivity("browse %q: %d item(s)", strings.TrimSpace(env.Body.Browse.ObjectID), count)
 		w.Header().Set("Content-Type", `text/xml; charset="utf-8"`)
 		fmt.Fprintf(w, `<?xml version="1.0"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
