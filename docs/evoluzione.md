@@ -479,116 +479,86 @@ socket — so the transport stays isolated and swappable.
 
 ## 8. Measurement harnesses
 
-*(in migration: the list of harnesses and the holepunch harness, to be merged in the next pass)*
+The measurements below are taken by hand, outside CI: they serve to decide with
+numbers, and a change on a data path is kept only if it is **at least equivalent** to
+what it replaces. Two rules apply everywhere: measure the system **as it really runs**
+(queue and slots, seed policy, scheduler and auto-management on — never "with the
+queues off", which would be a laboratory and not production), and compare two clients
+only with the same swarm, the same role, the same policies and the same metrics.
 
-Available outside CI, to decide with numbers:
+**Cheap probes and harnesses.**
 
-- `scripts/bench-engines.sh` — RAM/throughput probe of gx-core: swarm throughput on
-  loopback (with peak RSS) and disk write throughput of a directory (`--dir`, point
-  it at a mount NFS to compare). `scripts/bench-engines.sh [--size MiB] [--dir DIR]
-  [--leechers N]`;
-- `make measure-seeding` / `make measure-choking` — choking and seeding, locally or
-  with a real libtorrent leecher (§6);
-- `make measure-pipeline` — the adaptive request queue (pipelining), local swarm at
-  shallow and deeper depths (§6.4);
-- `make measure-realswarm` — a public torrent with DHT, trackers and uTP enabled,
-  sampling the uTP counters (§4.3, §6.8);
-- `make measure-merge3` — Swarm Merging Phase 3 on real ISOs (§10.1);
-- `make measure-dht` — the **public DHT**: routing-table fill and query success
-  (`GX_MEASURE_DHT=5m`), the basis of the anti-Sybil and multi-path numbers (§4.4).
+- `scripts/bench-engines.sh` — RAM and throughput probe of gx-core: swarm throughput on
+  loopback (with peak RSS) and disk write throughput of a directory (`--dir`, point it
+  at a mount NFS to compare):
+  `scripts/bench-engines.sh [--size MiB] [--dir DIR] [--leechers N]`;
+- `make measure-seeding` — local swarm, seeder plus 3 leechers by default, with
+  distinct `127.0.0.x` addresses (the engine refuses two connections from the same IP).
+  `GX_MEASURE_SUPERSEED=1` compares super-seeding, `GX_MEASURE_MESH=1` connects the
+  leechers to each other, `GX_MEASURE_LEECHERS=N` sets the swarm size; the output is
+  the seed upload as `Nx corpus` with averages and times. Absolute numbers depend on
+  the machine and are not comparable between runs, and a peer may take two retry ticks
+  (10 s) in super-seeding: the harness reports instead of failing;
+- `make measure-choking` — the choking campaign: the controlled half serves a real
+  **libtorrent** leecher on loopback (`scripts/libtorrent-leech.py`, needs
+  `python3-libtorrent`), the real-swarm half seeds a public torrent and needs a
+  reachable inbound port;
+- `make measure-pipeline` — the **adaptive request queue**, local swarm at shallow
+  (def=4/max=4), default (50/250) and deep (200/500) depths, reporting bytes and time;
+  the knobs travel in `NetworkOptions` (`MaxRequestsOut`/`DefaultRequestsOut`). On
+  loopback the RTT is ~0, so the depth is not the bottleneck and the profiles give
+  nearly identical numbers (~200 ms, ~40 MB/s with one leecher): it is a
+  regression/sanity check, not a WAN demonstration;
+- `make measure-realswarm GX_MEASURE_REAL=<public.torrent>` — a public torrent with the
+  DHT, the trackers and uTP enabled (`GX_MEASURE_REAL_SECONDS`, default 120 s),
+  reporting peak peers, the uTP peer split and the uTP socket counters. It is the
+  control-path check the local swarm cannot give: a run that sees no peer at all fails,
+  so it cannot pass hollow;
+- `make measure-merge3` — Swarm Merging Phase 3 on real ISOs (see §12);
+- `make measure-dht` — the **public DHT**, routing-table fill and query success
+  (`GX_MEASURE_DHT=5m`, `GX_MEASURE_DHT_INFOHASH=<40 hex>`), the basis of the anti-Sybil
+  and multi-path numbers (§11);
+- the **deterministic unchoker harness** (`internal/gxcore/internal/unchoker/sim_test.go`,
+  run by `make test-engine`): it drives the real `Unchoker` with synthetic peers and
+  fixes its properties (fast downloaders in download, fast uploaders in seed, immediate
+  `FastUnchoke`, optimistic unchoke that does not steal a regular slot and rotates, the
+  budget respected, fairness). A safety net for future variants of the algorithm.
 
-Support for `scripts/holepunch-netns-test.sh` (engine behaviour in
-`docs/gx-torrent.md`).
+**Isolation with latency.** `TestMeasurePipeliningLatency` puts an **in-process latency
+proxy** in front of the seed (no `tc`/`netem`, no root): every chunk is released at
+arrival plus latency, in order and **without limiting the bandwidth**, so the RTT is
+added without throttling the link.
 
-**Purpose**: verify end-to-end that gx-torrent opens a hole (BEP 55,
-`ut_holepunch`) between two clients behind NAT/firewall using a public peer as a
-**relay**. Root-only, all inside dedicated network namespaces: the host network is
-not touched.
-
-**Topology**: `gx-lab` (public: tracker `10.0.0.1:13800`, seed, relay
-`10.1.0.1:51410`) + two stateful firewalls `gx-r1`/`gx-r2` (they let outbound through,
-DROP new inbound connections, accept `ESTABLISHED,RELATED`,
-refuse TCP towards the peer ports so the hole opens over uTP) + clients
-`gx-a 10.10.0.2` (leecher) and `gx-b 10.20.0.2` (seed).
-
-**Sequence**: minimal Python tracker (interval 30 s) → seed with data → B enters as
-leecher, downloads, completes while staying connected to the relay (interested leecher) →
-only then A enters: it does not reach B, asks the relay for an introduction, `connect` to
-both, cross dial over uTP. Success: a peer with origin **`holepunch`**
-(the one that dials) or `incoming` (the other side) in
-`/api/v1/torrents/<hash>/peers`.
-
-**Choices**: stateful firewall instead of NAT (conntrack does not emulate a cone
-port-translating NAT: the direct dial creates a local entry that conflicts with the
-SNAT; the stateful one reproduces the same observable and makes the test
-deterministic); seed and relay on different IPs (the engine deduplicates peers by IP);
-`-outgoing-interface` = listening IP (otherwise announce with the wrong IP);
-interested leecher relay (a completed torrent does not dial and discards the
-non-interested ones); tracker with a long interval (a re-announce would attribute
-the connection to the tracker dial instead of the holepunch); success detected on
-both sides (race of the dial).
-
-**Usage**: `make gx-torrent`, then `sudo scripts/holepunch-netns-test.sh`
-(`--keep` for debugging, `--size 16` for a larger torrent). A successful example in
-`scripts/risultato.txt`. Debug: `HOLEPUNCH_DEADLINE` (default 90 s),
-`HOLEPUNCH_B_DEADLINE` (60 s), `HOLEPUNCH_DIAG=1` (conntrack dump). On
-failure it prints the `holepunch` lines of the logs (rendezvous/connect).
-
-**Limits**: emulation with a stateful firewall, not a real cone NAT; outcome
-`holepunch`/`incoming` according to who wins the race; IP dedup of peers by the
-engine (in a real swarm the peers are on different IPs).
-
----
+**Holepunching.** `scripts/holepunch-netns-test.sh` verifies end-to-end that gx-torrent
+opens a hole (BEP 55, `ut_holepunch`) between two clients behind NAT/firewall with a
+public peer as **relay** (engine behaviour in [`gx-torrent.md`](gx-torrent.md)). It is
+root-only and runs entirely inside dedicated network namespaces, so the host network is
+not touched: `gx-lab` (public: tracker, seed, relay `10.1.0.1:51410`) plus two stateful
+firewalls `gx-r1`/`gx-r2` (outbound allowed, new inbound DROPped, `ESTABLISHED,RELATED`
+accepted, TCP towards the peer ports refused so the hole opens over uTP) and the clients
+`gx-a` (leecher) and `gx-b` (seed). A minimal Python tracker introduces them; the seed
+completes and stays interested, then the leecher asks the relay for an introduction and
+the two cross-dial over uTP. Success is a peer with origin `holepunch` (the dialling
+side) or `incoming` (the other) in `/api/v1/torrents/<hash>/peers`. Choices worth
+knowing: a **stateful firewall** instead of a cone NAT (conntrack would create a local
+entry conflicting with the SNAT; the firewall reproduces the same observable and makes
+the test deterministic), seed and relay on different IPs (the engine deduplicates peers
+by IP), `-outgoing-interface` set to the listening IP so the announce carries the right
+address, a long tracker interval so a re-announce is not mistaken for the holepunch, and
+success detected on both sides because the dial is a race. Usage: `make gx-torrent`, then
+`sudo scripts/holepunch-netns-test.sh` (`--keep` to debug, `--size 16` for a larger
+torrent); debug with `HOLEPUNCH_DEADLINE` (default 90 s), `HOLEPUNCH_B_DEADLINE` (60 s)
+and `HOLEPUNCH_DIAG=1` (conntrack dump). Limits: it emulates with a stateful firewall
+rather than a real cone NAT, and which side reports `holepunch` or `incoming` depends on
+who wins the race.
 
 ## 9. Benchmarks and footprint
 
-*(in migration: the table of optimisations in place joins the benchmarks of §9)*
-
-Items ordered by **expected value = (impact × certainty) / (effort × risk)**, one
-item = one commit.
-
-| # | Intervention | Status |
-|---|---|---|
-| 1 | LSD without `d.mu`/`t.Stats()` (read the lock-free snapshot) | done (`d2a4060`) |
-| 2 | Streaming: targeted `Torrent.PiecesDone(begin,end)` | done (`ff2d4bf`) |
-| 3 | Remove `O_SYNC` + batched durability | done |
-| 4 | MSE `StreamWriter` in place (0 alloc/block) | done (`5af2ee0`) |
-| 5 | `servedRequests` bounded window (≈1024) | done (`a8b3e77`) |
-| 6 | Piece cache: lazy TTL (sharding only if profiling shows contention) | done (`60b090e`) |
-| 7 | `Bitfield.Count` with `math/bits` | done (`8caf6ad`) |
-| 8 | Optionals: `findLocked` O(1) (done), ETag/304 (not to do) | decided |
-
-**Item 3 (durability).** `O_SYNC` is removed and durability is batched, with the
-invariant *a persisted bit refers to data already fsynced*: `syncPieces()` on the run
-loop, `writeBitfield()` ordered snapshot → fsync → write, `updateStats` in two phases
-(no Bolt transaction open during the fsyncs). `fdatasync` for the piece data;
-**mmap opt-in** (`-mmap`, Linux) serves the files from a shared mapping.
-
-Follow-ups **not added**, each without a measurement to justify it: io_uring/AIO (Go
-does not expose it without a dependency or cgo; the mmap path is already
-asynchronous) and explicit contiguous-write coalescing (the page cache already merges
-adjacent writebacks).
-
-**Measurements (Intel N97).** `O_SYNC` removal on NFS: 16 KiB 35→81 MiB/s (2.3×),
-64 KiB 1.5×, 256 KiB 1.6×, 1 MiB 1.2×; on NVMe up to ~118× at small blocks;
-forecast on NFS pieces 32 KiB–2 MiB: **~1.2×–1.8×**. mmap on tmpfs **~7.0 GB/s** vs
-**~5.9 GB/s** for `pwrite`. Ranged mmap flush: clean mapping 477 µs → **13 ns**, one
-dirtied piece unchanged (~1%). Seeding/choking measurements in §6.
-
-**Deliberately excluded, with justification (measured at this load)**: rarity
-buckets / picker refactor, watermark cursor in `pickSequential`/`pickFileEdge`,
-`PieceDownloader` bitmask, `clear(b.Data)` in `bufferpool`, `FADV_RANDOM`,
-`saveLocked` outside `d.mu`, `/proc/meminfo` under `d.mu`, `HandleDisconnect` O(N).
-**Postponed**: qBittorrent `renameFile`/`renameFolder` (needs rename support in the
-engine, a feature of its own).
-
-**Practice.** Periodically carry out an in-depth performance check of the application
-and the engine, optimising CPU and RAM: benchmarks (`go test -bench … -benchmem`),
-`pprof` CPU/heap profiles, the footprint of the daemon and of `gx-torrent` (RSS,
-goroutines, allocations), `make measure-seeding` for seeding. Constraint: every
-replacement or change must be **at least equivalent** to the previous one, if not
-better, and must be measured before and after. The numbers below are the current state
-(Intel N97); the figures a change replaced are kept where they justify the design.
+**What is measured here:** the cost of the code — CPU, allocations, RSS — with
+`go test -bench … -benchmem`, `pprof` CPU/heap profiles and the footprint of the daemon
+and of `gx-torrent` (RSS, goroutines, allocations). The swarm behaviour (throughput,
+seeding, choking, pipelining) is in §10. Intel N97; the figures a change replaced are
+kept where they justify the design.
 
 **Engine micro-benchmarks** (quiet machine / machine under load):
 
@@ -599,11 +569,27 @@ better, and must be measured before and after. The numbers below are the current
 | `BenchmarkPickerRarestSteady` | **~105 / 143.5 µs/op, 0 allocs/op** | piece picker, steady state |
 | `BenchmarkTickUnchokeSeeding` | **1.3 / 1.64 µs/op, 1 alloc/op** | unchoker tick |
 | `BenchmarkPrefillFromUnrelatedV2` (16 candidates) | **1.49 / 1.58 µs/op, 128 B/op, 16 allocs/op** | one-shot cost of the Phase 2 merge scan (allocation, resume, later trigger), **no steady-state path** |
-| `BenchmarkMergeCandidatesUnrelated` (32 torrents) | **~98 ns/op, 0 allocs/op** | the filter the resume and later-trigger paths pay when nothing is reusable (§10.1) |
+| `BenchmarkMergeCandidatesUnrelated` (32 torrents) | **~98 ns/op, 0 allocs/op** | the filter the resume and later-trigger paths pay when nothing is reusable (§12) |
+| `BenchmarkNewConnID` (uTP) | **31 ns/op, 0 B/op, 0 allocs/op** | the connection id probes from a random value and stops at the first free one, O(1) with the connections a socket really has; it used to build a 64K-entry table per dial (512 KiB and 152,353 ns/op) |
+| `BenchmarkTransferLoopback` (uTP, 16 KiB block) | **45.6 → 62.0 MB/s, 82,020 → 23,692 B/op (−71%), 173 → 116 allocs/op (−33%)** | four optimisations from the profile: the connection-id probe, lazy `Event` channels (the per-send `acked` flag no longer allocates one per packet), a reusable read window (`readPos` offset instead of reslicing) and a `netip.AddrPort` connection key instead of a `UDPAddr.String()` per inbound packet |
+| `BenchmarkUTPConnRemoteAddr` | **259 → 113 ns/op, 152 → 40 B/op, 6 → 3 allocs/op** | the TCP-view addresses are converted once at wrap (`NewUTPConn`) instead of at every `RemoteAddr()` call; the rest is `String()` |
 
 Matching 16 unrelated v2 candidates costs ~1.6 µs once per torrent (one small map per
 candidate) and the picker/peer/piece-write paths are not touched, so the merge cannot
 affect seeding or download throughput.
+
+**uTP retransmission.** The RTO consumes the loss signal. A **minimum-RTT floor of
+5 ms**: without it a fast path (loopback or LAN, RTT of tens of µs) collapses the RTO
+to sub-ms and a briefly stalled peer becomes a resend storm — on the silent-peer
+harness (1 s) 18,184 resends at a 1 µs floor against 2,919 at 5 ms (**6.2×**). A
+**per-connection backoff** doubles on each RTO timeout (cap 4×) and halves on each
+delivered packet, so a silent or congested peer is retried with growing patience and a
+link that delivers again relaxes to the measured RTT — silent-peer A/B (3×4 s) 17,663
+resends fixed against 8,853 adaptive (**50% fewer**). A healthy connection never
+timeout-resends, so the backoff stays 1 and the swarm numbers are unchanged. Fresh
+connections seed the RTO from the per-host winning-dial latency EMA instead of the fixed
+400 ms, clamped to [5 ms, 400 ms], and the samples always win: a 5 ms seed gives an RTO
+of [10, 20] ms against [800, 1600] ms by default.
 
 **The engine rewrite and `own-deps` are allocation-neutral.** The 54 engine benchmarks
 compared with `benchstat` (`-count=6`) show identical `B/op` and `allocs/op`
@@ -616,430 +602,260 @@ everywhere, `BenchmarkHasAnyNotIn` 3.77 → **3.15 ns/op** (−16%) and `Benchma
 `BenchmarkPrefillFromUnrelatedV2` 1.487 → 1.488 µs). The three benchmarks that a single
 pass had shown +13…17% slower (picker file-edge scan, interest update, prefill) are
 **run-to-run drift**: re-measured interleaved (`-count=20` each) they are statistically
-equal (p ≥ 0.15).
+equal (p ≥ 0.15). The `uTP` connection-id probe and the word-wise interest update
+(`HasAnyOutside` + `skipBits`, 231 → **2.8 µs** per peer on 100k pieces, ×80, 0 alloc)
+are the two places where the rewrite is measurably faster.
 
-**End-to-end, seeding and pipelining.** `make measure-seeding`, 2 MiB and 3 leechers:
-3.00× corpus, all done in 11 ms. `make measure-pipeline` in a local swarm, 8 MiB × 2:
-16 MiB in 101 ms (~162 MiB/s); with RTT 50 ms, default depth (def=50/max=250) 0.608 s /
-6736 KiB/s and shallow (def=1/max=1) 13.55 s / 302 KiB/s. The harness runs the seeder
-and every leecher in one process and the engine's outgoing interface is
-process-wide: each leecher creates its connection before the next daemon replaces
-the setting, so the distinct source addresses are kept and the swarm reaches the
-intended 3.00× (§6.6).
-
-**Real swarm.** `make measure-realswarm`, one run each: Big Buck Bunny 276 MB in 90 s
-(75 peers, 23 uTP, 0 SYN drops), Debian netinst 793 MB in 180 s (80 peers, 18 uTP,
-0 SYN drops), Ubuntu 24.04 1.08 GB in 180 s (85 peers, 31 uTP, 0 SYN drops). Real uTP
-peers connect, the downloads complete and `utp_syn_drops` stays 0 (the 50-SYN backlog
-bound never binds); the resends show loss on a noisy swarm without a storm — Big Buck
-Bunny dials 342, accepts 57, RTO resends 2563, fast 557; Debian dials 277, accepts 14,
-RTO resends 932, fast 41.
-
-### 1.6 Resource footprint, robustness and network measurements
-
-**Memory footprint.** The IP filter stores the IPv4 rules, like the IPv6 ones, as
-**sorted and merged intervals** with binary search; the pointer-based segment tree
+**Footprint.** The IP filter stores the IPv4 rules, like the IPv6 ones, as **sorted and
+merged intervals** with binary search; the pointer-based segment tree
 (`internal/blocklist/stree`) is gone. With the Aetherinox blocklist (34 MB,
 **666,763 rules** → 343,024 intervals) the live heap is **5.4 MB** (was 190 MB) and
 `gx-torrent` RSS **~105 MB** (RssAnon 92 MB) against 295 MB, with the same number of
-rules loaded. The 34 MB raw file stays in the daemon's cache (rare re-reading on manual
-reload): removable later. The SQLite `cache_size` is SQLite's default **2 MB**
+rules loaded; the 34 MB raw file stays in the daemon's cache (rare re-reading on manual
+reload) and is removable later. The SQLite `cache_size` is SQLite's default **2 MB**
 (`sqlite.go`): on the real archive DB (510 MB, FTS5; `Archive.Browse` and
 `CountMatches`, tried up to 16 MB of cache) the latency is **flat**, within the noise
 even on the broad `MATCH` (~1.14 s), because it is the OS page cache that serves the
 file — `gexttod` RSS **67.6 MB** (RssAnon 46.2 MB) against 109.7 MB at the same uptime.
 At ~29 min uptime, real 34 MB blocklist and 4 active torrents: `gexttod` RSS 113 MB
 (RssAnon 89 MB), `gx-torrent` RSS 165 MB (RssAnon 150 MB) — workload-dependent
-(peers/active pieces), with no new steady-state allocation.
+(peers and active pieces), within the range of the other rounds, with no new
+steady-state allocation.
 
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
 the whole answer unreadable), and the cost is nil: on a 100-item answer, strict
 **2.24–2.32 ms/op, 642.8 kB/op, 17179 allocs/op**, lenient **2.22–2.29 ms/op,
 642.8 kB/op, 17179 allocs/op**. Prowlarr's aggregate search is JSON (one
-`json.Unmarshal` into a slice of small structs), outside the XML path.
+`json.Unmarshal` into a slice of small structs), outside the XML path. The same holds
+for the other robustness work: the uTP header refuses inputs shorter than 20 bytes
+instead of panicking, the bencode screen bounds lengths and depth before the decoder,
+and the mmap fault guard turns a fault into an I/O error with an **equivalent** write
+bench (36.3–38.0 → 35.9–37.5 µs, 0 alloc).
 
-**Network.**
-- **Adaptive RTO** (silent-peer harness, §4.3): the minimum-RTT floor removes a 6.2×
-  resend storm and the per-connection backoff sends **50% fewer** resends than the
-  fixed backoff;
-- **DHT on the public network** (`make measure-dht`, 4 min): **4262 nodes**, 21.9%
-  query success, 875 reflected pings, 2 peers found from a cold start.
+**Other measurements.** The feed archive (`feed_archive.go`, bbolt with a compact
+index): `BenchmarkFeedArchiveSearch` on 100k elements **362 ms → 7.4 ms** (49×) with
+2,800× less allocation. HTML listings used as feeds (`internal/rss/listing.go`, ext.to
+and TorrentGalaxy resolved to direct magnets and feed links instead of failing on
+invalid XML): **50 elements in 0.3 s / 1.9 s** on the two real URLs. The auto-speed
+probe is ~1 connection/s and does not touch the data path; with auto-speed off nothing
+changes, so there is no regression. Still to measure: **graduated file priority** with
+mixed-priority files (§14).
 
-**Moved here from the capability tables** *(raw material: to be merged in the next pass)*
+**Optimisations in place.** Items ordered by **expected value = (impact × certainty) /
+(effort × risk)**, one item = one commit:
 
-| Reader with seek + readahead and **graduated piece priority** | streaming/priority design, rewritten in-tree | done (stream > readahead > rarest) |
-| **uTP behind `internal/utp`** (isolation) | own implementation | done: the engine talks to our `Socket` (dial/accept counters, `net.PacketConn` for the shared DHT socket); the implementation in `internal/utp/transport` is **our own code** (EUPL-1.2), swappable. Its helper primitives are reimplemented in `gextto_support.go`, so no third-party transport helper and no MPL component is linked |
-| **uTP connection-id pick** (perf) | own (`internal/utp/transport`) | done: `newConnID` no longer builds a 64K-entry table per dial (512 KiB and 152,353 ns/op); it probes from a random id and stops at the first free one, O(1) with the connections a socket really has — `BenchmarkNewConnID`: 31 ns/op, 0 B/op, 0 allocs/op (`TestNewConnIDAvoidsCollisions`) |
-| **uTP data path** (perf) | own (`internal/utp/transport`) | done: profiling a loopback transfer (`BenchmarkTransferLoopback`, 16 KiB block) produced four optimisations — the connection-id probe, lazy `Event` channels (the per-send `acked` flag no longer allocates one per packet), a reusable read window (`readPos` offset instead of reslicing), and a `netip.AddrPort` connection key instead of a `UDPAddr.String()` per inbound packet. Overall **45.6→62.0 MB/s, 82,020→23,692 B/op (−71%), 173→116 allocs/op (−33%)** on loopback |
-| **uTP dial preference** (fewer wasted dials) | own (`internal/netx`) | done: per-host memory of race winners (≥4 races, ≥75% share, decayed past 64); the winner gets a 150 ms head start, the loser still races delayed so single-transport peers connect. Steady state: 1 raced dial per peer instead of 2 (`TestDialPeerSkipsLoserWhenPreferredWins` asserts zero loser dials; `TestDialPeerFallsBackToDelayedLeg` keeps the fallback) |
-| **`UTPConn` address snapshot** (fewer allocs) | own (`internal/netx`) | done: TCP-view addrs converted once at wrap (`NewUTPConn`) instead of per `RemoteAddr()` call. `BenchmarkUTPConnRemoteAddr`: 259→113 ns/op, 152→40 B/op, 6→3 allocs/op (rest is `String()`); Intel N97 |
-| **uTP resend counters** (congestion signal) | own (`internal/utp/transport`) | done: per-socket RTO/fast resends counted in the stack (`ResendStats`, proven by a stalled-server test), through `SessionStats` into the daemon API (`utp_resends_timeout/fast`); shown in both UIs (Salute «uTP» row and daemon status bar) when non-zero |
-| **uTP initial RTO from measured latency** (faster loss recovery) | own (`internal/utp/transport`, `internal/netx`) | done: fresh connections seed the RTO from the per-host winning-dial latency EMA instead of the fixed 400 ms (clamped [5 ms, 400 ms], samples always win). `TestInitialLatencySeedBoundsRTO`: 5 ms seed → RTO [10,20] ms vs [800,1600] ms default. Loopback swarm validation on the branch: seeding 2.99× corpus; pipeline RTT 50 ms shallow 304 KiB/s in 13.5 s / default 6757 KiB/s in 0.6 s — identical to the pre-branch §6.7 numbers, no regression; real-swarm validation open |
-| **uTP header hardening + fuzz** (robustness) | own (`internal/utp/transport`) | done: `header.Unmarshal` rejects <20B inputs instead of panicking (30 s fuzz clean, 36k execs); `FuzzHeaderUnmarshal` in `make fuzz-smoke` |
-| **uTP SYN-drop counter** (burst signal) | own (`internal/utp/transport`) | done: backlog evictions counted per socket (`SynDrops`), through `SessionStats` into the daemon API (`utp_syn_drops`); tells whether the 50-SYN bound ever binds, shown in both UIs when non-zero |
-| **uTP socket health in UI** (diagnostics) | own | done: socket dial/accept/error counters flow engine → daemon `/api/v1/stats` → Salute «uTP» row (hidden while idle, warns on dial errors with zero accepts: UDP likely firewalled) and daemon status bar («uTP socket», translated it/de/fr/es/pl); pattern of «Riuso locale» |
-| **uTP adaptive RTO** (retransmission control) | own (`internal/utp/transport`) | done: the RTO consumes the loss signal. (1) A **minimum-RTT floor of 5 ms**: without it a fast path (loopback/LAN, RTT of tens of µs) collapses the RTO to sub-ms and a briefly stalled peer becomes a resend storm — silent-peer harness, 1 s: 18,184 resends at a 1 µs floor vs 2,919 at 5 ms (**6.2×**); `TestMinimumLatencyFloor`. (2) A **per-connection backoff** that doubles on each RTO timeout (cap 4×) and halves on each delivered packet, so a silent or congested peer is retried with growing patience while a link that delivers again relaxes to the measured RTT: silent-peer A/B, 3×4 s: 17,663 resends fixed vs 8,853 adaptive (**50% fewer**, backoff reaching 4); `TestAdaptiveRTOBacksOffOnTimeouts`, `TestAdaptiveRTOMeasurement` (opt-in `GX_MEASURE_UTP=1`). A healthy connection never timeout-resends, so the backoff stays 1: the RTO is today's, and the loopback swarm numbers are unchanged |
+| Intervention | Effect |
+|---|---|
+| Remove `O_SYNC`, batch durability | 16 KiB **35 → 81 MiB/s** on NFS (2.3×), 64 KiB 1.5×, 256 KiB 1.6×, 1 MiB 1.2×, up to ~118× at small blocks on NVMe; the invariant is that a persisted bit refers to data already fsynced (`syncPieces()` on the run loop, `writeBitfield()` ordered snapshot → fsync → write, `updateStats` in two phases with no Bolt transaction open during the fsyncs) |
+| mmap opt-in (`-mmap`, Linux) | **~7.0 GB/s** on tmpfs against **~5.9 GB/s** for `pwrite`; a **ranged flush** takes a clean mapping from 477 µs to **13 ns**, with one dirtied piece unchanged (~1%) |
+| LSD without `d.mu`/`t.Stats()` (lock-free snapshot) | no lock on the local-service-discovery path |
+| Streaming: targeted `Torrent.PiecesDone(begin,end)` | the streaming reader does not walk the whole bitfield |
+| MSE `StreamWriter` in place | 0 alloc per block |
+| `servedRequests` bounded window (~1024) | bounded memory in the tracker path |
+| Piece cache with lazy TTL | no sharding needed (profiling showed no contention) |
+| `Bitfield.Count` with `math/bits` | one word per iteration |
+| Optionals: `findLocked` O(1) | constant-time lookup |
+| Write ring buffer (4 pieces/torrent) | the network keeps flowing while pieces are written; the prerequisite for multi-piece per peer (§10) |
+| Disk guard, mmap fault guard, word-wise interest, bounded bencode screen | see above and §6 |
 
-- **Feed archive** (`feed_archive.go`): `BenchmarkFeedArchiveSearch` (100k elements)
-  **362 ms → 7.4 ms** (49×) and 2,800× less allocation.
-- **HTML listings as feeds** (`internal/rss/listing.go`): pages such as ext.to and
-  TorrentGalaxy resolve to direct magnets, `/post-detail/` and feed links instead of
-  failing on invalid XML — **50 elements in 0.3 s / 1.9 s** on the two real URLs.
-- **Auto-speed probe**: ~1 connection/s, it does not touch the data path; with
-  auto-speed off nothing changes (no regression).
-- To measure: **graduated file priority** with mixed-priority files (§14).
-
----
+Follow-ups **not added**, each without a measurement to justify it: io_uring/AIO (Go
+does not expose it without a dependency or cgo, and the mmap path is already
+asynchronous), explicit contiguous-write coalescing (the page cache already merges
+adjacent writebacks), rarity buckets and a picker refactor, a watermark cursor in
+`pickSequential`/`pickFileEdge`, a `PieceDownloader` bitmask, `clear(b.Data)` in
+`bufferpool`, `FADV_RANDOM`, `saveLocked` outside `d.mu`, `/proc/meminfo` under `d.mu`
+and `HandleDisconnect` O(N). **Postponed**: qBittorrent's
+`renameFile`/`renameFolder` (it needs rename support in the engine: a feature of its
+own).
 
 ## 10. Swarm: seeding, choking, pipelining
 
-*(in migration: the harness and its method move to §8, the results stay in §10)*
+**Metrics.** Choking (upload slots): who is unchoked and for how long, fairness at
+equal speed, optimistic unchoke rotation, behaviour while downloading (rewarding fast
+downloaders) and while seeding (rewarding fast uploaders). Seeding end-to-end: bytes
+uploaded by the seed against the corpus (`Nx corpus`), throughput up and down,
+completion time, ratio and time to 1:1 in a real campaign.
 
-Measurement of the seeding/choking quality (§4.1). Underlying rule: **measure
-first**, then decide whether to touch the engine core.
+**Deterministic unchoker bench.** All the properties hold on the real `Unchoker` driven
+by synthetic peers, and the tick with 50 peers costs ~1.1 µs, 896 B/op, 1 alloc:
+**negligible**. Hardening applied along the way: an interested but stalled peer (zero
+speed) receives the next piece at the tick instead of waiting for `not-interested`
+alone.
 
-### 6.1 Constraint: do not force the automation
+**Local swarm, first round (Intel N97, corpus 2 MiB).** Seeding without mesh (seed → 3
+leechers, 5 repetitions): normal ~41–42 ms with the seed at **3.00× corpus**;
+super-seeding ~51–52 ms (**~24% slower**) with the same 3.00×. Mesh with 2 peers
+(indicative): both **1.00×**, the leechers exchange the pieces among themselves; mesh
+with 3+ peers on one host does not converge. A later run measured the reciprocation
+more precisely: with mesh the leechers upload **2.52 MB among themselves** and the
+seed's upload drops from 3.00× to **1.84× (−39%)**.
 
-The measurements reflect the system **as it really runs** (queue/slots, seed policy,
-scheduler on): a deterministic harness on the pure algorithm (no session);
-local swarm with the daemon and automanagement active; real campaign with Gextto
-(`AdjustQueue`, seed policy, limits). Never "with queues off": that would be a laboratory,
-not production.
+**Honest reading.** The engine's choking is **correct and negligible as a cost**. On
+small or fast swarms super-seeding **does not reduce** the upload (the exchange is
+already enough) and costs throughput and variability: the BEP 16 advantage is for the
+*initial seeding* of large torrents with many slow peers, which one host cannot
+reproduce. Consequence: **super-seeding stays opt-in, not default**, and the scaling
+question goes to a real campaign.
 
-### 6.2 Metrics
-
-Choking (upload slots): who is unchoked and for how long, fairness at equal
-speed, optimistic unchoke rotation, behaviour in download (rewards fast
-downloaders) and in seed (rewards fast uploaders).
-Seeding (end-to-end): bytes uploaded by the seed vs corpus (`Nx corpus`),
-up/down throughput, completion time, ratio and time to 1:1 in a real campaign.
-
-### 6.3 Bench 1 — deterministic harness of the unchoker
-
-`internal/gxcore/internal/unchoker/sim_test.go` (in `make test-engine`): it drives
-the real `Unchoker` with synthetic peers and fixes the properties (fast downloads in
-download, fast uploads in seed, immediate `FastUnchoke`, optimistic that does not
-steal regular slots and rotates, budget respected, fairness) + `BenchmarkTickUnchokeSeeding`.
-Usage: `go test …/internal/unchoker -v` and `-bench TickUnchoke`. A safety
-net for future variants of the algorithm.
-
-### 6.4 Bench 2 — local swarm (opt-in)
-
-`cmd/gx-torrent/measure_test.go`, outside `make test`, with `GX_MEASURE=1`:
-
-```
-make measure-seeding                        # seeder + 3 leechers
-GX_MEASURE_SUPERSEED=1 make measure-seeding # super-seeding comparison
-GX_MEASURE_MESH=1 make measure-seeding      # leechers connected to each other
-GX_MEASURE_LEECHERS=2 make measure-seeding  # swarm of 2 peers
-```
-
-**Pipelining.** `cmd/gx-torrent/measure_pipeline_test.go` is the harness dedicated
-to the **adaptive request queue** (opt-in, `make measure-pipeline`): it starts the same
-local swarm at different depths (`shallow` def=4/max=4, `default` 50/250,
-`deep` 200/500) and reports bytes and time. The knobs travel in `NetworkOptions`
-(`MaxRequestsOut`/`DefaultRequestsOut`). **Declared limitation:** on loopback the RTT
-is ~0, so the depth is not the bottleneck and the profiles give almost identical
-numbers (~200 ms, ~40 MB/s with 1 leecher).
-
-**Real swarm.** `cmd/gx-torrent/measure_realswarm_test.go` (opt-in,
-`make measure-realswarm GX_MEASURE_REAL=<public.torrent>`) downloads a **public
-torrent** with the DHT, the trackers and uTP enabled
-(`GX_MEASURE_REAL_SECONDS` sets the window, default 120 s) and reports peak peers,
-the uTP peer split and the uTP socket counters. It is the control-path check the
-local swarm cannot give: real uTP peers connect, and on healthy connections the
-RTO must not fire, so the resend counters stay low and the adaptive backoff stays
-at 1. A run that sees no peer at all fails, so it cannot pass hollow.
-
-**Isolation with latency (done).**
-`TestMeasurePipeliningLatency` puts an **in-process latency proxy** in front of the
-seed (no `tc`/`netem`, no root): every chunk is released at
-arrival+latency, in order and **without limiting the bandwidth**, so RTT is added
-without throttling the link. With RTT 50 ms, 256 KiB pieces (16 blocks) and a corpus
-of 4 MiB, a single leecher:
+**Pipelining, isolated with latency.** With RTT 50 ms, 256 KiB pieces (16 blocks) and a
+4 MiB corpus, one leecher:
 
 | Profile | blocks in flight | time | average |
 | --- | --- | --- | --- |
 | `shallow` def=1/max=1 | 1 | 13.4 s | 305 KiB/s |
 | `default` def=50/max=250 | ≤50 | 1.1 s | **3.8 MiB/s** |
 
-~12× with the adaptive queue: it is the isolation that loopback (RTT ~0) cannot give.
-**Confirmation (2026-10-13):** the same run reproduces it exactly (`shallow` 300 KiB/s
-in 13.7 s, `default` 3850 KiB/s in 1.06 s, ~12.8×), so the adaptive queue is stable.
-**Ceiling read from the numbers:** with 256 KiB pieces (16 blocks) a queue of ≤250 is
-bounded by the piece's block count, and the `default` run was already at the ceiling;
-the next lever for high-bandwidth-delay links was therefore **multi-piece per peer**.
-
-**Multi-piece per peer (done).** A peer may download up to
-`maxPiecesPerPeer` (2) pieces at once (`peer.ConcurrentPieces`/`MaxConcurrentPieces`,
-`fillPeerDownloads`, one `pieceDownloaders[peer][index]` map per peer), sharing a
-single in-flight request budget across the pieces (`torrent.requestBlocks`, the
-extra piece opens only when the window has room, `pipeHasRoom`); the picker never
-returns a piece the peer already requests. Re-running the same latency harness
-(256 KiB pieces, RTT 50 ms):
+~12× with the adaptive queue (a second run reproduced it exactly: 300 KiB/s in 13.7 s
+against 3850 KiB/s in 1.06 s, ~12.8×). The ceiling is readable from the numbers: with
+256 KiB pieces a queue of ≤250 is bounded by the piece's block count, so the
+`default` run was already at it — the next lever for high-bandwidth-delay links was
+**multi-piece per peer**. A peer now downloads up to two pieces at once, sharing a
+single in-flight budget (the extra piece opens only when the window has room) and never
+receiving the same piece twice; re-running the same harness:
 
 | Profile | single piece | multi-piece |
 | --- | --- | --- |
 | `shallow` def=1/max=1 | 301 KiB/s | 301 KiB/s (window of 1 respected) |
 | `default` def=50/max=250 | 3853 KiB/s | **6756 KiB/s** (×1.75) |
 
-So multi-piece raises the throughput at RTT 50 ms where the single-piece block
-count was the limit (the `shallow` profile keeps its window of 1). The write ring
-buffer (§10.3) is what keeps the disk from becoming the bottleneck while more
-pieces are in flight; RAM and CPU equivalent.
+So multi-piece raises the throughput at RTT 50 ms where the single-piece block count was
+the limit, while the `shallow` profile keeps its window of 1, and RAM and CPU stay
+equivalent. The **bounded write ring buffer** (4 pieces per torrent) is what keeps the
+disk from becoming the bottleneck while more pieces are in flight: on loopback the
+seeding harness is **equivalent** (the disk is not the bottleneck there) and the gain is
+on slow storage.
 
-Seeder + N leechers on loopback with distinct `127.0.0.x` IPs (the engine refuses two
-connections from the same IP). Default: every leecher only towards the seeder — the
-**seed upload** is measured (what super-seeding changes). Experimental mesh
-on one host (multiple connections on loopback unstable: peers that
-do not connect/do not complete): only an indicative snapshot, few peers,
-repeat. Output: `uploaded=Nx corpus`, averages, times. Limits: absolute numbers
-dependent on the machine (not comparable between different runs); one peer may
-take two retry ticks (10 s) in super-seeding: the harness reports instead
-of failing on a slow peer.
+**End-to-end on loopback.** `make measure-seeding`, 2 MiB and 3 leechers: **3.00×
+corpus**, all done in 11 ms. `make measure-pipeline` in a local swarm, 8 MiB × 2:
+16 MiB in 101 ms (**~162 MiB/s**); with RTT 50 ms, default depth 0.608 s /
+**6736 KiB/s** and shallow 13.55 s / 302 KiB/s. The harness runs the seeder and every
+leecher in one process and the engine's outgoing interface is process-wide: each
+leecher creates its connection before the next daemon replaces the setting, so the
+distinct source addresses are kept and the swarm reaches the intended 3.00×.
 
-### 6.5 Bench 3 — campaign on a real swarm
+**Campaign on a real swarm, first run (2026-10-12).** The same well-seeded public
+torrent (Ubuntu 24.04.3 desktop amd64, ~6.0 GB), the same machine, the same 40 s window
+after a 5 s ramp-up post-metadata, three public UDP trackers in the magnet, sequential
+runs (never in parallel), two runs each of **libtorrent 2.0.11** (`python3-libtorrent`)
+and **gx-core** (`gx-torrent -mode standalone`):
 
-For gx-torrent vs **libtorrent/qBittorrent**: same swarm and role, same
-policies (slots, bandwidth, no. peers), same metrics (seed bytes `Nx corpus`,
-throughput, time to 1:1, seeds generated), median over several runs, automation active.
-The only bench that shows the benefit of super-seeding (~1x instead of Nx) and the
-quality of choking with real exchange. First run (real download, gx-core vs
-libtorrent) in **§6.8**.
+| Client | run | metadata | peers (window) | downloaded | average |
+| --- | --- | --- | --- | --- | --- |
+| libtorrent 2.0.11 | 1 | 3 s | 83 (81 seed) | 292.9 MB | **7,149 KiB/s** |
+| libtorrent 2.0.11 | 2 | 3 s | 66 (61 seed) | 258.8 MB | **6,317 KiB/s** |
+| gx-core | 1 | 3 s | 80 (77 seed) | 385.1 MB | **9,401 KiB/s** |
+| gx-core | 2 | 3 s | 81 (79 seed) | 381.2 MB | **9,305 KiB/s** |
 
-### 6.6 Results (first round, local; Intel N97, corpus 2 MiB)
+**Honest reading:** on this swarm gx-core is **on par with or above** libtorrent
+(median ~9.3 against ~6.7 MiB/s), with immediate metadata and a comparable number of
+peers. It is **not** an isolated demonstration of choking or pipelining (the choice of
+peers differs, one machine, two runs): it is the proof that gx-core really downloads
+from a real swarm and that neither is a bottleneck against libtorrent at this load. The
+isolation of the two algorithms is above (the in-process latency proxy for pipelining,
+the deterministic bench for choking); `tc netem` is not needed.
 
-Deterministic choking: all properties pass; tick with 50 peers ~1.1 µs,
-896 B/op, 1 alloc — negligible.
-Seeding without mesh (seed → 3 leechers, 5 repetitions): normal ~41–42 ms, seed
-**3.00x**; super-seeding ~51–52 ms (**~24% slower**), seed **3.00x**.
-Mesh with 2 peers (indicative): both **1.00x** (the leechers exchange the pieces).
-Mesh with 3+ peers on one host does not converge.
+**Downloads and uTP on real swarms** (`make measure-realswarm`, one run each): Big Buck
+Bunny 276 MB in 90 s (75 peers, 23 uTP, 0 SYN drops), Debian netinst 793 MB in 180 s (80
+peers, 18 uTP, 0 SYN drops), Ubuntu 24.04 1.08 GB in 180 s (85 peers, 31 uTP, 0 SYN
+drops). Real uTP peers connect, the downloads complete and `utp_syn_drops` stays 0 (the
+50-SYN backlog bound never binds); the resends show loss on a noisy swarm without a
+storm — Big Buck Bunny dials 342, accepts 57, RTO resends 2563, fast 557; Debian dials
+277, accepts 14, RTO resends 932, fast 41.
 
-Honest reading: the engine's choking is **correct and negligible as a cost**;
-on small/fast swarms super-seeding **does not reduce** the upload (the exchange
-is already enough) and costs throughput/variability. The BEP 16 advantage is for the *initial
-seeding* of large torrents with many slow peers, not reproducible on one host.
-Consequence: super-seeding **opt-in**, not default; scaling via a real campaign.
-Hardening applied: an interested but stalled peer (zero speed) receives the
-next piece at the tick instead of waiting for `not-interested` alone.
+**Choking campaign, controlled against libtorrent.** Our seeder serves a real
+libtorrent leecher on loopback: **48 MiB uploaded (100% of the file) in 4.84 s**
+(~10.4 MB/s) with the leecher verifying complete. The real-swarm half (seeding the
+Debian ISO for 3 min) found **0 peers**, because seeding needs an **inbound** port and
+this host is behind a NAT with no reachable port (the download run finds 80 peers
+outbound); the harness is kept for a host with a reachable port.
 
-### 6.7 What to decide based on the results
+**Decision: no choking change.** Reciprocation works locally and an external libtorrent
+client is served well; the only missing datum — a real swarm where peers download
+*from* us — is blocked by the test host's NAT, not by the algorithm. The campaign stays
+as the gate for any future change.
 
-- Choking worse than libtorrent on a real swarm → act on
-  `internal/unchoker` with the deterministic bench as a net and the swarm as verification.
-- Super-seeding slower locally but lighter on a real swarm → it remains
-  an *initial seeding* option (BEP 16), not default.
-- No measurable difference → the core is not touched (rebase cost not
-  justified).
-
-### 6.8 Campaign on a real swarm — first run (2026-10-12)
-
-Requirement §4.6 point 3. Same well-seeded public torrent (**Ubuntu 24.04.3
-desktop amd64**, ~6.0 GB), same machine, same 40 s window (after 5 s of
-ramp-up post-metadata), three public UDP trackers in the magnet, **sequential** runs
-(never in parallel). Two different systems, 2 runs each: **libtorrent 2.0.11**
-(`python3-libtorrent`) and **gx-core** (`gx-torrent -mode standalone`).
-
-| Client | run | metadata | peers (window) | window | downloaded | average |
-| --- | --- | --- | --- | --- | --- | --- |
-| libtorrent 2.0.11 | 1 | 3 s | 83 (81 seed) | 40 s | 292.9 MB | **7,149 KiB/s** |
-| libtorrent 2.0.11 | 2 | 3 s | 66 (61 seed) | 40 s | 258.8 MB | **6,317 KiB/s** |
-| gx-core | 1 | 3 s | 80 (77 seed) | 40 s | 385.1 MB | **9,401 KiB/s** |
-| gx-core | 2 | 3 s | 81 (79 seed) | 40 s | 381.2 MB | **9,305 KiB/s** |
-
-Honest reading: on this swarm gx-core is **on par with or above** libtorrent
-(median ~9.3 against ~6.7 MiB/s), with immediate metadata and a comparable
-number of peers. It is **not** an isolated demonstration of choking or pipelining (the
-choice of peers differs, a single machine, two runs): it is the proof that gx-core
-really downloads from a real swarm and that choking and the request queue are not a
-bottleneck compared with libtorrent at this load. The isolation of the two
-algorithms is in §6.4 (in-process latency proxy for pipelining, deterministic
-bench for choking); real `tc netem` is not needed.
-
-**DHT cold start.** The peer-search retry while a torrent looks for peers uses a
-**15 s** interval (`DHTMinAnnounceInterval`); the Ubuntu torrent over DHT-only
-resolves its metadata in ~49 s with 12 peers. The remaining time is the
-routing-table fill (~30 s cold), not the lookup.
-
-### 10.3 Multi-piece pipelining — measurement and outcome
-
-The measured baseline (§6.4, 2026-10-13) is ~12.8× from the adaptive queue at
-RTT 50 ms, and it also shows the ceiling: with 256 KiB pieces (16 blocks) the
-queue cannot exceed the piece's block count, so multi-piece per peer is the next
-lever for high-bandwidth-delay links.
-
-**Bounded write ring buffer (done).** The per-torrent "one write at a
-time" is replaced by a **bounded per-torrent write ring buffer**:
-`beginPieceWrite`/`endPieceWrite` (`torrent_write.go`) suspend the piece channels
-only once `maxPendingWrites` (4) pieces are being written, so the network keeps
-flowing while pieces are written. The picker skips a piece marked `Writing`, so a
-piece is never written twice, and `Config.ParallelWrites` (`semWrite`) still caps
-the disk parallelism globally; the per-torrent bound limits the in-flight piece
-buffers. Tests: `torrent_writering_test.go` (suspend at the cap, resume below, no
-underflow), the full `cmd/gx-torrent` e2e suite and `-race` on the transfer tests.
-**Measurement:** `make measure-seeding` on loopback is **equivalent** (the disk is
-not the bottleneck there); the gain is on slow storage, and it is the prerequisite
-for multi-piece.
-
-**Multi-piece per peer (done).** A peer downloads up to
-`maxPiecesPerPeer` (2) pieces at once: `pieceDownloaders` is a per-peer map keyed
-by piece index (`torrent.go`, `closePieceDownloader`, `handlePieceMessage` look
-the piece up by `msg.Index`), `peer.ConcurrentPieces`/`MaxConcurrentPieces` gate
-the picker (`findPiece`), and the in-flight budget is shared across a peer's
-pieces (`torrent.requestBlocks`, `RequestBlocks` returns the count sent; the
-extra piece opens only when the window has room, `pipeHasRoom`).
-`fillPeerDownloads` tops a peer up to the cap on
-Have/Bitfield/HaveAll/Unchoke/completion, one queued RAM request per peer, and
-endgame duplicates are cancelled as soon as a copy starts writing (peer and
-webseed, `markDirty` widened for out-of-order writes); the picker never hands a
-peer the same piece twice. **Measurement (the latency harness):** `default`
-**3853 → 6756 KiB/s** (×1.75), `shallow` 301 KiB/s (window of 1 respected) at RTT
-50 ms with 256 KiB pieces. Tests: e2e suite + `-race` on the transfer tests,
-`piecedownloader` budget test. RAM and CPU equivalent.
-
-### 12.3 Choking/seeding campaign
-
-- **Local reciprocation.** Without mesh the seeder uploads **3.00×** the corpus
-  (3 pure leechers). With mesh the leechers **reciprocate** (2.52 MB uploaded
-  among themselves) and the seeder's upload drops to **1.84×** (−39 %).
-- **Controlled vs libtorrent.** `TestMeasureChokingLibtorrent` (`scripts/
-  libtorrent-leech.py`): our seeder serves a real **libtorrent** leecher on
-  loopback — **48 MiB uploaded (100 % of the file) in 4.84 s** (~10.4 MB/s), the
-  leecher verified complete.
-- **Real swarm.** `TestMeasureChokingRealSwarm` seeds the Debian ISO for 3 min:
-  **0 peers**, because seeding needs an **inbound** port and this host is
-  behind NAT with no reachable port (the earlier download run found 80 peers
-  outbound). The harness is kept for a host with a reachable port.
-
-**Decision: no choking change.** Reciprocation works locally and an external
-libtorrent client is served well; the only missing datum (a real swarm where
-peers download *from* us) is blocked by the test host's NAT, not by the
-algorithm. The campaign stays as the gate for any future change.
-
----
+**DHT cold start.** The peer-search retry while a torrent looks for peers uses a **15 s**
+interval (`DHTMinAnnounceInterval`); the Ubuntu torrent over DHT only resolves its
+metadata in ~49 s with 12 peers, and the remaining time is the routing-table fill
+(~30 s cold), not the lookup.
 
 ## 11. DHT
 
-*(in migration: DHT state and measurements, to be refined in the next pass)*
-
-### 4.4 DHT: hardening and multi-path
-
 The gx-core DHT (`internal/dht`, a module of its own) covers BEP 5/32/33/42/43/44/46
-with a routing table as a bucket-less binary tree; compared with Tixati the gap is
+with a routing table as a bucket-less binary tree; against Tixati the gap is
 **hardening and diagnostics**, not BEP coverage (see [`bep.md`](bep.md)).
 
-- **Diagnostics — done.** `Stats()` exposes per-RPC and screening counters, the
-  reflected address, the NAT type, `subnet_share_max`, `nodes_insecure_id`,
-  `subnet_cap_hint` and `peers_confirmed_multi` (see
-  [`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md)). It is the
-  measurement basis of the items below.
-- **Token hygiene — done.** The `announce_peer` token is bound to source address +
-  scope (the info-hash), so a token from one swarm is not reused on another.
-- **Anti-Sybil cap per subnet** (`Config.MaxNodesPerSubnet`, default 0 = off):
-  implemented with an **O(1) counter**; nodes beyond the threshold stay in the
-  address book with `noTree`, and `subnet_cap_hint` *advises* a value.
-  **Measured 2026-10-14** (5 min, real info-hash): `subnet_share_max` **4–7**,
-  `nodes_capped` **0** — no node exceeds any candidate threshold (8/16/24), so
-  enforcement would be a no-op and CGNAT/mobile legitimately share subnets.
-  **Decision: keep it as a hint, off by default.**
-- **Multi-path lookup**: design only (`get_peers` on several branches in parallel,
-  peers preferred when confirmed by ≥2 paths). The routing table already deduplicates
-  repeated queries, and the two real measurements (random and real info-hash) gave
-  **`peers_confirmed_multi` 0**: the gain is **not proven**, so the rewrite is
-  **closed with data** (§10.2).
-- **Harness**: `make measure-dht` (`GX_MEASURE_DHT=5m`,
-  `GX_MEASURE_DHT_INFOHASH=<40 hex>`, opt-in, outside CI). On the public DHT we
-  measured ~740 known nodes, `subnet_share_max` 14, `nodes_insecure_id` ≈42%, and
-  the discovery of **108 peers in ~30 s** on the Ubuntu 24.04 torrent.
-- **Out of scope**: DHT over I2P; the BEP 44 **outgoing client** (no consumer yet).
+**What it has.** `Stats()` exposes per-RPC and screening counters, the reflected
+address, the NAT type, `subnet_share_max`, `nodes_insecure_id`, `subnet_cap_hint` and
+`peers_confirmed_multi`, and it is the measurement basis of everything below. The
+`announce_peer` token is bound to source address **and** scope (the info-hash), so a
+token from one swarm is not reused on another. The **anti-Sybil cap per subnet**
+(`Config.MaxNodesPerSubnet`, default 0 = off) is implemented with an O(1) counter:
+nodes beyond the threshold stay in the address book with `noTree`, and
+`subnet_cap_hint` advises a value. Out of scope: DHT over I2P and the BEP 44
+**outgoing client** (no consumer yet).
 
-### 10.2 DHT multi-path — measurement and plan
+**Measurements.** `make measure-dht` on the public DHT (opt-in, outside CI):
 
-The iterative lookup already fans out to the ~8 closest nodes and re-enqueues
-while peers are still needed; the missing part is **confirmation across paths**
-(prefer a peer seen from ≥2 independent paths) to resist a node that lies or
-swallows results. Design sketch: an explicit per-lookup state machine like the
-BEP 44 one (`bep44_client.go`), with the reporters of each candidate peer
-tracked, a bounded fan-out and a deadline; expose `peers_confirmed_multi` and
-`lookup_paths` in `Stats()` (they surface as `dht_<key>` with no UI work).
+- ~740 known nodes, `subnet_share_max` 14, `nodes_insecure_id` ≈42%, and the discovery
+  of **108 peers in ~30 s** on the Ubuntu 24.04 torrent;
+- a 3 minute run (2026-10-13): nodes settled at ~254 from a peak of ~536 (stale nodes
+  cleaned), `subnet_share_max` **8** — below the hint threshold of 16, so no cap is
+  suggested — `nodes_insecure_id` ≈40%, `capped` 0, `queries_out` 2899 / `replies_in`
+  834 (**≈29% reply success**), `dropped` 1290 (rate limit), `reflected_observations`
+  619 (the sending side of the BEP 42 `ip` field works) and `peers_found` 0 (a random
+  info-hash);
+- a 5 minute run on a real info-hash (Debian, 2026-10-14): nodes ~296 (peak 525),
+  `subnet_share_max` 4–7, `nodes_insecure_id` ≈42%, `nodes_capped` 0, `queries_out`
+  4703 / `replies_in` 1670 (**35.5%**), `reflected_observations` 1063, `peers_found` 0
+  and **`peers_confirmed_multi` 0**;
+- a further run on the public network: **4262 nodes**, 21.9% query success, 875
+  reflected pings, 2 peers found from a cold start.
 
-Per the repo rule this is gated by the real-swarm measurement
-(`make measure-dht`): query-out/reply-in and peers found set the baseline.
+**Read.** The routing table is **not concentrated** and no node exceeds any candidate
+threshold (8/16/24), so enforcing the anti-Sybil cap would be a no-op while CGNAT and
+mobile legitimately share subnets: **the cap stays a hint, off by default**. The ~65–71%
+of unanswered queries are nodes that do not reply, not proof of poisoning.
 
-**Measurement (2026-10-13, 3 minutes, public DHT):** nodes settled at ~254 from
-a peak of ~536 (stale nodes cleaned), **`subnet_share_max` = 8** (below the hint
-threshold of 16, so no cap is suggested), `nodes_insecure_id` ≈ 40 %, `capped` =
-0, `queries_out` 2899 / `replies_in` 834 (**≈ 29 % reply success**), `dropped`
-1290 (rate limit), **`reflected_observations` 619** (the sending side of the BEP
-42 `ip` field works: observers now report our address) and `peers_found` 0 (the
-probe used a random info-hash).
-
-**Read:** the routing table is **not concentrated** and the anti-Sybil cap is not
-triggered, so the concentration lever is already sufficient; the ~71 % of
-unanswered queries are nodes that do not reply, not proof of poisoning. There is
-therefore **no data yet that justifies a multi-path lookup**: the next step was the
-instrumentation, not the rewrite.
-
-**Instrumentation (done).** `notePeerReport`/`expirePeerConfirm`
-(`internal/dht/confirm.go`) track which responding nodes reported each
-(info-hash, peer), bounded to `peerConfirmMax` entries and expiring after
-`peerConfirmWindow`; `peers_confirmed_multi` (in `Stats()`, therefore
-`dht_peers_confirmed_multi` in the daemon) counts the peers a second distinct
-node confirmed. **Reporters are counted per subnet** (`reporterKey`, the same /24 or /48 unit as the anti-Sybil cap), so one host on many ports or a block of Sybil nodes in one /24 cannot confirm its own peers and inflate the datum that has to justify the rewrite. It is read-only: it changes nothing about which peers are used.
-On a real swarm a non-trivial value is the evidence needed before spending the
-cost of a full multi-path lookup (an explicit per-lookup state machine with a
-bounded fan-out and a deadline, like `bep44_client.go`). Tests:
-`TestPeerConfirmCountsDistinctReporters`, `TestPeerConfirmIsBounded`,
-`TestPeerConfirmExpiry`, `TestReporterKeyIsTheSubnet`.
-
-**Second measurement (2026-10-14, 5 minutes, real Debian info-hash
-`7acf8fb5…`):** nodes ~296 (peak 525), `subnet_share_max` 4–7, `nodes_insecure_id`
-≈ 42 %, `nodes_capped` 0, queries_out 4703 / replies_in 1670 (35.5 %),
-`reflected_observations` 1063, **`peers_found` 0**, **`peers_confirmed_multi` 0**.
-Same read as the first run, on a populated info-hash rather than a random one:
-the routing table is not concentrated and **no peer was confirmed by two
-distinct subnets**, so there is still **no evidence to justify a multi-path
-rewrite**. The item is therefore **closed with data** (a controlled adversarial
-swarm would be the only next step, and it is out of scope for a home client).
-
----
+**Multi-path `get_peers` — closed with data.** The idea is to confirm peers across
+independent paths and prefer those seen from ≥2 (an explicit per-lookup state machine
+like the BEP 44 one, with a bounded fan-out and a deadline). The instrumentation exists
+and is read-only: `notePeerReport`/`expirePeerConfirm` (`internal/dht/confirm.go`) track
+which responding nodes reported each (info-hash, peer), bounded to `peerConfirmMax`
+entries and expiring after `peerConfirmWindow`, and **reporters are counted per subnet**
+(the same /24 or /48 unit as the cap), so one host on many ports or a Sybil block cannot
+confirm its own peers and inflate the datum. In both real measurements
+`peers_confirmed_multi` was **0**, so **no peer was confirmed by two distinct subnets**
+and there is no evidence justifying the cost of the rewrite: the item is closed with
+data. A controlled adversarial swarm would be the only next step, and it is out of
+scope for a home client.
 
 ## 12. Merge on real data
 
-*(in migration: merge measurements, to be refined in the next pass)*
+**Phase 3, block-granularity reuse.** Phase 2 reuses a destination piece only when
+**every** source piece overlapping it is verified; Phase 3 reuses the rest at **16 KiB
+block** granularity: the verified spans of a partially covered destination piece are
+written to disk (`storePartialBlocks`) and the blocks they cover are recorded per piece
+(`torrent.partialBlocks`); when the piece is picked, the downloader reads those blocks
+back (`prefillBlocks` → `PieceDownloader.Prefill`) and requests only the others, with
+the assembled piece verified whole as usual. It is safe because BEP 52 leaves are the
+16 KiB blocks of the **file**, not of the piece: two torrents with the same
+`pieces root` share the whole Merkle tree below the piece layer, whatever their piece
+length, so a span copied from a verified source piece is the file's true content. The
+final whole-piece check still runs; if it fails on a piece with local blocks, the blocks
+are dropped, the peer is not banned (the mismatch cannot be blamed on it) and the piece
+is downloaded whole.
 
-### 10.1 Merge Phase 3 — block-granularity reuse (done)
-
-Phase 2 reuses a destination piece only when **every** source piece overlapping
-it is verified. Phase 3 reuses the rest at **16 KiB block** granularity: the
-verified spans of a partially covered destination piece are written to disk
-(`storePartialBlocks`, `filesection.Piece.WriteAt`) and the blocks they cover
-are recorded per piece (`torrent.partialBlocks`, handed from the verifier
-goroutine to the run loop through `mergeOut`). When the piece is picked, the
-downloader reads those blocks back (`prefillBlocks` → `PieceDownloader.Prefill`)
-and requests only the others; the assembled piece is verified whole
-(`VerifyV2`) as usual.
-
-**Why it is safe.** BEP 52 leaves are the 16 KiB blocks of the *file*, not of
-the piece: two torrents with the same `pieces root` share the whole Merkle tree
-below the piece layer, whatever their piece length. A span copied from a
-source piece the source verified is therefore the file's true content. The
-final whole-piece check still runs; if it fails on a piece with local blocks,
-the blocks are dropped, the peer is not banned (the mismatch cannot be blamed
-on it) and the piece is downloaded whole, where smart ban applies again.
-
-**Test environment (real data, public torrents).** `scripts/phase3-env.sh`
-downloads the Debian netinst and Arch Linux ISOs over BitTorrent (aria2c),
-builds with python3-libtorrent two **v2-only** torrents of each ISO — source
-with 256 KiB pieces, destination with 1 MiB pieces, same file so same root — and
-corrupts one source piece in four, so every destination piece straddles
-verified and unverified source pieces. `TestMeasureMergePhase3`
-(`GX_MEASURE_MERGE3=<dir>`, opt-in) runs a gx-torrent seeder of the destination
-and a leecher holding the partial source, adds the destination to the leecher
-and measures the bytes taken from the network; `GX_MEASURE_MERGE3_PEER` with
-`scripts/phase3-seed.py` uses a **libtorrent** seeder instead (interoperability).
+**Test environment (real data, public torrents).** `scripts/phase3-env.sh` downloads the
+Debian netinst and Arch Linux ISOs over BitTorrent (aria2c) and builds, with
+python3-libtorrent, two **v2-only** torrents of each — source with 256 KiB pieces,
+destination with 1 MiB pieces, same file so same root — corrupting one source piece in
+four, so every destination piece straddles verified and unverified source pieces.
+`TestMeasureMergePhase3` (`GX_MEASURE_MERGE3=<dir>`, opt-in) runs a gx-torrent seeder of
+the destination and a leecher holding the partial source, adds the destination to the
+leecher and measures the bytes taken from the network; `GX_MEASURE_MERGE3_PEER` with
+`scripts/phase3-seed.py` uses a **libtorrent** seeder instead, for interoperability.
 
 | Run (loopback) | before (Phase 2) | after (Phase 3) |
 | --- | --- | --- |
@@ -1051,49 +867,37 @@ and measures the bytes taken from the network; `GX_MEASURE_MERGE3_PEER` with
 | Arch: peak RSS | 109 MiB | 111 MiB |
 | Debian with a libtorrent 2.0.11 seeder | — | 25.0% from the network, complete |
 
-All 756 (Debian) and 1565 (Arch) destination pieces were reused at block level
-and every one passed its hash. The reused blocks are not persisted as such, but
-the merge now re-runs on the **resume path** (`handleAllocationDone` +
-`startMergeVerifier`, §9.2): after a restart from the resume data the blocks of
-the pieces not yet completed are re-derived from the source and are **not**
-downloaded again.
+All 756 (Debian) and 1565 (Arch) destination pieces were reused at block level and every
+one passed its hash.
 
-**Resume-path measurement (2026-10-13, `TestMeasureMergeResumePath` on the
-Debian ISO, same harness/data as above).** A destination merged with no peer,
-then paused and reloaded by a restarted leecher session, downloads after the
-restart:
+**On a resume (2026-10-13).** A destination merged with no peer, then paused and reloaded
+by a restarted leecher session, downloads after the restart:
 
 | Run (loopback) | before (no resume merge) | after (resume merge) |
 | --- | --- | --- |
 | Debian 756 MiB: from the network after the restart | 792,723,456 B (100%) | **198,180,864 B (25.0%)** |
-| merged_bytes re-derived | 0 | 594,542,592 B |
+| `merged_bytes` re-derived | 0 | 594,542,592 B |
 | partial (block-level) pieces re-derived | 0 | 756 (every destination piece) |
 | total time | 2.61 s | 1.00 s |
 
-Exactly the no-restart Phase 3 figure: the reloaded bitfield is kept (no piece
-re-read or re-hashed via `Verifier.Skip`/`Only`) and the block-level reuse is
-re-derived, so a restart no longer re-downloads the file. On the resume path the
-added cost when nothing is reusable is only the candidate filter: **115 ns and
-0 allocations** over 32 unrelated session torrents
-(`BenchmarkMergeCandidatesUnrelated`).
+Exactly the no-restart figure: the reloaded bitfield is kept (no piece re-read or
+re-hashed, via `Verifier.Skip`/`Only`) and the block-level reuse is re-derived, so a
+restart no longer re-downloads the file. The added cost when nothing is reusable is only
+the candidate filter: **115 ns and 0 allocations** over 32 unrelated session torrents.
 
-**Later-sibling measurement (2026-10-13, `TestMeasureMergeLaterSibling` on the
-Debian ISO, same harness/data).** The destination is added **first**, with no
-sibling and no peer; the source is added afterwards and wakes it:
+**When the sibling arrives later (2026-10-13).** The destination is added first, with no
+sibling and no peer, and the source is added afterwards:
 
 | Run (loopback) | before (no trigger) | after (later-sibling trigger) |
 | --- | --- | --- |
 | later merge observed | no | yes |
-| merged_bytes | 0 | 594,542,592 B |
+| `merged_bytes` | 0 | 594,542,592 B |
 | partial (block-level) pieces | 0 | 756 (every destination piece) |
 | Debian 756 MiB: from the network | 792,723,456 B (100%) | **198,180,864 B (25.0%)** |
 | total time | 2.61 s | 0.91 s |
 
-Same 25.0% as the no-restart Phase 3, the resume path and the first-run merge:
-the order in which the torrents are added no longer decides whether the reuse
-happens.
-
----
+The same 25.0% as the first run, the resume path and the no-restart merge: the order in
+which the torrents are added no longer decides whether the reuse happens.
 
 ## 13. Accessibility verification
 
@@ -1103,17 +907,6 @@ via Playwright, regression tests (dialogs, keyboard sort, polling, narrow
 viewports). Suite: **13 green tests** on dashboard, downloads, settings,
 maintenance, health, logs (`cd uiweb/end2end && npm ci && npm run test:a11y`;
 a safety net, not a substitute for the manual assessment).
-
-**Improvements implemented**: language via the `lang` attribute; landmarks
-(skip-nav, `aside`/`nav`/`header`/`main`); `aria-current="page"`;
-accessible names (not just placeholder/tooltip); labels on icon controls;
-dialogs (focus inside, Tab/Shift+Tab trap, Escape, focus restore);
-keyboard-sortable headers with `aria-sort`; focus preserved under polling;
-visible focus; tables with caption/scope (also dynamic); progressbar with a
-value; ARIA for tabs/dialogs/landmarks; live region for states/errors/notifications/
-async; decorative symbols never instead of text; settings search with
-synonyms (`memo`, `memory`, `RAM`, `cache`); light-theme contrasts darkened where
-needed; mobile reflow (tables with internal scroll); reduced-motion respected.
 
 **Residual validation** (before any formal declaration): primary
 workflows with Tab/Shift+Tab/Enter/Space/arrows/Escape; at least one desktop
@@ -1128,6 +921,7 @@ injected external content.
 mouse action from the keyboard; focus contained/restored in the dialogs;
 async announcements without excessive interruptions; contrasts in both themes; semantics
 usable for tables/tabs/progress/errors; no regression on desktop and mobile.
+
 ---
 
 ## 14. Open items and the measurement-gated program
