@@ -26,7 +26,6 @@ needs.
 | [BEP compliance](bep.md) | Which BitTorrent specifications (BEPs) the engine supports, which are missing and the roadmap. |
 | [Beyond the BEPs](beyond-bep.md) | Analysis of the protocol extensions outside the BEP catalogue (WebSocket tracker, WebTorrent/WebRTC, v1 cross-layout merge, BEP 46 feeds) and how they would be implemented. |
 | [gx-core](gx-core.md) | The standalone torrent client (the `gx-torrent` binary used without Gextto): modes, security, packaging, what is still open. |
-| [Archive](archive/README.md) | Historical reports and plans, no longer maintained. |
 
 > [!NOTE]
 > The paths, ports and commands here are examples. Always check the service
