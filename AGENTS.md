@@ -29,18 +29,17 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   nella root; il `main` è in `cmd/gexttod`.
 - UI server-side in `uiweb/v2` (SSR + HTMX), i18n it/en/de/fr/es/pl. I test
   end2end dell'UI sono Playwright (Node) in `uiweb/end2end`, non Go.
-- **Motori torrent**: `gx-torrent` (default, Go puro), libtorrent integrato
-  (fallback automatico), qBittorrent-nox esterno. Contratto in
-  `torrent_engine.go`; adapter `gxtorrent_engine.go`/`gxtorrent_runtime.go`,
-  `libtorrent.go`, `qbittorrent_engine.go`. Matrice capacità in
+- **Motori torrent**: `gx-torrent` (default, Go puro) e `qBittorrent-nox`
+  (esterno o gestito). Contratto in
+  `torrent_engine.go`; adapter `gxtorrent_engine.go`/`gxtorrent_runtime.go` e
+  `qbittorrent_engine.go`. Matrice capacità in
   `capabilityLevels` (`torrent_engine.go`): è la **fonte unica**. Da lì derivano
   l'API (`GET /api/torrent-backend`) e i flag
   della scheda di dettaglio (`v2DetailCapsFor` in `uiweb_v2.go`, test
   `TestV2DetailCapsFollowCapabilityMatrix`). Le operazioni che un motore non ha
-  rifiutano con `ErrCapabilityUnavailable`; i blocchi solo-libtorrent usano
-  `requireEmbedded`. La **visibilità delle impostazioni** è un asse diverso
-  (`uiSettingAllowedBackends`/`uiLibtorrentEngineOnlySettings`): quali chiavi un
-  motore legge, non quali operazioni supporta.
+  rifiutano con `ErrCapabilityUnavailable`. La **visibilità delle impostazioni**
+  è un asse diverso (`uiSettingAllowedBackends`): quali chiavi un motore legge,
+  non quali operazioni supporta.
 - `gx-torrent` è **sempre avviato e sorvegliato** da Gextto quando è il motore
   attivo (nessuna opzione per disattivarlo). Un demone esterno già in ascolto
   sull'URL viene usato così com'è.
@@ -67,19 +66,12 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 
 ## Build e test
 - `make build` — incrementa `build_number` (committato) e compila
-  `bin/gexttod` **e** `bin/gx-torrent`. La build è **Go puro di default**
-  (`CGO_ENABLED=0`, nessun libtorrent: `gx-torrent` è il motore predefinito).
-  Per includere il motore **libtorrent integrato** usa `make build-libtorrent`
-  (`GEXTTO_LIBTORRENT=1`), che attiva CGO e richiede compilatore C++17 e header
-  libtorrent-rasterbar; i warning di deprecazione di libtorrent sono normali.
+  `bin/gexttod` **e** `bin/gx-torrent`. La build è **Go puro**
+  (`CGO_ENABLED=0`: `gx-torrent` è il motore predefinito).
   `gx-torrent` viene sostituito solo se il suo codice è cambiato
   (`bin/gx-torrent.code-sha256`, `GEXTTO_FORCE_GXTORRENT=1` per forzarlo). Il
   confronto compila con `-buildvcs=false`: senza, Go marchia la revisione git
   nel binario e ogni commit sembrerebbe un cambiamento di gx-torrent.
-- Senza cgo, `libtorrent_nocgo.go` (`//go:build !cgo`) fornisce gli stub del
-  bridge e `LibtorrentCompiled()` è `false`: il backend `embedded` non è
-  selezionabile (l'opzione non compare nella UI e la selezione è rifiutata);
-  un `torrent_backend=embedded` salvato fa partire il demone su gx-torrent.
 - `build_number` è la **sorgente unica** del numero di build: checkout e CI
   leggono lo stesso file (`build_number`, il valore corrente). La CI non usa più
   `github.run_number`: build e `release.json` prendono il valore dal file, così
@@ -131,9 +123,7 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   TUI, gestione processi/systemd, metadati fs e installer/updater sono Unix
   (vedi `docs/gx-torrent.md`, *Standalone use → Platforms*).
 - `make test` — `check-ui` + `installer-test` + `test-dht` +
-  `CGO_ENABLED=0 go test ./...` (Go puro; i test del motore libtorrent sono dietro
-  `//go:build cgo`). `make test-libtorrent` (`CGO_ENABLED=1 go test ./...`) esegue
-  anche quelli e richiede libtorrent.
+  `CGO_ENABLED=0 go test ./...` (Go puro).
 - **Giro di controllo a ogni chiusura di ciclo** (motore o demone): `make test`,
   `make test-engine` e `make vet`, più gli invarianti qui sotto. Il resto della
   verifica obbligatoria (TUI, performance) è nei punti seguenti.
@@ -173,20 +163,17 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   non è stata fatta.
 
 ## Release, installer e aggiornamenti
-- Il pacchetto di release si compila **su Ubuntu 22.04** (glibc 2.35, libtorrent
-  2.0.5) con `scripts/build-release.sh`: in locale gira in un container
+- Il pacchetto di release si compila **su Ubuntu 22.04** (glibc 2.35) con
+  `scripts/build-release.sh`: in locale gira in un container
   docker/podman, in CI (`continuous.yml`, `release.yml`) i job `package` usano
   `container: ubuntu:22.04` per x86_64 e aarch64 (`ubuntu-24.04-arm`). Un
   binario compilato su un sistema più nuovo non parte su Debian 12/Ubuntu 22.04.
-  Il bridge C++ deve compilare anche con libtorrent 2.0.5 (`LIBTORRENT_VERSION_NUM`).
-- Ogni architettura esce in due varianti (matrice `variant` dei job `package`):
-  `gextto-linux-<arch>.tar.gz` (Go puro, predefinita) e
-  `gextto-linux-<arch>-libtorrent.tar.gz` (`GEXTTO_LIBTORRENT=1`, con il motore
-  libtorrent integrato). `install.sh --libtorrent` installa la seconda e
-  `gexttod --update` resta sulla variante installata (`LibtorrentCompiled()`).
+- Ogni architettura esce in un solo pacchetto Go puro:
+  `gextto-linux-<arch>.tar.gz`; `gexttod --update` aggiorna l'installazione allo
+  stesso pacchetto.
 - `scripts/package-gx-torrent.sh` produce l'archivio **standalone**
   `gx-torrent-linux-<arch>.tar.gz` (binario + unit systemd + README), che
-  `build-release.sh` genera nella variante Go pura e la CI pubblica accanto a
+  `build-release.sh` genera e la CI pubblica accanto a
   quelli di Gextto: è il client usabile da solo, come qbittorrent-nox, senza
   Gextto. `scripts/package-gx-torrent-windows.sh` fa lo stesso per Windows
   (`gx-torrent-windows-<arch>.zip`, amd64/arm64, servizio nativo).

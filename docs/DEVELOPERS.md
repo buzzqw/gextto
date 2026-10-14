@@ -30,26 +30,20 @@ the torrent backends and where to make common changes, see
 
 ## Requirements and build
 
-Install Go 1.26.8 or newer (the version in `go.mod`). The default build is **pure Go** and needs no
-libtorrent: `gx-torrent`, the default engine, is a pure-Go daemon built next to
-`gexttod`. To include the embedded **libtorrent** engine, also install a C++17
-toolchain and the `libtorrent-rasterbar` development headers, then build with
-`GEXTTO_LIBTORRENT=1`. The normal build embeds the web UI; it does not need a
-separate frontend build.
+Install Go 1.26.8 or newer (the version in `go.mod`). The build is **pure Go**
+and has no C/C++ dependency: `gx-torrent`, the default engine, is a pure-Go
+daemon built next to `gexttod`. The normal build embeds the web UI; it does not
+need a separate frontend build.
 
 ```bash
-make build                 # pure Go (default): gx-torrent
-make build-libtorrent      # also link the embedded libtorrent engine
-go test ./...              # pure-Go tests (libtorrent tests are behind //go:build cgo)
+make build                 # pure Go (default): gexttod + gx-torrent
+go test ./...              # pure-Go tests
 ```
 
-The executable is written to `bin/gexttod`, with the pure-Go `gx-torrent` daemon
-next to it. Supported torrent backends are **gx-torrent** (default, pure Go),
-**embedded libtorrent** (present only in a build made with `GEXTTO_LIBTORRENT=1`;
-`LibtorrentCompiled()` reports it, and without it the backend is not selectable)
-and the **qBittorrent-nox** Web API adapter. See
-[ARCHITECTURE.md](ARCHITECTURE.md) for the cgo boundary (`libtorrent_cgo.go` vs
-the `libtorrent_nocgo.go` stub).
+The executable is written to `bin/gexttod`, with the `gx-torrent` daemon next to
+it. Supported torrent backends are **gx-torrent** (default, pure Go) and the
+**qBittorrent-nox** Web API adapter. See
+[ARCHITECTURE.md](ARCHITECTURE.md) for the torrent engine layer.
 
 ## Local development
 
@@ -130,15 +124,12 @@ gofmt -w changed.go
 make test                 # pure Go: check-ui + installer self-test + test-dht + CGO_ENABLED=0 go test ./...
 make test-engine            # tests of the gx-core engine
 make test-ui              # UI end2end (Playwright): pages, mobile, a11y (needs Node + a browser)
-CGO_ENABLED=1 go test -race ./...   # race detector needs cgo (and the libtorrent headers)
+CGO_ENABLED=1 go test -race ./...   # race detector needs cgo (a C compiler)
 node --check uiweb/v2/static/v2-core.js
 git diff --check
 ```
 
-`make test` is pure Go and skips the libtorrent-only tests (guarded by
-`//go:build cgo`). Run `make test-libtorrent` and `make build-libtorrent`
-(requires the libtorrent headers) when you touch the embedded engine, the cgo
-bridge or the capability gating.
+`make test` is pure Go.
 
 The end-to-end suite is under `uiweb/end2end` (Playwright + Node). `make test-ui`
 builds the daemon, starts it in dry-run on its own port, completes the first-run
@@ -172,9 +163,9 @@ Go fuzzer shutting down under load does not fail the run (a real crash repeats).
 
 ## Build cache
 
-The Go build cache (`GOCACHE`, normally `~/.cache/go-build`) grows over time and
-balloons with CGO builds (the embedded libtorrent engine): a few gigabytes are
-normal on a busy machine. `scripts/refresh-build-cache.sh` keeps it in check:
+The Go build cache (`GOCACHE`, normally `~/.cache/go-build`) grows over time: a
+few gigabytes are normal on a busy machine. `scripts/refresh-build-cache.sh`
+keeps it in check:
 when the cache passes a threshold (default 5 GiB; override with
 `GEXTTO_BUILD_CACHE_LIMIT_GB` or `--limit-gb N`) it runs `go clean -cache`, then
 `go build ./...` and `make test`, so the cache is left **clean and warm** rather
@@ -218,18 +209,12 @@ scripts/prune-actions-caches.sh --overlay-only  # CodeQL base databases only
 
 ## Concurrency and safety
 
-The daemon mixes HTTP handlers, long-lived workers and (in a build made with
-`GEXTTO_LIBTORRENT=1`) a CGo libtorrent session, so a few invariants are
+The daemon mixes HTTP handlers and long-lived workers, so a few invariants are
 load-bearing:
 
-- **The native session handle is shared state.** Reads of `LibtorrentClient.session`
-  must take `sessionMu.RLock()`; `Shutdown` destroys the handle under
-  `sessionMu.Lock()`. Never read the field directly in a new method — a cgo
-  call on a destroyed session aborts the process. This only applies when
-  libtorrent is compiled in; `LibtorrentCompiled()` distinguishes the builds.
 - **Goroutines started by HTTP handlers** (manual cycle, rename-all) must be
   tracked in a `WaitGroup` or derive from `BackgroundContext()` so they finish
-  before the torrent session is torn down.
+  before their state is torn down.
 - **Run `go test -race ./...`.** It catches the races above; do not merge a
   change that introduces a new race.
 - New endpoints must validate and bound every user input and restrict filesystem
@@ -244,15 +229,14 @@ make build
 scripts/package-linux.sh
 ```
 
-The default payload is **pure Go**: `gexttod`, the `gx-torrent` daemon, `run.sh`,
-`VERSION` and a quick-start README. It bundles the `libtorrent` shared library
-only when built with `GEXTTO_LIBTORRENT=1`; `scripts/build-release.sh` builds the
-release in an Ubuntu 22.04 container (the libtorrent C++ ABI pins that baseline).
-It is the payload consumed by the official installer and by the advanced
-self-update command.
+The payload is **pure Go**: `gexttod`, the `gx-torrent` daemon, `run.sh`,
+`VERSION` and a quick-start README. `scripts/build-release.sh` builds the
+release in an Ubuntu 22.04 container (glibc 2.35 is the baseline the released
+binaries must run against). It is the payload consumed by the official installer
+and by the advanced self-update command.
 
 The same release build also produces the **standalone gx-torrent** packages,
-published next to Gextto's (pure-Go variant only):
+published next to Gextto's:
 
 | Script | Output | Contents |
 |---|---|---|
