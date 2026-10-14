@@ -167,6 +167,10 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   migliore: misura prima e dopo (`go test -bench … -benchmem`, profili `pprof`
   CPU/heap, footprint del demone e di `gx-torrent`, `make measure-seeding`) e
   annota i numeri in `docs/measurements.md`.
+- **Ogni volta che fai dei benchmark, aggiorna `docs/measurements.md`.** Vale per
+  qualunque misura (benchmark Go, `make measure-*`, profili, RSS): il documento è
+  il posto dove i numeri restano, con macchina e data — se una misura non è lì,
+  non è stata fatta.
 
 ## Release, installer e aggiornamenti
 - Il pacchetto di release si compila **su Ubuntu 22.04** (glibc 2.35, libtorrent
