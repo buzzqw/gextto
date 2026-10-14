@@ -567,7 +567,9 @@ editor is the place for precise AND filtering. The **cookie API**
 (`app/cookies`, `app/setCookies`) stores the cookies the daemon sends when it
 fetches `.torrent` files and metadata over HTTP (private trackers): they are
 used by the daemon's URL adds, the magnet `xs=`/`as=` sources and the web
-seeds. The API uses the
+seeds. The **torrent creator** API (`torrentcreator/addTask`, `status`,
+`torrentFile`, `deleteTask`) builds a v1 `.torrent` from a path on the server
+(a requested v2/hybrid format is produced as v1). The API uses the
 same access criteria as the page: without a password it is open, otherwise the LAN bypass
 is needed (if `local-bypass` is active) or a session (`SID` qBittorrent or `gx_session`
 of the page). In managed it is **not** exposed: only Gextto commands.

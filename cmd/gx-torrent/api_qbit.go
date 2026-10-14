@@ -136,6 +136,11 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/rss/setRule", d.handleQbitRssSetRule)
 	mux.HandleFunc("POST /api/v2/rss/renameRule", d.handleQbitRssRenameRule)
 	mux.HandleFunc("POST /api/v2/rss/removeRule", d.handleQbitRssRemoveRule)
+	// Torrent creator, mapped onto the engine's CreateTorrent.
+	mux.HandleFunc("POST /api/v2/torrentcreator/addTask", d.handleQbitTorrentCreatorAdd)
+	mux.HandleFunc("GET /api/v2/torrentcreator/status", d.handleQbitTorrentCreatorStatus)
+	mux.HandleFunc("GET /api/v2/torrentcreator/torrentFile", d.handleQbitTorrentCreatorFile)
+	mux.HandleFunc("POST /api/v2/torrentcreator/deleteTask", d.handleQbitTorrentCreatorDelete)
 	return d.qbitAuth(mux)
 }
 
