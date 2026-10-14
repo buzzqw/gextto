@@ -28,6 +28,9 @@ func (d *Daemon) handleUICategory(w http.ResponseWriter, r *http.Request) {
 	}
 	err := d.setCategory(hash, category)
 	if err == nil {
+		err = d.setAutoManagement(hash, formBool(r, "auto_tmm"))
+	}
+	if err == nil {
 		err = d.setTags(hash, tags)
 	}
 	d.uiRedirect(w, r, url.Values{"open": {hash}, "tab": {"general"}}, "Category and tags updated", err)

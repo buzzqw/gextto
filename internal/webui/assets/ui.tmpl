@@ -392,6 +392,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
     <div class="dlg-body">
       <label class="field">Category<input type="text" name="category" list="catlist-all" autocomplete="off" title="Category assigned to this torrent for organization and filtering"></label>
       <label class="field">Tags<input type="text" name="tags" placeholder="tag, tag" autocomplete="off" title="Tags assigned to this torrent, separated by commas"></label>
+      <label class="chk"><input type="checkbox" name="auto_tmm" value="1" title="Let the category decide the save path: assigning a category moves the torrent to its folder (qBittorrent automatic torrent management)"> Save path managed by the category</label>
     </div>
     <div class="dlg-foot">
       <button type="button" data-close title="Close without saving">Cancel</button>
@@ -630,7 +631,7 @@ function copyMagnet(hash){
 }
 function editCategory(hashes){
   var dlg=$('#dlg-cat'),r=rows().find(function(x){return x.dataset.hash===hashes[0];});
-  dlg._hashes=hashes;$('input[name=category]',dlg).value=r?r.dataset.cat:'';$('input[name=tags]',dlg).value=r?r.dataset.tags.split(',').join(', '):'';openDialog(dlg);
+  dlg._hashes=hashes;$('input[name=category]',dlg).value=r?r.dataset.cat:'';$('input[name=tags]',dlg).value=r?r.dataset.tags.split(',').join(', '):'';$('input[name=auto_tmm]',dlg).checked=!!(r&&r.dataset.tmm);openDialog(dlg);
 }
 function renameTorrentDialog(hashes){
   var dlg=$('#dlg-rename'),r=rows().find(function(x){return x.dataset.hash===hashes[0];});
@@ -919,7 +920,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
     </tr></thead>
     <tbody>
     {{range .Rows}}
-    <tr tabindex="-1" aria-selected="false" data-hash="{{.Hash}}" data-name="{{.Name}}" data-state="{{.State}}" data-cat="{{.Category}}" data-tags="{{.Tags}}" data-path="{{.SavePath}}" data-down="{{.DLRate}}" data-up="{{.ULRate}}" data-k-name="{{.Name}}" data-k-size="{{.TotalSize}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-eta="{{.ETAVal}}" data-k-peers="{{.Peers}}" data-k-ratio="{{.RatioVal}}">
+    <tr tabindex="-1" aria-selected="false" data-hash="{{.Hash}}" data-name="{{.Name}}" data-state="{{.State}}" data-cat="{{.Category}}" data-tags="{{.Tags}}" data-tmm="{{if .AutoTMM}}1{{end}}" data-path="{{.SavePath}}" data-down="{{.DLRate}}" data-up="{{.ULRate}}" data-k-name="{{.Name}}" data-k-size="{{.TotalSize}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-eta="{{.ETAVal}}" data-k-peers="{{.Peers}}" data-k-ratio="{{.RatioVal}}">
       <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}" aria-label="Select torrent" title="Select this torrent for batch actions"></td>
       <td class="name"><div class="t1"><a class="open" href="/?open={{.Hash}}" title="{{.Name}}">{{.Name}}</a></div><div class="t2">{{if .Category}}<span class="chip cat">{{.Category}}</span>{{end}}<span class="path" title="{{.SavePath}}">{{.SavePath}}</span></div></td>
       <td class="num c-size" title="{{.DoneSize}}">{{.Size}}</td>

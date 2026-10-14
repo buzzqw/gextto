@@ -128,6 +128,9 @@ type torrentMeta struct {
 	// (standalone mode). They do not affect the transfer.
 	Category string   `json:"category,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
+	// AutoTMM: the category decides the save path (qBittorrent automatic torrent
+	// management). When on, assigning a category relocates the torrent.
+	AutoTMM bool `json:"auto_tmm,omitempty"`
 	// ExportedTorrent/ExportedFin mark the export_dir/export_dir_fin copies, so
 	// the tick does not repeat them.
 	ExportedTorrent bool `json:"exported_torrent,omitempty"`
@@ -1281,6 +1284,7 @@ type torrentInfo struct {
 	// Category and Tags are the qBittorrent-style labels (standalone mode).
 	Category string   `json:"category,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
+	AutoTMM  bool     `json:"auto_tmm"`
 }
 
 // stateFor maps the engine's status and gx-torrent's flags onto Gextto's states.
@@ -1372,6 +1376,7 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtime
 		UploadLimitKib:   kibOrInherit(meta.UploadLimitKib),
 		HasMetadata:      stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0,
 		AutoManaged:      !meta.UserPaused && !meta.Parked && !meta.Pinned,
+		AutoTMM:          meta.AutoTMM,
 		Sequential:       meta.Sequential,
 		FirstLast:        meta.FirstLast,
 		SuperSeeding:     meta.SuperSeeding,
@@ -1530,6 +1535,8 @@ type addRequest struct {
 	// Category and Tags are the qBittorrent-style labels (standalone mode).
 	Category string
 	Tags     []string
+	// AutoTMM lets the category decide the save path (qBittorrent autoTMM).
+	AutoTMM bool
 }
 
 // add registers a torrent stopped and lets the queue start it. A torrent
@@ -1633,6 +1640,7 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		SeedRatio:  req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
 		Category: req.Category,
 		Tags:     req.Tags,
+		AutoTMM:  req.AutoTMM,
 	}
 	d.state.Tags = mergeTagNames(d.state.Tags, req.Tags)
 	d.indexTorrentLocked(t)
@@ -2421,19 +2429,72 @@ func dropTagNames(existing, remove []string) []string {
 	return out
 }
 
-// setCategory assigns (or, with "", clears) the category of a torrent.
+// setCategory assigns (or, with "", clears) the category of a torrent. An
+// auto-managed torrent is relocated to the new category's save path.
 func (d *Daemon) setCategory(key, category string) error {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	_, meta := d.findLocked(key)
 	if meta == nil {
+		d.mu.Unlock()
 		return errNotFound
 	}
 	meta.Category = strings.TrimSpace(category)
+	auto := meta.AutoTMM
 	d.dirty = true
 	d.saveLocked()
 	d.poke()
+	d.mu.Unlock()
+	if auto {
+		d.relocateForCategory(key)
+	}
 	return nil
+}
+
+// setAutoManagement turns qBittorrent automatic torrent management on or off for
+// a torrent; turning it on relocates the torrent to its category's save path.
+func (d *Daemon) setAutoManagement(key string, on bool) error {
+	d.mu.Lock()
+	_, meta := d.findLocked(key)
+	if meta == nil {
+		d.mu.Unlock()
+		return errNotFound
+	}
+	if meta.AutoTMM == on {
+		d.mu.Unlock()
+		return nil
+	}
+	meta.AutoTMM = on
+	d.dirty = true
+	d.saveLocked()
+	d.poke()
+	d.mu.Unlock()
+	if on {
+		d.relocateForCategory(key)
+	}
+	return nil
+}
+
+// relocateForCategory moves an auto-managed torrent to its category's save path
+// (or the default download folder); a no-op when the path is unchanged.
+func (d *Daemon) relocateForCategory(key string) {
+	d.mu.Lock()
+	_, meta := d.findLocked(key)
+	if meta == nil || !meta.AutoTMM {
+		d.mu.Unlock()
+		return
+	}
+	category, current := meta.Category, meta.SavePath
+	d.mu.Unlock()
+	dest := d.categorySavePath(category)
+	if dest == "" {
+		dest = d.downloadDir()
+	}
+	if dest == "" || dest == current {
+		return
+	}
+	if err := d.move(key, dest, false); err != nil {
+		logf("autoTMM %s: cannot move to %s: %v", key, dest, err)
+	}
 }
 
 func (d *Daemon) addTags(key string, tags []string) error {
@@ -2489,14 +2550,24 @@ func (d *Daemon) editCategory(name, savePath string) {
 		return
 	}
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	if d.state.Categories == nil {
 		d.state.Categories = map[string]string{}
 	}
 	d.state.Categories[name] = strings.TrimSpace(savePath)
+	// Relocate the auto-managed torrents of this category to the new path.
+	var managed []string
+	for _, meta := range d.state.Torrents {
+		if meta.AutoTMM && meta.Category == name {
+			managed = append(managed, meta.Hash)
+		}
+	}
 	d.dirty = true
 	d.saveLocked()
 	d.poke()
+	d.mu.Unlock()
+	for _, hash := range managed {
+		d.relocateForCategory(hash)
+	}
 }
 
 // removeCategories deletes categories and clears them on the torrents that

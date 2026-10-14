@@ -155,6 +155,7 @@ type uiTorrentRow struct {
 	SavePath  string
 	Category  string
 	Tags      string
+	AutoTMM   bool
 
 	TotalDone int64
 	TotalSize int64
@@ -1393,6 +1394,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 			ETA:       "—",
 			SavePath:  view.SavePath,
 			Category:  view.Category,
+			AutoTMM:   view.AutoTMM,
 			Tags:      strings.Join(view.Tags, ", "),
 			TotalDone: view.TotalDone,
 			TotalSize: view.TotalSize,

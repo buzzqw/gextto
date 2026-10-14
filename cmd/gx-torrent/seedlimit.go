@@ -20,6 +20,9 @@ const (
 	maxRatioActKey           = "max-ratio-act"
 	maxSeedingTimeEnabledKey = "max-seeding-time-enabled"
 	maxSeedingTimeKey        = "max-seeding-time"
+	// autoTMMEnabledKey is the global default for qBittorrent automatic torrent
+	// management (the per-torrent flag is what actually drives a relocation).
+	autoTMMEnabledKey = "auto-tmm-enabled"
 )
 
 // settingInt reads an integer setting, with a fallback when unset or invalid.

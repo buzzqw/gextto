@@ -607,7 +607,12 @@ On first open (`http://HOST:8080/`) the page redirects to the wizard
 
 In standalone the page also has a **Categories** filter in the side bar and,
 in the *General* detail, the **Category** and **Tag** fields (writing a new
-category creates it). In managed these controls do not appear and the endpoint
+category creates it). The category dialog has a **Save path managed by the
+category** switch (qBittorrent **automatic torrent management**, `auto_tmm`):
+when on, assigning a category — or changing the category's save path — moves the
+torrent to that folder (the qBittorrent API `setAutoManagement` and the
+`auto_tmm` field in `torrents/info`/`sync/maindata` use the same flag). In
+managed these controls do not appear and the endpoint
 `/ui/category` rejects the request.
 
 The **indexer search** (standalone) uses the `indexers` key of

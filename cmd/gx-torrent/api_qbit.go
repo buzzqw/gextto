@@ -495,7 +495,7 @@ func qbitView(v torrentInfo) qbitTorrent {
 		SeqDL:             v.Sequential,
 		FLPiecePrio:       v.FirstLast,
 		ForceStart:        v.Pinned,
-		AutoTMM:           false,
+		AutoTMM:           v.AutoTMM,
 	}
 }
 
@@ -853,9 +853,13 @@ func (d *Daemon) handleQbitSetForceStart(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleQbitSetAutoManagement is accepted as a no-op: the daemon's queue is
-// always managed by its own scheduler.
-func (d *Daemon) handleQbitSetAutoManagement(w http.ResponseWriter, _ *http.Request) {
+// handleQbitSetAutoManagement toggles qBittorrent automatic torrent management:
+// when on, the category decides the save path and the torrent is relocated.
+func (d *Daemon) handleQbitSetAutoManagement(w http.ResponseWriter, r *http.Request) {
+	on := formBool(r, "value")
+	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		_ = d.setAutoManagement(hash, on)
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -905,8 +909,9 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 	savePath := strings.TrimSpace(r.FormValue("savepath"))
 	category := strings.TrimSpace(r.FormValue("category"))
 	tags := qbitList(r.FormValue("tags"))
+	autoTMM := formBool(r, "autoTMM")
 	switch {
-	case formBool(r, "autoTMM") && category != "":
+	case autoTMM && category != "":
 		// With automatic torrent management the category decides the path, even
 		// when a savepath is also sent (qBittorrent behaviour).
 		savePath = d.categorySavePath(category)
@@ -931,7 +936,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 			if readErr != nil || len(data) == 0 {
 				continue
 			}
-			req := addRequest{TorrentData: data, Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast}
+			req := addRequest{TorrentData: data, Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, AutoTMM: autoTMM}
 			if _, _, err := d.add(req); err != nil {
 				qbitText(w, http.StatusUnsupportedMediaType, qbitInvalidCode)
 				return
@@ -946,7 +951,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 		if line == "" {
 			continue
 		}
-		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast}
+		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, AutoTMM: autoTMM}
 		switch {
 		case strings.HasPrefix(strings.ToLower(line), "magnet:"):
 			req.Magnet = line
@@ -1153,56 +1158,61 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 	}
 	exportDir, exportFinDir := d.exportDirs()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"locale":                         d.opts.Lang,
-		"save_path":                      d.downloadDir(),
-		"temp_path":                      d.opts.PartsDir,
-		"temp_path_enabled":              d.opts.PartsDir != "",
-		"create_subfolder_enabled":       true,
-		"start_paused_enabled":           false,
-		"preallocate_all":                cfg.Preallocate,
-		"incomplete_files_ext":           false,
-		"listen_port":                    stats.PeerPort,
-		"random_port":                    false,
-		"dht":                            stats.DHT,
-		"pex":                            !d.settingBool("no-pex", false),
-		"lsd":                            !d.settingBool("no-lsd", false),
-		"upnp":                           !d.settingBool("no-upnp", false),
-		"encryption":                     qbitEncryptionMode(stats.Encryption),
-		"bittorrent_protocol":            qbitProtocol(stats.UTP),
-		"limit_utp_rate":                 true,
-		"queueing_enabled":               true,
-		"max_active_downloads":           cfg.ActiveDownloads,
-		"max_active_uploads":             cfg.ActiveSeeds,
-		"max_active_torrents":            cfg.ActiveLimit,
-		"dont_count_slow_torrents":       cfg.DontCountSlow,
-		"slow_torrent_dl_rate_threshold": int(cfg.SlowRate),
-		"slow_torrent_ul_rate_threshold": int(cfg.SlowRate),
-		"slow_torrent_inactive_timer":    int(cfg.SlowAfterSecs),
-		"dl_limit":                       qbitPrefLimitOut(cfg.SpeedLimitDownload),
-		"up_limit":                       qbitPrefLimitOut(cfg.SpeedLimitUpload),
-		"alt_dl_limit":                   altDL,
-		"alt_up_limit":                   altUL,
-		"use_alt_speed_limits":           altManual,
-		"max_connec":                     cfg.MaxPeerDial + cfg.MaxPeerAccept,
-		"max_connec_per_torrent":         0,
-		"max_uploads":                    0,
-		"max_uploads_per_torrent":        0,
-		"max_ratio_enabled":              d.settingBool(maxRatioEnabledKey, false),
-		"max_ratio":                      d.settingFloat(maxRatioKey, -1),
-		"max_ratio_act":                  d.settingInt(maxRatioActKey, 0),
-		"max_seeding_time_enabled":       d.settingBool(maxSeedingTimeEnabledKey, false),
-		"max_seeding_time":               d.settingInt(maxSeedingTimeKey, -1),
-		"scheduler_enabled":              d.settingBool(scheduleEnabledKey, false),
-		"proxy_type":                     proxyType,
-		"anonymous_mode":                 false,
-		"ip_filter_enabled":              stats.IPFilterRules > 0,
-		"ip_filter_path":                 stats.IPFilterPath,
-		"ip_filter_trackers":             d.settingBool("ipfilter-trackers", true),
-		"rss_refresh_interval":           d.rssRefreshMinutes(),
-		"export_dir":                     exportDir,
-		"export_dir_fin":                 exportFinDir,
-		"scan_dirs":                      scanDirs,
-		"save_resume_data_interval":      60,
+		"locale":                            d.opts.Lang,
+		"save_path":                         d.downloadDir(),
+		"temp_path":                         d.opts.PartsDir,
+		"temp_path_enabled":                 d.opts.PartsDir != "",
+		"create_subfolder_enabled":          true,
+		"start_paused_enabled":              false,
+		"preallocate_all":                   cfg.Preallocate,
+		"incomplete_files_ext":              false,
+		"listen_port":                       stats.PeerPort,
+		"random_port":                       false,
+		"dht":                               stats.DHT,
+		"pex":                               !d.settingBool("no-pex", false),
+		"lsd":                               !d.settingBool("no-lsd", false),
+		"upnp":                              !d.settingBool("no-upnp", false),
+		"encryption":                        qbitEncryptionMode(stats.Encryption),
+		"bittorrent_protocol":               qbitProtocol(stats.UTP),
+		"limit_utp_rate":                    true,
+		"queueing_enabled":                  true,
+		"max_active_downloads":              cfg.ActiveDownloads,
+		"max_active_uploads":                cfg.ActiveSeeds,
+		"max_active_torrents":               cfg.ActiveLimit,
+		"dont_count_slow_torrents":          cfg.DontCountSlow,
+		"slow_torrent_dl_rate_threshold":    int(cfg.SlowRate),
+		"slow_torrent_ul_rate_threshold":    int(cfg.SlowRate),
+		"slow_torrent_inactive_timer":       int(cfg.SlowAfterSecs),
+		"dl_limit":                          qbitPrefLimitOut(cfg.SpeedLimitDownload),
+		"up_limit":                          qbitPrefLimitOut(cfg.SpeedLimitUpload),
+		"alt_dl_limit":                      altDL,
+		"alt_up_limit":                      altUL,
+		"use_alt_speed_limits":              altManual,
+		"max_connec":                        cfg.MaxPeerDial + cfg.MaxPeerAccept,
+		"max_connec_per_torrent":            0,
+		"max_uploads":                       0,
+		"max_uploads_per_torrent":           0,
+		"max_ratio_enabled":                 d.settingBool(maxRatioEnabledKey, false),
+		"max_ratio":                         d.settingFloat(maxRatioKey, -1),
+		"max_ratio_act":                     d.settingInt(maxRatioActKey, 0),
+		"max_seeding_time_enabled":          d.settingBool(maxSeedingTimeEnabledKey, false),
+		"max_seeding_time":                  d.settingInt(maxSeedingTimeKey, -1),
+		"auto_tmm_enabled":                  d.settingBool(autoTMMEnabledKey, false),
+		"torrent_changed_tmm_enabled":       true,
+		"category_changed_tmm_enabled":      true,
+		"save_path_changed_tmm_enabled":     true,
+		"use_category_paths_in_manual_mode": false,
+		"scheduler_enabled":                 d.settingBool(scheduleEnabledKey, false),
+		"proxy_type":                        proxyType,
+		"anonymous_mode":                    false,
+		"ip_filter_enabled":                 stats.IPFilterRules > 0,
+		"ip_filter_path":                    stats.IPFilterPath,
+		"ip_filter_trackers":                d.settingBool("ipfilter-trackers", true),
+		"rss_refresh_interval":              d.rssRefreshMinutes(),
+		"export_dir":                        exportDir,
+		"export_dir_fin":                    exportFinDir,
+		"scan_dirs":                         scanDirs,
+		"save_resume_data_interval":         60,
 	})
 }
 
@@ -1560,6 +1570,13 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 			var minutes int
 			if json.Unmarshal(v, &minutes) == nil {
 				d.opts.Settings.Set(maxSeedingTimeKey, strconv.Itoa(minutes))
+				changed = true
+			}
+		}
+		if v, ok := prefs["auto_tmm_enabled"]; ok {
+			var on bool
+			if json.Unmarshal(v, &on) == nil {
+				d.opts.Settings.Set(autoTMMEnabledKey, strconv.FormatBool(on))
 				changed = true
 			}
 		}
