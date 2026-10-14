@@ -1,8 +1,11 @@
 package main
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/settings"
 )
 
 func savePathOf(t *testing.T, d *Daemon, hash string) string {
@@ -63,5 +66,60 @@ func TestAutoTMM(t *testing.T) {
 	}
 	if got := savePathOf(t, d, hash); got != newPath {
 		t.Fatalf("path changed after disabling autoTMM: %s", got)
+	}
+}
+
+func TestAutoTMMForAdd(t *testing.T) {
+	cases := []struct {
+		req    addRequest
+		global bool
+		want   bool
+	}{
+		{addRequest{}, false, false},                                // default off
+		{addRequest{}, true, true},                                  // global on
+		{addRequest{AutoTMM: false, AutoTMMSet: true}, true, false}, // explicit wins
+		{addRequest{AutoTMM: true, AutoTMMSet: true}, false, true},  // explicit wins
+	}
+	for _, c := range cases {
+		if got := autoTMMForAdd(c.req, c.global); got != c.want {
+			t.Errorf("autoTMMForAdd(%+v, %v) = %v, want %v", c.req, c.global, got, c.want)
+		}
+	}
+}
+
+// TestAutoTMMGlobalDefault checks the global default is applied to new torrents
+// that do not state the flag, and that an explicit value wins.
+func TestAutoTMMGlobalDefault(t *testing.T) {
+	store, err := settings.Load(filepath.Join(t.TempDir(), "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.Set(autoTMMEnabledKey, "true")
+	d := newTestDaemonFull(t, NetworkOptions{PortBegin: 42300, PortEnd: 42400, Encryption: 1, PEX: true}, store)
+	src := t.TempDir()
+
+	autoOf := func(hash string) bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		_, meta := d.findLocked(hash)
+		return meta != nil && meta.AutoTMM
+	}
+
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "a.bin", 10_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitListed(t, d, hash)
+	if !autoOf(hash) {
+		t.Fatal("the global autoTMM default was not applied")
+	}
+
+	hash2, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "b.bin", 10_000), Destination: src, AutoTMM: false, AutoTMMSet: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitListed(t, d, hash2)
+	if autoOf(hash2) {
+		t.Fatal("an explicit autoTMM=false must win over the global default")
 	}
 }

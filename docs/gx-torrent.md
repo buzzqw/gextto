@@ -581,7 +581,8 @@ fetches `.torrent` files and metadata over HTTP (private trackers): they are
 used by the daemon's URL adds, the magnet `xs=`/`as=` sources and the web
 seeds. The **torrent creator** API (`torrentcreator/addTask`, `status`,
 `torrentFile`, `deleteTask`) builds a v1 `.torrent` from a path on the server
-(a requested v2/hybrid format is produced as v1). The API uses the
+(a requested v2/hybrid format is produced as v1). The same cookies are editable
+from the Settings page (*Cookies*), stored in settings.json. The API uses the
 same access criteria as the page: without a password it is open, otherwise the LAN bypass
 is needed (if `local-bypass` is active) or a session (`SID` qBittorrent or `gx_session`
 of the page). In managed it is **not** exposed: only Gextto commands.
@@ -611,7 +612,10 @@ category creates it). The category dialog has a **Save path managed by the
 category** switch (qBittorrent **automatic torrent management**, `auto_tmm`):
 when on, assigning a category — or changing the category's save path — moves the
 torrent to that folder (the qBittorrent API `setAutoManagement` and the
-`auto_tmm` field in `torrents/info`/`sync/maindata` use the same flag). In
+`auto_tmm` field in `torrents/info`/`sync/maindata` use the same flag). The
+**global default** is the *New torrents follow their category's folder* switch in
+Settings → Folders (**off by default**): when on, a torrent added without an
+explicit flag becomes auto-managed, otherwise nothing changes. In
 managed these controls do not appear and the endpoint
 `/ui/category` rejects the request.
 

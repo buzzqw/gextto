@@ -1535,8 +1535,20 @@ type addRequest struct {
 	// Category and Tags are the qBittorrent-style labels (standalone mode).
 	Category string
 	Tags     []string
-	// AutoTMM lets the category decide the save path (qBittorrent autoTMM).
+	// AutoTMM: the category decides the save path (qBittorrent autoTMM).
 	AutoTMM bool
+	// AutoTMMSet marks AutoTMM as explicitly given by the caller: when it is
+	// false the add follows the global auto-tmm-enabled default.
+	AutoTMMSet bool
+}
+
+// autoTMMForAdd resolves the automatic-torrent-management flag of a new torrent:
+// an explicit value wins, otherwise the global default (off by default).
+func autoTMMForAdd(req addRequest, globalDefault bool) bool {
+	if req.AutoTMMSet {
+		return req.AutoTMM
+	}
+	return globalDefault
 }
 
 // add registers a torrent stopped and lets the queue start it. A torrent
@@ -1640,7 +1652,9 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		SeedRatio:  req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
 		Category: req.Category,
 		Tags:     req.Tags,
-		AutoTMM:  req.AutoTMM,
+		// AutoTMM off by default: an add that does not say otherwise follows the
+		// global auto-tmm-enabled default (false unless the operator turns it on).
+		AutoTMM: autoTMMForAdd(req, d.settingBool(autoTMMEnabledKey, false)),
 	}
 	d.state.Tags = mergeTagNames(d.state.Tags, req.Tags)
 	d.indexTorrentLocked(t)

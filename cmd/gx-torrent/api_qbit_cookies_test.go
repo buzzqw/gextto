@@ -76,6 +76,32 @@ func TestQbitCookiesAPI(t *testing.T) {
 	}
 }
 
+// TestCookiesSettingsForm covers the settings-page cookies editor: a JSON array
+// is accepted, invalid JSON is refused, and empty clears them.
+func TestCookiesSettingsForm(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	if err := d.saveCookiesFromForm("not json"); err == nil {
+		t.Fatal("invalid JSON must be refused")
+	}
+	body := `[{"name":"sid","value":"abc","domain":"tracker.example","path":"/"}]`
+	if err := d.saveCookiesFromForm(body); err != nil {
+		t.Fatal(err)
+	}
+	got := d.storedCookies()
+	if len(got) != 1 || got[0].Name != "sid" || got[0].Domain != "tracker.example" {
+		t.Fatalf("cookies = %+v", got)
+	}
+	if !strings.Contains(d.cookiesPretty(), "tracker.example") {
+		t.Fatalf("cookiesPretty = %q", d.cookiesPretty())
+	}
+	if err := d.saveCookiesFromForm(""); err != nil {
+		t.Fatal(err)
+	}
+	if len(d.storedCookies()) != 0 {
+		t.Fatal("cookies not cleared")
+	}
+}
+
 func TestQbitCookieMatches(t *testing.T) {
 	now := time.Now()
 	u, _ := url.Parse("http://sub.tracker.example/announce?x=1")

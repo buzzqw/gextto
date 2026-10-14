@@ -7,6 +7,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -44,12 +45,44 @@ func (d *Daemon) saveCookies(list []qbitCookie) error {
 	if d.opts.Settings == nil {
 		return nil
 	}
+	if len(list) == 0 {
+		d.opts.Settings.Set(cookiesSettingKey, "")
+		return d.opts.Settings.Save()
+	}
 	raw, err := json.Marshal(list)
 	if err != nil {
 		return err
 	}
 	d.opts.Settings.Set(cookiesSettingKey, string(raw))
 	return d.opts.Settings.Save()
+}
+
+// cookiesPretty renders the stored cookies as indented JSON for the settings
+// page (empty when there are none).
+func (d *Daemon) cookiesPretty() string {
+	cookies := d.storedCookies()
+	if len(cookies) == 0 {
+		return ""
+	}
+	raw, err := json.MarshalIndent(cookies, "", "  ")
+	if err != nil {
+		return ""
+	}
+	return string(raw)
+}
+
+// saveCookiesFromForm validates and stores the cookies textarea: a JSON array of
+// cookie objects, or empty to clear them.
+func (d *Daemon) saveCookiesFromForm(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return d.saveCookies(nil)
+	}
+	var list []qbitCookie
+	if err := json.Unmarshal([]byte(raw), &list); err != nil {
+		return errors.New("expecting a JSON array of cookies")
+	}
+	return d.saveCookies(list)
 }
 
 // cookieJar is the live http.CookieJar used by the engine and by the daemon's

@@ -49,6 +49,13 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 
 	store := d.opts.Settings
 
+	// Cookies are validated first, so a bad value does not leave a half-applied
+	// page (the store keeps unsaved changes in memory).
+	if err := d.saveCookiesFromForm(r.FormValue("cookies")); err != nil {
+		d.renderSettings(w, r, "Cookies: "+err.Error(), true)
+		return
+	}
+
 	// Queue cache and limits (queue config, applied at once). A value equal to
 	// the current one is left out of the patch.
 	cfg, _, _ := d.config()
@@ -168,6 +175,9 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	store.Set(maxRatioActKey, act)
 	store.Set(maxSeedingTimeEnabledKey, strconv.FormatBool(formBool(r, "max-seeding-time-enabled")))
+	// Global autoTMM default (off unless enabled): new torrents follow their
+	// category's save path.
+	store.Set(autoTMMEnabledKey, strconv.FormatBool(formBool(r, "auto-tmm-enabled")))
 	if v, err := strconv.Atoi(strings.TrimSpace(r.FormValue("max-seeding-time"))); err == nil && v >= 0 {
 		store.Set(maxSeedingTimeKey, strconv.Itoa(v))
 	}
@@ -437,12 +447,14 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{TEMP_DIR}}", get("temp-dir"))
 	repl("{{EXPORT_DIR}}", get("export-dir"))
 	repl("{{EXPORT_FIN_DIR}}", get("export-dir-fin"))
+	repl("{{AUTO_TMM_ON}}", checkedIf(boolSetting(autoTMMEnabledKey)))
 	repl("{{MAX_RATIO_ON}}", checkedIf(boolSetting(maxRatioEnabledKey)))
 	repl("{{MAX_RATIO}}", strconv.FormatFloat(d.settingFloat(maxRatioKey, -1), 'f', -1, 64))
 	repl("{{MAX_RATIO_REMOVE}}", checkedIf(d.settingInt(maxRatioActKey, 0) == 1))
 	repl("{{MAX_TIME_ON}}", checkedIf(boolSetting(maxSeedingTimeEnabledKey)))
 	repl("{{MAX_TIME}}", strconv.Itoa(d.settingInt(maxSeedingTimeKey, -1)))
 	repl("{{WATCH_FOLDERS}}", get("watch-folders"))
+	repl("{{COOKIES}}", html.EscapeString(d.cookiesPretty()))
 	repl("{{LISTEN}}", get("listen"))
 	repl("{{PEER_PORTS}}", get("peer-ports"))
 	repl("{{LISTEN_IFACE}}", get("listen-interface"))
