@@ -237,7 +237,10 @@ func cycleModeLabel(mode string) string {
 	case "comics":
 		return "comics only"
 	default:
-		return "all titles"
+		// A full cycle covers every kind: name them so the log shows the movie
+		// scan too (searching the log for "movie" used to find nothing, which
+		// made it look like movies were never scanned).
+		return "series, movies and comics"
 	}
 }
 

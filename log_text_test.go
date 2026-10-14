@@ -213,3 +213,21 @@ func TestRenameItemLogTextSaysWhatChanged(t *testing.T) {
 		t.Fatalf("failed item must not log, got %q", got)
 	}
 }
+
+// TestCycleModeLabelNamesEveryKind: a full cycle must name the kinds it scans,
+// so searching the log for "movie" shows the movie scan instead of the opaque
+// "all titles" (which made it look like movies were never scanned).
+func TestCycleModeLabelNamesEveryKind(t *testing.T) {
+	cases := map[string]string{
+		"series": "series only",
+		"movies": "movies only",
+		"comics": "comics only",
+		"full":   "series, movies and comics",
+		"":       "series, movies and comics",
+	}
+	for mode, want := range cases {
+		if got := cycleModeLabel(mode); got != want {
+			t.Fatalf("cycleModeLabel(%q) = %q, want %q", mode, got, want)
+		}
+	}
+}

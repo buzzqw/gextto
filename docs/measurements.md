@@ -345,6 +345,19 @@ finishes a real swarm, and a healthy path never timeout-resends; the dial error 
 (~34%) is the expected cost of racing uTP against TCP-only peers and is worth a closer
 look in a later round, not a regression.
 
+**Longer real-swarm run while investigating a reported slowdown (2026-10-14).** To rule
+out a degradation of the engine over time (the user reports downloads that "start fast
+then slow down" until the gx-torrent daemon is restarted), `make measure-realswarm` was
+run on the same Debian 13.7 netinst torrent for **5 minutes**: the download **completes
+to 100%**, `downloaded=792,723,456 B`; peers peak **80** (uTP peak **24**); connections
+out **49 uTP / 108 TCP** and 9 uTP in; uTP socket **dials 270 (107 errors)**, accepts 9
+(0 errors), **RTO resends 831, fast 69, SYN drops 0**. A longer window changes nothing:
+the swarm is reached, the ISO is fetched and the retransmission counters stay far from a
+storm. The slowdown on the live instance is therefore not an engine-wide defect; the
+torrent that triggered it (`Silo.S02E09`) had a **scarce swarm** (trackers reported 0–1
+seeders) and the daemon was reaching a single 100% peer, so the rate was bounded by that
+peer, not by gx-core.
+
 **Choking campaign, controlled against libtorrent.** Our seeder serves a real
 libtorrent leecher on loopback: **48 MiB uploaded (100% of the file) in 4.84 s**
 (~10.4 MB/s) with the leecher verifying complete. The real-swarm half (seeding the
