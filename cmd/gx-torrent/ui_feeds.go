@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"html"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,6 +49,7 @@ func (d *Daemon) handleUIFeedPoll(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, status := range d.feedStatusesSnapshot() {
 			if status.Name == name || status.URL == name {
+				status.Total = d.archive().feedCounts()[name]
 				writeJSON(w, http.StatusOK, status)
 				return
 			}
@@ -186,6 +188,18 @@ func (d *Daemon) handleUIRssConfig(w http.ResponseWriter, r *http.Request) {
 	feedsRaw := strings.TrimSpace(r.FormValue("feeds"))
 	rulesRaw := strings.TrimSpace(r.FormValue("rules"))
 	indexersRaw := strings.TrimSpace(r.FormValue("indexers"))
+	// The page imports a whole setup as a file exported by /ui/rss-export,
+	// instead of having the operator edit the JSON by hand.
+	if file, _, err := r.FormFile("setup"); err == nil {
+		raw, readErr := io.ReadAll(io.LimitReader(file, 8<<20))
+		file.Close()
+		var setup rssSetupFile
+		if readErr != nil || json.Unmarshal(raw, &setup) != nil {
+			d.renderRSS(w, r, "The file is not a gx-torrent RSS setup.")
+			return
+		}
+		feedsRaw, rulesRaw, indexersRaw = setup.raw(setup.Feeds), setup.raw(setup.Rules), setup.raw(setup.Indexers)
+	}
 
 	if feedsRaw != "" {
 		var feeds []feedConfig
@@ -219,6 +233,49 @@ func (d *Daemon) handleUIRssConfig(w http.ResponseWriter, r *http.Request) {
 	// manual button.
 	d.pokeFeeds()
 	http.Redirect(w, r, "/ui/rss#options", http.StatusSeeOther)
+}
+
+// rssSetupFile is the exported RSS setup: feeds, rules and indexers as they
+// are stored in settings.json.
+type rssSetupFile struct {
+	Feeds    json.RawMessage `json:"feeds,omitempty"`
+	Rules    json.RawMessage `json:"rules,omitempty"`
+	Indexers json.RawMessage `json:"indexers,omitempty"`
+}
+
+// raw is one section as stored text; empty (left unchanged) when absent.
+func (rssSetupFile) raw(section json.RawMessage) string {
+	text := strings.TrimSpace(string(section))
+	if text == "null" {
+		return ""
+	}
+	return text
+}
+
+// handleUIRssExport downloads the feeds, rules and indexers as one JSON file,
+// to copy a setup to another gx-torrent or keep it as a backup.
+func (d *Daemon) handleUIRssExport(w http.ResponseWriter, r *http.Request) {
+	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	setup := rssSetupFile{
+		Feeds:    json.RawMessage(orEmptyJSON(d.opts.Settings.Get(feedsSettingKey, ""))),
+		Rules:    json.RawMessage(orEmptyJSON(d.opts.Settings.Get(rulesSettingKey, ""))),
+		Indexers: json.RawMessage(orEmptyJSON(d.opts.Settings.Get(indexersSettingKey, ""))),
+	}
+	raw, err := json.MarshalIndent(setup, "", "  ")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", `attachment; filename="gx-torrent-rss-setup.json"`)
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(raw)
 }
 
 // renderRSS writes the RSS page, localized like the daemon page.

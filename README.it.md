@@ -339,16 +339,21 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
   test indexer in tempo reale, FlareSolverr opzionale e un **archivio** locale
   di tutto ciò che i feed hanno restituito (100.000 release cercabili in ~7
   ms, con opzione di interrogare dal vivo Jackett/Prowlarr).
-- **Gestione.** Limiti globali e per torrent, scheduler giornaliero,
-  auto-speed sulla latenza (anti-bufferbloat), ottimizzazione di
-  coda/cache/banda con un clic, filtro IP da URL o file con refresh
-  programmato, categorie e tag, diagnostica in tempo reale.
+- **Gestione.** Limiti globali e per torrent, scheduler di banda con fascia e
+  limiti propri per ogni giorno della settimana, auto-speed sulla latenza
+  (anti-bufferbloat), ottimizzazione di coda/cache/banda con un clic, filtro IP
+  da URL o file (di default la blocklist di Gextto) con refresh programmato,
+  categorie e tag, diagnostica in tempo reale, test porte dalle impostazioni.
+- **Notifiche.** Gli stessi canali di Gextto: Telegram, e-mail e webhook (JSON
+  generico, Discord, Slack, Gotify, ntfy, Pushover) per download completati,
+  match dei feed ed errori dei feed, con pulsante di prova.
 - **Si aggiorna da solo.** In *Impostazioni → Manutenzione* controlla a
   intervalli (o quando premi **Verifica aggiornamenti**) la build pubblicata
   dalla CI; il pulsante diventa **Aggiorna** solo se è cambiato il codice di
   gx-torrent: scarica l'archivio, verifica lo SHA-256, prova il nuovo binario,
   lo sostituisce e si riavvia nello stesso processo, poi mostra in un popup i
-  commit nuovi. Se la nuova versione non parte, torna da sola la precedente.
+  commit nuovi. Una spia *Aggiornamento disponibile* si accende nella barra di
+  stato della pagina Torrents. Se la nuova versione non parte, torna da sola la precedente.
 - **Piattaforme.** Linux x86_64/aarch64 (`gx-torrent-linux-<arch>.tar.gz`,
   unit systemd o `run.sh`, immagine Docker non privilegiata) e servizio
   Windows nativo amd64/arm64 (`gx-torrent-windows-<arch>.zip`,

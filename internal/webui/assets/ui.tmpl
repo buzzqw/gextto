@@ -76,7 +76,8 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .statusbar{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding:6px 14px;border-top:1px solid var(--border);background:var(--surface);font-size:12.5px;color:var(--muted)}
 .statusbar b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
 .statusbar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:var(--subtle)}
-.statusbar .dot.ok{background:var(--ok)}.statusbar .dot.bad{background:var(--err)}
+.statusbar .dot.ok{background:var(--ok)}.statusbar .dot.bad{background:var(--err)}.statusbar .dot.warn{background:var(--warn)}
+.statusbar .sb-update{display:inline-flex;align-items:center;color:var(--text);font-weight:600;text-decoration:none;border:1px solid var(--warn);border-radius:999px;padding:1px 9px}.statusbar .sb-update:hover,.statusbar .sb-update:focus-visible{background:var(--warn-soft)}
 .statusbar .disk{display:inline-flex;align-items:center;gap:6px}
 .statusbar .disk .progress{width:70px}
 .drawer{flex:none;height:clamp(220px,46vh,520px);border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;min-height:0}
@@ -844,6 +845,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
     </section>
     {{end}}
 {{end}}{{define "status"}}
+    {{if .UpdateAvailable}}<a class="sb-update" href="/ui/settings#maintenance" title="A new version of gx-torrent is available: open Settings, Maintenance to see the changes and install it"><span class="dot warn" aria-hidden="true"></span><span>Update available</span>{{if .UpdateDate}} <span class="subtle">{{.UpdateDate}}</span>{{end}}</a>{{end}}
     <span class="hide-m" data-down="{{.DownRateRaw}}" data-up="{{.UpRateRaw}}" data-down-s="{{.DownloadRate}}" data-up-s="{{.UploadRate}}" title="Downloaded / uploaded since start"><span>Totals</span> <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
     <span class="disk" title="Free space on the download folder"><svg class="i"><use href="#i-disk"/></svg><span>Free space</span> <b>{{bytes .DiskFree}}</b><span class="subtle">/ {{bytes .DiskTotal}}</span></span>
     <span class="hide-m" title="CPU load (percent of one core, short average) and resident memory of the gx-torrent process itself"><span>Process</span> <b>{{percent .CPUPercent}}%</b> · <b>{{bytes .ProcRSS}}</b></span>

@@ -963,6 +963,11 @@ func (d *Daemon) tick(now time.Time) {
 		if complete && meta.CompletedAt.IsZero() {
 			meta.CompletedAt = now
 			d.dirty = true
+			// Only a download that moved data now is news; a torrent added
+			// over files already on disk completes at its first check.
+			if stats.Bytes.Downloaded > 0 {
+				d.notify("download_complete", map[string]any{"name": stats.Name, "hash": id})
+			}
 		}
 		if !running && stats.Error != nil && meta.Error == "" && !d.moving[id] {
 			meta.Error = stats.Error.Error()

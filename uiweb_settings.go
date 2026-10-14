@@ -167,6 +167,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "libtorrent_sched_days", Label: "Programmazione — giorni", Tab: "libtorrent", Group: "Programmazione velocità"},
 	{Key: "libtorrent_sched_dl_limit", Label: "Programmazione — download", Tab: "libtorrent", Group: "Programmazione velocità"},
 	{Key: "libtorrent_sched_ul_limit", Label: "Programmazione — upload", Tab: "libtorrent", Group: "Programmazione velocità"},
+	{Key: "libtorrent_sched_week", Label: "Programmazione — per giorno", Tab: "libtorrent", Group: "Programmazione velocità"},
 	{Key: "libtorrent_port_min", Label: "Porta minima", Tab: "libtorrent", Group: "Porte e interfacce"},
 	{Key: "libtorrent_port_max", Label: "Porta massima", Tab: "libtorrent", Group: "Porte e interfacce"},
 	{Key: "libtorrent_listen_interfaces", Label: "Interfacce listen", Tab: "libtorrent", Group: "Porte e interfacce"},

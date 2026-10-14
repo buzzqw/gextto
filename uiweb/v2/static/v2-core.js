@@ -843,6 +843,9 @@
   function setRowValue(row, value) {
     var toggle = row.querySelector('input[role="switch"]');
     if (toggle) { var want = value === toggle.value; if (toggle.checked === want) return false; toggle.checked = want; return true; }
+    // The per-day schedule resets as a whole: the save clears it.
+    var weekReset = row.querySelector('.setting-week input[name="week-reset"]');
+    if (weekReset) { if (weekReset.value === "1") return false; weekReset.value = "1"; return true; }
     var days = row.querySelectorAll('.setting-days input[type="checkbox"]');
     if (days.length) {
       var wanted = {};

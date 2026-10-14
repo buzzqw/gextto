@@ -2250,6 +2250,22 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		value = uiDaysValue(r.Form["value"])
 		field = uiSettingFieldFor(key, v2SettingLabelFor(key), value)
 	}
+	// The per-day schedule is a table of fields: build its stored form back;
+	// «Predefinito» posts week-reset and clears it (single window again).
+	if uiSettingMetaByKey[key].Kind == "week" {
+		_ = r.ParseForm()
+		if r.FormValue("week-reset") == "1" {
+			value = ""
+		} else {
+			week, problem := uiWeekValue(r.Form)
+			if problem != "" {
+				render(problem, true)
+				return
+			}
+			value = week
+		}
+		field = uiSettingFieldFor(key, v2SettingLabelFor(key), value)
+	}
 	if _, ok := uiJSONScalarList(latestConfig(s).Settings[key]); ok {
 		items := []string{}
 		for _, line := range strings.FieldsFunc(value, func(r rune) bool { return r == '\n' || r == ',' }) {

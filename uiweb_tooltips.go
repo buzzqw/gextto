@@ -64,6 +64,7 @@ var uiSettingTooltipText = map[string]string{
 	"libtorrent_sched_days":                        "Giorni attivi: 0=Lun … 6=Dom (es. 0,1,2,3,4).",
 	"libtorrent_sched_dl_limit":                    "Limite di download in KiB/s durante la programmazione.",
 	"libtorrent_sched_ul_limit":                    "Limite di upload in KiB/s durante la programmazione.",
+	"libtorrent_sched_week":                        "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia.",
 	"flaresolverr_url":                             "URL del servizio FlareSolverr per aggirare Cloudflare.",
 	"refresh_interval":                             "Intervallo tra le ricerche automatiche di serie e film, in secondi (21600 = 6 ore).",
 	"max_release_age_days":                         "Ignora le release più vecchie di N giorni (0 = nessun limite). Le release senza data sono considerate pubblicate oggi.",

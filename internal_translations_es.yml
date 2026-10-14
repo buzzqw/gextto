@@ -2276,6 +2276,12 @@ spa:
   Programmazione — ora fine (HH:MM): Programación — hora de finalización (HH:MM)
   Programmazione — ora inizio (HH:MM): Programación — hora de inicio (HH:MM)
   Programmazione — upload (KiB/s): Programación — carga (KiB/s)
+  "Programmazione — per giorno": "Programación — por día"
+  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia.": "Una franja horaria y límites distintos para cada día de la semana; una franja que pasa la medianoche pertenece al día en que empieza."
+  "una volta salvata sostituisce fascia, giorni e limiti qui sopra; «Predefinito» torna alla fascia unica": "una vez guardada sustituye la franja, los días y los límites de arriba; «Predeterminado» vuelve a la franja única"
+  "ogni giorno attivo vuole un orario di inizio e uno di fine diversi": "cada día activo necesita horas de inicio y de fin distintas"
+  "Inizio": "Inicio"
+  "Fine": "Fin"
   Progresso: Progreso
   Proper (Corretto): Proper (Corregido)
   Prossima: Próxima
@@ -4277,6 +4283,7 @@ spa:
   "Chiudi questo messaggio": "Cerrar este mensaje"
   "Scarica l'ultima build, la installa e riavvia Gextto": "Descarga la última compilación, la instala y reinicia Gextto"
   "Cerca subito una versione più recente": "Buscar ahora una versión más reciente"
+  "Versione del motore gx-core (demone gx-torrent)": "Versión del motor gx-core (demonio gx-torrent)"
   "Ricontrolla": "Volver a comprobar"
   "Controllo automatico ogni": "Comprobación automática cada"
   "(Impostazioni → Sistema → Aggiornamenti)": "(Ajustes → Sistema → Actualizaciones)"

@@ -1,8 +1,11 @@
 package gextto
 
 import (
+	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/buzzqw/gextto/internal/bwschedule"
 )
 
 // uiweb_settings_meta.go describes how each setting is edited, beyond its
@@ -65,6 +68,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"libtorrent_sched_start":       {Kind: "time", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_sched_end":         {Kind: "time", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_sched_days":        {Kind: "days", Zero: "nessun giorno = mai attiva", DependsOn: "libtorrent_sched_enabled"},
+	"libtorrent_sched_week":        {Kind: "week", Zero: "una volta salvata sostituisce fascia, giorni e limiti qui sopra; «Predefinito» torna alla fascia unica", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_sched_dl_limit":    {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_sched_ul_limit":    {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_announce_interval": {Unit: "secondi"},
@@ -137,6 +141,65 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"auth_local_bypass": {DependsOn: "auth_enabled"},
 	"auth_username":     {DependsOn: "auth_enabled"},
 	"auth_password":     {DependsOn: "auth_enabled"},
+}
+
+// uiWeekRow is one day of the per-day bandwidth schedule editor.
+type uiWeekRow struct {
+	// Key is the stored day name (mon…sun), used in the form field names.
+	Key      string
+	Label    string
+	On       bool
+	Start    string
+	End      string
+	Download int64
+	Upload   int64
+}
+
+// uiWeekRows renders a stored libtorrent_sched_week value as editor rows,
+// Monday first. An empty or unreadable value gives every day off on the
+// default night window.
+func uiWeekRows(value string) []uiWeekRow {
+	week, ok := bwschedule.Parse(value)
+	if !ok {
+		week = bwschedule.Uniform([7]bool{}, 23*60, 8*60, 0, 0)
+	}
+	return uiWeekRowsFrom(week)
+}
+
+func uiWeekRowsFrom(week bwschedule.Week) []uiWeekRow {
+	rows := make([]uiWeekRow, 0, 7)
+	for index, weekday := range bwschedule.MondayFirst {
+		day := week[weekday]
+		rows = append(rows, uiWeekRow{Key: bwschedule.DayName(weekday), Label: uiWeekdays[index], On: day.On,
+			Start: bwschedule.FormatClock(day.Start), End: bwschedule.FormatClock(day.End),
+			Download: day.Download, Upload: day.Upload})
+	}
+	return rows
+}
+
+// uiWeekValue reads the per-day schedule editor of a settings form
+// ("day-<name>-on|start|end|dl|ul"). It returns an Italian error message (the
+// page translates it) for an active day without a valid window.
+func uiWeekValue(form url.Values) (string, string) {
+	var week bwschedule.Week
+	for _, weekday := range bwschedule.MondayFirst {
+		prefix := "day-" + bwschedule.DayName(weekday) + "-"
+		on := form.Get(prefix+"on") != ""
+		start, okStart := bwschedule.ParseClock(form.Get(prefix + "start"))
+		end, okEnd := bwschedule.ParseClock(form.Get(prefix + "end"))
+		if on && (!okStart || !okEnd || start == end) {
+			return "", "ogni giorno attivo vuole un orario di inizio e uno di fine diversi"
+		}
+		limit := func(name string) int64 {
+			parsed, err := strconv.ParseInt(strings.TrimSpace(form.Get(prefix+name)), 10, 64)
+			if err != nil || parsed < 0 {
+				return 0
+			}
+			return parsed
+		}
+		week[weekday] = bwschedule.Day{On: on, Start: start, End: end, Download: limit("dl"), Upload: limit("ul")}
+	}
+	return week.String(), ""
 }
 
 // uiWeekdays are the values of libtorrent_sched_days: 0 = Monday … 6 = Sunday.

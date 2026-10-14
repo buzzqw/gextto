@@ -34,8 +34,12 @@ const wantedIndexerInterval = 30 * time.Minute
 // results are stored. Archiving them means a later search reads them from the
 // archive (fast) instead of asking the indexer again.
 func wantedFeedName(name string) string {
-	return "wanted:" + strings.TrimSpace(name)
+	return wantedFeedPrefix + strings.TrimSpace(name)
 }
+
+// wantedFeedPrefix marks the archive "feeds" that hold a wanted title's
+// indexer results: internal buckets, not feeds the operator configured.
+const wantedFeedPrefix = "wanted:"
 
 // wantedGapMaxPerCycle bounds how many missing episodes are searched per title
 // per cycle, so a large gap does not flood the indexers.
@@ -326,8 +330,10 @@ func (d *Daemon) pollWantedLocked(ctx context.Context, onlyName string) wantedPo
 		}
 		checked++
 		var items []rss.Item
-		if len(d.indexers()) > 0 && (onlyName != "" || d.wantedIndexerDue(w.Name, now)) {
-			found, err := d.searchFeedSuggest(ctx, w.Name)
+		// A /regex/ title is searched by its literal words (none with "|").
+		searchText := titleSearchText(w.Name)
+		if searchText != "" && len(d.indexers()) > 0 && (onlyName != "" || d.wantedIndexerDue(w.Name, now)) {
+			found, err := d.searchFeedSuggest(ctx, searchText)
 			if err != nil {
 				errorsList = append(errorsList, w.Name+": "+err.Error())
 			} else {
@@ -342,7 +348,7 @@ func (d *Daemon) pollWantedLocked(ctx context.Context, onlyName string) wantedPo
 			}
 			d.markWantedIndexer(w.Name, now)
 		}
-		items = append(items, d.archiveWantedItems(w.Name, wantedArchiveScan)...)
+		items = append(items, d.archiveWantedItems(searchText, wantedArchiveScan)...)
 		if len(items) > 0 {
 			n, titles := d.applyWanted(now, wantedFeedName(w.Name), items)
 			addedCount += n
@@ -691,7 +697,11 @@ func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEnt
 		if ctx.Err() != nil {
 			return total, addedTitles
 		}
-		query := fmt.Sprintf("%s S%02dE%02d", w.Name, ep.season, ep.episode)
+		text := titleSearchText(w.Name)
+		if text == "" {
+			break
+		}
+		query := fmt.Sprintf("%s S%02dE%02d", text, ep.season, ep.episode)
 		items, err := d.searchFeedSuggest(ctx, query)
 		if err != nil {
 			continue

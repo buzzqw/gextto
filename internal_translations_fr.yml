@@ -2310,6 +2310,12 @@ fra:
   Programmazione — ora fine (HH:MM): Programmation — heure de fin (HH:MM)
   Programmazione — ora inizio (HH:MM): Programmation — heure de début (HH:MM)
   Programmazione — upload (KiB/s): Programmation — téléchargement (KiB/s)
+  "Programmazione — per giorno": "Planification — par jour"
+  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia.": "Une plage horaire et des limites différentes pour chaque jour de la semaine ; une plage passant minuit appartient au jour où elle commence."
+  "una volta salvata sostituisce fascia, giorni e limiti qui sopra; «Predefinito» torna alla fascia unica": "une fois enregistrée, elle remplace la plage, les jours et les limites ci-dessus ; «Par défaut» revient à la plage unique"
+  "ogni giorno attivo vuole un orario di inizio e uno di fine diversi": "chaque jour actif demande des heures de début et de fin différentes"
+  "Inizio": "Début"
+  "Fine": "Fin"
   Progresso: Progrès
   Proper (Corretto): Proper (Corrigé)
   Prossima: Prochaine
@@ -4324,6 +4330,7 @@ fra:
   "Chiudi questo messaggio": "Fermer ce message"
   "Scarica l'ultima build, la installa e riavvia Gextto": "Télécharge le dernier build, l'installe et redémarre Gextto"
   "Cerca subito una versione più recente": "Rechercher une version plus récente maintenant"
+  "Versione del motore gx-core (demone gx-torrent)": "Version du moteur gx-core (démon gx-torrent)"
   "Ricontrolla": "Vérifier à nouveau"
   "Controllo automatico ogni": "Vérification automatique toutes les"
   "(Impostazioni → Sistema → Aggiornamenti)": "(Paramètres → Système → Mises à jour)"

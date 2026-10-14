@@ -238,7 +238,15 @@ The standalone pages follow the same structure:
   episodes, advanced filters) and *What to do* (save path, category, tags,
   flags), with the **preview** of the archived items it would take next to it.
   The options tab holds the refresh interval, the archive retention,
-  FlareSolverr (with its test) and the advanced JSON.
+  FlareSolverr (with its test) and **Copy the setup**: *Export* downloads the
+  feeds, rules and indexers as one JSON file (`GET /ui/rss-export`), *Import*
+  loads such a file (validated) and replaces them; nothing is edited by hand.
+  The Rules tab opens with a short *What are rules for?* explanation (a rule is
+  a more powerful "add a series to Wanted"), and every feed row shows the
+  **torrents it has brought into the archive** (not the items of its last
+  read). The archive's feed filter lists only the configured feeds: the
+  `wanted:<title>` buckets holding a wanted title's indexer results stay
+  searchable under *all feeds*.
 - **Wanted** (`/ui/wanted`): a card per title with type, state, filters as
   chips, and for a series what it has and what it lacks: **Have** collapses a
   season with no gap into `S01` and lists the episodes of the seasons with gaps
@@ -679,6 +687,12 @@ error: so you can
 immediately tell an absent or unresponsive indexer from the results of the
 feeds alone.
 
+A title written between slashes is a **regular expression** (case-insensitive):
+`/ted.?lasso/` takes the releases matching the expression instead of the plain
+words. The indexer and archive searches use its literal words; a pattern with
+alternatives (`|`) is matched only against what the feeds and the archive scan
+bring. The form says so under the title field.
+
 At the top of the *Wanted* page, the **Search all wanted** button triggers an immediate
 manual search across indexers, RSS feeds and the archive for all configured titles and
 gap searches missing episodes, displaying real-time feedback with items added and status.
@@ -724,9 +738,7 @@ first that matches wins — and *Remove*; the form also has *Download once*
 (`once`) and **Match preview**: it tries the form's rule, saved or not,
 on the last 5,000 items of the archive and shows those it would take (qBittorrent's
 "matching articles" view, instantaneous and without network requests).
-Regexes and numeric filters are under *Advanced filters*. Then follow the
-advanced JSON textareas for feeds, rules and indexers (saved with validation) and,
-for each feed, a button that immediately reads the current items with the rule
+Regexes and numeric filters are under *Advanced filters*. For each feed a button that immediately reads the current items with the rule
 that would take them and a manual *Add*.
 All controls, buttons and input fields of the standalone UI
 have descriptive, localised tooltips. In the first-startup wizard
@@ -738,8 +750,8 @@ The same results are obtained via
 place —, `toggle`, `remove`), `POST /ui/rss-rule` (op `add` — with `index` it edits
 —, `toggle`, `remove`, `up`, `down`), `POST /ui/rss-rule-preview` (same fields
 as the form, responds `{matches, scanned}`), `POST /ui/rss-settings` (`interval` in
-minutes, `archive_days`) and `POST /ui/wanted`; the JSON textareas remain on
-`POST /ui/rss-config`.
+minutes, `archive_days`) and `POST /ui/wanted`; `POST /ui/rss-config` takes
+the three JSON arrays (`feeds`, `rules`, `indexers`) or an exported `setup` file.
 
 ### Feed archive
 
@@ -785,13 +797,17 @@ Endpoints: `GET /ui/archive/items?q=&feed=&added=1&sort=new|old|seeds|size|title
 `all=1` with `q`/`feed`/`added`, or `days=N`).
 
 The **bandwidth scheduler** (standalone) applies alternative global limits in a
-daily time window, like qBittorrent: with `schedule-enabled` active and
-`schedule-start`/`schedule-end` (`HH:MM`, also across midnight) the
-daemon uses `schedule-download`/`schedule-upload` (KiB/s) inside the window and the
-normal limits outside. The window can be restricted to some weekdays with
-`schedule-days` (a comma-separated list of `time.Weekday` numbers, 0=Sunday;
-empty means every day), set from the *Active days* checkboxes of the page. The
-limits change on the fly, without reopening the session.
+time window, like qBittorrent, but **per weekday**: the settings page has a
+table with one row per day (active, start, end, download and upload KiB/s), so
+every day has its own window and limits. It is stored in `schedule-week`
+(`mon=23:00-07:00/0/500;-tue=…`, a leading `-` for a day that is off) and
+evaluated by `internal/bwschedule`, shared with Gextto. A window that crosses
+midnight belongs to the day it starts on (Friday 23:00–07:00 covers Saturday
+morning); the next day's own window wins where they overlap. Older settings
+with a single window (`schedule-start`/`schedule-end`, `schedule-download`/
+`schedule-upload`, `schedule-days` as `time.Weekday` numbers) keep working
+until the table is saved. The limits change on the fly, without reopening the
+session.
 It is configured from the **`/ui/settings`** page (*Settings* link in the
 bar of every page), which in **standalone** is the client's complete panel:
 **Folders** (download, temporary), **Network** (listen address, peer port
@@ -799,7 +815,7 @@ range, incoming/outgoing interface, proxy, token), **IP filter** (below),
 **Protocols** (encryption, DHT/PEX/uTP/holepunch/LSD/UPnP/NAT-PMP, bootstrap nodes,
 DHT read-only), **Queue and cache** (active downloads/seeds, active limit, disk
 cache, preallocation, sequential), **Optimisation** (below), **bandwidth** and
-**scheduler**, **language** and **notifications** (`notify-url`). Bandwidth, scheduler and
+**scheduler**, **language** and **notifications** (below). Bandwidth, scheduler and
 queue limits apply immediately; folders, network and protocols apply **from
 the next startup**. The **DHT read-only (BEP 43)** stays off by default: a
 read-only node does not respond to queries and asks not to be entered into
@@ -808,7 +824,10 @@ but a complete client that uses the DHT must also serve it (it is also the choic
 libtorrent and qBittorrent).
 
 The **IP filter** (`ipfilter`) is a local file or a **URL** (P2P, eMule or
-CIDR format, plain or gzip). A URL is downloaded to `<data>/ipfilter.dat` at startup
+CIDR format, plain or gzip). A new standalone daemon starts with the blocklist
+Gextto uses (`constants.DefaultIPFilterURL`), written to settings.json the
+first time the key is missing and no `-ipfilter` flag is given: clearing the
+field keeps it cleared. A URL is downloaded to `<data>/ipfilter.dat` at startup
 (the session immediately uses the copy downloaded last time, if any) and again
 every `ipfilter-refresh-hours` (default 24, `0` = never); a local file is
 reloaded when it changes on disk (size or mtime, checked every 10
@@ -816,6 +835,26 @@ minutes). The box shows loaded rules, time and path of the load,
 next refresh and any error; **Load now** immediately applies the
 value of the field (even unsaved) without saving the rest of the page
 (`POST /ui/ipfilter` with `return=settings`).
+
+The **Network** box has a **Test port** button (the reachability of the saved
+peer port, from `/ui/portcheck`), and the download and temporary folders have
+a **Browse…** picker. The DLNA **Library folders** take one folder per line;
+*Add folder…* appends the chosen folder to the list.
+
+**Notifications** use the same channels as Gextto (`internal/notify`):
+**Telegram** (`notify-telegram-token`, `notify-telegram-chat`), a **webhook**
+(`notify-url`, `notify-webhook-format` = `json` — the historical
+`{app, event, time, …}` payload plus `text` —, `discord`, `slack`, `gotify`,
+`ntfy` or `pushover`, with `notify-webhook-token`/`notify-webhook-user`) and
+**e-mail** over SMTP with STARTTLS (`notify-email-smtp`, `-from`, `-to`,
+`-password`). The events are *download complete*, *feed added torrents* and
+*feed error*, each one switchable (`notify-on-complete`, `notify-on-feed-match`,
+`notify-on-feed-error`); **Send test** (`POST /ui/notify-test`) delivers a test
+message with the saved channels.
+
+When a check finds a newer release, the status bar at the bottom of the
+Torrents page shows an **Update available** indicator linking to *Settings →
+Maintenance*.
 
 **Optimisation** is the equivalent of Gextto's *Optimise* button: a single
 **Optimize** button runs all three actions (`POST /ui/optimize` with

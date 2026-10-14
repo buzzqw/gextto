@@ -210,6 +210,8 @@ provides the stubs (`//go:build !cgo`), `libtorrent.go` stays unchanged and
 | `internal/dht` | DHT implementation, a module of its own under the main module. |
 | `internal/gxcore` | gx-core torrent engine (the `gx-torrent` binary): our original code (early versions built on MIT/BSD bases, since rewritten). |
 | `internal/queue` | manager of the gx-torrent queue (which torrents to run). |
+| `internal/bwschedule` | weekly bandwidth scheduler (a window and limits per weekday), shared by Gextto and gx-torrent. |
+| `internal/notify` | gx-torrent notifications: Telegram, e-mail, webhook (JSON, Discord, Slack, Gotify, ntfy, Pushover). |
 | `internal/rss` | parsing of RSS/Atom/Torznab feeds and HTML listings (ext.to, TorrentGalaxy: `listing.go`), ordered rules and episode filter. |
 | `internal/settings` | persistent key/value store of the gx-torrent standalone mode. |
 | `internal/torznab` | client for Torznab indexers (Jackett, Prowlarr and similar). |

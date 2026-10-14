@@ -131,6 +131,11 @@ type gxTorrentEngine struct {
 	// updated one, so its exit is not a crash.
 	replacing bool
 
+	// versionMu guards the daemon version cached for the UI header.
+	versionMu sync.Mutex
+	version   string
+	versionAt time.Time
+
 	mu               sync.Mutex
 	syncMu           sync.Mutex
 	cache            map[string]models.TorrentView
@@ -324,7 +329,36 @@ func (e *gxTorrentEngine) health() (gxHealth, bool) {
 	if err := e.do(http.MethodGet, "/api/v1/health", nil, "", &health); err != nil {
 		return health, false
 	}
+	if health.OK && health.Version != "" {
+		e.versionMu.Lock()
+		e.version, e.versionAt = health.Version, time.Now()
+		e.versionMu.Unlock()
+	}
 	return health, health.OK
+}
+
+// gxVersionTTL bounds how long the daemon version shown in the UI header is
+// reused before /api/v1/health is asked again (it changes only on restart).
+const gxVersionTTL = time.Minute
+
+// DaemonVersion is the gx-core version (1.1.<gx-torrent build>) of the daemon
+// in use, as /api/v1/health reports it, cached for gxVersionTTL. Empty while
+// the daemon does not answer and nothing was cached yet.
+func (e *gxTorrentEngine) DaemonVersion() string {
+	e.versionMu.Lock()
+	version, fresh := e.version, time.Since(e.versionAt) < gxVersionTTL
+	e.versionMu.Unlock()
+	if fresh {
+		return version
+	}
+	if health, ok := e.health(); ok && health.Version != "" {
+		return health.Version
+	}
+	e.versionMu.Lock()
+	// Retry at most once per TTL while the daemon is down.
+	e.versionAt = time.Now()
+	e.versionMu.Unlock()
+	return version
 }
 
 // adoptOrReplace handles a managed daemon left running by a previous Gextto

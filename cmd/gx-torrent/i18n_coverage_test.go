@@ -31,6 +31,9 @@ var uiI18nAllowlist = map[string]bool{
 	"Jackett": true, "Prowlarr": true, "MIRCrew": true,
 	// Example values used as placeholders on the RSS page.
 	"1080p, ita": true, "Serie S01": true, "Serie S02": true, "Serie": true,
+	// Example values used as placeholders on the settings page.
+	"smtp.example.com:587": true, "gx-torrent@example.com": true,
+	"/srv/media/Movies\n/srv/media/TV": true,
 }
 
 // uiI18nWorth reports whether a string is user-facing prose worth translating.

@@ -62,20 +62,22 @@ type uiDashboardData struct {
 	DryRun            bool
 	Backend           string
 	LibtorrentVersion string
-	Torrents          int
-	Downloading       int
-	Idle              int
-	Seeding           int
-	Paused            int
-	Errors            int
-	DownloadRate      uint64
-	UploadRate        uint64
-	UpdatedAt         string
-	CycleScraped      int
-	CycleCandidates   int
-	CycleStarted      int
-	CycleGaps         int
-	CycleErrors       int
+	// EngineVersion is the gx-core version of the gx-torrent daemon.
+	EngineVersion   string
+	Torrents        int
+	Downloading     int
+	Idle            int
+	Seeding         int
+	Paused          int
+	Errors          int
+	DownloadRate    uint64
+	UploadRate      uint64
+	UpdatedAt       string
+	CycleScraped    int
+	CycleCandidates int
+	CycleStarted    int
+	CycleGaps       int
+	CycleErrors     int
 	// Parity data from the classic dashboard.
 	SeriesConfigured int
 	MoviesConfigured int
@@ -319,6 +321,9 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 		LibtorrentVersion: LibtorrentVersion(),
 		Torrents:          len(views),
 		UpdatedAt:         uiNowClock(),
+	}
+	if gx, ok := engine.(*gxTorrentEngine); ok {
+		data.EngineVersion = gx.DaemonVersion()
 	}
 	for _, view := range views {
 		switch view.State {

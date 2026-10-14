@@ -55,3 +55,8 @@ var GxReleaseChannel = ""
 // BuiltAt is the build time (RFC 3339, UTC), stamped like Commit. A release is
 // offered as an update only when it was built after the running binary.
 var BuiltAt = ""
+
+// DefaultIPFilterURL is the IP filter a standalone gx-torrent starts with: the
+// same blocklist configured in Gextto. It is written to settings.json once,
+// when the key was never set, so an operator who clears it keeps it cleared.
+const DefaultIPFilterURL = "https://github.com/Aetherinox/blocklists/raw/refs/heads/main/blocklists/transmission/blocklist.gz"

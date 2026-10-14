@@ -13,12 +13,22 @@ main{max-width:900px;margin:0 auto;padding:20px 16px 90px}
 main>p.muted:first-child{margin-top:0}
 label{display:flex;flex-direction:column;gap:5px;margin:10px 0;font-size:13px}
 label.chk{flex-direction:row;align-items:center;gap:8px;font-size:14px}
+/* A checkbox sharing a grid row with a labelled field lines up with the
+   field's input box, not with its label text. */
+.grid>label.chk{align-self:end;min-height:34px}
 input:not([type=checkbox]):not([type=radio]),select{width:100%}
 fieldset{scroll-margin-top:70px}
 fieldset .muted{font-size:13px}
 .days{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:6px 0}
 .days-label{flex-basis:100%;color:var(--subtle);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
 .days label.chk{margin:0}
+.table-scroll{overflow-x:auto}
+h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:uppercase;letter-spacing:.05em}
+.sched-week{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px}
+.sched-week th,.sched-week td{padding:4px 6px;text-align:left;white-space:nowrap}
+.sched-week thead th{color:var(--subtle);font-weight:600}
+.sched-week input[type=time]{min-width:7.5em}
+.sched-week input[type=number]{min-width:6em}
 .savebar{position:sticky;bottom:0;margin:18px -16px 0;padding:12px 16px;display:flex;justify-content:flex-end;gap:10px;background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -6px 20px rgba(0,0,0,.08)}
 </style></head>
 <body>
@@ -35,8 +45,8 @@ fieldset .muted{font-size:13px}
 <fieldset>
   <legend>Folders</legend>
   <div class="grid">
-    <label>Download folder<input type="text" name="download-dir" value="{{DOWNLOAD_DIR}}" placeholder="/srv/downloads" autocomplete="off" title="Main folder for completed downloads"></label>
-    <label>Temporary folder for incomplete files<input type="text" name="temp-dir" value="{{TEMP_DIR}}" autocomplete="off" title="Temporary folder for incomplete downloads"></label>
+    <label>Download folder<span class="field-row"><input type="text" id="download-dir" name="download-dir" value="{{DOWNLOAD_DIR}}" placeholder="/srv/downloads" autocomplete="off" title="Main folder for completed downloads"><button type="button" class="browse" data-target="download-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
+    <label>Temporary folder for incomplete files<span class="field-row"><input type="text" id="temp-dir" name="temp-dir" value="{{TEMP_DIR}}" autocomplete="off" title="Temporary folder for incomplete downloads"><button type="button" class="browse" data-target="temp-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
   </div>
 </fieldset>
 <fieldset>
@@ -50,6 +60,8 @@ fieldset .muted{font-size:13px}
     <label>API token<input type="text" name="token" value="{{TOKEN}}" autocomplete="off" title="Authentication token for API requests"></label>
     <label class="chk"><input type="checkbox" name="web-sources-allow-private" value="1"{{WEB_PRIVATE}} title="Web seeds and magnet sources (xs=/as=) come from torrent data: by default they cannot reach the local network, so a torrent from a feed cannot make the client request the router or the NAS"> Allow web seeds and magnet sources on the local network</label>
   </div>
+  <div class="actions"><button type="button" class="secondary sm" id="port-test" title="Test whether the peer port is reachable from the Internet (uses the port saved above)">Test port</button></div>
+  <p class="muted" id="port-test-result" role="status" aria-live="polite"></p>
 </fieldset>
 <fieldset id="ipfilter">
   <legend>IP filter</legend>
@@ -98,8 +110,9 @@ fieldset .muted{font-size:13px}
     <label class="chk"><input type="checkbox" name="dlna-enabled" value="1"{{DLNA_ENABLED}} title="Advertise the completed media to DLNA/UPnP players (TV, console) on the local network. Off by default; local network only, no authentication."> Enable DLNA/UPnP media server</label>
     <label>HTTP bind<input type="text" name="dlna-listen" value="{{DLNA_LISTEN}}" autocomplete="off" placeholder=":8200" title="Address and port the media server listens on, e.g. :8200 for all interfaces or 192.168.1.10:8200 for one. Discovery uses UDP 1900 on the same interface."></label>
     <label>Server name<input type="text" name="dlna-name" value="{{DLNA_NAME}}" autocomplete="off" placeholder="gx-torrent" title="Friendly name shown to the DLNA players on the network."></label>
-    <label>Library folders<input type="text" name="dlna-folders" value="{{DLNA_FOLDERS}}" autocomplete="off" title="Folders shown to the DLNA players beside the torrents, as browsable folders (e.g. the archive on the NAS). Separate them with ;. Read only; hidden and NAS system folders are skipped."></label>
   </div>
+  <label>Library folders<span class="field-row"><textarea name="dlna-folders" id="dlna-folders" rows="3" placeholder="/srv/media/Movies&#10;/srv/media/TV" autocomplete="off" aria-describedby="dlna-folders-help" title="Folders shown to the DLNA players beside the torrents, as browsable folders (e.g. the archive on the NAS). One folder per line. Read only; hidden and NAS system folders are skipped.">{{DLNA_FOLDERS}}</textarea><button type="button" class="browse" data-target="dlna-folders" data-append="1" title="Add an existing folder on the server to the list">Add folder…</button></span></label>
+  <p class="muted" id="dlna-folders-help">Any number of folders, one per line: each one appears to the players as a browsable folder beside the torrents. Add folder… appends the chosen folder to the list; to remove one, delete its line.</p>
   <p class="muted" role="status">{{DLNA_STATUS}}</p>
 </fieldset>
 <fieldset id="optimize">
@@ -126,22 +139,15 @@ fieldset .muted{font-size:13px}
 <fieldset>
   <legend>Bandwidth scheduler</legend>
   <label class="chk"><input type="checkbox" name="schedule-enabled" value="1"{{SCHED_ENABLED}} title="Activate time-based speed limits schedule"> Enable the scheduler</label>
-  <label>Start (HH:MM)<input type="text" name="schedule-start" value="{{SCHED_START}}" placeholder="01:00" title="Start time of the scheduled bandwidth window (HH:MM)"></label>
-  <label>End (HH:MM)<input type="text" name="schedule-end" value="{{SCHED_END}}" placeholder="08:00" title="End time of the scheduled bandwidth window (HH:MM)"></label>
-  <label>Scheduled download (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-download" value="{{SCHED_DL}}" title="Download speed limit during scheduled window in KiB/s"></label>
-  <label>Scheduled upload (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-upload" value="{{SCHED_UL}}" title="Upload speed limit during scheduled window in KiB/s"></label>
-  <div class="days" role="group" aria-labelledby="sched-days-label">
-    <input type="hidden" name="schedule-days-form" value="1">
-    <span id="sched-days-label" class="days-label">Active days</span>
-    <label class="chk"><input type="checkbox" name="schedule-day" value="1"{{SCHED_DAY_1}} title="Apply the scheduled limits on this day of the week">Mon</label>
-    <label class="chk"><input type="checkbox" name="schedule-day" value="2"{{SCHED_DAY_2}} title="Apply the scheduled limits on this day of the week">Tue</label>
-    <label class="chk"><input type="checkbox" name="schedule-day" value="3"{{SCHED_DAY_3}} title="Apply the scheduled limits on this day of the week">Wed</label>
-    <label class="chk"><input type="checkbox" name="schedule-day" value="4"{{SCHED_DAY_4}} title="Apply the scheduled limits on this day of the week">Thu</label>
-    <label class="chk"><input type="checkbox" name="schedule-day" value="5"{{SCHED_DAY_5}} title="Apply the scheduled limits on this day of the week">Fri</label>
-    <label class="chk"><input type="checkbox" name="schedule-day" value="6"{{SCHED_DAY_6}} title="Apply the scheduled limits on this day of the week">Sat</label>
-    <label class="chk"><input type="checkbox" name="schedule-day" value="0"{{SCHED_DAY_0}} title="Apply the scheduled limits on this day of the week">Sun</label>
+  <input type="hidden" name="schedule-week-form" value="1">
+  <div class="table-scroll">
+  <table class="sched-week">
+    <caption class="sr-only">Window and limits for each day of the week</caption>
+    <thead><tr><th scope="col">Day</th><th scope="col" id="sched-col-on">Active</th><th scope="col" id="sched-col-start">Start</th><th scope="col" id="sched-col-end">End</th><th scope="col" id="sched-col-dl">Download (KiB/s)</th><th scope="col" id="sched-col-ul">Upload (KiB/s)</th></tr></thead>
+    <tbody>{{SCHED_WEEK_ROWS}}</tbody>
+  </table>
   </div>
-  <p class="muted">Inside the window on the selected days the scheduled limits apply; outside, the global limits above (0 = unlimited). The window may cross midnight.</p>
+  <p class="muted">Every day has its own window and limits (0 = unlimited). Inside the window of an active day its limits apply; outside, the global limits above. A window may cross midnight: it then belongs to the day it starts on (Friday 23:00–07:00 covers Saturday morning too).</p>
 </fieldset>
 <fieldset>
   <legend>Latency auto-speed</legend>
@@ -154,9 +160,39 @@ fieldset .muted{font-size:13px}
   <p class="muted"><span>Current latency / upload cap</span>: {{AUTOSPEED_STATUS}}</p>
 </fieldset>
 <fieldset>
-  <legend>Interface and notifications</legend>
+  <legend>Interface</legend>
   <label>Language<select name="lang" title="Web interface language">{{LANG_OPTIONS}}</select></label>
-  <label>Notification webhook URL<input type="text" name="notify-url" value="{{NOTIFY_URL}}" autocomplete="off" title="Webhook URL to receive notifications on torrent completion or feed events"></label>
+</fieldset>
+<fieldset id="notifications">
+  <legend>Notifications</legend>
+  <p class="muted">The same channels as Gextto: fill in the ones you use, leave the others empty. Every filled channel receives every enabled event.</p>
+  <div class="days" role="group" aria-labelledby="notify-events-label">
+    <span id="notify-events-label" class="days-label">Events</span>
+    <label class="chk"><input type="checkbox" name="notify-on-complete" value="1"{{NOTIFY_ON_COMPLETE}} title="Notify when a download finishes"> Download complete</label>
+    <label class="chk"><input type="checkbox" name="notify-on-feed-match" value="1"{{NOTIFY_ON_MATCH}} title="Notify when a feed rule or a wanted title adds torrents"> Feed added torrents</label>
+    <label class="chk"><input type="checkbox" name="notify-on-feed-error" value="1"{{NOTIFY_ON_ERROR}} title="Notify when a feed cannot be read"> Feed error</label>
+  </div>
+  <h3 class="sub">Telegram</h3>
+  <div class="grid">
+    <label>Bot token<input type="password" name="notify-telegram-token" value="{{NOTIFY_TG_TOKEN}}" autocomplete="off" title="Token of your Telegram bot, from @BotFather"></label>
+    <label>Chat ID<input type="text" name="notify-telegram-chat" value="{{NOTIFY_TG_CHAT}}" autocomplete="off" title="Chat or channel the bot writes to (e.g. 123456789 or @channel)"></label>
+  </div>
+  <h3 class="sub">Webhook</h3>
+  <div class="grid">
+    <label>Webhook URL<input type="text" name="notify-url" value="{{NOTIFY_URL}}" autocomplete="off" placeholder="https://ntfy.sh/my-topic" title="Address the notifications are posted to"></label>
+    <label>Format<select name="notify-webhook-format" title="Payload of the webhook: generic JSON or the format of a service">{{NOTIFY_FORMAT_OPTIONS}}</select></label>
+    <label>Webhook token<input type="password" name="notify-webhook-token" value="{{NOTIFY_WH_TOKEN}}" autocomplete="off" title="Credential of the service: ntfy access token, Gotify application key or Pushover application token"></label>
+    <label>Pushover user key<input type="text" name="notify-webhook-user" value="{{NOTIFY_WH_USER}}" autocomplete="off" title="Your Pushover user key (Pushover format only)"></label>
+  </div>
+  <h3 class="sub">E-mail</h3>
+  <div class="grid">
+    <label>SMTP server (host:port)<input type="text" name="notify-email-smtp" value="{{NOTIFY_SMTP}}" autocomplete="off" placeholder="smtp.example.com:587" title="Mail server and port; STARTTLS is used when the server offers it"></label>
+    <label>From<input type="text" name="notify-email-from" value="{{NOTIFY_FROM}}" autocomplete="off" placeholder="gx-torrent@example.com" title="Sender address, also the SMTP login"></label>
+    <label>To (comma separated)<input type="text" name="notify-email-to" value="{{NOTIFY_TO}}" autocomplete="off" title="Recipients of the notifications, separated by commas"></label>
+    <label>SMTP password<input type="password" name="notify-email-password" value="{{NOTIFY_PASSWORD}}" autocomplete="new-password" title="Password of the sender account on the SMTP server"></label>
+  </div>
+  <div class="actions"><button type="button" class="secondary sm" id="notify-test" title="Send a test notification with the saved channels">Send test</button></div>
+  <p class="muted" id="notify-test-result" role="status" aria-live="polite"></p>
 </fieldset>
 <fieldset id="maintenance">
   <legend>Maintenance</legend>
@@ -170,6 +206,14 @@ fieldset .muted{font-size:13px}
 </form>
 <!--UPDATE_NOTES-->
 </main>
+<dialog id="browse-overlay" class="picker" data-browse-endpoint="/ui/browse-dir" aria-label="Choose an existing folder on the server">
+  <div class="picker-head"><code id="browse-path"></code><button type="button" data-picker-close title="Cancel folder selection">Cancel</button></div>
+  <div class="picker-list" id="browse-list"></div>
+  <div class="picker-foot">
+    <button type="button" data-picker-up title="Navigate to parent directory">↑ Parent</button>
+    <button type="button" class="primary" data-picker-choose title="Select the current directory as destination folder">Choose this folder</button>
+  </div>
+</dialog>
 <script id="ui-i18n"></script>
 <script src="/assets/common.js"></script>
 <script>
@@ -213,6 +257,40 @@ Array.prototype.forEach.call(document.querySelectorAll('[data-formaction]'), fun
     form.submit();
   });
 });
+// "Test port": the reachability of the saved peer port, rendered by
+// /ui/portcheck (coloured dot and explanation) in the live region below.
+(function () {
+  var btn = document.getElementById('port-test');
+  var out = document.getElementById('port-test-result');
+  if (!btn || !out) return;
+  var t = function (s) { return (window.__uiI18n && window.__uiI18n[s]) || s; };
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    out.textContent = t('checking…');
+    fetch('/ui/portcheck', {cache: 'no-store', credentials: 'same-origin'}).then(function (r) {
+      if (!r.ok) throw new Error(String(r.status));
+      return r.text();
+    }).then(function (h) { out.innerHTML = h; }).catch(function () {
+      out.textContent = t('Port test failed');
+    }).then(function () { btn.disabled = false; });
+  });
+})();
+// "Send test": a test notification through the saved channels.
+(function () {
+  var btn = document.getElementById('notify-test');
+  var out = document.getElementById('notify-test-result');
+  if (!btn || !out) return;
+  var t = function (s) { return (window.__uiI18n && window.__uiI18n[s]) || s; };
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    out.textContent = t('checking…');
+    fetch('/ui/notify-test', {method: 'POST', cache: 'no-store', credentials: 'same-origin'}).then(function (r) {
+      return r.text();
+    }).then(function (text) { out.textContent = text; }).catch(function (e) {
+      out.textContent = t('Error') + ': ' + e.message;
+    }).then(function () { btn.disabled = false; });
+  });
+})();
 // While an update installs, follow it: once the daemon answers again without
 // the "installing" marker (the new version is up), reload to show its notes.
 if (document.querySelector('[data-update-applying]')) {

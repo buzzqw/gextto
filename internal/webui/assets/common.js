@@ -62,11 +62,13 @@
   // machine's directories (`/ui/browse-dir`, standalone only) so the operator
   // picks a folder instead of typing it. Any <button class="browse"
   // data-target="fieldId"> opens it and writes the chosen path back into that
-  // field. It is a native dialog, so it stacks above an already open modal
-  // (the add-torrent form) that a plain overlay could not.
+  // field; with data-append the field is a list (one path per line, ";" also
+  // accepted) and the path is added to it instead of replacing it. It is a native dialog, so it stacks
+  // above an already open modal (the add-torrent form) that a plain overlay
+  // could not.
   (function () {
     var overlay = null, listEl = null, pathEl = null;
-    var target = null, current = "", parent = "", endpoint = "/ui/browse-dir";
+    var target = null, appendList = false, current = "", parent = "", endpoint = "/ui/browse-dir";
 
     function ensure() {
       if (overlay && overlay.isConnected) return true;
@@ -80,10 +82,17 @@
     }
     function field(id) { return id ? document.getElementById(id) : null; }
 
-    function open(id) {
+    function listItems(value) {
+      return String(value || "").split(/[;\n]/).map(function (p) { return p.trim(); }).filter(Boolean);
+    }
+    function open(id, list) {
       if (id) target = id;
+      appendList = !!list;
       if (!ensure()) return;
       var input = field(target);
+      // A list field starts the picker from its last entry.
+      var start = input ? input.value : "";
+      if (appendList) start = listItems(start).pop() || "";
       if (typeof overlay.showModal === "function") {
         if (!overlay.open) overlay.showModal();
       } else {
@@ -91,7 +100,7 @@
       }
       var close = overlay.querySelector("[data-picker-close]");
       if (close) close.focus();
-      go(input ? input.value : "");
+      go(start);
     }
     function close() {
       if (!overlay) return;
@@ -129,7 +138,16 @@
     function up() { if (parent) go(parent); }
     function choose() {
       var input = field(target);
-      if (input && current) input.value = current;
+      if (input && current) {
+        if (appendList) {
+          var items = listItems(input.value);
+          if (items.indexOf(current) < 0) items.push(current);
+          input.value = items.join("\n");
+        } else {
+          input.value = current;
+        }
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
       close();
     }
 
@@ -139,7 +157,7 @@
       var el = e.target;
       if (!el || !el.closest) return;
       var browse = el.closest(".browse");
-      if (browse) { e.preventDefault(); open(browse.getAttribute("data-target")); return; }
+      if (browse) { e.preventDefault(); open(browse.getAttribute("data-target"), browse.hasAttribute("data-append")); return; }
       if (el.closest("[data-picker-close]")) { close(); return; }
       if (el.closest("[data-picker-up]")) { go(parent); return; }
       if (el.closest("[data-picker-choose]")) { choose(); return; }

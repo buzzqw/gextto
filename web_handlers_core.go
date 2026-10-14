@@ -985,6 +985,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"libtorrent_sched_days":                settingsOr(cfg, "libtorrent_sched_days", ""),
 		"libtorrent_sched_dl_limit":            settingsOr(cfg, "libtorrent_sched_dl_limit", "0"),
 		"libtorrent_sched_ul_limit":            settingsOr(cfg, "libtorrent_sched_ul_limit", "0"),
+		"libtorrent_sched_week":                settingsOr(cfg, "libtorrent_sched_week", ""),
 		"libtorrent_temp_dl_limit":             settingsOr(cfg, "libtorrent_temp_dl_limit", "0"),
 		"libtorrent_temp_ul_limit":             settingsOr(cfg, "libtorrent_temp_ul_limit", "0"),
 		"libtorrent_temp_limit_enabled":        settingsOr(cfg, "libtorrent_temp_limit_enabled", "0"),

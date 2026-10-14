@@ -24,7 +24,7 @@ func TestUISettingsSavesLimitsAndSchedule(t *testing.T) {
 	}
 	body, _ := io.ReadAll(page.Body)
 	page.Body.Close()
-	if page.StatusCode != http.StatusOK || !strings.Contains(string(body), `name="speed-download"`) || !strings.Contains(string(body), `name="schedule-start"`) {
+	if page.StatusCode != http.StatusOK || !strings.Contains(string(body), `name="speed-download"`) || !strings.Contains(string(body), `name="schedule-mon-start"`) {
 		t.Fatalf("settings page: status=%d", page.StatusCode)
 	}
 
@@ -136,13 +136,56 @@ func TestUISettingsSavesScheduleDays(t *testing.T) {
 	body, _ = io.ReadAll(page.Body)
 	page.Body.Close()
 	htmlBody := string(body)
-	for _, want := range []string{`name="schedule-day" value="1" checked`, `name="schedule-day" value="4" checked`, `Active days`} {
+	// The single window shows in the per-day table on the selected days.
+	for _, want := range []string{`name="schedule-mon-on" value="1" checked`, `name="schedule-thu-on" value="1" checked`, `name="schedule-mon-start" value="01:00"`} {
 		if !strings.Contains(htmlBody, want) {
 			t.Fatalf("settings page missing %q", want)
 		}
 	}
-	if strings.Contains(htmlBody, `name="schedule-day" value="2" checked`) {
+	if strings.Contains(htmlBody, `name="schedule-tue-on" value="1" checked`) {
 		t.Fatal("Tuesday must not be checked")
+	}
+}
+
+// TestUISettingsSavesScheduleWeek checks the per-day table: each weekday keeps
+// its own window and limits, and an active day without a window is refused.
+func TestUISettingsSavesScheduleWeek(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.PostForm(srv.URL+"/ui/settings", url.Values{
+		"schedule-enabled": {"1"}, "schedule-week-form": {"1"},
+		"schedule-mon-on": {"1"}, "schedule-mon-start": {"08:00"}, "schedule-mon-end": {"08:00"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if d.opts.Settings.Get(scheduleEnabledKey, "") == "true" {
+		t.Fatal("an active day with an empty window must be refused")
+	}
+
+	resp, err = http.PostForm(srv.URL+"/ui/settings", url.Values{
+		"schedule-enabled": {"1"}, "schedule-week-form": {"1"},
+		"schedule-mon-on": {"1"}, "schedule-mon-start": {"08:00"}, "schedule-mon-end": {"18:00"}, "schedule-mon-dl": {"1000"}, "schedule-mon-ul": {"100"},
+		"schedule-fri-on": {"1"}, "schedule-fri-start": {"23:00"}, "schedule-fri-end": {"07:00"}, "schedule-fri-dl": {"0"}, "schedule-fri-ul": {"500"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	// 2026-01-05 is a Monday, 2026-01-10 a Saturday.
+	at := func(day, hour int) time.Time { return time.Date(2026, 1, day, hour, 0, 0, 0, time.Local) }
+	if dl, ul, active := d.scheduledSpeedLimits(at(5, 10)); !active || dl != 1000 || ul != 100 {
+		t.Fatalf("Monday 10:00: dl=%d ul=%d active=%v", dl, ul, active)
+	}
+	if _, _, active := d.scheduledSpeedLimits(at(6, 10)); active {
+		t.Fatal("Tuesday is off")
+	}
+	if dl, ul, active := d.scheduledSpeedLimits(at(10, 3)); !active || dl != 0 || ul != 500 {
+		t.Fatalf("Saturday 03:00 (Friday's night window): dl=%d ul=%d active=%v", dl, ul, active)
 	}
 }
 

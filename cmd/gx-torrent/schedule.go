@@ -1,8 +1,9 @@
 package main
 
-// schedule.go is the standalone bandwidth scheduler: an optional daily window
-// with alternate global speed limits, like qBittorrent's scheduler. Outside the
-// window the configured limits apply. The engine changes the global limits in place,
+// schedule.go is the standalone bandwidth scheduler: an optional window per
+// weekday with alternate global speed limits, like qBittorrent's scheduler but
+// with every day on its own times and limits (internal/bwschedule, shared with
+// Gextto). Outside the window the configured limits apply. The engine changes the global limits in place,
 // so switching never reopens the session or drops peers.
 
 import (
@@ -10,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/bwschedule"
 )
 
 const (
@@ -23,6 +26,10 @@ const (
 	// empty value means every day, so settings written before this option keep
 	// working unchanged.
 	scheduleDaysKey = "schedule-days"
+	// scheduleWeekKey holds the per-day schedule (bwschedule's stored form):
+	// each weekday with its own window and limits. When set it supersedes the
+	// single window above, which stays as the fallback of older settings.
+	scheduleWeekKey = "schedule-week"
 )
 
 // scheduleDaysSet parses the stored weekday list into a per-weekday flag. An
@@ -67,9 +74,29 @@ func formatScheduleDays(days [7]bool) string {
 	return strings.Join(parts, ",")
 }
 
+// scheduleWeek is the configured week: the per-day schedule when saved,
+// otherwise the single window on the selected days (older settings). ok is
+// false when neither is usable.
+func (d *Daemon) scheduleWeek() (week bwschedule.Week, ok bool) {
+	settings := d.opts.Settings
+	if settings == nil {
+		return week, false
+	}
+	if week, ok := bwschedule.Parse(settings.Get(scheduleWeekKey, "")); ok {
+		return week, true
+	}
+	start, okStart := parseClock(settings.Get(scheduleStartKey, ""))
+	end, okEnd := parseClock(settings.Get(scheduleEndKey, ""))
+	if !okStart || !okEnd || start == end {
+		return week, false
+	}
+	return bwschedule.Uniform(scheduleDaysSet(settings.Get(scheduleDaysKey, "")), start, end,
+		int64FromSetting(settings.Get(scheduleDLKey, "0")), int64FromSetting(settings.Get(scheduleULKey, "0"))), true
+}
+
 // scheduledSpeedLimits returns the alternate limits and whether the window is
-// active at now. A disabled or invalid schedule is never active; the window
-// applies only on the selected weekdays.
+// active at now. A disabled or invalid schedule is never active; each weekday
+// has its own window and limits (see bwschedule).
 func (d *Daemon) scheduledSpeedLimits(now time.Time) (download, upload int64, active bool) {
 	settings := d.opts.Settings
 	if settings == nil {
@@ -78,44 +105,15 @@ func (d *Daemon) scheduledSpeedLimits(now time.Time) (download, upload int64, ac
 	if strings.ToLower(strings.TrimSpace(settings.Get(scheduleEnabledKey, "false"))) != "true" {
 		return 0, 0, false
 	}
-	if !scheduleDaysSet(settings.Get(scheduleDaysKey, ""))[int(now.Weekday())] {
+	week, ok := d.scheduleWeek()
+	if !ok {
 		return 0, 0, false
 	}
-	start, okStart := parseClock(settings.Get(scheduleStartKey, ""))
-	end, okEnd := parseClock(settings.Get(scheduleEndKey, ""))
-	if !okStart || !okEnd || start == end {
-		return 0, 0, false
-	}
-	minute := now.Hour()*60 + now.Minute()
-	if start < end {
-		active = minute >= start && minute < end
-	} else { // wraps midnight
-		active = minute >= start || minute < end
-	}
-	if !active {
-		return 0, 0, false
-	}
-	return int64FromSetting(settings.Get(scheduleDLKey, "0")), int64FromSetting(settings.Get(scheduleULKey, "0")), true
+	return week.At(now)
 }
 
 // parseClock reads "HH:MM" into minutes since midnight.
-func parseClock(value string) (int, bool) {
-	parts := strings.SplitN(strings.TrimSpace(value), ":", 2)
-	if len(parts) != 2 {
-		return 0, false
-	}
-	var hour, minute int
-	if _, err := fmt.Sscanf(strings.TrimSpace(parts[0]), "%d", &hour); err != nil {
-		return 0, false
-	}
-	if _, err := fmt.Sscanf(strings.TrimSpace(parts[1]), "%d", &minute); err != nil {
-		return 0, false
-	}
-	if hour < 0 || hour > 23 || minute < 0 || minute > 59 {
-		return 0, false
-	}
-	return hour*60 + minute, true
-}
+func parseClock(value string) (int, bool) { return bwschedule.ParseClock(value) }
 
 func int64FromSetting(value string) int64 {
 	var n int64

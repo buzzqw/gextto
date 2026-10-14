@@ -73,11 +73,12 @@
         </div>
         <label class="field">Title
           <div class="searchrow">
-            <input type="text" name="name" id="wanted-name" list="series-list" placeholder="Title" autocomplete="off" required title="Series or movie title to search for">
+            <input type="text" name="name" id="wanted-name" list="series-list" placeholder="Title" autocomplete="off" required aria-describedby="wanted-regex-hint" title="Series or movie title to search for">
             <button type="button" id="wanted-search" title="Search the archive (fast) for matching titles"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search</button>
           </div>
         </label>
         <datalist id="series-list"></datalist>
+        <p class="hint" id="wanted-regex-hint">Regular expressions are supported: write the title between slashes, e.g. /ted.?lasso/ or /^the office/ (case-insensitive). The release must match the expression instead of the plain words.</p>
         <label class="chk"><input type="checkbox" id="wanted-live" title="Also query the configured indexers live (slow); for a title not yet in the archive"> Search indexers too</label>
         <p class="hint" id="wanted-search-source" aria-live="polite">Search to see how the title is named in the feeds and pick the right one.</p>
         <div class="pick" id="wanted-results" aria-live="polite"></div>

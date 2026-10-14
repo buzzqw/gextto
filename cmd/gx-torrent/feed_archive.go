@@ -658,6 +658,24 @@ func (a *feedArchive) stats(feeds bool) archiveStats {
 	return out
 }
 
+// feedCounts counts the archived entries per feed: every torrent a feed has
+// brought in (kept within the retention), for the feed rows.
+func (a *feedArchive) feedCounts() map[string]int {
+	out := map[string]int{}
+	if a == nil {
+		return out
+	}
+	_ = a.db.View(func(tx *bolt.Tx) error {
+		return tx.Bucket(archiveIdxBucket).ForEach(func(_, v []byte) error {
+			if rec, ok := parseArchiveIdx(v); ok {
+				out[string(rec.feed)]++
+			}
+			return nil
+		})
+	})
+	return out
+}
+
 // archive returns the feed archive, opening it on first use. It exists only in
 // standalone mode with a data directory: managed mode has no feeds, and a
 // Daemon built by hand in a test must not create files.

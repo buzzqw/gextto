@@ -71,14 +71,18 @@ type uiPageData struct {
 	PeerErrors    string
 	// UTPSocket is the preformatted uTP socket dial/accept summary for the
 	// status bar, empty while the socket never dialled nor accepted.
-	UTPSocket    string
-	DHT          bool
-	DHTNodes     int64
-	UTP          bool
-	Encryption   string
-	Proxy        bool
-	IPFilter     int
-	IPFilterPath string
+	UTPSocket string
+	// UpdateAvailable lights the status bar's update indicator (standalone,
+	// after a check found a newer gx-torrent); UpdateDate is its build day.
+	UpdateAvailable bool
+	UpdateDate      string
+	DHT             bool
+	DHTNodes        int64
+	UTP             bool
+	Encryption      string
+	Proxy           bool
+	IPFilter        int
+	IPFilterPath    string
 	// IPFilterSource prefills the IP filter field with Gextto's setting.
 	IPFilterSource string
 	// GexttoLog enables the Gextto log tab.
@@ -452,15 +456,16 @@ func (d *Daemon) handleUIPortCheck(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	check := d.checkPort(targetPort)
-	class, label := "bad", "porta chiusa"
+	class, label := "bad", "port closed"
 	switch {
 	case check.Port <= 0:
-		class, label = "bad", "nessuna porta peer configurata"
+		class, label = "bad", "no peer port configured"
 	case check.Open:
-		class, label = "ok", "porta aperta"
+		class, label = "ok", "port open"
 	case check.Listening:
-		class, label = "warn", "in ascolto, non inoltrata"
+		class, label = "warn", "listening, not forwarded"
 	}
+	label = uiTranslateText(label, uiDictionary(d.uiLang(r)))
 	detail := check.Detail
 	if check.ExternalIP != "" {
 		if detail != "" {
@@ -1275,6 +1280,10 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		stats.Session["utp_resends_timeout"], stats.Session["utp_resends_fast"],
 		stats.Session["utp_syn_drops"])
 	page.CPUPercent, page.ProcRSS = d.processUsage(time.Now())
+	if d.opts.Mode == ModeStandalone {
+		update := d.updateStatus()
+		page.UpdateAvailable, page.UpdateDate = update.Available && !update.Applying, update.LatestDate
+	}
 	switch {
 	case stats.PortMapping.Method != "":
 		page.PortOpen = true

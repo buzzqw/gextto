@@ -85,6 +85,24 @@ func optStr(store *settings.Store, key, flagValue string) string {
 	return strings.TrimSpace(flagValue)
 }
 
+// seedDefaultIPFilter gives a standalone daemon Gextto's IP filter list the
+// first time it runs: only when settings.json never had the key and no
+// -ipfilter flag was passed, so a filter the operator removed stays removed.
+func seedDefaultIPFilter(store *settings.Store, flagValue string) {
+	if store == nil || strings.TrimSpace(flagValue) != "" {
+		return
+	}
+	for _, key := range store.Keys() {
+		if key == "ipfilter" {
+			return
+		}
+	}
+	store.Set("ipfilter", constants.DefaultIPFilterURL)
+	if err := store.Save(); err != nil {
+		log.Printf("cannot save the default IP filter: %v", err)
+	}
+}
+
 // stringList is a repeatable string flag.
 type stringList []string
 
@@ -270,6 +288,7 @@ func main() {
 			log.Printf("cannot read settings.json: %v", loadErr)
 		} else {
 			settingsStore = store
+			seedDefaultIPFilter(store, *ipFilter)
 		}
 	}
 	// In standalone settings.json is authoritative: a value there wins over the

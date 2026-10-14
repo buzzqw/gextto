@@ -3,8 +3,9 @@ package main
 // ui_rss_edit.go adds the friendly indexer/feed editors on top of the JSON
 // settings of the standalone RSS page: small forms that append to or remove
 // from the `indexers` and `feeds` arrays, so the operator does not have to hand
-// edit JSON. The raw settings stay the source of truth and remain editable in
-// the page's advanced textareas (/ui/rss-config).
+// edit JSON. The raw settings stay the source of truth; a whole setup moves
+// between daemons as an exported file (/ui/rss-export, imported by
+// /ui/rss-config).
 
 import (
 	"context"
@@ -18,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/buzzqw/gextto/internal/rss"
 	"github.com/buzzqw/gextto/internal/torznab"
@@ -416,6 +418,9 @@ func titleCase(value string) string {
 // language/quality words also matches unrelated releases returned by fuzzy
 // indexer queries (e.g. any release carrying "1080p").
 func titleMatchRegex(title string) string {
+	if pattern, ok := titleRegexPattern(title); ok {
+		return "(?i)" + pattern
+	}
 	words := strings.FieldsFunc(strings.ToLower(title), func(r rune) bool {
 		return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9')
 	})
@@ -429,6 +434,36 @@ func titleMatchRegex(title string) string {
 		return ""
 	}
 	return "(?i)" + strings.Join(quoted, `[\s._\-]+`)
+}
+
+// titleRegexPattern recognizes a title written as a regular expression:
+// between slashes, like /ted.?lasso/. It returns the pattern inside.
+func titleRegexPattern(title string) (string, bool) {
+	title = strings.TrimSpace(title)
+	if len(title) < 3 || !strings.HasPrefix(title, "/") || !strings.HasSuffix(title, "/") {
+		return "", false
+	}
+	return title[1 : len(title)-1], true
+}
+
+// titleSearchText is the plain text an indexer or the archive is searched with
+// for a title: the title itself, or for a /regex/ title its literal words. A
+// regex with alternatives (|) has no single text: it is matched only against
+// what the feeds and the archive scan bring.
+func titleSearchText(title string) string {
+	pattern, ok := titleRegexPattern(title)
+	if !ok {
+		return strings.TrimSpace(title)
+	}
+	if strings.Contains(pattern, "|") {
+		return ""
+	}
+	// Drop escapes and classes (\d, \s, [..]) before taking the words.
+	cleaned := regexp.MustCompile(`\\.|\[[^\]]*\]|\{[^}]*\}`).ReplaceAllString(pattern, " ")
+	words := strings.FieldsFunc(cleaned, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	return strings.Join(words, " ")
 }
 
 // uiRuleFromForm builds one rule from the add-rule form, validating the regexes
@@ -787,6 +822,7 @@ func (d *Daemon) uiFeedRowsHTML() string {
 	})
 	var b strings.Builder
 	rules := d.rules()
+	totals := d.archive().feedCounts()
 	for _, row := range rows {
 		feed := row.feed
 		index := strconv.Itoa(row.index)
@@ -816,7 +852,7 @@ func (d *Daemon) uiFeedRowsHTML() string {
 			cls += " off"
 		}
 		b.WriteString(`<li class="` + cls + `" data-feed-row="` + html.EscapeString(key) + `"><div class="item-main">`)
-		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(orDefault(feed.Name, "—")) + `</span>` + badges + `<span class="item-status" data-feed-status>` + uiFeedStatusHTML(statuses[key]) + `</span></div>`)
+		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(orDefault(feed.Name, "—")) + `</span>` + badges + `<span class="item-status" data-feed-status>` + uiFeedStatusHTML(statuses[key], totals[key]) + `</span></div>`)
 		b.WriteString(`<div class="item-sub mono" title="` + html.EscapeString(source) + `">` + html.EscapeString(source) + `</div>`)
 		if chips := uiFeedChipsHTML(feed); chips != "" {
 			b.WriteString(`<div class="chips">` + chips + `</div>`)
@@ -860,8 +896,14 @@ func uiFeedChipsHTML(feed feedConfig) string {
 
 // uiFeedStatusHTML renders a feed's last outcome: when it was checked, how
 // many items it returned (and how many were new or added), or its error.
-func uiFeedStatusHTML(status feedStatus) string {
+// uiFeedStatusHTML renders a feed's row status: the total of torrents it has
+// brought into the archive, then the outcome of the last check.
+func uiFeedStatusHTML(status feedStatus, total int) string {
+	totalHTML := `<span title="Torrents this feed has brought into the archive">` + strconv.Itoa(total) + `</span> <span class="muted">torrents</span>`
 	if status.LastCheck == 0 {
+		if total > 0 {
+			return totalHTML
+		}
 		return `<span class="muted">not checked yet</span>`
 	}
 	when := time.Unix(status.LastCheck, 0).Format("02/01 15:04")
@@ -869,7 +911,7 @@ func uiFeedStatusHTML(status feedStatus) string {
 	if status.LastError != "" {
 		return out + `<span class="err" role="status">` + html.EscapeString(status.LastError) + `</span>`
 	}
-	out += `<span title="Items in the feed">` + strconv.Itoa(status.Items) + `</span> <span class="muted">items</span>`
+	out += totalHTML
 	if status.New > 0 {
 		out += ` · <span class="ok">` + strconv.Itoa(status.New) + `</span> <span class="muted">new</span>`
 	}

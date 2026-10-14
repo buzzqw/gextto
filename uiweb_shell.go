@@ -58,20 +58,23 @@ func (d *healthStatusDebouncer) update(raw string, now time.Time) string {
 // classic one, which showed the same figures from /api/status, /api/health and
 // /api/torrents.
 type uiShellChrome struct {
-	Version      string
-	DryRun       bool
-	Status       string
-	CurrentTime  string
-	CPU          string
-	CPUFrequency string
-	RAM          string
-	Download     string
-	Upload       string
-	NextCycle    string
-	Lang         string
-	Torrents     int
-	Peers        int
-	Seeds        int
+	Version string
+	// EngineVersion is the gx-core version of the gx-torrent daemon, shown
+	// last in the header; empty with the other engines.
+	EngineVersion string
+	DryRun        bool
+	Status        string
+	CurrentTime   string
+	CPU           string
+	CPUFrequency  string
+	RAM           string
+	Download      string
+	Upload        string
+	NextCycle     string
+	Lang          string
+	Torrents      int
+	Peers         int
+	Seeds         int
 	// Transferring and Stuck split the unfinished torrents for the phone
 	// status strip; Problems is logging.ProblemCount (the page compares it
 	// with the value seen last time to show only new warnings).
@@ -130,6 +133,9 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 		Upload:       "0 B",
 		NextCycle:    "—",
 		Lang:         "it",
+	}
+	if gx, ok := s.activeEngine().(*gxTorrentEngine); ok {
+		chrome.EngineVersion = gx.DaemonVersion()
 	}
 
 	// The top bar only needs the status and the process CPU/RAM. The full

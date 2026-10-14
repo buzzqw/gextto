@@ -123,6 +123,7 @@ var uiSettingDefaults = map[string]string{
 	"libtorrent_sched_days":                        "",
 	"libtorrent_sched_dl_limit":                    "0",
 	"libtorrent_sched_ul_limit":                    "0",
+	"libtorrent_sched_week":                        "",
 	"libtorrent_extra_settings":                    "Una per riga: chiave=valore\nmax_peerlist_size=4000\nmax_queued_disk_bytes=104857600\nactive_downloads=6\nsmooth_connects=true\nrequest_timeout=10",
 
 	// --- Motore torrent (backend) ------------------------------------------

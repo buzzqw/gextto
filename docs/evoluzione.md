@@ -695,6 +695,21 @@ WebTorrent, native I2P (reachable via a SOCKS5/HTTP proxy).
   state and *Load now* in the settings.
 - **Optimise** (`optimize.go`): queue (Gextto base), cache (automatic), bandwidth
   (80% of the measured peak upload, auto-speed active).
+- **Per-day bandwidth scheduler** (`internal/bwschedule`, shared by Gextto and
+  gx-torrent): every weekday has its own window and limits (`schedule-week` in
+  the daemon, `libtorrent_sched_week` in Gextto); a window past midnight
+  belongs to the day it starts on. The older single window stays as fallback.
+  Gextto's two duplicated evaluators now call the same function.
+- **Notifications on Gextto's channels** (`internal/notify`): Telegram, e-mail
+  (SMTP/STARTTLS) and webhook in the JSON, Discord, Slack, Gotify, ntfy and
+  Pushover formats, for completed downloads, feed matches and feed errors,
+  each switchable, with a test button.
+- **Usability of the standalone pages**: Browse… on the folders, port test in
+  *Network*, multi-folder DLNA library with *Add folder…*, Gextto's blocklist
+  as default IP filter, export/import of the RSS setup instead of the raw
+  JSON, total torrents per feed, `/regex/` wanted titles, an explanation of the
+  rules, an *Update available* indicator in the status bar, and the gx-core
+  version shown in Gextto's header and dashboard.
 
 ### 4.8 Verification criterion
 

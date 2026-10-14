@@ -60,11 +60,14 @@ func (c feedConfig) rule() rss.TitleFilter {
 
 // feedStatus is the last outcome of one feed, for the page.
 type feedStatus struct {
-	Name      string `json:"name"`
-	URL       string `json:"url"`
-	Items     int    `json:"items"`
-	Added     int    `json:"added"`
-	New       int    `json:"new"` // items not seen before (archived)
+	Name  string `json:"name"`
+	URL   string `json:"url"`
+	Items int    `json:"items"`
+	Added int    `json:"added"`
+	New   int    `json:"new"` // items not seen before (archived)
+	// Total is the torrents the feed has brought into the archive (filled for
+	// the page, not stored).
+	Total     int    `json:"total"`
 	LastError string `json:"last_error,omitempty"`
 	LastCheck int64  `json:"last_check,omitempty"`
 }

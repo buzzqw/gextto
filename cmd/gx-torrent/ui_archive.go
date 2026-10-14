@@ -41,6 +41,11 @@ func (d *Daemon) handleUIArchive(w http.ResponseWriter, r *http.Request) {
 	stats := d.archive().stats(true)
 	var options strings.Builder
 	for _, feed := range stats.Feeds {
+		// The wanted titles' indexer results are an internal cache, not a feed
+		// the operator configured: they stay searchable under "all feeds".
+		if strings.HasPrefix(feed, wantedFeedPrefix) {
+			continue
+		}
 		options.WriteString(`<option value="` + html.EscapeString(feed) + `">` + html.EscapeString(feed) + `</option>`)
 	}
 	page = strings.Replace(page, "{{FEEDOPTIONS}}", options.String(), 1)

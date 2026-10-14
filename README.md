@@ -327,15 +327,20 @@ fewer features, but all the ones a standalone client needs.
   reload, live indexer tests, optional FlareSolverr, and a local **archive**
   of everything feeds returned (100,000 releases searchable in ~7 ms, with an
   option to query Jackett/Prowlarr live).
-- **Operations.** Global and per-torrent limits, daily scheduler, latency
-  auto-speed (anti-bufferbloat), one-click queue/cache/bandwidth optimisation,
-  URL or file IP filter with scheduled refresh, categories and tags,
-  real-time diagnostics.
+- **Operations.** Global and per-torrent limits, a bandwidth scheduler with
+  its own window and limits for every weekday, latency auto-speed
+  (anti-bufferbloat), one-click queue/cache/bandwidth optimisation, URL or file
+  IP filter (Gextto's blocklist by default) with scheduled refresh, categories
+  and tags, real-time diagnostics, port test from the settings.
+- **Notifications.** The same channels as Gextto: Telegram, e-mail and
+  webhooks (generic JSON, Discord, Slack, Gotify, ntfy, Pushover) for completed
+  downloads, feed matches and feed errors, with a test button.
 - **Updates itself.** *Settings → Maintenance* checks the build CI published on
   a timer (or when you press **Check for updates**); the button turns into
   **Update** only when gx-torrent's own code changed: it downloads the archive,
   checks its SHA-256, tries the new binary, swaps it in and restarts in the same
-  process, then shows the new commits in a popup. If the new version does not
+  process, then shows the new commits in a popup. An *Update available*
+  indicator lights up in the status bar of the Torrents page. If the new version does not
   start, the previous one comes back by itself.
 - **Platforms.** Linux x86_64/aarch64 (`gx-torrent-linux-<arch>.tar.gz`, systemd
   unit or `run.sh`, unprivileged Docker image) and native Windows service

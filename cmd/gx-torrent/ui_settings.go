@@ -14,10 +14,14 @@ import (
 	"html"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/bwschedule"
+	"github.com/buzzqw/gextto/internal/notify"
+	"github.com/buzzqw/gextto/internal/settings"
 	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
@@ -110,29 +114,30 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	if !daysProvided {
 		days = scheduleDaysSet(store.Get(scheduleDaysKey, ""))
 	}
-	if enabled {
-		startMinute, okStart := parseClock(start)
-		endMinute, okEnd := parseClock(end)
-		if !okStart || !okEnd {
-			d.renderSettings(w, r, "The scheduler window must be two times in HH:MM.", true)
+	// The per-day table (one window and limits per weekday) supersedes the
+	// single window; a form without it (an older client) keeps the old path.
+	if r.FormValue("schedule-week-form") == "1" {
+		week, errKey := parseScheduleWeekForm(r)
+		if errKey == "" && enabled && !week.AnyOn() {
+			errKey = "Select at least one day for the scheduler window."
+		}
+		if errKey != "" {
+			d.renderSettings(w, r, errKey, true)
 			return
 		}
-		if startMinute == endMinute {
-			d.renderSettings(w, r, "The scheduler start and end must differ.", true)
+		store.Set(scheduleEnabledKey, strconv.FormatBool(enabled))
+		store.Set(scheduleWeekKey, week.String())
+		scheduleUL = 0
+		for _, day := range week {
+			if day.On && day.Upload > scheduleUL {
+				scheduleUL = day.Upload
+			}
+		}
+	} else {
+		if errKey := saveScheduleSingleWindow(store, enabled, start, end, scheduleDL, scheduleUL, days, daysProvided); errKey != "" {
+			d.renderSettings(w, r, errKey, true)
 			return
 		}
-		if scheduleDaysSelected(days) == 0 {
-			d.renderSettings(w, r, "Select at least one day for the scheduler window.", true)
-			return
-		}
-	}
-	store.Set(scheduleEnabledKey, strconv.FormatBool(enabled))
-	store.Set(scheduleStartKey, start)
-	store.Set(scheduleEndKey, end)
-	store.Set(scheduleDLKey, strconv.FormatInt(scheduleDL, 10))
-	store.Set(scheduleULKey, strconv.FormatInt(scheduleUL, 10))
-	if daysProvided {
-		store.Set(scheduleDaysKey, formatScheduleDays(days))
 	}
 
 	// Latency auto-speed (settings.json, applied at once). It needs a positive
@@ -156,7 +161,9 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	for _, key := range []string{
 		"download-dir", "temp-dir", "listen", "peer-ports", "listen-interface",
 		"outgoing-interface", "proxy", "token", "ipfilter", "dht-bootstrap",
-		"notify-url", "lang",
+		"notify-url", "lang", notifyWebhookTokenKey, notifyWebhookUserKey,
+		notifyTelegramTokenKey, notifyTelegramChatKey, notifyEmailSMTPKey,
+		notifyEmailFromKey, notifyEmailToKey,
 	} {
 		store.Set(key, strings.TrimSpace(r.FormValue(key)))
 	}
@@ -165,6 +172,16 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 		encryption = 1
 	}
 	store.Set("encryption", strconv.Itoa(encryption))
+	// Notifications: the password is kept as typed (it may hold spaces).
+	store.Set(notifyEmailPasswordKey, r.FormValue(notifyEmailPasswordKey))
+	format := strings.TrimSpace(r.FormValue(notifyFormatKey))
+	if !slices.Contains(notify.Formats, format) {
+		format = "json"
+	}
+	store.Set(notifyFormatKey, format)
+	for _, key := range []string{notifyOnCompleteKey, notifyOnFeedMatchKey, notifyOnFeedErrorKey} {
+		store.Set(key, strconv.FormatBool(formBool(r, key)))
+	}
 	store.Set("ipfilter-trackers", strconv.FormatBool(formBool(r, "ipfilter-trackers")))
 	if hours := formInt(r, ipFilterRefreshKey, ipFilterDefaultRefreshHours); hours >= 0 && hours <= 24*30 {
 		store.Set(ipFilterRefreshKey, strconv.FormatInt(hours, 10))
@@ -189,6 +206,87 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	d.applyScheduleNow()
 	http.Redirect(w, r, uiSettingsPath+"?msg="+url.QueryEscape("Settings saved")+"&ok=1", http.StatusSeeOther)
+}
+
+// saveScheduleSingleWindow stores the older single-window scheduler form (one
+// window and one pair of limits on the selected days). It returns a catalog
+// key when the form is invalid.
+func saveScheduleSingleWindow(store *settings.Store, enabled bool, start, end string, scheduleDL, scheduleUL int64, days [7]bool, daysProvided bool) string {
+	if enabled {
+		startMinute, okStart := parseClock(start)
+		endMinute, okEnd := parseClock(end)
+		if !okStart || !okEnd {
+			return "The scheduler window must be two times in HH:MM."
+		}
+		if startMinute == endMinute {
+			return "The scheduler start and end must differ."
+		}
+		if scheduleDaysSelected(days) == 0 {
+			return "Select at least one day for the scheduler window."
+		}
+	}
+	store.Set(scheduleEnabledKey, strconv.FormatBool(enabled))
+	store.Set(scheduleStartKey, start)
+	store.Set(scheduleEndKey, end)
+	store.Set(scheduleDLKey, strconv.FormatInt(scheduleDL, 10))
+	store.Set(scheduleULKey, strconv.FormatInt(scheduleUL, 10))
+	if daysProvided {
+		store.Set(scheduleDaysKey, formatScheduleDays(days))
+	}
+	// A single-window form replaces any per-day schedule.
+	store.Set(scheduleWeekKey, "")
+	return ""
+}
+
+// parseScheduleWeekForm reads the per-day scheduler table: for every weekday
+// "schedule-<day>-on", "-start", "-end", "-dl" and "-ul" (day = sun…sat). A
+// day that is on needs two different HH:MM times; blank limits mean 0
+// (unlimited). The error is a catalog key.
+func parseScheduleWeekForm(r *http.Request) (bwschedule.Week, string) {
+	var week bwschedule.Week
+	for n := range week {
+		prefix := "schedule-" + bwschedule.DayName(time.Weekday(n)) + "-"
+		day := bwschedule.Day{On: formBool(r, prefix+"on")}
+		start, okStart := parseClock(r.FormValue(prefix + "start"))
+		end, okEnd := parseClock(r.FormValue(prefix + "end"))
+		if day.On && (!okStart || !okEnd) {
+			return week, "The scheduler window must be two times in HH:MM."
+		}
+		if day.On && start == end {
+			return week, "The scheduler start and end must differ."
+		}
+		day.Start, day.End = start, end
+		day.Download, _ = parseFormKib(r.FormValue(prefix + "dl"))
+		day.Upload, _ = parseFormKib(r.FormValue(prefix + "ul"))
+		week[n] = day
+	}
+	return week, ""
+}
+
+// scheduleWeekRows renders the per-day scheduler table body, Monday first.
+// The day names and column headers are catalog strings, translated with the
+// page; every input is named by its row header plus its column header.
+func scheduleWeekRows(week bwschedule.Week) string {
+	names := map[time.Weekday]string{time.Monday: "Mon", time.Tuesday: "Tue", time.Wednesday: "Wed",
+		time.Thursday: "Thu", time.Friday: "Fri", time.Saturday: "Sat", time.Sunday: "Sun"}
+	var b strings.Builder
+	for _, weekday := range bwschedule.MondayFirst {
+		day := week[weekday]
+		key := bwschedule.DayName(weekday)
+		prefix := "schedule-" + key + "-"
+		row := "sched-row-" + key
+		checked := ""
+		if day.On {
+			checked = " checked"
+		}
+		fmt.Fprintf(&b, `<tr><th scope="row" id="%s">%s</th>`, row, names[weekday])
+		fmt.Fprintf(&b, `<td><input type="checkbox" name="%son" value="1"%s aria-labelledby="%s sched-col-on" title="Apply the scheduled limits on this day of the week"></td>`, prefix, checked, row)
+		fmt.Fprintf(&b, `<td><input type="time" name="%sstart" value="%s" aria-labelledby="%s sched-col-start" title="Start time of the scheduled bandwidth window (HH:MM)"></td>`, prefix, bwschedule.FormatClock(day.Start), row)
+		fmt.Fprintf(&b, `<td><input type="time" name="%send" value="%s" aria-labelledby="%s sched-col-end" title="End time of the scheduled bandwidth window (HH:MM)"></td>`, prefix, bwschedule.FormatClock(day.End), row)
+		fmt.Fprintf(&b, `<td><input type="number" min="0" name="%sdl" value="%d" aria-labelledby="%s sched-col-dl" title="Download speed limit during scheduled window in KiB/s"></td>`, prefix, day.Download, row)
+		fmt.Fprintf(&b, `<td><input type="number" min="0" name="%sul" value="%d" aria-labelledby="%s sched-col-ul" title="Upload speed limit during scheduled window in KiB/s"></td></tr>`, prefix, day.Upload, row)
+	}
+	return b.String()
 }
 
 // parseScheduleDayForm reads the day checkboxes (weekday numbers, 0=Sunday) into
@@ -284,15 +382,13 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 
 	repl("{{SPEED_DL}}", strconv.FormatInt(cfg.SpeedLimitDownload, 10))
 	repl("{{SPEED_UL}}", strconv.FormatInt(cfg.SpeedLimitUpload, 10))
-	repl("{{SCHED_START}}", html.EscapeString(store.Get(scheduleStartKey, "")))
-	repl("{{SCHED_END}}", html.EscapeString(store.Get(scheduleEndKey, "")))
-	repl("{{SCHED_DL}}", strconv.FormatInt(int64FromSetting(store.Get(scheduleDLKey, "0")), 10))
-	repl("{{SCHED_UL}}", strconv.FormatInt(int64FromSetting(store.Get(scheduleULKey, "0")), 10))
 	repl("{{SCHED_ENABLED}}", checkedIf(boolSetting(scheduleEnabledKey)))
-	schedDays := scheduleDaysSet(store.Get(scheduleDaysKey, ""))
-	for n := 0; n < 7; n++ {
-		repl(fmt.Sprintf("{{SCHED_DAY_%d}}", n), checkedIf(schedDays[n]))
+	week, ok := d.scheduleWeek()
+	if !ok {
+		// Nothing usable saved yet: a night window, every day off, as a start.
+		week = bwschedule.Uniform([7]bool{}, 1*60, 8*60, 0, 0)
 	}
+	repl("{{SCHED_WEEK_ROWS}}", scheduleWeekRows(week))
 	repl("{{AUTOSPEED_ENABLED}}", checkedIf(boolSetting(autospeedEnabledKey)))
 	repl("{{AUTOSPEED_TARGET}}", get(autospeedTargetKey))
 	autoSpeedMin := int64FromSetting(store.Get(autospeedMinKey, strconv.Itoa(autoSpeedDefaultMinKiB)))
@@ -341,7 +437,8 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{DLNA_ENABLED}}", checkedIf(boolSetting(dlnaEnabledKey)))
 	repl("{{DLNA_LISTEN}}", get(dlnaListenKey))
 	repl("{{DLNA_NAME}}", get(dlnaNameKey))
-	repl("{{DLNA_FOLDERS}}", get(dlnaFoldersKey))
+	// One folder per line in the textarea; stored ";"-separated.
+	repl("{{DLNA_FOLDERS}}", html.EscapeString(strings.Join(dlnaSplitList(store.Get(dlnaFoldersKey, "")), "\n")))
 	dlnaStatus := "Media server off."
 	if base := d.dlnaStatusURL(); base != "" {
 		dlnaStatus = "Media server running at <code>" + html.EscapeString(base) + "</code>"
@@ -355,6 +452,28 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 
 	repl("{{LANG_OPTIONS}}", languageOptions(store.Get("lang", "")))
 	repl("{{NOTIFY_URL}}", get("notify-url"))
+	repl("{{NOTIFY_TG_TOKEN}}", get(notifyTelegramTokenKey))
+	repl("{{NOTIFY_TG_CHAT}}", get(notifyTelegramChatKey))
+	repl("{{NOTIFY_WH_TOKEN}}", get(notifyWebhookTokenKey))
+	repl("{{NOTIFY_WH_USER}}", get(notifyWebhookUserKey))
+	repl("{{NOTIFY_SMTP}}", get(notifyEmailSMTPKey))
+	repl("{{NOTIFY_FROM}}", get(notifyEmailFromKey))
+	repl("{{NOTIFY_TO}}", get(notifyEmailToKey))
+	repl("{{NOTIFY_PASSWORD}}", get(notifyEmailPasswordKey))
+	repl("{{NOTIFY_ON_COMPLETE}}", checkedIf(d.notifyEventOn("download_complete")))
+	repl("{{NOTIFY_ON_MATCH}}", checkedIf(d.notifyEventOn("feed_match")))
+	repl("{{NOTIFY_ON_ERROR}}", checkedIf(d.notifyEventOn("feed_error")))
+	formatLabels := map[string]string{"json": "Generic JSON", "discord": "Discord", "slack": "Slack", "gotify": "Gotify", "ntfy": "ntfy", "pushover": "Pushover"}
+	var formats strings.Builder
+	selectedFormat := store.Get(notifyFormatKey, "json")
+	for _, format := range notify.Formats {
+		mark := ""
+		if format == selectedFormat {
+			mark = " selected"
+		}
+		formats.WriteString(`<option value="` + format + `"` + mark + `>` + formatLabels[format] + `</option>`)
+	}
+	repl("{{NOTIFY_FORMAT_OPTIONS}}", formats.String())
 
 	errorHTML := ""
 	if errKey != "" {

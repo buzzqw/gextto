@@ -114,6 +114,8 @@ type uiSettingField struct {
 	DisabledEngine string
 	// Options is set for Kind=="select": a fixed list to choose from.
 	Options []uiFormOption
+	// Week is set for Kind=="week": the per-day bandwidth schedule rows.
+	Week []uiWeekRow
 	// Hint is the descriptive tooltip shown on the label (ported from rextto).
 	Hint string
 	// BoolValue, TrueValue and FalseValue are set only for Kind=="bool": they
@@ -439,6 +441,10 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 			value = raw
 		}
 		field := uiSettingFieldFor(def.Key, def.Label, value)
+		// An unsaved per-day schedule shows the single window it replaces.
+		if field.Kind == "week" && strings.TrimSpace(value) == "" {
+			field.Week = uiWeekRowsFrom(speedScheduleWeek(cfg))
+		}
 		if !uiBackendAllows(uiSettingAllowedBackends(def.Key), activeBackend) {
 			field.Disabled = true
 			field.DisabledNote = "Non attivo con il motore «" + uiBackendLabel(activeBackend) + "»."
@@ -1010,6 +1016,9 @@ func uiApplySettingMeta(field *uiSettingField, stored string) {
 		case "days":
 			field.Kind = "days"
 			field.Options = uiDaysOptions(field.Value)
+		case "week":
+			field.Kind = "week"
+			field.Week = uiWeekRows(field.Value)
 		case "url":
 			if field.Kind == "text" {
 				field.Kind = "url"

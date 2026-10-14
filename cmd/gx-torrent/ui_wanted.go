@@ -80,6 +80,12 @@ func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
 			d.renderWanted(w, r, "A wanted title needs a name.")
 			return
 		}
+		if pattern, ok := titleRegexPattern(entry.Name); ok {
+			if _, err := regexp.Compile("(?i)" + pattern); err != nil {
+				d.renderWanted(w, r, "The title regular expression is not valid.")
+				return
+			}
+		}
 		if _, err := rss.ParseEpisodeFilter(entry.episodeFilter()); err != nil {
 			d.renderWanted(w, r, err.Error())
 			return
@@ -367,7 +373,8 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
 	}
-	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	// A /regex/ title is searched by its literal words.
+	query := titleSearchText(r.URL.Query().Get("q"))
 	langFilters := splitList(r.URL.Query().Get("language"))
 	qualityFilter := strings.TrimSpace(r.URL.Query().Get("quality"))
 	if len([]rune(query)) < 2 {

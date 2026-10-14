@@ -520,7 +520,7 @@ func TestUIRssPageAndConfig(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `name="feeds"`) || !strings.Contains(string(body), `name="rules"`) {
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `name="setup"`) || !strings.Contains(string(body), `href="/ui/rss-export"`) {
 		t.Fatalf("RSS page: status=%d", resp.StatusCode)
 	}
 

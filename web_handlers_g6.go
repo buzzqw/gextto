@@ -147,48 +147,7 @@ func gh6_truthySetting(value string) bool {
 }
 
 func gh6_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
-	if !gh6_truthySetting(cfg.Settings["libtorrent_sched_enabled"]) {
-		return 0, 0, false
-	}
-	now := time.Now()
-	// `%u` is Monday=1..Sunday=7; `-1` makes it Monday=0..Sunday=6.
-	weekday := (int(now.Weekday()) + 6) % 7
-	activeDays := map[int]bool{}
-	for _, day := range strings.Split(cfg.Settings["libtorrent_sched_days"], ",") {
-		if parsed, err := strconv.Atoi(strings.TrimSpace(day)); err == nil {
-			activeDays[parsed] = true
-		}
-	}
-	dayOK := activeDays[weekday]
-	parseTime := func(key string, defaultHour, defaultMinute int) (int, int) {
-		if value, ok := cfg.Settings[key]; ok {
-			parts := strings.SplitN(value, ":", 2)
-			if len(parts) == 2 {
-				hour, errHour := strconv.Atoi(strings.TrimSpace(parts[0]))
-				minute, errMinute := strconv.Atoi(strings.TrimSpace(parts[1]))
-				if errHour == nil && errMinute == nil {
-					return hour, minute
-				}
-			}
-		}
-		return defaultHour, defaultMinute
-	}
-	startHour, startMinute := parseTime("libtorrent_sched_start", 23, 0)
-	endHour, endMinute := parseTime("libtorrent_sched_end", 8, 0)
-	nowMinutes := now.Hour()*60 + now.Minute()
-	startMinutes := startHour*60 + startMinute
-	endMinutes := endHour*60 + endMinute
-	inTime := false
-	if startMinutes <= endMinutes {
-		inTime = nowMinutes >= startMinutes && nowMinutes < endMinutes
-	} else {
-		inTime = nowMinutes >= startMinutes || nowMinutes < endMinutes
-	}
-	if dayOK && inTime {
-		return gh6_parseSettingInt(cfg, "libtorrent_sched_dl_limit"),
-			gh6_parseSettingInt(cfg, "libtorrent_sched_ul_limit"), true
-	}
-	return 0, 0, false
+	return scheduledSpeedLimitsAt(cfg, time.Now())
 }
 
 // Speed policy sources, in the order they are tried.
