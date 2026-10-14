@@ -2,6 +2,48 @@ package main
 
 import "testing"
 
+func TestMediaContentType(t *testing.T) {
+	cases := map[string]string{
+		"movie.mkv":           "video/x-matroska",
+		"movie.MP4":           "video/mp4",
+		"clip.webm":           "video/webm",
+		"song.flac":           "audio/flac",
+		"subs.srt":            "application/x-subrip",
+		"report.pdf":          "application/octet-stream",
+		"noext":               "application/octet-stream",
+		"/path/to/series.mkv": "video/x-matroska",
+	}
+	for name, want := range cases {
+		if got := mediaContentType(name); got != want {
+			t.Errorf("mediaContentType(%q) = %q, want %q", name, got, want)
+		}
+	}
+	if !isMediaFile("a.mkv") || isMediaFile("a.txt") {
+		t.Fatal("isMediaFile is wrong")
+	}
+}
+
+func TestSanitizeFilename(t *testing.T) {
+	if got := sanitizeFilename("/x/y/na\"me\r\n.mkv"); got != "name.mkv" {
+		t.Fatalf("sanitizeFilename = %q", got)
+	}
+}
+
+func TestStreamRefcount(t *testing.T) {
+	d := &Daemon{}
+	d.beginStream("aa")
+	d.beginStream("aa")
+	if last := d.endStream("aa"); last {
+		t.Fatal("the first close must not be the last stream")
+	}
+	if last := d.endStream("aa"); !last {
+		t.Fatal("the second close must be the last stream")
+	}
+	if last := d.endStream("bb"); !last {
+		t.Fatal("closing an unknown stream must report last (nothing to clear)")
+	}
+}
+
 func TestParseByteRange(t *testing.T) {
 	cases := []struct {
 		header  string

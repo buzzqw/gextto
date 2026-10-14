@@ -1,8 +1,10 @@
 package main
 
 // stream.go serves a torrent file to a media player over HTTP with Range
-// support, while asking the engine to fetch the pieces of the requested window first
-//. The player can start before the download is complete.
+// support, while asking the engine to fetch the pieces of the requested window
+// first, so the player can start before the download is complete. The same
+// core (serveTorrentFile) backs the UI player (/ui/stream, authenticated) and
+// the DLNA server (dlna.go, LAN, no auth).
 
 import (
 	"context"
@@ -24,6 +26,72 @@ const (
 	streamPollEvery   = 200 * time.Millisecond
 )
 
+// mediaContentTypes maps media extensions to a Content-Type so a browser or a
+// player can play the stream inline instead of downloading it. The DLNA server
+// also uses the class derived from it.
+var mediaContentTypes = map[string]string{
+	".mp4":  "video/mp4",
+	".m4v":  "video/mp4",
+	".mkv":  "video/x-matroska",
+	".webm": "video/webm",
+	".avi":  "video/x-msvideo",
+	".mov":  "video/quicktime",
+	".ts":   "video/mp2t",
+	".mpg":  "video/mpeg",
+	".mpeg": "video/mpeg",
+	".flv":  "video/x-flv",
+	".wmv":  "video/x-ms-wmv",
+	".mp3":  "audio/mpeg",
+	".m4a":  "audio/mp4",
+	".aac":  "audio/aac",
+	".flac": "audio/flac",
+	".ogg":  "audio/ogg",
+	".opus": "audio/ogg",
+	".wav":  "audio/wav",
+	".srt":  "application/x-subrip",
+	".vtt":  "text/vtt",
+}
+
+// mediaContentType returns the Content-Type for a file name: the media type for
+// a known extension, application/octet-stream otherwise.
+func mediaContentType(name string) string {
+	if ct, ok := mediaContentTypes[strings.ToLower(filepath.Ext(name))]; ok {
+		return ct
+	}
+	return "application/octet-stream"
+}
+
+// isMediaFile reports whether a file name has a known media extension (used by
+// the DLNA server to list only playable files).
+func isMediaFile(name string) bool {
+	_, ok := mediaContentTypes[strings.ToLower(filepath.Ext(name))]
+	return ok
+}
+
+// beginStream records one active stream of a torrent.
+func (d *Daemon) beginStream(hash string) {
+	d.streamMu.Lock()
+	if d.activeStreams == nil {
+		d.activeStreams = map[string]int{}
+	}
+	d.activeStreams[hash]++
+	d.streamMu.Unlock()
+}
+
+// endStream drops one active stream and reports whether it was the last, so the
+// caller clears the engine window only when nobody else needs it.
+func (d *Daemon) endStream(hash string) (last bool) {
+	d.streamMu.Lock()
+	if d.activeStreams[hash] <= 1 {
+		delete(d.activeStreams, hash)
+		last = true
+	} else {
+		d.activeStreams[hash]--
+	}
+	d.streamMu.Unlock()
+	return last
+}
+
 // handleUIStream serves one file of a torrent, honouring a single HTTP Range.
 // It is served under the UI authentication so ?token= works for players.
 func (d *Daemon) handleUIStream(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +111,14 @@ func (d *Daemon) handleUIStream(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "torrent not found", http.StatusNotFound)
 		return
 	}
+	d.serveTorrentFile(w, r, hash, t, meta, fileIndex)
+}
+
+// serveTorrentFile is the shared media-serving core: it resolves the file, sets
+// the engine's stream windows, and writes the requested Range (waiting for the
+// pieces). It handles HEAD too. The caller has already resolved t and meta and,
+// for the UI path, authenticated.
+func (d *Daemon) serveTorrentFile(w http.ResponseWriter, r *http.Request, hash string, t *torrent.Torrent, meta *torrentMeta, fileIndex int) {
 	files, err := t.Files()
 	if err != nil || fileIndex >= len(files) {
 		http.Error(w, "file not found", http.StatusNotFound)
@@ -60,12 +136,16 @@ func (d *Daemon) handleUIStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The bytes the player needs now are prioritised first; the readahead just
-	// after, so the next pieces are ready while it reads.
-	setStreamWindows(t, fileIndex, start)
+	// after, so the next pieces are ready while it reads. Closing one of
+	// several concurrent streams leaves the window the others still use.
+	d.beginStream(hash)
 	defer func() {
-		t.SetFileStreamWindow(fileIndex, 0, 0)
-		t.SetFileReadaheadWindow(fileIndex, 0, 0)
+		if d.endStream(hash) {
+			t.SetFileStreamWindow(fileIndex, 0, 0)
+			t.SetFileReadaheadWindow(fileIndex, 0, 0)
+		}
 	}()
+	setStreamWindows(t, fileIndex, start)
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -74,9 +154,10 @@ func (d *Daemon) handleUIStream(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
-	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Type", mediaContentType(file.Path()))
 	w.Header().Set("Accept-Ranges", "bytes")
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Disposition", "inline; filename=\""+sanitizeFilename(file.Path())+"\"")
 	if partial {
 		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, start+length-1, size))
 		w.Header().Set("Content-Length", strconv.FormatInt(length, 10))
@@ -85,8 +166,21 @@ func (d *Daemon) handleUIStream(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 		w.WriteHeader(http.StatusOK)
 	}
+	if r.Method == http.MethodHead {
+		return
+	}
 
 	d.streamRange(r.Context(), w, t, fileIndex, f, start, length)
+}
+
+// sanitizeFilename strips the path and characters that would break a
+// Content-Disposition header.
+func sanitizeFilename(name string) string {
+	name = filepath.Base(name)
+	name = strings.ReplaceAll(name, "\"", "")
+	name = strings.ReplaceAll(name, "\r", "")
+	name = strings.ReplaceAll(name, "\n", "")
+	return name
 }
 
 // setStreamWindows tells the engine which pieces the player needs now (the next
