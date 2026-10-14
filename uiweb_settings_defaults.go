@@ -176,6 +176,7 @@ var uiSettingDefaults = map[string]string{
 	"hardlink_seeding":           "true",
 	"debug_enabled":              "false",
 	"update_check":               "true",
+	"update_check_hours":         "6",
 
 	// --- Acquisizione -------------------------------------------------------
 	"delay_torrent_minutes":                "0",

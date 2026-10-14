@@ -147,6 +147,29 @@
     </div>
   </main>
 </div>
+{{with .UpdateNotes}}<div class="overlay" style="display:flex" id="v2-update-notes">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-update-notes-title">
+    <div class="modal-head"><h3 id="v2-update-notes-title">Gextto aggiornato</h3></div>
+    <div class="modal-body">
+      <p><strong>{{.FromVersion}}</strong> → <strong>{{.ToVersion}}</strong></p>
+      {{if .Changes}}<p class="hint">Cosa è cambiato:</p>
+      <ul class="v2-update-changes">{{range .Changes}}<li><a href="{{.URL}}" target="_blank" rel="noopener noreferrer"><code>{{.Short}}</code></a> <small class="muted">{{.Day}}</small> {{.Subject}}</li>{{end}}</ul>{{end}}
+      <div class="form-actions"><button class="btn primary" type="button" hx-post="/maintenance/update-notes" hx-target="#v2-update-notes" hx-swap="outerHTML" data-update-notes-close title="Chiudi questo messaggio">OK</button></div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var box = document.getElementById("v2-update-notes");
+  if (!box) return;
+  var ok = box.querySelector("[data-update-notes-close]");
+  window.setTimeout(function () { try { ok.focus(); } catch (error) { /* ignore */ } }, 0);
+  box.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") { event.preventDefault(); ok.click(); }
+    if (event.key === "Tab") { event.preventDefault(); ok.focus(); }
+  });
+}());
+</script>{{end}}
 {{if .Update.Available}}<a class="v2-update-badge" href="/?view=maintenance#v2-update-panel" title="Nuova versione disponibile: apri Manutenzione"><span aria-hidden="true">⬆️</span><span class="v2-update-badge-label">Aggiornamento disponibile</span></a>{{end}}
 <a class="v2-donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project" target="_blank" rel="noopener noreferrer" title="Sostieni Gextto con una donazione PayPal" aria-label="Sostieni Gextto con una donazione PayPal"><span class="v2-donate-icon" aria-hidden="true">❤️</span><span class="v2-donate-label">Dona</span></a>
 </body>
@@ -1849,10 +1872,11 @@
     <p><span class="badge ok">Aggiornato</span> <span>Gextto è all'ultima versione disponibile.</span></p>
     {{end}}
     {{if .Error}}<p class="alert" role="alert"><span>Controllo aggiornamenti non riuscito:</span> {{.Error}}</p>{{end}}
-    {{if not .CheckEnabled}}<p class="hint">Controllo automatico disattivato (Impostazioni → Sistema → Aggiornamenti).</p>{{end}}
+    {{if not .CheckEnabled}}<p class="hint">Controllo automatico disattivato (Impostazioni → Sistema → Aggiornamenti).</p>{{else}}<p class="hint"><span>Controllo automatico ogni</span> {{.CheckHours}} <span>ore</span> <small class="muted">(Impostazioni → Sistema → Aggiornamenti)</small></p>{{end}}
     <div class="toolbar">
-      <form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="action" value="check" /><button class="btn sm" type="submit">Controlla ora</button></form>
-      {{if .CanApply}}<form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" hx-confirm="Aggiornare Gextto ora? Il servizio si riavvia al termine." style="display:inline"><input type="hidden" name="action" value="apply" /><button class="btn sm primary" type="submit">Aggiorna ora</button></form>{{end}}
+      {{if .CanApply}}<form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" hx-confirm="Aggiornare Gextto ora? Il servizio si riavvia al termine." style="display:inline"><input type="hidden" name="action" value="apply" /><button class="btn sm primary" type="submit" title="Scarica l'ultima build, la installa e riavvia Gextto">Aggiorna</button></form>
+      <form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="action" value="check" /><button class="btn sm" type="submit" title="Cerca subito una versione più recente">Ricontrolla</button></form>
+      {{else}}<form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="action" value="check" /><button class="btn sm primary" type="submit" title="Cerca subito una versione più recente">Verifica aggiornamenti</button></form>{{end}}
       {{if .CheckedAt}}<small class="muted"><span>Ultimo controllo:</span> {{.CheckedLabel}}</small>{{end}}
     </div>
     {{if .LastLog}}<details><summary id="v2-update-lastlog-heading">Log dell'ultimo aggiornamento</summary><pre class="log-view" tabindex="0" role="region" aria-labelledby="v2-update-lastlog-heading">{{.LastLog}}</pre></details>{{end}}

@@ -331,6 +331,39 @@ precisely so as not to cut the user out. The basic defence remains the login (an
 Windows, the service runs as a dedicated account and not SYSTEM, so writing
 is still confined to what that account can write).
 
+**In-app update** (`update.go`, standalone only). *Settings → Maintenance*
+shows the running version (build, commit, build date, release channel) and
+reads the `release.json` CI publishes beside the archives
+(`internal/updatecheck`): automatically every `update-check-hours` (default 6,
+`update-check` turns it off) and on **Check for updates**. The manifest flags
+each commit that touches the daemon's code (`"gx": true`, from the
+`GX_PATHS` of `scripts/release-manifest.sh`, kept in sync with
+`go list -deps ./cmd/gx-torrent` by `TestReleaseManifestCoversDaemonPackages`),
+so a release whose new commits only touch Gextto is no update for the daemon;
+the button turns into **Update** and lists those commits. **Update**
+downloads `gx-torrent-<os>-<arch>` of the binary's channel and its `.sha256`
+(mismatch → refused), extracts `gx-torrent` to `<binary>.new`, runs it with
+`--version` (failure → refused), records `update-notes.json` in the data
+folder, keeps the running binary as `<binary>.prev`, renames the new one over
+it, stops the daemon cleanly and **re-executes itself in the same process**
+(`syscall.Exec`: same PID, so systemd keeps tracking it; if exec fails the
+process exits 1 and `Restart=on-failure` starts the new binary). The settings
+page follows the installation and reloads on the new version, which shows a
+**gx-torrent updated** popup (old → new version and commits) on the main and
+settings pages until closed. **Rollback:** while `update-notes.json` is
+pending (the first 30 s of the new version) every start is counted; at the
+fourth start `<binary>.prev` is put back and executed, and the popup reports
+it. The update is off when the daemon is managed by Gextto (Gextto ships it),
+for a local build (`constants.GxReleaseChannel` is stamped only by
+`scripts/build-release.sh`, since a checkout may be newer than the release) and
+for platforms without a published archive; on Windows it checks and offers the
+download link, but does not install (the service cannot replace itself).
+`GX_TORRENT_UPDATE_URL` points the asset downloads at a mirror (a folder with
+`release.json`, the archive and its `.sha256`). The standalone service unit
+installs the binary under `/opt/gx-torrent`, owned by the service user, so
+the swap needs no privilege; a binary folder the service cannot write is
+reported as such.
+
 **Platforms.** The daemon is pure Go and also runs on **Windows** (amd64 and
 arm64): `GOOS=windows CGO_ENABLED=0 go build ./cmd/gx-torrent/`. System
 reads use the Win32 APIs, so the cache and diagnostics stay complete:

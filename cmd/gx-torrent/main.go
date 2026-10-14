@@ -385,6 +385,19 @@ func main() {
 		}
 		return
 	}
+	// After an in-app update: count the new version's starts and put the
+	// previous binary back if it keeps failing (update.go).
+	if opts.Mode == ModeStandalone {
+		if exe, err := os.Executable(); err == nil {
+			if exe, err = filepath.EvalSymlinks(exe); err == nil {
+				if target := updateBootGuard(opts.DataDir, exe); target != "" {
+					if err := restartInto(target); err != nil {
+						logf("cannot start the restored version: %v", err)
+					}
+				}
+			}
+		}
+	}
 	run, err := startDaemon(opts)
 	if err != nil {
 		log.Fatalf("cannot start: %v", err)
@@ -402,6 +415,19 @@ func main() {
 			logf("API server failed: %v", err)
 			exitCode = 1
 		}
+	case <-run.daemon.updater.restartC():
+		// An in-app update replaced the binary: stop cleanly, then start the
+		// new one in this same process.
+		logf("restarting into the updated version")
+		run.shutdown()
+		exe, err := run.daemon.updater.executable()
+		if err == nil {
+			err = restartInto(exe)
+		}
+		// Exec failed: exit with an error so a supervisor (systemd
+		// Restart=on-failure) starts the new binary.
+		logf("cannot restart in place: %v", err)
+		os.Exit(1)
 	}
 	run.shutdown()
 	os.Exit(exitCode)
@@ -470,6 +496,10 @@ func startDaemon(opts Options) (*daemonRun, error) {
 				}
 			}()
 		}
+	}
+	if opts.Mode == ModeStandalone {
+		go daemon.updateWorker(stop)
+		go daemon.updateMarkHealthy(stop)
 	}
 	return &daemonRun{daemon: daemon, server: server, addr: listener.Addr(), stop: stop, loopDone: loopDone, serverErr: serverErr}, nil
 }

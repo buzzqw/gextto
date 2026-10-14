@@ -98,6 +98,14 @@ fi
 ARCHIVE="$OUTPUT_DIR/gextto-linux-${ARCH}${VARIANT}.tar.gz"
 mkdir -p "$OUTPUT_DIR"
 BINARY="$ROOT/bin/gexttod"
+# The release channel stamped into gx-torrent turns its in-app update on: a
+# "continuous-<sha>" label is the continuous build, any other label a tag.
+GX_CHANNEL=""
+case "$LABEL" in
+  continuous*) GX_CHANNEL="continuous" ;;
+  ?*) GX_CHANNEL="stable" ;;
+esac
+export GEXTTO_GX_CHANNEL="$GX_CHANNEL"
 GEXTTO_BINARY="$BINARY" GEXTTO_FORCE_GXTORRENT=1 "$ROOT/scripts/build-daemon.sh"
 
 # Fail early, with the exact reason, if the binaries do not run here.

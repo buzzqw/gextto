@@ -236,6 +236,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /setup/sources", V2SetupSources)
 	v2Handle(s, mux, "POST /setup/finish", V2SetupFinish)
 	v2Handle(s, mux, "POST /maintenance/update", V2Update)
+	v2Handle(s, mux, "POST /maintenance/update-notes", V2UpdateNotesDismiss)
 	v2Handle(s, mux, "POST /maintenance/folder-rename/scan", V2FolderRenameScan)
 	v2Handle(s, mux, "POST /maintenance/folder-rename/apply", V2FolderRenameApply)
 	v2Handle(s, mux, "GET /partial/rename-progress", V2RenameProgress)
@@ -291,6 +292,8 @@ type v2ShellData struct {
 	FlashErr bool
 	// Update drives the "update available" badge next to the donate button.
 	Update UpdateStatus
+	// UpdateNotes, after an update, is what it brought: shown once as a popup.
+	UpdateNotes *UpdateNotes
 	// ClientI18n is the JSON dictionary window.__v2i18n for the strings the
 	// client script renders at runtime (see uiweb_v2_client_i18n.go).
 	ClientI18n template.JS
@@ -608,6 +611,9 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Update:   updates.Status(cfg),
 
 		ClientI18n: v2ClientI18nJSON(s),
+	}
+	if notes, ok := PendingUpdateNotes(cfg); ok {
+		page.UpdateNotes = notes
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_shell", page, dict, eng)

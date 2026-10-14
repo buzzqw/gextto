@@ -236,6 +236,18 @@ sudo systemctl edit gx-torrent
 `gx-torrent.service` to `/etc/systemd/system/`, then
 `sudo systemctl daemon-reload && sudo systemctl enable --now gx-torrent`.
 
+### Updates
+
+*Settings → Maintenance* checks for a new release on a timer (every 6 hours by
+default) or when you press **Check for updates**. When gx-torrent's own code
+changed the button becomes **Update**: it downloads this archive again from the
+same release channel, verifies the SHA-256, tries the new binary, keeps the old
+one as `gx-torrent.prev`, and restarts in place; a popup then lists what
+changed. If the new version fails to start three times, the previous one is
+restored by itself. The service user must be able to write the program folder
+(`/opt/gx-torrent`, as installed by `install-service.sh`). On Windows the page
+checks and links the new zip; install it by hand.
+
 ---
 
 ## 3. Web UI Features & Usage

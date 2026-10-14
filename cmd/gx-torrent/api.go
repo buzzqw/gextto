@@ -103,6 +103,8 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/add-file", d.handleUIAddFile)
 	root.HandleFunc("POST /ui/ipfilter", d.handleUIIPFilter)
 	root.HandleFunc("POST /ui/optimize", d.handleUIOptimize)
+	root.HandleFunc("POST /ui/update", d.handleUIUpdate)
+	root.HandleFunc("POST /ui/update-notes", d.handleUIUpdateNotes)
 	root.HandleFunc("POST /ui/file-priority", d.handleUIFilePriority)
 	root.HandleFunc("POST /ui/trackers", d.handleUITrackers)
 	root.HandleFunc("POST /ui/create-torrent", d.handleUICreateTorrent)

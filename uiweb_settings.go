@@ -294,6 +294,7 @@ var uiSettingsIndex = []uiSettingDef{
 	// --- Diagnostica e traduzioni -------------------------------------------
 	{Key: "debug_enabled", Label: "Debug (log dettagliati)", Tab: "system", Group: "Diagnostica"},
 	{Key: "update_check", Label: "Controlla gli aggiornamenti", Tab: "system", Group: "Aggiornamenti"},
+	{Key: "update_check_hours", Label: "Intervallo controllo aggiornamenti", Tab: "system", Group: "Aggiornamenti"},
 }
 
 // uiSettingGroupByKey maps an indexed setting to its explicit panel.

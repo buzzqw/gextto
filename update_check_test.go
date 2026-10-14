@@ -3,6 +3,7 @@ package gextto
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -95,12 +96,89 @@ func TestV2UpdateBadgeAndPanelShowTheNewVersion(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("maintenance -> %d", code)
 	}
-	for _, want := range []string{`class="v2-update-badge"`, `id="v2-update-panel"`, "1.1.5000", "feat: something new", "cccc111", `value="apply"`} {
+	for _, want := range []string{`class="v2-update-badge"`, `id="v2-update-panel"`, "1.1.5000", "feat: something new", "cccc111", `value="apply"`, ">Aggiorna</button>", ">Ricontrolla</button>"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("maintenance page missing %q", want)
 		}
 	}
 	if strings.Contains(body, "the installed one") {
 		t.Fatal("the installed commit is listed as a change")
+	}
+}
+
+func TestUpdateNotesPopupAfterTheUpdate(t *testing.T) {
+	previous := constants.Commit
+	constants.Commit = "aaaa3333"
+	previousUnit, previousMarker := updatePathUnit, updateMarkerSource
+	unit := filepath.Join(t.TempDir(), "gextto-update.path")
+	if err := os.WriteFile(unit, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	updatePathUnit = unit
+	updateMarkerSource = func() (string, bool) { return "continuous-aaaa3333", true }
+	t.Cleanup(func() {
+		constants.Commit = previous
+		updatePathUnit, updateMarkerSource = previousUnit, previousMarker
+		updates.mu.Lock()
+		updates.manifest = nil
+		updates.mu.Unlock()
+	})
+	updates.mu.Lock()
+	updates.manifest = &updateManifest{AppVersion: "1.1.5000", Commit: "cccc1111", Commits: []UpdateCommit{
+		{Sha: "cccc1111", Date: "2026-10-09T08:00:00+02:00", Subject: "feat: something new"},
+		{Sha: "aaaa3333", Subject: "the installed one"},
+	}}
+	updates.checkedAt = time.Now()
+	updates.mu.Unlock()
+
+	state := newTestAppState(t)
+	if err := CompleteSetup(state.cfg); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	// Requesting the update records what it brings; the running (old)
+	// version shows no popup.
+	if err := updates.RequestUpdate(state.cfg); err != nil {
+		t.Fatal(err)
+	}
+	notesPath := filepath.Join(state.cfg.DataDir, updateNotesFile)
+	if _, err := os.Stat(notesPath); err != nil {
+		t.Fatalf("no notes written: %v", err)
+	}
+	_, body := v2Request(t, server, http.MethodGet, "/?view=maintenance", nil)
+	if strings.Contains(body, `id="v2-update-notes"`) {
+		t.Fatal("the popup shows before the update")
+	}
+
+	// The new version shows them once.
+	constants.Commit = "cccc1111"
+	_, body = v2Request(t, server, http.MethodGet, "/?view=maintenance", nil)
+	for _, want := range []string{`id="v2-update-notes"`, "Gextto aggiornato", "feat: something new", `role="dialog"`, `hx-post="/maintenance/update-notes"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("popup missing %q", want)
+		}
+	}
+	if code, _ := v2Request(t, server, http.MethodPost, "/maintenance/update-notes", url.Values{}); code != http.StatusOK {
+		t.Fatalf("dismiss -> %d", code)
+	}
+	if _, err := os.Stat(notesPath); !os.IsNotExist(err) {
+		t.Fatal("the notes survived the dismiss")
+	}
+	if _, body = v2Request(t, server, http.MethodGet, "/?view=maintenance", nil); strings.Contains(body, `id="v2-update-notes"`) {
+		t.Fatal("the popup shows again")
+	}
+
+	// Notes of an update that never installed are dropped once stale.
+	raw := []byte(`{"from_version":"1.1.1","from_commit":"cccc1111","at":"2020-01-01T00:00:00Z"}`)
+	if err := os.WriteFile(notesPath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := PendingUpdateNotes(state.cfg); ok {
+		t.Fatal("stale notes shown")
+	}
+	if _, err := os.Stat(notesPath); !os.IsNotExist(err) {
+		t.Fatal("stale notes kept")
 	}
 }

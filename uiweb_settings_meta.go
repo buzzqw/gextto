@@ -27,6 +27,7 @@ type uiSettingMeta struct {
 }
 
 var uiSettingMetaByKey = map[string]uiSettingMeta{
+	"update_check_hours": {Unit: "ore", DependsOn: "update_check"},
 	// Generale
 	"refresh_interval":        {Unit: "secondi"},
 	"max_release_age_days":    {Unit: "giorni", Zero: "0 = nessun limite"},

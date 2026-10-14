@@ -1656,6 +1656,27 @@ converting to RGBA). Verified end to end against a real daemon (SSDP
 discovery, Browse, Range 206, a non-offered file refused). Open: transcoding,
 frames extracted from the video (no ffmpeg), search, Xbox/WMP (`X_MS_MediaReceiverRegistrar`).
 
+### 12.2b In-app updates for gx-torrent and Gextto (new)
+
+**gx-torrent standalone** (`cmd/gx-torrent/update.go`, `internal/updatecheck`)
+updates itself from *Settings → Maintenance*: a timer (`update-check-hours`,
+default 6) or **Check for updates** reads `release.json`; the manifest now
+flags the commits that touch the daemon's code (`"gx"`, `gx_torrent_commit`),
+so only real daemon changes are offered. **Update** downloads the release
+archive, verifies SHA-256, test-runs the binary, swaps it (keeping `.prev`),
+re-executes in place (same PID) and shows the new commits in a popup; three
+failed starts restore `.prev`. Off when managed by Gextto and for local builds
+(release channel stamped only by `build-release.sh`). Verified end to end with
+two real binaries and a local release: check → **Update** → restart in the
+same process (1.1.500 → 1.1.501, PID unchanged) → popup → confirmed after 30 s
+→ "up to date".
+
+**Gextto**: the check period is a setting (`update_check_hours`, default 6),
+the panel has one button that reads **Check for updates** and becomes
+**Update**, and the version that comes after an update shows a **Gextto
+updated** popup with the commits it brought (`update-notes.json`, written when
+the update is requested).
+
 ### 12.3 Choking/seeding campaign
 
 - **Local reciprocation.** Without mesh the seeder uploads **3.00×** the corpus

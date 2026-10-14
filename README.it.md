@@ -343,6 +343,12 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
   auto-speed sulla latenza (anti-bufferbloat), ottimizzazione di
   coda/cache/banda con un clic, filtro IP da URL o file con refresh
   programmato, categorie e tag, diagnostica in tempo reale.
+- **Si aggiorna da solo.** In *Impostazioni → Manutenzione* controlla a
+  intervalli (o quando premi **Verifica aggiornamenti**) la build pubblicata
+  dalla CI; il pulsante diventa **Aggiorna** solo se è cambiato il codice di
+  gx-torrent: scarica l'archivio, verifica lo SHA-256, prova il nuovo binario,
+  lo sostituisce e si riavvia nello stesso processo, poi mostra in un popup i
+  commit nuovi. Se la nuova versione non parte, torna da sola la precedente.
 - **Piattaforme.** Linux x86_64/aarch64 (`gx-torrent-linux-<arch>.tar.gz`,
   unit systemd o `run.sh`, immagine Docker non privilegiata) e servizio
   Windows nativo amd64/arm64 (`gx-torrent-windows-<arch>.zip`,

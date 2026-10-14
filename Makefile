@@ -28,7 +28,7 @@ fast-libtorrent:
 gx-torrent:
 	GX_BUILD="$$(scripts/next-gx-build-number.sh)"; \
 	CGO_ENABLED=0 go build -trimpath -buildvcs=false \
-		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$$GX_BUILD" \
+		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$$(git rev-parse HEAD 2>/dev/null) -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 		-o bin/gx-torrent ./cmd/gx-torrent; \
 	printf 'built bin/gx-torrent (build %s)\n' "$$GX_BUILD"
 

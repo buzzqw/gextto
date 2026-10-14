@@ -149,7 +149,7 @@ func TestDLNAArtServed(t *testing.T) {
 		{"/art/0/Film/movie-poster.jpg", 160, 160, 106, 160, "JPEG_TN", false},
 		{"/art/0/Show/ep-thumb.jpg?pn=JPEG_SM", 640, 480, 640, 360, "JPEG_SM", false},
 		{"/art/0/Show/season02-poster.png?pn=JPEG_TN", 160, 160, 106, 160, "JPEG_TN", false}, // PNG becomes JPEG
-		{"/art/0/Show/?pn=JPEG_SM", 640, 480, 100, 150, "JPEG_SM", true},                    // folder.jpg already fits
+		{"/art/0/Show/?pn=JPEG_SM", 640, 480, 100, 150, "JPEG_SM", true},                     // folder.jpg already fits
 		{"/art/0/Show/Season%2002/", 160, 160, 106, 160, "JPEG_TN", false},
 	} {
 		resp, body := get(c.url)

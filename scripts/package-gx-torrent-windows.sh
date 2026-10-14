@@ -48,13 +48,16 @@ OUTPUT="${OUT_DIR}/$(basename "$OUTPUT")"
 # The daemon's own build number, when it has already been built, so the package
 # reports the same 1.1.<n> as the checkout.
 GX_BUILD="$(cat "${ROOT}/gx-torrent.build_number" 2>/dev/null || echo 0)"
+# Commit and build time for the in-app update check (as scripts/build-daemon.sh).
+GX_COMMIT="${GEXTTO_COMMIT:-${GITHUB_SHA:-$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)}}"
+GX_BUILT_AT="${GEXTTO_BUILT_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
 echo "building gx-torrent.exe (windows/$ARCH, build $GX_BUILD)…"
 ( cd "$ROOT" && GOOS=windows GOARCH="$ARCH" CGO_ENABLED=0 go build -trimpath -buildvcs=false \
-    -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=${GX_BUILD}" \
+    -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=${GX_BUILD} -X github.com/buzzqw/gextto/internal/constants.Commit=${GX_COMMIT} -X github.com/buzzqw/gextto/internal/constants.BuiltAt=${GX_BUILT_AT} -X github.com/buzzqw/gextto/internal/constants.GxReleaseChannel=${GEXTTO_GX_CHANNEL:-}" \
     -o "$STAGE/gx-torrent.exe" ./cmd/gx-torrent )
 
 cat > "$STAGE/install-service.ps1" <<'PS1'

@@ -51,6 +51,20 @@ done
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION" 2>/dev/null || true)"
 COMMIT="${GEXTTO_COMMIT:-${GITHUB_SHA:-$(git -C "$ROOT" rev-parse HEAD)}}"
 
+# GX_PATHS is the code of the gx-torrent daemon: its package and every package
+# of this repository it imports (`go list -deps ./cmd/gx-torrent`, kept in
+# sync by TestReleaseManifestCoversDaemonPackages). A commit that touches one
+# of them is flagged "gx": true, so the standalone daemon offers an update
+# only when its own code changed.
+GX_PATHS=(cmd/gx-torrent internal/auth internal/constants internal/dht internal/flaresolverr
+  internal/gxcore internal/logging internal/queue internal/rss internal/settings
+  internal/torznab internal/updatecheck internal/utp internal/webui go.mod go.sum)
+declare -A GX_COMMITS=()
+while read -r sha; do
+  [[ -n "$sha" ]] && GX_COMMITS[$sha]=1
+done < <(git -C "$ROOT" log -n "$COMMITS" --format='%H' "$COMMIT" -- "${GX_PATHS[@]}" 2>/dev/null || true)
+GX_COMMIT="$(git -C "$ROOT" log -n 1 --format='%H' "$COMMIT" -- "${GX_PATHS[@]}" 2>/dev/null || true)"
+
 # json_escape quotes a string for JSON (backslash, quote, control characters).
 json_escape() {
   local value="$1"
@@ -72,6 +86,7 @@ json_escape() {
   printf '  "build": %s,\n' "$BUILD"
   printf '  "commit": %s,\n' "$(json_escape "$COMMIT")"
   printf '  "built_at": %s,\n' "$(json_escape "$BUILT_AT")"
+  printf '  "gx_torrent_commit": %s,\n' "$(json_escape "$GX_COMMIT")"
   printf '  "commits": ['
   first=1
   # A shallow checkout lists only what it has: the update check treats a
@@ -79,8 +94,10 @@ json_escape() {
   while IFS=$'\t' read -r sha date subject; do
     [[ -n "$sha" ]] || continue
     if [[ "$first" == "1" ]]; then first=0; printf '\n'; else printf ',\n'; fi
-    printf '    {"sha": %s, "date": %s, "subject": %s}' \
-      "$(json_escape "$sha")" "$(json_escape "$date")" "$(json_escape "$subject")"
+    gx=false
+    [[ -n "${GX_COMMITS[$sha]:-}" ]] && gx=true
+    printf '    {"sha": %s, "date": %s, "subject": %s, "gx": %s}' \
+      "$(json_escape "$sha")" "$(json_escape "$date")" "$(json_escape "$subject")" "$gx"
   done < <(git -C "$ROOT" log -n "$COMMITS" --format='%H%x09%cI%x09%s' "$COMMIT" 2>/dev/null || true)
   [[ "$first" == "1" ]] || printf '\n  '
   printf ']\n'

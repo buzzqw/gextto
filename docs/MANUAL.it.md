@@ -957,13 +957,19 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
 
 - **Aggiornamenti** — versione installata e canale, ultima versione pubblicata e
   l'elenco delle novità (i commit successivi a quello installato, con il link a
-  GitHub). **Controlla ora** interroga subito GitHub; **Aggiorna ora** fa un
+  GitHub). Il controllo avviene da solo ogni *Intervallo controllo
+  aggiornamenti* ore (6 di default; *Impostazioni → Sistema → Aggiornamenti*).
+  **Verifica aggiornamenti** interroga subito GitHub; quando c'è una build nuova
+  il pulsante diventa **Aggiorna** (accanto resta **Ricontrolla**), che fa un
   backup dei database e chiede l'aggiornamento al servizio di sistema
   `gextto-update`, installato dall'installer: Gextto attende la fine delle copie
   verso la libreria, si riavvia con la nuova versione e il pannello lo segnala
   da solo. Se la nuova versione non parte torna la precedente; il log
-  dell'ultimo aggiornamento è in fondo al pannello. Quando c'è una versione
-  nuova compare anche il pulsante **Aggiornamento disponibile** sopra **Dona**.
+  dell'ultimo aggiornamento è in fondo al pannello. Al primo accesso dopo il
+  riavvio un popup **Gextto aggiornato** mostra la versione di partenza, quella
+  nuova e i commit che ha portato; si chiude con **OK** (o `Esc`) e non
+  ricompare. Quando c'è una versione nuova compare anche il pulsante
+  **Aggiornamento disponibile** sopra **Dona**.
   Su un'installazione da sorgenti il pannello indica di usare `git pull` e
   `make build`.
 
@@ -1858,7 +1864,8 @@ password viaggia in chiaro.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Controlla gli aggiornamenti | Ogni 6 ore scarica da GitHub le informazioni sull'ultima versione e, se ce n'è una nuova, mostra «Aggiornamento disponibile». Non invia dati e non aggiorna da solo: l'aggiornamento parte solo da Manutenzione. |
+| Controlla gli aggiornamenti | Scarica periodicamente da GitHub le informazioni sull'ultima build (ogni quante ore lo decide «Intervallo controllo aggiornamenti») e, se ce n'è una nuova, mostra «Aggiornamento disponibile». Non invia dati e non aggiorna da solo: l'aggiornamento parte solo da Manutenzione. |
+| Intervallo controllo aggiornamenti | Ogni quante ore Gextto controlla se è uscita una nuova build (da 1 a 720, default 6). Il controllo scarica solo un piccolo file da GitHub; «Verifica aggiornamenti» in Manutenzione controlla subito. |
 
 **Editor**
 

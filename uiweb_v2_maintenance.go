@@ -203,6 +203,13 @@ func V2Update(w http.ResponseWriter, r *http.Request, s *AppState) {
 	v2Render(w, http.StatusOK, "v2_update_panel", view, dict, eng)
 }
 
+// V2UpdateNotesDismiss closes the "updated" popup for good.
+func V2UpdateNotesDismiss(w http.ResponseWriter, r *http.Request, s *AppState) {
+	DismissUpdateNotes(latestConfig(s))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+}
+
 // v2UpdateErrorMessage turns a RequestUpdate error into a message of the UI.
 func v2UpdateErrorMessage(err error) string {
 	switch {

@@ -928,13 +928,18 @@ arguments if the command may be recorded in system logs.
 The complete list of actions and parameters is in [Appendix C](#appendix-c-reference-maintenance).
 
 - **Updates** — installed version and channel, latest published version and
-  what changed (the commits after the installed one, linked to GitHub). **Check
-  now** asks GitHub right away; **Update now** backs up the databases and asks
+  what changed (the commits after the installed one, linked to GitHub). The
+  check runs by itself every *Update check interval* hours (6 by default;
+  *Settings → System → Updates*). **Check for updates** asks GitHub right away;
+  when a new build exists the button turns into **Update** (with **Check
+  again** beside it), which backs up the databases and asks
   the `gextto-update` system service, set up by the installer, to update:
   Gextto waits for the copies to the library to finish, restarts with the new
   version and the panel reports it by itself. If the new version does not start
   the previous one comes back; the log of the last update is at the bottom of
-  the panel. When a new version exists an **Update available** button also
+  the panel. On the first visit after the restart a **Gextto updated** popup
+  shows the old version, the new one and the commits it brought; **OK** (or
+  `Esc`) closes it for good. When a new version exists an **Update available** button also
   appears above **Donate**. On a source installation the panel says to use
   `git pull` and `make build`.
 
@@ -1813,7 +1818,8 @@ with a certificate, or a VPN), otherwise the password travels in clear text.
 
 | Setting | What it does |
 |---|---|
-| Check for updates | Every 6 hours downloads the latest release information from GitHub and, when a newer one exists, shows «Update available». It sends no data and never updates on its own: the update only starts from Maintenance. |
+| Check for updates | Downloads the latest build information from GitHub on a timer (how often is set by «Update check interval») and, when a newer one exists, shows «Update available». It sends no data and never updates on its own: the update only starts from Maintenance. |
+| Update check interval | How many hours apart Gextto checks whether a new build is out (1 to 720, default 6). The check downloads only a small file from GitHub; «Check for updates» in Maintenance checks at once. |
 
 **Editors**
 

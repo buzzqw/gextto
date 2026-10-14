@@ -176,6 +176,10 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	store.Set(dlnaListenKey, strings.TrimSpace(r.FormValue("dlna-listen")))
 	store.Set(dlnaNameKey, strings.TrimSpace(r.FormValue("dlna-name")))
 	store.Set(dlnaFoldersKey, strings.Join(dlnaSplitList(r.FormValue("dlna-folders")), ";"))
+	store.Set(updateCheckKey, strconv.FormatBool(formBool(r, updateCheckKey)))
+	if hours, err := strconv.Atoi(strings.TrimSpace(r.FormValue(updateHoursKey))); err == nil && hours >= 1 && hours <= updateMaxHours {
+		store.Set(updateHoursKey, strconv.Itoa(hours))
+	}
 	for _, toggle := range []string{"dht", "pex", "utp", "holepunch", "lsd", "upnp", "natpmp"} {
 		store.Set("no-"+toggle, strconv.FormatBool(!formBool(r, toggle)))
 	}
@@ -343,6 +347,11 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 		dlnaStatus = "Media server running at <code>" + html.EscapeString(base) + "</code>"
 	}
 	repl("{{DLNA_STATUS}}", dlnaStatus)
+
+	repl("{{UPDATE_CHECK}}", checkedIf(d.updateCheckEnabled()))
+	repl("{{UPDATE_HOURS}}", strconv.Itoa(d.updateHours()))
+	repl("{{UPDATE_STATUS}}", d.updateSectionHTML())
+	repl("<!--UPDATE_NOTES-->", d.updateNotesDialogHTML())
 
 	repl("{{LANG_OPTIONS}}", languageOptions(store.Get("lang", "")))
 	repl("{{NOTIFY_URL}}", get("notify-url"))

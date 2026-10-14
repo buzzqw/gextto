@@ -158,9 +158,17 @@ fieldset .muted{font-size:13px}
   <label>Language<select name="lang" title="Web interface language">{{LANG_OPTIONS}}</select></label>
   <label>Notification webhook URL<input type="text" name="notify-url" value="{{NOTIFY_URL}}" autocomplete="off" title="Webhook URL to receive notifications on torrent completion or feed events"></label>
 </fieldset>
+<fieldset id="maintenance">
+  <legend>Maintenance</legend>
+  <label class="chk"><input type="checkbox" name="update-check" value="1"{{UPDATE_CHECK}} title="Look for a new version of gx-torrent on a timer; nothing is installed without your click"> Check for updates automatically</label>
+  <label>Check every (hours)<input type="number" min="1" max="720" name="update-check-hours" value="{{UPDATE_HOURS}}" title="Hours between two automatic checks for a new version (1 to 720)"></label>
+  {{UPDATE_STATUS}}
+  <span hidden id="update-confirm">Install the update now? gx-torrent restarts by itself and the transfers resume after the restart.</span>
+</fieldset>
 <div class="savebar"><button type="submit" class="primary" title="Save settings to settings.json">Save</button></div>
 <!--ERROR-->
 </form>
+<!--UPDATE_NOTES-->
 </main>
 <script id="ui-i18n"></script>
 <script src="/assets/common.js"></script>
@@ -193,10 +201,29 @@ Array.prototype.forEach.call(document.querySelectorAll('[data-formaction]'), fun
       input.type = 'hidden'; input.name = 'optimize'; input.value = opt;
       form.appendChild(input);
     }
+    var upd = btn.getAttribute('data-update');
+    if (upd) {
+      var confirmText = document.getElementById('update-confirm');
+      if (upd === 'apply' && confirmText && !window.confirm(confirmText.textContent)) return;
+      var action = document.createElement('input');
+      action.type = 'hidden'; action.name = 'action'; action.value = upd;
+      form.appendChild(action);
+    }
     form.action = btn.getAttribute('data-formaction');
     form.submit();
   });
 });
+// While an update installs, follow it: once the daemon answers again without
+// the "installing" marker (the new version is up), reload to show its notes.
+if (document.querySelector('[data-update-applying]')) {
+  setInterval(function () {
+    fetch(location.pathname, {cache: 'no-store', credentials: 'same-origin'}).then(function (r) {
+      return r.ok ? r.text() : '';
+    }).then(function (t) {
+      if (t && t.indexOf('data-update-applying') < 0) location.replace(location.pathname + '#maintenance');
+    }).catch(function () {});
+  }, 3000);
+}
 document.addEventListener('DOMContentLoaded', function () { ensureTooltips(document); });
 ensureTooltips(document);
 </script>

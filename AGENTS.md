@@ -180,9 +180,14 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   Gextto. `scripts/package-gx-torrent-windows.sh` fa lo stesso per Windows
   (`gx-torrent-windows-<arch>.zip`, amd64/arm64, servizio nativo).
 - `scripts/build-daemon.sh` imprime nel binario `constants.Commit` e
-  `constants.BuiltAt`; `scripts/release-manifest.sh` scrive `release.json`
-  (versione, commit, ultimi commit) pubblicato accanto ai pacchetti: è ciò che
-  legge il controllo aggiornamenti in-app (`update_check.go`).
+  `constants.BuiltAt` (anche in `gx-torrent`); `scripts/release-manifest.sh` scrive `release.json`
+  (versione, commit, ultimi commit, con `"gx": true` sui commit che toccano il
+  codice di gx-torrent, cioè i `GX_PATHS` tenuti allineati da
+  `TestReleaseManifestCoversDaemonPackages`) pubblicato accanto ai pacchetti: è
+  ciò che legge il controllo aggiornamenti in-app di Gextto (`update_check.go`)
+  e di gx-torrent standalone (`cmd/gx-torrent/update.go`). Solo
+  `build-release.sh` imprime `constants.GxReleaseChannel`: una build locale di
+  gx-torrent non si aggiorna da sola.
 - `install.sh` installa anche `gextto-update.path`/`.service`: la UI scrive
   `<data>/update-request`, la unit root esegue `gexttod --update` (log in
   `/var/log/gextto-update.log`), che tiene `gexttod.prev` e lo ripristina se la

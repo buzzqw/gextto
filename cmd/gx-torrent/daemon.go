@@ -222,6 +222,8 @@ type runtimeInfo struct {
 // Daemon owns the engine session and the queue.
 type Daemon struct {
 	opts Options
+	// updater is the in-app update of the standalone daemon (update.go).
+	updater gxUpdater
 
 	mu      sync.Mutex
 	session *torrent.Session

@@ -167,6 +167,11 @@ func (d *Daemon) renderUI(w http.ResponseWriter, r *http.Request, name string, d
 	}
 	lang := d.uiLang(r)
 	body := buffer.String()
+	if name == "" || name == "ui" {
+		// The "updated" popup of a new version (update.go). The slot is an
+		// element: html/template drops comments.
+		body = strings.Replace(body, "<div hidden data-update-notes-slot></div>", d.updateNotesDialogHTML(), 1)
+	}
 	if lang != "" && lang != "en" {
 		// <html lang="en"> must reflect the language actually served.
 		body = strings.Replace(body, `lang="en"`, `lang="`+lang+`"`, 1)

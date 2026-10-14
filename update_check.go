@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,8 +31,13 @@ const (
 	updateRequestFile = "update-request"
 	// updateLogFile is where gextto-update.service writes its output.
 	updateLogFile = "/var/log/gextto-update.log"
-	// updateCheckInterval spaces the automatic checks (one small download).
-	updateCheckInterval = 6 * time.Hour
+	// updateCheckDefaultHours spaces the automatic checks (one small
+	// download) unless update_check_hours says otherwise.
+	updateCheckDefaultHours = 6
+	updateCheckMaxHours     = 24 * 30
+	// updateNotesFile, in the data directory, carries what an update brings
+	// across the restart: the new version shows it once in a popup.
+	updateNotesFile     = "update-notes.json"
 	updateManifestName  = "release.json"
 	updateCommitBaseURL = "https://github.com/" + DefaultRepo + "/commit/"
 )
@@ -86,6 +92,7 @@ type UpdateStatus struct {
 	// Updater is true when the root path unit that applies updates exists.
 	Updater      bool   `json:"updater"`
 	CheckEnabled bool   `json:"check_enabled"`
+	CheckHours   int    `json:"check_hours"`
 	CheckedAt    string `json:"checked_at,omitempty"`
 	Error        string `json:"error,omitempty"`
 
@@ -156,6 +163,17 @@ func updateCheckEnabled(cfg *Config) bool {
 	return cfg == nil || settingsBool(cfg, "update_check", true)
 }
 
+// updateCheckHours is the period of the automatic check (update_check_hours).
+func updateCheckHours(cfg *Config) int {
+	hours := updateCheckDefaultHours
+	if cfg != nil {
+		if v, err := strconv.Atoi(strings.TrimSpace(cfg.Settings["update_check_hours"])); err == nil && v > 0 {
+			hours = v
+		}
+	}
+	return min(hours, updateCheckMaxHours)
+}
+
 // fetchManifest downloads release.json for the installed channel.
 func (u *updateChecker) fetch(ctx context.Context, channel string) (*updateManifest, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -214,6 +232,7 @@ func (u *updateChecker) Status(cfg *Config) UpdateStatus {
 		Managed:      managed,
 		Updater:      updateIsFile(updatePathUnit),
 		CheckEnabled: updateCheckEnabled(cfg),
+		CheckHours:   updateCheckHours(cfg),
 	}
 	if cfg != nil && cfg.DataDir != "" {
 		status.Requested = updateIsFile(filepath.Join(cfg.DataDir, updateRequestFile))
@@ -332,12 +351,68 @@ func (u *updateChecker) RequestUpdate(cfg *Config) error {
 	if err := os.WriteFile(request, []byte(body), 0o644); err != nil {
 		return fmt.Errorf("cannot request the update: %w", err)
 	}
+	// What the update brings, for the popup of the new version.
+	notes := UpdateNotes{FromVersion: status.Version, FromCommit: status.Commit, Changes: status.Changes, At: time.Now().UTC()}
+	if raw, err := json.Marshal(notes); err == nil {
+		_ = os.WriteFile(filepath.Join(cfg.DataDir, updateNotesFile), raw, 0o644)
+	}
 	logging.Info(fmt.Sprintf("⬆️ Update requested: %s → %s; Gextto restarts when it is installed", status.Version, status.LatestVersion))
 	return nil
 }
 
+// UpdateNotes is update-notes.json: written when an update is requested and
+// shown once by the version that comes after it.
+type UpdateNotes struct {
+	FromVersion string         `json:"from_version"`
+	FromCommit  string         `json:"from_commit"`
+	Changes     []UpdateCommit `json:"changes"`
+	At          time.Time      `json:"at"`
+	// ToVersion is filled at display time: the running version.
+	ToVersion string `json:"-"`
+}
+
+// updateNotesStale is how long notes of an update that never happened (the
+// version did not change) are kept before being dropped.
+const updateNotesStale = 6 * time.Hour
+
+// PendingUpdateNotes returns the notes to show now: an update happened since
+// they were written (the running commit is another one). Notes of an update
+// that did not install are dropped once stale.
+func PendingUpdateNotes(cfg *Config) (*UpdateNotes, bool) {
+	if cfg == nil || cfg.DataDir == "" {
+		return nil, false
+	}
+	path := filepath.Join(cfg.DataDir, updateNotesFile)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, false
+	}
+	var notes UpdateNotes
+	if json.Unmarshal(raw, &notes) != nil {
+		_ = os.Remove(path)
+		return nil, false
+	}
+	current := updateInstalledCommit()
+	if current == "" || current == notes.FromCommit {
+		if time.Since(notes.At) > updateNotesStale {
+			_ = os.Remove(path)
+		}
+		return nil, false
+	}
+	notes.ToVersion = constants.AppVersion()
+	return &notes, true
+}
+
+// DismissUpdateNotes removes the notes once the popup was closed.
+func DismissUpdateNotes(cfg *Config) {
+	if cfg != nil && cfg.DataDir != "" {
+		_ = os.Remove(filepath.Join(cfg.DataDir, updateNotesFile))
+	}
+}
+
 // updateCheckWorker checks for updates shortly after start and then every
-// updateCheckInterval, unless `update_check` is off or this is a source build.
+// update_check_hours (default 6), unless `update_check` is off or this is a
+// source build. The period is read again at each round.
 func updateCheckWorker(state *AppState) {
 	if !state.SleepBackground(2 * time.Minute) {
 		return
@@ -347,7 +422,7 @@ func updateCheckWorker(state *AppState) {
 		if _, managed := updateMarkerSource(); managed && updateCheckEnabled(cfg) {
 			updates.Check(context.Background())
 		}
-		if !state.SleepBackground(updateCheckInterval) {
+		if !state.SleepBackground(time.Duration(updateCheckHours(cfg)) * time.Hour) {
 			return
 		}
 	}

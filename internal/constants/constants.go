@@ -46,6 +46,12 @@ func GxTorrentVersion() string { return "1.1." + GxTorrentBuild }
 // in-app update check compares it with the published release manifest.
 var Commit = ""
 
+// GxReleaseChannel is the release channel a gx-torrent binary was published
+// on ("continuous" or "stable"), stamped only by scripts/build-release.sh. A
+// local build leaves it empty, so its in-app update stays off: a checkout may
+// be newer than the published build.
+var GxReleaseChannel = ""
+
 // BuiltAt is the build time (RFC 3339, UTC), stamped like Commit. A release is
 // offered as an update only when it was built after the running binary.
 var BuiltAt = ""
