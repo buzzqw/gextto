@@ -45,6 +45,10 @@ html, body {
   align-items: center;
   gap: 8px;
 }
+.setting-control-browse > .setting-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .setting-control-browse .input {
   flex: 1 1 auto;
   min-width: 0;
@@ -1504,6 +1508,15 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   .setting-row:has(.setting-week) > .setting-info { grid-column: 1; grid-row: 1; }
   .setting-row:has(.setting-week) > .setting-actions { grid-column: 2; grid-row: 1; }
   .setting-row:has(.setting-week) > .setting-control { grid-column: 1 / -1; grid-row: 2; }
+}
+/* A folder path is long and the «Sfoglia» button takes part of the control
+   column: squeezed into it, the field could not show the whole path. Like the
+   per-day schedule, a row with a browse button gives its control a full line. */
+@media (min-width: 861px) {
+  .settings-view .setting-row:has(.setting-control-browse) { grid-template-columns: 1fr auto; }
+  .setting-row:has(.setting-control-browse) > .setting-info { grid-column: 1; grid-row: 1; }
+  .setting-row:has(.setting-control-browse) > .setting-actions { grid-column: 2; grid-row: 1; }
+  .setting-row:has(.setting-control-browse) > .setting-control { grid-column: 1 / -1; grid-row: 2; }
 }
 .setting-input:has(> .setting-week) { display: block; }
 .setting-week { overflow-x: auto; max-width: 100%; }
