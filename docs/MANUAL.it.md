@@ -359,7 +359,9 @@ bloccata, già presente o inferiore al file archiviato.
   così puoi iniziare a guardare prima che il download finisca. Lo stesso motore
   di streaming serve il **media server DLNA/UPnP** (opzione *gx-torrent — server
   DLNA/UPnP*): TV e console sulla rete locale vedono i media **completati** senza
-  configurare percorsi; i sottotitoli `.srt`/`.vtt` con lo stesso nome del video
+  configurare percorsi, e anche le **cartelle della libreria** (l'archivio sul
+  NAS: serie e film, navigabili per cartelle; opzione *gx-torrent — DLNA:
+  cartelle della libreria*, vuota = automatico); i sottotitoli `.srt`/`.vtt` con lo stesso nome del video
   vengono agganciati al video. È disattivato di default e non ha autenticazione:
   per questo risponde **solo** ai dispositivi della rete locale (le richieste da
   indirizzi pubblici sono rifiutate) e serve solo i media elencati. Nella pagina
@@ -1445,6 +1447,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | gx-torrent — server DLNA/UPnP | Abilita il media server DLNA/UPnP del demone: i media **completati** dei torrent sono visibili a TV e console sulla rete locale. Solo rete locale, senza autenticazione; disattivato di default. Funziona con il motore gx-torrent. |
 | gx-torrent — DLNA: indirizzo HTTP | Indirizzo e porta di ascolto del media server (es. `:8200` per tutte le interfacce, `192.168.1.10:8200` per una sola). Vuoto = `:8200`. La discovery usa UDP 1900 sulla stessa interfaccia. |
 | gx-torrent — DLNA: nome del server | Nome mostrato ai lettori DLNA sulla rete. Vuoto = `gx-torrent`. |
+| gx-torrent — DLNA: cartelle della libreria | Cartelle (es. l'archivio sul NAS) mostrate dal media server accanto ai torrent, navigabili per cartelle; separale con `;`. Vuoto = automatico: la cartella archivio e le cartelle che contengono gli archivi delle serie. Sola lettura; il cestino, le cartelle nascoste e quelle di sistema del NAS (`@eaDir`, `#recycle`) sono escluse. |
 
 **qBittorrent-nox**
 

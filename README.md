@@ -208,7 +208,8 @@ player playback window (`SetStreamWindow`) from the readahead horizon
 (`SetReadaheadWindow`); per-file priorities apply live and MKV/MP4 stream
 smoothly over HTTP Range, with the right `Content-Type` so a browser plays them
 inline. An **opt-in DLNA/UPnP media server** exposes the completed media to TVs
-and consoles on the LAN (paged browsing, Range seeking, subtitles attached to
+and consoles on the LAN, together with the **library on the NAS** browsable by
+folder (paged browsing, Range seeking, subtitles attached to
 their video, LAN-only by construction). Web seeds and magnet `xs=`/`as=` sources enforce
 strict SSRF protection (checked on resolved IPs, rebinding-safe). Strict BEP
 27 private torrents (no DHT, PEX or LSD), 30-minute quarantine for peers

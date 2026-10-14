@@ -72,6 +72,11 @@ type Options struct {
 	DLNAEnabled bool
 	DLNAListen  string
 	DLNAName    string
+	// DLNAFolders are library folders shown beside the torrents (the archive
+	// Gextto files into); DLNAExclude are paths inside them never exposed
+	// (Gextto's trash).
+	DLNAFolders []string
+	DLNAExclude []string
 	Tick        time.Duration
 	ProbeWindow time.Duration
 }

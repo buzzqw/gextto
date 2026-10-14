@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -174,6 +175,15 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 	}
 	if v := strings.TrimSpace(cfg.Settings["gxtorrent_dlna_name"]); v != "" {
 		args = append(args, "-dlna-name", v)
+	}
+	if strings.EqualFold(strings.TrimSpace(cfg.Settings["gxtorrent_dlna"]), "true") {
+		folders, exclude := gxDLNAFolders(cfg)
+		for _, f := range folders {
+			args = append(args, "-dlna-folder", f)
+		}
+		for _, x := range exclude {
+			args = append(args, "-dlna-exclude", x)
+		}
 	}
 	env := os.Environ()
 	if settings.Token != "" {
@@ -737,4 +747,53 @@ func gxEnsureIPFilter(cfg *Config, force bool) bool {
 	}
 	logging.Info("IP filter updated", "path", path, "bytes", len(data))
 	return true
+}
+
+// gxDLNAFolders returns the library folders the DLNA media server shows beside
+// the torrents, and the folders inside them it must never show. The explicit
+// gxtorrent_dlna_folders list (";"-separated) wins; when it is empty the
+// library is derived from the configuration with no disk access: the archive
+// root (movies, and series without an explicit path) and the folder holding
+// each series' explicit archive path (on this setup SerieTVArchivio). Nested
+// folders collapse into their outermost one. Gextto's trash is excluded.
+func gxDLNAFolders(cfg *Config) (folders, exclude []string) {
+	var candidates []string
+	for _, f := range strings.Split(cfg.Settings["gxtorrent_dlna_folders"], ";") {
+		if f = strings.TrimSpace(f); f != "" {
+			candidates = append(candidates, f)
+		}
+	}
+	if len(candidates) == 0 {
+		if cfg.ArchiveRoot != nil {
+			candidates = append(candidates, *cfg.ArchiveRoot)
+		}
+		for i := range cfg.Series {
+			if p := strings.TrimSpace(cfg.Series[i].ArchivePath); p != "" {
+				candidates = append(candidates, filepath.Dir(p))
+			}
+		}
+	}
+	var cleaned []string
+	for _, c := range candidates {
+		if c = filepath.Clean(strings.TrimSpace(c)); filepath.IsAbs(c) && c != string(filepath.Separator) {
+			cleaned = append(cleaned, c)
+		}
+	}
+	sort.Strings(cleaned)
+	for _, c := range cleaned {
+		nested := false
+		for _, kept := range folders {
+			if c == kept || strings.HasPrefix(c, kept+string(filepath.Separator)) {
+				nested = true
+				break
+			}
+		}
+		if !nested {
+			folders = append(folders, c)
+		}
+	}
+	if cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" {
+		exclude = append(exclude, filepath.Clean(*cfg.TrashPath))
+	}
+	return folders, exclude
 }

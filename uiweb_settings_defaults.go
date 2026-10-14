@@ -140,6 +140,7 @@ var uiSettingDefaults = map[string]string{
 	"gxtorrent_dlna":                   "false",
 	"gxtorrent_dlna_listen":            "",
 	"gxtorrent_dlna_name":              "",
+	"gxtorrent_dlna_folders":           "",
 	"qbittorrent_username":             "admin",
 	"qbittorrent_request_timeout_secs": "15",
 	"qbittorrent_poll_interval_ms":     "1500",

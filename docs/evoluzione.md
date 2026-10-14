@@ -1641,7 +1641,12 @@ non-local address are refused) and `/res` serves only the files the listing
 offers. Settings `dlna-enabled`, `dlna-listen`, `dlna-name`: the **daemon
 page** in standalone (with the running URL shown), the **Gextto** options
 `gxtorrent_dlna*` in managed (passed as flags/env); an address or name change
-restarts the server. Verified end to end against a real daemon (SSDP
+restarts the server. **Library folders** (`dlna_library.go`): the archive on
+the NAS is shown beside the torrents as a browsable folder tree (Gextto passes
+its archive root and series archive folders automatically, trash excluded),
+read through `os.Root` (no `..`/symlink escape), NAS system folders skipped,
+listings cached 30 s; on the real NFS archive 125 series list in ~0.5 s and a
+5 GB 2160p episode streams by Range. Verified end to end against a real daemon (SSDP
 discovery, Browse, Range 206, a non-offered file refused). Open: transcoding,
 thumbnails, search, Xbox/WMP (`X_MS_MediaReceiverRegistrar`).
 

@@ -177,6 +177,7 @@ var uiSettingTooltipText = map[string]string{
 	"gxtorrent_dlna":                               "Abilita il media server DLNA/UPnP di gx-torrent: i media completati dei torrent sono visibili a TV e console sulla rete locale. Solo LAN, senza autenticazione; disattivato di default. Funziona solo con il motore gx-torrent.",
 	"gxtorrent_dlna_listen":                        "Indirizzo e porta di ascolto del media server DLNA (es. :8200 per tutte le interfacce, 192.168.1.10:8200 per una sola). Vuoto = :8200. La discovery usa UDP 1900 sulla stessa interfaccia.",
 	"gxtorrent_dlna_name":                          "Nome mostrato ai lettori DLNA sulla rete. Vuoto = gx-torrent.",
+	"gxtorrent_dlna_folders":                       "Cartelle della libreria (es. l'archivio sul NAS) mostrate dal media server DLNA accanto ai torrent, navigabili per cartelle; separale con ;. Vuoto = automatico: la cartella archivio e le cartelle che contengono gli archivi delle serie. Sola lettura; il cestino, le cartelle nascoste e quelle di sistema del NAS sono escluse.",
 }
 
 // uiSettingTooltip returns the tooltip for a setting key. Score weights without

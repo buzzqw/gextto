@@ -146,6 +146,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "gxtorrent_dlna", Label: "gx-torrent — server DLNA/UPnP", Tab: "backend", Group: "gx-torrent"},
 	{Key: "gxtorrent_dlna_listen", Label: "gx-torrent — DLNA: indirizzo HTTP", Tab: "backend", Group: "gx-torrent"},
 	{Key: "gxtorrent_dlna_name", Label: "gx-torrent — DLNA: nome del server", Tab: "backend", Group: "gx-torrent"},
+	{Key: "gxtorrent_dlna_folders", Label: "gx-torrent — DLNA: cartelle della libreria", Tab: "backend", Group: "gx-torrent"},
 	{Key: "qbittorrent_managed", Label: "qBittorrent-nox — scaricato e aggiornato da Gextto", Tab: "backend", Group: "qBittorrent-nox"},
 	{Key: "qbittorrent_url", Label: "qBittorrent-nox — URL Web API", Tab: "backend", Group: "qBittorrent-nox"},
 	{Key: "qbittorrent_username", Label: "qBittorrent-nox — utente", Tab: "backend", Group: "qBittorrent-nox"},

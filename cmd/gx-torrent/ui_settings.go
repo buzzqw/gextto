@@ -175,6 +175,7 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	store.Set(dlnaEnabledKey, strconv.FormatBool(formBool(r, "dlna-enabled")))
 	store.Set(dlnaListenKey, strings.TrimSpace(r.FormValue("dlna-listen")))
 	store.Set(dlnaNameKey, strings.TrimSpace(r.FormValue("dlna-name")))
+	store.Set(dlnaFoldersKey, strings.Join(dlnaSplitList(r.FormValue("dlna-folders")), ";"))
 	for _, toggle := range []string{"dht", "pex", "utp", "holepunch", "lsd", "upnp", "natpmp"} {
 		store.Set("no-"+toggle, strconv.FormatBool(!formBool(r, toggle)))
 	}
@@ -336,6 +337,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{DLNA_ENABLED}}", checkedIf(boolSetting(dlnaEnabledKey)))
 	repl("{{DLNA_LISTEN}}", get(dlnaListenKey))
 	repl("{{DLNA_NAME}}", get(dlnaNameKey))
+	repl("{{DLNA_FOLDERS}}", get(dlnaFoldersKey))
 	dlnaStatus := "Media server off."
 	if base := d.dlnaStatusURL(); base != "" {
 		dlnaStatus = "Media server running at <code>" + html.EscapeString(base) + "</code>"

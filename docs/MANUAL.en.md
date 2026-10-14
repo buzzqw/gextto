@@ -357,7 +357,9 @@ inferior to the archived file.
   downloaded first, so playback can start before the download finishes. The same
   streaming engine backs the **DLNA/UPnP media server** (option *gx-torrent —
   DLNA/UPnP server*): TVs and consoles on the local network see the **completed**
-  media with no path to configure; `.srt`/`.vtt` subtitles named like a video
+  media with no path to configure, and the **library folders** too (the
+  archive on the NAS: series and movies, browsable by folder; option
+  *gx-torrent — DLNA: library folders*, empty = automatic); `.srt`/`.vtt` subtitles named like a video
   are attached to it. It is off by default and has no authentication, so it
   answers **only** devices on the local network (requests from public addresses
   are refused) and serves only the listed media. The gx-torrent settings page
@@ -1402,6 +1404,7 @@ Recalculate scores* after changing weights.
 | gx-torrent — DLNA/UPnP server | Enables the daemon's DLNA/UPnP media server: the torrents' **completed** media is visible to TVs and consoles on the local network. Local network only, no authentication; off by default. Works with the gx-torrent engine. |
 | gx-torrent — DLNA: HTTP bind | Address and port the media server listens on (e.g. `:8200` for all interfaces, `192.168.1.10:8200` for one). Empty = `:8200`. Discovery uses UDP 1900 on the same interface. |
 | gx-torrent — DLNA: server name | Name shown to the DLNA players on the network. Empty = `gx-torrent`. |
+| gx-torrent — DLNA: library folders | Folders (e.g. the archive on the NAS) the media server shows beside the torrents, browsable by folder; separate them with `;`. Empty = automatic: the archive folder and the folders holding the series archives. Read only; the trash, hidden folders and NAS system folders (`@eaDir`, `#recycle`) are excluded. |
 
 **qBittorrent-nox**
 

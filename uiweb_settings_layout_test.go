@@ -59,8 +59,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 	if got := len(uiSettingsKeysBeforeReorganization); got != 149 {
 		t.Fatalf("frozen list has %d keys, want 149", got)
 	}
-	if got := len(uiSettingsIndex); got != 158 {
-		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default and the 3 DLNA media server options", got)
+	if got := len(uiSettingsIndex); got != 159 {
+		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default and the 4 DLNA media server options", got)
 	}
 	if got := len(uiScoreSettingDefs); got != 27 {
 		t.Fatalf("score weights = %d, want 27", got)
@@ -99,8 +99,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		}
 		found++
 	}
-	if found != 185 {
-		t.Fatalf("rendered %d options, want 185", found)
+	if found != 186 {
+		t.Fatalf("rendered %d options, want 186", found)
 	}
 
 	// Editors, panels and actions without a single key.

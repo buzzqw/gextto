@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -113,7 +114,7 @@ func (d *Daemon) setDLNAStatus(base string) {
 // name change, without the settings handler having to know about it.
 func (d *Daemon) runDLNA(stop <-chan struct{}) {
 	var srv *dlnaServer
-	var running string // listen+name of srv
+	var running string // listen+name+folders of srv
 	shutdown := func() {
 		if srv != nil {
 			srv.Close()
@@ -130,7 +131,7 @@ func (d *Daemon) runDLNA(stop <-chan struct{}) {
 			}
 			return
 		}
-		want := d.dlnaListen() + "\x00" + d.dlnaServerName()
+		want := d.dlnaListen() + "\x00" + d.dlnaServerName() + "\x00" + strings.Join(d.dlnaFolders(), "\x00")
 		if srv != nil && want == running {
 			return
 		}
@@ -191,6 +192,11 @@ type dlnaServer struct {
 	// player issues a Range request per seek or buffer refill.
 	servedMu sync.Mutex
 	served   map[string]time.Time
+	// libRoots are the library folders shown beside the torrents
+	// (dlna_library.go); exclude are absolute paths never listed or served.
+	libRoots []dlnaLibRoot
+	exclude  []string
+	dlnaDirCacheState
 }
 
 // logSearch logs an M-SEARCH, at most once per source address per minute.
@@ -232,6 +238,15 @@ func (d *Daemon) startDLNA() (*dlnaServer, error) {
 		httpAddr: ln.Addr().String(),
 		base:     "http://" + net.JoinHostPort(ip.String(), strconv.Itoa(addr.Port)),
 		closeC:   make(chan struct{}),
+		libRoots: dlnaLibRoots(d.dlnaFolders()),
+	}
+	for _, ex := range d.opts.DLNAExclude {
+		if abs, err := filepath.Abs(ex); err == nil {
+			srv.exclude = append(srv.exclude, abs)
+		}
+	}
+	for _, root := range srv.libRoots {
+		logf("DLNA: library folder %s", root.path)
 	}
 	srv.httpSrv = &http.Server{Handler: srv.handler(), ReadHeaderTimeout: 10 * time.Second}
 	go func() { _ = srv.httpSrv.Serve(ln) }()
@@ -258,6 +273,7 @@ func (s *dlnaServer) handler() http.Handler {
 	mux.HandleFunc("SUBSCRIBE /event/{service}", s.handleSubscribe)
 	mux.HandleFunc("UNSUBSCRIBE /event/{service}", s.handleUnsubscribe)
 	mux.HandleFunc("GET /res/{hash}/{file}", s.handleMedia) // GET also matches HEAD
+	mux.HandleFunc("GET /lib/{n}/{path...}", s.handleLibMedia)
 	return dlnaLANOnly(mux)
 }
 
@@ -597,19 +613,27 @@ func writeRootContainer(b *strings.Builder, name string, children int) {
 		children, xmlEscape(name))
 }
 
-func writeFolder(b *strings.Builder, f dlnaFolder) {
-	fmt.Fprintf(b, `<container id="%s" parentID="0" restricted="1" searchable="0" childCount="%d"><dc:title>%s</dc:title><upnp:class>object.container.storageFolder</upnp:class></container>`,
-		xmlEscape(dlnaContainerID(f.hash)), len(f.items), xmlEscape(f.name))
+func writeFolder(b *strings.Builder, f dlnaFolder, parent string) {
+	fmt.Fprintf(b, `<container id="%s" parentID="%s" restricted="1" searchable="0" childCount="%d"><dc:title>%s</dc:title><upnp:class>object.container.storageFolder</upnp:class></container>`,
+		xmlEscape(dlnaContainerID(f.hash)), xmlEscape(parent), len(f.items), xmlEscape(f.name))
 }
 
+// writeItem renders a torrent file as a DIDL item.
 func writeItem(b *strings.Builder, e dlnaEntry, base string) {
+	writeItemAt(b, e, dlnaEntryKey(e.hash, e.fileIndex), dlnaContainerID(e.hash),
+		func(index int) string { return mediaURL(base, e.hash, index) })
+}
+
+// writeItemAt renders one playable file with its id, its parent and the URL
+// of a file index (the media itself and its subtitles).
+func writeItemAt(b *strings.Builder, e dlnaEntry, id, parent string, urlOf func(int) string) {
 	fmt.Fprintf(b, `<item id="%s" parentID="%s" restricted="1"><dc:title>%s</dc:title><upnp:class>%s</upnp:class>`,
-		xmlEscape(dlnaEntryKey(e.hash, e.fileIndex)), xmlEscape(dlnaContainerID(e.hash)),
+		xmlEscape(id), xmlEscape(parent),
 		xmlEscape(strings.TrimSuffix(path.Base(e.name), path.Ext(e.name))), e.didlClass())
 	fmt.Fprintf(b, `<res protocolInfo="http-get:*:%s:%s" size="%d">%s</res>`,
-		e.mime, dlnaFeatures, e.size, xmlEscape(mediaURL(base, e.hash, e.fileIndex)))
+		e.mime, dlnaFeatures, e.size, xmlEscape(urlOf(e.fileIndex)))
 	for _, s := range e.subs {
-		u := xmlEscape(mediaURL(base, e.hash, s.fileIndex))
+		u := xmlEscape(urlOf(s.fileIndex))
 		// The res form is the DLNA one; CaptionInfoEx is what Samsung and LG
 		// renderers read.
 		fmt.Fprintf(b, `<res protocolInfo="http-get:*:%s:*">%s</res><sec:CaptionInfoEx sec:type="%s">%s</sec:CaptionInfoEx>`,
@@ -629,10 +653,16 @@ var (
 	dlnaInvalidArgs  = &dlnaFault{402, "Invalid Args"}
 )
 
-// browse answers a ContentDirectory Browse: BrowseMetadata returns the object
-// itself, BrowseDirectChildren its children from start (count 0 = all). It is
-// pure, so it is tested without a session.
-func (lib *dlnaLibrary) browse(objectID, flag string, start, count int, name, base string) (didl string, returned, total int, fault *dlnaFault) {
+// browse answers a ContentDirectory Browse on the torrents: BrowseMetadata
+// returns the object itself, BrowseDirectChildren its children from start
+// (count 0 = all). top is the id holding the torrent containers: the root, or
+// the "torrents" container when library folders are configured. It is pure,
+// so it is tested without a session.
+func (lib *dlnaLibrary) browse(objectID, flag string, start, count int, name, base string, top ...string) (didl string, returned, total int, fault *dlnaFault) {
+	parent := dlnaRootID
+	if len(top) > 0 {
+		parent = top[0]
+	}
 	if start < 0 || count < 0 {
 		return "", 0, 0, dlnaInvalidArgs
 	}
@@ -659,7 +689,7 @@ func (lib *dlnaLibrary) browse(objectID, flag string, start, count int, name, ba
 			if !ok {
 				return "", 0, 0, dlnaNoSuchObject
 			}
-			writeFolder(&b, lib.folders[fi])
+			writeFolder(&b, lib.folders[fi], parent)
 		default:
 			e, ok := lib.entry(objectID)
 			if !ok {
@@ -671,7 +701,7 @@ func (lib *dlnaLibrary) browse(objectID, flag string, start, count int, name, ba
 	case "BrowseDirectChildren":
 		switch {
 		case objectID == dlnaRootID:
-			page(len(lib.folders), func(i int) { writeFolder(&b, lib.folders[i]) })
+			page(len(lib.folders), func(i int) { writeFolder(&b, lib.folders[i], parent) })
 		case strings.HasPrefix(objectID, "torrent:"):
 			fi, ok := lib.byHash[strings.TrimPrefix(objectID, "torrent:")]
 			if !ok {
@@ -690,6 +720,60 @@ func (lib *dlnaLibrary) browse(objectID, flag string, start, count int, name, ba
 	}
 	b.WriteString(`</DIDL-Lite>`)
 	return b.String(), returned, total, nil
+}
+
+// browseObject routes a Browse: without library folders the torrents sit in
+// the root (lib.browse); with folders the root holds one container per folder
+// plus a "Torrent" container, and lib:<n>/... ids go to the folder tree.
+func (s *dlnaServer) browseObject(lib *dlnaLibrary, objectID, flag string, start, count int, base string) (string, int, int, *dlnaFault) {
+	if start < 0 || count < 0 || (flag != "BrowseMetadata" && flag != "BrowseDirectChildren") {
+		return "", 0, 0, dlnaInvalidArgs
+	}
+	if len(s.libRoots) == 0 {
+		return lib.browse(objectID, flag, start, count, s.name, base)
+	}
+	torrents := func(b *strings.Builder) {
+		fmt.Fprintf(b, `<container id="%s" parentID="0" restricted="1" searchable="0" childCount="%d"><dc:title>Torrent</dc:title><upnp:class>object.container.storageFolder</upnp:class></container>`,
+			dlnaTorrentsID, len(lib.folders))
+	}
+	switch {
+	case strings.HasPrefix(objectID, dlnaLibPrefix):
+		return s.browseLib(objectID, flag, start, count, base)
+	case objectID == dlnaTorrentsID:
+		if flag == "BrowseDirectChildren" {
+			return lib.browse(dlnaRootID, flag, start, count, s.name, base, dlnaTorrentsID)
+		}
+		var b strings.Builder
+		b.WriteString(didlOpen)
+		torrents(&b)
+		b.WriteString(`</DIDL-Lite>`)
+		return b.String(), 1, 1, nil
+	case objectID == dlnaRootID:
+		children := len(s.libRoots) + 1
+		var b strings.Builder
+		b.WriteString(didlOpen)
+		if flag == "BrowseMetadata" {
+			writeRootContainer(&b, s.name, children)
+			b.WriteString(`</DIDL-Lite>`)
+			return b.String(), 1, 1, nil
+		}
+		end := children
+		if count > 0 && start+count < children {
+			end = start + count
+		}
+		returned := 0
+		for i := start; i < end; i++ {
+			if i < len(s.libRoots) {
+				writeLibContainer(&b, dlnaLibID(i, ""), dlnaRootID, s.libRoots[i].name)
+			} else {
+				torrents(&b)
+			}
+			returned++
+		}
+		b.WriteString(`</DIDL-Lite>`)
+		return b.String(), returned, children, nil
+	}
+	return lib.browse(objectID, flag, start, count, s.name, base, dlnaTorrentsID)
 }
 
 // entry resolves a file:<hash>:<index> object id.
@@ -797,7 +881,7 @@ func (s *dlnaServer) handleContentDirControl(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		objectID := strings.TrimSpace(args.ObjectID)
-		didl, returned, total, fault := lib.browse(objectID, strings.TrimSpace(args.BrowseFlag), start, count, s.name, s.dlnaBaseFor(r))
+		didl, returned, total, fault := s.browseObject(lib, objectID, strings.TrimSpace(args.BrowseFlag), start, count, s.dlnaBaseFor(r))
 		if fault != nil {
 			soapFault(w, fault)
 			return

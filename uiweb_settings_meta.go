@@ -56,6 +56,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"gxtorrent_poll_interval_ms":       {Unit: "ms"},
 	"gxtorrent_dlna_listen":            {DependsOn: "gxtorrent_dlna"},
 	"gxtorrent_dlna_name":              {DependsOn: "gxtorrent_dlna"},
+	"gxtorrent_dlna_folders":           {Zero: "vuoto = automatico (archivio)", DependsOn: "gxtorrent_dlna"},
 
 	// Velocità e rete
 	"libtorrent_dl_limit":          {Unit: "KiB/s", Zero: "0 = illimitato"},

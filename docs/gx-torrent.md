@@ -1216,6 +1216,25 @@ UDP 1900 on the same interface.
   `GetCurrentConnectionInfo`. **GENA**: `SUBSCRIBE`/`UNSUBSCRIBE` on both
   services are accepted (several TVs refuse a server whose event URL fails) and
   the initial event is sent; the callback must be the subscriber's own address.
+- **Library folders** (`dlna_library.go`): besides the torrents the server
+  shows configured folders, typically the archive on the NAS Gextto files the
+  media into, as a **browsable folder tree** (subfolders, then the video/audio
+  files, with their subtitles attached). With folders configured the root holds
+  one container per folder plus a **Torrent** container; without, the torrents
+  stay directly in the root. Folders come from `-dlna-folder` (repeatable) or
+  `GX_TORRENT_DLNA_FOLDERS`, and in standalone from `dlna-folders` on the
+  settings page; `-dlna-exclude` hides paths inside them. In managed mode Gextto
+  passes its own library: the `gxtorrent_dlna_folders` list or, when it is
+  empty, the archive root plus the folder holding each series' archive path,
+  nested folders collapsed, with **Gextto's trash excluded**. Every access goes
+  through `os.Root`: `..`, an absolute path or a symlink leading out of the
+  folder are refused; hidden entries and the NAS system folders (`@eaDir`,
+  `#recycle`, `#snapshot`) are neither listed nor served, and `/lib/<n>/<path>`
+  serves only a file its directory listing offers (`http.ServeContent`, Range
+  and HEAD, same DLNA headers). A directory listing is cached for 30 s (a TV
+  pages a folder with several Browse calls); a folder that is not mounted yet
+  is an empty container. On a real NFS archive the 125 series folders list in
+  about 0.5 s on the first read.
 - **Listing**: the root holds one container per completed torrent with at least
   one playable (video/audio) file, sorted by name; a container lists its files
   sorted by path. **Subtitles** (`.srt`, `.vtt`) are not items: one with the

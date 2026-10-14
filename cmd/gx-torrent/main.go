@@ -85,6 +85,18 @@ func optStr(store *settings.Store, key, flagValue string) string {
 	return strings.TrimSpace(flagValue)
 }
 
+// stringList is a repeatable string flag.
+type stringList []string
+
+func (l *stringList) String() string { return strings.Join(*l, ";") }
+
+func (l *stringList) Set(v string) error {
+	if v = strings.TrimSpace(v); v != "" {
+		*l = append(*l, v)
+	}
+	return nil
+}
+
 // optBool returns the settings value when set, otherwise the flag value.
 func optBool(store *settings.Store, key string, flagValue bool) bool {
 	if store != nil {
@@ -228,6 +240,10 @@ func main() {
 	dlnaEnabled := flag.Bool("dlna", envBool("GX_TORRENT_DLNA", false), "enable the DLNA/UPnP media server for the completed media (LAN only)")
 	dlnaListen := flag.String("dlna-listen", envOr("GX_TORRENT_DLNA_LISTEN", ""), "DLNA media server HTTP bind address (default :8200)")
 	dlnaName := flag.String("dlna-name", envOr("GX_TORRENT_DLNA_NAME", ""), "DLNA media server friendly name (default gx-torrent)")
+	dlnaFolders := stringList(dlnaSplitList(envOr("GX_TORRENT_DLNA_FOLDERS", "")))
+	flag.Var(&dlnaFolders, "dlna-folder", "library folder the DLNA media server shows beside the torrents (repeatable)")
+	dlnaExclude := stringList(dlnaSplitList(envOr("GX_TORRENT_DLNA_EXCLUDE", "")))
+	flag.Var(&dlnaExclude, "dlna-exclude", "folder inside a DLNA library folder that is never shown (repeatable)")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -355,6 +371,8 @@ func main() {
 		DLNAEnabled:    dlnaEnabledValue,
 		DLNAListen:     dlnaListenValue,
 		DLNAName:       dlnaNameValue,
+		DLNAFolders:    dlnaFolders,
+		DLNAExclude:    dlnaExclude,
 		Tick:           3 * time.Second,
 		ProbeWindow:    15 * time.Minute,
 	}

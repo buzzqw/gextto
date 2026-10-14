@@ -216,8 +216,8 @@ finestra di riproduzione del player (`SetStreamWindow`) dall'orizzonte di
 readahead (`SetReadaheadWindow`); le priorità per file si applicano a caldo e
 i file MKV/MP4 sono riprodotti fluidamente in streaming via HTTP Range, con il
 `Content-Type` corretto così il browser li riproduce inline. Un **media server
-DLNA/UPnP opzionale** espone i media completati a TV e console sulla LAN
-(navigazione a pagine, seek via Range, sottotitoli agganciati al video, solo LAN
+DLNA/UPnP opzionale** espone i media completati a TV e console sulla LAN,
+insieme alla **libreria sul NAS** navigabile per cartelle (navigazione a pagine, seek via Range, sottotitoli agganciati al video, solo LAN
 per costruzione). Web seed
 e sorgenti magnet `xs=`/`as=` implementano una rigida protezione SSRF (controllo
 sull'IP risolto, immune al DNS rebinding). Torrent privati rigorosi (BEP 27:
