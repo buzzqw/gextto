@@ -54,6 +54,90 @@ func gxTorrentBinary() (string, error) {
 	return "", errors.New("gx-torrent binary not found: build it with `make gx-torrent` (it is installed next to gexttod)")
 }
 
+// gxTorrentPreviousBinary returns the path of the previous gx-torrent binary the
+// updater keeps next to the current one, when it is a regular file. Empty when
+// there is nothing to roll back to.
+func gxTorrentPreviousBinary(binary string) string {
+	if strings.TrimSpace(binary) == "" {
+		return ""
+	}
+	prev := binary + ".prev"
+	info, err := os.Lstat(prev)
+	if err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	return prev
+}
+
+// rollbackGxTorrentBinary restores the previous gx-torrent binary after the
+// current one failed repeatedly. It renames the current binary to `.failed`
+// (never deleting it, so it can be inspected) and the `.prev` binary back into
+// place. It reports whether a rollback happened.
+func rollbackGxTorrentBinary(binary string) (bool, error) {
+	prev := gxTorrentPreviousBinary(binary)
+	if prev == "" {
+		return false, nil
+	}
+	failed := binary + ".failed"
+	_ = os.Remove(failed)
+	if err := os.Rename(binary, failed); err != nil {
+		return false, fmt.Errorf("rollback gx-torrent: %w", err)
+	}
+	if err := os.Rename(prev, binary); err != nil {
+		// Put the current binary back so the daemon still has something to run.
+		if restoreErr := os.Rename(failed, binary); restoreErr != nil {
+			return false, fmt.Errorf("rollback gx-torrent: %w (il binario attuale non è stato ripristinato: %v)", err, restoreErr)
+		}
+		return false, fmt.Errorf("rollback gx-torrent: %w", err)
+	}
+	return true, nil
+}
+
+// gxUnresponsiveLimit is how long the managed daemon may keep its API
+// unreachable while the process stays alive before the supervisor treats it as a
+// failure and restarts it: a process that is alive but not answering is as
+// useless as a crashed one.
+const gxUnresponsiveLimit = 5 * time.Minute
+
+// gxUnresponsive reports whether the daemon has been unresponsive for longer
+// than the limit. Pure, so the policy is unit-testable.
+func gxUnresponsive(lastOK, now time.Time) bool {
+	return now.Sub(lastOK) >= gxUnresponsiveLimit
+}
+
+// watchManagedHealth kills the managed daemon when it stops answering its own
+// health endpoint for longer than gxUnresponsiveLimit, so the supervisor sees an
+// exit and counts it as a failure. It stops when the caller closes stop, which
+// the supervisor does right after the process is reaped; it must not read
+// process.done, which belongs to the supervisor's wait.
+func (e *gxTorrentEngine) watchManagedHealth(process *gxManagedProcess, stop <-chan struct{}) {
+	const interval = 30 * time.Second
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	lastOK := time.Now()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			if e.ping() {
+				lastOK = time.Now()
+				continue
+			}
+			if !gxUnresponsive(lastOK, time.Now()) {
+				continue
+			}
+			logging.Error("gx-torrent non risponde alle API pur essendo attivo: lo riavvio",
+				"unresponsive_for", time.Since(lastOK).Round(time.Second).String())
+			e.notifyEvent("engine_unresponsive", map[string]any{
+				"unresponsive_seconds": int(time.Since(lastOK).Seconds()),
+			})
+			_ = process.Stop()
+			return
+		}
+	}
+}
+
 // gxManagedListen returns the address the managed daemon must listen on.
 // `gxtorrent_listen` chooses the interface (e.g. "0.0.0.0:8890" to expose the
 // web page and the API on the LAN); its port is always aligned with the port of
@@ -468,11 +552,11 @@ const gxStableUptime = 30 * time.Minute
 
 // superviseManagedProcess restarts the managed daemon after an unexpected exit
 // or a failed start. Once the crash budget is exhausted the daemon is not
-// recovering on its own: a build with libtorrent hands the transfers back to
-// the embedded engine (saving the setting and restarting the service). A build
-// without libtorrent has nothing to fall back to, so it keeps gx-torrent, in
-// safe mode and with growing pauses, instead of restarting the service in a
-// loop.
+// recovering on its own: applyEngineFallback hands the transfers to another
+// engine (the managed qBittorrent-nox, downloaded on demand, then the embedded
+// libtorrent on a build that includes it), saving the setting and restarting
+// the service. When no alternative is available it keeps gx-torrent, in safe
+// mode and with growing pauses, instead of restarting the service in a loop.
 func (e *gxTorrentEngine) superviseManagedProcess() {
 	defer recoverGoroutine("gx-torrent supervisor")
 	const restartPause = 5 * time.Second
@@ -481,30 +565,48 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 	startSettings := e.settings
 	unstable := 0
 	startedAt := time.Now()
-	fallbackToLibtorrent := func() {
-		logging.Error("gx-torrent non riesce a restare attivo: passo al motore libtorrent e riavvio il servizio",
-			"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()))
-		e.notifyEvent("engine_fallback", map[string]any{"crashes": budget.len()})
-		e.processMu.Lock()
-		process := e.process
-		e.processMu.Unlock()
-		_ = process.Stop()
-		if saveErr := SaveSetting(e.settings.dataDir, "torrent_backend", BackendEmbedded); saveErr != nil {
-			logging.Error("impossibile impostare torrent_backend=embedded", "error", saveErr)
-		}
-		requestServiceActionLater("restart")
-	}
+	rollbackTried := false
 	// budgetExhausted reacts to an exhausted crash budget and reports whether
-	// the supervisor must stop.
+	// the supervisor must stop. It first tries the cheapest fix — restoring the
+	// previous gx-torrent binary when the updater kept one — then hands the
+	// transfers to another engine when one can be made to work: the chain
+	// prefers the managed qBittorrent-nox, downloaded on demand, and keeps
+	// libtorrent as a last resort on a build that includes it (see
+	// engine_fallback.go). Only when no alternative is available does it keep
+	// gx-torrent in safe mode with growing pauses, instead of restarting the
+	// service in a loop.
 	budgetExhausted := func() bool {
-		if LibtorrentCompiled() {
-			fallbackToLibtorrent()
+		if !rollbackTried {
+			rollbackTried = true
+			if binary, err := gxTorrentBinary(); err == nil {
+				if rolled, rollErr := rollbackGxTorrentBinary(binary); rollErr != nil {
+					logging.Error("rollback del binario gx-torrent non riuscito", "error", rollErr.Error())
+				} else if rolled {
+					logging.Error("gx-torrent non riesce a restare attivo: ripristino il binario precedente",
+						"crashes", budget.len(), "binary", binary)
+					e.notifyEvent("engine_rollback", map[string]any{"binary": binary, "crashes": budget.len()})
+					budget = newBudget()
+					unstable = 0
+					startSettings.SafeMode = false
+					return false
+				}
+			}
+		}
+		if applyEngineFallback(context.Background(), e.cfg, BackendGxTorrent, e.notifier) {
+			logging.Error("gx-torrent non riesce a restare attivo: cambio motore e riavvio il servizio",
+				"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()))
+			e.processMu.Lock()
+			process := e.process
+			e.processMu.Unlock()
+			if process != nil {
+				_ = process.Stop()
+			}
 			return true
 		}
 		pause := gxUnstablePause(unstable)
 		unstable++
 		startSettings.SafeMode = true
-		logging.Error("gx-torrent non riesce a restare attivo e questa build non include libtorrent: trasferimenti fermi, nuovo tentativo in modalità sicura (senza uTP e holepunch)",
+		logging.Error("gx-torrent non riesce a restare attivo e nessun motore alternativo è disponibile: trasferimenti fermi, nuovo tentativo in modalità sicura (senza uTP e holepunch)",
 			"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()),
 			"retry_in", pause.String(), "crash_log", filepath.Join(e.cfg.DataDir, "gx-torrent", "gx-torrent.crash.log"))
 		e.notifyEvent("engine_unstable", map[string]any{
@@ -527,7 +629,13 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		if closed || process == nil {
 			return
 		}
+		// Keep the daemon honest while it runs: a process that stops answering
+		// its health endpoint is killed and counts as a failure, instead of
+		// keeping the transfers frozen forever.
+		watchStop := make(chan struct{})
+		go e.watchManagedHealth(process, watchStop)
 		err := process.wait()
+		close(watchStop)
 		e.processMu.Lock()
 		closed = e.closed
 		replacing := e.replacing

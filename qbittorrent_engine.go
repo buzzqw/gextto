@@ -177,8 +177,9 @@ func newQbittorrentEngine(cfg *Config) (*qbittorrentEngine, error) {
 
 // superviseManagedProcess keeps the managed qBittorrent-nox alive: every
 // unexpected exit is logged and the process is restarted. After too many
-// crashes in a short window Gextto gives up, switches back to the embedded
-// libtorrent engine and restarts the service to apply it.
+// crashes in a short window Gextto hands the transfers to another engine
+// (gx-torrent, then the embedded libtorrent when the build has it) and
+// restarts the service to apply it (see engine_fallback.go).
 func (e *qbittorrentEngine) superviseManagedProcess() {
 	const (
 		crashWindow  = 10 * time.Minute
@@ -221,13 +222,22 @@ func (e *qbittorrentEngine) superviseManagedProcess() {
 		crashes = kept
 
 		if len(crashes) >= maxCrashes {
-			logging.Error("qBittorrent non riesce a restare attivo: passo al motore libtorrent e riavvio il servizio",
-				"crashes", len(crashes), "window_minutes", int(crashWindow.Minutes()))
-			if saveErr := SaveSetting(e.settings.dataDir, "torrent_backend", BackendEmbedded); saveErr != nil {
-				logging.Error("impossibile impostare torrent_backend=embedded", "error", saveErr)
+			// Hand the transfers back to another engine: gx-torrent (the
+			// default), then the embedded libtorrent when the build has it.
+			if applyEngineFallback(context.Background(), e.cfg, BackendQbittorrent, nil) {
+				logging.Error("qBittorrent non riesce a restare attivo: cambio motore e riavvio il servizio",
+					"crashes", len(crashes), "window_minutes", int(crashWindow.Minutes()))
+				e.processMu.Lock()
+				process := e.process
+				e.processMu.Unlock()
+				if process != nil {
+					_ = process.Close()
+				}
+				return
 			}
-			requestServiceActionLater("restart")
-			return
+			logging.Error("qBittorrent non riesce a restare attivo e nessun motore alternativo è disponibile: continuo a riavviare l'istanza gestita",
+				"crashes", len(crashes), "window_minutes", int(crashWindow.Minutes()))
+			crashes = crashes[:0]
 		}
 
 		select {

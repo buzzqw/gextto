@@ -1078,17 +1078,45 @@ func formatEvent(event string, data map[string]any) string {
 			messages.Pick("🔄 riavviato dopo un'uscita inattesa", "🔄 restarted after an unexpected exit"),
 			messages.Pick("riavvii recenti:", "recent restarts:"), restarts)
 	case "engine_fallback":
+		target := text("to")
+		if target == "" {
+			target = BackendQbittorrent
+		}
+		return fmt.Sprintf("Gextto: %s %s",
+			messages.Pick(
+				"⛔ il motore torrent non riesce a restare attivo; passo al motore",
+				"⛔ the torrent engine cannot stay up; switching to the",
+			), target)
+	case "engine_recovery":
+		reason := text("reason")
+		head := messages.Pick(
+			"⛔ nessun motore torrent alternativo disponibile: trasferimenti fermi, controlla la configurazione",
+			"⛔ no alternative torrent engine is available: transfers stopped, check the configuration",
+		)
+		if reason != "" {
+			return fmt.Sprintf("Gextto: %s — %s", head, reason)
+		}
+		return "Gextto: " + head
+	case "engine_rollback":
 		return fmt.Sprintf("gx-torrent: %s",
 			messages.Pick(
-				"⛔ non riesce a restare attivo; passo al motore libtorrent",
-				"⛔ cannot stay up; falling back to the embedded libtorrent engine",
+				"♻️ non riesce a restare attivo; ho ripristinato il binario precedente",
+				"♻️ cannot stay up; the previous binary has been restored",
 			))
+	case "engine_unresponsive":
+		seconds, _ := jsonInt(mapLookup(data, "unresponsive_seconds"))
+		return fmt.Sprintf("gx-torrent: %s (%s %d s)",
+			messages.Pick(
+				"⚠️ non risponde più alle API pur essendo attivo; lo riavvio",
+				"⚠️ stopped answering its API while still running; restarting it",
+			),
+			messages.Pick("fermo da", "silent for"), seconds)
 	case "engine_unstable":
 		retry, _ := jsonInt(mapLookup(data, "retry_minutes"))
 		return fmt.Sprintf("gx-torrent: %s (%s %d min)",
 			messages.Pick(
-				"⛔ non riesce a restare attivo e questa build non include libtorrent: trasferimenti fermi, riprovo in modalità sicura",
-				"⛔ cannot stay up and this build has no libtorrent: transfers stopped, retrying in safe mode",
+				"⛔ non riesce a restare attivo e nessun motore alternativo è disponibile: trasferimenti fermi, riprovo in modalità sicura",
+				"⛔ cannot stay up and no alternative engine is available: transfers stopped, retrying in safe mode",
 			),
 			messages.Pick("prossimo tentativo tra", "next attempt in"), retry)
 	case "engine_error":

@@ -1,22 +1,19 @@
 #!/usr/bin/env bash
 # Build the release archive on the oldest supported baseline: Ubuntu 22.04
-# (glibc 2.35). The default release is pure Go (static, no libtorrent); with
-# GEXTTO_LIBTORRENT=1 it also links libtorrent 2.0.5, whose C++ ABI pins the
-# baseline. A binary built on a newer system may need a newer glibc and not
-# start on the older ones.
+# (glibc 2.35). The release is pure Go (static, no libtorrent): the archive is
+# gextto-linux-<arch>.tar.gz. A binary built on a newer system may need a newer
+# glibc and not start on the older ones.
 #
 #   scripts/build-release.sh [--label TEXT] [--output-dir DIR]
 #       runs the build in an ubuntu:22.04 container (docker or podman) and
-#       leaves gextto-linux-<arch>.tar.gz(.sha256) in DIR (default: dist/);
-#       with GEXTTO_LIBTORRENT=1 the archive is gextto-linux-<arch>-libtorrent.tar.gz
+#       leaves gextto-linux-<arch>.tar.gz(.sha256) in DIR (default: dist/)
 #   scripts/build-release.sh --in-container [--label TEXT] [--output-dir DIR]
 #       builds in the current system, which must be the baseline (CI jobs run
 #       with `container: ubuntu:22.04`)
 #
 # Environment: GEXTTO_BUILD (build number; when unset the committed
 # build_number file is used, so checkout and CI share the same number),
-# GEXTTO_COMMIT, GEXTTO_BASE_IMAGE, GEXTTO_LIBTORRENT (set to 1 to include the
-# embedded libtorrent engine; by default the release is pure Go).
+# GEXTTO_COMMIT, GEXTTO_BASE_IMAGE.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -49,7 +46,6 @@ if [[ "$IN_CONTAINER" != "1" ]]; then
   exec "$engine" run --rm \
     -v "$ROOT:/src:ro" -v "$OUTPUT_DIR:/out" \
     -e GEXTTO_BUILD="${GEXTTO_BUILD:-}" -e GEXTTO_COMMIT="$commit" \
-    -e GEXTTO_LIBTORRENT="${GEXTTO_LIBTORRENT:-0}" \
     "$BASE_IMAGE" bash -c '
       set -euo pipefail
       mkdir -p /build
@@ -64,9 +60,6 @@ if command -v apt-get >/dev/null 2>&1; then
   [[ "$(id -u)" == "0" ]] || SUDO="sudo"
   $SUDO apt-get update -qq
   packages="ca-certificates curl git binutils zip unzip"
-  if [[ "${GEXTTO_LIBTORRENT:-0}" == "1" ]]; then
-    packages="build-essential pkg-config libtorrent-rasterbar-dev $packages"
-  fi
   $SUDO apt-get install -y -qq --no-install-recommends $packages >/dev/null
 fi
 
@@ -89,13 +82,7 @@ fi
 export HOME="${HOME:-/root}" GOTOOLCHAIN=local
 
 ARCH="$(uname -m)"
-# The libtorrent build is published next to the pure Go one: its name says so,
-# and the updater keeps an installation on the variant it runs.
-VARIANT=""
-if [[ "${GEXTTO_LIBTORRENT:-0}" == "1" ]]; then
-  VARIANT="-libtorrent"
-fi
-ARCHIVE="$OUTPUT_DIR/gextto-linux-${ARCH}${VARIANT}.tar.gz"
+ARCHIVE="$OUTPUT_DIR/gextto-linux-${ARCH}.tar.gz"
 mkdir -p "$OUTPUT_DIR"
 BINARY="$ROOT/bin/gexttod"
 # The release channel stamped into gx-torrent turns its in-app update on: a
@@ -115,10 +102,6 @@ GEXTTO_BINARY="$BINARY" GEXTTO_FORCE_GXTORRENT=1 "$ROOT/scripts/build-daemon.sh"
 # requirement to report.
 glibc="$(objdump -T "$BINARY" 2>/dev/null | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1 || true)"
 echo "highest glibc symbol required: ${glibc:-none (static binary)}"
-if [[ -n "$VARIANT" ]]; then
-  objdump -p "$BINARY" | grep -q 'NEEDED.*libtorrent-rasterbar' \
-    || { echo "the libtorrent build is not linked to libtorrent-rasterbar" >&2; exit 1; }
-fi
 
 "$ROOT/scripts/package-linux.sh" --binary "$BINARY" --arch "$ARCH" \
   --output "$ARCHIVE" ${LABEL:+--label "$LABEL"}

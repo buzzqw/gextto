@@ -100,12 +100,8 @@ func ChannelFromMarker(marker string) string {
 	return "continuous"
 }
 
-// LibtorrentArchiveSuffix marks the release asset that embeds the libtorrent
-// engine (gextto-linux-<arch>-libtorrent.tar.gz).
-const LibtorrentArchiveSuffix = "-libtorrent"
-
 // ArchiveURL builds the release asset URL for a repository, release and
-// architecture. The architecture may carry LibtorrentArchiveSuffix.
+// architecture.
 func ArchiveURL(repo, release, arch string) string {
 	asset := fmt.Sprintf("%s-%s.tar.gz", ArchiveStem, arch)
 	if release == "latest" || release == "stable" {
@@ -176,11 +172,6 @@ func Run(ctx context.Context, opts UpdateOptions) error {
 		arch, err := updateTargetArch()
 		if err != nil {
 			return err
-		}
-		// An installation built with libtorrent stays on that variant: the
-		// default archive is pure Go and would drop the embedded engine.
-		if LibtorrentCompiled() {
-			arch += LibtorrentArchiveSuffix
 		}
 		url := ArchiveURL(repo, release, arch)
 		destination := filepath.Join(work.Path(), path.Base(url))
@@ -529,11 +520,20 @@ func updateInstallRelease(root, installDir string) error {
 		if err := updateSetExecutable(staged); err != nil {
 			return err
 		}
+		// Keep the previous daemon for a rollback: a crash loop after an update
+		// restores it before handing the transfers to another engine.
+		if updateIsFile(destination) {
+			previous := destination + ".prev"
+			_ = os.Remove(previous)
+			if err := os.Rename(destination, previous); err != nil {
+				return fmt.Errorf("cannot keep the previous gx-torrent: %w", err)
+			}
+		}
 		if err := os.Rename(staged, destination); err != nil {
 			return fmt.Errorf("cannot install gx-torrent: %w", err)
 		}
 	} else {
-		logging.Warn("gx-torrent is missing from the update payload: Gextto will fall back to embedded libtorrent")
+		logging.Warn("gx-torrent is missing from the update payload: Gextto will use the configured alternative engine")
 	}
 
 	// Keep the launcher, the release notes and the licence notices alongside

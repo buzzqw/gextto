@@ -179,6 +179,9 @@ func runDaemon(dryRun bool, configOption *string) error {
 			"addresses", conflicts)
 	}
 
+	if engine := gextto.ApplyEngineOverride(&cfg); engine != "" {
+		logging.Info("motore torrent forzato dall'ambiente per questo avvio", "engine", engine, "env", gextto.EngineOverrideEnv)
+	}
 	state := gextto.NewAppState(
 		&cfg,
 		configPath,

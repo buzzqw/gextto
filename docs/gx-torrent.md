@@ -10,8 +10,10 @@ see *Web interface* to open it to the LAN; standalone: already reachable from
 another PC on the LAN). In short, as a standalone client it is a **simpler,
 reduced version of Gextto** — fewer features, but all the ones needed to run
 without it. The embedded
-libtorrent engine remains selectable — on builds that include it — and acts as an
-automatic fallback if gx-torrent does not start.
+libtorrent engine remains selectable — on builds that include it — and is one step
+of the automatic fallback when gx-torrent does not start: Gextto first tries the
+managed qBittorrent-nox (downloaded on demand), then libtorrent, then a recovery
+state (see `engine_fallback.go` and the Gextto manual).
 
 The gx-core engine lives in `internal/gxcore`. Its features are
 described in `internal/gxcore/GEXTTO.md`: single port, outgoing interface,
@@ -115,16 +117,20 @@ Code:
      requests (`-orphan-timeout`); if the active engine is no longer gx-torrent,
      Gextto stops the daemon left running at startup. Gextto re-attaches to or
      stops only a daemon with its own data folder;
-   - after 6 abnormal starts/stops in 10 minutes Gextto stops retrying.
-     On a build with embedded libtorrent it falls back to the `embedded` engine and restarts
-     the service; on a **pure Go** build (the default one) there is no
-     fallback engine, so it continues with gx-torrent in **safe mode**
+   - after 6 abnormal starts/stops in 10 minutes Gextto stops retrying and runs
+     the fallback chain (`engine_fallback.go`). It first restores `gx-torrent.prev`
+     when the updater kept one, then hands the transfers to the managed
+     qBittorrent-nox (downloaded on demand, or an external one already configured),
+     then to the `embedded` engine on a build that includes it, and finally to a
+     recovery state with the transfers stopped and the UI up. Only when no
+     alternative is available does it continue with gx-torrent in **safe mode**
      (without uTP or holepunch) and growing waits between attempts (1 m, 5 m,
      15 m, 1 h). A clean shutdown (restart of Gextto or of the service, for
      example for an update) does not count: the budget considers only unexpected
      exits and failed starts; a daemon that stays up long enough
      resets it (10 minutes for the stop budget, 30 minutes to reset the
-     growing waits).
+     growing waits). A daemon that is alive but stops answering its health
+     endpoint for five minutes is killed and counted as a failure.
 
    If a gx-torrent already answers on the URL (for example a systemd service of yours),
    Gextto uses that one.

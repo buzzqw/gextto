@@ -228,7 +228,7 @@ isolated, login-less system account.
 For a no-root installation from a source checkout:
 
 ```bash
-make build          # pure Go (default); 'make build-libtorrent' for libtorrent
+make build          # pure Go, with gx-torrent
 GEXTTO_DATA_DIR="$HOME/gextto-data" \
   GEXTTO_LISTEN=127.0.0.1:5000 \
   scripts/install-user-service.sh
@@ -717,6 +717,13 @@ and archive; only the transfer plane is pluggable, chosen in
 time, so switching is a controlled migration, not two clients working on the
 same data.
 
+If the active engine cannot stay up, Gextto switches to another engine by
+itself: first **qBittorrent-nox** (downloaded on demand and started with a
+private profile, or the external one already configured), then the built-in
+**libtorrent** when the build includes it, and finally a **recovery** state with
+the transfers stopped and the UI still reachable. An updated `gx-torrent` that
+will not start is restored to the previous binary first.
+
 The default engine's core, **`gx-core`** (`internal/gxcore`), and the DHT
 (`internal/dht`) are original code written in this repository, so they are
 covered by the same EUPL-1.2 licence as Gextto (see the *Licence* page of the
@@ -747,9 +754,10 @@ web interface).
   web seeds and `dht=` adds a DHT bootstrap node. It supports
   **v2-only** torrents (BEP 52), both from a `.torrent` and from a magnet link;
   it does not support WebTorrent/WebRTC.
-- **libtorrent (optional build)** — the libtorrent session inside Gextto's own
+- **libtorrent (no longer shipped)** — the libtorrent session inside Gextto's own
   process, available **only if you built Gextto with it**
-  (`make build-libtorrent`); release packages do not include it. Every
+  (`make build-libtorrent`); release packages do not include it and the engine is
+  being removed. Every
   *libtorrent* setting applies.
 - **qBittorrent-nox** — Gextto drives an existing qBittorrent-nox through its Web
   API. Set the URL, user/password, category, tag and poll interval, and the
@@ -1114,7 +1122,10 @@ Besides download events, Gextto notifies service problems:
   it is reported as an unclean shutdown;
 - **stopped by an error** — when the service exits because of a fatal error;
 - **gx-torrent** — unexpected exit of the managed daemon, restart after the
-  exit, and falling back to the libtorrent engine when it cannot stay up;
+  exit, restoring the previous binary after an update that will not start,
+  a live daemon that stops answering, and the automatic switch to another
+  engine (qBittorrent-nox first, downloaded on demand, then libtorrent when
+  compiled in, finally recovery with the transfers stopped);
 - **health problems** — when the health check finds a problem and when it is
   healthy again.
 

@@ -59,7 +59,7 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
 | **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr) · RSS · web search · stuck-download replacement |
 | **Integrations** | Jellyfin, Plex, Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
 | **Interfaces** | Web UI (SSR + HTMX, zero-Node/pure Go, installable PWA) · terminal TUI over SSH · JSON API |
-| **Build** | Pure Go (`CGO_ENABLED=0`) · optional libtorrent engine · Linux x86_64/aarch64 · gx-torrent also on Windows |
+| **Build** | Pure Go (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent also on Windows |
 
 ## Features
 
@@ -121,6 +121,19 @@ Gextto keeps the control plane (queue, scoring, post-processing, archiving)
 and delegates transfers to one selectable engine (*Configuration → Torrent
 engine*). A single engine runs at a time; switching is a clean, coordinated
 migration with no I/O conflicts.
+
+**Automatic fallback.** If the active engine cannot stay up — a crash loop, or
+an activation refused at startup — Gextto does not just stop. It walks a chain
+and persists the choice: first the **managed qBittorrent-nox**, downloaded on
+demand from the `userdocs/qbittorrent-nox-static` releases (the last libtorrent
+v2 build, SHA-256 verified) and started with a private profile — or an external
+qBittorrent you already run; then the optional embedded libtorrent, on a build
+that includes it; finally a recovery state where the transfers stay stopped and
+the UI stays up so you can intervene. Before switching engines it tries the
+cheapest fix: an updated `gx-torrent` that fails to start is rolled back to the
+previous binary. A cooldown prevents two crashing engines from ping-ponging, and
+`GEXTTO_ENGINE=qbittorrent` (or `gx-torrent`) forces the engine for one run,
+which also serves as a one-line recovery from a shell.
 
 ### gx-core and gx-torrent (default, recommended)
 
@@ -223,8 +236,8 @@ resume storage, and real-time Server-Sent Events (`/ui/events`).
 | Engine | Where it runs | When to pick it |
 |---|---|---|
 | gx-torrent (default) | Separate supervised Go process | Pure Go, self-contained, active development. v1, hybrid and v2-only, DHT and MSE/PE; also standalone on Linux and Windows; no WebTorrent/WebRTC |
-| qBittorrent-nox | External daemon via its Web API | You already run qBittorrent-nox or prefer its UI. Needs path mappings and an extra process ([setup guide](docs/qbittorrent-nox.md)) |
-| libtorrent (optional build) | Inside Gextto's process, **only if compiled in** (`make build-libtorrent`) | Advanced libtorrent controls or compatibility; also the automatic fallback. A crash takes Gextto down too |
+| qBittorrent-nox | External daemon via its Web API, or one Gextto downloads and runs privately | You already run qBittorrent-nox or prefer its UI. Needs path mappings and an extra process ([setup guide](docs/qbittorrent-nox.md)); also the first step of the automatic fallback, downloaded on demand |
+| libtorrent (no longer shipped) | Inside Gextto's process, **only in a custom build** (`make build-libtorrent`); releases are pure Go | Advanced libtorrent controls or compatibility; one step of the automatic fallback. A crash takes Gextto down too. Being removed |
 
 Engine statistics — torrents by state, speed and queue slots, port/router,
 DHT/uTP/LSD, encryption, proxy, IP filter, cache, **incoming connections**,
@@ -265,10 +278,11 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 ```
 
 It installs to `/opt/gextto`, keeps service data in `/var/lib/gextto`, and
-serves the UI on port 5000. The default engine `gx-torrent` (pure Go) is
+serves the UI on port 5000. The engine `gx-torrent` (pure Go) is
 installed alongside `gexttod` and started in managed mode. The release package
 is pure Go — nothing else to install. An external qBittorrent-nox can be used
-instead ([setup guide](docs/qbittorrent-nox.md)); the libtorrent engine needs your own build (see below).
+instead ([setup guide](docs/qbittorrent-nox.md)); the embedded libtorrent
+engine is no longer shipped (see below).
 
 The installer first runs the downloaded program once: a missing library or an
 old glibc is reported immediately instead of leaving a service that never
@@ -287,14 +301,11 @@ to that group.
 
 ### Install from source
 
-Go 1.26.8+ required; the default build is **pure Go**. Only the optional
-**libtorrent** engine additionally needs a C++17 compiler and the
-libtorrent-rasterbar headers. The web UI is embedded — no frontend build
-needed. See the [developer manual](docs/DEVELOPERS.md).
+Go 1.26.8+ required; the build is **pure Go**. The web UI is embedded — no
+frontend build needed. See the [developer manual](docs/DEVELOPERS.md).
 
 ```bash
-make build                 # pure Go (default), with gx-torrent
-make build-libtorrent      # also link the optional libtorrent engine
+make build                 # pure Go, with gx-torrent
 ```
 
 `make build` increments the **committed** build number (`build_number`, shared
