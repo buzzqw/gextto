@@ -11,7 +11,8 @@ import (
 
 // TestCountingConnTracksRawBytes proves the engine counts the raw peer
 // wire bytes (framing and encryption included) separately from the payload,
-// which is what the session reports as protocol overhead.
+// which is what the session reports as protocol overhead. The counters are
+// per-connection/session, so a fresh WireStats starts at zero.
 func TestCountingConnTracksRawBytes(t *testing.T) {
 	client, server := net.Pipe()
 	defer client.Close()
@@ -25,10 +26,8 @@ func TestCountingConnTracksRawBytes(t *testing.T) {
 		_, _ = server.Write([]byte("pong"))
 	}()
 
-	c := New(client, logger.New("test"), time.Second, 1, 1<<20, false, nil, nil)
-
-	writeBefore := WireBytesWritten.Load()
-	readBefore := WireBytesRead.Load()
+	stats := &WireStats{}
+	c := New(client, stats, logger.New("test"), time.Second, 1, 1<<20, false, nil, nil)
 
 	if _, err := c.conn.Write([]byte("ping")); err != nil {
 		t.Fatalf("write: %v", err)
@@ -38,10 +37,10 @@ func TestCountingConnTracksRawBytes(t *testing.T) {
 		t.Fatalf("read: %v", err)
 	}
 
-	if got := WireBytesWritten.Load() - writeBefore; got != 4 {
-		t.Fatalf("wire written delta = %d, want 4", got)
+	if got := stats.Written.Load(); got != 4 {
+		t.Fatalf("wire written = %d, want 4", got)
 	}
-	if got := WireBytesRead.Load() - readBefore; got != 4 {
-		t.Fatalf("wire read delta = %d, want 4", got)
+	if got := stats.Read.Load(); got != 4 {
+		t.Fatalf("wire read = %d, want 4", got)
 	}
 }

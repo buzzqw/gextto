@@ -6,7 +6,6 @@ import (
 
 	"github.com/buzzqw/gextto/internal/dht"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
-	"github.com/buzzqw/gextto/internal/gxcore/internal/peerconn"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resumer/boltdbresumer"
 	"go.etcd.io/bbolt"
 )
@@ -94,7 +93,9 @@ type SessionStats struct {
 	// BytesDownloaded/BytesUploaded are the payload totals.
 	BytesDownloaded int64
 	BytesUploaded   int64
-	// PeerWireDownloaded/PeerWireUploaded include framing and encryption.
+	// PeerWireDownloaded/PeerWireUploaded are this session's raw peer-wire
+	// bytes, framing included; the difference from the payload totals is the
+	// protocol overhead.
 	PeerWireDownloaded int64
 	PeerWireUploaded   int64
 	// BytesRead/BytesWritten are the disk totals.
@@ -148,8 +149,8 @@ func (s *Session) Stats() SessionStats {
 		out.UTPSynDrops = int64(ust.SynDrops)
 	}
 	out.DHT = s.config.DHTEnabled
-	out.PeerWireDownloaded = peerconn.WireBytesRead.Load()
-	out.PeerWireUploaded = peerconn.WireBytesWritten.Load()
+	out.PeerWireDownloaded = s.wire.Read.Load()
+	out.PeerWireUploaded = s.wire.Written.Load()
 	if s.config.DHTEnabled {
 		out.DHTStats = dht.Stats()
 	}

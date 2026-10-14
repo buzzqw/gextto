@@ -84,3 +84,23 @@ func TestSessionStatsCarriesUTPSocketCounters(t *testing.T) {
 		t.Fatalf("expected zero syn drops, got %+v", st)
 	}
 }
+
+// The wire counters must be session-scoped, not process-global: the payload
+// meters reset when a session is recreated, so the wire tally has to as well,
+// otherwise the reported protocol overhead (wire minus payload) is inflated
+// by all the traffic of the previous sessions.
+func TestSessionWireStatsArePerSession(t *testing.T) {
+	first := &Session{metrics: stubSessionMetrics(), createdAt: time.Now()}
+	first.wire.Read.Add(4096)
+	first.wire.Written.Add(2048)
+
+	st := first.Stats()
+	if st.PeerWireDownloaded != 4096 || st.PeerWireUploaded != 2048 {
+		t.Fatalf("first session wire = %d/%d, want 4096/2048", st.PeerWireDownloaded, st.PeerWireUploaded)
+	}
+
+	second := &Session{metrics: stubSessionMetrics(), createdAt: time.Now()}
+	if st := second.Stats(); st.PeerWireDownloaded != 0 || st.PeerWireUploaded != 0 {
+		t.Fatalf("a fresh session must start with zero wire bytes, got %d/%d", st.PeerWireDownloaded, st.PeerWireUploaded)
+	}
+}

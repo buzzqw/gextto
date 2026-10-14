@@ -1478,7 +1478,10 @@ engine-specific counters (cache, disk speed, DHT traffic) remain
 alongside. Compared to libtorrent:
 
 - the **protocol overhead** is available (`protocol_overhead_bytes`: bytes
-  exchanged on the peer connections minus the payload, encryption included);
+  exchanged on the peer connections minus the payload, wire framing
+  included); like the payload totals it is **session-scoped**, so it restarts
+  when the engine session does (encryption is not in the count: the byte
+  tally sits above the MSE layer);
 - disk job times and failed pieces per peer are **missing**: the engine does not
   measure them and they are not implemented.
 

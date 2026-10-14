@@ -2420,6 +2420,8 @@ func (d *Daemon) stats() daemonStats {
 			"peer_wire_downloaded":     s.PeerWireDownloaded,
 			"peer_wire_uploaded":       s.PeerWireUploaded,
 		}
+		// Wire counters and payload meters are both session-scoped, so the
+		// difference is the protocol overhead of this session.
 		if overhead := (s.PeerWireDownloaded - s.BytesDownloaded) + (s.PeerWireUploaded - s.BytesUploaded); overhead > 0 {
 			out.Session["protocol_overhead_bytes"] = overhead
 		}

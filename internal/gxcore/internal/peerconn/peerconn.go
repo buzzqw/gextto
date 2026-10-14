@@ -13,27 +13,35 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
 )
 
-// Wire byte counters, tallied below the message layer so the session can
-// report protocol and encryption overhead as wire minus payload.
-var (
-	WireBytesRead    atomic.Int64
-	WireBytesWritten atomic.Int64
-)
+// WireStats tallies the raw peer-socket bytes below the message layer, so
+// the session can report protocol overhead as wire minus payload. One
+// instance is owned by a Session and shared by all its peers: keeping it
+// per-session (not process-global) makes both sides of the subtraction the
+// same scope, also across engine session restarts.
+type WireStats struct {
+	Read    atomic.Int64
+	Written atomic.Int64
+}
 
-// countingConn wraps a peer socket with wire accounting.
+// countingConn wraps a peer socket with wire accounting into stats.
 type countingConn struct {
 	net.Conn
+	stats *WireStats
 }
 
 func (c *countingConn) Read(p []byte) (int, error) {
 	n, err := c.Conn.Read(p)
-	WireBytesRead.Add(int64(n))
+	if c.stats != nil {
+		c.stats.Read.Add(int64(n))
+	}
 	return n, err
 }
 
 func (c *countingConn) Write(p []byte) (int, error) {
 	n, err := c.Conn.Write(p)
-	WireBytesWritten.Add(int64(n))
+	if c.stats != nil {
+		c.stats.Written.Add(int64(n))
+	}
 	return n, err
 }
 
@@ -49,9 +57,10 @@ type Conn struct {
 	doneC    chan struct{}
 }
 
-// New wraps conn with rate-limited reading and writing.
-func New(conn net.Conn, l logger.Logger, pieceTimeout time.Duration, maxRequestsIn, maxMsgSize int, fastEnabled bool, br, bw *bandwidth.Limiter) *Conn {
-	conn = &countingConn{Conn: conn}
+// New wraps conn with rate-limited reading and writing. Wire bytes are
+// accumulated into stats (nil disables the accounting).
+func New(conn net.Conn, stats *WireStats, l logger.Logger, pieceTimeout time.Duration, maxRequestsIn, maxMsgSize int, fastEnabled bool, br, bw *bandwidth.Limiter) *Conn {
+	conn = &countingConn{Conn: conn, stats: stats}
 	return &Conn{
 		conn:     conn,
 		reader:   peerreader.New(conn, l, pieceTimeout, maxMsgSize, br),

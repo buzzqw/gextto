@@ -105,13 +105,14 @@ type PieceMessage struct {
 }
 
 // New wraps conn, decoding the capability bits (fast 61, extension 43, DHT
-// 63, v2 59) out of the handshake extensions.
-func New(conn net.Conn, source peersource.Source, id [20]byte, extensions [8]byte, cipher mse.CryptoMethod, pieceReadTimeout, snubTimeout time.Duration, maxRequestsIn, maxMsgSize int, br, bw *bandwidth.Limiter) *Peer {
+// 63, v2 59) out of the handshake extensions. wire accumulates the raw
+// socket bytes of the owning session (for the protocol-overhead report).
+func New(conn net.Conn, wire *peerconn.WireStats, source peersource.Source, id [20]byte, extensions [8]byte, cipher mse.CryptoMethod, pieceReadTimeout, snubTimeout time.Duration, maxRequestsIn, maxMsgSize int, br, bw *bandwidth.Limiter) *Peer {
 	bf, _ := bitfield.NewBytes(extensions[:], 64)
 	snub := time.NewTimer(math.MaxInt64)
 	snub.Stop()
 	return &Peer{
-		Conn:              peerconn.New(conn, newPeerLogger(source, conn), pieceReadTimeout, maxRequestsIn, maxMsgSize, bf.Test(61), br, bw),
+		Conn:              peerconn.New(conn, wire, newPeerLogger(source, conn), pieceReadTimeout, maxRequestsIn, maxMsgSize, bf.Test(61), br, bw),
 		Source:            source,
 		ConnectedAt:       time.Now(),
 		ID:                id,

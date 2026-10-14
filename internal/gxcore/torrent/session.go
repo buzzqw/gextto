@@ -23,6 +23,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/peerconn"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piececache"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resolver"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resourcemanager"
@@ -64,6 +65,10 @@ type Session struct {
 	createdAt      time.Time
 	semWrite       *semaphore.Semaphore
 	metrics        *sessionMetrics
+	// wire tallies the raw peer-socket bytes of this session, so the
+	// reported protocol overhead (wire minus payload) is measured within the
+	// same scope and resets with the session.
+	wire peerconn.WireStats
 	// bucketDownload/bucketUpload are retuned live by SetSpeedLimits.
 	bucketDownload *bandwidth.Limiter
 	bucketUpload   *bandwidth.Limiter
