@@ -189,31 +189,24 @@ once.
 
 **Still open.**
 
-- **Notifications and post-processing on completion**: the webhook exists
-  (`notify.go`, events `feed_match`/`feed_error`), but the *completion* hooks and the
-  automatic **move on completion** are missing (the temporary folder is set by the
-  wizard, the move stays manual).
+- **Post-processing on completion**: notifications are complete (webhook, Telegram,
+  e-mail; events `download_complete`, `feed_match`, `feed_error`); Gextto's completion
+  post-processing — rename and move into the library — is not part of the standalone.
 - **Rate-based choking and anti-leech**: to be validated with the deterministic harness
   and the real-swarm campaign before touching the algorithm
   ([`measurements.md`](measurements.md) §3).
-- **Container image**: to be verified, together with the first CI run on Debian 12 and
-  Ubuntu 22.04 (amd64 and arm64).
+- **Container image**: the `Dockerfile` is built and smoke-tested in CI (job
+  `container image`); publishing it to a registry is not done.
 - **Distribution targets**: Linux (amd64/arm64) and Windows are covered; macOS is not
   decided.
-- **Password hash**: bcrypt today; argon2id was the proposal, as Gextto already uses it.
+- **Password hash**: bcrypt today, the same as Gextto; argon2id was floated as a
+  stronger option but is not adopted anywhere.
 - **Where the shared modules live**: inside this repository (today) or in a module of its
   own.
 - **i18n**: the six languages of the page are assumed to be enough for the standalone
   product; extending the catalogue is not decided.
 - **WebTorrent/WebRTC** and **share mode**: not needed for now
   ([`evoluzione.md`](evoluzione.md) §6).
-
-**Decided**, recorded so it is not reopened by mistake: the product is **gx-core**, one
-binary, two modes (2026-10-10); the engine lives in the main module as
-`internal/gxcore`; the standalone package is published separately from Gextto's archive;
-the v1 API is frozen and the managed path must stay unchanged at every commit. The
-decision would be reopened only if Gextto abandoned this engine for another, because
-then the compatibility constraint would disappear.
 
 **Risks and countermeasures.** A regression on Gextto's path is prevented by the v1
 contract tests, by a `fingerprint` independent of `settings.json` and by switching the
