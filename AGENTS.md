@@ -4,10 +4,6 @@ Istruzioni operative per lavorare su questo repository. OpenCode carica
 automaticamente questo file, che è l'**unica** fonte delle regole operative.
 
 ## Regole commit e PR
-- Mai "Claude" o "Anthropic" in autore, committer, `Co-Authored-By`, trailer o
-  messaggi di commit.
-- Mai "Claude" nel titolo o nel corpo delle PR; il titolo descrive la modifica
-  (es. `fix(logs): …`).
 - Autore dei commit: `buzzqw <azanzani@gmail.com>`.
 - Non committare `gx-torrent.build_number`, `bin/` né directory dati (`data/`,
   `gextto-data/`). `build_number` invece **è committato**: è la sorgente unica
