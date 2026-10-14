@@ -474,3 +474,7 @@ Gextto is licensed under the [EUPL-1.2](LICENSE). The engine core (`gx-core`,
 repository under the same licence. See [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES)
 for the copyright and licence texts of linked third-party libraries (also on
 the web UI *Licence* page).
+
+## Acknowledgements
+
+Thanks to **DeepSeek** for its support and patience while this project grew.

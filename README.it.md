@@ -488,3 +488,8 @@ repository con la stessa licenza. Note di copyright e testi di licenza delle
 librerie di terze parti collegate sono in
 [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES), mostrato anche nella pagina
 *Licenza* dell'interfaccia web.
+
+## Ringraziamenti
+
+Grazie a **DeepSeek** per il supporto e la pazienza mentre questo progetto
+cresceva.
