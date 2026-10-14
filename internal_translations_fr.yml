@@ -4687,7 +4687,6 @@ fra:
   "Chiede a Plex di aggiornare la libreria.": "Demande à Plex d'actualiser la bibliothèque."
   "Cicli da conservare": "Cycles à conserver"
   "Comic ": "Comic "
-  "Con gx-torrent non è disponibile l'upload/share mode. Il download sequenziale e il super-seeding (BEP 16) si attivano anche a caldo, la prima/ultima parte solo quando aggiungi il torrent; il super-seeding vale solo a torrent completato e riduce di proposito l'upload del seed.": "Avec gx-torrent, le mode upload/share n'est pas disponible. Le téléchargement séquentiel et le super-seeding (BEP 16) s'activent aussi à chaud, la première/dernière partie uniquement lors de l'ajout du torrent ; le super-seeding ne s'applique qu'à un torrent terminé et réduit volontairement l'upload du seed."
   "Conserva le schede dei torrent in errore per almeno N giorni prima di rimuoverle dal database.": "Conserver les fiches des torrent en erreur pendant au moins N jours avant de les supprimer de la base de données."
   "Cosa fare": "Que faire"
   "Crea subito uno snapshot di backup dei database.": "Créer immédiatement un instantané de sauvegarde des bases de données."

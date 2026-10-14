@@ -112,7 +112,7 @@ func TestUIIsTranslatable(t *testing.T) {
 
 	templateText := regexp.MustCompile(`>([^<>{}]+)<`)
 	templateAttr := regexp.MustCompile(`(?:title|placeholder|aria-label|label|hx-confirm|data-v2-toast-title|data-v2-toast-message)="([^"{}]+)"`)
-	goField := regexp.MustCompile(`(?:Label|Value|Title|Hint|Note|Empty|Placeholder|SearchHint|Description|Caption|Subtitle|Message|Flash|Confirm|Intro|Submit|TestLabel|RefreshHint|GeneralNote|CustomPlaceholder|Initial):\s*"([^"\\\n]{3,})"`)
+	goField := regexp.MustCompile(`(?:Label|Value|Title|Hint|Note|Empty|Placeholder|SearchHint|Description|Caption|Subtitle|Message|Flash|Confirm|Intro|Submit|TestLabel|RefreshHint|CustomPlaceholder|Initial):\s*"([^"\\\n]{3,})"`)
 	// A text node at runtime is everything between two tags. Template actions
 	// do not split it: a printed value ({{.X}}) or a word sitting next to an
 	// {{if}} block ends up in the same node as the surrounding words, so that
