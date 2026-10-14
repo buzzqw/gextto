@@ -61,7 +61,10 @@ type uiDashboardData struct {
 	Active  bool
 	DryRun  bool
 	Backend string
-	// EngineVersion is the gx-core version of the gx-torrent daemon.
+	// EngineLabel and EngineVersion name the torrent engine actually moving the
+	// bytes (e.g. "gx-core 1.1.193", "qBittorrent-nox v5.1.1"); both empty with
+	// an engine that does not report a version.
+	EngineLabel     string
 	EngineVersion   string
 	Torrents        int
 	Downloading     int
@@ -325,8 +328,8 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 		Torrents:  len(views),
 		UpdatedAt: uiNowClock(),
 	}
-	if gx, ok := engine.(*gxTorrentEngine); ok {
-		data.EngineVersion = gx.DaemonVersion()
+	if identity, ok := engine.(TorrentEngineIdentity); ok {
+		data.EngineLabel, data.EngineVersion = identity.EngineVersion()
 	}
 	for _, view := range views {
 		switch view.State {

@@ -167,6 +167,20 @@ func newFakeQBEngine(t *testing.T) (*fakeQB, *qbittorrentEngine, string) {
 	return fake, engine, cfg.DownloadDir
 }
 
+// TestQbittorrentEngineVersionIsNamed pins the header identity: with the
+// qBittorrent backend the UI must name the engine "qBittorrent-nox" and its
+// real version, next to Gextto's own version.
+func TestQbittorrentEngineVersionIsNamed(t *testing.T) {
+	_, engine, _ := newFakeQBEngine(t)
+	label, version := engine.EngineVersion()
+	if label != "qBittorrent-nox" {
+		t.Fatalf("EngineVersion label = %q, want qBittorrent-nox", label)
+	}
+	if version != "v5.0.0" {
+		t.Fatalf("EngineVersion version = %q, want v5.0.0 (from /api/v2/app/version)", version)
+	}
+}
+
 func TestQbittorrentEngineListMapping(t *testing.T) {
 	fake, engine, downloads := newFakeQBEngine(t)
 	fake.setTorrents([]qbittorrent.Torrent{{

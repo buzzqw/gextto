@@ -4209,7 +4209,7 @@ pol:
   "Chiudi questo messaggio": "Zamknij ten komunikat"
   "Scarica l'ultima build, la installa e riavvia Gextto": "Pobiera najnowszą kompilację, instaluje ją i uruchamia ponownie Gextto"
   "Cerca subito una versione più recente": "Wyszukaj teraz nowszą wersję"
-  "Versione del motore gx-core (demone gx-torrent)": "Wersja silnika gx-core (demon gx-torrent)"
+  "Versione del motore torrent in uso": "Wersja używanego silnika torrentów"
   "Ricontrolla": "Sprawdź ponownie"
   "Controllo automatico ogni": "Automatyczne sprawdzanie co"
   "(Impostazioni → Sistema → Aggiornamenti)": "(Ustawienia → System → Aktualizacje)"

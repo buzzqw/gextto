@@ -1215,6 +1215,38 @@ func TestV2MaintenanceTrashActionAndFlash(t *testing.T) {
 	}
 }
 
+// TestV2TrashDeleteRedirectsWithToastFlash pins the feedback after "Svuota
+// cestino": the shell renders the global toast from `toast`/`toast_err`, so the
+// trash delete must forward its summary there — not to the setup-only `msg`,
+// which the maintenance page ignores and would show nothing at all.
+func TestV2TrashDeleteRedirectsWithToastFlash(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	request, err := http.NewRequest(http.MethodPost, server.URL+"/trash/delete", strings.NewReader(url.Values{"all": {"1"}}.Encode()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("HX-Request", "true")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("trash delete: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("trash delete -> %d, want 204", response.StatusCode)
+	}
+	redirect := response.Header.Get("HX-Redirect")
+	if !strings.Contains(redirect, "view=maintenance") {
+		t.Fatalf("redirect = %q, want view=maintenance", redirect)
+	}
+	if !strings.Contains(redirect, "toast=") || strings.Contains(redirect, "msg=") {
+		t.Fatalf("redirect must carry a toast flash, got %q", redirect)
+	}
+}
+
 // TestV2LogsSelectorReadsChosenFile checks the Log page offers the available
 // gextto log files (current first) and reads the one the user selects.
 func TestV2LogsSelectorReadsChosenFile(t *testing.T) {

@@ -729,6 +729,11 @@ The default engine's core, **`gx-core`** (`internal/gxcore`), and the DHT
 covered by the same EUPL-1.2 licence as Gextto (see the *Licence* page of the
 web interface).
 
+In the interface header, next to Gextto's version, the **active engine with its
+version** is shown: `gx-core 1.1.<n>` with gx-torrent, `qBittorrent-nox v…` with
+qBittorrent (the brand and version of the engine actually moving the bytes, so
+what is transferring the files is visible at a glance).
+
 - **gx-torrent** (default) — a pure-Go BitTorrent daemon, started and supervised
   by Gextto in a separate process; it has no C/C++ dependency. Set the
   **Web API URL**, the **listen address** (default `127.0.0.1:8890`: web page
@@ -1991,7 +1996,7 @@ Key") instead of the bare HTTP code.
 | Item | What it does |
 |---|---|
 | Trash — Open trash | Shows the trash items so you can delete them one by one. |
-| Trash — Empty trash | Deletes every trash item. |
+| Trash — Empty trash | Deletes every trash item and shows a notice with the removed files and the freed space. |
 | Database cleanup — Cycles to keep | Number of cycle statistics to keep. |
 | Database cleanup — Error days | Keeps error torrent entries for at least N days before removing them. |
 

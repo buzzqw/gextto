@@ -746,6 +746,11 @@ Il nucleo del motore predefinito, **`gx-core`** (`internal/gxcore`), e il DHT
 coperti dalla stessa licenza EUPL-1.2 di Gextto (vedi la pagina *Licenza*
 dell'interfaccia web).
 
+Nell'intestazione dell'interfaccia, accanto alla versione di Gextto, compare il
+**motore in uso con la sua versione**: `gx-core 1.1.<n>` con gx-torrent,
+`qBittorrent-nox v…` con qBittorrent (il marchio e la versione del motore
+attivo, così si vede a colpo d'occhio cosa sta trasferendo i file).
+
 - **gx-torrent** (predefinito) — demone BitTorrent in Go puro, avviato e
   sorvegliato da Gextto in un processo separato; non ha dipendenze C/C++. Imposta **URL Web API**, **indirizzo di ascolto**
   (predefinito `127.0.0.1:8890`: pagina web e API solo su questo server; usa
@@ -2038,7 +2043,7 @@ Key») invece del solo codice HTTP.
 | Voce | Cosa fa |
 |---|---|
 | Cestino — Apri cestino | Mostra gli elementi nel cestino per eliminarli singolarmente. |
-| Cestino — Svuota cestino | Elimina tutti gli elementi del cestino. |
+| Cestino — Svuota cestino | Elimina tutti gli elementi del cestino e mostra un avviso con i file rimossi e lo spazio liberato. |
 | Pulizia database — Cicli da conservare | Numero di statistiche dei cicli da mantenere. |
 | Pulizia database — Giorni errori | Conserva le schede dei torrent in errore per almeno N giorni prima di rimuoverle. |
 

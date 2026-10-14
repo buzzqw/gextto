@@ -54,10 +54,9 @@ var i18nAllowlist = map[string]bool{
 var i18nMixedAllowlist = map[string]bool{
 	"Gextto · {}": true,
 	"EXpert Torrent Transfer Orchestrator · v{}": true,
-	// The header with the gx-core engine version appended (product name +
-	// printed version, nothing to translate).
+	// The header with the engine version appended (product name + printed
+	// engine label/version, nothing to translate).
 	"EXpert Torrent Transfer Orchestrator · v{}{}": true,
-	"· gx-core {}":           true,
 	"libtorrent {}":          true,
 	"TMDB {}":                true,
 	"TVDB {}":                true,

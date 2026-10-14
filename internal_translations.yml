@@ -3605,7 +3605,7 @@ eng:
   "Chiudi questo messaggio": "Close this message"
   "Scarica l'ultima build, la installa e riavvia Gextto": "Downloads the latest build, installs it and restarts Gextto"
   "Cerca subito una versione più recente": "Look for a newer version now"
-  "Versione del motore gx-core (demone gx-torrent)": "gx-core engine version (gx-torrent daemon)"
+  "Versione del motore torrent in uso": "Version of the torrent engine in use"
   "Ricontrolla": "Check again"
   "Controllo automatico ogni": "Automatic check every"
   "(Impostazioni → Sistema → Aggiornamenti)": "(Settings → System → Updates)"

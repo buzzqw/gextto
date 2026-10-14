@@ -59,8 +59,12 @@ func (d *healthStatusDebouncer) update(raw string, now time.Time) string {
 // /api/torrents.
 type uiShellChrome struct {
 	Version string
-	// EngineVersion is the gx-core version of the gx-torrent daemon, shown
-	// last in the header; empty with the other engines.
+	// EngineLabel and EngineVersion name the torrent engine actually moving
+	// the bytes, shown last in the header (e.g. "gx-core 1.1.193" for the
+	// gx-torrent daemon, "qBittorrent-nox v5.1.1" for the external engine).
+	// EngineLabel is a brand name (never translated); both are empty with an
+	// engine that does not report a version.
+	EngineLabel   string
 	EngineVersion string
 	DryRun        bool
 	Status        string
@@ -134,8 +138,8 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 		NextCycle:    "—",
 		Lang:         "it",
 	}
-	if gx, ok := s.activeEngine().(*gxTorrentEngine); ok {
-		chrome.EngineVersion = gx.DaemonVersion()
+	if identity, ok := s.activeEngine().(TorrentEngineIdentity); ok {
+		chrome.EngineLabel, chrome.EngineVersion = identity.EngineVersion()
 	}
 
 	// The top bar only needs the status and the process CPU/RAM. The full

@@ -138,9 +138,18 @@ type qbittorrentEngine struct {
 	lastAttempt  time.Time
 	lastErr      string
 	connected    bool
+
+	// identityMu guards the qBittorrent version shown in the UI header, fetched
+	// at most once per qbitVersionTTL.
+	identityMu   sync.Mutex
+	appVersion   string
+	appVersionAt time.Time
 }
 
-var _ TorrentEngine = (*qbittorrentEngine)(nil)
+var (
+	_ TorrentEngine         = (*qbittorrentEngine)(nil)
+	_ TorrentEngineIdentity = (*qbittorrentEngine)(nil)
+)
 
 // newQbittorrentEngine builds the adapter. It does not connect: a qBittorrent
 // that is down at startup must degrade gracefully, not abort the daemon.
@@ -173,6 +182,48 @@ func newQbittorrentEngine(cfg *Config) (*qbittorrentEngine, error) {
 		go engine.superviseManagedProcess()
 	}
 	return engine, nil
+}
+
+// qbitVersionTTL bounds how long the qBittorrent version shown in the UI header
+// is reused — including after a failed lookup — before /api/v2/app/version is
+// asked again. The header is rendered on every page and SSE tick, so an
+// unreachable qBittorrent must not be probed every time.
+const qbitVersionTTL = time.Minute
+
+// AppVersion returns the version of the qBittorrent-nox Gextto drives (e.g.
+// "v5.1.1"), cached for qbitVersionTTL. Empty while qBittorrent does not answer
+// and nothing was cached yet.
+func (e *qbittorrentEngine) AppVersion() string {
+	if e.client == nil {
+		return ""
+	}
+	e.identityMu.Lock()
+	version, fresh := e.appVersion, time.Since(e.appVersionAt) < qbitVersionTTL
+	e.identityMu.Unlock()
+	if fresh {
+		return version
+	}
+	timeout := e.settings.Client.RequestTimeout
+	if timeout <= 0 {
+		timeout = 15 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	fetched, err := e.client.AppVersion(ctx)
+	e.identityMu.Lock()
+	e.appVersionAt = time.Now()
+	if err == nil && strings.TrimSpace(fetched) != "" {
+		version = strings.TrimSpace(fetched)
+		e.appVersion = version
+	}
+	e.identityMu.Unlock()
+	return version
+}
+
+// EngineVersion names the qBittorrent-nox engine for the UI header, next to
+// Gextto's own version.
+func (e *qbittorrentEngine) EngineVersion() (string, string) {
+	return "qBittorrent-nox", e.AppVersion()
 }
 
 // superviseManagedProcess keeps the managed qBittorrent-nox alive: every

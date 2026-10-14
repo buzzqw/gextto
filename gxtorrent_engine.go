@@ -150,7 +150,10 @@ type gxTorrentEngine struct {
 	sequentialPushed string
 }
 
-var _ TorrentEngine = (*gxTorrentEngine)(nil)
+var (
+	_ TorrentEngine         = (*gxTorrentEngine)(nil)
+	_ TorrentEngineIdentity = (*gxTorrentEngine)(nil)
+)
 
 // newGxTorrentEngine builds the adapter and, in managed mode, starts the
 // daemon. It does not require the daemon to answer: an outage degrades to a
@@ -358,6 +361,12 @@ func (e *gxTorrentEngine) DaemonVersion() string {
 	e.versionAt = time.Now()
 	e.versionMu.Unlock()
 	return version
+}
+
+// EngineVersion names the gx-core engine of the gx-torrent daemon for the UI
+// header, next to Gextto's own version.
+func (e *gxTorrentEngine) EngineVersion() (string, string) {
+	return "gx-core", e.DaemonVersion()
 }
 
 // adoptOrReplace handles a managed daemon left running by a previous Gextto

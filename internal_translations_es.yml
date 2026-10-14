@@ -4215,7 +4215,7 @@ spa:
   "Chiudi questo messaggio": "Cerrar este mensaje"
   "Scarica l'ultima build, la installa e riavvia Gextto": "Descarga la última compilación, la instala y reinicia Gextto"
   "Cerca subito una versione più recente": "Buscar ahora una versión más reciente"
-  "Versione del motore gx-core (demone gx-torrent)": "Versión del motor gx-core (demonio gx-torrent)"
+  "Versione del motore torrent in uso": "Versión del motor torrent en uso"
   "Ricontrolla": "Volver a comprobar"
   "Controllo automatico ogni": "Comprobación automática cada"
   "(Impostazioni → Sistema → Aggiornamenti)": "(Ajustes → Sistema → Actualizaciones)"

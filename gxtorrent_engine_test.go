@@ -336,6 +336,23 @@ func TestUIEngineLabelsMatchBackend(t *testing.T) {
 	}
 }
 
+// TestGxEngineVersionIsNamed pins the header identity: the gx-torrent daemon
+// reports its gx-core version, named "gx-core", from /api/v1/health.
+func TestGxEngineVersionIsNamed(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "version": "1.1.193"})
+	}))
+	defer server.Close()
+	engine := &gxTorrentEngine{
+		settings: gxTorrentSettings{BaseURL: server.URL, Timeout: time.Second},
+		client:   server.Client(),
+	}
+	label, version := engine.EngineVersion()
+	if label != "gx-core" || version != "1.1.193" {
+		t.Fatalf("EngineVersion() = %q, %q; want gx-core 1.1.193", label, version)
+	}
+}
+
 func TestGxNetworkArgs(t *testing.T) {
 	cfg := &Config{DataDir: t.TempDir()}
 	cfg.Transfer.PortMin = 6881

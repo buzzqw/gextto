@@ -75,9 +75,12 @@ func V2TrashDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	redirect := "/?view=maintenance"
 	if message != "" {
-		redirect += "&msg=" + url.QueryEscape(message)
+		// The shell renders the global toast from `toast`/`toast_err` (unlike
+		// the setup form, which uses `msg`): using `msg` here dropped the
+		// summary, so emptying the trash showed no feedback at all.
+		redirect += "&toast=" + url.QueryEscape(message)
 		if failed {
-			redirect += "&msg_err=1"
+			redirect += "&toast_err=1"
 		}
 	}
 	if r.Header.Get("HX-Request") == "" {

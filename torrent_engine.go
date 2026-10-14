@@ -53,6 +53,19 @@ type TorrentSessionHealth interface {
 	SessionHealthy() bool
 }
 
+// TorrentEngineIdentity is optionally implemented by backends whose underlying
+// software has a version worth naming in the UI: "gx-core" for the gx-torrent
+// daemon, "qBittorrent-nox" for the external engine. It is separate from
+// TorrentEngine so a backend that cannot answer does not have to fake one: the
+// header then shows only Gextto's own version.
+type TorrentEngineIdentity interface {
+	// EngineVersion returns the product label (a brand name, never translated,
+	// e.g. "gx-core", "qBittorrent-nox") and the running version (e.g.
+	// "1.1.193", "v5.1.1"). An empty version means "not available" and hides
+	// the suffix.
+	EngineVersion() (label, version string)
+}
+
 // TorrentPieceRun is a compact run of consecutive pieces that share a state.
 // Exposed by GET /api/torrents/{hash}/pieces for backends that support it.
 type TorrentPieceRun struct {

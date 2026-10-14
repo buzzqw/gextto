@@ -4268,7 +4268,7 @@ deu:
   "Chiudi questo messaggio": "Diese Meldung schließen"
   "Scarica l'ultima build, la installa e riavvia Gextto": "Lädt den neuesten Build herunter, installiert ihn und startet Gextto neu"
   "Cerca subito una versione più recente": "Jetzt nach einer neueren Version suchen"
-  "Versione del motore gx-core (demone gx-torrent)": "Version der gx-core-Engine (gx-torrent-Dienst)"
+  "Versione del motore torrent in uso": "Version der verwendeten Torrent-Engine"
   "Ricontrolla": "Erneut prüfen"
   "Controllo automatico ogni": "Automatische Prüfung alle"
   "(Impostazioni → Sistema → Aggiornamenti)": "(Einstellungen → System → Updates)"
