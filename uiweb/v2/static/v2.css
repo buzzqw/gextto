@@ -1497,9 +1497,20 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 .setting-zero { display: block; margin-top: 3px; color: var(--muted); font-size: 0.75rem; }
 .setting-days { display: flex; flex-wrap: wrap; gap: 6px; }
 .setting-days .check { min-height: 36px; }
+/* The per-day speed schedule is a table: it takes a line of its own across
+   the whole row, under the description, instead of the narrow control column. */
+@media (min-width: 861px) {
+  .settings-view .setting-row:has(.setting-week) { grid-template-columns: 1fr auto; }
+  .setting-row:has(.setting-week) > .setting-info { grid-column: 1; grid-row: 1; }
+  .setting-row:has(.setting-week) > .setting-actions { grid-column: 2; grid-row: 1; }
+  .setting-row:has(.setting-week) > .setting-control { grid-column: 1 / -1; grid-row: 2; }
+}
+.setting-input:has(> .setting-week) { display: block; }
 .setting-week { overflow-x: auto; max-width: 100%; }
+.setting-week table { width: 100%; }
 .setting-week th, .setting-week td { white-space: nowrap; padding: 4px 6px; }
-.setting-week input.input { min-width: 6.5em; }
+.setting-week input.input { width: 100%; min-width: 5.5em; }
+.setting-week td:nth-child(2) { width: 1%; text-align: center; }
 .setting-row[data-dirty] { box-shadow: inset 3px 0 0 var(--warn); padding-left: 10px; }
 /* The save button is a quiet outline until the row has something to save. */
 .settings-view .setting-row:not([data-dirty]) .setting-save {
