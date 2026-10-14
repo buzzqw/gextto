@@ -463,11 +463,10 @@ equivalence is proved by execution: MSE handshake cross-check over `net.Pipe`, f
 byte identity, resume-DB and RPC shapes byte-identical. How this state was reached is in
 the git history.
 
-**Policy for anything adopted from elsewhere** (also in `AGENTS.md`): an algorithm is
-**rewritten** — third-party code is not copied, the idea is not covered by copyright
-while the expression is — or the module is adopted as an **MPL-2.0 dependency**. The
-engine talks to the uTP `Socket` — dial and accept counters, a `net.PacketConn` facade
-for the shared DHT socket — so the transport stays isolated and swappable.
+**Policy.** Gextto prefers its own code: what the engine needs is written here, not
+copied from anywhere. The pieces the engine talks to stay ours and swappable — it
+speaks to a uTP `Socket` (dial and accept counters, a `net.PacketConn` facade for the
+shared DHT socket), so the transport is isolated and can be replaced.
 
 ---
 

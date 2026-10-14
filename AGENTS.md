@@ -56,6 +56,8 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   iniziali sono state riscritte file per file), parte del modulo
   principale come `github.com/buzzqw/gextto/internal/gxcore`. Lo usano
   `cmd/gx-torrent` e i test.
+- **Preferenza di progetto: codice nostro.** Quello che serve si scrive in questo
+  repository, non si copia da altri.
 - Panoramica e inventario delle funzionalità del motore:
   `internal/gxcore/GEXTTO.md`.
 - Il DHT vive in `internal/dht`, un modulo a sé sotto il modulo principale.
