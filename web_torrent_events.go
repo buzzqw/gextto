@@ -1509,7 +1509,7 @@ func tev_ramdiskRelocation(cfg *Config, torrents TorrentSession, hash, savePath 
 	if !found {
 		return "", "", false
 	}
-	free := FreeSpaceBytes(*ramdisk)
+	free := ramdiskEffectiveFreeBytes(*ramdisk)
 	if free == nil {
 		return "", "", false
 	}
@@ -1574,7 +1574,7 @@ func tev_ramdiskAdmission(cfg *Config, torrents TorrentSession, event *models.To
 	if torrent.TotalDone > 0 && torrent.Progress >= ramdiskAdmitMaxProgress {
 		return "", false
 	}
-	free := FreeSpaceBytes(*ramdisk)
+	free := ramdiskEffectiveFreeBytes(*ramdisk)
 	if free == nil {
 		return "", false
 	}

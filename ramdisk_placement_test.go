@@ -236,6 +236,108 @@ func TestRamdiskAdmissionDisabledForBackendsWithoutRamdisk(t *testing.T) {
 	}
 }
 
+// withHostMemory pins the host-memory reader for the duration of a test. Tests
+// in this package do not run in parallel, so the global hook is safe.
+func withHostMemory(t *testing.T, available uint64, ok bool) {
+	t.Helper()
+	previous := ramdiskHostMemoryAvailable
+	ramdiskHostMemoryAvailable = func() (uint64, bool) { return available, ok }
+	t.Cleanup(func() { ramdiskHostMemoryAvailable = previous })
+}
+
+// TestRamdiskEffectiveFreeBytesCapsByHostMemory pins the core of the RAM gate: a
+// tmpfs reports its own free space, which can be several GB on a 6 GB mount
+// while the host has almost no memory left. The effective free space must be the
+// lesser of the two, keep the filesystem figure when the host one is unknown,
+// and keep it too when the host has memory to spare.
+func TestRamdiskEffectiveFreeBytesCapsByHostMemory(t *testing.T) {
+	dir := t.TempDir()
+
+	withHostMemory(t, 1<<30, true)
+	if free := ramdiskEffectiveFreeBytes(dir); free == nil || *free != 1<<30 {
+		t.Fatalf("effective free = %v, want the 1 GB of available host memory", free)
+	}
+
+	// Unknown host memory: the filesystem figure is used unchanged.
+	withHostMemory(t, 0, false)
+	base := FreeSpaceBytes(dir)
+	if base == nil {
+		t.Fatal("the temp dir must report a filesystem free space")
+	}
+	if got := ramdiskEffectiveFreeBytes(dir); got == nil || *got != *base {
+		t.Fatalf("unknown host memory must keep the filesystem free space: got %v want %v", got, base)
+	}
+
+	// Plenty of host memory: the filesystem free space is the smaller figure.
+	withHostMemory(t, ^uint64(0), true)
+	if got := ramdiskEffectiveFreeBytes(dir); got == nil || *got != *base {
+		t.Fatalf("ample host memory must keep the filesystem free space: got %v want %v", got, base)
+	}
+}
+
+// TestAutomaticDownloadPathChecksHostMemory pins the RAM gate on the initial
+// path choice: a release that fits the size threshold must still fall back to
+// the overflow dir when the host has too little memory to hold it.
+func TestAutomaticDownloadPathChecksHostMemory(t *testing.T) {
+	temp := t.TempDir()
+	ramdisk := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.LibtorrentDir = t.TempDir()
+	cfg.LibtorrentTempDir = &temp
+	cfg.Settings = map[string]string{
+		"libtorrent_ramdisk_dir":          ramdisk,
+		"libtorrent_ramdisk_enabled":      "yes",
+		"libtorrent_ramdisk_threshold_gb": "3.5",
+		"libtorrent_ramdisk_margin_gb":    "0.5",
+	}
+	release := &models.Release{SizeBytes: 1 << 30}
+
+	// 1 GB available: a 1 GB payload plus the 0.5 GB margin does not fit.
+	withHostMemory(t, 1<<30, true)
+	if got := automaticDownloadPath(release, &cfg, true); got == nil || *got != temp {
+		t.Fatalf("a tight host must fall back to the overflow dir, got %v", got)
+	}
+
+	// 4 GB available: it fits the RAM disk.
+	withHostMemory(t, 4<<30, true)
+	if got := automaticDownloadPath(release, &cfg, true); got == nil || *got != ramdisk {
+		t.Fatalf("a well-provided host must still use the RAM disk, got %v", got)
+	}
+}
+
+// TestRamdiskAdmissionChecksHostMemory pins the same gate at the metadata-time
+// move: a fitting torrent must not be moved onto the RAM disk when the host
+// lacks the memory to hold it.
+func TestRamdiskAdmissionChecksHostMemory(t *testing.T) {
+	ramdisk := t.TempDir()
+	disk := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.LibtorrentDir = disk
+	cfg.Settings = map[string]string{
+		"libtorrent_ramdisk_dir":          ramdisk,
+		"libtorrent_ramdisk_enabled":      "yes",
+		"libtorrent_ramdisk_threshold_gb": "3.5",
+		"libtorrent_ramdisk_margin_gb":    "0.5",
+	}
+	hash := strings.Repeat("e", 40)
+	torrents := &stubTorrentSession{list: []models.TorrentView{{
+		Hash: hash, Name: "fits", SavePath: disk, TotalSize: 1 << 30,
+	}}}
+	event := &models.TorrentEvent{Kind: "metadata_received", Hash: hash, Name: "fits", SavePath: disk}
+
+	withHostMemory(t, 1<<30, true)
+	tev_admitToRamdisk(&cfg, torrents, event)
+	if len(torrents.moved) != 0 {
+		t.Fatalf("a tight host must not admit the torrent: %v", torrents.moved)
+	}
+
+	withHostMemory(t, 4<<30, true)
+	tev_admitToRamdisk(&cfg, torrents, event)
+	if torrents.moved[hash] != ramdisk {
+		t.Fatalf("a well-provided host must admit the torrent: %v", torrents.moved)
+	}
+}
+
 // TestRamdiskPendingBytesCountsPreallocatedSpace covers a download copied onto
 // the RAM disk from a preallocated file: the whole payload already occupies the
 // tmpfs, so it must not

@@ -436,6 +436,33 @@ func preferredDownloadPath(cfg *Config) string {
 	return cfg.LibtorrentDir
 }
 
+// ramdiskHostMemoryAvailable reports the host memory that is actually available
+// (MemAvailable) in bytes; ok is false when it cannot be determined. It is a
+// variable so tests can pin it; the default reads /proc/meminfo.
+var ramdiskHostMemoryAvailable = func() (uint64, bool) {
+	_, available := memory_info()
+	return available, available > 0
+}
+
+// ramdiskEffectiveFreeBytes returns the RAM disk's usable free space: the lesser
+// of the tmpfs free space and the host memory that is really available. A tmpfs
+// is RAM-backed, so its statfs free space can report several GB on a 6 GB mount
+// while the machine has almost no memory left; trusting it would stage a
+// download that then fails or drives the host into swap. When the host figure
+// cannot be read the tmpfs one is used unchanged (the historical behavior).
+// A nil result means the space could not be determined.
+func ramdiskEffectiveFreeBytes(ramdisk string) *uint64 {
+	free := FreeSpaceBytes(ramdisk)
+	if free == nil {
+		return nil
+	}
+	available, ok := ramdiskHostMemoryAvailable()
+	if !ok || available >= *free {
+		return free
+	}
+	return &available
+}
+
 // ramdiskDefaultDir returns the RAM disk when it is enabled, mounted and has
 // enough free space for the configured margin. It is the explicit target for an
 // acquisition whose size is known to fit; it is never the implicit engine
@@ -452,7 +479,7 @@ func ramdiskDefaultDir(cfg *Config) (string, bool) {
 	if minimumFree == 0 {
 		minimumFree = cfg.RamdiskMarginBytes()
 	}
-	if free := FreeSpaceBytes(*dir); free != nil && *free >= minimumFree {
+	if free := ramdiskEffectiveFreeBytes(*dir); free != nil && *free >= minimumFree {
 		return *dir, true
 	}
 	return "", false
@@ -560,9 +587,22 @@ func automaticDownloadPath(release *models.Release, cfg *Config, ramdiskSupporte
 		}
 		return nil
 	}
-	// Known to fit: the RAM disk is an explicit choice (the engine default no
-	// longer falls back to it), so ask for it when it has room.
+	// Known to fit the size threshold: the RAM disk is an explicit choice (the
+	// engine default no longer falls back to it), so ask for it only when it
+	// has room for the payload. The size threshold alone is not enough: the
+	// tmpfs may be free while the host has little memory left, or the tmpfs
+	// itself may be nearly full, so the payload must fit the effective free
+	// space too. Otherwise it falls back to the overflow dir like an oversized
+	// release.
 	if dir, ok := ramdiskDefaultDir(cfg); ok {
+		if free := ramdiskEffectiveFreeBytes(dir); free != nil {
+			if err := RamdiskFits(cfg.RamdiskThresholdBytes(), cfg.RamdiskMarginBytes(), *free, 0, uint64(release.SizeBytes)); err != nil {
+				if overflow, ok := ramdiskOverflowDir(cfg); ok {
+					return &overflow
+				}
+				return nil
+			}
+		}
 		return &dir
 	}
 	return nil

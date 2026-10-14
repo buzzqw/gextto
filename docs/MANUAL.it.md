@@ -1610,6 +1610,14 @@ soglia. Un file troppo grande non tocca mai il RAM disk. La regola vale per tutt
 i download — automatici e aggiunti a mano — e per ogni motore che usa il RAM
 disk; qBittorrent, che non lo supporta, scarica sempre su disco.
 
+Gextto verifica anche la memoria disponibile della macchina: un `tmpfs` sta in
+RAM, quindi un disco da 6 GB può risultare quasi vuoto mentre il sistema ha poca
+memoria libera. Prima di iniziare, lo spazio usabile del RAM disk è limitato
+dalla memoria disponibile (`MemAvailable`): il download va sul RAM disk solo se
+ci stanno sia lo spazio del `tmpfs` sia la memoria del sistema, altrimenti resta
+su disco come i file troppo grandi. Se la memoria non è leggibile vale il solo
+spazio del `tmpfs`, come prima.
+
 **Per esperti**
 
 | Impostazione | Cosa fa |

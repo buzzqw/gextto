@@ -1618,6 +1618,13 @@ a download at 20% from `/dev/shm` to the disk.
   with `ramdisk` support; qBittorrent (`ramdisk: none`) always downloads to disk.
 - The "reserved" space on the RAM disk does not count the torrents already
   leaving it.
+- The tmpfs free space is not trusted on its own: a tmpfs is RAM-backed, so a
+  6 GB mount can report several GB free while the host has almost no memory
+  left. Before staging a payload, Gextto caps the RAM disk's usable free space
+  by the host's available memory (`MemAvailable`): a download starts on the
+  tmpfs only when both the tmpfs and the machine can hold it, and otherwise
+  falls back to the overflow dir like an oversized release. When the memory
+  figure cannot be read the tmpfs one is used unchanged.
 
 ## On-disk layout and data safety
 

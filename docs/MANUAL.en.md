@@ -1566,6 +1566,13 @@ the RAM disk. The rule applies to every download — automatic and manually adde
 and to every engine that uses the RAM disk; qBittorrent, which does not support
 it, always downloads to disk.
 
+Gextto also checks the machine's available memory: a `tmpfs` lives in RAM, so a
+6 GB mount can look almost empty while the system has little memory left. Before
+starting, the RAM disk's usable space is capped by the available memory
+(`MemAvailable`): a download goes to the RAM disk only if both the `tmpfs` space
+and the system memory can hold it, otherwise it stays on disk like oversized
+files. When the memory cannot be read, only the `tmpfs` space counts, as before.
+
 **For experts**
 
 | Setting | What it does |
