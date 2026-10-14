@@ -34,11 +34,16 @@ const (
 var logOutput io.Writer = os.Stderr
 
 // logFilePath is the rotating file setupLogFile opened, if any (empty = stderr).
+// logRingCapacity is the fixed number of log lines the ring keeps. It bounds
+// the tail allocation with a compile-time constant, so a ?lines= query value
+// can never size it (CodeQL: uncontrolled allocation size).
+const logRingCapacity = 4000
+
 var logFilePath string
 
 // logRing keeps the most recent daemon log lines so the web page can show what
 // the daemon is doing, regardless of where the log is written (stderr or file).
-var logRing = newLogRingBuffer(4000)
+var logRing = newLogRingBuffer(logRingCapacity)
 
 func init() {
 	// Always keep the ring fed, also when the log goes to stderr only.
@@ -87,9 +92,12 @@ func (r *logRingBuffer) Write(p []byte) (int, error) {
 func (r *logRingBuffer) tail(n int) []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	// n comes from a query parameter (strconv.Atoi on ?lines=): bound it by the
-	// ring size before it sizes the allocation, so the make is provably capped
-	// (CodeQL: uncontrolled allocation size).
+	// n comes from a query parameter (strconv.Atoi on ?lines=): clamp it to the
+	// compile-time ring capacity, then to the ring's own length, before it sizes
+	// the allocation.
+	if n > logRingCapacity {
+		n = logRingCapacity
+	}
 	if n > len(r.lines) {
 		n = len(r.lines)
 	}

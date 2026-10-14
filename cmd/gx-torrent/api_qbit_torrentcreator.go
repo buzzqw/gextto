@@ -43,7 +43,15 @@ func (d *Daemon) handleQbitTorrentCreatorAdd(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "sourcePath is required", http.StatusBadRequest)
 		return
 	}
-	pieceSize, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("pieceSize")))
+	// pieceSize is a power of two between 16 KiB and 64 MiB (qBittorrent's
+	// limits); anything else, or an empty value, lets the creator choose. The
+	// range is checked before the int -> uint32 conversion.
+	pieceSize := 0
+	if raw := strings.TrimSpace(r.FormValue("pieceSize")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v >= 16<<10 && v <= 64<<20 {
+			pieceSize = v
+		}
+	}
 	now := time.Now().Unix()
 	task := &qbitCreateTask{
 		sourcePath:      sourcePath,
