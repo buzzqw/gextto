@@ -14,7 +14,7 @@ func TestReleaseFitsRamdisk(t *testing.T) {
 	cfg.LibtorrentDir = t.TempDir()
 	temp := t.TempDir()
 	cfg.LibtorrentTempDir = &temp
-	cfg.Settings = map[string]string{"libtorrent_ramdisk_dir": t.TempDir()}
+	cfg.Settings = map[string]string{"torrent_ramdisk_dir": t.TempDir()}
 
 	if !ReleaseFitsRamdisk(&models.Release{SizeBytes: 1_000_000_000}, &cfg) {
 		t.Fatal("a 1 GB release must fit the default 3.5 GB threshold")
@@ -32,8 +32,8 @@ func TestReleaseFitsRamdisk(t *testing.T) {
 	// With the RAM disk disabled there is nothing to skip.
 	off := DefaultConfig()
 	off.Settings = map[string]string{
-		"libtorrent_ramdisk_enabled": "false",
-		"libtorrent_ramdisk_dir":     t.TempDir(),
+		"torrent_ramdisk_enabled": "false",
+		"torrent_ramdisk_dir":     t.TempDir(),
 	}
 	if !ReleaseFitsRamdisk(&models.Release{SizeBytes: 100_000_000_000}, &off) {
 		t.Fatal("a disabled RAM disk must never divert the download")
@@ -63,8 +63,8 @@ func TestRamdiskNeedsMetadata(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.LibtorrentDir = t.TempDir()
 	cfg.Settings = map[string]string{
-		"libtorrent_ramdisk_dir":     t.TempDir(),
-		"libtorrent_ramdisk_enabled": "yes",
+		"torrent_ramdisk_dir":     t.TempDir(),
+		"torrent_ramdisk_enabled": "yes",
 	}
 	if !RamdiskNeedsMetadata(&models.Release{}, &cfg) {
 		t.Fatal("an unknown size must be staged off the RAM disk until metadata")
@@ -75,8 +75,8 @@ func TestRamdiskNeedsMetadata(t *testing.T) {
 
 	off := DefaultConfig()
 	off.Settings = map[string]string{
-		"libtorrent_ramdisk_enabled": "false",
-		"libtorrent_ramdisk_dir":     t.TempDir(),
+		"torrent_ramdisk_enabled": "false",
+		"torrent_ramdisk_dir":     t.TempDir(),
 	}
 	if RamdiskNeedsMetadata(&models.Release{}, &off) {
 		t.Fatal("a disabled RAM disk must never divert the download")
@@ -94,9 +94,9 @@ func TestAutomaticDownloadPathRamdiskPolicy(t *testing.T) {
 	cfg.LibtorrentDir = t.TempDir()
 	cfg.LibtorrentTempDir = &temp
 	cfg.Settings = map[string]string{
-		"libtorrent_ramdisk_dir":          ramdisk,
-		"libtorrent_ramdisk_enabled":      "yes",
-		"libtorrent_ramdisk_threshold_gb": "3.5",
+		"torrent_ramdisk_dir":          ramdisk,
+		"torrent_ramdisk_enabled":      "yes",
+		"torrent_ramdisk_threshold_gb": "3.5",
 	}
 
 	// A known size that fits: the RAM disk, chosen explicitly.
@@ -166,10 +166,10 @@ func TestRamdiskAdmissionMovesFittingTorrentOntoTheRamdisk(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.LibtorrentDir = disk
 	cfg.Settings = map[string]string{
-		"libtorrent_ramdisk_dir":          ramdisk,
-		"libtorrent_ramdisk_enabled":      "yes",
-		"libtorrent_ramdisk_threshold_gb": "3.5",
-		"libtorrent_ramdisk_margin_gb":    "0.5",
+		"torrent_ramdisk_dir":          ramdisk,
+		"torrent_ramdisk_enabled":      "yes",
+		"torrent_ramdisk_threshold_gb": "3.5",
+		"torrent_ramdisk_margin_gb":    "0.5",
 	}
 	hash := strings.Repeat("a", 40)
 	torrents := &stubTorrentSession{list: []models.TorrentView{{
@@ -191,10 +191,10 @@ func TestRamdiskAdmissionRejectsOversizedOrStartedTorrent(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.LibtorrentDir = disk
 	cfg.Settings = map[string]string{
-		"libtorrent_ramdisk_dir":          ramdisk,
-		"libtorrent_ramdisk_enabled":      "yes",
-		"libtorrent_ramdisk_threshold_gb": "3.5",
-		"libtorrent_ramdisk_margin_gb":    "0.5",
+		"torrent_ramdisk_dir":          ramdisk,
+		"torrent_ramdisk_enabled":      "yes",
+		"torrent_ramdisk_threshold_gb": "3.5",
+		"torrent_ramdisk_margin_gb":    "0.5",
 	}
 	oversized := strings.Repeat("b", 40)
 	started := strings.Repeat("c", 40)
@@ -218,10 +218,10 @@ func TestRamdiskAdmissionDisabledForBackendsWithoutRamdisk(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.LibtorrentDir = disk
 	cfg.Settings = map[string]string{
-		"libtorrent_ramdisk_dir":          ramdisk,
-		"libtorrent_ramdisk_enabled":      "yes",
-		"libtorrent_ramdisk_threshold_gb": "3.5",
-		"libtorrent_ramdisk_margin_gb":    "0.5",
+		"torrent_ramdisk_dir":          ramdisk,
+		"torrent_ramdisk_enabled":      "yes",
+		"torrent_ramdisk_threshold_gb": "3.5",
+		"torrent_ramdisk_margin_gb":    "0.5",
 	}
 	hash := strings.Repeat("d", 40)
 	torrents := &ramdiskCapStub{
@@ -285,10 +285,10 @@ func TestAutomaticDownloadPathChecksHostMemory(t *testing.T) {
 	cfg.LibtorrentDir = t.TempDir()
 	cfg.LibtorrentTempDir = &temp
 	cfg.Settings = map[string]string{
-		"libtorrent_ramdisk_dir":          ramdisk,
-		"libtorrent_ramdisk_enabled":      "yes",
-		"libtorrent_ramdisk_threshold_gb": "3.5",
-		"libtorrent_ramdisk_margin_gb":    "0.5",
+		"torrent_ramdisk_dir":          ramdisk,
+		"torrent_ramdisk_enabled":      "yes",
+		"torrent_ramdisk_threshold_gb": "3.5",
+		"torrent_ramdisk_margin_gb":    "0.5",
 	}
 	release := &models.Release{SizeBytes: 1 << 30}
 
@@ -314,10 +314,10 @@ func TestRamdiskAdmissionChecksHostMemory(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.LibtorrentDir = disk
 	cfg.Settings = map[string]string{
-		"libtorrent_ramdisk_dir":          ramdisk,
-		"libtorrent_ramdisk_enabled":      "yes",
-		"libtorrent_ramdisk_threshold_gb": "3.5",
-		"libtorrent_ramdisk_margin_gb":    "0.5",
+		"torrent_ramdisk_dir":          ramdisk,
+		"torrent_ramdisk_enabled":      "yes",
+		"torrent_ramdisk_threshold_gb": "3.5",
+		"torrent_ramdisk_margin_gb":    "0.5",
 	}
 	hash := strings.Repeat("e", 40)
 	torrents := &stubTorrentSession{list: []models.TorrentView{{

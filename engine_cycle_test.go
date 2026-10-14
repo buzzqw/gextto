@@ -407,10 +407,10 @@ func TestDownloadPathFreeSpaceFloorUsesRamdiskBudget(t *testing.T) {
 	ramdisk := t.TempDir()
 	other := t.TempDir()
 	cfg.Settings = map[string]string{
-		"min_free_space_gb":            "250",
-		"libtorrent_ramdisk_dir":       ramdisk,
-		"libtorrent_ramdisk_enabled":   "yes",
-		"libtorrent_ramdisk_margin_gb": "0.5",
+		"min_free_space_gb":         "250",
+		"torrent_ramdisk_dir":       ramdisk,
+		"torrent_ramdisk_enabled":   "yes",
+		"torrent_ramdisk_margin_gb": "0.5",
 	}
 	global := uint64(250) * 1024 * 1024 * 1024
 
@@ -418,7 +418,7 @@ func TestDownloadPathFreeSpaceFloorUsesRamdiskBudget(t *testing.T) {
 		t.Fatalf("ramdisk floor = %v, want margin %d", got, cfg.RamdiskMarginBytes())
 	}
 
-	cfg.Settings["libtorrent_ramdisk_min_free_bytes"] = "1048576"
+	cfg.Settings["torrent_ramdisk_min_free_bytes"] = "1048576"
 	if got := downloadPathFreeSpaceFloor(&cfg, ramdisk, &global); got == nil || *got != 1048576 {
 		t.Fatalf("ramdisk explicit floor = %v, want 1048576", got)
 	}

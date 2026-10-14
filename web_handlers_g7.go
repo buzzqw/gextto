@@ -678,7 +678,7 @@ func gh7_setting_key_allowed(key string) bool {
 		return false
 	}
 	for _, prefix := range []string{
-		"libtorrent_", "delay_", "housekeeping_", "media_info_", "score_", "tvdb_",
+		"torrent_", "libtorrent_", "delay_", "housekeeping_", "media_info_", "score_", "tvdb_",
 		"simkl_", "backup_", "notify_", "jellyfin_", "plex_", "gxtorrent_",
 	} {
 		if strings.HasPrefix(key, prefix) {
@@ -690,8 +690,8 @@ func gh7_setting_key_allowed(key string) bool {
 		"content_filters", "max_release_age_days", "gap_fill_max_per_series",
 		"gap_filling", "gap_deep_interval_hours", "gap_deep_max_per_cycle", "flaresolverr_url",
 		"tmdb_api_key", "tmdb_language", "default_language", "rename_episodes", "rename_format",
-		"rename_template", "archive_root", "trash_path", "libtorrent_dir",
-		"libtorrent_temp_dir", "libtorrent_ramdisk_dir", "libtorrent_extra_settings",
+		"rename_template", "archive_root", "trash_path", "torrent_dir",
+		"torrent_temp_dir", "torrent_ramdisk_dir", "libtorrent_extra_settings",
 		"cleanup_upgrades", "cleanup_min_score_diff", "upgrade_min_score_diff", "upgrade_until_score", "cleanup_action", "dry_run",
 		"min_free_space_gb", "trash_retention_days", "archive_cleanup_enabled",
 		"archive_max_age_days", "archive_keep_min", "stop_on_old_page_threshold", "debug_enabled",

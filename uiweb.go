@@ -389,7 +389,7 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 		trash = *s.cfg.TrashPath
 	}
 	ramdisk := ""
-	if value, ok := s.cfg.Settings["libtorrent_ramdisk_dir"]; ok {
+	if value, ok := s.cfg.Settings["torrent_ramdisk_dir"]; ok {
 		ramdisk = value
 	}
 	health := CheckWithPaths(&HealthPaths{
@@ -437,7 +437,7 @@ func uiHealthPathsFrom(s *AppState) *HealthPaths {
 		trash = *s.cfg.TrashPath
 	}
 	ramdisk := ""
-	if value, ok := s.cfg.Settings["libtorrent_ramdisk_dir"]; ok {
+	if value, ok := s.cfg.Settings["torrent_ramdisk_dir"]; ok {
 		ramdisk = value
 	}
 	return &HealthPaths{

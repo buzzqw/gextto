@@ -577,13 +577,13 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 	cfg := latestConfig(s)
 	page := uiDownloadsPage{
 		Torrents:            uiTorrentsDataFrom(s),
-		TempDL:              uiSettingInt(cfg, "libtorrent_temp_dl_limit"),
-		TempUL:              uiSettingInt(cfg, "libtorrent_temp_ul_limit"),
+		TempDL:              uiSettingInt(cfg, "torrent_temp_dl_limit"),
+		TempUL:              uiSettingInt(cfg, "torrent_temp_ul_limit"),
 		AutoRemoveCompleted: settingsBool(cfg, "auto_remove_completed", false),
 		TagOptions:          uiDownloadTagOptions(s, cfg),
 	}
-	if uiSettingString(cfg, "libtorrent_temp_limit_enabled") == "1" {
-		until := uiSettingInt(cfg, "libtorrent_temp_limit_until")
+	if uiSettingString(cfg, "torrent_temp_limit_enabled") == "1" {
+		until := uiSettingInt(cfg, "torrent_temp_limit_until")
 		if until == 0 {
 			page.TempActive = true
 			page.TempMinutes = 0

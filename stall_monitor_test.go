@@ -37,8 +37,8 @@ func (s *stallSession) Restart(string) (bool, error) {
 func TestMonitorStalledParksProbesAndKeepsItsClock(t *testing.T) {
 	db := newTestDB(t)
 	cfg := &Config{Settings: map[string]string{
-		"libtorrent_stall_after_min": "60",
-		"libtorrent_stall_retry_min": "60",
+		"torrent_stall_after_min": "60",
+		"torrent_stall_retry_min": "60",
 	}}
 	session := &stallSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{
 		{Hash: "fbi", Name: "FBI Stagione 2", State: "downloading", Progress: 74, TotalDone: 1000, NumPeers: 2},
@@ -134,7 +134,7 @@ func TestMonitorStalledParksProbesAndKeepsItsClock(t *testing.T) {
 
 func TestMonitorStalledGivesUpOnTheOriginalClock(t *testing.T) {
 	db := newTestDB(t)
-	cfg := &Config{Settings: map[string]string{"libtorrent_dead_swarm_giveup_min": "4320"}}
+	cfg := &Config{Settings: map[string]string{"torrent_dead_swarm_giveup_min": "4320"}}
 	session := &stallSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{
 		{Hash: "fbi", Name: "FBI Stagione 3", State: "stalled", Stalled: true, HasMetadata: true, Progress: 9, TotalDone: 1000, NumPeers: 1, NumComplete: 0},
 	}}}
@@ -150,7 +150,7 @@ func TestMonitorStalledGivesUpOnTheOriginalClock(t *testing.T) {
 
 func TestMonitorStalledIdleClockSurvivesRestart(t *testing.T) {
 	db := newTestDB(t)
-	cfg := &Config{Settings: map[string]string{"libtorrent_stall_after_min": "60"}}
+	cfg := &Config{Settings: map[string]string{"torrent_stall_after_min": "60"}}
 	session := &stallSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{
 		{Hash: "fbi", Name: "FBI.S03", State: "downloading", Progress: 53, TotalDone: 1000, NumPeers: 4},
 	}}}
@@ -208,8 +208,8 @@ func TestMonitorStalledIdleClockSurvivesRestart(t *testing.T) {
 func TestMonitorStalledDoesNotRewriteAnUnchangedRow(t *testing.T) {
 	db := newTestDB(t)
 	cfg := &Config{Settings: map[string]string{
-		"libtorrent_stall_after_min": "60",
-		"libtorrent_stall_retry_min": "60",
+		"torrent_stall_after_min": "60",
+		"torrent_stall_retry_min": "60",
 	}}
 	session := &stallSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{
 		{Hash: "fbi", Name: "FBI Stagione 2", State: "downloading", Progress: 74, TotalDone: 1000, NumPeers: 2},

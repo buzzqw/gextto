@@ -60,7 +60,7 @@ func TestV2SetupPathsHaveFolderBrowser(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("step 2 -> %d", code)
 	}
-	for _, key := range []string{"archive_root", "libtorrent_dir", "libtorrent_temp_dir", "trash_path"} {
+	for _, key := range []string{"archive_root", "torrent_dir", "torrent_temp_dir", "trash_path"} {
 		if !strings.Contains(body, `data-v2-browse-for="`+key+`"`) || !strings.Contains(body, `name="`+key+`"`) {
 			t.Fatalf("step 2: %s has no folder browser", key)
 		}
@@ -76,7 +76,7 @@ func TestV2SetupPathsCheckAndSave(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	// A missing library is refused (it is usually a NAS mount) and nothing is saved.
-	response, err := client.PostForm(server.URL+"/setup/paths", url.Values{"action": {"save"}, "archive_root": {filepath.Join(library, "missing")}, "libtorrent_dir": {downloads}})
+	response, err := client.PostForm(server.URL+"/setup/paths", url.Values{"action": {"save"}, "archive_root": {filepath.Join(library, "missing")}, "torrent_dir": {downloads}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestV2SetupPathsCheckAndSave(t *testing.T) {
 		t.Fatalf("missing library accepted: %q", location)
 	}
 
-	response, err = client.PostForm(server.URL+"/setup/paths", url.Values{"action": {"save"}, "archive_root": {library}, "libtorrent_dir": {downloads}})
+	response, err = client.PostForm(server.URL+"/setup/paths", url.Values{"action": {"save"}, "archive_root": {library}, "torrent_dir": {downloads}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestV2SetupPathsKeepsUnchangedDownloadFolder(t *testing.T) {
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
-	response, err := client.PostForm(server.URL+"/setup/paths", url.Values{"action": {"save"}, "archive_root": {library}, "libtorrent_dir": {current}})
+	response, err := client.PostForm(server.URL+"/setup/paths", url.Values{"action": {"save"}, "archive_root": {library}, "torrent_dir": {current}})
 	if err != nil {
 		t.Fatal(err)
 	}

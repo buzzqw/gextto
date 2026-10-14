@@ -1723,7 +1723,7 @@ func gh0_libtorrentOptimizationFor(cfg *Config) gh0_libtorrentOptimization {
 		trash = *cfg.TrashPath
 	}
 	var ramdisk *string
-	if value, ok := cfg.Settings["libtorrent_ramdisk_dir"]; ok {
+	if value, ok := cfg.Settings["torrent_ramdisk_dir"]; ok {
 		copied := value
 		ramdisk = &copied
 	}
@@ -1770,15 +1770,15 @@ func gh0_libtorrentOptimizationFor(cfg *Config) gh0_libtorrentOptimization {
 		fmt.Sprintf("max_peerlist_size=%d", peerList),
 	)
 	changes := []gh0_libtorrentChange{
-		{"libtorrent_active_downloads", strconv.Itoa(activeDownloads)},
-		{"libtorrent_active_seeds", strconv.Itoa(activeSeeds)},
-		{"libtorrent_active_limit", strconv.Itoa(activeLimit)},
-		{"libtorrent_dynamic_queue", "yes"},
-		{"libtorrent_dynamic_queue_min", "1"},
-		{"libtorrent_dynamic_queue_max", "10"},
-		{"libtorrent_dont_count_slow_torrents", "yes"},
-		{"libtorrent_cache_size", strconv.FormatInt(cacheSize, 10)},
-		{"libtorrent_cache_expiry", "300"},
+		{"torrent_active_downloads", strconv.Itoa(activeDownloads)},
+		{"torrent_active_seeds", strconv.Itoa(activeSeeds)},
+		{"torrent_active_limit", strconv.Itoa(activeLimit)},
+		{"torrent_dynamic_queue", "yes"},
+		{"torrent_dynamic_queue_min", "1"},
+		{"torrent_dynamic_queue_max", "10"},
+		{"torrent_dont_count_slow_torrents", "yes"},
+		{"torrent_cache_size", strconv.FormatInt(cacheSize, 10)},
+		{"torrent_cache_expiry", "300"},
 		{"libtorrent_extra_settings", strings.Join(extraSettings, "\n")},
 	}
 	return gh0_libtorrentOptimization{
@@ -1812,7 +1812,7 @@ func OptimizeLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppSt
 	}
 	// gx-torrent: the cache goes back to automatic (sized from the RAM).
 	if gx, ok := s.activeEngine().(*gxTorrentEngine); ok {
-		if err := SaveSetting(s.cfg.DataDir, "libtorrent_cache_size", "-1"); err != nil {
+		if err := SaveSetting(s.cfg.DataDir, "torrent_cache_size", "-1"); err != nil {
 			jsonError(w, http.StatusInternalServerError, err.Error())
 			return
 		}

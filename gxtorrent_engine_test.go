@@ -601,7 +601,7 @@ func TestGxMirrorsPreexistingTorrentCopy(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(state, hash+".torrent"), content, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cfg := &Config{Settings: map[string]string{"libtorrent_torrent_copy_dir": copyDir}}
+	cfg := &Config{Settings: map[string]string{"torrent_copy_dir": copyDir}}
 	engine := &gxTorrentEngine{cfg: cfg}
 	engine.settings.stateDir = state
 

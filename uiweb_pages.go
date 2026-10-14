@@ -403,10 +403,10 @@ type uiSearchEntry struct {
 // tuning. They render as "Auto" instead of an editable value.
 func gxAutoManagedKey(key string) bool {
 	switch key {
-	case "libtorrent_active_downloads", "libtorrent_active_seeds", "libtorrent_active_limit",
-		"libtorrent_dont_count_slow_torrents",
-		"libtorrent_dynamic_queue", "libtorrent_dynamic_queue_min", "libtorrent_dynamic_queue_max",
-		"libtorrent_cache_size", "libtorrent_cache_expiry":
+	case "torrent_active_downloads", "torrent_active_seeds", "torrent_active_limit",
+		"torrent_dont_count_slow_torrents",
+		"torrent_dynamic_queue", "torrent_dynamic_queue_min", "torrent_dynamic_queue_max",
+		"torrent_cache_size", "torrent_cache_expiry":
 		return true
 	}
 	return false
@@ -828,8 +828,8 @@ func uiHideDependentFields(fields []uiSettingField) {
 // settings, superseded in the page by libtorrent_sched_week. They are still
 // read as the fallback of an unsaved per-day schedule (speedScheduleWeek).
 var uiSchedSingleWindowKeys = map[string]bool{
-	"libtorrent_sched_start": true, "libtorrent_sched_end": true, "libtorrent_sched_days": true,
-	"libtorrent_sched_dl_limit": true, "libtorrent_sched_ul_limit": true,
+	"torrent_sched_start": true, "torrent_sched_end": true, "torrent_sched_days": true,
+	"torrent_sched_dl_limit": true, "torrent_sched_ul_limit": true,
 }
 
 // uiSettingsTabEditors returns the structured list editors shown on a tab.
@@ -868,10 +868,10 @@ var uiSettingsEditorSearchEntries = []uiSearchEntry{
 // uiManagedSetting lists the settings the continuous optimization drives: with
 // `libtorrent_auto_optimize` on they render as "Auto" and cannot be edited.
 var uiManagedSetting = map[string]bool{
-	"libtorrent_active_downloads": true,
-	"libtorrent_active_seeds":     true,
-	"libtorrent_active_limit":     true,
-	"libtorrent_cache_size":       true,
+	"torrent_active_downloads": true,
+	"torrent_active_seeds":     true,
+	"torrent_active_limit":     true,
+	"torrent_cache_size":       true,
 }
 
 // uiLibtorrentEngineOnlySettings lists the options read only by the embedded
@@ -1132,7 +1132,7 @@ func uiSettingFieldBase(key, label, value string) uiSettingField {
 			{Value: "delete", Label: "Elimina definitivamente", Selected: selected == "delete"},
 		}
 	}
-	if key == "libtorrent_encryption" {
+	if key == "torrent_encryption" {
 		selected := strings.TrimSpace(value)
 		if selected != "0" && selected != "2" {
 			selected = "1"
@@ -1144,7 +1144,7 @@ func uiSettingFieldBase(key, label, value string) uiSettingField {
 			{Value: "2", Label: "Forzata", Selected: selected == "2"},
 		}
 	}
-	if key == "libtorrent_outgoing_interface" {
+	if key == "torrent_outgoing_interface" {
 		selected := strings.TrimSpace(value)
 		field.Kind = "select"
 		field.Options = []uiFormOption{{

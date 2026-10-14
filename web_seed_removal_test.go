@@ -259,8 +259,8 @@ func TestEnforceSeedPolicyArchivesAtSeedEnd(t *testing.T) {
 // and is not the release's configured archive destination.
 func TestEnforceSeedPolicyMovesRamdiskSourceDirectlyToArchive(t *testing.T) {
 	db, cfg, view, source, processed := seedTestSetup(t)
-	cfg.Settings["libtorrent_ramdisk_enabled"] = "yes"
-	cfg.Settings["libtorrent_ramdisk_dir"] = filepath.Dir(source)
+	cfg.Settings["torrent_ramdisk_enabled"] = "yes"
+	cfg.Settings["torrent_ramdisk_dir"] = filepath.Dir(source)
 	cfg.LibtorrentDir = filepath.Join(t.TempDir(), "downloads")
 	library := filepath.Dir(processed)
 	cfg.ArchiveRoot = &library
@@ -281,8 +281,8 @@ func TestEnforceSeedPolicyMovesRamdiskSourceDirectlyToArchive(t *testing.T) {
 // not be moved into the archive as a second copy in a subfolder.
 func TestEnforceSeedPolicyRamdiskSkipsArchiveWhenAlreadyCopied(t *testing.T) {
 	db, cfg, view, source, processed := seedTestSetup(t)
-	cfg.Settings["libtorrent_ramdisk_enabled"] = "yes"
-	cfg.Settings["libtorrent_ramdisk_dir"] = filepath.Dir(source)
+	cfg.Settings["torrent_ramdisk_enabled"] = "yes"
+	cfg.Settings["torrent_ramdisk_dir"] = filepath.Dir(source)
 	downloads := filepath.Join(t.TempDir(), "downloads")
 	cfg.LibtorrentDir = downloads
 	library := filepath.Dir(processed)
@@ -299,8 +299,8 @@ func TestEnforceSeedPolicyRamdiskSkipsArchiveWhenAlreadyCopied(t *testing.T) {
 // was populated before a restart interrupted the storage_moved event.
 func TestEnforceSeedPolicyAssociatesExistingArchive(t *testing.T) {
 	db, cfg, view, source, processed := seedTestSetup(t)
-	cfg.Settings["libtorrent_ramdisk_enabled"] = "yes"
-	cfg.Settings["libtorrent_ramdisk_dir"] = filepath.Dir(source)
+	cfg.Settings["torrent_ramdisk_enabled"] = "yes"
+	cfg.Settings["torrent_ramdisk_dir"] = filepath.Dir(source)
 	cfg.LibtorrentDir = filepath.Join(t.TempDir(), "downloads")
 	library := filepath.Dir(processed)
 	cfg.ArchiveRoot = &library

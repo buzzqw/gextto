@@ -934,7 +934,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			logging.Debug("debug diagnostics", "resident_kb", bg_residentKB(), "torrents", len(torrents.List()))
 		}
 		var pinned *string
-		if value, ok := cfg.Settings["libtorrent_pinned_hash"]; ok {
+		if value, ok := cfg.Settings["torrent_pinned_hash"]; ok {
 			trimmed := strings.ToLower(strings.TrimSpace(value))
 			if trimmed != "" {
 				pinned = &trimmed
@@ -960,7 +960,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			}
 		}
 		sequential := false
-		if value, ok := cfg.Settings["libtorrent_sequential"]; ok {
+		if value, ok := cfg.Settings["torrent_sequential"]; ok {
 			sequential = settingTruthy(value)
 		}
 		if lastSequential == nil || *lastSequential != sequential {
@@ -972,7 +972,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		}
 		// A plain flag on the engine: re-applying it each pass also covers a
 		// switch of the active engine.
-		torrents.SetFirstLastDefault(settingTruthy(cfg.Settings["libtorrent_first_last"]))
+		torrents.SetFirstLastDefault(settingTruthy(cfg.Settings["torrent_first_last"]))
 		MonitorMetadata(cfg, torrents, db, notifier, metadataWaitStart, metadataFirstSeen, metadataLastWarning)
 		MonitorStalled(cfg, torrents, db, notifier, stallWaitStart)
 		if now.Sub(lastRamdiskCheck) >= 30*time.Second {

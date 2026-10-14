@@ -238,11 +238,11 @@ func SaveRamdiskSettings(dataDir string, path string) (map[string]any, error) {
 		key   string
 		value string
 	}{
-		{"libtorrent_ramdisk_dir", path},
-		{"libtorrent_ramdisk_enabled", "yes"},
-		{"libtorrent_ramdisk_threshold_gb", jsonStringField(recommendation, "threshold_gb", "3.5")},
-		{"libtorrent_ramdisk_margin_gb", jsonStringField(recommendation, "margin_gb", "0.5")},
-		{"libtorrent_ramdisk_min_free_bytes", "0"},
+		{"torrent_ramdisk_dir", path},
+		{"torrent_ramdisk_enabled", "yes"},
+		{"torrent_ramdisk_threshold_gb", jsonStringField(recommendation, "threshold_gb", "3.5")},
+		{"torrent_ramdisk_margin_gb", jsonStringField(recommendation, "margin_gb", "0.5")},
+		{"torrent_ramdisk_min_free_bytes", "0"},
 	}
 	for _, step := range steps {
 		if err := saveConfigSetting(dataDir, step.key, step.value); err != nil {

@@ -74,13 +74,13 @@ func TestTorrentAPILifecycle(t *testing.T) {
 
 	// latestConfig reloads the JSON file: make sure it is not dry-run.
 	configJSON, _ := json.Marshal(map[string]any{
-		"data_dir":            state.cfg.DataDir,
-		"state_dir":           state.cfg.StateDir,
-		"libtorrent_dir":      state.cfg.LibtorrentDir,
-		"libtorrent_temp_dir": state.cfg.LibtorrentTempDir,
-		"trash_path":          state.cfg.TrashPath,
-		"dry_run":             false,
-		"active":              false,
+		"data_dir":         state.cfg.DataDir,
+		"state_dir":        state.cfg.StateDir,
+		"torrent_dir":      state.cfg.LibtorrentDir,
+		"torrent_temp_dir": state.cfg.LibtorrentTempDir,
+		"trash_path":       state.cfg.TrashPath,
+		"dry_run":          false,
+		"active":           false,
 	})
 	if err := os.WriteFile(state.config_path, configJSON, 0o644); err != nil {
 		t.Fatalf("write config: %v", err)

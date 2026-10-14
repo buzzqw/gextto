@@ -738,7 +738,7 @@ func (e *gxTorrentEngine) ensureTorrentFile(hash string) {
 }
 
 // torrentCopyDir is the optional folder Gextto keeps the `.torrent` copies in
-// (libtorrent_torrent_copy_dir); empty means none.
+// (torrent_copy_dir); empty means none.
 func (e *gxTorrentEngine) torrentCopyDir() string {
 	if e.cfg == nil {
 		return ""

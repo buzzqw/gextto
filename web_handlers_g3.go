@@ -710,7 +710,7 @@ func SystemStats(w http.ResponseWriter, r *http.Request, s *AppState) {
 		trash = *s.cfg.TrashPath
 	}
 	ramdisk := ""
-	if value, ok := s.cfg.Settings["libtorrent_ramdisk_dir"]; ok && strings.TrimSpace(value) != "" {
+	if value, ok := s.cfg.Settings["torrent_ramdisk_dir"]; ok && strings.TrimSpace(value) != "" {
 		ramdisk = value
 	}
 	health := CheckWithPaths(&HealthPaths{

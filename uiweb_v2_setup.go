@@ -170,16 +170,16 @@ func v2SetupViewFrom(s *AppState, r *http.Request) v2SetupView {
 
 func v2SetupPathValues(cfg *Config) map[string]string {
 	values := map[string]string{
-		"archive_root":        "",
-		"libtorrent_dir":      cfg.LibtorrentDir,
-		"libtorrent_temp_dir": "",
-		"trash_path":          "",
+		"archive_root":     "",
+		"torrent_dir":      cfg.LibtorrentDir,
+		"torrent_temp_dir": "",
+		"trash_path":       "",
 	}
 	if cfg.ArchiveRoot != nil {
 		values["archive_root"] = *cfg.ArchiveRoot
 	}
 	if cfg.LibtorrentTempDir != nil {
-		values["libtorrent_temp_dir"] = *cfg.LibtorrentTempDir
+		values["torrent_temp_dir"] = *cfg.LibtorrentTempDir
 	}
 	if cfg.TrashPath != nil {
 		values["trash_path"] = *cfg.TrashPath
@@ -189,8 +189,8 @@ func v2SetupPathValues(cfg *Config) map[string]string {
 
 var v2SetupPathOrder = []struct{ key, label, hint, placeholder string }{
 	{"archive_root", "Libreria (serie TV e film)", "La cartella finale, di solito sul NAS: ogni serie o film vi ha la sua sottocartella.", "/mnt/nas/media"},
-	{"libtorrent_dir", "Download", "Dove restano i file mentre vengono condivisi (seed).", "/var/lib/gextto/downloads"},
-	{"libtorrent_temp_dir", "Download temporanei", "I file incompleti. Meglio su un disco locale veloce, non sul NAS.", "/var/lib/gextto/incomplete"},
+	{"torrent_dir", "Download", "Dove restano i file mentre vengono condivisi (seed).", "/var/lib/gextto/downloads"},
+	{"torrent_temp_dir", "Download temporanei", "I file incompleti. Meglio su un disco locale veloce, non sul NAS.", "/var/lib/gextto/incomplete"},
 	{"trash_path", "Cestino", "I file sostituiti da un upgrade, conservati prima della cancellazione.", "/var/lib/gextto/trash"},
 }
 

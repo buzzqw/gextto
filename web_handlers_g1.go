@@ -1110,7 +1110,7 @@ func TorrentTags(w http.ResponseWriter, r *http.Request, s *AppState) {
 func UnpinTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	ok, err := s.activeEngine().SetPin("", false)
 	if err == nil {
-		_ = SaveSetting(s.cfg.DataDir, "libtorrent_pinned_hash", "")
+		_ = SaveSetting(s.cfg.DataDir, "torrent_pinned_hash", "")
 	}
 	status, value := gh1_torrentAction(ok, err)
 	jsonStatus(w, status, value)

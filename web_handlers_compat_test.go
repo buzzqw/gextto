@@ -272,7 +272,7 @@ func TestRamdiskViewReportsConfiguredProblems(t *testing.T) {
 
 	// A configured path that no longer exists must be flagged explicitly.
 	missing := filepath.Join(t.TempDir(), "gone")
-	if err := SaveSetting(state.cfg.DataDir, "libtorrent_ramdisk_dir", missing); err != nil {
+	if err := SaveSetting(state.cfg.DataDir, "torrent_ramdisk_dir", missing); err != nil {
 		t.Fatal(err)
 	}
 	code, _, body = webGet(t, server, "/api/ramdisk")

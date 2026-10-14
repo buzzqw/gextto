@@ -556,12 +556,12 @@ func DetachCompletedArchivedSingles(cfg *Config, torrents TorrentSession, db *Da
 
 // tev_configuredStallGiveupMinutes implements `configured_stall_giveup_minutes`.
 func tev_configuredStallGiveupMinutes(cfg *Config) float64 {
-	if value, ok := cfg.Settings["libtorrent_stall_giveup_min"]; ok {
+	if value, ok := cfg.Settings["torrent_stall_giveup_min"]; ok {
 		if parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil {
 			return parsed
 		}
 	}
-	if value, ok := cfg.Settings["libtorrent_stall_timeout_min"]; ok {
+	if value, ok := cfg.Settings["torrent_stall_timeout_min"]; ok {
 		if parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil {
 			if parsed > 0 {
 				if parsed > 10080 {
@@ -637,7 +637,7 @@ func tev_scheduleStallRetry(entry *StallWatch, now time.Time, base time.Duration
 // expires the gap is retried immediately.
 func tev_stallGiveupWindow(cfg *Config, torrent *models.TorrentView) (time.Duration, float64, bool) {
 	minutes := tev_configuredStallGiveupMinutes(cfg)
-	if deadSwarm := tev_settingFloatOr(cfg, "libtorrent_dead_swarm_giveup_min", 4320.0); deadSwarm > 0 {
+	if deadSwarm := tev_settingFloatOr(cfg, "torrent_dead_swarm_giveup_min", 4320.0); deadSwarm > 0 {
 		if code, _, _ := DiagnoseTorrent(torrent); code == "dead_swarm" {
 			minutes = deadSwarm
 		}
@@ -650,8 +650,8 @@ func tev_stallGiveupWindow(cfg *Config, torrent *models.TorrentView) (time.Durat
 
 // MonitorStalled implements `monitor_stalled`.
 func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, watch map[string]StallWatch) {
-	stallAfterMinutes := tev_settingFloatOr(cfg, "libtorrent_stall_after_min", 60.0)
-	retryMinutes := tev_settingFloatOr(cfg, "libtorrent_stall_retry_min", 60.0)
+	stallAfterMinutes := tev_settingFloatOr(cfg, "torrent_stall_after_min", 60.0)
+	retryMinutes := tev_settingFloatOr(cfg, "torrent_stall_retry_min", 60.0)
 	if stallAfterMinutes <= 0 {
 		clear(watch)
 		return
@@ -892,7 +892,7 @@ func tev_metadataRetryWarningDue(lastWarning, now time.Time) bool {
 // MonitorMetadata implements `monitor_metadata`. The retry cadence and give-up
 // policy are intentionally unchanged; only the repeated warning is rate-limited.
 func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, waitStart, firstSeen, lastWarning map[string]time.Time) {
-	giveupMinutes := tev_settingFloatOr(cfg, "libtorrent_metadata_giveup_min", 1440.0)
+	giveupMinutes := tev_settingFloatOr(cfg, "torrent_metadata_giveup_min", 1440.0)
 	if giveupMinutes <= 0 {
 		clear(waitStart)
 		clear(firstSeen)

@@ -543,7 +543,7 @@ func TestV2DetailAndRemoveFragmentsRender(t *testing.T) {
 
 func TestV2TorrentOnRamdisk(t *testing.T) {
 	ramdisk := t.TempDir()
-	cfg := &Config{Settings: map[string]string{"libtorrent_ramdisk_dir": ramdisk}}
+	cfg := &Config{Settings: map[string]string{"torrent_ramdisk_dir": ramdisk}}
 	if !v2TorrentOnRamdisk(filepath.Join(ramdisk, "payload"), cfg) {
 		t.Fatal("RAM disk payload not detected")
 	}
@@ -585,7 +585,7 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 		t.Fatalf("IP filter status -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=settings&tab=paths", nil)
-	if code != http.StatusOK || !strings.Contains(body, `data-v2-browse-for="libtorrent_dir"`) {
+	if code != http.StatusOK || !strings.Contains(body, `data-v2-browse-for="torrent_dir"`) {
 		t.Fatalf("path folder browser -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=settings&tab=rename", nil)
@@ -1474,7 +1474,7 @@ func TestGxAutoMarksCacheAndQueueManaged(t *testing.T) {
 			managed[f.Key] = f.Managed
 		}
 	}
-	for _, key := range []string{"libtorrent_cache_size", "libtorrent_active_downloads", "libtorrent_dynamic_queue"} {
+	for _, key := range []string{"torrent_cache_size", "torrent_active_downloads", "torrent_dynamic_queue"} {
 		if !managed[key] {
 			t.Fatalf("setting %q must be managed (Auto) with gx-torrent self-management on", key)
 		}

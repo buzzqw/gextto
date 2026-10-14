@@ -1800,7 +1800,7 @@ func (c *LibtorrentClient) torrentCopyDir() string {
 	}
 	defer conn.Close()
 	var value string
-	if err := conn.QueryRow("SELECT value FROM settings WHERE key='libtorrent_torrent_copy_dir'").Scan(&value); err != nil {
+	if err := conn.QueryRow("SELECT value FROM settings WHERE key='torrent_copy_dir'").Scan(&value); err != nil {
 		return ""
 	}
 	return strings.TrimSpace(value)

@@ -101,12 +101,12 @@ func validateBackendInteger(key, raw string, min, max int64) error {
 
 // pathSettings are the configuration keys that hold filesystem paths.
 var pathSettings = map[string]bool{
-	"trash_path":                  true,
-	"archive_root":                true,
-	"libtorrent_dir":              true,
-	"libtorrent_temp_dir":         true,
-	"libtorrent_torrent_copy_dir": true,
-	"libtorrent_ramdisk_dir":      true,
+	"trash_path":          true,
+	"archive_root":        true,
+	"torrent_dir":         true,
+	"torrent_temp_dir":    true,
+	"torrent_copy_dir":    true,
+	"torrent_ramdisk_dir": true,
 }
 
 // validatePathSetting rejects path values that are unsafe for the role they

@@ -93,11 +93,11 @@ func TestLibtorrentPreallocateDefaultsToTrue(t *testing.T) {
 	if !cfg.LibtorrentPreallocate() {
 		t.Fatal("preallocation must default to true")
 	}
-	cfg.Settings["libtorrent_preallocate"] = "false"
+	cfg.Settings["torrent_preallocate"] = "false"
 	if cfg.LibtorrentPreallocate() {
 		t.Fatal("explicit false ignored")
 	}
-	cfg.Settings["libtorrent_preallocate"] = "yes"
+	cfg.Settings["torrent_preallocate"] = "yes"
 	if !cfg.LibtorrentPreallocate() {
 		t.Fatal("explicit yes must enable preallocation")
 	}
@@ -157,7 +157,7 @@ func TestCopyTorrentFileHonoursSetting(t *testing.T) {
 	}
 
 	// With the setting the .torrent is copied under the display name.
-	if err := SaveSetting(dir, "libtorrent_torrent_copy_dir", outDir); err != nil {
+	if err := SaveSetting(dir, "torrent_copy_dir", outDir); err != nil {
 		t.Fatal(err)
 	}
 	client.copyTorrentFile("abc", source)

@@ -1882,7 +1882,7 @@ func (field v2Field) DescribedBy() string {
 // Browse reports whether the field is a server folder with a «Sfoglia» picker.
 func (field v2Field) Browse() bool {
 	switch field.Key {
-	case "archive_root", "trash_path", "libtorrent_dir", "libtorrent_temp_dir", "libtorrent_torrent_copy_dir", "libtorrent_ramdisk_dir":
+	case "archive_root", "trash_path", "torrent_dir", "torrent_temp_dir", "torrent_copy_dir", "torrent_ramdisk_dir":
 		return true
 	}
 	return false

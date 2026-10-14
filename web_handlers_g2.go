@@ -633,7 +633,7 @@ func PinTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := strings.ToLower(input.Hash)
 	result, err := s.activeEngine().SetPin(hash, true)
 	if err == nil {
-		_ = SaveSetting(s.cfg.DataDir, "libtorrent_pinned_hash", hash)
+		_ = SaveSetting(s.cfg.DataDir, "torrent_pinned_hash", hash)
 	}
 	status, value := gh2_torrentAction(result, err)
 	jsonStatus(w, status, value)
@@ -1030,7 +1030,7 @@ func SetSequential(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if input.Enabled {
 		value = "true"
 	}
-	_ = SaveSetting(s.cfg.DataDir, "libtorrent_sequential", value)
+	_ = SaveSetting(s.cfg.DataDir, "torrent_sequential", value)
 	result, err := s.activeEngine().SetSequential(input.Enabled)
 	status, response := gh2_torrentAction(result, err)
 	jsonStatus(w, status, response)

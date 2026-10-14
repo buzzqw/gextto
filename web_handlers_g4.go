@@ -1311,11 +1311,11 @@ func SetSpeedLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if upload < 0 {
 		upload = 0
 	}
-	if err := SaveSetting(s.cfg.DataDir, "libtorrent_dl_limit", strconv.FormatInt(download, 10)); err != nil {
+	if err := SaveSetting(s.cfg.DataDir, "torrent_dl_limit", strconv.FormatInt(download, 10)); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	_ = SaveSetting(s.cfg.DataDir, "libtorrent_ul_limit", strconv.FormatInt(upload, 10))
+	_ = SaveSetting(s.cfg.DataDir, "torrent_ul_limit", strconv.FormatInt(upload, 10))
 	if _, err := s.activeEngine().SetGlobalSpeedLimits(download, upload); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return

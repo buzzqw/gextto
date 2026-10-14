@@ -66,11 +66,11 @@ func TestReadsImportedBandwidthLimitsWithoutChangingUnits(t *testing.T) {
 func TestRamdiskSettingsReadFromConfigDB(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Settings = map[string]string{
-		"libtorrent_ramdisk_dir":            "/mnt/ramdisk",
-		"libtorrent_ramdisk_enabled":        "yes",
-		"libtorrent_ramdisk_threshold_gb":   "5.5",
-		"libtorrent_ramdisk_margin_gb":      "0.5",
-		"libtorrent_ramdisk_min_free_bytes": "1024",
+		"torrent_ramdisk_dir":            "/mnt/ramdisk",
+		"torrent_ramdisk_enabled":        "yes",
+		"torrent_ramdisk_threshold_gb":   "5.5",
+		"torrent_ramdisk_margin_gb":      "0.5",
+		"torrent_ramdisk_min_free_bytes": "1024",
 	}
 	if !cfg.RamdiskEnabled() {
 		t.Fatal("ramdisk should be enabled")
@@ -88,7 +88,7 @@ func TestRamdiskSettingsReadFromConfigDB(t *testing.T) {
 	if got := cfg.RamdiskMinFreeBytes(); got != 1024 {
 		t.Fatalf("min free = %d", got)
 	}
-	cfg.Settings["libtorrent_ramdisk_enabled"] = "no"
+	cfg.Settings["torrent_ramdisk_enabled"] = "no"
 	if cfg.RamdiskEnabled() {
 		t.Fatal("ramdisk should be disabled")
 	}
