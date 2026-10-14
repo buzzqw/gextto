@@ -302,6 +302,14 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   tabelle di stato, capacità e conteggi (righe, test, versioni, percorsi) vanno
   riallineati quando cambiano. Vale anche per il lavoro non visibile all'utente
   (motore, coda, DHT, storage): quei documenti sono il posto dove resta tracciato.
+- **Ogni modifica alle API aggiorna anche `docs/API.md`.** Nuova rotta, rotta
+  rimossa, cambio di metodo o parametri — su Gextto (`/api/*`, `web_router.go`)
+  come sul demone gx-torrent (`/api/v1/*` nativo e `/api/v2/*` compatibile
+  qBittorrent): la tabella in `docs/API.md` va allineata nello stesso lavoro,
+  non dopo. Guardia per Gextto: `TestAPIDocumentationMatchesRouter`; procedura:
+  `docs/DEVELOPERS.md`, *Web UI and API changes*. Nota: oggi `docs/API.md`
+  copre solo le rotte di Gextto; le `/api/v1` e `/api/v2` del demone sono
+  ancora da riversare (solo cenni sparsi in `docs/gx-torrent.md`).
 - **`docs/evoluzione.md` è uno dei documenti più lavorati del repository e tiene traccia solo delle evoluzioni, MAI dei bug.** Il documento è la sede esclusiva per: (1) **lo stato attuale** di Gextto, del demone e del motore (cosa c'è oggi e il perché delle scelte); (2) **il futuro delle migliorie da fare** (punti aperti con il loro gate, direttrici strategiche, roadmap). Le **misurazioni** stanno in `docs/measurements.md`, documento tecnico a sé — come ogni numero si prende, cosa dice oggi, come si verifica — e qui restano solo i rimandi. **Si scrive in termini di _cosa c'è_, non di cosa è stato fatto**: niente cronache di fix, di implementazioni («aggiunto», date di completamento, hash di commit), log di review per-commit o dettagli superati dal codice — quelli appartengono esclusivamente alla storia dei commit git. Restano invece le **decisioni**, con la loro motivazione (e i numeri, che stanno in `docs/measurements.md` con macchina e data della misura).
 - Quando aggiungi o sposti documenti, aggiorna l'indice `docs/README.md`.
 
