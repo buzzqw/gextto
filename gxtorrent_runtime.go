@@ -230,7 +230,7 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 		args = append(args, "-insecure")
 		logging.Debug("gx-torrent listens on the network without a token: set gxtorrent_token to protect its API", "listen", listen)
 	}
-	if dir := strings.TrimSpace(cfg.LibtorrentDir); dir != "" {
+	if dir := strings.TrimSpace(cfg.DownloadDir); dir != "" {
 		if absolute, absErr := filepath.Abs(dir); absErr == nil {
 			args = append(args, "-download-dir", absolute)
 		}
@@ -248,7 +248,7 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 		"-gextto-log", filepath.Join(cfg.DataDir, "gextto.log"),
 		"-orphan-timeout", gxOrphanTimeout.String(),
 	)
-	if source := strings.TrimSpace(cfg.Libtorrent.IpFilterPath); source != "" {
+	if source := strings.TrimSpace(cfg.Transfer.IpFilterPath); source != "" {
 		args = append(args, "-ipfilter-source", source)
 	}
 	if strings.EqualFold(strings.TrimSpace(cfg.Settings["gxtorrent_dlna"]), "true") {
@@ -748,7 +748,7 @@ func splitListenEntry(entry string) (host, ports string) {
 // gxNetworkArgs translates Gextto's libtorrent network settings into
 // gx-torrent flags.
 func gxNetworkArgs(cfg *Config) []string {
-	lt := cfg.Libtorrent
+	lt := cfg.Transfer
 	ports := ""
 	if lt.PortMin > 0 {
 		ports = fmt.Sprintf("%d-%d", lt.PortMin, max(lt.PortMin, lt.PortMax))
@@ -806,7 +806,7 @@ func gxNetworkArgs(cfg *Config) []string {
 // gxIPFilterPath is the local IP filter file: the configured path, or the
 // copy Gextto downloads from a configured URL.
 func gxIPFilterPath(cfg *Config) string {
-	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+	target := strings.TrimSpace(cfg.Transfer.IpFilterPath)
 	if target == "" {
 		return ""
 	}
@@ -828,7 +828,7 @@ func gxEnsureIPFilter(cfg *Config, force bool) bool {
 	if cfg == nil {
 		return false
 	}
-	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+	target := strings.TrimSpace(cfg.Transfer.IpFilterPath)
 	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
 		return false
 	}

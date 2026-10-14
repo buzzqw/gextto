@@ -244,7 +244,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/torrents/temp-limits", SetTempLimits)
 	handle(s, mux, "POST /api/torrents/ipfilter_update", IpfilterUpdate)
 	handle(s, mux, "GET /api/torrents/ipfilter_status", IpfilterStatus)
-	handle(s, mux, "POST /api/torrents/optimize_settings", OptimizeLibtorrentSettings)
+	handle(s, mux, "POST /api/torrents/optimize_settings", OptimizeTransferSettings)
 	handle(s, mux, "POST /api/service/restart", ServiceRestart)
 	handle(s, mux, "GET /api/services", ServicesStatus)
 	handle(s, mux, "POST /api/jellyfin/refresh", JellyfinRefresh)

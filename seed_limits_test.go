@@ -7,8 +7,8 @@ import "testing"
 // (unlimited). Both the "seed ∞" badge and "Pulisci completati" rely on it.
 func TestSeedLimitsForTorrent(t *testing.T) {
 	cfg := &Config{}
-	cfg.Libtorrent.SeedRatio = 2.0
-	cfg.Libtorrent.SeedTimeDays = 3
+	cfg.Transfer.SeedRatio = 2.0
+	cfg.Transfer.SeedTimeDays = 3
 
 	if ratio, timeLimit := seedLimitsForTorrent(cfg, 5, 1); ratio == nil || *ratio != 5 || timeLimit == nil || *timeLimit != 86_400 {
 		t.Fatalf("own limits: ratio=%v time=%v", ratio, timeLimit)
@@ -26,7 +26,7 @@ func TestSeedLimitsForTorrent(t *testing.T) {
 	}
 	// Minutes fallback when no day limit is set.
 	minutes := &Config{}
-	minutes.Libtorrent.SeedTimeMinutes = 30
+	minutes.Transfer.SeedTimeMinutes = 30
 	if _, timeLimit := seedLimitsForTorrent(minutes, -1, -1); timeLimit == nil || *timeLimit != 1800 {
 		t.Fatalf("minutes fallback: time=%v", timeLimit)
 	}

@@ -6,7 +6,7 @@ import "testing"
 // torrent_first_last setting adds first_last to a torrent added without it.
 func TestGxFirstLastDefaultReachesEveryAdd(t *testing.T) {
 	engine, fake := newTestGxEngine(t, "")
-	cfg := &Config{LibtorrentDir: "/dl"}
+	cfg := &Config{DownloadDir: "/dl"}
 	if _, err := engine.AddWithOptions("magnet:?off", cfg, nil, AddOptions{}); err != nil {
 		t.Fatal(err)
 	}

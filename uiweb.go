@@ -398,7 +398,7 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 	health := CheckWithPaths(&HealthPaths{
 		DataDir:      s.cfg.DataDir,
 		TrashPath:    trash,
-		DownloadPath: s.cfg.LibtorrentDir,
+		DownloadPath: s.cfg.DownloadDir,
 		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
 	})
@@ -446,7 +446,7 @@ func uiHealthPathsFrom(s *AppState) *HealthPaths {
 	return &HealthPaths{
 		DataDir:      s.cfg.DataDir,
 		TrashPath:    trash,
-		DownloadPath: s.cfg.LibtorrentDir,
+		DownloadPath: s.cfg.DownloadDir,
 		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
 	}

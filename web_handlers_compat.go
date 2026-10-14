@@ -246,10 +246,10 @@ func DebugTorrentMatch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		archivePath = matchedSeries.ArchivePath
 	}
 
-	finalDir := strings.TrimSpace(cfg.LibtorrentDir)
+	finalDir := strings.TrimSpace(cfg.DownloadDir)
 	tempDir := ""
-	if cfg.LibtorrentTempDir != nil {
-		tempDir = strings.TrimSpace(*cfg.LibtorrentTempDir)
+	if cfg.DownloadTempDir != nil {
+		tempDir = strings.TrimSpace(*cfg.DownloadTempDir)
 	}
 
 	result["title"] = release.Title

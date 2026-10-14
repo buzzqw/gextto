@@ -1404,7 +1404,7 @@ func v2DetailBackendLabel(backend string) string {
 	case BackendQbittorrent:
 		return "qBittorrent-nox"
 	default:
-		return "libtorrent"
+		return backend
 	}
 }
 

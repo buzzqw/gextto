@@ -640,7 +640,7 @@ func AddTorrentHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	preallocate := cfg.LibtorrentPreallocate()
+	preallocate := cfg.TorrentPreallocate()
 	if input.Preallocate != nil {
 		preallocate = *input.Preallocate
 	}

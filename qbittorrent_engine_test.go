@@ -151,8 +151,8 @@ func newFakeQBEngine(t *testing.T) (*fakeQB, *qbittorrentEngine, string) {
 	cfg := DefaultConfig()
 	cfg.DataDir = dir
 	cfg.StateDir = filepath.Join(dir, "state")
-	cfg.LibtorrentDir = filepath.Join(dir, "downloads")
-	if err := os.MkdirAll(cfg.LibtorrentDir, 0o755); err != nil {
+	cfg.DownloadDir = filepath.Join(dir, "downloads")
+	if err := os.MkdirAll(cfg.DownloadDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	cfg.Settings["torrent_backend"] = BackendQbittorrent
@@ -164,7 +164,7 @@ func newFakeQBEngine(t *testing.T) (*fakeQB, *qbittorrentEngine, string) {
 	if err != nil {
 		t.Fatalf("newQbittorrentEngine: %v", err)
 	}
-	return fake, engine, cfg.LibtorrentDir
+	return fake, engine, cfg.DownloadDir
 }
 
 func TestQbittorrentEngineListMapping(t *testing.T) {
@@ -403,7 +403,7 @@ func TestQbittorrentEngineResolveSavePathMapping(t *testing.T) {
 	fake, engine, _ := newFakeQBEngine(t)
 	engine.settings.Mappings = []PathMapping{{Gextto: "/gextto/downloads", Backend: "/data/downloads"}}
 	engine.settings.dataDir = "/gextto"
-	savePath, err := engine.resolveSavePath(nil, &Config{LibtorrentDir: "/gextto/downloads"})
+	savePath, err := engine.resolveSavePath(nil, &Config{DownloadDir: "/gextto/downloads"})
 	if err != nil || savePath != "/data/downloads" {
 		t.Fatalf("resolveSavePath = %q, %v", savePath, err)
 	}
@@ -458,7 +458,7 @@ func TestQbittorrentEngineAdjustQueue(t *testing.T) {
 		{Hash: "ccc", Name: "c", State: "downloading", Progress: 0.1, Size: 100, Priority: 3, SavePath: downloads},
 	})
 	cfg := DefaultConfig()
-	cfg.Libtorrent.ActiveDownloads = 2
+	cfg.Transfer.ActiveDownloads = 2
 
 	engine.AdjustQueue(&cfg, 0)
 	if total := fake.calls["/api/v2/torrents/stop"] + fake.calls["/api/v2/torrents/pause"]; total != 1 {

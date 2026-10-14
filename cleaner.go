@@ -1415,9 +1415,9 @@ func SweepStaleTempFiles(cfg *Config) int {
 			roots = append(roots, p)
 		}
 	}
-	addRoot(cfg.LibtorrentDir)
-	if cfg.LibtorrentTempDir != nil {
-		addRoot(*cfg.LibtorrentTempDir)
+	addRoot(cfg.DownloadDir)
+	if cfg.DownloadTempDir != nil {
+		addRoot(*cfg.DownloadTempDir)
 	}
 	if cfg.RamdiskDir() != nil {
 		addRoot(*cfg.RamdiskDir())

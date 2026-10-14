@@ -33,7 +33,7 @@ func fallbackTestConfig(t *testing.T) Config {
 	t.Helper()
 	cfg := DefaultConfig()
 	cfg.DataDir = t.TempDir()
-	cfg.LibtorrentDir = t.TempDir()
+	cfg.DownloadDir = t.TempDir()
 	cfg.Settings = map[string]string{}
 	return cfg
 }

@@ -86,7 +86,7 @@ func TestCycleFullNoSourcesIsNoOp(t *testing.T) {
 func TestCycleSkipsDownloadsWhenConfiguredFreeSpaceCannotBeRead(t *testing.T) {
 	state := newCycleState(t)
 	cfg := *state.cfg
-	cfg.LibtorrentDir = "\x00unreadable-download-volume"
+	cfg.DownloadDir = "\x00unreadable-download-volume"
 	cfg.Settings = map[string]string{"min_free_space_gb": "1"}
 
 	stats, err := RunCycle(context.Background(), &cfg, state.engine, state.db, state.archive, state.comics, state.notifier, state.activeEngine())

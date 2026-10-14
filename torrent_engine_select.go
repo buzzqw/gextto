@@ -92,9 +92,9 @@ func selectTorrentEngine(cfg *Config, notifier *Notifier) (TorrentEngine, string
 
 // requiredBackendPaths lists the Gextto paths a backend may be asked to use.
 func requiredBackendPaths(cfg *Config) []string {
-	paths := []string{cfg.LibtorrentDir}
-	if cfg.LibtorrentTempDir != nil {
-		paths = append(paths, *cfg.LibtorrentTempDir)
+	paths := []string{cfg.DownloadDir}
+	if cfg.DownloadTempDir != nil {
+		paths = append(paths, *cfg.DownloadTempDir)
 	}
 	if ramdisk := cfg.RamdiskDir(); ramdisk != nil {
 		paths = append(paths, *ramdisk)

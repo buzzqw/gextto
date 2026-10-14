@@ -612,7 +612,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		// settings, so the same form is not shown twice.
 		page.EditorsFirst = true
 		page.CheckboxGroups = uiSourcesCheckboxGroups(cfg)
-	case "libtorrent":
+	case "network":
 		page.Actions = &uiActionSection{
 			Label:   "Applica alla sessione",
 			Hint:    "Le impostazioni salvate valgono dal ciclo successivo; «Applica ora» le riapplica subito alla sessione attiva.",

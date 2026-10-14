@@ -72,20 +72,20 @@ func normalizeJSONScalar(value any) string {
 	}
 }
 
-func TestLibtorrentPreallocateDefaultsToTrue(t *testing.T) {
+func TestTorrentPreallocateDefaultsToTrue(t *testing.T) {
 	cfg := DefaultConfig()
 	if cfg.Settings == nil {
 		cfg.Settings = map[string]string{}
 	}
-	if !cfg.LibtorrentPreallocate() {
+	if !cfg.TorrentPreallocate() {
 		t.Fatal("preallocation must default to true")
 	}
 	cfg.Settings["torrent_preallocate"] = "false"
-	if cfg.LibtorrentPreallocate() {
+	if cfg.TorrentPreallocate() {
 		t.Fatal("explicit false ignored")
 	}
 	cfg.Settings["torrent_preallocate"] = "yes"
-	if !cfg.LibtorrentPreallocate() {
+	if !cfg.TorrentPreallocate() {
 		t.Fatal("explicit yes must enable preallocation")
 	}
 }

@@ -2,7 +2,7 @@ package gextto
 
 // uiweb_settings_defaults.go carries the default value of every setting the
 // Configurazione page exposes, ported from rextto's `setting_tooltip` era and
-// from Gextto's own config defaults (config.go, DefaultLibtorrentSettings and
+// from Gextto's own config defaults (config.go, DefaultTransferSettings and
 // the config_view mapping in web_handlers_core.go).
 //
 // The settings page reads raw `cfg.Settings`, which only contains the keys the

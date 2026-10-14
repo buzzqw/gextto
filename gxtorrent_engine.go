@@ -743,7 +743,7 @@ func (e *gxTorrentEngine) torrentCopyDir() string {
 	if e.cfg == nil {
 		return ""
 	}
-	if dir := e.cfg.LibtorrentTorrentCopyDir(); dir != nil {
+	if dir := e.cfg.TorrentCopyDir(); dir != nil {
 		return strings.TrimSpace(*dir)
 	}
 	return ""
@@ -936,7 +936,7 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		}
 		return int(value)
 	}
-	lt := cfg.Libtorrent
+	lt := cfg.Transfer
 	// gx-torrent's own self-management: dynamic queue and adaptive cache, on by
 	// default. Disabling it makes the daemon use static slot limits and a static
 	// RAM-based cache; the manual per-value settings still apply.
@@ -952,7 +952,7 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		"dynamic_max":      clamp(lt.DynamicQueueMax),
 		"cache_mb":         gxCacheMB(lt.CacheSize),
 		"cache_ttl_secs":   max(lt.CacheExpiry, 10),
-		"preallocate":      cfg.LibtorrentPreallocate(),
+		"preallocate":      cfg.TorrentPreallocate(),
 	}
 	// Disk guard: Gextto's minimum free space also pauses the daemon's running
 	// downloads below it. Not set (0) keeps the daemon's own default, so the

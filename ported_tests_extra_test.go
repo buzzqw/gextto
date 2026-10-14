@@ -16,8 +16,8 @@ import (
 
 func TestSeedLimitsReachedMatchesPolicy(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Libtorrent.SeedRatio = 0.5
-	cfg.Libtorrent.SeedTimeDays = 1
+	cfg.Transfer.SeedRatio = 0.5
+	cfg.Transfer.SeedTimeDays = 1
 
 	// Uses the global ratio (per-torrent -1) and reaches it.
 	torrent := &models.TorrentView{

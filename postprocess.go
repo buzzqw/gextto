@@ -134,7 +134,7 @@ func DestinationFor(release *models.Release, cfg *Config) (string, bool) {
 	if destination, ok := ConfiguredDestinationFor(release, cfg); ok {
 		return destination, true
 	}
-	return cfg.LibtorrentDir, true
+	return cfg.DownloadDir, true
 }
 
 // DownloadDirFor returns the per-tag temporary download directory for a

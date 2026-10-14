@@ -689,10 +689,10 @@ func RunCycleDomain(
 		}
 	}
 	if minFreeBytes != nil {
-		free := FreeSpaceBytes(cfg.LibtorrentDir)
+		free := FreeSpaceBytes(cfg.DownloadDir)
 		if free == nil {
 			logging.Warn("⚠️ No downloads this time: cannot read the free space of the download folder",
-				"folder", cfg.LibtorrentDir)
+				"folder", cfg.DownloadDir)
 			stats.Error("min_free_space_unavailable")
 			return finishCycleWithoutDownloads(db, stats)
 		}
@@ -1983,7 +1983,7 @@ func runComicsIfDue(ctx context.Context, cfg *Config, db *Database, comics *Comi
 	if !requested && comicsInterval != 0 && saturatingSub(nowTs, lastComicsCheck) < comicsInterval {
 		return
 	}
-	downloaded, runErr := RunComicsCycle(ctx, comics, NewGetComicsClient(), notifier, cfg.LibtorrentDir, torrents, db, cfg)
+	downloaded, runErr := RunComicsCycle(ctx, comics, NewGetComicsClient(), notifier, cfg.DownloadDir, torrents, db, cfg)
 	if runErr != nil {
 		stats.Error("comics")
 		// Retry in an hour instead of after the whole interval, without

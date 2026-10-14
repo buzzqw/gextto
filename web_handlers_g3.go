@@ -716,7 +716,7 @@ func SystemStats(w http.ResponseWriter, r *http.Request, s *AppState) {
 	health := CheckWithPaths(&HealthPaths{
 		DataDir:      s.cfg.DataDir,
 		TrashPath:    trash,
-		DownloadPath: s.cfg.LibtorrentDir,
+		DownloadPath: s.cfg.DownloadDir,
 		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
 	})
@@ -774,8 +774,8 @@ func UploadTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	cfg := latestConfig(s)
 	dir := cfg.DataDir + "/incomplete"
-	if cfg.LibtorrentTempDir != nil {
-		dir = *cfg.LibtorrentTempDir
+	if cfg.DownloadTempDir != nil {
+		dir = *cfg.DownloadTempDir
 	}
 	_ = os.MkdirAll(dir, 0o755)
 	path := filepath.Join(dir, fmt.Sprintf("upload-%s.torrent", gh3UUID()))
@@ -785,11 +785,11 @@ func UploadTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	// An explicit `save_path` lets the caller point the torrent at data that is
 	// already on disk (the torrent is then re-checked and seeded).
-	savePath := cfg.LibtorrentDir
+	savePath := cfg.DownloadDir
 	if requested := strings.TrimSpace(r.URL.Query().Get("save_path")); requested != "" {
 		savePath = requested
 	}
-	hash, err := s.activeEngine().AddTorrentFileEx(path, savePath, AddOptions{Preallocate: cfg.LibtorrentPreallocate()})
+	hash, err := s.activeEngine().AddTorrentFileEx(path, savePath, AddOptions{Preallocate: cfg.TorrentPreallocate()})
 	if err != nil {
 		_ = os.Remove(path)
 		jsonStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
@@ -1407,7 +1407,7 @@ func gh3DryRunSessionPreview(s *AppState) []models.TorrentView {
 			State:           state,
 			DownloadRate:    0,
 			UploadRate:      0,
-			SavePath:        s.cfg.LibtorrentDir,
+			SavePath:        s.cfg.DownloadDir,
 			DownloadLimit:   -1,
 			UploadLimit:     -1,
 			AllTimeUpload:   0,

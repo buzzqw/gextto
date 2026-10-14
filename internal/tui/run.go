@@ -910,8 +910,8 @@ func performAction(ctx context.Context, client *Client, tr *Translator, action A
 				DryRun:           config.DryRun,
 				RefreshSecs:      config.RefreshSecs,
 				DefaultLanguage:  config.DefaultLanguage,
-				DownloadLimitKib: config.Libtorrent.DownloadLimitKib,
-				UploadLimitKib:   config.Libtorrent.UploadLimitKib,
+				DownloadLimitKib: config.Transfer.DownloadLimitKib,
+				UploadLimitKib:   config.Transfer.UploadLimitKib,
 			})
 		}
 		result.clearMessage = true

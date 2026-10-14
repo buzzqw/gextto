@@ -610,7 +610,7 @@ func (e *qbittorrentEngine) AdjustQueue(cfg *Config, _ int64) {
 	// inside an explicit range guard, which is what go/incorrect-integer-
 	// conversion recognizes (a plain clamp is not accepted).
 	limit := 1
-	if value := cfg.Libtorrent.ActiveDownloads; value >= 1 && value <= math.MaxInt {
+	if value := cfg.Transfer.ActiveDownloads; value >= 1 && value <= math.MaxInt {
 		limit = int(value)
 	}
 	if limit < 1 {
@@ -1400,7 +1400,7 @@ func (e *qbittorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) 
 	if preferredPath != nil && strings.TrimSpace(*preferredPath) != "" {
 		candidate = strings.TrimSpace(*preferredPath)
 	} else if cfg != nil {
-		candidate = cfg.LibtorrentDir
+		candidate = cfg.DownloadDir
 	} else {
 		candidate = e.settings.dataDir
 	}

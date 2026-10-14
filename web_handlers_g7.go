@@ -806,7 +806,7 @@ func BrowserHandlerDownload(w http.ResponseWriter, r *http.Request, s *AppState)
 func ComicCycle(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	client := NewGetComicsClient()
-	defaultRoot := cfg.LibtorrentDir
+	defaultRoot := cfg.DownloadDir
 	if s.cycle_lock != nil {
 		s.cycle_lock.Lock()
 		defer s.cycle_lock.Unlock()
@@ -932,7 +932,7 @@ func applyIPFilter(ctx context.Context, s *AppState) (int, string, error) {
 	}
 	loader = active
 	cfg := latestConfig(s)
-	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+	target := strings.TrimSpace(cfg.Transfer.IpFilterPath)
 	if target == "" {
 		return 0, "", fmt.Errorf("nessun IP filter configurato")
 	}
@@ -992,8 +992,8 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	cfg := latestConfig(s)
 	destination := strings.TrimSpace(input.Path)
-	allowed := gh7_path_starts_with(destination, cfg.LibtorrentDir) ||
-		(cfg.LibtorrentTempDir != nil && gh7_path_starts_with(destination, *cfg.LibtorrentTempDir)) ||
+	allowed := gh7_path_starts_with(destination, cfg.DownloadDir) ||
+		(cfg.DownloadTempDir != nil && gh7_path_starts_with(destination, *cfg.DownloadTempDir)) ||
 		(cfg.ArchiveRoot != nil && gh7_path_starts_with(destination, *cfg.ArchiveRoot)) ||
 		gh7_isConfiguredArchive(cfg, s.db, hash, destination)
 	if !allowed {

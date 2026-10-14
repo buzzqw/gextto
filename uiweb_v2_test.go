@@ -573,7 +573,7 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 	if !strings.Contains(css, ".v2-topbar-sticky .top-actions") || !strings.Contains(css, "flex-wrap: wrap") {
 		t.Fatalf("topbar compact layout missing")
 	}
-	code, body = v2Request(t, server, http.MethodGet, "/?view=settings&tab=libtorrent", nil)
+	code, body = v2Request(t, server, http.MethodGet, "/?view=settings&tab=network", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Auto (interfaccia predefinita)") || !strings.Contains(body, `name="value"`) {
 		t.Fatalf("outgoing interface select -> %d", code)
 	}

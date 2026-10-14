@@ -766,7 +766,7 @@ func V2SettingsIPFilterApply(w http.ResponseWriter, r *http.Request, s *AppState
 // already on disk, shown when the Libtorrent tab opens.
 func V2SettingsIPFilterStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+	target := strings.TrimSpace(cfg.Transfer.IpFilterPath)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	switch {
 	case target == "":

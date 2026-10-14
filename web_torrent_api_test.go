@@ -76,8 +76,8 @@ func TestTorrentAPILifecycle(t *testing.T) {
 	configJSON, _ := json.Marshal(map[string]any{
 		"data_dir":         state.cfg.DataDir,
 		"state_dir":        state.cfg.StateDir,
-		"torrent_dir":      state.cfg.LibtorrentDir,
-		"torrent_temp_dir": state.cfg.LibtorrentTempDir,
+		"torrent_dir":      state.cfg.DownloadDir,
+		"torrent_temp_dir": state.cfg.DownloadTempDir,
 		"trash_path":       state.cfg.TrashPath,
 		"dry_run":          false,
 		"active":           false,

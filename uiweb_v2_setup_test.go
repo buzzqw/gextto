@@ -97,8 +97,8 @@ func TestV2SetupPathsCheckAndSave(t *testing.T) {
 		t.Fatalf("download folder not created: %v", err)
 	}
 	cfg := latestConfig(state)
-	if cfg.ArchiveRoot == nil || *cfg.ArchiveRoot != library || cfg.LibtorrentDir != downloads {
-		t.Fatalf("folders not stored: archive=%v downloads=%q", cfg.ArchiveRoot, cfg.LibtorrentDir)
+	if cfg.ArchiveRoot == nil || *cfg.ArchiveRoot != library || cfg.DownloadDir != downloads {
+		t.Fatalf("folders not stored: archive=%v downloads=%q", cfg.ArchiveRoot, cfg.DownloadDir)
 	}
 }
 
@@ -121,7 +121,7 @@ func TestV2SetupFinishMarksCompleted(t *testing.T) {
 func TestV2SetupPathsKeepsUnchangedDownloadFolder(t *testing.T) {
 	state := newTestAppState(t)
 	library := t.TempDir()
-	current := latestConfig(state).LibtorrentDir
+	current := latestConfig(state).DownloadDir
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)

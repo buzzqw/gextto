@@ -60,9 +60,9 @@ func newTestAppState(t *testing.T) *AppState {
 	cfg := DefaultConfig()
 	cfg.DataDir = dir
 	cfg.StateDir = filepath.Join(dir, "state")
-	cfg.LibtorrentDir = filepath.Join(dir, "downloads")
+	cfg.DownloadDir = filepath.Join(dir, "downloads")
 	libtorrentTemp := filepath.Join(dir, "incomplete")
-	cfg.LibtorrentTempDir = &libtorrentTemp
+	cfg.DownloadTempDir = &libtorrentTemp
 	trash := filepath.Join(dir, "trash")
 	cfg.TrashPath = &trash
 	cfg.DryRun = true
@@ -531,8 +531,8 @@ func TestSpeedPolicyScheduleBeatsTemporaryLimitWithoutExpiry(t *testing.T) {
 		"torrent_temp_dl_limit":      "3000",
 		"torrent_temp_ul_limit":      "200",
 	}}
-	cfg.Libtorrent.DownloadLimitKib = 500
-	cfg.Libtorrent.UploadLimitKib = 50
+	cfg.Transfer.DownloadLimitKib = 500
+	cfg.Transfer.UploadLimitKib = 50
 	if dl, ul, source, shadowed := speedPolicy(cfg); dl != 8000 || ul != 1000 || source != speedSourceSchedule || !shadowed {
 		t.Fatalf("permanent temp in schedule window = %d/%d %s shadowed=%v", dl, ul, source, shadowed)
 	}

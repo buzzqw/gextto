@@ -19,7 +19,7 @@ func orphanTestSetup(t *testing.T) (*Config, string, string) {
 	if err := os.MkdirAll(temp, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cfg := &Config{DataDir: root, LibtorrentTempDir: &temp, TrashPath: &trash, Settings: map[string]string{}}
+	cfg := &Config{DataDir: root, DownloadTempDir: &temp, TrashPath: &trash, Settings: map[string]string{}}
 	return cfg, temp, trash
 }
 

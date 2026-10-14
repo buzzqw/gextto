@@ -181,10 +181,10 @@ func TestGxEngineStalledFlowUsesParkAndProbe(t *testing.T) {
 func TestGxEngineAdjustQueuePushesPolicyOnce(t *testing.T) {
 	engine, fake := newTestGxEngine(t, "")
 	cfg := &Config{}
-	cfg.Libtorrent.ActiveDownloads = 4
-	cfg.Libtorrent.ActiveSeeds = 2
-	cfg.Libtorrent.ActiveLimit = 8
-	cfg.Libtorrent.DontCountSlowTorrents = true
+	cfg.Transfer.ActiveDownloads = 4
+	cfg.Transfer.ActiveSeeds = 2
+	cfg.Transfer.ActiveLimit = 8
+	cfg.Transfer.DontCountSlowTorrents = true
 	engine.AdjustQueue(cfg, 0)
 	engine.AdjustQueue(cfg, 0)
 	fake.mu.Lock()
@@ -200,7 +200,7 @@ func TestGxEngineAdjustQueuePushesPolicyOnce(t *testing.T) {
 	if policy["active_downloads"] != float64(4) || policy["active_limit"] != float64(8) || policy["dont_count_slow"] != true {
 		t.Fatalf("unexpected policy %v", policy)
 	}
-	cfg.Libtorrent.ActiveDownloads = 5
+	cfg.Transfer.ActiveDownloads = 5
 	engine.AdjustQueue(cfg, 0)
 	if ok, err := engine.SetGlobalSpeedLimits(300, 50); err != nil || !ok {
 		t.Fatalf("speed limits: %v %v", ok, err)
@@ -225,10 +225,10 @@ func TestGxEngineOperations(t *testing.T) {
 	if !fake.seen("DELETE /api/v1/torrents/aa?delete_files=1") {
 		t.Fatal("deleteFiles must reach the daemon")
 	}
-	if ok, _ := engine.AddWithOptions("magnet:?dup", &Config{LibtorrentDir: "/dl"}, nil, AddOptions{}); ok {
+	if ok, _ := engine.AddWithOptions("magnet:?dup", &Config{DownloadDir: "/dl"}, nil, AddOptions{}); ok {
 		t.Fatal("an existing torrent must not report a new start")
 	}
-	if ok, err := engine.AddWithOptions("magnet:?new", &Config{LibtorrentDir: "/dl"}, nil, AddOptions{QueueTop: true}); err != nil || !ok {
+	if ok, err := engine.AddWithOptions("magnet:?new", &Config{DownloadDir: "/dl"}, nil, AddOptions{QueueTop: true}); err != nil || !ok {
 		t.Fatalf("add: %v %v", ok, err)
 	}
 	if !fake.seen("POST /api/v1/add?destination=%2Fdl&magnet=magnet%3A%3Fnew&top=1") {
@@ -307,31 +307,31 @@ func TestUIEngineLabelsMatchBackend(t *testing.T) {
 
 func TestGxNetworkArgs(t *testing.T) {
 	cfg := &Config{DataDir: t.TempDir()}
-	cfg.Libtorrent.PortMin = 6881
-	cfg.Libtorrent.PortMax = 6891
-	cfg.Libtorrent.ListenInterfaces = "wg0:51413"
-	cfg.Libtorrent.OutgoingInterface = "wg0"
-	cfg.Libtorrent.Encryption = 2
-	cfg.Libtorrent.Dht = true
-	cfg.Libtorrent.Pex = false
-	cfg.Libtorrent.Utp = true
-	cfg.Libtorrent.Holepunch = true
-	cfg.Libtorrent.Lsd = false
-	cfg.Libtorrent.Upnp = false
-	cfg.Libtorrent.Natpmp = true
-	cfg.Libtorrent.ApplyIpFilter = true
+	cfg.Transfer.PortMin = 6881
+	cfg.Transfer.PortMax = 6891
+	cfg.Transfer.ListenInterfaces = "wg0:51413"
+	cfg.Transfer.OutgoingInterface = "wg0"
+	cfg.Transfer.Encryption = 2
+	cfg.Transfer.Dht = true
+	cfg.Transfer.Pex = false
+	cfg.Transfer.Utp = true
+	cfg.Transfer.Holepunch = true
+	cfg.Transfer.Lsd = false
+	cfg.Transfer.Upnp = false
+	cfg.Transfer.Natpmp = true
+	cfg.Transfer.ApplyIpFilter = true
 	got := strings.Join(gxNetworkArgs(cfg), " ")
 	want := "-peer-ports 51413 -listen-interface wg0 -outgoing-interface wg0 -encryption 2 -no-pex -no-lsd -no-upnp -ipfilter-trackers=true"
 	if got != want {
 		t.Fatalf("got  %q\nwant %q", got, want)
 	}
 	// Disabling holepunching is forwarded to the daemon.
-	cfg.Libtorrent.Holepunch = false
+	cfg.Transfer.Holepunch = false
 	if got := strings.Join(gxNetworkArgs(cfg), " "); !strings.Contains(got, "-no-holepunch") {
 		t.Fatalf("holepunch off not forwarded: %q", got)
 	}
-	cfg.Libtorrent.ListenInterfaces = "0.0.0.0:6881-6891"
-	if host, ports := gxListenInterface(cfg.Libtorrent.ListenInterfaces); host != "" || ports != "6881-6891" {
+	cfg.Transfer.ListenInterfaces = "0.0.0.0:6881-6891"
+	if host, ports := gxListenInterface(cfg.Transfer.ListenInterfaces); host != "" || ports != "6881-6891" {
 		t.Fatalf("all interfaces: %q %q", host, ports)
 	}
 }
@@ -471,7 +471,7 @@ func TestGxEnsureIPFilterForcesAtBoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := &Config{DataDir: dir}
-	cfg.Libtorrent.IpFilterPath = server.URL
+	cfg.Transfer.IpFilterPath = server.URL
 
 	// Not forced: a recent file is reused instead of downloading again.
 	gxEnsureIPFilter(cfg, false)
@@ -570,8 +570,8 @@ func TestGxAutoSettingDrivesQueueAndCache(t *testing.T) {
 func TestGxResolveSavePathUsesIncompleteDir(t *testing.T) {
 	temp := t.TempDir()
 	final := t.TempDir()
-	cfg := &Config{LibtorrentDir: final}
-	cfg.LibtorrentTempDir = &temp
+	cfg := &Config{DownloadDir: final}
+	cfg.DownloadTempDir = &temp
 	engine := &gxTorrentEngine{cfg: cfg}
 	if got := engine.resolveSavePath(nil, cfg); got != temp {
 		t.Fatalf("nil preferredPath must use the temp/incomplete dir: got %q want %q", got, temp)
@@ -579,7 +579,7 @@ func TestGxResolveSavePathUsesIncompleteDir(t *testing.T) {
 	if preferred := final; engine.resolveSavePath(&preferred, cfg) != final {
 		t.Fatal("an explicit preferredPath must win")
 	}
-	noTemp := &Config{LibtorrentDir: final}
+	noTemp := &Config{DownloadDir: final}
 	if got := engine.resolveSavePath(nil, noTemp); got != final {
 		t.Fatalf("without a temp dir the final dir is used: got %q", got)
 	}

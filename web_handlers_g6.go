@@ -179,7 +179,7 @@ func speedPolicy(cfg *Config) (download, upload int64, source string, tempShadow
 	if tempKeep {
 		return tempDownload, tempUpload, speedSourceTempKeep, false
 	}
-	return max(cfg.Libtorrent.DownloadLimitKib, 0), max(cfg.Libtorrent.UploadLimitKib, 0), speedSourceBase, false
+	return max(cfg.Transfer.DownloadLimitKib, 0), max(cfg.Transfer.UploadLimitKib, 0), speedSourceBase, false
 }
 
 func gh6_currentSpeedLimits(cfg *Config) (int64, int64) {
@@ -750,7 +750,7 @@ func ExplainRelease(w http.ResponseWriter, r *http.Request, s *AppState) {
 // IpfilterStatus implements `ipfilter_status`.
 func IpfilterStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+	target := strings.TrimSpace(cfg.Transfer.IpFilterPath)
 	cached := filepath.Join(cfg.DataDir, "ipfilter.dat")
 	isURL := strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://")
 	path := cached
@@ -1379,10 +1379,10 @@ func GetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"sched_active":       schedActive,
 		"sched_download_kib": schedDownload,
 		"sched_upload_kib":   schedUpload,
-		"base_download_kib":  max(cfg.Libtorrent.DownloadLimitKib, 0),
-		"base_upload_kib":    max(cfg.Libtorrent.UploadLimitKib, 0),
+		"base_download_kib":  max(cfg.Transfer.DownloadLimitKib, 0),
+		"base_upload_kib":    max(cfg.Transfer.UploadLimitKib, 0),
 		// Shown next to the limits on the TUI downloads tab.
-		"auto_remove_completed": cfg.Libtorrent.AutoRemoveCompleted,
+		"auto_remove_completed": cfg.Transfer.AutoRemoveCompleted,
 	})
 }
 

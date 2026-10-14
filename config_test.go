@@ -46,9 +46,9 @@ func TestPrepareDirsDoesNotCreateTheImportSource(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.DataDir = filepath.Join(root, "data")
 	cfg.StateDir = filepath.Join(cfg.DataDir, "state")
-	cfg.LibtorrentDir = filepath.Join(cfg.DataDir, "downloads")
+	cfg.DownloadDir = filepath.Join(cfg.DataDir, "downloads")
 	temp := filepath.Join(cfg.DataDir, "incomplete")
-	cfg.LibtorrentTempDir = &temp
+	cfg.DownloadTempDir = &temp
 	trash := filepath.Join(cfg.DataDir, "trash")
 	cfg.TrashPath = &trash
 
@@ -860,7 +860,7 @@ func TestConfigUnmarshalKeepsDefaultsForAbsentKeys(t *testing.T) {
 	if cfg.RefreshSecs == 0 {
 		t.Fatal("refresh_secs default was wiped by an empty JSON")
 	}
-	if cfg.LibtorrentTempDir == nil {
+	if cfg.DownloadTempDir == nil {
 		t.Fatal("libtorrent temp dir default was wiped by an empty JSON")
 	}
 
@@ -917,7 +917,7 @@ func TestValidatePathSettingRejectsDangerousPaths(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.DataDir = "/var/lib/gextto"
 	cfg.StateDir = "/var/lib/gextto/state"
-	cfg.LibtorrentDir = "/var/lib/gextto/downloads"
+	cfg.DownloadDir = "/var/lib/gextto/downloads"
 
 	for _, bad := range []string{"/", "/var", "/var/lib", "/var/lib/gextto", "relative/path"} {
 		if err := validatePathSetting("trash_path", bad, &cfg); err == nil {

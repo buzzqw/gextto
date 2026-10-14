@@ -11,9 +11,9 @@ import (
 
 func TestReleaseFitsRamdisk(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.LibtorrentDir = t.TempDir()
+	cfg.DownloadDir = t.TempDir()
 	temp := t.TempDir()
-	cfg.LibtorrentTempDir = &temp
+	cfg.DownloadTempDir = &temp
 	cfg.Settings = map[string]string{"torrent_ramdisk_dir": t.TempDir()}
 
 	if !ReleaseFitsRamdisk(&models.Release{SizeBytes: 1_000_000_000}, &cfg) {
@@ -44,13 +44,13 @@ func TestRamdiskOverflowDirPrefersTempDir(t *testing.T) {
 	main := t.TempDir()
 	temp := t.TempDir()
 	cfg := DefaultConfig()
-	cfg.LibtorrentDir = main
-	cfg.LibtorrentTempDir = &temp
+	cfg.DownloadDir = main
+	cfg.DownloadTempDir = &temp
 	if dir, ok := ramdiskOverflowDir(&cfg); !ok || dir != temp {
 		t.Fatalf("overflow dir = %q (%v), want the temp dir", dir, ok)
 	}
 
-	cfg.LibtorrentTempDir = nil
+	cfg.DownloadTempDir = nil
 	if dir, ok := ramdiskOverflowDir(&cfg); !ok || dir != main {
 		t.Fatalf("overflow dir = %q (%v), want the main dir", dir, ok)
 	}
@@ -61,7 +61,7 @@ func TestRamdiskOverflowDirPrefersTempDir(t *testing.T) {
 // metadata arrives; a disabled RAM disk never diverts anything.
 func TestRamdiskNeedsMetadata(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.LibtorrentDir = t.TempDir()
+	cfg.DownloadDir = t.TempDir()
 	cfg.Settings = map[string]string{
 		"torrent_ramdisk_dir":     t.TempDir(),
 		"torrent_ramdisk_enabled": "yes",
@@ -91,8 +91,8 @@ func TestAutomaticDownloadPathRamdiskPolicy(t *testing.T) {
 	temp := t.TempDir()
 	ramdisk := t.TempDir()
 	cfg := DefaultConfig()
-	cfg.LibtorrentDir = t.TempDir()
-	cfg.LibtorrentTempDir = &temp
+	cfg.DownloadDir = t.TempDir()
+	cfg.DownloadTempDir = &temp
 	cfg.Settings = map[string]string{
 		"torrent_ramdisk_dir":          ramdisk,
 		"torrent_ramdisk_enabled":      "yes",
@@ -164,7 +164,7 @@ func TestRamdiskAdmissionMovesFittingTorrentOntoTheRamdisk(t *testing.T) {
 	ramdisk := t.TempDir()
 	disk := t.TempDir()
 	cfg := DefaultConfig()
-	cfg.LibtorrentDir = disk
+	cfg.DownloadDir = disk
 	cfg.Settings = map[string]string{
 		"torrent_ramdisk_dir":          ramdisk,
 		"torrent_ramdisk_enabled":      "yes",
@@ -189,7 +189,7 @@ func TestRamdiskAdmissionRejectsOversizedOrStartedTorrent(t *testing.T) {
 	ramdisk := t.TempDir()
 	disk := t.TempDir()
 	cfg := DefaultConfig()
-	cfg.LibtorrentDir = disk
+	cfg.DownloadDir = disk
 	cfg.Settings = map[string]string{
 		"torrent_ramdisk_dir":          ramdisk,
 		"torrent_ramdisk_enabled":      "yes",
@@ -216,7 +216,7 @@ func TestRamdiskAdmissionDisabledForBackendsWithoutRamdisk(t *testing.T) {
 	ramdisk := t.TempDir()
 	disk := t.TempDir()
 	cfg := DefaultConfig()
-	cfg.LibtorrentDir = disk
+	cfg.DownloadDir = disk
 	cfg.Settings = map[string]string{
 		"torrent_ramdisk_dir":          ramdisk,
 		"torrent_ramdisk_enabled":      "yes",
@@ -282,8 +282,8 @@ func TestAutomaticDownloadPathChecksHostMemory(t *testing.T) {
 	temp := t.TempDir()
 	ramdisk := t.TempDir()
 	cfg := DefaultConfig()
-	cfg.LibtorrentDir = t.TempDir()
-	cfg.LibtorrentTempDir = &temp
+	cfg.DownloadDir = t.TempDir()
+	cfg.DownloadTempDir = &temp
 	cfg.Settings = map[string]string{
 		"torrent_ramdisk_dir":          ramdisk,
 		"torrent_ramdisk_enabled":      "yes",
@@ -312,7 +312,7 @@ func TestRamdiskAdmissionChecksHostMemory(t *testing.T) {
 	ramdisk := t.TempDir()
 	disk := t.TempDir()
 	cfg := DefaultConfig()
-	cfg.LibtorrentDir = disk
+	cfg.DownloadDir = disk
 	cfg.Settings = map[string]string{
 		"torrent_ramdisk_dir":          ramdisk,
 		"torrent_ramdisk_enabled":      "yes",

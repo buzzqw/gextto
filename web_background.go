@@ -1216,7 +1216,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			// Only when the user asked for automatic removal: with the setting
 			// off the torrent is paused and stays listed as completed, and the
 			// user clears it with "Pulisci completati".
-			if processed && cfg.Libtorrent.AutoRemoveCompleted && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
+			if processed && cfg.Transfer.AutoRemoveCompleted && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
 				isPack := false
 				if meta, err := db.TorrentMeta(event.Hash); err == nil && meta != nil {
 					isPack = meta.Release.IsPack
@@ -1577,7 +1577,7 @@ func ipFilterRefreshWorker(state *AppState) {
 			return
 		}
 		cfg := latestConfig(state)
-		if cfg == nil || strings.TrimSpace(cfg.Libtorrent.IpFilterPath) == "" {
+		if cfg == nil || strings.TrimSpace(cfg.Transfer.IpFilterPath) == "" {
 			continue
 		}
 		if _, ok := state.activeEngine().(interface {
@@ -1658,10 +1658,10 @@ func bg_dirHasFiles(dir string) bool {
 // active torrent directories and too-recent ones, so a just-started download is
 // not disturbed.
 func bg_cleanupEmptyTempDirs(cfg *Config, torrents TorrentSession) {
-	if cfg.LibtorrentTempDir == nil {
+	if cfg.DownloadTempDir == nil {
 		return
 	}
-	temp := *cfg.LibtorrentTempDir
+	temp := *cfg.DownloadTempDir
 	live := torrents.List()
 	active := map[string]struct{}{}
 	activePaths := make([]string, 0, len(live))

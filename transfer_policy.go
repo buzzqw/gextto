@@ -165,10 +165,10 @@ func RamdiskPendingBytes(view models.TorrentView) uint64 {
 // any other torrent whose real size turns out to fit.
 func preferredDownloadPath(cfg *Config) string {
 	var candidates []string
-	if cfg.LibtorrentTempDir != nil {
-		candidates = append(candidates, *cfg.LibtorrentTempDir)
+	if cfg.DownloadTempDir != nil {
+		candidates = append(candidates, *cfg.DownloadTempDir)
 	}
-	candidates = append(candidates, cfg.LibtorrentDir)
+	candidates = append(candidates, cfg.DownloadDir)
 	explicit := cfg.RamdiskMinFreeBytes()
 	minimumFree := explicit
 	if explicit == 0 {
@@ -182,7 +182,7 @@ func preferredDownloadPath(cfg *Config) string {
 			return path
 		}
 	}
-	return cfg.LibtorrentDir
+	return cfg.DownloadDir
 }
 
 // ramdiskHostMemoryAvailable reports the host memory that is actually available
@@ -271,11 +271,11 @@ func RamdiskNeedsMetadata(release *models.Release, cfg *Config) bool {
 // downloaded instead of the RAM disk: the temporary disk when it exists, the
 // final directory otherwise. The returned path always exists as a directory.
 func ramdiskOverflowDir(cfg *Config) (string, bool) {
-	if cfg.LibtorrentTempDir != nil && pathIsDir(*cfg.LibtorrentTempDir) {
-		return *cfg.LibtorrentTempDir, true
+	if cfg.DownloadTempDir != nil && pathIsDir(*cfg.DownloadTempDir) {
+		return *cfg.DownloadTempDir, true
 	}
-	if pathIsDir(cfg.LibtorrentDir) {
-		return cfg.LibtorrentDir, true
+	if pathIsDir(cfg.DownloadDir) {
+		return cfg.DownloadDir, true
 	}
 	return "", false
 }

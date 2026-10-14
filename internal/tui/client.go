@@ -182,10 +182,10 @@ type ConfigSnapshot struct {
 	DryRun          bool   `json:"dry_run"`
 	RefreshSecs     uint64 `json:"refresh_secs"`
 	DefaultLanguage string `json:"default_language"`
-	Libtorrent      struct {
+	Transfer        struct {
 		DownloadLimitKib int64 `json:"download_limit_kib"`
 		UploadLimitKib   int64 `json:"upload_limit_kib"`
-	} `json:"libtorrent"`
+	} `json:"transfer"`
 }
 
 // SpeedPolicy mirrors GET /api/torrents/temp-limits: the global limits in

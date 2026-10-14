@@ -125,10 +125,10 @@ func restoreMissingTorrents(cfg *Config, db *Database, engine TorrentEngine) int
 	if dir := cfg.RamdiskDir(); dir != nil {
 		addFolder(*dir)
 	}
-	if cfg.LibtorrentTempDir != nil {
-		addFolder(*cfg.LibtorrentTempDir)
+	if cfg.DownloadTempDir != nil {
+		addFolder(*cfg.DownloadTempDir)
 	}
-	addFolder(cfg.LibtorrentDir)
+	addFolder(cfg.DownloadDir)
 	for _, torrent := range snapshot {
 		addFolder(torrent.SavePath)
 	}

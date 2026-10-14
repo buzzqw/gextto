@@ -962,7 +962,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	comicDir, hasComicDir := ComicDownloadDir(cfg)
-	target := cfg.LibtorrentDir
+	target := cfg.DownloadDir
 	if strings.TrimSpace(input.SavePath) == "" {
 		if hasComicDir {
 			target = comicDir
@@ -971,7 +971,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		target = strings.TrimSpace(input.SavePath)
 	}
 	allowed := pathStartsWith(target, cfg.DataDir) ||
-		pathStartsWith(target, cfg.LibtorrentDir) ||
+		pathStartsWith(target, cfg.DownloadDir) ||
 		(hasComicDir && pathStartsWith(target, comicDir)) ||
 		gh0_anyPathStartsWith(target, monitoredPaths)
 	if !allowed {
@@ -1730,7 +1730,7 @@ func gh0_libtorrentOptimizationFor(cfg *Config) gh0_libtorrentOptimization {
 	health := CheckWithPaths(&HealthPaths{
 		DataDir:      cfg.DataDir,
 		TrashPath:    trash,
-		DownloadPath: cfg.LibtorrentDir,
+		DownloadPath: cfg.DownloadDir,
 		ArchiveRoot:  gh0_derefStr(cfg.ArchiveRoot),
 		RamdiskPath:  gh0_derefStr(ramdisk),
 	})
@@ -1792,7 +1792,7 @@ func gh0_libtorrentOptimizationFor(cfg *Config) gh0_libtorrentOptimization {
 	}
 }
 
-func OptimizeLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
+func OptimizeTransferSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// On qBittorrent the same operational goal is expressed with the backend's
 	// own MiB-based disk cache preferences.
 	if qb, ok := s.activeEngine().(*qbittorrentEngine); ok {

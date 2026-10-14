@@ -95,7 +95,7 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		"sources":     {"Feed RSS", "Motori web", "Filtri contenuto esclusi", "Filtri per sorgente", "Cartelle osservate", "Pulisci i risultati già archiviati"},
 		"scores":      {"Gruppi custom", "Aggiungi gruppo"},
 		"backend":     {"Applica motore", "Installa / Ottimizza qBittorrent-nox", "Stato qBittorrent-nox", "Test connessione"},
-		"libtorrent":  {"Applica ora", "v2-ipfilter-panel", "Carica / aggiorna ora"},
+		"network":     {"Applica ora", "v2-ipfilter-panel", "Carica / aggiorna ora"},
 		"performance": {"Ottimizza", "Applica ora"},
 		"rename":      {"Composizione del nome", "Regole tag → cartella"},
 		"notify":      {"Hook eventi"},
@@ -158,7 +158,7 @@ func TestSettingsRowsControlsAndAccessibility(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	_, body := v2Request(t, server, http.MethodGet, "/settings/body?tab=libtorrent", nil)
+	_, body := v2Request(t, server, http.MethodGet, "/settings/body?tab=network", nil)
 	for _, marker := range []string{
 		// Time pickers and one checkbox per weekday.
 		`type="time" name="value" id="input-torrent_sched_start"`,

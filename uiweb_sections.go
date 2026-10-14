@@ -602,8 +602,8 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 			page.TempShadowed = true
 		}
 	}
-	page.BaseDL = cfg.Libtorrent.DownloadLimitKib
-	page.BaseUL = cfg.Libtorrent.UploadLimitKib
+	page.BaseDL = cfg.Transfer.DownloadLimitKib
+	page.BaseUL = cfg.Transfer.UploadLimitKib
 	page.Panels = []uiPageSection{
 		sectionTable(uiTableSpec{
 			Title:    "Storico download",

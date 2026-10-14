@@ -508,10 +508,10 @@ func writeManagedQbittorrentConfig(cfg *Config, settings qbittorrentSettings) er
 	// QSettings serializes QByteArray values using the @ByteArray(...) marker;
 	// qBittorrent expects that marker when reading Password_PBKDF2 from disk.
 	content = qbittorrentINISet(content, "Preferences", "WebUI\\Password_PBKDF2", "@ByteArray("+hash+")")
-	content = qbittorrentINISet(content, "Preferences", "Downloads\\SavePath", cfg.LibtorrentDir)
-	if cfg.LibtorrentTempDir != nil && strings.TrimSpace(*cfg.LibtorrentTempDir) != "" {
+	content = qbittorrentINISet(content, "Preferences", "Downloads\\SavePath", cfg.DownloadDir)
+	if cfg.DownloadTempDir != nil && strings.TrimSpace(*cfg.DownloadTempDir) != "" {
 		content = qbittorrentINISet(content, "Preferences", "Downloads\\TempPathEnabled", "true")
-		content = qbittorrentINISet(content, "Preferences", "Downloads\\TempPath", *cfg.LibtorrentTempDir)
+		content = qbittorrentINISet(content, "Preferences", "Downloads\\TempPath", *cfg.DownloadTempDir)
 	}
 	content = qbittorrentINISet(content, "LegalNotice", "Accepted", "true")
 	tmp := path + ".tmp"

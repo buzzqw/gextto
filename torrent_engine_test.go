@@ -191,7 +191,7 @@ func TestTorrentBackendAndListUseActiveEngine(t *testing.T) {
 	t.Cleanup(server.Close)
 	fake.setTorrents([]qbittorrent.Torrent{{
 		Hash: "feedbeef", Name: "engine.mkv", State: "downloading",
-		Progress: 0.5, Size: 100, SavePath: state.cfg.LibtorrentDir,
+		Progress: 0.5, Size: 100, SavePath: state.cfg.DownloadDir,
 	}})
 
 	cfg := state.cfg

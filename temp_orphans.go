@@ -81,13 +81,13 @@ func newestModTime(path string) (time.Time, error) {
 // that name (lost by an unclean stop, about to be added back). It returns how
 // many entries were moved.
 func trashOrphanedTempData(cfg *Config, torrents TorrentSession, db *Database, now time.Time) int {
-	if cfg == nil || cfg.LibtorrentTempDir == nil || torrents == nil {
+	if cfg == nil || cfg.DownloadTempDir == nil || torrents == nil {
 		return 0
 	}
 	if value, ok := cfg.Settings[tempOrphanEnabledSetting]; ok && !settingTruthy(value) {
 		return 0
 	}
-	temp := strings.TrimSpace(*cfg.LibtorrentTempDir)
+	temp := strings.TrimSpace(*cfg.DownloadTempDir)
 	if temp == "" {
 		return 0
 	}

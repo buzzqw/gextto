@@ -171,15 +171,15 @@ func v2SetupViewFrom(s *AppState, r *http.Request) v2SetupView {
 func v2SetupPathValues(cfg *Config) map[string]string {
 	values := map[string]string{
 		"archive_root":     "",
-		"torrent_dir":      cfg.LibtorrentDir,
+		"torrent_dir":      cfg.DownloadDir,
 		"torrent_temp_dir": "",
 		"trash_path":       "",
 	}
 	if cfg.ArchiveRoot != nil {
 		values["archive_root"] = *cfg.ArchiveRoot
 	}
-	if cfg.LibtorrentTempDir != nil {
-		values["torrent_temp_dir"] = *cfg.LibtorrentTempDir
+	if cfg.DownloadTempDir != nil {
+		values["torrent_temp_dir"] = *cfg.DownloadTempDir
 	}
 	if cfg.TrashPath != nil {
 		values["trash_path"] = *cfg.TrashPath

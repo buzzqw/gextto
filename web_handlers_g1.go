@@ -375,7 +375,7 @@ func BackupSendTelegram(w http.ResponseWriter, r *http.Request, s *AppState) {
 func CheckPorts(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	ports := []map[string]any{}
-	for port := int(cfg.Libtorrent.PortMin); port <= int(cfg.Libtorrent.PortMax); port++ {
+	for port := int(cfg.Transfer.PortMin); port <= int(cfg.Transfer.PortMax); port++ {
 		address := fmt.Sprintf("0.0.0.0:%d", port)
 		tcpAvailable := false
 		if listener, err := net.Listen("tcp", address); err == nil {
@@ -396,8 +396,8 @@ func CheckPorts(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":       true,
-		"port_min": cfg.Libtorrent.PortMin,
-		"port_max": cfg.Libtorrent.PortMax,
+		"port_min": cfg.Transfer.PortMin,
+		"port_max": cfg.Transfer.PortMax,
 		"ports":    ports,
 	})
 }

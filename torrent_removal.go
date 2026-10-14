@@ -352,7 +352,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 					if ramdisk := cfg.RamdiskDir(); ramdisk != nil {
 						inRamdisk = PathOnRamdisk(targetTorrent.SavePath, *ramdisk)
 					}
-					inTemp := cfg.LibtorrentTempDir != nil && SamePath(targetTorrent.SavePath, *cfg.LibtorrentTempDir)
+					inTemp := cfg.DownloadTempDir != nil && SamePath(targetTorrent.SavePath, *cfg.DownloadTempDir)
 					if (inRamdisk || inTemp) && !SamePath(source, *processed) {
 						_ = os.RemoveAll(source)
 					}
@@ -386,8 +386,8 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		return false, fmt.Errorf("file sorgente non trovato: %s: %w", source, err)
 	}
 
-	// Resolve destination: configured archive destination (NAS) or LibtorrentDir fallback
-	destination := cfg.LibtorrentDir
+	// Resolve destination: configured archive destination (NAS) or DownloadDir fallback
+	destination := cfg.DownloadDir
 	if release != nil {
 		if dest, ok := DestinationFor(release, cfg); ok && strings.TrimSpace(dest) != "" {
 			destination = dest
@@ -509,7 +509,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		if ramdisk := cfg.RamdiskDir(); ramdisk != nil {
 			inRamdisk = PathOnRamdisk(targetTorrent.SavePath, *ramdisk)
 		}
-		inTemp := cfg.LibtorrentTempDir != nil && SamePath(targetTorrent.SavePath, *cfg.LibtorrentTempDir)
+		inTemp := cfg.DownloadTempDir != nil && SamePath(targetTorrent.SavePath, *cfg.DownloadTempDir)
 		if inRamdisk || inTemp {
 			_ = os.RemoveAll(source)
 		}
@@ -555,7 +555,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 				if ramdisk := cfg.RamdiskDir(); ramdisk != nil {
 					inRamdisk = PathOnRamdisk(targetTorrent.SavePath, *ramdisk)
 				}
-				inTemp := cfg.LibtorrentTempDir != nil && SamePath(targetTorrent.SavePath, *cfg.LibtorrentTempDir)
+				inTemp := cfg.DownloadTempDir != nil && SamePath(targetTorrent.SavePath, *cfg.DownloadTempDir)
 				if inRamdisk || inTemp {
 					_ = os.RemoveAll(source)
 				}

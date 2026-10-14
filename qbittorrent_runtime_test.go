@@ -12,9 +12,9 @@ import (
 func TestManagedQbittorrentConfigDefaultsAndPrivateProfile(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.DataDir = t.TempDir()
-	cfg.LibtorrentDir = filepath.Join(cfg.DataDir, "downloads")
+	cfg.DownloadDir = filepath.Join(cfg.DataDir, "downloads")
 	tempDir := filepath.Join(cfg.DataDir, "incomplete")
-	cfg.LibtorrentTempDir = &tempDir
+	cfg.DownloadTempDir = &tempDir
 
 	prepared, err := managedQbittorrentConfig(&cfg)
 	if err != nil {
@@ -47,7 +47,7 @@ func TestManagedQbittorrentConfigDefaultsAndPrivateProfile(t *testing.T) {
 		"WebUI\\Port=8080",
 		"WebUI\\Username=admin",
 		"WebUI\\Password_PBKDF2=@ByteArray(",
-		"Downloads\\SavePath=" + cfg.LibtorrentDir,
+		"Downloads\\SavePath=" + cfg.DownloadDir,
 		"Downloads\\TempPath=" + tempDir,
 		"[LegalNotice]",
 	} {

@@ -346,7 +346,7 @@ func HealthApi(w http.ResponseWriter, r *http.Request, s *AppState) {
 	report := CheckWithPaths(&HealthPaths{
 		DataDir:      dataDir,
 		TrashPath:    trashPath,
-		DownloadPath: s.cfg.LibtorrentDir,
+		DownloadPath: s.cfg.DownloadDir,
 		ArchiveRoot:  archiveRoot,
 		RamdiskPath:  ramdiskPath,
 	})
@@ -892,8 +892,8 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 	paths := map[string]any{
 		"data_dir":            cfg.DataDir,
-		"torrent_dir":         cfg.LibtorrentDir,
-		"torrent_temp_dir":    cfg.LibtorrentTempDir,
+		"torrent_dir":         cfg.DownloadDir,
+		"torrent_temp_dir":    cfg.DownloadTempDir,
 		"torrent_ramdisk_dir": settingsOrNil(cfg, "torrent_ramdisk_dir"),
 		"state_dir":           cfg.StateDir,
 		"archive_root":        cfg.ArchiveRoot,
@@ -1002,7 +1002,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"feed_max_pages":                       strconv.Itoa(cfg.FeedMaxPages()),
 		"cleanup_upgrades":                     cfg.CleanupUpgrades,
 		"cleanup_action":                       cfg.CleanupAction,
-		"auto_remove_completed":                cfg.Libtorrent.AutoRemoveCompleted,
+		"auto_remove_completed":                cfg.Transfer.AutoRemoveCompleted,
 		"rename_format":                        cfg.RenameFormat,
 		"rename_template":                      cfg.RenameTemplate,
 		"rename_episodes":                      cfg.RenameEpisodes,
@@ -1020,6 +1020,10 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"qbittorrent_managed_binary":       qbittorrentManagedBinary(cfg),
 		"qbittorrent_password_configured":  settingsNonEmpty(cfg, "qbittorrent_password"),
 		"paths":                            paths,
+		"transfer": map[string]any{
+			"download_limit_kib": cfg.Transfer.DownloadLimitKib,
+			"upload_limit_kib":   cfg.Transfer.UploadLimitKib,
+		},
 	})
 }
 

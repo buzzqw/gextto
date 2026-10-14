@@ -132,7 +132,7 @@ func validatePathSetting(key, value string, cfg *Config) error {
 	if cfg == nil {
 		return nil
 	}
-	for _, critical := range []string{cfg.DataDir, cfg.StateDir, cfg.LibtorrentDir} {
+	for _, critical := range []string{cfg.DataDir, cfg.StateDir, cfg.DownloadDir} {
 		if strings.TrimSpace(critical) == "" {
 			continue
 		}

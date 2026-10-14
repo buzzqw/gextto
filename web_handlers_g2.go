@@ -811,7 +811,7 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	startPaused := input.StartPaused
 	noRename := input.NoRename
-	preallocate := cfg.LibtorrentPreallocate()
+	preallocate := cfg.TorrentPreallocate()
 	if input.Preallocate != nil {
 		preallocate = *input.Preallocate
 	}
@@ -878,8 +878,8 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	dir := filepath.Join(cfg.DataDir, "incomplete")
-	if cfg.LibtorrentTempDir != nil {
-		dir = *cfg.LibtorrentTempDir
+	if cfg.DownloadTempDir != nil {
+		dir = *cfg.DownloadTempDir
 	}
 	_ = os.MkdirAll(dir, 0o755)
 	path := filepath.Join(dir, fmt.Sprintf("upload-%s.torrent", backupUUID()))
@@ -887,7 +887,7 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	preferredPath := cfg.LibtorrentDir
+	preferredPath := cfg.DownloadDir
 	if input.SavePath != nil && strings.TrimSpace(*input.SavePath) != "" {
 		preferredPath = strings.TrimSpace(*input.SavePath)
 	}
