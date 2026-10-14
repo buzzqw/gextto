@@ -92,16 +92,19 @@ test("cambiare sezione con modifiche in sospeso chiede conferma", async ({ page 
 
 test("un interruttore mostra i campi che dipendono da lui", async ({ page }) => {
   await page.goto("/?view=settings&tab=libtorrent");
-  const start = page.locator("#v2-setting-libtorrent_sched_start");
+  const week = page.locator("#v2-setting-libtorrent_sched_week");
   const toggle = page.getByRole("switch", { name: "Programmazione velocità attiva" });
   await expect(toggle).not.toBeChecked();
-  await expect(start).toBeHidden();
+  await expect(week).toBeHidden();
   await toggle.check();
-  await expect(start).toBeVisible();
-  await expect(page.locator("#input-libtorrent_sched_start")).toHaveAttribute("type", "time");
-  await expect(page.locator("#v2-setting-libtorrent_sched_days").getByRole("checkbox")).toHaveCount(7);
+  await expect(week).toBeVisible();
+  // The per-day table has one row per day, each with an on/off checkbox.
+  await expect(week.locator('input[type="checkbox"][name^="day-"]')).toHaveCount(7);
+  // The older single-window settings are superseded by the per-day table and
+  // stay hidden even while the switch is on.
+  await expect(page.locator("#v2-setting-libtorrent_sched_start")).toBeHidden();
   await toggle.uncheck();
-  await expect(start).toBeHidden();
+  await expect(week).toBeHidden();
 });
 
 test("predefinito ripristina il valore e va salvato", async ({ page }) => {
