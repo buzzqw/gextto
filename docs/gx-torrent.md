@@ -546,7 +546,11 @@ only the changed torrents/categories/tags and the removed entries, otherwise a
 full snapshot. `app/preferences` returns the preferences the clients read
 (save/temp path, port, DHT/PEX/LSD/UPnP, encryption, protocol, queue and cache
 knobs, global limits in KiB/s, IP filter, RSS interval) and `setPreferences`
-applies the global limits (KiB/s, `-1` = no limit) and the queue knobs. The API uses the
+applies the global limits (KiB/s, `-1` = no limit) and the queue knobs. The
+**write side** covers `torrents/addPeers`, `transfer/banPeers`,
+`torrents/editCategory`, `torrents/toggleFirstLastPiecePrio`, the queue
+priorities (`increasePrio`, `decreasePrio`, `topPrio`, `bottomPrio`) and
+`app/shutdown` (a clean stop, standalone only). The API uses the
 same access criteria as the page: without a password it is open, otherwise the LAN bypass
 is needed (if `local-bypass` is active) or a session (`SID` qBittorrent or `gx_session`
 of the page). In managed it is **not** exposed: only Gextto commands.

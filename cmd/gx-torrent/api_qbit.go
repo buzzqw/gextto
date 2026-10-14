@@ -96,6 +96,17 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("GET /api/v2/app/networkInterfaceAddressList", d.handleQbitNetworkInterfaceAddressList)
 	mux.HandleFunc("GET /api/v2/log/main", d.handleQbitLogMain)
 	mux.HandleFunc("GET /api/v2/log/peers", d.handleQbitLogPeers)
+	// Write endpoints: peers, category editing, piece priority, queue priority
+	// and a clean shutdown.
+	mux.HandleFunc("POST /api/v2/torrents/addPeers", d.handleQbitAddPeers)
+	mux.HandleFunc("POST /api/v2/transfer/banPeers", d.handleQbitBanPeers)
+	mux.HandleFunc("POST /api/v2/torrents/editCategory", d.handleQbitEditCategory)
+	mux.HandleFunc("POST /api/v2/torrents/toggleFirstLastPiecePrio", d.handleQbitToggleFirstLast)
+	mux.HandleFunc("POST /api/v2/torrents/increasePrio", d.handleQbitIncreasePrio)
+	mux.HandleFunc("POST /api/v2/torrents/decreasePrio", d.handleQbitDecreasePrio)
+	mux.HandleFunc("POST /api/v2/torrents/topPrio", d.handleQbitTopPrio)
+	mux.HandleFunc("POST /api/v2/torrents/bottomPrio", d.handleQbitBottomPrio)
+	mux.HandleFunc("POST /api/v2/app/shutdown", d.handleQbitShutdown)
 	return d.qbitAuth(mux)
 }
 

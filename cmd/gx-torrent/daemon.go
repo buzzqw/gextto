@@ -1890,6 +1890,56 @@ func (d *Daemon) moveToTop(key string) error {
 	})
 }
 
+// moveToBottom puts a torrent at the end of the queue.
+func (d *Daemon) moveToBottom(key string) error {
+	return d.withTorrent(key, func(_ *torrent.Torrent, meta *torrentMeta) error {
+		highest := meta.Pos
+		for _, other := range d.state.Torrents {
+			if other.Pos > highest {
+				highest = other.Pos
+			}
+		}
+		meta.Pos = highest + 1
+		meta.RotatedAt = time.Time{}
+		return nil
+	})
+}
+
+// shiftPriority swaps a torrent's queue position with its nearest neighbour
+// (up = earlier). Used by the qBittorrent increasePrio/decreasePrio.
+func (d *Daemon) shiftPriority(key string, up bool) error {
+	return d.withTorrent(key, func(_ *torrent.Torrent, meta *torrentMeta) error {
+		var neighbour *torrentMeta
+		for _, other := range d.state.Torrents {
+			if other == meta {
+				continue
+			}
+			if up {
+				if other.Pos < meta.Pos && (neighbour == nil || other.Pos > neighbour.Pos) {
+					neighbour = other
+				}
+			} else if other.Pos > meta.Pos && (neighbour == nil || other.Pos < neighbour.Pos) {
+				neighbour = other
+			}
+		}
+		if neighbour == nil {
+			return nil
+		}
+		meta.Pos, neighbour.Pos = neighbour.Pos, meta.Pos
+		meta.RotatedAt = time.Time{}
+		return nil
+	})
+}
+
+// toggleFirstLast flips "download the first and last part of each file first"
+// on the running torrent.
+func (d *Daemon) toggleFirstLast(key string) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
+		meta.FirstLast = !meta.FirstLast
+		return t.SetFirstLast(meta.FirstLast)
+	})
+}
+
 func (d *Daemon) addTrackers(key string, urls []string) error {
 	return d.withTorrent(key, func(t *torrent.Torrent, _ *torrentMeta) error {
 		for _, url := range urls {
@@ -2364,6 +2414,24 @@ func (d *Daemon) removeTags(key string, tags []string) error {
 }
 
 func (d *Daemon) createCategory(name, savePath string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.state.Categories == nil {
+		d.state.Categories = map[string]string{}
+	}
+	d.state.Categories[name] = strings.TrimSpace(savePath)
+	d.dirty = true
+	d.saveLocked()
+	d.poke()
+}
+
+// editCategory sets the save path of an existing category (qBittorrent
+// editCategory), creating it when missing.
+func (d *Daemon) editCategory(name, savePath string) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return
