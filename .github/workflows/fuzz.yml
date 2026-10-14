@@ -41,8 +41,7 @@ jobs:
   fuzz:
     name: fuzz-smoke (x86_64)
     runs-on: ubuntu-24.04
-    # Every target is pure Go: the libtorrent stub applies and no C/C++ headers
-    # are needed.
+    # Every target is pure Go: no C/C++ headers are needed.
     env:
       CGO_ENABLED: "0"
     steps:

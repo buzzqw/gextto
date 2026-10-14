@@ -3,27 +3,18 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 cache-refresh
+.PHONY: all build fast gx-torrent test test-race test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 cache-refresh
 
 all: build
 
-# Default build: pure Go. gx-torrent (the default engine) is a pure-Go daemon;
-# the embedded libtorrent engine is opt-in (see build-libtorrent).
+# Default build: pure Go. gx-torrent (the engine) is a pure-Go daemon.
 build:
 	GEXTTO_BUMP_BUILD=1 scripts/build-daemon.sh
-
-# Same, linking the embedded libtorrent engine (needs libtorrent-rasterbar-dev
-# and a C/C++ toolchain).
-build-libtorrent:
-	GEXTTO_BUMP_BUILD=1 GEXTTO_LIBTORRENT=1 scripts/build-daemon.sh
 
 fast:
 	scripts/build-daemon.sh
 
-fast-libtorrent:
-	GEXTTO_LIBTORRENT=1 scripts/build-daemon.sh
-
-# Only the gx-torrent daemon (pure Go, no libtorrent needed). Bumps the daemon's
+# Only the gx-torrent daemon (pure Go). Bumps the daemon's
 # own build number, independent from Gextto's.
 gx-torrent:
 	GX_BUILD="$$(GEXTTO_BUMP_BUILD=1 scripts/next-gx-build-number.sh)"; \
@@ -39,14 +30,6 @@ container:
 
 test: check-ui installer-test test-dht
 	CGO_ENABLED=0 go test ./...
-
-# Tests with the embedded libtorrent engine (cgo; needs the dev headers). The
-# default `make test` is pure Go and skips the libtorrent-only tests.
-test-libtorrent: check-ui installer-test
-	CGO_ENABLED=1 go test ./...
-
-test-real:
-	CGO_ENABLED=1 go test -run 'LibtorrentLocalTransfer|LibtorrentMagnetTransfer' -v -timeout 300s ./...
 
 # Tests of the gx-core engine. It lives in internal/gxcore as part of the main
 # module, so the packages resolve through the main go.sum.

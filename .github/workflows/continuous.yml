@@ -26,11 +26,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Install native dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libtorrent-rasterbar-dev
-
       - name: Test
         run: make test
 
@@ -43,8 +38,7 @@ jobs:
   # The build number is not taken from github.run_number: build-daemon.sh reads
   # the committed build_number file, so the installed version shows the same
   # 1.1.<n> as the checkout.
-  # Each architecture ships one pure Go archive (gx-torrent engine); the
-  # embedded libtorrent variant is no longer built.
+  # Each architecture ships one pure Go archive (gx-torrent engine).
   package:
     name: package (${{ matrix.arch }})
     needs: test
