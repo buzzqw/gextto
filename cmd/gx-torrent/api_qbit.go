@@ -118,6 +118,21 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/search/uninstallPlugin", d.handleQbitSearchPluginManage)
 	mux.HandleFunc("POST /api/v2/search/enablePlugin", d.handleQbitSearchPluginManage)
 	mux.HandleFunc("POST /api/v2/search/updatePlugins", d.handleQbitSearchPluginManage)
+	// RSS API, mapped onto the daemon's feeds and rules.
+	mux.HandleFunc("GET /api/v2/rss/items", d.handleQbitRssItems)
+	mux.HandleFunc("POST /api/v2/rss/addFolder", d.handleQbitRssAddFolder)
+	mux.HandleFunc("POST /api/v2/rss/addFeed", d.handleQbitRssAddFeed)
+	mux.HandleFunc("POST /api/v2/rss/setFeedURL", d.handleQbitRssSetFeedURL)
+	mux.HandleFunc("POST /api/v2/rss/setFeedRefreshInterval", d.handleQbitRssSetFeedInterval)
+	mux.HandleFunc("POST /api/v2/rss/removeItem", d.handleQbitRssRemoveItem)
+	mux.HandleFunc("POST /api/v2/rss/moveItem", d.handleQbitRssMoveItem)
+	mux.HandleFunc("POST /api/v2/rss/refreshItem", d.handleQbitRssRefreshItem)
+	mux.HandleFunc("POST /api/v2/rss/markAsRead", d.handleQbitRssMarkAsRead)
+	mux.HandleFunc("GET /api/v2/rss/rules", d.handleQbitRssRules)
+	mux.HandleFunc("GET /api/v2/rss/matchingArticles", d.handleQbitRssMatchingArticles)
+	mux.HandleFunc("POST /api/v2/rss/setRule", d.handleQbitRssSetRule)
+	mux.HandleFunc("POST /api/v2/rss/renameRule", d.handleQbitRssRenameRule)
+	mux.HandleFunc("POST /api/v2/rss/removeRule", d.handleQbitRssRemoveRule)
 	return d.qbitAuth(mux)
 }
 

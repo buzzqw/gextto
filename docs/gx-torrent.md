@@ -555,7 +555,14 @@ priorities (`increasePrio`, `decreasePrio`, `topPrio`, `bottomPrio`) and
 onto the configured Torznab indexers, which are exposed as the "plugins";
 `installPlugin`/`uninstallPlugin`/`enablePlugin`/`updatePlugins` are accepted
 and ignored (indexers are configured from `/ui/rss` or `settings.json`, there
-is no plugin model). The API uses the
+is no plugin model). The **RSS API** (`rss/items` with the folder/feed tree and,
+with `withData`, the archived articles; `addFolder`, `addFeed`, `setFeedURL`,
+`removeItem`, `moveItem`, `refreshItem`, `markAsRead`; and the rules
+`rules`, `setRule`, `renameRule`, `removeRule`, `matchingArticles`) is mapped
+onto the daemon's feeds and rules. Note: qBittorrent's rule `mustContain`
+requires **all** the words while gx-core's include is "at least one", so a
+multi-word `mustContain` maps to a more permissive OR; the `/ui/rss` rule
+editor is the place for precise AND filtering. The API uses the
 same access criteria as the page: without a password it is open, otherwise the LAN bypass
 is needed (if `local-bypass` is active) or a session (`SID` qBittorrent or `gx_session`
 of the page). In managed it is **not** exposed: only Gextto commands.
