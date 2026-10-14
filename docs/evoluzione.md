@@ -478,6 +478,67 @@ justifies it, otherwise it is closed with the recorded data. Most of what remain
 **implemented or designed but not validated on a real swarm**, or needs a **go/no-go
 decided on data**, so every item carries the gate it waits for.
 
+**The engine fallback, and what removing libtorrent costs.** `gx-torrent` is the default
+engine; the embedded libtorrent is optional at build time (`GEXTTO_LIBTORRENT=1`,
+`LibtorrentCompiled()`) and was historically its automatic fallback. The fallback no longer
+depends on it (`engine_fallback.go`). When the active engine fails — a crash budget spent, or
+an activation refused at startup — Gextto walks a chain and persists the choice:
+
+1. **qBittorrent.** The managed runtime is downloaded on demand from
+   [`userdocs/qbittorrent-nox-static`](https://github.com/userdocs/qbittorrent-nox-static)
+   (the last libtorrent **v2** build for the architecture, SHA-256 verified against the
+   GitHub digest), configured with a private profile under the application directory and
+   started by Gextto; an operator who points Gextto at an **external** qBittorrent gets that
+   one used as is, with nothing to download. This is the safety net that does not need
+   libtorrent.
+2. **the embedded libtorrent**, only on a build that includes it.
+3. **recovery**: no alternative is available, so the transfers stay stopped, the UI stays up
+   and the operator is notified.
+
+Before the engine handover the supervisor tries the cheapest fix: if the updater kept
+`gx-torrent.prev` (now installed by `gexttod --update`), the previous binary is restored and
+gx-torrent is retried instead of switching engines. A managed daemon that is **alive but
+stops answering** its own health endpoint for five minutes is killed and counted as a
+failure (`gxUnresponsiveLimit`), so a frozen API is not mistaken for a healthy engine. A
+cooldown (`DATA_DIR/engine-fallback.json`, 30 minutes) stops the chain from ping-ponging
+between two engines that both crash: within the window it goes straight to recovery.
+`GEXTTO_ENGINE` forces the engine for one run, so a service whose saved backend is broken is
+recovered from a shell without editing the database.
+
+**Removing libtorrent entirely** is an open item, staged so the removal never opens a window
+without a fallback. The cost, measured on the current tree:
+
+- **engine**: `libtorrent_bridge.cpp` (1721) + `.h` (237) + `libtorrent_cgo.go` (608) +
+  `libtorrent_nocgo.go` (195) go away; `libtorrent.go` (2842) is a **split**, not a delete:
+  about half its free functions are Gextto-level policy used by every engine
+  (`FreeSpaceBytes`, `RamdiskFits*`, `PathOnRamdisk`, `RamdiskPendingBytes`,
+  `automaticDownloadPath`, `preferredDownloadPath`, `resolveSavePath`, `CompletionPath`) and
+  must be relocated. The cgo tests (`libtorrent_test.go`, `_transfer`, `_archived`,
+  `_session_guard`, ~990 lines) go away.
+- **adapter surface**: 13 `requireEmbedded(...)` call sites in 8 files; `session_stats`,
+  `ip_filter`, `super_seeding`, `apply_settings`, `optimize_settings` already have a
+  gx-torrent equivalent and only need re-routing, `scrape` and `dht_announce` exist in the
+  daemon but are not wired to `TorrentEngine`, and `upload_mode`/`share_mode`/`torrent_flags`
+  are libtorrent-only concepts that would be dropped.
+- **selection**: `BackendEmbedded`, `embeddedEngine`, its row in `capabilityLevels`, and the
+  `torrent_backend=embedded` **migration** for existing installations (`TorrentBackendName`
+  normalises unknown values to embedded today).
+- **build/release/CI**: the `build-libtorrent`/`fast-libtorrent`/`test-libtorrent`/`test-real`
+  targets, `build-daemon.sh`, the two-variant release matrix and `install.sh --libtorrent`,
+  `THIRD-PARTY-NOTICES`.
+- **settings/UI/i18n**: the 15 `uiLibtorrentEngineOnlySettings` keys plus their tooltips,
+  catalogue entries, manual rows and Appendix A, and the settings-count test.
+- **docs**: 12 documents mention libtorrent.
+
+Staged plan and effort: **(0)** the fallback above, already in place; **(1)** stop shipping
+the `libtorrent` variant from release/CI/`install.sh`, keeping the code (~0.5–1 day);
+**(2)** remove the backend, re-route the handlers, decide the two libtorrent-only features and
+migrate `torrent_backend` (~3–6 days); **(3)** clean Makefile, workflows, scripts, docs
+(~1–2 days). Total ≈ 5–10 person-days. Gate: the stock is only cut once the replacement
+fallback is validated with a cross-engine conformance run (the same controlled torrent on
+gx-torrent and on the managed qBittorrent, asserting completion, piece integrity, resume,
+move and seed), so the removal cannot leave a single engine without a parachute.
+
 **Waiting for a measurement or a host.**
 
 - **Choking on a real swarm.** The controlled evidence is healthy (§3 of [`measurements.md`](measurements.md)): a real

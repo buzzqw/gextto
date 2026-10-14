@@ -717,6 +717,13 @@ and archive; only the transfer plane is pluggable, chosen in
 time, so switching is a controlled migration, not two clients working on the
 same data.
 
+If the active engine cannot stay up, Gextto switches to another engine by
+itself: first **qBittorrent-nox** (downloaded on demand and started with a
+private profile, or the external one already configured), then the built-in
+**libtorrent** when the build includes it, and finally a **recovery** state with
+the transfers stopped and the UI still reachable. An updated `gx-torrent` that
+will not start is restored to the previous binary first.
+
 The default engine's core, **`gx-core`** (`internal/gxcore`), and the DHT
 (`internal/dht`) are original code written in this repository, so they are
 covered by the same EUPL-1.2 licence as Gextto (see the *Licence* page of the
@@ -1114,7 +1121,10 @@ Besides download events, Gextto notifies service problems:
   it is reported as an unclean shutdown;
 - **stopped by an error** — when the service exits because of a fatal error;
 - **gx-torrent** — unexpected exit of the managed daemon, restart after the
-  exit, and falling back to the libtorrent engine when it cannot stay up;
+  exit, restoring the previous binary after an update that will not start,
+  a live daemon that stops answering, and the automatic switch to another
+  engine (qBittorrent-nox first, downloaded on demand, then libtorrent when
+  compiled in, finally recovery with the transfers stopped);
 - **health problems** — when the health check finds a problem and when it is
   healthy again.
 

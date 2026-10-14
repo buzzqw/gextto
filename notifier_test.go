@@ -284,8 +284,17 @@ func TestNotifierFormatEventLifecycle(t *testing.T) {
 	if got := formatEvent("engine_crashed", map[string]any{"error": "exit 1", "restarts_in_window": 2}); !strings.Contains(got, "uscita inattesa") || !strings.Contains(got, "exit 1") {
 		t.Fatalf("engine_crashed it = %q", got)
 	}
-	if got := formatEvent("engine_fallback", nil); !strings.Contains(got, "libtorrent") {
+	if got := formatEvent("engine_fallback", map[string]any{"from": "gx-torrent", "to": "qbittorrent"}); !strings.Contains(got, "qbittorrent") {
 		t.Fatalf("engine_fallback it = %q", got)
+	}
+	if got := formatEvent("engine_recovery", map[string]any{"from": "gx-torrent", "reason": "boom"}); !strings.Contains(got, "nessun motore") || !strings.Contains(got, "boom") {
+		t.Fatalf("engine_recovery it = %q", got)
+	}
+	if got := formatEvent("engine_rollback", nil); !strings.Contains(got, "binario precedente") {
+		t.Fatalf("engine_rollback it = %q", got)
+	}
+	if got := formatEvent("engine_unresponsive", map[string]any{"unresponsive_seconds": 400}); !strings.Contains(got, "non risponde") || !strings.Contains(got, "400") {
+		t.Fatalf("engine_unresponsive it = %q", got)
 	}
 	if got := formatEvent("engine_unstable", map[string]any{"retry_minutes": 5}); !strings.Contains(got, "modalità sicura") || !strings.Contains(got, "5 min") {
 		t.Fatalf("engine_unstable it = %q", got)

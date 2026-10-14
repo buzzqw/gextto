@@ -133,9 +133,10 @@ provides the stubs (`//go:build !cgo`), `libtorrent.go` stays unchanged and
 |---|---|
 | `torrent_engine.go` | the `TorrentEngine` contract between Gextto and the engine. |
 | `torrent_engine_select.go` | backend selection from `torrent_backend` + preflight. |
+| `engine_fallback.go` | the engine-agnostic fallback chain (managed qBittorrent-nox downloaded on demand → embedded libtorrent → recovery), its cooldown and the `GEXTTO_ENGINE` override. |
 | `gxtorrent_engine.go` + `gxtorrent_runtime.go` + `cmd/gx-torrent/` | **gx-torrent** backend (pure Go, default): REST adapter, startup and supervision of the daemon, which uses the gx-core engine in `internal/gxcore`. The same daemon also runs on its own (standalone) on Linux and Windows; the platform layer is in `cmd/gx-torrent/*_linux.go` / `*_windows.go` / `*_other.go` (memory, disk class, gateway, data folder, link/junction, cross-volume move, browser opening, Windows service in `service_windows.go`). |
-| `libtorrent.go` + `libtorrent_cgo.go` + `libtorrent_bridge.cpp/.h` + `libtorrent_nocgo.go` | libtorrent backend (C++/cgo), **optional at build time** (`GEXTTO_LIBTORRENT=1`; `LibtorrentCompiled()`): in a pure Go build the `libtorrent_nocgo.go` stub applies and the backend is not selectable; when compiled it is also the automatic fallback of gx-torrent. |
-| `qbittorrent_engine.go` + `qbittorrent_runtime.go` | qBittorrent backend. |
+| `libtorrent.go` + `libtorrent_cgo.go` + `libtorrent_bridge.cpp/.h` + `libtorrent_nocgo.go` | libtorrent backend (C++/cgo), **optional at build time** (`GEXTTO_LIBTORRENT=1`; `LibtorrentCompiled()`): in a pure Go build the `libtorrent_nocgo.go` stub applies and the backend is not selectable; when compiled it is one step of the fallback chain in `engine_fallback.go`. |
+| `qbittorrent_engine.go` + `qbittorrent_runtime.go` | qBittorrent backend: adapter, supervision, and the private managed runtime (download of the `userdocs/qbittorrent-nox-static` build, SHA-256 verified). |
 | `torrent_migration.go` | preparation of the migration between backends. |
 | `torrent_removal.go` | recording of manual removals. |
 

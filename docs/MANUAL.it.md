@@ -735,6 +735,13 @@ archivio; è sostituibile solo il piano di trasferimento, scelto in
 quindi il passaggio è una migrazione controllata, non due client sugli stessi
 dati.
 
+Se il motore attivo non riesce a restare in piedi Gextto passa da solo a un
+altro motore: prima **qBittorrent-nox** (scaricato al momento e avviato con
+profilo privato, oppure quello esterno già configurato), poi il **libtorrent**
+integrato se la build lo include, infine uno stato di **recovery** con i
+trasferimenti fermi e la UI raggiungibile. Un demone `gx-torrent` aggiornato che
+non parte viene prima ripristinato alla versione precedente.
+
 Il nucleo del motore predefinito, **`gx-core`** (`internal/gxcore`), e il DHT
 (`internal/dht`) sono codice originale scritto in questo repository, quindi
 coperti dalla stessa licenza EUPL-1.2 di Gextto (vedi la pagina *Licenza*
@@ -1150,8 +1157,11 @@ Oltre agli eventi di download, Gextto notifica i problemi del servizio:
   da quanto era fermo; se l'arresto precedente non è stato registrato (crash,
   `kill -9`) lo segnala come arresto anomalo;
 - **arresto per errore** — quando il servizio termina per un errore fatale;
-- **gx-torrent** — uscita inattesa del demone gestito, riavvio dopo l'uscita e
-  passaggio al motore libtorrent se non riesce a restare attivo;
+- **gx-torrent** — uscita inattesa del demone gestito, riavvio dopo l'uscita,
+  ripristino del binario precedente dopo un aggiornamento che non parte,
+  demone attivo ma che non risponde più, e passaggio automatico a un altro
+  motore (prima qBittorrent-nox, scaricato al momento, poi libtorrent se
+  compilato, infine recovery con i trasferimenti fermi);
 - **problemi di salute** — quando il controllo di salute rileva un problema e
   quando torna operativo.
 

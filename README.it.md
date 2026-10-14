@@ -126,6 +126,20 @@ archivio) e delega i trasferimenti a un motore selezionabile in
 *Configurazione → Motore torrent*. Gira un solo motore alla volta; il passaggio
 è una migrazione pulita e coordinata, senza conflitti di I/O.
 
+**Fallback automatico.** Se il motore attivo non riesce a restare in piedi — un
+ciclo di crash, o un'attivazione rifiutata all'avvio — Gextto non si limita a
+fermarsi. Percorre una catena e persiste la scelta: prima il
+**qBittorrent-nox gestito**, scaricato al momento dalle release di
+`userdocs/qbittorrent-nox-static` (l'ultima build libtorrent v2, verificata con
+SHA-256) e avviato con un profilo privato — oppure un qBittorrent esterno già
+tuo; poi il libtorrent integrato opzionale, se la build lo include; infine uno
+stato di recovery in cui i trasferimenti restano fermi e la UI resta
+raggiungibile per intervenire. Prima di cambiare motore tenta la soluzione più
+economica: un `gx-torrent` aggiornato che non parte viene ripristinato alla
+versione precedente. Un cooldown evita il ping-pong tra due motori che crashano
+entrambi, e `GEXTTO_ENGINE=qbittorrent` (o `gx-torrent`) forza il motore per un
+solo avvio, utile anche come recupero da riga di comando.
+
 ### gx-core e gx-torrent (predefinito, consigliato)
 
 **gx-torrent** è il motore predefinito: Go puro (`CGO_ENABLED=0`), nessuna
@@ -233,8 +247,8 @@ resume transazionale su BoltDB e flusso di Server-Sent Events in tempo reale
 | Motore | Dove gira | Quando sceglierlo |
 |---|---|---|
 | gx-torrent (predefinito) | Processo Go separato e sorvegliato | Go puro, autonomo, sviluppo attivo. v1, ibridi e solo-v2, DHT e cifratura MSE/PE; anche autonomo su Linux e Windows; niente WebTorrent/WebRTC |
-| qBittorrent-nox | Demone esterno via Web API | Hai già qBittorrent-nox o preferisci la sua UI. Servono mappature percorsi e un processo in più ([guida alla configurazione](docs/qbittorrent-nox.md)) |
-| libtorrent (build opzionale) | Nel processo di Gextto, **solo se compilato** (`make build-libtorrent`) | Controlli avanzati o compatibilità di libtorrent; anche fallback automatico. Un crash coinvolge anche Gextto |
+| qBittorrent-nox | Demone esterno via Web API, oppure uno che Gextto scarica e avvia in privato | Hai già qBittorrent-nox o preferisci la sua UI. Servono mappature percorsi e un processo in più ([guida alla configurazione](docs/qbittorrent-nox.md)); è anche il primo passo del fallback automatico, scaricato al momento |
+| libtorrent (build opzionale) | Nel processo di Gextto, **solo se compilato** (`make build-libtorrent`) | Controlli avanzati o compatibilità di libtorrent; un passo del fallback automatico. Un crash coinvolge anche Gextto |
 
 Le statistiche del motore attivo — torrent per stato, velocità e slot,
 porta/router, DHT/uTP/LSD, cifratura, proxy, filtro IP, cache, **connessioni

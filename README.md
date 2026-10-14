@@ -122,6 +122,19 @@ and delegates transfers to one selectable engine (*Configuration → Torrent
 engine*). A single engine runs at a time; switching is a clean, coordinated
 migration with no I/O conflicts.
 
+**Automatic fallback.** If the active engine cannot stay up — a crash loop, or
+an activation refused at startup — Gextto does not just stop. It walks a chain
+and persists the choice: first the **managed qBittorrent-nox**, downloaded on
+demand from the `userdocs/qbittorrent-nox-static` releases (the last libtorrent
+v2 build, SHA-256 verified) and started with a private profile — or an external
+qBittorrent you already run; then the optional embedded libtorrent, on a build
+that includes it; finally a recovery state where the transfers stay stopped and
+the UI stays up so you can intervene. Before switching engines it tries the
+cheapest fix: an updated `gx-torrent` that fails to start is rolled back to the
+previous binary. A cooldown prevents two crashing engines from ping-ponging, and
+`GEXTTO_ENGINE=qbittorrent` (or `gx-torrent`) forces the engine for one run,
+which also serves as a one-line recovery from a shell.
+
 ### gx-core and gx-torrent (default, recommended)
 
 **gx-torrent** is the default engine: pure Go (`CGO_ENABLED=0`), no C/C++
@@ -223,8 +236,8 @@ resume storage, and real-time Server-Sent Events (`/ui/events`).
 | Engine | Where it runs | When to pick it |
 |---|---|---|
 | gx-torrent (default) | Separate supervised Go process | Pure Go, self-contained, active development. v1, hybrid and v2-only, DHT and MSE/PE; also standalone on Linux and Windows; no WebTorrent/WebRTC |
-| qBittorrent-nox | External daemon via its Web API | You already run qBittorrent-nox or prefer its UI. Needs path mappings and an extra process ([setup guide](docs/qbittorrent-nox.md)) |
-| libtorrent (optional build) | Inside Gextto's process, **only if compiled in** (`make build-libtorrent`) | Advanced libtorrent controls or compatibility; also the automatic fallback. A crash takes Gextto down too |
+| qBittorrent-nox | External daemon via its Web API, or one Gextto downloads and runs privately | You already run qBittorrent-nox or prefer its UI. Needs path mappings and an extra process ([setup guide](docs/qbittorrent-nox.md)); also the first step of the automatic fallback, downloaded on demand |
+| libtorrent (optional build) | Inside Gextto's process, **only if compiled in** (`make build-libtorrent`) | Advanced libtorrent controls or compatibility; one step of the automatic fallback. A crash takes Gextto down too |
 
 Engine statistics — torrents by state, speed and queue slots, port/router,
 DHT/uTP/LSD, encryption, proxy, IP filter, cache, **incoming connections**,
