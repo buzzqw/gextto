@@ -988,6 +988,9 @@ func RunCycleDomain(
 			if cfg.DryRun {
 				logMessage = fmt.Sprintf("🧪 Test mode: would download %s — %s (%s)", logTarget(&release), why, friendlyQuality(release.Quality))
 			}
+			if destination := downloadDestinationLabel(cfg, preferredPath); destination != "" {
+				logMessage += " → " + destination
+			}
 			logHash, _ := utils.MagnetHash(release.Magnet)
 			logging.Info(logMessage, "release", release.Title, "from", release.Source, "score", score, "hash", logHash)
 			logging.Debug("download decision",
@@ -1260,7 +1263,11 @@ func prioritizeArchiveGapDownloads(
 		stats.DownloadsStarted++
 		stats.GapsFilled++
 		started++
-		logging.Info(fmt.Sprintf("📥 Downloading %s — fills a missing episode (%s)", logTarget(&release), friendlyQuality(release.Quality)),
+		gapMessage := fmt.Sprintf("📥 Downloading %s — fills a missing episode (%s)", logTarget(&release), friendlyQuality(release.Quality))
+		if destination := downloadDestinationLabel(cfg, preferredPath); destination != "" {
+			gapMessage += " → " + destination
+		}
+		logging.Info(gapMessage,
 			"release", release.Title, "from", release.Source, "score", candidate.score, "hash", hash)
 		if err := notifier.NotifyEvent("download_started", map[string]any{
 			"title": release.Title, "kind": release.Kind, "series": release.Series, "season": release.Season,

@@ -382,6 +382,30 @@ func resolveSavePath(preferredPath *string, cfg *Config) string {
 	return preferredDownloadPath(cfg)
 }
 
+// downloadDestinationLabel names where a new download is started, so the
+// "Downloading" line says it right away instead of leaving the placement to a
+// later move: the RAM disk, the overflow/tag folder, or the engine's default
+// temp/final folder. A nil preferred path is resolved exactly like the engine
+// does (preferredDownloadPath), so the line cannot promise a different folder.
+func downloadDestinationLabel(cfg *Config, preferredPath *string) string {
+	if cfg == nil {
+		return ""
+	}
+	destination := preferredDownloadPath(cfg)
+	if preferredPath != nil && strings.TrimSpace(*preferredPath) != "" {
+		destination = *preferredPath
+	}
+	destination = strings.TrimSpace(destination)
+	if destination == "" {
+		return ""
+	}
+	if ramdisk := cfg.RamdiskDir(); ramdisk != nil && strings.TrimSpace(*ramdisk) != "" &&
+		filepath.Clean(destination) == filepath.Clean(*ramdisk) {
+		return "RAM disk"
+	}
+	return destination
+}
+
 // DiagnoseTorrent explains a torrent's situation as a short machine code plus a
 // human reason and hint. It makes extreme cases explicit (no seeders, a
 // leechers-only swarm, missing metadata, dead trackers) in the logs and in the

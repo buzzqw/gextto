@@ -376,3 +376,30 @@ func TestRamdiskPendingBytesCountsPreallocatedSpace(t *testing.T) {
 		t.Fatalf("a payload not created yet needs %d bytes, want %d", pending, 3<<20)
 	}
 }
+
+// TestDownloadDestinationLabel pins the destination shown on the "Downloading"
+// line: the RAM disk is named, everything else is the real folder, and a nil
+// preferred path mirrors the engine's own choice.
+func TestDownloadDestinationLabel(t *testing.T) {
+	if got := downloadDestinationLabel(nil, nil); got != "" {
+		t.Fatalf("nil config: %q", got)
+	}
+	temp := t.TempDir()
+	cfg := &Config{
+		DownloadDir:     t.TempDir(),
+		DownloadTempDir: &temp,
+		Settings:        map[string]string{},
+	}
+	if got := downloadDestinationLabel(cfg, nil); got != temp {
+		t.Fatalf("default destination = %q, want the temp dir %q", got, temp)
+	}
+	ram := t.TempDir()
+	cfg.Settings["torrent_ramdisk_dir"] = ram
+	if got := downloadDestinationLabel(cfg, &ram); got != "RAM disk" {
+		t.Fatalf("RAM-disk destination = %q, want %q", got, "RAM disk")
+	}
+	other := t.TempDir()
+	if got := downloadDestinationLabel(cfg, &other); got != other {
+		t.Fatalf("explicit destination = %q, want %q", got, other)
+	}
+}
