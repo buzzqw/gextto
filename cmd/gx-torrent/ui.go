@@ -338,9 +338,15 @@ func handleStaticAsset(contentType string, body func() string) http.HandlerFunc 
 	}
 }
 
-// handleUI renders the page.
+// handleUI renders the page (or the alternative interface when enabled).
 func (d *Daemon) handleUI(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
+		return
+	}
+	// With the alternative interface on, the root address serves it; /ui keeps
+	// the standard page (the way back).
+	if r.URL.Path == "/" && d.altWebUIEnabled() && d.altWebUIAvailable() {
+		d.handleAltWebUI(w, r)
 		return
 	}
 	page, err := d.uiPageData(d.uiRowLimit(r))

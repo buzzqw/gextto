@@ -178,6 +178,8 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	// Global autoTMM default (off unless enabled): new torrents follow their
 	// category's save path.
 	store.Set(autoTMMEnabledKey, strconv.FormatBool(formBool(r, "auto-tmm-enabled")))
+	// Alternative web interface (VueTorrent) at the root address.
+	store.Set(altWebUISettingKey, strconv.FormatBool(formBool(r, "webui-alternative")))
 	if v, err := strconv.Atoi(strings.TrimSpace(r.FormValue("max-seeding-time"))); err == nil && v >= 0 {
 		store.Set(maxSeedingTimeKey, strconv.Itoa(v))
 	}
@@ -455,6 +457,12 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{MAX_TIME}}", strconv.Itoa(d.settingInt(maxSeedingTimeKey, -1)))
 	repl("{{WATCH_FOLDERS}}", get("watch-folders"))
 	repl("{{COOKIES}}", html.EscapeString(d.cookiesPretty()))
+	repl("{{ALT_WEBUI_ON}}", checkedIf(d.altWebUIEnabled()))
+	altVersion := d.altWebUIVersion()
+	if altVersion == "" {
+		altVersion = "not installed"
+	}
+	repl("{{ALT_WEBUI_VERSION}}", html.EscapeString(altVersion))
 	repl("{{LISTEN}}", get("listen"))
 	repl("{{PEER_PORTS}}", get("peer-ports"))
 	repl("{{LISTEN_IFACE}}", get("listen-interface"))

@@ -162,6 +162,16 @@ The page is **translated** (Italian, English, German, French, Spanish,
 Polish): at startup Gextto passes the interface language to the daemon with
 `-lang`, and `?lang=xx` overrides it for the single request.
 
+The built-in page can be replaced by an **alternative web interface**
+(*Settings → Web interface*): the daemon downloads the latest **VueTorrent**
+release from GitHub into `<data>/vuetorrent` and serves it at the root address;
+*Install or update VueTorrent* refreshes it to the latest release at any time.
+The **standard page always stays available at `/ui`** (same login), so the switch
+is reversible and the operator can never be locked out. The alternative
+interface is a qBittorrent-compatible app driven only by `/api/v2`; a 404 on
+VueTorrent's optional `/backend/ping` (a companion service that does not exist
+here, as on plain qBittorrent) is expected.
+
 All the daemon pages share one **design system** (`internal/webui/assets/theme.css`,
 `common.js`, `icons.svg`, served under `/assets/` without a token so the sign-in
 and setup pages use them too): colour tokens for a **light and a dark theme**

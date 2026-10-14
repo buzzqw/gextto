@@ -50,6 +50,7 @@ func (d *Daemon) routes() http.Handler {
 	root.Handle("/api/", d.authenticate(api))
 	root.HandleFunc("GET /{$}", d.handleUI)
 	root.HandleFunc("GET /favicon.ico", handleFavicon)
+	root.HandleFunc("POST /ui/webui-install", d.handleUIWebUIInstall)
 	// The shared stylesheet and script are public like the icon: the sign-in
 	// and setup pages need them before any session exists.
 	root.HandleFunc("GET /assets/theme.css", handleStaticAsset("text/css; charset=utf-8", assets.ThemeCSS))
@@ -125,7 +126,7 @@ func (d *Daemon) routes() http.Handler {
 		// the standalone daemon; managed mode is driven by Gextto only.
 		root.Handle("/api/v2/", d.routesQbit())
 	}
-	return d.standaloneGuard(root)
+	return d.standaloneGuard(d.altWebUIFallback(root))
 }
 
 // authenticate requires the shared token on every request when one is set. In

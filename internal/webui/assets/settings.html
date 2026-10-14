@@ -61,6 +61,15 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <label>Cookies sent when fetching .torrent files and metadata (JSON array)<textarea name="cookies" rows="4" spellcheck="false" autocomplete="off" title="A JSON array of cookie objects, sent when the daemon fetches .torrent files and metadata over HTTP (private trackers); the same shape as the qBittorrent cookie API. Each entry has name, value, domain and path. Empty means no cookies.">{{COOKIES}}</textarea></label>
 </fieldset>
 <fieldset>
+  <legend>Web interface</legend>
+  <label class="chk"><input type="checkbox" name="webui-alternative" value="1"{{ALT_WEBUI_ON}} title="Serve a downloaded VueTorrent at the root address; the standard interface stays available at /ui"> Use the alternative web interface (VueTorrent)</label>
+  <p class="muted" style="margin:0;font-size:12.5px"><span>Installed version</span>: {{ALT_WEBUI_VERSION}}</p>
+  <div class="actions">
+    <button type="button" class="secondary sm" data-formaction="/ui/webui-install" title="Download the latest VueTorrent release and install (or update) it here">Install or update VueTorrent</button>
+  </div>
+  <p class="muted" style="margin:0;font-size:12.5px">The standard interface is always available at <a href="/ui">/ui</a>.</p>
+</fieldset>
+<fieldset>
   <legend>Network</legend>
   <div class="grid">
     <label>Web UI / API listen address<input type="text" name="listen" value="{{LISTEN}}" placeholder="0.0.0.0:8890" autocomplete="off" title="IP address and port for the web interface and API"></label>
