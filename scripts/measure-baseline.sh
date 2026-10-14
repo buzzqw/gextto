@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # measure-baseline.sh — one reproducible baseline of the cheap harnesses of the
-# gx-core engine, so a change can be compared against it (docs/evoluzione.md §14,
+# gx-core engine, so a change can be compared against it (docs/evoluzione.md §8, and the numbers go into docs/measurements.md,
 # WP0/WP1). Local by default; the network harnesses run only when their
 # environment is set, because they need a public torrent or the live DHT.
 #
@@ -8,7 +8,7 @@
 #   GX_MEASURE_REAL=<public.torrent> GX_MEASURE_DHT=3m \
 #       GX_MEASURE_DHT_INFOHASH=<40-hex> scripts/measure-baseline.sh out.txt
 #
-# The output (a Markdown-ish log) is what gets pasted into evoluzione.md.
+# The output (a Markdown-ish log) is what gets pasted into measurements.md.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 out=${1:-/tmp/gx-baseline-$(date +%Y%m%d-%H%M%S).txt}

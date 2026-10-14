@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Multi-path confirmation observability (docs/evoluzione.md §11): track which
+// Multi-path confirmation observability (docs/measurements.md §4): track which
 // responding nodes reported each peer for an info-hash, so the engine can say
 // how often a peer is confirmed by more than one path. It is read-only
 // instrumentation — it does not change which peers are used — and it is the

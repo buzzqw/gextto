@@ -432,7 +432,7 @@ flussi, dialoghi e navigazione, di cui 13 dedicati specificamente alle verifiche
 di accessibilità WCAG con axe-core sulle sezioni principali. Non è una
 certificazione legale: restano necessari test manuali con screen reader,
 tastiera e tecnologie assistive. Ambito e limiti:
-[verifica di accessibilità](docs/evoluzione.md#13-accessibility-verification).
+[verifica di accessibilità](docs/measurements.md#6-accessibility-verification).
 
 ## Documentazione
 
@@ -450,7 +450,7 @@ tastiera e tecnologie assistive. Ambito e limiti:
 | Backend qBittorrent-nox | [Guida alla configurazione](docs/qbittorrent-nox.md) |
 | Compilare o contribuire | [Manuale sviluppatori](docs/DEVELOPERS.md) |
 | Rete e protezione dati | [Politica di sicurezza](docs/SECURITY.md) |
-| Ambito e test accessibilità | [Verifica di accessibilità](docs/evoluzione.md#13-accessibility-verification) |
+| Ambito e test accessibilità | [Verifica di accessibilità](docs/measurements.md#6-accessibility-verification) |
 
 Struttura completa: l'[indice della documentazione](docs/README.md).
 

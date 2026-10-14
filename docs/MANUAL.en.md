@@ -65,7 +65,7 @@ including dialogs, keyboard sorting, polling and 320 px reflow. This result is
 not a WCAG or legal-compliance declaration: an attestation also requires manual
 screen-reader, keyboard, magnification and assistive-technology testing, plus
 an assessment of the applicable requirements. See
-[`evoluzione.md`](evoluzione.md#13-accessibility-verification) for the detailed scope
+[`measurements.md`](measurements.md#6-accessibility-verification) for the detailed scope
 and known limitations.
 
 This manual distinguishes between:

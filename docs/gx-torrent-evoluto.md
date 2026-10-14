@@ -177,7 +177,7 @@ dragging all of Gextto along. They have been **extracted into `internal/rss` and
   truncated hash (v2 reserved bit) and fetch of `piece layers` (`hash request`/`hashes`).
 - **Quality**: smart ban of corrupt peers (**done**: session ban with
   expiry, `Session.BanIP`), adaptive depth of the request queue (**done**,
-  with harness and latency isolation: §10 of `evoluzione.md`), rate-based
+  with harness and latency isolation: §3 of `measurements.md`), rate-based
   choking (deterministic bench, §6), reader with readahead for streaming (**done**),
   **graduated file priority (done, §4.5)** and disk I/O (**opt-in mmap + batched
   durability done, §5; contiguous writes not necessary without measurements**). These are
@@ -434,7 +434,7 @@ to be verified against the libraries' code before each porting.
 | 4 | Reader with readahead for streaming | reference clients | the prefetch has priority over rarest-first (`SetFileReadaheadWindow`), instead of waiting by polling (200 ms, 2 min timeout) | done |
 | 5 | BitTorrent v2 and hybrids | reference clients | v2-only torrents already in circulation; merkle per file is needed | high |
 | 6 | Rate-based choking and anti-leech | libtorrent | seeding quality; to be validated with the `unchoker/sim_test.go` harness | medium |
-| 7 | Disk I/O: writing in contiguous blocks, hashing on a pool | libtorrent | CPU and disk wear on slow NAS | **mmap + `fdatasync` done (§9 of `evoluzione.md`); contiguous/pool hashing not necessary without measurements** |
+| 7 | Disk I/O: writing in contiguous blocks, hashing on a pool | libtorrent | CPU and disk wear on slow NAS | **mmap + `fdatasync` done (§2 of `measurements.md`); contiguous/pool hashing not necessary without measurements** |
 | 8 | Share mode | libtorrent | already discarded for Gextto (§4.1: share mode skipped); for the standalone it counts as an option | low |
 | 9 | WebTorrent | reference clients | niche | high |
 
@@ -702,8 +702,11 @@ Decisions to be made **before** F1/F2, not urgent in F0:
 ## 16. References
 
 - [`docs/gx-torrent.md`](gx-torrent.md) — technical reference of the current engine.
-- [`docs/evoluzione.md`](evoluzione.md) — §6–§7 (the engine) and §8–§13 (the measurements): engine gaps, optimisations,
-  choking measurements; the standalone plan is this document.
+- [`docs/evoluzione.md`](evoluzione.md) — §6–§7 the engine (what it has, its identity),
+  §8 the open items;
+- [`docs/measurements.md`](measurements.md) — the harnesses, the benchmarks and the
+  footprint, the swarm, the DHT, the merge on real data; the standalone plan is this
+  document.
 - [`docs/bep.md`](bep.md) — BEP status and the BitTorrent v2 rules; v2 state also
   in [`docs/gx-torrent.md`](gx-torrent.md).
 - [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) — inventory of the

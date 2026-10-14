@@ -419,7 +419,7 @@ navigation, dialogs and workflows, with 13 tests dedicated specifically to
 axe-core WCAG accessibility audits on the main sections. That is not a legal
 certification: manual screen-reader, keyboard and assistive-technology testing
 is still required. Scope and limits:
-[accessibility verification](docs/evoluzione.md#13-accessibility-verification).
+[accessibility verification](docs/measurements.md#6-accessibility-verification).
 
 ## Documentation
 
@@ -437,7 +437,7 @@ is still required. Scope and limits:
 | qBittorrent-nox backend | [Setup guide](docs/qbittorrent-nox.md) |
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |
-| Accessibility scope and testing | [Accessibility verification](docs/evoluzione.md#13-accessibility-verification) |
+| Accessibility scope and testing | [Accessibility verification](docs/measurements.md#6-accessibility-verification) |
 
 Full tree: the [documentation index](docs/README.md).
 

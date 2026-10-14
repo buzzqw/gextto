@@ -538,8 +538,9 @@ qBittorrent states (`metaDL`, `forcedDL`/`forcedUP`, `stalledUP`, `pausedUP`,
 `checkingUP`); `torrents/pieceStates` and `torrents/pieceHashes` expose the
 piece diagnostics; `torrents/webseeds` lists the HTTP sources;
 `torrents/downloadLimit`/`uploadLimit` read the per-torrent limits;
-`transfer/speedLimitsMode` reports whether the scheduled alternative limits are
-active; `app/networkInterfaceList`/`networkInterfaceAddressList` list the
+`transfer/speedLimitsMode` reports whether the alternative limits are active
+(the scheduled window or the manual toggle) and `transfer/toggleSpeedLimitsMode`
+flips the manual mode (the qBittorrent speed-limit button); `app/networkInterfaceList`/`networkInterfaceAddressList` list the
 interfaces; `log/main` and `log/peers` read the daemon log. `sync/maindata`
 answers **incrementally**: when the client echoes the last `rid` it receives
 only the changed torrents/categories/tags and the removed entries, otherwise a
@@ -851,7 +852,8 @@ bar of every page), which in **standalone** is the client's complete panel:
 range, incoming/outgoing interface, proxy, token), **IP filter** (below),
 **Protocols** (encryption, DHT/PEX/uTP/holepunch/LSD/UPnP/NAT-PMP, bootstrap nodes,
 DHT read-only), **Queue and cache** (active downloads/seeds, active limit, disk
-cache, preallocation, sequential), **Optimisation** (below), **bandwidth** and
+cache, preallocation, sequential), **Optimisation** (below), **bandwidth**
+(global limits, alternative limits and their manual toggle) and
 **scheduler**, **language** and **notifications** (below). Bandwidth, scheduler and
 queue limits apply immediately; folders, network and protocols apply **from
 the next startup**. The **DHT read-only (BEP 43)** stays off by default: a
@@ -1287,7 +1289,7 @@ The merge has three phases:
   whole once complete. If that check fails, the local blocks are dropped and
   the piece is downloaded whole (the peer is not banned for it). Measured on
   the Debian and Arch ISOs with a source 75% complete: 25% of the file from the
-  network instead of 100% (§12 of [`evoluzione.md`](evoluzione.md), harness
+  network instead of 100% (§5 of [`measurements.md`](measurements.md), harness
   `scripts/phase3-env.sh` + `TestMeasureMergePhase3`).
 - **Phase 4 — v1, a different piece length.** Two **v1** torrents matched by
   file **path and length** share **whole** pieces even when their piece grids
@@ -1928,7 +1930,7 @@ other cases the LSD also announces and listens on the group `[ff15::efc0:988f]:6
   - loading of the IP filter.
   - (opt-in, `GX_MEASURE=1` / `make measure-seeding`) the seeding/choking measurement
     on a local swarm, with bytes and times per peer: method and metrics in
-    `docs/evoluzione.md` (§8).
+    `docs/measurements.md` (§3).
 - `go test ./internal/blocklist` in `internal/gxcore` covers the formats of the
   IP filter.
 - `make test-engine` also covers the deterministic choking harness
