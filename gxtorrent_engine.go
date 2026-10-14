@@ -148,7 +148,6 @@ type gxTorrentEngine struct {
 	connected        bool
 	queuePushed      string
 	sequentialPushed string
-	speedPushed      string
 }
 
 var _ TorrentEngine = (*gxTorrentEngine)(nil)
@@ -674,10 +673,10 @@ func (e *gxTorrentEngine) sync() error {
 	if reconnected {
 		logging.Debug("gx-torrent connesso", "url", e.settings.BaseURL)
 		e.mu.Lock()
-		// Re-push the queue policy and the limits: a restarted daemon must not
-		// run with stale values.
+		// Re-push the queue policy: a restarted daemon must not run with a
+		// stale value. The speed limits are re-asserted every minute by the
+		// policy, which never caches them.
 		e.queuePushed = ""
-		e.speedPushed = ""
 		e.mu.Unlock()
 	}
 	for _, hash := range export {
@@ -1031,6 +1030,19 @@ func (e *gxTorrentEngine) pushConfig(values map[string]any, last *string) error 
 	return nil
 }
 
+// pushConfigAlways posts a config patch unconditionally. The speed policy uses
+// it: it must re-assert the limits every minute so a value changed behind
+// Gextto's back (the daemon's own optimizer, a manual change on its page, a
+// session restart that reloaded a stale value) is corrected, and the
+// "unchanged" cache would wrongly skip the re-assertion.
+func (e *gxTorrentEngine) pushConfigAlways(values map[string]any) error {
+	encoded, err := json.Marshal(values)
+	if err != nil {
+		return err
+	}
+	return e.do(http.MethodPost, "/api/v1/config", bytes.NewReader(encoded), "application/json", nil)
+}
+
 // AdjustQueue pushes Gextto's queue policy to the daemon, which applies it
 // by itself every few seconds (slots, slow torrents, stall rotation, dynamic
 // queue). The push is skipped when nothing changed.
@@ -1045,7 +1057,11 @@ func (e *gxTorrentEngine) AdjustQueue(cfg *Config, effectiveDownloadKib int64) {
 	_ = effectiveDownloadKib // the daemon reads the global limit pushed by SetGlobalSpeedLimits
 }
 
-// SetGlobalSpeedLimits applies the global limits (KiB/s; 0 = unlimited).
+// SetGlobalSpeedLimits applies the global limits (KiB/s; 0 = unlimited). It
+// pushes every time and never relies on a cache: the caller (the speed policy)
+// re-asserts the effective limits every minute, so a value changed behind
+// Gextto's back — by the daemon's own optimizer, a manual edit on its page or a
+// session restart that reloaded a stale value — is corrected within a minute.
 func (e *gxTorrentEngine) SetGlobalSpeedLimits(downloadKib, uploadKib int64) (bool, error) {
 	values := map[string]any{}
 	if downloadKib >= 0 {
@@ -1057,7 +1073,7 @@ func (e *gxTorrentEngine) SetGlobalSpeedLimits(downloadKib, uploadKib int64) (bo
 	if len(values) == 0 {
 		return true, nil
 	}
-	if err := e.pushConfig(values, &e.speedPushed); err != nil {
+	if err := e.pushConfigAlways(values); err != nil {
 		return false, err
 	}
 	return true, nil

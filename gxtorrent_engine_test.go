@@ -99,6 +99,37 @@ func newTestGxEngine(t *testing.T, token string) (*gxTorrentEngine, *fakeGxDaemo
 	return engine, fake
 }
 
+// TestGxSetGlobalSpeedLimitsAlwaysReasserts pins that the speed policy is not
+// cached: identical limits are pushed again, so a value changed behind Gextto's
+// back (the daemon's own optimizer, a manual edit, a session restart) is
+// corrected at the next tick instead of staying wrong.
+func TestGxSetGlobalSpeedLimitsAlwaysReasserts(t *testing.T) {
+	engine, fake := newTestGxEngine(t, "")
+	configs := func() []string {
+		fake.mu.Lock()
+		defer fake.mu.Unlock()
+		return append([]string(nil), fake.configs...)
+	}
+
+	if _, err := engine.SetGlobalSpeedLimits(3000, 200); err != nil {
+		t.Fatal(err)
+	}
+	afterFirst := configs()
+	if len(afterFirst) == 0 {
+		t.Fatal("the first SetGlobalSpeedLimits did not push any config")
+	}
+	if last := afterFirst[len(afterFirst)-1]; !strings.Contains(last, `"speed_limit_download":3000`) {
+		t.Fatalf("pushed config does not carry the limit: %s", last)
+	}
+
+	if _, err := engine.SetGlobalSpeedLimits(3000, 200); err != nil {
+		t.Fatal(err)
+	}
+	if afterSecond := configs(); len(afterSecond) <= len(afterFirst) {
+		t.Fatalf("the second identical SetGlobalSpeedLimits was skipped (configs %d -> %d)", len(afterFirst), len(afterSecond))
+	}
+}
+
 func TestGxEngineMapsStatesAndEmitsEvents(t *testing.T) {
 	engine, fake := newTestGxEngine(t, "")
 	fake.set(gxTorrentItem{Hash: "AA", Name: "Show", State: "downloading_metadata", SavePath: "/dl", SeedRatio: -1, SeedDays: -1})
