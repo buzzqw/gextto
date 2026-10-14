@@ -92,7 +92,26 @@ func TestContractStatsShape(t *testing.T) {
 		"ip_filter_rules", "encryption", "proxy", "dht", "utp", "cache_read_mb",
 		"cache_write_mb", "cache_auto", "preallocate", "lsd", "disk_free_bytes",
 		"disk_total_bytes", "session", "active_downloads", "active_seeds",
-		"active_limit", "restart_pending", "ratio")
+		"active_limit", "restart_pending", "ratio", "lifetime")
+}
+
+// TestContractStatsHistoryShape pins the Statistics page's graph endpoint.
+func TestContractStatsHistoryShape(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	defer server.Close()
+
+	for _, rng := range []string{"1h", "24h", "7d"} {
+		requireKeys(t, "stats history "+rng,
+			getJSONObject(t, server, "/api/v1/stats/history?range="+rng),
+			"range", "samples", "down_peak", "up_peak")
+	}
+	// An unknown range answers the short one, never an error.
+	got := getJSONObject(t, server, "/api/v1/stats/history?range=nope")
+	var name string
+	if err := json.Unmarshal(got["range"], &name); err != nil || name != "1h" {
+		t.Fatalf("unknown range = %q (err %v), want 1h", name, err)
+	}
 }
 
 func TestContractConfigShape(t *testing.T) {

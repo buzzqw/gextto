@@ -247,6 +247,12 @@ type Daemon struct {
 	pendingRename *pendingRename
 	dirty         bool
 	startedAt     time.Time
+	// lifetime are the persisted all-time transfer totals (lifetime.go) and
+	// rateHist the in-memory speed history (ratehistory.go), both for the
+	// Statistics page.
+	lifetime       lifetimeTotals
+	lifetimeSaveAt time.Time
+	rateHist       rateHistory
 	// lastPeerNoiseReport rate-limits the periodic peer/tracker error summary.
 	lastPeerNoiseReport time.Time
 	// trackers drops trackers that never work (see tracker_health.go).
@@ -425,6 +431,8 @@ func newDaemon(opts Options) (*Daemon, error) {
 	if err := d.loadState(); err != nil {
 		return nil, err
 	}
+	d.loadLifetime()
+	d.rateHist = newRateHistory()
 	for id, meta := range d.state.Torrents {
 		d.setSelection(id, meta.FilePriorities)
 	}
@@ -814,6 +822,9 @@ func (d *Daemon) run(stop <-chan struct{}) {
 	for {
 		select {
 		case <-stop:
+			// Keep the all-time totals as fresh as possible across a restart
+			// that is not a crash.
+			d.saveLifetime()
 			return
 		case <-ticker.C:
 		case <-d.wake:
@@ -913,6 +924,9 @@ func (d *Daemon) tick(now time.Time) {
 	if session == nil {
 		return
 	}
+	// The engine's session counters feed the lifetime totals and the speed
+	// history; sampled here, outside d.mu, like the per-torrent calls.
+	engineStats := session.Stats()
 	torrents := session.ListTorrents()
 	collected := make(map[string]collectedTorrent, len(torrents))
 	for _, t := range torrents {
@@ -1156,8 +1170,15 @@ func (d *Daemon) tick(now time.Time) {
 		views = append(views, d.infoLocked(t, stats, d.runtimeLocked(id), d.moving[id], positions))
 	}
 	sort.Slice(views, func(i, j int) bool { return views[i].Hash < views[j].Hash })
+	saveLifetime := d.accumulateLifetimeLocked(now, engineStats.BytesDownloaded, engineStats.BytesUploaded)
+	d.rateHist.add(now, int64(engineStats.SpeedDownload), int64(engineStats.SpeedUpload))
 	d.publishViewsLocked(views)
 	d.mu.Unlock()
+
+	// The lifetime flush does file I/O: outside d.mu, and only on its cadence.
+	if saveLifetime {
+		d.saveLifetime()
+	}
 
 	// Phase 3: act on the run loops without holding d.mu.
 	for _, t := range pendingStops {
@@ -2263,6 +2284,9 @@ type daemonStats struct {
 	LSD             lsdStatus     `json:"lsd"`
 	DiskFreeBytes   int64         `json:"disk_free_bytes"`
 	DiskTotalBytes  int64         `json:"disk_total_bytes"`
+	// Lifetime holds the all-time transfer totals, persisted across restarts
+	// (lifetime.go).
+	Lifetime lifetimeStats `json:"lifetime"`
 	// Session holds the engine's session counters (cache, disk, transfer).
 	Session map[string]int64 `json:"session"`
 	// PeerErrors counts the peer/tracker errors demoted by the log filter since
@@ -2404,6 +2428,7 @@ func (d *Daemon) stats() daemonStats {
 		}
 		out.Session["lsd_peers_found"] = out.LSD.PeersFound
 	}
+	out.Lifetime = d.lifetimeLocked()
 	return out
 }
 

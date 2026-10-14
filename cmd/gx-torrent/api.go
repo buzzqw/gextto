@@ -28,6 +28,7 @@ func (d *Daemon) routes() http.Handler {
 	api := http.NewServeMux()
 	api.HandleFunc("GET /api/v1/health", d.handleHealth)
 	api.HandleFunc("GET /api/v1/stats", d.handleStats)
+	api.HandleFunc("GET /api/v1/stats/history", d.handleStatsHistory)
 	api.HandleFunc("GET /api/v1/portcheck", d.handlePortCheck)
 	api.HandleFunc("GET /api/v1/torrents", d.handleList)
 	api.HandleFunc("GET /api/v1/torrents/{hash}", d.handleGetTorrent)
@@ -226,6 +227,12 @@ func (d *Daemon) handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 func (d *Daemon) handleStats(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, d.stats())
+}
+
+// handleStatsHistory answers the Statistics page's graph: the speed samples of
+// one range, with their peaks.
+func (d *Daemon) handleStatsHistory(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, d.rateHist.snapshot(strings.TrimSpace(r.URL.Query().Get("range"))))
 }
 
 // handlePortCheck is the eMule-style "test ports": is the daemon listening and
