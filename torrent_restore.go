@@ -1,10 +1,10 @@
 package gextto
 
-// Recovery of downloads lost by an unclean stop. The embedded libtorrent
-// session is persisted through its resume files; a download added after the
-// last save and before a crash or a forced kill exists only in torrent_meta.
-// At start-up those downloads are added again from their magnet, in the folder
-// that already holds their data, so libtorrent checks and reuses it.
+// Recovery of downloads lost by an unclean stop. The active engine persists its
+// own session; a download added after the last save and before a crash or a
+// forced kill exists only in torrent_meta. At start-up those downloads are added
+// again from their magnet, in the folder that already holds their data, so the
+// engine checks and reuses it.
 
 import (
 	"fmt"
@@ -90,7 +90,7 @@ func existingDataFolder(name string, candidates []string) string {
 }
 
 // restoreMissingTorrents adds back the active downloads missing from the
-// embedded session. It runs once at start-up, before the workers: the first
+// engine's session. It runs once at start-up, before the workers: the first
 // cycle would otherwise mark them as missing and stop tracking them.
 func restoreMissingTorrents(cfg *Config, db *Database, engine TorrentEngine) int {
 	if cfg == nil || db == nil || engine == nil || cfg.DryRun {

@@ -1499,7 +1499,6 @@ Recalculate scores* after changing weights.
 
 | Setting | What it does |
 |---|---|
-| Apply now | Re-applies the settings to the active session right away (otherwise they apply from the next cycle). |
 | IP filter → Load / update now | Downloads the list from the configured URL (or uses the local file) and applies it to the active engine right away, gx-torrent included. |
 
 #### Queues and performance
@@ -1569,7 +1568,6 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Setting | What it does |
 |---|---|
 | Optimize | Computes cache and buffers from the RAM. |
-| Apply now | Re-applies the settings to the active session right away. |
 
 #### Seeding and completion
 

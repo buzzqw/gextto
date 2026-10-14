@@ -177,8 +177,7 @@ func newQbittorrentEngine(cfg *Config) (*qbittorrentEngine, error) {
 
 // superviseManagedProcess keeps the managed qBittorrent-nox alive: every
 // unexpected exit is logged and the process is restarted. After too many
-// crashes in a short window Gextto hands the transfers to another engine
-// (gx-torrent, then the embedded libtorrent when the build has it) and
+// crashes in a short window Gextto hands the transfers back to gx-torrent and
 // restarts the service to apply it (see engine_fallback.go).
 func (e *qbittorrentEngine) superviseManagedProcess() {
 	const (
@@ -222,8 +221,7 @@ func (e *qbittorrentEngine) superviseManagedProcess() {
 		crashes = kept
 
 		if len(crashes) >= maxCrashes {
-			// Hand the transfers back to another engine: gx-torrent (the
-			// default), then the embedded libtorrent when the build has it.
+			// Hand the transfers back to gx-torrent (the default engine).
 			if applyEngineFallback(context.Background(), e.cfg, BackendQbittorrent, nil) {
 				logging.Error("qBittorrent non riesce a restare attivo: cambio motore e riavvio il servizio",
 					"crashes", len(crashes), "window_minutes", int(crashWindow.Minutes()))
@@ -831,7 +829,7 @@ func (e *qbittorrentEngine) Stats() map[string]any {
 func (e *qbittorrentEngine) ApplyOptimization(cfg *Config) (map[string]any, error) {
 	memoryMB := uint64(0)
 	if cfg != nil {
-		memoryMB = gh0_libtorrentOptimizationFor(cfg).memoryMB
+		memoryMB = gh0_memoryMBFor(cfg)
 	}
 	cacheMB := int64(512)
 	switch {
@@ -1013,7 +1011,7 @@ func (e *qbittorrentEngine) MoveStorage(hash, destination string) (bool, error) 
 func (e *qbittorrentEngine) MarkStalled(hash string) (bool, error) {
 	hash = strings.ToLower(strings.TrimSpace(hash))
 	// Park the torrent in the backend too: a dead stall must not keep occupying
-	// an active download slot (parity with the embedded engine).
+	// an active download slot.
 	paused, err := e.Pause(hash)
 	if err != nil {
 		return false, err
@@ -1175,9 +1173,9 @@ func (e *qbittorrentEngine) SetTrackers(hash string, trackers []TrackerEntry) (b
 	}
 	ctx, cancel := e.requestContext()
 	defer cancel()
-	// Replace the list like the embedded engine: remove the trackers that are
-	// no longer wanted (qBittorrent's own "** [DHT] **" rows are not
-	// trackers) and add the new ones.
+	// Replace the list: remove the trackers that are no longer wanted
+	// (qBittorrent's own "** [DHT] **" rows are not trackers) and add the new
+	// ones.
 	current, err := e.client.Trackers(ctx, hash)
 	if err != nil {
 		return false, err
@@ -1451,8 +1449,8 @@ func (e *qbittorrentEngine) AddWithOptions(magnet string, cfg *Config, preferred
 	defer cancel()
 	e.ensureCategory(ctx)
 	// Do not report a phantom start when the torrent is already in the session:
-	// the embedded backend returns false in the same case, and the caller uses
-	// that to avoid registering a download that never started.
+	// the engine returns false in the same case, and the caller uses that to
+	// avoid registering a download that never started.
 	if known, ok := utils.MagnetHash(magnet); ok {
 		for _, existing := range e.List() {
 			if strings.EqualFold(existing.Hash, known) {

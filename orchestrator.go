@@ -8,7 +8,8 @@ package gextto
 // port) root helpers; see the assumptions listed at the bottom of the file:
 //
 //	comics.go ComicsDb, GetComicsClient, NewGetComicsClient, RunComicsCycle
-//	libtorrent.go LibtorrentClient.List/AddWithPath/AddFileWithPath, FreeSpaceBytes
+//	transfer_policy.go FreeSpaceBytes, DiagnoseTorrent
+//	torrent_engine.go TorrentSession (List/AddWithPath/AddFileWithPath)
 //	cleaner.go IndexArchive
 //	postprocess.go DownloadDirFor
 //	tmdb.go TmdbClient (already written)
@@ -1927,12 +1928,12 @@ func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
 
 // Cross-module calls reconciled with the shared ports:
 //
-//	libtorrent.LibtorrentClient.List() []models.TorrentView
-//	libtorrent.LibtorrentClient.AddWithPath(magnet string, cfg *Config,
+//	torrent_engine.go TorrentSession.List() []models.TorrentView
+//	torrent_engine.go TorrentSession.AddWithPath(magnet string, cfg *Config,
 // preferredPath *string) (bool, error)
-//	libtorrent.LibtorrentClient.AddFileWithPath(torrentPath string, cfg *Config,
-// preferredPath *string) (bool, error)
-//	libtorrent.FreeSpaceBytes(path string) *uint64
+//	torrent_engine.go TorrentSession.AddFileWithPath(torrentPath string,
+// cfg *Config, preferredPath *string) (bool, error)
+//	transfer_policy.go FreeSpaceBytes(path string) *uint64
 //	cleaner.IndexArchive(seriesName, archivePath string,
 // settings map[string]string) models.ArchiveQualityIndex
 //	postprocess.DownloadDirFor(release *models.Release, cfg *Config) (string, bool)
@@ -1943,7 +1944,7 @@ func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
 //	comics.ComicsDb.SetSetting(key, value string) error
 //	comics.NewGetComicsClient() *GetComicsClient
 //	comics.RunComicsCycle(comics *ComicsDb, client *GetComicsClient,
-// notifier *Notifier, defaultRoot string, torrents *LibtorrentClient,
+// notifier *Notifier, defaultRoot string, torrents TorrentSession,
 // mainDB *Database, cfg *Config) (int, error)
 
 // comicsFailureRetrySecs is the delay before a failed comics cycle is retried.

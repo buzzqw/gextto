@@ -1007,7 +1007,7 @@ func TestGxSetSuperSeedingPosts(t *testing.T) {
 }
 
 // TestGxSessionStatsMapping pins the libtorrent-style counter names exposed by
-// gx-torrent, so /api/libtorrent/session-stats reads the same whichever engine
+// gx-torrent, so /api/torrents/session-stats reads the same whichever engine
 // is active.
 func TestGxSessionStatsMapping(t *testing.T) {
 	in := map[string]int64{

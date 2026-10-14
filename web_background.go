@@ -1491,41 +1491,11 @@ func bg_residentKB() uint64 {
 }
 
 // ---------------------------------------------------------------------------
-// apply_libtorrent_optimization
-// ---------------------------------------------------------------------------
-
-// bg_applyLibtorrentOptimization applies the optimization only when a value
-// changed, so the continuous worker does not rewrite the config every tick.
-// It returns (changed, detected memory MB).
-func bg_applyLibtorrentOptimization(s *AppState) (bool, uint64, error) {
-	cfg := latestConfig(s)
-	optimization := gh0_libtorrentOptimizationFor(cfg)
-	changed := false
-	for _, change := range optimization.changes {
-		if cfg.Settings[change.key] != change.value {
-			changed = true
-			break
-		}
-	}
-	if !changed {
-		return false, optimization.memoryMB, nil
-	}
-	for _, change := range optimization.changes {
-		if err := SaveSetting(s.cfg.DataDir, change.key, change.value); err != nil {
-			return false, optimization.memoryMB, fmt.Errorf("%s: %w", change.key, err)
-		}
-	}
-	return true, optimization.memoryMB, nil
-}
-
-// ---------------------------------------------------------------------------
 // optimize_worker
 // ---------------------------------------------------------------------------
 
-// optimizeWorker implements `optimize_worker`. For gx-torrent it re-asserts the
-// engine's own optimization (cache sized from the RAM, queue policy) every
-// period; for the embedded engine it runs the libtorrent optimization when
-// `libtorrent_auto_optimize` is enabled.
+// optimizeWorker implements `optimize_worker`: it re-asserts the engine's own
+// optimization (cache sized from the RAM, queue policy) every period.
 func optimizeWorker(state *AppState) {
 	const optimizePeriod = 15 * time.Minute
 	for {
@@ -1535,25 +1505,12 @@ func optimizeWorker(state *AppState) {
 		// gx-torrent owns its cache sizing: the daemon keeps it automatic
 		// (1/32 read, 1/16 write of the RAM). Re-assert the policy periodically
 		// so a machine/RAM change or a settings edit is re-applied; this is the
-		// gx-torrent continuous optimization and is always on.
+		// gx-torrent continuous optimization and is always on. qBittorrent owns
+		// its own cache, tuned by the managed runtime.
 		if gx, ok := state.activeEngine().(*gxTorrentEngine); ok {
 			if _, err := gx.ApplyOptimization(latestConfig(state)); err != nil {
 				logging.Debug("gx-torrent continuous optimization failed", "error", err.Error())
 			}
-			continue
-		}
-		// Read-only use: the shared cached configuration is enough.
-		enabled := settingTruthy(latestConfig(state).Settings["libtorrent_auto_optimize"])
-		if !enabled {
-			continue
-		}
-		changed, memoryMB, err := bg_applyLibtorrentOptimization(state)
-		if err != nil {
-			logging.Warn("libtorrent continuous optimization failed", "error", err)
-		} else if changed {
-			logging.Info("libtorrent continuous optimization applied", "memory_mb", memoryMB)
-		} else {
-			logging.Debug("libtorrent continuous optimization: values already optimal")
 		}
 	}
 }
@@ -1978,7 +1935,7 @@ func formatScheduledCycleTime(now, due time.Time) string {
 
 func cycleWorker(state *AppState) {
 	// Cancelled on shutdown so a cycle in progress releases the torrent engine
-	// before ShutdownEmbedded destroys the native session.
+	// before the daemon tears it down.
 	ctx, cancel := state.BackgroundContext()
 	defer cancel()
 	lastRenameCheck := time.Now().Add(-6 * time.Hour)

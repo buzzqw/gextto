@@ -2,10 +2,10 @@ package gextto
 
 // Torrent backend abstraction and the qBittorrent connectivity endpoints.
 //
-// The daemon is normally driven by the embedded libtorrent engine (the
-// official backend). `torrent_backend=qbittorrent` switches the transfer plane
-// to qBittorrent-nox through the adapter in qbittorrent_engine.go, while Gextto
-// keeps ownership of the queue, the automation and the post-processing.
+// Gextto drives gx-torrent by default; `torrent_backend=qbittorrent` switches
+// the transfer plane to qBittorrent-nox through the adapter in
+// qbittorrent_engine.go, while Gextto keeps ownership of the queue, the
+// automation and the post-processing.
 //
 // These endpoints expose the active backend, the explicit capability matrix and
 // the mandatory activation preflight (connectivity + path mapping).
@@ -28,10 +28,9 @@ type TorrentBackend interface {
 	Capabilities() map[string]bool
 }
 
-// torrentSessionSyncer is implemented by the external backends that expose their
-// poll/sync diagnostics (the capability matrix marks `sync` as `none` for the
-// embedded engine). Using the interface keeps a single mechanism instead of a
-// concrete type switch per engine.
+// torrentSessionSyncer is implemented by the engines that expose their
+// poll/sync diagnostics. Using the interface keeps a single mechanism instead of
+// a concrete type switch per engine.
 type torrentSessionSyncer interface {
 	SyncStats() map[string]any
 }

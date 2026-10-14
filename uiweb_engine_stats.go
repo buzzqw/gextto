@@ -27,7 +27,7 @@ type uiEngineStats struct {
 }
 
 // engineNum reads a number from a stats map whatever its Go type (JSON
-// decoding yields float64, the embedded engine native integers).
+// decoding yields float64, the HTTP APIs native integers).
 func engineNum(values map[string]any, key string) int64 {
 	switch v := values[key].(type) {
 	case int:

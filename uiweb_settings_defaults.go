@@ -59,7 +59,7 @@ var uiSettingDefaults = map[string]string{
 	"websearch_engines": "",
 	"content_filters":   "",
 
-	// --- Libtorrent ---------------------------------------------------------
+	// --- Transfer -----------------------------------------------------------
 	"torrent_dynamic_queue":               "false",
 	"torrent_preallocate":                 "false",
 	"torrent_dynamic_queue_min":           "1",

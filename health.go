@@ -46,8 +46,8 @@ type Health struct {
 type ProcessMetricsSnapshot struct {
 	ResidentBytes     uint64   `json:"resident_bytes"`
 	ProcessCPUPercent *float64 `json:"process_cpu_percent"`
-	// Go runtime figures help distinguish the daemon's own footprint from the
-	// embedded libtorrent session, whose cache grows during transfers.
+	// Go runtime figures help separate the process's own heap from the engine's
+	// footprint (the managed qBittorrent process or the gx-torrent daemon).
 	GoHeapBytes      uint64 `json:"go_heap_bytes"`
 	GoHeapInuseBytes uint64 `json:"go_heap_inuse_bytes"`
 	GoGoroutines     int    `json:"go_goroutines"`

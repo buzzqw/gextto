@@ -1,7 +1,7 @@
 // Command gx-torrent is a small BitTorrent daemon built on the gx-core engine (pure Go).
-// Gextto drives it over a local REST API as an alternative to the embedded
-// libtorrent engine; the daemon owns its queue (slots, slow torrents, stall
-// rotation) and keeps the payload safe on removal.
+// Gextto drives it over a local REST API as its default transfer engine; the
+// daemon owns its queue (slots, slow torrents, stall rotation) and keeps the
+// payload safe on removal.
 package main
 
 import (

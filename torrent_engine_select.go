@@ -4,8 +4,8 @@ package gextto
 // engine, with the mandatory preflight that protects the filesystem: a backend
 // is never activated when a path it may be asked to use cannot be translated.
 //
-// `gx-torrent` is the default (DefaultTorrentBackend); embedded libtorrent is
-// the automatic fallback. Selecting qBittorrent is opt-in
+// `gx-torrent` is the default (DefaultTorrentBackend); qBittorrent is the
+// alternative selected by the fallback chain. Selecting qBittorrent is opt-in
 // and non-destructive: if the connectivity preflight fails the adapter is still
 // installed (it degrades to an empty/stale view), but a path-mapping failure
 // refuses activation because it could relocate files to the wrong place.
@@ -20,30 +20,6 @@ import (
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/qbittorrent"
 )
-
-// alternativeBackendActive reports whether a non-embedded backend will be
-// activated at startup. It mirrors selectTorrentEngine's validation (without
-// the connectivity probe) so NewLibtorrentClient can suppress its session
-// exactly when the alternative engine will really take over.
-func alternativeBackendActive(cfg *Config) bool {
-	if cfg == nil {
-		return false
-	}
-	switch TorrentBackendName(cfg) {
-	case BackendQbittorrent:
-		settings, err := qbittorrentSettingsFromConfig(cfg)
-		if err != nil || settings.Client.BaseURL == "" {
-			return false
-		}
-		return validateBackendMappings(settings.Mappings, requiredBackendPaths(cfg)) == nil
-	case BackendGxTorrent:
-		// gx-torrent runs on this machine and shares Gextto's paths.
-		_, err := gxTorrentSettingsFromConfig(cfg)
-		return err == nil
-	default:
-		return false
-	}
-}
 
 // selectTorrentEngine builds the configured backend. The second return value is
 // a human-readable note (empty on the happy path), and an error means activation
@@ -182,8 +158,7 @@ func PreflightQbittorrentWith(settings qbittorrentSettings) QbittorrentPreflight
 }
 
 // ShutdownTorrentEngine releases the active engine when it owns process-level
-// resources. The embedded engine is closed
-// by the daemon through LibtorrentClient.Shutdown.
+// resources (the managed qBittorrent process, the gx-torrent daemon adoption).
 func ShutdownTorrentEngine(s *AppState) error {
 	engine := s.activeEngine()
 	if closer, ok := engine.(interface{ Close() error }); ok {

@@ -2,9 +2,7 @@ package gextto
 
 // transfer_policy.go holds the transfer policy that is shared by every engine:
 // download-path selection (including the RAM disk), the free-space budget, the
-// torrent diagnosis and the small path helpers. It used to live in
-// libtorrent.go next to the embedded libtorrent client; the client is gone and
-// these helpers stayed.
+// torrent diagnosis and the small path helpers.
 
 import (
 	"fmt"
@@ -49,12 +47,9 @@ type TrackerEntry struct {
 	URL  string
 }
 
-// TrimMemory returns freed C++/libtorrent heap pages to the operating system.
-// Called after transfers and cycles so the resident size falls back instead of
-// staying at the download peak.
-// TrimMemory is a no-op: it used to return the embedded libtorrent session's
-// C++ heap to the operating system. The pure-Go build always stubbed it, and
-// the embedded engine is gone, so it is kept only for its callers.
+// TrimMemory keeps the historical name used by its callers. It is a no-op: it
+// used to return the embedded libtorrent session's C++ heap to the operating
+// system, and the pure-Go build always stubbed it.
 func TrimMemory() {}
 
 // FreeSpaceBytes returns the free space in bytes for the filesystem containing

@@ -750,7 +750,7 @@ func V2SettingsContentArchiveDelete(w http.ResponseWriter, r *http.Request, s *A
 }
 
 // V2SettingsIPFilterApply loads the configured IP filter (downloading the URL if
-// needed) and reports the result in place, from the Libtorrent settings tab.
+// needed) and reports the result in place, from the network settings tab.
 func V2SettingsIPFilterApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	rules, path, err := applyIPFilter(r.Context(), s)
@@ -763,7 +763,7 @@ func V2SettingsIPFilterApply(w http.ResponseWriter, r *http.Request, s *AppState
 }
 
 // V2SettingsIPFilterStatus reports the configured filter and whether it is
-// already on disk, shown when the Libtorrent tab opens.
+// already on disk, shown when the network tab opens.
 func V2SettingsIPFilterStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	target := strings.TrimSpace(cfg.Transfer.IpFilterPath)

@@ -6,14 +6,12 @@ package gextto
 // Gextto stays the owner of the queue, the automation and the post-processing;
 // the engine only provides the transfer plan. Two implementations exist:
 //
-//   - embeddedEngine  — the official libtorrent backend (default, unchanged);
+//   - gxTorrentEngine   — the native gx-torrent daemon (the default engine);
 //   - qbittorrentEngine — an adapter over the qBittorrent-nox Web API.
 //
-// The refactor is deliberately behavior-preserving: `embeddedEngine` embeds the
-// existing *LibtorrentClient, so every promoted method behaves exactly as
-// before. The abstraction exists to let the daemon select a different engine
-// without changing the HTTP contract or the automation policy (see
-// the backend-specific implementation notes).
+// The abstraction keeps the daemon able to select a different engine without
+// changing the HTTP contract or the automation policy (see the backend-specific
+// implementation notes).
 
 import (
 	"errors"
@@ -81,8 +79,7 @@ type TorrentEngine interface {
 
 	Stats() map[string]any
 	// AdjustQueue enforces Gextto's active-download slots on the backend. The
-	// embedded engine applies libtorrent's dynamic queue; the external engines
-	// implement the same policy with pause/start.
+	// engines implement the same policy with pause/start.
 	AdjustQueue(cfg *Config, effectiveDownloadKib int64)
 
 	Add(magnet string, cfg *Config) (bool, error)
@@ -382,10 +379,6 @@ func ValidatePathMappings(mappings []PathMapping, required []string) error {
 	}
 	return nil
 }
-
-// require is gone with the embedded engine: every engine now implements the
-// full TorrentEngine contract, and an operation it cannot do is refused with
-// ErrCapabilityUnavailable at the adapter.
 
 // backendCapabilityError builds the canonical explicit "unsupported" error.
 func backendCapabilityError(backend, capability string) error {

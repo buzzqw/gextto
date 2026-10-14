@@ -552,11 +552,10 @@ const gxStableUptime = 30 * time.Minute
 
 // superviseManagedProcess restarts the managed daemon after an unexpected exit
 // or a failed start. Once the crash budget is exhausted the daemon is not
-// recovering on its own: applyEngineFallback hands the transfers to another
-// engine (the managed qBittorrent-nox, downloaded on demand, then the embedded
-// libtorrent on a build that includes it), saving the setting and restarting
-// the service. When no alternative is available it keeps gx-torrent, in safe
-// mode and with growing pauses, instead of restarting the service in a loop.
+// recovering on its own: applyEngineFallback hands the transfers to qBittorrent
+// (downloaded on demand), saving the setting and restarting the service. When
+// no alternative is available it keeps gx-torrent, in safe mode and with growing
+// pauses, instead of restarting the service in a loop.
 func (e *gxTorrentEngine) superviseManagedProcess() {
 	defer recoverGoroutine("gx-torrent supervisor")
 	const restartPause = 5 * time.Second

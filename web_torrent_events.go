@@ -319,7 +319,7 @@ func tev_scheduleStorageMoveRetry(retries map[string]StorageMoveRetry, hash, des
 }
 
 // storageMoveReporter is implemented by engines that can say which torrents
-// are still moving their files (the embedded libtorrent).
+// are still moving their files.
 type storageMoveReporter interface {
 	MovingStorage() (map[string]string, bool)
 }

@@ -1543,7 +1543,6 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 
 | Impostazione | Cosa fa |
 |---|---|
-| Applica ora | Riapplica subito le impostazioni alla sessione attiva (altrimenti valgono dal ciclo successivo). |
 | Filtro IP → Carica / aggiorna ora | Scarica la lista dall'URL configurato (o usa il file locale) e la applica subito al motore attivo, gx-torrent compreso. |
 
 #### Code e prestazioni
@@ -1614,7 +1613,6 @@ spazio del `tmpfs`, come prima.
 | Impostazione | Cosa fa |
 |---|---|
 | Ottimizza | Calcola cache e buffer in base alla RAM. |
-| Applica ora | Riapplica subito le impostazioni alla sessione attiva. |
 
 #### Seed e completamento
 

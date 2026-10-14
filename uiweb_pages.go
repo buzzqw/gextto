@@ -191,7 +191,7 @@ type uiSettingsPage struct {
 	ListEditors     []uiListEditor
 	SearchIndexJSON string
 	// Actions is an optional toolbar of API buttons shown at the top of the
-	// tab (e.g. Ottimizza / Applica ora in Libtorrent).
+	// tab (e.g. Ottimizza on the performance tab).
 	Actions *uiActionSection
 	// EditorsFirst renders the structured editors (the feed editor) before the
 	// plain fields, the order extto/rextto use on the Sorgenti tab.
@@ -553,15 +553,6 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		ActiveID: active,
 		Fields:   fieldsByTab[active],
 	}
-	// With the continuous optimization on, the queue/cache fields are handled
-	// by Rextto/Gextto: show them as "Auto" (read-only), like rextto does.
-	if active == "performance" && settingsBool(cfg, "libtorrent_auto_optimize", false) {
-		for index := range page.Fields {
-			if uiManagedSetting[page.Fields[index].Key] {
-				page.Fields[index].Managed = true
-			}
-		}
-	}
 	// The transfer backend is a fixed choice: render it as a select instead of
 	// a free-text box.
 	if active == "backend" {
@@ -604,7 +595,6 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	page.ShowI18n = active == "system"
 	page.ListEditors = uiSettingsTabEditors(active)
 	page.ShowEditors = len(page.ListEditors) > 0
-	applyNow := uiActionButton{Label: "Applica ora", Method: "POST", Path: "/api/torrents/apply_settings", Body: "{}", Hint: "Riapplica subito le impostazioni libtorrent alla sessione attiva."}
 	switch active {
 	case "sources":
 		// The Indexer Torznab editor and FlareSolverr live only in Integrazioni
@@ -613,11 +603,6 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		page.EditorsFirst = true
 		page.CheckboxGroups = uiSourcesCheckboxGroups(cfg)
 	case "network":
-		page.Actions = &uiActionSection{
-			Label:   "Applica alla sessione",
-			Hint:    "Le impostazioni salvate valgono dal ciclo successivo; «Applica ora» le riapplica subito alla sessione attiva.",
-			Buttons: []uiActionButton{applyNow},
-		}
 		for index := range page.Groups {
 			if page.Groups[index].Title == "Porte e interfacce" {
 				page.Groups[index].Hint = "Porta peer usata dal motore torrent. «Test porte» verifica che sia in ascolto e inoltrata dal router (disponibile con gx-torrent)."
@@ -632,7 +617,6 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 			Hint:  "Ottimizza calcola cache e buffer in base alla RAM e adatta la coda dinamica durante il funzionamento. Con l'ottimizzazione continua attiva i campi Download attivi, Seed attivi, Limite torrent attivi e Cache disco sono gestiti automaticamente (Auto).",
 			Buttons: []uiActionButton{
 				{Label: "Ottimizza", Class: "primary", Method: "POST", Path: "/api/torrents/optimize_settings", Body: "{}", Hint: "Applica una base sicura e suggerisce cache e buffer in base alla RAM."},
-				applyNow,
 			},
 		}
 	}
@@ -865,15 +849,6 @@ var uiSettingsEditorSearchEntries = []uiSearchEntry{
 	{Key: "", Label: "Traduzioni", Tab: "system"},
 }
 
-// uiManagedSetting lists the settings the continuous optimization drives: with
-// `libtorrent_auto_optimize` on they render as "Auto" and cannot be edited.
-var uiManagedSetting = map[string]bool{
-	"torrent_active_downloads": true,
-	"torrent_active_seeds":     true,
-	"torrent_active_limit":     true,
-	"torrent_cache_size":       true,
-}
-
 // uiSettingAllowedBackends lists the torrent engines a setting applies to. A
 // nil/empty result means every engine.
 func uiSettingAllowedBackends(key string) []string {
@@ -899,7 +874,7 @@ func uiBackendAllows(allowed []string, backend string) bool {
 }
 
 // uiActiveTorrentBackend returns the configured transfer backend, defaulting to
-// the embedded engine.
+// gx-torrent.
 func uiActiveTorrentBackend(cfg *Config) string {
 	return TorrentBackendName(cfg)
 }
