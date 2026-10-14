@@ -114,7 +114,7 @@ kept where they justify the design.
 | `BenchmarkPickerRarestSteady` | **~105 / 143.5 µs/op, 0 allocs/op** | piece picker, steady state |
 | `BenchmarkTickUnchokeSeeding` | **1.3 / 1.64 µs/op, 1 alloc/op** | unchoker tick |
 | `BenchmarkPrefillFromUnrelatedV2` (16 candidates) | **1.49 / 1.58 µs/op, 128 B/op, 16 allocs/op** | one-shot cost of the Phase 2 merge scan (allocation, resume, later trigger), **no steady-state path** |
-| `BenchmarkMergeCandidatesUnrelated` (32 torrents) | **~98 ns/op, 0 allocs/op** | the filter the resume and later-trigger paths pay when nothing is reusable (§5) |
+| `BenchmarkMergeCandidatesUnrelated` (32 torrents) | **~265 ns/op, 0 allocs/op** | the filter the resume and later-trigger paths pay when nothing is reusable (§5) |
 | `BenchmarkNewConnID` (uTP) | **31 ns/op, 0 B/op, 0 allocs/op** | the connection id probes from a random value and stops at the first free one, O(1) with the connections a socket really has; it used to build a 64K-entry table per dial (512 KiB and 152,353 ns/op) |
 | `BenchmarkTransferLoopback` (uTP, 16 KiB block) | **45.6 → 62.0 MB/s, 82,020 → 23,692 B/op (−71%), 173 → 116 allocs/op (−33%)** | four optimisations from the profile: the connection-id probe, lazy `Event` channels (the per-send `acked` flag no longer allocates one per packet), a reusable read window (`readPos` offset instead of reslicing) and a `netip.AddrPort` connection key instead of a `UDPAddr.String()` per inbound packet |
 | `BenchmarkUTPConnRemoteAddr` | **259 → 113 ns/op, 152 → 40 B/op, 6 → 3 allocs/op** | the TCP-view addresses are converted once at wrap (`NewUTPConn`) instead of at every `RemoteAddr()` call; the rest is `String()` |
@@ -170,7 +170,8 @@ are the two places where the rewrite is measurably faster.
 with a nested scan had pushed `BenchmarkMergeCandidatesUnrelated` from ~98 to
 **1360 ns/op**; the scan is now nested only while `len(a)*len(b) <= 1024` (lengths
 compared before paths) and larger packs index the smaller torrent in a map:
-**375 → 265 ns/op, still 0 allocs**. `BenchmarkV1FilesMatchNoMatch` (unrelated torrents
+**375 → 265 ns/op, still 0 allocs**. (Re-run 2026-10-14, Intel N97: ~286–351 ns/op,
+0 allocs — same shape, the absolute varies with machine and load.) `BenchmarkV1FilesMatchNoMatch` (unrelated torrents
 with the same file length): 8 files 290 → 278 ns, 64 files 18.2 → 3.4 µs, 2000 files
 17.3 ms → **0.13 ms** (109 KB, 9 allocs).
 
@@ -374,8 +375,8 @@ address, the NAT type, `subnet_share_max`, `nodes_insecure_id`, `subnet_cap_hint
 token from one swarm is not reused on another. The **anti-Sybil cap per subnet**
 (`Config.MaxNodesPerSubnet`, default 0 = off) is implemented with an O(1) counter:
 nodes beyond the threshold stay in the address book with `noTree`, and
-`subnet_cap_hint` advises a value. Out of scope: DHT over I2P and the BEP 44
-**outgoing client** (no consumer yet).
+`subnet_cap_hint` advises a value. Out of scope: DHT over I2P and the BEP 44 `put` path (the iterative `get` client already
+serves the BEP 46 feed resolver behind `GET /api/v1/dht-feed`).
 
 **Measurements.** `make measure-dht` on the public DHT (opt-in, outside CI):
 
@@ -485,7 +486,7 @@ which the torrents are added no longer decides whether the reuse happens.
 **Method**: static review (HTML/CSS/JS), semantics/names/ARIA/focus,
 responsive layout/visible focus/reduced-motion, light/dark theme contrast, axe-core
 via Playwright, regression tests (dialogs, keyboard sort, polling, narrow
-viewports). Suite: **13 green tests** on dashboard, downloads, settings,
+viewports). Suite: **14 green tests** on dashboard, downloads, settings,
 maintenance, health, logs (`cd uiweb/end2end && npm ci && npm run test:a11y`;
 a safety net, not a substitute for the manual assessment).
 

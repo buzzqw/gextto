@@ -112,9 +112,10 @@ Two details matter:
   point per byte), not hex and not base64. The Go encoder must emit `\u00XX`
   escapes and the decoder must interpret each rune as a byte.
 - the reference server sets `compact = -1` for WebSocket announces ("return full
-  peer objects"), so a native client **does** receive `peers` as ip:port objects
-  for TCP peers. The tracker is therefore useful on its own, without WebRTC:
-  the `offers`/`answer` fields are only needed for the browser peers of item 2.
+  peer objects"), so a native client **can** receive `peers` as ip:port objects —
+  but in practice `bittorrent-tracker` only tracks WebRTC peers, so a native
+  client gains no TCP peers there (see the §1 caveat): the `offers`/`answer`
+  fields are only needed for the browser peers of item 2.
 
 **Why it matters here.** Some swarms are only announced on `wss://` trackers
 (the WebTorrent trackers, and a growing number of private/public trackers that
@@ -130,7 +131,7 @@ also lays the transport and the JSON signalling groundwork for item 2.
   (`Announce`, `Scrape`, `URL`) every tracker implements.
 - `internal/gxcore/internal/tracker/httptracker/` — the announce query builder
   and the peer decoders (`decodeAnnouncePeers`, compact and dictionary forms)
-  that the WS tracker would reuse.
+  that the WS tracker reuses.
 - `internal/gxcore/internal/tracker/udptracker/` — the shared UDP engine, a
   model for a shared WS transport.
 - `internal/gxcore/internal/netx/` — the egress the WS dial must use: the
@@ -141,15 +142,12 @@ also lays the transport and the JSON signalling groundwork for item 2.
 1. New package `internal/gxcore/internal/tracker/wstracker` implementing
    `tracker.Tracker`. It owns one WebSocket connection per tracker URL and one
    in-flight request at a time (announce and scrape are request/response).
-2. WebSocket client. Two options, both acceptable:
-   - reuse `golang.org/x/net/websocket` (already an indirect dependency:
-     `golang.org/x/net`), which handles the RFC 6455 handshake and framing; or
-   - implement a **bounded** RFC 6455 client in-tree (handshake, text/binary
-     frames, masking, ping/pong, close, fragmentation, a hard frame-size cap),
-     consistent with the "original code" policy of the engine and fuzzable like
-     the other wire parsers.
-   I would start with `golang.org/x/net/websocket` to validate the feature, then
-   decide whether to replace it in-tree for full control and a fuzz target.
+2. WebSocket client. Chosen: the **bounded** RFC 6455 client implemented in-tree
+   (handshake, text/binary frames, masking, ping/pong, close, fragmentation,
+   a hard frame-size cap), consistent with the "original code" policy of the
+   engine and fuzzed like the other wire parsers — instead of reusing
+   `golang.org/x/net/websocket` (which survives only as the test-server
+   handler).
 3. Connection path: dial through the session egress. Reuse the resolver +
    blocklist of `trackermanager` (the same `DialContext` the HTTP transport
    uses) and `tls.Config` for `wss`. A shared WS transport in `TrackerManager`

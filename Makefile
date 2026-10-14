@@ -57,7 +57,7 @@ test-dht:
 # seed corpus; this actually fuzzes, so a panic on hostile input surfaces before
 # a release (the pass of 2026-10-13 found a .torrent scanner panic in minutes).
 # Not part of `make test`; run it by hand or in a nightly job. Override the
-# per-target time with FUZZ_TIME=2m. See docs/evoluzione.md §10.
+# per-target time with FUZZ_TIME=2m. See docs/evoluzione.md §6.
 FUZZ_TIME ?= 30s
 # Each target runs once and, if it fails, once more. The Go fuzzing engine
 # occasionally ends a target with a spurious "context deadline exceeded" when
@@ -141,7 +141,7 @@ measure-choking:
 # over BitTorrent and two v2 torrents of each with different piece lengths
 # (scripts/phase3-env.sh), then the bytes the destination takes from the
 # network. GX_PHASE3_DIR sets the folder, GX_PHASE3_SET picks debian or arch.
-# See docs/evoluzione.md (section 10.1).
+# See docs/evoluzione.md §6.
 measure-merge3:
 	scripts/phase3-env.sh $${GX_PHASE3_DIR:-$$HOME/gx-phase3}
 	GX_MEASURE_MERGE3=$${GX_PHASE3_DIR:-$$HOME/gx-phase3}/$${GX_PHASE3_SET:-debian} go test ./cmd/gx-torrent/ -run MeasureMergePhase3 -v -count=1 -timeout 40m

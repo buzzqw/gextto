@@ -1867,7 +1867,6 @@ eng:
   "Una riga per cartella, nel formato percorso Gextto = percorso visto da qBittorrent. Obbligatoria se i due processi non condividono lo stesso filesystem. Le directory non devono sovrapporsi.": "One directory per line, in the format Gextto path = path seen by qBittorrent. Required when the two processes do not share a filesystem. Directories must not overlap."
   "Se Categoria o Tag sono compilati, Gextto sincronizza solo i torrent che li rispettano; lascia entrambi vuoti per gestire tutti i torrent già presenti.": "When Category or Tag is set, Gextto synchronizes only matching torrents; leave both empty to manage all existing torrents."
   "Mappatura percorsi (normalmente vuota)": "Path mapping (normally empty)"
-  "lascia vuoto per il motore integrato": "leave empty for the built-in engine"
   "directory dati Gextto non configurata": "Gextto data directory is not configured"
   "URL qBittorrent gestito non valido": "Invalid managed qBittorrent URL"
   "qBittorrent gestito richiede Web API HTTP locale": "Managed qBittorrent requires a local HTTP Web API"

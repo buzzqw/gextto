@@ -337,7 +337,7 @@ the worst connection; `.torrent` creation from a folder (`CreateTorrent`, form a
 DHT: our own module (`internal/dht`, BEP 5/32/33/42/43/44/46) with a bucket-less
 binary-tree routing table, tokens bound to source address and scope, an opt-in
 anti-Sybil cap per subnet, and the **feeds** of BEP 46. Robustness: parser fuzzing in
-CI (`make fuzz-smoke`, 21 targets, seeds in `testdata/fuzz`), a bounded bencode screen
+CI (`make fuzz-smoke`, 23 targets, seeds in `testdata/fuzz`), a bounded bencode screen
 before the decoder on every hand-written path, snub and session ban with TTL, IP
 filter, and hostile hash-request headers (bogus root, bad length, huge proof, overflow)
 refused without a panic. Diagnostics: uTP socket, dial, accept, error, RTO and SYN-drop counters, merge
@@ -452,7 +452,7 @@ in `internal/gxcore/torrent/torrent_id.go`, the logger `internal/gxcore/logging`
 backoff `internal/gxcore/internal/backoff`, the uTP transport and the DHT address
 decoding and throttle our own.
 
-Every file of `internal/gxcore` (~130) and `internal/dht` (8) is rewritten in this
+Every file of `internal/gxcore` (~170) and `internal/dht` (17) is rewritten in this
 repository with APIs, wire formats and behaviours preserved. What still matches the old
 code is protocol-mandated format (BEP wire layouts, bencode tags, API shapes) and
 compatibility-kept strings (error/log texts, resume-DB and flag spellings), plus

@@ -61,7 +61,7 @@ npm ci
 npm run test:a11y
 ```
 
-La suite corrente esegue 13 controlli axe-core/Playwright sulle sezioni
+La suite corrente esegue 14 controlli axe-core/Playwright sulle sezioni
 principali, compresi dialoghi, ordinamento da tastiera, polling e reflow a 320
 px. Il risultato non è una dichiarazione di conformità WCAG o normativa: per
 un'attestazione servono anche audit manuale con screen reader, tastiera,
@@ -638,7 +638,7 @@ prestazioni, Seed e completamento), **Dove salvare** (Libreria e rinomina,
 Archivio e spazio) e **Sistema** (Manutenzione automatica, Notifiche, Accesso e
 servizi, Diagnostica e traduzioni). Le modifiche non salvate sono
 evidenziate con la barra “Salva tutte”. L'elenco completo di ogni voce, tab per
-tab, è nell'[Appendice A](#appendice-a-riferimento-configurazione).
+tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
 
 - **Sorgenti** — lista feed RSS, indexer (Jackett/Prowlarr) con pulsante
   *Verifica*, URL FlareSolverr + test, motori web, filtri contenuto, blacklist.
@@ -801,13 +801,12 @@ del motore finché ha torrent in sessione, e con un motore esterno
 (**gx-torrent** o **qBittorrent-nox**) vive nel suo processo. Per ridurre RAM e
 CPU:
 
-- **RAM** — con **gx-torrent** la cache è **adattiva**: il demone la ricalcola da
-  memoria disponibile, download/seed attivi e tipo di storage (più grande su
-  HDD/NFS, piccola su SSD), e Gextto la riafferma ogni 15 minuti, quindi non c'è
-  nulla da tarare. Un valore di `torrent_cache_size` maggiore di zero è un
-  override manuale. Il daemon libera
-  la memoria al sistema (`malloc_trim`) dopo i completamenti, dopo ogni ciclo e
-  ogni 15 minuti, così l'RSS non resta al picco del download.
+- **RAM** — con **gx-torrent** la cache è **adattiva**: il demone la ricalcola
+  ogni pochi minuti da memoria disponibile, download/seed attivi e tipo di
+  storage (più grande su HDD/NFS, piccola su SSD), quindi non c'è nulla da
+  tarare. Un valore di `torrent_cache_size` maggiore di zero è un override
+  manuale. Il runtime Go restituisce nel tempo la memoria inutilizzata al
+  sistema, così l'RSS non resta al picco del download.
 - **CPU** — attiva la **coda dinamica** e *Non contare i torrent fermi negli
   slot attivi*: i torrent a 0 B/s non occupano slot e quelli **stalled** vengono
   messi in pausa e ritentati invece di girare a vuoto. Meno torrent attivi — e
@@ -915,7 +914,7 @@ backfill si mette in pausa da solo.
 
 ## 8. Integrazioni
 
-L'elenco completo dei campi e delle azioni è nell'[Appendice B](#appendice-b-riferimento-integrazioni).
+L'elenco completo dei campi e delle azioni è nell'[Appendice B](#appendice-b-riferimento--integrazioni).
 
 - **Simkl** — credenziali, flusso PIN, import watchlist, calendario e segna come
   visto.
@@ -951,7 +950,7 @@ token o password negli argomenti se il comando finisce nei log del sistema.
 
 ## 9. Manutenzione
 
-L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-c-riferimento-manutenzione).
+L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-c-riferimento--manutenzione).
 
 - **Aggiornamenti** — versione installata e canale, ultima versione pubblicata e
   l'elenco delle novità (i commit successivi a quello installato, con il link a

@@ -60,7 +60,7 @@ npm ci
 npm run test:a11y
 ```
 
-The current suite runs 13 axe-core/Playwright checks on the main sections,
+The current suite runs 14 axe-core/Playwright checks on the main sections,
 including dialogs, keyboard sorting, polling and 320 px reflow. This result is
 not a WCAG or legal-compliance declaration: an attestation also requires manual
 screen-reader, keyboard, magnification and assistive-technology testing, plus
@@ -626,7 +626,7 @@ Queues and performance, Seeding and completion), **Where to store** (Library and
 renaming, Archive and space) and **System** (Automatic maintenance,
 Notifications, Access and services, Diagnostics and translations). Unsaved changes are
 highlighted with a “Save all” bar. The complete per-tab list of every entry is in
-[Appendix A](#appendix-a-reference-configuration).
+[Appendix A](#appendix-a-reference--configuration).
 
 - **Sources** — RSS feed list, indexers (Jackett/Prowlarr) with a *Verify*
   button, FlareSolverr URL + test, web engines, content filters, blacklist.
@@ -782,11 +782,12 @@ engine while it has torrents in the session, and with an external engine
 (**gx-torrent** or **qBittorrent-nox**) it lives in its own process. To lower RAM
 and CPU:
 
-- **RAM** — with **gx-torrent** the cache is automatic (1/32 read, 1/16 write of
-  the RAM) and Gextto re-asserts it every 15 minutes, so there is nothing to
-  tune; a non-default *Disk cache* value is a manual override. The daemon returns
-  memory to the OS (`malloc_trim`) after completions, after every cycle and every
-  15 minutes, so the RSS does not stay at the download peak.
+- **RAM** — with **gx-torrent** the cache is **adaptive**: the daemon recomputes
+  it every few minutes from available memory, active downloads/seeds and
+  storage class (larger on HDD/NFS, smaller on SSD), so there is nothing to
+  tune; a non-default *Disk cache* value is a manual override. The Go runtime
+  releases idle memory back to the OS over time, so the RSS does not stay at
+  the download peak.
 - **CPU** — enable the **dynamic queue** and *Do not count slow torrents in
   active slots*: zero-rate torrents do not hold a slot and **stalled** ones are
   paused and retried instead of spinning. Fewer active torrents — and no "dead"
@@ -889,7 +890,7 @@ scan). If `ffprobe` is missing, the backfill pauses by itself.
 
 ## 8. Integrations
 
-The complete list of fields and actions is in [Appendix B](#appendix-b-reference-integrations).
+The complete list of fields and actions is in [Appendix B](#appendix-b-reference--integrations).
 
 - **Simkl** — credentials, PIN flow, watchlist import, calendar and mark-watched.
 - **Jellyfin / Plex** — server URL + token and a library refresh button.
@@ -923,7 +924,7 @@ arguments if the command may be recorded in system logs.
 
 ## 9. Maintenance
 
-The complete list of actions and parameters is in [Appendix C](#appendix-c-reference-maintenance).
+The complete list of actions and parameters is in [Appendix C](#appendix-c-reference--maintenance).
 
 - **Updates** — installed version and channel, latest published version and
   what changed (the commits after the installed one, linked to GitHub). The

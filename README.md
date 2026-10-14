@@ -426,7 +426,7 @@ npm run test:a11y
 ```
 
 The automated Playwright suite includes 63 end-to-end tests covering
-navigation, dialogs and workflows, with 13 tests dedicated specifically to
+navigation, dialogs and workflows, with 14 tests dedicated specifically to
 axe-core WCAG accessibility audits on the main sections. That is not a legal
 certification: manual screen-reader, keyboard and assistive-technology testing
 is still required. Scope and limits:
@@ -439,15 +439,18 @@ is still required. Scope and limits:
 | Operate the service | [English manual](docs/MANUAL.en.md) · [Manuale italiano](docs/MANUAL.it.md) |
 | Architecture and design | [Architecture](docs/ARCHITECTURE.md) |
 | BitTorrent specifications (BEPs) | [BEP compliance](docs/bep.md) |
+| Beyond the BEPs (WebSocket trackers, DHT feed) | [Beyond the BEPs](docs/beyond-bep.md) |
 | Technical state, measurements and backlog | [State, measurements and backlog](docs/evoluzione.md) |
 | NAS, reverse proxy, recovery | [Advanced guide](docs/ADVANCED.en.md) |
 | HTTP integrations | [API reference](docs/API.md) |
 | Move an existing installation | [Migration guide](docs/MIGRATION.md) |
 | Terminal client | [TUI reference](docs/tui.md) |
 | gx-torrent engine and standalone client | [gx-torrent technical document](docs/gx-torrent.md) |
+| gx-core as a standalone client | [gx-core](docs/gx-core.md) |
 | qBittorrent-nox backend | [Setup guide](docs/qbittorrent-nox.md) |
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |
+| Performance measurements and method | [Measurements](docs/measurements.md) |
 | Accessibility scope and testing | [Accessibility verification](docs/measurements.md#6-accessibility-verification) |
 
 Full tree: the [documentation index](docs/README.md).
