@@ -41,7 +41,7 @@ compliance [`bep.md`](bep.md), the engine inventory
 > [!NOTE]
 > The document is being reorganised into these four parts. Until the pass is
 > complete, the sections marked *(in migration)* still carry the earlier structure:
-> each of them states where its content is going.
+> each of them states what has still to be merged.
 
 ---
 
@@ -307,11 +307,179 @@ Recorded with the reason, so the ground is not re-covered:
 
 ---
 
-## Open: state and measurements to redistribute
+## Part II — The engine (gx-torrent / gx-core)
 
-*(in migration: the observability state and the decisions in force are already in §3 and §5; what remains here goes to §7–§12.)*
+### 6. What the engine has and what is missing
 
-### 1.2 Measurement harnesses
+`gx-torrent` is the BitTorrent engine in **pure Go**: the **gx-core engine**
+(`internal/gxcore`) plus the **daemon and adapter** (`cmd/gx-torrent`,
+`gxtorrent_engine.go` — REST, web page, self-managed queue, the `TorrentEngine`
+contract with Gextto). The per-capability state lives in `capabilityLevels`
+(`torrent_engine.go`), the single source of truth for the UI: an operation a backend
+does not have is refused with `ErrCapabilityUnavailable`, and only the embedded
+engine's own blocks use `requireEmbedded`.
+
+Around every engine Gextto provides queue/slots, stalled/retry, seed policy, RSS,
+search, categories/tags, the bandwidth scheduler, post-processing, moves and the RAM
+disk, the IP filter and the proxy: **those are not engine gaps**, and limits follow
+the libtorrent semantics (**−1 = inherit the global one, 0 = unlimited**).
+
+**What the engine has.** Protocol: BitTorrent v1 and v2-only (from `.torrent` and
+magnet, BEP 52), dual-stack IPv6 (`peers6`, PEX v6, DHT BEP 32, LSD IPv6/BEP 14) and
+uTP. Per torrent: download/upload limits, connection and upload-slot limits, per-piece
+priority and diagnostics, **graduated file priority 0–7**, tracker removal and hot
+add/remove, tracker scrape (BEP 48, HTTP and UDP), a runtime sequential toggle, web
+seed, **super-seeding** (BEP 16) and **holepunching** (BEP 55, peer relay over uTP). Port
+mapping and NAT: **PCP** (RFC 6887, our own minimal client, tried after UPnP and before
+NAT-PMP), UPnP and NAT-PMP, and NAT detection (`portcheck`: `reflected_port`,
+`nat_mapping`, `natHint`) — the BEP 42 `ip` field does not arrive on the public DHT
+(0 observations), so the datum shows only where nodes include it. Storage: mmap opt-in
+with a **ranged flush**, `O_SYNC` removed with `fdatasync`, bad-storage and write-error
+diagnosis in the error line, a guard that turns an mmap fault into an I/O error on the
+torrent, and a **disk guard** that pauses and resumes downloads when a folder falls
+below the free-space threshold while seeding continues. Streaming: a reader with seek
+and readahead with graduated piece priority (stream > readahead > rarest). Request
+queue: adaptive depth per delivered block, reset on choke; **two pieces per peer** with
+a shared in-flight budget; a bounded per-torrent write ring buffer. Session: an engine
+event bus (SSE `GET /ui/events`), a global in-flight budget and a deterministic drop of
+the worst connection; `.torrent` creation from a folder (`CreateTorrent`, form and API).
+DHT: our own module (`internal/dht`, BEP 5/32/33/42/43/44/46) with a bucket-less
+binary-tree routing table, tokens bound to source address and scope, an opt-in
+anti-Sybil cap per subnet, and the **feeds** of BEP 46. Robustness: parser fuzzing in
+CI (`make fuzz-smoke`, 21 targets, seeds in `testdata/fuzz`), a bounded bencode screen
+before the decoder on every hand-written path, snub and session ban with TTL, IP
+filter. Diagnostics: uTP socket, dial, accept, error, RTO and SYN-drop counters, merge
+metrics (`merged_pieces`/`merged_bytes`) and storage errors flow from the engine stats
+to the daemon API into **both UIs**.
+
+The **standalone daemon** adds: *Wanted* (type, seasons, language, quality, exclusions,
+episode filter, category and path; added by hand or with **Search the feeds**, a register
+in `state.json` with a throttled gap search, and no feed generation so the feeds stay
+free for the advanced rules), the RSS panel (per-feed state, synchronous reload,
+enable/disable, configurable interval, ordered PASS/FAIL rules with `once` and a preview
+on the archive), **HTML listings as feeds** (ext.to and TorrentGalaxy pages resolved to
+direct magnets and feed links instead of failing on invalid XML), the **feed archive**
+(bbolt with a compact index), the IP filter with a scheduled refresh, *Optimise*
+(queue, cache, bandwidth at 80% of the measured peak with auto-speed active), the
+**per-day bandwidth scheduler** (`internal/bwschedule`, shared with Gextto: every
+weekday has its own window and limits, a window past midnight belongs to the day it
+starts on, and the older single window stays as fallback), notifications on Gextto's
+channels (`internal/notify`: Telegram, email and webhook in the JSON, Discord, Slack,
+Gotify, ntfy and Pushover formats, each switchable with a test button), and the
+standalone pages' usability (Browse… on the folders, the port test, the multi-folder
+DLNA library, Gextto's blocklist as the default IP filter, export/import of the RSS
+setup, `/regex/` wanted titles, the *Update available* indicator in the status bar).
+The standalone **self-update** is described in §3.
+
+**Swarm Merging** (file sharing between torrents). Different swarms holding **the same
+file** collaborate: a torrent reuses the pieces another one already has instead of
+downloading them again, which revives seedless torrents when the content exists
+elsewhere in the session. The match is by **structure** — an identical piece layout, or
+an equal v2 per-file Merkle root — never by the BEP 38 `similar`/`collections` hints,
+which are only read and reported: the structure is what makes the reuse safe. The
+reused bytes are always **verified against the destination's own hashes** before being
+written, so no unverified byte reaches the storage. What is in place: **Phase 1** (same
+layout, A's hash verifies the piece), **Phase 2** (v2 per-file Merkle root, so identical
+files with different layouts), **Phase 3** (reuse at **16 KiB block** granularity from
+partially covered pieces, `storePartialBlocks`/`prefillBlocks`), **Phase 4** (two v1
+torrents with different piece lengths, matched by file path and length, whole pieces
+only, a candidate dropped after 64 failed verifications), the **resume path** (the merge
+also runs when a torrent is reloaded from resume data, so a restart does not lose the
+block-level reuse) and the **later-sibling trigger** (a torrent that gains verified
+pieces wakes the others, with a write-drain gate and no ping-pong). Within one pass each
+reused piece is read and written **once** even with several candidates, the pieces the
+merge verified are handed to the verifier without re-reading them (`Verifier.Skip`), and
+the merge runs off the run loop. Private torrents are excluded: if A **or** B is
+private the merge is disabled (**BEP 27 guard**, not an option). There is deliberately
+no ED2K-style content hash: for v1 the match is by path and length, because those hashes
+are not in the `.torrent` and would need a private index. The measurements are in §12,
+the cost when nothing is reusable in §9.
+
+**Ping-Based Auto-Speed** (anti-bufferbloat, standalone). A probe measures every second
+the RTT towards the gateway (or the configured target) with a TCP connect, with a
+baseline that is the minimum of the last 60 s; when the latency exceeds the baseline by
+50% **and** 20 ms the upload cap is reduced by 15%, and it is raised by `cap/20` when the
+line is at rest, never below `autospeed-min`, never above the configured or scheduled
+cap. It is a feedback control on **latency**, only on the cap: the data path is
+untouched, and `applyEffectiveSpeedLimitsLocked` (base → scheduler → auto-speed) remains
+the only caller of `SetSpeedLimits`. It needs a positive upload limit, is off by default
+and exists only standalone, like the bandwidth scheduler (in managed mode Gextto governs
+the limits). A managed version on Gextto's side would measure the RTT and modulate the
+limits through `SetLimits` (§14).
+
+**Extensions outside the BEPs** (analysis in [`beyond-bep.md`](beyond-bep.md)): a
+**WebSocket tracker** (ws/wss, an original bounded RFC 6455 client plus the
+WebTorrent/bittorrent-tracker protocol, dialled through the same egress as the HTTP
+tracker — proxy, resolver, blocklist), **DHT feeds** (a `dht://<pubkey-hex>[?salt=]` URL
+becomes a normal feed source resolved to magnets, so rules, archive, dedup and add are
+reused; `GET /api/v1/dht-feed` resolves one for external consumers) and the v1
+cross-layout merge above. Caveats: the reference `bittorrent-tracker` returns only
+WebRTC peers to a WebSocket client, so a native client gets no TCP peers there — the
+real unlock would be WebRTC, which is not done — and only the **resolver** side of BEP 46
+exists, not the publisher (signing).
+
+**What is missing.** The quality gaps against libtorrent (craftsmanship, not features):
+
+| Area | gx-core today | Gap |
+|---|---|---|
+| Choking / seeding | speed-based + optimistic, deterministic harness | quality algorithms absent; measurements **local only** (§10) |
+| Pipelining | adaptive queue (50→250), two pieces per peer with a shared budget, writes bounded to 4 pieces/torrent | the 10 Gbps "to be measured" (§14) |
+| Disk I/O | `O_SYNC` removed, `fdatasync`, mmap opt-in | O_DIRECT/io_uring/contiguous writes absent (not justified by a measurement) |
+| DHT | BEP 5/32/33/42/43/44/46, dedup | hardening not active, multi-path unproven (§11) |
+| v2 / merge | v2 download, merge phases 1–4 | v2 seed serves block-layer hashes only for whole files (`hash reject` otherwise) |
+| Adversarial robustness | snub, session ban with TTL, IP filter | less battle-tested than libtorrent |
+
+Wishlist, outside those: **WebTorrent/WebRTC** (niche, a lot of work) and alternative
+storages (blob, bolt, sqlite: not needed). Postponed: **replacing `internal/dht` with an
+external DHT** — the API model differs (per-torrent traversal against a request channel)
+and it would drop the dual-stack/shared-socket patches, so it stays our own module.
+Out of scope by choice (in [`bep.md`](bep.md)): BEP 8/17/18/22/26/28/30/34/35/45/50/51,
+WebTorrent, native I2P (reachable through a SOCKS5/HTTP proxy). What remains open, with
+its gate and its evidence, is in §14.
+
+### 7. The engine is our own code
+
+gx-core is our engine and the documentation presents it as such: no external origin of
+the code is advertised. The whole engine (`internal/gxcore`), the DHT (`internal/dht`)
+and the uTP transport (`internal/utp`) are original code in-tree under EUPL-1.2, and the
+per-component `LICENSE` files are gone: `THIRD-PARTY-NOTICES` lists linked third-party
+libraries only. The peer ID prefix is `-GX` and the network identity is
+`"gx-core " + Version`. Generic references to the *functionality* of other clients
+remain (for example "as libtorrent does"), as do the optional alternative engines
+(libtorrent behind cgo).
+
+No dependency does the work of the engine: the rate limiter is a token bucket in
+`internal/gxcore/internal/bandwidth`, the torrent id a version-1 UUID minted in
+`internal/gxcore/torrent/torrent_id.go`, the logger `internal/gxcore/logging`, the
+backoff `internal/gxcore/internal/backoff`, the DHT address decoding and throttle our
+own. `go.mod` carries none of the engine's old helpers (`juju/ratelimit`
+**LGPL-3.0**, `gofrs/uuid`, `fatih/structs`, `hokaccha/go-prettyjson`); the
+replacements are behaviour-equivalent (the token bucket keeps the same refill/debt
+semantics, the id stays unique and well-formed).
+
+Every file of `internal/gxcore` (~130) and `internal/dht` (8) is rewritten in this
+repository with APIs, wire formats and behaviours preserved. What still matches the old
+code is protocol-mandated format (BEP wire layouts, bencode tags, API shapes) and
+compatibility-kept strings (error/log texts, resume-DB and flag spellings), plus
+algorithm bodies where any correct Go implementation converges. Where it mattered,
+equivalence is proved by execution: MSE handshake cross-check over `net.Pipe`, fast-set
+byte identity, resume-DB and RPC shapes byte-identical. How this state was reached is in
+the git history.
+
+**Policy for anything adopted from elsewhere** (also in `AGENTS.md`): an algorithm is
+**rewritten** — third-party code is not copied, the idea is not covered by copyright
+while the expression is — or the module is adopted as an **MPL-2.0 dependency**. The uTP
+transport was first vendored as an MPL-2.0 dependency and then rewritten as our own code
+in `internal/utp/transport`, with its helper primitives reimplemented in-tree
+(`gextto_support.go`), so **no MPL component remains**. The engine talks to our own uTP
+`Socket` — dial and accept counters, a `net.PacketConn` facade for the shared DHT
+socket — so the transport stays isolated and swappable.
+
+---
+
+## 8. Measurement harnesses
+
+*(in migration: the list of harnesses and the holepunch harness, to be merged in the next pass)*
 
 Available outside CI, to decide with numbers:
 
@@ -329,36 +497,90 @@ Available outside CI, to decide with numbers:
 - `make measure-dht` — the **public DHT**: routing-table fill and query success
   (`GX_MEASURE_DHT=5m`), the basis of the anti-Sybil and multi-path numbers (§4.4).
 
-### 1.4 The engine is presented as our own code
+Support for `scripts/holepunch-netns-test.sh` (engine behaviour in
+`docs/gx-torrent.md`).
 
-gx-core is our engine and the documentation presents it as such: no external origin of
-the code is advertised. The whole engine (`internal/gxcore`), the DHT (`internal/dht`)
-and the uTP transport (`internal/utp`) are original code in-tree under EUPL-1.2, and
-the per-component `LICENSE` files are gone: `THIRD-PARTY-NOTICES` lists linked
-third-party libraries only. The peer ID prefix is `-GX` and the network identity is
-`"gx-core " + Version`. Generic references to the *functionality* of other clients
-remain (for example "as libtorrent does"), as do the optional alternative engines
-(libtorrent behind cgo).
+**Purpose**: verify end-to-end that gx-torrent opens a hole (BEP 55,
+`ut_holepunch`) between two clients behind NAT/firewall using a public peer as a
+**relay**. Root-only, all inside dedicated network namespaces: the host network is
+not touched.
 
-No dependency does the work of the engine: the rate limiter is a token bucket in
-`internal/gxcore/internal/bandwidth`, the torrent id a version-1 UUID minted in
-`internal/gxcore/torrent/torrent_id.go`, the logger `internal/gxcore/logging`, the
-backoff `internal/gxcore/internal/backoff`, the DHT address decoding and throttle our
-own. `go.mod` carries none of the engine's old helpers (`juju/ratelimit`
-**LGPL-3.0**, `gofrs/uuid`, `fatih/structs`, `hokaccha/go-prettyjson`); the
-replacements are behaviour-equivalent (the token bucket keeps the same refill/debt
-semantics, the id stays unique and well-formed).
+**Topology**: `gx-lab` (public: tracker `10.0.0.1:13800`, seed, relay
+`10.1.0.1:51410`) + two stateful firewalls `gx-r1`/`gx-r2` (they let outbound through,
+DROP new inbound connections, accept `ESTABLISHED,RELATED`,
+refuse TCP towards the peer ports so the hole opens over uTP) + clients
+`gx-a 10.10.0.2` (leecher) and `gx-b 10.20.0.2` (seed).
 
-Every file of `internal/gxcore` (~130) and `internal/dht` (8) is rewritten in this
-repository with APIs, wire formats and behaviours preserved. What still matches the
-old code is protocol-mandated format (BEP wire layouts, bencode tags, API shapes) and
-compatibility-kept strings (error/log texts, resume-DB and flag spellings), plus
-algorithm bodies where any correct Go implementation converges. Where it mattered,
-equivalence is proved by execution: MSE handshake cross-check over `net.Pipe`,
-fast-set byte identity, resume-DB and RPC shapes byte-identical. How this state was
-reached is in the git history.
+**Sequence**: minimal Python tracker (interval 30 s) → seed with data → B enters as
+leecher, downloads, completes while staying connected to the relay (interested leecher) →
+only then A enters: it does not reach B, asks the relay for an introduction, `connect` to
+both, cross dial over uTP. Success: a peer with origin **`holepunch`**
+(the one that dials) or `incoming` (the other side) in
+`/api/v1/torrents/<hash>/peers`.
 
-### 1.5 Performance benchmarks (CPU, allocations, throughput)
+**Choices**: stateful firewall instead of NAT (conntrack does not emulate a cone
+port-translating NAT: the direct dial creates a local entry that conflicts with the
+SNAT; the stateful one reproduces the same observable and makes the test
+deterministic); seed and relay on different IPs (the engine deduplicates peers by IP);
+`-outgoing-interface` = listening IP (otherwise announce with the wrong IP);
+interested leecher relay (a completed torrent does not dial and discards the
+non-interested ones); tracker with a long interval (a re-announce would attribute
+the connection to the tracker dial instead of the holepunch); success detected on
+both sides (race of the dial).
+
+**Usage**: `make gx-torrent`, then `sudo scripts/holepunch-netns-test.sh`
+(`--keep` for debugging, `--size 16` for a larger torrent). A successful example in
+`scripts/risultato.txt`. Debug: `HOLEPUNCH_DEADLINE` (default 90 s),
+`HOLEPUNCH_B_DEADLINE` (60 s), `HOLEPUNCH_DIAG=1` (conntrack dump). On
+failure it prints the `holepunch` lines of the logs (rendezvous/connect).
+
+**Limits**: emulation with a stateful firewall, not a real cone NAT; outcome
+`holepunch`/`incoming` according to who wins the race; IP dedup of peers by the
+engine (in a real swarm the peers are on different IPs).
+
+---
+
+## 9. Benchmarks and footprint
+
+*(in migration: the table of optimisations in place joins the benchmarks of §9)*
+
+Items ordered by **expected value = (impact × certainty) / (effort × risk)**, one
+item = one commit.
+
+| # | Intervention | Status |
+|---|---|---|
+| 1 | LSD without `d.mu`/`t.Stats()` (read the lock-free snapshot) | done (`d2a4060`) |
+| 2 | Streaming: targeted `Torrent.PiecesDone(begin,end)` | done (`ff2d4bf`) |
+| 3 | Remove `O_SYNC` + batched durability | done |
+| 4 | MSE `StreamWriter` in place (0 alloc/block) | done (`5af2ee0`) |
+| 5 | `servedRequests` bounded window (≈1024) | done (`a8b3e77`) |
+| 6 | Piece cache: lazy TTL (sharding only if profiling shows contention) | done (`60b090e`) |
+| 7 | `Bitfield.Count` with `math/bits` | done (`8caf6ad`) |
+| 8 | Optionals: `findLocked` O(1) (done), ETag/304 (not to do) | decided |
+
+**Item 3 (durability).** `O_SYNC` is removed and durability is batched, with the
+invariant *a persisted bit refers to data already fsynced*: `syncPieces()` on the run
+loop, `writeBitfield()` ordered snapshot → fsync → write, `updateStats` in two phases
+(no Bolt transaction open during the fsyncs). `fdatasync` for the piece data;
+**mmap opt-in** (`-mmap`, Linux) serves the files from a shared mapping.
+
+Follow-ups **not added**, each without a measurement to justify it: io_uring/AIO (Go
+does not expose it without a dependency or cgo; the mmap path is already
+asynchronous) and explicit contiguous-write coalescing (the page cache already merges
+adjacent writebacks).
+
+**Measurements (Intel N97).** `O_SYNC` removal on NFS: 16 KiB 35→81 MiB/s (2.3×),
+64 KiB 1.5×, 256 KiB 1.6×, 1 MiB 1.2×; on NVMe up to ~118× at small blocks;
+forecast on NFS pieces 32 KiB–2 MiB: **~1.2×–1.8×**. mmap on tmpfs **~7.0 GB/s** vs
+**~5.9 GB/s** for `pwrite`. Ranged mmap flush: clean mapping 477 µs → **13 ns**, one
+dirtied piece unchanged (~1%). Seeding/choking measurements in §6.
+
+**Deliberately excluded, with justification (measured at this load)**: rarity
+buckets / picker refactor, watermark cursor in `pickSequential`/`pickFileEdge`,
+`PieceDownloader` bitmask, `clear(b.Data)` in `bufferpool`, `FADV_RANDOM`,
+`saveLocked` outside `d.mu`, `/proc/meminfo` under `d.mu`, `HandleDisconnect` O(N).
+**Postponed**: qBittorrent `renameFile`/`renameFolder` (needs rename support in the
+engine, a feature of its own).
 
 **Practice.** Periodically carry out an in-depth performance check of the application
 and the engine, optimising CPU and RAM: benchmarks (`go test -bench … -benchmem`),
@@ -444,72 +666,9 @@ the whole answer unreadable), and the cost is nil: on a 100-item answer, strict
 - **DHT on the public network** (`make measure-dht`, 4 min): **4262 nodes**, 21.9%
   query success, 875 reflected pings, 2 peers found from a cold start.
 
----
+**Moved here from the capability tables** *(raw material: to be merged in the next pass)*
 
-## 6. What the engine has and what is missing
-
-*(in migration: the capability tables and the gaps move into §6 (state) and §14 (what is next))*
-
-`gx-torrent` is the BitTorrent engine in **pure Go**: the **gx-core engine**
-(`internal/gxcore`) plus the **daemon and adapter** (`cmd/gx-torrent`,
-`gxtorrent_engine.go` — REST, web page, self-managed queue, the `TorrentEngine`
-contract with Gextto). The per-capability state is in `capabilityLevels`
-(`torrent_engine.go`), the single source of truth for the UI.
-
-Gextto already provides, around every engine: queue/slots, stalled/retry, seed
-policy, RSS, search, categories/tags, bandwidth scheduler, post-processing, moves
-and RAM disk, IP filter, proxy — those are **not** engine gaps.
-
-### 4.1 What was missing (now done or decided)
-
-| Area | What was missing | Outcome |
-|---|---|---|
-| Per-torrent limits | download/upload speed; connections and upload slots | done (`SetLimits`, `SetMaxConnections`/`SetMaxUploads`) |
-| Priority | per-piece, piece diagnostics, file priority | done (`pieces` API; graduated file priorities 0–7) |
-| Trackers / web seed | removal; hot add/remove | done (`set-trackers`, `webseeds`) |
-| Sequential | runtime toggle | done (`PiecePicker.SetOrder`) |
-| Protocol | IPv6; BitTorrent v2-only | done (dual-stack, `peers6`, PEX v6, DHT BEP 32, LSD v6; v2 from `.torrent` and magnet, BEP 52) |
-| Super-seeding | BEP 16 | done |
-| Holepunching | BEP 55 | done (peer relay, uTP dial) |
-| Upload/share mode | — | **skipped** (infinite seed with ratio 0 is used) |
-| Seeding/choking quality | — | measured locally (§6); real-swarm scaling still open |
-
-**Not gaps** (provided by Gextto around every engine): RSS, search plugin,
-categories/tags, scheduler, ratio, post-processing, encryption, IP filter, proxy,
-DHT/PEX/LSD, UPnP/NAT-PMP, fast resume, file selection.
-Limit semantics: **-1 = inherit the global one, 0 = unlimited** (like libtorrent).
-
-### 4.2 Remaining wishlist
-
-- **WebTorrent/WebRTC**: niche, a lot of work.
-- **Alternative storages** (blob, bolt, sqlite): not needed.
-- **Seeding/choking scaling**: a campaign on a real swarm (gx-torrent vs
-  libtorrent/qBittorrent, same policy, median over several runs).
-
-### 4.3 Cherry-picks and follow-ups
-
-Policy (also in `AGENTS.md`): the algorithm is **rewritten** (third-party code is
-not copied — the idea is not covered by copyright, the expression is) or the module
-is adopted as an **MPL-2.0 dependency**. The uTP transport was first vendored as
-an MPL-2.0 dependency and then **rewritten as our own code** in
-`internal/utp/transport` (EUPL-1.2); its helper primitives were reimplemented
-in-tree too, so **no MPL component remains**.
-Rules: one item = one commit; **measure before/after**; changes to `internal/gxcore`
-recorded in `GEXTTO.md`; targeted tests; with a visible effect also both UIs and the docs.
-
-| Item | Note | Status |
-|---|---|---|
 | Reader with seek + readahead and **graduated piece priority** | streaming/priority design, rewritten in-tree | done (stream > readahead > rarest) |
-| **Adaptive request queue** (depth grows per delivered block, reset on choke) | reference design, rewritten in-tree | done; to validate on a real swarm |
-| **External DHT replacing `internal/dht`** | own module vs a dependency | **postponed**: the API model differs (per-torrent traversal vs request channel) and it would drop the dual-stack/shared-socket patches; reopen if BEP 44/BEP 42 hardening or the own module becomes a burden |
-| **Tracker scrape** (BEP 48) | reference design, rewritten in-tree | done (HTTP + UDP, `Torrent.Scrape`) |
-| **Engine event bus** (SSE `GET /ui/events`) | own event bus (alerts-style) | done |
-| **`.torrent` creation from a folder** | reference design, rewritten in-tree | done (`CreateTorrent`, form + API) |
-| **Bad-storage / write-error diagnosis** | reference design, rewritten in-tree | done (folder in the error, `storage_errors` counter) |
-| **LSD IPv6** (BEP 14, `ff15::efc0:988f`) | BEP 14, rewritten in-tree | done |
-| **Ranged mmap flush** | reference design, rewritten in-tree | done |
-| **Global in-flight budget — liveness** | reference design, rewritten in-tree | done |
-| **Drop the worst connection** (deterministic order) | reference design, rewritten in-tree | done |
 | **uTP behind `internal/utp`** (isolation) | own implementation | done: the engine talks to our `Socket` (dial/accept counters, `net.PacketConn` for the shared DHT socket); the implementation in `internal/utp/transport` is **our own code** (EUPL-1.2), swappable. Its helper primitives are reimplemented in `gextto_support.go`, so no third-party transport helper and no MPL component is linked |
 | **uTP connection-id pick** (perf) | own (`internal/utp/transport`) | done: `newConnID` no longer builds a 64K-entry table per dial (512 KiB and 152,353 ns/op); it probes from a random id and stops at the first free one, O(1) with the connections a socket really has — `BenchmarkNewConnID`: 31 ns/op, 0 B/op, 0 allocs/op (`TestNewConnIDAvoidsCollisions`) |
 | **uTP data path** (perf) | own (`internal/utp/transport`) | done: profiling a loopback transfer (`BenchmarkTransferLoopback`, 16 KiB block) produced four optimisations — the connection-id probe, lazy `Event` channels (the per-send `acked` flag no longer allocates one per packet), a reusable read window (`readPos` offset instead of reslicing), and a `netip.AddrPort` connection key instead of a `UDPAddr.String()` per inbound packet. Overall **45.6→62.0 MB/s, 82,020→23,692 B/op (−71%), 173→116 allocs/op (−33%)** on loopback |
@@ -522,150 +681,14 @@ recorded in `GEXTTO.md`; targeted tests; with a visible effect also both UIs and
 | **uTP socket health in UI** (diagnostics) | own | done: socket dial/accept/error counters flow engine → daemon `/api/v1/stats` → Salute «uTP» row (hidden while idle, warns on dial errors with zero accepts: UDP likely firewalled) and daemon status bar («uTP socket», translated it/de/fr/es/pl); pattern of «Riuso locale» |
 | **uTP adaptive RTO** (retransmission control) | own (`internal/utp/transport`) | done: the RTO consumes the loss signal. (1) A **minimum-RTT floor of 5 ms**: without it a fast path (loopback/LAN, RTT of tens of µs) collapses the RTO to sub-ms and a briefly stalled peer becomes a resend storm — silent-peer harness, 1 s: 18,184 resends at a 1 µs floor vs 2,919 at 5 ms (**6.2×**); `TestMinimumLatencyFloor`. (2) A **per-connection backoff** that doubles on each RTO timeout (cap 4×) and halves on each delivered packet, so a silent or congested peer is retried with growing patience while a link that delivers again relaxes to the measured RTT: silent-peer A/B, 3×4 s: 17,663 resends fixed vs 8,853 adaptive (**50% fewer**, backoff reaching 4); `TestAdaptiveRTOBacksOffOnTimeouts`, `TestAdaptiveRTOMeasurement` (opt-in `GX_MEASURE_UTP=1`). A healthy connection never timeout-resends, so the backoff stays 1: the RTO is today's, and the loopback swarm numbers are unchanged |
 
-### 4.4 DHT: hardening and multi-path
-
-The gx-core DHT (`internal/dht`, a module of its own) covers BEP 5/32/33/42/43/44/46
-with a routing table as a bucket-less binary tree; compared with Tixati the gap is
-**hardening and diagnostics**, not BEP coverage (see [`bep.md`](bep.md)).
-
-- **Diagnostics — done.** `Stats()` exposes per-RPC and screening counters, the
-  reflected address, the NAT type, `subnet_share_max`, `nodes_insecure_id`,
-  `subnet_cap_hint` and `peers_confirmed_multi` (see
-  [`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md)). It is the
-  measurement basis of the items below.
-- **Token hygiene — done.** The `announce_peer` token is bound to source address +
-  scope (the info-hash), so a token from one swarm is not reused on another.
-- **Anti-Sybil cap per subnet** (`Config.MaxNodesPerSubnet`, default 0 = off):
-  implemented with an **O(1) counter**; nodes beyond the threshold stay in the
-  address book with `noTree`, and `subnet_cap_hint` *advises* a value.
-  **Measured 2026-10-14** (5 min, real info-hash): `subnet_share_max` **4–7**,
-  `nodes_capped` **0** — no node exceeds any candidate threshold (8/16/24), so
-  enforcement would be a no-op and CGNAT/mobile legitimately share subnets.
-  **Decision: keep it as a hint, off by default.**
-- **Multi-path lookup**: design only (`get_peers` on several branches in parallel,
-  peers preferred when confirmed by ≥2 paths). The routing table already deduplicates
-  repeated queries, and the two real measurements (random and real info-hash) gave
-  **`peers_confirmed_multi` 0**: the gain is **not proven**, so the rewrite is
-  **closed with data** (§10.2).
-- **Harness**: `make measure-dht` (`GX_MEASURE_DHT=5m`,
-  `GX_MEASURE_DHT_INFOHASH=<40 hex>`, opt-in, outside CI). On the public DHT we
-  measured ~740 known nodes, `subnet_share_max` 14, `nodes_insecure_id` ≈42%, and
-  the discovery of **108 peers in ~30 s** on the Ubuntu 24.04 torrent.
-- **Out of scope**: DHT over I2P; the BEP 44 **outgoing client** (no consumer yet).
-
-### 4.5 Port mapping, NAT detection, file priority
-
-| Item | State |
-|---|---|
-| **PCP** (RFC 6887) port opening | done (own minimal client, tried after UPnP and before NAT-PMP) |
-| **NAT type / reflected port** | done (`portcheck`: `reflected_port`, `nat_mapping`, `natHint`). Live: the BEP 42 `ip` field does not arrive on the public DHT (0 observations), so the datum shows only where nodes include it |
-| **Graduated file priority** (0–7) | done (`piece.Piece.Priority`, `pickHigh` stage, `capabilityLevels.file_priorities = full`); **remaining**: measure with mixed-priority files |
-
-### 4.6 Quality gaps vs libtorrent (craftsmanship, not features)
-
-| Area | gx-core today | Gap |
-|---|---|---|
-| Choking / seeding | speed-based + optimistic, deterministic harness | quality algorithms absent; measurements **local only** |
-| Pipelining | adaptive queue (50→250), 2 pieces per peer with a shared budget, write bounded to 4 pieces/torrent | 10 Gbps "to be measured" |
-| Disk I/O | `O_SYNC` removed, `fdatasync`, mmap opt-in | O_DIRECT/io_uring/contiguous writes absent (not justified by a measurement) |
-| File priority | graduated 0–7 | closed (residual measurement) |
-| DHT | BEP 5/32/33/42/43/44/46, dedup | hardening not active, multi-path unproven |
-| v2 / merge | v2 download, merge phases 1–3 (§9.2, §10.1) | v2 seed serves block-layer hashes only for whole files (`hash reject` otherwise) |
-| Adversarial robustness | snub, session ban with TTL, IP filter | less battle-tested than libtorrent |
-
-Out of scope by choice (in `bep.md`): BEP 8/17/18/22/26/28/30/34/35/45/50/51,
-WebTorrent, native I2P (reachable via a SOCKS5/HTTP proxy).
-
-### 4.7 Standalone daemon: Wanted, RSS, feed archive, IP filter (done)
-
-- **Wanted** (`cmd/gx-torrent/wanted.go`, `/ui/rss` → *Wanted*): each title has
-  type, seasons, language, quality, exclusions, episode filter, category and path;
-  it is added by hand or via **Search the feeds**. The engine searches the indexers
-  and the feeds each cycle, keeps a register in `state.json`
-  (`wanted_seen`/`wanted_taken`), shows the **missing** episodes and runs a throttled
-  **gap search**. For a movie it takes one release. The list does not generate
-  feeds/rules, so the feeds stay free for the advanced rules.
-- **RSS panel**: per-feed state (last check, elements, new, added, error),
-  synchronous reload, enable/disable, configurable interval, ordered PASS/FAIL rules
-  with up/down/disable, `once`, preview on the archive.
+- **Feed archive** (`feed_archive.go`): `BenchmarkFeedArchiveSearch` (100k elements)
+  **362 ms → 7.4 ms** (49×) and 2,800× less allocation.
 - **HTML listings as feeds** (`internal/rss/listing.go`): pages such as ext.to and
-  TorrentGalaxy are resolved (direct magnets, `/post-detail/`, feed links) instead of
-  failing on invalid XML; measured 50 elements in 0.3 s / 1.9 s on the two real URLs.
-- **Feed archive** (`feed_archive.go`): bbolt with a compact index;
-  `BenchmarkFeedArchiveSearch` (100k elements) from **362 ms to 7.4 ms** (49×) and
-  2,800× less allocation.
-- **IP filter** (`ipfilter_refresh.go`): a URL in `settings.json` is downloaded at
-  startup and every `ipfilter-refresh-hours`; a local file is reloaded when it changes;
-  state and *Load now* in the settings.
-- **Optimise** (`optimize.go`): queue (Gextto base), cache (automatic), bandwidth
-  (80% of the measured peak upload, auto-speed active).
-- **Per-day bandwidth scheduler** (`internal/bwschedule`, shared by Gextto and
-  gx-torrent): every weekday has its own window and limits (`schedule-week` in
-  the daemon, `libtorrent_sched_week` in Gextto); a window past midnight
-  belongs to the day it starts on. The older single window stays as fallback.
-  Gextto's two duplicated evaluators now call the same function.
-- **Notifications on Gextto's channels** (`internal/notify`): Telegram, e-mail
-  (SMTP/STARTTLS) and webhook in the JSON, Discord, Slack, Gotify, ntfy and
-  Pushover formats, for completed downloads, feed matches and feed errors,
-  each switchable, with a test button.
-- **Usability of the standalone pages**: Browse… on the folders, port test in
-  *Network*, multi-folder DLNA library with *Add folder…*, Gextto's blocklist
-  as default IP filter, export/import of the RSS setup instead of the raw
-  JSON, total torrents per feed, `/regex/` wanted titles, an explanation of the
-  rules, an *Update available* indicator in the status bar, and the gx-core
-  version shown in Gextto's header and dashboard.
-
-### 4.8 Verification criterion
-
-- Per point: `go test ./cmd/gx-torrent/`, `go test -run GxEngine .`, `make test-engine`.
-- With a visible effect: `docs/gx-torrent.md`, `MANUAL.*`, `README`.
-- Every improvement visible in **both UIs** (Gextto `uiweb/v2` + `cmd/gx-torrent/ui.go`),
-  never only via API.
-- Comparisons with libtorrent/qBittorrent **only by measurement**.
-
----
-
-## 9. Benchmarks and footprint
-
-*(in migration: the table of optimisations in place joins the benchmarks of §9)*
-
-Items ordered by **expected value = (impact × certainty) / (effort × risk)**, one
-item = one commit.
-
-| # | Intervention | Status |
-|---|---|---|
-| 1 | LSD without `d.mu`/`t.Stats()` (read the lock-free snapshot) | done (`d2a4060`) |
-| 2 | Streaming: targeted `Torrent.PiecesDone(begin,end)` | done (`ff2d4bf`) |
-| 3 | Remove `O_SYNC` + batched durability | done |
-| 4 | MSE `StreamWriter` in place (0 alloc/block) | done (`5af2ee0`) |
-| 5 | `servedRequests` bounded window (≈1024) | done (`a8b3e77`) |
-| 6 | Piece cache: lazy TTL (sharding only if profiling shows contention) | done (`60b090e`) |
-| 7 | `Bitfield.Count` with `math/bits` | done (`8caf6ad`) |
-| 8 | Optionals: `findLocked` O(1) (done), ETag/304 (not to do) | decided |
-
-**Item 3 (durability).** `O_SYNC` is removed and durability is batched, with the
-invariant *a persisted bit refers to data already fsynced*: `syncPieces()` on the run
-loop, `writeBitfield()` ordered snapshot → fsync → write, `updateStats` in two phases
-(no Bolt transaction open during the fsyncs). `fdatasync` for the piece data;
-**mmap opt-in** (`-mmap`, Linux) serves the files from a shared mapping.
-
-Follow-ups **not added**, each without a measurement to justify it: io_uring/AIO (Go
-does not expose it without a dependency or cgo; the mmap path is already
-asynchronous) and explicit contiguous-write coalescing (the page cache already merges
-adjacent writebacks).
-
-**Measurements (Intel N97).** `O_SYNC` removal on NFS: 16 KiB 35→81 MiB/s (2.3×),
-64 KiB 1.5×, 256 KiB 1.6×, 1 MiB 1.2×; on NVMe up to ~118× at small blocks;
-forecast on NFS pieces 32 KiB–2 MiB: **~1.2×–1.8×**. mmap on tmpfs **~7.0 GB/s** vs
-**~5.9 GB/s** for `pwrite`. Ranged mmap flush: clean mapping 477 µs → **13 ns**, one
-dirtied piece unchanged (~1%). Seeding/choking measurements in §6.
-
-**Deliberately excluded, with justification (measured at this load)**: rarity
-buckets / picker refactor, watermark cursor in `pickSequential`/`pickFileEdge`,
-`PieceDownloader` bitmask, `clear(b.Data)` in `bufferpool`, `FADV_RANDOM`,
-`saveLocked` outside `d.mu`, `/proc/meminfo` under `d.mu`, `HandleDisconnect` O(N).
-**Postponed**: qBittorrent `renameFile`/`renameFolder` (needs rename support in the
-engine, a feature of its own).
+  TorrentGalaxy resolve to direct magnets, `/post-detail/` and feed links instead of
+  failing on invalid XML — **50 elements in 0.3 s / 1.9 s** on the two real URLs.
+- **Auto-speed probe**: ~1 connection/s, it does not touch the data path; with
+  auto-speed off nothing changes (no regression).
+- To measure: **graduated file priority** with mixed-priority files (§14).
 
 ---
 
@@ -840,309 +863,152 @@ bench for choking); real `tc netem` is not needed.
 resolves its metadata in ~49 s with 12 peers. The remaining time is the
 routing-table fill (~30 s cold), not the lookup.
 
----
+### 10.3 Multi-piece pipelining — measurement and outcome
 
-## 8. Measurement harnesses
+The measured baseline (§6.4, 2026-10-13) is ~12.8× from the adaptive queue at
+RTT 50 ms, and it also shows the ceiling: with 256 KiB pieces (16 blocks) the
+queue cannot exceed the piece's block count, so multi-piece per peer is the next
+lever for high-bandwidth-delay links.
 
-*(in migration: the holepunch harness is one of the harnesses of §8)*
+**Bounded write ring buffer (done).** The per-torrent "one write at a
+time" is replaced by a **bounded per-torrent write ring buffer**:
+`beginPieceWrite`/`endPieceWrite` (`torrent_write.go`) suspend the piece channels
+only once `maxPendingWrites` (4) pieces are being written, so the network keeps
+flowing while pieces are written. The picker skips a piece marked `Writing`, so a
+piece is never written twice, and `Config.ParallelWrites` (`semWrite`) still caps
+the disk parallelism globally; the per-torrent bound limits the in-flight piece
+buffers. Tests: `torrent_writering_test.go` (suspend at the cap, resume below, no
+underflow), the full `cmd/gx-torrent` e2e suite and `-race` on the transfer tests.
+**Measurement:** `make measure-seeding` on loopback is **equivalent** (the disk is
+not the bottleneck there); the gain is on slow storage, and it is the prerequisite
+for multi-piece.
 
-Support for `scripts/holepunch-netns-test.sh` (engine behaviour in
-`docs/gx-torrent.md`).
+**Multi-piece per peer (done).** A peer downloads up to
+`maxPiecesPerPeer` (2) pieces at once: `pieceDownloaders` is a per-peer map keyed
+by piece index (`torrent.go`, `closePieceDownloader`, `handlePieceMessage` look
+the piece up by `msg.Index`), `peer.ConcurrentPieces`/`MaxConcurrentPieces` gate
+the picker (`findPiece`), and the in-flight budget is shared across a peer's
+pieces (`torrent.requestBlocks`, `RequestBlocks` returns the count sent; the
+extra piece opens only when the window has room, `pipeHasRoom`).
+`fillPeerDownloads` tops a peer up to the cap on
+Have/Bitfield/HaveAll/Unchoke/completion, one queued RAM request per peer, and
+endgame duplicates are cancelled as soon as a copy starts writing (peer and
+webseed, `markDirty` widened for out-of-order writes); the picker never hands a
+peer the same piece twice. **Measurement (the latency harness):** `default`
+**3853 → 6756 KiB/s** (×1.75), `shallow` 301 KiB/s (window of 1 respected) at RTT
+50 ms with 256 KiB pieces. Tests: e2e suite + `-race` on the transfer tests,
+`piecedownloader` budget test. RAM and CPU equivalent.
 
-**Purpose**: verify end-to-end that gx-torrent opens a hole (BEP 55,
-`ut_holepunch`) between two clients behind NAT/firewall using a public peer as a
-**relay**. Root-only, all inside dedicated network namespaces: the host network is
-not touched.
+### 12.3 Choking/seeding campaign
 
-**Topology**: `gx-lab` (public: tracker `10.0.0.1:13800`, seed, relay
-`10.1.0.1:51410`) + two stateful firewalls `gx-r1`/`gx-r2` (they let outbound through,
-DROP new inbound connections, accept `ESTABLISHED,RELATED`,
-refuse TCP towards the peer ports so the hole opens over uTP) + clients
-`gx-a 10.10.0.2` (leecher) and `gx-b 10.20.0.2` (seed).
+- **Local reciprocation.** Without mesh the seeder uploads **3.00×** the corpus
+  (3 pure leechers). With mesh the leechers **reciprocate** (2.52 MB uploaded
+  among themselves) and the seeder's upload drops to **1.84×** (−39 %).
+- **Controlled vs libtorrent.** `TestMeasureChokingLibtorrent` (`scripts/
+  libtorrent-leech.py`): our seeder serves a real **libtorrent** leecher on
+  loopback — **48 MiB uploaded (100 % of the file) in 4.84 s** (~10.4 MB/s), the
+  leecher verified complete.
+- **Real swarm.** `TestMeasureChokingRealSwarm` seeds the Debian ISO for 3 min:
+  **0 peers**, because seeding needs an **inbound** port and this host is
+  behind NAT with no reachable port (the earlier download run found 80 peers
+  outbound). The harness is kept for a host with a reachable port.
 
-**Sequence**: minimal Python tracker (interval 30 s) → seed with data → B enters as
-leecher, downloads, completes while staying connected to the relay (interested leecher) →
-only then A enters: it does not reach B, asks the relay for an introduction, `connect` to
-both, cross dial over uTP. Success: a peer with origin **`holepunch`**
-(the one that dials) or `incoming` (the other side) in
-`/api/v1/torrents/<hash>/peers`.
-
-**Choices**: stateful firewall instead of NAT (conntrack does not emulate a cone
-port-translating NAT: the direct dial creates a local entry that conflicts with the
-SNAT; the stateful one reproduces the same observable and makes the test
-deterministic); seed and relay on different IPs (the engine deduplicates peers by IP);
-`-outgoing-interface` = listening IP (otherwise announce with the wrong IP);
-interested leecher relay (a completed torrent does not dial and discards the
-non-interested ones); tracker with a long interval (a re-announce would attribute
-the connection to the tracker dial instead of the holepunch); success detected on
-both sides (race of the dial).
-
-**Usage**: `make gx-torrent`, then `sudo scripts/holepunch-netns-test.sh`
-(`--keep` for debugging, `--size 16` for a larger torrent). A successful example in
-`scripts/risultato.txt`. Debug: `HOLEPUNCH_DEADLINE` (default 90 s),
-`HOLEPUNCH_B_DEADLINE` (60 s), `HOLEPUNCH_DIAG=1` (conntrack dump). On
-failure it prints the `holepunch` lines of the logs (rendezvous/connect).
-
-**Limits**: emulation with a stateful firewall, not a real cone NAT; outcome
-`holepunch`/`incoming` according to who wins the race; IP dedup of peers by the
-engine (in a real swarm the peers are on different IPs).
-
----
-
-## 13. Accessibility verification
-
-**Method**: static review (HTML/CSS/JS), semantics/names/ARIA/focus,
-responsive layout/visible focus/reduced-motion, light/dark theme contrast, axe-core
-via Playwright, regression tests (dialogs, keyboard sort, polling, narrow
-viewports). Suite: **13 green tests** on dashboard, downloads, settings,
-maintenance, health, logs (`cd uiweb/end2end && npm ci && npm run test:a11y`;
-a safety net, not a substitute for the manual assessment).
-
-**Improvements implemented**: language via the `lang` attribute; landmarks
-(skip-nav, `aside`/`nav`/`header`/`main`); `aria-current="page"`;
-accessible names (not just placeholder/tooltip); labels on icon controls;
-dialogs (focus inside, Tab/Shift+Tab trap, Escape, focus restore);
-keyboard-sortable headers with `aria-sort`; focus preserved under polling;
-visible focus; tables with caption/scope (also dynamic); progressbar with a
-value; ARIA for tabs/dialogs/landmarks; live region for states/errors/notifications/
-async; decorative symbols never instead of text; settings search with
-synonyms (`memo`, `memory`, `RAM`, `cache`); light-theme contrasts darkened where
-needed; mobile reflow (tables with internal scroll); reduced-motion respected.
-
-**Residual validation** (before any formal declaration): primary
-workflows with Tab/Shift+Tab/Enter/Space/arrows/Escape; at least one desktop
-screen reader (NVDA+Firefox or VoiceOver+Safari) and TalkBack where applicable; zoom
-200%/400% (overflow, dialogs, tables, forms); every form with a screen reader
-(error summary, field association, invalid states, recovery); async
-states not colour-only (loading/success/warning/failure/empty/retry); both
-themes, mobile viewports, reduced motion; browser-specific behaviours and
-injected external content.
-
-**Acceptance criteria**: reliable name+role for every control; every
-mouse action from the keyboard; focus contained/restored in the dialogs;
-async announcements without excessive interruptions; contrasts in both themes; semantics
-usable for tables/tabs/progress/errors; no regression on desktop and mobile.
+**Decision: no choking change.** Reciprocation works locally and an external
+libtorrent client is served well; the only missing datum (a real swarm where
+peers download *from* us) is blocked by the test host's NAT, not by the
+algorithm. The campaign stays as the gate for any future change.
 
 ---
 
-## Open: extensions from the BiglyBT comparison
+## 11. DHT
 
-*(in migration: the two extensions move to §6, the merge measurements to §12, what remains open to §14)*
+*(in migration: DHT state and measurements, to be refined in the next pass)*
 
-Comparative analysis with **BiglyBT** (Java client, heir of Azureus/Vuze). The
-majority of its capabilities are **application-level or historical** (chat/friends, Vuze
-DDB, media server, plugins, WebTorrent) and must not be ported. Two *core*
-functions were worth porting; both are **done**, with the plan and the
-measurements kept below as the record.
+### 4.4 DHT: hardening and multi-path
 
-### 9.1 Ping-Based Auto-Speed (anti-bufferbloat) — done
+The gx-core DHT (`internal/dht`, a module of its own) covers BEP 5/32/33/42/43/44/46
+with a routing table as a bucket-less binary tree; compared with Tixati the gap is
+**hardening and diagnostics**, not BEP coverage (see [`bep.md`](bep.md)).
 
-**Idea.** BiglyBT continuously measures the RTT (towards the gateway or a
-reliable host); when the upload saturates the modem queue the RTT spikes and the engine
-**dynamically reduces the upload limit** before the connection loses
-packets and worsens the browsing/VoIP of the other devices. It is a feedback
-control on **latency**, not on bandwidth: it acts only on the cap, it does not
-touch the data path.
+- **Diagnostics — done.** `Stats()` exposes per-RPC and screening counters, the
+  reflected address, the NAT type, `subnet_share_max`, `nodes_insecure_id`,
+  `subnet_cap_hint` and `peers_confirmed_multi` (see
+  [`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md)). It is the
+  measurement basis of the items below.
+- **Token hygiene — done.** The `announce_peer` token is bound to source address +
+  scope (the info-hash), so a token from one swarm is not reused on another.
+- **Anti-Sybil cap per subnet** (`Config.MaxNodesPerSubnet`, default 0 = off):
+  implemented with an **O(1) counter**; nodes beyond the threshold stay in the
+  address book with `noTree`, and `subnet_cap_hint` *advises* a value.
+  **Measured 2026-10-14** (5 min, real info-hash): `subnet_share_max` **4–7**,
+  `nodes_capped` **0** — no node exceeds any candidate threshold (8/16/24), so
+  enforcement would be a no-op and CGNAT/mobile legitimately share subnets.
+  **Decision: keep it as a hint, off by default.**
+- **Multi-path lookup**: design only (`get_peers` on several branches in parallel,
+  peers preferred when confirmed by ≥2 paths). The routing table already deduplicates
+  repeated queries, and the two real measurements (random and real info-hash) gave
+  **`peers_confirmed_multi` 0**: the gain is **not proven**, so the rewrite is
+  **closed with data** (§10.2).
+- **Harness**: `make measure-dht` (`GX_MEASURE_DHT=5m`,
+  `GX_MEASURE_DHT_INFOHASH=<40 hex>`, opt-in, outside CI). On the public DHT we
+  measured ~740 known nodes, `subnet_share_max` 14, `nodes_insecure_id` ≈42%, and
+  the discovery of **108 peers in ~30 s** on the Ubuntu 24.04 torrent.
+- **Out of scope**: DHT over I2P; the BEP 44 **outgoing client** (no consumer yet).
 
-**Implemented (standalone).** `cmd/gx-torrent/autospeed.go`:
+### 10.2 DHT multi-path — measurement and plan
 
-- A **probe** (`runAutoSpeed`, started next to the queue loop) measures every
-  second the RTT with a **TCP connect** to the gateway (ports 80/443/53, gateway
-  resolved from the default route) or to the configured `autospeed-target`; the baseline at
-  rest is the **minimum of the last 60 s**.
-- The **controller** (`autoSpeed.clampUpload`) reduces the upload by 15%
-  (`autoSpeedReduceNum/Den`) when the latency exceeds `baseline × 1.5` **and**
-  `baseline + 20 ms`, and raises it by `cap/20` when the line is at rest; never
-  below `autospeed-min`. It **never** exceeds the configured or scheduled cap.
-- The **only** point that calls `Session.SetSpeedLimits` remains
-  `applyEffectiveSpeedLimitsLocked` (`schedule.go`): base/config → scheduler →
-  auto-speed clamp, with reason `auto-speed` in the log. The engine's hot
-  hook was already ready (`internal/gxcore/torrent/session_limits.go`).
-- Keys in settings.json: `autospeed-enabled` (default `false`),
-  `autospeed-target` (empty = gateway), `autospeed-min` (KiB/s, default 50).
-  A positive upload limit is needed (global or scheduled) and the page enforces
-  it. The option is in the daemon page (`settings.html`), with the
-  *current latency / upload cap* state; it is **standalone only** like the bandwidth
-  scheduler (in managed mode it is Gextto that governs the limits).
+The iterative lookup already fans out to the ~8 closest nodes and re-enqueues
+while peers are still needed; the missing part is **confirmation across paths**
+(prefer a peer seen from ≥2 independent paths) to resist a node that lies or
+swallows results. Design sketch: an explicit per-lookup state machine like the
+BEP 44 one (`bep44_client.go`), with the reporters of each candidate peer
+tracked, a bounded fan-out and a deadline; expose `peers_confirmed_multi` and
+`lookup_paths` in `Stats()` (they surface as `dht_<key>` with no UI work).
 
-**Test.** `cmd/gx-torrent/autospeed_test.go`: clamp on high latency and recovery at
-rest, floor at the minimum, inactivity without a cap or without measurements, `reset`,
-probe against a local listener, parsing of the candidates and integration
-`applyEffectiveSpeedLimitsLocked` (1000 → 850 KiB/s) + UI
-(`TestUISettingsSavesAutoSpeed`). The i18n coverage (`TestUIPageIsFullyTranslatable`)
-covers the new strings. **Measurement**: the probe is ~1 connection/s and does not touch the
-data path; with auto-speed **off** nothing changes (no regression).
+Per the repo rule this is gated by the real-swarm measurement
+(`make measure-dht`): query-out/reply-in and peers found set the baseline.
 
-**Possible follow-up.** Gextto-side (managed) version: Gextto measures the RTT and
-modulates the limits via `SetLimits`, so the option also applies to managed engines.
+**Measurement (2026-10-13, 3 minutes, public DHT):** nodes settled at ~254 from
+a peak of ~536 (stale nodes cleaned), **`subnet_share_max` = 8** (below the hint
+threshold of 16, so no cap is suggested), `nodes_insecure_id` ≈ 40 %, `capped` =
+0, `queries_out` 2899 / `replies_in` 834 (**≈ 29 % reply success**), `dropped`
+1290 (rate limit), **`reflected_observations` 619** (the sending side of the BEP
+42 `ip` field works: observers now report our address) and `peers_found` 0 (the
+probe used a random info-hash).
 
-### 9.2 Swarm Merging (file sharing between torrents) — Phases 1–3, resume path and later trigger done
+**Read:** the routing table is **not concentrated** and the anti-Sybil cap is not
+triggered, so the concentration lever is already sufficient; the ~71 % of
+unanswered queries are nodes that do not reply, not proof of poisoning. There is
+therefore **no data yet that justifies a multi-path lookup**: the next step was the
+instrumentation, not the rewrite.
 
-**Idea.** Make different swarms that contain **the same file** collaborate,
-reusing the pieces already present in another torrent A instead of re-downloading them:
-it revives torrents without seeders when identical content exists elsewhere. In
-gx-core it is missing on v1; in v2 the intrinsic protocol deduplication already exists.
+**Instrumentation (done).** `notePeerReport`/`expirePeerConfirm`
+(`internal/dht/confirm.go`) track which responding nodes reported each
+(info-hash, peer), bounded to `peerConfirmMax` entries and expiring after
+`peerConfirmWindow`; `peers_confirmed_multi` (in `Stats()`, therefore
+`dht_peers_confirmed_multi` in the daemon) counts the peers a second distinct
+node confirmed. **Reporters are counted per subnet** (`reporterKey`, the same /24 or /48 unit as the anti-Sybil cap), so one host on many ports or a block of Sybil nodes in one /24 cannot confirm its own peers and inflate the datum that has to justify the rewrite. It is read-only: it changes nothing about which peers are used.
+On a real swarm a non-trivial value is the evidence needed before spending the
+cost of a full multi-path lookup (an explicit per-lookup state machine with a
+bounded fan-out and a deadline, like `bep44_client.go`). Tests:
+`TestPeerConfirmCountsDistinctReporters`, `TestPeerConfirmIsBounded`,
+`TestPeerConfirmExpiry`, `TestReporterKeyIsTheSubnet`.
 
-**Hooks already present.** `piece.Piece.Data` is a `filesection.Piece` and every
-`FileSection{File, Offset, Length, Padding}` points to a file+**absolute** offset
-(`internal/filesection/section.go`): writing a piece is `File.WriteAt(buf, off)`.
-The **BEP 38** hints (`similar`/`collections`) are already read and merged
-(`internal/metainfo/bep38.go`) and the local torrents that
-share them are already found (`cmd/gx-torrent/bep38.go`). The merge does **not**
-drive its candidates from them, though: it matches by **structure** (an
-identical piece layout, or an equal v2 per-file Merkle root), which is what makes
-the reuse safe; the hints are the *reporting* side of the BEP.
-The verification already exists (`Piece.VerifyHash` v1, `Piece.VerifyV2` v2); in v2
-`metainfo.V2Files[fi].Root` is the **per-file identity**, and `internal/merkle`
-provides the 16 KiB leaves for the **per-block** verification. The problem is not the
-disk, it is the **verification**: B's bytes are not trusted until they are validated
-against A's structure.
-
-**Phase 1 (done, `torrent/localmerge.go`).** Merge only between torrents with an
-**identical layout** (same piece length, same total length and same hashes at the same
-indices): the pieces are directly interchangeable and are verified with
-**A**'s hash. It covers the common case "same content, different `.torrent`/name/tracker"
-with a corruption risk ≈ nil. Implementation: at the end
-of A's allocation (`handleAllocationDone`) every torrent publishes an
-immutable snapshot of its own pieces (`localData`); A reads the snapshots of the
-other torrents of the session, for every piece **already verified** by the other
-(bitfield) with the same hash and length reads the bytes from the other's storage,
-re-verifies them against its own hash and writes them into its own storage; the
-existing verifier then marks the pieces and closes the completion. No
-cross-torrent query (atomic snapshot + bitfield under lock): no deadlock.
-Accounting (bitfield/completion) per torrent.
-
-- **Phase 2 (v2-first) — done (`prefillV2From`/`mergeV2Files` in
-  `torrent/localmerge.go`):** match by **per-file Merkle root** (`V2Files[].PiecesRoot`
-  plus length) → identical files even with **different layouts**, without
-  corruption. The destination pieces are reassembled from the source's
-  **verified** pieces (the source pieces overlapping the destination piece's
-  file-local range must be set in the source bitfield) and every destination
-  piece is then **re-verified against its own hash** (`VerifyV2`) before it is
-  written, so no unverified byte reaches the storage; the existing verifier then
-  marks the pieces. An identical-layout pair stays Phase 1's job. The BEP 27
-  guard is checked on both the snapshot and the parsed info. Tests:
-  `torrent/localmerge_v2_test.go` (different layout, partial source, different
-  content, private).
-- **Phase 3 (block granularity) — done (`storePartialBlocks`/
-  `prefillBlocks`):** the destination pieces that straddle verified and
-  unverified source pieces reuse the verified 16 KiB blocks (`partialBlocks`);
-  the downloader reads them from disk and requests only the rest. See §10.1.
-- **Resume path — done:** the merge also runs when a torrent is
-  **reloaded from its resume data** instead of being freshly allocated
-  (`handleAllocationDone` + `startMergeVerifier` with the reloaded bitfield).
-  The pieces the reloaded bitfield already verified are kept and the merge fills
-  the rest, so a restart no longer drops the block-level reuse; the verifier
-  takes the reloaded and merged pieces through `Skip`/`Only`, so **nothing is
-  re-read or re-hashed** on that path.
-- **Later-sibling trigger — done:** the merge is also re-triggered
-  when a sibling **publishes its data after** this torrent's allocation (the
-  one-shot allocation merge only saw the then-present siblings). Every torrent
-  that gains verified pieces wakes the others (`notifySiblings`, only when its
-  verified count grows, so two incomplete torrents cannot ping each other
-  forever with no-op merges); a downloading torrent queues the merge, waits for
-  the in-flight piece writes to drain (`mergeWaiting`/`pendingWrites`: an
-  adoption during the verifier's bitfield swap would be lost), then runs it in
-  the same exclusive window as the resume path (piece fetches and webseeds are
-  cancelled, so nothing else writes) and restarts the pipeline at the end.
-- **Phase 4, v1 cross-layout — done:** reuse between two **v1**
-  torrents with a **different piece length**, matched by file **path and
-  length** (`v1FilesMatch`, a heuristic — unlike the v2 Merkle root; see
-  `beyond-bep.md` §5). Only **whole** destination pieces are reused: v1 has no
-  per-block hash to justify a partial write, so a piece is assembled from
-  verified source pieces and checked against its own hash **before** writing; a
-  wrong match therefore never writes, and a candidate is abandoned after
-  `maxV1VerifyFailures` (64) hash failures so it cannot read the whole source
-  for nothing.
-
-**No ED2K-style content hash.** The v1 cross-layout match is by file path and
-length, not by a chunk content hash (BiglyBT/ED2K): those hashes are not in the
-`.torrent`, so they would need a private index. The piece hash still verifies
-every reuse.
-
-**Critical guard: BEP 27.** The merge is disabled if A **or** B is private
-(`info.Private`): mixing private swarms violates the tracker rules and pollutes
-ratio/statistics. It is a guard, not an option.
-
-**Test/measurement.** `torrent/localmerge_test.go` (reuse, different content, private
-guard), `torrent/localmerge_resume_test.go` (the resume path through
-`handleAllocationDone`: missing pieces filled and partial blocks re-derived, the
-reloaded pieces kept without a re-read; the later-sibling trigger and its
-write-drain gate; the notify count guard) and `cmd/gx-torrent/swarmmerge_test.go`
-(end-to-end: B populated from disk, A with identical content and a different
-name completes **without peers**; `TestDaemonSwarmMergeResumePath` reloads A from
-resume across a daemon restart; `TestDaemonSwarmMergeLaterSibling` adds A first
-and completes it when B appears afterwards). The tests also pass with `-race`.
-Effort: Phase 1 **medium** (done), Phase 2 **large**.
-
-**Cost.** The merge runs once per torrent, at the end of the allocation (and on
-a resume from the reloaded bitfield, and — re-triggered — when a sibling
-publishes its data afterwards): the
-per-piece comparison (hash and length) happens **only** for the torrents with the
-same `piece length` and the same total length (the outer filter is O(torrent)
-with two field reads), and only the pieces that pass the comparison involve
-I/O. Within one
-pass each reused piece is read and written **once** even when several candidates
-hold the same content (an index shared by Phase 1 and Phase 2), and a later
-candidate fills only the gaps a previous one could not. The pieces the merge
-re-verified against this torrent's own hashes are also handed to the verifier
-(`Verifier.Skip`), which sets their bit without re-reading and re-hashing them:
-only the pieces that were already on disk are verified again. The skip set is
-consumed and cleared at the allocation-time verification, so a later manual
-re-check verifies everything.
-The later-sibling wake-up is a non-blocking send on a buffered per-torrent
-channel, and only fires when a torrent's verified count grows (no steady-state
-cost, no ping-pong); the merge it starts is the only path that briefly pauses
-the fetch pipeline (piece fetches and webseeds are cancelled for the duration,
-then restarted), the price of reusing data that appeared after the allocation.
-On the **resume path** the same filter runs before starting the pieces from the
-reloaded bitfield; when nothing is reusable it costs 115 ns and 0 allocations
-over 32 unrelated session torrents (`BenchmarkMergeCandidatesUnrelated`), and
-when something is, the merge is the intended work (§10.1).
-
-### 9.3 Verification criterion (like §4.8)
-
-For every point: targeted tests (`./cmd/gx-torrent/`, `GxEngine`, `make test-engine`,
-`make test`); with a visible effect also the documentation (`docs/gx-torrent.md`,
-`MANUAL.*`, `README*`) and **both UIs** (Gextto `uiweb/v2` + the daemon
-page), never only via API. **Before/after measurement** of CPU, RAM and throughput, as per the
-performance rule of `AGENTS.md`; the new UI controls respect
-accessibility and i18n.
+**Second measurement (2026-10-14, 5 minutes, real Debian info-hash
+`7acf8fb5…`):** nodes ~296 (peak 525), `subnet_share_max` 4–7, `nodes_insecure_id`
+≈ 42 %, `nodes_capped` 0, queries_out 4703 / replies_in 1670 (35.5 %),
+`reflected_observations` 1063, **`peers_found` 0**, **`peers_confirmed_multi` 0**.
+Same read as the first run, on a populated info-hash rather than a random one:
+the routing table is not concentrated and **no peer was confirmed by two
+distinct subnets**, so there is still **no evidence to justify a multi-path
+rewrite**. The item is therefore **closed with data** (a controlled adversarial
+swarm would be the only next step, and it is out of scope for a home client).
 
 ---
 
-## Open: smartness ideas
+## 12. Merge on real data
 
-*(in migration: the realised ideas move to §6, their measurements to §10/§11/§12, the open ones to §14)*
-
-The night session (parser fuzzing, Swarm Merging Phase 2, the DHT anti-Sybil
-counter, the performance round) produced ideas that would make Gextto, gx-torrent
-and gx-core **smarter**, not only faster or more correct. Each is classified
-here; the implemented ones are dated, the others are a proposal to be agreed.
-
-| # | Idea | Value | Risk | Status |
-|---|---|---|---|---|
-| 1 | **Continuous fuzzing** of every network-facing parser, with the found inputs kept as seeds, run by hand or in a nightly job | high (a DoS caught before a release) | low | **done**: `make fuzz-smoke` (`FUZZ_TIME=2m`), 21 targets (DHT, bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE, peer-wire handshake), the seeds are committed under `testdata/fuzz`; `.github/workflows/fuzz.yml` runs it nightly (2m per target) and on a push that touches an engine/parser path (30s), uploading the failing inputs as an artifact |
-| 2 | **Merge: read and write each reused piece once** across all candidates; a later candidate only fills the gaps a previous one could not | medium (no duplicate I/O when several torrents hold the same content) | low | **done**: `mergedIdx` shared by Phase 1 and Phase 2 |
-| 3 | Merge: order the candidates by **reusable bytes** so the richest source is read first | low | low | **closed:** superseded by the dedupe (#2) — ordering changes only *which* source provides a piece, not the work; no measurable gain, so no speculative code |
-| 4 | **Merge Phase 3: reuse at block granularity** via v2 Merkle proofs, so a source that has only part of a file (or only its block layer) still contributes | high (revives more seedless torrents) | high | **done**: real-data harness, 100% → 25% from the network, see §10.1 |
-| 5 | DHT **adaptive subnet cap**: choose the threshold from the observed `subnet_share_max` distribution instead of a fixed number (still opt-in) | medium | medium | **partial**: `subnet_cap_hint` (the suggested cap from the live concentration) is exposed in `Stats()`; automatic enforcement not pursued (a /24 can be legitimate CGNAT/mobile) |
-| 6 | DHT **multi-path `get_peers`** with peers confirmed by ≥2 paths | medium | medium | **measured + instrumented**: `peers_confirmed_multi` counts peers reported by ≥2 distinct nodes; the full rewrite awaits data, see §10.2 |
-| 7 | **Merge metrics**: expose reused pieces/bytes and torrents completed without peers (stats, daemon page, Gextto) | medium | low | **done**: `merged_pieces`/`merged_bytes` in the engine session stats → daemon API → Gextto «Riuso locale» |
-| 8 | **Multi-piece pipelining per peer** + write ring buffer, gated by the harness | high | high | **done**: write ring buffer + 2 pieces per peer; measured ×1.75 (3.85→6.76 MiB/s at RTT 50 ms), details in §6.4/§10.3 |
-| 9 | A **single bounded bencode scanner** for every hand-written path (length and depth checked), plus an allocation-free screen before the decoder that trusts declared lengths | medium/high | low | **done (extended)**: `internal/utils/utils.go` (length bounded, recursion depth ≤64) and `internal/dht/bencode.go` `validBencode` cover DHT packets; a shared `internal/gxcore/internal/bencodecheck` screens every engine path that hands untrusted bytes to zeebo/bencode — which allocates a declared string length up front — so a tiny crafted input cannot ask for gigabytes: the `.torrent`/file-tree/piece-layer parsers (`metainfo`), the BEP 10 extension messages (`peerprotocol`) and the HTTP/UDP tracker replies (`httptracker`, `udptracker`) |
-| 10 | Merge: **no double verification** — the pieces the merge just re-verified are handed to the verifier as already done | medium (no re-read and re-hash of the reused bytes) | low | **done**: `Verifier.Skip`, cleared after the allocation-time check |
-| 11 | Merge **off the run loop**: the candidate scan stays on the run loop, the copy runs in `Verifier.Prepare` (cancellable, snapshot of the deselected pieces) | high | low | **done** |
-| 12 | Merge on **empty storage**: `Verifier.Only` restricts the check to the merged pieces when no file existed | medium (no read+SHA-1 of the whole torrent after a partial merge) | low | **done** |
-| 13 | **Word-wise interest** over the wanted set (`HasAnyOutside` + `skipBits`) | high (run-loop CPU on large torrents) | low | **done**: 231 → 2.8 µs per peer on 100k pieces (×80), 0 alloc |
-| 14 | **Smarter eviction**: `peerUseful` keeps only interested peers when seeding, with a 30 s grace (`newPeerGrace`) | medium | low | **done** |
-| 15 | **mmap fault guard**: `recoverFault` turns a fault (full disk, truncated file) into an I/O error on the torrent under `-mmap` | high for `-mmap` users | low | **done**: write bench equivalent (36.3–38.0 → 35.9–37.5 µs), 0 alloc |
-| 16 | **Disk guard** in gx-torrent: downloads on a folder below the free-space threshold pause and resume by themselves, seeding goes on (Gextto only refused to *start* downloads) | high (no write errors, no torrents in error on a full disk) | low | **done**: `diskguard.go`, `min_free_mb` (default 1 GiB), daemon setting + badge, pushed from Gextto's `min_free_space_gb` |
-| 17 | **Wanted state hygiene**: `pruneWantedTimers` bounds the state file while keeping the taken ledger (a re-added title is not downloaded again) | low | low | **done** |
-
-The criterion is the same as §4.8/§9.3: one item = one commit, measurement
-before/after for anything on a data path, both UIs and i18n for anything visible
-to the user, and the reference documents kept aligned.
+*(in migration: merge measurements, to be refined in the next pass)*
 
 ### 10.1 Merge Phase 3 — block-granularity reuse (done)
 
@@ -1227,121 +1093,41 @@ Same 25.0% as the no-restart Phase 3, the resume path and the first-run merge:
 the order in which the torrents are added no longer decides whether the reuse
 happens.
 
-### 10.2 DHT multi-path — measurement and plan
+---
 
-The iterative lookup already fans out to the ~8 closest nodes and re-enqueues
-while peers are still needed; the missing part is **confirmation across paths**
-(prefer a peer seen from ≥2 independent paths) to resist a node that lies or
-swallows results. Design sketch: an explicit per-lookup state machine like the
-BEP 44 one (`bep44_client.go`), with the reporters of each candidate peer
-tracked, a bounded fan-out and a deadline; expose `peers_confirmed_multi` and
-`lookup_paths` in `Stats()` (they surface as `dht_<key>` with no UI work).
+## 13. Accessibility verification
 
-Per the repo rule this is gated by the real-swarm measurement
-(`make measure-dht`): query-out/reply-in and peers found set the baseline.
+**Method**: static review (HTML/CSS/JS), semantics/names/ARIA/focus,
+responsive layout/visible focus/reduced-motion, light/dark theme contrast, axe-core
+via Playwright, regression tests (dialogs, keyboard sort, polling, narrow
+viewports). Suite: **13 green tests** on dashboard, downloads, settings,
+maintenance, health, logs (`cd uiweb/end2end && npm ci && npm run test:a11y`;
+a safety net, not a substitute for the manual assessment).
 
-**Measurement (2026-10-13, 3 minutes, public DHT):** nodes settled at ~254 from
-a peak of ~536 (stale nodes cleaned), **`subnet_share_max` = 8** (below the hint
-threshold of 16, so no cap is suggested), `nodes_insecure_id` ≈ 40 %, `capped` =
-0, `queries_out` 2899 / `replies_in` 834 (**≈ 29 % reply success**), `dropped`
-1290 (rate limit), **`reflected_observations` 619** (the sending side of the BEP
-42 `ip` field works: observers now report our address) and `peers_found` 0 (the
-probe used a random info-hash).
+**Improvements implemented**: language via the `lang` attribute; landmarks
+(skip-nav, `aside`/`nav`/`header`/`main`); `aria-current="page"`;
+accessible names (not just placeholder/tooltip); labels on icon controls;
+dialogs (focus inside, Tab/Shift+Tab trap, Escape, focus restore);
+keyboard-sortable headers with `aria-sort`; focus preserved under polling;
+visible focus; tables with caption/scope (also dynamic); progressbar with a
+value; ARIA for tabs/dialogs/landmarks; live region for states/errors/notifications/
+async; decorative symbols never instead of text; settings search with
+synonyms (`memo`, `memory`, `RAM`, `cache`); light-theme contrasts darkened where
+needed; mobile reflow (tables with internal scroll); reduced-motion respected.
 
-**Read:** the routing table is **not concentrated** and the anti-Sybil cap is not
-triggered, so the concentration lever is already sufficient; the ~71 % of
-unanswered queries are nodes that do not reply, not proof of poisoning. There is
-therefore **no data yet that justifies a multi-path lookup**: the next step was the
-instrumentation, not the rewrite.
+**Residual validation** (before any formal declaration): primary
+workflows with Tab/Shift+Tab/Enter/Space/arrows/Escape; at least one desktop
+screen reader (NVDA+Firefox or VoiceOver+Safari) and TalkBack where applicable; zoom
+200%/400% (overflow, dialogs, tables, forms); every form with a screen reader
+(error summary, field association, invalid states, recovery); async
+states not colour-only (loading/success/warning/failure/empty/retry); both
+themes, mobile viewports, reduced motion; browser-specific behaviours and
+injected external content.
 
-**Instrumentation (done).** `notePeerReport`/`expirePeerConfirm`
-(`internal/dht/confirm.go`) track which responding nodes reported each
-(info-hash, peer), bounded to `peerConfirmMax` entries and expiring after
-`peerConfirmWindow`; `peers_confirmed_multi` (in `Stats()`, therefore
-`dht_peers_confirmed_multi` in the daemon) counts the peers a second distinct
-node confirmed. **Reporters are counted per subnet** (`reporterKey`, the same /24 or /48 unit as the anti-Sybil cap), so one host on many ports or a block of Sybil nodes in one /24 cannot confirm its own peers and inflate the datum that has to justify the rewrite. It is read-only: it changes nothing about which peers are used.
-On a real swarm a non-trivial value is the evidence needed before spending the
-cost of a full multi-path lookup (an explicit per-lookup state machine with a
-bounded fan-out and a deadline, like `bep44_client.go`). Tests:
-`TestPeerConfirmCountsDistinctReporters`, `TestPeerConfirmIsBounded`,
-`TestPeerConfirmExpiry`, `TestReporterKeyIsTheSubnet`.
-
-**Second measurement (2026-10-14, 5 minutes, real Debian info-hash
-`7acf8fb5…`):** nodes ~296 (peak 525), `subnet_share_max` 4–7, `nodes_insecure_id`
-≈ 42 %, `nodes_capped` 0, queries_out 4703 / replies_in 1670 (35.5 %),
-`reflected_observations` 1063, **`peers_found` 0**, **`peers_confirmed_multi` 0**.
-Same read as the first run, on a populated info-hash rather than a random one:
-the routing table is not concentrated and **no peer was confirmed by two
-distinct subnets**, so there is still **no evidence to justify a multi-path
-rewrite**. The item is therefore **closed with data** (a controlled adversarial
-swarm would be the only next step, and it is out of scope for a home client).
-
-### 10.3 Multi-piece pipelining — measurement and outcome
-
-The measured baseline (§6.4, 2026-10-13) is ~12.8× from the adaptive queue at
-RTT 50 ms, and it also shows the ceiling: with 256 KiB pieces (16 blocks) the
-queue cannot exceed the piece's block count, so multi-piece per peer is the next
-lever for high-bandwidth-delay links.
-
-**Bounded write ring buffer (done).** The per-torrent "one write at a
-time" is replaced by a **bounded per-torrent write ring buffer**:
-`beginPieceWrite`/`endPieceWrite` (`torrent_write.go`) suspend the piece channels
-only once `maxPendingWrites` (4) pieces are being written, so the network keeps
-flowing while pieces are written. The picker skips a piece marked `Writing`, so a
-piece is never written twice, and `Config.ParallelWrites` (`semWrite`) still caps
-the disk parallelism globally; the per-torrent bound limits the in-flight piece
-buffers. Tests: `torrent_writering_test.go` (suspend at the cap, resume below, no
-underflow), the full `cmd/gx-torrent` e2e suite and `-race` on the transfer tests.
-**Measurement:** `make measure-seeding` on loopback is **equivalent** (the disk is
-not the bottleneck there); the gain is on slow storage, and it is the prerequisite
-for multi-piece.
-
-**Multi-piece per peer (done).** A peer downloads up to
-`maxPiecesPerPeer` (2) pieces at once: `pieceDownloaders` is a per-peer map keyed
-by piece index (`torrent.go`, `closePieceDownloader`, `handlePieceMessage` look
-the piece up by `msg.Index`), `peer.ConcurrentPieces`/`MaxConcurrentPieces` gate
-the picker (`findPiece`), and the in-flight budget is shared across a peer's
-pieces (`torrent.requestBlocks`, `RequestBlocks` returns the count sent; the
-extra piece opens only when the window has room, `pipeHasRoom`).
-`fillPeerDownloads` tops a peer up to the cap on
-Have/Bitfield/HaveAll/Unchoke/completion, one queued RAM request per peer, and
-endgame duplicates are cancelled as soon as a copy starts writing (peer and
-webseed, `markDirty` widened for out-of-order writes); the picker never hands a
-peer the same piece twice. **Measurement (the latency harness):** `default`
-**3853 → 6756 KiB/s** (×1.75), `shallow` 301 KiB/s (window of 1 respected) at RTT
-50 ms with 256 KiB pieces. Tests: e2e suite + `-race` on the transfer tests,
-`piecedownloader` budget test. RAM and CPU equivalent.
-
-### 10.4 Beyond the BEPs: WebSocket tracker, DHT feeds, v1 cross-layout merge (done)
-
-The analysis and the design are in [`beyond-bep.md`](beyond-bep.md); these are
-the protocol extensions outside the BEP catalogue. Implemented:
-
-- **WebSocket tracker (ws/wss).** `internal/gxcore/internal/tracker/wstracker`
-  is a bounded, original RFC 6455 client plus the WebTorrent/bittorrent-tracker
-  tracker (JSON announce/scrape, binary fields as 20-code-point strings, full
-  and compact peers, BEP 31 retry); `trackermanager.Get` accepts `ws`/`wss` and
-  the sockets are closed with the session. It dials through the same egress as
-  the HTTP tracker (proxy, resolver, blocklist) and supports `wss`. Tests:
-  announce, scrape, failure, `wss`, a rejected handshake and a frame fuzzer
-  (`FuzzWSReadMessage`, in `make fuzz-smoke`). **Caveat:** the reference
-  `bittorrent-tracker` returns only WebRTC peers to a WebSocket client, so a
-  native client gets no TCP peers from it; the standalone value is limited to
-  trackers that return standard peers, and the real unlock is WebRTC (not done).
-- **DHT feeds (BEP 46).** Engine: `bep46Feed` decodes a mutable item value as a
-  single torrent (`{"ih"}`) or a feed (`{"items":[{"ih","name"}]}`), and
-  `Session.ResolveDHTFeed` resolves it (signature verified by the DHT client).
-  Daemon: a feed URL `dht://<pubkey-hex>[?salt=<hex>]` becomes a normal feed
-  source (resolved to magnet items, so rules/archive/dedup/add are reused) and
-  `GET /api/v1/dht-feed` resolves one for external consumers. Tests: the value
-  codec (engine) and the URL parse and item mapping (daemon). The **publisher**
-  side (signing a feed) is not implemented.
-- **v1 cross-layout merge** (Swarm Merging Phase 4, §9.2): two v1 torrents with
-  a different piece length share whole pieces, matched by file path and length
-  and verified against each destination piece's hash before writing. No
-  per-block reuse for v1 (no per-block hash), and a candidate is dropped after
-  64 failed verifications.
-
+**Acceptance criteria**: reliable name+role for every control; every
+mouse action from the keyboard; focus contained/restored in the dialogs;
+async announcements without excessive interruptions; contrasts in both themes; semantics
+usable for tables/tabs/progress/errors; no regression on desktop and mobile.
 ---
 
 ## 14. Open items and the measurement-gated program
@@ -1524,28 +1310,3 @@ in `make fuzz-smoke`.
 multi-path → **close with data**; choking → **gated on a real-swarm campaign**;
 10 Gbps → **close with data**; disk I/O → **close with data**; **v2 partial-file
 hash serving → done**.
-
----
-
-## Open: choking/seeding campaign
-
-*(in migration: the streaming, DLNA and in-app update parts are already in §3; the campaign goes to §10.)*
-
-### 12.3 Choking/seeding campaign
-
-- **Local reciprocation.** Without mesh the seeder uploads **3.00×** the corpus
-  (3 pure leechers). With mesh the leechers **reciprocate** (2.52 MB uploaded
-  among themselves) and the seeder's upload drops to **1.84×** (−39 %).
-- **Controlled vs libtorrent.** `TestMeasureChokingLibtorrent` (`scripts/
-  libtorrent-leech.py`): our seeder serves a real **libtorrent** leecher on
-  loopback — **48 MiB uploaded (100 % of the file) in 4.84 s** (~10.4 MB/s), the
-  leecher verified complete.
-- **Real swarm.** `TestMeasureChokingRealSwarm` seeds the Debian ISO for 3 min:
-  **0 peers**, because seeding needs an **inbound** port and this host is
-  behind NAT with no reachable port (the earlier download run found 80 peers
-  outbound). The harness is kept for a host with a reachable port.
-
-**Decision: no choking change.** Reciprocation works locally and an external
-libtorrent client is served well; the only missing datum (a real swarm where
-peers download *from* us) is blocked by the test host's NAT, not by the
-algorithm. The campaign stays as the gate for any future change.
