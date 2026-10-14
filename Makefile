@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast gx-torrent test test-race test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 cache-refresh
+.PHONY: all build fast gx-torrent test test-race test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui check-scripts installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 cache-refresh
 
 all: build
 
@@ -28,7 +28,7 @@ gx-torrent:
 container:
 	docker build --build-arg GX_BUILD="$$(cat gx-torrent.build_number 2>/dev/null || echo 0)" -t gx-torrent .
 
-test: check-ui installer-test test-dht
+test: check-ui check-scripts installer-test test-dht
 	CGO_ENABLED=0 go test ./...
 
 # Tests of the gx-core engine. It lives in internal/gxcore as part of the main
@@ -161,6 +161,11 @@ fmt:
 # Validate the server-rendered UI settings index.
 check-ui:
 	scripts/check-ui-settings-index.sh
+
+# Lint the shell scripts (bash -n, plus shellcheck when installed). Wired into
+# `make test` so a scripting mistake fails locally, not only in CI.
+check-scripts:
+	scripts/check-scripts.sh
 
 # Side-effect-free checks for the bash installers (also run by `make test`).
 installer-test:

@@ -131,8 +131,15 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   da `mountPointReparseData` (`junction.go`), testato anche su Linux. Gextto intero (`cmd/gexttod`) **non** è Windows:
   TUI, gestione processi/systemd, metadati fs e installer/updater sono Unix
   (vedi `docs/gx-torrent.md`, *Standalone use → Platforms*).
-- `make test` — `check-ui` + `installer-test` + `test-dht` +
+- `make test` — `check-ui` + `check-scripts` + `installer-test` + `test-dht` +
   `CGO_ENABLED=0 go test ./...` (Go puro).
+- **Guardie statiche della UI** (girano con `go test ./...`): `TestUIActionPathsAreRegisteredRoutes`
+  (ogni `Path: "/api/…"` dei bottoni/azioni della UI deve essere una rotta
+  registrata: un endpoint rimosso non può lasciare un bottone morto che risponde
+  404) e `TestEnd2EndSelectorsReferenceRealSettings` (i selettori
+  `#input-<key>`/`#v2-setting-<key>` e le `tab=` dei test Playwright devono
+  esistere nell'indice/scheda: un rename non può lasciare la suite rossa solo in
+  CI).
 - `make test-ui` — suite end2end Playwright della UI (`uiweb/end2end`): costruisce
   il daemon, lo avvia in dry-run e pilota l'interfaccia reale in un browser
   (pagine, mobile, i18n, accessibilità axe). **Non fa parte di `make test`**
@@ -154,7 +161,8 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   pacchetti del motore). Fa parte del modulo, quindi `go test ./...` lo include
   già; `make test-engine` resta per eseguire solo quei pacchetti.
 - Invarianti da non rompere: `scripts/check-ui-settings-index.sh` (indice
-  impostazioni UI) e `scripts/installer-selftest.sh`.
+  impostazioni UI), `scripts/check-scripts.sh` (lint degli script: `bash -n`, più
+  `shellcheck` quando è installato) e `scripts/installer-selftest.sh`.
 - **Igiene dei test**: nessun test deve lasciare file fuori dalle proprie
   cartelle temporanee. Usa `t.TempDir()` (o `os.MkdirTemp` con
   `t.Cleanup`/`defer os.RemoveAll`), mai percorsi relativi alla CWD. Un `Daemon`
