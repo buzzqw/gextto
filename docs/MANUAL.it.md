@@ -227,7 +227,7 @@ l'installer**; `--user NAME` (o `GEXTTO_USER`) sceglie un altro utente e
 Per un'installazione senza root da un checkout sorgente:
 
 ```bash
-make build          # Go puro (predefinita); 'make build-libtorrent' per libtorrent
+make build          # Go puro, con gx-torrent
 GEXTTO_DATA_DIR="$HOME/gextto-data" \
   GEXTTO_LISTEN=127.0.0.1:5000 \
   scripts/install-user-service.sh
@@ -773,9 +773,10 @@ dell'interfaccia web).
   Supporta i torrent **solo-v2** (BEP 52),
   sia da `.torrent` sia da
   magnet; non supporta WebTorrent/WebRTC.
-- **libtorrent (build opzionale)** — la sessione libtorrent nello stesso processo
+- **libtorrent (non più spedito)** — la sessione libtorrent nello stesso processo
   di Gextto, presente **solo se hai compilato Gextto con libtorrent**
-  (`make build-libtorrent`); i pacchetti di release non la includono. Valgono
+  (`make build-libtorrent`); i pacchetti di release non la includono e il motore
+  è in fase di rimozione. Valgono
   tutte le voci *libtorrent*.
 - **qBittorrent-nox** — Gextto pilota un qBittorrent-nox esistente tramite la sua
   Web API. Imposta URL, utente/password, categoria, tag e intervallo di polling, e

@@ -63,7 +63,7 @@ Node.js/npm, sei lingue nell'interfaccia.
 | **Automazione** | Serie TV, film, fumetti · Torznab (Jackett, Prowlarr) · RSS · ricerca web · recupero dei download bloccati |
 | **Integrazioni** | Jellyfin, Plex, Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
 | **Interfacce** | UI web (SSR + HTMX, zero-Node/Go puro, PWA installabile) · TUI da terminale via SSH · API JSON |
-| **Build** | Go puro (`CGO_ENABLED=0`) · motore libtorrent opzionale · Linux x86_64/aarch64 · gx-torrent anche su Windows |
+| **Build** | Go puro (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent anche su Windows |
 
 ## Funzionalità
 
@@ -248,7 +248,7 @@ resume transazionale su BoltDB e flusso di Server-Sent Events in tempo reale
 |---|---|---|
 | gx-torrent (predefinito) | Processo Go separato e sorvegliato | Go puro, autonomo, sviluppo attivo. v1, ibridi e solo-v2, DHT e cifratura MSE/PE; anche autonomo su Linux e Windows; niente WebTorrent/WebRTC |
 | qBittorrent-nox | Demone esterno via Web API, oppure uno che Gextto scarica e avvia in privato | Hai già qBittorrent-nox o preferisci la sua UI. Servono mappature percorsi e un processo in più ([guida alla configurazione](docs/qbittorrent-nox.md)); è anche il primo passo del fallback automatico, scaricato al momento |
-| libtorrent (build opzionale) | Nel processo di Gextto, **solo se compilato** (`make build-libtorrent`) | Controlli avanzati o compatibilità di libtorrent; un passo del fallback automatico. Un crash coinvolge anche Gextto |
+| libtorrent (non più spedito) | Nel processo di Gextto, **solo in una build propria** (`make build-libtorrent`); le release sono Go puro | Controlli avanzati o compatibilità di libtorrent; un passo del fallback automatico. Un crash coinvolge anche Gextto. In fase di rimozione |
 
 Le statistiche del motore attivo — torrent per stato, velocità e slot,
 porta/router, DHT/uTP/LSD, cifratura, proxy, filtro IP, cache, **connessioni
@@ -290,11 +290,11 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 ```
 
 Installa in `/opt/gextto`, tiene i dati in `/var/lib/gextto` ed espone la UI
-sulla porta 5000. Il motore predefinito `gx-torrent` (Go puro) è installato
+sulla porta 5000. Il motore `gx-torrent` (Go puro) è installato
 accanto a `gexttod` e avviato in modalità gestita. Il pacchetto è Go puro —
 null'altro da installare. In alternativa, un qBittorrent-nox esterno
 ([guida alla configurazione](docs/qbittorrent-nox.md)); il
-motore libtorrent richiede una build propria (vedi sotto).
+motore libtorrent integrato non viene più spedito (vedi sotto).
 
 Prima di toccare il sistema l'installer avvia una volta il programma
 scaricato: librerie mancanti o glibc troppo vecchia vengono segnalate subito,
@@ -313,14 +313,11 @@ aggiunge l'utente del servizio a quel gruppo.
 
 ### Installazione dal sorgente
 
-Serve Go 1.26.8+; la build predefinita è in **Go puro**. Solo il motore
-opzionale **libtorrent** richiede anche un compilatore C++17 e gli header
-libtorrent-rasterbar. La UI web è incorporata — nessun build frontend.
-Vedi il [manuale sviluppatori](docs/DEVELOPERS.md).
+Serve Go 1.26.8+; la build è in **Go puro**. La UI web è incorporata — nessun
+build frontend. Vedi il [manuale sviluppatori](docs/DEVELOPERS.md).
 
 ```bash
-make build                 # Go puro (predefinita), con gx-torrent
-make build-libtorrent      # include anche il motore opzionale libtorrent
+make build                 # Go puro, con gx-torrent
 ```
 
 `make build` incrementa il numero di build **committato** (`build_number`,

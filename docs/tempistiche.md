@@ -86,12 +86,12 @@ Wall times of the whole run (jobs usually run in parallel), from recent runs on
 | `ci.yml` | push and PR | **~4.5–8 min** (263–477 s) | *vet and test (x86_64)* 166–226 · *embedded libtorrent (x86_64)* 175–474 · *race detector* 375 (non-blocking) · *gx-torrent platform tests (Windows)* 45 · *service install (Windows)* 69 (non-blocking) · *container image* 44 |
 | `continuous.yml` | push to `main` | **~4 min** (243–259 s) | *test* 122 · *package (x86_64/aarch64 × go/libtorrent)* 74–101, in parallel · *publish* 11 |
 | `codeql.yml` | push, PR and weekly | **~3.5 min** | *analyze (go)* 203 |
-| `release.yml` | tag | — (no recent run to measure) | *test* + matrix *package (`{x86_64,aarch64} × {go,libtorrent}`)* in the `ubuntu:22.04` container, with the Windows packages alongside |
+| `release.yml` | tag | — (no recent run to measure) | *test* + matrix *package (`{x86_64,aarch64}`)* in the `ubuntu:22.04` container, with the Windows packages alongside |
 
-`continuous.yml` and `release.yml` publish **8 packages** (+ `release.json`):
+`continuous.yml` and `release.yml` publish **6 packages** (+ `release.json`):
 
-- `gextto-linux-x86_64.tar.gz`, `gextto-linux-x86_64-libtorrent.tar.gz`;
-- `gextto-linux-aarch64.tar.gz`, `gextto-linux-aarch64-libtorrent.tar.gz`;
+- `gextto-linux-x86_64.tar.gz`;
+- `gextto-linux-aarch64.tar.gz`;
 - `gx-torrent-linux-x86_64.tar.gz`, `gx-torrent-linux-aarch64.tar.gz`;
 - `gx-torrent-windows-amd64.zip`, `gx-torrent-windows-arm64.zip`.
 

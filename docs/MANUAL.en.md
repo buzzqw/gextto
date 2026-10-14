@@ -228,7 +228,7 @@ isolated, login-less system account.
 For a no-root installation from a source checkout:
 
 ```bash
-make build          # pure Go (default); 'make build-libtorrent' for libtorrent
+make build          # pure Go, with gx-torrent
 GEXTTO_DATA_DIR="$HOME/gextto-data" \
   GEXTTO_LISTEN=127.0.0.1:5000 \
   scripts/install-user-service.sh
@@ -754,9 +754,10 @@ web interface).
   web seeds and `dht=` adds a DHT bootstrap node. It supports
   **v2-only** torrents (BEP 52), both from a `.torrent` and from a magnet link;
   it does not support WebTorrent/WebRTC.
-- **libtorrent (optional build)** — the libtorrent session inside Gextto's own
+- **libtorrent (no longer shipped)** — the libtorrent session inside Gextto's own
   process, available **only if you built Gextto with it**
-  (`make build-libtorrent`); release packages do not include it. Every
+  (`make build-libtorrent`); release packages do not include it and the engine is
+  being removed. Every
   *libtorrent* setting applies.
 - **qBittorrent-nox** — Gextto drives an existing qBittorrent-nox through its Web
   API. Set the URL, user/password, category, tag and poll interval, and the

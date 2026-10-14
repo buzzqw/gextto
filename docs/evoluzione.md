@@ -478,9 +478,10 @@ justifies it, otherwise it is closed with the recorded data. Most of what remain
 **implemented or designed but not validated on a real swarm**, or needs a **go/no-go
 decided on data**, so every item carries the gate it waits for.
 
-**The engine fallback, and what removing libtorrent costs.** `gx-torrent` is the default
-engine; the embedded libtorrent is optional at build time (`GEXTTO_LIBTORRENT=1`,
-`LibtorrentCompiled()`) and was historically its automatic fallback. The fallback no longer
+**The engine fallback, and what removing libtorrent costs.** `gx-torrent` is the
+engine; the embedded libtorrent is **no longer shipped** in releases — it survives
+only in a custom build made with `GEXTTO_LIBTORRENT=1` (`LibtorrentCompiled()`) and
+is in the process of removal. The fallback no longer
 depends on it (`engine_fallback.go`). When the active engine fails — a crash budget spent, or
 an activation refused at startup — Gextto walks a chain and persists the choice:
 
@@ -530,11 +531,11 @@ without a fallback. The cost, measured on the current tree:
   catalogue entries, manual rows and Appendix A, and the settings-count test.
 - **docs**: 12 documents mention libtorrent.
 
-Staged plan and effort: **(0)** the fallback above, already in place; **(1)** stop shipping
-the `libtorrent` variant from release/CI/`install.sh`, keeping the code (~0.5–1 day);
-**(2)** remove the backend, re-route the handlers, decide the two libtorrent-only features and
+Staged plan and effort: **(1)** stop shipping the `libtorrent` variant from
+release/CI/`install.sh`, keeping the code — done, the release is pure Go; **(2)** remove the
+backend, re-route the handlers and
 migrate `torrent_backend` (~3–6 days); **(3)** clean Makefile, workflows, scripts, docs
-(~1–2 days). Total ≈ 5–10 person-days. Gate: the stock is only cut once the replacement
+(~1–2 days). Total ≈ 4–8 person-days remaining. Gate: the stock is only cut once the replacement
 fallback is validated with a cross-engine conformance run (the same controlled torrent on
 gx-torrent and on the managed qBittorrent, asserting completion, piece integrity, resume,
 move and seed), so the removal cannot leave a single engine without a parachute.
