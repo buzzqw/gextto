@@ -123,62 +123,30 @@ equivalence is proved by execution: MSE handshake cross-check over `net.Pipe`,
 fast-set byte identity, resume-DB and RPC shapes byte-identical. How this state was
 reached is in the git history.
 
-### 1.5 In-depth performance check (CPU and RAM)
+### 1.5 Performance benchmarks (CPU, allocations, throughput)
 
 **Practice.** Periodically carry out an in-depth performance check of the application
 and the engine, optimising CPU and RAM: benchmarks (`go test -bench … -benchmem`),
-`pprof` CPU/heap profiles, footprint of the daemon and of `gx-torrent` (RSS,
+`pprof` CPU/heap profiles, the footprint of the daemon and of `gx-torrent` (RSS,
 goroutines, allocations), `make measure-seeding` for seeding. Constraint: every
 replacement or change must be **at least equivalent** to the previous one, if not
-better, and must be measured before and after. The numbers below are the current
-state (Intel N97); the figures a change replaced are kept where they justify the
-design.
+better, and must be measured before and after. The numbers below are the current state
+(Intel N97); the figures a change replaced are kept where they justify the design.
 
-**Engine logger.** Records below the handler threshold are discarded **before** being
-formatted, so at WARNING (normal daemon use) the `Debugf`/`Infof` calls on the hot
-paths allocate nothing: `BenchmarkEngineLoggerFiltered` vs `Forwarded` ~151 vs
-~785 ns/op, 3 vs 6 allocs. The handler still receives the same records (ERROR/WARNING;
-the swarm-noise counts are not lost).
-
-**IP filter.** The IPv4 rules, like the IPv6 ones, are stored as **sorted and merged
-intervals** with binary search (`sortMergeV4`/`v4Contains`); the pointer-based segment
-tree (`internal/blocklist/stree`) is gone. With the Aetherinox blocklist (34 MB,
-**666,763 rules** → 343,024 intervals): live heap **5.4 MB** (was 190 MB),
-`BenchmarkBlocked` **18.6 ns/op, 0 alloc/op** (the old lookup allocated a `map` and a
-slice on the path of every peer/tracker connection), `gx-torrent` RSS **~105 MB**
-(RssAnon 92 MB) against 295 MB with the same number of rules loaded. The 34 MB raw
-file stays in the daemon's cache (rare re-reading on manual reload): removable later.
-
-**SQLite page cache.** `cache_size` is SQLite's default **2 MB** (`sqlite.go`). On the
-real archive DB (510 MB, FTS5; `Archive.Browse` and `CountMatches`, tried up to 16 MB
-of cache) the latency is **flat**, within the noise even on the broad `MATCH`
-(~1.14 s), because it is the OS page cache that serves the file. `gexttod` RSS
-**67.6 MB** (RssAnon 46.2 MB) against 109.7 MB at the same uptime.
-
-**Torznab XML.** Answers are decoded with `Strict=false` plus the HTML entity table (a
-raw `&` or `&egrave;` in a scraped title no longer makes the whole answer unreadable)
-at no cost: on a 100-item answer, strict **2.24–2.32 ms/op, 642.8 kB/op,
-17179 allocs/op**, lenient **2.22–2.29 ms/op, 642.8 kB/op, 17179 allocs/op**.
-Prowlarr's aggregate search is JSON (one `json.Unmarshal` into a slice of small
-structs), outside the XML path.
-
-**Hot paths and the Phase 2 merge.** With the machine not idle, so the absolute numbers
-are higher than the quiet rounds but the same order, and no regression on the paths
-touched by the v2 swarm merge and the parser fuzzing:
+**Engine micro-benchmarks** (quiet machine / machine under load):
 
 | Benchmark | Result | Note |
 |---|---|---|
-| `BenchmarkPickerRarestSteady` | **143.5 µs/op, 0 B/op, 0 allocs/op** | piece picker, steady state (~102 µs when quiet) |
-| `BenchmarkTickUnchokeSeeding` | **1.64 µs/op, 896 B/op, 1 alloc/op** | unchoker tick (~1.3 µs when quiet) |
-| `BenchmarkBlocked` | **37.7 ns/op, 0 B/op, 0 allocs/op** | IP filter lookup (18.6 ns when quiet; load-dependent) |
-| `BenchmarkEngineLoggerFiltered` vs `Forwarded` | **175 vs 730 ns/op, 3 vs 6 allocs/op** | the below-threshold fast path avoids the message formatting |
-| `BenchmarkPrefillFromUnrelatedV2` | **1.58 µs/op, 128 B/op, 16 allocs/op** (16 candidates) | one-shot cost of the Phase 2 merge scan (allocation, resume, later trigger), **no steady-state path** |
+| `BenchmarkEngineLoggerFiltered` vs `Forwarded` | **151–175 vs 730–785 ns/op, 3 vs 6 allocs/op** | records below the handler threshold are discarded **before** being formatted, so at WARNING (normal daemon use) the `Debugf`/`Infof` calls on the hot paths allocate nothing; the handler still receives the same records (ERROR/WARNING, no swarm-noise count lost) |
+| `BenchmarkBlocked` (IP filter lookup) | **18.6 / 37.7 ns/op, 0 alloc/op** | sorted merged intervals with binary search; the old lookup allocated a `map` and a slice on the path of every peer/tracker connection |
+| `BenchmarkPickerRarestSteady` | **~105 / 143.5 µs/op, 0 allocs/op** | piece picker, steady state |
+| `BenchmarkTickUnchokeSeeding` | **1.3 / 1.64 µs/op, 1 alloc/op** | unchoker tick |
+| `BenchmarkPrefillFromUnrelatedV2` (16 candidates) | **1.49 / 1.58 µs/op, 128 B/op, 16 allocs/op** | one-shot cost of the Phase 2 merge scan (allocation, resume, later trigger), **no steady-state path** |
+| `BenchmarkMergeCandidatesUnrelated` (32 torrents) | **~98 ns/op, 0 allocs/op** | the filter the resume and later-trigger paths pay when nothing is reusable (§10.1) |
 
 Matching 16 unrelated v2 candidates costs ~1.6 µs once per torrent (one small map per
 candidate) and the picker/peer/piece-write paths are not touched, so the merge cannot
-affect seeding or download throughput. The cheap candidate filter that the resume and
-later-trigger paths pay when nothing is reusable is `BenchmarkMergeCandidatesUnrelated`:
-**~98 ns/op, 0 allocs/op** over 32 unrelated torrents (§10.1).
+affect seeding or download throughput.
 
 **The engine rewrite and `own-deps` are allocation-neutral.** The 54 engine benchmarks
 compared with `benchstat` (`-count=6`) show identical `B/op` and `allocs/op`
@@ -191,10 +159,7 @@ everywhere, `BenchmarkHasAnyNotIn` 3.77 → **3.15 ns/op** (−16%) and `Benchma
 `BenchmarkPrefillFromUnrelatedV2` 1.487 → 1.488 µs). The three benchmarks that a single
 pass had shown +13…17% slower (picker file-edge scan, interest update, prefill) are
 **run-to-run drift**: re-measured interleaved (`-count=20` each) they are statistically
-equal (p ≥ 0.15). Footprint at ~29 min uptime, real 34 MB blocklist and 4 active
-torrents: `gexttod` RSS 113 MB (RssAnon 89 MB), `gx-torrent` RSS 165 MB (RssAnon
-150 MB) — workload-dependent (peers/active pieces), within the range of the other
-rounds, with no new steady-state allocation.
+equal (p ≥ 0.15).
 
 **End-to-end, seeding and pipelining.** `make measure-seeding`, 2 MiB and 3 leechers:
 3.00× corpus, all done in 11 ms. `make measure-pipeline` in a local swarm, 8 MiB × 2:
@@ -205,18 +170,44 @@ process-wide: each leecher creates its connection before the next daemon replace
 the setting, so the distinct source addresses are kept and the swarm reaches the
 intended 3.00× (§6.6).
 
-**Real swarm and DHT.** `make measure-realswarm`, one run each: Big Buck Bunny 276 MB
-in 90 s (75 peers, 23 uTP, 0 SYN drops), Debian netinst 793 MB in 180 s (80 peers,
-18 uTP, 0 SYN drops), Ubuntu 24.04 1.08 GB in 180 s (85 peers, 31 uTP, 0 SYN drops).
-The first runs on 180 s windows recorded the uTP counters: Big Buck Bunny dials 342,
-accepts 57, RTO resends 2563, fast 557; Debian dials 277, accepts 14, RTO resends 932,
-fast 41; `utp_syn_drops` 0 in both (the 50-SYN backlog bound never binds) — real uTP
-peers connect, the downloads complete and the resends show loss on a noisy swarm
-without a storm. `make measure-dht` on the public network (4 min): **4262 nodes**,
-21.9% query success, 875 reflected pings, 2 peers found from a cold start. The adaptive
-RTO on the silent-peer harness (§4.3): the minimum-RTT floor removes a 6.2× resend
-storm and the per-connection backoff sends **50% fewer** resends than the fixed
-backoff.
+**Real swarm.** `make measure-realswarm`, one run each: Big Buck Bunny 276 MB in 90 s
+(75 peers, 23 uTP, 0 SYN drops), Debian netinst 793 MB in 180 s (80 peers, 18 uTP,
+0 SYN drops), Ubuntu 24.04 1.08 GB in 180 s (85 peers, 31 uTP, 0 SYN drops). Real uTP
+peers connect, the downloads complete and `utp_syn_drops` stays 0 (the 50-SYN backlog
+bound never binds); the resends show loss on a noisy swarm without a storm — Big Buck
+Bunny dials 342, accepts 57, RTO resends 2563, fast 557; Debian dials 277, accepts 14,
+RTO resends 932, fast 41.
+
+### 1.6 Resource footprint, robustness and network measurements
+
+**Memory footprint.** The IP filter stores the IPv4 rules, like the IPv6 ones, as
+**sorted and merged intervals** with binary search; the pointer-based segment tree
+(`internal/blocklist/stree`) is gone. With the Aetherinox blocklist (34 MB,
+**666,763 rules** → 343,024 intervals) the live heap is **5.4 MB** (was 190 MB) and
+`gx-torrent` RSS **~105 MB** (RssAnon 92 MB) against 295 MB, with the same number of
+rules loaded. The 34 MB raw file stays in the daemon's cache (rare re-reading on manual
+reload): removable later. The SQLite `cache_size` is SQLite's default **2 MB**
+(`sqlite.go`): on the real archive DB (510 MB, FTS5; `Archive.Browse` and
+`CountMatches`, tried up to 16 MB of cache) the latency is **flat**, within the noise
+even on the broad `MATCH` (~1.14 s), because it is the OS page cache that serves the
+file — `gexttod` RSS **67.6 MB** (RssAnon 46.2 MB) against 109.7 MB at the same uptime.
+At ~29 min uptime, real 34 MB blocklist and 4 active torrents: `gexttod` RSS 113 MB
+(RssAnon 89 MB), `gx-torrent` RSS 165 MB (RssAnon 150 MB) — workload-dependent
+(peers/active pieces), with no new steady-state allocation.
+
+**Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
+plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
+the whole answer unreadable), and the cost is nil: on a 100-item answer, strict
+**2.24–2.32 ms/op, 642.8 kB/op, 17179 allocs/op**, lenient **2.22–2.29 ms/op,
+642.8 kB/op, 17179 allocs/op**. Prowlarr's aggregate search is JSON (one
+`json.Unmarshal` into a slice of small structs), outside the XML path.
+
+**Network.**
+- **Adaptive RTO** (silent-peer harness, §4.3): the minimum-RTT floor removes a 6.2×
+  resend storm and the per-connection backoff sends **50% fewer** resends than the
+  fixed backoff;
+- **DHT on the public network** (`make measure-dht`, 4 min): **4262 nodes**, 21.9%
+  query success, 875 reflected pings, 2 peers found from a cold start.
 
 ---
 
