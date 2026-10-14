@@ -1200,28 +1200,59 @@ no client-side configuration. It is off by default and separate from the UI: it
 binds its own HTTP listener (`dlna-listen`, default `:8200`) and answers SSDP on
 UDP 1900 on the same interface.
 
-- **Discovery**: SSDP M-SEARCH replies and `ssdp:alive`/`byebye` NOTIFYs for a
-  `MediaServer:1` device.
-- **ContentDirectory:1** (`Browse`, `GetSystemUpdateID`, `GetSortCapabilities`)
-  and **ConnectionManager:1** (`GetProtocolInfo`); the root lists one container
-  per completed torrent with at least one media file, each container lists its
-  media files.
-- **Media**: `/res/<hash>/<file>` is served with HTTP Range by the same core as
-  the UI player (`serveTorrentFile`), so a file still downloading streams as soon
-  as the wanted pieces are there. Only **fully downloaded** torrents are exposed:
-  a renderer probes the container metadata (moov/cue) and a partial file plays
-  badly.
-- **Safety**: LAN only and no authentication, so it is off unless asked for; the
+- **Discovery**: SSDP M-SEARCH replies (only to LAN sources) and
+  `ssdp:alive`/`byebye` NOTIFYs for a `MediaServer:1` device (DLNA `DMS-1.50`);
+  `ssdp:alive` is sent twice at start and again every 15 minutes, before the
+  1800 s max-age runs out, so a TV switched on later still finds the server.
+  The device UUID is derived from the host name and the port: stable across
+  restarts (a TV keeps its bookmarks) and distinct for two instances.
+- **ContentDirectory:1**: `Browse` with both flags, **BrowseMetadata** (the
+  object itself: many TVs ask for the root first) and **BrowseDirectChildren**,
+  with **paging** (`StartingIndex`/`RequestedCount`, `TotalMatches` is the full
+  count) and UPnP errors 701 (no such object) / 402 (bad arguments);
+  `GetSystemUpdateID` and the Browse `UpdateID` change whenever the listing
+  changes, so a control point knows to refresh. **ConnectionManager:1**:
+  `GetProtocolInfo` lists every served type, plus `GetCurrentConnectionIDs` and
+  `GetCurrentConnectionInfo`. **GENA**: `SUBSCRIBE`/`UNSUBSCRIBE` on both
+  services are accepted (several TVs refuse a server whose event URL fails) and
+  the initial event is sent; the callback must be the subscriber's own address.
+- **Listing**: the root holds one container per completed torrent with at least
+  one playable (video/audio) file, sorted by name; a container lists its files
+  sorted by path. **Subtitles** (`.srt`, `.vtt`) are not items: one with the
+  name of a video in the same folder (`ep1.srt`, `ep1.it.srt` for `ep1.mkv`) is
+  attached to it as a `res` and as `sec:CaptionInfoEx` (Samsung/LG). The
+  listing is rebuilt at most every 5 seconds.
+- **Media**: `/res/<hash>/<file>` is served with HTTP Range (and HEAD) by the
+  same core as the UI player (`serveTorrentFile`), with the DLNA headers
+  `contentFeatures.dlna.org` (`DLNA.ORG_OP=01`: seeking by byte range) and
+  `transferMode.dlna.org`, spelled exactly as renderers expect. Links are built
+  on the Host the client used, so a multi-homed host hands each client a URL on
+  its own interface. Only **fully downloaded** torrents are exposed, because a
+  renderer probes the container metadata (moov/cue) and a partial file plays
+  badly, and `/res` serves **only** the files the listing offers: never an
+  incomplete torrent, a non-media file or a file not listed.
+- **Safety**: no authentication, so it is off unless asked for, and **LAN
+  only** by construction: every HTTP request and SSDP probe from an address
+  that is not loopback, private (RFC 1918/ULA) or link-local is refused (403),
+  so a port exposed by mistake does not hand the media to the internet. The
   settings are `dlna-enabled`, `dlna-listen`, `dlna-name` (daemon page in
-  standalone, Gextto options `gxtorrent_dlna*` in managed).
-- **Log**: the daemon log (and the page's log tab) records the server start/stop,
-  each M-SEARCH (throttled to once per source address per minute), each Browse
-  with the item count, and each media request with its Range.
+  standalone, Gextto options `gxtorrent_dlna*` in managed); a change to the
+  address or the name restarts the server within 10 seconds, and the settings
+  page shows the URL it is running on.
+- **Log**: the daemon log (and the page's log tab) records the server
+  start/stop/restart, each M-SEARCH, each Browse and each played file, all
+  throttled to once per client and object per minute (a player issues a Range
+  request per seek).
+- **Not covered**: transcoding, thumbnails, search, and the Microsoft
+  `X_MS_MediaReceiverRegistrar` that Xbox/Windows Media Player require.
 
 The media `Content-Type` comes from the file extension (`video/mp4`,
 `video/x-matroska`, `audio/flac`, …); a stream also sets
-`Content-Disposition: inline` and answers HEAD, so a browser plays it instead of
-downloading it.
+`Content-Disposition: inline` (RFC 6266, `filename*` for non-ASCII names) and
+answers HEAD without moving the engine's stream window, so a browser plays it
+instead of downloading it. Concurrent streams are counted **per file**: closing
+one leaves the window of another reader of the same file, and a stream of
+another file of the same torrent does not keep a closed file's window alive.
 
 ## Statistics
 

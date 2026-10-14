@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -68,25 +69,33 @@ func isMediaFile(name string) bool {
 	return ok
 }
 
-// beginStream records one active stream of a torrent.
-func (d *Daemon) beginStream(hash string) {
+// streamKey identifies one file of a torrent: the engine windows are per file.
+func streamKey(hash string, fileIndex int) string {
+	return hash + "/" + strconv.Itoa(fileIndex)
+}
+
+// beginStream records one active stream of a torrent file.
+func (d *Daemon) beginStream(hash string, fileIndex int) {
+	key := streamKey(hash, fileIndex)
 	d.streamMu.Lock()
 	if d.activeStreams == nil {
 		d.activeStreams = map[string]int{}
 	}
-	d.activeStreams[hash]++
+	d.activeStreams[key]++
 	d.streamMu.Unlock()
 }
 
-// endStream drops one active stream and reports whether it was the last, so the
-// caller clears the engine window only when nobody else needs it.
-func (d *Daemon) endStream(hash string) (last bool) {
+// endStream drops one active stream of a file and reports whether it was the
+// last, so the caller clears that file's engine windows only when nobody else
+// reads it.
+func (d *Daemon) endStream(hash string, fileIndex int) (last bool) {
+	key := streamKey(hash, fileIndex)
 	d.streamMu.Lock()
-	if d.activeStreams[hash] <= 1 {
-		delete(d.activeStreams, hash)
+	if d.activeStreams[key] <= 1 {
+		delete(d.activeStreams, key)
 		last = true
 	} else {
-		d.activeStreams[hash]--
+		d.activeStreams[key]--
 	}
 	d.streamMu.Unlock()
 	return last
@@ -135,18 +144,6 @@ func (d *Daemon) serveTorrentFile(w http.ResponseWriter, r *http.Request, hash s
 		return
 	}
 
-	// The bytes the player needs now are prioritised first; the readahead just
-	// after, so the next pieces are ready while it reads. Closing one of
-	// several concurrent streams leaves the window the others still use.
-	d.beginStream(hash)
-	defer func() {
-		if d.endStream(hash) {
-			t.SetFileStreamWindow(fileIndex, 0, 0)
-			t.SetFileReadaheadWindow(fileIndex, 0, 0)
-		}
-	}()
-	setStreamWindows(t, fileIndex, start)
-
 	f, err := os.Open(path)
 	if err != nil {
 		http.Error(w, "file not readable", http.StatusInternalServerError)
@@ -157,7 +154,7 @@ func (d *Daemon) serveTorrentFile(w http.ResponseWriter, r *http.Request, hash s
 	w.Header().Set("Content-Type", mediaContentType(file.Path()))
 	w.Header().Set("Accept-Ranges", "bytes")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Disposition", "inline; filename=\""+sanitizeFilename(file.Path())+"\"")
+	w.Header().Set("Content-Disposition", contentDisposition(file.Path()))
 	if partial {
 		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, start+length-1, size))
 		w.Header().Set("Content-Length", strconv.FormatInt(length, 10))
@@ -167,20 +164,32 @@ func (d *Daemon) serveTorrentFile(w http.ResponseWriter, r *http.Request, hash s
 		w.WriteHeader(http.StatusOK)
 	}
 	if r.Method == http.MethodHead {
-		return
+		return // a probe: no data, so no engine window either
 	}
 
+	// The bytes the player needs now are prioritised first; the readahead just
+	// after, so the next pieces are ready while it reads. Closing one of
+	// several concurrent streams of the file leaves the window the others use.
+	d.beginStream(hash, fileIndex)
+	defer func() {
+		if d.endStream(hash, fileIndex) {
+			t.SetFileStreamWindow(fileIndex, 0, 0)
+			t.SetFileReadaheadWindow(fileIndex, 0, 0)
+		}
+	}()
+	setStreamWindows(t, fileIndex, start)
 	d.streamRange(r.Context(), w, t, fileIndex, f, start, length)
 }
 
-// sanitizeFilename strips the path and characters that would break a
-// Content-Disposition header.
-func sanitizeFilename(name string) string {
-	name = filepath.Base(name)
-	name = strings.ReplaceAll(name, "\"", "")
-	name = strings.ReplaceAll(name, "\r", "")
-	name = strings.ReplaceAll(name, "\n", "")
-	return name
+// contentDisposition renders "inline" with the file's base name. The name is
+// encoded by mime.FormatMediaType (RFC 2231 filename* for non-ASCII names), so
+// quotes, control characters or accents cannot break the header.
+func contentDisposition(name string) string {
+	base := filepath.Base(filepath.FromSlash(name))
+	if v := mime.FormatMediaType("inline", map[string]string{"filename": base}); v != "" {
+		return v
+	}
+	return "inline"
 }
 
 // setStreamWindows tells the engine which pieces the player needs now (the next

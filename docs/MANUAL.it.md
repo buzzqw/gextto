@@ -359,7 +359,11 @@ bloccata, già presente o inferiore al file archiviato.
   così puoi iniziare a guardare prima che il download finisca. Lo stesso motore
   di streaming serve il **media server DLNA/UPnP** (opzione *gx-torrent — server
   DLNA/UPnP*): TV e console sulla rete locale vedono i media **completati** senza
-  configurare percorsi. È solo LAN, senza autenticazione, e disattivato di default.
+  configurare percorsi; i sottotitoli `.srt`/`.vtt` con lo stesso nome del video
+  vengono agganciati al video. È disattivato di default e non ha autenticazione:
+  per questo risponde **solo** ai dispositivi della rete locale (le richieste da
+  indirizzi pubblici sono rifiutate) e serve solo i media elencati. Nella pagina
+  delle impostazioni di gx-torrent compare l'indirizzo su cui è attivo.
 - Quando usi **Sposta storage**, il log registra richiesta, destinazione e
   accettazione del comando; l'esito finale viene scritto quando libtorrent
   completa o rifiuta lo spostamento. Con **Check** il log distingue comando

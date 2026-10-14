@@ -1618,24 +1618,32 @@ hash serving → done**.
   browser plays the stream instead of downloading it, and answers **HEAD**;
 - keeps a shared **serveTorrentFile** core, reused by the UI player and by the
   DLNA server;
-- refcounts the concurrent streams per torrent (`beginStream`/`endStream`), so a
-  player closing does not clear the engine stream window another still needs.
+- refcounts the concurrent streams **per file** (`beginStream`/`endStream`;
+  the engine windows are per file), so a player closing does not clear the
+  stream window another reader of the same file still needs; a HEAD probe does
+  not touch the windows, and `Content-Disposition` is RFC 6266-encoded.
 
-Tests: `TestMediaContentType`, `TestSanitizeFilename`, `TestStreamRefcount`,
+Tests: `TestMediaContentType`, `TestContentDisposition`, `TestStreamRefcount`,
 `TestParseByteRange`. No data-path change.
 
 ### 12.2 DLNA/UPnP media server (new)
 
 `cmd/gx-torrent/dlna.go` + `dlna_ssdp.go`: an **opt-in** DLNA/UPnP AV media
 server that exposes the **completed** torrents' media to a TV/console on the
-LAN. SSDP (M-SEARCH replies, alive/byebye) + ContentDirectory:1 (`Browse`,
-`GetSystemUpdateID`, `GetSortCapabilities`) + ConnectionManager:1
-(`GetProtocolInfo`); media served with HTTP Range by the shared core. Off by
-default; LAN only, no authentication. Settings `dlna-enabled`, `dlna-listen`,
-`dlna-name`: the **daemon page** in standalone, the **Gextto** options
-`gxtorrent_dlna*` in managed (passed as flags/env), tooltips and six languages,
-manuals updated (Appendix A + a prose note). Tests: DIDL for root/container,
-device description, SOAP Browse, SSDP parse/match/reply, a rejected media path.
+LAN. SSDP (M-SEARCH replies, alive at start and every 15 min, byebye) +
+ContentDirectory:1 (`Browse` with BrowseMetadata/BrowseDirectChildren and
+paging, a content-derived `SystemUpdateID`) + ConnectionManager:1 + GENA
+`SUBSCRIBE` with the initial event; media served with HTTP Range by the shared
+core plus the DLNA `contentFeatures`/`transferMode` headers; subtitles attached
+to the video with the same name (`res` + `sec:CaptionInfoEx`). Off by default,
+no authentication, **LAN-only by construction** (HTTP and SSDP from a
+non-local address are refused) and `/res` serves only the files the listing
+offers. Settings `dlna-enabled`, `dlna-listen`, `dlna-name`: the **daemon
+page** in standalone (with the running URL shown), the **Gextto** options
+`gxtorrent_dlna*` in managed (passed as flags/env); an address or name change
+restarts the server. Verified end to end against a real daemon (SSDP
+discovery, Browse, Range 206, a non-offered file refused). Open: transcoding,
+thumbnails, search, Xbox/WMP (`X_MS_MediaReceiverRegistrar`).
 
 ### 12.3 Choking/seeding campaign
 

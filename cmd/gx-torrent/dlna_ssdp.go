@@ -7,6 +7,7 @@ package main
 import (
 	"net"
 	"strings"
+	"time"
 )
 
 // ssdpSTs are the search targets a media server answers to, in the order a
@@ -54,6 +55,7 @@ func (s *dlnaServer) ssdpResponses(st string) []string {
 		}
 		out = append(out, "HTTP/1.1 200 OK\r\n"+
 			"CACHE-CONTROL: max-age=1800\r\n"+
+			"DATE: "+time.Now().UTC().Format(http1Date)+"\r\n"+
 			"EXT:\r\n"+
 			"LOCATION: "+s.base+"/rootDesc.xml\r\n"+
 			"SERVER: Linux/1.0 UPnP/1.0 gx-torrent/1.0\r\n"+
@@ -100,8 +102,31 @@ func (s *dlnaServer) startSSDP(ip net.IP) error {
 		s.ssdpDst = dst
 	}
 	go s.ssdpLoop(conn)
-	s.sendAlive()
+	go s.aliveLoop()
 	return nil
+}
+
+// aliveLoop announces the server at start (twice: UDP multicast is lossy) and
+// again every dlnaAliveEvery, before the advertised max-age runs out, until the
+// server closes.
+func (s *dlnaServer) aliveLoop() {
+	s.sendAlive()
+	select {
+	case <-s.closeC:
+		return
+	case <-time.After(time.Second):
+	}
+	s.sendAlive()
+	ticker := time.NewTicker(dlnaAliveEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-s.closeC:
+			return
+		case <-ticker.C:
+			s.sendAlive()
+		}
+	}
 }
 
 // ssdpLoop reads probes and answers them from a fresh unicast socket, so the
@@ -111,12 +136,7 @@ func (s *dlnaServer) ssdpLoop(conn net.PacketConn) {
 	for {
 		n, from, err := conn.ReadFrom(buf)
 		if err != nil {
-			select {
-			case <-s.closeC:
-				return
-			default:
-			}
-			return
+			return // closed with the server, or a fatal socket error
 		}
 		headers, ok := parseMSearch(buf[:n])
 		if !ok {
@@ -127,7 +147,7 @@ func (s *dlnaServer) ssdpLoop(conn net.PacketConn) {
 			continue
 		}
 		fromAddr, ok := from.(*net.UDPAddr)
-		if !ok {
+		if !ok || !dlnaLocalAddr(fromAddr.IP) {
 			continue
 		}
 		s.logSearch(fromAddr.IP.String(), st)
@@ -185,6 +205,9 @@ func (s *dlnaServer) notify(nt string) {
 		_, _ = out.Write([]byte(msg))
 	}
 }
+
+// http1Date is the RFC 1123 date format of HTTP headers.
+const http1Date = "Mon, 02 Jan 2006 15:04:05 GMT"
 
 // interfaceForIP returns the network interface that owns ip, or nil (the
 // default) when it is not found or ip is loopback.

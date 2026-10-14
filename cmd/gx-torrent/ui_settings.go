@@ -336,6 +336,11 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{DLNA_ENABLED}}", checkedIf(boolSetting(dlnaEnabledKey)))
 	repl("{{DLNA_LISTEN}}", get(dlnaListenKey))
 	repl("{{DLNA_NAME}}", get(dlnaNameKey))
+	dlnaStatus := "Media server off."
+	if base := d.dlnaStatusURL(); base != "" {
+		dlnaStatus = "Media server running at <code>" + html.EscapeString(base) + "</code>"
+	}
+	repl("{{DLNA_STATUS}}", dlnaStatus)
 
 	repl("{{LANG_OPTIONS}}", languageOptions(store.Get("lang", "")))
 	repl("{{NOTIFY_URL}}", get("notify-url"))

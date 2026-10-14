@@ -2,19 +2,26 @@ package main
 
 // dlna.go implements an opt-in DLNA/UPnP AV media server for the daemon: a TV
 // or console on the LAN can browse the completed torrents' media files and
-// play them. It speaks SSDP (discovery) and the UPnP AV ContentDirectory
-// (browse); the media themselves are served with HTTP Range by the same core
-// as the UI player (stream.go), so a file still being downloaded streams as
-// soon as the wanted pieces are there. It is LAN-only and off by default.
+// play them. It speaks SSDP (discovery, dlna_ssdp.go), the UPnP AV
+// ContentDirectory:1 (Browse with BrowseMetadata/BrowseDirectChildren and
+// paging) and ConnectionManager:1, accepts GENA subscriptions, and serves the
+// media with HTTP Range by the same core as the UI player (stream.go) plus the
+// DLNA headers (contentFeatures/transferMode) the renderers expect. Subtitles
+// next to a video (same name) are attached to it, not listed as items. It is
+// LAN-only (every request from a non-local address is refused), exposes only
+// the media of completed torrents, and is off by default.
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
 	"fmt"
+	"hash/fnv"
 	"html"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"sort"
@@ -34,9 +41,19 @@ const (
 	dlnaContentDir    = "urn:schemas-upnp-org:service:ContentDirectory:1"
 	dlnaConnMgr       = "urn:schemas-upnp-org:service:ConnectionManager:1"
 	dlnaDeviceType    = "urn:schemas-upnp-org:device:MediaServer:1"
-	// dlnaClassUnknownContainer/title sizing are constants so the DIDL is
-	// stable and testable.
-	dlnaRootParent = "-1"
+	// dlnaRootID is the ContentDirectory root; its parent is "-1".
+	dlnaRootID = "0"
+	// dlnaFeatures are the DLNA content features of every resource: Range
+	// seeking (OP=01), not transcoded (CI=0), streaming + background transfer
+	// and DLNA 1.5 (FLAGS).
+	dlnaFeatures = "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000"
+	// dlnaLibraryTTL bounds how stale the media listing may be: every media
+	// request checks it, and players issue many Range requests.
+	dlnaLibraryTTL = 5 * time.Second
+	// dlnaAliveEvery re-announces the server before the 1800 s SSDP max-age
+	// expires, so a TV that missed the first NOTIFY still finds it.
+	dlnaAliveEvery = 15 * time.Minute
+	dlnaCheckEvery = 10 * time.Second
 )
 
 // dlnaEnabled reports whether the media server is on: settings.json wins when
@@ -77,37 +94,66 @@ func (d *Daemon) dlnaServerName() string {
 	return dlnaDefaultName
 }
 
+// dlnaStatusURL is the base URL of the running media server, "" when it is
+// off (shown on the settings page).
+func (d *Daemon) dlnaStatusURL() string {
+	d.dlnaStatusMu.Lock()
+	defer d.dlnaStatusMu.Unlock()
+	return d.dlnaStatus
+}
+
+func (d *Daemon) setDLNAStatus(base string) {
+	d.dlnaStatusMu.Lock()
+	d.dlnaStatus = base
+	d.dlnaStatusMu.Unlock()
+}
+
 // runDLNA keeps the media server in step with the settings: it starts it when
-// enabled and stops it when disabled, without needing the settings handler to
-// know about it. Runs beside the queue loop.
+// enabled, stops it when disabled and restarts it when the bind address or the
+// name change, without the settings handler having to know about it.
 func (d *Daemon) runDLNA(stop <-chan struct{}) {
 	var srv *dlnaServer
-	apply := func() {
-		if d.dlnaEnabled() {
-			if srv == nil {
-				started, err := d.startDLNA()
-				if err != nil {
-					logf("DLNA: cannot start the media server: %v", err)
-					return
-				}
-				srv = started
-				logf("DLNA: media server «%s» listening on %s (HTTP %s)", srv.name, srv.httpAddr, srv.baseURL())
-			}
-		} else if srv != nil {
+	var running string // listen+name of srv
+	shutdown := func() {
+		if srv != nil {
 			srv.Close()
 			srv = nil
-			logf("DLNA: media server stopped")
+			running = ""
+			d.setDLNAStatus("")
 		}
 	}
+	apply := func() {
+		if !d.dlnaEnabled() {
+			if srv != nil {
+				shutdown()
+				logf("DLNA: media server stopped")
+			}
+			return
+		}
+		want := d.dlnaListen() + "\x00" + d.dlnaServerName()
+		if srv != nil && want == running {
+			return
+		}
+		if srv != nil {
+			shutdown()
+			logf("DLNA: settings changed, restarting the media server")
+		}
+		started, err := d.startDLNA()
+		if err != nil {
+			logf("DLNA: cannot start the media server: %v", err)
+			return
+		}
+		srv, running = started, want
+		d.setDLNAStatus(srv.base)
+		logf("DLNA: media server «%s» listening on %s (%s)", srv.name, srv.httpAddr, srv.base)
+	}
 	apply()
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(dlnaCheckEvery)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-stop:
-			if srv != nil {
-				srv.Close()
-			}
+			shutdown()
 			return
 		case <-ticker.C:
 			apply()
@@ -121,45 +167,53 @@ type dlnaServer struct {
 	name     string
 	uuid     string
 	httpSrv  *http.Server
-	listener net.Listener
 	httpAddr string
-	// base is the http://ip:port the LOCATION and the media URLs use.
+	// base is the http://ip:port SSDP advertises in LOCATION. HTTP replies
+	// use the Host the client reached instead (dlnaBaseFor), so a multi-homed
+	// host hands each client a URL on the interface it used.
 	base string
 	// browse returns the media listing; nil uses the daemon's torrents. It is
-	// a field so tests can drive the DIDL without a live session.
-	browse  func() map[string][]dlnaEntry
+	// a field so tests can drive the server without a live session.
+	browse  func() []dlnaFolder
 	ssdp    net.PacketConn
 	ssdpDst *net.UDPAddr
 	closeC  chan struct{}
 	once    sync.Once
+	// lib caches the listing for dlnaLibraryTTL.
+	libMu sync.Mutex
+	lib   *dlnaLibrary
+	libAt time.Time
 	// seen records the last SSDP search logged per source address, so a chatty
 	// control point does not fill the log.
 	seenMu sync.Mutex
 	seen   map[string]time.Time
-}
-
-// logActivity records one DLNA action in the daemon log.
-func (s *dlnaServer) logActivity(format string, args ...any) {
-	logf("DLNA: "+format, args...)
+	// served throttles the media log to one line per file per minute: a
+	// player issues a Range request per seek or buffer refill.
+	servedMu sync.Mutex
+	served   map[string]time.Time
 }
 
 // logSearch logs an M-SEARCH, at most once per source address per minute.
 func (s *dlnaServer) logSearch(ip, st string) {
+	if s.throttle(&s.seenMu, &s.seen, ip) {
+		logf("DLNA: search from %s for %s", ip, st)
+	}
+}
+
+// throttle reports whether key was not seen in the last minute (and records
+// it). The map is reset when it grows, so it stays bounded.
+func (s *dlnaServer) throttle(mu *sync.Mutex, seen *map[string]time.Time, key string) bool {
 	now := time.Now()
-	s.seenMu.Lock()
-	if s.seen == nil {
-		s.seen = map[string]time.Time{}
+	mu.Lock()
+	defer mu.Unlock()
+	if *seen == nil || len(*seen) > 256 {
+		*seen = map[string]time.Time{}
 	}
-	if last, ok := s.seen[ip]; ok && now.Sub(last) < time.Minute {
-		s.seenMu.Unlock()
-		return
+	if last, ok := (*seen)[key]; ok && now.Sub(last) < time.Minute {
+		return false
 	}
-	if len(s.seen) > 256 {
-		s.seen = map[string]time.Time{}
-	}
-	s.seen[ip] = now
-	s.seenMu.Unlock()
-	logf("DLNA: search from %s for %s", ip, st)
+	(*seen)[key] = now
+	return true
 }
 
 // startDLNA binds the HTTP listener and the SSDP socket and starts both.
@@ -168,19 +222,19 @@ func (d *Daemon) startDLNA() (*dlnaServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	port := ln.Addr().(*net.TCPAddr).Port
-	ip := dlnaLocalIP(ln.Addr().(*net.TCPAddr).IP)
+	addr := ln.Addr().(*net.TCPAddr)
+	ip := dlnaLocalIP(addr.IP)
+	name := d.dlnaServerName()
 	srv := &dlnaServer{
 		d:        d,
-		name:     d.dlnaServerName(),
-		uuid:     dlnaUUID(),
-		listener: ln,
+		name:     name,
+		uuid:     dlnaUUID(addr.Port),
 		httpAddr: ln.Addr().String(),
-		base:     fmt.Sprintf("http://%s", net.JoinHostPort(ip.String(), strconv.Itoa(port))),
+		base:     "http://" + net.JoinHostPort(ip.String(), strconv.Itoa(addr.Port)),
 		closeC:   make(chan struct{}),
 	}
 	srv.httpSrv = &http.Server{Handler: srv.handler(), ReadHeaderTimeout: 10 * time.Second}
-	go srv.httpSrv.Serve(ln)
+	go func() { _ = srv.httpSrv.Serve(ln) }()
 
 	// SSDP: join the multicast group on the interface that owns the LAN IP and
 	// answer M-SEARCH. A failure here is not fatal: the server still works for
@@ -191,11 +245,9 @@ func (d *Daemon) startDLNA() (*dlnaServer, error) {
 	return srv, nil
 }
 
-// baseURL is the root the LOCATION and the media URLs use.
-func (s *dlnaServer) baseURL() string { return s.base }
-
 // handler builds the HTTP mux: the device/service descriptions, the SOAP
-// control endpoints and the media route.
+// control endpoints, the GENA event endpoints and the media route, all behind
+// the LAN-only guard.
 func (s *dlnaServer) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /rootDesc.xml", s.handleRootDesc)
@@ -203,8 +255,30 @@ func (s *dlnaServer) handler() http.Handler {
 	mux.HandleFunc("GET /ConnectionManager.xml", s.handleConnMgrSCPD)
 	mux.HandleFunc("POST /control/ContentDirectory", s.handleContentDirControl)
 	mux.HandleFunc("POST /control/ConnectionManager", s.handleConnMgrControl)
-	mux.HandleFunc("GET /res/{hash}/{file}", s.handleMedia)
-	return mux
+	mux.HandleFunc("SUBSCRIBE /event/{service}", s.handleSubscribe)
+	mux.HandleFunc("UNSUBSCRIBE /event/{service}", s.handleUnsubscribe)
+	mux.HandleFunc("GET /res/{hash}/{file}", s.handleMedia) // GET also matches HEAD
+	return dlnaLANOnly(mux)
+}
+
+// dlnaLANOnly refuses every request whose source is not on a local network:
+// the server has no authentication, so a port forwarded or exposed by mistake
+// must not hand the media to the internet.
+func dlnaLANOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil || !dlnaLocalAddr(net.ParseIP(host)) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// dlnaLocalAddr reports whether ip is loopback, private (RFC 1918 / ULA) or
+// link-local: the addresses a LAN media client can have.
+func dlnaLocalAddr(ip net.IP) bool {
+	return ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast())
 }
 
 // Close shuts the HTTP server and the SSDP socket down.
@@ -228,7 +302,7 @@ func dlnaLocalIP(bound net.IP) net.IP {
 	if bound != nil && !bound.IsUnspecified() {
 		return bound
 	}
-	if conn, err := net.Dial("udp", "8.8.8.8:80"); err == nil {
+	if conn, err := net.Dial("udp4", "8.8.8.8:80"); err == nil {
 		ip := conn.LocalAddr().(*net.UDPAddr).IP
 		conn.Close()
 		if ip != nil && !ip.IsUnspecified() {
@@ -238,22 +312,234 @@ func dlnaLocalIP(bound net.IP) net.IP {
 	return net.ParseIP("127.0.0.1")
 }
 
-// dlnaQuery renders a UUID-shaped device serial from the host and the port, so
-// two instances on one host differ and it stays stable across restarts.
-func dlnaUUID() string {
+// dlnaUUID renders a UUID-shaped device id from the host name and the port, so
+// two instances on one host differ and it stays stable across restarts (a TV
+// keeps its bookmarks).
+func dlnaUUID(port int) string {
 	host, _ := os.Hostname()
-	var sum uint32 = 2166136261
-	for i := 0; i < len(host); i++ {
-		sum = (sum ^ uint32(host[i])) * 16777619
-	}
-	return fmt.Sprintf("uuid:6b7a9c2e-3f1d-4a5b-8c9d-%012x", sum)
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(host))
+	_, _ = h.Write([]byte{byte(port >> 8), byte(port)})
+	return fmt.Sprintf("uuid:6b7a9c2e-3f1d-4a5b-8c9d-%012x", h.Sum64()&0xffffffffffff)
 }
 
-// handleMedia serves one media file of a torrent with Range, LAN, no auth.
+// dlnaBaseFor is the base URL for the links in an HTTP reply: the Host the
+// client used (the right interface on a multi-homed host), else the
+// advertised base.
+func (s *dlnaServer) dlnaBaseFor(r *http.Request) string {
+	if r != nil {
+		if host := strings.TrimSpace(r.Host); host != "" && !strings.ContainsAny(host, "/\\\"<> ") {
+			return "http://" + host
+		}
+	}
+	return s.base
+}
+
+// ---------------------------------------------------------------------------
+// Media listing
+// ---------------------------------------------------------------------------
+
+// dlnaEntry is one playable media file offered to a renderer.
+type dlnaEntry struct {
+	hash      string
+	fileIndex int
+	name      string // path inside the torrent
+	size      int64
+	mime      string
+	video     bool
+	subs      []dlnaSub // subtitles next to a video
+}
+
+// dlnaSub is a subtitle file attached to a video.
+type dlnaSub struct {
+	fileIndex int
+	mime      string
+	kind      string // srt, vtt
+}
+
+// dlnaFolder is one completed torrent with at least one playable file.
+type dlnaFolder struct {
+	hash  string
+	name  string
+	items []dlnaEntry
+}
+
+// dlnaLibrary is the listing indexed for Browse and for the media guard.
+type dlnaLibrary struct {
+	folders []dlnaFolder // sorted by name
+	byHash  map[string]int
+	// files are the (hash, index) pairs /res may serve: items and subtitles.
+	files map[dlnaFileKey]string // -> mime
+	// updateID changes whenever the listing changes (SystemUpdateID).
+	updateID uint32
+}
+
+type dlnaFileKey struct {
+	hash  string
+	index int
+}
+
+// dlnaPlayable reports whether a MIME type is something a renderer plays.
+func dlnaPlayable(mime string) bool {
+	return strings.HasPrefix(mime, "video/") || strings.HasPrefix(mime, "audio/")
+}
+
+// dlnaSubtitleKind returns srt/vtt for a subtitle MIME type, "" otherwise.
+func dlnaSubtitleKind(mime string) string {
+	switch mime {
+	case "application/x-subrip":
+		return "srt"
+	case "text/vtt":
+		return "vtt"
+	}
+	return ""
+}
+
+// dlnaFile is the minimal view of a torrent file the listing needs.
+type dlnaFile struct {
+	path   string
+	length int64
+}
+
+// dlnaFolderFor builds the folder of one completed torrent: its playable files
+// sorted by path, each video with the subtitles that share its name (ep1.mkv
+// takes ep1.srt and ep1.it.srt from the same directory). ok is false when the
+// torrent has no playable file.
+func dlnaFolderFor(hash, name string, files []dlnaFile) (dlnaFolder, bool) {
+	type subFile struct {
+		index      int
+		dir, stem  string
+		mime, kind string
+	}
+	var subs []subFile
+	folder := dlnaFolder{hash: hash, name: name}
+	for i, f := range files {
+		mime := mediaContentType(f.path)
+		if kind := dlnaSubtitleKind(mime); kind != "" {
+			dir, file := path.Split(f.path)
+			subs = append(subs, subFile{index: i, dir: dir, stem: strings.ToLower(strings.TrimSuffix(file, path.Ext(file))), mime: mime, kind: kind})
+			continue
+		}
+		if !dlnaPlayable(mime) {
+			continue
+		}
+		folder.items = append(folder.items, dlnaEntry{
+			hash: hash, fileIndex: i, name: f.path, size: f.length,
+			mime: mime, video: strings.HasPrefix(mime, "video/"),
+		})
+	}
+	if len(folder.items) == 0 {
+		return folder, false
+	}
+	for i := range folder.items {
+		e := &folder.items[i]
+		if !e.video {
+			continue
+		}
+		dir, file := path.Split(e.name)
+		stem := strings.ToLower(strings.TrimSuffix(file, path.Ext(file)))
+		for _, s := range subs {
+			if s.dir == dir && (s.stem == stem || strings.HasPrefix(s.stem, stem+".")) {
+				e.subs = append(e.subs, dlnaSub{fileIndex: s.index, mime: s.mime, kind: s.kind})
+			}
+		}
+	}
+	sort.SliceStable(folder.items, func(a, b int) bool {
+		return strings.ToLower(folder.items[a].name) < strings.ToLower(folder.items[b].name)
+	})
+	return folder, true
+}
+
+// newDLNALibrary indexes a listing: folders sorted by name, the servable files
+// and an update id derived from the content.
+func newDLNALibrary(folders []dlnaFolder) *dlnaLibrary {
+	sort.SliceStable(folders, func(a, b int) bool {
+		na, nb := strings.ToLower(folders[a].name), strings.ToLower(folders[b].name)
+		if na != nb {
+			return na < nb
+		}
+		return folders[a].hash < folders[b].hash
+	})
+	lib := &dlnaLibrary{folders: folders, byHash: make(map[string]int, len(folders)), files: map[dlnaFileKey]string{}}
+	h := fnv.New32a()
+	for i, f := range folders {
+		lib.byHash[f.hash] = i
+		fmt.Fprintf(h, "%s|%s|", f.hash, f.name)
+		for _, e := range f.items {
+			lib.files[dlnaFileKey{e.hash, e.fileIndex}] = e.mime
+			fmt.Fprintf(h, "%d:%d:%s|", e.fileIndex, e.size, e.name)
+			for _, s := range e.subs {
+				lib.files[dlnaFileKey{e.hash, s.fileIndex}] = s.mime
+				fmt.Fprintf(h, "s%d|", s.fileIndex)
+			}
+		}
+	}
+	// 0 is avoided: some control points treat it as "never changed".
+	lib.updateID = h.Sum32() | 1
+	return lib
+}
+
+// daemonListing lists the completed torrents with playable media. Only fully
+// downloaded torrents are exposed: a renderer probes the container metadata
+// (moov/cue) at both ends and a partial file plays badly.
+func (s *dlnaServer) daemonListing() []dlnaFolder {
+	var out []dlnaFolder
+	if s.d == nil || s.d.session == nil {
+		return out
+	}
+	for _, t := range s.d.session.ListTorrents() {
+		st := t.Stats()
+		if st.Bytes.Incomplete > 0 || st.Bytes.Total == 0 {
+			continue
+		}
+		files, err := t.Files()
+		if err != nil {
+			continue
+		}
+		list := make([]dlnaFile, len(files))
+		for i, f := range files {
+			list[i] = dlnaFile{path: f.Path(), length: f.Length()}
+		}
+		if folder, ok := dlnaFolderFor(t.InfoHash().String(), t.Name(), list); ok {
+			out = append(out, folder)
+		}
+	}
+	return out
+}
+
+// library returns the current listing, rebuilt at most every dlnaLibraryTTL.
+func (s *dlnaServer) library() *dlnaLibrary {
+	s.libMu.Lock()
+	defer s.libMu.Unlock()
+	if s.lib != nil && time.Since(s.libAt) < dlnaLibraryTTL {
+		return s.lib
+	}
+	var folders []dlnaFolder
+	if s.browse != nil {
+		folders = s.browse()
+	} else {
+		folders = s.daemonListing()
+	}
+	s.lib, s.libAt = newDLNALibrary(folders), time.Now()
+	return s.lib
+}
+
+// ---------------------------------------------------------------------------
+// Media
+// ---------------------------------------------------------------------------
+
+// handleMedia serves one media (or subtitle) file of a completed torrent with
+// Range. Only the files the listing offers are served: the route has no
+// authentication, so it must not reach incomplete torrents or other files.
 func (s *dlnaServer) handleMedia(w http.ResponseWriter, r *http.Request) {
-	hash := strings.TrimSpace(r.PathValue("hash"))
+	hash := strings.ToLower(strings.TrimSpace(r.PathValue("hash")))
 	fileIndex, err := strconv.Atoi(strings.TrimSpace(r.PathValue("file")))
 	if err != nil || fileIndex < 0 || len(hash) != 40 {
+		http.NotFound(w, r)
+		return
+	}
+	mime, ok := s.library().files[dlnaFileKey{hash, fileIndex}]
+	if !ok || s.d == nil {
 		http.NotFound(w, r)
 		return
 	}
@@ -265,64 +551,37 @@ func (s *dlnaServer) handleMedia(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if rangeHeader := strings.TrimSpace(r.Header.Get("Range")); rangeHeader != "" {
-		s.logActivity("serve %s file %d (%s)", hash, fileIndex, rangeHeader)
+	if r.Method == http.MethodGet && s.throttle(&s.servedMu, &s.served, r.RemoteAddr+hash+strconv.Itoa(fileIndex)) {
+		logf("DLNA: %s plays %s file %d", r.RemoteAddr, hash, fileIndex)
+	}
+	// The DLNA headers are set with their exact spelling (not canonicalised):
+	// some renderers match them case-sensitively.
+	if dlnaSubtitleKind(mime) != "" {
+		w.Header()["transferMode.dlna.org"] = []string{"Interactive"}
 	} else {
-		s.logActivity("serve %s file %d (whole file)", hash, fileIndex)
+		w.Header()["transferMode.dlna.org"] = []string{"Streaming"}
+		w.Header()["contentFeatures.dlna.org"] = []string{dlnaFeatures}
 	}
 	d.serveTorrentFile(w, r, hash, t, meta, fileIndex)
 }
 
-// dlnaEntry is one media file offered to a renderer.
-type dlnaEntry struct {
-	hash      string
-	fileIndex int
-	name      string
-	size      int64
-	mime      string
-	video     bool
+// mediaURL is the absolute URL of one file of a torrent.
+func mediaURL(base, hash string, index int) string {
+	return fmt.Sprintf("%s/res/%s/%d", base, hash, index)
 }
 
-// dlnaBrowse lists the media files of the completed torrents, grouped by
-// torrent. Only fully downloaded torrents are exposed: a renderer probes the
-// container metadata (moov/cue) and a partial file plays badly, so the safe
-// default is completed material.
-func (d *dlnaServer) dlnaBrowse() map[string][]dlnaEntry {
-	out := map[string][]dlnaEntry{}
-	if d.d.session == nil {
-		return out
-	}
-	for _, t := range d.d.session.ListTorrents() {
-		st := t.Stats()
-		if st.Bytes.Incomplete > 0 || st.Bytes.Total == 0 {
-			continue
-		}
-		files, err := t.Files()
-		if err != nil {
-			continue
-		}
-		name := t.Name()
-		hash := t.InfoHash().String()
-		var entries []dlnaEntry
-		for i, f := range files {
-			if !isMediaFile(f.Path()) {
-				continue
-			}
-			mime := mediaContentType(f.Path())
-			entries = append(entries, dlnaEntry{
-				hash:      hash,
-				fileIndex: i,
-				name:      f.Path(),
-				size:      f.Length(),
-				mime:      mime,
-				video:     strings.HasPrefix(mime, "video/"),
-			})
-		}
-		if len(entries) > 0 {
-			out[name+"\x00"+hash] = entries
-		}
-	}
-	return out
+// ---------------------------------------------------------------------------
+// ContentDirectory: DIDL-Lite
+// ---------------------------------------------------------------------------
+
+const didlOpen = `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:dlna="urn:schemas-dlna-org:metadata-1-0/" xmlns:sec="http://www.sec.co.kr/">`
+
+// dlnaContainerID is the object id of a torrent container.
+func dlnaContainerID(hash string) string { return "torrent:" + hash }
+
+// dlnaEntryKey is the object id of one media file.
+func dlnaEntryKey(hash string, index int) string {
+	return fmt.Sprintf("file:%s:%d", hash, index)
 }
 
 // didlClass names the upnp class of an entry.
@@ -330,79 +589,127 @@ func (e dlnaEntry) didlClass() string {
 	if e.video {
 		return "object.item.videoItem"
 	}
-	return "object.item.audioItem"
+	return "object.item.audioItem.musicTrack"
 }
 
-// dlnaEntryKey is the object id of one media file.
-func dlnaEntryKey(hash string, index int) string {
-	return fmt.Sprintf("file:%s:%d", hash, index)
+func writeRootContainer(b *strings.Builder, name string, children int) {
+	fmt.Fprintf(b, `<container id="0" parentID="-1" restricted="1" searchable="0" childCount="%d"><dc:title>%s</dc:title><upnp:class>object.container.storageFolder</upnp:class></container>`,
+		children, xmlEscape(name))
 }
 
-// dlnaContainerID is the object id of a torrent container.
-func dlnaContainerID(hash string) string { return "torrent:" + hash }
+func writeFolder(b *strings.Builder, f dlnaFolder) {
+	fmt.Fprintf(b, `<container id="%s" parentID="0" restricted="1" searchable="0" childCount="%d"><dc:title>%s</dc:title><upnp:class>object.container.storageFolder</upnp:class></container>`,
+		xmlEscape(dlnaContainerID(f.hash)), len(f.items), xmlEscape(f.name))
+}
 
-// browseData returns the current media listing.
-func (s *dlnaServer) browseData() map[string][]dlnaEntry {
-	if s.browse != nil {
-		return s.browse()
+func writeItem(b *strings.Builder, e dlnaEntry, base string) {
+	fmt.Fprintf(b, `<item id="%s" parentID="%s" restricted="1"><dc:title>%s</dc:title><upnp:class>%s</upnp:class>`,
+		xmlEscape(dlnaEntryKey(e.hash, e.fileIndex)), xmlEscape(dlnaContainerID(e.hash)),
+		xmlEscape(strings.TrimSuffix(path.Base(e.name), path.Ext(e.name))), e.didlClass())
+	fmt.Fprintf(b, `<res protocolInfo="http-get:*:%s:%s" size="%d">%s</res>`,
+		e.mime, dlnaFeatures, e.size, xmlEscape(mediaURL(base, e.hash, e.fileIndex)))
+	for _, s := range e.subs {
+		u := xmlEscape(mediaURL(base, e.hash, s.fileIndex))
+		// The res form is the DLNA one; CaptionInfoEx is what Samsung and LG
+		// renderers read.
+		fmt.Fprintf(b, `<res protocolInfo="http-get:*:%s:*">%s</res><sec:CaptionInfoEx sec:type="%s">%s</sec:CaptionInfoEx>`,
+			s.mime, u, s.kind, u)
 	}
-	return s.dlnaBrowse()
+	b.WriteString(`</item>`)
 }
 
-// browseDIDL renders the DIDL-Lite for one object: the root lists the torrent
-// containers, a container lists its media files.
-func (s *dlnaServer) browseDIDL(objectID string) (didl string, total int, updateID int) {
-	return didlForObject(s.browseData(), objectID, s.base)
+// dlnaFault is a UPnP error code and description for a SOAP fault.
+type dlnaFault struct {
+	code int
+	desc string
 }
 
-// didlForObject renders the DIDL-Lite of one object id from a media listing. It
-// is pure, so it can be tested without a session.
-func didlForObject(browse map[string][]dlnaEntry, objectID, base string) (didl string, total int, updateID int) {
-	if objectID == "" || objectID == "0" {
-		var b strings.Builder
-		b.WriteString(`<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">`)
-		names := make([]string, 0, len(browse))
-		for k := range browse {
-			names = append(names, k)
-		}
-		sort.Strings(names)
-		for _, k := range names {
-			name, hash, _ := strings.Cut(k, "\x00")
-			b.WriteString(`<container id="` + xmlEscape(dlnaContainerID(hash)) + `" parentID="0" restricted="1" searchable="0">` +
-				`<dc:title>` + xmlEscape(name) + `</dc:title>` +
-				`<upnp:class>object.container.storageFolder</upnp:class></container>`)
-		}
-		b.WriteString(`</DIDL-Lite>`)
-		return b.String(), len(names), 0
-	}
-	hash := strings.TrimPrefix(objectID, "torrent:")
-	if hash == objectID { // a file id browsed directly: nothing below it
-		return `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"></DIDL-Lite>`, 0, 0
+var (
+	dlnaNoSuchObject = &dlnaFault{701, "No such object"}
+	dlnaInvalidArgs  = &dlnaFault{402, "Invalid Args"}
+)
+
+// browse answers a ContentDirectory Browse: BrowseMetadata returns the object
+// itself, BrowseDirectChildren its children from start (count 0 = all). It is
+// pure, so it is tested without a session.
+func (lib *dlnaLibrary) browse(objectID, flag string, start, count int, name, base string) (didl string, returned, total int, fault *dlnaFault) {
+	if start < 0 || count < 0 {
+		return "", 0, 0, dlnaInvalidArgs
 	}
 	var b strings.Builder
-	b.WriteString(`<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">`)
-	count := 0
-	for _, entries := range browse {
-		for _, e := range entries {
-			if e.hash != hash {
-				continue
-			}
-			title := path.Base(e.name)
-			b.WriteString(`<item id="` + xmlEscape(dlnaEntryKey(e.hash, e.fileIndex)) + `" parentID="` + xmlEscape(dlnaContainerID(e.hash)) + `" restricted="1">` +
-				`<dc:title>` + xmlEscape(title) + `</dc:title>` +
-				`<upnp:class>` + e.didlClass() + `</upnp:class>` +
-				`<res protocolInfo="http-get:*:` + e.mime + `:*" size="` + strconv.FormatInt(e.size, 10) + `">` +
-				xmlEscape(mediaURL(base, e)) + `</res></item>`)
-			count++
+	b.WriteString(didlOpen)
+	page := func(n int, write func(i int)) {
+		total = n
+		end := n
+		if count > 0 && start+count < n {
+			end = start + count
+		}
+		for i := start; i < end; i++ {
+			write(i)
+			returned++
 		}
 	}
+	switch flag {
+	case "BrowseMetadata":
+		switch {
+		case objectID == dlnaRootID:
+			writeRootContainer(&b, name, len(lib.folders))
+		case strings.HasPrefix(objectID, "torrent:"):
+			fi, ok := lib.byHash[strings.TrimPrefix(objectID, "torrent:")]
+			if !ok {
+				return "", 0, 0, dlnaNoSuchObject
+			}
+			writeFolder(&b, lib.folders[fi])
+		default:
+			e, ok := lib.entry(objectID)
+			if !ok {
+				return "", 0, 0, dlnaNoSuchObject
+			}
+			writeItem(&b, e, base)
+		}
+		returned, total = 1, 1
+	case "BrowseDirectChildren":
+		switch {
+		case objectID == dlnaRootID:
+			page(len(lib.folders), func(i int) { writeFolder(&b, lib.folders[i]) })
+		case strings.HasPrefix(objectID, "torrent:"):
+			fi, ok := lib.byHash[strings.TrimPrefix(objectID, "torrent:")]
+			if !ok {
+				return "", 0, 0, dlnaNoSuchObject
+			}
+			items := lib.folders[fi].items
+			page(len(items), func(i int) { writeItem(&b, items[i], base) })
+		default:
+			if _, ok := lib.entry(objectID); !ok {
+				return "", 0, 0, dlnaNoSuchObject
+			}
+			// An item has no children.
+		}
+	default:
+		return "", 0, 0, dlnaInvalidArgs
+	}
 	b.WriteString(`</DIDL-Lite>`)
-	return b.String(), count, 0
+	return b.String(), returned, total, nil
 }
 
-// mediaURL is the absolute URL of one media file.
-func mediaURL(base string, e dlnaEntry) string {
-	return fmt.Sprintf("%s/res/%s/%d", base, e.hash, e.fileIndex)
+// entry resolves a file:<hash>:<index> object id.
+func (lib *dlnaLibrary) entry(objectID string) (dlnaEntry, bool) {
+	rest, ok := strings.CutPrefix(objectID, "file:")
+	if !ok {
+		return dlnaEntry{}, false
+	}
+	hash, idx, ok := strings.Cut(rest, ":")
+	n, err := strconv.Atoi(idx)
+	fi, found := lib.byHash[hash]
+	if !ok || err != nil || !found {
+		return dlnaEntry{}, false
+	}
+	for _, e := range lib.folders[fi].items {
+		if e.fileIndex == n {
+			return e, true
+		}
+	}
+	return dlnaEntry{}, false
 }
 
 // xmlEscape escapes text for XML content and attributes.
@@ -419,20 +726,22 @@ func xmlEscape(s string) string {
 func (s *dlnaServer) handleRootDesc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", `text/xml; charset="utf-8"`)
 	fmt.Fprintf(w, `<?xml version="1.0"?>
-<root xmlns="urn:schemas-upnp-org:device-1-0">
+<root xmlns="urn:schemas-upnp-org:device-1-0" xmlns:dlna="urn:schemas-dlna-org:device-1-0">
 <specVersion><major>1</major><minor>0</minor></specVersion>
 <device>
 <deviceType>%s</deviceType>
 <friendlyName>%s</friendlyName>
 <manufacturer>gx-torrent</manufacturer>
 <modelName>gx-torrent media server</modelName>
+<modelNumber>1</modelNumber>
+<dlna:X_DLNADOC>DMS-1.50</dlna:X_DLNADOC>
 <UDN>%s</UDN>
 <serviceList>
 <service><serviceType>%s</serviceType><serviceId>urn:upnp-org:serviceId:ContentDirectory</serviceId><SCPDURL>/ContentDirectory.xml</SCPDURL><controlURL>/control/ContentDirectory</controlURL><eventSubURL>/event/ContentDirectory</eventSubURL></service>
 <service><serviceType>%s</serviceType><serviceId>urn:upnp-org:serviceId:ConnectionManager</serviceId><SCPDURL>/ConnectionManager.xml</SCPDURL><controlURL>/control/ConnectionManager</controlURL><eventSubURL>/event/ConnectionManager</eventSubURL></service>
 </serviceList>
 </device>
-</root>`, dlnaDeviceType, html.EscapeString(s.name), s.uuid, dlnaContentDir, dlnaConnMgr)
+</root>`, dlnaDeviceType, xmlEscape(s.name), s.uuid, dlnaContentDir, dlnaConnMgr)
 }
 
 func (s *dlnaServer) handleContentDirSCPD(w http.ResponseWriter, r *http.Request) {
@@ -455,75 +764,110 @@ type soapEnvelope struct {
 		Browse struct {
 			ObjectID       string `xml:"ObjectID"`
 			BrowseFlag     string `xml:"BrowseFlag"`
-			StartingIndex  int    `xml:"StartingIndex"`
-			RequestedCount int    `xml:"RequestedCount"`
+			StartingIndex  string `xml:"StartingIndex"`
+			RequestedCount string `xml:"RequestedCount"`
 		} `xml:"Browse"`
 	} `xml:"Body"`
 }
 
+// soapUint parses a ui4 argument; empty is 0.
+func soapUint(v string) (int, bool) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0, true
+	}
+	n, err := strconv.ParseUint(v, 10, 31)
+	return int(n), err == nil
+}
+
 func (s *dlnaServer) handleContentDirControl(w http.ResponseWriter, r *http.Request) {
-	action := soapAction(r)
-	switch action {
+	lib := s.library()
+	switch soapAction(r) {
 	case "Browse":
 		var env soapEnvelope
-		body := io.LimitReader(r.Body, 1<<20)
-		dec := xml.NewDecoder(body)
-		if err := dec.Decode(&env); err != nil {
-			soapFault(w, 402, "Invalid Args")
+		if err := xml.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&env); err != nil {
+			soapFault(w, dlnaInvalidArgs)
 			return
 		}
-		didl, count, updateID := s.browseDIDL(strings.TrimSpace(env.Body.Browse.ObjectID))
-		s.logActivity("browse %q: %d item(s)", strings.TrimSpace(env.Body.Browse.ObjectID), count)
-		w.Header().Set("Content-Type", `text/xml; charset="utf-8"`)
-		fmt.Fprintf(w, `<?xml version="1.0"?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-<s:Body>
-<u:BrowseResponse xmlns:u="%s">
-<Result>%s</Result>
-<NumberReturned>%d</NumberReturned>
-<TotalMatches>%d</TotalMatches>
-<UpdateID>%d</UpdateID>
-</u:BrowseResponse>
-</s:Body>
-</s:Envelope>`, dlnaContentDir, xmlEscape(didl), count, count, updateID)
+		args := env.Body.Browse
+		start, ok1 := soapUint(args.StartingIndex)
+		count, ok2 := soapUint(args.RequestedCount)
+		if !ok1 || !ok2 {
+			soapFault(w, dlnaInvalidArgs)
+			return
+		}
+		objectID := strings.TrimSpace(args.ObjectID)
+		didl, returned, total, fault := lib.browse(objectID, strings.TrimSpace(args.BrowseFlag), start, count, s.name, s.dlnaBaseFor(r))
+		if fault != nil {
+			soapFault(w, fault)
+			return
+		}
+		if s.throttle(&s.seenMu, &s.seen, "browse"+r.RemoteAddr+objectID) {
+			logf("DLNA: %s browses %q: %d of %d item(s)", r.RemoteAddr, objectID, returned, total)
+		}
+		soapReply(w, dlnaContentDir, "Browse", fmt.Sprintf(
+			"<Result>%s</Result><NumberReturned>%d</NumberReturned><TotalMatches>%d</TotalMatches><UpdateID>%d</UpdateID>",
+			xmlEscape(didl), returned, total, lib.updateID))
 	case "GetSortCapabilities":
-		soapReply(w, dlnaContentDir, "GetSortCapabilities", "<SortCaps>dc:title</SortCaps>")
+		soapReply(w, dlnaContentDir, "GetSortCapabilities", "<SortCaps></SortCaps>")
 	case "GetSearchCapabilities":
 		soapReply(w, dlnaContentDir, "GetSearchCapabilities", "<SearchCaps></SearchCaps>")
 	case "GetSystemUpdateID":
-		soapReply(w, dlnaContentDir, "GetSystemUpdateID", "<Id>0</Id>")
+		soapReply(w, dlnaContentDir, "GetSystemUpdateID", fmt.Sprintf("<Id>%d</Id>", lib.updateID))
 	default:
-		soapFault(w, 401, "Invalid Action")
+		soapFault(w, &dlnaFault{401, "Invalid Action"})
 	}
+}
+
+// dlnaSourceProtocols lists the protocolInfo of every type the server can
+// serve (ConnectionManager SourceProtocolInfo).
+func dlnaSourceProtocols() string {
+	seen := map[string]bool{}
+	var out []string
+	for _, mime := range mediaContentTypes {
+		if seen[mime] {
+			continue
+		}
+		seen[mime] = true
+		if dlnaPlayable(mime) {
+			out = append(out, "http-get:*:"+mime+":"+dlnaFeatures)
+		} else {
+			out = append(out, "http-get:*:"+mime+":*")
+		}
+	}
+	sort.Strings(out)
+	return strings.Join(out, ",")
 }
 
 func (s *dlnaServer) handleConnMgrControl(w http.ResponseWriter, r *http.Request) {
 	switch soapAction(r) {
 	case "GetProtocolInfo":
-		soapReply(w, dlnaConnMgr, "GetProtocolInfo", "<Source></Source><Sink></Sink>")
+		soapReply(w, dlnaConnMgr, "GetProtocolInfo", "<Source>"+xmlEscape(dlnaSourceProtocols())+"</Source><Sink></Sink>")
 	case "GetCurrentConnectionIDs":
 		soapReply(w, dlnaConnMgr, "GetCurrentConnectionIDs", "<ConnectionIDs>0</ConnectionIDs>")
+	case "GetCurrentConnectionInfo":
+		soapReply(w, dlnaConnMgr, "GetCurrentConnectionInfo",
+			"<RcsID>-1</RcsID><AVTransportID>-1</AVTransportID><ProtocolInfo></ProtocolInfo>"+
+				"<PeerConnectionManager></PeerConnectionManager><PeerConnectionID>-1</PeerConnectionID>"+
+				"<Direction>Output</Direction><Status>OK</Status>")
 	default:
-		soapFault(w, 401, "Invalid Action")
+		soapFault(w, &dlnaFault{401, "Invalid Action"})
 	}
 }
 
-// soapAction extracts the action name from the SOAPAction header or the body.
+// soapAction extracts the action name from the SOAPAction header.
 func soapAction(r *http.Request) string {
-	raw := strings.TrimSpace(r.Header.Get("SOAPAction"))
-	raw = strings.Trim(raw, `"`)
-	if raw == "" {
-		return ""
-	}
+	raw := strings.Trim(strings.TrimSpace(r.Header.Get("SOAPAction")), `"`)
 	if i := strings.LastIndex(raw, "#"); i >= 0 {
 		return raw[i+1:]
 	}
 	return raw
 }
 
-// soapReply writes a one-element SOAP response.
+// soapReply writes a SOAP response with the given out arguments.
 func soapReply(w http.ResponseWriter, service, action, inner string) {
 	w.Header().Set("Content-Type", `text/xml; charset="utf-8"`)
+	w.Header().Set("EXT", "")
 	fmt.Fprintf(w, `<?xml version="1.0"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
 <s:Body><u:%sResponse xmlns:u="%s">%s</u:%sResponse></s:Body>
@@ -531,14 +875,108 @@ func soapReply(w http.ResponseWriter, service, action, inner string) {
 }
 
 // soapFault writes a UPnP error.
-func soapFault(w http.ResponseWriter, code int, desc string) {
+func soapFault(w http.ResponseWriter, f *dlnaFault) {
 	w.Header().Set("Content-Type", `text/xml; charset="utf-8"`)
 	w.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprintf(w, `<?xml version="1.0"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
 <s:Body><s:Fault><faultcode>s:Client</faultcode><faultstring>UPnPError</faultstring><detail>
 <UPnPError xmlns="urn:schemas-upnp-org:control-1-0"><errorCode>%d</errorCode><errorDescription>%s</errorDescription></UPnPError>
-</detail></s:Fault></s:Body></s:Envelope>`, code, html.EscapeString(desc))
+</detail></s:Fault></s:Body></s:Envelope>`, f.code, html.EscapeString(f.desc))
+}
+
+// ---------------------------------------------------------------------------
+// HTTP: GENA eventing
+// ---------------------------------------------------------------------------
+
+// dlnaSubTimeout is the subscription lifetime granted to a control point.
+const dlnaSubTimeout = 1800
+
+// handleSubscribe accepts a GENA subscription (several TVs refuse a server
+// whose eventSubURL fails) and sends the initial event with the current state
+// variables. Renewals (SID, no CALLBACK) are accepted as they come. The
+// callback must point back at the subscriber's own address, so the server
+// cannot be used to post to a third host.
+func (s *dlnaServer) handleSubscribe(w http.ResponseWriter, r *http.Request) {
+	service := r.PathValue("service")
+	if service != "ContentDirectory" && service != "ConnectionManager" {
+		http.NotFound(w, r)
+		return
+	}
+	sid := strings.TrimSpace(r.Header.Get("SID"))
+	callback := strings.TrimSpace(r.Header.Get("CALLBACK"))
+	if sid != "" {
+		if callback != "" {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("SID", sid)
+		w.Header().Set("TIMEOUT", "Second-"+strconv.Itoa(dlnaSubTimeout))
+		return
+	}
+	target, ok := dlnaCallback(callback, r.RemoteAddr)
+	if !ok || !strings.EqualFold(strings.TrimSpace(r.Header.Get("NT")), "upnp:event") {
+		http.Error(w, "precondition failed", http.StatusPreconditionFailed)
+		return
+	}
+	sid = fmt.Sprintf("uuid:%x", time.Now().UnixNano())
+	w.Header().Set("SID", sid)
+	w.Header().Set("TIMEOUT", "Second-"+strconv.Itoa(dlnaSubTimeout))
+	w.WriteHeader(http.StatusOK)
+	var props string
+	if service == "ContentDirectory" {
+		props = fmt.Sprintf("<e:property><SystemUpdateID>%d</SystemUpdateID></e:property>", s.library().updateID)
+	} else {
+		props = "<e:property><SourceProtocolInfo>" + xmlEscape(dlnaSourceProtocols()) + "</SourceProtocolInfo></e:property>" +
+			"<e:property><SinkProtocolInfo></SinkProtocolInfo></e:property>" +
+			"<e:property><CurrentConnectionIDs>0</CurrentConnectionIDs></e:property>"
+	}
+	go dlnaSendEvent(target, sid, props)
+}
+
+func (s *dlnaServer) handleUnsubscribe(w http.ResponseWriter, r *http.Request) {
+	if strings.TrimSpace(r.Header.Get("SID")) == "" {
+		http.Error(w, "precondition failed", http.StatusPreconditionFailed)
+	}
+}
+
+// dlnaCallback picks the first http callback URL of a CALLBACK header
+// ("<url1><url2>") whose host is the subscriber's own address.
+func dlnaCallback(header, remoteAddr string) (string, bool) {
+	remote, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return "", false
+	}
+	for _, part := range strings.Split(header, ">") {
+		raw := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(part), "<"))
+		u, err := url.Parse(raw)
+		if err != nil || u.Scheme != "http" || u.Hostname() == "" {
+			continue
+		}
+		if ip := net.ParseIP(u.Hostname()); ip != nil && ip.Equal(net.ParseIP(remote)) {
+			return u.String(), true
+		}
+	}
+	return "", false
+}
+
+// dlnaSendEvent posts the initial GENA event (SEQ 0).
+func dlnaSendEvent(target, sid, props string) {
+	body := `<?xml version="1.0"?><e:propertyset xmlns:e="urn:schemas-upnp-org:event-1-0">` + props + `</e:propertyset>`
+	req, err := http.NewRequest("NOTIFY", target, bytes.NewBufferString(body))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", `text/xml; charset="utf-8"`)
+	req.Header.Set("NT", "upnp:event")
+	req.Header.Set("NTS", "upnp:propchange")
+	req.Header.Set("SID", sid)
+	req.Header.Set("SEQ", "0")
+	client := &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	if resp, err := client.Do(req); err == nil {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		resp.Body.Close()
+	}
 }
 
 const contentDirSCPD = `<?xml version="1.0"?>

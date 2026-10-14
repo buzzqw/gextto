@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestMediaContentType(t *testing.T) {
 	cases := map[string]string{
@@ -23,23 +26,40 @@ func TestMediaContentType(t *testing.T) {
 	}
 }
 
-func TestSanitizeFilename(t *testing.T) {
-	if got := sanitizeFilename("/x/y/na\"me\r\n.mkv"); got != "name.mkv" {
-		t.Fatalf("sanitizeFilename = %q", got)
+func TestContentDisposition(t *testing.T) {
+	cases := map[string]string{
+		"/x/y/movie.mkv":       `inline; filename=movie.mkv`,
+		"dir/my movie.mkv":     `inline; filename="my movie.mkv"`,
+		"na\"me.mkv":           `inline; filename="na\"me.mkv"`,
+		"città/è stato.mkv":    `inline; filename*=utf-8''%C3%A8%20stato.mkv`,
+		"evil\r\nX-Bad: 1.mp4": "",
+	}
+	for name, want := range cases {
+		got := contentDisposition(name)
+		if strings.ContainsAny(got, "\r\n") {
+			t.Fatalf("contentDisposition(%q) = %q: header injection", name, got)
+		}
+		if want != "" && got != want {
+			t.Errorf("contentDisposition(%q) = %q, want %q", name, got, want)
+		}
 	}
 }
 
 func TestStreamRefcount(t *testing.T) {
 	d := &Daemon{}
-	d.beginStream("aa")
-	d.beginStream("aa")
-	if last := d.endStream("aa"); last {
-		t.Fatal("the first close must not be the last stream")
+	d.beginStream("aa", 0)
+	d.beginStream("aa", 0)
+	d.beginStream("aa", 1)
+	if last := d.endStream("aa", 1); !last {
+		t.Fatal("another file of the same torrent must not keep file 1's window")
 	}
-	if last := d.endStream("aa"); !last {
-		t.Fatal("the second close must be the last stream")
+	if last := d.endStream("aa", 0); last {
+		t.Fatal("the first close must not be the last stream of the file")
 	}
-	if last := d.endStream("bb"); !last {
+	if last := d.endStream("aa", 0); !last {
+		t.Fatal("the second close must be the last stream of the file")
+	}
+	if last := d.endStream("bb", 0); !last {
 		t.Fatal("closing an unknown stream must report last (nothing to clear)")
 	}
 }

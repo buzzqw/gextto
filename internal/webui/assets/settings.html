@@ -99,6 +99,7 @@ fieldset .muted{font-size:13px}
     <label>HTTP bind<input type="text" name="dlna-listen" value="{{DLNA_LISTEN}}" autocomplete="off" placeholder=":8200" title="Address and port the media server listens on, e.g. :8200 for all interfaces or 192.168.1.10:8200 for one. Discovery uses UDP 1900 on the same interface."></label>
     <label>Server name<input type="text" name="dlna-name" value="{{DLNA_NAME}}" autocomplete="off" placeholder="gx-torrent" title="Friendly name shown to the DLNA players on the network."></label>
   </div>
+  <p class="muted" role="status">{{DLNA_STATUS}}</p>
 </fieldset>
 <fieldset id="optimize">
   <legend>Optimization</legend>

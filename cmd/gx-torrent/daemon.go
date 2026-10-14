@@ -260,10 +260,15 @@ type Daemon struct {
 	// two polls against the same feed at once.
 	feedPollMu sync.Mutex
 	// streamMu guards activeStreams: how many streams (the UI player and the
-	// DLNA server) are reading a torrent right now, keyed by info hash, so
-	// closing one stream does not clear the engine window another still needs.
+	// DLNA server) are reading a file right now, keyed by info hash and file
+	// index (the engine windows are per file), so closing one stream does not
+	// clear the window another still needs.
 	streamMu      sync.Mutex
 	activeStreams map[string]int
+	// dlnaStatus is the base URL of the running DLNA media server ("" when
+	// off), shown on the settings page.
+	dlnaStatusMu sync.Mutex
+	dlnaStatus   string
 	// archiveOnlyLogged remembers the feeds whose "archive only" notice was
 	// already printed: a feed with no rule and no filter is a valid, intentional
 	// configuration that only grows the archive, so the notice must not repeat at
