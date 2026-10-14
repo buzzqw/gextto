@@ -1538,7 +1538,13 @@ set, and writes a dated baseline. First baseline stored from the branch.
 cross-layout filter: `BenchmarkMergeCandidatesUnrelated` **1360 → 375 ns/op,
 0 allocs/op** after replacing a per-candidate map with a nested scan (was
 ~98 ns before the v1 work; the remaining cost is the per-candidate file scan
-the feature needs, on one-shot paths only). No other hotspot appeared.
+the feature needs, on one-shot paths only). The nested scan is quadratic, so
+it is kept only up to `len(a)*len(b) <= 1024` (lengths compared before paths);
+larger packs index the smaller torrent in a map. `BenchmarkV1FilesMatchNoMatch`
+(unrelated torrents, same file length): 8 files **290 → 278 ns**, 64 files
+**18.2 → 3.4 µs**, 2000 files **17.3 ms → 0.13 ms** (109 KB, 9 allocs);
+`BenchmarkMergeCandidatesUnrelated` **375 → 265 ns/op**, still 0 allocs. No
+other hotspot appeared.
 
 **WP2 (real swarm).** `make measure-realswarm` on the Debian 13.7 netinst
 torrent, 2 minutes: download **completed to 100 %**, peers **peak 80**
@@ -1583,7 +1589,11 @@ network speed: the disk is **not** the bottleneck, so `O_DIRECT`/`io_uring` are
 
 **WP4d (v2 partial-file hash serving).** Implemented: `servePartialBlockHashes`
 + `blockLeavesRange` in `torrent_hashrequest.go`; tests verify the reply against
-the file root (`torrent_hashrequest_serve_test.go`).
+the file root and, for every servable request (zero padding past the end of the
+file included), compare it byte-for-byte with the full block tree
+(`torrent_hashrequest_serve_test.go`). The same path answers a complete file
+while its block tree is still being built, and a request is capped at 512
+hashes so the leaves read on the torrent loop stay bounded.
 
 **WP4e (adversarial).** Hostile hash-request headers (bogus root, bad length,
 huge proof, overflow) are refused without panic; the WebSocket frame fuzzer is

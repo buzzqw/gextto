@@ -141,7 +141,7 @@ stay narrow and the tables remain readable.
 > present in full and, for the parts already verified, for a partially
 > downloaded file (the requested 16 KiB leaf hashes are computed from the
 > verified pieces and anchored with the piece layer's uncles; a request that
-> touches a missing piece is refused).
+> touches a missing piece or asks for more than 512 hashes is refused).
 >
 > The magnet parameter `so=` is **BEP 53**. `ws=` (web seed), `xs=` (exact
 > source), `as=` (acceptable source) and `dht=` (DHT bootstrap node) come

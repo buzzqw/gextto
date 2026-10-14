@@ -14,8 +14,15 @@ import (
 // written. It returns the torrent and the file's root.
 func v2ServeFixture(t *testing.T, verified ...uint32) (*torrent, [merkle.HashSize]byte) {
 	t.Helper()
+	return v2ServeFixtureSized(t, 24*merkle.BlockSize, verified...)
+}
+
+// v2ServeFixtureSized is v2ServeFixture with a file of size bytes (pieces of 4
+// blocks).
+func v2ServeFixtureSized(t *testing.T, size int, verified ...uint32) (*torrent, [merkle.HashSize]byte) {
+	t.Helper()
 	block := merkle.BlockSize
-	content := make([]byte, 24*block)
+	content := make([]byte, size)
 	for i := range content {
 		content[i] = byte(i*7 + 1)
 	}
@@ -42,7 +49,9 @@ func TestServeHashesPartialBlockLayer(t *testing.T) {
 	}
 	paddedLeaves := merkle.NextPowerOfTwo(24) // 32
 	height := merkle.Log2(paddedLeaves)       // 5
-	req := peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: 0, Length: 4, ProofLayers: uint32(height - 2)}
+	// A full proof from base 0 (as the downloader asks): proof = height-1,
+	// uncles at levels 2..4.
+	req := peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: 0, Length: 4, ProofLayers: uint32(height - 1)}
 	hashes, ok := tr.serveHashes(req)
 	if !ok {
 		t.Fatal("serveHashes refused a request fully covered by verified pieces")
@@ -55,7 +64,7 @@ func TestServeHashesPartialBlockLayer(t *testing.T) {
 	}
 
 	// A later range (piece 1) is served too.
-	req = peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: 4, Length: 4, ProofLayers: uint32(height - 2)}
+	req = peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: 4, Length: 4, ProofLayers: uint32(height - 1)}
 	hashes, ok = tr.serveHashes(req)
 	if !ok || !merkle.VerifyHashes(root, paddedLeaves, 0, 4, 4, hashes[:4], hashes[4:]) {
 		t.Fatal("a later range was not served or did not verify")
@@ -70,17 +79,17 @@ func TestServeHashesPartialOnlyVerifiedPieces(t *testing.T) {
 	height := merkle.Log2(paddedLeaves)
 
 	// Blocks 0..3 are in the verified piece 0.
-	okReq := peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: 0, Length: 4, ProofLayers: uint32(height - 2)}
+	okReq := peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: 0, Length: 4, ProofLayers: uint32(height - 1)}
 	if _, ok := tr.serveHashes(okReq); !ok {
 		t.Fatal("a range inside a verified piece must be served")
 	}
 	// Blocks 4..7 are in the missing piece 1.
-	missing := peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: 4, Length: 4, ProofLayers: uint32(height - 2)}
+	missing := peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: 4, Length: 4, ProofLayers: uint32(height - 1)}
 	if _, ok := tr.serveHashes(missing); ok {
 		t.Fatal("a range touching a missing piece must be refused")
 	}
 	// Blocks 0..7 span piece 0 (verified) and piece 1 (missing).
-	span := peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: 0, Length: 8, ProofLayers: uint32(height - 3)}
+	span := peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: 0, Length: 8, ProofLayers: uint32(height - 1)}
 	if _, ok := tr.serveHashes(span); ok {
 		t.Fatal("a range spanning a missing piece must be refused")
 	}
@@ -103,6 +112,8 @@ func TestServeHashesRejectsAbuse(t *testing.T) {
 		{Root: root, Base: 0, Index: 1, Length: 4, ProofLayers: 3},                        // index not aligned
 		{Root: root, Base: 0, Index: 0, Length: 1 << 20, ProofLayers: 3},                  // length past the tree
 		{Root: root, Base: 0, Index: 0, Length: 4, ProofLayers: 1 << 20},                  // huge proof
+		{Root: root, Base: 0, Index: 0, Length: 4, ProofLayers: 5},                        // proof reaching past the root
+		{Root: root, Base: 0, Index: 1 << 31, Length: 4, ProofLayers: 0},                  // index past the padded layer
 		{Root: root, Base: 1 << 20, Index: 0, Length: 1, ProofLayers: 0},                  // base past the height
 	}
 	for i, req := range bad {
@@ -130,4 +141,76 @@ func TestServeHashesPieceLayerWithoutData(t *testing.T) {
 	if !merkle.VerifyHashes(root, paddedLeaves, 2, 0, 2, hashes[:2], hashes[2:]) {
 		t.Fatal("the piece-layer proof does not anchor to the file root")
 	}
+}
+
+// TestServeHashesPartialMatchesFullTree: for every request a partly downloaded
+// file can answer, the reply is exactly what the full block tree returns, so a
+// downloader cannot tell the two apart; ranges reaching into the zero padding
+// past the end of the file are covered too.
+func TestServeHashesPartialMatchesFullTree(t *testing.T) {
+	block := merkle.BlockSize
+	size := 21*block + 100 // 22 blocks: 6 pieces of 4, the last one short
+	tr, root := v2ServeFixtureSized(t, size, 0, 1, 2, 3, 4, 5)
+	content := make([]byte, size)
+	for i := range content {
+		content[i] = byte(i*7 + 1)
+	}
+	full := merkle.NewLayerTree(0, merkle.LeafHashes(content))
+	if full.Root() != root {
+		t.Fatal("the reference tree does not match the file root")
+	}
+	// Pretend the file is partial for the serving path: drop a piece we never
+	// request below, so v2FileComplete is false.
+	partial, _ := v2ServeFixtureSized(t, size, 0, 1, 2, 3, 5)
+	height := full.Height()
+	served := 0
+	for _, length := range []int{4, 8, 16, 32} {
+		for index := 0; index+length <= 1<<height; index += length {
+			for proof := 0; proof < height; proof++ {
+				req := peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: uint32(index), Length: uint32(length), ProofLayers: uint32(proof)}
+				want := full.GetHashes(0, index, length, proof)
+				got, ok := tr.servePartialBlockHashes(0, 2, req)
+				if !ok || !equalHashes(got, want) {
+					t.Fatalf("index=%d length=%d proof=%d: partial reply differs from the full tree (ok=%v, %d vs %d hashes)", index, length, proof, ok, len(got), len(want))
+				}
+				// Piece 4 holds blocks 16..19: only ranges avoiding it are served.
+				got, ok = partial.serveHashes(req)
+				touches := index < 20 && index+length > 16
+				if ok == touches {
+					t.Fatalf("index=%d length=%d proof=%d: served=%v with piece 4 missing", index, length, proof, ok)
+				}
+				if ok {
+					served++
+					if !equalHashes(got, want) {
+						t.Fatalf("index=%d length=%d proof=%d: partial reply differs from the full tree", index, length, proof)
+					}
+				}
+			}
+		}
+	}
+	if served == 0 {
+		t.Fatal("no request was served from the partial file")
+	}
+}
+
+// TestServeHashesPartialCapsLength: a range larger than v2ChunkMax hashes is
+// refused, so one request cannot make the torrent loop read a huge file span.
+func TestServeHashesPartialCapsLength(t *testing.T) {
+	tr, root := v2ServeFixture(t, 0, 1, 2)
+	req := peerprotocol.HashRequestHeader{Root: root, Base: 0, Index: 0, Length: 2 * v2ChunkMax}
+	if _, ok := tr.servePartialBlockHashes(0, 2, req); ok {
+		t.Fatal("a request above v2ChunkMax must be refused")
+	}
+}
+
+func equalHashes(a, b [][merkle.HashSize]byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

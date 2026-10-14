@@ -1134,9 +1134,11 @@ blocks while downloading them: for a file **entirely present** the block tree
 is built from the data and **cached per-file**; for a file that is only
 **partly downloaded** the requested 16 KiB leaf hashes are computed from the
 verified pieces and anchored with the piece layer's uncles, so the parts the
-seed already has are still servable. A request that touches a missing piece,
-folds below the piece layer, or has no complete proof is refused
-(`hash reject`). The v2 wire rules are in [`bep.md`](bep.md).
+seed already has are still servable (the same path answers a complete file
+while its block tree is still being built). The reply is byte-for-byte what
+the full block tree would return. A request that touches a missing piece,
+folds below the piece layer or asks for more than 512 hashes (the leaves are
+read on the torrent loop) is refused (`hash reject`). The v2 wire rules are in [`bep.md`](bep.md).
 
 ## Local data reuse (Swarm Merging)
 
@@ -1653,7 +1655,7 @@ error (`ErrCapabilityUnavailable`), never with a false success:
   the data, then cached) and, for a file only **partly downloaded**, for the
   requested 16 KiB leaf hashes whose pieces are verified (anchored with the
   piece layer's uncles); a request that touches a missing piece, folds below the
-  piece layer or has no complete proof responds `hash reject`
+  piece layer or asks for more than 512 hashes responds `hash reject`
   (see *BitTorrent v2 torrents*);
 - IPv6: **partial support** (see *IPv6* below).
 

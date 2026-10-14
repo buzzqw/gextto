@@ -393,23 +393,45 @@ func bitSet(bits []byte, i int) bool {
 // read twice for a wrong match.
 const maxV1VerifyFailures = 64
 
+// v1FilesMatchScanMax is the largest len(a)*len(b) v1FilesMatch compares
+// pair by pair; above it a map of the smaller torrent keeps the check linear.
+const v1FilesMatchScanMax = 1024
+
 // v1FilesMatch reports whether two v1 torrents share a file of the same path
 // and length: the metadata identity a cross-layout v1 reuse starts from. It is
 // a heuristic (the content is checked per piece before writing), unlike the
-// cryptographic per-file Merkle root of v2. A nested scan instead of a map
-// keeps the merge candidate filter allocation-free on the one-shot paths.
+// cryptographic per-file Merkle root of v2. Small torrents, the common case of
+// the merge candidate filter, are compared with an allocation-free nested
+// scan; large packs use a map so the check does not grow quadratically.
 func v1FilesMatch(a, b *metainfo.Info) bool {
-	for i := range a.Files {
-		if a.Files[i].Padding {
-			continue
-		}
-		for j := range b.Files {
-			if b.Files[j].Padding {
+	if len(a.Files)*len(b.Files) <= v1FilesMatchScanMax {
+		for i := range a.Files {
+			if a.Files[i].Padding {
 				continue
 			}
-			if a.Files[i].Path == b.Files[j].Path && a.Files[i].Length == b.Files[j].Length {
-				return true
+			for j := range b.Files {
+				if !b.Files[j].Padding && a.Files[i].Length == b.Files[j].Length && a.Files[i].Path == b.Files[j].Path {
+					return true
+				}
 			}
+		}
+		return false
+	}
+	if len(a.Files) > len(b.Files) {
+		a, b = b, a
+	}
+	lengths := make(map[string]int64, len(a.Files))
+	for i := range a.Files {
+		if !a.Files[i].Padding {
+			lengths[a.Files[i].Path] = a.Files[i].Length
+		}
+	}
+	for i := range b.Files {
+		if b.Files[i].Padding {
+			continue
+		}
+		if length, ok := lengths[b.Files[i].Path]; ok && length == b.Files[i].Length {
+			return true
 		}
 	}
 	return false
