@@ -563,7 +563,11 @@ with `withData`, the archived articles; `addFolder`, `addFeed`, `setFeedURL`,
 onto the daemon's feeds and rules. Note: qBittorrent's rule `mustContain`
 requires **all** the words while gx-core's include is "at least one", so a
 multi-word `mustContain` maps to a more permissive OR; the `/ui/rss` rule
-editor is the place for precise AND filtering. The API uses the
+editor is the place for precise AND filtering. The **cookie API**
+(`app/cookies`, `app/setCookies`) stores the cookies the daemon sends when it
+fetches `.torrent` files and metadata over HTTP (private trackers): they are
+used by the daemon's URL adds, the magnet `xs=`/`as=` sources and the web
+seeds. The API uses the
 same access criteria as the page: without a password it is open, otherwise the LAN bypass
 is needed (if `local-bypass` is active) or a session (`SID` qBittorrent or `gx_session`
 of the page). In managed it is **not** exposed: only Gextto commands.

@@ -39,6 +39,8 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("GET /api/v2/app/defaultSavePath", d.handleQbitDefaultSavePath)
 	mux.HandleFunc("GET /api/v2/app/preferences", d.handleQbitPreferences)
 	mux.HandleFunc("GET /api/v2/app/buildInfo", d.handleQbitBuildInfo)
+	mux.HandleFunc("GET /api/v2/app/cookies", d.handleQbitGetCookies)
+	mux.HandleFunc("POST /api/v2/app/setCookies", d.handleQbitSetCookies)
 	mux.HandleFunc("GET /api/v2/transfer/info", d.handleQbitTransferInfo)
 	mux.HandleFunc("GET /api/v2/transfer/downloadLimit", d.handleQbitDownloadLimit)
 	mux.HandleFunc("GET /api/v2/transfer/uploadLimit", d.handleQbitUploadLimit)
@@ -966,7 +968,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 // fetchTorrentURL downloads a .torrent from a URL, with the same size cap the
 // API applies to an uploaded file.
 func (d *Daemon) fetchTorrentURL(rawURL string) ([]byte, error) {
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second, Jar: d.cookieJar()}
 	resp, err := client.Get(rawURL)
 	if err != nil {
 		return nil, err

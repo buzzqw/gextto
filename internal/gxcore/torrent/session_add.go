@@ -189,6 +189,7 @@ func (s *Session) addURL(u string, opt *AddTorrentOptions) (*Torrent, error) {
 	client := http.Client{
 		Timeout:   s.config.TorrentAddHTTPTimeout,
 		Transport: netx.HTTPTransport(),
+		Jar:       s.config.CookieJar,
 	}
 	resp, err := client.Get(u) // nolint: noctx
 	if err != nil {
@@ -330,6 +331,7 @@ func (s *Session) addMagnetFromSources(ma *magnet.Magnet, opt *AddTorrentOptions
 	client := http.Client{
 		Timeout:   s.config.TorrentAddHTTPTimeout,
 		Transport: transport,
+		Jar:       s.config.CookieJar,
 	}
 	var lastErr error
 	for _, src := range sources {

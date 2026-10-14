@@ -551,6 +551,9 @@ func (d *Daemon) sessionConfig() torrent.Config {
 		cfg.MaxPeerAccept = d.state.Config.MaxPeerAccept
 	}
 	cfg.CustomLogHandler = engineLogHandler(d.opts.Debug)
+	// The user-managed cookies (qBittorrent API) are supplied to the .torrent
+	// and metadata HTTP fetches.
+	cfg.CookieJar = d.cookieJar()
 	return cfg
 }
 

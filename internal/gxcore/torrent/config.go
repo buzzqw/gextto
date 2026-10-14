@@ -2,6 +2,7 @@ package torrent
 
 import (
 	"io/fs"
+	"net/http"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
@@ -76,6 +77,10 @@ type Config struct {
 	MaxPieces uint32 `yaml:"max-pieces"`
 	// Time to wait when resolving host names for trackers and peers.
 	DNSResolveTimeout time.Duration `yaml:"dns-resolve-timeout"`
+	// CookieJar, when set, supplies the cookies for the .torrent/metadata
+	// downloads (addURL, the magnet xs=/as= sources) and the web seed fetches.
+	// It is used by the daemon's qBittorrent-compatible cookie API. Not serialized.
+	CookieJar http.CookieJar `yaml:"-"`
 
 	// Networking: single port, uTP, holepunch, egress control.
 	// ListenPort, when non-zero, is the single TCP port shared by all

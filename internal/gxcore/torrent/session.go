@@ -385,6 +385,7 @@ func webseedHTTPClient(cfg Config, bl *blocklist.Blocklist) http.Client {
 			TLSClientConfig:       &tls.Config{InsecureSkipVerify: !cfg.WebseedVerifyTLS}, // nolint: gosec
 			ResponseHeaderTimeout: cfg.WebseedResponseHeaderTimeout,
 		},
+		Jar: cfg.CookieJar,
 	}
 }
 
