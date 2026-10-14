@@ -91,8 +91,8 @@ test("cambiare sezione con modifiche in sospeso chiede conferma", async ({ page 
 });
 
 test("un interruttore mostra i campi che dipendono da lui", async ({ page }) => {
-  await page.goto("/?view=settings&tab=libtorrent");
-  const week = page.locator("#v2-setting-libtorrent_sched_week");
+  await page.goto("/?view=settings&tab=network");
+  const week = page.locator("#v2-setting-torrent_sched_week");
   const toggle = page.getByRole("switch", { name: "Programmazione velocità attiva" });
   await expect(toggle).not.toBeChecked();
   await expect(week).toBeHidden();
@@ -102,7 +102,7 @@ test("un interruttore mostra i campi che dipendono da lui", async ({ page }) => 
   await expect(week.locator('input[type="checkbox"][name^="day-"]')).toHaveCount(7);
   // The older single-window settings are superseded by the per-day table and
   // stay hidden even while the switch is on.
-  await expect(page.locator("#v2-setting-libtorrent_sched_start")).toBeHidden();
+  await expect(page.locator("#v2-setting-torrent_sched_start")).toBeHidden();
   await toggle.uncheck();
   await expect(week).toBeHidden();
 });
@@ -141,7 +141,7 @@ test("le chiavi tecniche si mostrano a richiesta", async ({ page }) => {
 test("ogni sezione è senza violazioni di accessibilità", async ({ page }) => {
   test.setTimeout(180000);
   const AxeBuilder = (await import("@axe-core/playwright")).default;
-  for (const tab of ["daemon", "sources", "scores", "backend", "libtorrent", "performance", "seeding", "rename", "paths", "maintenance", "notify", "access", "system"]) {
+  for (const tab of ["daemon", "sources", "scores", "backend", "network", "performance", "seeding", "rename", "paths", "maintenance", "notify", "access", "system"]) {
     await page.goto(`/?view=settings&tab=${tab}`);
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
     expect(results.violations.map((violation) => `${tab}: ${violation.id} ${violation.nodes.map((node) => node.html).join(" | ")}`)).toEqual([]);
@@ -157,7 +157,7 @@ test("il tema chiaro mantiene leggibili stato salvato e sezione attiva", async (
 });
 
 test("l'indice dei gruppi salta al gruppo scelto", async ({ page }) => {
-  await page.goto("/?view=settings&tab=libtorrent");
+  await page.goto("/?view=settings&tab=network");
   const index = page.getByRole("navigation", { name: "Gruppi di questa sezione" });
   await expect(index).toBeVisible();
   const chip = index.getByRole("link", { name: "Ricerca peer e tracker" });

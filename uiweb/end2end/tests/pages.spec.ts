@@ -130,7 +130,7 @@ test("ricerca impostazioni apre la tab e raggiunge il campo", async ({ page }) =
   await expect(hit).toBeVisible();
   await hit.click();
   await expect(page.locator("h1").filter({ hasText: "Configurazione" })).toBeVisible();
-  await expect(page.locator("#input-libtorrent_ramdisk_dir")).toBeVisible();
+  await expect(page.locator("#input-torrent_ramdisk_dir")).toBeVisible();
 });
 
 test.describe("mobile", () => {
