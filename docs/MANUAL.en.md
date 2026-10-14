@@ -1758,6 +1758,11 @@ login from clients that are not on the local network.
 | API key (scripts, TUI, calendar) | For non-browser access: header `X-Api-Key: <key>` or `?apikey=<key>` in the URL. The TUI reads it from the `GEXTTO_API_KEY` variable. |
 | gx-torrent — access token (page and API on the LAN) | Under the **Access** tab: shared secret required by the page and the API; mandatory when the daemon listens on the network (not shown). |
 
+Both secrets are generated from the row itself: **Generate** creates a long
+random value and saves it, **Copy** puts it in the clipboard. A new gx-torrent
+token needs the daemon restarted to be applied. What they are and how to use
+them is explained in [Access keys](api-keys.md).
+
 **Metadata services**
 
 | Setting | What it does |

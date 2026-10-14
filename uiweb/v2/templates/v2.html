@@ -759,6 +759,7 @@
 {{end}}
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    {{if .Links}}<div class="toolbar settings-group-links">{{range .Links}}<a class="btn sm" href="{{.Href}}" target="_blank" rel="noopener noreferrer"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}</a>{{end}}</div>{{end}}
     <div class="{{if .Grid}}form-grid{{else}}settings-rows{{end}}">
       {{range .Fields}}{{template "v2_setting_field" .}}{{end}}
     </div>
@@ -1040,11 +1041,14 @@
     {{else}}<input class="input" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />{{end}}
     {{if .Unit}}<span class="setting-unit" id="unit-{{.Key}}">{{.Unit}}</span>{{end}}
     {{if .Browse}}<button class="btn sm" type="button" data-v2-browse-for="{{.Key}}" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button>{{end}}
+    {{if .Generatable}}<button class="btn sm" type="button" data-v2-generate="{{.Key}}" aria-describedby="hint-{{.Key}}" title="Genera una chiave casuale e la salva">Genera</button>
+    <button class="btn sm" type="button" data-v2-copy-field="{{.Key}}" aria-describedby="hint-{{.Key}}" title="Copia la chiave negli appunti">Copia</button>{{end}}
     </div>
     {{if .Zero}}<small class="setting-zero" id="zero-{{.Key}}">{{.Zero}}</small>{{end}}
   </div>
   <div class="setting-actions">
     <small class="setting-status" id="status-{{.Key}}">{{if .Status}}<span class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Status}}</span>{{else if .Disabled}}{{if .DisabledEngine}}<span>Non attivo con il motore</span> «{{.DisabledEngine}}»{{else}}{{.DisabledNote}}{{end}}{{end}}</small>
+    {{if .Generatable}}<small class="setting-status" id="gen-status-{{.Key}}" role="status" aria-live="polite"></small>{{end}}
     {{if .Resettable}}<button class="btn sm ghost setting-reset" type="button" id="reset-{{.Key}}" data-v2-reset="{{.Default}}" aria-labelledby="reset-{{.Key}} label-{{.Key}}" title="Ripristina il valore predefinito (da salvare)"><span aria-hidden="true">↺</span> <span>Predefinito</span></button>{{end}}
     {{if and (ne .Kind "structured") (not .Managed) (not .Disabled)}}<button class="btn sm primary setting-save" type="submit" id="save-{{.Key}}" aria-labelledby="save-{{.Key}} label-{{.Key}}">Salva</button>{{end}}
   </div>

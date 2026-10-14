@@ -8,6 +8,8 @@ needs.
 |---|---|
 | [Manuale italiano](MANUAL.it.md) | Setup and day-to-day use of the web UI. |
 | [English manual](MANUAL.en.md) | English version of the complete user guide. |
+| [Chiavi di accesso](api-keys.it.md) | The Gextto API key and the gx-torrent token: what they are, how to generate and use them. |
+| [Access keys](api-keys.md) | English version: the Gextto API key and the gx-torrent token. |
 | [Guida avanzata (Italiano)](ADVANCED.it.md) | NAS, permissions, proxy, backup and diagnostics. |
 | [Advanced guide](ADVANCED.en.md) | English advanced-operation guide. |
 | [HTTP API](API.md) | Automations and integrations that use the daemon. |
