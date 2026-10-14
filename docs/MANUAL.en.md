@@ -1288,10 +1288,12 @@ How to read a row:
 - **Name and description** on the left; the control in the middle with its
   **unit** (seconds, minutes, GB, KiB/s…) and, below it, the meaning of the
   **special values** (for example “0 = never”).
-- Yes/no options are **switches**; times use the time picker and the schedule
-  days are seven check boxes; **Schedule — per day** is a table with one row
-  per weekday (active, start, end, download and upload limits), so every day
-  can have its own window and limits.
+- Yes/no options are **switches**; times use the time picker. The **speed
+  schedule** is the switch plus a table with one row per weekday (active,
+  start, end, download and upload limits), as in gx-torrent: every day has its
+  own window and limits. The older single-window settings no longer appear on
+  the page: until the table is saved it shows their values and they stay in
+  use.
 - Options that depend on a switch (for example the speed schedule or RAM disk
   fields) **appear only while the switch is on**, even before it is saved.
 - A value different from the default shows **changed**, the *Default* value
@@ -1460,12 +1462,12 @@ Recalculate scores* after changing weights.
 | Setting | What it does |
 |---|---|
 | Speed schedule enabled | Enable the time window with different speed limits. |
-| Schedule — start time | Schedule start time (HH:MM). Shown only while «Speed schedule enabled» is on. |
-| Schedule — end time | Schedule end time (HH:MM). Shown only while «Speed schedule enabled» is on. |
-| Schedule — days | Active days: 0=Mon … 6=Sun (e.g. 0,1,2,3,4). *(no day = never active)* Shown only while «Speed schedule enabled» is on. |
-| Schedule — download | Download limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Shown only while «Speed schedule enabled» is on. |
-| Schedule — upload | Upload limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Shown only while «Speed schedule enabled» is on. |
-| Schedule — per day | A different time window and limits for each day of the week; a window past midnight belongs to the day it starts on. *(once saved it replaces the window, days and limits above; «Default» goes back to the single window)* Shown only while «Speed schedule enabled» is on. |
+| Schedule — start time | Schedule start time (HH:MM). Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
+| Schedule — end time | Schedule end time (HH:MM). Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
+| Schedule — days | Active days: 0=Mon … 6=Sun (e.g. 0,1,2,3,4). *(no day = never active)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
+| Schedule — download | Download limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
+| Schedule — upload | Upload limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
+| Schedule — per day | A different time window and limits for each day of the week; a window past midnight belongs to the day it starts on. *(every day has its own window and limits (0 = unlimited); a window past midnight belongs to the day it starts on)* Shown only while «Speed schedule enabled» is on. |
 
 **Ports and interfaces**
 

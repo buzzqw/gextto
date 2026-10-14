@@ -68,7 +68,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"libtorrent_sched_start":       {Kind: "time", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_sched_end":         {Kind: "time", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_sched_days":        {Kind: "days", Zero: "nessun giorno = mai attiva", DependsOn: "libtorrent_sched_enabled"},
-	"libtorrent_sched_week":        {Kind: "week", Zero: "una volta salvata sostituisce fascia, giorni e limiti qui sopra; «Predefinito» torna alla fascia unica", DependsOn: "libtorrent_sched_enabled"},
+	"libtorrent_sched_week":        {Kind: "week", Zero: "ogni giorno ha fascia e limiti propri (0 = illimitato); una fascia oltre la mezzanotte appartiene al giorno in cui inizia", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_sched_dl_limit":    {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_sched_ul_limit":    {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_announce_interval": {Unit: "secondi"},

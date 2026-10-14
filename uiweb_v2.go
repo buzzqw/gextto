@@ -2200,7 +2200,7 @@ func V2SettingsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	defs := append(append([]uiSettingDef{}, uiSettingsIndex...), uiScoreSettingDefs...)
 	for _, def := range defs {
 		haystack := strings.ToLower(def.Key + " " + def.Label + " " + uiSettingSearchTerms[def.Key])
-		if !strings.Contains(haystack, query) || seen[def.Key] {
+		if !strings.Contains(haystack, query) || seen[def.Key] || uiSchedSingleWindowKeys[def.Key] {
 			continue
 		}
 		seen[def.Key] = true

@@ -815,6 +815,21 @@ func uiHideDependentFields(fields []uiSettingField) {
 		}
 		fields[index].Hidden = !parent.BoolValue
 	}
+	// The single speed window is edited through the per-day table (which
+	// shows its values until saved): its rows stay in the page, never shown.
+	for index := range fields {
+		if uiSchedSingleWindowKeys[fields[index].Key] {
+			fields[index].Hidden, fields[index].DependsOn = true, ""
+		}
+	}
+}
+
+// uiSchedSingleWindowKeys are the older single-window speed schedule
+// settings, superseded in the page by libtorrent_sched_week. They are still
+// read as the fallback of an unsaved per-day schedule (speedScheduleWeek).
+var uiSchedSingleWindowKeys = map[string]bool{
+	"libtorrent_sched_start": true, "libtorrent_sched_end": true, "libtorrent_sched_days": true,
+	"libtorrent_sched_dl_limit": true, "libtorrent_sched_ul_limit": true,
 }
 
 // uiSettingsTabEditors returns the structured list editors shown on a tab.

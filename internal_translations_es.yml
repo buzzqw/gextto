@@ -2278,7 +2278,7 @@ spa:
   Programmazione — upload (KiB/s): Programación — carga (KiB/s)
   "Programmazione — per giorno": "Programación — por día"
   "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia.": "Una franja horaria y límites distintos para cada día de la semana; una franja que pasa la medianoche pertenece al día en que empieza."
-  "una volta salvata sostituisce fascia, giorni e limiti qui sopra; «Predefinito» torna alla fascia unica": "una vez guardada sustituye la franja, los días y los límites de arriba; «Predeterminado» vuelve a la franja única"
+  "ogni giorno ha fascia e limiti propri (0 = illimitato); una fascia oltre la mezzanotte appartiene al giorno in cui inizia": "cada día tiene su propia franja y sus propios límites (0 = ilimitado); una franja que pasa la medianoche pertenece al día en que empieza"
   "ogni giorno attivo vuole un orario di inizio e uno di fine diversi": "cada día activo necesita horas de inicio y de fin distintas"
   "Inizio": "Inicio"
   "Fine": "Fin"

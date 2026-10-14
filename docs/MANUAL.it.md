@@ -1332,9 +1332,11 @@ Come si legge una riga:
   (secondi, minuti, GB, KiB/s…) e, sotto, il significato dei **valori
   speciali** (per esempio «0 = mai»).
 - Le opzioni sì/no sono **interruttori**; gli orari usano il selettore
-  dell'ora e i giorni della programmazione sono sette caselle; **Programmazione
-  — per giorno** è una tabella con una riga per giorno (attivo, inizio, fine,
-  limiti di download e upload), così ogni giorno ha fascia e limiti propri.
+  dell'ora. La **programmazione velocità** è l'interruttore più una tabella
+  con una riga per giorno (attivo, inizio, fine, limiti di download e upload),
+  come in gx-torrent: ogni giorno ha fascia e limiti propri. Le vecchie
+  impostazioni a fascia unica non compaiono più nella pagina: finché la tabella
+  non viene salvata ne mostra i valori e restano in uso.
 - Le opzioni che dipendono da un interruttore (per esempio i campi della
   programmazione velocità o del RAM disk) **compaiono solo quando l'interruttore
   è acceso**, anche prima di salvarlo.
@@ -1504,12 +1506,12 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | Impostazione | Cosa fa |
 |---|---|
 | Programmazione velocità attiva | Attiva la fascia oraria con limiti di velocità diversi. |
-| Programmazione — ora inizio | Ora di inizio della programmazione (HH:MM). Compare solo con «Programmazione velocità attiva» attivo. |
-| Programmazione — ora fine | Ora di fine della programmazione (HH:MM). Compare solo con «Programmazione velocità attiva» attivo. |
-| Programmazione — giorni | Giorni attivi: 0=Lun … 6=Dom (es. 0,1,2,3,4). *(nessun giorno = mai attiva)* Compare solo con «Programmazione velocità attiva» attivo. |
-| Programmazione — download | Limite di download in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Compare solo con «Programmazione velocità attiva» attivo. |
-| Programmazione — upload | Limite di upload in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Compare solo con «Programmazione velocità attiva» attivo. |
-| Programmazione — per giorno | Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. *(una volta salvata sostituisce fascia, giorni e limiti qui sopra; «Predefinito» torna alla fascia unica)* Compare solo con «Programmazione velocità attiva» attivo. |
+| Programmazione — ora inizio | Ora di inizio della programmazione (HH:MM). Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
+| Programmazione — ora fine | Ora di fine della programmazione (HH:MM). Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
+| Programmazione — giorni | Giorni attivi: 0=Lun … 6=Dom (es. 0,1,2,3,4). *(nessun giorno = mai attiva)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
+| Programmazione — download | Limite di download in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
+| Programmazione — upload | Limite di upload in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
+| Programmazione — per giorno | Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. *(ogni giorno ha fascia e limiti propri (0 = illimitato); una fascia oltre la mezzanotte appartiene al giorno in cui inizia)* Compare solo con «Programmazione velocità attiva» attivo. |
 
 **Porte e interfacce**
 
