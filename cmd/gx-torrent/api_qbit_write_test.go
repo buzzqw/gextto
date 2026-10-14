@@ -1,10 +1,13 @@
 package main
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
+	"time"
 )
 
 // TestQbitWriteEndpoints covers the qBittorrent write endpoints added on top of
@@ -103,4 +106,83 @@ func pos(t *testing.T, d *Daemon, hash string) int64 {
 		t.Fatalf("meta %s not found", hash)
 	}
 	return meta.Pos
+}
+
+// TestAltSpeedLimits covers the manual alternative limits: the settings, the
+// effective limits precedence and the qBittorrent toggle/speedLimitsMode.
+func TestAltSpeedLimits(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	// No limits, no schedule: the alternative mode is off.
+	if d.altSpeedActive(time.Now()) {
+		t.Fatal("alternative limits active by default")
+	}
+
+	d.opts.Settings.Set(altSpeedEnabledKey, "true")
+	d.opts.Settings.Set(altSpeedDLKey, "123")
+	d.opts.Settings.Set(altSpeedULKey, "45")
+	if dl, ul, manual := d.altSpeedSettings(); !manual || dl != 123 || ul != 45 {
+		t.Fatalf("alt settings = %d/%d/%v, want 123/45/true", dl, ul, manual)
+	}
+	if !d.altSpeedActive(time.Now()) {
+		t.Fatal("manual alternative limits should be active")
+	}
+	d.mu.Lock()
+	d.applyEffectiveSpeedLimitsLocked(time.Now())
+	d.mu.Unlock()
+	if d.appliedDL != 123 || d.appliedUL != 45 {
+		t.Fatalf("applied = %d/%d, want 123/45", d.appliedDL, d.appliedUL)
+	}
+
+	// Turning the manual mode off restores the configured global limits.
+	d.opts.Settings.Set(altSpeedEnabledKey, "false")
+	d.mu.Lock()
+	d.state.Config.SpeedLimitDownload = 999
+	d.state.Config.SpeedLimitUpload = 888
+	d.applyEffectiveSpeedLimitsLocked(time.Now())
+	d.mu.Unlock()
+	if d.appliedDL != 999 || d.appliedUL != 888 {
+		t.Fatalf("applied = %d/%d, want 999/888", d.appliedDL, d.appliedUL)
+	}
+	if d.altSpeedActive(time.Now()) {
+		t.Fatal("alternative limits should be off")
+	}
+}
+
+func TestQbitToggleSpeedLimitsModeAPI(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	mode := func() string {
+		resp := mustGet(t, srv.URL+"/api/v2/transfer/speedLimitsMode")
+		raw, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return strings.TrimSpace(string(raw))
+	}
+	if got := mode(); got != "0" {
+		t.Fatalf("speedLimitsMode = %q, want 0", got)
+	}
+	resp, err := http.PostForm(srv.URL+"/api/v2/transfer/toggleSpeedLimitsMode", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("toggleSpeedLimitsMode: %d", resp.StatusCode)
+	}
+	if got := mode(); got != "1" {
+		t.Fatalf("speedLimitsMode after toggle = %q, want 1", got)
+	}
+	if _, _, manual := d.altSpeedSettings(); !manual {
+		t.Fatal("the toggle did not enable the manual alternative limits")
+	}
+	// Toggling again turns them off.
+	resp2, err := http.PostForm(srv.URL+"/api/v2/transfer/toggleSpeedLimitsMode", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp2.Body.Close()
+	if got := mode(); got != "0" {
+		t.Fatalf("speedLimitsMode after second toggle = %q, want 0", got)
+	}
 }

@@ -92,6 +92,7 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("GET /api/v2/torrents/uploadLimit", d.handleQbitTorrentUploadLimits)
 	mux.HandleFunc("POST /api/v2/torrents/uploadLimit", d.handleQbitTorrentUploadLimits)
 	mux.HandleFunc("GET /api/v2/transfer/speedLimitsMode", d.handleQbitSpeedLimitsMode)
+	mux.HandleFunc("POST /api/v2/transfer/toggleSpeedLimitsMode", d.handleQbitToggleSpeedLimitsMode)
 	mux.HandleFunc("GET /api/v2/app/networkInterfaceList", d.handleQbitNetworkInterfaceList)
 	mux.HandleFunc("GET /api/v2/app/networkInterfaceAddressList", d.handleQbitNetworkInterfaceAddressList)
 	mux.HandleFunc("GET /api/v2/log/main", d.handleQbitLogMain)
@@ -1121,6 +1122,7 @@ func (d *Daemon) rssRefreshMinutes() int {
 func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 	stats := d.stats()
 	cfg, _, _ := d.config()
+	altDL, altUL, altManual := d.altSpeedSettings()
 	proxyType := -1
 	if stats.Proxy {
 		// The clients only need to know a proxy is in use; the daemon keeps the
@@ -1155,6 +1157,9 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		"slow_torrent_inactive_timer":    int(cfg.SlowAfterSecs),
 		"dl_limit":                       qbitPrefLimitOut(cfg.SpeedLimitDownload),
 		"up_limit":                       qbitPrefLimitOut(cfg.SpeedLimitUpload),
+		"alt_dl_limit":                   altDL,
+		"alt_up_limit":                   altUL,
+		"use_alt_speed_limits":           altManual,
 		"max_connec":                     cfg.MaxPeerDial + cfg.MaxPeerAccept,
 		"max_connec_per_torrent":         0,
 		"max_uploads":                    0,
@@ -1422,6 +1427,39 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 		if _, err := d.setConfig(patch); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+	}
+	// Alternative limits and the manual toggle live in settings.json.
+	if d.opts.Settings != nil {
+		changed := false
+		for _, m := range []struct{ pref, key string }{
+			{"alt_dl_limit", altSpeedDLKey},
+			{"alt_up_limit", altSpeedULKey},
+		} {
+			v, ok := prefs[m.pref]
+			if !ok {
+				continue
+			}
+			var kib int64
+			if json.Unmarshal(v, &kib) != nil {
+				continue
+			}
+			if kib < 0 {
+				kib = 0
+			}
+			d.opts.Settings.Set(m.key, strconv.FormatInt(kib, 10))
+			changed = true
+		}
+		if v, ok := prefs["use_alt_speed_limits"]; ok {
+			var on bool
+			if json.Unmarshal(v, &on) == nil {
+				d.opts.Settings.Set(altSpeedEnabledKey, strconv.FormatBool(on))
+				changed = true
+			}
+		}
+		if changed {
+			_ = d.opts.Settings.Save()
+			d.applyScheduleNow()
 		}
 	}
 	w.WriteHeader(http.StatusOK)

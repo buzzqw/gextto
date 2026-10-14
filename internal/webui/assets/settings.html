@@ -135,6 +135,9 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <legend>Bandwidth</legend>
   <label>Download limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="speed-download" value="{{SPEED_DL}}" title="Global download speed limit in KiB/s (0 = unlimited)"></label>
   <label>Upload limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="speed-upload" value="{{SPEED_UL}}" title="Global upload speed limit in KiB/s (0 = unlimited)"></label>
+  <label>Alternative download limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="alt-speed-download" value="{{ALT_SPEED_DL}}" title="Alternative download speed limit in KiB/s, applied when the alternative limits are active (0 = unlimited)"></label>
+  <label>Alternative upload limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="alt-speed-upload" value="{{ALT_SPEED_UL}}" title="Alternative upload speed limit in KiB/s, applied when the alternative limits are active (0 = unlimited)"></label>
+  <label class="chk"><input type="checkbox" name="alt-speed-limits-on" value="1"{{ALT_SPEED_ON}} title="Apply the alternative limits now, like qBittorrent's speed-limit button; the scheduler still applies inside its window"> Alternative limits active</label>
 </fieldset>
 <fieldset>
   <legend>Bandwidth scheduler</legend>

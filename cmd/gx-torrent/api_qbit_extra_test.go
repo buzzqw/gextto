@@ -234,7 +234,8 @@ func TestQbitPreferencesSurface(t *testing.T) {
 		"lsd", "upnp", "encryption", "bittorrent_protocol", "queueing_enabled",
 		"max_active_downloads", "max_active_uploads", "max_active_torrents",
 		"dont_count_slow_torrents", "slow_torrent_dl_rate_threshold",
-		"dl_limit", "up_limit", "max_connec", "scheduler_enabled",
+		"dl_limit", "up_limit", "alt_dl_limit", "alt_up_limit",
+		"use_alt_speed_limits", "max_connec", "scheduler_enabled",
 		"ip_filter_enabled", "ip_filter_trackers", "rss_refresh_interval",
 		"save_resume_data_interval", "scan_dirs",
 	} {

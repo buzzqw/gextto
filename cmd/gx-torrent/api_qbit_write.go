@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -114,4 +115,18 @@ func (d *Daemon) handleQbitShutdown(w http.ResponseWriter, _ *http.Request) {
 			_ = p.Signal(os.Interrupt)
 		}
 	}()
+}
+
+// handleQbitToggleSpeedLimitsMode flips the manual alternative-limits mode (the
+// qBittorrent speed-limit button) and applies the new effective limits at once.
+func (d *Daemon) handleQbitToggleSpeedLimitsMode(w http.ResponseWriter, _ *http.Request) {
+	if d.opts.Settings == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	_, _, manual := d.altSpeedSettings()
+	d.opts.Settings.Set(altSpeedEnabledKey, strconv.FormatBool(!manual))
+	_ = d.opts.Settings.Save()
+	d.applyScheduleNow()
+	w.WriteHeader(http.StatusOK)
 }

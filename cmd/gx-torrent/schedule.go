@@ -30,6 +30,12 @@ const (
 	// each weekday with its own window and limits. When set it supersedes the
 	// single window above, which stays as the fallback of older settings.
 	scheduleWeekKey = "schedule-week"
+	// altSpeedEnabledKey is the manual "alternative limits" toggle (qBittorrent's
+	// speed-limit button): when on, altSpeedDLKey/altSpeedULKey apply outside the
+	// scheduled window too.
+	altSpeedEnabledKey = "alt-speed-limits-on"
+	altSpeedDLKey      = "alt-speed-download"
+	altSpeedULKey      = "alt-speed-upload"
 )
 
 // scheduleDaysSet parses the stored weekday list into a per-weekday flag. An
@@ -115,6 +121,29 @@ func (d *Daemon) scheduledSpeedLimits(now time.Time) (download, upload int64, ac
 // parseClock reads "HH:MM" into minutes since midnight.
 func parseClock(value string) (int, bool) { return bwschedule.ParseClock(value) }
 
+// altSpeedSettings returns the manual alternative limits (KiB/s, 0 = unlimited)
+// and whether the manual mode is on (qBittorrent's speed-limit button).
+func (d *Daemon) altSpeedSettings() (download, upload int64, manual bool) {
+	settings := d.opts.Settings
+	if settings == nil {
+		return 0, 0, false
+	}
+	manual = strings.EqualFold(strings.TrimSpace(settings.Get(altSpeedEnabledKey, "false")), "true")
+	download = int64FromSetting(settings.Get(altSpeedDLKey, "0"))
+	upload = int64FromSetting(settings.Get(altSpeedULKey, "0"))
+	return download, upload, manual
+}
+
+// altSpeedActive reports whether the alternative limits are in force now: the
+// scheduled window, or the manual toggle outside it.
+func (d *Daemon) altSpeedActive(now time.Time) bool {
+	if _, _, active := d.scheduledSpeedLimits(now); active {
+		return true
+	}
+	_, _, manual := d.altSpeedSettings()
+	return manual
+}
+
 func int64FromSetting(value string) int64 {
 	var n int64
 	if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &n); err != nil || n < 0 {
@@ -132,6 +161,9 @@ func (d *Daemon) applyEffectiveSpeedLimitsLocked(now time.Time) {
 	if sd, su, active := d.scheduledSpeedLimits(now); active {
 		download, upload = sd, su
 		reason = "schedule"
+	} else if ad, au, manual := d.altSpeedSettings(); manual {
+		download, upload = ad, au
+		reason = "alt-speed"
 	}
 	// Latency auto-speed clamps the upload below the configured (or scheduled)
 	// ceiling; it never raises it above. See autospeed.go.

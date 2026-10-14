@@ -129,10 +129,10 @@ func (d *Daemon) qbitTorrentLimits(w http.ResponseWriter, r *http.Request, downl
 	writeJSON(w, http.StatusOK, out)
 }
 
-// handleQbitSpeedLimitsMode reports whether the alternative (scheduled) speed
-// limits are currently in force: 1 or 0, like qBittorrent.
+// handleQbitSpeedLimitsMode reports whether the alternative speed limits are
+// currently in force (the scheduled window or the manual toggle): 1 or 0.
 func (d *Daemon) handleQbitSpeedLimitsMode(w http.ResponseWriter, _ *http.Request) {
-	if _, _, active := d.scheduledSpeedLimits(time.Now()); active {
+	if d.altSpeedActive(time.Now()) {
 		qbitText(w, http.StatusOK, "1")
 		return
 	}

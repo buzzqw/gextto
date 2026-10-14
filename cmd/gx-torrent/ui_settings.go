@@ -156,6 +156,20 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	store.Set(autospeedTargetKey, autoTarget)
 	store.Set(autospeedMinKey, strconv.FormatInt(autoMin, 10))
 
+	// Alternative limits and the manual toggle (settings.json, applied at once).
+	altDL, altUL, _ := d.altSpeedSettings()
+	if v, ok := parseFormKib(r.FormValue("alt-speed-download")); ok && v != altDL {
+		store.Set(altSpeedDLKey, strconv.FormatInt(v, 10))
+	}
+	if v, ok := parseFormKib(r.FormValue("alt-speed-upload")); ok && v != altUL {
+		store.Set(altSpeedULKey, strconv.FormatInt(v, 10))
+	}
+	// Only touch the toggle when the form carries it, so an older client that
+	// does not post the checkbox does not clear the mode set from the API.
+	if r.Form.Has("alt-speed-limits-on") {
+		store.Set(altSpeedEnabledKey, strconv.FormatBool(formBool(r, "alt-speed-limits-on")))
+	}
+
 	// Folders, network, protocols, language and notifications (settings.json,
 	// read at the next start).
 	for _, key := range []string{
@@ -382,6 +396,10 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 
 	repl("{{SPEED_DL}}", strconv.FormatInt(cfg.SpeedLimitDownload, 10))
 	repl("{{SPEED_UL}}", strconv.FormatInt(cfg.SpeedLimitUpload, 10))
+	altDL, altUL, altManual := d.altSpeedSettings()
+	repl("{{ALT_SPEED_DL}}", strconv.FormatInt(altDL, 10))
+	repl("{{ALT_SPEED_UL}}", strconv.FormatInt(altUL, 10))
+	repl("{{ALT_SPEED_ON}}", checkedIf(altManual))
 	repl("{{SCHED_ENABLED}}", checkedIf(boolSetting(scheduleEnabledKey)))
 	week, ok := d.scheduleWeek()
 	if !ok {
