@@ -343,7 +343,8 @@ binary-tree routing table, tokens bound to source address and scope, an opt-in
 anti-Sybil cap per subnet, and the **feeds** of BEP 46. Robustness: parser fuzzing in
 CI (`make fuzz-smoke`, 21 targets, seeds in `testdata/fuzz`), a bounded bencode screen
 before the decoder on every hand-written path, snub and session ban with TTL, IP
-filter. Diagnostics: uTP socket, dial, accept, error, RTO and SYN-drop counters, merge
+filter, and hostile hash-request headers (bogus root, bad length, huge proof, overflow)
+refused without a panic. Diagnostics: uTP socket, dial, accept, error, RTO and SYN-drop counters, merge
 metrics (`merged_pieces`/`merged_bytes`) and storage errors flow from the engine stats
 to the daemon API into **both UIs**.
 
@@ -417,15 +418,18 @@ WebRTC peers to a WebSocket client, so a native client gets no TCP peers there �
 real unlock would be WebRTC, which is not done — and only the **resolver** side of BEP 46
 exists, not the publisher (signing).
 
-**What is missing.** The quality gaps against libtorrent (craftsmanship, not features):
-
-| Area | gx-core today | Gap |
-|---|---|---|
-| Choking / seeding | speed-based + optimistic, deterministic harness | quality algorithms absent; measurements **local only** (§10) |
-| Pipelining | adaptive queue (50→250), two pieces per peer with a shared budget, writes bounded to 4 pieces/torrent | the 10 Gbps "to be measured" (§14) |
-| Disk I/O | `O_SYNC` removed, `fdatasync`, mmap opt-in | O_DIRECT/io_uring/contiguous writes absent (not justified by a measurement) |
-| DHT | BEP 5/32/33/42/43/44/46, dedup | hardening not active, multi-path unproven (§11) |
-| Adversarial robustness | snub, session ban with TTL, IP filter, hostile hash-request headers (bogus root, bad length, huge proof, overflow) refused without a panic | less battle-tested than libtorrent |
+**What is missing.** Feature-wise the engine covers what libtorrent covers for this
+use. What libtorrent has and gx-core does not is **exposure**: twenty years of runs in
+the wild, and that is not a backlog item — it is acquired by running, which is exactly
+what the campaign in §10 and the open items in §14 are for. What is left is therefore
+tuning and measurement, not capability: the **choking quality** on a real swarm (the
+deterministic harness is the net, the swarm is the verification), the **pipelining**
+ceiling beyond a local pair (the 10 Gbps target needs hardware that is not here), the
+**disk I/O** (`fdatasync` and opt-in mmap today, measured at ~5.8 GB/s buffered and
+~7.4 GB/s mmap; `O_DIRECT`/`io_uring` and contiguous writes are not justified by a
+measurement), the **graduated file priority** with mixed priorities, and the **DHT**
+levers (multi-path closed with data, the anti-Sybil cap kept as a hint, §11). Each has
+its gate in §14.
 
 Wishlist, outside those: **WebTorrent/WebRTC** (niche, a lot of work) and alternative
 storages (blob, bolt, sqlite: not needed). Postponed: **replacing `internal/dht` with an
