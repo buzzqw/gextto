@@ -174,6 +174,9 @@ var uiSettingTooltipText = map[string]string{
 	"gxtorrent_token":                              "Segreto condiviso con gx-torrent (header X-Gx-Token). Facoltativo se gx-torrent ascolta solo su 127.0.0.1; obbligatorio se lo esponi in rete. Non visualizzato.",
 	"gxtorrent_proxy":                              "Proxy per gx-torrent: socks5://utente:password@host:porta oppure http://host:porta. Peer, tracker HTTP e web seed passano dal proxy; DHT e tracker UDP vengono spenti per non uscire fuori dal proxy. Non visualizzato.",
 	"gxtorrent_auto":                               "Attiva l'autogestione di gx-torrent: coda dinamica e cache adattiva (dimensionata su memoria disponibile, download/seed attivi e tipo di storage). Predefinito attivo. Disattivalo per fissare a mano cache e slot.",
+	"gxtorrent_dlna":                               "Abilita il media server DLNA/UPnP di gx-torrent: i media completati dei torrent sono visibili a TV e console sulla rete locale. Solo LAN, senza autenticazione; disattivato di default. Funziona solo con il motore gx-torrent.",
+	"gxtorrent_dlna_listen":                        "Indirizzo e porta di ascolto del media server DLNA (es. :8200 per tutte le interfacce, 192.168.1.10:8200 per una sola). Vuoto = :8200. La discovery usa UDP 1900 sulla stessa interfaccia.",
+	"gxtorrent_dlna_name":                          "Nome mostrato ai lettori DLNA sulla rete. Vuoto = gx-torrent.",
 }
 
 // uiSettingTooltip returns the tooltip for a setting key. Score weights without

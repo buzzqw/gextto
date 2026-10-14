@@ -354,7 +354,10 @@ inferior to the archived file.
   downloading, grey missing, dimmed skipped) on engines that expose it
   (gx-torrent). With gx-torrent every file has a **▶** button that opens the
   file's **HTTP streaming** (with Range): the pieces of the part being read are
-  downloaded first, so playback can start before the download finishes.
+  downloaded first, so playback can start before the download finishes. The same
+  streaming engine backs the **DLNA/UPnP media server** (option *gx-torrent —
+  DLNA/UPnP server*): TVs and consoles on the local network see the **completed**
+  media with no path to configure. LAN only, no authentication, off by default.
 - When you use **Move storage**, the log records the request, destination and
   command acceptance; the final outcome is written when libtorrent completes or
   rejects the move. With **Check**, the log distinguishes command start from
@@ -1392,6 +1395,9 @@ Recalculate scores* after changing weights.
 | gx-torrent — proxy (socks5:// or http://) | Proxy for peers, HTTP trackers and web seeds; with a proxy, DHT and UDP trackers are disabled (not shown). |
 | gx-torrent — request timeout | Timeout in seconds for HTTP requests to gx-torrent. *(Unit: seconds)* |
 | gx-torrent — polling interval | Minimum interval in milliseconds between torrent status reads (the daemon owns the queue). *(Unit: ms)* |
+| gx-torrent — DLNA/UPnP server | Enables the daemon's DLNA/UPnP media server: the torrents' **completed** media is visible to TVs and consoles on the local network. Local network only, no authentication; off by default. Works with the gx-torrent engine. |
+| gx-torrent — DLNA: HTTP bind | Address and port the media server listens on (e.g. `:8200` for all interfaces, `192.168.1.10:8200` for one). Empty = `:8200`. Discovery uses UDP 1900 on the same interface. |
+| gx-torrent — DLNA: server name | Name shown to the DLNA players on the network. Empty = `gx-torrent`. |
 
 **qBittorrent-nox**
 

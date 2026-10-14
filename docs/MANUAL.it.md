@@ -356,7 +356,10 @@ bloccata, già presente o inferiore al file archiviato.
   mancante, spento saltato): compare con i motori che la espongono (gx-torrent).
   Con gx-torrent ogni file ha un pulsante **▶** che apre lo **streaming HTTP**
   del file (con Range): i pezzi della parte letta vengono scaricati per primi,
-  così puoi iniziare a guardare prima che il download finisca.
+  così puoi iniziare a guardare prima che il download finisca. Lo stesso motore
+  di streaming serve il **media server DLNA/UPnP** (opzione *gx-torrent — server
+  DLNA/UPnP*): TV e console sulla rete locale vedono i media **completati** senza
+  configurare percorsi. È solo LAN, senza autenticazione, e disattivato di default.
 - Quando usi **Sposta storage**, il log registra richiesta, destinazione e
   accettazione del comando; l'esito finale viene scritto quando libtorrent
   completa o rifiuta lo spostamento. Con **Check** il log distingue comando
@@ -1435,6 +1438,9 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | gx-torrent — proxy (socks5:// o http://) | Proxy per peer, tracker HTTP e web seed; con un proxy DHT e tracker UDP vengono spenti (non visualizzato). |
 | gx-torrent — timeout richieste | Timeout in secondi delle richieste HTTP verso gx-torrent. *(Unità: secondi)* |
 | gx-torrent — intervallo polling | Intervallo minimo in millisecondi tra due letture dello stato dei torrent (la coda la gestisce il demone). *(Unità: ms)* |
+| gx-torrent — server DLNA/UPnP | Abilita il media server DLNA/UPnP del demone: i media **completati** dei torrent sono visibili a TV e console sulla rete locale. Solo rete locale, senza autenticazione; disattivato di default. Funziona con il motore gx-torrent. |
+| gx-torrent — DLNA: indirizzo HTTP | Indirizzo e porta di ascolto del media server (es. `:8200` per tutte le interfacce, `192.168.1.10:8200` per una sola). Vuoto = `:8200`. La discovery usa UDP 1900 sulla stessa interfaccia. |
+| gx-torrent — DLNA: nome del server | Nome mostrato ai lettori DLNA sulla rete. Vuoto = `gx-torrent`. |
 
 **qBittorrent-nox**
 

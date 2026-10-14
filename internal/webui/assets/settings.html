@@ -92,6 +92,14 @@ fieldset .muted{font-size:13px}
     <label class="chk"><input type="checkbox" name="sequential" value="1"{{SEQUENTIAL}} title="Download torrent pieces in sequential order for media streaming preview"> Download in sequential order</label>
   </div>
 </fieldset>
+<fieldset>
+  <legend>Media server (DLNA)</legend>
+  <div class="grid">
+    <label class="chk"><input type="checkbox" name="dlna-enabled" value="1"{{DLNA_ENABLED}} title="Advertise the completed media to DLNA/UPnP players (TV, console) on the local network. Off by default; local network only, no authentication."> Enable DLNA/UPnP media server</label>
+    <label>HTTP bind<input type="text" name="dlna-listen" value="{{DLNA_LISTEN}}" autocomplete="off" placeholder=":8200" title="Address and port the media server listens on, e.g. :8200 for all interfaces or 192.168.1.10:8200 for one. Discovery uses UDP 1900 on the same interface."></label>
+    <label>Server name<input type="text" name="dlna-name" value="{{DLNA_NAME}}" autocomplete="off" placeholder="gx-torrent" title="Friendly name shown to the DLNA players on the network."></label>
+  </div>
+</fieldset>
 <fieldset id="optimize">
   <legend>Optimization</legend>
   <p class="muted">One click puts the queue, the disk cache and the bandwidth on values that work well.</p>

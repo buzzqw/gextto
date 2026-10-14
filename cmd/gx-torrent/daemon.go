@@ -65,7 +65,13 @@ type Options struct {
 	NotifyURL string
 	// Mmap serves torrent files from a shared memory mapping (Linux), so piece
 	// writes are asynchronous page-cache writes. Experimental/opt-in.
-	Mmap        bool
+	Mmap bool
+	// DLNA is the opt-in DLNA/UPnP media server (dlna.go): enabled, HTTP bind
+	// and friendly name. In managed mode Gextto passes them as flags/env; in
+	// standalone settings.json overrides them (dlnaEnabled and friends read it).
+	DLNAEnabled bool
+	DLNAListen  string
+	DLNAName    string
 	Tick        time.Duration
 	ProbeWindow time.Duration
 }
@@ -253,6 +259,11 @@ type Daemon struct {
 	// feedPollMu serialises polls: the loop and the manual button must not run
 	// two polls against the same feed at once.
 	feedPollMu sync.Mutex
+	// streamMu guards activeStreams: how many streams (the UI player and the
+	// DLNA server) are reading a torrent right now, keyed by info hash, so
+	// closing one stream does not clear the engine window another still needs.
+	streamMu      sync.Mutex
+	activeStreams map[string]int
 	// archiveOnlyLogged remembers the feeds whose "archive only" notice was
 	// already printed: a feed with no rule and no filter is a valid, intentional
 	// configuration that only grows the archive, so the notice must not repeat at
@@ -751,6 +762,8 @@ func (d *Daemon) run(stop <-chan struct{}) {
 	go d.runAutoSpeed(stop)
 	// The IP filter refresh (standalone): a URL is downloaded and kept current.
 	go d.runIPFilterRefresh(stop)
+	// The DLNA media server follows its settings (off by default).
+	go d.runDLNA(stop)
 	ticker := time.NewTicker(d.opts.Tick)
 	defer ticker.Stop()
 	for {

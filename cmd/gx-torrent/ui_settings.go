@@ -171,6 +171,10 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	store.Set("dht-read-only", strconv.FormatBool(formBool(r, "dht-read-only")))
 	store.Set("web-sources-allow-private", strconv.FormatBool(formBool(r, "web-sources-allow-private")))
+	// DLNA media server (settings.json, applied by the DLNA loop).
+	store.Set(dlnaEnabledKey, strconv.FormatBool(formBool(r, "dlna-enabled")))
+	store.Set(dlnaListenKey, strings.TrimSpace(r.FormValue("dlna-listen")))
+	store.Set(dlnaNameKey, strings.TrimSpace(r.FormValue("dlna-name")))
 	for _, toggle := range []string{"dht", "pex", "utp", "holepunch", "lsd", "upnp", "natpmp"} {
 		store.Set("no-"+toggle, strconv.FormatBool(!formBool(r, toggle)))
 	}
@@ -329,6 +333,9 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{CACHE_MB}}", strconv.FormatInt(cacheMB, 10))
 	repl("{{PREALLOCATE}}", checkedIf(cfg.Preallocate))
 	repl("{{SEQUENTIAL}}", checkedIf(cfg.Sequential))
+	repl("{{DLNA_ENABLED}}", checkedIf(boolSetting(dlnaEnabledKey)))
+	repl("{{DLNA_LISTEN}}", get(dlnaListenKey))
+	repl("{{DLNA_NAME}}", get(dlnaNameKey))
 
 	repl("{{LANG_OPTIONS}}", languageOptions(store.Get("lang", "")))
 	repl("{{NOTIFY_URL}}", get("notify-url"))

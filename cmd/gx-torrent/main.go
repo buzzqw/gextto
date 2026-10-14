@@ -225,6 +225,9 @@ func main() {
 	gexttoLog := flag.String("gextto-log", envOr("GX_TORRENT_GEXTTO_LOG", ""), "Gextto log file shown in the web page's Gextto log tab")
 	notify := flag.String("notify-url", envOr("GX_TORRENT_NOTIFY_URL", ""), "webhook URL posted on feed match/error (empty = disabled)")
 	mmapStorage := flag.Bool("mmap", envBool("GX_TORRENT_MMAP", false), "serve torrent files from a shared memory mapping (Linux, experimental): writes are page-cache memcpy and reads avoid a syscall")
+	dlnaEnabled := flag.Bool("dlna", envBool("GX_TORRENT_DLNA", false), "enable the DLNA/UPnP media server for the completed media (LAN only)")
+	dlnaListen := flag.String("dlna-listen", envOr("GX_TORRENT_DLNA_LISTEN", ""), "DLNA media server HTTP bind address (default :8200)")
+	dlnaName := flag.String("dlna-name", envOr("GX_TORRENT_DLNA_NAME", ""), "DLNA media server friendly name (default gx-torrent)")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -297,6 +300,9 @@ func main() {
 	dhtBootstrapValue := optStr(settingsStore, "dht-bootstrap", *dhtBootstrap)
 	dhtReadOnlyValue := optBool(settingsStore, "dht-read-only", *dhtReadOnly)
 	webSourcesAllowPrivateValue := optBool(settingsStore, "web-sources-allow-private", *webSourcesAllowPrivate)
+	dlnaEnabledValue := optBool(settingsStore, dlnaEnabledKey, *dlnaEnabled)
+	dlnaListenValue := optStr(settingsStore, dlnaListenKey, *dlnaListen)
+	dlnaNameValue := optStr(settingsStore, dlnaNameKey, *dlnaName)
 	var allowed []string
 	for _, root := range strings.Split(*roots, ",") {
 		if root = strings.TrimSpace(root); root != "" {
@@ -346,6 +352,9 @@ func main() {
 		Lang:           langValue,
 		NotifyURL:      notifyURLValue,
 		Mmap:           *mmapStorage,
+		DLNAEnabled:    dlnaEnabledValue,
+		DLNAListen:     dlnaListenValue,
+		DLNAName:       dlnaNameValue,
 		Tick:           3 * time.Second,
 		ProbeWindow:    15 * time.Minute,
 	}

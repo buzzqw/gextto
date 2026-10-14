@@ -58,6 +58,7 @@ Code:
 - [Sequential download (streaming)](#sequential-download-streaming)
 - [BitTorrent v2 torrents](#bittorrent-v2-torrents)
 - [Local data reuse (Swarm Merging)](#local-data-reuse-swarm-merging)
+- [DLNA media server](#dlna-media-server)
 - [Statistics](#statistics)
 - [Piece diagnostics](#piece-diagnostics)
 - [HTTP streaming (HTTP Range)](#http-streaming-http-range)
@@ -1190,6 +1191,34 @@ The merge has three phases:
 The session statistics report `merged_pieces`, `merged_bytes` (block-level
 bytes included) and `merged_partial_pieces` (pieces reused at block level);
 Gextto shows them as «Riuso locale».
+
+## DLNA media server
+
+An **opt-in** DLNA/UPnP AV media server (`cmd/gx-torrent/dlna.go`) lets a TV or
+console on the LAN browse and play the **completed** torrents' media files with
+no client-side configuration. It is off by default and separate from the UI: it
+binds its own HTTP listener (`dlna-listen`, default `:8200`) and answers SSDP on
+UDP 1900 on the same interface.
+
+- **Discovery**: SSDP M-SEARCH replies and `ssdp:alive`/`byebye` NOTIFYs for a
+  `MediaServer:1` device.
+- **ContentDirectory:1** (`Browse`, `GetSystemUpdateID`, `GetSortCapabilities`)
+  and **ConnectionManager:1** (`GetProtocolInfo`); the root lists one container
+  per completed torrent with at least one media file, each container lists its
+  media files.
+- **Media**: `/res/<hash>/<file>` is served with HTTP Range by the same core as
+  the UI player (`serveTorrentFile`), so a file still downloading streams as soon
+  as the wanted pieces are there. Only **fully downloaded** torrents are exposed:
+  a renderer probes the container metadata (moov/cue) and a partial file plays
+  badly.
+- **Safety**: LAN only and no authentication, so it is off unless asked for; the
+  settings are `dlna-enabled`, `dlna-listen`, `dlna-name` (daemon page in
+  standalone, Gextto options `gxtorrent_dlna*` in managed).
+
+The media `Content-Type` comes from the file extension (`video/mp4`,
+`video/x-matroska`, `audio/flac`, …); a stream also sets
+`Content-Disposition: inline` and answers HEAD, so a browser plays it instead of
+downloading it.
 
 ## Statistics
 

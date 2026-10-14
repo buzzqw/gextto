@@ -166,6 +166,15 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 	if source := strings.TrimSpace(cfg.Libtorrent.IpFilterPath); source != "" {
 		args = append(args, "-ipfilter-source", source)
 	}
+	if strings.EqualFold(strings.TrimSpace(cfg.Settings["gxtorrent_dlna"]), "true") {
+		args = append(args, "-dlna")
+	}
+	if v := strings.TrimSpace(cfg.Settings["gxtorrent_dlna_listen"]); v != "" {
+		args = append(args, "-dlna-listen", v)
+	}
+	if v := strings.TrimSpace(cfg.Settings["gxtorrent_dlna_name"]); v != "" {
+		args = append(args, "-dlna-name", v)
+	}
 	env := os.Environ()
 	if settings.Token != "" {
 		// Passed through the environment, not argv, so it never shows in ps.
