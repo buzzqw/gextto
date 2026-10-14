@@ -1214,6 +1214,9 @@ UDP 1900 on the same interface.
 - **Safety**: LAN only and no authentication, so it is off unless asked for; the
   settings are `dlna-enabled`, `dlna-listen`, `dlna-name` (daemon page in
   standalone, Gextto options `gxtorrent_dlna*` in managed).
+- **Log**: the daemon log (and the page's log tab) records the server start/stop,
+  each M-SEARCH (throttled to once per source address per minute), each Browse
+  with the item count, and each media request with its Range.
 
 The media `Content-Type` comes from the file extension (`video/mp4`,
 `video/x-matroska`, `audio/flac`, …); a stream also sets
