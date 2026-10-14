@@ -359,7 +359,9 @@ channels (`internal/notify`: Telegram, email and webhook in the JSON, Discord, S
 Gotify, ntfy and Pushover formats, each switchable with a test button), and the
 standalone pages' usability (Browse… on the folders, the port test, the multi-folder
 DLNA library, Gextto's blocklist as the default IP filter, export/import of the RSS
-setup, `/regex/` wanted titles, the *Update available* indicator in the status bar).
+setup, `/regex/` wanted titles, the *Update available* indicator in the status bar, the
+**Statistics** page with this session and all-time totals — kept across restarts —,
+disk and cache, the network, the queue and a speed graph over 1 h/24 h/7 d).
 The standalone **self-update** is described in §3.
 
 **Swarm Merging** (file sharing between torrents). Different swarms holding **the same

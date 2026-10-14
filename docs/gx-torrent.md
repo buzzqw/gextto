@@ -1487,6 +1487,26 @@ The *Test ports* button (in Gextto and on the daemon page) does not read
 `/api/v1/stats`: it queries `GET /api/v1/portcheck`, which responds whether the peer port
 is listening and whether the router forwards it.
 
+The daemon also has its own **Statistics** page (`/ui/stats`, in the nav next to
+*Archive*): the qBittorrent-style view — live rates, the totals of this session and of
+**every** session, disk and cache, the network and the queue, a speed graph with three
+ranges (`1 h`, `24 h`, `7 d`) with peaks, and the busiest torrents right now. The page
+is a translated shell filled from the API, so it always shows the same data as
+`GET /api/v1/stats`.
+
+**All-time totals.** The engine's counters are per session (they start at zero when the
+daemon starts); the all-time downloaded/uploaded bytes are folded from them and kept in
+`<data>/lifetime.json` — atomic write, flushed at most every 60 s and on shutdown, and
+a no-op when the daemon has no data dir. A counter lower than the one already seen means
+the engine restarted its session: it is adopted without subtracting.
+
+**Speed history.** The speed is sampled every queue tick into three in-memory rings —
+one point per tick for the last hour, per minute for a day, per hour for a week — so any
+range is cheap to draw; the rings allocate nothing while sampling and, like
+qBittorrent's graph, start empty when the daemon restarts. `GET
+/api/v1/stats/history?range=1h|24h|7d` returns the points and the peaks of one range (an
+unknown range answers `1h`).
+
 ## Piece diagnostics
 
 `GET /api/v1/torrents/{hash}/pieces` reports the status of every piece as

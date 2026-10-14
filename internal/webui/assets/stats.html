@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>gx-torrent</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.ico">
+<script>try{var m=localStorage.getItem('gx-theme');if(m==='light'||m==='dark')document.documentElement.setAttribute('data-theme',m);}catch(e){}</script>
+<link rel="stylesheet" href="/assets/theme.css">
+<style>
+main.page{max-width:1080px}
+.panel{padding:16px;margin-bottom:16px}
+.panel h2{margin:0}
+.panel .cardtitle{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.panel .cardtitle h2{font-size:14px}
+.panel .cardtitle .right{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.stats{margin-bottom:16px}
+.stats .stat{flex:1;min-width:126px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media (max-width:760px){.cols{grid-template-columns:1fr}}
+.cols .panel{margin:0}
+.graph.big{margin:0;padding:6px 10px 10px;background:var(--sunken);border:1px solid var(--border);border-radius:var(--radius)}
+.graph.big svg{display:block;width:100%;height:170px}
+.graph .gl{stroke:var(--border);stroke-width:1;stroke-dasharray:3 4}
+.graph .legend{display:flex;gap:20px;flex-wrap:wrap;margin-top:8px;font-variant-numeric:tabular-nums}
+.graph .legend span{display:inline-flex;align-items:center;gap:6px}
+.graph .legend i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.graph .legend .dl{background:var(--info)}
+.graph .legend .ul{background:var(--ok)}
+.graph path.d{stroke:var(--info);fill:none;stroke-width:1.8}
+.graph path.u{stroke:var(--ok);fill:none;stroke-width:1.8}
+.graph path.da{fill:var(--info-soft);stroke:none}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0 20px;margin:0}
+.kv .row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.kv .row span{color:var(--muted)}
+.kv .row strong{font-weight:550;text-align:right;word-break:break-word;font-variant-numeric:tabular-nums}
+.tbl .num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl td.z{color:var(--subtle)}
+.aux{color:var(--subtle);font-size:12px}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/" title="gx-torrent"><img src="/favicon.ico" alt=""><span>gx-torrent</span></a>
+  <nav class="nav" aria-label="Sections"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/wanted" title="TV shows and movies wanted list">Wanted</a><a href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a class="on" href="/ui/stats" aria-current="page" title="Transfer, disk and network statistics">Statistics</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a></nav>
+  <span class="spacer"></span>
+  <button type="button" class="ghost icon" data-theme-switch data-label-auto="Theme: automatic (follows the system)" data-label-light="Theme: light" data-label-dark="Theme: dark" aria-label="Theme: automatic (follows the system)" title="Switch theme (automatic, light, dark)"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
+</header>
+<main class="page">
+  <div class="page-head">
+    <div class="grow">
+      <h1>Statistics</h1>
+      <p>Live transfer, the totals of this session and of every session, the disk and its cache, the network and the queue. The counters of this session start again when the daemon does.</p>
+    </div>
+  </div>
+
+  <section class="panel" aria-labelledby="h-transfer">
+    <div class="cardtitle">
+      <h2 id="h-transfer">Transfer</h2>
+      <div class="right">
+        <span class="chip in">↓ <span id="s-rate-d">—</span></span>
+        <span class="chip out">↑ <span id="s-rate-u">—</span></span>
+        <span class="chip"><span>Peak</span> ↓ <span id="s-peak-d">—</span> ↑ <span id="s-peak-u">—</span></span>
+      </div>
+    </div>
+    <div class="graph big">
+      <svg id="s-graph" viewBox="0 0 1024 170" preserveAspectRatio="none" role="img" aria-label="Download and upload speed over the selected period"></svg>
+      <div class="legend">
+        <span><i class="dl"></i><span>Downloaded</span> <span class="aux">—</span> <span id="s-legend-d">—</span></span>
+        <span><i class="ul"></i><span>Uploaded</span> <span class="aux">—</span> <span id="s-legend-u">—</span></span>
+      </div>
+    </div>
+    <div class="btn-group" role="group" aria-label="Time range" data-range-group style="margin-top:10px">
+      <button type="button" class="sm" data-range="1h" aria-pressed="true" title="Show the graph over this period">1 h</button>
+      <button type="button" class="sm" data-range="24h" aria-pressed="false" title="Show the graph over this period">24 h</button>
+      <button type="button" class="sm" data-range="7d" aria-pressed="false" title="Show the graph over this period">7 d</button>
+    </div>
+  </section>
+
+  <div class="stats">
+    <div class="stat"><b id="s-downloaded">—</b><span>Downloaded</span></div>
+    <div class="stat"><b id="s-uploaded">—</b><span>Uploaded</span></div>
+    <div class="stat"><b id="s-ratio">—</b><span>Session ratio</span></div>
+    <div class="stat"><b id="s-active">—</b><span>Active</span></div>
+    <div class="stat"><b id="s-peers">—</b><span>Peers</span></div>
+    <div class="stat"><b id="s-dht">—</b><span>DHT nodes</span></div>
+  </div>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="h-lifetime">
+      <div class="cardtitle"><h2 id="h-lifetime">Session &amp; lifetime</h2></div>
+      <div class="kv">
+        <div class="row"><span>Downloaded this session</span><strong id="v-sess-d">—</strong></div>
+        <div class="row"><span>Uploaded this session</span><strong id="v-sess-u">—</strong></div>
+        <div class="row"><span>All-time downloaded</span><strong id="v-all-d">—</strong></div>
+        <div class="row"><span>All-time uploaded</span><strong id="v-all-u">—</strong></div>
+        <div class="row"><span>All-time ratio</span><strong id="v-all-ratio">—</strong></div>
+        <div class="row"><span>Protocol overhead</span><strong id="v-overhead">—</strong></div>
+        <div class="row"><span>Uptime</span><strong id="v-uptime">—</strong></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-disk">
+      <div class="cardtitle"><h2 id="h-disk">Disk &amp; cache</h2></div>
+      <div class="kv">
+        <div class="row"><span>Free space</span><strong id="v-free">—</strong></div>
+        <div class="row"><span>Read cache</span><strong id="v-cache-r">—</strong></div>
+        <div class="row"><span>Write cache</span><strong id="v-cache-w">—</strong></div>
+        <div class="row"><span>Read / write operations</span><strong id="v-ops">—</strong></div>
+        <div class="row"><span>Memory available</span><strong id="v-mem">—</strong></div>
+        <div class="row"><span>Preallocate files</span><strong id="v-prealloc">—</strong></div>
+        <div class="row"><span>Storage errors</span><strong id="v-errors">—</strong></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-network">
+      <div class="cardtitle"><h2 id="h-network">Network</h2></div>
+      <div class="kv">
+        <div class="row"><span>Peer port</span><strong id="v-port">—</strong></div>
+        <div class="row"><span>Listen address</span><strong id="v-listen">—</strong></div>
+        <div class="row"><span>Port mapping</span><strong id="v-mapping">—</strong></div>
+        <div class="row"><span>DHT</span><strong id="v-dht">—</strong></div>
+        <div class="row"><span>Local peer discovery</span><strong id="v-lsd">—</strong></div>
+        <div class="row"><span>uTP</span><strong id="v-utp">—</strong></div>
+        <div class="row"><span>Encryption</span><strong id="v-crypto">—</strong></div>
+        <div class="row"><span>Proxy</span><strong id="v-proxy">—</strong></div>
+        <div class="row"><span>IP filter rules</span><strong id="v-ipfilter">—</strong></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-queue">
+      <div class="cardtitle"><h2 id="h-queue">Queue &amp; state</h2><span class="chip"><span id="v-torrents">—</span> <span>Torrents</span></span></div>
+      <div class="kv">
+        <div class="row"><span>Active downloads</span><strong id="v-adl">—</strong></div>
+        <div class="row"><span>Active seeds</span><strong id="v-aseed">—</strong></div>
+        <div class="row"><span>Queued</span><strong id="v-queued">—</strong></div>
+        <div class="row"><span>Stalled</span><strong id="v-stalled">—</strong></div>
+        <div class="row"><span>Slow</span><strong id="v-slow">—</strong></div>
+        <div class="row"><span>Moving</span><strong id="v-moving">—</strong></div>
+        <div class="row"><span>Paused</span><strong id="v-paused">—</strong></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="h-busiest">
+    <div class="cardtitle"><h2 id="h-busiest">Busiest right now</h2><span class="aux">At page load</span></div>
+    <div class="table-wrap">
+      <table class="tbl" style="width:100%">
+        <thead><tr><th scope="col">Name</th><th scope="col" class="num">↓</th><th scope="col" class="num">↑</th><th scope="col" class="num">Ratio</th><th scope="col" class="num">Peers</th></tr></thead>
+        <tbody id="s-busiest"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script id="ui-i18n"></script>
+<script src="/assets/common.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  function t(s) { return (window.__uiI18n && window.__uiI18n[s]) || s; }
+  function bytes(n) {
+    n = Number(n) || 0;
+    var u = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i === 0 ? n.toFixed(0) : n.toFixed(n < 10 ? 2 : 1)) + ' ' + u[i];
+  }
+  function rate(n) { return bytes(n) + '/s'; }
+  function ratio(v) { return (Number(v) || 0).toFixed(2); }
+  function uptime(sec) {
+    sec = Math.max(0, Math.floor(Number(sec) || 0));
+    var d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
+    if (d) { return d + 'd ' + h + 'h ' + m + 'm'; }
+    if (h) { return h + 'h ' + m + 'm'; }
+    return m + 'm';
+  }
+  function yesno(v) { return v ? t('Yes') : t('No'); }
+  function onoff(v) { return v ? t('On') : t('Off'); }
+
+  function fill(s) {
+    var sess = s.session || {};
+    var life = s.lifetime || {};
+    $('s-rate-d').textContent = rate(s.download_rate);
+    $('s-rate-u').textContent = rate(s.upload_rate);
+    $('s-downloaded').textContent = bytes(sess.bytes_downloaded);
+    $('s-uploaded').textContent = bytes(sess.bytes_uploaded);
+    $('s-ratio').textContent = ratio(s.ratio);
+    $('s-active').textContent = (s.downloading || 0) + (s.seeding || 0);
+    $('s-peers').textContent = s.peers || 0;
+    $('s-dht').textContent = sess.dht_nodes || 0;
+    $('s-legend-d').textContent = bytes(sess.bytes_downloaded);
+    $('s-legend-u').textContent = bytes(sess.bytes_uploaded);
+
+    $('v-sess-d').textContent = bytes(sess.bytes_downloaded);
+    $('v-sess-u').textContent = bytes(sess.bytes_uploaded);
+    $('v-all-d').textContent = bytes(life.downloaded_bytes);
+    $('v-all-u').textContent = bytes(life.uploaded_bytes);
+    $('v-all-ratio').textContent = ratio(life.ratio);
+    $('v-overhead').textContent = bytes(sess.protocol_overhead_bytes);
+    $('v-uptime').textContent = uptime(s.uptime_seconds);
+
+    $('v-free').textContent = bytes(s.disk_free_bytes) + ' / ' + bytes(s.disk_total_bytes);
+    $('v-cache-r').textContent = bytes((s.cache_read_mb || 0) * 1048576);
+    $('v-cache-w').textContent = bytes((s.cache_write_mb || 0) * 1048576);
+    $('v-ops').textContent = (sess.read_ops_total || 0).toLocaleString() + ' / ' + (sess.write_ops_total || 0).toLocaleString();
+    $('v-mem').textContent = s.mem_available_mb ? bytes(s.mem_available_mb * 1048576) : '—';
+    $('v-prealloc').textContent = yesno(s.preallocate);
+    $('v-errors').textContent = sess.storage_errors || 0;
+
+    $('v-port').textContent = s.peer_port || '—';
+    $('v-listen').textContent = s.listen_address || '—';
+    var pm = s.port_mapping || {};
+    $('v-mapping').textContent = pm.method && !pm.error ? t('Yes') : t('No');
+    $('v-dht').textContent = s.dht ? (sess.dht_nodes || 0) + ' ' + t('nodes') : t('Off');
+    $('v-lsd').textContent = s.lsd && s.lsd.enabled ? (s.lsd.peers_found || 0) + ' ' + t('nodes') : t('Off');
+    $('v-utp').textContent = onoff(s.utp);
+    $('v-crypto').textContent = ['Disabled', 'Enabled', 'Forced'][s.encryption] || '—';
+    if (s.encryption === 0) { $('v-crypto').textContent = t('Disabled'); }
+    if (s.encryption === 1) { $('v-crypto').textContent = t('Enabled'); }
+    if (s.encryption === 2) { $('v-crypto').textContent = t('Forced'); }
+    $('v-proxy').textContent = onoff(s.proxy);
+    $('v-ipfilter').textContent = (s.ip_filter_rules || 0).toLocaleString();
+
+    $('v-adl').textContent = (s.active_downloads || 0) + ' / ' + (s.active_limit || 0);
+    $('v-aseed').textContent = (s.active_seeds || 0) + ' / ' + (s.active_limit || 0);
+    $('v-queued').textContent = s.queued || 0;
+    $('v-stalled').textContent = s.stalled || 0;
+    $('v-slow').textContent = s.slow || 0;
+    $('v-moving').textContent = s.moving || 0;
+    $('v-paused').textContent = s.paused || 0;
+    $('v-torrents').textContent = s.torrents || 0;
+  }
+
+  function busiest(list) {
+    var rows = list.slice().sort(function (a, b) {
+      return (b.download_rate + b.upload_rate) - (a.download_rate + a.upload_rate);
+    }).slice(0, 5);
+    var body = $('s-busiest');
+    body.textContent = '';
+    rows.forEach(function (x) {
+      var tr = document.createElement('tr');
+      function td(text, cls) {
+        var c = document.createElement('td');
+        c.textContent = text;
+        if (cls) { c.className = cls; }
+        tr.appendChild(c);
+      }
+      td(x.name || x.hash);
+      td(x.download_rate ? rate(x.download_rate) : '—', 'num');
+      td(x.upload_rate ? rate(x.upload_rate) : '—', 'num');
+      td(ratio(x.uploaded && x.downloaded ? x.uploaded / x.downloaded : 0), 'num');
+      td(x.num_peers || 0, 'num');
+      body.appendChild(tr);
+    });
+  }
+
+  function draw(hist) {
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = $('s-graph');
+    while (svg.firstChild) { svg.removeChild(svg.firstChild); }
+    var d = hist.samples || [];
+    var W = 1024, H = 170, padT = 12, padB = 8;
+    var max = Math.max(1024, hist.down_peak || 0, hist.up_peak || 0);
+    var n = d.length;
+    function el(tag, attrs) { var e = document.createElementNS(NS, tag); for (var k in attrs) { e.setAttribute(k, attrs[k]); } return e; }
+    for (var g = 1; g <= 3; g++) {
+      var gy = (H - padB - (H - padT - padB) * g / 4).toFixed(1);
+      svg.appendChild(el('line', { x1: 0, y1: gy, x2: W, y2: gy, class: 'gl' }));
+    }
+    if (n < 2) { return; }
+    function x(i) { return (W * i / (n - 1)).toFixed(1); }
+    function y(v) { return (H - padB - (H - padT - padB) * (Number(v) || 0) / max).toFixed(1); }
+    function line(key) { return d.map(function (s, i) { return (i ? 'L' : 'M') + x(i) + ' ' + y(s[key]); }).join(' '); }
+    svg.appendChild(el('path', { class: 'da', d: line('d') + ' L ' + W + ' ' + (H - padB) + ' L 0 ' + (H - padB) + ' Z' }));
+    svg.appendChild(el('path', { class: 'd', d: line('d') }));
+    svg.appendChild(el('path', { class: 'u', d: line('u') }));
+  }
+
+  var range = '1h';
+  function loadHistory() {
+    fetch('/api/v1/stats/history?range=' + range, { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (h) {
+        draw(h);
+        $('s-peak-d').textContent = rate(h.down_peak);
+        $('s-peak-u').textContent = rate(h.up_peak);
+      }).catch(function (e) { console.error('gx-stats history', e); });
+  }
+  function loadStats() {
+    fetch('/api/v1/stats', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(fill).catch(function () {});
+  }
+  function loadBusiest() {
+    fetch('/api/v1/torrents', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { busiest(Array.isArray(d) ? d : (d.torrents || [])); }).catch(function () {});
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-range]'), function (btn) {
+    btn.addEventListener('click', function () {
+      range = btn.getAttribute('data-range');
+      Array.prototype.forEach.call(document.querySelectorAll('[data-range]'), function (b) {
+        b.setAttribute('aria-pressed', String(b === btn));
+      });
+      loadHistory();
+    });
+  });
+  function refresh() { loadStats(); loadHistory(); loadBusiest(); }
+  refresh();
+  setInterval(refresh, 3000);
+})();
+</script>
+</body>
+</html>

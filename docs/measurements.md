@@ -123,6 +123,21 @@ Matching 16 unrelated v2 candidates costs ~1.6 µs once per torrent (one small m
 candidate) and the picker/peer/piece-write paths are not touched, so the merge cannot
 affect seeding or download throughput.
 
+**Statistics page** (2026-10-14, Intel N97, `go test -bench … -benchmem` + RSS/CPU
+probe of the standalone daemon, 0 torrents). What the page adds to the tick is a
+history sample and the folding of the session byte counters into the all-time totals,
+both free at the sampling path: `BenchmarkRateHistoryAdd` **42 ns/op, 0 allocs/op** and
+`BenchmarkLifetimeAccumulate` **6.4 ns/op, 0 allocs/op**. A graph request pays
+`BenchmarkRateHistorySnapshot1h` **11.3 µs/op, 20 KiB, 1 alloc/op** (the output slice,
+one per request) and the page translation `BenchmarkStatsPageTranslate`
+**255 µs/op, 89 KiB, 1,919 allocs/op**. Over 30 s idle the daemon spent **89 → 91 CPU
+ticks (+20 ms, +2 %)** and with the page open, polling every 3 s, the same ticks
+(88–91 vs 89 baseline): within run-to-run noise. RSS after the first 35 s is
+indistinguishable (~108–114 MB both, dominated by the engine's early growth), and the
+Go-pure binary grew **24,075,951 → 24,128,331 bytes (+52 KiB)**: the page and the new
+code. The three history rings (1 200 + 1 440 + 168 points × 16 bytes) are ~45 KiB of
+fixed resident memory.
+
 **uTP retransmission.** The RTO consumes the loss signal. A **minimum-RTT floor of
 5 ms**: without it a fast path (loopback or LAN, RTT of tens of µs) collapses the RTO
 to sub-ms and a briefly stalled peer becomes a resend storm — on the silent-peer

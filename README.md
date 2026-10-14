@@ -318,7 +318,10 @@ fewer features, but all the ones a standalone client needs.
   sidebar with status/category/tag filters and a live transfer graph, dense
   sortable multi-select list with context menu and keyboard shortcuts, torrent
   detail in a side panel, drag-and-drop of `.torrent` files and pasted
-  magnets, phone-friendly cards. Every page axe-core checked.
+  magnets, phone-friendly cards, and a **Statistics** page (live rates, the
+  totals of this session and of every session — kept across restarts —, disk
+  and cache, the network, the queue and a speed graph over 1 h/24 h/7 d).
+  Every page axe-core checked.
 - **RSS and automation.** A **Wanted** page (cards per title with Have/Missing
   episodes, an episode manager to mark what you have or miss and force a new
   search, guided add dialog) and an **RSS & Indexers** page (feeds, rules,

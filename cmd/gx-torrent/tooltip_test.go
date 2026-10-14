@@ -26,6 +26,7 @@ func TestEveryOptionHasATooltip(t *testing.T) {
 		{"rss.html", assets.RSSPage()},
 		{"settings.html", assets.SettingsPage()},
 		{"archive.html", assets.ArchivePage()},
+		{"stats.html", assets.StatsPage()},
 		{"setup.html", assets.SetupPage()},
 	}
 	control := regexp.MustCompile(`<(?:input|select|textarea)\b[^>]*>`)

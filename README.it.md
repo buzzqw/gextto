@@ -330,7 +330,10 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
   barra laterale con filtri per stato/categoria/tag e grafico del traffico,
   elenco denso ordinabile con selezione multipla, menu contestuale e
   scorciatoie, dettaglio in un pannello laterale, trascinamento dei `.torrent`
-  e magnet incollati, schede su telefono. Ogni pagina verificata con axe-core.
+  e magnet incollati, schede su telefono, e una pagina **Statistiche**
+  (velocità dal vivo, i totali di questa sessione e di tutte le sessioni —
+  mantenuti tra i riavvii —, disco e cache, rete, coda e un grafico delle
+  velocità su 1 h/24 h/7 d). Ogni pagina verificata con axe-core.
 - **RSS e automazione.** Pagina **Cercati** (schede per titolo con episodi
   Have/Missing, gestore puntate per segnare cosa hai o manca e forzare una nuova
   ricerca, finestra guidata di aggiunta) e pagina **RSS & Indexer** (feed,
