@@ -12,7 +12,7 @@ needs.
 | [Access keys](api-keys.md) | English version: the Gextto API key and the gx-torrent token. |
 | [Guida avanzata (Italiano)](ADVANCED.it.md) | NAS, permissions, proxy, backup and diagnostics. |
 | [Advanced guide](ADVANCED.en.md) | English advanced-operation guide. |
-| [HTTP API](API.md) | Automations and integrations that use the daemon. |
+| [HTTP API](API.md) | The route tables of the Gextto daemon and of the gx-torrent daemon (`/api/v1` and `/api/v2`) for automations and integrations. |
 | [Migration](MIGRATION.md) | A safe move from a previous install. |
 | [qBittorrent-nox for Gextto](qbittorrent-nox.md) | How to configure the qBittorrent-nox backend: settings, path mapping, examples and typical cases. |
 | [Security](SECURITY.md) | Network exposure, secrets and vulnerability reporting. |

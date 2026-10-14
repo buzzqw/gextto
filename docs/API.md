@@ -4,6 +4,10 @@ This is the table of the public routes registered by the daemon. It is a
 surface reference, not a stable integration contract for every payload: before
 automating an action, check the request and the response on the running build.
 
+The document covers two servers: the **Gextto daemon** (`/api/…`, the routes
+below) and the **gx-torrent daemon**, which exposes its own native `/api/v1` and
+a qBittorrent-compatible `/api/v2` (see *gx-torrent daemon routes* at the end).
+
 ## Before using the API
 
 - By default the API is open, as on a trusted LAN. With
@@ -29,7 +33,7 @@ internal HTMX routes under `/v2` are not part of this integration table and may
 change. The old `/ui` route is no longer available. For operational checks use
 `GET /api/health` and `GET /api/status` first.
 
-## Route
+## Gextto routes
 
 | Method | Path |
 |---|---|
@@ -130,7 +134,6 @@ change. The old `/ui` route is no longer available. For operational checks use
 | POST | `/api/jobs/{id}/cancel` |
 | GET | `/api/last_cycle` |
 | GET | `/api/last_cycles` |
-| GET | `/api/torrents/session-stats` |
 | GET | `/api/license` |
 | POST | `/api/log-level` |
 | GET | `/api/log_level` |
@@ -255,6 +258,7 @@ change. The old `/ui` route is no longer available. For operational checks use
 | POST | `/api/torrents/remove` |
 | POST | `/api/torrents/remove_completed` |
 | POST | `/api/torrents/sequential` |
+| GET | `/api/torrents/session-stats` |
 | POST | `/api/torrents/set_limits` |
 | GET | `/api/torrents/stats` |
 | GET | `/api/torrents/temp-limits` |
@@ -301,4 +305,163 @@ change. The old `/ui` route is no longer available. For operational checks use
 | GET | `/feed/calendar.ics` |
 | GET | `/magnet` |
 
-Total routes: 273
+Total routes: 267
+
+## gx-torrent daemon routes
+
+The `gx-torrent` daemon (also usable standalone, without Gextto) serves its own
+API on its listen address (default `127.0.0.1:8890`). Two dialects are exposed:
+
+- the **native API** under `/api/v1`;
+- the **qBittorrent-compatible API** under `/api/v2`, so a client written for
+  qBittorrent can talk to it unchanged.
+
+When the daemon is reachable on the network, protect it with the shared token
+`gxtorrent_token`: the `/api/v1` clients send the header `X-Gx-Token: <token>`,
+or log in on the daemon page. The qBittorrent-compatible `/api/v2` POSTs do not
+use the token; they are protected by an `Origin`/`Referer` check instead, so a
+qBittorrent client keeps working unchanged. What the token is and how to
+generate it is in [`api-keys.md`](api-keys.md) /
+[`api-keys.it.md`](api-keys.it.md). The daemon also serves its own
+server-rendered UI under `/ui`; those HTML routes are not part of this table.
+
+### Native API (`/api/v1`)
+
+| Method | Path |
+|---|---|
+| POST | `/api/v1/add` |
+| POST | `/api/v1/add-file` |
+| GET | `/api/v1/config` |
+| POST | `/api/v1/config` |
+| POST | `/api/v1/create-torrent` |
+| GET | `/api/v1/dht-feed` |
+| GET | `/api/v1/health` |
+| POST | `/api/v1/ipfilter` |
+| POST | `/api/v1/pins/clear` |
+| GET | `/api/v1/portcheck` |
+| GET | `/api/v1/stats` |
+| GET | `/api/v1/stats/history` |
+| GET | `/api/v1/torrents` |
+| DELETE | `/api/v1/torrents/{hash}` |
+| GET | `/api/v1/torrents/{hash}` |
+| POST | `/api/v1/torrents/{hash}/{action}` |
+| GET | `/api/v1/torrents/{hash}/{what}` |
+
+The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
+`peers`, `trackers`. The `{action}` of
+`POST /api/v1/torrents/{hash}/{action}` is one of `pause`, `resume`,
+`verify`, `reannounce`, `restart`, `park`, `unpark`, `pin`, `top`, `rename`,
+`rename-file`, `rename-folder`, `move`, `associate`, `seed-limits`,
+`conn-limits`, `super-seeding`, `file-priorities`, `trackers`, `set-trackers`,
+`webseeds`.
+
+### qBittorrent-compatible API (`/api/v2`)
+
+| Method | Path |
+|---|---|
+| GET | `/api/v2/app/buildInfo` |
+| GET | `/api/v2/app/cookies` |
+| GET | `/api/v2/app/defaultSavePath` |
+| GET | `/api/v2/app/networkInterfaceAddressList` |
+| GET | `/api/v2/app/networkInterfaceList` |
+| GET | `/api/v2/app/preferences` |
+| POST | `/api/v2/app/setCookies` |
+| POST | `/api/v2/app/setPreferences` |
+| POST | `/api/v2/app/shutdown` |
+| GET | `/api/v2/app/version` |
+| GET | `/api/v2/app/webapiVersion` |
+| POST | `/api/v2/auth/login` |
+| POST | `/api/v2/auth/logout` |
+| GET | `/api/v2/log/main` |
+| GET | `/api/v2/log/peers` |
+| POST | `/api/v2/rss/addFeed` |
+| POST | `/api/v2/rss/addFolder` |
+| GET | `/api/v2/rss/items` |
+| POST | `/api/v2/rss/markAsRead` |
+| GET | `/api/v2/rss/matchingArticles` |
+| POST | `/api/v2/rss/moveItem` |
+| POST | `/api/v2/rss/refreshItem` |
+| POST | `/api/v2/rss/removeItem` |
+| POST | `/api/v2/rss/removeRule` |
+| POST | `/api/v2/rss/renameRule` |
+| GET | `/api/v2/rss/rules` |
+| POST | `/api/v2/rss/setFeedRefreshInterval` |
+| POST | `/api/v2/rss/setFeedURL` |
+| POST | `/api/v2/rss/setRule` |
+| POST | `/api/v2/search/delete` |
+| POST | `/api/v2/search/enablePlugin` |
+| POST | `/api/v2/search/installPlugin` |
+| GET | `/api/v2/search/plugins` |
+| GET | `/api/v2/search/results` |
+| POST | `/api/v2/search/start` |
+| GET | `/api/v2/search/status` |
+| POST | `/api/v2/search/stop` |
+| POST | `/api/v2/search/uninstallPlugin` |
+| POST | `/api/v2/search/updatePlugins` |
+| GET | `/api/v2/sync/maindata` |
+| GET | `/api/v2/sync/torrentPeers` |
+| POST | `/api/v2/torrentcreator/addTask` |
+| POST | `/api/v2/torrentcreator/deleteTask` |
+| GET | `/api/v2/torrentcreator/status` |
+| GET | `/api/v2/torrentcreator/torrentFile` |
+| POST | `/api/v2/torrents/add` |
+| POST | `/api/v2/torrents/addPeers` |
+| POST | `/api/v2/torrents/addTags` |
+| POST | `/api/v2/torrents/addTrackers` |
+| POST | `/api/v2/torrents/bottomPrio` |
+| GET | `/api/v2/torrents/categories` |
+| POST | `/api/v2/torrents/createCategory` |
+| POST | `/api/v2/torrents/createTags` |
+| POST | `/api/v2/torrents/decreasePrio` |
+| POST | `/api/v2/torrents/delete` |
+| POST | `/api/v2/torrents/deleteTags` |
+| GET | `/api/v2/torrents/downloadLimit` |
+| POST | `/api/v2/torrents/downloadLimit` |
+| POST | `/api/v2/torrents/editCategory` |
+| POST | `/api/v2/torrents/editTracker` |
+| GET | `/api/v2/torrents/export` |
+| POST | `/api/v2/torrents/filePrio` |
+| GET | `/api/v2/torrents/files` |
+| POST | `/api/v2/torrents/increasePrio` |
+| GET | `/api/v2/torrents/info` |
+| POST | `/api/v2/torrents/pause` |
+| GET | `/api/v2/torrents/pieceHashes` |
+| GET | `/api/v2/torrents/pieceStates` |
+| GET | `/api/v2/torrents/properties` |
+| POST | `/api/v2/torrents/reannounce` |
+| POST | `/api/v2/torrents/recheck` |
+| POST | `/api/v2/torrents/removeCategories` |
+| POST | `/api/v2/torrents/removeTags` |
+| POST | `/api/v2/torrents/removeTrackers` |
+| POST | `/api/v2/torrents/rename` |
+| POST | `/api/v2/torrents/renameFile` |
+| POST | `/api/v2/torrents/renameFolder` |
+| POST | `/api/v2/torrents/resume` |
+| POST | `/api/v2/torrents/setAutoManagement` |
+| POST | `/api/v2/torrents/setCategory` |
+| POST | `/api/v2/torrents/setDownloadLimit` |
+| POST | `/api/v2/torrents/setForceStart` |
+| POST | `/api/v2/torrents/setLocation` |
+| POST | `/api/v2/torrents/setShareLimits` |
+| POST | `/api/v2/torrents/setSuperSeeding` |
+| POST | `/api/v2/torrents/setUploadLimit` |
+| POST | `/api/v2/torrents/start` |
+| POST | `/api/v2/torrents/stop` |
+| GET | `/api/v2/torrents/tags` |
+| POST | `/api/v2/torrents/toggleFirstLastPiecePrio` |
+| POST | `/api/v2/torrents/toggleSequentialDownload` |
+| POST | `/api/v2/torrents/topPrio` |
+| GET | `/api/v2/torrents/trackers` |
+| GET | `/api/v2/torrents/uploadLimit` |
+| POST | `/api/v2/torrents/uploadLimit` |
+| GET | `/api/v2/torrents/webseeds` |
+| POST | `/api/v2/transfer/banPeers` |
+| GET | `/api/v2/transfer/downloadLimit` |
+| GET | `/api/v2/transfer/info` |
+| POST | `/api/v2/transfer/setDownloadLimit` |
+| POST | `/api/v2/transfer/setUploadLimit` |
+| GET | `/api/v2/transfer/speedLimitsMode` |
+| POST | `/api/v2/transfer/toggleSpeedLimitsMode` |
+| GET | `/api/v2/transfer/uploadLimit` |
+
+Total routes: 17 (gx-torrent `/api/v1`) + 104 (gx-torrent `/api/v2`).

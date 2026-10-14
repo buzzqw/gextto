@@ -87,7 +87,9 @@ When adding an API endpoint:
 3. add authorization, validation and bounded input handling;
 4. document it in `docs/API.md`;
 5. add a focused Go test and, when it changes the UI, a Playwright test;
-6. keep the route table in `docs/API.md` aligned.
+6. keep the route table in `docs/API.md` aligned
+   (`TestAPIDocumentationMatchesRouter` for Gextto, `TestAPIRoutesAreDocumented`
+   for the gx-torrent `/api/v1` and `/api/v2` tables).
 
 Use the existing JSON helpers and keep destructive operations explicit and
 confirmable in the UI.
