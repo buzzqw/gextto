@@ -317,5 +317,25 @@ func (d *Daemon) handleUIWebUIInstall(w http.ResponseWriter, r *http.Request) {
 		d.uiRedirect(w, r, nil, "", fmt.Errorf("VueTorrent: %w", err))
 		return
 	}
+	if err := d.applyAltWebUICheckbox(r); err != nil {
+		d.uiRedirect(w, r, nil, "", fmt.Errorf("VueTorrent: %w", err))
+		return
+	}
 	d.uiRedirect(w, r, nil, "VueTorrent "+version+" installed", nil)
+}
+
+// applyAltWebUICheckbox turns the alternative interface on when the install
+// submission carried the checked box (the button lives in the settings form),
+// so "check + install" enables it in one step, and persists the store: the
+// values live in memory until a save, and an unsaved switch is lost on restart.
+// An unchecked box is left alone — installing or updating must not disable it.
+func (d *Daemon) applyAltWebUICheckbox(r *http.Request) error {
+	if !formBool(r, "webui-alternative") {
+		return nil
+	}
+	d.opts.Settings.Set(altWebUISettingKey, "true")
+	if err := d.opts.Settings.Save(); err != nil {
+		return fmt.Errorf("cannot save the settings: %w", err)
+	}
+	return nil
 }

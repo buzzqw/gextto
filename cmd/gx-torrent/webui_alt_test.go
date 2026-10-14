@@ -8,7 +8,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/settings"
 )
 
 func TestAltWebUIExtract(t *testing.T) {
@@ -101,5 +104,44 @@ func TestAltWebUIFallback(t *testing.T) {
 	d.opts.Settings.Set(altWebUISettingKey, "false")
 	if code, _ := fetch("GET", "/"); code != http.StatusNotFound {
 		t.Fatalf("disabled root: %d", code)
+	}
+}
+
+// TestApplyAltWebUICheckboxEnablesAndPersists: the install button lives in the
+// settings form, so "check + install" must enable the interface in one step and
+// write the settings file (the store keeps values in memory until a save). An
+// unchecked submission must leave the setting alone.
+func TestApplyAltWebUICheckboxEnablesAndPersists(t *testing.T) {
+	dir := t.TempDir()
+	store, err := settings.Load(filepath.Join(dir, "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := &Daemon{opts: Options{Mode: ModeStandalone, Settings: store}}
+	post := func(body string) *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/ui/webui-install", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		return r
+	}
+
+	if err := d.applyAltWebUICheckbox(post("webui-alternative=1")); err != nil {
+		t.Fatal(err)
+	}
+	if !d.altWebUIEnabled() {
+		t.Fatal("a checked install must enable the alternative interface")
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"webui-alternative": "true"`) {
+		t.Fatalf("the switch was not persisted, it would be lost on restart: %s", raw)
+	}
+
+	if err := d.applyAltWebUICheckbox(post("")); err != nil {
+		t.Fatal(err)
+	}
+	if !d.altWebUIEnabled() {
+		t.Fatal("an unchecked install must not disable the interface")
 	}
 }
