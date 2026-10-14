@@ -169,7 +169,7 @@ deprecati o di nicchia e WebTorrent/I2P sono fuori scope, con le motivazioni
 nello stesso documento. Oltre i BEP: **tracker `ws://`/`wss://`** (protocollo
 WebTorrent, con l'avvertenza che il tracker di riferimento restituisce solo peer
 WebRTC) e **feed DHT** (URL di feed `dht://<pubkey>` risolti da un item
-mutabile BEP 46) — vedi [`docs/beyond-bep.md`](docs/beyond-bep.md).
+mutabile BEP 46).
 
 **Riuso locale.** Gli hint `similar`/`collections` (BEP 38) sono conservati
 nell'export e confrontati con gli altri torrent locali
@@ -453,7 +453,6 @@ tastiera e tecnologie assistive. Ambito e limiti:
 | Usare il servizio | [Manuale italiano](docs/MANUAL.it.md) · [English manual](docs/MANUAL.en.md) |
 | Architettura e design | [Architettura](docs/ARCHITECTURE.md) |
 | Specifiche BitTorrent (BEP) | [Conformità BEP](docs/bep.md) |
-| Oltre i BEP (tracker WebSocket, feed DHT) | [Oltre i BEP](docs/beyond-bep.md) |
 | Stato tecnico, misure e backlog | [Stato, misure e backlog](docs/evoluzione.md) |
 | NAS, reverse proxy, ripristino | [Guida avanzata](docs/ADVANCED.it.md) |
 | Integrazioni HTTP | [Riferimento API](docs/API.md) |

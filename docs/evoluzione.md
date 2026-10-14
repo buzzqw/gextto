@@ -401,7 +401,7 @@ and exists only standalone, like the bandwidth scheduler (in managed mode Gextto
 the limits). A managed version on Gextto's side would measure the RTT and modulate the
 limits through `SetLimits` (§8).
 
-**Extensions outside the BEPs** (analysis in [`beyond-bep.md`](beyond-bep.md)): a
+**Extensions outside the BEPs**: a
 **WebSocket tracker** (ws/wss, an original bounded RFC 6455 client plus the
 WebTorrent/bittorrent-tracker protocol, dialled through the same egress as the HTTP
 tracker — proxy, resolver, blocklist), **DHT feeds** (a `dht://<pubkey-hex>[?salt=]` URL

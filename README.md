@@ -161,8 +161,7 @@ store, `urn:btpk:` updates) plus v2 and magnet `so=` selection. Deprecated or
 niche BEPs and WebTorrent/I2P are out of scope, with rationale in the same
 document. Beyond the BEPs: **`ws://`/`wss://` trackers** (WebTorrent protocol,
 with the caveat that the reference tracker returns only WebRTC peers) and
-**DHT feeds** (`dht://<pubkey>` feed URLs resolved from a BEP 46 mutable item)
-— see [`docs/beyond-bep.md`](docs/beyond-bep.md).
+**DHT feeds** (`dht://<pubkey>` feed URLs resolved from a BEP 46 mutable item).
 
 **Local reuse.** A torrent's `similar`/`collections` hints (BEP 38) are kept on
 export and matched against local torrents
@@ -439,7 +438,6 @@ is still required. Scope and limits:
 | Operate the service | [English manual](docs/MANUAL.en.md) · [Manuale italiano](docs/MANUAL.it.md) |
 | Architecture and design | [Architecture](docs/ARCHITECTURE.md) |
 | BitTorrent specifications (BEPs) | [BEP compliance](docs/bep.md) |
-| Beyond the BEPs (WebSocket trackers, DHT feed) | [Beyond the BEPs](docs/beyond-bep.md) |
 | Technical state, measurements and backlog | [State, measurements and backlog](docs/evoluzione.md) |
 | NAS, reverse proxy, recovery | [Advanced guide](docs/ADVANCED.en.md) |
 | HTTP integrations | [API reference](docs/API.md) |

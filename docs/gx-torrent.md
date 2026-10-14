@@ -700,8 +700,7 @@ results as feed items (same rules, dedup and actions). Example:
 
 A feed can also be a **DHT feed**: `url` of the form
 `dht://<ed25519-pubkey-hex>[?salt=<hex>]` is resolved from the DHT as a BEP 46
-signed mutable item listing torrents (see
-[`beyond-bep.md`](beyond-bep.md) §6); each entry becomes a magnet item, so the
+signed mutable item listing torrents; each entry becomes a magnet item, so the
 same rules/archive/add path applies. `GET /api/v1/dht-feed?key=<hex>[&salt=<hex>]`
 resolves one for external consumers. It needs the DHT enabled.
 
@@ -1098,7 +1097,7 @@ RPC server is disabled.
     dialed through the same egress as the HTTP tracker and closed with the
     session. Note that the reference `bittorrent-tracker` returns only WebRTC
     peers to a WebSocket client, so a native client receives no TCP peers from
-    it (see [`beyond-bep.md`](beyond-bep.md) §3).
+    it.
 - **BEP 38 hints** (`similar`/`collections`).
   - The `.torrent` hints (from the info dictionary and from the top level, merged)
     are shown in the General tab together with the **local** torrents that
@@ -1349,7 +1348,7 @@ The merge has three phases:
   checked against its own hash before it is written. v1 has no per-block hash,
   so a piece only partly covered by the source is **not** reused (no block-level
   write), and a wrong metadata match is abandoned after 64 hash failures instead
-  of reading the whole source. See [`beyond-bep.md`](beyond-bep.md) §5.
+  of reading the whole source.
 
 The session statistics report `merged_pieces`, `merged_bytes` (block-level
 bytes included) and `merged_partial_pieces` (pieces reused at block level);
