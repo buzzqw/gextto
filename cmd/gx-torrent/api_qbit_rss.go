@@ -7,10 +7,12 @@ package main
 // in settings.json; folders are the feeds' "folder" field plus an explicit list
 // (rss-folders) so an empty folder created via the API survives.
 //
-// Semantic note: qBittorrent's rule "mustContain" requires ALL the words, while
-// gx-core's include is "at least one". setRule maps mustContain to the include
-// list (OR), so a multi-word mustContain is more permissive here; the gx rule
-// editor is the place for precise AND filtering. Registered only in standalone.
+// Rule terms: qBittorrent's "mustContain" requires every word, and "|"
+// separates alternatives. setRule maps the words to the rule's Require list
+// (every term) and single-word alternatives to Include (one of), so a rule
+// set through this API takes what it takes in qBittorrent; the reverse
+// mapping renders Require as words and Include as "a|b". Registered only in
+// standalone.
 
 import (
 	"crypto/sha1"
@@ -374,8 +376,11 @@ func gxRuleToQbit(rule rss.Rule, urlByFeed map[string]string) map[string]any {
 	if rule.Enabled != nil {
 		enabled = *rule.Enabled
 	}
-	mustContain := strings.Join(rule.Match.Include, " ")
-	mustNotContain := strings.Join(rule.Match.Exclude, " ")
+	mustContain := strings.Join(rule.Match.Require, " ")
+	if mustContain == "" {
+		mustContain = strings.Join(rule.Match.Include, "|")
+	}
+	mustNotContain := strings.Join(rule.Match.Exclude, "|")
 	useRegex := false
 	if rule.Match.Regex != "" {
 		mustContain = rule.Match.Regex
@@ -495,8 +500,8 @@ func (d *Daemon) handleQbitRssSetRule(w http.ResponseWriter, r *http.Request) {
 		rule.Match.Regex = strings.TrimSpace(def.MustContain)
 		rule.Match.NotRegex = strings.TrimSpace(def.MustNotContain)
 	} else {
-		rule.Match.Include = qbitTerms(def.MustContain)
-		rule.Match.Exclude = qbitTerms(def.MustNotContain)
+		rule.Match.Include, rule.Match.Require = qbitMustContain(def.MustContain)
+		rule.Match.Exclude = qbitMustNotContain(def.MustNotContain)
 	}
 	for _, url := range def.AffectedFeeds {
 		if name, ok := nameByFeedURL[url]; ok {
@@ -522,6 +527,36 @@ func (d *Daemon) handleQbitRssSetRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// qbitMustContain maps qBittorrent's mustContain onto the rule terms: words
+// without "|" must all appear (Require); "a|b|c" is one of them (Include),
+// each alternative kept as a phrase.
+func qbitMustContain(value string) (include, require []string) {
+	if !strings.Contains(value, "|") {
+		return nil, qbitTerms(value)
+	}
+	for _, alt := range strings.Split(value, "|") {
+		if alt = strings.Join(strings.Fields(alt), " "); alt != "" {
+			include = append(include, alt)
+		}
+	}
+	return include, nil
+}
+
+// qbitMustNotContain maps mustNotContain: "a|b" excludes either alternative;
+// plain words each exclude (the stricter reading of "a b").
+func qbitMustNotContain(value string) []string {
+	if !strings.Contains(value, "|") {
+		return qbitTerms(value)
+	}
+	var out []string
+	for _, alt := range strings.Split(value, "|") {
+		if alt = strings.Join(strings.Fields(alt), " "); alt != "" {
+			out = append(out, alt)
+		}
+	}
+	return out
 }
 
 // qbitTerms splits a qBittorrent mustContain/mustNotContain value into terms.

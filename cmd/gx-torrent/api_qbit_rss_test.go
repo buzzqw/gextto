@@ -5,7 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/rss"
 )
 
 // TestQbitRssAPI covers the qBittorrent RSS API mapped onto the daemon's feeds
@@ -152,4 +155,28 @@ func keysOf(m map[string]json.RawMessage) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// TestQbitMustContainMapsWordsToEveryTerm checks the qBittorrent rule terms
+// keep their meaning: words are all required, "|" separates alternatives.
+func TestQbitMustContainMapsWordsToEveryTerm(t *testing.T) {
+	include, require := qbitMustContain("the office 1080p")
+	if len(include) != 0 || strings.Join(require, ",") != "the,office,1080p" {
+		t.Fatalf("words: include=%v require=%v", include, require)
+	}
+	include, require = qbitMustContain("1080p|2160p | ted lasso")
+	if len(require) != 0 || strings.Join(include, ",") != "1080p,2160p,ted lasso" {
+		t.Fatalf("alternatives: include=%v require=%v", include, require)
+	}
+	if got := qbitMustNotContain("cam|hd ts"); strings.Join(got, ",") != "cam,hd ts" {
+		t.Fatalf("mustNotContain alternatives = %v", got)
+	}
+	rule := rss.Rule{Match: rss.Criteria{Require: []string{"the", "office"}}}
+	if got := gxRuleToQbit(rule, nil)["mustContain"]; got != "the office" {
+		t.Fatalf("mustContain rendered as %q", got)
+	}
+	rule = rss.Rule{Match: rss.Criteria{Include: []string{"1080p", "2160p"}}}
+	if got := gxRuleToQbit(rule, nil)["mustContain"]; got != "1080p|2160p" {
+		t.Fatalf("mustContain rendered as %q", got)
+	}
 }

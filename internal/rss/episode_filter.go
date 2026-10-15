@@ -7,7 +7,8 @@ package rss
 //	1x01           a single episode
 //	1x01-05        a range within one season
 //	1x01-1x05      a range across seasons (expanded)
-//	1x01-          open-ended: episode 1 and later of that season
+//	1x01-          open-ended: episode 1 and later, and every later season
+//	               (qBittorrent's meaning; wanted "1+" relies on it)
 //	1x??  1x*      every episode of that season
 //	S01E01 …       the SxxExx form is accepted too
 //	S01E01-E05     the SxxExx form with an episode-range tail
@@ -36,6 +37,8 @@ type episodeRange struct {
 	to     int
 	any    bool
 	open   bool
+	// later extends an open range to every following season ("1x05-").
+	later bool
 }
 
 // Empty reports whether the filter has no constraints.
@@ -119,7 +122,7 @@ func parseEpisodeToken(token string) ([]episodeRange, error) {
 	right = strings.TrimSpace(right)
 	// Open-ended: "1x05-" or "1x05-*".
 	if right == "" || isEpisodeWildcard(right) {
-		return []episodeRange{{season: season, from: from, open: true}}, nil
+		return []episodeRange{{season: season, from: from, open: true, later: true}}, nil
 	}
 	// Same-season range: "1x05-08".
 	if !strings.Contains(right, "x") {
@@ -165,6 +168,9 @@ func (f EpisodeFilter) Match(title string) bool {
 		return false
 	}
 	for _, group := range f.groups {
+		if group.later && season > group.season {
+			return true
+		}
 		if group.season != season {
 			continue
 		}

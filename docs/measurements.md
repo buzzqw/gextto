@@ -123,6 +123,17 @@ Matching 16 unrelated v2 candidates costs ~1.6 µs once per torrent (one small m
 candidate) and the picker/peer/piece-write paths are not touched, so the merge cannot
 affect seeding or download throughput.
 
+**RSS term matching** (2026-10-15, Intel N97, `go test -bench BenchmarkCriteriaMatch
+-benchmem -count 5 ./internal/rss/`: one rule with two *one of* and two *none of* terms
+over four typical release names). The terms are found with `rss.HasTerm` — separators of
+release names normalized, from a word start — instead of a lowercase substring:
+**250 → 142 ns/op, 46 → 0 B/op, 1 → 0 allocs/op**. A first version normalizing both
+strings per term cost 1,590 ns/op and 8 allocs/op, and one normalizing the title once
+into a buffer 395 ns/op with 1 allocation (the buffer escaped): the kept version scans
+the title in place, jumping to the occurrences of the term's first letter with
+`strings.IndexByte`. The rule preview (up to 5,000 archived items) and every feed poll
+pay this per item.
+
 **Statistics page** (2026-10-14, Intel N97, `go test -bench … -benchmem` + RSS/CPU
 probe of the standalone daemon, 0 torrents). What the page adds to the tick is a
 history sample and the folding of the session byte counters into the all-time totals,
@@ -502,6 +513,18 @@ via Playwright, regression tests (dialogs, keyboard sort, polling, narrow
 viewports). Suite: **14 green tests** on dashboard, downloads, settings,
 maintenance, health, logs (`cd uiweb/end2end && npm ci && npm run test:a11y`;
 a safety net, not a substitute for the manual assessment).
+
+**gx-torrent pages** (2026-10-15, Chromium via Playwright + `@axe-core/playwright`, tags
+`wcag2a`/`wcag2aa`, light and dark theme, a standalone daemon with sample torrents,
+feeds, rules and wanted titles): the torrent list, its context and column menus, the
+detail panel (general, files, peers), *Connection details*, *Global speed limits*, the
+RSS rules and feeds with their editors, the wanted page with its editor and the
+*Releases* dialog — **0 violations**. The first run found and led to fixing: column and
+panel resizers without a value (`aria-valuenow`), zero-count filters dimmed below the
+contrast minimum, `aria-selected` rows outside a grid (the table is now
+`role="grid"` with `aria-multiselectable`), `aria-expanded` set on a row by the context
+menu, preview lists that scroll but could not take the focus, and the progress
+percentage drawn over the bar (now beside it, readable on any bar colour).
 
 **Residual validation** (before any formal declaration): primary
 workflows with Tab/Shift+Tab/Enter/Space/arrows/Escape; at least one desktop

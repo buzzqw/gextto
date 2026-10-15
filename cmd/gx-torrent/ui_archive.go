@@ -9,6 +9,7 @@ import (
 	"errors"
 	"html"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -190,6 +191,11 @@ func (d *Daemon) handleUIRssRulePreview(w http.ResponseWriter, r *http.Request) 
 		Added bool   `json:"added,omitempty"`
 	}
 	matches := []match{}
+	total := 0
+	// The titles the rule takes, so the editor can warn when a rule meant for
+	// one series takes several (a "one of" term like 1080p alone does that).
+	groups := map[string]int{}
+	var order []string
 	for _, entry := range result.Items {
 		item := rss.Item{Title: entry.Title, Size: entry.Size, Seeders: entry.Seeders, Leechers: entry.Leechers, Magnet: entry.Download}
 		if entry.Published > 0 {
@@ -200,12 +206,37 @@ func (d *Daemon) handleUIRssRulePreview(w http.ResponseWriter, r *http.Request) 
 		if _, _, matched := rss.Evaluate([]rss.Rule{rule}, entry.Feed, item, now); !matched {
 			continue
 		}
-		matches = append(matches, match{Title: entry.Title, Feed: entry.Feed, Size: entry.Size, Added: entry.Added})
-		if len(matches) >= rulePreviewMax {
-			break
+		total++
+		if key := previewTitleKey(entry.Title); key != "" {
+			if groups[key] == 0 {
+				order = append(order, key)
+			}
+			groups[key]++
+		}
+		if len(matches) < rulePreviewMax {
+			matches = append(matches, match{Title: entry.Title, Feed: entry.Feed, Size: entry.Size, Added: entry.Added})
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"matches": matches, "scanned": len(result.Items)})
+	type group struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+	titles := make([]group, 0, len(order))
+	for _, name := range order {
+		titles = append(titles, group{Name: name, Count: groups[name]})
+	}
+	sort.SliceStable(titles, func(i, j int) bool { return titles[i].Count > titles[j].Count })
+	writeJSON(w, http.StatusOK, map[string]any{"matches": matches, "total": total, "scanned": len(result.Items), "titles": titles, "skip": rule.Fail})
+}
+
+// previewTitleKey is the title a release belongs to, for grouping a preview:
+// the series before the episode marker, or the release's base name.
+func previewTitleKey(title string) string {
+	if series, _, _, ok := rss.FindEpisode(title); ok && strings.TrimSpace(series) != "" {
+		return titleCase(series)
+	}
+	name, _ := releaseBaseName(title)
+	return titleCase(name)
 }
 
 // sessionInfoHashes is the set of v1 info-hashes in the session.

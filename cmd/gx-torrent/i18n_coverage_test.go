@@ -30,7 +30,7 @@ var uiI18nAllowlist = map[string]bool{
 	// Indexer product names used as placeholders.
 	"Jackett": true, "Prowlarr": true, "MIRCrew": true,
 	// Example values used as placeholders on the RSS page.
-	"1080p, ita": true, "Serie S01": true, "Serie S02": true, "Serie": true,
+	"1080p, ita": true, "cam, ts": true, "the office, 1080p": true, "Serie S01": true, "Serie S02": true, "Serie": true,
 	// Example values used as placeholders on the settings page.
 	"smtp.example.com:587": true, "gx-torrent@example.com": true,
 	"/srv/media/Movies\n/srv/media/TV": true,

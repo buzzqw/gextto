@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -194,8 +195,9 @@ func (w wantedEntry) criteria() rss.Criteria {
 // and satisfies the quality requirement.
 func wantedIncludeMatch(w wantedEntry, title string) bool {
 	lower := strings.ToLower(title)
+	// rss.HasTerm: "sub ita" finds "SUB.ITA", "ita" does not find "Capitan".
 	for _, term := range splitList(w.Language) {
-		if term = strings.ToLower(strings.TrimSpace(term)); term != "" && !strings.Contains(lower, term) {
+		if strings.TrimSpace(term) != "" && !rss.HasTerm(title, term) {
 			return false
 		}
 	}
@@ -497,12 +499,53 @@ func (d *Daemon) wantedTakenEpisodes(w wantedEntry) []wantedEpisode {
 			out = append(out, wantedEpisode{season: season, episode: episode})
 		}
 	}
+	if w.kind() != "movie" {
+		for ep := range d.wantedSessionEpisodes(w) {
+			if key := fmt.Sprintf("%d-%d", ep.season, ep.episode); !seen[key] {
+				seen[key] = true
+				out = append(out, ep)
+			}
+		}
+	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].season != out[j].season {
 			return out[i].season < out[j].season
 		}
 		return out[i].episode < out[j].episode
 	})
+	return out
+}
+
+// wantedSessionEpisodes are the episodes of a wanted series already in the
+// session, whatever brought them there (a rule, a manual add, another
+// release): they count as had, so the series is not downloaded twice and its
+// row tells the truth. A movie in the session is the {-1, 0} entry. Season
+// packs, with no episode number, are not counted.
+func (d *Daemon) wantedSessionEpisodes(w wantedEntry) map[wantedEpisode]bool {
+	pattern := titleMatchRegex(w.Name)
+	if pattern == "" {
+		return nil
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil
+	}
+	out := map[wantedEpisode]bool{}
+	for _, view := range d.snapshotViews() {
+		if !re.MatchString(view.Name) {
+			continue
+		}
+		_, season, episode, ok := rss.FindEpisode(view.Name)
+		if w.kind() == "movie" {
+			if !ok {
+				out[wantedEpisode{season: -1}] = true
+			}
+			continue
+		}
+		if ok && seasonAllowed(w.Seasons, season) {
+			out[wantedEpisode{season: season, episode: episode}] = true
+		}
+	}
 	return out
 }
 
@@ -592,6 +635,7 @@ func (d *Daemon) wantedMissing(w wantedEntry) []wantedEpisode {
 	d.mu.Unlock()
 
 	prefix := strings.TrimSpace(w.Name) + "\x00"
+	inSession := d.wantedSessionEpisodes(w)
 	var missing []wantedEpisode
 	for key, eps := range seen {
 		if !strings.HasPrefix(key, prefix) {
@@ -608,6 +652,9 @@ func (d *Daemon) wantedMissing(w wantedEntry) []wantedEpisode {
 				continue
 			}
 			if _, ok := takenSeason[token]; ok {
+				continue
+			}
+			if inSession[wantedEpisode{season: season, episode: episode}] {
 				continue
 			}
 			missing = append(missing, wantedEpisode{season: season, episode: episode})
@@ -646,6 +693,8 @@ func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (
 	}
 	added := 0
 	var addedTitles []string
+	// What is already in the session, per title, read once for this batch.
+	inSession := map[string]map[wantedEpisode]bool{}
 	for _, item := range items {
 		if added >= feedMaxAddsPerPoll {
 			break
@@ -660,6 +709,14 @@ func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (
 			}
 			d.recordWantedSeen(w, season, episode)
 			if d.feedSeen(feedName, item.GUID) || d.wantedTaken(w.Name, season, episode) {
+				continue
+			}
+			if _, ok := inSession[w.Name]; !ok {
+				inSession[w.Name] = d.wantedSessionEpisodes(w)
+			}
+			if inSession[w.Name][wantedEpisode{season: season, episode: episode}] {
+				// Already downloaded by something else: had, not taken again.
+				d.recordWantedTaken(w, season, episode)
 				continue
 			}
 			action := rss.Action{SavePath: strings.TrimSpace(w.SavePath), Category: strings.TrimSpace(w.Category)}
@@ -693,7 +750,12 @@ func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEnt
 	}
 	total := 0
 	var addedTitles []string
+	inSession := d.wantedSessionEpisodes(w)
 	for _, ep := range missing {
+		if inSession[ep] {
+			d.recordWantedTaken(w, ep.season, ep.episode)
+			continue
+		}
 		if ctx.Err() != nil {
 			return total, addedTitles
 		}

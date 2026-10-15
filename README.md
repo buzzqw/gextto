@@ -337,11 +337,17 @@ fewer features, but all the ones a standalone client needs.
   totals of this session and of every session — kept across restarts —, disk
   and cache, the network, the queue and a speed graph over 1 h/24 h/7 d).
   Every page axe-core checked.
-- **RSS and automation.** A **Wanted** page (cards per title with Have/Missing
-  episodes, an episode manager to mark what you have or miss and force a new
-  search, guided add dialog) and an **RSS & Indexers** page (feeds, rules,
-  indexers, options as tabbed cards; rule editor split into *which items* /
-  *what to do* with live match preview). Ordered PASS/FAIL rules, per-row
+- **RSS and automation with nothing decided out of sight.** A **Wanted** page
+  (cards per title with Have/Missing episodes — episodes already in the client
+  count as had, so nothing is downloaded twice —, an episode manager to mark
+  what you have or miss and force a new search, and for every title the list of
+  its **releases with a verdict**: would be taken, already had, or the filter
+  that turns it away — language, quality, season, excluded term — shown live
+  while you add it) and an **RSS & Indexers** page (feeds, rules, indexers,
+  options as tabbed cards; every feed says which rules decide its downloads;
+  rule terms in *contains all of* / *one of* / *none of*, matched across the
+  dots and dashes of release names; a match preview that updates as you type
+  and warns when a rule takes releases of several titles). Ordered PASS/FAIL rules, per-row
   reload, live indexer tests, optional FlareSolverr, and a local **archive**
   of everything feeds returned (100,000 releases searchable in ~7 ms, with an
   option to query Jackett/Prowlarr live).

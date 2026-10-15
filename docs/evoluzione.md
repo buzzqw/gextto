@@ -142,6 +142,17 @@ bring it to one state, every control usable from the keyboard (submenus, column
 and panel resizing included), the technical counters kept one click away instead
 of crowding the status bar. Details in [`gx-torrent.md`](gx-torrent.md), *Web interface*.
 
+The RSS and wanted pages follow one principle: **nothing is decided out of
+sight**. A rule's preview updates as it is typed and warns when it takes several
+titles; a feed row says which rules decide its downloads, and a feed filter that
+rules make unused is marked so; a wanted title lists its releases with the
+verdict for each (taken, had, or the filter that turns it away), live while it
+is added. Rule terms come in *all of* / *one of* / *none of*, all found with the
+same separator-insensitive, word-start match (`rss.HasTerm`), and the open
+episode range `1x01-` reaches the later seasons as in qBittorrent, which is what
+a wanted title's *Seasons* `1+` promises. Episodes already in the client count as
+had for a wanted series, whatever brought them there.
+
 **Accessibility.** Reference **WCAG 2.1 AA** (compatible 2.2 practices). The
 interface is **partially accessible**, with an automated baseline that passes but is
 not a WCAG/EN 301 549 certification. What is in place: language via the `lang`

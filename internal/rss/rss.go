@@ -41,9 +41,9 @@ func (i Item) Download() string {
 }
 
 // TitleFilter filters items by title: Include (when non-empty) requires at
-// least one match; any Exclude match rejects. Matching is a case-insensitive
-// substring. It is the simple per-feed filter; the ordered Rule (rules.go) is
-// the advanced one.
+// least one match; any Exclude match rejects. Terms are found with HasTerm
+// (case-insensitive, separators normalized, from a word start). It is the
+// simple per-feed filter; the ordered Rule (rules.go) is the advanced one.
 type TitleFilter struct {
 	Include []string `json:"include,omitempty"`
 	Exclude []string `json:"exclude,omitempty"`
@@ -51,25 +51,10 @@ type TitleFilter struct {
 
 // Match reports whether the title passes the filter.
 func (r TitleFilter) Match(title string) bool {
-	lower := strings.ToLower(title)
-	if len(r.Include) > 0 {
-		ok := false
-		for _, needle := range r.Include {
-			if needle = strings.ToLower(strings.TrimSpace(needle)); needle != "" && strings.Contains(lower, needle) {
-				ok = true
-				break
-			}
-		}
-		if !ok {
-			return false
-		}
+	if countTerms(r.Include) > 0 && !hasAnyTerm(title, r.Include) {
+		return false
 	}
-	for _, needle := range r.Exclude {
-		if needle = strings.ToLower(strings.TrimSpace(needle)); needle != "" && strings.Contains(lower, needle) {
-			return false
-		}
-	}
-	return true
+	return !hasAnyTerm(title, r.Exclude)
 }
 
 // Filter returns the items of list whose title passes the filter.

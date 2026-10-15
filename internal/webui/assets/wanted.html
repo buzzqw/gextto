@@ -28,6 +28,14 @@
 .epchip.miss{background:var(--warn-soft);color:var(--warn);border-color:transparent}
 .epadd{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:8px 0}
 .epadd .field{width:96px}
+.vcounts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.relview{max-height:46vh;overflow:auto;display:flex;flex-direction:column;gap:4px}
+.relview .r{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12.5px}
+.relview .r .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.relview .r .ep{font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+.relview .r.take{border-color:var(--ok)}
+.relview .r .v{white-space:nowrap}
+details.hint summary{cursor:pointer}
 </style>
 </head>
 <body>
@@ -78,7 +86,7 @@
           </div>
         </label>
         <datalist id="series-list"></datalist>
-        <p class="hint" id="wanted-regex-hint">Regular expressions are supported: write the title between slashes, e.g. /ted.?lasso/ or /^the office/ (case-insensitive). The release must match the expression instead of the plain words.</p>
+        <details class="hint" id="wanted-regex-hint"><summary>Advanced: match the title with a regular expression</summary>Write the title between slashes, e.g. /ted.?lasso/ or /^the office/ (case-insensitive). The release must match the expression instead of the plain words.</details>
         <label class="chk"><input type="checkbox" id="wanted-live" title="Also query the configured indexers live (slow); for a title not yet in the archive"> Search indexers too</label>
         <p class="hint" id="wanted-search-source" aria-live="polite">Search to see how the title is named in the feeds and pick the right one.</p>
         <div class="pick" id="wanted-results" aria-live="polite"></div>
@@ -113,8 +121,14 @@
           <label class="field">Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
           <label class="field">Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
         </div>
-        <div class="checks"><label class="chk"><input type="checkbox" name="paused" value="1" title="Add matched torrents in paused state"> Paused</label></div>
+        <div class="checks"><label class="chk"><input type="checkbox" name="paused" value="1" title="Do not search for this title until it is resumed; what was found stays"> Monitoring paused</label></div>
       </details>
+      <div class="fsec" id="wanted-preview-sec">
+        <h3>3 · What would be taken now</h3>
+        <p class="hint" id="wanted-preview-sum" role="status" aria-live="polite">Type a title to see which releases in the archive it would take, and why the others are left out.</p>
+        <div class="vcounts" id="wanted-preview-counts"></div>
+        <div class="preview relview" id="wanted-preview-list" tabindex="0" role="region" aria-label="Releases"></div>
+      </div>
       <details class="more" id="wanted-episodes-mgr" hidden>
         <summary>Episodes</summary>
         <p class="hint">Mark what you already have and what is missing; missing episodes are searched again.</p>
@@ -132,6 +146,16 @@
       <button type="submit" class="primary" id="wanted-submit" title="Add title to wanted list">Add wanted</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="dlg-releases" class="wide" aria-labelledby="dlg-releases-title">
+  <div class="dlg-head"><h2 id="dlg-releases-title">Releases</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+  <div class="dlg-body">
+    <p class="hint" id="releases-sum" role="status" aria-live="polite"></p>
+    <div class="vcounts" id="releases-counts"></div>
+    <div class="preview relview" id="releases-list" style="max-height:60vh" tabindex="0" role="region" aria-label="Releases"></div>
+  </div>
+  <div class="dlg-foot"><button type="button" data-close title="Close">Close</button></div>
 </dialog>
 </main>
 <script id="ui-i18n"></script>
@@ -174,7 +198,7 @@ function openEditor(data,index){
   if(editing&&(data.kind||'series')!=='movie'){mgr.hidden=false;mgr.open=true;loadEpisodes(index);}
   else{mgr.hidden=true;mgr.open=false;currentIndex=null;$('#wanted-episodes-body').textContent='';}
   $('#dlg-wanted-title').textContent=editing?t('Edit title'):t('Add title');$('#wanted-submit').textContent=editing?t('Save wanted'):t('Add wanted');
-  syncKind();syncLang();openDialog(dlg);form.elements.name.focus();
+  syncKind();syncLang();openDialog(dlg);form.elements.name.focus();previewWanted();
 }
 $('#add-wanted').addEventListener('click',function(){openEditor(null);});
 $$('[data-wanted-edit]').forEach(function(btn){btn.addEventListener('click',function(){var d={};['name','kind','seasons','language','quality','exclude','episode','category','savepath','paused'].forEach(function(k){d[k]=btn.getAttribute('data-'+k)||'';});openEditor(d,btn.getAttribute('data-index'));});});
@@ -229,6 +253,42 @@ function search(){
 }
 $('#wanted-search').addEventListener('click',search);
 form.elements.name.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.isComposing&&$('#wanted-results').children.length===0){e.preventDefault();search();}});
+
+// What the title would take: asked while the fields change (debounced), and
+// per row from the Releases button. Every release carries its verdict.
+var previewTimer=null,previewSeq=0;
+function verdictClass(v){return v==='Would be taken'?'b-seeding':(v==='Taken'||v==='Already in the client')?'b-downloading':'b-paused';}
+function renderReleases(res,sum,counts,list){
+  counts.textContent='';list.textContent='';
+  var total=res.total||0;
+  if(!total){sum.textContent=t('Nothing in the archive for this title yet: it is searched at every check of the feeds and the indexers.');return;}
+  var parts=[];
+  if(res.take)parts.push(res.movie?t('This release would be taken now'):(res.take+' '+t('episodes would be taken now')+(res.take_episodes?' ('+res.take_episodes+')':'')));
+  else parts.push(t('Nothing new would be taken now'));
+  if(res.had)parts.push(res.had+' '+t('already had'));
+  sum.textContent=parts.join(' · ')+' · '+total+' '+t('releases in the archive');
+  (res.counts||[]).forEach(function(c){var b=document.createElement('span');b.className='badge '+verdictClass(c.verdict);b.textContent=t(c.verdict)+' '+c.count;counts.appendChild(b);});
+  (res.releases||[]).forEach(function(it){
+    var r=document.createElement('div');r.className='r'+(it.take?' take':'');
+    if(it.episode){var e=document.createElement('span');e.className='ep';e.textContent=it.episode;r.appendChild(e);}
+    var ti=document.createElement('span');ti.className='t';ti.textContent=it.title;ti.title=it.title;r.appendChild(ti);
+    var v=document.createElement('span');v.className='v badge '+verdictClass(it.verdict);v.textContent=t(it.verdict);r.appendChild(v);
+    list.appendChild(r);
+  });
+}
+function previewParams(){var p=new URLSearchParams();['name','kind','seasons','language','quality','exclude','episode_filter'].forEach(function(n){var el=form.elements[n];if(!el)return;p.set(n,el.value||'');});return p;}
+function previewWanted(){
+  var seq=++previewSeq,sum=$('#wanted-preview-sum');
+  if((form.elements.name.value||'').trim().length<2){sum.textContent=t('Type a title to see which releases in the archive it would take, and why the others are left out.');$('#wanted-preview-counts').textContent='';$('#wanted-preview-list').textContent='';return;}
+  fetch('/ui/wanted-preview?'+previewParams().toString(),{cache:'no-store'}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});}).then(function(res){if(seq===previewSeq)renderReleases(res,sum,$('#wanted-preview-counts'),$('#wanted-preview-list'));}).catch(function(e){if(seq===previewSeq)sum.textContent=t('Error')+': '+e.message;});
+}
+form.addEventListener('input',function(e){if(e.target.closest('#wanted-episodes-mgr'))return;clearTimeout(previewTimer);previewTimer=setTimeout(previewWanted,450);});
+form.addEventListener('change',function(e){if(e.target.closest('#wanted-episodes-mgr'))return;clearTimeout(previewTimer);previewTimer=setTimeout(previewWanted,150);});
+$('#wanted-results').addEventListener('click',function(){clearTimeout(previewTimer);previewTimer=setTimeout(previewWanted,50);});
+$$('[data-wanted-releases]').forEach(function(btn){btn.addEventListener('click',function(){
+  var dlg=$('#dlg-releases'),sum=$('#releases-sum');$('#dlg-releases-title').textContent=t('Releases')+' · '+btn.getAttribute('data-name');sum.textContent=t('Searching…');$('#releases-counts').textContent='';$('#releases-list').textContent='';openDialog(dlg);
+  fetch('/ui/wanted-preview?index='+encodeURIComponent(btn.getAttribute('data-index')),{cache:'no-store'}).then(function(r){return r.json();}).then(function(res){renderReleases(res,sum,$('#releases-counts'),$('#releases-list'));}).catch(function(e){sum.textContent=t('Error')+': '+e.message;});
+});});
 
 // Filter the list.
 $('#wanted-filter').addEventListener('input',function(){var q=this.value.toLowerCase();$$('#wanted-list > li[data-wanted-row]').forEach(function(li){var n=($('.name',li)||{}).textContent||'';li.hidden=q&&n.toLowerCase().indexOf(q)<0;});});

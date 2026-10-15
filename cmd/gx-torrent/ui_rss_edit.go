@@ -478,6 +478,7 @@ func uiRuleFromForm(r *http.Request) (rss.Rule, error) {
 		Fail:       formBool(r, "fail"),
 		Match: rss.Criteria{
 			Include:        splitList(r.FormValue("include")),
+			Require:        splitList(r.FormValue("require")),
 			Exclude:        splitList(r.FormValue("exclude")),
 			Regex:          strings.TrimSpace(r.FormValue("regex")),
 			NotRegex:       strings.TrimSpace(r.FormValue("not_regex")),
@@ -599,11 +600,14 @@ func uiRuleChipsHTML(rule rss.Rule) string {
 	var b strings.Builder
 	add := func(class, label, value string) { b.WriteString(uiChip(class, label, value)) }
 	flag := func(label string) { b.WriteString(`<span class="chip"><span>` + label + `</span></span>`) }
+	if len(m.Require) > 0 {
+		add("in", "All of", strings.Join(m.Require, ", "))
+	}
 	if len(m.Include) > 0 {
-		add("in", "Include", strings.Join(m.Include, ", "))
+		add("in", "One of", strings.Join(m.Include, ", "))
 	}
 	if len(m.Exclude) > 0 {
-		add("out", "Exclude", strings.Join(m.Exclude, ", "))
+		add("out", "None of", strings.Join(m.Exclude, ", "))
 	}
 	if m.Regex != "" {
 		add("in", "Regex", m.Regex)
@@ -636,10 +640,10 @@ func uiRuleChipsHTML(rule rss.Rule) string {
 		add("", "Cooldown (days)", strconv.Itoa(rule.IgnoreDays))
 	}
 	if m.RequireEpisode {
-		flag("Require episode")
+		flag("Episodes only")
 	}
 	if m.SmartEpisode {
-		flag("Smart episode")
+		flag("Each episode once")
 	}
 	if a.SavePath != "" {
 		add("act", "Save to", a.SavePath)
@@ -823,6 +827,13 @@ func (d *Daemon) uiFeedRowsHTML() string {
 	var b strings.Builder
 	rules := d.rules()
 	totals := d.archive().feedCounts()
+	wantedOn := false
+	for _, w := range d.wantedList() {
+		if !w.Paused {
+			wantedOn = true
+			break
+		}
+	}
 	for _, row := range rows {
 		feed := row.feed
 		index := strconv.Itoa(row.index)
@@ -854,6 +865,8 @@ func (d *Daemon) uiFeedRowsHTML() string {
 		b.WriteString(`<li class="` + cls + `" data-feed-row="` + html.EscapeString(key) + `"><div class="item-main">`)
 		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(orDefault(feed.Name, "—")) + `</span>` + badges + `<span class="item-status" data-feed-status>` + uiFeedStatusHTML(statuses[key], totals[key]) + `</span></div>`)
 		b.WriteString(`<div class="item-sub mono" title="` + html.EscapeString(source) + `">` + html.EscapeString(source) + `</div>`)
+		covering := feedCoveringRules(rules, key)
+		b.WriteString(uiFeedGovernanceHTML(rules, feed, key, covering, wantedOn))
 		if chips := uiFeedChipsHTML(feed); chips != "" {
 			b.WriteString(`<div class="chips">` + chips + `</div>`)
 		}
@@ -865,7 +878,7 @@ func (d *Daemon) uiFeedRowsHTML() string {
 		b.WriteString(`</div><div class="item-actions">`)
 		b.WriteString(`<button type="button" class="sm" data-feed-reload="` + html.EscapeString(key) + `" title="Fetch this feed now and apply the rules" aria-label="Reload this feed now"><svg class="i"><use href="/assets/icons.svg#i-reload"/></svg>Reload</button>`)
 		b.WriteString(`<button type="button" class="sm" data-feed-items="` + html.EscapeString(key) + `" title="Show the items of this feed and the rule that takes each one">Items</button>`)
-		b.WriteString(`<button type="button" class="sm" data-feed-edit data-index="` + index + `" data-feed="` + html.EscapeString(string(feedJSON)) + `" title="Open this feed to change it">Edit</button>`)
+		b.WriteString(`<button type="button" class="sm" data-feed-edit data-index="` + index + `" data-feed="` + html.EscapeString(string(feedJSON)) + `" data-covered="` + html.EscapeString(strings.Join(covering, ", ")) + `" title="Open this feed to change it">Edit</button>`)
 		b.WriteString(`<form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="toggle"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="sm ghost" title="Stop or resume the automatic checks of this feed without deleting it">` + toggle + `</button></form>`)
 		b.WriteString(`<form method="post" action="/ui/rss-feed" data-confirm="Delete this feed?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="ghost icon sm danger" title="Delete this feed" aria-label="Delete this feed"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
 		b.WriteString(`</div></li>`)
@@ -874,13 +887,48 @@ func (d *Daemon) uiFeedRowsHTML() string {
 }
 
 // uiFeedChipsHTML shows the options of a feed that change what it adds.
+// feedCoveringRules are the names of the rules that watch a feed; with at
+// least one, the feed's own filter is not used.
+func feedCoveringRules(rules []rss.Rule, feedName string) []string {
+	var out []string
+	for _, rule := range rules {
+		if rss.RuleAppliesToFeed(rule, feedName) {
+			out = append(out, orDefault(rule.Name, "—"))
+		}
+	}
+	return out
+}
+
+// uiFeedGovernanceHTML says, on the feed row, what decides what the feed
+// downloads: the rules that watch it, its own filter, everything, or nothing
+// (archive only), and whether the wanted titles also take from it.
+func uiFeedGovernanceHTML(rules []rss.Rule, feed feedConfig, key string, covering []string, wantedOn bool) string {
+	var b strings.Builder
+	b.WriteString(`<div class="item-sub governs"><svg class="i"><use href="/assets/icons.svg#i-filter"/></svg>`)
+	switch {
+	case len(covering) > 0:
+		b.WriteString(`<span>Downloads what these rules take:</span> <b>` + html.EscapeString(strings.Join(covering, ", ")) + `</b>`)
+	case feed.All:
+		b.WriteString(`<span>Downloads every item (Take everything)</span>`)
+	case feedTakesEverything(rules, feed, key):
+		b.WriteString(`<span>Archive only: no rule watches it and it has no filter, so nothing is downloaded</span>`)
+	default:
+		b.WriteString(`<span>Downloads what its own filter takes</span>`)
+	}
+	if wantedOn {
+		b.WriteString(` · <span>the wanted titles also take from it</span>`)
+	}
+	b.WriteString(`</div>`)
+	return b.String()
+}
+
 func uiFeedChipsHTML(feed feedConfig) string {
 	var b strings.Builder
 	if strings.TrimSpace(feed.Include) != "" {
-		b.WriteString(uiChip("in", "Include", feed.Include))
+		b.WriteString(uiChip("in", "One of", feed.Include))
 	}
 	if strings.TrimSpace(feed.Exclude) != "" {
-		b.WriteString(uiChip("out", "Exclude", feed.Exclude))
+		b.WriteString(uiChip("out", "None of", feed.Exclude))
 	}
 	if strings.TrimSpace(feed.SavePath) != "" {
 		b.WriteString(uiChip("act", "Save to", feed.SavePath))

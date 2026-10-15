@@ -282,9 +282,19 @@ The standalone pages follow the same structure:
   and indexer is a card with its state and actions; the feed card shows the last
   check, its options as chips and opens its **items** (with the rule that takes
   each one and an *Add* button). New and edited entries open an editor dialog;
-  the rule editor is organised in *Which items* (feeds, include, exclude,
-  episodes, advanced filters) and *What to do* (save path, category, tags,
-  flags), with the **preview** of the archived items it would take next to it.
+  the rule editor is organised in *Which items* (feeds, *Contains all of*,
+  *Contains one of*, *Contains none of*, episodes, advanced filters) and *What
+  to do* (save path, category, tags, flags), with the **preview** of the
+  archived items it would take next to it. The preview **updates by itself**
+  while the rule is typed and warns about what surprises: when a rule takes
+  releases of **several titles** (a *one of* term like `1080p` alone takes every
+  1080p release) it lists them with their counts and suggests putting the series
+  name in *Contains all of*; when nothing matches yet it says the rule waits
+  for new items. Every feed row says **what decides its downloads**: the rules
+  that watch it, its own filter, *Take everything*, or *archive only*, and
+  whether the wanted titles also take from it; the feed editor marks its
+  fallback filter as **not used** (with the rules' names) when rules watch the
+  feed, instead of leaving fields that would be ignored in silence.
   The options tab holds the refresh interval, the archive retention,
   FlareSolverr (with its test) and **Copy the setup**: *Export* downloads the
   feeds, rules and indexers as one JSON file (`GET /ui/rss-export`), *Import*
@@ -301,7 +311,19 @@ The standalone pages follow the same structure:
   (`S03E01–E03`), **Missing** highlights the episodes seen but not downloaded.
   The card lists episodes, never a bare count nor a false "complete" (a season
   is only as complete as the episodes seen so far), plus search now / edit /
-  pause / remove. The *Edit* dialog has an **Episodes** manager: it lists the
+  pause / remove, and **Releases**: the releases of the title in the archive,
+  each with its **verdict** — *Would be taken*, *Taken*, *Already in the
+  client*, or the first filter that turns it away (season not wanted, not in
+  the episode filter, no episode number, language, quality, excluded term) —
+  with the counts per verdict (`GET /ui/wanted-preview?index=N`). The add and
+  edit dialog shows the same preview **live** while the title and the filters
+  are typed (`GET /ui/wanted-preview` with the form's fields): *what would be
+  taken now* is never a surprise. The card also says when the indexers were
+  last searched for the title. Episodes already in the client, whatever
+  brought them there (a rule, a manual add), **count as had**: the card lists
+  them under *Have*, they are not *Missing*, and the title does not download a
+  second release of them. *Monitoring paused* in the dialog stops the searches
+  for the title. The *Edit* dialog has an **Episodes** manager: it lists the
   known episodes per season, a click marks one **downloaded** or **missing**, an
   episode can be added as missing, and **Force download missing** searches the
   indexers again for what is missing. *Add title* is a guided
@@ -616,10 +638,11 @@ is no plugin model). The **RSS API** (`rss/items` with the folder/feed tree and,
 with `withData`, the archived articles; `addFolder`, `addFeed`, `setFeedURL`,
 `removeItem`, `moveItem`, `refreshItem`, `markAsRead`; and the rules
 `rules`, `setRule`, `renameRule`, `removeRule`, `matchingArticles`) is mapped
-onto the daemon's feeds and rules. Note: qBittorrent's rule `mustContain`
-requires **all** the words while gx-core's include is "at least one", so a
-multi-word `mustContain` maps to a more permissive OR; the `/ui/rss` rule
-editor is the place for precise AND filtering. The **cookie API**
+onto the daemon's feeds and rules. A rule's `mustContain` keeps its
+qBittorrent meaning: plain words must **all** appear (the rule's `require`),
+`a|b` alternatives are **one of** (`include`); `mustNotContain` maps to
+`exclude`, and the reverse mapping renders `require` as words and `include` as
+`a|b`. The **cookie API**
 (`app/cookies`, `app/setCookies`) stores the cookies the daemon sends when it
 fetches `.torrent` files and metadata over HTTP (private trackers): they are
 used by the daemon's URL adds, the magnet `xs=`/`as=` sources and the web
@@ -737,7 +760,8 @@ BiglyBT: the first rule that matches decides (`fail: true` discards, otherwise
 it adds). Each rule has `name`, `feeds` (to limit it to some feeds; empty =
 all), `fail`, `match` and `action`:
 
-- `match`: `include`/`exclude` (substrings), `regex`/`not_regex`,
+- `match`: `require` (every term), `include` (at least one term), `exclude`
+  (no term), `regex`/`not_regex`,
   `min_size`/`max_size` (bytes), `min_seeders`/`max_seeders`, `min_peers`,
   `max_age_days`, `require_episode`, `episode_filter` and `smart_episode`
   (adds an episode of a series only once, keeping track
@@ -765,9 +789,19 @@ all), `fail`, `match` and `action`:
   `top`, `once` (disables the rule after the first download; it is used by *Follow a
   title* for movies).
 
+**Terms** (`require`, `include`, `exclude`, the feed's own include/exclude and
+a wanted title's languages) are found the same way everywhere
+(`rss.HasTerm`): case-insensitive, with the separators of release names — dots,
+underscores, dashes, brackets — counting as spaces on both sides, and from the
+start of a word. So `the office` finds `The.Office.US.S03E01`, `sub ita` finds
+`SUB.ITA`, `ita` finds `ITA` and `Italian` but not `Capitan`, `1080` finds
+`1080p`.
+
 The **episode filter** `episode_filter` uses qBittorrent's syntax: `1x01`
 (single), `1x01-05` (range within the season), `1x01-1x05` (spanning two
-seasons), `1x01-` (open), `1x??`/`1x*` (whole season), separated by commas
+seasons), `1x01-` (open: from that episode on **and every later season**, as
+in qBittorrent — a wanted title's *Seasons* `1+` becomes `1x01-`), `1x??`/`1x*`
+(whole season), separated by commas
 or semicolons (`1x01, 1x03, 2x01-`); the `S01E01` forms are also accepted,
 the range with tail `S01E01-E05` and the season alone `S01`/`s1`. The filter applies only
 to titles with a recognisable episode; an invalid filter never matches
@@ -857,7 +891,8 @@ The same results are obtained via
 `POST /ui/rss-indexer`, `POST /ui/rss-feed` (op `add` — with `index` it edits in
 place —, `toggle`, `remove`), `POST /ui/rss-rule` (op `add` — with `index` it edits
 —, `toggle`, `remove`, `up`, `down`), `POST /ui/rss-rule-preview` (same fields
-as the form, responds `{matches, scanned}`), `POST /ui/rss-settings` (`interval` in
+as the form, responds `{matches, total, scanned, titles, skip}`: `titles` groups
+the matches by series or release name with their counts), `POST /ui/rss-settings` (`interval` in
 minutes, `archive_days`) and `POST /ui/wanted`; `POST /ui/rss-config` takes
 the three JSON arrays (`feeds`, `rules`, `indexers`) or an exported `setup` file.
 

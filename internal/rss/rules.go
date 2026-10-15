@@ -13,8 +13,10 @@ import (
 
 // Criteria is what a rule matches on. Empty/zero fields are not enforced.
 type Criteria struct {
-	Include  []string `json:"include,omitempty"` // at least one substring
-	Exclude  []string `json:"exclude,omitempty"` // no substring
+	Include []string `json:"include,omitempty"` // at least one term
+	// Require lists terms that must all appear (Include is one of them).
+	Require  []string `json:"require,omitempty"`
+	Exclude  []string `json:"exclude,omitempty"` // no term
 	Regex    string   `json:"regex,omitempty"`   // title must match
 	NotRegex string   `json:"not_regex,omitempty"`
 
@@ -101,24 +103,18 @@ func normalizeSeries(value string) string {
 // Match reports whether the item satisfies the criteria at time now.
 func (c Criteria) Match(item Item, now time.Time) bool {
 	title := item.Title
-	lower := strings.ToLower(title)
 
-	if len(c.Include) > 0 {
-		found := false
-		for _, needle := range c.Include {
-			if needle = strings.ToLower(strings.TrimSpace(needle)); needle != "" && strings.Contains(lower, needle) {
-				found = true
-				break
-			}
-		}
-		if !found {
+	// Terms are found with HasTerm (separators normalized, word starts).
+	if countTerms(c.Include) > 0 && !hasAnyTerm(title, c.Include) {
+		return false
+	}
+	for _, term := range c.Require {
+		if strings.TrimSpace(term) != "" && !HasTerm(title, term) {
 			return false
 		}
 	}
-	for _, needle := range c.Exclude {
-		if needle = strings.ToLower(strings.TrimSpace(needle)); needle != "" && strings.Contains(lower, needle) {
-			return false
-		}
+	if hasAnyTerm(title, c.Exclude) {
+		return false
 	}
 	if c.Regex != "" {
 		re, err := regexp.Compile(c.Regex)
@@ -214,6 +210,10 @@ func ruleWithinIgnoreWindow(rule Rule, now time.Time, lastMatch func(string) tim
 	}
 	return !now.Before(last.Add(time.Duration(rule.IgnoreDays) * 24 * time.Hour))
 }
+
+// RuleAppliesToFeed reports whether rule watches feedName (a rule with no
+// Feeds watches every feed); a disabled rule still applies.
+func RuleAppliesToFeed(rule Rule, feedName string) bool { return ruleAppliesToFeed(rule, feedName) }
 
 func ruleAppliesToFeed(rule Rule, feedName string) bool {
 	if len(rule.Feeds) == 0 {

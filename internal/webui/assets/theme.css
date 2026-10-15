@@ -234,6 +234,7 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-lg); pad
 legend { color: var(--text); font-weight: 600; padding: 0 6px; }
 .notice { padding: 10px 14px; border-radius: var(--radius); margin-bottom: 12px; background: var(--ok-soft); color: var(--text); border: 1px solid transparent; }
 .notice.err { background: var(--err-soft); color: var(--err); }
+.notice.warn { background: var(--warn-soft); color: var(--text); border-color: var(--warn); }
 
 /* ---------- update notes (settings → Maintenance, "updated" popup) ---------- */
 .update-changes { margin: 6px 0 10px; padding-left: 18px; max-height: 260px; overflow: auto; font-size: 13px; line-height: 1.5; }

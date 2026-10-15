@@ -24,7 +24,12 @@ func TestEpisodeFilterMatch(t *testing.T) {
 
 		{"1x01-", "Show S01E01", true},
 		{"1x01-", "Show S01E99", true},
-		{"1x01-", "Show S02E01", false},
+		// Open-ended means the later seasons too, like qBittorrent: wanted
+		// "Seasons 1+" is "1x01-" and must take season 2.
+		{"1x01-", "Show S02E01", true},
+		{"2x05-", "Show S02E04", false},
+		{"2x05-", "Show S01E09", false},
+		{"2x05-", "Show S03E01", true},
 
 		{"1x??", "Show S01E07", true},
 		{"1x??", "Show S02E07", false},
@@ -38,6 +43,7 @@ func TestEpisodeFilterMatch(t *testing.T) {
 		{"1x05-2x02", "Show S01E09", true},
 		{"1x05-2x02", "Show S01E04", false},
 		{"1x05-2x02", "Show S02E02", true},
+		{"1x05-2x02", "Show S03E01", false},
 		{"1x05-2x02", "Show S02E03", false},
 
 		// SxxExx spelling is accepted.

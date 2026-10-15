@@ -21,6 +21,10 @@
 .itemsview .r .seed{font-size:12px;color:var(--subtle);white-space:nowrap}
 .itemsview .r .take{font-size:12px;white-space:nowrap}
 textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
+#rule-preview-warn .hint{color:var(--subtle)}
+#feed-fallback.unused .fgrid,#feed-fallback.unused .checks{border-left:3px solid var(--warn);padding-left:10px}
+.item-sub.governs{color:var(--muted)}
+.item-sub.governs b{color:var(--text);font-weight:600}
 </style>
 </head>
 <body>
@@ -121,11 +125,12 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
         <label class="field">Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off" required title="RSS feed URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…)"></label>
         <label class="field">Folder<input type="text" name="folder" placeholder="tv" autocomplete="off" title="Group shown next to the feed name"></label>
       </div>
-      <div class="fsec">
+      <div class="fsec" id="feed-fallback">
         <h3>When no rule covers this feed</h3>
+        <p class="notice warn" id="feed-covered" role="status" hidden><span>These rules watch this feed, so the fields below are not used:</span> <b id="feed-covered-names"></b></p>
         <div class="fgrid">
-          <label class="field">Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off" title="Terms that must appear in the title (used when no rule covers this feed)"></label>
-          <label class="field">Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off" title="Terms that must not appear in the title (used when no rule covers this feed)"></label>
+          <label class="field">Contains one of<input type="text" name="include" placeholder="1080p, 2160p" autocomplete="off" title="At least one of these terms must be in the title (used when no rule covers this feed)"></label>
+          <label class="field">Contains none of<input type="text" name="exclude" placeholder="cam, ts" autocomplete="off" title="A title with any of these terms is not taken (used when no rule covers this feed)"></label>
           <label class="field">Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
           <label class="field">Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
         </div>
@@ -167,14 +172,16 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
           <div class="fsec">
             <h3>Which items</h3>
             <div class="fgrid">
-              <label class="field full">Feeds (comma)<input type="text" name="feeds" placeholder="serie" list="feednames" autocomplete="off" title="Feeds to apply this rule to (empty = all)"></label>
-              <label class="field">Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off" title="Required terms in title"></label>
-              <label class="field">Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off" title="Excluded terms in title"></label>
+              <label class="field full">Feeds (empty = all)<input type="text" name="feeds" placeholder="serie" list="feednames" autocomplete="off" title="Feeds this rule watches, separated by commas; empty = every feed"></label>
+              <label class="field full">Contains all of<input type="text" name="require" placeholder="the office, 1080p" autocomplete="off" title="Every one of these terms must be in the title (comma separated): use it for the series name and what you always want"></label>
+              <label class="field">Contains one of<input type="text" name="include" placeholder="1080p, 2160p" autocomplete="off" title="At least one of these terms must be in the title (comma separated): use it for alternatives"></label>
+              <label class="field">Contains none of<input type="text" name="exclude" placeholder="cam, ts" autocomplete="off" title="A title with any of these terms is not taken (comma separated)"></label>
               <label class="field">Episode filter<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off" title="Episode pattern (e.g. 1x01-05)"></label>
             </div>
+            <p class="hint">Terms are separated by commas. Dots, dashes and spaces in release names count the same, and a term matches from the start of a word: "the office" finds The.Office.US, "ita" finds ITA but not Capitan.</p>
             <div class="checks">
-              <label class="chk"><input type="checkbox" name="require_episode" value="1" title="Require a recognizable episode number"> Require episode</label>
-              <label class="chk"><input type="checkbox" name="smart_episode" value="1" title="Download each episode once and avoid duplicates"> Smart episode</label>
+              <label class="chk"><input type="checkbox" name="require_episode" value="1" title="Take only titles with an episode number (S01E02 or 1x02): no movies and no season packs"> Episodes only</label>
+              <label class="chk"><input type="checkbox" name="smart_episode" value="1" title="Download each episode only once, even when several releases of it appear"> Each episode once</label>
             </div>
             <details class="more">
               <summary>Advanced filters</summary>
@@ -209,9 +216,10 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
         </div>
         <aside class="rule-side" aria-labelledby="pv-title">
           <h3 id="pv-title">Preview</h3>
-          <p class="muted" style="margin:0;font-size:12.5px">Which archived items this rule would take.</p>
-          <button type="button" class="sm" id="rule-preview" title="Show which archived items this rule would match">Preview matches</button>
-          <div class="preview" id="rule-preview-box" aria-live="polite"><span class="subtle">—</span></div>
+          <p class="muted" style="margin:0;font-size:12.5px">Which archived items this rule would take. It updates as you type.</p>
+          <button type="button" class="sm" id="rule-preview" title="Show which archived items this rule would match">Refresh preview</button>
+          <div id="rule-preview-warn" aria-live="polite"></div>
+          <div class="preview" id="rule-preview-box" aria-live="polite" tabindex="0" role="region" aria-label="Preview"><span class="subtle">—</span></div>
         </aside>
       </div>
     </div>
@@ -245,7 +253,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
   <div class="dlg-head"><h2 id="dlg-items-title">Feed items</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
   <div class="dlg-body">
     <p class="muted" id="items-info" style="margin:0" aria-live="polite"></p>
-    <div class="preview itemsview" id="items" style="max-height:60vh"></div>
+    <div class="preview itemsview" id="items" style="max-height:60vh" tabindex="0" role="region" aria-label="Feed items"></div>
   </div>
   <div class="dlg-foot"><button type="button" data-close title="Close">Close</button></div>
 </dialog>
@@ -286,8 +294,10 @@ $('#feednames').innerHTML=FEEDNAMES.map(function(n){var o=document.createElement
 
 // ---------- feeds ----------
 var feedForm=$('#feed-form');
-function editFeed(feed,index){
+function editFeed(feed,index,covered){
   feedForm.reset();$('#feed-index').value=index===undefined?'':index;
+  // With rules watching the feed its own filter is not used: say so and dim it.
+  $('#feed-covered').hidden=!covered;$('#feed-covered-names').textContent=covered||'';$('#feed-fallback').classList.toggle('unused',!!covered);
   ['name','url','folder','include','exclude','category','savepath'].forEach(function(n){feedForm.elements[n].value=feed[n]||'';});
   ['paused','disabled','all'].forEach(function(n){feedForm.elements[n].checked=!!feed[n];});
   var editing=index!==undefined;
@@ -295,7 +305,7 @@ function editFeed(feed,index){
   openDialog($('#dlg-feed'));
 }
 $('#new-feed').addEventListener('click',function(){editFeed({});});
-$$('[data-feed-edit]').forEach(function(b){b.addEventListener('click',function(){var f={};try{f=JSON.parse(b.getAttribute('data-feed')||'{}');}catch(_){}editFeed(f,b.getAttribute('data-index'));});});
+$$('[data-feed-edit]').forEach(function(b){b.addEventListener('click',function(){var f={};try{f=JSON.parse(b.getAttribute('data-feed')||'{}');}catch(_){}editFeed(f,b.getAttribute('data-index'),b.getAttribute('data-covered')||'');});});
 $$('[data-feed-reload]').forEach(function(btn){btn.addEventListener('click',function(){
   var name=btn.getAttribute('data-feed-reload'),row=btn.closest('li'),cell=row?$('[data-feed-status]',row):null;btn.disabled=true;if(cell)cell.textContent=t('Checking…');
   var f=new URLSearchParams();f.set('feed',name);
@@ -339,25 +349,42 @@ function editRule(rule,index){
   function set(n,v){var el=ruleForm.elements[n];if(!el)return;if(el.type==='checkbox')el.checked=!!v;else el.value=(v===undefined||v===null||v===0)?'':v;}
   function mib(b){return b?Math.round(b/1048576):'';}
   set('name',rule.name);set('feeds',(rule.feeds||[]).join(', '));set('enabled',rule.enabled!==false);
-  set('include',(m.include||[]).join(', '));set('exclude',(m.exclude||[]).join(', '));set('episode_filter',m.episode_filter);set('require_episode',m.require_episode);set('smart_episode',m.smart_episode);
+  set('include',(m.include||[]).join(', '));set('require',(m.require||[]).join(', '));set('exclude',(m.exclude||[]).join(', '));set('episode_filter',m.episode_filter);set('require_episode',m.require_episode);set('smart_episode',m.smart_episode);
   set('paused',a.paused);set('sequential',a.sequential);set('first_last',a.first_last);set('top',a.top);set('once',a.once);set('savepath',a.savepath);set('category',a.category);set('tags',(a.tags||[]).join(', '));
   set('regex',m.regex);set('not_regex',m.not_regex);set('min_size',mib(m.min_size));set('max_size',mib(m.max_size));set('min_seeders',m.min_seeders);set('max_seeders',m.max_seeders);set('min_peers',m.min_peers);set('max_age_days',m.max_age_days);set('ignore_days',rule.ignore_days);
   if(m.regex||m.not_regex||m.min_size||m.max_size||m.min_seeders||m.max_seeders||m.min_peers||m.max_age_days||rule.ignore_days)$('details.more',ruleForm).open=true;
   setKind(!!rule.fail);
   var editing=index!==undefined;
   $('#dlg-rule-title').textContent=editing?t('Edit rule'):t('New rule');$('#rule-submit').textContent=editing?t('Save rule'):t('Add rule');
-  $('#rule-preview-box').innerHTML='<span class="subtle">—</span>';
+  $('#rule-preview-box').innerHTML='<span class="subtle">—</span>';$('#rule-preview-warn').textContent='';
   openDialog($('#dlg-rule'));
+  if(editing)previewRule();
 }
 $('#new-rule').addEventListener('click',function(){editRule({enabled:true});});
 $$('[data-rule-edit]').forEach(function(b){b.addEventListener('click',function(){var r={};try{r=JSON.parse(b.getAttribute('data-rule')||'{}');}catch(_){}editRule(r,b.getAttribute('data-index'));});});
-$('#rule-preview').addEventListener('click',function(){
-  var box=$('#rule-preview-box');box.textContent=t('Searching…');
+// The preview runs by itself while the rule is edited (debounced), and warns
+// about what surprises: a rule that takes several titles, or none at all.
+var previewTimer=null,previewSeq=0;
+function previewRule(){
+  var box=$('#rule-preview-box'),warn=$('#rule-preview-warn'),seq=++previewSeq;box.setAttribute('aria-busy','true');
   fetch('/ui/rss-rule-preview',{method:'POST',body:new URLSearchParams(new FormData(ruleForm)),headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});}).then(function(res){
-    box.innerHTML='';var head=document.createElement('p');head.className='muted';head.style.margin='0 0 6px';head.textContent=res.matches.length+' '+t('matches among the last')+' '+res.scanned+' '+t('archived items');box.appendChild(head);
-    res.matches.forEach(function(m){var r=document.createElement('div');r.className='r';var ti=document.createElement('span');ti.className='t';ti.textContent=m.title;r.appendChild(ti);if(m.added){var f=document.createElement('span');f.className='badge b-seeding';f.textContent=t('downloaded');r.appendChild(f);}box.appendChild(r);});
-  }).catch(function(e){box.textContent=t('Error')+': '+e.message;});
-});
+    if(seq!==previewSeq)return;
+    box.innerHTML='';warn.textContent='';
+    var head=document.createElement('p');head.className='muted';head.style.margin='0 0 6px';head.textContent=(res.total||0)+' '+t('matches among the last')+' '+res.scanned+' '+t('archived items');box.appendChild(head);
+    var titles=res.titles||[];
+    if(!res.total){warn.appendChild(note('hint',t('Nothing in the archive matches yet: the rule waits for new items.')));}
+    else if(titles.length>1){
+      var w=note('notice warn',(res.skip?t('This rule skips releases of several titles:'):t('This rule takes releases of several titles:'))+' '+titles.slice(0,6).map(function(g){return g.name+' ('+g.count+')';}).join(', ')+(titles.length>6?' …':''));
+      if(!res.skip)w.appendChild(document.createTextNode(' '+t('If it is meant for one series, put its name in Contains all of.')));
+      warn.appendChild(w);
+    }
+    (res.matches||[]).forEach(function(m){var r=document.createElement('div');r.className='r';var ti=document.createElement('span');ti.className='t';ti.textContent=m.title;r.appendChild(ti);if(m.added){var f=document.createElement('span');f.className='badge b-seeding';f.textContent=t('downloaded');r.appendChild(f);}box.appendChild(r);});
+  }).catch(function(e){if(seq===previewSeq)box.textContent=t('Error')+': '+e.message;}).then(function(){if(seq===previewSeq)box.removeAttribute('aria-busy');});
+}
+function note(cls,text){var p=document.createElement('p');p.className=cls;p.style.margin='0 0 6px';p.style.fontSize='12.5px';p.setAttribute('role','status');p.textContent=text;return p;}
+$('#rule-preview').addEventListener('click',previewRule);
+ruleForm.addEventListener('input',function(){clearTimeout(previewTimer);previewTimer=setTimeout(previewRule,450);});
+ruleForm.addEventListener('change',function(){clearTimeout(previewTimer);previewTimer=setTimeout(previewRule,150);});
 
 // ---------- indexers ----------
 var idxForm=$('#indexer-form'),autoName='';

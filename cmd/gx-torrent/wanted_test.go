@@ -96,11 +96,17 @@ func TestWantedSeenTakenMissing(t *testing.T) {
 		t.Fatalf("missing = %+v", missing)
 	}
 
-	// A season outside the spec never matches (the episode filter rejects it).
-	d.applyWanted(now, "f", []rss.Item{{Title: "Reacher S09E01 1080p", GUID: "g9"}})
+	// A season outside the spec never matches (the episode filter rejects
+	// it): "1+" leaves out the specials (season 0) and takes every later one.
+	d.applyWanted(now, "f", []rss.Item{{Title: "Reacher S00E01 1080p", GUID: "g0"}})
 	if got := d.wantedMissing(w); len(got) != 1 {
 		t.Fatalf("a season outside the spec must not appear: %+v", got)
 	}
+	d.applyWanted(now, "f", []rss.Item{{Title: "Reacher S09E01 1080p", GUID: "g9"}})
+	if got := d.wantedMissing(w); len(got) != 2 {
+		t.Fatalf("a later season is inside 1+: %+v", got)
+	}
+	d.recordWantedTaken(w, 9, 1)
 
 	// Once taken it is no longer missing.
 	d.recordWantedTaken(w, 1, 1)

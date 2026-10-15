@@ -353,11 +353,18 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
   (velocità dal vivo, i totali di questa sessione e di tutte le sessioni —
   mantenuti tra i riavvii —, disco e cache, rete, coda e un grafico delle
   velocità su 1 h/24 h/7 d). Ogni pagina verificata con axe-core.
-- **RSS e automazione.** Pagina **Cercati** (schede per titolo con episodi
-  Have/Missing, gestore puntate per segnare cosa hai o manca e forzare una nuova
-  ricerca, finestra guidata di aggiunta) e pagina **RSS & Indexer** (feed,
-  regole, indexer, opzioni a schede; editor diviso in *quali elementi* / *cosa
-  fare* con anteprima dal vivo). Regole PASS/FAIL ordinate, ricarica per riga,
+- **RSS e automazione senza decisioni nascoste.** Pagina **Cercati** (schede
+  per titolo con episodi Have/Missing — gli episodi già nel client valgono come
+  posseduti, quindi nulla viene scaricato due volte —, gestore puntate per
+  segnare cosa hai o manca e forzare una nuova ricerca, e per ogni titolo
+  l'elenco delle sue **release con un verdetto**: verrebbe presa, già
+  posseduta, o il filtro che la scarta — lingua, qualità, stagione, termine
+  escluso — mostrato dal vivo mentre lo aggiungi) e pagina **RSS & Indexer**
+  (feed, regole, indexer, opzioni a schede; ogni feed dice quali regole
+  decidono cosa scarica; termini delle regole in *contiene tutti* / *uno di* /
+  *nessuno di*, confrontati ignorando punti e trattini dei nomi delle release;
+  anteprima che si aggiorna mentre scrivi e avvisa quando una regola prende
+  release di più titoli). Regole PASS/FAIL ordinate, ricarica per riga,
   test indexer in tempo reale, FlareSolverr opzionale e un **archivio** locale
   di tutto ciò che i feed hanno restituito (100.000 release cercabili in ~7
   ms, con opzione di interrogare dal vivo Jackett/Prowlarr).

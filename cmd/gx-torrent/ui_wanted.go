@@ -692,15 +692,19 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			if len(missing) > 0 {
 				statusParts = append(statusParts, `<span class="warn" title="Episodes seen but not downloaded">Missing</span> `+formatEpisodeRanges(missing, wantedEpisodeListMax))
 			}
-		} else if taken > 0 {
+		} else if taken > 0 || d.wantedSessionEpisodes(w)[wantedEpisode{season: -1}] {
 			statusParts = append(statusParts, `<span class="ok">✓ <span>Downloaded</span></span>`)
 		}
 		if len(statusParts) == 0 {
 			statusParts = append(statusParts, `<span class="muted">Not found yet</span>`)
 		}
 		b.WriteString(strings.Join(statusParts, ` · `))
+		if _, last := d.wantedProgress(w); !last.IsZero() {
+			b.WriteString(` · <span class="muted" title="When the indexers were last searched for this title">` + `<span>Indexers searched</span> ` + last.Format("02/01 15:04") + `</span>`)
+		}
 		b.WriteString(`</div><div class="item-status" data-wanted-status="` + idx + `" aria-live="polite"></div></div><div class="item-actions">`)
 
+		b.WriteString(`<button type="button" class="sm" data-wanted-releases data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="The releases of this title in the archive, with what would be taken and why the others are not">Releases</button>`)
 		b.WriteString(`<button type="button" class="sm" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="Search this title now"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search</button>`)
 		attrs := `data-wanted-edit data-index="` + idx + `"` +
 			` data-name="` + html.EscapeString(w.Name) + `"` +
