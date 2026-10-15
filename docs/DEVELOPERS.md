@@ -93,6 +93,9 @@ uncommitted changes) and no release channel, so it never updates itself.
 `GX_TEST_DIR`, `GX_TEST_LISTEN` (e.g. `0.0.0.0:8899` to open it from another
 device on the LAN), `GX_TEST_PEER_PORTS`, `GX_TEST_TOKEN` and `GX_TEST_BIN`
 change the defaults.
+The script can be called through a symlink (for example
+`ln -s ~/gextto/scripts/gx-core-test.sh ~/gx-core-test.sh`): it resolves the
+link and builds the checkout the link points to.
 
 ## Web UI and API changes
 

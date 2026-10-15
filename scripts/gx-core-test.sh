@@ -27,7 +27,9 @@
 # clear of both.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Resolve a symlink (e.g. ~/gx-core-test.sh) to find the checkout.
+SCRIPT="$(readlink -f "$0")"
+ROOT="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
 DIR="${GX_TEST_DIR:-$HOME/gx-core-test}"
 LISTEN="${GX_TEST_LISTEN:-127.0.0.1:8899}"
 PEER_PORTS="${GX_TEST_PEER_PORTS:-51500-51510}"
@@ -41,7 +43,7 @@ HOST="${LISTEN%:*}"
 BASE_URL="http://$HOST:$PORT"
 
 usage() {
-  sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,11p' "$SCRIPT" | sed 's/^# \{0,1\}//'
   exit 2
 }
 
