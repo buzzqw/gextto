@@ -490,6 +490,12 @@ mano). «Sottocartelle per stagione» archivia gli episodi in *Stagione 01*,
 
 - La lista mostra Nome, Stagioni, Qualità, Lingua, Episodi (scaricati/totali),
   Completezza, Ultimo download; filtrala con la casella di ricerca.
+- La lista si può leggere in due modi, col selettore **Elenco / Locandine** sopra
+  la tabella: *Locandine* mostra una card per titolo con la copertina e i dati
+  essenziali (qualità, lingua, episodi, stato), e si entra nel dettaglio dal
+  titolo o dalla copertina. La scelta è ricordata e vale anche per la pagina
+  Film, così l'elenco si apre sempre come preferisci.
+
 - Azioni bulk: imposta lingua, elimina selezionate.
 - **Dettaglio serie**: locandina/trama/cast, badge (anno, rete, stato,
   completezza), link del cast alle schede TVDB/TMDB e, se configurate, un badge
@@ -567,7 +573,8 @@ essere una singola puntata o un altro pack.
 
 ## 5. Film
 
-- Tab **Monitorati / Scaricati**; colonne ordinabili (nome, anno, qualità, lingua).
+- Tab **Monitorati / Scaricati**; colonne ordinabili (nome, anno, qualità, lingua). Come per le serie, il selettore **Elenco / Locandine** legge la tabella come
+  card con la copertina (la scelta è condivisa con la pagina Serie TV).
 - L'editor gestisce qualità, lingua base, sottotitoli, esclusioni e **Lingue
   richieste**. Nel form il valore è mostrato in formato leggibile, per esempio
   `ita,eng`, non come JSON interno.

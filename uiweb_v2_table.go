@@ -132,6 +132,13 @@ type v2TableData struct {
 	Next       int
 	Total      int
 	Colspan    int
+	// Layout is "cards" or "list" for the two library lists that have both
+	// (empty elsewhere): Cards carries the poster cards when it is "cards", and
+	// the two URLs are the switch links (the choice is remembered in a cookie).
+	Layout         string
+	LayoutListURL  string
+	LayoutCardsURL string
+	Cards          []v2CardItem
 	// Refresh shows the "Aggiorna" button; Manual marks a table that must not
 	// load automatically (the source health check is slow and on demand).
 	Refresh       bool
@@ -361,7 +368,29 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 	if data.Pages < 1 {
 		data.Pages = 1
 	}
+	// The Series and Movies lists can be read as posters: the cards come from
+	// the same items (filter and sort already applied) and the choice is a
+	// parameter remembered in a cookie, so the other pages keep it.
+	if v2ViewHasLayouts(data.BaseView) {
+		data.Layout = v2Layout(r)
+		data.LayoutListURL = v2LayoutURL(r, data.BaseView, "list")
+		data.LayoutCardsURL = v2LayoutURL(r, data.BaseView, "cards")
+		if data.Layout == "cards" {
+			data.Cards = v2LibraryCardsFrom(r.Context(), s, data.BaseView, items, columns)
+		}
+	}
 	return data
+}
+
+// v2RenderTableBody writes a table body as an HTMX fragment: the poster cards
+// when the library list is being read that way, the table otherwise.
+func v2RenderTableBody(w http.ResponseWriter, r *http.Request, s *AppState, data v2TableData) {
+	dict, eng := v2Dictionaries(s)
+	if data.Layout == "cards" {
+		v2Render(w, http.StatusOK, "v2_library_cards", data, dict, eng)
+		return
+	}
+	v2Render(w, http.StatusOK, "v2_table_body", data, dict, eng)
 }
 
 // v2TableItems extracts the row slice from the endpoint payload.
@@ -1005,8 +1034,7 @@ func V2Table(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Error(w, "tabella sconosciuta", http.StatusNotFound)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_table_body", v2TableDataFrom(s, r, view, spec), dict, eng)
+	v2RenderTableBody(w, r, s, v2TableDataFrom(s, r, view, spec))
 }
 
 // V2TableAction forwards a generic table action to the existing JSON API and
@@ -1061,10 +1089,9 @@ func V2TableAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 	}
-	dict, eng := v2Dictionaries(s)
 	data := v2TableDataFrom(s, r, view, spec)
 	data.Notice = notice
-	v2Render(w, http.StatusOK, "v2_table_body", data, dict, eng)
+	v2RenderTableBody(w, r, s, data)
 }
 
 // V2TableLibrary toggles or removes a series/movie, mirroring the classic
@@ -1110,8 +1137,7 @@ func V2TableLibrary(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	if spec, ok := v2SpecFor(s, view); ok {
-		dict, eng := v2Dictionaries(s)
-		v2Render(w, http.StatusOK, "v2_table_body", v2TableDataFrom(s, r, view, spec), dict, eng)
+		v2RenderTableBody(w, r, s, v2TableDataFrom(s, r, view, spec))
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -1127,8 +1153,7 @@ func V2TableGapSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		v2InternalJSON(s, http.MethodPost, "/api/episodes/"+series+"/"+season+"/"+episode+"/search", nil, []byte("{}"))
 	}
 	if spec, ok := v2SpecFor(s, view); ok {
-		dict, eng := v2Dictionaries(s)
-		v2Render(w, http.StatusOK, "v2_table_body", v2TableDataFrom(s, r, view, spec), dict, eng)
+		v2RenderTableBody(w, r, s, v2TableDataFrom(s, r, view, spec))
 		return
 	}
 	w.WriteHeader(http.StatusOK)

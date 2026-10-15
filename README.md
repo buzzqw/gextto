@@ -105,7 +105,9 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
   **To check** panel collects edge cases; threshold alerts warn when an
   indexer fails repeatedly or slows down.
 - **Interfaces.** Responsive web UI installable as a mobile PWA, fully
-  keyboard-navigable and axe-core checked; server-side rendered (SSR + HTMX)
+  keyboard-navigable and axe-core checked; the Series and Movies lists read as
+  **posters** when you want (one cover per title, the rest one click away, the
+  choice remembered — the view Sonarr and Radarr offer); server-side rendered (SSR + HTMX)
   with all assets embedded — zero Node.js or npm runtime dependencies; a single
   **Theme** picker with 20+ contrast-checked themes plus custom server-side
   themes that follow you to every device; a full terminal TUI for SSH

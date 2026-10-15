@@ -1411,7 +1411,11 @@
 {{define "v2_table_panel"}}
 <div class="view">
   <div class="panel" id="v2-table-panel-{{.View}}">
-    <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{.Total}} <span>voci</span></small></div>
+    <div class="panel-head"><h3>{{.Title}}</h3>{{if .Layout}}
+      <div class="layout-switch" role="group" aria-label="Come mostrare l'elenco">
+        <a class="btn sm{{if eq .Layout "list"}} active{{end}}" href="{{.LayoutListURL}}" title="Mostra l'elenco come tabella"{{if eq .Layout "list"}} aria-current="true"{{end}}>Elenco</a>
+        <a class="btn sm{{if eq .Layout "cards"}} active{{end}}" href="{{.LayoutCardsURL}}" title="Mostra l'elenco come locandine"{{if eq .Layout "cards"}} aria-current="true"{{end}}>Locandine</a>
+      </div>{{end}}<small class="muted">{{.Total}} <span>voci</span></small></div>
     <div class="panel-body">
       {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
       {{if or .Search .Filter .Refresh}}<form class="toolbar" hx-get="/table?view={{.View}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML" hx-trigger="{{if eq .BaseView "archive"}}submit, input[window.gexttoArchiveLiveAllowed && window.gexttoArchiveLiveAllowed(this, event)] changed delay:300ms{{else}}submit, input changed delay:300ms{{end}}" hx-indicator="#v2-table-panel-{{.View}} .archive-indicator">
@@ -1428,7 +1432,7 @@
         {{if .Refresh}}<button class="btn sm" type="submit">Aggiorna</button>{{end}}
         {{end}}
       </form>{{end}}
-       {{template "v2_table_body" .}}
+       {{if eq .Layout "cards"}}{{template "v2_library_cards" .}}{{else}}{{template "v2_table_body" .}}{{end}}
        {{if or .FooterForm .FooterActions}}
        <div class="table-panel-footer">
          {{if .FooterForm}}{{template "v2_table_footer_form" .}}{{end}}
@@ -1448,6 +1452,21 @@
   {{range .FooterForm.Fields}}{{template "v2_form_field" .}}{{end}}
   <div class="form-actions"><button class="btn sm primary" type="submit">{{if .FooterForm.Submit}}{{.FooterForm.Submit}}{{else}}Salva{{end}}</button></div>
 </form>
+{{end}}
+
+{{define "v2_library_cards"}}
+<div class="tmdb-grid library-cards" id="v2-table-body-{{.View}}">
+  {{if not .Cards}}<p class="hint">{{.Empty}}</p>{{end}}
+  {{range .Cards}}
+  <article class="tmdb-card">
+    <a class="tmdb-poster{{if not .Poster}} placeholder{{end}}" href="{{.Link}}" title="Apri il dettaglio" aria-hidden="{{if .Poster}}false{{else}}true{{end}}">{{if .Poster}}<img src="{{.Poster}}" alt="" loading="lazy" />{{else}}<span>▤</span>{{end}}</a>
+    <div class="tmdb-card-body">
+      <strong><a href="{{.Link}}">{{.Name}}</a></strong>
+      <div class="card-meta">{{range .Meta}}{{.}}{{end}}</div>
+    </div>
+  </article>
+  {{end}}
+</div>
 {{end}}
 
 {{define "v2_table_body"}}

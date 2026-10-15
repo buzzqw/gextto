@@ -132,6 +132,17 @@ shown to the user may stay in the original language. Guard: `TestUIIsTranslatabl
 fails if a UI string or a `uiText` literal is not a key of the catalogues (with an
 explicit allowlist); `TestClientI18nKeysTranslated` covers the client keys.
 
+**Library lists as posters.** The *Series* and *Movies* pages read the library
+either as a table or as **poster cards** (one cover per title, the essential data
+on the card, the detail one click away, as Sonarr and Radarr offer), through the
+*List / Posters* switch above the table: the choice is a parameter remembered in
+a cookie, so it follows the operator from one page to the other and no script is
+needed to keep it. The covers come from the metadata Gextto already fetches —
+the `poster_path` of the movie library, and for the series a lookup through the
+configured provider (TMDB, else TVDB) whose result, including "no cover", is
+cached for half a day and resolved a few titles at a time, so the first poster
+page pays for the lookups once.
+
 **gx-torrent web page.** The standalone client's page is laid out the way a
 qBittorrent Web UI user expects to find things — filters on the left, one compact
 line per torrent, the detail panel below, a complete context menu, the speeds and
@@ -596,11 +607,6 @@ recovered from a shell without editing the database.
 - **Watch folders.** The *Watch folders* section should say that the `.torrent`
   files it finds are **downloaded**, not only "added automatically", so what the
   feature does to the media is explicit.
-- **Poster and card views.** In *Series* and *Movies* the list should be
-  switchable to a **poster view** (one cover per title, the essential data on the
-  card, everything else when it is opened), as Sonarr and Radarr offer, with the
-  choice remembered per view: the covers come from the same TMDB data the
-  *Explore* search already uses.
 
 **Closing the gap with Sonarr/Radarr** (§1), by value per effort, each after a study and
 without copying code (Sonarr is GPLv3, Gextto EUPL-1.2):

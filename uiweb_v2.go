@@ -616,6 +616,9 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 		page.UpdateNotes = notes
 	}
 	dict, eng := v2Dictionaries(s)
+	// The list/card choice is kept in a cookie so the pages reached later (their
+	// links do not carry the parameter) read the library the same way.
+	v2RememberLayout(w, r)
 	v2Render(w, http.StatusOK, "v2_shell", page, dict, eng)
 }
 

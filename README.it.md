@@ -108,7 +108,10 @@ Node.js/npm, sei lingue nell'interfaccia.
   seguito in tutti i log (ricerca, selezione, trasferimento, post-processing,
   archivio). Il pannello **Da controllare** raccoglie i casi anomali; gli
   avvisi a soglia segnalano le sorgenti che falliscono o rallentano.
-- **Interfacce.** UI web responsive installabile come PWA, interamente da
+- **Interfacce.** UI web responsive installabile come PWA, con le liste di
+  **Serie TV e Film** leggibili anche come **locandine** (una copertina per
+  titolo, il resto a un clic, la scelta ricordata — come in Sonarr e Radarr),
+  interamente da
   tastiera e verificata con axe-core; renderizzata interamente server-side
   (SSR + HTMX) con tutti gli asset incorporati — zero dipendenze o build
   Node.js/npm; un selettore **Tema** unico con oltre 20 temi verificati per il

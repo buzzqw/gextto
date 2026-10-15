@@ -482,6 +482,11 @@ episodes in *Season 01*, *Season 02*, … inside the series folder.
 
 - The list shows Name, Seasons, Quality, Language, Episodes (downloaded/total),
   Completeness, Last download; filter it with the search box.
+- The list can be read in two ways, with the **List / Posters** switch above the
+  table: *Posters* shows one card per title with its cover and the essential data
+  (quality, language, episodes, status), and the title or the cover opens the
+  detail. The choice is remembered and also applies to the Movies page, so the
+  list opens the way you prefer.
 - Bulk actions: set language, delete selected.
 - **Series detail**: poster/plot/cast, badges (year, network, status,
   completeness), cast links to TVDB/TMDB and, if configured, a **“disabled
@@ -558,7 +563,9 @@ eligible, and the alternative may be a single episode or another pack.
 ## 5. Movies
 
 - Tabs **Monitored / Downloaded**; sortable columns (name, year, quality,
-  language).
+  language). As for the series, the **List / Posters** switch
+  reads the table as cards with the cover (the choice is shared with the Series
+  page).
 - The editor supports quality, base language, subtitles, exclusions and
   **Required languages**. The form shows a readable value such as `ita,eng`, not
   the internal JSON representation.

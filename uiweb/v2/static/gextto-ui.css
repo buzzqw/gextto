@@ -1552,3 +1552,15 @@ pre.log-view { margin: 0; }
 .piece-run.piece-down { background: #d4a72c; }
 .piece-run.piece-skip { background: #8c959f; opacity: 0.4; }
 .piece-run.piece-missing { background: #d0d7de; }
+
+/* Library poster cards (Series/Movies): the Explore grid, with the title's own
+   data under the cover; the switch sits in the panel head. */
+.layout-switch { display: inline-flex; gap: 4px; margin-right: auto; }
+.layout-switch .btn.active { border-color: var(--accent); color: var(--accent); }
+.panel-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.library-cards { margin-top: 12px; }
+.library-cards .tmdb-card-body strong a { color: inherit; text-decoration: none; }
+.library-cards .tmdb-card-body strong a:hover { color: var(--accent); text-decoration: underline; }
+.library-cards .card-meta { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin-top: 2px; }
+.library-cards .card-meta > * { font-size: 0.72rem; }
+.library-cards .tmdb-poster.placeholder { font-size: 1.2rem; color: var(--muted); }
