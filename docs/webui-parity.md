@@ -78,7 +78,8 @@ Migliorie proposte (usabilità, non motore):
       riga vuota. Le regole che guardano un feed sono cliccabili (aprono
       l'editor della regola).
 - [x] Template regole one-click: `TV series`, `Movie`, `Take all`. Compilano
-      l'editor, la preview live mostra subito cosa prenderebbero.- [x] Editor feed: bottone `Test` (fetch via `/ui/feed-items?url=`, senza
+      l'editor, la preview live mostra subito cosa prenderebbero.
+- [x] Editor feed: bottone `Test` (fetch via `/ui/feed-items?url=`, senza
       salvare, con titoli di esempio). I campi fallback restano editabili e
       dimmati quando le regole coprono il feed (disabilitarli cancellerebbe i
       valori al salvataggio): avviso con nomi regole già presente.
@@ -91,6 +92,9 @@ Migliorie proposte (usabilità, non motore):
       (la regola once si spegne al primo hit, il feed all scarica tutto).
 - [x] Import setup: preview di validazione (N feed, M regole, K indexer)
       alla scelta del file, prima di `Import` (il server rivalida comunque).
+- [x] Riga feed: hint azionabile sotto il `last_error` (chiave API,
+      Cloudflare → FlareSolverr, pagina senza link, timeout) + `Reload`
+      esistente come riprova.
 - [ ] Parità API RSS qBittorrent: `rss/items` con tree folder/feed,
       `refreshItem`, `markAsRead`, `matchingArticles` già mappati — verificare
       contro VueTorrent e fissare i gap in `qbit_compat_test.go`.
@@ -105,8 +109,6 @@ Migliorie proposte (usabilità, non motore):
 - [x] Dialog bulk: riepilogo `N torrent` + placeholder `mixed` nei limiti quando
       la selezione ha valori diversi; undo di 8s dopo `remove` senza cancellare
       i file (riaggiunge dai magnet, in pausa).
-- [x] Settings con filtro di ricerca per sezione (il badge `modified` resta
-      rinviato: richiederebbe i default nel client).
 - [x] Log stile qBittorrent: filtro livelli DEBUG/INFO/WARN/ERROR
       (client-side, classi già esistenti).
 - [x] Context-menu bottom-sheet su `<760px` (`theme.css`, vale per tutte le
