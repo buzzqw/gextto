@@ -338,17 +338,23 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
 - **UI web moderna, familiare a chi viene da qBittorrent.** Temi chiaro e
   scuro; barra laterale con filtri comprimibili per stato (12 filtri),
   categoria, tag e **tracker** e grafico del traffico; elenco compatto, una
-  riga per torrent, con **scelta delle colonne** (20 colonne: aggiunto e
-  completato il, scaricato, rimanente, posizione in coda, tracker, percorso…)
-  e **colonne ridimensionabili**, entrambe ricordate; **menu contestuale**
+  riga per torrent, con **scelta delle colonne** (24 colonne: aggiunto e
+  completato il, scaricato, rimanente, posizione in coda, tracker, percorso,
+  disponibilità, tempo attivo, ultima attività, sprecato…) e **colonne
+  ridimensionabili**, entrambe ricordate — e, in standalone, conservate anche
+  sul server, così colonne, filtri e tema ti seguono tra i browser; **menu contestuale**
   completo (avvio forzato, imposta posizione, sottomenu categorie, gestione
   automatica, limiti di velocità, super-seeding, download sequenziale e
   prima/ultima parte, coda, copia nome/hash/magnet) con interruttori che
   mostrano lo stato di tutta la selezione, anche misto; **pannello dei
-  dettagli ridimensionabile** (file con avanzamento e priorità di gruppo,
-  peer da aggiungere o bannare); limiti di velocità globali a un clic dalla
+  dettagli ridimensionabile** (file con avanzamento, priorità di gruppo,
+  **raggruppamento per cartella** — una casella e una priorità per cartella — e
+  rinomina di file e cartelle; peer da aggiungere o bannare); il dialog di
+  aggiunta mostra l'anteprima del magnet mentre lo scrivi (nome e info hash) e
+  accetta i limiti per torrent; la rimozione chiede dei file e offre un **undo**
+  di 8 secondi; limiti di velocità globali a un clic dalla
   barra di stato, velocità nel titolo della scheda, scorciatoie da tastiera,
-  trascinamento dei `.torrent` e magnet incollati, schede su telefono, e una
+  trascinamento dei `.torrent` e magnet incollati, stati vuoti guidati, schede su telefono, e una
   pagina **Statistiche**
   (velocità dal vivo, i totali di questa sessione e di tutte le sessioni —
   mantenuti tra i riavvii —, disco e cache, rete, coda e un grafico delle
@@ -363,8 +369,11 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
   (feed, regole, indexer, opzioni a schede; ogni feed dice quali regole
   decidono cosa scarica; termini delle regole in *contiene tutti* / *uno di* /
   *nessuno di*, confrontati ignorando punti e trattini dei nomi delle release;
-  anteprima che si aggiorna mentre scrivi e avvisa quando una regola prende
-  release di più titoli). Regole PASS/FAIL ordinate, ricarica per riga,
+  anteprima che si aggiorna mentre scrivi, avvisa quando una regola prende
+  release di più titoli e **dice perché le altre voci dell'archivio restano
+  fuori**; modelli di regola pronti, un `Test` del feed che mostra le voci di un
+  URL prima di salvarlo e un import del setup che dice cosa contiene il file
+  prima di sostituire qualcosa). Regole PASS/FAIL ordinate, ricarica per riga,
   test indexer in tempo reale, FlareSolverr opzionale e un **archivio** locale
   di tutto ciò che i feed hanno restituito (100.000 release cercabili in ~7
   ms, con opzione di interrogare dal vivo Jackett/Prowlarr); in *Impostazioni*

@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +61,53 @@ func TestUILiveFragment(t *testing.T) {
 	body := string(raw)
 	if !strings.Contains(body, "IP filter") || strings.Contains(body, "<html") {
 		t.Fatalf("live fragment unexpected: %s", body)
+	}
+}
+
+// TestUIRowsClientTemplateCoversColumns guards the split between the server
+// row template and the client one: every column the chooser knows (data-col in
+// ui.tmpl) must have its cell in the client row template, and the client must
+// not render a cell no column stands for. The rows are drawn by the browser
+// from /ui/rows, so nothing else compares the two templates.
+func TestUIRowsClientTemplateCoversColumns(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "internal", "webui", "assets", "ui.tmpl"))
+	if err != nil {
+		t.Skip("page assets are unavailable outside the source tree")
+	}
+	body := string(raw)
+	columnRe := regexp.MustCompile(`data-col="([a-z]+)"`)
+	columns := map[string]bool{}
+	for _, m := range columnRe.FindAllStringSubmatch(body, -1) {
+		columns[m[1]] = true
+	}
+	if len(columns) < 20 {
+		t.Fatalf("found %d columns in the page, want the full chooser", len(columns))
+	}
+
+	start := strings.Index(body, "function rowHTML(r){")
+	if start < 0 {
+		t.Fatal("the client row template (rowHTML) is gone from ui.tmpl")
+	}
+	end := strings.Index(body[start:], "\n}")
+	if end < 0 {
+		t.Fatal("cannot find the end of rowHTML")
+	}
+	client := body[start : start+end]
+
+	cellRe := regexp.MustCompile(`(?:^|[\s"])c-([a-z]+)(?:[^a-z]|$)`)
+	cells := map[string]bool{}
+	for _, m := range cellRe.FindAllStringSubmatch(client, -1) {
+		cells[m[1]] = true
+	}
+	for column := range columns {
+		if !cells[column] {
+			t.Errorf("column %q has no cell in the client row template (rowHTML)", column)
+		}
+	}
+	for cell := range cells {
+		if !columns[cell] {
+			t.Errorf("the client row template renders c-%s, which is not a column (data-col)", cell)
+		}
 	}
 }
 

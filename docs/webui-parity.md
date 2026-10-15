@@ -29,7 +29,8 @@ Stato di partenza (già buono, da non regredire):
 
 - [x] Dialog Add: limiti DL/UP per-torrent in creazione (`addRequestFromForm`,
       applicati via `torrentMeta`), `autoTMM` per-add (standalone).
-      Resta: selettore cookie, content-layout, anteprima nome dopo magnet.
+      Resta: content-layout (richiede supporto engine: oggi il save path è
+      per-torrent/categoria).
 - [x] Colonne mancanti: `Availability, Time active, Last activity, Wasted`
       (dati già in `torrentInfo`/engine: `LastActive` esposto da
       `runtimeInfo.lastActive`; scelta/ordinamento persistiti come le altre).
@@ -124,7 +125,7 @@ Migliorie proposte (usabilità, non motore):
 
 - [x] Audit `/api/v2`: copertura completa (auth/app/transfer/torrents/sync/log/
       search/rss/torrentcreator, inclusi rename e prio); gate
-      `qbit_compat_test.go` verde. Resta: prova contro VueTorrent reale.
+      `qbit_compat_test.go` verde e prova contro VueTorrent reale fatta (§2).
 - [x] Refresh leggero: righe via JSON (`/ui/rows`) + chrome via HTML
       (`/ui/live?notable=1`), template client verificato cella-per-cella contro
       il server, misure in `measurements.md` (−63% byte/tick).
@@ -133,9 +134,6 @@ Migliorie proposte (usabilità, non motore):
 - [x] Preferenze UI (colonne/filtri/tema) anche lato server (`GET/POST
       /ui/uiprefs`, solo standalone; localStorage resta fast path e vince,
       il server riempie solo ciò che manca).
-- [x] Audit `/api/v2`: copertura completa (auth/app/transfer/torrents/sync/log/
-      search/rss/torrentcreator, inclusi rename e prio); gate
-      `qbit_compat_test.go` verde. Resta: prova contro VueTorrent reale.
 
 ## Ordine di lavoro
 
