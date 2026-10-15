@@ -355,7 +355,9 @@ fewer features, but all the ones a standalone client needs.
   dots and dashes of release names; a match preview that updates as you type,
   warns when a rule takes releases of several titles and **says why the other
   archived items stay out**; ready-made rule templates, a feed `Test` that
-  previews the items of a URL before saving it, and a setup import that shows
+  previews the items of a URL before saving it, a *New feed* dialog that takes a
+  **pasted list** (one address per line, optionally named) and creates a feed for
+  each, and a setup import that shows
   what the file holds before it replaces anything). Ordered PASS/FAIL rules, per-row
   reload, live indexer tests, optional FlareSolverr, and a local **archive**
   of everything feeds returned (100,000 releases searchable in ~7 ms, with an

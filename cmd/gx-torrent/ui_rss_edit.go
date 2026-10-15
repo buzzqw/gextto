@@ -237,6 +237,12 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 		}
 		list[index].Disabled = !list[index].Disabled
 	default:
+		// A pasted list of addresses adds one feed per line, sharing the
+		// options of the form (see ui_rss_bulk.go).
+		if raw := strings.TrimSpace(r.FormValue("urls")); raw != "" {
+			d.uiRssAddFeedsBulk(w, r, list, raw)
+			return
+		}
 		feed := feedConfig{
 			Name:     strings.TrimSpace(r.FormValue("name")),
 			URL:      strings.TrimSpace(r.FormValue("url")),

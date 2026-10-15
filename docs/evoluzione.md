@@ -164,7 +164,10 @@ turns an error into an actionable hint (API key, Cloudflare/FlareSolverr, a page
 without links, a timeout); ready-made rule templates and a feed `Test` (items of
 a URL previewed before saving) plus a setup import that shows what the file holds
 before it replaces the current configuration keep every change visible before it
-lands; a feed filter that the rules make unused is marked so; a wanted title lists
+lands; *New feed* takes a **pasted list** too — one address per line, a name
+before the address when wanted — and creates one feed per line, deriving a
+readable name from the address and skipping what is already configured; a feed
+filter that the rules make unused is marked so; a wanted title lists
 its releases with the
 verdict for each (taken, had, or the filter that turns it away), live while it
 is added. Rule terms come in *all of* / *one of* / *none of*, all found with the
@@ -591,9 +594,6 @@ recovered from a shell without editing the database.
 - **Watch folders.** The *Watch folders* section should say that the `.torrent`
   files it finds are **downloaded**, not only "added automatically", so what the
   feature does to the media is explicit.
-- **RSS feeds in bulk.** On the RSS & Indexer page, *New feed* should accept many
-  lines pasted at once — one feed URL per line — and create a feed for each, so a
-  list copied from elsewhere does not have to be added one at a time.
 
 **Closing the gap with Sonarr/Radarr** (§1), by value per effort, each after a study and
 without copying code (Sonarr is GPLv3, Gextto EUPL-1.2):

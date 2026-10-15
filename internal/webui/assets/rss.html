@@ -38,6 +38,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
   <button type="button" class="ghost icon" data-theme-switch data-label-auto="Theme: automatic (follows the system)" data-label-light="Theme: light" data-label-dark="Theme: dark" aria-label="Theme: automatic (follows the system)" title="Switch theme (automatic, light, dark)"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
 </header>
 <main class="page" style="max-width:1100px">
+<!--NOTICE-->
 <!--ERROR-->
 <div class="page-head">
   <div class="grow">
@@ -138,6 +139,11 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
         <label class="field">Feed URL<input type="text" name="url" id="feed-url" placeholder="http://…/rss" autocomplete="off" required title="RSS feed URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…)"></label>
         <div class="actions" style="margin:0"><button type="button" class="sm" id="feed-test" title="Fetch this URL now and show how many items it returns, before saving">Test</button><span class="muted" id="feed-test-status" aria-live="polite"></span></div>
         <label class="field">Folder<input type="text" name="folder" placeholder="tv" autocomplete="off" title="Group shown next to the feed name"></label>
+      </div>
+      <div class="fsec">
+        <h3>Add several feeds at once</h3>
+        <p class="muted" style="margin:0 0 8px;font-size:13px">One URL per line. When you want to name a feed, put the name before its URL separated by a vertical bar. The folder and the options below apply to every feed added.</p>
+        <label class="field">Feed URLs<textarea name="urls" id="feed-urls" rows="4" placeholder="https://…/rss&#10;https://…/browse/?filter=u=name" title="One feed per line: an RSS URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…). A line may read Name | URL; without a name it is taken from the address."></textarea></label>
       </div>
       <div class="fsec" id="feed-fallback">
         <h3>When no rule covers this feed</h3>
@@ -328,6 +334,9 @@ var feedForm=$('#feed-form');
 })();
 function editFeed(feed,index,covered){
   feedForm.reset();$('#feed-index').value=index===undefined?'':index;
+  // A pasted list fills the feeds by itself: the single name and URL are only
+  // required while the list is empty.
+  $('#feed-urls').value='';feedForm.elements.name.required=true;feedForm.elements.url.required=true;
   // With rules watching the feed its own filter is not used: say so and dim it.
   $('#feed-covered').hidden=!covered;$('#feed-covered-names').textContent=covered||'';$('#feed-fallback').classList.toggle('unused',!!covered);
   ['name','url','folder','include','exclude','category','savepath'].forEach(function(n){feedForm.elements[n].value=feed[n]||'';});
@@ -337,6 +346,7 @@ function editFeed(feed,index,covered){
   openDialog($('#dlg-feed'));
 }
 $('#new-feed').addEventListener('click',function(){editFeed({});});
+$('#feed-urls').addEventListener('input',function(){var on=this.value.trim()!=='';feedForm.elements.name.required=!on;feedForm.elements.url.required=!on;});
 $$('[data-feed-edit]').forEach(function(b){b.addEventListener('click',function(){var f={};try{f=JSON.parse(b.getAttribute('data-feed')||'{}');}catch(_){}editFeed(f,b.getAttribute('data-index'),b.getAttribute('data-covered')||'');});});
 $$('[data-feed-reload]').forEach(function(btn){btn.addEventListener('click',function(){
   var name=btn.getAttribute('data-feed-reload'),row=btn.closest('li'),cell=row?$('[data-feed-status]',row):null;btn.disabled=true;if(cell)cell.textContent=t('Checking…');

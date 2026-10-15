@@ -372,7 +372,9 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
   anteprima che si aggiorna mentre scrivi, avvisa quando una regola prende
   release di più titoli e **dice perché le altre voci dell'archivio restano
   fuori**; modelli di regola pronti, un `Test` del feed che mostra le voci di un
-  URL prima di salvarlo e un import del setup che dice cosa contiene il file
+  URL prima di salvarlo, un dialogo *Nuovo feed* che accetta una **lista
+  incollata** (un indirizzo per riga, con nome se vuoi) e crea un feed per
+  ciascuno, e un import del setup che dice cosa contiene il file
   prima di sostituire qualcosa). Regole PASS/FAIL ordinate, ricarica per riga,
   test indexer in tempo reale, FlareSolverr opzionale e un **archivio** locale
   di tutto ciò che i feed hanno restituito (100.000 release cercabili in ~7

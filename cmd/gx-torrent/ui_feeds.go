@@ -291,6 +291,13 @@ func (d *Daemon) handleUIRssExport(w http.ResponseWriter, r *http.Request) {
 
 // renderRSS writes the RSS page, localized like the daemon page.
 func (d *Daemon) renderRSS(w http.ResponseWriter, r *http.Request, errKey string) {
+	d.renderRSSPage(w, r, errKey, "")
+}
+
+// renderRSSPage writes the RSS page with the error and the neutral notice (the
+// outcome of an action, e.g. how many feeds a pasted list added). Both are shown
+// at the top of the page; noticeHTML is already-built markup.
+func (d *Daemon) renderRSSPage(w http.ResponseWriter, r *http.Request, errKey, noticeHTML string) {
 	page := assets.RSSPage()
 	page = strings.Replace(page, "{{FEEDS}}", html.EscapeString(orEmptyJSON(d.opts.Settings.Get(feedsSettingKey, ""))), 1)
 	page = strings.Replace(page, "{{RULES}}", html.EscapeString(orEmptyJSON(d.opts.Settings.Get(rulesSettingKey, ""))), 1)
@@ -326,6 +333,7 @@ func (d *Daemon) renderRSS(w http.ResponseWriter, r *http.Request, errKey string
 	if errKey != "" {
 		errorHTML = `<div class="notice err" role="alert">` + html.EscapeString(errKey) + `</div>`
 	}
+	page = strings.Replace(page, "<!--NOTICE-->", noticeHTML, 1)
 	page = strings.Replace(page, "<!--ERROR-->", errorHTML, 1)
 
 	lang := d.uiLang(r)

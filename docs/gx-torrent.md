@@ -299,7 +299,12 @@ The standalone pages follow the same structure:
   that watch it, its own filter, *Take everything*, or *archive only*, and
   whether the wanted titles also take from it; the feed editor marks its
   fallback filter as **not used** (with the rules' names) when rules watch the
-  feed, instead of leaving fields that would be ignored in silence.
+  feed, instead of leaving fields that would be ignored in silence. The feed
+  editor takes a **pasted list** as well: one address per line (a name before the
+  address when wanted, separated by a vertical bar), and it creates one feed per
+  line with the options of the form (folder, filter, category, paused, disabled,
+  *Take everything*), deriving a readable name from each address and skipping the
+  lines already configured or unusable, which it then reports on the page.
   The options tab holds the refresh interval, the archive retention,
   FlareSolverr (with its test) and **Copy the setup**: *Export* downloads the
   feeds, rules and indexers as one JSON file (`GET /ui/rss-export`), *Import*
