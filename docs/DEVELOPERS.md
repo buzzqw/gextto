@@ -85,14 +85,17 @@ scripts/gx-core-test.sh start -- -debug # extra daemon options after "--"
 
 It keeps everything apart from Gextto: its own directory (`~/gx-core-test`:
 binary, state, session database, downloads, log), its own web page/API address
-(`127.0.0.1:8899`) and peer ports (`51500-51510`), no UPnP/NAT-PMP mapping.
-The build goes to `~/gx-core-test/bin`, not to `bin/`, and does not bump
-`gx-torrent.build_number`: Gextto's managed gx-torrent is never replaced. The
-binary carries the commit (`-dirty` when the engine or daemon sources have
+(`0.0.0.0:8899`, open on the whole LAN like the packaged standalone daemon) and
+peer ports (`51500-51510`), no UPnP/NAT-PMP mapping. `start` and `status` print
+the address another device on the network opens (the machine's LAN address); its
+page stays open until a password is set in its own `settings.json` (standalone's
+LAN bypass). The build goes to `~/gx-core-test/bin`, not to `bin/`, and does not
+bump `gx-torrent.build_number`: Gextto's managed gx-torrent is never replaced.
+The binary carries the commit (`-dirty` when the engine or daemon sources have
 uncommitted changes) and no release channel, so it never updates itself.
-`GX_TEST_DIR`, `GX_TEST_LISTEN` (e.g. `0.0.0.0:8899` to open it from another
-device on the LAN), `GX_TEST_PEER_PORTS`, `GX_TEST_TOKEN` and `GX_TEST_BIN`
-change the defaults.
+`GX_TEST_DIR`, `GX_TEST_LISTEN` (e.g. `127.0.0.1:8899` to keep it on this
+machine only), `GX_TEST_PEER_PORTS`, `GX_TEST_TOKEN` and `GX_TEST_BIN` change the
+defaults.
 The script can be called through a symlink (for example
 `ln -s ~/gextto/scripts/gx-core-test.sh ~/gx-core-test.sh`): it resolves the
 link and builds the checkout the link points to.

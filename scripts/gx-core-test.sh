@@ -15,9 +15,15 @@
 # numbers, so Gextto's managed gx-torrent is never replaced. It is a local
 # build without a release channel: it never updates itself.
 #
+# It listens on the whole LAN, like the packaged standalone daemon, and start
+# and status print the address another device on the network opens (its own
+# page stays open until a password is set in its settings.json, standalone's
+# LAN bypass): it is a test daemon to try from the phone or another PC, not a
+# second server to expose beyond the local network.
+#
 # Settings (environment):
 #   GX_TEST_DIR         test directory           (default ~/gx-core-test)
-#   GX_TEST_LISTEN      web page / API address   (default 127.0.0.1:8899)
+#   GX_TEST_LISTEN      web page / API address   (default 0.0.0.0:8899)
 #   GX_TEST_PEER_PORTS  peer port range          (default 51500-51510)
 #   GX_TEST_TOKEN       X-Gx-Token required by the API; without it a
 #                       non-loopback GX_TEST_LISTEN gets -insecure
@@ -31,7 +37,7 @@ set -euo pipefail
 SCRIPT="$(readlink -f "$0")"
 ROOT="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
 DIR="${GX_TEST_DIR:-$HOME/gx-core-test}"
-LISTEN="${GX_TEST_LISTEN:-127.0.0.1:8899}"
+LISTEN="${GX_TEST_LISTEN:-0.0.0.0:8899}"
 PEER_PORTS="${GX_TEST_PEER_PORTS:-51500-51510}"
 TOKEN="${GX_TEST_TOKEN:-}"
 BIN="${GX_TEST_BIN:-$DIR/bin/gx-torrent}"
@@ -39,12 +45,71 @@ PID_FILE="$DIR/gx-torrent.pid"
 LOG_FILE="$DIR/gx-torrent.log"
 PORT="${LISTEN##*:}"
 HOST="${LISTEN%:*}"
-[[ "$HOST" == "0.0.0.0" || -z "$HOST" ]] && HOST="127.0.0.1"
-BASE_URL="http://$HOST:$PORT"
+HOST="${HOST#[}"
+HOST="${HOST%]}"
+# A wildcard bind is not an address anyone can type: the health checks use
+# loopback and the LAN address is looked up separately (lan_url).
+WILDCARD=0
+case "$HOST" in
+  "" | 0.0.0.0 | ::) WILDCARD=1 ;;
+esac
+BASE_URL="http://127.0.0.1:$PORT"
 
 usage() {
   sed -n '2,11p' "$SCRIPT" | sed 's/^# \{0,1\}//'
   exit 2
+}
+
+loopback_host() {
+  [[ "$1" == "localhost" || "$1" == "::1" || "$1" == 127.* ]]
+}
+
+# lan_ip is the machine's address on the local network: the source IP of the
+# route to the gateway (the kernel only picks the route, no packet is sent),
+# falling back to the first address of `hostname -I`; empty when the host has no
+# usable LAN address.
+lan_ip() {
+  local ip=""
+  if command -v ip >/dev/null 2>&1; then
+    ip="$(ip -4 route get 1.1.1.1 2>/dev/null \
+      | awk '{for (i = 1; i < NF; i++) if ($i == "src") {print $(i + 1); exit}}')"
+  fi
+  if [[ -z "$ip" ]] && command -v hostname >/dev/null 2>&1; then
+    ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  fi
+  printf '%s' "$ip"
+}
+
+# lan_url is where another device on the local network opens the test daemon:
+# the bound address when it is a concrete one, the machine's LAN address when a
+# wildcard is bound, empty when it listens on loopback only (or this host has no
+# LAN address).
+lan_url() {
+  if [[ "$WILDCARD" == 1 ]]; then
+    local ip
+    ip="$(lan_ip)"
+    [[ -n "$ip" ]] || return 0
+    printf 'http://%s:%s' "$ip" "$PORT"
+    return 0
+  fi
+  if loopback_host "$HOST"; then
+    return 0
+  fi
+  printf 'http://%s:%s' "$HOST" "$PORT"
+}
+
+# report_lan prints the address on the LAN, or why the daemon cannot be reached
+# there.
+report_lan() {
+  local url
+  url="$(lan_url)"
+  if [[ -n "$url" ]]; then
+    echo "reachable from the LAN at $url"
+  elif [[ "$WILDCARD" == 1 ]]; then
+    echo "no LAN address on this host: reachable from this machine only ($BASE_URL)" >&2
+  else
+    echo "bound to $HOST: reachable from this machine only, not from the LAN" >&2
+  fi
 }
 
 running_pid() {
@@ -82,6 +147,7 @@ start() {
   local pid
   if pid="$(running_pid)"; then
     echo "already running (pid $pid) on $BASE_URL"
+    report_lan
     return 0
   fi
   if [[ ! -x "$BIN" ]]; then
@@ -106,7 +172,7 @@ start() {
   )
   if [[ -n "$TOKEN" ]]; then
     args+=(-token "$TOKEN")
-  elif [[ "${LISTEN%:*}" != "127.0.0.1" && "${LISTEN%:*}" != "localhost" ]]; then
+  elif [[ "$WILDCARD" == 1 ]] || ! loopback_host "$HOST"; then
     args+=(-insecure)
   fi
   args+=("${EXTRA_ARGS[@]}")
@@ -115,6 +181,7 @@ start() {
   for _ in $(seq 1 60); do
     if curl -fsS -m 2 ${TOKEN:+-H "X-Gx-Token: $TOKEN"} "$BASE_URL/api/v1/health" > /dev/null 2>&1; then
       echo "gx-core test started (pid $(cat "$PID_FILE")): $BASE_URL"
+      report_lan
       status_line
       return 0
     fi
@@ -157,6 +224,7 @@ status() {
   local pid
   if pid="$(running_pid)"; then
     echo "running (pid $pid) on $BASE_URL, directory $DIR"
+    report_lan
     status_line
   else
     echo "not running (directory $DIR)"
