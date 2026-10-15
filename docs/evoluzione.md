@@ -149,8 +149,11 @@ priority control each, and folders renamed like files; guided empty states and a
 section filter in Settings; the table refresh travels as JSON (`/ui/rows`) with the
 chrome as translated HTML, which is six times smaller per tick (see
 [`measurements.md`](measurements.md)). Details in
-[`gx-torrent.md`](gx-torrent.md), *Web interface*; the remaining gaps towards
-qBittorrent and the work plan are in [`webui-parity.md`](webui-parity.md).
+[`gx-torrent.md`](gx-torrent.md), *Web interface*. Two points of the page are
+still open: **virtualising the table** beyond the 300-row window with *Show
+more* (for sessions with more than a thousand torrents), and a **content layout**
+in the Add dialog, which needs engine support because today the save path is per
+torrent or per category.
 
 The RSS and wanted pages follow one principle: **nothing is decided out of
 sight**. A rule's preview updates as it is typed, warns when it takes several
