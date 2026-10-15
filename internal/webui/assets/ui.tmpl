@@ -12,7 +12,7 @@
 // default width in px (0 = the name column, which takes the remaining space).
 // The style is written before the table is parsed, so a hidden column never
 // flashes on load.
-window.__gxCols=[["name",1,0],["size",1,92],["progress",1,120],["state",1,112],["seeds",1,72],["peers",1,72],["down",1,104],["up",1,104],["eta",1,76],["ratio",1,64],["category",1,104],["tags",0,120],["added",0,132],["completed",0,132],["downloaded",0,94],["uploaded",0,94],["remaining",0,94],["queue",0,52],["tracker",0,150],["path",0,220],["availability",0,80],["active",0,90],["lastactive",0,132],["wasted",0,94]];
+window.__gxCols=[["name",1,0],["size",1,92],["progress",1,120],["state",1,112],["seeds",1,72],["peers",1,72],["down",1,104],["up",1,104],["eta",1,76],["ratio",1,64],["category",1,104],["tags",0,120],["added",0,132],["completed",0,132],["downloaded",0,94],["uploaded",0,94],["remaining",0,94],["queue",0,52],["tracker",0,150],["path",0,220],["availability",1,80],["active",1,90],["lastactive",1,132],["wasted",1,94]];
 window.gxColStyle=function(){
   var saved={};try{saved=JSON.parse(localStorage.getItem('gx-cols')||'{}')||{};}catch(e){}
   var css='',total=34+40+200;
@@ -450,10 +450,10 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="queue" title="Show or hide this column">Queue position</button>
   <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="tracker" title="Show or hide this column">Tracker</button>
   <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="path" title="Show or hide this column">Save path</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="availability" title="Show or hide this column">Availability</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="active" title="Show or hide this column">Time active</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="lastactive" title="Show or hide this column">Last activity</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="wasted" title="Show or hide this column">Wasted</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="availability" title="Show or hide this column">Availability</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="active" title="Show or hide this column">Time active</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="lastactive" title="Show or hide this column">Last activity</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="wasted" title="Show or hide this column">Wasted</button>
   <hr>
   <button type="button" role="menuitem" data-col-reset title="Show the default columns with their default widths">Reset columns</button>
 </div>
