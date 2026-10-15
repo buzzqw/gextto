@@ -186,6 +186,14 @@ no feed configured, records in `state.json` what appeared and what was taken, an
 throttled **gap search** for the missing episodes; **Check feeds** forces a check at
 once.
 
+Each wanted row says honestly what the operator has, never guessing a season is
+complete: it counts the episodes **downloaded**, the ones **downloading** in the session
+and the ones **seen but not downloaded**, with a chip per season (a season only partly
+seen is not collapsed to a bare `S01`). The **Episodes** button opens the per-episode
+grid inline, and an episode already in the session links to its torrent; a movie shows
+its single release with the same states. This is why the row needs no "Missing" claim:
+the state vocabulary is explained by a legend on the page.
+
 ## 6. What is missing and what is decided
 
 **Still open.**

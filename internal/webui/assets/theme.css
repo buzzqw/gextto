@@ -270,7 +270,7 @@ legend { color: var(--text); font-weight: 600; padding: 0 6px; }
 .b-downloading { background: var(--info-soft); color: var(--info); }
 .b-seeding { background: var(--ok-soft); color: var(--ok); }
 .b-paused { background: var(--surface-2); color: var(--muted); }
-.b-stalled, .b-disk_wait { background: var(--warn-soft); color: var(--warn); }
+.b-stalled, .b-disk_wait, .b-missing { background: var(--warn-soft); color: var(--warn); }
 .b-error { background: var(--err-soft); color: var(--err); }
 .b-moving { background: var(--violet-soft); color: var(--violet); }
 .b-checking_files, .b-downloading_metadata { background: var(--accent-soft); color: var(--accent-soft-fg); }

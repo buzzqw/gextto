@@ -363,12 +363,15 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
   mantenuti tra i riavvii —, disco e cache, rete, coda e un grafico delle
   velocità su 1 h/24 h/7 d). Ogni pagina verificata con axe-core.
 - **RSS e automazione senza decisioni nascoste.** Pagina **Cercati** (schede
-  per titolo con episodi Have/Missing — gli episodi già nel client valgono come
-  posseduti, quindi nulla viene scaricato due volte —, gestore puntate per
-  segnare cosa hai o manca e forzare una nuova ricerca, e per ogni titolo
-  l'elenco delle sue **release con un verdetto**: verrebbe presa, già
-  posseduta, o il filtro che la scarta — lingua, sottotitoli, qualità, stagione,
-  termine escluso — mostrato dal vivo mentre lo aggiungi) e pagina **RSS & Indexer**
+  per titolo che dicono esattamente cosa hai — quanti episodi sono
+  **scaricati**, quanti sono **in download** nella sessione e quanti sono
+  **visti ma non scaricati**, con una pastiglia per stagione e senza mai
+  dichiarare completa una stagione vista solo in parte —, una griglia
+  **Episodi** aperta inline per ogni titolo, un collegamento da ogni episodio
+  scaricato al suo torrent nella sessione, e per ogni titolo l'elenco delle sue
+  **release con un verdetto**: verrebbe presa, già posseduta, o il filtro che la
+  scarta — lingua, sottotitoli, qualità, stagione, termine escluso — mostrato
+  dal vivo mentre lo aggiungi) e pagina **RSS & Indexer**
   (feed, regole, indexer, opzioni a schede; ogni feed dice quali regole
   decidono cosa scarica; termini delle regole in *contiene tutti* / *uno di* /
   *nessuno di*, confrontati ignorando punti e trattini dei nomi delle release;

@@ -189,6 +189,18 @@ episode range `1x01-` reaches the later seasons as in qBittorrent, which is what
 a wanted title's *Seasons* `1+` promises. Episodes already in the client count as
 had for a wanted series, whatever brought them there.
 
+A wanted row states what the operator has in four honest states, never guessing
+completeness: how many episodes are **downloaded** (in the session and complete,
+or taken by the engine), how many are **downloading** (in the session but still
+running) and how many were **seen but not downloaded**, with a chip per season
+(a season only partly seen is not collapsed to a bare `S01` the way
+"Have S01" used to). The title badge shows the single most useful state (paused,
+downloading, to complete, up to date, waiting); the **Episodes** button opens the
+per-episode grid inline and an episode in the session links to its torrent; a
+movie shows its single release with the same states. The episode grid is the
+authoritative ledger (`/ui/wanted-episodes`) and it is no longer hidden inside
+the edit dialog.
+
 **Accessibility.** Reference **WCAG 2.1 AA** (compatible 2.2 practices). The
 interface is **partially accessible**, with an automated baseline that passes but is
 not a WCAG/EN 301 549 certification. What is in place: language via the `lang`

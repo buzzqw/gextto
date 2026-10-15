@@ -326,12 +326,15 @@ The standalone pages follow the same structure:
   read). The archive's feed filter lists only the configured feeds: the
   `wanted:<title>` buckets holding a wanted title's indexer results stay
   searchable under *all feeds*.
-- **Wanted** (`/ui/wanted`): a card per title with type, state, filters as
-  chips, and for a series what it has and what it lacks: **Have** collapses a
-  season with no gap into `S01` and lists the episodes of the seasons with gaps
-  (`S03E01–E03`), **Missing** highlights the episodes seen but not downloaded.
-  The card lists episodes, never a bare count nor a false "complete" (a season
-  is only as complete as the episodes seen so far), plus search now / edit /
+- **Wanted** (`/ui/wanted`): a card per title with type, filters as chips and a
+  **state badge** (paused, downloading, to complete, up to date, waiting), and
+  for a series the honest counts of what it has: how many episodes are
+  **downloaded** (in the session and complete, or taken by the engine), how many
+  are **downloading** (in the session, still running) and how many were **seen
+  but not downloaded**, with a **chip per season**. A season only partly seen is
+  never collapsed to a bare `S01` that reads as complete. The card lists
+  episodes, never a bare count nor a false "complete" (a season is only as
+  complete as the episodes seen so far), plus **Episodes** / search now / edit /
   pause / remove, and **Releases**: the releases of the title in the archive,
   each with its **verdict** — *Would be taken*, *Taken*, *Already in the
   client*, or the first filter that turns it away (season not wanted, not in
@@ -346,13 +349,16 @@ The standalone pages follow the same structure:
   what they return into the same list — the interactive search for a release the
   automatic pass would not pick. The card also says when the indexers were
   last searched for the title. Episodes already in the client, whatever
-  brought them there (a rule, a manual add), **count as had**: the card lists
-  them under *Have*, they are not *Missing*, and the title does not download a
-  second release of them. *Monitoring paused* in the dialog stops the searches
-  for the title. The *Edit* dialog has an **Episodes** manager: it lists the
-  known episodes per season, a click marks one **downloaded** or **missing**, an
-  episode can be added as missing, and **Force download missing** searches the
-  indexers again for what is missing. *Add title* is a guided
+  brought them there (a rule, a manual add), **count as downloaded**: the card
+  counts them as *downloaded*, they are not *seen, not downloaded*, and the
+  title does not download a second release of them. A movie shows its single
+  release with the same states and links to its torrent. *Monitoring paused* in
+  the dialog stops the searches for the title. **Episodes** opens the grid
+  **inline** on the card: it lists the known episodes per season with their state
+  (downloaded / downloading / missing, with a legend), a click marks one
+  **downloaded** or **missing**, an episode in the session carries a **link to
+  its torrent**, an episode can be added as missing, and **Force download
+  missing** searches the indexers again for what is missing. *Add title* is a guided
   dialog: series or movie, the title with a search that shows how it is named in
   the archive, feeds and indexers (pick one to use it), then seasons, language
   (with quick picks), subtitles (terms matched on the release name, with quick

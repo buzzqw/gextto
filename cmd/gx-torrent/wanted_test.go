@@ -116,47 +116,134 @@ func TestWantedSeenTakenMissing(t *testing.T) {
 	}
 }
 
-// TestWantedRowListsHaveAndMissing checks the wanted row shows which episodes
-// were taken (Have) and which were seen but not downloaded (Missing): a season
-// with no gap collapses to its season, a gap lists the episodes.
-func TestWantedRowListsHaveAndMissing(t *testing.T) {
+// TestWantedStatsForSeries checks the per-season picture the page shows: what
+// is downloaded, what is still downloading and what was seen but not taken.
+func TestWantedStatsForSeries(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Show","kind":"series","seasons":"1+"}]`)
+	w := d.wantedList()[0]
+	// Seen and taken E01..E03: three downloaded, nothing missing.
+	for ep := 1; ep <= 3; ep++ {
+		d.recordWantedSeen(w, 1, ep)
+		d.recordWantedTaken(w, 1, ep)
+	}
+	stats := d.wantedStatsFor(w)
+	if stats.Downloaded != 3 || stats.Missing != 0 || stats.Downloading != 0 {
+		t.Fatalf("stats = %+v", stats)
+	}
+	if len(stats.Seasons) != 1 || stats.Seasons[0].Season != 1 || stats.Seasons[0].Downloaded != 3 {
+		t.Fatalf("seasons = %+v", stats.Seasons)
+	}
+	// E05 seen but not taken: one known missing episode.
+	d.recordWantedSeen(w, 1, 5)
+	stats = d.wantedStatsFor(w)
+	if stats.Downloaded != 3 || stats.Missing != 1 {
+		t.Fatalf("stats after a gap = %+v", stats)
+	}
+	if stats.Seasons[0].Missing != 1 {
+		t.Fatalf("the season must carry the gap: %+v", stats.Seasons)
+	}
+}
+
+// TestWantedRowShowsCounts checks the wanted row counts what is downloaded and
+// never presents a partly-seen season as complete (the old "Have S01" made a
+// season of three seen episodes read as the whole season).
+func TestWantedRowShowsCounts(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
 	d.opts.Settings.Set(setupCompleteKey, "true")
 	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Show","kind":"series","seasons":"1+"}]`)
 	w := d.wantedList()[0]
-	d.recordWantedSeen(w, 1, 1)
-	d.recordWantedTaken(w, 1, 1)
+	for ep := 1; ep <= 3; ep++ {
+		d.recordWantedSeen(w, 1, ep)
+		d.recordWantedTaken(w, 1, ep)
+	}
 	row := d.uiWantedRowsHTML()
-	if strings.Contains(row, "Nothing missing") || strings.Contains(row, "<span>taken</span>") {
-		t.Fatalf("the wanted row must list the episodes, not a count: %s", row)
+	if strings.Contains(row, `>Have</span>`) || strings.Contains(row, ">Missing</span>") {
+		t.Fatalf("the row must use the new counts, not Have/Missing: %s", row)
 	}
-	// A season with no gap collapses to its season alone.
-	if !strings.Contains(row, `>Have</span> S01`) || strings.Contains(row, ">Missing</span>") {
-		t.Fatalf("a complete season must collapse and show no gap: %s", row)
+	if !strings.Contains(row, `>3</b> <span>Downloaded</span>`) {
+		t.Fatalf("the row must count the downloaded episodes: %s", row)
 	}
-	// A seen-but-not-taken episode opens a gap: Have lists the episodes held,
-	// Missing flags the episode seen but not downloaded.
-	d.recordWantedSeen(w, 1, 2)
+	if !strings.Contains(row, "seasonchip") {
+		t.Fatalf("the row must carry a per-season chip: %s", row)
+	}
+	// A seen-but-not-taken episode shows as such.
+	d.recordWantedSeen(w, 1, 5)
 	row = d.uiWantedRowsHTML()
-	if !strings.Contains(row, `>Have</span> S01E01`) || !strings.Contains(row, `>Missing</span> S01E02`) {
-		t.Fatalf("the gap must be listed: %s", row)
+	if !strings.Contains(row, "Seen, not downloaded") {
+		t.Fatalf("a known missing episode must be flagged: %s", row)
 	}
 }
 
-// TestFormatHaveEpisodes checks that complete seasons collapse and seasons with
-// a gap list their episodes.
-func TestFormatHaveEpisodes(t *testing.T) {
-	if got := formatHaveEpisodes(
-		[]wantedEpisode{{1, 1}, {1, 2}, {1, 3}}, nil, 24); got != "S01" {
-		t.Fatalf("complete season = %q, want S01", got)
+// TestWantedTitleState fixes the badge of a wanted title: paused, downloading,
+// to-complete, up to date or still waiting.
+func TestWantedTitleState(t *testing.T) {
+	if got := wantedTitleState(wantedEntry{}, wantedStats{}); got != "waiting" {
+		t.Fatalf("no episodes = %q, want waiting", got)
 	}
-	if got := formatHaveEpisodes(
-		[]wantedEpisode{{1, 1}, {1, 2}, {1, 3}}, []wantedEpisode{{1, 5}}, 24); got != "S01E01–E03" {
-		t.Fatalf("season with a gap = %q, want S01E01–E03", got)
+	if got := wantedTitleState(wantedEntry{}, wantedStats{Downloaded: 2}); got != "uptodate" {
+		t.Fatalf("downloaded only = %q, want uptodate", got)
 	}
-	if got := formatHaveEpisodes(
-		[]wantedEpisode{{1, 1}, {1, 2}, {2, 1}, {2, 2}}, []wantedEpisode{{2, 3}}, 24); got != "S01, S02E01–E02" {
-		t.Fatalf("mixed seasons = %q, want S01, S02E01–E02", got)
+	if got := wantedTitleState(wantedEntry{}, wantedStats{Downloaded: 2, Missing: 1}); got != "missing" {
+		t.Fatalf("with a gap = %q, want missing", got)
+	}
+	if got := wantedTitleState(wantedEntry{}, wantedStats{Downloaded: 2, Downloading: 1}); got != "downloading" {
+		t.Fatalf("with a download running = %q, want downloading", got)
+	}
+	if got := wantedTitleState(wantedEntry{Paused: true}, wantedStats{Missing: 3}); got != "paused" {
+		t.Fatalf("paused = %q, want paused", got)
+	}
+}
+
+// TestWantedEpisodeViewsStates checks the episode grid states: an episode still
+// downloading in the session reads "downloading" and carries the torrent hash
+// to link to it, a downloaded one reads "downloaded".
+func TestWantedEpisodeViewsStates(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Show","kind":"series","seasons":"1+"}]`)
+	w := d.wantedList()[0]
+	d.recordWantedSeen(w, 1, 1)
+	d.recordWantedTaken(w, 1, 1)
+	d.recordWantedSeen(w, 1, 2)
+	d.recordWantedSeen(w, 1, 3) // seen only: missing
+	d.snapMu.Lock()
+	d.snapshot = []torrentInfo{{Hash: "abc", Name: "Show S01E02 1080p", State: "downloading", Progress: 42}}
+	d.snapMu.Unlock()
+
+	views := d.wantedEpisodeViews(w)
+	if len(views) != 3 {
+		t.Fatalf("views = %+v", views)
+	}
+	if views[0].Episode != 1 || views[0].State != wantedEpisodeDownloaded || !views[0].Have {
+		t.Fatalf("E01 = %+v", views[0])
+	}
+	if views[1].Episode != 2 || views[1].State != wantedEpisodeDownloading || views[1].Hash != "abc" {
+		t.Fatalf("E02 = %+v", views[1])
+	}
+	if views[2].Episode != 3 || views[2].State != wantedEpisodeMissing || views[2].Have {
+		t.Fatalf("E03 = %+v", views[2])
+	}
+	if got := d.wantedStatsFor(w); got.Downloading != 1 || got.Downloaded != 1 || got.Missing != 1 {
+		t.Fatalf("stats = %+v", got)
+	}
+}
+
+// TestWantedMovieStatusLinksToTorrent checks a wanted movie in the session
+// reads as downloaded and links to its torrent, so the operator can see it.
+func TestWantedMovieStatusLinksToTorrent(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Big Movie","kind":"movie"}]`)
+	d.snapMu.Lock()
+	d.snapshot = []torrentInfo{{Hash: "deadbeef", Name: "Big Movie 2024 1080p", State: "seeding", Progress: 100}}
+	d.snapMu.Unlock()
+
+	row := d.uiWantedRowsHTML()
+	if !strings.Contains(row, `/?open=deadbeef`) {
+		t.Fatalf("the movie row must link to its torrent: %s", row)
+	}
+	if !strings.Contains(row, "Downloaded") {
+		t.Fatalf("the movie must read as downloaded: %s", row)
 	}
 }
 

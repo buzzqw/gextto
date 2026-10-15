@@ -346,12 +346,15 @@ fewer features, but all the ones a standalone client needs.
   and cache, the network, the queue and a speed graph over 1 h/24 h/7 d).
   Every page axe-core checked.
 - **RSS and automation with nothing decided out of sight.** A **Wanted** page
-  (cards per title with Have/Missing episodes — episodes already in the client
-  count as had, so nothing is downloaded twice —, an episode manager to mark
-  what you have or miss and force a new search, and for every title the list of
-  its **releases with a verdict**: would be taken, already had, or the filter
-  that turns it away — language, subtitles, quality, season, excluded term —
-  shown live while you add it) and an **RSS & Indexers** page (feeds, rules, indexers,
+  (cards per title that say exactly what you have — how many episodes are
+  **downloaded**, how many are **downloading** in the session and how many were
+  **seen but not downloaded**, with a chip per season and never claiming a
+  partly-seen season is complete —, an **Episodes** grid opened inline per
+  title, a link from each downloaded episode to its torrent in the session, and
+  for every title the list of its **releases with a verdict**: would be taken,
+  already had, or the filter that turns it away — language, subtitles, quality,
+  season, excluded term — shown live while you add it) and an **RSS & Indexers**
+  page (feeds, rules, indexers,
   options as tabbed cards; every feed says which rules decide its downloads;
   rule terms in *contains all of* / *one of* / *none of*, matched across the
   dots and dashes of release names; a match preview that updates as you type,

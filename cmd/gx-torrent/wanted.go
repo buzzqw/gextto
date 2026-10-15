@@ -575,12 +575,13 @@ func (d *Daemon) wantedTakenEpisodes(w wantedEntry) []wantedEpisode {
 	return out
 }
 
-// wantedSessionEpisodes are the episodes of a wanted series already in the
-// session, whatever brought them there (a rule, a manual add, another
-// release): they count as had, so the series is not downloaded twice and its
-// row tells the truth. A movie in the session is the {-1, 0} entry. A season
-// pack, with no episode number, counts as the whole season (episode 0).
-func (d *Daemon) wantedSessionEpisodes(w wantedEntry) map[wantedEpisode]bool {
+// wantedSessionMedia maps every episode of a wanted series already in the
+// session — whatever brought it there (a rule, a manual add, another release)
+// — to the torrent that holds it, so the page can tell a downloaded episode
+// from one still downloading and link to it. A movie in the session is the
+// {-1, 0} entry. A season pack, with no episode number, counts as the whole
+// season (episode 0).
+func (d *Daemon) wantedSessionMedia(w wantedEntry) map[wantedEpisode]torrentInfo {
 	pattern := titleMatchRegex(w.Name)
 	if pattern == "" {
 		return nil
@@ -589,7 +590,7 @@ func (d *Daemon) wantedSessionEpisodes(w wantedEntry) map[wantedEpisode]bool {
 	if err != nil {
 		return nil
 	}
-	out := map[wantedEpisode]bool{}
+	out := map[wantedEpisode]torrentInfo{}
 	for _, view := range d.snapshotViews() {
 		if !re.MatchString(view.Name) {
 			continue
@@ -597,21 +598,179 @@ func (d *Daemon) wantedSessionEpisodes(w wantedEntry) map[wantedEpisode]bool {
 		_, season, episode, ok := rss.FindEpisode(view.Name)
 		if w.kind() == "movie" {
 			if !ok {
-				out[wantedEpisode{season: -1}] = true
+				ep := wantedEpisode{season: -1}
+				out[ep] = preferMedia(out[ep], view)
 			}
 			continue
 		}
 		if ok && seasonAllowed(w.Seasons, season) {
-			out[wantedEpisode{season: season, episode: episode}] = true
+			ep := wantedEpisode{season: season, episode: episode}
+			out[ep] = preferMedia(out[ep], view)
 			continue
 		}
 		if !ok {
 			if packSeason, ok := wantedPackSeason(view.Name); ok && seasonAllowed(w.Seasons, packSeason) {
-				out[wantedEpisode{season: packSeason, episode: 0}] = true
+				ep := wantedEpisode{season: packSeason, episode: 0}
+				out[ep] = preferMedia(out[ep], view)
 			}
 		}
 	}
 	return out
+}
+
+// preferMedia keeps the more advanced torrent when two copies of the same
+// episode are in the session (a repack, a second release): a fully downloaded
+// one wins over a still-downloading one.
+func preferMedia(a, b torrentInfo) torrentInfo {
+	if a.Hash == "" || (mediaDownloaded(b) && !mediaDownloaded(a)) {
+		return b
+	}
+	return a
+}
+
+// mediaDownloaded reports whether a session torrent is fully downloaded (it is
+// seeding or its progress is complete), as opposed to still downloading.
+func mediaDownloaded(v torrentInfo) bool {
+	return v.Progress >= 100 || v.State == "seeding"
+}
+
+// wantedSessionEpisodes is the set of episode keys wantedSessionMedia holds;
+// callers that only ask "is it in the session?" use this.
+func (d *Daemon) wantedSessionEpisodes(w wantedEntry) map[wantedEpisode]bool {
+	media := d.wantedSessionMedia(w)
+	if media == nil {
+		return nil
+	}
+	out := make(map[wantedEpisode]bool, len(media))
+	for ep := range media {
+		out[ep] = true
+	}
+	return out
+}
+
+// Episode states shown on the wanted page. They answer, at a glance, what the
+// operator has: downloaded (in the session and complete, or taken by the
+// engine), downloading (in the session but still running) or missing (seen in
+// the feeds/indexers but not taken).
+const (
+	wantedEpisodeDownloaded  = "downloaded"
+	wantedEpisodeDownloading = "downloading"
+	wantedEpisodeMissing     = "missing"
+)
+
+// wantedSeasonStat is the per-season count of a wanted title's episodes.
+type wantedSeasonStat struct {
+	Season      int
+	Downloaded  int
+	Downloading int
+	Missing     int
+}
+
+// wantedStats is the episode picture of one wanted title: how many episodes are
+// downloaded, still downloading and known but not taken, with the per-season
+// breakdown. It is what the page shows, so "have" and "missing" are never
+// guessed from a partial season (a season we only saw three episodes of is not
+// presented as complete).
+type wantedStats struct {
+	Downloaded  int
+	Downloading int
+	Missing     int
+	Seasons     []wantedSeasonStat
+}
+
+// wantedStatsFor computes the episode picture of a wanted title. A movie has a
+// single release, not episodes: it counts one downloaded or one downloading.
+func (d *Daemon) wantedStatsFor(w wantedEntry) wantedStats {
+	if w.kind() == "movie" {
+		var s wantedStats
+		if media, ok := d.wantedSessionMedia(w)[wantedEpisode{season: -1}]; ok {
+			if mediaDownloaded(media) {
+				s.Downloaded = 1
+			} else {
+				s.Downloading = 1
+			}
+		} else if len(d.wantedLedgerEpisodes(w)) > 0 {
+			s.Downloaded = 1
+		}
+		return s
+	}
+	states := map[wantedEpisode]string{}
+	for _, ep := range d.wantedLedgerEpisodes(w) {
+		if seasonAllowed(w.Seasons, ep.season) {
+			states[ep] = wantedEpisodeDownloaded
+		}
+	}
+	for ep, view := range d.wantedSessionMedia(w) {
+		if !seasonAllowed(w.Seasons, ep.season) {
+			continue
+		}
+		if mediaDownloaded(view) {
+			states[ep] = wantedEpisodeDownloaded
+		} else if states[ep] != wantedEpisodeDownloaded {
+			states[ep] = wantedEpisodeDownloading
+		}
+	}
+	for _, ep := range d.wantedMissing(w) {
+		if _, ok := states[ep]; !ok {
+			states[ep] = wantedEpisodeMissing
+		}
+	}
+	return summarizeWanted(states)
+}
+
+// summarizeWanted turns the per-episode states into the counts the page shows.
+func summarizeWanted(states map[wantedEpisode]string) wantedStats {
+	var s wantedStats
+	bySeason := map[int]*wantedSeasonStat{}
+	for ep, state := range states {
+		switch state {
+		case wantedEpisodeDownloaded:
+			s.Downloaded++
+		case wantedEpisodeDownloading:
+			s.Downloading++
+		case wantedEpisodeMissing:
+			s.Missing++
+		}
+		if ep.season < 0 {
+			continue
+		}
+		row := bySeason[ep.season]
+		if row == nil {
+			row = &wantedSeasonStat{Season: ep.season}
+			bySeason[ep.season] = row
+		}
+		switch state {
+		case wantedEpisodeDownloaded:
+			row.Downloaded++
+		case wantedEpisodeDownloading:
+			row.Downloading++
+		case wantedEpisodeMissing:
+			row.Missing++
+		}
+	}
+	for _, row := range bySeason {
+		s.Seasons = append(s.Seasons, *row)
+	}
+	sort.Slice(s.Seasons, func(i, j int) bool { return s.Seasons[i].Season < s.Seasons[j].Season })
+	return s
+}
+
+// wantedTitleState is the single most useful state of a wanted title, shown as
+// its badge: a paused title, one downloading, one with known missing episodes,
+// one up to date with what was seen, or one still waiting for a first result.
+func wantedTitleState(w wantedEntry, s wantedStats) string {
+	switch {
+	case w.Paused:
+		return "paused"
+	case s.Downloading > 0:
+		return "downloading"
+	case s.Missing > 0:
+		return "missing"
+	case s.Downloaded > 0:
+		return "uptodate"
+	default:
+		return "waiting"
+	}
 }
 
 // formatEpisodeRanges compacts a sorted episode list into ranges, e.g.
@@ -651,38 +810,6 @@ func formatEpisodeRanges(eps []wantedEpisode, max int) string {
 		out += " +" + strconv.Itoa(len(eps)-shown)
 	}
 	return out
-}
-
-// formatHaveEpisodes renders what the operator has for a series: a season with
-// no missing episode collapses to its season alone ("S01"), a season with gaps
-// lists the downloaded episodes ("S03E01–E03"). It reads taken (all the episodes
-// downloaded) and missing (seen but not downloaded) so a season is "collapsed"
-// only when nothing seen for it is missing.
-func formatHaveEpisodes(taken, missing []wantedEpisode, max int) string {
-	missingSeason := map[int]bool{}
-	for _, ep := range missing {
-		missingSeason[ep.season] = true
-	}
-	bySeason := map[int][]wantedEpisode{}
-	var seasons []int
-	for _, ep := range taken {
-		if _, ok := bySeason[ep.season]; !ok {
-			seasons = append(seasons, ep.season)
-		}
-		bySeason[ep.season] = append(bySeason[ep.season], ep)
-	}
-	sort.Ints(seasons)
-	parts := make([]string, 0, len(seasons))
-	for _, season := range seasons {
-		if !missingSeason[season] {
-			parts = append(parts, fmt.Sprintf("S%02d", season))
-			continue
-		}
-		if ranges := formatEpisodeRanges(bySeason[season], max); ranges != "" {
-			parts = append(parts, ranges)
-		}
-	}
-	return strings.Join(parts, ", ")
 }
 
 // wantedMissing lists the episodes seen but not downloaded, inside the wanted

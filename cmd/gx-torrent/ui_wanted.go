@@ -14,6 +14,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"html"
 	"net/http"
 	"regexp"
@@ -130,16 +131,24 @@ func (d *Daemon) handleUIWantedGet(w http.ResponseWriter, r *http.Request) {
 	d.renderWanted(w, r, "")
 }
 
-// wantedEpisodeView is one episode of a wanted title for the episode manager.
+// wantedEpisodeView is one episode of a wanted title for the episode grid: its
+// state (downloaded, downloading or missing) and, when the episode is in the
+// session, the torrent that holds it, so the page can link to it.
 type wantedEpisodeView struct {
-	Season  int  `json:"season"`
-	Episode int  `json:"episode"`
-	Have    bool `json:"have"`
+	Season   int     `json:"season"`
+	Episode  int     `json:"episode"`
+	Have     bool    `json:"have"`
+	State    string  `json:"state"`
+	Hash     string  `json:"hash,omitempty"`
+	Name     string  `json:"name,omitempty"`
+	Progress float64 `json:"progress,omitempty"`
 }
 
-// wantedEpisodeViews lists the known episodes (seen or taken) of a title,
-// ordered by season then episode, with what the operator has.
-func (d *Daemon) wantedEpisodeViews(name string) []wantedEpisodeView {
+// wantedEpisodeViews lists the known episodes of a wanted title, ordered by
+// season then episode, with what the operator has: downloaded (taken by the
+// engine, or in the session and complete), downloading (in the session, still
+// running) or missing (seen in the feeds/indexers, not taken).
+func (d *Daemon) wantedEpisodeViews(w wantedEntry) []wantedEpisodeView {
 	d.mu.Lock()
 	seen := map[string]smartEpisodes{}
 	for key, eps := range d.state.WantedSeen {
@@ -150,11 +159,19 @@ func (d *Daemon) wantedEpisodeViews(name string) []wantedEpisodeView {
 		taken[key] = eps
 	}
 	d.mu.Unlock()
+	media := d.wantedSessionMedia(w)
 
-	prefix := strings.TrimSpace(name) + "\x00"
-	have := map[[2]int]bool{}
+	prefix := strings.TrimSpace(w.Name) + "\x00"
+	states := map[[2]int]string{}
+	mediaByKey := map[[2]int]torrentInfo{}
 	var keys [][2]int
-	add := func(byKey map[string]smartEpisodes, isHave bool) {
+	record := func(k [2]int, state string) {
+		if _, ok := states[k]; !ok {
+			keys = append(keys, k)
+		}
+		states[k] = strongerEpisodeState(states[k], state)
+	}
+	add := func(byKey map[string]smartEpisodes, state string) {
 		for key, eps := range byKey {
 			if !strings.HasPrefix(key, prefix) {
 				continue
@@ -168,18 +185,21 @@ func (d *Daemon) wantedEpisodeViews(name string) []wantedEpisodeView {
 				if err != nil {
 					continue
 				}
-				k := [2]int{season, episode}
-				if _, ok := have[k]; !ok {
-					keys = append(keys, k)
-				}
-				if isHave {
-					have[k] = true
-				}
+				record([2]int{season, episode}, state)
 			}
 		}
 	}
-	add(seen, false)
-	add(taken, true)
+	add(seen, wantedEpisodeMissing)
+	add(taken, wantedEpisodeDownloaded)
+	for ep, view := range media {
+		state := wantedEpisodeDownloading
+		if mediaDownloaded(view) {
+			state = wantedEpisodeDownloaded
+		}
+		k := [2]int{ep.season, ep.episode}
+		record(k, state)
+		mediaByKey[k] = view
+	}
 	sort.Slice(keys, func(i, j int) bool {
 		if keys[i][0] != keys[j][0] {
 			return keys[i][0] < keys[j][0]
@@ -188,9 +208,42 @@ func (d *Daemon) wantedEpisodeViews(name string) []wantedEpisodeView {
 	})
 	out := make([]wantedEpisodeView, 0, len(keys))
 	for _, k := range keys {
-		out = append(out, wantedEpisodeView{Season: k[0], Episode: k[1], Have: have[k]})
+		state := states[k]
+		view := wantedEpisodeView{
+			Season:  k[0],
+			Episode: k[1],
+			Have:    state == wantedEpisodeDownloaded,
+			State:   state,
+		}
+		if media, ok := mediaByKey[k]; ok {
+			view.Hash = media.Hash
+			view.Name = media.Name
+			view.Progress = media.Progress
+		}
+		out = append(out, view)
 	}
 	return out
+}
+
+// strongerEpisodeState keeps the most advanced of two states of the same
+// episode: downloaded beats downloading beats missing.
+func strongerEpisodeState(a, b string) string {
+	if a == "" {
+		return b
+	}
+	rank := func(s string) int {
+		switch s {
+		case wantedEpisodeDownloaded:
+			return 2
+		case wantedEpisodeDownloading:
+			return 1
+		}
+		return 0
+	}
+	if rank(b) > rank(a) {
+		return b
+	}
+	return a
 }
 
 // handleUIWantedEpisodes reads and edits the episode ledger of one wanted title:
@@ -215,7 +268,7 @@ func (d *Daemon) handleUIWantedEpisodes(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusOK, map[string]any{
 			"name":     list[index].Name,
 			"kind":     list[index].kind(),
-			"episodes": d.wantedEpisodeViews(list[index].Name),
+			"episodes": d.wantedEpisodeViews(list[index]),
 		})
 		return
 	}
@@ -250,7 +303,7 @@ func (d *Daemon) handleUIWantedEpisodes(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, errors.New("unknown episode operation"))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "episodes": d.wantedEpisodeViews(entry.Name)})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "episodes": d.wantedEpisodeViews(entry)})
 }
 
 func (d *Daemon) renderWanted(w http.ResponseWriter, r *http.Request, errKey string) {
@@ -636,21 +689,22 @@ func (d *Daemon) uiWantedRowsHTML() string {
 	var b strings.Builder
 	for index, w := range list {
 		idx := strconv.Itoa(index)
-		taken, _ := d.wantedProgress(w)
+		stats := d.wantedStatsFor(w)
+		badgeClass, badgeLabel := wantedBadge(wantedTitleState(w, stats))
 		icon, kindLabel := "i-tv", "Series"
 		if w.kind() == "movie" {
 			icon, kindLabel = "i-film", "Movie"
 		}
 		cls := "item"
-		state := `<span class="badge b-seeding">Monitoring</span>`
-		pauseText, pauseTitle := "Pause", "Pause monitoring this wanted title"
 		if w.Paused {
 			cls += " off"
-			state = `<span class="badge b-paused">Paused</span>`
+		}
+		pauseText, pauseTitle := "Pause", "Pause monitoring this wanted title"
+		if w.Paused {
 			pauseText, pauseTitle = "Resume", "Resume monitoring this wanted title"
 		}
 		b.WriteString(`<li class="` + cls + `" data-wanted-row="` + idx + `"><div class="kind-icon" aria-hidden="true"><svg class="i"><use href="/assets/icons.svg#` + icon + `"/></svg></div><div class="item-main">`)
-		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(w.Name) + `</span><span class="chip">` + kindLabel + `</span>` + state + `</div>`)
+		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(w.Name) + `</span><span class="chip">` + kindLabel + `</span><span class="badge ` + badgeClass + `">` + badgeLabel + `</span></div>`)
 
 		var chips strings.Builder
 		if w.kind() != "movie" && strings.TrimSpace(w.Seasons) != "" {
@@ -681,33 +735,24 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			b.WriteString(`<div class="chips">` + chips.String() + `</div>`)
 		}
 
-		// What the operator has and what is missing for a series, honestly: the
-		// episodes downloaded (Have) and the ones seen but not taken (Missing).
-		// No bare count and no "nothing missing" claim: a series is only as
-		// complete as the episodes seen so far.
+		// What the operator has, honestly: how many episodes are downloaded,
+		// how many are still downloading and how many were seen but not taken.
+		// A season we only partly saw is never claimed complete.
 		b.WriteString(`<div class="item-status">`)
-		var statusParts []string
-		if w.kind() != "movie" {
-			have := d.wantedTakenEpisodes(w)
-			missing := d.wantedMissing(w)
-			if len(have) > 0 {
-				statusParts = append(statusParts, `<span class="ok" title="Episodes downloaded for this title">Have</span> `+formatHaveEpisodes(have, missing, wantedEpisodeListMax))
-			}
-			if len(missing) > 0 {
-				statusParts = append(statusParts, `<span class="warn" title="Episodes seen but not downloaded">Missing</span> `+formatEpisodeRanges(missing, wantedEpisodeListMax))
-			}
-		} else if taken > 0 || d.wantedSessionEpisodes(w)[wantedEpisode{season: -1}] {
-			statusParts = append(statusParts, `<span class="ok">✓ <span>Downloaded</span></span>`)
-		}
-		if len(statusParts) == 0 {
-			statusParts = append(statusParts, `<span class="muted">Not found yet</span>`)
-		}
-		b.WriteString(strings.Join(statusParts, ` · `))
+		b.WriteString(d.uiWantedStatusHTML(w, stats))
 		if _, last := d.wantedProgress(w); !last.IsZero() {
-			b.WriteString(` · <span class="muted" title="When the indexers were last searched for this title">` + `<span>Indexers searched</span> ` + last.Format("02/01 15:04") + `</span>`)
+			b.WriteString(` · <span class="muted" title="When the indexers were last searched for this title"><span>Indexers searched</span> ` + last.Format("02/01 15:04") + `</span>`)
 		}
-		b.WriteString(`</div><div class="item-status" data-wanted-status="` + idx + `" aria-live="polite"></div></div><div class="item-actions">`)
+		b.WriteString(`</div>`)
+		if w.kind() != "movie" {
+			// The episode grid is loaded on demand into this container.
+			b.WriteString(`<div class="epgrid" data-wanted-grid="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" hidden></div>`)
+		}
+		b.WriteString(`<div class="item-status" data-wanted-status="` + idx + `" aria-live="polite"></div></div><div class="item-actions">`)
 
+		if w.kind() != "movie" {
+			b.WriteString(`<button type="button" class="sm" data-wanted-episodes data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" aria-expanded="false" title="Show or hide the episodes of this title"><svg class="i"><use href="/assets/icons.svg#i-list"/></svg>Episodes</button>`)
+		}
 		b.WriteString(`<button type="button" class="sm" data-wanted-releases data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="The releases of this title in the archive, with what would be taken and why the others are not">Releases</button>`)
 		b.WriteString(`<button type="button" class="sm" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="Search this title now"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search</button>`)
 		attrs := `data-wanted-edit data-index="` + idx + `"` +
@@ -728,6 +773,86 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		b.WriteString(`</div></li>`)
 	}
 	return b.String()
+}
+
+// wantedBadge maps a title state to its badge class and label (a catalog key).
+func wantedBadge(state string) (class, label string) {
+	switch state {
+	case "paused":
+		return "b-paused", "Paused"
+	case "downloading":
+		return "b-downloading", "Downloading"
+	case "missing":
+		return "b-missing", "To complete"
+	case "uptodate":
+		return "b-seeding", "Up to date"
+	default:
+		return "b-paused", "Waiting"
+	}
+}
+
+// uiWantedStatusHTML renders the "what I have" line of one wanted title: the
+// counts of downloaded, downloading and known-missing episodes, with a chip per
+// season. For a movie it shows the single release and links to its torrent.
+func (d *Daemon) uiWantedStatusHTML(w wantedEntry, stats wantedStats) string {
+	if w.kind() == "movie" {
+		return d.uiWantedMovieStatusHTML(w, stats)
+	}
+	var parts []string
+	if stats.Downloaded > 0 {
+		parts = append(parts, `<span class="ok" title="Episodes downloaded for this title">✓</span> <b>`+strconv.Itoa(stats.Downloaded)+`</b> <span>Downloaded</span>`)
+	}
+	if stats.Downloading > 0 {
+		parts = append(parts, `<span class="warn" title="Episodes still downloading">◐</span> <b>`+strconv.Itoa(stats.Downloading)+`</b> <span>Downloading</span>`)
+	}
+	if stats.Missing > 0 {
+		parts = append(parts, `<span class="warn" title="Episodes seen but not downloaded">○</span> <b>`+strconv.Itoa(stats.Missing)+`</b> <span>Seen, not downloaded</span>`)
+	}
+	if len(parts) == 0 {
+		return `<span class="muted">No episodes seen yet</span>`
+	}
+	status := strings.Join(parts, ` · `)
+	if len(stats.Seasons) > 0 {
+		var chips []string
+		for _, season := range stats.Seasons {
+			chips = append(chips, uiWantedSeasonChip(season))
+		}
+		status += `<div class="seasons" title="Episodes per season">` + strings.Join(chips, " ") + `</div>`
+	}
+	return status
+}
+
+// uiWantedSeasonChip renders one season with its episode counts (only the
+// non-zero ones), so a partly-seen season is not mistaken for a complete one.
+func uiWantedSeasonChip(s wantedSeasonStat) string {
+	var parts []string
+	if s.Downloaded > 0 {
+		parts = append(parts, `<span class="ok">✓`+strconv.Itoa(s.Downloaded)+`</span>`)
+	}
+	if s.Downloading > 0 {
+		parts = append(parts, `<span class="warn">◐`+strconv.Itoa(s.Downloading)+`</span>`)
+	}
+	if s.Missing > 0 {
+		parts = append(parts, `<span class="warn">○`+strconv.Itoa(s.Missing)+`</span>`)
+	}
+	return `<span class="chip seasonchip">` + fmt.Sprintf("S%02d", s.Season) + ` ` + strings.Join(parts, " ") + `</span>`
+}
+
+// uiWantedMovieStatusHTML shows the state of a wanted movie and links to its
+// torrent in the session when there is one.
+func (d *Daemon) uiWantedMovieStatusHTML(w wantedEntry, stats wantedStats) string {
+	media, _ := d.wantedSessionMedia(w)[wantedEpisode{season: -1}]
+	if media.Hash != "" {
+		link := `<a class="eplink" href="/?open=` + media.Hash + `" title="Opens the torrent in the session">` + html.EscapeString(media.Name) + `</a>`
+		if mediaDownloaded(media) {
+			return `<span class="ok">✓</span> <span>Downloaded</span> · ` + link
+		}
+		return `<span class="warn">◐</span> <span>Downloading</span> <b>` + fmt.Sprintf("%.0f%%", media.Progress) + `</b> · ` + link
+	}
+	if stats.Downloaded > 0 {
+		return `<span class="ok">✓</span> <span>Downloaded</span> · <span class="muted">Downloaded (no longer in session)</span>`
+	}
+	return `<span class="muted">No release seen yet</span>`
 }
 
 // wantedProgress returns how many episodes (or releases) were taken for a

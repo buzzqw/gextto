@@ -25,7 +25,14 @@
 .eprow .epseason{width:44px;color:var(--muted);font-variant-numeric:tabular-nums}
 .epchip{height:26px;min-width:44px;padding:0 8px;font-size:12px;border-radius:6px;margin:0}
 .epchip.have{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.epchip.dl{background:var(--info-soft);color:var(--info);border-color:transparent}
 .epchip.miss{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.eplink{margin:0 4px 0 -2px;font-size:12px;color:var(--accent);text-decoration:none}
+.seasons{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.seasonchip{font-variant-numeric:tabular-nums}
+.seasonchip .ok,.seasonchip .warn{font-weight:650;margin-left:4px}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.legend .epchip{pointer-events:none}
 .epadd{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:8px 0}
 .epadd .field{width:96px}
 .vcounts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
@@ -65,6 +72,11 @@ details.hint summary{cursor:pointer}
   <input type="search" id="wanted-filter" placeholder="Filter titles…" autocomplete="off" aria-label="Filter titles" title="Filter the wanted titles by name">
 </div>
 
+<p class="legend" aria-hidden="true">
+  <span class="epchip have">✓</span> <span>Downloaded</span>
+  <span class="epchip dl">◐</span> <span>Downloading</span>
+  <span class="epchip miss">○</span> <span>Seen, not downloaded</span>
+</p>
 <h2 class="sr-only" id="wanted-list-title">Wanted titles</h2>
 <ul class="items" id="wanted-list" aria-labelledby="wanted-list-title">{{WANTEDROWS}}</ul>
 
@@ -212,10 +224,19 @@ function openEditor(data,index){
 $('#add-wanted').addEventListener('click',function(){openEditor(null);});
 $$('[data-wanted-edit]').forEach(function(btn){btn.addEventListener('click',function(){var d={};['name','kind','seasons','language','subtitles','quality','exclude','episode','category','savepath','paused'].forEach(function(k){d[k]=btn.getAttribute('data-'+k)||'';});openEditor(d,btn.getAttribute('data-index'));});});
 
-// Episode manager: what is present, what is missing, and force a new search.
+// Episode grid: what is present, what is downloading, what is missing. The same
+// renderer feeds the edit dialog and the inline grid of each row.
 var currentIndex=null;
-function renderEpisodes(list){
-  var box=$('#wanted-episodes-body');box.textContent='';
+function epState(e){return e.state||(e.have?'downloaded':'missing');}
+function epClass(st){return st==='downloaded'?'have':(st==='downloading'?'dl':'miss');}
+function epSymbol(st){return st==='downloaded'?'✓':(st==='downloading'?'◐':'○');}
+function epTitle(e,st){
+  if(st==='downloading'){return t('Downloading')+(e.progress?' '+Math.round(e.progress)+'%':'');}
+  return st==='downloaded'?t('Downloaded: click to mark it missing'):t('Missing: click to mark it downloaded');
+}
+function renderEpisodes(box,list,index){
+  if(!box)return;
+  box.textContent='';
   var bySeason={},seasons=[];
   (list||[]).forEach(function(e){if(!bySeason[e.season]){bySeason[e.season]=[];seasons.push(e.season);}bySeason[e.season].push(e);});
   seasons.sort(function(a,b){return a-b;});
@@ -223,10 +244,12 @@ function renderEpisodes(list){
     var row=document.createElement('div');row.className='eprow';
     var lab=document.createElement('span');lab.className='epseason';lab.textContent='S'+String(s).padStart(2,'0');row.appendChild(lab);
     bySeason[s].forEach(function(e){
-      var b=document.createElement('button');b.type='button';b.className='epchip '+(e.have?'have':'miss');
-      b.textContent='E'+String(e.episode).padStart(2,'0');
-      b.title=e.have?t('Downloaded: click to mark it missing'):t('Missing: click to mark it downloaded');
-      b.onclick=function(){episodeOp(s,e.episode,e.have?'missing':'have');};row.appendChild(b);
+      var st=epState(e);
+      var b=document.createElement('button');b.type='button';b.className='epchip '+epClass(st);
+      b.textContent=epSymbol(st)+'E'+String(e.episode).padStart(2,'0');
+      b.title=epTitle(e,st);
+      b.onclick=function(){episodeOp(index,s,e.episode,st==='missing'?'have':'missing');};row.appendChild(b);
+      if(e.hash){var a=document.createElement('a');a.className='eplink';a.href='/?open='+encodeURIComponent(e.hash);a.title=t('Opens the torrent in the session');a.textContent='↗';row.appendChild(a);}
     });
     box.appendChild(row);
   });
@@ -234,13 +257,28 @@ function renderEpisodes(list){
 }
 function loadEpisodes(index){
   currentIndex=index;
-  fetch('/ui/wanted-episodes?index='+encodeURIComponent(index),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(res){renderEpisodes(res.episodes||[]);}).catch(function(){var box=$('#wanted-episodes-body');if(box)box.textContent=t('Error');});
+  var box=$('#wanted-episodes-body');
+  fetch('/ui/wanted-episodes?index='+encodeURIComponent(index),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(res){renderEpisodes(box,res.episodes||[],index);}).catch(function(){if(box)box.textContent=t('Error');});
 }
-function episodeOp(season,episode,op){
-  var f=new URLSearchParams();f.set('op',op);f.set('index',currentIndex);f.set('season',season);f.set('episode',episode);
-  fetch('/ui/wanted-episodes',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});}).then(function(res){renderEpisodes(res.episodes||[]);}).catch(function(e){toast(t('Error')+': '+(e.message||''),true);});
+function episodeOp(index,season,episode,op){
+  var f=new URLSearchParams();f.set('op',op);f.set('index',index);f.set('season',season);f.set('episode',episode);
+  fetch('/ui/wanted-episodes',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});}).then(function(res){
+    if(currentIndex===index)renderEpisodes($('#wanted-episodes-body'),res.episodes||[],index);
+    var grid=document.querySelector('[data-wanted-grid="'+index+'"]');
+    if(grid&&!grid.hidden)renderEpisodes(grid,res.episodes||[],index);
+  }).catch(function(e){toast(t('Error')+': '+(e.message||''),true);});
 }
-$('#wanted-ep-add').addEventListener('click',function(){var s=$('#wanted-ep-season').value,e=$('#wanted-ep-episode').value;if(s===''||e===''){toast(t('Enter a season and an episode'),true);return;}episodeOp(s,e,'add');$('#wanted-ep-episode').value='';});
+// The row's Episodes button opens the grid inline, under the row.
+$$('[data-wanted-episodes]').forEach(function(btn){btn.addEventListener('click',function(){
+  var index=btn.getAttribute('data-index');
+  var grid=document.querySelector('[data-wanted-grid="'+index+'"]');
+  if(!grid)return;
+  if(!grid.hidden){grid.hidden=true;btn.setAttribute('aria-expanded','false');return;}
+  grid.hidden=false;btn.setAttribute('aria-expanded','true');
+  grid.textContent=t('loading…');
+  fetch('/ui/wanted-episodes?index='+encodeURIComponent(index),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(res){renderEpisodes(grid,res.episodes||[],index);}).catch(function(){grid.textContent=t('Error');});
+});});
+$('#wanted-ep-add').addEventListener('click',function(){var s=$('#wanted-ep-season').value,e=$('#wanted-ep-episode').value;if(s===''||e===''){toast(t('Enter a season and an episode'),true);return;}episodeOp(currentIndex,s,e,'add');$('#wanted-ep-episode').value='';});
 $('#wanted-ep-force').addEventListener('click',function(){if(currentIndex===null)return;poll(form.elements.name.value.trim(),null,this);});
 // Search one episode interactively: what the indexers return for "Title SxxEyy",
 // with the verdicts and an Add per release.
