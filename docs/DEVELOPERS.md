@@ -67,6 +67,33 @@ GEXTTO_DATA_DIR="$HOME/gextto-data" \
 After a source update, `scripts/update.sh` builds the daemon and restarts the
 detected service.
 
+### Testing a local gx-core build
+
+`scripts/gx-core-test.sh` runs a **test gx-core** (gx-torrent in standalone
+mode) built from the checkout, next to the Gextto in production, so a change
+to the engine or the daemon can be tried as soon as it compiles, without
+waiting for a CI release:
+
+```bash
+scripts/gx-core-test.sh start --build   # compile this checkout and start it
+scripts/gx-core-test.sh restart --build # after a change: recompile and restart
+scripts/gx-core-test.sh status          # pid, version, data directory
+scripts/gx-core-test.sh log             # follow its log
+scripts/gx-core-test.sh stop
+scripts/gx-core-test.sh start -- -debug # extra daemon options after "--"
+```
+
+It keeps everything apart from Gextto: its own directory (`~/gx-core-test`:
+binary, state, session database, downloads, log), its own web page/API address
+(`127.0.0.1:8899`) and peer ports (`51500-51510`), no UPnP/NAT-PMP mapping.
+The build goes to `~/gx-core-test/bin`, not to `bin/`, and does not bump
+`gx-torrent.build_number`: Gextto's managed gx-torrent is never replaced. The
+binary carries the commit (`-dirty` when the engine or daemon sources have
+uncommitted changes) and no release channel, so it never updates itself.
+`GX_TEST_DIR`, `GX_TEST_LISTEN` (e.g. `0.0.0.0:8899` to open it from another
+device on the LAN), `GX_TEST_PEER_PORTS`, `GX_TEST_TOKEN` and `GX_TEST_BIN`
+change the defaults.
+
 ## Web UI and API changes
 
 The server-rendered UI is assembled in `uiweb_v2.go`, `uiweb_sections.go`,
