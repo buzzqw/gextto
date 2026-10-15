@@ -337,6 +337,8 @@ inferior to the archived file.
 - **Table columns**: Name, Status, Progress, ↓, ↑, ETA, Peers, Ratio — click a
   header to sort. **Bulk actions**: pause, resume, recheck, remove.
 - **Row actions**: pause/resume, recheck, details, remove.
+- **Details** open as a frame **above the download history**, not a centered
+  window: the session and the history stay visible while you set the values.
 - **Details** tabs: General, Tracker, Content, Peers, Pieces, Limits, Storage;
   includes copy magnet, per-torrent limits/seed-days, reannounce, pin, restart,
   mark-failed, move storage. **General** also offers **Export .torrent**,

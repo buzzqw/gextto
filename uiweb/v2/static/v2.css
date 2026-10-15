@@ -604,20 +604,16 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
   box-shadow: var(--v2-shadow);
 }
 
-/* Torrent detail: a bottom drawer like gx-core's, so the list stays visible
-   while the detail is open (no dimming backdrop). */
+/* Torrent detail: a framed panel placed above the download history, so the
+   list and the history stay visible (no dimming backdrop, no fixed overlay). */
 .torrent-drawer {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 70;
   display: flex;
   flex-direction: column;
-  max-height: min(70vh, 640px);
+  margin: 0 0 16px;
   background: var(--panel-bg, var(--panel, var(--surface, #1c2420)));
-  border-top: 1px solid var(--border, rgba(128, 128, 128, .25));
-  box-shadow: 0 -12px 34px rgba(0, 0, 0, .38);
+  border: 1px solid var(--border, rgba(128, 128, 128, .25));
+  border-radius: var(--v2-radius);
+  box-shadow: var(--v2-shadow);
 }
 .torrent-drawer[hidden] { display: none; }
 .torrent-drawer-head {
@@ -635,10 +631,7 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.torrent-drawer-body { overflow: auto; padding: 12px 16px calc(18px + env(safe-area-inset-bottom)); }
-@media (min-width: 901px) {
-  .torrent-drawer { left: 250px; }
-}
+.torrent-drawer-body { max-height: min(70vh, 640px); overflow: auto; padding: 12px 16px 18px; }
 
 /* Stronger, always-visible keyboard focus ring. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {

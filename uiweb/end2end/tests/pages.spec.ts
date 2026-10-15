@@ -280,11 +280,14 @@ test("integrazioni raggruppa le voci con intestazioni sticky", async ({ page }) 
   await expect(labels.first()).toBeVisible();
 });
 
-test("il dettaglio torrent usa un pannello in basso, non un modale", async ({ page }) => {
+test("il dettaglio torrent è un frame sopra lo storico, non un modale", async ({ page }) => {
   await page.goto("/?view=downloads");
   const drawer = page.locator("#v2-detail-drawer");
   await expect(drawer).toHaveCount(1);
   await expect(drawer).toBeHidden();
+  // The frame is placed above the download history, not overlaid on the viewport.
+  const position = await drawer.evaluate((el) => getComputedStyle(el).position);
+  expect(position).not.toBe("fixed");
   // The old centered torrent modal must be gone.
   await expect(page.locator(".modal.torrent-modal")).toHaveCount(0);
 });

@@ -391,6 +391,9 @@
     drawer.hidden = false;
     var close = drawer.querySelector("[data-v2-detail-close]");
     if (close) { try { close.focus(); } catch (error) { /* ignore */ } }
+    // The frame sits in the page above the download history: bring it into
+    // view rather than covering the content like an overlay.
+    try { drawer.scrollIntoView({ block: "nearest" }); } catch (error) { /* ignore */ }
   }
 
   function closeDetailDrawer() {

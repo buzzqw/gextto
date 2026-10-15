@@ -338,6 +338,9 @@ bloccata, già presente o inferiore al file archiviato.
 - **Colonne tabella**: Nome, Stato, Progresso, ↓, ↑, ETA, Peers, Ratio — clicca
   l'intestazione per ordinare. **Azioni bulk**: pausa, riprendi, recheck, rimuovi.
 - **Azioni riga**: pausa/riprendi, recheck, dettagli, rimuovi.
+- **Dettagli** si aprono come un riquadro **sopra lo Storico download**, non
+  come finestra centrata: la sessione e lo storico restano visibili mentre
+  imposti i valori.
 - **Dettagli** (tab Generale, Tracker, Contenuto, Peers, Pezzi, Limiti, Storage):
   copia magnet, limiti per torrent/giorni di seed, reannounce, pin, riavvia,
   segna come fallito, sposta storage. In **Generale** trovi anche **Esporta

@@ -1059,19 +1059,26 @@ func TestV2TorrentDetailGeneralShowsEngineStats(t *testing.T) {
 	}
 }
 
-// TestV2ShellHasDetailDrawer: the torrent detail renders in a bottom drawer
-// container (like gx-core), not in the centered #v2-modal.
-func TestV2ShellHasDetailDrawer(t *testing.T) {
+// TestV2DownloadsHasDedicatedDetailFrame: the torrent detail renders in its own
+// framed container placed above the download history, not in the centered
+// #v2-modal and not as a fixed overlay.
+func TestV2DownloadsHasDedicatedDetailFrame(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	code, body := v2Request(t, server, http.MethodGet, "/", nil)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
 	if code != http.StatusOK {
-		t.Fatalf("dashboard -> %d", code)
+		t.Fatalf("downloads -> %d", code)
 	}
 	if !strings.Contains(body, `id="v2-detail-drawer"`) || !strings.Contains(body, `class="torrent-drawer"`) {
-		t.Fatalf("shell is missing the torrent detail drawer container")
+		t.Fatalf("downloads page is missing the torrent detail frame")
+	}
+	// The frame must come before the download history, so it opens above it.
+	drawerAt := strings.Index(body, `id="v2-detail-drawer"`)
+	historyAt := strings.Index(body, `id="v2-table-panel-downloads-history"`)
+	if drawerAt == -1 || historyAt == -1 || drawerAt > historyAt {
+		t.Fatalf("the detail frame must be above the download history (frame=%d history=%d)", drawerAt, historyAt)
 	}
 }
 

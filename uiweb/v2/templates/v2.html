@@ -145,7 +145,6 @@
       {{else if eq .Body "v2_movie_detail"}}{{template "v2_movie_detail" .Content}}
       {{else}}{{template "v2_unavailable" .Content}}{{end}}
     </div>
-    <div id="v2-detail-drawer" class="torrent-drawer" role="dialog" aria-modal="false" aria-labelledby="v2-detail-title" hidden></div>
   </main>
 </div>
 {{with .UpdateNotes}}<div class="overlay" style="display:flex" id="v2-update-notes">
@@ -403,6 +402,7 @@
     <div class="panel-body">{{template "v2_torrents_wrap" .}}</div>
   </div>
   <div id="v2-modal"></div>
+  <div id="v2-detail-drawer" class="torrent-drawer" role="dialog" aria-modal="false" aria-labelledby="v2-detail-title" hidden></div>
   {{range .History}}{{template "v2_table_panel" .}}{{end}}
 </div>
 {{end}}
