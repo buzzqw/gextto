@@ -367,7 +367,9 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
   release di più titoli). Regole PASS/FAIL ordinate, ricarica per riga,
   test indexer in tempo reale, FlareSolverr opzionale e un **archivio** locale
   di tutto ciò che i feed hanno restituito (100.000 release cercabili in ~7
-  ms, con opzione di interrogare dal vivo Jackett/Prowlarr).
+  ms, con opzione di interrogare dal vivo Jackett/Prowlarr); in *Impostazioni*
+  la manutenzione dell'archivio (elimina gli elementi vecchi, **ottimizza** per
+  restituire spazio al disco).
 - **Gestione.** Limiti globali e per torrent, scheduler di banda con fascia e
   limiti propri per ogni giorno della settimana, auto-speed sulla latenza
   (anti-bufferbloat), ottimizzazione di coda/cache/banda con un clic, filtro IP

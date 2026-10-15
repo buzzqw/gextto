@@ -164,6 +164,40 @@ func (d *Daemon) handleUIArchiveDelete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"removed": removed})
 }
 
+// handleUIArchiveMaintenance maintains the archive database from Settings:
+// op=prune deletes the items older than days, op=compact rewrites the file so
+// the space a prune freed is returned to the filesystem.
+func (d *Daemon) handleUIArchiveMaintenance(w http.ResponseWriter, r *http.Request) {
+	if !d.archiveAvailable(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	archive := d.archive()
+	switch strings.TrimSpace(r.FormValue("op")) {
+	case "prune":
+		days, err := strconv.Atoi(strings.TrimSpace(r.FormValue("days")))
+		if err != nil || days < 1 {
+			writeError(w, http.StatusBadRequest, errors.New("days must be a positive number"))
+			return
+		}
+		removed, err := archive.prune(time.Now().Add(-time.Duration(days)*24*time.Hour), archiveMaxEntries)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "op": "prune", "removed": removed})
+	case "compact":
+		before, after, err := archive.compact()
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "op": "compact", "before": before, "after": after})
+	default:
+		writeError(w, http.StatusBadRequest, errors.New("unknown archive maintenance operation"))
+	}
+}
+
 // handleUIRssRulePreview tests the rule in the form (saved or not) against the
 // most recent archived items and returns the ones it matches: the "matching
 // articles" view of qBittorrent, without fetching any feed.

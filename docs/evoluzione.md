@@ -574,11 +574,6 @@ recovered from a shell without editing the database.
 - **RSS feeds in bulk.** On the RSS & Indexer page, *New feed* should accept many
   lines pasted at once — one feed URL per line — and create a feed for each, so a
   list copied from elsewhere does not have to be added one at a time.
-- **Archive-database maintenance.** The Archive page can delete old items, but
-  there is no way to *optimize* the archive database (SQLite `VACUUM`, so the file
-  shrinks after a big prune) and no maintenance entry in *Settings*: the archive
-  file keeps its size after deletions and the operator has nothing to reclaim it
-  from the interface.
 
 **Closing the gap with Sonarr/Radarr** (§1), by value per effort, each after a study and
 without copying code (Sonarr is GPLv3, Gextto EUPL-1.2):

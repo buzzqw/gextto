@@ -509,3 +509,78 @@ func TestArchiveIdxRecordClampsSeeders(t *testing.T) {
 		}
 	}
 }
+
+// TestArchiveMaintenanceFromSettings: the Settings maintenance prunes the items
+// older than the given days and compacts the archive file; the database stays
+// usable after the swap and an unknown operation is refused.
+func TestArchiveMaintenanceFromSettings(t *testing.T) {
+	d := feedDaemon(t, "")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	old := time.Now().Add(-200 * 24 * time.Hour)
+	ancient := rss.Item{
+		Title:  "Ancient Release 1080p",
+		GUID:   strings.Repeat("a", 40),
+		Magnet: "magnet:?xt=urn:btih:" + strings.Repeat("a", 40),
+	}
+	if _, err := d.archive().record("feedA", []rss.Item{ancient}, old); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prune: the item found 200 days ago goes with a 90-day retention.
+	resp, err := http.PostForm(srv.URL+"/ui/archive/maintenance", url.Values{"op": {"prune"}, "days": {"90"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pruned struct {
+		Removed int `json:"removed"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&pruned); err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if pruned.Removed != 1 {
+		t.Fatalf("prune removed %d, want 1", pruned.Removed)
+	}
+
+	// Compact: the file is rewritten and the archive answers again.
+	resp, err = http.PostForm(srv.URL+"/ui/archive/maintenance", url.Values{"op": {"compact"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var compacted struct {
+		Before int64 `json:"before"`
+		After  int64 `json:"after"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&compacted); err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if compacted.Before <= 0 || compacted.After <= 0 {
+		t.Fatalf("compact sizes before=%d after=%d", compacted.Before, compacted.After)
+	}
+	if stats := d.archive().stats(false); stats.Entries != 0 {
+		t.Fatalf("after compact the archive has %d entries, want 0", stats.Entries)
+	}
+	if _, err := d.archive().record("feedB", []rss.Item{{
+		Title:  "Fresh Release 1080p",
+		GUID:   strings.Repeat("b", 40),
+		Magnet: "magnet:?xt=urn:btih:" + strings.Repeat("b", 40),
+	}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if stats := d.archive().stats(false); stats.Entries != 1 {
+		t.Fatalf("after compact the archive has %d entries, want 1", stats.Entries)
+	}
+
+	// An unknown operation is refused.
+	resp, err = http.PostForm(srv.URL+"/ui/archive/maintenance", url.Values{"op": {"nonsense"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unknown op -> %d, want 400", resp.StatusCode)
+	}
+	resp.Body.Close()
+}

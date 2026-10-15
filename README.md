@@ -350,7 +350,8 @@ fewer features, but all the ones a standalone client needs.
   and warns when a rule takes releases of several titles). Ordered PASS/FAIL rules, per-row
   reload, live indexer tests, optional FlareSolverr, and a local **archive**
   of everything feeds returned (100,000 releases searchable in ~7 ms, with an
-  option to query Jackett/Prowlarr live).
+  option to query Jackett/Prowlarr live); *Settings* keeps the archive in shape
+  (delete the old items, **optimize** to give the freed space back to the disk).
 - **Operations.** Global and per-torrent limits, a bandwidth scheduler with
   its own window and limits for every weekday, latency auto-speed
   (anti-bufferbloat), one-click queue/cache/bandwidth optimisation, URL or file

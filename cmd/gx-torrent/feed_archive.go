@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/rss"
@@ -66,7 +67,32 @@ type archiveEntry struct {
 }
 
 type feedArchive struct {
-	db *bolt.DB
+	// mu guards the handle: read/write transactions take it shared, a live
+	// compaction takes it exclusive while it rewrites the file, so a reader
+	// never touches a half-swapped database.
+	mu   sync.RWMutex
+	path string
+	db   *bolt.DB
+}
+
+// view and update are the only way to reach the database, so the compaction
+// lock covers every transaction.
+func (a *feedArchive) view(fn func(*bolt.Tx) error) error {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if a.db == nil {
+		return errors.New("feed archive is closed")
+	}
+	return a.db.View(fn)
+}
+
+func (a *feedArchive) update(fn func(*bolt.Tx) error) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.db == nil {
+		return errors.New("feed archive is closed")
+	}
+	return a.db.Update(fn)
 }
 
 // openFeedArchive opens (creating) the archive database and rebuilds the
@@ -102,14 +128,21 @@ func openFeedArchive(path string) (*feedArchive, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	return &feedArchive{db: db}, nil
+	return &feedArchive{db: db, path: path}, nil
 }
 
 func (a *feedArchive) close() error {
-	if a == nil || a.db == nil {
+	if a == nil {
 		return nil
 	}
-	return a.db.Close()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.db == nil {
+		return nil
+	}
+	err := a.db.Close()
+	a.db = nil
+	return err
 }
 
 // archiveID is the identity of a release: its info-hash when it has a magnet,
@@ -232,7 +265,7 @@ func (a *feedArchive) record(feed string, items []rss.Item, now time.Time) (int,
 		return 0, nil
 	}
 	added := 0
-	err := a.db.Update(func(tx *bolt.Tx) error {
+	err := a.update(func(tx *bolt.Tx) error {
 		entries := tx.Bucket(archiveItemsBucket)
 		ids := tx.Bucket(archiveIDsBucket)
 		for _, item := range items {
@@ -301,7 +334,7 @@ func (a *feedArchive) markAdded(feed string, item rss.Item) {
 	if id == nil {
 		return
 	}
-	_ = a.db.Update(func(tx *bolt.Tx) error {
+	_ = a.update(func(tx *bolt.Tx) error {
 		key := tx.Bucket(archiveIDsBucket).Get(id)
 		if key == nil {
 			return nil
@@ -326,7 +359,7 @@ func (a *feedArchive) get(hexID string) (archiveEntry, bool) {
 		return entry, false
 	}
 	found := false
-	_ = a.db.View(func(tx *bolt.Tx) error {
+	_ = a.view(func(tx *bolt.Tx) error {
 		key := tx.Bucket(archiveIDsBucket).Get(id)
 		if key == nil {
 			return nil
@@ -455,7 +488,7 @@ func (a *feedArchive) search(q archiveQuery, sortBy string, page, size int) (arc
 	if page < 1 {
 		page = 1
 	}
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.view(func(tx *bolt.Tx) error {
 		c := tx.Bucket(archiveIdxBucket).Cursor()
 		type hit struct {
 			key     []byte
@@ -540,7 +573,7 @@ func (a *feedArchive) deleteIDs(hexIDs []string) (int, error) {
 		return 0, nil
 	}
 	removed := 0
-	err := a.db.Update(func(tx *bolt.Tx) error {
+	err := a.update(func(tx *bolt.Tx) error {
 		ids := tx.Bucket(archiveIDsBucket)
 		for _, hexID := range hexIDs {
 			id, err := hex.DecodeString(strings.TrimSpace(hexID))
@@ -571,7 +604,7 @@ func (a *feedArchive) deleteMatching(q archiveQuery) (int, error) {
 		return 0, errors.New("refusing to delete the whole archive: search for something first")
 	}
 	removed := 0
-	err := a.db.Update(func(tx *bolt.Tx) error {
+	err := a.update(func(tx *bolt.Tx) error {
 		var doomed [][]byte
 		c := tx.Bucket(archiveIdxBucket).Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
@@ -598,7 +631,7 @@ func (a *feedArchive) prune(cutoff time.Time, maxEntries int) (int, error) {
 		return 0, nil
 	}
 	removed := 0
-	err := a.db.Update(func(tx *bolt.Tx) error {
+	err := a.update(func(tx *bolt.Tx) error {
 		entries := tx.Bucket(archiveItemsBucket)
 		excess := entries.Stats().KeyN - maxEntries
 		var doomed [][]byte
@@ -622,6 +655,61 @@ func (a *feedArchive) prune(cutoff time.Time, maxEntries int) (int, error) {
 	return removed, err
 }
 
+// compact rewrites the archive into a fresh file and swaps it in: bbolt reuses
+// freed pages but never shrinks the file, so after a large prune the space
+// stays occupied until the database is rewritten. It holds the write lock for
+// the whole swap, so no other transaction sees a half-replaced database. It
+// returns the size in bytes before and after.
+func (a *feedArchive) compact() (int64, int64, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.db == nil {
+		return 0, 0, errors.New("feed archive is closed")
+	}
+	path := a.path
+	before := archiveFileSize(path)
+	tmp := path + ".compact"
+	_ = os.Remove(tmp)
+	dst, err := bolt.Open(tmp, 0o600, nil)
+	if err != nil {
+		return before, before, err
+	}
+	err = bolt.Compact(dst, a.db, 0)
+	_ = dst.Close()
+	if err != nil {
+		_ = os.Remove(tmp)
+		return before, before, err
+	}
+	if err := a.db.Close(); err != nil {
+		_ = os.Remove(tmp)
+		if reopened, reopenErr := openFeedArchive(path); reopenErr == nil {
+			a.db = reopened.db
+		}
+		return before, before, err
+	}
+	a.db = nil
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		if reopened, reopenErr := openFeedArchive(path); reopenErr == nil {
+			a.db = reopened.db
+		}
+		return before, before, err
+	}
+	reopened, err := openFeedArchive(path)
+	if err != nil {
+		return before, before, err
+	}
+	a.db = reopened.db
+	return before, archiveFileSize(path), nil
+}
+
+func archiveFileSize(path string) int64 {
+	if info, err := os.Stat(path); err == nil {
+		return info.Size()
+	}
+	return 0
+}
+
 // archiveStats is the archive size for the page.
 type archiveStats struct {
 	Entries   int      `json:"entries"`
@@ -636,7 +724,7 @@ func (a *feedArchive) stats(feeds bool) archiveStats {
 	if a == nil {
 		return out
 	}
-	_ = a.db.View(func(tx *bolt.Tx) error {
+	_ = a.view(func(tx *bolt.Tx) error {
 		idx := tx.Bucket(archiveIdxBucket)
 		out.Entries = idx.Stats().KeyN
 		if !feeds {
@@ -652,7 +740,7 @@ func (a *feedArchive) stats(feeds bool) archiveStats {
 		})
 	})
 	sort.Strings(out.Feeds)
-	if info, err := os.Stat(a.db.Path()); err == nil {
+	if info, err := os.Stat(a.path); err == nil {
 		out.SizeBytes = info.Size()
 	}
 	return out
@@ -665,7 +753,7 @@ func (a *feedArchive) feedCounts() map[string]int {
 	if a == nil {
 		return out
 	}
-	_ = a.db.View(func(tx *bolt.Tx) error {
+	_ = a.view(func(tx *bolt.Tx) error {
 		return tx.Bucket(archiveIdxBucket).ForEach(func(_, v []byte) error {
 			if rec, ok := parseArchiveIdx(v); ok {
 				out[string(rec.feed)]++

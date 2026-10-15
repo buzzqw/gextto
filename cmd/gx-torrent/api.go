@@ -77,6 +77,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /ui/archive/items", d.handleUIArchiveItems)
 	root.HandleFunc("POST /ui/archive/add", d.handleUIArchiveAdd)
 	root.HandleFunc("POST /ui/archive/delete", d.handleUIArchiveDelete)
+	root.HandleFunc("POST /ui/archive/maintenance", d.handleUIArchiveMaintenance)
 	root.HandleFunc("GET /ui/wanted", d.handleUIWanted)
 	root.HandleFunc("POST /ui/wanted", d.handleUIWanted)
 	root.HandleFunc("POST /ui/wanted-poll", d.handleUIWantedPoll)

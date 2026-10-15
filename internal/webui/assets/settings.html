@@ -234,6 +234,16 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   {{UPDATE_STATUS}}
   <span hidden id="update-confirm">Install the update now? gx-torrent restarts by itself and the transfers resume after the restart.</span>
 </fieldset>
+<fieldset id="archive-db">
+  <legend>Archive database</legend>
+  <p class="muted">Everything the feeds found is kept in the archive database. Delete the old items to free space, then optimize to give the freed space back to the filesystem.</p>
+  <div class="actions">
+    <label>Older than (days)<input type="number" min="1" id="archive-maint-days" value="90" title="Delete the items found more than this many days ago"></label>
+    <button type="button" class="secondary sm" id="archive-maint-prune" title="Delete the items found more than this many days ago">Delete old items</button>
+    <button type="button" class="secondary sm" id="archive-maint-compact" title="Rewrite the archive database compactly so the file shrinks after deletions">Optimize archive</button>
+  </div>
+  <p class="muted" id="archive-maint-result" role="status" aria-live="polite"></p>
+</fieldset>
 <div class="savebar"><button type="submit" class="primary" title="Save settings to settings.json">Save</button></div>
 <!--ERROR-->
 </form>
@@ -327,6 +337,35 @@ Array.prototype.forEach.call(document.querySelectorAll('[data-formaction]'), fun
       out.textContent = t('Error') + ': ' + e.message;
     }).then(function () { btn.disabled = false; });
   });
+})();
+// "Archive database": prune the old items, then compact the file so the space a
+// deletion freed is returned to the filesystem.
+(function () {
+  var out = document.getElementById('archive-maint-result');
+  if (!out) return;
+  var t = function (s) { return (window.__uiI18n && window.__uiI18n[s]) || s; };
+  function fmtBytes(n) { if (!n || n < 0) return '—'; var u = ['B', 'KiB', 'MiB', 'GiB', 'TiB'], i = 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return (i ? n.toFixed(1) : n) + ' ' + u[i]; }
+  function run(btn, op, params) {
+    btn.disabled = true;
+    out.textContent = t('checking…');
+    var f = new URLSearchParams(); f.set('op', op);
+    Object.keys(params || {}).forEach(function (k) { f.set(k, params[k]); });
+    fetch('/ui/archive/maintenance', { method: 'POST', cache: 'no-store', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: f.toString() }).then(function (r) {
+      return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; });
+    }).then(function (res) {
+      if (op === 'prune') out.textContent = res.removed + ' ' + t('items deleted');
+      else out.textContent = t('Archive optimized') + ': ' + fmtBytes(res.before) + ' → ' + fmtBytes(res.after);
+    }).catch(function (e) {
+      out.textContent = t('Error') + ': ' + e.message;
+    }).then(function () { btn.disabled = false; });
+  }
+  var prune = document.getElementById('archive-maint-prune');
+  if (prune) prune.addEventListener('click', function () {
+    if (!window.confirm(t('Delete the items found more than this many days ago?'))) return;
+    run(prune, 'prune', { days: document.getElementById('archive-maint-days').value });
+  });
+  var compact = document.getElementById('archive-maint-compact');
+  if (compact) compact.addEventListener('click', function () { run(compact, 'compact'); });
 })();
 // While an update installs, follow it: once the daemon answers again without
 // the "installing" marker (the new version is up), reload to show its notes.

@@ -333,6 +333,12 @@ The standalone pages follow the same structure:
   picks like `sub ita`) and quality, and the other options folded away.
 - **Archive** and **Settings** use the same top bar, tables and fieldsets;
   Settings keeps its *Save* button visible at the bottom while scrolling.
+- **Archive database maintenance** (`Settings → Archive database`): *Delete old
+  items* prunes the entries older than the given days (the same prune the Archive
+  page does), and *Optimize archive* rewrites the bbolt file compactly, because
+  the database reuses freed pages but never shrinks the file on its own; the
+  result shows the size before and after. The compaction holds the archive lock
+  for the swap, so no other transaction sees a half-replaced database.
 
 The definitive command remains Gextto; the page is a convenience for
 the operator.
