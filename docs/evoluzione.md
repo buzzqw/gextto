@@ -596,6 +596,11 @@ recovered from a shell without editing the database.
 - **Watch folders.** The *Watch folders* section should say that the `.torrent`
   files it finds are **downloaded**, not only "added automatically", so what the
   feature does to the media is explicit.
+- **Poster and card views.** In *Series* and *Movies* the list should be
+  switchable to a **poster view** (one cover per title, the essential data on the
+  card, everything else when it is opened), as Sonarr and Radarr offer, with the
+  choice remembered per view: the covers come from the same TMDB data the
+  *Explore* search already uses.
 
 **Closing the gap with Sonarr/Radarr** (§1), by value per effort, each after a study and
 without copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
