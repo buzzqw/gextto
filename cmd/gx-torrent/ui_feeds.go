@@ -110,6 +110,10 @@ type feedItemView struct {
 	Rule     string `json:"rule"`
 	Pass     bool   `json:"pass"`
 	Seen     bool   `json:"seen"`
+	// Base is the title reduced to what a rule would be named after (the series
+	// name, or the release's base name): the page uses it to build a rule from
+	// the item (qBittorrent's "add to my rules").
+	Base string `json:"base"`
 }
 
 // handleUIFeedItems fetches one feed now and returns its items with the rule
@@ -161,7 +165,7 @@ func (d *Daemon) handleUIFeedItems(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	out := make([]feedItemView, 0, len(items))
 	for _, item := range items {
-		view := feedItemView{Title: item.Title, Size: item.Size, Seeders: item.Seeders, Leechers: item.Leechers, Download: item.Download(), Seen: d.feedSeen(feedName, item.GUID)}
+		view := feedItemView{Title: item.Title, Size: item.Size, Seeders: item.Seeders, Leechers: item.Leechers, Download: item.Download(), Seen: d.feedSeen(feedName, item.GUID), Base: previewTitleKey(item.Title)}
 		if len(rules) > 0 {
 			rule, pass, matched := rss.Evaluate(rules, feedName, item, now)
 			view.Rule = rule.Name
@@ -305,6 +309,7 @@ func (d *Daemon) renderRSSPage(w http.ResponseWriter, r *http.Request, errKey, n
 	page = strings.Replace(page, "{{INDEXERROWS}}", d.uiIndexerRowsHTML(), 1)
 	page = strings.Replace(page, "{{FEEDROWS}}", d.uiFeedRowsHTML(), 1)
 	page = strings.Replace(page, "{{INDEXEROPTIONS}}", uiIndexerOptionsHTML(), 1)
+	page = strings.Replace(page, "{{RULEFEEDS}}", d.uiRuleFeedsHTML(), 1)
 	page = strings.Replace(page, "{{INDEXERCOUNT}}", strconv.Itoa(len(d.indexers())), 1)
 	page = strings.Replace(page, "{{FEEDCOUNT}}", strconv.Itoa(len(d.feeds())), 1)
 	page = strings.Replace(page, "{{RULEROWS}}", d.uiRuleRowsHTML(), 1)

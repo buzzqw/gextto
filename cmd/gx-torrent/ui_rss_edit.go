@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -478,7 +479,7 @@ func uiRuleFromForm(r *http.Request) (rss.Rule, error) {
 	enabled := formBool(r, "enabled")
 	rule := rss.Rule{
 		Name:       strings.TrimSpace(r.FormValue("name")),
-		Feeds:      splitList(r.FormValue("feeds")),
+		Feeds:      formList(r, "feeds"),
 		Enabled:    &enabled,
 		IgnoreDays: int(formInt(r, "ignore_days", 0)),
 		Fail:       formBool(r, "fail"),
@@ -535,6 +536,47 @@ func mibToBytes(raw string) int64 {
 		return 0
 	}
 	return int64(value * 1024 * 1024)
+}
+
+// uiRuleFeedsHTML is the "apply this rule to these feeds" picker: one checkbox
+// per configured feed (qBittorrent's RSS Downloader), nothing checked meaning
+// every feed. The feed names are data, not strings to translate.
+func (d *Daemon) uiRuleFeedsHTML() string {
+	feeds := d.feeds()
+	if len(feeds) == 0 {
+		return `<span class="muted">No feeds configured yet: add one in the Feeds tab and it can be picked here.</span>`
+	}
+	names := make([]string, 0, len(feeds))
+	for _, feed := range feeds {
+		name := feed.Name
+		if name == "" {
+			name = feed.URL
+		}
+		if strings.TrimSpace(name) != "" {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	var b strings.Builder
+	for _, name := range names {
+		b.WriteString(`<label class="chk"><input type="checkbox" name="feeds" value="` + html.EscapeString(name) + `">` + html.EscapeString(name) + `</label>`)
+	}
+	return b.String()
+}
+
+// formList collects every value of a repeated form field, each split on commas
+// too: the "apply to these feeds" picker posts one value per checked box, and
+// the older hand-written "a, b" list keeps working.
+func formList(r *http.Request, key string) []string {
+	var out []string
+	for _, value := range r.Form[key] {
+		for _, term := range splitList(value) {
+			if !slices.Contains(out, term) {
+				out = append(out, term)
+			}
+		}
+	}
+	return out
 }
 
 // uiRuleRowsHTML renders the ordered rules as table rows, each with up/down and

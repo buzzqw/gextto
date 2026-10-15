@@ -217,6 +217,56 @@ func TestUIRssAddAndRemoveFeed(t *testing.T) {
 	}
 }
 
+// TestUIRssRuleTakesSeveralFeedsAndThePicker: the "apply this rule to these
+// feeds" picker (qBittorrent's RSS Downloader) posts one value per checked box
+// and the page renders one checkbox per configured feed.
+func TestUIRssRuleTakesSeveralFeedsAndThePicker(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	if err := d.saveFeeds([]feedConfig{{Name: "serie", URL: "http://example/serie"}, {Name: "film", URL: "http://example/film"}}); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	page, err := http.Get(srv.URL + "/ui/rss")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(page.Body)
+	page.Body.Close()
+	for _, name := range []string{"serie", "film"} {
+		if !strings.Contains(string(body), `name="feeds" value="`+name+`"`) {
+			t.Fatalf("the rule editor does not offer the feed %q as a checkbox", name)
+		}
+	}
+
+	resp, err := http.PostForm(srv.URL+"/ui/rss-rule", url.Values{
+		"op": {"add"}, "name": {"le serie"}, "enabled": {"1"}, "feeds": {"serie", "film"}, "include": {"1080p"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	rules := d.rules()
+	if len(rules) != 1 || len(rules[0].Feeds) != 2 || rules[0].Feeds[0] != "serie" || rules[0].Feeds[1] != "film" {
+		t.Fatalf("rules = %+v, want the two checked feeds", rules)
+	}
+	// A hand-written list ("a, b") still works, and a repeated value is not
+	// duplicated in the rule.
+	resp, err = http.PostForm(srv.URL+"/ui/rss-rule", url.Values{
+		"op": {"add"}, "name": {"a mano"}, "enabled": {"1"}, "feeds": {"serie, film", "serie"}, "include": {"1080p"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	rules = d.rules()
+	if len(rules) != 2 || len(rules[1].Feeds) != 2 {
+		t.Fatalf("rules = %+v, want the second rule with the two feeds once each", rules)
+	}
+}
+
 // TestUIRssSearchFeedCanBeAdded checks that a Torznab search feed works without
 // a URL.
 func TestUIRssSearchFeedCanBeAdded(t *testing.T) {

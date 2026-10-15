@@ -290,8 +290,11 @@ The standalone pages follow the same structure:
   folders are remembered in the browser: a list of thirty imported feeds stays
   navigable). The feed card shows the last
   check, its options as chips and opens its **items** (with the rule that takes
-  each one and an *Add* button). New and edited entries open an editor dialog;
-  the rule editor is organised in *Which items* (feeds, *Contains all of*,
+  each one, an *Add* button and *Add to my rules*, which opens the rule editor
+  on that title, watching that feed). New and edited entries open an editor dialog;
+  the rule editor is organised in *Which items* (the feeds it watches — one
+  **checkbox per configured feed**, nothing checked meaning every feed, as in
+  qBittorrent's RSS Downloader —, *Contains all of*,
   *Contains one of*, *Contains none of*, episodes, advanced filters) and *What
   to do* (save path, category, tags, flags), with the **preview** of the
   archived items it would take next to it. The preview **updates by itself**

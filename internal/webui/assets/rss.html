@@ -28,6 +28,12 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 .linklike{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit}
 .linklike:hover{text-decoration:underline}
 .linklike b{color:inherit}
+/* Applica la regola ai feed: caselle, come l'RSS Downloader di qBittorrent. */
+.feedpick{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin:0;grid-column:1/-1}
+.feedpick legend{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--subtle);padding:0 4px}
+.feedpick .hint{margin:0 0 6px}
+.feedpick-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;max-height:150px;overflow:auto}
+.feedpick-list label.chk{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Feed folders: a header that folds the group away. .items > li is display:flex,
    so a hidden row needs the rule below ([hidden] alone would be overridden). */
 #feed-list > li.feed-folder{display:block;padding:0;background:var(--sunken)}
@@ -211,7 +217,11 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
           <div class="fsec">
             <h3>Which items</h3>
             <div class="fgrid">
-              <label class="field full">Feeds (empty = all)<input type="text" name="feeds" placeholder="serie" list="feednames" autocomplete="off" title="Feeds this rule watches, separated by commas; empty = every feed"></label>
+              <fieldset class="feedpick">
+                <legend>Apply this rule to these feeds</legend>
+                <p class="hint">No feed checked = every feed.</p>
+                <div class="feedpick-list">{{RULEFEEDS}}</div>
+              </fieldset>
               <label class="field full">Contains all of<input type="text" name="require" placeholder="the office, 1080p" autocomplete="off" title="Every one of these terms must be in the title (comma separated): use it for the series name and what you always want"></label>
               <label class="field">Contains one of<input type="text" name="include" placeholder="1080p, 2160p" autocomplete="off" title="At least one of these terms must be in the title (comma separated): use it for alternatives"></label>
               <label class="field">Contains none of<input type="text" name="exclude" placeholder="cam, ts" autocomplete="off" title="A title with any of these terms is not taken (comma separated)"></label>
@@ -401,7 +411,15 @@ $$('[data-feed-items]').forEach(function(btn){btn.addEventListener('click',funct
       var tk=document.createElement('span');tk.className='take '+(it.pass?'ok':'subtle');tk.textContent=it.pass?(it.rule?'✓ '+it.rule:'✓'):(it.rule||'—');r.appendChild(tk);
       var b=document.createElement('button');b.type='button';b.className='sm';b.textContent=t('Add');b.title=t('Add this torrent to the download queue');
       b.onclick=function(){var f=new URLSearchParams();f.set('source',it.download);fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded','X-GX-Fetch':'1'}}).then(function(r){return r.json();}).then(function(res){toast(res.msg,!res.ok);if(res.ok)b.disabled=true;});};
-      r.appendChild(b);box.appendChild(r);
+      r.appendChild(b);
+      // "Add to my rules" from the article (qBittorrent): the rule editor opens
+      // with this title as its term, named after the release, on this feed.
+      var rb=document.createElement('button');rb.type='button';rb.className='sm';rb.textContent=t('Add to my rules');rb.title=t('Create a rule from this item, watching this feed');
+      rb.onclick=function(){
+        closeDialog($('#dlg-items'));showTab('rules');
+        editRule({name:it.base||it.title,enabled:true,feeds:[name],match:{include:[it.title]}});
+      };
+      r.appendChild(rb);box.appendChild(r);
     });
   }).catch(function(){info.textContent=t('Error');});
 });});
@@ -433,7 +451,7 @@ function editRule(rule,index){
   var m=rule.match||{},a=rule.action||{};
   function set(n,v){var el=ruleForm.elements[n];if(!el)return;if(el.type==='checkbox')el.checked=!!v;else el.value=(v===undefined||v===null||v===0)?'':v;}
   function mib(b){return b?Math.round(b/1048576):'';}
-  set('name',rule.name);set('feeds',(rule.feeds||[]).join(', '));set('enabled',rule.enabled!==false);
+  set('name',rule.name);$$('input[name=feeds]',ruleForm).forEach(function(cb){cb.checked=(rule.feeds||[]).indexOf(cb.value)>=0;});set('enabled',rule.enabled!==false);
   set('include',(m.include||[]).join(', '));set('require',(m.require||[]).join(', '));set('exclude',(m.exclude||[]).join(', '));set('episode_filter',m.episode_filter);set('require_episode',m.require_episode);set('smart_episode',m.smart_episode);
   set('paused',a.paused);set('sequential',a.sequential);set('first_last',a.first_last);set('top',a.top);set('once',a.once);set('savepath',a.savepath);set('category',a.category);set('tags',(a.tags||[]).join(', '));
   set('regex',m.regex);set('not_regex',m.not_regex);set('min_size',mib(m.min_size));set('max_size',mib(m.max_size));set('min_seeders',m.min_seeders);set('max_seeders',m.max_seeders);set('min_peers',m.min_peers);set('max_age_days',m.max_age_days);set('ignore_days',rule.ignore_days);
