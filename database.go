@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -669,7 +670,7 @@ func ConnectionRowCount(db *sql.DB) int64 {
 const databaseSchemaBase = `CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS series (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, seasons TEXT DEFAULT '1+', quality TEXT DEFAULT '', language TEXT DEFAULT 'ita', enabled INTEGER DEFAULT 1, archive_path TEXT DEFAULT '', tmdb_id TEXT DEFAULT '', aliases TEXT DEFAULT ''); CREATE TABLE IF NOT EXISTS episodes (id INTEGER PRIMARY KEY, series_id INTEGER NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, title TEXT, quality_score INTEGER NOT NULL DEFAULT 0, is_repack INTEGER DEFAULT 0, magnet_hash TEXT UNIQUE, magnet_link TEXT, downloaded_at TEXT, archive_path TEXT, size_bytes INTEGER DEFAULT 0, original_title TEXT, rename_verified INTEGER DEFAULT 0, UNIQUE(series_id, season, episode)); CREATE TABLE IF NOT EXISTS movies (id INTEGER PRIMARY KEY, name TEXT, year INTEGER, title TEXT, quality_score INTEGER DEFAULT 0, magnet_hash TEXT UNIQUE, magnet_link TEXT, downloaded_at TEXT, size_bytes INTEGER DEFAULT 0, removed_at TEXT); CREATE TABLE IF NOT EXISTS pending_downloads (id INTEGER PRIMARY KEY, series_id INTEGER, season INTEGER, episode INTEGER, best_magnet TEXT, best_quality_score INTEGER, ready_at TEXT); CREATE TABLE IF NOT EXISTS cycle_history (id INTEGER PRIMARY KEY, at TEXT NOT NULL, payload_json TEXT NOT NULL); CREATE TABLE IF NOT EXISTS torrent_meta (hash TEXT PRIMARY KEY, tag TEXT DEFAULT '', source TEXT DEFAULT '', ui_state TEXT DEFAULT '', progress REAL DEFAULT 0, paused INTEGER DEFAULT 0, total_size INTEGER DEFAULT 0, downloaded INTEGER DEFAULT 0, name TEXT DEFAULT '', kind TEXT DEFAULT '', title TEXT DEFAULT '', series_name TEXT DEFAULT '', season INTEGER, episode INTEGER, year INTEGER, quality_score INTEGER DEFAULT 0, metadata_json TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'queued', completed_at TEXT, processed_path TEXT, error TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_episodes_lookup ON episodes(series_id, season, episode); CREATE INDEX IF NOT EXISTS idx_episodes_magnet ON episodes(magnet_hash); CREATE INDEX IF NOT EXISTS idx_episodes_downloaded ON episodes(downloaded_at); CREATE INDEX IF NOT EXISTS idx_movies_magnet ON movies(magnet_hash); CREATE INDEX IF NOT EXISTS idx_movies_removed ON movies(removed_at); CREATE INDEX IF NOT EXISTS idx_torrent_meta_status ON torrent_meta(status); INSERT INTO schema_meta(key,value,updated_at) VALUES ('schema_version','2',datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at;`
 
 // databaseSchemaExtra is the second `execute_batch` of `Database::migrate`.
-const databaseSchemaExtra = `CREATE TABLE IF NOT EXISTS gap_search_log (series_name TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, last_searched_at TEXT NOT NULL, PRIMARY KEY(series_name,season,episode)); CREATE TABLE IF NOT EXISTS series_metadata (series_name TEXT NOT NULL, season INTEGER NOT NULL, episode_count INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(series_name,season)); CREATE TABLE IF NOT EXISTS episode_metadata (series_name TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, air_date TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, PRIMARY KEY(series_name,season,episode)); CREATE TABLE IF NOT EXISTS ignored_episodes (series_name TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, reason TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(series_name,season,episode)); CREATE TABLE IF NOT EXISTS upgrade_backup (new_hash TEXT PRIMARY KEY, payload_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))); CREATE TABLE IF NOT EXISTS series_status (series_name TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT '', last_air_date TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL);`
+const databaseSchemaExtra = `CREATE TABLE IF NOT EXISTS gap_search_log (series_name TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, last_searched_at TEXT NOT NULL, PRIMARY KEY(series_name,season,episode)); CREATE TABLE IF NOT EXISTS series_metadata (series_name TEXT NOT NULL, season INTEGER NOT NULL, episode_count INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(series_name,season)); CREATE TABLE IF NOT EXISTS episode_metadata (series_name TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, air_date TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, PRIMARY KEY(series_name,season,episode)); CREATE TABLE IF NOT EXISTS ignored_episodes (series_name TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, reason TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(series_name,season,episode)); CREATE TABLE IF NOT EXISTS forced_gaps (series_name TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, requested_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(series_name,season,episode)); CREATE TABLE IF NOT EXISTS upgrade_backup (new_hash TEXT PRIMARY KEY, payload_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))); CREATE TABLE IF NOT EXISTS series_status (series_name TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT '', last_air_date TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL);`
 
 // databasePendingMoviesSchema mirrors the `pending_movies` table.
 const databasePendingMoviesSchema = `CREATE TABLE IF NOT EXISTS pending_movies (
@@ -2470,6 +2471,75 @@ func (d *Database) LaterArchivedMaxResolutionRank(seriesName string, season, epi
 	return best, rows.Err()
 }
 
+// specialEpisodeZeroPattern matches an explicit season+episode-0 marker
+// ("S02E00", "S02 E00", "2x00") in a release or file title.
+var specialEpisodeZeroPattern = regexp.MustCompile(`(?i)(?:s\d{1,2}[ ._-]?e0{1,2}|\d{1,2}x0{1,2})(?:[^0-9]|$)`)
+
+// episodeZeroRowIsSpecial reports whether an episodes row stored with episode=0
+// is really an SxxE00 special. A special and a whole-season pack both use
+// episode 0 in the schema, but only a pack covers every episode of the season:
+// a special must not hide the season's gaps.
+func episodeZeroRowIsSpecial(title, originalTitle string) bool {
+	return specialEpisodeZeroPattern.MatchString(title) || specialEpisodeZeroPattern.MatchString(originalTitle)
+}
+
+// AddForcedGap records an explicit "re-download this episode" request. A forced
+// gap bypasses the season-pack cover, the ignored set and the "a later episode
+// is already archived" rule, so an episode removed from the library can be
+// fetched again. It is cleared as soon as the episode is present again.
+func (d *Database) AddForcedGap(series string, season, episode int64) error {
+	_, err := d.db.Exec(
+		"INSERT INTO forced_gaps(series_name,season,episode,requested_at) VALUES (?1,?2,?3,datetime('now')) "+
+			"ON CONFLICT(series_name,season,episode) DO UPDATE SET requested_at=excluded.requested_at",
+		series, season, episode)
+	return err
+}
+
+// ClearForcedGap drops a forced-gap request (the episode is back in the library
+// or a download for it is active again).
+func (d *Database) ClearForcedGap(series string, season, episode int64) error {
+	_, err := d.db.Exec("DELETE FROM forced_gaps WHERE lower(series_name)=lower(?1) AND season=?2 AND episode=?3", series, season, episode)
+	return err
+}
+
+// loadForcedGaps returns the explicit re-download requests keyed by
+// series/season, using the series-table name so it lines up with the gap maps.
+func (d *Database) loadForcedGaps() (map[string]map[int64]struct{}, error) {
+	out := map[string]map[int64]struct{}{}
+	rows, err := d.db.Query("SELECT s.name,f.season,f.episode FROM forced_gaps f JOIN series s ON lower(s.name)=lower(f.series_name)")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		var season, episode int64
+		if err := rows.Scan(&name, &season, &episode); err != nil {
+			return nil, err
+		}
+		key := forcedGapKey(name, season)
+		if out[key] == nil {
+			out[key] = map[int64]struct{}{}
+		}
+		out[key][episode] = struct{}{}
+	}
+	return out, rows.Err()
+}
+
+// forcedGapKey is the series/season key of a forced-gap group.
+func forcedGapKey(series string, season int64) string {
+	return series + "\x00" + strconv.FormatInt(season, 10)
+}
+
+// splitForcedGapKey reverses forcedGapKey.
+func splitForcedGapKey(key string) (string, int64) {
+	if index := strings.LastIndexByte(key, 0); index >= 0 {
+		season, _ := strconv.ParseInt(key[index+1:], 10, 64)
+		return key[:index], season
+	}
+	return key, 0
+}
+
 // ArchiveGaps computes the missing episodes for every series/season.
 func (d *Database) ArchiveGaps() ([]SeriesGap, error) {
 	type seasonTargetKey struct {
@@ -2521,16 +2591,19 @@ func (d *Database) ArchiveGaps() ([]SeriesGap, error) {
 	metaRows.Close()
 	// Materialize the three sets once.
 	completePacks := make(map[seasonTargetKey]struct{})
-	packRows, err := d.db.Query("SELECT s.name,e.season FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.episode=0 AND (e.downloaded_at IS NOT NULL OR EXISTS(SELECT 1 FROM torrent_meta t WHERE t.hash=e.magnet_hash AND t.status NOT IN ('error','removed')))")
+	packRows, err := d.db.Query("SELECT s.name,e.season,COALESCE(e.title,''),COALESCE(e.original_title,'') FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.episode=0 AND (e.downloaded_at IS NOT NULL OR EXISTS(SELECT 1 FROM torrent_meta t WHERE t.hash=e.magnet_hash AND t.status NOT IN ('error','removed')))")
 	if err != nil {
 		return nil, err
 	}
 	for packRows.Next() {
-		var name string
+		var name, title, originalTitle string
 		var season int64
-		if err := packRows.Scan(&name, &season); err != nil {
+		if err := packRows.Scan(&name, &season, &title, &originalTitle); err != nil {
 			packRows.Close()
 			return nil, err
+		}
+		if episodeZeroRowIsSpecial(title, originalTitle) {
+			continue
 		}
 		completePacks[seasonTargetKey{Series: name, Season: season}] = struct{}{}
 	}
@@ -2593,6 +2666,29 @@ func (d *Database) ArchiveGaps() ([]SeriesGap, error) {
 	for key := range seasonTargets {
 		keys = append(keys, key)
 	}
+	forced, err := d.loadForcedGaps()
+	if err != nil {
+		return nil, err
+	}
+	// A forced-gap season may have no episodes row left at all: keep it in the
+	// target set so the request is not lost.
+	for key, forcedEpisodes := range forced {
+		name, season := splitForcedGapKey(key)
+		target := seasonTargetKey{Series: name, Season: season}
+		if _, ok := seasonTargets[target]; ok {
+			continue
+		}
+		maxEpisode := int64(0)
+		for episode := range forcedEpisodes {
+			if episode > maxEpisode {
+				maxEpisode = episode
+			}
+		}
+		if maxEpisode > 0 {
+			seasonTargets[target] = maxEpisode
+			keys = append(keys, target)
+		}
+	}
 	sort.Slice(keys, func(i, j int) bool {
 		if keys[i].Series != keys[j].Series {
 			return keys[i].Series < keys[j].Series
@@ -2602,19 +2698,35 @@ func (d *Database) ArchiveGaps() ([]SeriesGap, error) {
 	gaps := make([]SeriesGap, 0)
 	for _, key := range keys {
 		maxEpisode := seasonTargets[key]
-		if _, ok := completePacks[key]; ok {
-			continue
-		}
-		if downloading.season(key.Series, key.Season) {
-			continue
-		}
 		episodes := present[key]
+		forcedEpisodes := forced[forcedGapKey(key.Series, key.Season)]
+		if _, ok := completePacks[key]; ok || downloading.season(key.Series, key.Season) {
+			// A season pack or an active whole-season download covers every
+			// episode: only an explicit re-download request may surface a gap.
+			for episode := range forcedEpisodes {
+				if _, ok := episodes[episode]; ok {
+					_ = d.ClearForcedGap(key.Series, key.Season, episode)
+					continue
+				}
+				if downloading.episode(key.Series, key.Season, episode) {
+					continue
+				}
+				gaps = append(gaps, SeriesGap{Series: key.Series, Season: key.Season, Episode: episode})
+			}
+			continue
+		}
 		for episode := int64(1); episode <= maxEpisode; episode++ {
-			if _, ok := ignored[key][episode]; ok {
+			if _, ok := episodes[episode]; ok {
+				if _, forcedHere := forcedEpisodes[episode]; forcedHere {
+					_ = d.ClearForcedGap(key.Series, key.Season, episode)
+				}
 				continue
 			}
-			if _, ok := episodes[episode]; ok {
-				continue
+			// A forced gap overrides the ignored set and is fetched again.
+			if _, forcedHere := forcedEpisodes[episode]; !forcedHere {
+				if _, ok := ignored[key][episode]; ok {
+					continue
+				}
 			}
 			if downloading.episode(key.Series, key.Season, episode) {
 				continue
@@ -2722,15 +2834,19 @@ func (d *Database) ArchiveGapsForSeries(seriesName string) ([][2]int64, error) {
 	}
 	metaRows.Close()
 	completeSeasons := make(map[int64]struct{})
-	packRows, err := d.db.Query("SELECT e.season FROM episodes e WHERE e.series_id=(SELECT id FROM series WHERE name=?1) AND e.episode=0 AND (e.downloaded_at IS NOT NULL OR EXISTS(SELECT 1 FROM torrent_meta t WHERE t.hash=e.magnet_hash AND t.status NOT IN ('error','removed')))", seriesName)
+	packRows, err := d.db.Query("SELECT e.season,COALESCE(e.title,''),COALESCE(e.original_title,'') FROM episodes e WHERE e.series_id=(SELECT id FROM series WHERE name=?1) AND e.episode=0 AND (e.downloaded_at IS NOT NULL OR EXISTS(SELECT 1 FROM torrent_meta t WHERE t.hash=e.magnet_hash AND t.status NOT IN ('error','removed')))", seriesName)
 	if err != nil {
 		return nil, err
 	}
 	for packRows.Next() {
 		var season int64
-		if err := packRows.Scan(&season); err != nil {
+		var title, originalTitle string
+		if err := packRows.Scan(&season, &title, &originalTitle); err != nil {
 			packRows.Close()
 			return nil, err
+		}
+		if episodeZeroRowIsSpecial(title, originalTitle) {
+			continue
 		}
 		completeSeasons[season] = struct{}{}
 	}
@@ -2775,29 +2891,66 @@ func (d *Database) ArchiveGapsForSeries(seriesName string) ([][2]int64, error) {
 		return nil, err
 	}
 	ignoredRows.Close()
+	downloading, err := d.activeDownloadEpisodes()
+	if err != nil {
+		return nil, err
+	}
+	forced, err := d.loadForcedGaps()
+	if err != nil {
+		return nil, err
+	}
+	// A forced-gap season may have no episodes row left at all: keep it in the
+	// target set so the request is not lost.
+	for key, forcedEpisodes := range forced {
+		name, season := splitForcedGapKey(key)
+		if !strings.EqualFold(name, seriesName) {
+			continue
+		}
+		maxEpisode := int64(0)
+		for episode := range forcedEpisodes {
+			if episode > maxEpisode {
+				maxEpisode = episode
+			}
+		}
+		if existing, ok := targets[season]; !ok || maxEpisode > existing {
+			targets[season] = maxEpisode
+		}
+	}
 	seasons := make([]int64, 0, len(targets))
 	for season := range targets {
 		seasons = append(seasons, season)
 	}
 	sort.Slice(seasons, func(i, j int) bool { return seasons[i] < seasons[j] })
-	downloading, err := d.activeDownloadEpisodes()
-	if err != nil {
-		return nil, err
-	}
 	gaps := make([][2]int64, 0)
 	for _, season := range seasons {
-		if _, ok := completeSeasons[season]; ok {
-			continue
-		}
-		if downloading.season(seriesName, season) {
+		seasonForced := forced[forcedGapKey(seriesName, season)]
+		if _, ok := completeSeasons[season]; ok || downloading.season(seriesName, season) {
+			// A season pack or an active whole-season download covers every
+			// episode: only an explicit re-download request may surface a gap.
+			for episode := range seasonForced {
+				if _, ok := present[[2]int64{season, episode}]; ok {
+					_ = d.ClearForcedGap(seriesName, season, episode)
+					continue
+				}
+				if downloading.episode(seriesName, season, episode) {
+					continue
+				}
+				gaps = append(gaps, [2]int64{season, episode})
+			}
 			continue
 		}
 		for episode := int64(1); episode <= targets[season]; episode++ {
-			if _, ok := ignored[[2]int64{season, episode}]; ok {
+			if _, ok := present[[2]int64{season, episode}]; ok {
+				if _, forcedHere := seasonForced[episode]; forcedHere {
+					_ = d.ClearForcedGap(seriesName, season, episode)
+				}
 				continue
 			}
-			if _, ok := present[[2]int64{season, episode}]; ok {
-				continue
+			// A forced gap overrides the ignored set and is fetched again.
+			if _, forcedHere := seasonForced[episode]; !forcedHere {
+				if _, ok := ignored[[2]int64{season, episode}]; ok {
+					continue
+				}
 			}
 			if downloading.episode(seriesName, season, episode) {
 				continue
@@ -3190,6 +3343,17 @@ func (d *Database) SetEpisodeIgnored(seriesName string, season, episode int64, i
 }
 
 // ResetEpisode resets the state of one episode.
+// ArchivedEpisodePath returns the archived file path of an episode, or "" when
+// the episode has no archived file.
+func (d *Database) ArchivedEpisodePath(series string, season, episode int64) (string, error) {
+	var path string
+	err := d.db.QueryRow("SELECT COALESCE(archive_path,'') FROM episodes WHERE series_id=(SELECT id FROM series WHERE lower(name)=lower(?1)) AND season=?2 AND episode=?3", series, season, episode).Scan(&path)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return path, err
+}
+
 func (d *Database) ResetEpisode(seriesName string, season, episode int64, removeHistory bool) error {
 	tx, err := d.db.Begin()
 	if err != nil {

@@ -181,6 +181,16 @@ func TestQbittorrentEngineVersionIsNamed(t *testing.T) {
 	}
 }
 
+// TestQbEtaSecondsSanitizesInfinite maps qBittorrent's 8640000 ("unknown") ETA
+// to the -1 the detail view expects, so no bogus 100-day estimate is shown.
+func TestQbEtaSecondsSanitizesInfinite(t *testing.T) {
+	for input, want := range map[int64]int64{0: -1, -5: -1, 8640000: -1, 120: 120} {
+		if got := qbEtaSeconds(input); got != want {
+			t.Errorf("qbEtaSeconds(%d) = %d, want %d", input, got, want)
+		}
+	}
+}
+
 func TestQbittorrentEngineListMapping(t *testing.T) {
 	fake, engine, downloads := newFakeQBEngine(t)
 	fake.setTorrents([]qbittorrent.Torrent{{

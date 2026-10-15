@@ -280,6 +280,15 @@ test("integrazioni raggruppa le voci con intestazioni sticky", async ({ page }) 
   await expect(labels.first()).toBeVisible();
 });
 
+test("il dettaglio torrent usa un pannello in basso, non un modale", async ({ page }) => {
+  await page.goto("/?view=downloads");
+  const drawer = page.locator("#v2-detail-drawer");
+  await expect(drawer).toHaveCount(1);
+  await expect(drawer).toBeHidden();
+  // The old centered torrent modal must be gone.
+  await expect(page.locator(".modal.torrent-modal")).toHaveCount(0);
+});
+
 test("Salute affianca Motore torrent e Stato provider", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/?view=health");

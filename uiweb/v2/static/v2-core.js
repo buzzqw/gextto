@@ -379,6 +379,58 @@
     }
   }
 
+  // ----------------------------------------------- torrent detail drawer --
+  // The torrent detail opens as a bottom drawer (like gx-core) instead of a
+  // centered modal, so the list stays visible while it is open. It is not
+  // modal: focus moves in and is restored on close, but is not trapped.
+  var detailDrawerOpener = null;
+
+  function openDetailDrawer() {
+    var drawer = document.getElementById("v2-detail-drawer");
+    if (!drawer) return;
+    drawer.hidden = false;
+    var close = drawer.querySelector("[data-v2-detail-close]");
+    if (close) { try { close.focus(); } catch (error) { /* ignore */ } }
+  }
+
+  function closeDetailDrawer() {
+    var drawer = document.getElementById("v2-detail-drawer");
+    if (!drawer || drawer.hidden) return;
+    drawer.hidden = true;
+    drawer.innerHTML = "";
+    if (detailDrawerOpener && document.contains(detailDrawerOpener) && !detailDrawerOpener.disabled) {
+      try { detailDrawerOpener.focus(); } catch (error) { /* ignore */ }
+    }
+    detailDrawerOpener = null;
+  }
+  window.gexttoCloseDetailDrawer = closeDetailDrawer;
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape" || activeDialog) return;
+    var drawer = document.getElementById("v2-detail-drawer");
+    if (drawer && !drawer.hidden) { event.preventDefault(); closeDetailDrawer(); }
+  });
+
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest) return;
+    if (event.target.closest("[data-v2-detail-close]")) {
+      event.preventDefault();
+      closeDetailDrawer();
+      return;
+    }
+    // The info button and the row itself open the same drawer: keep the opener
+    // so focus returns to where the user was.
+    var info = event.target.closest("button[hx-get*='/downloads/detail']");
+    if (info) { detailDrawerOpener = info; return; }
+    if (event.target.closest("button, a, input, select, textarea, label")) return;
+    var row = event.target.closest("tr[data-hash]");
+    if (!row) return;
+    var open = row.querySelector("button[hx-get*='/downloads/detail']");
+    if (!open) return;
+    detailDrawerOpener = open;
+    open.click();
+  });
+
   document.addEventListener("keydown", function (event) {
     if (!activeDialog || !document.contains(activeDialog)) return;
     if (event.key === "Escape") {
@@ -1306,6 +1358,7 @@
     updateDownloadsBadge();
     ensureTooltips(event.target);
     if (event.target.id === "v2-modal") { scanModal(); initThemeModal(); return; }
+    if (event.target.id === "v2-detail-drawer") { openDetailDrawer(); return; }
     updateTorrentSelection();
     if (event.target.id === "v2-logs-view") {
       updateLogsFollowButton();

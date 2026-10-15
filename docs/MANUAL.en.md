@@ -1186,6 +1186,7 @@ seconds.
 | Fill missing episodes | Search missing / Series cycle |
 | Choose one specific release | **Why not this one?** → Queue |
 | Make existing files known | Scan archive |
+| Re-download an already archived episode | ↻ Re-download (moves the file to the trash and queues it again) |
 | Change names without re-downloading | Rename preview |
 | Fix an external service | Health → source → Verify |
 | Remove inferior files | Preview duplicates → Cleanup |
@@ -1196,6 +1197,10 @@ seconds.
 - **Release**: a result found by a feed, indexer or web engine.
 - **Cycle**: one automatic search and selection pass.
 - **Gap**: a missing episode recognised in the archive.
+- **Forced gap**: an explicit request to re-download an episode (the ↻
+  Re-download action). It bypasses the cover of a season pack and the "a later
+  episode is already archived" rule, so the episode can be fetched again even
+  when it would not normally count as missing.
 - **Placeholder**: a temporary row representing an incomplete download.
 - **Upgrade**: replacing an archived file with a better release.
 - **Backoff**: a progressive pause for requests to a failing source.
@@ -1215,6 +1220,12 @@ seconds.
   `/api/v2.0/indexers/all/results/torznab/api` twice.
 - **Nothing downloads** — confirm *active mode*, that the series/movie is
   enabled, and check the quality/language filters and the free-space guard.
+- **An archived episode will not re-download** — use **↻ Re-download** in the
+  series detail: it moves the file to the trash, deletes the episode row and
+  records a *forced gap*. This is needed when the season is covered by a pack or
+  when a later episode is already archived; without the forced gap the episode
+  does not count as missing. An `SxxE00` special, instead, is a single file and
+  does **not** cover the season.
 - **A torrent is stalled** — check the values under *Configuration →
   Seeding and completion → Stalled torrents*. It is intentionally paused and excluded from active slots; wait
   for the retry or use **Resume/Restart** manually.

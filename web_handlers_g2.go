@@ -639,7 +639,12 @@ func PinTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonStatus(w, status, value)
 }
 
-// RedownloadEpisode implements `redownload_episode`.
+// RedownloadEpisode implements `redownload_episode`. It is the "Riscarica"
+// action: it moves the archived file to the trash (so the disk check does not
+// see it), deletes the episode row and records an explicit forced gap, then
+// starts a series search. The forced gap is what makes the episode eligible
+// again even when a season pack covers the season or a later episode is
+// already archived.
 func RedownloadEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 	series := pathParam(r, "series")
 	season, seasonOK := pathInt(r, "season")
@@ -648,15 +653,55 @@ func RedownloadEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "invalid path parameter")
 		return
 	}
+	cfg := latestConfig(s)
+	keepFiles := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("keep_files")), "1")
+	moved := ""
+	if !keepFiles {
+		if archived, err := s.db.ArchivedEpisodePath(series, season, episode); err == nil && archived != "" {
+			if trash := trashRoot(cfg); trash != "" {
+				if destination, err := MoveToTrash(archived, trash); err != nil {
+					logging.Warn("redownload: could not move the file to the trash", "path", archived, "error", err.Error())
+				} else {
+					moved = destination
+				}
+			}
+		}
+	}
 	if err := s.db.ResetEpisode(series, season, episode, true); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if err := s.db.AddForcedGap(series, season, episode); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	// Kick off a series search right away so the episode is re-queued without
+	// waiting for the next scheduled cycle.
+	clone := r.Clone(r.Context())
+	query := clone.URL.Query()
+	query.Set("domain", "series")
+	clone.URL.RawQuery = query.Encode()
+	RunNow(&v2DiscardWriter{}, clone, s)
+	logging.Info(fmt.Sprintf("🔁 «%s» S%02dE%02d marked for re-download%s", series, season, episode, func() string {
+		if moved == "" {
+			return ""
+		}
+		return " (file moved to the trash)"
+	}()))
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":         true,
 		"redownload": true,
-		"message":    "episodio reso nuovamente disponibile al prossimo ciclo",
+		"moved_to":   moved,
+		"message":    "episodio reso nuovamente scaricabile: ricerca serie avviata",
 	})
+}
+
+// trashRoot returns the configured trash directory, or "" when none is set.
+func trashRoot(cfg *Config) string {
+	if cfg == nil || cfg.TrashPath == nil {
+		return ""
+	}
+	return strings.TrimSpace(*cfg.TrashPath)
 }
 
 // RenameAll implements `rename_all`.

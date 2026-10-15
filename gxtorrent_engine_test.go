@@ -353,6 +353,24 @@ func TestGxEngineVersionIsNamed(t *testing.T) {
 	}
 }
 
+// TestGxTorrentItemCarriesEngineStats pins the mapping of the transfer/piece
+// statistics the detail general tab shows.
+func TestGxTorrentItemCarriesEngineStats(t *testing.T) {
+	engine := &gxTorrentEngine{}
+	view := engine.toView(gxTorrentItem{
+		Hash: "AB", Name: "x", State: "downloading", Progress: 50,
+		ETASeconds: 120, Private: true, FileCount: 4,
+		PiecesTotal: 200, PiecesHave: 100, PiecesAvailable: 150, PieceLength: 1 << 20,
+		Wasted: 3 << 20, Allocated: 200 << 20, AddedAt: 1700000000,
+	}, time.Now())
+	if view.EtaSeconds != 120 || !view.Private || view.FileCount != 4 ||
+		view.PiecesTotal != 200 || view.PiecesHave != 100 || view.PiecesAvailable != 150 ||
+		view.PieceLength != 1<<20 || view.Wasted != 3<<20 || view.Allocated != 200<<20 ||
+		view.AddedAt != 1700000000 || view.CompletedAt != 0 {
+		t.Fatalf("toView dropped engine stats: %+v", view)
+	}
+}
+
 func TestGxNetworkArgs(t *testing.T) {
 	cfg := &Config{DataDir: t.TempDir()}
 	cfg.Transfer.PortMin = 6881

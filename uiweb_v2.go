@@ -1414,6 +1414,24 @@ func v2FindTorrent(s *AppState, hash string) (models.TorrentView, bool) {
 	return models.TorrentView{}, false
 }
 
+// v2PiecesLabel renders "available / total (pct%)" for the piece counters, or
+// an empty string when the engine did not report the total.
+func v2PiecesLabel(available, total int) string {
+	if total <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d / %d (%.1f%%)", available, total, float64(available)*100/float64(total))
+}
+
+// v2UnixTimeLabel formats a Unix timestamp as a local date and time, or an
+// empty string for the "unknown" zero value.
+func v2UnixTimeLabel(seconds int64) string {
+	if seconds <= 0 {
+		return ""
+	}
+	return time.Unix(seconds, 0).Local().Format("02/01/2006 15:04")
+}
+
 func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	view := v2DetailView{Hash: hash, Tab: tab, Caps: v2DetailCapsFor(s.activeEngine().Name())}
 	view.Tabs = []v2DetailTab{
@@ -1502,6 +1520,33 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		view.General = append(view.General, v2KV{Label: "Torrent simili BEP 38", Value: fmt.Sprintf("%d", len(torrent.Similar))})
 	}
 	view.General = append(view.General, v2KV{Label: "Motore", Value: view.Caps.Backend})
+	// Engine statistics. gx-core's own page shows them and the detail must not
+	// hide them: ETA and the added/completed dates come from qBittorrent too,
+	// while the piece and disk counters are gx-torrent only.
+	if torrent.EtaSeconds > 0 {
+		view.General = append(view.General, v2KV{Label: "Tempo rimanente", Value: logging.HumanDuration(torrent.EtaSeconds)})
+	}
+	if view.Caps.Backend == "gx-torrent" {
+		private := "no"
+		if torrent.Private {
+			private = "sì"
+		}
+		view.General = append(view.General,
+			v2KV{Label: "Privato", Value: private},
+			v2KV{Label: "Numero file", Value: fmt.Sprintf("%d", torrent.FileCount)},
+			v2KV{Label: "Pezzi disponibili", Value: v2PiecesLabel(torrent.PiecesAvailable, torrent.PiecesTotal)},
+			v2KV{Label: "Pezzi completati", Value: fmt.Sprintf("%d", torrent.PiecesHave)},
+			v2KV{Label: "Dimensione pezzo", Value: logging.HumanBytesI64(torrent.PieceLength)},
+			v2KV{Label: "Sprecato", Value: logging.HumanBytesI64(torrent.Wasted)},
+			v2KV{Label: "Allocato su disco", Value: logging.HumanBytesI64(torrent.Allocated)},
+		)
+	}
+	if torrent.AddedAt > 0 {
+		view.General = append(view.General, v2KV{Label: "Aggiunto", Value: v2UnixTimeLabel(torrent.AddedAt)})
+	}
+	if torrent.CompletedAt > 0 {
+		view.General = append(view.General, v2KV{Label: "Completato", Value: v2UnixTimeLabel(torrent.CompletedAt)})
+	}
 	for index := range view.General {
 		if strings.TrimSpace(view.General[index].Value) == "" {
 			view.General[index].Value = "—"

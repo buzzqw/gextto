@@ -810,6 +810,103 @@ func TestCompletePackSuppressesMetadataGapsOnlyWhileQueuedOrCompleted(t *testing
 	assertEqual(t, len(gaps), 3)
 }
 
+// TestEpisodeZeroRowIsSpecial pins the heuristic that tells an SxxE00 special
+// (episode 0) apart from a whole-season pack: both use episode 0 in the schema.
+func TestEpisodeZeroRowIsSpecial(t *testing.T) {
+	cases := map[string]bool{
+		"Example.S01.COMPLETE.1080p":  false,
+		"Example.S01.REPACK.1080p":    false,
+		"Example - S01E00 - Speciale": true,
+		"Example.S01E00.Speciale":     true,
+		"Example 1x00 Pilota":         true,
+		"Example.S01E09.mkv":          false,
+	}
+	for title, want := range cases {
+		if got := episodeZeroRowIsSpecial(title, ""); got != want {
+			t.Errorf("episodeZeroRowIsSpecial(%q) = %v, want %v", title, got, want)
+		}
+	}
+}
+
+// TestSpecialEpisodeZeroDoesNotCoverTheSeason: an SxxE00 special must not hide
+// the season's gaps the way a real season pack does.
+func TestSpecialEpisodeZeroDoesNotCoverTheSeason(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Example')"); err != nil {
+		t.Fatal(err)
+	}
+	var sid int64
+	if err := db.db.QueryRow("SELECT id FROM series WHERE name='Example'").Scan(&sid); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveSeriesMetadata("Example", [][2]int64{{1, 3}}); err != nil {
+		t.Fatal(err)
+	}
+	// A real season pack covers every episode of season 1.
+	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,downloaded_at) VALUES (?1,1,0,'Example.S01.COMPLETE.1080p','2026-01-01 00:00:00')", sid); err != nil {
+		t.Fatal(err)
+	}
+	gaps, err := db.ArchiveGaps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, len(gaps), 0)
+
+	// The same row, once it is an SxxE00 special, no longer covers the season.
+	if _, err := db.db.Exec("UPDATE episodes SET title='Example - S01E00 - Speciale' WHERE series_id=?1 AND season=1 AND episode=0", sid); err != nil {
+		t.Fatal(err)
+	}
+	gaps, err = db.ArchiveGaps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, len(gaps), 3)
+}
+
+// TestForcedGapSurfacesAnEpisodeCoveredByAPack: an explicit re-download request
+// must surface the episode even when a season pack covers the season, and clear
+// itself once the episode is present again.
+func TestForcedGapSurfacesAnEpisodeCoveredByAPack(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Example')"); err != nil {
+		t.Fatal(err)
+	}
+	var sid int64
+	if err := db.db.QueryRow("SELECT id FROM series WHERE name='Example'").Scan(&sid); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveSeriesMetadata("Example", [][2]int64{{1, 3}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,downloaded_at) VALUES (?1,1,0,'Example.S01.COMPLETE.1080p','2026-01-01 00:00:00')", sid); err != nil {
+		t.Fatal(err)
+	}
+	gaps, err := db.ArchiveGaps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, len(gaps), 0)
+
+	if err := db.AddForcedGap("Example", 1, 2); err != nil {
+		t.Fatal(err)
+	}
+	gaps, err = db.ArchiveGaps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, gaps, []SeriesGap{{Series: "Example", Season: 1, Episode: 2}})
+
+	// The episode comes back: the request clears itself.
+	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,downloaded_at) VALUES (?1,1,2,'Example - S01E02','2026-01-02 00:00:00')", sid); err != nil {
+		t.Fatal(err)
+	}
+	gaps, err = db.ArchiveGaps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, len(gaps), 0)
+}
+
 func TestMigratesLegacyTorrentMetadataBeforeCreatingStatusIndex(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "legacy.db")
 	legacy, err := sql.Open("sqlite", path)

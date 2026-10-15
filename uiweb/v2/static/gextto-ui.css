@@ -657,7 +657,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 18px; margin-bottom: 10px; }
 @media (max-width: 700px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) { .stat-grid { grid-template-columns: 1fr; } }
-.torrent-modal .form-grid { margin-top: 10px; }
+.torrent-drawer .form-grid { margin-top: 10px; }
 
 /* Theme picker: a grid of preview cards (native radios, so arrow keys move
    between themes), the saved themes and the four-colour editor. */
@@ -689,10 +689,10 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 @media (max-width: 760px) { .theme-editor .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* Torrent details: two wide columns instead of three narrow ones, so long
    values (paths, hashes, trackers) are not cut short. */
-.torrent-modal .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 28px; }
-.torrent-modal .stat-grid > .row > span { flex: 0 0 auto; white-space: nowrap; color: var(--muted); }
-.torrent-modal .stat-grid > .row > strong { min-width: 0; text-align: right; }
-@media (max-width: 700px) { .torrent-modal .stat-grid { grid-template-columns: 1fr; } }
+.torrent-drawer .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 28px; }
+.torrent-drawer .stat-grid > .row > span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; color: var(--muted); }
+.torrent-drawer .stat-grid > .row > strong { flex: 0 1 auto; min-width: 0; text-align: right; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .torrent-drawer .stat-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* tables */
 .table-wrap { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-sm); }

@@ -127,6 +127,52 @@ func webGet(t *testing.T, server *httptest.Server, path string) (int, http.Heade
 	return response.StatusCode, response.Header, body
 }
 
+// TestRedownloadEpisodeMovesTheFileAndForcesTheGap is the specific test of the
+// "Riscarica" action: it must move the archived file to the trash, delete the
+// episode row and record a forced gap so the episode is fetched again even when
+// a season pack covers the season.
+func TestRedownloadEpisodeMovesTheFileAndForcesTheGap(t *testing.T) {
+	state := newTestAppState(t)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "Example - S01E01 - Pilot.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO series(name) VALUES ('Example')"); err != nil {
+		t.Fatal(err)
+	}
+	var sid int64
+	if err := state.db.db.QueryRow("SELECT id FROM series WHERE name='Example'").Scan(&sid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,downloaded_at,archive_path) VALUES (?1,1,1,'Example - S01E01','2026-01-01 00:00:00',?2)", sid, file); err != nil {
+		t.Fatal(err)
+	}
+
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodPost, "/api/episodes/Example/1/1/redownload", nil)
+	if code != http.StatusOK {
+		t.Fatalf("redownload -> %d: %s", code, body)
+	}
+	if _, err := os.Stat(file); !os.IsNotExist(err) {
+		t.Fatalf("the archived file must leave the library, stat err = %v", err)
+	}
+	var count int
+	if err := state.db.db.QueryRow("SELECT COUNT(*) FROM episodes WHERE series_id=?1 AND season=1 AND episode=1", sid).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("episode row not cleared: %d", count)
+	}
+	if err := state.db.db.QueryRow("SELECT COUNT(*) FROM forced_gaps WHERE lower(series_name)='example' AND season=1 AND episode=1").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("forced gap not recorded: %d", count)
+	}
+}
+
 func TestBrowserHandlerDownloadsUseGexttoEndpoints(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

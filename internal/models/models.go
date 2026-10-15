@@ -553,6 +553,21 @@ type TorrentView struct {
 	UploadMode        bool     `json:"upload_mode"`
 	ShareMode         bool     `json:"share_mode"`
 	DistributedCopies float64  `json:"distributed_copies"`
+	// Engine statistics the detail view surfaces. gx-torrent reports all of
+	// them; qBittorrent carries ETA and the added/completed dates in its list.
+	// EtaSeconds < 0 means "unknown" (seeding or stopped).
+	EtaSeconds      int64 `json:"eta_seconds"`
+	Private         bool  `json:"private"`
+	FileCount       int   `json:"file_count"`
+	PiecesTotal     int   `json:"pieces_total"`
+	PiecesHave      int   `json:"pieces_have"`
+	PiecesAvailable int   `json:"pieces_available"`
+	PieceLength     int64 `json:"piece_length"`
+	Wasted          int64 `json:"wasted"`
+	Allocated       int64 `json:"allocated"`
+	// AddedAt and CompletedAt are Unix seconds.
+	AddedAt     int64 `json:"added_at"`
+	CompletedAt int64 `json:"completed_at"`
 	// Diagnosis is a short machine code explaining the torrent's situation
 	// (downloading, metadata, dead_swarm, no_connected_seed, stalled, no_peers,
 	// seeding, error). See GET /api/torrents/{hash}/why for the human reason.

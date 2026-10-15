@@ -450,9 +450,21 @@ func (e *qbittorrentEngine) toView(t qbittorrent.Torrent) models.TorrentView {
 		SuperSeeding:   t.SuperSeeding,
 		Error:          errMessage,
 		Stalled:        state == "stalled",
+		EtaSeconds:     qbEtaSeconds(t.ETASeconds),
+		AddedAt:        t.AddedOn,
+		CompletedAt:    t.CompletedOn,
 	}
 	view.Diagnosis, _, _ = DiagnoseTorrent(&view)
 	return view
+}
+
+// qbEtaSeconds maps qBittorrent's ETA, which reports 8640000 (100 days) when it
+// is unknown, to the -1 the UI treats as "no estimate".
+func qbEtaSeconds(value int64) int64 {
+	if value <= 0 || value >= 8640000 {
+		return -1
+	}
+	return value
 }
 
 // ---------------------------------------------------------------------------

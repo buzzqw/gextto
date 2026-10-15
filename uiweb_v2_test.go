@@ -1001,12 +1001,77 @@ func TestV2TorrentDetailExposesEditableTabs(t *testing.T) {
 
 	code, body := v2Request(t, server, http.MethodGet, "/downloads/detail?hash=deadbeef&tab=limits", nil)
 	if code != http.StatusOK {
-		t.Fatalf("detail modal -> %d", code)
+		t.Fatalf("detail drawer -> %d", code)
 	}
-	for _, marker := range []string{"torrent-modal", "data-v2-detail-tab=\"limits\"", "aria-selected=\"true\"", "Limiti", "Storage", "/downloads/detail/panel"} {
+	for _, marker := range []string{"torrent-drawer-body", "data-v2-detail-tab=\"limits\"", "aria-selected=\"true\"", "Limiti", "Storage", "/downloads/detail/panel"} {
 		if !strings.Contains(body, marker) {
-			t.Fatalf("detail modal missing %q", marker)
+			t.Fatalf("detail drawer missing %q", marker)
 		}
+	}
+}
+
+// fakeDetailEngine is a minimal engine used to exercise the detail view-model
+// with a torrent that carries the engine statistics.
+type fakeDetailEngine struct {
+	nullEngine
+	torrent models.TorrentView
+}
+
+func (f fakeDetailEngine) Name() string               { return BackendGxTorrent }
+func (f fakeDetailEngine) List() []models.TorrentView { return []models.TorrentView{f.torrent} }
+
+// TestV2TorrentDetailGeneralShowsEngineStats: the general tab surfaces the
+// transfer/piece statistics gx-core reports, not only the orchestration fields.
+func TestV2TorrentDetailGeneralShowsEngineStats(t *testing.T) {
+	state := newTestAppState(t)
+	state.setActiveEngine(fakeDetailEngine{torrent: models.TorrentView{
+		Hash: "abc123", Name: "Example.mkv", State: "downloading", Progress: 40,
+		EtaSeconds: 90, Private: true, FileCount: 3,
+		PiecesTotal: 100, PiecesHave: 40, PiecesAvailable: 80, PieceLength: 1 << 20,
+		Wasted: 2 << 20, Allocated: 100 << 20, AddedAt: 1700000000,
+	}})
+	view := v2DetailViewFrom(state, "abc123", "general")
+	rows := map[string]string{}
+	for _, kv := range view.General {
+		rows[kv.Label] = kv.Value
+	}
+	for _, label := range []string{
+		"Tempo rimanente", "Privato", "Numero file", "Pezzi disponibili",
+		"Pezzi completati", "Dimensione pezzo", "Sprecato", "Allocato su disco", "Aggiunto",
+	} {
+		if _, ok := rows[label]; !ok {
+			t.Errorf("general tab is missing the %q row", label)
+		}
+	}
+	if rows["Privato"] != "sì" {
+		t.Errorf("Privato = %q, want sì", rows["Privato"])
+	}
+	if !strings.Contains(rows["Pezzi disponibili"], "80 / 100") {
+		t.Errorf("Pezzi disponibili = %q, want 80 / 100", rows["Pezzi disponibili"])
+	}
+	if rows["Numero file"] != "3" {
+		t.Errorf("Numero file = %q, want 3", rows["Numero file"])
+	}
+	// A completed torrent that reports nothing else still exposes no invented
+	// date: the row is only added when the engine reports one.
+	if _, ok := rows["Completato"]; ok {
+		t.Errorf("Completato must be hidden when CompletedAt is 0, got %q", rows["Completato"])
+	}
+}
+
+// TestV2ShellHasDetailDrawer: the torrent detail renders in a bottom drawer
+// container (like gx-core), not in the centered #v2-modal.
+func TestV2ShellHasDetailDrawer(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/", nil)
+	if code != http.StatusOK {
+		t.Fatalf("dashboard -> %d", code)
+	}
+	if !strings.Contains(body, `id="v2-detail-drawer"`) || !strings.Contains(body, `class="torrent-drawer"`) {
+		t.Fatalf("shell is missing the torrent detail drawer container")
 	}
 }
 

@@ -145,6 +145,7 @@
       {{else if eq .Body "v2_movie_detail"}}{{template "v2_movie_detail" .Content}}
       {{else}}{{template "v2_unavailable" .Content}}{{end}}
     </div>
+    <div id="v2-detail-drawer" class="torrent-drawer" role="dialog" aria-modal="false" aria-labelledby="v2-detail-title" hidden></div>
   </main>
 </div>
 {{with .UpdateNotes}}<div class="overlay" style="display:flex" id="v2-update-notes">
@@ -481,7 +482,7 @@
                   {{else}}<button class="btn sm icon-action" type="submit" name="row_action" value="pause:{{.Hash}}" title="Pausa" aria-label="Pausa"><span aria-hidden="true">⏸</span></button>{{end}}
                   <button class="btn sm icon-action" type="submit" name="row_action" value="recheck:{{.Hash}}" title="Verifica dati" aria-label="Verifica dati"><span aria-hidden="true">⟳</span></button>
                   <button class="btn sm icon-action" type="submit" name="row_action" value="reannounce:{{.Hash}}" title="Riannuncia ai tracker" aria-label="Riannuncia"><span aria-hidden="true">↻</span></button>
-                  <button class="btn sm icon-action" type="button" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-modal" hx-swap="innerHTML" title="Dettagli" aria-label="Dettagli"><span aria-hidden="true">ⓘ</span></button>
+                  <button class="btn sm icon-action" type="button" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-detail-drawer" hx-swap="innerHTML" title="Dettagli" aria-label="Dettagli"><span aria-hidden="true">ⓘ</span></button>
                   <button class="btn sm icon-action danger" type="button" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Rimuovi" aria-label="Rimuovi"><span aria-hidden="true">🗑️</span></button>
                 </div>
               </div>
@@ -520,17 +521,15 @@
 {{end}}
 
 {{define "v2_detail_modal"}}
-<div class="overlay" style="display:block">
-  <div class="modal torrent-modal" role="dialog" aria-modal="true" aria-labelledby="v2-detail-title">
-    <div class="modal-head"><h3 id="v2-detail-title">{{.Name}}</h3>
-      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi i dettagli del torrent">Chiudi</button></div>
-    <div class="modal-body">
-      <div class="toolbar" role="tablist" aria-label="Sezioni dettagli torrent">
-        {{range .Tabs}}<button class="btn sm{{if .Active}} primary{{end}}" type="button" role="tab" aria-selected="{{if .Active}}true{{else}}false{{end}}" data-v2-detail-tab="{{.ID}}" hx-get="/downloads/detail/panel?hash={{$.Hash}}&tab={{.ID}}" hx-target="#v2-detail-panel" hx-swap="innerHTML" title="Mostra la sezione {{.Label}} del dettaglio torrent">{{.Label}}</button>{{end}}
-      </div>
-      <div id="v2-detail-panel" role="tabpanel">{{template "v2_detail_panel" .}}</div>
-    </div>
+<div class="torrent-drawer-head">
+  <h3 id="v2-detail-title">{{.Name}}</h3>
+  <button class="btn sm" type="button" data-v2-detail-close title="Chiudi i dettagli del torrent">Chiudi</button>
+</div>
+<div class="torrent-drawer-body">
+  <div class="toolbar" role="tablist" aria-label="Sezioni dettagli torrent">
+    {{range .Tabs}}<button class="btn sm{{if .Active}} primary{{end}}" type="button" role="tab" aria-selected="{{if .Active}}true{{else}}false{{end}}" data-v2-detail-tab="{{.ID}}" hx-get="/downloads/detail/panel?hash={{$.Hash}}&tab={{.ID}}" hx-target="#v2-detail-panel" hx-swap="innerHTML" title="Mostra la sezione {{.Label}} del dettaglio torrent">{{.Label}}</button>{{end}}
   </div>
+  <div id="v2-detail-panel" role="tabpanel">{{template "v2_detail_panel" .}}</div>
 </div>
 {{end}}
 
@@ -2284,7 +2283,7 @@
                 <button class="btn sm icon-action" type="button" hx-post="/series/episode-search?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Cerca manualmente questa puntata" aria-label="Cerca S{{.Season}}E{{.Episode}}"><span aria-hidden="true">🔍</span></button>
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .ForcePath "Method" "POST" "Body" "{}" "Label" "⚡" "Class" "icon-action" "Title" "Forza il download")}}
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .IgnorePath "Method" "POST" "Body" .IgnoreBody "Label" (ternary .Ignored "✓" "🚫") "Class" "icon-action" "Title" "Ignora o riabilita")}}
-                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .Redownload "Method" "POST" "Body" "{}" "Label" "↻" "Class" "icon-action" "Title" "Rendi di nuovo scaricabile")}}
+                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .Redownload "Method" "POST" "Body" "{}" "Label" "↻" "Class" "icon-action" "Title" "Riscarica: sposta il file nel cestino, azzera la puntata e la riscarica" "Confirm" "Spostare il file nel cestino e riscaricare questa puntata?")}}
                 <button class="btn sm icon-action" type="button" hx-get="/series/sources?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Sorgenti in archivio locale (nessuna ricerca online)" aria-label="Sorgenti in archivio S{{.Season}}E{{.Episode}}"><span aria-hidden="true">ⓘ</span></button>
                 <button class="btn sm icon-action" type="button" hx-get="/series/history?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia dei download di questa puntata: ricerca, download, spostamenti, errori" aria-label="Storia dei download della puntata">📜</button>
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .DeletePath "Method" "DELETE" "Body" "{}" "Label" "🗑️" "Class" "icon-action danger" "Title" "Elimina dall'archivio" "Confirm" "Eliminare questa puntata dall'archivio?")}}

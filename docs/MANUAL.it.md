@@ -1221,6 +1221,7 @@ dopo 30 secondi.
 | Riempire episodi mancanti | Cerca mancanti / ciclo Serie |
 | Scegliere una release specifica | **Perché non questa?** → Accoda |
 | Far riconoscere file già presenti | Scansiona archivio |
+| Riscaricare una puntata già archiviata | ↻ Riscarica (sposta il file nel cestino e la rimette in coda) |
 | Cambiare il nome senza riscaricare | Anteprima rinomina |
 | Correggere un servizio esterno | Salute → sorgente → Verifica |
 | Eliminare file inferiori | Anteprima duplicati → Pulizia |
@@ -1231,6 +1232,10 @@ dopo 30 secondi.
 - **Release**: risultato trovato da feed, indexer o motore web.
 - **Ciclo**: una passata automatica di ricerca e selezione.
 - **Gap**: episodio mancante riconosciuto nell'archivio.
+- **Gap forzato**: richiesta esplicita di riscaricare una puntata (azione ↻
+  Riscarica). Scavalca la copertura di un pack di stagione e la regola
+  «episodio successivo già archiviato», così la puntata può essere ripresa
+  anche quando normalmente non sarebbe considerata mancante.
 - **Placeholder**: riga temporanea che rappresenta un download non ancora
   completato.
 - **Upgrade**: sostituzione di un file archiviato con una release migliore.
@@ -1251,6 +1256,12 @@ dopo 30 secondi.
   percorso `/api/v2.0/indexers/all/results/torznab/api`.
 - **Non scarica nulla** — verifica la *modalità attiva*, che serie/film siano
   abilitati, e controlla filtri qualità/lingua e il limite di spazio libero.
+- **Una puntata archiviata non si riscarica** — usa **↻ Riscarica** nel
+  dettaglio serie: sposta il file nel cestino, cancella la riga dell'episodio e
+  registra un *gap forzato*. È necessario quando la stagione è coperta da un
+  pack o quando un episodio successivo è già archiviato; senza il gap forzato
+  la puntata non risulta mancante. Uno speciale `SxxE00`, invece, è un singolo
+  file e **non** copre la stagione.
 - **Un torrent è stalled** — controlla i valori in *Configurazione →
   Seed e completamento → Torrent bloccati*. Il torrent è intenzionalmente pausato e fuori dalla coda attiva;
   attendi il retry oppure usa **Riprendi/Riavvia** manualmente.

@@ -107,6 +107,14 @@ a watched folder or from the phone — and a season with a season pack in progre
 not missing, neither in the cycle nor in the series tab; a download in error makes
 them missing again.
 
+**Re-downloading an episode.** The ↻ *Re-download* action in the series detail moves
+the archived file to the trash, deletes the episode row and records a **forced gap**
+(`forced_gaps`). A forced gap bypasses the cover of a season pack and the "a later
+episode is already archived" rule, and clears itself as soon as the episode is present
+again, so it is the one path that re-fetches an episode already in the library. An
+`SxxE00` special shares `episode=0` with season packs in the schema, but it is a single
+file and does **not** cover the season (a real `S01`/`S02` pack still does).
+
 **Comics** (`comicinfo.go`): in CBZ files downloaded directly over HTTP or Mega,
 `ComicInfo.xml` is added with series, number and year from the GetComics title.
 Files that already have it, CBR files and comics arriving by torrent (being seeded)

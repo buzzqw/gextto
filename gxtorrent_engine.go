@@ -497,10 +497,21 @@ type gxTorrentItem struct {
 	Pinned           bool   `json:"pinned"`
 	Error            string `json:"error"`
 	CompletedAt      int64  `json:"completed_at"`
+	AddedAt          int64  `json:"added_at"`
 	CurrentTracker   string `json:"current_tracker"`
 	TorrentVersion   string `json:"torrent_version"`
 	// SuperSeeding is BEP 16 super-seeding, a seeding strategy.
 	SuperSeeding bool `json:"super_seeding"`
+	// Engine statistics shown in the detail general tab.
+	ETASeconds      int64 `json:"eta_seconds"`
+	Private         bool  `json:"private"`
+	FileCount       int   `json:"file_count"`
+	PiecesTotal     int   `json:"pieces_total"`
+	PiecesHave      int   `json:"pieces_have"`
+	PiecesAvailable int   `json:"pieces_available"`
+	PieceLength     int64 `json:"piece_length"`
+	Wasted          int64 `json:"wasted"`
+	Allocated       int64 `json:"allocated"`
 	// BEP 38 hints.
 	Collections []string `json:"collections,omitempty"`
 	Similar     []string `json:"similar,omitempty"`
@@ -545,6 +556,17 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 		SuperSeeding:      item.SuperSeeding,
 		Collections:       item.Collections,
 		Similar:           item.Similar,
+		EtaSeconds:        item.ETASeconds,
+		Private:           item.Private,
+		FileCount:         item.FileCount,
+		PiecesTotal:       item.PiecesTotal,
+		PiecesHave:        item.PiecesHave,
+		PiecesAvailable:   item.PiecesAvailable,
+		PieceLength:       item.PieceLength,
+		Wasted:            item.Wasted,
+		Allocated:         item.Allocated,
+		AddedAt:           item.AddedAt,
+		CompletedAt:       item.CompletedAt,
 	}
 	if item.CompletedAt > 0 {
 		view.FinishedSeconds = int64(now.Sub(time.Unix(item.CompletedAt, 0)).Seconds())
