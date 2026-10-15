@@ -290,7 +290,10 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
 - **Da controllare** — sotto la striscia: i download **fermi** (con il motivo,
   il prossimo tentativo e quando verranno abbandonati), gli **spostamenti in
   libreria in sospeso** (destinazione e tentativi) e gli avvisi, gli errori e i
-  recuperi di pack 🛟 delle **ultime 24 ore**, uno per download. *Storia* apre
+  recuperi di pack 🛟 delle **ultime 24 ore**, uno per download. Un download il
+  cui ciclo si è chiuso bene (il file è finito in libreria) **non compare**: un
+  avviso attorno a un ciclo riuscito è rumore, non qualcosa da controllare.
+  *Storia* apre
   la storia completa di quel download. Si aggiorna da solo ogni minuto; se è
   tutto a posto dice «Niente da controllare».
 - **Card statistiche** — libreria (serie/film), spazio libero, magnet in

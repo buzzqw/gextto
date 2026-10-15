@@ -290,7 +290,9 @@ release package the installer uses (README, *Install on Linux*).
 - **To check** — below the strip: **stuck** downloads (with the reason, the
   next attempt and when they will be abandoned), **pending moves to the
   library** (destination and attempts) and the warnings, errors and 🛟 pack
-  salvages of the **last 24 hours**, one per download. *History* opens the full
+  salvages of the **last 24 hours**, one per download. A download whose cycle
+  ended well (its file made it into the library) is **not listed**: a warning
+  around a successful cycle is noise, not something to check. *History* opens the full
   story of that download. It refreshes every minute; when all is well it says
   "Nothing to check".
 - **Stat cards** — library (series/movies), free space, archive magnets

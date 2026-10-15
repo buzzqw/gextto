@@ -203,7 +203,10 @@ func (d *Database) AcquisitionEventsByAcqID(acq string) ([]AcquisitionEvent, err
 
 // AcquisitionProblemsSince returns, for every download with a warning, an
 // error or a salvage (🛟) since the given time, its most recent such event,
-// newest first, at most limit rows. Repeat holds how many there were.
+// newest first, at most limit rows. Repeat holds how many there were. A
+// download whose cycle ended well — its file was added to the library, or it
+// superseded an existing copy (♻️) — is left out: that cycle completed
+// correctly, so a warning around it is noise, not something to check.
 func (d *Database) AcquisitionProblemsSince(since time.Time, limit int) ([]AcquisitionEvent, error) {
 	if limit <= 0 {
 		limit = 20
@@ -213,6 +216,10 @@ func (d *Database) AcquisitionProblemsSince(since time.Time, limit int) ([]Acqui
 			SELECT hash, MAX(id) AS last_id, SUM(repeat) AS total FROM acquisition_events
 			WHERE at >= ?1 AND (level IN ('WARN','ERROR') OR message LIKE '🛟%')
 			GROUP BY hash) p ON e.id = p.last_id
+		WHERE NOT EXISTS (
+			SELECT 1 FROM acquisition_events s
+			WHERE s.hash = e.hash AND s.at >= ?1
+			  AND ((s.message LIKE '%added to the library%' AND s.message NOT LIKE '🛟%') OR s.message LIKE '♻️%'))
 		ORDER BY e.id DESC LIMIT ?2`, since.Format(acquisitionTimeLayout), limit)
 }
 
