@@ -483,9 +483,10 @@ func TestProposedArchivePath(t *testing.T) {
 	}
 }
 
-// TestV2AddTorrentIsOpenedFromTheTopBar: the add-torrent form lives behind a
-// top-bar toggle (only on Scarico) and the block is identified so the script
-// can open it; the panel starts closed so the block costs no vertical space.
+// TestV2AddTorrentIsOpenedFromTheTopBar: the add-torrent button is in the
+// chrome on every page, but only Scarico carries the form it opens (with the
+// aria-controls wiring); elsewhere the button navigates there. The panel starts
+// closed so the block costs no vertical space.
 func TestV2AddTorrentIsOpenedFromTheTopBar(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
@@ -504,13 +505,17 @@ func TestV2AddTorrentIsOpenedFromTheTopBar(t *testing.T) {
 			t.Fatalf("downloads page missing %q", marker)
 		}
 	}
-	// The toggle belongs to Scarico, not to every page.
+	// The toggle is in the chrome on every page; the panel it controls and its
+	// ARIA wiring only exist on Scarico.
 	code, body = v2Request(t, server, http.MethodGet, "/?view=logs", nil)
 	if code != http.StatusOK {
 		t.Fatalf("logs -> %d", code)
 	}
-	if strings.Contains(body, "data-add-torrent-toggle") {
-		t.Fatalf("the add-torrent toggle must only appear on Scarico")
+	if !strings.Contains(body, "data-add-torrent-toggle") {
+		t.Fatalf("the add-torrent toggle must appear on every page")
+	}
+	if strings.Contains(body, `id="v2-add-torrent"`) || strings.Contains(body, `aria-controls="v2-add-torrent"`) {
+		t.Fatalf("only Scarico carries the add-torrent panel and its aria-controls")
 	}
 }
 

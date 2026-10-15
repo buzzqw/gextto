@@ -327,10 +327,11 @@ inferior to the archived file.
 
 ## 3. Downloads
 
-- The **Add torrent** form opens from the button of the same name in the top bar
-  (on Downloads): while closed it takes no room. It accepts a magnet/.torrent URL
-  or a `.torrent` file; optionally set a save path, “Download now” and “Do not
-  rename”.
+- The **Add torrent** form opens from the button of the same name in the top bar,
+  present on **every page** (from another page it takes you to Downloads and
+  opens the form): while closed it takes no room. It accepts a magnet/.torrent
+  URL or a `.torrent` file; optionally set a save path, “Download now” and “Do
+  not rename”.
 - **Downloads in session**: download/upload rate, torrent and peer counts; the
   list refreshes automatically every 5 seconds.
 - Comic HTTP downloads show status, progress, downloaded bytes and speed in the

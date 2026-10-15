@@ -81,6 +81,17 @@ test("scarico espone aggiunta torrent e registrazione magnet", async ({ page }) 
   await expect(page.locator("label.check").filter({ hasText: "Scarica subito" })).toBeVisible();
 });
 
+test("il pulsante Aggiungi torrent è in ogni pagina e apre il modulo su Scarico", async ({ page }) => {
+  await page.goto("/");
+  // The button is part of the chrome, not only of Scarico.
+  const toggle = page.locator("[data-add-torrent-toggle]");
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(page).toHaveURL(/view=downloads/);
+  await expect(page.locator("details.add-torrent-panel")).toBeVisible();
+  await expect(page.locator('input[name="magnet"]')).toBeFocused();
+});
+
 test("la selezione torrent aggiorna il riepilogo delle azioni", async ({ page }) => {
   await page.route("**/downloads/table", async (route) => {
     await route.fulfill({

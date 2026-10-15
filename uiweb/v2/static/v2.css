@@ -1118,13 +1118,15 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
 
 /* From tablet up the add-torrent form is opened from the top bar, so while it
    is closed the whole block disappears and the session starts right under the
-   chrome. On a phone the summary row stays as the affordance, so the top-bar
-   toggle is hidden there. */
+   chrome. On a phone the summary row stays as an extra affordance. */
 @media (min-width: 561px) {
   details.add-torrent-panel:not([open]) { display: none; }
 }
+/* On a phone the toggle keeps only its "＋" (the accessible name stays on the
+   button), so it fits beside Tema and Aggiorna at 320 px. */
 @media (max-width: 560px) {
-  .add-torrent-toggle { display: none; }
+  .add-torrent-toggle-label { display: none; }
+  .add-torrent-toggle { padding: 0 12px; }
 }
 
 /* Status strip: what is happening, each item opens the page that explains it. */

@@ -1621,22 +1621,37 @@
     }
   }
 
-  // Scarico: the add-torrent block is opened from the top bar, so the closed
-  // form costs no vertical space. The details summary keeps working on a phone,
-  // where the top-bar toggle is hidden.
+  // The top-bar "Aggiungi torrent" button is on every page. On Scarico it
+  // toggles the form; elsewhere it goes to Scarico with the form already open
+  // (the anchor, since the ?add= parameter already carries a shared link).
+  function focusAddTorrent(panel) {
+    var field = panel.querySelector('input[name="magnet"]');
+    try { panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (error) { /* ignore */ }
+    if (field) { try { field.focus(); } catch (error) { /* ignore */ } }
+  }
   document.addEventListener("click", function (event) {
     var toggle = event.target.closest && event.target.closest("[data-add-torrent-toggle]");
     if (!toggle) return;
     var panel = document.getElementById("v2-add-torrent");
-    if (!panel) return;
+    if (!panel) {
+      window.location.assign("/?view=downloads#v2-add-torrent");
+      return;
+    }
     var open = !panel.hasAttribute("open");
     if (open) panel.setAttribute("open", ""); else panel.removeAttribute("open");
     toggle.setAttribute("aria-expanded", open ? "true" : "false");
-    if (!open) return;
-    var field = panel.querySelector('input[name="magnet"]');
-    try { panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (error) { /* ignore */ }
-    if (field) { try { field.focus(); } catch (error) { /* ignore */ } }
+    if (open) focusAddTorrent(panel);
   });
+
+  // Arriving from the top bar on another page: open the form and drop the
+  // anchor so a reload does not keep opening it.
+  function openAddFormFromAnchor() {
+    var panel = document.getElementById("v2-add-torrent");
+    if (!panel || window.location.hash !== "#v2-add-torrent") return;
+    panel.setAttribute("open", "");
+    focusAddTorrent(panel);
+    try { window.history.replaceState(null, "", window.location.pathname + window.location.search); } catch (error) { /* ignore */ }
+  }
 
   // Keep the top-bar toggle's aria-expanded honest when the panel is opened or
   // closed elsewhere (its own summary, a shared link): toggle does not bubble.
@@ -1731,5 +1746,5 @@
   });
   document.addEventListener("DOMContentLoaded", syncSetupToggles);
 
-  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); initPullToRefresh(); initLiveMetrics(); });
+  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); openAddFormFromAnchor(); initPullToRefresh(); initLiveMetrics(); });
 })();
