@@ -911,13 +911,30 @@ func feedCoveringRules(rules []rss.Rule, feedName string) []string {
 
 // uiFeedGovernanceHTML says, on the feed row, what decides what the feed
 // downloads: the rules that watch it, its own filter, everything, or nothing
-// (archive only), and whether the wanted titles also take from it.
+// (archive only), and whether the wanted titles also take from it. Watching
+// rules are buttons: one click opens the rule editor for that rule.
 func uiFeedGovernanceHTML(rules []rss.Rule, feed feedConfig, key string, covering []string, wantedOn bool) string {
 	var b strings.Builder
 	b.WriteString(`<div class="item-sub governs"><svg class="i"><use href="/assets/icons.svg#i-filter"/></svg>`)
 	switch {
 	case len(covering) > 0:
-		b.WriteString(`<span>Downloads what these rules take:</span> <b>` + html.EscapeString(strings.Join(covering, ", ")) + `</b>`)
+		b.WriteString(`<span>Downloads what these rules take:</span> `)
+		indexByName := map[string]int{}
+		for index, rule := range rules {
+			if _, ok := indexByName[orDefault(rule.Name, "—")]; !ok {
+				indexByName[orDefault(rule.Name, "—")] = index
+			}
+		}
+		for i, name := range covering {
+			if i > 0 {
+				b.WriteString(`<span>, </span>`)
+			}
+			if index, ok := indexByName[name]; ok {
+				b.WriteString(`<button type="button" class="linklike" data-open-rule="` + strconv.Itoa(index) + `" title="Open this rule to change it"><b>` + html.EscapeString(name) + `</b></button>`)
+			} else {
+				b.WriteString(`<b>` + html.EscapeString(name) + `</b>`)
+			}
+		}
 	case feed.All:
 		b.WriteString(`<span>Downloads every item (Take everything)</span>`)
 	case feedTakesEverything(rules, feed, key):

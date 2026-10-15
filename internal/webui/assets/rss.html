@@ -25,6 +25,9 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 #feed-fallback.unused .fgrid,#feed-fallback.unused .checks{border-left:3px solid var(--warn);padding-left:10px}
 .item-sub.governs{color:var(--muted)}
 .item-sub.governs b{color:var(--text);font-weight:600}
+.linklike{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit}
+.linklike:hover{text-decoration:underline}
+.linklike b{color:inherit}
 </style>
 </head>
 <body>
@@ -115,11 +118,12 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
   <div class="panel" style="margin-top:20px;padding:14px">
     <h3>Copy the setup</h3>
     <p class="muted" style="margin:0 0 10px;font-size:13px">Export saves the feeds, rules and indexers in one file, as a backup or to bring them to another gx-torrent. Import loads such a file and replaces the feeds, rules and indexers it contains.</p>
-    <form method="post" action="/ui/rss-config" enctype="multipart/form-data" class="actions" style="margin:0;align-items:flex-end">
+    <form method="post" action="/ui/rss-config" enctype="multipart/form-data" class="actions" style="margin:0;align-items:flex-end" id="rss-import-form">
       <a class="btn sm" href="/ui/rss-export" download title="Download the feeds, rules and indexers as a file">Export</a>
-      <label class="field" style="margin:0">Setup file<input type="file" name="setup" accept="application/json,.json" required title="A file exported from a gx-torrent RSS page"></label>
+      <label class="field" style="margin:0">Setup file<input type="file" name="setup" id="rss-import-file" accept="application/json,.json" required title="A file exported from a gx-torrent RSS page"></label>
       <button type="submit" class="sm" title="Replace the feeds, rules and indexers with those in the file">Import</button>
     </form>
+    <p class="muted" id="rss-import-preview" style="margin:8px 0 0;font-size:13px" aria-live="polite"></p>
   </div>
 </section>
 
@@ -400,6 +404,11 @@ function editRule(rule,index){
   if(editing)previewRule();
 }
 $('#new-rule').addEventListener('click',function(){editRule({enabled:true});});
+$$('[data-open-rule]').forEach(function(btn){btn.addEventListener('click',function(){
+  showTab('rules');
+  var ed=document.querySelector('[data-rule-edit][data-index="'+btn.getAttribute('data-open-rule')+'"]');
+  if(ed)ed.click();
+});});
 $$('[data-rule-edit]').forEach(function(b){b.addEventListener('click',function(){var r={};try{r=JSON.parse(b.getAttribute('data-rule')||'{}');}catch(_){}editRule(r,b.getAttribute('data-index'));});});
 // The preview runs by itself while the rule is edited (debounced), and warns
 // about what surprises: a rule that takes several titles, or none at all.
@@ -426,6 +435,18 @@ function note(cls,text){var p=document.createElement('p');p.className=cls;p.styl
 $('#rule-preview').addEventListener('click',previewRule);
 ruleForm.addEventListener('input',function(){clearTimeout(previewTimer);previewTimer=setTimeout(previewRule,450);});
 ruleForm.addEventListener('change',function(){clearTimeout(previewTimer);previewTimer=setTimeout(previewRule,150);});
+// A "download once" rule turns itself off after the first hit: confirm it, so
+// a series rule with the flag ticked by mistake does not stop after one episode.
+ruleForm.addEventListener('submit',function(e){
+  var skip=ruleForm.elements.fail&&ruleForm.elements.fail.checked;
+  var once=ruleForm.elements.once&&ruleForm.elements.once.checked;
+  if(!skip&&once&&!window.confirm(t('This rule stops after its first download. Save it?')))e.preventDefault();
+});
+// "Take everything" downloads whatever the feed publishes: confirm it, so a
+// feed meant as archive-only does not fill the client.
+feedForm.addEventListener('submit',function(e){
+  if(feedForm.elements.all&&feedForm.elements.all.checked&&!window.confirm(t('This feed downloads EVERYTHING it publishes. Save it?')))e.preventDefault();
+});
 
 // ---------- indexers ----------
 var idxForm=$('#indexer-form'),autoName='';
@@ -455,6 +476,24 @@ $('#feed-test').addEventListener('click',function(){
     var preview=list.slice(0,3).map(function(it){return it.title;}).join(' · ');
     span.textContent='✓ '+list.length+' '+t('items')+(preview?' — '+preview:'');
   }).catch(function(e){span.className='err';span.textContent=t('test failed:')+' '+(e.message||'');});
+});
+
+// ---------- setup import preview ----------
+// Before replacing everything, show what the file holds (and refuse a file
+// that is not a setup at all); the server still validates on import.
+document.getElementById('rss-import-file').addEventListener('change',function(){
+  var out=document.getElementById('rss-import-preview'),f=this.files&&this.files[0];
+  out.textContent='';if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      var setup=JSON.parse(rd.result);
+      var feeds=(setup.feeds||[]).length,rules=(setup.rules||[]).length,indexers=(setup.indexers||[]).length;
+      out.textContent=t('This file holds:')+' '+feeds+' '+t('feeds')+', '+rules+' '+t('rules')+', '+indexers+' '+t('indexers')+'. '+t('Import replaces the current setup.');
+    }catch(e){out.textContent=t('The file is not a gx-torrent RSS setup.');}
+  };
+  rd.onerror=function(){out.textContent=t('The file is not a gx-torrent RSS setup.');};
+  rd.readAsText(f);
 });
 
 // ---------- options ----------

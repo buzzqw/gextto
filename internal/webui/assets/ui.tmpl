@@ -131,6 +131,10 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .sbmore .row:last-child{border-bottom:0}
 .sbmore .row span:first-child{color:var(--muted)}
 .sbmore .row b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;word-break:break-word}
+/* Undo bar: after a remove without deleting files, one click brings the
+   torrents back from their magnets until the countdown runs out. */
+.undobar{position:fixed;left:50%;transform:translateX(-50%);bottom:44px;z-index:70;display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);font-size:13px}
+.undobar[hidden]{display:none}
 /* Detail panel under the list, resizable from its top edge. */
 .drawer{flex:none;height:var(--drawer-h,clamp(220px,42vh,520px));border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;min-height:0;position:relative}
 .drawer[hidden]{display:none}
@@ -373,6 +377,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
   </main>
 </div>
 <div class="sbmore" id="sb-more" role="region" aria-labelledby="sb-more-title" hidden>{{template "sbmore" .}}</div>
+<div class="undobar" id="undo-bar" hidden><span id="undo-text" role="status"></span><button type="button" class="sm primary" id="undo-btn" title="Bring the removed torrents back (their files stayed on disk)">Undo</button></div>
 
 <div class="menu" id="row-menu" role="menu" aria-label="Torrent actions" hidden>
   <button type="button" role="menuitem" data-act="details" title="Details: files, peers, trackers"><svg class="i"><use href="#i-info"/></svg>Details<kbd>Enter</kbd></button>
@@ -880,6 +885,32 @@ function sampleGraph(){
   document.title='↓ '+(st.dataset.downS||'')+' ↑ '+(st.dataset.upS||'')+' · gx-torrent';
 }
 
+// ---------- undo remove ----------
+// After a remove that keeps the files, the magnets are fetched first so the
+// torrents can come back with one click until the countdown runs out.
+var undoState=null,undoTimer=null;
+function hideUndo(){undoState=null;if(undoTimer){clearInterval(undoTimer);undoTimer=null;}var b=$('#undo-bar');if(b)b.hidden=true;}
+function showUndo(items){
+  hideUndo();if(!items.length)return;
+  undoState={items:items,left:8};
+  var b=$('#undo-bar');if(!b)return;
+  $('#undo-text').textContent=items.length+' '+t('torrents removed')+' ('+undoState.left+'s)';b.hidden=false;
+  undoTimer=setInterval(function(){if(!undoState){return;}undoState.left--;if(undoState.left<=0){hideUndo();return;}$('#undo-text').textContent=undoState.items.length+' '+t('torrents removed')+' ('+undoState.left+'s)';},1000);
+}
+function snapshotForUndo(hashes){
+  return hashes.map(function(h){var r=rowByHash(h);return r?{hash:h,dest:r.dataset.kPath||'',cat:r.dataset.cat||'',tags:r.dataset.tags||''}:null;}).filter(Boolean);
+}
+function fetchMagnets(snap){
+  Promise.all(snap.map(function(s){return fetch('/ui/magnet?hash='+encodeURIComponent(s.hash),{cache:'no-store'}).then(function(r){return r.ok?r.text():null;}).then(function(m){s.magnet=(m||'').trim();return s;}).catch(function(){return s;});})).then(function(items){
+    showUndo(items.filter(function(s){return !!s.magnet;}));
+  });
+}
+function doUndo(){
+  var st=undoState;hideUndo();if(!st)return;
+  var jobs=st.items.map(function(s){var p=new URLSearchParams();p.set('source',s.magnet);if(s.dest)p.set('destination',s.dest);if(s.cat)p.set('category',s.cat);if(s.tags)p.set('tags',s.tags);p.set('paused','1');return post('/ui/add',p);});
+  Promise.all(jobs).then(function(res){var ok=0;res.forEach(function(r){if(r&&r.ok)ok++;});toast(ok+' '+t('torrent(s) added'),false);refresh();});
+}
+
 // ---------- actions ----------
 function bulk(op,hashes){
   hashes=hashes||selHashes();
@@ -1207,6 +1238,7 @@ document.addEventListener('click',function(e){
   var da=el.closest('#drawer [data-dact]');if(da&&state.drawer){var h=state.drawer.hash;if(da.dataset.dact==='magnet')copyMagnet(h);else if(da.dataset.dact==='dht'){toast(t('DHT swarm')+'…',false);fetch('/ui/dhtscrape?hash='+encodeURIComponent(h),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(d){toast(t('DHT swarm (seeders / peers):')+' ~'+d.seeders+' / ~'+d.peers,false);}).catch(function(){toast(t('DHT swarm')+': '+t('Copy failed'),true);});}else act(da.dataset.dact,[h]);return;}
   var res=el.closest('#searchresults [data-add]');if(res){var p=new URLSearchParams();p.set('source',res.dataset.add);res.disabled=true;post('/ui/add',p).then(function(x){report(x);refresh();});return;}
   if(el.closest('#btn-add')){openDialog($('#dlg-add'));return;}
+  if(el.closest('#undo-btn')){doUndo();return;}
   if(el.closest('#btn-search')){openDialog($('#dlg-search'));return;}
   if(el.closest('#btn-log')){showLog($('#btn-log').getAttribute('aria-pressed')!=='true');return;}
   if(el.closest('#log-reload')){loadLog();return;}
@@ -1249,7 +1281,7 @@ document.addEventListener('contextmenu',function(e){
 document.addEventListener('submit',function(e){
   var form=e.target;
   if(form.id==='form-add'){e.preventDefault();submitAdd(form);return;}
-  if(form.id==='form-remove'){e.preventDefault();var d=$('#dlg-remove'),hs=d._hashes||[];closeDialog(d);bulk($('#remove-files').checked?'remove-files':'remove',hs).then(function(){hs.forEach(function(h){state.selected.delete(h);});if(state.drawer&&hs.indexOf(state.drawer.hash)>=0)closeDetail();});return;}
+  if(form.id==='form-remove'){e.preventDefault();var d=$('#dlg-remove'),hs=d._hashes||[];var delFiles=$('#remove-files').checked;var snap=delFiles?null:snapshotForUndo(hs);closeDialog(d);bulk(delFiles?'remove-files':'remove',hs).then(function(){hs.forEach(function(h){state.selected.delete(h);});if(state.drawer&&hs.indexOf(state.drawer.hash)>=0)closeDetail();if(snap&&snap.length)fetchMagnets(snap);});return;}
   if(form.id==='form-cat'){e.preventDefault();var dc=$('#dlg-cat'),cat=$('input[name=category]',dc).value,tags=$('input[name=tags]',dc).value,tmm=$('input[name=auto_tmm]',dc).checked;closeDialog(dc);Promise.all((dc._hashes||[]).map(function(h){var p={hash:h,category:cat,tags:tags};if(tmm)p.auto_tmm='1';return post('/ui/category',p);})).then(function(r){report(r[r.length-1]);refresh();});return;}
   if(form.id==='form-search'){e.preventDefault();runSearch();return;}
   if(form.id==='form-location'||form.id==='form-limits'){

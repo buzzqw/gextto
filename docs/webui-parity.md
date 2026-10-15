@@ -75,7 +75,8 @@ Migliorie proposte (usabilità, non motore):
 
 - [x] Prima esecuzione guidata: con 0 feed la tab Feeds mostra 3 strade
       (`New feed` / `New rule` da preset / `Import a setup`) invece della sola
-      riga vuota.
+      riga vuota. Le regole che guardano un feed sono cliccabili (aprono
+      l'editor della regola).
 - [x] Template regole one-click: `TV series`, `Movie`, `Take all`. Compilano
       l'editor, la preview live mostra subito cosa prenderebbero.- [x] Editor feed: bottone `Test` (fetch via `/ui/feed-items?url=`, senza
       salvare, con titoli di esempio). I campi fallback restano editabili e
@@ -86,11 +87,10 @@ Migliorie proposte (usabilità, non motore):
       tradotte lato server).
 - [x] Cooldown visibile: `ignore_days` mostra chip `Next match <data>` sulla
       riga regola mentre il cooldown è attivo (`RuleLastMatch` persistito).
-- [ ] `Download once` e `Take everything`: conferma esplicita nel dialog
-      ("aggiungerà tutto ciò che il feed pubblica") + contatore `aggiunti da
-      questa regola` sulla riga.
-- [ ] Import setup: preview di validazione (N feed, M regole, K indexer,
-      conflitti di nome) prima di `Replace`.
+- [x] `Download once` e `Take everything`: conferma esplicita nel dialog
+      (la regola once si spegne al primo hit, il feed all scarica tutto).
+- [x] Import setup: preview di validazione (N feed, M regole, K indexer)
+      alla scelta del file, prima di `Import` (il server rivalida comunque).
 - [ ] Parità API RSS qBittorrent: `rss/items` con tree folder/feed,
       `refreshItem`, `markAsRead`, `matchingArticles` già mappati — verificare
       contro VueTorrent e fissare i gap in `qbit_compat_test.go`.
@@ -103,7 +103,8 @@ Migliorie proposte (usabilità, non motore):
 - [x] Settings con filtro di ricerca per sezione (JS, il form posta comunque
       tutti i campi).
 - [x] Dialog bulk: riepilogo `N torrent` + placeholder `mixed` nei limiti quando
-      la selezione ha valori diversi. Resta: undo di 5s per `remove`.
+      la selezione ha valori diversi; undo di 8s dopo `remove` senza cancellare
+      i file (riaggiunge dai magnet, in pausa).
 - [x] Settings con filtro di ricerca per sezione (il badge `modified` resta
       rinviato: richiederebbe i default nel client).
 - [x] Log stile qBittorrent: filtro livelli DEBUG/INFO/WARN/ERROR
