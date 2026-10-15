@@ -957,7 +957,20 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 		// here: moved into the library, renamed, quality-checked and deduplicated
 		// before being dropped from the session. A bare Remove would leave the
 		// file unchecked and under the wrong name.
-		if !gh6_archivedCopyFinalized(s.db, torrent.Name, torrent.Hash) {
+		source := CompletionPath(&models.TorrentEvent{
+			Kind:     "torrent_finished",
+			Hash:     torrent.Hash,
+			Name:     torrent.Name,
+			SavePath: torrent.SavePath,
+		})
+		// An archived torrent whose library copy was later replaced (a better
+		// release superseded it and sent it to the trash) has neither the
+		// archived file nor its source any more: there is nothing left to
+		// finalize, so it is only dropped from the session. Without this the
+		// finalization fails on the missing source at every cleanup.
+		_, sourceErr := os.Stat(source)
+		archivedAndGone := isArchived && sourceErr != nil
+		if !archivedAndGone && !gh6_archivedCopyFinalized(s.db, torrent.Name, torrent.Hash) {
 			logging.Debug("completed download still needs archiving; finalizing it before cleanup",
 				"hash", torrent.Hash, "name", torrent.Name)
 			if ok, err := ArchiveAndRemoveTorrent(s, cfg, torrent.Hash); err != nil {
@@ -981,12 +994,6 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 		// button looked like it did nothing. Files are reclaimed by the automatic
 		// removal and by an explicit "remove and delete the files".
 		deleteFiles := input.DeleteFiles
-		source := CompletionPath(&models.TorrentEvent{
-			Kind:     "torrent_finished",
-			Hash:     torrent.Hash,
-			Name:     torrent.Name,
-			SavePath: torrent.SavePath,
-		})
 		if deleteFiles && cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" && cfg.CleanupAction != "delete" {
 			if _, statErr := os.Stat(source); statErr == nil {
 				if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {

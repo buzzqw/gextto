@@ -475,3 +475,25 @@ func TestRemoveCompletedKeepsInfiniteSeeds(t *testing.T) {
 		}
 	}
 }
+
+// TestRemoveCompletedDropsSupersededArchive pins the reported bug: a torrent
+// archived into the library whose copy was later replaced by a better release
+// (sent to the trash) has neither the archived file nor its source. "Pulisci
+// completati" tried to finalize it again, failed on the missing source and
+// kept it forever; it must be dropped from the session instead.
+func TestRemoveCompletedDropsSupersededArchive(t *testing.T) {
+	db, cfg, view, source, processed := seedTestSetup(t)
+	if err := os.Remove(source); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(processed); err != nil {
+		t.Fatal(err)
+	}
+	engine := &mockTorrentEngine{torrents: []models.TorrentView{view}, removed: map[string]bool{}}
+	s := &AppState{torrent_engine: engine, db: db, cfg: cfg, config_path: filepath.Join(t.TempDir(), "missing.toml")}
+	req := httptest.NewRequest(http.MethodPost, "/api/torrents/remove_completed", strings.NewReader(`{"delete_files":false}`))
+	RemoveCompletedTorrents(httptest.NewRecorder(), req, s)
+	if _, got := engine.removed[seedTestHash]; !got {
+		t.Fatal("superseded archived torrent must be removed from the session")
+	}
+}
