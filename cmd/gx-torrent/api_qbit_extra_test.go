@@ -26,6 +26,12 @@ func TestQbitStateFor(t *testing.T) {
 		{torrentInfo{State: "seeding", Pinned: true}, "forcedUP"},
 		{torrentInfo{State: "paused"}, "pausedDL"},
 		{done, "pausedUP"},
+		// A torrent the queue is holding reads queuedDL/queuedUP, like
+		// qBittorrent: pausedDL/pausedUP are for the ones stopped outside the
+		// queue (auto_managed false), and the "downloading"/"seeding" filters
+		// include the queued states.
+		{torrentInfo{State: "paused", AutoManaged: true}, "queuedDL"},
+		{torrentInfo{State: "paused", AutoManaged: true, HasMetadata: true, TotalSize: 10, TotalDone: 10}, "queuedUP"},
 		{torrentInfo{State: "stalled"}, "stalledDL"},
 		{torrentInfo{State: "stalled", HasMetadata: true, TotalSize: 10, TotalDone: 10}, "stalledUP"},
 		{torrentInfo{State: "checking_files"}, "checkingDL"},
@@ -54,6 +60,12 @@ func TestQbitMatchFilter(t *testing.T) {
 		{"completed", torrentInfo{State: "seeding", HasMetadata: true, TotalSize: 4, TotalDone: 4}, true},
 		{"completed", torrentInfo{State: "seeding", HasMetadata: true, TotalSize: 4, TotalDone: 1}, false},
 		{"paused", torrentInfo{State: "paused"}, true},
+		// Queued (the queue holds it but it is not stopped): qBittorrent's
+		// "downloading" filter includes queuedDL, so a torrent waiting for a
+		// slot is not invisible to a client that filters downloads.
+		{"downloading", torrentInfo{State: "paused", AutoManaged: true}, true},
+		{"seeding", torrentInfo{State: "paused", AutoManaged: true}, false},
+		{"paused", torrentInfo{State: "paused", AutoManaged: true}, false},
 		{"active", torrentInfo{State: "downloading", DownloadRate: 10}, true},
 		{"inactive", torrentInfo{State: "downloading"}, true},
 		{"stalled_downloading", torrentInfo{State: "stalled"}, true},
@@ -366,7 +378,11 @@ func TestQbitSyncIncremental(t *testing.T) {
 func TestQbitTorrentsInfoCategoryTagAndState(t *testing.T) {
 	d := newTestDaemon(t)
 	src := t.TempDir()
-	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 80_000), Destination: src})
+	// The payload stays out of the destination: a torrent whose data already sits
+	// there verifies as complete at once and leaves "downloading" a fraction of a
+	// second after the add, which made this test flake on a slow CI runner.
+	dest := t.TempDir()
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 80_000), Destination: dest})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,6 +423,9 @@ func TestQbitTorrentsInfoCategoryTagAndState(t *testing.T) {
 		t.Fatalf("tag=nope returned %d, want 0", n)
 	}
 	if n := count("filter=downloading"); n != 1 {
+		// The download is incomplete and nothing stopped it: it is either
+		// waiting for a queue slot (qBittorrent's queuedDL) or already running,
+		// and both are inside the "downloading" filter.
 		t.Fatalf("filter=downloading returned %d, want 1", n)
 	}
 	if n := count("filter=seeding"); n != 0 {

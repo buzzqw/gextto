@@ -531,6 +531,17 @@ func qbitStateFor(v torrentInfo) string {
 		}
 		return "uploading"
 	case "paused":
+		// The daemon reports "paused" both for a torrent the queue is holding
+		// and for one stopped outside it; `auto_managed` tells them apart.
+		// qBittorrent names the first queuedDL/queuedUP (and its "downloading"
+		// and "seeding" filters include the queued states), the second
+		// pausedDL/pausedUP.
+		if v.AutoManaged {
+			if done {
+				return "queuedUP"
+			}
+			return "queuedDL"
+		}
 		if done {
 			return "pausedUP"
 		}

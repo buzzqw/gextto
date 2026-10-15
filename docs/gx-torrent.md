@@ -611,7 +611,11 @@ fields (`tracker`, `completed`, `dl_limit`/`up_limit`, `seeding_time`,
 `time_active`, `num_complete`/`num_incomplete`, `availability`,
 `downloaded_session`/`uploaded_session`, `total_wasted`) with the fuller
 qBittorrent states (`metaDL`, `forcedDL`/`forcedUP`, `stalledUP`, `pausedUP`,
-`checkingUP`); `torrents/pieceStates` and `torrents/pieceHashes` expose the
+`checkingUP`, `queuedDL`/`queuedUP`); a torrent the queue is holding (the
+daemon's `paused` with `auto_managed`) reads `queuedDL`/`queuedUP`, not
+`pausedDL`/`pausedUP`, so the `downloading` and `seeding` filters see it exactly
+as qBittorrent does — `pausedDL`/`pausedUP` are the torrents stopped outside the
+queue; `torrents/pieceStates` and `torrents/pieceHashes` expose the
 piece diagnostics; `torrents/webseeds` lists the HTTP sources;
 `torrents/downloadLimit`/`uploadLimit` read the per-torrent limits;
 `transfer/speedLimitsMode` reports whether the alternative limits are active
