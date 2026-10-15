@@ -204,6 +204,28 @@ and on demand from the Actions tab, uploading the failing inputs as an artifact.
 Each target is retried once, so a spurious `context deadline exceeded` from the
 Go fuzzer shutting down under load does not fail the run (a real crash repeats).
 
+## Temporary space (/tmp)
+
+`/tmp` here is a **tmpfs** (RAM), so everything left there costs memory and, once
+it fills up, breaks the tests: gextto's disk guard pauses downloads when the
+target filesystem has less than 1 GiB free, and the tests that download then wait
+for a torrent that never starts (a suite that takes 40 s turns into minutes of
+timeouts). Keep it clean:
+
+```bash
+scripts/tmp-smart-clean.sh --dry-run   # what would go
+scripts/tmp-smart-clean.sh --verbose   # what goes
+scripts/install-tmp-cleaner.sh         # daily systemd *user* timer (no sudo)
+```
+
+The cleaner is deliberately conservative: it only looks at the current user's
+entries, only older than 24 h (build/test residue, `go-build*`, `Test*`,
+`playwright-*`, ages faster, 6 h, with a 1 h floor), never anything a process
+still holds open (a directory holding an open file, or a socket, is left alone),
+and never the system/desktop plumbing (`systemd-private-*`, `snap-private-tmp`,
+`.X11-unix`, `tmux-*`, `ssh-*`, …). The timer runs it daily with a 30 minute
+jitter; the log is in the journal (`journalctl --user -u tmp-clean`).
+
 ## Build cache
 
 The Go build cache (`GOCACHE`, normally `~/.cache/go-build`) grows over time: a
