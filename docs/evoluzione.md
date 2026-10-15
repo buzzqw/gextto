@@ -541,6 +541,16 @@ recovered from a shell without editing the database.
   included); measuring further needs a multi-peer swarm on a fast link, neither
   available here.
 
+**Product-surface wording and defaults.**
+
+- **DLNA library folders.** On the gx-torrent settings page, the *Library folders*
+  field of *Media server (DLNA)* should propose the configured **Download
+  folder** at least, so the folder that already holds the completed media is a
+  click away instead of a path to type.
+- **Watch folders.** The *Watch folders* section should say that the `.torrent`
+  files it finds are **downloaded**, not only "added automatically", so what the
+  feature does to the media is explicit.
+
 **Closing the gap with Sonarr/Radarr** (§1), by value per effort, each after a study and
 without copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
 
