@@ -485,8 +485,10 @@ body{display:flex;flex-direction:column;overflow:hidden}
     <div class="dlg-head"><h2 id="dlg-add-title">Add torrents</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
       <label class="field">Magnet links or .torrent URLs, one per line
-        <textarea name="source" rows="3" placeholder="magnet:?xt=…" autocomplete="off" title="Magnet link (magnet:?) or HTTP URL of a .torrent file to download"></textarea>
+        <textarea name="source" id="add-source" rows="3" placeholder="magnet:?xt=…" autocomplete="off" title="Magnet link (magnet:?) or HTTP URL of a .torrent file to download"></textarea>
       </label>
+      <div class="results" id="add-preview" aria-live="polite" hidden style="max-height:22vh"></div>
+      <p class="dlg-help">A .torrent URL from a private tracker needs its login cookies: <a href="/ui/settings#cookies" title="Cookies sent when fetching .torrent files and metadata">manage cookies</a>.</p>
       <div class="filepick" id="filepick">
         <span id="filepick-text">Drop .torrent files anywhere on the page, or</span>
         <input type="file" name="torrent" id="add-files" multiple accept=".torrent,application/x-bittorrent" aria-label="Choose .torrent files" title="Select a local .torrent file to upload and start downloading">
@@ -1108,6 +1110,41 @@ function renderLog(scroll){var view=$('#log-view'),q=($('#log-filter').value||''
 // ---------- add ----------
 function setFiles(files){var input=$('#add-files');try{input.files=files;}catch(e){}updateFilePick();}
 function updateFilePick(){var input=$('#add-files'),n=input.files?input.files.length:0;$('#filepick').classList.toggle('has',n>0);$('#filepick-text').textContent=n?n+' '+t('file(s) selected'):t('Drop .torrent files anywhere on the page, or');}
+// ---------- add preview ----------
+// What will be added: each magnet line shows its display name (dn) and info
+// hash (btih), each URL its address, so a paste is checked before sending.
+function parseMagnetLine(line){
+  var m=/^magnet:\?(.+)$/i.exec(line.trim());if(!m)return null;
+  var q=m[1],dn='',hash='';
+  q.split('&').forEach(function(p){
+    var kv=p.split('='),k=(kv[0]||'').toLowerCase(),v=kv[1]||'';
+    try{v=decodeURIComponent(v.replace(/\+/g,' '));}catch(e){}
+    if(k==='dn'&&!dn)dn=v;
+    if(k==='xt'&&!hash){var hm=/^urn:btih:(.+)$/i.exec(v);if(hm)hash=hm[1];}
+  });
+  return {name:dn,hash:hash};
+}
+function updateAddPreview(){
+  var ta=$('#add-source'),box=$('#add-preview');if(!ta||!box)return;
+  var lines=ta.value.split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean);
+  box.innerHTML='';
+  if(!lines.length){box.hidden=true;return;}
+  box.hidden=false;
+  var ignored=0;
+  lines.forEach(function(line){
+    var r=document.createElement('div');r.className='r';
+    var low=line.toLowerCase();
+    if(low.indexOf('magnet:')===0){
+      var p=parseMagnetLine(line);
+      var ti=document.createElement('span');ti.className='t';ti.textContent=p&&p.name?p.name:line;ti.title=line;r.appendChild(ti);
+      var hh=document.createElement('span');hh.className='seed';hh.textContent=p&&p.hash?p.hash.slice(0,16)+'…':t('no info hash');r.appendChild(hh);
+    }else if(low.indexOf('http://')===0||low.indexOf('https://')===0){
+      var u=document.createElement('span');u.className='t';u.textContent=line;u.title=line;r.appendChild(u);
+    }else{ignored++;return;}
+    box.appendChild(r);
+  });
+  if(ignored){var n=document.createElement('p');n.className='muted';n.style.margin='6px 0 0';n.textContent=ignored+' '+t('lines ignored');box.appendChild(n);}
+}
 function submitAdd(form){
   var opts=new FormData(form),sources=String(opts.get('source')||'').split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean),files=$('#add-files').files||[];
   if(!sources.length&&!files.length){toast(t('Paste a magnet link or choose a .torrent file'),true);return;}
@@ -1117,7 +1154,7 @@ function submitAdd(form){
   Array.prototype.forEach.call(files,function(file){var fd=new FormData();Object.keys(base).forEach(function(k){fd.set(k,base[k]);});fd.set('torrent',file);jobs.push(fetch('/ui/add',{method:'POST',body:fd,headers:{'X-GX-Fetch':'1'}}).then(function(r){return r.json();}).catch(function(e){return {ok:false,msg:e.message};}));});
   Promise.all(jobs).then(function(res){res.forEach(function(r){if(r&&r.ok)ok++;else fail.push(r&&r.msg);});
     if(ok)toast(ok+' '+t('torrent(s) added'),false);fail.forEach(function(m){toast(m||t('Error'),true);});
-    if(!fail.length){closeDialog($('#dlg-add'));form.reset();updateFilePick();}
+    if(!fail.length){closeDialog($('#dlg-add'));form.reset();updateFilePick();updateAddPreview();}
     refresh();});
 }
 
@@ -1182,6 +1219,7 @@ document.addEventListener('change',function(e){
 document.addEventListener('input',function(e){
   if(e.target.id==='filter'){state.q=e.target.value;applyFilters();}
   if(e.target.id==='log-filter')renderLog();
+  if(e.target.id==='add-source')updateAddPreview();
   var f=e.target.closest&&e.target.closest('#drawer form');if(f)f.classList.add('dirty');
 });
 document.addEventListener('dblclick',function(e){var r=rowOf(e.target);if(r&&!e.target.closest('button,input,a')){select(r.dataset.hash,'only');openDetail(r.dataset.hash);}if(e.target.closest&&e.target.closest('#torrents th .rz')){var th=e.target.closest('th');setCol(th.dataset.col,{w:0});}});
@@ -1253,7 +1291,7 @@ window.addEventListener('dragenter',function(e){if(e.dataTransfer&&Array.prototy
 window.addEventListener('dragleave',function(){dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)$('#dropzone').hidden=true;});
 window.addEventListener('dragover',function(e){if(e.dataTransfer&&Array.prototype.indexOf.call(e.dataTransfer.types,'Files')>=0)e.preventDefault();});
 window.addEventListener('drop',function(e){dragDepth=0;$('#dropzone').hidden=true;if(!e.dataTransfer||!e.dataTransfer.files.length)return;e.preventDefault();var d=$('#dlg-add');if(!d.open)openDialog(d);setFiles(e.dataTransfer.files);});
-document.addEventListener('paste',function(e){var tag=(document.activeElement&&document.activeElement.tagName)||'';if(/INPUT|TEXTAREA/.test(tag)||$('dialog[open]'))return;var text=(e.clipboardData&&e.clipboardData.getData('text'))||'';if(/^\s*(magnet:\?|https?:\/\/\S+\.torrent)/i.test(text)){e.preventDefault();var d=$('#dlg-add');openDialog(d);$('textarea[name=source]',d).value=text.trim();}});
+document.addEventListener('paste',function(e){var tag=(document.activeElement&&document.activeElement.tagName)||'';if(/INPUT|TEXTAREA/.test(tag)||$('dialog[open]'))return;var text=(e.clipboardData&&e.clipboardData.getData('text'))||'';if(/^\s*(magnet:\?|https?:\/\/\S+\.torrent)/i.test(text)){e.preventDefault();var d=$('#dlg-add');openDialog(d);$('textarea[name=source]',d).value=text.trim();updateAddPreview();}});
 
 function tool(name){
   if(name==='ipfilter')openDialog($('#dlg-ipfilter'));

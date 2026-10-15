@@ -41,6 +41,10 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
 <main>
 <div class="page-head"><div class="grow"><h1>Settings</h1></div></div>
 <p class="muted">Folders, network, ports and the engine options apply from the next start; the bandwidth, queue limits and language apply at once.</p>
+<div role="search" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+  <input type="search" id="settings-filter" placeholder="Filter settings…" autocomplete="off" aria-label="Filter settings" title="Show only the sections mentioning this text" style="max-width:340px">
+  <span class="muted" id="settings-filter-info" aria-live="polite"></span>
+</div>
 <form method="post" action="/ui/settings">
 <fieldset>
   <legend>Folders</legend>
@@ -56,7 +60,7 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <legend>Watch folders</legend>
   <label>Folders to watch for .torrent files (one per line)<textarea name="watch-folders" rows="3" spellcheck="false" autocomplete="off" title="Folders scanned for .torrent files to add automatically; each line is a folder, or folder=destination to pick where its torrents are saved. The .torrent is removed after a successful add; a file that is not a valid .torrent is renamed to .invalid. Empty disables the feature.">{{WATCH_FOLDERS}}</textarea></label>
 </fieldset>
-<fieldset>
+<fieldset id="cookies">
   <legend>Cookies</legend>
   <label>Cookies sent when fetching .torrent files and metadata (JSON array)<textarea name="cookies" rows="4" spellcheck="false" autocomplete="off" title="A JSON array of cookie objects, sent when the daemon fetches .torrent files and metadata over HTTP (private trackers); the same shape as the qBittorrent cookie API. Each entry has name, value, domain and path. Empty means no cookies.">{{COOKIES}}</textarea></label>
 </fieldset>
@@ -304,6 +308,26 @@ Array.prototype.forEach.call(document.querySelectorAll('[data-formaction]'), fun
     form.setAttribute('action', originalAction);
   });
 });
+// Section filter: with many sections, typing narrows the page to the ones
+// mentioning the text (legend, labels, help). A section with a match stays
+// whole, so nothing saves half-hidden: the form still posts every field.
+(function () {
+  var box = document.getElementById('settings-filter');
+  var info = document.getElementById('settings-filter-info');
+  if (!box) return;
+  var t = function (s) { return (window.__uiI18n && window.__uiI18n[s]) || s; };
+  function apply() {
+    var q = box.value.trim().toLowerCase(), shown = 0, total = 0;
+    Array.prototype.forEach.call(document.querySelectorAll('form fieldset'), function (fs) {
+      total++;
+      var hit = !q || (fs.textContent || '').toLowerCase().indexOf(q) >= 0;
+      fs.hidden = !hit;
+      if (hit) shown++;
+    });
+    if (info) info.textContent = q ? (shown + ' / ' + total + ' ' + t('sections')) : '';
+  }
+  box.addEventListener('input', apply);
+})();
 // "Test port": the reachability of the saved peer port, rendered by
 // /ui/portcheck (coloured dot and explanation) in the live region below.
 (function () {

@@ -46,6 +46,9 @@ Stato di partenza (già buono, da non regredire):
       memoria; pulsante Stream con etichetta visibile. Resta: rename cartella.
 - [ ] Resta Add dialog: selettore cookie, content-layout, anteprima nome dopo
       magnet.
+      → fatto: anteprima magnet (nome dn + hash) live nel dialog, hint cookie
+      con link a `Settings → Cookies` (`#cookies`); content-layout rinviato
+      (richiede supporto engine: oggi il save path è per-torrent/categoria).
 
 ## 2. RSS, regole e logica di scarico (P0 — il punto che mancava)
 
@@ -96,15 +99,17 @@ Migliorie proposte (usabilità, non motore):
 
 - [x] Empty states guidati in lista torrent (`Add` / `Search indexers` /
       `RSS & indexers`) e `Clear filters` quando i filtri nascondono tutto.
-      Resta: Wanted/Archive.
-- [ ] Dialog bulk (`Set location / Limits / Category`) con riepilogo
-      `N torrent, X con valori misti`; toast con undo di 5s per `remove`
-      (solo lista, non file).
+      Wanted (`Add title`) e Archive (guida a archivio vuoto) fatti.
+- [x] Settings con filtro di ricerca per sezione (JS, il form posta comunque
+      tutti i campi).
+- [x] Dialog bulk: riepilogo `N torrent` + placeholder `mixed` nei limiti quando
+      la selezione ha valori diversi. Resta: undo di 5s per `remove`.
 - [ ] Settings cercabile: filtro sopra `/ui/settings` + badge `modified` per
       valori non-default; tab già deep-linkabili (`tab=`).
-- [ ] Log stile qBittorrent: filtro livelli `normal/info/warning/critical` su
-      `log/main` + tab `peer log` (dati `PeerErrors` già disponibili).
-- [ ] Context-menu bottom-sheet su `<760px`; toolbar già scrollabile.
+- [x] Log stile qBittorrent: filtro livelli DEBUG/INFO/WARN/ERROR
+      (client-side, classi già esistenti).
+- [x] Context-menu bottom-sheet su `<760px` (`theme.css`, vale per tutte le
+      pagine gx-core); toolbar già scrollabile.
 
 ## 4. Scala ed ecosistema (P2)
 
