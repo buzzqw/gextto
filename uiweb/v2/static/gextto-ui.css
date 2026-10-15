@@ -307,6 +307,11 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
   scrollbar-width: thin;
 }
 .top-actions > * { flex: none; }
+/* The chrome carries many controls (language, text size, font, theme, refresh,
+   add torrent): a slightly smaller type on the buttons and the select keeps
+   them all on one line without wrapping. */
+.top-actions .btn,
+.top-actions .lang-select { font-size: 0.84rem; }
 .top-live-metrics { display: contents; }
 
 .icon-btn {

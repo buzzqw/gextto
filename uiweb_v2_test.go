@@ -483,6 +483,37 @@ func TestProposedArchivePath(t *testing.T) {
 	}
 }
 
+// TestV2AddTorrentIsOpenedFromTheTopBar: the add-torrent form lives behind a
+// top-bar toggle (only on Scarico) and the block is identified so the script
+// can open it; the panel starts closed so the block costs no vertical space.
+func TestV2AddTorrentIsOpenedFromTheTopBar(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
+	if code != http.StatusOK {
+		t.Fatalf("downloads -> %d", code)
+	}
+	for _, marker := range []string{
+		`id="v2-add-torrent"`,
+		`data-add-torrent-toggle`,
+		`aria-controls="v2-add-torrent"`,
+	} {
+		if !strings.Contains(body, marker) {
+			t.Fatalf("downloads page missing %q", marker)
+		}
+	}
+	// The toggle belongs to Scarico, not to every page.
+	code, body = v2Request(t, server, http.MethodGet, "/?view=logs", nil)
+	if code != http.StatusOK {
+		t.Fatalf("logs -> %d", code)
+	}
+	if strings.Contains(body, "data-add-torrent-toggle") {
+		t.Fatalf("the add-torrent toggle must only appear on Scarico")
+	}
+}
+
 func TestV2DownloadsPageAndActions(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

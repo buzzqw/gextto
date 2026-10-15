@@ -328,8 +328,10 @@ bloccata, già presente o inferiore al file archiviato.
 
 ## 3. Scarico
 
-- **Aggiungi** un magnet/URL `.torrent` oppure carica un file `.torrent`;
-  opzionalmente percorso di salvataggio, “Scarica subito” e “Non rinominare”.
+- Il modulo **Aggiungi torrent** si apre dal pulsante con lo stesso nome in alto
+  (in Scarico): da chiuso non occupa spazio. Accetta un magnet/URL `.torrent`
+  oppure un file `.torrent`; opzionalmente percorso di salvataggio, “Scarica
+  subito” e “Non rinominare”.
 - **Download in sessione**: velocità download/upload, numero torrent e peer;
   l'elenco si aggiorna automaticamente ogni 5 secondi.
 - I download HTTP dei fumetti mostrano stato, progressione, byte scaricati e

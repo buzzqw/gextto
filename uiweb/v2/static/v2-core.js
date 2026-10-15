@@ -1621,6 +1621,32 @@
     }
   }
 
+  // Scarico: the add-torrent block is opened from the top bar, so the closed
+  // form costs no vertical space. The details summary keeps working on a phone,
+  // where the top-bar toggle is hidden.
+  document.addEventListener("click", function (event) {
+    var toggle = event.target.closest && event.target.closest("[data-add-torrent-toggle]");
+    if (!toggle) return;
+    var panel = document.getElementById("v2-add-torrent");
+    if (!panel) return;
+    var open = !panel.hasAttribute("open");
+    if (open) panel.setAttribute("open", ""); else panel.removeAttribute("open");
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (!open) return;
+    var field = panel.querySelector('input[name="magnet"]');
+    try { panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (error) { /* ignore */ }
+    if (field) { try { field.focus(); } catch (error) { /* ignore */ } }
+  });
+
+  // Keep the top-bar toggle's aria-expanded honest when the panel is opened or
+  // closed elsewhere (its own summary, a shared link): toggle does not bubble.
+  document.addEventListener("toggle", function (event) {
+    var panel = event.target;
+    if (!panel || panel.id !== "v2-add-torrent") return;
+    var toggle = document.querySelector("[data-add-torrent-toggle]");
+    if (toggle) toggle.setAttribute("aria-expanded", panel.open ? "true" : "false");
+  }, true);
+
   // Scarico: bandwidth limits and clean-up tools sit behind "Opzioni" on a
   // phone. The class lives outside the auto-refreshed table, so it survives
   // the 5-second swaps.

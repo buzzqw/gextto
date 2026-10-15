@@ -103,6 +103,7 @@
         <button class="btn" type="button" data-font="+5" title="Testo più grande">A+</button>
         <button class="btn" type="button" data-font-open title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog">Font</button>
         <button class="btn" type="button" hx-get="/theme" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli il tema dell'interfaccia o creane uno" aria-haspopup="dialog">Tema</button>
+        {{if eq .Page "downloads"}}<button class="btn add-torrent-toggle" type="button" data-add-torrent-toggle aria-expanded="false" aria-controls="v2-add-torrent" title="Apri o chiudi il modulo per aggiungere un torrent"><span aria-hidden="true">＋</span> Aggiungi torrent</button>{{end}}
         <button class="btn btn-refresh" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati" aria-label="Ricarica i dati mostrati"><span class="btn-refresh-icon" aria-hidden="true">↺</span><span class="btn-refresh-label">Aggiorna</span></button>
         {{template "v2_live_status" .Chrome}}
       </div>
@@ -358,7 +359,7 @@
 {{define "v2_downloads"}}
 <div class="view downloads-view{{if .AddLink}} has-add-link{{end}}">
   {{if .Flash}}<p class="{{if .FlashErr}}alert{{else}}muted{{end}} downloads-flash" role="status" aria-live="polite">{{.Flash}}</p>{{end}}
-  <details class="panel add-torrent-panel" data-mobile-collapse>
+  <details class="panel add-torrent-panel" id="v2-add-torrent">
     <summary class="panel-head"><h3><span class="add-torrent-plus" aria-hidden="true">＋ </span>Aggiungi torrent</h3><small class="muted">Magnet, URL .torrent o file locale</small></summary>
     <div class="panel-body">
       <form class="torrent-add-form" method="post" action="/downloads/add" enctype="multipart/form-data">

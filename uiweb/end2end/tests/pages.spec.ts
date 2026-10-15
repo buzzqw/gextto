@@ -70,6 +70,13 @@ test("la navigazione desktop conserva la barra laterale verticale", async ({ pag
 test("scarico espone aggiunta torrent e registrazione magnet", async ({ page }) => {
   await page.goto("/");
   await nav(page, "Scarico").click();
+  // The form is hidden behind the top-bar toggle so the closed block costs no
+  // vertical space; the toggle opens it.
+  const toggle = page.locator("[data-add-torrent-toggle]");
+  await expect(toggle).toBeVisible();
+  await expect(page.locator("details.add-torrent-panel")).toBeHidden();
+  await toggle.click();
+  await expect(page.locator("details.add-torrent-panel")).toBeVisible();
   await expect(page.locator("h3").filter({ hasText: "Aggiungi torrent" })).toBeVisible();
   await expect(page.locator("label.check").filter({ hasText: "Scarica subito" })).toBeVisible();
 });
