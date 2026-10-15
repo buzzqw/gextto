@@ -1109,7 +1109,10 @@ network problem may require checking DNS, containers, ports or the firewall.
 
 Configure Telegram, e-mail (SMTP) or a webhook — including Discord, Slack,
 ntfy, Gotify or Pushover — and send a test. Completion notifications include
-size, download time and average speed.
+size, download time and average speed. For a season pack the notice separates
+**new** episodes from those that **replaced an inferior version** already in the
+library: the latter are not counted as new, so downloading a single episode and
+then its season pack does not look like a duplicate.
 
 ### Status notifications (Gextto and gx-torrent)
 

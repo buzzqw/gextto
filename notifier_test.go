@@ -644,3 +644,71 @@ func TestSeasonPackNotificationIsCompact(t *testing.T) {
 		t.Fatalf("body must not list full file paths:\n%s", body)
 	}
 }
+
+// TestSeasonPackNotificationSeparatesUpgrades locks that a pack replacing an
+// inferior copy already in the library says so, instead of counting the
+// replaced episode among the "new" ones: downloading a single episode and then
+// its season pack must not look like two brand-new episodes.
+func TestSeasonPackNotificationSeparatesUpgrades(t *testing.T) {
+	previous := messages.Language()
+	messages.SetLanguage("it")
+	t.Cleanup(func() { messages.SetLanguage(previous) })
+
+	body := formatEvent("season_pack_completed", map[string]any{
+		"series":         "Silo",
+		"season":         int64(2),
+		"size_bytes":     int64(23104349240),
+		"new_count":      int64(1),
+		"upgraded_count": int64(2),
+		"episodes": []any{
+			map[string]any{"series": "Silo", "season": int64(2), "episode": int64(10), "path": "/archivio/E10.mkv"},
+		},
+		"upgraded": []any{
+			map[string]any{"series": "Silo", "season": int64(2), "episode": int64(9), "path": "/archivio/E09.mkv"},
+			map[string]any{"series": "Silo", "season": int64(2), "episode": int64(8), "path": "/archivio/E08.mkv"},
+		},
+		"path": "/home/andres/SerieTVArchivio/Silo",
+	})
+	for _, want := range []string{
+		"✅ 1 nuovi: E10",
+		"♻️ 2 sostituiscono versioni inferiori: E08-E09",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("body missing %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "✅ 2 nuovi") || strings.Contains(body, "E08, E09") {
+		t.Fatalf("replaced episodes must not be counted as new:\n%s", body)
+	}
+	// The upgrade line carries no full paths: it is a compact summary.
+	if strings.Contains(body, ".mkv") {
+		t.Fatalf("body must not list full file paths:\n%s", body)
+	}
+}
+
+// TestSeasonPackNotificationUpgradeOnly: when a pack only replaces inferior
+// copies (no genuinely new episode), the "new" line disappears instead of
+// claiming "0 nuovi".
+func TestSeasonPackNotificationUpgradeOnly(t *testing.T) {
+	previous := messages.Language()
+	messages.SetLanguage("it")
+	t.Cleanup(func() { messages.SetLanguage(previous) })
+
+	body := formatEvent("season_pack_completed", map[string]any{
+		"series":         "Silo",
+		"season":         int64(2),
+		"size_bytes":     int64(9000000000),
+		"new_count":      int64(0),
+		"upgraded_count": int64(1),
+		"upgraded": []any{
+			map[string]any{"series": "Silo", "season": int64(2), "episode": int64(9), "path": "/archivio/E09.mkv"},
+		},
+		"path": "/home/andres/SerieTVArchivio/Silo",
+	})
+	if !strings.Contains(body, "♻️ 1 sostituisce una versione inferiore: E09") {
+		t.Fatalf("body missing the singular upgrade line:\n%s", body)
+	}
+	if strings.Contains(body, "0 nuovi") || strings.Contains(body, "nuovi") {
+		t.Fatalf("no new episodes must not print a new-episodes line:\n%s", body)
+	}
+}

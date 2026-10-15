@@ -818,9 +818,10 @@ func formatEvent(event string, data map[string]any) string {
 		season, _ := jsonInt(mapLookup(data, "season"))
 		size, _ := jsonInt(mapLookup(data, "size_bytes"))
 		newCount, _ := jsonInt(mapLookup(data, "new_count"))
+		upgradedCount, _ := jsonInt(mapLookup(data, "upgraded_count"))
 		discardedCount, _ := jsonInt(mapLookup(data, "discarded_count"))
 		body := fmt.Sprintf(
-			"%s\n\n🎬 %s S%02d\n\n💾 %s\n\n✅ %d %s",
+			"%s\n\n🎬 %s S%02d\n\n💾 %s",
 			messages.Pick(
 				"✅ DOWNLOAD COMPLETATO — SEASON PACK ARCHIVIATO",
 				"✅ DOWNLOAD COMPLETE — SEASON PACK ARCHIVED",
@@ -828,11 +829,28 @@ func formatEvent(event string, data map[string]any) string {
 			valueText(data, "series", "Release"),
 			season,
 			formatBytes(size),
-			newCount,
-			messages.Pick("nuovi", "new"),
 		)
-		if kept := formatSeasonEpisodes(mapLookup(data, "episodes")); kept != "" {
-			body += ": " + kept
+		if newCount > 0 {
+			body += fmt.Sprintf("\n\n✅ %d %s", newCount, messages.Pick("nuovi", "new"))
+			if newEpisodes := formatSeasonEpisodes(mapLookup(data, "episodes")); newEpisodes != "" {
+				body += ": " + newEpisodes
+			}
+		}
+		if upgradedCount > 0 {
+			label := messages.Pick(
+				"sostituisce una versione inferiore",
+				"replaces an inferior version",
+			)
+			if upgradedCount > 1 {
+				label = messages.Pick(
+					"sostituiscono versioni inferiori",
+					"replace inferior versions",
+				)
+			}
+			body += fmt.Sprintf("\n♻️ %d %s", upgradedCount, label)
+			if upgraded := formatSeasonEpisodes(mapLookup(data, "upgraded")); upgraded != "" {
+				body += ": " + upgraded
+			}
 		}
 		if discardedCount > 0 {
 			body += fmt.Sprintf("\n🗑️ %d %s", discardedCount, messages.Pick(

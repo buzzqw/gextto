@@ -2911,6 +2911,12 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				return false, nil
 			}
 			entries := []PackEpisode{}
+			// Separate the episodes the pack adds from those it upgrades: a
+			// pack often arrives right after a single episode was downloaded
+			// and replaces that lower-quality copy. Telling them apart is what
+			// makes the notification honest ("still new" vs "replaced").
+			newEpisodes := []any{}
+			upgradedList := []any{}
 			for _, item := range processed {
 				if item.Discarded {
 					continue
@@ -2921,24 +2927,23 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 					SizeBytes: item.SizeBytes,
 					Score:     item.QualityScore,
 				})
-			}
-			if err := db.MarkPackCompleted(&release, entries, destination, size); err != nil {
-				return false, err
-			}
-			episodes := []any{}
-			for _, item := range processed {
-				if item.Discarded {
-					continue
-				}
-				episodes = append(episodes, map[string]any{
+				entry := map[string]any{
 					"series":  release.Series,
 					"season":  release.Season,
 					"episode": item.Episode,
 					"path":    item.Path,
-				})
+				}
+				if item.Upgrade {
+					upgradedList = append(upgradedList, entry)
+					continue
+				}
+				newEpisodes = append(newEpisodes, entry)
+			}
+			if err := db.MarkPackCompleted(&release, entries, destination, size); err != nil {
+				return false, err
 			}
 			logging.Info(fmt.Sprintf("🎉 %s complete: %s (%s) added to the library in %s",
-				logTarget(&release), countLabel(len(episodes), "episode", "episodes"), logging.HumanBytesI64(size), destination), "hash", event.Hash)
+				logTarget(&release), countLabel(len(entries), "episode", "episodes"), logging.HumanBytesI64(size), destination), "hash", event.Hash)
 			// Detail per file: which episodes were kept and which were discarded.
 			// The Python original logged this per file; the Rust port only kept
 			// the counts, which made a rejected episode impossible to trace.
@@ -2980,9 +2985,11 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				"title":           release.Title,
 				"path":            destination,
 				"size_bytes":      size,
-				"new_count":       len(episodes),
+				"new_count":       len(newEpisodes),
+				"upgraded_count":  len(upgradedList),
 				"discarded_count": discardedCount,
-				"episodes":        episodes,
+				"episodes":        newEpisodes,
+				"upgraded":        upgradedList,
 				"discarded":       discardedList,
 			})
 			if notificationErr != nil {

@@ -446,7 +446,11 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 			return false, fmt.Errorf("tutti gli episodi del season pack sono risultati inferiori ai file esistenti")
 		}
 		entries := []PackEpisode{}
-		episodes := []any{}
+		// Newly added episodes and episodes that replaced an inferior copy are
+		// reported separately: a pack that upgrades a single episode already in
+		// the library is not the same as a pack that adds episodes.
+		newEpisodes := []any{}
+		upgradedList := []any{}
 		for _, item := range processed {
 			if item.Discarded {
 				continue
@@ -457,12 +461,17 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 				SizeBytes: item.SizeBytes,
 				Score:     item.QualityScore,
 			})
-			episodes = append(episodes, map[string]any{
+			entry := map[string]any{
 				"series":  release.Series,
 				"season":  release.Season,
 				"episode": item.Episode,
 				"path":    item.Path,
-			})
+			}
+			if item.Upgrade {
+				upgradedList = append(upgradedList, entry)
+				continue
+			}
+			newEpisodes = append(newEpisodes, entry)
 		}
 		size, _ := SizeOfPath(destination)
 		if s.db != nil {
@@ -494,9 +503,11 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 				"title":           release.Title,
 				"path":            destination,
 				"size_bytes":      size,
-				"new_count":       len(episodes),
+				"new_count":       len(newEpisodes),
+				"upgraded_count":  len(upgradedList),
 				"discarded_count": len(discardedList),
-				"episodes":        episodes,
+				"episodes":        newEpisodes,
+				"upgraded":        upgradedList,
 				"discarded":       discardedList,
 			}); nErr != nil {
 				logging.Warn("archive pack completion notification failed", "hash", hash, "name", targetTorrent.Name, "error", nErr)

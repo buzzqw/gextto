@@ -1145,7 +1145,11 @@ firewall.
 
 Configura Telegram, e-mail (SMTP) o un webhook — anche verso Discord, Slack,
 ntfy, Gotify o Pushover — e invia un test. Le notifiche di completamento
-includono dimensione, tempo di download e velocità media.
+includono dimensione, tempo di download e velocità media. Per un season pack
+l'avviso distingue gli episodi **nuovi** da quelli che hanno **sostituito una
+versione inferiore** già in libreria: questi ultimi non vengono contati fra i
+nuovi, così scaricare un episodio singolo e poi il suo season pack non sembra
+un doppione.
 
 ### Notifiche di stato (Gextto e gx-torrent)
 

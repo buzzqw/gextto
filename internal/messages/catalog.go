@@ -58,6 +58,8 @@ var catalogIT = map[string][4]string{
 	"prossimo tentativo tra":               {"Nächster Versuch in", "prochaine tentative dans", "próximo intento en", "następna próba za"},
 	"riavvii recenti:":                     {"Letzte Neustarts:", "redémarrages récents :", "reinicios recientes:", "ostatnie restarty:"},
 	"serie completata":                     {"Serie abgeschlossen", "série terminée", "serie completada", "serial ukończony"},
+	"sostituisce una versione inferiore":   {"ersetzt eine niedrigere Version", "remplace une version inférieure", "reemplaza una versión inferior", "zastępuje niższą wersję"},
+	"sostituiscono versioni inferiori":     {"ersetzen niedrigere Versionen", "remplacent des versions inférieures", "reemplazan versiones inferiores", "zastępują niższe wersje"},
 	"uscita inattesa":                      {"Unerwartetes Beenden", "arrêt inattendu", "salida inesperada", "nieoczekiwane zakończenie"},
 	"⏱️ Download bloccato: provo un'alternativa":                 {"⏱️ Download hängt: ich versuche eine Alternative", "⏱️ Téléchargement bloqué : j'essaie une alternative", "⏱️ Descarga bloqueada: pruebo una alternativa", "⏱️ Pobieranie zablokowane: próbuję alternatywy"},
 	"⏳ Sarà archiviato a fine seed":                              {"⏳ Wird am Ende des Seeds archiviert", "⏳ Sera archivé en fin de seed", "⏳ Se archivará al terminar el seed", "⏳ Zostanie zarchiwizowane po zakończeniu seedowania"},
