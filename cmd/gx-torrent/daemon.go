@@ -299,6 +299,9 @@ type Daemon struct {
 	// feedPollMu serialises polls: the loop and the manual button must not run
 	// two polls against the same feed at once.
 	feedPollMu sync.Mutex
+	// feedPace spaces the requests to one site and cools down the hosts that
+	// answer 429 (see feed_pace.go).
+	feedPace *feedPacer
 	// streamMu guards activeStreams: how many streams (the UI player and the
 	// DLNA server) are reading a file right now, keyed by info hash and file
 	// index (the engine windows are per file), so closing one stream does not
@@ -420,6 +423,7 @@ func newDaemon(opts Options) (*Daemon, error) {
 		startedAt: time.Now(),
 		wake:      make(chan struct{}, 1),
 		feedWake:  make(chan struct{}, 1),
+		feedPace:  newFeedPacer(feedHostGap, feedHostCooldown),
 		trackers:  newTrackerHealth(),
 		appliedDL: -1,
 		appliedUL: -1,

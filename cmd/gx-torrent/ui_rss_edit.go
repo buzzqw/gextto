@@ -1016,11 +1016,13 @@ func feedErrorHint(errText string) string {
 		strings.Contains(lower, "forbidden") || strings.Contains(lower, "invalid api key") ||
 		strings.Contains(lower, "apikey"):
 		return "Check the indexer's API key"
+	case strings.Contains(lower, "429") || strings.Contains(lower, "too many requests"):
+		return "Too many requests: the feeds of this site are spaced and the rest is left for the next check"
 	case strings.Contains(lower, "cloudflare") || strings.Contains(lower, "challenge") ||
 		strings.Contains(lower, "403") || strings.Contains(lower, "just a moment"):
 		return "Cloudflare challenge: set FlareSolverr in Options"
-	case strings.Contains(lower, "without torrent links"):
-		return "This page has no torrent links: use its RSS feed instead"
+	case strings.Contains(lower, "no torrent link") || strings.Contains(lower, "without torrent links"):
+		return "The page returned no items: it may be an empty listing, or an address that is not a listing"
 	case strings.Contains(lower, "timeout") || strings.Contains(lower, "deadline"):
 		return "The server took too long: retry, or check its address"
 	}

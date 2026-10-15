@@ -211,6 +211,11 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 		totalNew     int
 		totalAdded   int
 		errorsList   []string
+		archiveOnly  []string
+		// rateLimitedByHost counts the feeds skipped because their site asked to
+		// slow down, so the cycle reports it once per host instead of once per
+		// feed.
+		rateLimitedByHost = map[string]int{}
 	)
 	for _, feed := range feeds {
 		if only != "" && feed.Name != only && feed.URL != only {
@@ -242,6 +247,18 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 			timeout = dhtFeedTimeout
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		// Many feeds of one site must not be fetched back to back: space them,
+		// and leave a host that answered 429 alone until it cools down.
+		host := feedHost(feed.URL, search)
+		if cooldown := d.feedPace.wait(ctx, host); cooldown > 0 {
+			cancel()
+			rateLimitedByHost[host]++
+			d.setFeedStatus(feedStatus{
+				Name: name, URL: source, LastCheck: time.Now().Unix(),
+				LastError: "HTTP 429: the site is limiting the requests",
+			})
+			continue
+		}
 		var items []rss.Item
 		var err error
 		switch {
@@ -253,6 +270,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 			items, err = d.fetchFeedItems(ctx, client, feed.URL, name)
 		}
 		cancel()
+		d.feedPace.done(host, err)
 		feedsChecked++
 		status := feedStatus{Name: name, URL: source, LastCheck: time.Now().Unix()}
 		// Notify only when a feed enters the error state: a feed that keeps
@@ -281,7 +299,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 		var addedTitles []string
 		rules := d.rules()
 		if feedTakesEverything(rules, feed, name) {
-			d.logArchiveOnlyOnce(name, len(items))
+			archiveOnly = append(archiveOnly, name)
 		}
 		for _, item := range items {
 			if added >= feedMaxAddsPerPoll {
@@ -350,6 +368,13 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 		}
 		d.setFeedStatus(status)
 	}
+	// One line for all the feeds that only grow the archive, not one per feed.
+	d.logArchiveOnly(archiveOnly)
+	// A host that answered 429 is reported once, with how long it is left alone.
+	for host, skipped := range rateLimitedByHost {
+		errorsList = append(errorsList, fmt.Sprintf("%s: %d feed(s) left for the next check, the site is limiting the requests", host, skipped))
+		logf("rate limited by %s: %d feed(s) left for the next check", host, skipped)
+	}
 	if len(rulesOnce) > 0 {
 		d.disableRules(rulesOnce)
 	}
@@ -404,22 +429,29 @@ func feedTakesEverything(rules []rss.Rule, feed feedConfig, feedName string) boo
 	return strings.TrimSpace(feed.Include) == "" && strings.TrimSpace(feed.Exclude) == ""
 }
 
-// logArchiveOnlyOnce prints the "archive only" notice for a feed the first time
-// it is polled, never again: a feed that only grows the archive is a valid,
-// intentional configuration (the search for series and movies reads the
-// archive), so repeating the line at every cycle is noise, not a warning.
-func (d *Daemon) logArchiveOnlyOnce(name string, items int) {
+// logArchiveOnly prints one line for the feeds that only grow the archive (no
+// rule and no filter): a valid, intentional configuration (the search for series
+// and movies reads the archive), so it is said once per feed and as a single
+// line — a list of 30 imported feeds must not fill the log with 30 lines at the
+// first check.
+func (d *Daemon) logArchiveOnly(names []string) {
+	if len(names) == 0 {
+		return
+	}
 	d.archiveOnlyMu.Lock()
-	seen := d.archiveOnlyLogged[name]
-	if !seen {
-		if d.archiveOnlyLogged == nil {
-			d.archiveOnlyLogged = map[string]bool{}
+	if d.archiveOnlyLogged == nil {
+		d.archiveOnlyLogged = map[string]bool{}
+	}
+	var fresh []string
+	for _, name := range names {
+		if !d.archiveOnlyLogged[name] {
+			d.archiveOnlyLogged[name] = true
+			fresh = append(fresh, name)
 		}
-		d.archiveOnlyLogged[name] = true
 	}
 	d.archiveOnlyMu.Unlock()
-	if !seen {
-		logf("feed %s: archive only (%d items), no rule or filter to download", name, items)
+	if len(fresh) > 0 {
+		logf("archive only (no rule and no filter, nothing downloaded): %s", strings.Join(fresh, ", "))
 	}
 }
 

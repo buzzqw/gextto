@@ -94,6 +94,9 @@ func TestFetchFollowsAdvertisedFeed(t *testing.T) {
 	}
 }
 
+// TestFetchHTMLWithoutTorrentsExplainsTheError: an HTML page that lists nothing
+// is reported as such — it may be an empty listing, not necessarily an address
+// that is not a feed.
 func TestFetchHTMLWithoutTorrentsExplainsTheError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
@@ -101,7 +104,7 @@ func TestFetchHTMLWithoutTorrentsExplainsTheError(t *testing.T) {
 	}))
 	defer srv.Close()
 	_, err := Fetch(context.Background(), srv.Client(), srv.URL, "site")
-	if err == nil || !strings.Contains(err.Error(), "not an RSS feed") {
+	if err == nil || !strings.Contains(err.Error(), "no torrent link") {
 		t.Fatalf("err = %v", err)
 	}
 }

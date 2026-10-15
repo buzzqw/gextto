@@ -138,7 +138,10 @@ func parseListing(ctx context.Context, client *http.Client, pageURL string, body
 		if len(details) > 0 {
 			return nil, fmt.Errorf("rss: %s: no magnet found in the detail pages", source)
 		}
-		return nil, fmt.Errorf("rss: %s is an HTML page without torrent links, not an RSS feed", source)
+		// The page parsed as HTML but lists nothing: it can be a listing that is
+		// simply empty right now (an uploader with no release, a filter that
+		// matches nothing), not necessarily an address that is not a listing.
+		return nil, fmt.Errorf("rss: %s: the page has no torrent link (an empty listing, or a page that is not a torrent listing)", source)
 	}
 	return items, nil
 }

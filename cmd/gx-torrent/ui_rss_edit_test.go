@@ -530,12 +530,13 @@ func TestTitleMatchRegex(t *testing.T) {
 // own hint, while a plain error stays bare.
 func TestFeedErrorHint(t *testing.T) {
 	cases := map[string]string{
-		"HTTP 401":                        "Check the indexer's API key",
-		"invalid api key":                 "Check the indexer's API key",
-		"Cloudflare challenge":            "Cloudflare challenge: set FlareSolverr in Options",
-		"HTML page without torrent links": "This page has no torrent links: use its RSS feed instead",
-		"request timeout":                 "The server took too long: retry, or check its address",
-		"connection refused":              "",
+		"HTTP 401":             "Check the indexer's API key",
+		"invalid api key":      "Check the indexer's API key",
+		"Cloudflare challenge": "Cloudflare challenge: set FlareSolverr in Options",
+		"the page has no torrent link (an empty listing)": "The page returned no items: it may be an empty listing, or an address that is not a listing",
+		"rss: ext.to returned HTTP 429":                   "Too many requests: the feeds of this site are spaced and the rest is left for the next check",
+		"request timeout":                                 "The server took too long: retry, or check its address",
+		"connection refused":                              "",
 	}
 	for errText, want := range cases {
 		if got := feedErrorHint(errText); got != want {

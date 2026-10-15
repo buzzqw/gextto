@@ -761,10 +761,19 @@ title from the text or from `dn`, dedup by info-hash) or of **TorrentGalaxy**
 (`/get-posts/user:NAME/`: the rows point to `/post-detail/` pages read with 3
 parallel requests and an in-memory cache, so a round costs one request
 per new release). A page that advertises a feed (`<link rel="alternate"
-type="application/rss+xml">`) is followed; an HTML page without torrent links
-gives a clear error (*HTML page without torrent links, not an RSS feed*) instead
-of the old `XML syntax error`. Requests use a browser User-Agent
+type="application/rss+xml">`) is followed; a page that lists nothing gives a
+clear error (*the page has no torrent link: an empty listing, or a page that is
+not a torrent listing* — an uploader with no release, a filter that matches
+nothing) instead of the old `XML syntax error`. Requests use a browser User-Agent
 (`internal/rss/listing.go`).
+
+**Requests are spaced per site.** A list of feeds imported at once (13 uploader
+listings of TorrentGalaxy, say) is not fetched back to back: two requests to the
+same host are at least `feedHostGap` (2 s) apart, and a host that answers **429**
+is left alone for `feedHostCooldown` (10 min) — its remaining feeds are skipped
+for the cycle with a *HTTP 429: the site is limiting the requests* status and
+retried at the next check, instead of failing one after the other. The round
+reports it once per host. `cmd/gx-torrent/feed_pace.go`.
 
 A feed can also be a **search**: instead of `url` a `search` (a
 query) is used and the worker queries the configured Torznab **indexers**, treating the
