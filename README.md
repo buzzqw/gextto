@@ -324,16 +324,22 @@ fewer features, but all the ones a standalone client needs.
 - **Modern web UI, familiar to qBittorrent users.** Light and dark themes;
   a sidebar with collapsible status (12 filters), category, tag and **tracker**
   filters and a live transfer graph; a compact one-line-per-torrent list with a
-  **column chooser** (20 columns: added/completed on, downloaded, remaining,
-  queue position, tracker, save path…) and **resizable columns**, both
-  remembered; a full **context menu** (force start, set location, category
+  **column chooser** (24 columns: added/completed on, downloaded, remaining,
+  queue position, tracker, save path, availability, time active, last activity,
+  wasted…) and **resizable columns**, both remembered — and, standalone, kept on
+  the server too, so columns, filters and theme follow you across browsers; a
+  full **context menu** (force start, set location, category
   submenu, automatic management, speed limits, super-seeding, sequential and
   first/last pieces, queue, copy name/hash/magnet) whose toggles show the
   state of the whole selection, mixed included; a **resizable detail panel**
-  (files with progress and bulk priority, peers you can add or ban); the
+  (files with progress, bulk priority, **grouping by folder** — one checkbox and
+  one priority per folder — and rename of files and folders; peers you can add or
+  ban); the Add dialog previews a magnet as you type it (name and info hash) and
+  takes per-torrent limits; removing asks about the files and offers an 8-second
+  **undo**; the
   global speed limits one click away in the status bar, speeds in the tab
   title, keyboard shortcuts everywhere, drag-and-drop of `.torrent` files and
-  pasted magnets, phone-friendly cards, and a **Statistics** page (live rates, the
+  pasted magnets, guided empty states, phone-friendly cards, and a **Statistics** page (live rates, the
   totals of this session and of every session — kept across restarts —, disk
   and cache, the network, the queue and a speed graph over 1 h/24 h/7 d).
   Every page axe-core checked.
@@ -346,8 +352,11 @@ fewer features, but all the ones a standalone client needs.
   shown live while you add it) and an **RSS & Indexers** page (feeds, rules, indexers,
   options as tabbed cards; every feed says which rules decide its downloads;
   rule terms in *contains all of* / *one of* / *none of*, matched across the
-  dots and dashes of release names; a match preview that updates as you type
-  and warns when a rule takes releases of several titles). Ordered PASS/FAIL rules, per-row
+  dots and dashes of release names; a match preview that updates as you type,
+  warns when a rule takes releases of several titles and **says why the other
+  archived items stay out**; ready-made rule templates, a feed `Test` that
+  previews the items of a URL before saving it, and a setup import that shows
+  what the file holds before it replaces anything). Ordered PASS/FAIL rules, per-row
   reload, live indexer tests, optional FlareSolverr, and a local **archive**
   of everything feeds returned (100,000 releases searchable in ~7 ms, with an
   option to query Jackett/Prowlarr live); *Settings* keeps the archive in shape

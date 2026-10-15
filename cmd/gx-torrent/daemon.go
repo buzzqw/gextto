@@ -1262,6 +1262,8 @@ type torrentInfo struct {
 	Uploaded       int64   `json:"uploaded"`
 	SeedingSeconds int64   `json:"seeding_seconds"`
 	ActiveSeconds  int64   `json:"active_seconds"`
+	// LastActive is the Unix time of the last data movement (0 = never/unknown).
+	LastActive     int64   `json:"last_active"`
 	ETASeconds     int64   `json:"eta_seconds"`
 	CurrentTracker string  `json:"current_tracker,omitempty"`
 	QueuePosition  int     `json:"queue_position"`
@@ -1429,6 +1431,9 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtime
 	if !rt.startedAt.IsZero() {
 		info.ActiveSeconds = int64(time.Since(rt.startedAt).Seconds())
 	}
+	if !rt.lastActive.IsZero() {
+		info.LastActive = rt.lastActive.Unix()
+	}
 	if !meta.CompletedAt.IsZero() {
 		info.CompletedAt = meta.CompletedAt.Unix()
 	}
@@ -1553,6 +1558,10 @@ type addRequest struct {
 	SuperSeeding bool
 	SeedRatio    float64
 	SeedDays     int64
+	// DownloadLimitKib/UploadLimitKib are per-torrent speed limits in KiB/s
+	// for a new torrent: nil = inherit the global limit, 0 = unlimited.
+	DownloadLimitKib *int64
+	UploadLimitKib   *int64
 	// Category and Tags are the qBittorrent-style labels (standalone mode).
 	Category string
 	Tags     []string
@@ -1671,6 +1680,8 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		// arrives (the engine already uses it as a seed meanwhile).
 		SelectOnly: t.SelectOnly(),
 		SeedRatio:  req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
+		// Per-torrent limits chosen in the add dialog (nil = global).
+		DownloadLimitKib: req.DownloadLimitKib, UploadLimitKib: req.UploadLimitKib,
 		Category: req.Category,
 		Tags:     req.Tags,
 		// AutoTMM off by default: an add that does not say otherwise follows the

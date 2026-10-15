@@ -123,6 +123,7 @@ func (d *Daemon) handleUIFeedItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimSpace(r.URL.Query().Get("feed"))
+	rawURL := strings.TrimSpace(r.URL.Query().Get("url"))
 	var chosen *feedConfig
 	for _, feed := range d.feeds() {
 		if feed.Name == name || feed.URL == name {
@@ -132,8 +133,18 @@ func (d *Daemon) handleUIFeedItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if chosen == nil {
-		writeError(w, http.StatusNotFound, errNotFound)
-		return
+		// The feed editor tests a URL before saving it: fetch it like a
+		// configured feed, without storing anything.
+		if rawURL == "" {
+			writeError(w, http.StatusNotFound, errNotFound)
+			return
+		}
+		if !strings.HasPrefix(strings.ToLower(rawURL), "http://") && !strings.HasPrefix(strings.ToLower(rawURL), "https://") && !strings.HasPrefix(strings.ToLower(rawURL), "dht://") {
+			writeError(w, http.StatusBadRequest, errors.New("the URL must start with http://, https:// or dht://"))
+			return
+		}
+		tmp := feedConfig{Name: rawURL, URL: rawURL}
+		chosen = &tmp
 	}
 	feedName := chosen.Name
 	if feedName == "" {

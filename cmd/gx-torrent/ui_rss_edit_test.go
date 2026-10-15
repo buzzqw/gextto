@@ -524,3 +524,26 @@ func TestTitleMatchRegex(t *testing.T) {
 		t.Fatalf("mamma mia regex must require both words: %q", titleMatchRegex("Mamma Mia"))
 	}
 }
+
+// TestFeedErrorHint checks the actionable hints of the feed rows: a wrong key,
+// a Cloudflare challenge, a listing without links and a timeout each get their
+// own hint, while a plain error stays bare.
+func TestFeedErrorHint(t *testing.T) {
+	cases := map[string]string{
+		"HTTP 401":                        "Check the indexer's API key",
+		"invalid api key":                 "Check the indexer's API key",
+		"Cloudflare challenge":            "Cloudflare challenge: set FlareSolverr in Options",
+		"HTML page without torrent links": "This page has no torrent links: use its RSS feed instead",
+		"request timeout":                 "The server took too long: retry, or check its address",
+		"connection refused":              "",
+	}
+	for errText, want := range cases {
+		if got := feedErrorHint(errText); got != want {
+			t.Errorf("feedErrorHint(%q) = %q, want %q", errText, got, want)
+		}
+	}
+	row := uiFeedStatusHTML(feedStatus{Name: "f", LastCheck: 1700000000, LastError: "HTTP 401"}, 3)
+	if !strings.Contains(row, "HTTP 401") || !strings.Contains(row, "Check the indexer") {
+		t.Errorf("error row misses the error or its hint: %s", row)
+	}
+}

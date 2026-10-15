@@ -14,14 +14,10 @@ import (
 	"time"
 )
 
-// qbitBanTTL is how long a peer banned through the qBittorrent API stays banned
-// in the session.
-const qbitBanTTL = 30 * time.Minute
-
 // handleQbitAddPeers adds "peers" (ip:port, pipe/comma separated) to the given
 // torrents.
 func (d *Daemon) handleQbitAddPeers(w http.ResponseWriter, r *http.Request) {
-	peers := qbitList(r.FormValue("peers"))
+	peers := splitFormList(r.FormValue("peers"))
 	if len(peers) > 0 {
 		for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
 			d.mu.Lock()
@@ -41,13 +37,13 @@ func (d *Daemon) handleQbitAddPeers(w http.ResponseWriter, r *http.Request) {
 // handleQbitBanPeers bans "peers" (ip:port or ip) in the whole session.
 func (d *Daemon) handleQbitBanPeers(w http.ResponseWriter, r *http.Request) {
 	if d.session != nil {
-		for _, peer := range qbitList(r.FormValue("peers")) {
+		for _, peer := range splitFormList(r.FormValue("peers")) {
 			ip := strings.TrimSpace(peer)
 			if host, _, err := net.SplitHostPort(ip); err == nil {
 				ip = host
 			}
 			if ip != "" {
-				d.session.BanIP(ip, qbitBanTTL)
+				d.session.BanIP(ip, banTTL)
 			}
 		}
 	}

@@ -563,6 +563,16 @@ func (d *Daemon) uiRuleRowsHTML() string {
 		if chips := uiRuleChipsHTML(rule); chips != "" {
 			b.WriteString(`<div class="chips">` + chips + `</div>`)
 		}
+		// Cooldown visibility: with ignore_days the rule stops matching for a
+		// while after each match, which looks like a bug when nothing arrives.
+		// Show when it may match again.
+		if rule.IgnoreDays > 0 {
+			if last := d.ruleLastMatch(rule.Name); !last.IsZero() {
+				if next := last.Add(time.Duration(rule.IgnoreDays) * 24 * time.Hour); time.Now().Before(next) {
+					b.WriteString(`<div class="item-sub">` + uiChip("", "Next match", next.Format("2006-01-02 15:04")) + `</div>`)
+				}
+			}
+		}
 		b.WriteString(`</div><div class="item-actions">`)
 		ruleJSON, _ := json.Marshal(rule)
 		toggle := "Disable"
@@ -901,13 +911,30 @@ func feedCoveringRules(rules []rss.Rule, feedName string) []string {
 
 // uiFeedGovernanceHTML says, on the feed row, what decides what the feed
 // downloads: the rules that watch it, its own filter, everything, or nothing
-// (archive only), and whether the wanted titles also take from it.
+// (archive only), and whether the wanted titles also take from it. Watching
+// rules are buttons: one click opens the rule editor for that rule.
 func uiFeedGovernanceHTML(rules []rss.Rule, feed feedConfig, key string, covering []string, wantedOn bool) string {
 	var b strings.Builder
 	b.WriteString(`<div class="item-sub governs"><svg class="i"><use href="/assets/icons.svg#i-filter"/></svg>`)
 	switch {
 	case len(covering) > 0:
-		b.WriteString(`<span>Downloads what these rules take:</span> <b>` + html.EscapeString(strings.Join(covering, ", ")) + `</b>`)
+		b.WriteString(`<span>Downloads what these rules take:</span> `)
+		indexByName := map[string]int{}
+		for index, rule := range rules {
+			if _, ok := indexByName[orDefault(rule.Name, "—")]; !ok {
+				indexByName[orDefault(rule.Name, "—")] = index
+			}
+		}
+		for i, name := range covering {
+			if i > 0 {
+				b.WriteString(`<span>, </span>`)
+			}
+			if index, ok := indexByName[name]; ok {
+				b.WriteString(`<button type="button" class="linklike" data-open-rule="` + strconv.Itoa(index) + `" title="Open this rule to change it"><b>` + html.EscapeString(name) + `</b></button>`)
+			} else {
+				b.WriteString(`<b>` + html.EscapeString(name) + `</b>`)
+			}
+		}
 	case feed.All:
 		b.WriteString(`<span>Downloads every item (Take everything)</span>`)
 	case feedTakesEverything(rules, feed, key):
@@ -957,7 +984,11 @@ func uiFeedStatusHTML(status feedStatus, total int) string {
 	when := time.Unix(status.LastCheck, 0).Format("02/01 15:04")
 	out := `<span class="muted" title="Last check">` + when + `</span> `
 	if status.LastError != "" {
-		return out + `<span class="err" role="status">` + html.EscapeString(status.LastError) + `</span>`
+		errHTML := `<span class="err" role="status">` + html.EscapeString(status.LastError) + `</span>`
+		if hint := feedErrorHint(status.LastError); hint != "" {
+			errHTML += ` <span class="muted">` + hint + `</span>`
+		}
+		return out + errHTML
 	}
 	out += totalHTML
 	if status.New > 0 {
@@ -967,6 +998,27 @@ func uiFeedStatusHTML(status feedStatus, total int) string {
 		out += ` · <span class="ok">` + strconv.Itoa(status.Added) + `</span> <span class="muted">added</span>`
 	}
 	return out
+}
+
+// feedErrorHint maps a feed check error to an actionable hint (a catalog key):
+// a wrong API key, a Cloudflare challenge (FlareSolverr), or a page without
+// torrent links mistaken for a feed. Empty when the error says it all.
+func feedErrorHint(errText string) string {
+	lower := strings.ToLower(errText)
+	switch {
+	case strings.Contains(lower, "401") || strings.Contains(lower, "unauthorized") ||
+		strings.Contains(lower, "forbidden") || strings.Contains(lower, "invalid api key") ||
+		strings.Contains(lower, "apikey"):
+		return "Check the indexer's API key"
+	case strings.Contains(lower, "cloudflare") || strings.Contains(lower, "challenge") ||
+		strings.Contains(lower, "403") || strings.Contains(lower, "just a moment"):
+		return "Cloudflare challenge: set FlareSolverr in Options"
+	case strings.Contains(lower, "without torrent links"):
+		return "This page has no torrent links: use its RSS feed instead"
+	case strings.Contains(lower, "timeout") || strings.Contains(lower, "deadline"):
+		return "The server took too long: retry, or check its address"
+	}
+	return ""
 }
 
 // indexerPageURL is the web page of an indexer: the scheme and host of its

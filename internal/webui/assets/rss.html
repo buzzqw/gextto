@@ -25,6 +25,9 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 #feed-fallback.unused .fgrid,#feed-fallback.unused .checks{border-left:3px solid var(--warn);padding-left:10px}
 .item-sub.governs{color:var(--muted)}
 .item-sub.governs b{color:var(--text);font-weight:600}
+.linklike{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit}
+.linklike:hover{text-decoration:underline}
+.linklike b{color:inherit}
 </style>
 </head>
 <body>
@@ -61,6 +64,15 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <p class="hint">A feed is an RSS URL, or the page of an ext.to or TorrentGalaxy listing. Its items are fetched periodically, kept in the archive and evaluated by rules and wanted titles.</p>
   </div>
   <ul class="items" id="feed-list">{{FEEDROWS}}</ul>
+  <div class="panel" id="feed-guide" hidden style="margin-top:12px;padding:14px">
+    <h3>No feeds yet: pick a way to start</h3>
+    <p class="muted" style="margin:0 0 10px;font-size:13px">Feeds fill the archive with releases; rules and wanted titles decide what gets downloaded. Without a feed nothing can arrive on its own.</p>
+    <div class="actions" style="margin:0">
+      <button type="button" class="primary sm" id="guide-new-feed" title="Add an RSS feed">New feed</button>
+      <button type="button" class="sm" id="guide-new-rule" title="Add a download rule">New rule</button>
+      <a class="btn sm" href="#options" id="guide-import" title="Refresh interval, archive retention, FlareSolverr">Import a setup</a>
+    </div>
+  </div>
 </section>
 
 <section class="tabpanel" id="p-rules" role="tabpanel" aria-labelledby="tab-rules" hidden>
@@ -106,11 +118,12 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
   <div class="panel" style="margin-top:20px;padding:14px">
     <h3>Copy the setup</h3>
     <p class="muted" style="margin:0 0 10px;font-size:13px">Export saves the feeds, rules and indexers in one file, as a backup or to bring them to another gx-torrent. Import loads such a file and replaces the feeds, rules and indexers it contains.</p>
-    <form method="post" action="/ui/rss-config" enctype="multipart/form-data" class="actions" style="margin:0;align-items:flex-end">
+    <form method="post" action="/ui/rss-config" enctype="multipart/form-data" class="actions" style="margin:0;align-items:flex-end" id="rss-import-form">
       <a class="btn sm" href="/ui/rss-export" download title="Download the feeds, rules and indexers as a file">Export</a>
-      <label class="field" style="margin:0">Setup file<input type="file" name="setup" accept="application/json,.json" required title="A file exported from a gx-torrent RSS page"></label>
+      <label class="field" style="margin:0">Setup file<input type="file" name="setup" id="rss-import-file" accept="application/json,.json" required title="A file exported from a gx-torrent RSS page"></label>
       <button type="submit" class="sm" title="Replace the feeds, rules and indexers with those in the file">Import</button>
     </form>
+    <p class="muted" id="rss-import-preview" style="margin:8px 0 0;font-size:13px" aria-live="polite"></p>
   </div>
 </section>
 
@@ -122,7 +135,8 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <div class="dlg-body">
       <div class="fsec">
         <label class="field">Name<input type="text" name="name" placeholder="Feed name" autocomplete="off" required title="Feed name"></label>
-        <label class="field">Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off" required title="RSS feed URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…)"></label>
+        <label class="field">Feed URL<input type="text" name="url" id="feed-url" placeholder="http://…/rss" autocomplete="off" required title="RSS feed URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…)"></label>
+        <div class="actions" style="margin:0"><button type="button" class="sm" id="feed-test" title="Fetch this URL now and show how many items it returns, before saving">Test</button><span class="muted" id="feed-test-status" aria-live="polite"></span></div>
         <label class="field">Folder<input type="text" name="folder" placeholder="tv" autocomplete="off" title="Group shown next to the feed name"></label>
       </div>
       <div class="fsec" id="feed-fallback">
@@ -154,6 +168,14 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <input type="hidden" name="op" value="add"><input type="hidden" name="index" id="rule-index">
     <div class="dlg-head"><h2 id="dlg-rule-title">New rule</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
     <div class="dlg-body">
+      <div class="fsec" id="rule-presets">
+        <h3>Presets</h3>
+        <div class="actions" style="margin:0">
+          <button type="button" class="sm" data-preset="series" title="Fill the rule for TV series: Italian 1080p episodes, each taken once">TV series</button>
+          <button type="button" class="sm" data-preset="movie" title="Fill the rule for movies: 1080p or 2160p, no CAM or TS">Movie</button>
+          <button type="button" class="sm" data-preset="all" title="Fill the rule to take everything except CAM and TS releases">Take all</button>
+        </div>
+      </div>
       <div class="rule-layout">
         <div>
           <div class="fsec">
@@ -294,6 +316,16 @@ $('#feednames').innerHTML=FEEDNAMES.map(function(n){var o=document.createElement
 
 // ---------- feeds ----------
 var feedForm=$('#feed-form');
+// With no feed configured, show the getting-started guide instead of an
+// empty list (the empty placeholder is an li without data-feed-row).
+(function(){
+  var empty=!document.querySelector('#feed-list [data-feed-row]');
+  var guide=$('#feed-guide');if(guide)guide.hidden=!empty;
+  if(!empty)return;
+  $('#guide-new-feed').addEventListener('click',function(){editFeed({});});
+  $('#guide-new-rule').addEventListener('click',function(){showTab('rules');editRule({enabled:true});});
+  $('#guide-import').addEventListener('click',function(){showTab('options');});
+})();
 function editFeed(feed,index,covered){
   feedForm.reset();$('#feed-index').value=index===undefined?'':index;
   // With rules watching the feed its own filter is not used: say so and dim it.
@@ -341,6 +373,17 @@ $('#poll-all').addEventListener('click',function(){
 
 // ---------- rules ----------
 var ruleForm=$('#rule-form');
+// One-click presets fill the editor; the preview (live) shows at once what
+// they would take, before anything is saved.
+$$('#rule-presets [data-preset]').forEach(function(btn){btn.addEventListener('click',function(){
+  var p=btn.dataset.preset;
+  function set(n,v){var el=ruleForm.elements[n];if(!el)return;if(el.type==='checkbox')el.checked=!!v;else el.value=v||'';}
+  ruleForm.reset();setKind(false);
+  if(p==='series'){set('include','1080p, ITA');set('exclude','cam, ts');set('require_episode',true);set('smart_episode',true);}
+  if(p==='movie'){set('include','1080p, 2160p');set('exclude','cam, ts, CAMRip');set('min_seeders','3');}
+  if(p==='all'){set('exclude','cam, ts');}
+  clearTimeout(previewTimer);previewTimer=setTimeout(previewRule,150);
+});});
 function setKind(skip){ruleForm.elements.fail.checked=skip;$$('input[name=kind]',ruleForm).forEach(function(r){r.checked=(r.value==='skip')===skip;});$('#rule-action').hidden=skip;}
 $$('input[name=kind]',ruleForm).forEach(function(r){r.addEventListener('change',function(){setKind(r.value==='skip');});});
 function editRule(rule,index){
@@ -361,6 +404,11 @@ function editRule(rule,index){
   if(editing)previewRule();
 }
 $('#new-rule').addEventListener('click',function(){editRule({enabled:true});});
+$$('[data-open-rule]').forEach(function(btn){btn.addEventListener('click',function(){
+  showTab('rules');
+  var ed=document.querySelector('[data-rule-edit][data-index="'+btn.getAttribute('data-open-rule')+'"]');
+  if(ed)ed.click();
+});});
 $$('[data-rule-edit]').forEach(function(b){b.addEventListener('click',function(){var r={};try{r=JSON.parse(b.getAttribute('data-rule')||'{}');}catch(_){}editRule(r,b.getAttribute('data-index'));});});
 // The preview runs by itself while the rule is edited (debounced), and warns
 // about what surprises: a rule that takes several titles, or none at all.
@@ -371,6 +419,8 @@ function previewRule(){
     if(seq!==previewSeq)return;
     box.innerHTML='';warn.textContent='';
     var head=document.createElement('p');head.className='muted';head.style.margin='0 0 6px';head.textContent=(res.total||0)+' '+t('matches among the last')+' '+res.scanned+' '+t('archived items');box.appendChild(head);
+    var leftout=res.rejected||[];
+    if(leftout.length){var w2=note('hint',t('Why the others stay out:')+' '+leftout.map(function(g){return g.name+' ('+g.count+')';}).join(', '));warn.appendChild(w2);}
     var titles=res.titles||[];
     if(!res.total){warn.appendChild(note('hint',t('Nothing in the archive matches yet: the rule waits for new items.')));}
     else if(titles.length>1){
@@ -385,6 +435,18 @@ function note(cls,text){var p=document.createElement('p');p.className=cls;p.styl
 $('#rule-preview').addEventListener('click',previewRule);
 ruleForm.addEventListener('input',function(){clearTimeout(previewTimer);previewTimer=setTimeout(previewRule,450);});
 ruleForm.addEventListener('change',function(){clearTimeout(previewTimer);previewTimer=setTimeout(previewRule,150);});
+// A "download once" rule turns itself off after the first hit: confirm it, so
+// a series rule with the flag ticked by mistake does not stop after one episode.
+ruleForm.addEventListener('submit',function(e){
+  var skip=ruleForm.elements.fail&&ruleForm.elements.fail.checked;
+  var once=ruleForm.elements.once&&ruleForm.elements.once.checked;
+  if(!skip&&once&&!window.confirm(t('This rule stops after its first download. Save it?')))e.preventDefault();
+});
+// "Take everything" downloads whatever the feed publishes: confirm it, so a
+// feed meant as archive-only does not fill the client.
+feedForm.addEventListener('submit',function(e){
+  if(feedForm.elements.all&&feedForm.elements.all.checked&&!window.confirm(t('This feed downloads EVERYTHING it publishes. Save it?')))e.preventDefault();
+});
 
 // ---------- indexers ----------
 var idxForm=$('#indexer-form'),autoName='';
@@ -403,6 +465,36 @@ $$('[data-idx-test]').forEach(function(btn){btn.addEventListener('click',functio
   var f=new URLSearchParams();f.set('index',i);
   fetch('/ui/rss-indexer-test',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json();}).then(function(res){if(!span)return;if(res.ok){span.className='item-status ok';span.textContent='✓ '+res.ms+' ms';}else{span.className='item-status err';span.textContent=t('test failed:')+' '+(res.error||'');}}).catch(function(){if(span){span.className='item-status err';span.textContent=t('test failed:');}});
 });});
+
+// ---------- feed URL test (before saving) ----------
+$('#feed-test').addEventListener('click',function(){
+  var span=$('#feed-test-status'),url=$('#feed-url').value.trim();
+  span.className='muted';span.textContent=url?t('Checking…'):t('Type a feed URL first');
+  if(!url)return;
+  fetch('/ui/feed-items?url='+encodeURIComponent(url),{cache:'no-store'}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});}).then(function(list){
+    span.className='ok';
+    var preview=list.slice(0,3).map(function(it){return it.title;}).join(' · ');
+    span.textContent='✓ '+list.length+' '+t('items')+(preview?' — '+preview:'');
+  }).catch(function(e){span.className='err';span.textContent=t('test failed:')+' '+(e.message||'');});
+});
+
+// ---------- setup import preview ----------
+// Before replacing everything, show what the file holds (and refuse a file
+// that is not a setup at all); the server still validates on import.
+document.getElementById('rss-import-file').addEventListener('change',function(){
+  var out=document.getElementById('rss-import-preview'),f=this.files&&this.files[0];
+  out.textContent='';if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      var setup=JSON.parse(rd.result);
+      var feeds=(setup.feeds||[]).length,rules=(setup.rules||[]).length,indexers=(setup.indexers||[]).length;
+      out.textContent=t('This file holds:')+' '+feeds+' '+t('feeds')+', '+rules+' '+t('rules')+', '+indexers+' '+t('indexers')+'. '+t('Import replaces the current setup.');
+    }catch(e){out.textContent=t('The file is not a gx-torrent RSS setup.');}
+  };
+  rd.onerror=function(){out.textContent=t('The file is not a gx-torrent RSS setup.');};
+  rd.readAsText(f);
+});
 
 // ---------- options ----------
 $('#flare-test').addEventListener('click',function(){

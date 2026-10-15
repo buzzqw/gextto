@@ -161,7 +161,8 @@ Gextto forwards them to the daemon.
 At the address indicated by `gxtorrent_url` (default `http://127.0.0.1:8890`) the
 daemon does not expose only the REST API: `GET /` (or `/ui`) opens an **operational
 web page** intended for whoever opens that address from the browser, like qBittorrent's
-Web UI. It refreshes by itself every 2 seconds without reloading the page.
+Web UI. It refreshes by itself every 2 seconds without reloading the page
+(the rows travel as JSON, the filters and status as small HTML fragments).
 The browser tab shows the daemon icon (a blue download arrow),
 included in the page and also served by `GET /favicon.ico` without a token.
 The page is **translated** (Italian, English, German, French, Spanish,
@@ -211,8 +212,8 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   user (*Columns* in the toolbar, or a right click on the header): name, size,
   progress, status, seeds and peers (connected, with the swarm the trackers
   report in brackets), speeds, ETA, ratio, category by default; tags, added
-  on, completed on, downloaded, uploaded, remaining, queue position, tracker
-  and save path on demand. Columns are **resizable** by dragging the header
+  on, completed on, downloaded, uploaded, remaining, queue position, tracker,
+  save path, availability, time active, last activity and wasted on demand. Columns are **resizable** by dragging the header
   edge or with the arrow keys on it (double click restores the default);
   choice and widths are remembered in the browser and applied before the
   table is drawn, so a hidden column never flashes. Columns are sortable (the
@@ -241,7 +242,9 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   paths, with a *Browse* folder picker in standalone: `GET /ui/browse-dir` lists
   the daemon machine's directories so the path is chosen instead of typed),
   category (standalone) and the options (paused, top, sequential,
-  first/last, super-seeding). A `.torrent` dropped anywhere on the page or a
+  first/last, super-seeding, per-torrent download/upload limits, automatic
+  management). What is typed is previewed at once (magnet name and info hash,
+  ignored lines); a `.torrent` dropped anywhere on the page or a
   magnet pasted outside a field opens it pre-filled.
 - **Remove** asks in a dialog whether to delete the files too.
 - **Per-torrent detail** in a panel below the list (like qBittorrent; full width
@@ -250,7 +253,9 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   *General* (actions, data, pieces, space, dates, pin, speed, connection,
   upload and seed limits, super-seeding, move, category and tags, **web
   seeds**), *Files* (progress bar per file, priority per file or for **all the
-  ticked files at once**, **rename** and **HTTP streaming** with ▶), *Peers*
+  ticked files at once**, **group by folder** with one checkbox and one
+  priority control per folder, **rename** of files and folders, and **HTTP
+  streaming** with a labelled *Stream* button), *Peers*
   (connection flags, transport, encryption; **add peers** by `ip:port` and
   **ban** a peer's IP for 30 minutes, `POST /ui/peers`), *Trackers* (status,
   swarm, add and **remove**), *Pieces* (coloured map). Peers, trackers and pieces refresh while

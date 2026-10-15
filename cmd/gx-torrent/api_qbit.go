@@ -15,7 +15,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
@@ -919,7 +918,7 @@ func (d *Daemon) handleQbitDelete(w http.ResponseWriter, r *http.Request) {
 func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 	savePath := strings.TrimSpace(r.FormValue("savepath"))
 	category := strings.TrimSpace(r.FormValue("category"))
-	tags := qbitList(r.FormValue("tags"))
+	tags := splitFormList(r.FormValue("tags"))
 	autoTMM := formBool(r, "autoTMM")
 	switch {
 	case autoTMM && category != "":
@@ -989,35 +988,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 	qbitText(w, http.StatusOK, qbitOKCode)
 }
 
-// fetchTorrentURL downloads a .torrent from a URL, with the same size cap the
-// API applies to an uploaded file.
-func (d *Daemon) fetchTorrentURL(rawURL string) ([]byte, error) {
-	client := &http.Client{Timeout: 60 * time.Second, Jar: d.cookieJar()}
-	resp, err := client.Get(rawURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("torrent URL returned %d", resp.StatusCode)
-	}
-	return io.ReadAll(io.LimitReader(resp.Body, maxTorrentFile))
-}
-
-// qbitList splits a qBittorrent list parameter (comma, pipe or newline).
-func qbitList(value string) []string {
-	fields := strings.FieldsFunc(value, func(r rune) bool {
-		return r == ',' || r == '|' || r == '\n' || r == '\r'
-	})
-	out := make([]string, 0, len(fields))
-	for _, field := range fields {
-		if field = strings.TrimSpace(field); field != "" {
-			out = append(out, field)
-		}
-	}
-	return out
-}
-
+// addRequestFromForm builds the options shared by the add endpoints (API and
 // qbitCategory is the category object the clients read.
 type qbitCategory struct {
 	Name     string `json:"name"`
@@ -1039,7 +1010,7 @@ func (d *Daemon) handleQbitCreateCategory(w http.ResponseWriter, r *http.Request
 }
 
 func (d *Daemon) handleQbitRemoveCategories(w http.ResponseWriter, r *http.Request) {
-	d.removeCategories(qbitList(r.FormValue("categories")))
+	d.removeCategories(splitFormList(r.FormValue("categories")))
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -1056,17 +1027,17 @@ func (d *Daemon) handleQbitTags(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (d *Daemon) handleQbitCreateTags(w http.ResponseWriter, r *http.Request) {
-	d.createTags(qbitList(r.FormValue("tags")))
+	d.createTags(splitFormList(r.FormValue("tags")))
 	w.WriteHeader(http.StatusOK)
 }
 
 func (d *Daemon) handleQbitDeleteTags(w http.ResponseWriter, r *http.Request) {
-	d.deleteTags(qbitList(r.FormValue("tags")))
+	d.deleteTags(splitFormList(r.FormValue("tags")))
 	w.WriteHeader(http.StatusOK)
 }
 
 func (d *Daemon) handleQbitAddTags(w http.ResponseWriter, r *http.Request) {
-	tags := qbitList(r.FormValue("tags"))
+	tags := splitFormList(r.FormValue("tags"))
 	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
 		_ = d.addTags(hash, tags)
 	}
@@ -1074,7 +1045,7 @@ func (d *Daemon) handleQbitAddTags(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Daemon) handleQbitRemoveTags(w http.ResponseWriter, r *http.Request) {
-	tags := qbitList(r.FormValue("tags"))
+	tags := splitFormList(r.FormValue("tags"))
 	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
 		_ = d.removeTags(hash, tags)
 	}

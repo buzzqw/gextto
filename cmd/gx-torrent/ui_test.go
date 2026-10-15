@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +61,110 @@ func TestUILiveFragment(t *testing.T) {
 	body := string(raw)
 	if !strings.Contains(body, "IP filter") || strings.Contains(body, "<html") {
 		t.Fatalf("live fragment unexpected: %s", body)
+	}
+}
+
+// TestUIRowsClientTemplateCoversColumns guards the split between the server
+// row template and the client one: every column the chooser knows (data-col in
+// ui.tmpl) must have its cell in the client row template, and the client must
+// not render a cell no column stands for. The rows are drawn by the browser
+// from /ui/rows, so nothing else compares the two templates.
+func TestUIRowsClientTemplateCoversColumns(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "internal", "webui", "assets", "ui.tmpl"))
+	if err != nil {
+		t.Skip("page assets are unavailable outside the source tree")
+	}
+	body := string(raw)
+	columnRe := regexp.MustCompile(`data-col="([a-z]+)"`)
+	columns := map[string]bool{}
+	for _, m := range columnRe.FindAllStringSubmatch(body, -1) {
+		columns[m[1]] = true
+	}
+	if len(columns) < 20 {
+		t.Fatalf("found %d columns in the page, want the full chooser", len(columns))
+	}
+
+	start := strings.Index(body, "function rowHTML(r){")
+	if start < 0 {
+		t.Fatal("the client row template (rowHTML) is gone from ui.tmpl")
+	}
+	end := strings.Index(body[start:], "\n}")
+	if end < 0 {
+		t.Fatal("cannot find the end of rowHTML")
+	}
+	client := body[start : start+end]
+
+	cellRe := regexp.MustCompile(`(?:^|[\s"])c-([a-z]+)(?:[^a-z]|$)`)
+	cells := map[string]bool{}
+	for _, m := range cellRe.FindAllStringSubmatch(client, -1) {
+		cells[m[1]] = true
+	}
+	for column := range columns {
+		if !cells[column] {
+			t.Errorf("column %q has no cell in the client row template (rowHTML)", column)
+		}
+	}
+	for cell := range cells {
+		if !columns[cell] {
+			t.Errorf("the client row template renders c-%s, which is not a column (data-col)", cell)
+		}
+	}
+}
+
+// TestUIRowsJSON checks the table's JSON feed: one object per torrent with the
+// datasets and cells the page renders from, so the client template and the
+// server template cannot drift apart silently.
+func TestUIRowsJSON(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 80_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(server.URL + "/ui/rows")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /ui/rows -> %d", resp.StatusCode)
+	}
+	var page struct {
+		Rows []struct {
+			Hash     string
+			Name     string
+			State    string
+			Progress float64
+			DLRate   int64
+			QueuePos int
+		}
+		CountAll int
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Rows) != 1 || !strings.EqualFold(page.Rows[0].Hash, hash) {
+		t.Fatalf("rows = %+v, want the added torrent %s", page.Rows, hash)
+	}
+	if page.Rows[0].Name == "" || page.CountAll != 1 {
+		t.Fatalf("row/count incomplete: %+v count=%d", page.Rows[0], page.CountAll)
+	}
+
+	// The chrome-only fragment carries no table: the rows travel as JSON.
+	resp2, err := http.Get(server.URL + "/ui/live?notable=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	raw, _ := io.ReadAll(resp2.Body)
+	frag := string(raw)
+	if !strings.Contains(frag, "frag-side") || strings.Contains(frag, "torrent-rows") {
+		t.Fatalf("notable fragment unexpected: %s", frag)
 	}
 }
 

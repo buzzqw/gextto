@@ -137,15 +137,32 @@ qBittorrent Web UI user expects to find things — filters on the left, one comp
 line per torrent, the detail panel below, a complete context menu, the speeds and
 global limits in the status bar — so switching costs nothing; it is not a copy, and
 where qBittorrent is weak the page goes further: per-user column choice and widths
-applied before the first paint, menu toggles that show a **mixed** selection and
-bring it to one state, every control usable from the keyboard (submenus, column
-and panel resizing included), the technical counters kept one click away instead
-of crowding the status bar. Details in [`gx-torrent.md`](gx-torrent.md), *Web interface*.
+applied before the first paint (24 columns, availability, time active, last
+activity and wasted included) and, standalone, kept on the server so columns,
+filters and theme follow the operator across browsers; menu toggles that show a
+**mixed** selection and bring it to one state; every control usable from the
+keyboard (submenus, column and panel resizing included); the technical counters
+kept one click away instead of crowding the status bar; an Add dialog that
+previews a magnet (name and info hash) and takes per-torrent limits; an 8-second
+**undo** after a remove that kept the files; files grouped by folder with one
+priority control each, and folders renamed like files; guided empty states and a
+section filter in Settings; the table refresh travels as JSON (`/ui/rows`) with the
+chrome as translated HTML, which is six times smaller per tick (see
+[`measurements.md`](measurements.md)). Details in
+[`gx-torrent.md`](gx-torrent.md), *Web interface*; the remaining gaps towards
+qBittorrent and the work plan are in [`webui-parity.md`](webui-parity.md).
 
 The RSS and wanted pages follow one principle: **nothing is decided out of
-sight**. A rule's preview updates as it is typed and warns when it takes several
-titles; a feed row says which rules decide its downloads, and a feed filter that
-rules make unused is marked so; a wanted title lists its releases with the
+sight**. A rule's preview updates as it is typed, warns when it takes several
+titles and **names the criterion that leaves the other archived items out**
+(`rss.Criteria.RejectReason`); a feed row says which rules decide its downloads
+(links to their editor), shows when a rule may match again after its cooldown and
+turns an error into an actionable hint (API key, Cloudflare/FlareSolverr, a page
+without links, a timeout); ready-made rule templates and a feed `Test` (items of
+a URL previewed before saving) plus a setup import that shows what the file holds
+before it replaces the current configuration keep every change visible before it
+lands; a feed filter that the rules make unused is marked so; a wanted title lists
+its releases with the
 verdict for each (taken, had, or the filter that turns it away), live while it
 is added. Rule terms come in *all of* / *one of* / *none of*, all found with the
 same separator-insensitive, word-start match (`rss.HasTerm`), and the open

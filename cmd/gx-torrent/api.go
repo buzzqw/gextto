@@ -59,6 +59,10 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /assets/icons.svg", handleStaticAsset("image/svg+xml", assets.IconsSVG))
 	root.HandleFunc("GET /ui", d.handleUI)
 	root.HandleFunc("GET /ui/live", d.handleUILive)
+	root.HandleFunc("GET /ui/rows", d.handleUIRows)
+	root.HandleFunc("GET /ui/cookie-domains", d.handleUICookieDomains)
+	root.HandleFunc("GET /ui/uiprefs", d.handleUIGetPrefs)
+	root.HandleFunc("POST /ui/uiprefs", d.handleUIPostPrefs)
 	root.HandleFunc("GET /ui/events", d.handleUIEvents)
 	root.HandleFunc("GET /ui/detail", d.handleUIDetail)
 	root.HandleFunc("GET /ui/gextto-log", d.handleUIGexttoLog)
@@ -113,6 +117,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/remove", d.handleUIRemove)
 	root.HandleFunc("POST /ui/rename", d.handleUIRename)
 	root.HandleFunc("POST /ui/rename-file", d.handleUIRenameFile)
+	root.HandleFunc("POST /ui/rename-folder", d.handleUIRenameFolder)
 	root.HandleFunc("POST /ui/alt-speed", d.handleUIAltSpeed)
 	root.HandleFunc("POST /ui/add", d.handleUIAdd)
 	root.HandleFunc("POST /ui/add-file", d.handleUIAddFile)
@@ -205,11 +210,43 @@ func formInt(r *http.Request, key string, fallback int64) int64 {
 	return fallback
 }
 
+// splitFormList splits a list form field into its items: one per comma, pipe or
+// line break, trimmed and without empty entries. Pages and both APIs use it for
+// "tags", "peers", "plugins" and the like.
+func splitFormList(value string) []string {
+	fields := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == '|' || r == '\n' || r == '\r'
+	})
+	out := make([]string, 0, len(fields))
+	for _, field := range fields {
+		if field = strings.TrimSpace(field); field != "" {
+			out = append(out, field)
+		}
+	}
+	return out
+}
+
+// fetchTorrentURL downloads a .torrent from a URL, with the same size cap the
+// API applies to an uploaded file. The RSS auto-download and the compatible API
+// both use it; the cookie jar is the one the settings page manages.
+func (d *Daemon) fetchTorrentURL(rawURL string) ([]byte, error) {
+	client := &http.Client{Timeout: 60 * time.Second, Jar: d.cookieJar()}
+	resp, err := client.Get(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("torrent URL returned %d", resp.StatusCode)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, maxTorrentFile))
+}
+
 // addRequestFromForm builds the options shared by the add endpoints (API and
 // UI, magnet/URL and file): one place for the parameter names so the forms
 // cannot drift apart. Callers set Magnet or TorrentData on top.
 func addRequestFromForm(r *http.Request) addRequest {
-	return addRequest{
+	req := addRequest{
 		Destination:    r.FormValue("destination"),
 		Paused:         formBool(r, "paused"),
 		QueueTop:       formBool(r, "top"),
@@ -221,6 +258,24 @@ func addRequestFromForm(r *http.Request) addRequest {
 		SeedDays:       formInt(r, "seed_days", -1),
 		Category:       strings.TrimSpace(r.FormValue("category")),
 	}
+	// Per-torrent limits (KiB/s): empty = inherit the global limit,
+	// 0 = unlimited. formInt cannot tell "empty" from 0, so read raw.
+	if raw := strings.TrimSpace(r.FormValue("download_limit")); raw != "" {
+		if v, err := strconv.ParseInt(raw, 10, 64); err == nil && v >= 0 {
+			req.DownloadLimitKib = &v
+		}
+	}
+	if raw := strings.TrimSpace(r.FormValue("upload_limit")); raw != "" {
+		if v, err := strconv.ParseInt(raw, 10, 64); err == nil && v >= 0 {
+			req.UploadLimitKib = &v
+		}
+	}
+	// Automatic management is opt-in per add: the checkbox sends auto_tmm=1
+	// only when ticked, otherwise the global default applies.
+	if _, ok := r.Form["auto_tmm"]; ok {
+		req.AutoTMM, req.AutoTMMSet = formBool(r, "auto_tmm"), true
+	}
+	return req
 }
 
 func (d *Daemon) handleHealth(w http.ResponseWriter, _ *http.Request) {

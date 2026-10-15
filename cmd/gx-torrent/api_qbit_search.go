@@ -47,7 +47,7 @@ const qbitSearchTimeout = 90 * time.Second
 
 func (d *Daemon) handleQbitSearchStart(w http.ResponseWriter, r *http.Request) {
 	pattern := strings.TrimSpace(r.FormValue("pattern"))
-	plugins := qbitList(r.FormValue("plugins"))
+	plugins := splitFormList(r.FormValue("plugins"))
 	ctx, cancel := context.WithTimeout(context.Background(), qbitSearchTimeout)
 
 	d.qbitSearchMu.Lock()

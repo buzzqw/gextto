@@ -168,6 +168,74 @@ func (c Criteria) Match(item Item, now time.Time) bool {
 	return true
 }
 
+// RejectReason names the first criterion that turns item away, or "" when the
+// item satisfies every criterion. It mirrors Criteria.Match check by check, so
+// the rule preview (and the feed items view) can tell why an archived release
+// stays out instead of just hiding it. Stable keys: "include", "require",
+// "exclude", "regex", "not_regex", "min_size", "max_size", "min_seeders",
+// "max_seeders", "min_peers", "max_age_days", "require_episode",
+// "episode_filter".
+func (c Criteria) RejectReason(item Item, now time.Time) string {
+	title := item.Title
+
+	if countTerms(c.Include) > 0 && !hasAnyTerm(title, c.Include) {
+		return "include"
+	}
+	for _, term := range c.Require {
+		if strings.TrimSpace(term) != "" && !HasTerm(title, term) {
+			return "require"
+		}
+	}
+	if hasAnyTerm(title, c.Exclude) {
+		return "exclude"
+	}
+	if c.Regex != "" {
+		re, err := regexp.Compile(c.Regex)
+		if err != nil || !re.MatchString(title) {
+			return "regex"
+		}
+	}
+	if c.NotRegex != "" {
+		if re, err := regexp.Compile(c.NotRegex); err == nil && re.MatchString(title) {
+			return "not_regex"
+		}
+	}
+	if item.Size > 0 {
+		if c.MinSize > 0 && item.Size < c.MinSize {
+			return "min_size"
+		}
+		if c.MaxSize > 0 && item.Size > c.MaxSize {
+			return "max_size"
+		}
+	}
+	if c.MinSeeders != 0 && item.Seeders < c.MinSeeders {
+		return "min_seeders"
+	}
+	if c.MaxSeeders > 0 && item.Seeders > c.MaxSeeders {
+		return "max_seeders"
+	}
+	if c.MinPeers > 0 && item.Leechers < c.MinPeers {
+		return "min_peers"
+	}
+	if c.MaxAgeDays > 0 && !item.Published.IsZero() {
+		if now.Sub(item.Published) > time.Duration(c.MaxAgeDays)*24*time.Hour {
+			return "max_age_days"
+		}
+	}
+	if c.RequireEpisode {
+		if _, _, _, ok := FindEpisode(title); !ok {
+			return "require_episode"
+		}
+	}
+	if c.EpisodeFilter != "" {
+		filter, err := ParseEpisodeFilter(c.EpisodeFilter)
+		if err != nil || !filter.Match(title) {
+			return "episode_filter"
+		}
+	}
+	return ""
+}
+
 // Evaluate walks the rules in order and returns the first that matches the item
 // for feedName: pass=true means "add it" (using the rule's Action), pass=false
 // means the rule explicitly skips it. matched is false when no rule applies.

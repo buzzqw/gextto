@@ -192,6 +192,17 @@ type uiTorrentRow struct {
 	Tracker       string
 	SwarmSeeds    int
 	SwarmPeers    int
+	// Availability is the swarm availability (average pieces available, -1
+	// while the metadata is missing); ActiveVal/LastActiveVal are seconds
+	// since the torrent started and the Unix time of its last data movement.
+	Availability    string
+	AvailabilityVal float64
+	Active          string
+	ActiveVal       int64
+	LastActive      string
+	LastActiveVal   int64
+	Wasted          string
+	WastedVal       int64
 	// Per-torrent toggles and limits, ticked in the context menu and used to
 	// prefill the limits dialog (KiB/s, -1 global, 0 unlimited).
 	Sequential   bool
@@ -304,6 +315,18 @@ type uiDetailData struct {
 	CompletedAt     int64
 	AddedStr        string
 	CompletedStr    string
+	// AvailabilityPct is the swarm availability in percent (-1 = unknown);
+	// ActiveSeconds counts since the torrent started, LastActiveVal is the
+	// Unix time of its last data movement (0 = never), NextAnnounce the
+	// seconds to the next tracker announce (-1 = none scheduled).
+	AvailabilityPct float64
+	ActiveSeconds   int64
+	ActiveStr       string
+	LastActiveVal   int64
+	LastActiveStr   string
+	NextAnnounce    int64
+	SeedingSeconds  int64
+	SeedingStr      string
 	PiecesPercent   float64
 	Magnet          string
 
@@ -428,6 +451,12 @@ func (d *Daemon) handleUILive(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
 	}
+	name := "fragments"
+	if r.URL.Query().Get("notable") == "1" {
+		// The table travels as JSON (/ui/rows); the chrome (filters,
+		// speeds, status) still travels as HTML, translated by the server.
+		name = "fragments-notable"
+	}
 	page, err := d.uiPageData(d.uiRowLimit(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -435,7 +464,23 @@ func (d *Daemon) handleUILive(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	d.renderUI(w, r, "fragments", page)
+	d.renderUI(w, r, name, page)
+}
+
+// handleUIRows renders the torrent table as JSON, for the page's periodic
+// refresh: a row list is several times smaller than the same rows as HTML,
+// and the browser updates the cells without rebuilding the page chrome.
+func (d *Daemon) handleUIRows(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	page, err := d.uiPageData(d.uiRowLimit(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, page)
 }
 
 // handleUIDetail renders one tab of a torrent's detail, as a fragment for the
@@ -762,6 +807,26 @@ func (d *Daemon) handleUIRenameFile(w http.ResponseWriter, r *http.Request) {
 		err = d.renameFile(hash, oldPath, newPath)
 	}
 	d.uiDoneDetail(w, r, hash, "files", "File renamed", err)
+}
+
+// handleUIRenameFolder renames one top folder of a torrent (from the grouped
+// Files tab). Like every rename it moves the content on disk and never
+// changes the torrent identity.
+func (d *Daemon) handleUIRenameFolder(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	oldPath := strings.TrimSpace(r.FormValue("old"))
+	newPath := strings.TrimSpace(r.FormValue("new"))
+	var err error
+	if hash == "" || oldPath == "" || newPath == "" {
+		err = fmt.Errorf("hash, old and new are required")
+	} else {
+		err = d.renameFolder(hash, oldPath, newPath)
+	}
+	d.uiDoneDetail(w, r, hash, "files", "Folder renamed", err)
 }
 
 // handleUIAltSpeed toggles the manual alternative speed limits (the qBittorrent
@@ -1618,6 +1683,25 @@ func uiFillOptionalColumns(row *uiTorrentRow, view torrentInfo) {
 	row.Sequential, row.FirstLast = view.Sequential, view.FirstLast
 	row.Pinned, row.SuperSeeding = view.Pinned, view.SuperSeeding
 	row.DLLimitKib, row.ULLimitKib = view.DownloadLimitKib, view.UploadLimitKib
+	// Availability (qBittorrent semantics: average pieces available).
+	row.AvailabilityVal = -1
+	row.Availability = "—"
+	if view.PiecesTotal > 0 {
+		row.AvailabilityVal = float64(view.PiecesAvailable) / float64(view.PiecesTotal)
+		row.Availability = fmt.Sprintf("%.2f", row.AvailabilityVal)
+	}
+	row.ActiveVal = view.ActiveSeconds
+	row.Active = "—"
+	if view.ActiveSeconds > 0 {
+		row.Active = uiDuration(view.ActiveSeconds)
+	}
+	row.LastActiveVal = view.LastActive
+	row.LastActive = "—"
+	if view.LastActive > 0 {
+		row.LastActive = time.Unix(view.LastActive, 0).Format("2006-01-02 15:04")
+	}
+	row.WastedVal = view.Wasted
+	row.Wasted = uiBytes(view.Wasted)
 }
 
 // uiTrackerHost is the host of a tracker URL ("" for none), the name the
@@ -1706,6 +1790,16 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 	}
 	metaCategory := meta.Category
 	metaTags := strings.Join(meta.Tags, ", ")
+	// Volatile timings, copied under the lock (the tick rewrites them).
+	activeSeconds := int64(0)
+	if !rt.startedAt.IsZero() {
+		activeSeconds = int64(time.Since(rt.startedAt).Seconds())
+	}
+	lastActive := int64(0)
+	if !rt.lastActive.IsZero() {
+		lastActive = rt.lastActive.Unix()
+	}
+	seedingSeconds := int64(stats.SeededFor.Seconds())
 	d.mu.Unlock()
 
 	progress := 0.0
@@ -1743,6 +1837,23 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 	if data.PiecesTotal > 0 {
 		data.PiecesPercent = float64(data.PiecesAvailable) * 100 / float64(data.PiecesTotal)
 	}
+	data.AvailabilityPct = -1
+	if data.PiecesTotal > 0 {
+		data.AvailabilityPct = float64(data.PiecesAvailable) / float64(data.PiecesTotal)
+	}
+	data.ActiveSeconds = activeSeconds
+	if activeSeconds > 0 {
+		data.ActiveStr = uiDuration(activeSeconds)
+	}
+	data.LastActiveVal = lastActive
+	if lastActive > 0 {
+		data.LastActiveStr = time.Unix(lastActive, 0).Format("2006-01-02 15:04")
+	}
+	data.SeedingSeconds = seedingSeconds
+	if seedingSeconds > 0 {
+		data.SeedingStr = uiDuration(seedingSeconds)
+	}
+	data.NextAnnounce = -1
 	if addedAt > 0 {
 		data.AddedStr = time.Unix(addedAt, 0).Format("2006-01-02 15:04")
 	}
@@ -1751,6 +1862,14 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 	}
 
 	trackers := t.Trackers()
+	for _, tracker := range trackers {
+		if !tracker.NextAnnounce.IsZero() {
+			if next := int64(time.Until(tracker.NextAnnounce).Seconds()); next >= 0 &&
+				(data.NextAnnounce < 0 || next < data.NextAnnounce) {
+				data.NextAnnounce = next
+			}
+		}
+	}
 	var webseeds []string
 	for _, ws := range t.Webseeds() {
 		webseeds = append(webseeds, ws.URL)

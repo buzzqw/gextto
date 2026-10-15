@@ -631,7 +631,7 @@ func baseNameSuggestions(query string, items []rss.Item, includeLang []string, q
 func (d *Daemon) uiWantedRowsHTML() string {
 	list := d.wantedList()
 	if len(list) == 0 {
-		return `<li class="empty"><svg class="i" style="width:40px;height:40px;color:var(--subtle)"><use href="/assets/icons.svg#i-tv"/></svg><h3>Nothing wanted yet</h3><p>Add a series or a movie: gx-torrent watches the feeds and the indexers for it and downloads what is missing.</p></li>`
+		return `<li class="empty"><svg class="i" style="width:40px;height:40px;color:var(--subtle)"><use href="/assets/icons.svg#i-tv"/></svg><h3>Nothing wanted yet</h3><p>Add a series or a movie: gx-torrent watches the feeds and the indexers for it and downloads what is missing.</p><button type="button" class="primary sm" onclick="document.getElementById('add-wanted').click()" title="Add a series or a movie to the wanted list">Add title</button></li>`
 	}
 	var b strings.Builder
 	for index, w := range list {

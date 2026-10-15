@@ -145,7 +145,7 @@ func (d *Daemon) handleUIPeers(w http.ResponseWriter, r *http.Request) {
 				ip = host
 			}
 			if net.ParseIP(ip) != nil {
-				d.session.BanIP(ip, qbitBanTTL)
+				d.session.BanIP(ip, banTTL)
 			}
 		}
 		d.uiDoneDetail(w, r, hash, "peers", "Peer banned", nil)
