@@ -201,14 +201,19 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 .sidebar::-webkit-scrollbar { display: none; }
 .sidebar nav { display: flex; gap: 4px; flex: none; }
 
-.brand { display: none; align-items: center; gap: 11px; padding: 4px 6px 12px; border-bottom: 1px solid var(--line-soft); }
+/* Mark and name on the first row; tagline and version below, full width. */
+.brand {
+  display: none; grid-template-columns: auto 1fr; align-items: center;
+  column-gap: 11px; row-gap: 2px; padding: 4px 6px 12px; border-bottom: 1px solid var(--line-soft);
+}
 .brand-mark {
   width: 40px; height: 40px; flex: none; border-radius: 12px;
   display: grid; place-items: center; font-weight: 800; font-size: 1.15rem;
   color: #04121f; background: linear-gradient(135deg, var(--accent-2), var(--accent));
 }
-.brand strong { display: block; font-size: 1rem; }
-.brand small { color: var(--muted); font-size: 0.72rem; }
+.brand strong { display: block; font-size: 1.15rem; }
+.brand small { grid-column: 1 / -1; color: var(--muted); font-size: 0.72rem; line-height: 1.35; }
+.brand .brand-tagline { margin-top: 8px; font-size: 0.68rem; letter-spacing: -0.01em; }
 
 .nav-group { display: contents; }
 .nav-group-label { display: none; }
@@ -1173,7 +1178,7 @@ pre.log-view { margin: 0; }
   border-bottom: 0;
   border-right: 1px solid var(--line);
 }
-.brand { display: flex; }
+.brand { display: grid; }
 .sidebar nav { flex-direction: column; }
 .nav-group { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
 .nav-group-label { display: none; }

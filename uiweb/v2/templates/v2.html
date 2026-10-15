@@ -54,7 +54,9 @@
   <aside class="sidebar" id="app-sidebar">
     <div class="brand" title="Gextto EXpert Torrent Transfer Orchestrator" aria-label="Gextto EXpert Torrent Transfer Orchestrator">
       <span class="brand-mark" aria-hidden="true">G</span>
-      <div><strong>Gextto</strong><small>EXpert Torrent Transfer Orchestrator · v{{.Chrome.Version}}{{if .Chrome.EngineVersion}}<span title="Versione del motore torrent in uso"> · {{.Chrome.EngineLabel}} {{.Chrome.EngineVersion}}</span>{{end}}</small></div>
+      <strong class="brand-name">Gextto</strong>
+      <small class="brand-tagline">EXpert Torrent Transfer Orchestrator</small>
+      <small class="brand-version">v{{.Chrome.Version}}{{if .Chrome.EngineVersion}}<span title="Versione del motore torrent in uso"> · {{.Chrome.EngineLabel}} {{.Chrome.EngineVersion}}</span>{{end}}</small>
     </div>
     <nav aria-label="Navigazione principale">
       {{range .Groups}}
