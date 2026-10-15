@@ -102,7 +102,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
   <div class="panel" style="margin-top:20px;padding:14px">
     <h3>Copy the setup</h3>
     <p class="muted" style="margin:0 0 10px;font-size:13px">Export saves the feeds, rules and indexers in one file, as a backup or to bring them to another gx-torrent. Import loads such a file and replaces the feeds, rules and indexers it contains.</p>
-    <form method="post" action="/ui/rss-config" enctype="multipart/form-data" class="actions" style="margin:0">
+    <form method="post" action="/ui/rss-config" enctype="multipart/form-data" class="actions" style="margin:0;align-items:flex-end">
       <a class="btn sm" href="/ui/rss-export" download title="Download the feeds, rules and indexers as a file">Export</a>
       <label class="field" style="margin:0">Setup file<input type="file" name="setup" accept="application/json,.json" required title="A file exported from a gx-torrent RSS page"></label>
       <button type="submit" class="sm" title="Replace the feeds, rules and indexers with those in the file">Import</button>
