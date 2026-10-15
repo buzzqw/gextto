@@ -362,7 +362,7 @@ func v2SetupSave(s *AppState, key, value string) error {
 	if !gh7_setting_key_allowed(key) {
 		return fmt.Errorf("%s is not writable", key)
 	}
-	if err := validatePathSetting(key, value, latestConfig(s)); err != nil {
+	if err := validateSettingValue(key, value, latestConfig(s)); err != nil {
 		return err
 	}
 	return saveConfigSetting(s.cfg.DataDir, key, value)

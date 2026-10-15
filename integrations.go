@@ -131,8 +131,8 @@ func TokenString(value any, key string) (string, error) {
 	return str, nil
 }
 
-// integrationJSON validates the HTTP status and decodes a JSON response body,
-// mirroring reqwest's error_for_status().json() chain.
+// integrationJSON validates the HTTP status and decodes a JSON response body:
+// a non-2xx status is an error even when the body is valid JSON.
 func integrationJSON(body []byte, status int) (any, error) {
 	if status < 200 || status >= 300 {
 		return nil, fmt.Errorf("HTTP %d", status)

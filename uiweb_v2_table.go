@@ -21,16 +21,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
 )
-
-// v2Routers maps an AppState to its router so v2 handlers can call the existing
-// JSON APIs internally (same handlers, same validation) without a loopback
-// network call and without re-implementing data access.
-var v2Routers sync.Map
 
 // v2PublicBase returns the scheme://host the browser used to reach Gextto, so a
 // table can build client-facing links (e.g. the gx-torrent web page on another
@@ -56,14 +50,14 @@ func v2PublicBase(r *http.Request) string {
 	return scheme + "://" + host
 }
 
+// v2InternalJSON calls one of the JSON APIs through the state's own router
+// (same handlers, same validation) without a loopback network call and without
+// re-implementing data access. TestInternalJSONPathsAreRegisteredRoutes keeps
+// every literal path a registered route.
 func v2InternalJSON(s *AppState, method, path string, query url.Values, jsonBody []byte) ([]byte, int) {
-	muxAny, ok := v2Routers.Load(s)
-	if !ok {
+	mux := s.internalMux.Load()
+	if mux == nil {
 		return []byte(`{"ok":false,"error":"v2 router not registered"}`), http.StatusInternalServerError
-	}
-	mux, ok := muxAny.(*http.ServeMux)
-	if !ok {
-		return []byte(`{"ok":false,"error":"invalid v2 router"}`), http.StatusInternalServerError
 	}
 	var body io.Reader
 	if len(jsonBody) > 0 {

@@ -1589,7 +1589,7 @@ pol:
   Jellyfin: Galaretowata
   Jellyfin / Plex: Jellyfin / Plex
   Jellyfin aggiornato: Aktualizacja Jellyfin
-  Jellyfin salvato: Jellyfin uratowany
+  Jellyfin salvato: Zapisano Jellyfin
   Kad: Kad
   'Killswitch VPN: interfaccia usata per tutto il traffico BitTorrent in uscita (es. tun0, wg0).': 'Killswitch VPN: Interfejs używany dla całego
     wychodzącego ruchu BitTorrent (np. tun0, wg0).'
@@ -3725,7 +3725,7 @@ pol:
   ripristino: przywrócić
   risultati: wyniki
   salta TMDB e rinomina automatica: pomiń TMDB i automatycznie zmień nazwę
-  salvato: uratowany
+  salvato: zapisano
   salvato nel Database: zapisane w Bazie Danych
   sane: zdrowy
   scaricati: pobrano
@@ -5047,3 +5047,11 @@ pol:
   "Mostra l'elenco come tabella": "Pokaż listę jako tabelę"
   "Mostra l'elenco come locandine": "Pokaż listę jako plakaty"
   "Apri il dettaglio": "Otwórz szczegóły"
+  "salvata": "zapisano"
+  "chiave non modificabile": "ustawienia nie można zmienić"
+  "non modificata": "bez zmian"
+  "valore troppo grande": "wartość zbyt duża"
+  "il punteggio deve essere un numero intero": "wynik musi być liczbą całkowitą"
+  "deve essere un percorso assoluto": "musi być ścieżką bezwzględną"
+  "non può essere la radice del filesystem": "nie może być katalogiem głównym systemu plików"
+  "non può contenere la cartella dati o download di Gextto": "nie może zawierać folderu danych ani pobierania Gextto"

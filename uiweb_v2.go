@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	stdhtml "html"
 	"html/template"
@@ -115,7 +116,7 @@ func v2Handle(s *AppState, mux *http.ServeMux, pattern string, fn HandlerFunc) {
 func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// The v2 handlers call the existing JSON APIs through this router so the
 	// list pages reuse the same data access as the classic UI.
-	v2Routers.Store(s, mux)
+	s.internalMux.Store(mux)
 	mux.Handle("GET /static/", UiNoCache(http.StripPrefix("/static/", http.FileServer(http.FS(v2StaticFSRoot())))))
 	// Legacy /v2 prefix: permanent redirect that strips it (query preserved), so
 	// old bookmarks and already-loaded pages keep working.
@@ -2365,7 +2366,14 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		render("valore troppo grande", true)
 		return
 	}
-	if err := validateBackendSetting(key, value); err != nil {
+	// The same check as the JSON API: before, the page skipped the path rules,
+	// so a trash or archive folder refused by the API was accepted here.
+	if err := validateSettingValue(key, value, latestConfig(s)); err != nil {
+		var pathErr *pathSettingError
+		if errors.As(err, &pathErr) {
+			render(pathErr.UIText, true)
+			return
+		}
 		render(err.Error(), true)
 		return
 	}

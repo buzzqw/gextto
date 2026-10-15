@@ -283,6 +283,20 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "update_check_hours", Label: "Intervallo controllo aggiornamenti", Tab: "system", Group: "Aggiornamenti"},
 }
 
+// uiSettingIndexed holds every key the settings page shows (index and score
+// weights). gh7_setting_key_allowed accepts all of them, so a field on the page
+// is always savable.
+var uiSettingIndexed = func() map[string]bool {
+	keys := make(map[string]bool, len(uiSettingsIndex)+len(uiScoreSettingDefs))
+	for _, def := range uiSettingsIndex {
+		keys[def.Key] = true
+	}
+	for key := range uiScoreSettingKeys {
+		keys[key] = true
+	}
+	return keys
+}()
+
 // uiSettingGroupByKey maps an indexed setting to its explicit panel.
 var uiSettingGroupByKey = func() map[string]string {
 	groups := make(map[string]string, len(uiSettingsIndex))

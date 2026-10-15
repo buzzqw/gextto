@@ -1,8 +1,7 @@
 package gextto
 
-// web_torrent_events.go ports the torrent lifecycle machinery of
-// `the reference daemon`: the metadata/stall monitors, the storage-move
-// retry loop, the RAM-disk reconciliation, the seed/cleanup policy, the
+// web_torrent_events.go holds the torrent lifecycle machinery: the
+// metadata/stall monitors, the storage-move retry loop, the RAM-disk reconciliation, the seed/cleanup policy, the
 // background detachment sweeps and the actual torrent-event handler.
 //
 // Exported entry points keep the CamelCase names the sibling group files call

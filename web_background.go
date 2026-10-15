@@ -1,7 +1,7 @@
 package gextto
 
-// web_background.go ports the long-lived background workers and the shared
-// `series_rename_apply` helper of `the reference daemon`.
+// web_background.go holds the long-lived background workers and the shared
+// series rename helper.
 //
 // The worker entry points are launched by `startBackgroundWorkers` in
 // web_serve.go. Private helpers defined here carry the unique `bg_` prefix so

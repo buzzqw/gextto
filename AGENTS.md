@@ -145,10 +145,14 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - **Guardie statiche della UI** (girano con `go test ./...`): `TestUIActionPathsAreRegisteredRoutes`
   (ogni `Path: "/api/…"` dei bottoni/azioni della UI deve essere una rotta
   registrata: un endpoint rimosso non può lasciare un bottone morto che risponde
-  404) e `TestEnd2EndSelectorsReferenceRealSettings` (i selettori
-  `#input-<key>`/`#v2-setting-<key>` e le `tab=` dei test Playwright devono
-  esistere nell'indice/scheda: un rename non può lasciare la suite rossa solo in
-  CI).
+  404), `TestInternalJSONPathsAreRegisteredRoutes` (metodo e path di ogni
+  chiamata `v2InternalJSON` e dei campi `Endpoint`/`GetPath`/`PostPath` delle
+  pagine v2 devono risolversi sul router reale: il giro HTTP in-process non
+  fallisce in build), `TestSettingsIndexIsWritable` (ogni opzione mostrata nella
+  pagina impostazioni è salvabile) e `TestEnd2EndSelectorsReferenceRealSettings`
+  (i selettori `#input-<key>`/`#v2-setting-<key>` e le `tab=` dei test
+  Playwright devono esistere nell'indice/scheda: un rename non può lasciare la
+  suite rossa solo in CI).
 - `make test-ui` — suite end2end Playwright della UI (`uiweb/end2end`): costruisce
   il daemon, lo avvia in dry-run e pilota l'interfaccia reale in un browser
   (pagine, mobile, i18n, accessibilità axe). **Non fa parte di `make test`**
@@ -293,7 +297,12 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   le traduzioni di etichetta e descrizione nei cataloghi `internal_translations*.yml`
   e la riga nell'Appendice A dei manuali. Il test
   `TestSettingsEveryPreviousOptionIsStillAvailable` conta le opzioni: se ne
-  aggiungi una aggiorna i conteggi.
+  aggiungi una aggiorna i conteggi. Una chiave dell'indice è **scrivibile per
+  costruzione** (`gh7_setting_key_allowed` accetta `uiSettingIndexed`): non va
+  aggiunta a mano a nessuna allowlist; `settingWritableAPIOnly` serve solo per
+  le chiavi senza riga nella pagina (editor dedicati o sola API). Ogni scrittura
+  — API, pagina impostazioni, wizard — passa da `validateSettingValue`: una
+  nuova regola di validazione va lì, non in un singolo handler.
 - Una nuova feature visibile va esposta **sia** nella UI di Gextto
   (`uiweb/v2`) **sia**, dove ha senso, nella pagina web del demone
   (`cmd/gx-torrent/ui.go`): non lasciarla raggiungibile solo via API.

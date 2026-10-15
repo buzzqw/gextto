@@ -671,39 +671,44 @@ func gh7_json_string(value map[string]any, key string) string {
 }
 
 func gh7_setting_key_allowed(key string) bool {
-	// gxtorrent_binary used to select a custom executable; it was removed so a
-	// wrong path cannot break the managed engine. The binary is always the one
-	// installed next to gexttod (or, as a fallback, the one in the PATH).
-	if key == "gxtorrent_binary" {
+	if key == "" || settingNeverWritable[key] {
 		return false
 	}
-	for _, prefix := range []string{
-		"torrent_", "delay_", "housekeeping_", "media_info_", "score_", "tvdb_",
-		"simkl_", "backup_", "notify_", "jellyfin_", "plex_", "gxtorrent_",
-	} {
+	// Every option the settings page shows is writable by construction: an
+	// indexed key that this function rejected would render as an editable field
+	// whose save always failed with «chiave non modificabile».
+	if uiSettingIndexed[key] || settingWritableAPIOnly[key] {
+		return true
+	}
+	// Engine and integration families: the API writes keys of these families
+	// that have no row of their own in the settings page.
+	for _, prefix := range settingWritablePrefixes {
 		if strings.HasPrefix(key, prefix) {
 			return true
 		}
 	}
-	switch key {
-	case "active", "refresh_interval", "url", "indexers", "websearch_engines", "blacklist",
-		"content_filters", "max_release_age_days", "gap_fill_max_per_series",
-		"gap_filling", "gap_deep_interval_hours", "gap_deep_max_per_cycle", "flaresolverr_url",
-		"tmdb_api_key", "tmdb_language", "default_language", "rename_episodes", "rename_format",
-		"rename_template", "archive_root", "trash_path", "torrent_dir",
-		"torrent_temp_dir", "torrent_ramdisk_dir",
-		"cleanup_upgrades", "cleanup_min_score_diff", "upgrade_min_score_diff", "upgrade_until_score", "cleanup_action", "dry_run",
-		"min_free_space_gb", "trash_retention_days", "archive_cleanup_enabled",
-		"archive_max_age_days", "archive_keep_min", "stop_on_old_page_threshold", "debug_enabled",
-		"move_episodes", "hardlink_seeding", "auth_enabled", "auth_local_bypass", "auth_username", "auth_password", "auth_api_key", "rename_verify_interval", "auto_remove_completed", "telegram_bot_token",
-		"telegram_chat_id", "email_smtp", "email_from", "email_to", "email_password",
-		"notify_webhook_format", "notify_webhook_token", "notify_webhook_user",
-		"torrent_backend", "qbittorrent_url", "qbittorrent_username", "qbittorrent_password",
-		"qbittorrent_category", "qbittorrent_tag", "qbittorrent_request_timeout_secs",
-		"qbittorrent_poll_interval_ms", "qbittorrent_path_mappings", "qbittorrent_managed":
-		return true
-	}
 	return false
+}
+
+// settingNeverWritable lists keys no endpoint may write, even when a writable
+// prefix covers them. gxtorrent_binary used to select a custom executable; it
+// was removed so a wrong path cannot break the managed engine. The binary is
+// always the one installed next to gexttod (or, as a fallback, the one in the
+// PATH).
+var settingNeverWritable = map[string]bool{"gxtorrent_binary": true}
+
+// settingWritableAPIOnly lists the writable keys that have no row in the
+// settings index: they are edited by dedicated editors (indexers, filters,
+// web search engines, rename format) or only through the API.
+var settingWritableAPIOnly = map[string]bool{
+	"content_filters": true, "dry_run": true, "flaresolverr_url": true,
+	"indexers": true, "rename_format": true, "rename_template": true,
+	"url": true, "websearch_engines": true,
+}
+
+var settingWritablePrefixes = []string{
+	"torrent_", "delay_", "housekeeping_", "media_info_", "score_", "tvdb_",
+	"simkl_", "backup_", "notify_", "jellyfin_", "plex_", "gxtorrent_",
 }
 
 // ArchiveEntries handles GET /api/archive.
@@ -1144,11 +1149,7 @@ func SaveSettingHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "setting is too large")
 		return
 	}
-	if err := validateBackendSetting(input.Key, value); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if err := validatePathSetting(input.Key, value, latestConfig(s)); err != nil {
+	if err := validateSettingValue(input.Key, value, latestConfig(s)); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}

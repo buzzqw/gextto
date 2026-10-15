@@ -14,10 +14,9 @@ import (
 // only adds resident memory, ~14 MB per connection from 2 to 8 MiB.
 const sqliteCacheSizeKiB = "-2000"
 
-// OpenSQLite opens a SQLite database with the same conservative pragmas the
-// daemon used through rusqlite (`busy_timeout`, WAL, foreign keys).
-// A single connection is kept so concurrent goroutines never race on write
-// locks, matching the single `Mutex<Connection>` of the original.
+// OpenSQLite opens a SQLite database with conservative pragmas
+// (`busy_timeout`, WAL, foreign keys). A single connection is kept so
+// concurrent goroutines never race on write locks.
 func OpenSQLite(path string) (*sql.DB, error) {
 	dsn := "file:" + path + "?_pragma=busy_timeout(10000)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)&_pragma=cache_size(" + sqliteCacheSizeKiB + ")"
 	db, err := sql.Open("sqlite", dsn)

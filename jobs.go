@@ -59,10 +59,8 @@ type JobFunc func(ctx context.Context, id string)
 // completed jobs and ordered shutdown. Producers register work with Create +
 // Start; consumers read List/Get and stop work with Cancel.
 //
-// This is the phase-3 foundation of the technical review. Rename-all,
-// scan-archives and media-info-backfill are already ported; each ported
-// operation keeps its visible HTTP contract (or documents the change) and
-// observes cancellation at safe points.
+// Rename-all, scan-archives and media-info-backfill run as jobs; each keeps
+// its visible HTTP contract and observes cancellation at safe points.
 type JobManager struct {
 	mu        sync.Mutex
 	jobs      map[string]*Job

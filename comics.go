@@ -1,12 +1,10 @@
 // Package gextto's comics module implements the core module: the GetComics
 // scraper, the comics SQLite database, the in-process HTTP download registry and
-// the comics download cycle. SQL statements, log messages and behaviour are
-// preserved from the original implementation.
+// the comics download cycle.
 //
-// The original relied on an HTML scraper (tokenizer + selectors) and
-// `reqwest`. The Go port keeps the dependency set to the standard library, so a
-// small HTML tree builder and the handful of CSS selectors GetComics needs are
-// implemented at the bottom of this file.
+// It depends on the standard library only: a small HTML tree builder and the
+// handful of CSS selectors GetComics needs are implemented at the bottom of
+// this file.
 
 package gextto
 
@@ -238,8 +236,8 @@ func OpenComicsDb(path string) (*ComicsDb, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The original sets journal_mode=WAL (already done by OpenSQLite) and
-	// then hardens the connection before creating the schema.
+	// OpenSQLite already set journal_mode=WAL; harden the connection before
+	// creating the schema.
 	if err := HardenConnection(db); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -633,10 +631,8 @@ func (d *ComicsDb) PendingWeekly() ([]WeeklyPending, error) {
 }
 
 // ---------------------------------------------------------------------------
-// In-process HTTP download registry.
-//
-// kept two `OnceLock<Mutex<BTreeMap<...>>>` statics. The Go port uses two
-// mutex-protected maps with goroutines for the active downloads.
+// In-process HTTP download registry: two mutex-protected maps, with one
+// goroutine per active download.
 // ---------------------------------------------------------------------------
 
 var (
@@ -2426,8 +2422,8 @@ func matchesMonitoredIssue(monitoredTitle, postTitle string) bool {
 // ---------------------------------------------------------------------------
 // Minimal HTML tree builder and CSS selector matching.
 //
-// The original used `scraper` (html5ever + selectors). This port implements
-// only the small subset needed by the GetComics parsing functions.
+// Only the small subset needed by the GetComics parsing functions is
+// implemented.
 // ---------------------------------------------------------------------------
 
 type htmlNode struct {

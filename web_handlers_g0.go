@@ -1,6 +1,7 @@
 package gextto
 
-// web_handlers_g0.go is the group-0 implementation of `the reference daemon`.
+// web_handlers_g0.go is group 0 of the HTTP handlers (the number only splits
+// the handler table into files of manageable size).
 // Every handler keeps the shared signature
 //
 //	func Name(w http.ResponseWriter, r *http.Request, s *AppState)

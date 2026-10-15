@@ -177,3 +177,5 @@ pol:
   "Ultime righe del log del motore torrent gx-torrent (": ["Ostatnie wiersze logu silnika torrent gx-torrent (", "Ostatnie wiersze logu silnika torrentów gx-torrent ("]
   "Velocità di download e upload": ["Prędkość download i upload", "Prędkość pobierania i wysyłania"]
   "Verifica di nuovo i pezzi già scaricati": ["Sprawdź ponownie pobrane już fragmenty", "Sprawdź ponownie pobrane już części"]
+  "salvato": ["uratowany", "zapisano"]
+  "Jellyfin salvato": ["Jellyfin uratowany", "Zapisano Jellyfin"]

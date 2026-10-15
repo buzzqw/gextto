@@ -109,6 +109,17 @@ var pathSettings = map[string]bool{
 	"torrent_ramdisk_dir": true,
 }
 
+// pathSettingError is a rejected path value. Error() is the English text the
+// JSON API returns; UIText is the Italian source string the settings page
+// shows, translated through the interface catalogs like every other label.
+type pathSettingError struct {
+	Key    string
+	UIText string
+	reason string
+}
+
+func (e *pathSettingError) Error() string { return e.Key + " " + e.reason }
+
 // validatePathSetting rejects path values that are unsafe for the role they
 // play. Empty values are allowed (they clear/disable the setting). A path that
 // is the filesystem root or that contains the daemon's data/state directory is
@@ -124,10 +135,10 @@ func validatePathSetting(key, value string, cfg *Config) error {
 	}
 	cleaned := filepath.Clean(trimmed)
 	if !filepath.IsAbs(cleaned) {
-		return fmt.Errorf("%s must be an absolute path", key)
+		return &pathSettingError{Key: key, UIText: "deve essere un percorso assoluto", reason: "must be an absolute path"}
 	}
 	if cleaned == string(filepath.Separator) {
-		return fmt.Errorf("%s cannot be the filesystem root", key)
+		return &pathSettingError{Key: key, UIText: "non può essere la radice del filesystem", reason: "cannot be the filesystem root"}
 	}
 	if cfg == nil {
 		return nil
@@ -137,10 +148,20 @@ func validatePathSetting(key, value string, cfg *Config) error {
 			continue
 		}
 		if pathWithin(critical, cleaned) {
-			return fmt.Errorf("%s cannot contain the Gextto data/download directory", key)
+			return &pathSettingError{Key: key, UIText: "non può contenere la cartella dati o download di Gextto", reason: "cannot contain the Gextto data/download directory"}
 		}
 	}
 	return nil
+}
+
+// validateSettingValue is the value check every write of a setting goes
+// through — the JSON API, the settings page and the setup wizard — so a value
+// one entry point rejects cannot slip in through another.
+func validateSettingValue(key, value string, cfg *Config) error {
+	if err := validateBackendSetting(key, value); err != nil {
+		return err
+	}
+	return validatePathSetting(key, value, cfg)
 }
 
 // safeTrashRoot also protects configurations already on disk (not just new

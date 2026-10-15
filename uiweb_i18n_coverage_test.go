@@ -135,6 +135,10 @@ func TestUIIsTranslatable(t *testing.T) {
 	goAssign := regexp.MustCompile(`\.(?:Empty|Message|Hint|Title|Label|Note|Initial)\s*=\s*"([^"\\\n]{3,})"`)
 	goHelper := regexp.MustCompile(`(?:boolField|boolFieldHint|sectionSettingsActions)\(\s*"[^"]*",\s*"([^"\\\n]{3,})"(?:,\s*"([^"\\\n]{3,})")?`)
 	goUIText := regexp.MustCompile(`uiText\([^,]+,\s*"([^"\\\n]{3,})"\)`)
+	// Save outcomes rendered next to a setting (render("salvata", false),
+	// Status: "salvato"): they are text nodes of the page like any label.
+	goStatus := regexp.MustCompile(`(?:\brender\(|\bStatus:\s*)"([^"\\\n]{3,})"`)
+	goUIText2 := regexp.MustCompile(`UIText:\s*"([^"\\\n]{3,})"`)
 
 	missing := map[string]string{}
 	record := func(source, raw string) {
@@ -218,6 +222,9 @@ func TestUIIsTranslatable(t *testing.T) {
 		for _, m := range goUIText.FindAllStringSubmatch(string(raw), -1) {
 			record(path, m[1])
 		}
+		for _, m := range goStatus.FindAllStringSubmatch(string(raw), -1) {
+			record(path, m[1])
+		}
 		for _, m := range goAssign.FindAllStringSubmatch(string(raw), -1) {
 			record(path, m[1])
 		}
@@ -227,6 +234,14 @@ func TestUIIsTranslatable(t *testing.T) {
 				record(path, m[2])
 			}
 		}
+	}
+	// Rejected path values carry the Italian text the settings page shows.
+	if raw, err := os.ReadFile("backend_config_validation.go"); err == nil {
+		for _, m := range goUIText2.FindAllStringSubmatch(string(raw), -1) {
+			record("backend_config_validation.go", m[1])
+		}
+	} else {
+		t.Fatalf("read backend_config_validation.go: %v", err)
 	}
 
 	if len(mixed) > 0 {

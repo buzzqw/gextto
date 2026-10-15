@@ -538,10 +538,14 @@ type AppState struct {
 	engine_mu      sync.RWMutex
 	torrent_engine TorrentEngine
 	torrent_events *EventLog
-	notifier       *Notifier
-	tmdb           *TmdbClient
-	last_cycle     *CycleState
-	cycle_lock     *sync.Mutex
+	// internalMux is the router the v2 pages call the JSON API through
+	// (v2InternalJSON). It lives on the state it serves, so a test state and
+	// its router are freed together instead of staying in a package-level map.
+	internalMux atomic.Pointer[http.ServeMux]
+	notifier    *Notifier
+	tmdb        *TmdbClient
+	last_cycle  *CycleState
+	cycle_lock  *sync.Mutex
 	// manualCyclePending coalesces repeated manual cycle requests while one is
 	// waiting for, or holding, cycle_lock. Without it a rapid series of clicks
 	// could create an unbounded backlog of full monitoring runs.

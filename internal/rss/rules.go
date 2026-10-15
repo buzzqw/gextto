@@ -95,8 +95,8 @@ var (
 	// optional disc suffix S03D01), Season 4, Stagione 4. It is the pack
 	// counterpart of FindEpisode, so a title like "Reacher S04 COMPLETE" or
 	// "Reacher (2022) S04 1080p WEBRip" yields its season.
-	seasonPackSRegex       = regexp.MustCompile(`(?i)(?:^|[\s._\-\[\(])s(\d{1,2})(?:d\d{1,2})?(?:[\s._\-\]\)\.]|$)`)
-	seasonPackWordRegex    = regexp.MustCompile(`(?i)\bseason[\s._\-]*(\d{1,2})\b`)
+	seasonPackSRegex        = regexp.MustCompile(`(?i)(?:^|[\s._\-\[\(])s(\d{1,2})(?:d\d{1,2})?(?:[\s._\-\]\)\.]|$)`)
+	seasonPackWordRegex     = regexp.MustCompile(`(?i)\bseason[\s._\-]*(\d{1,2})\b`)
 	seasonPackStagioneRegex = regexp.MustCompile(`(?i)\bstagione[\s._\-]*(\d{1,2})\b`)
 )
 

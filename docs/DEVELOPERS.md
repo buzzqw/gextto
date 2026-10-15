@@ -135,6 +135,19 @@ When adding an API endpoint:
 Use the existing JSON helpers and keep destructive operations explicit and
 confirmable in the UI.
 
+The v2 pages read and write through the JSON API in-process
+(`v2InternalJSON`, using the router stored on `AppState`). A renamed route does
+not break the build, so `TestInternalJSONPathsAreRegisteredRoutes` resolves
+every literal method and path of those calls, and the `Endpoint`/`GetPath`/
+`PostPath`/`TestEndpoint`/`AddPath` fields of the page specs, against the real
+router.
+
+Settings: a key in the settings index (`uiweb_settings.go`) is writable by
+construction; `settingWritableAPIOnly` (`web_handlers_g7.go`) lists only the
+keys with no row on the page. Every write path (the JSON API, the settings page,
+the setup wizard) validates the value through `validateSettingValue`
+(`backend_config_validation.go`), so a rule added there applies everywhere.
+
 Every route sits behind `AuthMiddleware` (`auth.go`). Access control is off by
 default; when it is on, only `/login`, `/logout`, `/static/`, the favicon, the
 manifest and the service worker are public, and local clients pass without a
