@@ -86,9 +86,11 @@ func (a *feedArchive) view(fn func(*bolt.Tx) error) error {
 	return a.db.View(fn)
 }
 
+// update takes the lock shared too: bbolt already serializes write
+// transactions, the exclusive lock is only for compact and close.
 func (a *feedArchive) update(fn func(*bolt.Tx) error) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if a.db == nil {
 		return errors.New("feed archive is closed")
 	}
