@@ -787,6 +787,26 @@ func (d *Daemon) handleUIRenameFile(w http.ResponseWriter, r *http.Request) {
 	d.uiDoneDetail(w, r, hash, "files", "File renamed", err)
 }
 
+// handleUIRenameFolder renames one top folder of a torrent (from the grouped
+// Files tab). Like every rename it moves the content on disk and never
+// changes the torrent identity.
+func (d *Daemon) handleUIRenameFolder(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	oldPath := strings.TrimSpace(r.FormValue("old"))
+	newPath := strings.TrimSpace(r.FormValue("new"))
+	var err error
+	if hash == "" || oldPath == "" || newPath == "" {
+		err = fmt.Errorf("hash, old and new are required")
+	} else {
+		err = d.renameFolder(hash, oldPath, newPath)
+	}
+	d.uiDoneDetail(w, r, hash, "files", "Folder renamed", err)
+}
+
 // handleUIAltSpeed toggles the manual alternative speed limits (the qBittorrent
 // speed-limit button).
 func (d *Daemon) handleUIAltSpeed(w http.ResponseWriter, r *http.Request) {

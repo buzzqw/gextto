@@ -113,6 +113,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/remove", d.handleUIRemove)
 	root.HandleFunc("POST /ui/rename", d.handleUIRename)
 	root.HandleFunc("POST /ui/rename-file", d.handleUIRenameFile)
+	root.HandleFunc("POST /ui/rename-folder", d.handleUIRenameFolder)
 	root.HandleFunc("POST /ui/alt-speed", d.handleUIAltSpeed)
 	root.HandleFunc("POST /ui/add", d.handleUIAdd)
 	root.HandleFunc("POST /ui/add-file", d.handleUIAddFile)

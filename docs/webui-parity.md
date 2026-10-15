@@ -43,7 +43,8 @@ Stato di partenza (già buono, da non regredire):
 - [x] Tab Content ad albero: `Group by folder` nel Files tab (JS, senza nuove
       API): header per cartella con checkbox tri-state, priorità per cartella
       (ri-usa `/ui/file-priority` multi-`index`), collapse persistente in
-      memoria; pulsante Stream con etichetta visibile. Resta: rename cartella.
+      memoria; pulsante Stream con etichetta visibile; rename cartella
+      (`POST /ui/rename-folder` + dialog dedicato).
 - [ ] Resta Add dialog: selettore cookie, content-layout, anteprima nome dopo
       magnet.
       → fatto: anteprima magnet (nome dn + hash) live nel dialog, hint cookie
@@ -76,8 +77,7 @@ Migliorie proposte (usabilità, non motore):
       (`New feed` / `New rule` da preset / `Import a setup`) invece della sola
       riga vuota.
 - [x] Template regole one-click: `TV series`, `Movie`, `Take all`. Compilano
-      l'editor, la preview live mostra subito cosa prenderebbero.
-- [x] Editor feed: bottone `Test` (fetch via `/ui/feed-items?url=`, senza
+      l'editor, la preview live mostra subito cosa prenderebbero.- [x] Editor feed: bottone `Test` (fetch via `/ui/feed-items?url=`, senza
       salvare, con titoli di esempio). I campi fallback restano editabili e
       dimmati quando le regole coprono il feed (disabilitarli cancellerebbe i
       valori al salvataggio): avviso con nomi regole già presente.
@@ -104,8 +104,8 @@ Migliorie proposte (usabilità, non motore):
       tutti i campi).
 - [x] Dialog bulk: riepilogo `N torrent` + placeholder `mixed` nei limiti quando
       la selezione ha valori diversi. Resta: undo di 5s per `remove`.
-- [ ] Settings cercabile: filtro sopra `/ui/settings` + badge `modified` per
-      valori non-default; tab già deep-linkabili (`tab=`).
+- [x] Settings con filtro di ricerca per sezione (il badge `modified` resta
+      rinviato: richiederebbe i default nel client).
 - [x] Log stile qBittorrent: filtro livelli DEBUG/INFO/WARN/ERROR
       (client-side, classi già esistenti).
 - [x] Context-menu bottom-sheet su `<760px` (`theme.css`, vale per tutte le
@@ -120,9 +120,9 @@ Migliorie proposte (usabilità, non motore):
       `?rows=300` + `Show more`.
 - [ ] Preferenze UI (colonne/filtri/tema) salvate anche lato server
       (`settings.json`) per multi-device, non solo `localStorage`.
-- [ ] Chiudere i gap `/api/v2` che rompono VueTorrent/*arr/mobile
-      (`transfer/*`, `app/preferences` mancanti, `search/*`); gate
-      `qbit_compat_test.go` con client `internal/qbittorrent`.
+- [x] Audit `/api/v2`: copertura completa (auth/app/transfer/torrents/sync/log/
+      search/rss/torrentcreator, inclusi rename e prio); gate
+      `qbit_compat_test.go` verde. Resta: prova contro VueTorrent reale.
 
 ## Ordine di lavoro
 

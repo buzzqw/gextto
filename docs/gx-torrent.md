@@ -241,7 +241,9 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   paths, with a *Browse* folder picker in standalone: `GET /ui/browse-dir` lists
   the daemon machine's directories so the path is chosen instead of typed),
   category (standalone) and the options (paused, top, sequential,
-  first/last, super-seeding). A `.torrent` dropped anywhere on the page or a
+  first/last, super-seeding, per-torrent download/upload limits, automatic
+  management). What is typed is previewed at once (magnet name and info hash,
+  ignored lines); a `.torrent` dropped anywhere on the page or a
   magnet pasted outside a field opens it pre-filled.
 - **Remove** asks in a dialog whether to delete the files too.
 - **Per-torrent detail** in a panel below the list (like qBittorrent; full width
@@ -250,7 +252,9 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   *General* (actions, data, pieces, space, dates, pin, speed, connection,
   upload and seed limits, super-seeding, move, category and tags, **web
   seeds**), *Files* (progress bar per file, priority per file or for **all the
-  ticked files at once**, **rename** and **HTTP streaming** with ▶), *Peers*
+  ticked files at once**, **group by folder** with one checkbox and one
+  priority control per folder, **rename** of files and folders, and **HTTP
+  streaming** with a labelled *Stream* button), *Peers*
   (connection flags, transport, encryption; **add peers** by `ip:port` and
   **ban** a peer's IP for 30 minutes, `POST /ui/peers`), *Trackers* (status,
   swarm, add and **remove**), *Pieces* (coloured map). Peers, trackers and pieces refresh while

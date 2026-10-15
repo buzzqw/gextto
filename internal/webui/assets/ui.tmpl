@@ -556,6 +556,22 @@ body{display:flex;flex-direction:column;overflow:hidden}
   </form>
 </dialog>
 
+<dialog id="dlg-rename-folder" aria-labelledby="dlg-rename-folder-title">
+  <form method="post" action="/ui/rename-folder" id="form-rename-folder">
+    <div class="dlg-head"><h2 id="dlg-rename-folder-title">Rename folder</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-body">
+      <input type="hidden" name="hash">
+      <input type="hidden" name="old">
+      <label class="field">New folder name<input type="text" name="new" autocomplete="off" required title="The new name of the folder inside the torrent"></label>
+      <p class="muted" style="margin:0;font-size:12.5px">Every file in the folder moves with it; the torrent keeps its info hash.</p>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" data-close title="Close without renaming">Cancel</button>
+      <button type="submit" class="primary" title="Rename this folder">Rename</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="dlg-cat" aria-labelledby="dlg-cat-title">
   <form method="post" action="/ui/category" id="form-cat">
     <div class="dlg-head"><h2 id="dlg-cat-title">Category and tags</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
@@ -1061,7 +1077,8 @@ function groupFiles(){
       '<td class="fname"><button type="button" class="ghost icon sm exp" aria-expanded="'+(!shut)+'" aria-label="'+(shut?t('Expand folder'):t('Collapse folder'))+'" title="'+(shut?t('Expand folder'):t('Collapse folder'))+'"><svg class="i"><use href="#i-chev"/></svg></button>'+
       '<svg class="i"><use href="#i-folder"/></svg><span></span> <span class="muted"></span></td>'+
       '<td class="num"></td><td class="fp"></td>'+
-      '<td><select aria-label="'+t('Priority of every file in this folder')+'" title="'+t('Download priority for every file in this folder')+'"><option value="0">Skip</option><option value="4">Normal</option><option value="6">High</option><option value="7">Maximum</option></select></td><td></td>';
+      '<td><select aria-label="'+t('Priority of every file in this folder')+'" title="'+t('Download priority for every file in this folder')+'"><option value="0">Skip</option><option value="4">Normal</option><option value="6">High</option><option value="7">Maximum</option></select></td>'+
+      '<td><button type="button" class="btn ghost icon sm fdirrn" aria-label="'+t('Rename folder')+'" title="'+t('Rename folder')+'"><svg class="i"><use href="#i-edit"/></svg></button></td>';
     $('.fname span',h).textContent=dir;
     $('.fname .muted',h).textContent=g.rows.length+' '+t('files');
     var cb=$('.fdirsel',h);
@@ -1081,6 +1098,8 @@ function groupFiles(){
     var exp=$('.exp',h);
     exp.addEventListener('click',function(){shut=!shut;collapsedDirs[key]=shut;g.rows.forEach(function(r){r.hidden=shut;});exp.setAttribute('aria-expanded',(!shut)+'');exp.setAttribute('aria-label',shut?t('Expand folder'):t('Collapse folder'));exp.setAttribute('title',shut?t('Expand folder'):t('Collapse folder'));});
     cb.addEventListener('change',function(){g.rows.forEach(function(r){var c=$('.filesel',r);if(c)c.checked=cb.checked;});});
+    var rn=$('.fdirrn',h);
+    if(rn)rn.addEventListener('click',function(){var frd=$('#dlg-rename-folder');if(!frd||!state.drawer)return;$('input[name=hash]',frd).value=state.drawer.hash;$('input[name=old]',frd).value=dir;$('input[name=new]',frd).value=dir;openDialog(frd);});
     ps.addEventListener('change',function(){
       var f=new URLSearchParams();f.set('hash',hash||'');
       g.rows.forEach(function(r){var c=$('.filesel',r);var idx=c?c.value:null;if(idx!==null)f.append('index',idx);});
