@@ -321,11 +321,19 @@ fewer features, but all the ones a standalone client needs.
 - **`*arr` ready.** qBittorrent Web API v2 (`/api/v2/...`) for Sonarr, Radarr,
   Lidarr, Readarr and mobile managers, plus its own JSON API (`/api/v1/...`)
   and sign-in page.
-- **Modern web UI.** Light and dark themes in the spirit of VueTorrent/Flood:
-  sidebar with status/category/tag filters and a live transfer graph, dense
-  sortable multi-select list with context menu and keyboard shortcuts, torrent
-  detail in a side panel, drag-and-drop of `.torrent` files and pasted
-  magnets, phone-friendly cards, and a **Statistics** page (live rates, the
+- **Modern web UI, familiar to qBittorrent users.** Light and dark themes;
+  a sidebar with collapsible status (12 filters), category, tag and **tracker**
+  filters and a live transfer graph; a compact one-line-per-torrent list with a
+  **column chooser** (20 columns: added/completed on, downloaded, remaining,
+  queue position, tracker, save path…) and **resizable columns**, both
+  remembered; a full **context menu** (force start, set location, category
+  submenu, automatic management, speed limits, super-seeding, sequential and
+  first/last pieces, queue, copy name/hash/magnet) whose toggles show the
+  state of the whole selection, mixed included; a **resizable detail panel**
+  (files with progress and bulk priority, peers you can add or ban); the
+  global speed limits one click away in the status bar, speeds in the tab
+  title, keyboard shortcuts everywhere, drag-and-drop of `.torrent` files and
+  pasted magnets, phone-friendly cards, and a **Statistics** page (live rates, the
   totals of this session and of every session — kept across restarts —, disk
   and cache, the network, the queue and a speed graph over 1 h/24 h/7 d).
   Every page axe-core checked.

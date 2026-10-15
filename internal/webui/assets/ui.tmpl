@@ -7,6 +7,26 @@
 <title>gx-torrent</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.ico">
 <script>try{var m=localStorage.getItem('gx-theme');if(m==='light'||m==='dark')document.documentElement.setAttribute('data-theme',m);}catch(e){}</script>
+<script>
+// The torrent table's columns (the column chooser): key, shown by default,
+// default width in px (0 = the name column, which takes the remaining space).
+// The style is written before the table is parsed, so a hidden column never
+// flashes on load.
+window.__gxCols=[["name",1,0],["size",1,92],["progress",1,120],["state",1,112],["seeds",1,72],["peers",1,72],["down",1,104],["up",1,104],["eta",1,76],["ratio",1,64],["category",1,104],["tags",0,120],["added",0,132],["completed",0,132],["downloaded",0,94],["uploaded",0,94],["remaining",0,94],["queue",0,52],["tracker",0,150],["path",0,220]];
+window.gxColStyle=function(){
+  var saved={};try{saved=JSON.parse(localStorage.getItem('gx-cols')||'{}')||{};}catch(e){}
+  var css='',total=34+40+200;
+  window.__gxCols.forEach(function(c){
+    var s=saved[c[0]]||{},on=c[0]==='name'?true:(s.on===undefined?!!c[1]:!!s.on),w=s.w||c[2];
+    if(!on){css+='.tbl.t .c-'+c[0]+'{display:none}';return;}
+    if(w){css+='.tbl.t th.c-'+c[0]+'{width:'+w+'px}';total+=w;}
+  });
+  css='@media (min-width:761px){'+css+'.tbl.t{min-width:'+total+'px}}';
+  var el=document.getElementById('col-style');if(!el){el=document.createElement('style');el.id='col-style';document.head.appendChild(el);}
+  el.textContent=css;
+};
+window.gxColStyle();
+</script>
 <link rel="stylesheet" href="/assets/theme.css">
 <style>
 html,body{height:100%}
@@ -20,16 +40,23 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .speeds span{display:inline-flex;align-items:center;gap:4px}
 .speeds .d{color:var(--info)}.speeds .u{color:var(--ok)}
 .shell{flex:1;display:flex;min-height:0}
-.side{width:224px;flex:none;overflow:auto;padding:14px 10px;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;gap:18px}
-.side h2{margin:0 8px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--subtle);font-weight:650}
-.flist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
-.flist button{width:100%;height:32px;justify-content:flex-start;gap:9px;border:0;background:transparent;color:var(--muted);font-weight:500;padding:0 8px}
+/* Sidebar: qBittorrent's filter panel, every section collapsible. */
+.side{width:224px;flex:none;overflow:auto;padding:10px 8px;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;gap:10px}
+.side h2{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--subtle);font-weight:650}
+.side h2 button{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:6px;width:100%;padding:4px 8px;border-radius:6px;cursor:pointer}
+.side h2 button:hover{color:var(--text)}
+.side h2 button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.side h2 button svg{width:12px;height:12px;transition:transform .15s}
+.side h2 button[aria-expanded="false"] svg{transform:rotate(-90deg)}
+.flist{list-style:none;margin:2px 0 0;padding:0;display:flex;flex-direction:column;gap:1px}
+.flist[hidden]{display:none}
+.flist button{width:100%;height:28px;justify-content:flex-start;gap:9px;border:0;background:transparent;color:var(--muted);font-weight:500;padding:0 8px}
 .flist button:hover{background:var(--hover);color:var(--text)}
 .flist button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-soft-fg)}
 .flist button .n{margin-left:auto;font-size:12px;color:var(--subtle);font-variant-numeric:tabular-nums}
 .flist button[aria-pressed="true"] .n{color:inherit}
 .flist button .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.flist .empty{padding:4px 8px;font-size:12.5px;color:var(--subtle)}
+.flist button.zero{opacity:.62}
 .graph{margin:0 4px;padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--sunken)}
 .graph svg{display:block;width:100%;height:56px}
 .graph .legend{display:flex;justify-content:space-between;font-size:12px;margin-top:6px;font-variant-numeric:tabular-nums}
@@ -39,61 +66,88 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .graph path.da{fill:var(--info-soft);stroke:none}
 .work{flex:1;min-width:0;display:flex;flex-direction:column}
 .torrentpane{flex:1;min-height:0;display:flex;flex-direction:column}
-.toolbar{display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
+.toolbar{display:flex;align-items:center;gap:4px;padding:6px 12px;border-bottom:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
 .toolbar .sep{width:1px;height:20px;background:var(--border);margin:0 4px}
 .toolbar .selinfo{font-size:12.5px;color:var(--muted);margin-left:4px}
-.toolbar .right{margin-left:auto;display:flex;gap:6px;align-items:center}
+.toolbar .right{margin-left:auto;display:flex;gap:4px;align-items:center}
 .listwrap{flex:1;min-height:0;overflow:auto;position:relative;background:var(--surface)}
-.tbl.t{table-layout:fixed;min-width:860px}
-.tbl.t col.c-sel{width:40px}.tbl.t col.c-size{width:108px}.tbl.t col.c-prog{width:150px}.tbl.t col.c-state{width:150px}
-.tbl.t col.c-rate{width:96px}.tbl.t col.c-eta{width:84px}.tbl.t col.c-peers{width:84px}.tbl.t col.c-ratio{width:92px}.tbl.t col.c-more{width:44px}
-.tbl.t th{overflow:hidden;text-overflow:ellipsis}
-.tbl.t th button.sort{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;max-width:100%}
+/* Torrent table: one compact line per torrent, like qBittorrent. */
+.tbl.t{table-layout:fixed;font-size:13px}
+.tbl.t th{height:30px;padding:0 8px;position:sticky;top:0;overflow:hidden;text-overflow:ellipsis;text-transform:none;letter-spacing:0;font-size:12px}
+.tbl.t th.sel{width:34px}.tbl.t th.c-more{width:40px}
+.tbl.t th button.sort{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;max-width:calc(100% - 6px);overflow:hidden;text-overflow:ellipsis}
 .tbl.t th button.sort:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+.tbl.t th.num button.sort{float:right}
 .tbl.t th[aria-sort="ascending"] .arrow::after{content:"▲";font-size:9px}
 .tbl.t th[aria-sort="descending"] .arrow::after{content:"▼";font-size:9px}
+.tbl.t th .rz{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;touch-action:none}
+.tbl.t th .rz::after{content:"";position:absolute;top:8px;bottom:8px;right:3px;width:1px;background:var(--border)}
+.tbl.t th .rz:hover::after,.tbl.t th .rz:focus-visible::after{background:var(--accent);width:2px}
+.tbl.t th .rz:focus-visible{outline:none}
 .tbl.t tbody tr{cursor:default}
-.tbl.t tbody tr td{height:52px;padding:6px 10px}
+.tbl.t tbody tr td{height:32px;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tbl.t tbody tr[aria-selected="true"] td{background:var(--accent-soft)}
 .tbl.t tbody tr:focus-visible{outline:none}
 .tbl.t tbody tr:focus-visible td{box-shadow:inset 0 2px 0 var(--focus),inset 0 -2px 0 var(--focus)}
 .tbl.t tbody tr:focus-visible td:first-child{box-shadow:inset 2px 2px 0 var(--focus),inset 0 -2px 0 var(--focus)}
 .tbl.t td.sel{text-align:center}
-.tbl.t .name{min-width:0}
-.tbl.t .name .t1{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tbl.t .name .t1 a{color:var(--text);text-decoration:none}
-.tbl.t .name .t1 a:hover{text-decoration:underline;color:var(--accent)}
-.tbl.t .name .t2{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--subtle);white-space:nowrap;overflow:hidden;margin-top:2px}
-.tbl.t .name .t2 .path{overflow:hidden;text-overflow:ellipsis}
-.tbl.t .prog .pl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px;font-variant-numeric:tabular-nums}
-.tbl.t td.more button{opacity:.5}
+.tbl.t td.name a{color:var(--text);text-decoration:none;font-weight:550}
+.tbl.t td.name a:hover{text-decoration:underline;color:var(--accent)}
+.tbl.t td.name .fl{font-size:10.5px;font-weight:650;color:var(--accent-soft-fg);background:var(--accent-soft);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:1px}
+.tbl.t .state .badge{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.pbar{position:relative;height:16px;border-radius:4px;background:var(--surface-2);overflow:hidden;font-size:11px;font-variant-numeric:tabular-nums}
+.pbar>i{position:absolute;inset:0 auto 0 0;background:var(--bar-down);opacity:.85}
+.pbar.seeding>i{background:var(--bar-seed)}
+.pbar.paused>i,.pbar.stalled>i,.pbar.disk_wait>i{background:var(--bar-paused)}
+.pbar.error>i{background:var(--err)}
+.pbar>span{position:relative;display:block;text-align:center;line-height:16px;color:var(--text);font-weight:600;text-shadow:0 0 3px var(--surface)}
+.tbl.t td.more{padding:0 4px}
+.tbl.t td.more button{opacity:.5;width:28px;height:24px}
 .tbl.t tr:hover td.more button,.tbl.t tr[aria-selected="true"] td.more button,.tbl.t td.more button:focus-visible{opacity:1}
 .tbl.t .z{color:var(--subtle)}
 .emptystate{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:80px 20px;text-align:center;color:var(--muted)}
 .emptystate svg{width:44px;height:44px;color:var(--subtle)}
 .emptystate h3{margin:0;color:var(--text);font-size:16px}
 .more-rows{padding:12px;text-align:center}
-.statusbar{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding:6px 14px;border-top:1px solid var(--border);background:var(--surface);font-size:12.5px;color:var(--muted)}
+/* Status bar: what matters at a glance; the rest is one click away. */
+.statusbar{display:flex;gap:6px 16px;align-items:center;flex-wrap:wrap;padding:4px 12px;border-top:1px solid var(--border);background:var(--surface);font-size:12.5px;color:var(--muted)}
 .statusbar b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.statusbar .spacer{flex:1}
 .statusbar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:var(--subtle)}
 .statusbar .dot.ok{background:var(--ok)}.statusbar .dot.bad{background:var(--err)}.statusbar .dot.warn{background:var(--warn)}
 .statusbar .sb-update{display:inline-flex;align-items:center;color:var(--text);font-weight:600;text-decoration:none;border:1px solid var(--warn);border-radius:999px;padding:1px 9px}.statusbar .sb-update:hover,.statusbar .sb-update:focus-visible{background:var(--warn-soft)}
 .statusbar .disk{display:inline-flex;align-items:center;gap:6px}
 .statusbar .disk .progress{width:70px}
+.statusbar .sb-btn{display:inline-flex;align-items:center;gap:5px;height:24px;border:1px solid transparent;background:transparent;color:var(--muted);border-radius:6px;padding:0 7px;font:inherit;cursor:pointer}
+.statusbar .sb-btn:hover{background:var(--hover);color:var(--text)}
+.statusbar .sb-btn .d{color:var(--info)}.statusbar .sb-btn .u{color:var(--ok)}
 .statusbar .sb-alt{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:999px;padding:1px 9px;cursor:pointer;font:inherit}
 .statusbar .sb-alt[aria-checked=true]{border-color:var(--warn);color:var(--text);background:var(--warn-soft)}
-.drawer{flex:none;height:clamp(220px,46vh,520px);border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;min-height:0}
+.sbmore{position:fixed;right:12px;bottom:38px;z-index:55;width:min(420px,calc(100vw - 24px));padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);font-size:12.5px}
+.sbmore[hidden]{display:none}
+.sbmore h2{margin:0 0 8px;font-size:13px}
+.sbmore .row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--border)}
+.sbmore .row:last-child{border-bottom:0}
+.sbmore .row span:first-child{color:var(--muted)}
+.sbmore .row b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;word-break:break-word}
+/* Detail panel under the list, resizable from its top edge. */
+.drawer{flex:none;height:var(--drawer-h,clamp(220px,42vh,520px));border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;min-height:0;position:relative}
 .drawer[hidden]{display:none}
-.drawer .dhead{display:flex;align-items:flex-start;gap:10px;padding:14px 16px 8px}
-.drawer .dhead h2{margin:0;font-size:15px;flex:1;word-break:break-word}
+.dsplit{position:absolute;left:0;right:0;top:-4px;height:8px;cursor:row-resize;z-index:3;touch-action:none}
+.dsplit::after{content:"";position:absolute;left:50%;top:2px;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--border-strong);opacity:0;transition:opacity .15s}
+.dsplit:hover::after,.dsplit:focus-visible::after{opacity:1;background:var(--accent)}
+.dsplit:focus-visible{outline:none}
+.drawer #drawer-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.drawer .dhead{display:flex;align-items:flex-start;gap:10px;padding:10px 16px 4px}
+.drawer .dhead h2{margin:0;font-size:14px;flex:1;word-break:break-word}
 .drawer .dbody{flex:1;overflow:auto;padding:0 16px 20px}
-.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin:0 -16px 14px;padding:0 12px;position:sticky;top:0;background:var(--surface);z-index:1}
-.tabs button{height:36px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--muted);padding:0 10px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin:0 -16px 12px;padding:0 12px;position:sticky;top:0;background:var(--surface);z-index:1}
+.tabs button{height:34px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--muted);padding:0 10px}
 .tabs button:hover{background:transparent;color:var(--text)}
 .tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
 .tabs .cnt{font-size:11.5px;color:var(--subtle)}
 .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0 20px;margin-bottom:14px}
-.kv .row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.kv .row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
 .kv .row span{color:var(--muted)}
 .kv .row strong{font-weight:550;text-align:right;word-break:break-word;font-variant-numeric:tabular-nums}
 .dsec{margin:18px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--subtle);font-weight:650}
@@ -103,8 +157,13 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .form-grid textarea,.form-grid .wide{grid-column:1/-1}
 .form-grid .wide textarea,.form-grid .wide input{width:100%}
 .drawer .tbl{font-size:12.5px}
-.drawer .tbl td{padding:6px 8px}
-.drawer .tbl th{padding:0 8px}
+.drawer .tbl td{padding:5px 8px}
+.drawer .tbl th{padding:0 8px;height:30px;text-transform:none;letter-spacing:0}
+.filesbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px;font-size:12.5px}
+.filesbar select{height:28px}
+.tbl.files .fp{min-width:110px}
+.tbl.files .fname .dir{color:var(--subtle)}
+.tbl.files td.sel{width:30px;text-align:center}
 .flags{display:flex;flex-wrap:wrap;gap:3px}
 .flag{font-size:11px;padding:0 6px;border-radius:5px;background:var(--surface-2);color:var(--muted);white-space:nowrap;line-height:18px}
 .flag.on{background:var(--ok-soft);color:var(--ok)}
@@ -128,16 +187,18 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .logbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface)}
 .logview{flex:1;margin:0;overflow:auto;padding:10px 14px;background:var(--sunken);font:12.5px/1.45 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .logview .warn{color:var(--warn)}.logview .error{color:var(--err)}.logview .debug{color:var(--subtle)}
+/* Menus: check marks for toggles, an arrow for submenus. */
+.menu [role=menuitemcheckbox]::after,.menu [aria-haspopup=menu]::after{margin-left:auto;padding-left:12px;color:var(--subtle)}
+.menu [role=menuitemcheckbox][aria-checked=true]::after{content:"✓";color:var(--accent);font-weight:700}
+.menu [role=menuitemcheckbox][aria-checked=mixed]::after{content:"–";color:var(--accent);font-weight:700}
+.menu [aria-haspopup=menu]::after{content:"›";font-size:16px}
+.menu .mhead{padding:4px 10px 2px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--subtle)}
+.menu.cols{max-height:min(70vh,560px);overflow:auto}
+.dlg-help{margin:0;font-size:12.5px;color:var(--muted)}
 .tbl.t td.meta-m{display:none}
 .menu-side{display:none!important}
-/* The list adapts to its own width (side panel open or not), not the window. */
-.listwrap{container-type:inline-size}
-.work{container-type:inline-size;container-name:work}
-@container (max-width:1000px){.tbl.t col.c-ratio,.tbl.t th.c-ratio,.tbl.t td.c-ratio{display:none}.tbl.t{min-width:0}}
-@container (max-width:860px){.tbl.t col.c-peers,.tbl.t th.c-peers,.tbl.t td.c-peers,.tbl.t col.c-eta,.tbl.t th.c-eta,.tbl.t td.c-eta,.tbl.t col.c-upc,.tbl.t th.c-upc,.tbl.t td.c-upc{display:none}}
-@container (max-width:700px){.tbl.t col.c-size,.tbl.t th.c-size,.tbl.t td.c-size{display:none}.tbl.t col.c-prog{width:110px}}
 @container work (max-width:880px){.toolbar .lbl{display:none}}
-@media (max-width:1180px){.tbl.t col.c-ratio,.tbl.t th.c-ratio,.tbl.t td.c-ratio{display:none}}
+.work{container-type:inline-size;container-name:work}
 @media (max-width:980px){
   .side{display:none}
   .side.open{display:flex;position:fixed;z-index:40;top:52px;bottom:0;left:0;box-shadow:var(--shadow-lg)}
@@ -145,22 +206,21 @@ body{display:flex;flex-direction:column;overflow:hidden}
 }
 @media (max-width:760px){
   .topbar .search{display:none}.speeds{display:none}.brand small{display:none}
-  .tbl.t{min-width:0}
+  .tbl.t{min-width:0;table-layout:auto}
   .tbl.t thead{display:none}
-  .tbl.t colgroup{display:none}
   .tbl.t,.tbl.t tbody{display:block}
   .tbl.t tbody tr{display:grid;grid-template-columns:28px 1fr auto;grid-template-areas:"sel name more" "sel prog prog" "sel meta meta";gap:4px 8px;padding:10px 12px;border-bottom:1px solid var(--border)}
-  .tbl.t tbody tr td{display:none;height:auto;padding:0;border:0;background:transparent!important}
+  .tbl.t tbody tr td{display:none;height:auto;padding:0;border:0;background:transparent!important;white-space:normal}
   .tbl.t tbody tr[aria-selected="true"]{background:var(--accent-soft)}
   .tbl.t td.sel{display:block;grid-area:sel;padding-top:2px}
   .tbl.t td.name{display:block;grid-area:name}
   .tbl.t td.more{display:block;grid-area:more}
-  .tbl.t td.prog{display:block;grid-area:prog}
+  .tbl.t td.c-progress{display:block;grid-area:prog}
   .tbl.t td.meta-m{display:flex;grid-area:meta;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
   .toolbar .lbl{display:none}
   .toolbar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
-  .toolbar .selinfo{display:none}
-  .statusbar{gap:4px 14px}
+  .toolbar .selinfo,.toolbar .hide-m{display:none}
+  .statusbar{gap:4px 12px}
   .statusbar .hide-m{display:none}
 }
 </style>
@@ -170,9 +230,11 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
   <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
   <symbol id="i-signal" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/></symbol>
   <symbol id="i-top" viewBox="0 0 24 24"><path d="M5 3h14M12 21V8M6 14l6-6 6 6"/></symbol>
+  <symbol id="i-bottom" viewBox="0 0 24 24"><path d="M5 21h14M12 3v13M6 10l6 6 6-6"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></symbol>
   <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
@@ -185,6 +247,9 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
   <symbol id="i-seed" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 4-4 4 4M12 16V8"/></symbol>
   <symbol id="i-dl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 4 4 4-4M12 8v8"/></symbol>
+  <symbol id="i-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.5 9.5"/></symbol>
+  <symbol id="i-run" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5 3.5-5 3.5z"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></symbol>
   <symbol id="i-pausec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></symbol>
   <symbol id="i-warn" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
@@ -201,6 +266,13 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></symbol>
   <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></symbol>
   <symbol id="i-log" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M12 14l4-4"/><path d="M3.3 17a9 9 0 1 1 17.4 0"/></symbol>
+  <symbol id="i-columns" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/></symbol>
 </svg>
 <a class="sr-only" href="#torrent-list">Skip to the torrent list</a>
 <header class="topbar">
@@ -236,8 +308,8 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <aside class="side" id="side" aria-label="Filters">
     <div id="side-live">{{template "side" .}}</div>
     <section aria-labelledby="h-transfer">
-      <h2 id="h-transfer">Transfer</h2>
-      <div class="graph">
+      <h2 id="h-transfer"><button type="button" aria-expanded="true" aria-controls="sec-transfer" data-sec="transfer"><svg class="i"><use href="#i-chev"/></svg><span>Transfer</span></button></h2>
+      <div class="graph flist" id="sec-transfer">
         <svg viewBox="0 0 120 40" preserveAspectRatio="none" role="img" aria-label="Download and upload speed over the last two minutes"><path class="da" id="g-da"/><path class="d" id="g-d"/><path class="u" id="g-u"/></svg>
         <div class="legend"><span class="d" id="g-dl">↓ {{.DownloadRate}}</span><span class="u" id="g-ul">↑ {{.UploadRate}}</span></div>
       </div>
@@ -249,13 +321,16 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <button type="button" class="primary" id="btn-add" title="Add torrents: magnet links, .torrent URLs or files (shortcut N)"><svg class="i"><use href="#i-plus"/></svg><span class="lbl">Add</span></button>
       <span class="sep" aria-hidden="true"></span>
       <button type="button" class="ghost" data-bulk="resume" title="Resume the selected torrents"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Resume</span></button>
-      <button type="button" class="ghost" data-bulk="pause" title="Pause the selected torrents"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause</span></button>
-      <button type="button" class="ghost" data-bulk="verify" title="Recheck piece integrity on disk for all selected torrents"><svg class="i"><use href="#i-check"/></svg><span class="lbl">Recheck</span></button>
-      <button type="button" class="ghost" data-bulk="reannounce" title="Force immediate tracker reannounce for all selected torrents"><svg class="i"><use href="#i-signal"/></svg><span class="lbl">Reannounce</span></button>
-      <button type="button" class="ghost" data-bulk="top" title="Move all selected torrents to the top of the queue"><svg class="i"><use href="#i-top"/></svg><span class="lbl">Top</span></button>
+      <button type="button" class="ghost" data-bulk="pause" title="Pause the selected torrents (P)"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause</span></button>
       <button type="button" class="ghost danger" data-bulk="remove-ask" title="Remove the selected torrents (Delete)"><svg class="i"><use href="#i-trash"/></svg><span class="lbl">Remove</span></button>
+      <span class="sep hide-m" aria-hidden="true"></span>
+      <button type="button" class="ghost icon hide-m" data-bulk="top" aria-label="Move to the top of the queue" title="Move the selected torrents to the top of the queue"><svg class="i"><use href="#i-top"/></svg></button>
+      <button type="button" class="ghost icon hide-m" data-bulk="up" aria-label="Move up in the queue" title="Move the selected torrents up in the queue"><svg class="i"><use href="#i-up"/></svg></button>
+      <button type="button" class="ghost icon hide-m" data-bulk="down" aria-label="Move down in the queue" title="Move the selected torrents down in the queue"><svg class="i"><use href="#i-down"/></svg></button>
+      <button type="button" class="ghost icon hide-m" data-bulk="bottom" aria-label="Move to the bottom of the queue" title="Move the selected torrents to the bottom of the queue"><svg class="i"><use href="#i-bottom"/></svg></button>
       <span class="selinfo" id="selinfo" aria-live="polite"></span>
       <div class="right">
+        <button type="button" class="ghost hide-m" id="btn-cols" aria-haspopup="menu" aria-expanded="false" aria-controls="cols-menu" title="Choose the columns of the list (also with a right click on the header)"><svg class="i"><use href="#i-columns"/></svg><span class="lbl">Columns</span></button>
         {{if .SearchEnabled}}<button type="button" class="ghost" id="btn-search" title="Search configured Torznab indexers for releases"><svg class="i"><use href="#i-search"/></svg><span class="lbl">Search indexers</span></button>{{end}}
         {{if or .Standalone .GexttoLog}}<button type="button" class="ghost" id="btn-log" aria-pressed="false" data-log-url="{{if .Standalone}}/ui/log{{else}}/ui/gextto-log{{end}}" title="Switch to live server log view"><svg class="i"><use href="#i-log"/></svg><span class="lbl">{{if .Standalone}}Log{{else if .GexttoLog}}Gextto log{{end}}</span></button>{{end}}
         <button type="button" class="ghost" id="btn-tools" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" title="IP filter, create a .torrent, feeds"><svg class="i"><use href="#i-tools"/></svg><span class="lbl">Tools</span></button>
@@ -263,10 +338,11 @@ body{display:flex;flex-direction:column;overflow:hidden}
     </div>
 
     <div class="torrentpane" id="pane-torrents">
-      <div class="listwrap">
+      <div class="listwrap" id="torrent-list" tabindex="-1">
         <div id="live">{{template "live" .}}</div>
       </div>
       <aside class="drawer" id="drawer" hidden aria-labelledby="drawer-title">
+        <div class="dsplit" id="dsplit" role="separator" aria-orientation="horizontal" tabindex="0" aria-label="Resize the details panel" title="Drag, or use the up and down arrows, to resize the details panel"></div>
         <div id="drawer-body"></div>
       </aside>
     </div>
@@ -274,7 +350,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
     <div id="pane-log" class="logpane" hidden>
       <div class="logbar">
         <label class="chk">Lines <select id="log-lines" title="Number of recent log lines to display"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
-        <input type="search" id="log-filter" placeholder="Filter lines…" autocomplete="off" title="Filter log lines by keyword or severity level">
+        <input type="search" id="log-filter" placeholder="Filter lines…" autocomplete="off" aria-label="Filter lines…" title="Filter log lines by keyword or severity level">
         <label class="chk"><input type="checkbox" id="log-nodebug" checked title="Hide low-level debug messages and show only informational and warning logs"> hide DEBUG</label>
         <button type="button" class="sm" id="log-reload" title="Reload latest logs from server">Reload</button>
         <span class="muted" id="log-info"></span>
@@ -286,24 +362,81 @@ body{display:flex;flex-direction:column;overflow:hidden}
     <footer class="statusbar" id="statusbar">{{template "status" .}}</footer>
   </main>
 </div>
+<div class="sbmore" id="sb-more" role="region" aria-labelledby="sb-more-title" hidden>{{template "sbmore" .}}</div>
 
 <div class="menu" id="row-menu" role="menu" aria-label="Torrent actions" hidden>
   <button type="button" role="menuitem" data-act="details" title="Details: files, peers, trackers"><svg class="i"><use href="#i-info"/></svg>Details<kbd>Enter</kbd></button>
   <hr>
-  <button type="button" role="menuitem" data-act="resume" title="Resume this torrent"><svg class="i"><use href="#i-play"/></svg>Resume</button>
-  <button type="button" role="menuitem" data-act="pause" title="Pause this torrent"><svg class="i"><use href="#i-pause"/></svg>Pause</button>
-  <button type="button" role="menuitem" data-act="verify" title="Recheck data on disk"><svg class="i"><use href="#i-check"/></svg>Recheck</button>
-  <button type="button" role="menuitem" data-act="reannounce" title="Reannounce to trackers"><svg class="i"><use href="#i-signal"/></svg>Reannounce</button>
+  <button type="button" role="menuitem" data-act="resume" title="Resume the selected torrents"><svg class="i"><use href="#i-play"/></svg>Resume</button>
+  <button type="button" role="menuitem" data-act="pause" title="Pause the selected torrents"><svg class="i"><use href="#i-pause"/></svg>Pause</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="force" title="Force start: run now, outside the queue limits"><svg class="i"><use href="#i-bolt"/></svg>Force start</button>
+  <hr>
+  <button type="button" role="menuitem" class="danger" data-act="remove" title="Remove from the session (you choose whether the files stay)"><svg class="i"><use href="#i-trash"/></svg>Remove…<kbd>Del</kbd></button>
+  <hr>
+  <button type="button" role="menuitem" data-act="location" title="Move the downloaded data to another folder"><svg class="i"><use href="#i-move"/></svg>Set location…</button>
+  {{if .Standalone}}<button type="button" role="menuitem" data-act="rename" title="Rename this torrent's name and content folder"><svg class="i"><use href="#i-edit"/></svg>Rename…</button>
+  <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" data-sub="#cat-menu" title="Assign a category to the selected torrents"><svg class="i"><use href="#i-folder"/></svg>Category</button>
+  <button type="button" role="menuitem" data-act="category" title="Category assigned to this torrent for organization and filtering"><svg class="i"><use href="#i-tag"/></svg>Category and tags…</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="tmm" title="Let the category decide the save path: assigning a category moves the torrent to its folder (qBittorrent automatic torrent management)"><svg class="i"><use href="#i-folder"/></svg>Automatic management</button>{{end}}
+  <hr>
+  <button type="button" role="menuitem" data-act="limits" title="Download and upload speed limits of the selected torrents"><svg class="i"><use href="#i-gauge"/></svg>Limit speed…</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="superseed" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><svg class="i"><use href="#i-seed"/></svg>Super-seeding</button>
+  <hr>
+  <button type="button" role="menuitem" data-act="verify" title="Recheck data on disk"><svg class="i"><use href="#i-check"/></svg>Force recheck</button>
+  <button type="button" role="menuitem" data-act="reannounce" title="Reannounce to trackers"><svg class="i"><use href="#i-signal"/></svg>Force reannounce</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="sequential" title="Download pieces in order (streaming); slower overall"><svg class="i"><use href="#i-list"/></svg>Sequential download</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="firstlast" title="Download the ends of every file first"><svg class="i"><use href="#i-list"/></svg>First and last pieces first</button>
+  <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" data-sub="#queue-menu" title="Position of the selected torrents in the download queue"><svg class="i"><use href="#i-top"/></svg>Queue</button>
+  <hr>
+  <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" data-sub="#copy-menu" title="Copy the name, the info hash or the magnet link"><svg class="i"><use href="#i-copy"/></svg>Copy</button>
+  <button type="button" role="menuitem" data-act="export" title="Export and download the .torrent metainfo file"><svg class="i"><use href="#i-file"/></svg>Export .torrent</button>
+</div>
+
+<div class="menu" id="queue-menu" role="menu" aria-label="Queue" hidden>
   <button type="button" role="menuitem" data-act="top" title="Move to the top of the queue"><svg class="i"><use href="#i-top"/></svg>Move to top</button>
   <button type="button" role="menuitem" data-act="up" title="Move up in the queue"><svg class="i"><use href="#i-up"/></svg>Move up</button>
   <button type="button" role="menuitem" data-act="down" title="Move down in the queue"><svg class="i"><use href="#i-down"/></svg>Move down</button>
+  <button type="button" role="menuitem" data-act="bottom" title="Move to the bottom of the queue"><svg class="i"><use href="#i-bottom"/></svg>Move to bottom</button>
+</div>
+
+<div class="menu" id="copy-menu" role="menu" aria-label="Copy" hidden>
+  <button type="button" role="menuitem" data-act="copy-name" title="Copy the names of the selected torrents"><svg class="i"><use href="#i-copy"/></svg>Name</button>
+  <button type="button" role="menuitem" data-act="copy-hash" title="Copy the info hashes of the selected torrents"><svg class="i"><use href="#i-copy"/></svg>Info hash</button>
+  <button type="button" role="menuitem" data-act="magnet" title="Copy magnet URI with info hash and trackers to clipboard"><svg class="i"><use href="#i-copy"/></svg>Magnet link</button>
+</div>
+
+{{if .Standalone}}
+<div class="menu" id="cat-menu" role="menu" aria-label="Category" hidden>
+  <button type="button" role="menuitemradio" aria-checked="false" data-setcat="" title="Remove the category from the selected torrents"><svg class="i"><use href="#i-x"/></svg>No category</button>
+  <div id="cat-menu-list"></div>
   <hr>
-  {{if .Standalone}}<button type="button" role="menuitem" data-act="rename" title="Rename this torrent's name and content folder"><svg class="i"><use href="#i-edit"/></svg>Rename…</button>{{end}}
-  {{if .Standalone}}<button type="button" role="menuitem" data-act="category" title="Category assigned to this torrent for organization and filtering"><svg class="i"><use href="#i-tag"/></svg>Category and tags…</button>{{end}}
-  <button type="button" role="menuitem" data-act="magnet" title="Copy magnet URI with info hash and trackers to clipboard"><svg class="i"><use href="#i-copy"/></svg>Copy magnet</button>
-  <button type="button" role="menuitem" data-act="export" title="Export and download the .torrent metainfo file"><svg class="i"><use href="#i-file"/></svg>Export .torrent</button>
+  <button type="button" role="menuitem" data-act="category" title="Type a new category, or edit the tags"><svg class="i"><use href="#i-plus"/></svg>New category…</button>
+</div>
+{{end}}
+
+<div class="menu cols" id="cols-menu" role="menu" aria-label="Columns" hidden>
+  <div class="mhead" aria-hidden="true">Columns</div>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="size" title="Show or hide this column">Size</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="progress" title="Show or hide this column">Progress</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="state" title="Show or hide this column">Status</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="seeds" title="Show or hide this column">Seeds</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="peers" title="Show or hide this column">Peers</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="down" title="Show or hide this column">Down speed</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="up" title="Show or hide this column">Up speed</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="eta" title="Show or hide this column">ETA</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="ratio" title="Show or hide this column">Ratio</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="category" title="Show or hide this column">Category</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="tags" title="Show or hide this column">Tags</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="added" title="Show or hide this column">Added on</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="completed" title="Show or hide this column">Completed on</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="downloaded" title="Show or hide this column">Downloaded</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="uploaded" title="Show or hide this column">Uploaded</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="remaining" title="Show or hide this column">Remaining</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="queue" title="Show or hide this column">Queue position</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="tracker" title="Show or hide this column">Tracker</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="path" title="Show or hide this column">Save path</button>
   <hr>
-  <button type="button" role="menuitem" class="danger" data-act="remove" title="Remove from the session (files stay)"><svg class="i"><use href="#i-trash"/></svg>Remove…<kbd>Del</kbd></button>
+  <button type="button" role="menuitem" data-col-reset title="Show the default columns with their default widths">Reset columns</button>
 </div>
 
 <div class="menu" id="tools-menu" role="menu" aria-label="Tools" hidden>
@@ -323,7 +456,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
       </label>
       <div class="filepick" id="filepick">
         <span id="filepick-text">Drop .torrent files anywhere on the page, or</span>
-        <input type="file" name="torrent" id="add-files" multiple accept=".torrent,application/x-bittorrent" title="Select a local .torrent file to upload and start downloading">
+        <input type="file" name="torrent" id="add-files" multiple accept=".torrent,application/x-bittorrent" aria-label="Choose .torrent files" title="Select a local .torrent file to upload and start downloading">
       </div>
       <label class="field">Save to
         <span class="field-row"><input type="text" id="add-destination" name="destination" list="savepaths" placeholder="destination (empty = default)" autocomplete="off" title="Destination directory for download files (empty uses default download folder)">{{if .Standalone}}<button type="button" class="browse" data-target="add-destination" title="Choose an existing folder on the server">Browse…</button>{{end}}</span>
@@ -402,6 +535,54 @@ body{display:flex;flex-direction:column;overflow:hidden}
   </form>
 </dialog>
 
+<dialog id="dlg-location" aria-labelledby="dlg-location-title">
+  <form method="post" action="/ui/bulk-move" id="form-location">
+    <div class="dlg-head"><h2 id="dlg-location-title">Set location</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-body">
+      <p class="dlg-help" id="location-what"></p>
+      <label class="field">New folder
+        <span class="field-row"><input type="text" id="location-dest" name="destination" list="savepaths" required autocomplete="off" title="Folder on the server the downloaded data is moved to">{{if .Standalone}}<button type="button" class="browse" data-target="location-dest" title="Choose an existing folder on the server">Browse…</button>{{end}}</span>
+      </label>
+      <p class="dlg-help">The files are moved in the background; the torrents keep seeding from the new folder.</p>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" data-close title="Close without moving">Cancel</button>
+      <button type="submit" class="primary" title="Move the data of the selected torrents to this folder">Move</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-limits" aria-labelledby="dlg-limits-title">
+  <form method="post" action="/ui/bulk-limits" id="form-limits">
+    <div class="dlg-head"><h2 id="dlg-limits-title">Limit speed</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-body">
+      <p class="dlg-help" id="limits-what"></p>
+      <label class="field">Download limit (KiB/s)<input type="number" min="0" name="download_limit" id="limits-dl" placeholder="global" title="Download speed limit of the selected torrents in KiB/s: 0 = unlimited, empty = follow the global limit"></label>
+      <label class="field">Upload limit (KiB/s)<input type="number" min="0" name="upload_limit" id="limits-ul" placeholder="global" title="Upload speed limit of the selected torrents in KiB/s: 0 = unlimited, empty = follow the global limit"></label>
+      <p class="dlg-help">0 means unlimited; leave a field empty to follow the global limit.</p>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" data-close title="Close without saving">Cancel</button>
+      <button type="submit" class="primary" title="Apply these limits to the selected torrents">Save limits</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-global" aria-labelledby="dlg-global-title">
+  <form method="post" action="/ui/global-limits" id="form-global">
+    <div class="dlg-head"><h2 id="dlg-global-title">Global speed limits</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-body">
+      <label class="field">Download limit (KiB/s)<input type="number" min="0" name="download_limit" id="global-dl" title="Global download speed limit in KiB/s (0 = unlimited)"></label>
+      <label class="field">Upload limit (KiB/s)<input type="number" min="0" name="upload_limit" id="global-ul" title="Global upload speed limit in KiB/s (0 = unlimited)"></label>
+      <p class="dlg-help">0 means unlimited. The scheduler and the alternative limits, when active, take precedence.</p>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" data-close title="Close without saving">Cancel</button>
+      <button type="submit" class="primary" title="Save the global speed limits">Save limits</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="dlg-ipfilter" aria-labelledby="dlg-ip-title">
   <form method="post" action="/ui/ipfilter">
     <div class="dlg-head"><h2 id="dlg-ip-title">IP filter</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
@@ -439,7 +620,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
     <div class="dlg-head"><h2 id="dlg-search-title">Search indexers</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
       <div style="display:flex;gap:8px">
-        <input type="search" id="searchbox" style="flex:1" placeholder="Search indexers…" autocomplete="off" title="Search configured Torznab indexers for releases">
+        <input type="search" id="searchbox" style="flex:1" placeholder="Search indexers…" autocomplete="off" aria-label="Search indexers…" title="Search configured Torznab indexers for releases">
         <button type="submit" class="primary" title="Execute search query across configured indexers">Search</button>
       </div>
       <p class="muted" id="searchinfo" style="margin:0" aria-live="polite"></p>
@@ -475,7 +656,8 @@ var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelect
 var toast=function(m,e){window.gx.toast(m,e);};
 var store={get:function(k,d){try{var v=localStorage.getItem('gx-'+k);return v===null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem('gx-'+k,JSON.stringify(v));}catch(e){}}};
 
-var state={selected:new Set(),anchor:null,filter:store.get('filter',{status:'all',cat:null,tag:null}),sort:store.get('sort',{key:'name',asc:true}),q:'',drawer:null,rows:window.__rows||0};
+var state={selected:new Set(),anchor:null,filter:store.get('filter',{status:'all',cat:null,tag:null,tracker:null}),sort:store.get('sort',{key:'name',asc:true}),q:'',drawer:null,rows:window.__rows||0,collapsed:store.get('collapsed',{}),sbmore:false};
+if(state.filter.tracker===undefined)state.filter.tracker=null;
 
 // ---------- server calls ----------
 function post(url,params){
@@ -490,6 +672,7 @@ function report(res){if(res&&res.msg)toast(res.msg,!res.ok);}
 function rows(){return $$('#torrents tbody tr');}
 function visibleRows(){return rows().filter(function(r){return !r.hidden;});}
 function rowOf(el){return el&&el.closest?el.closest('#torrents tbody tr'):null;}
+function rowByHash(h){return rows().find(function(r){return r.dataset.hash===h;});}
 function selHashes(){return Array.from(state.selected);}
 function renderSelection(){
   rows().forEach(function(r){var on=state.selected.has(r.dataset.hash);r.setAttribute('aria-selected',on?'true':'false');var cb=$('.rowsel',r);if(cb)cb.checked=on;});
@@ -505,38 +688,50 @@ function select(hash,mode){
   if(mode!=='range')state.anchor=hash;
   renderSelection();
 }
+// matchStatus is the page side of the sidebar counts (uiPageData).
 function matchStatus(r,f){
-  var st=r.dataset.state;
+  var st=r.dataset.state,moving=(+r.dataset.down>0)||(+r.dataset.up>0);
   switch(f){
     case 'all':return true;
     case 'downloading':return st==='downloading'||st==='downloading_metadata'||st==='checking_files';
-    case 'active':return (+r.dataset.down>0)||(+r.dataset.up>0);
+    case 'completed':return +r.dataset.kProgress>=100;
+    case 'running':return st!=='paused'&&st!=='disk_wait';
+    case 'active':return moving;
+    case 'inactive':return !moving;
     case 'paused':return st==='paused'||st==='disk_wait';
+    case 'checking':return st==='checking_files';
     default:return st===f;
   }
 }
 function applyFilters(){
   var q=state.q.toLowerCase(),f=state.filter,shown=0;
   rows().forEach(function(r){
-    var ok=matchStatus(r,f.status)&&(f.cat===null||r.dataset.cat===f.cat)&&(f.tag===null||(','+r.dataset.tags+',').indexOf(','+f.tag+',')>=0)&&(!q||(r.dataset.name+' '+r.dataset.cat+' '+r.dataset.tags).toLowerCase().indexOf(q)>=0);
+    var ok=matchStatus(r,f.status)&&(f.cat===null||r.dataset.cat===f.cat)
+      &&(f.tag===null||(f.tag===''?!r.dataset.tags:(','+r.dataset.tags.replace(/,\s+/g,',')+',').indexOf(','+f.tag+',')>=0))
+      &&(f.tracker===null||r.dataset.tracker===f.tracker)
+      &&(!q||(r.dataset.name+' '+r.dataset.cat+' '+r.dataset.tags).toLowerCase().indexOf(q)>=0);
     r.hidden=!ok;if(ok)shown++;
   });
-  $$('#side [data-status]').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.status===f.status?'true':'false');});
-  $$('#side [data-cat]').forEach(function(b){var v=b.dataset.cat==='\u0000'?null:b.dataset.cat;b.setAttribute('aria-pressed',v===f.cat&&b.hasAttribute('data-catbtn')?'true':'false');});
-  $$('#side [data-tag]').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.tag===f.tag?'true':'false');});
+  function press(sel,attr,val){$$(sel).forEach(function(b){var v=b.hasAttribute('data-all')?null:b.getAttribute(attr);b.setAttribute('aria-pressed',v===val?'true':'false');});}
+  press('#side [data-status]','data-status',f.status);
+  press('#side [data-catbtn]','data-cat',f.cat);
+  press('#side [data-tagbtn]','data-tag',f.tag);
+  press('#side [data-trkbtn]','data-tracker',f.tracker);
   var empty=$('#filtered-empty');if(empty)empty.hidden=shown>0||rows().length===0;
   // Selection follows what is visible.
-  state.selected.forEach(function(h){var r=rows().find(function(x){return x.dataset.hash===h;});if(!r||r.hidden)state.selected.delete(h);});
+  state.selected.forEach(function(h){var r=rowByHash(h);if(!r||r.hidden)state.selected.delete(h);});
   renderSelection();
 }
 function countSide(){
-  // Active and category/tag counts are computed here, from the rows.
-  var active=0,cats={},tags={};
-  rows().forEach(function(r){if((+r.dataset.down>0)||(+r.dataset.up>0))active++;cats[r.dataset.cat]=(cats[r.dataset.cat]||0)+1;(r.dataset.tags||'').split(',').forEach(function(tg){tg=tg.trim();if(tg)tags[tg]=(tags[tg]||0)+1;});});
-  var a=$('#side [data-status="active"] .n');if(a)a.textContent=active;
-  $$('#side [data-catbtn]').forEach(function(b){var n=$('.n',b);if(n)n.textContent=cats[b.dataset.cat]||0;});
-  $$('#side [data-tag]').forEach(function(b){var n=$('.n',b);if(n)n.textContent=tags[b.dataset.tag]||0;});
-  var none=$('#side [data-cat=""] .n');if(none)none.textContent=cats['']||0;
+  // Category and tag counts are computed here, from the rows.
+  var cats={},tags={},untagged=0;
+  rows().forEach(function(r){cats[r.dataset.cat]=(cats[r.dataset.cat]||0)+1;var any=false;(r.dataset.tags||'').split(',').forEach(function(tg){tg=tg.trim();if(tg){any=true;tags[tg]=(tags[tg]||0)+1;}});if(!any)untagged++;});
+  $$('#side [data-catbtn]:not([data-all])').forEach(function(b){var n=$('.n',b);if(n)n.textContent=cats[b.dataset.cat]||0;});
+  $$('#side [data-tagbtn]:not([data-all])').forEach(function(b){var n=$('.n',b);if(n)n.textContent=b.dataset.tag===''?untagged:(tags[b.dataset.tag]||0);});
+  $$('#side .flist button .n').forEach(function(n){n.parentNode.classList.toggle('zero',n.textContent==='0');});
+}
+function applyCollapsed(){
+  $$('#side [data-sec]').forEach(function(b){var shut=!!state.collapsed[b.dataset.sec];b.setAttribute('aria-expanded',shut?'false':'true');var list=document.getElementById(b.getAttribute('aria-controls'));if(list)list.hidden=shut;});
 }
 function applySort(){
   var s=state.sort,tb=$('#torrents tbody');if(!tb)return;
@@ -546,6 +741,17 @@ function applySort(){
   $$('#torrents th[data-sort]').forEach(function(th){th.setAttribute('aria-sort',th.dataset.sort===s.key?(s.asc?'ascending':'descending'):'none');});
 }
 function setSort(key){var s=state.sort;state.sort={key:key,asc:s.key===key?!s.asc:true};store.set('sort',state.sort);applySort();}
+
+// ---------- columns: chooser and widths ----------
+function colPrefs(){return store.get('cols',{});}
+function colDefault(k){var c=window.__gxCols.find(function(x){return x[0]===k;});return c||[k,1,90];}
+function colOn(k){var p=colPrefs()[k]||{};return p.on===undefined?!!colDefault(k)[1]:!!p.on;}
+function setCol(k,patch){var p=colPrefs();p[k]=Object.assign({},p[k]||{},patch);store.set('cols',p);window.gxColStyle();renderColsMenu();}
+function renderColsMenu(){$$('#cols-menu [data-col]').forEach(function(b){b.setAttribute('aria-checked',colOn(b.dataset.col)?'true':'false');});}
+var resizing=null;
+function startResize(handle,x){var th=handle.closest('th');resizing={k:th.dataset.col,x:x,w:th.getBoundingClientRect().width};document.body.style.cursor='col-resize';}
+document.addEventListener('pointermove',function(e){if(!resizing)return;var w=Math.max(40,Math.round(resizing.w+e.clientX-resizing.x));var p=colPrefs();p[resizing.k]=Object.assign({},p[resizing.k]||{},{w:w});store.set('cols',p);window.gxColStyle();});
+document.addEventListener('pointerup',function(){if(resizing){resizing=null;document.body.style.cursor='';}});
 
 // ---------- live refresh ----------
 var refreshing=false,lastSide='',pointerDown=false;
@@ -568,34 +774,43 @@ function applyLive(frag){
   $('#live').innerHTML=frag.innerHTML;
 }
 function refresh(){
-  if(refreshing||document.hidden||pointerDown)return;refreshing=true;
+  if(refreshing||document.hidden||pointerDown||resizing)return;refreshing=true;
   var active=document.activeElement,activeRow=rowOf(active),activeHash=activeRow&&activeRow.dataset.hash;
   fetch('/ui/live'+(state.rows?'?rows='+state.rows:''),{cache:'no-store'}).then(function(r){return r.ok?r.text():null;}).then(function(html){
     if(!html)return;
     var box=document.createElement('div');box.innerHTML=html;
-    var live=$('#frag-live',box),side=$('#frag-side',box),status=$('#frag-status',box),speeds=$('#frag-speeds',box);
+    var live=$('#frag-live',box),side=$('#frag-side',box),status=$('#frag-status',box),speeds=$('#frag-speeds',box),more=$('#frag-sbmore',box);
     // Never touch the DOM while the pointer is down: a click spans mousedown and
     // mouseup, and a replacement in between loses it.
     if(!pointerDown){
       if(live)applyLive(live);
-      if(side&&side.innerHTML!==lastSide){lastSide=side.innerHTML;$('#side-live').innerHTML=side.innerHTML;}
-      if(status)$('#statusbar').innerHTML=status.innerHTML;
+      if(side&&side.innerHTML!==lastSide){var focusKey=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#side-live')&&focusKeyOf(document.activeElement);lastSide=side.innerHTML;$('#side-live').innerHTML=side.innerHTML;if(focusKey){var back=$(focusKey);if(back)back.focus();}}
+      if(status){var sbFocus=$('#statusbar').contains(document.activeElement)?(document.activeElement.id?'#'+document.activeElement.id:document.activeElement.hasAttribute('data-global-limits')?'[data-global-limits]':document.activeElement.hasAttribute('data-alt-speed')?'[data-alt-speed]':null):null;$('#statusbar').innerHTML=status.innerHTML;if(sbFocus){var sbEl=$('#statusbar '+sbFocus);if(sbEl)sbEl.focus();}}
       if(speeds)$('#top-speeds').innerHTML=speeds.innerHTML;
+      if(more)$('#sb-more').innerHTML=more.innerHTML;
     }
     afterRender();
-    if(activeHash){var r=rows().find(function(x){return x.dataset.hash===activeHash;});if(r){r.tabIndex=0;r.focus({preventScroll:true});}}
+    if(activeHash){var r=rowByHash(activeHash);if(r){r.tabIndex=0;r.focus({preventScroll:true});}}
     sampleGraph();
   }).catch(function(){}).then(function(){refreshing=false;});
+}
+// focusKeyOf finds the sidebar button again after the sidebar is redrawn.
+function focusKeyOf(el){
+  var b=el.closest('button');if(!b)return null;
+  var attrs=['data-sec','data-status','data-cat','data-tag','data-tracker'];
+  for(var i=0;i<attrs.length;i++){var v=b.getAttribute(attrs[i]);if(v!==null)return '#side-live ['+attrs[i]+'="'+v.replace(/"/g,'\\"')+'"]'+(b.hasAttribute('data-all')?'[data-all]':':not([data-all])');}
+  return null;
 }
 function afterRender(){
   var known=new Set(rows().map(function(r){return r.dataset.hash;}));
   state.selected.forEach(function(h){if(!known.has(h))state.selected.delete(h);});
-  countSide();applySort();applyFilters();roving();savePaths();
+  countSide();applyCollapsed();applySort();applyFilters();roving();savePaths();
+  var sb=$('#sb-more-btn');if(sb)sb.setAttribute('aria-expanded',state.sbmore?'true':'false');
 }
 function roving(){var rs=visibleRows(),cur=rs.find(function(r){return r.tabIndex===0;});rs.forEach(function(r){r.tabIndex=-1;});(cur||rs[0])&&((cur||rs[0]).tabIndex=0);}
-function savePaths(){var dl=$('#savepaths'),seen={},html='';rows().forEach(function(r){var p=r.dataset.path;if(p&&!seen[p]){seen[p]=1;var o=document.createElement('option');o.value=p;html+=o.outerHTML;}});dl.innerHTML=html;}
+function savePaths(){var dl=$('#savepaths'),seen={},html='';rows().forEach(function(r){var p=r.dataset.kPath;if(p&&!seen[p]){seen[p]=1;var o=document.createElement('option');o.value=p;html+=o.outerHTML;}});dl.innerHTML=html;}
 
-// ---------- transfer graph ----------
+// ---------- transfer graph and window title ----------
 var samples=[];
 function sampleGraph(){
   var st=$('#statusbar [data-down]');if(!st)return;
@@ -607,6 +822,8 @@ function sampleGraph(){
   $('#g-d').setAttribute('d',d);$('#g-u').setAttribute('d',u);
   if(samples.length>1){var x0=(w*(n-samples.length)/(n-1)).toFixed(1);$('#g-da').setAttribute('d',d+' L'+w+' '+h+' L'+x0+' '+h+' Z');}
   $('#g-dl').textContent='↓ '+(st.dataset.downS||'');$('#g-ul').textContent='↑ '+(st.dataset.upS||'');
+  // Like qBittorrent, the speeds are in the tab title too.
+  document.title='↓ '+(st.dataset.downS||'')+' ↑ '+(st.dataset.upS||'')+' · gx-torrent';
 }
 
 // ---------- actions ----------
@@ -616,68 +833,143 @@ function bulk(op,hashes){
   var f=new URLSearchParams();f.set('op',op);hashes.forEach(function(h){f.append('hashes',h);});
   return post('/ui/bulk',f).then(function(res){report(res);refresh();});
 }
+function whatSelected(hashes){
+  if(hashes.length===1){var r=rowByHash(hashes[0]);return r?r.dataset.name:'';}
+  return hashes.length+' '+t('torrents selected');
+}
 function askRemove(hashes){
   hashes=hashes||selHashes();
   if(!hashes.length){toast(t('Select at least one torrent'),true);return;}
   var dlg=$('#dlg-remove');dlg._hashes=hashes;
-  var name=hashes.length===1?(rows().find(function(r){return r.dataset.hash===hashes[0];})||{dataset:{name:''}}).dataset.name:'';
-  $('#remove-what').textContent=hashes.length===1?name:hashes.length+' '+t('torrents will be removed.');
+  $('#remove-what').textContent=hashes.length===1?whatSelected(hashes):hashes.length+' '+t('torrents will be removed.');
   $('#remove-files').checked=false;openDialog(dlg);
 }
+function copyText(text,done){
+  if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(text).then(function(){toast(done,false);}).catch(function(){window.prompt(t('Copy'),text);});
+  window.prompt(t('Copy'),text);
+}
 function copyMagnet(hash){
-  fetch('/ui/magnet?hash='+encodeURIComponent(hash),{cache:'no-store'}).then(function(r){return r.ok?r.text():Promise.reject(new Error(r.status));}).then(function(m){
-    if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(m).then(function(){toast(t('Magnet copied'),false);});
-    window.prompt(t('Magnet link'),m);
-  }).catch(function(){toast(t('Copy failed'),true);});
+  fetch('/ui/magnet?hash='+encodeURIComponent(hash),{cache:'no-store'}).then(function(r){return r.ok?r.text():Promise.reject(new Error(r.status));}).then(function(m){copyText(m,t('Magnet copied'));}).catch(function(){toast(t('Copy failed'),true);});
 }
 function editCategory(hashes){
-  var dlg=$('#dlg-cat'),r=rows().find(function(x){return x.dataset.hash===hashes[0];});
-  dlg._hashes=hashes;$('input[name=category]',dlg).value=r?r.dataset.cat:'';$('input[name=tags]',dlg).value=r?r.dataset.tags.split(',').join(', '):'';$('input[name=auto_tmm]',dlg).checked=!!(r&&r.dataset.tmm);openDialog(dlg);
+  var dlg=$('#dlg-cat'),r=rowByHash(hashes[0]);
+  dlg._hashes=hashes;$('input[name=category]',dlg).value=r?r.dataset.cat:'';$('input[name=tags]',dlg).value=r?r.dataset.tags.split(',').map(function(s){return s.trim();}).filter(Boolean).join(', '):'';$('input[name=auto_tmm]',dlg).checked=!!(r&&r.dataset.tmm);openDialog(dlg);
 }
 function renameTorrentDialog(hashes){
-  var dlg=$('#dlg-rename'),r=rows().find(function(x){return x.dataset.hash===hashes[0];});
+  var dlg=$('#dlg-rename'),r=rowByHash(hashes[0]);
   if(!r)return;$('input[name=hash]',dlg).value=r.dataset.hash;$('input[name=name]',dlg).value=r.dataset.name;openDialog(dlg);
+}
+function locationDialog(hashes){
+  var dlg=$('#dlg-location'),r=rowByHash(hashes[0]);dlg._hashes=hashes;
+  $('#location-what').textContent=whatSelected(hashes);$('#location-dest').value=r?r.dataset.kPath:'';openDialog(dlg);
+}
+function limitsDialog(hashes){
+  var dlg=$('#dlg-limits'),r=hashes.length===1?rowByHash(hashes[0]):null;dlg._hashes=hashes;
+  $('#limits-what').textContent=whatSelected(hashes);
+  function v(x){x=r?+x:-1;return x<0?'':String(x);}
+  $('#limits-dl').value=r?v(r.dataset.dll):'';$('#limits-ul').value=r?v(r.dataset.ull):'';openDialog(dlg);
+}
+function globalLimitsDialog(btn){
+  $('#global-dl').value=btn.dataset.dl||'0';$('#global-ul').value=btn.dataset.ul||'0';openDialog($('#dlg-global'));
+}
+// flagState is "true", "false" or "mixed" for a row flag over the selection.
+function flagState(hashes,attr){
+  var on=0;hashes.forEach(function(h){var r=rowByHash(h);if(r&&r.dataset[attr])on++;});
+  return on===0?'false':on===hashes.length?'true':'mixed';
+}
+// toggleFlag switches a per-torrent option: every selected torrent ends in the
+// same state (on, unless they all are already), and toggles reach only the
+// torrents that need them.
+function toggleFlag(hashes,attr,onOp,offOp,toggle){
+  var target=flagState(hashes,attr)!=='true';
+  var need=hashes.filter(function(h){var r=rowByHash(h);return r&&(!!r.dataset[attr])!==target;});
+  if(toggle)return bulk(onOp,need.length?need:hashes);
+  return bulk(target?onOp:offOp,hashes);
 }
 function act(op,hashes){
   switch(op){
     case 'details':openDetail(hashes[0]);break;
     case 'remove':askRemove(hashes);break;
     case 'magnet':copyMagnet(hashes[0]);break;
+    case 'copy-name':copyText(hashes.map(function(h){var r=rowByHash(h);return r?r.dataset.name:h;}).join('\n'),t('Copied'));break;
+    case 'copy-hash':copyText(hashes.join('\n'),t('Copied'));break;
     case 'export':window.location.href='/ui/torrent-file?hash='+encodeURIComponent(hashes[0]);break;
     case 'category':editCategory(hashes);break;
     case 'rename':renameTorrentDialog(hashes);break;
+    case 'location':locationDialog(hashes);break;
+    case 'limits':limitsDialog(hashes);break;
+    case 'force':toggleFlag(hashes,'pin','force-start','unforce');break;
+    case 'tmm':toggleFlag(hashes,'tmm','tmm-on','tmm-off');break;
+    case 'superseed':toggleFlag(hashes,'ss','super-seed-on','super-seed-off');break;
+    case 'sequential':toggleFlag(hashes,'seq','sequential','sequential',true);break;
+    case 'firstlast':toggleFlag(hashes,'fl','first-last','first-last',true);break;
     default:bulk(op,hashes);
   }
+}
+function setCategory(cat,hashes){
+  Promise.all(hashes.map(function(h){var r=rowByHash(h);return post('/ui/category',{hash:h,category:cat,tags:r?r.dataset.tags:''});})).then(function(r){report(r[r.length-1]);refresh();});
 }
 
 // ---------- dialogs and menus ----------
 function openDialog(d){if(typeof d.showModal==='function'){d.showModal();}else{d.setAttribute('open','');}var f=$('textarea,input:not([type=hidden]):not([type=checkbox]),select',d);if(f)f.focus();}
 function closeDialog(d){if(d.close)d.close();else d.removeAttribute('open');}
-var openMenuEl=null,menuReturn=null;
-function openMenu(menu,x,y,returnTo){
-  closeMenu();menu.hidden=false;openMenuEl=menu;menuReturn=returnTo||null;
+// Menus stack: a context menu and, at most, one of its submenus.
+var menus=[];
+function topMenu(){return menus.length?menus[menus.length-1].el:null;}
+function menuItems(m){return $$('[role^=menuitem]',m).filter(function(b){return !b.hidden;});}
+function openMenu(menu,x,y,returnTo,asSub){
+  if(!asSub)closeMenus();
+  menu.hidden=false;menus.push({el:menu,ret:returnTo||null});
   var w=menu.offsetWidth,h=menu.offsetHeight;
+  if(asSub&&x+w>window.innerWidth-8&&returnTo){x=returnTo.getBoundingClientRect().left-w-2;}
   menu.style.left=Math.max(8,Math.min(x,window.innerWidth-w-8))+'px';menu.style.top=Math.max(8,Math.min(y,window.innerHeight-h-8))+'px';
-  var first=$('[role=menuitem]',menu);if(first)first.focus();
+  var first=menuItems(menu)[0];if(first)first.focus();
   if(returnTo&&returnTo.setAttribute)returnTo.setAttribute('aria-expanded','true');
 }
-function closeMenu(focusBack){
-  if(!openMenuEl)return;openMenuEl.hidden=true;
-  if(menuReturn&&menuReturn.setAttribute)menuReturn.setAttribute('aria-expanded','false');
-  if(focusBack&&menuReturn&&menuReturn.focus)menuReturn.focus();
-  openMenuEl=null;
+function closeTopMenu(focusBack){
+  var m=menus.pop();if(!m)return;m.el.hidden=true;
+  if(m.ret&&m.ret.setAttribute)m.ret.setAttribute('aria-expanded','false');
+  if(focusBack&&m.ret&&m.ret.focus)m.ret.focus();
+}
+function closeMenus(focusBack){while(menus.length>1)closeTopMenu(false);closeTopMenu(focusBack);}
+function openSub(item){
+  var sub=$(item.dataset.sub);if(!sub)return;
+  if(topMenu()===sub)return;
+  while(menus.length>1)closeTopMenu(false);
+  if(sub.id==='cat-menu')buildCatMenu(sub);
+  sub._hashes=$('#row-menu')._hashes;
+  var rc=item.getBoundingClientRect();openMenu(sub,rc.right+2,rc.top-6,item,true);
+}
+function buildCatMenu(sub){
+  var hashes=$('#row-menu')._hashes||[],cur=null;
+  hashes.forEach(function(h,i){var r=rowByHash(h),c=r?r.dataset.cat:'';cur=i===0?c:(cur===c?cur:undefined);});
+  var box=$('#cat-menu-list',sub);box.textContent='';
+  $$('#catlist-all option').forEach(function(o){var b=document.createElement('button');b.type='button';b.setAttribute('role','menuitemradio');b.dataset.setcat=o.value;b.setAttribute('aria-checked',cur===o.value?'true':'false');b.title=o.value;b.innerHTML='<svg class="i"><use href="#i-folder"/></svg>';b.appendChild(document.createTextNode(o.value));box.appendChild(b);});
+  var none=$('[data-setcat=""]',sub);if(none)none.setAttribute('aria-checked',cur===''?'true':'false');
 }
 function rowMenu(row,x,y,from){
   if(!state.selected.has(row.dataset.hash))select(row.dataset.hash,'only');
   var menu=$('#row-menu');menu._hashes=selHashes();
-  var one=menu._hashes.length===1;
-  $$('[data-act=details],[data-act=magnet],[data-act=export],[data-act=rename]',menu).forEach(function(b){b.hidden=!one;});
+  var hs=menu._hashes,one=hs.length===1;
+  $$('[data-act=details],[data-act=export],[data-act=rename]',menu).forEach(function(b){b.hidden=!one;});
+  [['force','pin'],['tmm','tmm'],['superseed','ss'],['sequential','seq'],['firstlast','fl']].forEach(function(p){var b=$('[data-act='+p[0]+']',menu);if(b)b.setAttribute('aria-checked',flagState(hs,p[1]));});
   openMenu(menu,x,y,from||row);
 }
 
 // ---------- detail drawer ----------
+function setDrawerHeight(h){
+  var max=Math.max(160,window.innerHeight-200);h=Math.max(120,Math.min(max,Math.round(h)));
+  $('#drawer').style.setProperty('--drawer-h',h+'px');store.set('drawer-h',h);
+  var s=$('#dsplit');s.setAttribute('aria-valuenow',h);s.setAttribute('aria-valuemin',120);s.setAttribute('aria-valuemax',max);
+}
+(function(){var h=store.get('drawer-h',0);if(h)setDrawerHeight(h);})();
+var splitting=null;
+$('#dsplit').addEventListener('pointerdown',function(e){e.preventDefault();splitting={y:e.clientY,h:$('#drawer').getBoundingClientRect().height};this.setPointerCapture(e.pointerId);});
+$('#dsplit').addEventListener('pointermove',function(e){if(splitting)setDrawerHeight(splitting.h+splitting.y-e.clientY);});
+$('#dsplit').addEventListener('pointerup',function(){splitting=null;});
+$('#dsplit').addEventListener('keydown',function(e){var h=$('#drawer').getBoundingClientRect().height;if(e.key==='ArrowUp'){e.preventDefault();setDrawerHeight(h+24);}else if(e.key==='ArrowDown'){e.preventDefault();setDrawerHeight(h-24);}});
 function openDetail(hash,tab){
-  tab=tab||(state.drawer&&state.drawer.hash===hash?state.drawer.tab:'general');
+  tab=tab||(state.drawer?state.drawer.tab:'general');
   state.drawer={hash:hash,tab:tab};
   var d=$('#drawer');
   return fetch('/ui/detail?hash='+encodeURIComponent(hash)+'&tab='+encodeURIComponent(tab),{cache:'no-store'}).then(function(r){return r.text();}).then(function(h){
@@ -685,12 +977,12 @@ function openDetail(hash,tab){
     if(!wasOpen){var c=$('#drawer [data-close-drawer]');if(c)c.focus();}
   });
 }
-function closeDetail(){var d=$('#drawer');if(d.hidden)return;d.hidden=true;var h=state.drawer&&state.drawer.hash;state.drawer=null;var r=h&&rows().find(function(x){return x.dataset.hash===h;});if(r)r.focus();}
+function closeDetail(){var d=$('#drawer');if(d.hidden)return;d.hidden=true;var h=state.drawer&&state.drawer.hash;state.drawer=null;var r=h&&rowByHash(h);if(r)r.focus();}
 function refreshDetail(){
   var s=state.drawer;if(!s||document.hidden)return;
   if(['peers','trackers','pieces','general'].indexOf(s.tab)<0)return;
   if($('#drawer').contains(document.activeElement)&&document.activeElement.matches('input,textarea,select'))return;
-  if(s.tab==='general'&&$('#drawer form.dirty'))return;
+  if($('#drawer form.dirty'))return;
   openDetail(s.hash,s.tab);
 }
 
@@ -721,19 +1013,29 @@ function submitAdd(form){
 // ---------- wiring ----------
 document.addEventListener('click',function(e){
   var el=e.target;
-  if(openMenuEl&&!openMenuEl.contains(el)&&!el.closest('[aria-haspopup=menu]'))closeMenu();
+  if(menus.length&&!menus.some(function(m){return m.el.contains(el);})&&!el.closest('[aria-haspopup=menu]'))closeMenus();
+  if(state.sbmore&&!el.closest('#sb-more')&&!el.closest('#sb-more-btn')){state.sbmore=false;$('#sb-more').hidden=true;afterRender();}
   var c=el.closest('[data-close]');if(c){closeDialog(c.closest('dialog'));return;}
   if(el.closest('[data-close-drawer]')){closeDetail();return;}
   var b=el.closest('[data-bulk]');if(b){if(b.getAttribute('aria-disabled')==='true'){toast(t('Select at least one torrent'),true);return;}if(b.dataset.bulk==='remove-ask')askRemove();else bulk(b.dataset.bulk);return;}
-  var mi=el.closest('#row-menu [data-act]');if(mi){var hs=$('#row-menu')._hashes||[];closeMenu();act(mi.dataset.act,hs);return;}
-  var ti=el.closest('#tools-menu [data-tool]');if(ti){closeMenu();tool(ti.dataset.tool);return;}
+  var sub=el.closest('.menu [data-sub]');if(sub){openSub(sub);return;}
+  var sc=el.closest('#cat-menu [data-setcat]');if(sc){var hs0=$('#cat-menu')._hashes||[];closeMenus();setCategory(sc.dataset.setcat,hs0);return;}
+  var mi=el.closest('.menu [data-act]');if(mi){var hs=(mi.closest('.menu')._hashes)||$('#row-menu')._hashes||[];closeMenus();act(mi.dataset.act,hs);return;}
+  var ci=el.closest('#cols-menu [data-col]');if(ci){setCol(ci.dataset.col,{on:!colOn(ci.dataset.col)});return;}
+  if(el.closest('#cols-menu [data-col-reset]')){store.set('cols',{});window.gxColStyle();renderColsMenu();closeMenus();return;}
+  var ti=el.closest('#tools-menu [data-tool]');if(ti){closeMenus();tool(ti.dataset.tool);return;}
   var alt=el.closest('[data-alt-speed]');if(alt){post('/ui/alt-speed',new URLSearchParams()).then(function(res){report(res);refresh();});return;}
+  var gl=el.closest('[data-global-limits]');if(gl){globalLimitsDialog(gl);return;}
+  if(el.closest('#sb-more-btn')){state.sbmore=!state.sbmore;$('#sb-more').hidden=!state.sbmore;afterRender();return;}
+  var sec=el.closest('#side [data-sec]');if(sec){state.collapsed[sec.dataset.sec]=sec.getAttribute('aria-expanded')==='true';store.set('collapsed',state.collapsed);applyCollapsed();return;}
   var rf=el.closest('[data-rename-file]');if(rf){var frf=$('#dlg-rename-file');$('input[name=hash]',frf).value=rf.dataset.hash;$('input[name=old]',frf).value=rf.dataset.renameFile;$('input[name=new]',frf).value=rf.dataset.renameFile;openDialog(frf);return;}
   var st=el.closest('#side [data-status]');if(st){state.filter.status=st.dataset.status;store.set('filter',state.filter);applyFilters();return;}
-  var cb=el.closest('#side [data-catbtn]');if(cb){var v=cb.dataset.cat;state.filter.cat=state.filter.cat===v?null:v;store.set('filter',state.filter);applyFilters();return;}
-  var tg=el.closest('#side [data-tag]');if(tg){state.filter.tag=state.filter.tag===tg.dataset.tag?null:tg.dataset.tag;store.set('filter',state.filter);applyFilters();return;}
-  var sb=el.closest('#torrents th[data-sort] button');if(sb){setSort(sb.closest('th').dataset.sort);return;}
-  var more=el.closest('#torrents td.more button');if(more){var r=rowOf(more),rc=more.getBoundingClientRect();rowMenu(r,rc.right-210,rc.bottom+4,more);return;}
+  function pick(attr,key,btn){state.filter[key]=btn.hasAttribute('data-all')?null:btn.getAttribute(attr);store.set('filter',state.filter);applyFilters();}
+  var cb=el.closest('#side [data-catbtn]');if(cb){pick('data-cat','cat',cb);return;}
+  var tg=el.closest('#side [data-tagbtn]');if(tg){pick('data-tag','tag',tg);return;}
+  var tk=el.closest('#side [data-trkbtn]');if(tk){pick('data-tracker','tracker',tk);return;}
+  var sb=el.closest('#torrents th[data-sort] button.sort');if(sb){setSort(sb.closest('th').dataset.sort);return;}
+  var more=el.closest('#torrents td.more button');if(more){var r=rowOf(more),rc=more.getBoundingClientRect();rowMenu(r,rc.right-230,rc.bottom+4,more);return;}
   var tab=el.closest('#drawer [data-tab]');if(tab&&state.drawer){openDetail(state.drawer.hash,tab.dataset.tab);return;}
   var da=el.closest('#drawer [data-dact]');if(da&&state.drawer){var h=state.drawer.hash;if(da.dataset.dact==='magnet')copyMagnet(h);else if(da.dataset.dact==='dht'){toast(t('DHT swarm')+'…',false);fetch('/ui/dhtscrape?hash='+encodeURIComponent(h),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(d){toast(t('DHT swarm (seeders / peers):')+' ~'+d.seeders+' / ~'+d.peers,false);}).catch(function(){toast(t('DHT swarm')+': '+t('Copy failed'),true);});}else act(da.dataset.dact,[h]);return;}
   var res=el.closest('#searchresults [data-add]');if(res){var p=new URLSearchParams();p.set('source',res.dataset.add);res.disabled=true;post('/ui/add',p).then(function(x){report(x);refresh();});return;}
@@ -741,15 +1043,26 @@ document.addEventListener('click',function(e){
   if(el.closest('#btn-search')){openDialog($('#dlg-search'));return;}
   if(el.closest('#btn-log')){showLog($('#btn-log').getAttribute('aria-pressed')!=='true');return;}
   if(el.closest('#log-reload')){loadLog();return;}
-  var tb=el.closest('#btn-tools');if(tb){var rc2=tb.getBoundingClientRect();if(openMenuEl===$('#tools-menu'))closeMenu();else openMenu($('#tools-menu'),rc2.right-220,rc2.bottom+4,tb);return;}
+  var tb=el.closest('#btn-tools');if(tb){var rc2=tb.getBoundingClientRect();if(topMenu()===$('#tools-menu'))closeMenus();else openMenu($('#tools-menu'),rc2.right-220,rc2.bottom+4,tb);return;}
+  var cbtn=el.closest('#btn-cols');if(cbtn){var rc3=cbtn.getBoundingClientRect();if(topMenu()===$('#cols-menu'))closeMenus();else{renderColsMenu();openMenu($('#cols-menu'),rc3.right-220,rc3.bottom+4,cbtn);}return;}
   if(el.closest('#side-toggle')){var s=$('#side'),open=!s.classList.contains('open');s.classList.toggle('open',open);$('#side-toggle').setAttribute('aria-expanded',open?'true':'false');return;}
   var row=rowOf(el);
-  if(row&&!el.closest('a,button,input,label')){row.tabIndex=0;select(row.dataset.hash,e.shiftKey?'range':(e.ctrlKey||e.metaKey)?'toggle':'only');if(state.drawer)openDetail(row.dataset.hash);}
+  if(row&&!el.closest('a,button,input,label')){row.tabIndex=0;select(row.dataset.hash,e.shiftKey?'range':(e.ctrlKey||e.metaKey)?'toggle':'only');if(state.drawer&&state.selected.size===1)openDetail(row.dataset.hash);}
   if(row&&el.closest('a.open')){e.preventDefault();select(row.dataset.hash,'only');openDetail(row.dataset.hash);}
 });
+document.addEventListener('mouseover',function(e){
+  if(menus.length<1)return;
+  var item=e.target.closest&&e.target.closest('.menu [role^=menuitem]');if(!item)return;
+  var owner=item.closest('.menu');
+  if(item.dataset.sub){openSub(item);return;}
+  // Hovering another item of the parent menu closes its submenu.
+  if(menus.length>1&&owner===menus[0].el)while(menus.length>1)closeTopMenu(false);
+});
+document.addEventListener('pointerdown',function(e){var h=e.target.closest&&e.target.closest('#torrents th .rz');if(h){e.preventDefault();startResize(h,e.clientX);}});
 document.addEventListener('change',function(e){
   if(e.target.classList.contains('rowsel')){var r=rowOf(e.target);select(r.dataset.hash,'toggle');return;}
   if(e.target.id==='selall'){var on=e.target.checked;visibleRows().forEach(function(r){if(on)state.selected.add(r.dataset.hash);else state.selected.delete(r.dataset.hash);});renderSelection();return;}
+  if(e.target.id==='files-all'){$$('#drawer .filesel').forEach(function(c){c.checked=e.target.checked;});return;}
   if(e.target.id==='add-files'){updateFilePick();return;}
   if(e.target.id==='log-nodebug'||e.target.id==='log-lines'){if(e.target.id==='log-lines')loadLog();else renderLog();return;}
   var f=e.target.closest('#drawer form');if(f)f.classList.add('dirty');
@@ -759,16 +1072,26 @@ document.addEventListener('input',function(e){
   if(e.target.id==='log-filter')renderLog();
   var f=e.target.closest&&e.target.closest('#drawer form');if(f)f.classList.add('dirty');
 });
-document.addEventListener('dblclick',function(e){var r=rowOf(e.target);if(r&&!e.target.closest('button,input,a')){select(r.dataset.hash,'only');openDetail(r.dataset.hash);}});
-document.addEventListener('contextmenu',function(e){var r=rowOf(e.target);if(r&&!e.target.closest('input,a')){e.preventDefault();rowMenu(r,e.clientX,e.clientY,r);}});
+document.addEventListener('dblclick',function(e){var r=rowOf(e.target);if(r&&!e.target.closest('button,input,a')){select(r.dataset.hash,'only');openDetail(r.dataset.hash);}if(e.target.closest&&e.target.closest('#torrents th .rz')){var th=e.target.closest('th');setCol(th.dataset.col,{w:0});}});
+document.addEventListener('contextmenu',function(e){
+  var head=e.target.closest&&e.target.closest('#torrents thead');if(head){e.preventDefault();renderColsMenu();openMenu($('#cols-menu'),e.clientX,e.clientY,$('#btn-cols'));return;}
+  var r=rowOf(e.target);if(r&&!e.target.closest('input,a')){e.preventDefault();rowMenu(r,e.clientX,e.clientY,r);}
+});
 document.addEventListener('submit',function(e){
   var form=e.target;
   if(form.id==='form-add'){e.preventDefault();submitAdd(form);return;}
   if(form.id==='form-remove'){e.preventDefault();var d=$('#dlg-remove'),hs=d._hashes||[];closeDialog(d);bulk($('#remove-files').checked?'remove-files':'remove',hs).then(function(){hs.forEach(function(h){state.selected.delete(h);});if(state.drawer&&hs.indexOf(state.drawer.hash)>=0)closeDetail();});return;}
-  if(form.id==='form-cat'){e.preventDefault();var dc=$('#dlg-cat'),cat=$('input[name=category]',dc).value,tags=$('input[name=tags]',dc).value;closeDialog(dc);Promise.all((dc._hashes||[]).map(function(h){return post('/ui/category',{hash:h,category:cat,tags:tags});})).then(function(r){report(r[r.length-1]);refresh();});return;}
+  if(form.id==='form-cat'){e.preventDefault();var dc=$('#dlg-cat'),cat=$('input[name=category]',dc).value,tags=$('input[name=tags]',dc).value,tmm=$('input[name=auto_tmm]',dc).checked;closeDialog(dc);Promise.all((dc._hashes||[]).map(function(h){var p={hash:h,category:cat,tags:tags};if(tmm)p.auto_tmm='1';return post('/ui/category',p);})).then(function(r){report(r[r.length-1]);refresh();});return;}
   if(form.id==='form-search'){e.preventDefault();runSearch();return;}
+  if(form.id==='form-location'||form.id==='form-limits'){
+    e.preventDefault();var dl=form.closest('dialog'),p2=new URLSearchParams();
+    (dl._hashes||[]).forEach(function(h){p2.append('hashes',h);});
+    $$('input[name]',form).forEach(function(i){var v=i.value.trim();if(form.id==='form-limits'&&v==='')v='-1';p2.set(i.name,v);});
+    closeDialog(dl);post(form.action,p2).then(function(res){report(res);refresh();});return;
+  }
   if(form.hasAttribute('data-native'))return;
-  // Every other form (detail drawer, IP filter): post in place, report, refresh.
+  if(form.hasAttribute('data-confirm-ban')&&!window.confirm(t('Ban this peer for 30 minutes? Its IP address is refused by every torrent.'))){e.preventDefault();return;}
+  // Every other form (detail drawer, IP filter, global limits): post in place, report, refresh.
   if(form.method.toLowerCase()==='post'&&(form.closest('#drawer')||form.closest('dialog'))){
     e.preventDefault();
     var p=new URLSearchParams(new FormData(form));if(e.submitter&&e.submitter.name)p.set(e.submitter.name,e.submitter.value);
@@ -778,18 +1101,22 @@ document.addEventListener('submit',function(e){
 });
 document.addEventListener('keydown',function(e){
   var tag=(document.activeElement&&document.activeElement.tagName)||'',typing=/INPUT|TEXTAREA|SELECT/.test(tag)||(document.activeElement&&document.activeElement.isContentEditable);
-  if(openMenuEl){
-    var items=$$('[role=menuitem]',openMenuEl).filter(function(b){return !b.hidden;}),i=items.indexOf(document.activeElement);
-    if(e.key==='Escape'){e.preventDefault();closeMenu(true);return;}
+  var rz=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#torrents th .rz');
+  if(rz&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){e.preventDefault();var th=rz.closest('th');setCol(th.dataset.col,{w:Math.max(40,Math.round(th.getBoundingClientRect().width+(e.key==='ArrowRight'?10:-10)))});rz.focus();return;}
+  if(menus.length){
+    var m=topMenu(),items=menuItems(m),i=items.indexOf(document.activeElement);
+    if(e.key==='Escape'){e.preventDefault();if(menus.length>1)closeTopMenu(true);else closeMenus(true);return;}
+    if(e.key==='ArrowLeft'&&menus.length>1){e.preventDefault();closeTopMenu(true);return;}
+    if((e.key==='ArrowRight'||e.key==='Enter'||e.key===' ')&&document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.sub){e.preventDefault();openSub(document.activeElement);return;}
     if(e.key==='ArrowDown'){e.preventDefault();items[(i+1)%items.length].focus();return;}
     if(e.key==='ArrowUp'){e.preventDefault();items[(i-1+items.length)%items.length].focus();return;}
     if(e.key==='Home'){e.preventDefault();items[0].focus();return;}
     if(e.key==='End'){e.preventDefault();items[items.length-1].focus();return;}
-    if(e.key==='Tab'){closeMenu();return;}
+    if(e.key==='Tab'){closeMenus();return;}
     return;
   }
   if($('dialog[open]'))return;
-  if(e.key==='Escape'){if(!$('#drawer').hidden){closeDetail();return;}if(state.selected.size){state.selected.clear();renderSelection();}return;}
+  if(e.key==='Escape'){if(state.sbmore){state.sbmore=false;$('#sb-more').hidden=true;afterRender();var sb=$('#sb-more-btn');if(sb)sb.focus();return;}if(!$('#drawer').hidden){closeDetail();return;}if(state.selected.size){state.selected.clear();renderSelection();}return;}
   if(typing)return;
   if(e.key==='/'){e.preventDefault();$('#filter').focus();return;}
   if(e.key==='n'||e.key==='N'){e.preventDefault();openDialog($('#dlg-add'));return;}
@@ -804,7 +1131,7 @@ document.addEventListener('keydown',function(e){
   }
   if((e.ctrlKey||e.metaKey)&&(e.key==='a'||e.key==='A')){e.preventDefault();visibleRows().forEach(function(r){state.selected.add(r.dataset.hash);});renderSelection();return;}
   if(e.key==='Delete'&&state.selected.size){e.preventDefault();askRemove();return;}
-  if((e.key==='p'||e.key==='P')&&state.selected.size){e.preventDefault();var anyRun=selHashes().some(function(h){var r=rows().find(function(x){return x.dataset.hash===h;});return r&&r.dataset.state!=='paused';});bulk(anyRun?'pause':'resume');return;}
+  if((e.key==='p'||e.key==='P')&&state.selected.size){e.preventDefault();var anyRun=selHashes().some(function(h){var r=rowByHash(h);return r&&r.dataset.state!=='paused';});bulk(anyRun?'pause':'resume');return;}
 });
 
 // Drag and drop / paste anywhere: .torrent files and magnet links open Add.
@@ -832,7 +1159,7 @@ function runSearch(){
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}
 
 // Restore and start.
-state.q='';afterRender();sampleGraph();
+state.q='';lastSide=$('#side-live').innerHTML;afterRender();renderColsMenu();sampleGraph();
 var params=new URLSearchParams(location.search);
 if(params.get('open'))openDetail(params.get('open'),params.get('tab')||'general');
 if(params.has('msg')){history.replaceState(null,'',location.pathname);}
@@ -857,81 +1184,120 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
           <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="super_seeding" value="1"> super-seeding</label>
         </div>
       </details>
-{{end}}{{define "fragments"}}<div id="frag-side">{{template "side" .}}</div><div id="frag-live">{{template "live" .}}</div><div id="frag-status">{{template "status" .}}</div><div id="frag-speeds">{{template "speeds" .}}</div>{{end}}{{define "speeds"}}<span class="d" title="Download speed"><svg class="i"><use href="#i-down"/></svg>{{.DownloadRate}}</span><span class="u" title="Upload speed"><svg class="i"><use href="#i-up"/></svg>{{.UploadRate}}</span>{{end}}{{define "side"}}
+{{end}}{{define "fragments"}}<div id="frag-side">{{template "side" .}}</div><div id="frag-live">{{template "live" .}}</div><div id="frag-status">{{template "status" .}}</div><div id="frag-speeds">{{template "speeds" .}}</div><div id="frag-sbmore">{{template "sbmore" .}}</div>{{end}}{{define "speeds"}}<span class="d" title="Download speed"><svg class="i"><use href="#i-down"/></svg>{{.DownloadRate}}</span><span class="u" title="Upload speed"><svg class="i"><use href="#i-up"/></svg>{{.UploadRate}}</span>{{end}}{{define "side"}}
     <section aria-labelledby="h-status">
-      <h2 id="h-status">Status</h2>
-      <ul class="flist">
+      <h2 id="h-status"><button type="button" aria-expanded="true" aria-controls="sec-status" data-sec="status"><svg class="i"><use href="#i-chev"/></svg><span>Status</span></button></h2>
+      <ul class="flist" id="sec-status">
         <li><button type="button" data-status="all" aria-pressed="true" title="Show all torrents in the session"><svg class="i"><use href="#i-list"/></svg><span class="lbl">All</span><span class="n">{{.CountAll}}</span></button></li>
         <li><button type="button" data-status="downloading" aria-pressed="false" title="Show only torrents currently downloading"><svg class="i"><use href="#i-dl"/></svg><span class="lbl">Downloading</span><span class="n">{{.CountDown}}</span></button></li>
         <li><button type="button" data-status="seeding" aria-pressed="false" title="Show only torrents currently seeding"><svg class="i"><use href="#i-seed"/></svg><span class="lbl">Seeding</span><span class="n">{{.CountSeeding}}</span></button></li>
-        <li><button type="button" data-status="active" aria-pressed="false" title="Show only torrents moving data right now"><svg class="i"><use href="#i-activity"/></svg><span class="lbl">Active</span><span class="n">0</span></button></li>
+        <li><button type="button" data-status="completed" aria-pressed="false" title="Show only torrents whose download is complete"><svg class="i"><use href="#i-done"/></svg><span class="lbl">Completed</span><span class="n">{{.CountCompleted}}</span></button></li>
+        <li><button type="button" data-status="running" aria-pressed="false" title="Show only torrents that are not paused"><svg class="i"><use href="#i-run"/></svg><span class="lbl">Running</span><span class="n">{{.CountRunning}}</span></button></li>
         <li><button type="button" data-status="paused" aria-pressed="false" title="Show only paused torrents"><svg class="i"><use href="#i-pausec"/></svg><span class="lbl">Paused</span><span class="n">{{.CountPaused}}</span></button></li>
+        <li><button type="button" data-status="active" aria-pressed="false" title="Show only torrents moving data right now"><svg class="i"><use href="#i-activity"/></svg><span class="lbl">Active</span><span class="n">{{.CountActive}}</span></button></li>
+        <li><button type="button" data-status="inactive" aria-pressed="false" title="Show only torrents not moving data right now"><svg class="i"><use href="#i-sleep"/></svg><span class="lbl">Inactive</span><span class="n">{{.CountInactive}}</span></button></li>
         <li><button type="button" data-status="stalled" aria-pressed="false" title="Show only stalled torrents (no seeders or peers)"><svg class="i"><use href="#i-warn"/></svg><span class="lbl">Stalled</span><span class="n">{{.CountStalled}}</span></button></li>
-        {{if .CountMoving}}<li><button type="button" data-status="moving" aria-pressed="false" title="Show only torrents currently being moved across storage"><svg class="i"><use href="#i-move"/></svg><span class="lbl">Moving</span><span class="n">{{.CountMoving}}</span></button></li>{{end}}
-        {{if .CountError}}<li><button type="button" data-status="error" aria-pressed="false" title="Show only torrents in error state"><svg class="i"><use href="#i-xc"/></svg><span class="lbl">Error</span><span class="n">{{.CountError}}</span></button></li>{{end}}
+        <li><button type="button" data-status="checking" aria-pressed="false" title="Show only torrents whose data is being checked"><svg class="i"><use href="#i-check"/></svg><span class="lbl">Checking</span><span class="n">{{.CountChecking}}</span></button></li>
+        <li><button type="button" data-status="moving" aria-pressed="false" title="Show only torrents currently being moved across storage"><svg class="i"><use href="#i-move"/></svg><span class="lbl">Moving</span><span class="n">{{.CountMoving}}</span></button></li>
+        <li><button type="button" data-status="error" aria-pressed="false" title="Show only torrents in error state"><svg class="i"><use href="#i-xc"/></svg><span class="lbl">Errored</span><span class="n">{{.CountError}}</span></button></li>
       </ul>
     </section>
-    {{if .Categories}}
+    {{if .Standalone}}
     <section aria-labelledby="h-cats">
-      <h2 id="h-cats">Categories</h2>
-      <ul class="flist">
-        {{range .Categories}}<li><button type="button" data-catbtn data-cat="{{.}}" aria-pressed="false" title="Filter torrents by category"><svg class="i"><use href="#i-folder"/></svg><span class="lbl">{{.}}</span><span class="n">0</span></button></li>{{end}}
+      <h2 id="h-cats"><button type="button" aria-expanded="true" aria-controls="sec-cats" data-sec="cats"><svg class="i"><use href="#i-chev"/></svg><span>Categories</span></button></h2>
+      <ul class="flist" id="sec-cats">
+        <li><button type="button" data-catbtn data-all data-cat="" aria-pressed="true" title="Torrents of every category"><svg class="i"><use href="#i-folder"/></svg><span class="lbl">All</span><span class="n">{{.CountAll}}</span></button></li>
         <li><button type="button" data-catbtn data-cat="" aria-pressed="false" title="Torrents without a category"><svg class="i"><use href="#i-folder"/></svg><span class="lbl">Uncategorized</span><span class="n">0</span></button></li>
+        {{range .Categories}}<li><button type="button" data-catbtn data-cat="{{.}}" aria-pressed="false" title="Filter torrents by category"><svg class="i"><use href="#i-folder"/></svg><span class="lbl">{{.}}</span><span class="n">0</span></button></li>{{end}}
       </ul>
     </section>
-    {{end}}
-    {{if .Tags}}
     <section aria-labelledby="h-tags">
-      <h2 id="h-tags">Tags</h2>
-      <ul class="flist">
-        {{range .Tags}}<li><button type="button" data-tag="{{.}}" aria-pressed="false" title="Filter torrents by tag"><svg class="i"><use href="#i-tag"/></svg><span class="lbl">{{.}}</span><span class="n">0</span></button></li>{{end}}
+      <h2 id="h-tags"><button type="button" aria-expanded="true" aria-controls="sec-tags" data-sec="tags"><svg class="i"><use href="#i-chev"/></svg><span>Tags</span></button></h2>
+      <ul class="flist" id="sec-tags">
+        <li><button type="button" data-tagbtn data-all data-tag="" aria-pressed="true" title="Torrents with any tag or none"><svg class="i"><use href="#i-tag"/></svg><span class="lbl">All</span><span class="n">{{.CountAll}}</span></button></li>
+        <li><button type="button" data-tagbtn data-tag="" aria-pressed="false" title="Torrents without tags"><svg class="i"><use href="#i-tag"/></svg><span class="lbl">Untagged</span><span class="n">0</span></button></li>
+        {{range .Tags}}<li><button type="button" data-tagbtn data-tag="{{.}}" aria-pressed="false" title="Filter torrents by tag"><svg class="i"><use href="#i-tag"/></svg><span class="lbl">{{.}}</span><span class="n">0</span></button></li>{{end}}
       </ul>
     </section>
     {{end}}
+    <section aria-labelledby="h-trackers">
+      <h2 id="h-trackers"><button type="button" aria-expanded="true" aria-controls="sec-trackers" data-sec="trackers"><svg class="i"><use href="#i-chev"/></svg><span>Trackers</span></button></h2>
+      <ul class="flist" id="sec-trackers">
+        <li><button type="button" data-trkbtn data-all data-tracker="" aria-pressed="true" title="Torrents of every tracker"><svg class="i"><use href="#i-server"/></svg><span class="lbl">All</span><span class="n">{{.CountAll}}</span></button></li>
+        {{range .TrackerHosts}}{{if .Name}}<li><button type="button" data-trkbtn data-tracker="{{.Name}}" aria-pressed="false" title="Filter torrents by the tracker that answers for them"><svg class="i"><use href="#i-server"/></svg><span class="lbl">{{.Name}}</span><span class="n">{{.Count}}</span></button></li>{{else}}<li><button type="button" data-trkbtn data-tracker="" aria-pressed="false" title="Torrents without a working tracker: none answers yet, or they have none (DHT and peer exchange only)"><svg class="i"><use href="#i-server"/></svg><span class="lbl">No working tracker</span><span class="n">{{.Count}}</span></button></li>{{end}}{{end}}
+      </ul>
+    </section>
 {{end}}{{define "status"}}
-    {{if .Standalone}}<button type="button" class="sb-alt" role="switch" aria-checked="{{if .AltSpeed}}true{{else}}false{{end}}" data-alt-speed title="Toggle the alternative speed limits (the scheduler's window or the configured alternative limits)"><svg class="i"><use href="#i-clock"/></svg>Alternative limits</button>{{end}}
-    {{if .UpdateAvailable}}<a class="sb-update" href="/ui/settings#maintenance" title="A new version of gx-torrent is available: open Settings, Maintenance to see the changes and install it"><span class="dot warn" aria-hidden="true"></span><span>Update available</span>{{if .UpdateDate}} <span class="subtle">{{.UpdateDate}}</span>{{end}}</a>{{end}}
-    <span class="hide-m" data-down="{{.DownRateRaw}}" data-up="{{.UpRateRaw}}" data-down-s="{{.DownloadRate}}" data-up-s="{{.UploadRate}}" title="Downloaded / uploaded since start"><span>Totals</span> <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
-    <span class="disk" title="Free space on the download folder"><svg class="i"><use href="#i-disk"/></svg><span>Free space</span> <b>{{bytes .DiskFree}}</b><span class="subtle">/ {{bytes .DiskTotal}}</span></span>
-    <span class="hide-m" title="CPU load (percent of one core, short average) and resident memory of the gx-torrent process itself"><span>Process</span> <b>{{percent .CPUPercent}}%</b> · <b>{{bytes .ProcRSS}}</b></span>
+    <span {{if .PortReachable}}title="The peer port is reachable from the internet (router mapping or incoming peers)"{{else}}title="No router mapping and no incoming peer yet: the peer port may be closed"{{end}}><span class="dot {{if .PortReachable}}ok{{else}}bad{{end}}" aria-hidden="true"></span><span>Port</span> <b>{{.PeerPort}}</b> {{if not .PortOpen}}<span class="subtle hide-m">not open</span>{{end}}</span>
     <span title="Nodes in the DHT routing table">DHT <b>{{if .DHT}}{{.DHTNodes}}{{else}}<span>off</span>{{end}}</b></span>
-    <span {{if .PortReachable}}title="The peer port is reachable from the internet (router mapping or incoming peers)"{{else}}title="No router mapping and no incoming peer yet: the peer port may be closed"{{end}}><span class="dot {{if .PortReachable}}ok{{else}}bad{{end}}" aria-hidden="true"></span><span>Port</span> <b>{{.PeerPort}}</b> {{if .PortOpen}}<span class="subtle">{{.Router}}{{if .ExternalIP}} · {{.ExternalIP}}{{end}}</span>{{else}}<span class="subtle">not open</span>{{end}}</span>
-    <span class="hide-m" title="Incoming peer connections since start"><span>Incoming</span> <b>{{.IncomingConns}}</b></span>
-    <span {{if .IPFilterPath}}title="{{.IPFilterPath}}"{{else}}title="IP filter rules"{{end}}><span>IP filter</span> <b>{{if .IPFilter}}{{.IPFilter}}{{else}}<span>none</span>{{end}}</b></span>
-    <span class="hide-m" title="Encryption policy for peer connections"><span>Encryption</span> <b>{{.Encryption}}</b></span>
-    {{if not .Standalone}}<span title="Read / write cache"><span>Cache</span> <b>{{.CacheReadMB}}/{{.CacheWB}} MB</b></span>{{end}}
-    {{if .PeerErrors}}<span title="Peer/tracker errors filtered from the log, by category (since start)"><span>Peer errors</span> <b>{{.PeerErrors}}</b></span>{{end}}
-    {{if .UTPSocket}}<span title="uTP socket dials, accepts and retransmissions since start (errors with no accepts: UDP is likely firewalled)"><span>uTP socket</span> <b>{{.UTPSocket}}</b></span>{{end}}
+    <span class="disk" title="Free space on the download folder"><svg class="i"><use href="#i-disk"/></svg><span class="hide-m">Free space</span> <b>{{bytes .DiskFree}}</b><span class="subtle hide-m">/ {{bytes .DiskTotal}}</span></span>
+    <span class="spacer"></span>
+    {{if .UpdateAvailable}}<a class="sb-update" href="/ui/settings#maintenance" title="A new version of gx-torrent is available: open Settings, Maintenance to see the changes and install it"><span class="dot warn" aria-hidden="true"></span><span>Update available</span>{{if .UpdateDate}} <span class="subtle">{{.UpdateDate}}</span>{{end}}</a>{{end}}
+    {{if .Standalone}}<button type="button" class="sb-alt" role="switch" aria-checked="{{if .AltSpeed}}true{{else}}false{{end}}" data-alt-speed title="Toggle the alternative speed limits (the scheduler's window or the configured alternative limits)"><svg class="i"><use href="#i-clock"/></svg><span class="hide-m">Alternative limits</span></button>{{end}}
+    <button type="button" class="sb-btn" data-global-limits data-dl="{{.GlobalDownKib}}" data-ul="{{.GlobalUpKib}}" data-down="{{.DownRateRaw}}" data-up="{{.UpRateRaw}}" data-down-s="{{.DownloadRate}}" data-up-s="{{.UploadRate}}" title="Download and upload speed with the global limits: click to change the limits"><svg class="i d"><use href="#i-down"/></svg><b>{{.DownloadRate}}</b><span class="subtle">({{kibrate .GlobalDownKib}})</span><svg class="i u"><use href="#i-up"/></svg><b>{{.UploadRate}}</b><span class="subtle">({{kibrate .GlobalUpKib}})</span></button>
+    <button type="button" class="sb-btn" id="sb-more-btn" aria-expanded="false" aria-controls="sb-more" aria-label="Connection details" title="Connection details: totals, IP filter, encryption, process"><svg class="i"><use href="#i-info"/></svg></button>
+{{end}}{{define "sbmore"}}
+  <h2 id="sb-more-title">Connection details</h2>
+  <div class="row"><span>Downloaded / uploaded since start</span><b>{{bytes .TotalDown}} / {{bytes .TotalUp}}</b></div>
+  <div class="row"><span>External address</span><b>{{if .PortOpen}}{{.Router}}{{if .ExternalIP}} · {{.ExternalIP}}{{end}}{{else}}<span>not open</span>{{end}}</b></div>
+  <div class="row"><span>Incoming connections</span><b>{{.IncomingConns}}</b></div>
+  <div class="row"><span>IP filter</span><b {{if .IPFilterPath}}title="{{.IPFilterPath}}"{{end}}>{{if .IPFilter}}{{.IPFilter}}{{else}}<span>none</span>{{end}}</b></div>
+  <div class="row"><span>Encryption</span><b>{{.Encryption}}</b></div>
+  <div class="row"><span>Process (CPU, memory)</span><b>{{percent .CPUPercent}}% · {{bytes .ProcRSS}}</b></div>
+  {{if not .Standalone}}<div class="row"><span>Read / write cache</span><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b></div>{{end}}
+  {{if .PeerErrors}}<div class="row"><span>Peer errors</span><b>{{.PeerErrors}}</b></div>{{end}}
+  {{if .UTPSocket}}<div class="row"><span>uTP socket</span><b>{{.UTPSocket}}</b></div>{{end}}
 {{end}}{{define "live"}}
   {{if .Rows}}
   <table class="tbl t" id="torrents" aria-label="Torrents">
-    <colgroup><col class="c-sel"><col><col class="c-size"><col class="c-prog"><col class="c-state"><col class="c-rate"><col class="c-rate c-upc"><col class="c-eta"><col class="c-peers"><col class="c-ratio"><col class="c-more"></colgroup>
     <thead><tr>
       <th class="sel" scope="col"><input type="checkbox" id="selall" aria-label="Select all" title="Select all"></th>
-      <th scope="col" data-sort="name" aria-sort="none"><button type="button" class="sort" title="Sort by name">Name<span class="arrow" aria-hidden="true"></span></button></th>
-      <th scope="col" class="num c-size" data-sort="size" aria-sort="none"><button type="button" class="sort" title="Sort by size">Size<span class="arrow" aria-hidden="true"></span></button></th>
-      <th scope="col" data-sort="progress" aria-sort="none"><button type="button" class="sort" title="Sort by progress">Progress<span class="arrow" aria-hidden="true"></span></button></th>
-      <th scope="col" data-sort="state" aria-sort="none"><button type="button" class="sort" title="Sort by state">Status<span class="arrow" aria-hidden="true"></span></button></th>
-      <th scope="col" class="num" data-sort="down" aria-sort="none"><button type="button" class="sort" title="Sort by download speed">Down<span class="arrow" aria-hidden="true"></span></button></th>
-      <th scope="col" class="num c-upc" data-sort="up" aria-sort="none"><button type="button" class="sort" title="Sort by upload speed">Up<span class="arrow" aria-hidden="true"></span></button></th>
-      <th scope="col" class="num c-eta" data-sort="eta" aria-sort="none"><button type="button" class="sort" title="Sort by time left">ETA<span class="arrow" aria-hidden="true"></span></button></th>
-      <th scope="col" class="num c-peers" data-sort="peers" aria-sort="none"><button type="button" class="sort" title="Sort by connected peers">Peers<span class="arrow" aria-hidden="true"></span></button></th>
-      <th scope="col" class="num c-ratio" data-sort="ratio" aria-sort="none"><button type="button" class="sort" title="Sort by share ratio">Ratio<span class="arrow" aria-hidden="true"></span></button></th>
-      <th scope="col"><span class="sr-only">Actions</span></th>
+      <th scope="col" class="c-name" data-col="name" data-sort="name" aria-sort="none"><button type="button" class="sort" title="Sort by name">Name<span class="arrow" aria-hidden="true"></span></button></th>
+      {{template "th" "size"}}<button type="button" class="sort" title="Sort by size">Size<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "progress"}}<button type="button" class="sort" title="Sort by progress">Progress<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "state"}}<button type="button" class="sort" title="Sort by state">Status<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "seeds"}}<button type="button" class="sort" title="Sort by connected seeds; in brackets the seeds the trackers report">Seeds<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "peers"}}<button type="button" class="sort" title="Sort by connected peers; in brackets the peers the trackers report">Peers<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "down"}}<button type="button" class="sort" title="Sort by download speed">Down speed<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "up"}}<button type="button" class="sort" title="Sort by upload speed">Up speed<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "eta"}}<button type="button" class="sort" title="Sort by time left">ETA<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "ratio"}}<button type="button" class="sort" title="Sort by share ratio">Ratio<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "category"}}<button type="button" class="sort" title="Sort by category">Category<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "tags"}}<button type="button" class="sort" title="Sort by tags">Tags<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "added"}}<button type="button" class="sort" title="Sort by the date the torrent was added">Added on<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "completed"}}<button type="button" class="sort" title="Sort by the date the download completed">Completed on<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "downloaded"}}<button type="button" class="sort" title="Sort by data downloaded">Downloaded<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "uploaded"}}<button type="button" class="sort" title="Sort by data uploaded">Uploaded<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "remaining"}}<button type="button" class="sort" title="Sort by data still to download">Remaining<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "queue"}}<button type="button" class="sort" title="Sort by queue position">#<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "tracker"}}<button type="button" class="sort" title="Sort by the tracker that answers">Tracker<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "path"}}<button type="button" class="sort" title="Sort by save path">Save path<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      <th scope="col" class="c-more"><span class="sr-only">Actions</span></th>
     </tr></thead>
     <tbody>
     {{range .Rows}}
-    <tr tabindex="-1" aria-selected="false" data-hash="{{.Hash}}" data-name="{{.Name}}" data-state="{{.State}}" data-cat="{{.Category}}" data-tags="{{.Tags}}" data-tmm="{{if .AutoTMM}}1{{end}}" data-path="{{.SavePath}}" data-down="{{.DLRate}}" data-up="{{.ULRate}}" data-k-name="{{.Name}}" data-k-size="{{.TotalSize}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-eta="{{.ETAVal}}" data-k-peers="{{.Peers}}" data-k-ratio="{{.RatioVal}}">
+    <tr tabindex="-1" aria-selected="false" data-hash="{{.Hash}}" data-name="{{.Name}}" data-state="{{.State}}" data-cat="{{.Category}}" data-tags="{{.Tags}}" data-tracker="{{.Tracker}}" data-tmm="{{if .AutoTMM}}1{{end}}" data-pin="{{if .Pinned}}1{{end}}" data-seq="{{if .Sequential}}1{{end}}" data-fl="{{if .FirstLast}}1{{end}}" data-ss="{{if .SuperSeeding}}1{{end}}" data-dll="{{.DLLimitKib}}" data-ull="{{.ULLimitKib}}" data-down="{{.DLRate}}" data-up="{{.ULRate}}" data-k-name="{{.Name}}" data-k-size="{{.TotalSize}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-seeds="{{.Seeds}}" data-k-peers="{{.Peers}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-eta="{{.ETAVal}}" data-k-ratio="{{.RatioVal}}" data-k-category="{{.Category}}" data-k-tags="{{.Tags}}" data-k-added="{{.AddedVal}}" data-k-completed="{{.CompletedVal}}" data-k-downloaded="{{.DownloadedVal}}" data-k-uploaded="{{.UploadedVal}}" data-k-remaining="{{.RemainingVal}}" data-k-queue="{{.QueuePos}}" data-k-tracker="{{.Tracker}}" data-k-path="{{.SavePath}}">
       <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}" aria-label="Select torrent" title="Select this torrent for batch actions"></td>
-      <td class="name"><div class="t1"><a class="open" href="/?open={{.Hash}}" title="{{.Name}}">{{.Name}}</a></div><div class="t2">{{if .Category}}<span class="chip cat">{{.Category}}</span>{{end}}<span class="path" title="{{.SavePath}}">{{.SavePath}}</span></div></td>
+      <td class="name c-name" title="{{.Name}}"><a class="open" href="/?open={{.Hash}}">{{.Name}}</a>{{if .Pinned}}<span class="fl" title="Force started: runs outside the queue limits">F</span>{{end}}</td>
       <td class="num c-size" title="{{.DoneSize}}">{{.Size}}</td>
-      <td class="prog"><div class="pl"><span>{{.ProgressS}}</span></div><div class="progress {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><i style="width:{{percent .Progress}}%"></i></div></td>
-      <td><span class="badge b-{{.State}}">{{.StateLabel}}</span></td>
-      <td class="num{{if not .DLRate}} z{{end}}">{{.Down}}</td>
-      <td class="num c-upc{{if not .ULRate}} z{{end}}">{{.Up}}</td>
+      <td class="c-progress"><div class="pbar {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><i style="width:{{percent .Progress}}%"></i><span>{{.ProgressS}}</span></div></td>
+      <td class="state c-state"><span class="badge b-{{.State}}">{{.StateLabel}}</span></td>
+      <td class="num c-seeds">{{.Seeds}}{{if ge .SwarmSeeds 0}}<span class="subtle"> ({{.SwarmSeeds}})</span>{{end}}</td>
+      <td class="num c-peers">{{.Peers}}{{if ge .SwarmPeers 0}}<span class="subtle"> ({{.SwarmPeers}})</span>{{end}}</td>
+      <td class="num c-down{{if not .DLRate}} z{{end}}">{{.Down}}</td>
+      <td class="num c-up{{if not .ULRate}} z{{end}}">{{.Up}}</td>
       <td class="num c-eta">{{.ETA}}</td>
-      <td class="num c-peers" title="Seeds / peers"><span>{{.Seeds}}</span><span class="subtle"> / {{.Peers}}</span></td>
       <td class="num c-ratio" title="{{.RatioGoal}}">{{.Ratio}}</td>
+      <td class="c-category">{{.Category}}</td>
+      <td class="c-tags">{{.Tags}}</td>
+      <td class="c-added">{{.Added}}</td>
+      <td class="c-completed">{{.Completed}}</td>
+      <td class="num c-downloaded">{{.Downloaded}}</td>
+      <td class="num c-uploaded">{{.Uploaded}}</td>
+      <td class="num c-remaining">{{.Remaining}}</td>
+      <td class="num c-queue">{{if gt .QueuePos 0}}{{.QueuePos}}{{else}}*{{end}}</td>
+      <td class="c-tracker">{{.Tracker}}</td>
+      <td class="c-path" title="{{.SavePath}}">{{.SavePath}}</td>
       <td class="meta-m"><span class="badge b-{{.State}}">{{.StateLabel}}</span><span>{{.Size}}</span><span>↓ {{.Down}}</span><span>↑ {{.Up}}</span><span>{{.ETA}}</span></td>
       <td class="more"><button type="button" class="ghost icon sm" aria-haspopup="menu" aria-label="More actions" title="More actions"><svg class="i"><use href="#i-dots"/></svg></button></td>
     </tr>
@@ -950,7 +1316,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
     <button type="button" class="primary" onclick="document.getElementById('btn-add').click()" title="Add torrents: magnet links, .torrent URLs or files (shortcut N)"><svg class="i"><use href="#i-plus"/></svg>Add</button>
   </div>
   {{end}}
-{{end}}{{define "detail"}}
+{{end}}{{define "th"}}<th scope="col" class="c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "thnum"}}<th scope="col" class="num c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "rz"}}<span class="rz" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize column" title="Drag, or use the left and right arrows, to resize the column; double click for the default width"></span>{{end}}{{define "detail"}}
 <div class="dhead">
   <h2 id="drawer-title">{{.Name}}</h2>
   <button type="button" class="ghost icon" data-close-drawer aria-label="Close details" title="Close details"><svg class="i"><use href="#i-x"/></svg></button>
@@ -1051,14 +1417,21 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
   </form>
 {{else if eq .Tab "files"}}
   {{if .Files}}
-  <table class="tbl">
-    <thead><tr><th scope="col">File</th><th scope="col" class="num">Size</th><th scope="col" class="num">Done</th><th scope="col">Priority</th><th scope="col"><span class="sr-only">Play</span></th></tr></thead>
+  <form class="filesbar" method="post" action="/ui/file-priority" id="files-bulk">
+    <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="files">
+    <label class="chk" for="files-prio">With the selected files:</label>
+    <select name="priority" id="files-prio" title="Download priority to give to the ticked files"><option value="0">Skip</option><option value="4" selected>Normal</option><option value="6">High</option><option value="7">Maximum</option></select>
+    <button type="submit" class="sm" title="Apply this priority to the ticked files">Apply</button>
+  </form>
+  <table class="tbl files">
+    <thead><tr><th scope="col" class="sel"><input type="checkbox" id="files-all" aria-label="Select all files" title="Select all files"></th><th scope="col">File</th><th scope="col" class="num">Size</th><th scope="col">Progress</th><th scope="col">Priority</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
     <tbody>
     {{range .Files}}
       <tr>
-        <td style="word-break:break-word">{{.Path}}</td>
+        <td class="sel"><input type="checkbox" class="filesel" name="index" value="{{.Index}}" form="files-bulk" aria-label="Select file" title="Select this file to change its priority with the others"></td>
+        <td class="fname" style="word-break:break-word">{{.Path}}</td>
         <td class="num">{{bytes .Size}}</td>
-        <td class="num">{{bytes .Done}}</td>
+        <td class="fp"><div class="pbar{{if not .Wanted}} paused{{end}}" role="progressbar" aria-valuenow="{{pct .Done .Size}}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><i style="width:{{pct .Done .Size}}%"></i><span>{{pct .Done .Size}}%</span></div></td>
         <td><form method="post" action="/ui/file-priority" class="autosubmit">
           <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="files"><input type="hidden" name="index" value="{{.Index}}">
           <select name="priority" aria-label="Priority" title="Download priority for this file (Skip, Normal, High, Maximum)" onchange="this.form.requestSubmit()"><option value="0"{{if eq .Priority 0}} selected{{end}}>Skip</option><option value="4"{{if eq .Priority 4}} selected{{end}}>Normal</option><option value="6"{{if eq .Priority 6}} selected{{end}}>High</option><option value="7"{{if eq .Priority 7}} selected{{end}}>Maximum</option></select>
@@ -1072,18 +1445,24 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
 {{else if eq .Tab "peers"}}
   {{if .Peers}}
   <table class="tbl">
-    <thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col" class="num">↓</th><th scope="col" class="num">↑</th><th scope="col" class="num">Prog.</th><th scope="col">Flag</th><th scope="col" class="num">For</th></tr></thead>
+    <thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col" class="num">↓</th><th scope="col" class="num">↑</th><th scope="col" class="num">Prog.</th><th scope="col">Flag</th><th scope="col" class="num">For</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
     <tbody>
     {{range .Peers}}
       <tr><td class="mono" title="{{.Source}}">{{.Address}}</td><td>{{if .Client}}{{.Client}}{{else}}—{{end}}</td>
       <td class="num">{{rate .Down}}</td><td class="num">{{rate .Up}}</td>
       <td class="num">{{printf "%.1f" .Progress}}%</td>
       <td><div class="flags">{{if .Seed}}<span class="flag on">seed</span>{{end}}{{if .Incoming}}<span class="flag">incoming</span>{{else}}<span class="flag">outgoing</span>{{end}}{{if .UTP}}<span class="flag">uTP</span>{{else}}<span class="flag">TCP</span>{{end}}{{if .Encrypted}}<span class="flag on">encrypted</span>{{end}}{{if .Handshake}}<span class="flag on">encrypted HS</span>{{end}}{{if .Snubbed}}<span class="flag">snubbed</span>{{end}}{{if .Optimistic}}<span class="flag on">optimistic</span>{{end}}{{if .ClientChoke}}<span class="flag">choking us</span>{{end}}{{if .PeerChoke}}<span class="flag">we choke</span>{{end}}{{if .ClientInt}}<span class="flag">interested</span>{{end}}{{if .PeerInt}}<span class="flag">interested in us</span>{{end}}{{if .Downloading}}<span class="flag">downloading</span>{{end}}</div></td>
-      <td class="num">{{dur .Connected}}</td></tr>
+      <td class="num">{{dur .Connected}}</td>
+      <td><form method="post" action="/ui/peers" data-confirm-ban><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="peers"><input type="hidden" name="op" value="ban"><input type="hidden" name="peers" value="{{.Address}}"><button type="submit" class="ghost icon sm danger" aria-label="Ban this peer" title="Ban this peer's IP address for 30 minutes"><svg class="i"><use href="#i-ban"/></svg></button></form></td></tr>
     {{end}}
     </tbody>
   </table>
   {{else}}<p class="muted">No peers connected.</p>{{end}}
+  <form class="form-grid" method="post" action="/ui/peers">
+    <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="peers"><input type="hidden" name="op" value="add">
+    <label class="wide">Add peers (ip:port, one per line)<textarea name="peers" rows="2" placeholder="203.0.113.5:51413" title="Peers to connect to now, as ip:port, one per line"></textarea></label>
+    <div><button type="submit" class="sm" title="Connect to these peers now">Add peers</button></div>
+  </form>
 {{else if eq .Tab "trackers"}}
   {{if .Trackers}}
   <table class="tbl">

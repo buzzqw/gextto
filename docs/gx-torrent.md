@@ -186,32 +186,56 @@ remembered in the browser), the same top bar and navigation on every page,
 native `<dialog>` windows, cards, chips and toasts announced to screen readers.
 Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
 
-- **Layout** (inspired by qBittorrent's Web UI, VueTorrent and Flood): a top bar
-  with search (`/`), live speeds and the theme switch; a **side bar** with the
-  status filters and their counts (all, downloading, seeding, *active*, paused,
-  stalled, moving, error), the **categories** and **tags** with counts, and a
-  two-minute **transfer graph**; a **toolbar** acting on the selection
-  (resume, pause, recheck, reannounce, top, move up/down, remove) plus *Tools* (IP filter,
-  create `.torrent`, check feeds, test ports); the status bar at the bottom
-  with totals, free space, the **CPU load and resident memory of the gx-torrent
-  process itself**, DHT, port reachability, incoming connections, IP
-  filter, encryption, and the **alternative-limits toggle** (standalone: the
-  qBittorrent speed-limit button — the scheduler's window or the configured
-  alternative limits).
-- **Table**: one row per torrent (name with category chip and folder, size,
-  progress bar coloured by state, readable state badge, speeds, ETA,
-  seeds/peers, ratio), sortable columns (the order and the filters are
-  remembered), click / Ctrl-click / Shift-click selection, a **context menu**
-  (right click, the ⋯ button or the menu key: details, resume, pause, recheck,
-  reannounce, top, move up/down, rename (standalone), category and tags, copy
-  magnet, export `.torrent`, remove)
-  and keyboard navigation (arrows, Space to select, Enter for the detail, Del to
-  remove, `P` to pause/resume, `N` to add, Ctrl+A). Columns give way as the list
-  narrows; on a phone the rows become cards. The list refreshes every 2 seconds
-  (and at once on engine events) without losing selection, focus or scroll.
-  The periodic refresh swaps only the rows: the table header, and with it the
-  **select-all** checkbox, is never replaced, so a click is never lost to a
-  refresh landing between the press and the release.
+- **Layout** (familiar to qBittorrent Web UI users, not a copy of it): a top
+  bar with search (`/`), live speeds and the theme switch; a **side bar** with
+  collapsible sections (the collapsed ones are remembered): the **status
+  filters** with their counts, always all listed (all, downloading, seeding,
+  completed, running, paused, active, inactive, stalled, checking, moving,
+  errored), the **categories** (all, uncategorized, each category) and
+  **tags** (all, untagged, each tag) in standalone, the **trackers** (the host
+  of each torrent's working tracker, plus *No working tracker*), and a
+  two-minute **transfer graph**. The status counts come from the server with
+  the same predicates as the page filter (`uiPageData`, `matchStatus`). A
+  **toolbar** acts on the selection (resume, pause, remove, queue top/up/
+  down/bottom) next to *Columns*, *Log* and *Tools* (IP filter, create
+  `.torrent`, check feeds, test ports). The **status bar** keeps what matters
+  at a glance — port reachability, DHT nodes, free space, the
+  **alternative-limits toggle** (standalone), the update notice, and the
+  **download/upload speeds with the global limits**: a click opens *Global
+  speed limits* (`POST /ui/global-limits`, KiB/s, 0 = unlimited) — while the
+  technical figures (totals, external address, incoming connections, IP
+  filter, encryption, CPU and memory of the gx-torrent process, peer errors,
+  uTP socket) are one click away in *Connection details*. The browser tab title
+  carries the speeds, like qBittorrent.
+- **Table**: one compact line per torrent. The **columns are chosen** by the
+  user (*Columns* in the toolbar, or a right click on the header): name, size,
+  progress, status, seeds and peers (connected, with the swarm the trackers
+  report in brackets), speeds, ETA, ratio, category by default; tags, added
+  on, completed on, downloaded, uploaded, remaining, queue position, tracker
+  and save path on demand. Columns are **resizable** by dragging the header
+  edge or with the arrow keys on it (double click restores the default);
+  choice and widths are remembered in the browser and applied before the
+  table is drawn, so a hidden column never flashes. Columns are sortable (the
+  order and the filters are remembered); click / Ctrl-click / Shift-click
+  selection; a **context menu** (right click, the ⋯ button or the menu key)
+  with details, resume, pause, **force start**, remove, **set location**
+  (`POST /ui/bulk-move`, several torrents at once), rename and a **category
+  submenu** plus *Category and tags…* and **automatic management** (standalone),
+  **limit speed** (`POST /ui/bulk-limits`: per-torrent limits for the whole
+  selection, empty = follow the global limit), super-seeding, force recheck,
+  force reannounce, **sequential download**, **first and last pieces first**,
+  a *Queue* submenu (top, up, down, bottom), a *Copy* submenu (name, info hash,
+  magnet) and export `.torrent`. The toggles show the state of the whole
+  selection — ticked, unticked or **mixed** — and a click brings every selected
+  torrent to the same state (the toggle reaches only the torrents that need
+  it). Submenus open with the mouse, Enter or the right arrow and close with
+  the left arrow or Escape. Keyboard navigation: arrows, Space to select,
+  Enter for the detail, Del to remove, `P` to pause/resume, `N` to add,
+  Ctrl+A. On a phone the rows become cards. The list refreshes every 2
+  seconds (and at once on engine events) without losing selection, focus or
+  scroll. The periodic refresh swaps only the rows: the table header, and with
+  it the **select-all** checkbox, is never replaced, so a click is never lost
+  to a refresh landing between the press and the release.
 - **Add** in a dialog: several magnet links or `.torrent` URLs (one per line)
   and several files at once, destination (suggested from the existing save
   paths, with a *Browse* folder picker in standalone: `GET /ui/browse-dir` lists
@@ -221,11 +245,15 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   magnet pasted outside a field opens it pre-filled.
 - **Remove** asks in a dialog whether to delete the files too.
 - **Per-torrent detail** in a panel below the list (like qBittorrent; full width
-  on a phone), with tabs: *General* (actions, data, pieces, space, dates, pin, speed,
-  connection, upload and seed limits, super-seeding, move, category and tags,
-  **web seeds**), *Files* (priority, **rename** and **HTTP streaming** with ▶), *Peers*
-  (connection flags, transport, encryption), *Trackers* (status, swarm, add and
-  **remove**), *Pieces* (coloured map). Peers, trackers and pieces refresh while
+  on a phone) whose **height is resizable** from its top edge (drag, or the up
+  and down arrows; remembered), and which follows the selected row. Tabs:
+  *General* (actions, data, pieces, space, dates, pin, speed, connection,
+  upload and seed limits, super-seeding, move, category and tags, **web
+  seeds**), *Files* (progress bar per file, priority per file or for **all the
+  ticked files at once**, **rename** and **HTTP streaming** with ▶), *Peers*
+  (connection flags, transport, encryption; **add peers** by `ip:port` and
+  **ban** a peer's IP for 30 minutes, `POST /ui/peers`), *Trackers* (status,
+  swarm, add and **remove**), *Pieces* (coloured map). Peers, trackers and pieces refresh while
   the panel is open; the forms save in place, without reloading the page.
 - **IP filter** from a URL or file (*Tools*); the field is pre-filled with the
   filter configured in Gextto.

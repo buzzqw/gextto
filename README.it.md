@@ -335,11 +335,21 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
 - **Pronto per gli `*arr`.** API Web v2 di qBittorrent (`/api/v2/...`) per
   Sonarr, Radarr, Lidarr, Readarr e app mobili, più API JSON propria
   (`/api/v1/...`) e pagina di accesso.
-- **UI web moderna.** Temi chiaro e scuro nello spirito di VueTorrent/Flood:
-  barra laterale con filtri per stato/categoria/tag e grafico del traffico,
-  elenco denso ordinabile con selezione multipla, menu contestuale e
-  scorciatoie, dettaglio in un pannello laterale, trascinamento dei `.torrent`
-  e magnet incollati, schede su telefono, e una pagina **Statistiche**
+- **UI web moderna, familiare a chi viene da qBittorrent.** Temi chiaro e
+  scuro; barra laterale con filtri comprimibili per stato (12 filtri),
+  categoria, tag e **tracker** e grafico del traffico; elenco compatto, una
+  riga per torrent, con **scelta delle colonne** (20 colonne: aggiunto e
+  completato il, scaricato, rimanente, posizione in coda, tracker, percorso…)
+  e **colonne ridimensionabili**, entrambe ricordate; **menu contestuale**
+  completo (avvio forzato, imposta posizione, sottomenu categorie, gestione
+  automatica, limiti di velocità, super-seeding, download sequenziale e
+  prima/ultima parte, coda, copia nome/hash/magnet) con interruttori che
+  mostrano lo stato di tutta la selezione, anche misto; **pannello dei
+  dettagli ridimensionabile** (file con avanzamento e priorità di gruppo,
+  peer da aggiungere o bannare); limiti di velocità globali a un clic dalla
+  barra di stato, velocità nel titolo della scheda, scorciatoie da tastiera,
+  trascinamento dei `.torrent` e magnet incollati, schede su telefono, e una
+  pagina **Statistiche**
   (velocità dal vivo, i totali di questa sessione e di tutte le sessioni —
   mantenuti tra i riavvii —, disco e cache, rete, coda e un grafico delle
   velocità su 1 h/24 h/7 d). Ogni pagina verificata con axe-core.

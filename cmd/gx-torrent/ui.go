@@ -104,13 +104,27 @@ type uiPageData struct {
 	CPUPercent float64
 	ProcRSS    int64
 
-	CountAll     int
-	CountDown    int
-	CountSeeding int
-	CountPaused  int
-	CountStalled int
-	CountMoving  int
-	CountError   int
+	CountAll       int
+	CountDown      int
+	CountSeeding   int
+	CountCompleted int
+	CountRunning   int
+	CountPaused    int
+	CountActive    int
+	CountInactive  int
+	CountStalled   int
+	CountChecking  int
+	CountMoving    int
+	CountError     int
+
+	// TrackerHosts feeds the sidebar's tracker filter: the host of each
+	// torrent's working tracker, with how many torrents use it. An empty
+	// host groups the torrents without a working tracker.
+	TrackerHosts []uiNamedCount
+	// GlobalDownKib and GlobalUpKib are the configured global speed limits
+	// (KiB/s, 0 = unlimited), shown and edited from the status bar.
+	GlobalDownKib int64
+	GlobalUpKib   int64
 
 	// Categories and Tags are the qBittorrent-style labels (standalone mode).
 	Categories []string
@@ -161,6 +175,37 @@ type uiTorrentRow struct {
 	TotalSize int64
 	DLRate    int64
 	ULRate    int64
+
+	// Optional columns (the column chooser): the formatted value and the raw
+	// one used to sort.
+	Added         string
+	AddedVal      int64
+	Completed     string
+	CompletedVal  int64
+	Downloaded    string
+	DownloadedVal int64
+	Uploaded      string
+	UploadedVal   int64
+	Remaining     string
+	RemainingVal  int64
+	QueuePos      int
+	Tracker       string
+	SwarmSeeds    int
+	SwarmPeers    int
+	// Per-torrent toggles and limits, ticked in the context menu and used to
+	// prefill the limits dialog (KiB/s, -1 global, 0 unlimited).
+	Sequential   bool
+	FirstLast    bool
+	Pinned       bool
+	SuperSeeding bool
+	DLLimitKib   int64
+	ULLimitKib   int64
+}
+
+// uiNamedCount is one sidebar filter entry with its torrent count.
+type uiNamedCount struct {
+	Name  string
+	Count int
 }
 
 // uiFileRow, uiPeerRow and uiTrackerRow back the torrent detail tabs.
@@ -300,6 +345,20 @@ func uiTemplates() *template.Template {
 			"dur":     uiDuration,
 			// stateLabel prints the human name of a state, a catalog key.
 			"stateLabel": uiStateLabel,
+			// kibrate prints a KiB/s limit as a rate ("∞" when unlimited).
+			"kibrate": func(kib int64) string {
+				if kib <= 0 {
+					return "∞"
+				}
+				return uiRate(kib * 1024)
+			},
+			// pct is done over size in percent, for the Files tab bars.
+			"pct": func(done, size int64) string {
+				if size <= 0 {
+					return "0.0"
+				}
+				return fmt.Sprintf("%.1f", min(100, float64(done)*100/float64(size)))
+			},
 		}).Parse(assets.UITemplate()))
 	})
 	return uiTemplate
@@ -620,6 +679,28 @@ func (d *Daemon) handleUIBulk(w http.ResponseWriter, r *http.Request) {
 			err = d.remove(hash, false)
 		case "remove-files":
 			err = d.remove(hash, true)
+		case "bottom":
+			err = d.moveToBottom(hash)
+		case "force-start":
+			// qBittorrent's force start is the daemon's pin: the queue does
+			// not rotate the torrent out. Resume it too, like qBittorrent.
+			if err = d.setPin(hash, true); err == nil {
+				err = d.resume(hash)
+			}
+		case "unforce":
+			err = d.setPin(hash, false)
+		case "sequential":
+			err = d.toggleSequential(hash)
+		case "first-last":
+			err = d.toggleFirstLast(hash)
+		case "tmm-on":
+			err = d.setAutoManagement(hash, true)
+		case "tmm-off":
+			err = d.setAutoManagement(hash, false)
+		case "super-seed-on":
+			err = d.setSuperSeeding(hash, true)
+		case "super-seed-off":
+			err = d.setSuperSeeding(hash, false)
 		default:
 			err = fmt.Errorf("unknown action: %s", op)
 		}
@@ -627,7 +708,10 @@ func (d *Daemon) handleUIBulk(w http.ResponseWriter, r *http.Request) {
 			firstErr = err
 		}
 	}
-	d.uiDone(w, r, fmt.Sprintf("%d torrent: %s", len(hashes), uiActionMessage(op)), firstErr)
+	// The count is printed, so the message is translated before formatting:
+	// the whole string would never match a catalog key.
+	msg := uiTranslateText(uiActionMessage(op), uiDictionary(d.uiLang(r)))
+	d.uiDone(w, r, fmt.Sprintf("%d torrent: %s", len(hashes), msg), firstErr)
 }
 
 func (d *Daemon) handleUIRemove(w http.ResponseWriter, r *http.Request) {
@@ -996,7 +1080,6 @@ func (d *Daemon) handleUIFilePriority(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	hash := strings.TrimSpace(r.FormValue("hash"))
-	index, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("index")))
 	priority, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("priority")))
 	if priority < 0 {
 		priority = 0
@@ -1027,8 +1110,11 @@ func (d *Daemon) handleUIFilePriority(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < len(priorities) && i < len(previous); i++ {
 		priorities[i] = previous[i]
 	}
-	if index >= 0 && index < len(priorities) {
-		priorities[index] = priority
+	// One select sends one index; the Files tab's bulk bar sends several.
+	for _, raw := range r.Form["index"] {
+		if index, convErr := strconv.Atoi(strings.TrimSpace(raw)); convErr == nil && index >= 0 && index < len(priorities) {
+			priorities[index] = priority
+		}
 	}
 	err = d.setFilePriorities(hash, priorities)
 	d.uiDoneDetail(w, r, hash, "files", "File priority updated", err)
@@ -1205,6 +1291,20 @@ func uiActionMessage(op string) string {
 		return "removed (files kept)"
 	case "remove-files":
 		return "removed with files"
+	case "bottom":
+		return "Moved to the bottom of the queue"
+	case "force-start":
+		return "Force started"
+	case "unforce":
+		return "Back under the queue"
+	case "sequential":
+		return "Sequential download toggled"
+	case "first-last":
+		return "First and last pieces toggled"
+	case "tmm-on", "tmm-off":
+		return "Automatic management updated"
+	case "super-seed-on", "super-seed-off":
+		return "Super-seeding updated"
 	}
 	return "Done"
 }
@@ -1431,6 +1531,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 			row.ETA = uiDuration(view.ETASeconds)
 			row.ETAVal = view.ETASeconds
 		}
+		uiFillOptionalColumns(&row, view)
 		page.Rows = append(page.Rows, row)
 	}
 	sort.Slice(page.Rows, func(i, j int) bool {
@@ -1440,6 +1541,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		return page.Rows[i].Name < page.Rows[j].Name
 	})
 	page.CountAll = len(page.Rows)
+	trackers := map[string]int{}
 	for _, row := range page.Rows {
 		switch row.State {
 		case "downloading", "downloading_metadata", "checking_files":
@@ -1455,7 +1557,36 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		case "paused", "disk_wait":
 			page.CountPaused++
 		}
+		// The same predicates as the page's status filter (matchStatus).
+		if row.State == "checking_files" {
+			page.CountChecking++
+		}
+		if row.Progress >= 100 {
+			page.CountCompleted++
+		}
+		if row.State != "paused" && row.State != "disk_wait" {
+			page.CountRunning++
+		}
+		if row.DLRate > 0 || row.ULRate > 0 {
+			page.CountActive++
+		} else {
+			page.CountInactive++
+		}
+		trackers[row.Tracker]++
 	}
+	for host, n := range trackers {
+		page.TrackerHosts = append(page.TrackerHosts, uiNamedCount{Name: host, Count: n})
+	}
+	sort.Slice(page.TrackerHosts, func(i, j int) bool {
+		// The torrents without a working tracker come last.
+		a, b := page.TrackerHosts[i].Name, page.TrackerHosts[j].Name
+		if (a == "") != (b == "") {
+			return b == ""
+		}
+		return a < b
+	})
+	cfg, _, _ := d.config()
+	page.GlobalDownKib, page.GlobalUpKib = cfg.SpeedLimitDownload, cfg.SpeedLimitUpload
 	page.RowsTotal = len(page.Rows)
 	if limit > 0 && len(page.Rows) > limit {
 		page.Rows = page.Rows[:limit]
@@ -1463,6 +1594,43 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		page.RowsShown = limit
 	}
 	return page, nil
+}
+
+// uiFillOptionalColumns fills the columns a user can add with the column
+// chooser (added/completed dates, transferred bytes, queue, tracker, swarm)
+// and the per-torrent toggles the context menu ticks.
+func uiFillOptionalColumns(row *uiTorrentRow, view torrentInfo) {
+	row.AddedVal, row.CompletedVal = view.AddedAt, view.CompletedAt
+	row.Added, row.Completed = "—", "—"
+	if view.AddedAt > 0 {
+		row.Added = time.Unix(view.AddedAt, 0).Format("2006-01-02 15:04")
+	}
+	if view.CompletedAt > 0 {
+		row.Completed = time.Unix(view.CompletedAt, 0).Format("2006-01-02 15:04")
+	}
+	row.DownloadedVal, row.UploadedVal = view.Downloaded, view.Uploaded
+	row.Downloaded, row.Uploaded = uiBytes(view.Downloaded), uiBytes(view.Uploaded)
+	row.RemainingVal = max(view.TotalSize-view.TotalDone, 0)
+	row.Remaining = uiBytes(row.RemainingVal)
+	row.QueuePos = view.QueuePosition
+	row.Tracker = uiTrackerHost(view.CurrentTracker)
+	row.SwarmSeeds, row.SwarmPeers = view.NumComplete, view.NumIncomplete
+	row.Sequential, row.FirstLast = view.Sequential, view.FirstLast
+	row.Pinned, row.SuperSeeding = view.Pinned, view.SuperSeeding
+	row.DLLimitKib, row.ULLimitKib = view.DownloadLimitKib, view.UploadLimitKib
+}
+
+// uiTrackerHost is the host of a tracker URL ("" for none), the name the
+// tracker filter groups torrents by.
+func uiTrackerHost(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if u, err := url.Parse(raw); err == nil && u.Hostname() != "" {
+		return u.Hostname()
+	}
+	return raw
 }
 
 // defaultUIRowLimit bounds the rows a standalone page renders at once, so a

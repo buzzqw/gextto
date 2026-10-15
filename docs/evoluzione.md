@@ -132,6 +132,16 @@ shown to the user may stay in the original language. Guard: `TestUIIsTranslatabl
 fails if a UI string or a `uiText` literal is not a key of the catalogues (with an
 explicit allowlist); `TestClientI18nKeysTranslated` covers the client keys.
 
+**gx-torrent web page.** The standalone client's page is laid out the way a
+qBittorrent Web UI user expects to find things — filters on the left, one compact
+line per torrent, the detail panel below, a complete context menu, the speeds and
+global limits in the status bar — so switching costs nothing; it is not a copy, and
+where qBittorrent is weak the page goes further: per-user column choice and widths
+applied before the first paint, menu toggles that show a **mixed** selection and
+bring it to one state, every control usable from the keyboard (submenus, column
+and panel resizing included), the technical counters kept one click away instead
+of crowding the status bar. Details in [`gx-torrent.md`](gx-torrent.md), *Web interface*.
+
 **Accessibility.** Reference **WCAG 2.1 AA** (compatible 2.2 practices). The
 interface is **partially accessible**, with an automated baseline that passes but is
 not a WCAG/EN 301 549 certification. What is in place: language via the `lang`
