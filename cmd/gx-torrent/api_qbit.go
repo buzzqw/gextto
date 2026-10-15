@@ -1171,7 +1171,7 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		"alt_up_limit":                      altUL,
 		"use_alt_speed_limits":              altManual,
 		"max_connec":                        cfg.MaxPeerDial + cfg.MaxPeerAccept,
-		"max_connec_per_torrent":            0,
+		"max_connec_per_torrent":            qbitPrefLimitOut(int64(cfg.MaxConnectionsPerTorrent)),
 		"max_uploads":                       0,
 		"max_uploads_per_torrent":           0,
 		"max_ratio_enabled":                 d.settingBool(maxRatioEnabledKey, false),
@@ -1403,11 +1403,12 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 		return
 	}
 	patch := map[string]json.RawMessage{}
-	// qBittorrent sends the global limits in KiB/s with -1 meaning "no limit";
-	// the daemon stores KiB/s with 0 meaning unlimited.
+	// qBittorrent sends the global limits (KiB/s) and the per-torrent
+	// connection cap with -1 meaning "no limit"; the daemon stores 0 for it.
 	for _, m := range []struct{ pref, config string }{
 		{"dl_limit", "speed_limit_download"},
 		{"up_limit", "speed_limit_upload"},
+		{"max_connec_per_torrent", "max_connections_per_torrent"},
 	} {
 		v, ok := prefs[m.pref]
 		if !ok {

@@ -1840,8 +1840,11 @@ after every command), with the same policy that Gextto applies to its engines.
   - those moving.
 - **Pin and probe.** Torrents with pin and those in probe (see below) always
   run and do not occupy slots.
-- **Dynamic queue** (`dynamic_queue`, with minimum and maximum). It is the same logic
-  Gextto applies to the other engines:
+- **Dynamic queue** (`dynamic_queue`, with minimum and maximum). Gextto keeps it
+  on while gx-torrent's self-management (`auto`) is on, and with self-management off
+  it follows Gextto's *Automatic queue and resource management* option
+  (`torrent_dynamic_queue`). It is the same logic Gextto applies to
+  the other engines:
   - it narrows the slots if the global download limit stays saturated (≥ 90%)
     for ten minutes;
   - it widens them quickly if the bandwidth stays unused (≤ 70%) and there are
@@ -1969,7 +1972,13 @@ and the next and the daemon reapplies them to the reloaded session.
 Every torrent also has its own **connection limit** and **upload
 slots** (`POST /api/v1/torrents/{hash}/conn-limits`, fields `max_connections` and
 `max_uploads`; `-1` and `0` both mean no per-torrent cap — the global
-budget `max_peer_dial`/`max_peer_accept` remains). The connection limit applies
+budget `max_peer_dial`/`max_peer_accept` remains). A torrent without a cap of
+its own takes the session default `max_connections_per_torrent` (queue policy,
+0 = no cap): Gextto pushes it from *Max connections per torrent*, the daemon page
+has *Peers per torrent*, and the qBittorrent-compatible API maps it to
+`max_connec_per_torrent` (-1 = no cap). It changes in place on the running
+torrents and is reapplied after a session reload; clearing a torrent's own cap
+returns it to the default. The connection limit applies
 to the connections established; if it is lowered below the current number,
 the excess ones are closed immediately. The upload slots change the
 number of peers the unchoker keeps unblocked.
@@ -2044,6 +2053,8 @@ Keys accepted by `POST /api/v1/config`:
 - `dynamic_queue`, `dynamic_min`, `dynamic_max`;
 - `speed_limit_download`, `speed_limit_upload` (KiB/s);
 - `max_peer_dial`, `max_peer_accept`;
+- `max_connections_per_torrent` (default peer cap of a torrent without its own;
+  0 = no cap, applied in place);
 - `cache_mb`, `cache_ttl_secs`, `preallocate` (cache and preallocation: `cache_mb`
   ≤ 0 = adaptive);
 - `auto` (self-management: dynamic queue and adaptive cache);

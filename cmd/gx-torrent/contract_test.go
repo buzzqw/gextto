@@ -126,7 +126,8 @@ func TestContractConfigShape(t *testing.T) {
 		"active_downloads", "active_seeds", "active_limit", "dont_count_slow",
 		"slow_rate", "slow_after_secs", "slow_rotate_secs", "dynamic_queue",
 		"dynamic_min", "dynamic_max", "speed_limit_download",
-		"speed_limit_upload", "max_peer_dial", "max_peer_accept", "cache_mb",
+		"speed_limit_upload", "max_peer_dial", "max_peer_accept",
+		"max_connections_per_torrent", "cache_mb",
 		"cache_ttl_secs", "preallocate", "sequential", "auto")
 }
 

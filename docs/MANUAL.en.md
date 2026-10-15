@@ -1341,8 +1341,10 @@ How to read a row:
   keys**; the search finds it anyway.
 - Settings the active torrent engine does not use are collected, closed, in
   **Not used by the active engine** (or in the panel of the inactive engine):
-  they stay saved and become active again when you switch engine. Rare options
-  are in the closed **For experts** panel.
+  they stay saved and become active again when you switch engine. With
+  qBittorrent-nox this includes the network, protocol, queue, cache and RAM disk
+  options only gx-torrent reads: qBittorrent keeps its own configuration. Rare
+  options are in the closed **For experts** panel.
 
 Each row is saved with its own **Save**. A field changed and not yet saved is
 marked **not saved** and the *Unsaved changes* bar appears at the bottom, with
@@ -1566,7 +1568,7 @@ Recalculate scores* after changing weights.
 
 | Setting | What it does |
 |---|---|
-| Max connections per torrent | Connection limit per torrent (-1 = unlimited). *(-1 = unlimited)* |
+| Max connections per torrent | Connection limit per torrent (-1 = unlimited). It applies to every torrent without a limit of its own (*Limits* tab of the detail) and takes effect at once, running torrents included; gx-torrent only. *(-1 = unlimited)* |
 
 **RAM disk**
 

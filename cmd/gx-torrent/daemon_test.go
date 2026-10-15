@@ -1591,6 +1591,67 @@ func TestDaemonPerTorrentConnLimits(t *testing.T) {
 	waitFor(t, "caps after reload", func() bool { c, u := connLimits(); return c == 25 && u == 4 })
 }
 
+// TestDaemonSessionDefaultConnLimit checks the session-wide peer cap
+// (max_connections_per_torrent): it reaches the running torrents in place, a
+// torrent's own cap wins over it, clearing the own cap goes back to the
+// default, and a session reload reapplies it.
+func TestDaemonSessionDefaultConnLimit(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	hashA, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "a.bin", 100_000), Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hashB, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "b.bin", 100_000), Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	maxConns := func(hash string) int {
+		d.mu.Lock()
+		tt, _ := d.findLocked(hash)
+		d.mu.Unlock()
+		if tt == nil {
+			return -1
+		}
+		return tt.MaxConnections()
+	}
+	setDefault := func(value int) {
+		raw, _ := json.Marshal(value)
+		if _, err := d.setConfig(map[string]json.RawMessage{"max_connections_per_torrent": raw}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	own := int64(7)
+	if err := d.setConnLimits(hashB, &own, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	setDefault(40)
+	waitFor(t, "default applied", func() bool { return maxConns(hashA) == 40 && maxConns(hashB) == 7 })
+
+	clear := int64(-1)
+	if err := d.setConnLimits(hashB, &clear, nil); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "own cap cleared", func() bool { return maxConns(hashB) == 40 })
+
+	d.mu.Lock()
+	d.restartSessionLocked()
+	d.mu.Unlock()
+	waitFor(t, "default after reload", func() bool { return maxConns(hashA) == 40 && maxConns(hashB) == 40 })
+
+	setDefault(0)
+	waitFor(t, "default removed", func() bool { return maxConns(hashA) == 0 && maxConns(hashB) == 0 })
+	if cfg, _, _ := d.config(); cfg.MaxConnectionsPerTorrent != 0 {
+		t.Fatalf("stored default = %d, want 0", cfg.MaxConnectionsPerTorrent)
+	}
+	// A negative value from the API means "no cap", like qBittorrent's -1.
+	setDefault(-1)
+	if cfg, _, _ := d.config(); cfg.MaxConnectionsPerTorrent != 0 {
+		t.Fatalf("negative default stored as %d, want 0", cfg.MaxConnectionsPerTorrent)
+	}
+}
+
 // TestDaemonStreamServesARange checks the streaming endpoint: full download,
 // HTTP Range (206 with Content-Range) and the unsatisfiable case.
 func TestDaemonStreamServesARange(t *testing.T) {

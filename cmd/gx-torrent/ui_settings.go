@@ -79,6 +79,9 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	if v := formInt(r, "active-limit", int64(cfg.ActiveLimit)); v > 0 && int(v) != cfg.ActiveLimit {
 		putInt("active_limit", v)
 	}
+	if v := formInt(r, "max-conns-per-torrent", int64(cfg.MaxConnectionsPerTorrent)); v >= 0 && int(v) != cfg.MaxConnectionsPerTorrent {
+		putInt("max_connections_per_torrent", v)
+	}
 	if v := formInt(r, "cache-mb", cfg.CacheMB); v != cfg.CacheMB {
 		putInt("cache_mb", v)
 	}
@@ -490,6 +493,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{ACTIVE_SEEDS}}", strconv.Itoa(cfg.ActiveSeeds))
 	repl("{{MIN_FREE_MB}}", strconv.FormatInt(cfg.MinFree()>>20, 10))
 	repl("{{ACTIVE_LIMIT}}", strconv.Itoa(cfg.ActiveLimit))
+	repl("{{MAX_CONNS_TORRENT}}", strconv.Itoa(cfg.MaxConnectionsPerTorrent))
 	cacheMB := cfg.CacheMB
 	if cacheMB < 0 {
 		cacheMB = 0

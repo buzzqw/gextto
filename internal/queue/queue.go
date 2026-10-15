@@ -42,6 +42,10 @@ type Config struct {
 	SpeedLimitUpload   int64 `json:"speed_limit_upload"`
 	MaxPeerDial        int   `json:"max_peer_dial"`
 	MaxPeerAccept      int   `json:"max_peer_accept"`
+	// MaxConnectionsPerTorrent caps the peers of every torrent that has no cap
+	// of its own (0 = no cap). It changes in place, without reopening the
+	// session.
+	MaxConnectionsPerTorrent int `json:"max_connections_per_torrent"`
 	// Disk cache: CacheMB <= 0 sizes it from the RAM (automatic), otherwise
 	// it is the read cache and the write buffer in MiB. CacheTTLSecs keeps
 	// read blocks; Preallocate reserves new files in full.
@@ -136,6 +140,9 @@ func (c Config) Normalized() Config {
 	}
 	if c.SpeedLimitUpload < 0 {
 		c.SpeedLimitUpload = 0
+	}
+	if c.MaxConnectionsPerTorrent < 0 {
+		c.MaxConnectionsPerTorrent = 0
 	}
 	if c.CacheMB <= 0 {
 		c.CacheMB = -1

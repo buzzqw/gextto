@@ -849,20 +849,61 @@ var uiSettingsEditorSearchEntries = []uiSearchEntry{
 	{Key: "", Label: "Traduzioni", Tab: "system"},
 }
 
+// uiSettingCapability ties an option to the engine capability it configures
+// (capabilityLevels): the option is active only with the engines whose level is
+// not "none". TestSettingCapabilitiesFollowTheMatrix keeps the two aligned.
+var uiSettingCapability = map[string]string{
+	"torrent_holepunch":                   "holepunch",
+	"torrent_max_connections_per_torrent": "connections",
+	"torrent_ramdisk_enabled":             "ramdisk",
+	"torrent_ramdisk_dir":                 "ramdisk",
+	"torrent_ramdisk_threshold_gb":        "ramdisk",
+	"torrent_ramdisk_margin_gb":           "ramdisk",
+	"torrent_ramdisk_min_free_bytes":      "ramdisk",
+}
+
+// uiSettingGxTorrentOnly lists the transfer options only gx-torrent reads:
+// Gextto pushes them to its daemon (start arguments or queue policy), while
+// qBittorrent keeps its own network, protocol, queue and cache configuration.
+// With qBittorrent active they are shown as not active instead of as controls
+// that silently do nothing.
+var uiSettingGxTorrentOnly = map[string]bool{
+	"torrent_port_min": true, "torrent_port_max": true,
+	"torrent_listen_interfaces": true, "torrent_outgoing_interface": true,
+	"torrent_dht": true, "torrent_pex": true, "torrent_lsd": true,
+	"torrent_upnp": true, "torrent_natpmp": true, "torrent_utp": true,
+	"torrent_dht_bootstrap_nodes": true, "torrent_encryption": true,
+	"torrent_apply_ip_filter": true, "torrent_ipfilter_url": true,
+	"torrent_dynamic_queue": true, "torrent_dynamic_queue_min": true, "torrent_dynamic_queue_max": true,
+	"torrent_dont_count_slow_torrents": true, "torrent_active_seeds": true, "torrent_active_limit": true,
+	"torrent_preallocate": true, "torrent_cache_size": true, "torrent_cache_expiry": true,
+}
+
 // uiSettingAllowedBackends lists the torrent engines a setting applies to. A
 // nil/empty result means every engine.
 func uiSettingAllowedBackends(key string) []string {
 	switch {
 	case strings.HasPrefix(key, "qbittorrent_"):
 		return []string{BackendQbittorrent}
-	case strings.HasPrefix(key, "gxtorrent_"):
+	case strings.HasPrefix(key, "gxtorrent_"), uiSettingGxTorrentOnly[key]:
 		return []string{BackendGxTorrent}
+	}
+	if capability, ok := uiSettingCapability[key]; ok {
+		allowed := []string{}
+		for _, backend := range []string{BackendGxTorrent, BackendQbittorrent} {
+			if level := capabilityLevels[backend][capability]; level != "" && level != "none" {
+				allowed = append(allowed, backend)
+			}
+		}
+		return allowed
 	}
 	return nil
 }
 
 func uiBackendAllows(allowed []string, backend string) bool {
-	if len(allowed) == 0 {
+	// nil is "every engine"; an empty, non-nil list is "no engine" (a
+	// capability no engine has).
+	if allowed == nil {
 		return true
 	}
 	for _, candidate := range allowed {

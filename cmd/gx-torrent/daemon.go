@@ -678,8 +678,10 @@ func (d *Daemon) reconcileLocked() {
 		if meta.DownloadLimitKib != nil || meta.UploadLimitKib != nil {
 			t.SetSpeedLimits(kibOrInherit(meta.DownloadLimitKib), kibOrInherit(meta.UploadLimitKib))
 		}
-		if meta.MaxConnections != nil {
-			t.SetMaxConnections(int(*meta.MaxConnections))
+		// The engine starts every torrent without a cap: apply its own one or
+		// the session default.
+		if limit := d.maxConnectionsLocked(meta); limit > 0 {
+			t.SetMaxConnections(limit)
 		}
 		if meta.MaxUploads != nil {
 			t.SetMaxUploads(int(*meta.MaxUploads))
@@ -1692,6 +1694,9 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		// global auto-tmm-enabled default (false unless the operator turns it on).
 		AutoTMM: autoTMMForAdd(req, d.settingBool(autoTMMEnabledKey, false)),
 	}
+	if limit := d.state.Config.MaxConnectionsPerTorrent; limit > 0 {
+		t.SetMaxConnections(limit)
+	}
 	d.state.Tags = mergeTagNames(d.state.Tags, req.Tags)
 	d.indexTorrentLocked(t)
 	d.saveLocked()
@@ -1912,8 +1917,9 @@ func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) er
 	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
 		if maxConnections != nil {
 			if *maxConnections < 0 {
+				// Back to the session default, not to "no cap".
 				meta.MaxConnections = nil
-				t.SetMaxConnections(-1)
+				t.SetMaxConnections(d.state.Config.MaxConnectionsPerTorrent)
 			} else {
 				value := *maxConnections
 				meta.MaxConnections = &value
@@ -2225,6 +2231,9 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (queue.Config, erro
 	if previous.Sequential != next.Sequential {
 		d.applySequentialLocked(next.Sequential)
 	}
+	if previous.MaxConnectionsPerTorrent != next.MaxConnectionsPerTorrent {
+		d.applyDefaultMaxConnectionsLocked()
+	}
 	// Peer limits, the cache TTL and preallocation are read by the engine only when
 	// the session opens.
 	if previous.MaxPeerDial != next.MaxPeerDial || previous.MaxPeerAccept != next.MaxPeerAccept ||
@@ -2234,6 +2243,28 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (queue.Config, erro
 	d.saveLocked()
 	d.poke()
 	return next, nil
+}
+
+// maxConnectionsLocked is the peer cap a torrent runs with: its own one when
+// set, otherwise the session default (0 = no cap).
+func (d *Daemon) maxConnectionsLocked(meta *torrentMeta) int {
+	if meta != nil && meta.MaxConnections != nil {
+		return int(*meta.MaxConnections)
+	}
+	return d.state.Config.MaxConnectionsPerTorrent
+}
+
+// applyDefaultMaxConnectionsLocked applies a changed session default to the
+// running torrents that have no cap of their own.
+func (d *Daemon) applyDefaultMaxConnectionsLocked() {
+	if d.session == nil {
+		return
+	}
+	for _, t := range d.session.ListTorrents() {
+		if meta := d.state.Torrents[t.ID()]; meta == nil || meta.MaxConnections == nil {
+			t.SetMaxConnections(d.state.Config.MaxConnectionsPerTorrent)
+		}
+	}
 }
 
 // applySequentialLocked pushes the session-wide sequential flag onto every

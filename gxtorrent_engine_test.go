@@ -626,6 +626,28 @@ func TestGxAutoSettingDrivesQueueAndCache(t *testing.T) {
 	if policy["auto"] != false || policy["dynamic_queue"] != false {
 		t.Fatalf("disabling self-management must stop the dynamic queue: %v", policy)
 	}
+	// With self-management off the manual «Coda dinamica» decides.
+	cfg.Transfer.DynamicQueue = true // what loadConfigDB reads from torrent_dynamic_queue
+	if policy = gxQueuePolicy(cfg); policy["auto"] != false || policy["dynamic_queue"] != true {
+		t.Fatalf("the manual dynamic queue must apply with self-management off: %v", policy)
+	}
+}
+
+// TestGxQueuePolicyCarriesPerTorrentPeerCap checks «Connessioni max per
+// torrent»: -1 (the page's "unlimited") reaches the daemon as 0, a value as is.
+func TestGxQueuePolicyCarriesPerTorrentPeerCap(t *testing.T) {
+	cfg := &Config{Settings: map[string]string{}}
+	if got := gxQueuePolicy(cfg)["max_connections_per_torrent"]; got != int64(0) {
+		t.Fatalf("unset cap = %v (%T), want 0", got, got)
+	}
+	cfg.Settings["torrent_max_connections_per_torrent"] = "-1"
+	if got := gxQueuePolicy(cfg)["max_connections_per_torrent"]; got != int64(0) {
+		t.Fatalf("unlimited cap = %v, want 0", got)
+	}
+	cfg.Settings["torrent_max_connections_per_torrent"] = "60"
+	if got := gxQueuePolicy(cfg)["max_connections_per_torrent"]; got != int64(60) {
+		t.Fatalf("cap = %v, want 60", got)
+	}
 }
 
 // TestGxResolveSavePathUsesIncompleteDir checks that gx-torrent stages new

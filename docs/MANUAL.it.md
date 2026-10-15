@@ -1386,8 +1386,10 @@ Come si legge una riga:
   tecniche**; la ricerca la trova comunque.
 - Le impostazioni che il motore torrent attivo non usa sono raccolte, chiuse,
   in **Non usate dal motore attivo** (o nel pannello del motore non attivo):
-  restano salvate e tornano attive cambiando motore. Le opzioni rare sono nel
-  pannello chiuso **Per esperti**.
+  restano salvate e tornano attive cambiando motore. Con qBittorrent-nox ci
+  finiscono anche le opzioni di rete, protocollo, coda, cache e RAM disk che
+  legge solo gx-torrent: qBittorrent usa la propria configurazione. Le opzioni
+  rare sono nel pannello chiuso **Per esperti**.
 
 Ogni riga si salva con il suo **Salva**. Un campo cambiato e non ancora salvato
 è segnato **non salvata** e compare la barra in basso *Modifiche non salvate*,
@@ -1611,7 +1613,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 
 | Impostazione | Cosa fa |
 |---|---|
-| Connessioni max per torrent | Limite di connessioni per singolo torrent (-1 = illimitato). *(-1 = illimitato)* |
+| Connessioni max per torrent | Limite di connessioni per singolo torrent (-1 = illimitato). Vale per ogni torrent che non ha un limite proprio (scheda *Limiti* del dettaglio) e si applica subito, anche ai torrent in corso; solo gx-torrent. *(-1 = illimitato)* |
 
 **RAM disk**
 

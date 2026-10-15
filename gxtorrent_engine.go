@@ -968,21 +968,25 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 	}
 	lt := cfg.Transfer
 	// gx-torrent's own self-management: dynamic queue and adaptive cache, on by
-	// default. Disabling it makes the daemon use static slot limits and a static
-	// RAM-based cache; the manual per-value settings still apply.
+	// default. Disabling it makes the daemon use static sizing and the manual
+	// per-value settings, «Coda dinamica» (torrent_dynamic_queue) included: it
+	// used to be ignored, so the dynamic queue could not be kept on by hand.
 	auto := settingsBool(cfg, "gxtorrent_auto", true)
 	policy := map[string]any{
 		"active_downloads": clamp(lt.ActiveDownloads),
 		"active_seeds":     clamp(lt.ActiveSeeds),
 		"active_limit":     clamp(lt.ActiveLimit),
 		"dont_count_slow":  lt.DontCountSlowTorrents,
-		"dynamic_queue":    auto,
+		"dynamic_queue":    auto || lt.DynamicQueue,
 		"auto":             auto,
 		"dynamic_min":      clamp(lt.DynamicQueueMin),
 		"dynamic_max":      clamp(lt.DynamicQueueMax),
 		"cache_mb":         gxCacheMB(lt.CacheSize),
 		"cache_ttl_secs":   max(lt.CacheExpiry, 10),
 		"preallocate":      cfg.TorrentPreallocate(),
+		// Default peer cap of every torrent without one of its own (-1 in the
+		// settings page = no cap, 0 for the daemon).
+		"max_connections_per_torrent": max(numberSettingInt(cfg.Settings, "torrent_max_connections_per_torrent", -1), 0),
 	}
 	// Disk guard: Gextto's minimum free space also pauses the daemon's running
 	// downloads below it. Not set (0) keeps the daemon's own default, so the
