@@ -329,7 +329,12 @@ The standalone pages follow the same structure:
   with the counts per verdict (`GET /ui/wanted-preview?index=N`). The add and
   edit dialog shows the same preview **live** while the title and the filters
   are typed (`GET /ui/wanted-preview` with the form's fields): *what would be
-  taken now* is never a surprise. The card also says when the indexers were
+  taken now* is never a surprise. A *Would be taken* release carries its own
+  **Add**, which takes it now with the title's category and path; **Search the
+  indexers now** (`GET /ui/wanted-preview?index=N&live=1`, and the dialog's
+  *Search indexers too* checkbox) queries the indexers for the title and merges
+  what they return into the same list — the interactive search for a release the
+  automatic pass would not pick. The card also says when the indexers were
   last searched for the title. Episodes already in the client, whatever
   brought them there (a rule, a manual add), **count as had**: the card lists
   them under *Have*, they are not *Missing*, and the title does not download a
@@ -871,6 +876,18 @@ manual search across indexers, RSS feeds and the archive for all configured titl
 gap searches missing episodes, displaying real-time feedback with items added and status.
 Each row in the table provides individual **Search**, **Edit**, **Pause/Resume** and
 **Remove** actions, missing episodes ledger and real-time status.
+
+**Taking a release by hand (interactive search).** *Releases* on a title opens the
+releases held for it and gives each one a verdict (**Would be taken**, *Taken*,
+*Already in the client*, or the first filter that turns it away: season, episode
+filter, language, subtitles, quality, excluded term); every *Would be taken* row
+carries its **Add** button, which puts that release in the queue now with the
+title's own category and path. **Search the indexers now**, in the same dialog,
+queries the configured indexers for that title and merges what they return into
+the list with the same verdicts, so a release the automatic pass would not pick
+(an odd naming, a different quality) can still be taken deliberately. In the
+add/edit dialog the same preview is live while the filters are typed, and the
+*Search indexers too* checkbox makes it include the indexer results.
 
 The daemon, at every cycle, reads the **archive** for every title and turns the
 matching material into downloads. The **indexers** are queried only for the

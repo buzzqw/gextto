@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/rss"
+	"github.com/buzzqw/gextto/internal/torznab"
 )
 
 func archiveItems(t *testing.T, d *Daemon, feed string, titles ...string) {
@@ -107,6 +108,70 @@ func TestWantedPreviewGivesEveryReleaseAVerdict(t *testing.T) {
 		if want[r.Title] != r.Verdict {
 			t.Errorf("%s: verdict %q, want %q", r.Title, r.Verdict, want[r.Title])
 		}
+	}
+}
+
+// TestWantedPreviewLiveSearchesTheIndexers: live=1 asks the indexers for the
+// title and lists what they return with the same verdicts, so a release that is
+// not in the archive yet can be seen and taken by hand (the interactive search).
+func TestWantedPreviewLiveSearchesTheIndexers(t *testing.T) {
+	d := feedDaemon(t, "")
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(searchFeedXML)) // "Movie 2024 1080p" with a magnet
+	}))
+	defer indexer.Close()
+	if err := d.saveIndexers([]torznab.Indexer{{Name: "jackett", URL: indexer.URL}}); err != nil {
+		t.Fatal(err)
+	}
+	w := wantedEntry{Name: "Movie 2024", Kind: "movie", Quality: "1080p", Category: "film", SavePath: "/srv/film"}
+	if err := d.saveWanted([]wantedEntry{w}); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	type previewOut struct {
+		Total    int    `json:"total"`
+		Take     int    `json:"take"`
+		Live     bool   `json:"live"`
+		Category string `json:"category"`
+		SavePath string `json:"savepath"`
+		Releases []struct {
+			Title    string `json:"title"`
+			Verdict  string `json:"verdict"`
+			Download string `json:"download"`
+		} `json:"releases"`
+	}
+	load := func(query string) previewOut {
+		t.Helper()
+		resp, err := http.Get(srv.URL + "/ui/wanted-preview?" + query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var out previewOut
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+
+	// The archive holds nothing for this title: without live there is nothing to
+	// take, and the indexers are not asked at all.
+	if out := load("index=0"); out.Total != 0 || out.Live {
+		t.Fatalf("without live: total=%d live=%v, want an empty archive preview", out.Total, out.Live)
+	}
+	out := load("index=0&live=1")
+	if !out.Live || out.Total != 1 || out.Take != 1 {
+		t.Fatalf("live preview: live=%v total=%d take=%d, want the indexer release ready to take", out.Live, out.Total, out.Take)
+	}
+	rel := out.Releases[0]
+	if rel.Title != "Movie 2024 1080p" || rel.Verdict != verdictTake || !strings.HasPrefix(rel.Download, "magnet:") {
+		t.Fatalf("release = %+v, want the indexer release with a magnet and a take verdict", rel)
+	}
+	// The page adds it with the title's own category and path.
+	if out.Category != "film" || out.SavePath != "/srv/film" {
+		t.Fatalf("category/path = %q/%q, want the wanted entry's own", out.Category, out.SavePath)
 	}
 }
 

@@ -69,6 +69,15 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - Panoramica e inventario delle funzionalità del motore:
   `internal/gxcore/GEXTTO.md`.
 - Il DHT vive in `internal/dht`, un modulo a sé sotto il modulo principale.
+- **Le funzioni standalone sono solo di gx-core.** Pagine e motori che non
+  appartengono al demone gestito — RSS/feed/regole/indexer, Wanted/Cercati,
+  Archivio dei feed, Impostazioni, wizard, ricerca indexer, cartelle watch —
+  esistono **solo** in `-mode=standalone`; in `-mode=managed` sono spenti e le
+  loro rotte rispondono 404, perché lì comanda Gextto (coda, categorie, RSS,
+  ricerca, limiti) e due motori di acquisizione sulla stessa sessione non
+  vanno bene. Non sono una lacuna da colmare: non vanno abilitati in managed.
+  Chi vuole feed/regole/cercati usa un gx-torrent standalone (o l'istanza di
+  prova di `scripts/gx-core-test.sh`). Dettagli: `docs/gx-core.md`.
 - Analisi delle lacune rispetto a libtorrent e qBittorrent e piano di
   miglioramento: **`docs/evoluzione.md`** (§6–§7); evoluzione verso client
   standalone (gx-core): **`docs/gx-core.md`**.

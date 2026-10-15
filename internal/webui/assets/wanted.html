@@ -158,7 +158,7 @@ details.hint summary{cursor:pointer}
     <div class="vcounts" id="releases-counts"></div>
     <div class="preview relview" id="releases-list" style="max-height:60vh" tabindex="0" role="region" aria-label="Releases"></div>
   </div>
-  <div class="dlg-foot"><button type="button" data-close title="Close">Close</button></div>
+  <div class="dlg-foot"><button type="button" id="releases-live" title="Search the indexers now">Search the indexers now</button><button type="button" data-close title="Close">Close</button></div>
 </dialog>
 </main>
 <script id="ui-i18n"></script>
@@ -266,7 +266,21 @@ form.elements.name.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e
 // per row from the Releases button. Every release carries its verdict.
 var previewTimer=null,previewSeq=0;
 function verdictClass(v){return v==='Would be taken'?'b-seeding':(v==='Taken'||v==='Already in the client')?'b-downloading':'b-paused';}
-function renderReleases(res,sum,counts,list){
+// addRelease takes one release from the preview: source is the magnet or the
+// .torrent URL the item carries, the category and the path are the wanted
+// title's own, so a hand-picked release lands where the automatic one would.
+function addRelease(it,btn,res,reload){
+  btn.disabled=true;btn.textContent=t('Adding…');
+  var f=new URLSearchParams();f.set('source',it.download);
+  if(res.category)f.set('category',res.category);
+  if(res.savepath)f.set('destination',res.savepath);
+  fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded','X-GX-Fetch':'1'}}).then(function(r){return r.json();}).then(function(out){
+    toast(out.msg,out.ok);
+    if(out.ok){btn.textContent=t('Added');if(reload)setTimeout(reload,500);}
+    else{btn.disabled=false;btn.textContent=t('Add');}
+  }).catch(function(){btn.disabled=false;btn.textContent=t('Add');toast(t('Error'),true);});
+}
+function renderReleases(res,sum,counts,list,reload){
   counts.textContent='';list.textContent='';
   var total=res.total||0;
   if(!total){sum.textContent=t('Nothing in the archive for this title yet: it is searched at every check of the feeds and the indexers.');return;}
@@ -275,28 +289,45 @@ function renderReleases(res,sum,counts,list){
   else parts.push(t('Nothing new would be taken now'));
   if(res.had)parts.push(res.had+' '+t('already had'));
   sum.textContent=parts.join(' · ')+' · '+total+' '+t('releases in the archive');
+  if(res.live&&res.indexers)sum.textContent+=' · '+t('Indexers searched');
+  if(res.indexer_error)sum.textContent+=' · '+t('Error')+': '+res.indexer_error;
   (res.counts||[]).forEach(function(c){var b=document.createElement('span');b.className='badge '+verdictClass(c.verdict);b.textContent=t(c.verdict)+' '+c.count;counts.appendChild(b);});
   (res.releases||[]).forEach(function(it){
     var r=document.createElement('div');r.className='r'+(it.take?' take':'');
     if(it.episode){var e=document.createElement('span');e.className='ep';e.textContent=it.episode;r.appendChild(e);}
     var ti=document.createElement('span');ti.className='t';ti.textContent=it.title;ti.title=it.title;r.appendChild(ti);
+    if(it.seeders){var s=document.createElement('span');s.className='ep';s.textContent=it.seeders+' '+t('Seeds');r.appendChild(s);}
     var v=document.createElement('span');v.className='v badge '+verdictClass(it.verdict);v.textContent=t(it.verdict);r.appendChild(v);
+    if(it.take&&it.download){
+      var add=document.createElement('button');add.type='button';add.className='sm';add.textContent=t('Add');add.title=t('Add this release now, before the next automatic check');
+      add.onclick=function(){addRelease(it,add,res,reload);};r.appendChild(add);
+    }
     list.appendChild(r);
   });
 }
-function previewParams(){var p=new URLSearchParams();['name','kind','seasons','language','subtitles','quality','exclude','episode_filter'].forEach(function(n){var el=form.elements[n];if(!el)return;p.set(n,el.value||'');});return p;}
+function previewParams(){var p=new URLSearchParams();['name','kind','seasons','language','subtitles','quality','exclude','episode_filter'].forEach(function(n){var el=form.elements[n];if(!el)return;p.set(n,el.value||'');});if($('#wanted-live')&&$('#wanted-live').checked)p.set('live','1');return p;}
 function previewWanted(){
   var seq=++previewSeq,sum=$('#wanted-preview-sum');
   if((form.elements.name.value||'').trim().length<2){sum.textContent=t('Type a title to see which releases in the archive it would take, and why the others are left out.');$('#wanted-preview-counts').textContent='';$('#wanted-preview-list').textContent='';return;}
-  fetch('/ui/wanted-preview?'+previewParams().toString(),{cache:'no-store'}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});}).then(function(res){if(seq===previewSeq)renderReleases(res,sum,$('#wanted-preview-counts'),$('#wanted-preview-list'));}).catch(function(e){if(seq===previewSeq)sum.textContent=t('Error')+': '+e.message;});
+  fetch('/ui/wanted-preview?'+previewParams().toString(),{cache:'no-store'}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});}).then(function(res){if(seq===previewSeq)renderReleases(res,sum,$('#wanted-preview-counts'),$('#wanted-preview-list'),previewWanted);}).catch(function(e){if(seq===previewSeq)sum.textContent=t('Error')+': '+e.message;});
 }
 form.addEventListener('input',function(e){if(e.target.closest('#wanted-episodes-mgr'))return;clearTimeout(previewTimer);previewTimer=setTimeout(previewWanted,450);});
 form.addEventListener('change',function(e){if(e.target.closest('#wanted-episodes-mgr'))return;clearTimeout(previewTimer);previewTimer=setTimeout(previewWanted,150);});
 $('#wanted-results').addEventListener('click',function(){clearTimeout(previewTimer);previewTimer=setTimeout(previewWanted,50);});
 $$('[data-wanted-releases]').forEach(function(btn){btn.addEventListener('click',function(){
-  var dlg=$('#dlg-releases'),sum=$('#releases-sum');$('#dlg-releases-title').textContent=t('Releases')+' · '+btn.getAttribute('data-name');sum.textContent=t('Searching…');$('#releases-counts').textContent='';$('#releases-list').textContent='';openDialog(dlg);
-  fetch('/ui/wanted-preview?index='+encodeURIComponent(btn.getAttribute('data-index')),{cache:'no-store'}).then(function(r){return r.json();}).then(function(res){renderReleases(res,sum,$('#releases-counts'),$('#releases-list'));}).catch(function(e){sum.textContent=t('Error')+': '+e.message;});
+  relIndex=btn.getAttribute('data-index');relLive=false;
+  $('#dlg-releases-title').textContent=t('Releases')+' · '+btn.getAttribute('data-name');openDialog($('#dlg-releases'));loadReleases();
 });});
+// The interactive search: ask the indexers now and list what they return, with
+// the verdict of the wanted filters and an Add button per release.
+var relIndex=null,relLive=false;
+function loadReleases(){
+  if(relIndex===null)return;
+  var sum=$('#releases-sum');sum.textContent=t('Searching…');$('#releases-counts').textContent='';$('#releases-list').textContent='';
+  var u='/ui/wanted-preview?index='+encodeURIComponent(relIndex)+(relLive?'&live=1':'');
+  fetch(u,{cache:'no-store'}).then(function(r){return r.json();}).then(function(res){renderReleases(res,sum,$('#releases-counts'),$('#releases-list'),loadReleases);}).catch(function(e){sum.textContent=t('Error')+': '+e.message;});
+}
+$('#releases-live').addEventListener('click',function(){relLive=true;loadReleases();});
 
 // Filter the list.
 $('#wanted-filter').addEventListener('input',function(){var q=this.value.toLowerCase();$$('#wanted-list > li[data-wanted-row]').forEach(function(li){var n=($('.name',li)||{}).textContent||'';li.hidden=q&&n.toLowerCase().indexOf(q)<0;});});

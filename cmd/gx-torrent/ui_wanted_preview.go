@@ -9,6 +9,7 @@ package main
 // typed, the list shows it per title: nothing is decided out of sight.
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -100,7 +101,7 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 	entry := wantedEntry{
 		Name: strings.TrimSpace(q.Get("name")), Kind: q.Get("kind"), Seasons: q.Get("seasons"),
 		Language: q.Get("language"), Subtitles: q.Get("subtitles"), Quality: q.Get("quality"), Exclude: q.Get("exclude"),
-		EpisodeFilter: q.Get("episode_filter"),
+		EpisodeFilter: q.Get("episode_filter"), Category: q.Get("category"), SavePath: q.Get("savepath"),
 	}
 	if raw := strings.TrimSpace(q.Get("index")); raw != "" {
 		list := d.wantedList()
@@ -108,6 +109,10 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 			entry = list[index]
 		}
 	}
+	// live asks the indexers now (the interactive search): the archive is read
+	// anyway and the two sources are merged, so a release found both in the
+	// archive and by the indexers appears once.
+	live := q.Get("live") == "1"
 	type release struct {
 		Title   string `json:"title"`
 		Size    int64  `json:"size,omitempty"`
@@ -132,6 +137,20 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 	var items []rss.Item
 	if text != "" {
 		items = d.archiveWantedItems(text, wantedArchiveScan)
+	}
+	// The interactive search: ask the indexers now, so a release that is not in
+	// the archive yet can be seen (with its verdict) and taken by hand.
+	indexerError := ""
+	indexers := len(d.indexers())
+	if live && text != "" && indexers > 0 {
+		ctx, cancel := context.WithTimeout(r.Context(), indexerSearchTimeout)
+		found, err := d.searchFeed(ctx, wantedFeedName(entry.Name), text)
+		cancel()
+		if err != nil {
+			indexerError = err.Error()
+		} else {
+			items = mergeFeedItems(items, found)
+		}
 	}
 	taken := map[wantedEpisode]bool{}
 	for _, ep := range d.wantedLedgerEpisodes(entry) {
@@ -205,7 +224,33 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 		"releases": releases, "total": total, "counts": byVerdict,
 		"take": len(willTake), "take_episodes": takeSummary,
 		"had": len(taken) + len(inSession), "movie": entry.kind() == "movie",
+		// The action a release taken from here gets, and how the live search
+		// went (the page adds a release with the title's own category and path).
+		"category": entry.Category, "savepath": entry.SavePath,
+		"live": live, "indexers": indexers, "indexer_error": indexerError,
 	})
+}
+
+// mergeFeedItems merges the indexer results into the archive ones for the
+// preview: one entry per release. The key is the lower-cased title, because the
+// same release read from the archive and from the indexers does not carry the
+// same identity (the archive keeps an info-hash or a detail URL, the indexer a
+// magnet), while the title is what the operator recognises.
+func mergeFeedItems(base, extra []rss.Item) []rss.Item {
+	seen := map[string]bool{}
+	for _, item := range base {
+		seen[strings.ToLower(item.Title)] = true
+	}
+	out := base
+	for _, item := range extra {
+		key := strings.ToLower(item.Title)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, item)
+	}
+	return out
 }
 
 // wantedLedgerEpisodes are the episodes the wanted engine itself recorded as

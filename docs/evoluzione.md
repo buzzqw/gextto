@@ -170,7 +170,9 @@ readable name from the address and skipping what is already configured; a feed
 filter that the rules make unused is marked so; a wanted title lists
 its releases with the
 verdict for each (taken, had, or the filter that turns it away), live while it
-is added. Rule terms come in *all of* / *one of* / *none of*, all found with the
+is added, and a verdict of *would be taken* can be acted on: the release is
+taken by hand from the same list, which can also ask the indexers now for the
+title (the interactive search). Rule terms come in *all of* / *one of* / *none of*, all found with the
 same separator-insensitive, word-start match (`rss.HasTerm`), and the open
 episode range `1x01-` reaches the later seasons as in qBittorrent, which is what
 a wanted title's *Seasons* `1+` promises. Episodes already in the client count as
