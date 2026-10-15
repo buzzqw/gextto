@@ -421,10 +421,10 @@
       closeDetailDrawer();
       return;
     }
-    // The info button and the row itself open the same drawer: keep the opener
-    // so focus returns to where the user was.
-    var info = event.target.closest("button[hx-get*='/downloads/detail']");
-    if (info) { detailDrawerOpener = info; return; }
+    // The torrent name button and the row itself open the same drawer: keep the
+    // opener so focus returns to where the user was.
+    var openBtn = event.target.closest("button[hx-get*='/downloads/detail']");
+    if (openBtn) { detailDrawerOpener = openBtn; return; }
     if (event.target.closest("button, a, input, select, textarea, label")) return;
     var row = event.target.closest("tr[data-hash]");
     if (!row) return;

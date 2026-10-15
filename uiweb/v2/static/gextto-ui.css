@@ -631,7 +631,12 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .torrent-head { grid-column: 1; display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
 .torrent-select { flex: none; display: flex; align-items: center; padding-top: 2px; }
 .torrent-name { flex: 1 1 auto; min-width: 0; max-width: none; }
-.torrent-name > .truncate { display: block; font-weight: 600; }
+/* The torrent name is the keyboard-accessible way to open the details drawer
+   (clicking anywhere else on the row works too); it looks like the plain name
+   but is a button, so it must reset the native button chrome. */
+.torrent-open { display: block; max-width: 100%; margin: 0; padding: 0; border: 0; border-radius: 4px; background: none; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.torrent-open .truncate { display: block; }
+.torrent-open:hover .truncate { text-decoration: underline; }
 .torrent-state { flex: none; }
 .torrent-body { grid-column: 1; min-width: 0; }
 .torrent-progress { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -645,7 +650,6 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
   .torrent-card > .row-actions { grid-column: 1; grid-row: auto; justify-content: flex-start; padding-top: 6px; border-top: 1px solid var(--line-soft); }
   .torrent-card > .row-actions .btn { min-height: 40px; }
 }
-.torrent-name > .truncate { display: block; font-weight: 600; }
 .origin { display: block; margin-top: 2px; font-size: 0.72rem; }
 .th-sort { cursor: pointer; user-select: none; }
 .th-sort::after { content: "↕"; margin-left: 4px; opacity: 0.35; font-size: 0.7em; }

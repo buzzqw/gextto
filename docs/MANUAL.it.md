@@ -337,10 +337,11 @@ bloccata, già presente o inferiore al file archiviato.
 - **Filtro per tag** e **limiti di velocità temporanei** (DL/UL per N minuti).
 - **Colonne tabella**: Nome, Stato, Progresso, ↓, ↑, ETA, Peers, Ratio — clicca
   l'intestazione per ordinare. **Azioni bulk**: pausa, riprendi, recheck, rimuovi.
-- **Azioni riga**: pausa/riprendi, recheck, dettagli, rimuovi.
-- **Dettagli** si aprono come un riquadro **sopra lo Storico download**, non
-  come finestra centrata: la sessione e lo storico restano visibili mentre
-  imposti i valori.
+- **Azioni riga**: pausa/riprendi, recheck, rimuovi.
+- **Dettagli**: si aprono cliccando il **nome del torrent** (o un punto qualsiasi
+  della riga; da tastiera il nome è il pulsante che li apre) come riquadro
+  **sopra lo Storico download**, non come finestra centrata: la sessione e lo
+  storico restano visibili mentre imposti i valori.
 - **Dettagli** (tab Generale, Tracker, Contenuto, Peers, Pezzi, Limiti, Storage):
   copia magnet, limiti per torrent/giorni di seed, reannounce, pin, riavvia,
   segna come fallito, sposta storage. In **Generale** trovi anche **Esporta

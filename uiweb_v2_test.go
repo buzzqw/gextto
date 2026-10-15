@@ -1082,6 +1082,33 @@ func TestV2DownloadsHasDedicatedDetailFrame(t *testing.T) {
 	}
 }
 
+// TestV2TorrentRowOpensDetailsFromTheName: a torrent row carries no separate
+// info button; the torrent name is the control that opens the details drawer
+// (by mouse and by keyboard), and clicking anywhere else on the row does the
+// same. The name button targets the drawer frame, so the action strip keeps its
+// space and the list loses nothing.
+func TestV2TorrentRowOpensDetailsFromTheName(t *testing.T) {
+	state := newTestAppState(t)
+	state.setActiveEngine(fakeDetailEngine{torrent: models.TorrentView{
+		Hash: "abc123", Name: "Example.mkv", State: "downloading", Progress: 40,
+	}})
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodPost, "/downloads/table", url.Values{"refresh": {"1"}})
+	if code != http.StatusOK {
+		t.Fatalf("downloads table -> %d", code)
+	}
+	if !strings.Contains(body, `class="torrent-open"`) ||
+		!strings.Contains(body, `hx-get="/downloads/detail?hash=abc123&tab=general"`) ||
+		!strings.Contains(body, `hx-target="#v2-detail-drawer"`) {
+		t.Fatalf("the torrent name must open the detail drawer:\n%s", body)
+	}
+	if strings.Contains(body, `title="Dettagli"`) || strings.Contains(body, `aria-label="Dettagli"`) {
+		t.Fatalf("the redundant per-row info button must be gone:\n%s", body)
+	}
+}
+
 func TestV2LanguageSwitch(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

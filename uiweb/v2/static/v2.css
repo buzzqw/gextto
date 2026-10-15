@@ -863,6 +863,9 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
 .comic-link-group { margin-top: 12px; }
 .comic-link-group > span { display: block; margin-bottom: 6px; font-weight: 600; }
 .detail-actions { margin-top: 14px; }
+/* Space between the detail tab bar and the panel it switches, so the two rows
+   do not look glued together. */
+.detail-tabs { margin-bottom: 12px; }
 .detail-tag-form { margin-top: 10px; }
 .detail-tag-form .input { min-width: 220px; }
 .torrent-detail-tabs { overflow-x: auto; }

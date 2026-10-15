@@ -459,7 +459,7 @@
                 <div class="torrent-head">
                   <span class="torrent-select"><input type="checkbox" data-v2-select name="hash" value="{{.Hash}}" aria-label="Seleziona {{.Name}}" title="Seleziona questo torrent per le azioni di gruppo" /></span>
                   <span class="torrent-name">
-                    <span class="truncate" title="{{.Name}}">{{.Name}}</span>
+                    <button class="torrent-open" type="button" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-detail-drawer" hx-swap="innerHTML" title="{{.Name}}"><span class="truncate">{{.Name}}</span></button>
                     {{if .Archived}}<span class="badge ok" title="Copia archiviata presente">NAS</span>{{end}}
                     {{if .SeedInfinite}}<span class="badge warn" title="Seed senza limiti">seed ∞</span>{{end}}
                     {{if .Tags}}<span class="tag-chips">{{range .Tags}}<span class="tag-chip">{{.}}</span>{{end}}</span>{{end}}
@@ -482,7 +482,6 @@
                   {{else}}<button class="btn sm icon-action" type="submit" name="row_action" value="pause:{{.Hash}}" title="Pausa" aria-label="Pausa"><span aria-hidden="true">⏸</span></button>{{end}}
                   <button class="btn sm icon-action" type="submit" name="row_action" value="recheck:{{.Hash}}" title="Verifica dati" aria-label="Verifica dati"><span aria-hidden="true">⟳</span></button>
                   <button class="btn sm icon-action" type="submit" name="row_action" value="reannounce:{{.Hash}}" title="Riannuncia ai tracker" aria-label="Riannuncia"><span aria-hidden="true">↻</span></button>
-                  <button class="btn sm icon-action" type="button" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-detail-drawer" hx-swap="innerHTML" title="Dettagli" aria-label="Dettagli"><span aria-hidden="true">ⓘ</span></button>
                   <button class="btn sm icon-action danger" type="button" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Rimuovi" aria-label="Rimuovi"><span aria-hidden="true">🗑️</span></button>
                 </div>
               </div>
@@ -526,7 +525,7 @@
   <button class="btn sm" type="button" data-v2-detail-close title="Chiudi i dettagli del torrent">Chiudi</button>
 </div>
 <div class="torrent-drawer-body">
-  <div class="toolbar" role="tablist" aria-label="Sezioni dettagli torrent">
+  <div class="toolbar detail-tabs" role="tablist" aria-label="Sezioni dettagli torrent">
     {{range .Tabs}}<button class="btn sm{{if .Active}} primary{{end}}" type="button" role="tab" aria-selected="{{if .Active}}true{{else}}false{{end}}" data-v2-detail-tab="{{.ID}}" hx-get="/downloads/detail/panel?hash={{$.Hash}}&tab={{.ID}}" hx-target="#v2-detail-panel" hx-swap="innerHTML" title="Mostra la sezione {{.Label}} del dettaglio torrent">{{.Label}}</button>{{end}}
   </div>
   <div id="v2-detail-panel" role="tabpanel">{{template "v2_detail_panel" .}}</div>
