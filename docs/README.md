@@ -25,6 +25,7 @@ needs.
 | [gx-torrent engine](gx-torrent.md) | Technical document of the pure-Go torrent engine (gx-core, daemon, adapter). |
 | [BEP compliance](bep.md) | Which BitTorrent specifications (BEPs) the engine supports, which are missing and the roadmap. |
 | [gx-core](gx-core.md) | The standalone torrent client (the `gx-torrent` binary used without Gextto): modes, security, packaging, what is still open. |
+| [Web UI verso parità qBittorrent](webui-parity.md) | Work plan of the `webui-qbit-parity` branch: gx-torrent page towards qBittorrent parity (torrent list, RSS/rules/download logic, usability, scale). |
 
 > [!NOTE]
 > The paths, ports and commands here are examples. Always check the service
