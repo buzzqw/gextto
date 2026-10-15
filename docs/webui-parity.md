@@ -45,11 +45,11 @@ Stato di partenza (già buono, da non regredire):
       (ri-usa `/ui/file-priority` multi-`index`), collapse persistente in
       memoria; pulsante Stream con etichetta visibile; rename cartella
       (`POST /ui/rename-folder` + dialog dedicato).
-- [ ] Resta Add dialog: selettore cookie, content-layout, anteprima nome dopo
-      magnet.
-      → fatto: anteprima magnet (nome dn + hash) live nel dialog, hint cookie
-      con link a `Settings → Cookies` (`#cookies`); content-layout rinviato
-      (richiede supporto engine: oggi il save path è per-torrent/categoria).
+- [x] Add dialog: anteprima magnet (nome dn + hash) live nel dialog, hint cookie
+      con link a `Settings → Cookies` (`#cookies`); stato cookie per host
+      (`GET /ui/cookie-domains`, solo domini, mai valori); content-layout
+      rinviato (richiede supporto engine: oggi il save path è
+      per-torrent/categoria).
 
 ## 2. RSS, regole e logica di scarico (P0 — il punto che mancava)
 
@@ -95,9 +95,15 @@ Migliorie proposte (usabilità, non motore):
 - [x] Riga feed: hint azionabile sotto il `last_error` (chiave API,
       Cloudflare → FlareSolverr, pagina senza link, timeout) + `Reload`
       esistente come riprova.
-- [ ] Parità API RSS qBittorrent: `rss/items` con tree folder/feed,
+- [x] Parità API RSS qBittorrent: `rss/items` con tree folder/feed,
       `refreshItem`, `markAsRead`, `matchingArticles` già mappati — verificare
       contro VueTorrent e fissare i gap in `qbit_compat_test.go`.
+- [x] Prova contro VueTorrent reale (2026-10-15, VueTorrent v2.36.1 su istanza
+      standalone di prova, Chromium headless): dashboard e dettaglio torrent
+      (Overview/Info/Trackers/Peers/Content con file) renderizzati dai nostri
+      `/api/v2` — zero errori JS, zero HTTP 4xx/5xx tranne il 404 atteso di
+      `/backend/ping` (servizio compagno inesistente, già documentato). Le
+      scritture (pause/resume/add/delete) sono coperte da `qbit_compat_test.go`.
 
 ## 3. Facilità d'uso oltre qBittorrent (P1)
 
@@ -124,8 +130,9 @@ Migliorie proposte (usabilità, non motore):
       il server, misure in `measurements.md` (−63% byte/tick).
 - [ ] Virtualizzazione oltre ~1000 righe (IntersectionObserver) al posto di
       `?rows=300` + `Show more`.
-- [ ] Preferenze UI (colonne/filtri/tema) salvate anche lato server
-      (`settings.json`) per multi-device, non solo `localStorage`.
+- [x] Preferenze UI (colonne/filtri/tema) anche lato server (`GET/POST
+      /ui/uiprefs`, solo standalone; localStorage resta fast path e vince,
+      il server riempie solo ciò che manca).
 - [x] Audit `/api/v2`: copertura completa (auth/app/transfer/torrents/sync/log/
       search/rss/torrentcreator, inclusi rename e prio); gate
       `qbit_compat_test.go` verde. Resta: prova contro VueTorrent reale.

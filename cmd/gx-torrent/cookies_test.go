@@ -1,6 +1,9 @@
 package main
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -88,5 +91,44 @@ func TestCookieMatches(t *testing.T) {
 		if got := cookieMatches(c.cookie, u, now); got != c.want {
 			t.Errorf("cookieMatches(%+v) = %v, want %v", c.cookie, got, c.want)
 		}
+	}
+}
+
+// TestUICookieDomains checks the Add dialog helper: distinct domains only, no
+// values, empty list (not null) when nothing is stored.
+func TestUICookieDomains(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	get := func() map[string]any {
+		t.Helper()
+		resp, err := http.Get(server.URL + "/ui/cookie-domains")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("GET /ui/cookie-domains -> %d", resp.StatusCode)
+		}
+		var out map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	if domains := get()["domains"].([]any); len(domains) != 0 {
+		t.Fatalf("domains = %v, want empty", domains)
+	}
+	if err := d.saveCookies([]storedCookie{
+		{Name: "sid", Value: "abc", Domain: ".tracker.example", Path: "/"},
+		{Name: "other", Value: "zzz", Domain: "tracker.example", Path: "/"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	domains := get()["domains"].([]any)
+	if len(domains) != 1 || domains[0] != "tracker.example" {
+		t.Fatalf("domains = %v, want [tracker.example]", domains)
 	}
 }

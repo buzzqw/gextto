@@ -493,6 +493,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <textarea name="source" id="add-source" rows="3" placeholder="magnet:?xt=…" autocomplete="off" title="Magnet link (magnet:?) or HTTP URL of a .torrent file to download"></textarea>
       </label>
       <div class="results" id="add-preview" aria-live="polite" hidden style="max-height:22vh"></div>
+      <p class="dlg-help" id="add-cookies" aria-live="polite" hidden></p>
       <p class="dlg-help">A .torrent URL from a private tracker needs its login cookies: <a href="/ui/settings#cookies" title="Cookies sent when fetching .torrent files and metadata">manage cookies</a>.</p>
       <div class="filepick" id="filepick">
         <span id="filepick-text">Drop .torrent files anywhere on the page, or</span>
@@ -711,7 +712,51 @@ function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
 var $=function(s,r){return (r||document).querySelector(s);};
 var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
 var toast=function(m,e){window.gx.toast(m,e);};
-var store={get:function(k,d){try{var v=localStorage.getItem('gx-'+k);return v===null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem('gx-'+k,JSON.stringify(v));}catch(e){}}};
+var store={get:function(k,d){try{var v=localStorage.getItem('gx-'+k);return v===null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem('gx-'+k,JSON.stringify(v));}catch(e){}pushPrefs(k);}};
+// pushPrefs mirrors columns/filters/theme to the server (standalone), so they
+// follow the operator across browsers. Best effort: managed mode has no store
+// and answers 404, which is silently ignored.
+var prefsTimer=null;
+function pushPrefs(which){
+  if(which!=='cols'&&which!=='filter'&&which!=='theme')return;
+  if(prefsTimer)return;prefsTimer=setTimeout(function(){prefsTimer=null;
+    try{
+      var body={};
+      var c=localStorage.getItem('gx-cols');if(c!==null)body.cols=JSON.parse(c);
+      var f=localStorage.getItem('gx-filter');if(f!==null)body.filter=JSON.parse(f);
+      var t2=localStorage.getItem('gx-theme');if(t2==='light'||t2==='dark'||t2==='auto')body.theme=t2;
+      if(body.cols===undefined&&body.filter===undefined&&body.theme===undefined)return;
+      fetch('/ui/uiprefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(function(){});
+    }catch(e){}
+  },1000);
+}
+// pullPrefs fills in what this browser does not have yet from the server
+// copy (another device may have saved it). Local values always win.
+function pullPrefs(){
+  var needCols=false,needFilter=false,needTheme=false;
+  try{
+    needCols=localStorage.getItem('gx-cols')===null;
+    needFilter=localStorage.getItem('gx-filter')===null;
+    needTheme=localStorage.getItem('gx-theme')===null;
+  }catch(e){return;}
+  if(!needCols&&!needFilter&&!needTheme)return;
+  fetch('/ui/uiprefs',{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(p){
+    if(!p)return;
+    try{
+      if(needCols&&p.cols!==undefined)localStorage.setItem('gx-cols',JSON.stringify(p.cols));
+      if(needFilter&&p.filter!==undefined)localStorage.setItem('gx-filter',JSON.stringify(p.filter));
+      if(needTheme&&(p.theme==='light'||p.theme==='dark'||p.theme==='auto'))localStorage.setItem('gx-theme',p.theme);
+    }catch(e){return;}
+    if(needCols&&window.gxColStyle)window.gxColStyle();
+    if(needFilter&&p.filter!==undefined&&typeof p.filter==='object')state.filter=Object.assign({status:'all',cat:null,tag:null,tracker:null},p.filter);
+    if(needTheme&&window.gx&&window.gx.theme)window.gx.theme.apply(window.gx.theme.read());
+    renderColsMenu();afterRender();
+  }).catch(function(){});
+}
+document.addEventListener('click',function(e){
+  var sw=e.target.closest&&e.target.closest('[data-theme-switch]');
+  if(sw)setTimeout(function(){pushPrefs('theme');},0);
+});
 
 var state={selected:new Set(),anchor:null,filter:store.get('filter',{status:'all',cat:null,tag:null,tracker:null}),sort:store.get('sort',{key:'name',asc:true}),q:'',drawer:null,rows:window.__rows||0,collapsed:store.get('collapsed',{}),sbmore:false};
 if(state.filter.tracker===undefined)state.filter.tracker=null;
@@ -1265,10 +1310,49 @@ function parseMagnetLine(line){
   });
   return {name:dn,hash:hash};
 }
+// cookieHint says, per .torrent URL host, whether a saved login cookie will
+// be sent (suffix match like the jar, "*" matches all). Domains load once per
+// dialog opening; values never leave the server.
+var cookieDomains=null;
+function loadCookieDomains(then){
+  if(cookieDomains!==null){if(then)then();return;}
+  fetch('/ui/cookie-domains',{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(j){
+    cookieDomains=(j&&j.domains)||[];
+    if(then)then();
+  }).catch(function(){cookieDomains=[];if(then)then();});
+}
+function cookieForHost(host){
+  host=String(host||'').toLowerCase();
+  for(var i=0;i<(cookieDomains||[]).length;i++){
+    var d=String(cookieDomains[i]||'').toLowerCase();
+    if(d==='*'||host===d||host.slice(-d.length-1)==='.'+d)return cookieDomains[i];
+  }
+  return null;
+}
+function updateCookieHint(){
+  var box=$('#add-cookies');if(!box)return;
+  var ta=$('#add-source'),hosts={},order=[];
+  (ta?ta.value:'').split(/\r?\n/).forEach(function(line){
+    var m=/^https?:\/\/([^\/\s]+)/i.exec(line.trim());if(!m)return;
+    var h=m[1].toLowerCase();if(!hosts[h]){hosts[h]=1;order.push(h);}
+  });
+  if(!order.length){box.hidden=true;box.textContent='';return;}
+  loadCookieDomains(function(){
+    box.innerHTML='';
+    order.forEach(function(h){
+      var dom=cookieForHost(h);
+      var p=document.createElement('div');p.className=dom?'ok':'muted';
+      p.textContent=h+': '+(dom?t('uses saved cookies'):t('no saved cookies'));
+      box.appendChild(p);
+    });
+    box.hidden=false;
+  });
+}
 function updateAddPreview(){
   var ta=$('#add-source'),box=$('#add-preview');if(!ta||!box)return;
   var lines=ta.value.split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean);
   box.innerHTML='';
+  updateCookieHint();
   if(!lines.length){box.hidden=true;return;}
   box.hidden=false;
   var ignored=0;
@@ -1328,7 +1412,7 @@ document.addEventListener('click',function(e){
   var tab=el.closest('#drawer [data-tab]');if(tab&&state.drawer){openDetail(state.drawer.hash,tab.dataset.tab);return;}
   var da=el.closest('#drawer [data-dact]');if(da&&state.drawer){var h=state.drawer.hash;if(da.dataset.dact==='magnet')copyMagnet(h);else if(da.dataset.dact==='dht'){toast(t('DHT swarm')+'…',false);fetch('/ui/dhtscrape?hash='+encodeURIComponent(h),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(d){toast(t('DHT swarm (seeders / peers):')+' ~'+d.seeders+' / ~'+d.peers,false);}).catch(function(){toast(t('DHT swarm')+': '+t('Copy failed'),true);});}else act(da.dataset.dact,[h]);return;}
   var res=el.closest('#searchresults [data-add]');if(res){var p=new URLSearchParams();p.set('source',res.dataset.add);res.disabled=true;post('/ui/add',p).then(function(x){report(x);refresh();});return;}
-  if(el.closest('#btn-add')){openDialog($('#dlg-add'));return;}
+  if(el.closest('#btn-add')){cookieDomains=null;openDialog($('#dlg-add'));updateAddPreview();return;}
   if(el.closest('#undo-btn')){doUndo();return;}
   if(el.closest('#btn-search')){openDialog($('#dlg-search'));return;}
   if(el.closest('#btn-log')){showLog($('#btn-log').getAttribute('aria-pressed')!=='true');return;}
@@ -1452,7 +1536,7 @@ function runSearch(){
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}
 
 // Restore and start.
-state.q='';lastSide=$('#side-live').innerHTML;captureTableChrome();afterRender();renderColsMenu();sampleGraph();
+state.q='';lastSide=$('#side-live').innerHTML;captureTableChrome();afterRender();renderColsMenu();sampleGraph();pullPrefs();
 var params=new URLSearchParams(location.search);
 if(params.get('open'))openDetail(params.get('open'),params.get('tab')||'general');
 if(params.has('msg')){history.replaceState(null,'',location.pathname);}

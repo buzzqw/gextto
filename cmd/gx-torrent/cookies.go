@@ -86,6 +86,32 @@ func (d *Daemon) saveCookiesFromForm(raw string) error {
 	return d.saveCookies(list)
 }
 
+// cookieDomains returns the distinct domains of the stored cookies (names
+// only, never values), so the Add dialog can say whether a .torrent URL will
+// be fetched with a login cookie.
+func (d *Daemon) handleUICookieDomains(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	seen := map[string]bool{}
+	var domains []string
+	for _, c := range d.storedCookies() {
+		domain := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(c.Domain)), ".")
+		if domain == "" {
+			domain = "*"
+		}
+		if !seen[domain] {
+			seen[domain] = true
+			domains = append(domains, domain)
+		}
+	}
+	if domains == nil {
+		domains = []string{}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{"domains": domains})
+}
+
 // cookieJar is the live http.CookieJar used by the engine and by the daemon's
 // own fetches. It reads the stored cookies on every request, so setCookies
 // takes effect at once without rebuilding the session.
