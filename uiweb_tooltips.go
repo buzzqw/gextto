@@ -152,7 +152,7 @@ var uiSettingTooltipText = map[string]string{
 	"qbittorrent_tag":                      "Tag applicato ai torrent aggiunti a qBittorrent-nox.",
 	"qbittorrent_request_timeout_secs":     "Timeout in secondi delle richieste HTTP verso qBittorrent-nox.",
 	"qbittorrent_poll_interval_ms":         "Intervallo in millisecondi tra due letture dello stato dei torrent.",
-	"qbittorrent_path_mappings":            "Mappatura dei percorsi tra Gextto e qBittorrent-nox, una per riga (locale=remoto).",
+	"qbittorrent_path_mappings":            "Serve solo se qBittorrent vede le cartelle con percorsi diversi (Docker, NAS, altro host): una riga per percorso, forma locale=remoto. Stessa macchina e stesse cartelle — o modalità gestita —: lascia pure vuoto.",
 	"qbittorrent_managed":                  "Gextto scarica da sé l'ultima release di qBittorrent-nox, la installa nella cartella dell'applicazione (accanto a gexttod), la avvia e la ferma con il servizio e la aggiorna (con backup e rollback). Il motore in uso però si sceglie dalla voce «Motore torrent»: questa opzione non lo cambia.",
 	"gxtorrent_url":                        "URL dell'interfaccia API di gx-torrent (es. http://127.0.0.1:8890).",
 	"gxtorrent_listen":                     "Indirizzo di ascolto del demone. Predefinito 127.0.0.1:8890, cioè solo questo server: pagina web e API non escono in LAN. Per esporle in LAN usa 0.0.0.0:8890 e imposta gxtorrent_token (senza token Gextto avvia il demone in -insecure e lo segnala nel log). Il traffico peer usa sempre la porta singola/le torrent_port_*.",

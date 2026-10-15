@@ -1462,7 +1462,7 @@ Recalculate scores* after changing weights.
 | qBittorrent-nox — tag | Tag applied to torrents added to qBittorrent-nox. |
 | qBittorrent-nox — request timeout | Timeout in seconds for HTTP requests to qBittorrent-nox. *(Unit: seconds)* |
 | qBittorrent-nox — polling interval | Interval in milliseconds between torrent status reads. *(Unit: ms)* |
-| qBittorrent-nox — path mapping | Path mapping between Gextto and qBittorrent-nox, one per line (local=remote). |
+| qBittorrent-nox — path mapping | Needed only when qBittorrent sees the folders under different paths (Docker, NAS, another host): one line per path, local=remote form. Same machine with the same folders — or managed mode —: leave it empty. |
 
 **Actions**
 

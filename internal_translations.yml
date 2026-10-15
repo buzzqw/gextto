@@ -3497,7 +3497,7 @@ eng:
   "Le release che contengono queste parole o script (es. [non-latino], [porno]) vengono escluse. Le modifiche si salvano subito.": "Releases containing these words or scripts (e.g. [non-latino], [porno]) are excluded. Changes are saved right away."
   "Limite di seeding in minuti, usato solo se Seed massimo (giorni) è 0.": "Seeding limit in minutes, used only when Maximum seeding (days) is 0."
   "Lingua usata per i metadati TMDB (es. it-IT, en-US).": "Language used for TMDB metadata (e.g. it-IT, en-US)."
-  "Mappatura dei percorsi tra Gextto e qBittorrent-nox, una per riga (locale=remoto).": "Path mapping between Gextto and qBittorrent-nox, one per line (local=remote)."
+  "Serve solo se qBittorrent vede le cartelle con percorsi diversi (Docker, NAS, altro host): una riga per percorso, forma locale=remoto. Stessa macchina e stesse cartelle — o modalità gestita —: lascia pure vuoto.": "Needed only when qBittorrent sees the folders under different paths (Docker, NAS, another host): one line per path, local=remote form. Same machine with the same folders — or managed mode —: leave it empty."
   "Minuti tra due passaggi del backfill MediaInfo.": "Minutes between two MediaInfo backfill runs."
   "Mostra dove è installato qBittorrent-nox e se c'è un aggiornamento.": "Shows where qBittorrent-nox is installed and whether an update is available."
   "Motore torrent attivo (gx-torrent predefinito oppure qBittorrent-nox).": "Active torrent engine (gx-torrent by default, or qBittorrent-nox)."

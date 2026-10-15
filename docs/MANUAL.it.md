@@ -1507,7 +1507,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | qBittorrent-nox — tag | Tag applicato ai torrent aggiunti a qBittorrent-nox. |
 | qBittorrent-nox — timeout richieste | Timeout in secondi delle richieste HTTP verso qBittorrent-nox. *(Unità: secondi)* |
 | qBittorrent-nox — intervallo polling | Intervallo in millisecondi tra due letture dello stato dei torrent. *(Unità: ms)* |
-| qBittorrent-nox — mappatura percorsi | Mappatura dei percorsi tra Gextto e qBittorrent-nox, una per riga (locale=remoto). |
+| qBittorrent-nox — mappatura percorsi | Serve solo se qBittorrent vede le cartelle con percorsi diversi (Docker, NAS, altro host): una riga per percorso, forma locale=remoto. Stessa macchina e stesse cartelle — o modalità gestita —: lascia pure vuoto. |
 
 **Azioni**
 

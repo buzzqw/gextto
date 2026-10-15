@@ -14,7 +14,12 @@ qBittorrent-nox and want Gextto to automate it.
 
 ## 1. Prepare qBittorrent-nox
 
-- Enable the **Web User Interface** (qBittorrent-nox serves it by default).
+Gextto talks to qBittorrent **only through its Web API**, which is part of the
+Web UI component: with the Web UI off there is no API and Gextto cannot
+connect at all. So:
+
+- Keep the **Web User Interface enabled** (it is on by default in
+  qbittorrent-nox; the switch is under *Tools → Options → Web UI*).
 - Set a **username and password**: Gextto authenticates with them.
 - Note the **Web UI port** (default `8080`) and whether it answers on
   `127.0.0.1` only or on the LAN. If Gextto and qBittorrent are on different
@@ -29,39 +34,46 @@ Open **Settings → Torrent engine → qBittorrent-nox** and set:
 
 | Setting | Meaning |
 |---|---|
+| **Downloaded and updated by Gextto** | Managed mode: Gextto downloads the latest qBittorrent-nox, starts/stops it with the service and updates it (see §5). Needs nothing else on this page |
 | **Web API URL** | qBittorrent Web UI URL, e.g. `http://127.0.0.1:8080` |
 | **User / Password** | qBittorrent Web UI credentials |
 | **Category** | Category applied to every torrent Gextto adds (created if missing) |
 | **Tag** | Tag applied to every torrent Gextto adds |
 | **Request timeout** | Seconds for a Web API request (default 15) |
 | **Polling interval** | Milliseconds between status reads (default 1500) |
-| **Path mapping** | `gextto_path=qbittorrent_path`, one per line (see below) |
-| **Downloaded and updated by Gextto** | Managed mode: Gextto downloads the latest qBittorrent-nox, starts/stops it with the service and updates it |
+| **Path mapping** | `gextto_path=qbittorrent_path`, one per line — leave empty in the common case (see §3) |
 
 The **Test** button runs the preflight: it connects, reads the version, the
 default save path and the number of torrents. **Activation is refused** when a
 Gextto path the backend would receive is not covered by a mapping, so a move
 can never target the wrong folder.
 
-## 3. Paths: the part that matters
+## 3. Paths: usually nothing to do
 
 Gextto computes a save path for every torrent (the configured download folder,
 or a per-title/per-rule folder). It hands that path to qBittorrent **in
 qBittorrent's own filesystem namespace**. The two only agree when both see the
-same folders.
+same folders — which is the common case, and then there is nothing to fill in.
 
-### 3.1 Same host, same folders — no mapping
+### 3.1 The common case — leave Path mapping empty
 
-If qBittorrent runs natively on the same machine and the download folder is the
-same, leave **Path mapping** empty. Gextto only checks that the folder exists
-locally. Example:
+- **Managed mode** (§5): Gextto starts qBittorrent itself on the same machine,
+  so both see the same folders. Nothing to map.
+- **Same host, same folders**: qBittorrent runs natively on the same machine
+  and the download folder is the same. Leave **Path mapping** empty; Gextto
+  only checks that the folder exists locally. Example:
 
 ```
 Gextto download folder:      /mnt/media/downloads
 qBittorrent sees the same:   /mnt/media/downloads   -> no mapping
 ```
 
-### 3.2 Different path, same files — map it
+An empty field is always safe: if a path Gextto would hand over is not
+covered, **activation is refused** with
+`path "…" is not covered by backend_path_mappings` naming the offending path —
+a download never lands in the wrong place silently.
+
+### 3.2 Only for Docker, NAS or another host — map it
 
 When the same folder has a **different path** in qBittorrent (a container, a
 different mount point, another host), tell Gextto how to translate. One entry
@@ -106,28 +118,66 @@ destination before asking qBittorrent to relocate the data.
 
 | Setup | qBittorrent sees | Path mapping |
 |---|---|---|
-| Native, same host, same folders | same paths | *(empty)* |
+| Managed by Gextto, or native on the same host with the same folders | same paths | *(empty)* |
 | Docker container, host `/mnt/media/downloads` | `/downloads` | `/mnt/media/downloads=/downloads` |
 | NAS, Gextto mount `/mnt/nas/downloads` | `/volume1/downloads` | `/mnt/nas/downloads=/volume1/downloads` |
 | Gextto RAM disk enabled | its path inside qBittorrent | map the RAM disk path too |
 
-## 4. Managed mode
+## 4. What Gextto drives, and what stays in qBittorrent
+
+The settings below live in Gextto's own *Configuration* tabs — there is
+nothing to set twice. While this backend is active Gextto pushes its policy to
+qBittorrent and reads the results back:
+
+- **Speed limits** (*Speed and network*): the global download/upload caps,
+  including the scheduled windows and the temporary limit, are re-applied to
+  qBittorrent every minute.
+- **Queue** (*Queues and performance*): the active-download slots are enforced
+  by pausing and resuming; Gextto switches qBittorrent's own queueing off
+  while it runs and restores the previous value on shutdown, so the two never
+  fight.
+- **Seed** (*Seed*): the global ratio and max seed time travel with every
+  torrent, together with the per-torrent limits set in Scarico.
+- **Per torrent**: pause/resume, recheck, reannounce, move, sequential and
+  first/last pieces, super-seeding, file priorities, tracker add/remove, and
+  the category/tag from §2.
+- **Optimize** (*Queues and performance → Optimize*): applies a disk-cache
+  profile sized from the machine's RAM.
+
+What stays configured **in qBittorrent itself** (*Tools → Options*), because
+Gextto does not manage it:
+
+- the **listening port** (and UPnP/NAT-PMP), **DHT, PeX and LSD**,
+  **encryption mode**, **proxy** and **connection limits**;
+- the **IP filter**: Gextto does not push its blocklist to this backend, so
+  set it in qBittorrent (*Connection → IP filtering*) if you use one;
+- qBittorrent's own **RSS and search**: Gextto never reads them — a rule left
+  enabled there downloads on its own, outside Gextto's library.
+
+Known gaps against gx-torrent (full matrix in *Health → Torrent engine*):
+no **RAM disk** (its path must still be covered by a mapping if enabled),
+no **web seeds**, partial **seed policy**, **super-seeding** and **session
+totals**.
+
+## 5. Managed mode
 
 With **Downloaded and updated by Gextto** on, Gextto downloads the latest
 qBittorrent-nox static release, installs it next to `gexttod`, and starts/stops
 it together with the service; updates are applied with backup and rollback, and
 a watchdog restarts it after an unexpected exit (after repeated crashes Gextto
 runs the engine fallback chain). If qBittorrent is down at startup, Gextto
-keeps retrying instead of failing.
+keeps retrying instead of failing. No path mapping is needed: both see the
+same folders.
 
 In managed mode you do not set the URL to a service you started yourself: Gextto
 owns the process, so the URL is the one it starts (still editable, keeping the
 default local address and port).
 
-## 5. Verify and diagnose
+## 6. Verify and diagnose
 
-- **Health → Torrent engine** summarises the active engine (queue, speed, port,
-  DHT/uTP/LSD, encryption, proxy, IP filter, cache, I/O).
+- **Health → Torrent engine** summarises the active engine. With this backend
+  it shows speeds, torrent counts and session totals — the port, DHT, cache
+  and I/O detail is a gx-torrent page.
 - The **Test / preflight** on the backend tile shows the connected version, the
   default save path and the torrent count, and lists the mappings in use.
 - `ErrPathMappingMissing` in the log (or "backend path … does not exist;
