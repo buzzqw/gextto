@@ -562,7 +562,7 @@ recovered from a shell without editing the database.
   included); measuring further needs a multi-peer swarm on a fast link, neither
   available here.
 
-**Product-surface wording and defaults.**
+**Product-surface refinements.**
 
 - **DLNA library folders.** On the gx-torrent settings page, the *Library folders*
   field of *Media server (DLNA)* should propose the configured **Download
@@ -571,6 +571,14 @@ recovered from a shell without editing the database.
 - **Watch folders.** The *Watch folders* section should say that the `.torrent`
   files it finds are **downloaded**, not only "added automatically", so what the
   feature does to the media is explicit.
+- **RSS feeds in bulk.** On the RSS & Indexer page, *New feed* should accept many
+  lines pasted at once — one feed URL per line — and create a feed for each, so a
+  list copied from elsewhere does not have to be added one at a time.
+- **Archive-database maintenance.** The Archive page can delete old items, but
+  there is no way to *optimize* the archive database (SQLite `VACUUM`, so the file
+  shrinks after a big prune) and no maintenance entry in *Settings*: the archive
+  file keeps its size after deletions and the operator has nothing to reclaim it
+  from the interface.
 
 **Closing the gap with Sonarr/Radarr** (§1), by value per effort, each after a study and
 without copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
