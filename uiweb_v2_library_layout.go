@@ -106,12 +106,25 @@ func v2LayoutURL(r *http.Request, view, layout string) string {
 	return "/?" + values.Encode()
 }
 
-// v2CardMetaKeys are the columns a card shows beside the title, in order.
-func v2CardMetaKeys(base string) []string {
+// v2CardMetaField selects one column for a poster card: by key when the column
+// maps to a single item field, by format for the computed ones (progress,
+// completion, status) whose column carries no key.
+type v2CardMetaField struct {
+	Key    string
+	Format string
+}
+
+// v2CardMetaFields are the columns a card shows beside the title, in order.
+func v2CardMetaFields(base string) []v2CardMetaField {
 	if base == "movies" {
-		return []string{"year", "quality", "language", "enabled"}
+		return []v2CardMetaField{
+			{Key: "year"}, {Key: "quality"}, {Key: "language"}, {Key: "enabled"},
+		}
 	}
-	return []string{"seasons", "quality", "language", "episodes", "completion", "series_status"}
+	return []v2CardMetaField{
+		{Key: "seasons"}, {Key: "quality"}, {Key: "language"},
+		{Format: "episodes"}, {Format: "completion"}, {Format: "series_status"},
+	}
 }
 
 // v2LibraryCardsFrom builds the cards of one library list out of the same items
@@ -142,8 +155,8 @@ func v2LibraryCardsFrom(ctx context.Context, s *AppState, base string, items []m
 			card.Link = "/?view=series&series=" + url.QueryEscape(name)
 			card.Poster = posters[strings.ToLower(name)]
 		}
-		for _, key := range v2CardMetaKeys(base) {
-			if column, ok := v2ColumnByKey(columns, key); ok {
+		for _, field := range v2CardMetaFields(base) {
+			if column, ok := v2CardColumn(columns, field); ok {
 				if html := v2FormatCell(item, column); strings.TrimSpace(string(html)) != "" && string(html) != "—" {
 					card.Meta = append(card.Meta, v2CardMeta{Value: html, Label: column.Label})
 				}
@@ -154,10 +167,15 @@ func v2LibraryCardsFrom(ctx context.Context, s *AppState, base string, items []m
 	return cards
 }
 
-// v2ColumnByKey finds a column by key, sortable or not.
-func v2ColumnByKey(columns []uiColumn, key string) (uiColumn, bool) {
+// v2CardColumn finds the column a card field names: by key when the field has
+// one, otherwise by format, so the computed columns (progress, completion,
+// status) — which carry no key — still reach the card.
+func v2CardColumn(columns []uiColumn, field v2CardMetaField) (uiColumn, bool) {
 	for _, column := range columns {
-		if column.Key == key {
+		if field.Key != "" && column.Key == field.Key {
+			return column, true
+		}
+		if field.Format != "" && column.Format == field.Format {
 			return column, true
 		}
 	}

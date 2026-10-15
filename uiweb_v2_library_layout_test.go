@@ -110,6 +110,36 @@ func TestV2LibraryLayoutSwitchAndCards(t *testing.T) {
 	}
 }
 
+// TestV2LibraryCardsShowProgressAndStatus: the card reaches the computed
+// columns too (progress, completion, status). Those columns carry no key, so
+// before they were silently dropped and a series card showed only seasons,
+// quality and language; the lookup now falls back to the column format.
+func TestV2LibraryCardsShowProgressAndStatus(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveLibrary(state.cfg.DataDir,
+		[]SeriesConfig{{Name: "Progress Show", Quality: "1080p", Language: "ita", Enabled: true}},
+		nil,
+	); err != nil {
+		t.Fatalf("SaveLibrary: %v", err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=series&layout=cards", nil)
+	if code != http.StatusOK {
+		t.Fatalf("series cards -> %d", code)
+	}
+	for _, marker := range []string{
+		`class="card-meta-item" title="Ep."`,
+		`class="card-meta-item" title="Complet."`,
+		`class="card-meta-item" title="Stato"`,
+	} {
+		if !strings.Contains(body, marker) {
+			t.Fatalf("the card is missing the %q field", marker)
+		}
+	}
+}
+
 // TestV2LibraryCardsFollowTheFilter: the cards come from the filtered items, so
 // the poster view hides what the list hides.
 func TestV2LibraryCardsFollowTheFilter(t *testing.T) {
