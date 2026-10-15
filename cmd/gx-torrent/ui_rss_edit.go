@@ -563,6 +563,16 @@ func (d *Daemon) uiRuleRowsHTML() string {
 		if chips := uiRuleChipsHTML(rule); chips != "" {
 			b.WriteString(`<div class="chips">` + chips + `</div>`)
 		}
+		// Cooldown visibility: with ignore_days the rule stops matching for a
+		// while after each match, which looks like a bug when nothing arrives.
+		// Show when it may match again.
+		if rule.IgnoreDays > 0 {
+			if last := d.ruleLastMatch(rule.Name); !last.IsZero() {
+				if next := last.Add(time.Duration(rule.IgnoreDays) * 24 * time.Hour); time.Now().Before(next) {
+					b.WriteString(`<div class="item-sub">` + uiChip("", "Next match", next.Format("2006-01-02 15:04")) + `</div>`)
+				}
+			}
+		}
 		b.WriteString(`</div><div class="item-actions">`)
 		ruleJSON, _ := json.Marshal(rule)
 		toggle := "Disable"

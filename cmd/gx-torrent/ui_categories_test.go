@@ -16,11 +16,11 @@ func TestTagHelpers(t *testing.T) {
 	if got := dropTagNames([]string{"a", "b", "c"}, []string{"b"}); !reflect.DeepEqual(got, []string{"a", "c"}) {
 		t.Fatalf("dropTagNames = %v", got)
 	}
-	if got := qbitList("a, b|c\nd"); !reflect.DeepEqual(got, []string{"a", "b", "c", "d"}) {
-		t.Fatalf("qbitList = %v", got)
+	if got := splitFormList("a, b|c\nd"); !reflect.DeepEqual(got, []string{"a", "b", "c", "d"}) {
+		t.Fatalf("splitFormList = %v", got)
 	}
-	if got := qbitList("  "); len(got) != 0 {
-		t.Fatalf("qbitList(blank) = %v", got)
+	if got := splitFormList("  "); len(got) != 0 {
+		t.Fatalf("splitFormList(blank) = %v", got)
 	}
 }
 

@@ -61,6 +61,15 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <p class="hint">A feed is an RSS URL, or the page of an ext.to or TorrentGalaxy listing. Its items are fetched periodically, kept in the archive and evaluated by rules and wanted titles.</p>
   </div>
   <ul class="items" id="feed-list">{{FEEDROWS}}</ul>
+  <div class="panel" id="feed-guide" hidden style="margin-top:12px;padding:14px">
+    <h3>No feeds yet: pick a way to start</h3>
+    <p class="muted" style="margin:0 0 10px;font-size:13px">Feeds fill the archive with releases; rules and wanted titles decide what gets downloaded. Without a feed nothing can arrive on its own.</p>
+    <div class="actions" style="margin:0">
+      <button type="button" class="primary sm" id="guide-new-feed" title="Add an RSS feed">New feed</button>
+      <button type="button" class="sm" id="guide-new-rule" title="Add a download rule">New rule</button>
+      <a class="btn sm" href="#options" id="guide-import" title="Refresh interval, archive retention, FlareSolverr">Import a setup</a>
+    </div>
+  </div>
 </section>
 
 <section class="tabpanel" id="p-rules" role="tabpanel" aria-labelledby="tab-rules" hidden>
@@ -122,7 +131,8 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <div class="dlg-body">
       <div class="fsec">
         <label class="field">Name<input type="text" name="name" placeholder="Feed name" autocomplete="off" required title="Feed name"></label>
-        <label class="field">Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off" required title="RSS feed URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…)"></label>
+        <label class="field">Feed URL<input type="text" name="url" id="feed-url" placeholder="http://…/rss" autocomplete="off" required title="RSS feed URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…)"></label>
+        <div class="actions" style="margin:0"><button type="button" class="sm" id="feed-test" title="Fetch this URL now and show how many items it returns, before saving">Test</button><span class="muted" id="feed-test-status" aria-live="polite"></span></div>
         <label class="field">Folder<input type="text" name="folder" placeholder="tv" autocomplete="off" title="Group shown next to the feed name"></label>
       </div>
       <div class="fsec" id="feed-fallback">
@@ -154,6 +164,14 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <input type="hidden" name="op" value="add"><input type="hidden" name="index" id="rule-index">
     <div class="dlg-head"><h2 id="dlg-rule-title">New rule</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
     <div class="dlg-body">
+      <div class="fsec" id="rule-presets">
+        <h3>Presets</h3>
+        <div class="actions" style="margin:0">
+          <button type="button" class="sm" data-preset="series" title="Fill the rule for TV series: Italian 1080p episodes, each taken once">TV series</button>
+          <button type="button" class="sm" data-preset="movie" title="Fill the rule for movies: 1080p or 2160p, no CAM or TS">Movie</button>
+          <button type="button" class="sm" data-preset="all" title="Fill the rule to take everything except CAM and TS releases">Take all</button>
+        </div>
+      </div>
       <div class="rule-layout">
         <div>
           <div class="fsec">
@@ -294,6 +312,16 @@ $('#feednames').innerHTML=FEEDNAMES.map(function(n){var o=document.createElement
 
 // ---------- feeds ----------
 var feedForm=$('#feed-form');
+// With no feed configured, show the getting-started guide instead of an
+// empty list (the empty placeholder is an li without data-feed-row).
+(function(){
+  var empty=!document.querySelector('#feed-list [data-feed-row]');
+  var guide=$('#feed-guide');if(guide)guide.hidden=!empty;
+  if(!empty)return;
+  $('#guide-new-feed').addEventListener('click',function(){editFeed({});});
+  $('#guide-new-rule').addEventListener('click',function(){showTab('rules');editRule({enabled:true});});
+  $('#guide-import').addEventListener('click',function(){showTab('options');});
+})();
 function editFeed(feed,index,covered){
   feedForm.reset();$('#feed-index').value=index===undefined?'':index;
   // With rules watching the feed its own filter is not used: say so and dim it.
@@ -341,6 +369,17 @@ $('#poll-all').addEventListener('click',function(){
 
 // ---------- rules ----------
 var ruleForm=$('#rule-form');
+// One-click presets fill the editor; the preview (live) shows at once what
+// they would take, before anything is saved.
+$$('#rule-presets [data-preset]').forEach(function(btn){btn.addEventListener('click',function(){
+  var p=btn.dataset.preset;
+  function set(n,v){var el=ruleForm.elements[n];if(!el)return;if(el.type==='checkbox')el.checked=!!v;else el.value=v||'';}
+  ruleForm.reset();setKind(false);
+  if(p==='series'){set('include','1080p, ITA');set('exclude','cam, ts');set('require_episode',true);set('smart_episode',true);}
+  if(p==='movie'){set('include','1080p, 2160p');set('exclude','cam, ts, CAMRip');set('min_seeders','3');}
+  if(p==='all'){set('exclude','cam, ts');}
+  clearTimeout(previewTimer);previewTimer=setTimeout(previewRule,150);
+});});
 function setKind(skip){ruleForm.elements.fail.checked=skip;$$('input[name=kind]',ruleForm).forEach(function(r){r.checked=(r.value==='skip')===skip;});$('#rule-action').hidden=skip;}
 $$('input[name=kind]',ruleForm).forEach(function(r){r.addEventListener('change',function(){setKind(r.value==='skip');});});
 function editRule(rule,index){
@@ -371,6 +410,8 @@ function previewRule(){
     if(seq!==previewSeq)return;
     box.innerHTML='';warn.textContent='';
     var head=document.createElement('p');head.className='muted';head.style.margin='0 0 6px';head.textContent=(res.total||0)+' '+t('matches among the last')+' '+res.scanned+' '+t('archived items');box.appendChild(head);
+    var leftout=res.rejected||[];
+    if(leftout.length){var w2=note('hint',t('Why the others stay out:')+' '+leftout.map(function(g){return g.name+' ('+g.count+')';}).join(', '));warn.appendChild(w2);}
     var titles=res.titles||[];
     if(!res.total){warn.appendChild(note('hint',t('Nothing in the archive matches yet: the rule waits for new items.')));}
     else if(titles.length>1){
@@ -403,6 +444,18 @@ $$('[data-idx-test]').forEach(function(btn){btn.addEventListener('click',functio
   var f=new URLSearchParams();f.set('index',i);
   fetch('/ui/rss-indexer-test',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json();}).then(function(res){if(!span)return;if(res.ok){span.className='item-status ok';span.textContent='✓ '+res.ms+' ms';}else{span.className='item-status err';span.textContent=t('test failed:')+' '+(res.error||'');}}).catch(function(){if(span){span.className='item-status err';span.textContent=t('test failed:');}});
 });});
+
+// ---------- feed URL test (before saving) ----------
+$('#feed-test').addEventListener('click',function(){
+  var span=$('#feed-test-status'),url=$('#feed-url').value.trim();
+  span.className='muted';span.textContent=url?t('Checking…'):t('Type a feed URL first');
+  if(!url)return;
+  fetch('/ui/feed-items?url='+encodeURIComponent(url),{cache:'no-store'}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});}).then(function(list){
+    span.className='ok';
+    var preview=list.slice(0,3).map(function(it){return it.title;}).join(' · ');
+    span.textContent='✓ '+list.length+' '+t('items')+(preview?' — '+preview:'');
+  }).catch(function(e){span.className='err';span.textContent=t('test failed:')+' '+(e.message||'');});
+});
 
 // ---------- options ----------
 $('#flare-test').addEventListener('click',function(){

@@ -230,6 +230,10 @@ func (d *Daemon) handleUIRssRulePreview(w http.ResponseWriter, r *http.Request) 
 	// one series takes several (a "one of" term like 1080p alone does that).
 	groups := map[string]int{}
 	var order []string
+	// rejected counts why the other archived items stay out (first failing
+	// criterion each), so the editor shows it instead of silence.
+	rejected := map[string]int{}
+	var rejectedOrder []string
 	for _, entry := range result.Items {
 		item := rss.Item{Title: entry.Title, Size: entry.Size, Seeders: entry.Seeders, Leechers: entry.Leechers, Magnet: entry.Download}
 		if entry.Published > 0 {
@@ -238,6 +242,18 @@ func (d *Daemon) handleUIRssRulePreview(w http.ResponseWriter, r *http.Request) 
 			item.Published = time.Unix(entry.FirstSeen, 0)
 		}
 		if _, _, matched := rss.Evaluate([]rss.Rule{rule}, entry.Feed, item, now); !matched {
+			reason := "feeds"
+			if rss.RuleAppliesToFeed(rule, entry.Feed) {
+				reason = rule.Match.RejectReason(item, now)
+				if reason == "" {
+					// The cooldown/smart-episode state (daemon-side) holds it.
+					reason = "cooldown"
+				}
+			}
+			if rejected[reason] == 0 {
+				rejectedOrder = append(rejectedOrder, reason)
+			}
+			rejected[reason]++
 			continue
 		}
 		total++
@@ -260,7 +276,46 @@ func (d *Daemon) handleUIRssRulePreview(w http.ResponseWriter, r *http.Request) 
 		titles = append(titles, group{Name: name, Count: groups[name]})
 	}
 	sort.SliceStable(titles, func(i, j int) bool { return titles[i].Count > titles[j].Count })
-	writeJSON(w, http.StatusOK, map[string]any{"matches": matches, "total": total, "scanned": len(result.Items), "titles": titles, "skip": rule.Fail})
+	dict := uiDictionary(d.uiLang(r))
+	leftOut := make([]group, 0, len(rejectedOrder))
+	for _, reason := range rejectedOrder {
+		leftOut = append(leftOut, group{Name: uiTranslateText(rejectReasonLabel(reason), dict), Count: rejected[reason]})
+	}
+	sort.SliceStable(leftOut, func(i, j int) bool { return leftOut[i].Count > leftOut[j].Count })
+	writeJSON(w, http.StatusOK, map[string]any{"matches": matches, "total": total, "scanned": len(result.Items), "titles": titles, "skip": rule.Fail, "rejected": leftOut})
+}
+
+// rejectReasonLabel is the catalog key naming one RejectReason (or the feed
+// scope / cooldown), shown in the rule editor's "why the others stay out".
+func rejectReasonLabel(reason string) string {
+	switch reason {
+	case "feeds":
+		return "Not in the rule's feeds"
+	case "include", "require":
+		return "Missing wanted terms"
+	case "exclude":
+		return "Excluded term"
+	case "regex", "not_regex":
+		return "Regex does not match"
+	case "min_size":
+		return "Too small"
+	case "max_size":
+		return "Too big"
+	case "min_seeders":
+		return "Too few seeders"
+	case "max_seeders":
+		return "Too many seeders"
+	case "min_peers":
+		return "Too few peers"
+	case "max_age_days":
+		return "Too old"
+	case "require_episode":
+		return "No episode number"
+	case "episode_filter":
+		return "Not in the episode filter"
+	default:
+		return "Cooling down"
+	}
 }
 
 // previewTitleKey is the title a release belongs to, for grouping a preview:

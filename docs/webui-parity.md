@@ -27,20 +27,25 @@ Stato di partenza (già buono, da non regredire):
 
 ## 1. Parità lista torrent e dettaglio (P0)
 
-- [ ] Dialog Add stile qBittorrent: limiti DL/UP per-torrent in creazione,
-      `autoTMM`, selettore cookie (`app/cookies`), content-layout, anteprima
-      nome dopo magnet. File: `ui.tmpl` (`dlg-add`), `ui.go` (`uiBuildAddRequest`).
-- [ ] Tab Content ad albero: raggruppa per `/`, checkbox tri-state, priorità bulk
-      su cartella, rename file/folder inline, pulsante stream più visibile.
-      Ri-usa `setFilePriorities` (`ui.go:handleUIFilePriority`).
-- [ ] Colonne mancanti: `Availability, Time active, Last activity, Wasted`.
-      Dati già in `torrentInfo`/engine, solo `uiFillOptionalColumns` + `__gxCols`.
-- [ ] General arricchito: `availability, wasted, time active, last activity,
-      next announce, share limits effettivi`. Nessuna nuova API engine.
-- [ ] Ricerca anche su hash/tracker, bottone reset filtri evidente, `Esc` chiude
-      drawer/menu, `?` apre help shortcut (`N/P/Del/Enter//`, Space, frecce).
-- [ ] Toolbar: tooltip `Start/Stop (qBittorrent 5)` su Resume/Pause,
-      `Force start` visibile in toolbar quando la selezione è tutta/mista forzata.
+- [x] Dialog Add: limiti DL/UP per-torrent in creazione (`addRequestFromForm`,
+      applicati via `torrentMeta`), `autoTMM` per-add (standalone).
+      Resta: selettore cookie, content-layout, anteprima nome dopo magnet.
+- [x] Colonne mancanti: `Availability, Time active, Last activity, Wasted`
+      (dati già in `torrentInfo`/engine: `LastActive` esposto da
+      `runtimeInfo.lastActive`; scelta/ordinamento persistiti come le altre).
+- [x] General arricchito: availability, time active, last activity, seeding
+      time, next announce (minimo sui tracker).
+- [x] Filtri e tastiera: ricerca anche su hash/tracker, `Clear filters`,
+      empty-state guidato (Add / Search indexers / RSS), dialog shortcut (`?`),
+      `Esc` chiude pannello/menu/sbmore.
+- [x] Toolbar: `Force start` anche in toolbar, tooltip Start/Stop stile
+      qBittorrent 5 su Resume/Pause.
+- [x] Tab Content ad albero: `Group by folder` nel Files tab (JS, senza nuove
+      API): header per cartella con checkbox tri-state, priorità per cartella
+      (ri-usa `/ui/file-priority` multi-`index`), collapse persistente in
+      memoria; pulsante Stream con etichetta visibile. Resta: rename cartella.
+- [ ] Resta Add dialog: selettore cookie, content-layout, anteprima nome dopo
+      magnet.
 
 ## 2. RSS, regole e logica di scarico (P0 — il punto che mancava)
 
@@ -64,28 +69,20 @@ FlareSolverr, poll singolo/all con `409` se già in corso.
 
 Migliorie proposte (usabilità, non motore):
 
-- [ ] Prima esecuzione guidata: con 0 feed la tab Feeds mostra 3 strade
-      (`Aggiungi feed` / `Scegli un template regola` / `Importa setup`) invece
-      della lista vuota.
-- [ ] Template regole one-click: `Serie TV 1080p ITA`, `Film 2160p`,
-      `Tutto il feed in una cartella`, `Scarta CAM/TS`. Compilano l'editor,
-      l'utente salva dopo aver visto la preview.
-- [ ] Editor feed: bottone `Prova` (fetch sincrono di N item + mostra titoli)
-      prima di salvare; se regole coprono il feed, i campi fallback restano
-      visibili ma disabilitati con il nome delle regole (oggi c'è l'avviso,
-      manca il disable + il test).
-- [ ] Preview regola: oltre a `Taken/Would be taken`, mostrare **perché un item
-      è scartato** (primo filtro che lo ferma: `exclude cam`, `min_seeders`,
-      `stagione non voluta`…), come già fa Wanted con i verdetti. Stesso
-      endpoint `/ui/rss-rule-preview`, più campo `rejected_by`.
-- [ ] Riga feed: oltre a `items/new/added/last_error`, mostrare `prossimo
-      controllo`, `ultima durata`, `regole che lo guardano` (click → apre la
-      regola), `torrent portati in archivio` (oggi solo count, senza link).
-- [ ] Errori azionabili: `last_error` con bottone `Riprova` + hint specifico
-      (chiave API Jackett/Prowlarr errata, Cloudflare → FlareSolverr, HTML senza
-      link torrent), non solo testo.
-- [ ] Cooldown visibile: `ignore_days` mostra `prossimo match possibile il …`
-      per regola, così un episodio non preso non sembra un bug.
+- [x] Prima esecuzione guidata: con 0 feed la tab Feeds mostra 3 strade
+      (`New feed` / `New rule` da preset / `Import a setup`) invece della sola
+      riga vuota.
+- [x] Template regole one-click: `TV series`, `Movie`, `Take all`. Compilano
+      l'editor, la preview live mostra subito cosa prenderebbero.
+- [x] Editor feed: bottone `Test` (fetch via `/ui/feed-items?url=`, senza
+      salvare, con titoli di esempio). I campi fallback restano editabili e
+      dimmati quando le regole coprono il feed (disabilitarli cancellerebbe i
+      valori al salvataggio): avviso con nomi regole già presente.
+- [x] Preview regola: aggregato `rejected` con **perché gli altri restano
+      fuori** (`rss.Criteria.RejectReason`, chiavi stabili mappate a etichette
+      tradotte lato server).
+- [x] Cooldown visibile: `ignore_days` mostra chip `Next match <data>` sulla
+      riga regola mentre il cooldown è attivo (`RuleLastMatch` persistito).
 - [ ] `Download once` e `Take everything`: conferma esplicita nel dialog
       ("aggiungerà tutto ciò che il feed pubblica") + contatore `aggiunti da
       questa regola` sulla riga.
@@ -97,8 +94,9 @@ Migliorie proposte (usabilità, non motore):
 
 ## 3. Facilità d'uso oltre qBittorrent (P1)
 
-- [ ] Empty states guidati in lista torrent (`Aggiungi / Cerca indexer /
-      Importa RSS`) e in Wanted/Archive.
+- [x] Empty states guidati in lista torrent (`Add` / `Search indexers` /
+      `RSS & indexers`) e `Clear filters` quando i filtri nascondono tutto.
+      Resta: Wanted/Archive.
 - [ ] Dialog bulk (`Set location / Limits / Category`) con riepilogo
       `N torrent, X con valori misti`; toast con undo di 5s per `remove`
       (solo lista, non file).

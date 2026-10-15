@@ -231,6 +231,7 @@ one.
 | `internal/webui/assets/*` | templates and embedded assets of the daemon UI (see §7). |
 | `api.go` | routes of the native JSON API (`/api/v1/...`) and `/ui/...` pages. |
 | `api_qbit.go` | qBittorrent-compatible API (`/api/v2/...`). |
+| `cookies.go` | cookie store (settings page and the live jar used when fetching `.torrent` files and metadata). |
 | `setup.go` | guided first-start configuration (`/ui/setup`). |
 | `ui_feeds.go`, `ui_rss_edit.go` | RSS page: feeds (status, reload, edit, enable/disable), rules (edit, preview), indexers, RSS options. |
 | `feed.go`, `feed_search.go`, `wanted.go` | RSS engine: feed polling (including a single one), rules, Torznab searches, searched titles. |

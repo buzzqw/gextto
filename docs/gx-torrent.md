@@ -211,8 +211,8 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   user (*Columns* in the toolbar, or a right click on the header): name, size,
   progress, status, seeds and peers (connected, with the swarm the trackers
   report in brackets), speeds, ETA, ratio, category by default; tags, added
-  on, completed on, downloaded, uploaded, remaining, queue position, tracker
-  and save path on demand. Columns are **resizable** by dragging the header
+  on, completed on, downloaded, uploaded, remaining, queue position, tracker,
+  save path, availability, time active, last activity and wasted on demand. Columns are **resizable** by dragging the header
   edge or with the arrow keys on it (double click restores the default);
   choice and widths are remembered in the browser and applied before the
   table is drawn, so a hidden column never flashes. Columns are sortable (the

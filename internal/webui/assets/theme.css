@@ -325,6 +325,15 @@ dialog.picker { width: min(640px, calc(100vw - 32px)); padding: 16px; gap: 10px;
 .menu button.danger { color: var(--err); }
 .menu hr { border: 0; border-top: 1px solid var(--border); margin: 5px 2px; }
 .menu kbd { margin-left: auto; color: var(--subtle); font: 11px var(--mono); }
+/* On a phone the menus become a bottom sheet: reachable by thumb, never
+   clipped by the viewport edge. */
+@media (max-width: 760px) {
+  .menu {
+    left: 8px !important; right: 8px; top: auto !important; bottom: 8px;
+    width: auto; max-width: none; max-height: 62vh; overflow: auto;
+  }
+  .menu button { height: 40px; }
+}
 
 /* ---------- toasts ---------- */
 .toasts { position: fixed; right: 16px; bottom: 16px; z-index: 90; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }

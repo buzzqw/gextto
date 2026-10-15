@@ -21,7 +21,7 @@ func (d *Daemon) handleUICategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	category := strings.TrimSpace(r.FormValue("category"))
-	tags := qbitList(r.FormValue("tags"))
+	tags := splitFormList(r.FormValue("tags"))
 	if category != "" {
 		// Auto-create the category so typing a new name in the page works.
 		d.createCategory(category, d.categorySavePath(category))

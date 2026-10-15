@@ -12,7 +12,7 @@
 // default width in px (0 = the name column, which takes the remaining space).
 // The style is written before the table is parsed, so a hidden column never
 // flashes on load.
-window.__gxCols=[["name",1,0],["size",1,92],["progress",1,120],["state",1,112],["seeds",1,72],["peers",1,72],["down",1,104],["up",1,104],["eta",1,76],["ratio",1,64],["category",1,104],["tags",0,120],["added",0,132],["completed",0,132],["downloaded",0,94],["uploaded",0,94],["remaining",0,94],["queue",0,52],["tracker",0,150],["path",0,220]];
+window.__gxCols=[["name",1,0],["size",1,92],["progress",1,120],["state",1,112],["seeds",1,72],["peers",1,72],["down",1,104],["up",1,104],["eta",1,76],["ratio",1,64],["category",1,104],["tags",0,120],["added",0,132],["completed",0,132],["downloaded",0,94],["uploaded",0,94],["remaining",0,94],["queue",0,52],["tracker",0,150],["path",0,220],["availability",0,80],["active",0,90],["lastactive",0,132],["wasted",0,94]];
 window.gxColStyle=function(){
   var saved={};try{saved=JSON.parse(localStorage.getItem('gx-cols')||'{}')||{};}catch(e){}
   var css='',total=34+40+200;
@@ -163,6 +163,9 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .filesbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px;font-size:12.5px}
 .filesbar select{height:28px}
 .tbl.files .fp{min-width:110px}
+.tbl.files tr.fdir td{background:var(--surface-2);font-weight:600}
+.tbl.files tr.fdir .fname{display:flex;align-items:center;gap:6px}
+.tbl.files tr.fdir .exp{width:26px;height:24px}
 .tbl.files .fname .dir{color:var(--subtle)}
 .tbl.files td.sel{width:30px;text-align:center}
 .flags{display:flex;flex-wrap:wrap;gap:3px}
@@ -292,7 +295,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <span class="spacer"></span>
   <div class="search" role="search">
     <svg class="i"><use href="#i-search"/></svg>
-    <input type="search" id="filter" placeholder="Filter torrents…" autocomplete="off" aria-label="Filter torrents by name" title="Filter displayed torrents by name, category or tag">
+    <input type="search" id="filter" placeholder="Filter torrents…" autocomplete="off" aria-label="Filter torrents by name, hash, tracker, category or tag" title="Filter displayed torrents by name, info hash, tracker, category or tag">
     <kbd aria-hidden="true">/</kbd>
   </div>
   <div class="speeds" id="top-speeds" aria-live="off">{{template "speeds" .}}</div>
@@ -321,8 +324,9 @@ body{display:flex;flex-direction:column;overflow:hidden}
     <div class="toolbar" role="toolbar" aria-label="Torrent actions" id="toolbar">
       <button type="button" class="primary" id="btn-add" title="Add torrents: magnet links, .torrent URLs or files (shortcut N)"><svg class="i"><use href="#i-plus"/></svg><span class="lbl">Add</span></button>
       <span class="sep" aria-hidden="true"></span>
-      <button type="button" class="ghost" data-bulk="resume" title="Resume the selected torrents"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Resume</span></button>
-      <button type="button" class="ghost" data-bulk="pause" title="Pause the selected torrents (P)"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause</span></button>
+      <button type="button" class="ghost" data-bulk="resume" title="Start the selected torrents (Resume; qBittorrent Start)"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Resume</span></button>
+      <button type="button" class="ghost" data-bulk="pause" title="Stop the selected torrents (Pause; qBittorrent Stop) (P)"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause</span></button>
+      <button type="button" class="ghost hide-m" data-bulk="force-start" aria-label="Force start the selected torrents" title="Force start: run now, outside the queue limits"><svg class="i"><use href="#i-bolt"/></svg></button>
       <button type="button" class="ghost danger" data-bulk="remove-ask" title="Remove the selected torrents (Delete)"><svg class="i"><use href="#i-trash"/></svg><span class="lbl">Remove</span></button>
       <span class="sep hide-m" aria-hidden="true"></span>
       <button type="button" class="ghost icon hide-m" data-bulk="top" aria-label="Move to the top of the queue" title="Move the selected torrents to the top of the queue"><svg class="i"><use href="#i-top"/></svg></button>
@@ -352,7 +356,12 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <div class="logbar">
         <label class="chk">Lines <select id="log-lines" title="Number of recent log lines to display"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
         <input type="search" id="log-filter" placeholder="Filter lines…" autocomplete="off" aria-label="Filter lines…" title="Filter log lines by keyword or severity level">
-        <label class="chk"><input type="checkbox" id="log-nodebug" checked title="Hide low-level debug messages and show only informational and warning logs"> hide DEBUG</label>
+        <span class="lvl" role="group" aria-label="Log levels" title="Show only the selected severity levels">
+          <label class="chk"><input type="checkbox" id="log-debug" title="Show low-level debug messages"> DEBUG</label>
+          <label class="chk"><input type="checkbox" id="log-info" checked title="Show informational messages"> INFO</label>
+          <label class="chk"><input type="checkbox" id="log-warn" checked title="Show warnings"> WARN</label>
+          <label class="chk"><input type="checkbox" id="log-error" checked title="Show errors"> ERROR</label>
+        </span>
         <button type="button" class="sm" id="log-reload" title="Reload latest logs from server">Reload</button>
         <span class="muted" id="log-info"></span>
       </div>
@@ -436,6 +445,10 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="queue" title="Show or hide this column">Queue position</button>
   <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="tracker" title="Show or hide this column">Tracker</button>
   <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="path" title="Show or hide this column">Save path</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="availability" title="Show or hide this column">Availability</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="active" title="Show or hide this column">Time active</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="lastactive" title="Show or hide this column">Last activity</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="wasted" title="Show or hide this column">Wasted</button>
   <hr>
   <button type="button" role="menuitem" data-col-reset title="Show the default columns with their default widths">Reset columns</button>
 </div>
@@ -446,6 +459,25 @@ body{display:flex;flex-direction:column;overflow:hidden}
   {{if .FeedsEnabled}}<button type="button" role="menuitem" data-tool="feeds" title="Fetch new items from configured RSS feeds now"><svg class="i"><use href="#i-rss"/></svg>Check feeds</button>{{end}}
   <button type="button" role="menuitem" data-tool="ports" title="Check that the peer port is listening and forwarded by the router"><svg class="i"><use href="#i-signal"/></svg>Test ports</button>
 </div>
+
+<dialog id="dlg-shortcuts" aria-labelledby="dlg-shortcuts-title">
+  <div class="dlg-head"><h2 id="dlg-shortcuts-title">Keyboard shortcuts</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-body">
+    <div class="kv" style="grid-template-columns:1fr;gap:0">
+      <div class="row"><span>Filter torrents</span><strong>/</strong></div>
+      <div class="row"><span>Add torrents</span><strong>N</strong></div>
+      <div class="row"><span>Pause / resume selection</span><strong>P</strong></div>
+      <div class="row"><span>Remove selection</span><strong>Del</strong></div>
+      <div class="row"><span>Select all visible</span><strong>Ctrl+A</strong></div>
+      <div class="row"><span>Open details</span><strong>Enter</strong></div>
+      <div class="row"><span>Toggle selection</span><strong>Space</strong></div>
+      <div class="row"><span>Range select</span><strong>Shift+↑↓</strong></div>
+      <div class="row"><span>This help</span><strong>?</strong></div>
+      <div class="row"><span>Close panel</span><strong>Esc</strong></div>
+    </div>
+  </div>
+  <div class="dlg-foot"><button type="button" class="primary" data-close title="Close">Close</button></div>
+</dialog>
 
 <div hidden data-update-notes-slot></div>
 <dialog id="dlg-add" aria-labelledby="dlg-add-title">
@@ -466,6 +498,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <label class="field">Category
         <input type="text" name="category" list="catlist-all" autocomplete="off" title="Category assigned to the added torrents for organization and filtering">
       </label>
+      <label class="chk" title="Let the category decide the save path: assigning a category moves the torrent to its folder (qBittorrent automatic torrent management)"><input type="checkbox" name="auto_tmm" value="1"> Save path managed by the category</label>
       {{end}}
       {{template "addopts"}}
     </div>
@@ -710,7 +743,7 @@ function applyFilters(){
     var ok=matchStatus(r,f.status)&&(f.cat===null||r.dataset.cat===f.cat)
       &&(f.tag===null||(f.tag===''?!r.dataset.tags:(','+r.dataset.tags.replace(/,\s+/g,',')+',').indexOf(','+f.tag+',')>=0))
       &&(f.tracker===null||r.dataset.tracker===f.tracker)
-      &&(!q||(r.dataset.name+' '+r.dataset.cat+' '+r.dataset.tags).toLowerCase().indexOf(q)>=0);
+      &&(!q||(r.dataset.name+' '+r.dataset.hash+' '+r.dataset.tracker+' '+r.dataset.cat+' '+r.dataset.tags).toLowerCase().indexOf(q)>=0);
     r.hidden=!ok;if(ok)shown++;
   });
   function press(sel,attr,val){$$(sel).forEach(function(b){var v=b.hasAttribute('data-all')?null:b.getAttribute(attr);b.setAttribute('aria-pressed',v===val?'true':'false');});}
@@ -870,7 +903,17 @@ function limitsDialog(hashes){
   var dlg=$('#dlg-limits'),r=hashes.length===1?rowByHash(hashes[0]):null;dlg._hashes=hashes;
   $('#limits-what').textContent=whatSelected(hashes);
   function v(x){x=r?+x:-1;return x<0?'':String(x);}
-  $('#limits-dl').value=r?v(r.dataset.dll):'';$('#limits-ul').value=r?v(r.dataset.ull):'';openDialog(dlg);
+  var dl=$('#limits-dl'),ul=$('#limits-ul');
+  dl.value=r?v(r.dataset.dll):'';ul.value=r?v(r.dataset.ull):'';
+  // With several torrents, a "mixed" placeholder says the selection holds
+  // different values; saving then brings every selected torrent to one value.
+  if(!r){
+    var dd={},uu={};
+    hashes.forEach(function(h){var rr=rowByHash(h);if(rr){dd[rr.dataset.dll]=1;uu[rr.dataset.ull]=1;}});
+    dl.placeholder=Object.keys(dd).length>1?'mixed':'global';
+    ul.placeholder=Object.keys(uu).length>1?'mixed':'global';
+  }else{dl.placeholder='global';ul.placeholder='global';}
+  openDialog(dlg);
 }
 function globalLimitsDialog(btn){
   $('#global-dl').value=btn.dataset.dl||'0';$('#global-ul').value=btn.dataset.ul||'0';openDialog($('#dlg-global'));
@@ -979,6 +1022,69 @@ function openDetail(hash,tab){
     var wasOpen=!d.hidden;$('#drawer-body').innerHTML=h;d.hidden=false;
     if(!wasOpen){var sp=$('#dsplit');sp.setAttribute('aria-valuenow',Math.round(d.getBoundingClientRect().height));sp.setAttribute('aria-valuemin',120);sp.setAttribute('aria-valuemax',Math.max(160,window.innerHeight-200));}
     if(!wasOpen){var c=$('#drawer [data-close-drawer]');if(c)c.focus();}
+    groupFiles();
+  });
+}
+// collapsedDirs remembers the collapsed folders per torrent while the drawer
+// is open (reset on torrent change, like the selection).
+var collapsedDirs={};
+function filesTreeOn(){try{return localStorage.getItem('gx-files-tree')==='1';}catch(e){return false;}}
+// groupFiles folds the flat Files table by top folder, with one tri-state
+// checkbox and one priority control per folder. It re-runs after every detail
+// load (openDetail hook above); with the toggle off it removes its headers.
+function groupFiles(){
+  var body=$('#files-body');if(!body)return;
+  $$('tr.fdir',body).forEach(function(h){h.remove();});
+  $$('#files-body tr[data-path]',body).forEach(function(r){r.hidden=false;});
+  var box=$('#files-tree');if(box&&box.checked!==filesTreeOn())box.checked=filesTreeOn();
+  if(!filesTreeOn())return;
+  var hash=state.drawer&&state.drawer.hash;
+  var groups={},order=[];
+  $$('#files-body tr[data-path]').forEach(function(r){
+    var p=r.dataset.path||'',i=p.indexOf('/');
+    var dir=i<0?'':p.slice(0,i);
+    if(!dir)return;
+    if(!groups[dir]){groups[dir]={rows:[],done:0,size:0};order.push(dir);}
+    groups[dir].rows.push(r);
+  });
+  order.forEach(function(dir){
+    var g=groups[dir],first=g.rows[0];
+    var sel=g.rows.map(function(r){var s=$('select[name=priority]',r);return s?s.value:'4';});
+    var wanted=sel.filter(function(v){return v!=='0';}).length;
+    var counts={};sel.forEach(function(v){counts[v]=(counts[v]||0)+1;});
+    var top=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];})[0]||'4';
+    var h=document.createElement('tr');h.className='fdir';
+    var key=hash+'/'+dir,shut=!!collapsedDirs[key];
+    h.innerHTML='<td class="sel"><input type="checkbox" class="fdirsel" aria-label="'+t('Select folder')+'" title="'+t('Select every file in this folder')+'"></td>'+
+      '<td class="fname"><button type="button" class="ghost icon sm exp" aria-expanded="'+(!shut)+'" aria-label="'+(shut?t('Expand folder'):t('Collapse folder'))+'" title="'+(shut?t('Expand folder'):t('Collapse folder'))+'"><svg class="i"><use href="#i-chev"/></svg></button>'+
+      '<svg class="i"><use href="#i-folder"/></svg><span></span> <span class="muted"></span></td>'+
+      '<td class="num"></td><td class="fp"></td>'+
+      '<td><select aria-label="'+t('Priority of every file in this folder')+'" title="'+t('Download priority for every file in this folder')+'"><option value="0">Skip</option><option value="4">Normal</option><option value="6">High</option><option value="7">Maximum</option></select></td><td></td>';
+    $('.fname span',h).textContent=dir;
+    $('.fname .muted',h).textContent=g.rows.length+' '+t('files');
+    var cb=$('.fdirsel',h);
+    cb.checked=wanted===sel.length;cb.indeterminate=wanted>0&&wanted<sel.length;
+    var ps=$('select',h);ps.value=top;
+    var total=0,done=0;
+    g.rows.forEach(function(r){
+      var bar=$('.pbar i',r);
+      var w=bar?parseFloat(bar.style.width)||0:0;
+      var sz=r.cells[2].textContent;
+      total++;
+      if(w>=99.99)done++;
+    });
+    $('td.num',h).textContent=done+'/'+total;
+    body.insertBefore(h,first);
+    g.rows.forEach(function(r){r.hidden=shut;});
+    var exp=$('.exp',h);
+    exp.addEventListener('click',function(){shut=!shut;collapsedDirs[key]=shut;g.rows.forEach(function(r){r.hidden=shut;});exp.setAttribute('aria-expanded',(!shut)+'');exp.setAttribute('aria-label',shut?t('Expand folder'):t('Collapse folder'));exp.setAttribute('title',shut?t('Expand folder'):t('Collapse folder'));});
+    cb.addEventListener('change',function(){g.rows.forEach(function(r){var c=$('.filesel',r);if(c)c.checked=cb.checked;});});
+    ps.addEventListener('change',function(){
+      var f=new URLSearchParams();f.set('hash',hash||'');
+      g.rows.forEach(function(r){var c=$('.filesel',r);var idx=c?c.value:null;if(idx!==null)f.append('index',idx);});
+      f.set('priority',ps.value);
+      post('/ui/file-priority',f).then(function(res){report(res);if(state.drawer)openDetail(state.drawer.hash,state.drawer.tab);});
+    });
   });
 }
 function closeDetail(){var d=$('#drawer');if(d.hidden)return;d.hidden=true;var h=state.drawer&&state.drawer.hash;state.drawer=null;var r=h&&rowByHash(h);if(r)r.focus();}
@@ -996,7 +1102,8 @@ function showLog(on){
   $('#pane-torrents').hidden=on;$('#pane-log').hidden=!on;if(on)loadLog();
 }
 function loadLog(){var n=$('#log-lines').value,url=($('#btn-log')&&$('#btn-log').getAttribute('data-log-url'))||'/ui/gextto-log';$('#log-info').textContent=t('loading…');fetch(url+'?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(x){throw new Error(x);});}).then(function(d){window.__log=d.lines||[];$('#log-info').textContent=(d.path?d.path+' · ':'')+(d.lines||[]).length+' '+t('lines')+' · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){$('#log-view').textContent=t('Cannot read the log:')+' '+e.message;$('#log-info').textContent='';});}
-function renderLog(scroll){var view=$('#log-view'),q=($('#log-filter').value||'').toLowerCase(),nodebug=$('#log-nodebug').checked,frag=document.createDocumentFragment();(window.__log||[]).forEach(function(line){if(nodebug&&/\sDEBUG\s/.test(line))return;if(q&&line.toLowerCase().indexOf(q)<0)return;var row=document.createElement('div');if(/\s(ERROR|FATAL)\s/.test(line))row.className='error';else if(/\sWARN(ING)?\s/.test(line))row.className='warn';else if(/\sDEBUG\s/.test(line))row.className='debug';row.textContent=line;frag.appendChild(row);});view.textContent='';view.appendChild(frag);if(scroll!==false)view.scrollTop=view.scrollHeight;}
+function logLevel(line){if(/\sDEBUG\s/.test(line))return 'debug';if(/\s(ERROR|FATAL)\s/.test(line))return 'error';if(/\sWARN(ING)?\s/.test(line))return 'warn';return 'info';}
+function renderLog(scroll){var view=$('#log-view'),q=($('#log-filter').value||'').toLowerCase(),show={debug:$('#log-debug').checked,info:$('#log-info').checked,warn:$('#log-warn').checked,error:$('#log-error').checked},frag=document.createDocumentFragment();(window.__log||[]).forEach(function(line){var lv=logLevel(line);if(!show[lv])return;if(q&&line.toLowerCase().indexOf(q)<0)return;var row=document.createElement('div');if(lv==='error')row.className='error';else if(lv==='warn')row.className='warn';else if(lv==='debug')row.className='debug';row.textContent=line;frag.appendChild(row);});view.textContent='';view.appendChild(frag);if(scroll!==false)view.scrollTop=view.scrollHeight;}
 
 // ---------- add ----------
 function setFiles(files){var input=$('#add-files');try{input.files=files;}catch(e){}updateFilePick();}
@@ -1004,7 +1111,7 @@ function updateFilePick(){var input=$('#add-files'),n=input.files?input.files.le
 function submitAdd(form){
   var opts=new FormData(form),sources=String(opts.get('source')||'').split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean),files=$('#add-files').files||[];
   if(!sources.length&&!files.length){toast(t('Paste a magnet link or choose a .torrent file'),true);return;}
-  var base={};['destination','category','paused','top','sequential','first_last','super_seeding'].forEach(function(k){var v=opts.get(k);if(v)base[k]=v;});
+  var base={};['destination','category','auto_tmm','paused','top','sequential','first_last','super_seeding','download_limit','upload_limit'].forEach(function(k){var v=opts.get(k);if(v)base[k]=v;});
   var jobs=[],ok=0,fail=[];
   sources.forEach(function(s){var p=new URLSearchParams(base);p.set('source',s);jobs.push(post('/ui/add',p));});
   Array.prototype.forEach.call(files,function(file){var fd=new FormData();Object.keys(base).forEach(function(k){fd.set(k,base[k]);});fd.set('torrent',file);jobs.push(fetch('/ui/add',{method:'POST',body:fd,headers:{'X-GX-Fetch':'1'}}).then(function(r){return r.json();}).catch(function(e){return {ok:false,msg:e.message};}));});
@@ -1067,8 +1174,9 @@ document.addEventListener('change',function(e){
   if(e.target.classList.contains('rowsel')){var r=rowOf(e.target);select(r.dataset.hash,'toggle');return;}
   if(e.target.id==='selall'){var on=e.target.checked;visibleRows().forEach(function(r){if(on)state.selected.add(r.dataset.hash);else state.selected.delete(r.dataset.hash);});renderSelection();return;}
   if(e.target.id==='files-all'){$$('#drawer .filesel').forEach(function(c){c.checked=e.target.checked;});return;}
+  if(e.target.id==='files-tree'){try{localStorage.setItem('gx-files-tree',e.target.checked?'1':'0');}catch(_){}groupFiles();return;}
   if(e.target.id==='add-files'){updateFilePick();return;}
-  if(e.target.id==='log-nodebug'||e.target.id==='log-lines'){if(e.target.id==='log-lines')loadLog();else renderLog();return;}
+  if(e.target.id==='log-debug'||e.target.id==='log-info'||e.target.id==='log-warn'||e.target.id==='log-error'||e.target.id==='log-lines'){if(e.target.id==='log-lines')loadLog();else renderLog();return;}
   var f=e.target.closest('#drawer form');if(f)f.classList.add('dirty');
 });
 document.addEventListener('input',function(e){
@@ -1123,6 +1231,7 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){if(state.sbmore){state.sbmore=false;$('#sb-more').hidden=true;afterRender();var sb=$('#sb-more-btn');if(sb)sb.focus();return;}if(!$('#drawer').hidden){closeDetail();return;}if(state.selected.size){state.selected.clear();renderSelection();}return;}
   if(typing)return;
   if(e.key==='/'){e.preventDefault();$('#filter').focus();return;}
+  if(e.key==='?'){e.preventDefault();openDialog($('#dlg-shortcuts'));return;}
   if(e.key==='n'||e.key==='N'){e.preventDefault();openDialog($('#dlg-add'));return;}
   var row=rowOf(document.activeElement);
   if(row){
@@ -1174,6 +1283,7 @@ document.addEventListener('visibilitychange',function(){if(!document.hidden)refr
 // waiting for the next poll. Piece events are too frequent to refresh on.
 try{var es=new EventSource('/ui/events');es.onmessage=function(m){try{var ev=JSON.parse(m.data);if(ev.type!=='torrent_piece')refresh();}catch(_){}};}catch(_){}
 window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
+window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tracker:null};state.q='';var f=$('#filter');if(f)f.value='';store.set('filter',state.filter);applyFilters();};
 })();
 </script>
 </body>
@@ -1186,6 +1296,10 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
           <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
           <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
           <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="super_seeding" value="1"> super-seeding</label>
+        </div>
+        <div class="form-grid" style="margin-top:10px">
+          <label title="Download speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit">Download limit (KiB/s)<input type="number" min="0" name="download_limit" placeholder="global"></label>
+          <label title="Upload speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit">Upload limit (KiB/s)<input type="number" min="0" name="upload_limit" placeholder="global"></label>
         </div>
       </details>
 {{end}}{{define "fragments"}}<div id="frag-side">{{template "side" .}}</div><div id="frag-live">{{template "live" .}}</div><div id="frag-status">{{template "status" .}}</div><div id="frag-speeds">{{template "speeds" .}}</div><div id="frag-sbmore">{{template "sbmore" .}}</div>{{end}}{{define "speeds"}}<span class="d" title="Download speed"><svg class="i"><use href="#i-down"/></svg>{{.DownloadRate}}</span><span class="u" title="Upload speed"><svg class="i"><use href="#i-up"/></svg>{{.UploadRate}}</span>{{end}}{{define "side"}}
@@ -1276,11 +1390,15 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
       {{template "thnum" "queue"}}<button type="button" class="sort" title="Sort by queue position">#<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
       {{template "th" "tracker"}}<button type="button" class="sort" title="Sort by the tracker that answers">Tracker<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
       {{template "th" "path"}}<button type="button" class="sort" title="Sort by save path">Save path<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "availability"}}<button type="button" class="sort" title="Sort by swarm availability (average pieces available)">Availability<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "active"}}<button type="button" class="sort" title="Sort by time since the torrent started">Time active<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "lastactive"}}<button type="button" class="sort" title="Sort by the last data movement">Last activity<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "wasted"}}<button type="button" class="sort" title="Sort by discarded data">Wasted<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
       <th scope="col" class="c-more"><span class="sr-only">Actions</span></th>
     </tr></thead>
     <tbody>
     {{range .Rows}}
-    <tr tabindex="-1" aria-selected="false" data-hash="{{.Hash}}" data-name="{{.Name}}" data-state="{{.State}}" data-cat="{{.Category}}" data-tags="{{.Tags}}" data-tracker="{{.Tracker}}" data-tmm="{{if .AutoTMM}}1{{end}}" data-pin="{{if .Pinned}}1{{end}}" data-seq="{{if .Sequential}}1{{end}}" data-fl="{{if .FirstLast}}1{{end}}" data-ss="{{if .SuperSeeding}}1{{end}}" data-dll="{{.DLLimitKib}}" data-ull="{{.ULLimitKib}}" data-down="{{.DLRate}}" data-up="{{.ULRate}}" data-k-name="{{.Name}}" data-k-size="{{.TotalSize}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-seeds="{{.Seeds}}" data-k-peers="{{.Peers}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-eta="{{.ETAVal}}" data-k-ratio="{{.RatioVal}}" data-k-category="{{.Category}}" data-k-tags="{{.Tags}}" data-k-added="{{.AddedVal}}" data-k-completed="{{.CompletedVal}}" data-k-downloaded="{{.DownloadedVal}}" data-k-uploaded="{{.UploadedVal}}" data-k-remaining="{{.RemainingVal}}" data-k-queue="{{.QueuePos}}" data-k-tracker="{{.Tracker}}" data-k-path="{{.SavePath}}">
+    <tr tabindex="-1" aria-selected="false" data-hash="{{.Hash}}" data-name="{{.Name}}" data-state="{{.State}}" data-cat="{{.Category}}" data-tags="{{.Tags}}" data-tracker="{{.Tracker}}" data-tmm="{{if .AutoTMM}}1{{end}}" data-pin="{{if .Pinned}}1{{end}}" data-seq="{{if .Sequential}}1{{end}}" data-fl="{{if .FirstLast}}1{{end}}" data-ss="{{if .SuperSeeding}}1{{end}}" data-dll="{{.DLLimitKib}}" data-ull="{{.ULLimitKib}}" data-down="{{.DLRate}}" data-up="{{.ULRate}}" data-k-name="{{.Name}}" data-k-size="{{.TotalSize}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-seeds="{{.Seeds}}" data-k-peers="{{.Peers}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-eta="{{.ETAVal}}" data-k-ratio="{{.RatioVal}}" data-k-category="{{.Category}}" data-k-tags="{{.Tags}}" data-k-added="{{.AddedVal}}" data-k-completed="{{.CompletedVal}}" data-k-downloaded="{{.DownloadedVal}}" data-k-uploaded="{{.UploadedVal}}" data-k-remaining="{{.RemainingVal}}" data-k-queue="{{.QueuePos}}" data-k-tracker="{{.Tracker}}" data-k-path="{{.SavePath}}" data-k-availability="{{.AvailabilityVal}}" data-k-active="{{.ActiveVal}}" data-k-lastactive="{{.LastActiveVal}}" data-k-wasted="{{.WastedVal}}">
       <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}" aria-label="Select torrent" title="Select this torrent for batch actions"></td>
       <td class="name c-name" title="{{.Name}}"><a class="open" href="/?open={{.Hash}}">{{.Name}}</a>{{if .Pinned}}<span class="fl" title="Force started: runs outside the queue limits">F</span>{{end}}</td>
       <td class="num c-size" title="{{.DoneSize}}">{{.Size}}</td>
@@ -1302,13 +1420,17 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
       <td class="num c-queue">{{if gt .QueuePos 0}}{{.QueuePos}}{{else}}*{{end}}</td>
       <td class="c-tracker">{{.Tracker}}</td>
       <td class="c-path" title="{{.SavePath}}">{{.SavePath}}</td>
+      <td class="num c-availability">{{.Availability}}</td>
+      <td class="num c-active">{{.Active}}</td>
+      <td class="c-lastactive">{{.LastActive}}</td>
+      <td class="num c-wasted">{{.Wasted}}</td>
       <td class="meta-m"><span class="badge b-{{.State}}">{{.StateLabel}}</span><span>{{.Size}}</span><span>↓ {{.Down}}</span><span>↑ {{.Up}}</span><span>{{.ETA}}</span></td>
       <td class="more"><button type="button" class="ghost icon sm" aria-haspopup="menu" aria-label="More actions" title="More actions"><svg class="i"><use href="#i-dots"/></svg></button></td>
     </tr>
     {{end}}
     </tbody>
   </table>
-  <div class="emptystate" id="filtered-empty" hidden><svg class="i"><use href="#i-search"/></svg><h3>No torrent matches the filters</h3></div>
+  <div class="emptystate" id="filtered-empty" hidden><svg class="i"><use href="#i-search"/></svg><h3>No torrent matches the filters</h3><button type="button" class="sm" onclick="gxClearFilters()" title="Show all torrents again">Clear filters</button></div>
   {{if .RowsLimited}}
   <p class="more-rows muted"><span>Showing</span> {{.RowsShown}} <span>of</span> {{.RowsTotal}} · <button type="button" class="sm" onclick="gxShowMore()" title="Load more torrent rows in the table">Show more</button></p>
   {{end}}
@@ -1317,7 +1439,11 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
     <svg class="i"><use href="#i-inbox"/></svg>
     <h3>No torrents in the session.</h3>
     <p>Add a magnet link or a .torrent file, or drop one on the page.</p>
-    <button type="button" class="primary" onclick="document.getElementById('btn-add').click()" title="Add torrents: magnet links, .torrent URLs or files (shortcut N)"><svg class="i"><use href="#i-plus"/></svg>Add</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+      <button type="button" class="primary" onclick="document.getElementById('btn-add').click()" title="Add torrents: magnet links, .torrent URLs or files (shortcut N)"><svg class="i"><use href="#i-plus"/></svg>Add</button>
+      {{if .SearchEnabled}}<button type="button" onclick="document.getElementById('btn-search').click()" title="Search configured Torznab indexers for releases">Search indexers</button>{{end}}
+      {{if .Standalone}}<a class="btn" href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a>{{end}}
+    </div>
   </div>
   {{end}}
 {{end}}{{define "th"}}<th scope="col" class="c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "thnum"}}<th scope="col" class="num c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "rz"}}<span class="rz" role="separator" aria-orientation="vertical" aria-valuemin="40" aria-valuemax="800" aria-valuenow="100" tabindex="0" aria-label="Resize column" title="Drag, or use the left and right arrows, to resize the column; double click for the default width"></span>{{end}}{{define "detail"}}
@@ -1357,7 +1483,12 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
     <div class="row"><span>↓ / ↑</span><strong>{{rate .DownRate}} / {{rate .UpRate}}</strong></div>
     <div class="row"><span>Peer / Seed</span><strong>{{.NumPeers}} / {{.NumSeeds}}</strong></div>
     <div class="row"><span>Swarm (seeds / peers)</span><strong>{{if lt .NumComplete 0}}—{{else}}{{.NumComplete}}{{end}} / {{if lt .NumIncomplete 0}}—{{else}}{{.NumIncomplete}}{{end}}</strong></div>
+    <div class="row"><span>Availability</span><strong>{{if lt .AvailabilityPct 0.0}}—{{else}}{{printf "%.2f" .AvailabilityPct}}{{end}}</strong></div>
     <div class="row"><span>ETA</span><strong>{{if lt .ETA 0}}—{{else}}{{dur .ETA}}{{end}}</strong></div>
+    <div class="row"><span>Time active</span><strong>{{if .ActiveStr}}{{.ActiveStr}}{{else}}—{{end}}</strong></div>
+    <div class="row"><span>Last activity</span><strong>{{if .LastActiveStr}}{{.LastActiveStr}}{{else}}—{{end}}</strong></div>
+    <div class="row"><span>Seeding time</span><strong>{{if .SeedingStr}}{{.SeedingStr}}{{else}}—{{end}}</strong></div>
+    <div class="row"><span>Next announce</span><strong>{{if lt .NextAnnounce 0}}—{{else}}{{dur .NextAnnounce}}{{end}}</strong></div>
     <div class="row"><span>Folder</span><strong>{{.SavePath}}</strong></div>
     <div class="row"><span>Seed ratio set</span><strong>{{if lt .SeedRatio 0.0}}<span>Global</span>{{else if eq .SeedRatio 0.0}}<span>Unlimited</span>{{else}}{{printf "%.2f" .SeedRatio}}{{end}}</strong></div>
     <div class="row"><span>Seed days</span><strong>{{if lt .SeedDays 0}}<span>Global</span>{{else if eq .SeedDays 0}}<span>Unlimited</span>{{else}}{{.SeedDays}}{{end}}</strong></div>
@@ -1426,12 +1557,13 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
     <label class="chk" for="files-prio">With the selected files:</label>
     <select name="priority" id="files-prio" title="Download priority to give to the ticked files"><option value="0">Skip</option><option value="4" selected>Normal</option><option value="6">High</option><option value="7">Maximum</option></select>
     <button type="submit" class="sm" title="Apply this priority to the ticked files">Apply</button>
+    <label class="chk" title="Group the files by their folder, with one priority control per folder"><input type="checkbox" id="files-tree"> Group by folder</label>
   </form>
   <table class="tbl files">
     <thead><tr><th scope="col" class="sel"><input type="checkbox" id="files-all" aria-label="Select all files" title="Select all files"></th><th scope="col">File</th><th scope="col" class="num">Size</th><th scope="col">Progress</th><th scope="col">Priority</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
-    <tbody>
+    <tbody id="files-body">
     {{range .Files}}
-      <tr>
+      <tr data-path="{{.Path}}">
         <td class="sel"><input type="checkbox" class="filesel" name="index" value="{{.Index}}" form="files-bulk" aria-label="Select file" title="Select this file to change its priority with the others"></td>
         <td class="fname" style="word-break:break-word">{{.Path}}</td>
         <td class="num">{{bytes .Size}}</td>
@@ -1440,7 +1572,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
           <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="files"><input type="hidden" name="index" value="{{.Index}}">
           <select name="priority" aria-label="Priority" title="Download priority for this file (Skip, Normal, High, Maximum)" onchange="this.form.requestSubmit()"><option value="0"{{if eq .Priority 0}} selected{{end}}>Skip</option><option value="4"{{if eq .Priority 4}} selected{{end}}>Normal</option><option value="6"{{if eq .Priority 6}} selected{{end}}>High</option><option value="7"{{if eq .Priority 7}} selected{{end}}>Maximum</option></select>
         </form></td>
-        <td><a class="btn ghost icon sm" href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" aria-label="Stream" title="Stream this file with HTTP Range; the pieces of the window are downloaded first"><svg class="i"><use href="#i-play"/></svg></a>{{if $.Standalone}}<button type="button" class="btn ghost icon sm" data-rename-file="{{.Path}}" data-hash="{{$.Hash}}" aria-label="Rename file" title="Rename this file"><svg class="i"><use href="#i-edit"/></svg></button>{{end}}</td>
+        <td><span style="display:inline-flex;gap:4px"><a class="btn sm" href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" aria-label="Stream" title="Stream this file with HTTP Range; the pieces of the window are downloaded first"><svg class="i"><use href="#i-play"/></svg>Stream</a>{{if $.Standalone}}<button type="button" class="btn ghost icon sm" data-rename-file="{{.Path}}" data-hash="{{$.Hash}}" aria-label="Rename file" title="Rename this file"><svg class="i"><use href="#i-edit"/></svg></button>{{end}}</span></td>
       </tr>
     {{end}}
     </tbody>
