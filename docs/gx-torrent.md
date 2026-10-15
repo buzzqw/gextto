@@ -161,7 +161,8 @@ Gextto forwards them to the daemon.
 At the address indicated by `gxtorrent_url` (default `http://127.0.0.1:8890`) the
 daemon does not expose only the REST API: `GET /` (or `/ui`) opens an **operational
 web page** intended for whoever opens that address from the browser, like qBittorrent's
-Web UI. It refreshes by itself every 2 seconds without reloading the page.
+Web UI. It refreshes by itself every 2 seconds without reloading the page
+(the rows travel as JSON, the filters and status as small HTML fragments).
 The browser tab shows the daemon icon (a blue download arrow),
 included in the page and also served by `GET /favicon.ico` without a token.
 The page is **translated** (Italian, English, German, French, Spanish,

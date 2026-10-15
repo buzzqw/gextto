@@ -63,6 +63,63 @@ func TestUILiveFragment(t *testing.T) {
 	}
 }
 
+// TestUIRowsJSON checks the table's JSON feed: one object per torrent with the
+// datasets and cells the page renders from, so the client template and the
+// server template cannot drift apart silently.
+func TestUIRowsJSON(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 80_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(server.URL + "/ui/rows")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /ui/rows -> %d", resp.StatusCode)
+	}
+	var page struct {
+		Rows []struct {
+			Hash     string
+			Name     string
+			State    string
+			Progress float64
+			DLRate   int64
+			QueuePos int
+		}
+		CountAll int
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Rows) != 1 || !strings.EqualFold(page.Rows[0].Hash, hash) {
+		t.Fatalf("rows = %+v, want the added torrent %s", page.Rows, hash)
+	}
+	if page.Rows[0].Name == "" || page.CountAll != 1 {
+		t.Fatalf("row/count incomplete: %+v count=%d", page.Rows[0], page.CountAll)
+	}
+
+	// The chrome-only fragment carries no table: the rows travel as JSON.
+	resp2, err := http.Get(server.URL + "/ui/live?notable=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	raw, _ := io.ReadAll(resp2.Body)
+	frag := string(raw)
+	if !strings.Contains(frag, "frag-side") || strings.Contains(frag, "torrent-rows") {
+		t.Fatalf("notable fragment unexpected: %s", frag)
+	}
+}
+
 func TestUIActions(t *testing.T) {
 	d := newTestDaemon(t)
 	server := httptest.NewServer(d.routes())

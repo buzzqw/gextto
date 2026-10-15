@@ -227,6 +227,21 @@ probe is ~1 connection/s and does not touch the data path; with auto-speed off n
 changes, so there is no regression. Still to measure: **graduated file priority** with
 mixed-priority files (the open item is in [`evoluzione.md`](evoluzione.md) §8).
 
+**Web UI refresh (gx-torrent page).** The 2 s table refresh shipped the rows as
+server-rendered HTML (`/ui/live`); with 24 columns the row markup costs about
+**10 KB per torrent**, so a 300-row window moves ~3 MB per tick plus a full
+table re-parse. The rows now travel as JSON (`GET /ui/rows`, same
+`uiPageData`, `?rows=` window unchanged) and the browser renders them with a
+client template verified cell-by-cell against the server one (node harness:
+every `c-*` cell identical on the live session); filters/speeds/status still
+travel as translated HTML (`/ui/live?notable=1`). Measured on the live service
+(Intel N97, 2026-10-15, 2 torrents): `/ui/live` **26,701 B** per tick →
+`/ui/rows` **3,432 B** + notable **6,399 B** = **9,831 B** (−63%); per row
+~10 KB HTML vs ~1.7 KB JSON (~6×). Empty session and limited windows still use
+the server HTML (translated empty states, "show more"). Correctness is pinned
+by `TestUIRowsJSON` and the i18n guards (state badges and labels go through
+`t()` with client keys).
+
 **Optimisations in place.** Items ordered by **expected value = (impact × certainty) /
 (effort × risk)**, one item = one commit:
 

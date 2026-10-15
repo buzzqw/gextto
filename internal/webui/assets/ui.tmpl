@@ -813,6 +813,87 @@ document.addEventListener('pointermove',function(e){if(!resizing)return;var w=Ma
 document.addEventListener('pointerup',function(){if(resizing){resizing=null;document.body.style.cursor='';syncResizers();}});
 
 // ---------- live refresh ----------
+// esc quotes a server value for HTML: /ui/rows is JSON, so the browser (not
+// the Go template) escapes names, paths and tags here.
+function esc(s){return String(s===undefined||s===null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// rowHTML renders one JSON row exactly like the server "live" template, so
+// sorting, filtering, selection and the context menu keep working on the
+// same datasets and classes.
+function rowHTML(r){
+  function flag(v){return v?'1':'';}
+  var h='<tr tabindex="-1" aria-selected="false" data-hash="'+esc(r.Hash)+'" data-name="'+esc(r.Name)+'" data-state="'+esc(r.State)+'" data-cat="'+esc(r.Category)+'" data-tags="'+esc(r.Tags)+'" data-tracker="'+esc(r.Tracker)+'" data-tmm="'+flag(r.AutoTMM)+'" data-pin="'+flag(r.Pinned)+'" data-seq="'+flag(r.Sequential)+'" data-fl="'+flag(r.FirstLast)+'" data-ss="'+flag(r.SuperSeeding)+'" data-dll="'+r.DLLimitKib+'" data-ull="'+r.ULLimitKib+'" data-down="'+r.DLRate+'" data-up="'+r.ULRate+'"'+
+  ' data-k-name="'+esc(r.Name)+'" data-k-size="'+r.TotalSize+'" data-k-progress="'+r.Progress+'" data-k-state="'+esc(r.State)+'" data-k-seeds="'+r.Seeds+'" data-k-peers="'+r.Peers+'" data-k-down="'+r.DLRate+'" data-k-up="'+r.ULRate+'" data-k-eta="'+r.ETAVal+'" data-k-ratio="'+r.RatioVal+'" data-k-category="'+esc(r.Category)+'" data-k-tags="'+esc(r.Tags)+'" data-k-added="'+r.AddedVal+'" data-k-completed="'+r.CompletedVal+'" data-k-downloaded="'+r.DownloadedVal+'" data-k-uploaded="'+r.UploadedVal+'" data-k-remaining="'+r.RemainingVal+'" data-k-queue="'+r.QueuePos+'" data-k-tracker="'+esc(r.Tracker)+'" data-k-path="'+esc(r.SavePath)+'" data-k-availability="'+r.AvailabilityVal+'" data-k-active="'+r.ActiveVal+'" data-k-lastactive="'+r.LastActiveVal+'" data-k-wasted="'+r.WastedVal+'">';
+  h+='<td class="sel"><input class="rowsel" type="checkbox" value="'+esc(r.Hash)+'" aria-label="'+esc(t('Select torrent'))+'" title="'+esc(t('Select this torrent for batch actions'))+'"></td>';
+  h+='<td class="name c-name" title="'+esc(r.Name)+'"><a class="open" href="/?open='+esc(r.Hash)+'">'+esc(r.Name)+'</a>'+(r.Pinned?'<span class="fl" title="'+esc(t('Force started: runs outside the queue limits'))+'">F</span>':'')+'</td>';
+  h+='<td class="num c-size" title="'+esc(r.DoneSize)+'">'+esc(r.Size)+'</td>';
+  h+='<td class="c-progress"><div class="prog"><div class="pbar '+esc(r.State)+'" role="progressbar" aria-valuenow="'+r.Progress.toFixed(1)+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+esc(t('Progress'))+'"><i style="width:'+r.Progress.toFixed(1)+'%"></i></div><span class="pct" aria-hidden="true">'+esc(r.ProgressS)+'</span></div></td>';
+  h+='<td class="state c-state"><span class="badge b-'+esc(r.State)+'">'+esc(t(r.StateLabel))+'</span></td>';
+  h+='<td class="num c-seeds">'+r.Seeds+(r.SwarmSeeds>=0?'<span class="subtle"> ('+r.SwarmSeeds+')</span>':'')+'</td>';
+  h+='<td class="num c-peers">'+r.Peers+(r.SwarmPeers>=0?'<span class="subtle"> ('+r.SwarmPeers+')</span>':'')+'</td>';
+  h+='<td class="num c-down'+(r.DLRate?'':' z')+'">'+esc(r.Down)+'</td>';
+  h+='<td class="num c-up'+(r.ULRate?'':' z')+'">'+esc(r.Up)+'</td>';
+  h+='<td class="num c-eta">'+esc(r.ETA)+'</td>';
+  h+='<td class="num c-ratio" title="'+esc(r.RatioGoal)+'">'+esc(r.Ratio)+'</td>';
+  h+='<td class="c-category">'+esc(r.Category)+'</td>';
+  h+='<td class="c-tags">'+esc(r.Tags)+'</td>';
+  h+='<td class="c-added">'+esc(r.Added)+'</td>';
+  h+='<td class="c-completed">'+esc(r.Completed)+'</td>';
+  h+='<td class="num c-downloaded">'+esc(r.Downloaded)+'</td>';
+  h+='<td class="num c-uploaded">'+esc(r.Uploaded)+'</td>';
+  h+='<td class="num c-remaining">'+esc(r.Remaining)+'</td>';
+  h+='<td class="num c-queue">'+(r.QueuePos>0?r.QueuePos:'*')+'</td>';
+  h+='<td class="c-tracker">'+esc(r.Tracker)+'</td>';
+  h+='<td class="c-path" title="'+esc(r.SavePath)+'">'+esc(r.SavePath)+'</td>';
+  h+='<td class="num c-availability">'+esc(r.Availability)+'</td>';
+  h+='<td class="num c-active">'+esc(r.Active)+'</td>';
+  h+='<td class="c-lastactive">'+esc(r.LastActive)+'</td>';
+  h+='<td class="num c-wasted">'+esc(r.Wasted)+'</td>';
+  h+='<td class="meta-m"><span class="badge b-'+esc(r.State)+'">'+esc(t(r.StateLabel))+'</span><span>'+esc(r.Size)+'</span><span>↓ '+esc(r.Down)+'</span><span>↑ '+esc(r.Up)+'</span><span>'+esc(r.ETA)+'</span></td>';
+  h+='<td class="more"><button type="button" class="ghost icon sm" aria-haspopup="menu" aria-label="'+esc(t('More actions'))+'" title="'+esc(t('More actions'))+'"><svg class="i"><use href="#i-dots"/></svg></button></td></tr>';
+  return h;
+}
+// tableShell rebuilds an empty table keeping the server-rendered header (and
+// the translated "no match" note, both captured at boot): only the rows are
+// ever replaced.
+function tableShell(){
+  var t=$('#torrents');
+  var open=t?(' class="'+t.className+'" id="torrents" role="'+t.getAttribute('role')+'" aria-multiselectable="'+t.getAttribute('aria-multiselectable')+'" aria-label="'+esc(t.getAttribute('aria-label'))+'"'):' class="tbl t" id="torrents" role="grid" aria-multiselectable="true" aria-label="Torrents"';
+  return '<table'+open+'>'+(window.__thead||'')+'<tbody id="torrent-rows"></tbody></table>'+(window.__filteredEmpty||'');
+}
+// legacyTable swaps the server-rendered table HTML (translated empty states,
+// paging, header): the fallback for an empty session, a limited window, or a
+// boot without a captured header.
+function legacyTable(){
+  return fetch('/ui/live'+(state.rows?'?rows='+state.rows:''),{cache:'no-store'}).then(function(r){return r.ok?r.text():null;}).then(function(html){
+    if(!html)return;
+    var box=document.createElement('div');box.innerHTML=html;
+    var live=$('#frag-live',box);
+    if(live)applyLive(live);
+    captureTableChrome();
+  });
+}
+// captureTableChrome remembers the server-rendered header (and the translated
+// "no match" note) so later refreshes only replace the rows.
+function captureTableChrome(){
+  try{
+    var th=$('#torrents thead');if(th)window.__thead=th.outerHTML;
+    var fe=$('#filtered-empty');if(fe)window.__filteredEmpty=fe.outerHTML;
+  }catch(e){}
+}
+// updateTable swaps the rows from /ui/rows. An empty session or a limited
+// window (paging) still uses the server HTML, which owns the translated empty
+// states and the "show more" row.
+function updateTable(data){
+  var rows=data.Rows||[];
+  if(!rows.length||data.RowsLimited||!window.__thead){
+    return legacyTable();
+  }
+  var tb=$('#torrent-rows');
+  if(!tb){$('#live').innerHTML=tableShell();tb=$('#torrent-rows');}
+  if(!tb)return Promise.resolve();
+  tb.innerHTML=rows.map(rowHTML).join('');
+  return Promise.resolve();
+}
 var refreshing=false,lastSide='',pointerDown=false;
 document.addEventListener('mousedown',function(){pointerDown=true;});
 document.addEventListener('mouseup',function(){pointerDown=false;});
@@ -835,19 +916,29 @@ function applyLive(frag){
 function refresh(){
   if(refreshing||document.hidden||pointerDown||resizing)return;refreshing=true;
   var active=document.activeElement,activeRow=rowOf(active),activeHash=activeRow&&activeRow.dataset.hash;
-  fetch('/ui/live'+(state.rows?'?rows='+state.rows:''),{cache:'no-store'}).then(function(r){return r.ok?r.text():null;}).then(function(html){
-    if(!html)return;
+  var rowsParam=state.rows?('?rows='+state.rows):'';
+  // The rows travel as JSON (small, no chrome rebuild); the filters, speeds
+  // and status travel as HTML (server-translated). Both derive from the same
+  // snapshot, so they never disagree.
+  var rowsP=fetch('/ui/rows'+rowsParam,{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+  var chromeP=fetch('/ui/live?notable=1'+(state.rows?('&rows='+state.rows):''),{cache:'no-store'}).then(function(r){return r.ok?r.text():null;}).catch(function(){return null;});
+  Promise.all([rowsP,chromeP]).then(function(pair){
+    var data=pair[0],html=pair[1];
+    if(!data||!html)return Promise.resolve();
     var box=document.createElement('div');box.innerHTML=html;
-    var live=$('#frag-live',box),side=$('#frag-side',box),status=$('#frag-status',box),speeds=$('#frag-speeds',box),more=$('#frag-sbmore',box);
+    var side=$('#frag-side',box),status=$('#frag-status',box),speeds=$('#frag-speeds',box),more=$('#frag-sbmore',box);
     // Never touch the DOM while the pointer is down: a click spans mousedown and
     // mouseup, and a replacement in between loses it.
+    var tableP=Promise.resolve();
     if(!pointerDown){
-      if(live)applyLive(live);
+      tableP=updateTable(data);
       if(side&&side.innerHTML!==lastSide){var focusKey=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#side-live')&&focusKeyOf(document.activeElement);lastSide=side.innerHTML;$('#side-live').innerHTML=side.innerHTML;if(focusKey){var back=$(focusKey);if(back)back.focus();}}
       if(status){var sbFocus=$('#statusbar').contains(document.activeElement)?(document.activeElement.id?'#'+document.activeElement.id:document.activeElement.hasAttribute('data-global-limits')?'[data-global-limits]':document.activeElement.hasAttribute('data-alt-speed')?'[data-alt-speed]':null):null;$('#statusbar').innerHTML=status.innerHTML;if(sbFocus){var sbEl=$('#statusbar '+sbFocus);if(sbEl)sbEl.focus();}}
       if(speeds)$('#top-speeds').innerHTML=speeds.innerHTML;
       if(more)$('#sb-more').innerHTML=more.innerHTML;
     }
+    return tableP;
+  }).then(function(){
     afterRender();
     if(activeHash){var r=rowByHash(activeHash);if(r){r.tabIndex=0;r.focus({preventScroll:true});}}
     sampleGraph();
@@ -1361,7 +1452,7 @@ function runSearch(){
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}
 
 // Restore and start.
-state.q='';lastSide=$('#side-live').innerHTML;afterRender();renderColsMenu();sampleGraph();
+state.q='';lastSide=$('#side-live').innerHTML;captureTableChrome();afterRender();renderColsMenu();sampleGraph();
 var params=new URLSearchParams(location.search);
 if(params.get('open'))openDetail(params.get('open'),params.get('tab')||'general');
 if(params.has('msg')){history.replaceState(null,'',location.pathname);}
@@ -1391,7 +1482,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
           <label title="Upload speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit">Upload limit (KiB/s)<input type="number" min="0" name="upload_limit" placeholder="global"></label>
         </div>
       </details>
-{{end}}{{define "fragments"}}<div id="frag-side">{{template "side" .}}</div><div id="frag-live">{{template "live" .}}</div><div id="frag-status">{{template "status" .}}</div><div id="frag-speeds">{{template "speeds" .}}</div><div id="frag-sbmore">{{template "sbmore" .}}</div>{{end}}{{define "speeds"}}<span class="d" title="Download speed"><svg class="i"><use href="#i-down"/></svg>{{.DownloadRate}}</span><span class="u" title="Upload speed"><svg class="i"><use href="#i-up"/></svg>{{.UploadRate}}</span>{{end}}{{define "side"}}
+{{end}}{{define "fragments"}}<div id="frag-side">{{template "side" .}}</div><div id="frag-live">{{template "live" .}}</div><div id="frag-status">{{template "status" .}}</div><div id="frag-speeds">{{template "speeds" .}}</div><div id="frag-sbmore">{{template "sbmore" .}}</div>{{end}}{{define "fragments-notable"}}<div id="frag-side">{{template "side" .}}</div><div id="frag-status">{{template "status" .}}</div><div id="frag-speeds">{{template "speeds" .}}</div><div id="frag-sbmore">{{template "sbmore" .}}</div>{{end}}{{define "speeds"}}<span class="d" title="Download speed"><svg class="i"><use href="#i-down"/></svg>{{.DownloadRate}}</span><span class="u" title="Upload speed"><svg class="i"><use href="#i-up"/></svg>{{.UploadRate}}</span>{{end}}{{define "side"}}
     <section aria-labelledby="h-status">
       <h2 id="h-status"><button type="button" aria-expanded="true" aria-controls="sec-status" data-sec="status"><svg class="i"><use href="#i-chev"/></svg><span>Status</span></button></h2>
       <ul class="flist" id="sec-status">
@@ -1485,7 +1576,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
       {{template "thnum" "wasted"}}<button type="button" class="sort" title="Sort by discarded data">Wasted<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
       <th scope="col" class="c-more"><span class="sr-only">Actions</span></th>
     </tr></thead>
-    <tbody>
+    <tbody id="torrent-rows">
     {{range .Rows}}
     <tr tabindex="-1" aria-selected="false" data-hash="{{.Hash}}" data-name="{{.Name}}" data-state="{{.State}}" data-cat="{{.Category}}" data-tags="{{.Tags}}" data-tracker="{{.Tracker}}" data-tmm="{{if .AutoTMM}}1{{end}}" data-pin="{{if .Pinned}}1{{end}}" data-seq="{{if .Sequential}}1{{end}}" data-fl="{{if .FirstLast}}1{{end}}" data-ss="{{if .SuperSeeding}}1{{end}}" data-dll="{{.DLLimitKib}}" data-ull="{{.ULLimitKib}}" data-down="{{.DLRate}}" data-up="{{.ULRate}}" data-k-name="{{.Name}}" data-k-size="{{.TotalSize}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-seeds="{{.Seeds}}" data-k-peers="{{.Peers}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-eta="{{.ETAVal}}" data-k-ratio="{{.RatioVal}}" data-k-category="{{.Category}}" data-k-tags="{{.Tags}}" data-k-added="{{.AddedVal}}" data-k-completed="{{.CompletedVal}}" data-k-downloaded="{{.DownloadedVal}}" data-k-uploaded="{{.UploadedVal}}" data-k-remaining="{{.RemainingVal}}" data-k-queue="{{.QueuePos}}" data-k-tracker="{{.Tracker}}" data-k-path="{{.SavePath}}" data-k-availability="{{.AvailabilityVal}}" data-k-active="{{.ActiveVal}}" data-k-lastactive="{{.LastActiveVal}}" data-k-wasted="{{.WastedVal}}">
       <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}" aria-label="Select torrent" title="Select this torrent for batch actions"></td>

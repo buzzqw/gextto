@@ -116,9 +116,12 @@ Migliorie proposte (usabilità, non motore):
 
 ## 4. Scala ed ecosistema (P2)
 
-- [ ] Refresh incrementale stile `sync/maindata rid`: righe cambiate soltanto
-      (oggi fragment HTML intero ogni 2s; basi pronte: `snapshotViews()` + SSE
-      `/ui/events`). Misurare prima/dopo in `docs/measurements.md`.
+- [x] Audit `/api/v2`: copertura completa (auth/app/transfer/torrents/sync/log/
+      search/rss/torrentcreator, inclusi rename e prio); gate
+      `qbit_compat_test.go` verde. Resta: prova contro VueTorrent reale.
+- [x] Refresh leggero: righe via JSON (`/ui/rows`) + chrome via HTML
+      (`/ui/live?notable=1`), template client verificato cella-per-cella contro
+      il server, misure in `measurements.md` (−63% byte/tick).
 - [ ] Virtualizzazione oltre ~1000 righe (IntersectionObserver) al posto di
       `?rows=300` + `Show more`.
 - [ ] Preferenze UI (colonne/filtri/tema) salvate anche lato server

@@ -451,6 +451,12 @@ func (d *Daemon) handleUILive(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
 	}
+	name := "fragments"
+	if r.URL.Query().Get("notable") == "1" {
+		// The table travels as JSON (/ui/rows); the chrome (filters,
+		// speeds, status) still travels as HTML, translated by the server.
+		name = "fragments-notable"
+	}
 	page, err := d.uiPageData(d.uiRowLimit(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -458,7 +464,23 @@ func (d *Daemon) handleUILive(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	d.renderUI(w, r, "fragments", page)
+	d.renderUI(w, r, name, page)
+}
+
+// handleUIRows renders the torrent table as JSON, for the page's periodic
+// refresh: a row list is several times smaller than the same rows as HTML,
+// and the browser updates the cells without rebuilding the page chrome.
+func (d *Daemon) handleUIRows(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	page, err := d.uiPageData(d.uiRowLimit(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, page)
 }
 
 // handleUIDetail renders one tab of a torrent's detail, as a fragment for the

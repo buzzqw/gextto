@@ -59,6 +59,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /assets/icons.svg", handleStaticAsset("image/svg+xml", assets.IconsSVG))
 	root.HandleFunc("GET /ui", d.handleUI)
 	root.HandleFunc("GET /ui/live", d.handleUILive)
+	root.HandleFunc("GET /ui/rows", d.handleUIRows)
 	root.HandleFunc("GET /ui/events", d.handleUIEvents)
 	root.HandleFunc("GET /ui/detail", d.handleUIDetail)
 	root.HandleFunc("GET /ui/gextto-log", d.handleUIGexttoLog)
