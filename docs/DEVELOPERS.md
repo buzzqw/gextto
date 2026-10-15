@@ -75,11 +75,12 @@ to the engine or the daemon can be tried as soon as it compiles, without
 waiting for a CI release:
 
 ```bash
-scripts/gx-core-test.sh start --build   # compile this checkout and start it
-scripts/gx-core-test.sh restart --build # after a change: recompile and restart
+scripts/gx-core-test.sh start           # start it (rebuilds if the code changed)
+scripts/gx-core-test.sh restart         # stop + start (rebuilds if changed)
 scripts/gx-core-test.sh status          # pid, version, data directory
 scripts/gx-core-test.sh log             # follow its log
 scripts/gx-core-test.sh stop
+scripts/gx-core-test.sh start --build   # force a rebuild even if nothing changed
 scripts/gx-core-test.sh start -- -debug # extra daemon options after "--"
 ```
 
@@ -96,10 +97,13 @@ uncommitted changes) and no release channel, so it never updates itself.
 `GX_TEST_DIR`, `GX_TEST_LISTEN` (e.g. `127.0.0.1:8899` to keep it on this
 machine only), `GX_TEST_PEER_PORTS`, `GX_TEST_TOKEN` and `GX_TEST_BIN` change the
 defaults.
-`start` warns when the test binary lags behind the checkout (`gx-torrent.build_number`)
-and, when the instance was set up with a page password, still recognises it: the
-API answers `401` until a session exists, and the script reports that instead of
-calling the daemon dead.
+`start` and `restart` rebuild the test binary **by themselves** when the
+gx-torrent sources changed since the last build: the script hashes them exactly
+as `scripts/build-daemon.sh` does for `bin/gx-torrent`, so a copy left behind by
+a merge is refreshed instead of showing the old page (`--build` forces a rebuild,
+`GX_TEST_BIN` is never touched). When the instance was set up with a page
+password, the script still recognises it: the API answers `401` until a session
+exists, and the script reports that instead of calling the daemon dead.
 The script can be called through a symlink (for example
 `ln -s ~/gextto/scripts/gx-core-test.sh ~/gx-core-test.sh`): it resolves the
 link and builds the checkout the link points to.

@@ -3,11 +3,12 @@
 # to try a local change without waiting for a CI release.
 #
 #   scripts/gx-core-test.sh build      # compile this checkout into the test dir
-#   scripts/gx-core-test.sh start      # start it (add --build to compile first)
-#   scripts/gx-core-test.sh restart    # stop + start (add --build to recompile)
+#   scripts/gx-core-test.sh start      # start it (rebuilds if the code changed)
+#   scripts/gx-core-test.sh restart    # stop + start (rebuilds if changed)
 #   scripts/gx-core-test.sh stop | status | log
 #
-# Extra daemon options go after "--", e.g. `start -- -debug -no-dht`.
+# Extra daemon options go after "--", e.g. `start -- -debug -no-dht`. `--build`
+# on start/restart forces a rebuild even when the sources did not change.
 #
 # It never touches what Gextto uses: its own directory (state, session DB,
 # downloads, log), its own API port and its own peer ports. The build goes to
@@ -21,9 +22,11 @@
 # LAN bypass): it is a test daemon to try from the phone or another PC, not a
 # second server to expose beyond the local network.
 #
-# start warns when the test binary is older than the checkout (run it with
-# --build to pick up the current code) and still detects an instance set up
-# with a page password, whose API answers 401 until a session exists.
+# start and restart rebuild the test binary by themselves when gx-torrent's
+# sources changed since the last build (the same fingerprint
+# scripts/build-daemon.sh uses for bin/gx-torrent), so an old page cannot hide
+# behind a stale binary; --build forces a rebuild. An instance set up with a
+# page password is still detected, its API answering 401 until a session exists.
 #
 # Settings (environment):
 #   GX_TEST_DIR         test directory           (default ~/gx-core-test)
@@ -47,6 +50,10 @@ TOKEN="${GX_TEST_TOKEN:-}"
 BIN="${GX_TEST_BIN:-$DIR/bin/gx-torrent}"
 PID_FILE="$DIR/gx-torrent.pid"
 LOG_FILE="$DIR/gx-torrent.log"
+# Fingerprint of the sources the test binary was last built from, so a start
+# rebuilds only when gx-torrent's code actually changed (like bin/gx-torrent's
+# own .code-sha256).
+HASH_FILE="$DIR/gx-torrent.code-sha256"
 PORT="${LISTEN##*:}"
 HOST="${LISTEN%:*}"
 HOST="${HOST#[}"
@@ -136,13 +143,60 @@ daemon_answers() {
 
 # warn_if_stale points out a test binary that lags behind the checkout: the page
 # then shows an old build number and old behaviour, which reads as "the last
-# merge changed nothing".
+# merge changed nothing". Used when the binary is not ours to rebuild
+# (GX_TEST_BIN) and by status, which must not build.
 warn_if_stale() {
   local built want
   built="$("$BIN" -version 2>/dev/null | awk -F. '{print $NF}')"
   want="$(tr -d '[:space:]' < "$ROOT/gx-torrent.build_number" 2>/dev/null)"
   if [[ -n "$built" && -n "$want" && "$built" != "$want" ]]; then
-    echo "note: $BIN is gx-torrent build $built while this checkout is $want: run '$0 restart --build' to test the current code" >&2
+    echo "note: $BIN is gx-torrent build $built while this checkout is $want: run '$0 restart' to rebuild and load it" >&2
+  elif [[ -n "$(git -C "$ROOT" status --porcelain -- cmd/gx-torrent internal 2>/dev/null)" ]]; then
+    echo "note: the gx-torrent sources have uncommitted changes: run '$0 restart' to rebuild and load them" >&2
+  fi
+}
+
+# gx_source_hash is a fingerprint of the gx-torrent sources: the same build
+# scripts/build-daemon.sh hashes to decide whether bin/gx-torrent must be
+# replaced (built without the build number and with -buildvcs=false, so a commit
+# alone does not look like a change).
+gx_source_hash() {
+  local probe
+  probe="$(mktemp "${TMPDIR:-/tmp}/gx-torrent-probe.XXXXXX")"
+  if ! (cd "$ROOT" && CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o "$probe" ./cmd/gx-torrent); then
+    rm -f "$probe"
+    return 1
+  fi
+  sha256sum "$probe" | cut -d' ' -f1
+  rm -f "$probe"
+}
+
+# build_if_stale rebuilds the test binary only when gx-torrent's code changed
+# since the last build, so starting after a merge picks up the new page instead
+# of silently running the old one, and an unchanged tree costs no build.
+build_if_stale() {
+  local want
+  if ! want="$(gx_source_hash)"; then
+    echo "cannot fingerprint the gx-torrent sources; building from scratch" >&2
+    build
+    return
+  fi
+  if [[ -x "$BIN" && -f "$HASH_FILE" && "$(cat "$HASH_FILE")" == "$want" ]]; then
+    return 0
+  fi
+  build "$want"
+}
+
+# maybe_build prepares the binary start/restart will run: an explicit --build
+# always compiles, an external GX_TEST_BIN is never touched (only checked), and
+# the default test binary is rebuilt only when its sources changed.
+maybe_build() {
+  if [[ "$DO_BUILD" == 1 ]]; then
+    build
+  elif [[ -n "${GX_TEST_BIN:-}" ]]; then
+    warn_if_stale
+  else
+    build_if_stale
   fi
 }
 
@@ -160,6 +214,7 @@ running_pid() {
 }
 
 build() {
+  local want="${1:-}"
   mkdir -p "$DIR/bin"
   local gx_build commit built_at
   gx_build="$(tr -d '[:space:]' < "$ROOT/gx-torrent.build_number")"
@@ -174,15 +229,23 @@ build() {
     -o "$DIR/bin/gx-torrent.new" ./cmd/gx-torrent)
   # Rename over the old file: a running test daemon keeps its own copy.
   mv -f "$DIR/bin/gx-torrent.new" "$DIR/bin/gx-torrent"
+  # Record what this binary was built from so the next start can tell whether a
+  # rebuild is needed (build_if_stale passes the hash it already computed).
+  [[ -n "$want" ]] || want="$(gx_source_hash 2>/dev/null || true)"
+  [[ -n "$want" ]] && printf '%s\n' "$want" > "$HASH_FILE"
+  REBUILT=1
   "$DIR/bin/gx-torrent" -version
 }
 
 start() {
   local pid
-  warn_if_stale
   if pid="$(running_pid)"; then
     echo "already running (pid $pid) on $BASE_URL"
     report_lan
+    status_line
+    if [[ "$REBUILT" == 1 ]]; then
+      echo "note: the binary was rebuilt just now: run '$0 restart' to load it" >&2
+    fi
     return 0
   fi
   if [[ ! -x "$BIN" ]]; then
@@ -281,6 +344,7 @@ status() {
 COMMAND="$1"
 shift
 DO_BUILD=0
+REBUILT=0
 EXTRA_ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -292,8 +356,8 @@ done
 
 case "$COMMAND" in
   build) build ;;
-  start) [[ $DO_BUILD == 1 ]] && build; start ;;
-  restart) [[ $DO_BUILD == 1 ]] && build; stop; start ;;
+  start) maybe_build; start ;;
+  restart) maybe_build; stop; start ;;
   stop) stop ;;
   status) status ;;
   log) exec tail -n 50 -F "$LOG_FILE" ;;
