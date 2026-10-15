@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -421,5 +422,40 @@ func TestPruneWantedTimers(t *testing.T) {
 	}
 	if len(d.state.WantedTaken) != 1 {
 		t.Fatal("the taken ledger must survive (no re-download on re-add)")
+	}
+}
+
+// TestWantedSeasonPacksMatch: a season pack (season marker without an episode)
+// belongs to the wanted series and is downloaded as the whole season.
+func TestWantedSeasonPacksMatch(t *testing.T) {
+	now := time.Now()
+	w := wantedEntry{Name: "Reacher", Kind: "series", Seasons: "4"}
+	packs := []string{
+		"Reacher - S04 (2026) [COMPLETE] SD AMZN Rip XviD ita eng Mp3 Sub ita eng[Pir8]",
+		"Reacher (2022) S04 1080p WEBRip 10bit EAC3 5 1 x265-iVy",
+	}
+	for _, title := range packs {
+		if season, ok := wantedPackSeason(title); !ok || season != 4 {
+			t.Fatalf("wantedPackSeason(%q) = %d,%v want 4,true", title, season, ok)
+		}
+		if !w.matches(title, now) {
+			t.Fatalf("wanted Reacher S04 must match %q", title)
+		}
+		if season, episode := wantedItemEpisode(w, title); season != 4 || episode != 0 {
+			t.Fatalf("wantedItemEpisode(%q) = %d,%d want 4,0", title, season, episode)
+		}
+	}
+	// Another season is not wanted.
+	other := "Reacher S03 COMPLETE 1080p"
+	if w.matches(other, now) {
+		t.Fatalf("wanted Reacher S04 must not match %q", other)
+	}
+	// The preview verdict takes the pack instead of reporting "No episode number".
+	re, _ := regexp.Compile(titleMatchRegex(w.Name))
+	for _, title := range packs {
+		verdict, ep := wantedVerdict(w, re, title, now, map[wantedEpisode]bool{}, map[wantedEpisode]bool{})
+		if verdict != verdictTake || ep.season != 4 || ep.episode != 0 {
+			t.Fatalf("verdict(%q) = %q %+v, want %q S04 pack", title, verdict, ep, verdictTake)
+		}
 	}
 }

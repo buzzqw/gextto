@@ -180,7 +180,8 @@ folder and category): the series name is suggested from the indexer results and 
 the feeds and the archive contain (episode names, season packs, "complete" packs), and
 when nothing looks like a series — a movie, a special — the **clean name** of the
 matching releases is proposed, cut at year, resolution and source/codec tags, never a raw
-release title. The engine searches the indexers and the feeds for every title even with
+release title. A season pack (`S04`, `Season 4`, `COMPLETE`) counts as its whole
+season and is downloaded when the season is wanted. The engine searches the indexers and the feeds for every title even with
 no feed configured, records in `state.json` what appeared and what was taken, and runs a
 throttled **gap search** for the missing episodes; **Check feeds** forces a check at
 once.

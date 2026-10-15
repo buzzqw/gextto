@@ -188,7 +188,11 @@ native `<dialog>` windows, cards, chips and toasts announced to screen readers.
 Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
 
 - **Layout** (familiar to qBittorrent Web UI users, not a copy of it): a top
-  bar with search (`/`), live speeds and the theme switch; a **side bar** with
+  bar with search (`/`), live speeds and the theme switch; the standalone
+  navigation holds Torrents, Wanted, RSS & indexers, Archive, Statistics and
+  Settings, plus a **More** menu beside Settings with **Log**, **Tools** and
+  **Search indexers** (the main-page actions, opened here from every page);
+  a **side bar** with
   collapsible sections (the collapsed ones are remembered): the **status
   filters** with their counts, always all listed (all, downloading, seeding,
   completed, running, paused, active, inactive, stalled, checking, moving,
@@ -908,7 +912,12 @@ search and the next cycle read it from the archive instead of asking the indexer
 again. It keeps a **record** (in the state file) of what has appeared and what has
 been downloaded, shows the **missing** ones in the table and
 **searches again** (gap search, with query `Title SxxEyy`) until it finds them. When a title is removed, its search timestamps are dropped from the state file at the next cycle; the record of the episodes already taken is kept, so re-adding the title does not download them again.
-For a **movie** it takes one release and does not look for others. The list does
+For a **movie** it takes one release and does not look for others. A **season
+pack** (a season marker without an episode number: `S04`, `Season 4`,
+`Stagione 4`, `COMPLETE`) belongs to its season: when the season is wanted
+it is downloaded as the whole season (episode 0 in the ledger, `S04 pack` in
+the preview), and a taken pack covers the season, so no episode of it stays
+missing. The list does
 not create feeds or rules: the feeds grow the archive, the wanted titles turn it
 into downloads, so language and quality apply in AND and feeds remain free for
 advanced rules.

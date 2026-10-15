@@ -168,6 +168,24 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 }
 .nav a:hover { background: var(--hover); color: var(--text); }
 .nav a.on, .nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent-soft-fg); }
+/* Nav menu: the dropdown beside Settings with Log, Tools and Search indexers
+   (the main-page actions, reachable from every standalone page). */
+.navmenu { position: relative; display: inline-flex; }
+.navmenu > button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border: 0; border-radius: var(--radius);
+  background: transparent; color: var(--muted); font-weight: 500; white-space: nowrap;
+  height: auto; font-size: inherit; font-family: inherit; cursor: pointer;
+}
+.navmenu > button:hover { background: var(--hover); color: var(--text); }
+.navmenu > button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.navmenu > button .caret { font-size: 10px; color: var(--subtle); }
+.navmenu .menu a {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 0 10px; height: 32px; border-radius: 6px;
+  color: var(--text); text-decoration: none; font-weight: 450; font-size: 13.5px;
+}
+.navmenu .menu a:hover { background: var(--hover); }
 .topbar .spacer { flex: 1; }
 .topbar .tools { display: flex; align-items: center; gap: 6px; }
 

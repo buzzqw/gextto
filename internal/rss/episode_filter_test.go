@@ -80,6 +80,56 @@ func TestEpisodeFilterRejectsInvalid(t *testing.T) {
 	}
 }
 
+// TestFindSeason pins the season-pack detection: a season marker without an
+// episode marker yields its season, movies and single episodes do not.
+func TestFindSeason(t *testing.T) {
+	cases := []struct {
+		title  string
+		season int
+		ok     bool
+	}{
+		{"Reacher - S04 (2026) [COMPLETE] SD AMZN Rip XviD ita eng Mp3 Sub ita eng[Pir8]", 4, true},
+		{"Reacher (2022) S04 1080p WEBRip 10bit EAC3 5 1 x265-iVy", 4, true},
+		{"The.Mandalorian.S01.2160p.UHD.BluRay", 1, true},
+		{"Show Season 2 Complete 1080p", 2, true},
+		{"Show Stagione 3 ITA", 3, true},
+		{"Movie 2024 1080p", 0, false},
+	}
+	for _, tc := range cases {
+		if season, ok := FindSeason(tc.title); season != tc.season || ok != tc.ok {
+			t.Errorf("FindSeason(%q) = %d,%v want %d,%v", tc.title, season, ok, tc.season, tc.ok)
+		}
+	}
+}
+
+// TestEpisodeFilterMatchesSeason pins that a season pack falls into any filter
+// covering its season: a whole season, a range, an open filter or no filter.
+func TestEpisodeFilterMatchesSeason(t *testing.T) {
+	cases := []struct {
+		filter string
+		season int
+		want   bool
+	}{
+		{"", 4, true},
+		{"4x*", 4, true},
+		{"4x*", 3, false},
+		{"4x03", 4, true},
+		{"4x03", 5, false},
+		{"1x01-", 4, true},
+		{"2x01-3x99", 3, true},
+		{"2x01-3x99", 4, false},
+	}
+	for _, tc := range cases {
+		filter, err := ParseEpisodeFilter(tc.filter)
+		if err != nil {
+			t.Fatalf("ParseEpisodeFilter(%q): %v", tc.filter, err)
+		}
+		if got := filter.MatchesSeason(tc.season); got != tc.want {
+			t.Errorf("filter %q MatchesSeason(%d) = %v, want %v", tc.filter, tc.season, got, tc.want)
+		}
+	}
+}
+
 func TestRuleCriteriaEpisodeFilter(t *testing.T) {
 	criteria := Criteria{EpisodeFilter: "1x01-03"}
 	now := time.Now()

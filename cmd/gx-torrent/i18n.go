@@ -696,6 +696,8 @@ var uiCatalog = map[string][5]string{
 
 	// Standalone navigation and the friendly indexer/feed editors.
 	"RSS & indexers":      {"RSS e indexer", "RSS & Indexer", "RSS et indexeurs", "RSS e indexadores", "RSS i indeksery"},
+	"More":                {"Altro", "Mehr", "Plus", "Más", "Więcej"},
+	"Log, tools and indexer search": {"Log, strumenti e ricerca indexer", "Log, Werkzeuge und Indexersuche", "Journal, outils et recherche d'indexeurs", "Registro, herramientas y búsqueda en indexadores", "Dziennik, narzędzia i wyszukiwanie w indekserach"},
 	"Type":                {"Tipo", "Typ", "Type", "Tipo", "Typ"},
 	"API key":             {"Chiave API", "API-Schlüssel", "Clé API", "Clave API", "Klucz API"},
 	"Add indexer":         {"Aggiungi indexer", "Indexer hinzufügen", "Ajouter un indexeur", "Añadir indexador", "Dodaj indekser"},

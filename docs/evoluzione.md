@@ -410,7 +410,8 @@ metrics (`merged_pieces`/`merged_bytes`) and storage errors flow from the engine
 to the daemon API into **both UIs**.
 
 The **standalone daemon** adds: *Wanted* (type, seasons, language, quality, exclusions,
-episode filter, category and path; added by hand or with **Search the feeds**, a register
+episode filter, category and path; season packs count as their whole season;
+added by hand or with **Search the feeds**, a register
 in `state.json` with a throttled gap search, and no feed generation so the feeds stay
 free for the advanced rules), the RSS panel (per-feed state, synchronous reload,
 enable/disable, configurable interval, ordered PASS/FAIL rules with `once` and a preview

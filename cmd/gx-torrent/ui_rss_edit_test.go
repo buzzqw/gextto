@@ -313,6 +313,41 @@ func TestStandaloneNavHasRssLink(t *testing.T) {
 	}
 }
 
+// TestStandaloneNavHasMoreMenu checks the navigation menu beside Settings:
+// Log, Tools and Search indexers on the main page (actions) and as /?show=
+// links on the secondary pages.
+func TestStandaloneNavHasMoreMenu(t *testing.T) {
+	page := renderUITemplate(t, &Daemon{}, true)
+	for _, want := range []string{`id="nav-menu"`, `data-navshow="log"`, `data-navshow="tools"`, `data-navshow="search"`} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("the standalone main page must offer the More menu (%q)", want)
+		}
+	}
+	if strings.Contains(renderUITemplate(t, &Daemon{}, false), `id="nav-menu"`) {
+		t.Fatal("managed mode must not show the standalone More menu")
+	}
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	for _, path := range []string{"/ui/wanted", "/ui/rss", "/ui/archive", "/ui/stats", "/ui/settings"} {
+		resp, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("GET %s -> %d", path, resp.StatusCode)
+		}
+		for _, want := range []string{`id="nav-menu"`, `href="/?show=log"`, `href="/?show=tools"`, `href="/?show=search"`} {
+			if !strings.Contains(string(body), want) {
+				t.Fatalf("GET %s must offer the More menu (%q)", path, want)
+			}
+		}
+	}
+}
+
 // TestStandalonePagesAreLocalized checks the new strings are wired into the
 // translation pass, not just present in English.
 func TestStandalonePagesAreLocalized(t *testing.T) {

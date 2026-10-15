@@ -168,6 +168,42 @@
     var btn = e.target.closest && e.target.closest("[data-theme-switch]");
     if (btn) { e.preventDefault(); cycle(); }
   });
+  // ---------- nav menu beside Settings ----------
+  // The standalone secondary pages (Wanted, RSS, Archive, Statistics,
+  // Settings) link to the main-page actions (Log, Tools, Search indexers)
+  // through /?show=…. The dropdown itself is toggled here; the main page
+  // uses its own menu system (data-navshow buttons) and is skipped.
+  document.addEventListener("click", function (e) {
+    var menu = document.getElementById("nav-menu");
+    if (!menu || menu.querySelector("[data-navshow]")) return;
+    var btn = e.target.closest && e.target.closest(".navmenu > button");
+    if (btn) {
+      var open = menu.hidden;
+      menu.hidden = !open;
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) {
+        var r = btn.getBoundingClientRect();
+        menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 230)) + "px";
+        menu.style.top = (r.bottom + 4) + "px";
+        var first = menu.querySelector("[role=menuitem]");
+        if (first) first.focus();
+      }
+      return;
+    }
+    if (!menu.hidden && (!e.target.closest || !e.target.closest(".navmenu"))) {
+      menu.hidden = true;
+      var b = document.querySelector(".navmenu > button");
+      if (b) b.setAttribute("aria-expanded", "false");
+    }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    var menu = document.getElementById("nav-menu");
+    if (!menu || menu.hidden || menu.querySelector("[data-navshow]")) return;
+    menu.hidden = true;
+    var b = document.querySelector(".navmenu > button");
+    if (b) { b.setAttribute("aria-expanded", "false"); b.focus(); }
+  });
   function init() {
     apply(read());
     // A server notice (redirect after a classic form post) becomes a toast.

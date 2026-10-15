@@ -156,6 +156,28 @@ func parseEpisodeToken(token string) ([]episodeRange, error) {
 	return groups, nil
 }
 
+// MatchesSeason reports whether a season pack of the given season falls into
+// the filter: an empty filter takes every season, otherwise any group for
+// that season (whole season, range or open) counts, because the pack holds
+// the season's episodes.
+func (f EpisodeFilter) MatchesSeason(season int) bool {
+	if f.Empty() {
+		return true
+	}
+	if season <= 0 {
+		return false
+	}
+	for _, group := range f.groups {
+		if group.later && season > group.season {
+			return true
+		}
+		if group.season == season {
+			return true
+		}
+	}
+	return false
+}
+
 // Match reports whether the title's season/episode falls into the filter. An
 // empty filter matches everything; a filter never matches a title without a
 // recognisable season/episode marker.

@@ -91,7 +91,38 @@ func FindEpisode(title string) (series string, season, episode int, ok bool) {
 var (
 	episodeRegex  = regexp.MustCompile(`(?i)[.\s_\-]?s(\d{1,2})[.\s_\-]?e(\d{1,3})`)
 	episodeXRegex = regexp.MustCompile(`(?i)\b(\d{1,2})x(\d{1,3})\b`)
+	// seasonPackRegex finds a season marker without an episode: S04 (with an
+	// optional disc suffix S03D01), Season 4, Stagione 4. It is the pack
+	// counterpart of FindEpisode, so a title like "Reacher S04 COMPLETE" or
+	// "Reacher (2022) S04 1080p WEBRip" yields its season.
+	seasonPackSRegex       = regexp.MustCompile(`(?i)(?:^|[\s._\-\[\(])s(\d{1,2})(?:d\d{1,2})?(?:[\s._\-\]\)\.]|$)`)
+	seasonPackWordRegex    = regexp.MustCompile(`(?i)\bseason[\s._\-]*(\d{1,2})\b`)
+	seasonPackStagioneRegex = regexp.MustCompile(`(?i)\bstagione[\s._\-]*(\d{1,2})\b`)
 )
+
+// FindSeason extracts the season number from a season-pack title like
+// "Show.S04.1080p", "Show Season 2 Complete" or "Show - S04 (2026) [COMPLETE]".
+// It returns ok=false when the title carries no season marker. Unlike
+// FindEpisode it also matches titles that carry an episode marker (the caller
+// checks FindEpisode first when it needs packs only).
+func FindSeason(title string) (season int, ok bool) {
+	if loc := seasonPackSRegex.FindStringSubmatch(title); loc != nil {
+		if season = atoiOr(loc[1], 0); season > 0 {
+			return season, true
+		}
+	}
+	if loc := seasonPackWordRegex.FindStringSubmatch(title); loc != nil {
+		if season = atoiOr(loc[1], 0); season > 0 {
+			return season, true
+		}
+	}
+	if loc := seasonPackStagioneRegex.FindStringSubmatch(title); loc != nil {
+		if season = atoiOr(loc[1], 0); season > 0 {
+			return season, true
+		}
+	}
+	return 0, false
+}
 
 // normalizeSeries reduces the part before the episode marker to a stable key.
 func normalizeSeries(value string) string {

@@ -41,19 +41,28 @@ const (
 
 // wantedVerdict is the first reason a release is not taken for w, or one of
 // the taking verdicts. have holds the episodes already taken or in session.
+// A season pack (episode 0) is a whole season: it takes the season when wanted.
 func wantedVerdict(w wantedEntry, re *regexp.Regexp, title string, now time.Time, taken, inSession map[wantedEpisode]bool) (verdict string, ep wantedEpisode) {
 	if re != nil && !re.MatchString(title) {
 		return verdictOther, ep
 	}
 	ep = wantedEpisode{season: -1}
 	if w.kind() != "movie" {
-		_, season, episode, ok := rss.FindEpisode(title)
-		if !ok {
+		if _, season, episode, ok := rss.FindEpisode(title); ok {
+			ep = wantedEpisode{season: season, episode: episode}
+			if !seasonAllowed(w.Seasons, season) && strings.TrimSpace(w.EpisodeFilter) == "" {
+				return verdictSeason, ep
+			}
+		} else if packSeason, ok := wantedPackSeason(title); ok {
+			ep = wantedEpisode{season: packSeason, episode: 0}
+			if !seasonAllowed(w.Seasons, packSeason) && strings.TrimSpace(w.EpisodeFilter) == "" {
+				return verdictSeason, ep
+			}
+			if filter, err := rss.ParseEpisodeFilter(w.episodeFilter()); err != nil || !filter.MatchesSeason(packSeason) {
+				return verdictEpisode, ep
+			}
+		} else {
 			return verdictNoEp, ep
-		}
-		ep = wantedEpisode{season: season, episode: episode}
-		if !seasonAllowed(w.Seasons, season) && strings.TrimSpace(w.EpisodeFilter) == "" {
-			return verdictSeason, ep
 		}
 	} else if _, _, _, ok := rss.FindEpisode(title); ok {
 		return verdictOther, ep
@@ -76,7 +85,11 @@ func wantedVerdict(w wantedEntry, re *regexp.Regexp, title string, now time.Time
 			return verdictExcluded, ep
 		}
 	}
-	if !w.criteria().Match(rss.Item{Title: title}, now) {
+	if ep.season > 0 && ep.episode == 0 {
+		// Season pack: the season and name checks above are the verdict;
+		// the episode-based criteria would reject the pack for having no
+		// episode number.
+	} else if !w.criteria().Match(rss.Item{Title: title}, now) {
 		return verdictEpisode, ep
 	}
 	switch {
@@ -205,7 +218,11 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 		}
 		rel := release{Title: item.Title, Size: item.Size, Seeders: item.Seeders, Verdict: verdict, Take: take, Magnet: item.Download()}
 		if ep.season >= 0 {
-			rel.Episode = fmt.Sprintf("S%02dE%02d", ep.season, ep.episode)
+			if ep.episode == 0 {
+				rel.Episode = fmt.Sprintf("S%02d pack", ep.season)
+			} else {
+				rel.Episode = fmt.Sprintf("S%02dE%02d", ep.season, ep.episode)
+			}
 		}
 		releases = append(releases, rel)
 	}
@@ -250,7 +267,23 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(byVerdict, func(i, j int) bool { return byVerdict[i].Count > byVerdict[j].Count })
 	takeSummary := ""
 	if entry.kind() != "movie" {
-		takeSummary = formatEpisodeRanges(takeEps, wantedEpisodeListMax)
+		var takePacks []int
+		var takeRegular []wantedEpisode
+		for _, ep := range takeEps {
+			if ep.episode == 0 && ep.season > 0 {
+				takePacks = append(takePacks, ep.season)
+			} else {
+				takeRegular = append(takeRegular, ep)
+			}
+		}
+		parts := []string{}
+		for _, season := range takePacks {
+			parts = append(parts, fmt.Sprintf("S%02d pack", season))
+		}
+		if ranges := formatEpisodeRanges(takeRegular, wantedEpisodeListMax); ranges != "" {
+			parts = append(parts, ranges)
+		}
+		takeSummary = strings.Join(parts, ", ")
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"releases": releases, "total": total, "counts": byVerdict,

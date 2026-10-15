@@ -221,8 +221,51 @@ func (w wantedEntry) kind() string {
 	return "series"
 }
 
+// wantedPackSeason returns the season of a season-pack title: a season marker
+// without an episode marker ("Reacher S04 COMPLETE", "Reacher (2022) S04
+// 1080p"). Single episodes are not packs (FindEpisode wins).
+func wantedPackSeason(title string) (int, bool) {
+	if _, _, _, ok := rss.FindEpisode(title); ok {
+		return 0, false
+	}
+	return rss.FindSeason(title)
+}
+
+// matchesPack reports whether a season-pack title belongs to the wanted
+// series: the name matches, the season is wanted and the language, subtitle,
+// quality and exclude terms hold. Episode 0 marks the whole season.
+func (w wantedEntry) matchesPack(title string) bool {
+	season, ok := wantedPackSeason(title)
+	if !ok || w.kind() == "movie" {
+		return false
+	}
+	if !seasonAllowed(w.Seasons, season) && strings.TrimSpace(w.EpisodeFilter) == "" {
+		return false
+	}
+	if pattern := titleMatchRegex(w.Name); pattern != "" {
+		re, err := regexp.Compile(pattern)
+		if err != nil || !re.MatchString(title) {
+			return false
+		}
+	} else {
+		return false
+	}
+	for _, term := range splitList(w.Exclude) {
+		if strings.TrimSpace(term) != "" && rss.HasTerm(title, term) {
+			return false
+		}
+	}
+	if filter, err := rss.ParseEpisodeFilter(w.episodeFilter()); err != nil || !filter.MatchesSeason(season) {
+		return false
+	}
+	return wantedIncludeMatch(w, title)
+}
+
 // matches reports whether a release title belongs to the wanted entry.
 func (w wantedEntry) matches(title string, now time.Time) bool {
+	if w.matchesPack(title) {
+		return true
+	}
 	return wantedIncludeMatch(w, title) && w.criteria().Match(rss.Item{Title: title}, now)
 }
 
@@ -434,6 +477,15 @@ func (d *Daemon) wantedTaken(name string, season, episode int) bool {
 	return ok
 }
 
+// wantedPackTaken reports whether the whole season was taken as a season pack
+// (episode 0) or is already in the session as a pack.
+func (d *Daemon) wantedPackTaken(w wantedEntry, season int, inSession map[wantedEpisode]bool) bool {
+	if d.wantedTaken(w.Name, season, 0) {
+		return true
+	}
+	return inSession[wantedEpisode{season: season, episode: 0}]
+}
+
 // setWantedTaken marks an episode as downloaded (have) or not (missing), from
 // the episode manager of the wanted page.
 func (d *Daemon) setWantedTaken(name string, season, episode int, have bool) {
@@ -526,8 +578,8 @@ func (d *Daemon) wantedTakenEpisodes(w wantedEntry) []wantedEpisode {
 // wantedSessionEpisodes are the episodes of a wanted series already in the
 // session, whatever brought them there (a rule, a manual add, another
 // release): they count as had, so the series is not downloaded twice and its
-// row tells the truth. A movie in the session is the {-1, 0} entry. Season
-// packs, with no episode number, are not counted.
+// row tells the truth. A movie in the session is the {-1, 0} entry. A season
+// pack, with no episode number, counts as the whole season (episode 0).
 func (d *Daemon) wantedSessionEpisodes(w wantedEntry) map[wantedEpisode]bool {
 	pattern := titleMatchRegex(w.Name)
 	if pattern == "" {
@@ -551,6 +603,12 @@ func (d *Daemon) wantedSessionEpisodes(w wantedEntry) map[wantedEpisode]bool {
 		}
 		if ok && seasonAllowed(w.Seasons, season) {
 			out[wantedEpisode{season: season, episode: episode}] = true
+			continue
+		}
+		if !ok {
+			if packSeason, ok := wantedPackSeason(view.Name); ok && seasonAllowed(w.Seasons, packSeason) {
+				out[wantedEpisode{season: packSeason, episode: 0}] = true
+			}
 		}
 	}
 	return out
@@ -652,10 +710,14 @@ func (d *Daemon) wantedMissing(w wantedEntry) []wantedEpisode {
 		if err != nil || !seasonAllowed(w.Seasons, season) {
 			continue
 		}
+		// A season pack covers the whole season: nothing of it is missing.
+		if _, ok := taken[key]["0"]; ok || inSession[wantedEpisode{season: season, episode: 0}] {
+			continue
+		}
 		takenSeason := taken[key]
 		for token := range eps {
 			episode, err := strconv.Atoi(strings.SplitN(token, "-", 2)[0])
-			if err != nil {
+			if err != nil || episode <= 0 {
 				continue
 			}
 			if _, ok := takenSeason[token]; ok {
@@ -677,16 +739,20 @@ func (d *Daemon) wantedMissing(w wantedEntry) []wantedEpisode {
 }
 
 // wantedItemEpisode extracts the season/episode of an item for a wanted title,
-// or (-1, 0) for a movie.
+// or (-1, 0) for a movie. A season pack (season marker without an episode)
+// is the whole season, marked as episode 0.
 func wantedItemEpisode(w wantedEntry, title string) (int, int) {
 	if w.kind() == "movie" {
 		return -1, 0
 	}
 	_, season, episode, ok := rss.FindEpisode(title)
-	if !ok {
-		return -1, 0
+	if ok {
+		return season, episode
 	}
-	return season, episode
+	if packSeason, ok := wantedPackSeason(title); ok {
+		return packSeason, 0
+	}
+	return -1, 0
 }
 
 // applyWanted evaluates the items of one feed against the wanted list: it records
@@ -737,7 +803,11 @@ func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (
 				d.recordWantedTaken(w, season, episode)
 				added++
 				addedTitles = append(addedTitles, item.Title)
-				logf("wanted %q: added %s S%02dE%02d", w.Name, item.Title, season, episode)
+				if episode == 0 && season > 0 {
+					logf("wanted %q: added %s S%02d pack", w.Name, item.Title, season)
+				} else {
+					logf("wanted %q: added %s S%02dE%02d", w.Name, item.Title, season, episode)
+				}
 			}
 		}
 	}
