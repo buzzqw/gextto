@@ -80,6 +80,10 @@ func TestV2LibraryLayoutSwitchAndCards(t *testing.T) {
 		"/?view=movies&amp;movie=7",
 		"layout=list",
 		"Elenco",
+		// The fields beside the title are separated and each carries its column
+		// label as a tooltip, so the values never run together unreadably.
+		`class="card-meta-sep"`,
+		`class="card-meta-item" title="Anno"`,
 	} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("the card view is missing %q", marker)

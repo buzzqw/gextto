@@ -50,9 +50,19 @@ type v2CardItem struct {
 	Name   string
 	Link   string
 	Poster string
-	// Meta holds the title's cells already formatted by the table (badges,
-	// quality, progress…): it is HTML produced by v2FormatCell, rendered as is.
-	Meta []template.HTML
+	// Meta holds the title's cells, in the order of v2CardMetaKeys: each is
+	// formatted by the table, so no second set of labels has to be translated.
+	Meta []v2CardMeta
+}
+
+// v2CardMeta is one field beside the title on a poster card: the value, already
+// formatted by the table (a badge, quality, progress…), and the label of the
+// column it comes from. The label is only a tooltip, so a compact "ita" on the
+// card still reads as "Lingua" on hover and to assistive technology, and the
+// card keeps saying what the list says.
+type v2CardMeta struct {
+	Value template.HTML
+	Label string
 }
 
 // v2Layout answers which layout to render: the parameter wins, then the
@@ -135,7 +145,7 @@ func v2LibraryCardsFrom(ctx context.Context, s *AppState, base string, items []m
 		for _, key := range v2CardMetaKeys(base) {
 			if column, ok := v2ColumnByKey(columns, key); ok {
 				if html := v2FormatCell(item, column); strings.TrimSpace(string(html)) != "" && string(html) != "—" {
-					card.Meta = append(card.Meta, html)
+					card.Meta = append(card.Meta, v2CardMeta{Value: html, Label: column.Label})
 				}
 			}
 		}

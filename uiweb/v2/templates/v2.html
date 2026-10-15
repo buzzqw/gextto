@@ -1462,7 +1462,7 @@
     <a class="tmdb-poster{{if not .Poster}} placeholder{{end}}" href="{{.Link}}" title="Apri il dettaglio" aria-hidden="{{if .Poster}}false{{else}}true{{end}}">{{if .Poster}}<img src="{{.Poster}}" alt="" loading="lazy" />{{else}}<span>▤</span>{{end}}</a>
     <div class="tmdb-card-body">
       <strong><a href="{{.Link}}">{{.Name}}</a></strong>
-      <div class="card-meta">{{range .Meta}}{{.}}{{end}}</div>
+      <div class="card-meta">{{range $i, $m := .Meta}}{{if $i}}<span class="card-meta-sep" aria-hidden="true">·</span>{{end}}<span class="card-meta-item"{{if $m.Label}} title="{{$m.Label}}"{{end}}>{{$m.Value}}</span>{{end}}</div>
     </div>
   </article>
   {{end}}
