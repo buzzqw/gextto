@@ -1418,7 +1418,7 @@ func BackfillMediaInfo(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 func gh0_logMediaInfoFailure(target MediaInfoBackfillTarget, reason string, items *[]any) {
-	logging.Warn("🔬 MediaInfo backfill: file non analizzato",
+	logging.Warn("🔬 MediaInfo backfill: file not analysed",
 		"path", target.Path, "kind", target.Kind, "series", target.Series,
 		"season", target.Season, "episode", target.Episode, "name", target.Name,
 		"year", target.Year, "reason", reason)

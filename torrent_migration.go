@@ -220,7 +220,7 @@ func ImportMigrationManifest(s *AppState, cfg *Config) (int, []string, error) {
 			}
 			continue
 		}
-		warnings = append(warnings, fmt.Sprintf("%s: nessuna sorgente reimportabile", item.Name))
+		warnings = append(warnings, fmt.Sprintf("%s: no re-importable source", item.Name))
 	}
 	if len(warnings) == 0 {
 		manifest.Imported = imported
@@ -228,10 +228,10 @@ func ImportMigrationManifest(s *AppState, cfg *Config) (int, []string, error) {
 		if _, err := PersistMigrationManifest(cfg, *manifest); err != nil {
 			return imported, warnings, err
 		}
-		logging.Info("migrazione: torrent reimportati nel backend attivo",
+		logging.Info("migration: torrents re-imported into the active backend",
 			"backend", active, "imported", imported)
 	} else {
-		logging.Warn("migrazione: alcuni torrent non sono stati reimportati", "warnings", len(warnings))
+		logging.Warn("migration: some torrents were not re-imported", "warnings", len(warnings))
 	}
 	return imported, warnings, nil
 }

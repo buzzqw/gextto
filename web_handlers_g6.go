@@ -80,7 +80,7 @@ func gh6_purgeRemovedLibrary(
 		}
 		if !present {
 			if _, err := db.PurgeSeries(old.Name); err != nil {
-				logging.Warn("impossibile rimuovere lo stato della serie eliminata", "error", err, "series", old.Name)
+				logging.Warn("cannot remove the state of the deleted series", "error", err, "series", old.Name)
 			}
 		}
 	}
@@ -104,7 +104,7 @@ func gh6_purgeRemovedLibrary(
 		}
 		if !stillPresent {
 			if _, err := db.PurgeMovie(old.Name); err != nil {
-				logging.Warn("impossibile rimuovere lo stato del film eliminato", "error", err, "movie", old.Name)
+				logging.Warn("cannot remove the state of the deleted movie", "error", err, "movie", old.Name)
 			}
 		}
 	}

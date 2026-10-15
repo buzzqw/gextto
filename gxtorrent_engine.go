@@ -641,7 +641,7 @@ func (e *gxTorrentEngine) sync() error {
 		e.lastErr = err.Error()
 		e.mu.Unlock()
 		if wasConnected {
-			logging.Warn("gx-torrent non raggiungibile", "url", e.settings.BaseURL, "error", err)
+			logging.Warn("gx-torrent unreachable", "url", e.settings.BaseURL, "error", err)
 		}
 		return err
 	}
@@ -1656,7 +1656,7 @@ func gxWarnUnsupportedOptions(options AddOptions) {
 		unsupported = append(unsupported, "seed_mode")
 	}
 	if len(unsupported) > 0 {
-		logging.Warn("gx-torrent non supporta queste opzioni di aggiunta: verranno ignorate",
+		logging.Warn("gx-torrent does not support these add options: they will be ignored",
 			"options", strings.Join(unsupported, ","))
 	}
 }

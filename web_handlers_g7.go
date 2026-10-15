@@ -1642,7 +1642,7 @@ func TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	source := "tmdb"
 	if len(tvdbItems) > 0 {
 		source = "tvdb"
-		logging.Info("TMDB senza risultati o non raggiungibile: uso il fallback TVDB", "query", query)
+		logging.Info("TMDB returned no results or is unreachable: using the TVDB fallback", "query", query)
 	}
 	jsonResponse(w, map[string]any{"ok": true, "kind": "series", "items": tvdbItems, "source": source})
 }

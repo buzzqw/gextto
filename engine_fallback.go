@@ -221,7 +221,7 @@ func applyEngineFallback(ctx context.Context, cfg *Config, current string, notif
 	now := time.Now()
 	if engineFallbackWithinCooldown(cfg.DataDir, now) {
 		state := readEngineFallbackState(cfg.DataDir)
-		logging.Error("fallback motore già avvenuto di recente: niente nuovo cambio, passo in recovery",
+		logging.Error("engine fallback already happened recently: no new switch, switching to recovery",
 			"from", current, "last_fallback", state.LastAt.Format(time.RFC3339), "cooldown", engineFallbackCooldown.String())
 		engineFallbackNotify(notifier, "engine_recovery", map[string]any{
 			"from": current, "reason": "cooldown", "last_fallback": state.LastAt.Format(time.RFC3339),
@@ -232,11 +232,11 @@ func applyEngineFallback(ctx context.Context, cfg *Config, current string, notif
 	plan := planEngineFallback(current, managedQbittorrentInstalled(cfg), externalQbittorrentConfigured(cfg))
 	if plan.Download {
 		downloadCtx, cancel := context.WithTimeout(ctx, engineFallbackDownloadTimeout)
-		logging.Warn("fallback motore: scarico qBittorrent-nox (userdocs/qbittorrent-nox-static)", "from", current)
+		logging.Warn("engine fallback: downloading qBittorrent-nox (userdocs/qbittorrent-nox-static)", "from", current)
 		err := engineFallbackDownload(downloadCtx, cfg)
 		cancel()
 		if err != nil {
-			logging.Error("fallback motore: download qBittorrent-nox non riuscito", "error", err.Error())
+			logging.Error("engine fallback: qBittorrent-nox download failed", "error", err.Error())
 			plan = engineFallbackSecondary(current)
 			if plan.Backend == BackendRecovery {
 				engineFallbackNotify(notifier, "engine_recovery", map[string]any{"from": current, "reason": err.Error()})
@@ -250,7 +250,7 @@ func applyEngineFallback(ctx context.Context, cfg *Config, current string, notif
 	}
 	if plan.Backend == BackendQbittorrent && plan.Managed {
 		if err := persistManagedQbittorrent(cfg); err != nil {
-			logging.Error("fallback motore: configurazione qBittorrent gestito non riuscita", "error", err.Error())
+			logging.Error("engine fallback: managed qBittorrent setup failed", "error", err.Error())
 			plan = engineFallbackSecondary(current)
 			if plan.Backend == BackendRecovery {
 				engineFallbackNotify(notifier, "engine_recovery", map[string]any{"from": current, "reason": err.Error()})
@@ -259,12 +259,12 @@ func applyEngineFallback(ctx context.Context, cfg *Config, current string, notif
 		}
 	}
 	if err := SaveSetting(cfg.DataDir, "torrent_backend", plan.Backend); err != nil {
-		logging.Error("fallback motore: salvataggio torrent_backend non riuscito", "backend", plan.Backend, "error", err.Error())
+		logging.Error("engine fallback: saving torrent_backend failed", "backend", plan.Backend, "error", err.Error())
 		engineFallbackNotify(notifier, "engine_recovery", map[string]any{"from": current, "reason": err.Error()})
 		return false
 	}
 	_ = writeEngineFallbackState(cfg.DataDir, engineFallbackState{LastAt: now, From: current, To: plan.Backend})
-	logging.Error("fallback motore: passo a "+plan.Backend+" e riavvio il servizio", "from", current)
+	logging.Error("engine fallback: switching to "+plan.Backend+" and restarting the service", "from", current)
 	engineFallbackNotify(notifier, "engine_fallback", map[string]any{"from": current, "to": plan.Backend})
 	engineFallbackRestart("restart")
 	return true
@@ -281,7 +281,7 @@ func persistManagedQbittorrent(cfg *Config) error {
 	for _, key := range []string{"qbittorrent_url", "qbittorrent_username", "qbittorrent_password", "qbittorrent_managed"} {
 		if value, ok := prepared.Settings[key]; ok {
 			if saveErr := SaveSetting(cfg.DataDir, key, value); saveErr != nil {
-				return fmt.Errorf("salvataggio %s: %w", key, saveErr)
+				return fmt.Errorf("saving %s: %w", key, saveErr)
 			}
 		}
 	}
@@ -306,7 +306,7 @@ func ApplyEngineOverride(cfg *Config) string {
 		return ""
 	}
 	if !isKnownTorrentBackend(value) {
-		logging.Warn("GEXTTO_ENGINE ignorato: motore sconosciuto", "value", value)
+		logging.Warn("GEXTTO_ENGINE ignored: unknown engine", "value", value)
 		return ""
 	}
 	if cfg.Settings == nil {

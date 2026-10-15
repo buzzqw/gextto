@@ -127,7 +127,7 @@ func (e *gxTorrentEngine) watchManagedHealth(process *gxManagedProcess, stop <-c
 			if !gxUnresponsive(lastOK, time.Now()) {
 				continue
 			}
-			logging.Error("gx-torrent non risponde alle API pur essendo attivo: lo riavvio",
+			logging.Error("gx-torrent is not answering the API although it is up: restarting it",
 				"unresponsive_for", time.Since(lastOK).Round(time.Second).String())
 			e.notifyEvent("engine_unresponsive", map[string]any{
 				"unresponsive_seconds": int(time.Since(lastOK).Seconds()),
@@ -162,7 +162,7 @@ func gxManagedListen(settings gxTorrentSettings) (string, error) {
 			return "", fmt.Errorf("gxtorrent_listen must be host:port, got %q", listen)
 		}
 		if port != urlPort {
-			logging.Warn("gxtorrent_listen porta diversa da gxtorrent_url: uso la porta dell'URL per restare raggiungibile",
+			logging.Warn("gxtorrent_listen port differs from gxtorrent_url: using the URL port to stay reachable",
 				"listen_port", port, "url_port", urlPort)
 			port = urlPort
 		}
@@ -578,9 +578,9 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			rollbackTried = true
 			if binary, err := gxTorrentBinary(); err == nil {
 				if rolled, rollErr := rollbackGxTorrentBinary(binary); rollErr != nil {
-					logging.Error("rollback del binario gx-torrent non riuscito", "error", rollErr.Error())
+					logging.Error("gx-torrent binary rollback failed", "error", rollErr.Error())
 				} else if rolled {
-					logging.Error("gx-torrent non riesce a restare attivo: ripristino il binario precedente",
+					logging.Error("gx-torrent cannot stay up: restoring the previous binary",
 						"crashes", budget.len(), "binary", binary)
 					e.notifyEvent("engine_rollback", map[string]any{"binary": binary, "crashes": budget.len()})
 					budget = newBudget()
@@ -591,7 +591,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			}
 		}
 		if applyEngineFallback(context.Background(), e.cfg, BackendGxTorrent, e.notifier) {
-			logging.Error("gx-torrent non riesce a restare attivo: cambio motore e riavvio il servizio",
+			logging.Error("gx-torrent cannot stay up: switching engine and restarting the service",
 				"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()))
 			e.processMu.Lock()
 			process := e.process
@@ -604,7 +604,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		pause := gxUnstablePause(unstable)
 		unstable++
 		startSettings.SafeMode = true
-		logging.Error("gx-torrent non riesce a restare attivo e nessun motore alternativo è disponibile: trasferimenti fermi, nuovo tentativo in modalità sicura (senza uTP e holepunch)",
+		logging.Error("gx-torrent cannot stay up and no alternative engine is available: transfers stopped, retrying in safe mode (without uTP and holepunch)",
 			"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()),
 			"retry_in", pause.String(), "crash_log", filepath.Join(e.cfg.DataDir, "gx-torrent", "gx-torrent.crash.log"))
 		e.notifyEvent("engine_unstable", map[string]any{
@@ -656,11 +656,15 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		if time.Since(startedAt) >= gxStableUptime {
 			unstable = 0
 		}
-		exit := "uscita inattesa"
+		exit := ""
 		if err != nil {
 			exit = err.Error()
 		}
-		logging.Error("gx-torrent gestito terminato in modo inatteso", "error", exit, "restarts_in_window", budget.len()+1)
+		logExit := exit
+		if logExit == "" {
+			logExit = "unexpected exit"
+		}
+		logging.Error("managed gx-torrent exited unexpectedly", "error", logExit, "restarts_in_window", budget.len()+1)
 		e.notifyEvent("engine_crashed", map[string]any{"error": exit, "restarts_in_window": budget.len() + 1})
 		if budget.register(time.Now()) && budgetExhausted() {
 			return
@@ -680,7 +684,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			if startErr == nil {
 				break
 			}
-			logging.Error("riavvio di gx-torrent gestito non riuscito", "error", startErr, "restarts_in_window", budget.len()+1)
+			logging.Error("restarting managed gx-torrent failed", "error", startErr, "restarts_in_window", budget.len()+1)
 			if budget.register(time.Now()) && budgetExhausted() {
 				return
 			}
@@ -699,7 +703,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			_ = restarted.Stop()
 			return
 		}
-		logging.Info("gx-torrent gestito riavviato dopo un'uscita inattesa", "restart", budget.len())
+		logging.Info("managed gx-torrent restarted after an unexpected exit", "restart", budget.len())
 		e.notifyEvent("engine_restarted", map[string]any{"restarts_in_window": budget.len()})
 	}
 }

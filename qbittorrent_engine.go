@@ -255,12 +255,12 @@ func (e *qbittorrentEngine) superviseManagedProcess() {
 			return // intentional stop
 		}
 
-		exit := "uscita inattesa"
+		exit := "unexpected exit"
 		if err != nil {
 			exit = err.Error()
 		}
 		now := time.Now()
-		logging.Error("qBittorrent gestito terminato in modo inatteso", "error", exit, "restarts_in_window", len(crashes)+1)
+		logging.Error("managed qBittorrent exited unexpectedly", "error", exit, "restarts_in_window", len(crashes)+1)
 
 		crashes = append(crashes, now)
 		kept := crashes[:0]
@@ -274,7 +274,7 @@ func (e *qbittorrentEngine) superviseManagedProcess() {
 		if len(crashes) >= maxCrashes {
 			// Hand the transfers back to gx-torrent (the default engine).
 			if applyEngineFallback(context.Background(), e.cfg, BackendQbittorrent, nil) {
-				logging.Error("qBittorrent non riesce a restare attivo: cambio motore e riavvio il servizio",
+				logging.Error("qBittorrent cannot stay up: switching engine and restarting the service",
 					"crashes", len(crashes), "window_minutes", int(crashWindow.Minutes()))
 				e.processMu.Lock()
 				process := e.process
@@ -284,7 +284,7 @@ func (e *qbittorrentEngine) superviseManagedProcess() {
 				}
 				return
 			}
-			logging.Error("qBittorrent non riesce a restare attivo e nessun motore alternativo è disponibile: continuo a riavviare l'istanza gestita",
+			logging.Error("qBittorrent cannot stay up and no alternative engine is available: keeping the managed instance restarting",
 				"crashes", len(crashes), "window_minutes", int(crashWindow.Minutes()))
 			crashes = crashes[:0]
 		}
@@ -297,7 +297,7 @@ func (e *qbittorrentEngine) superviseManagedProcess() {
 
 		restarted, startErr := startManagedQbittorrent(e.cfg, e.settings)
 		if startErr != nil {
-			logging.Error("riavvio di qBittorrent gestito non riuscito", "error", startErr)
+			logging.Error("restarting managed qBittorrent failed", "error", startErr)
 			continue
 		}
 		e.processMu.Lock()
@@ -308,7 +308,7 @@ func (e *qbittorrentEngine) superviseManagedProcess() {
 			_ = restarted.Close()
 			return
 		}
-		logging.Info("qBittorrent gestito riavviato dopo un'uscita inattesa", "restart", len(crashes))
+		logging.Info("managed qBittorrent restarted after an unexpected exit", "restart", len(crashes))
 	}
 }
 
@@ -506,7 +506,7 @@ func (e *qbittorrentEngine) sync() error {
 		e.lastErr = err.Error()
 		e.mu.Unlock()
 		if wasConnected {
-			logging.Warn("qBittorrent non raggiungibile", "url", e.settings.Client.BaseURL, "error", err)
+			logging.Warn("qBittorrent unreachable", "url", e.settings.Client.BaseURL, "error", err)
 		}
 		return err
 	}

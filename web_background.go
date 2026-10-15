@@ -852,7 +852,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					}
 					line += " · stuck: " + strings.Join(shown, ", ") + extra
 				}
-				logging.Info(line)
+				logging.Debug(line)
 				lastQueueCounts = counts
 			}
 			lastDynamicAdjustment = now

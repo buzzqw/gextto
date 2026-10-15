@@ -164,7 +164,7 @@ func gh1_purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previo
 		}
 		if !present {
 			if _, err := db.PurgeSeries(old.Name); err != nil {
-				logging.Warn("impossibile rimuovere lo stato della serie eliminata", "error", err.Error(), "series", old.Name)
+				logging.Warn("cannot remove the state of the deleted series", "error", err.Error(), "series", old.Name)
 			}
 		}
 	}
@@ -188,7 +188,7 @@ func gh1_purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previo
 		}
 		if !present {
 			if _, err := db.PurgeMovie(old.Name); err != nil {
-				logging.Warn("impossibile rimuovere lo stato del film eliminato", "error", err.Error(), "movie", old.Name)
+				logging.Warn("cannot remove the state of the deleted movie", "error", err.Error(), "movie", old.Name)
 			}
 		}
 	}

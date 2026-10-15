@@ -25,17 +25,17 @@ func requestServiceActionLater(action string) {
 		time.Sleep(1500 * time.Millisecond)
 		if scope, scopeName := gh6_serviceScope("gextto.service"); scopeName == "user" {
 			if err := exec.Command("systemctl", append(append([]string{}, scope...), verb, "gextto.service")...).Run(); err != nil {
-				logging.Error("riavvio del servizio gextto non riuscito", "scope", "user", "error", err)
+				logging.Error("restarting the gextto service failed", "scope", "user", "error", err)
 			}
 			return
 		}
 		const restartHelper = "/usr/local/bin/gextto-restart"
 		if _, err := os.Stat(restartHelper); err != nil {
-			logging.Error("helper di riavvio non installato: impossibile applicare il cambio di motore", "helper", restartHelper)
+			logging.Error("restart helper not installed: cannot apply the engine switch", "helper", restartHelper)
 			return
 		}
 		if err := exec.Command("sudo", "-n", restartHelper, verb).Run(); err != nil {
-			logging.Error("riavvio del servizio gextto non riuscito", "error", err)
+			logging.Error("restarting the gextto service failed", "error", err)
 		}
 	}()
 }
