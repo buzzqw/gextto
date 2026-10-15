@@ -96,6 +96,10 @@ uncommitted changes) and no release channel, so it never updates itself.
 `GX_TEST_DIR`, `GX_TEST_LISTEN` (e.g. `127.0.0.1:8899` to keep it on this
 machine only), `GX_TEST_PEER_PORTS`, `GX_TEST_TOKEN` and `GX_TEST_BIN` change the
 defaults.
+`start` warns when the test binary lags behind the checkout (`gx-torrent.build_number`)
+and, when the instance was set up with a page password, still recognises it: the
+API answers `401` until a session exists, and the script reports that instead of
+calling the daemon dead.
 The script can be called through a symlink (for example
 `ln -s ~/gextto/scripts/gx-core-test.sh ~/gx-core-test.sh`): it resolves the
 link and builds the checkout the link points to.

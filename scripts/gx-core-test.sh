@@ -21,6 +21,10 @@
 # LAN bypass): it is a test daemon to try from the phone or another PC, not a
 # second server to expose beyond the local network.
 #
+# start warns when the test binary is older than the checkout (run it with
+# --build to pick up the current code) and still detects an instance set up
+# with a page password, whose API answers 401 until a session exists.
+#
 # Settings (environment):
 #   GX_TEST_DIR         test directory           (default ~/gx-core-test)
 #   GX_TEST_LISTEN      web page / API address   (default 0.0.0.0:8899)
@@ -112,6 +116,36 @@ report_lan() {
   fi
 }
 
+# health_code is the HTTP status of /api/v1/health: "200" when the script can
+# read it, "401" when the page password guards the API (still proof that the
+# daemon answers), "" or "000" when nothing listens.
+health_code() {
+  local args=(-sS -o /dev/null -m 2 -w '%{http_code}')
+  [[ -n "$TOKEN" ]] && args+=(-H "X-Gx-Token: $TOKEN")
+  curl "${args[@]}" "$BASE_URL/api/v1/health" 2>/dev/null || true
+}
+
+# daemon_answers reports whether the daemon is up: any HTTP status counts,
+# because a standalone instance set up with a page password answers 401 to the
+# API until a session exists.
+daemon_answers() {
+  local code
+  code="$(health_code)"
+  [[ "$code" =~ ^[0-9]{3}$ && "$code" != "000" ]]
+}
+
+# warn_if_stale points out a test binary that lags behind the checkout: the page
+# then shows an old build number and old behaviour, which reads as "the last
+# merge changed nothing".
+warn_if_stale() {
+  local built want
+  built="$("$BIN" -version 2>/dev/null | awk -F. '{print $NF}')"
+  want="$(tr -d '[:space:]' < "$ROOT/gx-torrent.build_number" 2>/dev/null)"
+  if [[ -n "$built" && -n "$want" && "$built" != "$want" ]]; then
+    echo "note: $BIN is gx-torrent build $built while this checkout is $want: run '$0 restart --build' to test the current code" >&2
+  fi
+}
+
 running_pid() {
   [[ -f "$PID_FILE" ]] || return 1
   local pid
@@ -145,6 +179,7 @@ build() {
 
 start() {
   local pid
+  warn_if_stale
   if pid="$(running_pid)"; then
     echo "already running (pid $pid) on $BASE_URL"
     report_lan
@@ -179,7 +214,7 @@ start() {
   nohup "$BIN" "${args[@]}" >> "$DIR/gx-torrent.stdout" 2>&1 &
   echo $! > "$PID_FILE"
   for _ in $(seq 1 60); do
-    if curl -fsS -m 2 ${TOKEN:+-H "X-Gx-Token: $TOKEN"} "$BASE_URL/api/v1/health" > /dev/null 2>&1; then
+    if daemon_answers; then
       echo "gx-core test started (pid $(cat "$PID_FILE")): $BASE_URL"
       report_lan
       status_line
@@ -215,13 +250,23 @@ stop() {
 }
 
 status_line() {
-  curl -fsS -m 3 ${TOKEN:+-H "X-Gx-Token: $TOKEN"} "$BASE_URL/api/v1/health" 2>/dev/null \
-    | grep -oE '"(version|pid|mode|data_dir)": *"?[^,"}]*' | tr -d '"' | tr '\n' ' '
-  echo
+  local code
+  code="$(health_code)"
+  case "$code" in
+    200)
+      curl -fsS -m 3 ${TOKEN:+-H "X-Gx-Token: $TOKEN"} "$BASE_URL/api/v1/health" 2>/dev/null \
+        | grep -oE '"(version|pid|mode|data_dir)": *"?[^,"}]*' | tr -d '"' | tr '\n' ' '
+      echo
+      ;;
+    401) echo "API behind the page password (401): open $BASE_URL/ and sign in" ;;
+    "" | 000) echo "no answer on $BASE_URL" ;;
+    *) echo "HTTP $code on $BASE_URL/api/v1/health" ;;
+  esac
 }
 
 status() {
   local pid
+  warn_if_stale
   if pid="$(running_pid)"; then
     echo "running (pid $pid) on $BASE_URL, directory $DIR"
     report_lan
