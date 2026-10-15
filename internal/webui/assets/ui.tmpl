@@ -56,7 +56,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .flist button .n{margin-left:auto;font-size:12px;color:var(--subtle);font-variant-numeric:tabular-nums}
 .flist button[aria-pressed="true"] .n{color:inherit}
 .flist button .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.flist button.zero{opacity:.62}
+.flist button.zero .lbl,.flist button.zero .n,.flist button.zero svg{color:var(--subtle)}
 .graph{margin:0 4px;padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--sunken)}
 .graph svg{display:block;width:100%;height:56px}
 .graph .legend{display:flex;justify-content:space-between;font-size:12px;margin-top:6px;font-variant-numeric:tabular-nums}
@@ -95,12 +95,13 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .tbl.t td.name a:hover{text-decoration:underline;color:var(--accent)}
 .tbl.t td.name .fl{font-size:10.5px;font-weight:650;color:var(--accent-soft-fg);background:var(--accent-soft);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:1px}
 .tbl.t .state .badge{max-width:100%;overflow:hidden;text-overflow:ellipsis}
-.pbar{position:relative;height:16px;border-radius:4px;background:var(--surface-2);overflow:hidden;font-size:11px;font-variant-numeric:tabular-nums}
-.pbar>i{position:absolute;inset:0 auto 0 0;background:var(--bar-down);opacity:.85}
+.prog{display:flex;align-items:center;gap:6px}
+.prog .pct{flex:none;min-width:42px;text-align:right;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pbar{position:relative;flex:1;min-width:24px;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.pbar>i{position:absolute;inset:0 auto 0 0;background:var(--bar-down)}
 .pbar.seeding>i{background:var(--bar-seed)}
 .pbar.paused>i,.pbar.stalled>i,.pbar.disk_wait>i{background:var(--bar-paused)}
 .pbar.error>i{background:var(--err)}
-.pbar>span{position:relative;display:block;text-align:center;line-height:16px;color:var(--text);font-weight:600;text-shadow:0 0 3px var(--surface)}
 .tbl.t td.more{padding:0 4px}
 .tbl.t td.more button{opacity:.5;width:28px;height:24px}
 .tbl.t tr:hover td.more button,.tbl.t tr[aria-selected="true"] td.more button,.tbl.t td.more button:focus-visible{opacity:1}
@@ -342,7 +343,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <div id="live">{{template "live" .}}</div>
       </div>
       <aside class="drawer" id="drawer" hidden aria-labelledby="drawer-title">
-        <div class="dsplit" id="dsplit" role="separator" aria-orientation="horizontal" tabindex="0" aria-label="Resize the details panel" title="Drag, or use the up and down arrows, to resize the details panel"></div>
+        <div class="dsplit" id="dsplit" role="separator" aria-orientation="horizontal" aria-valuemin="120" aria-valuemax="800" aria-valuenow="320" tabindex="0" aria-label="Resize the details panel" title="Drag, or use the up and down arrows, to resize the details panel"></div>
         <div id="drawer-body"></div>
       </aside>
     </div>
@@ -746,12 +747,14 @@ function setSort(key){var s=state.sort;state.sort={key:key,asc:s.key===key?!s.as
 function colPrefs(){return store.get('cols',{});}
 function colDefault(k){var c=window.__gxCols.find(function(x){return x[0]===k;});return c||[k,1,90];}
 function colOn(k){var p=colPrefs()[k]||{};return p.on===undefined?!!colDefault(k)[1]:!!p.on;}
-function setCol(k,patch){var p=colPrefs();p[k]=Object.assign({},p[k]||{},patch);store.set('cols',p);window.gxColStyle();renderColsMenu();}
+function setCol(k,patch){var p=colPrefs();p[k]=Object.assign({},p[k]||{},patch);store.set('cols',p);window.gxColStyle();renderColsMenu();syncResizers();}
+// syncResizers tells assistive technology each column's width.
+function syncResizers(){$$('#torrents th .rz').forEach(function(h){h.setAttribute('aria-valuenow',Math.round(h.closest('th').getBoundingClientRect().width));});}
 function renderColsMenu(){$$('#cols-menu [data-col]').forEach(function(b){b.setAttribute('aria-checked',colOn(b.dataset.col)?'true':'false');});}
 var resizing=null;
 function startResize(handle,x){var th=handle.closest('th');resizing={k:th.dataset.col,x:x,w:th.getBoundingClientRect().width};document.body.style.cursor='col-resize';}
 document.addEventListener('pointermove',function(e){if(!resizing)return;var w=Math.max(40,Math.round(resizing.w+e.clientX-resizing.x));var p=colPrefs();p[resizing.k]=Object.assign({},p[resizing.k]||{},{w:w});store.set('cols',p);window.gxColStyle();});
-document.addEventListener('pointerup',function(){if(resizing){resizing=null;document.body.style.cursor='';}});
+document.addEventListener('pointerup',function(){if(resizing){resizing=null;document.body.style.cursor='';syncResizers();}});
 
 // ---------- live refresh ----------
 var refreshing=false,lastSide='',pointerDown=false;
@@ -804,7 +807,7 @@ function focusKeyOf(el){
 function afterRender(){
   var known=new Set(rows().map(function(r){return r.dataset.hash;}));
   state.selected.forEach(function(h){if(!known.has(h))state.selected.delete(h);});
-  countSide();applyCollapsed();applySort();applyFilters();roving();savePaths();
+  countSide();applyCollapsed();applySort();applyFilters();roving();savePaths();syncResizers();
   var sb=$('#sb-more-btn');if(sb)sb.setAttribute('aria-expanded',state.sbmore?'true':'false');
 }
 function roving(){var rs=visibleRows(),cur=rs.find(function(r){return r.tabIndex===0;});rs.forEach(function(r){r.tabIndex=-1;});(cur||rs[0])&&((cur||rs[0]).tabIndex=0);}
@@ -924,11 +927,11 @@ function openMenu(menu,x,y,returnTo,asSub){
   if(asSub&&x+w>window.innerWidth-8&&returnTo){x=returnTo.getBoundingClientRect().left-w-2;}
   menu.style.left=Math.max(8,Math.min(x,window.innerWidth-w-8))+'px';menu.style.top=Math.max(8,Math.min(y,window.innerHeight-h-8))+'px';
   var first=menuItems(menu)[0];if(first)first.focus();
-  if(returnTo&&returnTo.setAttribute)returnTo.setAttribute('aria-expanded','true');
+  if(returnTo&&returnTo.hasAttribute&&returnTo.hasAttribute('aria-haspopup'))returnTo.setAttribute('aria-expanded','true');
 }
 function closeTopMenu(focusBack){
   var m=menus.pop();if(!m)return;m.el.hidden=true;
-  if(m.ret&&m.ret.setAttribute)m.ret.setAttribute('aria-expanded','false');
+  if(m.ret&&m.ret.hasAttribute&&m.ret.hasAttribute('aria-haspopup'))m.ret.setAttribute('aria-expanded','false');
   if(focusBack&&m.ret&&m.ret.focus)m.ret.focus();
 }
 function closeMenus(focusBack){while(menus.length>1)closeTopMenu(false);closeTopMenu(focusBack);}
@@ -974,6 +977,7 @@ function openDetail(hash,tab){
   var d=$('#drawer');
   return fetch('/ui/detail?hash='+encodeURIComponent(hash)+'&tab='+encodeURIComponent(tab),{cache:'no-store'}).then(function(r){return r.text();}).then(function(h){
     var wasOpen=!d.hidden;$('#drawer-body').innerHTML=h;d.hidden=false;
+    if(!wasOpen){var sp=$('#dsplit');sp.setAttribute('aria-valuenow',Math.round(d.getBoundingClientRect().height));sp.setAttribute('aria-valuemin',120);sp.setAttribute('aria-valuemax',Math.max(160,window.innerHeight-200));}
     if(!wasOpen){var c=$('#drawer [data-close-drawer]');if(c)c.focus();}
   });
 }
@@ -1249,7 +1253,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
   {{if .UTPSocket}}<div class="row"><span>uTP socket</span><b>{{.UTPSocket}}</b></div>{{end}}
 {{end}}{{define "live"}}
   {{if .Rows}}
-  <table class="tbl t" id="torrents" aria-label="Torrents">
+  <table class="tbl t" id="torrents" role="grid" aria-multiselectable="true" aria-label="Torrents">
     <thead><tr>
       <th class="sel" scope="col"><input type="checkbox" id="selall" aria-label="Select all" title="Select all"></th>
       <th scope="col" class="c-name" data-col="name" data-sort="name" aria-sort="none"><button type="button" class="sort" title="Sort by name">Name<span class="arrow" aria-hidden="true"></span></button></th>
@@ -1280,7 +1284,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
       <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}" aria-label="Select torrent" title="Select this torrent for batch actions"></td>
       <td class="name c-name" title="{{.Name}}"><a class="open" href="/?open={{.Hash}}">{{.Name}}</a>{{if .Pinned}}<span class="fl" title="Force started: runs outside the queue limits">F</span>{{end}}</td>
       <td class="num c-size" title="{{.DoneSize}}">{{.Size}}</td>
-      <td class="c-progress"><div class="pbar {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><i style="width:{{percent .Progress}}%"></i><span>{{.ProgressS}}</span></div></td>
+      <td class="c-progress"><div class="prog"><div class="pbar {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><i style="width:{{percent .Progress}}%"></i></div><span class="pct" aria-hidden="true">{{.ProgressS}}</span></div></td>
       <td class="state c-state"><span class="badge b-{{.State}}">{{.StateLabel}}</span></td>
       <td class="num c-seeds">{{.Seeds}}{{if ge .SwarmSeeds 0}}<span class="subtle"> ({{.SwarmSeeds}})</span>{{end}}</td>
       <td class="num c-peers">{{.Peers}}{{if ge .SwarmPeers 0}}<span class="subtle"> ({{.SwarmPeers}})</span>{{end}}</td>
@@ -1316,7 +1320,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
     <button type="button" class="primary" onclick="document.getElementById('btn-add').click()" title="Add torrents: magnet links, .torrent URLs or files (shortcut N)"><svg class="i"><use href="#i-plus"/></svg>Add</button>
   </div>
   {{end}}
-{{end}}{{define "th"}}<th scope="col" class="c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "thnum"}}<th scope="col" class="num c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "rz"}}<span class="rz" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize column" title="Drag, or use the left and right arrows, to resize the column; double click for the default width"></span>{{end}}{{define "detail"}}
+{{end}}{{define "th"}}<th scope="col" class="c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "thnum"}}<th scope="col" class="num c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "rz"}}<span class="rz" role="separator" aria-orientation="vertical" aria-valuemin="40" aria-valuemax="800" aria-valuenow="100" tabindex="0" aria-label="Resize column" title="Drag, or use the left and right arrows, to resize the column; double click for the default width"></span>{{end}}{{define "detail"}}
 <div class="dhead">
   <h2 id="drawer-title">{{.Name}}</h2>
   <button type="button" class="ghost icon" data-close-drawer aria-label="Close details" title="Close details"><svg class="i"><use href="#i-x"/></svg></button>
@@ -1431,7 +1435,7 @@ window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
         <td class="sel"><input type="checkbox" class="filesel" name="index" value="{{.Index}}" form="files-bulk" aria-label="Select file" title="Select this file to change its priority with the others"></td>
         <td class="fname" style="word-break:break-word">{{.Path}}</td>
         <td class="num">{{bytes .Size}}</td>
-        <td class="fp"><div class="pbar{{if not .Wanted}} paused{{end}}" role="progressbar" aria-valuenow="{{pct .Done .Size}}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><i style="width:{{pct .Done .Size}}%"></i><span>{{pct .Done .Size}}%</span></div></td>
+        <td class="fp"><div class="prog"><div class="pbar{{if not .Wanted}} paused{{end}}" role="progressbar" aria-valuenow="{{pct .Done .Size}}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><i style="width:{{pct .Done .Size}}%"></i></div><span class="pct" aria-hidden="true">{{pct .Done .Size}}%</span></div></td>
         <td><form method="post" action="/ui/file-priority" class="autosubmit">
           <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="files"><input type="hidden" name="index" value="{{.Index}}">
           <select name="priority" aria-label="Priority" title="Download priority for this file (Skip, Normal, High, Maximum)" onchange="this.form.requestSubmit()"><option value="0"{{if eq .Priority 0}} selected{{end}}>Skip</option><option value="4"{{if eq .Priority 4}} selected{{end}}>Normal</option><option value="6"{{if eq .Priority 6}} selected{{end}}>High</option><option value="7"{{if eq .Priority 7}} selected{{end}}>Maximum</option></select>
