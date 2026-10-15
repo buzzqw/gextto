@@ -226,6 +226,13 @@ and never the system/desktop plumbing (`systemd-private-*`, `snap-private-tmp`,
 `.X11-unix`, `tmux-*`, `ssh-*`, …). The timer runs it daily with a 30 minute
 jitter; the log is in the journal (`journalctl --user -u tmp-clean`).
 
+Claude Code's scratch area (`/tmp/claude-<uid>`) is cleaned too, one session at
+a time rather than as a whole: `<project>/<session>` goes once the session is
+idle — its transcript `~/.claude/projects/<project>/<session>.jsonl` and its
+own content untouched for 12 h (`--claude-idle HOURS`) — and nothing in it is
+open or is a process's working directory, so a running session keeps its
+scratchpad. The loose files beside the sessions age like build residue (6 h).
+
 ## Build cache
 
 The Go build cache (`GOCACHE`, normally `~/.cache/go-build`) grows over time: a

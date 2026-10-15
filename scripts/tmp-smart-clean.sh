@@ -14,12 +14,17 @@
 #     hard floor (1 h);
 #   * system and desktop plumbing is never touched: systemd-private-*,
 #     snap-private-tmp, .X11-unix, .ICE-unix, .XIM-unix, .font-unix, .Test-unix,
-#     and any entry that is a socket.
+#     and any entry that is a socket;
+#   * Claude Code's scratch area (/tmp/claude-<uid>) is cleaned per session:
+#     <project>/<session> goes once the session is idle — its transcript
+#     (~/.claude/projects/<project>/<session>.jsonl) untouched for the idle
+#     time (default 12 h) — and nothing in it is open or a process's cwd; the
+#     loose files beside the sessions age like residue.
 #
 # Usage:
 #   scripts/tmp-smart-clean.sh [--dry-run] [--older-than HOURS]
 #                              [--junk-older-than HOURS] [--floor HOURS]
-#                              [--paths DIR] [--verbose]
+#                              [--claude-idle HOURS] [--paths DIR] [--verbose]
 #
 # With a systemd user timer (scripts/install-tmp-cleaner.sh) it runs daily; the
 # summary goes to the journal (`journalctl --user -u tmp-clean`).
@@ -30,10 +35,11 @@ VERBOSE=0
 OLDER_HOURS=24
 JUNK_HOURS=6
 FLOOR_HOURS=1
+CLAUDE_IDLE_HOURS=12
 PATHS=()
 
 usage() {
-  sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
 }
 
@@ -44,6 +50,7 @@ while [[ $# -gt 0 ]]; do
     --older-than) OLDER_HOURS="${2:?}"; shift 2 ;;
     --junk-older-than) JUNK_HOURS="${2:?}"; shift 2 ;;
     --floor) FLOOR_HOURS="${2:?}"; shift 2 ;;
+    --claude-idle) CLAUDE_IDLE_HOURS="${2:?}"; shift 2 ;;
     --paths) PATHS+=("${2:?}"); shift 2 ;;
     -h | --help) usage ;;
     *) echo "unknown option: $1" >&2; usage ;;
@@ -70,6 +77,8 @@ in_use_file="$(mktemp "${TMPDIR:-/tmp}/tmp-clean-inuse.XXXXXX")"
 trap 'rm -f "$in_use_file"' EXIT
 for pid in /proc/[0-9]*; do
   [[ -d "$pid/fd" ]] || continue
+  # A shell sitting in a directory holds it as much as an open file does.
+  link="$(readlink -f "$pid/cwd" 2>/dev/null)" && [[ "$link" == /tmp/* ]] && printf '%s\n' "$link"
   for fd in "$pid"/fd/*; do
     link="$(readlink -f "$fd" 2>/dev/null)" || continue
     [[ -n "$link" && "$link" != "/" ]] || continue
@@ -169,6 +178,68 @@ for root in "${PATHS[@]}"; do
     remove_entry "$entry" "old file, ${age_h}h"
   done < <(find "$root" -xdev -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
 done
+
+# Claude Code's scratch area. The top-level loop skips it (claude- is in
+# PROTECTED_NAME): removing it whole would pull the floor from under a running
+# session, so it is cleaned one session at a time here.
+CLAUDE_TMP="/tmp/claude-$UID_NOW"
+CLAUDE_PROJECTS="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
+claude_threshold=$CLAUDE_IDLE_HOURS
+((claude_threshold < FLOOR_HOURS)) && claude_threshold=$FLOOR_HOURS
+junk_threshold=$JUNK_HOURS
+((junk_threshold < FLOOR_HOURS)) && junk_threshold=$FLOOR_HOURS
+
+# claude_entry removes one entry of the scratch area when it is ours, not in
+# use and idle for the threshold; idle_since (epoch) is when it was last
+# touched, by its own content or by the session transcript.
+claude_entry() {
+  local entry="$1" threshold="$2" idle_since="$3" kind="$4" idle_h
+  [[ "$(stat -c %u -- "$entry" 2>/dev/null || echo -1)" == "$UID_NOW" ]] || return 0
+  if [[ -S "$entry" ]] || held_open "$entry" ||
+    { [[ -d "$entry" && ! -L "$entry" ]] && [[ -n "$(find "$entry" -xdev -type s -print -quit 2>/dev/null)" ]]; }; then
+    skipped_in_use=$((skipped_in_use + 1))
+    [[ "$VERBOSE" == 1 ]] && printf 'kept (in use): %s\n' "$entry"
+    return 0
+  fi
+  idle_h=$(( (NOW - idle_since) / 3600 ))
+  if ((idle_h < threshold)); then
+    skipped_young=$((skipped_young + 1))
+    [[ "$VERBOSE" == 1 ]] && printf 'kept (%s active %sh ago): %s\n' "$kind" "$idle_h" "$entry"
+    return 0
+  fi
+  remove_entry "$entry" "$kind idle ${idle_h}h"
+}
+
+if [[ -d "$CLAUDE_TMP" && ! -L "$CLAUDE_TMP" ]]; then
+  while IFS= read -r -d '' entry; do
+    name="$(basename "$entry")"
+    if [[ -d "$entry" && ! -L "$entry" && "$name" == -* ]]; then
+      # A project directory: one subdirectory per session.
+      while IFS= read -r -d '' sess; do
+        last="$(newest_mtime "$sess")"
+        transcript="$CLAUDE_PROJECTS/$name/$(basename "$sess").jsonl"
+        if [[ -f "$transcript" ]]; then
+          t="$(stat -c %Y -- "$transcript" 2>/dev/null || echo 0)"
+          ((t > last)) && last="$t"
+        fi
+        if [[ -d "$sess" && ! -L "$sess" ]]; then
+          claude_entry "$sess" "$claude_threshold" "$last" "session"
+        else
+          claude_entry "$sess" "$junk_threshold" "$last" "file"
+        fi
+      done < <(find "$entry" -xdev -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
+      # The project directory goes with its last session.
+      [[ "$DRY_RUN" == 1 ]] || rmdir -- "$entry" 2>/dev/null || true
+      continue
+    fi
+    # Loose files and tool directories (bash-edit-diff, ...) beside the sessions.
+    if [[ -d "$entry" && ! -L "$entry" ]]; then
+      claude_entry "$entry" "$junk_threshold" "$(newest_mtime "$entry")" "scratch"
+    else
+      claude_entry "$entry" "$junk_threshold" "$(stat -c %Y -- "$entry" 2>/dev/null || echo "$NOW")" "scratch"
+    fi
+  done < <(find "$CLAUDE_TMP" -xdev -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
+fi
 
 if [[ "$DRY_RUN" == 1 ]]; then
   printf 'tmp-smart-clean (dry run): %d entries would go, %d kept (in use), %d kept (too young)\n' \
