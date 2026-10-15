@@ -52,6 +52,7 @@ type wantedEntry struct {
 	Kind          string `json:"kind"` // "series" | "movie"
 	Seasons       string `json:"seasons,omitempty"`
 	Language      string `json:"language,omitempty"`
+	Subtitles     string `json:"subtitles,omitempty"`
 	Quality       string `json:"quality,omitempty"`
 	Exclude       string `json:"exclude,omitempty"`
 	EpisodeFilter string `json:"episode_filter,omitempty"`
@@ -91,10 +92,11 @@ func (d *Daemon) saveWanted(list []wantedEntry) error {
 	return d.opts.Settings.Save()
 }
 
-// wantedIncludes are the include terms of a wanted entry: language and
-// quality, formatted for display.
+// wantedIncludes are the include terms of a wanted entry: language, subtitles
+// and quality, formatted for display.
 func (w wantedEntry) includes() []string {
 	out := splitList(w.Language)
+	out = append(out, splitList(w.Subtitles)...)
 	if q := strings.TrimSpace(w.Quality); q != "" && q != "any" && q != "*" {
 		out = append(out, q)
 	}
@@ -191,12 +193,17 @@ func (w wantedEntry) criteria() rss.Criteria {
 	}
 }
 
-// wantedIncludeMatch reports whether the title contains every language term
-// and satisfies the quality requirement.
+// wantedIncludeMatch reports whether the title contains every language and
+// subtitle term and satisfies the quality requirement.
 func wantedIncludeMatch(w wantedEntry, title string) bool {
 	lower := strings.ToLower(title)
 	// rss.HasTerm: "sub ita" finds "SUB.ITA", "ita" does not find "Capitan".
 	for _, term := range splitList(w.Language) {
+		if strings.TrimSpace(term) != "" && !rss.HasTerm(title, term) {
+			return false
+		}
+	}
+	for _, term := range splitList(w.Subtitles) {
 		if strings.TrimSpace(term) != "" && !rss.HasTerm(title, term) {
 			return false
 		}

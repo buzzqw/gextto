@@ -358,8 +358,8 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
   posseduti, quindi nulla viene scaricato due volte —, gestore puntate per
   segnare cosa hai o manca e forzare una nuova ricerca, e per ogni titolo
   l'elenco delle sue **release con un verdetto**: verrebbe presa, già
-  posseduta, o il filtro che la scarta — lingua, qualità, stagione, termine
-  escluso — mostrato dal vivo mentre lo aggiungi) e pagina **RSS & Indexer**
+  posseduta, o il filtro che la scarta — lingua, sottotitoli, qualità, stagione,
+  termine escluso — mostrato dal vivo mentre lo aggiungi) e pagina **RSS & Indexer**
   (feed, regole, indexer, opzioni a schede; ogni feed dice quali regole
   decidono cosa scarica; termini delle regole in *contiene tutti* / *uno di* /
   *nessuno di*, confrontati ignorando punti e trattini dei nomi delle release;

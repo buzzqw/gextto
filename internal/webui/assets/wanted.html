@@ -96,7 +96,10 @@ details.hint summary{cursor:pointer}
         <div class="fgrid">
           <label class="field" id="seasons-field">Seasons<input type="text" name="seasons" placeholder="1+ / 2-4 / 1" autocomplete="off" title="Season numbers or range (e.g. 1+, 2-4, 1)"><span class="hint">1+ = from season 1 on</span></label>
           <label class="field">Language<input type="text" name="language" id="wanted-language" placeholder="ita" autocomplete="off" title="Required language terms (e.g. ita, eng)">
-            <span class="quick" role="group" aria-label="Common languages"><button type="button" data-lang="ita" aria-pressed="false" title="Italian releases">ita</button><button type="button" data-lang="eng" aria-pressed="false" title="English releases">eng</button><button type="button" data-lang="multi" aria-pressed="false" title="Releases with several audio tracks">multi</button><button type="button" data-lang="sub ita" aria-pressed="false" title="Italian subtitles">sub ita</button></span>
+            <span class="quick" role="group" aria-label="Common languages"><button type="button" data-lang="ita" aria-pressed="false" title="Italian releases">ita</button><button type="button" data-lang="eng" aria-pressed="false" title="English releases">eng</button><button type="button" data-lang="multi" aria-pressed="false" title="Releases with several audio tracks">multi</button></span>
+          </label>
+          <label class="field">Subtitles<input type="text" name="subtitles" id="wanted-subtitles" placeholder="sub ita" autocomplete="off" title="Subtitle terms matched on the release name (e.g. sub ita)">
+            <span class="quick" role="group" aria-label="Common subtitles"><button type="button" data-sub="sub ita" aria-pressed="false" title="Italian subtitles">sub ita</button><button type="button" data-sub="sub eng" aria-pressed="false" title="English subtitles">sub eng</button></span>
           </label>
           <label class="field">Quality<select name="quality" id="wanted-quality" title="Required video quality resolution">
             <option value="">Any</option>
@@ -182,12 +185,17 @@ function syncLang(){var terms=($('#wanted-language').value||'').toLowerCase().sp
 $$('[data-lang]').forEach(function(b){b.addEventListener('click',function(){var input=$('#wanted-language'),terms=input.value.split(',').map(function(s){return s.trim();}).filter(Boolean),i=terms.map(function(x){return x.toLowerCase();}).indexOf(b.dataset.lang);if(i>=0)terms.splice(i,1);else terms.push(b.dataset.lang);input.value=terms.join(', ');syncLang();});});
 $('#wanted-language').addEventListener('input',syncLang);
 
+// Subtitles quick picks toggle a term in the field (matched on the release name).
+function syncSub(){var terms=($('#wanted-subtitles').value||'').toLowerCase().split(',').map(function(s){return s.trim();});$$('[data-sub]').forEach(function(b){b.setAttribute('aria-pressed',terms.indexOf(b.dataset.sub)>=0?'true':'false');});}
+$$('[data-sub]').forEach(function(b){b.addEventListener('click',function(){var input=$('#wanted-subtitles'),terms=input.value.split(',').map(function(s){return s.trim();}).filter(Boolean),i=terms.map(function(x){return x.toLowerCase();}).indexOf(b.dataset.sub);if(i>=0)terms.splice(i,1);else terms.push(b.dataset.sub);input.value=terms.join(', ');syncSub();});});
+$('#wanted-subtitles').addEventListener('input',syncSub);
+
 function openEditor(data,index){
   form.reset();$('#wanted-index').value=index===undefined?'':index;$('#wanted-results').textContent='';
   $('#wanted-search-source').textContent=t('Search to see how the title is named in the feeds and pick the right one.');
   if(data){
     form.elements.name.value=data.name||'';$$('input[name=kind]',form).forEach(function(r){r.checked=r.value===(data.kind||'series');});
-    ['seasons','language','exclude','category','savepath'].forEach(function(n){form.elements[n].value=data[n]||'';});
+    ['seasons','language','subtitles','exclude','category','savepath'].forEach(function(n){form.elements[n].value=data[n]||'';});
     form.elements.episode_filter.value=data.episode||'';form.elements.paused.checked=data.paused==='true';
     var q=$('#wanted-quality');if(data.quality&&!q.querySelector('option[value="'+data.quality+'"]')){var o=document.createElement('option');o.value=data.quality;o.textContent=data.quality;q.appendChild(o);}q.value=data.quality||'';
     $('#wanted-more').open=!!(data.exclude||data.episode||data.category||data.savepath||data.paused==='true');
@@ -198,10 +206,10 @@ function openEditor(data,index){
   if(editing&&(data.kind||'series')!=='movie'){mgr.hidden=false;mgr.open=true;loadEpisodes(index);}
   else{mgr.hidden=true;mgr.open=false;currentIndex=null;$('#wanted-episodes-body').textContent='';}
   $('#dlg-wanted-title').textContent=editing?t('Edit title'):t('Add title');$('#wanted-submit').textContent=editing?t('Save wanted'):t('Add wanted');
-  syncKind();syncLang();openDialog(dlg);form.elements.name.focus();previewWanted();
+  syncKind();syncLang();syncSub();openDialog(dlg);form.elements.name.focus();previewWanted();
 }
 $('#add-wanted').addEventListener('click',function(){openEditor(null);});
-$$('[data-wanted-edit]').forEach(function(btn){btn.addEventListener('click',function(){var d={};['name','kind','seasons','language','quality','exclude','episode','category','savepath','paused'].forEach(function(k){d[k]=btn.getAttribute('data-'+k)||'';});openEditor(d,btn.getAttribute('data-index'));});});
+$$('[data-wanted-edit]').forEach(function(btn){btn.addEventListener('click',function(){var d={};['name','kind','seasons','language','subtitles','quality','exclude','episode','category','savepath','paused'].forEach(function(k){d[k]=btn.getAttribute('data-'+k)||'';});openEditor(d,btn.getAttribute('data-index'));});});
 
 // Episode manager: what is present, what is missing, and force a new search.
 var currentIndex=null;
@@ -276,7 +284,7 @@ function renderReleases(res,sum,counts,list){
     list.appendChild(r);
   });
 }
-function previewParams(){var p=new URLSearchParams();['name','kind','seasons','language','quality','exclude','episode_filter'].forEach(function(n){var el=form.elements[n];if(!el)return;p.set(n,el.value||'');});return p;}
+function previewParams(){var p=new URLSearchParams();['name','kind','seasons','language','subtitles','quality','exclude','episode_filter'].forEach(function(n){var el=form.elements[n];if(!el)return;p.set(n,el.value||'');});return p;}
 function previewWanted(){
   var seq=++previewSeq,sum=$('#wanted-preview-sum');
   if((form.elements.name.value||'').trim().length<2){sum.textContent=t('Type a title to see which releases in the archive it would take, and why the others are left out.');$('#wanted-preview-counts').textContent='';$('#wanted-preview-list').textContent='';return;}

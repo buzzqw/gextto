@@ -69,6 +69,7 @@ func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
 			Kind:          strings.TrimSpace(r.FormValue("kind")),
 			Seasons:       strings.TrimSpace(r.FormValue("seasons")),
 			Language:      strings.TrimSpace(r.FormValue("language")),
+			Subtitles:     strings.TrimSpace(r.FormValue("subtitles")),
 			Quality:       strings.TrimSpace(r.FormValue("quality")),
 			Exclude:       strings.TrimSpace(r.FormValue("exclude")),
 			EpisodeFilter: strings.TrimSpace(r.FormValue("episode_filter")),
@@ -658,6 +659,9 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		if strings.TrimSpace(w.Language) != "" {
 			chips.WriteString(uiChip("in", "Language", w.Language))
 		}
+		if strings.TrimSpace(w.Subtitles) != "" {
+			chips.WriteString(uiChip("in", "Subtitles", w.Subtitles))
+		}
 		if q := strings.TrimSpace(w.Quality); q != "" {
 			chips.WriteString(uiChip("in", "Quality", q))
 		}
@@ -711,6 +715,7 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			` data-kind="` + w.kind() + `"` +
 			` data-seasons="` + html.EscapeString(w.Seasons) + `"` +
 			` data-language="` + html.EscapeString(w.Language) + `"` +
+			` data-subtitles="` + html.EscapeString(w.Subtitles) + `"` +
 			` data-quality="` + html.EscapeString(w.Quality) + `"` +
 			` data-exclude="` + html.EscapeString(w.Exclude) + `"` +
 			` data-episode="` + html.EscapeString(w.EpisodeFilter) + `"` +

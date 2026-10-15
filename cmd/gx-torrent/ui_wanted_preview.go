@@ -31,6 +31,7 @@ const (
 	verdictEpisode  = "Not in the episode filter"
 	verdictNoEp     = "No episode number"
 	verdictLanguage = "Language does not match"
+	verdictSubtitle = "Subtitles do not match"
 	verdictQuality  = "Quality does not match"
 	verdictExcluded = "Excluded term"
 	verdictOther    = "Another title"
@@ -58,6 +59,11 @@ func wantedVerdict(w wantedEntry, re *regexp.Regexp, title string, now time.Time
 	for _, term := range splitList(w.Language) {
 		if strings.TrimSpace(term) != "" && !rss.HasTerm(title, term) {
 			return verdictLanguage, ep
+		}
+	}
+	for _, term := range splitList(w.Subtitles) {
+		if strings.TrimSpace(term) != "" && !rss.HasTerm(title, term) {
+			return verdictSubtitle, ep
 		}
 	}
 	if !wantedQualityMatch(w.Quality, strings.ToLower(title)) {
@@ -93,7 +99,7 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	entry := wantedEntry{
 		Name: strings.TrimSpace(q.Get("name")), Kind: q.Get("kind"), Seasons: q.Get("seasons"),
-		Language: q.Get("language"), Quality: q.Get("quality"), Exclude: q.Get("exclude"),
+		Language: q.Get("language"), Subtitles: q.Get("subtitles"), Quality: q.Get("quality"), Exclude: q.Get("exclude"),
 		EpisodeFilter: q.Get("episode_filter"),
 	}
 	if raw := strings.TrimSpace(q.Get("index")); raw != "" {

@@ -342,8 +342,8 @@ fewer features, but all the ones a standalone client needs.
   count as had, so nothing is downloaded twice —, an episode manager to mark
   what you have or miss and force a new search, and for every title the list of
   its **releases with a verdict**: would be taken, already had, or the filter
-  that turns it away — language, quality, season, excluded term — shown live
-  while you add it) and an **RSS & Indexers** page (feeds, rules, indexers,
+  that turns it away — language, subtitles, quality, season, excluded term —
+  shown live while you add it) and an **RSS & Indexers** page (feeds, rules, indexers,
   options as tabbed cards; every feed says which rules decide its downloads;
   rule terms in *contains all of* / *one of* / *none of*, matched across the
   dots and dashes of release names; a match preview that updates as you type

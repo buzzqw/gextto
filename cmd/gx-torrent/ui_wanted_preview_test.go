@@ -112,6 +112,21 @@ func TestWantedPreviewGivesEveryReleaseAVerdict(t *testing.T) {
 
 // TestRulePreviewWarnsAboutSeveralTitles: the rule preview groups what a rule
 // takes by title, so the editor can say "1080p" alone takes three series.
+// TestWantedVerdictRequiresSubtitles: a release without the subtitle term is
+// reported with its own reason, so the preview explains it.
+func TestWantedVerdictRequiresSubtitles(t *testing.T) {
+	w := wantedEntry{Name: "Show", Kind: "series", Seasons: "1", Subtitles: "sub ita"}
+	now := time.Now()
+	taken := map[wantedEpisode]bool{}
+	inSession := map[wantedEpisode]bool{}
+	if v, _ := wantedVerdict(w, nil, "Show.S01E02.SUB.ITA.1080p", now, taken, inSession); v != verdictTake {
+		t.Fatalf("with the subtitle term the verdict is %q, want %q", v, verdictTake)
+	}
+	if v, _ := wantedVerdict(w, nil, "Show.S01E02.1080p", now, taken, inSession); v != verdictSubtitle {
+		t.Fatalf("without the subtitle term the verdict is %q, want %q", v, verdictSubtitle)
+	}
+}
+
 func TestRulePreviewWarnsAboutSeveralTitles(t *testing.T) {
 	d := feedDaemon(t, "")
 	srv := httptest.NewServer(d.routes())

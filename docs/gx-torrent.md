@@ -329,7 +329,8 @@ The standalone pages follow the same structure:
   indexers again for what is missing. *Add title* is a guided
   dialog: series or movie, the title with a search that shows how it is named in
   the archive, feeds and indexers (pick one to use it), then seasons, language
-  (with quick picks) and quality, and the other options folded away.
+  (with quick picks), subtitles (terms matched on the release name, with quick
+  picks like `sub ita`) and quality, and the other options folded away.
 - **Archive** and **Settings** use the same top bar, tables and fieldsets;
   Settings keeps its *Save* button visible at the bottom while scrolling.
 

@@ -302,6 +302,19 @@ func TestWantedMatchesTitleAndFilters(t *testing.T) {
 	}
 }
 
+// TestWantedMatchesSubtitlesOnTheReleaseName: the Subtitles field is matched on
+// the release name, like the language terms.
+func TestWantedMatchesSubtitlesOnTheReleaseName(t *testing.T) {
+	w := wantedEntry{Name: "Mamma Mia", Kind: "series", Seasons: "1", Subtitles: "sub ita"}
+	now := time.Now()
+	if !w.matches("Mamma.Mia.S01E03.SUB.ITA.1080p", now) {
+		t.Fatal("a title carrying the subtitle term must match")
+	}
+	if w.matches("Mamma.Mia.S01E03.1080p", now) {
+		t.Fatal("a title without the subtitle term must not match")
+	}
+}
+
 func TestWantedQualityMatch(t *testing.T) {
 	tests := []struct {
 		req   string
