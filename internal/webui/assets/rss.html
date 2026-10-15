@@ -28,6 +28,17 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 .linklike{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit}
 .linklike:hover{text-decoration:underline}
 .linklike b{color:inherit}
+/* Feed folders: a header that folds the group away. .items > li is display:flex,
+   so a hidden row needs the rule below ([hidden] alone would be overridden). */
+#feed-list > li.feed-folder{display:block;padding:0;background:var(--sunken)}
+#feed-list > li[hidden]{display:none}
+.folder-toggle{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:10px 16px;cursor:pointer;color:var(--muted);font:600 12.5px/1 var(--font);text-align:left}
+.folder-toggle:hover{color:var(--text)}
+.folder-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.folder-toggle .fname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-toggle .cnt{font-weight:500;color:var(--subtle)}
+.folder-toggle svg{width:14px;height:14px;flex:none;transition:transform .15s}
+#feed-list > li.feed-folder.folded .folder-toggle svg{transform:rotate(-90deg)}
 </style>
 </head>
 <body>
@@ -322,6 +333,27 @@ $('#feednames').innerHTML=FEEDNAMES.map(function(n){var o=document.createElement
 
 // ---------- feeds ----------
 var feedForm=$('#feed-form');
+// Feed folders fold away: the header hides the feeds of its group, and the
+// choice is remembered per folder (34 imported feeds are unmanageable flat).
+(function(){
+  var KEY='gx-feed-folders',saved={};
+  try{saved=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){}
+  function rowsOf(folder){return $$('#feed-list > li[data-feed-row]').filter(function(li){return (li.getAttribute('data-folder')||'')===folder;});}
+  function apply(folder,folded,btn){
+    rowsOf(folder).forEach(function(li){li.hidden=folded;});
+    if(btn){btn.setAttribute('aria-expanded',folded?'false':'true');var head=btn.closest('li');if(head)head.classList.toggle('folded',folded);}
+  }
+  $$('#feed-list [data-folder-toggle]').forEach(function(btn){
+    var folder=btn.getAttribute('data-folder-toggle')||'';
+    var folded=!!saved[folder];
+    apply(folder,folded,btn);
+    btn.addEventListener('click',function(){
+      folded=btn.getAttribute('aria-expanded')==='true';
+      saved[folder]=folded;try{localStorage.setItem(KEY,JSON.stringify(saved));}catch(e){}
+      apply(folder,folded,btn);
+    });
+  });
+})();
 // With no feed configured, show the getting-started guide instead of an
 // empty list (the empty placeholder is an li without data-feed-row).
 (function(){

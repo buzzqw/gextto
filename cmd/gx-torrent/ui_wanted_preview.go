@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -113,6 +114,21 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 	// anyway and the two sources are merged, so a release found both in the
 	// archive and by the indexers appears once.
 	live := q.Get("live") == "1"
+	// season+episode scope the whole preview to one episode: the per-episode
+	// interactive search, which asks the indexers for "Title SxxEyy" (or reads
+	// the archive) and lists only that episode.
+	season, episode := -1, -1
+	if raw := strings.TrimSpace(q.Get("season")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			season = v
+		}
+	}
+	if raw := strings.TrimSpace(q.Get("episode")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			episode = v
+		}
+	}
+	oneEpisode := season >= 0 && episode >= 0
 	type release struct {
 		Title   string `json:"title"`
 		Size    int64  `json:"size,omitempty"`
@@ -128,6 +144,14 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 	if len([]rune(strings.TrimSpace(entry.Name))) < 2 || pattern == "" {
 		writeJSON(w, http.StatusOK, out)
 		return
+	}
+	if oneEpisode {
+		// The per-episode search looks for the episode itself, not the title: an
+		// indexer asked for "Title" alone would return the whole series.
+		if text == "" {
+			text = strings.Trim(strings.TrimSpace(entry.Name), "/")
+		}
+		text = fmt.Sprintf("%s S%02dE%02d", text, season, episode)
 	}
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -162,6 +186,14 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 	var releases []release
 	willTake := map[wantedEpisode]bool{}
 	for _, item := range items {
+		if oneEpisode {
+			// Only the asked episode: the same list is used by the automatic
+			// verdict, which would otherwise fill up with the other episodes.
+			_, itemSeason, itemEpisode, ok := rss.FindEpisode(item.Title)
+			if !ok || itemSeason != season || itemEpisode != episode {
+				continue
+			}
+		}
 		verdict, ep := wantedVerdict(entry, re, item.Title, now, taken, inSession)
 		if verdict == verdictOther {
 			continue
@@ -228,6 +260,7 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 		// went (the page adds a release with the title's own category and path).
 		"category": entry.Category, "savepath": entry.SavePath,
 		"live": live, "indexers": indexers, "indexer_error": indexerError,
+		"season": season, "episode": episode,
 	})
 }
 

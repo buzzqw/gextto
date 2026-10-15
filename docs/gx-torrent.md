@@ -285,7 +285,10 @@ The standalone pages follow the same structure:
 
 - **RSS & indexers** (`/ui/rss`) in four tabs (*Feeds*, *Rules*, *Indexers*,
   *Options*; the tab is in the URL, so a save comes back to it). Each feed, rule
-  and indexer is a card with its state and actions; the feed card shows the last
+  and indexer is a card with its state and actions; the feeds are **grouped by
+  folder**, each group opening with a header that folds it away (the folded
+  folders are remembered in the browser: a list of thirty imported feeds stays
+  navigable). The feed card shows the last
   check, its options as chips and opens its **items** (with the rule that takes
   each one and an *Add* button). New and edited entries open an editor dialog;
   the rule editor is organised in *Which items* (feeds, *Contains all of*,
@@ -888,6 +891,11 @@ the list with the same verdicts, so a release the automatic pass would not pick
 (an odd naming, a different quality) can still be taken deliberately. In the
 add/edit dialog the same preview is live while the filters are typed, and the
 *Search indexers too* checkbox makes it include the indexer results.
+The episode manager searches **one episode**: with a season and an episode typed,
+*Search this episode* opens the same list scoped to it (`GET
+/ui/wanted-preview?index=N&season=S&episode=E&live=1`), which queries the
+indexers for `Title SxxEyy` and keeps only that episode, so the release of a
+single missing episode is picked without wading through the series.
 
 The daemon, at every cycle, reads the **archive** for every title and turns the
 matching material into downloads. The **indexers** are queried only for the

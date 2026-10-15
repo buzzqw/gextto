@@ -850,9 +850,25 @@ func (d *Daemon) uiFeedRowsHTML() string {
 			break
 		}
 	}
+	// The feeds are grouped by folder: each group opens with a header the page
+	// can fold away (34 imported feeds are unmanageable as one flat list).
+	folderCounts := map[string]int{}
+	var order []string
+	for _, row := range rows {
+		folder := strings.TrimSpace(row.feed.Folder)
+		if _, seen := folderCounts[folder]; !seen {
+			order = append(order, folder)
+		}
+		folderCounts[folder]++
+	}
 	for _, row := range rows {
 		feed := row.feed
 		index := strconv.Itoa(row.index)
+		folder := strings.TrimSpace(feed.Folder)
+		if folderCounts[folder] > 0 {
+			b.WriteString(uiFeedFolderHeaderHTML(folder, folderCounts[folder], len(order) > 1))
+			folderCounts[folder] = 0 // once per group
+		}
 		source := strings.TrimSpace(feed.URL)
 		if source == "" && strings.TrimSpace(feed.Search) != "" {
 			source = "search: " + feed.Search
@@ -862,9 +878,6 @@ func (d *Daemon) uiFeedRowsHTML() string {
 			key = source
 		}
 		badges := ""
-		if feed.Folder != "" {
-			badges += `<span class="chip cat">` + html.EscapeString(feed.Folder) + `</span>`
-		}
 		if feed.Disabled {
 			badges += `<span class="badge b-paused">disabled</span>`
 		}
@@ -878,7 +891,7 @@ func (d *Daemon) uiFeedRowsHTML() string {
 		if feed.Disabled {
 			cls += " off"
 		}
-		b.WriteString(`<li class="` + cls + `" data-feed-row="` + html.EscapeString(key) + `"><div class="item-main">`)
+		b.WriteString(`<li class="` + cls + `" data-feed-row="` + html.EscapeString(key) + `" data-folder="` + html.EscapeString(folder) + `"><div class="item-main">`)
 		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(orDefault(feed.Name, "—")) + `</span>` + badges + `<span class="item-status" data-feed-status>` + uiFeedStatusHTML(statuses[key], totals[key]) + `</span></div>`)
 		b.WriteString(`<div class="item-sub mono" title="` + html.EscapeString(source) + `">` + html.EscapeString(source) + `</div>`)
 		covering := feedCoveringRules(rules, key)
@@ -900,6 +913,21 @@ func (d *Daemon) uiFeedRowsHTML() string {
 		b.WriteString(`</div></li>`)
 	}
 	return b.String()
+}
+
+// uiFeedFolderHeaderHTML opens a feed folder group: the page folds the group
+// away with the header (the state is remembered per folder in the browser). The
+// count says how many feeds the group holds. A single group (all the feeds
+// unfiled, say) gets no header: there would be nothing to fold.
+func uiFeedFolderHeaderHTML(folder string, feeds int, grouped bool) string {
+	if !grouped {
+		return ""
+	}
+	name := folder
+	if name == "" {
+		name = "No folder"
+	}
+	return `<li class="feed-folder" data-folder-head="` + html.EscapeString(folder) + `"><button type="button" class="folder-toggle" data-folder-toggle="` + html.EscapeString(folder) + `" aria-expanded="true" title="Show or hide this folder"><svg class="i"><use href="/assets/icons.svg#i-down"/></svg><span class="fname">` + html.EscapeString(name) + `</span><span class="cnt">` + strconv.Itoa(feeds) + `</span></button></li>`
 }
 
 // uiFeedChipsHTML shows the options of a feed that change what it adds.

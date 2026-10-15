@@ -175,6 +175,68 @@ func TestWantedPreviewLiveSearchesTheIndexers(t *testing.T) {
 	}
 }
 
+// TestWantedPreviewScopesToOneEpisode: the per-episode interactive search asks
+// for "Title SxxEyy" and lists only that episode, so the operator can pick a
+// release for the episode that is missing without wading through the series.
+func TestWantedPreviewScopesToOneEpisode(t *testing.T) {
+	d := feedDaemon(t, "")
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(searchFeedXML)) // a movie title, i.e. no episode
+	}))
+	defer indexer.Close()
+	if err := d.saveIndexers([]torznab.Indexer{{Name: "jackett", URL: indexer.URL}}); err != nil {
+		t.Fatal(err)
+	}
+	archiveItems(t, d, "feedA",
+		"Show Name S01E01 1080p ITA",
+		"Show Name S01E02 1080p ITA WEB",
+		"Show Name S01E02 720p ITA WEB",
+		"Show Name S01E03 1080p ITA",
+	)
+	if err := d.saveWanted([]wantedEntry{{Name: "Show Name", Kind: "series", Seasons: "1", Quality: "1080p"}}); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	var out struct {
+		Total    int `json:"total"`
+		Season   int `json:"season"`
+		Episode  int `json:"episode"`
+		Releases []struct {
+			Title   string `json:"title"`
+			Episode string `json:"episode"`
+			Verdict string `json:"verdict"`
+		} `json:"releases"`
+	}
+	resp, err := http.Get(srv.URL + "/ui/wanted-preview?index=0&season=1&episode=2&live=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	// Only the asked episode is listed: its two releases with their own verdicts.
+	// S01E01, S01E03 and the movie the indexer returns are left out.
+	if out.Total != 2 || out.Season != 1 || out.Episode != 2 {
+		t.Fatalf("total=%d season=%d episode=%d, want the two S01E02 releases", out.Total, out.Season, out.Episode)
+	}
+	byTitle := map[string]string{}
+	for _, rel := range out.Releases {
+		if rel.Episode != "S01E02" {
+			t.Fatalf("release %q is not S01E02: %+v", rel.Title, rel)
+		}
+		byTitle[rel.Title] = rel.Verdict
+	}
+	if byTitle["Show Name S01E02 1080p ITA WEB"] != verdictTake {
+		t.Fatalf("the 1080p release must be ready to take: %v", byTitle)
+	}
+	if byTitle["Show Name S01E02 720p ITA WEB"] != verdictQuality {
+		t.Fatalf("the 720p release must be turned away by quality: %v", byTitle)
+	}
+}
+
 // TestRulePreviewWarnsAboutSeveralTitles: the rule preview groups what a rule
 // takes by title, so the editor can say "1080p" alone takes three series.
 // TestWantedVerdictRequiresSubtitles: a release without the subtitle term is

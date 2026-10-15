@@ -140,6 +140,7 @@ details.hint summary{cursor:pointer}
           <label class="field">Season<input type="number" min="0" id="wanted-ep-season" title="Season number"></label>
           <label class="field">Episode<input type="number" min="1" id="wanted-ep-episode" title="Episode number"></label>
           <button type="button" id="wanted-ep-add" title="Add the episode as missing, so it is searched">Add as missing</button>
+          <button type="button" id="wanted-ep-search" title="Search this episode">Search this episode</button>
           <button type="button" id="wanted-ep-force" title="Search the indexers now for the missing episodes"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Force download missing</button>
         </div>
       </details>
@@ -241,6 +242,14 @@ function episodeOp(season,episode,op){
 }
 $('#wanted-ep-add').addEventListener('click',function(){var s=$('#wanted-ep-season').value,e=$('#wanted-ep-episode').value;if(s===''||e===''){toast(t('Enter a season and an episode'),true);return;}episodeOp(s,e,'add');$('#wanted-ep-episode').value='';});
 $('#wanted-ep-force').addEventListener('click',function(){if(currentIndex===null)return;poll(form.elements.name.value.trim(),null,this);});
+// Search one episode interactively: what the indexers return for "Title SxxEyy",
+// with the verdicts and an Add per release.
+$('#wanted-ep-search').addEventListener('click',function(){
+  var s=$('#wanted-ep-season').value,e=$('#wanted-ep-episode').value;
+  if(s===''||e===''){toast(t('Enter a season and an episode'),true);return;}
+  if(currentIndex===null)return;
+  openReleases(String(currentIndex),true,Number(s),Number(e),form.elements.name.value.trim());
+});
 
 // Typeahead from the archive.
 (function(){var input=$('#wanted-name'),list=$('#series-list'),timer=null;input.addEventListener('input',function(){clearTimeout(timer);var q=input.value.trim();if(q.length<2)return;timer=setTimeout(function(){fetch('/ui/rss-suggest?q='+encodeURIComponent(q),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){list.innerHTML='';(names||[]).forEach(function(n){var o=document.createElement('option');o.value=n;list.appendChild(o);});}).catch(function(){});},300);});})();
@@ -315,16 +324,25 @@ form.addEventListener('input',function(e){if(e.target.closest('#wanted-episodes-
 form.addEventListener('change',function(e){if(e.target.closest('#wanted-episodes-mgr'))return;clearTimeout(previewTimer);previewTimer=setTimeout(previewWanted,150);});
 $('#wanted-results').addEventListener('click',function(){clearTimeout(previewTimer);previewTimer=setTimeout(previewWanted,50);});
 $$('[data-wanted-releases]').forEach(function(btn){btn.addEventListener('click',function(){
-  relIndex=btn.getAttribute('data-index');relLive=false;
-  $('#dlg-releases-title').textContent=t('Releases')+' · '+btn.getAttribute('data-name');openDialog($('#dlg-releases'));loadReleases();
+  openReleases(btn.getAttribute('data-index'),false,null,null,btn.getAttribute('data-name'));
 });});
-// The interactive search: ask the indexers now and list what they return, with
-// the verdict of the wanted filters and an Add button per release.
-var relIndex=null,relLive=false;
+// The interactive search, per title or per episode: ask the indexers now and
+// list what they return, with the verdict of the wanted filters and an Add
+// button per release.
+var relIndex=null,relLive=false,relSeason=null,relEpisode=null;
+function openReleases(index,live,season,episode,label){
+  relIndex=index;relLive=!!live;relSeason=(season===undefined?null:season);relEpisode=(episode===undefined?null:episode);
+  var title=t('Releases')+' · '+(label||'');
+  if(relSeason!==null&&relEpisode!==null)title+=' S'+String(relSeason).padStart(2,'0')+'E'+String(relEpisode).padStart(2,'0');
+  $('#dlg-releases-title').textContent=title;
+  openDialog($('#dlg-releases'));loadReleases();
+}
 function loadReleases(){
   if(relIndex===null)return;
   var sum=$('#releases-sum');sum.textContent=t('Searching…');$('#releases-counts').textContent='';$('#releases-list').textContent='';
-  var u='/ui/wanted-preview?index='+encodeURIComponent(relIndex)+(relLive?'&live=1':'');
+  var u='/ui/wanted-preview?index='+encodeURIComponent(relIndex);
+  if(relSeason!==null&&relEpisode!==null)u+='&season='+relSeason+'&episode='+relEpisode;
+  if(relLive)u+='&live=1';
   fetch(u,{cache:'no-store'}).then(function(r){return r.json();}).then(function(res){renderReleases(res,sum,$('#releases-counts'),$('#releases-list'),loadReleases);}).catch(function(e){sum.textContent=t('Error')+': '+e.message;});
 }
 $('#releases-live').addEventListener('click',function(){relLive=true;loadReleases();});
