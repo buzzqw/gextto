@@ -207,6 +207,17 @@ At ~29 min uptime, real 34 MB blocklist and 4 active torrents: `gexttod` RSS 113
 (peers and active pieces), within the range of the other rounds, with no new
 steady-state allocation.
 
+**Crash-safe adds and engine-aware settings (2026-10-16, Intel N97, 4 cores).** The
+add intent written before every engine add and cleared after it (`torrent_add_intents`)
+costs **76–79 µs, 3.2 kB, 44 allocs** per started download (WAL SQLite, benchmark of
+`BeginTorrentAdd`+`EndTorrentAdd`, 3 runs): negligible next to the engine add itself;
+the recovery is one indexed query per cycle start. The per-torrent default peer cap
+(`max_connections_per_torrent`) is one engine command per torrent, only at add, session
+reload or when the value changes. Live service 12 minutes after the restart (2 torrents):
+`gexttod` RSS **70.7 MB**, ~1 % CPU including start-up (before: 83.4 MB, 0.8 %, at 81 min
+uptime); `gx-torrent` RSS **104.6 MB**, 0.3 % CPU (before: 115.7 MB, 0.7 %, at 106 min) —
+no regression.
+
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
 the whole answer unreadable), and the cost is nil: on a 100-item answer, strict
