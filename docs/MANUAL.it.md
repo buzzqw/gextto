@@ -426,8 +426,10 @@ quella generale); vale con ogni motore, anche per un torrent parcheggiato.
 
 **Rimuovi** agisce sulla sessione torrent e può chiedere se eliminare i file.
 **Pulisci completati** è più selettivo: rimuove i torrent che hanno raggiunto i
-limiti di seed. Un torrent rimosso dalla sessione non equivale necessariamente a
-un file rimosso dalla libreria.
+limiti di seed. Un torrent impostato a **seed infinito** (rapporto 0 oppure
+giorni 0) non viene mai rimosso, nemmeno se è in pausa o già archiviato. Un
+torrent rimosso dalla sessione non equivale necessariamente a un file rimosso
+dalla libreria.
 
 ### Completamento di file e cartelle
 

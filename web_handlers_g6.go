@@ -907,6 +907,15 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 		if !completed {
 			continue
 		}
+		// Explicit infinite seeding (ratio 0 or days 0): the operator asked
+		// for the torrent to keep seeding, so "Pulisci completati" leaves it
+		// in place like the automatic removal does (RemoveSeededCompleted).
+		// Only the no-limit branch below would otherwise take it, and that
+		// branch is meant for torrents with no policy at all.
+		if torrent.SeedRatio == 0.0 || torrent.SeedDays == 0 {
+			skipped++
+			continue
+		}
 		// Never interfere with a move/rename in progress: a torrent libtorrent is
 		// moving, or a tracked release whose library copy is not in place yet
 		// (end-of-seed archive pending), must be left alone. Removing it now would

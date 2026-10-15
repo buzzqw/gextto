@@ -1,6 +1,8 @@
 package gextto
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -442,5 +444,34 @@ func TestTeVeSeedsForever(t *testing.T) {
 	cfg.Transfer.SeedRatio = 1.5
 	if tev_seedsForever(&cfg, session, seedTestHash) {
 		t.Fatal("global ratio limit must make the policy finite")
+	}
+}
+
+// TestRemoveCompletedKeepsInfiniteSeeds pins the reported bug: "Pulisci
+// completati" removed a torrent the operator had set to seed forever. Ratio
+// 0 or days 0 is an explicit infinite seed and must stay, like it does for
+// the automatic removal; a torrent whose policy is reached still goes.
+func TestRemoveCompletedKeepsInfiniteSeeds(t *testing.T) {
+	db, cfg, view, _, _ := seedTestSetup(t)
+	for _, tc := range []struct {
+		name        string
+		ratio       float64
+		days        int64
+		wantRemoved bool
+	}{
+		{"ratio 0 (infinite)", 0, -1, false},
+		{"days 0 (infinite)", -1, 0, false},
+		{"both 0 (infinite)", 0, 0, false},
+		{"global ratio reached", -1, -1, true},
+	} {
+		v := view
+		v.SeedRatio, v.SeedDays = tc.ratio, tc.days
+		engine := &mockTorrentEngine{torrents: []models.TorrentView{v}, removed: map[string]bool{}}
+		s := &AppState{torrent_engine: engine, db: db, cfg: cfg, config_path: filepath.Join(t.TempDir(), "missing.toml")}
+		req := httptest.NewRequest(http.MethodPost, "/api/torrents/remove_completed", strings.NewReader(`{"delete_files":false}`))
+		RemoveCompletedTorrents(httptest.NewRecorder(), req, s)
+		if _, got := engine.removed[seedTestHash]; got != tc.wantRemoved {
+			t.Errorf("%s: removed=%v, want %v", tc.name, got, tc.wantRemoved)
+		}
 	}
 }

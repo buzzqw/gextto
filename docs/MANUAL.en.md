@@ -423,8 +423,9 @@ one); it works with every engine, even for a parked torrent.
 
 **Remove** acts on the torrent session and may ask whether to delete files.
 **Clean completed** is more selective: it removes torrents that reached their
-seeding limits. Removing a torrent from the session does not necessarily remove
-the file from the library.
+seeding limits. A torrent set to **seed forever** (ratio 0 or days 0) is never
+removed, not even when paused or already archived. Removing a torrent from the
+session does not necessarily remove the file from the library.
 
 ### Completion of files and folders
 
