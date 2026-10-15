@@ -387,7 +387,7 @@ install_files() {
   # Replace the bundled libraries cleanly: leftovers from a previous version
   # must not shadow the new ones.
   if [[ "$DRY_RUN" != "1" ]]; then
-    rm -rf "$INSTALL_DIR/lib"
+    rm -rf "${INSTALL_DIR:?}/lib"
   fi
   run install -d "$INSTALL_DIR/lib"
   if [[ -d "$work/lib" ]]; then

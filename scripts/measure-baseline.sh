@@ -10,7 +10,7 @@
 #
 # The output (a Markdown-ish log) is what gets pasted into measurements.md.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 out=${1:-/tmp/gx-baseline-$(date +%Y%m%d-%H%M%S).txt}
 exec > >(tee "$out") 2>&1
 

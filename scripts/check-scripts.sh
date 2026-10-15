@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Lint the maintenance scripts so a scripting mistake fails the local test
-# suite, not only a release or CI job. `bash -n` catches syntax errors; when
-# shellcheck is installed it also catches SC2154 (a variable referenced under
+# suite, not only a release or CI job. `bash -n` catches syntax errors; with
+# ShellCheck installed it also catches SC2154 (a variable referenced under
 # `set -u` but never assigned), the class of bug that once broke the release
-# packaging only in CI. shellcheck is not required: without it the syntax is
+# packaging only in CI. ShellCheck is not required: without it the syntax is
 # still checked.
 set -euo pipefail
 

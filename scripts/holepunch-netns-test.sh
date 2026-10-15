@@ -336,8 +336,8 @@ daemon_api() {
 
 wait_api() {
   # wait_api <netns|-> <api-port>
-  local ns="$1" api="$2" i
-  for i in $(seq 1 40); do
+  local ns="$1" api="$2"
+  for _ in $(seq 1 40); do
     if [[ -n "$(daemon_api "$ns" "$api" /api/v1/health 2>/dev/null)" ]]; then return 0; fi
     sleep 0.5
   done
