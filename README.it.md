@@ -51,7 +51,7 @@ Node.js/npm, sei lingue nell'interfaccia.
   visibili a ogni livello.
 - **Si controlla e si distribuisce con facilità.** Go puro senza CGO, nessuna
   dipendenza o build Node.js/npm, un processo sorvegliato per componente, oltre
-  1.780 funzioni di test e controlli di accessibilità con axe-core.
+  1.940 funzioni di test e controlli di accessibilità con axe-core.
 
 ### In breve
 
@@ -467,9 +467,9 @@ npm ci
 npm run test:a11y
 ```
 
-La suite automatizzata Playwright include 63 test end-to-end complessivi tra
-flussi, dialoghi e navigazione, di cui 14 dedicati specificamente alle verifiche
-di accessibilità WCAG con axe-core sulle sezioni principali. Non è una
+La suite automatizzata Playwright include 55 test end-to-end complessivi tra
+flussi, dialoghi e navigazione, di cui 14 di accessibilità, con verifiche
+WCAG con axe-core sulle sezioni principali. Non è una
 certificazione legale: restano necessari test manuali con screen reader,
 tastiera e tecnologie assistive. Ambito e limiti:
 [verifica di accessibilità](docs/measurements.md#6-accessibility-verification).

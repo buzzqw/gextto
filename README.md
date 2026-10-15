@@ -46,7 +46,7 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
   disk is reused across swarms without re-downloading. Detailed live
   diagnostics and connection telemetry are exposed at every layer.
 - **It is easy to audit and deploy.** Pure Go with zero CGO, zero Node.js/npm
-  runtime dependencies, a single supervised process per component, over 1,780
+  runtime dependencies, a single supervised process per component, over 1,940
   test functions, and accessibility checks with axe-core.
 
 ### At a glance
@@ -448,9 +448,9 @@ npm ci
 npm run test:a11y
 ```
 
-The automated Playwright suite includes 63 end-to-end tests covering
-navigation, dialogs and workflows, with 14 tests dedicated specifically to
-axe-core WCAG accessibility audits on the main sections. That is not a legal
+The automated Playwright suite includes 55 end-to-end tests covering
+navigation, dialogs and workflows, with 14 accessibility tests including
+axe-core WCAG audits on the main sections. That is not a legal
 certification: manual screen-reader, keyboard and assistive-technology testing
 is still required. Scope and limits:
 [accessibility verification](docs/measurements.md#6-accessibility-verification).
