@@ -91,6 +91,9 @@ Node.js/npm, sei lingue nell'interfaccia.
 - **Guardia NAS e mount point.** Una condivisione smontata non viene mai
   scambiata per file cancellati. I guasti transienti (disco pieno, timeout di
   rete) ritentano da soli e gli spostamenti interrotti riprendono al riavvio.
+  Anche l'avvio di un download resiste ai crash: un riavvio a metà aggiunta la
+  completa o la annulla, così nessun torrent resta orfano e nessun episodio
+  sembra preso quando non lo è.
 - **Cestino.** I file sostituiti da un vero upgrade e i dati di un torrent
   rimosso "con i dati" passano prima dal cestino configurato. Il torrent esce
   dal motore prima che si tocchi alcun file (nulla resta aperto su NFS) e le

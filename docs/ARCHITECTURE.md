@@ -75,6 +75,7 @@ qBittorrent-nox.
 | `appstate.go` | construction of the shared state `AppState` (`NewAppState`). |
 | `engine.go` | scrape/search engine: HTML/RSS feeds, Torznab, web engines. |
 | `orchestrator.go` | one complete acquisition cycle. |
+| `torrent_add_intent.go` | starting an approved release (add → approval → `torrent_meta`) and recovery of adds interrupted by a crash. |
 | `web_serve.go` | startup of the web server and background workers. |
 | `service_restart.go` | scheduled systemd actions (e.g. service restart). |
 | `update.go` | self-update of the binary. |

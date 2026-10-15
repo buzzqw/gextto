@@ -106,6 +106,13 @@ func RunCycleDomain(
 		for _, torrent := range snapshot {
 			liveHashes[strings.ToLower(torrent.Hash)] = struct{}{}
 		}
+		// Adds a previous process left half done are finished or undone first,
+		// so the reconciliation below sees their final torrent_meta rows.
+		if !cfg.DryRun {
+			if _, err := recoverInterruptedAdds(db, torrents, liveHashes, reportsHealth || len(snapshot) > 0, processStartedAt); err != nil {
+				logging.Warn("interrupted torrent adds could not be checked", "error", err)
+			}
+		}
 		if count, err := db.ReconcileMissingTorrents(liveHashes); err != nil {
 			logging.Warn("torrent reconciliation failed", "error", err)
 		} else if count > 0 {
@@ -868,8 +875,8 @@ func RunCycleDomain(
 			StallAlternatives: stallAlternatives,
 			StallScoreDrop:    stallScoreDrop,
 		}
-		// Decide only: nothing is written until the torrent is in the engine
-		// (see commitReleaseApproval).
+		// Decide only: the library is not written until the torrent is in the
+		// engine (see startApprovedRelease).
 		approved, approvalReason, err := evaluateReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade, true)
 		if err != nil {
 			return nil, err
@@ -923,47 +930,24 @@ func RunCycleDomain(
 					continue
 				}
 			}
-			added := false
-			if torrentFile != nil && *torrentFile != "" {
-				added, err = torrents.AddFileWithPath(*torrentFile, cfg, preferredPath)
-			} else {
-				added, err = torrents.AddWithPath(release.Magnet, cfg, preferredPath)
+			add := func() (bool, error) {
+				if torrentFile != nil && *torrentFile != "" {
+					return torrents.AddFileWithPath(*torrentFile, cfg, preferredPath)
+				}
+				return torrents.AddWithPath(release.Magnet, cfg, preferredPath)
 			}
-			if err != nil {
-				// A single release refused by the engine must not abort the whole
-				// cycle: nothing was written yet, so record the failure and
-				// continue with the remaining candidates.
-				stats.Error("add_failed")
-				logging.Warn(fmt.Sprintf("⚠️ Could not start the download of %s; moving on", logTarget(&release)), "error", err)
-				continue
+			commit := func() (bool, string, error) {
+				return commitReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade)
 			}
-			if !added {
-				stats.Error("torrent_rejected")
+			outcome, commitReason, err := startApprovedRelease(db, torrents, &release, score, cfg.DryRun, add, commit)
+			if outcome != "" {
+				// A single release that cannot be started must not abort the whole
+				// cycle: record the failure and continue with the other candidates.
+				logStartFailure(stats, &release, outcome, commitReason, err)
 				continue
 			}
 			if !cfg.DryRun {
-				committed, commitReason, commitErr := commitReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade)
-				if commitErr != nil || !committed {
-					stats.Error("approval_commit_failed")
-					logging.Warn(fmt.Sprintf("⚠️ %s withdrawn: it could not be recorded in the database", logTarget(&release)),
-						"reason", commitReason, "error", commitErr)
-					withdrawAddedTorrent(torrents, &release)
-					continue
-				}
 				approvalReason = commitReason
-			}
-			if !cfg.DryRun {
-				if err := db.RegisterTorrentScored(&release, score); err != nil {
-					// The torrent is already in the engine: without its database row
-					// it would be treated as a foreign torrent and never archived.
-					// Undo the add and the approval, then go on with the cycle.
-					stats.Error("register_failed")
-					logging.Warn(fmt.Sprintf("⚠️ %s withdrawn: it could not be recorded in the database", logTarget(&release)),
-						"error", err)
-					withdrawAddedTorrent(torrents, &release)
-					rollbackReleasePlaceholder(cfg, db, &release)
-					continue
-				}
 				if hash, ok := utils.MagnetHash(release.Magnet); ok {
 					_ = db.SetTorrentReason(hash, decisionReason)
 				}
@@ -1228,31 +1212,12 @@ func prioritizeArchiveGapDownloads(
 		if directory, ok := DownloadDirFor(&release, cfg); ok {
 			preferredPath = &directory
 		}
-		added, err := torrents.AddWithPath(release.Magnet, cfg, preferredPath)
-		if err != nil {
-			stats.Error("add_failed")
-			logging.Warn(fmt.Sprintf("⚠️ Could not start the download of %s; moving on", logTarget(&release)), "error", err)
-			continue
+		add := func() (bool, error) { return torrents.AddWithPath(release.Magnet, cfg, preferredPath) }
+		commit := func() (bool, string, error) {
+			return commitReleaseApproval(db, &release, candidate.score, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades)
 		}
-		if !added {
-			stats.Error("torrent_rejected")
-			continue
-		}
-		if committed, commitReason, commitErr := commitReleaseApproval(db, &release, candidate.score, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades); commitErr != nil || !committed {
-			stats.Error("approval_commit_failed")
-			logging.Warn(fmt.Sprintf("⚠️ %s withdrawn: it could not be recorded in the database", logTarget(&release)),
-				"reason", commitReason, "error", commitErr)
-			withdrawAddedTorrent(torrents, &release)
-			continue
-		}
-		if err := db.RegisterTorrentScored(&release, candidate.score); err != nil {
-			// Same rule as the main loop: an unregistered torrent must not stay in
-			// the engine, and one failure must not abort the cycle.
-			stats.Error("register_failed")
-			logging.Warn(fmt.Sprintf("⚠️ %s withdrawn: it could not be recorded in the database", logTarget(&release)),
-				"error", err)
-			withdrawAddedTorrent(torrents, &release)
-			_ = db.RollbackRelease(&release)
+		if outcome, commitReason, err := startApprovedRelease(db, torrents, &release, candidate.score, false, add, commit); outcome != "" {
+			logStartFailure(stats, &release, outcome, commitReason, err)
 			continue
 		}
 		_ = db.SetTorrentReason(hash, "gap_filled")
@@ -1389,17 +1354,18 @@ func withdrawAddedTorrent(torrents TorrentEngine, release *models.Release) {
 	}
 }
 
-// rollbackReleasePlaceholder undoes the episode/movie placeholder written by
-// commitReleaseApproval when the torrent registration that follows it fails,
-// so the release stays eligible for a later cycle instead of looking like an
-// already-downloaded duplicate. Dry runs write no placeholder, so it is a
-// no-op there.
-func rollbackReleasePlaceholder(cfg *Config, db *Database, release *models.Release) {
-	if cfg.DryRun {
-		return
-	}
-	if err := db.RollbackRelease(release); err != nil {
-		logging.Warn("release rollback failed", "error", err)
+// logStartFailure records why startApprovedRelease did not start a release.
+func logStartFailure(stats *models.CycleStats, release *models.Release, outcome, reason string, err error) {
+	stats.Error(outcome)
+	switch outcome {
+	case addFailed:
+		logging.Warn(fmt.Sprintf("⚠️ Could not start the download of %s; moving on", logTarget(release)), "error", err)
+	case addRejected:
+	case addIntentFailed:
+		logging.Warn(fmt.Sprintf("⚠️ %s not started: it could not be recorded in the database", logTarget(release)), "error", err)
+	default:
+		logging.Warn(fmt.Sprintf("⚠️ %s withdrawn: it could not be recorded in the database", logTarget(release)),
+			"step", outcome, "reason", reason, "error", err)
 	}
 }
 

@@ -102,6 +102,22 @@ difference (`upgrade_min_score_diff`) remains, deciding *by how much* a release 
 improve against *up to where* it is accepted, and the per-title "No upgrade" block
 is in the series tab.
 
+**Starting a download survives a crash** (`torrent_add_intent.go`). A release the
+cycle approves is recorded in three steps — the engine add, the approval in the
+library (placeholder or upgrade backup) and the `torrent_meta` row — and all of
+them go through `startApprovedRelease`, both in the cycle and in the missing-episode
+priority pass. Before the add an *intent* is written (`torrent_add_intents`) and it
+is cleared once the outcome is recorded; a failure at any step withdraws the torrent
+and undoes the approval. If the process dies in between, the next cycle resolves the
+leftover intents against the engine snapshot: a torrent that only lacked its row is
+registered and goes on downloading, one whose approval never reached the library is
+taken out of the session keeping its data (a new add of the same release resumes it),
+and a placeholder whose torrent is gone is rolled back so the episode is searched
+again. An empty snapshot from a backend that cannot report its health is not taken
+as evidence: those intents wait. The decision itself is still evaluated twice on
+purpose — a read-only evaluation before the add and the committing one after it —
+so a refused add writes nothing and the commit never trusts a stale state.
+
 **What counts as missing**: an episode with an active torrent — added by hand, from
 a watched folder or from the phone — and a season with a season pack in progress are
 not missing, neither in the cycle nor in the series tab; a download in error makes

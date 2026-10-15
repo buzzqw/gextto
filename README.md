@@ -85,7 +85,9 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
   disk usage during seeding.
 - **NAS and mount guard.** An unmounted share is never mistaken for deleted
   files. Transient failures (disk full, network timeouts) retry transparently
-  and interrupted moves resume on restart.
+  and interrupted moves resume on restart. Starting a download is crash-safe
+  too: a restart in the middle of an add either completes it or undoes it, so
+  no torrent is left orphaned and no episode looks taken when it is not.
 - **Recycle bin.** Files replaced by a true quality upgrade, and data of a
   torrent removed "with data", move to the configured trash first. The torrent
   leaves the engine before any file is touched (nothing held open on NFS) and
