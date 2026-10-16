@@ -16,7 +16,9 @@
 #
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+# Risolve un eventuale symlink (es. ~/gextto_tui.sh) per trovare il checkout.
+SCRIPT="$(readlink -f "$0")"
+ROOT="$(cd "$(dirname "$SCRIPT")" && pwd)"
 BIN="${GEXTTO_BINARY:-$ROOT/bin/gexttod}"
 
 if [[ ! -x "$BIN" ]]; then
