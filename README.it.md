@@ -74,8 +74,10 @@ Node.js/npm, sei lingue nell'interfaccia.
   deterministico su qualità, sorgente, codec, audio, HDR/Dolby Vision, lingua
   e dimensione. I file migliori già in libreria sono protetti, gli scarti sono
   registrati con la motivazione e una soglia ferma gli upgrade quando il file
-  raggiunge lo standard voluto. `ffprobe` può analizzare i media archiviati
-  per arricchire le decisioni.
+  raggiunge lo standard voluto. La pagina impostazioni mostra release di
+  riferimento valutate dal vivo con i pesi correnti, e le finestre dei download
+  bloccati si leggono come un'unica sequenza: i numeri si spiegano da soli.
+  `ffprobe` può analizzare i media archiviati per arricchire le decisioni.
 - **Serie, film, fumetti.** Per gli archivi CBZ vengono scritti metadati
   standard `ComicInfo.xml` (Komga, Kavita, reader).
 - **Recupero dai blocchi.** I download fermi e i magnet in attesa prolungata

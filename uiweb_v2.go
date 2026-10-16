@@ -1967,6 +1967,9 @@ const v2UnusedSettingsHint = "Valgono solo con un altro motore torrent: restano 
 type v2SettingGroup struct {
 	Title     string
 	Hint      string
+	// Summary is an optional read-only line under the hint (the stuck-download
+	// timeline, for instance), already translated.
+	Summary   string
 	Fields    []v2Field
 	Buttons   []v2Button
 	Links     []v2Link
@@ -2030,6 +2033,11 @@ type v2SettingsView struct {
 	ScoreGroups []v2ScoreGroup
 	ScoreNotice string
 	ScoreError  bool
+	// ScoreExamples are the reference releases scored with the current weights,
+	// shown above the weights in the Punteggi tab.
+	ScoreExamples []string
+	// Sources is the entry point of the Sorgenti tab (deep links + status).
+	Sources *v2SourcesIndex
 	// Structured editors (feeds, checkbox groups, list editors, rename,
 	// translations), rendered on the tab that owns them.
 	EditorsFirst   bool
@@ -2166,6 +2174,20 @@ func v2SettingsViewFrom(s *AppState, tab, highlight string) v2SettingsView {
 		i18nView := v2I18nViewFrom(s, "")
 		view.I18n = &i18nView
 	}
+	// Read-only insights built from the configured values: the stuck-download
+	// timeline on both of its panels, and the per-tab extras.
+	cfg := latestConfig(s)
+	for i := range view.Groups {
+		if stallSummaryGroupTitles[view.Groups[i].Title] {
+			view.Groups[i].Summary = stallPolicySummary(s, cfg)
+		}
+	}
+	switch page.ActiveID {
+	case "scores":
+		view.ScoreExamples = scoreExampleLines(s, cfg)
+	case "sources":
+		view.Sources = v2SourcesIndexFrom(s, cfg)
+	}
 	return view
 }
 
@@ -2291,9 +2313,11 @@ func V2SettingsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		seen[def.Key] = true
 		out.Matches = append(out.Matches, v2SettingMatch{Key: def.Key, Label: def.Label, Tab: def.Tab, TabLabel: labels[def.Tab]})
 	}
-	// The structured editors have no key: their result opens the section.
+	// The structured editors have no key: their result opens the section. Their
+	// search terms let a concept ("Prowlarr") reach an editor that has no key.
 	for _, entry := range uiSettingsEditorSearchEntries {
-		if strings.Contains(strings.ToLower(entry.Label), query) {
+		haystack := strings.ToLower(entry.Label + " " + entry.Terms)
+		if strings.Contains(haystack, query) {
 			out.Matches = append(out.Matches, v2SettingMatch{Label: entry.Label, Tab: entry.Tab, TabLabel: labels[entry.Tab]})
 		}
 	}

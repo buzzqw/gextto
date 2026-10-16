@@ -837,6 +837,9 @@ func uiSettingsTabEditors(tab string) []uiListEditor {
 // uiSettingsEditorSearchEntries point the settings search at the structured
 // editors, which have no single setting key.
 var uiSettingsEditorSearchEntries = []uiSearchEntry{
+	// The indexer/manager editor lives in the Integrazioni page; the result
+	// opens the Sorgenti tab, whose entry point links to it.
+	{Key: "", Label: "Indexer e manager", Tab: "sources", Terms: "prowlarr jackett torznab indexer manager sorgenti fonti"},
 	{Key: "", Label: "Feed RSS", Tab: "sources"},
 	{Key: "", Label: "Motori web", Tab: "sources"},
 	{Key: "", Label: "Filtri contenuto esclusi", Tab: "sources"},

@@ -325,6 +325,18 @@ saving; the value is shown next to it when compact (`Resettable`/`DefaultInline`
 `uiweb_v2.go`, `HasDefault` in `uiweb_pages.go`). Excluded: fields disabled for the
 active engine, handled by auto-tuning, secrets, or without a default.
 
+**Settings that explain themselves.** Read-only insights sit next to the controls
+(`uiweb_v2_settings_insights.go`), built from the configured values without moving a
+single row: the Sorgenti tab opens a three-link entry point (indexers/manager →
+Integrazioni, feed, web engines) with the active indexer count and the last cycle's
+outcome from `CycleSourceStat`; both stuck-download panels show the same one-line
+timeline («stalled after 60 min · retry every 60 · alternative after 360 up to −100 ·
+without seeders remove after 3 days · otherwise after 14 days»); and the Punteggi tab
+shows reference releases (1080p WEB-DL H.264/H.265, 2160p Dolby Vision) scored live
+with the current weights plus the stop threshold, so the 27 weights stop being opaque
+numbers. The settings search also reaches the indexer/manager editor by concept
+("Prowlarr"), which has no setting key of its own.
+
 **Streaming and DLNA.** Web streaming (`cmd/gx-torrent/stream.go`, the endpoint
 Gextto redirects to) sends the **Content-Type from the file extension**
 (`video/mp4`, `video/x-matroska`, `audio/flac`, …) with

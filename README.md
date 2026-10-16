@@ -71,7 +71,10 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
   quality, source, codec, audio, HDR/Dolby Vision, language and size.
   Higher-grade library files are protected, rejections are logged with the
   reason, and an optional ceiling stops upgrades once a file is good enough.
-  `ffprobe` can analyse archived media to inform decisions.
+  The settings page shows reference releases scored live with the current
+  weights, and the stuck-download windows read as a single timeline, so the
+  numbers explain themselves. `ffprobe` can analyse archived media to inform
+  decisions.
 - **TV, movies, comics.** Standard `ComicInfo.xml` metadata is written for CBZ
   archives (Komga, Kavita, readers).
 - **Stuck-download recovery.** Downloads that stop progressing, or magnets

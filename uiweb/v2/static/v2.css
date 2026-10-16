@@ -1624,6 +1624,25 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 }
 .settings-group-actions { margin-top: 12px; }
 .settings-group-links { margin-bottom: 12px; }
+.settings-summary {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent-2);
+  background: var(--surface-2, rgba(0, 0, 0, 0.03));
+  border-radius: 4px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text);
+  max-width: 70ch;
+}
+.sources-index-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.sources-index-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+.sources-index-item .btn { flex: 0 0 auto; }
+.sources-index-hint { flex: 1 1 220px; min-width: 0; }
+.sources-index-status { font-size: 0.8rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.sources-index-status.htx-status.err { font-weight: 600; }
+.score-examples { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-variant-numeric: tabular-nums; }
+.score-examples li { color: var(--text); }
 @media (max-width: 900px) {
   .settings-layout { grid-template-columns: 1fr; gap: 12px; }
   .settings-nav { position: static; max-height: none; overflow: visible; }

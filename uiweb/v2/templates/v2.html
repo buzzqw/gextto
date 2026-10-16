@@ -727,6 +727,8 @@
       <ul>{{range .Groups}}{{if not .Collapsed}}<li><a class="settings-group-chip" href="#{{.ID}}">{{.Title}}</a></li>{{end}}{{end}}</ul>
     </nav>{{end}}
     {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
+    {{if .Sources}}{{template "v2_sources_index" .Sources}}{{end}}
+    {{if .ScoreExamples}}{{template "v2_score_examples" .ScoreExamples}}{{end}}
     {{if .Actions}}
     <div class="panel settings-panel settings-actions-panel">
       <div class="panel-head"><h3>{{.Actions.Title}}</h3></div>
@@ -759,6 +761,7 @@
 {{end}}
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    {{if .Summary}}<p class="settings-summary" role="note">{{.Summary}}</p>{{end}}
     {{if .Links}}<div class="toolbar settings-group-links">{{range .Links}}<a class="btn sm" href="{{.Href}}" target="_blank" rel="noopener noreferrer"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}</a>{{end}}</div>{{end}}
     <div class="{{if .Grid}}form-grid{{else}}settings-rows{{end}}">
       {{range .Fields}}{{template "v2_setting_field" .}}{{end}}
@@ -766,6 +769,33 @@
     {{if .Buttons}}<div class="toolbar settings-group-actions">{{range .Buttons}}{{template "v2_button" .}}{{end}}</div>{{end}}
   </div>
 {{if .Collapsed}}</details>{{else}}</div>{{end}}
+{{end}}
+
+{{define "v2_sources_index"}}
+<div class="panel settings-panel" id="v2-sources-index">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <ul class="sources-index-list">
+      {{range .Links}}
+      <li class="sources-index-item">
+        <a class="btn sm" href="{{.Href}}"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}</a>
+        <span class="sources-index-hint muted">{{.Hint}}</span>
+        {{if .Status}}<span class="sources-index-status htx-status{{if .Alert}} err{{end}}">{{.Status}}</span>{{end}}
+      </li>
+      {{end}}
+    </ul>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_score_examples"}}
+<div class="panel settings-panel" id="v2-score-examples">
+  <div class="panel-head"><h3>Esempi con i pesi attuali</h3><small class="muted">Ricalcolati dai pesi correnti</small></div>
+  <div class="panel-body">
+    <ul class="score-examples">{{range .}}<li>{{.}}</li>{{end}}</ul>
+  </div>
+</div>
 {{end}}
 
 {{define "v2_ipfilter_action"}}
@@ -809,7 +839,7 @@
 
 {{define "v2_settings_editors"}}
 {{if .ShowFeeds}}
-<div class="card editor-card">
+<div class="card editor-card" id="v2-sources-feeds">
   <h3>Feed RSS</h3>
   <form method="post" action="/settings/feed" hx-post="/settings/feed" hx-swap="none" data-v2-track>
     <label class="field"><span>Un URL per riga</span><textarea class="input" name="feeds" rows="9">{{.Feeds}}</textarea></label>
