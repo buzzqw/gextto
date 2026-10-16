@@ -1049,6 +1049,12 @@ func (m *Model) speedPolicyLabel() string {
 	if policy.Source == "auto" {
 		return m.Tr.T("policy.auto")
 	}
+	// The scheduled "Auto" window: it beats the temporary limit without expiry
+	// and hands the line to the auto-tune, so it must not show as a kept temp
+	// limit (the "-1/-1" sentinel never reaches the header).
+	if policy.Source == "schedule_auto" {
+		return m.Tr.T("policy.schedauto")
+	}
 	// The schedule beats a temporary limit without expiry.
 	if minutes, active := m.TempLimitMinutes(); active && (minutes > 0 || policy.Source != "schedule") {
 		down, up := kibLabel(m.Tr, policy.TempDownloadKib), kibLabel(m.Tr, policy.TempUploadKib)

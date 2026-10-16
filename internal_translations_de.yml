@@ -5190,6 +5190,7 @@ deu:
   "Auto speed": "Auto-Geschwindigkeit"
   "Auto speed: la banda va all'auto-tune, senza tetto, come una fascia «Auto» della programmazione; disabilita i limiti temporanei": "Auto-Geschwindigkeit: die Bandbreite geht ohne Grenze an den Auto-Tune, wie ein «Auto»-Zeitfenster; deaktiviert die temporären Grenzen"
   "Auto speed: la banda va all'auto-tune, senza tetto": "Auto-Geschwindigkeit: die Bandbreite geht ohne Grenze an den Auto-Tune"
+  "Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune": "Zeitplan aktiv: «Auto»-Fenster, keine Grenze, die Leitung wird vom Auto-Tune gemessen"
   "Velocità automatica (misura la linea)": "Automatische Geschwindigkeit (misst die Leitung)"
   "Nessun tetto: la banda va all'auto-tune, che misura la linea e la lascia libera. Vince sui limiti globali e sulla programmazione; il limite temporaneo in Scarico resta un override a parte.": "Keine Grenze: die Bandbreite geht an den Auto-Tune, der die Leitung misst und frei lässt. Es gewinnt gegen die globalen Grenzen und den Zeitplan; das temporäre Limit in Downloads bleibt ein eigener Override."
   "Velocità automatica: nessun tetto, la linea la misura l'auto-tune": "Automatische Geschwindigkeit: keine Grenze, der Auto-Tune misst die Leitung"

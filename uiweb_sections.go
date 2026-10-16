@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/bwschedule"
 )
 
 // uiPageSection is one block of a panel page.
@@ -218,6 +220,10 @@ type uiDownloadsPage struct {
 	SpeedAuto bool
 	// Active scheduled speed limits and base limits
 	SchedActive bool
+	// SchedAuto: the active schedule window is an "Auto" band (the AutoLimit
+	// sentinel), which leaves the line to the auto-tune with no cap instead of
+	// applying a fixed number. The badge then says "Auto", never "-1/-1".
+	SchedAuto bool
 	// TempShadowed: a temporary limit without expiry overridden by the schedule.
 	TempShadowed bool
 	SchedDL      int64
@@ -601,6 +607,9 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 	}
 	if dl, ul, ok := gh6_scheduledSpeedLimits(cfg); ok {
 		page.SchedActive = true
+		// An "Auto" window is stored as the AutoLimit sentinel: it must show as
+		// "Auto", not as "-1/-1" KiB/s.
+		page.SchedAuto = dl == bwschedule.AutoLimit || ul == bwschedule.AutoLimit
 		page.SchedDL = dl
 		page.SchedUL = ul
 		// The schedule beats a temporary limit without expiry.

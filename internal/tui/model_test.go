@@ -738,6 +738,17 @@ func TestTempLimitsPrefillAndHeader(t *testing.T) {
 	if screen := m.Render(160, 20); !lineContains(screen, "fino a rimozione") {
 		t.Fatalf("permanent temporary limit missing from header: %+v", screen.Lines)
 	}
+
+	// A scheduled "Auto" window: the shadowed temporary limit must not show, and
+	// the header must name the Auto window instead of the raw -1/-1 sentinel.
+	m.SetSpeedPolicy(SpeedPolicy{Source: "schedule_auto", SchedActive: true, TempActive: true, TempDownloadKib: 500, TempUploadKib: 100})
+	screen := m.Render(160, 20)
+	if !lineContains(screen, "banda programmata · fascia Auto · nessun tetto") {
+		t.Fatalf("scheduled Auto window missing from header: %+v", screen.Lines)
+	}
+	if lineContains(screen, "limite temporaneo") {
+		t.Fatalf("the shadowed temporary limit must not show while the Auto window is active: %+v", screen.Lines)
+	}
 }
 
 func TestListCommandsWorkOnHTTPRows(t *testing.T) {

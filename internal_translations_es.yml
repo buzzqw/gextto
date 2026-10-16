@@ -5137,6 +5137,7 @@ spa:
   "Auto speed": "Velocidad auto"
   "Auto speed: la banda va all'auto-tune, senza tetto, come una fascia «Auto» della programmazione; disabilita i limiti temporanei": "Velocidad auto: el ancho de banda pasa sin límite al auto-tune, como una franja «Auto»; desactiva los límites temporales"
   "Auto speed: la banda va all'auto-tune, senza tetto": "Velocidad auto: el ancho de banda pasa sin límite al auto-tune"
+  "Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune": "Programación activa: franja «Auto», sin tope, la línea la mide el auto-tune"
   "Velocità automatica (misura la linea)": "Velocidad automática (mide la línea)"
   "Nessun tetto: la banda va all'auto-tune, che misura la linea e la lascia libera. Vince sui limiti globali e sulla programmazione; il limite temporaneo in Scarico resta un override a parte.": "Sin límite: el ancho de banda pasa al auto-tune, que mide la línea y la deja libre. Gana a los límites globales y a la programación; el límite temporal en Descargas sigue siendo un ajuste aparte."
   "Velocità automatica: nessun tetto, la linea la misura l'auto-tune": "Velocidad automática: sin límite, el auto-tune mide la línea"

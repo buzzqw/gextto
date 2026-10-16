@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/bwschedule"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -547,6 +548,54 @@ func TestV2DownloadsPageAndActions(t *testing.T) {
 	code, body = v2Request(t, server, http.MethodPost, "/downloads/table", url.Values{"sort": {"name"}, "sort_click": {"ratio"}})
 	if code != http.StatusOK || !strings.Contains(body, `value="ratio"`) {
 		t.Fatalf("sort click -> %d", code)
+	}
+}
+
+// TestV2DownloadsScheduleAutoBadge: an active "Auto" schedule window (stored as
+// the AutoLimit sentinel) must show as an "Auto" badge in the downloads toolbar,
+// never as the raw "-1/-1" KiB/s the sentinel would print.
+func TestV2DownloadsScheduleAutoBadge(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	// A window one hour wide around the current time, on every weekday, that
+	// hands the line to the auto-tune (AutoLimit): it is active right now.
+	now := time.Now()
+	minute := now.Hour()*60 + now.Minute()
+	week := bwschedule.Week{}
+	for day := range week {
+		week[day] = bwschedule.Day{
+			On:       true,
+			Start:    (minute - 30 + 1440) % 1440,
+			End:      (minute + 30) % 1440,
+			Download: bwschedule.AutoLimit,
+			Upload:   bwschedule.AutoLimit,
+		}
+	}
+	for _, pair := range [][2]string{
+		{"torrent_sched_enabled", "true"},
+		{"torrent_sched_week", week.String()},
+	} {
+		if err := saveConfigSetting(state.cfg.DataDir, pair[0], pair[1]); err != nil {
+			t.Fatalf("save %s: %v", pair[0], err)
+		}
+	}
+
+	page := uiDownloadsPageFor(state)
+	if !page.SchedActive || !page.SchedAuto {
+		t.Fatalf("Auto window not detected: SchedActive=%v SchedAuto=%v", page.SchedActive, page.SchedAuto)
+	}
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
+	if code != http.StatusOK {
+		t.Fatalf("downloads page -> %d", code)
+	}
+	if !strings.Contains(body, "⏰ <span>Auto</span>") || !strings.Contains(body, "Programmazione oraria attiva: fascia") {
+		t.Fatalf("Auto schedule badge missing: %s", body)
+	}
+	if strings.Contains(body, "-1/-1") {
+		t.Fatal("the AutoLimit sentinel leaked into the badge as -1/-1")
 	}
 }
 
