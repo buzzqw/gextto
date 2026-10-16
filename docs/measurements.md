@@ -475,6 +475,18 @@ metadata in ~49 s with 12 peers, and the remaining time is the routing-table fil
 
 ## 4. DHT
 
+**Peer discovery over the public DHT works** (2026-10-16, Intel N97, `cd internal/dht &&
+GX_MEASURE_DHT=2m GX_MEASURE_DHT_INFOHASH=8ce412454ecff20763b805fe68e608cb2fe931bb
+go test -run TestMeasureDHTRealSwarm -v`, the Ubuntu 24.04 torrent). A fresh DHT node
+bootstrapped from the built-in routers filled the routing table to **1290 nodes in ~80 s**,
+ran **1432 `get_peers` queries with 314 replies (21.9%)** and, for the Ubuntu infohash,
+returned **`peers_found=2`, `peers_confirmed_multi=1`**: the lookup path returns real peers,
+not just nodes. `dropped=411` (unresponsive/parameter-blocked nodes), `reflected_observations=189`,
+`nat_mapping=1`, `nodes_insecure_id=76` (the anti-Sybil counter, no subnet concentration:
+`subnet_share_max=4`). Conclusion: the discovery lever the auto-tune cannot move is already
+in place — DHT finds peers, trackers have their own health and PEX/LSD are wired — so there
+is no low-risk peer-discovery gap to close; more speed means more swarm, not more knobs.
+
 The gx-core DHT (`internal/dht`, a module of its own) covers BEP 5/32/33/42/43/44/46
 with a routing table as a bucket-less binary tree; what it still needs is **hardening
 and diagnostics**, not more BEP coverage (see [`bep.md`](bep.md)).
