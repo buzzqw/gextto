@@ -377,8 +377,11 @@ never the user's, never a value never tuned — and only past a hysteresis
 (`adaptiveHysteresisFraction`), so the values do not wobble. The cycle is the
 cadence, which keeps it gentle. A restart is never read as instability: a
 restart that changed the binary is an update (`restart_cause.go`). The link-peak
-input for adapting the bandwidth is still missing in Gextto, so the bandwidth
-limits stay the user's; the free-space and RAM-disk parts adapt today. The
+input now exists: the daemon's 90-second policy tick records the highest download
+and upload rate the line actually reached (`autotune_peaks.go`, hidden keys that
+only grow), and the tuning proposes `torrent_dl_limit`/`torrent_ul_limit` at 80%
+of that peak, leaving headroom for the ACKs. A fresh install has no peak yet, so
+the bandwidth stays the user's until the line has been measured. The
 free-space guard is bounded (20–50 GB): the 5% rule alone asked for hundreds of GB
 on a multi-terabyte disk. The automatic cycle is on by default (`active`, a combo
 in the page), so a fresh installation searches on its own; the wizard still sets

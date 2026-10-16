@@ -4513,3 +4513,5 @@ eng:
   "Le porte non risultano aperte automaticamente: inoltra sul router TCP e UDP %s.": "The ports do not look opened automatically: forward TCP and UDP %s on the router."
   "Apri o inoltra sul router TCP e UDP %s, oppure lascia che Gextto provi ad aprirle via UPnP.": "Open or forward TCP and UDP %s on the router, or let Gextto try to open them via UPnP."
   "%s di RAM: %d connessioni per torrent.": "%s of RAM: %d connections per torrent."
+  "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Highest download rate observed %d KiB/s: limit at 80%% → %d KiB/s."
+  "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Highest upload rate observed %d KiB/s: limit at 80%% → %d KiB/s."

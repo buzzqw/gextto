@@ -84,6 +84,23 @@ func ProposeTuning(facts SystemFacts, cfg *Config, manual map[string]bool) []Tun
 		}
 	}
 
+	// Bandwidth: a limit at 80% of the highest rate the line actually reached,
+	// leaving headroom for the ACKs (a saturated upload slows the download). Only
+	// once a peak was observed; a fresh install has none, so the limit stays the
+	// user's until the line has been measured.
+	if peak := speedPeakKib(cfg, autotunePeakDownKey); peak > 0 {
+		if limit := peak * 8 / 10; limit > 0 {
+			add("torrent_dl_limit", strconv.FormatInt(limit, 10),
+				"Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.", peak, limit)
+		}
+	}
+	if peak := speedPeakKib(cfg, autotunePeakUpKey); peak > 0 {
+		if limit := peak * 8 / 10; limit > 0 {
+			add("torrent_ul_limit", strconv.FormatInt(limit, 10),
+				"Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.", peak, limit)
+		}
+	}
+
 	// Connections per torrent: the engine does not manage this by itself, so the
 	// tuning picks a bounded value from the RAM (50 to 400).
 	connections := proposedConnectionsPerTorrent(facts.MemTotal)

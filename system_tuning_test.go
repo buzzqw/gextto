@@ -105,6 +105,37 @@ func TestProposeTuningConnectionsAreBoundedFromRAM(t *testing.T) {
 	}
 }
 
+func TestObserveSpeedPeakKeepsTheHighest(t *testing.T) {
+	state := newTestAppState(t)
+	cfg := latestConfig(state)
+	observeSpeedPeak(cfg, 3<<20, 1<<20) // 3072 KiB/s down, 1024 up
+	observeSpeedPeak(cfg, 1<<20, 2<<20) // a lower down, a higher up
+	if got := speedPeakKib(latestConfig(state), autotunePeakDownKey); got != 3072 {
+		t.Fatalf("download peak = %d, want 3072 (the highest)", got)
+	}
+	if got := speedPeakKib(latestConfig(state), autotunePeakUpKey); got != 2048 {
+		t.Fatalf("upload peak = %d, want 2048 (the highest)", got)
+	}
+}
+
+func TestProposeTuningBandwidthFromPeak(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Settings = map[string]string{autotunePeakDownKey: "1000", autotunePeakUpKey: "500"}
+	keys := tuningProposalKeys(ProposeTuning(tuningTestFacts(), &cfg, nil))
+	if keys["torrent_dl_limit"] != "800" {
+		t.Fatalf("download limit = %q, want 800 (80%% of the peak)", keys["torrent_dl_limit"])
+	}
+	if keys["torrent_ul_limit"] != "400" {
+		t.Fatalf("upload limit = %q, want 400 (80%% of the peak)", keys["torrent_ul_limit"])
+	}
+	// No peak observed yet: the bandwidth stays the user's.
+	empty := DefaultConfig()
+	keys = tuningProposalKeys(ProposeTuning(tuningTestFacts(), &empty, nil))
+	if _, ok := keys["torrent_dl_limit"]; ok {
+		t.Fatal("no peak must not propose a bandwidth limit")
+	}
+}
+
 func TestProposeTuningDetectsNetworkFilesystem(t *testing.T) {
 	cfg := DefaultConfig()
 	facts := tuningTestFacts()

@@ -5169,3 +5169,5 @@ fra:
   "Le porte non risultano aperte automaticamente: inoltra sul router TCP e UDP %s.": "Les ports ne semblent pas ouverts automatiquement : redirigez TCP et UDP %s sur le routeur."
   "Apri o inoltra sul router TCP e UDP %s, oppure lascia che Gextto provi ad aprirle via UPnP.": "Ouvrez ou redirigez TCP et UDP %s sur le routeur, ou laissez Gextto les ouvrir via UPnP."
   "%s di RAM: %d connessioni per torrent.": "%s de RAM : %d connexions par torrent."
+  "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Débit de téléchargement maximal observé %d KiB/s : limite à 80%% → %d KiB/s."
+  "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Débit d'envoi maximal observé %d KiB/s : limite à 80%% → %d KiB/s."

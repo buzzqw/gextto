@@ -806,6 +806,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			transferring := 0
 			idle := 0
 			var rateKib uint64
+			var uploadBytes uint64
 			stuck := []string{}
 			for _, torrent := range snapshot {
 				// A torrent parked by the stall monitor is stuck whatever its
@@ -829,7 +830,11 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					stuck = append(stuck, fmt.Sprintf("%s %s", shortTorrentName(torrent.Name), logPercent(torrent.Progress)))
 				}
 				rateKib += torrent.DownloadRate
+				uploadBytes += torrent.UploadRate
 			}
+			// Record the line's observed peak for the guided tuning (never shown,
+			// only raises). The sample is the sum of the torrent rates in bytes/s.
+			observeSpeedPeak(cfg, saturatingInt64(rateKib), saturatingInt64(uploadBytes))
 			counts := fmt.Sprintf("%d/%d/%d", transferring, idle, queued)
 			// Skip the first tick after start: the engine has not finished syncing
 			// and resumed torrents read as paused, so that triple is transient
