@@ -1950,7 +1950,8 @@
   <div class="panel-body">
     <p class="hint">Scansiona una cartella di serie o film: Gextto confronta i nomi con TMDB/TVDB e propone le rinomine. La scansione non modifica nulla; vengono applicate solo le righe accettate.</p>
     <form class="toolbar" hx-post="/maintenance/folder-rename/scan" hx-target="#v2-folder-rename-panel" hx-swap="outerHTML">
-      <input class="input" type="text" name="path" value="{{.Path}}" placeholder="/percorso/alla/cartella" autocomplete="off" aria-label="Cartella" />
+      <input class="input" type="text" name="path" value="{{.Path}}" placeholder="/percorso/alla/cartella" autocomplete="off" aria-label="Cartella" data-v2-browse-input />
+      <button class="btn sm" type="button" data-v2-browse-for="path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button>
       <button class="btn sm primary" type="submit">Scansiona e proponi</button>
     </form>
     {{if .Error}}<p class="alert">{{.Message}}</p>{{end}}

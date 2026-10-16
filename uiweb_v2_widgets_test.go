@@ -107,6 +107,8 @@ func TestV2MaintenanceWidgetEndpoints(t *testing.T) {
 	}
 	if code, body := v2Request(t, server, http.MethodPost, "/maintenance/folder-rename/scan", url.Values{"path": {""}}); code != http.StatusOK || !strings.Contains(body, "Rinomina contenuto cartella") {
 		t.Fatalf("folder rename scan -> %d", code)
+	} else if !strings.Contains(body, `data-v2-browse-for="path"`) || !strings.Contains(body, `data-v2-browse-input`) {
+		t.Fatalf("folder rename scan has no folder browser: %s", body)
 	}
 	if code, body := v2Request(t, server, http.MethodGet, "/partial/rename-progress", nil); code != http.StatusOK || !strings.Contains(body, "Nessuna rinomina") {
 		t.Fatalf("rename progress -> %d", code)
