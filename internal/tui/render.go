@@ -392,6 +392,15 @@ func (m *Model) statusInfoLines(width int) []Line {
 	tr := m.Tr
 	lines := []Line{}
 
+	// Live transfer rates. On a phone the Status window shows only a handful of
+	// rows (the pinned log block takes the bottom), so the traffic line and its
+	// trend go first: they are the reason to open the tab and must never be
+	// below the fold. On a wide screen they stay after the download row.
+	metrics := m.renderMetricLines(width)
+	if width < compactWidth {
+		lines = append(lines, metrics...)
+	}
+
 	// Daemon: version, mode, uptime and own resources.
 	mode := tr.T("mode.standby")
 	switch {
@@ -510,8 +519,10 @@ func (m *Model) statusInfoLines(width int) []Line {
 	}
 	lines = append(lines, m.statusRow(tr.T("status.downloads"), downloads, StyleNormal))
 
-	// Traffic and consumption.
-	lines = append(lines, m.renderMetricLines(width)...)
+	// Traffic and consumption (already first on a phone).
+	if width >= compactWidth {
+		lines = append(lines, metrics...)
+	}
 
 	// Attention: everything that needs a look, or an explicit "all good".
 	problems, severity := m.statusProblems(diskUsed)

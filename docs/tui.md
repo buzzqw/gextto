@@ -36,7 +36,9 @@ network, pass the API key with `GEXTTO_API_KEY=<key>`: it is sent in the
    **Attention** line with what needs action (torrents in error, unwritable
    paths, almost full disk, last error), the transfers in progress with bar and
    ETA and, anchored at the bottom, the **latest log lines**. If the window is
-   short the upper part scrolls with `↑↓`/`PgUp`/`PgDn`.
+   short the upper part scrolls with `↑↓`/`PgUp`/`PgDn`; on a phone-width
+   terminal the traffic line (download/upload rates and trend) is shown first,
+   so it stays visible without scrolling.
 2. **Torrents** — unified list of torrents and HTTP comic downloads with state,
    progress, bytes, speed and name; filter (`/` or `F`), sort (`o`/`O`),
    torrent details (`Enter`), pause/resume and removal of HTTP downloads. Several

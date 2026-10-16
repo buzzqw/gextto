@@ -110,6 +110,51 @@ func TestTorrentsTitleWrapsOnPhoneWidth(t *testing.T) {
 	}
 }
 
+func TestStatusTrafficFirstOnPhoneWidth(t *testing.T) {
+	m := NewModel(NewTranslator("en"))
+	m.Tab = TabStatus
+	cpu := 1.0
+	m.SetStatus(Status{Version: "1.2.3", Active: true})
+	m.SetHealth(Health{Status: "ok", ProcessCPUPercent: &cpu, DiskFreeBytes: 1 << 30, DiskTotalBytes: 1 << 31})
+	m.SetMetrics(DashboardStats{TorrentStats: map[string]any{"download_rate": 1024.0, "upload_rate": 512.0}})
+	m.SetLogs([]string{"2026-10-06 INFO hello"})
+
+	// On a phone the traffic line is the first content row, so the download and
+	// upload rates are visible without scrolling.
+	narrow := m.Render(40, 24).Lines
+	traffic, system := -1, -1
+	for index, line := range narrow {
+		if strings.Contains(line.Text, "Traffic:") {
+			traffic = index
+		}
+		if strings.Contains(line.Text, "System:") {
+			system = index
+		}
+	}
+	if traffic < 0 || !strings.Contains(narrow[traffic].Text, "↓") || !strings.Contains(narrow[traffic].Text, "↑") {
+		t.Fatalf("the traffic rates must be visible on a phone Status screen: %v", firstLines(Screen{Lines: narrow}, 24))
+	}
+	if system < 0 || traffic > system {
+		t.Fatalf("traffic should come before the system rows on a phone (traffic=%d system=%d): %v", traffic, system, firstLines(Screen{Lines: narrow}, 24))
+	}
+
+	// On a wide terminal the order is unchanged: the dashboard rows first, the
+	// traffic after the download row.
+	wide := m.Render(100, 30).Lines
+	traffic, system = -1, -1
+	for index, line := range wide {
+		if strings.Contains(line.Text, "Traffic:") {
+			traffic = index
+		}
+		if strings.Contains(line.Text, "System:") {
+			system = index
+		}
+	}
+	if traffic < 0 || system < 0 || system > traffic {
+		t.Fatalf("wide layout order changed (traffic=%d system=%d): %v", traffic, system, firstLines(Screen{Lines: wide}, 30))
+	}
+}
+
 func TestPhoneWidthNeverOverflowsOnAnyTab(t *testing.T) {
 	m := NewModel(NewTranslator("it"))
 	cpu := 1.0
