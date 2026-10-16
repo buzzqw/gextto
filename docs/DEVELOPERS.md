@@ -153,7 +153,10 @@ saved: `TestSettingDefaultsMatchTheBackend` pins it against the typed
 `DefaultTransferSettings` (derived in `Config.applyTransferSettings`) and against
 the scalar getters, and `TestDefaultTransferSettingsMatchLoader` pins those
 fallbacks against the struct. A new option with a backend default needs an entry
-there.
+there. The `/api/config` view (`ConfigView`, `web_handlers_core.go`) carries its
+own copies of some defaults and is *not* covered by that guard yet: folding it in
+needs normalisation (list keys render as slices, booleans as `true`/`false`
+against the page's `yes`/`no`), so it is a separate step.
 
 Every route sits behind `AuthMiddleware` (`auth.go`). Access control is off by
 default; when it is on, only `/login`, `/logout`, `/static/`, the favicon, the
