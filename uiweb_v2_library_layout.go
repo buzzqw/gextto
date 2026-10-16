@@ -90,6 +90,7 @@ func v2RememberLayout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name: v2LayoutCookie, Value: value, Path: "/",
 		MaxAge: v2LayoutCookieAge, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: requestIsHTTPS(r),
 	})
 }
 

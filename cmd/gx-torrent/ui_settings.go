@@ -70,16 +70,16 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	if v, ok := parseFormKib(r.FormValue("speed-upload")); ok && v != cfg.SpeedLimitUpload {
 		putInt("speed_limit_upload", v)
 	}
-	if v := formInt(r, "active-downloads", int64(cfg.ActiveDownloads)); v > 0 && int(v) != cfg.ActiveDownloads {
+	if v := formInt(r, "active-downloads", int64(cfg.ActiveDownloads)); v > 0 && v != int64(cfg.ActiveDownloads) {
 		putInt("active_downloads", v)
 	}
-	if v := formInt(r, "active-seeds", int64(cfg.ActiveSeeds)); v >= 0 && int(v) != cfg.ActiveSeeds {
+	if v := formInt(r, "active-seeds", int64(cfg.ActiveSeeds)); v >= 0 && v != int64(cfg.ActiveSeeds) {
 		putInt("active_seeds", v)
 	}
-	if v := formInt(r, "active-limit", int64(cfg.ActiveLimit)); v > 0 && int(v) != cfg.ActiveLimit {
+	if v := formInt(r, "active-limit", int64(cfg.ActiveLimit)); v > 0 && v != int64(cfg.ActiveLimit) {
 		putInt("active_limit", v)
 	}
-	if v := formInt(r, "max-conns-per-torrent", int64(cfg.MaxConnectionsPerTorrent)); v >= 0 && int(v) != cfg.MaxConnectionsPerTorrent {
+	if v := formInt(r, "max-conns-per-torrent", int64(cfg.MaxConnectionsPerTorrent)); v >= 0 && v != int64(cfg.MaxConnectionsPerTorrent) {
 		putInt("max_connections_per_torrent", v)
 	}
 	if v := formInt(r, "cache-mb", cfg.CacheMB); v != cfg.CacheMB {

@@ -51,10 +51,11 @@ func v2SettingsMode(r *http.Request) string {
 // v2SetSettingsModeBriefAfterSetup stores the guided level for a brand-new
 // installation, so the first configuration visit is the simple one. Called by
 // the setup wizard when it finishes (or is skipped).
-func v2SetSettingsModeBriefAfterSetup(w http.ResponseWriter) {
+func v2SetSettingsModeBriefAfterSetup(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name: v2SettingsModeCookie, Value: v2SettingsModeBrief, Path: "/",
 		MaxAge: v2SettingsModeCookieAge, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: requestIsHTTPS(r),
 	})
 }
 
@@ -68,6 +69,7 @@ func v2RememberSettingsMode(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name: v2SettingsModeCookie, Value: value, Path: "/",
 		MaxAge: v2SettingsModeCookieAge, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: requestIsHTTPS(r),
 	})
 }
 

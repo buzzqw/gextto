@@ -525,6 +525,6 @@ func V2SetupFinish(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	// A brand-new user starts from the guided configuration: the few limits, with
 	// the system handling the internals.
-	v2SetSettingsModeBriefAfterSetup(w)
+	v2SetSettingsModeBriefAfterSetup(w, r)
 	http.Redirect(w, r, "/?view=dashboard&toast="+url.QueryEscape("Configurazione iniziale completata."), http.StatusSeeOther)
 }
