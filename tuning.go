@@ -84,6 +84,12 @@ func ProposeTuning(facts SystemFacts, cfg *Config, manual map[string]bool) []Tun
 		}
 	}
 
+	// Connections per torrent: the engine does not manage this by itself, so the
+	// tuning picks a bounded value from the RAM (50 to 400).
+	connections := proposedConnectionsPerTorrent(facts.MemTotal)
+	add("torrent_max_connections_per_torrent", strconv.FormatInt(connections, 10),
+		"%s di RAM: %d connessioni per torrent.", humanBytesString(facts.MemTotal), connections)
+
 	// RAM disk: recommend it when one is available, switch it off when none is.
 	if facts.RamdiskDir != "" {
 		recommendation := RamdiskRecommendation(facts.RamdiskDir)
@@ -251,6 +257,29 @@ func RunAdaptiveTuning(dataDir string, cfg *Config) int {
 		logging.Warn("adaptive tuning could not be applied", "error", err)
 	}
 	return applied
+}
+
+// Connections-per-torrent bounds and brackets: the engine does not auto-manage
+// this value, so the tuning keeps it between 50 and 400 by the RAM.
+const (
+	connectionsFloor = int64(50)
+	connectionsCeil  = int64(400)
+)
+
+func proposedConnectionsPerTorrent(memTotal uint64) int64 {
+	const gib = uint64(1024 * 1024 * 1024)
+	switch {
+	case memTotal == 0:
+		return connectionsFloor
+	case memTotal < 4*gib:
+		return 50
+	case memTotal < 8*gib:
+		return 100
+	case memTotal < 16*gib:
+		return 200
+	default:
+		return connectionsCeil
+	}
 }
 
 // humanBytesString renders a byte count for a sentence ("1.8 TB").

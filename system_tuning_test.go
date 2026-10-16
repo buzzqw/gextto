@@ -86,6 +86,25 @@ func TestProposeTuningSpaceGuardIsClampedToFreeSpace(t *testing.T) {
 	}
 }
 
+func TestProposeTuningConnectionsAreBoundedFromRAM(t *testing.T) {
+	cfg := DefaultConfig()
+	const gib = uint64(1024 * 1024 * 1024)
+	cases := []struct {
+		mem  uint64
+		want string
+	}{
+		{0, "50"}, {2 * gib, "50"}, {8 * gib, "200"}, {32 * gib, "400"},
+	}
+	for _, tc := range cases {
+		facts := tuningTestFacts()
+		facts.MemTotal = tc.mem
+		got := tuningProposalKeys(ProposeTuning(facts, &cfg, nil))["torrent_max_connections_per_torrent"]
+		if got != tc.want {
+			t.Fatalf("%s of RAM -> connections %q, want %q", humanBytesString(tc.mem), got, tc.want)
+		}
+	}
+}
+
 func TestProposeTuningDetectsNetworkFilesystem(t *testing.T) {
 	cfg := DefaultConfig()
 	facts := tuningTestFacts()

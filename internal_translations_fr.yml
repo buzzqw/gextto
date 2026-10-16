@@ -5168,3 +5168,4 @@ fra:
   "Gextto non è riuscito ad aprire le porte da solo (%s): inoltra sul router TCP e UDP %s.": "Gextto n'a pas pu ouvrir les ports tout seul (%s) : redirigez TCP et UDP %s sur le routeur."
   "Le porte non risultano aperte automaticamente: inoltra sul router TCP e UDP %s.": "Les ports ne semblent pas ouverts automatiquement : redirigez TCP et UDP %s sur le routeur."
   "Apri o inoltra sul router TCP e UDP %s, oppure lascia che Gextto provi ad aprirle via UPnP.": "Ouvrez ou redirigez TCP et UDP %s sur le routeur, ou laissez Gextto les ouvrir via UPnP."
+  "%s di RAM: %d connessioni per torrent.": "%s de RAM : %d connexions par torrent."

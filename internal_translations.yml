@@ -4512,3 +4512,4 @@ eng:
   "Gextto non è riuscito ad aprire le porte da solo (%s): inoltra sul router TCP e UDP %s.": "Gextto could not open the ports by itself (%s): forward TCP and UDP %s on the router."
   "Le porte non risultano aperte automaticamente: inoltra sul router TCP e UDP %s.": "The ports do not look opened automatically: forward TCP and UDP %s on the router."
   "Apri o inoltra sul router TCP e UDP %s, oppure lascia che Gextto provi ad aprirle via UPnP.": "Open or forward TCP and UDP %s on the router, or let Gextto try to open them via UPnP."
+  "%s di RAM: %d connessioni per torrent.": "%s of RAM: %d connections per torrent."

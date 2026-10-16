@@ -5116,3 +5116,4 @@ pol:
   "Gextto non è riuscito ad aprire le porte da solo (%s): inoltra sul router TCP e UDP %s.": "Gextto nie zdołał sam otworzyć portów (%s): przekieruj TCP i UDP %s na routerze."
   "Le porte non risultano aperte automaticamente: inoltra sul router TCP e UDP %s.": "Porty nie wyglądają na otwarte automatycznie: przekieruj TCP i UDP %s na routerze."
   "Apri o inoltra sul router TCP e UDP %s, oppure lascia che Gextto provi ad aprirle via UPnP.": "Otwórz lub przekieruj TCP i UDP %s na routerze, albo pozwól Gextto otworzyć je przez UPnP."
+  "%s di RAM: %d connessioni per torrent.": "%s RAM: %d połączeń na torrent."
