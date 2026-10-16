@@ -152,10 +152,11 @@ func gh6_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
 
 // Speed policy sources, in the order they are tried.
 const (
-	speedSourceTemp     = "temp"      // temporary limit with an expiry
-	speedSourceSchedule = "schedule"  // bandwidth schedule window
-	speedSourceTempKeep = "temp_keep" // temporary limit kept until removed
-	speedSourceBase     = "base"
+	speedSourceTemp         = "temp"          // temporary limit with an expiry
+	speedSourceSchedule     = "schedule"      // bandwidth schedule window
+	speedSourceScheduleAuto = "schedule_auto" // schedule window left to the tuning
+	speedSourceTempKeep     = "temp_keep"     // temporary limit kept until removed
+	speedSourceBase         = "base"
 )
 
 // speedPolicy picks the global limits in force and where they come from.
@@ -173,8 +174,16 @@ func speedPolicy(cfg *Config) (download, upload int64, source string, tempShadow
 		return tempDownload, tempUpload, speedSourceTemp, false
 	}
 	tempKeep := tempEnabled && tempUntil == 0
-	if download, upload, ok := gh6_scheduledSpeedLimits(cfg); ok {
-		return download, upload, speedSourceSchedule, tempKeep
+	if gh6_truthySetting(cfg.Settings["torrent_sched_enabled"]) {
+		if day, ok := speedScheduleWeek(cfg).AtDay(time.Now()); ok {
+			if day.Auto() {
+				// An "auto" window hands the limit to the guided tuning: it lifts
+				// the cap (unlimited) so the line can be measured there, while
+				// the user's limits apply in the other windows.
+				return 0, 0, speedSourceScheduleAuto, false
+			}
+			return day.Download, day.Upload, speedSourceSchedule, tempKeep
+		}
 	}
 	if tempKeep {
 		return tempDownload, tempUpload, speedSourceTempKeep, false

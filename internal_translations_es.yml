@@ -5125,3 +5125,5 @@ spa:
   "%s di RAM: %d connessioni per torrent.": "%s de RAM: %d conexiones por torrent."
   "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Velocidad de descarga máxima observada %d KiB/s: límite al 80%% → %d KiB/s."
   "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Velocidad de subida máxima observada %d KiB/s: límite al 80%% → %d KiB/s."
+  "Auto": "Auto"
+  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. Con «Auto» la fascia lascia la banda all'auto-tune (nessun limite), così la linea viene misurata in quelle ore; fuori fascia valgono i tuoi limiti.": "Franja horaria y límites por día de la semana; una franja pasada la medianoche pertenece al día en que empieza. Con «Auto» la franja deja el ancho de banda al auto-tune (sin límite), así la línea se mide en esas horas; fuera de la franja aplican tus límites."

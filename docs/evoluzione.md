@@ -396,6 +396,14 @@ the cleanup uses `upgrade_min_score_diff`, one voice for both the acquisition
 upgrade and the cleanup pass. `cleanup_upgrades` ("replace archived versions") is
 on by default, so archived files can actually be improved.
 
+**Scheduling the auto-tune.** A bandwidth-schedule window can be marked **Auto**
+(`internal/bwschedule` sentinel `AutoLimit = -1`, a checkbox in the per-day editor):
+inside that window the effective limit is lifted (`speedPolicy` returns unlimited,
+source `schedule_auto`), so the peak observer measures the real line there, while
+the user's conservative limits apply in the other windows — the right shape for a
+line shared with the family. A capped direction is never used to learn the peak
+(`autotune_peaks.go`), so the free window is exactly where the line is learned.
+
 **Streaming and DLNA.** Web streaming (`cmd/gx-torrent/stream.go`, the endpoint
 Gextto redirects to) sends the **Content-Type from the file extension**
 (`video/mp4`, `video/x-matroska`, `audio/flac`, …) with

@@ -1,6 +1,7 @@
 package bwschedule
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -69,5 +70,30 @@ func TestUniform(t *testing.T) {
 	}
 	if _, _, ok := week.At(at(7, 3, 0)); ok { // Wednesday 03:00, Tuesday is off
 		t.Fatal("Tuesday is off")
+	}
+}
+
+// TestAutoWindow: a limit of AutoLimit (-1) means "let the caller decide": it
+// round-trips through the stored form and Day.Auto reports it.
+func TestAutoWindow(t *testing.T) {
+	raw := "mon=23:00-08:00/-1/-1;tue=23:00-08:00/3000/200"
+	week, ok := Parse(raw)
+	if !ok {
+		t.Fatalf("Parse(%q) failed", raw)
+	}
+	if !week[time.Monday].Auto() || week[time.Monday].Download != AutoLimit {
+		t.Fatalf("monday not auto: %+v", week[time.Monday])
+	}
+	if week[time.Tuesday].Auto() {
+		t.Fatalf("tuesday must stay fixed: %+v", week[time.Tuesday])
+	}
+	if got := week.String(); !strings.Contains(got, "mon=23:00-08:00/-1/-1") {
+		t.Fatalf("round trip lost the auto sentinel: %q", got)
+	}
+	// AtDay returns the day, so the caller can read Auto.
+	now := time.Date(2026, 1, 5, 23, 30, 0, 0, time.Local) // Monday 23:30, inside the mon window
+	day, active := week.AtDay(now)
+	if !active || !day.Auto() {
+		t.Fatalf("AtDay(%v) = %+v active=%v, want the monday auto window", now, day, active)
 	}
 }

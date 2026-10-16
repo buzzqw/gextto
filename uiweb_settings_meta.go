@@ -153,6 +153,9 @@ type uiWeekRow struct {
 	End      string
 	Download int64
 	Upload   int64
+	// Auto hands the window's limit to the guided tuning (unlimited, so the line
+	// is measured there) instead of the two numbers.
+	Auto bool
 }
 
 // uiWeekRows renders a stored libtorrent_sched_week value as editor rows,
@@ -172,7 +175,7 @@ func uiWeekRowsFrom(week bwschedule.Week) []uiWeekRow {
 		day := week[weekday]
 		rows = append(rows, uiWeekRow{Key: bwschedule.DayName(weekday), Label: uiWeekdays[index], On: day.On,
 			Start: bwschedule.FormatClock(day.Start), End: bwschedule.FormatClock(day.End),
-			Download: day.Download, Upload: day.Upload})
+			Download: day.Download, Upload: day.Upload, Auto: day.Auto()})
 	}
 	return rows
 }
@@ -189,6 +192,12 @@ func uiWeekValue(form url.Values) (string, string) {
 		end, okEnd := bwschedule.ParseClock(form.Get(prefix + "end"))
 		if on && (!okStart || !okEnd || start == end) {
 			return "", "ogni giorno attivo vuole un orario di inizio e uno di fine diversi"
+		}
+		// "Auto" hands the window to the guided tuning (unlimited): the two
+		// numbers are kept out of the way and stored as the AutoLimit sentinel.
+		if form.Get(prefix+"auto") != "" {
+			week[weekday] = bwschedule.Day{On: on, Start: start, End: end, Download: bwschedule.AutoLimit, Upload: bwschedule.AutoLimit}
+			continue
 		}
 		limit := func(name string) int64 {
 			parsed, err := strconv.ParseInt(strings.TrimSpace(form.Get(prefix+name)), 10, 64)

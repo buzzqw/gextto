@@ -115,7 +115,9 @@ test("un interruttore mostra i campi che dipendono da lui", async ({ page }) => 
   await toggle.check();
   await expect(week).toBeVisible();
   // The per-day table has one row per day, each with an on/off checkbox.
-  await expect(week.locator('input[type="checkbox"][name^="day-"]')).toHaveCount(7);
+  await expect(week.locator('input[type="checkbox"][name$="-on"]')).toHaveCount(7);
+  // Each day also has an «Auto» checkbox (bandwidth left to the auto-tune).
+  await expect(week.locator('input[type="checkbox"][name$="-auto"]')).toHaveCount(7);
   // The older single-window settings are superseded by the per-day table and
   // stay hidden even while the switch is on.
   await expect(page.locator("#v2-setting-torrent_sched_start")).toBeHidden();

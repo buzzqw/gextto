@@ -1547,7 +1547,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | Programmazione — giorni | Giorni attivi: 0=Lun … 6=Dom (es. 0,1,2,3,4). *(nessun giorno = mai attiva)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
 | Programmazione — download | Limite di download in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
 | Programmazione — upload | Limite di upload in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
-| Programmazione — per giorno | Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. *(ogni giorno ha fascia e limiti propri (0 = illimitato); una fascia oltre la mezzanotte appartiene al giorno in cui inizia)* Compare solo con «Programmazione velocità attiva» attivo. |
+| Programmazione — per giorno | Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. La colonna **Auto** affida la fascia del giorno all'auto-tune: nessun limite in quella fascia, così la linea viene misurata lì (fuori fascia valgono i tuoi limiti). *(ogni giorno ha fascia e limiti propri (0 = illimitato); una fascia oltre la mezzanotte appartiene al giorno in cui inizia)* Compare solo con «Programmazione velocità attiva» attivo. |
 
 **Porte e interfacce**
 

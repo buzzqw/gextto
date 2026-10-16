@@ -5171,3 +5171,5 @@ fra:
   "%s di RAM: %d connessioni per torrent.": "%s de RAM : %d connexions par torrent."
   "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Débit de téléchargement maximal observé %d KiB/s : limite à 80%% → %d KiB/s."
   "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Débit d'envoi maximal observé %d KiB/s : limite à 80%% → %d KiB/s."
+  "Auto": "Auto"
+  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. Con «Auto» la fascia lascia la banda all'auto-tune (nessun limite), così la linea viene misurata in quelle ore; fuori fascia valgono i tuoi limiti.": "Plage horaire et limites par jour de la semaine ; une plage après minuit appartient au jour où elle commence. Avec « Auto » la plage laisse la bande à l'auto-tune (aucune limite), la ligne est donc mesurée sur ces heures ; hors plage vos limites s'appliquent."

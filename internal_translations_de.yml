@@ -5178,3 +5178,5 @@ deu:
   "%s di RAM: %d connessioni per torrent.": "%s RAM: %d Verbindungen pro Torrent."
   "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Höchste gemessene Downloadrate %d KiB/s: Grenze bei 80%% → %d KiB/s."
   "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Höchste gemessene Uploadrate %d KiB/s: Grenze bei 80%% → %d KiB/s."
+  "Auto": "Auto"
+  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. Con «Auto» la fascia lascia la banda all'auto-tune (nessun limite), così la linea viene misurata in quelle ore; fuori fascia valgono i tuoi limiti.": "Zeitfenster und Grenzen pro Wochentag; ein Fenster über Mitternacht gehört zum Starttag. Mit «Auto» überlässt das Fenster die Bandbreite dem Auto-Tune (kein Limit), sodass die Leitung in diesen Stunden gemessen wird; außerhalb gelten deine Grenzen."

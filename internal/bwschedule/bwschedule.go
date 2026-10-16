@@ -13,6 +13,10 @@
 // "<day>=<start>-<end>/<download KiB/s>/<upload KiB/s>", with a leading "-"
 // for a day that is switched off (its values are kept for when it is turned
 // back on). 0 means unlimited. Days missing from the text are off.
+//
+// A limit of AutoLimit (-1) marks the window as "let the caller decide": Gextto
+// reads it as the guided tuning (it lifts the limit so the line can be measured),
+// and the daemon, which has no such concept, treats it as an ordinary number.
 package bwschedule
 
 import (
@@ -22,15 +26,23 @@ import (
 	"time"
 )
 
+// AutoLimit is the sentinel a limit can take instead of a sound number: it means
+// "let the caller decide" (Gextto: the guided tuning). 0 means unlimited.
+const AutoLimit int64 = -1
+
 // Day is the schedule of one weekday.
 type Day struct {
 	On bool
 	// Start and End are minutes since midnight; Start == End is no window.
 	Start, End int
 	// Download and Upload are the limits inside the window, in KiB/s (0 =
-	// unlimited).
+	// unlimited, AutoLimit = let the caller decide).
 	Download, Upload int64
 }
+
+// Auto reports whether the window hands the limit to the caller (the guided
+// tuning) instead of using a fixed number.
+func (d Day) Auto() bool { return d.Download == AutoLimit || d.Upload == AutoLimit }
 
 // Week is indexed by time.Weekday: 0 = Sunday … 6 = Saturday.
 type Week [7]Day
@@ -112,7 +124,7 @@ func parseDay(spec string) (Day, error) {
 	}
 	download, errDL := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
 	upload, errUL := strconv.ParseInt(strings.TrimSpace(parts[2]), 10, 64)
-	if errDL != nil || errUL != nil || download < 0 || upload < 0 {
+	if errDL != nil || errUL != nil || download < AutoLimit || upload < AutoLimit {
 		return Day{}, fmt.Errorf("bad limit")
 	}
 	return Day{Start: start, End: end, Download: download, Upload: upload}, nil
@@ -146,22 +158,29 @@ func (w Week) AnyOn() bool {
 // At returns the scheduled limits in force at now, and whether a window is
 // active. Today's window wins over the after-midnight tail of yesterday's.
 func (w Week) At(now time.Time) (download, upload int64, active bool) {
+	day, active := w.AtDay(now)
+	return day.Download, day.Upload, active
+}
+
+// AtDay returns the window in force at now, so a caller can tell a fixed window
+// from an Auto one (Day.Auto).
+func (w Week) AtDay(now time.Time) (Day, bool) {
 	minute := now.Hour()*60 + now.Minute()
 	today := w[int(now.Weekday())]
 	if today.On && today.Start != today.End {
 		if today.Start < today.End {
 			if minute >= today.Start && minute < today.End {
-				return today.Download, today.Upload, true
+				return today, true
 			}
 		} else if minute >= today.Start {
-			return today.Download, today.Upload, true
+			return today, true
 		}
 	}
 	yesterday := w[(int(now.Weekday())+6)%7]
 	if yesterday.On && yesterday.Start > yesterday.End && minute < yesterday.End {
-		return yesterday.Download, yesterday.Upload, true
+		return yesterday, true
 	}
-	return 0, 0, false
+	return Day{}, false
 }
 
 // ParseClock reads "HH:MM" into minutes since midnight.

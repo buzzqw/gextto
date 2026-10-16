@@ -4515,3 +4515,5 @@ eng:
   "%s di RAM: %d connessioni per torrent.": "%s of RAM: %d connections per torrent."
   "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Highest download rate observed %d KiB/s: limit at 80%% → %d KiB/s."
   "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Highest upload rate observed %d KiB/s: limit at 80%% → %d KiB/s."
+  "Auto": "Auto"
+  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. Con «Auto» la fascia lascia la banda all'auto-tune (nessun limite), così la linea viene misurata in quelle ore; fuori fascia valgono i tuoi limiti.": "A time window and limits per weekday; a window past midnight belongs to the day it starts on. With «Auto» the window leaves the bandwidth to the auto-tune (no limit), so the line is measured in those hours; outside the window your limits apply."

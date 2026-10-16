@@ -878,16 +878,20 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			} else {
 				if changed {
 					label := map[string]string{
-						speedSourceTemp:     "temporary limit",
-						speedSourceTempKeep: "temporary limit, until removed",
-						speedSourceSchedule: "scheduled limit",
-						speedSourceBase:     "standard limit",
+						speedSourceTemp:         "temporary limit",
+						speedSourceTempKeep:     "temporary limit, until removed",
+						speedSourceSchedule:     "scheduled limit",
+						speedSourceScheduleAuto: "autotune window (unlimited)",
+						speedSourceBase:         "standard limit",
 					}[source]
-					wasScheduled := lastSpeed != nil && lastSpeed.source == speedSourceSchedule
+					inSchedule := source == speedSourceSchedule || source == speedSourceScheduleAuto
+					wasScheduled := lastSpeed != nil && (lastSpeed.source == speedSourceSchedule || lastSpeed.source == speedSourceScheduleAuto)
 					switch {
+					case source == speedSourceScheduleAuto && !wasScheduled:
+						label = "autotune window started (unlimited)"
 					case source == speedSourceSchedule && !wasScheduled:
 						label = "schedule started"
-					case source != speedSourceSchedule && wasScheduled:
+					case !inSchedule && wasScheduled:
 						label += ", schedule ended"
 					}
 					if source == speedSourceSchedule && tempShadowed {
