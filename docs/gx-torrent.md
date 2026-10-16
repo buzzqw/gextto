@@ -2141,6 +2141,29 @@ available: if the v6 listener does not open, the LSD stays active on IPv4. In th
 other cases the LSD also announces and listens on the group `[ff15::efc0:988f]:6771`
 (the BEP 14 multicast group).
 
+## Profiling (CPU and heap)
+
+The daemon exposes the Go profiles on demand for performance work. The endpoint
+is off by default and never reachable from the network: set `GX_TORRENT_PPROF` to
+a **loopback** `host:port` (for example `127.0.0.1:6060`) and restart the daemon.
+A non-loopback value is logged and ignored, so the endpoint cannot be exposed by
+mistake (`TestPprofAddress` pins the rule).
+
+```bash
+GX_TORRENT_PPROF=127.0.0.1:6060 ./gx-torrent -mode standalone ...
+# CPU profile (30 s) and heap snapshot
+go tool pprof -top -seconds 30 http://127.0.0.1:6060/debug/pprof/profile
+go tool pprof -top http://127.0.0.1:6060/debug/pprof/heap
+```
+
+The profiles available under `/debug/pprof/` are `profile`, `heap`, `goroutine`,
+`allocs`, `block`, `mutex`, `trace`, `cmdline` and `symbol`. The endpoint is
+served by its own listener and is deliberately **not** part of the REST API: no
+token, no TLS. Gextto never sets the variable, so a managed daemon stays without
+a profiling port; to profile one, set it in the environment of the `gextto`
+service and restart the daemon (the daemon is restarted because the environment
+is inherited at start-up).
+
 ## Tests
 
 - `go test ./cmd/gx-torrent/` covers:

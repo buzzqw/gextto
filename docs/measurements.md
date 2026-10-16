@@ -279,6 +279,22 @@ reload or when the value changes. Live service 12 minutes after the restart (2 t
 uptime); `gx-torrent` RSS **104.6 MB**, 0.3 % CPU (before: 115.7 MB, 0.7 %, at 106 min) —
 no regression.
 
+**Live CPU and memory, idle vs downloading (2026-10-17, Intel N97, 4 cores).** The
+TUI's *Sistema* row reads the whole-machine CPU (`cpu_percent`, `/proc/stat`) and the
+*Daemon* row `gexttod`'s own (`process_cpu_percent`), so the two are different
+numbers. A 100 % reading is the machine: while Jellyfin analysed two freshly archived
+episodes (`jellyfin-ffmpeg`, two `blackframe` jobs at 100–216 % each, nice 10) the host
+sat at 100 % on 4 cores (load ~14) with `gexttod` at ~2 %. `gx-torrent` is
+**load-proportional**: **~100 % of one core** while downloading six torrents at
+~8 MiB/s with 19–120 peers (75 % user / 25 % sys; syscalls dominated by
+`epoll_pwait`/`recvfrom`/`sendto`/`futex`), and back to **~3–5 %** once the downloads
+finish. Memory: after a restart the process sits at **RSS 110 MB (RssAnon 94 MB),
+heap in use ~44 MB** — dominated by the 34 MB IP-filter file kept in memory — and
+stays flat while idle (91→93→72 MB over four minutes, 85 goroutines, no growth); the
+**previous** process, after ~40 min under that same load, held **RssAnon ~960–1030 MB**
+and released it only on restart, a load-time high-water mark to attribute from a heap
+profile taken during a burst (opt-in `GX_TORRENT_PPROF`).
+
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
 the whole answer unreadable), and the cost is nil: on a 100-item answer, strict

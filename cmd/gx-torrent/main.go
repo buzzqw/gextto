@@ -472,6 +472,7 @@ func (r *daemonRun) Addr() net.Addr { return r.addr }
 // port is taken. It is shared by the interactive process and the Windows
 // service.
 func startDaemon(opts Options) (*daemonRun, error) {
+	startPProf()
 	daemon, err := newDaemon(opts)
 	if err != nil {
 		return nil, err
