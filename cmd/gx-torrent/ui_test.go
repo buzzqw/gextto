@@ -125,6 +125,9 @@ func TestUIRowsJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The rows feed reads the last published snapshot, refreshed by the periodic
+	// ticker; publish it now so the assertion is not a race against the ticker.
+	d.list()
 
 	resp, err := http.Get(server.URL + "/ui/rows")
 	if err != nil {
