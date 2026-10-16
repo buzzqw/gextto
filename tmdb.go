@@ -659,8 +659,25 @@ func (t *TmdbClient) EpisodeTitle(ctx context.Context, tmdbID string, season, ep
 		return nil, err
 	}
 	var result *string
-	if response.Name != nil && strings.TrimSpace(*response.Name) != "" {
+	name := ""
+	if response.Name != nil {
+		name = strings.TrimSpace(*response.Name)
+	}
+	switch {
+	case name == "":
+		// Nothing known for the episode: leave it empty (cached as nil).
+	case !isGenericEpisodeTitle(name):
 		result = response.Name
+	case !strings.HasPrefix(strings.ToLower(t.language), "en"):
+		// The localized name is the provider's placeholder ("Episodio 5", i.e.
+		// the translation is missing): the original (English) title exists and a
+		// real title beats a generic one in the library name.
+		var fallback episodeResult
+		if err := t.getJSON(ctx, rawURL, [][2]string{{"language", "en-US"}}, &fallback); err == nil {
+			if fallback.Name != nil && strings.TrimSpace(*fallback.Name) != "" && !isGenericEpisodeTitle(*fallback.Name) {
+				result = fallback.Name
+			}
+		}
 	}
 	t.cacheSet(cacheKey, result)
 	return result, nil

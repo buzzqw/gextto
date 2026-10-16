@@ -789,6 +789,46 @@ func TestTmdbEpisodeTitleCachesAndFiltersBlank(t *testing.T) {
 	}
 }
 
+// TestTmdbEpisodeTitleFallsBackToTheOriginalLanguage: when the localized
+// translation is the provider's placeholder ("Episodio 5"), the real title only
+// exists in the original language and must be used instead of the placeholder.
+func TestTmdbEpisodeTitleFallsBackToTheOriginalLanguage(t *testing.T) {
+	var fallbackHits atomic.Int32
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Query().Get("language") {
+		case "en-US":
+			fallbackHits.Add(1)
+			tmdbWriteJSON(t, w, `{"name":"Real Title"}`)
+		default:
+			tmdbWriteJSON(t, w, `{"name":"Episodio 5"}`)
+		}
+	})
+	client := NewTmdbClientWithLanguage(tmdbTestKey(), "it-IT")
+	title, err := client.EpisodeTitle(context.Background(), "7", 2, 5)
+	if err != nil || title == nil || *title != "Real Title" {
+		t.Fatalf("EpisodeTitle = %v, %v; want Real Title", title, err)
+	}
+	if fallbackHits.Load() != 1 {
+		t.Fatalf("original-language lookups = %d, want 1", fallbackHits.Load())
+	}
+
+	// A real localized title never triggers the fallback.
+	var realFallback atomic.Int32
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("language") == "en-US" {
+			realFallback.Add(1)
+		}
+		tmdbWriteJSON(t, w, `{"name":"Titolo vero"}`)
+	})
+	realClient := NewTmdbClientWithLanguage(tmdbTestKey(), "it-IT")
+	if title, err := realClient.EpisodeTitle(context.Background(), "7", 2, 5); err != nil || title == nil || *title != "Titolo vero" {
+		t.Fatalf("EpisodeTitle = %v, %v", title, err)
+	}
+	if realFallback.Load() != 0 {
+		t.Fatalf("unexpected original-language lookups = %d", realFallback.Load())
+	}
+}
+
 func TestTmdbEpisodeTitleInvalidIDReturnsNil(t *testing.T) {
 	title, err := NewTmdbClient(tmdbTestKey()).EpisodeTitle(context.Background(), "abc", 1, 1)
 	if err != nil || title != nil {
