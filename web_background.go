@@ -834,7 +834,10 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			}
 			// Record the line's observed peak for the guided tuning (never shown,
 			// only raises). The sample is the sum of the torrent rates in bytes/s.
-			observeSpeedPeak(cfg, saturatingInt64(rateKib), saturatingInt64(uploadBytes))
+			// A direction under a speed limit is not the line, so it is skipped
+			// (and any earlier peak forgotten): only an uncapped rate counts.
+			peakDownKib, peakUpKib, _, _ := speedPolicy(cfg)
+			observeSpeedPeak(cfg, saturatingInt64(rateKib), saturatingInt64(uploadBytes), peakDownKib > 0, peakUpKib > 0)
 			counts := fmt.Sprintf("%d/%d/%d", transferring, idle, queued)
 			// Skip the first tick after start: the engine has not finished syncing
 			// and resumed torrents read as paused, so that triple is transient

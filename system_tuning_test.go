@@ -108,13 +108,22 @@ func TestProposeTuningConnectionsAreBoundedFromRAM(t *testing.T) {
 func TestObserveSpeedPeakKeepsTheHighest(t *testing.T) {
 	state := newTestAppState(t)
 	cfg := latestConfig(state)
-	observeSpeedPeak(cfg, 3<<20, 1<<20) // 3072 KiB/s down, 1024 up
-	observeSpeedPeak(cfg, 1<<20, 2<<20) // a lower down, a higher up
+	observeSpeedPeak(cfg, 3<<20, 1<<20, false, false) // 3072 KiB/s down, 1024 up
+	observeSpeedPeak(cfg, 1<<20, 2<<20, false, false) // a lower down, a higher up
 	if got := speedPeakKib(latestConfig(state), autotunePeakDownKey); got != 3072 {
 		t.Fatalf("download peak = %d, want 3072 (the highest)", got)
 	}
 	if got := speedPeakKib(latestConfig(state), autotunePeakUpKey); got != 2048 {
 		t.Fatalf("upload peak = %d, want 2048 (the highest)", got)
+	}
+	// A direction under a speed limit is not the line: its peak is forgotten, so
+	// the tuning cannot propose 80% of its own cap.
+	observeSpeedPeak(latestConfig(state), 1<<20, 1<<20, true, false)
+	if got := speedPeakKib(latestConfig(state), autotunePeakDownKey); got != 0 {
+		t.Fatalf("limited download peak = %d, want 0 (a capped rate is not the line)", got)
+	}
+	if got := speedPeakKib(latestConfig(state), autotunePeakUpKey); got != 2048 {
+		t.Fatalf("upload peak = %d, want 2048 (the upload was not limited)", got)
 	}
 }
 

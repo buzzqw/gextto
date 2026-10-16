@@ -30,13 +30,27 @@ func speedPeakKib(cfg *Config, key string) int64 {
 }
 
 // observeSpeedPeak records the highest download/upload rate seen (bytes per
-// second), kept in KiB/s. It only raises the peak and does nothing when there is
-// no data dir (a hand-built config in a test must not write).
-func observeSpeedPeak(cfg *Config, downloadBytesPerSec, uploadBytesPerSec int64) {
+// second), kept in KiB/s. It does nothing when there is no data dir (a
+// hand-built config in a test must not write).
+//
+// A direction that currently has a speed limit is NOT a measurement of the line:
+// the achieved rate is bounded by the cap, so recording it would let the tuning
+// propose 80% of its own cap and ratchet the limit down every cycle. When a
+// direction is limited, any peak recorded earlier is forgotten, so a peak always
+// means "the rate the line reached with no cap".
+func observeSpeedPeak(cfg *Config, downloadBytesPerSec, uploadBytesPerSec int64, downloadLimited, uploadLimited bool) {
 	if cfg == nil || strings.TrimSpace(cfg.DataDir) == "" {
 		return
 	}
-	observe := func(key string, bytesPerSec int64) {
+	observe := func(key string, bytesPerSec int64, limited bool) {
+		if limited {
+			if cfg.Settings[key] != "" {
+				if _, err := DeleteSetting(cfg.DataDir, key); err == nil {
+					delete(cfg.Settings, key)
+				}
+			}
+			return
+		}
 		kib := bytesPerSec / 1024
 		if kib <= speedPeakKib(cfg, key) {
 			return
@@ -46,6 +60,6 @@ func observeSpeedPeak(cfg *Config, downloadBytesPerSec, uploadBytesPerSec int64)
 			cfg.Settings[key] = value
 		}
 	}
-	observe(autotunePeakDownKey, downloadBytesPerSec)
-	observe(autotunePeakUpKey, uploadBytesPerSec)
+	observe(autotunePeakDownKey, downloadBytesPerSec, downloadLimited)
+	observe(autotunePeakUpKey, uploadBytesPerSec, uploadLimited)
 }
