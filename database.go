@@ -1332,6 +1332,24 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 	if context == nil {
 		context = &models.ApprovalContext{}
 	}
+	// The episodes this season is actually missing, from the same archive gap
+	// pass the cycle uses (it already excludes the seasons a complete pack
+	// covers, the ignored episodes and the active downloads). A "complete" pack
+	// may only be approved to fill one of these, or to upgrade an existing
+	// episode: the raw TMDB episode count also holds unaired/planned episodes
+	// (13 for a 9-episode season, 6 for a 2-aired one), so using it would approve
+	// a pack that adds nothing — downloaded, then rejected file by file. A
+	// user-initiated pack keeps the broad range instead.
+	gapEpisodes := []int64{}
+	if !manual {
+		if gaps, gapErr := d.ArchiveGapsForSeries(seriesName); gapErr == nil {
+			for _, gap := range gaps {
+				if gap[0] == season {
+					gapEpisodes = append(gapEpisodes, gap[1])
+				}
+			}
+		}
+	}
 	tx, err := d.db.Begin()
 	if err != nil {
 		return false, "", err
@@ -1379,16 +1397,26 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 			return false, "", err
 		}
 		rows.Close()
-		var count int64
-		countErr := tx.QueryRow("SELECT episode_count FROM series_metadata WHERE series_name=?1 AND season=?2", seriesName, season).Scan(&count)
-		if countErr == nil {
-			if count > 0 && count <= 500 {
-				for episode := int64(1); episode <= count; episode++ {
-					targets = append(targets, episode)
+		// A "complete" pack may only be approved to fill the episodes the season
+		// is actually missing, or to upgrade the ones it has. The TMDB episode
+		// count (13 for a 9-episode season, 6 for a 2-aired one) would otherwise
+		// invent episodes the pack does not contain: the pack would be downloaded
+		// and then rejected file by file, wasting the bandwidth. A user-initiated
+		// pack keeps the broad range.
+		if manual {
+			var count int64
+			countErr := tx.QueryRow("SELECT episode_count FROM series_metadata WHERE series_name=?1 AND season=?2", seriesName, season).Scan(&count)
+			if countErr == nil {
+				if count > 0 && count <= 500 {
+					for episode := int64(1); episode <= count; episode++ {
+						targets = append(targets, episode)
+					}
 				}
+			} else if !errors.Is(countErr, sql.ErrNoRows) {
+				return false, "", countErr
 			}
-		} else if !errors.Is(countErr, sql.ErrNoRows) {
-			return false, "", countErr
+		} else {
+			targets = append(targets, gapEpisodes...)
 		}
 	}
 	filtered := targets[:0]

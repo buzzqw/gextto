@@ -793,6 +793,12 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 	englishRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+season[ ._-]*(\d{1,2})[ ._-]+(?:episode|ep)[ ._-]*(\d{1,4})(?:[ ._-]|$)`)
 	dateRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{4})[-.](\d{1,2})[-.](\d{1,2})(?:[ ._-]|$)`)
 	seasonPackRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})(?:[ ._-]+(?:complete|completa))?(?:[ ._-]|$)`)
+	// A pack marked "IN CORSO n/m" ("in progress", as Italian sites label an
+	// airing season) only holds the first n episodes, not the whole season: the
+	// pack range stops there, so it fills a gap only if one of those n is really
+	// missing. Reading it as a complete season would invent gaps up to the TMDB
+	// count and download the pack for nothing.
+	inProgressPackRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})\b.*?\b(?:in[ ._-]*(?:corso|progress)|incomplete)\b[ ._-]*0?(\d{1,3})[ ._-]*/[ ._-]*\d{1,3}`)
 	seriesName := func(capture []string) *string {
 		if capture == nil || capture[1] == "" {
 			return nil
@@ -953,6 +959,23 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 			season = &year
 			episode = &ordinal
 			episodeRange = []int64{ordinal}
+		}
+	} else if capture := inProgressPackRe.FindStringSubmatch(title); capture != nil {
+		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
+		if err != nil {
+			return nil
+		}
+		available, err := strconv.ParseInt(capture[3], 10, 64)
+		if err != nil || available < 1 || available > 999 {
+			return nil
+		}
+		first := int64(1)
+		series = seriesName(capture)
+		season = &seasonValue
+		episode = &first
+		episodeRange = make([]int64, 0, available)
+		for value := int64(1); value <= available; value++ {
+			episodeRange = append(episodeRange, value)
 		}
 	} else if capture := seasonPackRe.FindStringSubmatch(title); capture != nil {
 		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)

@@ -102,6 +102,19 @@ difference (`upgrade_min_score_diff`) remains, deciding *by how much* a release 
 improve against *up to where* it is accepted, and the per-title "No upgrade" block
 is in the series tab.
 
+**A pack is downloaded only when it is useful.** A whole-season pack may be approved
+only to fill a real gap or to upgrade an existing episode: its target episodes come
+from the same archive gap pass the cycle uses (`ArchiveGapsForSeries`, which already
+excludes the seasons a complete pack covers, the ignored episodes and the active
+downloads), never from the raw TMDB episode count — that count also holds
+unaired/planned episodes (13 for a 9-episode season) and would approve a pack that
+adds nothing, downloaded and then rejected file by file at import. A pack the title
+marks *"IN CORSO n/m"* (an airing season) is read with the range 1..n instead of the
+complete-season sentinel, so it fills a gap only among the episodes that exist. A
+user-initiated pack keeps the broad range. The content the pack physically holds is
+still only known at import (`StagePackFile`), where a pack whose every file is worse
+than the library copy is rejected and its source moved to the trash.
+
 Changing a score weight from the settings page or the API leaves every stored score
 computed with the old weights, which would look like a genuine improvement and
 re-download the library. The cycle recomputes them before it compares anything

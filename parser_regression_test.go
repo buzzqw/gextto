@@ -53,6 +53,29 @@ func TestParseReleaseSeasonFormats(t *testing.T) {
 	}
 }
 
+// A pack marked "IN CORSO n/m" holds only the first n episodes, not the whole
+// season: reading it as complete would invent gaps up to the TMDB count and
+// download the pack for nothing.
+func TestParseInProgressPackBoundsTheRange(t *testing.T) {
+	cases := []struct {
+		title  string
+		season int64
+		last   int64
+	}{
+		{"Marshals: A Yellowstone Story - Stagione 2 (2026) [IN CORSO 02/18] 1080p H264 ITA ENG EAC3 5.1 MULTISUB", 2, 2},
+		{"Dark Matter - Stagione 2 (2026) [IN CORSO 08/10] 1080p H265 ITA ENG EAC3 5.1 Atmos MULTISUB", 2, 8},
+	}
+	for _, tc := range cases {
+		release := ParseRelease(tc.title, parserTestMagnet, "test")
+		if release == nil || release.Kind != "series" || release.Season == nil || *release.Season != tc.season {
+			t.Fatalf("%q: not parsed as season %d: %+v", tc.title, tc.season, release)
+		}
+		if !release.IsPack || len(release.EpisodeRange) != int(tc.last) || release.EpisodeRange[len(release.EpisodeRange)-1] != tc.last {
+			t.Fatalf("%q: range %v (pack=%v), want 1..%d", tc.title, release.EpisodeRange, release.IsPack, tc.last)
+		}
+	}
+}
+
 func TestParseQualityNoFalsePositives(t *testing.T) {
 	if got := ParseQuality("Show.Name.S01E01.1080p.WEBRip.x265.10bit").Audio; got != "unknown" {
 		t.Errorf("x265.10bit must not yield audio %q", got)

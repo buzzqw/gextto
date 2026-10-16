@@ -463,6 +463,92 @@ func TestFailedReleaseClearsPlaceholdersToAllowFallback(t *testing.T) {
 	assertTrue(t, approved, "il 1080p deve essere approvato: "+reason)
 }
 
+// seedExampleSeason registers a series and its completed episodes in the
+// database (all present, in a quality better than a plain 1080p x264 pack). A
+// completePack marker (the episode 0 row a whole-season download leaves) makes
+// the archive gap pass consider the season covered.
+func seedExampleSeason(t *testing.T, db *Database, series string, season, episodeCount, metaCount int64, completePack bool) int64 {
+	t.Helper()
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES (?1)", series); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := db.db.QueryRow("SELECT id FROM series WHERE name=?1", series).Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	for episode := int64(1); episode <= episodeCount; episode++ {
+		if _, err := db.db.Exec(
+			"INSERT INTO episodes(series_id,season,episode,title,quality_score,archive_path) VALUES (?1,?2,?3,?4,1900,?5)",
+			seriesID, season, episode, "Example S01E01 [WEB-DL][2160p][h265][EAC3]", "/library/Example S01E01.mkv"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if metaCount > 0 {
+		if _, err := db.db.Exec("INSERT INTO series_metadata(series_name,season,episode_count,updated_at) VALUES (?1,?2,?3,datetime('now'))", series, season, metaCount); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if completePack {
+		if _, err := db.db.Exec(
+			"INSERT INTO episodes(series_id,season,episode,title,quality_score,archive_path,downloaded_at) VALUES (?1,?2,0,?3,1900,?4,datetime('now'))",
+			seriesID, season, "Example S01 1080p WEB-DL", "/library/Example S01"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return seriesID
+}
+
+// A "complete" season pack that adds nothing must not be downloaded: the season
+// already has every episode, and the TMDB episode count (13 for a 9-episode
+// season) must not invent gaps. Regression: a complete season already held was
+// downloaded and then rejected file by file, wasting the bandwidth.
+func TestCompletePackWithNoGapIsRefused(t *testing.T) {
+	db := newTestDB(t)
+	series, season := "Example", int64(1)
+	seedExampleSeason(t, db, series, season, 9, 13, true)
+
+	pack := models.Release{
+		Title: "Example.S01.1080p.x264.AAC", Magnet: "magnet:?xt=urn:btih:cccccccccccccccccccccccccccccccccccccccc",
+		Source: "rss", Quality: models.Quality{Resolution: "1080p", Codec: "x264", Audio: "AAC"},
+		Kind: "series", Series: &series, Season: &season, Episode: int64Ptr(0),
+		IsPack: true, EpisodeRange: []int64{0}, Seeders: -1, Peers: -1,
+	}
+	hash := mustHash(t, pack.Magnet)
+	// The archive pass reports no gap at all for this season.
+	context := &models.ApprovalContext{Archive: &models.ArchiveQualityIndex{}, Live: &models.LiveDownloads{}}
+	approved, reason, err := db.checkSeriesPack(&pack, hash, pack.Quality.Score(), 200, context, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if approved {
+		t.Fatalf("a complete pack that fits no gap and no upgrade must be refused, got %q", reason)
+	}
+}
+
+// A "complete" pack is still approved when the season really misses episodes:
+// the gap episodes the archive pass reports are exactly what it may fill.
+func TestCompletePackFillingARealGapIsApproved(t *testing.T) {
+	db := newTestDB(t)
+	series, season := "Example", int64(1)
+	// Two episodes present, the TMDB count says four: episodes 3 and 4 are a
+	// real gap the pack may fill.
+	seedExampleSeason(t, db, series, season, 2, 4, false)
+
+	pack := models.Release{
+		Title: "Example.S01.1080p.x265.EAC3", Magnet: "magnet:?xt=urn:btih:dddddddddddddddddddddddddddddddddddddddd",
+		Source: "rss", Quality: models.Quality{Resolution: "1080p", Codec: "x265", Audio: "EAC3"},
+		Kind: "series", Series: &series, Season: &season, Episode: int64Ptr(0),
+		IsPack: true, EpisodeRange: []int64{0}, Seeders: -1, Peers: -1,
+	}
+	hash := mustHash(t, pack.Magnet)
+	context := &models.ApprovalContext{Archive: &models.ArchiveQualityIndex{}, Live: &models.LiveDownloads{}}
+	approved, reason, err := db.checkSeriesPack(&pack, hash, pack.Quality.Score(), 200, context, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertTrue(t, approved, "a complete pack that fills a real gap must be approved: "+reason)
+}
+
 func TestArchiveIndexBlocksReleaseAlreadyPresentOnDisk(t *testing.T) {
 	db := newTestDB(t)
 	release := testRelease()
