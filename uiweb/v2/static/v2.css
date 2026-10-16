@@ -1346,6 +1346,11 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
 :root[data-theme="light"] .torrent-detail-tabs [role="tab"].tab-active,
 :root[data-theme="cream"] .torrent-detail-tabs [role="tab"].tab-active { color: #fff; }
 
+.settings-mode { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface-2); }
+.settings-mode-btn { padding: 5px 14px; text-decoration: none; color: var(--muted); font-weight: 600; font-size: 0.85rem; }
+.settings-mode-btn:hover { color: var(--text); }
+.settings-mode-btn.active { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 2px var(--accent-2); }
+.settings-mode-btn:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 .settings-view .settings-head { position: static; }
 .settings-view .settings-title-row { align-items: center; flex-wrap: wrap; }
 .settings-view .settings-save-hint { margin: 0; max-width: 70ch; }

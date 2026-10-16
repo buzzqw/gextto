@@ -1633,7 +1633,7 @@ func TestV2SeriesSaveAnimeAndUpgradeToggles(t *testing.T) {
 // "Auto" (managed) instead of editable values.
 func TestGxAutoMarksCacheAndQueueManaged(t *testing.T) {
 	state := newTestAppState(t)
-	page := uiSettingsPageFrom(state, "performance")
+	page := uiSettingsPageFrom(state, "performance", v2SettingsModeExpert)
 	managed := map[string]bool{}
 	for _, g := range page.Groups {
 		for _, f := range g.Fields {

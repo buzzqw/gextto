@@ -4488,3 +4488,8 @@ eng:
   "RAM disk: soglia per torrent pari a %s GB, in base allo spazio disponibile.": "RAM disk: per-torrent threshold of %s GB, from the available space."
   "RAM disk: mantengo %s GB liberi, in base allo spazio disponibile.": "RAM disk: I keep %s GB free, from the available space."
   "Nessun RAM disk disponibile su questa macchina: lo disattivo.": "No RAM disk available on this machine: I turn it off."
+  "Facilitata": "Guided"
+  "Esperto": "Expert"
+  "Livello di configurazione": "Configuration level"
+  "Poche impostazioni: il resto lo gestisce il sistema.": "A few settings: the system handles the rest."
+  "Tutti i valori, quelli interni compresi.": "Every value, internals included."

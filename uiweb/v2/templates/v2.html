@@ -666,6 +666,10 @@
 {{define "v2_settings"}}
 <div class="view settings-view" data-v2-settings>
   <div class="settings-head">
+    <div class="settings-mode" role="group" aria-label="Livello di configurazione">
+      <a class="settings-mode-btn{{if .Brief}} active{{end}}" href="{{.BriefURL}}" title="Poche impostazioni: il resto lo gestisce il sistema."{{if .Brief}} aria-current="true"{{end}}>Facilitata</a>
+      <a class="settings-mode-btn{{if not .Brief}} active{{end}}" href="{{.ExpertURL}}" title="Tutti i valori, quelli interni compresi."{{if not .Brief}} aria-current="true"{{end}}>Esperto</a>
+    </div>
     <div class="settings-title-row">
       <p class="settings-save-hint">Ogni impostazione si salva con il suo pulsante «Salva»; le modifiche in sospeso si salvano tutte insieme dalla barra in basso.</p>
       <label class="check settings-keys-toggle"><input type="checkbox" data-v2-show-keys /> <span>Mostra chiavi tecniche</span></label>
@@ -744,7 +748,7 @@
     {{if .Rename}}{{template "v2_rename_editor" .Rename}}{{end}}
     {{if not .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
     {{if .I18n}}{{template "v2_i18n_editor" .I18n}}{{end}}
-    {{if and (not .Groups) (not .I18n) (not .ShowFeeds) .Empty}}<p class="muted">{{.Empty}}</p>{{end}}
+    {{if and (not .Groups) (not .I18n) (not .ShowFeeds) (not .Tuning) (not .Sources) (not .ScoreExamples) .Empty}}<p class="muted">{{.Empty}}</p>{{end}}
     {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
     {{if eq .ActiveID "network"}}{{template "v2_ipfilter_action" .}}{{end}}
   </div>

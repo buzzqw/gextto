@@ -5151,3 +5151,8 @@ deu:
   "RAM disk: soglia per torrent pari a %s GB, in base allo spazio disponibile.": "RAM-Disk: Schwelle pro Torrent von %s GB, aus dem verfügbaren Speicher."
   "RAM disk: mantengo %s GB liberi, in base allo spazio disponibile.": "RAM-Disk: ich halte %s GB frei, aus dem verfügbaren Speicher."
   "Nessun RAM disk disponibile su questa macchina: lo disattivo.": "Auf dieser Maschine ist keine RAM-Disk verfügbar: ich deaktiviere sie."
+  "Facilitata": "Geführt"
+  "Esperto": "Experte"
+  "Livello di configurazione": "Konfigurationsebene"
+  "Poche impostazioni: il resto lo gestisce il sistema.": "Wenige Einstellungen: den Rest verwaltet das System."
+  "Tutti i valori, quelli interni compresi.": "Alle Werte, auch die internen."

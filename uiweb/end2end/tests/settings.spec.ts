@@ -15,6 +15,22 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("l'interruttore Facilitata/Esperto cambia le righe mostrate ed è ricordato", async ({ page }) => {
+  // Esperto: the cache row is present (it lives in the collapsed «Per esperti»
+  // group, so its presence is the signal, not its visibility).
+  await page.goto("/?view=settings&tab=performance&mode=expert");
+  await expect(page.locator("#v2-setting-torrent_cache_size")).toHaveCount(1);
+
+  await page.getByRole("link", { name: "Facilitata" }).click();
+  // The internals disappear; the guided panel stays reachable.
+  await expect(page.locator("#v2-setting-torrent_cache_size")).toHaveCount(0);
+  await expect(page.locator("#v2-tuning-panel")).toBeVisible();
+  // The choice is remembered on the next settings page (cookie).
+  await page.goto("/?view=settings&tab=paths");
+  await expect(page.locator("#v2-setting-min_free_space_gb")).toBeVisible();
+  await expect(page.locator("#v2-setting-torrent_cache_size")).toHaveCount(0);
+});
+
 test("la navigazione aggiorna titolo, sezione attiva e indirizzo", async ({ page }) => {
   await page.goto("/?view=settings");
   const nav = page.getByRole("navigation", { name: "Sezioni della configurazione" });

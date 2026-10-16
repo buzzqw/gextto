@@ -5092,3 +5092,8 @@ pol:
   "RAM disk: soglia per torrent pari a %s GB, in base allo spazio disponibile.": "RAM disk: próg na torrent %s GB, na podstawie dostępnego miejsca."
   "RAM disk: mantengo %s GB liberi, in base allo spazio disponibile.": "RAM disk: zachowuję %s GB wolnego, na podstawie dostępnego miejsca."
   "Nessun RAM disk disponibile su questa macchina: lo disattivo.": "Brak RAM disku na tej maszynie: wyłączam go."
+  "Facilitata": "Prowadzona"
+  "Esperto": "Ekspert"
+  "Livello di configurazione": "Poziom konfiguracji"
+  "Poche impostazioni: il resto lo gestisce il sistema.": "Niewiele ustawień: resztą zarządza system."
+  "Tutti i valori, quelli interni compresi.": "Wszystkie wartości, także wewnętrzne."

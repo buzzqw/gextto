@@ -5098,3 +5098,8 @@ spa:
   "RAM disk: soglia per torrent pari a %s GB, in base allo spazio disponibile.": "RAM disk: umbral por torrent de %s GB, según el espacio disponible."
   "RAM disk: mantengo %s GB liberi, in base allo spazio disponibile.": "RAM disk: mantengo %s GB libres, según el espacio disponible."
   "Nessun RAM disk disponibile su questa macchina: lo disattivo.": "No hay RAM disk disponible en esta máquina: lo desactivo."
+  "Facilitata": "Guiada"
+  "Esperto": "Experto"
+  "Livello di configurazione": "Nivel de configuración"
+  "Poche impostazioni: il resto lo gestisce il sistema.": "Pocas opciones: el resto lo gestiona el sistema."
+  "Tutti i valori, quelli interni compresi.": "Todos los valores, incluidos los internos."

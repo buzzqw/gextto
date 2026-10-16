@@ -351,6 +351,17 @@ itself (cache, active slots, dynamic queue) and from taste/policy settings
 (`restart_cause.go`): a restart that changed the binary is an update, never
 instability, so nothing in the tuning can read a routine update as a fault.
 
+**Two configuration levels.** The configuration page is shown at two levels,
+chosen with a switch and remembered in a cookie (`uiweb_v2_settings_mode.go`,
+like the List/Posters choice): **Facilitata** shows the limits the user must own
+(where data goes, speed and space limits, the seed policy, access and metadata
+keys — `uiEssentialKeys`) and hides the internals the system manages;
+**Esperto** shows every value. Nothing moves between them: it is one filter over
+the same index, and the settings-search index follows the level so a result
+never links to a hidden row. The default is Esperto, so an existing installation
+loses no row; the setup wizard sets Facilitata when it finishes, so a brand-new
+user starts from the guided page.
+
 **Streaming and DLNA.** Web streaming (`cmd/gx-torrent/stream.go`, the endpoint
 Gextto redirects to) sends the **Content-Type from the file extension**
 (`video/mp4`, `video/x-matroska`, `audio/flac`, …) with

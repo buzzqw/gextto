@@ -416,8 +416,9 @@ func gxAutoManagedKey(key string) bool {
 // and the live values. Legacy or dedicated-page-only keys are intentionally not
 // copied into a catch-all tab. Only the active tab is rendered, which keeps the
 // page small and usable on mobile.
-func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
+func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 	cfg := latestConfig(s)
+	brief := v2SettingsIsBrief(mode)
 
 	labels := map[string]string{}
 	order := []string{}
@@ -428,12 +429,18 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	fieldsByTab := map[string][]uiSettingField{}
 	activeBackend := uiActiveTorrentBackend(cfg)
 	// The score weights lead the Qualità e upgrade tab; its other settings
-	// (upgrade thresholds) follow them.
-	for _, def := range uiScoreSettingDefs {
-		fieldsByTab["scores"] = append(fieldsByTab["scores"], uiSettingFieldFor(def.Key, def.Label, cfg.Settings[def.Key]))
+	// (upgrade thresholds) follow them. In Facilitata the weights are internals
+	// and stay in Esperto.
+	if !brief {
+		for _, def := range uiScoreSettingDefs {
+			fieldsByTab["scores"] = append(fieldsByTab["scores"], uiSettingFieldFor(def.Key, def.Label, cfg.Settings[def.Key]))
+		}
 	}
 	for _, def := range uiSettingsIndex {
 		if _, ok := labels[def.Tab]; !ok {
+			continue
+		}
+		if brief && !uiEssentialKeys[def.Key] {
 			continue
 		}
 		value := ""
@@ -474,48 +481,55 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	for _, def := range uiSettingsIndex {
 		indexed[def.Key] = struct{}{}
 	}
+	// Unknown/score-override settings are Esperto only: in Facilitata the user
+	// sees the curated limits, not the raw keys.
 	keys := make([]string, 0, len(cfg.Settings))
-	for key := range cfg.Settings {
-		// Legacy score_bonus_ita is not a supported scoring rule: language is
-		// intentionally excluded from the quality score, so don't expose it as
-		// an editable override in the Punteggi tab.
-		if strings.EqualFold(key, "score_bonus_ita") {
-			continue
-		}
-		if _, ok := indexed[key]; ok {
-			continue
-		}
-		if _, ok := structured[key]; ok {
-			continue
-		}
-		// Internal markers and settings with a dedicated editor are not repeated.
-		if strings.HasPrefix(key, "_") || key == "download_tags" {
-			continue
-		}
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		// Unknown settings are normally legacy keys or values edited by a
-		// dedicated page (backup, integrations, runtime controls, ...). Do not
-		// expose them in a catch-all "Altro" tab: that made obsolete settings
-		// such as aMule and aria2 look supported and duplicated current controls.
-		// Quality score overrides are the one intentional exception; they are
-		// grouped in the Punteggi tab and edited by ScoreEditor.
-		if strings.HasPrefix(strings.ToLower(key), "score") {
-			if uiScoreSettingKeys[key] || uiDeprecatedScoreSettingKeys[key] {
+	if !brief {
+		for key := range cfg.Settings {
+			// Legacy score_bonus_ita is not a supported scoring rule: language is
+			// intentionally excluded from the quality score, so don't expose it as
+			// an editable override in the Punteggi tab.
+			if strings.EqualFold(key, "score_bonus_ita") {
 				continue
 			}
-			// Custom release groups have their own add/edit/delete interface in
-			// the v2 score editor; don't expose them as anonymous key/value rows.
-			if strings.HasPrefix(strings.ToLower(key), "score_group_") {
+			if _, ok := indexed[key]; ok {
 				continue
 			}
-			fieldsByTab["scores"] = append(fieldsByTab["scores"], uiSettingFieldFor(key, uiSettingAutoLabel(key), cfg.Settings[key]))
+			if _, ok := structured[key]; ok {
+				continue
+			}
+			// Internal markers and settings with a dedicated editor are not repeated.
+			if strings.HasPrefix(key, "_") || key == "download_tags" {
+				continue
+			}
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			// Unknown settings are normally legacy keys or values edited by a
+			// dedicated page (backup, integrations, runtime controls, ...). Do not
+			// expose them in a catch-all "Altro" tab: that made obsolete settings
+			// such as aMule and aria2 look supported and duplicated current controls.
+			// Quality score overrides are the one intentional exception; they are
+			// grouped in the Punteggi tab and edited by ScoreEditor.
+			if strings.HasPrefix(strings.ToLower(key), "score") {
+				if uiScoreSettingKeys[key] || uiDeprecatedScoreSettingKeys[key] {
+					continue
+				}
+				// Custom release groups have their own add/edit/delete interface in
+				// the v2 score editor; don't expose them as anonymous key/value rows.
+				if strings.HasPrefix(strings.ToLower(key), "score_group_") {
+					continue
+				}
+				fieldsByTab["scores"] = append(fieldsByTab["scores"], uiSettingFieldFor(key, uiSettingAutoLabel(key), cfg.Settings[key]))
+			}
 		}
 	}
 
-	special := map[string]bool{"sources": true, "scores": true, "system": true}
+	// These tabs always render even with no scalar field: they host structured
+	// editors or the guided panels (performance shows the Gestione automatica
+	// card in Facilitata, with every internal hidden).
+	special := map[string]bool{"sources": true, "scores": true, "system": true, "performance": true}
 	tabs := make([]uiSettingsTabRef, 0, len(order))
 	for _, tab := range uiSettingsTabs {
 		if len(fieldsByTab[tab.ID]) == 0 && !special[tab.ID] {

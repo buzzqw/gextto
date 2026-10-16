@@ -561,7 +561,7 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 	case "downloads":
 		return "v2_downloads", v2DownloadsViewFrom(s, r)
 	case "settings":
-		return "v2_settings", v2SettingsViewFrom(s, r.FormValue("tab"), r.FormValue("highlight"))
+		return "v2_settings", v2SettingsViewFrom(s, r.FormValue("tab"), r.FormValue("highlight"), v2SettingsMode(r))
 	case "health":
 		return "v2_health", v2HealthViewFrom(s, r)
 	case "logs":
@@ -621,6 +621,9 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// The list/card choice is kept in a cookie so the pages reached later (their
 	// links do not carry the parameter) read the library the same way.
 	v2RememberLayout(w, r)
+	// The Facilitata/Esperto choice is kept in a cookie too, so the tabs reached
+	// later keep it.
+	v2RememberSettingsMode(w, r)
 	v2Render(w, http.StatusOK, "v2_shell", page, dict, eng)
 }
 
@@ -2026,6 +2029,11 @@ type v2SettingsView struct {
 	ActiveID    string
 	ActiveLabel string
 	Intro       string
+	// Brief is the Facilitata mode: internals are hidden. BriefURL/ExpertURL are
+	// the switches, which keep the current section.
+	Brief     bool
+	BriefURL  string
+	ExpertURL string
 	Groups      []v2SettingGroup
 	Note        string
 	Empty       string
@@ -2077,13 +2085,17 @@ func v2ScoreGroupsFrom(s *AppState) []v2ScoreGroup {
 	return groups
 }
 
-func v2SettingsViewFrom(s *AppState, tab, highlight string) v2SettingsView {
-	page := uiSettingsPageFrom(s, tab)
+func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView {
+	page := uiSettingsPageFrom(s, tab, mode)
+	brief := v2SettingsIsBrief(mode)
 	view := v2SettingsView{
 		Tabs:        page.Tabs,
 		ActiveID:    page.ActiveID,
 		Highlight:   highlight,
 		ScoreGroups: v2ScoreGroupsFrom(s),
+		Brief:       brief,
+		BriefURL:    v2SettingsModeURL(page.ActiveID, v2SettingsModeBrief),
+		ExpertURL:   v2SettingsModeURL(page.ActiveID, v2SettingsModeExpert),
 		Empty:       "Nessuna impostazione in questa sezione.",
 	}
 	for _, area := range uiSettingsAreas {
@@ -2272,7 +2284,7 @@ func v2ListEditorKey(editor uiListEditor) (string, bool) {
 // search results). The address bar follows the section actually shown.
 func V2SettingsBody(w http.ResponseWriter, r *http.Request, s *AppState) {
 	dict, eng := v2Dictionaries(s)
-	view := v2SettingsViewFrom(s, r.FormValue("tab"), r.FormValue("highlight"))
+	view := v2SettingsViewFrom(s, r.FormValue("tab"), r.FormValue("highlight"), v2SettingsMode(r))
 	if r.Header.Get("HX-Request") != "" {
 		w.Header().Set("HX-Push-Url", "/?view=settings&tab="+view.ActiveID)
 	}
@@ -2309,8 +2321,14 @@ func V2SettingsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	seen := map[string]bool{}
+	brief := v2SettingsIsBrief(v2SettingsMode(r))
 	defs := append(append([]uiSettingDef{}, uiSettingsIndex...), uiScoreSettingDefs...)
 	for _, def := range defs {
+		// In Facilitata the search only reaches what the page shows, so its
+		// result never links to a hidden row.
+		if brief && !uiEssentialKeys[def.Key] {
+			continue
+		}
 		haystack := strings.ToLower(def.Key + " " + def.Label + " " + uiSettingSearchTerms[def.Key])
 		if !strings.Contains(haystack, query) || seen[def.Key] || uiSchedSingleWindowKeys[def.Key] {
 			continue

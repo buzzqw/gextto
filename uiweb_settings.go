@@ -283,6 +283,32 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "update_check_hours", Label: "Intervallo controllo aggiornamenti", Tab: "system", Group: "Aggiornamenti"},
 }
 
+// uiEssentialKeys is the Facilitata set: the handful of limits the user must
+// own (where data goes, the speed and space limits, the seed policy, access and
+// metadata keys), and everything the setup wizard writes. The internals the
+// system manages are not here: they live in Esperto. The rule for inclusion is
+// "if I get it wrong I lose data, space or security, or I download nothing".
+var uiEssentialKeys = map[string]bool{
+	// The cycle.
+	"active": true, "refresh_interval": true, "max_release_age_days": true,
+	// Where data goes.
+	"archive_root": true, "torrent_dir": true, "torrent_temp_dir": true,
+	"torrent_copy_dir": true, "trash_path": true,
+	// The engine to reach (the managed one is loopback by default).
+	"torrent_backend": true, "gxtorrent_url": true,
+	// The user's limits.
+	"torrent_dl_limit": true, "torrent_ul_limit": true, "min_free_space_gb": true,
+	"torrent_seed_ratio": true, "torrent_seed_time_days": true,
+	// Quality policy the user recognises.
+	"upgrade_until_score": true, "cleanup_upgrades": true,
+	// Metadata language.
+	"default_language": true, "tmdb_language": true,
+	// Access and keys (security and identity).
+	"auth_enabled": true, "auth_local_bypass": true, "auth_username": true,
+	"auth_password": true, "auth_api_key": true,
+	"tmdb_api_key": true, "tvdb_api_key": true, "tvdb_pin": true,
+}
+
 // uiSettingIndexed holds every key the settings page shows (index and score
 // weights). gh7_setting_key_allowed accepts all of them, so a field on the page
 // is always savable.
