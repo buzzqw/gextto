@@ -1399,9 +1399,13 @@ func SetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		{"torrent_temp_ul_limit", strconv.FormatInt(upload, 10)},
 		{"torrent_temp_limit_enabled", enabled},
 		{"torrent_temp_limit_until", strconv.FormatInt(until, 10)},
-		// A numeric temporary limit and "auto speed" are one override with two
-		// modes: setting numbers turns auto off.
-		{"torrent_temp_auto", "0"},
+	}
+	// A numeric temporary limit and "auto speed" are one override with two
+	// modes: applying real numbers (or removing the limit) turns auto off. An
+	// empty "Applica" — the three fields are disabled while auto is on, so they
+	// arrive empty — must not silence auto on its own.
+	if input.Clear || download > 0 || upload > 0 || minutes > 0 {
+		pairs = append(pairs, [2]string{"torrent_temp_auto", "0"})
 	}
 	for _, pair := range pairs {
 		if err := saveConfigSetting(s.cfg.DataDir, pair[0], pair[1]); err != nil {

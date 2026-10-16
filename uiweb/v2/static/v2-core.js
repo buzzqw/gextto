@@ -1777,6 +1777,11 @@
       var el = document.getElementById(ids[i]);
       if (el) el.disabled = auto.checked;
     }
+    // The numeric "Applica" needs the three fields, which are disabled while
+    // auto is on: disabling it removes the empty apply that used to turn auto
+    // back off by itself.
+    var apply = document.getElementById("v2-temp-apply");
+    if (apply) apply.disabled = auto.checked;
   }
   document.addEventListener("change", function (event) {
     if (event.target.id && event.target.id === "v2-temp-auto") syncTempAuto();

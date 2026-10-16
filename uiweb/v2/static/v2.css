@@ -1573,6 +1573,10 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 .setting-week table { width: 100%; }
 .setting-week th, .setting-week td { white-space: nowrap; padding: 4px 6px; }
 .setting-week input.input { width: 100%; min-width: 5.5em; }
+/* The second column is the day's mode (Non attiva / Limite / Auto): it needs
+   room for the longest option, while the two speed numbers can be narrower. */
+.setting-week select.input { width: 100%; min-width: 8.5em; }
+.setting-week input[type="number"].input { min-width: 4.25em; }
 .setting-week td:nth-child(2) { width: 1%; text-align: center; }
 .setting-row[data-dirty] { box-shadow: inset 3px 0 0 var(--warn); padding-left: 10px; }
 /* The save button is a quiet outline until the row has something to save. */
