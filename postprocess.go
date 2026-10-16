@@ -1566,6 +1566,19 @@ func RestoreSourceToken(name, source string) (string, bool) {
 	return builder.String(), true
 }
 
+// isGenericEpisodeTitle reports whether a metadata title is a placeholder
+// rather than a real name: some providers answer "Episodio 5" (or the same in
+// another language) for an episode whose translation is missing, and the real
+// title only exists in the original language.
+func isGenericEpisodeTitle(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	pattern, err := utils.CachedRegex(`(?i)^(?:episodio|episode|folge|épisode|aflevering|capítulo|capitulo|episódio|temporada)\s*\d+$`)
+	return err == nil && pattern.MatchString(value)
+}
+
 // EpisodeNameConforms reports whether a file already follows the configured
 // rename format, without TMDB or MediaInfo (implementation of `episode_name_conforms`).
 func EpisodeNameConforms(path string, release *models.Release, cfg *Config) bool {
