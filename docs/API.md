@@ -18,7 +18,12 @@ a qBittorrent-compatible `/api/v2` (see *gx-torrent daemon routes* at the end).
   Internet use HTTPS anyway (a reverse proxy with a certificate, or a VPN).
 - `/login` and `/logout` exist only when protected access is enabled.
 - Routes that change configuration, files, torrents or databases normally use
-  `POST`/`DELETE`; treat them as administrative actions and keep backups.
+  `POST`/`DELETE`; treat them as administrative actions and keep backups. A
+  browser request that declares itself cross-site (an `Origin`/`Referer` from
+  another site, or `Sec-Fetch-Site: cross-site`) is refused with `403`: this
+  stops a page on another origin from driving the API through the browser of a
+  user on the LAN. Same-origin calls and non-browser clients (curl, the TUI,
+  scripts) are unaffected.
 - Placeholders in curly braces, for example `{hash}`, are part of the path and
   must be encoded correctly by the client.
 - Some routes are historical aliases (`run_now`/`run-now`, for example). New

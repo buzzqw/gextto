@@ -1790,6 +1790,13 @@ login from clients that are not on the local network.
 | Username | Login username (default `admin`). Shown only while «Require login» is on. |
 | Password | Stored only as a bcrypt hash; changing it closes every open session. Leave the field empty to keep it. Shown only while «Require login» is on. |
 
+**Writes from another origin.** Regardless of the login, Gextto refuses
+changing requests that the browser declares to come from another site
+(`Origin`/`Referer`, `Sec-Fetch-Site: cross-site`): a malicious page cannot
+reconfigure Gextto (settings, event hooks, torrent actions) through the browser
+of someone who has the interface open. Reads (GET) and clients without a browser
+(curl, the TUI) are untouched.
+
 **API keys**
 
 | Setting | What it does |

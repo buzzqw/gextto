@@ -289,7 +289,9 @@ func Serve(state *AppState) error {
 	requestCtx, cancelRequests := context.WithCancel(context.Background())
 	defer cancelRequests()
 
-	app := AuthMiddleware(state, Router(state))
+	// The cross-origin guard runs outermost so a cross-site write is refused
+	// before it can reach the (often login-free from the LAN) API.
+	app := crossOriginGuard(AuthMiddleware(state, Router(state)))
 	// Timeouts defend against slowloris and idle-connection exhaustion. Write is
 	// intentionally unlimited: the log/notification SSE streams and long
 	// downloads must be able to stay open.

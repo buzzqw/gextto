@@ -102,6 +102,12 @@ difference (`upgrade_min_score_diff`) remains, deciding *by how much* a release 
 improve against *up to where* it is accepted, and the per-title "No upgrade" block
 is in the series tab.
 
+Changing a score weight from the settings page or the API leaves every stored score
+computed with the old weights, which would look like a genuine improvement and
+re-download the library. The cycle recomputes them before it compares anything
+(`SyncScoresWithSettings`, guarded by a weights fingerprint, so a normal cycle does
+not touch the library).
+
 **Starting a download survives a crash** (`torrent_add_intent.go`). A release the
 cycle approves is recorded in three steps — the engine add, the approval in the
 library (placeholder or upgrade backup) and the `torrent_meta` row — and all of
@@ -241,6 +247,11 @@ one minute; without a password or key the check stays open with a warning in the
 log, and `GEXTTO_AUTH_DISABLE=1` gets back in. Both secrets (the API key and the
 gx-torrent token) can be generated and copied from *Access and services → API
 keys*; what they are and how to use them is in [`api-keys.md`](api-keys.md).
+Independent of the login, **cross-site writes are refused**
+(`security_origin.go`, `net/http.CrossOriginProtection`): a page served from
+another origin cannot drive the API through the browser of a user who has Gextto
+open, which matters because the LAN is exempt from the login by default. Safe
+methods and non-browser clients (curl, the TUI) pass untouched.
 
 **Media servers and notifications.** After an import Jellyfin receives
 `/Library/Media/Updated` with the folder and Plex

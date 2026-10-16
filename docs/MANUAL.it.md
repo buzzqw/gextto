@@ -1836,6 +1836,13 @@ VPN) puoi chiedere il login a chi non è in rete locale.
 | Utente | Nome utente per il login (predefinito `admin`). Compare solo con «Richiedi l'accesso (login)» attivo. |
 | Password | Salvata solo come hash bcrypt; cambiarla chiude tutte le sessioni aperte. Lascia il campo vuoto per non modificarla. Compare solo con «Richiedi l'accesso (login)» attivo. |
 
+**Scritture da un'altra origine.** Indipendentemente dal login, Gextto rifiuta
+le richieste di modifica che il browser dichiara provenire da un altro sito
+(`Origin`/`Referer`, `Sec-Fetch-Site: cross-site`): una pagina malevola non può
+riconfigurare Gextto (impostazioni, hook, azioni sui torrent) usando il browser
+di chi ha l'interfaccia aperta. Le letture (GET) e i client senza browser
+(curl, la TUI) non sono toccati.
+
 **Chiavi API**
 
 | Impostazione | Cosa fa |

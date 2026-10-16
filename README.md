@@ -295,7 +295,9 @@ to that group.
 > Gextto is meant for a trusted network: the web UI and API are open by
 > default. For access from outside, enable the optional login
 > (*Configuration → Access and services*; the LAN stays free) and still use
-> HTTPS via reverse proxy or VPN. Read the [security policy](docs/SECURITY.md)
+> HTTPS via reverse proxy or VPN. Writes coming from a browser page served by
+> another origin are refused (CSRF protection), also when the interface is open.
+> Read the [security policy](docs/SECURITY.md)
 > before exposing it remotely.
 
 ### Install from source

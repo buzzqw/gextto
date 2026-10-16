@@ -76,6 +76,20 @@ func RunCycleDomain(
 		return stats, nil
 	}
 
+	// A scoring-weight change (from the settings page or the JSON API) leaves
+	// every stored quality score stale: the next comparison would then look like
+	// a genuine improvement and re-download content that already has the right
+	// quality. Recompute them before the cycle reads any score. The fingerprint
+	// check makes this a no-op unless a weight actually changed, so it does not
+	// touch the library on a normal cycle.
+	if !cfg.DryRun && db != nil {
+		if updated, err := db.SyncScoresWithSettings(cfg); err != nil {
+			logging.Warn("stored score refresh failed", "error", err)
+		} else if updated > 0 {
+			logging.Info("stored quality scores refreshed after a scoring change", "updated", updated)
+		}
+	}
+
 	// The comics settings live in their own database: read them only when this
 	// cycle can run comics, and never let a comics database problem abort a
 	// series/movies cycle.

@@ -46,6 +46,15 @@ interface.
   `trusted-proxies`, a loopback peer carrying forwarding headers is **not**
   treated as local, so a forwarded Internet client must log in; see
   `docs/gx-torrent.md`, *Standalone use → Reverse proxy and allowed hosts*.
+- **Cross-site writes are refused** (`security_origin.go`,
+  `net/http.CrossOriginProtection`): a browser request that declares itself to
+  come from another site (`Origin`/`Referer`, or `Sec-Fetch-Site: cross-site`)
+  cannot change anything, even while the interface is open. This matters because
+  the LAN is exempt from the login by default: without it, a page served from
+  another origin could reconfigure Gextto (settings, event hooks — that is,
+  command execution — and torrent actions) through the browser of a user who has
+  the interface open. Safe reads (GET/HEAD/OPTIONS) and non-browser clients
+  (curl, the TUI, scripts) are unaffected.
 - **Use TLS for remote access**: Gextto serves plain HTTP. Put a reverse proxy
   with a certificate (or a VPN) in front of it, otherwise passwords and keys
   travel in clear text.

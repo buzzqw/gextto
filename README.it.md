@@ -311,8 +311,9 @@ aggiunge l'utente del servizio a quel gruppo.
 > Gextto è pensato per una rete fidata: UI web e API sono aperte di default.
 > Per l'accesso da fuori, attiva il login facoltativo (*Configurazione →
 > Accesso e servizi*, la rete locale resta libera) e usa comunque HTTPS via
-> reverse proxy o VPN. Leggi la [politica di
-> sicurezza](docs/SECURITY.md) prima di esporlo in rete.
+> reverse proxy o VPN. Le scritture da una pagina di un'altra origine sono
+> rifiutate (protezione CSRF), anche quando l'interfaccia è aperta. Leggi la
+> [politica di sicurezza](docs/SECURITY.md) prima di esporlo in rete.
 
 ### Installazione dal sorgente
 

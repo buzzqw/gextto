@@ -98,6 +98,38 @@ func TestCycleSkipsDownloadsWhenConfiguredFreeSpaceCannotBeRead(t *testing.T) {
 	}
 }
 
+// TestCycleRefreshesStaleScoresAfterAWeightChange pins the hot re-scoring: a
+// scoring weight edited from the settings page leaves every stored score stale,
+// and the very next cycle must recompute them before comparing anything, or a
+// genuine re-download would be triggered by the artificial improvement.
+func TestCycleRefreshesStaleScoresAfterAWeightChange(t *testing.T) {
+	state := newCycleState(t)
+	// A score stored with the previous weights (0 marks "not yet computed").
+	if _, err := state.db.db.Exec("INSERT INTO series(id,name) VALUES (1,'Show')"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO episodes(id,series_id,season,episode,title,quality_score,downloaded_at) VALUES (1,1,1,1,'Show.S01E01.1080p.WEB-DL.H.265',0,datetime('now'))"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Not a dry run: a dry run deliberately leaves the database untouched.
+	cfg := *state.cfg
+	cfg.DryRun = false
+	cfg.Settings = map[string]string{"score_res_1080p": "1500"}
+
+	if _, err := RunCycle(context.Background(), &cfg, state.engine, state.db, state.archive, state.comics, state.notifier, state.activeEngine()); err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+
+	var score int64
+	if err := state.db.db.QueryRow("SELECT quality_score FROM episodes WHERE id=1").Scan(&score); err != nil {
+		t.Fatal(err)
+	}
+	if score != 1900 {
+		t.Fatalf("stored score = %d, want 1900 (1080p 1500 + WEB-DL 200 + H.265 200)", score)
+	}
+}
+
 // TestCycleCancelledContextAborts verifies that a cycle with an already
 // cancelled context (daemon shutting down) returns cleanly without doing work,
 // so the torrent session can be destroyed without a late engine call.
