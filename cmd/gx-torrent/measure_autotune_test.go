@@ -62,16 +62,49 @@ func TestMeasureAutotune(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The caps bracket the auto-tune range: 50 (floor), 400 (ceiling), and
-	// unlimited (what the engine does when nothing is set) as the control.
-	arms := []struct {
+	// The caps to sweep: the auto-tune bound is 50..400, so we test below, at
+	// and above it, plus unlimited (0) as the control. GX_MEASURE_AUTOTUNE_CAPS
+	// overrides the list ("20,50,100,200,400,800,0").
+	caps := []int{50, 400, 0}
+	if raw := os.Getenv("GX_MEASURE_AUTOTUNE_CAPS"); raw != "" {
+		caps = nil
+		for _, part := range strings.Split(raw, ",") {
+			if n, err := strconv.Atoi(strings.TrimSpace(part)); err == nil && n >= 0 {
+				caps = append(caps, n)
+			}
+		}
+	}
+	repeat := 1
+	if raw := os.Getenv("GX_MEASURE_AUTOTUNE_REPEAT"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			repeat = n
+		}
+	}
+
+	type arm struct {
 		name        string
 		connections int
 		portBase    int
-	}{
-		{"cap 50 (pavimento auto-tune)", 50, 45900},
-		{"cap 400 (tetto auto-tune)", 400, 45920},
-		{"illimitato (controllo)", 0, 45940},
+	}
+	var arms []arm
+	port := 45900
+	for pass := 1; pass <= repeat; pass++ {
+		for _, cap := range caps {
+			name := "illimitato"
+			if cap > 0 {
+				name = "cap " + strconv.Itoa(cap)
+			} else {
+				cap = 0
+			}
+			if repeat > 1 {
+				name += " · giro " + strconv.Itoa(pass)
+			}
+			arms = append(arms, arm{name: name, connections: cap, portBase: port})
+			port += 20
+			if port > 47000 {
+				port = 45900
+			}
+		}
 	}
 
 	baseRSS, _ := procSelfSample()

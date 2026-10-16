@@ -150,6 +150,23 @@ the swarm is**, so the auto-tune bound does not cripple the transfer. The lower 
 the method: repeat the battery (`scripts`-style, the run is opt-in and outside CI) before
 reading any single number as a trend; a public swarm varies run to run.
 
+**Connection-cap sweep on a bigger public ISO** (2026-10-16, Ubuntu 24.04.3 desktop, ~6 GB,
+`GX_MEASURE_AUTOTUNE_CAPS=20,50,100,200,400,800,0 GX_MEASURE_AUTOTUNE_SECONDS=60`), one 60 s
+pass per cap:
+
+| Cap | 20 | 50 | 100 | 200 | 400 | 800 | unlimited |
+|---|---|---|---|---|---|---|---|
+| avg MiB/s | 1.5 | 0.1 | 0.0 | 1.6 | 1.1 | 0.7 | 0.2 |
+| peak peers | 7 | 20 | 1 | 34 | 30 | 19 | 33 |
+
+The spread is **swarm luck, not the cap**: cap 100 got a single peer and zero bytes, cap 20
+got seven peers and the best rate. A single short pass on a public swarm **cannot rank the
+parameters** — which peers you happen to reach dominates everything. Conclusion for the
+auto-tune: the 50–400 bound is **safe** (on Debian it never lost to unlimited), and a low cap
+saves memory; but "the right value" cannot be read from a public swarm. To actually tune a
+parameter, run **repeated, interleaved** passes and/or the **controlled local swarm**
+(`make measure-seeding` / `measure-pipeline`), where the parameter is the only variable.
+
 **RSS term matching** (2026-10-15, Intel N97, `go test -bench BenchmarkCriteriaMatch
 -benchmem -count 5 ./internal/rss/`: one rule with two *one of* and two *none of* terms
 over four typical release names). The terms are found with `rss.HasTerm` — separators of
