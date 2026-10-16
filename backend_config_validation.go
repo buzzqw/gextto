@@ -161,7 +161,46 @@ func validateSettingValue(key, value string, cfg *Config) error {
 	if err := validateBackendSetting(key, value); err != nil {
 		return err
 	}
+	if err := validateNumericSetting(key, value); err != nil {
+		return err
+	}
 	return validatePathSetting(key, value, cfg)
+}
+
+// validateNumericSetting rejects a non-numeric value for the settings whose
+// reader silently falls back to the default. Without it a typo
+// (`score_res_1080p=abc`, a port, the seed ratio) is accepted, does nothing,
+// and disables the rule the operator meant to tune — with no error anywhere.
+// Empty is always allowed: it clears the setting and the default applies.
+func validateNumericSetting(key, value string) error {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return nil
+	}
+	switch {
+	case strings.HasPrefix(key, "score_"):
+		if _, err := strconv.ParseInt(raw, 10, 64); err != nil {
+			return fmt.Errorf("%s must be an integer score", key)
+		}
+	case key == "upgrade_min_score_diff", key == "cleanup_min_score_diff",
+		key == "upgrade_until_score", key == "stall_alternative_after_min",
+		key == "stall_alternative_score_drop":
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 0 {
+			return fmt.Errorf("%s must be zero or a positive integer", key)
+		}
+	case key == "min_free_space_gb", key == "torrent_seed_ratio":
+		parsed, err := strconv.ParseFloat(raw, 64)
+		if err != nil || parsed < 0 {
+			return fmt.Errorf("%s must be zero or a positive number", key)
+		}
+	case key == "torrent_port_min", key == "torrent_port_max":
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 1 || parsed > 65535 {
+			return fmt.Errorf("%s must be a port between 1 and 65535", key)
+		}
+	}
+	return nil
 }
 
 // safeTrashRoot also protects configurations already on disk (not just new

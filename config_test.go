@@ -951,3 +951,42 @@ func TestTrashRetentionRejectsNegative(t *testing.T) {
 		}
 	}
 }
+
+// TestNumericSettingRejectsGarbage pins the write-time check on the settings
+// whose reader falls back to the default: a typo must be refused instead of
+// silently disabling the rule (an edited score, the seed ratio, a port).
+func TestNumericSettingRejectsGarbage(t *testing.T) {
+	rejected := []struct{ key, value string }{
+		{"score_res_1080p", "abc"},
+		{"score_bonus_dv", "1.5"},
+		{"upgrade_min_score_diff", "-1"},
+		{"stall_alternative_after_min", "soon"},
+		{"min_free_space_gb", "-2"},
+		{"torrent_seed_ratio", "-5"},
+		{"torrent_port_min", "70000"},
+		{"torrent_port_max", "0"},
+	}
+	for _, item := range rejected {
+		if err := validateNumericSetting(item.key, item.value); err == nil {
+			t.Errorf("%s=%q must be rejected", item.key, item.value)
+		}
+	}
+
+	accepted := []struct{ key, value string }{
+		{"score_res_1080p", "1500"},
+		{"score_group_tbk", "125"},
+		{"upgrade_min_score_diff", "0"},
+		{"min_free_space_gb", "3.5"},
+		{"torrent_seed_ratio", "2"},
+		{"torrent_port_min", "6881"},
+		{"torrent_port_max", "6891"},
+		// Empty clears the setting and lets the default apply.
+		{"score_res_1080p", ""},
+		{"torrent_seed_ratio", ""},
+	}
+	for _, item := range accepted {
+		if err := validateNumericSetting(item.key, item.value); err != nil {
+			t.Errorf("%s=%q must be accepted: %v", item.key, item.value, err)
+		}
+	}
+}

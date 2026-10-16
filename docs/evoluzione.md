@@ -154,6 +154,16 @@ shown to the user may stay in the original language. Guard: `TestUIIsTranslatabl
 fails if a UI string or a `uiText` literal is not a key of the catalogues (with an
 explicit allowlist); `TestClientI18nKeysTranslated` covers the client keys.
 
+**A setting that cannot apply is refused.** Every write — the JSON API, the
+settings page and the setup wizard — passes through one check
+(`validateSettingValue`), so the entry points cannot disagree. Beyond the backends
+and the filesystem paths it validates the numeric settings whose reader falls back
+to the default (score weights, upgrade/stall thresholds, `min_free_space_gb`,
+`torrent_seed_ratio`, the ports): a typo like `score_res_1080p=abc` is answered with
+an error instead of being accepted, doing nothing and silently disabling the rule
+the operator meant to tune. Empty stays valid — it clears the setting and the
+default applies. Guard: `TestNumericSettingRejectsGarbage`.
+
 **Library lists as posters.** The *Series* and *Movies* pages read the library
 either as a table or as **poster cards** (one cover per title, the essential data
 on the card, the detail one click away, as Sonarr and Radarr offer), through the
