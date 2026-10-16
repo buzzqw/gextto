@@ -171,6 +171,10 @@ func TestRejectsNamesWithEmptyBracketArtifacts(t *testing.T) {
 	cfg.RenameEpisodes = true
 	cfg.RenameFormat = "custom"
 	cfg.RenameTemplate = "{Serie} - {Stagione}{Episodio} - {Titolo} - [{Source}][{Risoluzione}][{VideoCodec}][{HDR}][{Audio}][{Lingue}]"
+	// A provider is configured, so a generic title can still be replaced by the
+	// real one and must not conform.
+	tmdbKey := "test-key"
+	cfg.TmdbAPIKey = &tmdbKey
 	cfg.Series = append(cfg.Series, SeriesConfig{
 		Name:    "Only Murders in the Building",
 		Enabled: true,
@@ -203,6 +207,12 @@ func TestRejectsNamesWithEmptyBracketArtifacts(t *testing.T) {
 	clean := "Only Murders in the Building - S01E01 - True Crime - [480p][h264][AAC][IT].mkv"
 	if !EpisodeNameConforms(clean, &release, &cfg) {
 		t.Fatal("clean name should conform")
+	}
+	// Titolo generico "Episodio N" (fallback quando il metadato non c'era):
+	// non conforme, la rinomina lo ritenta per il titolo vero.
+	generic := "Only Murders in the Building - S01E01 - Episodio 1 - [480p][h264][AAC][IT].mkv"
+	if EpisodeNameConforms(generic, &release, &cfg) {
+		t.Fatal("a generic \"Episodio N\" title must not conform")
 	}
 }
 

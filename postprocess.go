@@ -1151,35 +1151,49 @@ func episodeTarget(
 		audioParts = append(audioParts, *media.Channels)
 	}
 	audioFull := strings.Join(audioParts, " ")
-	seriesName := sanitizeInvalid(series.Name)
-	sourceTag := sourceLabel(release.Quality.Source)
-	var targetStem string
+	channels := ""
+	if media.Channels != nil {
+		channels = *media.Channels
+	}
+	effective := release.Quality
+	effective.Resolution, effective.Codec, effective.Audio, effective.HDR = resolution, codec, audio, hdr
+	targetStem := renderEpisodeName(cfg, series.Name, title, season, episode, effective, audioFull, channels, language)
+	targetStem = cleanupFilename(sanitizeInvalid(targetStem))
+	targetName := fmt.Sprintf("%s.%s", targetStem, extension)
+	target := filepath.Join(filepath.Dir(source), targetName)
+	return source, target, true, nil
+}
+
+// renderEpisodeName renders the configured rename format for one episode from
+// already-resolved components. It is the single place the {Token} template is
+// applied, so the import/rename path and the folder-rename review tool produce
+// the same name.
+func renderEpisodeName(cfg *Config, seriesName, title string, season, episode int64, quality models.Quality, audioFull, channels, language string) string {
+	token := func(value string) string {
+		value = strings.TrimSpace(value)
+		if value == "" || strings.EqualFold(value, "unknown") {
+			return ""
+		}
+		return value
+	}
+	if cfg == nil {
+		return fmt.Sprintf("%s - S%02dE%02d - %s", seriesName, season, episode, title)
+	}
+	seriesName = sanitizeInvalid(seriesName)
 	switch cfg.RenameFormat {
 	case "standard":
-		targetStem = fmt.Sprintf(
+		return fmt.Sprintf(
 			"%s - S%02dE%02d - %s [%s][%s]",
-			seriesName, season, episode, title, resolution, codec,
+			seriesName, season, episode, title, token(quality.Resolution), token(quality.Codec),
 		)
 	case "full", "completo":
-		targetStem = fmt.Sprintf(
+		return fmt.Sprintf(
 			"%s - S%02dE%02d - %s [%s][%s][%s][%s][%s]",
-			seriesName, season, episode, title, resolution, audio, hdr, codec, language,
+			seriesName, season, episode, title, token(quality.Resolution), token(quality.Audio), token(quality.HDR), token(quality.Codec), token(language),
 		)
 	case "custom":
-		token := func(value string) string {
-			value = strings.TrimSpace(value)
-			if value == "" || strings.EqualFold(value, "unknown") {
-				return ""
-			}
-			return value
-		}
-		languageToken := token(language)
-		sourceToken := token(sourceTag)
-		channels := ""
-		if media.Channels != nil {
-			channels = *media.Channels
-		}
-		targetStem = cfg.RenameTemplate
+		sourceToken := token(sourceLabel(quality.Source))
+		rendered := cfg.RenameTemplate
 		replacements := []struct{ from, to string }{
 			{"{Serie}", seriesName},
 			{"{Stagione}", fmt.Sprintf("S%02d", season)},
@@ -1187,25 +1201,22 @@ func episodeTarget(
 			{"{Titolo}", title},
 			{"{Source}", sourceToken},
 			{"{Sorgente}", sourceToken},
-			{"{Gruppo}", token(release.Quality.Group)},
-			{"{Risoluzione}", token(resolution)},
-			{"{VideoCodec}", token(codec)},
+			{"{Gruppo}", token(quality.Group)},
+			{"{Risoluzione}", token(quality.Resolution)},
+			{"{VideoCodec}", token(quality.Codec)},
 			{"{Audio}", token(audioFull)},
 			{"{AudioCodec}", token(audioFull)},
 			{"{Canali}", token(channels)},
-			{"{HDR}", token(hdr)},
-			{"{Lingue}", languageToken},
+			{"{HDR}", token(quality.HDR)},
+			{"{Lingue}", token(language)},
 		}
 		for _, replacement := range replacements {
-			targetStem = strings.ReplaceAll(targetStem, replacement.from, replacement.to)
+			rendered = strings.ReplaceAll(rendered, replacement.from, replacement.to)
 		}
+		return rendered
 	default:
-		targetStem = fmt.Sprintf("%s - S%02dE%02d - %s", seriesName, season, episode, title)
+		return fmt.Sprintf("%s - S%02dE%02d - %s", seriesName, season, episode, title)
 	}
-	targetStem = cleanupFilename(sanitizeInvalid(targetStem))
-	targetName := fmt.Sprintf("%s.%s", targetStem, extension)
-	target := filepath.Join(filepath.Dir(source), targetName)
-	return source, target, true, nil
 }
 
 // RenameMovie renames a movie file according to the configured template and
@@ -1597,7 +1608,22 @@ func EpisodeNameConforms(path string, release *models.Release, cfg *Config) bool
 		return false
 	}
 	prefix = strings.ToLower(strings.TrimSpace(prefix))
-	return prefix != "" && strings.HasPrefix(stem, prefix)
+	if prefix == "" || !strings.HasPrefix(stem, prefix) {
+		return false
+	}
+	// A generic "Episodio N" title is the fallback the rename writes when the
+	// episode metadata was unavailable. When a provider is configured a real
+	// title can still arrive, so the name must be retried until it lands; with
+	// no provider there is nothing to fetch and the fallback is the best we can
+	// do, so it conforms. An episode the provider does not know yet keeps the
+	// fallback and is simply retried on the next pass. The series prefix matched
+	// first, so a real title that happens to mention "episodio" is left alone.
+	if cfg.TmdbAPIKey != nil || cfg.TvdbAPIKey() != nil {
+		if genericTitle, genericErr := utils.CachedRegex(`(?i)(?:^|[\s\-])episodio\s+\d+(?:\b|$)`); genericErr == nil && genericTitle.MatchString(stem) {
+			return false
+		}
+	}
+	return true
 }
 
 // RenameSidecars renames the files associated with a video (thumbnail,

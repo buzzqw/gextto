@@ -327,7 +327,7 @@ func folderRenameInspect(ctx context.Context, root, path string, cfg *Config, se
 		}
 	}
 	for index := range candidates {
-		candidates[index].Target = folderRenameTarget(path, item, candidates[index], "")
+		candidates[index].Target = folderRenameTarget(cfg, path, item, candidates[index], "")
 	}
 	if len(candidates) == 0 {
 		if item.Reason == "" {
@@ -336,10 +336,12 @@ func folderRenameInspect(ctx context.Context, root, path string, cfg *Config, se
 		return item, nil
 	}
 	// The first candidate is the default proposal. Fetch the episode title only
-	// for that proposal to keep a scan of a large folder bounded.
-	if item.Kind == "series" && candidates[0].Provider == "tmdb" && item.Season != nil && item.Episode != nil {
+	// for that proposal to keep a scan of a large folder bounded. The title is
+	// requested from whichever provider the proposal came from (TVDB or TMDB):
+	// the target includes it, so it must not depend on the winner being TMDB.
+	if item.Kind == "series" && item.Season != nil && item.Episode != nil {
 		if title, titleErr := folderRenameEpisodeTitle(ctx, cfg, candidates[0], *item.Season, *item.Episode); titleErr == nil {
-			candidates[0].Target = folderRenameTarget(path, item, candidates[0], title)
+			candidates[0].Target = folderRenameTarget(cfg, path, item, candidates[0], title)
 		}
 	}
 	item.Candidates = candidates
@@ -506,14 +508,26 @@ func folderRenameEpisodeTitle(ctx context.Context, cfg *Config, candidate folder
 	return strings.TrimSpace(*title), nil
 }
 
-func folderRenameTarget(path string, item folderRenameItem, candidate folderRenameCandidate, episodeTitle string) string {
+func folderRenameTarget(cfg *Config, path string, item folderRenameItem, candidate folderRenameCandidate, episodeTitle string) string {
 	ext := strings.TrimPrefix(filepath.Ext(path), ".")
 	if item.Kind == "series" && item.Season != nil && item.Episode != nil {
-		name := fmt.Sprintf("%s - S%02dE%02d", candidate.Title, *item.Season, *item.Episode)
-		if episodeTitle != "" {
-			name += " - " + episodeTitle
+		// The same configured rename template as the import/rename path: the
+		// quality tokens are read from the file name (no media probing here, it
+		// would be one mediainfo/ffprobe call per file on a possibly network
+		// volume). What the name does not carry, the template renders empty.
+		title := strings.TrimSpace(episodeTitle)
+		if title == "" {
+			title = fmt.Sprintf("Episodio %d", *item.Episode)
 		}
-		return filepath.Join(filepath.Dir(path), cleanupFilename(sanitizeInvalid(name))+"."+ext)
+		quality := ParseQuality(filepath.Base(path))
+		language := ""
+		if len(quality.Languages) > 0 {
+			language = folderRenameLanguages(quality.Languages)
+		} else if strings.TrimSpace(quality.Language) != "" {
+			language = strings.ToUpper(quality.Language)
+		}
+		stem := renderEpisodeName(cfg, candidate.Title, safeComponent(title), *item.Season, *item.Episode, quality, folderRenameAudioLabel(quality.Audio), "", language)
+		return filepath.Join(filepath.Dir(path), cleanupFilename(sanitizeInvalid(stem))+"."+ext)
 	}
 	name := candidate.Title
 	year := candidate.Year
@@ -524,6 +538,50 @@ func folderRenameTarget(path string, item folderRenameItem, candidate folderRena
 		name += " (" + year + ")"
 	}
 	return filepath.Join(filepath.Dir(path), cleanupFilename(sanitizeInvalid(name))+"."+ext)
+}
+
+// folderRenameLanguages renders the parsed language codes as the "IT+EN" tag
+// the template uses.
+func folderRenameLanguages(languages []string) string {
+	parts := make([]string, 0, len(languages))
+	for _, code := range languages {
+		code = strings.ToUpper(strings.TrimSpace(code))
+		if code == "" {
+			continue
+		}
+		if len(code) > 2 {
+			code = code[:2]
+		}
+		parts = append(parts, code)
+	}
+	return strings.Join(parts, "+")
+}
+
+// folderRenameAudioLabel gives the parsed audio token a readable form for the
+// rename template ("ddp" -> "DDP", "dts-hd" -> "DTS-HD").
+func folderRenameAudioLabel(audio string) string {
+	switch strings.ToLower(strings.TrimSpace(audio)) {
+	case "", "unknown":
+		return ""
+	case "truehd":
+		return "TrueHD"
+	case "dts-hd":
+		return "DTS-HD"
+	case "dts":
+		return "DTS"
+	case "ddp":
+		return "DDP"
+	case "ac3":
+		return "AC3"
+	case "aac":
+		return "AAC"
+	case "mp3":
+		return "MP3"
+	case "5.1":
+		return "5.1"
+	default:
+		return audio
+	}
 }
 
 func folderRenameMovieTitle(base string) (string, *int64) {
