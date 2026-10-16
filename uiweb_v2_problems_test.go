@@ -68,6 +68,48 @@ func TestDashboardProblemsHidesCompletedCycles(t *testing.T) {
 	}
 }
 
+// TestDashboardProblemsHidesWarningAfterAnOlderImport: un download importato
+// più di 24 ore fa e ripulito oggi con un avviso (la finalizzazione dopo
+// l'import) è già in libreria e non va proposto. Un secondo download, il cui
+// vecchio import è fuori finestra ma che ha ricominciato dopo (📥), mostra
+// invece il suo problema reale.
+func TestDashboardProblemsHidesWarningAfterAnOlderImport(t *testing.T) {
+	state := newTestAppState(t)
+	state.setActiveEngine(fakeProblemsEngine{})
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	importedOld := "cccc000000000000000000000000000000000001"
+	newCycle := "cccc000000000000000000000000000000000002"
+	now := time.Now()
+	for _, event := range []logging.Event{
+		// Importato 30 h fa (fuori dalla finestra di 24 h)...
+		{At: now.Add(-30 * time.Hour), Level: logging.LevelInfo, Hash: importedOld, Message: "📁 Silo S02E09 added to the library (5.0 GB): /lib/Silo.mkv"},
+		// ...e ripulito oggi con un avviso: rumore, il file è archiviato.
+		{At: now.Add(-1 * time.Hour), Level: logging.LevelWarn, Hash: importedOld, Message: "completed torrent finalization failed"},
+		// Un secondo download: l'import vecchio è a 30 h, ma un nuovo tentativo
+		// è partito dopo, quindi il fallimento è reale e va controllato.
+		{At: now.Add(-30 * time.Hour), Level: logging.LevelInfo, Hash: newCycle, Message: "📁 Show S01E01 added to the library (1.0 GB): /lib/Show.mkv"},
+		{At: now.Add(-4 * time.Hour), Level: logging.LevelInfo, Hash: newCycle, Message: "📥 Downloading Show S01E02"},
+		{At: now.Add(-1 * time.Hour), Level: logging.LevelError, Hash: newCycle, Message: "❌ Gave up on Show S01E02"},
+	} {
+		if err := state.db.RecordAcquisitionEvent(event); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	code, body := v2Request(t, server, http.MethodGet, "/dashboard/problems", nil)
+	if code != http.StatusOK {
+		t.Fatalf("panel -> %d", code)
+	}
+	if strings.Contains(body, "hash="+importedOld) {
+		t.Fatalf("un download importato prima della finestra non va elencato: %s", body)
+	}
+	if !strings.Contains(body, "hash="+newCycle) {
+		t.Fatalf("un nuovo ciclo fallito va elencato: %s", body)
+	}
+}
+
 // TestDashboardProblemsPanel: il riquadro "Da controllare" mostra il torrent
 // fermo con l'abbandono previsto, lo spostamento in sospeso e l'avviso recente
 // di un altro download, senza ripetere quelli già elencati sopra.
