@@ -341,6 +341,22 @@ and `HandleDisconnect` O(N). **Postponed**: qBittorrent's
 `renameFile`/`renameFolder` (it needs rename support in the engine: a feature of its
 own).
 
+**Real line, uncapped** (2026-10-16, the live Gextto install, 15 torrents, ~300 peers).
+Removing the effective cap (a global limit *and* a "temporary keep" limit — the temporary
+one wins, so both had to go) with the peak observer running: download reaches **6–7.7 MB/s**
+(peak **7729 KiB/s**; the recorded `autotune_peak_down_kib` = 7644), while the earlier 3000
+KiB/s cap had held it at ~3 MB/s. Upload is 97–245 KiB/s, but that is **demand-limited**, not
+the line: with one or two seeds and the rest downloading, few peers request our data, so the
+achieved upload is a lower bound; the line's upload capacity shows while seeding popular
+content. Effect on the tuning: a download proposal from the peak is solid (~80% of 7644),
+while an upload proposal is conservative because the sample is demand-bound.
+
+**A capped rate is not the line.** The peak observer must only learn from an uncapped
+direction: with a 3000 KiB/s global the "peak" was 2991 (the cap itself) and proposing 80%
+of it would ratchet the limit down every cycle. The code now skips (and forgets the peak of)
+any direction that has a limit in force. Note the effective limit can also come from the
+*temporary* limit (`torrent_temp_*`, kept until removed), which overrides the global.
+
 ## 3. Swarm: seeding, choking, pipelining
 
 **Metrics.** Choking (upload slots): who is unchoked and for how long, fairness at
