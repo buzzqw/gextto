@@ -2300,6 +2300,21 @@ func (c *Config) loadConfigDB() error {
 	} else {
 		c.CleanupAction = "move"
 	}
+	c.applyTransferSettings()
+	if value := configPathSetting(mapValue(c.Settings, "torrent_dir")); value != nil {
+		c.DownloadDir = *value
+	}
+	c.DownloadTempDir = configPathSetting(mapValue(c.Settings, "torrent_temp_dir"))
+	return nil
+}
+
+// applyTransferSettings derives the typed TransferSettings from the raw
+// `Settings` map, applying the fallback of every key that is absent. It is the
+// single place that turns the `torrent_*` strings into the struct the engine
+// receives; keeping it separate from loadConfigDB lets a test pin these
+// fallbacks against DefaultTransferSettings without touching SQLite (see
+// uiweb_settings_defaults_test.go).
+func (c *Config) applyTransferSettings() {
 	c.Transfer = TransferSettings{
 		PortMin:               numberSettingUint16(c.Settings, "torrent_port_min", 6881),
 		PortMax:               numberSettingUint16(c.Settings, "torrent_port_max", 6891),
@@ -2333,11 +2348,6 @@ func (c *Config) loadConfigDB() error {
 		OutgoingInterface:     settingOrDefault(c.Settings, "torrent_outgoing_interface", ""),
 		DhtBootstrapNodes:     settingOrDefault(c.Settings, "torrent_dht_bootstrap_nodes", ""),
 	}
-	if value := configPathSetting(mapValue(c.Settings, "torrent_dir")); value != nil {
-		c.DownloadDir = *value
-	}
-	c.DownloadTempDir = configPathSetting(mapValue(c.Settings, "torrent_temp_dir"))
-	return nil
 }
 
 // loadLegacySeries reads the legacy `series` table, tolerating missing columns.

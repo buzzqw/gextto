@@ -61,7 +61,7 @@ var uiSettingDefaults = map[string]string{
 
 	// --- Transfer -----------------------------------------------------------
 	"torrent_dynamic_queue":               "false",
-	"torrent_preallocate":                 "false",
+	"torrent_preallocate":                 "true",
 	"torrent_dynamic_queue_min":           "1",
 	"torrent_dynamic_queue_max":           "10",
 	"torrent_dont_count_slow_torrents":    "true",

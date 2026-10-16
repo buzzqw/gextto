@@ -147,6 +147,13 @@ construction; `settingWritableAPIOnly` (`web_handlers_g7.go`) lists only the
 keys with no row on the page. Every write path (the JSON API, the settings page,
 the setup wizard) validates the value through `validateSettingValue`
 (`backend_config_validation.go`), so a rule added there applies everywhere.
+The starting value the page shows (`uiSettingDefaults`,
+`uiweb_settings_defaults.go`) must match what the backend uses when nothing is
+saved: `TestSettingDefaultsMatchTheBackend` pins it against the typed
+`DefaultTransferSettings` (derived in `Config.applyTransferSettings`) and against
+the scalar getters, and `TestDefaultTransferSettingsMatchLoader` pins those
+fallbacks against the struct. A new option with a backend default needs an entry
+there.
 
 Every route sits behind `AuthMiddleware` (`auth.go`). Access control is off by
 default; when it is on, only `/login`, `/logout`, `/static/`, the favicon, the
