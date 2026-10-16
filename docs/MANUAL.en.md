@@ -1502,7 +1502,7 @@ Recalculate scores* after changing weights.
 | Schedule — days | Active days: 0=Mon … 6=Sun (e.g. 0,1,2,3,4). *(no day = never active)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
 | Schedule — download | Download limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
 | Schedule — upload | Upload limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
-| Schedule — per day | A different time window and limits for each day of the week; a window past midnight belongs to the day it starts on. The **Auto** column hands a day's window to the auto-tune: no limit in that window, so the line is measured there (outside the window your limits apply). *(every day has its own window and limits (0 = unlimited); a window past midnight belongs to the day it starts on)* Shown only while «Speed schedule enabled» is on. |
+| Schedule — per day | A different time window and limits for each day of the week; a window past midnight belongs to the day it starts on. **Attivo** turns the day's window on with its two limits; **Auto** turns it on and removes its limit (the bandwidth is left to the auto-tune, which measures the line there), so ticking Auto checks the day and disables the two speed fields. Outside those windows your global limits apply. *(every day has its own window and limits (0 = unlimited); a window past midnight belongs to the day it starts on)* Shown only while «Speed schedule enabled» is on. |
 
 **Ports and interfaces**
 

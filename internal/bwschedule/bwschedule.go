@@ -145,10 +145,11 @@ func (w Week) String() string {
 	return strings.Join(parts, ";")
 }
 
-// AnyOn reports whether at least one day has a usable window.
+// AnyOn reports whether at least one day has a usable window (an Auto day is
+// usable even without "on").
 func (w Week) AnyOn() bool {
 	for _, day := range w {
-		if day.On && day.Start != day.End {
+		if (day.On || day.Auto()) && day.Start != day.End {
 			return true
 		}
 	}
@@ -165,9 +166,12 @@ func (w Week) At(now time.Time) (download, upload int64, active bool) {
 // AtDay returns the window in force at now, so a caller can tell a fixed window
 // from an Auto one (Day.Auto).
 func (w Week) AtDay(now time.Time) (Day, bool) {
+	// An Auto window is active by itself: ticking Auto is enough, the user does
+	// not also have to tick "on".
+	usable := func(day Day) bool { return (day.On || day.Auto()) && day.Start != day.End }
 	minute := now.Hour()*60 + now.Minute()
 	today := w[int(now.Weekday())]
-	if today.On && today.Start != today.End {
+	if usable(today) {
 		if today.Start < today.End {
 			if minute >= today.Start && minute < today.End {
 				return today, true
@@ -177,7 +181,7 @@ func (w Week) AtDay(now time.Time) (Day, bool) {
 		}
 	}
 	yesterday := w[(int(now.Weekday())+6)%7]
-	if yesterday.On && yesterday.Start > yesterday.End && minute < yesterday.End {
+	if usable(yesterday) && yesterday.Start > yesterday.End && minute < yesterday.End {
 		return yesterday, true
 	}
 	return Day{}, false

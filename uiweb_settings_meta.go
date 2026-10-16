@@ -187,7 +187,8 @@ func uiWeekValue(form url.Values) (string, string) {
 	var week bwschedule.Week
 	for _, weekday := range bwschedule.MondayFirst {
 		prefix := "day-" + bwschedule.DayName(weekday) + "-"
-		on := form.Get(prefix+"on") != ""
+		// An Auto day is active by itself: ticking Auto checks the window too.
+		on := form.Get(prefix+"on") != "" || form.Get(prefix+"auto") != ""
 		start, okStart := bwschedule.ParseClock(form.Get(prefix + "start"))
 		end, okEnd := bwschedule.ParseClock(form.Get(prefix + "end"))
 		if on && (!okStart || !okEnd || start == end) {

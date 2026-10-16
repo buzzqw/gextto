@@ -301,6 +301,9 @@ var uiEssentialKeys = map[string]bool{
 	"torrent_port_min": true, "torrent_port_max": true,
 	// The user's limits.
 	"torrent_dl_limit": true, "torrent_ul_limit": true, "min_free_space_gb": true,
+	// The speed schedule (and its Auto windows) is how a shared line is kept for
+	// the family: it belongs to Facilitata too.
+	"torrent_sched_enabled": true, "torrent_sched_week": true,
 	"torrent_seed_ratio": true, "torrent_seed_time_days": true,
 	// Quality policy the user recognises.
 	"upgrade_until_score": true, "cleanup_upgrades": true,

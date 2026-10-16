@@ -1746,5 +1746,27 @@
   });
   document.addEventListener("DOMContentLoaded", syncSetupToggles);
 
-  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); openAddFormFromAnchor(); initPullToRefresh(); initLiveMetrics(); });
+  // Bandwidth schedule: an "Auto" day is active by itself and has no speed
+  // limits, so ticking Auto checks the day and disables its two speed fields
+  // while the time fields stay editable; unticking it re-enables them.
+  function syncScheduleRows(root) {
+    var scope = (root && root.querySelectorAll) ? root : document;
+    var rows = scope.querySelectorAll(".setting-week tbody tr");
+    for (var i = 0; i < rows.length; i++) {
+      var on = rows[i].querySelector('input[name$="-on"]');
+      var auto = rows[i].querySelector('input[name$="-auto"]');
+      if (!on || !auto) continue;
+      if (auto.checked) on.checked = true;
+      var speeds = rows[i].querySelectorAll('input[name$="-dl"], input[name$="-ul"]');
+      for (var j = 0; j < speeds.length; j++) speeds[j].disabled = auto.checked;
+    }
+  }
+  document.addEventListener("change", function (event) {
+    if (event.target.matches && event.target.matches('input[name$="-on"], input[name$="-auto"]')) {
+      syncScheduleRows(event.target.closest(".setting-week"));
+    }
+  });
+  document.addEventListener("htmx:afterSwap", function (event) { syncScheduleRows(event.target); });
+
+  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); openAddFormFromAnchor(); initPullToRefresh(); initLiveMetrics(); syncScheduleRows(document); });
 })();

@@ -58,6 +58,16 @@ func TestSettingsModeBriefHidesInternals(t *testing.T) {
 	}
 }
 
+// The speed schedule (and its Auto windows) belongs to Facilitata: it is how a
+// shared line is kept for the family.
+func TestFacilitataShowsTheSpeedSchedule(t *testing.T) {
+	state := newTestAppState(t)
+	brief := settingPageKeys(uiSettingsPageFrom(state, "network", v2SettingsModeBrief))
+	if !brief["torrent_sched_enabled"] || !brief["torrent_sched_week"] {
+		t.Fatalf("Facilitata must show the speed schedule: %v", brief)
+	}
+}
+
 // Every key the setup wizard writes that is part of the settings index must be
 // available in Facilitata: the user must find after setup what the wizard asked.
 func TestEssentialCoversWizardSteps(t *testing.T) {

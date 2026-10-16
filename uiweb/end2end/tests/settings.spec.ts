@@ -125,6 +125,21 @@ test("un interruttore mostra i campi che dipendono da lui", async ({ page }) => 
   await expect(week).toBeHidden();
 });
 
+test("Auto nella programmazione accende la fascia e spegne i limiti di velocità", async ({ page }) => {
+  await page.goto("/?view=settings&tab=network");
+  await page.getByRole("switch", { name: "Programmazione velocità attiva" }).check();
+  const row = page.locator("#v2-setting-torrent_sched_week tbody tr").first();
+  const on = row.locator('input[name$="-on"]');
+  const auto = row.locator('input[name$="-auto"]');
+  const dl = row.locator('input[name$="-dl"]');
+  await expect(dl).toBeEnabled();
+  await auto.check();
+  await expect(on).toBeChecked();
+  await expect(dl).toBeDisabled();
+  await auto.uncheck();
+  await expect(dl).toBeEnabled();
+});
+
 test("predefinito ripristina il valore e va salvato", async ({ page }) => {
   await page.goto("/?view=settings&tab=daemon");
   const row = page.locator("#v2-setting-refresh_interval");
