@@ -110,6 +110,9 @@ func TestPollFeedsArchivesItemsAndServesTheArchivePage(t *testing.T) {
 	defer feed.Close()
 	d := feedDaemon(t, `[{"name":"f","url":"`+feed.URL+`","include":"1080p"}]`)
 	d.pollFeeds()
+	// The archive page reads the last published snapshot, which the periodic
+	// ticker refreshes; publish it now so the assertion is not a race against it.
+	d.list()
 
 	srv := httptest.NewServer(d.routes())
 	defer srv.Close()
