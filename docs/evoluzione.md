@@ -187,6 +187,12 @@ shown to the user may stay in the original language. Guard: `TestUIIsTranslatabl
 fails if a UI string or a `uiText` literal is not a key of the catalogues (with an
 explicit allowlist); `TestClientI18nKeysTranslated` covers the client keys.
 
+**TUI on a phone.** The terminal client is designed for an SSH session and its
+layout follows the terminal width: at 60 columns or fewer — an SSH app on a
+phone — it compacts the header, the fixed label columns and the long values,
+wrapping instead of cutting, so the same information stays on the narrow screen
+(`compactWidth` in `internal/tui/render.go`).
+
 **A setting that cannot apply is refused.** Every write — the JSON API, the
 settings page and the setup wizard — passes through one check
 (`validateSettingValue`), so the entry points cannot disagree. Beyond the backends

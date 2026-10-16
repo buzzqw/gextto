@@ -130,7 +130,8 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
   with all assets embedded — zero Node.js or npm runtime dependencies; a single
   **Theme** picker with 20+ contrast-checked themes plus custom server-side
   themes that follow you to every device; a full terminal TUI for SSH
-  management. Six languages (IT, EN, DE, FR, ES, PL).
+  management that compacts itself on the narrow screen of a phone. Six
+  languages (IT, EN, DE, FR, ES, PL).
 
 The web UI listens on `http://<host>:5000/`. Setup and every UI section are
 covered by the [English manual](docs/MANUAL.en.md) and the

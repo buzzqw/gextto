@@ -194,6 +194,9 @@ La TUI si avvia con `/opt/gextto/gexttod tui` dopo aver avviato il daemon
 (sostituisci la directory se l'installazione è personalizzata). È un processo
 separato che usa esclusivamente le API HTTP e lo stream SSE del daemon: non
 legge direttamente i database e può quindi essere usata anche da una shell SSH.
+Su un terminale stretto — com'è tipicamente quello di un telefono collegato via
+SSH — l'interfaccia si compatta da sola (sotto le 60 colonne: intestazione,
+colonne e valori lunghi si adattano invece di essere tagliati).
 
 ```bash
 /opt/gextto/gexttod tui

@@ -194,7 +194,9 @@ understands:
 Start the TUI with `/opt/gextto/gexttod tui` after starting the daemon (use your
 installation directory if different). It is a separate
 process that uses only the daemon's HTTP API and SSE stream: it never reads the
-databases directly and can be used from an SSH shell.
+databases directly and can be used from an SSH shell. On a narrow terminal — as
+an SSH app on a phone typically is — the interface compacts itself (below 60
+columns the header, the columns and the long values adapt instead of being cut).
 
 ```bash
 /opt/gextto/gexttod tui

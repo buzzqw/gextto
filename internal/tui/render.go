@@ -10,6 +10,12 @@ import (
 
 const tabCount = 9
 
+// compactWidth is the widest terminal that still gets the compact, phone-
+// friendly layout. A mobile SSH client is typically only 40-60 columns wide,
+// and there the wide fixed columns push the useful text (a torrent name, the
+// peer rates, an event) off the row instead of adapting to it.
+const compactWidth = 60
+
 // Render produces a frame for the given terminal size. It is pure: the same
 // state always renders the same lines, which makes the layout testable.
 func (m *Model) Render(width, height int) Screen {
@@ -178,6 +184,15 @@ func (m *Model) headerLine(width int) string {
 	}
 	if !m.LogStreamConnected && m.StreamReconnect > 0 {
 		next += fmt.Sprintf(" · %s #%d", m.Tr.T("label.reconnect"), m.StreamReconnect)
+	}
+	if width < compactWidth {
+		// On a phone the brand gives way to the state: whether the daemon is
+		// reachable and when it runs next matter more than the title.
+		label := "[" + mode + "]"
+		if m.Status != nil && m.Status.Version != "" {
+			label = "v" + m.Status.Version + " " + label
+		}
+		return m.truncate(label+next, width)
 	}
 	return m.truncate(fmt.Sprintf("%s  [%s]%s", name, mode, next), width)
 }
@@ -660,7 +675,7 @@ func (m *Model) statusActiveLines(width int) []Line {
 		rows = rows[:5]
 	}
 	barWidth := 10
-	if width < 60 {
+	if width < compactWidth {
 		barWidth = 6
 	}
 	lines := make([]Line, 0, len(rows))
@@ -669,9 +684,22 @@ func (m *Model) statusActiveLines(width int) []Line {
 		if row.eta >= 0 {
 			eta = HumanDuration(row.eta)
 		}
+		name := Sanitize(row.name)
+		if width < compactWidth {
+			// Phone layout: the name gets its own row and the bar and figures
+			// go below it, so the title is never the part that gets cut.
+			lines = append(lines, Line{Text: "  " + name, Style: torrentStyle(row.state), Wrap: true, Indent: 4})
+			figures := fmt.Sprintf("    %s %s ↓%s", progressBar(row.progress, barWidth), PadLeft(fmt.Sprintf("%.0f%%", row.progress), 4), HumanRate(row.rate))
+			if row.upload > 0 {
+				figures += " ↑" + HumanRate(row.upload)
+			}
+			figures += " · " + m.Tr.Format("status.eta", eta)
+			lines = append(lines, Line{Text: figures, Style: StyleMuted, Wrap: true, Indent: 6})
+			continue
+		}
 		prefix := fmt.Sprintf("  %s %s ↓%s ↑%s %s ", progressBar(row.progress, barWidth), PadLeft(fmt.Sprintf("%.0f%%", row.progress), 4),
 			PadLeft(HumanRate(row.rate), 10), PadLeft(HumanRate(row.upload), 10), PadRight(m.Tr.Format("status.eta", eta), 10))
-		lines = append(lines, Line{Text: prefix + Sanitize(row.name), Style: torrentStyle(row.state), Wrap: true, Indent: min(StringWidth(prefix), width/2)})
+		lines = append(lines, Line{Text: prefix + name, Style: torrentStyle(row.state), Wrap: true, Indent: min(StringWidth(prefix), width/2)})
 	}
 	return lines
 }
@@ -883,7 +911,10 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 	if m.SpeedPolicy != nil && m.SpeedPolicy.AutoRemoveCompleted {
 		title += "  · " + m.Tr.T("label.autoremove")
 	}
-	lines := []Line{{Text: title, Style: StyleHeader}}
+	// The title may wrap on a narrow terminal (a phone cannot fit the count,
+	// the sort and the limits on one row): its real height is measured once and
+	// taken off the list budget below, so no row is silently clipped.
+	lines := expandLines([]Line{{Text: title, Style: StyleHeader, Wrap: true}}, width)
 	if len(items) == 0 {
 		lines = append(lines, Line{Text: m.Tr.T("msg.emptytorrents"), Style: StyleMuted})
 		return lines
@@ -916,7 +947,7 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 		return fmt.Sprintf("%s %s %.1f%% %s", marker(index), downloadStateLabel(m.Tr, item), downloadRowProgress(item), name)
 	}
 	if width < 50 {
-		budget := max(1, contentHeight-1)
+		budget := max(1, contentHeight-len(lines))
 		expanded := selectedRows(compactRow(m.Selected, items[m.Selected]), width, 2, budget-2)
 		start, end := window(budget - (len(expanded) - 1))
 		for index := start; index < end; index++ {
@@ -932,7 +963,7 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 		return lines
 	}
 	if width < 74 {
-		budget := max(2, contentHeight-1)
+		budget := max(2, contentHeight-len(lines))
 		expanded := selectedRows(compactRow(m.Selected, items[m.Selected]), width, 2, budget-4)
 		start, end := window(max(1, (budget-(len(expanded)-1))/2))
 		for index := start; index < end; index++ {
@@ -1274,7 +1305,7 @@ func (m *Model) renderArchive(width, contentHeight int) []Line {
 	if m.ArchiveFilter != "" {
 		title += fmt.Sprintf(" · %s '%s'", m.Tr.T("label.filter"), m.ArchiveFilter)
 	}
-	lines := []Line{{Text: title, Style: StyleHeader}}
+	lines := expandLines([]Line{{Text: title, Style: StyleHeader, Wrap: true}}, width)
 	items := m.VisibleArchive()
 	if len(items) == 0 {
 		return append(lines, Line{Text: m.Tr.T("msg.emptyarchive"), Style: StyleMuted})
@@ -1283,7 +1314,7 @@ func (m *Model) renderArchive(width, contentHeight int) []Line {
 	for index, entry := range items {
 		texts[index] = fmt.Sprintf("%s · %s · %s", entry.Title, entry.Source, firstNonEmpty(entry.AddedAt, "-"))
 	}
-	return append(lines, catalogRows(texts, m.ArchiveSelected, &m.ArchiveScroll, contentHeight-1, width)...)
+	return append(lines, catalogRows(texts, m.ArchiveSelected, &m.ArchiveScroll, contentHeight-len(lines), width)...)
 }
 
 func (m *Model) renderArchiveDetail(width int) []Line {
@@ -1299,10 +1330,11 @@ func (m *Model) renderArchiveDetail(width int) []Line {
 		{m.Tr.T("label.added"), firstNonEmpty(entry.AddedAt, "-")},
 		{m.Tr.T("label.magnet"), firstNonEmpty(entry.Magnet, "-")},
 	}
+	labelWidth := min(20, max(8, width/3))
 	lines := []Line{{Text: entry.Title, Style: StyleHeader, Wrap: true}}
 	start := min(m.ArchiveDetailScroll, max(0, len(rows)-1))
 	for _, row := range rows[start:] {
-		lines = append(lines, Line{Text: PadRight(row[0]+":", 20) + " " + row[1], Style: StyleNormal, Wrap: true, Indent: 21})
+		lines = append(lines, Line{Text: PadRight(row[0]+":", labelWidth) + " " + row[1], Style: StyleNormal, Wrap: true, Indent: labelWidth + 1})
 	}
 	return lines
 }
@@ -1364,7 +1396,7 @@ func (m *Model) renderLibrary(width, contentHeight int) []Line {
 			bar[index] = " " + label + " "
 		}
 	}
-	lines := []Line{{Text: strings.Join(bar, "  ") + "   " + m.Tr.T("library.switch"), Style: StyleSelected}, {Text: title, Style: StyleHeader}}
+	lines := []Line{{Text: strings.Join(bar, "  ") + "   " + m.Tr.T("library.switch"), Style: StyleSelected, Wrap: true}, {Text: title, Style: StyleHeader, Wrap: true}}
 	if len(items) == 0 {
 		return append(lines, Line{Text: m.Tr.T("msg.emptylibrary"), Style: StyleMuted})
 	}
@@ -1376,7 +1408,8 @@ func (m *Model) renderLibrary(width, contentHeight int) []Line {
 		}
 		texts[index] = fmt.Sprintf("%s %s · %s", PadRight(state, 4), item.Name, firstNonEmpty(item.Meta, "-"))
 	}
-	return append(lines, catalogRows(texts, m.LibrarySelected, &m.LibraryScroll, contentHeight-len(lines), width)...)
+	expanded := expandLines(lines, width)
+	return append(expanded, catalogRows(texts, m.LibrarySelected, &m.LibraryScroll, contentHeight-len(expanded), width)...)
 }
 
 func (m *Model) renderHealth(width int) []Line {
@@ -1401,11 +1434,11 @@ func (m *Model) renderHealth(width int) []Line {
 		Line{Text: fmt.Sprintf("%s: PID %d · %s %s · %s %s · %s %s", m.Tr.T("label.daemon"),
 			health.ProcessID, m.Tr.T("label.uptime"), HumanDuration(float64(health.ProcessUptimeSeconds)),
 			m.Tr.T("label.cpu"), OptionalNumber(floatPointerValue(health.ProcessCPUPercent), "%", 1),
-			m.Tr.T("label.ram"), HumanBytes(float64(health.ResidentBytes))), Style: StyleNormal},
+			m.Tr.T("label.ram"), HumanBytes(float64(health.ResidentBytes))), Style: StyleNormal, Wrap: true, Indent: 2},
 		Line{Text: fmt.Sprintf("%s: %s %s / %s · %s %s", m.Tr.T("label.disks"),
 			HumanBytes(float64(health.DiskFreeBytes)), m.Tr.T("label.free"),
 			HumanBytes(float64(health.DiskTotalBytes)),
-			m.Tr.T("label.trash"), fmt.Sprintf("%d %s (%s)", health.TrashFileCount, strings.ToLower(m.Tr.T("label.files")), HumanBytes(float64(health.TrashBytes)))), Style: StyleNormal},
+			m.Tr.T("label.trash"), fmt.Sprintf("%d %s (%s)", health.TrashFileCount, strings.ToLower(m.Tr.T("label.files")), HumanBytes(float64(health.TrashBytes)))), Style: StyleNormal, Wrap: true, Indent: 2},
 	)
 	if len(health.Paths) > 0 {
 		lines = append(lines, Line{Text: m.Tr.T("label.paths"), Style: StyleHeader})
@@ -1484,10 +1517,19 @@ func (m *Model) renderDetail(width, contentHeight int) []Line {
 				if truthy(item["seed"]) {
 					seed = "seed"
 				}
-				rendered = append(rendered, Line{Text: fmt.Sprintf("%s  %s  %s %s  %s %s  %s",
-					PadRight(stringValue(item["address"]), 22), PadRight(stringValue(item["client"]), 20),
+				address := stringValue(item["address"])
+				text := fmt.Sprintf("%s  %s  %s %s  %s %s  %s",
+					PadRight(address, 22), PadRight(stringValue(item["client"]), 20),
 					m.Tr.T("label.down"), HumanRate(numberValue(item["download_rate"])),
-					m.Tr.T("label.up"), HumanRate(numberValue(item["upload_rate"])), seed), Style: StyleNormal})
+					m.Tr.T("label.up"), HumanRate(numberValue(item["upload_rate"])), seed)
+				if width < compactWidth {
+					// On a phone the address and the rates are what matter; the
+					// client column would push them off the row.
+					text = joinNonEmpty(address,
+						m.Tr.T("label.down")+" "+HumanRate(numberValue(item["download_rate"])),
+						m.Tr.T("label.up")+" "+HumanRate(numberValue(item["upload_rate"])), seed)
+				}
+				rendered = append(rendered, Line{Text: text, Style: StyleNormal, Wrap: true, Indent: 4})
 			}
 		}
 		start := min(m.DetailScroll, max(0, len(rendered)-1))
@@ -1556,10 +1598,13 @@ func (m *Model) renderDetail(width, contentHeight int) []Line {
 		{m.Tr.T("label.savepath"), firstNonEmpty(torrent.SavePath, "-")},
 		{m.Tr.T("label.magnet"), firstNonEmpty(m.Detail.Magnet, "-")},
 	}...)
+	// On a narrow terminal the label column shrinks so the value keeps room:
+	// a phone cannot spare twenty cells for "Auto-rimozione:".
+	labelWidth := min(20, max(8, width/3))
 	lines := []Line{{Text: torrent.Name, Style: StyleHeader, Wrap: true}}
 	start := min(m.DetailScroll, max(0, len(rows)-1))
 	for _, row := range rows[start:] {
-		lines = append(lines, Line{Text: PadRight(row[0]+":", 20) + " " + row[1], Style: StyleNormal})
+		lines = append(lines, Line{Text: PadRight(row[0]+":", labelWidth) + " " + row[1], Style: StyleNormal})
 	}
 	return lines
 }
@@ -1694,12 +1739,16 @@ func (m *Model) renderEvents(width, contentHeight int) []Line {
 	maxScroll := max(0, len(m.Events)-visible)
 	m.EventScroll = min(max(m.EventScroll, 0), maxScroll)
 	end := min(len(m.Events), m.EventScroll+visible)
+	kindWidth, indent := 22, 23
+	if width < compactWidth {
+		kindWidth, indent = 10, 11
+	}
 	for _, event := range m.Events[m.EventScroll:end] {
-		line := fmt.Sprintf("%s %s", PadRight(event.Kind, 22), firstNonEmpty(event.Name, event.Hash))
+		line := fmt.Sprintf("%s %s", PadRight(event.Kind, kindWidth), firstNonEmpty(event.Name, event.Hash))
 		if event.SavePath != "" {
 			line += " · " + event.SavePath
 		}
-		lines = append(lines, Line{Text: line, Style: StyleNormal, Wrap: true, Indent: 23})
+		lines = append(lines, Line{Text: line, Style: StyleNormal, Wrap: true, Indent: indent})
 	}
 	return lines
 }

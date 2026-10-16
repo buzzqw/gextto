@@ -137,7 +137,8 @@ Node.js/npm, sei lingue nell'interfaccia.
   (SSR + HTMX) con tutti gli asset incorporati — zero dipendenze o build
   Node.js/npm; un selettore **Tema** unico con oltre 20 temi verificati per il
   contrasto più temi personali salvati sul server, che ti seguono su ogni
-  dispositivo; TUI completa via SSH. Sei lingue (IT, EN, DE, FR, ES, PL).
+  dispositivo; TUI completa via SSH, che si compatta sullo schermo stretto di un
+  telefono. Sei lingue (IT, EN, DE, FR, ES, PL).
 
 La UI è su `http://<host>:5000/`. Configurazione e sezioni sono nel
 [manuale italiano](docs/MANUAL.it.md) e nell'[English

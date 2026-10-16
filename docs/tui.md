@@ -122,6 +122,15 @@ The TUI is designed for an SSH session:
 - **Word wrap.** Logs, details, health and dashboard wrap instead of being cut;
   in the lists the selected line shows the whole title. Widths are computed in
   columns, so titles with ideograms or emoji do not break the layout.
+- **Narrow terminals (phones).** On a terminal narrower than 60 columns — the
+  usual width of an SSH app on a phone — the layout drops its fixed columns and
+  adapts instead of cutting the tail: the header shows the state (for example
+  `v1.1.123 [ACTIVE] · ONLINE · Next cycle: 5m`) in place of the title, the
+  active transfers put the name on its own row with the bar and speeds below it,
+  the dashboard/health and the torrent detail values keep their room (the label
+  column shrinks), the peer list, the events list and the archive detail compact
+  their columns, and the library sub-tab bar and the torrent/archive titles wrap
+  instead of being truncated.
 - **Safe text.** Escape sequences and control characters in torrent names,
   feed titles or logs are removed before they reach the terminal.
 - **Paste.** Bracketed paste is on: a pasted magnet arrives whole in the field,
