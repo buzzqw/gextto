@@ -167,6 +167,23 @@ saves memory; but "the right value" cannot be read from a public swarm. To actua
 parameter, run **repeated, interleaved** passes and/or the **controlled local swarm**
 (`make measure-seeding` / `measure-pipeline`), where the parameter is the only variable.
 
+**Controlled cap sweep** (2026-10-16, Intel N97, `GX_MEASURE_AUTOTUNE_LOCAL=1
+GX_MEASURE_AUTOTUNE_LOCAL_SEEDERS=8 GX_MEASURE_AUTOTUNE_LOCAL_SIZE_MB=64 go test
+./cmd/gx-torrent/ -run TestMeasureAutotuneLocal`). A local swarm of eight seeders on
+loopback, 64 MiB corpus, the leecher's per-torrent cap swept:
+
+| Cap | 1 | 2 | 4 | 8 | unlimited |
+|---|---|---|---|---|---|
+| time | 622 ms | 613 ms | 643 ms | 714 ms | 663 ms |
+| rate | 103 MiB/s | 104 MiB/s | 99 MiB/s | 90 MiB/s | 97 MiB/s |
+
+Throughput is **flat** across the cap: on loopback one seed source already saturates the
+path, so the cap only bounds how many connections are *allowed*, never the rate. This is the
+parameter-isolated confirmation of the public result: the auto-tune bound (50–400) trades
+connections (memory) for nothing in throughput. A per-connection memory curve needs a
+per-peer RSS breakdown the shared-process harness cannot give; the public runs already show
+a low cap using less than half the memory.
+
 **RSS term matching** (2026-10-15, Intel N97, `go test -bench BenchmarkCriteriaMatch
 -benchmem -count 5 ./internal/rss/`: one rule with two *one of* and two *none of* terms
 over four typical release names). The terms are found with `rss.HasTerm` — separators of
