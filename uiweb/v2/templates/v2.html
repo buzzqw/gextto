@@ -248,6 +248,10 @@
     <div class="panel-head"><h3>Da controllare</h3><small class="muted">Download fermi, spostamenti in sospeso e avvisi delle ultime 24 ore</small></div>
     <div class="panel-body" id="v2-dashboard-problems" hx-get="/dashboard/problems" hx-trigger="load, every 60s" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
   </div>
+  <div class="panel dashboard-traffic-panel">
+    <div class="panel-head"><h3>Traffico di rete</h3><small class="muted">Ultimi 30 minuti</small></div>
+    <div class="panel-body">{{template "v2_live_traffic" .Traffic}}</div>
+  </div>
   <div class="grid-4 dashboard-summary-grid">
     <div class="metric mint"><span class="metric-sub">Serie TV / Film</span><strong>{{.SeriesConfigured}} / {{.MoviesConfigured}}</strong></div>
     <div class="metric amber"><span class="metric-sub">Spazio libero</span><strong>{{bytesU .FreeSpace}}</strong><small class="muted" title="Cestino">{{bytesU .TrashBytes}}</small></div>
@@ -353,6 +357,27 @@
 {{else}}<p class="muted">Nessuna release trovata.</p>{{end}}
 {{end}}
 {{define "v2_dashboard_feed_result"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">{{.Message}}</span>{{end}}{{end}}
+
+{{define "v2_live_traffic"}}
+<div id="v2-live-traffic" class="traffic">
+  <div class="traffic-legend">
+    <span class="traffic-stat down" title="Velocità di download"><span aria-hidden="true">↓</span> {{.CurrentDown}}</span>
+    <span class="traffic-stat up" title="Velocità di upload"><span aria-hidden="true">↑</span> {{.CurrentUp}}</span>
+    {{if .HasData}}<span class="muted" title="Picco di download nel periodo">↓ {{.PeakDown}}</span>
+    <span class="muted" title="Picco di upload nel periodo">↑ {{.PeakUp}}</span>{{end}}
+    {{if .HasLimit}}<span class="badge warn" title="Limite di banda attivo">Limite <strong>{{.LimitLabel}}</strong></span>{{else}}<span class="badge" title="Nessun limite di banda attivo">Nessun limite</span>{{end}}
+  </div>
+  {{if .HasData}}
+  <svg class="traffic-chart" viewBox="0 0 {{.Width}} {{.Height}}" preserveAspectRatio="none" role="img" aria-label="Grafico della banda di rete, ultimi 30 minuti">
+    <polygon class="traffic-area down" points="{{.DownArea}}" />
+    {{if .HasLimit}}<line class="traffic-limit" x1="0" y1="{{.LimitY}}" x2="{{.Width}}" y2="{{.LimitY}}" />{{end}}
+    <polyline class="traffic-line up" points="{{.UpPoints}}" />
+    <polyline class="traffic-line down" points="{{.DownPoints}}" />
+  </svg>
+  <div class="traffic-axis"><span>0</span><span>{{.ScaleLabel}}</span></div>
+  {{else}}<p class="muted">Raccolta dati in corso…</p>{{end}}
+</div>
+{{end}}
 
 {{/* ------------------------------------------------------------------ */}}
 {{/* Scarico                                                             */}}

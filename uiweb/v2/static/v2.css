@@ -1826,3 +1826,33 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
    and a long source ends with an ellipsis instead of running over the score. */
 .archive-table th:last-child, .archive-table td:last-child { width: 12.5rem; }
 .archive-table td:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }
+
+/* Dashboard "Traffico di rete": a server-rendered SVG sparkline of the last
+   half hour. No charting library: the two curves are coloured through the
+   theme tokens, strokes stay crisp at any width (non-scaling-stroke) and the
+   numbers beside it carry the values for screen readers. */
+.dashboard-traffic-panel .traffic-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.dashboard-traffic-panel .traffic-stat { font-weight: 600; }
+.dashboard-traffic-panel .traffic-stat.down { color: var(--accent-2); }
+.dashboard-traffic-panel .traffic-stat.up { color: var(--accent); }
+.dashboard-traffic-panel .traffic-chart { width: 100%; height: 150px; display: block; }
+.dashboard-traffic-panel .traffic-area.down { fill: color-mix(in srgb, var(--accent-2) 18%, transparent); stroke: none; }
+.dashboard-traffic-panel .traffic-line { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dashboard-traffic-panel .traffic-line.down { stroke: var(--accent-2); }
+.dashboard-traffic-panel .traffic-line.up { stroke: var(--accent); }
+.dashboard-traffic-panel .traffic-limit { stroke: var(--warn); stroke-width: 1; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.dashboard-traffic-panel .traffic-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

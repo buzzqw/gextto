@@ -1720,6 +1720,11 @@
       var el = document.getElementById("v2-live-status");
       if (el) el.outerHTML = e.data;
     });
+    es.addEventListener("chrome-traffic", function(e) {
+      // Only the Dashboard hosts this panel; elsewhere it is a no-op.
+      var el = document.getElementById("v2-live-traffic");
+      if (el) el.outerHTML = e.data;
+    });
   }
 
   if ("serviceWorker" in navigator && window.isSecureContext) {

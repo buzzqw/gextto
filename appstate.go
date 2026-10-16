@@ -41,6 +41,7 @@ func NewAppState(
 		bgStop:          make(chan struct{}),
 		bgContext:       backgroundContext,
 		bgCancel:        stopBackgroundContext,
+		rate_history:    newRateHistory(rateHistoryLen),
 	}
 	// Install the configured transfer backend. A refused activation (invalid
 	// path mappings, a missing binary, a port conflict) leaves the daemon with

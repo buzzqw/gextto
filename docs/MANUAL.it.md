@@ -297,6 +297,11 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
   *Storia* apre
   la storia completa di quel download. Si aggiorna da solo ogni minuto; se è
   tutto a posto dice «Niente da controllare».
+- **Traffico di rete** — un grafico a linea degli **ultimi 30 minuti** con le
+  curve di **download** e **upload**, il picco, la velocità attuale e la linea
+  del **limite di banda in vigore** (base, programmazione o temporaneo; non
+  compare quando il limite è *Auto*, cioè lasciato all'auto-tune). Si aggiorna
+  da solo.
 - **Card statistiche** — libreria (serie/film), spazio libero, magnet in
   archivio e motore.
 - **Rete e download attivi** — CPU/RAM e sparkline di rete in tempo reale.

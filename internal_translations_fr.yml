@@ -5186,3 +5186,14 @@ fra:
   "Velocità automatica (misura la linea)": "Vitesse automatique (mesure la ligne)"
   "Nessun tetto: la banda va all'auto-tune, che misura la linea e la lascia libera. Vince sui limiti globali e sulla programmazione; il limite temporaneo in Scarico resta un override a parte.": "Aucune limite : la bande passe à l'auto-tune, qui mesure la ligne et la laisse libre. Il l'emporte sur les limites globales et la programmation ; la limite temporaire dans Téléchargements reste un réglage à part."
   "Velocità automatica: nessun tetto, la linea la misura l'auto-tune": "Vitesse automatique : sans limite, l'auto-tune mesure la ligne"
+
+  # Dashboard — bandwidth chart
+  "Traffico di rete": "Trafic réseau"
+  "Ultimi 30 minuti": "30 dernières minutes"
+  "Picco di download nel periodo": "Pic de téléchargement sur la période"
+  "Picco di upload nel periodo": "Pic d'envoi sur la période"
+  "Limite di banda attivo": "Limite de bande passante active"
+  "Nessun limite di banda attivo": "Aucune limite de bande passante active"
+  "Nessun limite": "Aucune limite"
+  "Raccolta dati in corso…": "Collecte des données…"
+  "Grafico della banda di rete, ultimi 30 minuti": "Graphique de bande passante réseau, 30 dernières minutes"

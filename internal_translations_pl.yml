@@ -5134,3 +5134,14 @@ pol:
   "Velocità automatica (misura la linea)": "Automatyczna prędkość (mierzy łącze)"
   "Nessun tetto: la banda va all'auto-tune, che misura la linea e la lascia libera. Vince sui limiti globali e sulla programmazione; il limite temporaneo in Scarico resta un override a parte.": "Bez limitu: przepustowość przechodzi do auto-tune, który mierzy łącze i pozostawia je wolne. Wygrywa z globalnymi limitami i harmonogramem; limit tymczasowy w Pobieraniu pozostaje osobnym ustawieniem."
   "Velocità automatica: nessun tetto, la linea la misura l'auto-tune": "Automatyczna prędkość: bez limitu, auto-tune mierzy łącze"
+
+  # Dashboard — bandwidth chart
+  "Traffico di rete": "Ruch sieciowy"
+  "Ultimi 30 minuti": "Ostatnie 30 minut"
+  "Picco di download nel periodo": "Szczyt pobierania w okresie"
+  "Picco di upload nel periodo": "Szczyt wysyłania w okresie"
+  "Limite di banda attivo": "Aktywny limit przepustowości"
+  "Nessun limite di banda attivo": "Brak aktywnego limitu przepustowości"
+  "Nessun limite": "Bez limitu"
+  "Raccolta dati in corso…": "Zbieranie danych…"
+  "Grafico della banda di rete, ultimi 30 minuti": "Wykres przepustowości sieci, ostatnie 30 minut"

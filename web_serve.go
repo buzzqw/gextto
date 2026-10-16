@@ -64,6 +64,7 @@ func startBackgroundWorkers(state *AppState) {
 	register("health_monitor_worker", func() { healthMonitorWorker(state) })
 	register("cycle_monitor_worker", func() { cycleHealthWorker(state) })
 	register("update_check_worker", func() { updateCheckWorker(state) })
+	register("bandwidth_history_worker", func() { bandwidthHistoryWorker(state) })
 }
 
 // BackgroundStop is closed as soon as the daemon begins shutting down. Workers

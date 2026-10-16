@@ -572,6 +572,9 @@ type AppState struct {
 	bgWG       sync.WaitGroup
 	bgContext  context.Context
 	bgCancel   context.CancelFunc
+	// rate_history is the in-memory bandwidth history the Dashboard chart
+	// draws. bandwidthHistoryWorker fills it while the daemon runs.
+	rate_history *rateHistory
 }
 
 // ---------------------------------------------------------------------------

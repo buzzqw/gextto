@@ -4530,3 +4530,14 @@ eng:
   "Velocità automatica (misura la linea)": "Automatic speed (measuring the line)"
   "Nessun tetto: la banda va all'auto-tune, che misura la linea e la lascia libera. Vince sui limiti globali e sulla programmazione; il limite temporaneo in Scarico resta un override a parte.": "No cap: the bandwidth goes to the auto-tune, which measures the line and leaves it free. It beats the global limits and the schedule; the temporary limit in Downloads stays a separate override."
   "Velocità automatica: nessun tetto, la linea la misura l'auto-tune": "Automatic speed: no cap, the auto-tune measures the line"
+
+  # Dashboard — bandwidth chart
+  "Traffico di rete": "Network traffic"
+  "Ultimi 30 minuti": "Last 30 minutes"
+  "Picco di download nel periodo": "Download peak in the period"
+  "Picco di upload nel periodo": "Upload peak in the period"
+  "Limite di banda attivo": "Active bandwidth limit"
+  "Nessun limite di banda attivo": "No active bandwidth limit"
+  "Nessun limite": "No limit"
+  "Raccolta dati in corso…": "Collecting data…"
+  "Grafico della banda di rete, ultimi 30 minuti": "Network bandwidth chart, last 30 minutes"

@@ -208,6 +208,17 @@ configured provider (TMDB, else TVDB) whose result, including "no cover", is
 cached for half a day and resolved a few titles at a time, so the first poster
 page pays for the lookups once.
 
+**Bandwidth chart on the Dashboard.** The Dashboard draws the aggregate
+download and upload of the **last 30 minutes** as a server-rendered SVG (no
+charting library), with the peak, the current speed and the line of the
+**active limit** — base, schedule or temporary; the line disappears when the
+policy is *Auto*, because the cap is lifted. A dedicated worker samples the
+engine rates into a bounded in-memory ring (`rate_history` on `AppState`, one
+point every 10 s for 30 minutes) so the history does not depend on a tab being
+open; the chart is refreshed by the same chrome SSE stream that updates the live
+metrics (`event: chrome-traffic`). It lives in Gextto's UI; the standalone
+gx-torrent page keeps its own live rate readouts.
+
 **gx-torrent web page.** The standalone client's page is laid out the way a
 qBittorrent Web UI user expects to find things — filters on the left, one compact
 line per torrent, the detail panel below, a complete context menu, the speeds and

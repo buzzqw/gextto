@@ -365,6 +365,7 @@ type v2DashboardView struct {
 	PanelTables []v2TableData
 	Jobs        *v2JobsView
 	Search      v2SearchView
+	Traffic     v2TrafficView
 }
 
 type v2DashboardCalendarItem struct {
@@ -458,6 +459,7 @@ func v2DashboardViewFrom(s *AppState, r *http.Request) v2DashboardView {
 		Calendar:        v2DashboardCalendarFrom(s),
 		Jobs:            &jobs,
 		Search:          v2SearchView{Redirect: "/?view=dashboard"},
+		Traffic:         v2TrafficViewFrom(s),
 	}
 }
 
@@ -675,6 +677,10 @@ func V2ChromeSSE(w http.ResponseWriter, r *http.Request, s *AppState) {
 			var statBuf bytes.Buffer
 			v2Templates.ExecuteTemplate(&statBuf, "v2_live_status", chrome)
 			fmt.Fprintf(w, "event: chrome-status\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(statBuf.String(), dict, eng), "\n", ""))
+
+			var trafficBuf bytes.Buffer
+			v2Templates.ExecuteTemplate(&trafficBuf, "v2_live_traffic", v2TrafficViewFrom(s))
+			fmt.Fprintf(w, "event: chrome-traffic\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(trafficBuf.String(), dict, eng), "\n", ""))
 
 			flusher.Flush()
 		}
