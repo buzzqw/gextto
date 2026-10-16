@@ -104,6 +104,11 @@ type uiSettingField struct {
 	// Managed marks a field the automatic optimization controls: it renders
 	// read-only with the value "Auto" (like rextto) instead of an editable box.
 	Managed bool
+	// OriginLabel/OriginTitle show where a value came from in Esperto:
+	// "gestito dal sistema" (the guided tuning) or "impostato da te" (a manual
+	// save), with the reason as a tooltip. Empty when the origin is unknown.
+	OriginLabel string
+	OriginTitle string
 	// Disabled marks a field that does not apply to the selected torrent
 	// engine: it renders read-only with an explanation, so the page never
 	// suggests a control has an effect when the active engine ignores it.
@@ -566,6 +571,26 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 		Tabs:     tabs,
 		ActiveID: active,
 		Fields:   fieldsByTab[active],
+	}
+	// In Esperto each value says where it came from: the guided tuning ("gestito
+	// dal sistema") or the user ("impostato da te"). In Facilitata the internals
+	// are hidden and the limits are the user's, so the badge would only add noise.
+	if !brief {
+		if origins, err := SettingOrigins(s.cfg.DataDir); err == nil {
+			for index := range page.Fields {
+				provenance, ok := origins[page.Fields[index].Key]
+				if !ok {
+					continue
+				}
+				switch provenance.Origin {
+				case OriginAuto:
+					page.Fields[index].OriginLabel = uiText(s, "gestito dal sistema")
+				case OriginManual:
+					page.Fields[index].OriginLabel = uiText(s, "impostato da te")
+				}
+				page.Fields[index].OriginTitle = strings.TrimSpace(provenance.Detail)
+			}
+		}
 	}
 	// The transfer backend is a fixed choice: render it as a select instead of
 	// a free-text box.

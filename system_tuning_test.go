@@ -225,6 +225,26 @@ func TestTuningApplyBriefAppliesTheWholeProposal(t *testing.T) {
 	}
 }
 
+// In Esperto each value says where it came from; in Facilitata the badge is not
+// shown (the internals are hidden and the limits are the user's).
+func TestExpertShowsWhereAValueCameFrom(t *testing.T) {
+	state := newTestAppState(t)
+	if err := MarkSettingOrigin(state.cfg.DataDir, "min_free_space_gb", OriginAuto, "8 GB RAM"); err != nil {
+		t.Fatalf("mark auto: %v", err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=paths", nil)
+	if code != http.StatusOK || !strings.Contains(body, "gestito dal sistema") {
+		t.Fatalf("expert page must show the auto origin -> %d", code)
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/?view=settings&tab=paths&mode=brief", nil)
+	if code != http.StatusOK || strings.Contains(body, "gestito dal sistema") {
+		t.Fatalf("Facilitata must not show origin badges -> %d", code)
+	}
+}
+
 func TestTuningPanelRendersInThePerformanceTab(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

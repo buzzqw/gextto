@@ -5101,3 +5101,5 @@ pol:
   "Il sistema adatta cache, coda, spazio e RAM disk a questo hardware, senza superare i tuoi limiti.": "System dostosowuje pamięć podręczną, kolejkę, miejsce i RAM disk do tego sprzętu, nie przekraczając twoich limitów."
   "Adatta ora": "Dostosuj teraz"
   "Il sistema adatterà %d valori a questo hardware.": "System dostosuje %d wartości do tego sprzętu."
+  "gestito dal sistema": "zarządzane przez system"
+  "impostato da te": "ustawione przez ciebie"

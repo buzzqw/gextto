@@ -1085,6 +1085,7 @@
     <div class="setting-title">
       {{if or (eq .Kind "days") (eq .Kind "week")}}<span class="setting-label" id="label-{{.Key}}">{{.Label}}</span>{{else}}<label class="setting-label" id="label-{{.Key}}" for="input-{{.Key}}">{{.Label}}</label>{{end}}
       {{if .Modified}}<span class="setting-badge">modificato</span>{{end}}
+      {{if .OriginLabel}}<span class="setting-badge setting-origin" title="{{.OriginTitle}}">{{.OriginLabel}}</span>{{end}}
       <span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>non salvata</span>
     </div>
     {{if .Hint}}<p class="setting-hint" id="hint-{{.Key}}">{{.Hint}}</p>{{end}}

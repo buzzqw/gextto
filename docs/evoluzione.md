@@ -362,6 +362,13 @@ never links to a hidden row. The default is Esperto, so an existing installation
 loses no row; the setup wizard sets Facilitata when it finishes, so a brand-new
 user starts from the guided page.
 
+The guided tuning appears as the **Gestione automatica** card in the performance
+tab: in Facilitata it is one button ("Adatta ora") that applies the whole
+proposal — the user trusts the system — with a one-line summary; in Esperto it
+lists each proposed value (current → proposed, with the reason) and a checkbox.
+In Esperto each value also carries where it came from — *gestito dal sistema*
+(the tuning) or *impostato da te* (a manual save), from `setting_provenance`.
+
 **Streaming and DLNA.** Web streaming (`cmd/gx-torrent/stream.go`, the endpoint
 Gextto redirects to) sends the **Content-Type from the file extension**
 (`video/mp4`, `video/x-matroska`, `audio/flac`, …) with

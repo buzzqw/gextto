@@ -4497,3 +4497,5 @@ eng:
   "Il sistema adatta cache, coda, spazio e RAM disk a questo hardware, senza superare i tuoi limiti.": "The system adapts cache, queue, space and RAM disk to this hardware, without exceeding your limits."
   "Adatta ora": "Adapt now"
   "Il sistema adatterà %d valori a questo hardware.": "The system will adapt %d values to this hardware."
+  "gestito dal sistema": "managed by the system"
+  "impostato da te": "set by you"
