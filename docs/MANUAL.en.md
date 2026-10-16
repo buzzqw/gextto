@@ -291,11 +291,12 @@ release package the installer uses (README, *Install on Linux*).
 - **To check** — below the strip: **stuck** downloads (with the reason, the
   next attempt and when they will be abandoned), **pending moves to the
   library** (destination and attempts) and the warnings, errors and 🛟 pack
-  salvages, one per download: they **stay until the download is resolved** (no
-  24-hour expiry) and **Clean** marks them as read (a new warning of the same
-  download shows again). A download whose cycle
-  ended well (its file made it into the library) is **not listed**: a warning
-  around a successful cycle is noise, not something to check. *History* opens the full
+  salvages, one per download. A warning **stays while the download is still in
+  the session** (or has a pending stall or move): when the download leaves the
+  session with nothing pending it **disappears on its own**, and a cycle that
+  ended well (file in the library, superseded copy) **never shows** — no
+  24-hour expiry. **Clean** marks the ones still shown as read (a new warning
+  of the same download shows again). *History* opens the full
   story of that download. It refreshes every minute; when all is well it says
   "Nothing to check".
 - **Network traffic** — a line chart of the **last 30 minutes** with the

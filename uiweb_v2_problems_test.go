@@ -26,14 +26,20 @@ func (fakeProblemsEngine) Files(string) ([]models.FileView, bool, error) { retur
 // (🛟) still does, even though its message also says "added to the library".
 func TestDashboardProblemsHidesCompletedCycles(t *testing.T) {
 	state := newTestAppState(t)
-	state.setActiveEngine(fakeProblemsEngine{})
-	server := httptest.NewServer(Router(state))
-	t.Cleanup(server.Close)
-
 	imported := "bbbb000000000000000000000000000000000001"
 	upgraded := "bbbb000000000000000000000000000000000002"
 	unfinished := "bbbb000000000000000000000000000000000003"
 	salvaged := "bbbb000000000000000000000000000000000004"
+	// All four downloads are still in the session: the completed ones are hidden
+	// because of the resolution, not because they left it.
+	state.setActiveEngine(fakeProblemsEngine{list: []models.TorrentView{
+		{Hash: imported, Name: "Silo.S02E09", State: "downloading"},
+		{Hash: upgraded, Name: "Silo.S02E09.up", State: "downloading"},
+		{Hash: unfinished, Name: "Silo.S02E10", State: "downloading"},
+		{Hash: salvaged, Name: "Pack", State: "downloading"},
+	}})
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
 	now := time.Now()
 	for _, event := range []logging.Event{
 		// Cycle ended well, then a spurious finalization warning.
@@ -75,12 +81,16 @@ func TestDashboardProblemsHidesCompletedCycles(t *testing.T) {
 // reale: conta solo il ciclo corrente.
 func TestDashboardProblemsHidesWarningAfterAnOlderImport(t *testing.T) {
 	state := newTestAppState(t)
-	state.setActiveEngine(fakeProblemsEngine{})
-	server := httptest.NewServer(Router(state))
-	t.Cleanup(server.Close)
-
 	importedOld := "cccc000000000000000000000000000000000001"
 	newCycle := "cccc000000000000000000000000000000000002"
+	// Both downloads are in the session: importedOld is hidden by its import,
+	// newCycle is shown because its problem belongs to the current cycle.
+	state.setActiveEngine(fakeProblemsEngine{list: []models.TorrentView{
+		{Hash: importedOld, Name: "Silo.S02E09", State: "downloading"},
+		{Hash: newCycle, Name: "Show.S01E02", State: "downloading"},
+	}})
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
 	now := time.Now()
 	for _, event := range []logging.Event{
 		// Importato 30 h fa (fuori dalla finestra di 24 h)...
@@ -121,6 +131,7 @@ func TestDashboardProblemsPanel(t *testing.T) {
 	state.setActiveEngine(fakeProblemsEngine{list: []models.TorrentView{
 		{Hash: stuck, Name: "Morgane.S04", State: "stalled", Stalled: true, HasMetadata: true, NumComplete: 0},
 		{Hash: moving, Name: "Marshals.S01E10", State: "seeding", Progress: 100},
+		{Hash: gone, Name: "FBI", State: "downloading"},
 	}})
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
@@ -185,11 +196,13 @@ func TestDashboardProblemsPanel(t *testing.T) {
 // higher event id) shows again.
 func TestDashboardProblemsAckHidesShownWarnings(t *testing.T) {
 	state := newTestAppState(t)
-	state.setActiveEngine(fakeProblemsEngine{})
+	hash := "dddd000000000000000000000000000000000001"
+	state.setActiveEngine(fakeProblemsEngine{list: []models.TorrentView{
+		{Hash: hash, Name: "Show.S01E01", State: "downloading"},
+	}})
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	hash := "dddd000000000000000000000000000000000001"
 	if err := state.db.RecordAcquisitionEvent(logging.Event{At: time.Now(), Level: logging.LevelWarn, Hash: hash, Message: "❌ Gave up on Show"}); err != nil {
 		t.Fatal(err)
 	}
@@ -216,5 +229,34 @@ func TestDashboardProblemsAckHidesShownWarnings(t *testing.T) {
 	code, body = v2Request(t, server, http.MethodGet, "/dashboard/problems", nil)
 	if code != http.StatusOK || !strings.Contains(body, "hash="+hash) {
 		t.Fatalf("a new warning must show after Pulisci -> %d: %s", code, body)
+	}
+}
+
+// TestDashboardProblemsHidesClosedDownload: a warning for a download that has
+// left the session (and has no pending stall or move) is a closed case, so it
+// disappears on its own instead of waiting for "Pulisci".
+func TestDashboardProblemsHidesClosedDownload(t *testing.T) {
+	state := newTestAppState(t)
+	// The session is empty: the warning's download is gone.
+	state.setActiveEngine(fakeProblemsEngine{})
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	closed := "eeee000000000000000000000000000000000001"
+	if err := state.db.RecordAcquisitionEvent(logging.Event{
+		At: time.Now(), Level: logging.LevelWarn, Hash: closed,
+		Message: "🗑️ Season pack rejected — no episodes kept",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	code, body := v2Request(t, server, http.MethodGet, "/dashboard/problems", nil)
+	if code != http.StatusOK {
+		t.Fatalf("panel -> %d", code)
+	}
+	if strings.Contains(body, "hash="+closed) {
+		t.Fatalf("a closed download must not be listed: %s", body)
+	}
+	if !strings.Contains(body, "Niente da controllare") {
+		t.Fatalf("panel should be empty: %s", body)
 	}
 }

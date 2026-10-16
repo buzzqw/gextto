@@ -15,8 +15,12 @@ import (
 // the operator does not have to read the log to find it.
 
 // v2ProblemsLimit caps how many unresolved warnings the panel lists (one row
-// per download, newest first).
-const v2ProblemsLimit = 50
+// per download, newest first). v2ProblemsScan is how many the query may fetch
+// before the closed cases (downloads no longer in the session) are filtered out.
+const (
+	v2ProblemsLimit = 50
+	v2ProblemsScan  = 200
+)
 
 type v2StalledRow struct {
 	Hash      string
@@ -123,7 +127,10 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 	if s.db != nil {
 		ackID = s.db.ProblemsAckID()
 	}
-	recent, err := s.db.AcquisitionProblems(ackID, v2ProblemsLimit)
+	// Scan a wider slice than the panel shows: warnings of downloads that have
+	// left the session are filtered below, so they must not fill the window and
+	// hide the ones still worth checking.
+	recent, err := s.db.AcquisitionProblems(ackID, v2ProblemsScan)
 	if err != nil && view.Error == "" {
 		view.Error = "Storia dei download non disponibile: " + err.Error()
 	}
@@ -132,7 +139,17 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 		if _, ok := listed[event.Hash]; ok {
 			continue
 		}
+		// The download left the session and has nothing pending: the case is
+		// closed, so its warning is history, not something to check now. It
+		// disappears on its own, unlike a stalled or moving download that
+		// stays in the session.
+		if _, ok := session[strings.ToLower(event.Hash)]; !ok {
+			continue
+		}
 		view.Recent = append(view.Recent, event)
+		if len(view.Recent) >= v2ProblemsLimit {
+			break
+		}
 	}
 	return view
 }

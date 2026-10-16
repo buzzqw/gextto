@@ -291,11 +291,12 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
 - **Da controllare** — sotto la striscia: i download **fermi** (con il motivo,
   il prossimo tentativo e quando verranno abbandonati), gli **spostamenti in
   libreria in sospeso** (destinazione e tentativi) e gli avvisi, gli errori e i
-  recuperi di pack 🛟, uno per download: **restano finché il download non si
-  risolve** (niente scadenza a 24 ore) e **Pulisci** li segna come letti (un
-  nuovo avviso dello stesso download ricompare). Un download il
-  cui ciclo si è chiuso bene (il file è finito in libreria) **non compare**: un
-  avviso attorno a un ciclo riuscito è rumore, non qualcosa da controllare.
+  recuperi di pack 🛟, uno per download. Un avviso **resta finché il download è
+  ancora in sessione** (o ha uno stallo o uno spostamento in sospeso): quando il
+  download esce dalla sessione senza nulla in sospeso **sparisce da solo**, e un
+  ciclo chiuso bene (file in libreria, copia sostituita) **non compare** mai —
+  niente scadenza a 24 ore. **Pulisci** segna come letti quelli ancora mostrati
+  (un nuovo avviso dello stesso download ricompare).
   *Storia* apre
   la storia completa di quel download. Si aggiorna da solo ogni minuto; se è
   tutto a posto dice «Niente da controllare».

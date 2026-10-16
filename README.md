@@ -113,8 +113,9 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
   library arrivals and air dates.
 - **Traceability.** Every download carries a unique **Acquisition ID** across
   search, selection, transfer, post-processing and archive logs. The dashboard
-  **To check** panel collects edge cases and keeps each warning until its
-  download is resolved (**Clean** marks them read); threshold alerts warn when
+  **To check** panel collects edge cases and keeps each warning while its
+  download is still active (a closed download clears on its own; **Clean**
+  marks them read); threshold alerts warn when
   an indexer fails repeatedly or slows down. A live **30-minute bandwidth chart**
   on the dashboard shows download/upload, the peak and the active limit.
 - **Interfaces.** Responsive web UI installable as a mobile PWA, fully
