@@ -1,8 +1,12 @@
 package gextto
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -108,4 +112,72 @@ func TestUISettingDefaultExceptionsReferenceRealOptions(t *testing.T) {
 			t.Errorf("%s is exempted but has no page default", key)
 		}
 	}
+}
+
+// TestConfigViewDefaultsMatchThePage pins the third copy of the defaults: the
+// `/api/config` view (ConfigView) repeats a page default for the flat options
+// it reports, and the two could drift (qbittorrent_url and qbittorrent_username
+// reported empty while the page, and the managed runtime's fallback, said
+// otherwise). Only the scalar, top-level keys are read here: a key the view
+// nests (the transfer settings, the paths) is compared through the config
+// itself, and list keys are a different representation, not a default.
+func TestConfigViewDefaultsMatchThePage(t *testing.T) {
+	state := newTestAppState(t)
+	rec := httptest.NewRecorder()
+	ConfigView(rec, httptest.NewRequest(http.MethodGet, "/api/config", nil), state)
+	var view map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &view); err != nil {
+		t.Fatalf("decode /api/config: %v", err)
+	}
+	for key, want := range uiSettingDefaults {
+		raw, ok := view[key]
+		if !ok || raw == nil {
+			continue // not a flat key of the view
+		}
+		got, scalar := viewScalarString(raw)
+		if !scalar {
+			continue // a list or a nested object: not a scalar default
+		}
+		if !sameSettingValue(want, got) {
+			t.Errorf("%s: the page shows %q but /api/config reports %q", key, want, got)
+		}
+	}
+}
+
+// viewScalarString renders a JSON-decoded scalar the way the page spells its
+// default, and reports false for the values that are not scalars.
+func viewScalarString(raw any) (string, bool) {
+	switch value := raw.(type) {
+	case string:
+		return value, true
+	case bool:
+		return strconv.FormatBool(value), true
+	case float64:
+		return strconv.FormatFloat(value, 'f', -1, 64), true
+	default:
+		return "", false
+	}
+}
+
+// sameSettingValue compares a page default with a backend value tolerating the
+// two spellings the codebase uses for the same boolean (yes/no and true/false).
+func sameSettingValue(page, backend string) bool {
+	page = strings.TrimSpace(page)
+	backend = strings.TrimSpace(backend)
+	if page == backend {
+		return true
+	}
+	truth := func(value string) (bool, bool) {
+		switch strings.ToLower(value) {
+		case "yes", "true":
+			return true, true
+		case "no", "false":
+			return false, true
+		default:
+			return false, false
+		}
+	}
+	left, leftOK := truth(page)
+	right, rightOK := truth(backend)
+	return leftOK && rightOK && left == right
 }

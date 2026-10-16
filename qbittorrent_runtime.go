@@ -127,7 +127,7 @@ func managedQbittorrentConfig(cfg *Config) (*Config, error) {
 	baseURL = strings.TrimRight(parsed.String(), "/")
 	username := strings.TrimSpace(prepared.Settings["qbittorrent_username"])
 	if username == "" {
-		username = "admin"
+		username = defaultQbittorrentUsername
 	}
 	password := prepared.Settings["qbittorrent_password"]
 	if password == "" {

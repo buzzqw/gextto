@@ -51,6 +51,12 @@ const (
 	// runtime; a different, non-loopback URL means the operator brought their
 	// own qBittorrent.
 	defaultManagedQbittorrentURL = "http://127.0.0.1:8080"
+
+	// defaultQbittorrentUsername is the WebUI user the managed runtime is
+	// configured with when the operator did not pick one (qBittorrent's own
+	// default). The settings page shows the same value when the key is unset,
+	// and ConfigView reports it so both agree (TestConfigViewDefaultsMatchThePage).
+	defaultQbittorrentUsername = "admin"
 )
 
 // engineFallbackPlan is the pure decision of the chain.
