@@ -5162,3 +5162,5 @@ deu:
   "Il sistema adatterà %d valori a questo hardware.": "Das System passt %d Werte an diese Hardware an."
   "gestito dal sistema": "vom System verwaltet"
   "impostato da te": "von dir festgelegt"
+  "Adatta i valori nel tempo": "Werte im Laufe der Zeit anpassen"
+  "Ritocca nel tempo i valori scelti dal sistema (per esempio lo spazio libero minimo) quando cambiano le condizioni. Non tocca mai i valori impostati a mano; spegnilo per avere valori fissi.": "Passt die vom System gewählten Werte im Laufe der Zeit an (zum Beispiel den Mindestfreispeicher), wenn sich die Bedingungen ändern. Von dir festgelegte Werte werden nie angetastet; schalte es aus, um feste Werte zu behalten."

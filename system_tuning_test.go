@@ -245,6 +245,56 @@ func TestExpertShowsWhereAValueCameFrom(t *testing.T) {
 	}
 }
 
+// The slow loop only ever re-tunes values the system already chose: a manual
+// value is never touched, and a never-tuned key is left for an explicit apply.
+func TestAdaptiveTuningOnlyRetunesAutoValues(t *testing.T) {
+	state := newTestAppState(t)
+	download := t.TempDir()
+	archive := t.TempDir()
+	if err := saveConfigSetting(state.cfg.DataDir, "torrent_dir", download); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveConfigSetting(state.cfg.DataDir, "archive_root", archive); err != nil {
+		t.Fatal(err)
+	}
+	cfg := latestConfig(state)
+	proposals := ProposeTuning(ProbeSystem(cfg), cfg, nil)
+	autoKey := ""
+	for _, proposal := range proposals {
+		if proposal.Key != "min_free_space_gb" {
+			autoKey = proposal.Key
+			break
+		}
+	}
+	if autoKey == "" {
+		t.Skip("this machine produces no suitable proposal")
+	}
+	// Nothing is the system's yet: the loop has nothing to do.
+	if changes := adaptiveTuningChanges(state.cfg.DataDir, cfg); len(changes) != 0 {
+		t.Fatalf("adaptive changed %d values before anything was tuned", len(changes))
+	}
+	if err := MarkSettingOrigin(state.cfg.DataDir, autoKey, OriginAuto, "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := MarkSettingOrigin(state.cfg.DataDir, "min_free_space_gb", OriginManual, "mine"); err != nil {
+		t.Fatal(err)
+	}
+	changes := adaptiveTuningChanges(state.cfg.DataDir, cfg)
+	seenAuto := false
+	for _, change := range changes {
+		if change.Key == "min_free_space_gb" {
+			t.Fatal("the adaptive loop touched a value set by hand")
+		}
+		if change.Key != autoKey {
+			t.Fatalf("the adaptive loop proposed an untuned key %q", change.Key)
+		}
+		seenAuto = true
+	}
+	if !seenAuto {
+		t.Fatalf("the adaptive loop should re-tune %q", autoKey)
+	}
+}
+
 func TestTuningPanelRendersInThePerformanceTab(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

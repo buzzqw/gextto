@@ -79,6 +79,7 @@ var uiSettingDefaults = map[string]string{
 	"torrent_seed_time_days":              "0",
 	"auto_remove_completed":               "false",
 	"torrent_max_connections_per_torrent": "-1",
+	"autotune_adaptive":                   "true",
 	"torrent_cache_size":                  "-1",
 	"torrent_cache_expiry":                "300",
 	"torrent_dht":                         "true",

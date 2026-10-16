@@ -5155,3 +5155,5 @@ fra:
   "Il sistema adatterà %d valori a questo hardware.": "Le système adaptera %d valeurs à ce matériel."
   "gestito dal sistema": "géré par le système"
   "impostato da te": "défini par vous"
+  "Adatta i valori nel tempo": "Adapter les valeurs dans le temps"
+  "Ritocca nel tempo i valori scelti dal sistema (per esempio lo spazio libero minimo) quando cambiano le condizioni. Non tocca mai i valori impostati a mano; spegnilo per avere valori fissi.": "Ajuste dans le temps les valeurs choisies par le système (l'espace libre minimal, par exemple) quand les conditions changent. Il ne touche jamais aux valeurs que vous définissez ; désactivez-le pour garder des valeurs fixes."

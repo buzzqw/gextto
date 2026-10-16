@@ -1589,6 +1589,12 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 
 *Quanti torrent restano attivi, connessioni, RAM disk e cache.*
 
+**Gestione automatica**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Adatta i valori nel tempo | Ritocca nel tempo i valori scelti dal sistema (per esempio lo spazio libero minimo) quando cambiano le condizioni. Non tocca mai i valori impostati a mano; spegnilo per avere valori fissi. |
+
 **Coda e slot**
 
 | Impostazione | Cosa fa |

@@ -1544,6 +1544,12 @@ Recalculate scores* after changing weights.
 
 *How many torrents stay active, connections, RAM disk and cache.*
 
+**Automatic management**
+
+| Setting | What it does |
+|---|---|
+| Adapt values over time | Adjusts over time the values the system chose (the minimum free space, for instance) when conditions change. It never touches values you set by hand; turn it off to keep them fixed. |
+
 **Queue and slots**
 
 | Setting | What it does |

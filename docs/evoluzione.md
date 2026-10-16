@@ -369,6 +369,17 @@ lists each proposed value (current → proposed, with the reason) and a checkbox
 In Esperto each value also carries where it came from — *gestito dal sistema*
 (the tuning) or *impostato da te* (a manual save), from `setting_provenance`.
 
+The tuning is **adaptive**: a slow loop runs at the start of each cycle
+(`autotune_adaptive`, on by default) and re-fits the values the system already
+chose when the facts moved (the free-space guard and the RAM-disk thresholds
+follow the disk, for instance). It only ever touches values with `origin=auto` —
+never the user's, never a value never tuned — and only past a hysteresis
+(`adaptiveHysteresisFraction`), so the values do not wobble. The cycle is the
+cadence, which keeps it gentle. A restart is never read as instability: a
+restart that changed the binary is an update (`restart_cause.go`). The link-peak
+input for adapting the bandwidth is still missing in Gextto, so the bandwidth
+limits stay the user's; the free-space and RAM-disk parts adapt today.
+
 **Streaming and DLNA.** Web streaming (`cmd/gx-torrent/stream.go`, the endpoint
 Gextto redirects to) sends the **Content-Type from the file extension**
 (`video/mp4`, `video/x-matroska`, `audio/flac`, …) with

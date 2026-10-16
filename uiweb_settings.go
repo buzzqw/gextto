@@ -184,6 +184,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "torrent_ipfilter_url", Label: "IP filter (file/URL)", Tab: "network", Group: "Cifratura e filtro IP"},
 
 	// --- Code e prestazioni -------------------------------------------------
+	{Key: "autotune_adaptive", Label: "Adatta i valori nel tempo", Tab: "performance", Group: "Gestione automatica"},
 	{Key: "torrent_dynamic_queue", Label: "Auto-gestione dinamica coda e risorse", Tab: "performance", Group: "Coda e slot"},
 	{Key: "torrent_dynamic_queue_min", Label: "Slot download dinamici minimi", Tab: "performance", Group: "Coda e slot"},
 	{Key: "torrent_dynamic_queue_max", Label: "Slot download dinamici massimi", Tab: "performance", Group: "Coda e slot"},

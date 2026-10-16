@@ -26,6 +26,7 @@ var uiSettingTooltipText = map[string]string{
 	"torrent_seed_time_days":               "Limite principale di seeding in giorni; se maggiore di 0 prevale sul limite in minuti.",
 	"auto_remove_completed":                "Attivo: a fine seed il torrent completato viene tolto dalla sessione (come «Pulisci completati»). Spento: a fine seed il torrent resta nell'elenco come Completato e lo rimuovi tu con «Pulisci completati». Non influisce su dove vengono spostati i file.",
 	"torrent_max_connections_per_torrent":  "Limite di connessioni per singolo torrent (-1 = illimitato).",
+	"autotune_adaptive":                    "Ritocca nel tempo i valori scelti dal sistema (per esempio lo spazio libero minimo) quando cambiano le condizioni. Non tocca mai i valori impostati a mano; spegnilo per avere valori fissi.",
 	"torrent_cache_size":                   "Dimensione della cache disco in blocchi (-1 = automatico).",
 	"torrent_cache_expiry":                 "Secondi di inattività dopo cui un blocco esce dalla cache.",
 	"torrent_dht":                          "Abilita la rete DHT per trovare peer senza tracker.",

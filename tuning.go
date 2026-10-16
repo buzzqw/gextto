@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -167,6 +168,77 @@ func ApplyTuning(dataDir string, cfg *Config, proposals []TuningProposal, chosen
 		applied++
 	}
 	return applied, nil
+}
+
+// adaptiveHysteresisFraction is how far a numeric value must move before the
+// slow loop touches it again: small drifts are left alone, so the values do not
+// wobble.
+const adaptiveHysteresisFraction = 0.20
+
+// adaptiveTuningChanges are the proposals the slow loop would apply now: only
+// values the system already chose (origin auto) and only when they moved beyond
+// the hysteresis. The user's values and the never-tuned ones are left alone, so
+// the loop only ever adjusts its own work.
+func adaptiveTuningChanges(dataDir string, cfg *Config) []TuningProposal {
+	origins, err := SettingOrigins(dataDir)
+	if err != nil {
+		return nil
+	}
+	manual := map[string]bool{}
+	for key, provenance := range origins {
+		if provenance.Origin == OriginManual {
+			manual[key] = true
+		}
+	}
+	out := []TuningProposal{}
+	for _, proposal := range ProposeTuning(ProbeSystem(cfg), cfg, manual) {
+		if origins[proposal.Key].Origin != OriginAuto {
+			continue
+		}
+		if !tuningMovedEnough(proposal.Current, proposal.Proposed) {
+			continue
+		}
+		out = append(out, proposal)
+	}
+	return out
+}
+
+// tuningMovedEnough is the hysteresis: a value never set yet always qualifies;
+// numbers must move by at least adaptiveHysteresisFraction (or one unit); other
+// values by any change.
+func tuningMovedEnough(current, proposed string) bool {
+	if strings.TrimSpace(current) == "" {
+		return true
+	}
+	currentNumber, currentErr := strconv.ParseFloat(current, 64)
+	proposedNumber, proposedErr := strconv.ParseFloat(proposed, 64)
+	if currentErr == nil && proposedErr == nil {
+		limit := math.Abs(currentNumber) * adaptiveHysteresisFraction
+		if limit < 1 {
+			limit = 1
+		}
+		return math.Abs(proposedNumber-currentNumber) >= limit
+	}
+	return current != proposed
+}
+
+// RunAdaptiveTuning is the slow loop: it re-tunes the values the system already
+// chose when the facts moved and returns how many it changed. It never touches a
+// value the user set, and it is a no-op when nothing moved.
+func RunAdaptiveTuning(dataDir string, cfg *Config) int {
+	changes := adaptiveTuningChanges(dataDir, cfg)
+	if len(changes) == 0 {
+		return 0
+	}
+	chosen := map[string]bool{}
+	for _, change := range changes {
+		chosen[change.Key] = true
+	}
+	applied, err := ApplyTuning(dataDir, cfg, changes, chosen)
+	if err != nil {
+		logging.Warn("adaptive tuning could not be applied", "error", err)
+	}
+	return applied
 }
 
 // humanBytesString renders a byte count for a sentence ("1.8 TB").

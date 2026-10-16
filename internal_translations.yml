@@ -4499,3 +4499,5 @@ eng:
   "Il sistema adatterà %d valori a questo hardware.": "The system will adapt %d values to this hardware."
   "gestito dal sistema": "managed by the system"
   "impostato da te": "set by you"
+  "Adatta i valori nel tempo": "Adapt values over time"
+  "Ritocca nel tempo i valori scelti dal sistema (per esempio lo spazio libero minimo) quando cambiano le condizioni. Non tocca mai i valori impostati a mano; spegnilo per avere valori fissi.": "Adjusts over time the values the system chose (the minimum free space, for instance) when conditions change. It never touches values you set by hand; turn it off to keep them fixed."

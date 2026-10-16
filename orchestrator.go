@@ -89,6 +89,14 @@ func RunCycleDomain(
 			logging.Info("stored quality scores refreshed after a scoring change", "updated", updated)
 		}
 	}
+	// The guided tuning's slow loop: once per cycle, re-fit the values the system
+	// already chose (never the user's) when the facts moved. The cycle is the
+	// natural cadence, and it keeps the values gentle rather than wobbling.
+	if !cfg.DryRun && settingTruthy(cfg.Settings["autotune_adaptive"]) {
+		if changed := RunAdaptiveTuning(cfg.DataDir, cfg); changed > 0 {
+			logging.Info("🛠️ Automatic tuning adjusted values for this hardware", "changed", changed)
+		}
+	}
 
 	// The comics settings live in their own database: read them only when this
 	// cycle can run comics, and never let a comics database problem abort a

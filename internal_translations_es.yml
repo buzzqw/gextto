@@ -5109,3 +5109,5 @@ spa:
   "Il sistema adatterà %d valori a questo hardware.": "El sistema adaptará %d valores a este hardware."
   "gestito dal sistema": "gestionado por el sistema"
   "impostato da te": "definido por ti"
+  "Adatta i valori nel tempo": "Adaptar los valores con el tiempo"
+  "Ritocca nel tempo i valori scelti dal sistema (per esempio lo spazio libero minimo) quando cambiano le condizioni. Non tocca mai i valori impostati a mano; spegnilo per avere valori fissi.": "Ajusta con el tiempo los valores elegidos por el sistema (por ejemplo, el espacio libre mínimo) cuando cambian las condiciones. Nunca toca los valores que defines a mano; desactívalo para mantener valores fijos."
