@@ -882,6 +882,8 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 						speedSourceTempKeep:     "temporary limit, until removed",
 						speedSourceSchedule:     "scheduled limit",
 						speedSourceScheduleAuto: "autotune window (unlimited)",
+						speedSourceTempAuto:     "auto speed (unlimited)",
+						speedSourceAuto:         "automatic speed (unlimited)",
 						speedSourceBase:         "standard limit",
 					}[source]
 					inSchedule := source == speedSourceSchedule || source == speedSourceScheduleAuto

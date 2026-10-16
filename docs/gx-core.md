@@ -46,7 +46,8 @@ Gextto would end up with the worse of the two engines.
 v1 API used by Gextto is only *added to*, never changed: persistent settings from the
 page (`settings.json`), the first-run wizard, login and sessions, categories and tags
 with a path per category, torrent table virtualisation, the bandwidth scheduler with
-alternative limits, the RSS manager with the *Wanted* page, the Torznab indexer search,
+alternative limits (**one choice per day — Off, Limit or Auto**, where Auto lifts the
+cap so the auto-speed/peak observer can measure the line), the RSS manager with the *Wanted* page, the Torznab indexer search,
 and the **qBittorrent-compatible Web API** (`/api/v2/auth`, `/api/v2/torrents/*`,
 `/api/v2/app/*`) that clients speaking that protocol can use.
 

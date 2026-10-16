@@ -292,16 +292,31 @@ func parseScheduleWeekForm(r *http.Request) (bwschedule.Week, string) {
 	var week bwschedule.Week
 	for n := range week {
 		prefix := "schedule-" + bwschedule.DayName(time.Weekday(n)) + "-"
-		day := bwschedule.Day{On: formBool(r, prefix+"on")}
+		// One choice per day. The older form used an "on" checkbox; keep reading
+		// it so a page loaded before the change still saves.
+		mode := strings.ToLower(strings.TrimSpace(r.FormValue(prefix + "mode")))
+		switch {
+		case mode == "off" || mode == "limit" || mode == "auto":
+		case formBool(r, prefix+"on"):
+			mode = "limit"
+		default:
+			mode = "off"
+		}
+		on := mode == "limit" || mode == "auto"
 		start, okStart := parseClock(r.FormValue(prefix + "start"))
 		end, okEnd := parseClock(r.FormValue(prefix + "end"))
-		if day.On && (!okStart || !okEnd) {
+		if on && (!okStart || !okEnd) {
 			return week, "The scheduler window must be two times in HH:MM."
 		}
-		if day.On && start == end {
+		if on && start == end {
 			return week, "The scheduler start and end must differ."
 		}
-		day.Start, day.End = start, end
+		// "Auto": the window has no cap, the auto-speed measures the line there.
+		if mode == "auto" {
+			week[n] = bwschedule.Day{On: true, Start: start, End: end, Download: bwschedule.AutoLimit, Upload: bwschedule.AutoLimit}
+			continue
+		}
+		day := bwschedule.Day{On: on, Start: start, End: end}
 		day.Download, _ = parseFormKib(r.FormValue(prefix + "dl"))
 		day.Upload, _ = parseFormKib(r.FormValue(prefix + "ul"))
 		week[n] = day
@@ -321,16 +336,30 @@ func scheduleWeekRows(week bwschedule.Week) string {
 		key := bwschedule.DayName(weekday)
 		prefix := "schedule-" + key + "-"
 		row := "sched-row-" + key
-		checked := ""
-		if day.On {
-			checked = " checked"
+		mode := "off"
+		if day.Auto() {
+			mode = "auto"
+		} else if day.On {
+			mode = "limit"
+		}
+		selected := func(value string) string {
+			if value == mode {
+				return " selected"
+			}
+			return ""
+		}
+		// The two numbers only matter for a "Limit" day; elsewhere they are out
+		// of the way (and stored as the AutoLimit sentinel for "Auto").
+		disabled, dl, ul := "", day.Download, day.Upload
+		if mode != "limit" {
+			disabled, dl, ul = " disabled", 0, 0
 		}
 		fmt.Fprintf(&b, `<tr><th scope="row" id="%s">%s</th>`, row, names[weekday])
-		fmt.Fprintf(&b, `<td><input type="checkbox" name="%son" value="1"%s aria-labelledby="%s sched-col-on" title="Apply the scheduled limits on this day of the week"></td>`, prefix, checked, row)
+		fmt.Fprintf(&b, `<td><select name="%smode" aria-labelledby="%s sched-col-mode" title="Mode of the day: Off (no window), Limit (your values) or Auto (no cap, the auto-speed measures the line)"><option value="off"%s>Off</option><option value="limit"%s>Limit</option><option value="auto"%s>Auto</option></select></td>`, prefix, row, selected("off"), selected("limit"), selected("auto"))
 		fmt.Fprintf(&b, `<td><input type="time" name="%sstart" value="%s" aria-labelledby="%s sched-col-start" title="Start time of the scheduled bandwidth window (HH:MM)"></td>`, prefix, bwschedule.FormatClock(day.Start), row)
 		fmt.Fprintf(&b, `<td><input type="time" name="%send" value="%s" aria-labelledby="%s sched-col-end" title="End time of the scheduled bandwidth window (HH:MM)"></td>`, prefix, bwschedule.FormatClock(day.End), row)
-		fmt.Fprintf(&b, `<td><input type="number" min="0" name="%sdl" value="%d" aria-labelledby="%s sched-col-dl" title="Download speed limit during scheduled window in KiB/s"></td>`, prefix, day.Download, row)
-		fmt.Fprintf(&b, `<td><input type="number" min="0" name="%sul" value="%d" aria-labelledby="%s sched-col-ul" title="Upload speed limit during scheduled window in KiB/s"></td></tr>`, prefix, day.Upload, row)
+		fmt.Fprintf(&b, `<td><input type="number" min="0" name="%sdl" value="%d"%s aria-labelledby="%s sched-col-dl" title="Download speed limit during scheduled window in KiB/s"></td>`, prefix, dl, disabled, row)
+		fmt.Fprintf(&b, `<td><input type="number" min="0" name="%sul" value="%d"%s aria-labelledby="%s sched-col-ul" title="Upload speed limit during scheduled window in KiB/s"></td></tr>`, prefix, ul, disabled, row)
 	}
 	return b.String()
 }

@@ -312,6 +312,11 @@ change. The old `/ui` route is no longer available. For operational checks use
 
 Total routes: 267
 
+The temporary speed limit (`POST /api/torrents/temp-limits`) also accepts
+`auto: true|false`: with `auto` the bandwidth is handed to the guided tuning with
+no cap (like an “Auto” window of the schedule), the numeric `download_kib` /
+`upload_kib` are ignored and the two modes are exclusive.
+
 ## gx-torrent daemon routes
 
 The `gx-torrent` daemon (also usable standalone, without Gextto) serves its own

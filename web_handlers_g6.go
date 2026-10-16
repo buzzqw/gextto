@@ -36,6 +36,10 @@ type TempLimitsInput struct {
 	UploadKib   int64 `json:"upload_kib"`
 	Minutes     int64 `json:"minutes"`
 	Clear       bool  `json:"clear"`
+	// Auto, when set, turns the "auto speed" override on (true) or off (false):
+	// the bandwidth is handed to the guided tuning with no cap, like being inside
+	// an "Auto" window of the schedule. It is the temporary override's other mode.
+	Auto *bool `json:"auto,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +157,8 @@ func gh6_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
 // Speed policy sources, in the order they are tried.
 const (
 	speedSourceTemp         = "temp"          // temporary limit with an expiry
+	speedSourceTempAuto     = "temp_auto"     // "auto speed": the whole line to the tuning, now
+	speedSourceAuto         = "auto"          // base policy: the tuning measures and sets the cap
 	speedSourceSchedule     = "schedule"      // bandwidth schedule window
 	speedSourceScheduleAuto = "schedule_auto" // schedule window left to the tuning
 	speedSourceTempKeep     = "temp_keep"     // temporary limit kept until removed
@@ -160,12 +166,21 @@ const (
 )
 
 // speedPolicy picks the global limits in force and where they come from.
-// A temporary limit with an expiry beats everything; the bandwidth schedule
-// beats a temporary limit without expiry, which in turn beats the base
-// limits. tempShadowed reports a permanent temporary limit that the schedule
-// is overriding right now.
+// "Auto speed" (the temporary override in its Auto mode) beats everything: the
+// line is left to the tuning, now. Then a temporary limit with an expiry; the
+// bandwidth schedule beats a temporary limit without expiry, which in turn beats
+// the base limits. tempShadowed reports a permanent temporary limit that the
+// schedule is overriding right now.
 func speedPolicy(cfg *Config) (download, upload int64, source string, tempShadowed bool) {
 	now := time.Now().Unix()
+	// "Auto speed" is the temporary override's other mode: it wins over every
+	// numeric limit and hands the line to the guided tuning with no cap, exactly
+	// like standing inside an "Auto" schedule window. The interface disables the
+	// temporary DL/UL fields while it is on, so a timed limit only exists when it
+	// is off.
+	if gh6_truthySetting(cfg.Settings["torrent_temp_auto"]) {
+		return 0, 0, speedSourceTempAuto, false
+	}
 	tempUntil := gh6_parseSettingInt(cfg, "torrent_temp_limit_until")
 	tempEnabled := gh6_truthySetting(cfg.Settings["torrent_temp_limit_enabled"])
 	tempDownload := gh6_parseSettingInt(cfg, "torrent_temp_dl_limit")
@@ -184,6 +199,11 @@ func speedPolicy(cfg *Config) (download, upload int64, source string, tempShadow
 			}
 			return day.Download, day.Upload, speedSourceSchedule, tempKeep
 		}
+	}
+	// The base "Auto" policy: no cap at all, the line to the tuning. It is the
+	// third policy next to the manual limits and the schedule.
+	if gh6_truthySetting(cfg.Settings["torrent_speed_auto"]) {
+		return 0, 0, speedSourceAuto, false
 	}
 	if tempKeep {
 		return tempDownload, tempUpload, speedSourceTempKeep, false
@@ -1329,6 +1349,29 @@ func SetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	// "Auto speed": hand the line to the tuning (no cap) or take it back. Turning
+	// it on drops any pending temporary limit, since the two are one override with
+	// two modes and the interface disables the numeric fields meanwhile.
+	if input.Auto != nil {
+		value := "0"
+		if *input.Auto {
+			value = "1"
+		}
+		for _, pair := range [][2]string{
+			{"torrent_temp_auto", value},
+			{"torrent_temp_limit_enabled", "0"},
+			{"torrent_temp_limit_until", "0"},
+		} {
+			if err := saveConfigSetting(s.cfg.DataDir, pair[0], pair[1]); err != nil {
+				jsonError(w, http.StatusInternalServerError, fmt.Sprintf("salvataggio auto speed: %v", err))
+				return
+			}
+		}
+		cfg := latestConfig(s)
+		gh6_applySpeedPolicy(cfg, s.activeEngine())
+		jsonResponse(w, map[string]any{"ok": true, "auto": *input.Auto})
+		return
+	}
 	download := input.DownloadKib
 	if download < 0 {
 		download = 0
@@ -1356,6 +1399,9 @@ func SetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		{"torrent_temp_ul_limit", strconv.FormatInt(upload, 10)},
 		{"torrent_temp_limit_enabled", enabled},
 		{"torrent_temp_limit_until", strconv.FormatInt(until, 10)},
+		// A numeric temporary limit and "auto speed" are one override with two
+		// modes: setting numbers turns auto off.
+		{"torrent_temp_auto", "0"},
 	}
 	for _, pair := range pairs {
 		if err := saveConfigSetting(s.cfg.DataDir, pair[0], pair[1]); err != nil {
@@ -1396,6 +1442,7 @@ func GetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"source":             source,
 		"download_kib":       download,
 		"upload_kib":         upload,
+		"temp_auto":          gh6_truthySetting(cfg.Settings["torrent_temp_auto"]),
 		"temp_active":        tempActive,
 		"temp_download_kib":  gh6_parseSettingInt(cfg, "torrent_temp_dl_limit"),
 		"temp_upload_kib":    gh6_parseSettingInt(cfg, "torrent_temp_ul_limit"),

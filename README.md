@@ -382,10 +382,12 @@ fewer features, but all the ones a standalone client needs.
   option to query Jackett/Prowlarr live); *Settings* keeps the archive in shape
   (delete the old items, **optimize** to give the freed space back to the disk).
 - **Operations.** Global and per-torrent limits, a bandwidth scheduler with
-  its own window and limits for every weekday, latency auto-speed
-  (anti-bufferbloat), one-click queue/cache/bandwidth optimisation, URL or file
-  IP filter (Gextto's blocklist by default) with scheduled refresh, categories
-  and tags, real-time diagnostics, port test from the settings.
+  its own window for every weekday (one choice per day: **Off / Limit / Auto**,
+  where Auto leaves the cap to the auto-tune and measures the line),
+  latency auto-speed (anti-bufferbloat), one-click queue/cache/bandwidth
+  optimisation, URL or file IP filter (Gextto's blocklist by default) with
+  scheduled refresh, categories and tags, real-time diagnostics, port test from
+  the settings.
 - **Notifications.** The same channels as Gextto: Telegram, e-mail and
   webhooks (generic JSON, Discord, Slack, Gotify, ntfy, Pushover) for completed
   downloads, feed matches and feed errors, with a test button.

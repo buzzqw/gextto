@@ -114,10 +114,9 @@ test("un interruttore mostra i campi che dipendono da lui", async ({ page }) => 
   await expect(week).toBeHidden();
   await toggle.check();
   await expect(week).toBeVisible();
-  // The per-day table has one row per day, each with an on/off checkbox.
-  await expect(week.locator('input[type="checkbox"][name$="-on"]')).toHaveCount(7);
-  // Each day also has an «Auto» checkbox (bandwidth left to the auto-tune).
-  await expect(week.locator('input[type="checkbox"][name$="-auto"]')).toHaveCount(7);
+  // The per-day table has one row per day, each with a single mode select:
+  // Non attiva / Limite / Auto.
+  await expect(week.locator('select[name$="-mode"]')).toHaveCount(7);
   // The older single-window settings are superseded by the per-day table and
   // stay hidden even while the switch is on.
   await expect(page.locator("#v2-setting-torrent_sched_start")).toBeHidden();
@@ -125,19 +124,18 @@ test("un interruttore mostra i campi che dipendono da lui", async ({ page }) => 
   await expect(week).toBeHidden();
 });
 
-test("Auto nella programmazione accende la fascia e spegne i limiti di velocità", async ({ page }) => {
+test("la modalità del giorno spegne i limiti di velocità tranne in «Limite»", async ({ page }) => {
   await page.goto("/?view=settings&tab=network");
   await page.getByRole("switch", { name: "Programmazione velocità attiva" }).check();
   const row = page.locator("#v2-setting-torrent_sched_week tbody tr").first();
-  const on = row.locator('input[name$="-on"]');
-  const auto = row.locator('input[name$="-auto"]');
+  const mode = row.locator('select[name$="-mode"]');
   const dl = row.locator('input[name$="-dl"]');
+  await mode.selectOption("limit");
   await expect(dl).toBeEnabled();
-  await auto.check();
-  await expect(on).toBeChecked();
+  await mode.selectOption("auto");
   await expect(dl).toBeDisabled();
-  await auto.uncheck();
-  await expect(dl).toBeEnabled();
+  await mode.selectOption("off");
+  await expect(dl).toBeDisabled();
 });
 
 test("predefinito ripristina il valore e va salvato", async ({ page }) => {

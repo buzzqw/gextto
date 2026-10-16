@@ -136,14 +136,21 @@ func TestUISettingsSavesScheduleDays(t *testing.T) {
 	body, _ = io.ReadAll(page.Body)
 	page.Body.Close()
 	htmlBody := string(body)
-	// The single window shows in the per-day table on the selected days.
-	for _, want := range []string{`name="schedule-mon-on" value="1" checked`, `name="schedule-thu-on" value="1" checked`, `name="schedule-mon-start" value="01:00"`} {
-		if !strings.Contains(htmlBody, want) {
-			t.Fatalf("settings page missing %q", want)
-		}
+	// The single window shows in the per-day table on the selected days: each day
+	// is one mode select, "Limit" on the selected days and "Off" elsewhere.
+	if !strings.Contains(htmlBody, `name="schedule-mon-mode"`) || !strings.Contains(htmlBody, `name="schedule-thu-mode"`) {
+		t.Fatal("settings page missing the per-day mode selects")
 	}
-	if strings.Contains(htmlBody, `name="schedule-tue-on" value="1" checked`) {
-		t.Fatal("Tuesday must not be checked")
+	monday := htmlBody[strings.Index(htmlBody, `name="schedule-mon-mode"`):]
+	if !strings.Contains(monday[:400], `<option value="limit" selected`) {
+		t.Fatal("Monday must be in Limit mode")
+	}
+	tuesday := htmlBody[strings.Index(htmlBody, `name="schedule-tue-mode"`):]
+	if !strings.Contains(tuesday[:400], `<option value="off" selected`) {
+		t.Fatal("Tuesday must be Off")
+	}
+	if !strings.Contains(htmlBody, `name="schedule-mon-start" value="01:00"`) {
+		t.Fatal("settings page missing the Monday start")
 	}
 }
 

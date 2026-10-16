@@ -995,6 +995,8 @@ type v2TorrentsView struct {
 	TempUL              int64
 	TempMinutes         int64
 	TempActive          bool
+	TempAuto            bool
+	SpeedAuto           bool
 	SchedActive         bool
 	TempShadowed        bool
 	SchedDL             int64
@@ -1166,6 +1168,8 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		TempUL:              settings.TempUL,
 		TempMinutes:         settings.TempMinutes,
 		TempActive:          settings.TempActive,
+		TempAuto:            settings.TempAuto,
+		SpeedAuto:           settings.SpeedAuto,
 		SchedActive:         settings.SchedActive,
 		TempShadowed:        settings.TempShadowed,
 		SchedDL:             settings.SchedDL,
@@ -2442,6 +2446,18 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if err := saveConfigSetting(s.cfg.DataDir, key, value); err != nil {
 		render(err.Error(), true)
 		return
+	}
+	// The base "Auto" policy and the schedule are two of the same policy choice:
+	// turning one on turns the other off, so the line has a single source.
+	switch key {
+	case "torrent_speed_auto":
+		if settingTruthy(value) {
+			_ = saveConfigSetting(s.cfg.DataDir, "torrent_sched_enabled", "0")
+		}
+	case "torrent_sched_enabled":
+		if settingTruthy(value) {
+			_ = saveConfigSetting(s.cfg.DataDir, "torrent_speed_auto", "0")
+		}
 	}
 	// A value typed by the user is theirs: record it so the guided tuning never
 	// proposes it again. Clearing the field goes back to the default, so the

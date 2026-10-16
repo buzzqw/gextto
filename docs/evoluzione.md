@@ -396,13 +396,18 @@ the cleanup uses `upgrade_min_score_diff`, one voice for both the acquisition
 upgrade and the cleanup pass. `cleanup_upgrades` ("replace archived versions") is
 on by default, so archived files can actually be improved.
 
-**Scheduling the auto-tune.** A bandwidth-schedule window can be marked **Auto**
-(`internal/bwschedule` sentinel `AutoLimit = -1`, a checkbox in the per-day editor):
-inside that window the effective limit is lifted (`speedPolicy` returns unlimited,
-source `schedule_auto`), so the peak observer measures the real line there, while
-the user's conservative limits apply in the other windows — the right shape for a
-line shared with the family. A capped direction is never used to learn the peak
-(`autotune_peaks.go`), so the free window is exactly where the line is learned.
+**Scheduling the auto-tune.** The per-day editor gives every day **one choice — Off,
+Limit or Auto** (`internal/bwschedule` sentinel `AutoLimit = -1`): an **Auto** day
+lifts the cap (`speedPolicy` returns unlimited, source `schedule_auto`), so the peak
+observer measures the real line there, while the user's conservative limits apply in
+the other windows — the right shape for a line shared with the family. A capped
+direction is never used to learn the peak (`autotune_peaks.go`), so the free window
+is exactly where the line is learned. The same "hand the line to the tuning" idea is
+a **base policy** (`torrent_speed_auto`, no cap at all, source `auto`, mutually
+exclusive with the schedule) and the temporary override's Auto mode in Downloads
+(`torrent_temp_auto`, source `temp_auto`), which wins over everything and is the
+sibling of the numeric temporary limit — so the speed has two levels: the **policy**
+(manual, scheduled or automatic) and the **temporary override** (limit or auto).
 
 **Streaming and DLNA.** Web streaming (`cmd/gx-torrent/stream.go`, the endpoint
 Gextto redirects to) sends the **Content-Type from the file extension**
@@ -568,8 +573,10 @@ direct magnets and feed links instead of failing on invalid XML), the **feed arc
 (bbolt with a compact index), the IP filter with a scheduled refresh, *Optimise*
 (queue, cache, bandwidth at 80% of the measured peak with auto-speed active), the
 **per-day bandwidth scheduler** (`internal/bwschedule`, shared with Gextto: every
-weekday has its own window and limits, a window past midnight belongs to the day it
-starts on, and the older single window stays as fallback), notifications on Gextto's
+weekday has its own window, with **one choice per day — Off, Limit or Auto** (Auto
+leaves the cap to the auto-tune so the line is measured there), a window past midnight
+belongs to the day it starts on, and the older single window stays as fallback),
+notifications on Gextto's
 channels (`internal/notify`: Telegram, email and webhook in the JSON, Discord, Slack,
 Gotify, ntfy and Pushover formats, each switchable with a test button), and the
 standalone pages' usability (Browse… on the folders, the port test, the multi-folder

@@ -214,6 +214,15 @@ const adaptiveHysteresisFraction = 0.20
 // values the system already chose (origin auto) and only when they moved beyond
 // the hysteresis. The user's values and the never-tuned ones are left alone, so
 // the loop only ever adjusts its own work.
+// autoInternalTuningKeys are the internal settings the system owns by itself:
+// the slow loop may set them from the machine facts even when the user never ran
+// the tuning, and the settings page shows them as "Auto". The user's own knobs
+// (the speed limits, the free-space guard, the quality policy) are not here:
+// those stay the user's, and the loop only touches them when it set them.
+var autoInternalTuningKeys = map[string]bool{
+	"torrent_max_connections_per_torrent": true,
+}
+
 func adaptiveTuningChanges(dataDir string, cfg *Config) []TuningProposal {
 	origins, err := SettingOrigins(dataDir)
 	if err != nil {
@@ -227,7 +236,16 @@ func adaptiveTuningChanges(dataDir string, cfg *Config) []TuningProposal {
 	}
 	out := []TuningProposal{}
 	for _, proposal := range ProposeTuning(ProbeSystem(cfg), cfg, manual) {
-		if origins[proposal.Key].Origin != OriginAuto {
+		origin := origins[proposal.Key].Origin
+		switch {
+		case origin == OriginManual:
+			// The user set it by hand: never touch it.
+			continue
+		case origin == OriginAuto:
+			// The system already owns it.
+		case autoInternalTuningKeys[proposal.Key]:
+			// An internal the system owns even before it was ever tuned.
+		default:
 			continue
 		}
 		if !tuningMovedEnough(proposal.Current, proposal.Proposed) {

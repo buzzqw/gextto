@@ -1373,10 +1373,11 @@ Come si legge una riga:
   speciali** (per esempio «0 = mai»).
 - Le opzioni sì/no sono **interruttori**; gli orari usano il selettore
   dell'ora. La **programmazione velocità** è l'interruttore più una tabella
-  con una riga per giorno (attivo, inizio, fine, limiti di download e upload),
-  come in gx-torrent: ogni giorno ha fascia e limiti propri. Le vecchie
-  impostazioni a fascia unica non compaiono più nella pagina: finché la tabella
-  non viene salvata ne mostra i valori e restano in uso.
+  con una riga per giorno: per ogni giorno **una scelta** tra *Non attiva*,
+  *Limite* (i tuoi valori, unici a usare i campi di velocità) e *Auto* (nessun
+  tetto: la banda all'auto-tune, che misura la linea), più inizio e fine. Le
+  vecchie impostazioni a fascia unica non compaiono più nella pagina: finché la
+  tabella non viene salvata ne mostra i valori e restano in uso.
 - Le opzioni che dipendono da un interruttore (per esempio i campi della
   programmazione velocità o del RAM disk) **compaiono solo quando l'interruttore
   è acceso**, anche prima di salvarlo.
@@ -1536,6 +1537,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 |---|---|
 | Limite download globale | Limite globale di download in KiB/s (0 = illimitato). *(Unità: KiB/s; 0 = illimitato)* |
 | Limite upload globale | Limite globale di upload in KiB/s (0 = illimitato). *(Unità: KiB/s; 0 = illimitato)* |
+| Velocità automatica (misura la linea) | Nessun tetto: la banda va all'auto-tune, che misura la linea e la lascia libera. Vince sui limiti globali e sulla programmazione; il limite temporaneo in Scarico resta un override a parte. Attivandola si spegne la programmazione, e viceversa. |
 
 **Programmazione velocità**
 
@@ -1547,7 +1549,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | Programmazione — giorni | Giorni attivi: 0=Lun … 6=Dom (es. 0,1,2,3,4). *(nessun giorno = mai attiva)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
 | Programmazione — download | Limite di download in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
 | Programmazione — upload | Limite di upload in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
-| Programmazione — per giorno | Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. La colonna **Auto** affida la fascia del giorno all'auto-tune: nessun limite in quella fascia, così la linea viene misurata lì (fuori fascia valgono i tuoi limiti). *(ogni giorno ha fascia e limiti propri (0 = illimitato); una fascia oltre la mezzanotte appartiene al giorno in cui inizia)* Compare solo con «Programmazione velocità attiva» attivo. |
+| Programmazione — per giorno | Una scelta per giorno: **Non attiva** (nessuna fascia), **Limite** (fascia con i tuoi valori di download e upload) o **Auto** (fascia senza limite: la banda va all'auto-tune, che misura la linea lì). Solo «Limite» abilita i due campi di velocità; gli orari restano sempre attivi. Una fascia oltre la mezzanotte appartiene al giorno in cui inizia. *(un giorno «Limite» ha i suoi valori (0 = illimitato); «Auto» lascia misurare la linea all'auto-tune; una fascia oltre la mezzanotte appartiene al giorno in cui inizia)* Compare solo con «Programmazione velocità attiva» attivo. |
 
 **Porte e interfacce**
 

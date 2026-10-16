@@ -73,7 +73,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"torrent_sched_start":    {Kind: "time", DependsOn: "torrent_sched_enabled"},
 	"torrent_sched_end":      {Kind: "time", DependsOn: "torrent_sched_enabled"},
 	"torrent_sched_days":     {Kind: "days", Zero: "nessun giorno = mai attiva", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_week":     {Kind: "week", Zero: "ogni giorno ha fascia e limiti propri (0 = illimitato); una fascia oltre la mezzanotte appartiene al giorno in cui inizia", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_week":     {Kind: "week", Zero: "un giorno «Limite» ha i suoi valori (0 = illimitato); «Auto» lascia misurare la linea all'auto-tune; una fascia oltre la mezzanotte appartiene al giorno in cui inizia", DependsOn: "torrent_sched_enabled"},
 	"torrent_sched_dl_limit": {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
 	"torrent_sched_ul_limit": {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
 	// Ricerca peer e tracker
@@ -143,19 +143,20 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"auth_password":     {DependsOn: "auth_enabled"},
 }
 
-// uiWeekRow is one day of the per-day bandwidth schedule editor.
+// uiWeekRow is one day of the per-day bandwidth schedule editor. Mode is the
+// single choice per day: "off" (no window), "limit" (the window with the two
+// numbers) or "auto" (the window with no limit, left to the guided tuning so the
+// line is measured there). One choice, so there is no "Attivo" checkbox to
+// combine with an "Auto" one.
 type uiWeekRow struct {
 	// Key is the stored day name (mon…sun), used in the form field names.
 	Key      string
 	Label    string
-	On       bool
+	Mode     string
 	Start    string
 	End      string
 	Download int64
 	Upload   int64
-	// Auto hands the window's limit to the guided tuning (unlimited, so the line
-	// is measured there) instead of the two numbers.
-	Auto bool
 }
 
 // uiWeekRows renders a stored libtorrent_sched_week value as editor rows,
@@ -173,22 +174,40 @@ func uiWeekRowsFrom(week bwschedule.Week) []uiWeekRow {
 	rows := make([]uiWeekRow, 0, 7)
 	for index, weekday := range bwschedule.MondayFirst {
 		day := week[weekday]
-		rows = append(rows, uiWeekRow{Key: bwschedule.DayName(weekday), Label: uiWeekdays[index], On: day.On,
+		mode := "off"
+		if day.Auto() {
+			mode = "auto"
+		} else if day.On {
+			mode = "limit"
+		}
+		rows = append(rows, uiWeekRow{Key: bwschedule.DayName(weekday), Label: uiWeekdays[index], Mode: mode,
 			Start: bwschedule.FormatClock(day.Start), End: bwschedule.FormatClock(day.End),
-			Download: day.Download, Upload: day.Upload, Auto: day.Auto()})
+			Download: day.Download, Upload: day.Upload})
 	}
 	return rows
 }
 
 // uiWeekValue reads the per-day schedule editor of a settings form
-// ("day-<name>-on|start|end|dl|ul"). It returns an Italian error message (the
-// page translates it) for an active day without a valid window.
+// ("day-<name>-mode|start|end|dl|ul"; the older "on"/"auto" checkboxes are still
+// read). It returns an Italian error message (the page translates it) for an
+// active day without a valid window.
 func uiWeekValue(form url.Values) (string, string) {
 	var week bwschedule.Week
 	for _, weekday := range bwschedule.MondayFirst {
 		prefix := "day-" + bwschedule.DayName(weekday) + "-"
-		// An Auto day is active by itself: ticking Auto checks the window too.
-		on := form.Get(prefix+"on") != "" || form.Get(prefix+"auto") != ""
+		// One choice per day. Older forms used two checkboxes ("on"/"auto"); keep
+		// reading them so a page loaded before the change still saves.
+		mode := strings.ToLower(strings.TrimSpace(form.Get(prefix + "mode")))
+		switch {
+		case mode == "off" || mode == "limit" || mode == "auto":
+		case form.Get(prefix+"auto") != "":
+			mode = "auto"
+		case form.Get(prefix+"on") != "":
+			mode = "limit"
+		default:
+			mode = "off"
+		}
+		on := mode == "limit" || mode == "auto"
 		start, okStart := bwschedule.ParseClock(form.Get(prefix + "start"))
 		end, okEnd := bwschedule.ParseClock(form.Get(prefix + "end"))
 		if on && (!okStart || !okEnd || start == end) {
@@ -196,8 +215,8 @@ func uiWeekValue(form url.Values) (string, string) {
 		}
 		// "Auto" hands the window to the guided tuning (unlimited): the two
 		// numbers are kept out of the way and stored as the AutoLimit sentinel.
-		if form.Get(prefix+"auto") != "" {
-			week[weekday] = bwschedule.Day{On: on, Start: start, End: end, Download: bwschedule.AutoLimit, Upload: bwschedule.AutoLimit}
+		if mode == "auto" {
+			week[weekday] = bwschedule.Day{On: true, Start: start, End: end, Download: bwschedule.AutoLimit, Upload: bwschedule.AutoLimit}
 			continue
 		}
 		limit := func(name string) int64 {

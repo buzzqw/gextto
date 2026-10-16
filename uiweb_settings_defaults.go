@@ -104,6 +104,7 @@ var uiSettingDefaults = map[string]string{
 	"torrent_port_max":                    "6891",
 	"torrent_dl_limit":                    "0",
 	"torrent_ul_limit":                    "0",
+	"torrent_speed_auto":                  "false",
 	"torrent_sched_enabled":               "false",
 	"torrent_sched_start":                 "23:00",
 	"torrent_sched_end":                   "08:00",

@@ -400,11 +400,13 @@ Gextto**: meno funzionalità, ma tutte quelle che servono a un client autonomo.
   ms, con opzione di interrogare dal vivo Jackett/Prowlarr); in *Impostazioni*
   la manutenzione dell'archivio (elimina gli elementi vecchi, **ottimizza** per
   restituire spazio al disco).
-- **Gestione.** Limiti globali e per torrent, scheduler di banda con fascia e
-  limiti propri per ogni giorno della settimana, auto-speed sulla latenza
-  (anti-bufferbloat), ottimizzazione di coda/cache/banda con un clic, filtro IP
-  da URL o file (di default la blocklist di Gextto) con refresh programmato,
-  categorie e tag, diagnostica in tempo reale, test porte dalle impostazioni.
+- **Gestione.** Limiti globali e per torrent, scheduler di banda con fascia
+  propria per ogni giorno della settimana (una scelta per giorno: **Non attiva /
+  Limite / Auto**, dove Auto lascia il tetto all'auto-tune e misura la linea),
+  auto-speed sulla latenza (anti-bufferbloat), ottimizzazione di
+  coda/cache/banda con un clic, filtro IP da URL o file (di default la blocklist
+  di Gextto) con refresh programmato, categorie e tag, diagnostica in tempo
+  reale, test porte dalle impostazioni.
 - **Notifiche.** Gli stessi canali di Gextto: Telegram, e-mail e webhook (JSON
   generico, Discord, Slack, Gotify, ntfy, Pushover) per download completati,
   match dei feed ed errori dei feed, con pulsante di prova.

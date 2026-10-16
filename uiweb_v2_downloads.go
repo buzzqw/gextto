@@ -36,6 +36,11 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	case "temp_clear":
 		path = "/api/torrents/temp-limits"
 		body, _ = json.Marshal(TempLimitsInput{Clear: true})
+	case "temp_auto":
+		// The temporary override's Auto mode: no cap now, the line to the tuning.
+		autoSpeed := r.FormValue("value") == "true"
+		path = "/api/torrents/temp-limits"
+		body, _ = json.Marshal(TempLimitsInput{Auto: &autoSpeed})
 	default:
 		http.Error(w, "impostazione download non valida", http.StatusBadRequest)
 		return
@@ -83,6 +88,12 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	} else if op == "temp_clear" && status < 400 {
 		message = "Limite temporaneo rimosso (ripristinati limiti normali)"
+	} else if op == "temp_auto" && status < 400 {
+		if r.FormValue("value") == "true" {
+			message = "Auto speed attivo: nessun tetto, la linea la misura l'auto-tune"
+		} else {
+			message = "Auto speed disattivato (ripristinati i limiti normali)"
+		}
 	}
 	if r.Header.Get("HX-Request") == "" {
 		query := url.Values{"view": {"downloads"}, "msg": {message}}
@@ -105,7 +116,7 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		view.Rows = filteredRows
 		view.Count = len(view.Rows)
 	}
-	if op == "clear_completed" || op == "temp_apply" || op == "temp_clear" {
+	if op == "clear_completed" || op == "temp_apply" || op == "temp_clear" || op == "temp_auto" {
 		title := "Limiti di velocità"
 		if op == "clear_completed" {
 			title = "Pulisci completati"

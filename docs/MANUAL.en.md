@@ -1328,11 +1328,12 @@ How to read a row:
   **unit** (seconds, minutes, GB, KiB/s…) and, below it, the meaning of the
   **special values** (for example “0 = never”).
 - Yes/no options are **switches**; times use the time picker. The **speed
-  schedule** is the switch plus a table with one row per weekday (active,
-  start, end, download and upload limits), as in gx-torrent: every day has its
-  own window and limits. The older single-window settings no longer appear on
-  the page: until the table is saved it shows their values and they stay in
-  use.
+  schedule** is the switch plus a table with one row per weekday: for every day
+  **one choice** among *Off*, *Limit* (your values, the only ones using the
+  speed fields) and *Auto* (no cap: the bandwidth to the auto-tune, which
+  measures the line), plus start and end. The older single-window settings no
+  longer appear on the page: until the table is saved it shows their values and
+  they stay in use.
 - Options that depend on a switch (for example the speed schedule or RAM disk
   fields) **appear only while the switch is on**, even before it is saved.
 - A value different from the default shows **changed**, the *Default* value
@@ -1491,6 +1492,7 @@ Recalculate scores* after changing weights.
 |---|---|
 | Global download limit | Global download limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
 | Global upload limit | Global upload limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
+| Automatic speed (measuring the line) | No cap: the bandwidth goes to the auto-tune, which measures the line and leaves it free. It beats the global limits and the schedule; the temporary limit in Downloads stays a separate override. Turning it on turns the schedule off, and the other way round. |
 
 **Speed schedule**
 
@@ -1502,7 +1504,7 @@ Recalculate scores* after changing weights.
 | Schedule — days | Active days: 0=Mon … 6=Sun (e.g. 0,1,2,3,4). *(no day = never active)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
 | Schedule — download | Download limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
 | Schedule — upload | Upload limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
-| Schedule — per day | A different time window and limits for each day of the week; a window past midnight belongs to the day it starts on. **Attivo** turns the day's window on with its two limits; **Auto** turns it on and removes its limit (the bandwidth is left to the auto-tune, which measures the line there), so ticking Auto checks the day and disables the two speed fields. Outside those windows your global limits apply. *(every day has its own window and limits (0 = unlimited); a window past midnight belongs to the day it starts on)* Shown only while «Speed schedule enabled» is on. |
+| Schedule — per day | One choice per day: **Off** (no window), **Limit** (the window with your download and upload values) or **Auto** (the window with no limit: the bandwidth goes to the auto-tune, which measures the line there). Only «Limit» enables the two speed fields; the times stay editable. A window past midnight belongs to the day it starts on. *(a «Limit» day has its own values (0 = unlimited); «Auto» leaves the line to the auto-tune; a window past midnight belongs to the day it starts on)* Shown only while «Speed schedule enabled» is on. |
 
 **Ports and interfaces**
 

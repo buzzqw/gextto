@@ -1010,6 +1010,14 @@ func (m *Model) speedPolicyLabel() string {
 	if policy == nil {
 		return ""
 	}
+	// "Auto speed" (the temporary override in its Auto mode) beats everything.
+	if policy.Source == "temp_auto" {
+		return m.Tr.T("policy.autospeed")
+	}
+	// The base "Auto" policy: no cap, the system measures.
+	if policy.Source == "auto" {
+		return m.Tr.T("policy.auto")
+	}
 	// The schedule beats a temporary limit without expiry.
 	if minutes, active := m.TempLimitMinutes(); active && (minutes > 0 || policy.Source != "schedule") {
 		down, up := kibLabel(m.Tr, policy.TempDownloadKib), kibLabel(m.Tr, policy.TempUploadKib)

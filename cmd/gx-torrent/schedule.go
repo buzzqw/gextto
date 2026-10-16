@@ -115,7 +115,18 @@ func (d *Daemon) scheduledSpeedLimits(now time.Time) (download, upload int64, ac
 	if !ok {
 		return 0, 0, false
 	}
-	return week.At(now)
+	download, upload, active = week.At(now)
+	// An "Auto" window (the AutoLimit sentinel) has no cap: the line is left to
+	// the auto-speed so it can measure it, exactly like Gextto's Auto windows.
+	if active {
+		if download == bwschedule.AutoLimit {
+			download = 0
+		}
+		if upload == bwschedule.AutoLimit {
+			upload = 0
+		}
+	}
+	return download, upload, active
 }
 
 // parseClock reads "HH:MM" into minutes since midnight.

@@ -438,6 +438,7 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 	}
 	fieldsByTab := map[string][]uiSettingField{}
 	activeBackend := uiActiveTorrentBackend(cfg)
+	origins, originsErr := SettingOrigins(s.cfg.DataDir)
 	// The score weights lead the Qualità e upgrade tab; its other settings
 	// (upgrade thresholds) follow them. In Facilitata the weights are internals
 	// and stay in Esperto.
@@ -472,6 +473,14 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 		// editable. Turning gxtorrent_auto off makes them editable again.
 		if activeBackend == BackendGxTorrent && settingsBool(cfg, "gxtorrent_auto", true) && gxAutoManagedKey(def.Key) {
 			field.Managed = true
+		}
+		// The settings the guided tuning owns by itself (the connections per
+		// torrent) render as "Auto" too, so they do not look like a number the
+		// user has to pick. A value the user set by hand stays editable.
+		if settingsBool(cfg, "autotune_adaptive", true) && autoInternalTuningKeys[def.Key] {
+			if originsErr != nil || origins[def.Key].Origin != OriginManual {
+				field.Managed = true
+			}
 		}
 		fieldsByTab[def.Tab] = append(fieldsByTab[def.Tab], field)
 	}
@@ -597,7 +606,7 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 	// dal sistema") or the user ("impostato da te"). In Facilitata the internals
 	// are hidden and the limits are the user's, so the badge would only add noise.
 	if !brief {
-		if origins, err := SettingOrigins(s.cfg.DataDir); err == nil {
+		if originsErr == nil {
 			for index := range page.Fields {
 				provenance, ok := origins[page.Fields[index].Key]
 				if !ok {

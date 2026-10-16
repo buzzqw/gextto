@@ -171,11 +171,11 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <div class="table-scroll">
   <table class="sched-week">
     <caption class="sr-only">Window and limits for each day of the week</caption>
-    <thead><tr><th scope="col">Day</th><th scope="col" id="sched-col-on">Active</th><th scope="col" id="sched-col-start">Start</th><th scope="col" id="sched-col-end">End</th><th scope="col" id="sched-col-dl">Download (KiB/s)</th><th scope="col" id="sched-col-ul">Upload (KiB/s)</th></tr></thead>
+    <thead><tr><th scope="col">Day</th><th scope="col" id="sched-col-mode">Mode</th><th scope="col" id="sched-col-start">Start</th><th scope="col" id="sched-col-end">End</th><th scope="col" id="sched-col-dl">Download (KiB/s)</th><th scope="col" id="sched-col-ul">Upload (KiB/s)</th></tr></thead>
     <tbody>{{SCHED_WEEK_ROWS}}</tbody>
   </table>
   </div>
-  <p class="muted">Every day has its own window and limits (0 = unlimited). Inside the window of an active day its limits apply; outside, the global limits above. A window may cross midnight: it then belongs to the day it starts on (Friday 23:00–07:00 covers Saturday morning too).</p>
+  <p class="muted">Every day has its own window and limits (0 = unlimited). The mode decides: Off (no window), Limit (the values apply inside the window) or Auto (no cap, the auto-speed measures the line there). Outside the window, the global limits above apply. A window may cross midnight: it then belongs to the day it starts on (Friday 23:00–07:00 covers Saturday morning too).</p>
 </fieldset>
 <fieldset>
   <legend>Seeding limits</legend>
@@ -282,6 +282,21 @@ function ensureTooltips(root) {
     if (text) { node.setAttribute('title', text); }
   }
 }
+// The per-day bandwidth scheduler: only a "Limit" day uses its two speed
+// numbers; "Off" and "Auto" (the auto-speed measures) get them out of the way.
+function syncSchedModes() {
+  var rows = document.querySelectorAll('.sched-week tbody tr');
+  for (var i = 0; i < rows.length; i++) {
+    var sel = rows[i].querySelector('select[name$="-mode"]');
+    if (!sel) continue;
+    var limited = sel.value === 'limit';
+    var nums = rows[i].querySelectorAll('input[name$="-dl"], input[name$="-ul"]');
+    for (var j = 0; j < nums.length; j++) nums[j].disabled = !limited;
+  }
+}
+document.addEventListener('change', function (e) {
+  if (e.target && e.target.matches && e.target.matches('.sched-week select[name$="-mode"]')) syncSchedModes();
+});
 // "Load now" and the optimization buttons post the form elsewhere; they are
 // plain buttons so Enter in a field still saves the settings.
 Array.prototype.forEach.call(document.querySelectorAll('[data-formaction]'), function (btn) {
@@ -403,7 +418,8 @@ if (document.querySelector('[data-update-applying]')) {
     }).catch(function () {});
   }, 3000);
 }
-document.addEventListener('DOMContentLoaded', function () { ensureTooltips(document); });
+document.addEventListener('DOMContentLoaded', function () { ensureTooltips(document); syncSchedModes(); });
 ensureTooltips(document);
+syncSchedModes();
 </script>
 </body></html>

@@ -1746,27 +1746,42 @@
   });
   document.addEventListener("DOMContentLoaded", syncSetupToggles);
 
-  // Bandwidth schedule: an "Auto" day is active by itself and has no speed
-  // limits, so ticking Auto checks the day and disables its two speed fields
-  // while the time fields stay editable; unticking it re-enables them.
+  // Bandwidth schedule: one choice per day (Non attiva / Limite / Auto). Only
+  // "Limite" uses the two speed numbers, so every other mode disables them while
+  // the time fields stay editable.
   function syncScheduleRows(root) {
     var scope = (root && root.querySelectorAll) ? root : document;
     var rows = scope.querySelectorAll(".setting-week tbody tr");
     for (var i = 0; i < rows.length; i++) {
-      var on = rows[i].querySelector('input[name$="-on"]');
-      var auto = rows[i].querySelector('input[name$="-auto"]');
-      if (!on || !auto) continue;
-      if (auto.checked) on.checked = true;
+      var mode = rows[i].querySelector('select[name$="-mode"]');
+      if (!mode) continue;
+      var limited = mode.value === "limit";
       var speeds = rows[i].querySelectorAll('input[name$="-dl"], input[name$="-ul"]');
-      for (var j = 0; j < speeds.length; j++) speeds[j].disabled = auto.checked;
+      for (var j = 0; j < speeds.length; j++) speeds[j].disabled = !limited;
     }
   }
   document.addEventListener("change", function (event) {
-    if (event.target.matches && event.target.matches('input[name$="-on"], input[name$="-auto"]')) {
+    if (event.target.matches && event.target.matches('select[name$="-mode"]')) {
       syncScheduleRows(event.target.closest(".setting-week"));
     }
   });
   document.addEventListener("htmx:afterSwap", function (event) { syncScheduleRows(event.target); });
 
-  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); openAddFormFromAnchor(); initPullToRefresh(); initLiveMetrics(); syncScheduleRows(document); });
+  // "Auto speed" (temporary limits toolbar): while it is on, the temporary DL/UL
+  // and minutes fields are disabled, because the line is left to the auto-tune.
+  function syncTempAuto() {
+    var auto = document.getElementById("v2-temp-auto");
+    if (!auto) return;
+    var ids = ["v2-temp-dl", "v2-temp-ul", "v2-temp-minutes"];
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (el) el.disabled = auto.checked;
+    }
+  }
+  document.addEventListener("change", function (event) {
+    if (event.target.id && event.target.id === "v2-temp-auto") syncTempAuto();
+  });
+  document.addEventListener("htmx:afterSwap", syncTempAuto);
+
+  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); openAddFormFromAnchor(); initPullToRefresh(); initLiveMetrics(); syncScheduleRows(document); syncTempAuto(); });
 })();

@@ -326,19 +326,24 @@ func TestAdaptiveTuningOnlyRetunesAutoValues(t *testing.T) {
 	}
 	cfg := latestConfig(state)
 	proposals := ProposeTuning(ProbeSystem(cfg), cfg, nil)
+	// A key the system owns from the start is the "internal" kind; the others
+	// wait for an explicit apply. Pick one of the others for the second half.
 	autoKey := ""
 	for _, proposal := range proposals {
-		if proposal.Key != "min_free_space_gb" {
+		if proposal.Key != "min_free_space_gb" && !autoInternalTuningKeys[proposal.Key] {
 			autoKey = proposal.Key
 			break
 		}
 	}
+	// Before anything is tuned, the loop may only touch the internal keys it
+	// owns by itself; a user-facing value waits for an explicit apply.
+	for _, change := range adaptiveTuningChanges(state.cfg.DataDir, cfg) {
+		if !autoInternalTuningKeys[change.Key] {
+			t.Fatalf("the loop changed the untuned, non-internal key %q", change.Key)
+		}
+	}
 	if autoKey == "" {
 		t.Skip("this machine produces no suitable proposal")
-	}
-	// Nothing is the system's yet: the loop has nothing to do.
-	if changes := adaptiveTuningChanges(state.cfg.DataDir, cfg); len(changes) != 0 {
-		t.Fatalf("adaptive changed %d values before anything was tuned", len(changes))
 	}
 	if err := MarkSettingOrigin(state.cfg.DataDir, autoKey, OriginAuto, "test"); err != nil {
 		t.Fatal(err)
@@ -352,10 +357,13 @@ func TestAdaptiveTuningOnlyRetunesAutoValues(t *testing.T) {
 		if change.Key == "min_free_space_gb" {
 			t.Fatal("the adaptive loop touched a value set by hand")
 		}
-		if change.Key != autoKey {
+		if change.Key == autoKey {
+			seenAuto = true
+			continue
+		}
+		if !autoInternalTuningKeys[change.Key] {
 			t.Fatalf("the adaptive loop proposed an untuned key %q", change.Key)
 		}
-		seenAuto = true
 	}
 	if !seenAuto {
 		t.Fatalf("the adaptive loop should re-tune %q", autoKey)

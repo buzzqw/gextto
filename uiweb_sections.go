@@ -211,6 +211,11 @@ type uiDownloadsPage struct {
 	TempUL      int64
 	TempActive  bool
 	TempMinutes int64
+	// TempAuto is the temporary override's Auto mode ("auto speed"): the line is
+	// left to the tuning with no cap, like an "Auto" schedule window right now.
+	TempAuto bool
+	// SpeedAuto is the base "Auto" policy (torrent_speed_auto): no cap at all.
+	SpeedAuto bool
 	// Active scheduled speed limits and base limits
 	SchedActive bool
 	// TempShadowed: a temporary limit without expiry overridden by the schedule.
@@ -579,6 +584,8 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 		Torrents:            uiTorrentsDataFrom(s),
 		TempDL:              uiSettingInt(cfg, "torrent_temp_dl_limit"),
 		TempUL:              uiSettingInt(cfg, "torrent_temp_ul_limit"),
+		TempAuto:            settingsBool(cfg, "torrent_temp_auto", false),
+		SpeedAuto:           settingsBool(cfg, "torrent_speed_auto", false),
 		AutoRemoveCompleted: settingsBool(cfg, "auto_remove_completed", false),
 		TagOptions:          uiDownloadTagOptions(s, cfg),
 	}

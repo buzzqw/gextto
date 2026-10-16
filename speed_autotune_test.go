@@ -8,15 +8,15 @@ import (
 	"github.com/buzzqw/gextto/internal/bwschedule"
 )
 
-// The per-day editor's "Auto" checkbox stores the AutoLimit sentinel instead of
-// a number.
+// The per-day editor's "Auto" mode stores the AutoLimit sentinel instead of a
+// number; a "Limite" day keeps its two values, and the older two-checkbox form
+// ("on"/"auto") is still read.
 func TestWeekValueAutoHandsTheWindowToTheTuning(t *testing.T) {
 	form := url.Values{
-		"day-mon-on":    {"1"},
+		"day-mon-mode":  {"auto"},
 		"day-mon-start": {"00:00"},
 		"day-mon-end":   {"23:59"},
-		"day-mon-auto":  {"1"},
-		"day-tue-on":    {"1"},
+		"day-tue-mode":  {"limit"},
 		"day-tue-start": {"23:00"},
 		"day-tue-end":   {"08:00"},
 		"day-tue-dl":    {"3000"},
@@ -35,6 +35,25 @@ func TestWeekValueAutoHandsTheWindowToTheTuning(t *testing.T) {
 	}
 	if week[time.Tuesday].Auto() || week[time.Tuesday].Download != 3000 {
 		t.Fatalf("tuesday must stay fixed: %+v", week[time.Tuesday])
+	}
+}
+
+// The older two-checkbox form ("on"/"auto") is still read while a page loaded
+// before the change saves.
+func TestWeekValueReadsTheOlderTwoCheckboxForm(t *testing.T) {
+	form := url.Values{
+		"day-wed-on":    {"1"},
+		"day-wed-start": {"22:00"},
+		"day-wed-end":   {"06:00"},
+		"day-wed-auto":  {"1"},
+	}
+	raw, problem := uiWeekValue(form)
+	if problem != "" {
+		t.Fatalf("uiWeekValue: %s", problem)
+	}
+	week, ok := bwschedule.Parse(raw)
+	if !ok || !week[time.Wednesday].Auto() {
+		t.Fatalf("wednesday must be auto from the legacy form: %q", raw)
 	}
 }
 
