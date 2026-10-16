@@ -68,11 +68,11 @@ func TestDashboardProblemsHidesCompletedCycles(t *testing.T) {
 	}
 }
 
-// TestDashboardProblemsHidesWarningAfterAnOlderImport: un download importato
-// più di 24 ore fa e ripulito oggi con un avviso (la finalizzazione dopo
+// TestDashboardProblemsHidesWarningAfterAnOlderImport: un download importato in
+// un ciclo precedente e ripulito oggi con un avviso (la finalizzazione dopo
 // l'import) è già in libreria e non va proposto. Un secondo download, il cui
-// vecchio import è fuori finestra ma che ha ricominciato dopo (📥), mostra
-// invece il suo problema reale.
+// vecchio import è prima dell'ultimo avvio (📥), mostra invece il suo problema
+// reale: conta solo il ciclo corrente.
 func TestDashboardProblemsHidesWarningAfterAnOlderImport(t *testing.T) {
 	state := newTestAppState(t)
 	state.setActiveEngine(fakeProblemsEngine{})
@@ -140,9 +140,12 @@ func TestDashboardProblemsPanel(t *testing.T) {
 	}
 	for _, event := range []logging.Event{
 		{At: time.Now(), Level: logging.LevelWarn, Hash: stuck, Message: "⏸️ Morgane is stuck"},
-		{At: time.Now(), Level: logging.LevelWarn, Hash: gone, Message: "❌ Gave up on FBI"},
+		// A stale error from a previous cycle, before the re-download: it must
+		// not resurface as the "latest" problem of the current one.
 		{At: time.Now().Add(-48 * time.Hour), Level: logging.LevelError, Hash: gone, Message: "old error"},
-		{At: time.Now(), Level: logging.LevelInfo, Hash: gone, Message: "📥 Downloading FBI"},
+		{At: time.Now().Add(-47 * time.Hour), Level: logging.LevelInfo, Hash: gone, Message: "📥 Downloading FBI"},
+		// Current cycle: this is the warning to check.
+		{At: time.Now(), Level: logging.LevelWarn, Hash: gone, Message: "❌ Gave up on FBI"},
 	} {
 		if err := state.db.RecordAcquisitionEvent(event); err != nil {
 			t.Fatal(err)
@@ -174,5 +177,44 @@ func TestDashboardProblemsPanel(t *testing.T) {
 	code, body = v2Request(t, server, http.MethodGet, "/?view=dashboard", nil)
 	if code != http.StatusOK || !strings.Contains(body, `hx-get="/dashboard/problems"`) || !strings.Contains(body, `id="v2-modal"`) {
 		t.Fatalf("dashboard lacks the problems panel -> %d", code)
+	}
+}
+
+// TestDashboardProblemsAckHidesShownWarnings: "Pulisci" marks the shown warnings
+// as read so they stay hidden, while a new warning for the same download (a
+// higher event id) shows again.
+func TestDashboardProblemsAckHidesShownWarnings(t *testing.T) {
+	state := newTestAppState(t)
+	state.setActiveEngine(fakeProblemsEngine{})
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	hash := "dddd000000000000000000000000000000000001"
+	if err := state.db.RecordAcquisitionEvent(logging.Event{At: time.Now(), Level: logging.LevelWarn, Hash: hash, Message: "❌ Gave up on Show"}); err != nil {
+		t.Fatal(err)
+	}
+	code, body := v2Request(t, server, http.MethodGet, "/dashboard/problems", nil)
+	if code != http.StatusOK || !strings.Contains(body, "hash="+hash) {
+		t.Fatalf("warning should show first -> %d: %s", code, body)
+	}
+	if !strings.Contains(body, `hx-post="/dashboard/problems/ack"`) {
+		t.Fatalf("panel must offer the Pulisci button: %s", body)
+	}
+
+	code, body = v2Request(t, server, http.MethodPost, "/dashboard/problems/ack", nil)
+	if code != http.StatusOK || strings.Contains(body, "hash="+hash) {
+		t.Fatalf("after Pulisci the warning must be hidden -> %d: %s", code, body)
+	}
+	if !strings.Contains(body, "Niente da controllare") {
+		t.Fatalf("panel should be empty after Pulisci: %s", body)
+	}
+
+	// A new warning for the same download is a higher event id: it shows again.
+	if err := state.db.RecordAcquisitionEvent(logging.Event{At: time.Now(), Level: logging.LevelError, Hash: hash, Message: "❌ Gave up on Show again"}); err != nil {
+		t.Fatal(err)
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/dashboard/problems", nil)
+	if code != http.StatusOK || !strings.Contains(body, "hash="+hash) {
+		t.Fatalf("a new warning must show after Pulisci -> %d: %s", code, body)
 	}
 }

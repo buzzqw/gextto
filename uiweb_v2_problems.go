@@ -14,7 +14,9 @@ import (
 // the stall monitor, the pending storage moves and the acquisition history, so
 // the operator does not have to read the log to find it.
 
-const v2ProblemsWindow = 24 * time.Hour
+// v2ProblemsLimit caps how many unresolved warnings the panel lists (one row
+// per download, newest first).
+const v2ProblemsLimit = 50
 
 type v2StalledRow struct {
 	Hash      string
@@ -117,7 +119,11 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 	}
 	sort.Slice(view.Moves, func(i, j int) bool { return view.Moves[i].Name < view.Moves[j].Name })
 
-	recent, err := s.db.AcquisitionProblemsSince(now.Add(-v2ProblemsWindow), 20)
+	ackID := int64(0)
+	if s.db != nil {
+		ackID = s.db.ProblemsAckID()
+	}
+	recent, err := s.db.AcquisitionProblems(ackID, v2ProblemsLimit)
 	if err != nil && view.Error == "" {
 		view.Error = "Storia dei download non disponibile: " + err.Error()
 	}
@@ -136,4 +142,19 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 func V2DashboardProblems(w http.ResponseWriter, r *http.Request, s *AppState) {
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_dashboard_problems", v2ProblemsViewFrom(s), dict, eng)
+}
+
+// V2DashboardProblemsAck marks the shown warnings as read (the "Pulisci"
+// button): the panel stops listing them, and a download that produces a new
+// warning shows again because its event id is above the watermark. It answers
+// with the refreshed panel.
+func V2DashboardProblemsAck(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if s != nil && s.db != nil {
+		if id, err := s.db.AckProblems(); err != nil {
+			logging.Warn("dashboard problems acknowledge failed", "error", err)
+		} else {
+			logging.Debug("dashboard problems acknowledged", "up_to_id", id)
+		}
+	}
+	V2DashboardProblems(w, r, s)
 }

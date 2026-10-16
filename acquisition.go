@@ -40,6 +40,16 @@ const databaseAcquisitionSchema = `CREATE TABLE IF NOT EXISTS acquisition_events
             CREATE INDEX IF NOT EXISTS idx_acquisition_events_series ON acquisition_events(series_name, season, episode);
             CREATE INDEX IF NOT EXISTS idx_acquisition_events_at ON acquisition_events(at);`
 
+// databaseUIStateSchema is a tiny key/value table for UI bookkeeping that is not
+// a user setting: today the "Da controllare" watermark (the highest warning the
+// operator has marked as read). Kept in the main database so it travels with
+// the data, not with one browser.
+const databaseUIStateSchema = `CREATE TABLE IF NOT EXISTS ui_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );`
+
 const (
 	// acquisitionRetention is how long events are kept.
 	acquisitionRetention = 180 * 24 * time.Hour
@@ -201,35 +211,92 @@ func (d *Database) AcquisitionEventsByAcqID(acq string) ([]AcquisitionEvent, err
 	return d.AcquisitionEvents(match)
 }
 
-// AcquisitionProblemsSince returns, for every download with a warning, an
-// error or a salvage (🛟) since the given time, its most recent such event,
-// newest first, at most limit rows. Repeat holds how many there were. A
-// download whose file was added to the library, or which superseded an existing
-// copy (♻️), is left out: its cycle completed correctly, so a later warning
-// (a finalization or cleanup that failed after the import) is noise, not
-// something to check.
+// AcquisitionProblems returns, for every download with an unresolved warning, an
+// error or a salvage (🛟), its most recent such event, newest first, at most
+// limit rows. Repeat holds how many there were. It does not look at a time
+// window: a warning stays until the download is resolved, so "ultime 24 ore"
+// is no longer the rule. A download whose file was added to the library, or
+// which superseded an existing copy (♻️), is left out: its cycle completed
+// correctly, so a later warning (a finalization or cleanup that failed after
+// the import) is noise, not something to check.
 //
-// The "good" event is searched over the whole story of the acquisition, not
-// only inside the window: a download imported two days ago and cleaned up
-// (with a warning) today must stay out. The anchor is the last download start
-// (📥): a good event older than it belongs to a previous cycle, so a new
-// problem must still show.
-func (d *Database) AcquisitionProblemsSince(since time.Time, limit int) ([]AcquisitionEvent, error) {
+// ackID is the watermark of the events the operator already marked as read
+// (ProblemsAckID): events up to it are hidden. A download that produces a new
+// warning gets a higher id and shows again, so "Pulisci" never hides a future
+// problem. Both the problem and the "good" event are anchored to the last
+// download start (📥): only the current cycle counts, so a stale warning from a
+// previous cycle, before a re-download, does not show and does not resurface.
+func (d *Database) AcquisitionProblems(ackID int64, limit int) ([]AcquisitionEvent, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	return d.scanAcquisitionEvents(`SELECT e.id, e.hash, e.first_at, e.at, p.total, e.level, e.message, e.fields, e.kind, e.title, e.series_name, e.season, e.episode
 		FROM acquisition_events e JOIN (
-			SELECT hash, MAX(id) AS last_id, SUM(repeat) AS total FROM acquisition_events
-			WHERE at >= ?1 AND (level IN ('WARN','ERROR') OR message LIKE '🛟%')
+			SELECT hash, MAX(id) AS last_id, SUM(repeat) AS total FROM acquisition_events e2
+			WHERE (level IN ('WARN','ERROR') OR message LIKE '🛟%')
+			  AND e2.id > COALESCE((SELECT MAX(d.id) FROM acquisition_events d
+			                        WHERE d.hash = e2.hash AND d.message LIKE '📥%'), 0)
 			GROUP BY hash) p ON e.id = p.last_id
-		WHERE NOT EXISTS (
+		WHERE e.id > ?1 AND NOT EXISTS (
 			SELECT 1 FROM acquisition_events s
 			WHERE s.hash = e.hash
 			  AND ((s.message LIKE '%added to the library%' AND s.message NOT LIKE '🛟%') OR s.message LIKE '♻️%')
 			  AND s.id > COALESCE((SELECT MAX(d.id) FROM acquisition_events d
 			                       WHERE d.hash = e.hash AND d.message LIKE '📥%'), 0))
-		ORDER BY e.id DESC LIMIT ?2`, since.Format(acquisitionTimeLayout), limit)
+		ORDER BY e.id DESC LIMIT ?2`, ackID, limit)
+}
+
+// problemsAckKey is the ui_state key for the "Da controllare" watermark.
+const problemsAckKey = "problems_ack_id"
+
+// ProblemsAckID returns the highest acquisition-event id the operator has marked
+// as read in the Dashboard "Da controllare" panel (0 when never).
+func (d *Database) ProblemsAckID() int64 {
+	value, ok := d.uiStateValue(problemsAckKey)
+	if !ok {
+		return 0
+	}
+	id, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil || id < 0 {
+		return 0
+	}
+	return id
+}
+
+// AckProblems marks every acquisition event seen so far as read and returns the
+// id it stored. Events written afterwards have a higher id and show again.
+func (d *Database) AckProblems() (int64, error) {
+	var maxID int64
+	if err := d.db.QueryRow(`SELECT COALESCE(MAX(id), 0) FROM acquisition_events`).Scan(&maxID); err != nil {
+		return 0, err
+	}
+	if err := d.setUIStateValue(problemsAckKey, strconv.FormatInt(maxID, 10)); err != nil {
+		return maxID, err
+	}
+	return maxID, nil
+}
+
+// uiStateValue reads one ui_state entry.
+func (d *Database) uiStateValue(key string) (string, bool) {
+	if d == nil || d.db == nil {
+		return "", false
+	}
+	var value string
+	if err := d.db.QueryRow(`SELECT value FROM ui_state WHERE key = ?1`, key).Scan(&value); err != nil {
+		return "", false
+	}
+	return value, true
+}
+
+// setUIStateValue writes one ui_state entry.
+func (d *Database) setUIStateValue(key, value string) error {
+	if d == nil || d.db == nil {
+		return nil
+	}
+	_, err := d.db.Exec(`INSERT INTO ui_state(key, value, updated_at) VALUES (?1, ?2, ?3)
+		ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
+		key, value, time.Now().UTC().Format(time.RFC3339))
+	return err
 }
 
 // DailyCount is one day of a daily metric.

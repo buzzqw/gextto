@@ -898,6 +898,11 @@ func (d *Database) migrate() error {
 	if _, err := d.db.Exec(databaseAcquisitionSchema); err != nil {
 		return err
 	}
+	// ui_state (acquisition.go): UI bookkeeping such as the "Da controllare"
+	// watermark.
+	if _, err := d.db.Exec(databaseUIStateSchema); err != nil {
+		return err
+	}
 	// Identità della release bloccata (come il legacy `download_blocklist`):
 	// hash + serie/stagione/episodio o film/anno, per audit e UI.
 	for _, column := range []struct{ table, name, definition string }{

@@ -118,10 +118,11 @@ Node.js/npm, sei lingue nell'interfaccia.
   per Jellyfin e Plex; feed iCal di arrivi e uscite.
 - **Tracciabilità.** Ogni download ha un **ID di acquisizione** univoco
   seguito in tutti i log (ricerca, selezione, trasferimento, post-processing,
-  archivio). Il pannello **Da controllare** raccoglie i casi anomali; gli
-  avvisi a soglia segnalano le sorgenti che falliscono o rallentano. Un
-  **grafico della banda degli ultimi 30 minuti** nella Dashboard mostra
-  download/upload, il picco e il limite in vigore.
+  archivio). Il pannello **Da controllare** raccoglie i casi anomali e tiene
+  ogni avviso **finché il download non si risolve** (**Pulisci** li segna come
+  letti); gli avvisi a soglia segnalano le sorgenti che falliscono o
+  rallentano. Un **grafico della banda degli ultimi 30 minuti** nella Dashboard
+  mostra download/upload, il picco e il limite in vigore.
 - **Interfacce.** UI web responsive installabile come PWA, con le liste di
   **Serie TV e Film** leggibili anche come **locandine** (una copertina per
   titolo, il resto a un clic, la scelta ricordata — come in Sonarr e Radarr),

@@ -5197,3 +5197,10 @@ fra:
   "Nessun limite": "Aucune limite"
   "Raccolta dati in corso…": "Collecte des données…"
   "Grafico della banda di rete, ultimi 30 minuti": "Graphique de bande passante réseau, 30 dernières minutes"
+
+  # Dashboard — "Da controllare" warnings (no 24h expiry)
+  "Avvisi": "Avertissements"
+  "Avvisi dei download non risolti": "Avertissements des téléchargements non résolus"
+  "Avvisi di questo download": "Avertissements de ce téléchargement"
+  "Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi": "Marquer les avertissements affichés comme lus ; ils reviennent seulement si le téléchargement en produit de nouveaux"
+  "Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.": "Rien à vérifier : aucun téléchargement bloqué, aucun déplacement en attente et aucun avertissement."

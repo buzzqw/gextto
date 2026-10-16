@@ -4541,3 +4541,10 @@ eng:
   "Nessun limite": "No limit"
   "Raccolta dati in corso…": "Collecting data…"
   "Grafico della banda di rete, ultimi 30 minuti": "Network bandwidth chart, last 30 minutes"
+
+  # Dashboard — "Da controllare" warnings (no 24h expiry)
+  "Avvisi": "Warnings"
+  "Avvisi dei download non risolti": "Warnings of unresolved downloads"
+  "Avvisi di questo download": "Warnings of this download"
+  "Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi": "Mark the shown warnings as read; they come back only if the download produces new ones"
+  "Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.": "Nothing to check: no stuck download, no pending move and no warning."

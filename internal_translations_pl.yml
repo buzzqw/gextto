@@ -5145,3 +5145,10 @@ pol:
   "Nessun limite": "Bez limitu"
   "Raccolta dati in corso…": "Zbieranie danych…"
   "Grafico della banda di rete, ultimi 30 minuti": "Wykres przepustowości sieci, ostatnie 30 minut"
+
+  # Dashboard — "Da controllare" warnings (no 24h expiry)
+  "Avvisi": "Ostrzeżenia"
+  "Avvisi dei download non risolti": "Ostrzeżenia nierozwiązanych pobrań"
+  "Avvisi di questo download": "Ostrzeżenia tego pobrania"
+  "Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi": "Oznacz wyświetlone ostrzeżenia jako przeczytane; wrócą tylko, gdy pobieranie wygeneruje nowe"
+  "Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.": "Nic do sprawdzenia: brak zablokowanych pobrań, brak oczekujących przeniesień i brak ostrzeżeń."

@@ -5204,3 +5204,10 @@ deu:
   "Nessun limite": "Kein Limit"
   "Raccolta dati in corso…": "Daten werden gesammelt…"
   "Grafico della banda di rete, ultimi 30 minuti": "Netzwerk-Bandbreitendiagramm, letzte 30 Minuten"
+
+  # Dashboard — "Da controllare" warnings (no 24h expiry)
+  "Avvisi": "Warnungen"
+  "Avvisi dei download non risolti": "Warnungen nicht abgeschlossener Downloads"
+  "Avvisi di questo download": "Warnungen dieses Downloads"
+  "Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi": "Die angezeigten Warnungen als gelesen markieren; sie erscheinen nur wieder, wenn der Download neue erzeugt"
+  "Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.": "Nichts zu prüfen: kein hängender Download, kein ausstehender Verschiebevorgang und keine Warnung."

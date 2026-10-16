@@ -603,6 +603,8 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .dashboard-problems-table td.nowrap { white-space: nowrap; }
 .dashboard-problems-panel h4 { margin: 12px 0 6px; }
 .dashboard-problems-panel h4:first-child { margin-top: 0; }
+.dashboard-problems-panel .problems-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dashboard-problems-panel .problems-section-head h4 { margin: 12px 0 6px; }
 .torrent-table td:nth-child(3) .badge { font-size: 0.68rem; white-space: nowrap; }
 
 .progress {

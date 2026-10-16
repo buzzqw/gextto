@@ -132,6 +132,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /dashboard/search", V2DashboardSearch)
 	v2Handle(s, mux, "GET /dashboard/feed", V2DashboardFeed)
 	v2Handle(s, mux, "GET /dashboard/problems", V2DashboardProblems)
+	v2Handle(s, mux, "POST /dashboard/problems/ack", V2DashboardProblemsAck)
 	v2Handle(s, mux, "POST /dashboard/feed/add", V2DashboardFeedAdd)
 
 	// Scarico.
