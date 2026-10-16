@@ -131,6 +131,25 @@ for both** — the adjustment costs nothing measurable and adds no allocation (t
 224 B/1 alloc come from the pre-existing `ReleaseScore`). It runs once per candidate in
 the cycle, never on a transfer path, so it cannot affect seeding or download throughput.
 
+**Auto-tune connection cap on a public swarm** (2026-10-16, Intel N97, `GX_MEASURE_AUTOTUNE=<Debian
+netinst .torrent> GX_MEASURE_AUTOTUNE_SECONDS=40 go test ./cmd/gx-torrent/ -run
+TestMeasureAutotune -v`). The guided tuning picks `torrent_max_connections_per_torrent`
+between 50 and 400; this battery downloads the same public torrent with the cap at the
+floor, at the ceiling and unlimited (one 40 s run each, DHT/uTP/PEX on, while the live
+Gextto service was also running). Indicative numbers on a noisy public swarm:
+
+| Cap | average | peak | peak peers | RSS delta | CPU |
+|---|---|---|---|---|---|
+| 50 (floor) | 8.4 MiB/s | 8.4 MiB/s | 25 | +43 MB | 8.4 s |
+| 400 (ceiling) | 2.3 MiB/s | 4.0 MiB/s | 78 | +93 MB | 11.2 s |
+| unlimited | 5.7 MiB/s | 6.4 MiB/s | 78 | +97 MB | 10.5 s |
+
+All three moved about the same total (~330 MB in 40 s): **the cap is not the bottleneck,
+the swarm is**, so the auto-tune bound does not cripple the transfer. The lower cap used
+**less than half the memory** (fewer connections) with comparable throughput. The point is
+the method: repeat the battery (`scripts`-style, the run is opt-in and outside CI) before
+reading any single number as a trend; a public swarm varies run to run.
+
 **RSS term matching** (2026-10-15, Intel N97, `go test -bench BenchmarkCriteriaMatch
 -benchmem -count 5 ./internal/rss/`: one rule with two *one of* and two *none of* terms
 over four typical release names). The terms are found with `rss.HasTerm` — separators of
