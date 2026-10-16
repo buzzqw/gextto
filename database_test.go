@@ -1575,6 +1575,39 @@ func TestRescoreScoresAnArchivedEpisodeFromItsFile(t *testing.T) {
 	}
 }
 
+// TestRescoreUsesMediaInfoWhenTheNameSaysNothing: an archived episode whose
+// name carries no quality tokens still gets a score from its media info,
+// instead of keeping a legacy value from another score scale.
+func TestRescoreUsesMediaInfoWhenTheNameSaysNothing(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "Show - S01E01 - Episodio 1.avi")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO series(id,name) VALUES (1,'Show')"); err != nil {
+		t.Fatal(err)
+	}
+	media := `{"video_codec":"hevc","audio_codec":"eac3","width":1920,"height":1080}`
+	if _, err := db.db.Exec("INSERT INTO episodes(id,series_id,season,episode,title,quality_score,archive_path,media_info_json,downloaded_at) VALUES (1,1,1,1,'Show - S01E01 - Episodio 1',20000,?1,?2,datetime('now'))", file, media); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := DefaultConfig()
+	cfg.DataDir = t.TempDir()
+	if _, err := db.SyncScoresWithSettings(&cfg); err != nil {
+		t.Fatal(err)
+	}
+	var got int64
+	if err := db.db.QueryRow("SELECT quality_score FROM episodes WHERE id=1").Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	// 1080p (1000) + H.265 (200) + EAC3/DDP (80) = 1280.
+	if got != 1280 {
+		t.Fatalf("score = %d, want 1280 from the media info", got)
+	}
+}
+
 func TestHistorySearchFiltersAcrossNameTagAndPath(t *testing.T) {
 	db := newTestDB(t)
 	insert := func(hash, name, tag, path string) {

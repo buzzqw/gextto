@@ -471,15 +471,24 @@ func enrichQualityWithMediaInfo(raw string, quality *models.Quality) {
 
 func meaningfulQuality(text string) (models.Quality, bool) {
 	quality := ParseQuality(text)
-	if quality.Resolution != "unknown" ||
-		quality.Source != "unknown" ||
-		quality.Codec != "unknown" ||
-		quality.Audio != "unknown" ||
-		quality.HDR != "" ||
-		quality.Score() > 0 {
-		return quality, true
+	return quality, qualityIsKnown(quality)
+}
+
+// qualityIsKnown reports whether a parsed quality carries any usable component:
+// a name that says nothing (an Italian title, a bare "S01E01.avi") is not
+// enough to score a file.
+func qualityIsKnown(quality models.Quality) bool {
+	// A zero Quality has empty fields, a parsed one uses "unknown": both mean
+	// "the name said nothing".
+	known := func(value string) bool {
+		return strings.TrimSpace(value) != "" && !strings.EqualFold(value, "unknown")
 	}
-	return quality, false
+	return known(quality.Resolution) ||
+		known(quality.Source) ||
+		known(quality.Codec) ||
+		known(quality.Audio) ||
+		quality.HDR != "" ||
+		quality.Score() > 0
 }
 
 func containsInt64Value(values []int64, needle int64) bool {
@@ -5071,17 +5080,20 @@ func (d *Database) Rescore(cfg *Config) (int, error) {
 	for _, row := range episodeScoreRows {
 		// Prefer the archived file's own name; the stored title is the fallback
 		// for old imports whose path is a folder or carries no quality tokens.
-		quality, ok := models.Quality{}, false
+		quality := models.Quality{}
 		if row.Path != "" {
-			quality, ok = meaningfulQuality(filepath.Base(row.Path))
+			quality = ParseQuality(filepath.Base(row.Path))
 		}
-		if !ok {
-			quality, ok = meaningfulQuality(row.Title)
+		if !qualityIsKnown(quality) {
+			quality = MergeQuality(quality, ParseQuality(row.Title))
 		}
-		if !ok {
+		// What neither name says, the media info can: a file called just
+		// "Show - S01E01 - Episodio 1.avi" still has a real resolution, codec
+		// and audio, so it gets a score instead of keeping a legacy value.
+		enrichQualityWithMediaInfo(row.MediaInfo, &quality)
+		if !qualityIsKnown(quality) {
 			continue
 		}
-		enrichQualityWithMediaInfo(row.MediaInfo, &quality)
 		release := archivedRelease(row.Title, row.Path, quality, "series", nil)
 		if result, err := d.db.Exec("UPDATE episodes SET quality_score=?1 WHERE id=?2", cfg.ReleaseScore(&release), row.ID); err != nil {
 			return changed, err
