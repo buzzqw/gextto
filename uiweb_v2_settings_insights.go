@@ -18,8 +18,7 @@ import (
 // policy. Both get the same one-line timeline, so the whole sequence stays
 // visible wherever the user lands (the rows themselves are not moved).
 var stallSummaryGroupTitles = map[string]bool{
-	"Torrent bloccati":  true,
-	"Download bloccati": true,
+	"Torrent bloccati": true,
 }
 
 // stallPolicySummary renders the six stuck-download windows in the order they

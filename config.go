@@ -2313,11 +2313,13 @@ func (c *Config) loadConfigDB() error {
 		c.EmailPassword = nil
 	}
 	c.CleanupUpgrades = configBoolSetting(mapValue(c.Settings, "cleanup_upgrades"))
-	c.CleanupMinScoreDiff = numberSettingInt(c.Settings, "cleanup_min_score_diff", 0)
 	c.UpgradeMinScoreDiff = numberSettingInt(c.Settings, "upgrade_min_score_diff", 200)
 	if c.UpgradeMinScoreDiff < 0 {
 		c.UpgradeMinScoreDiff = 0
 	}
+	// One threshold for both: the acquisition upgrade and the library cleanup.
+	// The old `cleanup_min_score_diff` is no longer read (and no longer shown).
+	c.CleanupMinScoreDiff = c.UpgradeMinScoreDiff
 	c.UpgradeUntilScore = numberSettingInt(c.Settings, "upgrade_until_score", 0)
 	if c.UpgradeUntilScore < 0 {
 		c.UpgradeUntilScore = 0

@@ -29,7 +29,6 @@ func TestConfigViewExposesAcquisitionAndMaintenanceSettings(t *testing.T) {
 		"media_info_backfill_interval_minutes": "30",
 		"media_info_backfill_batch":            "7",
 		"upgrade_min_score_diff":               "321",
-		"cleanup_min_score_diff":               "11",
 	}
 	for key, value := range saved {
 		payload, _ := json.Marshal(map[string]string{"key": key, "value": value})

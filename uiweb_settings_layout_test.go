@@ -26,7 +26,7 @@ var uiSettingsKeysBeforeReorganization = []string{
 	"qbittorrent_category", "qbittorrent_tag", "qbittorrent_request_timeout_secs", "qbittorrent_poll_interval_ms",
 	"qbittorrent_path_mappings", "qbittorrent_managed", "gxtorrent_url", "gxtorrent_listen", "gxtorrent_request_timeout_secs",
 	"gxtorrent_poll_interval_ms", "gxtorrent_proxy", "gxtorrent_auto", "rename_episodes", "tvdb_language", "tmdb_language",
-	"default_language", "cleanup_upgrades", "movies_flat_files", "cleanup_min_score_diff", "upgrade_min_score_diff", "upgrade_until_score",
+	"default_language", "cleanup_upgrades", "movies_flat_files", "upgrade_min_score_diff", "upgrade_until_score",
 	"tmdb_api_key", "tvdb_api_key", "min_free_space_gb", "trash_retention_days", "archive_cleanup_enabled", "archive_max_age_days",
 	"archive_keep_min", "stop_on_old_page_threshold", "rename_verify_interval", "auth_enabled", "auth_local_bypass", "auth_username",
 	"auth_password", "auth_api_key", "gxtorrent_token", "move_episodes", "hardlink_seeding", "debug_enabled", "delay_torrent_minutes",
@@ -43,11 +43,11 @@ var uiSettingsKeysBeforeReorganization = []string{
 // checks that each one is rendered, editable, in the section the index
 // assigns it to.
 func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
-	if got := len(uiSettingsKeysBeforeReorganization); got != 134 {
-		t.Fatalf("frozen list has %d keys, want 134", got)
+	if got := len(uiSettingsKeysBeforeReorganization); got != 133 {
+		t.Fatalf("frozen list has %d keys, want 133", got)
 	}
-	if got := len(uiSettingsIndex); got != 147 {
-		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default, the 4 DLNA media server options, the update check interval, the per-day speed schedule and the adaptive tuning switch", got)
+	if got := len(uiSettingsIndex); got != 146 {
+		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default, the 4 DLNA media server options, the update check interval, the per-day speed schedule and the adaptive tuning switch, minus cleanup_min_score_diff (folded into upgrade_min_score_diff)", got)
 	}
 	if got := len(uiScoreSettingDefs); got != 27 {
 		t.Fatalf("score weights = %d, want 27", got)
@@ -86,8 +86,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		}
 		found++
 	}
-	if found != 174 {
-		t.Fatalf("rendered %d options, want 174", found)
+	if found != 173 {
+		t.Fatalf("rendered %d options, want 173", found)
 	}
 
 	// Editors, panels and actions without a single key.

@@ -140,7 +140,6 @@ var uiSettingDefaults = map[string]string{
 	"default_language":       "ita",
 	"cleanup_upgrades":       "true",
 	"movies_flat_files":      "yes",
-	"cleanup_min_score_diff": "0",
 	"upgrade_min_score_diff": "200",
 	"upgrade_until_score":    "0",
 	// A stuck download keeps retrying, but after this long without progress the

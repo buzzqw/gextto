@@ -131,9 +131,6 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "upgrade_min_score_diff", Label: "Differenza minima score per upgrade", Tab: "scores", Group: "Upgrade e sostituzione"},
 	{Key: "upgrade_until_score", Label: "Smetti di migliorare oltre questo punteggio", Tab: "scores", Group: "Upgrade e sostituzione"},
 	{Key: "cleanup_upgrades", Label: "Sostituisci le versioni già archiviate", Tab: "scores", Group: "Upgrade e sostituzione"},
-	{Key: "cleanup_min_score_diff", Label: "Differenza minima score per cleanup", Tab: "scores", Group: "Upgrade e sostituzione"},
-	{Key: "stall_alternative_after_min", Label: "Prova un'alternativa dopo (stallo)", Tab: "scores", Group: "Download bloccati"},
-	{Key: "stall_alternative_score_drop", Label: "Punteggio in meno per l'alternativa", Tab: "scores", Group: "Download bloccati"},
 
 	// --- Motore torrent: one panel per engine -------------------------------
 	{Key: "torrent_backend", Label: "Motore torrent", Tab: "backend", Group: "Motore torrent"},
@@ -215,6 +212,8 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "torrent_stall_retry_min", Label: "Riprova i torrent bloccati ogni", Tab: "seeding", Group: "Torrent bloccati"},
 	{Key: "torrent_stall_giveup_min", Label: "Rimuovi i torrent bloccati dopo", Tab: "seeding", Group: "Torrent bloccati"},
 	{Key: "torrent_dead_swarm_giveup_min", Label: "Rimuovi i torrent senza seeder dopo", Tab: "seeding", Group: "Torrent bloccati"},
+	{Key: "stall_alternative_after_min", Label: "Prova un'alternativa dopo (stallo)", Tab: "seeding", Group: "Torrent bloccati"},
+	{Key: "stall_alternative_score_drop", Label: "Punteggio in meno per l'alternativa", Tab: "seeding", Group: "Torrent bloccati"},
 
 	// --- Libreria e rinomina ------------------------------------------------
 	{Key: "rename_episodes", Label: "Rinomina episodi", Tab: "rename", Group: "Rinomina"},
@@ -297,6 +296,9 @@ var uiEssentialKeys = map[string]bool{
 	"torrent_copy_dir": true, "trash_path": true,
 	// The engine to reach (the managed one is loopback by default).
 	"torrent_backend": true, "gxtorrent_url": true,
+	// The peer ports, unless the engine opens them by itself (the rows step
+	// aside in Facilitata when UPnP/NAT-PMP mapped them).
+	"torrent_port_min": true, "torrent_port_max": true,
 	// The user's limits.
 	"torrent_dl_limit": true, "torrent_ul_limit": true, "min_free_space_gb": true,
 	"torrent_seed_ratio": true, "torrent_seed_time_days": true,

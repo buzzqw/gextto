@@ -378,7 +378,20 @@ never the user's, never a value never tuned — and only past a hysteresis
 cadence, which keeps it gentle. A restart is never read as instability: a
 restart that changed the binary is an update (`restart_cause.go`). The link-peak
 input for adapting the bandwidth is still missing in Gextto, so the bandwidth
-limits stay the user's; the free-space and RAM-disk parts adapt today.
+limits stay the user's; the free-space and RAM-disk parts adapt today. The
+free-space guard is bounded (20–50 GB): the 5% rule alone asked for hundreds of GB
+on a multi-terabyte disk. The automatic cycle is on by default (`active`, a combo
+in the page), so a fresh installation searches on its own; the wizard still sets
+it.
+
+**Ports and one upgrade threshold.** The peer ports are a user limit
+(`uiEssentialKeys`), but the network tab reads the engine's `port_mapping` and,
+when the engine opened the port itself (UPnP/NAT-PMP), it says so and drops the two
+rows in Facilitata; otherwise it warns with the exact range to forward. The library
+cleanup no longer has its own score threshold: `cleanup_min_score_diff` is gone and
+the cleanup uses `upgrade_min_score_diff`, one voice for both the acquisition
+upgrade and the cleanup pass. `cleanup_upgrades` ("replace archived versions") is
+on by default, so archived files can actually be improved.
 
 **Streaming and DLNA.** Web streaming (`cmd/gx-torrent/stream.go`, the endpoint
 Gextto redirects to) sends the **Content-Type from the file extension**

@@ -1969,16 +1969,18 @@ func (field v2Field) DefaultInline() bool {
 const v2UnusedSettingsHint = "Valgono solo con un altro motore torrent: restano salvate e tornano attive cambiando motore."
 
 type v2SettingGroup struct {
-	Title     string
-	Hint      string
+	Title string
+	Hint  string
 	// Summary is an optional read-only line under the hint (the stuck-download
-	// timeline, for instance), already translated.
-	Summary   string
-	Fields    []v2Field
-	Buttons   []v2Button
-	Links     []v2Link
-	Grid      bool
-	Collapsed bool
+	// timeline, for instance), already translated. SummaryWarn marks a summary
+	// that needs attention (the ports to forward).
+	Summary     string
+	SummaryWarn bool
+	Fields      []v2Field
+	Buttons     []v2Button
+	Links       []v2Link
+	Grid        bool
+	Collapsed   bool
 	// Inactive marks a whole panel that the active torrent engine ignores.
 	Inactive bool
 	// ID is the anchor of the panel, used by the section's group index.
@@ -2031,9 +2033,9 @@ type v2SettingsView struct {
 	Intro       string
 	// Brief is the Facilitata mode: internals are hidden. BriefURL/ExpertURL are
 	// the switches, which keep the current section.
-	Brief     bool
-	BriefURL  string
-	ExpertURL string
+	Brief       bool
+	BriefURL    string
+	ExpertURL   string
 	Groups      []v2SettingGroup
 	Note        string
 	Empty       string
@@ -2204,6 +2206,17 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 		view.Sources = v2SourcesIndexFrom(s, cfg)
 	case "performance":
 		view.Tuning = v2TuningPanelFrom(s, cfg, brief)
+	case "network":
+		// The peer port: say whether the engine opened it by itself, or warn
+		// with the exact range to forward.
+		notice, warn := uiPeerPortNotice(s, page.PeerPorts,
+			numberSettingInt(cfg.Settings, "torrent_port_min", 6881),
+			numberSettingInt(cfg.Settings, "torrent_port_max", 6889))
+		for i := range view.Groups {
+			if view.Groups[i].Title == "Porte e interfacce" {
+				view.Groups[i].Summary, view.Groups[i].SummaryWarn = notice, warn
+			}
+		}
 	}
 	return view
 }

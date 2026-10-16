@@ -111,7 +111,6 @@ var uiSettingTooltipText = map[string]string{
 	"archive_cleanup_enabled":              "Abilita la pulizia automatica dell'archivio secondo età massima e numero minimo da conservare.",
 	"archive_max_age_days":                 "Età massima delle release in archivio, in giorni (0 = nessun limite).",
 	"archive_keep_min":                     "Numero minimo di release recenti da conservare sempre in archivio.",
-	"cleanup_min_score_diff":               "Differenza minima di punteggio per sostituire un file esistente con uno migliore (cleanup).",
 	"upgrade_until_score":                  "Quando il file in libreria ha almeno questo punteggio non si cercano più miglioramenti; resta accettato solo un REPACK o PROPER che corregge una release difettosa. Riferimenti: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p ≈ 2480. 0 = migliora sempre. Per fermare del tutto gli upgrade di un solo titolo usa «Niente upgrade» nella sua scheda.",
 	"upgrade_min_score_diff":               "Differenza minima di punteggio per sostituire un file con un upgrade migliore.",
 	"stall_alternative_after_min":          "Se un download è fermo da almeno questi minuti — a 0 B/s oppure ancora in attesa del suo elenco di file (metadati, tipico dei magnet morti) — la ricerca può avviare una versione alternativa della stessa puntata o film. Il download fermo resta in sessione e può riprendersi; la deduplica dell'archivio terrà poi la copia migliore. 0 disattiva.",

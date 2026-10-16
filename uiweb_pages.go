@@ -186,10 +186,13 @@ type uiSettingsTabRef struct {
 }
 
 type uiSettingsPage struct {
-	Tabs            []uiSettingsTabRef
-	ActiveID        string
-	Fields          []uiSettingField
-	Groups          []uiSettingGroup
+	Tabs     []uiSettingsTabRef
+	ActiveID string
+	Fields   []uiSettingField
+	Groups   []uiSettingGroup
+	// PeerPorts is the engine's port-mapping status, read for the network tab so
+	// the pages can tell whether the ports are open automatically.
+	PeerPorts       uiPeerPortStatus
 	ShowSources     bool
 	ShowEditors     bool
 	ShowI18n        bool
@@ -311,6 +314,8 @@ type uiListField struct {
 	Options []uiListFieldOption
 	// Wide gives the field two grid tracks on wide screens (URLs, API keys).
 	Wide bool
+	// Browse adds the server folder picker («Sfoglia») to a path field.
+	Browse bool
 }
 
 // uiListEditor edits a list of structured records with real form rows, so the
@@ -388,7 +393,7 @@ var uiAdvancedEditors = []uiListEditor{
 		Title: "Cartelle osservate", Hint: "Aggiunge automaticamente i .torrent trovati in queste cartelle.",
 		GetPath: "/api/watched-folders", Unwrap: "items", PostPath: "/api/watched-folders",
 		Fields: []uiListField{
-			{Name: "path", Label: "Cartella", Kind: "text"},
+			{Name: "path", Label: "Cartella", Kind: "text", Browse: true, Wide: true},
 			{Name: "enabled", Label: "Attiva", Kind: "bool"},
 			{Name: "recursive", Label: "Ricorsiva", Kind: "bool"},
 			{Name: "delete_after", Label: "Elimina dopo", Kind: "bool"},
@@ -571,6 +576,22 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 		Tabs:     tabs,
 		ActiveID: active,
 		Fields:   fieldsByTab[active],
+	}
+	// The peer port: on the network tab, read the engine's mapping so the panel
+	// can say whether it is open automatically, and in Facilitata drop the two
+	// port rows when it is (nothing left to choose).
+	if active == "network" {
+		page.PeerPorts = uiPeerPortStatusFrom(activeEngineStats(s))
+		if brief && page.PeerPorts.Auto {
+			filtered := page.Fields[:0:0]
+			for _, field := range page.Fields {
+				if uiPeerPortKey(field.Key) {
+					continue
+				}
+				filtered = append(filtered, field)
+			}
+			page.Fields = filtered
+		}
 	}
 	// In Esperto each value says where it came from: the guided tuning ("gestito
 	// dal sistema") or the user ("impostato da te"). In Facilitata the internals

@@ -1640,6 +1640,7 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   color: var(--text);
   max-width: 70ch;
 }
+.settings-summary.warn { border-left-color: var(--warn); }
 .sources-index-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .sources-index-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
 .sources-index-item .btn { flex: 0 0 auto; }

@@ -177,6 +177,7 @@ type v2ListFieldValue struct {
 	Name, Label, Kind, Placeholder, Value string
 	Options                               []uiListFieldOption
 	Wide                                  bool
+	Browse                                bool
 }
 
 type v2ListRow struct {
@@ -257,7 +258,7 @@ func v2ListRowFrom(fields []uiListField, item map[string]any, index int) v2ListR
 	for _, field := range fields {
 		row.Fields = append(row.Fields, v2ListFieldValue{
 			Name: field.Name, Label: field.Label, Kind: field.Kind,
-			Placeholder: field.Placeholder, Options: field.Options, Wide: field.Wide,
+			Placeholder: field.Placeholder, Options: field.Options, Wide: field.Wide, Browse: field.Browse,
 			Value: v2FieldValueString(item[field.Name], field.Kind),
 		})
 	}
