@@ -1653,6 +1653,7 @@ spazio del `tmpfs`, come prima.
 | Impostazione | Cosa fa |
 |---|---|
 | Ottimizza | Calcola cache e buffer in base alla RAM. |
+| Ottimizza per il sistema | Propone i valori adatti a questo hardware (memoria, dischi, condivisione di rete, RAM disk), una riga per modifica con il motivo; nulla viene scritto finché non applichi le righe selezionate. Un valore salvato a mano non viene mai riproposto. |
 
 #### Seed e completamento
 

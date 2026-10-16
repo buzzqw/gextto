@@ -1607,6 +1607,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Setting | What it does |
 |---|---|
 | Optimize | Computes cache and buffers from the RAM. |
+| Optimize for the system | Proposes the values that fit this hardware (memory, disks, network share, RAM disk), one row each with the reason; nothing is written until you apply the selected rows. A value you saved by hand is never proposed again. |
 
 #### Seeding and completion
 

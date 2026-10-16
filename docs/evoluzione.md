@@ -337,6 +337,20 @@ with the current weights plus the stop threshold, so the 27 weights stop being o
 numbers. The settings search also reaches the indexer/manager editor by concept
 ("Prowlarr"), which has no setting key of its own.
 
+**Guided tuning.** The performance tab proposes the values that fit the machine
+(`tuning.go`, `system_probe.go`, `sysinfo.go`): a read-only table (current →
+proposed, with the reason) built from RAM/CPU, the download and archive volumes,
+whether they are on the same filesystem and whether either is a network share,
+and the RAM disk. Nothing is written until the user applies the selected rows
+(`POST /settings/tuning/apply`); each write passes the usual
+`validateSettingValue` and is recorded in `setting_provenance` as `auto`, while a
+value the user saved by hand is marked `manual` and never proposed again. The
+tuning deliberately stays away from the settings the torrent engine manages by
+itself (cache, active slots, dynamic queue) and from taste/policy settings
+(search cadence, gaps, score weights). A restart is classified
+(`restart_cause.go`): a restart that changed the binary is an update, never
+instability, so nothing in the tuning can read a routine update as a fault.
+
 **Streaming and DLNA.** Web streaming (`cmd/gx-torrent/stream.go`, the endpoint
 Gextto redirects to) sends the **Content-Type from the file extension**
 (`video/mp4`, `video/x-matroska`, `audio/flac`, …) with

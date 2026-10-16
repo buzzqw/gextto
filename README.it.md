@@ -43,7 +43,10 @@ Node.js/npm, sei lingue nell'interfaccia.
   **[gx-torrent](https://github.com/buzzqw/gextto/releases)**, un client
   completo per Linux e Windows con UI web propria, API compatibile con
   qBittorrent per Sonarr/Radarr e una suite RSS all'altezza dei migliori.
-- **Si adatta, si calibra e si controlla da solo.** Coda dinamica, cache disco e
+- **Si adatta, si calibra e si controlla da solo.** La pagina impostazioni
+  propone i valori adatti alla macchina — memoria, dischi, condivisione di rete,
+  RAM disk — ciascuno con il suo motivo, e non scrive nulla finché non applichi.
+  Coda dinamica, cache disco e
   upload si adattano continuamente all'hardware (RAM, NVMe/SSD/HDD/NFS) e alla
   latenza della linea (anti-bufferbloat); i download vanno in pausa prima che il
   disco si riempia; il motore premia i peer veloci e scarta quelli lenti o

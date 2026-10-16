@@ -86,7 +86,8 @@ func V2SettingsTuningApply(w http.ResponseWriter, r *http.Request, s *AppState) 
 	case len(chosen) == 0:
 		panel.Notice = uiText(s, "Nessuna modifica selezionata.")
 	default:
-		applied, err := ApplyTuning(s.cfg.DataDir, cfg, chosen)
+		proposals := ProposeTuning(ProbeSystem(cfg), cfg, ManualSettings(s.cfg.DataDir))
+		applied, err := ApplyTuning(s.cfg.DataDir, cfg, proposals, chosen)
 		if err != nil {
 			panel.Error = true
 			panel.Notice = err.Error()

@@ -144,13 +144,14 @@ func proposedMinFreeSpaceGB(facts SystemFacts) int64 {
 	return int64(target / gib)
 }
 
-// ApplyTuning writes the confirmed proposals. It recomputes the proposal from
-// the current facts and applies only the keys the caller confirmed, using the
-// server's own proposed value (never a value taken from the request), each
-// through validateSettingValue. Every write is recorded as "auto" with the
-// reason, so re-optimizing recognises its own values and the user's stay theirs.
-func ApplyTuning(dataDir string, cfg *Config, chosen map[string]bool) (int, error) {
-	proposals := ProposeTuning(ProbeSystem(cfg), cfg, ManualSettings(dataDir))
+// ApplyTuning writes the confirmed proposals. It applies only the keys the
+// caller confirmed, using the proposed value the server computed itself (never a
+// value taken from the request), each through validateSettingValue. A key that
+// is not in the proposal list is ignored, so the request can never write a
+// setting the tuning did not suggest. Every write is recorded as "auto" with
+// the reason, so re-optimizing recognises its own values and the user's stay
+// theirs.
+func ApplyTuning(dataDir string, cfg *Config, proposals []TuningProposal, chosen map[string]bool) (int, error) {
 	applied := 0
 	for _, proposal := range proposals {
 		if !chosen[proposal.Key] {

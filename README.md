@@ -41,9 +41,11 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
   **[gx-torrent](https://github.com/buzzqw/gextto/releases)**, a complete
   client for Linux and Windows with its own web UI, a qBittorrent-compatible
   API for Sonarr/Radarr, and an RSS suite on par with the best.
-- **It tunes, adapts and controls itself.** Queue concurrency, disk cache and
-  upload bandwidth adapt dynamically to hardware (RAM, NVMe/SSD/HDD/NFS) and
-  network latency (anti-bufferbloat); downloads pause before disk fills up;
+- **It tunes, adapts and controls itself.** The settings page proposes the
+  values that fit the machine — memory, disks, a network share, the RAM disk —
+  each with its reason, and writes nothing until you apply. Queue concurrency,
+  disk cache and upload bandwidth adapt dynamically to hardware (RAM,
+  NVMe/SSD/HDD/NFS) and network latency (anti-bufferbloat); downloads pause before disk fills up;
   delivering peers get priority while sluggish ones are pruned; data already on
   disk is reused across swarms without re-downloading. Detailed live
   diagnostics and connection telemetry are exposed at every layer.
