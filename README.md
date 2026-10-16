@@ -50,7 +50,7 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
   disk is reused across swarms without re-downloading. Detailed live
   diagnostics and connection telemetry are exposed at every layer.
 - **It is easy to audit and deploy.** Pure Go with zero CGO, zero Node.js/npm
-  runtime dependencies, a single supervised process per component, over 1,940
+  runtime dependencies, a single supervised process per component, over 2,070
   test functions, and accessibility checks with axe-core.
 
 ### At a glance
@@ -79,6 +79,11 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
   decisions.
 - **TV, movies, comics.** Standard `ComicInfo.xml` metadata is written for CBZ
   archives (Komga, Kavita, readers).
+- **Season packs only when useful.** A pack is downloaded only to fill a real
+  gap or to upgrade an episode already in the library; a complete pack that
+  would add nothing is refused **before** it is downloaded (instead of being
+  fetched and then discarded file by file), and a pack still airing
+  (*IN CORSO n/m*) is read within the episodes that exist. No wasted bandwidth.
 - **Stuck-download recovery.** Downloads that stop progressing, or magnets
   stuck waiting for metadata, are superseded by a valid alternative after a
   configurable window (*Configuration → Quality and upgrades → Stuck
@@ -473,7 +478,7 @@ npm ci
 npm run test:a11y
 ```
 
-The automated Playwright suite includes 55 end-to-end tests covering
+The automated Playwright suite includes 57 end-to-end tests covering
 navigation, dialogs and workflows, with 14 accessibility tests including
 axe-core WCAG audits on the main sections. That is not a legal
 certification: manual screen-reader, keyboard and assistive-technology testing

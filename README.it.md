@@ -55,7 +55,7 @@ Node.js/npm, sei lingue nell'interfaccia.
   visibili a ogni livello.
 - **Si controlla e si distribuisce con facilità.** Go puro senza CGO, nessuna
   dipendenza o build Node.js/npm, un processo sorvegliato per componente, oltre
-  1.940 funzioni di test e controlli di accessibilità con axe-core.
+  2.070 funzioni di test e controlli di accessibilità con axe-core.
 
 ### In breve
 
@@ -83,6 +83,11 @@ Node.js/npm, sei lingue nell'interfaccia.
   `ffprobe` può analizzare i media archiviati per arricchire le decisioni.
 - **Serie, film, fumetti.** Per gli archivi CBZ vengono scritti metadati
   standard `ComicInfo.xml` (Komga, Kavita, reader).
+- **Pack di stagione solo quando servono.** Un pack si scarica solo per
+  riempire un buco reale o per sostituire un episodio già in libreria; un pack
+  completo che non aggiungerebbe nulla viene rifiutato **prima** di scaricarlo
+  (invece di scaricarlo e scartarlo file per file), e un pack ancora in onda
+  (*IN CORSO n/m*) si legge entro gli episodi esistenti. Niente banda sprecata.
 - **Recupero dai blocchi.** I download fermi e i magnet in attesa prolungata
   dei metadati vengono affiancati da un'alternativa valida dopo una finestra
   configurabile (*Configurazione → Qualità e upgrade → Download bloccati*).
@@ -494,7 +499,7 @@ npm ci
 npm run test:a11y
 ```
 
-La suite automatizzata Playwright include 55 test end-to-end complessivi tra
+La suite automatizzata Playwright include 57 test end-to-end complessivi tra
 flussi, dialoghi e navigazione, di cui 14 di accessibilità, con verifiche
 WCAG con axe-core sulle sezioni principali. Non è una
 certificazione legale: restano necessari test manuali con screen reader,
