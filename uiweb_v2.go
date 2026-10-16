@@ -2203,7 +2203,7 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 	case "sources":
 		view.Sources = v2SourcesIndexFrom(s, cfg)
 	case "performance":
-		view.Tuning = v2TuningPanelFrom(s, cfg)
+		view.Tuning = v2TuningPanelFrom(s, cfg, brief)
 	}
 	return view
 }

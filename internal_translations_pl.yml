@@ -5097,3 +5097,7 @@ pol:
   "Livello di configurazione": "Poziom konfiguracji"
   "Poche impostazioni: il resto lo gestisce il sistema.": "Niewiele ustawień: resztą zarządza system."
   "Tutti i valori, quelli interni compresi.": "Wszystkie wartości, także wewnętrzne."
+  "Gestione automatica": "Zarządzanie automatyczne"
+  "Il sistema adatta cache, coda, spazio e RAM disk a questo hardware, senza superare i tuoi limiti.": "System dostosowuje pamięć podręczną, kolejkę, miejsce i RAM disk do tego sprzętu, nie przekraczając twoich limitów."
+  "Adatta ora": "Dostosuj teraz"
+  "Il sistema adatterà %d valori a questo hardware.": "System dostosuje %d wartości do tego sprzętu."

@@ -4493,3 +4493,7 @@ eng:
   "Livello di configurazione": "Configuration level"
   "Poche impostazioni: il resto lo gestisce il sistema.": "A few settings: the system handles the rest."
   "Tutti i valori, quelli interni compresi.": "Every value, internals included."
+  "Gestione automatica": "Automatic management"
+  "Il sistema adatta cache, coda, spazio e RAM disk a questo hardware, senza superare i tuoi limiti.": "The system adapts cache, queue, space and RAM disk to this hardware, without exceeding your limits."
+  "Adatta ora": "Adapt now"
+  "Il sistema adatterà %d valori a questo hardware.": "The system will adapt %d values to this hardware."

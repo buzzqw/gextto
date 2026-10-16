@@ -783,6 +783,12 @@
     {{if .DryRun}}<p class="hint">{{.DryRunNote}}</p>{{end}}
     {{if .Notice}}<p class="{{if .Error}}error{{else}}muted{{end}}" role="status">{{.Notice}}</p>{{end}}
     {{if .Rows}}
+    {{if .Brief}}
+    <p class="settings-summary" role="note">{{.Summary}}</p>
+    <form method="post" hx-post="/settings/tuning/apply" hx-target="#v2-tuning-panel" hx-swap="outerHTML">
+      <div class="form-actions"><button class="btn sm primary" type="submit" hx-disabled-elt="this"{{if .DryRun}} disabled{{end}}>{{.ApplyLabel}}</button></div>
+    </form>
+    {{else}}
     <form method="post" hx-post="/settings/tuning/apply" hx-target="#v2-tuning-panel" hx-swap="outerHTML">
       <div class="settings-rows">
         {{range .Rows}}
@@ -799,6 +805,7 @@
       </div>
       <div class="form-actions"><button class="btn sm primary" type="submit" hx-disabled-elt="this"{{if .DryRun}} disabled{{end}}>{{.ApplyLabel}}</button></div>
     </form>
+    {{end}}
     {{else}}<p class="muted">{{.Empty}}</p>{{end}}
   </div>
 </div>

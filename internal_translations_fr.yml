@@ -5149,3 +5149,7 @@ fra:
   "Livello di configurazione": "Niveau de configuration"
   "Poche impostazioni: il resto lo gestisce il sistema.": "Peu de réglages : le système gère le reste."
   "Tutti i valori, quelli interni compresi.": "Toutes les valeurs, y compris les internes."
+  "Gestione automatica": "Gestion automatique"
+  "Il sistema adatta cache, coda, spazio e RAM disk a questo hardware, senza superare i tuoi limiti.": "Le système adapte le cache, la file, l'espace et le RAM disk à ce matériel, sans dépasser vos limites."
+  "Adatta ora": "Adapter maintenant"
+  "Il sistema adatterà %d valori a questo hardware.": "Le système adaptera %d valeurs à ce matériel."

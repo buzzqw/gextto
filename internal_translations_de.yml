@@ -5156,3 +5156,7 @@ deu:
   "Livello di configurazione": "Konfigurationsebene"
   "Poche impostazioni: il resto lo gestisce il sistema.": "Wenige Einstellungen: den Rest verwaltet das System."
   "Tutti i valori, quelli interni compresi.": "Alle Werte, auch die internen."
+  "Gestione automatica": "Automatische Verwaltung"
+  "Il sistema adatta cache, coda, spazio e RAM disk a questo hardware, senza superare i tuoi limiti.": "Das System passt Cache, Warteschlange, Speicher und RAM-Disk an diese Hardware an, ohne deine Grenzen zu überschreiten."
+  "Adatta ora": "Jetzt anpassen"
+  "Il sistema adatterà %d valori a questo hardware.": "Das System passt %d Werte an diese Hardware an."

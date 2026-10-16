@@ -186,6 +186,45 @@ func TestRestartCauseNeverReadsUpdateAsInstability(t *testing.T) {
 	}
 }
 
+// In Facilitata the card is one button: it applies the whole proposal (the user
+// trusts the system), and every write is recorded as auto.
+func TestTuningApplyBriefAppliesTheWholeProposal(t *testing.T) {
+	state := newTestAppState(t)
+	download := t.TempDir()
+	archive := t.TempDir()
+	if err := saveConfigSetting(state.cfg.DataDir, "torrent_dir", download); err != nil {
+		t.Fatalf("download dir: %v", err)
+	}
+	if err := saveConfigSetting(state.cfg.DataDir, "archive_root", archive); err != nil {
+		t.Fatalf("archive root: %v", err)
+	}
+	// The apply refuses to write in dry-run (correct): leave it for this test.
+	if err := saveConfigSetting(state.cfg.DataDir, "dry_run", "false"); err != nil {
+		t.Fatalf("dry run: %v", err)
+	}
+	cfg := latestConfig(state)
+	proposals := ProposeTuning(ProbeSystem(cfg), cfg, nil)
+	if len(proposals) == 0 {
+		t.Skip("this machine produces no proposal")
+	}
+
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodPost, "/settings/tuning/apply?mode=brief", nil)
+	if code != http.StatusOK || !strings.Contains(body, "applicat") {
+		t.Fatalf("brief apply -> %d: %s", code, body)
+	}
+	origins, err := SettingOrigins(state.cfg.DataDir)
+	if err != nil {
+		t.Fatalf("origins: %v", err)
+	}
+	for _, proposal := range proposals {
+		if origin := origins[proposal.Key].Origin; origin != OriginAuto {
+			t.Fatalf("%q was proposed but not applied as auto (origin %q)", proposal.Key, origin)
+		}
+	}
+}
+
 func TestTuningPanelRendersInThePerformanceTab(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

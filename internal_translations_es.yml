@@ -5103,3 +5103,7 @@ spa:
   "Livello di configurazione": "Nivel de configuración"
   "Poche impostazioni: il resto lo gestisce il sistema.": "Pocas opciones: el resto lo gestiona el sistema."
   "Tutti i valori, quelli interni compresi.": "Todos los valores, incluidos los internos."
+  "Gestione automatica": "Gestión automática"
+  "Il sistema adatta cache, coda, spazio e RAM disk a questo hardware, senza superare i tuoi limiti.": "El sistema adapta la caché, la cola, el espacio y el RAM disk a este hardware, sin superar tus límites."
+  "Adatta ora": "Adaptar ahora"
+  "Il sistema adatterà %d valori a questo hardware.": "El sistema adaptará %d valores a este hardware."
