@@ -2405,6 +2405,14 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		render(err.Error(), true)
 		return
 	}
+	// A value typed by the user is theirs: record it so the guided tuning never
+	// proposes it again. Clearing the field goes back to the default, so the
+	// origin is forgotten instead.
+	if strings.TrimSpace(value) == "" {
+		_ = ClearSettingOrigin(s.cfg.DataDir, key)
+	} else {
+		_ = MarkSettingOrigin(s.cfg.DataDir, key, OriginManual, "")
+	}
 	field = uiSettingFieldFor(key, v2SettingLabelFor(key), value)
 	render("salvata", false)
 }

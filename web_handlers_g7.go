@@ -1157,6 +1157,14 @@ func SaveSettingHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// A value written by the user is theirs: the guided tuning will not propose
+	// it again. An empty value is a reset to the default, so the origin is
+	// forgotten instead.
+	if strings.TrimSpace(value) == "" {
+		_ = ClearSettingOrigin(s.cfg.DataDir, input.Key)
+	} else {
+		_ = MarkSettingOrigin(s.cfg.DataDir, input.Key, OriginManual, "")
+	}
 	jsonResponse(w, map[string]any{"ok": true, "restart_required": true})
 }
 
