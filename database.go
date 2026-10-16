@@ -1136,6 +1136,14 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 			}
 		}
 		oldQuality := ParseQuality(dbTitle)
+		// The file actually in the library is the truth: dbTitle may still name
+		// the release a later upgrade replaced, and a same-quality candidate
+		// would then look like a resolution upgrade and re-download it.
+		if strings.TrimSpace(dbArchivePath) != "" {
+			if fileQuality, ok := meaningfulQuality(filepath.Base(dbArchivePath)); ok {
+				oldQuality = MergeQuality(fileQuality, oldQuality)
+			}
+		}
 		enrichQualityWithMediaInfo(dbMediaInfo, &oldQuality)
 		// A stuck download's placeholder carries the stuck release's score: while
 		// the tolerance applies, the alternative is allowed below it (the
@@ -5030,8 +5038,13 @@ func (d *Database) Rescore(cfg *Config) (int, error) {
 			changed += int(affected)
 		}
 	}
-	// Episodi senza una release tracciata: normalizza dal titolo o dal file.
-	episodeRows, err := d.db.Query("SELECT e.id, COALESCE(e.title,''), COALESCE(e.archive_path,''), COALESCE(e.media_info_json,'') FROM episodes e WHERE e.magnet_hash IS NULL OR NOT EXISTS(SELECT 1 FROM torrent_meta t WHERE lower(t.hash)=lower(e.magnet_hash) AND COALESCE(t.metadata_json,'') != '')")
+	// Episodi con un file in libreria, e quelli senza una release tracciata:
+	// il punteggio di un episodio archiviato deve riflettere il file che c'è
+	// davvero. Il titolo può ancora nominare la release che un upgrade ha poi
+	// sostituito (es. la 1080p rimpiazzata da una 2160p), quindi il file vince:
+	// altrimenti in libreria resterebbe un punteggio più basso del contenuto e
+	// l'episodio sembrerebbe da aggiornare con la copia che ha già.
+	episodeRows, err := d.db.Query("SELECT e.id, COALESCE(e.title,''), COALESCE(e.archive_path,''), COALESCE(e.media_info_json,'') FROM episodes e WHERE COALESCE(e.archive_path,'') <> '' OR e.magnet_hash IS NULL OR NOT EXISTS(SELECT 1 FROM torrent_meta t WHERE lower(t.hash)=lower(e.magnet_hash) AND COALESCE(t.metadata_json,'') != '')")
 	if err != nil {
 		return changed, err
 	}
@@ -5056,13 +5069,14 @@ func (d *Database) Rescore(cfg *Config) (int, error) {
 	}
 	episodeRows.Close()
 	for _, row := range episodeScoreRows {
-		quality, ok := meaningfulQuality(row.Title)
+		// Prefer the archived file's own name; the stored title is the fallback
+		// for old imports whose path is a folder or carries no quality tokens.
+		quality, ok := models.Quality{}, false
+		if row.Path != "" {
+			quality, ok = meaningfulQuality(filepath.Base(row.Path))
+		}
 		if !ok {
-			name := ""
-			if row.Path != "" {
-				name = filepath.Base(row.Path)
-			}
-			quality, ok = meaningfulQuality(name)
+			quality, ok = meaningfulQuality(row.Title)
 		}
 		if !ok {
 			continue

@@ -1487,6 +1487,94 @@ func TestSyncScoresWithSettingsOnlyRescoresOnWeightChange(t *testing.T) {
 	assertEqual(t, score(), int64(2400))
 }
 
+// TestUpgradeComparesAgainstTheArchivedFile reproduces the case of an episode
+// whose tracked release was later replaced by a better file (a 1080p upgraded
+// to a 2160p): the stored title still says 1080p, but the candidate 2160p is
+// the copy already in the library, so it must be a duplicate — not a
+// resolution upgrade that re-downloads it.
+func TestUpgradeComparesAgainstTheArchivedFile(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "Show - S01E02 - Titolo - [2160p][h265][DV HDR10][EAC3][IT+EN].mkv")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO series(id,name) VALUES (1,'Show')"); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	archived := archivedRelease(filepath.Base(file), file, ParseQuality(filepath.Base(file)), "series", nil)
+	fileScore := cfg.ReleaseScore(&archived)
+	if _, err := db.db.Exec("INSERT INTO episodes(id,series_id,season,episode,title,quality_score,magnet_hash,archive_path,downloaded_at) VALUES (1,1,1,2,?1,?2,'aaaa000000000000000000000000000000000001',?3,datetime('now'))", "Show S01E02 1080p WEB-DL H264", fileScore, file); err != nil {
+		t.Fatal(err)
+	}
+
+	season, episode := int64(1), int64(2)
+	series := "Show"
+	candidate := models.Release{
+		Title:   "Show S01E02 Titolo 2160p DDP5 1 DV H265",
+		Magnet:  "magnet:?xt=urn:btih:bbbb000000000000000000000000000000000002",
+		Kind:    "series",
+		Series:  &series,
+		Season:  &season,
+		Episode: &episode,
+		Quality: ParseQuality("Show S01E02 Titolo 2160p DDP5 1 DV H265"),
+	}
+	candScore := cfg.ReleaseScore(&candidate)
+	approved, reason, err := db.CheckSeriesScored(&candidate, candScore, 200, &models.ApprovalContext{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if approved {
+		t.Fatalf("un 2160p già in libreria è stato proposto come upgrade (%s)", reason)
+	}
+	if reason != "duplicate" {
+		t.Fatalf("reason = %q, want duplicate", reason)
+	}
+}
+
+// TestRescoreScoresAnArchivedEpisodeFromItsFile: the stored score of an
+// archived episode follows the file on disk, not the (superseded) release its
+// magnet_hash still points to.
+func TestRescoreScoresAnArchivedEpisodeFromItsFile(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "Show - S01E02 - Titolo - [2160p][h265][DV HDR10][EAC3][IT+EN].mkv")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO series(id,name) VALUES (1,'Show')"); err != nil {
+		t.Fatal(err)
+	}
+	release := models.Release{Title: "Show S01E02 1080p WEB-DL H264 MeM", Kind: "series", Quality: ParseQuality("Show S01E02 1080p WEB-DL H264 MeM")}
+	metadata, err := json.Marshal(models.TorrentMeta{Release: release})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO torrent_meta(hash,name,kind,title,status,metadata_json,updated_at) VALUES ('aaaa000000000000000000000000000000000001','Show.S01E02.1080p','series','Show S01E02','completed',?1,datetime('now'))", string(metadata)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO episodes(id,series_id,season,episode,title,quality_score,magnet_hash,archive_path,downloaded_at) VALUES (1,1,1,2,?1,0,'aaaa000000000000000000000000000000000001',?2,datetime('now'))", release.Title, file); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := DefaultConfig()
+	cfg.DataDir = t.TempDir()
+	if _, err := db.SyncScoresWithSettings(&cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	archived := archivedRelease(filepath.Base(file), file, ParseQuality(filepath.Base(file)), "series", nil)
+	want := cfg.ReleaseScore(&archived)
+	var got int64
+	if err := db.db.QueryRow("SELECT quality_score FROM episodes WHERE id=1").Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("stored score = %d, want %d (dal file 2160p, non dalla release 1080p)", got, want)
+	}
+}
+
 func TestHistorySearchFiltersAcrossNameTagAndPath(t *testing.T) {
 	db := newTestDB(t)
 	insert := func(hash, name, tag, path string) {
