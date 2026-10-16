@@ -4548,3 +4548,4 @@ eng:
   "Avvisi di questo download": "Warnings of this download"
   "Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi": "Mark the shown warnings as read; they come back only if the download produces new ones"
   "Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.": "Nothing to check: no stuck download, no pending move and no warning."
+  "Download fermi, spostamenti in sospeso e avvisi": "Stuck downloads, pending moves and warnings"

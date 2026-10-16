@@ -287,6 +287,10 @@ html, body {
 .session-strip .btn {
   margin-left: auto;
 }
+/* The session frame carries the live bandwidth chart below the summary line. */
+.session-strip-panel .traffic {
+  margin-top: 10px;
+}
 /* Live session counter in the panel head: same type as the title. */
 .session-count {
   font: inherit;

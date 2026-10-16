@@ -234,23 +234,21 @@
     </div>
     <span class="mode-badge{{if .DryRun}} dry{{else}} active{{end}}">{{if .DryRun}}DRY-RUN{{else}}ATTIVO{{end}}</span>
   </div>
-  <div class="panel session-strip-panel">
-    <div class="panel-body session-strip">
-      <strong class="session-strip-title">In sessione</strong>
-      <span>↓ {{rate .DownloadRate}} · ↑ {{rate .UploadRate}}</span>
-      <span>{{.Downloading}} <span>in scarico</span> · {{.Idle}} <span>fermi a 0 B/s</span> · {{.Seeding}} <span>in seed</span>{{if or .Paused .Errors}} · {{.Paused}} <span>in pausa</span> · {{.Errors}} <span>in errore</span>{{end}}</span>
-      <span class="muted"><span>Banda 30 giorni</span> {{bytes .Consumption.Last30}}</span>
-      <a class="btn sm" href="/?view=downloads">Vai a Scarico</a>
+  <div class="panel session-strip-panel dashboard-traffic-panel">
+    <div class="panel-head"><h3>In sessione</h3><small class="muted">Ultimi 30 minuti</small></div>
+    <div class="panel-body">
+      <div class="session-strip">
+        <span>{{.Downloading}} <span>in scarico</span> · {{.Idle}} <span>fermi a 0 B/s</span> · {{.Seeding}} <span>in seed</span>{{if or .Paused .Errors}} · {{.Paused}} <span>in pausa</span> · {{.Errors}} <span>in errore</span>{{end}}</span>
+        <span class="muted"><span>Banda 30 giorni</span> {{bytes .Consumption.Last30}}</span>
+        <a class="btn sm" href="/?view=downloads">Vai a Scarico</a>
+      </div>
+      {{template "v2_live_traffic" .Traffic}}
     </div>
   </div>
   <div id="v2-modal"></div>
   <div class="panel dashboard-problems-panel">
-    <div class="panel-head"><h3>Da controllare</h3><small class="muted">Download fermi, spostamenti in sospeso e avvisi delle ultime 24 ore</small></div>
+    <div class="panel-head"><h3>Da controllare</h3><small class="muted">Download fermi, spostamenti in sospeso e avvisi</small></div>
     <div class="panel-body" id="v2-dashboard-problems" hx-get="/dashboard/problems" hx-trigger="load, every 60s" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
-  </div>
-  <div class="panel dashboard-traffic-panel">
-    <div class="panel-head"><h3>Traffico di rete</h3><small class="muted">Ultimi 30 minuti</small></div>
-    <div class="panel-body">{{template "v2_live_traffic" .Traffic}}</div>
   </div>
   <div class="grid-4 dashboard-summary-grid">
     <div class="metric mint"><span class="metric-sub">Serie TV / Film</span><strong>{{.SeriesConfigured}} / {{.MoviesConfigured}}</strong></div>

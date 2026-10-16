@@ -286,8 +286,12 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
 - **Ricerca automatica** — avvia un ciclo completo o di un solo dominio (Serie,
   Film, Fumetti); mostra prossima esecuzione, intervallo ed esito dell'ultimo
   ciclo; backup immediato.
-- **In sessione** — striscia compatta in cima: velocità, torrent in scarico,
-  fermi e in seed, banda degli ultimi 30 giorni e accesso diretto a Scarico.
+- **In sessione** — un unico riquadro in cima: i torrent in scarico, fermi e in
+  seed, la banda degli ultimi 30 giorni e l'accesso diretto a Scarico, con sotto
+  il **grafico del traffico degli ultimi 30 minuti** (curve di **download** e
+  **upload**, il picco, la velocità attuale e la linea del **limite di banda in
+  vigore**: base, programmazione o temporaneo; non compare quando il limite è
+  *Auto*, cioè lasciato all'auto-tune). Si aggiorna da solo.
 - **Da controllare** — sotto la striscia: i download **fermi** (con il motivo,
   il prossimo tentativo e quando verranno abbandonati), gli **spostamenti in
   libreria in sospeso** (destinazione e tentativi) e gli avvisi, gli errori e i
@@ -300,11 +304,6 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
   *Storia* apre
   la storia completa di quel download. Si aggiorna da solo ogni minuto; se è
   tutto a posto dice «Niente da controllare».
-- **Traffico di rete** — un grafico a linea degli **ultimi 30 minuti** con le
-  curve di **download** e **upload**, il picco, la velocità attuale e la linea
-  del **limite di banda in vigore** (base, programmazione o temporaneo; non
-  compare quando il limite è *Auto*, cioè lasciato all'auto-tune). Si aggiorna
-  da solo.
 - **Card statistiche** — libreria (serie/film), spazio libero, magnet in
   archivio e motore.
 - **Rete e download attivi** — CPU/RAM e sparkline di rete in tempo reale.

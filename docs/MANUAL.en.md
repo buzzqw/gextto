@@ -286,8 +286,12 @@ release package the installer uses (README, *Install on Linux*).
 - **Manual global search** — searches archive + indexers + web engines.
 - **Automatic search** — run a full cycle or a single domain (Series, Movies,
   Comics); shows next run, interval and last-cycle outcome; backup now.
-- **In session** — compact strip on top: speeds, downloading/stalled/seeding
-  torrents, last-30-days bandwidth and direct access to Downloads.
+- **In session** — one card on top: torrents downloading, stalled and seeding,
+  the last-30-days bandwidth and direct access to Downloads, with the **last
+  30 minutes traffic chart** below (the **download** and **upload** curves, the
+  peak, the current speed and the line of the **active bandwidth limit**: base,
+  schedule or temporary; it is not drawn when the limit is *Auto*, i.e. left to
+  the auto-tune). It refreshes on its own.
 - **To check** — below the strip: **stuck** downloads (with the reason, the
   next attempt and when they will be abandoned), **pending moves to the
   library** (destination and attempts) and the warnings, errors and 🛟 pack
@@ -299,11 +303,6 @@ release package the installer uses (README, *Install on Linux*).
   of the same download shows again). *History* opens the full
   story of that download. It refreshes every minute; when all is well it says
   "Nothing to check".
-- **Network traffic** — a line chart of the **last 30 minutes** with the
-  **download** and **upload** curves, the peak, the current speed and the line
-  of the **active bandwidth limit** (base, schedule or temporary; it is not
-  drawn when the limit is *Auto*, i.e. left to the auto-tune). It refreshes on
-  its own.
 - **Stat cards** — library (series/movies), free space, archive magnets
   and engine.
 - **Network and active downloads** — CPU/RAM plus a live network sparkline.
