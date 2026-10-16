@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -18,6 +19,10 @@ import (
 type uiSettingMeta struct {
 	// Unit is shown as a suffix of the control (secondi, minuti, GB, ...).
 	Unit string
+	// Scale converts between the stored value and the value shown: the page
+	// shows value/Scale and saves value*Scale. 0 means the two are the same. It
+	// lets a setting stored in seconds (refresh_interval) be edited in hours.
+	Scale int64
 	// Zero explains a special value, e.g. "0 = mai" or "-1 = auto".
 	Zero string
 	// Kind forces the control type: time, days, url or select.
@@ -32,7 +37,7 @@ type uiSettingMeta struct {
 var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"update_check_hours": {Unit: "ore", DependsOn: "update_check"},
 	// Generale
-	"refresh_interval":        {Unit: "secondi"},
+	"refresh_interval":        {Unit: "ore", Scale: 3600},
 	"max_release_age_days":    {Unit: "giorni", Zero: "0 = nessun limite"},
 	"gap_fill_max_per_series": {Zero: "0 = illimitato", DependsOn: "gap_filling"},
 	"gap_deep_interval_hours": {Unit: "ore", DependsOn: "gap_filling"},
@@ -254,15 +259,65 @@ func uiIsBoolSpelling(value string) bool {
 	return false
 }
 
+// uiSettingDisplayNumber converts a stored numeric value into the unit the page
+// shows (a setting stored in seconds edited in hours). Keys without a scale are
+// returned unchanged.
+func uiSettingDisplayNumber(key, stored string) string {
+	scale := uiSettingMetaByKey[key].Scale
+	if scale <= 1 || strings.TrimSpace(stored) == "" {
+		return stored
+	}
+	value, err := strconv.ParseFloat(strings.TrimSpace(stored), 64)
+	if err != nil {
+		return stored
+	}
+	return formatScaledNumber(value / float64(scale))
+}
+
+// uiSettingStoredNumber converts a value typed in the shown unit back into the
+// stored unit (hours to seconds), rounded to a whole number.
+func uiSettingStoredNumber(key, shown string) string {
+	scale := uiSettingMetaByKey[key].Scale
+	if scale <= 1 || strings.TrimSpace(shown) == "" {
+		return shown
+	}
+	value, err := strconv.ParseFloat(strings.TrimSpace(shown), 64)
+	if err != nil {
+		return shown
+	}
+	return strconv.FormatInt(int64(math.Round(value*float64(scale))), 10)
+}
+
+// formatScaledNumber prints a scaled number without a trailing ".0".
+func formatScaledNumber(value float64) string {
+	if value == math.Trunc(value) {
+		return strconv.FormatInt(int64(value), 10)
+	}
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
 // uiSettingSameValue compares a stored value with the default the way the
-// field shows them: booleans by meaning, numbers numerically, text exactly.
+// field shows them: booleans by meaning, numbers numerically, text exactly. A
+// scaled unit (hours shown, seconds stored) is compared in the shown unit.
 func uiSettingSameValue(field uiSettingField, stored, def string) bool {
 	stored, def = strings.TrimSpace(stored), strings.TrimSpace(def)
+	if uiSettingMetaByKey[field.Key].Scale > 1 {
+		stored = uiSettingDisplayNumber(field.Key, stored)
+		def = uiSettingDisplayNumber(field.Key, def)
+	}
 	switch field.Kind {
 	case "bool":
 		storedBool, _, _ := uiBoolValues(stored)
 		defBool, _, _ := uiBoolValues(def)
 		return storedBool == defBool
+	case "select":
+		// A two-choice combo over a boolean (Attivo/Non attivo) is compared by
+		// meaning, so a stored "1" is not "modified" against a default "true".
+		if uiIsBoolSpelling(stored) && uiIsBoolSpelling(def) {
+			storedBool, _, _ := uiBoolValues(stored)
+			defBool, _, _ := uiBoolValues(def)
+			return storedBool == defBool
+		}
 	case "number":
 		a, errA := strconv.ParseFloat(stored, 64)
 		b, errB := strconv.ParseFloat(def, 64)

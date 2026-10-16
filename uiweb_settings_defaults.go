@@ -45,7 +45,7 @@ var uiSettingDefaults = map[string]string{
 	"score_bonus_real":    "100",
 
 	// --- Daemon -------------------------------------------------------------
-	"active":                  "false",
+	"active":                  "true",
 	"refresh_interval":        "21600",
 	"max_release_age_days":    "0",
 	"gap_fill_max_per_series": "0",
@@ -138,7 +138,7 @@ var uiSettingDefaults = map[string]string{
 	"tvdb_language":          "ita",
 	"tmdb_language":          "it-IT",
 	"default_language":       "ita",
-	"cleanup_upgrades":       "false",
+	"cleanup_upgrades":       "true",
 	"movies_flat_files":      "yes",
 	"cleanup_min_score_diff": "0",
 	"upgrade_min_score_diff": "200",

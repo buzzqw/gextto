@@ -111,7 +111,7 @@ func uiSettingsCanonicalTab(tab string) string {
 // page: the first setting of a group places the whole group.
 var uiSettingsIndex = []uiSettingDef{
 	// --- Generale -----------------------------------------------------------
-	{Key: "active", Label: "Ricerca e download automatici", Tab: "daemon", Group: "Ciclo di ricerca"},
+	{Key: "active", Label: "Ciclo automatico (ricerca e download)", Tab: "daemon", Group: "Ciclo di ricerca"},
 	{Key: "refresh_interval", Label: "Intervallo della ricerca automatica", Tab: "daemon", Group: "Ciclo di ricerca"},
 	{Key: "cycle_title_search", Label: "Ricerca titoli online nel ciclo", Tab: "daemon", Group: "Ciclo di ricerca"},
 	{Key: "max_release_age_days", Label: "Età massima delle release", Tab: "daemon", Group: "Ciclo di ricerca"},

@@ -125,16 +125,28 @@ func tuningAlreadySet(key, current, proposed string) bool {
 	return current == proposed
 }
 
-// proposedMinFreeSpaceGB is the free-space guard the tuning would set: at least
-// 20 GB or 5% of the volume, capped at half of the free space.
+// Free-space guard bounds: at least 20 GB, never more than 50 GB. The 5% of the
+// volume rule alone is wrong on a multi-terabyte disk (it asked for hundreds of
+// GB), so the percentage only raises the floor up to the ceiling.
+const (
+	minFreeSpaceFloorGB = 20
+	minFreeSpaceCeilGB  = 50
+)
+
+// proposedMinFreeSpaceGB is the free-space guard the tuning would set: between
+// 20 and 50 GB (5% of the volume raises the floor, the ceiling caps it), never
+// more than half of the free space.
 func proposedMinFreeSpaceGB(facts SystemFacts) int64 {
 	const gib = uint64(1024 * 1024 * 1024)
 	if !facts.Download.Exists || facts.Download.Total == 0 {
 		return 0
 	}
-	target := uint64(20) * gib
+	target := uint64(minFreeSpaceFloorGB) * gib
 	if fivePercent := facts.Download.Total / 20; fivePercent > target {
 		target = fivePercent
+	}
+	if ceiling := uint64(minFreeSpaceCeilGB) * gib; target > ceiling {
+		target = ceiling
 	}
 	if half := facts.Download.Free / 2; target > half {
 		target = half

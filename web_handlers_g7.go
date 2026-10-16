@@ -1149,6 +1149,8 @@ func SaveSettingHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "setting is too large")
 		return
 	}
+	// A value typed in a shown unit (hours) is stored in its stored unit (seconds).
+	value = uiSettingStoredNumber(input.Key, value)
 	if err := validateSettingValue(input.Key, value, latestConfig(s)); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return

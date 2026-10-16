@@ -66,7 +66,9 @@ func newTestAppState(t *testing.T) *AppState {
 	trash := filepath.Join(dir, "trash")
 	cfg.TrashPath = &trash
 	cfg.DryRun = true
-	cfg.Active = false
+	// The automatic cycle is on by default; a test daemon starts no scheduler, so
+	// this only keeps the config view agreeing with the page default.
+	cfg.Active = true
 	// Write a minimal configuration file pointing at the temporary directory so
 	// LatestConfig reloads from an isolated config database instead of falling
 	// back to `./data` (which would make the tests depend on the environment).
@@ -78,7 +80,7 @@ func newTestAppState(t *testing.T) *AppState {
 		"torrent_temp_dir": filepath.Join(dir, "incomplete"),
 		"trash_path":       filepath.Join(dir, "trash"),
 		"dry_run":          true,
-		"active":           false,
+		"active":           true,
 	})
 	if err != nil {
 		t.Fatalf("marshal test config: %v", err)

@@ -133,9 +133,10 @@ Gextto gira come un unico servizio. Apri la UI all'indirizzo `http://<host>:5000
   (ciclo automatico e uscita dalla modalità prova). Si può saltare e riaprire
   in ogni momento da `/?view=setup`; un'installazione che ha già serie, film o
   archivio non la mostra.
-- **Attivo vs dry-run**: in dry-run non partono download reali; abilita la
-  *modalità attiva* (interruttore *Ricerca e download automatici* in
-  *Configurazione → Generale*) solo quando sei pronto.
+- **Attivo vs dry-run**: il ciclo automatico è **acceso di default**, quindi
+  Gextto cerca da solo; con il **dry-run** attivo (la scelta *Scarica davvero*
+  nel wizard) non parte nessun download reale. L'interruttore del ciclo è *Ciclo
+  automatico (ricerca e download)* in *Configurazione → Generale*.
 - Aggiungi serie/film da **Esplora** (TMDB) oppure da **Serie TV / Film → Aggiungi**.
 - I metadati (stagioni, episodi, locandine, calendario) arrivano da TMDB o da
   TVDB: vedi *Configurazione → Metadati: TMDB o TVDB*.
@@ -1408,7 +1409,7 @@ salvata** finché non li salvi.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Ricerca e download automatici | Attiva o disattiva il daemon Gextto: cicli automatici e download. |
+| Ciclo automatico (ricerca e download) | Interruttore generale del ciclo: quando è spento Gextto non cerca e non scarica da solo. Acceso di default; con la prova (dry-run) attiva cerca senza scaricare. |
 | Intervallo della ricerca automatica | Intervallo tra le ricerche automatiche di serie e film, in secondi (21600 = 6 ore). *(Unità: secondi)* |
 | Ricerca titoli online nel ciclo | Cerca i titoli su indexer durante il ciclo: auto (solo se non ci sono feed configurati), yes (sempre), no (mai, usa solo feed e archivio locale). |
 | Età massima delle release | Ignora le release più vecchie di N giorni (0 = nessun limite). Le release senza data sono considerate pubblicate oggi. *(Unità: giorni; 0 = nessun limite)* |

@@ -76,6 +76,14 @@ func TestProposeTuningSpaceGuardIsClampedToFreeSpace(t *testing.T) {
 	if keys["min_free_space_gb"] != "4" {
 		t.Fatalf("clamped min_free_space_gb = %q, want 4 (half of the 8 GB free)", keys["min_free_space_gb"])
 	}
+	// A multi-terabyte volume must not ask for hundreds of GB: the 5% rule is
+	// capped.
+	huge := tuningTestFacts()
+	huge.Download = VolumeFacts{Path: "/downloads", Total: 16 << 40, Free: 4 << 40, Exists: true}
+	keys = tuningProposalKeys(ProposeTuning(huge, &cfg, nil))
+	if keys["min_free_space_gb"] != "50" {
+		t.Fatalf("capped min_free_space_gb = %q, want 50 on a 16 TB volume", keys["min_free_space_gb"])
+	}
 }
 
 func TestProposeTuningDetectsNetworkFilesystem(t *testing.T) {

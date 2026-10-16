@@ -130,6 +130,11 @@ func TestConfigViewDefaultsMatchThePage(t *testing.T) {
 		t.Fatalf("decode /api/config: %v", err)
 	}
 	for key, want := range uiSettingDefaults {
+		// A scaled key (hours on the page, seconds in the config) is compared in
+		// the stored unit elsewhere; the view reports the stored unit.
+		if uiSettingMetaByKey[key].Scale > 1 {
+			continue
+		}
 		raw, ok := view[key]
 		if !ok || raw == nil {
 			continue // not a flat key of the view
@@ -180,4 +185,21 @@ func sameSettingValue(page, backend string) bool {
 	left, leftOK := truth(page)
 	right, rightOK := truth(backend)
 	return leftOK && rightOK && left == right
+}
+
+// The automatic cycle runs by default: a fresh installation searches (in
+// dry-run) without the user having to flip a switch first. The page default and
+// the backend default must agree, and the legacy "1" spelling must read as the
+// same on/off so the row is not flagged as modified.
+func TestAutomaticCycleIsOnByDefault(t *testing.T) {
+	if !DefaultConfig().Active {
+		t.Fatal("the automatic cycle must be on by default")
+	}
+	if got := uiSettingDefaults["active"]; got != "true" {
+		t.Fatalf("page default for active = %q, want true", got)
+	}
+	field := uiSettingFieldFor("active", "active", "1")
+	if !uiSettingSameValue(field, "1", "true") {
+		t.Fatal("the stored \"1\" must read as the same on/off as the default \"true\"")
+	}
 }

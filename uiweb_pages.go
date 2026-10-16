@@ -1028,6 +1028,12 @@ func uiTorrentBackendOptions(value string) []uiFormOption {
 func uiSettingFieldFor(key, label, value string) uiSettingField {
 	field := uiSettingFieldBase(key, label, value)
 	uiApplySettingMeta(&field, value)
+	// A scaled unit (seconds stored, hours shown) is converted for the page; the
+	// save path converts it back to the stored unit.
+	if uiSettingMetaByKey[key].Scale > 1 {
+		field.Value = uiSettingDisplayNumber(key, field.Value)
+		field.Default = uiSettingDisplayNumber(key, field.Default)
+	}
 	return field
 }
 
@@ -1143,6 +1149,16 @@ func uiSettingFieldBase(key, label, value string) uiSettingField {
 		Placeholder: placeholder,
 		Kind:        uiSettingKind(key, value),
 		Hint:        uiSettingTooltip(key),
+	}
+	if key == "active" {
+		// A two-choice combo instead of a switch: it says "Attivo / Non attivo",
+		// so the user reads what the cycle is doing instead of guessing a toggle.
+		on := settingTruthy(value)
+		field.Kind = "select"
+		field.Options = []uiFormOption{
+			{Value: "true", Label: "Attivo", Selected: on},
+			{Value: "false", Label: "Non attivo", Selected: !on},
+		}
 	}
 	if key == "cleanup_action" {
 		selected := strings.TrimSpace(value)

@@ -132,9 +132,10 @@ Gextto runs as a single service. Open the web UI at `http://<host>:5000`.
   cycle and leaving test mode). It can be skipped and reopened at any time from
   `/?view=setup`; an installation that already has series, movies or an archive
   does not show it.
-- **Active vs dry-run**: dry-run never starts real downloads; enable *active
-  mode* (the *Automatic search and download* switch in *Configuration →
-  General*) only when you are ready.
+- **Active vs dry-run**: the automatic cycle is **on by default**, so Gextto
+  searches on its own; with **dry-run** enabled (the *Download for real* choice
+  in the setup wizard) it starts no real downloads. The cycle switch is *Automatic
+  cycle (search and download)* in *Configuration → General*.
 - Add series/movies from **Explore** (TMDB) or **Series / Movies → Add**.
 - Metadata (seasons, episodes, posters, calendar) comes from TMDB or TVDB: see
   *Configuration → Metadata: TMDB or TVDB*.
@@ -1363,7 +1364,7 @@ them.
 
 | Setting | What it does |
 |---|---|
-| Automatic search and download | Enable or disable the Gextto daemon: automatic cycles and downloads. |
+| Automatic cycle (search and download) | The master switch of the cycle: when off, Gextto neither searches nor downloads on its own. On by default; with dry-run on it searches without downloading. |
 | Automatic search interval | Interval between automatic series/movie searches, in seconds (21600 = 6 hours). *(Unit: seconds)* |
 | Online title search in the cycle | Search titles on indexers during the cycle: auto (only when no feeds are configured), yes (always), no (never, use only feeds and the local archive). |
 | Maximum release age | Ignore releases older than N days (0 = no limit). Releases without a date are treated as published today. *(Unit: days; 0 = no limit)* |

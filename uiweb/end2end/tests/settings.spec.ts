@@ -132,14 +132,15 @@ test("predefinito ripristina il valore e va salvato", async ({ page }) => {
     await row.evaluate((form) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.setAttribute("data-v2-reset", "21600");
+      // The interval is edited in hours (the default is 6).
+      button.setAttribute("data-v2-reset", "6");
       button.textContent = "Predefinito";
       form.querySelector(".setting-actions")!.prepend(button);
     });
   }
   await page.locator("#input-refresh_interval").evaluate((input: HTMLInputElement) => { input.value = "60"; input.defaultValue = "60"; });
   await row.locator("[data-v2-reset]").first().click();
-  await expect(page.locator("#input-refresh_interval")).toHaveValue("21600");
+  await expect(page.locator("#input-refresh_interval")).toHaveValue("6");
   await expect(page.locator("[data-v2-savebar]")).toBeVisible();
 });
 

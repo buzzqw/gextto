@@ -2409,6 +2409,8 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 			value = string(encoded)
 		}
 	}
+	// A value typed in a shown unit (hours) is stored in its stored unit (seconds).
+	value = uiSettingStoredNumber(key, value)
 	if len(value) > 4096 {
 		render("valore troppo grande", true)
 		return
