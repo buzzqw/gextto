@@ -657,10 +657,10 @@ func RunCycleDomain(
 				continue
 			}
 		}
-		score := cfg.ReleaseScore(&release)
+		score := cfg.AcquisitionScore(&release)
 		if release.Kind == "series" {
 			var superseded bool
-			best, superseded = mergeSeriesCandidate(best, release, score, cfg.ReleaseScore)
+			best, superseded = mergeSeriesCandidate(best, release, score, cfg.AcquisitionScore)
 			if superseded {
 				// Rejected because the selection already contains an equal or
 				// better release: routine deduplication, not an INFO event.
@@ -698,7 +698,7 @@ func RunCycleDomain(
 			"episodes", episodesLabel(release.EpisodeRange),
 			"gap_episodes", episodesLabel(gapEpisodesForRelease(release, gapTargets)),
 			"source", release.Source,
-			"score", cfg.ReleaseScore(release))
+			"score", cfg.AcquisitionScore(release))
 	}
 
 	// Advanced setting: refuse to start downloads when the download disk is
@@ -798,7 +798,7 @@ func RunCycleDomain(
 				isReadyPending = true
 			}
 		}
-		releaseScore := cfg.ReleaseScore(&release)
+		releaseScore := cfg.AcquisitionScore(&release)
 		// A candidate that fills a known archive gap, or that scores above the
 		// bypass threshold, is never held by a delay profile.
 		gapEpisodes := gapEpisodesForRelease(&release, gapTargets)
@@ -1165,7 +1165,7 @@ func prioritizeArchiveGapDownloads(
 			// torrent metadata all identify the same monitored series.
 			canonicalName := series.Name
 			release.Series = &canonicalName
-			score := cfg.ReleaseScore(release)
+			score := cfg.AcquisitionScore(release)
 			candidate, exists := candidates[hash]
 			if !exists || score > candidate.score {
 				gapSet := map[gapTarget]struct{}{}
@@ -1519,7 +1519,7 @@ func stalledAlternativeContext(cfg *Config, db *Database, torrents TorrentSessio
 				continue
 			}
 			release := &meta.Release
-			score := cfg.ReleaseScore(release)
+			score := cfg.AcquisitionScore(release)
 			for _, key := range releaseEpisodeKeys(release) {
 				if current, ok := alternatives[key]; !ok || score > current {
 					alternatives[key] = score
@@ -1783,7 +1783,7 @@ func releaseStrictlyBetter(a *models.Release, aScore int64, b *models.Release, b
 func incumbentWins(candidate *models.Release, candidateScore int64, incumbent *models.Release, cfg *Config) bool {
 	// Use the same policy-aware score the candidate was ranked with, so score
 	// rules and custom formats cannot make the two sides inconsistent.
-	incumbentScore := cfg.ReleaseScore(incumbent)
+	incumbentScore := cfg.AcquisitionScore(incumbent)
 	if incumbentScore != candidateScore {
 		return incumbentScore > candidateScore
 	}

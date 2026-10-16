@@ -23,8 +23,10 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
 
 - **It decides like an expert, and explains itself.** Every candidate release is
   scored on resolution, source, codec, audio, HDR/Dolby Vision, language and
-  size. The winner is downloaded; every rejected candidate keeps the exact
-  reason in the log. Upgrades stop once the file is good enough.
+  size. A dead swarm (no seeders and no peers) cannot win a slot over a viable
+  alternative, yet quality still dominates. The winner is downloaded; every
+  rejected candidate keeps the exact reason in the log. Upgrades stop once the
+  file is good enough.
 - **It protects your library.** Completed files enter the library as hardlinks
   while seeding, a mount guard tells an unmounted NAS apart from a deleted
   file, replaced files go to a recycle bin, and interrupted moves resume after
@@ -84,8 +86,10 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
   completed files appear in the library instantly as hardlinks — no duplicate
   disk usage during seeding.
 - **NAS and mount guard.** An unmounted share is never mistaken for deleted
-  files. Transient failures (disk full, network timeouts) retry transparently
-  and interrupted moves resume on restart. Starting a download is crash-safe
+  files, and a sudden burst of "missing" files is capped instead of re-downloading
+  the whole library; the destination probe is bounded, so a hung share cannot
+  freeze the engine. Transient failures (disk full, network timeouts) retry
+  transparently and interrupted moves resume on restart. Starting a download is crash-safe
   too: a restart in the middle of an add either completes it or undoes it, so
   no torrent is left orphaned and no episode looks taken when it is not.
 - **Recycle bin.** Files replaced by a true quality upgrade, and data of a

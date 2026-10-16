@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/backoff"
@@ -25,6 +26,17 @@ import (
 )
 
 const downloadHistoryRetentionDays int64 = 30
+
+// A vanished library volume makes every archived file look missing at once;
+// archive rows are therefore reset only in a bounded burst. See allowArchiveReset.
+const (
+	// archiveResetBurstLimit is the maximum number of archived rows that may be
+	// made eligible again within archiveResetBurstWindow.
+	archiveResetBurstLimit = 20
+	// archiveResetBurstWindow is longer than a typical cycle, so a mass reset
+	// spanning a single cycle still hits the ceiling.
+	archiveResetBurstWindow = 10 * time.Minute
+)
 
 // DefaultUpgradeMinScoreDiff is the default upgrade threshold used by callers
 // without a `Config`.
@@ -781,6 +793,16 @@ const databaseFeedSeenSchema = `CREATE TABLE IF NOT EXISTS movie_feed_seen (
 type Database struct {
 	db   *sql.DB
 	path string
+
+	// archiveReset* bound how many archived rows may be made eligible again in a
+	// short window. A vanished library volume (NAS unmounted, mount point
+	// removed, transient NFS ENOENT) makes every archived file look missing at
+	// once; without a ceiling one mount problem would turn into a library-wide
+	// re-download. See allowArchiveReset.
+	archiveResetMu     sync.Mutex
+	archiveResetStart  time.Time
+	archiveResetCount  int
+	archiveResetWarned bool
 }
 
 // Close closes the underlying SQLite connection. The OS reclaims the handle at
@@ -1036,13 +1058,20 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	err = d.db.QueryRow("SELECT COALESCE(archive_path,'') FROM episodes WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode).Scan(&persistedArchivePath)
 	if err == nil && strings.TrimSpace(persistedArchivePath) != "" {
 		if _, statErr := os.Stat(persistedArchivePath); errors.Is(statErr, os.ErrNotExist) && archiveFileConfirmedMissing(persistedArchivePath) {
-			if !dryRun {
-				if _, updateErr := d.db.Exec("UPDATE episodes SET downloaded_at=NULL,archive_path=NULL,size_bytes=0,media_info_json='' WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode); updateErr != nil {
-					return false, "", updateErr
+			if !d.allowArchiveReset() {
+				// Too many archived files vanished at once to be user deletions:
+				// the volume is probably unmounted. Preserve this row (and the
+				// hash), so it is not re-downloaded; allowArchiveReset already
+				// logged the warning for the window.
+			} else {
+				if !dryRun {
+					if _, updateErr := d.db.Exec("UPDATE episodes SET downloaded_at=NULL,archive_path=NULL,size_bytes=0,media_info_json='' WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode); updateErr != nil {
+						return false, "", updateErr
+					}
 				}
+				missingArchivedFile = true
+				logging.Warn("archive file missing; episode made eligible for recovery", "series", seriesName, "season", season, "episode", episode, "path", persistedArchivePath)
 			}
-			missingArchivedFile = true
-			logging.Warn("archive file missing; episode made eligible for recovery", "series", seriesName, "season", season, "episode", episode, "path", persistedArchivePath)
 		}
 	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return false, "", err
@@ -5961,4 +5990,30 @@ func archiveFileConfirmedMissing(path string) bool {
 			return false
 		}
 	}
+}
+
+// allowArchiveReset reports whether another archived row may be made eligible
+// again, and counts the reset. It returns false once archiveResetBurstLimit rows
+// have been reset within archiveResetBurstWindow and logs one warning per
+// window: a burst that large means the library volume is probably not mounted,
+// so the remaining rows are preserved instead of being re-downloaded.
+func (d *Database) allowArchiveReset() bool {
+	d.archiveResetMu.Lock()
+	defer d.archiveResetMu.Unlock()
+	now := time.Now()
+	if d.archiveResetStart.IsZero() || now.Sub(d.archiveResetStart) > archiveResetBurstWindow {
+		d.archiveResetStart = now
+		d.archiveResetCount = 0
+		d.archiveResetWarned = false
+	}
+	if d.archiveResetCount >= archiveResetBurstLimit {
+		if !d.archiveResetWarned {
+			d.archiveResetWarned = true
+			logging.Warn("too many archived files suddenly look missing to be deletions; keeping their records — check that the library volume is mounted",
+				"resets", d.archiveResetCount, "window", archiveResetBurstWindow.String())
+		}
+		return false
+	}
+	d.archiveResetCount++
+	return true
 }

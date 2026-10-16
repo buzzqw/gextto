@@ -124,6 +124,26 @@ as evidence: those intents wait. The decision itself is still evaluated twice on
 purpose — a read-only evaluation before the add and the committing one after it —
 so a refused add writes nothing and the commit never trusts a stale state.
 
+**Swarm health in the choice, not in the quality score.** The cycle score is
+quality + subtitles + size; the swarm enters the acquisition decision only, through
+`AcquisitionScore` (`config.go`): a definitively empty swarm (0 seeders and 0 peers) is
+discounted below the upgrade margin so it cannot claim a slot over a viable
+alternative, a swarm with only leechers is discounted mildly (leechers still complete
+each other), and a healthy swarm earns a small bonus capped below
+`upgrade_min_score_diff`. A source that does not report seeders (the `-1` sentinel,
+most RSS/feed releases) stays neutral, and the adjustment is never folded into
+`ReleaseScore`, so archived files and the UI keep the plain score. Quality stays
+sovereign: a dead 4K still beats a healthy 1080p.
+
+**A vanished library volume is not a mass deletion.** Resetting an episode because
+its file is gone (`archiveFileConfirmedMissing`) is bounded: at most
+`archiveResetBurstLimit` rows (20) may be made eligible again within
+`archiveResetBurstWindow` (10 minutes), after which the cycle keeps the remaining
+records and warns once to check the mount. The post-processing destination probe
+(`ValidateDestination`) runs under a timeout (`destinationProbeTimeout`, 30 s), so a
+hung network share reports an error and is retried instead of blocking the torrent
+event worker forever.
+
 **What counts as missing**: an episode with an active torrent — added by hand, from
 a watched folder or from the phone — and a season with a season pack in progress are
 not missing, neither in the cycle nor in the series tab; a download in error makes

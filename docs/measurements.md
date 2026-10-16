@@ -123,6 +123,14 @@ Matching 16 unrelated v2 candidates costs ~1.6 µs once per torrent (one small m
 candidate) and the picker/peer/piece-write paths are not touched, so the merge cannot
 affect seeding or download throughput.
 
+**Swarm health in the acquisition score is allocation-neutral** (2026-10-16, Intel N97,
+`go test -bench 'BenchmarkReleaseScore|BenchmarkAcquisitionScore' -benchmem -count 6 .`).
+The adjustment (`AcquisitionScore = ReleaseScore + healthAdjustment`) is a pure switch
+plus a `math.Log10` per candidate: **959–1009 vs 973–1024 ns/op, 224 B/op and 1 alloc/op
+for both** — the adjustment costs nothing measurable and adds no allocation (the
+224 B/1 alloc come from the pre-existing `ReleaseScore`). It runs once per candidate in
+the cycle, never on a transfer path, so it cannot affect seeding or download throughput.
+
 **RSS term matching** (2026-10-15, Intel N97, `go test -bench BenchmarkCriteriaMatch
 -benchmem -count 5 ./internal/rss/`: one rule with two *one of* and two *none of* terms
 over four typical release names). The terms are found with `rss.HasTerm` — separators of

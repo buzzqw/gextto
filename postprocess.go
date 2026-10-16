@@ -344,9 +344,23 @@ func CompletionPath(event *models.TorrentEvent) string {
 	return filepath.Join(root, fmt.Sprintf(".gextto-missing-%s", event.Hash))
 }
 
+// destinationProbeTimeout bounds the writability probe. The probe runs inside
+// the torrent event worker (every 750 ms); a hung network share would otherwise
+// block the whole worker forever. On timeout the completion is treated as a
+// transient failure and retried, instead of freezing every other torrent.
+//
+// It is a variable so tests can shorten it without touching the filesystem.
+var destinationProbeTimeout = 30 * time.Second
+
+// destinationWritable is the probe run by ValidateDestination. It is a variable
+// so tests can substitute a hung mount without a real network filesystem.
+var destinationWritable = probeDestinationWritable
+
 // ValidateDestination creates the post-processing destination (implementation of
 // `validate_destination`). It also verifies that the target directory is writable,
-// catching read-only mounts, network timeouts or disconnected NAS shares.
+// catching read-only mounts, network timeouts or disconnected NAS shares. A
+// destination that does not answer within destinationProbeTimeout is reported as
+// an error rather than hanging the caller.
 func ValidateDestination(destination string) error {
 	if destination == "" {
 		return errors.New("empty post-processing destination")
@@ -354,10 +368,23 @@ func ValidateDestination(destination string) error {
 	if strings.ContainsRune(destination, '\x00') {
 		return errors.New("invalid post-processing destination")
 	}
+	done := make(chan error, 1)
+	go func() { done <- destinationWritable(destination) }()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(destinationProbeTimeout):
+		return fmt.Errorf("post-processing destination did not respond within %s: %s", destinationProbeTimeout, destination)
+	}
+}
+
+// probeDestinationWritable creates the directory and writes a temporary probe to
+// catch read-only mounts or hung NAS shares. It performs blocking filesystem
+// calls, so ValidateDestination runs it under a timeout.
+func probeDestinationWritable(destination string) error {
 	if err := os.MkdirAll(destination, 0o755); err != nil {
 		return err
 	}
-	// Verify directory writability with a temporary probe to catch read-only mounts or hung NAS.
 	probe := filepath.Join(destination, fmt.Sprintf(".gextto-probe-%s", randomToken()))
 	f, err := os.OpenFile(probe, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {

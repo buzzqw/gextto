@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -1797,6 +1798,45 @@ func (c *Config) releaseScoreWithMovie(release *models.Release, movie *MovieConf
 		score += MovieSubtitleBonus(movie, &release.Quality)
 	}
 	return score + rules.SizeScoreBonus(release)
+}
+
+// AcquisitionScore is ReleaseScore plus the swarm-health adjustment, and it is
+// used only where a release is weighed against alternatives to actually claim a
+// download slot. It is deliberately not folded into ReleaseScore: that score is
+// also used for archived files and for the UI, where a swarm is meaningless
+// (archived releases carry `Seeders = -1`, which the adjustment leaves neutral).
+//
+// The adjustment is intentionally small relative to quality: the bonus is capped
+// below DefaultUpgradeMinScoreDiff and the empty-swarm penalty is bounded, so a
+// better resolution always wins and health alone never forces an upgrade.
+func (c *Config) AcquisitionScore(release *models.Release) int64 {
+	return c.ReleaseScore(release) + healthAdjustment(release)
+}
+
+// healthAdjustment nudges a candidate score by how alive its swarm looks.
+// Indexers report seeders inconsistently: a negative count means "unknown"
+// (most public/RSS sources never populate it) and stays neutral, while a
+// definitively empty swarm (0 seeders and 0 peers) is pushed down so it cannot
+// win a slot over a viable alternative. A swarm with only leechers is not dead
+// (leechers still complete each other), so it is only mildly discounted.
+func healthAdjustment(release *models.Release) int64 {
+	if release == nil {
+		return 0
+	}
+	switch {
+	case release.Seeders < 0:
+		return 0
+	case release.Seeders == 0 && release.Peers == 0:
+		return -400
+	case release.Seeders == 0:
+		return -150
+	default:
+		bonus := int64(30 * math.Log10(float64(release.Seeders)+1))
+		if bonus > 150 {
+			bonus = 150
+		}
+		return bonus
+	}
 }
 
 // FileScore scores an already archived file with the same release scorer used at

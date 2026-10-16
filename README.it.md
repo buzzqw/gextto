@@ -24,9 +24,10 @@ Node.js/npm, sei lingue nell'interfaccia.
 
 - **Decide come un esperto, e spiega le sue scelte.** Ogni release candidata
   riceve un punteggio su risoluzione, sorgente, codec, audio, HDR/Dolby
-  Vision, lingua e dimensione. Vince la migliore; ogni scartata conserva nel
-  log il motivo esatto. Gli upgrade si fermano quando il file è abbastanza
-  buono.
+  Vision, lingua e dimensione. Uno swarm morto (né seeder né peer) non può
+  soffiare uno slot a un'alternativa viva, ma la qualità resta sovrana. Vince
+  la migliore; ogni scartata conserva nel log il motivo esatto. Gli upgrade si
+  fermano quando il file è abbastanza buono.
 - **Protegge la tua libreria.** I file completati entrano in libreria come
   hardlink durante il seed, una guardia distingue un NAS smontato da un file
   cancellato, i file sostituiti vanno in un cestino e gli spostamenti
@@ -89,7 +90,10 @@ Node.js/npm, sei lingue nell'interfaccia.
   filesystem, i file completati compaiono subito in libreria come hardlink —
   senza duplicare lo spazio occupato.
 - **Guardia NAS e mount point.** Una condivisione smontata non viene mai
-  scambiata per file cancellati. I guasti transienti (disco pieno, timeout di
+  scambiata per file cancellati, e una raffica improvvisa di file «mancanti»
+  viene limitata invece di riscaricare l'intera libreria; la sonda sulla
+  destinazione ha un tempo massimo, così una condivisione bloccata non
+  congela il motore. I guasti transienti (disco pieno, timeout di
   rete) ritentano da soli e gli spostamenti interrotti riprendono al riavvio.
   Anche l'avvio di un download resiste ai crash: un riavvio a metà aggiunta la
   completa o la annulla, così nessun torrent resta orfano e nessun episodio
