@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -141,6 +142,30 @@ func proposedMinFreeSpaceGB(facts SystemFacts) int64 {
 		return 0
 	}
 	return int64(target / gib)
+}
+
+// ApplyTuning writes the confirmed proposals. It recomputes the proposal from
+// the current facts and applies only the keys the caller confirmed, using the
+// server's own proposed value (never a value taken from the request), each
+// through validateSettingValue. Every write is recorded as "auto" with the
+// reason, so re-optimizing recognises its own values and the user's stay theirs.
+func ApplyTuning(dataDir string, cfg *Config, chosen map[string]bool) (int, error) {
+	proposals := ProposeTuning(ProbeSystem(cfg), cfg, ManualSettings(dataDir))
+	applied := 0
+	for _, proposal := range proposals {
+		if !chosen[proposal.Key] {
+			continue
+		}
+		if err := validateSettingValue(proposal.Key, proposal.Proposed, cfg); err != nil {
+			return applied, fmt.Errorf("%s: %w", proposal.Key, err)
+		}
+		if err := saveConfigSetting(dataDir, proposal.Key, proposal.Proposed); err != nil {
+			return applied, err
+		}
+		_ = MarkSettingOrigin(dataDir, proposal.Key, OriginAuto, fmt.Sprintf(proposal.WhyTemplate, proposal.WhyArgs...))
+		applied++
+	}
+	return applied, nil
 }
 
 // humanBytesString renders a byte count for a sentence ("1.8 TB").

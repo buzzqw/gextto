@@ -149,6 +149,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "GET /settings/search", V2SettingsSearch)
 	v2Handle(s, mux, "POST /settings/save", V2SettingsSave)
 	v2Handle(s, mux, "POST /settings/score-groups", V2SettingsScoreGroup)
+	v2Handle(s, mux, "POST /settings/tuning/apply", V2SettingsTuningApply)
 	v2Handle(s, mux, "POST /settings/feed", V2SettingsFeed)
 	v2Handle(s, mux, "POST /settings/checkbox", V2SettingsCheckbox)
 	v2Handle(s, mux, "GET /settings/editor-row", V2SettingsEditorRow)
@@ -2038,6 +2039,8 @@ type v2SettingsView struct {
 	ScoreExamples []string
 	// Sources is the entry point of the Sorgenti tab (deep links + status).
 	Sources *v2SourcesIndex
+	// Tuning is the guided optimization panel of the performance tab.
+	Tuning *v2TuningPanel
 	// Structured editors (feeds, checkbox groups, list editors, rename,
 	// translations), rendered on the tab that owns them.
 	EditorsFirst   bool
@@ -2187,6 +2190,8 @@ func v2SettingsViewFrom(s *AppState, tab, highlight string) v2SettingsView {
 		view.ScoreExamples = scoreExampleLines(s, cfg)
 	case "sources":
 		view.Sources = v2SourcesIndexFrom(s, cfg)
+	case "performance":
+		view.Tuning = v2TuningPanelFrom(s, cfg)
 	}
 	return view
 }

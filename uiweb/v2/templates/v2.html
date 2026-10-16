@@ -729,6 +729,7 @@
     {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
     {{if .Sources}}{{template "v2_sources_index" .Sources}}{{end}}
     {{if .ScoreExamples}}{{template "v2_score_examples" .ScoreExamples}}{{end}}
+    {{if .Tuning}}{{template "v2_tuning_panel" .Tuning}}{{end}}
     {{if .Actions}}
     <div class="panel settings-panel settings-actions-panel">
       <div class="panel-head"><h3>{{.Actions.Title}}</h3></div>
@@ -769,6 +770,34 @@
     {{if .Buttons}}<div class="toolbar settings-group-actions">{{range .Buttons}}{{template "v2_button" .}}{{end}}</div>{{end}}
   </div>
 {{if .Collapsed}}</details>{{else}}</div>{{end}}
+{{end}}
+
+{{define "v2_tuning_panel"}}
+<div class="panel settings-panel" id="v2-tuning-panel">
+  <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{.Hint}}</small></div>
+  <div class="panel-body">
+    {{if .DryRun}}<p class="hint">{{.DryRunNote}}</p>{{end}}
+    {{if .Notice}}<p class="{{if .Error}}error{{else}}muted{{end}}" role="status">{{.Notice}}</p>{{end}}
+    {{if .Rows}}
+    <form method="post" hx-post="/settings/tuning/apply" hx-target="#v2-tuning-panel" hx-swap="outerHTML">
+      <div class="settings-rows">
+        {{range .Rows}}
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label" id="v2-tune-{{.Key}}">{{.Label}}</span>
+            <code class="setting-key">{{.Key}}</code>
+            <p class="setting-hint">{{.Why}}</p>
+          </div>
+          <div class="setting-control"><span class="muted">{{if .Current}}{{.Current}}{{else}}—{{end}}</span> <span aria-hidden="true">→</span> <strong>{{.Proposed}}</strong></div>
+          <div class="setting-actions"><input type="checkbox" id="v2-tune-check-{{.Key}}" name="key" value="{{.Key}}" checked aria-label="{{.CheckLabel}}" /></div>
+        </div>
+        {{end}}
+      </div>
+      <div class="form-actions"><button class="btn sm primary" type="submit" hx-disabled-elt="this"{{if .DryRun}} disabled{{end}}>{{.ApplyLabel}}</button></div>
+    </form>
+    {{else}}<p class="muted">{{.Empty}}</p>{{end}}
+  </div>
+</div>
 {{end}}
 
 {{define "v2_sources_index"}}
