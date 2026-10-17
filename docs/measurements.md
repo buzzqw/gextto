@@ -120,100 +120,61 @@ build-by-build chronicles are compressed to one row per step.
 
 ### 4.1 Engine CPU and memory
 
-**Peer reader under a saturated line** (9–10 releases re-added, Auto speed, collector
-every 5 s, 45 s CPU profile at ≥ 8 MB/s, means over the samples above 4 MB/s):
+**Current figures**, from a load test with 9–10 releases, Auto speed, a collector every
+5 s and a CPU profile at ≥ 8 MB/s:
 
-| gx-torrent | CPU mean (max) | rate | peers | CPU per MB/s | CPU per peer | RssAnon max |
-|---|---|---|---|---|---|---|
-| build 220 | 168 % (209 %) | 8.25 MB/s | 98 | 20.4 | 1.71 | 922 MB |
-| builds 221–222 (regression: deadline throttled, limiter atomics) | 198–221 % (256 %) | 7.9–8.1 MB/s | 135–143 | 24.5–27.9 | 1.39–1.64 | 1266–1555 MB |
-| **build 223**, progress-based deadline | **46 % (136 %)** | **8.12 MB/s** | 116 | **5.7** | **0.40** | 1858 MB |
-| **build 224**, uTP in-place receive, no `reflect.Select` | **45 % (80 %)** | **8.24 MB/s** | 131 | **5.5** | **0.35** | 1718 MB |
-| **build 225**, parsed IP filter cached, uTP buffers released | 44 % (99 %) | 6.80 MB/s | 125 | 6.5 | **0.35** | 1844 MB |
-| **build 226**, `GOGC=50` | 48 % (76 %) | **8.98 MB/s** | 111 | **5.3** | 0.43 | **1105 MB** |
+| | Value |
+|---|---|
+| Idle | 60–64 MB RSS (44–48 MB anonymous), 1–2 % of a core |
+| Under load | 44–48 % of a core at 8–9 MB/s with ~110–130 peers |
+| CPU per MB/s / per peer | 5.3 / 0.35–0.43 |
+| Memory under load | RssAnon peak ~1.1 GB with 10 torrents and the NFS write cache; ~507 MB outside the two caches |
+| Piece picker | 9 % of the profile |
 
-The table is the outcome: a busy loop on dead uTP connections and two copies in the read
-path were removed between builds 223 and 225, and `GOGC=50` trimmed the memory in 226.
-**−72 % CPU per MB/s and −77 % per peer** against build 220.
+**Choices behind these figures.** The read path uses a progress-based deadline, so a
+dead uTP connection fails at once instead of looping; the socket handles each datagram in
+the receive buffer and copies only what stays queued; `waitEvents` is a plain select.
+The IP filter keeps the parsed rules instead of the file, `GOGC=50` trims the heap
+headroom, and the buffers of a finished burst are released. The collector costs 0.5 %
+(`gcBgMarkWorker`) and 2.2 % (`mallocgc`) of the profile.
 
-**Memory** follows the write cache: with downloads on NFS the auto policy gives 1.26 GB
-to piece buffers on this 16 GB host, and the read cache is 128 MB. The comparable figure
-is the memory outside the two caches: **1032 → 859 MB** after build 225, then
-**859 → 507 MB** with `GOGC=50`. Two retentions were real and were fixed: uTP receive
-buffers (`appendReadBuf` + queued payloads) fell **376 → 66 MB**, and the IP filter from
-**33 MB (raw file) + 5 MB to 5 MB** (only the parsed rules are kept).
+**Piece picker.** With ~200 peers it reads the peer bitfield (O(1)), keeps a count per
+piece and a counter of high-priority pieces, and touches only the pieces a disconnecting
+peer had. On three public ISOs at 9.4 MB/s it is 9 % of the CPU;
+`BenchmarkRarestManyPeers` is 13.8 µs and the bitfield update+disconnect 65–68 µs.
+Pinned by `TestHoldersMatchAReferenceModel` (20,000 random have/don't-have/disconnect
+steps).
 
-**Decision:** progress-based read deadline, in-place receive, parsed-rule cache,
-`GOGC=50` unless the environment sets `GOGC`. The collector costs **0.5 %
-(`gcBgMarkWorker`) and 2.2 % (`mallocgc`)** of the profile; the last restart holds
-**60–64 MB RSS** at 1–2 % CPU.
-
-**Piece picker with many peers** (3 public ISOs, 168 peers, 9.4 MB/s): `PickFor` was
-**15 %** of the CPU — `pickHigh` walked every piece to find high-priority ones that did
-not exist, and `Having.Has` scanned slices of up to ~170 holders per candidate (5.5 %);
-the holder slices were **35 MB of heap (18 %)**. The picker now reads the peer bitfield
-(O(1)), keeps only a **count** per piece and a counter of high-priority pieces, and
-`HandleDisconnect` touches only the pieces the peer had. Pinned by
-`TestHoldersMatchAReferenceModel` (20,000 random have/don't-have/disconnect steps against
-an independent model). On the same swarm, 196 peers at 9.42 MB/s: **1962 ticks/60 s
-against 3273** (**−49 % per peer**), picker **9 %**. Super-seeding still runs after the
-picker, since it reads the bit.
-
-**uTP** (build 224): the socket reader copied every datagram into a fresh slice (43 % of
-the allocations); the datagram is now handled in the reused receive buffer and copied
-only when it stays queued. `waitEvents` no longer uses `reflect.Select`: a plain
-five-case select over the event channels, with a `reflect` fallback beyond five (no
-caller has more). The listen socket keeps a 50-SYN backlog bound that never binds on the
-real swarms tested (`utp_syn_drops` 0).
-
-**Other engine numbers.** `BenchmarkTransferLoopback` went from 23.6 KB / 118 allocs to
-**5.6 KB / 99 allocs** per op (116–127 → 131–139 MB/s). The uTP RTO has a **5 ms
-minimum-RTT floor** (silent-peer harness: 18,184 resends at 1 µs against 2,919 at 5 ms,
-**6.2×**) and a **per-connection backoff** that doubles on timeout and halves on delivery
-(silent peer: 17,663 → 8,853 resends, **−50 %**), seeded from the per-host winning-dial
-latency EMA clamped to [5, 400] ms. A healthy connection never timeout-resends, so the
-swarm numbers are unchanged.
+**uTP retransmission.** A 5 ms minimum-RTT floor keeps a fast path from collapsing the
+RTO; a per-connection backoff doubles on timeout and halves on delivery; a healthy
+connection never timeout-resends. `BenchmarkTransferLoopback` is 5.6 KB / 99 allocs per
+op at 131–139 MB/s. The listen socket keeps a 50-SYN backlog bound that never binds on
+the real swarms tested (`utp_syn_drops` 0).
 
 ### 4.2 Daemon at rest
 
-**gexttod** (live service, 4 torrents, 1 peer; `GEXTTO_PPROF`, `strace`, `/proc` over
-60 s):
+**Current figures** (live service, 4 torrents, 1 peer; `GEXTTO_PPROF`, `strace` and
+`/proc`):
 
-| gexttod | CPU ticks / 60 s | `torrentEventWorker` | directory opens / 20 s | write probes |
-|---|---|---|---|---|
-| build 1783 | 91 (~1.5 %) | — | 112 (`torrent-done` + state dir) | create + `fsync` + delete in 4 folders, NFS trash included, at every 5 s Salute poll |
-| build 1784 (`.torrent` copies cached, probes cached) | 62 | 280 ms | **0** | one per folder per 30 s; on NFS `access(W_OK)` |
-| **build 1785** (pack-identity verdict cached) | **46 (~0.7 %)** | **90 ms** | 0 | as 1784 |
+| | Value |
+|---|---|
+| Idle CPU | 46 ticks/min (~0.7 % of a core) |
+| Directory opens | 0 per 20 s; no write probe |
+| `torrentEventWorker` | 90 ms per 60 s |
+| First minutes after a start | 0.39 % of a core, stale-temp sweep 0.21 s |
+| Metadata calls | ~5,000 a day for 55 series |
 
-Each poll of the gx-torrent adapter (every 1.5 s) used to check both `.torrent` copies of
-every torrent with an `os.OpenRoot` + stat, under the adapter lock, so the cost grew
-with the session. A pair is now trusted for 5 minutes, or until the name or the copy
-folder changes. The Salute tile and the health check share the 30 s cache and use
-`access(W_OK)` on network shares, so the NAS disks can spin down. The pack-identity
-check (`RejectActivePackIdentityMismatches`) was 38 % of the remaining CPU: a consistent
-verdict is reused for 60 s, or until the name changes. What is left is TLS handshakes,
-the `RemoveSeededCompleted` status queries and the adapter's own HTTP poll.
+**Choices behind these figures.** The `.torrent` copies are trusted for 5 minutes (or
+until the name or the copy folder changes) instead of being stat'ed at every 1.5 s poll.
+The Salute tile and the health check share a 30 s cache and use `access(W_OK)` on network
+shares instead of writing, so the NAS disks can spin down. A consistent pack-identity
+verdict is reused for 60 s. The stale-temp sweep uses `WalkDir` and stats only temporary
+names. One TMDB transport is shared and the calendar is bounded to 8 lookups with a
+15 min cache. `RemoveSeededCompleted`, `DetachCompletedArchivedSingles` and
+`DetachErrorTorrents` query only what the session view does not already rule out.
 
-**The first minutes after a start** (builds 1788–1790):
-
-| gexttod | window | CPU | stale-temp sweep | new TLS to TMDB |
-|---|---|---|---|---|
-| build 1788 | 180 s | 1.12 % | 1.32 s (65 % of the profile) | 66 in 150 s |
-| build 1789 (`WalkDir` sweep, shared TMDB transport) | 180 s | 0.62 % | 0.25 s | 110 in 180 s |
-| **build 1790** (calendar bounded, 15 min cache) | 300 s | **0.39 %** | 0.21 s | **8 in 300 s**, then none |
-
-The sweep walks the download folders, the movie archive and every series folder on the
-NAS (32,672 entries): `WalkDir` takes the type from the listing and stats only temp
-names, **843 → 550 ms** of CPU and **1.92 → 1.68 s** per pass warm (**7.3 → 1.7 s**
-cold). The calendar rebuilt every ~3 minutes with one goroutine per enabled series (55)
-and a private transport per client: now one shared transport (HTTP/2, 8 idle
-connections per host), at most 8 lookups at a time and a 15 min cache keyed by the
-enabled series — **~40,000 TMDB calls a day become ~5,000**. `RemoveSeededCompleted` and
-`DetachCompletedArchivedSingles` query only the torrents the session view does not rule
-out; `DetachErrorTorrents` reuses a "not in error" verdict for 30 s.
-
-**gx-torrent at rest** (build 227): **1.45 % of a core**, of which 41 % syscalls and ~50 %
-`runtime.findRunnable` — uTP state packets and sends, incoming MSE handshakes
+**gx-torrent at rest** (same session): **1.45 % of a core**, of which 41 % syscalls and
+~50 % `runtime.findRunnable` — uTP state packets and sends, incoming MSE handshakes
 (`mse.keyPair` 4.6 %) and the DHT loop, which is real traffic. The ~330 `nanosleep`/s are
 the Go scheduler's own wake-ups. No spinning loop, nothing to change.
 
