@@ -2,6 +2,8 @@ package gextto
 
 import (
 	"bytes"
+	"encoding/base32"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -366,7 +368,8 @@ func benchArchiveMagnet(n int) string {
 }
 
 // BenchmarkArchiveSaveBatch measures a feed pass archiving 1000 releases into
-// an archive that already holds 50,000 (half of them already known).
+// an archive that already holds 50,000 (half of them already known), and the
+// file size of those 50,000 rows.
 func BenchmarkArchiveSaveBatch(b *testing.B) {
 	path := filepath.Join(b.TempDir(), "gextto_archive.db")
 	archive, err := OpenArchive(path)
@@ -382,6 +385,12 @@ func BenchmarkArchiveSaveBatch(b *testing.B) {
 	if err := archive.SaveBatch(seed, cfg); err != nil {
 		b.Fatal(err)
 	}
+	// The file after the 50,000 seed rows: a fixed point, unlike the size at
+	// the end, which grows with b.N.
+	seededSize := int64(0)
+	if info, err := os.Stat(path); err == nil {
+		seededSize = info.Size()
+	}
 	next := 50000
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -396,7 +405,83 @@ func BenchmarkArchiveSaveBatch(b *testing.B) {
 		}
 	}
 	b.StopTimer()
-	if info, err := os.Stat(path); err == nil {
-		b.ReportMetric(float64(info.Size())/(1<<20), "MiB-file")
+	b.ReportMetric(float64(seededSize)/(1<<20), "MiB-seeded")
+}
+
+// TestArchiveKeepsOneRowPerTorrent pins the infohash dedup: an archive with
+// several listings of the same torrent keeps only the newest one, a later
+// listing under another magnet refreshes that row, a base32 spelling is the
+// same torrent as its hex one, and rows without a hash are never merged.
+func TestArchiveKeepsOneRowPerTorrent(t *testing.T) {
+	const hexHash = "0123456789abcdef0123456789abcdef01234567"
+	raw, _ := hex.DecodeString(hexHash)
+	b32 := base32.StdEncoding.EncodeToString(raw)
+	path := filepath.Join(t.TempDir(), "archive.db")
+	legacy, err := OpenArchive(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := legacy.db.Exec("DROP INDEX idx_archive_hash"); err != nil {
+		t.Fatal(err)
+	}
+	rows := []struct{ title, magnet, hash, added string }{
+		{"Show S01E01 1080p", "magnet:?xt=urn:btih:" + hexHash + "&tr=a", hexHash, "2026-01-01 10:00:00"},
+		{"Show S01E01 1080p [Prowlarr - Knaben]", "magnet:?xt=urn:btih:" + hexHash + "&tr=b", hexHash, "2026-01-03 10:00:00"},
+		{"Show.S01E01.1080p", "magnet:?xt=urn:btih:" + b32, strings.ToLower(b32), "2026-01-02 10:00:00"},
+		{"Url One", "http://jackett/dl/1", "", "2026-01-01 09:00:00"},
+		{"Url One", "http://jackett/dl/2", "", "2026-01-01 09:00:00"},
+	}
+	for _, row := range rows {
+		if _, err := legacy.db.Exec("INSERT INTO archive(title,magnet,magnet_key,magnet_hash,source,added_at) VALUES (?1,?2,gextto_magnet_key(?2),?3,'feed',?4)", row.title, row.magnet, row.hash, row.added); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = legacy.Close()
+
+	archive, err := OpenArchive(path)
+	if err != nil {
+		t.Fatalf("reopen with duplicates: %v", err)
+	}
+	t.Cleanup(func() { _ = archive.Close() })
+	count := func() int64 {
+		n, err := archive.Count()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if got := count(); got != 3 {
+		t.Fatalf("rows after the dedup = %d, want 3 (1 torrent + 2 URLs)", got)
+	}
+	var title string
+	if err := archive.db.QueryRow("SELECT title FROM archive WHERE magnet_hash=?1", hexHash).Scan(&title); err != nil || title != "Show S01E01 1080p [Prowlarr - Knaben]" {
+		t.Fatalf("kept row = %q, %v; want the newest listing", title, err)
+	}
+	// The exact same magnet is ignored; another magnet of it refreshes the row.
+	cfg := &Config{}
+	if err := archive.SaveBatch([]models.Release{{Title: "Ignored", Magnet: "magnet:?xt=urn:btih:" + hexHash + "&tr=b"}}, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := archive.SaveBatch([]models.Release{{Title: "Show S01E01 1080p WEB", Magnet: "magnet:?xt=urn:btih:" + b32 + "&tr=c"}}, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if got := count(); got != 3 {
+		t.Fatalf("rows after re-listing = %d, want 3", got)
+	}
+	if err := archive.db.QueryRow("SELECT title FROM archive WHERE magnet_hash=?1", hexHash).Scan(&title); err != nil || title != "Show S01E01 1080p WEB" {
+		t.Fatalf("refreshed row = %q, %v", title, err)
+	}
+	if found, err := archive.Search("Show"); err != nil || len(found) != 1 {
+		t.Fatalf("search = %v, %v; want the one torrent", found, err)
+	}
+	// A URL resolved to a torrent already archived just goes away.
+	if err := archive.CanonicalizeTorrentURL("http://jackett/dl/1", "magnet:?xt=urn:btih:"+hexHash+"&tr=z"); err != nil {
+		t.Fatal(err)
+	}
+	if got := count(); got != 2 {
+		t.Fatalf("rows after canonicalizing a known torrent = %d, want 2", got)
+	}
+	if removed, err := archive.RemoveHash(strings.ToLower(b32)); err != nil || removed != 1 {
+		t.Fatalf("RemoveHash by base32 = %d, %v", removed, err)
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/base32"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -138,6 +140,93 @@ func migrateArchiveMagnetKey(db *sql.DB) error {
 	return nil
 }
 
+// archiveInfoHash is the archive's content identity of a magnet: its infohash,
+// with a base32 v1 hash turned into the usual 40-char hex so the two spellings
+// of the same torrent are one.
+func archiveInfoHash(magnet string) (string, bool) {
+	hash, ok := utils.MagnetHash(magnet)
+	if !ok {
+		return "", false
+	}
+	return normalizeArchiveHash(hash), true
+}
+
+// normalizeArchiveHash lowercases a hash and turns a 32-char base32 v1 hash
+// into hex; anything else is returned lowercased as it is.
+func normalizeArchiveHash(hash string) string {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if len(hash) == 32 {
+		if raw, err := base32.StdEncoding.DecodeString(strings.ToUpper(hash)); err == nil && len(raw) == 20 {
+			return hex.EncodeToString(raw)
+		}
+	}
+	return hash
+}
+
+// migrateArchiveOneRowPerHash makes the infohash unique in the archive. Rows
+// with the same infohash are the same torrent: the same content, listed again
+// with another tracker list, another source or a slightly different title.
+// Only the newest one is kept, the row Search and the orchestrator already
+// picked first, and idx_archive_hash keeps it that way. Rows without a hash
+// (`.torrent` URLs) cannot be compared, so they are never touched.
+func migrateArchiveOneRowPerHash(db *sql.DB) error {
+	var present int
+	if err := db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_archive_hash'").Scan(&present); err != nil || present > 0 {
+		return err
+	}
+	started := time.Now()
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	rows, err := tx.Query("SELECT id, magnet_hash FROM archive WHERE length(magnet_hash)=32")
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	type spelled struct {
+		id   int64
+		hash string
+	}
+	var base32Rows []spelled
+	for rows.Next() {
+		var row spelled
+		if err := rows.Scan(&row.id, &row.hash); err != nil {
+			rows.Close()
+			_ = tx.Rollback()
+			return err
+		}
+		base32Rows = append(base32Rows, row)
+	}
+	rows.Close()
+	for _, row := range base32Rows {
+		if _, err := tx.Exec("UPDATE archive SET magnet_hash=?1 WHERE id=?2", normalizeArchiveHash(row.hash), row.id); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	result, err := tx.Exec("DELETE FROM archive WHERE magnet_hash<>'' AND id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY magnet_hash ORDER BY added_at DESC, id DESC) AS rn FROM archive WHERE magnet_hash<>'') WHERE rn=1)")
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("archive dedup: %w", err)
+	}
+	removed, _ := result.RowsAffected()
+	if _, err := tx.Exec("CREATE UNIQUE INDEX idx_archive_hash ON archive(magnet_hash) WHERE magnet_hash<>''"); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("archive dedup index: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if removed > 0 {
+		if _, err := db.Exec("VACUUM"); err != nil {
+			logging.Warn("archive: VACUUM after the dedup failed", "error", err.Error())
+		}
+		logging.Info("archive: one row per torrent", "duplicates_removed", removed, "duration", time.Since(started).Round(time.Millisecond).String())
+	}
+	return nil
+}
+
 // OpenArchive opens (creating if needed) the archive database at path.
 func OpenArchive(path string) (*Archive, error) {
 	db, err := OpenSQLite(path)
@@ -155,6 +244,10 @@ func OpenArchive(path string) (*Archive, error) {
 	if _, err := db.Exec(archiveSchema); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("archive schema: %w", err)
+	}
+	if err := migrateArchiveOneRowPerHash(db); err != nil {
+		_ = db.Close()
+		return nil, err
 	}
 	// The plain title index is never used (titles are matched through FTS or
 	// lower(title) LIKE): it only cost space and write time.
@@ -187,16 +280,22 @@ func OpenArchive(path string) (*Archive, error) {
 		}
 		logging.Info("archive FTS index rebuilt", "rows", archiveCount)
 	}
-	// Ricerca case-insensitive per hash (`lower(COALESCE(magnet_hash,''))`):
-	// un indice di espressione evita la scansione completa.
-	if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_archive_magnet_lower ON archive(lower(COALESCE(magnet_hash,'')));"); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
+	// Hashes are stored normalized (lowercase hex), so the lookups by hash use
+	// idx_archive_hash: the older expression index only cost write time.
+	_, _ = db.Exec("DROP INDEX IF EXISTS idx_archive_magnet_lower")
 	return &Archive{db: db, path: path}, nil
 }
 
-// SaveBatch inserts releases, ignoring magnets/URLs already archived.
+// archiveInsertSQL and archiveRefreshSQL archive one release: ?1 title, ?2
+// magnet, ?3 infohash or NULL, ?4 source, ?5 quality score, ?6 magnet key. The
+// refresh runs only when the insert was ignored. A single upsert with two
+// conflict targets measured 71 ms per 1000 releases against 54 ms.
+const (
+	archiveInsertSQL  = "INSERT OR IGNORE INTO archive(title,magnet,magnet_key,magnet_hash,source,quality_score,added_at) VALUES (?1,?2,?6,?3,?4,?5,datetime('now'))"
+	archiveRefreshSQL = "UPDATE archive SET title=?1, magnet=?2, magnet_key=?6, source=?4, quality_score=?5, added_at=datetime('now') WHERE magnet_hash<>'' AND magnet_hash=?3 AND magnet_key<>?6"
+)
+
+// SaveBatch archives releases: one row per exact magnet/URL and per infohash.
 func (a *Archive) SaveBatch(releases []models.Release, cfg *Config) error {
 	// Spezza il batch in transazioni più piccole: un'unica transazione da
 	// migliaia di righe con l'indice FTS5 generava un WAL enorme (osservato
@@ -224,6 +323,20 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 	if err != nil {
 		return err
 	}
+	// Prepared once per chunk: compiling the SQL again for every release was
+	// a measurable part of a feed pass.
+	insert, err := tx.Prepare(archiveInsertSQL)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer insert.Close()
+	refresh, err := tx.Prepare(archiveRefreshSQL)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer refresh.Close()
 	for i := range releases {
 		r := &releases[i]
 		// Content filters are also an archive-ingestion boundary: releases that
@@ -246,12 +359,23 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 			continue
 		}
 		var hash any
-		if value, ok := utils.MagnetHash(source); ok {
+		if value, ok := archiveInfoHash(source); ok {
 			hash = value
 		}
-		if _, err := tx.Exec("INSERT OR IGNORE INTO archive(title,magnet,magnet_key,magnet_hash,source,quality_score,added_at) VALUES (?1,?2,?6,?3,?4,?5,datetime('now'))", r.Title, source, hash, r.Source, cfg.ReleaseScore(r), archiveMagnetKeyString(source)); err != nil {
+		// The exact magnet already archived is left as it is. The same torrent
+		// under another magnet (other trackers, source or title spelling)
+		// refreshes its one row, which becomes the newest, as a new row did.
+		args := []any{r.Title, source, hash, r.Source, cfg.ReleaseScore(r), archiveMagnetKeyString(source)}
+		result, err := insert.Exec(args...)
+		if err != nil {
 			_ = tx.Rollback()
 			return err
+		}
+		if inserted, _ := result.RowsAffected(); inserted == 0 && hash != nil {
+			if _, err := refresh.Exec(args...); err != nil {
+				_ = tx.Rollback()
+				return err
+			}
 		}
 	}
 	return tx.Commit()
@@ -268,8 +392,8 @@ func (a *Archive) QuickCheck() ([]string, error) {
 // pass even after it has been blocklisted.
 func (a *Archive) RemoveHash(hash string) (int, error) {
 	result, err := a.db.Exec(
-		"DELETE FROM archive WHERE lower(COALESCE(magnet_hash,''))=lower(?1)",
-		hash,
+		"DELETE FROM archive WHERE magnet_hash<>'' AND magnet_hash=?1",
+		normalizeArchiveHash(hash),
 	)
 	if err != nil {
 		return 0, err
@@ -283,22 +407,25 @@ func (a *Archive) RemoveHash(hash string) (int, error) {
 
 // CanonicalizeTorrentURL replaces an ephemeral `.torrent` URL with its durable
 // infohash magnet once the torrent has been downloaded successfully. If the
-// same magnet is already archived, the obsolete URL row is simply removed.
+// same magnet or torrent is already archived, the obsolete URL row is removed.
 func (a *Archive) CanonicalizeTorrentURL(torrentURL, magnet string) error {
 	tx, err := a.db.Begin()
 	if err != nil {
 		return err
 	}
+	var hash any
+	hashText := ""
+	if value, ok := archiveInfoHash(magnet); ok {
+		hash, hashText = value, value
+	}
+	// The URL row goes when the magnet, or another listing of the same
+	// torrent, is already archived.
 	if _, err := tx.Exec(
-		"DELETE FROM archive WHERE magnet_key=?1 AND magnet=?2 AND EXISTS (SELECT 1 FROM archive WHERE magnet_key=?3 AND magnet=?4)",
-		archiveMagnetKeyString(torrentURL), torrentURL, archiveMagnetKeyString(magnet), magnet,
+		"DELETE FROM archive WHERE magnet_key=?1 AND magnet=?2 AND EXISTS (SELECT 1 FROM archive WHERE (magnet_key=?3 AND magnet=?4) OR (?5<>'' AND magnet_hash=?5))",
+		archiveMagnetKeyString(torrentURL), torrentURL, archiveMagnetKeyString(magnet), magnet, hashText,
 	); err != nil {
 		_ = tx.Rollback()
 		return err
-	}
-	var hash any
-	if value, ok := utils.MagnetHash(magnet); ok {
-		hash = value
 	}
 	if _, err := tx.Exec(
 		"UPDATE OR IGNORE archive SET magnet=?1, magnet_key=?2, magnet_hash=?3 WHERE magnet_key=?4 AND magnet=?5",
@@ -650,12 +777,12 @@ func (a *Archive) DeleteMatching(query string) (int, error) {
 
 // Delete removes the row matching the magnet or its infohash.
 func (a *Archive) Delete(magnet string) (bool, error) {
-	hash, ok := utils.MagnetHash(magnet)
+	hash, ok := archiveInfoHash(magnet)
 	var query string
 	var args []any
 	if ok {
 		// Both sides use an index: the magnet key and the hash expression.
-		query = "DELETE FROM archive WHERE (magnet_key=?1 AND magnet=?2) OR lower(COALESCE(magnet_hash,''))=lower(?3)"
+		query = "DELETE FROM archive WHERE (magnet_key=?1 AND magnet=?2) OR (magnet_hash<>'' AND magnet_hash=?3)"
 		args = []any{archiveMagnetKeyString(magnet), magnet, hash}
 	} else {
 		// No usable magnet hash: match only by the exact magnet link so an

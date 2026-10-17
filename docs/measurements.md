@@ -433,9 +433,34 @@ intact (a copy of the original was kept before the rebuild). `BenchmarkArchiveSa
 
 −10 % per batch and −34 % on disk. The +4 allocations per row (+160 B) are the 16-byte key
 handed to the driver. The magnet is hashed through a stack buffer, so it is not copied.
-The exact-magnet lookups (`Delete`, `CanonicalizeTorrentURL`) go through the key, and
-`Delete` by infohash now uses the `lower(COALESCE(magnet_hash,''))` index instead of a
-full scan.
+
+**Feed archive: one row per torrent** (same day, build 1791). Of the 446,994 rows,
+255,892 are Jackett `/dl/` URLs with no infohash. They cannot be compared without
+downloading them, so they are left alone. Of the 191,102 rows with an infohash, 64,502
+repeated a torrent already listed (43,679 torrents). Same infohash means same content: the
+listings differed only in tracker list, source, or a title variant, usually the source
+appended (`[Prowlarr - Knaben]`) or a dash for a space. Search returns the 200 newest
+matches and the orchestrator deduplicates by hash only afterwards, so those copies took
+places in the 200. The archive now keeps the newest row per infohash, which is the row
+Search returned first and the orchestrator chose. Base32 hashes (222) are stored as hex,
+and `idx_archive_hash` (partial UNIQUE on `magnet_hash`) enforces the rule. A new listing
+of a known torrent under another magnet refreshes that row (title, magnet, source,
+date); the exact magnet seen again is still ignored. A URL resolved to a torrent already
+archived is removed. The one-off pass on the live service: **64,619 rows removed in 5.6 s,
+352 → 320 MB**, `quick_check` ok, no infohash left twice, the Archive page at 37 ms.
+
+| `BenchmarkArchiveSaveBatch` | ns/op | B/op | allocs/op |
+|---|---|---|---|
+| magnet `UNIQUE`, `Exec` per row (before today) | 58.7–59.1 ms | 2.64 MB | 40,016 |
+| one upsert with two conflict targets | 70.2–71.7 ms | 2.80 MB | 44,017 |
+| **`INSERT OR IGNORE` + conditional refresh, statements prepared per chunk** | **40.9–41.8 ms** | 3.00 MB | 50,528 |
+
+Two of the variants tried were rejected on these numbers. One upsert with two conflict
+targets costs 17 ms per 1000 releases more than `INSERT OR IGNORE`. Compiling the SQL for
+every row was the larger cost of all. The kept variant is −30 % against the morning's
+code, with +13 % allocated bytes (the prepared-statement arguments). The expression index
+`lower(COALESCE(magnet_hash,''))` is gone: hashes are stored normalized, and the lookups
+by hash use `idx_archive_hash`.
 
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
