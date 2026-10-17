@@ -330,7 +330,7 @@ sortable tables, live announcements, responsive reflow and contrast-checked
 themes, covered by axe-core and Playwright (`cd uiweb/end2end && npm ci && npm
 run test:a11y`). This is not a legal certification: manual screen-reader and
 assistive-technology testing is still required
-([scope and limits](docs/measurements.md#accessibility)).
+([scope, tests and limits](docs/ACCESSIBILITY.md)).
 
 ## Documentation
 

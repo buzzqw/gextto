@@ -67,7 +67,7 @@ px. Il risultato non è una dichiarazione di conformità WCAG o normativa: per
 un'attestazione servono anche audit manuale con screen reader, tastiera,
 ingrandimento e tecnologie assistive, oltre alla valutazione dei requisiti
 applicabili. Per il dettaglio vedere
-[`measurements.md`](measurements.md#accessibility).
+[`ACCESSIBILITY.md`](ACCESSIBILITY.md).
 
 Il manuale distingue sempre tra:
 

@@ -377,35 +377,10 @@ mixed-priority files (open item in [`evoluzione.md`](evoluzione.md) §8); qBitto
 
 ### Accessibility
 
-**Method**: static review (HTML/CSS/JS), semantics/names/ARIA/focus, responsive
-layout/visible focus/reduced-motion, light/dark theme contrast, axe-core via Playwright,
-regression tests (dialogs, keyboard sort, polling, narrow viewports). Suite: **14 green
-tests** on dashboard, downloads, settings, maintenance, health, logs
-(`cd uiweb/end2end && npm ci && npm run test:a11y`; a safety net, not a substitute for
-the manual assessment).
-
-**gx-torrent pages** (2026-10-15, Chromium via Playwright + `@axe-core/playwright`, tags
-`wcag2a`/`wcag2aa`, light and dark theme, a standalone daemon with sample torrents,
-feeds, rules and wanted titles): the torrent list, its context and column menus, the
-detail panel (general, files, peers), *Connection details*, *Global speed limits*, the
-RSS rules and feeds with their editors, the wanted page with its editor and the
-*Releases* dialog — **0 violations**. The first run found and led to fixing: column and
-panel resizers without a value (`aria-valuenow`), zero-count filters dimmed below the
-contrast minimum, `aria-selected` rows outside a grid (the table is now `role="grid"`
-with `aria-multiselectable`), `aria-expanded` set on a row by the context menu, preview
-lists that scroll but could not take the focus, and the progress percentage drawn over
-the bar (now beside it, readable on any bar colour).
-
-**Residual validation** (before any formal declaration): primary workflows with
-Tab/Shift+Tab/Enter/Space/arrows/Escape; at least one desktop screen reader
-(NVDA+Firefox or VoiceOver+Safari) and TalkBack where applicable; zoom 200 %/400 %;
-every form with a screen reader; async states not colour-only; both themes, mobile
-viewports, reduced motion; browser-specific behaviours and injected external content.
-
-**Acceptance criteria**: reliable name+role for every control; every mouse action from
-the keyboard; focus contained/restored in the dialogs; async announcements without
-excessive interruptions; contrasts in both themes; semantics usable for
-tables/tabs/progress/errors; no regression on desktop and mobile.
+The automated baseline passes: **14 axe-core/Playwright tests**, and the gx-torrent pages
+had **0 violations** in the audit (light and dark theme, sample torrents, feeds, rules
+and wanted titles). The method, the manual checklist, the acceptance criteria and the
+known limits are in [`ACCESSIBILITY.md`](ACCESSIBILITY.md).
 
 ### Backup and restore
 

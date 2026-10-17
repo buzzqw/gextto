@@ -366,7 +366,8 @@ punto aperto; le decisioni restano con la loro motivazione, i numeri in
   `icons.svg`, serviti su `/assets/`. Niente colori fissi nelle pagine: usa le
   variabili (`--text`, `--surface`, `--accent`, …) e i componenti esistenti
   (`.topbar`, `ul.items`, `dialog`, `.chip`, `.badge`, `.fsec`).
-- **Ogni modifica alla UI deve controllare e rispettare l'accessibilità.**
+- **Procedura, test e criteri di accessibilità: `docs/ACCESSIBILITY.md`.** Ogni
+  modifica alla UI deve controllare e rispettare l'accessibilità.
   Vale per `uiweb/v2` (SSR + HTMX), per la pagina del demone
   (`cmd/gx-torrent/ui.go`) e per ogni pagina HTML generata.
 - Requisiti minimi: HTML semantico e attributi ARIA corretti; ogni campo con un

@@ -16,6 +16,7 @@ needs.
 | [Migration](MIGRATION.md) | A safe move from a previous install. |
 | [qBittorrent-nox for Gextto](qbittorrent-nox.md) | How to configure the qBittorrent-nox backend: settings, path mapping, examples and typical cases. |
 | [Security](SECURITY.md) | Network exposure, secrets and vulnerability reporting. |
+| [Accessibility](ACCESSIBILITY.md) | Keyboard, screen reader, automated axe tests and the manual checklist for the web UI, the gx-torrent page and the TUI. |
 | [TUI](tui.md) | Terminal client and keyboard shortcuts. |
 | [Developers](DEVELOPERS.md) | Build, tests and contributor conventions. |
 | [Build and test times](tempistiche.md) | What builds and the test suite cost on a real machine, and how long CI takes. |
