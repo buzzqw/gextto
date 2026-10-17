@@ -934,11 +934,9 @@ The complete list of fields and actions is in [Appendix B](#appendix-b-reference
 
 - **Simkl** — credentials, PIN flow, watchlist import, calendar and mark-watched.
 - **Jellyfin / Plex** — server URL + token and a library refresh button.
-- **Engine metrics and events** — the gx-torrent daemon serves
-  `GET /api/v1/metrics` (Prometheus format, computed only when scraped) and
-  `GET /api/v1/events` (engine events as Server-Sent Events), for
-  Prometheus/Grafana, Home Assistant or a script. With the token set, send the
-  `X-Gx-Token` header; examples and routes are in `docs/API.md`.
+- **Metrics and events** — gx-torrent serves `GET /api/v1/metrics` for
+  Prometheus and `GET /api/v1/events` for Home Assistant or a script. With the
+  token, send the `X-Gx-Token` header. Examples in `docs/API.md`.
 - **Event hooks** — run an external program on Gextto events
   (`download_started`, `torrent_completed`, `season_pack_completed`,
   `torrent_error`, …). Fields accept placeholders such as `{title}`, `{hash}`,
@@ -1551,7 +1549,7 @@ Recalculate scores* after changing weights.
 | Global download limit | Global download limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
 | Global upload limit | Global upload limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
 | Automatic speed (measuring the line) | No cap: the bandwidth goes to the auto-tune, which measures the line and leaves it free. It beats the global limits and the schedule; the temporary limit in Downloads stays a separate override. Turning it on turns the schedule off, and the other way round. |
-| Auto respects latency | With the speed on Auto (the policy, an «Auto» schedule day or the temporary Auto) it measures the latency to the Internet every 2 seconds, only while Auto is in force. When it is high (or the idle reference is not known yet) it backs Gextto off to 60% for 8 seconds and watches: if the latency falls, the queue was Gextto's own and the line goes back to it (reference learned, 10 minutes of quiet); if it stays high while Gextto left room, someone else is filling the line and the guard yields, lowering the caps step by step and raising them again when the line is back at rest. When the router's WAN counters answer, their verdict on "others on the line" comes first. On by default. |
+| Auto respects latency | With the speed on Auto, Gextto measures the latency to the Internet every 2 seconds. When it is high, it backs off to 60% for 8 seconds: if the latency falls the queue was its own and it takes the line back; if it stays high someone else is filling the line and it yields, lowering the caps and raising them again when the line is at rest. With the router's WAN counters it decides first who else is on the line. On by default. |
 | Auto — host to measure latency | Host (or host:port) to measure the latency to with a TCP connection every 2 seconds, only while Auto is on. Empty = 9.9.9.9 and 1.1.1.1 (port 443). It must be past the router: the router does not see the provider's queue. |
 
 **Speed schedule**

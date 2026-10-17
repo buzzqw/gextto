@@ -963,11 +963,9 @@ L'elenco completo dei campi e delle azioni è nell'[Appendice B](#appendice-b-ri
   visto.
 - **Jellyfin / Plex** — URL + token del server e pulsante di aggiornamento
   libreria.
-- **Metriche ed eventi del motore** — il demone gx-torrent espone
-  `GET /api/v1/metrics` (formato Prometheus, calcolato solo allo scrape) e
-  `GET /api/v1/events` (eventi del motore in Server-Sent Events), utili per
-  Prometheus/Grafana, Home Assistant o uno script. Con il token impostato serve
-  l'header `X-Gx-Token`; esempi e rotte in `docs/API.md`.
+- **Metriche ed eventi** — gx-torrent espone `GET /api/v1/metrics` per
+  Prometheus e `GET /api/v1/events` per Home Assistant o uno script. Con il
+  token serve l'header `X-Gx-Token`. Esempi in `docs/API.md`.
 - **Hook eventi** — esegue un programma esterno su eventi Gextto
   (`download_started`, `torrent_completed`, `season_pack_completed`,
   `torrent_error`, …). I campi accettano segnaposto come `{title}`, `{hash}`,
@@ -1600,7 +1598,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | Limite download globale | Limite globale di download in KiB/s (0 = illimitato). *(Unità: KiB/s; 0 = illimitato)* |
 | Limite upload globale | Limite globale di upload in KiB/s (0 = illimitato). *(Unità: KiB/s; 0 = illimitato)* |
 | Velocità automatica (misura la linea) | Nessun tetto: la banda va all'auto-tune, che misura la linea e la lascia libera. Vince sui limiti globali e sulla programmazione; il limite temporaneo in Scarico resta un override a parte. Attivandola si spegne la programmazione, e viceversa. |
-| Auto rispetta la latenza | Con la velocità su Auto (politica, giorno «Auto» della programmazione o Auto temporaneo) misura la latenza verso Internet ogni 2 secondi, solo mentre Auto è attivo. Se è alta (o il riferimento a riposo non è ancora noto) rallenta Gextto al 60% per 8 secondi e guarda: se la latenza scende, la coda era di Gextto e la linea torna sua (riferimento appreso, 10 minuti di pausa); se resta alta mentre Gextto ha lasciato spazio, la linea la stanno usando altri e il guard cede, abbassando i tetti a passi e rialzandoli quando torna il riposo. Se i contatori WAN del router rispondono, il loro verdetto su «altri sulla linea» viene prima. Attiva per default. |
+| Auto rispetta la latenza | Con la velocità su Auto, Gextto misura la latenza verso Internet ogni 2 secondi. Se è alta, rallenta al 60% per 8 secondi: se la latenza scende la coda era sua e riprende la linea; se resta alta la linea è occupata da altri e cede, abbassando i tetti e rialzandoli quando torna il riposo. Con i contatori WAN del router decide prima chi altro è sulla linea. Attiva per default. |
 | Auto — host per misurare la latenza | Host (o host:porta) a cui misurare la latenza con una connessione TCP ogni 2 secondi, solo mentre Auto è attivo. Vuoto = 9.9.9.9 e 1.1.1.1 (porta 443). Deve stare oltre il router: il router non vede la coda del provider. |
 
 **Programmazione velocità**

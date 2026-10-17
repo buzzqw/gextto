@@ -1,11 +1,8 @@
 # Improvements and evolution of Gextto and gx-torrent
 
-Single working document for **what Gextto and gx-torrent are and what is next**: the
-capabilities as they exist today and the open items with their gate. The numbers behind
-the choices are in [`measurements.md`](measurements.md); the story of how we got here is
-in the git history, and the problems that have been solved are not recorded here.
-**Write it in the present tense:** a sentence that would be false in six months because
-it describes a transition does not belong here (see the rule in `AGENTS.md`).
+What Gextto and gx-torrent are today and what is next: the capabilities as they
+exist and the open items with their gate. The numbers behind the choices are in
+[`measurements.md`](measurements.md).
 
 The technical reference of the engine is [`gx-torrent.md`](gx-torrent.md), its BEP
 compliance [`bep.md`](bep.md), the engine inventory
@@ -744,32 +741,17 @@ its gate and its evidence, is in §8.
 
 ### 7. The engine is our own code
 
-gx-core is our engine and the documentation presents it as such: no external origin of
-the code is advertised. The whole engine (`internal/gxcore`), the DHT (`internal/dht`)
-and the uTP transport (`internal/utp`) are original code in-tree under EUPL-1.2, and the
-per-component `LICENSE` files are gone: `THIRD-PARTY-NOTICES` lists linked third-party
-libraries only. The peer ID prefix is `-GX` and the network identity is
-`"gx-core " + Version`.
+The engine (`internal/gxcore`), the DHT (`internal/dht`) and the uTP transport
+(`internal/utp`) are original code in this repository under EUPL-1.2;
+`THIRD-PARTY-NOTICES` lists only the linked libraries. The peer ID prefix is `-GX`
+and the network identity is `"gx-core " + Version`.
 
-Nothing does the engine's work from outside the repository: the rate limiter is a token
-bucket in `internal/gxcore/internal/bandwidth`, the torrent id a version-1 UUID minted
-in `internal/gxcore/torrent/torrent_id.go`, the logger `internal/gxcore/logging`, the
-backoff `internal/gxcore/internal/backoff`, the uTP transport and the DHT address
-decoding and throttle our own.
-
-Every file of `internal/gxcore` (~170) and `internal/dht` (17) is rewritten in this
-repository with APIs, wire formats and behaviours preserved. What still matches the old
-code is protocol-mandated format (BEP wire layouts, bencode tags, API shapes) and
-compatibility-kept strings (error/log texts, resume-DB and flag spellings), plus
-algorithm bodies where any correct Go implementation converges. Where it mattered,
-equivalence is proved by execution: MSE handshake cross-check over `net.Pipe`, fast-set
-byte identity, resume-DB and RPC shapes byte-identical. How this state was reached is in
-the git history.
-
-**Policy.** Gextto prefers its own code: what the engine needs is written here, not
-copied from anywhere. The pieces the engine talks to stay ours and swappable — it
-speaks to a uTP `Socket` (dial and accept counters, a `net.PacketConn` facade for the
-shared DHT socket), so the transport is isolated and can be replaced.
+The parts a client usually borrows are ours too: rate limiter, torrent id, logger,
+backoff, uTP transport, DHT decoding and throttle. The wire formats, the resume
+database and the flag spellings are kept compatible; where equivalence mattered it
+is proved by execution (MSE handshake over `net.Pipe`, fast-set bytes, resume-DB and
+RPC shapes). New engine code is written here, not copied, and the transport stays
+behind its own interface so it can be replaced.
 
 ---
 
