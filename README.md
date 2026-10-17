@@ -56,6 +56,11 @@ one.
 | **Interfaces** | Web UI (SSR + HTMX, pure Go, installable PWA) · terminal TUI over SSH · JSON API |
 | **Build** | Pure Go (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent also on Windows |
 
+It runs on a small machine. On a 4-core Intel N97 with 16 GB, gx-torrent idles at
+60–64 MB and ~1.5 % of a core, the Gextto daemon at ~70 MB and under 1 %, and the
+engine reaches ~100 MB at 100 MB/s. The health probes do not write to the NAS, so
+its disks can sleep.
+
 ## Numbers
 
 These figures come from the live installation and from real swarms, indexers

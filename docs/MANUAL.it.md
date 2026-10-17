@@ -836,10 +836,12 @@ identiche.
 
 ### Prestazioni: RAM e CPU
 
-La logica del daemon è trascurabile; il costo del trasferimento è quasi tutto
-del motore finché ha torrent in sessione, e con un motore esterno
-(**gx-torrent** o **qBittorrent-nox**) vive nel suo processo. Per ridurre RAM e
-CPU:
+Gira su un mini PC o su un NAS senza occuparli: a riposo il motore occupa
+60–64 MB e ~1,5 % di un core, Gextto ~70 MB e meno dell'1 %; a 9 MB/s il motore
+sta intorno a un terzo di un core con ~100 MB. I controlli di salute non scrivono sul NAS, così i suoi
+dischi possono dormire. Il costo del trasferimento è quasi tutto del motore
+(**gx-torrent** o **qBittorrent-nox**), che vive nel suo processo. Per ridurre
+RAM e CPU:
 
 - **RAM** — con **gx-torrent** la cache è **adattiva**: il demone la ricalcola
   ogni pochi minuti da memoria disponibile, download/seed attivi e tipo di

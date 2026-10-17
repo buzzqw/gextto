@@ -56,6 +56,11 @@ altro.
 | **Interfacce** | Web UI (SSR + HTMX, Go puro, PWA installabile) · TUI da terminale via SSH · API JSON |
 | **Build** | Go puro (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent anche su Windows |
 
+Gira su una macchina piccola. Su un Intel N97 da 4 core e 16 GB il motore a riposo
+occupa 60–64 MB e ~1,5 % di un core, il demone di Gextto ~70 MB e meno dell'1 %, e
+il motore arriva a ~100 MB a 100 MB/s. I controlli di salute non scrivono sul NAS,
+così i suoi dischi possono dormire.
+
 ## Numeri
 
 Questi numeri vengono dall'installazione reale e da swarm, indexer e linea

@@ -132,14 +132,9 @@ every 5 s, 45 s CPU profile at ≥ 8 MB/s, means over the samples above 4 MB/s):
 | **build 225**, parsed IP filter cached, uTP buffers released | 44 % (99 %) | 6.80 MB/s | 125 | 6.5 | **0.35** | 1844 MB |
 | **build 226**, `GOGC=50` | 48 % (76 %) | **8.98 MB/s** | 111 | **5.3** | 0.43 | **1105 MB** |
 
-The cause of the 220–222 profile was a busy loop, not lock pressure: `Conn.Read` on a
-destroyed uTP connection returns the ack-timeout error, which reports `Timeout()`, and
-`readPiece` took it as a slow peer and looped, taking the transport-wide lock and
-re-arming the deadline on every pass. The progress-based deadline (build 223) removed it:
-**−72 % CPU per MB/s and −77 % per peer** against build 220. Build 224 removed the
-per-datagram copy (43 % of allocated bytes) and the `reflect.Select` in every blocking
-uTP Read/Write (3.3 % of the CPU): −12 % CPU per peer. What remains is syscalls (~32 %),
-scheduler wake-ups (~14 %), RC4 ~5 % and SHA-1 ~2 %; RC4 is protocol crypto, not a bug.
+The table is the outcome: a busy loop on dead uTP connections and two copies in the read
+path were removed between builds 223 and 225, and `GOGC=50` trimmed the memory in 226.
+**−72 % CPU per MB/s and −77 % per peer** against build 220.
 
 **Memory** follows the write cache: with downloads on NFS the auto policy gives 1.26 GB
 to piece buffers on this 16 GB host, and the read cache is 128 MB. The comparable figure

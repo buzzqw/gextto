@@ -814,10 +814,12 @@ is active, the **Downloads** screen and every automation stay the same.
 
 ### Performance: RAM and CPU
 
-The daemon's own logic is negligible; the transfer cost is almost entirely the
-engine while it has torrents in the session, and with an external engine
-(**gx-torrent** or **qBittorrent-nox**) it lives in its own process. To lower RAM
-and CPU:
+It runs on a mini PC or a NAS without taking them over: at rest the engine uses
+60–64 MB and ~1.5 % of a core, Gextto ~70 MB and under 1 %; at 9 MB/s the engine
+uses about a third of a core with ~100 MB. The health probes do not write to the NAS, so its
+disks can sleep. The transfer cost is almost entirely the engine
+(**gx-torrent** or **qBittorrent-nox**), which lives in its own process. To lower
+RAM and CPU:
 
 - **RAM** — with **gx-torrent** the cache is **adaptive**: the daemon recomputes
   it every few minutes from available memory, active downloads/seeds and
