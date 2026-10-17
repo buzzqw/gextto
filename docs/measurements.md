@@ -310,6 +310,7 @@ and a 45 s pprof CPU profile at ≥ 8 MB/s. Means over the samples above 4 MB/s:
 | build 221–222 (deadline throttled, limiter atomics) | 198–221 % (256 %) | 7.9–8.1 MB/s | 135–143 | 24.5–27.9 | 1.39–1.64 | 1266–1555 MB |
 | **build 223** (progress-based deadline) | **46 % (136 %)** | **8.12 MB/s** | 116 (max 159) | **5.7** | **0.40** | 1858 MB |
 | **build 224** (uTP: in-place receive, no reflect.Select) | **45 % (80 %)** | **8.24 MB/s** | 131 (max 169) | **5.5** | **0.35** | 1718 MB |
+| **build 225** (IP filter rules cached parsed, uTP buffers released) | 44 % (99 %) | 6.80 MB/s | 125 (max 198) | 6.5 | **0.35** | 1844 MB |
 
 The profiles of builds 220–222 showed 40–47 % of the CPU in the uTP read path:
 `SetReadDeadline` (220), then `sync.RWMutex.Lock` in `utp Conn.Read` plus `time.Now`
@@ -329,6 +330,20 @@ uTP Read/Write (3.3 % of the CPU in build 223): −12 % CPU per peer, peak 80 % 
 datagram and one ACK per data packet through the 500 µs state timer), scheduler wake-ups
 (futex ~14 %), RC4 ~5 % and SHA-1 ~2 %. The RssAnon peak (1.7–1.9 GB with 10 torrents)
 is the piece buffer pool and the read cache, not the reader.
+
+**Memory under the same load (build 225).** The RssAnon peak follows the write cache: the
+auto policy gives 1.26 GB to piece buffers when downloads go to NFS (`cache_storage:
+network`) on this 16 GB host, and the read cache is 128 MB. So the comparable figure is the
+memory outside the two caches (RssAnon − write − read, mean of the second half of each run):
+**1032 MB → 859 MB**. In the heap profile at the end of the run, uTP receive buffers
+(`appendReadBuf` + queued payloads) drop from **376 MB to 66 MB** and the IP filter from 33 MB
+(raw file kept for session reopens) plus 5 MB to **5 MB** (the parsed rules are cached
+instead); total live heap **1342 MB → 925 MB**, of which 694 MB is the piece pool. The uTP
+figure was retention, not data in flight: the readers were waiting for data, while consumed
+inbound slots and acked sends stayed reachable through their slices' backing arrays and
+drained read buffers kept their burst-sized capacity. CPU per peer is unchanged (0.35); the
+lower mean rate of this run (6.8 MB/s) was the swarm. The garbage collector costs
+`mallocgc` 1.9 % of the profile, with `gcBgMarkWorker` not among the top 300 frames.
 
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
