@@ -214,14 +214,15 @@ func (t *torrent) noteHave(pe *peer.Peer, msg peerprotocol.HaveMessage) {
 		t.closePeer(pe)
 		return
 	}
-	if pe.Bitfield != nil {
+	// The picker sets the peer's bit with its holder list; without one the
+	// bit alone is the record. Super-seeding reads the bit, so it comes after.
+	if t.piecePicker != nil {
+		t.piecePicker.HandleHave(pe, msg.Index)
+	} else if pe.Bitfield != nil {
 		pe.Bitfield.Set(msg.Index)
 	}
 	if t.superSeedActive() {
 		t.superSeedHandleHave(pe, int32(msg.Index))
-	}
-	if t.piecePicker != nil {
-		t.piecePicker.HandleHave(pe, msg.Index)
 	}
 	t.updateInterestedState(pe)
 	t.fillPeerDownloads(pe)
@@ -250,11 +251,10 @@ func (t *torrent) noteBitfield(pe *peer.Peer, msg peerprotocol.BitfieldMessage) 
 		if !bf.Test(i) {
 			continue
 		}
-		if pe.Bitfield != nil {
-			pe.Bitfield.Set(i)
-		}
 		if t.piecePicker != nil {
 			t.piecePicker.HandleHave(pe, i)
+		} else if pe.Bitfield != nil {
+			pe.Bitfield.Set(i)
 		}
 	}
 	t.updateInterestedState(pe)

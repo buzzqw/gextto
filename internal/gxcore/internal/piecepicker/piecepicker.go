@@ -34,6 +34,10 @@ type PiecePicker struct {
 	available            uint32
 	endgame              bool
 
+	// highPriority counts the high-priority pieces (RefreshPriorities), so
+	// pickHigh skips its full scan when there are none, the usual case.
+	highPriority int
+
 	// sequential picks index order over rarest-first.
 	sequential bool
 
@@ -53,7 +57,10 @@ type PiecePicker struct {
 // myPiece is a piece plus its swarm bookkeeping.
 type myPiece struct {
 	*piece.Piece
-	Having    sliceset.SliceSet[peer.Peer]
+	// holders counts the connected peers that have the piece. Who they are
+	// is in each peer's bitfield (heldBy); a holder list cost one pointer per
+	// piece and peer (35 MB of heap with 150 peers on three ISOs).
+	holders uint32
 	Requested sliceset.SliceSet[peer.Peer]
 	Snubbed   sliceset.SliceSet[peer.Peer]
 	Choked    sliceset.SliceSet[peer.Peer]
@@ -94,7 +101,15 @@ func (p *myPiece) PickableBy(pe *peer.Peer) bool {
 	if p.Requested.Len() > 0 {
 		return false
 	}
-	return p.Having.Has(pe)
+	return p.heldBy(pe)
+}
+
+// heldBy reports whether pe has the piece, in O(1) from the peer's bitfield:
+// HandleHave sets the bit and counts the holder, HandleDontHave and
+// HandleDisconnect clear and uncount it, and the bitfields start empty,
+// sized to the torrent, when the picker is built.
+func (p *myPiece) heldBy(pe *peer.Peer) bool {
+	return pe.Bitfield != nil && pe.Bitfield.Has(p.Index)
 }
 
 // HighPriority marks pieces of high-priority files (5..7): fetched ahead
@@ -124,7 +139,7 @@ func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webse
 	if sequential || firstLast {
 		markFileEdges(ps)
 	}
-	return &PiecePicker{
+	picker := &PiecePicker{
 		pieces:               ps,
 		piecesByAvailability: byAvailability,
 		piecesByStalled:      byStalled,
@@ -134,6 +149,8 @@ func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webse
 		sequential:           sequential,
 		firstLast:            firstLast,
 	}
+	picker.RefreshPriorities()
+	return picker
 }
 
 // maxFileEdgeSize caps the file-end span fetched ahead: enough for an MP4
@@ -232,13 +249,16 @@ func firstPickable(pieces []myPiece, begin, end uint32, pe *peer.Peer) *myPiece 
 
 // pickHigh takes the rarest high-priority piece the peer can take.
 func (p *PiecePicker) pickHigh(pe *peer.Peer) *myPiece {
+	if p.highPriority == 0 {
+		return nil
+	}
 	var picked *myPiece
 	for i := range p.pieces {
 		mp := &p.pieces[i]
 		if !mp.HighPriority() || !mp.PickableBy(pe) {
 			continue
 		}
-		if picked == nil || mp.Having.Len() < picked.Having.Len() {
+		if picked == nil || mp.holders < picked.holders {
 			picked = mp
 		}
 	}
@@ -328,16 +348,31 @@ func (p *PiecePicker) RequestedWebseedSource(i uint32) *webseedsource.WebseedSou
 
 // HandleHave records peer availability of piece i.
 func (p *PiecePicker) HandleHave(pe *peer.Peer, i uint32) {
+	if pe.Bitfield.Test(i) {
+		return // already counted: the bit and the count move together
+	}
 	pe.Bitfield.Set(i)
-	p.addHavingPeer(i, pe)
+	p.addHolder(i)
 }
 
 // HandleDontHave clears BEP 54-reneged availability of piece i.
 func (p *PiecePicker) HandleDontHave(pe *peer.Peer, i uint32) {
-	if pe.Bitfield != nil {
-		pe.Bitfield.Clear(i)
+	if pe.Bitfield == nil || !pe.Bitfield.Test(i) {
+		return
 	}
-	p.removeHavingPeer(int(i), pe)
+	pe.Bitfield.Clear(i)
+	p.removeHolder(int(i))
+}
+
+// RefreshPriorities recounts the high-priority pieces after the file
+// priorities or the skipped files change.
+func (p *PiecePicker) RefreshPriorities() {
+	p.highPriority = 0
+	for i := range p.pieces {
+		if p.pieces[i].HighPriority() {
+			p.highPriority++
+		}
+	}
 }
 
 // HandleAllowedFast records a fast-exception grant for piece i.
@@ -375,20 +410,27 @@ func (p *PiecePicker) HandleCancelDownload(pe *peer.Peer, i uint32) {
 func (p *PiecePicker) HandleDisconnect(pe *peer.Peer) {
 	for i := range p.pieces {
 		p.HandleCancelDownload(pe, uint32(i))
-		p.removeHavingPeer(i, pe)
+		// Only the pieces it had count it. The bit is cleared with the count,
+		// so the books stay balanced even if a disconnect came twice.
+		if p.pieces[i].heldBy(pe) {
+			pe.Bitfield.Clear(uint32(i))
+			p.removeHolder(i)
+		}
 	}
 }
 
-// addHavingPeer counts a new holder, ticking availability on the first.
-func (p *PiecePicker) addHavingPeer(i uint32, pe *peer.Peer) {
-	if ok := p.pieces[i].Having.Add(pe); ok && p.pieces[i].Having.Len() == 1 {
+// addHolder counts a new holder, ticking availability on the first.
+func (p *PiecePicker) addHolder(i uint32) {
+	p.pieces[i].holders++
+	if p.pieces[i].holders == 1 {
 		p.available++
 	}
 }
 
-// removeHavingPeer drops a holder, ticking availability at zero.
-func (p *PiecePicker) removeHavingPeer(i int, pe *peer.Peer) {
-	if ok := p.pieces[i].Having.Remove(pe); ok && p.pieces[i].Having.Len() == 0 {
+// removeHolder uncounts a holder, ticking availability at zero.
+func (p *PiecePicker) removeHolder(i int) {
+	p.pieces[i].holders--
+	if p.pieces[i].holders == 0 {
 		p.available--
 	}
 }
@@ -490,7 +532,7 @@ func (p *PiecePicker) pickAllowedFast(pe *peer.Peer) *myPiece {
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
 		}
-		if mp.Requested.Len() == 0 && mp.Having.Has(pe) {
+		if mp.Requested.Len() == 0 && mp.heldBy(pe) {
 			if !p.sequential {
 				return mp
 			}
@@ -512,7 +554,7 @@ func (p *PiecePicker) pickRarest(pe *peer.Peer) *myPiece {
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
 		}
-		if mp.Requested.Len() == 0 && mp.Having.Has(pe) {
+		if mp.Requested.Len() == 0 && mp.heldBy(pe) {
 			picked = mp
 			break
 		}
@@ -529,7 +571,7 @@ func (p *PiecePicker) pickRarest(pe *peer.Peer) *myPiece {
 // sortByAvailability orders pieces rarest-first by holder count.
 func sortByAvailability(pieces []*myPiece) {
 	slices.SortFunc(pieces, func(a, b *myPiece) int {
-		return cmp.Compare(len(a.Having.Items), len(b.Having.Items))
+		return cmp.Compare(a.holders, b.holders)
 	})
 }
 
@@ -556,7 +598,7 @@ func (p *PiecePicker) pickSequential(pe *peer.Peer) *myPiece {
 		if mp.Requested.Len() > 0 {
 			continue
 		}
-		if mp.Having.Has(pe) {
+		if mp.heldBy(pe) {
 			return mp
 		}
 		hasUnrequested = true
@@ -575,7 +617,7 @@ func (p *PiecePicker) pickEndgame(pe *peer.Peer) *myPiece {
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
 		}
-		if mp.Requested.Len() < p.maxDuplicateDownload && mp.Having.Has(pe) && !mp.Requested.Has(pe) {
+		if mp.Requested.Len() < p.maxDuplicateDownload && mp.heldBy(pe) && !mp.Requested.Has(pe) {
 			return mp
 		}
 	}
@@ -602,7 +644,7 @@ func (p *PiecePicker) pickStalled(pe *peer.Peer) *myPiece {
 		if mp.RunningDownloads() > 0 {
 			continue
 		}
-		if mp.Requested.Len() < p.maxDuplicateDownload && mp.Having.Has(pe) && !mp.Requested.Has(pe) {
+		if mp.Requested.Len() < p.maxDuplicateDownload && mp.heldBy(pe) && !mp.Requested.Has(pe) {
 			return mp
 		}
 	}

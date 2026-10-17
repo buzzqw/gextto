@@ -123,7 +123,7 @@ func (p *PiecePicker) peerStealsFromWebseed(pe *peer.Peer) *myPiece {
 			if pi.Done || pi.Writing || pi.Skip {
 				continue
 			}
-			if !pi.Having.Has(pe) {
+			if !pi.heldBy(pe) {
 				continue
 			}
 			if pi.Requested.Len() > 0 {
@@ -182,7 +182,7 @@ func (p *PiecePicker) pickLastPieceOfSmallestGap(pe *peer.Peer) *myPiece {
 			if mp.Requested.Len() > 0 {
 				continue
 			}
-			if !mp.Having.Has(pe) {
+			if !mp.heldBy(pe) {
 				continue
 			}
 			if pe.PeerChoking && !pe.ReceivedAllowedFast.Has(mp.Piece) {

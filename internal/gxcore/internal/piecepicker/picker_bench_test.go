@@ -112,3 +112,55 @@ func BenchmarkPickerFileEdgeFullScan(b *testing.B) {
 		}
 	}
 }
+
+// benchSwarm builds a rarest-first picker over n pieces with peers holders, as
+// on a saturated line (168 peers measured on 2026-10-17): each peer has about
+// 90 % of the pieces, so every piece has well over a hundred holders.
+func benchSwarm(n, peers int) (*PiecePicker, []*peer.Peer) {
+	rng := rand.New(rand.NewSource(1))
+	pp := New(benchPieces(n), 8, nil, false, false)
+	all := make([]*peer.Peer, peers)
+	for p := range all {
+		all[p] = testPeer(n)
+		for i := 0; i < n; i++ {
+			if rng.Intn(10) != 0 {
+				pp.HandleHave(all[p], uint32(i))
+			}
+		}
+	}
+	return pp, all
+}
+
+// BenchmarkPickerRarestManyPeers picks for a peer in a swarm of 150 and gives
+// the piece back, so every pick walks the same holder sets.
+func BenchmarkPickerRarestManyPeers(b *testing.B) {
+	pp, all := benchSwarm(4000, 150)
+	pe := all[0]
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pi, _ := pp.PickFor(pe)
+		if pi == nil {
+			b.Fatal("no piece picked")
+		}
+		pp.HandleCancelDownload(pe, pi.Index)
+	}
+}
+
+// BenchmarkPickerBitfieldManyPeers is a new peer's bitfield arriving in a
+// swarm of 150: one HandleHave per piece it has, then its disconnect.
+func BenchmarkPickerBitfieldManyPeers(b *testing.B) {
+	const n = 4000
+	pp, _ := benchSwarm(n, 150)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pe := testPeer(n)
+		for j := 0; j < n; j++ {
+			if j%10 != 0 {
+				pp.HandleHave(pe, uint32(j))
+			}
+		}
+		pp.HandleDisconnect(pe)
+	}
+}

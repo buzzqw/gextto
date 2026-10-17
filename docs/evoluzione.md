@@ -766,24 +766,33 @@ recovered from a shell without editing the database.
   against libtorrent/qBittorrent on the same public torrent with the same policy and
   metrics (upload efficiency while seeding, reciprocation, first-block time, stall
   rate). Only a gap would justify touching `internal/unchoker`.
-- **The uTP dial error rate.** In the live run 91 of 265 dials failed: expected when
-  racing uTP against TCP-only peers, but worth a closer look in a later round.
 - **uTP acknowledgements stay one per data packet.** A state packet goes out
   500 µs after a data packet (`pendingSendStateDelay`), so only bursts share one. Under
   a saturated line with ~130 peers each connection receives a packet every ~13 ms, and
   the ACK sends cost as much as the datagram reads (~3 % of a core at 8 MB/s,
   [`measurements.md`](measurements.md)). Coalescing them would need a delay of 20 ms or
   more, which inflates the RTT the sender's RTO is built on. The CPU saving does not
-  justify that change in the transport's congestion behaviour. What would change the
-  picture is batched datagram I/O (`recvmmsg`/`sendmmsg`), which cuts syscalls without
-  touching the protocol timing.
+  justify that change in the transport's congestion behaviour. Batched datagram I/O
+  (`recvmmsg`/`sendmmsg`) cuts syscalls without touching the protocol timing, but on a
+  measured saturated swarm uTP made under 1 % of the syscall time (TCP carried the
+  bytes). Gate: the same `strace -c` on a uTP-heavy session (open inbound port) showing
+  `recvfrom`/`sendto` as a real share.
 - **Graduated file priority (0–7)** with mixed-priority files: so far measured only
   indirectly.
 - **DLNA**: transcoding, frames extracted from the video (no ffmpeg), search and
   Xbox/WMP (`X_MS_MediaReceiverRegistrar`) are missing; browsing, Range playback,
   subtitles, library folders and artwork are in place (§3).
-- **Auto-speed on the Gextto side**: today it exists only standalone; a managed version
-  would have Gextto measure the RTT and modulate the limits through `SetLimits` (§6).
+- **Latency-aware Auto on the Gextto side.** The *Auto* speed (policy, schedule day,
+  temporary) leaves the line uncapped so the peak is learned. A saturated download
+  raised the Internet RTT from 19.8 to 62.5 ms (82.6 ms peak) for the whole house
+  ([`measurements.md`](measurements.md), *Latency under a saturated download*). The
+  standalone auto-speed (§6) reacts on the upload cap only, so it would not cover
+  this. A managed version would have Gextto probe the RTT and lower the **download**
+  and upload caps it pushes when the latency rises, then raise them again at rest.
+  *Auto* would then mean the fastest speed that leaves the line usable. Open
+  points: keeping the peak observer learning from uncapped samples only, the probe
+  target (the gateway does not show ISP-side queueing, a public host does), and the
+  UI wording in six languages.
 - **DHT feeds**: the resolver exists, the **publisher** side (signing a feed) does not,
   and the BEP 44 outgoing client has no consumer yet (§4 of [`measurements.md`](measurements.md)).
 - **WebTorrent/WebRTC**: the WebSocket tracker's practical value stays limited until

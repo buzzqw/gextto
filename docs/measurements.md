@@ -462,6 +462,54 @@ code, with +13 % allocated bytes (the prepared-statement arguments). The express
 `lower(COALESCE(magnet_hash,''))` is gone: hashes are stored normalized, and the lookups
 by hash use `idx_archive_hash`.
 
+**Piece picker with many peers** (2026-10-17, Intel N97, a separate standalone
+instance on loopback, three public ISOs, Ubuntu 26.04, Ubuntu 26.10 beta and Debian 13.7
+DVD, 9.3–9.4 MB/s). At 168 peers the profile gave the picker **15 %** of the daemon's
+CPU (`PickFor`). `pickHigh` walked every piece at every pick to find high-priority
+pieces even when there were none, and `Having.Has` scanned a slice of up to ~170
+holders for every candidate piece (`slices.Contains`, 5.5 %). The holder slices were also
+**35 MB** of heap (18 %), one pointer per piece and peer. The picker now asks the
+peer's bitfield, O(1), which holds the same information. A piece keeps only its holder
+**count**, and a counter of high-priority pieces lets `pickHigh` return at once.
+`HandleDisconnect` touches only the pieces the peer had. `TestHoldersMatchAReferenceModel`
+checks bitfields and counts against an independent model through 20,000 random have,
+don't-have and disconnect steps. `noteHave`/`noteBitfield` leave the bit to the picker,
+and super-seeding still runs after it, since it reads the bit.
+
+| Benchmark (`internal/piecepicker`) | before | after |
+|---|---|---|
+| `RarestManyPeers` (4000 pieces, 150 peers) | 24.2–24.9 µs | **13.8 µs** |
+| `BitfieldManyPeers` (bitfield + disconnect, 150 peers) | 1.04 ms, 3 allocs | **65–68 µs**, 1 alloc |
+| `RarestSteady` | 149–151 µs | 123–125 µs |
+| `RarestShuffled` | 1.43–1.47 ms | 1.30–1.36 ms |
+| `SequentialNearlyDone` | 140 µs | 122–131 µs |
+| `FileEdgeFullScan` | 47–61 µs | 49–50 µs |
+
+`Bitfield.Has` is `Test` without the panic branch, so `PickableBy` stays small. On
+the same swarm afterwards, 196 peers at 9.42 MB/s: **1962 CPU ticks per 60 s against
+3273** with 168 peers (**−49 % per peer**), the picker at **9 %** (mostly the per-pick
+`sortByAvailability`), no `slices.Index` frame, no holder slices in the heap.
+
+**Syscalls on the same swarm (decisions on `recvmmsg` and the dial errors).** `strace
+-c` over 20 s at 9.3 MB/s with 107 peers: 109,331 `read` (TCP, 37 % `EAGAIN`), 9,431
+`recvfrom` (uTP, 39 % `EAGAIN`), 4,224 `sendto`. TCP carried most of the bytes here, so
+batched uTP datagram I/O would save under 1 % of the syscall time: **not justified on
+this load**. It is worth measuring again on a uTP-heavy session, the production one
+with an open port. A TCP `read` brings ~2.7 KB on average because each of the ~100
+peers sends ~90 KB/s, and a larger read buffer would only merge the 17-byte message
+head with the block. The dial counters: 1289 uTP dials, 689 errors, cancellations by
+a won TCP race not counted. On the same instance 302 of the 490 outgoing peers came
+over uTP. The race waits for both legs with one shared timeout, so a failed uTP leg
+takes no slot from anyone. The errors are the unreachable peers of the swarm, and the
+transport stays as it is.
+
+**Latency under a saturated download** (same run, `ping` 60 × 0.5 s). Gateway
+0.75 → 0.67 ms (the LAN is not the bottleneck). Internet (9.9.9.9) **19.8 ms at rest →
+62.5 ms average, 82.6 ms peak** at 9.4 MB/s down, near-zero upload. A full download
+queues at the ISP side and adds ~40 ms for every device in the house. The standalone
+ping auto-speed acts only on the upload cap, so it would not have helped here
+([`evoluzione.md`](evoluzione.md) §8).
+
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
 the whole answer unreadable), and the cost is nil: on a 100-item answer, strict
@@ -517,10 +565,11 @@ by `TestUIRowsJSON` and the i18n guards (state badges and labels go through
 Follow-ups **not added**, each without a measurement to justify it: io_uring/AIO (Go
 does not expose it without a dependency or cgo, and the mmap path is already
 asynchronous), explicit contiguous-write coalescing (the page cache already merges
-adjacent writebacks), rarity buckets and a picker refactor, a watermark cursor in
+adjacent writebacks), rarity buckets, a watermark cursor in
 `pickSequential`/`pickFileEdge`, a `PieceDownloader` bitmask, `clear(b.Data)` in
-`bufferpool`, `FADV_RANDOM`, `saveLocked` outside `d.mu`, `/proc/meminfo` under `d.mu`
-and `HandleDisconnect` O(N). **Postponed**: qBittorrent's
+`bufferpool`, `FADV_RANDOM`, `saveLocked` outside `d.mu` and `/proc/meminfo` under `d.mu`.
+The holder bookkeeping of the picker and `HandleDisconnect` were measured on a real
+swarm and changed (*Piece picker with many peers* below). **Postponed**: qBittorrent's
 `renameFile`/`renameFolder` (it needs rename support in the engine: a feature of its
 own).
 

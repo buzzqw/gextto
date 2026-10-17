@@ -250,6 +250,9 @@ func (t *torrent) applySkippedPieces() {
 			t.pieces[i].Priority = prio[i]
 		}
 	}
+	if t.piecePicker != nil {
+		t.piecePicker.RefreshPriorities()
+	}
 }
 
 // peerHasWanted reports whether the peer advertises a piece we miss and want

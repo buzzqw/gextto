@@ -86,6 +86,12 @@ func (b *Bitfield) Test(i uint32) bool {
 	return (b.bytes[div] & (1 << (7 - mod))) > 0
 }
 
+// Has is Test for the hot paths: an index past the end is simply not set,
+// with no panic branch, so a caller stays small enough to be inlined.
+func (b *Bitfield) Has(i uint32) bool {
+	return i < b.length && b.bytes[i>>3]&(0x80>>(i&7)) != 0
+}
+
 // Count totals the set bits with hardware popcount, a word at a time.
 func (b *Bitfield) Count() uint32 {
 	var total int
