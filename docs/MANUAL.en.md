@@ -1362,14 +1362,12 @@ translations). On a computer the sections are in the left column, with the
 number of settings; on a phone you pick them from the *Section* list. The page
 address follows the open section, so it can be bookmarked. Links to the old
 tabs (*Acquisition*, *Advanced*, *Translations*) open the section that took
-over their content. Entering Configuration hides the main menu bar, so the
-sections are no longer squeezed between the menu and the entries: the **Menu**
-button at the top left brings it back over the content (Esc closes it).
+over their content. Entering Configuration hides the main menu bar; the **Menu** button at the top
+left brings it back over the content (Esc closes it).
 
 When a section gathers several groups of settings (for example **Search cycle**
 and **Missing episodes** under *Automatic maintenance*), the group title stays
-**stuck to the top** while you scroll, with a coloured accent bar: the long list
-of options no longer makes you lose your place.
+**stuck to the top** while you scroll, with a coloured accent bar.
 
 Under the section title there is the **group index** (clickable chips) to jump
 straight to a group. The **Modified only** checkbox, next to *Show technical

@@ -1408,15 +1408,14 @@ sono nella colonna a sinistra, con il numero di impostazioni; su telefono si
 scelgono dalla tendina *Sezione*. L'indirizzo della pagina segue la sezione
 aperta, quindi si può salvare nei preferiti. I link alle vecchie schede
 (*Acquisizione*, *Avanzate*, *Traduzioni*) aprono la sezione che ne ha preso il
-contenuto. Entrando in Configurazione la barra dei menu principale si nasconde,
-così le sezioni non restano schiacciate tra il menu e le voci: il pulsante
-**Menu** in alto a sinistra la fa ricomparire sopra il contenuto (Esc per
-richiuderla).
+contenuto. Entrando in Configurazione la barra dei menu principale si nasconde; il
+pulsante **Menu** in alto a sinistra la fa ricomparire sopra il contenuto (Esc
+per richiuderla).
 
 Quando una sezione raccoglie più gruppi di impostazioni (per esempio **Ciclo di
 ricerca** ed **Episodi mancanti** in *Manutenzione automatica*), il titolo del
 gruppo resta **agganciato in alto** mentre scorri, con una barretta colorata
-d'accento: l'elenco lungo delle opzioni non ti fa più perdere il filo.
+d'accento.
 
 Sotto il titolo della sezione c'è l'**indice dei gruppi** (chip cliccabili) per
 saltare direttamente a un gruppo. La casella **Solo modificate**, accanto a

@@ -35,7 +35,7 @@ a qBittorrent-compatible `/api/v2` (see *gx-torrent daemon routes* at the end).
 
 The official server-rendered UI is at `/`; `/v2` is a technical alias. The
 internal HTMX routes under `/v2` are not part of this integration table and may
-change. The old `/ui` route is no longer available. For operational checks use
+change. `/ui` is not served. For operational checks use
 `GET /api/health` and `GET /api/status` first.
 
 ## Gextto routes

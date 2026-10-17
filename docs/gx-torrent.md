@@ -748,8 +748,8 @@ answers JSON: `internal/torznab` reads it (usenet results skipped, magnet built
 from the infohash when missing) and the connection test uses
 `/api/v1/system/status`. Gextto applies the same rule (`torznab_endpoint` in
 `rss.go`), so the address to type is identical in both. The Torznab XML is read
-**leniently**: a raw `&` or an HTML entity in a scraped title or URL no longer
-makes the whole answer unreadable. An indexer can put the **magnet in the link or
+**leniently**: a raw `&` or an HTML entity in a scraped title or URL does not
+make the whole answer unreadable. An indexer can put the **magnet in the link or
 in the enclosure** instead of in a `magneturl` attribute (this is MIRCrew's case):
 it is recognised and added as a magnet, without trying to download it via HTTP.
 An indexer that responds with an **error document** (e.g. invalid API key:

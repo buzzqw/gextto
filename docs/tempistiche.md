@@ -75,7 +75,7 @@ added since); **all the time is the Go suite**.
 The Playwright end2end tests run with **`make test-ui`** (it builds the daemon,
 starts it in dry-run and drives the real UI) and run in CI in the **`ui-e2e`**
 job; the harness completes the first-start wizard by itself
-(`uiweb/end2end/global-setup.ts`), so an empty data dir is no longer a problem.
+(`uiweb/end2end/global-setup.ts`), so an empty data dir works.
 
 ## CI (GitHub Actions)
 
