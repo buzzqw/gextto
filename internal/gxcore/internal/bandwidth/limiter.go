@@ -5,6 +5,7 @@ package bandwidth
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -14,8 +15,11 @@ import (
 type Limiter struct {
 	mu     sync.RWMutex
 	bucket *bucket
-	rate   int64
-	parent *Limiter
+	// rate and parent are atomics so Take can answer "unlimited" without taking
+	// a lock: with tens of peers asking per block, the shared limiter was a
+	// contention point even when the line was not throttled at all.
+	rate   atomic.Int64
+	parent atomic.Pointer[Limiter]
 }
 
 // New returns a limiter of bytesPerSecond (0 = unlimited).
@@ -29,9 +33,7 @@ func New(bytesPerSecond int64) *Limiter {
 // forward to the parent until a new parent is set. A nil parent clears the
 // inheritance.
 func (l *Limiter) SetParent(parent *Limiter) {
-	l.mu.Lock()
-	l.parent = parent
-	l.mu.Unlock()
+	l.parent.Store(parent)
 }
 
 // SetLimitKiB sets an explicit limit in KiB/s. A negative value
@@ -58,15 +60,16 @@ func (l *Limiter) SetRate(bytesPerSecond int64) {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if bytesPerSecond == l.rate && (bytesPerSecond == 0) == (l.bucket == nil) {
+	if bytesPerSecond == l.rate.Load() && (bytesPerSecond == 0) == (l.bucket == nil) {
 		return
 	}
-	l.rate = bytesPerSecond
 	if bytesPerSecond == 0 {
 		l.bucket = nil
+		l.rate.Store(0)
 		return
 	}
 	l.bucket = newBucket(bytesPerSecond)
+	l.rate.Store(bytesPerSecond)
 }
 
 // Rate returns the current rate in bytes per second (0 = unlimited).
@@ -74,34 +77,41 @@ func (l *Limiter) Rate() int64 {
 	if l == nil {
 		return 0
 	}
-	l.mu.RLock()
-	parent := l.parent
-	rate := l.rate
-	l.mu.RUnlock()
-	if parent != nil {
-		return parent.Rate()
+	for cur := l; cur != nil; {
+		if parent := cur.parent.Load(); parent != nil {
+			cur = parent
+			continue
+		}
+		return cur.rate.Load()
 	}
-	return rate
+	return 0
 }
 
 // Take takes n bytes from the bucket and returns how long the caller must
 // wait before using them. It never blocks: the caller sleeps for the
-// returned duration.
+// returned duration. An unlimited limiter (or one inheriting an unlimited
+// parent) answers with atomics only, without taking the shared lock.
 func (l *Limiter) Take(n int64) time.Duration {
 	if l == nil {
 		return 0
 	}
-	l.mu.RLock()
-	parent := l.parent
-	bucket := l.bucket
-	l.mu.RUnlock()
-	if parent != nil {
-		return parent.Take(n)
+	for cur := l; cur != nil; {
+		if parent := cur.parent.Load(); parent != nil {
+			cur = parent
+			continue
+		}
+		if cur.rate.Load() == 0 {
+			return 0
+		}
+		cur.mu.RLock()
+		bucket := cur.bucket
+		cur.mu.RUnlock()
+		if bucket == nil {
+			return 0
+		}
+		return bucket.take(n)
 	}
-	if bucket == nil {
-		return 0
-	}
-	return bucket.take(n)
+	return 0
 }
 
 // bucket is a classic token bucket: tokens accrue at rate per second up to a

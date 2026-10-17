@@ -40,14 +40,17 @@ type PeerReader struct {
 	messages     chan any
 	stopC        chan struct{}
 	doneC        chan struct{}
+	dr           *deadlineReader
 }
 
 // New wraps conn; maxMsgSize bounds any single message before its buffer is
 // allocated, closing the hostile-allocation hole on variable-length messages.
 func New(conn net.Conn, l logger.Logger, pieceTimeout time.Duration, maxMsgSize int, b *bandwidth.Limiter) *PeerReader {
+	dr := &deadlineReader{conn: conn, window: readTimeout}
 	return &PeerReader{
 		conn:         conn,
-		r:            bufio.NewReaderSize(conn, readBufferSize),
+		r:            bufio.NewReaderSize(dr, readBufferSize),
+		dr:           dr,
 		log:          l,
 		pieceTimeout: pieceTimeout,
 		maxMsgSize:   maxMsgSize,
@@ -71,6 +74,57 @@ func (p *PeerReader) Stop() {
 // Done closes when the read loop exits.
 func (p *PeerReader) Done() chan struct{} {
 	return p.doneC
+}
+
+// deadlineReader puts a progress-based read deadline under the message
+// parser. A read fails only when the peer sent nothing for a whole window, or
+// when the transport reports a timeout before the armed deadline. The second
+// case is a dead connection that calls itself a timeout: uTP reports its ack
+// timeout that way. The deadline is re-armed only when it passes, not per
+// message or block. On uTP SetReadDeadline takes the transport-wide lock and
+// resets a timer. Arming it per block was a large share of the CPU under load.
+// Retrying a dead connection's "timeout" made the reader spin on that lock.
+type deadlineReader struct {
+	conn       net.Conn
+	window     time.Duration // silence tolerated before a read fails
+	deadline   time.Time     // the armed socket read deadline
+	progressed bool          // bytes arrived since the deadline was armed
+}
+
+// arm sets the socket read deadline window from now.
+func (d *deadlineReader) arm(window time.Duration) error {
+	t := time.Now().Add(window)
+	if err := d.conn.SetReadDeadline(t); err != nil {
+		return err
+	}
+	d.deadline = t
+	d.progressed = false
+	return nil
+}
+
+func (d *deadlineReader) Read(b []byte) (int, error) {
+	for {
+		n, err := d.conn.Read(b)
+		if n > 0 {
+			d.progressed = true
+		}
+		if err == nil {
+			return n, nil
+		}
+		nerr, ok := err.(net.Error)
+		if !ok || !nerr.Timeout() || time.Now().Before(d.deadline) {
+			return n, err // real error, or a dead connection posing as a timeout
+		}
+		if n > 0 {
+			return n, nil // the next Read re-arms
+		}
+		if !d.progressed {
+			return 0, err // silent for a whole window
+		}
+		if err = d.arm(d.window); err != nil {
+			return 0, err
+		}
+	}
 }
 
 // Run reads length-prefixed messages until error or Stop. Routine endings
@@ -107,10 +161,10 @@ func (p *PeerReader) Run() {
 		}
 	}()
 
+	if err = p.dr.arm(readTimeout); err != nil {
+		return
+	}
 	for {
-		if err = p.conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
-			return
-		}
 		var length uint32
 		if err = binary.Read(p.r, binary.BigEndian, &length); err != nil {
 			return
@@ -307,9 +361,9 @@ func (p *PeerReader) parseHashMessage(length uint32, reject, withHashes bool) (a
 }
 
 // readPiece streams length payload bytes into a pooled buffer under the read
-// throttle and the piece deadline. A timed-out partial block keeps the bytes
-// and continues; a timed-out empty read disconnects. Stops release the
-// buffer instead of leaking it.
+// throttle. While the block is read, the reader tolerates pieceTimeout of
+// silence instead of readTimeout. A slow peer that keeps sending bytes is
+// kept. Stops release the buffer instead of leaking it.
 func (p *PeerReader) readPiece(length uint32) (buf bufferpool.Buffer, err error) {
 	buf = blockPool.Get(int(length))
 	defer func() {
@@ -318,33 +372,33 @@ func (p *PeerReader) readPiece(length uint32) (buf bufferpool.Buffer, err error)
 		}
 	}()
 
-	var n int
-	for {
-		if d := p.bucket.Take(int64(length)); d > 0 {
-			select {
-			case <-time.After(d):
-			case <-p.stopC:
-				err = errStoppedWhileWaitingBucket
-				return
-			}
-		}
-		if err = p.conn.SetReadDeadline(time.Now().Add(p.pieceTimeout)); err != nil {
+	if d := p.bucket.Take(int64(length)); d > 0 {
+		select {
+		case <-time.After(d):
+		case <-p.stopC:
+			err = errStoppedWhileWaitingBucket
 			return
 		}
-		var m int
-		m, err = io.ReadFull(p.r, buf.Data[n:])
-		n += m
-		if err != nil {
-			if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
-				if n > 0 {
-					continue // slow peer: keep the bytes, read the rest
-				}
-				return // silent peer: disconnect
-			}
+		// The throttle wait is not the peer's silence: start a fresh window.
+		if err = p.dr.arm(p.pieceTimeout); err != nil {
 			return
 		}
-		return
+	} else if time.Until(p.dr.deadline) > p.pieceTimeout {
+		// Tighten the idle deadline to the piece window. While blocks stream in
+		// the deadline is already that short, so this re-arms once per window.
+		if err = p.dr.arm(p.pieceTimeout); err != nil {
+			return
+		}
 	}
+	p.dr.window = p.pieceTimeout
+	_, err = io.ReadFull(p.r, buf.Data)
+	p.dr.window = readTimeout
+	if err == nil {
+		// A whole block arrived. It may have come from the bufio buffer without
+		// a socket read, so record the progress for the idle wait that follows.
+		p.dr.progressed = true
+	}
+	return
 }
 
 var errStoppedWhileWaitingBucket = errors.New("peer reader stopped while waiting for bucket")
