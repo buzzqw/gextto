@@ -177,335 +177,113 @@ are left untouched, and an error never compromises the download.
 
 ### 3. Product surface
 
-The manual is the user-facing description of these capabilities; this section states
-the surface and the design rules that are not obvious from it.
+The manual describes the pages; here are the capabilities and the design rules that are
+not obvious from them.
 
-**Web UI, TUI and languages.** The web UI is server-rendered with HTMX (`uiweb/v2`)
-and has a terminal client (`gexttod tui`). Six languages — it/en/de/fr/es/pl — cover
-the web UI (chrome, labels, tooltips, hints, server-side messages and the strings
-the client JS generates), the API/HTMX errors shown to the user, the notifications,
-the TUI and the gx-torrent web page (the language is passed by Gextto with `-lang`
-and `?lang=xx`). Daemon logs stay **in English by choice**; API error strings not
-shown to the user may stay in the original language. Guard: `TestUIIsTranslatable`
-fails if a UI string or a `uiText` literal is not a key of the catalogues (with an
-explicit allowlist); `TestClientI18nKeysTranslated` covers the client keys.
+**Web UI and TUI.** Server-rendered with HTMX (`uiweb/v2`), no Node build, plus a
+terminal client (`gexttod tui`) that compacts below 60 columns for an SSH session on a
+phone. Six languages (it/en/de/fr/es/pl) cover the web UI, the API/HTMX errors users
+see, notifications, the TUI and the daemon page; logs stay in English. Guards:
+`TestUIIsTranslatable`, `TestClientI18nKeysTranslated` and one catalogue check per
+language.
 
-**TUI on a phone.** The terminal client is designed for an SSH session and its
-layout follows the terminal width: at 60 columns or fewer — an SSH app on a
-phone — it compacts the header, the fixed label columns and the long values,
-wrapping instead of cutting, so the same information stays on the narrow screen
-(`compactWidth` in `internal/tui/render.go`).
+**One validation for every write.** The API, the settings page and the wizard all pass
+through `validateSettingValue`. A typo such as `score_res_1080p=abc` is refused instead
+of being stored and silently disabling a rule; an empty value is valid and restores the
+default. Guard: `TestNumericSettingRejectsGarbage`.
 
-**A setting that cannot apply is refused.** Every write — the JSON API, the
-settings page and the setup wizard — passes through one check
-(`validateSettingValue`), so the entry points cannot disagree. Beyond the backends
-and the filesystem paths it validates the numeric settings whose reader falls back
-to the default (score weights, upgrade/stall thresholds, `min_free_space_gb`,
-`torrent_seed_ratio`, the ports): a typo like `score_res_1080p=abc` is answered with
-an error instead of being accepted, doing nothing and silently disabling the rule
-the operator meant to tune. Empty stays valid — it clears the setting and the
-default applies. Guard: `TestNumericSettingRejectsGarbage`.
+**Settings that explain themselves.** Read-only insights
+(`uiweb_v2_settings_insights.go`) sit next to the controls: the Sorgenti tab links
+indexers, feeds and web engines with the active count and the last cycle outcome; the
+stuck-download panels show one timeline; the Punteggi tab scores reference releases with
+the current weights. Settings search also reaches the indexer editor by concept
+("Prowlarr").
 
-**Library lists as posters.** The *Series* and *Movies* pages read the library
-either as a table or as **poster cards** (one cover per title, the essential data
-on the card, the detail one click away, as Sonarr and Radarr offer), through the
-*List / Posters* switch above the table: the choice is a parameter remembered in
-a cookie, so it follows the operator from one page to the other and no script is
-needed to keep it. The covers come from the metadata Gextto already fetches —
-the `poster_path` of the movie library, and for the series a lookup through the
-configured provider (TMDB, else TVDB) whose result, including "no cover", is
-cached for half a day and resolved a few titles at a time, so the first poster
-page pays for the lookups once.
+**Guided tuning.** The performance tab proposes values from RAM, CPU, volumes and storage
+class (`tuning.go`, `system_probe.go`, `sysinfo.go`): current → proposed, with the reason.
+Nothing is written until the user applies it, and every write goes through
+`validateSettingValue`. `setting_provenance` records `auto` or `manual`: a value the user
+saved is never proposed again. An adaptive loop refits only `auto` values at the start of
+a cycle, past a hysteresis. The peak observer learns the line only from an uncapped
+direction and proposes 80 % of it; the free-space guard is bounded to 20–50 GB; a restart
+that changed the binary is classified as an update, not instability (`restart_cause.go`).
 
-**Bandwidth chart on the Dashboard.** The Dashboard draws the aggregate
-download and upload of the **last 30 minutes** as a server-rendered SVG (no
-charting library), with the peak, the current speed and the line of the
-**active limit** — base, schedule or temporary; the line disappears when the
-policy is *Auto*, because the cap is lifted. A dedicated worker samples the
-engine rates into a bounded in-memory ring (`rate_history` on `AppState`, one
-point every 10 s for 30 minutes) so the history does not depend on a tab being
-open; the chart is refreshed by the same chrome SSE stream that updates the live
-metrics (`event: chrome-traffic`). It lives in Gextto's UI; the standalone
-gx-torrent page keeps its own live rate readouts.
+**Two configuration levels.** *Facilitata* shows the limits the operator owns (folders,
+speed and space, seed policy, access, metadata keys) and hides what the system manages;
+*Esperto* shows everything. It is one filter over the same index, remembered in a cookie;
+the settings search follows the level. Default is Esperto, the wizard sets Facilitata.
 
-**gx-torrent web page.** The standalone client's page is laid out the way a
-qBittorrent Web UI user expects to find things — filters on the left, one compact
-line per torrent, the detail panel below, a complete context menu, the speeds and
-global limits in the status bar — so switching costs nothing; it is not a copy, and
-where qBittorrent is weak the page goes further: per-user column choice and widths
-applied before the first paint (24 columns, availability, time active, last
-activity and wasted included) and, standalone, kept on the server so columns,
-filters and theme follow the operator across browsers; menu toggles that show a
-**mixed** selection and bring it to one state; every control usable from the
-keyboard (submenus, column and panel resizing included); the technical counters
-kept one click away instead of crowding the status bar; an Add dialog that
-previews a magnet (name and info hash) and takes per-torrent limits; an 8-second
-**undo** after a remove that kept the files; files grouped by folder with one
-priority control each, and folders renamed like files; guided empty states and a
-section filter in Settings; the table refresh travels as JSON (`/ui/rows`) with the
-chrome as translated HTML, which is six times smaller per tick (see
-[`measurements.md`](measurements.md)). Details in
-[`gx-torrent.md`](gx-torrent.md), *Web interface*. Two points of the page are
-still open: **virtualising the table** beyond the 300-row window with *Show
-more* (for sessions with more than a thousand torrents), and a **content layout**
-in the Add dialog, which needs engine support because today the save path is per
-torrent or per category.
+**Library and dashboard.** Series and movies can be read as a table or as poster cards
+(cookie-remembered, covers from TMDB/TVDB with a half-day cache). The dashboard draws the
+last 30 minutes of bandwidth as a server-rendered SVG from a bounded ring sampled every
+10 s, refreshed by the chrome SSE stream.
 
-The RSS and wanted pages follow one principle: **nothing is decided out of
-sight**. A rule's preview updates as it is typed, warns when it takes several
-titles and **names the criterion that leaves the other archived items out**
-(`rss.Criteria.RejectReason`); a feed row says which rules decide its downloads
-(links to their editor), shows when a rule may match again after its cooldown and
-turns an error into an actionable hint (API key, Cloudflare/FlareSolverr, a page
-without links, a timeout); ready-made rule templates and a feed `Test` (items of
-a URL previewed before saving) plus a setup import that shows what the file holds
-before it replaces the current configuration keep every change visible before it
-lands; *New feed* takes a **pasted list** too — one address per line, a name
-before the address when wanted — and creates one feed per line, deriving a
-readable name from the address and skipping what is already configured; a feed
-filter that the rules make unused is marked so; a wanted title lists
-its releases with the
-verdict for each (taken, had, or the filter that turns it away), live while it
-is added, and a verdict of *would be taken* can be acted on: the release is
-taken by hand from the same list, which can also ask the indexers now for the
-title (the interactive search). Rule terms come in *all of* / *one of* / *none of*, all found with the
-same separator-insensitive, word-start match (`rss.HasTerm`), and the open
-episode range `1x01-` reaches the later seasons as in qBittorrent, which is what
-a wanted title's *Seasons* `1+` promises. Episodes already in the client count as
-had for a wanted series, whatever brought them there.
+**The standalone page** is laid out like qBittorrent's: filters on the left, one line per
+torrent, the detail panel below, a full context menu, per-user columns and widths kept on
+the server, controls usable from the keyboard, an 8-second undo after a remove, and the
+table refreshed as JSON (`/ui/rows`, about six times smaller than the HTML rows). Details
+in [`gx-torrent.md`](gx-torrent.md), *Web interface*.
 
-A wanted row states what the operator has in four honest states, never guessing
-completeness: how many episodes are **downloaded** (in the session and complete,
-or taken by the engine), how many are **downloading** (in the session but still
-running) and how many were **seen but not downloaded**, with a chip per season
-(a season only partly seen is not collapsed to a bare `S01`). The title badge shows the single most useful state (paused,
-downloading, to complete, up to date, waiting); the **Episodes** button opens the
-per-episode grid inline and an episode in the session links to its torrent; a
-movie shows its single release with the same states. The episode grid is the
-authoritative ledger (`/ui/wanted-episodes`) and it is not hidden inside
-the edit dialog.
+**RSS and Wanted.** Nothing is decided out of sight: a rule's preview updates as it is
+typed and names the criterion that leaves other archived items out; a feed row says which
+rules decide its downloads; templates and a feed test show a change before it lands.
+Rules are ordered PASS/FAIL with regex, include/exclude, size, seeds, age,
+`require_episode` and smart-episode, and the same separator-insensitive term match
+(`rss.HasTerm`) across *all of* / *one of* / *none of*. A wanted title lists what is
+downloaded, downloading and seen-but-skipped, with a chip per season that is never
+collapsed; the episode grid (`/ui/wanted-episodes`) is the ledger. Details in
+[`gx-torrent.md`](gx-torrent.md), *RSS and Wanted*.
 
-**Accessibility.** Reference **WCAG 2.1 AA** (compatible 2.2 practices). The
-interface is **partially accessible**, with an automated baseline that passes but is
-not a WCAG/EN 301 549 certification. What is in place: language via the `lang`
-attribute, landmarks (skip-nav, `aside`/`nav`/`header`/`main`), `aria-current`;
-accessible names (not only placeholder or tooltip) and labels on icon controls;
-dialogs with focus inside, Tab/Shift+Tab trap, Escape and focus restore;
-keyboard-sortable headers with `aria-sort`; focus preserved under polling; visible
-focus; tables with caption and scope (also dynamic); progressbar with a value; ARIA
-for tabs, dialogs and landmarks; live regions for states, errors, notifications and
-async work; decorative symbols never instead of text; settings search with synonyms
-(`memo`, `memory`, `RAM`, `cache`); light-theme contrasts darkened where needed;
-mobile reflow with internal table scroll; reduced motion respected. The method and
-what still needs manual validation are in §5 of [`measurements.md`](measurements.md).
+**Accessibility.** Reference WCAG 2.1 AA (compatible 2.2 practices): landmarks,
+accessible names, dialog focus, keyboard sort, live regions, contrast-checked themes,
+reflow and reduced motion. The automated baseline (14 axe-core tests) passes; it is not a
+legal certification, and manual screen-reader testing is still required
+([`measurements.md`](measurements.md#accessibility)).
 
-**Access and security** (`auth.go`, *Configuration → Access*): authentication is
-**off by default**. When on, anyone not on the LAN must log in (bcrypt password, a
-signed cookie valid 30 days, a new password closes the sessions) or use the API key
-(`X-Api-Key` or `?apikey=`; the TUI takes it from `GEXTTO_API_KEY`). The LAN is
-exempt by default; behind a reverse proxy the forwarded addresses count
-(`X-Forwarded-For`, `X-Real-IP`, `Forwarded`). Five wrong passwords block the IP for
-one minute; without a password or key the check stays open with a warning in the
-log, and `GEXTTO_AUTH_DISABLE=1` gets back in. Both secrets (the API key and the
-gx-torrent token) can be generated and copied from *Access and services → API
-keys*; what they are and how to use them is in [`api-keys.md`](api-keys.md).
-Independent of the login, **cross-site writes are refused**
-(`security_origin.go`, `net/http.CrossOriginProtection`): a page served from
-another origin cannot drive the API through the browser of a user who has Gextto
-open, which matters because the LAN is exempt from the login by default. Safe
-methods and non-browser clients (curl, the TUI) pass untouched.
+**Access and security.** Login is off by default; when on, clients outside the LAN must
+log in (bcrypt, 30-day signed cookie) or send the API key (`X-Api-Key`, `?apikey=`, or
+`GEXTTO_API_KEY` for the TUI). Forwarded addresses count only from declared proxies; five
+wrong passwords block the IP for a minute; `GEXTTO_AUTH_DISABLE=1` is the way back in.
+Cross-site writes are refused (`security_origin.go`, `net/http.CrossOriginProtection`),
+which matters because the LAN bypasses the login.
 
-**Media servers and notifications.** After an import Jellyfin receives
-`/Library/Media/Updated` with the folder and Plex
-`/library/sections/{id}/refresh?path=` for the section that contains it
-(`media_refresh.go`); the requests during a refresh are merged. Unknown folder, no
-Plex section or server refusal fall back to a full refresh as before, and the manual
-buttons remain complete. `jellyfin_path_mappings` / `plex_path_mappings` map paths
-per server for Docker. Notifications (Telegram, email, webhook) are translated, and
-the webhook also speaks **Discord, Slack, ntfy, Gotify and Pushover** through a
-format selector (`notify_webhook_format`).
+**Media servers, notifications, calendar.** Jellyfin gets `/Library/Media/Updated`, Plex a
+targeted section refresh, with path mappings for Docker and merged requests; notifications
+are translated and the webhook speaks Discord, Slack, ntfy, Gotify and Pushover. The iCal
+feed distinguishes arrival in the library, original air date and the Italian release of a
+movie, with a declared fallback to the original date.
 
-**Calendar** (`calendar_ics.go`, `GET /feed/calendar.ics`, linked in Integrations).
-For the Italian audience, where a series is dubbed months or years later, it
-distinguishes three dates: 📥 **arrived in the library** in the last 30 days (day of
-arrival), 📺 **original air date** from TMDB for the current season (✓ if already in
-the library) and 🎬 **Italian release of movies** from TMDB (digital → home video →
-cinema), with a declared fallback to the original date. The "Upcoming releases" tile
-of the Dashboard declares that it shows the original air date.
+**Health and history.** Health shows the searches per cycle (duration, outcome, failed
+sources, with warnings when a source keeps failing, a search takes over three hours or no
+clean cycle completes for three intervals), the delay-profile queue and the failed imports
+per day. Torrent log lines carry an `acq:` ID and are stored in `acquisition_events`
+(History tab, per-episode, series panel, `/api/acquisitions`), kept 180 days. The
+*Downloading* entry counts unfinished torrents plus active HTTP, not seeds.
 
-**Health and history.** The observability data is stored in the database and shown
-in *Health*, without Prometheus: the **Searches** panel with the duration and the
-outcome of every source cycle by cycle (and a warning — in the log and as a
-notification — when a source keeps failing, when a search takes too long or when no
-cycle completes cleanly for three intervals), the **Title queue** panel with the
-titles waiting, since when and until when, for series and movies, and **Failed
-imports** per day; the panels refresh themselves every 60 s and the indexer health
-is in *Sources*. Log lines about a torrent carry `acq: <id>` (a short ID derived
-from the hash, which stays hidden) and end up in `acquisition_events`: *History* tab
-in the torrent detail, 📜 per episode and a panel in the series page, API
-`/api/acquisitions`. A replacement produces a single line in the log —
-`♻️ FBI S03E01 updated (1.4 GB): … · previous version «…» moved to the trash` —
-while a normal addition stays `📁 … added to the library …`. The **Downloading**
-entry in the bar shows the ongoing downloads (unfinished torrents plus active HTTP,
-not seeds), refreshed every 5 s, and on the phone it is a counter on the icon.
+**Speed policies.** Manual limits, a per-weekday schedule with one choice per day (Off,
+Limit or Auto), and a temporary override (numeric or Auto). Auto leaves the line uncapped
+so the peak can be learned; a temporary Auto wins over everything and is the sibling of
+the numeric temporary limit.
 
-**First start and settings.** The guided first-start procedure
-(`/?view=setup`, `uiweb_v2_setup.go`) uses TMDB or TVDB and asks for the language at
-the first step. Every non-secret setting with a registered default (even empty)
-shows ↺ next to "Save": it fills the field with the default and the user confirms by
-saving; the value is shown next to it when compact (`Resettable`/`DefaultInline` in
-`uiweb_v2.go`, `HasDefault` in `uiweb_pages.go`). Excluded: fields disabled for the
-active engine, handled by auto-tuning, secrets, or without a default.
+**Latency guard (Auto respects latency, on by default).** While Auto is in force,
+`latency_guard.go` probes a public host every 2 s. On a high latency (or an unknown idle
+reference) it backs Gextto off to 60 % for 8 s: a falling latency means the queue was its
+own (reference kept for 6 h, 10 min cooldown); a latency that stays high means someone
+else is on the line, and the guard yields with AIMD caps lifted after a calm minute. The
+router's UPnP WAN counters decide first when they answer. The Downloads badge shows
+latency, reference and caps; `GET /api/torrents/temp-limits` carries `latency_guard`.
+Measurements: [`measurements.md`](measurements.md) §4.5.
 
-**Settings that explain themselves.** Read-only insights sit next to the controls
-(`uiweb_v2_settings_insights.go`), built from the configured values without moving a
-single row: the Sorgenti tab opens a three-link entry point (indexers/manager →
-Integrazioni, feed, web engines) with the active indexer count and the last cycle's
-outcome from `CycleSourceStat`; both stuck-download panels show the same one-line
-timeline («stalled after 60 min · retry every 60 · alternative after 360 up to −100 ·
-without seeders remove after 3 days · otherwise after 14 days»); and the Punteggi tab
-shows reference releases (1080p WEB-DL H.264/H.265, 2160p Dolby Vision) scored live
-with the current weights plus the stop threshold, so the 27 weights stop being opaque
-numbers. The settings search also reaches the indexer/manager editor by concept
-("Prowlarr"), which has no setting key of its own.
+**Streaming and DLNA.** The streaming endpoint sends the `Content-Type` from the file
+extension, answers HEAD and refcounts readers per file. The DLNA/UPnP server is opt-in:
+SSDP, ContentDirectory, ConnectionManager, GENA events, HTTP Range, subtitles, library
+folders on the NAS and artwork from the Jellyfin/Kodi images; LAN-only by construction.
+Details in [`gx-torrent.md`](gx-torrent.md), *DLNA media server*.
 
-**Guided tuning.** The performance tab proposes the values that fit the machine
-(`tuning.go`, `system_probe.go`, `sysinfo.go`): a read-only table (current →
-proposed, with the reason) built from RAM/CPU, the download and archive volumes,
-whether they are on the same filesystem and whether either is a network share,
-and the RAM disk. Nothing is written until the user applies the selected rows
-(`POST /settings/tuning/apply`); each write passes the usual
-`validateSettingValue` and is recorded in `setting_provenance` as `auto`, while a
-value the user saved by hand is marked `manual` and never proposed again. The
-tuning deliberately stays away from the settings the torrent engine manages by
-itself (cache, active slots, dynamic queue) and from taste/policy settings
-(search cadence, gaps, score weights). A restart is classified
-(`restart_cause.go`): a restart that changed the binary is an update, never
-instability, so nothing in the tuning can read a routine update as a fault.
-
-**Two configuration levels.** The configuration page is shown at two levels,
-chosen with a switch and remembered in a cookie (`uiweb_v2_settings_mode.go`,
-like the List/Posters choice): **Facilitata** shows the limits the user must own
-(where data goes, speed and space limits, the seed policy, access and metadata
-keys — `uiEssentialKeys`) and hides the internals the system manages;
-**Esperto** shows every value. Nothing moves between them: it is one filter over
-the same index, and the settings-search index follows the level so a result
-never links to a hidden row. The default is Esperto, so an existing installation
-loses no row; the setup wizard sets Facilitata when it finishes, so a brand-new
-user starts from the guided page.
-
-The guided tuning appears as the **Gestione automatica** card in the performance
-tab: in Facilitata it is one button ("Adatta ora") that applies the whole
-proposal — the user trusts the system — with a one-line summary; in Esperto it
-lists each proposed value (current → proposed, with the reason) and a checkbox.
-In Esperto each value also carries where it came from — *gestito dal sistema*
-(the tuning) or *impostato da te* (a manual save), from `setting_provenance`.
-
-The tuning is **adaptive**: a slow loop runs at the start of each cycle
-(`autotune_adaptive`, on by default) and re-fits the values the system already
-chose when the facts moved (the free-space guard and the RAM-disk thresholds
-follow the disk, for instance). It only ever touches values with `origin=auto` —
-never the user's, never a value never tuned — and only past a hysteresis
-(`adaptiveHysteresisFraction`), so the values do not wobble. The cycle is the
-cadence, which keeps it gentle. A restart is never read as instability: a
-restart that changed the binary is an update (`restart_cause.go`). The link-peak
-input exists: the daemon's 90-second policy tick records the highest download
-and upload rate the line actually reached (`autotune_peaks.go`, hidden keys that
-only grow), and the tuning proposes `torrent_dl_limit`/`torrent_ul_limit` at 80%
-of that peak, leaving headroom for the ACKs. A fresh install has no peak yet, so
-the bandwidth stays the user's until the line has been measured. The
-free-space guard is bounded (20–50 GB): the 5% rule alone asked for hundreds of GB
-on a multi-terabyte disk. The automatic cycle is on by default (`active`, a combo
-in the page), so a fresh installation searches on its own; the wizard still sets
-it.
-
-**Ports and one upgrade threshold.** The peer ports are a user limit
-(`uiEssentialKeys`), but the network tab reads the engine's `port_mapping` and,
-when the engine opened the port itself (UPnP/NAT-PMP), it says so and drops the two
-rows in Facilitata; otherwise it warns with the exact range to forward. The library
-cleanup has no score threshold of its own: it uses `upgrade_min_score_diff`, one
-voice for both the acquisition upgrade and the cleanup pass. `cleanup_upgrades` ("replace archived versions") is
-on by default, so archived files can actually be improved.
-
-**Scheduling the auto-tune.** The per-day editor gives every day **one choice — Off,
-Limit or Auto** (`internal/bwschedule` sentinel `AutoLimit = -1`): an **Auto** day
-lifts the cap (`speedPolicy` returns unlimited, source `schedule_auto`), so the peak
-observer measures the real line there, while the user's conservative limits apply in
-the other windows — the right shape for a line shared with the family. A capped
-direction is never used to learn the peak (`autotune_peaks.go`), so the free window
-is exactly where the line is learned. The same "hand the line to the tuning" idea is
-a **base policy** (`torrent_speed_auto`, no cap at all, source `auto`, mutually
-exclusive with the schedule) and the temporary override's Auto mode in Downloads
-(`torrent_temp_auto`, source `temp_auto`), which wins over everything and is the
-sibling of the numeric temporary limit — so the speed has two levels: the **policy**
-(manual, scheduled or automatic) and the **temporary override** (limit or auto).
-
-**Latency guard (Auto respects latency, on by default).** Auto would otherwise leave
-a saturated download free to add ~40 ms for every device in the house. The rule is
-the user's: the whole line belongs to Gextto **while nobody else needs it**, and
-Gextto yields when someone does. `latency_guard.go` probes the latency to a public
-host every 2 s, and only while Auto is in force (`torrent_auto_latency_target`, empty =
-9.9.9.9 and 1.1.1.1 on port 443). The gateway is no use as a target: it shows no
-queueing. Who else is on the line is found out by **trying**. When the latency is
-high, or the idle reference is unknown, Gextto backs off to 60 % for 8 s. If the
-latency falls, the queue was Gextto's own: that latency becomes the idle reference
-(the lowest kept for 6 h), the line goes back to Gextto and no trial follows for
-10 minutes. If the latency stays high while Gextto left room, someone else is filling
-the line. The guard then **yields**: −15 % per step while the latency stays high,
-+1/20 of the peak at rest, and the cap is lifted after a minute of calm at the
-ceiling. When the router's UPnP WAN counters answer (`line_usage.go`), their verdict
-comes first. The others' traffic is WAN minus Gextto's wire bytes, after the overhead
-learned as the lowest WAN/own ratio of the last hour, 2 of 3 reads. Gextto's rate
-comes from the engine's cumulative wire counters, since the reported rates are
-averaged over tens of seconds. Under the guard the 60 s policy tick pushes the
-guard's caps (`effectiveSpeedLimits`), the peak observer neither learns from a
-guarded direction nor forgets it, and leaving Auto pushes nothing. The Downloads badge
-shows latency, reference and caps while it acts, and `GET /api/torrents/temp-limits`
-carries `latency_guard`. Measured on a real line: [`measurements.md`](measurements.md),
-*Latency guard*.
-
-**Streaming and DLNA.** Web streaming (`cmd/gx-torrent/stream.go`, the endpoint
-Gextto redirects to) sends the **Content-Type from the file extension**
-(`video/mp4`, `video/x-matroska`, `audio/flac`, …) with
-`Content-Disposition: inline`, so a browser plays instead of downloading, and
-answers HEAD; a shared `serveTorrentFile` core is reused by the UI player and by the
-DLNA server, and the concurrent streams are refcounted per file
-(`beginStream`/`endStream`) so a player closing does not clear the window another
-reader of the same file still needs. The **DLNA/UPnP AV server**
-(`cmd/gx-torrent/dlna.go`, `dlna_ssdp.go`) is **opt-in** and exposes the completed
-torrents' media to a TV or console on the LAN: SSDP (M-SEARCH replies, alive at
-start and every 15 min, byebye), ContentDirectory:1 (`Browse`, BrowseMetadata,
-BrowseDirectChildren, paging, content-derived `SystemUpdateID`), ConnectionManager:1
-and GENA `SUBSCRIBE` with the initial event; media are served with HTTP Range by the
-shared core plus the DLNA `contentFeatures`/`transferMode` headers, and subtitles
-with the same name as the video are attached (`res` + `sec:CaptionInfoEx`). It is
-**LAN-only by construction** (HTTP and SSDP from a non-local address are refused)
-and `/res` serves only the files the listing offers. Settings `dlna-enabled`,
-`dlna-listen`, `dlna-name`, in the daemon page when standalone (with the running URL
-shown) and as Gextto options (`gxtorrent_dlna*`) when managed; an address or name
-change restarts the server. **Library folders** (`dlna_library.go`) show the NAS
-archive beside the torrents as a browsable tree (Gextto passes its archive root and
-the series folders automatically, trash excluded), read through `os.Root` with no
-`..`/symlink escape, skipping the NAS system folders, with listings cached 30 s: on
-the real NFS archive 125 series list in ~0.5 s and a 5 GB 2160p episode streams by
-Range. **Artwork** (`dlna_art.go`): videos and folders carry `upnp:albumArtURI`
-(`JPEG_TN` + `JPEG_SM`) from the Jellyfin/Kodi images beside the media (`-thumb`,
-`-poster`, `folder.jpg`, season posters `season01-poster.jpg`), scaled in Go with a
-box filter and an 8 MB LRU cache. Open in §8: transcoding, frames extracted from
-the video (no ffmpeg), search, Xbox/WMP (`X_MS_MediaReceiverRegistrar`).
-
-**In-app updates.** gx-torrent standalone
-(`cmd/gx-torrent/update.go`, `internal/updatecheck`) updates itself from *Settings →
-Maintenance*: a timer (`update-check-hours`, default 6) or **Check for updates**
-reads `release.json`, where the commits that touch the daemon's code are flagged
-(`"gx"`, `gx_torrent_commit`), so only real daemon changes are offered. **Update**
-downloads the archive, verifies SHA-256, test-runs the binary, swaps it keeping
-`.prev`, re-executes in place (same PID) and shows the new commits in a popup; three
-failed starts restore `.prev`. It is off when managed by Gextto and for local builds
-(the release channel is stamped only by `build-release.sh`). Gextto has the same
-check period as a setting (`update_check_hours`, default 6), one button that reads
-**Check for updates** and becomes **Update**, and after an update a **Gextto
-updated** popup with the commits it brought (`update-notes.json`).
+**In-app updates.** gx-torrent standalone checks `release.json` (only commits that touch
+the daemon are offered), verifies SHA-256, test-runs the new binary, swaps it keeping
+`.prev` and re-executes in place; three failed starts restore `.prev`. Gextto has the same
+check period and a popup with the commits it brought. Local builds do not self-update.
 
 ### 4. Indexers: the manager as the single source
 
@@ -794,7 +572,7 @@ recovered from a shell without editing the database.
 
 **Waiting for a measurement or a host.**
 
-- **Choking on a real swarm.** The controlled evidence is healthy (§3 of [`measurements.md`](measurements.md)): a real
+- **Choking on a real swarm.** The controlled evidence is healthy (§4.6 of [`measurements.md`](measurements.md)): a real
   libtorrent leecher is served at full speed on loopback and reciprocation works
   (leechers exchange 2.52 MB, the seed's upload drops to 1.84×). What is missing is a
   swarm where peers download *from* us, which needs a host with a **reachable inbound
@@ -827,7 +605,7 @@ recovered from a shell without editing the database.
   2 min 4 s with a 2-minute calm spell; the 60 s in force is pinned by tests, a
   physical re-measure is still to do.
 - **DHT feeds**: the resolver exists, the **publisher** side (signing a feed) does not,
-  and the BEP 44 outgoing client has no consumer yet (§4 of [`measurements.md`](measurements.md)).
+  and the BEP 44 outgoing client has no consumer yet (§4.7 of [`measurements.md`](measurements.md)).
 - **WebTorrent/WebRTC**: the WebSocket tracker's practical value stays limited until
   WebRTC is done, since the reference tracker serves only WebRTC peers to a WebSocket
   client (§6).
@@ -837,6 +615,10 @@ recovered from a shell without editing the database.
 
 **Product-surface refinements.**
 
+- **Virtualising the torrent table** beyond the 300-row window with *Show more*,
+  for sessions with more than a thousand torrents.
+- **A content layout in the Add dialog**, which needs engine support: the save
+  path is per torrent or per category.
 - **DLNA library folders.** On the gx-torrent settings page, the *Library folders*
   field of *Media server (DLNA)* should propose the configured **Download
   folder** at least, so the folder that already holds the completed media is a

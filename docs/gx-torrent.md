@@ -1262,9 +1262,9 @@ RPC server is disabled.
     collapsing the RTO to sub-milliseconds and resending in a storm, and a
     **per-connection backoff** doubles the RTO on each timeout (up to 4×) and
     halves it on each delivered packet, so a silent or congested peer is
-    retried with growing patience (measured: 50% fewer resends against a peer
-    that stops answering) while a link that delivers again returns to the
-    measured RTT. A healthy connection never timeout-resends, so its RTO is
+    retried with growing patience while a link that delivers again returns to
+    the measured RTT. On the silent-peer harness the backoff halves the resends
+    ([`measurements.md`](measurements.md) §4.1). A healthy connection never timeout-resends, so its RTO is
     unchanged.
   - Incoming, the handshake is routed as for TCP.
   - The peer list indicates which ones are connected over uTP.
@@ -1479,7 +1479,7 @@ The merge has three phases:
   whole once complete. If that check fails, the local blocks are dropped and
   the piece is downloaded whole (the peer is not banned for it). Measured on
   the Debian and Arch ISOs with a source 75% complete: 25% of the file from the
-  network instead of 100% (§5 of [`measurements.md`](measurements.md), harness
+  network instead of 100% ([`measurements.md`](measurements.md) §4.8, harness
   `scripts/phase3-env.sh` + `TestMeasureMergePhase3`).
 - **Phase 4 — v1, a different piece length.** Two **v1** torrents matched by
   file **path and length** share **whole** pieces even when their piece grids
@@ -1723,8 +1723,8 @@ using fixed values.
 - **`-mmap`** (experimental, Linux): the torrent's files are served from a
   **shared memory mapping** instead of with `read`/`write`. Piece writes
   become copies into the page cache (asynchronous kernel writeback) and
-  reads avoid the syscall: `filestorage` benchmark on tmpfs ~7.0 GB/s versus
-  ~5.9 GB/s for `pwrite`. It is **opt-in** (also `GX_TORRENT_MMAP=1`) because it maps
+  reads avoid the syscall (on tmpfs the benchmark is ~7.0 GB/s against
+  ~5.9 GB/s for `pwrite`, [`measurements.md`](measurements.md) §4.9). It is **opt-in** (also `GX_TORRENT_MMAP=1`) because it maps
   every open file: with torrents of thousands of files it approaches the
   `vm.max_map_count` limit. Outside Linux it is ignored (normal files are used).
   A page the disk cannot back (disk full on a sparse file, file truncated by
