@@ -2,8 +2,8 @@ package main
 
 import (
 	"crypto/rand"
-	"fmt"
 	"crypto/sha1"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"

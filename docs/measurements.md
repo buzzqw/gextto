@@ -57,6 +57,7 @@ Cheap probes and opt-in tests, all outside CI:
 | `TestMeasureLatencyGuard` | the latency guard against a second instance and a competing download on the real line (`GX_MEASURE_LATENCY_GUARD`, `GX_MEASURE_COMPETITOR_URL`) |
 | `TestMeasureManagerLanes` | Jackett/Prowlarr lanes against the aggregate on the live managers (`GX_MEASURE_LANES=<data dir>`) |
 | `TestMeasureManyFiles` | descriptors, peak RSS and check time of one torrent with many files already on disk (`GX_MEASURE_FILES=500,2000,5000`; run it niced and memory-capped, see §4.9) |
+| `TestMeasureManyFilesDownload` / `TestMeasureRealManyFiles` | a torrent of many files downloaded at full speed from a second daemon over loopback (`GX_MEASURE_DL=files:avgsize`) or from the real swarm (`GX_MEASURE_REAL_MANY=<torrent>`), data under `GX_MEASURE_DIR` on a real disk, stopping by itself if the host is under strain (§4.9) |
 | `TestMeasureMergePhase3` | block-granularity merge on real ISOs (`GX_MEASURE_MERGE3=<dir>`, `GX_MEASURE_MERGE3_PEER` for a libtorrent seeder) |
 | unchoker simulation (`internal/gxcore/internal/unchoker/sim_test.go`) | the real `Unchoker` driven by synthetic peers: fast downloaders in download, fast uploaders in seed, immediate fast unchoke, optimistic unchoke that does not steal a slot and rotates, budget respected, fairness |
 | `TestMeasurePipeliningLatency` | an in-process latency proxy before the seed (no `tc`/`netem`, no root): every chunk released at arrival plus latency, in order and without limiting bandwidth |
@@ -329,6 +330,22 @@ now only raises the soft limit. Decision: **no file pool**; the descriptor ceili
 the service (65536) covers every realistic session. With mmap storage each file is
 also a mapping: `vm.max_map_count` is 1,048,576 here, and a failed mapping falls back
 to a plain file.
+
+**Many files at full speed, loopback (2026-10-18, N97).** `TestMeasureManyFilesDownload`
+(`GX_MEASURE_DL=files:avgsize`, `GX_MEASURE_DIR` on the NVMe, same limits): a seeder
+daemon serves a torrent of many files (sizes spread ±50 % around the average, 512 KiB
+pieces spanning several files) and a second daemon downloads it over loopback with
+nothing throttled. CPU and RSS are the two daemons together.
+
+| Files | Size | Seeder check | Download | Average | CPU | Peak RSS | Peak descriptors | Host load (max) |
+|---|---|---|---|---|---|---|---|---|
+| 1,000 | 0.15 GiB | 1.4 s | 1.9 s | 85 MB/s | 0.65 core | 100 MiB | 2,013 | 0.6 |
+| 6,000 | 0.92 GiB | 5.8 s | 7.9 s | 125 MB/s (peak 140) | 0.88 core | 114 MiB | 12,015 | 1.5 |
+| 6,500 | 3.72 GiB | 10.2 s | 23.8 s | 168 MB/s | 1.37 cores | 121 MiB | 13,015 | 1.7 |
+
+The host stayed responsive throughout: available memory never moved from ~11.2 GiB and
+the load stayed under 2. Thousands of files cost neither memory nor speed: the rate is
+the loopback single-pair ceiling of §2.
 
 **Statistics page** (standalone daemon, 0 torrents): the new sample and lifetime folding
 are free (`42 ns/op` and `6.4 ns/op`, 0 allocs); a graph request pays 11.3 µs / 20 KiB / 1
