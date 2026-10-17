@@ -344,7 +344,7 @@ tabelle semantiche ordinabili, annunci live, reflow responsive e temi verificati
 per il contrasto, coperti da axe-core e Playwright (`cd uiweb/end2end && npm ci
 && npm run test:a11y`). Non è una certificazione legale: servono ancora prove
 manuali con screen reader e tecnologie assistive
-([ambito e limiti](docs/measurements.md#6-accessibility-verification)).
+([ambito e limiti](docs/measurements.md#accessibility)).
 
 ## Documentazione
 

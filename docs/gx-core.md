@@ -204,7 +204,7 @@ the state vocabulary is explained by a legend on the page.
   post-processing — rename and move into the library — is not part of the standalone.
 - **Rate-based choking and anti-leech**: to be validated with the deterministic harness
   and the real-swarm campaign before touching the algorithm
-  ([`measurements.md`](measurements.md) §3).
+  ([`measurements.md`](measurements.md) §4.6).
 - **Container image**: the `Dockerfile` is built and smoke-tested in CI (job
   `container image`); publishing it to a registry is not done.
 - **Distribution targets**: Linux (amd64/arm64) and Windows are covered; macOS is not

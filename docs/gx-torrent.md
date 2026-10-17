@@ -2211,7 +2211,7 @@ the resident memory. Measurements in `docs/measurements.md`.
   - loading of the IP filter.
   - (opt-in, `GX_MEASURE=1` / `make measure-seeding`) the seeding/choking measurement
     on a local swarm, with bytes and times per peer: method and metrics in
-    `docs/measurements.md` (§3).
+    `docs/measurements.md` (§4.6).
 - `go test ./internal/blocklist` in `internal/gxcore` covers the formats of the
   IP filter.
 - `make test-engine` also covers the deterministic choking harness

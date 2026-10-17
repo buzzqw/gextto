@@ -296,7 +296,7 @@ for tabs, dialogs and landmarks; live regions for states, errors, notifications 
 async work; decorative symbols never instead of text; settings search with synonyms
 (`memo`, `memory`, `RAM`, `cache`); light-theme contrasts darkened where needed;
 mobile reflow with internal table scroll; reduced motion respected. The method and
-what still needs manual validation are in §6 of [`measurements.md`](measurements.md).
+what still needs manual validation are in §5 of [`measurements.md`](measurements.md).
 
 **Access and security** (`auth.go`, *Configuration → Access*): authentication is
 **off by default**. When on, anyone not on the LAN must log in (bcrypt password, a
@@ -688,8 +688,8 @@ merge verified are handed to the verifier without re-reading them (`Verifier.Ski
 the merge runs off the run loop. Private torrents are excluded: if A **or** B is
 private the merge is disabled (**BEP 27 guard**, not an option). There is deliberately
 no ED2K-style content hash: for v1 the match is by path and length, because those hashes
-are not in the `.torrent` and would need a private index. The measurements are in §5 of
-[`measurements.md`](measurements.md), the cost when nothing is reusable in §2.
+are not in the `.torrent` and would need a private index. The measurements are in §4.8 of
+[`measurements.md`](measurements.md), the cost when nothing is reusable in §3.
 
 **Ping-Based Auto-Speed** (anti-bufferbloat, standalone). A probe measures every second
 the RTT towards the gateway (or the configured target) with a TCP connect, with a
@@ -721,7 +721,7 @@ exists, not the publisher (signing).
 **What is missing.** Feature-wise the engine covers what libtorrent covers for this
 use. What libtorrent has and gx-core does not is **exposure**: twenty years of runs in
 the wild, and that is not a backlog item — it is acquired by running, which is exactly
-what the campaign in [`measurements.md`](measurements.md) §3 and the open items in §8 are for. What is left is therefore
+what the campaign in [`measurements.md`](measurements.md) §4.6 and the open items in §8 are for. What is left is therefore
 tuning and measurement, not capability: the **choking quality** on a real swarm (the
 deterministic harness is the net, the swarm is the verification), the **pipelining**
 ceiling beyond a local pair (the 10 Gbps target needs hardware that is not here), the
