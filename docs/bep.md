@@ -212,40 +212,65 @@ given as absent must be closed or reclassified when the code implements it.
 
 ## Comparison with other clients
 
-A snapshot of the main capabilities, taken from each project's own documentation on
-2026-10-17. Legend: **yes** = supported; **no** = not supported; **opt-in** = supported
-but off by default; **n/d** = the project's documentation does not state it (not a claim
-that it is missing). A client built on libtorrent inherits the library's support.
+Support for the BEPs listed above, from each project's own documentation on 2026-10-17.
+**Yes** = supported; **partial** = only part of it; **no** = documented as absent;
+**–** = the project's documentation does not state it (not a claim that it is missing).
+A client built on libtorrent inherits the library's support: the column covers
+**qBittorrent** and **Deluge** as well.
 
-| Capability | gx-core | libtorrent 2.x | qBittorrent | Deluge | Transmission 4.x | Rain | anacrolix/torrent |
-|---|---|---|---|---|---|---|---|
-| v1 core, magnet, PEX, DHT, fast extension, UDP trackers | yes | yes | yes | yes | yes | yes | yes |
-| BitTorrent v2 / hybrid (BEP 52) | yes | yes | yes * | yes * | no | no | yes |
-| uTP (BEP 29) | yes | yes | yes | yes | yes | no | yes |
-| IPv6 trackers (BEP 7) | yes | yes | yes | yes | yes | no | n/d |
-| IPv6 DHT (BEP 32) | yes | yes | yes | yes | n/d | no | n/d |
-| Holepunch (BEP 55) | yes | yes | yes | yes | no | no | yes |
-| Web seeds (BEP 19) | yes | yes | yes | yes | yes | yes | yes |
-| Super-seeding (BEP 16) | opt-in | yes | yes | yes | n/d | no | n/d |
-| Protocol encryption (MSE/PE) | yes | yes | yes | yes | yes | yes | yes |
-| Local service discovery (BEP 14) | yes | yes | yes | yes | yes | n/d | n/d |
+| BEP | Specification | gx-core | libtorrent (qBittorrent, Deluge) | Transmission 4.x | Rain | anacrolix/torrent |
+|---|---|---|---|---|---|---|
+| 3 | Core wire protocol | yes | yes | yes | yes | yes |
+| 4 | Reserved handshake bits | yes | yes | yes | – | – |
+| 5 | Mainline DHT | yes | yes | yes | yes | yes |
+| 6 | Fast Extension | yes | yes | yes | yes | – |
+| 7 | IPv6 trackers | yes | yes | yes | no | – |
+| 9 | Metadata from peers (magnet) | yes | yes | yes | yes | – |
+| 10 | Extension Protocol | yes | yes | yes | yes | yes |
+| 11 | Peer Exchange | yes | yes | yes | yes | yes |
+| 12 | Multitracker | yes | yes | yes | yes | – |
+| 14 | Local Service Discovery | yes | yes | yes | – | – |
+| 15 | UDP trackers | yes | yes | yes | yes | – |
+| 16 | Super-seeding | yes (opt-in) | yes | – | no | – |
+| 19 | Web seeds | yes | yes | yes | yes | yes |
+| 20 | Peer ID conventions | yes | yes | yes | – | – |
+| 21 | Partial seeds | yes | yes | yes | – | – |
+| 23 | Compact peer lists | yes | yes | yes | – | – |
+| 24 | Tracker returns external IP | yes | yes | – | – | – |
+| 27 | Private torrents | yes | yes | yes | – | – |
+| 29 | uTP | yes | yes | yes | no | yes |
+| 31 | Tracker failure retry | yes | yes | – | – | – |
+| 32 | IPv6 DHT | yes | yes | – | no | – |
+| 33 | DHT scrape | yes | – | – | – | – |
+| 34 | DNS trackers (SRV) | no | no | – | – | – |
+| 38 | Local data hints | yes | no | – | – | – |
+| 40 | Canonical peer priority | yes | yes | – | – | – |
+| 41 | UDP tracker extensions | yes | – | – | – | – |
+| 42 | DHT security (secure node ID) | yes | yes | – | – | – |
+| 43 | Read-only DHT nodes | yes | yes | – | – | – |
+| 44 | DHT key/value store | yes | yes | – | – | – |
+| 45 | DHT multi-address | no | – | – | – | – |
+| 46 | DHT mutable items | yes | yes | – | – | – |
+| 47 | Padding files | yes | yes | – | – | – |
+| 48 | Tracker scrape | yes | yes | yes | – | – |
+| 51 | DHT infohash indexing | no | no | – | – | – |
+| 52 | BitTorrent v2 / hybrid | yes | yes (2.x) | no | – | yes |
+| 53 | Magnet: select only | yes | yes | – | – | – |
+| 54 | `lt_donthave` | partial (reception) | yes | – | – | – |
+| 55 | Holepunch | yes | yes | no | – | yes |
+| — | MSE/PE encryption | yes | yes | yes | yes | yes |
 
-\* Through libtorrent 2.x. Deluge 2.2 added v2 torrent creation and runs on libtorrent
-2.0; the qBittorrent build decides the library version, so check the one you run.
-
-**Reading the table.** gx-core covers the full v1 set and the v2/hybrid path, with
-holepunching, super-seeding (opt-in), web seeds, encryption, LSD and IPv6 on both
-trackers and DHT. Rain is deliberately focused on the server case and leaves uTP,
-IPv6, super-seeding and v2 out. Transmission 4.x still has v2 and BEP 55 as open items
-(milestone 5.0); Deluge and qBittorrent inherit libtorrent, so their matrix follows the
-library build. Beyond this table, gx-core also implements BEP 38 (local data hints),
-BEP 40 (peer priority), BEP 47 (padding files) and the reception side of BEP 54; the
-other clients' support there varies and is not compared.
+**Reading it.** gx-core covers the v1 set and v2/hybrid, with holepunching,
+super-seeding (opt-in), web seeds, encryption, LSD and IPv6 on trackers and DHT; it
+also implements BEP 38, 40, 41, 42–44, 46 and 47, which the other clients either leave
+undocumented or do not implement. Transmission 4.x still has v2 (BEP 52) and BEP 55 as
+open items (milestone 5.0). Rain is deliberately focused on the server case: its
+documented set has no uTP, IPv6, super-seeding or v2. For anacrolix/torrent the README
+names DHT, PEX, uTP, web seeds, v2 and holepunching; the rest is not documented there,
+so it is marked “–”.
 
 Application-level features (web UI, RSS, search, streaming, APIs) are outside a BEP
-comparison and are not listed here.
-
-Sources: libtorrent 2.x *features* page and *Upgrading to 2.0*; the Rain README
-(*Features* and *Missing features*); the anacrolix/torrent README; the Transmission
-issue tracker (v2 #458, BEP 55 #3705) and 4.1 release notes; the Deluge 2.2 release
-notes.
+comparison. Sources: libtorrent 2.x *features* page and *Upgrading to 2.0*; the Rain
+README (*Features* and *Missing features*); the anacrolix/torrent README; the
+Transmission issue tracker (v2 #458, BEP 55 #3705) and 4.1 release notes; the Deluge 2.2
+release notes.
