@@ -347,6 +347,14 @@ The host stayed responsive throughout: available memory never moved from ~11.2 G
 the load stayed under 2. Thousands of files cost neither memory nor speed: the rate is
 the loopback single-pair ceiling of §2.
 
+The same harness on the real swarm (`TestMeasureRealManyFiles`, Internet Archive item
+`talawa-images-archive`, CC0, 16,928 files, 1.24 GB) found no BitTorrent peers: the
+data came only from the two archive.org web seeds at ~0.2 MB/s, with the daemon idle
+(6 % CPU, 70 MiB, 16,946 descriptors, host load 0.4). archive.org answers one file in
+~3 s: `curl` fetched 20 files at 0.08 MB/s one after the other and 0.46 MB/s eight at
+a time. The run was stopped after 5 minutes: on that source the limit is the server,
+not the daemon.
+
 **Statistics page** (standalone daemon, 0 torrents): the new sample and lifetime folding
 are free (`42 ns/op` and `6.4 ns/op`, 0 allocs); a graph request pays 11.3 µs / 20 KiB / 1
 alloc and the page translation 255 µs / 89 KiB / 1,919 allocs. Over 30 s idle the daemon spends about **91 CPU ticks** (+20 ms against the version

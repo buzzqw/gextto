@@ -634,6 +634,12 @@ recovered from a shell without editing the database.
   included); measuring further needs a multi-peer swarm on a fast link, neither
   available here.
 
+- **Parallel requests per web seed.** One range download runs per web seed at a time;
+  on a source that answers each file slowly (archive.org, ~3 s per request) a torrent of
+  many small files is bound by that latency, and eight parallel requests measured ~2.5×
+  faster with `curl` ([`measurements.md`](measurements.md) §4.9). Gate: a torrent served
+  mostly by web seeds where the parallel version beats the current one on the same source.
+
 **Product-surface refinements.**
 
 - **Virtualising the torrent table** beyond the 300-row window with *Show more*,
