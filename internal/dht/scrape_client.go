@@ -2,7 +2,6 @@ package dht
 
 import (
 	"errors"
-	"strings"
 	"time"
 )
 
@@ -56,10 +55,7 @@ func (d *DHT) startScrape(req scrapeRequest) {
 	closest := d.routingTable.lookupFiltered(req.ih)
 	if len(closest) == 0 {
 		// Fall back to the bootstrap routers.
-		for _, s := range strings.Split(d.config.DHTRouters, ",") {
-			if s == "" {
-				continue
-			}
+		for _, s := range d.routers() {
 			if r, e := d.routingTable.getOrCreateNode("", s, d.config.UDPProto); e == nil {
 				closest = append(closest, r)
 			}

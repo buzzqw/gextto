@@ -154,16 +154,27 @@ type DHT struct {
 	sharedConn             bool
 	exploredNeighborhood   bool
 	remoteNodeAcquaintance chan string
-	peersRequest           chan ihReq
-	nodesRequest           chan ihReq
-	pingRequest            chan *remoteNode
-	portRequest            chan int
-	removeInfoHash         chan InfoHash
-	stop                   chan bool
-	wg                     sync.WaitGroup
-	clientThrottle         *clientThrottle
-	store                  *dhtStore
-	tokenSecrets           []string // current + previous announce-token secret
+	// The bootstrap routers resolved off the loop (routers.go): the loop
+	// owns these fields, the resolution comes back on routersResolved.
+	routerAddrs      []string
+	routersAt        time.Time
+	routersRetryAt   time.Time
+	routersResolving bool
+	routersResolved  chan []string
+	bootstrapPending bool
+	// lookupIP resolves host names (nil = the system resolver); set before
+	// Start, never changed afterwards.
+	lookupIP       ipLookup
+	peersRequest   chan ihReq
+	nodesRequest   chan ihReq
+	pingRequest    chan *remoteNode
+	portRequest    chan int
+	removeInfoHash chan InfoHash
+	stop           chan bool
+	wg             sync.WaitGroup
+	clientThrottle *clientThrottle
+	store          *dhtStore
+	tokenSecrets   []string // current + previous announce-token secret
 
 	// publicIP is the external IP we are reached at (BEP 42), once known.
 	publicIP net.IP
@@ -211,7 +222,7 @@ func New(config *Config) (node *DHT, err error) {
 	go func() {
 		defer node.wg.Done()
 		for addr := range c.Remotes {
-			node.AddNode(addr)
+			node.addNodeWait(addr)
 		}
 	}()
 	return
@@ -228,6 +239,7 @@ func makeNode(cfg Config) *DHT {
 		exploredNeighborhood: false,
 		// Buffered against senders that must not block.
 		remoteNodeAcquaintance: make(chan string, 100),
+		routersResolved:        make(chan []string, 1),
 		peersRequest:           make(chan ihReq, 100),
 		nodesRequest:           make(chan ihReq, 100),
 		pingRequest:            make(chan *remoteNode),
@@ -333,21 +345,14 @@ func (d *DHT) Port() int {
 	return <-d.portRequest
 }
 
-// AddNode feeds a "host:port" node to the routing table.
-func (d *DHT) AddNode(addr string) {
-	d.remoteNodeAcquaintance <- addr
-}
-
 // getPeers asks the closest nodes for infoHash's peers, falling back to
 // the bootstrap routers on an empty table.
 func (d *DHT) getPeers(infoHash InfoHash) {
 	closest := d.routingTable.lookupFiltered(infoHash)
 	if len(closest) == 0 {
-		for _, s := range strings.Split(d.config.DHTRouters, ",") {
-			if s != "" {
-				if r, e := d.routingTable.getOrCreateNode("", s, d.config.UDPProto); e == nil {
-					d.getPeersFrom(r, infoHash)
-				}
+		for _, s := range d.routers() {
+			if r, e := d.routingTable.getOrCreateNode("", s, d.config.UDPProto); e == nil {
+				d.getPeersFrom(r, infoHash)
 			}
 		}
 	}
@@ -361,11 +366,9 @@ func (d *DHT) findNode(id string) {
 	ih := InfoHash(id)
 	closest := d.routingTable.lookupFiltered(ih)
 	if len(closest) == 0 {
-		for _, s := range strings.Split(d.config.DHTRouters, ",") {
-			if s != "" {
-				if r, e := d.routingTable.getOrCreateNode("", s, d.config.UDPProto); e == nil {
-					d.findNodeFrom(r, id)
-				}
+		for _, s := range d.routers() {
+			if r, e := d.routingTable.getOrCreateNode("", s, d.config.UDPProto); e == nil {
+				d.findNodeFrom(r, id)
 			}
 		}
 	}
@@ -414,18 +417,27 @@ func (d *DHT) initSocket() (err error) {
 }
 
 // bootstrap pings the configured routers, looks us up through them, then
-// looks us up table-wide and pulls peers for active downloads.
+// looks us up table-wide and pulls peers for active downloads. Routers given
+// by name are resolved in the background first: the router part then runs
+// when they arrive (routersArrived).
 func (d *DHT) bootstrap() {
-	for _, s := range strings.Split(d.config.DHTRouters, ",") {
-		if s != "" {
-			d.ping(s)
-			if r, e := d.routingTable.getOrCreateNode("", s, d.config.UDPProto); e == nil {
-				d.findNodeFrom(r, d.nodeId)
-			}
-		}
+	if len(d.routers()) == 0 {
+		d.bootstrapPending = true
+	} else {
+		d.bootstrapRouters()
 	}
 	d.findNode(d.nodeId)
 	d.getMorePeers(nil)
+}
+
+// bootstrapRouters pings the resolved routers and looks us up through them.
+func (d *DHT) bootstrapRouters() {
+	for _, s := range d.routerAddrs {
+		d.ping(s)
+		if r, e := d.routingTable.getOrCreateNode("", s, d.config.UDPProto); e == nil {
+			d.findNodeFrom(r, d.nodeId)
+		}
+	}
 }
 
 // loop is the main working section of dht.
@@ -485,6 +497,8 @@ func (d *DHT) loop() {
 			return
 		case addr := <-d.remoteNodeAcquaintance:
 			d.helloFromPeer(addr)
+		case addrs := <-d.routersResolved:
+			d.routersArrived(addrs)
 		case req := <-d.peersRequest:
 			d.servePeersRequests(req)
 

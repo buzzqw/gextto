@@ -419,7 +419,9 @@ a shared in-flight budget; a bounded per-torrent write ring buffer. Session: an 
 event bus (SSE `GET /ui/events`), a global in-flight budget and a deterministic drop of
 the worst connection; `.torrent` creation from a folder (`CreateTorrent`, form and API).
 DHT: our own module (`internal/dht`, BEP 5/32/33/42/43/44/46) with a bucket-less
-binary-tree routing table, tokens bound to source address and scope, an opt-in
+binary-tree routing table, host names (bootstrap routers, a magnet's `dht=` nodes)
+resolved off the main loop so a hung resolver never stalls it, a non-blocking `AddNode`
+(a peer's PORT hint is dropped rather than waited on), tokens bound to source address and scope, an opt-in
 anti-Sybil cap per subnet, and the **feeds** of BEP 46. Robustness: parser fuzzing in
 CI (`make fuzz-smoke`, 23 targets, seeds in `testdata/fuzz`), a bounded bencode screen
 before the decoder on every hand-written path, snub and session ban with TTL, IP

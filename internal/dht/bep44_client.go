@@ -10,22 +10,10 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"sort"
-	"strings"
 	"time"
 
 	bencode "github.com/jackpal/bencode-go"
 )
-
-// splitRouters returns the non-empty bootstrap routers from the config string.
-func splitRouters(s string) []string {
-	var out []string
-	for _, part := range strings.Split(s, ",") {
-		if part != "" {
-			out = append(out, part)
-		}
-	}
-	return out
-}
 
 var errItemNotFound = errors.New("bep44: item not found")
 
@@ -171,7 +159,7 @@ func (d *DHT) startBep44(req bep44LookupRequest) {
 	}
 	if len(closest) == 0 {
 		// Fall back to the bootstrap routers.
-		for _, s := range splitRouters(d.config.DHTRouters) {
+		for _, s := range d.routers() {
 			if r, err := d.routingTable.getOrCreateNode("", s, d.config.UDPProto); err == nil {
 				d.bep44SendGet(lk, r)
 			}
