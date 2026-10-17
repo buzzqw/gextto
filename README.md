@@ -69,16 +69,16 @@ public torrents, the live indexers and the real home line.
 | Area | Measured result |
 |---|---|
 | **Engine memory** | ~25 MB idle and ~100 MB at 100 MB/s with 50 torrents, against up to ~5 GB for qBittorrent-nox on the same set. Downloads to a NAS: ~0.5 GB outside the write cache, which sizes itself from free RAM; ~60 MB right after a restart |
-| **Engine CPU** | CPU per peer **−49 %** after the piece picker read holders from the peer bitfields (its share of the profile 15 % → 9 %, 35 MB of heap gone); an earlier busy loop on dead uTP connections removed: **−72 %** CPU per MB/s |
-| **Indexer searches** | Jackett and Prowlarr searched one indexer at a time: on 30 titles a cycle took **110 s instead of 450 s**, with **0 failed requests instead of 25** and **twice the releases** (5,935 vs 2,737) |
-| **Sharing the line** | A saturated download raised the latency of the whole house from 20 to 62 ms. The latency guard keeps the full line for Gextto when it is alone (8.5 MB/s) and gives a competing download **+55–66 %** when someone else is on the line |
-| **Reusing local data** | Torrents sharing files with ones already on disk: **25 %** of the file from the network instead of 100 % (Debian and Arch ISOs), also after a restart and in any adding order |
-| **Disk writes** | Batched durability instead of `O_SYNC`: 16 KiB writes on NFS **35 → 81 MiB/s**; opt-in mmap ~7.0 GB/s on tmpfs |
-| **Feed archive** | **572 → 320 MB** (−44 %) with the same dedup, one row per torrent, inserts **−30 %**; standalone archive search 100,000 releases in **7.4 ms** (49× faster) |
-| **Daemon at rest** | Gextto idle **1.5 % → 0.4 %** CPU; metadata calls **~40,000 → ~5,000 a day** (shared connections, bounded calendar); the NAS is no longer woken by health probes |
+| **Engine CPU** | About **⅓ of one core** at 9.4 MB/s with ~200 peers (half over uTP, encrypted): **0.17 % per peer**, of which the piece picker takes 9 % |
+| **Indexer searches** | Jackett and Prowlarr searched one indexer at a time: a cycle of 30 titles in **110 s**, **205 requests and none failed**, **5,935 releases** |
+| **Sharing the line** | A saturated download adds ~40 ms of latency to the whole house. Alone on the line Gextto keeps all of it (**8.5 MB/s**); with another device downloading, that device gets **6.8–7.3 MB/s** of the 9 MB/s line |
+| **Reusing local data** | A torrent sharing files with one already on disk takes only **25 %** of the file from the network (Debian and Arch ISOs), also after a restart and in any adding order |
+| **Disk writes** | 16 KiB writes on NFS at **81 MiB/s** with batched durability; opt-in mmap ~7.0 GB/s on tmpfs |
+| **Feed archive** | **447,000 releases in 320 MB**, one row per torrent; 1,000 releases archived in **41 ms**; the standalone archive searches 100,000 releases in **7.4 ms** |
+| **Daemon at rest** | **0.4 %** CPU at rest; **~5,000 metadata calls a day** for 55 series; the health probes never write to a NAS, so its disks can sleep |
 
 The method — how each figure is produced and how to reproduce it — is in the
-same document, together with the ideas that were measured and **rejected**
+same document, together with the designs the measurements ruled out
 (io_uring, batched uTP I/O on this load, a write-back cache, …).
 
 ## Tested in depth
@@ -194,7 +194,8 @@ restarts: Gextto re-attaches when binary and options match.
   verified — same layout or the same v2 file — are copied and re-checked instead
   of downloaded; private torrents are never mixed (BEP 27).
 - **Network.** TCP and uTP (BEP 29) in parallel on one port, one UDP socket for
-  uTP and DHT; adaptive uTP retransmission (half the resends); `ut_holepunch`
+  uTP and DHT; adaptive uTP retransmission (a latency floor and per-connection
+  backoff); `ut_holepunch`
   (BEP 55) as client and relay; UPnP, NAT-PMP and **PCP**; a port check that
   tells cone from symmetric NAT; SOCKS5 and HTTP CONNECT; an
   `outgoing-interface` killswitch for VPNs.
@@ -204,7 +205,7 @@ restarts: Gextto re-attaches when binary and options match.
   seeding goes on; per-peer request queues adapt and the slowest idle
   connection is the one pruned.
 - **Footprint by design.** Pieces are written through and the OS page cache
-  coalesces I/O; batched `fdatasync` instead of `O_SYNC`; sparse files,
+  coalesces I/O; batched `fdatasync`, never `O_SYNC` per write; sparse files,
   `fallocate`, RAM-disk temp folders, opt-in mmap; zero-allocation hot paths
   (in-place RC4, word-wise bitfields, zero-copy uTP); the IP blocklist is
   binary-searched with no allocation.

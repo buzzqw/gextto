@@ -71,17 +71,17 @@ pubblici reali, gli indexer in uso e la vera linea di casa.
 | Area | Risultato misurato |
 |---|---|
 | **Memoria del motore** | ~25 MB a riposo e ~100 MB a 100 MB/s con 50 torrent, contro fino a ~5 GB di qBittorrent-nox sullo stesso insieme. Download verso un NAS: ~0,5 GB fuori dalla cache di scrittura, che si dimensiona dalla RAM libera; ~60 MB subito dopo un riavvio |
-| **CPU del motore** | CPU per peer **−49 %** da quando il piece picker legge i possessori dai bitfield dei peer (la sua quota del profilo dal 15 % al 9 %, 35 MB di heap in meno); eliminato un ciclo a vuoto sulle connessioni uTP morte: **−72 %** di CPU per MB/s |
-| **Ricerche sugli indexer** | Jackett e Prowlarr interrogati un indexer alla volta: su 30 titoli un ciclo dura **110 s invece di 450 s**, con **0 richieste fallite invece di 25** e **il doppio delle release** (5.935 contro 2.737) |
-| **Dividere la linea** | Un download a piena linea portava la latenza di tutta la casa da 20 a 62 ms. Il guardiano della latenza lascia la linea intera a Gextto quando è solo (8,5 MB/s) e dà a un download concorrente **+55–66 %** quando qualcun altro la usa |
-| **Riuso dei dati locali** | Torrent che condividono file con altri già su disco: dalla rete arriva il **25 %** del file invece del 100 % (ISO Debian e Arch), anche dopo un riavvio e in qualunque ordine si aggiungano |
-| **Scritture su disco** | Durabilità a lotti invece di `O_SYNC`: scritture da 16 KiB su NFS **da 35 a 81 MiB/s**; mmap opzionale ~7,0 GB/s su tmpfs |
-| **Archivio dei feed** | **Da 572 a 320 MB** (−44 %) con la stessa deduplica, una riga per torrent, inserimenti **−30 %**; ricerca nell'archivio standalone su 100.000 release in **7,4 ms** (49 volte più veloce) |
-| **Demone a riposo** | Gextto a riposo **dall'1,5 % allo 0,4 %** di CPU; chiamate ai metadati **da ~40.000 a ~5.000 al giorno** (connessioni condivise, calendario limitato); il NAS non viene più svegliato dai controlli di salute |
+| **CPU del motore** | Circa **⅓ di un core** a 9,4 MB/s con ~200 peer (metà su uTP, cifrati): **0,17 % per peer**, di cui il piece picker occupa il 9 % |
+| **Ricerche sugli indexer** | Jackett e Prowlarr interrogati un indexer alla volta: un ciclo di 30 titoli in **110 s**, **205 richieste e nessuna fallita**, **5.935 release** |
+| **Dividere la linea** | Un download a piena linea aggiunge ~40 ms di latenza a tutta la casa. Da solo sulla linea Gextto la usa tutta (**8,5 MB/s**); con un altro dispositivo che scarica, quel dispositivo ottiene **6,8–7,3 MB/s** dei 9 MB/s della linea |
+| **Riuso dei dati locali** | Un torrent che condivide file con uno già su disco prende dalla rete solo il **25 %** del file (ISO Debian e Arch), anche dopo un riavvio e in qualunque ordine si aggiungano |
+| **Scritture su disco** | Scritture da 16 KiB su NFS a **81 MiB/s** con durabilità a lotti; mmap opzionale ~7,0 GB/s su tmpfs |
+| **Archivio dei feed** | **447.000 release in 320 MB**, una riga per torrent; 1.000 release archiviate in **41 ms**; l'archivio standalone cerca su 100.000 release in **7,4 ms** |
+| **Demone a riposo** | **0,4 %** di CPU a riposo; **~5.000 chiamate ai metadati al giorno** per 55 serie; i controlli di salute non scrivono mai su un NAS, così i suoi dischi possono dormire |
 
 Il metodo — come si ottiene ogni numero e come riprodurlo — è nello stesso
-documento, insieme alle idee misurate e **scartate** (io_uring, I/O uTP a
-lotti su questo carico, una cache write-back, …).
+documento, insieme alle soluzioni che le misure hanno escluso (io_uring, I/O uTP
+a lotti su questo carico, una cache write-back, …).
 
 ## Testato a fondo
 
@@ -203,7 +203,8 @@ coincidono.
   ricontrollati invece che scaricati; i torrent privati non si mescolano mai
   (BEP 27).
 - **Rete.** TCP e uTP (BEP 29) in parallelo su una porta, un socket UDP per uTP
-  e DHT; ritrasmissione uTP adattiva (metà dei reinvii); `ut_holepunch` (BEP
+  e DHT; ritrasmissione uTP adattiva (soglia minima di latenza e backoff per
+  connessione); `ut_holepunch` (BEP
   55) come client e relay; UPnP, NAT-PMP e **PCP**; un test della porta che
   distingue NAT cone da simmetrico; SOCKS5 e HTTP CONNECT; un killswitch
   `outgoing-interface` per le VPN.
@@ -213,7 +214,8 @@ coincidono.
   che una cartella si riempia mentre il seeding continua; le code di richiesta
   per peer si adattano e la connessione chiusa è quella più lenta e inattiva.
 - **Impronta leggera per progetto.** I pezzi si scrivono direttamente e la page
-  cache del sistema unisce l'I/O; `fdatasync` a lotti invece di `O_SYNC`; file
+  cache del sistema unisce l'I/O; `fdatasync` a lotti, mai `O_SYNC` per
+  scrittura; file
   sparsi, `fallocate`, cartelle temporanee su RAM disk, mmap opzionale; percorsi
   caldi senza allocazioni (RC4 in place, bitfield a parole, uTP senza copie); la
   blocklist IP si cerca per bisezione senza allocare.
