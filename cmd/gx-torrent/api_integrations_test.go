@@ -57,7 +57,7 @@ func TestMetricsArePrometheusText(t *testing.T) {
 	}
 	for _, family := range []string{
 		"gxtorrent_info", "gxtorrent_download_rate_bytes_per_second", "gxtorrent_upload_rate_bytes_per_second",
-		"gxtorrent_torrents", "gxtorrent_torrents_by_state", "gxtorrent_peers", "gxtorrent_lifetime_downloaded_bytes_total",
+		"gxtorrent_torrents", "gxtorrent_torrents_by_state", "gxtorrent_slow_torrents", "gxtorrent_peers", "gxtorrent_lifetime_downloaded_bytes_total",
 		"gxtorrent_disk_free_bytes", "process_resident_memory_bytes", "process_cpu_seconds_total", "process_start_time_seconds",
 	} {
 		if !help[family] || typ[family] == "" {
@@ -66,6 +66,16 @@ func TestMetricsArePrometheusText(t *testing.T) {
 	}
 	if !strings.Contains(text, `gxtorrent_torrents_by_state{state="seeding"}`) {
 		t.Error("torrents by state not labelled")
+	}
+	// The states are a partition and "slow" is a condition: counting it as a
+	// state would make a dashboard sum some torrents twice.
+	if strings.Contains(text, `gxtorrent_torrents_by_state{state="slow"}`) {
+		t.Error("slow must not be one of the states")
+	}
+	for _, state := range []string{"downloading", "seeding", "queued", "stalled", "paused", "moving"} {
+		if !strings.Contains(text, `gxtorrent_torrents_by_state{state="`+state+`"}`) {
+			t.Errorf("state %q missing from gxtorrent_torrents_by_state", state)
+		}
 	}
 }
 

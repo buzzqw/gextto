@@ -492,8 +492,10 @@ Total routes: 19 (gx-torrent `/api/v1`) + 109 (gx-torrent `/api/v2`).
 
 **Prometheus and Grafana.** `GET /api/v1/metrics` serves the daemon's state in
 the Prometheus text format (0.0.4): transfer rates and lifetime totals,
-torrents in total (`gxtorrent_torrents`) and by state
-(`gxtorrent_torrents_by_state{state="seeding"}`), peers, queue slots, caches,
+torrents in total (`gxtorrent_torrents`), by state
+(`gxtorrent_torrents_by_state{state="seeding"}`, the states are a partition)
+and the slow ones as a condition (`gxtorrent_slow_torrents`, also downloading),
+peers, queue slots, caches,
 free disk, the IP filter, every engine session counter (`gxtorrent_session_*`,
 uTP and disk counters included) and the process
 (`process_resident_memory_bytes`, `process_cpu_seconds_total`,

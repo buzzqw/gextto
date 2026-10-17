@@ -53,13 +53,13 @@ func (d *Daemon) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 		}
 		return 0
 	}
-	states := metric{name: "gxtorrent_torrents_by_state", help: "Torrents in the session, by state.", kind: "gauge"}
+	states := metric{name: "gxtorrent_torrents_by_state", help: "Torrents in the session, by state (the states are a partition).", kind: "gauge"}
 	for _, state := range []struct {
 		name  string
 		count int
 	}{
 		{"downloading", s.Downloading}, {"seeding", s.Seeding}, {"queued", s.Queued},
-		{"stalled", s.Stalled}, {"paused", s.Paused}, {"slow", s.Slow}, {"moving", s.Moving},
+		{"stalled", s.Stalled}, {"paused", s.Paused}, {"moving", s.Moving},
 	} {
 		states.samples = append(states.samples, metricSample{labels: `state="` + state.name + `"`, value: float64(state.count)})
 	}
@@ -69,6 +69,9 @@ func (d *Daemon) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 		gauge("gxtorrent_uptime_seconds", "Seconds since the daemon started.", float64(s.UptimeSeconds)),
 		gauge("gxtorrent_torrents", "Torrents in the session.", float64(s.Torrents)),
 		states,
+		// Slow is a condition, not a state: a slow torrent is also downloading,
+		// so it has its own family and does not break the state partition.
+		gauge("gxtorrent_slow_torrents", "Torrents running below the slow threshold.", float64(s.Slow)),
 		gauge("gxtorrent_download_rate_bytes_per_second", "Current download rate in bytes per second.", float64(s.DownloadRate)),
 		gauge("gxtorrent_upload_rate_bytes_per_second", "Current upload rate in bytes per second.", float64(s.UploadRate)),
 		gauge("gxtorrent_peers", "Connected peers.", float64(s.Peers)),
