@@ -990,3 +990,35 @@ func TestNumericSettingRejectsGarbage(t *testing.T) {
 		}
 	}
 }
+
+// TestPrepareDirsReportOnlyRequiresDataAndState pins the restore case: a
+// configuration from another machine names folders that cannot be created
+// here. Download, temporary and trash folders become warnings so the daemon
+// starts and they can be fixed from the interface; the data folder stays
+// required.
+func TestPrepareDirsReportOnlyRequiresDataAndState(t *testing.T) {
+	root := t.TempDir()
+	blocker := filepath.Join(root, "not-a-folder")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = filepath.Join(root, "data")
+	cfg.StateDir = filepath.Join(cfg.DataDir, "state")
+	cfg.DownloadDir = filepath.Join(blocker, "downloads")
+	temp := filepath.Join(blocker, "incomplete")
+	cfg.DownloadTempDir = &temp
+	trash := filepath.Join(blocker, "trash")
+	cfg.TrashPath = &trash
+	warnings, err := cfg.PrepareDirsReport()
+	if err != nil {
+		t.Fatalf("an unavailable download folder must not stop the start: %v", err)
+	}
+	if len(warnings) != 3 {
+		t.Fatalf("warnings = %v, want the download, temporary and trash folders", warnings)
+	}
+	cfg.DataDir = filepath.Join(blocker, "data")
+	if _, err := cfg.PrepareDirsReport(); err == nil {
+		t.Fatal("an unavailable data folder must stop the start")
+	}
+}

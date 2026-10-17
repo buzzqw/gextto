@@ -93,6 +93,9 @@ func TestBackupCreateSnapshotIncludesDatabasesAndExcludesContent(t *testing.T) {
 	writeBackupFile(t, filepath.Join(dataDir, "gextto_magnet_feed.xml"), "<rss/>")
 	writeBackupFile(t, filepath.Join(dataDir, "gextto.log"), "log line\n")
 	writeBackupFile(t, filepath.Join(dataDir, "gextto.log.1"), "old log line\n")
+	writeBackupFile(t, filepath.Join(dataDir, "trash", "Show.S01E01.mkv"), "video")
+	writeBackupFile(t, filepath.Join(dataDir, ".health-probe-123-4"), "")
+	writeBackupFile(t, filepath.Join(dataDir, ".gextto-run.json"), "{}")
 
 	archive, err := CreateSnapshot(dataDir, backupRoot, 3)
 	if err != nil {
@@ -124,6 +127,9 @@ func TestBackupCreateSnapshotIncludesDatabasesAndExcludesContent(t *testing.T) {
 		"gextto_torrents_state/abc.fastresume",
 		"gextto.log",
 		"gextto.log.1",
+		"trash/Show.S01E01.mkv",
+		".health-probe-123-4",
+		".gextto-run.json",
 	} {
 		if _, ok := files[excluded]; ok {
 			t.Errorf("archive must not contain %q; entries: %v", excluded, backupZipNames(files))

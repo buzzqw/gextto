@@ -364,9 +364,14 @@ install_files() {
   fi
   run install -d "$INSTALL_DIR"
 
-  # Keep the previous binary so a failed upgrade can be rolled back.
+  # Keep the previous binaries so a failed upgrade can be rolled back: the
+  # engine supervisor restores gx-torrent.prev before switching engines, as
+  # after `gexttod --update`.
   if [[ "$DRY_RUN" != "1" && -f "$INSTALL_DIR/gexttod" ]]; then
     cp -a "$INSTALL_DIR/gexttod" "$INSTALL_DIR/gexttod.prev"
+  fi
+  if [[ "$DRY_RUN" != "1" && -f "$INSTALL_DIR/gx-torrent" ]]; then
+    cp -a "$INSTALL_DIR/gx-torrent" "$INSTALL_DIR/gx-torrent.prev"
   fi
 
   run install -m 0755 "$work/gexttod" "$INSTALL_DIR/gexttod"

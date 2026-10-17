@@ -225,7 +225,8 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   gx-torrent non si aggiorna da sola.
 - `install.sh` installa anche `gextto-update.path`/`.service`: la UI scrive
   `<data>/update-request`, la unit root esegue `gexttod --update` (log in
-  `/var/log/gextto-update.log`), che tiene `gexttod.prev` e lo ripristina se la
+  `/var/log/gextto-update.log`), che tiene `gexttod.prev` (e `gx-torrent.prev`,
+  come `install.sh` quando si rilancia) e lo ripristina se la
   nuova versione non parte.
 - Utente del servizio: per default è **l'utente locale che esegue l'installer**
   (`SUDO_USER`), così può creare cartelle nei media di quell'utente; `--user

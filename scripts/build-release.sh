@@ -110,6 +110,10 @@ echo "highest glibc symbol required: ${glibc:-none (static binary)}"
 contents="$(tar -tzf "$ARCHIVE")"
 grep -qx './gx-torrent' <<< "$contents" \
   || { echo "gx-torrent is missing from the release archive" >&2; exit 1; }
+# The archive root must be 0755: tar applies it to the folder extracted into.
+root_mode() { tar -tvzf "$1" | awk '$NF == "./" { print $1; exit }'; }
+[[ "$(root_mode "$ARCHIVE")" == "drwxr-xr-x" ]] \
+  || { echo "the release archive root is $(root_mode "$ARCHIVE"), not drwxr-xr-x" >&2; exit 1; }
 
 # Standalone archive: gx-torrent on its own, usable like qbittorrent-nox. The
 # daemon is always pure Go, so it is produced once.
@@ -119,6 +123,8 @@ GX_ARCHIVE="$OUTPUT_DIR/gx-torrent-linux-${ARCH}.tar.gz"
 gx_contents="$(tar -tzf "$GX_ARCHIVE")"
 grep -qx './gx-torrent' <<< "$gx_contents" \
   || { echo "gx-torrent is missing from the standalone archive" >&2; exit 1; }
+[[ "$(root_mode "$GX_ARCHIVE")" == "drwxr-xr-x" ]] \
+  || { echo "the standalone archive root is $(root_mode "$GX_ARCHIVE"), not drwxr-xr-x" >&2; exit 1; }
 
 # Windows package: the daemon as a native service, built for the same
 # architecture (the exe is static, so no glibc baseline applies).

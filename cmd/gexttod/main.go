@@ -74,7 +74,8 @@ func runDaemon(dryRun bool, configOption *string) error {
 	if dryRun {
 		cfg.DryRun = true
 	}
-	if err := cfg.PrepareDirs(); err != nil {
+	dirWarnings, err := cfg.PrepareDirsReport()
+	if err != nil {
 		return err
 	}
 	if err := gextto.CleanupMovieRequirements(cfg.DataDir); err != nil {
@@ -94,6 +95,9 @@ func runDaemon(dryRun bool, configOption *string) error {
 		filter = env
 	}
 	logging.SetLevel(filter)
+	for _, warning := range dirWarnings {
+		logging.Warn("a configured folder is not available; Gextto starts anyway, fix the path in Configuration", "folder", warning)
+	}
 	// Opt-in profiling on loopback only (GEXTTO_PPROF=127.0.0.1:6061).
 	debugpprof.StartFromEnv("GEXTTO_PPROF", func(format string, args ...any) {
 		logging.Info(fmt.Sprintf(format, args...))

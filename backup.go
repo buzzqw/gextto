@@ -45,7 +45,17 @@ var excludedEntries = []string{
 	"gextto_magnet_feed.xml",
 	// libtorrent session state (fastresume): excluded as before.
 	"gextto_torrents_state",
+	// The default recycle bin (<data>/trash): replaced and removed media, not
+	// configuration; a backup must not carry whole videos.
+	"trash",
+	// The marker of the running process: restored, it would describe a run
+	// that is not the one starting from the backup.
+	".gextto-run.json",
 }
+
+// excludedPrefixes are name prefixes excluded from the backup: leftovers of
+// the writable probes and of an interrupted backup's scratch folder.
+var excludedPrefixes = []string{".health-probe-", ".gextto-backup-"}
 
 // snapshotDatabase produces a consistent copy of a live database with the
 // online backup API. Copying the file while the daemon writes can capture a
@@ -476,7 +486,7 @@ func addDirectory(writer *zip.Writer, root, current, backupRoot, skip string) er
 		if backupPathWithin(path, backupRoot) || backupPathWithin(path, skip) {
 			continue
 		}
-		if containsString(excludedEntries, entry.Name()) {
+		if containsString(excludedEntries, entry.Name()) || hasAnyPrefix(entry.Name(), excludedPrefixes) {
 			continue
 		}
 		relative, err := filepath.Rel(root, path)
@@ -503,6 +513,16 @@ func addDirectory(writer *zip.Writer, root, current, backupRoot, skip string) er
 		}
 	}
 	return nil
+}
+
+// hasAnyPrefix reports whether name starts with one of prefixes.
+func hasAnyPrefix(name string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // backupPathWithin reports whether path is root or nested under it, mirroring

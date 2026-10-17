@@ -2641,22 +2641,36 @@ func boolToInt(value bool) int64 {
 
 // PrepareDirs creates the runtime directories.
 func (c *Config) PrepareDirs() error {
-	for _, path := range []string{c.DataDir, c.StateDir, c.DownloadDir} {
+	_, err := c.PrepareDirsReport()
+	return err
+}
+
+// PrepareDirsReport creates the working folders. Only the data and state
+// folders are required to start: a download, temporary or trash folder that
+// cannot be created (a configuration restored on another machine, a NAS not
+// mounted yet) is returned as a warning, so the daemon still starts and the
+// paths can be fixed from the interface, where Health reports them.
+func (c *Config) PrepareDirsReport() (warnings []string, err error) {
+	for _, path := range []string{c.DataDir, c.StateDir} {
 		if err := os.MkdirAll(path, 0o755); err != nil {
-			return err
+			return nil, err
 		}
 	}
+	optional := []string{c.DownloadDir}
 	if c.DownloadTempDir != nil {
-		if err := os.MkdirAll(*c.DownloadTempDir, 0o755); err != nil {
-			return err
-		}
+		optional = append(optional, *c.DownloadTempDir)
 	}
 	if c.TrashPath != nil {
-		if trimmed := strings.TrimSpace(*c.TrashPath); trimmed != "" {
-			if err := os.MkdirAll(trimmed, 0o755); err != nil {
-				return err
-			}
+		optional = append(optional, *c.TrashPath)
+	}
+	for _, path := range optional {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: %v", path, err))
 		}
 	}
-	return nil
+	return warnings, nil
 }

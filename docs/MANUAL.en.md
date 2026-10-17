@@ -184,8 +184,9 @@ understands:
 - `gexttod --version` — installed version, build number and release marker;
 - `gexttod --help` — usage summary;
 - `gexttod --update` — download and install the latest payload of the installed
-  channel (continuous or stable); the previous version is kept as
-  `gexttod.prev` and put back by itself if the new one does not start;
+  channel (continuous or stable); the previous versions are kept as
+  `gexttod.prev` and `gx-torrent.prev` (re-running `install.sh` keeps them too)
+  and put back by themselves if the new ones do not start;
 - `gexttod --config <file>` and `gexttod --dry-run` — used by the service and for
   local tests.
 
@@ -1051,6 +1052,42 @@ media archives or the complete torrent session state. Before restoring:
 
 Restoring a database does not automatically move media files. If the library was
 moved, fix paths or scan the archive before starting upgrades and missing searches.
+
+**What a backup contains.** A ZIP named `gextto-backup-<date>_<time>.zip` in
+`<data>/backups` (and on FTP, if configured) with:
+
+- the four databases as transaction-consistent snapshots:
+  `gextto_series.db` (series, episodes, movies, downloads, history, provider
+  health), `gextto_config.db` (every setting, the indexers, themes,
+  translations), `gextto_archive.db` (the feed archive), `gextto_comics.db`;
+- the other configuration files of the data folder: the setup marker, the
+  Cloudflare domains, the gx-torrent engine state (`gx-torrent/state.json`,
+  `lifetime.json`).
+
+It leaves out what is downloaded or rebuilt: the torrent session and its
+resume data (`gextto_torrents_state`, `gx-torrent/session.db`), the IP filter,
+the scraper caches, the comics, the logs and the default recycle bin
+(`<data>/trash`). Outside the data folder it does not hold
+`/etc/gextto/gextto.env` (your environment overrides, if you added any): keep
+a copy of it yourself.
+
+**Restoring on the same or a new machine.**
+
+1. Install Gextto with the same options as before (`--user`, `--data-dir`,
+   `--port`, …), or stop the existing service: `sudo systemctl stop gextto`.
+2. Keep the current data folder aside: `sudo mv /var/lib/gextto
+   /var/lib/gextto.old` (use your data folder if it is elsewhere).
+3. Extract the backup into a fresh data folder and give it to the service user:
+   ```bash
+   sudo install -d /var/lib/gextto
+   sudo unzip /path/gextto-backup-<date>.zip -d /var/lib/gextto
+   sudo chown -R <service user>:<its group> /var/lib/gextto
+   ```
+4. Put back `/etc/gextto/gextto.env` if you had one, then
+   `sudo systemctl start gextto`.
+5. Open **Health**: the databases are checked at start-up. With gx-torrent the
+   downloads that were running are added back from their magnet in the database,
+   and the data already in the download folders is re-checked and reused.
 
 ### Cleanup and irreversible operations
 

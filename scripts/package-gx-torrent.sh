@@ -45,6 +45,9 @@ fi
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
+# mktemp -d creates the folder 0700 and it becomes the archive's "./" entry: a
+# `tar xzf` into an existing folder (as root, /opt) would turn that folder 0700.
+chmod 0755 "$STAGE"
 
 cp "$BINARY" "$STAGE/gx-torrent"
 chmod +x "$STAGE/gx-torrent"
