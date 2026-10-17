@@ -264,6 +264,7 @@ func main() {
 	flag.Var(&dlnaExclude, "dlna-exclude", "folder inside a DLNA library folder that is never shown (repeatable)")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+	applyGCDefault()
 
 	if *showVersion {
 		fmt.Println(runtimeVersion())
