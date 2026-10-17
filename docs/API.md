@@ -492,12 +492,24 @@ Total routes: 19 (gx-torrent `/api/v1`) + 109 (gx-torrent `/api/v2`).
 
 **Prometheus and Grafana.** `GET /api/v1/metrics` serves the daemon's state in
 the Prometheus text format (0.0.4): transfer rates and lifetime totals,
-torrents by state (`gxtorrent_torrents{state="seeding"}`), peers, queue slots,
-caches, free disk, the IP filter, every engine session counter
-(`gxtorrent_session_*`, uTP and disk counters included) and the process
-(`process_resident_memory_bytes`, `process_cpu_seconds_total`). It is computed
-only when asked: one scrape costs about 0.2 ms. With a token, send it as a
-header:
+torrents in total (`gxtorrent_torrents`) and by state
+(`gxtorrent_torrents_by_state{state="seeding"}`), peers, queue slots, caches,
+free disk, the IP filter, every engine session counter (`gxtorrent_session_*`,
+uTP and disk counters included) and the process
+(`process_resident_memory_bytes`, `process_cpu_seconds_total`,
+`process_start_time_seconds`). It is computed only when asked: one scrape costs
+about 0.2 ms.
+
+The names follow the Prometheus conventions, so `rate()` and the standard
+dashboards read them correctly: a counter ends in `_total` (lifetime totals,
+`process_cpu_seconds_total`, the session counters whose key is a `_total`) and
+nothing else does; rates carry their unit
+(`gxtorrent_download_rate_bytes_per_second`); gauges with a unit end in it
+(`_bytes`, `_seconds`). Every family has one `HELP` and one `TYPE` line, label
+values are escaped, and the response carries
+`text/plain; version=0.0.4; charset=utf-8`.
+
+With a token, send it as a header:
 
 ```yaml
 scrape_configs:
@@ -511,8 +523,11 @@ scrape_configs:
 **Events for automations.** `GET /api/v1/events` is a Server-Sent Events
 stream of the engine events (a torrent added, completed, failed, a peer
 connected, …), one JSON object per `data:` line, with a comment every 30 s to
-keep proxies from closing it. It is the token-authenticated twin of the page's
-`/ui/events`, for Home Assistant, Node-RED or a script:
+keep proxies from closing it. The stream belongs to one engine session: when
+gx-torrent reopens it for a setting only the engine reads, the response ends
+and the client is expected to reconnect (an `EventSource` does it by itself),
+subscribing to the new session. It is the token-authenticated twin of the
+page's `/ui/events`, for Home Assistant, Node-RED or a script:
 
 ```bash
 curl -N -H 'X-Gx-Token: <token>' http://127.0.0.1:8890/api/v1/events

@@ -8,66 +8,21 @@ package main
 // editing calls (addWebSeeds, editWebSeed, removeWebSeeds).
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // handleAPIEvents streams the engine events (torrent added, completed, error,
 // peer connected, …) as Server-Sent Events, one JSON object per "data:" line.
 // It is the token-authenticated twin of the page's /ui/events, for Home
-// Assistant, Node-RED or a script; a comment line every 30 s keeps proxies from
-// closing an idle stream.
+// Assistant, Node-RED or a script; sse.go does the streaming and a comment line
+// every 30 s keeps proxies from closing an idle stream.
 func (d *Daemon) handleAPIEvents(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-	session := d.session
-	if session == nil {
-		http.Error(w, "session not ready", http.StatusServiceUnavailable)
-		return
-	}
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Connection", "keep-alive")
-	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprint(w, ": gx-torrent events\n\n")
-	flusher.Flush()
-
-	ch, cancel := session.Subscribe()
-	defer cancel()
-	keepAlive := time.NewTicker(30 * time.Second)
-	defer keepAlive.Stop()
-	for {
-		select {
-		case <-r.Context().Done():
-			return
-		case <-keepAlive.C:
-			if _, err := fmt.Fprint(w, ": keep-alive\n\n"); err != nil {
-				return
-			}
-			flusher.Flush()
-		case ev, ok := <-ch:
-			if !ok {
-				return
-			}
-			data, err := json.Marshal(ev)
-			if err != nil {
-				continue
-			}
-			if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
-				return
-			}
-			flusher.Flush()
-		}
-	}
+	d.streamSessionEvents(w, r, "gx-torrent events")
 }
 
 // metric is one Prometheus sample family.
@@ -98,7 +53,7 @@ func (d *Daemon) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 		}
 		return 0
 	}
-	states := metric{name: "gxtorrent_torrents", help: "Torrents in the session, by state.", kind: "gauge"}
+	states := metric{name: "gxtorrent_torrents_by_state", help: "Torrents in the session, by state.", kind: "gauge"}
 	for _, state := range []struct {
 		name  string
 		count int
@@ -112,10 +67,10 @@ func (d *Daemon) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 		{name: "gxtorrent_info", help: "The daemon version (value 1).", kind: "gauge",
 			samples: []metricSample{{labels: `version="` + promLabel(s.Version) + `"`, value: 1}}},
 		gauge("gxtorrent_uptime_seconds", "Seconds since the daemon started.", float64(s.UptimeSeconds)),
-		gauge("gxtorrent_torrents_total", "Torrents in the session.", float64(s.Torrents)),
+		gauge("gxtorrent_torrents", "Torrents in the session.", float64(s.Torrents)),
 		states,
-		gauge("gxtorrent_download_rate_bytes", "Current download rate in bytes per second.", float64(s.DownloadRate)),
-		gauge("gxtorrent_upload_rate_bytes", "Current upload rate in bytes per second.", float64(s.UploadRate)),
+		gauge("gxtorrent_download_rate_bytes_per_second", "Current download rate in bytes per second.", float64(s.DownloadRate)),
+		gauge("gxtorrent_upload_rate_bytes_per_second", "Current upload rate in bytes per second.", float64(s.UploadRate)),
 		gauge("gxtorrent_peers", "Connected peers.", float64(s.Peers)),
 		gauge("gxtorrent_active_downloads", "Downloads holding a queue slot.", float64(s.ActiveDownloads)),
 		gauge("gxtorrent_active_seeds", "Seeds holding a queue slot.", float64(s.ActiveSeeds)),
@@ -132,8 +87,11 @@ func (d *Daemon) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 		gauge("gxtorrent_lsd_peers_found", "Peers found by local service discovery.", float64(s.LSD.PeersFound)),
 		gauge("process_resident_memory_bytes", "Resident memory of the daemon.", float64(processMemoryBytes())),
 		counter("process_cpu_seconds_total", "CPU time used by the daemon.", processCPUTime().Seconds()),
+		gauge("process_start_time_seconds", "Start time of the daemon since the Unix epoch, in seconds.", float64(processStartedAt.UnixNano())/1e9),
 	}
-	// The engine's session counters, one family each, in a stable order.
+	// The engine's session counters, one family each, in a stable order. A key
+	// that ends in _total is a cumulative total and is exposed as a counter;
+	// the rest are snapshots (nodes, peers, cache sizes, rates) and are gauges.
 	keys := make([]string, 0, len(s.Session))
 	for key := range s.Session {
 		keys = append(keys, key)
@@ -141,7 +99,12 @@ func (d *Daemon) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 	sort.Strings(keys)
 	for _, key := range keys {
 		name := "gxtorrent_session_" + promName(key)
-		metrics = append(metrics, gauge(name, "Engine session counter "+key+".", float64(s.Session[key])))
+		kind := "gauge"
+		if strings.HasSuffix(name, "_total") {
+			kind = "counter"
+		}
+		metrics = append(metrics, metric{name: name, help: "Engine session counter " + key + ".", kind: kind,
+			samples: []metricSample{{value: float64(s.Session[key])}}})
 	}
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 	var b strings.Builder

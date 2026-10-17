@@ -585,8 +585,8 @@ answers in 0.1–1.3 s; Jackett caches a repeated search, which comes back in ~0
 100 s maximum is a title whose TorrentLeech search queued behind the others.
 
 **Prometheus metrics** (2026-10-17, Intel N97, `BenchmarkMetricsScrape`, a daemon with
-one torrent): one scrape of `/api/v1/metrics` costs **~0.2 ms and 118 KB allocated**
-(802 allocations), roughly 0.001 % of a core with a 15 s scrape interval. Nothing is
+one torrent): one scrape of `/api/v1/metrics` costs **~0.2 ms and 119 KB allocated**
+(810 allocations), roughly 0.001 % of a core with a 15 s scrape interval. Nothing is
 computed between scrapes: the endpoint reads the same snapshot as `/api/v1/stats`.
 
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`

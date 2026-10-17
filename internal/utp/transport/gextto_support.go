@@ -7,6 +7,7 @@ package transport
 import (
 	"math"
 	"math/rand"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -77,26 +78,35 @@ func (e *Event) SetBool(b bool) {
 }
 
 // waitEvents blocks until any of evs is set: it releases l (already held) while
-// waiting and takes it back before returning. It takes up to five events and
-// uses a plain select: reflect.Select allocated and was a visible CPU cost,
-// since every blocking uTP Read and Write goes through here. Unused slots stay
-// nil channels, which never fire.
+// waiting and takes it back before returning. Up to five events go through a
+// plain select: reflect.Select allocated and was a visible CPU cost, since every
+// blocking uTP Read and Write goes through here. Unused slots stay nil channels,
+// which never fire. A longer list (no caller has one today) falls back to
+// reflect.Select instead of failing: the fast path stays allocation-free and
+// the function remains total.
 func waitEvents(l sync.Locker, evs ...*Event) {
-	var c [5]<-chan struct{}
-	if len(evs) > len(c) {
-		panic("waitEvents: too many events")
+	if len(evs) <= 5 {
+		var c [5]<-chan struct{}
+		for i, ev := range evs {
+			c[i] = ev.C()
+		}
+		l.Unlock()
+		select {
+		case <-c[0]:
+		case <-c[1]:
+		case <-c[2]:
+		case <-c[3]:
+		case <-c[4]:
+		}
+		l.Lock()
+		return
 	}
+	cases := make([]reflect.SelectCase, len(evs))
 	for i, ev := range evs {
-		c[i] = ev.C()
+		cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ev.C())}
 	}
 	l.Unlock()
-	select {
-	case <-c[0]:
-	case <-c[1]:
-	case <-c[2]:
-	case <-c[3]:
-	case <-c[4]:
-	}
+	reflect.Select(cases)
 	l.Lock()
 }
 

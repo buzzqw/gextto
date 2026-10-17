@@ -31,27 +31,40 @@ func TestMetricsArePrometheusText(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	text := string(body)
 	sample := regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*(\{[^}]*\})? -?[0-9.eE+-]+$`)
-	help, typ := map[string]bool{}, map[string]bool{}
+	help, typ := map[string]bool{}, map[string]string{}
 	for _, line := range strings.Split(strings.TrimSpace(text), "\n") {
 		switch {
 		case strings.HasPrefix(line, "# HELP "):
 			help[strings.Fields(line)[2]] = true
 		case strings.HasPrefix(line, "# TYPE "):
-			typ[strings.Fields(line)[2]] = true
+			fields := strings.Fields(line)
+			typ[fields[2]] = fields[3]
 		case !sample.MatchString(line):
 			t.Errorf("malformed sample line %q", line)
 		}
 	}
+	// Prometheus naming: a counter ends in _total and nothing else does, so
+	// rate() and the dashboards interpret every family the right way.
+	for family, kind := range typ {
+		switch {
+		case kind != "gauge" && kind != "counter":
+			t.Errorf("family %s has type %q, want gauge or counter", family, kind)
+		case kind == "counter" && !strings.HasSuffix(family, "_total"):
+			t.Errorf("counter family %s does not end in _total", family)
+		case kind == "gauge" && strings.HasSuffix(family, "_total"):
+			t.Errorf("gauge family %s ends in _total (reserved for counters)", family)
+		}
+	}
 	for _, family := range []string{
-		"gxtorrent_info", "gxtorrent_download_rate_bytes", "gxtorrent_upload_rate_bytes",
-		"gxtorrent_torrents", "gxtorrent_peers", "gxtorrent_lifetime_downloaded_bytes_total",
-		"gxtorrent_disk_free_bytes", "process_resident_memory_bytes", "process_cpu_seconds_total",
+		"gxtorrent_info", "gxtorrent_download_rate_bytes_per_second", "gxtorrent_upload_rate_bytes_per_second",
+		"gxtorrent_torrents", "gxtorrent_torrents_by_state", "gxtorrent_peers", "gxtorrent_lifetime_downloaded_bytes_total",
+		"gxtorrent_disk_free_bytes", "process_resident_memory_bytes", "process_cpu_seconds_total", "process_start_time_seconds",
 	} {
-		if !help[family] || !typ[family] {
+		if !help[family] || typ[family] == "" {
 			t.Errorf("family %s missing its HELP/TYPE", family)
 		}
 	}
-	if !strings.Contains(text, `gxtorrent_torrents{state="seeding"}`) {
+	if !strings.Contains(text, `gxtorrent_torrents_by_state{state="seeding"}`) {
 		t.Error("torrents by state not labelled")
 	}
 }
@@ -76,6 +89,62 @@ func TestEventsStreamOpens(t *testing.T) {
 	line, err := bufio.NewReader(resp.Body).ReadString('\n')
 	if err != nil || !strings.HasPrefix(line, ": gx-torrent events") {
 		t.Fatalf("first line %q, %v", line, err)
+	}
+}
+
+// TestEventsStreamDeliversAndFollowsSession pins the two properties the stream
+// must have: an engine event reaches the client, and when the session is
+// replaced the stream ends (the client reconnects and subscribes to the new
+// one) instead of staying attached to a session that will never emit again.
+func TestEventsStreamDeliversAndFollowsSession(t *testing.T) {
+	d := newTestDaemon(t)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/api/v1/events", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	reader := bufio.NewReader(resp.Body)
+	if line, err := reader.ReadString('\n'); err != nil || !strings.HasPrefix(line, ": gx-torrent events") {
+		t.Fatalf("opening line %q, %v", line, err)
+	}
+
+	src := t.TempDir()
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 20_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitListed(t, d, hash)
+	if line := readEventDataLine(t, reader); !strings.Contains(line, "torrent_added") {
+		t.Fatalf("first event %q, want torrent_added", line)
+	}
+
+	// A setting that only the engine reads reopens the session: the stream
+	// must end rather than keep the subscription of the closed session.
+	d.mu.Lock()
+	d.restartSessionLocked()
+	d.mu.Unlock()
+	if _, err := io.Copy(io.Discard, reader); err != nil {
+		t.Fatalf("stream did not end after the session restart: %v", err)
+	}
+}
+
+// readEventDataLine returns the next "data:" line, skipping comments and blank
+// lines (the keep-alive).
+func readEventDataLine(t *testing.T, reader *bufio.Reader) string {
+	t.Helper()
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			t.Fatalf("reading the event stream: %v", err)
+		}
+		if strings.HasPrefix(line, "data: ") {
+			return line
+		}
 	}
 }
 

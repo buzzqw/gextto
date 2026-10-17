@@ -234,9 +234,13 @@ type Daemon struct {
 
 	mu      sync.Mutex
 	session *torrent.Session
-	state   persistedState
-	runtime map[string]*runtimeInfo
-	moving  map[string]bool
+	// sessionDone is closed when that session is replaced or the daemon closes:
+	// the event streams subscribe to one session and must end, not stay attached
+	// to a session that will never emit again (sse.go).
+	sessionDone chan struct{}
+	state       persistedState
+	runtime     map[string]*runtimeInfo
+	moving      map[string]bool
 	// disk pauses downloads on a storage folder low on space (diskguard.go).
 	disk           diskGuard
 	dyn            queue.Dynamic
@@ -595,6 +599,7 @@ func (d *Daemon) openSessionLocked() error {
 		return err
 	}
 	d.session = session
+	d.sessionDone = make(chan struct{})
 	if path := d.ipFilterPath; path != "" || d.opts.Network.IPFilter != "" {
 		if path == "" {
 			path = d.opts.Network.IPFilter
@@ -627,11 +632,23 @@ func (d *Daemon) openSessionLocked() error {
 	return nil
 }
 
+// closeSessionDoneLocked ends the event streams subscribed to the current
+// session. A replaced session never emits again, so a stream that kept it would
+// look connected and deliver nothing: the client reconnects (EventSource does
+// it on its own) and subscribes to the new session.
+func (d *Daemon) closeSessionDoneLocked() {
+	if d.sessionDone != nil {
+		close(d.sessionDone)
+		d.sessionDone = nil
+	}
+}
+
 // restartSessionLocked applies settings the engine reads only at session creation
 // (peer limits, cache TTL, preallocation). Torrents resume exactly as they were: the engine
 // restores the started flag and gx-torrent keeps its own state.
 func (d *Daemon) restartSessionLocked() {
 	d.restartPending = false
+	d.closeSessionDoneLocked()
 	if d.session != nil {
 		if err := d.session.Close(); err != nil {
 			logf("session close: %v", err)
@@ -714,6 +731,7 @@ func (d *Daemon) close() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.saveLocked()
+	d.closeSessionDoneLocked()
 	if d.session != nil {
 		if err := d.session.Close(); err != nil {
 			logf("session close: %v", err)

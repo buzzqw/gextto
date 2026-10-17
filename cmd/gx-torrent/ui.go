@@ -21,7 +21,6 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -1007,47 +1006,13 @@ func safeFilename(name string) string {
 
 // handleUIEvents streams session events (torrent added/completed/stopped/error)
 // as Server-Sent Events, so a client can react instead of polling. The
-// subscription is cancelled when the client disconnects.
+// subscription is cancelled when the client disconnects or the session is
+// replaced (sse.go).
 func (d *Daemon) handleUIEvents(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
 	}
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-	session := d.session
-	if session == nil {
-		http.Error(w, "session not ready", http.StatusServiceUnavailable)
-		return
-	}
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Connection", "keep-alive")
-	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
-
-	ch, cancel := session.Subscribe()
-	defer cancel()
-	for {
-		select {
-		case <-r.Context().Done():
-			return
-		case ev, ok := <-ch:
-			if !ok {
-				return
-			}
-			data, err := json.Marshal(ev)
-			if err != nil {
-				continue
-			}
-			if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
-				return
-			}
-			flusher.Flush()
-		}
-	}
+	d.streamSessionEvents(w, r, "")
 }
 
 // fetchRemoteTorrent downloads a .torrent from an http(s) URL, bounded in size

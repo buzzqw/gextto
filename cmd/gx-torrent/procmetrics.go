@@ -5,6 +5,12 @@ package main
 
 import "time"
 
+// processStartedAt is when this binary began running: the package is
+// initialised before main, so it is the start time within milliseconds. It
+// feeds the standard process_start_time_seconds gauge, which dashboards use to
+// tell a restart apart from a stable process.
+var processStartedAt = time.Now()
+
 // processUsage returns the CPU load (percent of one core) and the current
 // resident memory of the gx-torrent process.
 //

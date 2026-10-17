@@ -45,9 +45,10 @@ with a SQLite database, an integrated torrent engine and a server-rendered web U
 - **For new installations, not a drop-in replacement for Sonarr/Radarr**: no import
   of their databases, no in-place migration, no rollback. It is not an `*arr` under
   another name.
-- **Toward the indexer managers, not instead of them** (Jackett/Prowlarr): Gextto
-  consumes the manager's aggregate search and does not duplicate the indexer list
-  (§4).
+- **Toward the indexer managers, not instead of them** (Jackett/Prowlarr): the
+  manager stays the only source of truth for the indexers, read at run time and
+  never copied into the configuration; Gextto searches its indexers one at a
+  time, with the aggregate as the fallback when the list cannot be read (§4).
 - **Field**: whoever has a server with a media server (Jellyfin/Plex) and wants
   "find, download, rename, archive" from a single daemon; very likely they already
   have Jackett or Prowlarr.

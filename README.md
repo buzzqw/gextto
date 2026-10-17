@@ -85,13 +85,13 @@ same document, together with the designs the measurements ruled out
 
 | Layer | What runs |
 |---|---|
-| **Unit and integration** | 2,100 Go test functions in 411 files: engine, DHT, uTP, storage, scoring, post-processing, API, UI rendering. The TUI is driven against the real router |
+| **Unit and integration** | 2,100 Go test functions in 413 files: engine, DHT, uTP, storage, scoring, post-processing, API, UI rendering. The TUI is driven against the real router |
 | **End-to-end** | 57 Playwright tests drive the real daemon in a browser — pages, mobile, six languages, security, settings — including 14 accessibility tests with axe-core WCAG audits |
 | **Fuzzing** | 23 network-facing parsers (DHT, bencode, magnet, BEP 10/52, trackers, Torznab, RSS, MSE) fuzzed in CI; every crash found becomes a committed seed |
 | **Real-world harnesses** | 14 opt-in measurements: real public swarms, the public DHT, a real libtorrent peer, local merge on real ISOs, choking and pipelining, the live Jackett/Prowlarr, the latency of the home line |
 | **Static guards** | Every UI button points at a registered route, every internal call resolves on the real router, every setting is writable, translated in six languages and has its tooltip, every API route is documented |
 | **Platforms and packaging** | CI cross-compiles engine and daemon for Windows and runs the Windows platform tests and a real service install; the installers are self-tested (every flag, a dry-run that changes nothing) and the standalone Docker image is built and smoke-tested; CodeQL scans every push |
-| **Benchmarks** | 41 Go benchmarks on the hot paths (picker, storage, uTP, archive, merge, logging), run before and after every data-path change |
+| **Benchmarks** | 42 Go benchmarks on the hot paths (picker, storage, uTP, archive, merge, logging), run before and after every data-path change |
 
 ## Features
 
