@@ -4,7 +4,9 @@ Times measured on a real reference machine, to give an order of magnitude to
 whoever contributes to or evaluates the project. They are **indicative**: they
 depend on the hardware, and GitHub runners have fewer cores than this machine.
 
-Times measured on **2026-10-13**, code at commit `ef2c1fc`.
+The machine and the counts were re-checked on **2026-10-17** (build 1.1.1801); the
+timed figures were measured on **2026-10-13**, code at commit `ef2c1fc`, and have not
+been re-measured since: read them as orders of magnitude, not as current absolutes.
 
 ## Reference machine
 
@@ -32,27 +34,31 @@ Times measured on **2026-10-13**, code at commit `ef2c1fc`.
 
 Notes:
 
-- `make build` is **pure Go** (`CGO_ENABLED=0`); it is also the only target that
-  increments `build_number`, and it rebuilds `gx-torrent` **only when its code
-  changed** (hash comparison, `bin/gx-torrent.code-sha256`).
+- `make build` is **pure Go** (`CGO_ENABLED=0`); it increments Gextto's
+  `build_number` and, when the engine's code changed, also
+  `gx-torrent.build_number` (the daemon has its own number). It rebuilds
+  `gx-torrent` **only when its code changed** (hash comparison,
+  `bin/gx-torrent.code-sha256`); `make gx-torrent` builds only the daemon and
+  bumps only its own number.
 - Most of the time goes to the `internal/gxcore` engine: the `gx-torrent` binary
   alone recompiles in a few seconds when its dependencies are already cached.
 
 ## Tests
 
-Count (2026-10-13):
+Count (2026-10-17, build 1.1.1801):
 
 | | |
 |--|--|
-| Go test functions | **~1788** |
-| Go benchmarks | 28 |
-| `_test.go` files | **~337** |
-| Go packages | 82, of which **~53 with tests** |
+| Go test functions | **2,108** |
+| Go benchmarks | 42 |
+| `_test.go` files | **413** |
+| Go packages | 88, of which **59 with tests** |
 | Separate module `internal/dht` | tested by `make test-dht` (outside `go test ./...`) |
-| Playwright end2end tests (`uiweb/end2end`) | 63 |
+| Playwright end2end tests (`uiweb/end2end`) | 57 |
 
-Local times (`-count=1`, so **not cached**; "cold cache" means `go clean -cache`
-first, i.e. the whole suite is recompiled):
+Local times, measured **2026-10-13** on the reference machine (`-count=1`, so **not
+cached**; "cold cache" means `go clean -cache` first, i.e. the whole suite is
+recompiled). The suite has since grown by about a fifth, so expect more:
 
 | Round | Command | Time |
 |-------|---------|------|
@@ -60,10 +66,11 @@ first, i.e. the whole suite is recompiled):
 | Go tests, default engine (pure Go), warm build cache | `CGO_ENABLED=0 go test -count=1 ./...` | **~46 s** |
 | Full guard round (`make test`) | `make test` | **~48 s** (warm cache) |
 
-The `make test` round is `check-ui-settings-index` + `installer-selftest` +
-`test-dht` + `go test ./...`; the scripts together cost **< 1 s**
-(`check-ui` ~0.03 s, `installer-test` ~0.6 s, `test-dht` ~0.1 s): **all the time
-is the Go suite**.
+The `make test` round is `check-ui` (`scripts/check-ui-settings-index.sh`) +
+`check-scripts` (`bash -n` and `shellcheck` when installed) + `installer-test`
+(`scripts/installer-selftest.sh`) + `test-dht` + `go test ./...`; at the time of the
+measurement the scripts together cost **< 1 s** (the `check-scripts` lint has been
+added since); **all the time is the Go suite**.
 
 The Playwright end2end tests run with **`make test-ui`** (it builds the daemon,
 starts it in dry-run and drives the real UI) and run in CI in the **`ui-e2e`**
@@ -72,12 +79,13 @@ job; the harness completes the first-start wizard by itself
 
 ## CI (GitHub Actions)
 
-Wall times of the whole run (jobs usually run in parallel), from recent runs on
-`main`; a standard runner has 2 vCPUs.
+Wall times of the whole run (jobs usually run in parallel), measured on
+2026-10-13; a standard runner has 2 vCPUs. The job list is current, the times are
+not: re-read them with `gh run view` before quoting them.
 
 | Workflow | When | Wall | Main jobs (seconds) |
 |----------|------|------|---------------------|
-| `ci.yml` | push and PR | **~4.5–8 min** (263–477 s) | *vet and test (x86_64)* 166–226 · *race detector* 375 (non-blocking) · *gx-torrent platform tests (Windows)* 45 · *service install (Windows)* 69 (non-blocking) · *container image* 44 |
+| `ci.yml` | push and PR | **~4.5–8 min** (263–477 s) | *vet and test (x86_64)* 166–226 · *UI end2end (Playwright)* · *gx-torrent platform tests (Windows)* 45 · *gx-torrent service install (Windows)* 69 (non-blocking) · *race detector (x86_64)* 375 (non-blocking) · *container image (x86_64)* 44 |
 | `continuous.yml` | push to `main` | **~4 min** (243–259 s) | *test* 122 · *package (x86_64/aarch64)* 74–101, in parallel · *publish* 11 |
 | `codeql.yml` | push, PR and weekly | **~3.5 min** | *analyze (go)* 203 |
 | `release.yml` | tag | — (no recent run to measure) | *test* + matrix *package (`{x86_64,aarch64}`)* in the `ubuntu:22.04` container, with the Windows packages alongside |
