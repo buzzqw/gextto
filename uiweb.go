@@ -627,8 +627,7 @@ func healthStatusReasonIn(health Health, tr func(string) string) string {
 // uiHealthStatusTileFrom builds the Stato tile.
 func uiHealthStatusTileFrom(s *AppState) uiHealthData {
 	paths := uiHealthPathsFrom(s)
-	info, statErr := os.Stat(paths.DataDir)
-	writable := statErr == nil && info.IsDir() && write_probe(paths.DataDir)
+	writable := dataDirWritable(paths.DataDir)
 	status := "degraded"
 	if writable {
 		status = "ok"

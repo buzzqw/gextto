@@ -253,13 +253,46 @@ func tev_mismatchedPackRelease(torrents TorrentSession, db *Database, hash strin
 	return &result
 }
 
+// packIdentityCheck is a torrent whose pack identity was found consistent:
+// the name it was checked against and until when the verdict is reused.
+type packIdentityCheck struct {
+	name  string
+	until time.Time
+}
+
+// packIdentityRecheckInterval is how long a consistent verdict is reused. A new
+// torrent name (the metadata arriving) ends the reuse at once.
+const packIdentityRecheckInterval = 60 * time.Second
+
 // RejectActivePackIdentityMismatches implements `reject_active_pack_identity_mismatches`.
-func RejectActivePackIdentityMismatches(torrents TorrentSession, db *Database) {
-	for _, torrent := range torrents.List() {
-		release := tev_mismatchedPackRelease(torrents, db, torrent.Hash)
-		if release == nil {
+// checked, when not nil, remembers the torrents found consistent so the 750 ms
+// tick does not read and decode every torrent's metadata again.
+func RejectActivePackIdentityMismatches(torrents TorrentSession, db *Database, checked map[string]packIdentityCheck) {
+	now := time.Now()
+	list := torrents.List()
+	if checked != nil {
+		live := make(map[string]struct{}, len(list))
+		for _, torrent := range list {
+			live[torrent.Hash] = struct{}{}
+		}
+		for hash := range checked {
+			if _, ok := live[hash]; !ok {
+				delete(checked, hash)
+			}
+		}
+	}
+	for _, torrent := range list {
+		if seen, ok := checked[torrent.Hash]; ok && seen.name == torrent.Name && now.Before(seen.until) {
 			continue
 		}
+		release := tev_mismatchedPackRelease(torrents, db, torrent.Hash)
+		if release == nil {
+			if checked != nil {
+				checked[torrent.Hash] = packIdentityCheck{name: torrent.Name, until: now.Add(packIdentityRecheckInterval)}
+			}
+			continue
+		}
+		delete(checked, torrent.Hash)
 		alreadyBlocked, _ := db.IsBlocklisted(torrent.Hash)
 		if alreadyBlocked {
 			_, _ = torrents.Remove(torrent.Hash, true)

@@ -1233,3 +1233,55 @@ func TestGxQueuePolicyPushesMinFreeSpace(t *testing.T) {
 		t.Fatalf("min_free_mb = %v, want 2560", got)
 	}
 }
+
+// TestGxTorrentFilesCheckIsCached pins that a pair of `.torrent` copies found on
+// disk is not stat'ed again on every poll, and that a copy removed by hand is
+// still re-exported once the recheck window passes (or the name changes).
+func TestGxTorrentFilesCheckIsCached(t *testing.T) {
+	state := t.TempDir()
+	copyDir := t.TempDir()
+	hash := "aa11bb22cc33dd44ee55ff660011223344556677"
+	engine := &gxTorrentEngine{cfg: &Config{Settings: map[string]string{"torrent_copy_dir": copyDir}}}
+	engine.settings.stateDir = state
+	next := map[string]models.TorrentView{hash: {Hash: hash, Name: "x", HasMetadata: true}}
+	now := time.Now()
+
+	if got := engine.missingTorrentFilesLocked(next, now); len(got) != 1 {
+		t.Fatalf("missing copies must be exported: got %v", got)
+	}
+	for _, path := range []string{filepath.Join(state, hash+".torrent"), filepath.Join(copyDir, "x.torrent")} {
+		if err := os.WriteFile(path, []byte("d4:infod4:name1:xee"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := engine.missingTorrentFilesLocked(next, now); len(got) != 0 {
+		t.Fatalf("present copies must not be exported: got %v", got)
+	}
+	// Removed by hand: trusted within the window, re-exported after it.
+	if err := os.Remove(filepath.Join(copyDir, "x.torrent")); err != nil {
+		t.Fatal(err)
+	}
+	if got := engine.missingTorrentFilesLocked(next, now.Add(time.Minute)); len(got) != 0 {
+		t.Fatalf("a verified pair is trusted within the recheck window: got %v", got)
+	}
+	if got := engine.missingTorrentFilesLocked(next, now.Add(gxTorrentFilesRecheck+time.Second)); len(got) != 1 {
+		t.Fatalf("after the window the missing copy must be re-exported: got %v", got)
+	}
+	// A rename invalidates the cached check at once.
+	if err := os.WriteFile(filepath.Join(copyDir, "x.torrent"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	later := now.Add(gxTorrentFilesRecheck + 2*time.Second)
+	if got := engine.missingTorrentFilesLocked(next, later); len(got) != 0 {
+		t.Fatalf("restored copy: got %v", got)
+	}
+	renamed := map[string]models.TorrentView{hash: {Hash: hash, Name: "y", HasMetadata: true}}
+	if got := engine.missingTorrentFilesLocked(renamed, later); len(got) != 1 {
+		t.Fatalf("a new name must be checked again: got %v", got)
+	}
+	// A torrent that leaves the session is forgotten.
+	engine.missingTorrentFilesLocked(map[string]models.TorrentView{}, later)
+	if len(engine.torrentFilesOK) != 0 {
+		t.Fatalf("removed torrents must be dropped from the cache")
+	}
+}

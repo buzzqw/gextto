@@ -148,7 +148,23 @@ type gxTorrentEngine struct {
 	connected        bool
 	queuePushed      string
 	sequentialPushed string
+	// torrentFilesOK remembers, per hash, when both `.torrent` copies were
+	// last seen on disk, so the poll does not stat them on every tick.
+	torrentFilesOK map[string]gxTorrentFilesCheck
 }
+
+// gxTorrentFilesCheck is one verified pair of `.torrent` copies: the copy dir
+// and torrent name it was checked against and when.
+type gxTorrentFilesCheck struct {
+	copyDir string
+	name    string
+	at      time.Time
+}
+
+// gxTorrentFilesRecheck is how long a verified pair of `.torrent` copies is
+// trusted before the poll looks at the disk again. A copy removed by hand is
+// re-exported within this window instead of within one poll.
+const gxTorrentFilesRecheck = 5 * time.Minute
 
 var (
 	_ TorrentEngine         = (*gxTorrentEngine)(nil)
@@ -686,19 +702,7 @@ func (e *gxTorrentEngine) sync() error {
 	e.cache = next
 	var export []string
 	if e.settings.stateDir != "" {
-		copyDir := e.torrentCopyDir()
-		for hash, view := range next {
-			if !view.HasMetadata {
-				continue
-			}
-			stateMissing := !fileExists(filepath.Join(e.settings.stateDir, hash+".torrent"))
-			// Also re-export when only the operator's configured copy is
-			// missing (e.g. a .torrent left by libtorrent in the state dir).
-			copyMissing := copyDir != "" && !fileExists(filepath.Join(copyDir, safeTorrentCopyName(view.Name, hash)+".torrent"))
-			if stateMissing || copyMissing {
-				export = append(export, hash)
-			}
-		}
+		export = e.missingTorrentFilesLocked(next, now)
 	}
 	e.mu.Unlock()
 	if reconnected {
@@ -714,6 +718,42 @@ func (e *gxTorrentEngine) sync() error {
 		e.ensureTorrentFile(hash)
 	}
 	return nil
+}
+
+// missingTorrentFilesLocked returns the hashes whose Gextto-owned `.torrent`
+// or operator copy is missing. A pair already found on disk is trusted for
+// gxTorrentFilesRecheck (or until the name or the copy dir changes), so the
+// poll costs no file system access per torrent on most ticks.
+func (e *gxTorrentEngine) missingTorrentFilesLocked(next map[string]models.TorrentView, now time.Time) []string {
+	if e.torrentFilesOK == nil {
+		e.torrentFilesOK = map[string]gxTorrentFilesCheck{}
+	}
+	for hash := range e.torrentFilesOK {
+		if _, ok := next[hash]; !ok {
+			delete(e.torrentFilesOK, hash)
+		}
+	}
+	copyDir := e.torrentCopyDir()
+	var export []string
+	for hash, view := range next {
+		if !view.HasMetadata {
+			continue
+		}
+		if seen, ok := e.torrentFilesOK[hash]; ok && seen.copyDir == copyDir && seen.name == view.Name && now.Sub(seen.at) < gxTorrentFilesRecheck {
+			continue
+		}
+		stateMissing := !fileExists(filepath.Join(e.settings.stateDir, hash+".torrent"))
+		// Also re-export when only the operator's configured copy is
+		// missing (e.g. a .torrent left by libtorrent in the state dir).
+		copyMissing := copyDir != "" && !fileExists(filepath.Join(copyDir, safeTorrentCopyName(view.Name, hash)+".torrent"))
+		if stateMissing || copyMissing {
+			delete(e.torrentFilesOK, hash)
+			export = append(export, hash)
+			continue
+		}
+		e.torrentFilesOK[hash] = gxTorrentFilesCheck{copyDir: copyDir, name: view.Name, at: now}
+	}
+	return export
 }
 
 // diffLocked turns snapshot transitions into Gextto's lifecycle events.

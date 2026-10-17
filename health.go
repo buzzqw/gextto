@@ -416,8 +416,7 @@ func CheckWithPaths(paths *HealthPaths) Health {
 	dataDir := paths.DataDir
 	trashPath := paths.TrashPath
 	downloadPath := paths.DownloadPath
-	info, statErr := os.Stat(dataDir)
-	writable := statErr == nil && info.IsDir() && write_probe(dataDir)
+	writable := dataDirWritable(dataDir)
 	diskTotalBytes, diskFreeBytes := disk_space(downloadPath)
 	resident := healthResidentBytes()
 	uptimeSeconds := healthUptimeSeconds()
@@ -502,12 +501,13 @@ func healthIsDir(path string) bool {
 }
 
 // path_checks verifies existence and writability of the operational paths. The
-// write probe is limited to local paths so NAS mounts are not disturbed.
+// probe is cached (dataDirWritable) and, on a network share, asks the server
+// for write permission instead of writing, so NAS disks are not woken up.
 func path_checks(paths *HealthPaths) []PathCheck {
 	checks := []PathCheck{}
 	add := func(label, path string, probe bool) {
 		exists := healthIsDir(path)
-		writable := exists && (!probe || write_probe(path))
+		writable := exists && (!probe || dataDirWritable(path))
 		checks = append(checks, PathCheck{
 			Label:    label,
 			Path:     path,
@@ -714,6 +714,16 @@ func tree_stats(path string) (uint64, uint64) {
 // UI polls plus the background monitor) would otherwise collide on the same
 // `.health-probe-<pid>` name and make a writable directory look degraded.
 var healthProbeSeq atomic.Uint64
+
+// probeWritable checks a directory for writing: a create+fsync+delete on a
+// local disk, an access(W_OK) on a network share, where the server answers from
+// its permissions without a write reaching (and spinning up) its disks.
+func probeWritable(path string) bool {
+	if networkFilesystem(path) {
+		return syscall.Access(path, 0x2) == nil // W_OK
+	}
+	return write_probe(path)
+}
 
 func write_probe(dataDir string) bool {
 	path := filepath.Join(dataDir, fmt.Sprintf(".health-probe-%d-%d", os.Getpid(), healthProbeSeq.Add(1)))

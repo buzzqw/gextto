@@ -623,6 +623,9 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	// not queried again for settledRecheckInterval (each check costs several
 	// SQLite queries, at every 750 ms tick, for every seeding torrent).
 	settledTorrents := map[string]settledTorrent{}
+	// Torrents whose pack identity was found consistent, skipped for
+	// packIdentityRecheckInterval instead of decoding their metadata every tick.
+	packIdentityChecked := map[string]packIdentityCheck{}
 	storageMoveRetries := map[string]StorageMoveRetry{}
 	seedCopyWarnings := map[string]time.Time{}
 	// Storage moves are asynchronous. Keep post-seeding moves protected until
@@ -1346,7 +1349,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		}
 		DetachErrorTorrents(torrents, db, startupHashes)
 		DetachCompletedArchivedSingles(cfg, torrents, db)
-		RejectActivePackIdentityMismatches(torrents, db)
+		RejectActivePackIdentityMismatches(torrents, db, packIdentityChecked)
 		// Remove completed torrents that have finished seeding before the seed
 		// policy moves them to disk only to delete them. With automatic removal
 		// off, completed torrents stay listed as completed until the user runs

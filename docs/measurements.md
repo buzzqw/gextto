@@ -356,6 +356,46 @@ the series. Against build 224 the memory outside the caches is halved (1032 → 
 build 226 (3 seeds and 1 download loaded, full IP filter) `gx-torrent` holds **60–64 MB** RSS
 (44–48 MB anonymous) at 1–2 % CPU, against 90–110 MB right after a restart of build 220.
 
+**gexttod at rest (2026-10-17, Intel N97, live service, 4 torrents, 1 peer).** First
+profile of Gextto itself, through the new opt-in `GEXTTO_PPROF` endpoint, plus `strace`
+counts and CPU ticks from `/proc` over 60 s:
+
+| gexttod | CPU ticks / 60 s | `torrentEventWorker` CPU / 60 s | directory opens / 20 s | write probes |
+|---|---|---|---|---|
+| build 1783 | 91 (~1.5 %) | — (no profiler) | 112 (`torrent-done` + state dir) | create + `fsync` + delete in 4 folders, NFS trash included, at every 5 s Salute poll |
+| build 1784 (`.torrent` copies cached, probes cached) | 62 | 280 ms | **0** | one per folder per 30 s; on NFS `access(W_OK)`, no write |
+| **build 1785** (pack-identity verdict cached) | **46 (~0.7 %)** | **90 ms** | 0 | as 1784 |
+
+Each poll of the gx-torrent adapter (every 1.5 s) checked both `.torrent` copies of every
+torrent with an `os.OpenRoot` + stat, under the adapter lock, so the cost grew with the
+session size. A pair found on disk is now trusted for 5 minutes, or until the torrent's
+name or the copy folder changes. The Salute tile and the full health check used to probe
+every folder with a real write. They now share the 30 s cache of the chrome. On a
+network share the probe asks the server for write permission, so the NAS disks can spin
+down. In the build 1784 profile, 38 % of the remaining CPU was SQLite preparing and
+running `TorrentMeta` for every torrent at every 750 ms tick
+(`RejectActivePackIdentityMismatches`). A consistent verdict is now reused for 60 s, or
+until the torrent's name changes, which is when the metadata arrives and the check
+matters. What is left: TLS handshakes of the outbound HTTP clients, the
+`RemoveSeededCompleted` status queries and the adapter's own HTTP poll.
+
+**gx-torrent at rest (same session, build 227).** 1.45 % of a core, of which 41 %
+syscalls and ~50 % `runtime.findRunnable`: the uTP state packets and sends, incoming MSE
+handshakes (`mse.keyPair` 4.6 %) and the DHT loop, which is real traffic, with no
+spinning loop. The ~330 `nanosleep`/s are the Go scheduler's own wake-ups. Without a
+measured excess there is nothing to change.
+
+**Feed archive: where the 572 MB go** (2026-10-17, live `gextto_archive.db`, 446,994 rows,
+`dbstat`): the table 264 MB, the automatic index of `magnet TEXT UNIQUE` **207 MB** (the
+average magnet is 399 bytes, tracker list included), `idx_archive_title` 45 MB (never
+used: titles are matched through FTS or `lower(title) LIKE`), FTS 23 MB, other
+indexes 29 MB. Only 126,601 distinct infohashes (plus 49,390 `.torrent` URLs): most rows
+are the same torrent under another magnet string. A trial on a copy enforced the
+uniqueness through a 16-byte digest of the exact magnet instead of the text, with the
+same dedup and the ids and FTS index kept, and dropped the title index: **572 → 352 MB
+(−38 %)**, 7 s including the VACUUM, FTS integrity check passing. The rebuild of the
+live database is waiting for a decision (see [`evoluzione.md`](evoluzione.md) §8).
+
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
 the whole answer unreadable), and the cost is nil: on a 100-item answer, strict

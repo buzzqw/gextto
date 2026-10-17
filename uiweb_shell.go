@@ -104,8 +104,9 @@ type dataDirWritableEntry struct {
 
 var dataDirWritableCache sync.Map // string -> dataDirWritableEntry
 
-// dataDirWritable reports whether the data directory exists and is writable,
-// reusing the result for dataDirWritableTTL.
+// dataDirWritable reports whether a directory exists and is writable, reusing
+// the result for dataDirWritableTTL. The chrome, the Salute tiles and the full
+// health check all go through it, so a 5 s poll costs one probe per TTL.
 func dataDirWritable(path string) bool {
 	if path == "" {
 		return false
@@ -116,7 +117,7 @@ func dataDirWritable(path string) bool {
 		}
 	}
 	ok := false
-	if info, err := os.Stat(path); err == nil && info.IsDir() && write_probe(path) {
+	if info, err := os.Stat(path); err == nil && info.IsDir() && probeWritable(path) {
 		ok = true
 	}
 	dataDirWritableCache.Store(path, dataDirWritableEntry{ok: ok, at: time.Now()})
