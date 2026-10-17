@@ -126,29 +126,37 @@ func TestSeedRulesValidation(t *testing.T) {
 func TestSeedIdleTrackerCountsOnlyActiveSeeding(t *testing.T) {
 	tracker := &seedIdleTracker{marks: map[string]seedIdleMark{}}
 	start := time.Unix(1_700_000_000, 0)
-	if idle := tracker.observe("A", 100, true, start); idle != 0 {
+	idleAt := func(upload int64, seeding bool, at time.Duration) time.Duration {
+		idle, _ := tracker.observe("A", upload, seeding, start.Add(at))
+		return idle
+	}
+	if idle := idleAt(100, true, 0); idle != 0 {
 		t.Fatalf("first sighting idle=%v", idle)
 	}
-	if idle := tracker.observe("A", 100, true, start.Add(30*time.Minute)); idle != 30*time.Minute {
+	if idle := idleAt(100, true, 30*time.Minute); idle != 30*time.Minute {
 		t.Fatalf("idle=%v, want 30m", idle)
 	}
 	// An upload resets the clock.
-	if idle := tracker.observe("A", 150, true, start.Add(40*time.Minute)); idle != 0 {
+	if idle := idleAt(150, true, 40*time.Minute); idle != 0 {
 		t.Fatalf("upload must reset, idle=%v", idle)
 	}
 	// Queued or paused time does not count.
-	tracker.observe("A", 150, false, start.Add(90*time.Minute))
-	if idle := tracker.observe("A", 150, true, start.Add(100*time.Minute)); idle != 10*time.Minute {
+	idleAt(150, false, 90*time.Minute)
+	if idle := idleAt(150, true, 100*time.Minute); idle != 10*time.Minute {
 		t.Fatalf("paused time counted: idle=%v", idle)
 	}
-	// A seed stopped for inactivity keeps its verdict while stopped.
+	// A seed stopped for inactivity keeps its verdict while stopped, also
+	// across sweeps.
 	tracker.markReached("A")
-	if idle := tracker.observe("A", 150, false, start.Add(200*time.Minute)); idle == 0 || !tracker.reached("A") {
+	tracker.sweep()
+	tracker.sweep()
+	if idle := idleAt(150, false, 200*time.Minute); idle == 0 || !tracker.reached("A") {
 		t.Fatalf("stopped-for-idle verdict lost: idle=%v", idle)
 	}
-	// Resumed by hand: a new period starts.
-	if idle := tracker.observe("A", 150, true, start.Add(210*time.Minute)); idle != 0 || tracker.reached("A") {
-		t.Fatalf("resume must start a new period: idle=%v reached=%v", idle, tracker.reached("A"))
+	// Resumed by hand: a new period starts and the verdict is dropped.
+	idle, resumed := tracker.observe("A", 150, true, start.Add(210*time.Minute))
+	if idle != 0 || !resumed || tracker.reached("A") {
+		t.Fatalf("resume must start a new period: idle=%v resumed=%v reached=%v", idle, resumed, tracker.reached("A"))
 	}
 	// Torrents no longer listed are forgotten.
 	tracker.sweep()
@@ -160,7 +168,7 @@ func TestSeedIdleTrackerCountsOnlyActiveSeeding(t *testing.T) {
 
 func TestEnforceSeedPolicyStopsIdleSeed(t *testing.T) {
 	saved := seedIdle
-	seedIdle = &seedIdleTracker{marks: map[string]seedIdleMark{}}
+	seedIdle = &seedIdleTracker{marks: map[string]seedIdleMark{}, restored: true}
 	defer func() { seedIdle = saved }()
 
 	cfg := DefaultConfig()
@@ -171,15 +179,51 @@ func TestEnforceSeedPolicyStopsIdleSeed(t *testing.T) {
 	}
 	// First sighting starts the clock, then 31 minutes without upload.
 	seedIdle.observe(view.Hash, view.AllTimeUpload, true, time.Now().Add(-31*time.Minute))
-	limits := newSeedPolicy(&cfg, nil).limitsFor(&view)
-	if !limits.idleReached(&view, time.Now()) {
+	policy := newSeedPolicy(&cfg, nil)
+	limits := policy.limitsFor(&view)
+	if !policy.idleReached(&view, limits, time.Now()) {
 		t.Fatal("a seed idle for 31 minutes must reach a 30-minute limit")
 	}
 	// With uploads the limit is not reached.
 	busy := view
 	busy.AllTimeUpload = 50
-	if limits.idleReached(&busy, time.Now()) {
+	if policy.idleReached(&busy, limits, time.Now()) {
 		t.Fatal("an uploading seed must not be idle")
+	}
+}
+
+// TestSeedIdleStopSurvivesRestart: a seed paused for inactivity is still known
+// as such after a restart (it looks like any paused torrent otherwise), so its
+// end-of-seed handling completes; resuming it by hand clears the verdict.
+func TestSeedIdleStopSurvivesRestart(t *testing.T) {
+	saved := seedIdle
+	defer func() { seedIdle = saved }()
+	state := newTestAppState(t)
+	cfg := DefaultConfig()
+	cfg.Transfer.SeedIdleMinutes = 30
+	paused := models.TorrentView{
+		Hash: seedTestHash, State: "paused", Progress: 100, TotalSize: 10, TotalDone: 10,
+		SeedRatio: -1, SeedDays: -1, AllTimeUpload: 5,
+	}
+
+	seedIdle = &seedIdleTracker{marks: map[string]seedIdleMark{}}
+	newSeedPolicy(&cfg, state.db).markIdleStop(paused.Hash)
+
+	// Restart: a fresh tracker reads the verdict back.
+	seedIdle = &seedIdleTracker{marks: map[string]seedIdleMark{}}
+	policy := newSeedPolicy(&cfg, state.db)
+	if !policy.idleReached(&paused, policy.limitsFor(&paused), time.Now()) {
+		t.Fatal("the inactivity stop was lost across the restart")
+	}
+
+	// Resumed by hand: seeding again, the verdict is dropped everywhere.
+	seeding := paused
+	seeding.State = "seeding"
+	if policy.idleReached(&seeding, policy.limitsFor(&seeding), time.Now()) {
+		t.Fatal("a resumed seed must start a new idle period")
+	}
+	if hashes, err := state.db.SeedIdleStops(); err != nil || len(hashes) != 0 {
+		t.Fatalf("verdict still stored: %v %v", hashes, err)
 	}
 }
 

@@ -281,15 +281,20 @@ func (l seedLimits) timeReached(torrent *models.TorrentView) bool {
 // origins from the database once, and only when rules exist.
 type seedPolicy struct {
 	cfg     *Config
+	db      *Database
 	rules   []SeedRule
 	origins map[string]seedOrigin
 }
 
-// newSeedPolicy prepares the resolution for one pass over the session.
+// newSeedPolicy prepares the resolution for one pass over the session. The
+// first one also reads back the seeds stopped for inactivity before a restart.
 func newSeedPolicy(cfg *Config, db *Database) *seedPolicy {
-	policy := &seedPolicy{cfg: cfg, rules: seedRulesFrom(cfg)}
-	if len(policy.rules) > 0 && db != nil {
-		policy.origins, _ = db.TorrentOrigins()
+	policy := &seedPolicy{cfg: cfg, db: db, rules: seedRulesFrom(cfg)}
+	if db != nil {
+		seedIdle.restoreOnce(db)
+		if len(policy.rules) > 0 {
+			policy.origins, _ = db.TorrentOrigins()
+		}
 	}
 	return policy
 }
@@ -327,10 +332,14 @@ func (d *Database) TorrentOrigins() (map[string]seedOrigin, error) {
 }
 
 // seedIdleTracker measures, per torrent, how long it has been seeding without
-// uploading anything.
+// uploading anything, and remembers the seeds it stopped. That verdict is also
+// kept in torrent_meta.seed_idle_stop: a seed paused for inactivity looks like
+// any paused torrent, and without it a restart before the end-of-seed handling
+// (archive, removal) finished would leave the torrent paused for good.
 type seedIdleTracker struct {
-	mu    sync.Mutex
-	marks map[string]seedIdleMark
+	mu       sync.Mutex
+	marks    map[string]seedIdleMark
+	restored bool
 }
 
 type seedIdleMark struct {
@@ -343,18 +352,49 @@ type seedIdleMark struct {
 	seen    bool
 }
 
+// restoredUpload marks a verdict read back from the database: the uploaded
+// bytes are unknown and the first sighting adopts them.
+const restoredUpload = -1
+
 // seedIdle is the process-wide tracker used by EnforceSeedPolicy.
 var seedIdle = &seedIdleTracker{marks: map[string]seedIdleMark{}}
 
+// restoreOnce reads back, once per process, the seeds stopped for inactivity.
+func (t *seedIdleTracker) restoreOnce(db *Database) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.restored {
+		return
+	}
+	t.restored = true
+	hashes, err := db.SeedIdleStops()
+	if err != nil {
+		return
+	}
+	now := time.Now()
+	for _, hash := range hashes {
+		t.marks[hash] = seedIdleMark{upload: restoredUpload, since: now, reached: true, seen: true}
+	}
+}
+
 // observe records one sighting of a torrent and returns how long it has been
-// idle while seeding (0 when it is not seeding or just uploaded).
-func (t *seedIdleTracker) observe(hash string, upload int64, seeding bool, now time.Time) time.Duration {
+// idle while seeding (0 when it is not seeding or just uploaded), and whether a
+// seed stopped for inactivity is seeding again (its verdict is then dropped).
+func (t *seedIdleTracker) observe(hash string, upload int64, seeding bool, now time.Time) (time.Duration, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	key := strings.ToLower(hash)
 	mark, ok := t.marks[key]
+	resumed := false
 	switch {
+	case ok && mark.upload == restoredUpload:
+		mark.upload = upload
+		if seeding {
+			resumed = mark.reached
+			mark = seedIdleMark{upload: upload, since: now}
+		}
 	case !ok, upload != mark.upload:
+		resumed = ok && mark.reached
 		mark = seedIdleMark{upload: upload, since: now}
 	case !seeding:
 		// Not seeding (paused or queued): the clock does not run. A seed
@@ -365,14 +405,15 @@ func (t *seedIdleTracker) observe(hash string, upload int64, seeding bool, now t
 	case mark.reached:
 		// Seeding again after a stop for inactivity (resumed by hand): a new
 		// period starts.
+		resumed = true
 		mark = seedIdleMark{upload: upload, since: now}
 	}
 	mark.seen = true
 	t.marks[key] = mark
 	if !seeding && !mark.reached {
-		return 0
+		return 0, resumed
 	}
-	return now.Sub(mark.since)
+	return now.Sub(mark.since), resumed
 }
 
 // markReached remembers that the torrent was stopped for inactivity.
@@ -380,10 +421,10 @@ func (t *seedIdleTracker) markReached(hash string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	key := strings.ToLower(hash)
-	if mark, ok := t.marks[key]; ok {
-		mark.reached = true
-		t.marks[key] = mark
-	}
+	mark := t.marks[key]
+	mark.reached = true
+	mark.seen = true
+	t.marks[key] = mark
 }
 
 // reached reports whether the torrent was stopped for inactivity.
@@ -394,12 +435,13 @@ func (t *seedIdleTracker) reached(hash string) bool {
 }
 
 // sweep forgets the torrents not observed since the previous sweep (removed
-// from the session).
+// from the session). A stop verdict stays: a torrent missing from one listing
+// (the engine restarting) keeps it.
 func (t *seedIdleTracker) sweep() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for key, mark := range t.marks {
-		if !mark.seen {
+		if !mark.seen && !mark.reached {
 			delete(t.marks, key)
 			continue
 		}
@@ -408,17 +450,57 @@ func (t *seedIdleTracker) sweep() {
 	}
 }
 
-// idleReached reports whether a seeding torrent passed its inactivity limit,
-// recording the observation.
-func (l seedLimits) idleReached(torrent *models.TorrentView, now time.Time) bool {
-	idle := seedIdle.observe(torrent.Hash, torrent.AllTimeUpload, torrent.State == "seeding", now)
-	if l.IdleSeconds == nil {
+// idleReached reports whether a torrent passed its inactivity limit (or was
+// already stopped for it), recording the observation.
+func (p *seedPolicy) idleReached(torrent *models.TorrentView, limits seedLimits, now time.Time) bool {
+	idle, resumed := seedIdle.observe(torrent.Hash, torrent.AllTimeUpload, torrent.State == "seeding", now)
+	if resumed && p.db != nil {
+		_ = p.db.SetSeedIdleStop(torrent.Hash, false)
+	}
+	if limits.IdleSeconds == nil {
 		return false
 	}
 	if seedIdle.reached(torrent.Hash) {
 		return true
 	}
-	return idle >= time.Duration(*l.IdleSeconds)*time.Second
+	return idle >= time.Duration(*limits.IdleSeconds)*time.Second
+}
+
+// markIdleStop records that the torrent was stopped for inactivity, in memory
+// and in the database.
+func (p *seedPolicy) markIdleStop(hash string) {
+	seedIdle.markReached(hash)
+	if p.db != nil {
+		_ = p.db.SetSeedIdleStop(hash, true)
+	}
+}
+
+// SetSeedIdleStop records or clears the inactivity stop of a torrent.
+func (d *Database) SetSeedIdleStop(hash string, stopped bool) error {
+	if !stopped {
+		_, err := d.db.Exec("UPDATE torrent_meta SET seed_idle_stop=0 WHERE hash=?1", strings.ToLower(hash))
+		return err
+	}
+	_, err := d.db.Exec("INSERT INTO torrent_meta(hash,seed_idle_stop,status,created_at,updated_at) VALUES (?1,1,'queued',datetime('now'),datetime('now')) ON CONFLICT(hash) DO UPDATE SET seed_idle_stop=1, updated_at=excluded.updated_at", strings.ToLower(hash))
+	return err
+}
+
+// SeedIdleStops returns the torrents stopped for inactivity.
+func (d *Database) SeedIdleStops() ([]string, error) {
+	rows, err := d.db.Query("SELECT lower(hash) FROM torrent_meta WHERE seed_idle_stop=1")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var hashes []string
+	for rows.Next() {
+		var hash string
+		if err := rows.Scan(&hash); err != nil {
+			return nil, err
+		}
+		hashes = append(hashes, hash)
+	}
+	return hashes, rows.Err()
 }
 
 // SeedRulesView handles GET /api/seed-rules.

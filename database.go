@@ -950,6 +950,9 @@ func (d *Database) migrate() error {
 		{"torrent_meta", "reason", "TEXT DEFAULT ''"},
 		{"torrent_meta", "no_rename", "INTEGER DEFAULT 0"},
 		{"torrent_meta", "created_at", "TEXT"},
+		// A seed stopped for inactivity (seed_rules.go): kept so a restart
+		// does not leave it paused without its end-of-seed handling.
+		{"torrent_meta", "seed_idle_stop", "INTEGER DEFAULT 0"},
 		{"series", "timeframe", "INTEGER DEFAULT 0"},
 		{"series", "ignored_seasons", "TEXT DEFAULT '[]'"},
 		{"series", "subtitle", "TEXT DEFAULT ''"},

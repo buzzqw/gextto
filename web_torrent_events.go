@@ -1939,7 +1939,7 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 		}
 		ratioReached := limits.ratioReached(&torrent)
 		timeReached := limits.timeReached(&torrent)
-		idleReached := limits.idleReached(&torrent, now)
+		idleReached := policy.idleReached(&torrent, limits, now)
 		if !ratioReached && !timeReached && !idleReached {
 			continue
 		}
@@ -1969,7 +1969,7 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 					reason = "ratio reached"
 				case !timeReached && idleReached:
 					reason = "no upload while seeding"
-					seedIdle.markReached(torrent.Hash)
+					policy.markIdleStop(torrent.Hash)
 				}
 				if limits.Rule != "" {
 					reason += " (rule «" + limits.Rule + "»)"

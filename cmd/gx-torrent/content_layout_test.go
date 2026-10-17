@@ -55,16 +55,6 @@ func makeLayoutTorrent(t *testing.T, dataDir, name string, files []layoutFile) [
 	}})
 }
 
-// torrentInfoOf returns the listed view of one torrent.
-func torrentInfoOf(d *Daemon, hash string) (torrentInfo, bool) {
-	for _, info := range d.list() {
-		if strings.EqualFold(info.Hash, hash) {
-			return info, true
-		}
-	}
-	return torrentInfo{}, false
-}
-
 // TestContentLayoutNoSubfolder adds a multi-file torrent whose files sit
 // straight in the save path, next to a file that is not the torrent's: the
 // engine finds the data there, content_path is the save path, a move takes only
@@ -91,10 +81,10 @@ func TestContentLayoutNoSubfolder(t *testing.T) {
 	}
 	waitListed(t, d, hash)
 	waitFor(t, "the check to find the data in place", func() bool {
-		info, ok := torrentInfoOf(d, hash)
+		info, ok := findInfo(d, hash)
 		return ok && info.Progress >= 100
 	})
-	info, _ := torrentInfoOf(d, hash)
+	info, _ := findInfo(d, hash)
 	if info.ContentPath != dest {
 		t.Fatalf("content_path = %q, want the save path %q", info.ContentPath, dest)
 	}
@@ -108,7 +98,7 @@ func TestContentLayoutNoSubfolder(t *testing.T) {
 	d.restartSessionLocked()
 	d.mu.Unlock()
 	waitFor(t, "the reopened session to find the data", func() bool {
-		info, ok := torrentInfoOf(d, hash)
+		info, ok := findInfo(d, hash)
 		return ok && info.Progress >= 100 && info.ContentPath == dest
 	})
 
@@ -118,7 +108,7 @@ func TestContentLayoutNoSubfolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, "the move", func() bool {
-		info, ok := torrentInfoOf(d, hash)
+		info, ok := findInfo(d, hash)
 		return ok && info.SavePath == moved && info.State != "moving"
 	})
 	for _, rel := range []string{"e1.bin", "sub/e2.bin"} {
@@ -165,10 +155,10 @@ func TestContentLayoutSubfolder(t *testing.T) {
 	}
 	waitListed(t, d, hash)
 	waitFor(t, "the check to find the data in the subfolder", func() bool {
-		info, ok := torrentInfoOf(d, hash)
+		info, ok := findInfo(d, hash)
 		return ok && info.Progress >= 100
 	})
-	info, _ := torrentInfoOf(d, hash)
+	info, _ := findInfo(d, hash)
 	if want := filepath.Join(dest, "movie"); info.ContentPath != want {
 		t.Fatalf("content_path = %q, want %q", info.ContentPath, want)
 	}
@@ -213,5 +203,42 @@ func BenchmarkPayloadContentPath(b *testing.B) {
 				_ = payloadContentPath(tt, meta, "Pack")
 			}
 		})
+	}
+}
+
+// TestContentLayoutMagnetFromPeer adds a magnet whose metadata comes from a
+// peer (BEP 9) with the NoSubfolder layout: the layout is applied when the
+// info arrives, before any file is created, so the download lands straight in
+// the save path and never in a root folder.
+func TestContentLayoutMagnetFromPeer(t *testing.T) {
+	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 44100, PortEnd: 44199, Encryption: 1})
+	src := t.TempDir()
+	data := makeLayoutTorrent(t, filepath.Join(src, "Pack"), "Pack", []layoutFile{{"e1.bin", 40_000}, {"sub/e2.bin", 25_000}})
+	hash, _, err := seeder.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the seeder to seed", func() bool { return stateOf(seeder, hash) == "seeding" })
+
+	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 44200, PortEnd: 44299, Encryption: 1})
+	dst := t.TempDir()
+	magnet := fmt.Sprintf("magnet:?xt=urn:btih:%s&x.pe=127.0.0.1:%d", hash, seeder.peerPort)
+	if _, _, err := leecher.add(addRequest{Magnet: magnet, Destination: dst, ContentLayout: torrent.ContentLayoutNoSubfolder, SeedRatio: -1, SeedDays: -1}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the magnet to download from the peer", func() bool {
+		info, ok := findInfo(leecher, hash)
+		return ok && info.Progress >= 100
+	})
+	for _, rel := range []string{"e1.bin", "sub/e2.bin"} {
+		if _, err := os.Stat(filepath.Join(dst, filepath.FromSlash(rel))); err != nil {
+			t.Fatalf("%s not in the save path: %v", rel, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dst, "Pack")); !os.IsNotExist(err) {
+		t.Fatalf("a root folder was created for the magnet: %v", err)
+	}
+	if info, _ := findInfo(leecher, hash); info.ContentPath != dst {
+		t.Fatalf("content_path = %q, want %q", info.ContentPath, dst)
 	}
 }
