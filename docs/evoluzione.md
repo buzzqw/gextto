@@ -4,6 +4,8 @@ Single working document for **what Gextto and gx-torrent are and what is next**:
 capabilities as they exist today and the open items with their gate. The numbers behind
 the choices are in [`measurements.md`](measurements.md); the story of how we got here is
 in the git history, and the problems that have been solved are not recorded here.
+**Write it in the present tense:** a sentence that would be false in six months because
+it describes a transition does not belong here (see the rule in `AGENTS.md`).
 
 The technical reference of the engine is [`gx-torrent.md`](gx-torrent.md), its BEP
 compliance [`bep.md`](bep.md), the engine inventory
@@ -178,6 +180,9 @@ are left untouched, and an error never compromises the download.
 
 ### 3. Product surface
 
+The manual is the user-facing description of these capabilities; this section states
+the surface and the design rules that are not obvious from it.
+
 **Web UI, TUI and languages.** The web UI is server-rendered with HTMX (`uiweb/v2`)
 and has a terminal client (`gexttod tui`). Six languages — it/en/de/fr/es/pl — cover
 the web UI (chrome, labels, tooltips, hints, server-side messages and the strings
@@ -276,12 +281,11 @@ A wanted row states what the operator has in four honest states, never guessing
 completeness: how many episodes are **downloaded** (in the session and complete,
 or taken by the engine), how many are **downloading** (in the session but still
 running) and how many were **seen but not downloaded**, with a chip per season
-(a season only partly seen is not collapsed to a bare `S01` the way
-"Have S01" used to). The title badge shows the single most useful state (paused,
+(a season only partly seen is not collapsed to a bare `S01`). The title badge shows the single most useful state (paused,
 downloading, to complete, up to date, waiting); the **Episodes** button opens the
 per-episode grid inline and an episode in the session links to its torrent; a
 movie shows its single release with the same states. The episode grid is the
-authoritative ledger (`/ui/wanted-episodes`) and it is no longer hidden inside
+authoritative ledger (`/ui/wanted-episodes`) and it is not hidden inside
 the edit dialog.
 
 **Accessibility.** Reference **WCAG 2.1 AA** (compatible 2.2 practices). The
@@ -408,7 +412,7 @@ never the user's, never a value never tuned — and only past a hysteresis
 (`adaptiveHysteresisFraction`), so the values do not wobble. The cycle is the
 cadence, which keeps it gentle. A restart is never read as instability: a
 restart that changed the binary is an update (`restart_cause.go`). The link-peak
-input now exists: the daemon's 90-second policy tick records the highest download
+input exists: the daemon's 90-second policy tick records the highest download
 and upload rate the line actually reached (`autotune_peaks.go`, hidden keys that
 only grow), and the tuning proposes `torrent_dl_limit`/`torrent_ul_limit` at 80%
 of that peak, leaving headroom for the ACKs. A fresh install has no peak yet, so
@@ -422,9 +426,8 @@ it.
 (`uiEssentialKeys`), but the network tab reads the engine's `port_mapping` and,
 when the engine opened the port itself (UPnP/NAT-PMP), it says so and drops the two
 rows in Facilitata; otherwise it warns with the exact range to forward. The library
-cleanup no longer has its own score threshold: `cleanup_min_score_diff` is gone and
-the cleanup uses `upgrade_min_score_diff`, one voice for both the acquisition
-upgrade and the cleanup pass. `cleanup_upgrades` ("replace archived versions") is
+cleanup has no score threshold of its own: it uses `upgrade_min_score_diff`, one
+voice for both the acquisition upgrade and the cleanup pass. `cleanup_upgrades` ("replace archived versions") is
 on by default, so archived files can actually be improved.
 
 **Scheduling the auto-tune.** The per-day editor gives every day **one choice — Off,
@@ -783,8 +786,8 @@ decided on data**, so every item carries the gate it waits for.
 
 **The engine fallback.** There are two selectable engines: **`gx-torrent`**, the
 engine of this project, and **qBittorrent-nox** (external or managed). The
-libtorrent engine Gextto used to embed is **gone**: it is not built and not
-shipped, and the transfer settings are engine-neutral (`torrent_*`). When the
+libtorrent engine is **not** embedded: it is not built and not shipped, and the
+transfer settings are engine-neutral (`torrent_*`). When the
 active engine fails — a crash budget spent, or an activation refused at startup —
 Gextto walks a chain and persists the choice (`engine_fallback.go`):
 
@@ -798,7 +801,7 @@ Gextto walks a chain and persists the choice (`engine_fallback.go`):
    and the operator is notified.
 
 Before the engine handover the supervisor tries the cheapest fix: if the updater kept
-`gx-torrent.prev` (now installed by `gexttod --update`), the previous binary is restored and
+`gx-torrent.prev` (installed by `gexttod --update`), the previous binary is restored and
 gx-torrent is retried instead of switching engines. A managed daemon that is **alive but
 stops answering** its own health endpoint for five minutes is killed and counted as a
 failure (`gxUnresponsiveLimit`), so a frozen API is not mistaken for a healthy engine. A
@@ -839,7 +842,7 @@ recovered from a shell without editing the database.
   router's WAN counters see them; without counters such a user is not protected.
   Gate: a measurement with a real call or game next to a saturated download, on a
   line with and without counters. The release after the others stop was measured at
-  2 min 4 s with a 2-minute calm spell; the 60 s now in force is pinned by tests, a
+  2 min 4 s with a 2-minute calm spell; the 60 s in force is pinned by tests, a
   physical re-measure is still to do.
 - **DHT feeds**: the resolver exists, the **publisher** side (signing a feed) does not,
   and the BEP 44 outgoing client has no consumer yet (§4 of [`measurements.md`](measurements.md)).
@@ -886,10 +889,8 @@ candidates by reusable bytes** (superseded by the dedup, no measurable gain);
 (`write_cache=0`); a UI benchmark as a CI performance test (SSR rendering is ~1–3 ms per
 page).
 
-**Where the current round landed (2026-10-14, Intel N97, public torrents and DHT).**
-`scripts/measure-baseline.sh` runs the cheap harnesses — and the network ones when their
-environment is set — and writes a dated baseline, which is the reference the next round
-compares against. That round found and fixed the v1-filter regression, implemented the
-v2 partial-file hash serving (§6) and closed the DHT questions with the numbers now in
-[`measurements.md`](measurements.md). What remains is the real-swarm choking campaign, which needs the host
-with a reachable inbound port, and whatever that campaign justifies.
+**Baseline.** `scripts/measure-baseline.sh` runs the cheap harnesses — and the network
+ones when their environment is set — and writes a dated baseline, the reference a later
+round compares against; the numbers stay in [`measurements.md`](measurements.md). What
+remains is the real-swarm choking campaign, which needs the host with a reachable
+inbound port, and whatever that campaign justifies.
