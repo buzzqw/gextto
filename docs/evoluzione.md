@@ -439,6 +439,30 @@ exclusive with the schedule) and the temporary override's Auto mode in Downloads
 sibling of the numeric temporary limit — so the speed has two levels: the **policy**
 (manual, scheduled or automatic) and the **temporary override** (limit or auto).
 
+**Latency guard (Auto respects latency, on by default).** Auto would otherwise leave
+a saturated download free to add ~40 ms for every device in the house. The rule is
+the user's: the whole line belongs to Gextto **while nobody else needs it**, and
+Gextto yields when someone does. `latency_guard.go` probes the latency to a public
+host every 2 s, and only while Auto is in force (`torrent_auto_latency_target`, empty =
+9.9.9.9 and 1.1.1.1 on port 443). The gateway is no use as a target: it shows no
+queueing. Who else is on the line is found out by **trying**. When the latency is
+high, or the idle reference is unknown, Gextto backs off to 60 % for 8 s. If the
+latency falls, the queue was Gextto's own: that latency becomes the idle reference
+(the lowest kept for 6 h), the line goes back to Gextto and no trial follows for
+10 minutes. If the latency stays high while Gextto left room, someone else is filling
+the line. The guard then **yields**: −15 % per step while the latency stays high,
++1/20 of the peak at rest, and the cap is lifted after a minute of calm at the
+ceiling. When the router's UPnP WAN counters answer (`line_usage.go`), their verdict
+comes first. The others' traffic is WAN minus Gextto's wire bytes, after the overhead
+learned as the lowest WAN/own ratio of the last hour, 2 of 3 reads. Gextto's rate
+comes from the engine's cumulative wire counters, since the reported rates are
+averaged over tens of seconds. Under the guard the 60 s policy tick pushes the
+guard's caps (`effectiveSpeedLimits`), the peak observer neither learns from a
+guarded direction nor forgets it, and leaving Auto pushes nothing. The Downloads badge
+shows latency, reference and caps while it acts, and `GET /api/torrents/temp-limits`
+carries `latency_guard`. Measured on a real line: [`measurements.md`](measurements.md),
+*Latency guard*.
+
 **Streaming and DLNA.** Web streaming (`cmd/gx-torrent/stream.go`, the endpoint
 Gextto redirects to) sends the **Content-Type from the file extension**
 (`video/mp4`, `video/x-matroska`, `audio/flac`, …) with
@@ -649,8 +673,8 @@ cap. It is a feedback control on **latency**, only on the cap: the data path is
 untouched, and `applyEffectiveSpeedLimitsLocked` (base → scheduler → auto-speed) remains
 the only caller of `SetSpeedLimits`. It needs a positive upload limit, is off by default
 and exists only standalone, like the bandwidth scheduler (in managed mode Gextto governs
-the limits). A managed version on Gextto's side would measure the RTT and modulate the
-limits through `SetLimits` (§8).
+the limits). The probe, the baseline and the cap step are `internal/autospeed`, shared
+with Gextto's latency guard (§3, *Latency guard*), which passes its own window.
 
 **Extensions outside the BEPs**: a
 **WebSocket tracker** (ws/wss, an original bounded RFC 6455 client plus the
@@ -782,17 +806,14 @@ recovered from a shell without editing the database.
 - **DLNA**: transcoding, frames extracted from the video (no ffmpeg), search and
   Xbox/WMP (`X_MS_MediaReceiverRegistrar`) are missing; browsing, Range playback,
   subtitles, library folders and artwork are in place (§3).
-- **Latency-aware Auto on the Gextto side.** The *Auto* speed (policy, schedule day,
-  temporary) leaves the line uncapped so the peak is learned. A saturated download
-  raised the Internet RTT from 19.8 to 62.5 ms (82.6 ms peak) for the whole house
-  ([`measurements.md`](measurements.md), *Latency under a saturated download*). The
-  standalone auto-speed (§6) reacts on the upload cap only, so it would not cover
-  this. A managed version would have Gextto probe the RTT and lower the **download**
-  and upload caps it pushes when the latency rises, then raise them again at rest.
-  *Auto* would then mean the fastest speed that leaves the line usable. Open
-  points: keeping the peak observer learning from uncapped samples only, the probe
-  target (the gateway does not show ISP-side queueing, a public host does), and the
-  UI wording in six languages.
+- **Latency guard: what the trials cannot see.** A trial tells "Gextto's own queue"
+  from "someone else filling the line". It cannot see a user of little bandwidth
+  who only needs a low latency (a call, a game), because they fill no queue. The
+  router's WAN counters see them; without counters such a user is not protected.
+  Gate: a measurement with a real call or game next to a saturated download, on a
+  line with and without counters. The release after the others stop was measured at
+  2 min 4 s with a 2-minute calm spell; the 60 s now in force is pinned by tests, a
+  physical re-measure is still to do.
 - **DHT feeds**: the resolver exists, the **publisher** side (signing a feed) does not,
   and the BEP 44 outgoing client has no consumer yet (§4 of [`measurements.md`](measurements.md)).
 - **WebTorrent/WebRTC**: the WebSocket tracker's practical value stays limited until

@@ -44,6 +44,8 @@ var uiSettingTooltipText = map[string]string{
 	"torrent_outgoing_interface":           "Killswitch VPN: interfaccia usata per tutto il traffico BitTorrent in uscita.",
 	"torrent_dl_limit":                     "Limite globale di download in KiB/s (0 = illimitato).",
 	"torrent_ul_limit":                     "Limite globale di upload in KiB/s (0 = illimitato).",
+	"torrent_auto_latency_guard":           "Con la velocità su Auto misura la latenza verso Internet; se il download o l'upload la fanno salire mentre altri dispositivi di casa usano la linea, li rallenta quanto basta e poi li libera di nuovo. Se nessun altro la usa, la banda resta tutta a Gextto.",
+	"torrent_auto_latency_target":          "Host (o host:porta) a cui misurare la latenza con una connessione TCP ogni 2 secondi, solo mentre Auto è attivo. Deve stare oltre il router: il router non vede la coda del provider.",
 	"torrent_speed_auto":                   "Nessun tetto: la banda va all'auto-tune, che misura la linea e la lascia libera. Vince sui limiti globali e sulla programmazione; il limite temporaneo in Scarico resta un override a parte.",
 	"torrent_sched_enabled":                "Attiva la fascia oraria con limiti di velocità diversi.",
 	"torrent_sched_start":                  "Ora di inizio della programmazione (HH:MM).",

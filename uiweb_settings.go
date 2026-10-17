@@ -158,6 +158,8 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "torrent_dl_limit", Label: "Limite download globale", Tab: "network", Group: "Limiti di velocità"},
 	{Key: "torrent_ul_limit", Label: "Limite upload globale", Tab: "network", Group: "Limiti di velocità"},
 	{Key: "torrent_speed_auto", Label: "Velocità automatica (misura la linea)", Tab: "network", Group: "Limiti di velocità"},
+	{Key: "torrent_auto_latency_guard", Label: "Auto rispetta la latenza", Tab: "network", Group: "Limiti di velocità"},
+	{Key: "torrent_auto_latency_target", Label: "Auto — host per misurare la latenza", Tab: "network", Group: "Limiti di velocità"},
 	{Key: "torrent_sched_enabled", Label: "Programmazione velocità attiva", Tab: "network", Group: "Programmazione velocità"},
 	{Key: "torrent_sched_start", Label: "Programmazione — ora inizio", Tab: "network", Group: "Programmazione velocità"},
 	{Key: "torrent_sched_end", Label: "Programmazione — ora fine", Tab: "network", Group: "Programmazione velocità"},

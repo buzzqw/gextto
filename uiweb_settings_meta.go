@@ -68,14 +68,15 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"gxtorrent_dlna_folders":           {Zero: "vuoto = automatico (archivio)", DependsOn: "gxtorrent_dlna"},
 
 	// Velocità e rete
-	"torrent_dl_limit":       {Unit: "KiB/s", Zero: "0 = illimitato"},
-	"torrent_ul_limit":       {Unit: "KiB/s", Zero: "0 = illimitato"},
-	"torrent_sched_start":    {Kind: "time", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_end":      {Kind: "time", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_days":     {Kind: "days", Zero: "nessun giorno = mai attiva", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_week":     {Kind: "week", Zero: "un giorno «Limite» ha i suoi valori (0 = illimitato); «Auto» lascia misurare la linea all'auto-tune; una fascia oltre la mezzanotte appartiene al giorno in cui inizia", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_dl_limit": {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_ul_limit": {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
+	"torrent_dl_limit":            {Unit: "KiB/s", Zero: "0 = illimitato"},
+	"torrent_ul_limit":            {Unit: "KiB/s", Zero: "0 = illimitato"},
+	"torrent_auto_latency_target": {Zero: "vuoto = 9.9.9.9 e 1.1.1.1 (porta 443)", DependsOn: "torrent_auto_latency_guard"},
+	"torrent_sched_start":         {Kind: "time", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_end":           {Kind: "time", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_days":          {Kind: "days", Zero: "nessun giorno = mai attiva", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_week":          {Kind: "week", Zero: "un giorno «Limite» ha i suoi valori (0 = illimitato); «Auto» lascia misurare la linea all'auto-tune; una fascia oltre la mezzanotte appartiene al giorno in cui inizia", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_dl_limit":      {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_ul_limit":      {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
 	// Ricerca peer e tracker
 	"torrent_holepunch": {DependsOn: "torrent_utp"},
 

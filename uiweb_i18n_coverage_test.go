@@ -65,6 +65,8 @@ var i18nMixedAllowlist = map[string]bool{
 	"{} torrent · {} HTTP ·": true,
 	"Auto: {}on{}off{}":      true,
 	"CPU{}":                  true,
+	// The latency guard badge: units and DL/UL are the same in every language.
+	"{}/{} ms{} · DL {} KiB/s{}{} · UL {} KiB/s{}": true,
 	"{}TMDB {}{}TVDB {}{}{} · {}{}{} · ★ {}{}{} ·": true,
 	// The inline <script> that defines the client dictionary.
 	"window.__v2i18n={}{}{}{}{};": true,

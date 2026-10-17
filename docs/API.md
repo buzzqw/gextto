@@ -316,6 +316,11 @@ The temporary speed limit (`POST /api/torrents/temp-limits`) also accepts
 `auto: true|false`: with `auto` the bandwidth is handed to the guided tuning with
 no cap (like an “Auto” window of the schedule), the numeric `download_kib` /
 `upload_kib` are ignored and the two modes are exclusive.
+`GET /api/torrents/temp-limits` also returns `latency_guard`, the state of the
+Auto speed's latency guard: `active`, `measuring`, `latency_ms`, `baseline_ms`,
+the caps it applies (`download_cap_kib`, `upload_cap_kib`, 0 = none),
+`router_counters` (the router's WAN counters answer), `others_on_line` and the
+others' traffic (`others_download_kib`, `others_upload_kib`).
 
 ## gx-torrent daemon routes
 

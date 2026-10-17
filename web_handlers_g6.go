@@ -216,8 +216,8 @@ func gh6_currentSpeedLimits(cfg *Config) (int64, int64) {
 	return download, upload
 }
 
-func gh6_applySpeedPolicy(cfg *Config, torrents TorrentEngine) {
-	download, upload := gh6_currentSpeedLimits(cfg)
+func gh6_applySpeedPolicy(cfg *Config, torrents TorrentEngine, guard *latencyGuard) {
+	download, upload, _, _ := effectiveSpeedLimits(cfg, guard)
 	if _, err := torrents.SetGlobalSpeedLimits(download, upload); err != nil {
 		logging.Debug("speed policy apply failed", "error", err)
 	}
@@ -1368,7 +1368,7 @@ func SetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 		cfg := latestConfig(s)
-		gh6_applySpeedPolicy(cfg, s.activeEngine())
+		gh6_applySpeedPolicy(cfg, s.activeEngine(), s.latency_guard)
 		jsonResponse(w, map[string]any{"ok": true, "auto": *input.Auto})
 		return
 	}
@@ -1414,7 +1414,7 @@ func SetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	cfg := latestConfig(s)
-	gh6_applySpeedPolicy(cfg, s.activeEngine())
+	gh6_applySpeedPolicy(cfg, s.activeEngine(), s.latency_guard)
 	jsonResponse(w, map[string]any{
 		"ok":           true,
 		"until":        until,
@@ -1457,6 +1457,9 @@ func GetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"sched_upload_kib":   schedUpload,
 		"base_download_kib":  max(cfg.Transfer.DownloadLimitKib, 0),
 		"base_upload_kib":    max(cfg.Transfer.UploadLimitKib, 0),
+		// The latency guard of the Auto speed: latency, idle baseline and the
+		// caps it is applying (0 = none).
+		"latency_guard": s.latency_guard.status(),
 		// Shown next to the limits on the TUI downloads tab.
 		"auto_remove_completed": cfg.Transfer.AutoRemoveCompleted,
 	})

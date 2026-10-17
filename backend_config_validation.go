@@ -164,7 +164,32 @@ func validateSettingValue(key, value string, cfg *Config) error {
 	if err := validateNumericSetting(key, value); err != nil {
 		return err
 	}
+	if key == latencyGuardTargetKey {
+		if err := validateLatencyTarget(value); err != nil {
+			return err
+		}
+	}
 	return validatePathSetting(key, value, cfg)
+}
+
+// validateLatencyTarget accepts an empty value (the built-in targets), a host
+// or a host:port with a numeric port; a URL or spaces are refused.
+func validateLatencyTarget(value string) error {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return nil
+	}
+	host := raw
+	if h, port, err := net.SplitHostPort(raw); err == nil {
+		if n, perr := strconv.Atoi(port); perr != nil || n < 1 || n > 65535 {
+			return fmt.Errorf("%s: invalid port %q", latencyGuardTargetKey, port)
+		}
+		host = h
+	}
+	if host == "" || strings.ContainsAny(host, " /\\?#@") {
+		return fmt.Errorf("%s must be a host or host:port, not %q", latencyGuardTargetKey, raw)
+	}
+	return nil
 }
 
 // validateNumericSetting rejects a non-numeric value for the settings whose

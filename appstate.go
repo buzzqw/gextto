@@ -42,6 +42,7 @@ func NewAppState(
 		bgContext:       backgroundContext,
 		bgCancel:        stopBackgroundContext,
 		rate_history:    newRateHistory(rateHistoryLen),
+		latency_guard:   newLatencyGuard(),
 	}
 	// Install the configured transfer backend. A refused activation (invalid
 	// path mappings, a missing binary, a port conflict) leaves the daemon with

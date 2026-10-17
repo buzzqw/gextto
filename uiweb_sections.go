@@ -226,6 +226,9 @@ type uiDownloadsPage struct {
 	SchedAuto bool
 	// TempShadowed: a temporary limit without expiry overridden by the schedule.
 	TempShadowed bool
+	// Guard is the latency guard of the Auto speed: shown while it is
+	// slowing the transfers down for the other devices on the line.
+	Guard latencyGuardStatus
 	SchedDL      int64
 	SchedUL      int64
 	BaseDL       int64
@@ -594,6 +597,7 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 		SpeedAuto:           settingsBool(cfg, "torrent_speed_auto", false),
 		AutoRemoveCompleted: settingsBool(cfg, "auto_remove_completed", false),
 		TagOptions:          uiDownloadTagOptions(s, cfg),
+		Guard:               s.latency_guard.status(),
 	}
 	if uiSettingString(cfg, "torrent_temp_limit_enabled") == "1" {
 		until := uiSettingInt(cfg, "torrent_temp_limit_until")

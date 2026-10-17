@@ -1004,6 +1004,7 @@ type v2TorrentsView struct {
 	TempActive          bool
 	TempAuto            bool
 	SpeedAuto           bool
+	Guard               latencyGuardStatus
 	SchedActive         bool
 	SchedAuto           bool
 	TempShadowed        bool
@@ -1178,6 +1179,7 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		TempActive:          settings.TempActive,
 		TempAuto:            settings.TempAuto,
 		SpeedAuto:           settings.SpeedAuto,
+		Guard:               settings.Guard,
 		SchedActive:         settings.SchedActive,
 		SchedAuto:           settings.SchedAuto,
 		TempShadowed:        settings.TempShadowed,

@@ -575,6 +575,9 @@ type AppState struct {
 	// rate_history is the in-memory bandwidth history the Dashboard chart
 	// draws. bandwidthHistoryWorker fills it while the daemon runs.
 	rate_history *rateHistory
+	// latency_guard keeps the line usable while the speed is on Auto
+	// (latency_guard.go); latencyGuardWorker drives it.
+	latency_guard *latencyGuard
 }
 
 // ---------------------------------------------------------------------------

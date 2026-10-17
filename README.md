@@ -45,7 +45,11 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
   values that fit the machine — memory, disks, a network share, the RAM disk —
   each with its reason, and writes nothing until you apply. Queue concurrency,
   disk cache and upload bandwidth adapt dynamically to hardware (RAM,
-  NVMe/SSD/HDD/NFS) and network latency (anti-bufferbloat); downloads pause before disk fills up;
+  NVMe/SSD/HDD/NFS) and network latency (anti-bufferbloat). On **Auto** speed the
+  whole line is Gextto's while nobody else needs it: when the latency rises it backs
+  off for a few seconds to see whose queue it is and yields only to the other devices
+  at home (measured: +55–66 % for a competing download), using the router's counters
+  when they exist; downloads pause before disk fills up;
   delivering peers get priority while sluggish ones are pruned; data already on
   disk is reused across swarms without re-downloading. Detailed live
   diagnostics and connection telemetry are exposed at every layer.

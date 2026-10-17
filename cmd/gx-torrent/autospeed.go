@@ -18,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/autospeed"
 )
 
 const (
@@ -30,48 +32,33 @@ const (
 
 	// autoSpeedProbeInterval is how often the latency is sampled.
 	autoSpeedProbeInterval = 1 * time.Second
-	// autoSpeedProbeTimeout bounds a single measurement.
-	autoSpeedProbeTimeout = 1 * time.Second
 	// autoSpeedWindow is how far back the idle baseline is remembered.
 	autoSpeedWindow = 60 * time.Second
-	// autoSpeedStepInterval is the minimum time between two controller moves.
-	autoSpeedStepInterval = 3 * time.Second
-	// autoSpeedHighFactor and autoSpeedHighMargin decide when the line looks
-	// saturated: the current latency is "high" only when it is above both the
-	// idle baseline times the factor and the baseline plus the margin.
-	autoSpeedHighFactor = 1.5
-	autoSpeedHighMargin = 20 * time.Millisecond
-	// autoSpeedReduceNum/Den scale the upload down on a spike (x0.85).
-	autoSpeedReduceNum = 85
-	autoSpeedReduceDen = 100
-	// autoSpeedRiseDivisor is the additive step on recovery: ceiling/divisor.
-	autoSpeedRiseDivisor = 20
 )
 
-// autoSpeedSample is one measured round-trip latency.
-type autoSpeedSample struct {
-	at  time.Time
-	rtt time.Duration
+// autoSpeed is the standalone controller: the shared latency probe and the
+// one upload cap it moves (internal/autospeed). The zero value is ready to use.
+type autoSpeed struct {
+	mu    sync.Mutex
+	probe autospeed.Probe
+	clamp autospeed.Clamp
 }
 
-// autoSpeed keeps the recent latency samples and the current upload ceiling
-// the controller has settled on. The zero value is ready to use.
-type autoSpeed struct {
-	mu       sync.Mutex
-	samples  []autoSpeedSample
-	clampKiB int64 // current upload ceiling in KiB/s; 0 = none settled
-	lastStep time.Time
+func (a *autoSpeed) probeLocked() *autospeed.Probe {
+	if a.probe.Window == 0 {
+		a.probe.Window = autoSpeedWindow
+	}
+	return &a.probe
 }
 
 // record adds a measured latency. A non-positive value is ignored.
 func (a *autoSpeed) record(now time.Time, rtt time.Duration) {
-	if a == nil || rtt <= 0 {
+	if a == nil {
 		return
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.samples = append(a.samples, autoSpeedSample{at: now, rtt: rtt})
-	a.trimLocked(now)
+	a.probeLocked().Record(now, rtt)
 }
 
 // reset forgets the samples and the settled ceiling (on disable).
@@ -81,32 +68,8 @@ func (a *autoSpeed) reset() {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.samples = nil
-	a.clampKiB = 0
-	a.lastStep = time.Time{}
-}
-
-// trimLocked drops samples older than the window.
-func (a *autoSpeed) trimLocked(now time.Time) {
-	cut := now.Add(-autoSpeedWindow)
-	i := 0
-	for i < len(a.samples) && a.samples[i].at.Before(cut) {
-		i++
-	}
-	if i > 0 {
-		a.samples = a.samples[i:]
-	}
-}
-
-// baselineLocked is the lowest latency in the window, the idle reference.
-func (a *autoSpeed) baselineLocked() time.Duration {
-	baseline := a.samples[0].rtt
-	for _, s := range a.samples[1:] {
-		if s.rtt < baseline {
-			baseline = s.rtt
-		}
-	}
-	return baseline
+	a.probeLocked().Reset()
+	a.clamp.Reset()
 }
 
 // clampUpload returns the upload limit (KiB/s) to apply now and whether the
@@ -120,52 +83,14 @@ func (a *autoSpeed) clampUpload(now time.Time, ceilingKiB, floorKiB int64) (int6
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if ceilingKiB <= 0 {
-		a.clampKiB = 0
+		a.clamp.Value = 0
 		return ceilingKiB, false
 	}
-	if floorKiB < 1 {
-		floorKiB = 1
-	}
-	a.trimLocked(now)
-	if len(a.samples) == 0 {
+	_, _, high, ok := a.probeLocked().State(now, 1)
+	if !ok {
 		return ceilingKiB, false
 	}
-	current := a.samples[len(a.samples)-1].rtt
-	baseline := a.baselineLocked()
-	// First decision, or a ceiling that shrank: start from the ceiling.
-	if a.clampKiB <= 0 || a.clampKiB > ceilingKiB {
-		a.clampKiB = ceilingKiB
-	}
-	if now.Sub(a.lastStep) >= autoSpeedStepInterval {
-		a.lastStep = now
-		high := current > time.Duration(float64(baseline)*autoSpeedHighFactor) &&
-			current > baseline+autoSpeedHighMargin
-		if high {
-			reduced := a.clampKiB * autoSpeedReduceNum / autoSpeedReduceDen
-			if reduced < floorKiB {
-				reduced = floorKiB
-			}
-			if reduced < a.clampKiB {
-				a.clampKiB = reduced
-			}
-		} else if a.clampKiB < ceilingKiB {
-			step := ceilingKiB / autoSpeedRiseDivisor
-			if step < 1 {
-				step = 1
-			}
-			a.clampKiB += step
-			if a.clampKiB > ceilingKiB {
-				a.clampKiB = ceilingKiB
-			}
-		}
-	}
-	if a.clampKiB > ceilingKiB {
-		a.clampKiB = ceilingKiB
-	}
-	if a.clampKiB < 1 {
-		a.clampKiB = ceilingKiB
-	}
-	return a.clampKiB, true
+	return a.clamp.Step(now, high, ceilingKiB, floorKiB), true
 }
 
 // snapshot reports the last latency, the idle baseline and the settled ceiling
@@ -176,12 +101,11 @@ func (a *autoSpeed) snapshot(now time.Time) (rtt, baseline time.Duration, clampK
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.trimLocked(now)
-	if len(a.samples) == 0 {
+	rtt, baseline, _, have = a.probeLocked().State(now, 1)
+	if !have {
 		return 0, 0, 0, false
 	}
-	rtt = a.samples[len(a.samples)-1].rtt
-	return rtt, a.baselineLocked(), a.clampKiB, true
+	return rtt, baseline, a.clamp.Value, true
 }
 
 // autoSpeedSettings reads the standalone settings. Managed mode (nil store) is
@@ -255,35 +179,19 @@ func (d *Daemon) runAutoSpeed(stop <-chan struct{}) {
 // configured target (host or host:port) or, when empty, to the default
 // gateway on a few common ports. A failed connect is not a measurement.
 func probeLatency(target string, gateway net.IP) (time.Duration, bool) {
-	for _, address := range latencyCandidates(target, gateway) {
-		start := time.Now()
-		conn, err := net.DialTimeout("tcp", address, autoSpeedProbeTimeout)
-		if err != nil {
-			continue
-		}
-		rtt := time.Since(start)
-		_ = conn.Close()
-		return rtt, true
-	}
-	return 0, false
+	return autospeed.Measure(latencyCandidates(target, gateway))
 }
 
 // latencyCandidates lists the host:port endpoints to try, in order.
 func latencyCandidates(target string, gateway net.IP) []string {
-	target = strings.TrimSpace(target)
-	if target != "" {
-		if _, _, err := net.SplitHostPort(target); err == nil {
-			return []string{target}
+	var fallback []string
+	if gateway != nil {
+		host := gateway.String()
+		fallback = []string{
+			net.JoinHostPort(host, "80"),
+			net.JoinHostPort(host, "443"),
+			net.JoinHostPort(host, "53"),
 		}
-		return []string{net.JoinHostPort(target, "80"), net.JoinHostPort(target, "443")}
 	}
-	if gateway == nil {
-		return nil
-	}
-	host := gateway.String()
-	return []string{
-		net.JoinHostPort(host, "80"),
-		net.JoinHostPort(host, "443"),
-		net.JoinHostPort(host, "53"),
-	}
+	return autospeed.Candidates(target, fallback)
 }

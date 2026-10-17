@@ -510,6 +510,33 @@ queues at the ISP side and adds ~40 ms for every device in the house. The standa
 ping auto-speed acts only on the upload cap, so it would not have helped here
 ([`evoluzione.md`](evoluzione.md) §8).
 
+**Latency guard** (2026-10-17, Intel N97, the same line, `TestMeasureLatencyGuard` against
+a separate standalone instance downloading three public ISOs, 90 s phases; the "other
+device" is a plain HTTP download of the Ubuntu 26.04 ISO from the official mirror, read
+and discarded). The first two designs were rejected on these numbers.
+
+| design | phase | Gextto | other device | capped | verdict |
+|---|---|---|---|---|---|
+| reference = window minimum, router counters vs reported rates | alone | 9196 KiB/s | — | 43 % | false "others" (the reported rates lag tens of seconds behind the counters) |
+| same | others | 8479 | 754 | 93 % | ineffective: the reference was the loaded latency (56 ms) |
+| peak inference without router | others | 8764 | 298 | 0 % | blind: one competing flow takes 3–10 % of the line, Gextto stays "near its peak" |
+| **trials + instant wire rates** | **alone** | **8503** | — | 8 % (the trial) | the line stays Gextto's |
+| | others, guard off | 4532 | 4372 | — | today's sharing |
+| | **others, router** | 2084 | **6769 (+55 %)** | 100 % | yields |
+| | **others, no router** | 1606 | **7253 (+66 %)** | 100 % | yields on the trial alone |
+
+Two findings came out of these runs. The engine's reported `download_rate` is averaged:
+with a manual cap of 3000 KiB/s the NIC fell to 3401 KiB/s within 3 s (overhead and other
+host traffic included), while the reported rate still said 6.6 MB/s. The guard therefore
+reads the cumulative `peer_wire_*` counters. The latency did not improve while yielding
+to a bulk download, because the competitor fills the queue itself. Yielding gives it
+bandwidth; a lower latency would follow only where Gextto's traffic is the queue. Release:
+the other device stopped after a minute and the cap was lifted 2 min 4 s later, with the
+2-minute calm spell of that run (60 s now). A run where the CDN gave the competitor only
+253 KiB/s ended in an ambiguous trial (latency 100 → 53 ms) taken as "Gextto's own", with
+53 ms as the reference. Since then the lowest reference is kept for 6 h and only a lower
+measure replaces it, so one disturbed trial cannot blind the guard.
+
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
 the whole answer unreadable), and the cost is nil: on a 100-item answer, strict

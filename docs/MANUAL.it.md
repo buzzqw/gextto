@@ -1548,6 +1548,8 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | Limite download globale | Limite globale di download in KiB/s (0 = illimitato). *(Unità: KiB/s; 0 = illimitato)* |
 | Limite upload globale | Limite globale di upload in KiB/s (0 = illimitato). *(Unità: KiB/s; 0 = illimitato)* |
 | Velocità automatica (misura la linea) | Nessun tetto: la banda va all'auto-tune, che misura la linea e la lascia libera. Vince sui limiti globali e sulla programmazione; il limite temporaneo in Scarico resta un override a parte. Attivandola si spegne la programmazione, e viceversa. |
+| Auto rispetta la latenza | Con la velocità su Auto (politica, giorno «Auto» della programmazione o Auto temporaneo) misura la latenza verso Internet; se il download o l'upload la fanno salire mentre altri dispositivi di casa usano la linea, li rallenta quanto basta e poi li libera di nuovo. Se nessun altro la usa la banda resta tutta a Gextto. Chi altro usa la linea lo dicono i contatori WAN del router (UPnP); senza di essi lo si deduce dal picco imparato: se Gextto va vicino al picco la coda è sua e non frena, se va molto sotto qualcun altro sta usando il resto. Senza un picco ancora imparato una fascia «Auto» della programmazione non viene frenata. Attiva per default. |
+| Auto — host per misurare la latenza | Host (o host:porta) a cui misurare la latenza con una connessione TCP ogni 2 secondi, solo mentre Auto è attivo. Vuoto = 9.9.9.9 e 1.1.1.1 (porta 443). Deve stare oltre il router: il router non vede la coda del provider. |
 
 **Programmazione velocità**
 

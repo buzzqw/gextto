@@ -842,7 +842,18 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			// A direction under a speed limit is not the line, so it is skipped
 			// (and any earlier peak forgotten): only an uncapped rate counts.
 			peakDownKib, peakUpKib, _, _ := speedPolicy(cfg)
-			observeSpeedPeak(cfg, saturatingInt64(rateKib), saturatingInt64(uploadBytes), peakDownKib > 0, peakUpKib > 0)
+			// A direction the latency guard is capping is neither the line nor
+			// a user limit: it is not learned from, and its peak is kept.
+			observedDown, observedUp := rateKib, uploadBytes
+			if guardDown, guardUp := state.latency_guard.caps(); guardDown > 0 || guardUp > 0 {
+				if guardDown > 0 {
+					observedDown = 0
+				}
+				if guardUp > 0 {
+					observedUp = 0
+				}
+			}
+			observeSpeedPeak(cfg, saturatingInt64(observedDown), saturatingInt64(observedUp), peakDownKib > 0, peakUpKib > 0)
 			counts := fmt.Sprintf("%d/%d/%d", transferring, idle, queued)
 			// Skip the first tick after start: the engine has not finished syncing
 			// and resumed torrents read as paused, so that triple is transient
@@ -871,7 +882,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			lastDynamicAdjustment = now
 		}
 		if now.Sub(lastSpeedPolicy) >= 60*time.Second {
-			downloadKib, uploadKib, source, tempShadowed := speedPolicy(cfg)
+			downloadKib, uploadKib, source, tempShadowed := effectiveSpeedLimits(cfg, state.latency_guard)
 			// Always re-assert, not just on change: "Apply now" and the optimizer
 			// set the session limit to the unscheduled value (e.g. 3000 by day)
 			// and the policy must correct it on its own within a minute. The log

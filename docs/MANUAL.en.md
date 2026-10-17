@@ -1502,6 +1502,8 @@ Recalculate scores* after changing weights.
 | Global download limit | Global download limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
 | Global upload limit | Global upload limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
 | Automatic speed (measuring the line) | No cap: the bandwidth goes to the auto-tune, which measures the line and leaves it free. It beats the global limits and the schedule; the temporary limit in Downloads stays a separate override. Turning it on turns the schedule off, and the other way round. |
+| Auto respects latency | With the speed on Auto (the policy, an «Auto» schedule day or the temporary Auto) it measures the latency to the Internet; when the download or the upload makes it rise while other devices at home are using the line, it slows them just enough and then frees them again. When nobody else uses it the whole line stays with Gextto. Who else is on the line comes from the router's WAN counters (UPnP); without them it is inferred from the learned peak: with Gextto near its peak the queue is its own and nothing is slowed, well below it someone else is using the rest. With no peak learned yet an «Auto» schedule window is not slowed down. On by default. |
+| Auto — host to measure latency | Host (or host:port) to measure the latency to with a TCP connection every 2 seconds, only while Auto is on. Empty = 9.9.9.9 and 1.1.1.1 (port 443). It must be past the router: the router does not see the provider's queue. |
 
 **Speed schedule**
 

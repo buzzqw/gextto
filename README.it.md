@@ -48,7 +48,11 @@ Node.js/npm, sei lingue nell'interfaccia.
   RAM disk — ciascuno con il suo motivo, e non scrive nulla finché non applichi.
   Coda dinamica, cache disco e
   upload si adattano continuamente all'hardware (RAM, NVMe/SSD/HDD/NFS) e alla
-  latenza della linea (anti-bufferbloat); i download vanno in pausa prima che il
+  latenza della linea (anti-bufferbloat). Con la velocità su **Auto** la linea è
+  tutta di Gextto finché nessun altro la usa: quando la latenza sale si scansa per
+  qualche secondo per capire di chi è la coda e cede solo agli altri dispositivi di
+  casa (misurato: +55–66 % a un download concorrente), con i contatori del router
+  quando ci sono; i download vanno in pausa prima che il
   disco si riempia; il motore premia i peer veloci e scarta quelli lenti o
   inattivi, riusando i dati già su disco tra swarm diversi. Diagnostica
   dettagliata in tempo reale, telemetria delle connessioni e tassi di I/O sono
