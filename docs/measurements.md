@@ -352,7 +352,9 @@ zero, 15 min): RssAnon peak **1844 → 1105 MB**, second-half mean **1566 → 95
 outside the caches **859 → 507 MB**; live heap at the end 1.68 GB → 0.88 GB (`NextGC`
 1.93 → 1.22 GB, 114 collections in ~15 min). The collector's cost stays negligible:
 `gcBgMarkWorker` 0.5 % and `mallocgc` 2.2 % of the profile; CPU per MB/s 5.3, the best of
-the series. Against build 224 the memory outside the caches is halved (1032 → 507 MB).
+the series. Against build 224 the memory outside the caches is halved (1032 → 507 MB). After a clean restart of
+build 226 (3 seeds and 1 download loaded, full IP filter) `gx-torrent` holds **60–64 MB** RSS
+(44–48 MB anonymous) at 1–2 % CPU, against 90–110 MB right after a restart of build 220.
 
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes

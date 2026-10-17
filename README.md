@@ -58,6 +58,7 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
 | | |
 |---|---|
 | **Engine memory** | ~25 MB idle, ~100 MB at 100 MB/s with 50 torrents (qBittorrent-nox: up to ~5 GB) |
+| **Engine CPU** | ~45 % of one Intel N97 core on a saturated 8 MB/s line with ~130 peers (half over uTP, encrypted); 1–2 % with nothing to transfer |
 | **Protocol** | BitTorrent v1, v2 and hybrid (BEP 52) · 34 BEPs implemented and tested ([list](docs/bep.md)) |
 | **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP proxy · VPN killswitch |
 | **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr) · RSS · web search · stuck-download replacement |
@@ -288,9 +289,16 @@ downloads.
 
 **Engine CPU, measured**: a saturated 8 MB/s line with ~130 peers (about half
 over uTP, MSE encryption on) takes gx-torrent **~45 % of one core** on an Intel
-N97, about 0.35 % per connected peer. The peer reader rearms its read deadline
-only when it passes, and the uTP transport receives datagrams without copying
-them. Profiles and numbers are in `docs/measurements.md`.
+N97, about 0.35 % per connected peer, and 1–2 % when there is nothing to
+transfer. The peer reader rearms its read deadline only when it passes, and the
+uTP transport receives datagrams without copying them.
+
+**Downloads on a network share, measured** (16 GB host, NFS, 10 downloads at
+8–9 MB/s, ~110–180 peers): RSS peaks at **~1.1 GB**, most of it the write buffer
+that gx-torrent grows on its own because a network share writes slowly (up to
+1.26 GB on this host, sized from free RAM). Outside the caches it holds
+**~0.5 GB**. Right after a restart, with a few torrents and a full IP filter
+loaded, it takes **~60 MB**. Profiles and numbers are in `docs/measurements.md`.
 
 ## Install on Linux
 
