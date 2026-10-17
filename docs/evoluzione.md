@@ -670,7 +670,10 @@ it stays a hint, off by default); the **multi-path `get_peers`** rewrite
 candidates by reusable bytes** (superseded by the dedup, no measurable gain);
 `O_DIRECT`/`io_uring` (the disk is not the bottleneck); a write-back cache in the engine
 (`write_cache=0`); a UI benchmark as a CI performance test (SSR rendering is ~1–3 ms per
-page).
+page); a **file pool** (an LRU of open files): every file of a running torrent stays
+open, one descriptor each, and that is cheap and linear up to 20,000 files in one
+torrent — the only limit was the descriptor ceiling, which the engine now raises and
+never lowers (`setNoFile`).
 
 **Baseline.** `scripts/measure-baseline.sh` runs the cheap harnesses — and the network
 ones when their environment is set — and writes a dated baseline, the reference a later

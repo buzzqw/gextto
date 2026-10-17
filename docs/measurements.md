@@ -56,6 +56,7 @@ Cheap probes and opt-in tests, all outside CI:
 | `make measure-dht` | the public DHT: routing-table fill and query success (`GX_MEASURE_DHT=5m`, `GX_MEASURE_DHT_INFOHASH=<40 hex>`) |
 | `TestMeasureLatencyGuard` | the latency guard against a second instance and a competing download on the real line (`GX_MEASURE_LATENCY_GUARD`, `GX_MEASURE_COMPETITOR_URL`) |
 | `TestMeasureManagerLanes` | Jackett/Prowlarr lanes against the aggregate on the live managers (`GX_MEASURE_LANES=<data dir>`) |
+| `TestMeasureManyFiles` | descriptors, peak RSS and check time of one torrent with many files already on disk (`GX_MEASURE_FILES=500,2000,5000`; run it niced and memory-capped, see §4.9) |
 | `TestMeasureMergePhase3` | block-granularity merge on real ISOs (`GX_MEASURE_MERGE3=<dir>`, `GX_MEASURE_MERGE3_PEER` for a libtorrent seeder) |
 | unchoker simulation (`internal/gxcore/internal/unchoker/sim_test.go`) | the real `Unchoker` driven by synthetic peers: fast downloaders in download, fast uploaders in seed, immediate fast unchoke, optimistic unchoke that does not steal a slot and rotates, budget respected, fairness |
 | `TestMeasurePipeliningLatency` | an in-process latency proxy before the seed (no `tc`/`netem`, no root): every chunk released at arrival plus latency, in order and without limiting bandwidth |
@@ -302,6 +303,32 @@ reusable, the candidate filter costs 115 ns and 0 allocations over 32 unrelated 
 torrents.
 
 ### 4.9 Other measurements
+
+**Many files in one torrent (file pool, 2026-10-18, N97).** Is a pool of open files
+(an LRU, like libtorrent's) needed? The allocator opens every file of a torrent when it
+starts and keeps it open while it runs; a stop closes them all. `TestMeasureManyFiles`
+(`GX_MEASURE_FILES`, a torrent of 4 KiB files already on disk, run under
+`systemd-run --user --scope -p MemoryMax=6G -p CPUQuota=200%`, `nice`/`ionice`,
+`GOMAXPROCS=2`; load stayed under 0.6 apart from the compile):
+
+| Files | Descriptors while running | After a stop | Check of the data on disk |
+|---|---|---|---|
+| 500 | +500 | back to the base | 94 ms |
+| 2,000 | +2,000 | back to the base | 150 ms |
+| 5,000 | +5,000 | back to the base | 137 ms |
+| 12,000 | **failed** before the fix: `too many open files` at 8,762, torrent in error | — | — |
+| 12,000 | +12,000 (after the fix) | back to the base | 361 ms |
+| 20,000 | +20,000 (after the fix) | back to the base | 406 ms |
+
+The live daemon held 97 descriptors with 6 torrents (largest 71 files). The cost is
+one descriptor per file and nothing measurable on the check; the real limit was the
+ceiling: `setNoFile` set **both** the soft and the hard `RLIMIT_NOFILE` to
+`MaxOpenFiles` (10240), lowering the 65536 the service grants, so a torrent with
+more than ~10,200 files (or running torrents adding up to that) could not start. It
+now only raises the soft limit. Decision: **no file pool**; the descriptor ceiling of
+the service (65536) covers every realistic session. With mmap storage each file is
+also a mapping: `vm.max_map_count` is 1,048,576 here, and a failed mapping falls back
+to a plain file.
 
 **Statistics page** (standalone daemon, 0 torrents): the new sample and lifetime folding
 are free (`42 ns/op` and `6.4 ns/op`, 0 allocs); a graph request pays 11.3 µs / 20 KiB / 1
