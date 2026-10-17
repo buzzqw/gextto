@@ -2238,7 +2238,6 @@ pol:
   Programmazione — ora inizio (HH:MM): Programowanie — godzina rozpoczęcia (GG:MM)
   Programmazione — upload (KiB/s): Programowanie — przesyłanie (KiB/s)
   "Programmazione — per giorno": "Harmonogram — na dzień"
-  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia.": "Inne okno czasowe i limity dla każdego dnia tygodnia; okno po północy należy do dnia, w którym się zaczyna."
   "un giorno «Limite» ha i suoi valori (0 = illimitato); «Auto» lascia misurare la linea all'auto-tune; una fascia oltre la mezzanotte appartiene al giorno in cui inizia": "dzień «Limit» ma własne wartości (0 = bez limitu); «Auto» pozostawia łącze auto-tune; okno po północy należy do dnia, w którym się zaczyna"
   "ogni giorno attivo vuole un orario di inizio e uno di fine diversi": "każdy aktywny dzień wymaga różnych godzin początku i końca"
   "Inizio": "Początek"
@@ -5120,8 +5119,7 @@ pol:
   "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Najwyższa zaobserwowana prędkość pobierania %d KiB/s: limit na 80%% → %d KiB/s."
   "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Najwyższa zaobserwowana prędkość wysyłania %d KiB/s: limit na 80%% → %d KiB/s."
   "Auto": "Auto"
-  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. Con «Auto» la fascia lascia la banda all'auto-tune (nessun limite), così la linea viene misurata in quelle ore; fuori fascia valgono i tuoi limiti.": "Okno czasowe i limity dla każdego dnia tygodnia; okno po północy należy do dnia, w którym się zaczyna. Z «Auto» okno oddaje pasmo auto-tune (bez limitu), więc linia jest mierzona w tych godzinach; poza oknem obowiązują twoje limity."
-  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. «Modalità» decide cosa fa il giorno: «Non attiva» non applica nulla, «Limite» usa i tuoi valori di download e upload, «Auto» toglie il limite e lascia che l'auto-tune misuri la linea. Fuori da quelle fasce valgono i tuoi limiti globali.": "Inne okno czasowe i limity dla każdego dnia tygodnia; okno po północy należy do dnia, w którym się zaczyna. «Tryb» decyduje, co robi dzień: «Nieaktywny» nic nie stosuje, «Limit» używa twoich wartości pobierania i wysyłania, «Auto» usuwa limit i pozwala auto-tune zmierzyć łącze. Poza tymi oknami obowiązują twoje globalne limity."
+  "Una fascia e limiti per ogni giorno; «Modalità» sceglie «Non attiva», «Limite» o «Auto». Oltre la mezzanotte conta il giorno di inizio.": "Jedno okno i limity dla każdego dnia; «Tryb» wybiera «Nieaktywny», «Limit» lub «Auto». Okno po północy liczy się w dniu rozpoczęcia."
   "Accende la fascia oraria di questo giorno.": "Włącza okno czasowe tego dnia."
   "Accende la fascia e le toglie il limite: la banda va all'auto-tune.": "Włącza okno i usuwa jego limit: pasmo trafia do auto-tune."
   "Modalità": "Tryb"

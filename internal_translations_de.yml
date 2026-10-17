@@ -2272,7 +2272,6 @@ deu:
   Programmazione — ora inizio (HH:MM): Programmierung – Startzeit (HH:MM)
   Programmazione — upload (KiB/s): Programmierung – Upload (KiB/s)
   "Programmazione — per giorno": "Zeitplan — pro Tag"
-  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia.": "Eigenes Zeitfenster und eigene Limits für jeden Wochentag; ein Zeitfenster über Mitternacht gehört zum Tag, an dem es beginnt."
   "un giorno «Limite» ha i suoi valori (0 = illimitato); «Auto» lascia misurare la linea all'auto-tune; una fascia oltre la mezzanotte appartiene al giorno in cui inizia": "ein «Limit»-Tag hat eigene Werte (0 = unbegrenzt); «Auto» überlässt die Leitung dem Auto-Tune; ein Fenster über Mitternacht gehört zum Starttag"
   "ogni giorno attivo vuole un orario di inizio e uno di fine diversi": "jeder aktive Tag braucht unterschiedliche Start- und Endzeiten"
   "Inizio": "Beginn"
@@ -5179,8 +5178,7 @@ deu:
   "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Höchste gemessene Downloadrate %d KiB/s: Grenze bei 80%% → %d KiB/s."
   "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Höchste gemessene Uploadrate %d KiB/s: Grenze bei 80%% → %d KiB/s."
   "Auto": "Auto"
-  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. Con «Auto» la fascia lascia la banda all'auto-tune (nessun limite), così la linea viene misurata in quelle ore; fuori fascia valgono i tuoi limiti.": "Zeitfenster und Grenzen pro Wochentag; ein Fenster über Mitternacht gehört zum Starttag. Mit «Auto» überlässt das Fenster die Bandbreite dem Auto-Tune (kein Limit), sodass die Leitung in diesen Stunden gemessen wird; außerhalb gelten deine Grenzen."
-  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. «Modalità» decide cosa fa il giorno: «Non attiva» non applica nulla, «Limite» usa i tuoi valori di download e upload, «Auto» toglie il limite e lascia che l'auto-tune misuri la linea. Fuori da quelle fasce valgono i tuoi limiti globali.": "Zeitfenster und Grenzen pro Wochentag; ein Fenster über Mitternacht gehört zum Starttag. «Modus» entscheidet, was der Tag tut: «Aus» wendet nichts an, «Limit» nutzt deine Download- und Upload-Werte, «Auto» entfernt die Grenze und lässt den Auto-Tune die Leitung messen. Außerhalb gelten deine globalen Grenzen."
+  "Una fascia e limiti per ogni giorno; «Modalità» sceglie «Non attiva», «Limite» o «Auto». Oltre la mezzanotte conta il giorno di inizio.": "Ein Zeitfenster und Limits für jeden Tag; «Modus» wählt «Aus», «Limit» oder «Auto». Ein Fenster über Mitternacht zählt am Starttag."
   "Accende la fascia oraria di questo giorno.": "Schaltet das Zeitfenster dieses Tages ein."
   "Accende la fascia e le toglie il limite: la banda va all'auto-tune.": "Schaltet das Fenster ein und entfernt die Grenze: die Bandbreite geht an den Auto-Tune."
   "Modalità": "Modus"

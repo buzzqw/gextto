@@ -2240,7 +2240,6 @@ spa:
   Programmazione — ora inizio (HH:MM): Programación — hora de inicio (HH:MM)
   Programmazione — upload (KiB/s): Programación — carga (KiB/s)
   "Programmazione — per giorno": "Programación — por día"
-  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia.": "Una franja horaria y límites distintos para cada día de la semana; una franja que pasa la medianoche pertenece al día en que empieza."
   "un giorno «Limite» ha i suoi valori (0 = illimitato); «Auto» lascia misurare la linea all'auto-tune; una fascia oltre la mezzanotte appartiene al giorno in cui inizia": "un día «Límite» tiene sus propios valores (0 = ilimitado); «Auto» deja la línea al auto-tune; una franja pasada la medianoche pertenece al día en que empieza"
   "ogni giorno attivo vuole un orario di inizio e uno di fine diversi": "cada día activo necesita horas de inicio y de fin distintas"
   "Inizio": "Inicio"
@@ -5126,8 +5125,7 @@ spa:
   "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Velocidad de descarga máxima observada %d KiB/s: límite al 80%% → %d KiB/s."
   "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Velocidad de subida máxima observada %d KiB/s: límite al 80%% → %d KiB/s."
   "Auto": "Auto"
-  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. Con «Auto» la fascia lascia la banda all'auto-tune (nessun limite), così la linea viene misurata in quelle ore; fuori fascia valgono i tuoi limiti.": "Franja horaria y límites por día de la semana; una franja pasada la medianoche pertenece al día en que empieza. Con «Auto» la franja deja el ancho de banda al auto-tune (sin límite), así la línea se mide en esas horas; fuera de la franja aplican tus límites."
-  "Fascia oraria e limiti diversi per ogni giorno della settimana; una fascia oltre la mezzanotte appartiene al giorno in cui inizia. «Modalità» decide cosa fa il giorno: «Non attiva» non applica nulla, «Limite» usa i tuoi valori di download e upload, «Auto» toglie il limite e lascia che l'auto-tune misuri la linea. Fuori da quelle fasce valgono i tuoi limiti globali.": "Una franja horaria y límites distintos para cada día de la semana; una franja pasada la medianoche pertenece al día en que empieza. «Modo» decide qué hace el día: «Inactiva» no aplica nada, «Límite» usa tus valores de descarga y subida, «Auto» quita el límite y deja que el auto-tune mida la línea. Fuera de esas franjas se aplican tus límites globales."
+  "Una fascia e limiti per ogni giorno; «Modalità» sceglie «Non attiva», «Limite» o «Auto». Oltre la mezzanotte conta il giorno di inizio.": "Una franja y límites para cada día; «Modo» elige «Inactiva», «Límite» o «Auto». Una franja pasada la medianoche cuenta el día en que empieza."
   "Accende la fascia oraria di questo giorno.": "Enciende la franja horaria de este día."
   "Accende la fascia e le toglie il limite: la banda va all'auto-tune.": "Enciende la franja y le quita el límite: el ancho de banda va al auto-tune."
   "Modalità": "Modo"
