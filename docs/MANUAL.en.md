@@ -438,6 +438,35 @@ seeding limits. A torrent set to **seed forever** (ratio 0 or days 0) is never
 removed, not even when paused or already archived. Removing a torrent from the
 session does not necessarily remove the file from the library.
 
+### Seeding limits: per-source rules and idle seeds
+
+Gextto decides when a torrent stops seeding, in the same way for gx-torrent and
+for qBittorrent. For each limit (ratio, time, inactivity) the first level that
+sets it wins:
+
+1. the **torrent's** own limit (detail view: ratio and seed days);
+2. the first **seed rule** that matches the torrent (*Configuration → Seeding
+   and completion → Seed rules*);
+3. the **global** limit on the same tab.
+
+A rule names a **source** (the indexer the release came from, as shown in the
+download list: part of the name is enough, case-insensitive, so `mircrew` also
+matches `mircrew indexerr`) and/or a **category** (TV series, Movies, Comics,
+Other). It is the equivalent of qBittorrent 5.2's per-category limits, plus the
+source: a private tracker's rules follow the tracker, not the kind of content.
+In a rule an empty field uses the global limit and 0 removes the limit (the
+torrent keeps seeding even where the global limit would stop it). A torrent that
+came from Jackett's aggregate search (source `jackett` with no indexer name)
+does not carry the tracker's name: the category or the global limit applies.
+
+**Stop an idle seed after** stops a seeding torrent that has sent no data for
+that many minutes, like qBittorrent's inactive seeding limit. Only time spent
+actively seeding counts: a queued or paused torrent is not stopped for being
+idle, and the count restarts when Gextto restarts (a restart can only make a
+seed longer, never shorter). The end of the seed is followed by what follows the
+other limits: archiving into the library and, when enabled, removal. A torrent
+set to seed forever is never stopped for inactivity.
+
 ### Completion of files and folders
 
 The outcome depends on the torrent shape and on whether a **Library/NAS**
@@ -1683,6 +1712,13 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Global seed ratio | Upload/download ratio after which to stop seeding (0 = infinite). *(0 = infinite)* |
 | Maximum seeding | Primary seeding limit in days; when greater than 0 it takes precedence over the limit in minutes. *(Unit: days; 0 = use the limit in minutes)* |
 | Maximum seeding (fallback) | Seeding limit in minutes, used only when Maximum seed (days) is 0. *(Unit: minutes)* |
+| Stop an idle seed after | Stops a seeding torrent that has sent no data for this many minutes (only time spent actively seeding counts). Like the other limits, the end of the seed is followed by archiving or removal. *(Unit: minutes; 0 = off)* |
+
+**Editor**
+
+| Setting | What it does |
+|---|---|
+| Seed rules | Seeding limits (ratio, days, inactivity) by source/indexer and category; the first matching rule applies, an empty field uses the global limit, 0 removes the limit. |
 
 **When a download completes**
 

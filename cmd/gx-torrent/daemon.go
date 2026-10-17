@@ -224,6 +224,11 @@ type runtimeInfo struct {
 	tracker     string
 	// diskWait is set while the disk guard keeps this download paused.
 	diskWait bool
+	// seedUpload and seedIdleSince time the seeding inactivity
+	// (seedIdleReached): the uploaded bytes last seen and since when they
+	// have not grown.
+	seedUpload    int64
+	seedIdleSince time.Time
 }
 
 // Daemon owns the engine session and the queue.
@@ -1047,10 +1052,19 @@ func (d *Daemon) tick(now time.Time) {
 		// known and again on completion.
 		d.maybeExport(t, meta, stats, complete)
 		// Global seeding limits: pause (or remove) a seeding torrent that
-		// reached the configured share ratio or seeding time.
+		// reached the configured share ratio, seeding time or inactivity.
 		if complete && running {
-			if remove, reached := d.seedLimitReached(meta, stats); reached {
-				logf("%s reached the seeding limit", stats.Name)
+			remove, reached := d.seedLimitReached(meta, stats)
+			idle := !reached && d.seedIdleReached(rt, meta, stats, now)
+			if idle {
+				remove, reached = d.settingInt(maxRatioActKey, 0) == 1, true
+			}
+			if reached {
+				if idle {
+					logf("%s uploaded nothing for the inactive seeding time", stats.Name)
+				} else {
+					logf("%s reached the seeding limit", stats.Name)
+				}
 				if remove {
 					pendingRemovals = append(pendingRemovals, id)
 				} else {

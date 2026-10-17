@@ -4556,3 +4556,15 @@ eng:
   "Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi": "Mark the shown warnings as read; they come back only if the download produces new ones"
   "Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.": "Nothing to check: no stuck download, no pending move and no warning."
   "Download fermi, spostamenti in sospeso e avvisi": "Stuck downloads, pending moves and warnings"
+
+  # Seed rules and the inactivity limit
+  "Ferma il seed inattivo dopo": "Stop an idle seed after"
+  "Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione.": "Stops a seeding torrent that has sent no data for this many minutes (only time spent actively seeding counts). Like the other limits, the end of the seed is followed by archiving or removal."
+  "Regole di seed": "Seed rules"
+  "Limiti di seed per sorgente (indexer) e categoria, come i limiti per categoria di qBittorrent: vale la prima regola che corrisponde. Un campo vuoto usa il limite globale, 0 toglie il limite.": "Seeding limits by source (indexer) and category, like qBittorrent's per-category limits: the first matching rule applies. An empty field uses the global limit, 0 removes the limit."
+  "Giorni di seed": "Seed days"
+  "Inattivo per (minuti)": "Idle for (minutes)"
+  "Tutte": "All"
+  "es. mircrew (vuoto = tutte)": "e.g. mircrew (empty = all)"
+  "vuoto = globale": "empty = global"
+  "0 = disattivato": "0 = off"

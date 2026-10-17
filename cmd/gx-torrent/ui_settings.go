@@ -186,6 +186,10 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	if v, err := strconv.Atoi(strings.TrimSpace(r.FormValue("max-seeding-time"))); err == nil && v >= 0 {
 		store.Set(maxSeedingTimeKey, strconv.Itoa(v))
 	}
+	store.Set(maxInactiveSeedingTimeEnabledKey, strconv.FormatBool(formBool(r, "max-inactive-seeding-time-enabled")))
+	if v, err := strconv.Atoi(strings.TrimSpace(r.FormValue("max-inactive-seeding-time"))); err == nil && v >= 0 {
+		store.Set(maxInactiveSeedingTimeKey, strconv.Itoa(v))
+	}
 
 	// Alternative limits and the manual toggle (settings.json, applied at once).
 	altDL, altUL, _ := d.altSpeedSettings()
@@ -487,6 +491,8 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{MAX_RATIO_REMOVE}}", checkedIf(d.settingInt(maxRatioActKey, 0) == 1))
 	repl("{{MAX_TIME_ON}}", checkedIf(boolSetting(maxSeedingTimeEnabledKey)))
 	repl("{{MAX_TIME}}", strconv.Itoa(d.settingInt(maxSeedingTimeKey, -1)))
+	repl("{{MAX_IDLE_ON}}", checkedIf(boolSetting(maxInactiveSeedingTimeEnabledKey)))
+	repl("{{MAX_IDLE}}", strconv.Itoa(d.settingInt(maxInactiveSeedingTimeKey, -1)))
 	repl("{{WATCH_FOLDERS}}", get("watch-folders"))
 	repl("{{COOKIES}}", html.EscapeString(d.cookiesPretty()))
 	repl("{{ALT_WEBUI_ON}}", checkedIf(d.altWebUIEnabled()))

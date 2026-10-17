@@ -24,6 +24,7 @@ var uiSettingTooltipText = map[string]string{
 	"torrent_seed_ratio":                   "Rapporto upload/download dopo cui fermare il seeding (0 = infinito).",
 	"torrent_seed_time":                    "Limite di seeding in minuti, usato solo se Seed massimo (giorni) è 0.",
 	"torrent_seed_time_days":               "Limite principale di seeding in giorni; se maggiore di 0 prevale sul limite in minuti.",
+	"torrent_seed_idle_minutes":            "Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione.",
 	"auto_remove_completed":                "Attivo: a fine seed il torrent completato viene tolto dalla sessione (come «Pulisci completati»). Spento: a fine seed il torrent resta nell'elenco come Completato e lo rimuovi tu con «Pulisci completati». Non influisce su dove vengono spostati i file.",
 	"torrent_max_connections_per_torrent":  "Limite di connessioni per singolo torrent (-1 = illimitato).",
 	"autotune_adaptive":                    "Ritocca nel tempo i valori scelti dal sistema (per esempio lo spazio libero minimo) quando cambiano le condizioni. Non tocca mai i valori impostati a mano; spegnilo per avere valori fissi.",

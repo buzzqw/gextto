@@ -1911,7 +1911,10 @@ For diagnosis (`dead_swarm`, `no_connected_seed`, ...):
 The per-torrent limits (`SetLimits` with ratio and days) are saved by the
 daemon and reported in the list (`-1` = global, `0` = infinite). Gextto's
 `EnforceSeedPolicy` applies them, as for the other engines: pause at the end of seeding,
-then move or remove.
+then move or remove. Gextto resolves each limit from the torrent, then the first
+**seed rule** matching its source (indexer) and category, then the global
+settings, and adds an **inactivity** limit (no upload for N minutes while
+seeding); all of it lives in `seed_rules.go`, so it is the same with either engine.
 
 In **standalone** the daemon also enforces the **global** seeding limits
 (Settings, *Seeding limits*): a seeding torrent whose per-torrent limit is
@@ -1919,7 +1922,13 @@ In **standalone** the daemon also enforces the **global** seeding limits
 pausing*) when it reaches the configured share ratio (`max-ratio`) or seeding
 time (`max-seeding-time`, in minutes). A per-torrent limit always wins over the
 global one, and `0` means infinite. These are the qBittorrent `max_ratio` /
-`max_seeding_time` preferences.
+`max_seeding_time` preferences. The **inactive seeding** limit
+(`max-inactive-seeding-time-enabled` / `max-inactive-seeding-time`, qBittorrent
+`max_inactive_seeding_time_enabled` / `max_inactive_seeding_time`, minutes)
+stops a seed whose uploaded bytes have not grown for that long while it was
+seeding: the clock runs only in the seeding state and restarts with the daemon,
+a torrent set to seed forever is exempt, and the action is the same pause or
+removal as the other limits.
 
 ## Super-seeding (BEP 16)
 

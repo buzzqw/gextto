@@ -750,6 +750,7 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 	aux, _ := s.db.TorrentAuxBulk(hashes)
 	comicsDone := s.comics.CompletedTorrents(hashes)
 	rows := make([]uiTorrentRow, 0, len(views))
+	policy := newSeedPolicy(cfg, s.db)
 	for _, view := range views {
 		progress := view.Progress
 		if progress < 0 {
@@ -807,8 +808,7 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			}
 		}
 		if view.State == "seeding" || view.State == "finished" {
-			ratio, timeLimit := seedLimitsForTorrent(cfg, view.SeedRatio, view.SeedDays)
-			row.SeedInfinite = ratio == nil && timeLimit == nil
+			row.SeedInfinite = policy.limitsFor(&view).none()
 		}
 		rows = append(rows, row)
 	}

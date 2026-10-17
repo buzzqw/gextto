@@ -387,7 +387,8 @@ contract with Gextto). The per-capability state lives in `capabilityLevels`
 (`torrent_engine.go`), the single source of truth for the UI: an operation a backend
 does not have is refused with `ErrCapabilityUnavailable`.
 
-Around every engine Gextto provides queue/slots, stalled/retry, seed policy, RSS,
+Around every engine Gextto provides queue/slots, stalled/retry, seed policy (ratio,
+time and inactivity, resolved torrent → seed rule by source/category → global), RSS,
 search, categories/tags, the bandwidth scheduler, post-processing, moves and the RAM
 disk, the IP filter and the proxy: **those are not engine gaps**, and limits follow
 the libtorrent semantics (**−1 = inherit the global one, 0 = unlimited**).

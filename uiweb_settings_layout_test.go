@@ -46,8 +46,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 	if got := len(uiSettingsKeysBeforeReorganization); got != 133 {
 		t.Fatalf("frozen list has %d keys, want 133", got)
 	}
-	if got := len(uiSettingsIndex); got != 149 {
-		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default, the 4 DLNA media server options, the update check interval, the per-day speed schedule, the adaptive tuning switch, the automatic speed policy and its latency guard (switch and target), minus cleanup_min_score_diff (folded into upgrade_min_score_diff)", got)
+	if got := len(uiSettingsIndex); got != 150 {
+		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default, the 4 DLNA media server options, the update check interval, the per-day speed schedule, the adaptive tuning switch, the automatic speed policy and its latency guard (switch and target), the idle-seed limit, minus cleanup_min_score_diff (folded into upgrade_min_score_diff)", got)
 	}
 	if got := len(uiScoreSettingDefs); got != 27 {
 		t.Fatalf("score weights = %d, want 27", got)
@@ -86,8 +86,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		}
 		found++
 	}
-	if found != 176 {
-		t.Fatalf("rendered %d options, want 176", found)
+	if found != 177 {
+		t.Fatalf("rendered %d options, want 177", found)
 	}
 
 	// Editors, panels and actions without a single key.
@@ -99,6 +99,7 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		"performance": {"Ottimizza"},
 		"rename":      {"Composizione del nome", "Regole tag → cartella"},
 		"notify":      {"Hook eventi"},
+		"seeding":     {"Regole di seed"},
 		"system":      {"v2-i18n-table", "Esporta YAML", "Importa YAML"},
 	} {
 		body := render(tab)

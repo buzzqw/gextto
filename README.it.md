@@ -143,6 +143,10 @@ Cosa gira a ogni push (`make test`, `make test-ui`, `make fuzz-smoke` e CI):
   riprende la linea quando gli altri hanno finito. I contatori UPnP del router,
   quando ci sono, dicono chi altro usa la linea; la pagina Download mostra il
   guardiano mentre agisce.
+- **Seed che segue il tracker**: limiti di ratio, tempo e **inattività** (un seed
+  che non invia nulla per N minuti si ferma) e **regole di seed** per
+  sorgente/indexer e categoria: le regole di un tracker privato valgono solo per
+  i suoi torrent, con lo stesso comportamento su gx-torrent e qBittorrent.
 
 ### Integrazioni, controllo e interfacce
 

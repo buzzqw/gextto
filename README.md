@@ -142,6 +142,10 @@ What runs on every push (`make test`, `make test-ui`, `make fuzz-smoke` and CI):
   it keeps the line. Someone else's: it yields step by step and takes the line
   back when they are done. The router's UPnP counters, when present, tell who
   else is on the line; the Downloads page shows the guard while it acts.
+- **Seeding that follows the tracker**: ratio, time and **inactivity** limits
+  (a seed that uploads nothing for N minutes stops), and **seed rules** by
+  source/indexer and category — a private tracker's rules apply to its torrents
+  only, with the same behaviour on gx-torrent and qBittorrent.
 
 ### Integrations, control and interfaces
 

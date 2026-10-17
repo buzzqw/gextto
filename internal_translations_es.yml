@@ -5166,3 +5166,15 @@ spa:
   "Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi": "Marcar como leídos los avisos mostrados; vuelven solo si la descarga genera nuevos"
   "Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.": "Nada que revisar: ninguna descarga atascada, ningún movimiento pendiente y ningún aviso."
   "Download fermi, spostamenti in sospeso e avvisi": "Descargas atascadas, movimientos pendientes y avisos"
+
+  # Seed rules and the inactivity limit
+  "Ferma il seed inattivo dopo": "Detener la compartición inactiva tras"
+  "Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione.": "Detiene un torrent en compartición que no ha enviado datos durante estos minutos (solo cuenta el tiempo compartiendo activamente). Como con los demás límites, al final de la compartición sigue el archivado o la eliminación."
+  "Regole di seed": "Reglas de compartición"
+  "Limiti di seed per sorgente (indexer) e categoria, come i limiti per categoria di qBittorrent: vale la prima regola che corrisponde. Un campo vuoto usa il limite globale, 0 toglie il limite.": "Límites de compartición por fuente (indexador) y categoría, como los límites por categoría de qBittorrent: se aplica la primera regla que coincide. Un campo vacío usa el límite global, 0 quita el límite."
+  "Giorni di seed": "Días de compartición"
+  "Inattivo per (minuti)": "Inactivo durante (minutos)"
+  "Tutte": "Todas"
+  "es. mircrew (vuoto = tutte)": "p. ej. mircrew (vacío = todas)"
+  "vuoto = globale": "vacío = global"
+  "0 = disattivato": "0 = desactivado"

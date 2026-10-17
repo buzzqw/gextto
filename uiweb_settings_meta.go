@@ -95,6 +95,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"torrent_seed_ratio":            {Zero: "0 = infinito"},
 	"torrent_seed_time_days":        {Unit: "giorni", Zero: "0 = usa il limite in minuti"},
 	"torrent_seed_time":             {Unit: "minuti"},
+	"torrent_seed_idle_minutes":     {Unit: "minuti", Zero: "0 = disattivato"},
 	"torrent_stall_after_min":       {Unit: "minuti"},
 	"torrent_stall_retry_min":       {Unit: "minuti"},
 	"torrent_stall_giveup_min":      {Unit: "minuti", Zero: "0 = mai"},

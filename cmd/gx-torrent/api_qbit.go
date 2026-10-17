@@ -1184,6 +1184,8 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		"max_ratio_act":                     d.settingInt(maxRatioActKey, 0),
 		"max_seeding_time_enabled":          d.settingBool(maxSeedingTimeEnabledKey, false),
 		"max_seeding_time":                  d.settingInt(maxSeedingTimeKey, -1),
+		"max_inactive_seeding_time_enabled": d.settingBool(maxInactiveSeedingTimeEnabledKey, false),
+		"max_inactive_seeding_time":         d.settingInt(maxInactiveSeedingTimeKey, -1),
 		"auto_tmm_enabled":                  d.settingBool(autoTMMEnabledKey, false),
 		"torrent_changed_tmm_enabled":       true,
 		"category_changed_tmm_enabled":      true,
@@ -1529,6 +1531,7 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 		for _, b := range []struct{ pref, key string }{
 			{"max_ratio_enabled", maxRatioEnabledKey},
 			{"max_seeding_time_enabled", maxSeedingTimeEnabledKey},
+			{"max_inactive_seeding_time_enabled", maxInactiveSeedingTimeEnabledKey},
 		} {
 			v, ok := prefs[b.pref]
 			if !ok {
@@ -1554,10 +1557,17 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 				changed = true
 			}
 		}
-		if v, ok := prefs["max_seeding_time"]; ok {
+		for _, m := range []struct{ pref, key string }{
+			{"max_seeding_time", maxSeedingTimeKey},
+			{"max_inactive_seeding_time", maxInactiveSeedingTimeKey},
+		} {
+			v, ok := prefs[m.pref]
+			if !ok {
+				continue
+			}
 			var minutes int
 			if json.Unmarshal(v, &minutes) == nil {
-				d.opts.Settings.Set(maxSeedingTimeKey, strconv.Itoa(minutes))
+				d.opts.Settings.Set(m.key, strconv.Itoa(minutes))
 				changed = true
 			}
 		}

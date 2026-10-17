@@ -10,6 +10,7 @@ package main
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
@@ -20,6 +21,10 @@ const (
 	maxRatioActKey           = "max-ratio-act"
 	maxSeedingTimeEnabledKey = "max-seeding-time-enabled"
 	maxSeedingTimeKey        = "max-seeding-time"
+	// The inactivity limit (qBittorrent max_inactive_seeding_time): a seed
+	// that uploaded nothing for that many minutes while seeding stops.
+	maxInactiveSeedingTimeEnabledKey = "max-inactive-seeding-time-enabled"
+	maxInactiveSeedingTimeKey        = "max-inactive-seeding-time"
 	// autoTMMEnabledKey is the global default for qBittorrent automatic torrent
 	// management (the per-torrent flag is what actually drives a relocation).
 	autoTMMEnabledKey = "auto-tmm-enabled"
@@ -81,4 +86,27 @@ func (d *Daemon) seedLimitReached(meta *torrentMeta, stats torrent.Stats) (remov
 		return remove, true
 	}
 	return false, false
+}
+
+// seedIdleReached reports a seed that uploaded nothing for the global inactive
+// seeding time, and records the observation in rt. The clock runs only while
+// the torrent is seeding, so a queued or paused seed is never stopped for being
+// idle; a torrent set to seed forever (ratio or days 0) is never stopped either.
+// The stop action is the one of the other limits (pause, or remove with
+// max-ratio-act=1), like qBittorrent's single share-limit action.
+func (d *Daemon) seedIdleReached(rt *runtimeInfo, meta *torrentMeta, stats torrent.Stats, now time.Time) bool {
+	if stats.Status != torrent.Seeding {
+		rt.seedIdleSince = time.Time{}
+		return false
+	}
+	if rt.seedIdleSince.IsZero() || stats.Bytes.Uploaded != rt.seedUpload {
+		rt.seedUpload = stats.Bytes.Uploaded
+		rt.seedIdleSince = now
+		return false
+	}
+	if meta.SeedRatio == 0 || meta.SeedDays == 0 || !d.settingBool(maxInactiveSeedingTimeEnabledKey, false) {
+		return false
+	}
+	minutes := d.settingInt(maxInactiveSeedingTimeKey, -1)
+	return minutes > 0 && now.Sub(rt.seedIdleSince) >= time.Duration(minutes)*time.Minute
 }

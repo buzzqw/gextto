@@ -186,6 +186,8 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   </div>
   <label class="chk"><input type="checkbox" name="max-seeding-time-enabled" value="1"{{MAX_TIME_ON}} title="Stop seeding a torrent after the time below, unless the torrent has its own limit"> Enable the seeding-time limit</label>
   <label>Seeding time (minutes)<input type="number" min="-1" name="max-seeding-time" value="{{MAX_TIME}}" title="Global seeding time in minutes (0 = never stop)"></label>
+  <label class="chk"><input type="checkbox" name="max-inactive-seeding-time-enabled" value="1"{{MAX_IDLE_ON}} title="Stop seeding a torrent that uploaded nothing for the time below while seeding, unless the torrent is set to seed forever"> Enable the inactive-seeding limit</label>
+  <label>Inactive seeding time (minutes)<input type="number" min="-1" name="max-inactive-seeding-time" value="{{MAX_IDLE}}" title="Minutes without any upload while seeding before the torrent stops (only time spent seeding counts; 0 = never stop)"></label>
 </fieldset>
 <fieldset>
   <legend>Latency auto-speed</legend>

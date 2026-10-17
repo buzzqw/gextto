@@ -164,6 +164,11 @@ func validateSettingValue(key, value string, cfg *Config) error {
 	if err := validateNumericSetting(key, value); err != nil {
 		return err
 	}
+	if key == seedRulesKey {
+		if err := validateSeedRulesSetting(value); err != nil {
+			return err
+		}
+	}
 	if key == latencyGuardTargetKey {
 		if err := validateLatencyTarget(value); err != nil {
 			return err
@@ -209,7 +214,7 @@ func validateNumericSetting(key, value string) error {
 		}
 	case key == "upgrade_min_score_diff", key == "cleanup_min_score_diff",
 		key == "upgrade_until_score", key == "stall_alternative_after_min",
-		key == "stall_alternative_score_drop":
+		key == "stall_alternative_score_drop", key == "torrent_seed_idle_minutes":
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || parsed < 0 {
 			return fmt.Errorf("%s must be zero or a positive integer", key)

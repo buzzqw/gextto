@@ -5160,3 +5160,15 @@ pol:
   "Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi": "Oznacz wyświetlone ostrzeżenia jako przeczytane; wrócą tylko, gdy pobieranie wygeneruje nowe"
   "Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.": "Nic do sprawdzenia: brak zablokowanych pobrań, brak oczekujących przeniesień i brak ostrzeżeń."
   "Download fermi, spostamenti in sospeso e avvisi": "Zablokowane pobrania, oczekujące przeniesienia i ostrzeżenia"
+
+  # Seed rules and the inactivity limit
+  "Ferma il seed inattivo dopo": "Zatrzymaj nieaktywne seedowanie po"
+  "Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione.": "Zatrzymuje seedowany torrent, który nie wysłał danych przez tyle minut (liczy się tylko czas aktywnego seedowania). Jak przy innych limitach, po zakończeniu seedowania następuje archiwizacja lub usunięcie."
+  "Regole di seed": "Reguły seedowania"
+  "Limiti di seed per sorgente (indexer) e categoria, come i limiti per categoria di qBittorrent: vale la prima regola che corrisponde. Un campo vuoto usa il limite globale, 0 toglie il limite.": "Limity seedowania według źródła (indeksera) i kategorii, jak limity kategorii w qBittorrent: obowiązuje pierwsza pasująca reguła. Puste pole używa limitu globalnego, 0 usuwa limit."
+  "Giorni di seed": "Dni seedowania"
+  "Inattivo per (minuti)": "Nieaktywny przez (minuty)"
+  "Tutte": "Wszystkie"
+  "es. mircrew (vuoto = tutte)": "np. mircrew (puste = wszystkie)"
+  "vuoto = globale": "puste = globalny"
+  "0 = disattivato": "0 = wyłączone"

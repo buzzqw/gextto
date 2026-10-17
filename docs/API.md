@@ -192,6 +192,8 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/search/add` | add a search result |
 | POST | `/api/search/archive` | search the archive |
 | POST | `/api/search/explain` | explain a release decision |
+| GET | `/api/seed-rules` | seed rules: per-source/category seeding limits |
+| POST | `/api/seed-rules` | save the seed rules (list of name, source, category, ratio, seed_days, idle_minutes; null = global, 0 = no limit) |
 | POST | `/api/send-magnet` | send a magnet to the engine |
 | GET | `/api/series` | list series |
 | GET | `/api/series/all-missing` | missing episodes (alias of gaps) |

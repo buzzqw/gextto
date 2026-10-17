@@ -1057,7 +1057,8 @@ func tev_needsInfiniteSeedResume(torrent *models.TorrentView) bool {
 // import the file immediately instead.
 func tev_seedsForever(cfg *Config, torrents TorrentSession, hash string) bool {
 	globalSet := cfg != nil && (cfg.Transfer.SeedRatio > 0.0 ||
-		cfg.Transfer.SeedTimeDays > 0 || cfg.Transfer.SeedTimeMinutes > 0)
+		cfg.Transfer.SeedTimeDays > 0 || cfg.Transfer.SeedTimeMinutes > 0 ||
+		cfg.Transfer.SeedIdleMinutes > 0)
 	for _, torrent := range torrents.List() {
 		if !strings.EqualFold(torrent.Hash, hash) {
 			continue
@@ -1068,6 +1069,20 @@ func tev_seedsForever(cfg *Config, torrents TorrentSession, hash string) bool {
 		return !globalSet
 	}
 	return !globalSet
+}
+
+// tev_seedsForeverByPolicy is tev_seedsForever with the seed rules: a torrent
+// whose origin matches a rule with a limit does not seed forever even when no
+// global limit is set.
+func tev_seedsForeverByPolicy(cfg *Config, db *Database, torrents TorrentSession, hash string) bool {
+	view := models.TorrentView{Hash: hash, SeedRatio: -1, SeedDays: -1}
+	for _, torrent := range torrents.List() {
+		if strings.EqualFold(torrent.Hash, hash) {
+			view = torrent
+			break
+		}
+	}
+	return newSeedPolicy(cfg, db).limitsFor(&view).none()
 }
 
 // tev_effectiveDownloadForRatio implements `effective_download_for_ratio`.
@@ -1192,6 +1207,7 @@ func tev_completedSourceDisposable(db *Database, hash, savePath string) bool {
 
 // RemoveSeededCompleted implements `remove_seeded_completed`.
 func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, postSeedMoves map[string]struct{}) {
+	policy := newSeedPolicy(cfg, db)
 	for _, torrent := range torrents.List() {
 		if _, ok := postSeedMoves[torrent.Hash]; ok {
 			continue
@@ -1203,7 +1219,11 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 		// The seed limits come from the session view alone: a torrent that has
 		// reached none of them and is not paused is skipped by the check below
 		// whatever the database says, so it costs no query at every tick.
-		ratioReached, timeReached := tev_seedLimitsReached(cfg, &torrent)
+		limits := policy.limitsFor(&torrent)
+		ratioReached, timeReached := limits.ratioReached(&torrent), limits.timeReached(&torrent)
+		// A seed stopped for inactivity ended its seed like one that reached
+		// its time limit.
+		timeReached = timeReached || (limits.IdleSeconds != nil && seedIdle.reached(torrent.Hash))
 		if !ratioReached && !timeReached && torrent.State != "paused" {
 			continue
 		}
@@ -1885,23 +1905,9 @@ func ReconcileRamdisk(cfg *Config, torrents TorrentSession, attempts map[string]
 
 // EnforceSeedPolicy implements `enforce_seed_policy`.
 func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, seedCopyWarnings map[string]time.Time) {
-	ratioLimit := 0.0
-	ratioLimitSet := false
-	if cfg.Transfer.SeedRatio > 0.0 {
-		ratioLimit = cfg.Transfer.SeedRatio
-		ratioLimitSet = true
-	}
-	// legacy semantics: days is the authoritative long-duration setting;
-	// minutes remains as a backward-compatible fallback for sub-day limits.
-	timeLimit := int64(0)
-	timeLimitSet := false
-	if cfg.Transfer.SeedTimeDays > 0 {
-		timeLimit = tev_saturatingMulInt64(cfg.Transfer.SeedTimeDays, 86_400)
-		timeLimitSet = true
-	} else if cfg.Transfer.SeedTimeMinutes > 0 {
-		timeLimit = tev_saturatingMulInt64(cfg.Transfer.SeedTimeMinutes, 60)
-		timeLimitSet = true
-	}
+	policy := newSeedPolicy(cfg, db)
+	now := time.Now()
+	defer seedIdle.sweep()
 	// An infinite-seed override means the torrent must keep seeding: if a
 	// previous seed limit left it paused after completion, resume it.
 	for _, torrent := range torrents.List() {
@@ -1927,36 +1933,14 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 		if !eligible {
 			continue
 		}
-		hasOverride := torrent.SeedRatio >= 0.0 || torrent.SeedDays >= 0
-		// legacy treats either explicit zero as an infinite per-torrent seed rule.
-		if hasOverride && (torrent.SeedRatio == 0.0 || torrent.SeedDays == 0) {
+		limits := policy.limitsFor(&torrent)
+		if limits.none() {
 			continue
 		}
-		torrentRatioLimit := 0.0
-		torrentRatioLimitSet := false
-		if torrent.SeedRatio > 0.0 {
-			torrentRatioLimit = torrent.SeedRatio
-			torrentRatioLimitSet = true
-		} else if torrent.SeedRatio < 0.0 {
-			torrentRatioLimit = ratioLimit
-			torrentRatioLimitSet = ratioLimitSet
-		}
-		torrentTimeLimit := int64(0)
-		torrentTimeLimitSet := false
-		if torrent.SeedDays > 0 {
-			torrentTimeLimit = tev_saturatingMulInt64(torrent.SeedDays, 86_400)
-			torrentTimeLimitSet = true
-		} else if torrent.SeedDays < 0 {
-			torrentTimeLimit = timeLimit
-			torrentTimeLimitSet = timeLimitSet
-		}
-		ratioReached := false
-		if torrentRatioLimitSet {
-			download := tev_effectiveDownloadForRatio(&torrent)
-			ratioReached = download > 0.0 && (float64(torrent.AllTimeUpload)/download) >= torrentRatioLimit
-		}
-		timeReached := torrentTimeLimitSet && torrent.SeedingSeconds >= torrentTimeLimit
-		if !ratioReached && !timeReached {
+		ratioReached := limits.ratioReached(&torrent)
+		timeReached := limits.timeReached(&torrent)
+		idleReached := limits.idleReached(&torrent, now)
+		if !ratioReached && !timeReached && !idleReached {
 			continue
 		}
 		stopped := torrent.State == "paused" && !torrent.AutoManaged
@@ -1978,10 +1962,17 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 			} else if value {
 				stopped = true
 				reason := "seed time reached"
-				if ratioReached && timeReached {
+				switch {
+				case ratioReached && timeReached:
 					reason = "ratio and time reached"
-				} else if ratioReached {
+				case ratioReached:
 					reason = "ratio reached"
+				case !timeReached && idleReached:
+					reason = "no upload while seeding"
+					seedIdle.markReached(torrent.Hash)
+				}
+				if limits.Rule != "" {
+					reason += " (rule «" + limits.Rule + "»)"
 				}
 				seedReason = reason
 			} else {
@@ -2828,7 +2819,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 					logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
 					return true, nil
 				}
-				if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) || tev_seedsForever(cfg, torrents, event.Hash) {
+				if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) || tev_seedsForeverByPolicy(cfg, db, torrents, event.Hash) {
 					// Folder episodes, single files in copy mode, and any torrent
 					// configured to seed forever are imported by copying the video
 					// while the source stays in the download folder for seeding.

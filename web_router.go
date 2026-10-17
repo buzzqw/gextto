@@ -53,6 +53,8 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/config/source-filters", SaveSourceFilters)
 	handle(s, mux, "GET /api/tag-dir-rules", TagDirRules)
 	handle(s, mux, "POST /api/tag-dir-rules", SaveTagDirRules)
+	handle(s, mux, "GET /api/seed-rules", SeedRulesView)
+	handle(s, mux, "POST /api/seed-rules", SaveSeedRules)
 	handle(s, mux, "GET /api/event-hooks", EventHooksView)
 	handle(s, mux, "POST /api/event-hooks", SaveEventHooks)
 	handle(s, mux, "GET /api/providers/status", ProvidersStatusView)

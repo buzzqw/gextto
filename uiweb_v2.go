@@ -2311,6 +2311,8 @@ func v2ListEditorKey(editor uiListEditor) (string, bool) {
 		return "event_hooks", true
 	case "/api/watched-folders":
 		return "watched_folders", true
+	case "/api/seed-rules":
+		return "seed_rules", true
 	}
 	return "", false
 }

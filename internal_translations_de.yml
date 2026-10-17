@@ -5219,3 +5219,15 @@ deu:
   "Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi": "Die angezeigten Warnungen als gelesen markieren; sie erscheinen nur wieder, wenn der Download neue erzeugt"
   "Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.": "Nichts zu prüfen: kein hängender Download, kein ausstehender Verschiebevorgang und keine Warnung."
   "Download fermi, spostamenti in sospeso e avvisi": "Hängende Downloads, ausstehende Verschiebungen und Warnungen"
+
+  # Seed rules and the inactivity limit
+  "Ferma il seed inattivo dopo": "Inaktiven Seed stoppen nach"
+  "Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione.": "Stoppt einen seedenden Torrent, der seit so vielen Minuten keine Daten gesendet hat (es zählt nur die Zeit im aktiven Seeden). Wie bei den anderen Limits folgt am Ende des Seedens die Archivierung oder Entfernung."
+  "Regole di seed": "Seed-Regeln"
+  "Limiti di seed per sorgente (indexer) e categoria, come i limiti per categoria di qBittorrent: vale la prima regola che corrisponde. Un campo vuoto usa il limite globale, 0 toglie il limite.": "Seed-Limits nach Quelle (Indexer) und Kategorie, wie die Kategorie-Limits von qBittorrent: Es gilt die erste passende Regel. Ein leeres Feld nutzt das globale Limit, 0 hebt das Limit auf."
+  "Giorni di seed": "Seed-Tage"
+  "Inattivo per (minuti)": "Inaktiv seit (Minuten)"
+  "Tutte": "Alle"
+  "es. mircrew (vuoto = tutte)": "z. B. mircrew (leer = alle)"
+  "vuoto = globale": "leer = global"
+  "0 = disattivato": "0 = aus"

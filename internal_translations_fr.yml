@@ -5212,3 +5212,15 @@ fra:
   "Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi": "Marquer les avertissements affichés comme lus ; ils reviennent seulement si le téléchargement en produit de nouveaux"
   "Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.": "Rien à vérifier : aucun téléchargement bloqué, aucun déplacement en attente et aucun avertissement."
   "Download fermi, spostamenti in sospeso e avvisi": "Téléchargements bloqués, déplacements en attente et avertissements"
+
+  # Seed rules and the inactivity limit
+  "Ferma il seed inattivo dopo": "Arrêter le partage inactif après"
+  "Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione.": "Arrête un torrent en partage qui n'a envoyé aucune donnée depuis ce nombre de minutes (seul le temps de partage actif compte). Comme pour les autres limites, la fin du partage est suivie de l'archivage ou de la suppression."
+  "Regole di seed": "Règles de partage"
+  "Limiti di seed per sorgente (indexer) e categoria, come i limiti per categoria di qBittorrent: vale la prima regola che corrisponde. Un campo vuoto usa il limite globale, 0 toglie il limite.": "Limites de partage par source (indexeur) et catégorie, comme les limites par catégorie de qBittorrent : la première règle qui correspond s'applique. Un champ vide utilise la limite globale, 0 supprime la limite."
+  "Giorni di seed": "Jours de partage"
+  "Inattivo per (minuti)": "Inactif depuis (minutes)"
+  "Tutte": "Toutes"
+  "es. mircrew (vuoto = tutte)": "ex. mircrew (vide = toutes)"
+  "vuoto = globale": "vide = global"
+  "0 = disattivato": "0 = désactivé"

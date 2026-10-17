@@ -443,6 +443,36 @@ giorni 0) non viene mai rimosso, nemmeno se è in pausa o già archiviato. Un
 torrent rimosso dalla sessione non equivale necessariamente a un file rimosso
 dalla libreria.
 
+### Limiti di seed: regole per sorgente e seed inattivo
+
+Quando un torrent finisce il seed lo decide Gextto, con lo stesso criterio per
+gx-torrent e per qBittorrent. Per ogni limite (ratio, tempo, inattività) vale il
+primo livello che lo imposta:
+
+1. il limite del **torrent** (scheda di dettaglio: ratio e giorni di seed);
+2. la prima **regola di seed** che corrisponde al torrent (*Configurazione → Seed
+   e completamento → Regole di seed*);
+3. il limite **globale** della stessa scheda.
+
+Una regola indica una **sorgente** (l'indexer da cui è arrivata la release, come
+appare nell'elenco dei download: basta una parte del nome, senza distinguere
+maiuscole e minuscole, quindi `mircrew` vale anche per `mircrew indexerr`) e/o
+una **categoria** (Serie TV, Film, Fumetti, Altro). È l'equivalente dei limiti per
+categoria di qBittorrent 5.2, con in più la sorgente: le regole di un tracker
+privato seguono il tracker, non il tipo di contenuto. Nei campi della regola un
+valore vuoto usa il limite globale, 0 toglie il limite (il torrent resta in seed
+anche se il globale lo fermerebbe). Un torrent arrivato dalla ricerca aggregata
+di Jackett (sorgente `jackett` senza nome dell'indexer) non porta il nome del
+tracker: per lui valgono la categoria o il globale.
+
+**Ferma il seed inattivo dopo** ferma un torrent in seed che non invia dati da
+quei minuti, come il limite di inattività di qBittorrent. Conta solo il tempo in
+seed attivo: un torrent in coda o in pausa non viene fermato perché fermo, e il
+conteggio riparte a ogni riavvio di Gextto (un riavvio può solo allungare il seed,
+mai accorciarlo). A fine seed segue quello che segue gli altri limiti:
+archiviazione in libreria e, se attiva, rimozione. Un torrent impostato a seed
+infinito non viene mai fermato per inattività.
+
 ### Completamento di file e cartelle
 
 Il comportamento dipende dalla forma del torrent e dalla presenza di una
@@ -1734,6 +1764,13 @@ spazio del `tmpfs`, come prima.
 | Seed ratio globale | Rapporto upload/download dopo cui fermare il seeding (0 = infinito). *(0 = infinito)* |
 | Seed massimo | Limite principale di seeding in giorni; se maggiore di 0 prevale sul limite in minuti. *(Unità: giorni; 0 = usa il limite in minuti)* |
 | Seed massimo (fallback) | Limite di seeding in minuti, usato solo se Seed massimo (giorni) è 0. *(Unità: minuti)* |
+| Ferma il seed inattivo dopo | Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione. *(Unità: minuti; 0 = disattivato)* |
+
+**Editor**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Regole di seed | Limiti di seed (ratio, giorni, inattività) per sorgente/indexer e categoria; vale la prima regola che corrisponde, un campo vuoto usa il globale, 0 toglie il limite. |
 
 **A download completato**
 

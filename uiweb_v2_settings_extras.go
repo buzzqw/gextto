@@ -199,6 +199,8 @@ func v2ListEditorTab(key string) string {
 		return "rename"
 	case "event_hooks":
 		return "notify"
+	case "seed_rules":
+		return "seeding"
 	}
 	return "sources"
 }
@@ -223,6 +225,10 @@ func v2ListEditorByKey(key string) (uiListEditor, bool) {
 			}
 		case "/api/watched-folders":
 			if key == "watched_folders" {
+				return editor, true
+			}
+		case "/api/seed-rules":
+			if key == "seed_rules" {
 				return editor, true
 			}
 		}
@@ -310,6 +316,8 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		canonicalKey = "event_hooks"
 	case "watched_folders":
 		canonicalKey = "watched_folders"
+	case "seed_rules":
+		canonicalKey = "seed_rules"
 	default:
 		http.Error(w, "editor sconosciuto", http.StatusNotFound)
 		return
@@ -480,7 +488,17 @@ func v2FieldRawValue(fields []uiListField, name, value string) any {
 		case "bool":
 			return value == "true"
 		case "number":
-			if number, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
+			// An empty number is "not set" (null): a list whose records
+			// distinguish "inherit" from 0 (the seed rules) keeps the
+			// difference, and an int field decodes null as its zero value.
+			trimmed := strings.TrimSpace(value)
+			if trimmed == "" {
+				return nil
+			}
+			if number, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+				return number
+			}
+			if number, err := strconv.ParseFloat(strings.ReplaceAll(trimmed, ",", "."), 64); err == nil {
 				return number
 			}
 			return 0

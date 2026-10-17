@@ -187,17 +187,20 @@ type TransferSettings struct {
 	SeedRatio        float64 `json:"seed_ratio"`
 	SeedTimeMinutes  int64   `json:"seed_time_minutes"`
 	SeedTimeDays     int64   `json:"seed_time_days"`
-	ActiveDownloads  int64   `json:"active_downloads"`
-	ActiveSeeds      int64   `json:"active_seeds"`
-	ActiveLimit      int64   `json:"active_limit"`
-	Dht              bool    `json:"dht"`
-	Pex              bool    `json:"pex"`
-	Lsd              bool    `json:"lsd"`
-	Upnp             bool    `json:"upnp"`
-	Natpmp           bool    `json:"natpmp"`
-	DynamicQueue     bool    `json:"dynamic_queue"`
-	DynamicQueueMin  int64   `json:"dynamic_queue_min"`
-	DynamicQueueMax  int64   `json:"dynamic_queue_max"`
+	// SeedIdleMinutes stops a seed that uploaded nothing for that long while
+	// seeding (0 = off); see seed_rules.go.
+	SeedIdleMinutes int64 `json:"seed_idle_minutes"`
+	ActiveDownloads int64 `json:"active_downloads"`
+	ActiveSeeds     int64 `json:"active_seeds"`
+	ActiveLimit     int64 `json:"active_limit"`
+	Dht             bool  `json:"dht"`
+	Pex             bool  `json:"pex"`
+	Lsd             bool  `json:"lsd"`
+	Upnp            bool  `json:"upnp"`
+	Natpmp          bool  `json:"natpmp"`
+	DynamicQueue    bool  `json:"dynamic_queue"`
+	DynamicQueueMin int64 `json:"dynamic_queue_min"`
+	DynamicQueueMax int64 `json:"dynamic_queue_max"`
 	// Quando è true, i torrent che non trasferiscono payload non occupano uno
 	// slot attivo: evita che gli swarm senza peer blocchino i download sani.
 	DontCountSlowTorrents bool `json:"dont_count_slow_torrents"`
@@ -228,6 +231,7 @@ func DefaultTransferSettings() TransferSettings {
 		SeedRatio:             0.0,
 		SeedTimeMinutes:       0,
 		SeedTimeDays:          0,
+		SeedIdleMinutes:       0,
 		ActiveDownloads:       3,
 		ActiveSeeds:           3,
 		ActiveLimit:           5,
@@ -2365,6 +2369,7 @@ func (c *Config) applyTransferSettings() {
 		SeedRatio:             numberSettingFloat(c.Settings, "torrent_seed_ratio", 0.0),
 		SeedTimeMinutes:       numberSettingInt(c.Settings, "torrent_seed_time", 0),
 		SeedTimeDays:          numberSettingInt(c.Settings, "torrent_seed_time_days", 0),
+		SeedIdleMinutes:       numberSettingInt(c.Settings, "torrent_seed_idle_minutes", 0),
 		ActiveDownloads:       numberSettingInt(c.Settings, "torrent_active_downloads", 3),
 		ActiveSeeds:           numberSettingInt(c.Settings, "torrent_active_seeds", 3),
 		ActiveLimit:           numberSettingInt(c.Settings, "torrent_active_limit", 5),

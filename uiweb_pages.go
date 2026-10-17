@@ -390,6 +390,24 @@ var uiAdvancedEditors = []uiListEditor{
 		},
 	},
 	{
+		Title: "Regole di seed", Hint: "Limiti di seed per sorgente (indexer) e categoria, come i limiti per categoria di qBittorrent: vale la prima regola che corrisponde. Un campo vuoto usa il limite globale, 0 toglie il limite.",
+		GetPath: "/api/seed-rules", Unwrap: "items", PostPath: "/api/seed-rules",
+		Fields: []uiListField{
+			{Name: "name", Label: "Nome", Kind: "text"},
+			{Name: "source", Label: "Sorgente", Kind: "text", Placeholder: "es. mircrew (vuoto = tutte)"},
+			{Name: "category", Label: "Categoria", Kind: "select", Options: []uiListFieldOption{
+				{Value: "", Label: "Tutte"},
+				{Value: "series", Label: "Serie TV"},
+				{Value: "movie", Label: "Film"},
+				{Value: "comic", Label: "Fumetti"},
+				{Value: "other", Label: "Altro"},
+			}},
+			{Name: "ratio", Label: "Ratio", Kind: "number", Placeholder: "vuoto = globale"},
+			{Name: "seed_days", Label: "Giorni di seed", Kind: "number", Placeholder: "vuoto = globale"},
+			{Name: "idle_minutes", Label: "Inattivo per (minuti)", Kind: "number", Placeholder: "vuoto = globale"},
+		},
+	},
+	{
 		Title: "Cartelle osservate", Hint: "Aggiunge automaticamente i .torrent trovati in queste cartelle.",
 		GetPath: "/api/watched-folders", Unwrap: "items", PostPath: "/api/watched-folders",
 		Fields: []uiListField{
@@ -491,6 +509,7 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 	structured := map[string]struct{}{
 		"url": {}, "indexers": {}, "source_filters": {},
 		"tag_dir_rules": {}, "event_hooks": {}, "watched_folders": {},
+		seedRulesKey: {},
 		// Edited as checkbox groups (see uiSourcesCheckboxGroups).
 		"websearch_engines": {}, "content_filters": {},
 		// Edited by the rename-composition editor (see uiRenameEditor).
@@ -891,6 +910,7 @@ func uiSettingsTabEditors(tab string) []uiListEditor {
 		"sources": {"/api/config/source-filters", "/api/watched-folders"},
 		"rename":  {"/api/tag-dir-rules"},
 		"notify":  {"/api/event-hooks"},
+		"seeding": {"/api/seed-rules"},
 	}[tab]
 	editors := []uiListEditor{}
 	for _, path := range paths {
@@ -918,6 +938,7 @@ var uiSettingsEditorSearchEntries = []uiSearchEntry{
 	{Key: "", Label: "Composizione del nome", Tab: "rename"},
 	{Key: "", Label: "Regole tag → cartella", Tab: "rename"},
 	{Key: "", Label: "Hook eventi", Tab: "notify"},
+	{Key: "", Label: "Regole di seed", Tab: "seeding", Terms: "ratio seed tracker privato indexer categoria inattivo"},
 	{Key: "", Label: "Traduzioni", Tab: "system"},
 }
 

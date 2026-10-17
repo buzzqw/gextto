@@ -923,6 +923,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 	// opposed to the routine ones (seed limit not reached, move in progress,
 	// archive pending): only these are worth surfacing in the summary log.
 	failed := []string{}
+	policy := newSeedPolicy(cfg, s.db)
 	for _, torrent := range s.activeEngine().List() {
 		label := strings.TrimSpace(torrent.Name)
 		if label == "" {
@@ -959,22 +960,23 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 				continue
 			}
 		}
-		// Effective limits: the torrent's own when positive, the globals when
-		// negative (inherit), none when zero (unlimited). A torrent that only
-		// inherits the global limits must still be removable.
-		ratioLimit, timeLimit := seedLimitsForTorrent(cfg, torrent.SeedRatio, torrent.SeedDays)
+		// Effective limits: the torrent's own when positive, then the matching
+		// seed rule, then the globals; none when zero (unlimited). A torrent
+		// that only inherits the global limits must still be removable. A seed
+		// stopped for inactivity ended like one that reached its time.
+		limits := policy.limitsFor(&torrent)
 		ratioReached := false
-		if ratioLimit != nil {
+		if limits.Ratio != nil {
 			download := gh6_effectiveDownloadForRatio(torrent)
-			ratioReached = download > 0.0 && float64(torrent.AllTimeUpload)/download >= *ratioLimit
+			ratioReached = download > 0.0 && float64(torrent.AllTimeUpload)/download >= *limits.Ratio
 		}
-		timeReached := timeLimit != nil && torrent.SeedingSeconds >= *timeLimit
+		timeReached := limits.timeReached(&torrent) || (limits.IdleSeconds != nil && seedIdle.reached(torrent.Hash))
 		canRemove := false
 		if ratioReached || timeReached {
 			canRemove = true
 		} else if isArchived && torrent.State == "paused" {
 			canRemove = true
-		} else if ratioLimit == nil && timeLimit == nil && (torrent.State == "paused" || torrent.State == "finished" || isArchived) {
+		} else if limits.none() && (torrent.State == "paused" || torrent.State == "finished" || isArchived) {
 			canRemove = true
 		}
 		if !canRemove {
