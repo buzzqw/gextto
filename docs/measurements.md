@@ -308,7 +308,8 @@ and a 45 s pprof CPU profile at ≥ 8 MB/s. Means over the samples above 4 MB/s:
 |---|---|---|---|---|---|---|
 | build 220 | 168 % (209 %) | 8.25 MB/s | 98 | 20.4 | 1.71 | 922 MB |
 | build 221–222 (deadline throttled, limiter atomics) | 198–221 % (256 %) | 7.9–8.1 MB/s | 135–143 | 24.5–27.9 | 1.39–1.64 | 1266–1555 MB |
-| **build 223** (progress-based deadline) | **46 % (136 %)** | **8.12 MB/s** | 116 (max 159) | **5.7** | **0.40** | 751 MB |
+| **build 223** (progress-based deadline) | **46 % (136 %)** | **8.12 MB/s** | 116 (max 159) | **5.7** | **0.40** | 1858 MB |
+| **build 224** (uTP: in-place receive, no reflect.Select) | **45 % (80 %)** | **8.24 MB/s** | 131 (max 169) | **5.5** | **0.35** | 1718 MB |
 
 The profiles of builds 220–222 showed 40–47 % of the CPU in the uTP read path:
 `SetReadDeadline` (220), then `sync.RWMutex.Lock` in `utp Conn.Read` plus `time.Now`
@@ -320,7 +321,14 @@ error as a slow peer and looped, taking the transport-wide lock on every pass. T
 SHA-1 1.6 %. The earlier "RC4 29–51 %" readings were cumulative times that included the
 uTP read underneath: RC4 flat was 0.7 % in build 222. The build 223 run (15 min, 173
 samples above 4 MB/s) had a peer count close to builds 221–222: −72 % CPU per MB/s and
-−77 % per peer against build 220.
+−77 % per peer against build 220. Build 224 (15 min, 179 samples) removes the per-datagram copy in the
+uTP socket reader (43 % of the allocated bytes) and the `reflect.Select` in every blocking
+uTP Read/Write (3.3 % of the CPU in build 223): −12 % CPU per peer, peak 80 % instead of
+136 %. `BenchmarkTransferLoopback`: 23.6 KB / 118 allocs → 5.6 KB / 99 allocs per op,
+116–127 → 131–139 MB/s. What remains is syscalls (~32 %, one `recvfrom`/`sendto` per uTP
+datagram and one ACK per data packet through the 500 µs state timer), scheduler wake-ups
+(futex ~14 %), RC4 ~5 % and SHA-1 ~2 %. The RssAnon peak (1.7–1.9 GB with 10 torrents)
+is the piece buffer pool and the read cache, not the reader.
 
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
