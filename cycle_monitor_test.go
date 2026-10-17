@@ -114,3 +114,24 @@ func TestCycleWarningLogStateTransitions(t *testing.T) {
 		t.Fatalf("recovery -> %q", got)
 	}
 }
+
+// TestCycleWarningReasonCountsMostlyFailedCycles pins that a source answering
+// most of its requests is not "failing", and that a timeout says it is slow.
+func TestCycleWarningReasonCountsMostlyFailedCycles(t *testing.T) {
+	now := time.Now()
+	var working, slow []models.CycleHistoryEntry
+	for i := 0; i < cycleSourceFailCount+1; i++ {
+		at := now.Add(-time.Duration(i) * time.Hour)
+		working = append(working, testCycle(at, 60, 1,
+			models.CycleSourceStat{Kind: "indexer", Name: "prowlarr", OK: 16, Fail: 13, LastError: "context deadline exceeded"}))
+		slow = append(slow, testCycle(at, 60, 1,
+			models.CycleSourceStat{Kind: "indexer", Name: "prowlarr", OK: 2, Fail: 16, LastError: "context deadline exceeded"}))
+	}
+	if got := cycleWarningReason(working, 6*time.Hour, now); got != "" {
+		t.Fatalf("a source answering most requests warned: %q", got)
+	}
+	got := cycleWarningReason(slow, 6*time.Hour, now)
+	if !strings.Contains(got, "prowlarr") || !strings.Contains(got, "richieste scadute") {
+		t.Fatalf("a mostly timing-out source not reported as slow: %q", got)
+	}
+}

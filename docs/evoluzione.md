@@ -806,6 +806,17 @@ recovered from a shell without editing the database.
 - **DLNA**: transcoding, frames extracted from the video (no ffmpeg), search and
   Xbox/WMP (`X_MS_MediaReceiverRegistrar`) are missing; browsing, Range playback,
   subtitles, library folders and artwork are in place (§3).
+- **Querying Jackett and Prowlarr per indexer.** A manager serves each of its indexers
+  one search at a time and an aggregate waits for the slowest
+  ([`measurements.md`](measurements.md), *Indexer managers under a cycle's load*).
+  The direction is one **lane per underlying indexer**: Prowlarr `indexerIds=<id>`,
+  Jackett `/api/v2.0/indexers/<id>/results/torznab`. Each lane gets the concurrency
+  its indexer actually serves (one or two, not six), a timeout from its measured time
+  per search and its own health, so a slow tracker costs only its own results. The
+  same tracker listed in both managers is searched once, through the faster one, and
+  the indexers a manager reports as failing (`/api/v1/indexerstatus`) are skipped.
+  Gate: the cycle's answered share and wall time against today's aggregate, on the
+  same titles.
 - **Latency guard: what the trials cannot see.** A trial tells "Gextto's own queue"
   from "someone else filling the line". It cannot see a user of little bandwidth
   who only needs a low latency (a call, a game), because they fill no queue. The

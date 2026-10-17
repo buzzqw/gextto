@@ -5186,6 +5186,7 @@ fra:
   "Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune": "Programmation active : plage « Auto », sans plafond, la ligne est mesurée par l'auto-tune"
   "Auto rallenta per lasciare la linea agli altri dispositivi di casa": "Auto ralentit pour laisser la ligne aux autres appareils de la maison"
   "Latenza": "Latence"
+  "Completato · archiviato": "Terminé · archivé"
   "Auto rispetta la latenza": "Auto respecte la latence"
   "Auto — host per misurare la latenza": "Auto — hôte pour mesurer la latence"
   "vuoto = 9.9.9.9 e 1.1.1.1 (porta 443)": "vide = 9.9.9.9 et 1.1.1.1 (port 443)"

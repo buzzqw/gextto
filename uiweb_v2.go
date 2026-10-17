@@ -1492,6 +1492,10 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	if processed, err := s.db.TorrentProcessed(hash); err == nil && processed != nil && strings.TrimSpace(*processed) != "" {
 		archived = true
 	}
+	// A comic is archived by its own pipeline (comics_torrents).
+	if !archived && s.comics.CompletedTorrents([]string{hash})[strings.ToLower(hash)] {
+		archived = true
+	}
 	isCompleted := archived
 	if !isCompleted {
 		if status, err := s.db.TorrentStatus(hash); err == nil && status != nil && *status == "completed" {
@@ -1508,6 +1512,9 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		}
 		if torrent.State == "paused" {
 			stateLabel = "Completato"
+			if archived {
+				stateLabel = "Completato · archiviato"
+			}
 		}
 	}
 	view.General = []v2KV{

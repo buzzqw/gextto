@@ -61,8 +61,8 @@ func TestLocalTorznabTransportErrorSkipsFlareSolverr(t *testing.T) {
 // matters if the whole search waits longer than it (MirCrew may search its
 // forum and thank a topic before answering).
 func TestAutomaticSearchBudgetCoversIndexerTimeout(t *testing.T) {
-	if automaticSearchTimeout <= indexerRequestTimeout {
-		t.Fatalf("automaticSearchTimeout %s must exceed indexerRequestTimeout %s", automaticSearchTimeout, indexerRequestTimeout)
+	if automaticSearchTimeout <= indexerRequestTimeout || automaticSearchTimeout <= managerRequestTimeout {
+		t.Fatalf("automaticSearchTimeout %s must exceed indexerRequestTimeout %s and managerRequestTimeout %s", automaticSearchTimeout, indexerRequestTimeout, managerRequestTimeout)
 	}
 }
 

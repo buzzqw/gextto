@@ -537,6 +537,37 @@ the other device stopped after a minute and the cap was lifted 2 min 4 s later, 
 53 ms as the reference. Since then the lowest reference is kept for 6 h and only a lower
 measure replaces it, so one disturbed trial cannot blind the guard.
 
+**Indexer managers under a cycle's load** (2026-10-17, the live Prowlarr and Jackett on
+192.168.1.161, 30 enabled series titles, `type=search`, Python probe). Measured because
+the cycle history showed Prowlarr timing out: last cycles 0/6, 2/18, 16/29, 13/25
+requests answered, `context deadline exceeded` at 45 s. One search alone: Prowlarr
+aggregate **1.0 s** (LimeTorrents 1.2 s, The Pirate Bay 1.2 s, TorrentLeech 3.6 s);
+Jackett aggregate 2.1 s Torznab, 2.9 s JSON.
+
+| Prowlarr aggregate, 30 titles | wall | p50 | p90 / max |
+|---|---|---|---|
+| 1 at a time | 143 s | 4.1 s | 4.2 / 31.3 s |
+| 2 at a time | 123 s | 8.2 s | 8.4 s |
+| 6 at a time (Gextto's title concurrency) | 119 s | **24.6 s** | 24.7 s |
+
+| Prowlarr, one indexer, 18 titles, 6 at a time | per search | p50 |
+|---|---|---|
+| LimeTorrents | 1.9 s | 12.0 s |
+| The Pirate Bay | 1.9 s | 12.0 s |
+| TorrentLeech | **3.9 s** | 24.6 s |
+
+Prowlarr serves each indexer **one search at a time**, and an aggregate answers when its
+slowest indexer has. The throughput is that of TorrentLeech, about 0.25 searches/s,
+whatever the concurrency. Six concurrent searches only lengthen the queue (24.6 s each),
+and a full cycle, with season and id searches, queues past 45 s. A request that times out
+throws away the LimeTorrents and The Pirate Bay results that were ready. Jackett at 6 at
+a time: p50 4.3 s, p90 30.3 s. LimeTorrents and TorrentLeech are configured in **both**
+managers, so every title is searched twice on the same trackers. Since then managers get
+**90 s** per request (`managerRequestTimeout`, other indexers keep 45 s, the title budget
+is 100 s). A cycle counts as failed for a source only when most of its requests failed,
+and a timeout is reported as "risposte troppo lente". How the managers are queried is an
+open item ([`evoluzione.md`](evoluzione.md) §8).
+
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
 the whole answer unreadable), and the cost is nil: on a 100-item answer, strict

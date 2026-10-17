@@ -5134,6 +5134,7 @@ pol:
   "Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune": "Harmonogram aktywny: pasmo «Auto», bez limitu, linię mierzy auto-tune"
   "Auto rallenta per lasciare la linea agli altri dispositivi di casa": "Auto zwalnia, aby zostawić łącze innym urządzeniom w domu"
   "Latenza": "Opóźnienie"
+  "Completato · archiviato": "Ukończono · zarchiwizowano"
   "Auto rispetta la latenza": "Auto dba o opóźnienie"
   "Auto — host per misurare la latenza": "Auto — host do pomiaru opóźnienia"
   "vuoto = 9.9.9.9 e 1.1.1.1 (porta 443)": "puste = 9.9.9.9 i 1.1.1.1 (port 443)"

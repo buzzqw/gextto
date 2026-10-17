@@ -4530,6 +4530,7 @@ eng:
   "Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune": "Schedule active: «Auto» band, no cap, the line is measured by the auto-tune"
   "Auto rallenta per lasciare la linea agli altri dispositivi di casa": "Auto is slowing down to leave the line to the other devices at home"
   "Latenza": "Latency"
+  "Completato · archiviato": "Completed · archived"
   "Auto rispetta la latenza": "Auto respects latency"
   "Auto — host per misurare la latenza": "Auto — host to measure latency"
   "vuoto = 9.9.9.9 e 1.1.1.1 (porta 443)": "empty = 9.9.9.9 and 1.1.1.1 (port 443)"

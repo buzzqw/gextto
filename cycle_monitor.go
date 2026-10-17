@@ -69,6 +69,22 @@ func (s *cycleWarningLogState) observe(reason string, now time.Time) string {
 	return action
 }
 
+// cycleSourceErrorLabel turns a source's last error into a short reason for
+// the warning: a timeout says the source is slow, not down.
+func cycleSourceErrorLabel(lastError string) string {
+	lower := strings.ToLower(lastError)
+	switch {
+	case lower == "":
+		return ""
+	case strings.Contains(lower, "deadline exceeded") || strings.Contains(lower, "timeout"):
+		return "risposte troppo lente: richieste scadute"
+	case len(lastError) > 80:
+		return lastError[:80] + "…"
+	default:
+		return lastError
+	}
+}
+
 // cycleWarningReason describes what the cycle history shows as a problem, or ""
 // when the searches look healthy. Cycles are newest first.
 func cycleWarningReason(cycles []models.CycleHistoryEntry, interval time.Duration, now time.Time) string {
@@ -79,9 +95,10 @@ func cycleWarningReason(cycles []models.CycleHistoryEntry, interval time.Duratio
 
 	// A source that failed cycleSourceFailCount times across the recent cycles.
 	type sourceTally struct {
-		name     string
-		attempts int
-		failures int
+		name      string
+		attempts  int
+		failures  int
+		lastError string
 	}
 	tally := map[string]*sourceTally{}
 	for _, cycle := range cycles {
@@ -93,8 +110,14 @@ func cycleWarningReason(cycles []models.CycleHistoryEntry, interval time.Duratio
 				tally[key] = entry
 			}
 			entry.attempts++
-			if source.Fail > 0 {
+			// A cycle counts as failed for a source only when most of its
+			// requests failed: a manager answering 16 searches out of 29 is
+			// working, slowly, not failing.
+			if source.Fail > source.OK {
 				entry.failures++
+				if entry.lastError == "" {
+					entry.lastError = source.LastError
+				}
 			}
 		}
 	}
@@ -106,8 +129,12 @@ func cycleWarningReason(cycles []models.CycleHistoryEntry, interval time.Duratio
 	for _, key := range keys {
 		entry := tally[key]
 		if entry.failures >= cycleSourceFailCount {
-			problems = append(problems, fmt.Sprintf("la sorgente %s ha fallito in %d delle ultime %d ricerche",
-				entry.name, entry.failures, entry.attempts))
+			problem := fmt.Sprintf("la sorgente %s ha fallito in %d delle ultime %d ricerche",
+				entry.name, entry.failures, entry.attempts)
+			if reason := cycleSourceErrorLabel(entry.lastError); reason != "" {
+				problem += " (" + reason + ")"
+			}
+			problems = append(problems, problem)
 		}
 	}
 

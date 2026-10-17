@@ -67,11 +67,28 @@ const (
 // search budget. (With a 25s budget the 45s indexer limit was never reached: a
 // MirCrew on-demand answer was cut at 25s and only arrived one cycle later.)
 var (
-	automaticSearchTimeout = 50 * time.Second
+	// automaticSearchTimeout bounds one title search across every source; it
+	// is longer than the longest per-source limit, so each source can use its
+	// own.
+	automaticSearchTimeout = 100 * time.Second
 	// 45s: enough for the MirCrew indexer, which may search its forum and thank
 	// a topic on an on-demand query before answering.
 	indexerRequestTimeout = 45 * time.Second
+	// managerRequestTimeout is the limit for a Jackett/Prowlarr aggregate. The
+	// manager serves each of its indexers one search at a time and answers when
+	// the slowest has: measured on 2026-10-17, six concurrent title searches
+	// each waited 24.6 s behind a 3.9 s/search indexer, and a full cycle
+	// queues more than that, so 45 s cut answers that were on their way.
+	managerRequestTimeout = 90 * time.Second
 )
+
+// sourceRequestTimeout is the per-request limit for one indexer.
+func sourceRequestTimeout(indexer IndexerConfig) time.Duration {
+	if isManagerSource(indexer) {
+		return managerRequestTimeout
+	}
+	return indexerRequestTimeout
+}
 
 // NewEngine builds the default engine, mirroring `Engine::new`.
 func NewEngine() *Engine {
@@ -706,7 +723,7 @@ func searchOneWithDBType(
 					continue
 				}
 				logging.Debug("indexer search started", "indexer", indexer.Name, "query", query)
-				requestCtx, cancel := context.WithTimeout(ctx, indexerRequestTimeout)
+				requestCtx, cancel := context.WithTimeout(ctx, sourceRequestTimeout(indexer))
 				items, err := fetchTorznabFlareSolverr(requestCtx, indexer, query, externalIDs, cfg.FlaresolverrURL, searchType)
 				cancel()
 				indexerResults[index] = indexerResult{Name: indexer.Name, Query: query, Items: items, Err: err}

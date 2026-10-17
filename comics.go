@@ -447,6 +447,32 @@ func (d *ComicsDb) Torrent(hash string) (*ComicTorrent, error) {
 	return &item, nil
 }
 
+// CompletedTorrents returns, among hashes, the comics torrents already
+// completed (lowercase hash set). The comics pipeline archives them itself,
+// so torrent_meta does not know they are done.
+func (d *ComicsDb) CompletedTorrents(hashes []string) map[string]bool {
+	done := map[string]bool{}
+	if d == nil || d.db == nil || len(hashes) == 0 {
+		return done
+	}
+	rows, err := d.db.Query("SELECT hash FROM comics_torrents WHERE completed_at IS NOT NULL AND completed_at<>''")
+	if err != nil {
+		return done
+	}
+	defer rows.Close()
+	wanted := make(map[string]bool, len(hashes))
+	for _, hash := range hashes {
+		wanted[strings.ToLower(hash)] = true
+	}
+	for rows.Next() {
+		var hash string
+		if rows.Scan(&hash) == nil && wanted[strings.ToLower(hash)] {
+			done[strings.ToLower(hash)] = true
+		}
+	}
+	return done
+}
+
 // CompleteTorrent marks a comics torrent as completed with its processed path.
 func (d *ComicsDb) CompleteTorrent(hash, path string) error {
 	_, err := d.db.Exec("UPDATE comics_torrents SET completed_at=datetime('now'),processed_path=?1 WHERE hash=?2", path, strings.ToLower(hash))

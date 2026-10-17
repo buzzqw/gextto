@@ -5193,6 +5193,7 @@ deu:
   "Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune": "Zeitplan aktiv: «Auto»-Fenster, keine Grenze, die Leitung wird vom Auto-Tune gemessen"
   "Auto rallenta per lasciare la linea agli altri dispositivi di casa": "Auto bremst, um die Leitung den anderen Geräten im Haus zu überlassen"
   "Latenza": "Latenz"
+  "Completato · archiviato": "Abgeschlossen · archiviert"
   "Auto rispetta la latenza": "Auto achtet auf die Latenz"
   "Auto — host per misurare la latenza": "Auto — Host für die Latenzmessung"
   "vuoto = 9.9.9.9 e 1.1.1.1 (porta 443)": "leer = 9.9.9.9 und 1.1.1.1 (Port 443)"

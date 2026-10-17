@@ -748,6 +748,7 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 		hashes = append(hashes, view.Hash)
 	}
 	aux, _ := s.db.TorrentAuxBulk(hashes)
+	comicsDone := s.comics.CompletedTorrents(hashes)
 	rows := make([]uiTorrentRow, 0, len(views))
 	for _, view := range views {
 		progress := view.Progress
@@ -784,15 +785,21 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			row.Source = values[1]
 			row.Reason = values[2]
 		}
+		// A comic is archived by its own pipeline, which torrent_meta does not
+		// see: its completion lives in comics_torrents.
+		if comicsDone[strings.ToLower(view.Hash)] {
+			row.Archived = true
+		}
 		// A completed torrent kept in the session (automatic removal off) is
-		// reported as completed by libtorrent as "paused" after the seed limit;
-		// show the state the user cares about instead of a bare pause.
+		// reported by the engine as "paused" after the seed limit, and as 0 %
+		// after a restart re-check once its files went to the library; show
+		// the state the user cares about instead.
 		if row.Archived && view.State == "paused" {
-			row.State = "Completato"
+			row.State = "Completato · archiviato"
 			row.StateClass = "ok"
 			row.ProgressClass = "seed"
 		}
-		if row.Archived || row.State == "Completato" {
+		if row.Archived || row.State == "Completato" || row.State == "Completato · archiviato" {
 			row.Progress = 100.0
 			row.ProgressPct = "100.0"
 			if row.TotalSize > 0 && row.TotalDone < row.TotalSize {
