@@ -274,6 +274,11 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - Dopo una build: `systemctl --user restart gextto` (niente `sudo`). Se
   `bin/gx-torrent` non è cambiato il log dice "gx-torrent … was already
   running: kept as it is"; altrimenti il demone viene riavviato.
+- **Modifiche solo ai manuali o a stringhe della UI**: sono incorporate nel
+  binario, quindi servono `make build` e riavvio, ma vanno **accumulate**: un
+  solo riavvio alla fine del lavoro o quando l'utente lo chiede, non uno per
+  ogni modifica. `README`, `docs/measurements.md` e `docs/evoluzione.md` non
+  sono incorporati: nessun build né riavvio.
 - Log: `gextto-data/gextto.log` e `gextto-data/gx-torrent/gx-torrent.log`
   (entrambi ruotati a 5 MB × 4); `gx-torrent.crash.log` solo per i crash.
 - Verifica: `systemctl --user status gextto`;
