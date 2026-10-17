@@ -130,6 +130,7 @@ func NewSocketFromPacketConnNoClose(pc net.PacketConn) (*Socket, error) {
 // reading (the shared socket is best-effort).
 func (s *Socket) unusedRead(r read) {
 	unusedReads.Add(1)
+	r.data = append([]byte(nil), r.data...)
 	select {
 	case s.unusedReads <- r:
 	default:
@@ -181,7 +182,10 @@ func (s *Socket) reader() {
 			s.ReadErr = err
 			return
 		}
-		s.handleReceivedPacket(read{data: append([]byte(nil), b[:n]...), from: addr})
+		// The datagram is handled in place: b is reused for the next one, so
+		// whatever keeps packet bytes past this call copies them (an
+		// out-of-order payload in processDelivery, an unused read here).
+		s.handleReceivedPacket(read{data: b[:n], from: addr})
 	}
 }
 

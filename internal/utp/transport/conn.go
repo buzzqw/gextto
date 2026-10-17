@@ -491,7 +491,14 @@ func (c *Conn) processDelivery(h header, payload []byte) {
 	}
 	c.inbound[inboundIndex] = recv{true, payload, h.Type}
 	c.inboundWnd += len(payload)
+	before := len(c.inbound)
 	c.processInbound()
+	// payload points into the socket's receive buffer, reused for the next
+	// datagram. In-order data was just copied into readBuf; a packet still
+	// queued (out of order, or the read buffer full) must own its bytes.
+	if i := inboundIndex - (before - len(c.inbound)); i >= 0 {
+		c.inbound[i].data = append([]byte(nil), payload...)
+	}
 }
 
 // applyAcks acknowledges our sends from the packet's AckNr and selective-ACK

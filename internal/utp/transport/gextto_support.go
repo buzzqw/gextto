@@ -7,7 +7,6 @@ package transport
 import (
 	"math"
 	"math/rand"
-	"reflect"
 	"sync"
 	"time"
 )
@@ -78,17 +77,26 @@ func (e *Event) SetBool(b bool) {
 }
 
 // waitEvents blocks until any of evs is set: it releases l (already held) while
-// it waits and re-acquires it before returning.
+// waiting and takes it back before returning. It takes up to five events and
+// uses a plain select: reflect.Select allocated and was a visible CPU cost,
+// since every blocking uTP Read and Write goes through here. Unused slots stay
+// nil channels, which never fire.
 func waitEvents(l sync.Locker, evs ...*Event) {
-	cases := make([]reflect.SelectCase, 0, len(evs))
-	for _, ev := range evs {
-		cases = append(cases, reflect.SelectCase{
-			Dir:  reflect.SelectRecv,
-			Chan: reflect.ValueOf(ev.C()),
-		})
+	var c [5]<-chan struct{}
+	if len(evs) > len(c) {
+		panic("waitEvents: too many events")
+	}
+	for i, ev := range evs {
+		c[i] = ev.C()
 	}
 	l.Unlock()
-	reflect.Select(cases)
+	select {
+	case <-c[0]:
+	case <-c[1]:
+	case <-c[2]:
+	case <-c[3]:
+	case <-c[4]:
+	}
 	l.Lock()
 }
 
