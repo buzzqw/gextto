@@ -350,8 +350,10 @@ server-rendered UI under `/ui`; those HTML routes are not part of this table.
 | POST | `/api/v1/config` |
 | POST | `/api/v1/create-torrent` |
 | GET | `/api/v1/dht-feed` |
+| GET | `/api/v1/events` |
 | GET | `/api/v1/health` |
 | POST | `/api/v1/ipfilter` |
+| GET | `/api/v1/metrics` |
 | POST | `/api/v1/pins/clear` |
 | GET | `/api/v1/portcheck` |
 | GET | `/api/v1/stats` |
@@ -423,8 +425,10 @@ The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 | POST | `/api/v2/torrents/addPeers` |
 | POST | `/api/v2/torrents/addTags` |
 | POST | `/api/v2/torrents/addTrackers` |
+| POST | `/api/v2/torrents/addWebSeeds` |
 | POST | `/api/v2/torrents/bottomPrio` |
 | GET | `/api/v2/torrents/categories` |
+| GET | `/api/v2/torrents/count` |
 | POST | `/api/v2/torrents/createCategory` |
 | POST | `/api/v2/torrents/createTags` |
 | POST | `/api/v2/torrents/decreasePrio` |
@@ -434,6 +438,7 @@ The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 | POST | `/api/v2/torrents/downloadLimit` |
 | POST | `/api/v2/torrents/editCategory` |
 | POST | `/api/v2/torrents/editTracker` |
+| POST | `/api/v2/torrents/editWebSeed` |
 | GET | `/api/v2/torrents/export` |
 | POST | `/api/v2/torrents/filePrio` |
 | GET | `/api/v2/torrents/files` |
@@ -448,6 +453,7 @@ The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 | POST | `/api/v2/torrents/removeCategories` |
 | POST | `/api/v2/torrents/removeTags` |
 | POST | `/api/v2/torrents/removeTrackers` |
+| POST | `/api/v2/torrents/removeWebSeeds` |
 | POST | `/api/v2/torrents/rename` |
 | POST | `/api/v2/torrents/renameFile` |
 | POST | `/api/v2/torrents/renameFolder` |
@@ -474,9 +480,49 @@ The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 | GET | `/api/v2/transfer/downloadLimit` |
 | GET | `/api/v2/transfer/info` |
 | POST | `/api/v2/transfer/setDownloadLimit` |
+| POST | `/api/v2/transfer/setSpeedLimitsMode` |
 | POST | `/api/v2/transfer/setUploadLimit` |
 | GET | `/api/v2/transfer/speedLimitsMode` |
 | POST | `/api/v2/transfer/toggleSpeedLimitsMode` |
 | GET | `/api/v2/transfer/uploadLimit` |
 
-Total routes: 17 (gx-torrent `/api/v1`) + 104 (gx-torrent `/api/v2`).
+Total routes: 19 (gx-torrent `/api/v1`) + 109 (gx-torrent `/api/v2`).
+
+### Integrating with other systems
+
+**Prometheus and Grafana.** `GET /api/v1/metrics` serves the daemon's state in
+the Prometheus text format (0.0.4): transfer rates and lifetime totals,
+torrents by state (`gxtorrent_torrents{state="seeding"}`), peers, queue slots,
+caches, free disk, the IP filter, every engine session counter
+(`gxtorrent_session_*`, uTP and disk counters included) and the process
+(`process_resident_memory_bytes`, `process_cpu_seconds_total`). It is computed
+only when asked: one scrape costs about 0.2 ms. With a token, send it as a
+header:
+
+```yaml
+scrape_configs:
+  - job_name: gx-torrent
+    metrics_path: /api/v1/metrics
+    static_configs: [{ targets: ["192.168.1.10:8890"] }]
+    # with gxtorrent_token set:
+    http_headers: { X-Gx-Token: { values: ["<token>"] } }
+```
+
+**Events for automations.** `GET /api/v1/events` is a Server-Sent Events
+stream of the engine events (a torrent added, completed, failed, a peer
+connected, …), one JSON object per `data:` line, with a comment every 30 s to
+keep proxies from closing it. It is the token-authenticated twin of the page's
+`/ui/events`, for Home Assistant, Node-RED or a script:
+
+```bash
+curl -N -H 'X-Gx-Token: <token>' http://127.0.0.1:8890/api/v1/events
+```
+
+**qBittorrent 5 calls.** Besides the qBittorrent Web API v2 surface above, the
+daemon answers `torrents/count` (the number, as text),
+`transfer/setSpeedLimitsMode` (`mode=1` turns the alternative limits on, `0`
+off) and the web seed editing calls: `torrents/addWebSeeds` and
+`torrents/removeWebSeeds` take `hash` and `urls` separated by `|`;
+`torrents/editWebSeed` takes `hash`, `origUrl` and `newUrl`. They answer 404 for
+an unknown torrent, 400 for a URL that is not http(s), 409 when `origUrl` is not
+a web seed of the torrent.

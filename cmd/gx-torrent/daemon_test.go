@@ -106,7 +106,7 @@ func newTestDaemonWith(t *testing.T, network NetworkOptions) *Daemon {
 
 // newTestDaemonFull is newTestDaemonWith with a standalone settings store, set
 // before the run loop starts (so no goroutine reads the field concurrently).
-func newTestDaemonFull(t *testing.T, network NetworkOptions, store *settings.Store) *Daemon {
+func newTestDaemonFull(t testing.TB, network NetworkOptions, store *settings.Store) *Daemon {
 	t.Helper()
 	// Touch t.TempDir first: its cleanup (removing the whole per-test temp tree)
 	// is registered on the first call, so registering the daemon close after it

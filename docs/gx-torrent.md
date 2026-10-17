@@ -2005,6 +2005,14 @@ settings page shows the measured latency and the current cap.
 
 ## REST API (v1)
 
+For monitoring and automation the daemon also serves `GET /api/v1/metrics`
+(Prometheus text format, computed only when scraped) and `GET /api/v1/events`
+(the engine events as Server-Sent Events, with the API token); the
+qBittorrent-compatible `/api/v2` includes the qBittorrent 5 calls
+`torrents/count`, `transfer/setSpeedLimitsMode` and the web seed editing calls.
+Examples and the full route list: [`API.md`](API.md), *Integrating with other
+systems*.
+
 All requests require `X-Gx-Token` (or `Authorization: Bearer`) if the
 token is set. The complete route tables of `/api/v1` and of the
 qBittorrent-compatible `/api/v2` are in [`API.md`](API.md); this section

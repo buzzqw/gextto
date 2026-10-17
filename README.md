@@ -290,8 +290,12 @@ gx-torrent is also a complete client without Gextto, like `qbittorrent-nox` or
 `transmission-daemon` — **the same binary** Gextto drives, a simpler Gextto with
 everything a standalone client needs.
 
-- **`*arr` ready.** qBittorrent Web API v2 (`/api/v2/...`) for Sonarr, Radarr,
-  Lidarr, Readarr and mobile managers, plus its own JSON API and sign-in page.
+- **`*arr` ready, and easy to integrate.** qBittorrent Web API v2
+  (`/api/v2/...`, qBittorrent 5 calls included) for Sonarr, Radarr, Lidarr,
+  Readarr and mobile managers; its own JSON API; **Prometheus metrics**
+  (`/api/v1/metrics`) for Grafana or Home Assistant, and an **event stream**
+  (`/api/v1/events`) for Node-RED, Home Assistant or scripts
+  ([examples](docs/API.md#integrating-with-other-systems)).
 - **A web UI familiar to qBittorrent users.** Light and dark themes; status,
   category, tag and tracker filters; a column chooser (24 columns) with
   resizable columns kept on the server; a full context menu; a resizable detail

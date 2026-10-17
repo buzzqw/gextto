@@ -305,9 +305,12 @@ gx-torrent è anche un client completo senza Gextto, come `qbittorrent-nox` o
 `transmission-daemon` — **lo stesso binario** che Gextto pilota, un Gextto più
 semplice con tutto ciò che serve a un client autonomo.
 
-- **Pronto per gli `*arr`.** Web API v2 di qBittorrent (`/api/v2/...`) per
-  Sonarr, Radarr, Lidarr, Readarr e le app mobili, più la sua API JSON e una
-  pagina di accesso.
+- **Pronto per gli `*arr`, e facile da integrare.** Web API v2 di qBittorrent
+  (`/api/v2/...`, comprese le chiamate di qBittorrent 5) per Sonarr, Radarr,
+  Lidarr, Readarr e le app mobili; la sua API JSON; **metriche Prometheus**
+  (`/api/v1/metrics`) per Grafana o Home Assistant, e un **flusso di eventi**
+  (`/api/v1/events`) per Node-RED, Home Assistant o script
+  ([esempi](docs/API.md#integrating-with-other-systems)).
 - **Una web UI familiare a chi usa qBittorrent.** Temi chiaro e scuro; filtri
   per stato, categoria, tag e tracker; scelta delle colonne (24) con colonne
   ridimensionabili salvate sul server; menu contestuale completo; pannello di
