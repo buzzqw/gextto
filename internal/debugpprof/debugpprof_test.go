@@ -1,11 +1,11 @@
-package main
+package debugpprof
 
 import "testing"
 
-// TestPprofAddress pins the security property of the opt-in profiling endpoint:
-// only a loopback address is accepted, so GX_TORRENT_PPROF can never expose the
+// TestAddress pins the security property of the opt-in profiling endpoint:
+// only a loopback address is accepted, so GX_TORRENT_PPROF or GEXTTO_PPROF can never expose the
 // Go profiles on the network. A bare port defaults to 127.0.0.1.
-func TestPprofAddress(t *testing.T) {
+func TestAddress(t *testing.T) {
 	cases := []struct {
 		in   string
 		want string
@@ -25,9 +25,9 @@ func TestPprofAddress(t *testing.T) {
 		{"8.8.8.8:6060", "", false},
 	}
 	for _, tc := range cases {
-		got, ok := pprofAddress(tc.in)
+		got, ok := Address(tc.in)
 		if ok != tc.ok || got != tc.want {
-			t.Errorf("pprofAddress(%q) = %q, %v; want %q, %v", tc.in, got, ok, tc.want, tc.ok)
+			t.Errorf("Address(%q) = %q, %v; want %q, %v", tc.in, got, ok, tc.want, tc.ok)
 		}
 	}
 }

@@ -13,6 +13,7 @@ import (
 	gextto "github.com/buzzqw/gextto"
 	"github.com/buzzqw/gextto/internal/cache"
 	"github.com/buzzqw/gextto/internal/constants"
+	"github.com/buzzqw/gextto/internal/debugpprof"
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/messages"
 	"github.com/buzzqw/gextto/internal/tui"
@@ -93,6 +94,10 @@ func runDaemon(dryRun bool, configOption *string) error {
 		filter = env
 	}
 	logging.SetLevel(filter)
+	// Opt-in profiling on loopback only (GEXTTO_PPROF=127.0.0.1:6061).
+	debugpprof.StartFromEnv("GEXTTO_PPROF", func(format string, args ...any) {
+		logging.Info(fmt.Sprintf(format, args...))
+	})
 
 	db, err := gextto.OpenDatabase(filepath.Join(cfg.DataDir, constants.DefaultDBFile))
 	if err != nil {

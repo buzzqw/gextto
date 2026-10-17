@@ -2147,7 +2147,7 @@ The daemon exposes the Go profiles on demand for performance work. The endpoint
 is off by default and never reachable from the network: set `GX_TORRENT_PPROF` to
 a **loopback** `host:port` (for example `127.0.0.1:6060`) and restart the daemon.
 A non-loopback value is logged and ignored, so the endpoint cannot be exposed by
-mistake (`TestPprofAddress` pins the rule).
+mistake (`TestAddress` in `internal/debugpprof` pins the rule).
 
 ```bash
 GX_TORRENT_PPROF=127.0.0.1:6060 ./gx-torrent -mode standalone ...
@@ -2163,6 +2163,13 @@ token, no TLS. Gextto never sets the variable, so a managed daemon stays without
 a profiling port; to profile one, set it in the environment of the `gextto`
 service and restart the daemon (the daemon is restarted because the environment
 is inherited at start-up).
+
+Gextto itself (`gexttod`) has the same endpoint, from the same package
+(`internal/debugpprof`), behind its own variable `GEXTTO_PPROF` (for example
+`127.0.0.1:6061`), with the same loopback-only rule. For the user service:
+`systemctl --user set-environment GEXTTO_PPROF=127.0.0.1:6061
+GX_TORRENT_PPROF=127.0.0.1:6060` and a restart; `unset-environment` and another
+restart remove them.
 
 **Garbage collector.** The daemon sets `GOGC=50` at start-up unless `GOGC` is
 already in its environment (`cmd/gx-torrent/gc.go`). Most of the heap is bounded
