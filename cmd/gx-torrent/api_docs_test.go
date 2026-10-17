@@ -53,6 +53,9 @@ func TestAPIRoutesAreDocumented(t *testing.T) {
 			}
 			method := strings.TrimSpace(strings.Trim(strings.TrimSpace(parts[0]), "|"))
 			if method == "GET" || method == "POST" || method == "DELETE" || method == "PUT" {
+				if description := strings.TrimSpace(strings.Trim(strings.TrimSpace(parts[2]), "|")); description == "" {
+					t.Errorf("daemon route %s %s has no description", method, parts[1])
+				}
 				documented[method+" "+parts[1]] = true
 			}
 		}
