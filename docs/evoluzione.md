@@ -768,6 +768,15 @@ recovered from a shell without editing the database.
   rate). Only a gap would justify touching `internal/unchoker`.
 - **The uTP dial error rate.** In the live run 91 of 265 dials failed: expected when
   racing uTP against TCP-only peers, but worth a closer look in a later round.
+- **uTP acknowledgements stay one per data packet.** A state packet goes out
+  500 µs after a data packet (`pendingSendStateDelay`), so only bursts share one. Under
+  a saturated line with ~130 peers each connection receives a packet every ~13 ms, and
+  the ACK sends cost as much as the datagram reads (~3 % of a core at 8 MB/s,
+  [`measurements.md`](measurements.md)). Coalescing them would need a delay of 20 ms or
+  more, which inflates the RTT the sender's RTO is built on. The CPU saving does not
+  justify that change in the transport's congestion behaviour. What would change the
+  picture is batched datagram I/O (`recvmmsg`/`sendmmsg`), which cuts syscalls without
+  touching the protocol timing.
 - **Graduated file priority (0–7)** with mixed-priority files: so far measured only
   indirectly.
 - **DLNA**: transcoding, frames extracted from the video (no ffmpeg), search and

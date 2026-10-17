@@ -2164,6 +2164,13 @@ a profiling port; to profile one, set it in the environment of the `gextto`
 service and restart the daemon (the daemon is restarted because the environment
 is inherited at start-up).
 
+**Garbage collector.** The daemon sets `GOGC=50` at start-up unless `GOGC` is
+already in its environment (`cmd/gx-torrent/gc.go`). Most of the heap is bounded
+buffers (the write cache's piece buffers, the read cache), and the collector
+costs about 1 % of the CPU under a full download. Go's default of 100 lets the
+heap reach twice the live data before a collection; 50 trims that headroom from
+the resident memory. Measurements in `docs/measurements.md`.
+
 ## Tests
 
 - `go test ./cmd/gx-torrent/` covers:

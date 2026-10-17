@@ -286,6 +286,12 @@ MB under load. Values vary with torrents, peers and storage; on HDD/NFS
 Gextto grants gx-torrent a larger buffer, used only when writes lag behind
 downloads.
 
+**Engine CPU, measured**: a saturated 8 MB/s line with ~130 peers (about half
+over uTP, MSE encryption on) takes gx-torrent **~45 % of one core** on an Intel
+N97, about 0.35 % per connected peer. The peer reader rearms its read deadline
+only when it passes, and the uTP transport receives datagrams without copying
+them. Profiles and numbers are in `docs/measurements.md`.
+
 ## Install on Linux
 
 For 64-bit Linux with systemd: Debian 12+, Ubuntu 22.04+, Fedora, openSUSE

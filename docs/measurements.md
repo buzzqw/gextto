@@ -311,6 +311,7 @@ and a 45 s pprof CPU profile at ≥ 8 MB/s. Means over the samples above 4 MB/s:
 | **build 223** (progress-based deadline) | **46 % (136 %)** | **8.12 MB/s** | 116 (max 159) | **5.7** | **0.40** | 1858 MB |
 | **build 224** (uTP: in-place receive, no reflect.Select) | **45 % (80 %)** | **8.24 MB/s** | 131 (max 169) | **5.5** | **0.35** | 1718 MB |
 | **build 225** (IP filter rules cached parsed, uTP buffers released) | 44 % (99 %) | 6.80 MB/s | 125 (max 198) | 6.5 | **0.35** | 1844 MB |
+| **build 226** (GOGC=50) | 48 % (76 %) | **8.98 MB/s** | 111 (max 180) | **5.3** | 0.43 | **1105 MB** |
 
 The profiles of builds 220–222 showed 40–47 % of the CPU in the uTP read path:
 `SetReadDeadline` (220), then `sync.RWMutex.Lock` in `utp Conn.Read` plus `time.Now`
@@ -344,6 +345,14 @@ inbound slots and acked sends stayed reachable through their slices' backing arr
 drained read buffers kept their burst-sized capacity. CPU per peer is unchanged (0.35); the
 lower mean rate of this run (6.8 MB/s) was the swarm. The garbage collector costs
 `mallocgc` 1.9 % of the profile, with `gcBgMarkWorker` not among the top 300 frames.
+
+**GOGC=50 (build 226).** Since the collector was that cheap, the daemon now runs at
+`GOGC=50` unless the environment sets `GOGC`. Same load (all 10 releases restarted from
+zero, 15 min): RssAnon peak **1844 → 1105 MB**, second-half mean **1566 → 953 MB**, memory
+outside the caches **859 → 507 MB**; live heap at the end 1.68 GB → 0.88 GB (`NextGC`
+1.93 → 1.22 GB, 114 collections in ~15 min). The collector's cost stays negligible:
+`gcBgMarkWorker` 0.5 % and `mallocgc` 2.2 % of the profile; CPU per MB/s 5.3, the best of
+the series. Against build 224 the memory outside the caches is halved (1032 → 507 MB).
 
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
