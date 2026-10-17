@@ -50,6 +50,7 @@ scheduler with
 alternative limits (**one choice per day — Off, Limit or Auto**, where Auto lifts the
 cap so the auto-speed/peak observer can measure the line), the global seeding limits
 (share ratio, seeding time and inactive seeding time, as qBittorrent's preferences),
+the content layout of new torrents (Original, Subfolder, NoSubfolder),
 the RSS manager with the *Wanted* page, the Torznab indexer search,
 and the **qBittorrent-compatible Web API** (`/api/v2/auth`, `/api/v2/torrents/*`,
 `/api/v2/app/*`) that clients speaking that protocol can use.

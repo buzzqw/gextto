@@ -471,7 +471,7 @@ func qbitView(v torrentInfo) qbitTorrent {
 		ULRate:            v.UploadRate,
 		State:             qbitStateFor(v),
 		SavePath:          v.SavePath,
-		ContentPath:       filepath.Join(v.SavePath, v.Name),
+		ContentPath:       qbitContentPath(v),
 		Category:          v.Category,
 		Tags:              strings.Join(v.Tags, ", "),
 		NumSeeds:          v.NumSeeds,
@@ -937,6 +937,11 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 	paused := formBool(r, "paused")
 	sequential := formBool(r, "sequentialDownload")
 	firstLast := formBool(r, "firstLastPiecePrio")
+	layout := d.qbitContentLayout(r)
+	if _, ok := torrent.ParseContentLayout(layout); !ok {
+		qbitText(w, http.StatusBadRequest, "unknown contentLayout")
+		return
+	}
 	added := false
 
 	// Uploaded .torrent files (multipart field "torrents").
@@ -951,7 +956,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 			if readErr != nil || len(data) == 0 {
 				continue
 			}
-			req := addRequest{TorrentData: data, Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, AutoTMM: autoTMM, AutoTMMSet: true}
+			req := addRequest{TorrentData: data, Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout}
 			if _, _, err := d.add(req); err != nil {
 				qbitText(w, http.StatusUnsupportedMediaType, qbitInvalidCode)
 				return
@@ -966,7 +971,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 		if line == "" {
 			continue
 		}
-		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, AutoTMM: autoTMM, AutoTMMSet: true}
+		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout}
 		switch {
 		case strings.HasPrefix(strings.ToLower(line), "magnet:"):
 			req.Magnet = line
@@ -1187,6 +1192,7 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		"max_inactive_seeding_time_enabled": d.settingBool(maxInactiveSeedingTimeEnabledKey, false),
 		"max_inactive_seeding_time":         d.settingInt(maxInactiveSeedingTimeKey, -1),
 		"auto_tmm_enabled":                  d.settingBool(autoTMMEnabledKey, false),
+		"torrent_content_layout":            d.defaultContentLayout(),
 		"torrent_changed_tmm_enabled":       true,
 		"category_changed_tmm_enabled":      true,
 		"save_path_changed_tmm_enabled":     true,
@@ -1571,6 +1577,15 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 				changed = true
 			}
 		}
+		if v, ok := prefs["torrent_content_layout"]; ok {
+			var layout string
+			if json.Unmarshal(v, &layout) == nil {
+				if parsed, valid := torrent.ParseContentLayout(layout); valid {
+					d.opts.Settings.Set(contentLayoutKey, parsed)
+					changed = true
+				}
+			}
+		}
 		if v, ok := prefs["auto_tmm_enabled"]; ok {
 			var on bool
 			if json.Unmarshal(v, &on) == nil {
@@ -1762,4 +1777,13 @@ func (d *Daemon) handleQbitSync(w http.ResponseWriter, r *http.Request) {
 	payload["tags"] = addedTags
 	payload["tags_removed"] = removedTags
 	writeJSON(w, http.StatusOK, payload)
+}
+
+// qbitContentPath is the torrent's content_path: what the daemon reports, or
+// the save path joined with the name for an older view without it.
+func qbitContentPath(v torrentInfo) string {
+	if v.ContentPath != "" {
+		return v.ContentPath
+	}
+	return filepath.Join(v.SavePath, v.Name)
 }

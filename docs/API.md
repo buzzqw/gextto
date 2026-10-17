@@ -348,8 +348,8 @@ server-rendered UI under `/ui`; those HTML routes are not part of this table.
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/api/v1/add` | add a torrent (magnet, URL or JSON body) |
-| POST | `/api/v1/add-file` | add a .torrent file upload |
+| POST | `/api/v1/add` | add a torrent (magnet, URL or JSON body); content_layout = Original, Subfolder or NoSubfolder (empty = Original) |
+| POST | `/api/v1/add-file` | add a .torrent file upload (same content_layout) |
 | GET | `/api/v1/config` | daemon configuration |
 | POST | `/api/v1/config` | change the daemon configuration |
 | POST | `/api/v1/create-torrent` | create a .torrent from a folder |
@@ -426,7 +426,7 @@ The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 | POST | `/api/v2/torrentcreator/deleteTask` | delete a creation task |
 | GET | `/api/v2/torrentcreator/status` | creation task status |
 | GET | `/api/v2/torrentcreator/torrentFile` | download the created .torrent |
-| POST | `/api/v2/torrents/add` | add torrents |
+| POST | `/api/v2/torrents/add` | add torrents (contentLayout, or the older root_folder; none = the torrent_content_layout preference) |
 | POST | `/api/v2/torrents/addPeers` | add peers |
 | POST | `/api/v2/torrents/addTags` | add tags to torrents |
 | POST | `/api/v2/torrents/addTrackers` | add trackers |

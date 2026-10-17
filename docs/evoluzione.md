@@ -365,6 +365,11 @@ Recorded with the reason, so the ground is not re-covered:
   and download stay in step), so there would be no gain; to be reopened only with
   storage genuinely slower than the network.
 - **Specialist fields in the add form**: no request, it would be preventive fluff.
+- **A content layout in Gextto's Add dialog**: Gextto addresses a download by its
+  content root and renames it into the library anyway, so the layout of the download
+  folder buys nothing there and a root-less download would break the import. The
+  engine has it (Original, Subfolder, NoSubfolder) for gx-torrent standalone and its
+  qBittorrent API (§6).
 - **A UI benchmark as a performance test in CI**: SSR rendering costs ~1–3 ms/page,
   it is not a problem.
 - **A cache cap on slow storage (NFS)**: the cache self-regulates
@@ -396,7 +401,8 @@ the libtorrent semantics (**−1 = inherit the global one, 0 = unlimited**).
 **What the engine has.** Protocol: BitTorrent v1 and v2-only (from `.torrent` and
 magnet, BEP 52), dual-stack IPv6 (`peers6`, PEX v6, DHT BEP 32, LSD IPv6/BEP 14) and
 uTP. Per torrent: download/upload limits, connection and upload-slot limits, per-piece
-priority and diagnostics, **graduated file priority 0–7**, tracker removal and hot
+priority and diagnostics, **graduated file priority 0–7**, the qBittorrent **content
+layout** at add time (Original, Subfolder, NoSubfolder), tracker removal and hot
 add/remove, tracker scrape (BEP 48, HTTP and UDP), a runtime sequential toggle, web
 seed, **super-seeding** (BEP 16) and **holepunching** (BEP 55, peer relay over uTP). Port
 mapping and NAT: **PCP** (RFC 6887, our own minimal client, tried after UPnP and before
@@ -618,8 +624,6 @@ recovered from a shell without editing the database.
 
 - **Virtualising the torrent table** beyond the 300-row window with *Show more*,
   for sessions with more than a thousand torrents.
-- **A content layout in the Add dialog**, which needs engine support: the save
-  path is per torrent or per category.
 - **DLNA library folders.** On the gx-torrent settings page, the *Library folders*
   field of *Media server (DLNA)* should propose the configured **Download
   folder** at least, so the folder that already holds the completed media is a

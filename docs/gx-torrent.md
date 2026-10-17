@@ -668,7 +668,21 @@ priorities (`increasePrio`, `decreasePrio`, `topPrio`, `bottomPrio`), the
 renames (`rename`, `renameFile`, `renameFolder`) and `app/shutdown` (a clean
 stop, standalone only). A rename closes the session (so the files are closed),
 moves the content on disk with a rollback on failure, persists the new paths in
-the resume and reopens: the `.torrent` identity is never changed. A rename that
+the resume and reopens: the `.torrent` identity is never changed.
+The **content layout** chosen when adding (`content_layout` on `/api/v1/add`,
+`contentLayout` or the older `root_folder` on `torrents/add`, the
+`torrent_content_layout` preference as default, a select in the add dialog and
+in the settings) uses the same path override without any move: *Original* keeps
+the metainfo paths, *Subfolder* puts a single file in a folder named after it
+(without the extension), *NoSubfolder* drops the root folder of a multi-file
+torrent. It is applied before allocation — at once for a `.torrent`, when the
+metadata arrives for a magnet (the choice is kept in the resume as
+`content_layout`, so a restart in between does not lose it) — and a layout
+that changes nothing or would make two files collide leaves the paths as they
+are. A NoSubfolder torrent has no folder of its own: its `content_path` is the
+save path, and a move or a removal with data handles its files one by one and
+removes only the folders they leave empty, never a file that is not the
+torrent's (`payload.go`). A rename that
 would make two files share a path, turn a file into a folder or land on a file
 already on disk (not part of the torrent) is refused before anything moves. The
 new display name is kept as an override (`display_name` in the resume) on top

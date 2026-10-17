@@ -45,6 +45,7 @@ var Keys = struct {
 	SuperSeeding      []byte
 	FilePaths         []byte
 	DisplayName       []byte
+	ContentLayout     []byte
 	Version           []byte
 }{
 	InfoHash:          []byte("info_hash"),
@@ -71,6 +72,7 @@ var Keys = struct {
 	SuperSeeding:      []byte("super_seeding"),
 	FilePaths:         []byte("file_paths"),
 	DisplayName:       []byte("display_name"),
+	ContentLayout:     []byte("content_layout"),
 	Version:           []byte("version"),
 }
 
@@ -146,6 +148,7 @@ func (r *Resumer) Write(torrentID string, spec *Spec) error {
 		_ = b.Put(Keys.SuperSeeding, []byte(strconv.FormatBool(spec.SuperSeeding)))
 		_ = b.Put(Keys.FilePaths, filePaths)
 		_ = b.Put(Keys.DisplayName, []byte(spec.DisplayName))
+		_ = b.Put(Keys.ContentLayout, []byte(spec.ContentLayout))
 		_ = b.Put(Keys.Version, []byte(strconv.Itoa(version)))
 		return nil
 	})
@@ -273,6 +276,9 @@ func (r *Resumer) Read(torrentID string) (spec *Spec, err error) {
 		}
 		if v := b.Get(Keys.DisplayName); v != nil {
 			spec.DisplayName = string(v)
+		}
+		if v := b.Get(Keys.ContentLayout); v != nil {
+			spec.ContentLayout = string(v)
 		}
 		if err := readTrackers(b, spec); err != nil {
 			return err

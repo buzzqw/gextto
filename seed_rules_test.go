@@ -196,3 +196,29 @@ func TestSeedRulesAPIRoundTrip(t *testing.T) {
 		t.Fatalf("rules not read back: %+v", got)
 	}
 }
+
+// BenchmarkSeedPolicyPass measures what one EnforceSeedPolicy pass adds with
+// ten rules: reading them from the settings and resolving 100 torrents (the
+// origins come from one query, given here).
+func BenchmarkSeedPolicyPass(b *testing.B) {
+	cfg := DefaultConfig()
+	rules := make([]SeedRule, 10)
+	for i := range rules {
+		rules[i] = SeedRule{Name: "r", Source: "indexer" + string(rune('a'+i)), Ratio: floatPtr(1)}
+	}
+	raw, _ := json.Marshal(rules)
+	cfg.Settings[seedRulesKey] = string(raw)
+	views := make([]models.TorrentView, 100)
+	origins := map[string]seedOrigin{}
+	for i := range views {
+		views[i] = models.TorrentView{Hash: string(rune('A'+i%26)) + "x", SeedRatio: -1, SeedDays: -1}
+		origins[views[i].Hash] = seedOrigin{Source: "indexerj", Category: "series"}
+	}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		policy := &seedPolicy{cfg: &cfg, rules: seedRulesFrom(&cfg), origins: origins}
+		for j := range views {
+			_ = policy.limitsFor(&views[j])
+		}
+	}
+}

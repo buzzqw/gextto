@@ -99,10 +99,14 @@ type torrentMeta struct {
 	Sequential bool `json:"sequential,omitempty"`
 	FirstLast  bool `json:"first_last,omitempty"`
 	// SuperSeeding is BEP 16 super-seeding, a seeding strategy.
-	SuperSeeding bool      `json:"super_seeding,omitempty"`
-	RotatedAt    time.Time `json:"rotated_at,omitzero"`
-	SeedRatio    float64   `json:"seed_ratio"`
-	SeedDays     int64     `json:"seed_days"`
+	SuperSeeding bool `json:"super_seeding,omitempty"`
+	// ContentLayout is the qBittorrent content layout chosen at add time
+	// (empty = Original): with NoSubfolder the files have no folder of their
+	// own in the save path (payload.go).
+	ContentLayout string    `json:"content_layout,omitempty"`
+	RotatedAt     time.Time `json:"rotated_at,omitzero"`
+	SeedRatio     float64   `json:"seed_ratio"`
+	SeedDays      int64     `json:"seed_days"`
 	// Per-torrent speed limits in KiB/s: nil = inherit the global
 	// limit, 0 = unlimited, >0 = explicit. Pointers so a state file written
 	// before these existed still means "inherit".
@@ -1288,11 +1292,14 @@ func (d *Daemon) applySwarmLocked(meta *torrentMeta, rt *runtimeInfo, now time.T
 // ---------------------------------------------------------------------------
 
 type torrentInfo struct {
-	Hash           string  `json:"hash"`
-	ID             string  `json:"id"`
-	Name           string  `json:"name"`
-	State          string  `json:"state"`
-	SavePath       string  `json:"save_path"`
+	Hash     string `json:"hash"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	State    string `json:"state"`
+	SavePath string `json:"save_path"`
+	// ContentPath is where the content is: the content root under the save
+	// path, or the save path itself for a NoSubfolder multi-file torrent.
+	ContentPath    string  `json:"content_path,omitempty"`
 	Progress       float64 `json:"progress"`
 	TotalSize      int64   `json:"total_size"`
 	TotalDone      int64   `json:"total_done"`
@@ -1418,6 +1425,7 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtime
 		Name:             stats.Name,
 		State:            stateFor(meta, stats, moving),
 		SavePath:         meta.SavePath,
+		ContentPath:      payloadContentPath(t, meta, stats.Name),
 		Progress:         progress,
 		TotalSize:        stats.Bytes.Total,
 		TotalDone:        stats.Bytes.Completed,
@@ -1596,8 +1604,11 @@ type addRequest struct {
 	FirstLast bool
 	// SuperSeeding enables BEP 16 super-seeding, a seeding strategy.
 	SuperSeeding bool
-	SeedRatio    float64
-	SeedDays     int64
+	// ContentLayout is the qBittorrent content layout (torrent.ContentLayout*);
+	// empty = Original.
+	ContentLayout string
+	SeedRatio     float64
+	SeedDays      int64
 	// DownloadLimitKib/UploadLimitKib are per-torrent speed limits in KiB/s
 	// for a new torrent: nil = inherit the global limit, 0 = unlimited.
 	DownloadLimitKib *int64
@@ -1670,7 +1681,15 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		_ = os.Remove(d.linkPath(id))
 		return "", false, errors.New("session not available")
 	}
-	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true, Sequential: sequential, FirstLast: req.FirstLast, SuperSeeding: req.SuperSeeding}
+	layout, ok := torrent.ParseContentLayout(req.ContentLayout)
+	if !ok {
+		d.mu.Lock()
+		delete(d.adding, id)
+		d.mu.Unlock()
+		_ = os.Remove(d.linkPath(id))
+		return "", false, fmt.Errorf("unknown content layout %q", req.ContentLayout)
+	}
+	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true, Sequential: sequential, FirstLast: req.FirstLast, SuperSeeding: req.SuperSeeding, ContentLayout: layout}
 	var t *torrent.Torrent
 	if req.Magnet != "" {
 		t, err = session.AddURI(req.Magnet, opt)
@@ -1715,7 +1734,8 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		Sequential: req.Sequential || d.state.Config.Sequential,
 		FirstLast:  req.FirstLast,
 		// SuperSeeding is a per-torrent seeding strategy, not a queue default.
-		SuperSeeding: req.SuperSeeding,
+		SuperSeeding:  req.SuperSeeding,
+		ContentLayout: contentLayoutMeta(layout),
 		// BEP 53 "so": keep the magnet's file selection to apply when metadata
 		// arrives (the engine already uses it as a seed meanwhile).
 		SelectOnly: t.SelectOnly(),
@@ -1751,7 +1771,7 @@ func (d *Daemon) remove(key string, deleteFiles bool) error {
 		return errors.New("the torrent is being moved")
 	}
 	id := t.ID()
-	name := t.Stats().Name
+	data := payloadOf(t, meta, t.Stats().Name)
 	savePath := meta.SavePath
 	d.protectLegacyDir(id)
 	err := d.session.RemoveTorrent(id, false)
@@ -1767,7 +1787,7 @@ func (d *Daemon) remove(key string, deleteFiles bool) error {
 		return err
 	}
 	if deleteFiles {
-		return deletePayload(savePath, name)
+		return data.delete(savePath)
 	}
 	return nil
 }
@@ -1804,13 +1824,12 @@ func (d *Daemon) pause(key string) error {
 // longer at its save path (archived and renamed, or deleted): the engine would
 // re-create every file empty there, in the middle of the library.
 func errPayloadGone(t *torrent.Torrent, meta *torrentMeta) error {
-	root := contentRoot(t)
-	if meta.CompletedAt.IsZero() || root == "" {
+	if meta.CompletedAt.IsZero() || contentRoot(t) == "" {
 		return nil
 	}
-	path := filepath.Join(meta.SavePath, root)
-	if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("the downloaded data is no longer in %s", path)
+	data := payloadOf(t, meta, "")
+	if data.gone(meta.SavePath) {
+		return fmt.Errorf("the downloaded data is no longer in %s", data.contentPath(meta.SavePath))
 	}
 	return nil
 }
@@ -2162,16 +2181,17 @@ func (d *Daemon) move(key, destination string, associate bool) error {
 	}
 	from := meta.SavePath
 	name := stats.Name
+	data := payloadOf(t, meta, name)
 	d.mu.Unlock()
 	// Publish the "moving" state promptly: the read snapshot is refreshed by
 	// the tick, which may otherwise be up to Tick seconds away.
 	d.poke()
 
-	go d.finishMove(id, t, from, dest, name, wasRunning, associate, empty)
+	go d.finishMove(id, t, from, dest, name, data, wasRunning, associate, empty)
 	return nil
 }
 
-func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name string, wasRunning, associate, empty bool) {
+func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name string, data payload, wasRunning, associate, empty bool) {
 	// The engine stops asynchronously: wait until the files are closed.
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) && t.Stats().Status != torrent.Stopped {
@@ -2181,9 +2201,9 @@ func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name stri
 	switch {
 	case associate:
 	case empty:
-		err = discardEmptyPayload(from, dest, name)
+		err = data.discard(from, dest)
 	default:
-		err = movePayload(from, dest, name)
+		err = data.move(from, dest)
 	}
 	if err == nil {
 		err = d.pointLink(id, dest)
@@ -2771,4 +2791,26 @@ func (d *Daemon) setTags(key string, tags []string) error {
 	d.saveLocked()
 	d.poke()
 	return nil
+}
+
+// contentLayoutMeta is the layout recorded in the state: empty for Original,
+// so the state of every torrent added without a layout stays as it was.
+func contentLayoutMeta(layout string) string {
+	if layout == torrent.ContentLayoutOriginal {
+		return ""
+	}
+	return layout
+}
+
+// payloadContentPath is qBittorrent's content_path without listing the files:
+// the save path for loose files, the content root under it otherwise.
+func payloadContentPath(t *torrent.Torrent, meta *torrentMeta, name string) string {
+	if meta.ContentLayout == torrent.ContentLayoutNoSubfolder && t.FileCount() > 1 {
+		return meta.SavePath
+	}
+	root := t.ContentRoot()
+	if root == "" {
+		root = name
+	}
+	return filepath.Join(meta.SavePath, root)
 }

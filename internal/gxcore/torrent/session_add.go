@@ -46,6 +46,9 @@ type AddTorrentOptions struct {
 	// (BEP 53 "so"); empty wants everything. A magnet's "so" fills it when
 	// empty; Config.FileSelection wins over both.
 	SelectOnly []int
+	// ContentLayout is qBittorrent's content layout (ContentLayoutOriginal,
+	// ContentLayoutSubfolder, ContentLayoutNoSubfolder); empty = Original.
+	ContentLayout string
 }
 
 // ValidateTorrentFile reports whether data is a .torrent file the session would
@@ -101,6 +104,12 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 			s.releasePort(port)
 		}
 	}()
+	// The content layout overrides the storage paths before anything is
+	// allocated.
+	layoutPaths := layoutPaths(&mi.Info, opt.ContentLayout)
+	if layoutPaths != nil {
+		mi.Info.SetFilePaths(layoutPaths)
+	}
 	t, err := newTorrent(
 		s,
 		id,
@@ -132,6 +141,8 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		}
 	}()
 	t.pieceLayers = mi.PieceLayers
+	t.filePaths = layoutPaths
+	t.contentLayout = opt.ContentLayout
 	t.setSelectOnly(opt.SelectOnly)
 	layers, _ := metainfo.EncodePieceLayers(mi.PieceLayers)
 	rspec := &boltdbresumer.Spec{
@@ -148,6 +159,8 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		Sequential:        opt.Sequential,
 		FirstLast:         opt.FirstLast,
 		SuperSeeding:      opt.SuperSeeding,
+		FilePaths:         layoutPaths,
+		ContentLayout:     opt.ContentLayout,
 	}
 	if err = s.resumer.Write(id, rspec); err != nil {
 		return nil, err
@@ -265,6 +278,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		return nil, err
 	}
 	t.hasV2Hint = ma.HasV2
+	t.contentLayout = opt.ContentLayout
 	// BEP 53: the magnet "so" is the default selection; an explicit option wins.
 	wanted := opt.SelectOnly
 	if len(wanted) == 0 {
@@ -290,6 +304,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		Sequential:        opt.Sequential,
 		FirstLast:         opt.FirstLast,
 		SuperSeeding:      opt.SuperSeeding,
+		ContentLayout:     opt.ContentLayout,
 	}
 	if err = s.resumer.Write(id, rspec); err != nil {
 		return nil, err

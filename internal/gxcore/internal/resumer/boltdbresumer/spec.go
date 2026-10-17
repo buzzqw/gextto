@@ -43,7 +43,11 @@ type Spec struct {
 	// torrents/rename). Empty when the torrent was never renamed: the name then
 	// follows the metadata.
 	DisplayName string
-	Version     int
+	// ContentLayout is the qBittorrent content layout chosen at add time. A
+	// magnet still waiting for its metadata applies it when the info arrives,
+	// also after a restart.
+	ContentLayout string
+	Version       int
 }
 
 // jsonSpec is the JSON projection of Spec. Raw bytes ride base64-encoded,

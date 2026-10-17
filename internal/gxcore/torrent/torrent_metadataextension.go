@@ -110,6 +110,14 @@ func (t *torrent) installMetadata(id *infodownloader.InfoDownloader) {
 		t.stop(errors.New("private torrent from magnet"))
 		return
 	}
+	// The content layout chosen at add time becomes the storage paths now,
+	// before anything is allocated.
+	if t.applyContentLayout(info) {
+		if err := t.session.resumer.WriteFilePaths(t.id, t.filePaths); err != nil {
+			t.stop(fmt.Errorf("cannot write resume file paths: %w", err))
+			return
+		}
+	}
 	t.setInfo(info)
 	t.piecePool = bufferpool.New(int(info.PieceLength))
 	if err := t.session.resumer.WriteInfo(t.id, t.info().Bytes); err != nil {

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/bwschedule"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 	"github.com/buzzqw/gextto/internal/notify"
 	"github.com/buzzqw/gextto/internal/settings"
 	"github.com/buzzqw/gextto/internal/webui/assets"
@@ -181,6 +182,9 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	// Global autoTMM default (off unless enabled): new torrents follow their
 	// category's save path.
 	store.Set(autoTMMEnabledKey, strconv.FormatBool(formBool(r, "auto-tmm-enabled")))
+	if layout, ok := torrent.ParseContentLayout(r.FormValue("content-layout")); ok {
+		store.Set(contentLayoutKey, layout)
+	}
 	// Alternative web interface (VueTorrent) at the root address.
 	store.Set(altWebUISettingKey, strconv.FormatBool(formBool(r, "webui-alternative")))
 	if v, err := strconv.Atoi(strings.TrimSpace(r.FormValue("max-seeding-time"))); err == nil && v >= 0 {
@@ -420,6 +424,23 @@ func encryptionOptions(selected string) string {
 	return b.String()
 }
 
+// contentLayoutOptions renders the default content layout select.
+func contentLayoutOptions(selected string) string {
+	var b strings.Builder
+	for _, option := range []struct{ value, label string }{
+		{torrent.ContentLayoutOriginal, "Original"},
+		{torrent.ContentLayoutSubfolder, "Create subfolder"},
+		{torrent.ContentLayoutNoSubfolder, "Don't create subfolder"},
+	} {
+		mark := ""
+		if option.value == selected {
+			mark = " selected"
+		}
+		b.WriteString(`<option value="` + option.value + `"` + mark + `>` + html.EscapeString(option.label) + `</option>`)
+	}
+	return b.String()
+}
+
 // languageOptions renders the UI language select with the endonyms.
 func languageOptions(selected string) string {
 	selected = strings.ToLower(strings.TrimSpace(selected))
@@ -513,6 +534,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{OPT_STATUS}}", d.optimizationStatusHTML())
 	repl("{{IPFILTER_TRACKERS}}", checkedIf(!strings.EqualFold(strings.TrimSpace(store.Get("ipfilter-trackers", "true")), "false")))
 	repl("{{ENC_OPTIONS}}", encryptionOptions(store.Get("encryption", "1")))
+	repl("{{LAYOUT_OPTIONS}}", contentLayoutOptions(d.defaultContentLayout()))
 	repl("{{DHT_BOOTSTRAP}}", get("dht-bootstrap"))
 	repl("{{DHT_ON}}", checkedIf(featureOn("dht")))
 	repl("{{PEX_ON}}", checkedIf(featureOn("pex")))

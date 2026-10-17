@@ -317,7 +317,9 @@ everything a standalone client needs.
   ordered PASS/FAIL rules, live match previews, rule templates, feed tests,
   pasted feed lists, and a local **archive** of everything the feeds returned.
 - **Operations.** Limits, the per-weekday scheduler, latency auto-speed, one-click
-  optimisation, IP filter with scheduled refresh, categories and tags, port test.
+  optimisation, IP filter with scheduled refresh, categories and tags, port test;
+  seeding limits by ratio, time and **inactivity**, and qBittorrent's **content
+  layout** (original, create subfolder, no subfolder) when adding.
 - **Notifications** on the same channels as Gextto, with a test button.
 - **Updates itself** from the CI builds when its own code changed, verified by
   SHA-256, with automatic rollback.

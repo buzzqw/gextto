@@ -137,6 +137,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	t.pieceLayers = layers
 	t.filePaths = append([]string(nil), spec.FilePaths...)
 	t.displayName = spec.DisplayName
+	t.contentLayout = spec.ContentLayout
 	go s.checkTorrent(t)
 	delete(s.availablePorts, spec.Port)
 
@@ -211,6 +212,7 @@ func (s *Session) CompactDatabase(output string) error {
 			FirstLast:         t.torrent.firstLast,
 			SuperSeeding:      t.torrent.superSeeding,
 			FilePaths:         t.torrent.filePaths,
+			ContentLayout:     t.torrent.contentLayout,
 		}
 		if err := res.Write(t.torrent.id, spec); err != nil {
 			return err

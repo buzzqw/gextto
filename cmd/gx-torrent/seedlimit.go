@@ -8,6 +8,7 @@ package main
 // standalone.
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,9 @@ const (
 	// that uploaded nothing for that many minutes while seeding stops.
 	maxInactiveSeedingTimeEnabledKey = "max-inactive-seeding-time-enabled"
 	maxInactiveSeedingTimeKey        = "max-inactive-seeding-time"
+	// contentLayoutKey is the default content layout of the torrents added
+	// from the page and the compatible API (qBittorrent torrent_content_layout).
+	contentLayoutKey = "torrent-content-layout"
 	// autoTMMEnabledKey is the global default for qBittorrent automatic torrent
 	// management (the per-torrent flag is what actually drives a relocation).
 	autoTMMEnabledKey = "auto-tmm-enabled"
@@ -109,4 +113,32 @@ func (d *Daemon) seedIdleReached(rt *runtimeInfo, meta *torrentMeta, stats torre
 	}
 	minutes := d.settingInt(maxInactiveSeedingTimeKey, -1)
 	return minutes > 0 && now.Sub(rt.seedIdleSince) >= time.Duration(minutes)*time.Minute
+}
+
+// defaultContentLayout is the content layout of a torrent added without one
+// from the page or the compatible API (Original unless set in the settings).
+func (d *Daemon) defaultContentLayout() string {
+	if d.opts.Settings == nil {
+		return torrent.ContentLayoutOriginal
+	}
+	if layout, ok := torrent.ParseContentLayout(d.opts.Settings.Get(contentLayoutKey, "")); ok {
+		return layout
+	}
+	return torrent.ContentLayoutOriginal
+}
+
+// qbitContentLayout reads the compatible API's add parameters: contentLayout,
+// or the older root_folder (true = Subfolder, false = NoSubfolder); neither
+// means the settings default.
+func (d *Daemon) qbitContentLayout(r *http.Request) string {
+	if layout := strings.TrimSpace(r.FormValue("contentLayout")); layout != "" {
+		return layout
+	}
+	switch strings.ToLower(strings.TrimSpace(r.FormValue("root_folder"))) {
+	case "true":
+		return torrent.ContentLayoutSubfolder
+	case "false":
+		return torrent.ContentLayoutNoSubfolder
+	}
+	return d.defaultContentLayout()
 }

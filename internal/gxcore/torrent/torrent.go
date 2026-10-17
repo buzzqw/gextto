@@ -114,6 +114,9 @@ type torrent struct {
 	// written to the resume on the full-spec writes and applied to the info
 	// before allocation. Set by the resume loader and by the rename methods.
 	filePaths []string
+	// contentLayout is the qBittorrent content layout chosen at add time
+	// (content_layout.go); a magnet applies it when its metadata arrives.
+	contentLayout string
 
 	// Peer pumps and registries.
 	peerDisconnectedC chan *peer.Peer

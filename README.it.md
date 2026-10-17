@@ -332,7 +332,9 @@ semplice con tutto ciò che serve a un client autonomo.
   tutto ciò che i feed hanno restituito.
 - **Gestione.** Limiti, programmazione per giorno, auto-speed sulla latenza,
   ottimizzazione con un clic, filtro IP con aggiornamento programmato, categorie
-  e tag, test della porta.
+  e tag, test della porta; limiti di seed per ratio, tempo e **inattività**, e il
+  **content layout** di qBittorrent (originale, crea sottocartella, nessuna
+  sottocartella) all'aggiunta.
 - **Notifiche** sugli stessi canali di Gextto, con un pulsante di prova.
 - **Si aggiorna da solo** dalle build della CI quando cambia il suo codice,
   verificato SHA-256, con ripristino automatico.

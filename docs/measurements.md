@@ -110,6 +110,8 @@ when a change is meant to be an optimisation. A single pass is noise.
 | `BenchmarkCriteriaMatch` (RSS rule, 4 names) | 142 ns/op, 0 B, 0 allocs | scans the title in place |
 | `BenchmarkRateHistoryAdd` / `LifetimeAccumulate` | 42 / 6.4 ns/op, 0 allocs | the statistics page costs nothing on the sampling path |
 | `BenchmarkRateHistorySnapshot1h` / `StatsPageTranslate` | 11.3 µs, 20 KiB, 1 alloc / 255 µs, 89 KiB, 1,919 allocs | one snapshot and one page translation per graph request |
+| `BenchmarkSeedPolicyPass` (10 seed rules, 100 torrents) | 41.4 µs, 5.2 KB, 128 allocs per pass | what the seed rules add to one `EnforceSeedPolicy` pass (every few seconds), plus one `torrent_meta` query only when rules exist; measured 2026-10-17 on the N97 |
+| `BenchmarkPayloadContentPath` (2,000-file torrent) | Original 207 ns, 64 B, 1 alloc; NoSubfolder 1.65 µs, 0 allocs | the `content_path` every list refresh now computes per torrent (content layout); measured 2026-10-17 on the N97 |
 
 ## 4. Investigations and decisions
 

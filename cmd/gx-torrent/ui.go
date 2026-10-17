@@ -898,6 +898,10 @@ func (d *Daemon) uiFinishAdd(w http.ResponseWriter, r *http.Request, req addRequ
 		d.uiDone(w, r, "", err)
 		return
 	}
+	// The page's "Default" layout is the one chosen in the settings.
+	if req.ContentLayout == "" {
+		req.ContentLayout = d.defaultContentLayout()
+	}
 	_, existing, err := d.add(req)
 	if err != nil {
 		d.uiDone(w, r, "", err)

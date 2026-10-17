@@ -259,6 +259,9 @@ func addRequestFromForm(r *http.Request) addRequest {
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 		Category:       strings.TrimSpace(r.FormValue("category")),
+		// content_layout: Original, Subfolder or NoSubfolder (qBittorrent);
+		// empty = Original through the API, the settings default from the page.
+		ContentLayout: strings.TrimSpace(r.FormValue("content_layout")),
 	}
 	// Per-torrent limits (KiB/s): empty = inherit the global limit,
 	// 0 = unlimited. formInt cannot tell "empty" from 0, so read raw.
