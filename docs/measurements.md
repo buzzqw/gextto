@@ -279,21 +279,26 @@ reload or when the value changes. Live service 12 minutes after the restart (2 t
 uptime); `gx-torrent` RSS **104.6 MB**, 0.3 % CPU (before: 115.7 MB, 0.7 %, at 106 min) —
 no regression.
 
-**Live CPU and memory, idle vs downloading (2026-10-17, Intel N97, 4 cores).** The
-TUI's *Sistema* row reads the whole-machine CPU (`cpu_percent`, `/proc/stat`) and the
-*Daemon* row `gexttod`'s own (`process_cpu_percent`), so the two are different
-numbers. A 100 % reading is the machine: while Jellyfin analysed two freshly archived
-episodes (`jellyfin-ffmpeg`, two `blackframe` jobs at 100–216 % each, nice 10) the host
-sat at 100 % on 4 cores (load ~14) with `gexttod` at ~2 %. `gx-torrent` is
-**load-proportional**: **~100 % of one core** while downloading six torrents at
-~8 MiB/s with 19–120 peers (75 % user / 25 % sys; syscalls dominated by
-`epoll_pwait`/`recvfrom`/`sendto`/`futex`), and back to **~3–5 %** once the downloads
-finish. Memory: after a restart the process sits at **RSS 110 MB (RssAnon 94 MB),
-heap in use ~44 MB** — dominated by the 34 MB IP-filter file kept in memory — and
-stays flat while idle (91→93→72 MB over four minutes, 85 goroutines, no growth); the
-**previous** process, after ~40 min under that same load, held **RssAnon ~960–1030 MB**
-and released it only on restart, a load-time high-water mark to attribute from a heap
-profile taken during a burst (opt-in `GX_TORRENT_PPROF`).
+**Live CPU and memory, profiled during a download burst (2026-10-17, Intel N97, 4 cores).**
+The TUI's *Sistema* row reads the whole-machine CPU (`cpu_percent`, `/proc/stat`) and the
+*Daemon* row `gexttod`'s own (`process_cpu_percent`), so a 100 % reading is the machine:
+while Jellyfin analysed two freshly archived episodes (`jellyfin-ffmpeg`, two `blackframe`
+jobs at 100–216 % each, nice 10) the host sat at 100 % with `gexttod` at ~2 %.
+`gx-torrent` (build 220, opt-in `GX_TORRENT_PPROF`) is load-proportional. A 40 s CPU
+profile taken by a burst watcher at **3.9 MB/s, 44 peers** shows **8.98 s of samples =
+22.5 % of one core** (~57 ns/byte, ~17 MB/s per core): **29 % syscalls** (peer reads,
+disk), **31.5 % cumulative in `peerreader.readPiece`** — of which **MSE decrypt
+(`mse.Conn.Read` → `cipher.StreamReader`) 23.4 %, RC4 flat 10.1 %** — **SHA-1 4.7 %**
+(piece hashing), the rest Go runtime (futex 8.5 %, `selectgo`, `memclr`/`memmove`); no
+hot loop. Heap in use during the burst **159 MB**: **112 MB (70 %) in the piece buffer
+pool** (`bufferpool`, one buffer per piece length, reused through `sync.Pool`) and 33 MB
+the IP-filter file; RSS 368 MB, 463 goroutines (~10 per peer connection). After the burst
+the heap in use settles at **180 MB** (71 % the **read cache**, `cachedpiece.ReadAt`, plus
+the 33 MB IP filter) while RSS stays **~920 MB**: Go keeps the freed arenas mapped
+(high-water, not a leak). Idle CPU ~0.4 %; right after a restart RSS is **90–110 MB** and
+flat. Allocations since start **9.4 GB**, dominated by `utp.(*Socket).reader` (2.9 GB) and
+the piece pool (2.6 GB) — candidates for a future allocation reduction, not a current
+defect. `gexttod` stayed at ~2 % CPU / ~68 MB throughout.
 
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
