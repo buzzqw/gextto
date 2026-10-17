@@ -385,16 +385,30 @@ handshakes (`mse.keyPair` 4.6 %) and the DHT loop, which is real traffic, with n
 spinning loop. The ~330 `nanosleep`/s are the Go scheduler's own wake-ups. Without a
 measured excess there is nothing to change.
 
-**Feed archive: where the 572 MB go** (2026-10-17, live `gextto_archive.db`, 446,994 rows,
-`dbstat`): the table 264 MB, the automatic index of `magnet TEXT UNIQUE` **207 MB** (the
-average magnet is 399 bytes, tracker list included), `idx_archive_title` 45 MB (never
-used: titles are matched through FTS or `lower(title) LIKE`), FTS 23 MB, other
-indexes 29 MB. Only 126,601 distinct infohashes (plus 49,390 `.torrent` URLs): most rows
-are the same torrent under another magnet string. A trial on a copy enforced the
-uniqueness through a 16-byte digest of the exact magnet instead of the text, with the
-same dedup and the ids and FTS index kept, and dropped the title index: **572 → 352 MB
-(−38 %)**, 7 s including the VACUUM, FTS integrity check passing. The rebuild of the
-live database is waiting for a decision (see [`evoluzione.md`](evoluzione.md) §8).
+**Feed archive: compact magnet key** (2026-10-17, live `gextto_archive.db`, 446,994 rows,
+`dbstat`). Before, the 572 MB were: the table 264 MB, the automatic index of
+`magnet TEXT UNIQUE` **207 MB** (the average magnet is 399 bytes, tracker list included),
+`idx_archive_title` 45 MB (never used: titles are matched through FTS or
+`lower(title) LIKE`), FTS 23 MB, other indexes 29 MB. Only 126,601 distinct infohashes
+(plus 49,390 `.torrent` URLs): most rows are the same torrent under another magnet
+string, kept apart on purpose (titles and trackers differ between indexers). The
+uniqueness is now enforced on `magnet_key`, the first 16 bytes of the SHA-256 of the exact
+magnet, so the dedup is unchanged, and the title index is gone. The one-off rebuild at
+start-up (ids kept, so the FTS index stays valid; then VACUUM) took **8.2 s** on the live
+service: **599 → 352 MB (−41 %)**, `quick_check` ok, the 446,994 rows and the FTS search
+intact (a copy of the original was kept before the rebuild). `BenchmarkArchiveSaveBatch`
+(1000 releases with ~400-byte magnets, half already known, into 50,000 rows):
+
+| | ns/op | B/op | allocs/op | file |
+|---|---|---|---|---|
+| magnet `UNIQUE` | 58.7–59.1 ms | 2.64 MB | 40,016 | 57.7 MiB |
+| `magnet_key` | **52.9–54.0 ms** | 2.80 MB | 44,018 | **38.2 MiB** |
+
+−10 % per batch and −34 % on disk. The +4 allocations per row (+160 B) are the 16-byte key
+handed to the driver. The magnet is hashed through a stack buffer, so it is not copied.
+The exact-magnet lookups (`Delete`, `CanonicalizeTorrentURL`) go through the key, and
+`Delete` by infohash now uses the `lower(COALESCE(magnet_hash,''))` index instead of a
+full scan.
 
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes

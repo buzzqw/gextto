@@ -793,13 +793,6 @@ recovered from a shell without editing the database.
   included); measuring further needs a multi-peer swarm on a fast link, neither
   available here.
 
-- **A compact feed archive.** The uniqueness of an archived release is the exact magnet
-  text, held in an automatic index that is 207 MB of the 572 MB archive. A 16-byte digest
-  of the same text would keep the dedup identical at 38 % less disk, smaller daily
-  backups and cheaper inserts ([`measurements.md`](measurements.md), *Feed archive*).
-  Gate: a one-off rebuild of the live table (new table, rows copied with their ids,
-  VACUUM), to be run with a backup at hand.
-
 **Product-surface refinements.**
 
 - **DLNA library folders.** On the gx-torrent settings page, the *Library folders*

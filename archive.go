@@ -1,13 +1,17 @@
 package gextto
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
+	"modernc.org/sqlite"
 )
 
 // Archive is the durable catalogue of every release that passed through the
@@ -52,8 +56,87 @@ type ArchivePage struct {
 	Pages int            `json:"pages"`
 }
 
-// archiveSchema mirrors the batch executed by `Archive::open` verbatim.
-const archiveSchema = `CREATE TABLE IF NOT EXISTS archive (id INTEGER PRIMARY KEY, title TEXT NOT NULL, magnet TEXT NOT NULL UNIQUE, magnet_hash TEXT, source TEXT, quality_score INTEGER, added_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_archive_title ON archive(title); CREATE INDEX IF NOT EXISTS idx_archive_added ON archive(added_at DESC); CREATE VIRTUAL TABLE IF NOT EXISTS archive_fts USING fts5(title, content='archive', content_rowid='id'); CREATE TRIGGER IF NOT EXISTS archive_fts_ai AFTER INSERT ON archive BEGIN INSERT INTO archive_fts(rowid,title) VALUES (new.id,new.title); END; CREATE TRIGGER IF NOT EXISTS archive_fts_ad AFTER DELETE ON archive BEGIN INSERT INTO archive_fts(archive_fts,rowid,title) VALUES('delete',old.id,old.title); END; CREATE TRIGGER IF NOT EXISTS archive_fts_au AFTER UPDATE OF title ON archive BEGIN INSERT INTO archive_fts(archive_fts,rowid,title) VALUES('delete',old.id,old.title); INSERT INTO archive_fts(rowid,title) VALUES(new.id,new.title); END;`
+// archiveSchema creates the archive. A release is unique by its exact magnet
+// (or `.torrent` URL), enforced through magnet_key, a 16-byte digest of it: a
+// UNIQUE index on the magnet text itself (≈400 bytes with the tracker list)
+// was 207 MB of a 572 MB archive. Titles are searched through archive_fts, so
+// there is no plain index on them.
+const archiveSchema = `CREATE TABLE IF NOT EXISTS archive (id INTEGER PRIMARY KEY, title TEXT NOT NULL, magnet TEXT NOT NULL, magnet_key BLOB NOT NULL UNIQUE, magnet_hash TEXT, source TEXT, quality_score INTEGER, added_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_archive_added ON archive(added_at DESC); CREATE VIRTUAL TABLE IF NOT EXISTS archive_fts USING fts5(title, content='archive', content_rowid='id'); CREATE TRIGGER IF NOT EXISTS archive_fts_ai AFTER INSERT ON archive BEGIN INSERT INTO archive_fts(rowid,title) VALUES (new.id,new.title); END; CREATE TRIGGER IF NOT EXISTS archive_fts_ad AFTER DELETE ON archive BEGIN INSERT INTO archive_fts(archive_fts,rowid,title) VALUES('delete',old.id,old.title); END; CREATE TRIGGER IF NOT EXISTS archive_fts_au AFTER UPDATE OF title ON archive BEGIN INSERT INTO archive_fts(archive_fts,rowid,title) VALUES('delete',old.id,old.title); INSERT INTO archive_fts(rowid,title) VALUES(new.id,new.title); END;`
+
+// archiveMagnetKeySQL is the SQL function computing magnet_key.
+const archiveMagnetKeySQL = "gextto_magnet_key"
+
+func init() {
+	sqlite.MustRegisterDeterministicScalarFunction(archiveMagnetKeySQL, 1, func(_ *sqlite.FunctionContext, args []driver.Value) (driver.Value, error) {
+		switch value := args[0].(type) {
+		case string:
+			return archiveMagnetKeyString(value), nil
+		case []byte:
+			return archiveMagnetKey(value), nil
+		case nil:
+			return nil, nil
+		default:
+			return archiveMagnetKey([]byte(fmt.Sprint(value))), nil
+		}
+	})
+}
+
+// archiveMagnetKey is the first 16 bytes of the SHA-256 of the exact magnet:
+// collision-free in practice, so the dedup is the same as on the full text.
+func archiveMagnetKey(magnet []byte) []byte {
+	sum := sha256.Sum256(magnet)
+	return sum[:16]
+}
+
+// archiveMagnetKeyString is archiveMagnetKey for a string, hashing through a
+// stack buffer so a typical magnet costs no copy on the heap.
+func archiveMagnetKeyString(magnet string) []byte {
+	var buf [1024]byte
+	if len(magnet) > len(buf) {
+		return archiveMagnetKey([]byte(magnet))
+	}
+	return archiveMagnetKey(append(buf[:0], magnet...))
+}
+
+// migrateArchiveMagnetKey rebuilds an archive created before magnet_key: the
+// rows (ids included, so the FTS index stays valid) move to the new table, the
+// unused title index goes, and a VACUUM returns the freed pages to the disk.
+func migrateArchiveMagnetKey(db *sql.DB) error {
+	columns, err := tableColumns(db, "archive")
+	if err != nil || len(columns) == 0 || columns["magnet_key"] {
+		return err
+	}
+	started := time.Now()
+	logging.Info("archive: rebuilding the table with a compact magnet key (one-off)")
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	steps := []string{
+		"CREATE TABLE archive_new (id INTEGER PRIMARY KEY, title TEXT NOT NULL, magnet TEXT NOT NULL, magnet_key BLOB NOT NULL UNIQUE, magnet_hash TEXT, source TEXT, quality_score INTEGER, added_at TEXT NOT NULL)",
+		"INSERT OR IGNORE INTO archive_new(id,title,magnet,magnet_key,magnet_hash,source,quality_score,added_at) SELECT id,title,magnet," + archiveMagnetKeySQL + "(magnet),magnet_hash,source,quality_score,added_at FROM archive",
+		"DROP TABLE archive",
+		"ALTER TABLE archive_new RENAME TO archive",
+	}
+	for _, step := range steps {
+		if _, err := tx.Exec(step); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("archive migration: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if _, err := db.Exec(archiveSchema); err != nil {
+		return fmt.Errorf("archive schema: %w", err)
+	}
+	if _, err := db.Exec("VACUUM"); err != nil {
+		// The data is migrated; only the file size waits for the next VACUUM.
+		logging.Warn("archive: VACUUM after the migration failed", "error", err.Error())
+	}
+	logging.Info("archive: table rebuilt", "duration", time.Since(started).Round(time.Millisecond).String())
+	return nil
+}
 
 // OpenArchive opens (creating if needed) the archive database at path.
 func OpenArchive(path string) (*Archive, error) {
@@ -65,10 +148,17 @@ func OpenArchive(path string) (*Archive, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if err := migrateArchiveMagnetKey(db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	if _, err := db.Exec(archiveSchema); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("archive schema: %w", err)
 	}
+	// The plain title index is never used (titles are matched through FTS or
+	// lower(title) LIKE): it only cost space and write time.
+	_, _ = db.Exec("DROP INDEX IF EXISTS idx_archive_title")
 	var archiveCount int64
 	if err := db.QueryRow("SELECT COUNT(*) FROM archive").Scan(&archiveCount); err != nil {
 		_ = db.Close()
@@ -159,7 +249,7 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 		if value, ok := utils.MagnetHash(source); ok {
 			hash = value
 		}
-		if _, err := tx.Exec("INSERT OR IGNORE INTO archive(title,magnet,magnet_hash,source,quality_score,added_at) VALUES (?1,?2,?3,?4,?5,datetime('now'))", r.Title, source, hash, r.Source, cfg.ReleaseScore(r)); err != nil {
+		if _, err := tx.Exec("INSERT OR IGNORE INTO archive(title,magnet,magnet_key,magnet_hash,source,quality_score,added_at) VALUES (?1,?2,?6,?3,?4,?5,datetime('now'))", r.Title, source, hash, r.Source, cfg.ReleaseScore(r), archiveMagnetKeyString(source)); err != nil {
 			_ = tx.Rollback()
 			return err
 		}
@@ -200,8 +290,8 @@ func (a *Archive) CanonicalizeTorrentURL(torrentURL, magnet string) error {
 		return err
 	}
 	if _, err := tx.Exec(
-		"DELETE FROM archive WHERE magnet=?1 AND EXISTS (SELECT 1 FROM archive WHERE magnet=?2)",
-		torrentURL, magnet,
+		"DELETE FROM archive WHERE magnet_key=?1 AND magnet=?2 AND EXISTS (SELECT 1 FROM archive WHERE magnet_key=?3 AND magnet=?4)",
+		archiveMagnetKeyString(torrentURL), torrentURL, archiveMagnetKeyString(magnet), magnet,
 	); err != nil {
 		_ = tx.Rollback()
 		return err
@@ -211,8 +301,8 @@ func (a *Archive) CanonicalizeTorrentURL(torrentURL, magnet string) error {
 		hash = value
 	}
 	if _, err := tx.Exec(
-		"UPDATE OR IGNORE archive SET magnet=?1, magnet_hash=?2 WHERE magnet=?3",
-		magnet, hash, torrentURL,
+		"UPDATE OR IGNORE archive SET magnet=?1, magnet_key=?2, magnet_hash=?3 WHERE magnet_key=?4 AND magnet=?5",
+		magnet, archiveMagnetKeyString(magnet), hash, archiveMagnetKeyString(torrentURL), torrentURL,
 	); err != nil {
 		_ = tx.Rollback()
 		return err
@@ -564,13 +654,14 @@ func (a *Archive) Delete(magnet string) (bool, error) {
 	var query string
 	var args []any
 	if ok {
-		query = "DELETE FROM archive WHERE magnet=?1 OR lower(magnet_hash)=lower(?2)"
-		args = []any{magnet, hash}
+		// Both sides use an index: the magnet key and the hash expression.
+		query = "DELETE FROM archive WHERE (magnet_key=?1 AND magnet=?2) OR lower(COALESCE(magnet_hash,''))=lower(?3)"
+		args = []any{archiveMagnetKeyString(magnet), magnet, hash}
 	} else {
 		// No usable magnet hash: match only by the exact magnet link so an
 		// empty digest cannot delete unrelated rows with an empty magnet_hash.
-		query = "DELETE FROM archive WHERE magnet=?1"
-		args = []any{magnet}
+		query = "DELETE FROM archive WHERE magnet_key=?1 AND magnet=?2"
+		args = []any{archiveMagnetKeyString(magnet), magnet}
 	}
 	result, err := a.db.Exec(query, args...)
 	if err != nil {

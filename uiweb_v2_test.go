@@ -105,10 +105,10 @@ func TestV2SettingsRedirectUsesOnlyKnownLocalTargets(t *testing.T) {
 
 func TestV2ContentFilterArchiveCleanupSearchAndBulkDelete(t *testing.T) {
 	state := newTestAppState(t)
-	if _, err := state.archive.db.Exec(`INSERT INTO archive(title,magnet,source,added_at) VALUES
-		('Adult Porno Release 1','magnet:cleanup-1','feed','2026-01-01'),
-		('Adult Porno Release 2','magnet:cleanup-2','feed','2026-01-02'),
-		('Family Movie','magnet:keep','feed','2026-01-03')`); err != nil {
+	if _, err := state.archive.db.Exec(`INSERT INTO archive(title,magnet,magnet_key,source,added_at) VALUES
+		('Adult Porno Release 1','magnet:cleanup-1',gextto_magnet_key('magnet:cleanup-1'),'feed','2026-01-01'),
+		('Adult Porno Release 2','magnet:cleanup-2',gextto_magnet_key('magnet:cleanup-2'),'feed','2026-01-02'),
+		('Family Movie','magnet:keep',gextto_magnet_key('magnet:keep'),'feed','2026-01-03')`); err != nil {
 		t.Fatalf("insert archive fixtures: %v", err)
 	}
 	server := httptest.NewServer(Router(state))

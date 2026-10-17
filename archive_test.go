@@ -1,8 +1,11 @@
 package gextto
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -58,10 +61,10 @@ func TestRecentEntriesRespectTheLimit(t *testing.T) {
 
 func TestDeleteMatchingRemovesAllTitleMatchesOnly(t *testing.T) {
 	archive := openTestArchive(t)
-	if _, err := archive.db.Exec(`INSERT INTO archive(title,magnet,source,added_at) VALUES
-		('Adult Porno Release 1','magnet:porno-1','feed','2026-01-01'),
-		('Adult Porno Release 2','magnet:porno-2','feed','2026-01-02'),
-		('Family Movie','magnet:family','feed','2026-01-03')`); err != nil {
+	if _, err := archive.db.Exec(`INSERT INTO archive(title,magnet,magnet_key,source,added_at) VALUES
+		('Adult Porno Release 1','magnet:porno-1',gextto_magnet_key('magnet:porno-1'),'feed','2026-01-01'),
+		('Adult Porno Release 2','magnet:porno-2',gextto_magnet_key('magnet:porno-2'),'feed','2026-01-02'),
+		('Family Movie','magnet:family',gextto_magnet_key('magnet:family'),'feed','2026-01-03')`); err != nil {
 		t.Fatalf("insert archive fixtures: %v", err)
 	}
 	removed, err := archive.DeleteMatching("porno")
@@ -79,10 +82,10 @@ func TestDeleteMatchingRemovesAllTitleMatchesOnly(t *testing.T) {
 
 func TestArchiveContentPrefiltersPreviewAndDeleteMatching(t *testing.T) {
 	archive := openTestArchive(t)
-	if _, err := archive.db.Exec(`INSERT INTO archive(title,magnet,source,added_at) VALUES
-		('Adult Porno Movie','magnet:adult','feed','2026-01-01'),
-		('CJK 動画タイトル','magnet:cjk','feed','2026-01-02'),
-		('Family Movie','magnet:family','feed','2026-01-03')`); err != nil {
+	if _, err := archive.db.Exec(`INSERT INTO archive(title,magnet,magnet_key,source,added_at) VALUES
+		('Adult Porno Movie','magnet:adult',gextto_magnet_key('magnet:adult'),'feed','2026-01-01'),
+		('CJK 動画タイトル','magnet:cjk',gextto_magnet_key('magnet:cjk'),'feed','2026-01-02'),
+		('Family Movie','magnet:family',gextto_magnet_key('magnet:family'),'feed','2026-01-03')`); err != nil {
 		t.Fatalf("insert archive fixtures: %v", err)
 	}
 
@@ -108,7 +111,7 @@ func TestArchiveDeleteIDsBatchesAndDeduplicates(t *testing.T) {
 	archive := openTestArchive(t)
 	ids := make([]int64, 0, 501)
 	for index := 0; index < 501; index++ {
-		result, err := archive.db.Exec("INSERT INTO archive(title,magnet,source,added_at) VALUES (?1,?2,'test',datetime('now'))", fmt.Sprintf("Batch %d", index), fmt.Sprintf("magnet:batch-%d", index))
+		result, err := archive.db.Exec("INSERT INTO archive(title,magnet,magnet_key,source,added_at) VALUES (?1,?2,gextto_magnet_key(?2),'test',datetime('now'))", fmt.Sprintf("Batch %d", index), fmt.Sprintf("magnet:batch-%d", index))
 		if err != nil {
 			t.Fatalf("insert batch row %d: %v", index, err)
 		}
@@ -279,5 +282,121 @@ func TestStoresAndCanonicalizesTorrentURLs(t *testing.T) {
 	}
 	if entries[0][1] != magnet {
 		t.Fatalf("entry magnet = %q, want %q", entries[0][1], magnet)
+	}
+}
+
+// TestArchiveMigratesToMagnetKey pins the one-off rebuild of an archive created
+// before magnet_key: every row keeps its id and the FTS search still finds it,
+// the exact-magnet dedup holds, and the unused title index is gone.
+func TestArchiveMigratesToMagnetKey(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "archive.db")
+	legacy, err := OpenSQLite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const legacySchema = `CREATE TABLE archive (id INTEGER PRIMARY KEY, title TEXT NOT NULL, magnet TEXT NOT NULL UNIQUE, magnet_hash TEXT, source TEXT, quality_score INTEGER, added_at TEXT NOT NULL); CREATE INDEX idx_archive_title ON archive(title); CREATE INDEX idx_archive_added ON archive(added_at DESC); CREATE VIRTUAL TABLE archive_fts USING fts5(title, content='archive', content_rowid='id'); CREATE TRIGGER archive_fts_ai AFTER INSERT ON archive BEGIN INSERT INTO archive_fts(rowid,title) VALUES (new.id,new.title); END; CREATE TRIGGER archive_fts_ad AFTER DELETE ON archive BEGIN INSERT INTO archive_fts(archive_fts,rowid,title) VALUES('delete',old.id,old.title); END;`
+	if _, err := legacy.Exec(legacySchema); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := legacy.Exec(`INSERT INTO archive(id,title,magnet,magnet_hash,source,added_at) VALUES
+		(7,'Old Show S01E01','magnet:?xt=urn:btih:aaaa&tr=x','aaaa','feed','2026-01-01'),
+		(9,'Old Show S01E02','magnet:?xt=urn:btih:bbbb','bbbb','feed','2026-01-02')`); err != nil {
+		t.Fatal(err)
+	}
+	// A magnet longer than the stack buffer of archiveMagnetKeyString.
+	long := "magnet:?xt=urn:btih:cccc" + strings.Repeat("&tr=udp%3A%2F%2Ftracker.example.org%3A1337", 60)
+	if _, err := legacy.Exec("INSERT INTO archive(id,title,magnet,magnet_hash,source,added_at) VALUES (11,'Long Show S01E03',?1,'cccc','feed','2026-01-03')", long); err != nil {
+		t.Fatal(err)
+	}
+	_ = legacy.Close()
+
+	archive, err := OpenArchive(path)
+	if err != nil {
+		t.Fatalf("OpenArchive on a legacy archive: %v", err)
+	}
+	t.Cleanup(func() { _ = archive.Close() })
+	columns, err := tableColumns(archive.db, "archive")
+	if err != nil || !columns["magnet_key"] {
+		t.Fatalf("magnet_key missing after the migration: %v %v", columns, err)
+	}
+	var titleIndex int
+	if err := archive.db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE name='idx_archive_title'").Scan(&titleIndex); err != nil || titleIndex != 0 {
+		t.Fatalf("idx_archive_title kept: %d %v", titleIndex, err)
+	}
+	var id int64
+	if err := archive.db.QueryRow("SELECT id FROM archive WHERE magnet='magnet:?xt=urn:btih:bbbb'").Scan(&id); err != nil || id != 9 {
+		t.Fatalf("row id not kept: %d %v", id, err)
+	}
+	found, err := archive.Search("Old Show")
+	if err != nil || len(found) != 2 {
+		t.Fatalf("FTS after the migration = %v, %v; want 2 rows", found, err)
+	}
+	if !bytes.Equal(archiveMagnetKeyString(long), archiveMagnetKey([]byte(long))) {
+		t.Fatal("the long-magnet key differs from the plain digest")
+	}
+	var longKey []byte
+	if err := archive.db.QueryRow("SELECT magnet_key FROM archive WHERE id=11").Scan(&longKey); err != nil || !bytes.Equal(longKey, archiveMagnetKey([]byte(long))) {
+		t.Fatalf("long magnet key = %x, %v", longKey, err)
+	}
+	// The same exact magnet is still refused, a different string accepted.
+	if err := archive.SaveBatch([]models.Release{
+		{Title: "Dup", Magnet: "magnet:?xt=urn:btih:aaaa&tr=x"},
+		{Title: "Other trackers", Magnet: "magnet:?xt=urn:btih:aaaa&tr=y"},
+	}, &Config{}); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := archive.Count(); err != nil || count != 4 {
+		t.Fatalf("count after dedup = %d, %v; want 4", count, err)
+	}
+	if removed, err := archive.Delete("magnet:?xt=urn:btih:bbbb"); err != nil || !removed {
+		t.Fatalf("Delete by magnet = %v, %v", removed, err)
+	}
+	// Reopening an already migrated archive is a no-op.
+	_ = archive.Close()
+	again, err := OpenArchive(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = again.Close()
+}
+
+// benchArchiveMagnet is a realistic magnet: ~400 bytes with the tracker list.
+func benchArchiveMagnet(n int) string {
+	return fmt.Sprintf("magnet:?xt=urn:btih:%040x&dn=Some.Show.S01E%02d.1080p.WEB-DL.ITA.ENG&tr=udp%%3A%%2F%%2Ftracker.opentrackr.org%%3A1337%%2Fannounce&tr=udp%%3A%%2F%%2Fopen.stealth.si%%3A80%%2Fannounce&tr=udp%%3A%%2F%%2Ftracker.torrent.eu.org%%3A451%%2Fannounce&tr=udp%%3A%%2F%%2Fexodus.desync.com%%3A6969%%2Fannounce&tr=udp%%3A%%2F%%2Ftracker.tiny-vps.com%%3A6969", n, n%99)
+}
+
+// BenchmarkArchiveSaveBatch measures a feed pass archiving 1000 releases into
+// an archive that already holds 50,000 (half of them already known).
+func BenchmarkArchiveSaveBatch(b *testing.B) {
+	path := filepath.Join(b.TempDir(), "gextto_archive.db")
+	archive, err := OpenArchive(path)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer archive.Close()
+	cfg := &Config{}
+	seed := make([]models.Release, 50000)
+	for i := range seed {
+		seed[i] = models.Release{Title: fmt.Sprintf("Some Show S01E%02d %d", i%99, i), Magnet: benchArchiveMagnet(i)}
+	}
+	if err := archive.SaveBatch(seed, cfg); err != nil {
+		b.Fatal(err)
+	}
+	next := 50000
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		batch := make([]models.Release, 1000)
+		for j := range batch {
+			n := next - 500 + j
+			batch[j] = models.Release{Title: fmt.Sprintf("Some Show S01E%02d %d", n%99, n), Magnet: benchArchiveMagnet(n)}
+		}
+		next += 500
+		if err := archive.SaveBatch(batch, cfg); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+	if info, err := os.Stat(path); err == nil {
+		b.ReportMetric(float64(info.Size())/(1<<20), "MiB-file")
 	}
 }

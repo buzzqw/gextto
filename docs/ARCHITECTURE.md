@@ -88,7 +88,7 @@ qBittorrent-nox.
 | `config.go` | the `Config` model: read/write, generation, defaults. |
 | `database.go` | SQLite store: series, movies, torrents, feed history, provider backoff. |
 | `sqlite.go` | opening a SQLite DB with shared pragmas. |
-| `archive.go` | durable catalogue of archived releases. |
+| `archive.go` | durable catalogue of archived releases (SQLite + FTS5 on titles; a release is unique by its exact magnet through `magnet_key`, a 16-byte digest of it). |
 | `migrate.go` | migration of the data directory. |
 | `backup.go` | database backups (manual and scheduled). |
 | `library_alias.go` | helper for library persistence. |
