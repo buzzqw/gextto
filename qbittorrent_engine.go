@@ -138,6 +138,9 @@ type qbittorrentEngine struct {
 	lastAttempt  time.Time
 	lastErr      string
 	connected    bool
+	// torrentFileSeen remembers when each Gextto-owned `.torrent` was last
+	// found on disk, so the poll does not stat it on every tick.
+	torrentFileSeen map[string]time.Time
 
 	// identityMu guards the qBittorrent version shown in the UI header, fetched
 	// at most once per qbitVersionTTL.
@@ -561,13 +564,28 @@ func (e *qbittorrentEngine) sync() error {
 	// export and backend migration do not depend on qBittorrent retention. Do
 	// not perform the HTTP export while holding e.mu: an old qBittorrent can take
 	// seconds to answer and would block every read/control operation.
+	// A copy found on disk is trusted for gxTorrentFilesRecheck, like the
+	// gx-torrent adapter does.
+	if e.torrentFileSeen == nil {
+		e.torrentFileSeen = map[string]time.Time{}
+	}
+	for hash := range e.torrentFileSeen {
+		if _, ok := next[hash]; !ok {
+			delete(e.torrentFileSeen, hash)
+		}
+	}
 	var export []string
 	for hash, view := range next {
-		if view.HasMetadata {
-			target := filepath.Join(e.settings.stateDir, hash+".torrent")
-			if e.settings.stateDir != "" && !fileExists(target) {
-				export = append(export, hash)
-			}
+		if !view.HasMetadata || e.settings.stateDir == "" {
+			continue
+		}
+		if seen, ok := e.torrentFileSeen[hash]; ok && now.Sub(seen) < gxTorrentFilesRecheck {
+			continue
+		}
+		if fileExists(filepath.Join(e.settings.stateDir, hash+".torrent")) {
+			e.torrentFileSeen[hash] = now
+		} else {
+			export = append(export, hash)
 		}
 	}
 	e.mu.Unlock()

@@ -513,20 +513,34 @@ func tev_seedCopyWarningDue(warnings map[string]time.Time, hash string) bool {
 // detach sweeps
 // ---------------------------------------------------------------------------
 
+// notErrorRecheckInterval is how long DetachErrorTorrents trusts that a
+// torrent is not in error before reading its status again.
+const notErrorRecheckInterval = 30 * time.Second
+
 // DetachErrorTorrents implements `detach_error_torrents`: it removes torrents
 // that were already in the session when the daemon started and are persisted as
 // `error` (a leftover from a previous run; files are kept). Torrents added later
 // are never detached this way, so re-adding a previously failed torrent works.
-func DetachErrorTorrents(torrents TorrentSession, db *Database, startupHashes map[string]struct{}) {
+// notError, when not nil, remembers until when a torrent was found not in
+// error, so the 750 ms tick does not query every torrent kept from the startup.
+func DetachErrorTorrents(torrents TorrentSession, db *Database, startupHashes map[string]struct{}, notError map[string]time.Time) {
+	now := time.Now()
 	for _, torrent := range torrents.List() {
 		if _, known := startupHashes[strings.ToLower(torrent.Hash)]; !known {
+			continue
+		}
+		if until, ok := notError[torrent.Hash]; ok && now.Before(until) {
 			continue
 		}
 		status, err := db.TorrentStatus(torrent.Hash)
 		isError := err == nil && status != nil && *status == "error"
 		if !isError {
+			if notError != nil {
+				notError[torrent.Hash] = now.Add(notErrorRecheckInterval)
+			}
 			continue
 		}
+		delete(notError, torrent.Hash)
 		_, removeErr := torrents.Remove(torrent.Hash, false)
 		if removeErr != nil {
 			logging.Warn("failed to detach leftover error torrent",
@@ -547,15 +561,15 @@ func DetachCompletedArchivedSingles(cfg *Config, torrents TorrentSession, db *Da
 		return
 	}
 	for _, torrent := range torrents.List() {
-		meta, _ := db.TorrentMeta(torrent.Hash)
-		status, _ := db.TorrentStatus(torrent.Hash)
-		processed, _ := db.TorrentProcessed(torrent.Hash)
+		// The cheap row first: the metadata (a JSON decode) is read only for
+		// a completed and archived torrent.
+		status, processed, _ := db.TorrentStatusProcessed(torrent.Hash)
 		completed := status != nil && *status == "completed"
-		isPack := meta != nil && meta.Release.IsPack
-		if !completed || isPack {
+		if !completed || processed == nil || strings.TrimSpace(*processed) == "" {
 			continue
 		}
-		if processed == nil || strings.TrimSpace(*processed) == "" {
+		meta, _ := db.TorrentMeta(torrent.Hash)
+		if meta != nil && meta.Release.IsPack {
 			continue
 		}
 		processedPath := *processed
@@ -1186,20 +1200,25 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 		if torrent.SeedRatio == 0.0 || torrent.SeedDays == 0 {
 			continue
 		}
+		// The seed limits come from the session view alone: a torrent that has
+		// reached none of them and is not paused is skipped by the check below
+		// whatever the database says, so it costs no query at every tick.
+		ratioReached, timeReached := tev_seedLimitsReached(cfg, &torrent)
+		if !ratioReached && !timeReached && torrent.State != "paused" {
+			continue
+		}
 		// Real completeness, not just a momentary libtorrent state: a torrent
 		// that was relocated mid-download can briefly report "finished" while
 		// its file is still incomplete. Also recognize torrents already completed
 		// and archived in the database whose download files were moved to NAS.
-		status, _ := db.TorrentStatus(torrent.Hash)
-		processed, _ := db.TorrentProcessed(torrent.Hash)
+		status, processed, _ := db.TorrentStatusProcessed(torrent.Hash)
 		isArchived := processed != nil && strings.TrimSpace(*processed) != ""
 		isCompletedDB := status != nil && *status == "completed"
 		completed := (torrent.Progress >= 99.99 && torrent.TotalSize > 0 && torrent.TotalDone >= torrent.TotalSize) || isArchived || isCompletedDB
 		if !completed {
 			continue
 		}
-		ratioReached, timeReached := tev_seedLimitsReached(cfg, &torrent)
-		if !ratioReached && !timeReached && (!isArchived || torrent.State != "paused") {
+		if !ratioReached && !timeReached && !isArchived {
 			continue
 		}
 		archivedPack := tev_archivedPackSourceDisposable(db, torrent.Hash, torrent.SavePath)

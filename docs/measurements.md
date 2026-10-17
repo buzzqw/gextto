@@ -379,6 +379,33 @@ until the torrent's name changes, which is when the metadata arrives and the che
 matters. What is left: TLS handshakes of the outbound HTTP clients, the
 `RemoveSeededCompleted` status queries and the adapter's own HTTP poll.
 
+**gexttod in the first minutes after a start (builds 1788–1790, same host).** A profile
+that covers the start shows what the 60 s window above missed. These figures come from
+`GEXTTO_PPROF` and `strace -e connect`:
+
+| gexttod | window | CPU | stale-temp sweep | new TLS connections to TMDB |
+|---|---|---|---|---|
+| build 1788 | 180 s from start | 1.12 % | 1.32 s (65 % of the profile) | 66 in 150 s |
+| build 1789 (`WalkDir` sweep, shared TMDB transport) | 180 s from start | 0.62 % | 0.25 s | 110 in 180 s |
+| **build 1790** (calendar fan-out bounded, cache 15 min keyed by the series) | 300 s from start | **0.39 %** | 0.21 s | **8 in 300 s**, then none |
+
+The stale-temp sweep runs 60 s after the start and then every 30 minutes. It walks the
+download folders, the movie archive and every series folder on the NAS, up to four
+levels. `filepath.Walk` stat'ed each of the 32,672 entries. `filepath.WalkDir` takes the
+type from the directory listing and stats only the temporary names: on the live tree,
+with a warm cache, **843 → 550 ms CPU** and **1.92 → 1.68 s** per pass. With a cold
+cache, **7.3 → 1.7 s**. The TMDB connections were a calendar matter. The warm-up rebuilt
+the calendar every ~3 minutes with one goroutine per enabled series (55), so 55
+lookups started at once and each opened its own connection. Every `TmdbClient` also had a
+private transport, so nothing was reused across clients. Now one transport is shared
+(HTTP/2, 8 idle connections per host) and the calendar runs at most 8 lookups at a time.
+The calendar is reused for 15 minutes, and a change in the enabled series or their ids
+changes its key and rebuilds it at once. About 40,000 TMDB calls a day become about
+5,000. `RemoveSeededCompleted` and `DetachCompletedArchivedSingles` query the database only
+for the torrents the session view does not rule out: limits reached or paused for the
+first, completed and archived before the metadata decode for the second, with status and
+path read in one query. `DetachErrorTorrents` reuses a "not in error" verdict for 30 s.
+
 **gx-torrent at rest (same session, build 227).** 1.45 % of a core, of which 41 %
 syscalls and ~50 % `runtime.findRunnable`: the uTP state packets and sends, incoming MSE
 handshakes (`mse.keyPair` 4.6 %) and the DHT loop, which is real traffic, with no

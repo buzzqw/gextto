@@ -626,6 +626,8 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	// Torrents whose pack identity was found consistent, skipped for
 	// packIdentityRecheckInterval instead of decoding their metadata every tick.
 	packIdentityChecked := map[string]packIdentityCheck{}
+	// Startup torrents found not in error, skipped for notErrorRecheckInterval.
+	notErrorChecked := map[string]time.Time{}
 	storageMoveRetries := map[string]StorageMoveRetry{}
 	seedCopyWarnings := map[string]time.Time{}
 	// Storage moves are asynchronous. Keep post-seeding moves protected until
@@ -1347,7 +1349,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			// release it now instead of waiting for the next allocation burst.
 			TrimMemory()
 		}
-		DetachErrorTorrents(torrents, db, startupHashes)
+		DetachErrorTorrents(torrents, db, startupHashes, notErrorChecked)
 		DetachCompletedArchivedSingles(cfg, torrents, db)
 		RejectActivePackIdentityMismatches(torrents, db, packIdentityChecked)
 		// Remove completed torrents that have finished seeding before the seed

@@ -15,7 +15,9 @@ package gextto
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -830,14 +832,38 @@ func Calendar(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusConflict, "TMDB API key is not configured (nor a TVDB one)")
 		return
 	}
-	if cached, ok := cacheGet("calendar", 120*time.Second); ok {
+	key := calendarCacheKey(cfg)
+	if cached, ok := cacheGet(key, calendarCacheTTL); ok {
 		jsonResponse(w, cached)
 		return
 	}
 	response := gh0_buildCalendar(r.Context(), cfg)
-	cachePut("calendar", response)
+	cachePut(key, response)
 	jsonStatus(w, http.StatusOK, response)
 }
+
+// calendarCacheTTL is how long a calendar is reused. Air dates change once a
+// day at most; at 120 s the warm-up rebuilt it every ~3 minutes, two TMDB calls
+// per enabled series each time (~40,000 a day for 55 series).
+const calendarCacheTTL = 15 * time.Minute
+
+// calendarCacheKey ties the cached calendar to what it is built from: the
+// metadata provider, its language and the enabled series with their ids, so
+// adding, removing or re-identifying a series rebuilds it at once.
+func calendarCacheKey(cfg *Config) string {
+	hash := sha256.New()
+	meta := seriesMetadataFor(cfg)
+	fmt.Fprintf(hash, "%s\x00%s\x00", meta.Source(), cfg.TmdbLanguage())
+	for _, series := range cfg.Series {
+		if series.Enabled {
+			fmt.Fprintf(hash, "%s\x00%s\x00%s\x00", series.Name, series.TmdbID, series.TvdbID)
+		}
+	}
+	return "calendar:" + hex.EncodeToString(hash.Sum(nil)[:8])
+}
+
+// gh0CalendarParallel bounds the calendar's concurrent metadata lookups.
+const gh0CalendarParallel = 8
 
 func gh0_buildCalendar(ctx context.Context, cfg *Config) map[string]any {
 	meta := seriesMetadataFor(cfg)
@@ -849,11 +875,21 @@ func gh0_buildCalendar(ctx context.Context, cfg *Config) map[string]any {
 	}
 	items := make([]map[string]any, len(enabled))
 	var wg sync.WaitGroup
+	// A bounded fan-out: one goroutine per series sent every lookup at once,
+	// so each opened its own TLS connection to the provider (55 handshakes for
+	// 55 series) instead of sharing a few, and risked its rate limit.
+	slots := make(chan struct{}, gh0CalendarParallel)
 	for index := range enabled {
 		wg.Add(1)
 		go func(position int, series SeriesConfig) {
 			defer recoverGoroutine("series list")
 			defer wg.Done()
+			select {
+			case slots <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			defer func() { <-slots }()
 			seriesID, err := metadataSeriesID(ctx, meta, &series)
 			if err != nil || seriesID == nil {
 				return

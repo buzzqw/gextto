@@ -171,6 +171,21 @@ func NewTmdbClient(key *string) *TmdbClient {
 	return NewTmdbClientWithLanguage(key, "it-IT")
 }
 
+// tmdbTransport is shared by every TmdbClient. Clients are built per page,
+// per request and per worker pass: with a transport each, no connection was
+// reused and every TMDB call paid a new TCP + TLS handshake (66 in 150 s
+// after a start-up), leaving the idle connections of the old ones open.
+var tmdbTransport = &http.Transport{
+	Proxy:                 http.ProxyFromEnvironment,
+	DialContext:           (&net.Dialer{Timeout: 10 * time.Second}).DialContext,
+	ForceAttemptHTTP2:     true,
+	MaxIdleConns:          16,
+	MaxIdleConnsPerHost:   8,
+	IdleConnTimeout:       90 * time.Second,
+	TLSHandshakeTimeout:   10 * time.Second,
+	ExpectContinueTimeout: time.Second,
+}
+
 // NewTmdbClientWithLanguage mirrors `TmdbClient::with_language`.
 func NewTmdbClientWithLanguage(key *string, language string) *TmdbClient {
 	// tested `language.trim().is_empty()` but stored the original string.
@@ -180,11 +195,8 @@ func NewTmdbClientWithLanguage(key *string, language string) *TmdbClient {
 	}
 	return &TmdbClient{
 		client: &http.Client{
-			Timeout: 20 * time.Second,
-			Transport: &http.Transport{
-				Proxy:       http.ProxyFromEnvironment,
-				DialContext: (&net.Dialer{Timeout: 10 * time.Second}).DialContext,
-			},
+			Timeout:   20 * time.Second,
+			Transport: tmdbTransport,
 		},
 		key:      key,
 		language: stored,

@@ -3812,6 +3812,21 @@ func (d *Database) TorrentReason(hash string) (*string, error) {
 }
 
 // TorrentStatus returns the stored status of a torrent.
+// TorrentStatusProcessed returns TorrentStatus and TorrentProcessed in one
+// query: both nil when the torrent has no row.
+func (d *Database) TorrentStatusProcessed(hash string) (*string, *string, error) {
+	var status string
+	var processed sql.NullString
+	err := d.db.QueryRow("SELECT COALESCE(status,'queued'), processed_path FROM torrent_meta WHERE hash=?1", strings.ToLower(hash)).Scan(&status, &processed)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	return &status, nullStringPtr(processed), nil
+}
+
 func (d *Database) TorrentStatus(hash string) (*string, error) {
 	var status string
 	err := d.db.QueryRow("SELECT COALESCE(status,'queued') FROM torrent_meta WHERE hash=?1", strings.ToLower(hash)).Scan(&status)

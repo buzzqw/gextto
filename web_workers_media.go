@@ -125,9 +125,10 @@ func calendarWarmupWorker(state *AppState) {
 	for {
 		cfg := latestConfig(state)
 		if metadataConfigured(cfg) {
-			if _, ok := cacheGet("calendar", 120*time.Second); !ok {
+			key := calendarCacheKey(cfg)
+			if _, ok := cacheGet(key, calendarCacheTTL); !ok {
 				response := gh0_buildCalendar(context.Background(), cfg)
-				cachePut("calendar", response)
+				cachePut(key, response)
 			}
 		}
 		if !state.SleepBackground(60 * time.Second) {
