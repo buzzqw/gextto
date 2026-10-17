@@ -508,13 +508,39 @@ updated** popup with the commits it brought (`update-notes.json`).
 
 ### 4. Indexers: the manager as the single source
 
-Gextto treats the manager (**Jackett/Prowlarr**) as **a single aggregated source**
-and does not import its list of indexers: the manager is the only source of truth for
-indexers, categories, credentials, FlareSolverr and rate limits.
+The manager (**Jackett/Prowlarr**) is the only source of truth for indexers,
+categories, credentials, FlareSolverr and rate limits: Gextto stores none of it.
+
+**Searched one indexer at a time** (`indexer_lanes.go`). The manager's list is read at
+run time, cached for 10 minutes and never copied into the configuration: Prowlarr
+`/api/v1/indexer` with `/api/v1/indexerstatus`, Jackett Torznab `t=indexers`. Each
+indexer becomes a **lane**: Prowlarr `/api/v1/search?indexerIds=<id>`, Jackett
+`/api/v2.0/indexers/<id>/results/torznab/api`. The reason is how the managers behave.
+Prowlarr serves each indexer one search at a time, an aggregate answers when its
+slowest indexer has, and a search Gextto abandons at its timeout **keeps running
+inside Prowlarr** and queues the next ones behind it. Six concurrent aggregates with
+timeouts snowball until even a single search waits 120 s (measured, recovered once
+the backlog drained). Each lane therefore has its own slots: 1 for a Prowlarr indexer,
+which serves no more anyway, and 2 for Jackett, which answers in parallel and caches.
+At most one search per Prowlarr indexer is ever outstanding. Each lane also has its own
+timeout (90 s for Prowlarr, since waiting costs less than abandoning; 45 s for Jackett)
+and its own health: the backoff and the cycle warning name "prowlarr · TorrentLeech",
+not the whole manager. When a lane's queue, at its average time per search, would
+outlast what is left of a title's budget, that title skips the lane at once; this is
+not a failure, and a slow tracker serves the titles it can without holding the cycle.
+A tracker listed in both managers (here LimeTorrents and TorrentLeech) is searched
+**once**, through the lane that answers faster. A lane never measured is tried first,
+so each is tried once. The indexers Prowlarr reports as failing are skipped, the
+capabilities are each indexer's own instead of the intersection an aggregate needs,
+and an interactive search does not queue behind the cycle's. If the list cannot be
+read, the manager is queried as an aggregate, as before. The earlier prototype that
+**duplicated** the indexer list into Gextto's configuration (reverted below) is not
+this: nothing is duplicated, the list is read from the manager every time.
 
 - The manager type can be **declared** (`manager` in `config.go` and the UI) instead
   of inferred from URL, port or name; the inference remains as fallback.
-- A **timeout per source** keeps a single request below the search budget, and the
+- A **timeout per source** keeps a single request below the search budget (an
+  aggregate fallback gets 90 s, the title budget is 100 s), and the
   manager's health (Prowlarr `indexerstatus`) is shown in *Sources*: a broken or
   disabled indexer is visible instead of giving zero results in silence
   (`indexer_health.go`).
@@ -524,9 +550,9 @@ indexers, categories, credentials, FlareSolverr and rate limits.
 - A prototype that duplicated the indexer list was built, measured and **reverted**:
   no stability gain, only configuration drift.
 - Prowlarr's search API **ignores** season/episode and external-id (measured): they
-  are not forwarded, and `type` has no observed effect either. **Jackett's** indexer
-  list is not reachable with the Torznab key (its API redirects to the login), which
-  is irrelevant since only the aggregate is needed; Jackett exposes Torznab at
+  are not forwarded, and `type` has no observed effect either. **Jackett's** own
+  indexer API redirects to the login, but its Torznab `t=indexers` lists the
+  configured indexers with the Torznab key (what the lanes use); Jackett exposes Torznab at
   `/api/v2.0/indexers/all/results/torznab/api` instead of the generic `/api` (404),
   and `internal/torznab` infers the right one from the `:9117` port or from the
   name, with an automatic fallback on 404, shared between Gextto and gx-torrent.
@@ -806,17 +832,6 @@ recovered from a shell without editing the database.
 - **DLNA**: transcoding, frames extracted from the video (no ffmpeg), search and
   Xbox/WMP (`X_MS_MediaReceiverRegistrar`) are missing; browsing, Range playback,
   subtitles, library folders and artwork are in place (§3).
-- **Querying Jackett and Prowlarr per indexer.** A manager serves each of its indexers
-  one search at a time and an aggregate waits for the slowest
-  ([`measurements.md`](measurements.md), *Indexer managers under a cycle's load*).
-  The direction is one **lane per underlying indexer**: Prowlarr `indexerIds=<id>`,
-  Jackett `/api/v2.0/indexers/<id>/results/torznab`. Each lane gets the concurrency
-  its indexer actually serves (one or two, not six), a timeout from its measured time
-  per search and its own health, so a slow tracker costs only its own results. The
-  same tracker listed in both managers is searched once, through the faster one, and
-  the indexers a manager reports as failing (`/api/v1/indexerstatus`) are skipped.
-  Gate: the cycle's answered share and wall time against today's aggregate, on the
-  same titles.
 - **Latency guard: what the trials cannot see.** A trial tells "Gextto's own queue"
   from "someone else filling the line". It cannot see a user of little bandwidth
   who only needs a low latency (a call, a game), because they fill no queue. The

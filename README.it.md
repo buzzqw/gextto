@@ -122,7 +122,10 @@ Node.js/npm, sei lingue nell'interfaccia.
 
 - **Sorgenti.** Feed RSS, elenchi HTML (ext.to, TorrentGalaxy, Corsaro),
   indexer Torznab (Jackett, Prowlarr), ricerca web dedicata, FlareSolverr
-  opzionale.
+  opzionale. Jackett e Prowlarr vengono interrogati **un indexer alla volta**,
+  ognuno al ritmo che regge davvero, e un tracker presente in entrambi una volta
+  sola: sugli stessi 30 titoli un ciclo dura 110 s invece di 450 s, senza
+  richieste fallite e con il doppio delle release.
 - **Notifiche e media server.** Telegram, e-mail, webhook (Discord, Slack,
   ntfy, Gotify, Pushover) inclusi riavvii e anomalie del motore; refresh mirati
   per Jellyfin e Plex; feed iCal di arrivi e uscite.

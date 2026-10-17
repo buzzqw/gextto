@@ -565,8 +565,24 @@ a time: p50 4.3 s, p90 30.3 s. LimeTorrents and TorrentLeech are configured in *
 managers, so every title is searched twice on the same trackers. Since then managers get
 **90 s** per request (`managerRequestTimeout`, other indexers keep 45 s, the title budget
 is 100 s). A cycle counts as failed for a source only when most of its requests failed,
-and a timeout is reported as "risposte troppo lente". How the managers are queried is an
-open item ([`evoluzione.md`](evoluzione.md) §8).
+and a timeout is reported as "risposte troppo lente".
+
+**Per-indexer lanes against the aggregate** (same day, `TestMeasureManagerLanes`, the 30
+titles, 6 at a time like the cycle, Jackett and Prowlarr only). The order of the runs
+matters. An aggregate that times out leaves its searches running inside Prowlarr, and
+during a first series of runs this backlog grew until a single search timed out at
+120 s. It recovered (0.6 s) once the backlog drained, so the lanes are measured first,
+on a rested Prowlarr:
+
+| mode | cycle wall | per title p50 / max | requests ok / failed | releases |
+|---|---|---|---|---|
+| **lanes** | **110 s** | **2.1 s** / 100 s | **205 / 0** | **5935** |
+| aggregate, 90 s | 450 s | 90.0 s / 90 s | 35 / 25 | 2737 |
+| aggregate, 45 s (earlier run) | 225 s | 45.0 s / 45 s | 33 / 27 | 2672 |
+
+The lanes give −76 % cycle time, no failed request and +117 % releases. A Jackett lane
+answers in 0.1–1.3 s; Jackett caches a repeated search, which comes back in ~0 s. The
+100 s maximum is a title whose TorrentLeech search queued behind the others.
 
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes

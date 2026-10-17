@@ -53,7 +53,6 @@ func seriesExternalIDs(series *SeriesConfig) [][2]string {
 const (
 	queryConcurrency    = 6
 	feedConcurrency     = 4
-	indexerConcurrency  = 4
 	feedFetchBudget     = 75 * time.Second
 	manualSearchTimeout = 15 * time.Second
 	// A full library can take several minutes: keep the operator informed while
@@ -81,14 +80,6 @@ var (
 	// queues more than that, so 45 s cut answers that were on their way.
 	managerRequestTimeout = 90 * time.Second
 )
-
-// sourceRequestTimeout is the per-request limit for one indexer.
-func sourceRequestTimeout(indexer IndexerConfig) time.Duration {
-	if isManagerSource(indexer) {
-		return managerRequestTimeout
-	}
-	return indexerRequestTimeout
-}
 
 // NewEngine builds the default engine, mirroring `Engine::new`.
 func NewEngine() *Engine {
@@ -696,44 +687,61 @@ func searchOneWithDBType(
 	}
 
 	type indexerResult struct {
-		Name  string
-		Query string
-		Items []models.Release
-		Err   error
+		Name    string
+		Query   string
+		Items   []models.Release
+		Err     error
+		Skipped bool // a busy lane this title did not wait for
 	}
-	indexerResults := make([]indexerResult, len(indexers))
-	// An installation can have many indexers. Keep the fan-out bounded: title
-	// searches already run concurrently, so one unbounded goroutine per indexer
-	// would otherwise multiply the number of simultaneous HTTP requests.
-	jobs := make(chan int)
-	workers := indexerConcurrency
-	if workers > len(indexers) {
-		workers = len(indexers)
+	// Jackett and Prowlarr are searched one indexer at a time (lanes,
+	// indexer_lanes.go); a lane the provider backoff holds is skipped like a
+	// blocked indexer.
+	var lanes []searchLane
+	for _, lane := range expandSearchLanes(ctx, indexers) {
+		if _, blocked := blockedProviders[[2]string{"indexer", lane.health}]; blocked {
+			continue
+		}
+		lanes = append(lanes, lane)
 	}
+	// An interactive search does not queue behind the cycle's: it skips the
+	// lane slots (the manager still serves it in its own order).
+	interactive := webTimeout != nil
+	indexerResults := make([]indexerResult, len(lanes))
 	var indexerWG sync.WaitGroup
-	for worker := 0; worker < workers; worker++ {
+	for index, lane := range lanes {
 		indexerWG.Add(1)
-		go func() {
+		go func(index int, lane searchLane) {
 			defer recoverGoroutine("indexer search")
 			defer indexerWG.Done()
-			for index := range jobs {
-				indexer := indexers[index]
-				if ctx.Err() != nil {
-					indexerResults[index] = indexerResult{Name: indexer.Name, Query: query, Err: ctx.Err()}
-					continue
+			result := indexerResult{Name: lane.health, Query: query}
+			defer func() { indexerResults[index] = result }()
+			if !interactive {
+				release, err := acquireLane(ctx, lane)
+				if errors.Is(err, errLaneBusy) {
+					logging.Debug("indexer lane skipped: its queue outlasts this search", "indexer", lane.health, "query", query)
+					result.Skipped = true
+					return
 				}
-				logging.Debug("indexer search started", "indexer", indexer.Name, "query", query)
-				requestCtx, cancel := context.WithTimeout(ctx, sourceRequestTimeout(indexer))
-				items, err := fetchTorznabFlareSolverr(requestCtx, indexer, query, externalIDs, cfg.FlaresolverrURL, searchType)
-				cancel()
-				indexerResults[index] = indexerResult{Name: indexer.Name, Query: query, Items: items, Err: err}
+				if err != nil {
+					result.Err = err
+					return
+				}
+				defer release()
 			}
-		}()
+			if ctx.Err() != nil {
+				result.Err = ctx.Err()
+				return
+			}
+			logging.Debug("indexer search started", "indexer", lane.health, "query", query)
+			requestCtx, cancel := context.WithTimeout(ctx, lane.timeout)
+			started := time.Now()
+			result.Items, result.Err = fetchTorznabFlareSolverr(requestCtx, lane.indexer, query, externalIDs, cfg.FlaresolverrURL, searchType)
+			cancel()
+			if result.Err == nil || errors.Is(result.Err, context.DeadlineExceeded) && ctx.Err() == nil {
+				noteLaneLatency(lane.key, time.Since(started))
+			}
+		}(index, lane)
 	}
-	for index := range indexers {
-		jobs <- index
-	}
-	close(jobs)
 
 	var webResults []models.Release
 	var webWG sync.WaitGroup
@@ -749,6 +757,9 @@ func searchOneWithDBType(
 
 	indexerWG.Wait()
 	for _, result := range indexerResults {
+		if result.Skipped {
+			continue
+		}
 		if result.Err == nil {
 			logging.SourceOK("indexer", result.Name, len(result.Items))
 			if providerDB != nil {

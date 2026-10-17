@@ -116,7 +116,10 @@ no C dependencies, no Node.js/npm frontend build, six interface languages.
 
 - **Sources.** RSS feeds, HTML listings (ext.to, TorrentGalaxy, Corsaro),
   Torznab indexers (Jackett, Prowlarr), dedicated web search, optional
-  FlareSolverr.
+  FlareSolverr. Jackett and Prowlarr are searched **one indexer at a time**,
+  each at the pace it really serves, a tracker present in both only once: on the
+  same 30 titles a cycle took 110 s instead of 450 s, with no failed request and
+  twice the releases.
 - **Notifications and media servers.** Telegram, e-mail, webhooks (Discord,
   Slack, ntfy, Gotify, Pushover) including daemon restarts and engine
   warnings; folder-level refreshes for Jellyfin and Plex; an iCal feed of

@@ -2026,7 +2026,7 @@ func torznabRequestURL(indexer IndexerConfig, query string, externalIDs [][2]str
 
 func torznabRequestURLForType(indexer IndexerConfig, query string, externalIDs [][2]string, requestedType string) string {
 	endpoint := torznab_endpoint(indexer)
-	isProwlarrJSON := strings.HasSuffix(endpoint, "/api/v1/search")
+	isProwlarrJSON := strings.Contains(endpoint, "/api/v1/search")
 	searchType := normalizeSearchType(requestedType, query)
 	// Send only what the indexer declares (see torznab_caps.go); unknown caps
 	// keep every parameter.
