@@ -300,6 +300,27 @@ flat. Allocations since start **9.4 GB**, dominated by `utp.(*Socket).reader` (2
 the piece pool (2.6 GB) — candidates for a future allocation reduction, not a current
 defect. `gexttod` stayed at ~2 % CPU / ~68 MB throughout.
 
+**Peer reader under a saturated line (2026-10-17, Intel N97, 4 cores).** Load test: 9–10
+recent releases re-added, *Auto speed* (no caps), a collector sampling `/proc` every 5 s
+and a 45 s pprof CPU profile at ≥ 8 MB/s. Means over the samples above 4 MB/s:
+
+| gx-torrent | CPU mean (max) | rate | peers | CPU per MB/s | CPU per peer | RssAnon max |
+|---|---|---|---|---|---|---|
+| build 220 | 168 % (209 %) | 8.25 MB/s | 98 | 20.4 | 1.71 | 922 MB |
+| build 221–222 (deadline throttled, limiter atomics) | 198–221 % (256 %) | 7.9–8.1 MB/s | 135–143 | 24.5–27.9 | 1.39–1.64 | 1266–1555 MB |
+| **build 223** (progress-based deadline) | **40 % (136 %)** | **8.49 MB/s** | 75 | **4.8** | **0.54** | 751 MB |
+
+The profiles of builds 220–222 showed 40–47 % of the CPU in the uTP read path:
+`SetReadDeadline` (220), then `sync.RWMutex.Lock` in `utp Conn.Read` plus `time.Now`
+(222). The cause was a busy loop, not lock pressure. `Conn.Read` on a destroyed uTP
+connection returns the ack-timeout error, which reports `Timeout()`. `readPiece` took that
+error as a slow peer and looped, taking the transport-wide lock on every pass. The build
+223 profile (14.8 s of samples in 45 s = **33 % of one core at 8 MB/s**) has no lock, no
+`time.Now` and no deadline frame left: syscalls 30 %, futex/scheduler, RC4 4.5 % flat,
+SHA-1 1.6 %. The earlier "RC4 29–51 %" readings were cumulative times that included the
+uTP read underneath: RC4 flat was 0.7 % in build 222. The peer count differs between
+runs, so read the per-MB/s and per-peer columns: −76 % and −61 % against build 220.
+
 **Robustness at no performance cost.** Torznab answers are decoded with `Strict=false`
 plus the HTML entity table (a raw `&` or `&egrave;` in a scraped title no longer makes
 the whole answer unreadable), and the cost is nil: on a 100-item answer, strict
