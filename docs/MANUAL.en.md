@@ -814,26 +814,22 @@ is active, the **Downloads** screen and every automation stay the same.
 
 ### Performance: RAM and CPU
 
-It runs on a mini PC or a NAS without taking them over: at rest the engine uses
-60–64 MB and ~1.5 % of a core, Gextto ~70 MB and under 1 %; at 9 MB/s the engine
-uses about a third of a core with ~100 MB. The health probes do not write to the NAS, so its
-disks can sleep. The transfer cost is almost entirely the engine
-(**gx-torrent** or **qBittorrent-nox**), which lives in its own process. To lower
-RAM and CPU:
+Gextto does not need a powerful machine: it runs on a mini PC or a NAS and leaves
+CPU and RAM to the rest of the system. At rest you do not notice it; during a
+transfer the cost is the engine's, and it lives in a separate process and gives the
+memory back when the download ends. There is nothing to tune: the cache sizes
+itself from free memory and the storage class.
 
-- **RAM** — with **gx-torrent** the cache is **adaptive**: the daemon recomputes
-  it every few minutes from available memory, active downloads/seeds and
-  storage class (larger on HDD/NFS, smaller on SSD), so there is nothing to
-  tune; a non-default *Disk cache* value is a manual override. The Go runtime
-  releases idle memory back to the OS over time, so the RSS does not stay at
-  the download peak.
-- **CPU** — enable the **dynamic queue** and *Do not count slow torrents in
-  active slots*: zero-rate torrents do not hold a slot and **stalled** ones are
-  paused and retried instead of spinning. Fewer active torrents — and no "dead"
-  torrent without seeders — mean less DHT/tracker churn.
-- **Diagnosis** — `GET /api/torrents/{hash}/why` explains why a torrent is not
-  downloading (`dead_swarm`, `no_peers`, `no_connected_seed`, `stalled`, …);
-  *Health* shows the real process and session RAM/CPU.
+If the machine is small:
+
+- enable the **dynamic queue** and *Do not count slow torrents in active slots*:
+  zero-rate torrents do not hold a slot and **stalled** ones are paused and
+  retried instead of spinning;
+- do not set a cache limit: the automatic value is almost always the right one. A
+  manual value is only for a specific reason.
+
+When a torrent is not downloading, **Health** shows the engine state and the
+torrent page explains why (dead swarm, no peers, tracker unreachable).
 
 ### Configuring a Torznab indexer
 

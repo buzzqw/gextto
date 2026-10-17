@@ -836,26 +836,22 @@ identiche.
 
 ### Prestazioni: RAM e CPU
 
-Gira su un mini PC o su un NAS senza occuparli: a riposo il motore occupa
-60–64 MB e ~1,5 % di un core, Gextto ~70 MB e meno dell'1 %; a 9 MB/s il motore
-sta intorno a un terzo di un core con ~100 MB. I controlli di salute non scrivono sul NAS, così i suoi
-dischi possono dormire. Il costo del trasferimento è quasi tutto del motore
-(**gx-torrent** o **qBittorrent-nox**), che vive nel suo processo. Per ridurre
-RAM e CPU:
+Gextto non richiede una macchina potente: gira su un mini PC o su un NAS e lascia
+CPU e RAM al resto del sistema. A riposo non si nota; durante un trasferimento il
+costo è del motore, che vive in un processo separato e restituisce la memoria
+quando il download finisce. Non c'è niente da tarare: la cache si dimensiona da
+sola in base alla memoria libera e al tipo di disco.
 
-- **RAM** — con **gx-torrent** la cache è **adattiva**: il demone la ricalcola
-  ogni pochi minuti da memoria disponibile, download/seed attivi e tipo di
-  storage (più grande su HDD/NFS, piccola su SSD), quindi non c'è nulla da
-  tarare. Un valore di `torrent_cache_size` maggiore di zero è un override
-  manuale. Il runtime Go restituisce nel tempo la memoria inutilizzata al
-  sistema, così l'RSS non resta al picco del download.
-- **CPU** — attiva la **coda dinamica** e *Non contare i torrent fermi negli
-  slot attivi*: i torrent a 0 B/s non occupano slot e quelli **stalled** vengono
-  messi in pausa e ritentati invece di girare a vuoto. Meno torrent attivi — e
-  nessun torrent "morto" senza seeder — significano meno traffico DHT/tracker.
-- **Diagnosi** — `GET /api/torrents/{hash}/why` spiega perché un torrent non
-  scarica (`dead_swarm`, `no_peers`, `no_connected_seed`, `stalled`, …); *Salute*
-  mostra RAM/CPU reali del processo e della sessione.
+Se la macchina è piccola:
+
+- attiva la **coda dinamica** e *Non contare i torrent fermi negli slot attivi*:
+  i torrent a 0 B/s non occupano slot e quelli **stalled** vengono messi in pausa
+  e ritentati, invece di continuare a girare a vuoto;
+- non impostare un limite di cache: il valore automatico è quasi sempre quello
+  giusto. Un valore manuale serve solo se hai una ragione precisa.
+
+Se un torrent non scarica, **Salute** mostra lo stato del motore e la scheda del
+torrent spiega il motivo (swarm morto, nessun peer, tracker irraggiungibile).
 
 ### Configurare un indexer Torznab
 
