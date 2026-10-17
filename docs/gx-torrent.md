@@ -30,6 +30,8 @@ Code:
 | `internal/queue/queue.go` | queue scheduler (pure function) and dynamic queue |
 | `cmd/gx-torrent/storage.go` | per-torrent symlink, safe move and deletion |
 | `cmd/gx-torrent/api.go` | REST API with token |
+| `cmd/gx-torrent/api_integrations.go` | Prometheus metrics, qBittorrent 5 calls |
+| `cmd/gx-torrent/sse.go` | event stream shared by `/ui/events` and `/api/v1/events` |
 | `cmd/gx-torrent/network.go` | port, interfaces, proxy, encryption, IP filter |
 | `cmd/gx-torrent/portmap.go` | opening the port on the router (UPnP, NAT-PMP) |
 | `cmd/gx-torrent/selection.go` | file selection |
@@ -1608,7 +1610,8 @@ With gx-torrent it shows:
 - disk and cache, session totals.
 
 The same data are in `GET /api/v1/stats` of the daemon and in
-`GET /api/torrents/session-stats` of gextto. Shared counters use the
+`GET /api/torrents/session-stats` of gextto, and the same snapshot is what
+`GET /api/v1/metrics` exports for Prometheus. Shared counters use the
 **libtorrent names** also for gx-torrent (`net.recv_payload_bytes`,
 `peer.num_tcp_peers`, `disk.num_read_ops`, …), so the endpoint is uniform; the
 engine-specific counters (cache, disk speed, DHT traffic) remain
@@ -1992,7 +1995,8 @@ latency** with a TCP connection towards the **gateway** (ports 80, 443,
 **resting baseline**. When the latency exceeds `baseline × 1.5` **and**
 `baseline + 20 ms`, the daemon **lowers the upload** by 15% with respect to the limit in
 force (never below the configured minimum); when the line returns to rest it
-raises it again by `limit/20` at a time. It reduces **only** the effective upload: the global
+raises it again by `limit/20` at a time. Moves are at most one every 3 s
+(`internal/autospeed`, the controller shared with Gextto's latency guard). It reduces **only** the effective upload: the global
 or scheduled limit remains the cap, and an unlimited limit (or the absence of
 measurements) disables the clamp.
 
@@ -2007,11 +2011,12 @@ settings page shows the measured latency and the current cap.
 
 For monitoring and automation the daemon also serves `GET /api/v1/metrics`
 (Prometheus text format, computed only when scraped) and `GET /api/v1/events`
-(the engine events as Server-Sent Events, with the API token); the
-qBittorrent-compatible `/api/v2` includes the qBittorrent 5 calls
-`torrents/count`, `transfer/setSpeedLimitsMode` and the web seed editing calls.
-Examples and the full route list: [`API.md`](API.md), *Integrating with other
-systems*.
+(the engine events as Server-Sent Events, with the API token). The
+qBittorrent-compatible `/api/v2`, mounted **only in standalone mode**, includes
+the qBittorrent 5 calls `torrents/count`, `transfer/setSpeedLimitsMode` and the
+web seed editing calls; in managed mode Gextto is the single master and
+`/api/v2` is not exposed. Examples and the full route list:
+[`API.md`](API.md), *Integrating with other systems*.
 
 All requests require `X-Gx-Token` (or `Authorization: Bearer`) if the
 token is set. The complete route tables of `/api/v1` and of the
@@ -2035,7 +2040,12 @@ describes the payloads of the v1 resources.
 | `POST /api/v1/ipfilter` | reloads the IP filter (optional `path`) |
 | `GET /api/v1/config` | configuration and effective slots |
 | `POST /api/v1/config` | partial JSON: unknown keys rejected |
-| `GET /ui/events` | SSE of session events (`torrent_added`, `torrent_completed`, `torrent_stopped`, `torrent_error`, `torrent_piece`, `peer_connected`, `peer_disconnected`, `tracker_announce`); the page uses them to refresh immediately |
+| `GET /api/v1/metrics` | state in the Prometheus text format, computed only when scraped |
+| `GET /api/v1/events` | SSE of the session events (`torrent_added`, `torrent_completed`, `torrent_stopped`, `torrent_error`, `torrent_piece`, `peer_connected`, `peer_disconnected`, `tracker_announce`) |
+
+The page's own live updates use `GET /ui/events`, the session-authenticated twin of
+`/api/v1/events` (no token: it follows the page's login), and refresh the table
+immediately on the same events.
 
 Actions available on `POST /api/v1/torrents/{hash}/{action}`:
 

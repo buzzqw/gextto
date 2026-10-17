@@ -45,7 +45,8 @@ Gextto would end up with the worse of the two engines.
 **What standalone adds**, all of it living under `/ui` or `/api/v2` so that the frozen
 v1 API used by Gextto is only *added to*, never changed: persistent settings from the
 page (`settings.json`), the first-run wizard, login and sessions, categories and tags
-with a path per category, torrent table virtualisation, the bandwidth scheduler with
+with a path per category, the table window (300 rows with *Show more*), the bandwidth
+scheduler with
 alternative limits (**one choice per day — Off, Limit or Auto**, where Auto lifts the
 cap so the auto-speed/peak observer can measure the line), the RSS manager with the *Wanted* page, the Torznab indexer search,
 and the **qBittorrent-compatible Web API** (`/api/v2/auth`, `/api/v2/torrents/*`,
@@ -86,7 +87,8 @@ network and ports, protocols, queue and cache, bandwidth and the scheduler, lang
 notifications.
 
 **Packaging.** A dedicated archive `gx-torrent-linux-<arch>.tar.gz` (binary, `run.sh`,
-`gx-torrent.service`, `README`, `VERSION`, checksum) is produced by
+`gx-torrent.service`, `install-service.sh`/`uninstall-service.sh`, `README`, `VERSION`,
+`LICENSE`, `THIRD-PARTY-NOTICES`, checksum) is produced by
 `scripts/package-gx-torrent.sh` and published in the release beside Gextto's archives;
 for Windows, `scripts/package-gx-torrent-windows.sh` produces
 `gx-torrent-windows-<arch>.zip` (amd64/arm64, `gx-torrent.exe` as a native service plus
@@ -95,13 +97,18 @@ and the daemon on every build so the support cannot regress. The standalone pack
 **the same binary** Gextto uses as engine: the CI does not build a second product, it
 publishes this one separately.
 
-**API compatibility.** The qBittorrent-compatible API covers authentication, `app`,
-`transfer`, and for torrents `info`, `add`, `delete`, `pause`, `resume`, `recheck`,
-`properties`, `files`, `trackers`, `reannounce`, `setLocation` plus categories and tags,
-with `app/preferences` and the other endpoints. It is verified against Gextto's own
+**API compatibility.** In standalone the daemon serves the qBittorrent-compatible
+API: authentication, `app`, `transfer`, and for torrents `info`, `add`, `delete`,
+`pause`, `resume`, `recheck`, `properties`, `files`, `trackers`, `reannounce`,
+`setLocation` plus categories, tags, web seeds, the qBittorrent 5 calls
+(`torrents/count`, `transfer/setSpeedLimitsMode`, the web seed editing), and the
+RSS, search, sync and torrent-creator surfaces. It is verified against Gextto's own
 qBittorrent client (`internal/qbittorrent`), which acts as an automatic test bench, and
-it is the feature that lets existing clients of that protocol use gx-core without
-patches.
+it is what lets existing clients of that protocol use gx-core without patches. In
+managed the whole `/api/v2` is not mounted: Gextto is the single master. On the
+token-protected v1 side the daemon also serves `GET /api/v1/metrics` (Prometheus) and
+`GET /api/v1/events` (Server-Sent Events), in both modes, beside the frozen resources
+Gextto uses.
 
 ## 3. Security model
 

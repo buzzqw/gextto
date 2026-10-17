@@ -329,7 +329,9 @@ API on its listen address (default `127.0.0.1:8890`). Two dialects are exposed:
 
 - the **native API** under `/api/v1`;
 - the **qBittorrent-compatible API** under `/api/v2`, so a client written for
-  qBittorrent can talk to it unchanged.
+  qBittorrent can talk to it unchanged. It is mounted **only in standalone
+  mode**: when Gextto manages the daemon, Gextto is the single master and the
+  whole `/api/v2` is not exposed (the routes below answer 404).
 
 When the daemon is reachable on the network, protect it with the shared token
 `gxtorrent_token`: the `/api/v1` clients send the header `X-Gx-Token: <token>`,
@@ -365,7 +367,8 @@ server-rendered UI under `/ui`; those HTML routes are not part of this table.
 | GET | `/api/v1/torrents/{hash}/{what}` | files, peers or trackers |
 
 The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
-`peers`, `trackers`. The `{action}` of
+`peers`, `trackers`, `webseeds`, `pieces`, `torrent-file`, `scrape`,
+`dhtscrape`, `collections`. The `{action}` of
 `POST /api/v1/torrents/{hash}/{action}` is one of `pause`, `resume`,
 `verify`, `reannounce`, `restart`, `park`, `unpark`, `pin`, `top`, `rename`,
 `rename-file`, `rename-folder`, `move`, `associate`, `seed-limits`,

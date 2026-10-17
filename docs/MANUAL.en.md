@@ -621,7 +621,9 @@ are using the API directly.
   shows only the provider/domain (the full URL is in the tooltip), and every row
   offers **Why not this one?** like the search table. The title wraps over
   multiple lines and the row actions are compact icons (⬇️ queue, 🔍 why not
-  this one, 🧲 copy magnet, 🗑️ delete) so the release name gets the room.
+  this one, 🧲 copy magnet, 🗑️ delete) so the release name gets the room. The
+  same torrent (same infohash) appears **once**, with its newest listing: copies
+  of the same content under another magnet or title no longer fill the results.
 - **Seen from feed** — every release seen in the sources, grouped by title
   (movies/series) with count, best resolution and score; expand a group to
   queue a single release. Populated by each cycle, even for unmonitored titles.
@@ -638,7 +640,9 @@ are using the API directly.
   it with a similarly named issue. The monitored list, post link extraction,
   weekly-pack settings and resend/delete/force history are also available. Direct
   HTTP downloads appear in **Downloads in session** with status, bytes, progress,
-  speed and pause/resume actions.
+  speed and pause/resume actions. A comic completed by its own pipeline shows as
+  **Completed · archived** at 100% even when the pack's torrent is paused and
+  re-checked at 0%.
   In **CBZ** files downloaded directly (HTTP or Mega) Gextto adds a
   `ComicInfo.xml` with series, issue number and year taken from the title (e.g.
   “Poison Ivy #41 (2025)”): Komga, Kavita and tablet readers use it to group and
@@ -840,10 +844,13 @@ For Jackett:
 5. save and click **Verify**;
 6. check *Health → API status*.
 
-Gextto automatically uses `/api/v2.0/indexers/all/results/torznab/api` for
-Jackett. Do not append that path when using the base URL. If you use a custom
-full Torznab endpoint, keep it configured as an explicit endpoint. Prowlarr uses
-its own search endpoint and normally uses port `9696`.
+With Jackett and Prowlarr Gextto reads the manager's indexer list and queries
+them **one at a time** (the single indexer's Torznab endpoint for Jackett, the
+`indexerIds` search for Prowlarr): each tracker gets its own timeout and health,
+so the slowest one no longer holds the others. If the list cannot be read it
+falls back to the aggregate search. Do not append the Torznab path to the base
+URL: the manager's address is enough (Prowlarr normally on port `9696`). A custom
+full Torznab endpoint stays an explicit endpoint.
 
 An indexer can be reachable but unhealthy: Jackett may return HTTP 200 with a
 Torznab error caused by a wrong API key or no enabled indexer. In that case
@@ -927,6 +934,11 @@ The complete list of fields and actions is in [Appendix B](#appendix-b-reference
 
 - **Simkl** — credentials, PIN flow, watchlist import, calendar and mark-watched.
 - **Jellyfin / Plex** — server URL + token and a library refresh button.
+- **Engine metrics and events** — the gx-torrent daemon serves
+  `GET /api/v1/metrics` (Prometheus format, computed only when scraped) and
+  `GET /api/v1/events` (engine events as Server-Sent Events), for
+  Prometheus/Grafana, Home Assistant or a script. With the token set, send the
+  `X-Gx-Token` header; examples and routes are in `docs/API.md`.
 - **Event hooks** — run an external program on Gextto events
   (`download_started`, `torrent_completed`, `season_pack_completed`,
   `torrent_error`, …). Fields accept placeholders such as `{title}`, `{hash}`,
@@ -1539,7 +1551,7 @@ Recalculate scores* after changing weights.
 | Global download limit | Global download limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
 | Global upload limit | Global upload limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
 | Automatic speed (measuring the line) | No cap: the bandwidth goes to the auto-tune, which measures the line and leaves it free. It beats the global limits and the schedule; the temporary limit in Downloads stays a separate override. Turning it on turns the schedule off, and the other way round. |
-| Auto respects latency | With the speed on Auto (the policy, an «Auto» schedule day or the temporary Auto) it measures the latency to the Internet; when the download or the upload makes it rise while other devices at home are using the line, it slows them just enough and then frees them again. When nobody else uses it the whole line stays with Gextto. Who else is on the line comes from the router's WAN counters (UPnP); without them it is inferred from the learned peak: with Gextto near its peak the queue is its own and nothing is slowed, well below it someone else is using the rest. With no peak learned yet an «Auto» schedule window is not slowed down. On by default. |
+| Auto respects latency | With the speed on Auto (the policy, an «Auto» schedule day or the temporary Auto) it measures the latency to the Internet every 2 seconds, only while Auto is in force. When it is high (or the idle reference is not known yet) it backs Gextto off to 60% for 8 seconds and watches: if the latency falls, the queue was Gextto's own and the line goes back to it (reference learned, 10 minutes of quiet); if it stays high while Gextto left room, someone else is filling the line and the guard yields, lowering the caps step by step and raising them again when the line is back at rest. When the router's WAN counters answer, their verdict on "others on the line" comes first. On by default. |
 | Auto — host to measure latency | Host (or host:port) to measure the latency to with a TCP connection every 2 seconds, only while Auto is on. Empty = 9.9.9.9 and 1.1.1.1 (port 443). It must be past the router: the router does not see the provider's queue. |
 
 **Speed schedule**
@@ -2005,8 +2017,11 @@ A **direct** Torznab indexer (not Jackett/Prowlarr), for example the
 `mircrew-indexer` service on the same machine or the LAN, is added here with
 its base address (e.g. `http://192.168.1.10:9118`) or one ending in `/api`:
 Gextto uses `<base>/api`, the same rule as gx-torrent, so the address to type is
-identical in both. Automatic searches wait up to 45 seconds for each indexer,
-so an answer that needs a forum search still arrives in the same cycle. When an
+identical in both. Automatic searches have a **100-second budget per title**: an indexer behind
+Prowlarr may wait up to **90 seconds** (Prowlarr serves one search at a time per
+indexer), a direct indexer or Jackett up to **45**. A lane whose queue would
+outlast the budget is skipped without counting as a failure, so one slow tracker
+does not stop the cycle. When an
 indexer on a local or private-network address drops the connection or does not
 answer, Gextto does **not** retry through FlareSolverr (Cloudflare does not
 protect a LAN service): the error stays visible as it is. For `mircrew-indexer`,
@@ -2014,9 +2029,9 @@ protect a LAN service): the error stays visible as it is. For `mircrew-indexer`,
 login to the MirCrew forum worked; if it did not, log in again from the
 service's web UI.
 
-Gextto reads each indexer's capabilities once (the Torznab *caps*, for Prowlarr
-the list of its indexers, refreshed every 6 hours) and sends only the parameters
-the indexer declares. For example Jackett's "all" aggregate does not accept the
+Gextto reads the indexer list and its capabilities from the manager (the
+Torznab *caps*; for Prowlarr the list of its indexers, re-read every 10 minutes)
+and sends only the parameters that the single indexer declares. For example Jackett's "all" aggregate does not accept the
 TMDB id in series and movie searches, and Prowlarr's public indexers cannot
 search by id: in these cases the search uses title, season and episode instead
 of failing or coming back empty. If an indexer still rejects an id, the search
