@@ -115,6 +115,18 @@ user-initiated pack keeps the broad range. The content the pack physically holds
 still only known at import (`StagePackFile`), where a pack whose every file is worse
 than the library copy is rejected and its source moved to the trash.
 
+**A dead `.torrent` link is left alone.** A release that only offers an HTTP
+`.torrent` link (no magnet) is unusable when the link keeps failing — an indexer
+whose session is expired, a proxy answering 502, a torrent withdrawn from the
+site. The archive would propose the same URL on every cycle, so the failure
+repeats forever and the cycle never counts as clean. A link that fails in two
+different cycles is quarantined (`dead_torrent_links`, `torrent_link_quarantine.go`)
+and skipped before the score, so it cannot win over a working alternative. The
+wait grows with the strikes — 6 hours, 24 hours, then a week — and stays short
+at first so a repaired indexer is noticed the same day; a success deletes the
+row. Failures inside the same cycle (the archive and a feed proposing the same
+release) count once.
+
 Changing a score weight from the settings page or the API leaves every stored score
 computed with the old weights, which would look like a genuine improvement and
 re-download the library. The cycle recomputes them before it compares anything

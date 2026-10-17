@@ -616,10 +616,28 @@ func RunCycleDomain(
 	stats.Scraped = len(releases)
 
 	var best []models.Release
+	// Dead .torrent links (torrent_link_quarantine.go): a URL that failed in two
+	// different cycles is not proposed again for a while. Loaded once per cycle:
+	// the map is tiny and the release loop is not.
+	quarantinedLinks, err := db.QuarantinedTorrentLinks(time.Now())
+	if err != nil {
+		logging.Debug("could not read the quarantined torrent links", "error", err)
+	}
 	// Smallest archived episode per series, for the adaptive size floor.
 	seriesMinCache := map[string]*int64{}
 	for i := range releases {
 		release := releases[i]
+		// Never let a dead link compete with a working alternative: skipping it
+		// here (before the score) leaves the episode open for the next release
+		// instead of picking it and failing at the download step.
+		if release.Magnet == "" && release.TorrentURL != nil {
+			if reason, dead := quarantinedLinks[*release.TorrentURL]; dead {
+				logging.Debug("release skipped: its torrent link is in quarantine",
+					"target", releaseTarget(&release),
+					"reason", reason)
+				continue
+			}
+		}
 		if release.Kind == "series" {
 			if release.Series == nil {
 				continue
@@ -778,12 +796,25 @@ func RunCycleDomain(
 			if release.TorrentURL != nil {
 				magnet, path, err := resolveTorrentURL(ctx, engine, cfg, *release.TorrentURL, &release.Title)
 				if err != nil {
+					// Two failures in different cycles mean the link is dead:
+					// quarantine it so the archive stops proposing it (and the
+					// cycle stops counting it as an error) until the retry.
+					if failures, qerr := db.RecordTorrentLinkFailure(*release.TorrentURL, err.Error(), time.Now()); qerr != nil {
+						logging.Debug("could not record the failed torrent link", "error", qerr)
+					} else if failures == torrentLinkFailureLimit {
+						logging.Info("torrent link quarantined after repeated failures",
+							"target", releaseTarget(&release),
+							"retry_in", torrentLinkQuarantine(failures).String())
+					}
 					stats.Error("torrent_link")
 					logging.Warn("torrent link resolution failed",
 						"target", releaseTarget(&release),
 						"error", err)
 					continue
 				}
+				// The link works: forget any previous failure so it is eligible
+				// again if the indexer breaks later.
+				_ = db.ClearTorrentLinkFailure(*release.TorrentURL)
 				release.Magnet = magnet
 				// The feed was persisted before selection. Replace its
 				// short-lived Jackett URL with the stable magnet so a later

@@ -891,6 +891,11 @@ func (d *Database) migrate() error {
 	if _, err := d.db.Exec(databaseStallWatchSchema); err != nil {
 		return err
 	}
+	// Dead .torrent links (torrent_link_quarantine.go): the archive stops
+	// proposing a URL that failed in two different cycles.
+	if _, err := d.db.Exec(databaseTorrentLinkSchema); err != nil {
+		return err
+	}
 	if _, err := d.db.Exec(databaseTorrentMoveSchema); err != nil {
 		return err
 	}

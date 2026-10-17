@@ -393,6 +393,18 @@ unavailable download, temp or trash folder is a **warning** and is fixable from 
 interface. Verified in a systemd container
 (install, upgrade, restore offline in dry-run).
 
+### Dead torrent links
+
+The quarantine of `.torrent` links that keep failing (see
+[`evoluzione.md`](evoluzione.md) §2) costs **one query per cycle**, not one per
+release: the whole set is read once and checked in memory. With 300 quarantined
+rows — as many dead links as the archive held on the machine on 2026-10-17 —
+`BenchmarkQuarantinedTorrentLinks` measures **≈0.42 ms and ≈88 KB allocated per
+cycle** on the N97 (`go test -run '^$' -bench QuarantinedTorrentLinks -benchmem .`),
+against a cycle of minutes. `RecordTorrentLinkFailure` runs only for the links
+that actually fail (tens per cycle at most) and `ClearTorrentLinkFailure` only
+for the ones that are downloaded.
+
 ### Packaging
 
 The release archive root is **0755** (`mktemp -d` made it 0700, which tar applied to the
