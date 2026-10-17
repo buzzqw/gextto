@@ -1,15 +1,11 @@
 # Measurements and verification of Gextto, gx-torrent and gx-core
 
-The technical reference of the numbers: **what the figure is today**, how it is taken
-and how to reproduce it, the decisions it justified, and the verification that is not a
-benchmark (accessibility, backup, packaging). Everything is measured on an Intel N97
-mini-PC with 16 GB of RAM unless stated otherwise.
+The numbers we use to decide, with the machine they were taken on and the command to
+repeat them. The figures to beat are in §2, the benchmarks in §3, the investigations and
+their decisions in §4, the verification that is not a benchmark in §5.
 
-The rule behind the document: a change on a data path is kept only if a measurement
-shows it **at least equivalent** to what it replaces, and what a measurement does not
-justify is closed with the data instead of implemented. An idea without a measurement
-does not enter the code, and a rejected idea leaves its number here so nobody has to
-measure it twice.
+Everything is measured on an Intel N97 mini-PC with 16 GB of RAM unless stated
+otherwise.
 
 The state of the product and the open items are in [`evoluzione.md`](evoluzione.md);
 the engine is in [`gx-torrent.md`](gx-torrent.md) (inventory
@@ -576,11 +572,9 @@ extracted folder) and `build-release.sh` checks it; `install.sh` keeps `gexttod.
 
 ## 6. Adding a measurement
 
-- Write the **machine**, the **date**, the **build** and the **command** next to the
-  figure. A number without them is not a measurement.
+- Next to each figure: the machine, the date, the build and the command that produced
+  it, so the measurement can be repeated and compared.
 - If it changes a baseline, update §2 (and §3 for a benchmark); if it decides something,
-  add it to §4 with the decision and, when rejected, to §4.10.
-- Compare before and after with `-count`/`benchstat` or an interleaved A/B; never trust a
-  single public-swarm pass to rank a parameter.
-- A change on a data path is kept only if it is **at least equivalent** to what it
-  replaces: equivalence has to be shown, not assumed.
+  add it to §4 and, when rejected, to §4.10.
+- Compare before and after with `-count`/`benchstat` or an interleaved A/B. One pass on a
+  public swarm cannot rank a parameter.

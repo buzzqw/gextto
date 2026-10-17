@@ -343,35 +343,16 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   `/api/v2` compatibile qBittorrent), ognuna nella propria tabella.
 - Quando aggiungi o sposti documenti, aggiorna l'indice `docs/README.md`.
 
-## `docs/evoluzione.md`: cosa contiene e cosa no
+## `docs/evoluzione.md`
 
-`docs/evoluzione.md` ha **due soli contenuti** e si scrive solo per quelli:
-
-1. **Lo stato attuale** di Gextto, del demone e del motore: cosa c'è, come si comporta e
-   il perché delle scelte.
-2. **Il futuro delle migliorie**: punti aperti con il loro gate, direttrici strategiche
-   e roadmap.
-
-Non è un changelog, non è un manuale e non è un diario di lavoro. **Non ci vanno mai**:
-
-- bug, fix, regressioni, review per-commit, hash di commit, numeri di build o date di
-  completamento (vivono nella storia git);
-- cronache di implementazione («aggiunto», «ora», «non più», «in precedenza», «l'ultimo
-  giro», «dove siamo arrivati»);
-- descrizioni di come si usa una funzione (README e manuali) o dettagli interni del
-  motore (`docs/gx-torrent.md`, `internal/gxcore/GEXTTO.md`);
-- misure: stanno in `docs/measurements.md` con macchina, data e comando; qui resta solo
-  il rimando e la decisione.
-
-**Regola di scrittura:** una frase che fra sei mesi sarebbe falsa perché descrive una
-transizione va tagliata; una che descrive una capacità presente o una mancanza va
-tenuta. Quando una funzionalità arriva si aggiorna la frase di stato e si toglie il
-punto aperto: non si aggiunge una nota. Le **decisioni** restano, con la motivazione e
-il numero (che sta in `measurements.md`).
-
-**Autocontrollo prima di committare:** (a) il testo è al presente e descrive solo stato
-o mancanza? (b) ogni punto aperto ha il suo gate? (c) nessun numero, data o hash che
-appartenga alle misure o alla storia git?
+Solo due contenuti: lo **stato attuale** (cosa c'è e perché) e le **migliorie
+future** con il loro gate. Non è un changelog né un manuale: niente bug, fix,
+cronache di implementazione, date, numeri di build, hash di commit, istruzioni
+d'uso o misure. Si scrive al presente e si descrive _cosa c'è_, non cosa è stato
+fatto: una frase che fra sei mesi sarebbe falsa perché racconta una transizione
+va tagliata. Quando una funzionalità arriva si aggiorna lo stato e si toglie il
+punto aperto; le decisioni restano con la loro motivazione, i numeri in
+`measurements.md`.
 
 ## Accessibilità dell'interfaccia
 - Le pagine del demone gx-torrent (`internal/webui/assets`) usano il **design

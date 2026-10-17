@@ -4,10 +4,10 @@
 verifies it, names it and shelves it in your library — then keeps watching for
 a better copy.**
 
-Gextto is a self-hosted media automation daemon with a fast web UI and its own
-BitTorrent engine, written from scratch in pure Go. One binary per component,
-no C dependencies, no Node.js/npm frontend build, six interface languages —
-and every optimisation in it was measured before it was kept.
+Gextto is a self-hosted media automation daemon: it searches, downloads,
+verifies, renames and archives series, movies and comics. It has its own
+BitTorrent engine in Go, a server-rendered web UI and a terminal client. Two
+binaries, no C dependencies, no Node.js build, six languages.
 
 [![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-pure%2C%20zero%20CGO-00ADD8?logo=go)
@@ -21,28 +21,27 @@ and every optimisation in it was measured before it was kept.
 > [bugs and feature requests](https://github.com/buzzqw/gextto/issues) ·
 > **Contribute:** [developer guide](docs/DEVELOPERS.md)
 
-## Why Gextto
+## What it does
 
-- **It decides like an expert, and explains itself.** Every candidate is scored
-  on resolution, source, codec, audio, HDR/Dolby Vision, language and size; a
-  dead swarm cannot win over a viable alternative, every rejection keeps its
-  reason in the log, and upgrades stop once the file is good enough.
-- **It protects your library.** Hardlinks while seeding, a mount guard that
-  tells an unmounted NAS from a deleted file, a recycle bin for everything it
-  replaces, and moves that resume after a restart.
-- **It ships its own engine.** `gx-core` is an original BitTorrent
-  implementation — v1, v2 and hybrid, TCP+uTP on one port, NAT holepunching,
-  IPv6 DHT, streaming — running at a fraction of the memory of traditional
-  clients (~25 MB idle, ~100 MB at 100 MB/s; qBittorrent-nox up to ~5 GB). The
-  same engine is **[gx-torrent](https://github.com/buzzqw/gextto/releases)**, a
-  complete standalone client for Linux and Windows.
-- **It tunes itself — and shares the line.** Queue, disk cache and bandwidth
-  follow the hardware and the line; on **Auto** speed the whole line is
-  Gextto's while nobody else needs it, and it yields to the other devices at
-  home as soon as they do.
-- **It is measured and tested, not claimed.** 2,100 Go test functions, 57
-  end-to-end browser tests, 23 fuzzed parsers, and 14 measurement harnesses
-  run against real swarms, real indexers and a real line. Numbers below.
+Add a title and Gextto runs the chain by itself: it searches the sources you
+configured, scores the candidates, downloads the winner, checks the data and
+puts the file in the library under the right name. When a better release
+appears it replaces the old file; when a download stalls it looks for another
+one.
+
+- Candidates are scored on resolution, source, codec, audio, HDR, language and
+  size. A dead swarm cannot win over a working alternative, and every rejected
+  release keeps its reason in the log.
+- The library is protected by hardlinks while seeding, a mount guard that tells
+  an unmounted share from deleted files, and a recycle bin.
+- The engine is our own Go code: BitTorrent v1, v2 and hybrid, TCP and uTP on
+  one port, holepunching, IPv6 DHT, streaming. It idles at ~25 MB and uses
+  ~100 MB at 100 MB/s; qBittorrent-nox reaches ~5 GB on the same set. The same
+  binary is [gx-torrent](https://github.com/buzzqw/gextto/releases), a
+  standalone client for Linux and Windows.
+- Queue, cache and bandwidth follow the machine and the line. On Auto the whole
+  line is Gextto's while nobody else needs it, and it gives way when someone
+  does.
 
 ### At a glance
 
@@ -57,16 +56,14 @@ and every optimisation in it was measured before it was kept.
 | **Interfaces** | Web UI (SSR + HTMX, pure Go, installable PWA) · terminal TUI over SSH · JSON API |
 | **Build** | Pure Go (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent also on Windows |
 
-## Measured, not claimed
+## Numbers
 
-Gextto follows one rule: **a change on a data path is kept only if a measurement
-shows it at least equivalent to what it replaces**, and an idea a measurement
-does not justify is closed with the data instead of implemented. Every number
-lives in [`docs/measurements.md`](docs/measurements.md), with the machine, the
-date and how it was taken — an Intel N97 mini-PC with 16 GB of RAM, real
-public torrents, the live indexers and the real home line.
+These figures come from the live installation and from real swarms, indexers
+and the home line. Each one is in
+[`docs/measurements.md`](docs/measurements.md) with the machine, the date and
+the command to reproduce it.
 
-| Area | Measured result |
+| Area | Result |
 |---|---|
 | **Engine memory** | ~25 MB idle and ~100 MB at 100 MB/s with 50 torrents, against up to ~5 GB for qBittorrent-nox on the same set. Downloads to a NAS: ~0.5 GB outside the write cache, which sizes itself from free RAM; ~60 MB right after a restart |
 | **Engine CPU** | About **⅓ of one core** at 9.4 MB/s with ~200 peers (half over uTP, encrypted): **0.17 % per peer**, of which the piece picker takes 9 % |
@@ -77,11 +74,13 @@ public torrents, the live indexers and the real home line.
 | **Feed archive** | **447,000 releases in 320 MB**, one row per torrent; 1,000 releases archived in **41 ms**; the standalone archive searches 100,000 releases in **7.4 ms** |
 | **Daemon at rest** | **0.4 %** CPU at rest; **~5,000 metadata calls a day** for 55 series; the health probes never write to a NAS, so its disks can sleep |
 
-The method — how each figure is produced and how to reproduce it — is in the
-same document, together with the designs the measurements ruled out
-(io_uring, batched uTP I/O on this load, a write-back cache, …).
+The same document records what was measured and dropped — io_uring, batched
+uTP I/O on this load, a write-back cache — so the same ideas are not tried
+twice.
 
-## Tested in depth
+## Tests
+
+What runs on every push (`make test`, `make test-ui`, `make fuzz-smoke` and CI):
 
 | Layer | What runs |
 |---|---|
@@ -290,20 +289,20 @@ gx-torrent is also a complete client without Gextto, like `qbittorrent-nox` or
 `transmission-daemon` — **the same binary** Gextto drives, a simpler Gextto with
 everything a standalone client needs.
 
-- **`*arr` ready, and easy to integrate.** qBittorrent Web API v2
-  (`/api/v2/...`, qBittorrent 5 calls included) for Sonarr, Radarr, Lidarr,
-  Readarr and mobile managers; its own JSON API; **Prometheus metrics**
+- **qBittorrent Web API v2** (`/api/v2/...`, qBittorrent 5 calls included)
+  for Sonarr, Radarr, Lidarr, Readarr and mobile managers; its own JSON API;
+  **Prometheus metrics**
   (`/api/v1/metrics`) for Grafana or Home Assistant, and an **event stream**
   (`/api/v1/events`) for Node-RED, Home Assistant or scripts
   ([examples](docs/API.md#integrating-with-other-systems)).
-- **A web UI familiar to qBittorrent users.** Light and dark themes; status,
+- **Web UI** laid out like qBittorrent's: light and dark themes; status,
   category, tag and tracker filters; a column chooser (24 columns) with
   resizable columns kept on the server; a full context menu; a resizable detail
   panel (files grouped by folder, rename, peers); magnet preview while typing;
   undo after removal; keyboard shortcuts, drag-and-drop, phone-friendly cards
   and a **Statistics** page (session and all-time totals, 1 h/24 h/7 d graph).
   Every page axe-core checked.
-- **RSS and automation with nothing decided out of sight.** A **Wanted** page
+- **RSS and automation.** A **Wanted** page
   that says per title what is downloaded, downloading or seen but skipped, and
   why each release would be taken or refused; an **RSS & Indexers** page with
   ordered PASS/FAIL rules, live match previews, rule templates, feed tests,
