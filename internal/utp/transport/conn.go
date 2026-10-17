@@ -318,6 +318,7 @@ func (c *Conn) ack(nr uint16) {
 		if !c.unackedSends[0].acked.IsSet() {
 			return // the front packet is still outstanding
 		}
+		c.unackedSends[0] = nil // release the acked send from the backing array
 		c.unackedSends = c.unackedSends[1:]
 		c.updateCanWrite()
 		c.lastAck++
@@ -559,6 +560,9 @@ func (c *Conn) processInbound() {
 	for !c.gotFin.IsSet() && len(c.inbound) > 0 && c.inbound[0].seen && c.bufferedInbound() < readBufferLen {
 		c.ack_nr++
 		p := c.inbound[0]
+		// Clear the slot before reslicing: the backing array outlives the
+		// slice window, and a stale entry would keep its payload alive.
+		c.inbound[0] = recv{}
 		c.inbound = c.inbound[1:]
 		c.inboundWnd -= len(p.data)
 		c.appendReadBuf(p.data)
@@ -643,8 +647,13 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 		c.readPos += n
 		if c.readPos == len(c.readBuf) {
 			// The window is fully consumed: keep the backing array for the
-			// next fill instead of dropping it.
-			c.readBuf = c.readBuf[:0]
+			// next fill, unless a burst grew it past readBufKeep. Keeping
+			// those across idle connections held hundreds of MB under load.
+			if cap(c.readBuf) > readBufKeep {
+				c.readBuf = nil
+			} else {
+				c.readBuf = c.readBuf[:0]
+			}
 			c.readPos = 0
 		}
 		c.updateReadBufNotEmpty()

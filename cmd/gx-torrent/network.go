@@ -214,40 +214,41 @@ func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 	cfg.BlocklistEnabledForOutgoingConnections = true
 }
 
-// ipFilterBytes returns the filter file content, reusing the cached copy while
-// path, size and mtime are unchanged. The same bytes are then handed to the engine,
-// which still parses them (its blocklist is session-scoped), but the multi-
-// megabyte disk read is skipped on every session reopen.
-func (d *Daemon) ipFilterBytes(path string) ([]byte, string, error) {
+// ipFilterFileStamp identifies a filter file version as path|size|mtime.
+func ipFilterFileStamp(path string) (string, error) {
 	info, err := os.Stat(path)
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
-	stamp := fmt.Sprintf("%s|%d|%d", path, info.Size(), info.ModTime().UnixNano())
-	if d.ipFilterData != nil && d.ipFilterStamp == stamp {
-		return d.ipFilterData, stamp, nil
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, "", err
-	}
-	return data, stamp, nil
+	return fmt.Sprintf("%s|%d|%d", path, info.Size(), info.ModTime().UnixNano()), nil
 }
 
-// loadIPFilterLocked (re)loads the IP filter file into the session.
+// loadIPFilterLocked (re)loads the IP filter into the session. While the file
+// is unchanged the rules parsed for the previous session are reused; otherwise
+// the file is streamed into the parser without holding it in memory.
 func (d *Daemon) loadIPFilterLocked(path string) (int, error) {
 	if path == "" || d.session == nil {
 		return 0, nil
 	}
-	data, stamp, err := d.ipFilterBytes(path)
+	stamp, err := ipFilterFileStamp(path)
 	if err != nil {
 		return 0, err
 	}
-	rules, err := d.session.LoadBlocklist(bytes.NewReader(data))
-	if err != nil {
-		return 0, err
+	var rules int
+	if d.ipFilterStamp != "" && d.ipFilterStamp == stamp {
+		rules = d.session.SetBlocklistRules(d.ipFilterSet)
+	} else {
+		f, err := os.Open(path)
+		if err != nil {
+			return 0, err
+		}
+		rules, err = d.session.LoadBlocklist(f)
+		f.Close()
+		if err != nil {
+			return 0, err
+		}
+		d.ipFilterSet = d.session.BlocklistRules()
 	}
-	d.ipFilterData = data
 	d.ipFilterStamp = stamp
 	d.ipFilterRules = rules
 	d.ipFilterPath = path

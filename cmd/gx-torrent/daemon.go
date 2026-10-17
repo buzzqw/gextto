@@ -359,10 +359,12 @@ type Daemon struct {
 	lsdError      string
 	ipFilterPath  string
 	ipFilterRules int
-	// ipFilterData caches the raw filter file so a session reopen (peer limits,
-	// cache TTL, preallocation) does not re-read a multi-megabyte file from
-	// disk; ipFilterStamp is path|size|mtime and is empty when not cached.
-	ipFilterData  []byte
+	// ipFilterSet caches the parsed filter rules so a session reopen (peer
+	// limits, cache TTL, preallocation) does not re-read and re-parse a
+	// multi-megabyte file. The parsed ranges take a fraction of the raw file,
+	// which is not kept. ipFilterStamp is path|size|mtime and is empty when
+	// not cached.
+	ipFilterSet   torrent.BlocklistRules
 	ipFilterStamp string
 	// ipFilterStatus is the last load outcome and the next refresh
 	// (ipfilter_refresh.go), for the settings page.

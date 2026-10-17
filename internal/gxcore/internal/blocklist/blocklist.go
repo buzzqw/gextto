@@ -83,6 +83,33 @@ func (b *Blocklist) Reload(r io.Reader) (int, error) {
 	return b.count, nil
 }
 
+// Rules is a parsed rule set. Its slices are never modified after a load, so
+// one set can be installed into another Blocklist without reading the source
+// again.
+type Rules struct {
+	v4    []ipRange
+	v6    []ip6Range
+	count int
+}
+
+// Len returns the number of rules in the set.
+func (r Rules) Len() int { return r.count }
+
+// Rules returns the current rule set.
+func (b *Blocklist) Rules() Rules {
+	b.m.RLock()
+	defer b.m.RUnlock()
+	return Rules{v4: b.v4, v6: b.v6, count: b.count}
+}
+
+// SetRules installs a rule set taken from Rules and returns its rule count.
+func (b *Blocklist) SetRules(r Rules) int {
+	b.m.Lock()
+	defer b.m.Unlock()
+	b.v4, b.v6, b.count = r.v4, r.v6, r.count
+	return b.count
+}
+
 func load(r io.Reader, logger Logger) ([]ipRange, []ip6Range, int, int, error) {
 	var v4 []ipRange
 	var v6 []ip6Range

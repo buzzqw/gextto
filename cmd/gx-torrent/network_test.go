@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,29 +8,43 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
-func TestIPFilterBytesCache(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "filter.dat")
-	if err := os.WriteFile(path, []byte("1.2.3.0/24\n"), 0o600); err != nil {
+func TestIPFilterRulesCache(t *testing.T) {
+	d := newTestDaemon(t)
+	path := filepath.Join(t.TempDir(), "filter.dat")
+	if err := os.WriteFile(path, []byte("1.2.3.0/24\n5.6.7.0/24\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	d := &Daemon{}
-	data, stamp, err := d.ipFilterBytes(path)
-	if err != nil || string(data) != "1.2.3.0/24\n" || stamp == "" {
-		t.Fatalf("first read = %q/%q/%v", data, stamp, err)
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if n, err := d.loadIPFilterLocked(path); err != nil || n != 2 {
+		t.Fatalf("first load = %d/%v, want 2 rules", n, err)
+	}
+	if d.ipFilterSet.Len() != 2 {
+		t.Fatalf("cached set holds %d rules, want 2", d.ipFilterSet.Len())
 	}
 
-	// A matching stamp means the cached bytes are reused: seed a sentinel and
-	// confirm it is returned instead of re-reading the file.
+	// Same path, size and mtime: the parsed rules are reused and the file is
+	// not read. Garbage of the same length proves it.
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	d.ipFilterData = []byte("CACHED")
-	d.ipFilterStamp = fmt.Sprintf("%s|%d|%d", path, info.Size(), info.ModTime().UnixNano())
-	cached, _, err := d.ipFilterBytes(path)
-	if err != nil || string(cached) != "CACHED" {
-		t.Fatalf("cache was not reused: %q/%v", cached, err)
+	if err := os.WriteFile(path, []byte("not a filter at all!!\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := d.loadIPFilterLocked(path); err != nil || n != 2 {
+		t.Fatalf("cached load = %d/%v, want the 2 cached rules", n, err)
+	}
+
+	// A changed file is parsed again.
+	if err := os.WriteFile(path, []byte("9.9.9.0/24\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := d.loadIPFilterLocked(path); err != nil || n != 1 {
+		t.Fatalf("reload = %d/%v, want 1 rule", n, err)
 	}
 }
 

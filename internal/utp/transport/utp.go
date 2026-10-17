@@ -39,6 +39,10 @@ const (
 	// readBufferLen is the receive window each connection offers.
 	readBufferLen = 1 << 20 // ~1 MiB
 
+	// readBufKeep is the largest drained read buffer a connection keeps for
+	// reuse; a larger one (grown by a burst) is released.
+	readBufKeep = 256 << 10
+
 	// pendingSendStateDelay batches state packets: a state packet is not sent
 	// for every inbound packet, and an outgoing data packet fills the role.
 	pendingSendStateDelay = 500 * time.Microsecond

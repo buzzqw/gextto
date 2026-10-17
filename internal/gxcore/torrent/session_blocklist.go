@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/backoff"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/blocklist"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/ctxutil"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"go.etcd.io/bbolt"
@@ -200,4 +201,20 @@ func (s *Session) blocklistReloader(d time.Duration) {
 // files), returning the rule count.
 func (s *Session) LoadBlocklist(r io.Reader) (int, error) {
 	return s.blocklist.Reload(r)
+}
+
+// BlocklistRules is a parsed IP filter rule set (see BlocklistRules and
+// SetBlocklistRules).
+type BlocklistRules = blocklist.Rules
+
+// BlocklistRules returns the parsed IP filter rules currently loaded.
+func (s *Session) BlocklistRules() BlocklistRules {
+	return s.blocklist.Rules()
+}
+
+// SetBlocklistRules installs rules parsed by an earlier session, so a
+// session reopen does not read and parse the filter file again. It returns
+// the rule count.
+func (s *Session) SetBlocklistRules(r BlocklistRules) int {
+	return s.blocklist.SetRules(r)
 }
