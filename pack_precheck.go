@@ -208,7 +208,7 @@ func incompletePackReason(
 	}
 	if len(found) == 0 {
 		if videos == 0 {
-			return "il torrent non contiene file video", nil
+			return "the torrent holds no video file", nil
 		}
 		// File names without a season/episode marker cannot be matched: leave
 		// the verdict to the post-download check rather than risk rejecting a
@@ -223,10 +223,10 @@ func incompletePackReason(
 		return "", nil
 	}
 	if len(neededEpisodes) > 0 {
-		return fmt.Sprintf("il torrent non contiene nessuno degli episodi mancanti (%s): ne ha %d su %d dichiarati, già presenti in qualità uguale o migliore",
+		return fmt.Sprintf("the torrent holds none of the missing episodes (%s): it has %d of %d declared, already present in equal or better quality",
 			episodeList(neededEpisodes), len(found), release.InProgressEpisodes), nil
 	}
-	return fmt.Sprintf("nessun episodio utile: il torrent ne contiene %d su %d dichiarati, già presenti in qualità uguale o migliore",
+	return fmt.Sprintf("no useful episode: the torrent holds %d of %d declared, already present in equal or better quality",
 		len(found), release.InProgressEpisodes), nil
 }
 

@@ -150,8 +150,8 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, check
 			continue
 		}
 
-		reason := fmt.Sprintf("nessun episodio utile: ne contiene %d, già presenti in libreria in qualità uguale o migliore", len(found))
-		logging.Warn(fmt.Sprintf("🗑️ Pack in download scartato — «%s» · %s", candidate.release.Title, reason),
+		reason := fmt.Sprintf("no useful episode: it holds %d, already in the library in equal or better quality", len(found))
+		logging.Warn(fmt.Sprintf("🗑️ Pack discarded while downloading — «%s» · %s", candidate.release.Title, reason),
 			"hash", candidate.torrent.Hash, "name", candidate.torrent.Name)
 		_ = db.MarkTorrentError(candidate.torrent.Hash, reason)
 		_ = db.Blocklist(&candidate.release, "pack_inspection_useless")
@@ -233,7 +233,7 @@ func applyPackFilePriorities(
 			logging.Warn("could not record the skipped pack episodes", "hash", hash, "error", err.Error())
 		}
 	}
-	logging.Info(fmt.Sprintf("📥 Pack parzialmente utile: %d file su %d · risparmio %s",
+	logging.Info(fmt.Sprintf("📥 Partly useful pack: %d of %d files · saved %s",
 		len(files)-skipped, len(files), logging.HumanBytesI64(savedBytes)), "hash", hash)
 	return true
 }

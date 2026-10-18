@@ -1640,9 +1640,9 @@ func bg_speedDeltaText(prev, next int64) string {
 	case prev == next:
 		return "="
 	case prev <= 0:
-		return "da illimitato"
+		return "from unlimited"
 	case next <= 0:
-		return "a illimitato"
+		return "to unlimited"
 	case next > prev:
 		return fmt.Sprintf("+%d%%", bg_speedPct(prev, next))
 	default:
@@ -1653,18 +1653,18 @@ func bg_speedDeltaText(prev, next int64) string {
 // bg_speedMaxText renders the maximum of the policy in force, not the highest
 // number ever configured. An Auto window has no numeric user cap (the
 // controller is the cap; its internal ceiling is 100 MB/s), and an unlimited
-// policy has none either: both say "nessun limite". Showing the inactive
+// policy has none either: both say "no line max". Showing the inactive
 // schedule's 8000 next to a 14166 KiB/s cap would be a contradiction.
 func bg_speedMaxText(cfg *Config) string {
 	down, up, source, _ := speedPolicy(cfg)
 	if speedSourceIsAuto(source) {
 		if ld, lu := latencyGuardLineMaxKib(cfg); ld > 0 || lu > 0 {
-			return "max linea " + bg_speedPairText(ld, lu)
+			return "line max " + bg_speedPairText(ld, lu)
 		}
-		return "max nessun limite"
+		return "no line max"
 	}
 	if down == 0 && up == 0 {
-		return "max nessun limite"
+		return "no line max"
 	}
 	return "max " + bg_speedPairText(down, up)
 }
@@ -1675,16 +1675,16 @@ func bg_speedPairText(down, up int64) string {
 	case down > 0 && up > 0:
 		return fmt.Sprintf("%d/%d KB/s", down, up)
 	case down > 0:
-		return fmt.Sprintf("%d KB/s down, upload illimitato", down)
+		return fmt.Sprintf("%d KB/s down, upload unlimited", down)
 	default:
-		return fmt.Sprintf("upload %d KB/s, download illimitato", up)
+		return fmt.Sprintf("upload %d KB/s, download unlimited", up)
 	}
 }
 
 // bg_pingText renders the latency measured by the guard next to the speed.
 func bg_pingText(st latencyGuardStatus) string {
 	if st.LatencyMs <= 0 {
-		return "ping n/d"
+		return "ping n/a"
 	}
 	return fmt.Sprintf("ping %d/%d ms", st.LatencyMs, st.BaselineMs)
 }

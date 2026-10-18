@@ -144,9 +144,9 @@ func CleanTrash(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	if files > 0 {
-		logging.Info(fmt.Sprintf("🗑️ Cestino svuotato — %d elementi rimossi · %s", files, logging.HumanBytes(byteCount)), "path", trashPath)
+		logging.Info(fmt.Sprintf("🗑️ Trash emptied — %d items removed · %s", files, logging.HumanBytes(byteCount)), "path", trashPath)
 	} else {
-		logging.Info("🗑️ Cestino già vuoto", "path", trashPath)
+		logging.Info("🗑️ Trash already empty", "path", trashPath)
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":             true,
@@ -270,7 +270,7 @@ func DeleteTrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 		removedNames = append(removedNames, name)
 	}
 	if removed > 0 {
-		logging.Info(fmt.Sprintf("🗑️ Cestino svuotato — %d elementi rimossi · %s", removed, logging.HumanBytes(byteCount)), "path", root)
+		logging.Info(fmt.Sprintf("🗑️ Trash emptied — %d items removed · %s", removed, logging.HumanBytes(byteCount)), "path", root)
 	}
 	if len(errors) > 0 {
 		logging.Warn("trash cleanup left some entries", "path", root, "failed", len(errors), "names", strings.Join(errors, ", "))

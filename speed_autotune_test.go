@@ -85,8 +85,8 @@ func TestBGSpeedDeltaText(t *testing.T) {
 	}{
 		{1000, 1110, "+11%"},
 		{1000, 900, "-10%"},
-		{0, 1000, "da illimitato"},
-		{1000, 0, "a illimitato"},
+		{0, 1000, "from unlimited"},
+		{1000, 0, "to unlimited"},
 		{1000, 1000, "="},
 	} {
 		if got := bg_speedDeltaText(tc.prev, tc.next); got != tc.want {
@@ -105,8 +105,8 @@ func TestBGSpeedMaxTextShowsTheConfiguredCeiling(t *testing.T) {
 		t.Fatalf("max text = %q, want max 8000/1000 KB/s", got)
 	}
 	cfg.Transfer.DownloadLimitKib, cfg.Transfer.UploadLimitKib = 0, 0
-	if got := bg_speedMaxText(&cfg); got != "max nessun limite" {
-		t.Fatalf("unlimited max text = %q, want max nessun limite", got)
+	if got := bg_speedMaxText(&cfg); got != "no line max" {
+		t.Fatalf("unlimited max text = %q, want no line max", got)
 	}
 }
 
@@ -116,7 +116,7 @@ func TestBGPingTextRendersLatency(t *testing.T) {
 	if got := bg_pingText(latencyGuardStatus{LatencyMs: 23, BaselineMs: 14}); got != "ping 23/14 ms" {
 		t.Fatalf("ping text = %q", got)
 	}
-	if got := bg_pingText(latencyGuardStatus{}); got != "ping n/d" {
+	if got := bg_pingText(latencyGuardStatus{}); got != "ping n/a" {
 		t.Fatalf("missing ping text = %q", got)
 	}
 }
