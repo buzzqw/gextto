@@ -305,6 +305,10 @@ func TestNotifierFormatEventLifecycle(t *testing.T) {
 	if got := formatEvent("cycle_warning", map[string]any{"reason": "la sorgente TGx non risponde da 3 cicli"}); !strings.Contains(got, "RICERCA") || !strings.Contains(got, "TGx") {
 		t.Fatalf("cycle_warning it = %q", got)
 	}
+	indexerNotice := map[string]any{"source": "mircrew indexerr", "failed_links": 6, "error": "HTTP 502: MirCrew login failed"}
+	if got := formatEvent("indexer_failing", indexerNotice); !strings.Contains(got, "INDEXER") || !strings.Contains(got, "mircrew indexerr") || !strings.Contains(got, "6") || !strings.Contains(got, "login") {
+		t.Fatalf("indexer_failing it = %q", got)
+	}
 
 	messages.SetLanguage("en")
 	restart = formatEvent("daemon_restarted", map[string]any{"run": 3, "down_seconds": 4})
@@ -316,6 +320,9 @@ func TestNotifierFormatEventLifecycle(t *testing.T) {
 	}
 	if got := formatEvent("cycle_recovered", nil); !strings.Contains(got, "healthy again") {
 		t.Fatalf("cycle_recovered en = %q", got)
+	}
+	if got := formatEvent("indexer_failing", indexerNotice); !strings.Contains(got, "INDEXER NEEDS ATTENTION") || !strings.Contains(got, "mircrew indexerr") {
+		t.Fatalf("indexer_failing en = %q", got)
 	}
 }
 

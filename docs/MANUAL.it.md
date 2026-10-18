@@ -1195,7 +1195,13 @@ la pulizia degli altri.
   avvisa da sé (riga WARN e notifica) se una sorgente ha fallito in tre delle
   ultime ricerche, se l'ultima ricerca ha impiegato più di tre ore o se non c'è
   una ricerca senza errori da tre intervalli (minimo due ore); avvisa anche
-  quando tutto torna regolare.
+  quando tutto torna regolare. In più, se i link `.torrent` di una stessa
+  sorgente falliscono su due release diverse nello stesso ciclo — di solito un
+  login scaduto, come il 502 «login failed» di mircrew — Gextto scrive una riga
+  WARN e manda una notifica (al massimo ogni 12 ore per sorgente) con il motivo
+  restituito dall'indexer e cosa fare: rifare il login e, finché non funziona,
+  disabilitare quella sorgente nelle ricerche. Un link che si risolve riarma
+  l'avviso.
 - **Coda titoli** — riquadro con i titoli trattenuti dal *delay profile* (serie e
   film) prima del download: titolo, da quanto sono in attesa (`first_seen_at`) e
   quanto manca al `due_at`. Serve a vedere quando la coda cresce o un titolo

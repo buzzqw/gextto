@@ -773,6 +773,10 @@ func RunCycleDomain(
 	upgrades := 0
 	var skips cycleSkipCounts
 	newItems := 0
+	// Distinct `.torrent` links that failed per source in this cycle. Two of
+	// them mean the source is broken (an expired login, a dead proxy), not the
+	// single torrent.
+	linkFailures := map[string]map[string]struct{}{}
 	if cycleCancelled(ctx) {
 		return stats, nil
 	}
@@ -812,11 +816,23 @@ func RunCycleDomain(
 						"target", releaseTarget(&release),
 						"source", release.Source,
 						"error", err)
+					if source := strings.TrimSpace(release.Source); source != "" {
+						links := linkFailures[source]
+						if links == nil {
+							links = map[string]struct{}{}
+							linkFailures[source] = links
+						}
+						links[*release.TorrentURL] = struct{}{}
+						if len(links) == indexerFailureNotifyLimit {
+							notifyIndexerFailure(notifier, source, len(links), err.Error())
+						}
+					}
 					continue
 				}
 				// The link works: forget any previous failure so it is eligible
 				// again if the indexer breaks later.
 				_ = db.ClearTorrentLinkFailure(*release.TorrentURL)
+				clearIndexerFailureNotice(release.Source)
 				release.Magnet = magnet
 				// The feed was persisted before selection. Replace its
 				// short-lived Jackett URL with the stable magnet so a later

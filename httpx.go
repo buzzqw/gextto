@@ -34,6 +34,9 @@ const (
 	maxFeedResponseBytes = 64 << 20  // RSS/HTML feeds and .torrent files
 	maxDecompressedBytes = 512 << 20 // decompressed archives (e.g. blocklists)
 	maxUpdateBytes       = 512 << 20 // self-update payloads
+	// torrentFetchReasonLimit bounds the reason carried from a failed
+	// `.torrent` download into the log and the notification.
+	torrentFetchReasonLimit = 300
 )
 
 // readLimitedBody reads at most limit bytes from r; a larger body is an error

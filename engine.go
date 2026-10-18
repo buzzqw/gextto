@@ -13,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -143,6 +144,11 @@ func (e *Engine) FetchTorrent(ctx context.Context, rawURL string) ([]byte, strin
 			// query are left out: they carry the API key.
 			host = parsed.Host
 		}
+		if reason := torrentFetchFailureReason(resp.Body); reason != "" {
+			// The proxy's own words ("MirCrew login failed: …") say what to do;
+			// a bare status code makes the operator guess.
+			return nil, "", fmt.Errorf("HTTP %d fetching torrent from %s: %s", resp.StatusCode, host, reason)
+		}
 		return nil, "", fmt.Errorf("HTTP %d fetching torrent from %s", resp.StatusCode, host)
 	}
 	payload, err := readLimitedBody(resp.Body, maxFeedResponseBytes)
@@ -154,6 +160,26 @@ func (e *Engine) FetchTorrent(ctx context.Context, rawURL string) ([]byte, strin
 		return nil, trimmedPayload, nil
 	}
 	return payload, "", nil
+}
+
+// torrentFetchFailureReason is the readable cause a failed `.torrent` download
+// carried in its body. A proxy indexer such as mircrew answers 502 with a
+// sentence ("magnet not available: MirCrew login failed: credenziali rifiutate
+// o verifica richiesta") that tells the operator to sign in again; a bare status
+// code does not. The text is flattened to one line, redacted and bounded: the
+// body can be a long HTML error page and must never carry a credential into the
+// log.
+func torrentFetchFailureReason(body io.Reader) string {
+	if body == nil {
+		return ""
+	}
+	payload, err := io.ReadAll(io.LimitReader(body, 4<<10))
+	if err != nil && len(payload) == 0 {
+		return ""
+	}
+	reason := strings.Join(strings.Fields(strings.ToValidUTF8(string(payload), " ")), " ")
+	reason = strings.TrimSpace(utils.RedactURLSecrets(reason))
+	return boundReason(reason, torrentFetchReasonLimit)
 }
 
 // ScrapeAll scans every configured feed and then searches every enabled series

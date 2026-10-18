@@ -181,3 +181,31 @@ func TestFetchTorrentErrorNamesTheHostAndPort(t *testing.T) {
 		t.Fatalf("error %q leaks the URL path or the API key", err)
 	}
 }
+
+// TestFetchTorrentErrorCarriesTheProxyReason: a non-2xx answer from an indexer
+// proxy carries its own explanation (mircrew: "magnet not available: MirCrew
+// login failed: …"). The log and the indexer-failure notification must show
+// that sentence, not only the status code; the text is one line and never
+// echoes an API key.
+func TestFetchTorrentErrorCarriesTheProxyReason(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte("magnet not available: MirCrew login failed: credenziali rifiutate (apikey=SECRET)\nretry later"))
+	}))
+	defer server.Close()
+
+	engine := NewEngine()
+	_, _, err := engine.FetchTorrent(context.Background(), server.URL+"/dl/topic")
+	if err == nil {
+		t.Fatal("a 502 must be an error")
+	}
+	if !strings.Contains(err.Error(), "MirCrew login failed") {
+		t.Fatalf("error %q lost the proxy reason", err)
+	}
+	if strings.Contains(err.Error(), "SECRET") {
+		t.Fatalf("error %q leaks the API key", err)
+	}
+	if strings.Contains(err.Error(), "\n") {
+		t.Fatalf("error %q is not one line", err)
+	}
+}

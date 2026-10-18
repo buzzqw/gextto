@@ -1155,7 +1155,12 @@ the others.
   when a source has failed in three of the recent searches, when the last search
   took more than three hours, or when no cycle without errors has completed for
   three intervals (at least two hours); it also reports when everything is
-  healthy again.
+  healthy again. Separately, when the `.torrent` links of one source fail on two
+  different releases in the same cycle — usually an expired login, such as
+  mircrew's 502 "login failed" — Gextto writes a WARN line and sends a
+  notification (at most every 12 hours per source) with the reason the indexer
+  returned and what to do: sign in again and, until it works, disable that
+  source in the searches. A link that resolves re-arms the warning.
 - **Title queue** — panel with the titles held by the *delay profile* (series and
   movies) before the download: title, how long they have been waiting
   (`first_seen_at`) and how long until `due_at`. Shows a queue that keeps growing

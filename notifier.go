@@ -659,6 +659,12 @@ func formatEmailSubject(event string, data map[string]any) string {
 		return fmt.Sprintf("Gextto: %s", messages.Pick("Ricerca da controllare", "Search needs attention"))
 	case "cycle_recovered":
 		return fmt.Sprintf("Gextto: %s", messages.Pick("Ricerca di nuovo regolare", "Search healthy again"))
+	case "indexer_failing":
+		label := messages.Pick("Indexer da controllare", "Indexer needs attention")
+		if source := text("source"); source != "" {
+			return fmt.Sprintf("Gextto: %s — %s", label, source)
+		}
+		return fmt.Sprintf("Gextto: %s", label)
 	default:
 		return fmt.Sprintf("Gextto [%s]", event)
 	}
@@ -1157,6 +1163,17 @@ func formatEvent(event string, data map[string]any) string {
 			messages.Pick("Motivo", "Reason"), text("reason"))
 	case "cycle_recovered":
 		return messages.Pick("✅ La ricerca automatica è di nuovo regolare", "✅ The automatic search is healthy again")
+	case "indexer_failing":
+		failures, _ := jsonInt(mapLookup(data, "failed_links"))
+		return fmt.Sprintf("%s\n\n📡 %s: %s\n🔗 %s: %d\n📝 %s: %s\n\n💡 %s",
+			messages.Pick("⚠️ INDEXER DA CONTROLLARE", "⚠️ INDEXER NEEDS ATTENTION"),
+			messages.Pick("Fonte", "Source"), text("source"),
+			messages.Pick("Link falliti", "Failed links"), failures,
+			messages.Pick("Motivo", "Reason"), text("error"),
+			messages.Pick(
+				"Rifai il login nell'indexer (o aggiorna le credenziali) e controlla che il servizio risponda; finché non funziona, disabilitalo nelle ricerche.",
+				"Sign in to the indexer again (or update its credentials) and check that the service answers; until it works, disable it in the searches.",
+			))
 	default:
 		if value, ok := mapLookup(data, "text").(string); ok {
 			return fmt.Sprintf("Gextto [%s] %s", event, value)
