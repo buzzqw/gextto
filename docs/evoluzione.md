@@ -287,7 +287,11 @@ per day. Torrent log lines carry an `acq:` ID and are stored in `acquisition_eve
 Limit or Auto), and a temporary override (numeric or Auto). Auto leaves the line to the
 guided tuning: the latency guard may cap it while the ping is high and ramps it back up
 when the line is at rest, so the peak is learned when the guard is free. A temporary Auto
-wins over everything and is the sibling of the numeric temporary limit.
+wins over everything and is the sibling of the numeric temporary limit. When the base
+Auto from the settings is the policy in force, the temporary Auto switch in Downloads is
+shown disabled and points at Configuration → Speed and network; with an active numeric
+schedule it stays usable, because it is the only way to hand the line back to the tuning
+right then (`TempAutoRedundant`).
 
 **Latency guard (Auto respects latency, on by default).** While Auto is in force,
 `latency_guard.go` probes Google and Cloudflare every 2 s (8.8.8.8, 8.8.4.4, 1.1.1.1 and

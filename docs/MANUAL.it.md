@@ -352,7 +352,11 @@ bloccata, già presente o inferiore al file archiviato.
   l'elenco si aggiorna automaticamente ogni 5 secondi.
 - I download HTTP dei fumetti mostrano stato, progressione, byte scaricati e
   velocità nella stessa lista dei torrent.
-- **Filtro per tag** e **limiti di velocità temporanei** (DL/UL per N minuti).
+- **Filtro per tag** e **limiti di velocità temporanei** (DL/UL per N minuti). Se in
+  Configurazione → Velocità e rete è attiva la velocità automatica (misura la linea),
+  l'interruttore «Auto speed» in Scarico è disattivato e indica «da configurazione»:
+  il comando arriva da lì. Resta usabile quando è in corso una fascia oraria numerica,
+  perché in quel momento è l'unico modo per forzare l'Auto subito.
 - **Colonne tabella**: Nome, Stato, Progresso, ↓, ↑, ETA, Peers, Ratio — clicca
   l'intestazione per ordinare. **Azioni bulk**: pausa, riprendi, recheck, rimuovi.
 - **Azioni riga**: pausa/riprendi, recheck, rimuovi.

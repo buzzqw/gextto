@@ -349,7 +349,12 @@ inferior to the archived file.
   list refreshes automatically every 5 seconds.
 - Comic HTTP downloads show status, progress, downloaded bytes and speed in the
   same list as torrents.
-- **Tag filter** and **temporary speed limits** (DL/UL for N minutes).
+- **Tag filter** and **temporary speed limits** (DL/UL for N minutes). If
+  Configuration → Speed and network has the automatic speed (measuring the line)
+  on, the "Auto speed" switch in Downloads is disabled and says "from
+  configuration": that is where the command comes from. It stays usable while a
+  numeric schedule window is in force, because then it is the only way to hand
+  the line back to the tuning right away.
 - **Table columns**: Name, Status, Progress, ↓, ↑, ETA, Peers, Ratio — click a
   header to sort. **Bulk actions**: pause, resume, recheck, remove.
 - **Row actions**: pause/resume, recheck, remove.

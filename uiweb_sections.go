@@ -218,6 +218,11 @@ type uiDownloadsPage struct {
 	TempAuto bool
 	// SpeedAuto is the base "Auto" policy (torrent_speed_auto): no cap at all.
 	SpeedAuto bool
+	// TempAutoRedundant is true when the base "Auto" policy from
+	// Configuration → Speed and network is already in force: the temporary
+	// override would add nothing now, so the toolbar shows it disabled and
+	// points at the setting instead of pretending it is a second switch.
+	TempAutoRedundant bool
 	// Active scheduled speed limits and base limits
 	SchedActive bool
 	// SchedAuto: the active schedule window is an "Auto" band (the AutoLimit
@@ -228,11 +233,11 @@ type uiDownloadsPage struct {
 	TempShadowed bool
 	// Guard is the latency guard of the Auto speed: shown while it is
 	// slowing the transfers down for the other devices on the line.
-	Guard latencyGuardStatus
-	SchedDL      int64
-	SchedUL      int64
-	BaseDL       int64
-	BaseUL       int64
+	Guard   latencyGuardStatus
+	SchedDL int64
+	SchedUL int64
+	BaseDL  int64
+	BaseUL  int64
 	// Tag catalog and selection used by the toolbar filters.
 	TagOptions          []string
 	AutoRemoveCompleted bool
@@ -589,12 +594,18 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 // tag and temporary-limit panels of the classic interface.
 func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 	cfg := latestConfig(s)
+	speedAuto := settingsBool(cfg, "torrent_speed_auto", false)
+	// The temporary "Auto speed" is redundant only when the base Auto is the
+	// policy actually in force: with an active numeric schedule or temporary
+	// limit it is the escape hatch that hands the line back to the tuning.
+	_, _, source, _ := speedPolicy(cfg)
 	page := uiDownloadsPage{
 		Torrents:            uiTorrentsDataFrom(s),
 		TempDL:              uiSettingInt(cfg, "torrent_temp_dl_limit"),
 		TempUL:              uiSettingInt(cfg, "torrent_temp_ul_limit"),
 		TempAuto:            settingsBool(cfg, "torrent_temp_auto", false),
-		SpeedAuto:           settingsBool(cfg, "torrent_speed_auto", false),
+		SpeedAuto:           speedAuto,
+		TempAutoRedundant:   speedAuto && source == speedSourceAuto,
 		AutoRemoveCompleted: settingsBool(cfg, "auto_remove_completed", false),
 		TagOptions:          uiDownloadTagOptions(s, cfg),
 		Guard:               s.latency_guard.status(),

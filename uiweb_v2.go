@@ -989,23 +989,26 @@ var v2TorrentColumns = []v2Column{
 }
 
 type v2TorrentsView struct {
-	Rows                []uiTorrentRow
-	HTTPDownloads       []ComicDownload
-	Count               int
-	UpdatedAt           string
-	Sort                string
-	Dir                 string
-	Filter              string
-	Auto                bool
-	Columns             []v2Column
-	TagOptions          []string
-	TagFilter           string
-	TempDL              int64
-	TempUL              int64
-	TempMinutes         int64
-	TempActive          bool
-	TempAuto            bool
-	SpeedAuto           bool
+	Rows          []uiTorrentRow
+	HTTPDownloads []ComicDownload
+	Count         int
+	UpdatedAt     string
+	Sort          string
+	Dir           string
+	Filter        string
+	Auto          bool
+	Columns       []v2Column
+	TagOptions    []string
+	TagFilter     string
+	TempDL        int64
+	TempUL        int64
+	TempMinutes   int64
+	TempActive    bool
+	TempAuto      bool
+	SpeedAuto     bool
+	// TempAutoRedundant: the base Auto from the settings is in force, so the
+	// temporary switch is shown disabled and points at Configuration.
+	TempAutoRedundant   bool
 	Guard               latencyGuardStatus
 	SchedActive         bool
 	SchedAuto           bool
@@ -1181,6 +1184,7 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		TempActive:          settings.TempActive,
 		TempAuto:            settings.TempAuto,
 		SpeedAuto:           settings.SpeedAuto,
+		TempAutoRedundant:   settings.TempAutoRedundant,
 		Guard:               settings.Guard,
 		SchedActive:         settings.SchedActive,
 		SchedAuto:           settings.SchedAuto,

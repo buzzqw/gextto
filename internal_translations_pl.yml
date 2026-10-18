@@ -5128,6 +5128,8 @@ pol:
   "Modalità del giorno: «Non attiva» nessuna fascia, «Limite» la fascia con i tuoi valori, «Auto» la fascia senza limite (la banda va all'auto-tune, che misura la linea).": "Tryb dnia: «Nieaktywny» brak okna, «Limit» okno z twoimi wartościami, «Auto» okno bez limitu (przepustowość przechodzi do auto-tune, który mierzy łącze)."
   "Auto speed": "Auto-prędkość"
   "Auto speed: la banda va all'auto-tune, senza tetto, come una fascia «Auto» della programmazione; disabilita i limiti temporanei": "Auto-prędkość: przepustowość przechodzi bez limitu do auto-tune, jak okno «Auto»; wyłącza limity tymczasowe"
+  "Velocità automatica già attiva da Configurazione → Velocità e rete: qui è solo un override temporaneo che vince sulla programmazione": "Automatyczna prędkość jest już włączona w Konfiguracja → Prędkość i sieć: tutaj to tylko tymczasowe nadpisanie, które ma pierwszeństwo przed harmonogramem"
+  "da configurazione": "z konfiguracji"
   "Auto speed: la banda va all'auto-tune, senza tetto": "Auto-prędkość: przepustowość przechodzi bez limitu do auto-tune"
   "Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune": "Harmonogram aktywny: pasmo «Auto», bez limitu, linię mierzy auto-tune"
   "Auto rallenta per lasciare la linea agli altri dispositivi di casa": "Auto zwalnia, aby zostawić łącze innym urządzeniom w domu"

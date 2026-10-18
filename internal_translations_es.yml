@@ -5134,6 +5134,8 @@ spa:
   "Modalità del giorno: «Non attiva» nessuna fascia, «Limite» la fascia con i tuoi valori, «Auto» la fascia senza limite (la banda va all'auto-tune, che misura la linea).": "Modo del día: «Inactiva» ninguna franja, «Límite» la franja con tus valores, «Auto» la franja sin límite (el ancho de banda pasa al auto-tune, que mide la línea)."
   "Auto speed": "Velocidad auto"
   "Auto speed: la banda va all'auto-tune, senza tetto, come una fascia «Auto» della programmazione; disabilita i limiti temporanei": "Velocidad auto: el ancho de banda pasa sin límite al auto-tune, como una franja «Auto»; desactiva los límites temporales"
+  "Velocità automatica già attiva da Configurazione → Velocità e rete: qui è solo un override temporaneo che vince sulla programmazione": "La velocidad automática ya está activa en Configuración → Velocidad y red: aquí solo es una excepción temporal que prevalece sobre la programación"
+  "da configurazione": "desde la configuración"
   "Auto speed: la banda va all'auto-tune, senza tetto": "Velocidad auto: el ancho de banda pasa sin límite al auto-tune"
   "Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune": "Programación activa: franja «Auto», sin tope, la línea la mide el auto-tune"
   "Auto rallenta per lasciare la linea agli altri dispositivi di casa": "Auto frena para dejar la línea a los demás dispositivos de casa"

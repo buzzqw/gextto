@@ -2024,3 +2024,67 @@ func TestV2LogsPageCarriesTheGlobalModal(t *testing.T) {
 		t.Fatal("the logs page has no #v2-modal target for the theme button")
 	}
 }
+
+// v2TempAutoTag returns the <input id="v2-temp-auto"> tag, so a test can check
+// whether it is disabled or checked without depending on attribute order.
+func v2TempAutoTag(html string) string {
+	index := strings.Index(html, `id="v2-temp-auto"`)
+	if index < 0 {
+		return ""
+	}
+	if end := strings.Index(html[index:], ">"); end >= 0 {
+		return html[index : index+end]
+	}
+	return html[index:]
+}
+
+// TestV2DownloadsTempAutoFollowsTheSettings: when the base "Automatic speed"
+// from Configuration → Speed and network is already in force, the temporary
+// "Auto speed" switch in Downloads is disabled and points at the setting. With
+// a numeric schedule in force it stays usable: it is the escape hatch that
+// hands the line back to the tuning.
+func TestV2DownloadsTempAutoFollowsTheSettings(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	downloads := func() string {
+		code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
+		if code != http.StatusOK {
+			t.Fatalf("downloads -> %d: %s", code, body)
+		}
+		return body
+	}
+	set := func(key, value string) {
+		if err := saveConfigSetting(state.cfg.DataDir, key, value); err != nil {
+			t.Fatalf("save %s: %v", key, err)
+		}
+	}
+
+	if tag := v2TempAutoTag(downloads()); tag == "" || strings.Contains(tag, " disabled") || strings.Contains(tag, " checked") {
+		t.Fatalf("default temp auto tag = %q", tag)
+	}
+
+	set("torrent_speed_auto", "true")
+	body := downloads()
+	if tag := v2TempAutoTag(body); !strings.Contains(tag, "disabled") {
+		t.Fatalf("base Auto should disable the temporary switch, tag = %q", tag)
+	}
+	if !strings.Contains(body, "da configurazione") {
+		t.Fatal("the disabled switch does not point at the setting")
+	}
+
+	for key, value := range map[string]string{
+		"torrent_sched_enabled":  "true",
+		"torrent_sched_days":     "0,1,2,3,4,5,6",
+		"torrent_sched_start":    "00:00",
+		"torrent_sched_end":      "23:59",
+		"torrent_sched_dl_limit": "3000",
+		"torrent_sched_ul_limit": "300",
+	} {
+		set(key, value)
+	}
+	if tag := v2TempAutoTag(downloads()); strings.Contains(tag, "disabled") {
+		t.Fatalf("a numeric schedule must keep the temporary switch usable, tag = %q", tag)
+	}
+}
