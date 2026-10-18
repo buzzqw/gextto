@@ -361,7 +361,10 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 			if providers == "" {
 				providers = "no indexers configured"
 			}
-			logging.Warn(fmt.Sprintf(
+			// A title cut at the budget is normal: the results that arrived are
+			// kept and the next cycle retries it. Keep the summary at debug: a
+			// WARN here only looks like a fault.
+			logging.Debug(fmt.Sprintf(
 				"scheduled title searches timed out: %d target(s) · indexers: %s · queries: %s",
 				len(timedOutQueries), providers, strings.Join(timedOutQueries, ", ")),
 				"timeout_secs", int(automaticSearchTimeout.Seconds()))
