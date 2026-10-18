@@ -21,6 +21,7 @@ package gextto
 // the standalone daemon.
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -35,14 +36,30 @@ const (
 	// is the host[:port] to probe (empty: latencyGuardTargets).
 	latencyGuardKey       = "torrent_auto_latency_guard"
 	latencyGuardTargetKey = "torrent_auto_latency_target"
+	// latencyGuardSourceKey chooses what the controller listens to:
+	// "ping" (Google/Cloudflare only, the router is not read), "both"
+	// (ping decides, the router is shown as a diagnostic) or "router" (the
+	// old behaviour: yield only to other devices the router sees).
+	latencyGuardSourceKey = "torrent_auto_latency_source"
+	// latencyGuardLineMaxDownKey/UpKey hold the line's maximum in KiB/s as
+	// entered by the user (0 = unknown). When known, the controller uses it as
+	// the ceiling and finds the knee faster; it is not a hard cap in the code,
+	// it is the number the user knows about the line.
+	latencyGuardLineMaxDownKey = "torrent_line_max_down_kib"
+	latencyGuardLineMaxUpKey   = "torrent_line_max_up_kib"
+	// latencySourcePing/Both/Router are the values of that setting.
+	latencySourcePing   = "ping"
+	latencySourceBoth   = "both"
+	latencySourceRouter = "router"
 
 	// latencyGuardProbeEvery is the probe cadence; latencyGuardWindow how far
 	// back the probe keeps samples.
 	latencyGuardProbeEvery = 2 * time.Second
 	latencyGuardWindow     = 10 * time.Minute
 	// latencyGuardRecent is how many samples the current latency is the
-	// median of, so one late answer does not move the caps.
-	latencyGuardRecent = 3
+	// median of, so one late answer does not move the caps. Ten seconds at the
+	// two-second probe cadence: a single spike must not cut the line.
+	latencyGuardRecent = 5
 
 	// latencyGuardTrial is how long a trial backs Gextto off;
 	// latencyGuardTrialSettle the part of it left to the queue to drain
@@ -51,46 +68,60 @@ const (
 	latencyGuardTrial       = 8 * time.Second
 	latencyGuardTrialSettle = 3 * time.Second
 	latencyGuardTrialShare  = 0.6
-	// latencyGuardCooldown is the wait after a trial that found the line
-	// Gextto's own (or after a release) before another one.
-	latencyGuardCooldown = 10 * time.Minute
+	// latencyGuardCooldown is the wait after a release before another probe of
+	// the line. A confirmed latency rise is not blocked by it: the controller
+	// must react as soon as the ping degrades.
+	latencyGuardCooldown = time.Minute
 	// latencyGuardRestAge is how long a measured idle reference is kept. Only
 	// a lower measure replaces it before then: a trial disturbed by someone
 	// else's light traffic must not raise the reference and blind the guard.
 	latencyGuardRestAge = 6 * time.Hour
 
-	// latencyGuardRelease is the calm spell at the ceiling after which a cap
-	// is lifted.
-	latencyGuardRelease = time.Minute
 	// latencyGuardMinLoadKiB: a direction below this is not loading the line.
 	latencyGuardMinLoadKiB = 256
-	// latencyGuardMinFloorKiB is the lowest cap the guard may set.
-	latencyGuardMinFloorKiB = 64
+	// latencyGuardMaxDownKiB/UpKiB = 0 means no hard cap in the code. The
+	// controller ramps while the ping is good and stops at twice the rate the
+	// line is actually delivering (a dynamic governor, not a fixed ceiling), so
+	// a gigabit or 10-gigabit line is never limited by a constant chosen here.
+	// The ping, not a number, decides where the cap settles.
+	latencyGuardMaxDownKiB = 0
+	latencyGuardMaxUpKiB   = 0
+	// latencyGuardRiseDownKiB/UpKiB is the additive part of the upward step.
+	// The controller raises the cap while the ping is good and cuts it when the
+	// ping degrades; this is how it finds the line instead of sitting on a low
+	// peak measured during a slow swarm.
+	latencyGuardRiseDownKiB = 512
+	latencyGuardRiseUpKiB   = 64
+	// latencyGuardMinFloorDownKiB/UpKiB is the lowest cap the controller may
+	// settle on. The old 64 KiB/s was indistinguishable from a stall and was
+	// the visible sawtooth; the floor only applies while the cap is active.
+	latencyGuardMinFloorDownKiB = 128
+	latencyGuardMinFloorUpKiB   = 64
 )
 
-// latencyGuardTargets are probed when no target is configured: public anycast
-// resolvers, near on most lines, reached through the provider's queue (the
-// gateway is not: it shows no queueing).
-var latencyGuardTargets = []string{"9.9.9.9:443", "1.1.1.1:443"}
+// latencyGuardTargets are probed when no target is configured: Google and
+// Cloudflare, reached through the provider's queue (the gateway does not show
+// it). They are anycast and stable, and the controller takes the lowest of the
+// answers, so one server being far, slow or unreachable cannot fake a bad line.
+var latencyGuardTargets = []string{"8.8.8.8:443", "8.8.4.4:443", "1.1.1.1:443", "1.0.0.1:443"}
 
 // guardMode is where the guard stands.
 type guardMode int
 
 const (
-	guardFree  guardMode = iota // no caps: the line is Gextto's
-	guardTrial                  // backed off for a few seconds, watching
-	guardYield                  // capped for the others on the line
+	guardFree    guardMode = iota // no caps: the ping is good at full speed
+	guardTrial                    // backed off for a few seconds, measuring
+	guardControl                  // cap active: ramp up while the ping is good
 )
 
 func (m guardMode) String() string {
-	return [...]string{"free", "trial", "yield"}[m]
+	return [...]string{"free", "trial", "control"}[m]
 }
 
 // guardDirection is the guard's cap for download or upload.
 type guardDirection struct {
-	clamp     autospeed.Clamp
-	active    bool
-	calmSince time.Time
+	clamp  autospeed.Clamp
+	active bool
 }
 
 // start caps the direction at value.
@@ -99,29 +130,23 @@ func (d *guardDirection) start(value int64) {
 	d.clamp.Value = value
 }
 
-// step moves an active cap: down while high (when the direction loads the
-// line), up otherwise, lifted after a calm spell at the ceiling. It returns
-// the cap (0 = none).
-func (d *guardDirection) step(now time.Time, high bool, rateKiB, peakKiB int64) int64 {
+// step moves an active cap: up while the ping is good, down when it degrades.
+// It returns the cap (0 = none). ceilingKiB is the maximum the controller may
+// reach: the line maximum the user entered, or (0) twice the rate the line is
+// actually delivering. Using the current rate as the ceiling was the lock that
+// kept the cap at a slow sample; the 2x governor still lets it grow when the
+// rate grows, while a value entered by the user is respected exactly.
+func (d *guardDirection) step(now time.Time, high bool, rateKiB, ceilingKiB, floorKiB, riseKiB int64) int64 {
 	if !d.active {
 		return 0
 	}
-	ceiling := max(peakKiB, rateKiB, d.clamp.Value)
-	floor := max(ceiling/10, latencyGuardMinFloorKiB)
+	floor := max(floorKiB, 1)
+	ceiling := ceilingKiB
+	if ceiling <= 0 {
+		ceiling = max(d.clamp.Value, rateKiB*2)
+	}
 	loading := rateKiB >= d.clamp.Value/2
-	capKiB := d.clamp.Step(now, high && loading, ceiling, floor)
-	if high {
-		d.calmSince = time.Time{}
-		return capKiB
-	}
-	if d.calmSince.IsZero() {
-		d.calmSince = now
-	}
-	if capKiB >= ceiling && now.Sub(d.calmSince) >= latencyGuardRelease {
-		*d = guardDirection{}
-		return 0
-	}
-	return capKiB
+	return d.clamp.StepRamp(now, high && loading, ceiling, floor, riseKiB)
 }
 
 // latencyGuard is the Auto speed's latency controller. The zero value is not
@@ -144,6 +169,20 @@ type latencyGuard struct {
 	haveSample     bool
 	auto           bool
 	othersOnLine   bool
+	// routerOnly selects the legacy policy: cap only when the router confirms
+	// other traffic. With "ping"/"both" the latency decides and the router is
+	// only a diagnostic.
+	routerOnly bool
+	// controlStarted is set when the controller applies its first cap of a
+	// session; tick logs it once, with the values and the ping.
+	controlStarted bool
+	// capLoggedAt/Down/Up are that first-cap line: when it was written and the
+	// caps it named. The periodic speed line adopts it as its own last line,
+	// so it does not repeat the same numbers a few seconds later.
+	capLoggedAt                time.Time
+	capLoggedDown, capLoggedUp int64
+	// lineMaxDown/Up are the user's line maxima in KiB/s (0 = unknown).
+	lineMaxDown, lineMaxUp int64
 
 	// The engine's cumulative wire counters at the previous tick, for an
 	// instant rate (the reported rates are averaged over tens of seconds).
@@ -199,6 +238,48 @@ func latencyGuardEnabled(cfg *Config) bool {
 	return !ok || strings.TrimSpace(value) == "" || settingTruthy(value)
 }
 
+// latencyGuardSource reads the source setting: "ping" ignores the router,
+// "both" uses the ping for control and the router as a diagnostic, "router"
+// keeps the legacy policy. An unknown or empty value is "both".
+func latencyGuardSource(cfg *Config) string {
+	if cfg == nil {
+		return latencySourceBoth
+	}
+	switch strings.ToLower(strings.TrimSpace(cfg.Settings[latencyGuardSourceKey])) {
+	case latencySourcePing:
+		return latencySourcePing
+	case latencySourceRouter:
+		return latencySourceRouter
+	default:
+		return latencySourceBoth
+	}
+}
+
+// latencyGuardRouterEnabled reports whether the router counters are read. In
+// "ping" they are not, so a router that is absent or wrong cannot affect the
+// caps.
+func latencyGuardRouterEnabled(cfg *Config) bool {
+	return latencyGuardSource(cfg) != latencySourcePing
+}
+
+// latencyGuardRouterOnly reports whether the legacy router-only policy is in
+// force.
+func latencyGuardRouterOnly(cfg *Config) bool {
+	return latencyGuardSource(cfg) == latencySourceRouter
+}
+
+// latencyGuardLineMaxKib reads the line maxima entered by the user (0 = not
+// known). They are a ceiling for the controller, not a hard-coded limit: when
+// both are 0 the guard uses the 2x-rate governor.
+func latencyGuardLineMaxKib(cfg *Config) (down, up int64) {
+	if cfg == nil {
+		return 0, 0
+	}
+	down = max(settingsParseInt(cfg, latencyGuardLineMaxDownKey, 0), 0)
+	up = max(settingsParseInt(cfg, latencyGuardLineMaxUpKey, 0), 0)
+	return down, up
+}
+
 // speedSourceIsAuto reports the policy sources that leave the line uncapped.
 func speedSourceIsAuto(source string) bool {
 	return source == speedSourceAuto || source == speedSourceScheduleAuto || source == speedSourceTempAuto
@@ -227,24 +308,33 @@ type lineGuess struct {
 	known, others bool
 }
 
-// update runs one controller step with the current rates (bytes/s) and the
-// router's verdict, and returns the caps in force (0 = none) and whether they
-// changed.
-func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downBytes, upBytes uint64, peakDownKiB, peakUpKiB int64) (downCap, upCap int64, changed bool) {
+// update runs one controller step with the current rates (bytes/s) and
+// returns the caps in force (0 = none) and whether they changed.
+//
+// The decision is taken from the latency to Google/Cloudflare alone. The
+// router's counters are only a diagnostic: they can be missing, stale or
+// wrong, and they must never decide how much bandwidth Gextto uses. line is
+// kept for the status badge, not for the control loop.
+func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downBytes, upBytes uint64) (downCap, upCap int64, changed bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	prevDown, prevUp := g.downCap, g.upCap
 	g.auto = auto
+	g.othersOnLine = line.known && line.others
 	if !auto {
 		g.mode = guardFree
 		g.down, g.up = guardDirection{}, guardDirection{}
 		g.downCap, g.upCap = 0, 0
 		g.haveSample, g.othersOnLine = false, false
+		g.capLoggedAt, g.capLoggedDown, g.capLoggedUp = time.Time{}, 0, 0
 		return 0, 0, prevDown != 0 || prevUp != 0
 	}
 	current, windowMin, _, ok := g.probe.State(now, latencyGuardRecent)
 	g.current, g.haveSample = current, ok
 	if !ok {
+		// No measurement: hold what we have. Capping on a failed probe would
+		// throttle the line, and releasing would risk the bufferbloat the guard
+		// exists to prevent.
 		return g.downCap, g.upCap, false
 	}
 	baseline, trusted := g.baselineLocked(now, windowMin)
@@ -254,15 +344,19 @@ func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downByte
 
 	switch g.mode {
 	case guardFree:
-		g.othersOnLine = false
-		if !(loadDown || loadUp) || now.Before(g.cooldownUntil) {
+		if !(loadDown || loadUp) {
 			break
 		}
-		if line.known && trusted {
-			// The router tells who else is on the line: no trial needed.
+		if g.routerOnly && line.known {
+			// Legacy policy: the router says who else is on the line. We cap
+			// only for them; our own queue, when nobody else is there, is not
+			// a reason to slow down.
 			if high && line.others {
-				g.yieldLocked(rateDown, rateUp, loadDown, loadUp, 0.85)
+				g.controlLocked(rateDown, rateUp, loadDown, loadUp, 0.85)
 			}
+			break
+		}
+		if now.Before(g.cooldownUntil) {
 			break
 		}
 		if high || !trusted {
@@ -279,39 +373,38 @@ func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downByte
 		if len(g.trialSamples) > 0 {
 			measured = medianDuration(g.trialSamples)
 		}
-		dropped := fellFrom(measured, g.trialLoaded)
-		if dropped && (g.rest == 0 || !trusted || measured < g.rest) {
+		if dropped := fellFrom(measured, g.trialLoaded); dropped && (g.rest == 0 || !trusted || measured < g.rest) {
 			g.rest, g.restAt = measured, now
 		}
-		others := !dropped
-		if line.known {
-			others = line.others
-		}
-		if others {
-			g.othersOnLine = true
-			g.mode = guardYield
-			// The trial caps are the starting point of the yield.
-			break
-		}
-		g.releaseLocked(now)
-	case guardYield:
+		// The trial measured the line at a reduced rate. From here the
+		// controller ramps up while the ping stays good and cuts when it
+		// degrades; it no longer releases the line just because the latency
+		// fell (that is exactly the moment the line can be pushed again).
+		g.mode = guardControl
+	case guardControl:
 		if !trusted {
-			// Someone kept the line full since the trial, so its idle
-			// latency was never seen: the line stays "high" until the latency
-			// falls clearly below the loaded one, which is then the reference.
+			// The idle reference was never seen: use the latency measured
+			// during the trial as the loaded reference and treat a clear fall
+			// as the new rest.
 			high = !fellFrom(current, g.trialLoaded)
 			if !high {
 				g.rest, g.restAt = current, now
 			}
 		}
-		if line.known {
-			g.othersOnLine = line.others
-			if !line.others {
-				high = false // nobody else: climb back and release
-			}
+		if rateDown == 0 && rateUp == 0 {
+			// Nothing is transferring: there is no queue to protect and no
+			// reason to keep a stale cap for the next download.
+			g.releaseLocked(now)
+			break
 		}
-		g.downCap = g.down.step(now, high, rateDown, peakDownKiB)
-		g.upCap = g.up.step(now, high, rateUp, peakUpKiB)
+		if g.routerOnly && line.known && !line.others && !high {
+			// In the legacy policy the router is the authority: the others are
+			// gone and the ping is back to rest, so the line returns to Gextto.
+			g.releaseLocked(now)
+			break
+		}
+		g.downCap = g.down.step(now, high, rateDown, g.lineMaxDown, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
+		g.upCap = g.up.step(now, high, rateUp, g.lineMaxUp, latencyGuardMinFloorUpKiB, latencyGuardRiseUpKiB)
 		if !g.down.active && !g.up.active {
 			g.releaseLocked(now)
 		}
@@ -331,22 +424,24 @@ func (g *latencyGuard) startTrialLocked(now time.Time, loaded time.Duration, rat
 	g.trialUntil = now.Add(latencyGuardTrial)
 	g.trialLoaded = loaded
 	g.trialSamples = g.trialSamples[:0]
-	g.yieldLocked(rateDown, rateUp, loadDown, loadUp, latencyGuardTrialShare)
+	g.controlLocked(rateDown, rateUp, loadDown, loadUp, latencyGuardTrialShare)
 	g.mode = guardTrial
 }
 
-// yieldLocked caps the loading directions at share of their current rate.
-func (g *latencyGuard) yieldLocked(rateDown, rateUp int64, loadDown, loadUp bool, share float64) {
-	g.mode = guardYield
-	g.othersOnLine = true
+// controlLocked starts a control phase, capping the loading directions at
+// share of their current rate. The cap then ramps up while the ping is good
+// and is cut when it degrades.
+func (g *latencyGuard) controlLocked(rateDown, rateUp int64, loadDown, loadUp bool, share float64) {
+	g.mode = guardControl
+	g.controlStarted = true
 	g.down, g.up = guardDirection{}, guardDirection{}
 	g.downCap, g.upCap = 0, 0
 	if loadDown {
-		g.downCap = max(int64(float64(rateDown)*share), latencyGuardMinFloorKiB)
+		g.downCap = max(int64(float64(rateDown)*share), latencyGuardMinFloorDownKiB)
 		g.down.start(g.downCap)
 	}
 	if loadUp {
-		g.upCap = max(int64(float64(rateUp)*share), latencyGuardMinFloorKiB)
+		g.upCap = max(int64(float64(rateUp)*share), latencyGuardMinFloorUpKiB)
 		g.up.start(g.upCap)
 	}
 }
@@ -360,6 +455,15 @@ func (g *latencyGuard) releaseLocked(now time.Time) {
 	g.cooldownUntil = now.Add(latencyGuardCooldown)
 }
 
+// guardCapForEngine turns a finite controller maximum into "unlimited" (0).
+// maxKiB <= 0 means there is no hard cap at all, so the value is passed through.
+func guardCapForEngine(capKiB, maxKiB int64) int64 {
+	if maxKiB > 0 && capKiB >= maxKiB {
+		return 0
+	}
+	return capKiB
+}
+
 // caps returns the caps in force (0 = none).
 func (g *latencyGuard) caps() (downCap, upCap int64) {
 	if g == nil {
@@ -367,7 +471,19 @@ func (g *latencyGuard) caps() (downCap, upCap int64) {
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	return g.downCap, g.upCap
+	return guardCapForEngine(g.downCap, latencyGuardMaxDownKiB), guardCapForEngine(g.upCap, latencyGuardMaxUpKiB)
+}
+
+// firstCapLog is the last first-cap line the guard wrote itself: when it did,
+// and the caps it named. The periodic speed logger adopts it as its own last
+// line, so the same numbers are not printed twice.
+func (g *latencyGuard) firstCapLog() (at time.Time, downCap, upCap int64) {
+	if g == nil {
+		return time.Time{}, 0, 0
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.capLoggedAt, g.capLoggedDown, g.capLoggedUp
 }
 
 // latencyGuardStatus is what the interface shows about the guard.
@@ -399,14 +515,16 @@ func (g *latencyGuard) status() latencyGuardStatus {
 	if ok {
 		baseline, _ = g.baselineLocked(time.Now(), windowMin)
 	}
+	downKib := guardCapForEngine(g.downCap, latencyGuardMaxDownKiB)
+	upKib := guardCapForEngine(g.upCap, latencyGuardMaxUpKiB)
 	return latencyGuardStatus{
-		Active:         g.downCap > 0 || g.upCap > 0,
+		Active:         downKib > 0 || upKib > 0,
 		Measuring:      g.auto && g.haveSample,
 		Mode:           g.mode.String(),
 		LatencyMs:      g.current.Milliseconds(),
 		BaselineMs:     baseline.Milliseconds(),
-		DownloadKib:    g.downCap,
-		UploadKib:      g.upCap,
+		DownloadKib:    downKib,
+		UploadKib:      upKib,
 		RouterCounters: known,
 		OthersOnLine:   g.othersOnLine,
 		OthersDownKib:  int64(othersDown / 1024),
@@ -456,17 +574,48 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 		g.mu.Lock()
 		g.wireAt = time.Time{}
 		g.mu.Unlock()
-		g.update(now, false, lineGuess{}, 0, 0, 0, 0)
+		g.update(now, false, lineGuess{}, 0, 0)
 		return
 	}
-	if rtt, ok := autospeed.Measure(autospeed.Candidates(cfg.Settings[latencyGuardTargetKey], latencyGuardTargets)); ok {
+	// Google and Cloudflare, several targets, best RTT: a single server can be
+	// far away, rate-limited or unreachable, and the router can be wrong or
+	// missing. The minimum of the answers is the line, not the server.
+	if rtt, ok := autospeed.MeasureBest(autospeed.Candidates(cfg.Settings[latencyGuardTargetKey], latencyGuardTargets)); ok {
 		g.probe.Record(now, rtt)
 	}
 	down, up := g.ownRates(now, engine)
 	g.usage.observe(now, down, up)
-	others, known := g.usage.read(now)
-	peakDown, peakUp := speedPeakKib(cfg, autotunePeakDownKey), speedPeakKib(cfg, autotunePeakUpKey)
-	downCap, upCap, changed := g.update(now, true, lineGuess{known: known, others: others}, down, up, peakDown, peakUp)
+	var line lineGuess
+	if latencyGuardRouterEnabled(cfg) {
+		others, known := g.usage.read(now)
+		line = lineGuess{known: known, others: others}
+	} else {
+		// "ping": the router is not read at all, so an absent or lying router
+		// cannot influence the caps.
+		g.usage.reset()
+	}
+	g.mu.Lock()
+	g.routerOnly = latencyGuardRouterOnly(cfg)
+	g.lineMaxDown, g.lineMaxUp = latencyGuardLineMaxKib(cfg)
+	g.mu.Unlock()
+	downCap, upCap, changed := g.update(now, true, line, down, up)
+	downCap = guardCapForEngine(downCap, latencyGuardMaxDownKiB)
+	upCap = guardCapForEngine(upCap, latencyGuardMaxUpKiB)
+	// The first cap of a session is logged at once, with the values and the
+	// ping, even if it is the only line the controller ever prints: the user
+	// asked to see when autotune starts and at what speed.
+	g.mu.Lock()
+	started := g.controlStarted
+	g.controlStarted = false
+	if started {
+		g.capLoggedAt, g.capLoggedDown, g.capLoggedUp = now, downCap, upCap
+	}
+	g.mu.Unlock()
+	if started {
+		st := g.status()
+		logging.Info(fmt.Sprintf("🎚️ Autotune: first cap %s download, %s upload · %s · ping %d/%d ms · mode %s",
+			speedLimitLabel(downCap), speedLimitLabel(upCap), bg_speedMaxText(cfg), st.LatencyMs, st.BaselineMs, st.Mode))
+	}
 	if !changed || engine == nil {
 		return
 	}

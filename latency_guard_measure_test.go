@@ -182,5 +182,5 @@ func TestMeasureLatencyGuard(t *testing.T) {
 // latencyGuardMeasureOnce probes the latency like the guard does, for the
 // phases where the guard itself is off.
 func latencyGuardMeasureOnce(cfg *Config) (time.Duration, bool) {
-	return autospeed.Measure(autospeed.Candidates(cfg.Settings[latencyGuardTargetKey], latencyGuardTargets))
+	return autospeed.MeasureBest(autospeed.Candidates(cfg.Settings[latencyGuardTargetKey], latencyGuardTargets))
 }

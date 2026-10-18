@@ -68,9 +68,16 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"gxtorrent_dlna_folders":           {Zero: "vuoto = automatico (archivio)", DependsOn: "gxtorrent_dlna"},
 
 	// Velocità e rete
-	"torrent_dl_limit":            {Unit: "KiB/s", Zero: "0 = illimitato"},
-	"torrent_ul_limit":            {Unit: "KiB/s", Zero: "0 = illimitato"},
-	"torrent_auto_latency_target": {Zero: "vuoto = 9.9.9.9 e 1.1.1.1 (porta 443)", DependsOn: "torrent_auto_latency_guard"},
+	"torrent_dl_limit": {Unit: "KiB/s", Zero: "0 = illimitato"},
+	"torrent_ul_limit": {Unit: "KiB/s", Zero: "0 = illimitato"},
+	"torrent_auto_latency_source": {Kind: "select", Options: []uiFormOption{
+		{Value: "both", Label: "Ping Google/Cloudflare + router (consigliato)"},
+		{Value: "ping", Label: "Solo ping Google/Cloudflare (ignora il router)"},
+		{Value: "router", Label: "Solo contatori del router (vecchio comportamento)"},
+	}, DependsOn: "torrent_auto_latency_guard"},
+	"torrent_auto_latency_target": {Zero: "vuoto = Google 8.8.8.8/8.8.4.4 e Cloudflare (porta 443)", DependsOn: "torrent_auto_latency_guard"},
+	"torrent_line_max_down_kib":   {Unit: "KiB/s", Zero: "0 = non nota: la misura l'autotune", DependsOn: "torrent_auto_latency_guard"},
+	"torrent_line_max_up_kib":     {Unit: "KiB/s", Zero: "0 = non nota: la misura l'autotune", DependsOn: "torrent_auto_latency_guard"},
 	"torrent_sched_start":         {Kind: "time", DependsOn: "torrent_sched_enabled"},
 	"torrent_sched_end":           {Kind: "time", DependsOn: "torrent_sched_enabled"},
 	"torrent_sched_days":          {Kind: "days", Zero: "nessun giorno = mai attiva", DependsOn: "torrent_sched_enabled"},

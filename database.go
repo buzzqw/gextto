@@ -1810,6 +1810,55 @@ func (d *Database) RegisterTorrentScored(release *models.Release, qualityScore i
 	return err
 }
 
+// SetTorrentSkippedEpisodes records in the torrent metadata which episodes the
+// in-download inspection left out (file priority 0), so the pack identity check
+// at completion accepts the files that were actually downloaded.
+func (d *Database) SetTorrentSkippedEpisodes(hash string, episodes []int64) error {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if d == nil || d.db == nil || hash == "" {
+		return nil
+	}
+	var raw string
+	if err := d.db.QueryRow("SELECT COALESCE(metadata_json,'') FROM torrent_meta WHERE lower(hash)=?1", hash).Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var meta models.TorrentMeta
+	if err := json.Unmarshal([]byte(raw), &meta); err != nil {
+		return err
+	}
+	meta.Release.SkippedEpisodes = uniqueSortedInt64(episodes)
+	payload, err := json.Marshal(meta)
+	if err != nil {
+		return err
+	}
+	_, err = d.db.Exec("UPDATE torrent_meta SET metadata_json=?, updated_at=? WHERE lower(hash)=?", string(payload), nowSQLite(), hash)
+	return err
+}
+
+// uniqueSortedInt64 returns the distinct positive values in ascending order.
+func uniqueSortedInt64(values []int64) []int64 {
+	seen := make(map[int64]struct{}, len(values))
+	out := make([]int64, 0, len(values))
+	for _, value := range values {
+		if value <= 0 {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
 // SetTorrentNoRename sets the "do not rename" flag for a torrent (creating the
 // row when missing).
 func (d *Database) SetTorrentNoRename(hash string, value bool) error {
@@ -6072,4 +6121,36 @@ func (d *Database) allowArchiveReset() bool {
 	}
 	d.archiveResetCount++
 	return true
+}
+
+// SeriesQualityIndex returns the best known quality score per episode of one
+// season, read from the episodes table. It is the cheap counterpart of
+// IndexArchive (which walks the library folder) for the in-download pack
+// inspection, where a NAS scan at every tick would block the event loop.
+func (d *Database) SeriesQualityIndex(seriesName string, season int64) *models.ArchiveQualityIndex {
+	index := &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}}
+	if d == nil || d.db == nil {
+		return index
+	}
+	rows, err := d.db.Query(`SELECT e.season, e.episode, e.quality_score, COALESCE(e.archive_path,'')
+		FROM episodes e JOIN series s ON s.id=e.series_id
+		WHERE s.name=?1 AND e.season=?2 AND e.episode>0
+			AND COALESCE(e.archive_path,'')<>''`, seriesName, season)
+	if err != nil {
+		return index
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var episodeSeason, episode, score int64
+		var archivePath string
+		if err := rows.Scan(&episodeSeason, &episode, &score, &archivePath); err != nil {
+			return index
+		}
+		// The file name carries the quality tags Gextto wrote on import: keep
+		// them so the upgrade rules (HDR, WEB-DL, REMUX…) can judge the pack
+		// against the real library file, not only the numeric score.
+		quality := ParseQuality(filepath.Base(archivePath))
+		index.Best[[2]int64{episodeSeason, episode}] = models.ArchiveQuality{Quality: quality, Score: score}
+	}
+	return index
 }

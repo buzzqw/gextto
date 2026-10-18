@@ -32,12 +32,12 @@ func (r *guardRun) step(latency func(downCap int64) time.Duration, downKiB int64
 		rate = downCap
 	}
 	r.g.probe.Record(r.now, latency(downCap))
-	d, u, _ := r.g.update(r.now, true, r.line, uint64(rate*1024), 10*1024, 9400, 300)
+	d, u, _ := r.g.update(r.now, true, r.line, uint64(rate*1024), 10*1024)
 	return d, u
 }
 
-// ownQueue is a line used by Gextto alone: the latency is 60 ms when Gextto
-// runs uncapped and falls to 20 ms as soon as it backs off.
+// ownQueue is a line whose queue grows with Gextto's own rate: 60 ms uncapped,
+// 20 ms as soon as the controller backs off.
 func ownQueue(downCap int64) time.Duration {
 	if downCap > 0 {
 		return 20 * time.Millisecond
@@ -56,44 +56,67 @@ func othersQueue(leftAt *bool) func(int64) time.Duration {
 	}
 }
 
-// TestLatencyGuardAloneKeepsTheLine: with nobody else on the line a trial
-// shows the queue is Gextto's own (the latency falls while it backs off); the
-// line goes back to Gextto, the fallen latency is the idle reference, and no
-// cap follows for the cooldown, however high the latency.
-func TestLatencyGuardAloneKeepsTheLine(t *testing.T) {
+// TestLatencyGuardControlsItsOwnQueue: with no router information at all, a
+// high ping is enough to cap; the controller then keeps the cap while the ping
+// is high and ramps up when it is good. The old guard only capped for others.
+func TestLatencyGuardControlsItsOwnQueue(t *testing.T) {
 	r := newGuardRun()
-	var trial bool
-	for i := 0; i < 8; i++ {
+	controlled := false
+	for i := 0; i < 30; i++ {
 		if d, _ := r.step(ownQueue, 9000); d > 0 {
-			trial = true
+			controlled = true
 		}
 	}
-	if !trial {
-		t.Fatal("no trial on an unknown idle reference")
-	}
-	if st := r.g.status(); st.Mode != "free" || st.Active || st.BaselineMs != 20 {
-		t.Fatalf("after the trial: %+v, want free, no caps, reference 20 ms", st)
-	}
-	for i := 0; i < int(latencyGuardCooldown/latencyGuardProbeEvery)-10; i++ {
-		if d, u := r.step(ownQueue, 9000); d != 0 || u != 0 {
-			t.Fatalf("capped %d/%d with nobody else on the line", d, u)
-		}
+	if !controlled {
+		t.Fatal("the guard never capped its own queue despite the high ping")
 	}
 }
 
-// TestLatencyGuardYieldsToOthersAndReleases: someone else keeps the queue full
-// while Gextto backs off, so the guard yields (the caps go down while the
-// latency stays high); once the others leave the caps climb and are lifted.
+// TestLatencyGuardRampsUpWhileThePingIsGood: starting from a low cap the
+// controller climbs, and it cuts when the ping degrades. This is the behaviour
+// that replaces the old 64 KiB/s sawtooth.
+func TestLatencyGuardRampsUpWhileThePingIsGood(t *testing.T) {
+	r := newGuardRun()
+	// The line is good up to 4000 KiB/s and high above it.
+	line := func(downCap int64) time.Duration {
+		if downCap > 4000 {
+			return 60 * time.Millisecond
+		}
+		return 20 * time.Millisecond
+	}
+	for i := 0; i < 8; i++ { // trial and reference
+		r.step(line, 9000)
+	}
+	peak := int64(0)
+	for i := 0; i < 60; i++ {
+		d, _ := r.step(line, 9000)
+		peak = max(peak, d)
+	}
+	if peak < 3000 {
+		t.Fatalf("the cap never ramped toward the line: peak %d KiB/s", peak)
+	}
+	if st := r.g.status(); st.LatencyMs > 40 {
+		t.Fatalf("the controller settled with a bad ping: %+v", st)
+	}
+}
+
+// TestLatencyGuardYieldsToOthersAndReleases: with the router source, someone
+// else keeps the queue full while Gextto backs off, so the guard yields; once
+// the others leave the caps climb and are lifted.
 func TestLatencyGuardYieldsToOthersAndReleases(t *testing.T) {
 	r := newGuardRun()
+	r.g.routerOnly = true
+	r.line = lineGuess{known: true, others: true}
+	r.g.rest, r.g.restAt = 20*time.Millisecond, r.now
+	r.g.probe.Record(r.now, 20*time.Millisecond)
 	left := false
 	queue := othersQueue(&left)
 	var d int64
 	for i := 0; i < 8; i++ {
 		d, _ = r.step(queue, 9000)
 	}
-	if st := r.g.status(); st.Mode != "yield" || !st.OthersOnLine || d == 0 {
-		t.Fatalf("after the trial: %+v cap %d, want yield with a cap", st, d)
+	if st := r.g.status(); st.Mode != "control" || d == 0 {
+		t.Fatalf("after the trial: %+v cap %d, want control with a cap", st, d)
 	}
 	first := d
 	for i := 0; i < 6; i++ {
@@ -103,6 +126,7 @@ func TestLatencyGuardYieldsToOthersAndReleases(t *testing.T) {
 		t.Fatalf("the cap did not go down while the others kept the line full: %d → %d", first, d)
 	}
 	left = true
+	r.line.others = false
 	for i := 0; i < 400 && d != 0; i++ {
 		d, _ = r.step(queue, 9000)
 	}
@@ -111,26 +135,34 @@ func TestLatencyGuardYieldsToOthersAndReleases(t *testing.T) {
 	}
 }
 
-// TestLatencyGuardTrustsTheRouter: with the router's counters, a trusted
-// reference and nobody else on the line, a high latency caps nothing; with
-// someone else it yields at once, without a trial.
-func TestLatencyGuardTrustsTheRouter(t *testing.T) {
-	r := newGuardRun()
-	r.line = lineGuess{known: true}
-	for i := 0; i < 8; i++ { // the first trial measures the reference
-		r.step(ownQueue, 9000)
-	}
-	r.g.mu.Lock()
-	r.g.cooldownUntil = time.Time{}
-	r.g.mu.Unlock()
-	for i := 0; i < 20; i++ {
-		if d, _ := r.step(func(int64) time.Duration { return 60 * time.Millisecond }, 9000); d != 0 {
-			t.Fatalf("capped %d though the router sees nobody else", d)
-		}
-	}
-	r.line.others = true
-	if d, _ := r.step(func(int64) time.Duration { return 60 * time.Millisecond }, 9000); d == 0 || r.g.status().Mode != "yield" {
-		t.Fatalf("no yield with someone else on the line: cap %d mode %s", d, r.g.status().Mode)
+// TestLatencyGuardSourceModes: with "ping"/"both" the latency decides even
+// when the router sees nobody; with "router" a high ping and no other traffic
+// caps nothing, and another device does. This is the option the user asked
+// for: Google/Cloudflare ping alongside, or instead of, the router.
+func TestLatencyGuardSourceModes(t *testing.T) {
+	high := func(int64) time.Duration { return 60 * time.Millisecond }
+	for _, tc := range []struct {
+		name       string
+		routerOnly bool
+		others     bool
+		wantCapped bool
+	}{
+		{"both/no others", false, false, true},
+		{"ping/no others", false, false, true},
+		{"router/no others", true, false, false},
+		{"router/others", true, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newGuardRun()
+			r.g.routerOnly = tc.routerOnly
+			r.line = lineGuess{known: true, others: tc.others}
+			r.g.rest, r.g.restAt = 20*time.Millisecond, r.now
+			r.g.probe.Record(r.now, 20*time.Millisecond)
+			d, _ := r.step(high, 9000)
+			if capped := d > 0; capped != tc.wantCapped {
+				t.Fatalf("cap %d, want capped=%v", d, tc.wantCapped)
+			}
+		})
 	}
 }
 
@@ -149,8 +181,34 @@ func TestLatencyGuardIgnoresAnIdleLineAndNonAuto(t *testing.T) {
 	if d, _ := r.g.caps(); d == 0 {
 		t.Fatal("expected the trial cap before leaving Auto")
 	}
-	if d, u, changed := r.g.update(r.now, false, lineGuess{}, 0, 0, 0, 0); d != 0 || u != 0 || !changed {
+	if d, u, changed := r.g.update(r.now, false, lineGuess{}, 0, 0); d != 0 || u != 0 || !changed {
 		t.Fatalf("leaving Auto: %d/%d changed=%v, want 0/0 true", d, u, changed)
+	}
+}
+
+// TestLatencyGuardFirstCapLogIsAdoptable: the guard exposes the first-cap line
+// it wrote (time and caps) so the periodic speed logger can adopt it, and
+// leaving Auto clears it: a later session must not adopt a stale line.
+func TestLatencyGuardFirstCapLogIsAdoptable(t *testing.T) {
+	var nilGuard *latencyGuard
+	if at, _, _ := nilGuard.firstCapLog(); !at.IsZero() {
+		t.Fatal("a missing guard reported a first-cap line")
+	}
+	g := newLatencyGuard()
+	if at, _, _ := g.firstCapLog(); !at.IsZero() {
+		t.Fatal("a fresh guard reported a first-cap line")
+	}
+	at := time.Unix(1_800_000_000, 0)
+	g.mu.Lock()
+	g.capLoggedAt, g.capLoggedDown, g.capLoggedUp = at, 1932, 0
+	g.mu.Unlock()
+	gotAt, down, up := g.firstCapLog()
+	if !gotAt.Equal(at) || down != 1932 || up != 0 {
+		t.Fatalf("first cap line = %v %d/%d, want %v 1932/0", gotAt, down, up, at)
+	}
+	g.update(at, false, lineGuess{}, 0, 0)
+	if gotAt, _, _ := g.firstCapLog(); !gotAt.IsZero() {
+		t.Fatalf("leaving Auto kept the first-cap line: %v", gotAt)
 	}
 }
 
@@ -171,6 +229,40 @@ func TestEffectiveSpeedLimitsUsesTheGuardOnlyOnAuto(t *testing.T) {
 	manual.Transfer.DownloadLimitKib = 3000
 	if down, _, source, _ := effectiveSpeedLimits(manual, g); down != 3000 || source != speedSourceBase {
 		t.Fatalf("manual: %d %s, want 3000 base", down, source)
+	}
+}
+
+// TestGuardDirectionRampsAndCuts pins the direction controller: it climbs
+// from a low cap while the ping is good and cuts when it is high.
+func TestGuardDirectionRampsAndCuts(t *testing.T) {
+	var d guardDirection
+	d.start(128)
+	now := time.Unix(1_800_000_000, 0)
+	for i := 0; i < 20; i++ {
+		now = now.Add(3 * time.Second)
+		d.step(now, false, 9000, latencyGuardMaxDownKiB, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
+	}
+	ramped := d.clamp.Value
+	if ramped <= 128 {
+		t.Fatalf("the cap did not ramp up: %d", ramped)
+	}
+	now = now.Add(3 * time.Second)
+	cut := d.step(now, true, 90000, latencyGuardMaxDownKiB, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
+	if cut >= ramped {
+		t.Fatalf("the cap did not cut on a high ping: %d → %d", ramped, cut)
+	}
+}
+
+// TestLatencyGuardHasNoHardCap: 0 is the "no hard cap" sentinel, so even a
+// multi-gigabit value is passed through instead of being folded to unlimited.
+func TestLatencyGuardHasNoHardCap(t *testing.T) {
+	g := newLatencyGuard()
+	g.downCap, g.upCap = 2_000_000, 2_000_000
+	if d, u := g.caps(); d != 2_000_000 || u != 2_000_000 {
+		t.Fatalf("caps reported as %d/%d, want the values unchanged (no hard cap)", d, u)
+	}
+	if st := g.status(); !st.Active {
+		t.Fatalf("a real cap reported as inactive: %+v", st)
 	}
 }
 

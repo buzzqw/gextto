@@ -142,6 +142,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "GET /downloads/detail", V2DownloadsDetail)
 	v2Handle(s, mux, "GET /downloads/detail/panel", V2DownloadsDetailPanel)
 	v2Handle(s, mux, "POST /downloads/detail/action", V2DownloadsDetailAction)
+	v2Handle(s, mux, "GET /downloads/orphans", V2DownloadsOrphansModal)
+	v2Handle(s, mux, "POST /downloads/orphans/clean", V2DownloadsOrphansClean)
 	v2Handle(s, mux, "GET /downloads/remove", V2DownloadsRemoveModal)
 	v2Handle(s, mux, "POST /downloads/remove", V2DownloadsRemove)
 

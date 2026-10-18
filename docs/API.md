@@ -319,10 +319,20 @@ The temporary speed limit (`POST /api/torrents/temp-limits`) also accepts
 no cap (like an “Auto” window of the schedule), the numeric `download_kib` /
 `upload_kib` are ignored and the two modes are exclusive.
 `GET /api/torrents/temp-limits` also returns `latency_guard`, the state of the
-Auto speed's latency guard: `active`, `measuring`, `latency_ms`, `baseline_ms`,
-the caps it applies (`download_cap_kib`, `upload_cap_kib`, 0 = none),
-`router_counters` (the router's WAN counters answer), `others_on_line` and the
-others' traffic (`others_download_kib`, `others_upload_kib`).
+Auto speed's latency guard: `active`, `measuring`, `mode` (`free`, `trial` or
+`control`), `latency_ms`, `baseline_ms`, the caps it applies
+(`download_cap_kib`, `upload_cap_kib`, 0 = none), `router_counters` (the
+router's WAN counters answer), `others_on_line` and the others' traffic
+(`others_download_kib`, `others_upload_kib`).
+
+The controls behind it are settings: `torrent_auto_latency_guard` (on/off),
+`torrent_auto_latency_source` (`both` = the Google/Cloudflare ping decides and
+the router is diagnostic, `ping` = the router is not read, `router` = legacy
+yield-to-others), `torrent_auto_latency_target` (empty = Google 8.8.8.8/8.8.4.4
+and Cloudflare 1.1.1.1/1.0.0.1 on port 443) and `torrent_line_max_down_kib` /
+`torrent_line_max_up_kib` (the line's real maximum in KiB/s; 0 = unknown, the
+controller discovers it). The caps are driven by the latency, not by the
+router; the controller ramps while the ping is good and cuts when it rises.
 
 ## gx-torrent daemon routes
 

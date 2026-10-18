@@ -546,15 +546,27 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 		}
 		matched = append(matched, PackSourceFile{Path: file, Season: season, Episode: episode})
 	}
-	expected := map[int64]bool{}
+	declared := map[int64]bool{}
 	for _, episode := range release.EpisodeRange {
 		if episode > 0 {
-			expected[episode] = true
+			declared[episode] = true
 		}
 	}
 	// A complete pack has no trustworthy explicit episode list: import only
 	// files carrying their own season/episode identity.
-	if len(expected) == 0 || release.Season == nil {
+	if len(declared) == 0 || release.Season == nil {
+		return matched, nil
+	}
+	expected := make(map[int64]bool, len(declared))
+	for episode := range declared {
+		expected[episode] = true
+	}
+	// Episodes left out on purpose by the in-download inspection (priority 0)
+	// are not expected on disk; the files that were kept are enough.
+	for _, skipped := range release.SkippedEpisodes {
+		delete(expected, skipped)
+	}
+	if len(expected) == 0 {
 		return matched, nil
 	}
 	found := map[int64]bool{}
@@ -597,6 +609,16 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 		deduped = append(deduped, file)
 	}
 	matched = deduped
+	if len(release.SkippedEpisodes) > 0 {
+		// The pack was deliberately downloaded in part: accept the files that
+		// are here as long as every one of them belongs to the declared range.
+		for episode := range found {
+			if !declared[episode] {
+				return []PackSourceFile{}, nil
+			}
+		}
+		return matched, nil
+	}
 	if !sameIntSet(found, expected) {
 		return []PackSourceFile{}, nil
 	}

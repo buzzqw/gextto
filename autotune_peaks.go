@@ -15,15 +15,21 @@ const (
 	// autotunePeakDownKey/UpKey hold the highest observed rate in KiB/s.
 	autotunePeakDownKey = "autotune_peak_down_kib"
 	autotunePeakUpKey   = "autotune_peak_up_kib"
+	// autotuneMinPeakKib is the lowest rate that can be a measurement of the
+	// line. A slower sample is a dead or tiny swarm, not the connection: using
+	// it as a peak made the tuning propose 80 % of a stall (30 KiB/s became a
+	// 24 KiB/s limit) and anchored the latency guard to the same low value.
+	autotuneMinPeakKib = 128
 )
 
-// speedPeakKib reads a recorded peak in KiB/s (0 when none was observed yet).
+// speedPeakKib reads a recorded peak in KiB/s (0 when none was observed yet, or
+// when the stored value is too low to be a measurement of the line).
 func speedPeakKib(cfg *Config, key string) int64 {
 	if cfg == nil {
 		return 0
 	}
 	value, err := strconv.ParseInt(strings.TrimSpace(cfg.Settings[key]), 10, 64)
-	if err != nil || value < 0 {
+	if err != nil || value < autotuneMinPeakKib {
 		return 0
 	}
 	return value
@@ -52,7 +58,7 @@ func observeSpeedPeak(cfg *Config, downloadBytesPerSec, uploadBytesPerSec int64,
 			return
 		}
 		kib := bytesPerSec / 1024
-		if kib <= speedPeakKib(cfg, key) {
+		if kib < autotuneMinPeakKib || kib <= speedPeakKib(cfg, key) {
 			return
 		}
 		value := strconv.FormatInt(kib, 10)

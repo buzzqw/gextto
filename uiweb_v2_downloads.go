@@ -1,11 +1,14 @@
 package gextto
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/buzzqw/gextto/internal/logging"
 )
 
 func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -146,4 +149,64 @@ func V2HTTPDownloadDetail(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_http_download_detail", found, dict, eng)
+}
+
+// v2OrphansView is the data of the guided orphan-cleanup modal.
+type v2OrphansView struct {
+	Items      []OrphanDownload
+	TotalBytes int64
+	SafeBytes  int64
+	Message    string
+	Error      bool
+}
+
+func v2OrphansViewFrom(s *AppState) v2OrphansView {
+	view := v2OrphansView{}
+	if s == nil || s.db == nil {
+		return view
+	}
+	view.Items = FindOrphanedDownloads(latestConfig(s), s.db, s.activeEngine())
+	for _, item := range view.Items {
+		view.TotalBytes += item.SizeBytes
+		if item.Safe {
+			view.SafeBytes += item.SizeBytes
+		}
+	}
+	return view
+}
+
+// V2DownloadsOrphansModal lists the download-folder leftovers that no live
+// torrent owns, with the verdict of the library check.
+func V2DownloadsOrphansModal(w http.ResponseWriter, r *http.Request, s *AppState) {
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_orphans_modal", v2OrphansViewFrom(s), dict, eng)
+}
+
+// V2DownloadsOrphansClean moves the safe leftovers to the trash in a
+// background job: a cross-filesystem copy can be tens of gigabytes and must
+// not block the HTTP request. The modal says the job started; progress and the
+// final count are in the jobs panel.
+func V2DownloadsOrphansClean(w http.ResponseWriter, r *http.Request, s *AppState) {
+	view := v2OrphansViewFrom(s)
+	cfg := latestConfig(s)
+	torrents := s.activeEngine()
+	job, created := s.jobs.Create("orphan-cleanup", "orphan-cleanup")
+	if !created {
+		view.Message = "Una pulizia dei file orfani è già in corso"
+	} else if err := s.jobs.Start(job.ID, func(ctx context.Context, jobID string) {
+		moved, movedBytes, err := CleanOrphanedDownloads(cfg, s.db, torrents)
+		if err != nil {
+			s.jobs.Fail(jobID, err)
+			return
+		}
+		s.jobs.SetResult(jobID, map[string]any{"moved": moved, "bytes": movedBytes})
+		s.jobs.SetProgress(jobID, 1, fmt.Sprintf("%d elementi · %s", moved, logging.HumanBytesI64(movedBytes)))
+	}); err != nil {
+		view.Message = err.Error()
+		view.Error = true
+	} else {
+		view.Message = "Pulizia avviata: lo spostamento nel cestino può richiedere qualche minuto, controlla Operazioni"
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_orphans_modal", view, dict, eng)
 }

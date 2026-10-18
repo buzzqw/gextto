@@ -224,6 +224,13 @@ when the list cannot be read.
 
 ### 4.5 The home line and the latency guard
 
+> **Historical figures.** The numbers below were measured with the trial/router
+> design at build 1794. The current controller probes Google/Cloudflare, ramps while
+> the ping is good, cuts when it rises, and accepts an optional user line maximum
+> (`torrent_line_max_*_kib`); it no longer relies on the router to decide. The test
+> remains the gate, but these figures are the historical baseline, not a claim about
+> the current code.
+
 **Current figures** (`TestMeasureLatencyGuard`, a second instance downloading three
 public ISOs, 90 s phases; the other device is an HTTP download read and discarded):
 
@@ -420,7 +427,7 @@ Closed with a measurement, so they are not retried without new data:
 | Anti-Sybil cap on by default | the routing table is not concentrated and legitimate CGNAT/mobile subnets would be capped |
 | Choking changes | reciprocation works locally and against libtorrent |
 | Super-seeding by default | no upload reduction on the measurable swarms, and ~24 % slower locally |
-| Latency guard: window-minimum reference, router counters against reported rates, peak inference | false "others", ineffective, blind — the trials design replaced them |
+| Latency guard: fixed 100 MB/s ceiling, current-rate ceiling, 64 KiB/s floor, low-peak anchor | the cap either locked to a slow sample or was an arbitrary number; the current controller ramps on the Google/Cloudflare ping, uses the user's line maximum (or 2× the delivered rate) and cuts only on a real latency rise |
 
 **Postponed, with a reason:** qBittorrent's `renameFile`/`renameFolder` (needs rename
 support in the engine: a feature of its own); graduated file priority with

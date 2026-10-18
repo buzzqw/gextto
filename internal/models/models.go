@@ -434,6 +434,14 @@ type Release struct {
 	Episode      *int64  `json:"episode"`
 	IsPack       bool    `json:"is_pack"`
 	EpisodeRange []int64 `json:"episode_range"`
+	// InProgressEpisodes is the episode count an "in progress" pack declares
+	// ([IN CORSO][02/08] -> 2), 0 for every other release. Italian sites update
+	// the listing before the .torrent, so the acquisition loop compares the two.
+	InProgressEpisodes int64 `json:"in_progress_episodes,omitempty"`
+	// SkippedEpisodes lists the episodes deliberately left out of the download
+	// by the in-download inspection (file priority 0). The pack identity check
+	// accepts the remaining files instead of demanding the whole declared range.
+	SkippedEpisodes []int64 `json:"skipped_episodes,omitempty"`
 	// AbsoluteEpisode/AbsoluteSeries hold an anime-style absolute number
 	// ("[Group] Title - 1071") when the title has no season. The release stays
 	// unclassified until it matches a series marked as anime, which turns the

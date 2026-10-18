@@ -804,11 +804,13 @@ func RunCycleDomain(
 					} else if failures == torrentLinkFailureLimit {
 						logging.Info("torrent link quarantined after repeated failures",
 							"target", releaseTarget(&release),
+							"source", release.Source,
 							"retry_in", torrentLinkQuarantine(failures).String())
 					}
 					stats.Error("torrent_link")
 					logging.Warn("torrent link resolution failed",
 						"target", releaseTarget(&release),
+						"source", release.Source,
 						"error", err)
 					continue
 				}
@@ -916,6 +918,34 @@ func RunCycleDomain(
 		} else {
 			if movie := cfg.FindMovieMatchForRelease(&release, false); movie != nil {
 				forbidUpgrade = movie.DisableUpgrades
+			}
+		}
+		// An "in progress" pack declares how many episodes it holds long before
+		// the .torrent is updated. The file list is already here: keep the pack
+		// when it holds at least one episode we need (a gap or a real upgrade),
+		// and skip it only when everything inside is already better on disk.
+		if torrentFile != nil && release.IsPack && release.InProgressEpisodes > 0 {
+			reason, checkErr := incompletePackReason(
+				*torrentFile, &release, gapEpisodes, archiveIndex,
+				releaseScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade,
+			)
+			if checkErr != nil {
+				logging.Debug("could not read the pack torrent contents",
+					"target", releaseTarget(&release), "error", checkErr)
+			} else if reason != "" {
+				logging.Warn(fmt.Sprintf("⏭️ Season pack skipped — «%s» · %s", release.Title, reason),
+					"target", releaseTarget(&release))
+				if !cfg.DryRun {
+					if release.TorrentURL != nil {
+						if qerr := db.QuarantineTorrentLink(*release.TorrentURL, reason, time.Now(), 7*24*time.Hour); qerr != nil {
+							logging.Debug("could not quarantine the stale pack link", "error", qerr)
+						}
+					}
+					if berr := db.Blocklist(&release, "in_progress_pack_incomplete"); berr != nil {
+						logging.Debug("could not blocklist the stale pack", "error", berr)
+					}
+				}
+				continue
 			}
 		}
 		approvalContext := &models.ApprovalContext{

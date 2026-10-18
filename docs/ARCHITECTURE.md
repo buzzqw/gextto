@@ -245,7 +245,8 @@ one.
 | `ui_browse.go` | server-side folder picker. |
 | `ui_wanted.go` | Wanted page: item cards, status badges and episode manager modal. |
 | `diskguard.go` | free space guard: unfinished downloads pause before the disk fills up. |
-| `autospeed.go` | ping/latency auto-speed (anti-bufferbloat) upload bandwidth regulation. |
+| `autospeed.go` | standalone ping/latency auto-speed (anti-bufferbloat) upload bandwidth regulation. |
+| `latency_guard.go`, `line_usage.go`, `autotune_peaks.go` | managed Auto speed: Google/Cloudflare RTT probes, ramp/cut controller, optional user line maxima, router counters as diagnostics, peak recording for the tuning. |
 | `flaresolverr.go` | FlareSolverr integration for Cloudflare challenge clearance. |
 | `notify.go` | webhook notifications on rule matches and feed errors. |
 | `portmap.go`, `pcp.go` | port forwarding via UPnP, NAT-PMP and PCP (RFC 6887). |

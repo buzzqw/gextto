@@ -1990,3 +1990,37 @@ func TestV2ClientI18nCacheInvalidates(t *testing.T) {
 		t.Fatalf("cache not invalidated after a translation change: %s", second)
 	}
 }
+
+// The auto-remove switch must persist and come back checked in the same
+// response: the HTMX value is evaluated with `elt`, not `this`.
+func TestV2AutoRemoveSwitchPersists(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodPost, "/downloads/settings", url.Values{"op": {"auto_remove"}, "value": {"true"}})
+	if code != http.StatusOK {
+		t.Fatalf("auto_remove -> %d: %s", code, body)
+	}
+	if !latestConfig(state).Transfer.AutoRemoveCompleted {
+		t.Fatal("auto_remove_completed was not saved")
+	}
+	if !strings.Contains(body, `Elimina completati dopo il seed`) || !strings.Contains(body, `checked`) {
+		t.Fatalf("the switch did not come back checked: %s", body)
+	}
+}
+
+// The theme button in the header targets #v2-modal; the shell must carry it on
+// every page, including the logs page that has no page-level modal.
+func TestV2LogsPageCarriesTheGlobalModal(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=logs", nil)
+	if code != http.StatusOK {
+		t.Fatalf("logs page -> %d", code)
+	}
+	if !strings.Contains(body, `id="v2-modal"`) {
+		t.Fatal("the logs page has no #v2-modal target for the theme button")
+	}
+}

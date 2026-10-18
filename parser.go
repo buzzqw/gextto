@@ -798,7 +798,10 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 	// pack range stops there, so it fills a gap only if one of those n is really
 	// missing. Reading it as a complete season would invent gaps up to the TMDB
 	// count and download the pack for nothing.
-	inProgressPackRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})\b.*?\b(?:in[ ._-]*(?:corso|progress)|incomplete)\b[ ._-]*0?(\d{1,3})[ ._-]*/[ ._-]*\d{1,3}`)
+	// The count may be glued to the label ("[IN CORSO 02/18]") or sit in its
+	// own brackets ("[IN CORSO][02/08]", "[IN CORSO] [05/06]"): Italian sites
+	// use both. The total may be unknown ("02/??").
+	inProgressPackRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})\b.*?\b(?:in[ ._-]*(?:corso|progress)|incomplete)\b\W{0,6}0?(\d{1,3})[ ._-]*(?:/|di|of)[ ._-]*(?:0?\d{1,3}|\?{1,3})`)
 	seriesName := func(capture []string) *string {
 		if capture == nil || capture[1] == "" {
 			return nil
@@ -821,6 +824,10 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 		episode      *int64
 		episodeRange = []int64{}
 		seasonPack   bool
+		// inProgressAvailable is how many episodes an "in progress" pack
+		// declares it already holds (0 for every other release). The .torrent
+		// can lag behind that claim; the acquisition loop checks it.
+		inProgressAvailable int64
 	)
 	if capture := rangeRe.FindStringSubmatch(title); capture != nil {
 		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
@@ -973,6 +980,7 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 		series = seriesName(capture)
 		season = &seasonValue
 		episode = &first
+		inProgressAvailable = available
 		episodeRange = make([]int64, 0, available)
 		for value := int64(1); value <= available; value++ {
 			episodeRange = append(episodeRange, value)
@@ -1003,24 +1011,25 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 	// titles matched by seasonPackRe use the {0} range as a pack sentinel.
 	isPack := len(episodeRange) > 1 || seasonPack
 	return &models.Release{
-		Title:           title,
-		Magnet:          sanitizedMagnet,
-		TorrentURL:      normalizedURL,
-		Source:          source,
-		Quality:         ParseQuality(title),
-		Kind:            kind,
-		Series:          series,
-		Season:          season,
-		Episode:         episode,
-		IsPack:          isPack,
-		EpisodeRange:    episodeRange,
-		AbsoluteEpisode: absoluteEpisode,
-		AbsoluteSeries:  absoluteSeries,
-		Year:            year,
-		DiscoveredAt:    discoveredAt,
-		SizeBytes:       0,
-		Seeders:         -1,
-		Peers:           -1,
+		Title:              title,
+		Magnet:             sanitizedMagnet,
+		TorrentURL:         normalizedURL,
+		Source:             source,
+		Quality:            ParseQuality(title),
+		Kind:               kind,
+		Series:             series,
+		Season:             season,
+		Episode:            episode,
+		IsPack:             isPack,
+		EpisodeRange:       episodeRange,
+		InProgressEpisodes: inProgressAvailable,
+		AbsoluteEpisode:    absoluteEpisode,
+		AbsoluteSeries:     absoluteSeries,
+		Year:               year,
+		DiscoveredAt:       discoveredAt,
+		SizeBytes:          0,
+		Seeders:            -1,
+		Peers:              -1,
 	}
 }
 

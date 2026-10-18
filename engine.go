@@ -136,8 +136,12 @@ func (e *Engine) FetchTorrent(ctx context.Context, rawURL string) ([]byte, strin
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		host := "feed"
-		if parsed, err := url.Parse(rawURL); err == nil && parsed.Hostname() != "" {
-			host = parsed.Hostname()
+		if parsed, err := url.Parse(rawURL); err == nil && parsed.Host != "" {
+			// Host and port: all the indexers can share one address (e.g.
+			// 192.168.1.161 with Jackett on 9117 and Prowlarr on 9696), so the
+			// hostname alone does not say which one answered. The path and
+			// query are left out: they carry the API key.
+			host = parsed.Host
 		}
 		return nil, "", fmt.Errorf("HTTP %d fetching torrent from %s", resp.StatusCode, host)
 	}

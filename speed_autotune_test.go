@@ -8,6 +8,119 @@ import (
 	"github.com/buzzqw/gextto/internal/bwschedule"
 )
 
+// TestBGSpeedJumpedUsesTenPercent pins the log throttle: a 5 % step is not a
+// new line, an 11 % step is, and a move from or to unlimited always is.
+func TestBGSpeedJumpedUsesTenPercent(t *testing.T) {
+	cases := []struct {
+		prev, next int64
+		want       bool
+	}{
+		{1000, 1050, false},
+		{1000, 1099, false},
+		{1000, 1100, true}, // exactly 10 % counts
+		{1000, 900, true},  // exactly 10 % counts in both directions
+		{1000, 890, true},
+		{0, 1000, true},
+		{1000, 0, true},
+		{0, 0, false},
+	}
+	for _, tc := range cases {
+		if got := bg_speedJumped(tc.prev, tc.next); got != tc.want {
+			t.Errorf("bg_speedJumped(%d, %d) = %v, want %v", tc.prev, tc.next, got, tc.want)
+		}
+	}
+}
+
+// TestBGSpeedWorthLoggingConsidersTheTrend: a reversal of only 11 % is noise
+// and waits, while a change in the same direction (or a large reversal) is
+// worth a line.
+func TestBGSpeedWorthLoggingConsidersTheTrend(t *testing.T) {
+	cases := []struct {
+		name                             string
+		prevLogged, current, prevApplied int64
+		want                             bool
+	}{
+		{"first jump", 0, 1000, 0, true},
+		{"same direction", 1000, 1110, 1000, true},
+		{"below threshold", 1000, 1099, 1000, false},
+		{"exactly ten", 1000, 900, 1000, true},
+		{"small reversal", 1000, 1110, 900, false},
+		{"continuation", 1000, 1250, 1110, true},
+		{"large reversal", 1000, 800, 1000, true},
+	}
+	for _, tc := range cases {
+		if got := bg_speedWorthLogging(tc.prevLogged, tc.current, tc.prevApplied); got != tc.want {
+			t.Errorf("%s: bg_speedWorthLogging(%d, %d, %d) = %v, want %v", tc.name, tc.prevLogged, tc.current, tc.prevApplied, got, tc.want)
+		}
+	}
+}
+
+// TestBGAdoptsTheGuardsFirstCapLine: the guard prints the session's first cap
+// itself, at once. The periodic line must adopt that line as its last one
+// instead of repeating the same numbers (and reading "from unlimited") a few
+// seconds later.
+func TestBGAdoptsTheGuardsFirstCapLine(t *testing.T) {
+	last := time.Unix(1_800_000_000, 0)
+	if at, ok := bg_adoptFirstCap(last, time.Time{}); ok || !at.Equal(last) {
+		t.Fatalf("no guard line: adopted=%v at=%v", ok, at)
+	}
+	if _, ok := bg_adoptFirstCap(last, last); ok {
+		t.Fatal("adopted the line the logger already printed")
+	}
+	guardAt := last.Add(14 * time.Second)
+	at, ok := bg_adoptFirstCap(last, guardAt)
+	if !ok || !at.Equal(guardAt) {
+		t.Fatalf("guard line after the last one: adopted=%v at=%v", ok, at)
+	}
+	if _, ok := bg_adoptFirstCap(guardAt.Add(time.Second), guardAt); ok {
+		t.Fatal("adopted an older guard line")
+	}
+}
+
+// TestBGSpeedDeltaText pins the direction shown in the autotune line.
+func TestBGSpeedDeltaText(t *testing.T) {
+	for _, tc := range []struct {
+		prev, next int64
+		want       string
+	}{
+		{1000, 1110, "+11%"},
+		{1000, 900, "-10%"},
+		{0, 1000, "da illimitato"},
+		{1000, 0, "a illimitato"},
+		{1000, 1000, "="},
+	} {
+		if got := bg_speedDeltaText(tc.prev, tc.next); got != tc.want {
+			t.Errorf("bg_speedDeltaText(%d, %d) = %q, want %q", tc.prev, tc.next, got, tc.want)
+		}
+	}
+}
+
+// TestBGSpeedMaxTextShowsTheConfiguredCeiling: the autotune line names the
+// maximum the user configured, not the controller's internal ceiling.
+func TestBGSpeedMaxTextShowsTheConfiguredCeiling(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Settings = map[string]string{}
+	cfg.Transfer.DownloadLimitKib, cfg.Transfer.UploadLimitKib = 8000, 1000
+	if got := bg_speedMaxText(&cfg); got != "max 8000/1000 KB/s" {
+		t.Fatalf("max text = %q, want max 8000/1000 KB/s", got)
+	}
+	cfg.Transfer.DownloadLimitKib, cfg.Transfer.UploadLimitKib = 0, 0
+	if got := bg_speedMaxText(&cfg); got != "max nessun limite" {
+		t.Fatalf("unlimited max text = %q, want max nessun limite", got)
+	}
+}
+
+// TestBGPingTextRendersLatency: the speed line carries the guard's latency and
+// its idle reference.
+func TestBGPingTextRendersLatency(t *testing.T) {
+	if got := bg_pingText(latencyGuardStatus{LatencyMs: 23, BaselineMs: 14}); got != "ping 23/14 ms" {
+		t.Fatalf("ping text = %q", got)
+	}
+	if got := bg_pingText(latencyGuardStatus{}); got != "ping n/d" {
+		t.Fatalf("missing ping text = %q", got)
+	}
+}
+
 // The per-day editor's "Auto" mode stores the AutoLimit sentinel instead of a
 // number; a "Limite" day keeps its two values, and the older two-checkbox form
 // ("on"/"auto") is still read.

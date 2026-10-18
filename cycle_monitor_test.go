@@ -95,6 +95,42 @@ func TestCycleWarningReasonStaleSearch(t *testing.T) {
 	}
 }
 
+// A cycle that only failed to resolve some .torrent links completed its search:
+// the dead links are reported by the link quarantine, not as "search broken".
+func TestCycleWarningReasonIgnoresDeadTorrentLinks(t *testing.T) {
+	now := time.Now()
+	clean := testCycle(now.Add(-30*time.Hour), 60, 0)
+	dirty := testCycle(now.Add(-time.Hour), 60, 2)
+	dirty.ErrorDetails = map[string]int{"torrent_link": 2}
+	got := cycleWarningReason([]models.CycleHistoryEntry{dirty, clean}, 6*time.Hour, now)
+	if got != "" {
+		t.Fatalf("a cycle with only dead torrent links warned: %q", got)
+	}
+	// A real error in the same cycle still counts.
+	real := testCycle(now.Add(-time.Hour), 60, 1)
+	real.ErrorDetails = map[string]int{"min_free_space": 1}
+	got = cycleWarningReason([]models.CycleHistoryEntry{real, clean}, 6*time.Hour, now)
+	if !strings.Contains(got, "senza errori") {
+		t.Fatalf("a real cycle error was ignored: %q", got)
+	}
+}
+
+// The elapsed time changes the reason text at every check; the key must not,
+// or the warning is logged and notified every 30 minutes instead of on the
+// transition plus the hourly heartbeat.
+func TestCycleWarningKeyStableAcrossElapsedTime(t *testing.T) {
+	now := time.Now()
+	cycles := []models.CycleHistoryEntry{testCycle(now.Add(-5*time.Hour), 60, 2)}
+	first := cycleWarningKey(cycles, time.Hour, now)
+	second := cycleWarningKey(cycles, time.Hour, now.Add(30*time.Minute))
+	if first == "" {
+		t.Fatal("the stale search produced no key")
+	}
+	if first != second {
+		t.Fatalf("key changed with the elapsed time: %q -> %q", first, second)
+	}
+}
+
 func TestCycleWarningLogStateTransitions(t *testing.T) {
 	var state cycleWarningLogState
 	now := time.Now()

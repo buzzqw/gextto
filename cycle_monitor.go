@@ -41,31 +41,41 @@ const (
 	cycleStaleFloor  = 2 * time.Hour
 )
 
+// cycleProblem is one reason the search needs attention. key is stable across
+// checks while the problem persists; text may carry the elapsed time and is
+// what the operator reads.
+type cycleProblem struct {
+	key  string
+	text string
+}
+
 // cycleWarningLogState folds consecutive observations into the log action to
 // take, so the monitor logs transitions (plus an hourly heartbeat) instead of
 // every check.
 type cycleWarningLogState struct {
-	lastReason string
+	lastKey    string
 	lastLogged time.Time
 }
 
-// observe returns "warning" when the problem must be logged, "recovered" when a
-// previously warned search is clean again, or "" when nothing changed.
-func (s *cycleWarningLogState) observe(reason string, now time.Time) string {
+// observe takes the stable problem key (not the text, whose elapsed time
+// changes at every check) and returns "warning" when the problem must be
+// logged, "recovered" when a previously warned search is clean again, or ""
+// when nothing changed.
+func (s *cycleWarningLogState) observe(key string, now time.Time) string {
 	action := ""
 	switch {
-	case reason != "":
-		changed := reason != s.lastReason
+	case key != "":
+		changed := key != s.lastKey
 		heartbeat := !s.lastLogged.IsZero() && now.Sub(s.lastLogged) >= cycleMonitorHeartbeat
 		if changed || heartbeat {
 			action = "warning"
 			s.lastLogged = now
 		}
-	case s.lastReason != "":
+	case s.lastKey != "":
 		action = "recovered"
 		s.lastLogged = now
 	}
-	s.lastReason = reason
+	s.lastKey = key
 	return action
 }
 
@@ -85,13 +95,13 @@ func cycleSourceErrorLabel(lastError string) string {
 	}
 }
 
-// cycleWarningReason describes what the cycle history shows as a problem, or ""
-// when the searches look healthy. Cycles are newest first.
-func cycleWarningReason(cycles []models.CycleHistoryEntry, interval time.Duration, now time.Time) string {
+// cycleProblems describes what the cycle history shows as a problem. Cycles
+// are newest first.
+func cycleProblems(cycles []models.CycleHistoryEntry, interval time.Duration, now time.Time) []cycleProblem {
 	if len(cycles) == 0 {
-		return ""
+		return nil
 	}
-	var problems []string
+	var problems []cycleProblem
 
 	// A source that failed cycleSourceFailCount times across the recent cycles.
 	type sourceTally struct {
@@ -134,17 +144,20 @@ func cycleWarningReason(cycles []models.CycleHistoryEntry, interval time.Duratio
 			if reason := cycleSourceErrorLabel(entry.lastError); reason != "" {
 				problem += " (" + reason + ")"
 			}
-			problems = append(problems, problem)
+			problems = append(problems, cycleProblem{key: "source:" + key, text: problem})
 		}
 	}
 
 	// A single cycle that took far too long.
 	if cycles[0].DurationSeconds > int(cycleSlowWarning.Seconds()) {
-		problems = append(problems, fmt.Sprintf("l'ultima ricerca ha impiegato %s",
-			logging.HumanDuration(int64(cycles[0].DurationSeconds))))
+		problems = append(problems, cycleProblem{
+			key: "slow",
+			text: fmt.Sprintf("l'ultima ricerca ha impiegato %s",
+				logging.HumanDuration(int64(cycles[0].DurationSeconds))),
+		})
 	}
 
-	// Too long since a cycle completed without errors.
+	// Too long since a cycle completed without real errors.
 	if threshold := cycleStaleThreshold(interval); threshold > 0 {
 		var lastSuccess, oldest time.Time
 		for _, cycle := range cycles {
@@ -155,7 +168,7 @@ func cycleWarningReason(cycles []models.CycleHistoryEntry, interval time.Duratio
 			if oldest.IsZero() || at.Before(oldest) {
 				oldest = at
 			}
-			if cycle.Errors == 0 && at.After(lastSuccess) {
+			if cycleSearchErrors(cycle) == 0 && at.After(lastSuccess) {
 				lastSuccess = at
 			}
 		}
@@ -165,11 +178,62 @@ func cycleWarningReason(cycles []models.CycleHistoryEntry, interval time.Duratio
 			since = oldest
 		}
 		if !since.IsZero() && now.Sub(since) > threshold {
-			problems = append(problems, fmt.Sprintf("nessuna ricerca senza errori da %s",
-				logging.HumanDuration(int64(now.Sub(since).Seconds()))))
+			problems = append(problems, cycleProblem{
+				key: "stale",
+				text: fmt.Sprintf("nessuna ricerca senza errori da %s",
+					logging.HumanDuration(int64(now.Sub(since).Seconds()))),
+			})
 		}
 	}
-	return strings.Join(problems, "; ")
+	return problems
+}
+
+// cycleSearchErrors counts the errors that mean the search itself failed. A
+// dead .torrent link is a download-side problem: it has its own warning and
+// the link quarantine, and it must not keep the search "not clean" for days.
+func cycleSearchErrors(cycle models.CycleHistoryEntry) int {
+	errors := cycle.Errors
+	for category, count := range cycle.ErrorDetails {
+		if category == "torrent_link" {
+			errors -= count
+		}
+	}
+	if errors < 0 {
+		return 0
+	}
+	return errors
+}
+
+// cycleProblemsText joins the human reasons.
+func cycleProblemsText(problems []cycleProblem) string {
+	texts := make([]string, 0, len(problems))
+	for _, problem := range problems {
+		texts = append(texts, problem.text)
+	}
+	return strings.Join(texts, "; ")
+}
+
+// cycleProblemsKey joins the stable identities. It changes when a problem
+// appears or disappears, not when its elapsed time is redisplayed.
+func cycleProblemsKey(problems []cycleProblem) string {
+	keys := make([]string, 0, len(problems))
+	for _, problem := range problems {
+		keys = append(keys, problem.key)
+	}
+	return strings.Join(keys, "; ")
+}
+
+// cycleWarningReason is the operator-facing description, or "" when the
+// searches look healthy.
+func cycleWarningReason(cycles []models.CycleHistoryEntry, interval time.Duration, now time.Time) string {
+	return cycleProblemsText(cycleProblems(cycles, interval, now))
+}
+
+// cycleWarningKey is the stable identity used to decide whether a warning is
+// new. It deliberately leaves the elapsed time out: the reason text changes at
+// every check, the key changes only when the problem does.
+func cycleWarningKey(cycles []models.CycleHistoryEntry, interval time.Duration, now time.Time) string {
+	return cycleProblemsKey(cycleProblems(cycles, interval, now))
 }
 
 // cycleStaleThreshold is how long the search may go without a clean cycle
@@ -203,15 +267,18 @@ func cycleHealthWorker(state *AppState) {
 	var logState cycleWarningLogState
 	for {
 		reason := ""
+		key := ""
 		cfg := latestConfig(state)
 		if cfg.Active && state.db != nil {
 			interval := time.Duration(cfg.RefreshSecs) * time.Second
 			if cycles, err := state.db.RecentCycleStats(cycleMonitorHistory); err == nil {
-				reason = cycleWarningReason(cycles, interval, time.Now())
+				problems := cycleProblems(cycles, interval, time.Now())
+				reason = cycleProblemsText(problems)
+				key = cycleProblemsKey(problems)
 			}
 		}
 		now := time.Now()
-		switch logState.observe(reason, now) {
+		switch logState.observe(key, now) {
 		case "warning":
 			logging.Warn("search needs attention", "reason", reason)
 			if state.notifier != nil {

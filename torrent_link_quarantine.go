@@ -146,6 +146,31 @@ func (d *Database) RecordTorrentLinkFailure(rawURL, reason string, now time.Time
 	return failures, err
 }
 
+// QuarantineTorrentLink puts a link out of use immediately, for a reason that
+// is not a transient HTTP failure: for example an "in progress" pack whose
+// .torrent is behind its title. The link is not resolved again until the
+// quarantine ends, so the same stale pack does not cost a request every cycle.
+func (d *Database) QuarantineTorrentLink(rawURL, reason string, now time.Time, wait time.Duration) error {
+	url := torrentLinkKey(rawURL)
+	if d == nil || d.db == nil || url == "" {
+		return nil
+	}
+	if wait < 0 {
+		wait = 0
+	}
+	stamp := now.UTC().Format(time.RFC3339)
+	until := now.Add(wait).UTC().Format(time.RFC3339)
+	_, err := d.db.Exec(`INSERT INTO dead_torrent_links(url, failures, last_error, quarantined_until, updated_at)
+		VALUES(?,?,?,?,?)
+		ON CONFLICT(url) DO UPDATE SET
+			failures=excluded.failures,
+			last_error=excluded.last_error,
+			quarantined_until=excluded.quarantined_until,
+			updated_at=excluded.updated_at`,
+		url, torrentLinkFailureLimit, torrentLinkReason(reason), until, stamp)
+	return err
+}
+
 // ClearTorrentLinkFailure forgets the URL: it worked, so it is not dead and
 // must be eligible again if the indexer breaks later.
 func (d *Database) ClearTorrentLinkFailure(rawURL string) error {

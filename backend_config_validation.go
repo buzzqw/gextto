@@ -60,6 +60,12 @@ func validateBackendSetting(key, value string) error {
 			return fmt.Errorf("upgrade_until_score must be zero or a positive score")
 		}
 		return nil
+	case latencyGuardSourceKey:
+		switch strings.ToLower(raw) {
+		case "", latencySourcePing, latencySourceBoth, latencySourceRouter:
+			return nil
+		}
+		return fmt.Errorf("%s must be %q, %q or %q", latencyGuardSourceKey, latencySourcePing, latencySourceBoth, latencySourceRouter)
 	case "trash_retention_days":
 		if raw == "" {
 			return nil
@@ -218,6 +224,11 @@ func validateNumericSetting(key, value string) error {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || parsed < 0 {
 			return fmt.Errorf("%s must be zero or a positive integer", key)
+		}
+	case key == latencyGuardLineMaxDownKey, key == latencyGuardLineMaxUpKey:
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 0 || parsed > 10_000_000 {
+			return fmt.Errorf("%s must be between 0 and 10000000 KiB/s", key)
 		}
 	case key == "min_free_space_gb", key == "torrent_seed_ratio":
 		parsed, err := strconv.ParseFloat(raw, 64)

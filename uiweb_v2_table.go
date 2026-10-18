@@ -139,6 +139,8 @@ type v2TableData struct {
 	Manual        bool
 	Filter        bool
 	FilterQuery   string
+	DayFilter     bool
+	Today         bool
 	Sort          string
 	Dir           string
 	FooterForm    *uiFormSection
@@ -273,9 +275,14 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 		data.Colspan++
 	}
 	data.Manual = spec.ManualOnly
-	data.Refresh = spec.Search || spec.PageSize > 0 || spec.ManualOnly || spec.RefreshHint != "" || spec.Filter
+	data.Refresh = spec.Search || spec.PageSize > 0 || spec.ManualOnly || spec.RefreshHint != "" || spec.Filter || spec.DayFilter
 	data.Filter = spec.Filter
 	data.FilterQuery = r.FormValue("f")
+	data.DayFilter = spec.DayFilter
+	data.Today = spec.DayFilter && (r.FormValue("today") == "1" || strings.EqualFold(r.FormValue("today"), "true"))
+	if data.Today {
+		query.Set("day", "today")
+	}
 	data.FooterForm = spec.FooterForm
 	data.FooterActions = spec.FooterActions
 	data.FooterView = view

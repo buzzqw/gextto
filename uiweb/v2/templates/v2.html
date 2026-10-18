@@ -150,6 +150,7 @@
     </div>
   </main>
 </div>
+<div id="v2-modal"></div>
 {{with .UpdateNotes}}<div class="overlay" style="display:flex" id="v2-update-notes">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-update-notes-title">
     <div class="modal-head"><h3 id="v2-update-notes-title">Gextto aggiornato</h3></div>
@@ -245,8 +246,7 @@
       {{template "v2_live_traffic" .Traffic}}
     </div>
   </div>
-  <div id="v2-modal"></div>
-  <div class="panel dashboard-problems-panel">
+    <div class="panel dashboard-problems-panel">
     <div class="panel-head"><h3>Da controllare</h3><small class="muted">Download fermi, spostamenti in sospeso e avvisi</small></div>
     <div class="panel-body" id="v2-dashboard-problems" hx-get="/dashboard/problems" hx-trigger="load, every 60s" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
   </div>
@@ -419,7 +419,7 @@
   </details>
   <div class="panel session-panel">
     <div class="panel-head"><h3>Download in sessione <span class="session-count" id="v2-session-count">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · <span>aggiornato</span> {{.UpdatedAt}}</span></h3><span id="v2-temp-badge">{{template "v2_temp_badge" .}}</span><div class="toolbar head-limits">
-       <label class="check" title="Auto speed: la banda va all'auto-tune, senza tetto, come una fascia «Auto» della programmazione; disabilita i limiti temporanei"><input type="checkbox" id="v2-temp-auto" hx-post="/downloads/settings" hx-vals='js:{op:"temp_auto",value:(this.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .TempAuto}} checked{{end}} /> <span>Auto speed</span></label>
+       <label class="check" title="Auto speed: la banda va all'auto-tune, senza tetto, come una fascia «Auto» della programmazione; disabilita i limiti temporanei"><input type="checkbox" id="v2-temp-auto" hx-post="/downloads/settings" hx-vals='js:{op:"temp_auto",value:(elt.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .TempAuto}} checked{{end}} /> <span>Auto speed</span></label>
        <label class="field inline-field" title="Limite temporaneo di download in KiB/s; 0 significa illimitato"><span>DL</span><input id="v2-temp-dl" class="input compact" type="number" min="0" name="download_kib" value="{{.TempDL}}" hx-preserve="true"{{if .TempAuto}} disabled{{end}} /></label>
        <label class="field inline-field" title="Limite temporaneo di upload in KiB/s; 0 significa illimitato"><span>UL</span><input id="v2-temp-ul" class="input compact" type="number" min="0" name="upload_kib" value="{{.TempUL}}" hx-preserve="true"{{if .TempAuto}} disabled{{end}} /></label>
        <label class="field inline-field" title="Durata del limite temporaneo in minuti; 0 per mantenerlo fino a rimozione manuale"><span>min</span><input id="v2-temp-minutes" class="input compact" type="number" min="0" name="minutes" value="{{.TempMinutes}}" hx-preserve="true"{{if .TempAuto}} disabled{{end}} /></label>
@@ -428,13 +428,12 @@
     </div><button class="btn sm downloads-tools-toggle" type="button" data-downloads-tools aria-expanded="false" title="Mostra i limiti di banda">⚙ Opzioni</button></div>
     <div class="panel-body">{{template "v2_torrents_wrap" .}}</div>
   </div>
-  <div id="v2-modal"></div>
-  <div id="v2-detail-drawer" class="torrent-drawer" role="dialog" aria-modal="false" aria-labelledby="v2-detail-title" hidden></div>
+    <div id="v2-detail-drawer" class="torrent-drawer" role="dialog" aria-modal="false" aria-labelledby="v2-detail-title" hidden></div>
   {{range .History}}{{template "v2_table_panel" .}}{{end}}
 </div>
 {{end}}
 
-{{define "v2_temp_badge"}}{{if .TempAuto}}<span class="badge warn" title="Auto speed: la banda va all'auto-tune, senza tetto">Auto speed</span>{{else if .SpeedAuto}}<span class="badge warn" title="Velocità automatica: nessun tetto, la linea la misura l'auto-tune">Auto</span>{{else if .TempActive}}<span class="badge ok" {{if .TempMinutes}}title="Limite temporaneo attivo: scade dopo i minuti indicati"{{else}}title="Limite temporaneo attivo fino a rimozione manuale"{{end}}>⚡ {{if .TempMinutes}}({{ .TempMinutes }}m){{else}}(<span>perm.</span>){{end}}</span>{{else if .SchedActive}}{{if .SchedAuto}}<span class="badge warn" title="Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune">⏰ <span>Auto</span></span>{{else}}<span class="badge warn" title="Programmazione oraria della banda attiva: {{.SchedDL}} KiB/s DL · {{.SchedUL}} KiB/s UL">⏰ {{.SchedDL}}/{{.SchedUL}}</span>{{end}}{{else}}<span class="badge" title="Limiti standard: {{.BaseDL}} KiB/s DL · {{.BaseUL}} KiB/s UL">{{.BaseDL}}/{{.BaseUL}}</span>{{end}}{{if .Guard.Active}} <span class="badge" role="status" title="Auto rallenta per lasciare la linea agli altri dispositivi di casa"><span aria-hidden="true">🐢</span> <span>Latenza</span> {{.Guard.LatencyMs}}/{{.Guard.BaselineMs}} ms{{if .Guard.DownloadKib}} · DL {{.Guard.DownloadKib}} KiB/s{{end}}{{if .Guard.UploadKib}} · UL {{.Guard.UploadKib}} KiB/s{{end}}</span>{{end}}{{end}}
+{{define "v2_temp_badge"}}{{if .TempAuto}}<span class="badge warn" title="Auto speed: la banda va all'auto-tune, senza tetto">Auto speed</span>{{else if .SpeedAuto}}<span class="badge warn" title="Velocità automatica: nessun tetto, la linea la misura l'auto-tune">Auto</span>{{else if .TempActive}}<span class="badge ok" {{if .TempMinutes}}title="Limite temporaneo attivo: scade dopo i minuti indicati"{{else}}title="Limite temporaneo attivo fino a rimozione manuale"{{end}}>⚡ {{if .TempMinutes}}({{ .TempMinutes }}m){{else}}(<span>perm.</span>){{end}}</span>{{else if .SchedActive}}{{if .SchedAuto}}<span class="badge warn" title="Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune">⏰ <span>Auto</span></span>{{else}}<span class="badge warn" title="Programmazione oraria della banda attiva: {{.SchedDL}} KiB/s DL · {{.SchedUL}} KiB/s UL">⏰ {{.SchedDL}}/{{.SchedUL}}</span>{{end}}{{else}}<span class="badge" title="Limiti standard: {{.BaseDL}} KiB/s DL · {{.BaseUL}} KiB/s UL">{{.BaseDL}}/{{.BaseUL}}</span>{{end}}{{if .Guard.Active}} <span class="badge" role="status" title="Auto riduce la velocità per mantenere basso il ping verso Google/Cloudflare"><span aria-hidden="true">🐢</span> <span>Latenza</span> {{.Guard.LatencyMs}}/{{.Guard.BaselineMs}} ms{{if .Guard.DownloadKib}} · DL {{.Guard.DownloadKib}} KiB/s{{end}}{{if .Guard.UploadKib}} · UL {{.Guard.UploadKib}} KiB/s{{end}}</span>{{end}}{{end}}
 
 {{define "v2_torrents_wrap"}}
 <div id="v2-torrents-wrap">
@@ -455,7 +454,8 @@
        <button class="btn sm{{if .Auto}} primary{{end}}" type="submit" name="auto" value="{{if .Auto}}0{{else}}1{{end}}" title="{{if .Auto}}Disattiva l'aggiornamento automatico ogni 5 secondi{{else}}Attiva l'aggiornamento automatico ogni 5 secondi{{end}}">Auto: {{if .Auto}}on{{else}}off{{end}}</button>
        <label class="field inline-field" title="Mostra solo i torrent associati al tag selezionato"><span>Tag</span><select id="v2-tag-filter" class="input" name="tag_filter" aria-label="Filtra per tag"><option value="">Tutti i tag</option><option value="__none__"{{if eq .TagFilter "__none__"}} selected{{end}}>Senza tag</option>{{range .TagOptions}}<option value="{{.}}"{{if eq $.TagFilter .}} selected{{end}}>{{.}}</option>{{end}}</select></label>
        <button class="btn sm" type="button" hx-post="/downloads/settings" hx-vals='{"op":"clear_completed"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
-      <label class="check" title="A fine seed il torrent completato viene tolto dalla sessione"><input type="checkbox" hx-post="/downloads/settings" hx-vals='js:{op:"auto_remove",value:(this.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .AutoRemoveCompleted}} checked{{end}} /> <span>Elimina completati dopo il seed</span></label>
+       <button class="btn sm" type="button" hx-get="/downloads/orphans" hx-target="#v2-modal" hx-swap="innerHTML" title="Trova i file lasciati nella cartella download da torrent non più in sessione e spostali nel cestino se le copie in libreria sono complete">File orfani</button>
+      <label class="check" title="A fine seed il torrent completato viene tolto dalla sessione"><input type="checkbox" hx-post="/downloads/settings" hx-vals='js:{op:"auto_remove",value:(elt.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .AutoRemoveCompleted}} checked{{end}} /> <span>Elimina completati dopo il seed</span></label>
     </div>
      <div class="toolbar download-bulk-toolbar">
        <label class="check" title="Seleziona o deseleziona tutti i torrent su cui applicare le azioni"><input type="checkbox" data-v2-select-all aria-label="Seleziona tutti i torrent" /> <span>Seleziona tutti</span></label>
@@ -657,6 +657,28 @@
   <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="{{.Tab}}" /><input type="hidden" name="op" value="{{.Op}}" /><input type="hidden" name="body" value="{{.Body}}" />
   <button class="btn sm {{.Class}}" type="submit" title="{{.Label}}"{{if .Confirm}} hx-confirm="{{.Confirm}}"{{end}}>{{.Label}}</button>
 </form>
+{{end}}
+
+{{define "v2_orphans_modal"}}
+<div class="overlay" style="display:block">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-orphans-title">
+    <div class="modal-head"><h3 id="v2-orphans-title">File orfani</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi la finestra dei file orfani">Chiudi</button></div>
+    <div class="modal-body">
+      {{if .Message}}<p class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Message}}</p>{{end}}
+      <p class="muted">Voci nella cartella download non più gestite da un torrent. Vengono spostate nel cestino solo se ogni episodio ha una copia in libreria di qualità uguale o migliore.</p>
+      {{if .Items}}
+      <div class="table-wrap"><table class="data-table">
+        <caption class="sr-only">File orfani nella cartella download</caption>
+        <thead><tr><th scope="col">Elemento</th><th scope="col">Dimensione</th><th scope="col">Episodi</th><th scope="col">Esito</th></tr></thead>
+        <tbody>{{range .Items}}<tr><td class="truncate" title="{{.Path}}">{{.Name}}</td><td class="numeric">{{bytes .SizeBytes}}</td><td>{{if .Episodes}}{{.Episodes}}{{else}}—{{end}}</td><td>{{if .Safe}}<span class="badge ok">sicuro</span>{{else}}<span class="badge warn">saltato</span> <small class="muted">{{.Reason}}</small>{{end}}</td></tr>{{end}}</tbody>
+      </table></div>
+      <p class="muted"><span>Totale sicuro:</span> {{bytes .SafeBytes}} / {{bytes .TotalBytes}}</p>
+      {{if gt .SafeBytes 0}}<button class="btn danger" hx-post="/downloads/orphans/clean" hx-target="#v2-modal" hx-swap="innerHTML" hx-disabled-elt="this" hx-confirm="Spostare nel cestino i file orfani sicuri? Le copie in libreria restano." title="Sposta nel cestino le voci sicure">Sposta nel cestino <small class="muted">— {{bytes .SafeBytes}}</small></button>{{end}}
+      {{else}}<p class="muted">Nessun file orfano trovato.</p>{{end}}
+    </div>
+  </div>
+</div>
 {{end}}
 
 {{define "v2_remove_modal"}}
@@ -1444,8 +1466,7 @@
   {{end}}
   <div class="section-group-label">Download</div>
   {{template "v2_table_panel" .Downloads}}
-  <div id="v2-modal"></div>
-</div>
+  </div>
 {{end}}
 
 {{define "v2_comics_links_result"}}
@@ -1519,6 +1540,7 @@
         <input type="hidden" name="dir" value="{{.Dir}}" />
         {{if .Search}}<input class="input{{if eq .BaseView "archive"}} archive-search-input{{end}}" type="search" name="q" value="{{.Query}}" placeholder="{{if eq .BaseView "archive"}}Cerca in archivio, almeno 3 caratteri{{else}}Cerca…{{end}}" aria-label="Cerca"{{if eq .BaseView "archive"}} title="La ricerca nell'archivio parte da sola da 3 caratteri. Per termini più corti (es. IT) premi Invio o Cerca. Con «Cerca anche nel web» la ricerca online parte solo da Cerca."{{end}} />{{end}}
         {{if .Filter}}<input class="input" type="search" name="f" value="{{.FilterQuery}}" placeholder="Filtra l'elenco…" aria-label="Filtra l'elenco" />{{end}}
+        {{if .DayFilter}}<label class="check" title="Mostra solo i download conclusi oggi"><input type="checkbox" name="today" value="1"{{if .Today}} checked{{end}} /> <span>Oggi</span></label>{{end}}
         {{if eq .BaseView "archive"}}
         <label class="check archive-web-check" title="Cerca anche nei motori web e indexer online"><input type="checkbox" name="web" value="1"{{if .WebSearch}} checked{{end}} /> <span>Cerca anche nel web</span></label>
         <button class="btn sm primary" type="submit">Cerca</button>
@@ -1602,8 +1624,7 @@
     </section>
   {{end}}
   {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
-  <div id="v2-modal"></div>
-</div>
+  </div>
 {{end}}
 
 {{define "v2_movies"}}
@@ -1622,8 +1643,7 @@
       </div>
     {{end}}
   {{end}}
-  <div id="v2-modal"></div>
-</div>
+  </div>
 {{end}}
 
 {{define "v2_section"}}
@@ -2269,8 +2289,7 @@
        <div id="v2-search-results">{{template "v2_search_results" .}}</div>
     </div>
   </div>
-  <div id="v2-modal"></div>
-</div>
+  </div>
 {{end}}
 
 {{define "v2_search_results"}}
@@ -2323,8 +2342,7 @@
 <div class="view">
   <div class="toolbar">
     <a class="btn sm" href="/?view=series" title="Torna all'elenco delle serie">← Serie TV</a>
-    <div id="v2-modal"></div>
-    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/search-missing" .PathName) "Method" "POST" "Body" "{}" "Label" "Cerca mancanti" "Class" "primary" "Title" "Cerca le release per gli episodi mancanti")}}
+        {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/search-missing" .PathName) "Method" "POST" "Body" "{}" "Label" "Cerca mancanti" "Class" "primary" "Title" "Cerca le release per gli episodi mancanti")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/scan-archive" .PathName) "Method" "POST" "Body" "{}" "Label" "Scansiona archivio" "Class" "" "Title" "Scansiona l'archivio per questa serie")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/metadata" .PathName) "Method" "POST" "Body" "{}" "Label" "Aggiorna da TMDB" "Class" "" "Title" "Aggiorna i metadati TMDB")}}
     <button class="btn sm" type="button" hx-get="/series/rename-preview?series={{.PathName | urlquery}}" hx-target="#v2-rename-preview" hx-swap="innerHTML" title="Mostra le rinomine proposte senza toccare i file">Anteprima rinomina</button>
@@ -2459,8 +2477,7 @@
 <div class="view">
   <div class="toolbar">
     <a class="btn sm" href="/?view=movies" title="Torna all'elenco dei film">← Film</a>
-    <div id="v2-modal"></div>
-    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/search" .ID) "Method" "POST" "Body" "{}" "Label" "Cerca" "Class" "primary" "Title" "Cerca release per questo film")}}
+        {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/search" .ID) "Method" "POST" "Body" "{}" "Label" "Cerca" "Class" "primary" "Title" "Cerca release per questo film")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/redownload" .ID) "Method" "POST" "Body" "{}" "Label" "Riscarica" "Class" "" "Title" "Rendi di nuovo scaricabile")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/metadata" .ID) "Method" "POST" "Body" "{\"source\":\"tmdb\"}" "Label" "Aggiorna TMDB" "Class" "" "Title" "Applica i metadati TMDB")}}
     {{template "v2_action_btn" (dict "Redirect" "/?view=movies" "Path" (printf "/api/movies/%d" .ID) "Method" "DELETE" "Body" "{}" "Label" "Elimina" "Class" "danger" "Title" "Elimina questo film" "Confirm" "Eliminare questo film?")}}

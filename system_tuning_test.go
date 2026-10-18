@@ -105,6 +105,27 @@ func TestProposeTuningConnectionsAreBoundedFromRAM(t *testing.T) {
 	}
 }
 
+// TestSpeedPeakIgnoresSlowSwarms: a 30 KiB/s sample is a dead swarm, not the
+// line. If it were accepted, the tuning would propose 24 KiB/s and the latency
+// guard would anchor its ceiling to the same stall.
+func TestSpeedPeakIgnoresSlowSwarms(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Settings = map[string]string{autotunePeakDownKey: "30"}
+	if got := speedPeakKib(&cfg, autotunePeakDownKey); got != 0 {
+		t.Fatalf("a 30 KiB/s peak was accepted: %d", got)
+	}
+	cfg.Settings[autotunePeakDownKey] = "1024"
+	if got := speedPeakKib(&cfg, autotunePeakDownKey); got != 1024 {
+		t.Fatalf("a real peak was discarded: %d", got)
+	}
+
+	state := newTestAppState(t)
+	observeSpeedPeak(latestConfig(state), 30<<10, 30<<10, false, false)
+	if got := speedPeakKib(latestConfig(state), autotunePeakDownKey); got != 0 {
+		t.Fatalf("a 30 KiB/s sample was stored as a peak: %d", got)
+	}
+}
+
 func TestObserveSpeedPeakKeepsTheHighest(t *testing.T) {
 	state := newTestAppState(t)
 	cfg := latestConfig(state)

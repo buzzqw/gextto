@@ -1,6 +1,7 @@
 package autospeed
 
 import (
+	"net"
 	"testing"
 	"time"
 )
@@ -52,5 +53,63 @@ func TestClampStepsDownAndUpWithinBounds(t *testing.T) {
 	c.Reset()
 	if v := c.Step(now, true, 1000, 900); v != 900 {
 		t.Fatalf("floor = %d, want 900", v)
+	}
+}
+
+// TestClampStepRampFindsTheLine: the ramp grows from a low cap by at least
+// riseKiB, and by a quarter of the current value once that is larger, instead
+// of the ceiling/20 step (tiny when the ceiling is the current rate).
+func TestClampStepRampFindsTheLine(t *testing.T) {
+	var c Clamp
+	c.Value = 128
+	now := time.Unix(1_800_000_000, 0)
+	if v := c.StepRamp(now, false, 100000, 50, 512); v != 640 {
+		t.Fatalf("first ramp step = %d, want 640", v)
+	}
+	now = now.Add(StepInterval)
+	if v := c.StepRamp(now, false, 100000, 50, 512); v != 1152 {
+		t.Fatalf("second ramp step = %d, want 1152", v)
+	}
+	now = now.Add(StepInterval)
+	if v := c.StepRamp(now, true, 100000, 50, 512); v != 979 {
+		t.Fatalf("high step = %d, want 979 (15%% cut of 1152)", v)
+	}
+}
+
+// TestClampStepRampWithoutCeiling: ceilingKiB <= 0 is "no hard cap"; the cap
+// still grows and the high-latency cut still works.
+func TestClampStepRampWithoutCeiling(t *testing.T) {
+	var c Clamp
+	c.Value = 1000
+	now := time.Unix(1_800_000_000, 0)
+	if v := c.StepRamp(now, false, 0, 50, 512); v != 1512 {
+		t.Fatalf("unbounded ramp step = %d, want 1512", v)
+	}
+	now = now.Add(StepInterval)
+	if v := c.StepRamp(now, true, 0, 50, 512); v != 1285 {
+		t.Fatalf("unbounded high step = %d, want 1285 (15%% cut of 1512)", v)
+	}
+}
+
+// TestMeasureBestSkipsAFailingTarget: one unreachable target must not hide the
+// answer of another; the guard uses several Google/Cloudflare addresses.
+func TestMeasureBestSkipsAFailingTarget(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skip("no loopback listener")
+	}
+	defer ln.Close()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		}
+	}()
+	rtt, ok := MeasureBest([]string{"127.0.0.1:1", ln.Addr().String()})
+	if !ok || rtt <= 0 {
+		t.Fatalf("MeasureBest = %v, %v; want a measurement from the second target", rtt, ok)
 	}
 }

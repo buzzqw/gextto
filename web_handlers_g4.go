@@ -1401,8 +1401,19 @@ func TorrentHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 	sort.SliceStable(combined, func(i, j int) bool {
 		return combined[i].at > combined[j].at
 	})
+	todayOnly := strings.EqualFold(strings.TrimSpace(r.FormValue("day")), "today")
+	if todayOnly {
+		today := time.Now().Format("2006-01-02")
+		filtered := combined[:0]
+		for _, item := range combined {
+			if at, ok := gh4HistoryTimestampLocal(item.at); ok && at.Format("2006-01-02") == today {
+				filtered = append(filtered, item)
+			}
+		}
+		combined = filtered
+	}
 	total := int64(len(combined))
-	if torrentTotal > int64(len(torrents)) {
+	if !todayOnly && torrentTotal > int64(len(torrents)) {
 		// Keep pagination honest if the database contains more rows than the
 		// defensive fetch cap; the visible page is still correctly ordered for
 		// the rows we loaded.
@@ -1433,6 +1444,28 @@ func TorrentHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"page":  page,
 		"pages": pages,
 	})
+}
+
+// gh4HistoryTimestampLocal parses a stored history timestamp and returns it in
+// the local timezone. The database stores UTC SQLite timestamps; the UI shows
+// local time, so the "Oggi" filter must use the same convention.
+func gh4HistoryTimestampLocal(value string) (time.Time, bool) {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return time.Time{}, false
+	}
+	normalized := strings.Replace(raw, " ", "T", 1)
+	if !strings.HasSuffix(normalized, "Z") && !strings.ContainsAny(normalized, "+") {
+		if !strings.Contains(normalized, "-") || strings.Count(normalized, "-") == 2 {
+			normalized += "Z"
+		}
+	}
+	for _, layout := range []string{time.RFC3339Nano, time.RFC3339, "2006-01-02T15:04:05"} {
+		if parsed, err := time.Parse(layout, normalized); err == nil {
+			return parsed.Local(), true
+		}
+	}
+	return time.Time{}, false
 }
 
 // WatchedFoldersView implements `watched_folders_view`.

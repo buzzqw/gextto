@@ -626,6 +626,9 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	// Torrents whose pack identity was found consistent, skipped for
 	// packIdentityRecheckInterval instead of decoding their metadata every tick.
 	packIdentityChecked := map[string]packIdentityCheck{}
+	// Packs already inspected while downloading (see pack_inspector.go): the
+	// metadata never changes, so one verdict per torrent is enough.
+	packInspectionChecked := map[string]packInspectionCheck{}
 	// Startup torrents found not in error, skipped for notErrorRecheckInterval.
 	notErrorChecked := map[string]time.Time{}
 	storageMoveRetries := map[string]StorageMoveRetry{}
@@ -662,6 +665,12 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	queueTicks := 0
 	lastSpeedPolicy := time.Now().Add(-60 * time.Second)
 	var lastSpeed *bg_speedPair
+	// The autotune line is throttled: at most once a minute, and only when the
+	// cap moved by more than 10 % since the last line. The small 3-second steps
+	// of the controller stay in gx-torrent's debug log, not in the main log.
+	lastAutotuneLog := time.Time{}
+	lastAutotuneDown, lastAutotuneUp := int64(0), int64(0)
+	haveAutotuneLog := false
 	lastDebugLog := time.Now().Add(-300 * time.Second)
 	var lastPin *string
 	var lastSequential *bool
@@ -888,25 +897,28 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			// and the policy must correct it on its own within a minute. The log
 			// stays only on real changes, of the values or of their source (the
 			// schedule starting or ending is logged even with equal values).
-			changed := lastSpeed == nil || lastSpeed.download != downloadKib || lastSpeed.upload != uploadKib || lastSpeed.source != source
+			sourceChanged := lastSpeed == nil || lastSpeed.source != source
 			if _, err := torrents.SetGlobalSpeedLimits(downloadKib, uploadKib); err != nil {
 				logging.Debug("speed policy apply failed", "error", err)
 			} else {
-				if changed {
+				st := state.latency_guard.status()
+				ping := bg_pingText(st)
+				maxText := bg_speedMaxText(cfg)
+				if sourceChanged || !haveAutotuneLog {
 					label := map[string]string{
 						speedSourceTemp:         "temporary limit",
 						speedSourceTempKeep:     "temporary limit, until removed",
 						speedSourceSchedule:     "scheduled limit",
-						speedSourceScheduleAuto: "autotune window (unlimited)",
-						speedSourceTempAuto:     "auto speed (unlimited)",
-						speedSourceAuto:         "automatic speed (unlimited)",
+						speedSourceScheduleAuto: "autotune window",
+						speedSourceTempAuto:     "auto speed",
+						speedSourceAuto:         "automatic speed",
 						speedSourceBase:         "standard limit",
 					}[source]
 					inSchedule := source == speedSourceSchedule || source == speedSourceScheduleAuto
 					wasScheduled := lastSpeed != nil && (lastSpeed.source == speedSourceSchedule || lastSpeed.source == speedSourceScheduleAuto)
 					switch {
 					case source == speedSourceScheduleAuto && !wasScheduled:
-						label = "autotune window started (unlimited)"
+						label = "autotune window started"
 					case source == speedSourceSchedule && !wasScheduled:
 						label = "schedule started"
 					case !inSchedule && wasScheduled:
@@ -915,7 +927,54 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					if source == speedSourceSchedule && tempShadowed {
 						label += ", overrides the temporary limit without expiry"
 					}
-					logging.Info(fmt.Sprintf("🚦 Speed set to %s download, %s upload (%s)", speedLimitLabel(downloadKib), speedLimitLabel(uploadKib), label))
+					// An Auto window is not necessarily unlimited: while the latency
+					// guard is capping, the numbers are the guard's and the label must
+					// say so (the old "(unlimited)" read as a contradiction).
+					if speedSourceIsAuto(source) {
+						if d, u := state.latency_guard.caps(); d > 0 || u > 0 {
+							label += " · latency guard"
+						}
+					}
+					suffix := ping
+					if maxText != "" {
+						suffix = maxText + " · " + ping
+					}
+					logging.Info(fmt.Sprintf("🚦 Speed set to %s download, %s upload (%s) · %s", speedLimitLabel(downloadKib), speedLimitLabel(uploadKib), label, suffix))
+					lastAutotuneLog = now
+					lastAutotuneDown, lastAutotuneUp = downloadKib, uploadKib
+					haveAutotuneLog = true
+				} else if now.Sub(lastAutotuneLog) >= 60*time.Second {
+					guardAt, guardDown, guardUp := state.latency_guard.firstCapLog()
+					if at, ok := bg_adoptFirstCap(lastAutotuneLog, guardAt); ok {
+						// The guard printed this cap itself, at once: adopt
+						// that line as the last one logged instead of
+						// repeating the same numbers (and "from unlimited")
+						// a few seconds later.
+						lastAutotuneLog = at
+						lastAutotuneDown, lastAutotuneUp = guardDown, guardUp
+					} else {
+						prevDown, prevUp := int64(0), int64(0)
+						if lastSpeed != nil {
+							prevDown, prevUp = lastSpeed.download, lastSpeed.upload
+						}
+						if bg_speedWorthLogging(lastAutotuneDown, downloadKib, prevDown) || bg_speedWorthLogging(lastAutotuneUp, uploadKib, prevUp) {
+							delta := "DL " + bg_speedDeltaText(lastAutotuneDown, downloadKib)
+							if uploadKib != lastAutotuneUp {
+								delta += " · UL " + bg_speedDeltaText(lastAutotuneUp, uploadKib)
+							}
+							mode := st.Mode
+							if !st.Active {
+								mode = "free"
+							}
+							suffix := ping
+							if maxText != "" {
+								suffix = maxText + " · " + ping
+							}
+							logging.Info(fmt.Sprintf("🎚️ Autotune: %s download, %s upload · %s · %s · mode %s", speedLimitLabel(downloadKib), speedLimitLabel(uploadKib), delta, suffix, mode))
+							lastAutotuneLog = now
+							lastAutotuneDown, lastAutotuneUp = downloadKib, uploadKib
+						}
+					}
 				}
 				lastSpeed = &bg_speedPair{download: downloadKib, upload: uploadKib, source: source}
 			}
@@ -1363,6 +1422,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		DetachErrorTorrents(torrents, db, startupHashes, notErrorChecked)
 		DetachCompletedArchivedSingles(cfg, torrents, db)
 		RejectActivePackIdentityMismatches(torrents, db, packIdentityChecked)
+		InspectActivePacks(cfg, torrents, db, packInspectionChecked)
 		// Remove completed torrents that have finished seeding before the seed
 		// policy moves them to disk only to delete them. With automatic removal
 		// off, completed torrents stay listed as completed until the user runs
@@ -1502,6 +1562,131 @@ func bg_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
 
 func bg_currentSpeedLimits(cfg *Config) (int64, int64) {
 	return gh6_currentSpeedLimits(cfg)
+}
+
+// bg_speedJumped reports a change of at least 10 % of the previous value. A
+// move from or to "unlimited" (0) is always worth a line: it is a policy
+// change, not a small step of the controller.
+func bg_speedJumped(prev, next int64) bool {
+	if prev == next {
+		return false
+	}
+	if prev <= 0 || next <= 0 {
+		return true
+	}
+	diff := next - prev
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff*10 >= prev
+}
+
+// bg_speedPct is the absolute change in percent, rounded down.
+func bg_speedPct(prev, next int64) int64 {
+	if prev <= 0 {
+		return 100
+	}
+	diff := next - prev
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff * 100 / prev
+}
+
+// bg_adoptFirstCap reports whether the guard wrote the session's first-cap
+// line after the last line the periodic speed logger printed. Adopting it as
+// the last line avoids printing the same numbers twice: the guard logs the cap
+// at once, with the ping, and the periodic line used to repeat it (reading
+// "from unlimited") at its next tick.
+func bg_adoptFirstCap(lastLog, guardLog time.Time) (time.Time, bool) {
+	if guardLog.IsZero() || !guardLog.After(lastLog) {
+		return lastLog, false
+	}
+	return guardLog, true
+}
+
+// bg_speedWorthLogging also considers the trend: a move of at least 10 % is
+// logged when it continues the previous direction, but a reversal is logged
+// only if it is large (20 %). Otherwise a controller oscillating around a
+// value would print a line every minute.
+func bg_speedWorthLogging(prevLogged, current, prevApplied int64) bool {
+	if !bg_speedJumped(prevLogged, current) {
+		return false
+	}
+	if prevLogged <= 0 || current <= 0 || prevApplied <= 0 {
+		return true
+	}
+	dir := func(from, to int64) int {
+		switch {
+		case to > from:
+			return 1
+		case to < from:
+			return -1
+		default:
+			return 0
+		}
+	}
+	currentDir := dir(prevApplied, current)
+	previousDir := dir(prevLogged, prevApplied)
+	if currentDir == 0 || previousDir == 0 || currentDir == previousDir {
+		return true
+	}
+	return bg_speedPct(prevLogged, current) >= 20
+}
+
+// bg_speedDeltaText renders the change against the previously logged value.
+func bg_speedDeltaText(prev, next int64) string {
+	switch {
+	case prev == next:
+		return "="
+	case prev <= 0:
+		return "da illimitato"
+	case next <= 0:
+		return "a illimitato"
+	case next > prev:
+		return fmt.Sprintf("+%d%%", bg_speedPct(prev, next))
+	default:
+		return fmt.Sprintf("-%d%%", bg_speedPct(prev, next))
+	}
+}
+
+// bg_speedMaxText renders the maximum of the policy in force, not the highest
+// number ever configured. An Auto window has no numeric user cap (the
+// controller is the cap; its internal ceiling is 100 MB/s), and an unlimited
+// policy has none either: both say "nessun limite". Showing the inactive
+// schedule's 8000 next to a 14166 KiB/s cap would be a contradiction.
+func bg_speedMaxText(cfg *Config) string {
+	down, up, source, _ := speedPolicy(cfg)
+	if speedSourceIsAuto(source) {
+		if ld, lu := latencyGuardLineMaxKib(cfg); ld > 0 || lu > 0 {
+			return "max linea " + bg_speedPairText(ld, lu)
+		}
+		return "max nessun limite"
+	}
+	if down == 0 && up == 0 {
+		return "max nessun limite"
+	}
+	return "max " + bg_speedPairText(down, up)
+}
+
+// bg_speedPairText renders a download/upload pair in KiB/s.
+func bg_speedPairText(down, up int64) string {
+	switch {
+	case down > 0 && up > 0:
+		return fmt.Sprintf("%d/%d KB/s", down, up)
+	case down > 0:
+		return fmt.Sprintf("%d KB/s down, upload illimitato", down)
+	default:
+		return fmt.Sprintf("upload %d KB/s, download illimitato", up)
+	}
+}
+
+// bg_pingText renders the latency measured by the guard next to the speed.
+func bg_pingText(st latencyGuardStatus) string {
+	if st.LatencyMs <= 0 {
+		return "ping n/d"
+	}
+	return fmt.Sprintf("ping %d/%d ms", st.LatencyMs, st.BaselineMs)
 }
 
 func bg_residentKB() uint64 {

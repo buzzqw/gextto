@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -643,5 +644,52 @@ func TestUpdateAndDeleteSeriesChangeOnlyTheGivenFields(t *testing.T) {
 	}
 	if cfg := latestConfig(state); len(cfg.Series) != 1 || cfg.Series[0].Name != "Other" {
 		t.Fatalf("series after delete: %+v", cfg.Series)
+	}
+}
+
+// The Storico "Oggi" switch must return only the downloads completed today,
+// comparing in the same local timezone the table displays.
+func TestTorrentHistoryTodayFilter(t *testing.T) {
+	state := newTestAppState(t)
+	now := time.Now().UTC()
+	insert := func(hash, name, at string) {
+		if _, err := state.db.db.Exec(`INSERT INTO torrent_meta(hash,name,status,created_at,updated_at,completed_at,removed_at,processed_path)
+			VALUES(?1,?2,'completed',?3,?3,?3,?3,'/library')`, hash, name, at); err != nil {
+			t.Fatalf("insert %s: %v", name, err)
+		}
+	}
+	insert("hash-today", "Today Show", now.Format("2006-01-02 15:04:05"))
+	insert("hash-old", "Old Show", now.Add(-24*time.Hour).Format("2006-01-02 15:04:05"))
+
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, _, body := webGet(t, server, "/api/torrents/history?limit=10&day=today")
+	if code != http.StatusOK {
+		t.Fatalf("history today -> %d: %s", code, body)
+	}
+	var todayReply struct {
+		Items []map[string]any `json:"items"`
+		Total int              `json:"total"`
+	}
+	if err := json.Unmarshal(body, &todayReply); err != nil {
+		t.Fatalf("decode today: %v", err)
+	}
+	if len(todayReply.Items) != 1 || fmt.Sprint(todayReply.Items[0]["name"]) != "Today Show" {
+		t.Fatalf("today filter returned %+v", todayReply.Items)
+	}
+
+	code, _, body = webGet(t, server, "/api/torrents/history?limit=10")
+	if code != http.StatusOK {
+		t.Fatalf("history all -> %d: %s", code, body)
+	}
+	var allReply struct {
+		Items []map[string]any `json:"items"`
+	}
+	if err := json.Unmarshal(body, &allReply); err != nil {
+		t.Fatalf("decode all: %v", err)
+	}
+	if len(allReply.Items) != 2 {
+		t.Fatalf("unfiltered history returned %d items, want 2", len(allReply.Items))
 	}
 }

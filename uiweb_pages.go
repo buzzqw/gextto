@@ -58,6 +58,9 @@ type uiTableSpec struct {
 	Initial    string
 	// Filter adds a client-side text filter over the rendered rows.
 	Filter bool
+	// DayFilter adds an "Oggi" switch that limits the server-side results to
+	// the current local day (used by the download history).
+	DayFilter bool
 	// Comics enables the extra panels of the comics page (download queue and
 	// GetComics link finder) and the columns/actions of the queue table.
 	Comics               bool

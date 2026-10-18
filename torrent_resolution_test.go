@@ -157,3 +157,27 @@ func TestRunCycleDomainResolvesTorrentURLRedirectToMagnet(t *testing.T) {
 		t.Fatalf("DownloadsStarted = %d, want 1", stats.DownloadsStarted)
 	}
 }
+
+// TestFetchTorrentErrorNamesTheHostAndPort: all the indexers can live on one
+// machine (Jackett on 9117, Prowlarr on 9696, a Torznab service on 9118), so a
+// 502 must say which one answered. The path and query carry the API key and
+// must stay out of the message.
+func TestFetchTorrentErrorNamesTheHostAndPort(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer server.Close()
+
+	engine := NewEngine()
+	_, _, err := engine.FetchTorrent(context.Background(), server.URL+"/api/v2.0/indexers/tracker/results/torrents?apikey=SECRET")
+	if err == nil {
+		t.Fatal("a 502 must be an error")
+	}
+	host := strings.TrimPrefix(server.URL, "http://")
+	if !strings.Contains(err.Error(), host) {
+		t.Fatalf("error %q does not name %s", err, host)
+	}
+	if strings.Contains(err.Error(), "SECRET") || strings.Contains(err.Error(), "/api/") {
+		t.Fatalf("error %q leaks the URL path or the API key", err)
+	}
+}

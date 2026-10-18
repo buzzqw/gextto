@@ -58,12 +58,18 @@ func TestParseReleaseSeasonFormats(t *testing.T) {
 // download the pack for nothing.
 func TestParseInProgressPackBoundsTheRange(t *testing.T) {
 	cases := []struct {
-		title  string
-		season int64
-		last   int64
+		title     string
+		season    int64
+		last      int64
+		available int64
 	}{
-		{"Marshals: A Yellowstone Story - Stagione 2 (2026) [IN CORSO 02/18] 1080p H264 ITA ENG EAC3 5.1 MULTISUB", 2, 2},
-		{"Dark Matter - Stagione 2 (2026) [IN CORSO 08/10] 1080p H265 ITA ENG EAC3 5.1 Atmos MULTISUB", 2, 8},
+		{"Marshals: A Yellowstone Story - Stagione 2 (2026) [IN CORSO 02/18] 1080p H264 ITA ENG EAC3 5.1 MULTISUB", 2, 2, 2},
+		{"Dark Matter - Stagione 2 (2026) [IN CORSO 08/10] 1080p H265 ITA ENG EAC3 5.1 Atmos MULTISUB", 2, 8, 8},
+		// The forms the Italian sites actually use: the count sits in its own
+		// brackets, and the total may be unknown.
+		{"VisionQuest - Stagione 1 (2026) [IN CORSO][02/08] 1080p H264 ITA ENG EAC3 SUB ITA ENG", 1, 2, 2},
+		{"Slow Horses - Stagione 6 (2026) [IN CORSO] [05/06] 1080p H264 ITA AC3 ENG EAC3 SUB ITA ENG", 6, 5, 5},
+		{"Marshals: A Yellowstone Story - Stagione 2 (2026) [IN CORSO][02/??] 1080p H264 ITA ENG EAC3 SUB ITA ENG", 2, 2, 2},
 	}
 	for _, tc := range cases {
 		release := ParseRelease(tc.title, parserTestMagnet, "test")
@@ -72,6 +78,9 @@ func TestParseInProgressPackBoundsTheRange(t *testing.T) {
 		}
 		if !release.IsPack || len(release.EpisodeRange) != int(tc.last) || release.EpisodeRange[len(release.EpisodeRange)-1] != tc.last {
 			t.Fatalf("%q: range %v (pack=%v), want 1..%d", tc.title, release.EpisodeRange, release.IsPack, tc.last)
+		}
+		if release.InProgressEpisodes != tc.available {
+			t.Fatalf("%q: declared episodes = %d, want %d", tc.title, release.InProgressEpisodes, tc.available)
 		}
 	}
 }

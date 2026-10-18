@@ -273,18 +273,39 @@ per day. Torrent log lines carry an `acq:` ID and are stored in `acquisition_eve
 *Downloading* entry counts unfinished torrents plus active HTTP, not seeds.
 
 **Speed policies.** Manual limits, a per-weekday schedule with one choice per day (Off,
-Limit or Auto), and a temporary override (numeric or Auto). Auto leaves the line uncapped
-so the peak can be learned; a temporary Auto wins over everything and is the sibling of
-the numeric temporary limit.
+Limit or Auto), and a temporary override (numeric or Auto). Auto leaves the line to the
+guided tuning: the latency guard may cap it while the ping is high and ramps it back up
+when the line is at rest, so the peak is learned when the guard is free. A temporary Auto
+wins over everything and is the sibling of the numeric temporary limit.
 
 **Latency guard (Auto respects latency, on by default).** While Auto is in force,
-`latency_guard.go` probes a public host every 2 s. On a high latency (or an unknown idle
-reference) it backs Gextto off to 60 % for 8 s: a falling latency means the queue was its
-own (reference kept for 6 h, 10 min cooldown); a latency that stays high means someone
-else is on the line, and the guard yields with AIMD caps lifted after a calm minute. The
-router's UPnP WAN counters decide first when they answer. The Downloads badge shows
-latency, reference and caps; `GET /api/torrents/temp-limits` carries `latency_guard`.
-Measurements: [`measurements.md`](measurements.md) §4.5.
+`latency_guard.go` probes Google and Cloudflare every 2 s (8.8.8.8, 8.8.4.4, 1.1.1.1 and
+1.0.0.1 on port 443, TCP connect) and takes the **lowest** RTT: one server being far,
+slow or unreachable cannot fake a bad line. The current latency is the median of the
+last five samples (10 s); the idle reference is a trial's measure, kept for 6 h, or the
+lowest of the 10-minute window. A high latency (above `baseline × 1.5` **and**
+`baseline + 20 ms`) starts an 8 s trial at 60 %; after it the controller ramps **up**
+(+25 % or 512/64 KiB/s every 3 s) while the ping is good and cuts 15 % when it degrades,
+with floors of 128 KiB/s down and 64 KiB/s up. It does not release just because the
+latency fell: that is the moment the line can be pushed again. The ceiling is the
+**line maximum entered by the user** (`torrent_line_max_down_kib`, `_up_kib`; 0 =
+unknown), or twice the rate actually delivered when the line is unknown — there is no
+hard-coded speed cap. An idle line or leaving Auto drops the cap.
+
+The router is optional: `torrent_auto_latency_source` is `both` (default: the ping
+decides, the UPnP WAN counters are only a diagnostic), `ping` (the router is not read at
+all), or `router` (legacy: yield only to the devices the router sees, release when they
+leave). Background noise below 256 KiB/s is not "someone else"; the detector needs a
+majority of five reads. Peaks below 128 KiB/s are not recorded, so a dead swarm cannot
+become the tuning's ceiling. The first cap of a session is logged at once with the
+speed, the line maximum and the ping; the periodic line adopts it as its last
+one, so the same numbers are not repeated. After that the autotune line is
+printed at most once a minute, only when the speed changes by at least 10 % and
+the trend confirms it (a small reversal waits, a reversal of 20 % or more is
+logged). The Downloads badge
+shows latency, reference and caps; `GET /api/torrents/temp-limits` carries
+`latency_guard`. Measurements: [`measurements.md`](measurements.md) §4.5 (historical
+figures, from the trial/router design).
 
 **Streaming and DLNA.** The streaming endpoint sends the `Content-Type` from the file
 extension, answers HEAD and refcounts readers per file. The DLNA/UPnP server is opt-in:
@@ -617,14 +638,14 @@ recovered from a shell without editing the database.
 - **DLNA**: transcoding, frames extracted from the video (no ffmpeg), search and
   Xbox/WMP (`X_MS_MediaReceiverRegistrar`) are missing; browsing, Range playback,
   subtitles, library folders and artwork are in place (§3).
-- **Latency guard: what the trials cannot see.** A trial tells "Gextto's own queue"
-  from "someone else filling the line". It cannot see a user of little bandwidth
-  who only needs a low latency (a call, a game), because they fill no queue. The
-  router's WAN counters see them; without counters such a user is not protected.
-  Gate: a measurement with a real call or game next to a saturated download, on a
-  line with and without counters. The release after the others stop was measured at
-  2 min 4 s with a 2-minute calm spell; the 60 s in force is pinned by tests, a
-  physical re-measure is still to do.
+- **Latency guard: what a ping cannot see.** A latency probe tells a full queue from a
+  good line, but it cannot tell who filled it: a user of little bandwidth who only needs
+  a low latency (a call, a game) fills no queue. In `both`/`router` the router's WAN
+  counters see that user; in `ping` the router is deliberately not read, so such a user
+  is not protected (the operator chose to tune on the ping alone). Gate: a measurement
+  with a real call or game next to a saturated download, in `both` and in `ping`. The
+  current controller no longer releases after a calm spell at the ceiling: it keeps the
+  cap while Auto is on and drops it when the line is idle or Auto ends.
 - **DHT feeds**: the resolver exists, the **publisher** side (signing a feed) does not,
   and the BEP 44 outgoing client has no consumer yet (§4.7 of [`measurements.md`](measurements.md)).
 - **WebTorrent/WebRTC**: the WebSocket tracker's practical value stays limited until

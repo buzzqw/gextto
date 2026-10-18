@@ -501,6 +501,39 @@ func TestRejectsPartialPackWhenAnyDeclaredEpisodeIsMissing(t *testing.T) {
 	}
 }
 
+// A pack downloaded only in part on purpose (file priority 0) is valid: the
+// files that are present are enough, as long as they belong to the declared
+// season/episode range.
+func TestAcceptsPartialPackWhenEpisodesWereDeliberatelySkipped(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "Example.S03E02.mkv"), []byte("two"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	release := models.Release{
+		Title:           "Example.S03E01-02.1080p.WEB-DL",
+		Magnet:          "magnet:?xt=urn:btih:0123456789012345678901234567890123456789",
+		Source:          "test",
+		Quality:         models.Quality{},
+		Kind:            "series",
+		Series:          stringPtr("Example"),
+		Season:          int64Ptr(3),
+		Episode:         int64Ptr(1),
+		IsPack:          true,
+		EpisodeRange:    []int64{1, 2},
+		SkippedEpisodes: []int64{1},
+		Seeders:         -1,
+		Peers:           -1,
+		DiscoveredAt:    time.Now().UTC(),
+	}
+	files, err := MatchingPackFiles(root, &release)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0].Episode != 2 {
+		t.Fatalf("matched %v, want only episode 2", files)
+	}
+}
+
 func TestVideoFilesIncludeLegacyWebmAndWmvExtensions(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "Example.S01E01.webm"), []byte("webm"), 0o644); err != nil {

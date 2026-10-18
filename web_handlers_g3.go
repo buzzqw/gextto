@@ -139,8 +139,14 @@ func CleanTrash(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	files, byteCount, err := gh3RemoveTrashContents(trashPath, retentionDays)
 	if err != nil {
+		logging.Warn("trash cleanup failed", "path", trashPath, "error", err.Error())
 		jsonStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
 		return
+	}
+	if files > 0 {
+		logging.Info(fmt.Sprintf("🗑️ Cestino svuotato — %d elementi rimossi · %s", files, logging.HumanBytes(byteCount)), "path", trashPath)
+	} else {
+		logging.Info("🗑️ Cestino già vuoto", "path", trashPath)
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":             true,
@@ -262,6 +268,12 @@ func DeleteTrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 		removed++
 		byteCount += size
 		removedNames = append(removedNames, name)
+	}
+	if removed > 0 {
+		logging.Info(fmt.Sprintf("🗑️ Cestino svuotato — %d elementi rimossi · %s", removed, logging.HumanBytes(byteCount)), "path", root)
+	}
+	if len(errors) > 0 {
+		logging.Warn("trash cleanup left some entries", "path", root, "failed", len(errors), "names", strings.Join(errors, ", "))
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":      true,

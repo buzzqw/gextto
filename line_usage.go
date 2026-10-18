@@ -30,11 +30,15 @@ const (
 	lineUsageDefaultOverhead = 0.05
 	lineUsageMaxOverhead     = 0.15
 	// lineUsageOthersMinBytes and lineUsageOthersShare decide that someone
-	// else is on the line: their traffic is above both.
-	lineUsageOthersMinBytes = 48 << 10
+	// else is on the line: their traffic is above both. 256 KiB/s keeps
+	// background noise (phone sync, DNS, a firmware check, a notification)
+	// from being mistaken for a person using the line; a video call or a
+	// streaming session is well above it.
+	lineUsageOthersMinBytes = 256 << 10
 	lineUsageOthersShare    = 0.02
-	// lineUsageVotes: the others count as present in 2 of the last 3 reads.
-	lineUsageVotes = 3
+	// lineUsageVotes: the others count as present in a majority of the last
+	// five reads (20 s), so a short burst cannot move the caps.
+	lineUsageVotes = 5
 )
 
 // wanCounters reads the router's total WAN bytes.
