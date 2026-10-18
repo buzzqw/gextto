@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -207,5 +208,51 @@ func TestFetchTorrentErrorCarriesTheProxyReason(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "\n") {
 		t.Fatalf("error %q is not one line", err)
+	}
+}
+
+// A "no magnet for this request" answer is not a dead link: mircrew says it for
+// a topic whose magnet is not stored yet (the first post must be thanked), and
+// the link becomes usable as soon as that changes.
+func TestFetchTorrentNoMagnetIsTransient(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("no magnet for this request"))
+	}))
+	defer server.Close()
+
+	engine := NewEngine()
+	_, _, err := engine.FetchTorrent(context.Background(), server.URL+"/dl/235774.torrent")
+	if !errors.Is(err, errTorrentNotAvailable) {
+		t.Fatalf("404 no-magnet should be transient, got %v", err)
+	}
+}
+
+// A login that needs renewing is a source-wide transient too, not a dead link.
+func TestFetchTorrentLoginFailureIsTransient(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte("magnet not available: MirCrew login failed: credenziali rifiutate"))
+	}))
+	defer server.Close()
+
+	engine := NewEngine()
+	_, _, err := engine.FetchTorrent(context.Background(), server.URL+"/dl/topic")
+	if !errors.Is(err, errTorrentNotAvailable) {
+		t.Fatalf("a login failure should be transient, got %v", err)
+	}
+}
+
+// A plain 404 is still a dead link: the quarantine must keep working.
+func TestFetchTorrentPlainNotFoundIsNotTransient(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	engine := NewEngine()
+	_, _, err := engine.FetchTorrent(context.Background(), server.URL+"/dl/gone")
+	if err == nil || errors.Is(err, errTorrentNotAvailable) {
+		t.Fatalf("a plain 404 should stay a dead link, got %v", err)
 	}
 }

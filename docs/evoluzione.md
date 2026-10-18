@@ -125,12 +125,16 @@ and skipped before the score, so it cannot win over a working alternative. The
 wait grows with the strikes — 6 hours, 24 hours, then a week — and stays short
 at first so a repaired indexer is noticed the same day; a success deletes the
 row. Failures inside the same cycle (the archive and a feed proposing the same
-release) count once. A source that fails on two different links in one cycle is
-reported on its own: a warning in the log and, at most every 12 hours, a
-notification naming the source and the action — sign in again (mircrew answers
-502 with "MirCrew login failed: credenziali rifiutate") and, until it works,
-disable that indexer in the searches. A link that resolves re-arms the source
-(`indexer_failure.go`).
+release) count once. An answer that means "not now" is not a strike: mircrew's
+404 `no magnet for this request` (the topic's magnet is hidden until its first
+post is thanked) and a login failure both leave the link eligible and retry it
+on the next cycle (`errTorrentNotAvailable`), so a valid release is not hidden
+for hours by a transient state. A source that fails on two different links in
+one cycle is reported on its own: a warning in the log and, at most every 12
+hours, a notification naming the source and the action — sign in again
+(mircrew answers 502 with "MirCrew login failed: credenziali rifiutate") and,
+until it works, disable that indexer in the searches. A link that resolves
+re-arms the source (`indexer_failure.go`).
 
 Changing a score weight from the settings page or the API leaves every stored score
 computed with the old weights, which would look like a genuine improvement and

@@ -16,6 +16,7 @@ package gextto
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -800,6 +801,18 @@ func RunCycleDomain(
 			if release.TorrentURL != nil {
 				magnet, path, err := resolveTorrentURL(ctx, engine, cfg, *release.TorrentURL, &release.Title)
 				if err != nil {
+					if errors.Is(err, errTorrentNotAvailable) {
+						// The indexer knows the release but cannot serve it yet
+						// (mircrew: "no magnet for this request" until the topic
+						// is thanked, or a login that needs renewing). It is not
+						// a dead link: keep it eligible, no cycle error and no
+						// strike. The next cycle retries it.
+						logging.Debug("torrent link not available yet",
+							"target", releaseTarget(&release),
+							"source", release.Source,
+							"error", err)
+						continue
+					}
 					// Two failures in different cycles mean the link is dead:
 					// quarantine it so the archive stops proposing it (and the
 					// cycle stops counting it as an error) until the retry.

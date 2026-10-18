@@ -144,7 +144,15 @@ func (e *Engine) FetchTorrent(ctx context.Context, rawURL string) ([]byte, strin
 			// query are left out: they carry the API key.
 			host = parsed.Host
 		}
-		if reason := torrentFetchFailureReason(resp.Body); reason != "" {
+		reason := torrentFetchFailureReason(resp.Body)
+		if torrentFetchTransient(resp.StatusCode, reason) {
+			// The source knows the release but cannot serve it right now:
+			// mircrew answers 404 "no magnet for this request" for a topic
+			// whose magnet it has not stored (the first post must be thanked),
+			// and 502 when its login needs renewing. That is not a dead link.
+			return nil, "", fmt.Errorf("%w: HTTP %d from %s: %s", errTorrentNotAvailable, resp.StatusCode, host, reason)
+		}
+		if reason != "" {
 			// The proxy's own words ("MirCrew login failed: …") say what to do;
 			// a bare status code makes the operator guess.
 			return nil, "", fmt.Errorf("HTTP %d fetching torrent from %s: %s", resp.StatusCode, host, reason)
@@ -160,6 +168,24 @@ func (e *Engine) FetchTorrent(ctx context.Context, rawURL string) ([]byte, strin
 		return nil, trimmedPayload, nil
 	}
 	return payload, "", nil
+}
+
+// errTorrentNotAvailable marks a link the source knows but cannot serve right
+// now: mircrew answers 404 "no magnet for this request" for a topic whose
+// magnet it has not stored (the first post must be thanked), and 502 when its
+// login needs renewing. Neither means the link is dead: it must stay eligible
+// and must not be quarantined.
+var errTorrentNotAvailable = errors.New("torrent not available yet")
+
+// torrentFetchTransient reports whether the source's own answer is "not now"
+// rather than "this link is dead".
+func torrentFetchTransient(status int, reason string) bool {
+	lower := strings.ToLower(reason)
+	if status == http.StatusNotFound && strings.Contains(lower, "no magnet") {
+		return true
+	}
+	return strings.Contains(lower, "login") &&
+		(strings.Contains(lower, "failed") || strings.Contains(lower, "credenziali"))
 }
 
 // torrentFetchFailureReason is the readable cause a failed `.torrent` download
