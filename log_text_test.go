@@ -55,6 +55,41 @@ func TestLogTargetReadsLikeAPerson(t *testing.T) {
 	}
 }
 
+func TestEpisodeRangeLabelCompactsConsecutiveEpisodes(t *testing.T) {
+	cases := []struct {
+		episodes []int64
+		want     string
+	}{
+		{[]int64{1, 2, 3, 5}, "S01E01–S01E03, S01E05"},
+		{[]int64{2, 1, 2}, "S01E01–S01E02"},
+		{[]int64{7}, "S01E07"},
+		{nil, ""},
+	}
+	for _, tc := range cases {
+		if got := episodeRangeLabel(1, tc.episodes); got != tc.want {
+			t.Fatalf("episodeRangeLabel(%v) = %q, want %q", tc.episodes, got, tc.want)
+		}
+	}
+}
+
+func TestUpgradeSourceTextNamesTheLibraryCopy(t *testing.T) {
+	series := "Criminal Record"
+	season := int64(1)
+	episode := int64(0)
+	release := &models.Release{
+		Kind: "series", Series: &series, Season: &season, Episode: &episode,
+		EpisodeRange: []int64{1, 2, 3},
+	}
+	old := models.Quality{Resolution: "480p", Codec: "h264", Audio: "aac", Language: "ita"}
+	index := &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}}
+	index.Best[[2]int64{1, 1}] = models.ArchiveQuality{Quality: old, Score: 125}
+	index.Best[[2]int64{1, 2}] = models.ArchiveQuality{Quality: old, Score: 125}
+	want := "S01E01–S01E02 480p h264 aac ITA (score 125), S01E03 not in the library"
+	if got := upgradeSourceText(index, release); got != want {
+		t.Fatalf("upgradeSourceText = %q, want %q", got, want)
+	}
+}
+
 func TestCycleReportTextIsReadable(t *testing.T) {
 	stats := &models.CycleStats{Scraped: 3612, Candidates: 183, DownloadsStarted: 5, GapsFilled: 1}
 	want := "📊 Search finished in 5 minutes: 3,612 releases checked, 183 matched your titles, 5 downloads started (5 upgrades, 1 missing episode filled)"
@@ -133,6 +168,22 @@ func TestMediaInfoBackfillTextNamesTheFiles(t *testing.T) {
 	}
 	if mediaInfoBackfillText(nil, 0, 0) != "" {
 		t.Fatal("an empty run must not log")
+	}
+}
+
+func TestMediaInfoMismatchTextNamesTheRecordedRelease(t *testing.T) {
+	recorded := models.Quality{Resolution: "1080p", Codec: "h265", Audio: "ac3"}
+	onDisk := models.Quality{Resolution: "480p", Codec: "h264", Audio: "aac"}
+	got := mediaInfoMismatchText("Criminal Record S01E01", recorded, onDisk)
+	want := "🔎 «Criminal Record S01E01»: the library file is 480p h264 aac, the recorded release says 1080p h265 ac3; the file wins"
+	if got != want {
+		t.Fatalf("mismatch = %q, want %q", got, want)
+	}
+	if got := mediaInfoMismatchText("Show S01E01", recorded, recorded); got != "" {
+		t.Fatalf("equal qualities logged a mismatch: %q", got)
+	}
+	if got := mediaInfoMismatchText("Show S01E01", models.Quality{}, onDisk); got != "" {
+		t.Fatalf("a title without quality logged a mismatch: %q", got)
 	}
 }
 

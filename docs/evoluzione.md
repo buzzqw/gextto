@@ -115,6 +115,17 @@ user-initiated pack keeps the broad range. The content the pack physically holds
 still only known at import (`StagePackFile`), where a pack whose every file is worse
 than the library copy is rejected and its source moved to the trash.
 
+While a pack is downloading, the optional inspection (`pack_inspection`) reads its
+file list as soon as the metadata arrives and compares it episode by episode with
+the library: a pack with nothing useful is removed and **its upgrade backup is
+restored**, so the row of a discarded release does not stay in the library with the
+score of the pack that was thrown away. A partly useful pack downloads only the
+wanted files (`pack_inspection_prioritize`). The log names both sides of every
+verdict (existing quality/score against the candidate) and lists the kept and
+skipped episodes, and a metadata wait reports peers, received bytes and the
+absolute start of the current wait, so a restarted ten-minute counter is not
+mistaken for a loop.
+
 **A dead `.torrent` link is left alone.** A release that only offers an HTTP
 `.torrent` link (no magnet) is unusable when the link keeps failing — an indexer
 whose session is expired, a proxy answering 502, a torrent withdrawn from the

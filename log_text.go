@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -203,6 +204,113 @@ func friendlyQuality(quality models.Quality) string {
 		return "unknown quality"
 	}
 	return strings.Join(parts, " ")
+}
+
+// qualityDetailText is the fuller quality label used when the log has to
+// explain a comparison: resolution, source, codec, audio, HDR and language.
+// Unlike friendlyQuality it keeps the codec/audio fields, and it drops the
+// parser's literal "unknown" placeholders instead of printing them twice.
+func qualityDetailText(quality models.Quality) string {
+	value := func(raw string) string {
+		raw = strings.TrimSpace(raw)
+		if raw == "" || strings.EqualFold(raw, "unknown") {
+			return ""
+		}
+		return raw
+	}
+	parts := make([]string, 0, 6)
+	for _, raw := range []string{quality.Resolution, quality.Source, quality.Codec, quality.Audio} {
+		if field := value(raw); field != "" {
+			parts = append(parts, field)
+		}
+	}
+	if quality.IsDV {
+		parts = append(parts, "Dolby Vision")
+	} else if hdr := value(quality.HDR); hdr != "" {
+		parts = append(parts, strings.ToUpper(hdr))
+	}
+	if language := value(quality.Language); language != "" {
+		parts = append(parts, strings.ToUpper(language))
+	}
+	if len(parts) == 0 {
+		return "unknown quality"
+	}
+	return strings.Join(parts, " ")
+}
+
+// episodeRangeLabel names a set of episodes compactly: "S01E01", "S01E01–S01E02"
+// or "S01E01, S01E03". Consecutive episodes share one range, so a pack log line
+// stays readable even when it covers a whole season.
+func episodeRangeLabel(season int64, episodes []int64) string {
+	if len(episodes) == 0 {
+		return ""
+	}
+	ordered := append([]int64(nil), episodes...)
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i] < ordered[j] })
+	unique := ordered[:0]
+	for _, episode := range ordered {
+		if len(unique) == 0 || unique[len(unique)-1] != episode {
+			unique = append(unique, episode)
+		}
+	}
+	parts := make([]string, 0, len(unique))
+	start, previous := unique[0], unique[0]
+	flush := func() {
+		if start == previous {
+			parts = append(parts, fmt.Sprintf("S%02dE%02d", season, start))
+			return
+		}
+		parts = append(parts, fmt.Sprintf("S%02dE%02d–S%02dE%02d", season, start, season, previous))
+	}
+	for _, episode := range unique[1:] {
+		if episode == previous+1 {
+			previous = episode
+			continue
+		}
+		flush()
+		start, previous = episode, episode
+	}
+	flush()
+	return strings.Join(parts, ", ")
+}
+
+// upgradeSourceText describes what is already in the library for the episodes
+// a release would replace, e.g. "S01E01–S01E02 480p h264 aac ITA (125)".
+// It turns "better version than the one you have" into a statement that names
+// both sides of the comparison.
+func upgradeSourceText(archive *models.ArchiveQualityIndex, release *models.Release) string {
+	if archive.IsEmpty() || release == nil || release.Kind != "series" || release.Season == nil {
+		return ""
+	}
+	episodes := release.EpisodeRange
+	if len(episodes) == 0 && release.Episode != nil && *release.Episode > 0 {
+		episodes = []int64{*release.Episode}
+	}
+	if len(episodes) == 0 {
+		return ""
+	}
+	order := make([]string, 0, len(episodes))
+	groups := map[string][]int64{}
+	for _, episode := range episodes {
+		existing, onDisk := archive.BestFor(*release.Season, episode)
+		label := "not in the library"
+		if onDisk {
+			label = fmt.Sprintf("%s (score %d)", qualityDetailText(existing.Quality), existing.Score)
+		}
+		if _, seen := groups[label]; !seen {
+			order = append(order, label)
+		}
+		groups[label] = append(groups[label], episode)
+	}
+	parts := make([]string, 0, len(order))
+	for _, label := range order {
+		parts = append(parts, episodeRangeLabel(*release.Season, groups[label])+" "+label)
+		if len(parts) == 4 && len(order) > 4 {
+			parts = append(parts, fmt.Sprintf("+%d more", len(order)-4))
+			break
+		}
+	}
+	return strings.Join(parts, ", ")
 }
 
 // skipReasonText explains why a candidate was not downloaded.
@@ -436,6 +544,31 @@ func recordTorrentErrorNotice(hash, kind string, now time.Time) bool {
 	}
 	torrentErrorNotices.last[key] = now
 	return true
+}
+
+// mediaInfoMismatchText explains a file whose real quality differs from the
+// release title stored in the database. It is the line that makes a stale
+// upgrade row visible: "the file says 480p h264, the recorded release says
+// 1080p h265; the file wins". Empty when the two agree or the title carries no
+// quality at all.
+func mediaInfoMismatchText(name string, recorded, onDisk models.Quality) string {
+	known := func(value string) bool {
+		value = strings.TrimSpace(value)
+		return value != "" && !strings.EqualFold(value, "unknown")
+	}
+	different := func(a, b string) bool {
+		return known(a) && known(b) && !strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
+	}
+	if !known(recorded.Resolution) {
+		return ""
+	}
+	if !different(recorded.Resolution, onDisk.Resolution) &&
+		!different(recorded.Codec, onDisk.Codec) &&
+		!different(recorded.Audio, onDisk.Audio) {
+		return ""
+	}
+	return fmt.Sprintf("🔎 «%s»: the library file is %s, the recorded release says %s; the file wins",
+		name, qualityDetailText(onDisk), qualityDetailText(recorded))
 }
 
 // mediaInfoBackfillText summarises a MediaInfo backfill run: which library

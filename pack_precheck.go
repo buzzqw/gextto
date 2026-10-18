@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -139,10 +140,84 @@ func packEpisodesFromPaths(names []string, season int64) (map[int64]struct{}, in
 	return found, videos, nil
 }
 
-// packEpisodesUseful reports whether at least one episode the torrent carries
-// is worth downloading: a gap, an episode missing from the library, or one the
-// release would really upgrade. A pack whose files are all already better on
-// disk is useless even when its title promises the whole season.
+// packEpisodeDecision is the verdict for one episode inside a pack. Keeping
+// the per-episode detail (not only the boolean) is what lets the logs say why
+// a pack was kept or thrown away instead of just reporting a count.
+type packEpisodeDecision struct {
+	Episode  int64
+	Keep     bool
+	Reason   string
+	Existing models.ArchiveQuality
+	OnDisk   bool
+}
+
+// packEpisodeDecisions reports, episode by episode, whether the pack carries
+// something worth downloading: a gap, an episode missing from the library, or
+// one the release would really upgrade. A pack whose files are all already
+// better on disk is useless even when its title promises the whole season.
+func packEpisodeDecisions(
+	release *models.Release,
+	found map[int64]struct{},
+	needed map[int64]struct{},
+	archiveIndex *models.ArchiveQualityIndex,
+	releaseScore, upgradeMinScoreDiff, upgradeUntilScore int64,
+	forbidUpgrade bool,
+) []packEpisodeDecision {
+	if release == nil || release.Season == nil || len(found) == 0 {
+		return nil
+	}
+	season := *release.Season
+	episodes := make([]int64, 0, len(found))
+	for episode := range found {
+		episodes = append(episodes, episode)
+	}
+	sort.Slice(episodes, func(i, j int) bool { return episodes[i] < episodes[j] })
+
+	decisions := make([]packEpisodeDecision, 0, len(episodes))
+	for _, episode := range episodes {
+		decision := packEpisodeDecision{Episode: episode}
+		if _, ok := needed[episode]; ok {
+			decision.Keep = true
+			decision.Reason = "missing from the library"
+			decisions = append(decisions, decision)
+			continue
+		}
+		if forbidUpgrade {
+			decision.Reason = "upgrades disabled for this title"
+			decisions = append(decisions, decision)
+			continue
+		}
+		existing, onDisk := archiveIndex.BestFor(season, episode)
+		decision.Existing = existing
+		decision.OnDisk = onDisk
+		if !onDisk {
+			decision.Keep = true
+			decision.Reason = "not in the library"
+			decisions = append(decisions, decision)
+			continue
+		}
+		if upgradeUntilScore > 0 && existing.Score >= upgradeUntilScore {
+			decision.Reason = fmt.Sprintf("score at or above the upgrade limit (%d)", upgradeUntilScore)
+			decisions = append(decisions, decision)
+			continue
+		}
+		// Use the same semantic rules as the acquisition decision: a DV/HDR
+		// release or a WEB-DL over a WEBRip is an upgrade even when the numeric
+		// score delta is small.
+		if reason := release.Quality.UpgradeReason(&existing.Quality, releaseScore, existing.Score, upgradeMinScoreDiff); reason != "" {
+			decision.Keep = true
+			decision.Reason = "upgrade: " + reason
+			decisions = append(decisions, decision)
+			continue
+		}
+		decision.Reason = "already equal or better"
+		decisions = append(decisions, decision)
+	}
+	return decisions
+}
+
+// packEpisodesUseful reports whether at least one of the decisions keeps an
+// episode: it is the compact form used where only the verdict matters.
 func packEpisodesUseful(
 	release *models.Release,
 	found map[int64]struct{},
@@ -151,34 +226,50 @@ func packEpisodesUseful(
 	releaseScore, upgradeMinScoreDiff, upgradeUntilScore int64,
 	forbidUpgrade bool,
 ) bool {
-	if release == nil || release.Season == nil || len(found) == 0 {
-		return false
-	}
-	season := *release.Season
-	for episode := range needed {
-		if _, ok := found[episode]; ok {
-			return true
-		}
-	}
-	if forbidUpgrade {
-		return false
-	}
-	for episode := range found {
-		existing, onDisk := archiveIndex.BestFor(season, episode)
-		if !onDisk {
-			return true
-		}
-		if upgradeUntilScore > 0 && existing.Score >= upgradeUntilScore {
-			continue
-		}
-		// Use the same semantic rules as the acquisition decision: a DV/HDR
-		// release or a WEB-DL over a WEBRip is an upgrade even when the numeric
-		// score delta is small.
-		if qualityUpgradeAllowed(&release.Quality, &existing.Quality, releaseScore, existing.Score, upgradeMinScoreDiff) {
+	for _, decision := range packEpisodeDecisions(release, found, needed, archiveIndex, releaseScore, upgradeMinScoreDiff, upgradeUntilScore, forbidUpgrade) {
+		if decision.Keep {
 			return true
 		}
 	}
 	return false
+}
+
+// packDecisionDetails renders the per-episode comparison for the log, e.g.
+// "S01E03 1080p h265 AC3 (1880) vs 1080p h264 AC3 (1550): already equal or
+// better". limit caps the list so a 24-episode pack cannot flood the log.
+func packDecisionDetails(season int64, releaseQuality models.Quality, releaseScore int64, decisions []packEpisodeDecision, limit int) string {
+	if len(decisions) == 0 {
+		return ""
+	}
+	if limit <= 0 || limit > len(decisions) {
+		limit = len(decisions)
+	}
+	parts := make([]string, 0, limit+1)
+	for index, decision := range decisions {
+		if index >= limit {
+			parts = append(parts, fmt.Sprintf("+%d more", len(decisions)-limit))
+			break
+		}
+		label := fmt.Sprintf("S%02dE%02d", season, decision.Episode)
+		if decision.Keep {
+			if !decision.OnDisk {
+				parts = append(parts, label+" "+decision.Reason)
+				continue
+			}
+			parts = append(parts, fmt.Sprintf("%s %s (score %d) → %s (score %d): %s",
+				label, qualityDetailText(decision.Existing.Quality), decision.Existing.Score,
+				qualityDetailText(releaseQuality), releaseScore, decision.Reason))
+			continue
+		}
+		if decision.OnDisk {
+			parts = append(parts, fmt.Sprintf("%s %s (score %d) vs %s (score %d): %s",
+				label, qualityDetailText(decision.Existing.Quality), decision.Existing.Score,
+				qualityDetailText(releaseQuality), releaseScore, decision.Reason))
+			continue
+		}
+		parts = append(parts, label+" "+decision.Reason)
+	}
+	return strings.Join(parts, " · ")
 }
 
 // incompletePackReason reports why an in-progress pack must not be downloaded.
@@ -219,15 +310,24 @@ func incompletePackReason(
 	for _, episode := range neededEpisodes {
 		needed[episode] = struct{}{}
 	}
-	if packEpisodesUseful(release, found, needed, archiveIndex, releaseScore, upgradeMinScoreDiff, upgradeUntilScore, forbidUpgrade) {
-		return "", nil
+	decisions := packEpisodeDecisions(release, found, needed, archiveIndex, releaseScore, upgradeMinScoreDiff, upgradeUntilScore, forbidUpgrade)
+	for _, decision := range decisions {
+		if decision.Keep {
+			return "", nil
+		}
 	}
+	var reason string
 	if len(neededEpisodes) > 0 {
-		return fmt.Sprintf("the torrent holds none of the missing episodes (%s): it has %d of %d declared, already present in equal or better quality",
-			episodeList(neededEpisodes), len(found), release.InProgressEpisodes), nil
+		reason = fmt.Sprintf("the torrent holds none of the missing episodes (%s): it has %d of %d declared, already present in equal or better quality",
+			episodeList(neededEpisodes), len(found), release.InProgressEpisodes)
+	} else {
+		reason = fmt.Sprintf("no useful episode: the torrent holds %d of %d declared, already present in equal or better quality",
+			len(found), release.InProgressEpisodes)
 	}
-	return fmt.Sprintf("no useful episode: the torrent holds %d of %d declared, already present in equal or better quality",
-		len(found), release.InProgressEpisodes), nil
+	if details := packDecisionDetails(*release.Season, release.Quality, releaseScore, decisions, 8); details != "" {
+		reason += " · " + details
+	}
+	return reason, nil
 }
 
 // episodeList renders a short list of episodes for the log.

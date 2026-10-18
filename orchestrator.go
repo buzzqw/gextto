@@ -1078,6 +1078,11 @@ func RunCycleDomain(
 			if cfg.DryRun {
 				logMessage = fmt.Sprintf("🧪 Test mode: would download %s — %s (%s)", logTarget(&release), why, friendlyQuality(release.Quality))
 			}
+			if approvalReason == "upgrade" {
+				if from := upgradeSourceText(approvalContext.Archive, &release); from != "" {
+					logMessage += " · from: " + from
+				}
+			}
 			if destination := downloadDestinationLabel(cfg, preferredPath); destination != "" {
 				logMessage += " → " + destination
 			}

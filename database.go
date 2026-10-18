@@ -171,6 +171,10 @@ type MediaInfoBackfillTarget struct {
 	Name    string `json:"name"`
 	Year    *int64 `json:"year"`
 	Path    string `json:"path"`
+	// Title is the release title stored with the row. It may still name a
+	// release that was later replaced, so it is only used to explain the
+	// difference against the file that is actually on disk.
+	Title string `json:"title,omitempty"`
 }
 
 // displayName names the library item for a person: "Show S01E02" or
@@ -2082,20 +2086,21 @@ func (d *Database) MediaInfoBackfillTargets(limit int) ([]MediaInfoBackfillTarge
 		series          string
 		season, episode int64
 		path            string
+		title           string
 	}
 	seriesCandidates := make([]seriesCandidate, 0)
-	rows, err := d.db.Query("SELECT s.name, e.season, e.episode, e.archive_path FROM episodes e JOIN series s ON s.id=e.series_id WHERE COALESCE(e.media_info_json,'')='' AND COALESCE(e.archive_path,'')<>'' ORDER BY e.id DESC")
+	rows, err := d.db.Query("SELECT s.name, e.season, e.episode, e.archive_path, COALESCE(e.title,'') FROM episodes e JOIN series s ON s.id=e.series_id WHERE COALESCE(e.media_info_json,'')='' AND COALESCE(e.archive_path,'')<>'' ORDER BY e.id DESC")
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
-		var series, path string
+		var series, path, title string
 		var season, episode int64
-		if err := rows.Scan(&series, &season, &episode, &path); err != nil {
+		if err := rows.Scan(&series, &season, &episode, &path, &title); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		seriesCandidates = append(seriesCandidates, seriesCandidate{series: series, season: season, episode: episode, path: path})
+		seriesCandidates = append(seriesCandidates, seriesCandidate{series: series, season: season, episode: episode, path: path, title: title})
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
@@ -2114,6 +2119,7 @@ func (d *Database) MediaInfoBackfillTargets(limit int) ([]MediaInfoBackfillTarge
 			Season:  &seasonValue,
 			Episode: &episodeValue,
 			Path:    candidate.path,
+			Title:   candidate.title,
 		})
 		if int64(len(targets)) >= limit64 {
 			return targets, nil
@@ -2122,23 +2128,24 @@ func (d *Database) MediaInfoBackfillTargets(limit int) ([]MediaInfoBackfillTarge
 
 	if len(targets) < limit {
 		type movieCandidate struct {
-			name string
-			year sql.NullInt64
-			path string
+			name  string
+			year  sql.NullInt64
+			path  string
+			title string
 		}
 		movieCandidates := make([]movieCandidate, 0)
-		movieRows, err := d.db.Query("SELECT m.name, m.year, t.processed_path FROM movies m JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE COALESCE(m.media_info_json,'')='' AND COALESCE(t.processed_path,'')<>'' AND m.removed_at IS NULL ORDER BY m.id DESC")
+		movieRows, err := d.db.Query("SELECT m.name, m.year, t.processed_path, COALESCE(NULLIF(m.title,''), m.name, '') FROM movies m JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE COALESCE(m.media_info_json,'')='' AND COALESCE(t.processed_path,'')<>'' AND m.removed_at IS NULL ORDER BY m.id DESC")
 		if err != nil {
 			return nil, err
 		}
 		for movieRows.Next() {
-			var name, path string
+			var name, path, title string
 			var year sql.NullInt64
-			if err := movieRows.Scan(&name, &year, &path); err != nil {
+			if err := movieRows.Scan(&name, &year, &path, &title); err != nil {
 				movieRows.Close()
 				return nil, err
 			}
-			movieCandidates = append(movieCandidates, movieCandidate{name: name, year: year, path: path})
+			movieCandidates = append(movieCandidates, movieCandidate{name: name, year: year, path: path, title: title})
 		}
 		if err := movieRows.Err(); err != nil {
 			movieRows.Close()
@@ -2150,10 +2157,11 @@ func (d *Database) MediaInfoBackfillTargets(limit int) ([]MediaInfoBackfillTarge
 				continue
 			}
 			targets = append(targets, MediaInfoBackfillTarget{
-				Kind: "movie",
-				Name: candidate.name,
-				Year: nullInt64Ptr(candidate.year),
-				Path: candidate.path,
+				Kind:  "movie",
+				Name:  candidate.name,
+				Year:  nullInt64Ptr(candidate.year),
+				Path:  candidate.path,
+				Title: candidate.title,
 			})
 			if int64(len(targets)) >= limit64 {
 				break

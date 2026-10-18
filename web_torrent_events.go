@@ -951,6 +951,14 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 	for _, torrent := range torrents.List() {
 		live[torrent.Hash] = struct{}{}
 		if torrent.HasMetadata {
+			if started, ok := firstSeen[torrent.Hash]; ok {
+				if waited := now.Sub(started); waited >= time.Minute {
+					logging.Info(fmt.Sprintf("✅ «%s»: received the file list after %s; the download can start",
+						torrent.Name, logDuration(waited)), "hash", torrent.Hash,
+						"waited", logDuration(waited), "peers", torrent.NumConnections,
+						"downloaded_bytes", torrent.TotalDone)
+				}
+			}
 			delete(waitStart, torrent.Hash)
 			delete(firstSeen, torrent.Hash)
 			delete(lastWarning, torrent.Hash)
@@ -964,6 +972,15 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 			continue
 		}
 		if torrent.State != "downloading_metadata" {
+			// The wait restarts whenever the torrent leaves the metadata state.
+			// Saying so avoids a log that looks like the same ten minutes
+			// repeating forever after a state flap.
+			if started, ok := firstSeen[torrent.Hash]; ok {
+				if waited := now.Sub(started); waited >= 5*time.Minute {
+					logging.Info(fmt.Sprintf("⏳ «%s»: metadata wait restarted after %s because the state is now %s",
+						torrent.Name, logDuration(waited), torrent.State), "hash", torrent.Hash, "state", torrent.State)
+				}
+			}
 			delete(waitStart, torrent.Hash)
 			delete(firstSeen, torrent.Hash)
 			delete(lastWarning, torrent.Hash)
@@ -1009,8 +1026,11 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 			} else if value {
 				previousWarning := lastWarning[torrent.Hash]
 				if tev_metadataRetryWarningDue(previousWarning, now) {
-					logging.Warn(fmt.Sprintf("⏳ «%s»: after %s nobody has provided its list of files yet; still trying",
-						torrent.Name, logDuration(now.Sub(started))), "hash", torrent.Hash)
+					logging.Warn(fmt.Sprintf("⏳ «%s»: after %s nobody has provided its list of files yet (state %s, peers %d, received %s, since %s); still trying",
+						torrent.Name, logDuration(now.Sub(started)), torrent.State, torrent.NumConnections,
+						logging.HumanBytesI64(torrent.TotalDone), started.Format("15:04:05")),
+						"hash", torrent.Hash, "peers", torrent.NumConnections, "swarm_peers", torrent.NumPeers,
+						"seeds", torrent.NumSeeds, "downloaded_bytes", torrent.TotalDone, "since", started.Format(time.RFC3339))
 					lastWarning[torrent.Hash] = now
 				} else {
 					logging.Debug("torrent metadata retry still pending",

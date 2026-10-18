@@ -137,7 +137,15 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, check
 			forbidUpgrade = series.DisableUpgrades
 		}
 		score := cfg.AcquisitionScore(&candidate.release)
-		if packEpisodesUseful(&candidate.release, found, needed, index, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade) {
+		decisions := packEpisodeDecisions(&candidate.release, found, needed, index, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade)
+		useful := false
+		for _, decision := range decisions {
+			if decision.Keep {
+				useful = true
+				break
+			}
+		}
+		if useful {
 			if packInspectionPrioritizeEnabled(cfg) {
 				if !applyPackFilePriorities(cfg, db, torrents, candidate.torrent.Hash, files, &candidate.release, needed, index, score, forbidUpgrade) {
 					// Let the engine settle after the priority change before
@@ -151,8 +159,31 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, check
 		}
 
 		reason := fmt.Sprintf("no useful episode: it holds %d, already in the library in equal or better quality", len(found))
+		details := packDecisionDetails(*candidate.release.Season, candidate.release.Quality, score, decisions, 12)
+		// The pack may have replaced an existing library row when it was
+		// approved (upgrade backup). Discarding it must put that row back:
+		// otherwise the stale quality of the release we are throwing away
+		// stays in the library and the next inspection compares the pack
+		// with itself.
+		previous, hadPrevious := db.UpgradeReplacedInfo(candidate.torrent.Hash)
+		restored, restoreErr := db.RestoreUpgrade(candidate.torrent.Hash)
+		if restoreErr != nil {
+			logging.Warn("could not restore the version replaced by the discarded pack",
+				"hash", candidate.torrent.Hash, "name", candidate.torrent.Name, "error", restoreErr.Error())
+		}
+		if !restored {
+			if rollbackErr := db.RollbackRelease(&candidate.release); rollbackErr != nil {
+				logging.Warn("could not roll back the discarded pack",
+					"hash", candidate.torrent.Hash, "name", candidate.torrent.Name, "error", rollbackErr.Error())
+			}
+		}
 		logging.Warn(fmt.Sprintf("🗑️ Pack discarded while downloading — «%s» · %s", candidate.release.Title, reason),
-			"hash", candidate.torrent.Hash, "name", candidate.torrent.Name)
+			"hash", candidate.torrent.Hash, "name", candidate.torrent.Name,
+			"episodes", details, "restored_upgrade", restored, "previous_release", previous)
+		if restored && hadPrevious {
+			logging.Info(fmt.Sprintf("♻️ Restored the previous version after discarding the pack — «%s» · %s",
+				candidate.release.Title, previous), "hash", candidate.torrent.Hash)
+		}
 		_ = db.MarkTorrentError(candidate.torrent.Hash, reason)
 		_ = db.Blocklist(&candidate.release, "pack_inspection_useless")
 		if candidate.release.TorrentURL != nil {
@@ -192,6 +223,7 @@ func applyPackFilePriorities(
 		return true
 	}
 	priorities := make([]int32, len(files))
+	keptEpisodes := make([]int64, 0)
 	skippedEpisodes := make([]int64, 0)
 	skipped := 0
 	var savedBytes int64
@@ -205,6 +237,9 @@ func applyPackFilePriorities(
 			continue
 		}
 		if packEpisodesUseful(release, found, needed, index, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade) {
+			for episode := range found {
+				keptEpisodes = append(keptEpisodes, episode)
+			}
 			continue
 		}
 		priorities[i] = 0
@@ -233,8 +268,15 @@ func applyPackFilePriorities(
 			logging.Warn("could not record the skipped pack episodes", "hash", hash, "error", err.Error())
 		}
 	}
-	logging.Info(fmt.Sprintf("📥 Partly useful pack: %d of %d files · saved %s",
-		len(files)-skipped, len(files), logging.HumanBytesI64(savedBytes)), "hash", hash)
+	message := fmt.Sprintf("📥 Partly useful pack: %d of %d files · saved %s",
+		len(files)-skipped, len(files), logging.HumanBytesI64(savedBytes))
+	if kept := episodeRangeLabel(*release.Season, keptEpisodes); kept != "" {
+		message += " · kept: " + kept
+	}
+	if skippedLabels := episodeRangeLabel(*release.Season, skippedEpisodes); skippedLabels != "" {
+		message += " · skipped: " + skippedLabels
+	}
+	logging.Info(message, "hash", hash, "kept_episodes", episodeList(keptEpisodes), "skipped_episodes", episodeList(skippedEpisodes))
 	return true
 }
 

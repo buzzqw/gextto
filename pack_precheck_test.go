@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/models"
@@ -125,6 +126,38 @@ func TestIncompletePackReasonForbidUpgrade(t *testing.T) {
 	reason = checkPack(t, []string{"Show.S01E01.mkv"}, 2, []int64{1}, testArchive(1, 500), true)
 	if reason != "" {
 		t.Fatalf("a pack holding the missing episode was rejected: %s", reason)
+	}
+}
+
+func TestPackEpisodeDecisionsNameBothSides(t *testing.T) {
+	release := testInProgressRelease(2)
+	release.Quality = models.Quality{Resolution: "1080p", Codec: "h264"}
+	old := models.Quality{Resolution: "480p", Codec: "h264", Audio: "aac", Language: "ita"}
+	index := &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}}
+	index.Best[[2]int64{1, 1}] = models.ArchiveQuality{Quality: old, Score: 125}
+
+	decisions := packEpisodeDecisions(release, map[int64]struct{}{1: {}}, nil, index, 1000, 100, 0, false)
+	details := packDecisionDetails(1, release.Quality, 1000, decisions, 8)
+	want := "S01E01 480p h264 aac ITA (score 125) → 1080p h264 (score 1000): upgrade: resolution"
+	if details != want {
+		t.Fatalf("details = %q, want %q", details, want)
+	}
+
+	better := &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}}
+	better.Best[[2]int64{1, 1}] = models.ArchiveQuality{Quality: models.Quality{Resolution: "1080p"}, Score: 2000}
+	decisions = packEpisodeDecisions(release, map[int64]struct{}{1: {}}, nil, better, 1000, 100, 0, false)
+	details = packDecisionDetails(1, release.Quality, 1000, decisions, 8)
+	want = "S01E01 1080p (score 2000) vs 1080p h264 (score 1000): already equal or better"
+	if details != want {
+		t.Fatalf("details = %q, want %q", details, want)
+	}
+}
+
+func TestIncompletePackReasonNamesTheComparison(t *testing.T) {
+	reason := checkPack(t, []string{"Show.S01E01.mkv"}, 2, []int64{2}, testArchive(1, 2000), false)
+	want := "S01E01 1080p (score 2000) vs 1080p h264 (score 1000): already equal or better"
+	if !strings.Contains(reason, want) {
+		t.Fatalf("reason = %q, want it to contain %q", reason, want)
 	}
 }
 
