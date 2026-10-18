@@ -129,7 +129,9 @@ release) count once. An answer that means "not now" is not a strike: mircrew's
 404 `no magnet for this request` (the topic's magnet is hidden until its first
 post is thanked) and a login failure both leave the link eligible and retry it
 on the next cycle (`errTorrentNotAvailable`), so a valid release is not hidden
-for hours by a transient state. A source that fails on two different links in
+for hours by a transient state. Those transient answers still count towards
+the source notice below: a login that keeps failing must reach the operator.
+A source that fails on two different links in
 one cycle is reported on its own: a warning in the log and, at most every 12
 hours, a notification naming the source and the action — sign in again
 (mircrew answers 502 with "MirCrew login failed: credenziali rifiutate") and,

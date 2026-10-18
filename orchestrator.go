@@ -806,11 +806,13 @@ func RunCycleDomain(
 						// (mircrew: "no magnet for this request" until the topic
 						// is thanked, or a login that needs renewing). It is not
 						// a dead link: keep it eligible, no cycle error and no
-						// strike. The next cycle retries it.
+						// strike. The next cycle retries it. It still counts for
+						// the "indexer keeps failing" notice.
 						logging.Debug("torrent link not available yet",
 							"target", releaseTarget(&release),
 							"source", release.Source,
 							"error", err)
+						noteTorrentLinkFailure(linkFailures, release.Source, *release.TorrentURL, err, notifier)
 						continue
 					}
 					// Two failures in different cycles mean the link is dead:
@@ -830,15 +832,7 @@ func RunCycleDomain(
 						"source", release.Source,
 						"error", err)
 					if source := strings.TrimSpace(release.Source); source != "" {
-						links := linkFailures[source]
-						if links == nil {
-							links = map[string]struct{}{}
-							linkFailures[source] = links
-						}
-						links[*release.TorrentURL] = struct{}{}
-						if len(links) == indexerFailureNotifyLimit {
-							notifyIndexerFailure(notifier, source, len(links), err.Error())
-						}
+						noteTorrentLinkFailure(linkFailures, source, *release.TorrentURL, err, notifier)
 					}
 					continue
 				}

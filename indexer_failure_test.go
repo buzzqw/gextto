@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -54,5 +55,28 @@ func TestIndexerFailureReasonIsBounded(t *testing.T) {
 	}
 	if !strings.HasPrefix(got, "a b ") {
 		t.Fatalf("reason was not flattened: %q", got)
+	}
+}
+
+// A transient answer (login, no magnet yet) still counts for the "indexer
+// keeps failing" notice even though it does not quarantine the link.
+func TestNoteTorrentLinkFailureCountsDistinctLinks(t *testing.T) {
+	resetIndexerFailureNotices()
+	defer resetIndexerFailureNotices()
+
+	failures := map[string]map[string]struct{}{}
+	err := errors.New("HTTP 502: MirCrew login failed")
+	noteTorrentLinkFailure(failures, "mircrew indexerr", "u1", err, nil)
+	noteTorrentLinkFailure(failures, "mircrew indexerr", "u1", err, nil)
+	if got := len(failures["mircrew indexerr"]); got != 1 {
+		t.Fatalf("the same link counted %d times", got)
+	}
+	noteTorrentLinkFailure(failures, "mircrew indexerr", "u2", err, nil)
+	if got := len(failures["mircrew indexerr"]); got != 2 {
+		t.Fatalf("two distinct links counted as %d", got)
+	}
+	noteTorrentLinkFailure(failures, "", "u3", err, nil)
+	if len(failures) != 1 {
+		t.Fatalf("a source-less failure was counted: %+v", failures)
 	}
 }

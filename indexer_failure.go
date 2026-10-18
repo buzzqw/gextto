@@ -65,6 +65,27 @@ func clearIndexerFailureNotice(source string) {
 	indexerFailureNotices.mu.Unlock()
 }
 
+// noteTorrentLinkFailure counts one failed link per source and tells the user
+// when a source keeps failing. A transient answer counts too: a login that
+// keeps failing is exactly what the notice is for, even though it must not
+// quarantine the link.
+func noteTorrentLinkFailure(failures map[string]map[string]struct{}, source, rawURL string, err error, notifier *Notifier) {
+	source = strings.TrimSpace(source)
+	rawURL = strings.TrimSpace(rawURL)
+	if source == "" || rawURL == "" {
+		return
+	}
+	links := failures[source]
+	if links == nil {
+		links = map[string]struct{}{}
+		failures[source] = links
+	}
+	links[rawURL] = struct{}{}
+	if len(links) == indexerFailureNotifyLimit {
+		notifyIndexerFailure(notifier, source, len(links), err.Error())
+	}
+}
+
 // notifyIndexerFailure logs that a source keeps failing and, when the source's
 // notice is due, sends the notification. The text names the action: sign in to
 // the indexer again and disable it in the searches until it works.
