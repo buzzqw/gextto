@@ -48,7 +48,8 @@ disabled for eD2k-only releases.
 
 ## What is deliberately not implemented
 
-- the eMule transfer protocol, `.part`/`.part.met`, MD4 block trees, AICH;
+- the eMule transfer protocol, `.part`/`.part.met`, MD4 block trees, AICH
+  (design in [`ed2k-transfer.md`](ed2k-transfer.md), gated on Phase 0);
 - upload, sharing, credits, upload queue;
 - LowID callbacks, buddy/hole punching, direct UDP callback;
 - obfuscation/encryption (`KadVersion` stays below 6, so peers answer in

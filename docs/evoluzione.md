@@ -680,7 +680,9 @@ title and filters the episode locally (`S04E01`, `S04.E01`, `4x01`); the live
 `Tracker S04E01` check went from 0 to 5 Kad results. A new stratified sample is
 running before the gate is closed. Kad stays an optional **manual** search
 provider and `ed2k_fallback` stays off meanwhile. The numbers and caveats are in
-[`measurements.md`](measurements.md).
+[`measurements.md`](measurements.md); the transfer design is in
+[`ed2k-transfer.md`](ed2k-transfer.md) and stays a design until the gate
+passes.
 
 **Waiting for a measurement or a host.**
 
