@@ -410,3 +410,28 @@ func fileSizeFromTags(tags map[uint8]Tag) (int64, bool) {
 	}
 	return int64(size), true
 }
+
+// ReadTagList decodes count tags with the given byte order and returns the
+// bytes consumed. It is the generic tag list used by search packets, server
+// responses and .part.met files.
+func ReadTagList(data []byte, count int, bo binary.ByteOrder) ([]Tag, int, error) {
+	r := newReader(data, bo)
+	tags := make([]Tag, 0, count)
+	for i := 0; i < count; i++ {
+		tag, err := r.tag()
+		if err != nil {
+			return nil, 0, err
+		}
+		tags = append(tags, tag)
+	}
+	return tags, r.pos, nil
+}
+
+// WriteTagList encodes tags with the given byte order.
+func WriteTagList(tags []Tag, bo binary.ByteOrder) []byte {
+	w := newWriter(bo)
+	for _, tag := range tags {
+		w.tag(tag)
+	}
+	return w.buf
+}

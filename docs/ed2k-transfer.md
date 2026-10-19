@@ -6,9 +6,10 @@ into the daemon while the Phase 0 gate is open. The decision criteria are at the
 end.
 
 Spike (19 October 2026): `internal/ed2k/transfer/partfile` implements the
-9,728,000-byte part geometry and streaming MD4 whole-file/per-part hashing with
-tests. It is not imported by `cmd/gx-ed2k`; `.part.met` and AICH are still to
-do.
+9,728,000-byte part geometry, streaming MD4 whole-file/per-part hashing and the
+non-splitted `.part.met` reader/writer (0xE0/0xE2, tags via the shared codec)
+with tests. It is not imported by `cmd/gx-ed2k`; the splitted format (0xE1),
+AICH and the peer protocol are still to do.
 
 The goal is a pure-Go eMule-compatible client inside `gx-ed2k`, so Gextto can
 turn an eD2k result into a real download without aMule, `amulecmd` or the EC
