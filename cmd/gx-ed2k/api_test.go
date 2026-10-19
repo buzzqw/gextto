@@ -9,8 +9,10 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/transfer/download"
 )
 
 type fakeSearcher struct {
@@ -191,4 +193,85 @@ func TestUITemplateRenders(t *testing.T) {
 	if !strings.Contains(string(body), "gx-ed2k") {
 		t.Fatal("brand missing")
 	}
+}
+
+type emptyDiscoverer struct{}
+
+func (emptyDiscoverer) Sources(context.Context, string, int64) ([]ed2k.PeerSource, error) {
+	return nil, nil
+}
+
+func TestTransferEndpoints(t *testing.T) {
+	daemon, _ := testDaemon(t)
+	manager := download.NewManager(context.Background(), download.ManagerConfig{
+		Fetch: download.Config{TempDir: t.TempDir()},
+	}, emptyDiscoverer{})
+	defer manager.Close()
+	daemon.transfers = manager
+
+	recorder := httptest.NewRecorder()
+	daemon.handleHealth(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/health", nil))
+	var health map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &health); err != nil {
+		t.Fatal(err)
+	}
+	if health["download"] != true {
+		t.Fatalf("download capability = %v", health["download"])
+	}
+
+	link := "ed2k://|file|film.mkv|8000000|0123456789abcdef0123456789abcdef|/"
+	recorder = httptest.NewRecorder()
+	daemon.handleTransfers(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/transfers", strings.NewReader(`{"link":"`+link+`"}`)))
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("POST status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var created struct {
+		OK       bool              `json:"ok"`
+		Transfer download.Transfer `json:"transfer"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	if !created.OK || created.Transfer.ID != "0123456789abcdef0123456789abcdef" {
+		t.Fatalf("created = %+v", created)
+	}
+
+	recorder = httptest.NewRecorder()
+	daemon.handleTransfers(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/transfers", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET status = %d", recorder.Code)
+	}
+	var list struct {
+		Transfers []download.Transfer `json:"transfers"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Transfers) != 1 {
+		t.Fatalf("transfers = %+v", list.Transfers)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/transfers/"+created.Transfer.ID, nil)
+	request.SetPathValue("id", created.Transfer.ID)
+	recorder = httptest.NewRecorder()
+	daemon.handleTransfer(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET one status = %d", recorder.Code)
+	}
+
+	request = httptest.NewRequest(http.MethodDelete, "/api/v1/transfers/"+created.Transfer.ID, nil)
+	request.SetPathValue("id", created.Transfer.ID)
+	recorder = httptest.NewRecorder()
+	daemon.handleTransfer(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("DELETE status = %d", recorder.Code)
+	}
+
+	recorder = httptest.NewRecorder()
+	daemon.handleTransfers(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/transfers", strings.NewReader(`{"link":"nope"}`)))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("invalid link status = %d", recorder.Code)
+	}
+
+	time.Sleep(20 * time.Millisecond)
 }

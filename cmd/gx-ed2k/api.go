@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/transfer/download"
 	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
@@ -24,6 +25,10 @@ func (d *Daemon) routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/status", d.withAuth(d.handleStatus))
 	mux.HandleFunc("GET /api/v1/search", d.withAuth(d.handleSearch))
 	mux.HandleFunc("POST /api/v1/link", d.withAuth(d.handleLink))
+	mux.HandleFunc("GET /api/v1/transfers", d.withAuth(d.handleTransfers))
+	mux.HandleFunc("POST /api/v1/transfers", d.withAuth(d.handleTransfers))
+	mux.HandleFunc("GET /api/v1/transfers/{id}", d.withAuth(d.handleTransfer))
+	mux.HandleFunc("DELETE /api/v1/transfers/{id}", d.withAuth(d.handleTransfer))
 	mux.HandleFunc("GET /api/v1/nodes", d.withAuth(d.handleNodes))
 	mux.HandleFunc("GET /api/v1/update", d.withAuth(d.handleUpdate))
 	mux.HandleFunc("POST /api/v1/update/apply", d.withAuth(d.handleUpdateApply))
@@ -181,7 +186,7 @@ func (d *Daemon) handleLink(w http.ResponseWriter, r *http.Request) {
 			"ok":       true,
 			"kind":     "file",
 			"file":     apiResult{Name: file.Name, SizeBytes: file.Size, Hash: file.Hash, Link: file.String(), Origin: "link"},
-			"download": false,
+			"download": d.transfers != nil,
 		})
 		return
 	}
@@ -191,4 +196,73 @@ func (d *Daemon) handleLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+}
+
+func (d *Daemon) handleTransfers(w http.ResponseWriter, r *http.Request) {
+	if d.transfers == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]any{"ok": false, "error": "download is disabled on this daemon"})
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "transfers": d.transfers.List()})
+	case http.MethodPost:
+		var input linkInput
+		body, err := io.ReadAll(io.LimitReader(r.Body, apiBodyLimit))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "cannot read request"})
+			return
+		}
+		if err := json.Unmarshal(body, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid JSON"})
+			return
+		}
+		file, err := ed2k.ParseFileLink(strings.TrimSpace(input.Link))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		hash, err := ed2k.ParseID(file.Hash)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		transfer, err := d.transfers.Add(download.Link{Hash: hash, Name: file.Name, Size: file.Size})
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "transfer": transfer})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method not allowed"})
+	}
+}
+
+func (d *Daemon) handleTransfer(w http.ResponseWriter, r *http.Request) {
+	if d.transfers == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]any{"ok": false, "error": "download is disabled on this daemon"})
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "id is required"})
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		transfer, ok := d.transfers.Get(id)
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "transfer not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "transfer": transfer})
+	case http.MethodDelete:
+		if !d.transfers.Remove(id) {
+			writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "transfer not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method not allowed"})
+	}
 }

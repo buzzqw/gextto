@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/transfer/download"
 )
 
 // searcher is the part of *ed2k.Client the HTTP layer uses. It is an interface
@@ -33,9 +34,10 @@ type daemonOptions struct {
 }
 
 type Daemon struct {
-	opts   daemonOptions
-	client searcher
-	start  time.Time
+	opts      daemonOptions
+	client    searcher
+	transfers *download.Manager
+	start     time.Time
 
 	mu           sync.Mutex
 	startupError string
@@ -97,12 +99,13 @@ func (d *Daemon) healthPayload() map[string]any {
 		"data_dir":     d.opts.DataDir,
 		"kad_id":       d.client.SelfID().Hex(),
 		"udp_port":     d.client.UDPPort(),
-		"download":     false,
+		"download":     d.transfers != nil,
 		"search":       true,
 		"uptime_secs":  int64(time.Since(d.start).Seconds()),
 		"nodes":        stats.Nodes,
 		"reachability": stats.Reachability,
 		"low_id":       stats.LowID,
+		"transfers":    d.transferCount(),
 		"peer_packets": stats.PeerPackets,
 		"upnp":         stats.UPnP,
 	}
@@ -126,12 +129,19 @@ func (d *Daemon) statusPayload() map[string]any {
 		"uptime_secs": int64(time.Since(d.start).Seconds()),
 		"capabilities": map[string]bool{
 			"search":   true,
-			"download": false,
+			"download": d.transfers != nil,
 			"upload":   false,
 		},
 		"stats":         stats,
 		"startup_error": d.startup(),
 	}
+}
+
+func (d *Daemon) transferCount() int {
+	if d.transfers == nil {
+		return 0
+	}
+	return len(d.transfers.List())
 }
 
 // nodePayload is the JSON shape of a routing-table contact.

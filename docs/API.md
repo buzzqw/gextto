@@ -587,10 +587,18 @@ a native `/api/v1`. When `ed2k_token` is set, every `/api/v1` call must send
 | GET | `/api/v1/status` | counters (nodes, queries, results), capabilities and last error |
 | GET | `/api/v1/search?q=…&timeout_ms=…` | keyword search on Kad and the eD2k servers; results carry `name`, `size_bytes`, `hash`, `link`, `sources`, `origin` |
 | POST | `/api/v1/link` | validate a JSON `{"link":"ed2k://…"}` file or server link; returns the parsed identity |
+| GET | `/api/v1/transfers` | list the eD2k transfers and their state (`discovering`, `downloading`, `queued`, `completed`, `error`) with `done`, `size`, `sources` and `path` |
+| POST | `/api/v1/transfers` | start a transfer from a JSON `{"link":"ed2k://|file|…"}`; returns `201` with the transfer (idempotent by MD4) |
+| GET | `/api/v1/transfers/{id}` | one transfer, by MD4 |
+| DELETE | `/api/v1/transfers/{id}` | cancel and forget a transfer (partial files stay on disk) |
 | GET | `/api/v1/nodes` | the current Kad routing table |
 | GET | `/api/v1/update` | compare the running `gx-ed2k` build with `release.json` (`gx_ed2k_build`) and return the standalone archive URL; a local build answers `local_build: true` |
 | POST | `/api/v1/update/apply` | download the newer Linux archive, verify its SHA-256 and version, replace the binary and restart; a local build or Windows answers `409` |
 
-`/api/v1/health` reports `"download": false` in this version. That is the
-contract Gextto reads before offering to queue an eD2k result: the daemon
-searches, it does not implement the eMule client-to-client transfer protocol.
+`/api/v1/health` reports `"download": false` unless the daemon is started with
+`-download` (or `GX_ED2K_DOWNLOAD=yes`). That is the contract Gextto reads
+before offering to queue an eD2k result. With the transfer plane enabled the
+daemon accepts `ed2k://` links on `/api/v1/transfers`, downloads them in
+`-download-dir` (default `<data>/incoming`) and reports progress there. Upload,
+credits, LowID callback and obfuscation are not implemented yet, so a real peer
+may keep the transfer queued.

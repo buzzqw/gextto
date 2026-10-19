@@ -1,10 +1,11 @@
-// Command gx-ed2k is Gextto's native eD2k/Kad search daemon.
+// Command gx-ed2k is Gextto's native eD2k/Kad daemon.
 //
-// It is a search client: it bootstraps Kad, searches keywords on Kad and on
-// the configured eD2k servers, and answers over the same /api/v1 shape as
-// gx-torrent. It deliberately does not implement the eMule client-to-client
-// transfer protocol, upload or credits: /api/v1/health reports
-// "download": false so Gextto never routes a download it cannot complete.
+// By default it is a search client: it bootstraps Kad, searches keywords on
+// Kad and on the configured eD2k servers, and answers over the same /api/v1
+// shape as gx-torrent. With -download it also runs the transfer plane and
+// accepts ed2k:// links on /api/v1/transfers. Upload, credits, LowID callback
+// and obfuscation are not implemented yet, so health reports "download": false
+// unless the flag is set.
 package main
 
 import (
@@ -25,6 +26,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/transfer/download"
 	"github.com/buzzqw/gextto/internal/messages"
 )
 
@@ -72,6 +74,8 @@ func main() {
 	servers := flag.String("servers", envOr("GX_ED2K_SERVERS", ""), "comma-separated eD2k servers (host:port)")
 	upnp := flag.Bool("upnp", envBool("GX_ED2K_UPNP", true), "ask the router to forward the Kad UDP port with UPnP")
 	searchTimeout := flag.Duration("search-timeout", 20*time.Second, "whole search budget")
+	downloadEnabled := flag.Bool("download", envBool("GX_ED2K_DOWNLOAD", false), "enable the eD2k transfer plane")
+	downloadDir := flag.String("download-dir", envOr("GX_ED2K_DOWNLOAD_DIR", ""), "directory for .part files and completed downloads")
 	lang := flag.String("lang", messages.Language(), "UI language (it, en, de, fr, es, pl)")
 	fingerprint := flag.String("fingerprint", "", "configuration fingerprint (managed mode)")
 	logFile := flag.String("log-file", "", "write the log to this file instead of stderr")
@@ -121,6 +125,14 @@ func main() {
 	if *searchTimeout < 2*time.Second || *searchTimeout > 120*time.Second {
 		log.Fatalf("gx-ed2k: -search-timeout must be between 2s and 120s")
 	}
+	if *downloadDir == "" {
+		*downloadDir = filepath.Join(*dataDir, "incoming")
+	}
+	if *downloadEnabled {
+		if err := os.MkdirAll(*downloadDir, 0o755); err != nil {
+			log.Fatalf("gx-ed2k: download dir: %v", err)
+		}
+	}
 
 	client, err := ed2k.New(ed2k.Config{
 		DataDir:       *dataDir,
@@ -135,6 +147,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("gx-ed2k: %v", err)
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	daemon := newDaemon(daemonOptions{
 		DataDir:     *dataDir,
 		Mode:        modeValue,
@@ -143,9 +158,18 @@ func main() {
 		Lang:        *lang,
 		Commit:      commit,
 	}, client)
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	var manager *download.Manager
+	if *downloadEnabled {
+		manager = download.NewManager(ctx, download.ManagerConfig{
+			Fetch: download.Config{
+				TempDir:    *downloadDir,
+				ClientName: "gx-ed2k",
+				TCPPort:    uint16(*tcpPort),
+			},
+		}, client)
+		daemon.transfers = manager
+		log.Printf("gx-ed2k: transfer plane enabled, downloads in %s", *downloadDir)
+	}
 
 	if err := client.Start(ctx); err != nil {
 		// Kad is optional: the server search still works when UDP is blocked.
@@ -170,6 +194,9 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = server.Shutdown(shutdownCtx)
+	if manager != nil {
+		manager.Close()
+	}
 	_ = client.Close()
 }
 
