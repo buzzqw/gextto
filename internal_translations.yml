@@ -2558,7 +2558,7 @@ eng:
   "Mostra nei log i torrent scartati perché il titolo contiene una parola della Blacklist (cam, ts...). Utile per verificare che le regole di esclusione funzionino.": "Show torrents discarded in the logs because the title contains a word from the Blacklist (cam, ts...). Useful for checking that exclusion rules are working."
   "Mostra nei log i torrent scartati perché la qualità non corrisponde a quella richiesta (es: cercavi 1080p, trovato solo 480p). Aiuta a capire perché una serie non viene scaricata.": "Shows in the logs the torrents discarded because the quality does not match the requested one (e.g. you were looking for 1080p, only found 480p). Helps understand why a series isn't downloaded."
   "Motivo": "Reason"
-  "Motore": "Motor"
+  "Motore": "Engine"
   "Motore Interno": "Internal Engine"
   "Motore occupato, riprova tra poco": "Engine busy, try again soon"
   "Movie not found": "Movie not found"

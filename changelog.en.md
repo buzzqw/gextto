@@ -13,6 +13,15 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 19 October 2026
 
+- **Safer updates.** An update, from the **Update** button or by running the
+  installer again, succeeds only when the new version's web interface answers.
+  If the new version goes down a few seconds after starting, the previous one
+  comes straight back: before, it counted as a success and the service stayed
+  down. Running the installer again keeps the user of the installed service,
+  instead of switching to the `gextto` account when run as root without `sudo`.
+- **Translations.** The download counter reads "Torrents: 5 · HTTP: 0", right in
+  every language; the engine tile on the Dashboard is called "Engine" in English
+  and "Motor" in German.
 - **Speed: a rule and an exception.** In Configuration → Speed and network a
   single choice, **How the speed is decided**, sets the rule: Auto, fixed limits or
   hourly schedule. With the schedule you also pick whether Auto or the fixed limits

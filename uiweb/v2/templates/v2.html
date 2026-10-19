@@ -417,7 +417,7 @@
     </div>
   </details>
   <div class="panel session-panel">
-    <div class="panel-head"><h3>Download in sessione <span class="session-count" id="v2-session-count">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · <span>aggiornato</span> {{.UpdatedAt}}</span></h3><details class="v2-menu speed-menu" data-v2-menu>
+    <div class="panel-head"><h3>Download in sessione <span class="session-count" id="v2-session-count"><span>Torrent</span>: {{.Count}} · HTTP: {{len .HTTPDownloads}} · <span>aggiornato</span> {{.UpdatedAt}}</span></h3><details class="v2-menu speed-menu" data-v2-menu>
       <summary class="btn sm" title="Velocità: cosa vale adesso e un'eccezione temporanea">Banda <span id="v2-temp-badge">{{template "v2_temp_badge" .}}</span> <span aria-hidden="true">▾</span></summary>
       <div class="v2-menu-panel v2-menu-end speed-panel" id="v2-speed-panel">{{template "v2_speed_panel" .}}</div>
     </details></div>
@@ -478,7 +478,7 @@
         hx-post="/downloads/table" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"
          hx-trigger="submit, input changed delay:300ms from:#v2-filter, change from:#v2-tag-filter{{if .Auto}}, every 5s{{end}}">
     {{/* Live counter for the panel head (outside the refreshed fragment). */}}
-    <span id="v2-session-count" hx-swap-oob="innerHTML" hidden>{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · <span>aggiornato</span> {{.UpdatedAt}}</span>
+    <span id="v2-session-count" hx-swap-oob="innerHTML" hidden><span>Torrent</span>: {{.Count}} · HTTP: {{len .HTTPDownloads}} · <span>aggiornato</span> {{.UpdatedAt}}</span>
     <input type="hidden" name="dir" value="{{.Dir}}">
     <input type="hidden" name="auto_state" value="{{if .Auto}}1{{else}}0{{end}}">
     {{/* Live head fragments (outside the refreshed area). */}}

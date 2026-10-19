@@ -37,8 +37,10 @@ REPO="${GEXTTO_REPO:-buzzqw/gextto}"
 RELEASE="${GEXTTO_RELEASE:-continuous}"
 LOCAL_ARCHIVE="${GEXTTO_LOCAL_ARCHIVE:-}"
 NO_START="${GEXTTO_NO_START:-0}"
-HEALTH_TIMEOUT="${GEXTTO_HEALTH_TIMEOUT:-20}"
-HTTP_TIMEOUT="${GEXTTO_HTTP_TIMEOUT:-60}"
+# How long the restarted service gets to answer over HTTP; the first start of
+# a new version may migrate the databases. GEXTTO_HEALTH_TIMEOUT is the older
+# name of the same limit.
+HTTP_TIMEOUT="${GEXTTO_HTTP_TIMEOUT:-${GEXTTO_HEALTH_TIMEOUT:-180}}"
 MEDIA_GROUPS="${GEXTTO_MEDIA_GROUPS:-}"
 
 # Download hardening: HTTPS only (redirects included), a real TLS floor and
@@ -331,6 +333,13 @@ create_service_user() {
 # no --user/GEXTTO_USER the local user who invoked the installer wins (SUDO_USER),
 # falling back to a dedicated "gextto" account for unattended/root runs.
 resolve_service_identity() {
+  # Running the installer again (an update, a repair) keeps the user of the
+  # installed service: switching account would re-own the whole data folder.
+  # Only an explicit --user/GEXTTO_USER changes it.
+  if [[ -z "$SERVICE_USER" && -f "$UNIT_PATH" ]]; then
+    SERVICE_USER="$(sed -n 's/^User=//p' "$UNIT_PATH" | head -n 1)"
+    [[ -z "$SERVICE_GROUP" ]] && SERVICE_GROUP="$(sed -n 's/^Group=//p' "$UNIT_PATH" | head -n 1)"
+  fi
   if [[ -z "$SERVICE_USER" ]]; then
     if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
       SERVICE_USER="$SUDO_USER"
@@ -492,23 +501,33 @@ UNIT
   chmod 0644 "$UPDATE_LOG"
 }
 
-# wait_for_http waits until the web UI answers. A service that is "active" may
-# still be migrating its databases: only an HTTP answer proves it works.
-wait_for_http() {
-  local waited=0
+# service_health watches the service after a restart. Only an HTTP answer
+# proves the new version works: a simple unit is "active" the moment its
+# process starts, so a version crashing a few seconds later looked fine. Any
+# moment outside "active" (Restart=on-failure turns a crash into
+# "activating") is a crash. Prints healthy, crashed or slow.
+service_health() {
+  local waited=0 state code
   while (( waited < HTTP_TIMEOUT )); do
-    if curl -fs -o /dev/null --max-time 3 "http://127.0.0.1:$PORT/api/status"; then
-      log "web UI answering on port $PORT"
+    state="$(systemctl is-active "$SERVICE_NAME" 2>/dev/null || true)"
+    if [[ "$state" != "active" ]]; then
+      echo crashed
+      return 0
+    fi
+    # Any answer below 500 counts: with the login on, /api/status may be 401.
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:$PORT/api/status" || true)"
+    if [[ "$code" =~ ^[1-4][0-9][0-9]$ ]]; then
+      echo healthy
       return 0
     fi
     sleep 2
     waited=$((waited + 2))
   done
-  warn "the service is running but the web UI did not answer within ${HTTP_TIMEOUT}s; inspect: journalctl -u $SERVICE_NAME -n 100"
+  echo slow
 }
 
-# restart_and_verify restarts the service, waits for it to become active and
-# rolls back the previous binary when the new one fails to start.
+# restart_and_verify restarts the service and checks that it answers; when the
+# new binary crashes it rolls back to the previous one.
 restart_and_verify() {
   run systemctl daemon-reload
   run systemctl enable "$SERVICE_NAME"
@@ -520,29 +539,28 @@ restart_and_verify() {
   run systemctl restart "$SERVICE_NAME"
   [[ "$DRY_RUN" == "1" ]] && return 0
 
-  local waited=0
-  while (( waited < HEALTH_TIMEOUT )); do
-    if systemctl is-active --quiet "$SERVICE_NAME"; then
-      log "gextto is running"
-      # Keep the previous binary as gexttod.prev: the in-app updater restores
-      # it when a new version fails to start.
-      wait_for_http
+  case "$(service_health)" in
+    healthy)
+      log "gextto is running and the web UI answers on port $PORT"
       return 0
-    fi
-    sleep 1
-    waited=$((waited + 1))
-  done
+      ;;
+    slow)
+      # Alive but not answering yet (a long database migration): a rollback
+      # would interrupt it.
+      warn "gextto is running but the web UI did not answer within ${HTTP_TIMEOUT}s; inspect: journalctl -u $SERVICE_NAME -n 100"
+      return 0
+      ;;
+  esac
 
   if [[ -f "$INSTALL_DIR/gexttod.prev" ]]; then
     warn "gextto did not start; rolling back to the previous binary"
     install -m 0755 "$INSTALL_DIR/gexttod.prev" "$INSTALL_DIR/gexttod"
     systemctl daemon-reload
     systemctl restart "$SERVICE_NAME" || true
-    sleep 2
-    if systemctl is-active --quiet "$SERVICE_NAME"; then
-      warn "rollback successful: the previous version is running again"
-    else
+    if [[ "$(service_health)" == "crashed" ]]; then
       warn "rollback did not restore a running service"
+    else
+      warn "rollback successful: the previous version is running again"
     fi
   fi
   die "gextto failed to start; inspect: journalctl -u $SERVICE_NAME -n 100"

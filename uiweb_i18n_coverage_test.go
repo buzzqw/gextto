@@ -62,7 +62,7 @@ var i18nMixedAllowlist = map[string]bool{
 	"libtorrent {}":          true,
 	"TMDB {}":                true,
 	"TVDB {}":                true,
-	"{} torrent · {} HTTP ·": true,
+	": {} · HTTP: {} ·": true,
 	"Auto: {}on{}off{}":      true,
 	"CPU{}":                  true,
 	// The latency guard badge: units and DL/UL are the same in every language.

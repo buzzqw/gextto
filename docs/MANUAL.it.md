@@ -1075,8 +1075,11 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   backup dei database e chiede l'aggiornamento al servizio di sistema
   `gextto-update`, installato dall'installer: Gextto attende la fine delle copie
   verso la libreria, si riavvia con la nuova versione e il pannello lo segnala
-  da solo. Se la nuova versione non parte torna la precedente; il log
-  dell'ultimo aggiornamento è in fondo al pannello. Al primo accesso dopo il
+  da solo. L'aggiornamento è riuscito solo quando l'interfaccia della nuova
+  versione risponde: se il servizio cade, anche dopo qualche secondo, torna
+  subito la versione precedente; se è vivo ma lento a rispondere (per esempio
+  una migrazione lunga del database) viene solo segnalato. Il log dell'ultimo
+  aggiornamento è in fondo al pannello. Al primo accesso dopo il
   riavvio un popup **Gextto aggiornato** mostra la versione di partenza, quella
   nuova e i commit che ha portato; si chiude con **OK** (o `Esc`) e non
   ricompare. Quando c'è una versione nuova compare anche il pulsante

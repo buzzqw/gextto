@@ -117,3 +117,19 @@ func TestWorkDirCleanupRemovesTheDirectory(t *testing.T) {
 		t.Fatalf("work dir %q was not removed", work.Path())
 	}
 }
+
+// The health check after an update connects through loopback to the port the
+// unit listens on, whatever wildcard the listen address uses.
+func TestUpdateLoopbackAddress(t *testing.T) {
+	for listen, want := range map[string]string{
+		"0.0.0.0:5000":   "127.0.0.1:5000",
+		"[::]:5000":      "127.0.0.1:5000",
+		":5000":          "127.0.0.1:5000",
+		"127.0.0.1:8080": "127.0.0.1:8080",
+		"192.0.2.7:5000": "192.0.2.7:5000",
+	} {
+		if got := updateLoopbackAddress(listen); got != want {
+			t.Errorf("updateLoopbackAddress(%q) = %q, want %q", listen, got, want)
+		}
+	}
+}

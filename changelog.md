@@ -14,6 +14,16 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 19 ottobre 2026
 
+- **Aggiornamenti più sicuri.** Un aggiornamento, dal pulsante **Aggiorna** o
+  rilanciando l'installer, è riuscito solo quando l'interfaccia della nuova
+  versione risponde. Se la nuova versione cade dopo qualche secondo dall'avvio,
+  torna subito quella precedente: prima veniva data per buona e il servizio
+  restava fermo. Rilanciare l'installer tiene l'utente del servizio già
+  installato, invece di passare all'account `gextto` quando lo si esegue da root
+  senza `sudo`.
+- **Traduzioni.** Il contatore dei download dice «Torrent: 5 · HTTP: 0», giusto
+  in ogni lingua; il riquadro del motore in Dashboard si chiama «Engine» in
+  inglese e «Motor» in tedesco.
 - **Velocità: una regola e un'eccezione.** In Configurazione → Velocità e rete
   una sola scelta, **Come si decide la velocità**, decide la regola: Auto, limiti
   fissi o programmazione oraria. Con la programmazione scegli anche se fuori dalle

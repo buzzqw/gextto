@@ -1044,9 +1044,11 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   again** beside it), which backs up the databases and asks
   the `gextto-update` system service, set up by the installer, to update:
   Gextto waits for the copies to the library to finish, restarts with the new
-  version and the panel reports it by itself. If the new version does not start
-  the previous one comes back; the log of the last update is at the bottom of
-  the panel. On the first visit after the restart a **Gextto updated** popup
+  version and the panel reports it by itself. The update succeeds only when the
+  new version's web interface answers: if the service goes down, even a few
+  seconds later, the previous version comes straight back; if it is alive but
+  slow to answer (a long database migration, for example) it is only reported.
+  The log of the last update is at the bottom of the panel. On the first visit after the restart a **Gextto updated** popup
   shows the old version, the new one and the commits it brought; **OK** (or
   `Esc`) closes it for good. When a new version exists an **Update available** button also
   appears above **Donate**. On a source installation the panel says to use

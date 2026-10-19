@@ -133,7 +133,8 @@ NAS setup and troubleshooting: the [user manual](docs/MANUAL.en.md).
 An **Update available** button appears when a release is published;
 *Maintenance → Updates* shows the changes and **Update now** backs up the
 databases, installs, and restores the previous version if the new one does not
-start. Re-running the installer does the same from a shell.
+answer. Re-running the installer updates from a shell too, with the same
+rollback and the same service user.
 
 ```bash
 sudo bash install.sh --help       # all options

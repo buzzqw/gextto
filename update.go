@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -564,8 +565,14 @@ func updateRestartService(opts UpdateOptions) error {
 		fmt.Fprintf(os.Stderr, "Could not restart %s; run `systemctl restart %s` manually.\n", ServiceName, ServiceName)
 		return nil
 	}
-	if updateWaitActive(30 * time.Second) {
-		fmt.Printf("Service %s restarted.\n", ServiceName)
+	switch updateWaitHealthy(updateHealthLimit) {
+	case updateHealthy:
+		fmt.Printf("Service %s restarted and answering.\n", ServiceName)
+		return nil
+	case updateSlow:
+		// Alive but not answering yet (a long database migration): a
+		// rollback would interrupt it, so it is only reported.
+		fmt.Fprintf(os.Stderr, "Service %s is running but its web interface did not answer within %s; inspect: journalctl -u %s -n 100\n", ServiceName, updateHealthLimit, ServiceName)
 		return nil
 	}
 	// The new version does not start: put the previous executable back.
@@ -592,7 +599,7 @@ func updateRestartService(opts UpdateOptions) error {
 	} else {
 		_ = os.WriteFile(filepath.Join(installDir, "VERSION"), []byte("rollback\n"), 0o644)
 	}
-	if err := updateSystemctl("restart", ServiceName); err != nil || !updateWaitActive(30*time.Second) {
+	if err := updateSystemctl("restart", ServiceName); err != nil || updateWaitHealthy(updateHealthLimit) == updateCrashed {
 		return fmt.Errorf("the update failed and the previous version did not start either; inspect: journalctl -u %s -n 100", ServiceName)
 	}
 	return fmt.Errorf("the new version did not start: the previous one was restored and is running")
@@ -605,25 +612,67 @@ func updateSystemctl(args ...string) error {
 	return cmd.Run()
 }
 
-// updateWaitActive polls the service until it is active, for at most limit.
-// `systemctl restart` returns once the unit started; a binary that crashes
-// right away shows up as "activating"/"failed" within a few seconds.
-func updateWaitActive(limit time.Duration) bool {
+// updateHealthLimit is how long a restarted service gets to answer: the first
+// start after an update may migrate the databases.
+const updateHealthLimit = 3 * time.Minute
+
+type updateHealth int
+
+const (
+	updateHealthy updateHealth = iota // active and the web interface answers
+	updateCrashed                     // left "active": failed or restarting
+	updateSlow                        // still active, not answering yet
+)
+
+// updateWaitHealthy watches the service after a restart. Only an HTTP answer
+// proves the new version works: "active" alone is what a simple unit reports
+// the moment its process starts, so a version crashing a few seconds later
+// (during start-up or a migration) looked like a success. Any moment outside
+// "active" — Restart=on-failure turns a crash into "activating" — is a crash.
+func updateWaitHealthy(limit time.Duration) updateHealth {
+	statusURL := updateServiceStatusURL()
+	client := &http.Client{Timeout: 3 * time.Second}
 	deadline := time.Now().Add(limit)
-	stable := 0
 	for time.Now().Before(deadline) {
-		if exec.Command("systemctl", "is-active", "--quiet", ServiceName).Run() == nil {
-			// Active for five consecutive seconds: not a crash loop.
-			stable++
-			if stable >= 5 {
-				return true
-			}
-		} else {
-			stable = 0
+		if exec.Command("systemctl", "is-active", "--quiet", ServiceName).Run() != nil {
+			return updateCrashed
 		}
-		time.Sleep(time.Second)
+		if response, err := client.Get(statusURL); err == nil {
+			response.Body.Close()
+			if response.StatusCode < 500 {
+				return updateHealthy
+			}
+		}
+		time.Sleep(2 * time.Second)
 	}
-	return false
+	return updateSlow
+}
+
+// updateServiceStatusURL is /api/status on the address the unit listens on
+// (GEXTTO_LISTEN in its environment), reached through loopback.
+func updateServiceStatusURL() string {
+	listen := constants.DefaultListen
+	if output, err := exec.Command("systemctl", "show", "-p", "Environment", "--value", ServiceName).Output(); err == nil {
+		for _, field := range strings.Fields(string(output)) {
+			if value, ok := strings.CutPrefix(field, "GEXTTO_LISTEN="); ok && value != "" {
+				listen = value
+			}
+		}
+	}
+	return "http://" + updateLoopbackAddress(listen) + "/api/status"
+}
+
+// updateLoopbackAddress turns a listen address into one to connect to: a
+// wildcard host (0.0.0.0, [::], empty) becomes 127.0.0.1.
+func updateLoopbackAddress(listen string) string {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return listen
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, port)
 }
 
 func updateSetExecutable(path string) error {

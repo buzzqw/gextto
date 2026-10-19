@@ -4,6 +4,7 @@
 # the row is updated only while it still holds exactly the old bundled value,
 # so a translation edited by the user is never touched.
 deu:
+  "Motore": ["Engine", "Motor"]
   "), separato dal log di Gextto e conservato tra i riavvii del servizio. Utile quando un download o un trasferimento non si comporta come previsto.": ["), getrennt vom Gextto-log und über Neustarts des Dienstes hinweg erhalten. Nützlich, wenn ein download oder eine Übertragung sich nicht wie erwartet verhält.", "), getrennt vom Gextto-Log und über Neustarts des Dienstes hinweg erhalten. Nützlich, wenn sich ein Download oder eine Übertragung nicht wie erwartet verhält."]
   "A fine seed il torrent completato viene tolto dalla sessione": ["Am Ende des seeding wird der abgeschlossene torrent aus der Sitzung entfernt", "Am Ende des Seedings wird der abgeschlossene Torrent aus der Sitzung entfernt"]
   "Aggiorna le righe del log": ["Die log-Zeilen aktualisieren", "Die Log-Zeilen aktualisieren"]
@@ -179,3 +180,5 @@ pol:
   "Verifica di nuovo i pezzi già scaricati": ["Sprawdź ponownie pobrane już fragmenty", "Sprawdź ponownie pobrane już części"]
   "salvato": ["uratowany", "zapisano"]
   "Jellyfin salvato": ["Jellyfin uratowany", "Zapisano Jellyfin"]
+eng:
+  "Motore": ["Motor", "Engine"]

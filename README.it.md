@@ -138,7 +138,8 @@ Configurazione del NAS e risoluzione dei problemi: il
 Quando esce una release compare il pulsante **Aggiornamento disponibile**;
 *Manutenzione → Aggiornamenti* mostra le novità e **Aggiorna ora** fa il backup
 dei database, installa e ripristina la versione precedente se la nuova non
-parte. Rilanciare l'installer fa lo stesso da shell.
+risponde. Rilanciare l'installer aggiorna anche da shell, con lo stesso
+ripristino e lo stesso utente del servizio.
 
 ```bash
 sudo bash install.sh --help       # tutte le opzioni
