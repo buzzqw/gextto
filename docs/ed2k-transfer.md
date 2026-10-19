@@ -20,6 +20,9 @@ codecs (round-trip and malformed-packet tests), plus a framed `Conn` with a
 bounded payload (16 MiB, one compressed part) and a deadline-aware hello
 handshake that rejects self-answers and zero identities. `internal/ed2k/transfer/source`
 adds the per-file source list with deduplication, failure backoff and expiry.
+`internal/ed2k` now also has the source-discovery codecs: `OP_GETSOURCES` /
+`OP_FOUNDSOURCES` for servers and `SEARCH_SOURCE` requests/results for Kad,
+with the two IPv4 wire orders normalised in one place.
 
 The goal is a pure-Go eMule-compatible client inside `gx-ed2k`, so Gextto can
 turn an eD2k result into a real download without aMule, `amulecmd` or the EC
