@@ -144,6 +144,11 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 	if s != nil && s.rate_history != nil {
 		samples = s.rate_history.snapshot()
 	}
+	// Only the window is drawn: an older sample would pile up on the left edge.
+	start := time.Now().Add(-rateHistoryWindow)
+	for len(samples) > 0 && samples[0].At.Before(start) {
+		samples = samples[1:]
+	}
 	if len(samples) < 2 {
 		return view
 	}
@@ -174,7 +179,6 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 	scale := float64(top) * 1.15
 
 	height := float64(trafficChartHeight)
-	start := time.Now().Add(-rateHistoryWindow)
 	xOf := func(at time.Time) float64 {
 		frac := at.Sub(start).Seconds() / rateHistoryWindow.Seconds()
 		if frac < 0 {
@@ -192,7 +196,7 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 	}
 
 	var downPoints, upPoints strings.Builder
-	lastX := 0.0
+	firstX, lastX := xOf(samples[0].At), 0.0
 	for index, sample := range samples {
 		if index > 0 {
 			downPoints.WriteByte(' ')
@@ -205,7 +209,9 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 	}
 	view.DownPoints = downPoints.String()
 	view.UpPoints = upPoints.String()
-	view.DownArea = "0," + svgNumber(height) + " " + view.DownPoints + " " + svgNumber(lastX) + "," + svgNumber(height)
+	// The area starts under the first sample: the time before it has no data,
+	// and closing it at the left edge drew a ramp from zero.
+	view.DownArea = svgNumber(firstX) + "," + svgNumber(height) + " " + view.DownPoints + " " + svgNumber(lastX) + "," + svgNumber(height)
 
 	view.PeakDown = logging.HumanRate(saturatingInt64(peakDown))
 	view.PeakUp = logging.HumanRate(saturatingInt64(peakUp))

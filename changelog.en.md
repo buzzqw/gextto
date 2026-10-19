@@ -19,6 +19,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
   comes straight back: before, it counted as a success and the service stayed
   down. Running the installer again keeps the user of the installed service,
   instead of switching to the `gextto` account when run as root without `sudo`.
+- **Traffic chart.** On the Dashboard the part of the last 30 minutes with no
+  data yet stays empty, instead of a ramp rising from zero to the first value.
 - **Translations.** The download counter reads "Torrents: 5 · HTTP: 0", right in
   every language; the engine tile on the Dashboard is called "Engine" in English
   and "Motor" in German.

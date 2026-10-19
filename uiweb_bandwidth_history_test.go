@@ -96,6 +96,28 @@ func TestV2TrafficViewBuildsPointsAndLimit(t *testing.T) {
 	}
 }
 
+// TestV2TrafficViewAreaStartsAtTheFirstSample: history that starts mid-window
+// leaves the earlier part empty, instead of a ramp from the left edge; samples
+// older than the window are not drawn.
+func TestV2TrafficViewAreaStartsAtTheFirstSample(t *testing.T) {
+	cfg := DefaultConfig()
+	state := trafficTestState(&cfg)
+	now := time.Now()
+	state.rate_history.add(rateSample{At: now.Add(-rateHistoryWindow - time.Minute), Down: 9999})
+	for i := 0; i < 6; i++ {
+		state.rate_history.add(rateSample{At: now.Add(time.Duration(i-6) * 10 * time.Second), Down: 4 << 20})
+	}
+	view := v2TrafficViewFrom(state)
+	first := strings.SplitN(view.DownArea, " ", 2)[0]
+	x, err := strconv.ParseFloat(strings.SplitN(first, ",", 2)[0], 64)
+	if err != nil || x < trafficChartWidth*0.9 {
+		t.Fatalf("area starts at %q, want under the first sample near the right edge", first)
+	}
+	if strings.HasPrefix(view.DownPoints, "0,") {
+		t.Fatalf("a sample older than the window was drawn: %q", view.DownPoints)
+	}
+}
+
 // TestV2TrafficViewAutoHasNoLimit: Auto policies lift the cap, so the chart must
 // not draw a limit line (the same precedence the daemon applies).
 func TestV2TrafficViewAutoHasNoLimit(t *testing.T) {
