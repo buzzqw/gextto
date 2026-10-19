@@ -323,11 +323,13 @@ Manual search is useful for understanding what Gextto sees before changing a
 configuration or starting a download:
 
 1. enter a title or technical query;
-2. wait for sources to finish, or for slow-source timeouts to appear;
-3. compare title, source, quality, size and seed/peer counts;
-4. use **Filter loaded results** to narrow the list locally;
-5. open **Why not this one?** on interesting results;
-6. click **Queue** only after checking the reason and archive comparison.
+2. tick **Kad** next to the search button to include the eD2k/Kad network
+   (requires the provider enabled in Configuration → Sources);
+3. wait for sources to finish, or for slow-source timeouts to appear;
+4. compare title, source, quality, size and seed/peer counts;
+5. use **Filter loaded results** to narrow the list locally;
+6. open **Why not this one?** on interesting results;
+7. click **Queue** only after checking the reason and archive comparison.
 
 The local filter works on results already received, including title, source and
 technical quality fields. Typing in it does not query indexers again or change

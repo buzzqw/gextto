@@ -325,11 +325,13 @@ La ricerca manuale è utile per capire cosa vede Gextto prima di modificare una
 configurazione o avviare un download:
 
 1. inserisci un titolo o una query tecnica;
-2. attendi che le sorgenti terminino o che il timeout segnali quelle lente;
-3. confronta titolo, sorgente, qualità, dimensione e seed/peer;
-4. usa **Filtra i risultati già caricati** per restringere localmente la lista;
-5. apri **Perché non questa?** sui risultati interessanti;
-6. usa **Accoda** solo dopo aver controllato il motivo e il confronto archivio.
+2. se vuoi includere anche la rete eD2k/Kad, spunta **Kad** accanto al pulsante
+   di ricerca (richiede il provider attivo in Configurazione → Sorgenti);
+3. attendi che le sorgenti terminino o che il timeout segnali quelle lente;
+4. confronta titolo, sorgente, qualità, dimensione e seed/peer;
+5. usa **Filtra i risultati già caricati** per restringere localmente la lista;
+6. apri **Perché non questa?** sui risultati interessanti;
+7. usa **Accoda** solo dopo aver controllato il motivo e il confronto archivio.
 
 Il filtro locale lavora sui risultati già ricevuti, inclusi titolo, sorgente e
 campi tecnici della qualità. Scrivere nel filtro non interroga nuovamente gli
