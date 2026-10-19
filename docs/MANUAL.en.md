@@ -4,8 +4,10 @@ This is the operational guide for Gextto's web UI and terminal TUI. The web
 interface is available in English, Italian, German, French, Spanish and Polish; this document uses
 English labels. For Italian labels, read [MANUAL.it.md](MANUAL.it.md). The
 non-Italian UIs use their bundled catalogs and fall back to this English manual
-for long-form documentation. The in-app **Manual** page follows the language
-selected in its header.
+for long-form documentation. The **Manual** entry opens the updated manual
+online in the interface language; the **Changelog** entry opens the release
+notes. Neither is embedded in the binary, so updating them does not require
+rebuilding Gextto.
 
 > [!IMPORTANT]
 > Start in **dry-run**. Verify paths, source access and one test title before
@@ -590,6 +592,15 @@ When the same cycle offers a single episode and a pack containing it with the
 same score, Gextto picks the release covering more episodes. At an equal score a
 REMUX is still preferred and, at a further tie, the release with **known
 seeders** wins (a healthy swarm is less likely to stall).
+
+While a pack downloads, Gextto reads the file list as soon as it arrives and
+compares it with the library episode by episode. If the pack adds nothing it
+discards it and, if the approval had already replaced an episode, it restores
+the previous version; if only some files are useful it can download just those.
+The discard log shows the comparison (old and new quality and score) and the
+episodes kept or skipped. The two options are in
+*Configuration → Seeding and completion → Pack inspection*; inspection is off by
+default.
 
 An episode that already has a torrent downloading is not missing: it is not
 searched again and it does not appear among the series' missing episodes, even
@@ -1716,7 +1727,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 
 #### Seeding and completion
 
-*How long to seed, what to do when a download finishes and how to handle stalled torrents.*
+*How long to seed, what to do when a download finishes, how to inspect downloading packs and how to handle stalled torrents.*
 
 **Seeds**
 
@@ -1740,6 +1751,13 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Remove completed items after seeding | On: at the end of seeding the completed torrent is removed from the session (like “Clean completed”). Off: at the end of seeding the torrent stays in the list as Completed and you remove it with “Clean completed”. It does not affect where files are moved. |
 | Move episodes/packs to the archive (do not copy) | On: at the end of seeding the downloaded source is deleted (the file stays in the library). Off: the downloaded source is copied to the library and kept. |
 | Hardlink instead of copy while seeding | On (default): a file that keeps seeding enters the library as a hardlink, without using the space twice; when downloads and library are on different filesystems it is copied. See “Hardlinks instead of copies”. |
+
+**Pack inspection**
+
+| Setting | What it does |
+|---|---|
+| Inspect downloading packs and discard useless ones | On: as soon as the engine knows the file list, Gextto checks whether at least one episode is really wanted (missing from the library or a real upgrade). If none is, the torrent is removed with its partial data and blocklisted, so it is not downloaded again. Off (default): the pack is downloaded in full and decided only when the download ends. |
+| In useful packs, download only the files that are needed | On (with inspection): when the pack holds only some useful episodes, the engine downloads only those files and skips the others (priority 0); subtitles and files without an episode number stay active. Off: the useful pack is downloaded in full. |
 
 **Stalled torrents**
 

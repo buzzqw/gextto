@@ -4,8 +4,10 @@ Questa è la guida operativa per la UI web e la TUI terminale di Gextto. La UI �
 disponibile in italiano, inglese, tedesco, francese, spagnolo e polacco; qui sono usate le etichette italiane.
 Per le etichette inglesi consulta [MANUAL.en.md](MANUAL.en.md). La UI tedesca
 francese, spagnola e polacca usano i rispettivi cataloghi incorporati e, per la
-documentazione estesa, il manuale inglese come fallback. La pagina **Manuale**
-dell'app segue la lingua selezionata nell'intestazione.
+documentazione estesa, il manuale inglese come fallback. La voce **Manuale**
+apre il manuale aggiornato online nella lingua dell'interfaccia; la voce
+**Changelog** apre le novità. Manuale e changelog non sono incorporati nel
+binario: si aggiornano senza ricompilare Gextto.
 
 > [!IMPORTANT]
 > Inizia in **dry-run**. Verifica percorsi, accesso alle sorgenti e un titolo di
@@ -601,6 +603,15 @@ un pack che lo contiene con lo stesso punteggio, Gextto sceglie la release che
 copre più episodi. A parità di punteggio resta preferito un REMUX e, a ulteriore
 parità, vince la release con **seed noti** (uno swarm sano è meno a rischio di
 stallo).
+
+Mentre un pack scarica, Gextto legge l’elenco dei file appena arriva e lo
+confronta con la libreria episodio per episodio. Se il pack non aggiunge nulla
+lo scarta e, se l’approvazione aveva già sostituito un episodio, ripristina la
+versione precedente; se solo alcuni file sono utili può scaricare soltanto
+quelli. Il log dello scarto riporta il confronto (qualità e punteggio vecchi e
+nuovi) e gli episodi tenuti o saltati. Le due opzioni sono in
+*Configurazione → Seed e completamento → Controllo dei pack*; l’ispezione è
+spenta per default.
 
 Un episodio che ha già un torrent in download non è un mancante: non viene
 cercato di nuovo e non compare tra i mancanti della serie, anche se il torrent è
@@ -1768,7 +1779,7 @@ spazio del `tmpfs`, come prima.
 
 #### Seed e completamento
 
-*Quanto restare in seed, cosa fare a download finito e come gestire i torrent bloccati.*
+*Quanto restare in seed, cosa fare a download finito, come controllare i pack in download e come gestire i torrent bloccati.*
 
 **Seed**
 
@@ -1792,6 +1803,13 @@ spazio del `tmpfs`, come prima.
 | Elimina i completati dopo il seed | Attivo: a fine seed il torrent completato viene tolto dalla sessione (come «Pulisci completati»). Spento: a fine seed il torrent resta nell'elenco come Completato e lo rimuovi tu con «Pulisci completati». Non influisce su dove vengono spostati i file. |
 | Sposta gli episodi/pack in archivio (non copiare) | Attivo: al termine del seed la sorgente scaricata viene eliminata (il file resta in libreria). Spento: la sorgente scaricata viene copiata in libreria e mantenuta. |
 | Hardlink invece della copia durante il seed | Attivo (predefinito): un file che resta in seed entra in libreria come hardlink, senza occupare spazio due volte; se download e libreria sono su filesystem diversi si copia. Vedi «Hardlink al posto della copia». |
+
+**Controllo dei pack**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Ispeziona i pack in download e scarta quelli inutili | Attivo: appena il motore conosce la lista dei file, Gextto controlla se almeno un episodio serve davvero (manca dalla libreria oppure è un vero upgrade). Se nessuno serve, il torrent viene rimosso con i dati parziali e messo in blocklist, così non viene più scaricato. Spento (predefinito): il pack viene scaricato per intero e deciso solo a download finito. |
+| Nei pack utili scarica solo i file che servono | Attivo (con l'ispezione): quando il pack contiene solo alcuni episodi utili, il motore scarica soltanto quei file e salta gli altri (priorità 0); sottotitoli e file senza numero di episodio restano attivi. Spento: il pack utile viene scaricato per intero. |
 
 **Torrent bloccati**
 
