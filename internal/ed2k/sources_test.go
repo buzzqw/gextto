@@ -162,3 +162,29 @@ func TestSourceSearchEncoding(t *testing.T) {
 		t.Fatalf("size = %d", size)
 	}
 }
+
+func TestSourceResponseKeepsLowID(t *testing.T) {
+	sender, _ := ParseID("11111111111111111111111111111111")
+	target, _ := ParseID("22222222222222222222222222222222")
+	user, _ := ParseID("33333333333333333333333333333333")
+	tags := []Tag{
+		{Name: TagSourceIP, Type: TagUint32, Int: 0x01020304},
+		{Name: TagSourcePort, Type: TagUint16, Int: 0},
+		{Name: TagSourceUDPPort, Type: TagUint16, Int: 4672},
+		{Name: TagSourceType, Type: TagUint8, Int: 3},
+	}
+	w := newWriter(binary.LittleEndian)
+	w.kadID(sender)
+	w.kadID(target)
+	w.u16(1)
+	w.kadID(user)
+	w.u8(uint8(len(tags)))
+	w.raw(WriteTagList(tags, binary.LittleEndian))
+	_, sources, err := decodeSourceResponse(w.buf)
+	if err != nil || len(sources) != 1 {
+		t.Fatalf("sources = %+v, %v", sources, err)
+	}
+	if sources[0].TCPPort != 0 || sources[0].UDPPort != 4672 || sources[0].Type != 3 {
+		t.Fatalf("lowID source = %+v", sources[0])
+	}
+}

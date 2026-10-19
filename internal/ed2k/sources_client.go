@@ -216,10 +216,13 @@ func mergeSources(groups ...[]PeerSource) []PeerSource {
 	var out []PeerSource
 	for _, group := range groups {
 		for _, source := range group {
-			if source.IP == nil || source.TCPPort == 0 {
+			if source.IP == nil || (source.TCPPort == 0 && source.UDPPort == 0) {
 				continue
 			}
 			key := fmt.Sprintf("%s:%d", source.IP.String(), source.TCPPort)
+			if source.TCPPort == 0 {
+				key = fmt.Sprintf("%s:udp/%d", source.IP.String(), source.UDPPort)
+			}
 			if index, ok := seen[key]; ok {
 				existing := &out[index]
 				if existing.UserHash == (ID{}) && source.UserHash != (ID{}) {

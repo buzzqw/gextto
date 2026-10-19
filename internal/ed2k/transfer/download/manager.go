@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +18,14 @@ import (
 // Discoverer finds peers for a file. *ed2k.Client implements it.
 type Discoverer interface {
 	Sources(ctx context.Context, hash string, size int64) ([]ed2k.PeerSource, error)
+}
+
+// Callbacker sends an eMule direct callback to a LowID source. *ed2k.Client
+// implements it; a fake can implement it in tests.
+type Callbacker interface {
+	SendDirectCallback(ctx context.Context, source ed2k.PeerSource, ourPort uint16) error
+	CallbackIdentity() (ed2k.ID, uint16)
+	CanCallback() bool
 }
 
 // ManagerConfig tunes the transfer queue.
@@ -76,6 +86,9 @@ type Manager struct {
 	mu        sync.Mutex
 	transfers map[string]*managedTransfer
 	closed    bool
+
+	callbackMu sync.Mutex
+	pending    map[string]chan net.Conn
 }
 
 // NewManager creates a manager. The context bounds every transfer.
@@ -93,6 +106,7 @@ func NewManager(ctx context.Context, cfg ManagerConfig, discover Discoverer) *Ma
 	manager := &Manager{
 		cfg: cfg, discover: discover, ctx: managerCtx, cancel: cancel,
 		transfers: make(map[string]*managedTransfer),
+		pending:   make(map[string]chan net.Conn),
 	}
 	manager.load()
 	return manager
@@ -191,7 +205,6 @@ func (m *Manager) run(ctx context.Context, id string, link Link) {
 			if ctx.Err() != nil {
 				return
 			}
-			address := fmt.Sprintf("%s:%d", source.IP.String(), source.TCPPort)
 			m.update(id, func(t *Transfer) { t.State = StateDownloading; t.Error = "" })
 
 			fetchCtx, cancel := context.WithTimeout(ctx, m.cfg.FetchBudget)
@@ -202,7 +215,14 @@ func (m *Manager) run(ctx context.Context, id string, link Link) {
 			cfg.OnProgress = func(done, total int64) {
 				m.update(id, func(t *Transfer) { t.Done = done; t.Size = total })
 			}
-			result, err := Fetch(fetchCtx, address, link, cfg)
+			var result *Result
+			var err error
+			if source.TCPPort == 0 {
+				result, err = m.fetchViaCallback(fetchCtx, source, link, cfg)
+			} else {
+				address := fmt.Sprintf("%s:%d", source.IP.String(), source.TCPPort)
+				result, err = Fetch(fetchCtx, address, link, cfg)
+			}
 			cancel()
 			if err == nil {
 				m.update(id, func(t *Transfer) {
@@ -220,7 +240,7 @@ func (m *Manager) run(ctx context.Context, id string, link Link) {
 				return
 			}
 			if m.cfg.Fetch.Logf != nil {
-				m.cfg.Fetch.Logf("download: %s failed: %v", address, err)
+				m.cfg.Fetch.Logf("download: source %s failed: %v", source.IP, err)
 			}
 			if IsQueued(err) {
 				queued = true
@@ -239,6 +259,39 @@ func (m *Manager) run(ctx context.Context, id string, link Link) {
 		// Keep the row in the error state but retry: a source may come back,
 		// a queue may free a slot, or a new source may appear in Kad.
 		m.fail(id, lastErr)
+	}
+}
+
+func (m *Manager) fetchViaCallback(ctx context.Context, source ed2k.PeerSource, link Link, cfg Config) (*Result, error) {
+	callback, ok := m.discover.(Callbacker)
+	if !ok {
+		return nil, errors.New("download: direct callback is not available")
+	}
+	if !callback.CanCallback() {
+		return nil, errors.New("download: our TCP port is not reachable (LowID), direct callback skipped")
+	}
+	if source.UDPPort == 0 {
+		return nil, errors.New("download: LowID source has no UDP port")
+	}
+	ip := source.IP.String()
+	channel, done := m.expectCallback(ip)
+	defer done()
+	_, ourPort := callback.CallbackIdentity()
+	if err := callback.SendDirectCallback(ctx, source, ourPort); err != nil {
+		return nil, err
+	}
+	if cfg.Logf != nil {
+		cfg.Logf("download: direct callback sent to %s:%d, waiting for the source", ip, source.UDPPort)
+	}
+	timer := time.NewTimer(90 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-timer.C:
+		return nil, errors.New("download: direct callback timed out")
+	case conn := <-channel:
+		return FetchCallback(ctx, conn, link, cfg)
 	}
 }
 
@@ -306,6 +359,61 @@ func (m *Manager) fail(id string, err error) {
 		t.State = StateError
 		t.Error = err.Error()
 	})
+}
+
+// WantsIncoming reports whether an accepted connection comes from a source we
+// asked to call us back.
+func (m *Manager) WantsIncoming(conn net.Conn) bool {
+	ip := remoteIP(conn.RemoteAddr())
+	if ip == "" {
+		return false
+	}
+	m.callbackMu.Lock()
+	defer m.callbackMu.Unlock()
+	_, ok := m.pending[ip]
+	return ok
+}
+
+// HandleIncoming hands an accepted callback connection to the waiting worker.
+func (m *Manager) HandleIncoming(conn net.Conn) {
+	ip := remoteIP(conn.RemoteAddr())
+	m.callbackMu.Lock()
+	channel := m.pending[ip]
+	m.callbackMu.Unlock()
+	if channel == nil {
+		_ = conn.Close()
+		return
+	}
+	select {
+	case channel <- conn:
+	default:
+		_ = conn.Close()
+	}
+}
+
+func (m *Manager) expectCallback(ip string) (chan net.Conn, func()) {
+	channel := make(chan net.Conn, 1)
+	m.callbackMu.Lock()
+	m.pending[ip] = channel
+	m.callbackMu.Unlock()
+	return channel, func() {
+		m.callbackMu.Lock()
+		if m.pending[ip] == channel {
+			delete(m.pending, ip)
+		}
+		m.callbackMu.Unlock()
+	}
+}
+
+func remoteIP(addr net.Addr) string {
+	if addr == nil {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		return ""
+	}
+	return strings.Trim(host, "[]")
 }
 
 // List returns a snapshot ordered by creation time.

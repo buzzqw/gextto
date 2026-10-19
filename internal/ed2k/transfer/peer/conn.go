@@ -144,3 +144,39 @@ func (c *Conn) Handshake(ctx context.Context, hello Hello) (Hello, error) {
 
 // Close closes the underlying connection.
 func (c *Conn) Close() error { return c.conn.Close() }
+
+// HandshakeIncoming is the server side of the hello exchange: the remote
+// source initiates the connection after a direct callback, sends OP_HELLO and
+// expects our OP_HELLOANSWER. It is used when a LowID peer calls us back.
+func (c *Conn) HandshakeIncoming(ctx context.Context, hello Hello) (Hello, error) {
+	if hello.UserHash == (ed2k.ID{}) {
+		return Hello{}, errors.New("peer: incoming hello without a user hash")
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		if err := c.conn.SetDeadline(deadline); err != nil {
+			return Hello{}, err
+		}
+		defer c.conn.SetDeadline(time.Time{})
+	}
+	opcode, payload, err := c.Receive()
+	if err != nil {
+		return Hello{}, fmt.Errorf("peer: read incoming hello: %w", err)
+	}
+	if opcode != OpHello {
+		return Hello{}, fmt.Errorf("peer: expected incoming hello, got opcode 0x%02X", opcode)
+	}
+	remote, err := DecodeHelloRequest(payload)
+	if err != nil {
+		return Hello{}, err
+	}
+	if remote.UserHash == hello.UserHash {
+		return Hello{}, errors.New("peer: incoming hello from ourselves")
+	}
+	if remote.UserHash == (ed2k.ID{}) {
+		return Hello{}, errors.New("peer: incoming hello without a user hash")
+	}
+	if err := c.Send(OpHelloAnswer, EncodeHello(hello)); err != nil {
+		return Hello{}, fmt.Errorf("peer: send hello answer: %w", err)
+	}
+	return remote, nil
+}

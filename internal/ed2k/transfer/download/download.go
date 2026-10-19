@@ -146,6 +146,7 @@ type session struct {
 	name     string
 
 	accepted  bool
+	incoming  bool
 	rank      uint16
 	peerParts []bool
 
@@ -161,26 +162,10 @@ func Fetch(ctx context.Context, address string, link Link, cfg Config) (*Result,
 		return nil, errors.New("download: invalid link")
 	}
 	cfg.applyDefaults()
-	if err := os.MkdirAll(cfg.TempDir, 0o755); err != nil {
+	pf, partPath, resumed, err := preparePart(link, cfg)
+	if err != nil {
 		return nil, err
 	}
-
-	partPath := filepath.Join(cfg.TempDir, link.Hash.Hex()+".part")
-	var pf *partfile.PartFile
-	var resumed bool
-	if _, err := os.Stat(partPath + ".met"); err == nil {
-		pf, err = partfile.Open(partPath)
-		if err != nil {
-			return nil, fmt.Errorf("download: resume: %w", err)
-		}
-		if pf.Meta.File != link.Hash || pf.Meta.Size != link.Size {
-			pf.Close()
-			return nil, errors.New("download: part file does not match the link")
-		}
-		resumed = true
-	}
-
-	cfg.applyDefaults()
 	if cfg.Logf != nil {
 		cfg.Logf("download: dialing %s for %q (%d bytes)", address, link.Name, link.Size)
 	}
@@ -192,18 +177,72 @@ func Fetch(ctx context.Context, address string, link Link, cfg Config) (*Result,
 		}
 		return nil, fmt.Errorf("download: dial %s: %w", address, err)
 	}
-	s := &session{
-		cfg:      cfg,
-		link:     link,
-		conn:     peer.NewConn(conn),
-		pf:       pf,
-		partPath: partPath,
-		name:     link.Name,
-		parts:    make(map[int]*partDownload),
-		pending:  make(map[blockKey]pendingBlock),
+	s := newSession(cfg, link, peer.NewConn(conn), pf, partPath)
+	return runSession(ctx, s, resumed)
+}
+
+// FetchCallback downloads from a LowID source that connected to us after a
+// direct callback. The hello exchange is the server side; the rest of the
+// protocol is identical to an outgoing download.
+func FetchCallback(ctx context.Context, conn net.Conn, link Link, cfg Config) (*Result, error) {
+	if link.Hash == (ed2k.ID{}) || link.Size <= 0 {
+		return nil, errors.New("download: invalid link")
 	}
+	cfg.applyDefaults()
+	pf, partPath, resumed, err := preparePart(link, cfg)
+	if err != nil {
+		return nil, err
+	}
+	client := peer.NewConn(conn)
+	if cfg.Logf != nil {
+		cfg.Logf("download: incoming callback from %s for %q", conn.RemoteAddr(), link.Name)
+	}
+	s := newSession(cfg, link, client, pf, partPath)
+	s.incoming = true
+	if _, err := client.HandshakeIncoming(ctx, peer.Hello{
+		UserHash: cfg.UserHash, ClientID: cfg.ClientID, Port: cfg.TCPPort,
+		Name: cfg.ClientName, Version: ed2k.KadProtocolVersion, KadPort: 0,
+	}); err != nil {
+		if pf != nil {
+			pf.Close()
+		}
+		client.Close()
+		return nil, fmt.Errorf("download: callback handshake: %w", err)
+	}
+	return runSession(ctx, s, resumed)
+}
+
+func preparePart(link Link, cfg Config) (*partfile.PartFile, string, bool, error) {
+	if err := os.MkdirAll(cfg.TempDir, 0o755); err != nil {
+		return nil, "", false, err
+	}
+	partPath := filepath.Join(cfg.TempDir, link.Hash.Hex()+".part")
+	var pf *partfile.PartFile
+	var resumed bool
+	if _, err := os.Stat(partPath + ".met"); err == nil {
+		var err error
+		pf, err = partfile.Open(partPath)
+		if err != nil {
+			return nil, "", false, fmt.Errorf("download: resume: %w", err)
+		}
+		if pf.Meta.File != link.Hash || pf.Meta.Size != link.Size {
+			pf.Close()
+			return nil, "", false, errors.New("download: part file does not match the link")
+		}
+		resumed = true
+	}
+	return pf, partPath, resumed, nil
+}
+
+func newSession(cfg Config, link Link, conn *peer.Conn, pf *partfile.PartFile, partPath string) *session {
+	return &session{
+		cfg: cfg, link: link, conn: conn, pf: pf, partPath: partPath, name: link.Name,
+		parts: make(map[int]*partDownload), pending: make(map[blockKey]pendingBlock),
+	}
+}
+
+func runSession(ctx context.Context, s *session, resumed bool) (*Result, error) {
 	defer s.conn.Close()
-	// A paused/removed transfer must stop now, not after the next idle timeout.
 	stopped := make(chan struct{})
 	go func() {
 		select {
@@ -213,7 +252,6 @@ func Fetch(ctx context.Context, address string, link Link, cfg Config) (*Result,
 		}
 	}()
 	defer close(stopped)
-
 	if err := s.run(ctx); err != nil {
 		if s.pf != nil {
 			s.pf.Close()
@@ -222,13 +260,14 @@ func Fetch(ctx context.Context, address string, link Link, cfg Config) (*Result,
 	}
 	return s.finish(resumed)
 }
-
 func (s *session) run(ctx context.Context) error {
 	if s.pf != nil && s.pf.Complete() {
 		return nil
 	}
-	if err := s.handshake(ctx); err != nil {
-		return err
+	if !s.incoming {
+		if err := s.handshake(ctx); err != nil {
+			return err
+		}
 	}
 	s.logf("download: handshake with %s complete", s.conn.RemoteAddr())
 	if err := s.conn.SendExtended(peer.OpEmuleInfo, peer.EncodeMuleInfo()); err != nil {

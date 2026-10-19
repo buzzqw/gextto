@@ -129,8 +129,8 @@ func sourceFromTags(userHash ID, tags []Tag) (PeerSource, bool) {
 	// A Kad source tag carries the address as a host-order integer, so the
 	// most significant byte is the first octet.
 	ip := net.IPv4(byte(ipValue>>24), byte(ipValue>>16), byte(ipValue>>8), byte(ipValue))
-	port, ok := tagUint(byID, TagSourcePort)
-	if !ok || port == 0 || port > math.MaxUint16 {
+	port, hasPort := tagUint(byID, TagSourcePort)
+	if hasPort && port > math.MaxUint16 {
 		return PeerSource{}, false
 	}
 	source := PeerSource{
@@ -147,6 +147,12 @@ func sourceFromTags(userHash ID, tags []Tag) (PeerSource, bool) {
 	}
 	if encryption, ok := tagUint(byID, TagEncryption); ok && encryption <= math.MaxUint8 {
 		source.Encryption = uint8(encryption)
+	}
+	// Types 3, 5 and 6 are firewalled: they have no inbound TCP port but can
+	// be reached with a direct UDP callback.
+	lowID := source.Type == 3 || source.Type == 5 || source.Type == 6
+	if source.TCPPort == 0 && !(lowID && source.UDPPort != 0) {
+		return PeerSource{}, false
 	}
 	return source, true
 }

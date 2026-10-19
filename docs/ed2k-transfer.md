@@ -34,7 +34,11 @@ client header is protocol/length/opcode (length includes
 the opcode), OP_HELLO has a leading hash-size byte and a six-byte server
 IP/port suffix, the file-name length is 16-bit, and an extended file request
 carries the part-status and complete-source words. Files above 4 GiB use the
-I64 request/part opcodes. A queued transfer keeps retrying. Do not send OP_SETREQFILEID before
+I64 request/part opcodes. LowID Kad sources (type 3/5/6) are kept even without
+an inbound TCP port: when our own port is open (HighID), the manager sends
+OP_DIRECTCALLBACKREQ over UDP, waits for the source to connect back and runs a
+server-side hello plus the normal download over that connection. Buddy relay
+and TCP hole punching for a LowID client are still missing. A queued transfer keeps retrying. Do not send OP_SETREQFILEID before
 OP_STARTUPLOADREQ: real eMule peers close the socket after accepting the slot
 when that packet arrives, while aMule tolerates it. With the packet removed, a
 live download of the 4.2 MB eMule 0.70b installer completed, passed the final

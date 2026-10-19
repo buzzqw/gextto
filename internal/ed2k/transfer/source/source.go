@@ -18,6 +18,7 @@ type Source struct {
 	TCPPort  uint16
 	UDPPort  uint16
 	UserHash ed2k.ID
+	Type     uint8
 	Origin   string
 	LastSeen time.Time
 	Failures int
@@ -27,7 +28,10 @@ type Source struct {
 // Key is the identity used for deduplication: a peer is reachable at one
 // TCP endpoint even if it was learned from different networks.
 func (s Source) Key() string {
-	return fmt.Sprintf("%s:%d", s.IP.String(), s.TCPPort)
+	if s.TCPPort != 0 {
+		return fmt.Sprintf("%s:%d", s.IP.String(), s.TCPPort)
+	}
+	return fmt.Sprintf("%s:udp/%d", s.IP.String(), s.UDPPort)
 }
 
 // List is a bounded source set for one file.
@@ -48,7 +52,11 @@ func New(max int) *List {
 // invalid or the source was rejected.
 func (l *List) Add(source Source, now time.Time) bool {
 	ip := source.IP.To4()
-	if ip == nil || source.TCPPort == 0 || source.TCPPort > 65535 {
+	if ip == nil {
+		return false
+	}
+	lowID := source.TCPPort == 0 && source.UDPPort != 0 && (source.Type == 3 || source.Type == 5 || source.Type == 6)
+	if !lowID && (source.TCPPort == 0 || source.TCPPort > 65535) {
 		return false
 	}
 	// A private, link-local or multicast address can never be a public eD2k

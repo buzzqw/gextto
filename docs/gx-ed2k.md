@@ -191,7 +191,10 @@ Fatti verificati sul sorgente e bloccati dai test:
 - non si manda `OP_SETREQFILEID` prima di `OP_STARTUPLOADREQ`: eMule reale
   chiude la connessione, aMule la tollera; il test del fake peer lo impedisce;
 - per i file multi-parte si legge `OP_FILESTATUS` e si chiedono solo le parti
-  dichiarate dal peer.
+  dichiarate dal peer;
+- per le fonti LowID si invia `OP_DIRECTCALLBACKREQ` (UDP 0xC5/0x95) e si
+  accetta la connessione di ritorno solo quando la nostra porta è raggiungibile
+  (HighID); il buddy relay non è implementato.
 
 I test `TestClientWireInvariants`, `TestKadWireFormat`, i test dei codec e il
 fake peer in `internal/ed2k/transfer/download` bloccano questi invarianti.
