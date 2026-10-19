@@ -355,7 +355,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("downloads -> %d", code)
 	}
-	for _, marker := range []string{"Pulisci completati", "Strumenti", "Aggiorna ogni 5 s", "Rimozione a fine seed", "Eccezione per adesso", "Nuovo tag", "Prealloca spazio", `title="Incolla un link magnet`, `title="Avvia il download subito`, `title="Ricarica l'elenco dei torrent`, `title="Applica l'eccezione con questi valori`, `title="Metti in pausa i torrent selezionati`} {
+	for _, marker := range []string{"Pulisci completati", "Strumenti", "Aggiorna ogni 5 s", "Rimozione a fine seed", "Eccezione per adesso", "Nuovo tag", "Prealloca spazio", `title="Incolla un link magnet`, `title="Avvia il download subito`, `title="Ricarica l'elenco dei torrent`, `title="Applica l'eccezione con questi valori`, `title="Metti in pausa i torrent selezionati`, "Cerca una release", `name="kad"`, `id="v2-downloads-search-results"`, `name="view" value="downloads"`} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("downloads missing %q", marker)
 		}

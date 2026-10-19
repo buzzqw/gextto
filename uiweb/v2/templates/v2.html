@@ -384,6 +384,18 @@
 {{define "v2_downloads"}}
 <div class="view downloads-view{{if .AddLink}} has-add-link{{end}}">
   {{if .Flash}}<p class="{{if .FlashErr}}alert{{else}}muted{{end}} downloads-flash" role="status" aria-live="polite">{{.Flash}}</p>{{end}}
+  <details class="panel downloads-search-panel" open>
+    <summary class="panel-head"><h3>Cerca una release</h3><small class="muted">Archivio, indexer, motori web e Kad</small></summary>
+    <div class="panel-body">
+      <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-downloads-search-results" hx-swap="innerHTML">
+        <input type="search" name="q" value="{{.Search.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
+        <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche sulla rete Kad (eD2k), se attiva in Configurazione → Sorgenti">Kad</label>
+        <input type="hidden" name="view" value="downloads" />
+        <button class="btn primary" type="submit">Cerca</button>
+      </form>
+      <div id="v2-downloads-search-results">{{template "v2_search_results" .Search}}</div>
+    </div>
+  </details>
   <details class="panel add-torrent-panel" id="v2-add-torrent">
     <summary class="panel-head"><h3><span class="add-torrent-plus" aria-hidden="true">＋ </span>Aggiungi torrent</h3><small class="muted">Magnet, URL .torrent o file locale</small></summary>
     <div class="panel-body">

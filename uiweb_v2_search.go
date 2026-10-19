@@ -47,7 +47,13 @@ type v2ExplainView struct {
 func V2Search(w http.ResponseWriter, r *http.Request, s *AppState) {
 	query := strings.TrimSpace(r.FormValue("q"))
 	kad := r.FormValue("kad") != ""
-	view := v2SearchViewFrom(s, query, "/?view=search", kad)
+	redirect := "/?view=search"
+	if r.FormValue("view") == "downloads" {
+		// The same form is embedded in Scarico: keep the user there after
+		// adding a result instead of jumping to Esplora.
+		redirect = "/?view=downloads"
+	}
+	view := v2SearchViewFrom(s, query, redirect, kad)
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_search_results", view, dict, eng)
 }

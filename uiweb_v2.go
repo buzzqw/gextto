@@ -494,6 +494,9 @@ type v2DownloadsView struct {
 	FlashErr bool
 	// AddLink pre-fills the add form (a link shared from another app).
 	AddLink string
+	// Search is the release search shown above the download list, with the
+	// Kad opt-in next to the query like the dashboard and Esplora panels.
+	Search v2SearchView
 }
 
 func v2SectionTables(s *AppState, r *http.Request, sections []uiPageSection, views []string) []v2TableData {
@@ -607,6 +610,7 @@ func v2DownloadsViewFrom(s *AppState, r *http.Request) v2DownloadsView {
 		Flash:          strings.TrimSpace(r.FormValue("msg")),
 		FlashErr:       r.FormValue("msg_err") == "1",
 		AddLink:        strings.TrimSpace(r.FormValue("add")),
+		Search:         v2SearchView{Redirect: "/?view=downloads"},
 	}
 }
 
