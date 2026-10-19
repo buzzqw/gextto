@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -20,6 +21,7 @@ type fakeKadNode struct {
 	fileHash ID
 	files    []SearchFile
 	queries  chan string
+	mu       sync.Mutex
 	// dropSearches makes the fake ignore the first N keyword searches, to
 	// exercise the client's retry path.
 	dropSearches int
@@ -66,13 +68,35 @@ func (n *fakeKadNode) loop() {
 				continue
 			}
 			n.reply(addr, KadRes, encodeNodeResponse(target, nil))
+		case KadSearchSource:
+			target, _, _, err := decodeSearchRequest(payload)
+			if err != nil {
+				continue
+			}
+			w := newWriter(binary.LittleEndian)
+			w.kadID(n.id)
+			w.kadID(target)
+			w.u16(1)
+			w.kadID(n.fileHash)
+			tags := []Tag{
+				{Name: TagSourceIP, Type: TagUint32, Int: 0x08080404},
+				{Name: TagSourcePort, Type: TagUint16, Int: 4662},
+				{Name: TagSourceUDPPort, Type: TagUint16, Int: 4672},
+				{Name: TagSourceType, Type: TagUint8, Int: 1},
+			}
+			w.u8(uint8(len(tags)))
+			w.raw(WriteTagList(tags, binary.LittleEndian))
+			n.reply(addr, KadSearchRes, w.buf)
 		case KadSearchKeyReq:
 			target, _, _, err := decodeSearchRequest(payload)
 			if err != nil {
 				continue
 			}
+			n.mu.Lock()
 			n.searchCount++
-			if n.searchCount <= n.dropSearches {
+			drop := n.searchCount <= n.dropSearches
+			n.mu.Unlock()
+			if drop {
 				continue
 			}
 			keyword := ""
@@ -311,7 +335,9 @@ func TestContactValidRejectsNonRoutableIPs(t *testing.T) {
 
 func TestKadSearchRetriesWhenFirstRoundIsSilent(t *testing.T) {
 	node := newFakeKadNode(t)
+	node.mu.Lock()
 	node.dropSearches = 1
+	node.mu.Unlock()
 	dataDir := t.TempDir()
 	seed := Contact{ID: node.id, IP: net.IPv4(127, 0, 0, 1), UDPPort: uint16(node.address().Port), TCPPort: 4662, Version: KadVersion}
 	if err := WriteNodesFile(filepath.Join(dataDir, "nodes.dat"), []Contact{seed}); err != nil {
@@ -336,7 +362,45 @@ func TestKadSearchRetriesWhenFirstRoundIsSilent(t *testing.T) {
 	if len(files) != 1 || files[0].Name != "The Matrix 1999 1080p.mkv" {
 		t.Fatalf("retry returned %+v", files)
 	}
-	if node.searchCount < 2 {
-		t.Fatalf("search requests = %d, want at least 2", node.searchCount)
+	node.mu.Lock()
+	count := node.searchCount
+	node.mu.Unlock()
+	if count < 2 {
+		t.Fatalf("search requests = %d, want at least 2", count)
+	}
+}
+
+func TestKadSourcesAgainstFakeNode(t *testing.T) {
+	node := newFakeKadNode(t)
+	dataDir := t.TempDir()
+	seed := Contact{ID: node.id, IP: net.IPv4(127, 0, 0, 1), UDPPort: uint16(node.address().Port), TCPPort: 4662, Version: KadVersion}
+	if err := WriteNodesFile(filepath.Join(dataDir, "nodes.dat"), []Contact{seed}); err != nil {
+		t.Fatal(err)
+	}
+	client, err := New(Config{
+		DataDir:       dataDir,
+		UDPListen:     "127.0.0.1:0",
+		SearchTimeout: 4 * time.Second,
+		QueryTimeout:  1500 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	sources, err := client.Sources(ctx, node.fileHash.Hex(), 7_000_000_000)
+	if err != nil {
+		t.Fatalf("Sources: %v", err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("sources = %+v", sources)
+	}
+	source := sources[0]
+	if !source.IP.Equal(net.IPv4(8, 8, 4, 4)) || source.TCPPort != 4662 || source.UDPPort != 4672 {
+		t.Fatalf("source = %+v", source)
+	}
+	if source.UserHash != node.fileHash || source.Origin != "kad" {
+		t.Fatalf("source = %+v", source)
 	}
 }

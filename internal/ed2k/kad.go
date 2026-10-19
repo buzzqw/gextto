@@ -150,7 +150,8 @@ type Client struct {
 }
 
 type collector struct {
-	files chan SearchFile
+	files   chan SearchFile
+	sources chan PeerSource
 }
 
 // New creates a client. Start binds the socket and bootstraps; Search does
@@ -914,13 +915,31 @@ func (c *Client) handlePacket(data []byte, addr *net.UDPAddr) {
 		if err != nil {
 			return
 		}
+		_, sources, sourceErr := decodeSourceResponse(payload)
+		if sourceErr != nil {
+			sources = nil
+		}
 		c.mu.Lock()
 		collectors := append([]*collector(nil), c.searches[target]...)
 		c.mu.Unlock()
 		for _, file := range files {
 			for _, collector := range collectors {
+				if collector.files == nil {
+					continue
+				}
 				select {
 				case collector.files <- file:
+				default:
+				}
+			}
+		}
+		for _, source := range sources {
+			for _, collector := range collectors {
+				if collector.sources == nil {
+					continue
+				}
+				select {
+				case collector.sources <- source:
 				default:
 				}
 			}

@@ -104,3 +104,60 @@ func TestReadPackedServerPacket(t *testing.T) {
 		t.Fatalf("opcode=%#x body=%x", opcode, decoded)
 	}
 }
+
+func TestServerSourcesAgainstFakeServer(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	hash, _ := ParseID("55555555555555555555555555555555")
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		opcode, _, err := readServerPacket(conn)
+		if err != nil || opcode != OpLoginRequest {
+			return
+		}
+		_ = writeServerPacket(conn, OpIDChange, []byte{0, 0, 0, 1})
+		opcode, payload, err := readServerPacket(conn)
+		if err != nil || opcode != OpGetSources || len(payload) != 20 {
+			return
+		}
+		reply := append([]byte(nil), hash[:]...)
+		reply = append(reply, 2)
+		reply = append(reply, 1, 2, 3, 4, 0x36, 0x12)
+		reply = append(reply, 5, 6, 7, 8, 0x88, 0x13)
+		_ = writeServerPacket(conn, OpFoundSources, reply)
+	}()
+
+	client, err := New(Config{
+		DataDir:       t.TempDir(),
+		UDPListen:     "127.0.0.1:0",
+		Servers:       []string{listener.Addr().String()},
+		SearchTimeout: 4 * time.Second,
+		QueryTimeout:  time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	sources, err := client.Sources(ctx, hash.Hex(), 1234)
+	if err != nil {
+		t.Fatalf("Sources: %v", err)
+	}
+	if len(sources) != 2 {
+		t.Fatalf("sources = %+v", sources)
+	}
+	if !sources[0].IP.Equal(net.IPv4(1, 2, 3, 4)) || sources[0].TCPPort != 4662 || sources[0].Origin != "server" {
+		t.Fatalf("source = %+v", sources[0])
+	}
+	if !sources[1].IP.Equal(net.IPv4(5, 6, 7, 8)) || sources[1].TCPPort != 5000 {
+		t.Fatalf("source = %+v", sources[1])
+	}
+}
