@@ -601,17 +601,28 @@ Caveats: one run, one daemon and one network; DHT coverage varies with the
 routing table and peers throttle a burst; the 500-result cap and the regex
 matching are approximations; no downloaded file was validated.
 
-**Gate conclusion (preliminary).** 13% of the sampled real gaps clear the
-automatic fallback floor on gx-ed2k 1.1.16. That is below the level that would
-justify the 6.5–10 month eMule transfer engine, so Kad stays an optional
-**manual** search provider for now.
+**Second stratified sample (gx-ed2k 1.1.23, different episodes).** The same 30
+series with `-sample random -seed 2026`, 65 s between searches, after the broad
+retry and the episode-variant filter:
 
-The number is a **lower bound**, though: 1.1.23 adds a broad retry. When the
-exact episode token is silent, the daemon re-queries the title and filters the
-episode locally, accepting `S04E01`, `S04.E01` and `4x01`. Live check:
-`Tracker S04E01` went from **0** in the sample to **5 Kad results** (4 exact,
-6/5/5/2 sources). A new stratified sample with 1.1.23 is running before the
-transfer question is closed.
+| Measure | Result |
+|---|---|
+| Queries (one per series) | 30 |
+| With at least one Kad-origin result | 4/30 (13%) |
+| Exact episode + recognisable quality + plausible size | 3/30 (10%) |
+| Same, with at least 3 sources (default fallback floor) | **2/30 (7%)** |
+
+`CIA S02E02` (3 results with ≥3 sources) and `The Pitt S02E14` (1) clear the
+floor; `Surrealestate S02E04` has one exact result but a single source. The
+broad retry does recover individual cases (`Tracker S04E01` went from 0 to 5
+Kad results in a spot check), but it does not change the aggregate.
+
+**Gate conclusion.** Two independent 30-series samples put the real-fallback
+coverage at **7–13%** (2/30 and 4/30 with ≥3 sources). That is below the level
+that justifies the 6.5–10 month eMule transfer engine. Kad stays an optional
+**manual** search provider, `ed2k_fallback` stays off, and the T0/T1 spikes stay
+isolated from the daemon. The question is reopened only by a material change in
+metadata/aliases or by a much larger sample showing a different picture.
 
 **Localized vs original title.** The library name is not always the name on
 Kad. Two spot checks against the same routing table:

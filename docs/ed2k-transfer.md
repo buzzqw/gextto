@@ -1,9 +1,10 @@
 # eD2k/Kad transfer plane — design (gated)
 
-**Status: design only, with an isolated T0 spike.** The search plane is complete
-and measured; this document prepares the transfer plane, but nothing is wired
-into the daemon while the Phase 0 gate is open. The decision criteria are at the
-end.
+**Status: archived after the gate, with isolated T0/T1 spikes.** The Phase 0
+gate came back at **7–13%** real-fallback coverage in two independent samples
+(4/30 and 2/30 with ≥3 sources), so the transfer engine is **not started**. The
+design stays here for a future decision; the part-file and packet codecs remain
+isolated from the daemon. The decision criteria are at the end.
 
 Spike (19 October 2026): `internal/ed2k/transfer/partfile` implements the
 9,728,000-byte part geometry, streaming MD4 whole-file/per-part hashing and the
