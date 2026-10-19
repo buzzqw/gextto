@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -71,5 +72,30 @@ func TestUpdateApplyRejectsLocalBuild(t *testing.T) {
 	daemon.handleUpdateApply(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/update/apply", nil))
 	if recorder.Code != http.StatusConflict || !strings.Contains(recorder.Body.String(), "local build") {
 		t.Fatalf("local build = %d %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestDownloadUpdate(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/large" {
+			_, _ = w.Write([]byte("0123456789"))
+			return
+		}
+		if r.URL.Path == "/missing" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte("payload"))
+	}))
+	defer server.Close()
+	got, err := downloadUpdate(context.Background(), server.Client(), server.URL+"/ok", 16)
+	if err != nil || string(got) != "payload" {
+		t.Fatalf("download = %q, %v", got, err)
+	}
+	if _, err := downloadUpdate(context.Background(), server.Client(), server.URL+"/large", 4); err == nil {
+		t.Fatal("large download must fail")
+	}
+	if _, err := downloadUpdate(context.Background(), server.Client(), server.URL+"/missing", 16); err == nil {
+		t.Fatal("HTTP 404 must fail")
 	}
 }
