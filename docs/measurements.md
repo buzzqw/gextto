@@ -575,6 +575,38 @@ The tree target is the first real title word; episode markers, years and
 quality tags are skipped for the target but kept in the AND filter, and stop
 words are dropped so `The.Matrix.1999.mkv` still matches.
 
+### Phase 0 stratified sample — 30 series, 19 October 2026
+
+One already-aired gap per series (30 series in the gap list), query
+`<series or alias> SxxEyy`, 15 s timeout, 65 s between searches, gx-ed2k
+1.1.16 (before the retry/pacing change), 5 series queried by their alias.
+
+| Measure | Result |
+|---|---|
+| Queries (one per series) | 30 |
+| With at least one Kad-origin result | 7/30 (23%) |
+| Exact episode + recognisable quality + plausible size | 6/30 (20%) |
+| Same, with at least 2 sources | 5/30 (17%) |
+| Same, with at least 3 sources (default fallback floor) | 4/30 (13%) |
+
+The four series that clear the real floor are `9-1-1`, `CIA`, `Elsbeth` and
+`Scrubs`; `Surrealestate` (Agenzia Roman) and `FBI S03E12` have an exact,
+qualified result but only 1–2 sources. `Strike S04E01` has an exact name but no
+recognisable quality in the name. The other 23 series returned no exact Kad
+result; many of those queries still returned 500 eD2k **server** results with
+unrelated names, which confirms that the restrictive tree filtered the Kad
+bucket rather than filling it with noise.
+
+Caveats: one run, one daemon and one network; DHT coverage varies with the
+routing table and peers throttle a burst; the 500-result cap and the regex
+matching are approximations; no downloaded file was validated.
+
+**Gate conclusion.** 13% of the sampled real gaps clear the automatic fallback
+floor. That is not enough to justify the 6.5–10 month eMule transfer engine.
+Kad stays an optional **manual** search provider (and the automatic fallback
+stays off); the question is reopened only by a larger, multi-day sample or by
+metadata aliases that materially change the query.
+
 **Localized vs original title.** The library name is not always the name on
 Kad. Two spot checks against the same routing table:
 

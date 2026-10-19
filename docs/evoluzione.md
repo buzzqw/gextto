@@ -670,6 +670,15 @@ The gate is measured, not assumed:
    upload. The `multi_engine` router already merges rows, labels the network and
    routes by hash, so the automation does not need a second rewrite.
 
+**Gate 1 result (19 October 2026).** A stratified sample of 30 real gaps (one per
+series, aliases where available) found **4/30 (13%)** with an exact episode, a
+recognisable quality, a plausible size and at least the default 3 sources;
+7/30 had some Kad result. That is below the level that justifies the 6.5–10
+month eMule transfer engine. Kad stays an optional **manual** search provider,
+`ed2k_fallback` stays off, and the question is reopened only by a larger
+multi-day sample or by metadata changes that materially improve the query. The
+numbers and caveats are in [`measurements.md`](measurements.md).
+
 **Waiting for a measurement or a host.**
 
 - **Choking on a real swarm.** The controlled evidence is healthy (§4.6 of [`measurements.md`](measurements.md)): a real
