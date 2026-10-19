@@ -525,6 +525,44 @@ cached by aMule (`~/.aMule/nodes.dat`) and then the rebuilt daemon
 The earlier "outbound UDP blocked" note is superseded: UDP was fine, the
 datagrams were addressed to byte-reversed IPs.
 
+### Phase 0 sample — 30 gaps, 19 October 2026
+
+A first sample of the Fase 0 gate: 30 gaps spread across the 475 open
+episodes, queried as `<series> SxxEyy` against the daemon (Kad + eD2k
+servers), 12 s timeout. At that point the client still used the longest token
+as the Kad lookup target and did not send an expression tree.
+
+| Measure | Result |
+|---|---|
+| Queries with at least one Kad-origin result | 27/30 |
+| Exact episode + recognisable quality + plausible size | 5/30 |
+| Same, with at least 2 sources | 4/30 |
+| Queries where the top 500 results were all unrelated | many |
+
+Caveats: the result set is capped at 500, the match is a regex on the name
+(no download validation), localized series titles were used as-is, and the
+sample is a single run. Most of the 27 "Kad hits" were unrelated files that
+shared the longest token (for example every show with `S04E01`).
+
+### Search precision — plain keyword vs restrictive tree
+
+A/B on the same routing table (`gx-ed2k` 1.1.12, `fbi`/`elsbeth` targets):
+
+| Query | Plain keyword | Restrictive AND tree |
+|---|---|---|
+| `FBI S06E13` | 500 results, no exact match in the first page | 35 results, includes `FBI.S06E13...` |
+| `Elsbeth S04E02` | 500 results, mostly other Elsbeth episodes | 42 results, `S04E02` variants with 6–8 sources |
+
+The tree target is the first real title word; episode markers, years and
+quality tags are skipped for the target but kept in the AND filter, and stop
+words are dropped so `The.Matrix.1999.mkv` still matches.
+
+**Throttling.** A second 30-query batch run a few minutes later returned almost
+no Kad results from the same endpoint, while `PING` still answered and a fresh
+client on another UDP port found 35 `FBI S06E13` results. Peers appear to
+throttle rapid searches. The gate run must space queries (roughly one every
+1–2 minutes) and be repeated cleanly before its numbers are final.
+
 ### Dead torrent links
 
 The quarantine of `.torrent` links that keep failing (see

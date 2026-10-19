@@ -25,7 +25,10 @@ disabled for eD2k-only releases.
   - routing table with bounded contacts;
   - bootstrap from `nodes.dat` (version 1/2/3), downloaded or cached;
   - `BOOTSTRAP_REQ/RES`, `HELLO_REQ/RES`, `PING/PONG`, `REQ/RES`;
-  - `SEARCH_KEY_REQ` / `SEARCH_RES` with bounded iterative lookups;
+  - `SEARCH_KEY_REQ` / `SEARCH_RES` with bounded iterative lookups; the
+    request carries a restrictive AND expression tree (start position
+    `0x8000`) so the peer filters the keyword bucket instead of returning
+    every file indexed under the primary keyword;
   - answer to peers' routing/ping/hello requests, and an empty answer to search
     requests (this daemon does not index files).
 - **eD2k servers**:
