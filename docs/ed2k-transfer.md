@@ -12,8 +12,8 @@ plus a `PartFile` that creates the sparse `.part`, verifies each part before
 writing it, rebuilds the bitmap on reopen and verifies the whole file before
 completion. It is not imported by `cmd/gx-ed2k`; the splitted format (0xE1), AICH and the
 rest of the peer protocol are still to do. `internal/ed2k/transfer/peer` adds
-the 0xC5 TCP framing and the hello exchange (round-trip and malformed-packet
-tests).
+the 0xC5 TCP framing, the hello exchange and the file/hashset/part packet
+codecs (round-trip and malformed-packet tests).
 
 The goal is a pure-Go eMule-compatible client inside `gx-ed2k`, so Gextto can
 turn an eD2k result into a real download without aMule, `amulecmd` or the EC
