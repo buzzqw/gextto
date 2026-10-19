@@ -670,14 +670,17 @@ The gate is measured, not assumed:
    upload. The `multi_engine` router already merges rows, labels the network and
    routes by hash, so the automation does not need a second rewrite.
 
-**Gate 1 result (19 October 2026).** A stratified sample of 30 real gaps (one per
-series, aliases where available) found **4/30 (13%)** with an exact episode, a
-recognisable quality, a plausible size and at least the default 3 sources;
-7/30 had some Kad result. That is below the level that justifies the 6.5–10
-month eMule transfer engine. Kad stays an optional **manual** search provider,
-`ed2k_fallback` stays off, and the question is reopened only by a larger
-multi-day sample or by metadata changes that materially improve the query. The
-numbers and caveats are in [`measurements.md`](measurements.md).
+**Gate 1 result (19 October 2026, preliminary).** A stratified sample of 30 real
+gaps (one per series, aliases where available) found **4/30 (13%)** with an
+exact episode, a recognisable quality, a plausible size and at least the default
+3 sources; 7/30 had some Kad result. That is below the level that would justify
+the 6.5–10 month eMule transfer engine, but it is a lower bound: the sample ran
+before the broad retry. With 1.1.23 a silent exact-token round retries the
+title and filters the episode locally (`S04E01`, `S04.E01`, `4x01`); the live
+`Tracker S04E01` check went from 0 to 5 Kad results. A new stratified sample is
+running before the gate is closed. Kad stays an optional **manual** search
+provider and `ed2k_fallback` stays off meanwhile. The numbers and caveats are in
+[`measurements.md`](measurements.md).
 
 **Waiting for a measurement or a host.**
 

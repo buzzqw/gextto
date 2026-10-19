@@ -601,11 +601,17 @@ Caveats: one run, one daemon and one network; DHT coverage varies with the
 routing table and peers throttle a burst; the 500-result cap and the regex
 matching are approximations; no downloaded file was validated.
 
-**Gate conclusion.** 13% of the sampled real gaps clear the automatic fallback
-floor. That is not enough to justify the 6.5–10 month eMule transfer engine.
-Kad stays an optional **manual** search provider (and the automatic fallback
-stays off); the question is reopened only by a larger, multi-day sample or by
-metadata aliases that materially change the query.
+**Gate conclusion (preliminary).** 13% of the sampled real gaps clear the
+automatic fallback floor on gx-ed2k 1.1.16. That is below the level that would
+justify the 6.5–10 month eMule transfer engine, so Kad stays an optional
+**manual** search provider for now.
+
+The number is a **lower bound**, though: 1.1.23 adds a broad retry. When the
+exact episode token is silent, the daemon re-queries the title and filters the
+episode locally, accepting `S04E01`, `S04.E01` and `4x01`. Live check:
+`Tracker S04E01` went from **0** in the sample to **5 Kad results** (4 exact,
+6/5/5/2 sources). A new stratified sample with 1.1.23 is running before the
+transfer question is closed.
 
 **Localized vs original title.** The library name is not always the name on
 Kad. Two spot checks against the same routing table:
