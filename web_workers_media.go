@@ -204,9 +204,15 @@ func bwm_saveLastBackup(dataDir string, when time.Time) {
 // precedence (daily at that local time, at most once a day), otherwise the
 // `backup_schedule_hours` interval is measured from the last backup.
 func bwm_backupDue(cfg *Config, last *time.Time) bool {
+	return bwm_backupDueAt(cfg, last, time.Now())
+}
+
+// bwm_backupDueAt is bwm_backupDue with an explicit "now", so the schedule can
+// be checked at a fixed instant (tests) without depending on the wall clock.
+func bwm_backupDueAt(cfg *Config, last *time.Time, now time.Time) bool {
+	now = now.Local()
 	if at := strings.TrimSpace(cfg.Settings["backup_schedule_at"]); at != "" {
 		if parsed, err := time.Parse("15:04", at); err == nil {
-			now := time.Now()
 			alreadyToday := false
 			if last != nil {
 				local := last.Local()
@@ -227,7 +233,7 @@ func bwm_backupDue(cfg *Config, last *time.Time) bool {
 	if last == nil {
 		return true
 	}
-	return int64(time.Since(last.Local()).Seconds()) >= hours*3600
+	return int64(now.Sub(last.Local()).Seconds()) >= hours*3600
 }
 
 // bwm_executeScheduledBackup mirrors the web module `execute_scheduled_backup`: local

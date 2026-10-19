@@ -207,28 +207,44 @@ func TestSortCalendarItemsByAirDate(t *testing.T) {
 }
 
 func TestBackupDueIntervalAndDailyTime(t *testing.T) {
+	// Fixed local wall clock: the schedule must not depend on when the test
+	// runs. Using the real "now" made this test fail just after midnight.
+	now := time.Date(2026, time.March, 15, 10, 30, 0, 0, time.Local)
+
 	cfg := DefaultConfig()
 	cfg.Settings = map[string]string{"backup_schedule_hours": "24"}
-	if !bwm_backupDue(&cfg, nil) {
+	if !bwm_backupDueAt(&cfg, nil, now) {
 		t.Fatal("no previous backup should be due")
 	}
-	recent := time.Now().Add(-time.Hour)
-	if bwm_backupDue(&cfg, &recent) {
+	recent := now.Add(-time.Hour)
+	if bwm_backupDueAt(&cfg, &recent, now) {
 		t.Fatal("backup within the interval must not be due")
 	}
-	old := time.Now().Add(-25 * time.Hour)
-	if !bwm_backupDue(&cfg, &old) {
+	old := now.Add(-25 * time.Hour)
+	if !bwm_backupDueAt(&cfg, &old, now) {
 		t.Fatal("backup past the interval should be due")
 	}
 
-	// A daily time in the past is due once per day.
-	cfg.Settings = map[string]string{"backup_schedule_at": time.Now().Add(-2 * time.Minute).Format("15:04")}
-	if !bwm_backupDue(&cfg, nil) {
+	// A daily time already reached is due once per day.
+	cfg.Settings = map[string]string{"backup_schedule_at": "10:28"}
+	if !bwm_backupDueAt(&cfg, nil, now) {
 		t.Fatal("daily schedule in the past should be due")
 	}
-	now := time.Now()
-	if bwm_backupDue(&cfg, &now) {
+	if bwm_backupDueAt(&cfg, &now, now) {
 		t.Fatal("daily schedule already run today must not be due again")
+	}
+
+	// Just after midnight: a schedule later in the day is not due yet, while one
+	// that has already passed is. The old test built the schedule from
+	// now-2 minutes, which crossed back to the previous day.
+	midnight := time.Date(2026, time.March, 15, 0, 1, 0, 0, time.Local)
+	cfg.Settings = map[string]string{"backup_schedule_at": "23:59"}
+	if bwm_backupDueAt(&cfg, nil, midnight) {
+		t.Fatal("daily schedule later in the day must not be due yet")
+	}
+	cfg.Settings = map[string]string{"backup_schedule_at": "00:00"}
+	if !bwm_backupDueAt(&cfg, nil, midnight) {
+		t.Fatal("daily schedule already passed after midnight should be due")
 	}
 }
 
