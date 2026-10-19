@@ -1,8 +1,14 @@
 # eD2k/Kad transfer plane — design (gated)
 
-**Status: design only.** The search plane is complete and measured; this
-document prepares the transfer plane, but no transfer code is merged while the
-Phase 0 gate is open. The decision criteria are at the end.
+**Status: design only, with an isolated T0 spike.** The search plane is complete
+and measured; this document prepares the transfer plane, but nothing is wired
+into the daemon while the Phase 0 gate is open. The decision criteria are at the
+end.
+
+Spike (19 October 2026): `internal/ed2k/transfer/partfile` implements the
+9,728,000-byte part geometry and streaming MD4 whole-file/per-part hashing with
+tests. It is not imported by `cmd/gx-ed2k`; `.part.met` and AICH are still to
+do.
 
 The goal is a pure-Go eMule-compatible client inside `gx-ed2k`, so Gextto can
 turn an eD2k result into a real download without aMule, `amulecmd` or the EC
