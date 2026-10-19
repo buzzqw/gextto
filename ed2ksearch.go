@@ -144,6 +144,9 @@ type ed2kHealthEntry struct {
 // ed2kHealth probes gx-ed2k's /api/v1/health, caching the answer briefly so a
 // search never waits on a daemon that is down.
 func ed2kHealth(cfg *Config) ed2kHealthEntry {
+	if !ed2kEnabled(cfg) {
+		return ed2kHealthEntry{checkedAt: time.Now()}
+	}
 	settings, err := ed2kSettingsFromConfig(cfg)
 	if err != nil {
 		return ed2kHealthEntry{checkedAt: time.Now(), err: err.Error()}
