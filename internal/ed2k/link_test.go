@@ -112,3 +112,33 @@ func TestKeywordIDIsStable(t *testing.T) {
 		t.Fatal("keyword hash must be case-insensitive")
 	}
 }
+
+func TestMatchesQueryEpisodeVariants(t *testing.T) {
+	cases := []struct {
+		name  string
+		query string
+		want  bool
+	}{
+		{"Tracker.2024.S04E01.1080p.mkv", "Tracker S04E01", true},
+		{"Tracker.2024.S04.E01.1080p.mkv", "Tracker S04E01", true},
+		{"Tracker.2024.4x01.1080p.mkv", "Tracker S04E01", true},
+		{"Tracker.2024.04x01.1080p.mkv", "Tracker S04E01", true},
+		{"Tracker.2024.S04E02.1080p.mkv", "Tracker S04E01", false},
+		{"Another.Show.S04E01.mkv", "Tracker S04E01", false},
+	}
+	for _, tc := range cases {
+		if got := MatchesQuery(tc.name, tc.query); got != tc.want {
+			t.Errorf("MatchesQuery(%q, %q) = %v, want %v", tc.name, tc.query, got, tc.want)
+		}
+	}
+}
+
+func TestBroadTermsDropsEpisodeAndQuality(t *testing.T) {
+	got := broadTerms([]string{"tracker", "s04e01", "1080p", "2024"})
+	if len(got) != 1 || got[0] != "tracker" {
+		t.Fatalf("broadTerms = %#v", got)
+	}
+	if got := broadTerms([]string{"s04e01"}); len(got) != 0 {
+		t.Fatalf("episode-only broadTerms = %#v", got)
+	}
+}

@@ -626,7 +626,14 @@ func (c *Client) searchKad(ctx context.Context, keyword string, target ID, terms
 		retry = retry[:16]
 	}
 	if len(retry) > 0 {
-		c.sendSearch(ctx, retry, target, terms)
+		// A silent round with the exact episode token is often a bucket
+		// problem, not a missing file: ask for the title only and let the
+		// local filter pick the episode.
+		retryTerms := broadTerms(terms)
+		if len(retryTerms) == 0 {
+			retryTerms = terms
+		}
+		c.sendSearch(ctx, retry, target, retryTerms)
 		retryUntil := time.Now().Add(2 * time.Second)
 		if ctxDeadline, ok := ctx.Deadline(); ok && retryUntil.After(ctxDeadline) {
 			retryUntil = ctxDeadline
@@ -1017,6 +1024,21 @@ func SearchTerms(query string) []string {
 	return out
 }
 
+// broadTerms drops episode, quality and year tokens for the retry: a silent
+// round can mean the album/series is indexed under the title but the exact
+// "S04E01" token is not in the peer's keyword bucket. The caller still filters
+// the result against the full query.
+func broadTerms(terms []string) []string {
+	out := make([]string, 0, len(terms))
+	for _, term := range terms {
+		if lookupNoise(term) {
+			continue
+		}
+		out = append(out, term)
+	}
+	return out
+}
+
 var kadStopWords = map[string]struct{}{
 	"the": {}, "and": {}, "of": {}, "for": {}, "with": {},
 	"di": {}, "da": {}, "il": {}, "lo": {}, "la": {}, "le": {}, "les": {},
@@ -1065,9 +1087,60 @@ func QueryTokens(query string) []string {
 func MatchesQuery(name, query string) bool {
 	lower := strings.ToLower(name)
 	for _, token := range SearchTerms(query) {
+		if kadEpisodeToken.MatchString(token) {
+			if !episodeInName(lower, token) {
+				return false
+			}
+			continue
+		}
 		if !strings.Contains(lower, token) {
 			return false
 		}
 	}
 	return true
+}
+
+var kadEpisodeInName = regexp.MustCompile(`(?i)s(\d{1,2})[ ._-]?e(\d{1,3})`)
+var kadEpisodeXInName = regexp.MustCompile(`(?i)(?:^|[^0-9])(\d{1,2})x(\d{1,3})(?:[^0-9]|$)`)
+
+// episodeInName accepts the common episode spellings: S04E01, S04.E01,
+// S04 E01 and 4x01/04x01. It is used both for the query token and for the
+// file name.
+func episodeInName(name, token string) bool {
+	season, episode, ok := parseEpisodeToken(token)
+	if !ok {
+		return false
+	}
+	for _, match := range kadEpisodeInName.FindAllStringSubmatch(name, -1) {
+		if atoiSmall(match[1]) == season && atoiSmall(match[2]) == episode {
+			return true
+		}
+	}
+	for _, match := range kadEpisodeXInName.FindAllStringSubmatch(name, -1) {
+		if atoiSmall(match[1]) == season && atoiSmall(match[2]) == episode {
+			return true
+		}
+	}
+	return false
+}
+
+func parseEpisodeToken(token string) (int, int, bool) {
+	if match := regexp.MustCompile(`^s(\d{1,2})[ ._-]?e(\d{1,3})$`).FindStringSubmatch(strings.ToLower(token)); match != nil {
+		return atoiSmall(match[1]), atoiSmall(match[2]), true
+	}
+	if match := regexp.MustCompile(`^(\d{1,2})x(\d{1,3})$`).FindStringSubmatch(strings.ToLower(token)); match != nil {
+		return atoiSmall(match[1]), atoiSmall(match[2]), true
+	}
+	return 0, 0, false
+}
+
+func atoiSmall(value string) int {
+	n := 0
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return -1
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n
 }
