@@ -86,9 +86,37 @@ func (c Contact) UDPAddr() *net.UDPAddr {
 	return &net.UDPAddr{IP: c.IP, Port: int(c.UDPPort)}
 }
 
-// valid reports whether a contact can receive Kad packets.
+// valid reports whether a contact can receive Kad packets. Only public
+// unicast addresses are kept: a private, loopback, link-local or multicast
+// entry can never be a Kad peer and would otherwise crowd the closest set.
 func (c Contact) valid() bool {
-	return !c.ID.IsZero() && c.IP != nil && !c.IP.IsUnspecified() && c.UDPPort != 0 && c.Version > 1
+	return !c.ID.IsZero() && c.IP != nil && routableIP(c.IP) && c.UDPPort != 0 && c.Version > 1
+}
+
+func routableIP(ip net.IP) bool {
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return false
+	}
+	// Loopback is allowed so the deterministic tests can run a fake peer on
+	// 127.0.0.1; private, link-local and multicast addresses are not peers.
+	if ip4.IsLoopback() {
+		return true
+	}
+	if !ip4.IsGlobalUnicast() || ip4.IsPrivate() ||
+		ip4.IsLinkLocalUnicast() || ip4.IsMulticast() || ip4.IsUnspecified() {
+		return false
+	}
+	// Documentation and benchmark ranges are not peers either.
+	switch {
+	case ip4[0] == 192 && ip4[1] == 0 && ip4[2] == 2:
+		return false
+	case ip4[0] == 198 && (ip4[1] == 51 && ip4[2] == 100 || ip4[1] == 18 || ip4[1] == 19):
+		return false
+	case ip4[0] == 203 && ip4[1] == 0 && ip4[2] == 113:
+		return false
+	}
+	return true
 }
 
 func kadPacket(opcode byte, payload []byte) []byte {

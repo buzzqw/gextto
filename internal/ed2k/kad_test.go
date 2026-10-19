@@ -138,7 +138,7 @@ func TestParseNodesFileVersion2Layout(t *testing.T) {
 	w.u32(2)
 	w.u32(1)
 	w.kadID(id)
-	w.raw([]byte{1, 2, 0, 192})
+	w.raw([]byte{8, 8, 8, 8})
 	w.u16(4672)
 	w.u16(4662)
 	w.u8(3)
@@ -153,7 +153,7 @@ func TestParseNodesFileVersion2Layout(t *testing.T) {
 		t.Fatalf("contacts = %+v", contacts)
 	}
 	contact := contacts[0]
-	if contact.ID != id || contact.IP.String() != "192.0.2.1" || contact.UDPPort != 4672 || contact.TCPPort != 4662 || contact.Version != 3 {
+	if contact.ID != id || contact.IP.String() != "8.8.8.8" || contact.UDPPort != 4672 || contact.TCPPort != 4662 || contact.Version != 3 {
 		t.Fatalf("contact = %+v", contact)
 	}
 }
@@ -162,7 +162,7 @@ func TestNodesFileRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "nodes.dat")
 	id, _ := ParseID("33333333333333333333333333333333")
-	want := Contact{ID: id, IP: net.IPv4(192, 0, 2, 1), UDPPort: 4672, TCPPort: 4662, Version: KadVersion}
+	want := Contact{ID: id, IP: net.IPv4(8, 8, 8, 8), UDPPort: 4672, TCPPort: 4662, Version: KadVersion}
 	if err := WriteNodesFile(path, []Contact{want}); err != nil {
 		t.Fatal(err)
 	}
@@ -275,5 +275,28 @@ func TestSearchRequestExpressionTree(t *testing.T) {
 	plain := encodeSearchRequest(target, nil)
 	if len(plain) != 18 || binary.LittleEndian.Uint16(plain[16:]) != 0 {
 		t.Fatalf("plain request = %x", plain)
+	}
+}
+
+func TestContactValidRejectsNonRoutableIPs(t *testing.T) {
+	id, _ := ParseID("0123456789abcdef0123456789abcdef")
+	cases := map[string]bool{
+		"8.8.8.8":       true,
+		"192.168.1.10":  false,
+		"10.0.0.1":      false,
+		"172.16.5.4":    false,
+		"127.0.0.1":     true,
+		"169.254.10.20": false,
+		"224.0.0.1":     false,
+		"0.0.0.0":       false,
+		"192.0.2.1":     false,
+		"198.51.100.10": false,
+		"203.0.113.7":   false,
+	}
+	for raw, want := range cases {
+		contact := Contact{ID: id, IP: net.ParseIP(raw), UDPPort: 4672, TCPPort: 4662, Version: KadVersion}
+		if got := contact.valid(); got != want {
+			t.Errorf("valid(%s) = %v, want %v", raw, got, want)
+		}
 	}
 }
