@@ -169,3 +169,30 @@ be replaced, so the page keeps the zip download link there.
 All tests are local and deterministic: they do not contact the live eD2k/Kad
 network. Measuring live coverage is the Fase 0/Fase 1 gate in
 [`../docs/evoluzione.md`](evoluzione.md).
+
+## Riferimenti di protocollo (eMule/aMule)
+
+Il client resta codice nostro: il sorgente di eMule e delle sue mod è usato
+solo come **riferimento di protocollo**, non copiato e non incluso nel
+repository. In laboratorio è stato usato anche aMule come peer di
+interoperabilità (mai come dipendenza a runtime).
+
+Fatti verificati sul sorgente e bloccati dai test:
+
+- header client `<protocollo><lunghezza 4 LE><opcode>`, dove la lunghezza
+  include l'opcode; `0xE3` per i pacchetti eDonkey e `0xC5` per le estensioni
+  eMule (EMULEINFO, queue ranking, parti compresse, source exchange);
+- `OP_HELLO` inizia con il byte `16` (dimensione dell'hash) e termina con
+  server IP (4 byte, ordine di rete) e porta (2 byte LE); `OP_HELLOANSWER` non
+  ha il byte iniziale ma ha lo stesso suffisso;
+- `OP_REQFILENAMEANSWER` usa una lunghezza nome a 16 bit;
+- una richiesta file estesa aggiunge due word a 16 bit (stato parti e fonti
+  complete) dopo l'hash;
+- non si manda `OP_SETREQFILEID` prima di `OP_STARTUPLOADREQ`: eMule reale
+  chiude la connessione, aMule la tollera; il test del fake peer lo impedisce;
+- per i file multi-parte si legge `OP_FILESTATUS` e si chiedono solo le parti
+  dichiarate dal peer.
+
+I test `TestClientWireInvariants`, `TestKadWireFormat`, i test dei codec e il
+fake peer in `internal/ed2k/transfer/download` bloccano questi invarianti.
+
