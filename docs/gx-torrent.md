@@ -2028,6 +2028,9 @@ Keys in settings.json: `autospeed-enabled` (default `false`),
 (KiB/s, default 50). A **positive upload limit** (global or
 scheduled) is needed for auto-speed to act; the page enforces it. The decisions
 appear in the log with reason `auto-speed` (`effective speed limits …`). The
+line is written once a value has stayed put for ten seconds, so the controller's
+three-second steps do not each get a line: a ramp ends with one line carrying
+the cap the session actually runs with. The
 settings page shows the measured latency and the current cap.
 
 ## REST API (v1)

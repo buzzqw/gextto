@@ -341,6 +341,14 @@ type Daemon struct {
 	// appliedDL/appliedUL are the global limits currently on the session.
 	appliedDL int64
 	appliedUL int64
+	// The limits last written to the log and when the current values last
+	// changed: the autotune controller steps the cap every few seconds, and
+	// logging every step would bury the rest of the log.
+	loggedDL        int64
+	loggedUL        int64
+	loggedReason    string
+	loggedAt        time.Time
+	limitsChangedAt time.Time
 	// autoSpeed is the latency auto-speed controller (see autospeed.go).
 	autoSpeed *autoSpeed
 

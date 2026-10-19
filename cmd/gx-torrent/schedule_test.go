@@ -128,3 +128,31 @@ func TestApplyEffectiveSpeedLimitsSchedule(t *testing.T) {
 		t.Fatalf("limits changed unexpectedly: %d/%d", d.appliedDL, d.appliedUL)
 	}
 }
+
+func TestSpeedLimitLogWaitsForTheRampToSettle(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	base := clockAt(12, 0)
+	apply := func(at time.Time, download int64) {
+		d.mu.Lock()
+		d.state.Config.SpeedLimitDownload = download
+		d.applyEffectiveSpeedLimitsLocked(at)
+		d.mu.Unlock()
+	}
+
+	apply(base, 3000)
+	if d.loggedDL != 3000 {
+		t.Fatalf("first application must be logged, logged %d", d.loggedDL)
+	}
+	// The autotune ramp steps the cap every three seconds.
+	for step := int64(1); step <= 4; step++ {
+		apply(base.Add(time.Duration(step)*3*time.Second), 3000+step*1000)
+		if d.loggedDL != 3000 {
+			t.Fatalf("ramp step %d was logged (logged %d)", step, d.loggedDL)
+		}
+	}
+	// Once the value stays put, the settled limit is logged.
+	apply(base.Add(22*time.Second), 7000)
+	if d.appliedDL != 7000 || d.loggedDL != 7000 {
+		t.Fatalf("settled limit not logged: applied %d logged %d", d.appliedDL, d.loggedDL)
+	}
+}

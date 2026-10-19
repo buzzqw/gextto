@@ -187,11 +187,36 @@ func (d *Daemon) applyEffectiveSpeedLimitsLocked(now time.Time) {
 		}
 	}
 	if download == d.appliedDL && upload == d.appliedUL {
+		d.logSpeedLimitsLocked(now, reason)
 		return
 	}
 	if d.session != nil {
 		d.session.SetSpeedLimits(download, upload)
 	}
 	d.appliedDL, d.appliedUL = download, upload
-	logf("effective speed limits %d/%d KiB/s (%s)", download, upload, reason)
+	d.limitsChangedAt = now
+	d.logSpeedLimitsLocked(now, reason)
+}
+
+// speedLimitLogSettle is how long a limit must stay put before it is logged.
+// The autotune controller moves the cap every few seconds while it ramps: one
+// line per step would be hundreds of lines a day. Gextto logs the autotune
+// decisions on its own; here the log keeps the value the session really runs
+// with.
+const speedLimitLogSettle = 10 * time.Second
+
+// logSpeedLimitsLocked writes the applied limits once they have settled, and
+// whenever the reason changes (schedule, alternative limits, auto-speed).
+func (d *Daemon) logSpeedLimitsLocked(now time.Time, reason string) {
+	if !d.loggedAt.IsZero() {
+		if d.appliedDL == d.loggedDL && d.appliedUL == d.loggedUL && reason == d.loggedReason {
+			return
+		}
+		if now.Sub(d.limitsChangedAt) < speedLimitLogSettle {
+			return
+		}
+	}
+	d.loggedDL, d.loggedUL = d.appliedDL, d.appliedUL
+	d.loggedReason, d.loggedAt = reason, now
+	logf("effective speed limits %d/%d KiB/s (%s)", d.appliedDL, d.appliedUL, reason)
 }
