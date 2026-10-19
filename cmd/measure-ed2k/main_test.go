@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,12 +18,18 @@ func TestSampleStratified(t *testing.T) {
 		{Series: "Show B", Season: 2, Episode: 1},
 		{Series: "Future", Season: 1, Episode: 1, AirDate: "2027-01-01"},
 	}
-	got := sampleStratified(gaps, 0, "2026-10-19")
+	got := sampleStratified(gaps, 0, "2026-10-19", "first", rand.New(rand.NewSource(1)))
 	if len(got) != 2 || got[0].Series != "Show A" || got[0].Episode != 1 || got[1].Series != "Show B" {
 		t.Fatalf("sample = %+v", got)
 	}
-	if limited := sampleStratified(gaps, 1, "2026-10-19"); len(limited) != 1 {
+	if limited := sampleStratified(gaps, 1, "2026-10-19", "first", rand.New(rand.NewSource(1))); len(limited) != 1 {
 		t.Fatalf("limit = %+v", limited)
+	}
+	if last := sampleStratified(gaps, 0, "2026-10-19", "last", rand.New(rand.NewSource(1))); last[0].Episode != 2 {
+		t.Fatalf("last = %+v", last)
+	}
+	if random := sampleStratified(gaps, 0, "2026-10-19", "random", rand.New(rand.NewSource(1))); random[0].Series != "Show A" {
+		t.Fatalf("random = %+v", random)
 	}
 }
 
@@ -83,7 +90,7 @@ func TestRunAgainstFakeServers(t *testing.T) {
 
 	opt := options{
 		gextto: gextto.URL, daemon: daemon.URL, limit: 2, spacing: 0,
-		timeout: time.Second, minSources: 3, today: "2026-10-19",
+		timeout: time.Second, minSources: 3, today: "2026-10-19", sample: "first", seed: 1,
 		client: daemon.Client(), now: func() time.Time { return time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC) },
 	}
 	rep, err := run(context.Background(), opt)

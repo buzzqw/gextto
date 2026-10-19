@@ -14,6 +14,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -86,6 +87,8 @@ type options struct {
 	timeout    time.Duration
 	minSources int
 	today      string
+	sample     string
+	seed       int64
 	out        string
 	client     *http.Client
 	now        func() time.Time
@@ -107,6 +110,8 @@ func main() {
 	flag.DurationVar(&opt.timeout, "timeout", 15*time.Second, "per-search daemon timeout")
 	flag.IntVar(&opt.minSources, "min-sources", 3, "source floor used by the automatic fallback")
 	flag.StringVar(&opt.today, "today", time.Now().Format("2006-01-02"), "ignore gaps that air after this date")
+	flag.StringVar(&opt.sample, "sample", "first", "gap per series: first, last or random")
+	flag.Int64Var(&opt.seed, "seed", 1, "random seed when -sample random")
 	flag.StringVar(&opt.out, "out", "measure-ed2k.json", "JSON report destination")
 	flag.Parse()
 	opt.client = &http.Client{Timeout: opt.timeout + 30*time.Second}
@@ -134,7 +139,7 @@ func run(ctx context.Context, opt options) (*report, error) {
 	if err != nil {
 		return nil, err
 	}
-	sample := sampleStratified(gaps, opt.limit, opt.today)
+	sample := sampleStratified(gaps, opt.limit, opt.today, opt.sample, rand.New(rand.NewSource(opt.seed)))
 	if len(sample) == 0 {
 		return nil, fmt.Errorf("no eligible gaps (today %s)", opt.today)
 	}
@@ -190,26 +195,36 @@ func fetchGaps(ctx context.Context, opt options) ([]gap, error) {
 }
 
 // sampleStratified keeps one already-aired gap per series: the gap list is
-// grouped by show, so a plain spread overweights a single series.
-func sampleStratified(gaps []gap, limit int, today string) []gap {
-	seen := map[string]struct{}{}
+// grouped by show, so a plain spread overweights a single series. The mode
+// selects the first, the last or a random eligible gap of each show, which
+// lets a second run test different episodes without changing the structure.
+func sampleStratified(gaps []gap, limit int, today, mode string, rng *rand.Rand) []gap {
+	bySeries := map[string][]gap{}
 	series := make([]string, 0, len(gaps))
-	first := map[string]gap{}
 	for _, item := range gaps {
 		if item.AirDate != "" && item.AirDate > today {
 			continue
 		}
-		if _, ok := seen[item.Series]; ok {
-			continue
+		if _, ok := bySeries[item.Series]; !ok {
+			series = append(series, item.Series)
 		}
-		seen[item.Series] = struct{}{}
-		series = append(series, item.Series)
-		first[item.Series] = item
+		bySeries[item.Series] = append(bySeries[item.Series], item)
 	}
 	sort.Strings(series)
 	out := make([]gap, 0, len(series))
 	for _, name := range series {
-		out = append(out, first[name])
+		list := bySeries[name]
+		if len(list) == 0 {
+			continue
+		}
+		index := 0
+		switch mode {
+		case "last":
+			index = len(list) - 1
+		case "random":
+			index = rng.Intn(len(list))
+		}
+		out = append(out, list[index])
 	}
 	if limit > 0 && len(out) > limit {
 		out = out[:limit]
