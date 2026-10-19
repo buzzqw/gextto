@@ -488,15 +488,42 @@ One live run from the N97 (`bin/gx-ed2k`, standalone, UPnP on, `nodes.dat` from
   the first result. Packed server results (`0xD4` + zlib) and tagged
   `server.met` (0xE0) are supported.
 - **Kad**: 175 valid contacts loaded, but **no UDP response** to
-  `BOOTSTRAP_REQ`, `PING` or `HELLO_REQ` from the first 20 nodes. A UDP probe to
-  `8.8.8.8:53` also times out: this host/network blocks outbound UDP. The code
-  path is exercised against fake peers; the live Kad gate must be repeated on a
-  network with outbound UDP.
+  `BOOTSTRAP_REQ`, `PING` or `HELLO_REQ` from the first 20 nodes. The first
+  diagnosis blamed outbound UDP; that was wrong. A packet-level probe showed
+  outbound UDP working (STUN replies; 22/32 bootstrap responses). The real
+  cause was byte order: eMule writes `nodes.dat`/contact IPv4 and the other
+  Kad 32-bit fields little-endian, and 128-bit values as four native-order
+  chunks; the client read them big-endian, so it sent probes to reversed
+  addresses. The fix and the new live numbers are below.
 - **Gextto integration**: with `ed2k_enabled` on, the managed daemon started
   (fingerprint/scope), `/api/search` with `{"query":"the matrix 1999","kad":true}`
   returned **248 results (234 torrent + 14 eD2k)** in **25.7 s**; without `kad`
   only the 226 torrent ones. `POST /api/search/add` on an eD2k result answers
   **501** with the link and the reason, and queues nothing.
+
+### eD2k/Kad search — live after the wire-format fix, 19 October 2026
+
+Same host and network as the run above; a packet probe against the contacts
+cached by aMule (`~/.aMule/nodes.dat`) and then the rebuilt daemon
+(`gx-ed2k 1.1.11`) gave:
+
+- **Packet probe**: 200 valid contacts; 22/32 bootstrap requests answered with
+  a well-formed `BOOTSTRAP_RES` (20 contacts each); 293/318 `PING`s answered;
+  430 `SEARCH_RES` datagrams for `matrix` (mostly `0xE5` zlib-packed, which the
+  client now inflates).
+- **Daemon**: 421 nodes in the routing table, `peer_packets=142`,
+  `reachability=open` ("Kad peers answered"), UPnP mapping accepted.
+- **Search**: `the matrix 1999` returned 253 results through Gextto with
+  `kad:true`: 19 eD2k (4 `kad`, 7 `kad+server`, 8 `server`) plus torrents.
+  The `kad+server` entries match by MD4, which confirms that Kad file hashes
+  and eD2k server hashes are decoded in the same order.
+- **Wire format**: Kad 32-bit fields are little-endian; IPv4 is a
+  native-order word (bytes reversed relative to dotted notation); 128-bit
+  node IDs, keyword targets and file hashes are four native-order 32-bit
+  chunks; `0xE5` datagrams carry a zlib stream after the opcode.
+
+The earlier "outbound UDP blocked" note is superseded: UDP was fine, the
+datagrams were addressed to byte-reversed IPs.
 
 ### Dead torrent links
 

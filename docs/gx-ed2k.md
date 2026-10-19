@@ -19,6 +19,9 @@ disabled for eD2k-only releases.
   server links and server lists.
 - **Kad (Kademlia2)**:
   - 128-bit IDs and the XOR metric, MD4 keyword hashes;
+  - eMule wire layout: little-endian 32-bit fields, 128-bit values as four
+    native-order chunks, IPv4 as a native-order word; `0xE5` datagrams are
+    zlib-packed and inflated with a 1 MiB cap;
   - routing table with bounded contacts;
   - bootstrap from `nodes.dat` (version 1/2/3), downloaded or cached;
   - `BOOTSTRAP_REQ/RES`, `HELLO_REQ/RES`, `PING/PONG`, `REQ/RES`;
