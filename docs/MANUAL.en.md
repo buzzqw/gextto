@@ -688,11 +688,13 @@ are using the API directly.
   with only the TVDB key the title search goes to TVDB. Cards are shown in a five-column
   wall; a title already in the library carries a **Già in lista** badge and its
   add button is disabled, so you never create a duplicate by mistake. Under the
-  release search there is a field to **paste an `ed2k://` link**: Gextto checks
-  it and shows it as a result with name, size and hash. When the eD2k/Kad search
-  is enabled, network results appear in the same table with the **eD2k** badge
-  and the source count; their add button stays disabled until eD2k transfers
-  exist, and the row says **Search only**.
+  release search there is a field to **paste one or more `ed2k://` links** (one
+  per line or separated by spaces): Gextto checks them, drops duplicates and
+  shows each as a result with name, size and hash. **Add all** queues the whole
+  block, or use the per-row **Add** button. When the eD2k/Kad search is enabled,
+  network results appear in the same table with the **eD2k** badge and the
+  source count; when eD2k transfers are available the row is addable, otherwise
+  it says **Search only**.
 - **Archive** — full-text search of past releases with pagination, batch queue,
   copy magnet, delete; **Series/Movies from feed** tabs. The local archive search
   is **instant**: it starts on its own as you type (from three characters on)
@@ -1558,11 +1560,13 @@ them.
 
 The eD2k/Kad network is a **search provider**: its results appear next to the
 torrent ones with the file name, size, MD4 hash and source count. Gextto talks to
-the `gx-ed2k` daemon, which is a **search-only** client: it does not download,
-upload or share files. An eD2k result is therefore visible and can be checked
-(including by pasting an `ed2k://` link), but the button that queues it stays
-disabled until eD2k transfers exist. The feature is off by default: without your
-consent Gextto does not contact the network.
+the `gx-ed2k` daemon. By default it is a **search-only** client; with
+`-download` (which Gextto passes to the managed daemon when the provider is
+enabled) it also exposes the transfer plane: it accepts `ed2k://` links (more
+than one at a time too), downloads with MD4 verification, resumes `.part` files
+and shares completed files with a minimal upload. Full queue/credits,
+obfuscation and LowID callback are still missing. The feature is off by
+default: without your consent Gextto does not contact the network.
 
 | Setting | What it does |
 |---|---|

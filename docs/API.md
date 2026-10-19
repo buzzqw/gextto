@@ -198,9 +198,11 @@ With the eD2k provider enabled (`ed2k_enabled`), manual search results can carry
 `network: "ed2k"`, `ed2k_link` and `sources` next to the torrent fields. The
 provider is used only when the request asks for it: send `{"query":"…","kad":true}`
 to `POST /api/search` or `/api/search/dashboard` (the UI has a **Kad** checkbox).
-Such a result has no `magnet`: `POST /api/search/add` answers `501` while `gx-ed2k`
-reports `"download": false`, because the search daemon cannot complete an eD2k
-transfer. Use `GET /api/ed2k/status` for the live provider state.
+Such a result has no `magnet`: `POST /api/search/add` queues it when `gx-ed2k`
+reports `"download": true`, and answers `501` while the daemon is search-only.
+The daemon accepts one link per call; the v2 UI can paste a block of links and
+offers **Add all**, which calls the same endpoint once per MD4. Use
+`GET /api/ed2k/status` for the live provider state.
 | GET | `/api/seed-rules` | seed rules: per-source/category seeding limits |
 | POST | `/api/seed-rules` | save the seed rules (list of name, source, category, ratio, seed_days, idle_minutes; null = global, 0 = no limit) |
 | POST | `/api/send-magnet` | send a magnet to the engine |

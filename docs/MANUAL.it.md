@@ -702,12 +702,13 @@ manualmente il JSON se non stai usando direttamente l'API.
   TVDB la ricerca dei titoli passa a TVDB. Le card sono mostrate in una griglia a cinque colonne;
   un titolo già in libreria porta il badge **Già in lista** e il pulsante di
   aggiunta è disattivato, così non crei duplicati per errore. Sotto la ricerca
-  release c'è il campo per **incollare un link `ed2k://`**: Gextto lo verifica e
-  lo mostra come risultato con nome, dimensione e hash. Se la ricerca eD2k/Kad
-  è attiva, i risultati della rete compaiono nella stessa tabella con il badge
-  **eD2k** e il numero di fonti; il pulsante per accodarli resta spento finché
-  il trasferimento eD2k non è disponibile, e in quel caso la riga dice **Solo
-  ricerca**.
+  release c'è il campo per **incollare uno o più link `ed2k://`** (uno per riga
+  o separati da spazi): Gextto li verifica, elimina i duplicati e li mostra come
+  risultati con nome, dimensione e hash. Con **Aggiungi tutti** li accoda in
+  blocco, oppure usi il pulsante **Aggiungi** della singola riga. Se la ricerca
+  eD2k/Kad è attiva, i risultati della rete compaiono nella stessa tabella con
+  il badge **eD2k** e il numero di fonti; quando il trasferimento eD2k è
+  disponibile la riga è accodabile, altrimenti dice **Solo ricerca**.
 - **Archivio** — ricerca full-text delle release passate con paginazione, accoda
   in blocco, copia magnet, elimina; tab **Serie/Film dal feed**. La ricerca
   nell'archivio locale è **immediata**: parte da sola mentre digiti (dai tre
@@ -1613,11 +1614,13 @@ salvata** finché non li salvi.
 
 La rete eD2k/Kad è un **provider di ricerca**: i suoi risultati compaiono accanto
 ai torrent, con il nome del file, la dimensione, l'hash MD4 e il numero di fonti.
-Gextto parla con il demone `gx-ed2k`, che è un client di **sola ricerca**: non
-scarica, non carica e non condivide file. Un risultato eD2k è quindi mostrato e
-verificabile (anche incollando un link `ed2k://`), ma il pulsante per accodarlo
-resta spento finché il trasferimento eD2k non esiste. La funzione è spenta per
-default: senza il tuo consenso Gextto non contatta la rete.
+Gextto parla con il demone `gx-ed2k`. Per default è un client di **sola
+ricerca**; con l'opzione `-download` (che Gextto passa al demone gestito quando
+il provider è attivo) espone anche il piano di trasferimento: accetta link
+`ed2k://` (anche più di uno alla volta), scarica con verifica MD4, riprende i
+`.part` e condivide i file completati con un upload minimo. Restano fuori, per
+ora, coda/crediti completi, obfuscation e callback LowID. La funzione è spenta
+per default: senza il tuo consenso Gextto non contatta la rete.
 
 | Impostazione | Cosa fa |
 |---|---|

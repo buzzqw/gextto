@@ -393,6 +393,11 @@
         <input type="hidden" name="view" value="downloads" />
         <button class="btn primary" type="submit">Cerca</button>
       </form>
+      <form class="search-row" method="post" action="/search/link" hx-post="/search/link" hx-target="#v2-downloads-search-results" hx-swap="outerHTML">
+        <textarea class="input" name="ed2k_link" rows="2" aria-label="Link eD2k, uno per riga" placeholder="ed2k://|file|…&#10;ed2k://|file|…" title="Incolla uno o più link eD2k, uno per riga (o separati da spazi)."></textarea>
+        <input type="hidden" name="view" value="downloads" />
+        <button class="btn" type="submit" title="Controlla i link eD2k e mostrali come risultati">Apri link eD2k</button>
+      </form>
       <div id="v2-downloads-search-results">{{template "v2_search_results" .Search}}</div>
     </div>
   </details>
@@ -2345,8 +2350,8 @@
         <button class="btn primary" type="submit">Cerca</button>
       </form>
       <form class="search-row" method="post" action="/search/link" hx-post="/search/link" hx-target="#v2-search-results" hx-swap="outerHTML">
-        <input type="text" name="ed2k_link" aria-label="Link eD2k (ed2k://|file|…)" placeholder="ed2k://|file|…" title="Controlla un link eD2k di file prima di usarlo." />
-        <button class="btn" type="submit" title="Controlla il link eD2k e mostralo come risultato">Apri link eD2k</button>
+        <textarea class="input" name="ed2k_link" rows="2" aria-label="Link eD2k, uno per riga" placeholder="ed2k://|file|…&#10;ed2k://|file|…" title="Incolla uno o più link eD2k, uno per riga (o separati da spazi)."></textarea>
+        <button class="btn" type="submit" title="Controlla i link eD2k e mostrali come risultati">Apri link eD2k</button>
       </form>
        <div id="v2-search-results">{{template "v2_search_results" .}}</div>
     </div>
@@ -2358,6 +2363,11 @@
 {{if .Error}}<p class="alert">{{.Error}}</p>
 {{else if .Results}}
 {{if .Notice}}<p class="muted">{{.Notice}}</p>{{end}}
+{{if .Links}}<form method="post" action="/search/add-all" hx-post="/search/add-all" hx-swap="none" style="display:inline">
+  <textarea hidden name="ed2k_links">{{.Links}}</textarea>
+  <input type="hidden" name="redirect" value="{{$.Redirect}}" />
+  <button class="btn primary sm" type="submit" title="Accoda tutti i link eD2k elencati">Aggiungi tutti ({{len .Results}})</button>
+</form>{{end}}
 <div class="table-wrap"><table class="data-table">
   <thead><tr><th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col">Seed</th><th scope="col">Azioni</th></tr></thead>
   <tbody>{{range .Results}}<tr>

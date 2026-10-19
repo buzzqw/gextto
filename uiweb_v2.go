@@ -214,6 +214,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /search/add", V2SearchAdd)
 	v2Handle(s, mux, "POST /search/explain", V2SearchExplain)
 	v2Handle(s, mux, "POST /search/link", V2SearchLink)
+	v2Handle(s, mux, "POST /search/add-all", V2SearchAddAll)
 
 	// Esplora TMDB (calendario, tendenze, ricerca).
 	v2Handle(s, mux, "GET /tmdb/calendar", V2TmdbCalendar)

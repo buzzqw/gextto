@@ -7,7 +7,9 @@ package gextto
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -36,6 +38,32 @@ type v2SearchView struct {
 	Error    string
 	Notice   string
 	Redirect string
+	Links    string
+}
+
+var ed2kLinkPattern = regexp.MustCompile(`(?i)ed2k://\|file\|[^|\r\n]*\|\d+\|[0-9a-f]{32}\|/`)
+
+// extractEd2kLinks finds every ed2k file link in pasted text, accepting one
+// per line, several per line, or text around them. Identities are deduplicated
+// by MD4, so pasting the same link twice adds it once.
+func extractEd2kLinks(raw string) []string {
+	matches := ed2kLinkPattern.FindAllString(raw, -1)
+	out := make([]string, 0, len(matches))
+	seen := make(map[string]bool, len(matches))
+	for _, match := range matches {
+		match = strings.TrimSpace(match)
+		file, err := ed2k.ParseFileLink(match)
+		if err != nil {
+			continue
+		}
+		hash := strings.ToLower(file.Hash)
+		if seen[hash] {
+			continue
+		}
+		seen[hash] = true
+		out = append(out, file.String())
+	}
+	return out
 }
 
 type v2ExplainView struct {
@@ -113,33 +141,77 @@ func v2SearchSource(release models.Release) string {
 // queue something it cannot finish.
 func V2SearchLink(w http.ResponseWriter, r *http.Request, s *AppState) {
 	raw := strings.TrimSpace(r.FormValue("ed2k_link"))
-	view := v2SearchView{Redirect: "/?view=search", Searched: true}
-	file, err := ed2k.ParseFileLink(raw)
-	if err != nil {
-		view.Error = "Link eD2k non valido: " + err.Error()
-		dict, eng := v2Dictionaries(s)
-		v2Render(w, http.StatusOK, "v2_search_results", view, dict, eng)
-		return
+	redirect := "/?view=search"
+	if r.FormValue("view") == "downloads" {
+		redirect = "/?view=downloads"
 	}
-	release := ParseEd2kRelease(file.Name, file.String(), "ed2k:link", file.Size, 0, time.Now().UTC())
-	if release == nil {
-		view.Error = "Link eD2k non valido."
+	view := v2SearchView{Redirect: redirect, Searched: true}
+	links := extractEd2kLinks(raw)
+	if len(links) == 0 {
+		view.Error = "Nessun link eD2k valido trovato nel testo incollato."
 		dict, eng := v2Dictionaries(s)
 		v2Render(w, http.StatusOK, "v2_search_results", view, dict, eng)
 		return
 	}
 	cfg := latestConfig(s)
-	release.Score = cfg.ReleaseScore(release)
-	encoded, _ := json.Marshal(release)
-	view.Query = file.Name
-	view.Notice = "Link eD2k valido: il download non è disponibile in questa versione."
-	view.Results = []v2SearchResult{{
-		Title: release.Title, Source: "eD2k/Kad", Network: "ed2k", Sources: 0,
-		Ed2kLink: release.Ed2kLink, Addable: false, Score: release.Score,
-		SizeBytes: release.SizeBytes, ReleaseJSON: string(encoded), ExplainJSON: string(encoded),
-	}}
+	_, download := ed2kAvailability(cfg)
+	now := time.Now().UTC()
+	valid := make([]string, 0, len(links))
+	for _, link := range links {
+		file, err := ed2k.ParseFileLink(link)
+		if err != nil {
+			continue
+		}
+		release := ParseEd2kRelease(file.Name, link, "ed2k:link", file.Size, 0, now)
+		if release == nil {
+			continue
+		}
+		release.Score = cfg.ReleaseScore(release)
+		encoded, _ := json.Marshal(release)
+		view.Results = append(view.Results, v2SearchResult{
+			Title: release.Title, Source: "eD2k/Kad", Network: "ed2k", Sources: 0,
+			Ed2kLink: release.Ed2kLink, Addable: download, Score: release.Score,
+			SizeBytes: release.SizeBytes, ReleaseJSON: string(encoded), ExplainJSON: string(encoded),
+		})
+		valid = append(valid, link)
+	}
+	view.Links = strings.Join(valid, "\n")
+	view.Query = fmt.Sprintf("%d link eD2k", len(view.Results))
+	if download {
+		view.Notice = fmt.Sprintf("%d link eD2k validi: puoi aggiungerli singolarmente o tutti insieme.", len(view.Results))
+	} else {
+		view.Notice = fmt.Sprintf("%d link eD2k validi, ma il download eD2k non è disponibile in questa versione.", len(view.Results))
+	}
+	if len(view.Results) == 0 {
+		view.Error = "Nessun link eD2k valido trovato nel testo incollato."
+	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_search_results", view, dict, eng)
+}
+
+// V2SearchAddAll queues every ed2k link in the pasted block, reusing the same
+// /api/search/add path as the per-row button.
+func V2SearchAddAll(w http.ResponseWriter, r *http.Request, s *AppState) {
+	for _, link := range extractEd2kLinks(r.FormValue("ed2k_links")) {
+		file, err := ed2k.ParseFileLink(link)
+		if err != nil {
+			continue
+		}
+		release := ParseEd2kRelease(file.Name, link, "ed2k:link", file.Size, 0, time.Now().UTC())
+		if release == nil || release.Ed2kLink == "" {
+			continue
+		}
+		encoded, _ := json.Marshal(release)
+		body, _ := json.Marshal(map[string]json.RawMessage{"release": encoded})
+		v2InternalJSON(s, http.MethodPost, "/api/search/add", nil, body)
+	}
+	redirect := v2SearchRedirectTarget(r.FormValue("redirect"), "/?view=search")
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, redirect, http.StatusSeeOther)
+		return
+	}
+	w.Header().Set("HX-Redirect", redirect)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // v2SearchRedirectTarget keeps the post-add navigation inside a known view:
