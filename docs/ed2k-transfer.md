@@ -16,7 +16,8 @@ do. The splitted 0xE1 metadata variant with the zero marker is read and written
 (the older non-zero marker is rejected). AICH is implemented as the eMule SHA-1
 block/part tree (`AICHRootReader`, `AICHRootFile`) with small-size tree tests. `internal/ed2k/transfer/peer` adds
 the 0xC5 TCP framing, the hello exchange and the file/hashset/part packet
-codecs (round-trip and malformed-packet tests).
+codecs (round-trip and malformed-packet tests). `internal/ed2k/transfer/source`
+adds the per-file source list with deduplication, failure backoff and expiry.
 
 The goal is a pure-Go eMule-compatible client inside `gx-ed2k`, so Gextto can
 turn an eD2k result into a real download without aMule, `amulecmd` or the EC
