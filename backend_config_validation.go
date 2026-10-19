@@ -170,6 +170,11 @@ func validateSettingValue(key, value string, cfg *Config) error {
 	if err := validateNumericSetting(key, value); err != nil {
 		return err
 	}
+	if key == speedModeSetting {
+		if _, err := speedModeWrites(value); err != nil {
+			return err
+		}
+	}
 	if key == seedRulesKey {
 		if err := validateSeedRulesSetting(value); err != nil {
 			return err

@@ -921,6 +921,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"gap_deep_max_per_cycle":               settingsParseUint(cfg, "gap_deep_max_per_cycle", 5),
 		"torrent_sched_enabled":                settingsOr(cfg, "torrent_sched_enabled", "false"),
 		"torrent_speed_auto":                   settingsOr(cfg, "torrent_speed_auto", "false"),
+		"torrent_speed_mode":                   speedModeOf(cfg),
 		"torrent_auto_latency_guard":           settingsOr(cfg, "torrent_auto_latency_guard", "true"),
 		"torrent_auto_latency_source":          settingsOr(cfg, "torrent_auto_latency_source", "both"),
 		"torrent_auto_latency_target":          settingsOr(cfg, "torrent_auto_latency_target", ""),

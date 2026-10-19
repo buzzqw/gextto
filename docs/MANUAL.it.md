@@ -296,8 +296,8 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
   seed, la banda degli ultimi 30 giorni e l'accesso diretto a Scarico, con sotto
   il **grafico del traffico degli ultimi 30 minuti** (curve di **download** e
   **upload**, il picco, la velocità attuale e la linea del **limite di banda in
-  vigore**: base, programmazione o temporaneo; non compare quando il limite è
-  *Auto*, cioè lasciato all'auto-tune). Si aggiorna da solo.
+  vigore**: limiti fissi, programmazione o eccezione; non compare quando la
+  velocità è *Auto*, cioè quando Gextto misura la linea e si adatta). Si aggiorna da solo.
 - **Da controllare** — sotto la striscia: i download **fermi** (con il motivo,
   il prossimo tentativo e quando verranno abbandonati), gli **spostamenti in
   libreria in sospeso** (destinazione e tentativi) e gli avvisi, gli errori e i
@@ -364,21 +364,24 @@ bloccata, già presente o inferiore al file archiviato.
   deselezionarli, **Pausa**, **Riprendi**, **Ricontrolla**, il menu **Tag** (un clic
   su un tag lo assegna; in fondo crei un tag nuovo o togli quello presente) e
   **Rimuovi dalla sessione**.
-- **Banda** (in alto a destra del pannello): il pulsante mostra i limiti in
-  vigore e apre un menu.
-  - **Auto**: l'auto-tune misura la linea, senza tetto; vince anche sulla
-    programmazione oraria.
-  - **Come da configurazione**: toglie ogni override e torna ai limiti di
-    Configurazione → Velocità e rete (o alla programmazione oraria, se è attiva);
-    sotto la voce trovi cosa significa in questo momento.
+- **Banda** (in alto a destra del pannello). La velocità segue una **regola**
+  scelta in Configurazione → Velocità e rete (Auto, limiti fissi o programmazione
+  oraria); da qui fai un'**eccezione** per adesso, che vince sulla regola finché
+  non scade o non la togli. Il pulsante mostra cosa vale: ⚡ un'eccezione (con i
+  minuti che restano), ⏰ una fascia della programmazione, altrimenti la regola.
+  Il menu:
+  - **Adesso**: cosa vale e da dove viene; con un'eccezione attiva dice quando
+    finisce e quale regola torna dopo. **Togli l'eccezione** torna subito alla regola.
+  - **Auto**: Gextto misura la linea e si adatta, senza tetto. È grigio con
+    «È già la regola» quando la regola in quel momento è già Auto.
   - **Limita download** / **Limita upload**: scegli un valore (da 512 KB/s a 10 MB/s
-    per il download, da 64 KB/s a 1 MB/s per l'upload, oppure **Senza limite**) e
-    il limite rapido parte subito; l'altro verso resta com'era. Un limite rapido
-    dura finché non lo togli; se è attiva la programmazione oraria dura 1 ora,
-    perché la programmazione vincerebbe su un limite senza scadenza.
-  - **Durata** (con un limite rapido attivo): 30 min, 1 h, 3 h o fino a rimozione.
-  - **Valori personalizzati…**: DL e UL in KiB/s e durata in minuti (0 = fino a
-    rimozione), poi **Applica**.
+    per il download, da 64 KB/s a 1 MB/s per l'upload, oppure **Senza limite**):
+    l'eccezione parte subito e l'altro verso resta com'era.
+  - **Durata** (con un'eccezione attiva, Auto compreso): 1 h, 3 h, 6 h, 12 h o
+    **Finché non la tolgo**. Un'eccezione nuova dura finché non la togli.
+  - **Valori personalizzati…**: DL e UL in KiB/s e durata in minuti (0 = finché
+    non la togli), poi **Applica**.
+  - **Cambia la regola** porta alla scelta in Configurazione.
 - **Pin**: un torrent forzato fuori coda mostra il badge **📌 pin**; si sblocca
   dal pulsante **Sblocca pin** nella sua scheda di dettaglio (dove c'è anche **Pin**).
 - **Colonne tabella**: Nome, Stato, Progresso, ↓, ↑, ETA, Peers, Ratio — si ordinano
@@ -1502,15 +1505,18 @@ Come si legge una riga:
   (secondi, minuti, GB, KiB/s…) e, sotto, il significato dei **valori
   speciali** (per esempio «0 = mai»).
 - Le opzioni sì/no sono **interruttori**; gli orari usano il selettore
-  dell'ora. La **programmazione velocità** è l'interruttore più una tabella
-  con una riga per giorno: per ogni giorno **una scelta** tra *Non attiva*,
-  *Limite* (i tuoi valori, unici a usare i campi di velocità) e *Auto* (nessun
-  tetto: la banda all'auto-tune, che misura la linea), più inizio e fine. Le
+  dell'ora. In **Velocità e rete**, **Come si decide la velocità** sceglie la
+  regola: *Auto* (Gextto misura la linea e si adatta), *Limiti fissi* (i due
+  limiti globali) o *Programmazione oraria*. Con la programmazione compaiono la
+  tabella con una riga per giorno, dove per ogni giorno c'è **una scelta** tra
+  *Non attiva*, *Limite* (i tuoi valori, unici a usare i campi di velocità) e
+  *Auto*, più inizio e fine, e **Fuori dalle fasce orarie: Auto**, che decide se
+  fuori dalle fasce vale Auto o i limiti fissi. Le
   vecchie impostazioni a fascia unica non compaiono più nella pagina: finché la
   tabella non viene salvata ne mostra i valori e restano in uso.
-- Le opzioni che dipendono da un interruttore (per esempio i campi della
-  programmazione velocità o del RAM disk) **compaiono solo quando l'interruttore
-  è acceso**, anche prima di salvarlo.
+- Le opzioni che dipendono da un interruttore o da una scelta (per esempio i
+  campi della programmazione velocità o del RAM disk) **compaiono solo quando
+  servono**, anche prima di salvare.
 - Un valore diverso dal predefinito mostra **modificato**, il valore
   *Predefinito* e il pulsante **↺ Predefinito**, che rimette il valore
   predefinito nel campo (va poi salvato).
@@ -1665,26 +1671,22 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 
 | Impostazione | Cosa fa |
 |---|---|
-| Limite download globale | Limite globale di download in KiB/s (0 = illimitato). *(Unità: KiB/s; 0 = illimitato)* |
-| Limite upload globale | Limite globale di upload in KiB/s (0 = illimitato). *(Unità: KiB/s; 0 = illimitato)* |
-| Velocità automatica (misura la linea) | Nessun tetto: la banda va all'auto-tune, che misura la linea e la lascia libera. Vince sui limiti globali e sulla programmazione; il limite temporaneo in Scarico resta un override a parte. Attivandola si spegne la programmazione, e viceversa. |
-| Auto rispetta la latenza | Con la velocità su Auto, Gextto misura il ping verso Google e Cloudflare ogni 2 secondi (8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1; si usa il tempo più basso). Finché il ping è buono alza download e upload; quando sale taglia il 15% e scende fino a 128/64 KiB/s. La prima volta che applica un limite lo scrive subito nel log; poi scrive al massimo una riga al minuto, solo se la velocità cambia almeno del 10% e l'andamento lo conferma. Attiva per default. |
-| Auto — cosa misura la latenza | `both` (default): il ping decide, i contatori del router sono solo diagnostica. `ping`: solo ping, il router non viene letto. `router`: vecchio comportamento, si cede solo agli altri dispositivi visti dal router. |
-| Auto — host per misurare la latenza | Host (o host:porta) a cui misurare la latenza con una connessione TCP ogni 2 secondi, solo mentre Auto è attivo. Vuoto = Google (8.8.8.8, 8.8.4.4) e Cloudflare (1.1.1.1, 1.0.0.1), porta 443; si usa il tempo più basso, così un server lontano o lento non falsa la misura. |
-| Auto — velocità massima linea, download | Massima velocità reale della linea in download, in KiB/s (es. 9000 per 9 MB/s). 0 = non nota: la scopre l'autotune. Se la indichi, il controller non sale oltre e trova il punto giusto più in fretta. |
-| Auto — velocità massima linea, upload | Massima velocità reale della linea in upload, in KiB/s (es. 800). 0 = non nota: la scopre l'autotune. Se la indichi, il controller non sale oltre e trova il punto giusto più in fretta. |
-
-**Programmazione velocità**
-
-| Impostazione | Cosa fa |
-|---|---|
-| Programmazione velocità attiva | Attiva la fascia oraria con limiti di velocità diversi. |
+| Come si decide la velocità | La regola della velocità: **Auto** (Gextto misura la linea e si adatta, senza tetto), **Limiti fissi** (i due limiti qui sotto) o **Programmazione oraria** (fasce per giorno, ognuna con limiti o Auto). In Scarico, dal menu **Banda**, puoi sempre fare un'eccezione temporanea, che vince sulla regola. Non è un'impostazione a sé: accende o spegne «Programmazione velocità attiva» e «Fuori dalle fasce orarie: Auto». |
+| Limite download globale | Limite globale di download in KiB/s (0 = illimitato). *(Unità: KiB/s; 0 = illimitato)* Compare con «Limiti fissi» e «Programmazione oraria». |
+| Limite upload globale | Limite globale di upload in KiB/s (0 = illimitato). *(Unità: KiB/s; 0 = illimitato)* Compare con «Limiti fissi» e «Programmazione oraria». |
+| Programmazione velocità attiva | Si imposta da «Come si decide la velocità» e non compare nella pagina; resta disponibile dalle API. |
+| Fuori dalle fasce orarie: Auto | Con la programmazione oraria: fuori dalle fasce la velocità è Auto invece dei limiti fissi. Compare solo con «Programmazione oraria». |
+| Programmazione — per giorno | Una scelta per giorno: **Non attiva** (nessuna fascia), **Limite** (fascia con i tuoi valori di download e upload) o **Auto** (fascia in cui Gextto misura la linea e si adatta). Solo «Limite» abilita i due campi di velocità; gli orari restano sempre attivi. Una fascia oltre la mezzanotte appartiene al giorno in cui inizia. *(un giorno «Limite» ha i suoi valori (0 = illimitato); «Auto» lascia che Gextto misuri la linea e si adatti; una fascia oltre la mezzanotte appartiene al giorno in cui inizia)* Compare solo con «Programmazione velocità attiva» attivo. |
 | Programmazione — ora inizio | Ora di inizio della programmazione (HH:MM). Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
 | Programmazione — ora fine | Ora di fine della programmazione (HH:MM). Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
 | Programmazione — giorni | Giorni attivi: 0=Lun … 6=Dom (es. 0,1,2,3,4). *(nessun giorno = mai attiva)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
 | Programmazione — download | Limite di download in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
 | Programmazione — upload | Limite di upload in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
-| Programmazione — per giorno | Una scelta per giorno: **Non attiva** (nessuna fascia), **Limite** (fascia con i tuoi valori di download e upload) o **Auto** (fascia senza limite: la banda va all'auto-tune, che misura la linea lì). Solo «Limite» abilita i due campi di velocità; gli orari restano sempre attivi. Una fascia oltre la mezzanotte appartiene al giorno in cui inizia. *(un giorno «Limite» ha i suoi valori (0 = illimitato); «Auto» lascia misurare la linea all'auto-tune; una fascia oltre la mezzanotte appartiene al giorno in cui inizia)* Compare solo con «Programmazione velocità attiva» attivo. |
+| Auto rispetta la latenza | Con la velocità su Auto, Gextto misura il ping verso Google e Cloudflare ogni 2 secondi (8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1; si usa il tempo più basso). Finché il ping è buono alza download e upload; quando sale taglia il 15% e scende fino a 128/64 KiB/s. La prima volta che applica un limite lo scrive subito nel log; poi scrive al massimo una riga al minuto, solo se la velocità cambia almeno del 10% e l'andamento lo conferma. Attiva per default. |
+| Auto — cosa misura la latenza | `both` (default): il ping decide, i contatori del router sono solo diagnostica. `ping`: solo ping, il router non viene letto. `router`: vecchio comportamento, si cede solo agli altri dispositivi visti dal router. |
+| Auto — host per misurare la latenza | Host (o host:porta) a cui misurare la latenza con una connessione TCP ogni 2 secondi, solo mentre Auto è attivo. Vuoto = Google (8.8.8.8, 8.8.4.4) e Cloudflare (1.1.1.1, 1.0.0.1), porta 443; si usa il tempo più basso, così un server lontano o lento non falsa la misura. |
+| Auto — velocità massima linea, download | Massima velocità reale della linea in download, in KiB/s (es. 9000 per 9 MB/s). 0 = non nota: la scopre Auto. Se la indichi, Auto non sale oltre e trova il punto giusto più in fretta. |
+| Auto — velocità massima linea, upload | Massima velocità reale della linea in upload, in KiB/s (es. 800). 0 = non nota: la scopre Auto. Se la indichi, Auto non sale oltre e trova il punto giusto più in fretta. |
 
 **Porte e interfacce**
 

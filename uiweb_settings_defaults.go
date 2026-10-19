@@ -106,6 +106,7 @@ var uiSettingDefaults = map[string]string{
 	"torrent_dl_limit":                    "0",
 	"torrent_ul_limit":                    "0",
 	"torrent_speed_auto":                  "false",
+	"torrent_speed_mode":                  "fixed",
 	"torrent_auto_latency_guard":          "true",
 	"torrent_auto_latency_source":         "both",
 	"torrent_auto_latency_target":         "",

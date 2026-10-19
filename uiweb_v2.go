@@ -72,6 +72,24 @@ var v2Templates = template.Must(template.New("v2").Funcs(template.FuncMap{
 	},
 	"dict":    v2Dict,
 	"kibRate": v2KibRate,
+	// badgeLimits and minutesLeft print the badge values with no words to
+	// translate: "↓ 1 MB/s ↑ ∞" and " · 42 min".
+	"badgeLimits": func(download, upload int64) string {
+		short := func(kib int64) string {
+			if kib <= 0 {
+				return "∞"
+			}
+			return v2KibRate(kib)
+		}
+		return "↓ " + short(download) + " ↑ " + short(upload)
+	},
+	"minutesLeft": func(minutes int64) string {
+		if minutes <= 0 {
+			return ""
+		}
+		return fmt.Sprintf(" · %d min", minutes)
+	},
+	"div": func(a, b int64) int64 { return a / b },
 }).ParseFS(v2TemplatesFS, "uiweb/v2/templates/*.html"))
 
 // v2Dict builds a map from key/value pairs, used to pass several arguments to a
@@ -1044,23 +1062,8 @@ type v2TorrentsView struct {
 	Columns       []v2Column
 	TagOptions    []string
 	TagFilter     string
-	TempDL        int64
-	TempUL        int64
-	TempMinutes   int64
-	TempActive    bool
-	TempAuto      bool
-	SpeedAuto     bool
-	// TempAutoRedundant: the base Auto from the settings is in force, so the
-	// temporary switch is shown disabled and points at Configuration.
-	TempAutoRedundant   bool
-	Guard               latencyGuardStatus
-	SchedActive         bool
-	SchedAuto           bool
-	TempShadowed        bool
-	SchedDL             int64
-	SchedUL             int64
-	BaseDL              int64
-	BaseUL              int64
+	// Speed is the exception and the rule shown by the bandwidth menu.
+	Speed               uiSpeedState
 	AutoRemoveCompleted bool
 	Message             string
 	Error               bool
@@ -1070,50 +1073,14 @@ type v2TorrentsView struct {
 	Partial bool
 }
 
-// Quick choices of the bandwidth menu, in KiB/s (0 = no limit) and minutes
-// (0 = until removed).
+// Quick choices of the bandwidth menu, in KiB/s (0 = no limit).
 var (
-	v2SpeedPresetsDL      = []int64{512, 1024, 2048, 5120, 10240, 0}
-	v2SpeedPresetsUL      = []int64{64, 128, 256, 512, 1024, 0}
-	v2SpeedPresetsMinutes = []int64{30, 60, 180, 0}
+	v2SpeedPresetsDL = []int64{512, 1024, 2048, 5120, 10240, 0}
+	v2SpeedPresetsUL = []int64{64, 128, 256, 512, 1024, 0}
 )
 
 func (v v2TorrentsView) DLPresets() []int64 { return v2SpeedPresetsDL }
 func (v v2TorrentsView) ULPresets() []int64 { return v2SpeedPresetsUL }
-
-// v2SpeedDuration is one duration choice of the bandwidth menu.
-type v2SpeedDuration struct {
-	Minutes int64
-	Label   string
-}
-
-func (v v2TorrentsView) DurationChoices() []v2SpeedDuration {
-	choices := make([]v2SpeedDuration, 0, len(v2SpeedPresetsMinutes))
-	for _, minutes := range v2SpeedPresetsMinutes {
-		label := "Fino a rimozione"
-		switch {
-		case minutes > 0 && minutes < 60:
-			label = fmt.Sprintf("%d min", minutes)
-		case minutes >= 60:
-			label = fmt.Sprintf("%d h", minutes/60)
-		}
-		choices = append(choices, v2SpeedDuration{Minutes: minutes, Label: label})
-	}
-	return choices
-}
-
-// SpeedMode is the choice the bandwidth menu marks: "auto" (the temporary
-// Auto), "limit" (a quick limit in force) or "normal" (the configuration and
-// its schedule).
-func (v v2TorrentsView) SpeedMode() string {
-	switch {
-	case v.TempAuto:
-		return "auto"
-	case v.TempActive:
-		return "limit"
-	}
-	return "normal"
-}
 
 // v2KibRate names a KiB/s limit the way the menu shows it: 0 is no limit.
 func v2KibRate(kib int64) string {
@@ -1284,21 +1251,7 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		Columns:             v2TorrentColumns,
 		TagOptions:          uiDownloadTagOptions(s, latestConfig(s)),
 		TagFilter:           tagFilter,
-		TempDL:              settings.TempDL,
-		TempUL:              settings.TempUL,
-		TempMinutes:         settings.TempMinutes,
-		TempActive:          settings.TempActive,
-		TempAuto:            settings.TempAuto,
-		SpeedAuto:           settings.SpeedAuto,
-		TempAutoRedundant:   settings.TempAutoRedundant,
-		Guard:               settings.Guard,
-		SchedActive:         settings.SchedActive,
-		SchedAuto:           settings.SchedAuto,
-		TempShadowed:        settings.TempShadowed,
-		SchedDL:             settings.SchedDL,
-		SchedUL:             settings.SchedUL,
-		BaseDL:              settings.BaseDL,
-		BaseUL:              settings.BaseUL,
+		Speed:               settings.Speed,
 		AutoRemoveCompleted: settings.AutoRemoveCompleted,
 		Message:             message,
 		Error:               isErr,
@@ -2597,18 +2550,6 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if err := saveConfigSetting(s.cfg.DataDir, key, value); err != nil {
 		render(err.Error(), true)
 		return
-	}
-	// The base "Auto" policy and the schedule are two of the same policy choice:
-	// turning one on turns the other off, so the line has a single source.
-	switch key {
-	case "torrent_speed_auto":
-		if settingTruthy(value) {
-			_ = saveConfigSetting(s.cfg.DataDir, "torrent_sched_enabled", "0")
-		}
-	case "torrent_sched_enabled":
-		if settingTruthy(value) {
-			_ = saveConfigSetting(s.cfg.DataDir, "torrent_speed_auto", "0")
-		}
 	}
 	// A value typed by the user is theirs: record it so the guided tuning never
 	// proposes it again. Clearing the field goes back to the default, so the

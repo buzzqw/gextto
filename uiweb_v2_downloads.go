@@ -32,35 +32,51 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		path = "/api/torrents/temp-limits"
 		body, _ = json.Marshal(TempLimitsInput{DownloadKib: tempDL, UploadKib: tempUL, Minutes: tempMinutes})
 	case "temp_set":
-		// A quick choice of the bandwidth menu changes one value (download,
-		// upload or duration) of the temporary limit and keeps the others.
-		tempDL, tempUL, tempMinutes = v2QuickLimitBase(s)
+		// A quick choice of the bandwidth menu changes one value of the
+		// exception (download, upload or duration) and keeps the others.
+		speed := uiSpeedStateFor(latestConfig(s), latencyGuardStatus{})
+		tempMinutes = speed.ExceptionMinutes
+		if value := r.FormValue("minutes"); value != "" {
+			tempMinutes = v2ParseInt(value, tempMinutes)
+		}
+		path = "/api/torrents/temp-limits"
+		if speed.ExceptionAuto && r.FormValue("dl") == "" && r.FormValue("ul") == "" {
+			// A new duration for the Auto exception.
+			on := true
+			body, _ = json.Marshal(TempLimitsInput{Auto: &on, Minutes: tempMinutes})
+			break
+		}
+		// From the exception limit in force, or else from what the rule
+		// applies now.
+		tempDL, tempUL = speed.RuleDL, speed.RuleUL
+		if speed.ExceptionLimit {
+			tempDL, tempUL = speed.ExceptionDL, speed.ExceptionUL
+		} else if speed.RuleAuto() {
+			tempDL, tempUL = 0, 0
+		}
 		if value := r.FormValue("dl"); value != "" {
 			tempDL = v2ParseInt(value, tempDL)
 		}
 		if value := r.FormValue("ul"); value != "" {
 			tempUL = v2ParseInt(value, tempUL)
 		}
-		if value := r.FormValue("minutes"); value != "" {
-			tempMinutes = v2ParseInt(value, tempMinutes)
-		}
-		if settingsBool(latestConfig(s), "torrent_temp_auto", false) {
-			// Auto would beat the new limit, and an all-zero limit does not
-			// turn it off by itself.
+		if speed.ExceptionAuto {
+			// An all-zero limit does not turn the Auto exception off by itself.
 			off := false
 			autoBody, _ := json.Marshal(TempLimitsInput{Auto: &off})
 			v2InternalJSON(s, http.MethodPost, "/api/torrents/temp-limits", nil, autoBody)
 		}
-		path = "/api/torrents/temp-limits"
 		body, _ = json.Marshal(TempLimitsInput{DownloadKib: tempDL, UploadKib: tempUL, Minutes: tempMinutes})
 	case "temp_clear":
 		path = "/api/torrents/temp-limits"
 		body, _ = json.Marshal(TempLimitsInput{Clear: true})
 	case "temp_auto":
-		// The temporary override's Auto mode: no cap now, the line to the tuning.
+		// The Auto exception: no cap now, the line to the tuning, until it is
+		// removed or for the minutes given.
 		autoSpeed := r.FormValue("value") == "true"
+		tempMinutes = v2ParseInt(r.FormValue("minutes"), 0)
 		path = "/api/torrents/temp-limits"
-		body, _ = json.Marshal(TempLimitsInput{Auto: &autoSpeed})
+		body, _ = json.Marshal(TempLimitsInput{Auto: &autoSpeed, Minutes: tempMinutes})
 	default:
 		http.Error(w, "impostazione download non valida", http.StatusBadRequest)
 		return
@@ -97,20 +113,10 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 				message = "Nessun torrent completato da rimuovere"
 			}
 		}
-	} else if (op == "temp_apply" || op == "temp_set") && status < 400 {
-		if tempMinutes > 0 {
-			message = fmt.Sprintf("Limite temporaneo applicato: %d KiB/s DL · %d KiB/s UL per %d min", tempDL, tempUL, tempMinutes)
-		} else {
-			message = fmt.Sprintf("Limite temporaneo applicato: %d KiB/s DL · %d KiB/s UL (fino a rimozione)", tempDL, tempUL)
-		}
 	} else if op == "temp_clear" && status < 400 {
-		message = "Limite temporaneo rimosso (ripristinati limiti normali)"
-	} else if op == "temp_auto" && status < 400 {
-		if r.FormValue("value") == "true" {
-			message = "Auto speed attivo: nessun tetto, la linea la misura l'auto-tune"
-		} else {
-			message = "Auto speed disattivato (ripristinati i limiti normali)"
-		}
+		message = "Eccezione tolta: torna la regola della configurazione"
+	} else if (op == "temp_apply" || op == "temp_set" || op == "temp_auto") && status < 400 {
+		message = v2ExceptionMessage(latestConfig(s))
 	}
 	if r.Header.Get("HX-Request") == "" {
 		query := url.Values{"view": {"downloads"}, "msg": {message}}
@@ -148,27 +154,19 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	v2Render(w, http.StatusOK, "v2_torrents_wrap", view, dict, eng)
 }
 
-// v2QuickLimitBase is where a quick choice of the bandwidth menu starts from:
-// the temporary limit in force, or else the limits applied now with no expiry.
-// While a schedule window is active a limit without expiry would be beaten by
-// it, so a new quick limit lasts one hour there.
-func v2QuickLimitBase(s *AppState) (download, upload, minutes int64) {
-	page := uiDownloadsPageFor(s)
-	if page.TempActive {
-		return page.TempDL, page.TempUL, page.TempMinutes
+// v2ExceptionMessage confirms the exception now in force.
+func v2ExceptionMessage(cfg *Config) string {
+	speed := uiSpeedStateFor(cfg, latencyGuardStatus{})
+	what := "Auto"
+	if speed.ExceptionLimit {
+		what = fmt.Sprintf("↓ %s · ↑ %s", v2KibRate(speed.ExceptionDL), v2KibRate(speed.ExceptionUL))
+	} else if !speed.ExceptionAuto {
+		return "Eccezione tolta: torna la regola della configurazione"
 	}
-	cfg := latestConfig(s)
-	download, upload, _, _ = speedPolicy(cfg)
-	if download < 0 {
-		download = 0
+	if speed.ExceptionMinutes > 0 {
+		return fmt.Sprintf("Eccezione: %s fino alle %s", what, speed.ExceptionEnds)
 	}
-	if upload < 0 {
-		upload = 0
-	}
-	if page.SchedActive {
-		minutes = 60
-	}
-	return download, upload, minutes
+	return fmt.Sprintf("Eccezione: %s finché non la togli", what)
 }
 
 func V2HTTPDownloadDetail(w http.ResponseWriter, r *http.Request, s *AppState) {

@@ -9,9 +9,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/buzzqw/gextto/internal/bwschedule"
 )
 
 // uiPageSection is one block of a panel page.
@@ -207,37 +204,8 @@ type uiPanelsPage struct {
 type uiDownloadsPage struct {
 	Torrents uiTorrentsData
 	Panels   []uiPageSection
-	// Temporary speed limits, prefilled from the persisted settings so the
-	// toolbar shows the values currently in force.
-	TempDL      int64
-	TempUL      int64
-	TempActive  bool
-	TempMinutes int64
-	// TempAuto is the temporary override's Auto mode ("auto speed"): the line is
-	// left to the tuning with no cap, like an "Auto" schedule window right now.
-	TempAuto bool
-	// SpeedAuto is the base "Auto" policy (torrent_speed_auto): no cap at all.
-	SpeedAuto bool
-	// TempAutoRedundant is true when the base "Auto" policy from
-	// Configuration → Speed and network is already in force: the temporary
-	// override would add nothing now, so the toolbar shows it disabled and
-	// points at the setting instead of pretending it is a second switch.
-	TempAutoRedundant bool
-	// Active scheduled speed limits and base limits
-	SchedActive bool
-	// SchedAuto: the active schedule window is an "Auto" band (the AutoLimit
-	// sentinel), which leaves the line to the auto-tune with no cap instead of
-	// applying a fixed number. The badge then says "Auto", never "-1/-1".
-	SchedAuto bool
-	// TempShadowed: a temporary limit without expiry overridden by the schedule.
-	TempShadowed bool
-	// Guard is the latency guard of the Auto speed: shown while it is
-	// slowing the transfers down for the other devices on the line.
-	Guard   latencyGuardStatus
-	SchedDL int64
-	SchedUL int64
-	BaseDL  int64
-	BaseUL  int64
+	// Speed is the exception and the rule shown by the bandwidth menu.
+	Speed uiSpeedState
 	// Tag catalog and selection used by the toolbar filters.
 	TagOptions          []string
 	AutoRemoveCompleted bool
@@ -594,47 +562,12 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 // tag and temporary-limit panels of the classic interface.
 func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 	cfg := latestConfig(s)
-	speedAuto := settingsBool(cfg, "torrent_speed_auto", false)
-	// The temporary "Auto speed" is redundant only when the base Auto is the
-	// policy actually in force: with an active numeric schedule or temporary
-	// limit it is the escape hatch that hands the line back to the tuning.
-	_, _, source, _ := speedPolicy(cfg)
 	page := uiDownloadsPage{
 		Torrents:            uiTorrentsDataFrom(s),
-		TempDL:              uiSettingInt(cfg, "torrent_temp_dl_limit"),
-		TempUL:              uiSettingInt(cfg, "torrent_temp_ul_limit"),
-		TempAuto:            settingsBool(cfg, "torrent_temp_auto", false),
-		SpeedAuto:           speedAuto,
-		TempAutoRedundant:   speedAuto && source == speedSourceAuto,
+		Speed:               uiSpeedStateFor(cfg, s.latency_guard.status()),
 		AutoRemoveCompleted: settingsBool(cfg, "auto_remove_completed", false),
 		TagOptions:          uiDownloadTagOptions(s, cfg),
-		Guard:               s.latency_guard.status(),
 	}
-	if uiSettingString(cfg, "torrent_temp_limit_enabled") == "1" {
-		until := uiSettingInt(cfg, "torrent_temp_limit_until")
-		if until == 0 {
-			page.TempActive = true
-			page.TempMinutes = 0
-		} else if remaining := until - time.Now().Unix(); remaining > 0 {
-			page.TempActive = true
-			page.TempMinutes = (remaining + 59) / 60
-		}
-	}
-	if dl, ul, ok := gh6_scheduledSpeedLimits(cfg); ok {
-		page.SchedActive = true
-		// An "Auto" window is stored as the AutoLimit sentinel: it must show as
-		// "Auto", not as "-1/-1" KiB/s.
-		page.SchedAuto = dl == bwschedule.AutoLimit || ul == bwschedule.AutoLimit
-		page.SchedDL = dl
-		page.SchedUL = ul
-		// The schedule beats a temporary limit without expiry.
-		if page.TempActive && page.TempMinutes == 0 {
-			page.TempActive = false
-			page.TempShadowed = true
-		}
-	}
-	page.BaseDL = cfg.Transfer.DownloadLimitKib
-	page.BaseUL = cfg.Transfer.UploadLimitKib
 	page.Panels = []uiPageSection{
 		sectionTable(uiTableSpec{
 			Title:    "Storico download",

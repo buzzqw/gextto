@@ -63,7 +63,7 @@ func TestSettingsModeBriefHidesInternals(t *testing.T) {
 func TestFacilitataShowsTheSpeedSchedule(t *testing.T) {
 	state := newTestAppState(t)
 	brief := settingPageKeys(uiSettingsPageFrom(state, "network", v2SettingsModeBrief))
-	if !brief["torrent_sched_enabled"] || !brief["torrent_sched_week"] {
+	if !brief["torrent_speed_mode"] || !brief["torrent_sched_week"] || !brief["torrent_speed_auto"] {
 		t.Fatalf("Facilitata must show the speed schedule: %v", brief)
 	}
 }

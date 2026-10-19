@@ -154,70 +154,68 @@ func gh6_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
 	return scheduledSpeedLimitsAt(cfg, time.Now())
 }
 
-// Speed policy sources, in the order they are tried.
+// Speed policy sources. The exception set in Downloads ("temp*") comes first;
+// then the rule chosen in Configuration (see speed_mode.go): a schedule window,
+// Auto, or the fixed limits.
 const (
-	speedSourceTemp         = "temp"          // temporary limit with an expiry
-	speedSourceTempAuto     = "temp_auto"     // "auto speed": the whole line to the tuning, now
-	speedSourceAuto         = "auto"          // base policy: the tuning measures and sets the cap
-	speedSourceSchedule     = "schedule"      // bandwidth schedule window
-	speedSourceScheduleAuto = "schedule_auto" // schedule window left to the tuning
-	speedSourceTempKeep     = "temp_keep"     // temporary limit kept until removed
-	speedSourceBase         = "base"
+	speedSourceTemp         = "temp"          // exception: a limit with an expiry
+	speedSourceTempKeep     = "temp_keep"     // exception: a limit kept until removed
+	speedSourceTempAuto     = "temp_auto"     // exception: Auto, the whole line to the tuning
+	speedSourceSchedule     = "schedule"      // rule: schedule window with limits
+	speedSourceScheduleAuto = "schedule_auto" // rule: schedule window on Auto
+	speedSourceAuto         = "auto"          // rule: Auto (or Auto outside the windows)
+	speedSourceBase         = "base"          // rule: the fixed limits
 )
 
-// speedPolicy picks the global limits in force and where they come from.
-// "Auto speed" (the temporary override in its Auto mode) beats everything: the
-// line is left to the tuning, now. Then a temporary limit with an expiry; the
-// bandwidth schedule beats a temporary limit without expiry, which in turn beats
-// the base limits. tempShadowed reports a permanent temporary limit that the
-// schedule is overriding right now.
-func speedPolicy(cfg *Config) (download, upload int64, source string, tempShadowed bool) {
+// speedPolicy picks the global limits in force and where they come from. The
+// exception set in Downloads wins over the rule until it expires or is
+// removed, whatever the rule is: Auto, a limit with an expiry or one kept until
+// removed. Then the rule: the schedule window in force, Auto, the fixed limits.
+func speedPolicy(cfg *Config) (download, upload int64, source string) {
 	now := time.Now().Unix()
-	// "Auto speed" is the temporary override's other mode: it wins over every
-	// numeric limit and hands the line to the guided tuning with no cap, exactly
-	// like standing inside an "Auto" schedule window. The interface disables the
-	// temporary DL/UL fields while it is on, so a timed limit only exists when it
-	// is off.
-	if gh6_truthySetting(cfg.Settings["torrent_temp_auto"]) {
-		return 0, 0, speedSourceTempAuto, false
-	}
 	tempUntil := gh6_parseSettingInt(cfg, "torrent_temp_limit_until")
-	tempEnabled := gh6_truthySetting(cfg.Settings["torrent_temp_limit_enabled"])
-	tempDownload := gh6_parseSettingInt(cfg, "torrent_temp_dl_limit")
-	tempUpload := gh6_parseSettingInt(cfg, "torrent_temp_ul_limit")
-	if tempEnabled && tempUntil > now {
-		return tempDownload, tempUpload, speedSourceTemp, false
+	tempLive := tempUntil == 0 || tempUntil > now
+	if gh6_truthySetting(cfg.Settings["torrent_temp_auto"]) && tempLive {
+		return 0, 0, speedSourceTempAuto
 	}
-	tempKeep := tempEnabled && tempUntil == 0
+	if gh6_truthySetting(cfg.Settings["torrent_temp_limit_enabled"]) && tempLive {
+		download, upload = gh6_parseSettingInt(cfg, "torrent_temp_dl_limit"), gh6_parseSettingInt(cfg, "torrent_temp_ul_limit")
+		if tempUntil == 0 {
+			return download, upload, speedSourceTempKeep
+		}
+		return download, upload, speedSourceTemp
+	}
+	return speedRule(cfg)
+}
+
+// speedRule is the rule chosen in Configuration, without the exception: the
+// schedule window in force, Auto, or the fixed limits.
+func speedRule(cfg *Config) (download, upload int64, source string) {
 	if gh6_truthySetting(cfg.Settings["torrent_sched_enabled"]) {
 		if day, ok := speedScheduleWeek(cfg).AtDay(time.Now()); ok {
 			if day.Auto() {
 				// An "auto" window hands the limit to the guided tuning: it lifts
 				// the cap (unlimited) so the line can be measured there, while
 				// the user's limits apply in the other windows.
-				return 0, 0, speedSourceScheduleAuto, false
+				return 0, 0, speedSourceScheduleAuto
 			}
-			return day.Download, day.Upload, speedSourceSchedule, tempKeep
+			return day.Download, day.Upload, speedSourceSchedule
 		}
 	}
-	// The base "Auto" policy: no cap at all, the line to the tuning. It is the
-	// third policy next to the manual limits and the schedule.
+	// Auto as the rule, or Auto outside the schedule windows.
 	if gh6_truthySetting(cfg.Settings["torrent_speed_auto"]) {
-		return 0, 0, speedSourceAuto, false
+		return 0, 0, speedSourceAuto
 	}
-	if tempKeep {
-		return tempDownload, tempUpload, speedSourceTempKeep, false
-	}
-	return max(cfg.Transfer.DownloadLimitKib, 0), max(cfg.Transfer.UploadLimitKib, 0), speedSourceBase, false
+	return max(cfg.Transfer.DownloadLimitKib, 0), max(cfg.Transfer.UploadLimitKib, 0), speedSourceBase
 }
 
 func gh6_currentSpeedLimits(cfg *Config) (int64, int64) {
-	download, upload, _, _ := speedPolicy(cfg)
+	download, upload, _ := speedPolicy(cfg)
 	return download, upload
 }
 
 func gh6_applySpeedPolicy(cfg *Config, torrents TorrentEngine, guard *latencyGuard) {
-	download, upload, _, _ := effectiveSpeedLimits(cfg, guard)
+	download, upload, _ := effectiveSpeedLimits(cfg, guard)
 	if _, err := torrents.SetGlobalSpeedLimits(download, upload); err != nil {
 		logging.Debug("speed policy apply failed", "error", err)
 	}
@@ -1359,13 +1357,21 @@ func SetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if *input.Auto {
 			value = "1"
 		}
+		// The Auto exception lasts the minutes given (0 = until removed).
+		until := int64(0)
+		if minutes := input.Minutes; *input.Auto && minutes > 0 {
+			if minutes > 24*60 {
+				minutes = 24 * 60
+			}
+			until = time.Now().Unix() + minutes*60
+		}
 		for _, pair := range [][2]string{
 			{"torrent_temp_auto", value},
 			{"torrent_temp_limit_enabled", "0"},
-			{"torrent_temp_limit_until", "0"},
+			{"torrent_temp_limit_until", strconv.FormatInt(until, 10)},
 		} {
 			if err := saveConfigSetting(s.cfg.DataDir, pair[0], pair[1]); err != nil {
-				jsonError(w, http.StatusInternalServerError, fmt.Sprintf("salvataggio auto speed: %v", err))
+				jsonError(w, http.StatusInternalServerError, fmt.Sprintf("salvataggio eccezione Auto: %v", err))
 				return
 			}
 		}
@@ -1411,7 +1417,7 @@ func SetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	for _, pair := range pairs {
 		if err := saveConfigSetting(s.cfg.DataDir, pair[0], pair[1]); err != nil {
-			jsonError(w, http.StatusInternalServerError, fmt.Sprintf("salvataggio limite temporaneo: %v", err))
+			jsonError(w, http.StatusInternalServerError, fmt.Sprintf("salvataggio eccezione: %v", err))
 			return
 		}
 	}
@@ -1440,7 +1446,7 @@ func GetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		remaining = until - now
 	}
 	schedDownload, schedUpload, schedActive := gh6_scheduledSpeedLimits(cfg)
-	download, upload, source, _ := speedPolicy(cfg)
+	download, upload, source := speedPolicy(cfg)
 	if source == speedSourceTempKeep {
 		source = speedSourceTemp
 	}

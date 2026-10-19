@@ -218,16 +218,16 @@ func TestEffectiveSpeedLimitsUsesTheGuardOnlyOnAuto(t *testing.T) {
 	g := newLatencyGuard()
 	g.downCap, g.upCap = 4000, 0
 	auto := &Config{Settings: map[string]string{"torrent_speed_auto": "true"}}
-	if down, up, source, _ := effectiveSpeedLimits(auto, g); down != 4000 || up != 0 || source != speedSourceAuto {
+	if down, up, source := effectiveSpeedLimits(auto, g); down != 4000 || up != 0 || source != speedSourceAuto {
 		t.Fatalf("auto: %d/%d %s, want 4000/0 auto", down, up, source)
 	}
 	auto.Settings[latencyGuardKey] = "false"
-	if down, _, _, _ := effectiveSpeedLimits(auto, g); down != 0 {
+	if down, _, _ := effectiveSpeedLimits(auto, g); down != 0 {
 		t.Fatalf("guard off: download %d, want unlimited", down)
 	}
 	manual := &Config{Settings: map[string]string{}}
 	manual.Transfer.DownloadLimitKib = 3000
-	if down, _, source, _ := effectiveSpeedLimits(manual, g); down != 3000 || source != speedSourceBase {
+	if down, _, source := effectiveSpeedLimits(manual, g); down != 3000 || source != speedSourceBase {
 		t.Fatalf("manual: %d %s, want 3000 base", down, source)
 	}
 }

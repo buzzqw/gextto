@@ -1052,27 +1052,24 @@ func (m *Model) speedPolicyLabel() string {
 	if policy == nil {
 		return ""
 	}
-	// "Auto speed" (the temporary override in its Auto mode) beats everything.
+	// The exception set in Downloads wins over the rule: Auto or a limit.
 	if policy.Source == "temp_auto" {
 		return m.Tr.T("policy.autospeed")
 	}
-	// The base "Auto" policy: no cap, the system measures.
-	if policy.Source == "auto" {
-		return m.Tr.T("policy.auto")
-	}
-	// The scheduled "Auto" window: it beats the temporary limit without expiry
-	// and hands the line to the auto-tune, so it must not show as a kept temp
-	// limit (the "-1/-1" sentinel never reaches the header).
-	if policy.Source == "schedule_auto" {
-		return m.Tr.T("policy.schedauto")
-	}
-	// The schedule beats a temporary limit without expiry.
-	if minutes, active := m.TempLimitMinutes(); active && (minutes > 0 || policy.Source != "schedule") {
+	if minutes, active := m.TempLimitMinutes(); active && policy.Source == "temp" {
 		down, up := kibLabel(m.Tr, policy.TempDownloadKib), kibLabel(m.Tr, policy.TempUploadKib)
 		if minutes == 0 {
 			return m.Tr.Format("policy.tempkeep", down, up)
 		}
 		return m.Tr.Format("policy.temp", down, up, minutes)
+	}
+	// The rule: Auto, a schedule window (on Auto or with limits), the fixed
+	// limits. The "-1/-1" sentinel of an Auto window never reaches the header.
+	if policy.Source == "auto" {
+		return m.Tr.T("policy.auto")
+	}
+	if policy.Source == "schedule_auto" {
+		return m.Tr.T("policy.schedauto")
 	}
 	if policy.SchedActive && policy.Source == "schedule" {
 		return m.Tr.Format("policy.sched", kibLabel(m.Tr, policy.DownloadKib), kibLabel(m.Tr, policy.UploadKib))

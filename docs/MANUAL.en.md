@@ -295,8 +295,8 @@ release package the installer uses (README, *Install on Linux*).
   the last-30-days bandwidth and direct access to Downloads, with the **last
   30 minutes traffic chart** below (the **download** and **upload** curves, the
   peak, the current speed and the line of the **active bandwidth limit**: base,
-  schedule or temporary; it is not drawn when the limit is *Auto*, i.e. left to
-  the auto-tune). It refreshes on its own.
+  schedule or exception; it is not drawn when the speed is *Auto*, i.e. when
+  Gextto measures the line and adapts). It refreshes on its own.
 - **To check** — below the strip: **stuck** downloads (with the reason, the
   next attempt and when they will be abandoned), **pending moves to the
   library** (destination and attempts) and the warnings, errors and 🛟 pack
@@ -361,20 +361,24 @@ inferior to the archived file.
   them, **Pause**, **Resume**, **Check again**, the **Tag** menu (one click on a
   tag assigns it; at the bottom you create a new tag or remove the current one)
   and **Remove from session**.
-- **Bandwidth** (top right of the panel): the button shows the limits in force
-  and opens a menu.
-  - **Auto**: auto-tune measures the line, no cap; it beats the hourly schedule too.
-  - **As configured**: drops every override and goes back to the limits of
-    Configuration → Speed and network (or to the hourly schedule, when it is on);
-    the line under it says what that means right now.
+- **Bandwidth** (top right of the panel). The speed follows a **rule** chosen in
+  Configuration → Speed and network (Auto, fixed limits or hourly schedule); here
+  you make an **exception** for now, which beats the rule until it ends or you
+  remove it. The button shows what applies: ⚡ an exception (with the minutes
+  left), ⏰ a schedule window, otherwise the rule. The menu:
+  - **Now**: what applies and where it comes from; with an exception on it says
+    when it ends and which rule comes back afterwards. **Remove the exception**
+    goes back to the rule at once.
+  - **Auto**: Gextto measures the line and adapts, no cap. It is greyed out with
+    “It is already the rule” when the rule is already Auto at that moment.
   - **Limit download** / **Limit upload**: pick a value (512 KB/s to 10 MB/s for
-    download, 64 KB/s to 1 MB/s for upload, or **No limit**) and the quick limit
-    starts at once; the other direction stays as it was. A quick limit lasts until
-    you remove it; with the hourly schedule on it lasts 1 hour, because the
-    schedule would beat a limit with no expiry.
-  - **Duration** (while a quick limit is on): 30 min, 1 h, 3 h or until removed.
+    download, 64 KB/s to 1 MB/s for upload, or **No limit**): the exception starts
+    at once and the other direction stays as it was.
+  - **Duration** (while an exception is on, Auto included): 1 h, 3 h, 6 h, 12 h
+    or **Until I remove it**. A new exception lasts until you remove it.
   - **Custom values…**: DL and UL in KiB/s and the duration in minutes (0 = until
-    removed), then **Apply**.
+    you remove it), then **Apply**.
+  - **Change the rule** opens the choice in Configuration.
 - **Pin**: a torrent forced outside the queue shows the **📌 pinned** badge; it is
   unpinned with **Unlock pin** in its details (where **Pin** is too).
 - **Table columns**: Name, Status, Progress, ↓, ↑, ETA, Peers, Ratio — sorted
@@ -1449,15 +1453,18 @@ How to read a row:
 - **Name and description** on the left; the control in the middle with its
   **unit** (seconds, minutes, GB, KiB/s…) and, below it, the meaning of the
   **special values** (for example “0 = never”).
-- Yes/no options are **switches**; times use the time picker. The **speed
-  schedule** is the switch plus a table with one row per weekday: for every day
-  **one choice** among *Off*, *Limit* (your values, the only ones using the
-  speed fields) and *Auto* (no cap: the bandwidth to the auto-tune, which
-  measures the line), plus start and end. The older single-window settings no
+- Yes/no options are **switches**; times use the time picker. In **Speed and
+  network**, **How the speed is decided** picks the rule: *Auto* (Gextto measures
+  the line and adapts), *Fixed limits* (the two global limits) or *Hourly
+  schedule*. With the schedule you get the table with one row per weekday, where
+  every day has **one choice** among *Off*, *Limit* (your values, the only ones
+  using the speed fields) and *Auto*, plus start and end, and **Outside the hourly
+  windows: Auto**, which says whether Auto or the fixed limits apply outside the
+  windows. The older single-window settings no
   longer appear on the page: until the table is saved it shows their values and
   they stay in use.
-- Options that depend on a switch (for example the speed schedule or RAM disk
-  fields) **appear only while the switch is on**, even before it is saved.
+- Options that depend on a switch or a choice (for example the speed schedule or
+  RAM disk fields) **appear only when they matter**, even before saving.
 - A value different from the default shows **changed**, the *Default* value
   and the **↺ Default** button, which puts the default back in the field (it
   still has to be saved).
@@ -1612,26 +1619,22 @@ Recalculate scores* after changing weights.
 
 | Setting | What it does |
 |---|---|
-| Global download limit | Global download limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
-| Global upload limit | Global upload limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
-| Automatic speed (measuring the line) | No cap: the bandwidth goes to the auto-tune, which measures the line and leaves it free. It beats the global limits and the schedule; the temporary limit in Downloads stays a separate override. Turning it on turns the schedule off, and the other way round. |
-| Auto respects latency | With the speed on Auto, Gextto measures the ping to Google and Cloudflare every 2 seconds (8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1; the lowest time is used). While the ping is good it raises download and upload; when it rises it cuts 15% and goes down to 128/64 KiB/s. The first time it applies a cap it writes it to the log at once; after that it writes at most one line a minute, only when the speed changes by at least 10% and the trend confirms it. On by default. |
-| Auto — what measures the latency | `both` (default): the ping decides, the router counters are only diagnostics. `ping`: ping only, the router is not read. `router`: old behaviour, yield only to the other devices the router sees. |
-| Auto — host to measure latency | Host (or host:port) to measure the latency to with a TCP connection every 2 seconds, only while Auto is on. Empty = Google (8.8.8.8, 8.8.4.4) and Cloudflare (1.1.1.1, 1.0.0.1), port 443; the lowest time is used, so a distant or slow server cannot fake the measurement. |
-| Auto — line maximum, download | The real maximum download speed of the line, in KiB/s (e.g. 9000 for 9 MB/s). 0 = unknown: autotune discovers it. If you enter it, the controller never goes above it and finds the right point sooner. |
-| Auto — line maximum, upload | The real maximum upload speed of the line, in KiB/s (e.g. 800). 0 = unknown: autotune discovers it. If you enter it, the controller never goes above it and finds the right point sooner. |
-
-**Speed schedule**
-
-| Setting | What it does |
-|---|---|
-| Speed schedule enabled | Enable the time window with different speed limits. |
+| How the speed is decided | The speed rule: **Auto** (Gextto measures the line and adapts, no cap), **Fixed limits** (the two limits below) or **Hourly schedule** (windows per day, each with limits or Auto). In Downloads, from the **Bandwidth** menu, you can always make a temporary exception, which beats the rule. It is not a setting of its own: it turns «Speed schedule enabled» and «Outside the hourly windows: Auto» on or off. |
+| Global download limit | Global download limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* Shown with «Fixed limits» and «Hourly schedule». |
+| Global upload limit | Global upload limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* Shown with «Fixed limits» and «Hourly schedule». |
+| Speed schedule enabled | Set from «How the speed is decided» and not shown on the page; still available through the API. |
+| Outside the hourly windows: Auto | With the hourly schedule: outside the windows the speed is Auto instead of the fixed limits. Shown only with «Hourly schedule». |
+| Schedule — per day | One choice per day: **Off** (no window), **Limit** (the window with your download and upload values) or **Auto** (the window in which Gextto measures the line and adapts). Only «Limit» enables the two speed fields; the times stay editable. A window past midnight belongs to the day it starts on. *(a «Limit» day has its own values (0 = unlimited); «Auto» lets Gextto measure the line and adapt; a window past midnight belongs to the day it starts on)* Shown only while «Speed schedule enabled» is on. |
 | Schedule — start time | Schedule start time (HH:MM). Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
 | Schedule — end time | Schedule end time (HH:MM). Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
 | Schedule — days | Active days: 0=Mon … 6=Sun (e.g. 0,1,2,3,4). *(no day = never active)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
 | Schedule — download | Download limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
 | Schedule — upload | Upload limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
-| Schedule — per day | One choice per day: **Off** (no window), **Limit** (the window with your download and upload values) or **Auto** (the window with no limit: the bandwidth goes to the auto-tune, which measures the line there). Only «Limit» enables the two speed fields; the times stay editable. A window past midnight belongs to the day it starts on. *(a «Limit» day has its own values (0 = unlimited); «Auto» leaves the line to the auto-tune; a window past midnight belongs to the day it starts on)* Shown only while «Speed schedule enabled» is on. |
+| Auto respects latency | With the speed on Auto, Gextto measures the ping to Google and Cloudflare every 2 seconds (8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1; the lowest time is used). While the ping is good it raises download and upload; when it rises it cuts 15% and goes down to 128/64 KiB/s. The first time it applies a cap it writes it to the log at once; after that it writes at most one line a minute, only when the speed changes by at least 10% and the trend confirms it. On by default. |
+| Auto — what measures the latency | `both` (default): the ping decides, the router counters are only diagnostics. `ping`: ping only, the router is not read. `router`: old behaviour, yield only to the other devices the router sees. |
+| Auto — host to measure latency | Host (or host:port) to measure the latency to with a TCP connection every 2 seconds, only while Auto is on. Empty = Google (8.8.8.8, 8.8.4.4) and Cloudflare (1.1.1.1, 1.0.0.1), port 443; the lowest time is used, so a distant or slow server cannot fake the measurement. |
+| Auto — line maximum, download | The real maximum download speed of the line, in KiB/s (e.g. 9000 for 9 MB/s). 0 = unknown: Auto discovers it. If you enter it, Auto never goes above it and finds the right point sooner. |
+| Auto — line maximum, upload | The real maximum upload speed of the line, in KiB/s (e.g. 800). 0 = unknown: Auto discovers it. If you enter it, Auto never goes above it and finds the right point sooner. |
 
 **Ports and interfaces**
 

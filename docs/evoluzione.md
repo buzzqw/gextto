@@ -294,15 +294,17 @@ per day. Torrent log lines carry an `acq:` ID and are stored in `acquisition_eve
 (History tab, per-episode, series panel, `/api/acquisitions`), kept 180 days. The
 *Downloading* entry counts unfinished torrents plus active HTTP, not seeds.
 
-**Speed policies.** Manual limits, a per-weekday schedule with one choice per day (Off,
-Limit or Auto), and a temporary override (numeric or Auto). Auto leaves the line to the
-guided tuning: the latency guard may cap it while the ping is high and ramps it back up
-when the line is at rest, so the peak is learned when the guard is free. A temporary Auto
-wins over everything and is the sibling of the numeric temporary limit. When the base
-Auto from the settings is the policy in force, the temporary Auto switch in Downloads is
-shown disabled and points at Configuration → Speed and network; with an active numeric
-schedule it stays usable, because it is the only way to hand the line back to the tuning
-right then (`TempAutoRedundant`).
+**Speed policies: a rule and an exception.** The rule is one choice in Configuration
+(`torrent_speed_mode`, not stored: it reads and writes `torrent_speed_auto` and
+`torrent_sched_enabled`, so older settings need no migration): Auto, fixed limits, or a
+per-weekday schedule with one choice per day (Off, Limit or Auto) and, outside the
+windows, Auto or the fixed limits. The exception is set from the Bandwidth menu in
+Downloads: Auto or a limit, for 1/3/6/12 h or until removed. It wins over the rule,
+schedule included, until it expires or is removed (`speedPolicy` tries the exception,
+then `speedRule`); one model, so a limit never silently loses to a schedule window. Auto
+is one name for one mechanism: the guided tuning measures the line, the latency guard may
+cap it while the ping is high and ramps it back up when the line is at rest, so the peak
+is learned when the guard is free.
 
 **Latency guard (Auto respects latency, on by default).** While Auto is in force,
 `latency_guard.go` probes Google and Cloudflare every 2 s (8.8.8.8, 8.8.4.4, 1.1.1.1 and

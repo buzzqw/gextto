@@ -13,6 +13,15 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 19 October 2026
 
+- **Speed: a rule and an exception.** In Configuration → Speed and network a
+  single choice, **How the speed is decided**, sets the rule: Auto, fixed limits or
+  hourly schedule. With the schedule you also pick whether Auto or the fixed limits
+  apply outside the windows. Your settings stay as they were: nothing to redo. In
+  Downloads the **Bandwidth** menu says what applies now and where it comes from,
+  and makes an **exception**: Auto or a limit, for 1, 3, 6 or 12 hours or until you
+  remove it. The exception always beats the rule, schedule included: a limit you
+  set is no longer overridden by a schedule window. The mechanism that measures
+  the line is called **Auto** everywhere.
 - **A tidier Downloads page.** Filter, tag and sorting share one row; **Clean
   completed**, **Orphaned files** and the automatic refresh are in the **Tools**
   menu. Pause, Resume, Check again, tags and Remove from session appear only when
@@ -21,10 +30,9 @@ manual is online: [English](docs/MANUAL.en.md) ·
   Configuration → Seeding, and the Tools menu takes you there. "Unlock pin" is in the
   pinned torrent's details; the list marks it with a 📌 badge.
 - **Bandwidth menu.** The temporary-limit fields at the top of the panel give way
-  to a **Bandwidth** button that shows the limits in force. From its menu you pick
-  **Auto**, go back to **As configured** or set a download or upload limit on the
-  fly (64 KB/s to 10 MB/s) and its duration, in one click. Exact values stay under
-  **Custom values…**.
+  to a **Bandwidth** button that shows the limits in force. From its menu you set
+  Auto or a download or upload limit on the fly (64 KB/s to 10 MB/s) and its
+  duration, in one click. Exact values stay under **Custom values…**.
 
 - **Discarded packs leave no wrong traces.** When the inspection decides that a
   downloading pack is not needed, Gextto restores the previous version of the

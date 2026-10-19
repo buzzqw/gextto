@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -479,6 +480,10 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 		if raw, present := cfg.Settings[def.Key]; present {
 			value = raw
 		}
+		if def.Key == speedModeSetting {
+			// Not stored: read from the switches it writes.
+			value = speedModeOf(cfg)
+		}
 		field := uiSettingFieldFor(def.Key, def.Label, value)
 		// An unsaved per-day schedule shows the single window it replaces.
 		if field.Kind == "week" && strings.TrimSpace(value) == "" {
@@ -884,11 +889,27 @@ func uiHideDependentFields(fields []uiSettingField) {
 		parents[field.Key] = field
 	}
 	for index := range fields {
-		parent, ok := parents[fields[index].DependsOn]
-		if !ok || parent.Kind != "bool" || parent.Managed || parent.Disabled {
+		// "key=a|b" depends on a choice: shown while the choice is a or b.
+		parentKey, values, onChoice := strings.Cut(fields[index].DependsOn, "=")
+		parent, ok := parents[parentKey]
+		if !ok || parent.Managed || parent.Disabled {
+			continue
+		}
+		if onChoice {
+			fields[index].Hidden = !slices.Contains(strings.Split(values, "|"), parent.Value)
+			continue
+		}
+		if parent.Kind != "bool" {
 			continue
 		}
 		fields[index].Hidden = !parent.BoolValue
+	}
+	// The schedule switch is set by «Come si decide la velocità»: its row
+	// stays in the page (API and older links), never shown.
+	for index := range fields {
+		if fields[index].Key == "torrent_sched_enabled" {
+			fields[index].Hidden, fields[index].DependsOn = true, ""
+		}
 	}
 	// The single speed window is edited through the per-day table (which
 	// shows its values until saved): its rows stay in the page, never shown.

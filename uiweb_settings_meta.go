@@ -68,20 +68,26 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"gxtorrent_dlna_folders":           {Zero: "vuoto = automatico (archivio)", DependsOn: "gxtorrent_dlna"},
 
 	// Velocità e rete
-	"torrent_dl_limit": {Unit: "KiB/s", Zero: "0 = illimitato"},
-	"torrent_ul_limit": {Unit: "KiB/s", Zero: "0 = illimitato"},
+	"torrent_speed_mode": {Kind: "select", Options: []uiFormOption{
+		{Value: speedModeAuto, Label: "Auto: Gextto misura la linea e si adatta"},
+		{Value: speedModeFixed, Label: "Limiti fissi"},
+		{Value: speedModeSchedule, Label: "Programmazione oraria"},
+	}},
+	"torrent_dl_limit":   {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_speed_mode=fixed|schedule"},
+	"torrent_ul_limit":   {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_speed_mode=fixed|schedule"},
+	"torrent_speed_auto": {DependsOn: "torrent_speed_mode=schedule"},
 	"torrent_auto_latency_source": {Kind: "select", Options: []uiFormOption{
 		{Value: "both", Label: "Ping Google/Cloudflare + router (consigliato)"},
 		{Value: "ping", Label: "Solo ping Google/Cloudflare (ignora il router)"},
 		{Value: "router", Label: "Solo contatori del router (vecchio comportamento)"},
 	}, DependsOn: "torrent_auto_latency_guard"},
 	"torrent_auto_latency_target": {Zero: "vuoto = Google 8.8.8.8/8.8.4.4 e Cloudflare (porta 443)", DependsOn: "torrent_auto_latency_guard"},
-	"torrent_line_max_down_kib":   {Unit: "KiB/s", Zero: "0 = non nota: la misura l'autotune", DependsOn: "torrent_auto_latency_guard"},
-	"torrent_line_max_up_kib":     {Unit: "KiB/s", Zero: "0 = non nota: la misura l'autotune", DependsOn: "torrent_auto_latency_guard"},
+	"torrent_line_max_down_kib":   {Unit: "KiB/s", Zero: "0 = non nota: la misura Auto", DependsOn: "torrent_auto_latency_guard"},
+	"torrent_line_max_up_kib":     {Unit: "KiB/s", Zero: "0 = non nota: la misura Auto", DependsOn: "torrent_auto_latency_guard"},
 	"torrent_sched_start":         {Kind: "time", DependsOn: "torrent_sched_enabled"},
 	"torrent_sched_end":           {Kind: "time", DependsOn: "torrent_sched_enabled"},
 	"torrent_sched_days":          {Kind: "days", Zero: "nessun giorno = mai attiva", DependsOn: "torrent_sched_enabled"},
-	"torrent_sched_week":          {Kind: "week", Zero: "un giorno «Limite» ha i suoi valori (0 = illimitato); «Auto» lascia misurare la linea all'auto-tune; una fascia oltre la mezzanotte appartiene al giorno in cui inizia", DependsOn: "torrent_sched_enabled"},
+	"torrent_sched_week":          {Kind: "week", Zero: "un giorno «Limite» ha i suoi valori (0 = illimitato); «Auto» lascia che Gextto misuri la linea e si adatti; una fascia oltre la mezzanotte appartiene al giorno in cui inizia", DependsOn: "torrent_speed_mode=schedule"},
 	"torrent_sched_dl_limit":      {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
 	"torrent_sched_ul_limit":      {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "torrent_sched_enabled"},
 	// Ricerca peer e tracker

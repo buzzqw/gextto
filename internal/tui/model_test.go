@@ -715,7 +715,7 @@ func TestTempLimitsPrefillAndHeader(t *testing.T) {
 	m.SetTorrents(sampleTorrents())
 
 	m.SetSpeedPolicy(SpeedPolicy{Source: "base", BaseDownloadKib: 0, BaseUploadKib: 200})
-	if screen := m.Render(160, 20); !lineContains(screen, "limiti ↓illimitato ↑200 KiB/s") {
+	if screen := m.Render(160, 20); !lineContains(screen, "limiti fissi ↓illimitato ↑200 KiB/s") {
 		t.Fatalf("base limits missing from header: %+v", screen.Lines)
 	}
 	m.Update(runeKey('T'))
@@ -725,7 +725,7 @@ func TestTempLimitsPrefillAndHeader(t *testing.T) {
 	m.Update(kindKey(KeyEsc))
 
 	m.SetSpeedPolicy(SpeedPolicy{Source: "temp", TempActive: true, TempDownloadKib: 500, TempUploadKib: 100, TempRemainingSec: 90})
-	if screen := m.Render(160, 20); !lineContains(screen, "limite temporaneo ↓500 KiB/s ↑100 KiB/s · ancora 2 min") {
+	if screen := m.Render(160, 20); !lineContains(screen, "eccezione ↓500 KiB/s ↑100 KiB/s · ancora 2 min") {
 		t.Fatalf("temporary limit missing from header: %+v", screen.Lines)
 	}
 	m.Update(runeKey('T'))
@@ -735,19 +735,21 @@ func TestTempLimitsPrefillAndHeader(t *testing.T) {
 	m.Update(kindKey(KeyEsc))
 
 	m.SetSpeedPolicy(SpeedPolicy{Source: "temp", TempActive: true, TempDownloadKib: 500})
-	if screen := m.Render(160, 20); !lineContains(screen, "fino a rimozione") {
+	if screen := m.Render(160, 20); !lineContains(screen, "finché non la togli") {
 		t.Fatalf("permanent temporary limit missing from header: %+v", screen.Lines)
 	}
 
-	// A scheduled "Auto" window: the shadowed temporary limit must not show, and
-	// the header must name the Auto window instead of the raw -1/-1 sentinel.
-	m.SetSpeedPolicy(SpeedPolicy{Source: "schedule_auto", SchedActive: true, TempActive: true, TempDownloadKib: 500, TempUploadKib: 100})
+	// A scheduled "Auto" window with no exception: the header names the Auto
+	// window instead of the raw -1/-1 sentinel.
+	m.SetSpeedPolicy(SpeedPolicy{Source: "schedule_auto", SchedActive: true})
 	screen := m.Render(160, 20)
-	if !lineContains(screen, "banda programmata · fascia Auto · nessun tetto") {
+	if !lineContains(screen, "programmazione · fascia Auto · nessun tetto") {
 		t.Fatalf("scheduled Auto window missing from header: %+v", screen.Lines)
 	}
-	if lineContains(screen, "limite temporaneo") {
-		t.Fatalf("the shadowed temporary limit must not show while the Auto window is active: %+v", screen.Lines)
+	// The exception wins over the schedule: it is what the header shows.
+	m.SetSpeedPolicy(SpeedPolicy{Source: "temp", SchedActive: true, TempActive: true, TempDownloadKib: 500, TempUploadKib: 100})
+	if screen := m.Render(160, 20); !lineContains(screen, "eccezione ↓500 KiB/s ↑100 KiB/s") {
+		t.Fatalf("the exception must show over the schedule: %+v", screen.Lines)
 	}
 }
 

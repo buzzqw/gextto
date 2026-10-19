@@ -416,15 +416,35 @@ html, body {
 .speed-item small {
   font-size: 0.78rem;
 }
-.speed-current {
-  cursor: default;
+.speed-now {
+  display: grid;
+  gap: 2px;
+  padding: 6px 10px 8px;
+  font-size: 0.86rem;
 }
-.speed-current:hover {
-  background: transparent;
+.speed-now > strong {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
 }
-.speed-note {
-  margin: 2px 10px;
+.speed-now small {
   font-size: 0.78rem;
+}
+.v2-menu-heading {
+  margin: 2px 10px 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.v2-menu-item:disabled {
+  cursor: default;
+  color: var(--muted);
+}
+.v2-menu-item:disabled:hover {
+  background: transparent;
 }
 .v2-menu-sub {
   display: flex;

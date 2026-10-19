@@ -355,7 +355,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("downloads -> %d", code)
 	}
-	for _, marker := range []string{"Pulisci completati", "Strumenti", "Aggiorna ogni 5 s", "Rimozione a fine seed", "Limite temporaneo", "Nuovo tag", "Prealloca spazio", `title="Incolla un link magnet`, `title="Avvia il download subito`, `title="Ricarica l'elenco dei torrent`, `title="Applica temporaneamente i limiti`, `title="Metti in pausa i torrent selezionati`} {
+	for _, marker := range []string{"Pulisci completati", "Strumenti", "Aggiorna ogni 5 s", "Rimozione a fine seed", "Eccezione per adesso", "Nuovo tag", "Prealloca spazio", `title="Incolla un link magnet`, `title="Avvia il download subito`, `title="Ricarica l'elenco dei torrent`, `title="Applica l'eccezione con questi valori`, `title="Metti in pausa i torrent selezionati`} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("downloads missing %q", marker)
 		}
@@ -637,15 +637,15 @@ func TestV2DownloadsScheduleAutoBadge(t *testing.T) {
 	}
 
 	page := uiDownloadsPageFor(state)
-	if !page.SchedActive || !page.SchedAuto {
-		t.Fatalf("Auto window not detected: SchedActive=%v SchedAuto=%v", page.SchedActive, page.SchedAuto)
+	if !page.Speed.InWindow() || !page.Speed.RuleAuto() || page.Speed.Window == "" {
+		t.Fatalf("Auto window not detected: %+v", page.Speed)
 	}
 
 	code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
 	if code != http.StatusOK {
 		t.Fatalf("downloads page -> %d", code)
 	}
-	if !strings.Contains(body, "⏰ <span>Auto</span>") || !strings.Contains(body, "Programmazione oraria attiva: fascia") {
+	if !strings.Contains(body, "⏰ <span>Auto</span>") || !strings.Contains(body, "<span>Programmazione oraria</span> ("+page.Speed.Window+")") {
 		t.Fatalf("Auto schedule badge missing: %s", body)
 	}
 	if strings.Contains(body, "-1/-1") {
@@ -2137,16 +2137,18 @@ func TestV2DownloadsSpeedMenuFollowsTheSettings(t *testing.T) {
 	}
 
 	body := downloads()
-	if !strings.Contains(body, `aria-pressed="true" data-speed-mode="normal"`) || strings.Count(body, `id="v2-speed-panel"`) != 1 {
-		t.Fatal("by default the menu must mark the configuration, once")
+	if !strings.Contains(body, "<span>Limiti fissi</span>") || strings.Count(body, `id="v2-speed-panel"`) != 1 || strings.Contains(body, "Togli l'eccezione") {
+		t.Fatal("by default the menu must show the fixed limits as the rule, once, with no exception")
 	}
-	set("torrent_speed_auto", "true")
-	if body := downloads(); !strings.Contains(body, "<span>Auto</span>") {
-		t.Fatal("with the base Auto the configuration must read Auto")
+	set(speedModeSetting, speedModeAuto)
+	body = downloads()
+	if !strings.Contains(body, "È già la regola") || !strings.Contains(body, `data-speed-choice="auto" disabled`) {
+		t.Fatal("with the Auto rule the Auto exception must be greyed out")
 	}
 	set("torrent_temp_auto", "1")
-	if body := downloads(); !strings.Contains(body, `aria-pressed="true" data-speed-mode="auto"`) {
-		t.Fatal("the temporary Auto must be marked")
+	body = downloads()
+	if !strings.Contains(body, `aria-pressed="true" data-speed-choice="auto"`) || !strings.Contains(body, "Togli l'eccezione") || !strings.Contains(body, "Poi torna la regola") {
+		t.Fatal("the Auto exception must be marked, with a way back to the rule")
 	}
 }
 
@@ -2173,7 +2175,7 @@ func TestV2DownloadsQuickLimits(t *testing.T) {
 	if setting("torrent_temp_auto") != "0" || setting("torrent_temp_limit_enabled") != "1" || setting("torrent_temp_dl_limit") != "1024" {
 		t.Fatalf("download preset: auto=%s enabled=%s dl=%s", setting("torrent_temp_auto"), setting("torrent_temp_limit_enabled"), setting("torrent_temp_dl_limit"))
 	}
-	if !strings.Contains(body, `id="v2-speed-panel" hx-swap-oob="innerHTML"`) || !strings.Contains(body, "Limite rapido") {
+	if !strings.Contains(body, `id="v2-speed-panel" hx-swap-oob="innerHTML"`) || !strings.Contains(body, "<span>Eccezione</span>") {
 		t.Fatal("the answer must refresh the bandwidth menu")
 	}
 	post(url.Values{"ul": {"256"}})

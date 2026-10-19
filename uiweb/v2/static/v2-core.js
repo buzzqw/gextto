@@ -1019,11 +1019,21 @@
   // so the user immediately sees what turning it on means.
   function applyDependents(row) {
     if (!row || !row.matches || !row.matches("form.setting-row[data-setting-key]")) return;
-    var toggle = row.querySelector('input[role="switch"]');
-    if (!toggle) return;
     var key = row.getAttribute("data-setting-key");
-    var children = document.querySelectorAll('[data-v2-depends-on="' + key + '"]');
-    for (var i = 0; i < children.length; i++) children[i].hidden = !toggle.checked;
+    var toggle = row.querySelector('input[role="switch"]');
+    if (toggle) {
+      var children = document.querySelectorAll('[data-v2-depends-on="' + key + '"]');
+      for (var i = 0; i < children.length; i++) children[i].hidden = !toggle.checked;
+      return;
+    }
+    // A choice ("key=a|b"): the row shows while the choice is a or b.
+    var choice = row.querySelector('select[name="value"]');
+    if (!choice) return;
+    var rows = document.querySelectorAll('[data-v2-depends-on^="' + key + '="]');
+    for (var j = 0; j < rows.length; j++) {
+      var values = rows[j].getAttribute("data-v2-depends-on").split("=")[1].split("|");
+      rows[j].hidden = values.indexOf(choice.value) < 0;
+    }
   }
 
   function setRowValue(row, value) {
@@ -1059,7 +1069,7 @@
     if (form) {
       markForm(form);
       refreshSavebar();
-      if (event.target.matches('input[role="switch"]')) applyDependents(form);
+      if (event.target.matches('input[role="switch"], select[name="value"]')) applyDependents(form);
     }
     if (event.target.matches && event.target.matches("[data-v2-show-keys]")) {
       showKeys(event.target.checked);

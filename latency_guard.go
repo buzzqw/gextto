@@ -534,13 +534,13 @@ func (g *latencyGuard) status() latencyGuardStatus {
 
 // effectiveSpeedLimits is speedPolicy with the latency guard applied: on an
 // Auto source the guard's caps replace "unlimited" while it is acting.
-func effectiveSpeedLimits(cfg *Config, guard *latencyGuard) (download, upload int64, source string, tempShadowed bool) {
-	download, upload, source, tempShadowed = speedPolicy(cfg)
+func effectiveSpeedLimits(cfg *Config, guard *latencyGuard) (download, upload int64, source string) {
+	download, upload, source = speedPolicy(cfg)
 	if !speedSourceIsAuto(source) || !latencyGuardEnabled(cfg) {
-		return download, upload, source, tempShadowed
+		return download, upload, source
 	}
 	downCap, upCap := guard.caps()
-	return downCap, upCap, source, tempShadowed
+	return downCap, upCap, source
 }
 
 // latencyGuardWorker probes the latency while the speed is on Auto and the
@@ -567,7 +567,7 @@ func latencyGuardWorker(state *AppState) {
 // the caps and push them when they moved. Leaving Auto pushes nothing: the
 // policy that replaced Auto sets its own limits.
 func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
-	_, _, source, _ := speedPolicy(cfg)
+	_, _, source := speedPolicy(cfg)
 	if !speedSourceIsAuto(source) || !latencyGuardEnabled(cfg) {
 		g.probe.Reset()
 		g.usage.reset()

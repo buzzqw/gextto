@@ -106,27 +106,34 @@ test("cambiare sezione con modifiche in sospeso chiede conferma", async ({ page 
   await expect(page.locator("#v2-settings-heading")).toHaveText("Notifiche");
 });
 
-test("un interruttore mostra i campi che dipendono da lui", async ({ page }) => {
+test("la scelta della velocità mostra i campi che dipendono da lei", async ({ page }) => {
   await page.goto("/?view=settings&tab=network");
   const week = page.locator("#v2-setting-torrent_sched_week");
-  const toggle = page.getByRole("switch", { name: "Programmazione velocità attiva" });
-  await expect(toggle).not.toBeChecked();
+  const outside = page.locator("#v2-setting-torrent_speed_auto");
+  const limit = page.locator("#v2-setting-torrent_dl_limit");
+  const mode = page.locator("#input-torrent_speed_mode");
+  await expect(mode).toHaveValue("fixed");
   await expect(week).toBeHidden();
-  await toggle.check();
+  await expect(outside).toBeHidden();
+  await expect(limit).toBeVisible();
+  await mode.selectOption("schedule");
   await expect(week).toBeVisible();
+  await expect(outside).toBeVisible();
   // The per-day table has one row per day, each with a single mode select:
   // Non attiva / Limite / Auto.
   await expect(week.locator('select[name$="-mode"]')).toHaveCount(7);
   // The older single-window settings are superseded by the per-day table and
-  // stay hidden even while the switch is on.
+  // stay hidden; so does the schedule switch, set by the choice.
   await expect(page.locator("#v2-setting-torrent_sched_start")).toBeHidden();
-  await toggle.uncheck();
+  await expect(page.locator("#v2-setting-torrent_sched_enabled")).toBeHidden();
+  await mode.selectOption("auto");
   await expect(week).toBeHidden();
+  await expect(limit).toBeHidden();
 });
 
 test("la modalità del giorno spegne i limiti di velocità tranne in «Limite»", async ({ page }) => {
   await page.goto("/?view=settings&tab=network");
-  await page.getByRole("switch", { name: "Programmazione velocità attiva" }).check();
+  await page.locator("#input-torrent_speed_mode").selectOption("schedule");
   const row = page.locator("#v2-setting-torrent_sched_week tbody tr").first();
   const mode = row.locator('select[name$="-mode"]');
   const dl = row.locator('input[name$="-dl"]');

@@ -858,7 +858,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			// only raises). The sample is the sum of the torrent rates in bytes/s.
 			// A direction under a speed limit is not the line, so it is skipped
 			// (and any earlier peak forgotten): only an uncapped rate counts.
-			peakDownKib, peakUpKib, _, _ := speedPolicy(cfg)
+			peakDownKib, peakUpKib, _ := speedPolicy(cfg)
 			// A direction the latency guard is capping is neither the line nor
 			// a user limit: it is not learned from, and its peak is kept.
 			observedDown, observedUp := rateKib, uploadBytes
@@ -899,7 +899,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			lastDynamicAdjustment = now
 		}
 		if now.Sub(lastSpeedPolicy) >= 60*time.Second {
-			downloadKib, uploadKib, source, tempShadowed := effectiveSpeedLimits(cfg, state.latency_guard)
+			downloadKib, uploadKib, source := effectiveSpeedLimits(cfg, state.latency_guard)
 			// Always re-assert, not just on change: "Apply now" and the optimizer
 			// set the session limit to the unscheduled value (e.g. 3000 by day)
 			// and the policy must correct it on its own within a minute. The log
@@ -914,26 +914,23 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				maxText := bg_speedMaxText(cfg)
 				if sourceChanged || !haveAutotuneLog {
 					label := map[string]string{
-						speedSourceTemp:         "temporary limit",
-						speedSourceTempKeep:     "temporary limit, until removed",
+						speedSourceTemp:         "exception, with expiry",
+						speedSourceTempKeep:     "exception, until removed",
 						speedSourceSchedule:     "scheduled limit",
-						speedSourceScheduleAuto: "autotune window",
-						speedSourceTempAuto:     "auto speed",
-						speedSourceAuto:         "automatic speed",
-						speedSourceBase:         "standard limit",
+						speedSourceScheduleAuto: "schedule window on Auto",
+						speedSourceTempAuto:     "exception: Auto",
+						speedSourceAuto:         "Auto",
+						speedSourceBase:         "fixed limits",
 					}[source]
 					inSchedule := source == speedSourceSchedule || source == speedSourceScheduleAuto
 					wasScheduled := lastSpeed != nil && (lastSpeed.source == speedSourceSchedule || lastSpeed.source == speedSourceScheduleAuto)
 					switch {
 					case source == speedSourceScheduleAuto && !wasScheduled:
-						label = "autotune window started"
+						label = "schedule window on Auto started"
 					case source == speedSourceSchedule && !wasScheduled:
 						label = "schedule started"
 					case !inSchedule && wasScheduled:
 						label += ", schedule ended"
-					}
-					if source == speedSourceSchedule && tempShadowed {
-						label += ", overrides the temporary limit without expiry"
 					}
 					// An Auto window is not necessarily unlimited: while the latency
 					// guard is capping, the numbers are the guard's and the label must
@@ -1664,7 +1661,7 @@ func bg_speedDeltaText(prev, next int64) string {
 // policy has none either: both say "no line max". Showing the inactive
 // schedule's 8000 next to a 14166 KiB/s cap would be a contradiction.
 func bg_speedMaxText(cfg *Config) string {
-	down, up, source, _ := speedPolicy(cfg)
+	down, up, source := speedPolicy(cfg)
 	if speedSourceIsAuto(source) {
 		if ld, lu := latencyGuardLineMaxKib(cfg); ld > 0 || lu > 0 {
 			return "line max " + bg_speedPairText(ld, lu)

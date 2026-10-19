@@ -314,10 +314,15 @@ change. `/ui` is not served. For operational checks use
 
 Total routes: 267
 
-The temporary speed limit (`POST /api/torrents/temp-limits`) also accepts
-`auto: true|false`: with `auto` the bandwidth is handed to the guided tuning with
-no cap (like an “Auto” window of the schedule), the numeric `download_kib` /
-`upload_kib` are ignored and the two modes are exclusive.
+The temporary speed limit (`POST /api/torrents/temp-limits`) is the speed
+exception: it wins over the rule chosen in the settings (fixed limits, Auto or the
+schedule) until it expires or is removed, whether `minutes` is set or not (0 =
+until removed). It also accepts `auto: true|false`: with `auto` the bandwidth is
+handed to the guided tuning with no cap, the numeric `download_kib` /
+`upload_kib` are ignored, `minutes` sets how long it lasts and the two modes are
+exclusive. The rule itself is the setting `torrent_speed_mode` (`auto`, `fixed`
+or `schedule`), read and written through `/api/config/settings` like any other;
+it is stored as `torrent_speed_auto` and `torrent_sched_enabled`.
 `GET /api/torrents/temp-limits` also returns `latency_guard`, the state of the
 Auto speed's latency guard: `active`, `measuring`, `mode` (`free`, `trial` or
 `control`), `latency_ms`, `baseline_ms`, the caps it applies

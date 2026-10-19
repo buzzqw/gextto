@@ -185,13 +185,13 @@ func TestSpeedPolicyAutotuneWindowIsUnlimited(t *testing.T) {
 		"torrent_sched_enabled": "true",
 		"torrent_sched_week":    window(bwschedule.AutoLimit, bwschedule.AutoLimit),
 	}
-	download, upload, source, _ := speedPolicy(&cfg)
+	download, upload, source := speedPolicy(&cfg)
 	if source != speedSourceScheduleAuto || download != 0 || upload != 0 {
 		t.Fatalf("auto window = %d/%d source %q, want 0/0 %q", download, upload, source, speedSourceScheduleAuto)
 	}
 
 	cfg.Settings["torrent_sched_week"] = window(3000, 200)
-	download, upload, source, _ = speedPolicy(&cfg)
+	download, upload, source = speedPolicy(&cfg)
 	if source != speedSourceSchedule || download != 3000 || upload != 200 {
 		t.Fatalf("fixed window = %d/%d source %q, want 3000/200 %q", download, upload, source, speedSourceSchedule)
 	}

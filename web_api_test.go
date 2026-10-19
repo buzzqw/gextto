@@ -567,7 +567,9 @@ func TestTempLimitsReportTheSpeedPolicyInForce(t *testing.T) {
 	}
 }
 
-func TestSpeedPolicyScheduleBeatsTemporaryLimitWithoutExpiry(t *testing.T) {
+// The exception set in Downloads wins over the rule, the schedule included,
+// whether it has an expiry or is kept until removed; an expired one is gone.
+func TestSpeedPolicyExceptionBeatsTheSchedule(t *testing.T) {
 	cfg := &Config{Settings: map[string]string{
 		"torrent_sched_enabled":      "true",
 		"torrent_sched_days":         "0,1,2,3,4,5,6",
@@ -582,24 +584,70 @@ func TestSpeedPolicyScheduleBeatsTemporaryLimitWithoutExpiry(t *testing.T) {
 	}}
 	cfg.Transfer.DownloadLimitKib = 500
 	cfg.Transfer.UploadLimitKib = 50
-	if dl, ul, source, shadowed := speedPolicy(cfg); dl != 8000 || ul != 1000 || source != speedSourceSchedule || !shadowed {
-		t.Fatalf("permanent temp in schedule window = %d/%d %s shadowed=%v", dl, ul, source, shadowed)
+	if dl, ul, source := speedPolicy(cfg); dl != 3000 || ul != 200 || source != speedSourceTempKeep {
+		t.Fatalf("exception until removed in a schedule window = %d/%d %s", dl, ul, source)
 	}
 
 	cfg.Settings["torrent_temp_limit_until"] = strconv.FormatInt(time.Now().Unix()+600, 10)
-	if dl, ul, source, _ := speedPolicy(cfg); dl != 3000 || ul != 200 || source != speedSourceTemp {
-		t.Fatalf("temp with expiry in schedule window = %d/%d %s", dl, ul, source)
+	if dl, ul, source := speedPolicy(cfg); dl != 3000 || ul != 200 || source != speedSourceTemp {
+		t.Fatalf("exception with expiry in a schedule window = %d/%d %s", dl, ul, source)
 	}
 
-	cfg.Settings["torrent_temp_limit_until"] = "0"
-	cfg.Settings["torrent_sched_enabled"] = "false"
-	if dl, ul, source, _ := speedPolicy(cfg); dl != 3000 || ul != 200 || source != speedSourceTempKeep {
-		t.Fatalf("permanent temp outside schedule = %d/%d %s", dl, ul, source)
+	cfg.Settings["torrent_temp_limit_until"] = strconv.FormatInt(time.Now().Unix()-1, 10)
+	if dl, ul, source := speedPolicy(cfg); dl != 8000 || ul != 1000 || source != speedSourceSchedule {
+		t.Fatalf("expired exception = %d/%d %s", dl, ul, source)
 	}
 
+	// The Auto exception with a duration, then expired.
 	cfg.Settings["torrent_temp_limit_enabled"] = "0"
-	if dl, ul, source, _ := speedPolicy(cfg); dl != 500 || ul != 50 || source != speedSourceBase {
-		t.Fatalf("base = %d/%d %s", dl, ul, source)
+	cfg.Settings["torrent_temp_auto"] = "1"
+	cfg.Settings["torrent_temp_limit_until"] = strconv.FormatInt(time.Now().Unix()+600, 10)
+	if _, _, source := speedPolicy(cfg); source != speedSourceTempAuto {
+		t.Fatalf("Auto exception = %s", source)
+	}
+	cfg.Settings["torrent_temp_limit_until"] = strconv.FormatInt(time.Now().Unix()-1, 10)
+	if _, _, source := speedPolicy(cfg); source != speedSourceSchedule {
+		t.Fatalf("expired Auto exception = %s", source)
+	}
+
+	cfg.Settings["torrent_temp_auto"] = "0"
+	cfg.Settings["torrent_sched_enabled"] = "false"
+	if dl, ul, source := speedPolicy(cfg); dl != 500 || ul != 50 || source != speedSourceBase {
+		t.Fatalf("fixed limits = %d/%d %s", dl, ul, source)
+	}
+	// Auto outside the windows of the schedule.
+	cfg.Settings["torrent_speed_auto"] = "true"
+	if _, _, source := speedPolicy(cfg); source != speedSourceAuto {
+		t.Fatalf("Auto rule = %s", source)
+	}
+}
+
+// The single choice of the rule reads and writes the two switches.
+func TestSpeedModeReadsAndWritesTheSwitches(t *testing.T) {
+	state := newTestAppState(t)
+	mode := func() string { return speedModeOf(latestConfig(state)) }
+	if mode() != speedModeFixed {
+		t.Fatalf("default mode = %s", mode())
+	}
+	for _, step := range []struct{ mode, auto, sched string }{
+		{speedModeAuto, "true", "false"},
+		{speedModeSchedule, "true", "true"}, // Auto stays Auto outside the windows
+		{speedModeFixed, "false", "false"},
+		{speedModeSchedule, "false", "true"},
+	} {
+		if err := saveConfigSetting(state.cfg.DataDir, speedModeSetting, step.mode); err != nil {
+			t.Fatal(err)
+		}
+		cfg := latestConfig(state)
+		if mode() != step.mode || cfg.Settings["torrent_speed_auto"] != step.auto || cfg.Settings["torrent_sched_enabled"] != step.sched {
+			t.Fatalf("%s: mode=%s auto=%s sched=%s", step.mode, mode(), cfg.Settings["torrent_speed_auto"], cfg.Settings["torrent_sched_enabled"])
+		}
+		if _, stored := cfg.Settings[speedModeSetting]; stored {
+			t.Fatal("the mode must not be stored on its own")
+		}
+	}
+	if err := validateSettingValue(speedModeSetting, "turbo", latestConfig(state)); err == nil {
+		t.Fatal("an unknown mode must be refused")
 	}
 }
 

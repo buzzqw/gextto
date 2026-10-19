@@ -14,6 +14,15 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 19 ottobre 2026
 
+- **Velocità: una regola e un'eccezione.** In Configurazione → Velocità e rete
+  una sola scelta, **Come si decide la velocità**, decide la regola: Auto, limiti
+  fissi o programmazione oraria. Con la programmazione scegli anche se fuori dalle
+  fasce vale Auto o i limiti fissi. Le impostazioni che avevi restano quelle: non
+  devi rifare nulla. In Scarico il menu **Banda** dice cosa vale adesso e da dove
+  viene, e fa un'**eccezione**: Auto o un limite, per 1, 3, 6 o 12 ore o finché
+  non la togli. L'eccezione vince sempre sulla regola, programmazione compresa:
+  un limite impostato non viene più scavalcato da una fascia oraria. Il
+  meccanismo che misura la linea si chiama ovunque **Auto**.
 - **Scarico più ordinato.** Filtro, tag e ordinamento stanno su una sola riga;
   **Pulisci completati**, **File orfani** e l'aggiornamento automatico sono nel
   menu **Strumenti**. Pausa, Riprendi, Ricontrolla, i tag e Rimuovi dalla sessione
@@ -23,10 +32,9 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   lì. «Sblocca pin» si trova nella scheda del torrent fissato, che nell'elenco ha
   il badge 📌.
 - **Menu Banda.** I campi dei limiti temporanei in cima al pannello lasciano il
-  posto a un pulsante **Banda** che mostra i limiti in vigore. Dal menu scegli
-  **Auto**, torni a **Come da configurazione** o imposti al volo un limite di
-  download o di upload (da 64 KB/s a 10 MB/s) e la sua durata, con un clic. I
-  valori personalizzati restano in **Valori personalizzati…**.
+  posto a un pulsante **Banda** che mostra i limiti in vigore. Dal menu imposti al
+  volo Auto o un limite di download o di upload (da 64 KB/s a 10 MB/s) e la sua
+  durata, con un clic. I valori personalizzati restano in **Valori personalizzati…**.
 
 - **Pack scartati senza lasciare tracce sbagliate.** Quando l'ispezione decide
   che un pack in download non serve, Gextto ripristina la versione precedente

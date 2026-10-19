@@ -215,6 +215,19 @@ func saveConfigSetting(dataDir string, key string, value string) error {
 	if err := sqlExec(conn, "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);"); err != nil {
 		return err
 	}
+	if key == speedModeSetting {
+		// The speed rule is not stored: it writes the switches it stands for.
+		writes, err := speedModeWrites(value)
+		if err != nil {
+			return err
+		}
+		for _, pair := range writes {
+			if err := saveConfigSetting(dataDir, pair[0], pair[1]); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	if key == authPasswordSetting {
 		// The password is never stored in clear.
 		hashed, err := hashAuthPassword(value)
