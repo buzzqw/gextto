@@ -85,9 +85,10 @@ func DecodeHashsetRequest(payload []byte) (HashsetRequest, error) {
 	return request, nil
 }
 
-// HashsetAnswer is the deprecated OP_HASHSETANSWER: a part hash list. The
-// requester knows which file it belongs to.
+// HashsetAnswer is OP_HASHSETANSWER: the file hash, the part count and the
+// part hashes. eMule writes the file hash before the count.
 type HashsetAnswer struct {
+	Hash   ed2k.ID
 	Hashes []ed2k.ID
 }
 
@@ -95,8 +96,11 @@ func EncodeHashsetAnswer(answer HashsetAnswer) ([]byte, error) {
 	if len(answer.Hashes) > 0xFFFF {
 		return nil, errors.New("peer: too many part hashes")
 	}
-	out := make([]byte, 2, 2+len(answer.Hashes)*16)
-	binary.LittleEndian.PutUint16(out, uint16(len(answer.Hashes)))
+	out := make([]byte, 0, 18+len(answer.Hashes)*16)
+	out = append(out, answer.Hash[:]...)
+	var count [2]byte
+	binary.LittleEndian.PutUint16(count[:], uint16(len(answer.Hashes)))
+	out = append(out, count[:]...)
 	for _, hash := range answer.Hashes {
 		out = append(out, hash[:]...)
 	}
@@ -104,17 +108,19 @@ func EncodeHashsetAnswer(answer HashsetAnswer) ([]byte, error) {
 }
 
 func DecodeHashsetAnswer(payload []byte) (HashsetAnswer, error) {
-	if len(payload) < 2 {
-		return HashsetAnswer{}, errors.New("peer: short hashset answer")
+	var answer HashsetAnswer
+	if len(payload) < 18 {
+		return answer, errors.New("peer: short hashset answer")
 	}
-	count := int(binary.LittleEndian.Uint16(payload))
-	if 2+count*16 > len(payload) {
-		return HashsetAnswer{}, errors.New("peer: truncated hashset answer")
+	copy(answer.Hash[:], payload[:16])
+	count := int(binary.LittleEndian.Uint16(payload[16:]))
+	if 18+count*16 > len(payload) {
+		return answer, errors.New("peer: truncated hashset answer")
 	}
-	answer := HashsetAnswer{Hashes: make([]ed2k.ID, 0, count)}
+	answer.Hashes = make([]ed2k.ID, 0, count)
 	for i := 0; i < count; i++ {
 		var hash ed2k.ID
-		copy(hash[:], payload[2+i*16:])
+		copy(hash[:], payload[18+i*16:])
 		answer.Hashes = append(answer.Hashes, hash)
 	}
 	return answer, nil
@@ -230,7 +236,46 @@ func DecodeCompressedPart(payload []byte) (CompressedPart, error) {
 	return part, nil
 }
 
-// Queue and callback opcodes.
+// Download control opcodes on the client TCP protocol.
+const (
+	OpStartUploadReq  = 0x54
+	OpAcceptUploadReq = 0x55
+	OpCancelTransfer  = 0x56
+	OpOutOfPartReqs   = 0x57
+	OpQueueRanking    = 0x60
+)
+
+// Informational opcodes. OP_EMULEINFO uses the same numeric value as OP_HELLO
+// but travels on the extended (eMule) protocol, so the session treats it as a
+// benign packet after the handshake.
+const (
+	OpEmuleInfo       = 0x01
+	OpEmuleInfoAnswer = 0x02
+	OpEndOfDownload   = 0x49
+	OpMessage         = 0x4E
+	OpFileStatus      = 0x50
+)
+
+// QueueRanking is OP_QUEUERANKING: the position in the peer's upload queue.
+type QueueRanking struct {
+	Rank uint16
+}
+
+func EncodeQueueRanking(ranking QueueRanking) []byte {
+	var out [2]byte
+	binary.LittleEndian.PutUint16(out[:], ranking.Rank)
+	return out[:]
+}
+
+func DecodeQueueRanking(payload []byte) (QueueRanking, error) {
+	if len(payload) < 2 {
+		return QueueRanking{}, errors.New("peer: short queue ranking")
+	}
+	return QueueRanking{Rank: binary.LittleEndian.Uint16(payload)}, nil
+}
+
+// Queue and callback opcodes. These belong to the client UDP protocol: they
+// are not valid on the TCP session and are kept apart from the TCP opcodes.
 const (
 	OpReaskFilePing     = 0x90
 	OpReaskAck          = 0x91

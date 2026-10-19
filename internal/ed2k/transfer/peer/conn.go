@@ -34,6 +34,9 @@ func NewConn(conn net.Conn) *Conn {
 // RemoteAddr exposes the peer address for logs and source bookkeeping.
 func (c *Conn) RemoteAddr() net.Addr { return c.conn.RemoteAddr() }
 
+// SetDeadline bounds both reads and writes on the session.
+func (c *Conn) SetDeadline(deadline time.Time) error { return c.conn.SetDeadline(deadline) }
+
 // SetMaxPacketSize lowers or raises the payload cap. Invalid values are
 // rejected so a caller cannot accidentally disable the guard.
 func (c *Conn) SetMaxPacketSize(size int) error {

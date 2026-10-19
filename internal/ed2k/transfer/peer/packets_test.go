@@ -37,13 +37,13 @@ func TestHashsetPackets(t *testing.T) {
 	if err != nil || request.Hash != hash {
 		t.Fatalf("hashset request = %+v, %v", request, err)
 	}
-	answer := HashsetAnswer{Hashes: []ed2k.ID{hash, hash}}
+	answer := HashsetAnswer{Hash: hash, Hashes: []ed2k.ID{hash, hash}}
 	raw, err := EncodeHashsetAnswer(answer)
 	if err != nil {
 		t.Fatal(err)
 	}
 	got, err := DecodeHashsetAnswer(raw)
-	if err != nil || len(got.Hashes) != 2 || got.Hashes[0] != hash {
+	if err != nil || got.Hash != hash || len(got.Hashes) != 2 || got.Hashes[0] != hash {
 		t.Fatalf("hashset answer = %+v, %v", got, err)
 	}
 }

@@ -22,7 +22,14 @@ handshake that rejects self-answers and zero identities. `internal/ed2k/transfer
 adds the per-file source list with deduplication, failure backoff and expiry.
 `internal/ed2k` now also has the source-discovery codecs: `OP_GETSOURCES` /
 `OP_FOUNDSOURCES` for servers and `SEARCH_SOURCE` requests/results for Kad,
-with the two IPv4 wire orders normalised in one place.
+with the two IPv4 wire orders normalised in one place. `internal/ed2k/transfer/download`
+is the first end-to-end transfer path: hello, file name, hashset (file hash +
+part hashes, as eMule writes it), queue rank, upload acceptance, three-block
+part requests, compressed parts, per-part MD4 verification, resume from
+`.part.met` and a final whole-file MD4 gate. A `Manager` drives source
+discovery and the per-peer retry/queue state; a deterministic fake peer in the
+tests serves, queues and corrupts parts. None of it is imported by
+`cmd/gx-ed2k` yet.
 
 The goal is a pure-Go eMule-compatible client inside `gx-ed2k`, so Gextto can
 turn an eD2k result into a real download without aMule, `amulecmd` or the EC
