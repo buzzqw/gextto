@@ -23,7 +23,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   senza `sudo`.
 - **Grafico del traffico.** Nella Dashboard il tratto degli ultimi 30 minuti
   in cui non ci sono ancora dati resta vuoto, invece di una rampa che saliva
-  da zero fino al primo valore.
+  da zero fino al primo valore. Le velocità sotto 1 KB/s valgono 0: è solo
+  rumore di protocollo, e il grafico resta piatto invece di tremare.
 - **Traduzioni.** Il contatore dei download dice «Torrent: 5 · HTTP: 0», giusto
   in ogni lingua; il riquadro del motore in Dashboard si chiama «Engine» in
   inglese e «Motor» in tedesco.

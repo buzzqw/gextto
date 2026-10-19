@@ -32,6 +32,11 @@ const (
 	// strokes use non-scaling-stroke so they stay crisp at any width.
 	trafficChartWidth  = 600
 	trafficChartHeight = 160
+	// rateNoiseFloor is the rate below which the dashboard treats the session
+	// as idle: trackers, DHT and peer keepalives keep a few hundred bytes per
+	// second flowing even when nothing is transferring, and drawing that as a
+	// curve is just noise. Anything under 1 KiB/s is shown as 0.
+	rateNoiseFloor = 1024
 )
 
 // rateSample is one point of the history: the summed engine rates at a moment.
@@ -93,14 +98,25 @@ func (h *rateHistory) len() int {
 }
 
 // v2CurrentRates sums the download and upload rates of every torrent in the
-// active session, the same aggregation the top bar uses.
+// active session, like the top bar does, with sub-kilobyte chatter floored to
+// zero for the session panel.
 func v2CurrentRates(s *AppState) (uint64, uint64) {
 	var down, up uint64
 	for _, view := range s.activeEngine().List() {
 		down += view.DownloadRate
 		up += view.UploadRate
 	}
-	return down, up
+	return v2RateOrZero(down), v2RateOrZero(up)
+}
+
+// v2RateOrZero treats anything under the noise floor as no traffic, so the
+// session panel and its chart stay still instead of twitching at a few
+// hundred bytes per second.
+func v2RateOrZero(rate uint64) uint64 {
+	if rate < rateNoiseFloor {
+		return 0
+	}
+	return rate
 }
 
 // v2TrafficView is the data the bandwidth chart template needs. Points and
@@ -156,11 +172,11 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 
 	var peakDown, peakUp uint64
 	for _, sample := range samples {
-		if sample.Down > peakDown {
-			peakDown = sample.Down
+		if down := v2RateOrZero(sample.Down); down > peakDown {
+			peakDown = down
 		}
-		if sample.Up > peakUp {
-			peakUp = sample.Up
+		if up := v2RateOrZero(sample.Up); up > peakUp {
+			peakUp = up
 		}
 	}
 
@@ -204,8 +220,8 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 		}
 		x := xOf(sample.At)
 		lastX = x
-		downPoints.WriteString(svgPoint(x, yOf(sample.Down)))
-		upPoints.WriteString(svgPoint(x, yOf(sample.Up)))
+		downPoints.WriteString(svgPoint(x, yOf(v2RateOrZero(sample.Down))))
+		upPoints.WriteString(svgPoint(x, yOf(v2RateOrZero(sample.Up))))
 	}
 	view.DownPoints = downPoints.String()
 	view.UpPoints = upPoints.String()
@@ -255,5 +271,3 @@ func bandwidthHistoryWorker(s *AppState) {
 		}
 	}
 }
-
-

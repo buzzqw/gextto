@@ -151,6 +151,42 @@ func TestV2TrafficViewNeedsTwoSamples(t *testing.T) {
 	}
 }
 
+// TestV2TrafficViewTreatsSubKibRatesAsZero: protocol chatter under 1 KiB/s is
+// idle for the session panel, so the curves sit on the baseline and the peak
+// reads 0 B/s; the floor itself is kept.
+func TestV2TrafficViewTreatsSubKibRatesAsZero(t *testing.T) {
+	cfg := DefaultConfig()
+	state := trafficTestState(&cfg)
+	now := time.Now()
+	for i := 0; i < 6; i++ {
+		state.rate_history.add(rateSample{At: now.Add(time.Duration(i-6) * time.Second), Down: 300, Up: 900})
+	}
+	view := v2TrafficViewFrom(state)
+	if !view.HasData {
+		t.Fatal("expected a flat chart with six samples")
+	}
+	if got := v2RateOrZero(rateNoiseFloor - 1); got != 0 {
+		t.Fatalf("v2RateOrZero(%d) = %d, want 0", rateNoiseFloor-1, got)
+	}
+	if got := v2RateOrZero(rateNoiseFloor); got != rateNoiseFloor {
+		t.Fatalf("v2RateOrZero(%d) = %d, want it kept", rateNoiseFloor, got)
+	}
+	if view.PeakDown != "0 B/s" || view.PeakUp != "0 B/s" {
+		t.Fatalf("sub-floor peaks = %q/%q, want 0 B/s", view.PeakDown, view.PeakUp)
+	}
+	for _, point := range strings.Fields(view.DownPoints) {
+		if !strings.HasSuffix(point, ","+strconv.Itoa(trafficChartHeight)) {
+			t.Fatalf("sub-floor point not on the baseline: %q in %q", point, view.DownPoints)
+		}
+	}
+
+	state.rate_history.add(rateSample{At: now, Down: rateNoiseFloor, Up: rateNoiseFloor})
+	view = v2TrafficViewFrom(state)
+	if view.PeakDown != "1.0 KB/s" || view.PeakUp != "1.0 KB/s" {
+		t.Fatalf("rates at the floor = %q/%q, want 1.0 KB/s", view.PeakDown, view.PeakUp)
+	}
+}
+
 // TestV2LiveTrafficTemplateRendersChart renders the fragment the SSE stream
 // pushes and checks the accessible SVG plus the limit line are present.
 func TestV2LiveTrafficTemplateRendersChart(t *testing.T) {

@@ -297,7 +297,9 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
   il **grafico del traffico degli ultimi 30 minuti** (curve di **download** e
   **upload**, il picco, la velocità attuale e la linea del **limite di banda in
   vigore**: limiti fissi, programmazione o eccezione; non compare quando la
-  velocità è *Auto*, cioè quando Gextto misura la linea e si adatta). Si aggiorna da solo.
+  velocità è *Auto*, cioè quando Gextto misura la linea e si adatta). Le
+  velocità sotto 1 KB/s valgono 0: è solo rumore di protocollo, e il grafico
+  resta piatto invece di tremare. Si aggiorna da solo.
 - **Da controllare** — sotto la striscia: i download **fermi** (con il motivo,
   il prossimo tentativo e quando verranno abbandonati), gli **spostamenti in
   libreria in sospeso** (destinazione e tentativi) e gli avvisi, gli errori e i

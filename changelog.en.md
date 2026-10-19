@@ -21,6 +21,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
   instead of switching to the `gextto` account when run as root without `sudo`.
 - **Traffic chart.** On the Dashboard the part of the last 30 minutes with no
   data yet stays empty, instead of a ramp rising from zero to the first value.
+  Speeds under 1 KB/s count as zero: that is just protocol chatter, and the
+  chart stays flat instead of twitching.
 - **Translations.** The download counter reads "Torrents: 5 · HTTP: 0", right in
   every language; the engine tile on the Dashboard is called "Engine" in English
   and "Motor" in German.
