@@ -134,6 +134,9 @@ type ed2kHealthEntry struct {
 	healthy      bool
 	download     bool
 	version      string
+	fingerprint  string
+	dataDir      string
+	pid          int
 	reachability string
 	reachDetail  string
 	lowID        bool
@@ -180,6 +183,9 @@ func ed2kHealth(cfg *Config) ed2kHealthEntry {
 					OK           bool           `json:"ok"`
 					Version      string         `json:"version"`
 					Download     bool           `json:"download"`
+					Fingerprint  string         `json:"fingerprint"`
+					DataDir      string         `json:"data_dir"`
+					PID          int            `json:"pid"`
 					Reachability string         `json:"reachability"`
 					LowID        bool           `json:"low_id"`
 					UPnP         map[string]any `json:"upnp"`
@@ -190,6 +196,9 @@ func ed2kHealth(cfg *Config) ed2kHealthEntry {
 					entry.healthy = payload.OK
 					entry.download = payload.Download
 					entry.version = payload.Version
+					entry.fingerprint = payload.Fingerprint
+					entry.dataDir = payload.DataDir
+					entry.pid = payload.PID
 					entry.reachability = payload.Reachability
 					entry.lowID = payload.LowID
 					entry.upnp = payload.UPnP

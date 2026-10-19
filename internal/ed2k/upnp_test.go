@@ -91,19 +91,23 @@ func TestCallSOAP(t *testing.T) {
 }
 
 func TestReachabilitySensor(t *testing.T) {
-	open, _ := reachability(true, UPnPResult{Available: true}, false, true)
+	open, _ := reachability(true, UPnPResult{Available: true}, false, true, true)
 	if open != "open" {
-		t.Fatalf("UPnP success = %q", open)
+		t.Fatalf("peer answered = %q", open)
 	}
-	limited, _ := reachability(true, UPnPResult{}, false, true)
+	mappedButSilent, _ := reachability(true, UPnPResult{Available: true}, false, true, false)
+	if mappedButSilent != "limited" {
+		t.Fatalf("UPnP without Kad traffic = %q", mappedButSilent)
+	}
+	limited, _ := reachability(true, UPnPResult{}, false, true, false)
 	if limited != "limited" {
 		t.Fatalf("UPnP failure = %q", limited)
 	}
-	low, _ := reachability(true, UPnPResult{Available: true}, true, true)
+	low, _ := reachability(true, UPnPResult{Available: true}, true, true, true)
 	if low != "limited" {
 		t.Fatalf("LowID = %q", low)
 	}
-	unknown, _ := reachability(false, UPnPResult{}, false, false)
+	unknown, _ := reachability(false, UPnPResult{}, false, false, false)
 	if unknown != "unknown" {
 		t.Fatalf("no check = %q", unknown)
 	}

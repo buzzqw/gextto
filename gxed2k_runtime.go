@@ -94,19 +94,7 @@ func ensureEd2kDaemon(cfg *Config) {
 		// The operator points at a daemon they run themselves.
 		return
 	}
-	health := ed2kHealth(cfg)
-	ed2kProcess.mu.Lock()
 	ownedData := filepath.Join(cfg.DataDir, "gx-ed2k")
-	if health.healthy && health.err == "" {
-		ed2kProcess.mu.Unlock()
-		return
-	}
-	if ed2kProcess.cmd != nil {
-		ed2kProcess.mu.Unlock()
-		return
-	}
-	ed2kProcess.mu.Unlock()
-
 	binary, err := ed2kBinary()
 	if err != nil {
 		logging.Warn("gx-ed2k is enabled but not installed", "error", err)
@@ -138,6 +126,29 @@ func ensureEd2kDaemon(cfg *Config) {
 		return
 	}
 	args = append(args, "-fingerprint", fingerprint)
+
+	health := ed2kHealth(cfg)
+	if health.healthy && health.err == "" {
+		if health.fingerprint == fingerprint {
+			return
+		}
+		if SamePath(health.dataDir, ownedData) && health.pid > 0 {
+			// The managed binary or its settings changed (for example after an
+			// update): stop the old instance and start the new one. A daemon we
+			// do not own is never replaced.
+			logging.Info("restarting gx-ed2k: its program or settings changed")
+			gxStopPid(health.pid)
+			ed2kInvalidateHealth()
+		} else {
+			return
+		}
+	}
+	ed2kProcess.mu.Lock()
+	if ed2kProcess.cmd != nil {
+		ed2kProcess.mu.Unlock()
+		return
+	}
+	ed2kProcess.mu.Unlock()
 
 	if err := os.MkdirAll(ownedData, 0o755); err != nil {
 		logging.Warn("cannot create gx-ed2k data dir", "error", err)

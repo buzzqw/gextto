@@ -103,6 +103,7 @@ func (d *Daemon) healthPayload() map[string]any {
 		"nodes":        stats.Nodes,
 		"reachability": stats.Reachability,
 		"low_id":       stats.LowID,
+		"peer_packets": stats.PeerPackets,
 		"upnp":         stats.UPnP,
 	}
 	if startup := d.startup(); startup != "" {

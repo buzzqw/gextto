@@ -65,8 +65,10 @@ On start the daemon asks the router to map the Kad UDP port and the eD2k TCP por
 with **UPnP IGD** (`-upnp`, default on). The eD2k TCP port is accepted and
 closed: the daemon does not transfer files, but being connectable is what turns
 the server-assigned LowID into a HighID. `/api/v1/health` exposes a
-`reachability` sensor — `open`, `limited` (UPnP failed or a LowID was assigned)
-or `unknown` — and the page shows it next to the node count. A host behind NAT
+`reachability` sensor — `open` (Kad peers answered), `limited` (UPnP failed, a
+LowID was assigned, or UPnP succeeded but no Kad peer answered, which points at
+blocked outbound UDP) or `unknown` — and the page shows it next to the node
+count. A host behind NAT
 without UPnP can still search, but Kad may be firewalled and eD2k LowID, which
 reduces the number and quality of sources. Port forwarding UDP 4672 and TCP 4662
 is the manual fix.

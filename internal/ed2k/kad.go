@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 )
@@ -100,6 +101,7 @@ type Stats struct {
 	ServerID     uint32     `json:"server_id,omitempty"`
 	ServerIDSet  bool       `json:"server_id_known"`
 	LowID        bool       `json:"low_id"`
+	PeerPackets  int64      `json:"peer_packets"`
 	Reachability string     `json:"reachability"`
 	ReachDetail  string     `json:"reachability_detail,omitempty"`
 	UPnP         UPnPResult `json:"upnp"`
@@ -141,6 +143,8 @@ type Client struct {
 	serverMu    sync.Mutex
 	serverID    uint32
 	serverIDSet bool
+
+	peerPackets int64
 
 	servers []string
 }
@@ -341,22 +345,25 @@ func (c *Client) Stats() Stats {
 	stats.ServerID = serverID
 	stats.ServerIDSet = serverIDSet
 	stats.LowID = serverIDSet && serverID < 0x01000000
-	stats.Reachability, stats.ReachDetail = reachability(upnpDone, stats.UPnP, stats.LowID, serverIDSet)
+	stats.PeerPackets = atomic.LoadInt64(&c.peerPackets)
+	stats.Reachability, stats.ReachDetail = reachability(upnpDone, stats.UPnP, stats.LowID, serverIDSet, stats.PeerPackets > 0)
 	return stats
 }
 
-// reachability turns UPnP and the eD2k client ID into the "sensor" shown by
-// the page: open, limited (firewall/NAT) or unknown. It is deliberately
-// conservative: a successful UPnP mapping is evidence of an open path, a LowID
-// is evidence of a limited one, and everything else stays unknown instead of
-// claiming a reachability we cannot verify.
-func reachability(upnpDone bool, upnp UPnPResult, lowID, serverIDKnown bool) (string, string) {
+// reachability turns UPnP, the eD2k client ID and actual Kad traffic into the
+// "sensor" shown by the page: open, limited (firewall/NAT) or unknown. UPnP
+// alone is not enough: a mapping can succeed while every outgoing UDP packet
+// is dropped, and the sensor must not call that "open".
+func reachability(upnpDone bool, upnp UPnPResult, lowID, serverIDKnown, peerAnswered bool) (string, string) {
 	if lowID {
 		return "limited", "eD2k assigned a LowID: the server cannot call us back (NAT/firewall)"
 	}
+	if peerAnswered {
+		return "open", "Kad peers answered"
+	}
 	if upnpDone {
 		if upnp.Error == "" && upnp.Available {
-			return "open", "UPnP mapped the Kad UDP port"
+			return "limited", "UPnP mapped the port, but no Kad peer answered: outbound UDP may be blocked"
 		}
 		return "limited", "UPnP is unavailable: " + upnp.Error
 	}
@@ -768,6 +775,7 @@ func (c *Client) handlePacket(data []byte, addr *net.UDPAddr) {
 	if err != nil {
 		return
 	}
+	atomic.AddInt64(&c.peerPackets, 1)
 	switch opcode {
 	case KadPing:
 		c.writeTo(addr, KadPong, encodePong())

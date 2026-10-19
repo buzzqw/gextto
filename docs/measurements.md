@@ -478,7 +478,9 @@ One live run from the N97 (`bin/gx-ed2k`, standalone, UPnP on, `nodes.dat` from
 `upd.emule-security.org`):
 
 - **UPnP**: mapping accepted by the router, UDP and TCP mapped, external IP
-  `79.40.60.48`, `reachability=open`.
+  `79.40.60.48`; the sensor then reports **limited** because
+  `peer_packets=0` — UPnP succeeded but no Kad peer answered, which is exactly
+  the "port open, outbound UDP blocked" case it is meant to flag.
 - **eD2k servers**: login and HighID (`server_id=809248847`, `low_id=false`),
   `server.met` parsed (16 servers), search `the matrix 1999` returned **14
   results** (name, size, MD4, sources), including Italian releases; the query
