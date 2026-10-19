@@ -198,7 +198,8 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
 - **Seeding that follows the tracker**: ratio, time and **inactivity** limits
   (a seed that uploads nothing for N minutes stops), and **seed rules** by
   source/indexer and category — a private tracker's rules apply to its torrents
-  only, with the same behaviour on gx-torrent and qBittorrent.
+  only, with the same behaviour on gx-torrent and qBittorrent. How to set them:
+  [seeding limits](docs/MANUAL.en.md#seeding-limits-per-source-rules-and-idle-seeds).
 
 ### Integrations, control and interfaces
 

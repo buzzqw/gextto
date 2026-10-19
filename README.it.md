@@ -204,7 +204,9 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
 - **Seed che segue il tracker**: limiti di ratio, tempo e **inattività** (un seed
   che non invia nulla per N minuti si ferma) e **regole di seed** per
   sorgente/indexer e categoria: le regole di un tracker privato valgono solo per
-  i suoi torrent, con lo stesso comportamento su gx-torrent e qBittorrent.
+  i suoi torrent, con lo stesso comportamento su gx-torrent e qBittorrent. Come
+  si configurano:
+  [limiti di seed](docs/MANUAL.it.md#limiti-di-seed-regole-per-sorgente-e-seed-inattivo).
 
 ### Integrazioni, controllo e interfacce
 
