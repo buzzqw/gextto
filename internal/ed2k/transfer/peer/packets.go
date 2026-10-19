@@ -126,6 +126,46 @@ func DecodeHashsetAnswer(payload []byte) (HashsetAnswer, error) {
 	return answer, nil
 }
 
+// FileStatus is OP_FILESTATUS: the file hash, the eD2k part count and the
+// bitmap of completed parts. The eD2k count is size/PARTSIZE+1, which includes
+// the extra slot for a file whose size is an exact multiple of PARTSIZE.
+type FileStatus struct {
+	Hash  ed2k.ID
+	Parts int
+	Bits  []byte
+}
+
+func EncodeFileStatus(status FileStatus) ([]byte, error) {
+	if status.Parts <= 0 || status.Parts > 0xFFFF {
+		return nil, errors.New("peer: invalid file-status part count")
+	}
+	want := (status.Parts + 7) / 8
+	if len(status.Bits) != want {
+		return nil, fmt.Errorf("peer: file-status bitmap has %d bytes, want %d", len(status.Bits), want)
+	}
+	out := make([]byte, 0, 18+len(status.Bits))
+	out = append(out, status.Hash[:]...)
+	var count [2]byte
+	binary.LittleEndian.PutUint16(count[:], uint16(status.Parts))
+	out = append(out, count[:]...)
+	return append(out, status.Bits...), nil
+}
+
+func DecodeFileStatus(payload []byte) (FileStatus, error) {
+	var status FileStatus
+	if len(payload) < 18 {
+		return status, errors.New("peer: short file status")
+	}
+	copy(status.Hash[:], payload[:16])
+	status.Parts = int(binary.LittleEndian.Uint16(payload[16:]))
+	if status.Parts <= 0 || 18+(status.Parts+7)/8 > len(payload) {
+		return status, errors.New("peer: invalid file-status bitmap")
+	}
+	size := (status.Parts + 7) / 8
+	status.Bits = append([]byte(nil), payload[18:18+size]...)
+	return status, nil
+}
+
 // PartRequest asks for up to three byte ranges of one file.
 type PartRequest struct {
 	Hash   ed2k.ID
@@ -253,6 +293,7 @@ const (
 	OpEmuleInfoAnswer = 0x02
 	OpEndOfDownload   = 0x49
 	OpMessage         = 0x4E
+	OpSetReqFileID    = 0x4F
 	OpFileStatus      = 0x50
 )
 

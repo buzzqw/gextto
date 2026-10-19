@@ -20,6 +20,9 @@ type ManagerConfig struct {
 	Fetch       Config
 	MaxSources  int
 	FetchBudget time.Duration
+	// OnComplete is called after a transfer is verified and renamed. The
+	// daemon uses it to add the file to the upload index.
+	OnComplete func(Result)
 }
 
 // Transfer is the public state of one eD2k download.
@@ -155,6 +158,9 @@ func (m *Manager) run(ctx context.Context, id string, link Link) {
 				t.Path = result.Path
 				t.Error = ""
 			})
+			if m.cfg.OnComplete != nil {
+				m.cfg.OnComplete(*result)
+			}
 			return
 		}
 		if ctx.Err() != nil {

@@ -53,6 +53,10 @@ type Config struct {
 	UPnP bool
 	// UPnPDescription is the port-mapping description shown by the router.
 	UPnPDescription string
+	// ClientHandler receives incoming eMule client connections on TCPPort.
+	// Nil keeps the search-only behaviour: the callback is accepted and the
+	// connection is closed. The upload plane sets it.
+	ClientHandler func(net.Conn)
 }
 
 func (c *Config) applyDefaults() {
@@ -262,6 +266,10 @@ func (c *Client) acceptLoop() {
 		conn, err := c.tcpListener.Accept()
 		if err != nil {
 			return
+		}
+		if c.cfg.ClientHandler != nil {
+			go c.cfg.ClientHandler(conn)
+			continue
 		}
 		_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
 		buffer := make([]byte, 64)

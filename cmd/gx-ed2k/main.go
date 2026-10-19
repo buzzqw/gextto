@@ -27,6 +27,7 @@ import (
 	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/download"
+	"github.com/buzzqw/gextto/internal/ed2k/transfer/upload"
 	"github.com/buzzqw/gextto/internal/messages"
 )
 
@@ -134,6 +135,21 @@ func main() {
 		}
 	}
 
+	userHash, _ := ed2k.RandomID()
+	var uploader *upload.Server
+	if *downloadEnabled {
+		uploader = upload.New(2)
+		uploader.ClientName = "gx-ed2k"
+		uploader.UserHash = userHash
+		uploader.TCPPort = uint16(*tcpPort)
+		if err := uploader.IndexDir(*downloadDir); err != nil {
+			log.Printf("gx-ed2k: upload index: %v", err)
+		}
+	}
+	var clientHandler func(net.Conn)
+	if uploader != nil {
+		clientHandler = uploader.Handle
+	}
 	client, err := ed2k.New(ed2k.Config{
 		DataDir:       *dataDir,
 		UDPListen:     *kadListen,
@@ -143,6 +159,7 @@ func main() {
 		Servers:       ed2k.NormalizeServerList(*servers),
 		SearchTimeout: *searchTimeout,
 		UPnP:          *upnp,
+		ClientHandler: clientHandler,
 	})
 	if err != nil {
 		log.Fatalf("gx-ed2k: %v", err)
@@ -165,6 +182,14 @@ func main() {
 				TempDir:    *downloadDir,
 				ClientName: "gx-ed2k",
 				TCPPort:    uint16(*tcpPort),
+				UserHash:   userHash,
+			},
+			OnComplete: func(result download.Result) {
+				if uploader != nil {
+					if err := uploader.AddFile(result.Path); err != nil {
+						log.Printf("gx-ed2k: share completed file: %v", err)
+					}
+				}
 			},
 		}, client)
 		daemon.transfers = manager
