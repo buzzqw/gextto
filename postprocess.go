@@ -368,8 +368,11 @@ func ValidateDestination(destination string) error {
 	if strings.ContainsRune(destination, '\x00') {
 		return errors.New("invalid post-processing destination")
 	}
+	// Read the probe once, in the caller's goroutine: tests swap it while they
+	// run, and the goroutine below may outlive a timeout.
+	probe := destinationWritable
 	done := make(chan error, 1)
-	go func() { done <- destinationWritable(destination) }()
+	go func() { done <- probe(destination) }()
 	select {
 	case err := <-done:
 		return err
