@@ -7,8 +7,10 @@ end.
 
 Spike (19 October 2026): `internal/ed2k/transfer/partfile` implements the
 9,728,000-byte part geometry, streaming MD4 whole-file/per-part hashing and the
-non-splitted `.part.met` reader/writer (0xE0/0xE2, tags via the shared codec)
-with tests. It is not imported by `cmd/gx-ed2k`; the splitted format (0xE1),
+non-splitted `.part.met` reader/writer (0xE0/0xE2, tags via the shared codec),
+plus a `PartFile` that creates the sparse `.part`, verifies each part before
+writing it, rebuilds the bitmap on reopen and verifies the whole file before
+completion. It is not imported by `cmd/gx-ed2k`; the splitted format (0xE1),
 AICH and the peer protocol are still to do.
 
 The goal is a pure-Go eMule-compatible client inside `gx-ed2k`, so Gextto can
