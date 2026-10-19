@@ -150,4 +150,10 @@ if [[ -n "$winarch" ]]; then
     --output "$WIN_ARCHIVE" ${LABEL:+--label "$LABEL"}
   zipinfo -1 "$WIN_ARCHIVE" | grep -qx 'gx-torrent.exe' \
     || { echo "gx-torrent.exe is missing from the Windows archive" >&2; exit 1; }
+
+  ED2K_WIN_ARCHIVE="$OUTPUT_DIR/gx-ed2k-windows-${winarch}.zip"
+  "$ROOT/scripts/package-gx-ed2k-windows.sh" --arch "$winarch" \
+    --output "$ED2K_WIN_ARCHIVE" ${LABEL:+--label "$LABEL"}
+  zipinfo -1 "$ED2K_WIN_ARCHIVE" | grep -qx 'gx-ed2k.exe' \
+    || { echo "gx-ed2k.exe is missing from the Windows archive" >&2; exit 1; }
 fi

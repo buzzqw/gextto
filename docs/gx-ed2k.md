@@ -134,6 +134,10 @@ update that may be older than the source.
 
 ## Packaging
 
+- `scripts/package-gx-ed2k.sh` produces the Linux tarball;
+  `scripts/package-gx-ed2k-windows.sh` cross-builds `gx-ed2k.exe` (amd64 and
+  arm64) and packages a Windows service installer with the firewall rules for
+  UDP 4672 and TCP 4662.
 - `make gx-ed2k` builds `bin/gx-ed2k` with its own committed build number
   (`gx-ed2k.build_number`).
 - `make build` rebuilds it only when its code changed, like gx-torrent.

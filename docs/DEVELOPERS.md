@@ -339,6 +339,7 @@ published next to Gextto's:
 | `scripts/package-gx-torrent.sh` | `gx-torrent-linux-<arch>.tar.gz` | binary, `run.sh`, systemd unit, README, `VERSION` |
 | `scripts/package-gx-torrent-windows.sh` | `gx-torrent-windows-<arch>.zip` (amd64, arm64) | `gx-torrent.exe` (native Windows service), `install-service.ps1`, `uninstall-service.ps1`, `README.txt` |
 | `scripts/package-gx-ed2k.sh` | `gx-ed2k-linux-<arch>.tar.gz` | eD2k/Kad search daemon, `run.sh`, systemd unit, install/uninstall scripts, README, `VERSION` |
+| `scripts/package-gx-ed2k-windows.sh` | `gx-ed2k-windows-<arch>.zip` (amd64, arm64) | `gx-ed2k.exe` (native Windows service), `install-service.ps1`, `uninstall-service.ps1`, README, `VERSION` |
 
 ### eD2k Phase 0 gate
 

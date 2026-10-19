@@ -53,11 +53,20 @@ func updateViewFor(current string, currentBuild int64, channel string, manifest 
 		view.Latest = manifest.GxEd2kVersion
 	}
 	if available {
-		arch := "x86_64"
-		if runtime.GOARCH == "arm64" {
-			arch = "aarch64"
-		}
-		view.URL = updatecheck.AssetURL(channel, "gx-ed2k-linux-"+arch+".tar.gz")
+		view.URL = updatecheck.AssetURL(channel, updateAssetName())
 	}
 	return view
+}
+
+// updateAssetName is the standalone archive for this platform: the Linux
+// tarball uses uname-style names, the Windows zip uses Go's GOARCH.
+func updateAssetName() string {
+	if runtime.GOOS == "windows" {
+		return "gx-ed2k-windows-" + runtime.GOARCH + ".zip"
+	}
+	arch := "x86_64"
+	if runtime.GOARCH == "arm64" {
+		arch = "aarch64"
+	}
+	return "gx-ed2k-linux-" + arch + ".tar.gz"
 }
