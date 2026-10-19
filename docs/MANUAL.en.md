@@ -347,6 +347,11 @@ inferior to the archived file.
 
 ## 3. Downloads
 
+- **Search a release**: the panel at the top of Downloads searches the archive,
+  indexers, web engines and — when **Kad** is ticked — the eD2k/Kad network
+  without leaving the page. Results open under the field and an add keeps you
+  in Downloads. As on the Dashboard, the eD2k provider must be enabled in
+  Configuration → Sources.
 - The **Add torrent** form opens from the button of the same name in the top bar,
   present on **every page** (from another page it takes you to Downloads and
   opens the form): while closed it takes no room. It accepts a magnet/.torrent
