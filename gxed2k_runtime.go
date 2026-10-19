@@ -110,6 +110,12 @@ func ensureEd2kDaemon(cfg *Config) {
 		"-search-timeout", strconvDuration(settings.Timeout),
 		"-log-file", filepath.Join(ownedData, "gx-ed2k.log"),
 		"-lang", messages.Language(),
+		// The transfer plane is enabled together with the provider. Upload,
+		// credits and LowID callback are still missing, so a peer may keep a
+		// transfer queued, but the search-only contract would make the manual
+		// add path unreachable.
+		"-download",
+		"-download-dir", filepath.Join(ownedData, "incoming"),
 	}
 	if nodesURL := strings.TrimSpace(cfg.Settings["ed2k_nodes_url"]); nodesURL != "" {
 		args = append(args, "-nodes-url", nodesURL)

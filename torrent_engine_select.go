@@ -179,6 +179,16 @@ func ConfigureTorrentEngine(s *AppState, cfg *Config) error {
 	if err != nil {
 		return err
 	}
+	// The eD2k plane is optional and lives next to the torrent engine. It is
+	// installed whenever the provider is enabled: when the daemon is down the
+	// adapter simply returns no rows, and the torrent plane is unaffected.
+	if ed2kEnabled(cfg) {
+		if adapter, adapterErr := newEd2kEngine(cfg); adapterErr == nil {
+			engine = newMultiEngine(engine, adapter, nil)
+		} else {
+			logging.Warn("eD2k transfer plane not installed", "error", adapterErr)
+		}
+	}
 	s.setActiveEngine(engine)
 	if note != "" {
 		logging.Warn("torrent backend note", "note", note)

@@ -90,6 +90,14 @@ func (m *multiEngine) engineFor(hash string) TorrentEngine {
 
 func (m *multiEngine) Name() string { return "multi" }
 
+// Close releases the torrent plane; the eD2k adapter is stateless HTTP.
+func (m *multiEngine) Close() error {
+	if closer, ok := m.torrent.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
 // Capabilities reports what both planes can do. A capability is true only when
 // the torrent engine has it: the eD2k plane is advisory and must not make the
 // UI offer an operation the active downloads cannot perform.
@@ -115,6 +123,9 @@ func (m *multiEngine) List() []models.TorrentView {
 	if m.ed2k != nil {
 		for _, row := range m.ed2k.List() {
 			row.Network = networkEd2k
+			// Rebuild the route on every snapshot: after a restart the rows
+			// are still eD2k files, even if the route table was not persisted.
+			m.SetRoute(row.Hash, networkEd2k)
 			rows = append(rows, row)
 		}
 	}

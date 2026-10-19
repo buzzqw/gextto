@@ -1151,10 +1151,29 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 				"link":  link.String(),
 			}
 		}
-		return http.StatusNotImplemented, map[string]any{
-			"ok":    false,
-			"error": "the eD2k transfer engine is not installed",
-			"link":  link.String(),
+		engine := s.activeEngine()
+		added, err := engine.AddWithOptions(link.String(), latestConfig(s), nil, AddOptions{})
+		if err != nil {
+			return http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error(), "link": link.String()}
+		}
+		if !added {
+			return http.StatusConflict, map[string]any{"ok": false, "error": "eD2k download already queued", "link": link.String()}
+		}
+		release.Network = networkEd2k
+		if release.Title == "" {
+			release.Title = link.Name
+		}
+		score := latestConfig(s).ReleaseScore(&release)
+		if err := s.db.RegisterTorrentScored(&release, score); err != nil {
+			return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
+		}
+		_ = s.db.SetTorrentReason(strings.ToLower(link.Hash), "manual")
+		return http.StatusAccepted, map[string]any{
+			"ok":     true,
+			"title":  release.Title,
+			"hash":   strings.ToLower(link.Hash),
+			"link":   link.String(),
+			"queued": true,
 		}
 	}
 	source := strings.TrimSpace(release.Magnet)
