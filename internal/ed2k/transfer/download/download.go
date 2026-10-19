@@ -145,8 +145,9 @@ type session struct {
 	partPath string
 	name     string
 
-	accepted bool
-	rank     uint16
+	accepted  bool
+	rank      uint16
+	peerParts []bool
 
 	parts   map[int]*partDownload
 	pending map[blockKey]pendingBlock
@@ -258,6 +259,9 @@ func (s *session) run(ctx context.Context) error {
 		if err := s.createPart(hashes); err != nil {
 			return err
 		}
+	}
+	if partfile.PartCount(s.link.Size) > 1 {
+		s.readPeerStatus(ctx)
 	}
 	return s.download(ctx)
 }
@@ -426,13 +430,44 @@ func (s *session) control(opcode byte, payload []byte) (bool, error) {
 		return true, nil
 	case peer.OpCancelTransfer, peer.OpEndOfDownload:
 		return true, errors.New("download: peer cancelled the transfer")
-	case peer.OpMessage, peer.OpHello, peer.OpHelloAnswer, peer.OpFileStatus:
+	case peer.OpMessage, peer.OpHello, peer.OpHelloAnswer:
 		return true, nil
 	}
 	if opcode == peer.OpEmuleInfo || opcode == peer.OpEmuleInfoAnswer {
 		return true, nil
 	}
 	return false, nil
+}
+
+// readPeerStatus asks for OP_FILESTATUS and records which parts the peer has.
+// A peer that does not answer is treated as complete.
+func (s *session) readPeerStatus(ctx context.Context) {
+	s.setDeadline(ctx, 5*time.Second)
+	if err := s.conn.Send(peer.OpSetReqFileID, peer.EncodeFileRequest(peer.FileRequest{Hash: s.link.Hash})); err != nil {
+		return
+	}
+	for {
+		opcode, payload, err := s.conn.Receive()
+		if err != nil {
+			return
+		}
+		if opcode == peer.OpFileStatus {
+			status, err := peer.DecodeFileStatus(payload)
+			if err != nil || status.Hash != s.link.Hash {
+				return
+			}
+			parts := partfile.PartCount(s.link.Size)
+			have := make([]bool, parts)
+			for i := 0; i < parts && i < status.Parts; i++ {
+				have[i] = status.Bits[i/8]&(1<<uint(i%8)) != 0
+			}
+			s.peerParts = have
+			return
+		}
+		if handled, _ := s.control(opcode, payload); handled {
+			continue
+		}
+	}
 }
 
 func (s *session) download(ctx context.Context) error {
@@ -577,7 +612,7 @@ type blockRange struct {
 func (s *session) nextRanges(limit int) ([]blockRange, error) {
 	out := make([]blockRange, 0, limit)
 	for part := 0; part < len(s.pf.Meta.Parts); part++ {
-		if s.pf.Have(part) {
+		if s.pf.Have(part) || (s.peerParts != nil && !s.peerParts[part]) {
 			continue
 		}
 		state, err := s.partState(part)

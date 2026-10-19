@@ -76,6 +76,7 @@ func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.
 		return err
 	}
 
+	accepted := false
 	for {
 		opcode, payload, err := client.Receive()
 		if err != nil {
@@ -103,7 +104,25 @@ func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.
 				return err
 			}
 		case peer.OpSetReqFileID:
-			return errors.New("fake peer: unexpected OP_SETREQFILEID")
+			if !accepted {
+				return errors.New("fake peer: OP_SETREQFILEID before the upload slot")
+			}
+			request, err := peer.DecodeFileRequest(payload)
+			if err != nil || request.Hash != hashes.File {
+				return errors.New("fake peer: invalid file-status request")
+			}
+			parts := len(hashes.Parts)
+			bits := make([]byte, (parts+7)/8)
+			for i := range bits {
+				bits[i] = 0xFF
+			}
+			raw, err := peer.EncodeFileStatus(peer.FileStatus{Hash: hashes.File, Parts: parts, Bits: bits})
+			if err != nil {
+				return err
+			}
+			if err := client.Send(peer.OpFileStatus, raw); err != nil {
+				return err
+			}
 		case peer.OpStartUploadReq:
 			if queue {
 				if err := client.Send(peer.OpQueueRanking, peer.EncodeQueueRanking(peer.QueueRanking{Rank: 4})); err != nil {
@@ -117,6 +136,7 @@ func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.
 			if err := client.Send(peer.OpAcceptUploadReq, nil); err != nil {
 				return err
 			}
+			accepted = true
 		case peer.OpRequestParts:
 			request, err := peer.DecodePartRequest(payload)
 			if err != nil {

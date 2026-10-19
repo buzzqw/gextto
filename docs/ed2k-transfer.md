@@ -38,7 +38,9 @@ I64 request/part opcodes. A queued transfer keeps retrying. Do not send OP_SETRE
 OP_STARTUPLOADREQ: real eMule peers close the socket after accepting the slot
 when that packet arrives, while aMule tolerates it. With the packet removed, a
 live download of the 4.2 MB eMule 0.70b installer completed, passed the final
-MD4 and appeared in Gextto as a finished ed2k row. eD2k 0xC5 extension packets
+MD4 and appeared in Gextto as a finished ed2k row. For multi-part files the
+client reads OP_FILESTATUS and only asks for parts the peer actually has; a
+partial source no longer causes requests for missing parts. eD2k 0xC5 extension packets
 (EMULEINFO, queue ranking, compressed parts) use a separate header byte from
 the 0xE3 standard packets. None of it is imported by
 `cmd/gx-ed2k` yet.
