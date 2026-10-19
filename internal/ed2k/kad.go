@@ -11,12 +11,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-	"unicode/utf8"
 )
 
 // Config configures the search client.
@@ -541,6 +541,10 @@ func (c *Client) Search(ctx context.Context, query string) ([]SearchFile, error)
 		return nil, fmt.Errorf("ed2k: query %q has no searchable keyword", query)
 	}
 	target := KeywordID(keyword)
+	// Send every meaningful token as a restrictive AND tree: the peer then
+	// filters the keyword bucket, instead of returning every file indexed
+	// under the primary keyword (for example all shows with S04E01).
+	terms := SearchTerms(query)
 
 	type networkResult struct {
 		files []SearchFile
@@ -549,7 +553,7 @@ func (c *Client) Search(ctx context.Context, query string) ([]SearchFile, error)
 	kadCh := make(chan networkResult, 1)
 	serverCh := make(chan networkResult, 1)
 	go func() {
-		files, err := c.searchKad(searchCtx, keyword, target)
+		files, err := c.searchKad(searchCtx, keyword, target, terms)
 		kadCh <- networkResult{files: files, err: err}
 	}()
 	go func() {
@@ -583,7 +587,7 @@ func (c *Client) Search(ctx context.Context, query string) ([]SearchFile, error)
 	return merged, nil
 }
 
-func (c *Client) searchKad(ctx context.Context, keyword string, target ID) ([]SearchFile, error) {
+func (c *Client) searchKad(ctx context.Context, keyword string, target ID, terms []string) ([]SearchFile, error) {
 	if err := c.Bootstrap(ctx); err != nil {
 		// With an empty routing table there is nothing to ask. This is a
 		// normal, reportable condition (no nodes.dat), not a crash.
@@ -600,7 +604,7 @@ func (c *Client) searchKad(ctx context.Context, keyword string, target ID) ([]Se
 		return nil, errors.New("ed2k: no Kad contacts")
 	}
 	for _, contact := range contacts {
-		c.send(contact, KadSearchKeyReq, encodeSearchRequest(target))
+		c.send(contact, KadSearchKeyReq, encodeSearchRequest(target, terms))
 	}
 
 	deadline := time.Now().Add(c.cfg.QueryTimeout)
@@ -933,30 +937,54 @@ func filterQueryMatches(files []SearchFile, query string) []SearchFile {
 	return out
 }
 
-// BestKeyword splits a query the way Kad indexes names and returns the
-// longest usable token, lowercased. A file is published under each keyword of
-// its name, so the longest token is the most selective lookup target.
+// BestKeyword returns the primary token of a Kad lookup. eMule indexes every
+// word of a file name and derives the lookup target from the first keyword;
+// we prefer the first real title word, skipping episode markers, quality tags
+// and years, so "Silo S04E01" looks up "silo" and not "s04e01".
 func BestKeyword(query string) string {
-	invalid := " ()[]{}<>,._-!?:;\\/\"'"
-	words := strings.FieldsFunc(strings.ToLower(query), func(r rune) bool {
-		return strings.ContainsRune(invalid, r)
-	})
-	best := ""
-	seen := map[string]struct{}{}
-	for _, word := range words {
-		word = strings.TrimSpace(word)
-		if utf8.RuneCountInString(word) < 3 || len([]byte(word)) < 3 {
-			continue
-		}
-		if _, ok := seen[word]; ok && best != "" {
-			continue
-		}
-		seen[word] = struct{}{}
-		if len([]byte(word)) > len([]byte(best)) {
-			best = word
+	terms := SearchTerms(query)
+	if len(terms) == 0 {
+		return ""
+	}
+	for _, term := range terms {
+		if !lookupNoise(term) {
+			return term
 		}
 	}
-	return best
+	return terms[0]
+}
+
+// SearchTerms is the token list sent in the restrictive expression tree.
+// Stop words are dropped: names often omit them (The.Matrix.1999.mkv has no
+// "The"), and requiring one would hide valid results.
+func SearchTerms(query string) []string {
+	all := QueryTokens(query)
+	out := make([]string, 0, len(all))
+	for _, token := range all {
+		if _, stop := kadStopWords[token]; stop {
+			continue
+		}
+		out = append(out, token)
+	}
+	return out
+}
+
+var kadStopWords = map[string]struct{}{
+	"the": {}, "and": {}, "of": {}, "for": {}, "with": {},
+	"di": {}, "da": {}, "il": {}, "lo": {}, "la": {}, "le": {}, "les": {},
+	"el": {}, "los": {}, "las": {}, "der": {}, "die": {}, "das": {},
+	"und": {}, "et": {}, "de": {}, "del": {}, "della": {}, "dei": {},
+	"degli": {}, "un": {}, "una": {}, "uno": {}, "per": {}, "con": {},
+	"von": {}, "van": {},
+}
+
+var (
+	kadEpisodeToken = regexp.MustCompile(`^s\d{1,2}[ ._-]?e\d{1,3}$|^\d{1,2}x\d{1,3}$`)
+	kadNoiseToken   = regexp.MustCompile(`^(19|20)\d{2}$|^(2160p|1080p|1080i|720p|576p|480p|4k|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|xvid|divx|hevc|x265|x264|h264|h265|aac|ac3|dts|atmos)$`)
+)
+
+func lookupNoise(term string) bool {
+	return kadEpisodeToken.MatchString(term) || kadNoiseToken.MatchString(term)
 }
 
 // QueryTokens returns the distinct usable tokens of a query, used to make

@@ -249,3 +249,31 @@ func TestKadWireFormat(t *testing.T) {
 		t.Fatalf("packed decode = %+v, %v", files, err)
 	}
 }
+
+// TestSearchRequestExpressionTree pins the restrictive search layout: the
+// start-position high bit plus a left-deep AND of the query tokens.
+func TestSearchRequestExpressionTree(t *testing.T) {
+	target := KeywordID("silo")
+	got := encodeSearchRequest(target, []string{"silo", "s04e01"})
+
+	leaf := func(value string) []byte {
+		w := newWriter(binary.LittleEndian)
+		w.u8(0x01)
+		w.string16(value)
+		return w.buf
+	}
+	want := newWriter(binary.LittleEndian)
+	want.kadID(target)
+	want.u16(0x8000)
+	want.raw([]byte{0x00, 0x00})
+	want.raw(leaf("silo"))
+	want.raw(leaf("s04e01"))
+	if !bytes.Equal(got, want.buf) {
+		t.Fatalf("encodeSearchRequest =\n%x\nwant\n%x", got, want.buf)
+	}
+
+	plain := encodeSearchRequest(target, nil)
+	if len(plain) != 18 || binary.LittleEndian.Uint16(plain[16:]) != 0 {
+		t.Fatalf("plain request = %x", plain)
+	}
+}

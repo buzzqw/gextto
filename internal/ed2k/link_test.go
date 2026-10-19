@@ -77,10 +77,12 @@ func TestNormalizeServerList(t *testing.T) {
 
 func TestBestKeyword(t *testing.T) {
 	cases := map[string]string{
-		"The Matrix 1999 1080p": "matrix",
-		"a  b":                  "",
-		"serie S01E01":          "s01e01",
-		"Amélie":                "amélie",
+		"The Matrix 1999 1080p":    "matrix",
+		"a  b":                     "",
+		"serie S01E01":             "serie",
+		"Amélie":                   "amélie",
+		"Silo S04E01":              "silo",
+		"Murdoch Mysteries S13E12": "murdoch",
 	}
 	for query, want := range cases {
 		if got := BestKeyword(query); got != want {

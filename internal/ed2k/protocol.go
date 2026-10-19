@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 )
 
 // Kad wire protocol.
@@ -312,14 +313,42 @@ func decodeNodeResponse(payload []byte) (ID, []Contact, error) {
 	return target, contacts, nil
 }
 
-// encodeSearchRequest asks for every file indexed under target. start=0 with
-// no expression tree means "all entries for this keyword"; the node then only
-// has to look the keyword up, and we filter names locally.
-func encodeSearchRequest(target ID) []byte {
+// encodeSearchRequest asks for every file indexed under target. With terms it
+// sends a restrictive search: bit 15 of the start position is set and an
+// expression tree follows, so the peer filters the keyword bucket itself
+// instead of returning everything indexed under the primary keyword.
+func encodeSearchRequest(target ID, terms []string) []byte {
 	w := newWriter(binary.LittleEndian)
 	w.kadID(target)
-	w.u16(0)
+	if len(terms) == 0 {
+		w.u16(0)
+		return w.buf
+	}
+	w.u16(0x8000)
+	w.raw(encodeSearchTree(terms))
 	return w.buf
+}
+
+// encodeSearchTree builds a left-deep AND of string terms, the layout read by
+// eMule's CreateSearchExpressionTree: 0x01 + uint16 length + UTF-8 lowercased
+// text for a leaf, 0x00 0x00 for AND, then the left and right subtrees.
+func encodeSearchTree(terms []string) []byte {
+	var tree []byte
+	for index, term := range terms {
+		leaf := newWriter(binary.LittleEndian)
+		leaf.u8(0x01)
+		leaf.string16(strings.ToLower(term))
+		if index == 0 {
+			tree = leaf.buf
+			continue
+		}
+		node := make([]byte, 0, 2+len(tree)+len(leaf.buf))
+		node = append(node, 0x00, 0x00)
+		node = append(node, tree...)
+		node = append(node, leaf.buf...)
+		tree = node
+	}
+	return tree
 }
 
 func decodeSearchRequest(payload []byte) (ID, uint16, []byte, error) {
