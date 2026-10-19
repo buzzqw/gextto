@@ -174,6 +174,9 @@ func ensureEd2kDaemon(cfg *Config) {
 	ed2kProcess.lastError = ""
 	ed2kProcess.mu.Unlock()
 	logging.Info("gx-ed2k started", "listen", listen, "data_dir", ownedData)
+	// The pre-start probe cached "unreachable"; drop it so the next status and
+	// search see the daemon that is starting now.
+	ed2kInvalidateHealth()
 
 	go func(started *exec.Cmd) {
 		err := started.Wait()

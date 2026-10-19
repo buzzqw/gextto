@@ -490,6 +490,11 @@ One live run from the N97 (`bin/gx-ed2k`, standalone, UPnP on, `nodes.dat` from
   `8.8.8.8:53` also times out: this host/network blocks outbound UDP. The code
   path is exercised against fake peers; the live Kad gate must be repeated on a
   network with outbound UDP.
+- **Gextto integration**: with `ed2k_enabled` on, the managed daemon started
+  (fingerprint/scope), `/api/search` with `{"query":"the matrix 1999","kad":true}`
+  returned **248 results (234 torrent + 14 eD2k)** in **25.7 s**; without `kad`
+  only the 226 torrent ones. `POST /api/search/add` on an eD2k result answers
+  **501** with the link and the reason, and queues nothing.
 
 ### Dead torrent links
 
