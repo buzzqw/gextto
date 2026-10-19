@@ -11,7 +11,7 @@ dipendenza C, nessuna build Node.js, sei lingue.
 
 [![Licenza: EUPL-1.2](https://img.shields.io/badge/licenza-EUPL--1.2-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-puro%2C%20zero%20CGO-00ADD8?logo=go)
-![Test](https://img.shields.io/badge/test-2.100%20Go%20%C2%B7%2057%20E2E%20%C2%B7%2023%20fuzz-success)
+![Test](https://img.shields.io/badge/test-2.189%20Go%20%C2%B7%2057%20E2E%20%C2%B7%2023%20fuzz-success)
 ![Piattaforme](https://img.shields.io/badge/piattaforme-Linux%20%C2%B7%20Windows%20(gx--torrent)-informational)
 ![BEP](https://img.shields.io/badge/BEP%20BitTorrent-34%20implementati-success)
 ![Lingue](https://img.shields.io/badge/UI-IT%20%C2%B7%20EN%20%C2%B7%20DE%20%C2%B7%20FR%20%C2%B7%20ES%20%C2%B7%20PL-lightgrey)
@@ -36,9 +36,9 @@ altro.
   mount che distingue una condivisione smontata da file cancellati e da un
   cestino.
 - Il motore è codice Go nostro: BitTorrent v1, v2 e ibrido, TCP e uTP su una
-  porta, holepunching, DHT IPv6, streaming. A riposo occupa ~25 MB e arriva a
-  ~100 MB a 100 MB/s; qBittorrent-nox sullo stesso insieme arriva a ~5 GB. Lo
-  stesso binario è [gx-torrent](https://github.com/buzzqw/gextto/releases), un
+  porta, holepunching, DHT IPv6, streaming. Su uno swarm reale di Ubuntu scarica
+  a 9,3–9,4 MB/s dove libtorrent arriva a 6,3–7,1 MB/s, e a riposo occupa
+  60–64 MB. Lo stesso binario è [gx-torrent](https://github.com/buzzqw/gextto/releases), un
   client autonomo per Linux e Windows.
 - Coda, cache e banda seguono la macchina e la linea. Su Auto la linea è tutta
   di Gextto finché nessun altro ne ha bisogno, e la cede quando serve.
@@ -47,8 +47,8 @@ altro.
 
 | | |
 |---|---|
-| **Memoria del motore** | ~25 MB a riposo, ~100 MB a 100 MB/s con 50 torrent (qBittorrent-nox: fino a ~5 GB) |
-| **CPU del motore** | ~⅓ di un core Intel N97 a 9,4 MB/s con ~200 peer; 1–2 % senza nulla da trasferire |
+| **Velocità** | 9,3–9,4 MB/s su uno swarm reale di Ubuntu, contro 6,3–7,1 MB/s di libtorrent sullo stesso swarm |
+| **Consumi** | 60–64 MB e 1–2 % di un core a riposo; 44–48 % di un core Intel N97 a 8–9 MB/s |
 | **Protocollo** | BitTorrent v1, v2 e ibrido (BEP 52) · 34 BEP implementati e testati ([elenco](docs/bep.md)) |
 | **Rete** | TCP + uTP su una porta · UPnP, NAT-PMP, PCP · holepunching BEP 55 · proxy SOCKS5/HTTP · killswitch VPN |
 | **Automazione** | Serie TV, film, fumetti · Torznab (Jackett, Prowlarr) · RSS · ricerca web · sostituzione dei download bloccati |
@@ -56,183 +56,30 @@ altro.
 | **Interfacce** | Web UI (SSR + HTMX, Go puro, PWA installabile) · TUI da terminale via SSH · API JSON |
 | **Build** | Go puro (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent anche su Windows |
 
-Gira su una macchina piccola. Su un Intel N97 da 4 core e 16 GB il motore a riposo
-occupa 60–64 MB e ~1,5 % di un core, il demone di Gextto ~70 MB e meno dell'1 %, e
-il motore arriva a ~100 MB a 100 MB/s. I controlli di salute non scrivono sul NAS,
-così i suoi dischi possono dormire.
+Gira su una macchina piccola: tutti i numeri qui vengono da un Intel N97 da 4 core
+e 16 GB. I controlli di salute non scrivono sul NAS, così i suoi dischi possono
+dormire.
 
-## Numeri
+## Uno sguardo
 
-Questi numeri vengono dall'installazione reale e da swarm, indexer e linea
-veri. Ognuno è in [`docs/measurements.md`](docs/measurements.md) con la
-macchina, la data e il comando per rifarlo.
+Un'istanza di prova che scarica cinque torrent pubblici e legali: Debian, Ubuntu
+Server e i film open di Blender *Big Buck Bunny*, *Sintel* ed *Elephants Dream*.
 
-| Area | Risultato |
+![Scarico: cinque torrent in corso, filtri, ordinamento e il pulsante Banda](docs/screenshots/it/downloads.png)
+
+| | |
 |---|---|
-| **Memoria del motore** | ~25 MB a riposo e ~100 MB a 100 MB/s con 50 torrent, contro fino a ~5 GB di qBittorrent-nox sullo stesso insieme. Download verso un NAS: ~0,5 GB fuori dalla cache di scrittura, che si dimensiona dalla RAM libera; ~60 MB subito dopo un riavvio |
-| **CPU del motore** | Circa **⅓ di un core** a 9,4 MB/s con ~200 peer (metà su uTP, cifrati): **0,17 % per peer**, di cui il piece picker occupa il 9 % |
-| **Ricerche sugli indexer** | Jackett e Prowlarr interrogati un indexer alla volta: un ciclo di 30 titoli in **110 s**, **205 richieste e nessuna fallita**, **5.935 release** |
-| **Dividere la linea** | Un download a piena linea aggiunge ~40 ms di latenza a tutta la casa. Da solo sulla linea Gextto la usa tutta (**8,5 MB/s**); con un altro dispositivo che scarica, quel dispositivo ottiene **6,8–7,3 MB/s** dei 9 MB/s della linea |
-| **Riuso dei dati locali** | Un torrent che condivide file con uno già su disco prende dalla rete solo il **25 %** del file (ISO Debian e Arch), anche dopo un riavvio e in qualunque ordine si aggiungano |
-| **Scritture su disco** | Scritture da 16 KiB su NFS a **81 MiB/s** con durabilità a lotti; mmap opzionale ~7,0 GB/s su tmpfs |
-| **Archivio dei feed** | **447.000 release in 320 MB**, una riga per torrent; 1.000 release archiviate in **41 ms**; l'archivio standalone cerca su 100.000 release in **7,4 ms** |
-| **Demone a riposo** | **0,4 %** di CPU a riposo; **~5.000 chiamate ai metadati al giorno** per 55 serie; i controlli di salute non scrivono mai su un NAS, così i suoi dischi possono dormire |
+| ![Menu Banda](docs/screenshots/it/bandwidth.png) | ![Dettagli del torrent, mappa dei pezzi](docs/screenshots/it/detail.png) |
+| **Banda.** Cosa vale adesso e da dove viene; un'eccezione per adesso, Auto o un limite, con un clic. | **Dettagli del torrent.** Generale, tracker, contenuto, peer, la mappa dei pezzi, limiti e storage. |
+| ![Dashboard](docs/screenshots/it/dashboard.png) | ![La regola della velocità in Configurazione](docs/screenshots/it/speed-rule.png) |
+| **Dashboard.** La sessione a colpo d'occhio, il traffico in tempo reale e cosa va controllato. | **Configurazione.** Una sola scelta per la regola della velocità; le righe che ne dipendono compaiono solo quando servono. |
 
-Lo stesso documento registra cosa è stato misurato e scartato — io_uring, I/O
-uTP a lotti su questo carico, una cache write-back — così le stesse idee non si
-riprovano.
+<img src="docs/screenshots/it/phone.png" alt="Scarico su un telefono" width="260" align="right">
 
-## Test
-
-Cosa gira a ogni push (`make test`, `make test-ui`, `make fuzz-smoke` e CI):
-
-| Livello | Cosa gira |
-|---|---|
-| **Unitari e integrazione** | 2.100 funzioni di test Go in 413 file: motore, DHT, uTP, storage, punteggi, post-elaborazione, API, rendering della UI. La TUI viene pilotata contro il router reale |
-| **End-to-end** | 57 test Playwright pilotano il demone reale in un browser — pagine, mobile, sei lingue, sicurezza, impostazioni — compresi 14 test di accessibilità con audit WCAG axe-core |
-| **Fuzzing** | 23 parser esposti alla rete (DHT, bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE) sotto fuzzing in CI; ogni crash trovato diventa un seed committato |
-| **Misure sul mondo reale** | 14 misure opzionali: swarm pubblici reali, la DHT pubblica, un peer libtorrent reale, riuso locale su ISO reali, choking e pipelining, i Jackett/Prowlarr in uso, la latenza della linea di casa |
-| **Guardie statiche** | Ogni bottone della UI punta a una rotta registrata, ogni chiamata interna si risolve sul router reale, ogni impostazione è salvabile, tradotta in sei lingue e ha il suo tooltip, ogni rotta API è documentata |
-| **Piattaforme e pacchetti** | La CI cross-compila motore e demone per Windows ed esegue i test di piattaforma Windows e un'installazione reale del servizio; gli installer hanno auto-test (ogni opzione, un dry-run che non cambia nulla) e l'immagine Docker standalone viene costruita e provata; CodeQL analizza ogni push |
-| **Benchmark** | 42 benchmark Go sui percorsi caldi (picker, storage, uTP, archivio, riuso, logging), lanciati prima e dopo ogni modifica a un percorso dati |
-
-## Funzionalità
-
-### Trovare e scegliere le release
-
-- **Punteggio attento alla qualità.** Punteggi deterministici su qualità,
-  sorgente, codec, audio, HDR/Dolby Vision, lingua e dimensione; i file di
-  libreria di qualità superiore sono protetti; un tetto opzionale ferma gli
-  upgrade. La pagina impostazioni dà il punteggio a release di riferimento con i
-  pesi correnti. `ffprobe` legge la qualità reale dei file archiviati.
-- **Serie TV, film, fumetti.** `ComicInfo.xml` standard per gli archivi CBZ
-  (Komga, Kavita, lettori).
-- **Season pack solo quando servono.** Un pack si scarica solo per riempire un
-  buco reale o migliorare un episodio; uno che non aggiungerebbe nulla viene
-  rifiutato prima di scaricarlo, e un pack ancora in corso (*IN CORSO n/m*) si
-  legge entro gli episodi che esistono.
-- **Recupero dei download bloccati.** Un download che smette di avanzare, o un
-  magnet fermo in attesa dei metadati, viene sostituito da un'alternativa valida
-  dopo una finestra configurabile; la release abbandonata va in blocklist.
-- **Sorgenti.** Feed RSS, elenchi HTML (ext.to, TorrentGalaxy, Corsaro),
-  indexer Torznab e i gestori Jackett/Prowlarr, ricerca web, FlareSolverr
-  opzionale. I gestori vengono interrogati **un indexer alla volta**, ognuno al
-  ritmo che regge davvero, un tracker presente in entrambi una volta sola, e un
-  tracker lento perde solo i propri risultati.
-
-### Sicurezza della libreria
-
-- **Hardlink durante il seeding**: i file completati compaiono subito in
-  libreria, senza occupare spazio due volte.
-- **Guardia NAS e mount**: una condivisione smontata non viene mai scambiata per
-  file cancellati, un'ondata di file "mancanti" viene limitata, una condivisione
-  bloccata non congela il motore; gli errori transitori si riprovano e gli
-  spostamenti interrotti riprendono. L'avvio di un download resiste ai crash.
-- **Cestino**: i file sostituiti da un upgrade e i dati rimossi "con i dati"
-  vanno prima nel cestino, dopo che il torrent ha lasciato il motore.
-
-### Banda e linea condivisa
-
-- **Politiche di velocità**: limiti manuali, una programmazione per giorno della
-  settimana (una scelta per giorno: **Non attiva / Limite / Auto**), un override
-  temporaneo; *Auto* lascia la linea senza tetto, così il suo picco reale viene
-  imparato e proposto come limite.
-- **Auto rispetta la latenza** (attivo per default): quando la latenza verso
-  Internet sale, Gextto si scansa per qualche secondo per capire di chi è la
-  coda. Se è sua, si tiene la linea. Se è di qualcun altro, cede a passi e si
-  riprende la linea quando gli altri hanno finito. I contatori UPnP del router,
-  quando ci sono, dicono chi altro usa la linea; la pagina Download mostra il
-  guardiano mentre agisce.
-- **Seed che segue il tracker**: limiti di ratio, tempo e **inattività** (un seed
-  che non invia nulla per N minuti si ferma) e **regole di seed** per
-  sorgente/indexer e categoria: le regole di un tracker privato valgono solo per
-  i suoi torrent, con lo stesso comportamento su gx-torrent e qBittorrent.
-
-### Integrazioni, controllo e interfacce
-
-- **Notifiche e media server**: Telegram, e-mail, webhook (Discord, Slack,
-  ntfy, Gotify, Pushover), aggiornamento delle cartelle di Jellyfin e Plex, un
-  feed iCal di arrivi e date di uscita.
-- **Tracciabilità**: ogni download porta un **ID di acquisizione** attraverso i
-  log di ricerca, scelta, trasferimento, post-elaborazione e archivio; il
-  pannello **Da controllare** della dashboard tiene ogni avviso finché il suo
-  download è attivo; un grafico live della banda a 30 minuti; avvisi quando una
-  sorgente continua a fallire o rallenta.
-- **Interfacce**: web UI responsive installabile come PWA, navigabile da
-  tastiera e verificata con axe-core; vista a poster per serie e film; oltre 20
-  temi verificati per il contrasto più quelli personalizzati; una TUI completa
-  da terminale per SSH che si adatta allo schermo di un telefono. Sei lingue
-  (IT, EN, DE, FR, ES, PL).
-
-La web UI ascolta su `http://<host>:5000/`. La configurazione e ogni sezione sono
-descritte nel [manuale italiano](docs/MANUAL.it.md) e nell'
-[English manual](docs/MANUAL.en.md).
-
-## Motore torrent
-
-Gextto tiene il piano di controllo (coda, punteggi, post-elaborazione,
-archiviazione) e delega i trasferimenti a un motore selezionabile
-(*Configurazione → Motore torrent*); il cambio è una migrazione coordinata.
-
-| Motore | Dove gira | Quando sceglierlo |
-|---|---|---|
-| **gx-torrent** (default) | Processo Go separato e supervisionato | Go puro, autonomo, v1/v2/ibrido, DHT e MSE/PE; anche standalone su Linux e Windows; niente WebTorrent/WebRTC |
-| qBittorrent-nox | Demone esterno via Web API, o uno che Gextto scarica e gestisce in privato | Lo usi già o preferisci la sua UI ([guida](docs/qbittorrent-nox.md)); anche il primo passo del fallback automatico |
-
-**Fallback automatico.** Se il motore attivo non resta in piedi, Gextto prima
-riporta un `gx-torrent` aggiornato al binario precedente, poi passa a un
-qBittorrent-nox gestito (scaricato al bisogno, verificato SHA-256) o a uno
-esterno, e infine a uno stato di recupero con la UI attiva. Un periodo di attesa
-evita il ping-pong; `GEXTTO_ENGINE=qbittorrent` (o `gx-torrent`) forza il
-motore per un avvio.
-
-### gx-core e gx-torrent
-
-`gx-core` (`internal/gxcore`) e la sua DHT (`internal/dht`) sono codice
-originale scritto in questo repository sotto EUPL-1.2, senza codice derivato da
-terzi ([`THIRD-PARTY-NOTICES`](THIRD-PARTY-NOTICES) elenca solo le librerie
-collegate). `gx-torrent` lo esegue come processo supervisionato che sopravvive
-ai riavvii dell'orchestratore: Gextto si ricollega quando binario e opzioni
-coincidono.
-
-- **Protocollo.** BitTorrent v1, solo-v2 e ibrido (BEP 52) da `.torrent` e
-  magnet (`urn:btmh:`), con verifica Merkle SHA-256. **34 BEP implementati e
-  testati** — [`docs/bep.md`](docs/bep.md) è la fonte di verità: protocollo
-  wire, Fast Extension, metadati, PEX con IPv6, multitracker, LSD,
-  super-seeding, web seed, torrent privati, indicazioni sui dati locali,
-  `lt_donthave`, tracker UDP con scrape, e la suite DHT (IPv6, scrape, ID di
-  nodo sicuri, sola lettura, archivio K/V, `urn:btpk:`). Oltre i BEP: tracker
-  `ws://`/`wss://` e **feed DHT** (`dht://<pubkey>`).
-- **Riuso locale.** Pezzi e blocchi da 16 KiB già verificati da un altro
-  torrent locale — stessa disposizione o lo stesso file v2 — vengono copiati e
-  ricontrollati invece che scaricati; i torrent privati non si mescolano mai
-  (BEP 27).
-- **Rete.** TCP e uTP (BEP 29) in parallelo su una porta, un socket UDP per uTP
-  e DHT; ritrasmissione uTP adattiva (soglia minima di latenza e backoff per
-  connessione); `ut_holepunch` (BEP
-  55) come client e relay; UPnP, NAT-PMP e **PCP**; un test della porta che
-  distingue NAT cone da simmetrico; SOCKS5 e HTTP CONNECT; un killswitch
-  `outgoing-interface` per le VPN.
-- **Autogestione.** Il numero di download attivi segue il throughput; i
-  torrent lenti e fermi si fanno da parte; la cache disco si dimensiona da RAM e
-  classe di storage (NVMe, SSD, HDD, NFS); i download si mettono in pausa prima
-  che una cartella si riempia mentre il seeding continua; le code di richiesta
-  per peer si adattano e la connessione chiusa è quella più lenta e inattiva.
-- **Impronta leggera per progetto.** I pezzi si scrivono direttamente e la page
-  cache del sistema unisce l'I/O; `fdatasync` a lotti, mai `O_SYNC` per
-  scrittura; file
-  sparsi, `fallocate`, cartelle temporanee su RAM disk, mmap opzionale; percorsi
-  caldi senza allocazioni (RC4 in place, bitfield a parole, uTP senza copie); la
-  blocklist IP si cerca per bisezione senza allocare.
-- **Streaming e sicurezza.** Finestra di riproduzione e readahead separate,
-  priorità per file al volo, HTTP Range con il `Content-Type` giusto; un
-  **media server DLNA/UPnP** opzionale per le TV, con la libreria del NAS e i
-  suoi poster; web seed e `xs=`/`as=` protetti da SSRF; quarantena per i peer
-  che mandano blocchi corrotti; diagnostica live per peer, tassi di I/O e
-  Server-Sent Events.
-
-Le statistiche del motore sono in **Salute → Motore torrent** (`/?view=health`),
-in `GET /api/v1/stats` del demone e in `GET /api/torrents/session-stats`.
+Sul telefono le stesse pagine diventano schede, i menu si aprono sul posto e le
+azioni sulla selezione restano a portata di pollice. L'interfaccia web si
+installa anche come app (PWA), e un client da terminale fa lo stesso lavoro via SSH.
+<br clear="right">
 
 ## Installazione su Linux
 
@@ -304,6 +151,167 @@ sudo bash install.sh --uninstall --purge   # rimuove anche la cartella dei dati
 `GEXTTO_LOCAL_ARCHIVE=/percorso/gextto-linux-x86_64.tar.gz` installa offline. Da
 un checkout: `git pull --ff-only && ./scripts/update.sh`.
 
+## Funzionalità
+
+### Trovare e scegliere le release
+
+- **Punteggio attento alla qualità.** Punteggi deterministici su qualità,
+  sorgente, codec, audio, HDR/Dolby Vision, lingua e dimensione; i file di
+  libreria di qualità superiore sono protetti; un tetto opzionale ferma gli
+  upgrade. La pagina impostazioni dà il punteggio a release di riferimento con i
+  pesi correnti. `ffprobe` legge la qualità reale dei file archiviati.
+- **Serie TV, film, fumetti.** `ComicInfo.xml` standard per gli archivi CBZ
+  (Komga, Kavita, lettori).
+- **Season pack solo quando servono.** Un pack si scarica solo per riempire un
+  buco reale o migliorare un episodio; uno che non aggiungerebbe nulla viene
+  rifiutato prima di scaricarlo, e un pack ancora in corso (*IN CORSO n/m*) si
+  legge entro gli episodi che esistono.
+- **Recupero dei download bloccati.** Un download che smette di avanzare, o un
+  magnet fermo in attesa dei metadati, viene sostituito da un'alternativa valida
+  dopo una finestra configurabile; la release abbandonata va in blocklist.
+- **Sorgenti.** Feed RSS, elenchi HTML (ext.to, TorrentGalaxy, Corsaro),
+  indexer Torznab e i gestori Jackett/Prowlarr, ricerca web, FlareSolverr
+  opzionale. I gestori vengono interrogati **un indexer alla volta**, ognuno al
+  ritmo che regge davvero, un tracker presente in entrambi una volta sola, e un
+  tracker lento perde solo i propri risultati.
+
+### Sicurezza della libreria
+
+- **Hardlink durante il seeding**: i file completati compaiono subito in
+  libreria, senza occupare spazio due volte.
+- **Guardia NAS e mount**: una condivisione smontata non viene mai scambiata per
+  file cancellati, un'ondata di file "mancanti" viene limitata, una condivisione
+  bloccata non congela il motore; gli errori transitori si riprovano e gli
+  spostamenti interrotti riprendono. L'avvio di un download resiste ai crash.
+- **Cestino**: i file sostituiti da un upgrade e i dati rimossi "con i dati"
+  vanno prima nel cestino, dopo che il torrent ha lasciato il motore.
+
+### Banda e linea condivisa
+
+- **Una regola, un'eccezione**: la regola è una sola scelta — **Auto**, limiti
+  fissi o una programmazione per giorno della settimana (ogni giorno **Non attiva
+  / Limite / Auto**). Dalla pagina Scarico fai un'eccezione per adesso — Auto o un
+  limite, da 1 a 12 ore o finché non la togli — e vince sempre sulla regola.
+  *Auto* lascia la linea senza tetto, così il suo picco reale viene imparato.
+- **Auto rispetta la latenza** (attivo per default): quando la latenza verso
+  Internet sale, Gextto si scansa per qualche secondo per capire di chi è la
+  coda. Se è sua, si tiene la linea. Se è di qualcun altro, cede a passi e si
+  riprende la linea quando gli altri hanno finito. I contatori UPnP del router,
+  quando ci sono, dicono chi altro usa la linea; la pagina Download mostra il
+  guardiano mentre agisce.
+- **Seed che segue il tracker**: limiti di ratio, tempo e **inattività** (un seed
+  che non invia nulla per N minuti si ferma) e **regole di seed** per
+  sorgente/indexer e categoria: le regole di un tracker privato valgono solo per
+  i suoi torrent, con lo stesso comportamento su gx-torrent e qBittorrent.
+
+### Integrazioni, controllo e interfacce
+
+- **Notifiche e media server**: Telegram, e-mail, webhook (Discord, Slack,
+  ntfy, Gotify, Pushover), aggiornamento delle cartelle di Jellyfin e Plex, un
+  feed iCal di arrivi e date di uscita.
+- **Tracciabilità**: ogni download porta un **ID di acquisizione** attraverso i
+  log di ricerca, scelta, trasferimento, post-elaborazione e archivio; il
+  pannello **Da controllare** della dashboard tiene ogni avviso finché il suo
+  download è attivo; un grafico live della banda a 30 minuti; avvisi quando una
+  sorgente continua a fallire o rallenta.
+- **Interfacce**: web UI responsive installabile come PWA, navigabile da
+  tastiera e verificata con axe-core; vista a poster per serie e film; oltre 20
+  temi verificati per il contrasto più quelli personalizzati; una TUI completa
+  da terminale per SSH che si adatta allo schermo di un telefono. Sei lingue
+  (IT, EN, DE, FR, ES, PL).
+
+La web UI ascolta su `http://<host>:5000/`. La configurazione e ogni sezione sono
+descritte nel [manuale italiano](docs/MANUAL.it.md) e nell'
+[English manual](docs/MANUAL.en.md).
+
+## Numeri
+
+Questi numeri vengono dall'installazione reale e da swarm, indexer e linea
+veri. Ognuno è in [`docs/measurements.md`](docs/measurements.md) con la
+macchina, la data e il comando per rifarlo.
+
+| Area | Risultato |
+|---|---|
+| **Swarm reale** | **9,3–9,4 MB/s** sulla ISO di Ubuntu, contro **6,3–7,1 MB/s** di libtorrent sullo stesso swarm (una campagna di misura) |
+| **Memoria del motore** | **60–64 MB** a riposo. Con 10 torrent in download verso un NAS: **~507 MB** fuori dalle due cache; la cache di scrittura si dimensiona dalla RAM libera |
+| **CPU del motore** | **44–48 % di un core** a 8–9 MB/s con ~110–130 peer: **0,35–0,43 % per peer**, di cui il piece picker occupa il 9 %; 1–2 % a riposo |
+| **Ricerche sugli indexer** | Jackett e Prowlarr interrogati un indexer alla volta: un ciclo di 30 titoli in **110 s**, **205 richieste e nessuna fallita**, **5.935 release** |
+| **Dividere la linea** | Un download a piena linea aggiunge ~40 ms di latenza a tutta la casa. Da solo sulla linea Gextto la usa tutta (**8,5 MB/s**); con un altro dispositivo che scarica, quel dispositivo ottiene **6,8–7,3 MB/s** dei 9 MB/s della linea |
+| **Riuso dei dati locali** | Un torrent che condivide file con uno già su disco prende dalla rete solo il **25 %** del file (ISO Debian e Arch), anche dopo un riavvio e in qualunque ordine si aggiungano |
+| **Scritture su disco** | Scritture da 16 KiB su NFS a **81 MiB/s** con durabilità a lotti; mmap opzionale ~7,0 GB/s su tmpfs |
+| **Archivio dei feed** | **447.000 release in 320 MB**, una riga per torrent; 1.000 release archiviate in **41 ms**; l'archivio standalone cerca su 100.000 release in **7,4 ms** |
+| **Demone a riposo** | **~0,7 %** di CPU a riposo; **~5.000 chiamate ai metadati al giorno** per 55 serie; i controlli di salute non scrivono mai su un NAS, così i suoi dischi possono dormire |
+
+Lo stesso documento registra cosa è stato misurato e scartato — io_uring, I/O
+uTP a lotti su questo carico, una cache write-back — così le stesse idee non si
+riprovano.
+
+## Motore torrent
+
+Gextto tiene il piano di controllo (coda, punteggi, post-elaborazione,
+archiviazione) e delega i trasferimenti a un motore selezionabile
+(*Configurazione → Motore torrent*); il cambio è una migrazione coordinata.
+
+| Motore | Dove gira | Quando sceglierlo |
+|---|---|---|
+| **gx-torrent** (default) | Processo Go separato e supervisionato | Go puro, autonomo, v1/v2/ibrido, DHT e MSE/PE; anche standalone su Linux e Windows; niente WebTorrent/WebRTC |
+| qBittorrent-nox | Demone esterno via Web API, o uno che Gextto scarica e gestisce in privato | Lo usi già o preferisci la sua UI ([guida](docs/qbittorrent-nox.md)); anche il primo passo del fallback automatico |
+
+**Fallback automatico.** Se il motore attivo non resta in piedi, Gextto prima
+riporta un `gx-torrent` aggiornato al binario precedente, poi passa a un
+qBittorrent-nox gestito (scaricato al bisogno, verificato SHA-256) o a uno
+esterno, e infine a uno stato di recupero con la UI attiva. Un periodo di attesa
+evita il ping-pong; `GEXTTO_ENGINE=qbittorrent` (o `gx-torrent`) forza il
+motore per un avvio.
+
+### gx-core e gx-torrent
+
+`gx-core` (`internal/gxcore`) e la sua DHT (`internal/dht`) sono codice
+originale scritto in questo repository sotto EUPL-1.2, senza codice derivato da
+terzi ([`THIRD-PARTY-NOTICES`](THIRD-PARTY-NOTICES) elenca solo le librerie
+collegate). `gx-torrent` lo esegue come processo supervisionato che sopravvive
+ai riavvii dell'orchestratore: Gextto si ricollega quando binario e opzioni
+coincidono.
+
+- **Protocollo.** BitTorrent v1, solo-v2 e ibrido (BEP 52) da `.torrent` e
+  magnet (`urn:btmh:`), con verifica Merkle SHA-256. **34 BEP implementati e
+  testati** — [`docs/bep.md`](docs/bep.md) è la fonte di verità: protocollo
+  wire, Fast Extension, metadati, PEX con IPv6, multitracker, LSD,
+  super-seeding, web seed, torrent privati, indicazioni sui dati locali,
+  `lt_donthave`, tracker UDP con scrape, e la suite DHT (IPv6, scrape, ID di
+  nodo sicuri, sola lettura, archivio K/V, `urn:btpk:`). Oltre i BEP: tracker
+  `ws://`/`wss://` e **feed DHT** (`dht://<pubkey>`).
+- **Riuso locale.** Pezzi e blocchi da 16 KiB già verificati da un altro
+  torrent locale — stessa disposizione o lo stesso file v2 — vengono copiati e
+  ricontrollati invece che scaricati; i torrent privati non si mescolano mai
+  (BEP 27).
+- **Rete.** TCP e uTP (BEP 29) in parallelo su una porta, un socket UDP per uTP
+  e DHT; ritrasmissione uTP adattiva (soglia minima di latenza e backoff per
+  connessione); `ut_holepunch` (BEP
+  55) come client e relay; UPnP, NAT-PMP e **PCP**; un test della porta che
+  distingue NAT cone da simmetrico; SOCKS5 e HTTP CONNECT; un killswitch
+  `outgoing-interface` per le VPN.
+- **Autogestione.** Il numero di download attivi segue il throughput; i
+  torrent lenti e fermi si fanno da parte; la cache disco si dimensiona da RAM e
+  classe di storage (NVMe, SSD, HDD, NFS); i download si mettono in pausa prima
+  che una cartella si riempia mentre il seeding continua; le code di richiesta
+  per peer si adattano e la connessione chiusa è quella più lenta e inattiva.
+- **Impronta leggera per progetto.** I pezzi si scrivono direttamente e la page
+  cache del sistema unisce l'I/O; `fdatasync` a lotti, mai `O_SYNC` per
+  scrittura; file
+  sparsi, `fallocate`, cartelle temporanee su RAM disk, mmap opzionale; percorsi
+  caldi senza allocazioni (RC4 in place, bitfield a parole, uTP senza copie); la
+  blocklist IP si cerca per bisezione senza allocare.
+- **Streaming e sicurezza.** Finestra di riproduzione e readahead separate,
+  priorità per file al volo, HTTP Range con il `Content-Type` giusto; un
+  **media server DLNA/UPnP** opzionale per le TV, con la libreria del NAS e i
+  suoi poster; web seed e `xs=`/`as=` protetti da SSRF; quarantena per i peer
+  che mandano blocchi corrotti; diagnostica live per peer, tassi di I/O e
+  Server-Sent Events.
+
+Le statistiche del motore sono in **Salute → Motore torrent** (`/?view=health`),
+in `GET /api/v1/stats` del demone e in `GET /api/torrents/session-stats`.
+
 ## gx-torrent come client autonomo
 
 gx-torrent è anche un client completo senza Gextto, come `qbittorrent-nox` o
@@ -343,6 +351,20 @@ semplice con tutto ciò che serve a un client autonomo.
 
 Apri `http://<host>:8890/` per la sua procedura guidata. Riferimento completo:
 il [documento tecnico di gx-torrent](docs/gx-torrent.md).
+
+## Test
+
+Cosa gira a ogni push (`make test`, `make test-ui`, `make fuzz-smoke` e CI):
+
+| Livello | Cosa gira |
+|---|---|
+| **Unitari e integrazione** | 2.189 funzioni di test Go in 426 file: motore, DHT, uTP, storage, punteggi, post-elaborazione, API, rendering della UI. La TUI viene pilotata contro il router reale |
+| **End-to-end** | 57 test Playwright pilotano il demone reale in un browser — pagine, mobile, sei lingue, sicurezza, impostazioni — compresi 14 test di accessibilità con audit WCAG axe-core |
+| **Fuzzing** | 23 parser esposti alla rete (DHT, bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE) sotto fuzzing in CI; ogni crash trovato diventa un seed committato |
+| **Misure sul mondo reale** | 14 misure opzionali: swarm pubblici reali, la DHT pubblica, un peer libtorrent reale, riuso locale su ISO reali, choking e pipelining, i Jackett/Prowlarr in uso, la latenza della linea di casa |
+| **Guardie statiche** | Ogni bottone della UI punta a una rotta registrata, ogni chiamata interna si risolve sul router reale, ogni impostazione è salvabile, tradotta in sei lingue e ha il suo tooltip, ogni rotta API è documentata |
+| **Piattaforme e pacchetti** | La CI cross-compila motore e demone per Windows ed esegue i test di piattaforma Windows e un'installazione reale del servizio; gli installer hanno auto-test (ogni opzione, un dry-run che non cambia nulla) e l'immagine Docker standalone viene costruita e provata; CodeQL analizza ogni push |
+| **Benchmark** | 45 benchmark Go sui percorsi caldi (picker, storage, uTP, archivio, riuso, logging), lanciati prima e dopo ogni modifica a un percorso dati |
 
 ## Accessibilità
 
@@ -408,3 +430,4 @@ in questo repository con la stessa licenza. Vedi
 
 Grazie a **[DeepSeek](https://www.deepseek.com/)** per il supporto e la pazienza
 mentre questo progetto cresceva.
+
