@@ -643,8 +643,11 @@ recovered from a shell without editing the database.
 **eD2k/Kad search.** The search plane exists and is opt-in: `gx-ed2k` is our own
 Kad/eD2k search daemon (bootstrap, routing, keyword search, eD2k server search),
 Gextto can show its results in manual search, validate an `ed2k://` link, and
-optionally use it as a last-resort gap filler. The search provider, the link
-parser, the source threshold and the multi-engine router are in place. What is
+optionally use it as a last-resort gap filler. The gap filler queries the
+configured series name and its aliases in parallel and keeps the results that
+match any of them, so a localized library title does not hide releases published
+under the original one. The search provider, the link parser, the source
+threshold and the multi-engine router are in place. What is
 **not** in place is the transfer plane: the eMule client-to-client protocol,
 `.part`/AICH, upload, credits and LowID callbacks. Until then `gx-ed2k` reports
 `download: false`, the "add" action is disabled and the automatic fallback is

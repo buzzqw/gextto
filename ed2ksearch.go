@@ -360,8 +360,49 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 	if series == nil || season < 1 || episode < 1 || !ed2kEnabled(cfg) {
 		return nil
 	}
-	query := fmt.Sprintf("%s S%02dE%02d", series.Name, season, episode)
-	candidates := SearchED2K(ctx, cfg, query)
+	// Query the configured name and its aliases: a library often uses the
+	// localized title while releases on Kad carry the original one ("I misteri
+	// di Murdoch" vs "Murdoch Mysteries"). The queries run in parallel and the
+	// results are merged in a stable order, then deduplicated by link.
+	names := make([]string, 0, 1+len(series.Aliases))
+	seenName := map[string]struct{}{}
+	for _, name := range append([]string{series.Name}, series.Aliases...) {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, exists := seenName[key]; exists {
+			continue
+		}
+		seenName[key] = struct{}{}
+		names = append(names, name)
+	}
+	perName := make([][]models.Release, len(names))
+	var wait sync.WaitGroup
+	for index, name := range names {
+		wait.Add(1)
+		go func(index int, name string) {
+			defer wait.Done()
+			perName[index] = SearchED2K(ctx, cfg, fmt.Sprintf("%s S%02dE%02d", name, season, episode))
+		}(index, name)
+	}
+	wait.Wait()
+	candidates := make([]models.Release, 0)
+	seenRelease := map[string]struct{}{}
+	for _, group := range perName {
+		for _, release := range group {
+			key, ok := releaseDedupKey(&release)
+			if !ok {
+				continue
+			}
+			if _, exists := seenRelease[key]; exists {
+				continue
+			}
+			seenRelease[key] = struct{}{}
+			candidates = append(candidates, release)
+		}
+	}
 	if manual {
 		return candidates
 	}

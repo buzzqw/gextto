@@ -29,9 +29,12 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   funziona i server eD2k assegnano un HighID. I nodi Kad imparati vengono salvati
   e riusati al riavvio. **Il trasferimento eD2k non c'è**: il demone dichiara di
   saper solo cercare e il pulsante per accodare resta disattivato, quindi la
-  libreria non può riempirsi di file sbagliati. Nella ricerca di **Scarico** c'è
-  la casella **Kad**: spuntala per includere la rete anche in quella singola
-  ricerca, oltre a DB, web e indexer.
+  libreria non può riempirsi di file sbagliati. Nel pannello **Cerca una
+  release** di **Scarico** c'è la casella **Kad**: spuntala per includere la
+  rete anche in quella singola ricerca, oltre a DB, web e indexer. Il ripiego
+  automatico interroga anche i **titoli alternativi** della serie (per esempio
+  «Murdoch Mysteries» per «I misteri di Murdoch»), così un titolo localizzato
+  non nasconde i release con il nome originale.
 - **Aggiornamenti più sicuri.** Un aggiornamento, dal pulsante **Aggiorna** o
   rilanciando l'installer, è riuscito solo quando l'interfaccia della nuova
   versione risponde. Se la nuova versione cade dopo qualche secondo dall'avvio,

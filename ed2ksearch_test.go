@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -185,5 +186,43 @@ func TestDatabaseStoresEd2kIdentity(t *testing.T) {
 	}
 	if meta.Release.Ed2kLink == "" || meta.Release.Network != "ed2k" {
 		t.Fatalf("metadata = %+v", meta.Release)
+	}
+}
+
+func TestSearchSeriesED2KQueriesAliasesAndDedupes(t *testing.T) {
+	var mu sync.Mutex
+	queries := []string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		queries = append(queries, r.URL.Query().Get("q"))
+		mu.Unlock()
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"results": []map[string]any{
+				{
+					"name": "Murdoch Mysteries S13E12 1080p.mkv", "size_bytes": 2000000000,
+					"hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "sources": 4, "origin": "kad",
+				},
+			},
+		})
+	}))
+	defer server.Close()
+	ed2kInvalidateHealth()
+	cfgValue := DefaultConfig()
+	cfg := &cfgValue
+	cfg.Settings = map[string]string{"ed2k_enabled": "true", "ed2k_url": server.URL}
+	series := &SeriesConfig{Name: "I misteri di Murdoch", Aliases: []string{"Murdoch Mysteries"}}
+	engine := &Engine{}
+	got := engine.SearchSeriesED2K(context.Background(), cfg, series, 13, 12, true)
+	if len(got) != 1 {
+		t.Fatalf("aliases returned %d candidates, want 1 after dedup: %+v", len(got), got)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	joined := strings.Join(queries, "\n")
+	for _, want := range []string{"I misteri di Murdoch S13E12", "Murdoch Mysteries S13E12"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("queries missing %q: %v", want, queries)
+		}
 	}
 }

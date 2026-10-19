@@ -28,8 +28,11 @@ manual is online: [English](docs/MANUAL.en.md) ·
   Learned Kad nodes are saved and reused on restart. **There is no eD2k
   transfer**: the daemon says it can only search and the add button stays
   disabled, so the library cannot fill with wrong files. The **Downloads**
-  search has a **Kad** checkbox: tick it to include the network in that single
-  search, next to DB, web and indexers.
+  **Search a release** panel has a **Kad** checkbox: tick it to include the
+  network in that single search, next to DB, web and indexers. The automatic
+  fallback also queries the series' **alternate titles** (for example
+  "Murdoch Mysteries" for the Italian title), so a localized name does not hide
+  releases published under the original one.
 - **Safer updates.** An update, from the **Update** button or by running the
   installer again, succeeds only when the new version's web interface answers.
   If the new version goes down a few seconds after starting, the previous one
