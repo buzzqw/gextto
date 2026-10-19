@@ -29,7 +29,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
   transfer**: the daemon says it can only search and the add button stays
   disabled, so the library cannot fill with wrong files. The **Downloads**
   **Search a release** panel has a **Kad** checkbox: tick it to include the
-  network in that single search, next to DB, web and indexers. The automatic
+  network in that single search, next to DB, web and indexers. If the provider
+  is off, that search starts it without changing the global setting. The automatic
   fallback also queries the series' **alternate titles** (for example
   "Murdoch Mysteries" for the Italian title), so a localized name does not hide
   releases published under the original one.

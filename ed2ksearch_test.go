@@ -226,3 +226,37 @@ func TestSearchSeriesED2KQueriesAliasesAndDedupes(t *testing.T) {
 		}
 	}
 }
+
+func TestSearchED2KManualBypassesDisabledProvider(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/health":
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "search": true, "download": false})
+		case "/api/v1/search":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"results": []map[string]any{{
+					"name": "Rare Movie 1974 1080p.avi", "size_bytes": 700000000,
+					"hash": "0123456789abcdef0123456789abcdef", "sources": 4, "origin": "kad",
+				}},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	ed2kInvalidateHealth()
+	cfgValue := DefaultConfig()
+	cfg := &cfgValue
+	cfg.Settings = map[string]string{"ed2k_enabled": "false", "ed2k_url": server.URL}
+	if got := SearchED2K(context.Background(), cfg, "rare movie"); len(got) != 0 {
+		t.Fatalf("disabled provider returned %d releases", len(got))
+	}
+	got := SearchED2KManual(context.Background(), cfg, "rare movie")
+	if len(got) != 1 || got[0].Title == "" {
+		t.Fatalf("manual search = %+v", got)
+	}
+	if ed2kEnabled(cfg) {
+		t.Fatal("the per-search opt-in must not persist the setting")
+	}
+}

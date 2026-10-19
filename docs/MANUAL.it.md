@@ -326,7 +326,8 @@ configurazione o avviare un download:
 
 1. inserisci un titolo o una query tecnica;
 2. se vuoi includere anche la rete eD2k/Kad, spunta **Kad** accanto al pulsante
-   di ricerca (richiede il provider attivo in Configurazione → Sorgenti);
+   di ricerca: se il provider è spento, questa singola ricerca lo avvia senza
+   cambiare l'impostazione globale;
 3. attendi che le sorgenti terminino o che il timeout segnali quelle lente;
 4. confronta titolo, sorgente, qualità, dimensione e seed/peer;
 5. usa **Filtra i risultati già caricati** per restringere localmente la lista;
@@ -353,8 +354,8 @@ bloccata, già presente o inferiore al file archiviato.
 - **Cerca una release**: il pannello in cima a Scarico cerca su archivio,
   indexer, motori web e — se spunti **Kad** — sulla rete eD2k/Kad, senza
   cambiare pagina. I risultati si aprono sotto il campo; dopo un'aggiunta
-  resti in Scarico. Come nella Dashboard, il provider eD2k deve essere attivo
-  in Configurazione → Sorgenti.
+  resti in Scarico. La casella **Kad** vale per quella ricerca: se il provider
+  è spento, la singola ricerca lo avvia senza cambiare la configurazione.
 - Il modulo **Aggiungi torrent** si apre dal pulsante con lo stesso nome nella
   barra in alto, presente in **ogni pagina** (da un'altra pagina ti porta in
   Scarico e apre il modulo): da chiuso non occupa spazio. Accetta un magnet/URL

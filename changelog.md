@@ -31,7 +31,9 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   saper solo cercare e il pulsante per accodare resta disattivato, quindi la
   libreria non può riempirsi di file sbagliati. Nel pannello **Cerca una
   release** di **Scarico** c'è la casella **Kad**: spuntala per includere la
-  rete anche in quella singola ricerca, oltre a DB, web e indexer. Il ripiego
+  rete anche in quella singola ricerca, oltre a DB, web e indexer. Se il
+  provider è spento, la singola ricerca lo avvia senza cambiare
+  l'impostazione globale. Il ripiego
   automatico interroga anche i **titoli alternativi** della serie (per esempio
   «Murdoch Mysteries» per «I misteri di Murdoch»), così un titolo localizzato
   non nasconde i release con il nome originale.

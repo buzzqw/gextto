@@ -75,6 +75,18 @@ func ed2kEnabled(cfg *Config) bool {
 	return settingIsTrue(cfg.Settings["ed2k_enabled"])
 }
 
+// ed2kEnabledCopy returns a shallow copy with the provider switched on for one
+// manual search. The caller's config and its persisted settings are untouched.
+func ed2kEnabledCopy(cfg *Config) *Config {
+	copy := *cfg
+	copy.Settings = make(map[string]string, len(cfg.Settings)+1)
+	for key, value := range cfg.Settings {
+		copy.Settings[key] = value
+	}
+	copy.Settings["ed2k_enabled"] = "true"
+	return &copy
+}
+
 // ed2kFallbackEnabled is the automatic gap-filling switch. It is separate from
 // ed2k_enabled and defaults to off, so eD2k can be searched by hand without
 // ever changing which downloads Gextto starts by itself.
@@ -269,8 +281,30 @@ type ed2kAPIFile struct {
 // the provider is disabled, unreachable or finds nothing: a search-plane
 // failure must never fail the torrent search that called it.
 func SearchED2K(ctx context.Context, cfg *Config, query string) []models.Release {
-	if cfg == nil || !ed2kEnabled(cfg) {
+	return searchED2K(ctx, cfg, query, false)
+}
+
+// SearchED2KManual is the same search for a request that explicitly asked for
+// Kad (the checkbox in the manual search). When the global provider is off it
+// starts the managed daemon for this request without persisting the setting;
+// the automatic fallback keeps using the gated SearchED2K.
+func SearchED2KManual(ctx context.Context, cfg *Config, query string) []models.Release {
+	return searchED2K(ctx, cfg, query, true)
+}
+
+func searchED2K(ctx context.Context, cfg *Config, query string, manual bool) []models.Release {
+	if cfg == nil {
 		return nil
+	}
+	started := false
+	if !ed2kEnabled(cfg) {
+		if !manual {
+			return nil
+		}
+		cfg = ed2kEnabledCopy(cfg)
+		ensureEd2kDaemon(cfg)
+		ed2kInvalidateHealth()
+		started = true
 	}
 	query = strings.TrimSpace(query)
 	if query == "" {
@@ -280,6 +314,21 @@ func SearchED2K(ctx context.Context, cfg *Config, query string) []models.Release
 	if err != nil {
 		logging.SourceFail("ed2k", "gx-ed2k", err.Error())
 		return nil
+	}
+	if started {
+		if _, managed := ed2kListenFromURL(settings.BaseURL); managed {
+			deadline := time.Now().Add(5 * time.Second)
+			for time.Now().Before(deadline) {
+				if ed2kHealth(cfg).healthy {
+					break
+				}
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-time.After(150 * time.Millisecond):
+				}
+			}
+		}
 	}
 	timeout := settings.Timeout
 	if deadline, ok := ctx.Deadline(); ok {

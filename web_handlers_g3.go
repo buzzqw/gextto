@@ -1070,7 +1070,7 @@ func gh3ManualSearch(s *AppState, query string, kad ...bool) (int, any) {
 	}
 	results = append(results, gh3ArchiveReleasesForQuery(s, cfg, query)...)
 	if len(kad) > 0 && kad[0] {
-		results = append(results, SearchED2K(ctx, cfg, query)...)
+		results = append(results, SearchED2KManual(ctx, cfg, query)...)
 	}
 	seen := map[string]struct{}{}
 	deduped := results[:0]

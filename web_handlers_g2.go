@@ -587,7 +587,9 @@ func manualSearch(w http.ResponseWriter, r *http.Request, s *AppState, includeRe
 	// ones, labelled by Network. The UI only offers them for inspection while
 	// gx-ed2k reports download=false.
 	if input.Kad {
-		results = append(results, SearchED2K(ctx, cfg, query)...)
+		// The checkbox is an explicit per-search opt-in: start the managed
+		// daemon if the global provider is off, without persisting the switch.
+		results = append(results, SearchED2KManual(ctx, cfg, query)...)
 	}
 	if ctx.Err() == context.DeadlineExceeded {
 		logging.Warn("manual search budget expired; keeping completed search results", "query", query, "timeout_secs", int64(manualSearchBudget.Seconds()), "results", len(results))
