@@ -1,6 +1,8 @@
 package ed2k
 
 import (
+	"bytes"
+	"compress/zlib"
 	"context"
 	"encoding/binary"
 	"net"
@@ -75,11 +77,11 @@ func (n *fakeKadNode) loop() {
 			case n.queries <- keyword:
 			default:
 			}
-			w := newWriter(binary.BigEndian)
-			w.id(n.id)
-			w.id(target)
+			w := newWriter(binary.LittleEndian)
+			w.kadID(n.id)
+			w.kadID(target)
 			w.u16(1)
-			w.id(n.fileHash)
+			w.kadID(n.fileHash)
 			w.u8(2)
 			w.tag(Tag{Name: TagFileName, Type: TagString, Str: "The Matrix 1999 1080p.mkv"})
 			w.tag(Tag{Name: TagFileSize, Type: TagUint64, Int: 7_000_000_000})
@@ -135,8 +137,8 @@ func TestParseNodesFileVersion2Layout(t *testing.T) {
 	w.u32(0)
 	w.u32(2)
 	w.u32(1)
-	w.id(id)
-	w.raw([]byte{192, 0, 2, 1})
+	w.kadID(id)
+	w.raw([]byte{1, 2, 0, 192})
 	w.u16(4672)
 	w.u16(4662)
 	w.u8(3)
@@ -199,5 +201,51 @@ func TestParseServerMetVersionedWithTags(t *testing.T) {
 	}
 	if len(servers) != 1 || servers[0] != "192.0.2.1:4661" {
 		t.Fatalf("ParseServerMet = %#v", servers)
+	}
+}
+
+// TestKadWireFormat pins the datagram layout used by eMule: Kad 32-bit fields
+// are little-endian, 128-bit values are stored as four native-order chunks,
+// and packets above 200 bytes may arrive zlib-compressed behind 0xE5.
+func TestKadWireFormat(t *testing.T) {
+	nodeID, _ := ParseID("0123456789abcdef0123456789abcdef")
+	target := KeywordID("matrix")
+	hash, _ := ParseID("b1e6832c7b5a1326cb61268d4f6a9944")
+
+	w := newWriter(binary.LittleEndian)
+	w.kadID(nodeID)
+	w.kadID(target)
+	w.u16(1)
+	w.kadID(hash)
+	w.u8(2)
+	w.tag(Tag{Name: TagFileName, Type: TagString, Str: "The Matrix 1999.mkv"})
+	w.tag(Tag{Name: TagFileSize, Type: TagUint64, Int: 7_000_000_000})
+
+	sender, got, files, err := decodeSearchResponse(w.buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sender != nodeID || got != target {
+		t.Fatalf("sender/target = %v/%v, want %v/%v", sender, got, nodeID, target)
+	}
+	if len(files) != 1 || files[0].Hash != hash.Hex() || files[0].Name != "The Matrix 1999.mkv" || files[0].Size != 7_000_000_000 {
+		t.Fatalf("files = %+v", files)
+	}
+
+	// Compressed datagrams carry the same opcode and payload behind 0xE5.
+	var packed bytes.Buffer
+	zw := zlib.NewWriter(&packed)
+	if _, err := zw.Write(w.buf); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	opcode, payload, err := splitKadPacket(append([]byte{KadProtocolPacked, KadSearchRes}, packed.Bytes()...))
+	if err != nil || opcode != KadSearchRes {
+		t.Fatalf("splitKadPacket = %v, %v", opcode, err)
+	}
+	if _, _, files, err = decodeSearchResponse(payload); err != nil || len(files) != 1 {
+		t.Fatalf("packed decode = %+v, %v", files, err)
 	}
 }

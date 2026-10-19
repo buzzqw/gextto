@@ -1,15 +1,22 @@
 package ed2k
 
 import (
+	"bytes"
+	"compress/zlib"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 )
 
 // Kad wire protocol.
 const (
 	KadProtocol = 0xE4
+	// KadProtocolPacked marks a zlib-compressed Kad datagram: byte 1 is still
+	// the opcode and the compressed payload starts at byte 2. eMule uses it
+	// for packets above 200 bytes, which includes most search result pages.
+	KadProtocolPacked = 0xE5
 
 	KadBootstrapReq   = 0x01
 	KadBootstrapRes   = 0x09
@@ -92,21 +99,41 @@ func kadPacket(opcode byte, payload []byte) []byte {
 }
 
 // splitKadPacket validates the header and returns the opcode and payload.
+// Compressed datagrams are inflated first; network input is capped so a
+// malicious peer cannot make us allocate without bound.
 func splitKadPacket(data []byte) (byte, []byte, error) {
-	if len(data) < 2 || data[0] != KadProtocol {
+	if len(data) < 2 {
 		return 0, nil, errors.New("ed2k: not a Kad packet")
 	}
-	return data[1], data[2:], nil
+	switch data[0] {
+	case KadProtocol:
+		return data[1], data[2:], nil
+	case KadProtocolPacked:
+		zr, err := zlib.NewReader(bytes.NewReader(data[2:]))
+		if err != nil {
+			return 0, nil, fmt.Errorf("ed2k: packed Kad packet: %w", err)
+		}
+		defer zr.Close()
+		payload, err := io.ReadAll(io.LimitReader(zr, 1<<20))
+		if err != nil {
+			return 0, nil, fmt.Errorf("ed2k: unpack Kad packet: %w", err)
+		}
+		return data[1], payload, nil
+	default:
+		return 0, nil, errors.New("ed2k: not a Kad packet")
+	}
 }
 
-// encodeContact writes the contact layout used by REQ/RES and bootstrap.
+// contact writes the contact layout used by REQ/RES, bootstrap and nodes.dat.
+// The ID is a Kad value and the IPv4 address is stored as a native-order
+// 32-bit word, so its bytes are reversed relative to dotted notation.
 func (w *writer) contact(c Contact) {
-	w.id(c.ID)
+	w.kadID(c.ID)
 	ip := c.IP.To4()
 	if ip == nil {
 		ip = net.IPv4zero.To4()
 	}
-	w.raw(ip)
+	w.raw([]byte{ip[3], ip[2], ip[1], ip[0]})
 	w.u16(c.UDPPort)
 	w.u16(c.TCPPort)
 	w.u8(c.Version)
@@ -114,7 +141,7 @@ func (w *writer) contact(c Contact) {
 
 func (r *reader) contact() (Contact, error) {
 	var c Contact
-	id, err := r.id()
+	id, err := r.kadID()
 	if err != nil {
 		return c, err
 	}
@@ -123,7 +150,7 @@ func (r *reader) contact() (Contact, error) {
 	if err != nil {
 		return c, err
 	}
-	c.IP = net.IPv4(ip[0], ip[1], ip[2], ip[3])
+	c.IP = net.IPv4(ip[3], ip[2], ip[1], ip[0])
 	udp, err := r.u16()
 	if err != nil {
 		return c, err
@@ -144,8 +171,8 @@ func (r *reader) contact() (Contact, error) {
 // protocol version. No tags: we do not obfuscate, and peers take the UDP port
 // from the packet source, which is the only address we can verify.
 func encodeHello(id ID, tcpPort int) []byte {
-	w := newWriter(binary.BigEndian)
-	w.id(id)
+	w := newWriter(binary.LittleEndian)
+	w.kadID(id)
 	w.u16(uint16(tcpPort))
 	w.u8(KadVersion)
 	w.u8(0)
@@ -153,8 +180,8 @@ func encodeHello(id ID, tcpPort int) []byte {
 }
 
 func decodeHello(payload []byte) (Contact, error) {
-	r := newReader(payload, binary.BigEndian)
-	id, err := r.id()
+	r := newReader(payload, binary.LittleEndian)
+	id, err := r.kadID()
 	if err != nil {
 		return Contact{}, err
 	}
@@ -188,8 +215,8 @@ func encodeBootstrapResponse(id ID, tcpPort int, contacts []Contact, max int) []
 	if len(contacts) > max {
 		contacts = contacts[:max]
 	}
-	w := newWriter(binary.BigEndian)
-	w.id(id)
+	w := newWriter(binary.LittleEndian)
+	w.kadID(id)
 	w.u16(uint16(tcpPort))
 	w.u8(KadVersion)
 	w.u16(uint16(len(contacts)))
@@ -200,8 +227,8 @@ func encodeBootstrapResponse(id ID, tcpPort int, contacts []Contact, max int) []
 }
 
 func decodeBootstrapResponse(payload []byte) (Contact, []Contact, error) {
-	r := newReader(payload, binary.BigEndian)
-	id, err := r.id()
+	r := newReader(payload, binary.LittleEndian)
+	id, err := r.kadID()
 	if err != nil {
 		return Contact{}, nil, err
 	}
@@ -230,24 +257,24 @@ func decodeBootstrapResponse(payload []byte) (Contact, []Contact, error) {
 
 // encodeNodeRequest asks a node for contacts close to target.
 func encodeNodeRequest(target, receiver ID, count byte) []byte {
-	w := newWriter(binary.BigEndian)
+	w := newWriter(binary.LittleEndian)
 	w.u8(count)
-	w.id(target)
-	w.id(receiver)
+	w.kadID(target)
+	w.kadID(receiver)
 	return w.buf
 }
 
 func decodeNodeRequest(payload []byte) (byte, ID, ID, error) {
-	r := newReader(payload, binary.BigEndian)
+	r := newReader(payload, binary.LittleEndian)
 	count, err := r.u8()
 	if err != nil {
 		return 0, ID{}, ID{}, err
 	}
-	target, err := r.id()
+	target, err := r.kadID()
 	if err != nil {
 		return 0, ID{}, ID{}, err
 	}
-	receiver, err := r.id()
+	receiver, err := r.kadID()
 	if err != nil {
 		return 0, ID{}, ID{}, err
 	}
@@ -255,8 +282,8 @@ func decodeNodeRequest(payload []byte) (byte, ID, ID, error) {
 }
 
 func encodeNodeResponse(target ID, contacts []Contact) []byte {
-	w := newWriter(binary.BigEndian)
-	w.id(target)
+	w := newWriter(binary.LittleEndian)
+	w.kadID(target)
 	w.u8(uint8(len(contacts)))
 	for _, contact := range contacts {
 		w.contact(contact)
@@ -265,8 +292,8 @@ func encodeNodeResponse(target ID, contacts []Contact) []byte {
 }
 
 func decodeNodeResponse(payload []byte) (ID, []Contact, error) {
-	r := newReader(payload, binary.BigEndian)
-	target, err := r.id()
+	r := newReader(payload, binary.LittleEndian)
+	target, err := r.kadID()
 	if err != nil {
 		return ID{}, nil, err
 	}
@@ -289,15 +316,15 @@ func decodeNodeResponse(payload []byte) (ID, []Contact, error) {
 // no expression tree means "all entries for this keyword"; the node then only
 // has to look the keyword up, and we filter names locally.
 func encodeSearchRequest(target ID) []byte {
-	w := newWriter(binary.BigEndian)
-	w.id(target)
+	w := newWriter(binary.LittleEndian)
+	w.kadID(target)
 	w.u16(0)
 	return w.buf
 }
 
 func decodeSearchRequest(payload []byte) (ID, uint16, []byte, error) {
-	r := newReader(payload, binary.BigEndian)
-	target, err := r.id()
+	r := newReader(payload, binary.LittleEndian)
+	target, err := r.kadID()
 	if err != nil {
 		return ID{}, 0, nil, err
 	}
@@ -375,12 +402,12 @@ func searchFileFromTags(hash ID, tags map[uint8]Tag, origin string) (SearchFile,
 // decodeSearchResponse parses the Kad result packet: sender ID, target,
 // result count, then (file ID + tag list) entries.
 func decodeSearchResponse(payload []byte) (ID, ID, []SearchFile, error) {
-	r := newReader(payload, binary.BigEndian)
-	sender, err := r.id()
+	r := newReader(payload, binary.LittleEndian)
+	sender, err := r.kadID()
 	if err != nil {
 		return ID{}, ID{}, nil, err
 	}
-	target, err := r.id()
+	target, err := r.kadID()
 	if err != nil {
 		return ID{}, ID{}, nil, err
 	}
@@ -390,7 +417,7 @@ func decodeSearchResponse(payload []byte) (ID, ID, []SearchFile, error) {
 	}
 	files := make([]SearchFile, 0, count)
 	for i := 0; i < int(count); i++ {
-		hash, err := r.id()
+		hash, err := r.kadID()
 		if err != nil {
 			return ID{}, ID{}, nil, err
 		}

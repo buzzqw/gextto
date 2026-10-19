@@ -166,6 +166,29 @@ func (w *writer) u64(v uint64) {
 }
 func (w *writer) raw(v []byte) { w.buf = append(w.buf, v...) }
 func (w *writer) id(v ID)      { w.buf = append(w.buf, v[:]...) }
+
+// kadID reads a 128-bit Kad value (node ID, keyword target or file hash).
+// eMule and aMule keep Kad values as four native-order 32-bit chunks, so the
+// wire bytes of each chunk are reversed relative to the canonical big-endian
+// hex form (the one used by ed2k links and by ID.Hex).
+func (r *reader) kadID() (ID, error) {
+	var id ID
+	raw, err := r.n(16)
+	if err != nil {
+		return id, err
+	}
+	for i := 0; i < 16; i += 4 {
+		id[i], id[i+1], id[i+2], id[i+3] = raw[i+3], raw[i+2], raw[i+1], raw[i]
+	}
+	return id, nil
+}
+
+// kadID writes a Kad 128-bit value in the chunk order used on the wire.
+func (w *writer) kadID(v ID) {
+	for i := 0; i < 16; i += 4 {
+		w.buf = append(w.buf, v[i+3], v[i+2], v[i+1], v[i])
+	}
+}
 func (w *writer) string16(v string) {
 	w.u16(uint16(len(v)))
 	w.buf = append(w.buf, v...)

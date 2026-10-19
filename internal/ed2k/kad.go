@@ -869,9 +869,9 @@ func (c *Client) handlePacket(data []byte, addr *net.UDPAddr) {
 }
 
 func emptySearchResponse(self, target ID) []byte {
-	w := newWriter(binary.BigEndian)
-	w.id(self)
-	w.id(target)
+	w := newWriter(binary.LittleEndian)
+	w.kadID(self)
+	w.kadID(target)
 	w.u16(0)
 	return w.buf
 }
