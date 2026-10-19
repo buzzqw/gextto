@@ -962,6 +962,9 @@ func (d *Database) migrate() error {
 		// A seed stopped for inactivity (seed_rules.go): kept so a restart
 		// does not leave it paused without its end-of-seed handling.
 		{"torrent_meta", "seed_idle_stop", "INTEGER DEFAULT 0"},
+		// Since when a magnet is waiting for its file list (monitor_metadata):
+		// the give-up clock must not start over at every restart.
+		{"torrent_meta", "metadata_wait_since", "TEXT DEFAULT ''"},
 		{"series", "timeframe", "INTEGER DEFAULT 0"},
 		{"series", "ignored_seasons", "TEXT DEFAULT '[]'"},
 		{"series", "subtitle", "TEXT DEFAULT ''"},
@@ -4471,6 +4474,48 @@ func (d *Database) TorrentTimes(hash string) (*TorrentTimes, error) {
 	}
 	times := &TorrentTimes{CreatedAt: createdAt, CompletedAt: nullStringPtr(completedAt)}
 	return times, nil
+}
+
+// SaveMetadataWait records since when a magnet has been waiting for its file
+// list, so the give-up clock (monitor_metadata) survives a restart.
+func (d *Database) SaveMetadataWait(hash string, since time.Time) error {
+	_, err := d.db.Exec("UPDATE torrent_meta SET metadata_wait_since=?2 WHERE lower(hash)=lower(?1)",
+		strings.ToLower(hash), since.UTC().Format(time.RFC3339))
+	return err
+}
+
+// ClearMetadataWait drops the saved metadata wait of a torrent: the file list
+// arrived, the download was paused or it left the metadata state.
+func (d *Database) ClearMetadataWait(hash string) error {
+	_, err := d.db.Exec("UPDATE torrent_meta SET metadata_wait_since='' WHERE lower(hash)=lower(?1) AND COALESCE(metadata_wait_since,'')<>''",
+		strings.ToLower(hash))
+	return err
+}
+
+// LoadMetadataWaits returns the torrents still waiting for their file list,
+// keyed by lower-case hash.
+func (d *Database) LoadMetadataWaits() (map[string]time.Time, error) {
+	waits := map[string]time.Time{}
+	if d == nil || d.db == nil {
+		return waits, nil
+	}
+	rows, err := d.db.Query(`SELECT lower(hash), metadata_wait_since FROM torrent_meta WHERE COALESCE(metadata_wait_since,'')<>''`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var hash, value string
+		if err := rows.Scan(&hash, &value); err != nil {
+			return nil, err
+		}
+		since, err := time.Parse(time.RFC3339, value)
+		if err != nil {
+			continue
+		}
+		waits[hash] = since.Local()
+	}
+	return waits, rows.Err()
 }
 
 func storedTorrentFromRow(rows *sql.Rows) (StoredTorrent, error) {

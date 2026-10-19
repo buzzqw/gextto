@@ -25,6 +25,10 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 - **Attesa dei metadati leggibile.** Il messaggio “nessuno ha fornito la lista
   dei file” ora riporta peer, byte ricevuti e ora di inizio; quando la lista
   arriva, una riga lo dice; se il contatore riparte, il log spiega perché.
+- **L'attesa dei metadati sopravvive ai riavvii.** Se un magnet sta aspettando
+  l'elenco dei file e Gextto viene riavviato, il conto riprende da dove era:
+  dopo 24 ore senza elenco viene scartato come link morto, invece di ricevere
+  una finestra nuova a ogni riavvio.
 - **Qualità reale contro release registrata.** Se il file in libreria e il
   titolo registrato non concordano (per esempio un file 480p con un titolo
   1080p), il controllo qualità lo segnala e dichiara che vince il file.

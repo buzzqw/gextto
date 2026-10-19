@@ -645,6 +645,14 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	metadataWaitStart := map[string]time.Time{}
 	metadataFirstSeen := map[string]time.Time{}
 	metadataLastWarning := map[string]time.Time{}
+	// The metadata give-up clock lives in the database: without it a restart
+	// would hand a dead magnet a full new window every time.
+	if restored, err := db.LoadMetadataWaits(); err != nil {
+		logging.Warn("could not restore metadata wait state", "error", err)
+	} else if len(restored) > 0 {
+		metadataFirstSeen = restored
+		logging.Info("restored metadata wait state", "torrents", len(restored))
+	}
 	stallWaitStart := map[string]StallWatch{}
 	if restored, err := db.LoadStallWatches(); err != nil {
 		logging.Warn("could not restore stalled torrent retry state", "error", err)

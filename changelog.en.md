@@ -24,6 +24,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 - **Readable metadata wait.** The “nobody provided the file list” message now
   reports peers, bytes received and the start time; when the list arrives, a
   line says so; if the counter restarts, the log explains why.
+- **The metadata wait survives restarts.** If a magnet is waiting for its file
+  list and Gextto restarts, the clock resumes where it was: after 24 hours
+  without a list it is dropped as a dead link, instead of getting a fresh
+  window at every restart.
 - **Real quality versus recorded release.** If the file in the library and the
   recorded title disagree (for example a 480p file with a 1080p title), the
   quality check reports it and says that the file wins.

@@ -935,11 +935,32 @@ func tev_metadataRetryWarningDue(lastWarning, now time.Time) bool {
 	return lastWarning.IsZero() || now.Sub(lastWarning) >= tev_metadataWarnInterval
 }
 
+// tev_forgetMetadataWait ends the metadata wait of a torrent and drops its
+// persisted clock. The wait is saved only while it is running, so the give-up
+// does not start over at every restart.
+func tev_forgetMetadataWait(db *Database, hash string, waitStart, firstSeen, lastWarning map[string]time.Time) {
+	_, waited := firstSeen[hash]
+	delete(waitStart, hash)
+	delete(firstSeen, hash)
+	delete(lastWarning, hash)
+	if !waited {
+		return
+	}
+	if err := db.ClearMetadataWait(hash); err != nil {
+		logging.Debug("could not clear the metadata wait state", "hash", hash, "error", err.Error())
+	}
+}
+
 // MonitorMetadata implements `monitor_metadata`. The retry cadence and give-up
-// policy are intentionally unchanged; only the repeated warning is rate-limited.
+// policy are unchanged; the repeated warning is rate-limited, and the wait
+// start is kept in the database so a restart does not restart the give-up
+// clock.
 func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, waitStart, firstSeen, lastWarning map[string]time.Time) {
 	giveupMinutes := tev_settingFloatOr(cfg, "torrent_metadata_giveup_min", 1440.0)
 	if giveupMinutes <= 0 {
+		for hash := range firstSeen {
+			_ = db.ClearMetadataWait(hash)
+		}
 		clear(waitStart)
 		clear(firstSeen)
 		clear(lastWarning)
@@ -959,16 +980,12 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 						"downloaded_bytes", torrent.TotalDone)
 				}
 			}
-			delete(waitStart, torrent.Hash)
-			delete(firstSeen, torrent.Hash)
-			delete(lastWarning, torrent.Hash)
+			tev_forgetMetadataWait(db, torrent.Hash, waitStart, firstSeen, lastWarning)
 			continue
 		}
 		// A paused magnet is waiting for a download slot and must not age out.
 		if torrent.State == "paused" {
-			delete(waitStart, torrent.Hash)
-			delete(firstSeen, torrent.Hash)
-			delete(lastWarning, torrent.Hash)
+			tev_forgetMetadataWait(db, torrent.Hash, waitStart, firstSeen, lastWarning)
 			continue
 		}
 		if torrent.State != "downloading_metadata" {
@@ -981,15 +998,16 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 						torrent.Name, logDuration(waited), torrent.State), "hash", torrent.Hash, "state", torrent.State)
 				}
 			}
-			delete(waitStart, torrent.Hash)
-			delete(firstSeen, torrent.Hash)
-			delete(lastWarning, torrent.Hash)
+			tev_forgetMetadataWait(db, torrent.Hash, waitStart, firstSeen, lastWarning)
 			continue
 		}
 		started, ok := firstSeen[torrent.Hash]
 		if !ok {
 			started = now
 			firstSeen[torrent.Hash] = now
+			if err := db.SaveMetadataWait(torrent.Hash, now); err != nil {
+				logging.Debug("could not save the metadata wait state", "hash", torrent.Hash, "error", err.Error())
+			}
 		}
 		retryAt, ok := waitStart[torrent.Hash]
 		if !ok {
@@ -1015,9 +1033,7 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 				"error":            "metadata timeout",
 				"upgrade_restored": restored,
 			})
-			delete(waitStart, torrent.Hash)
-			delete(firstSeen, torrent.Hash)
-			delete(lastWarning, torrent.Hash)
+			tev_forgetMetadataWait(db, torrent.Hash, waitStart, firstSeen, lastWarning)
 		} else if now.Sub(retryAt) >= tev_metadataRetryInterval {
 			value, err := torrents.Reannounce(torrent.Hash)
 			if err != nil {
@@ -1053,8 +1069,7 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 	}
 	for hash := range firstSeen {
 		if _, ok := live[hash]; !ok {
-			delete(firstSeen, hash)
-			delete(lastWarning, hash)
+			tev_forgetMetadataWait(db, hash, waitStart, firstSeen, lastWarning)
 		}
 	}
 }
