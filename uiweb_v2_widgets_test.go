@@ -69,7 +69,7 @@ func TestV2DownloadsUploadAndTags(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("downloads page -> %d", code)
 	}
-	for _, want := range []string{"Aggiungi torrent", "File .torrent", "Assegna tag", "Rimuovi tag"} {
+	for _, want := range []string{"Aggiungi torrent", "File .torrent", "Togli il tag", `value="tag:__new__"`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("downloads page missing %q", want)
 		}

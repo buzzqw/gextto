@@ -56,7 +56,7 @@ var v2ClientKeys = []string{
 	"Richiesta autorizzazione…",
 	"Accesso ai font non autorizzato.",
 	"↓ Rilascia per aggiornare",
-	"selezionati · Azioni:",
+	"selezionati",
 	"risultati trovati",
 	"ricerca RSS, indexer e web in corso…",
 	"Impossibile accodare la release",

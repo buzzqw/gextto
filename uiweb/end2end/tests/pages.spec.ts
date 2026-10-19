@@ -96,7 +96,7 @@ test("la selezione torrent aggiorna il riepilogo delle azioni", async ({ page })
     await route.fulfill({
       contentType: "text/html; charset=utf-8",
       body: `<div id="v2-torrents-wrap"><form id="v2-torrent-form">
-        <span data-v2-selected-count>0 selezionati · Azioni:</span>
+        <span data-v2-selected-count>0 selezionati</span>
         <input type="checkbox" data-v2-select value="selection-test" aria-label="Seleziona test" />
       </form></div>
       <div class="view" data-torrents-slot>

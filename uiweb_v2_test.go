@@ -355,7 +355,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("downloads -> %d", code)
 	}
-	for _, marker := range []string{"Pulisci completati", "Elimina completati dopo il seed", "Limite temporaneo", "Nuovo tag", "Prealloca spazio", "Sblocca pin", `title="Incolla un link magnet`, `title="Avvia il download subito`, `title="Ricarica l'elenco dei torrent`, `title="Applica temporaneamente i limiti`, `title="Metti in pausa i torrent selezionati`} {
+	for _, marker := range []string{"Pulisci completati", "Strumenti", "Aggiorna ogni 5 s", "Rimozione a fine seed", "Limite temporaneo", "Nuovo tag", "Prealloca spazio", `title="Incolla un link magnet`, `title="Avvia il download subito`, `title="Ricarica l'elenco dei torrent`, `title="Applica temporaneamente i limiti`, `title="Metti in pausa i torrent selezionati`} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("downloads missing %q", marker)
 		}
@@ -580,7 +580,7 @@ func TestV2DownloadsPageAndActions(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
-	if code != http.StatusOK || !strings.Contains(body, `id="v2-torrents-wrap"`) || !strings.Contains(body, "Download in sessione") || strings.Contains(body, "Download session") || !strings.Contains(body, `Auto: on`) || !strings.Contains(body, `every 5s`) {
+	if code != http.StatusOK || !strings.Contains(body, `id="v2-torrents-wrap"`) || !strings.Contains(body, "Download in sessione") || strings.Contains(body, "Download session") || !strings.Contains(body, `aria-pressed="true"`) || !strings.Contains(body, `every 5s`) {
 		t.Fatalf("downloads page -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodPost, "/downloads/table", url.Values{"auto_state": {"1"}})
@@ -1339,7 +1339,7 @@ func TestV2ClientI18nDictionaryRendered(t *testing.T) {
 		t.Fatal("client i18n dictionary not injected")
 	}
 	// Italian key -> English value, from the catalogs.
-	for _, want := range []string{`"Copiato":"Copied"`, `"selezionati · Azioni:":"selected · Actions:"`} {
+	for _, want := range []string{`"Copiato":"Copied"`, `"selezionati":"selected"`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("client dictionary missing %q", want)
 		}
@@ -2045,22 +2045,59 @@ func TestV2ClientI18nCacheInvalidates(t *testing.T) {
 	}
 }
 
-// The auto-remove switch must persist and come back checked in the same
-// response: the HTMX value is evaluated with `elt`, not `this`.
-func TestV2AutoRemoveSwitchPersists(t *testing.T) {
+// The automatic removal at the end of seeding is a setting, not a toolbar
+// switch: the Strumenti menu shows its state and links to the setting.
+func TestV2AutoRemoveLivesInTheSettings(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	code, body := v2Request(t, server, http.MethodPost, "/downloads/settings", url.Values{"op": {"auto_remove"}, "value": {"true"}})
-	if code != http.StatusOK {
-		t.Fatalf("auto_remove -> %d: %s", code, body)
+	link := `href="/?view=settings&amp;tab=seeding&amp;highlight=auto_remove_completed#v2-setting-auto_remove_completed"`
+	code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
+	if code != http.StatusOK || !strings.Contains(body, link) {
+		t.Fatalf("downloads -> %d: no link to the auto-remove setting", code)
 	}
-	if !latestConfig(state).Transfer.AutoRemoveCompleted {
-		t.Fatal("auto_remove_completed was not saved")
+	if strings.Contains(body, `op:"auto_remove"`) {
+		t.Fatal("the toolbar still carries the auto-remove switch")
 	}
-	if !strings.Contains(body, `Elimina completati dopo il seed`) || !strings.Contains(body, `checked`) {
-		t.Fatalf("the switch did not come back checked: %s", body)
+	if code, body := v2Request(t, server, http.MethodPost, "/downloads/settings", url.Values{"op": {"auto_remove"}, "value": {"true"}}); code != http.StatusBadRequest {
+		t.Fatalf("auto_remove op -> %d: %s", code, body)
+	}
+}
+
+// The tag menu sends the tag inside the bulk value; "tag:__new__" takes the
+// name from the new-tag field and refuses an empty one.
+func TestV2BulkTagFromTheMenu(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	tagOf := func(hash string) string {
+		pairs, _ := state.db.TorrentTags()
+		for _, pair := range pairs {
+			if pair[0] == hash {
+				return pair[1]
+			}
+		}
+		return ""
+	}
+	if code, _ := v2Request(t, server, http.MethodPost, "/downloads/table", url.Values{"bulk": {"tag:serie"}, "hash": {"aaa", "bbb"}}); code != http.StatusOK {
+		t.Fatalf("bulk tag -> %d", code)
+	}
+	if tagOf("aaa") != "serie" || tagOf("bbb") != "serie" {
+		t.Fatalf("tag not assigned: %q %q", tagOf("aaa"), tagOf("bbb"))
+	}
+	_, body := v2Request(t, server, http.MethodPost, "/downloads/table", url.Values{"bulk": {"tag:__new__"}, "new_tag": {""}, "hash": {"aaa"}})
+	if !strings.Contains(body, "scrivi il nome del nuovo tag") || tagOf("aaa") != "serie" {
+		t.Fatalf("empty new tag must be refused: %q", tagOf("aaa"))
+	}
+	v2Request(t, server, http.MethodPost, "/downloads/table", url.Values{"bulk": {"tag:__new__"}, "new_tag": {"film"}, "hash": {"aaa"}})
+	if tagOf("aaa") != "film" {
+		t.Fatalf("new tag not assigned: %q", tagOf("aaa"))
+	}
+	v2Request(t, server, http.MethodPost, "/downloads/table", url.Values{"bulk": {"untag"}, "hash": {"aaa"}})
+	if tagOf("aaa") != "" {
+		t.Fatalf("untag left %q", tagOf("aaa"))
 	}
 }
 
@@ -2079,25 +2116,9 @@ func TestV2LogsPageCarriesTheGlobalModal(t *testing.T) {
 	}
 }
 
-// v2TempAutoTag returns the <input id="v2-temp-auto"> tag, so a test can check
-// whether it is disabled or checked without depending on attribute order.
-func v2TempAutoTag(html string) string {
-	index := strings.Index(html, `id="v2-temp-auto"`)
-	if index < 0 {
-		return ""
-	}
-	if end := strings.Index(html[index:], ">"); end >= 0 {
-		return html[index : index+end]
-	}
-	return html[index:]
-}
-
-// TestV2DownloadsTempAutoFollowsTheSettings: when the base "Automatic speed"
-// from Configuration → Speed and network is already in force, the temporary
-// "Auto speed" switch in Downloads is disabled and points at the setting. With
-// a numeric schedule in force it stays usable: it is the escape hatch that
-// hands the line back to the tuning.
-func TestV2DownloadsTempAutoFollowsTheSettings(t *testing.T) {
+// TestV2DownloadsSpeedMenuFollowsTheSettings: the bandwidth menu marks the
+// mode in force and describes what "Come da configurazione" means now.
+func TestV2DownloadsSpeedMenuFollowsTheSettings(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
@@ -2115,30 +2136,52 @@ func TestV2DownloadsTempAutoFollowsTheSettings(t *testing.T) {
 		}
 	}
 
-	if tag := v2TempAutoTag(downloads()); tag == "" || strings.Contains(tag, " disabled") || strings.Contains(tag, " checked") {
-		t.Fatalf("default temp auto tag = %q", tag)
-	}
-
-	set("torrent_speed_auto", "true")
 	body := downloads()
-	if tag := v2TempAutoTag(body); !strings.Contains(tag, "disabled") {
-		t.Fatalf("base Auto should disable the temporary switch, tag = %q", tag)
+	if !strings.Contains(body, `aria-pressed="true" data-speed-mode="normal"`) || strings.Count(body, `id="v2-speed-panel"`) != 1 {
+		t.Fatal("by default the menu must mark the configuration, once")
 	}
-	if !strings.Contains(body, "da configurazione") {
-		t.Fatal("the disabled switch does not point at the setting")
+	set("torrent_speed_auto", "true")
+	if body := downloads(); !strings.Contains(body, "<span>Auto</span>") {
+		t.Fatal("with the base Auto the configuration must read Auto")
 	}
+	set("torrent_temp_auto", "1")
+	if body := downloads(); !strings.Contains(body, `aria-pressed="true" data-speed-mode="auto"`) {
+		t.Fatal("the temporary Auto must be marked")
+	}
+}
 
-	for key, value := range map[string]string{
-		"torrent_sched_enabled":  "true",
-		"torrent_sched_days":     "0,1,2,3,4,5,6",
-		"torrent_sched_start":    "00:00",
-		"torrent_sched_end":      "23:59",
-		"torrent_sched_dl_limit": "3000",
-		"torrent_sched_ul_limit": "300",
-	} {
-		set(key, value)
+// TestV2DownloadsQuickLimits: each quick choice changes one value of the
+// temporary limit and keeps the others; it also turns the temporary Auto off.
+func TestV2DownloadsQuickLimits(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	if err := saveConfigSetting(state.cfg.DataDir, "torrent_temp_auto", "1"); err != nil {
+		t.Fatal(err)
 	}
-	if tag := v2TempAutoTag(downloads()); strings.Contains(tag, "disabled") {
-		t.Fatalf("a numeric schedule must keep the temporary switch usable, tag = %q", tag)
+	post := func(values url.Values) string {
+		values.Set("op", "temp_set")
+		code, body := v2Request(t, server, http.MethodPost, "/downloads/settings", values)
+		if code != http.StatusOK {
+			t.Fatalf("temp_set %v -> %d: %s", values, code, body)
+		}
+		return body
+	}
+	setting := func(key string) string { return latestConfig(state).Settings[key] }
+
+	body := post(url.Values{"dl": {"1024"}})
+	if setting("torrent_temp_auto") != "0" || setting("torrent_temp_limit_enabled") != "1" || setting("torrent_temp_dl_limit") != "1024" {
+		t.Fatalf("download preset: auto=%s enabled=%s dl=%s", setting("torrent_temp_auto"), setting("torrent_temp_limit_enabled"), setting("torrent_temp_dl_limit"))
+	}
+	if !strings.Contains(body, `id="v2-speed-panel" hx-swap-oob="innerHTML"`) || !strings.Contains(body, "Limite rapido") {
+		t.Fatal("the answer must refresh the bandwidth menu")
+	}
+	post(url.Values{"ul": {"256"}})
+	if setting("torrent_temp_dl_limit") != "1024" || setting("torrent_temp_ul_limit") != "256" || setting("torrent_temp_limit_until") != "0" {
+		t.Fatalf("upload preset lost a value: dl=%s ul=%s until=%s", setting("torrent_temp_dl_limit"), setting("torrent_temp_ul_limit"), setting("torrent_temp_limit_until"))
+	}
+	post(url.Values{"minutes": {"60"}})
+	if setting("torrent_temp_dl_limit") != "1024" || setting("torrent_temp_ul_limit") != "256" || setting("torrent_temp_limit_until") == "0" {
+		t.Fatalf("duration preset: dl=%s ul=%s until=%s", setting("torrent_temp_dl_limit"), setting("torrent_temp_ul_limit"), setting("torrent_temp_limit_until"))
 	}
 }

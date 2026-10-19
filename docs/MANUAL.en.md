@@ -28,8 +28,8 @@ panel. Every action stays reachable by touch.
 
 The official UI is served at `http://<host>:5000/`; the old `/v2` prefix
 redirects to the root and the old `/ui` route no longer exists. The **Downloads** page refreshes
-the session automatically every 5 seconds; the **Auto: on/off** button can disable
-or re-enable polling. CPU/RAM tiles and the transfer rates in the top bar use the
+the session automatically every 5 seconds; **Refresh every 5 s** in the **Tools**
+menu turns that off or back on, and the **⟳** button refreshes at once. CPU/RAM tiles and the transfer rates in the top bar use the
 same 5-second refresh.
 
 The recommended path for a new installation is:
@@ -351,14 +351,34 @@ inferior to the archived file.
   list refreshes automatically every 5 seconds.
 - Comic HTTP downloads show status, progress, downloaded bytes and speed in the
   same list as torrents.
-- **Tag filter** and **temporary speed limits** (DL/UL for N minutes). If
-  Configuration → Speed and network has the automatic speed (measuring the line)
-  on, the "Auto speed" switch in Downloads is disabled and says "from
-  configuration": that is where the command comes from. It stays usable while a
-  numeric schedule window is in force, because then it is the only way to hand
-  the line back to the tuning right away.
-- **Table columns**: Name, Status, Progress, ↓, ↑, ETA, Peers, Ratio — click a
-  header to sort. **Bulk actions**: pause, resume, recheck, remove.
+- **View row**: a box to select everything, name filter, tag filter, **Sort by**
+  with its direction (↑/↓), **⟳** to refresh at once and the **Tools** menu:
+  **Clean completed**, **Orphaned files…**, **Refresh every 5 s** and a link to
+  **Removal after seeding** (the "Remove completed items after seeding" option is
+  set in Configuration → Seeding; the ✓ mark says whether it is on).
+- **Selection bar**: it appears only once you tick at least one torrent and it
+  survives the automatic refresh. It shows how many you picked, **✕** to clear
+  them, **Pause**, **Resume**, **Check again**, the **Tag** menu (one click on a
+  tag assigns it; at the bottom you create a new tag or remove the current one)
+  and **Remove from session**.
+- **Bandwidth** (top right of the panel): the button shows the limits in force
+  and opens a menu.
+  - **Auto**: auto-tune measures the line, no cap; it beats the hourly schedule too.
+  - **As configured**: drops every override and goes back to the limits of
+    Configuration → Speed and network (or to the hourly schedule, when it is on);
+    the line under it says what that means right now.
+  - **Limit download** / **Limit upload**: pick a value (512 KB/s to 10 MB/s for
+    download, 64 KB/s to 1 MB/s for upload, or **No limit**) and the quick limit
+    starts at once; the other direction stays as it was. A quick limit lasts until
+    you remove it; with the hourly schedule on it lasts 1 hour, because the
+    schedule would beat a limit with no expiry.
+  - **Duration** (while a quick limit is on): 30 min, 1 h, 3 h or until removed.
+  - **Custom values…**: DL and UL in KiB/s and the duration in minutes (0 = until
+    removed), then **Apply**.
+- **Pin**: a torrent forced outside the queue shows the **📌 pinned** badge; it is
+  unpinned with **Unlock pin** in its details (where **Pin** is too).
+- **Table columns**: Name, Status, Progress, ↓, ↑, ETA, Peers, Ratio — sorted
+  from **Sort by**.
 - **Row actions**: pause/resume, recheck, remove.
 - **Details**: open by clicking the **torrent name** (or anywhere on the row; on
   the keyboard the name is the button that opens them) as a frame **above the

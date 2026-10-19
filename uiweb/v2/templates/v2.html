@@ -417,14 +417,10 @@
     </div>
   </details>
   <div class="panel session-panel">
-    <div class="panel-head"><h3>Download in sessione <span class="session-count" id="v2-session-count">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · <span>aggiornato</span> {{.UpdatedAt}}</span></h3><span id="v2-temp-badge">{{template "v2_temp_badge" .}}</span><div class="toolbar head-limits">
-       <label class="check{{if .TempAutoRedundant}} muted{{end}}" title="{{if .TempAutoRedundant}}Velocità automatica già attiva da Configurazione → Velocità e rete: qui è solo un override temporaneo che vince sulla programmazione{{else}}Auto speed: la banda va all'auto-tune, senza tetto, come una fascia «Auto» della programmazione; disabilita i limiti temporanei{{end}}"><input type="checkbox" id="v2-temp-auto" hx-post="/downloads/settings" hx-vals='js:{op:"temp_auto",value:(elt.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .TempAuto}} checked{{end}}{{if .TempAutoRedundant}} disabled{{end}} /> <span>Auto speed</span>{{if .TempAutoRedundant}} <small class="muted">da configurazione</small>{{end}}</label>
-       <label class="field inline-field" title="Limite temporaneo di download in KiB/s; 0 significa illimitato"><span>DL</span><input id="v2-temp-dl" class="input compact" type="number" min="0" name="download_kib" value="{{.TempDL}}" hx-preserve="true"{{if .TempAuto}} disabled{{end}} /></label>
-       <label class="field inline-field" title="Limite temporaneo di upload in KiB/s; 0 significa illimitato"><span>UL</span><input id="v2-temp-ul" class="input compact" type="number" min="0" name="upload_kib" value="{{.TempUL}}" hx-preserve="true"{{if .TempAuto}} disabled{{end}} /></label>
-       <label class="field inline-field" title="Durata del limite temporaneo in minuti; 0 per mantenerlo fino a rimozione manuale"><span>min</span><input id="v2-temp-minutes" class="input compact" type="number" min="0" name="minutes" value="{{.TempMinutes}}" hx-preserve="true"{{if .TempAuto}} disabled{{end}} /></label>
-       <button id="v2-temp-apply" class="btn sm primary" type="button" hx-post="/downloads/settings" hx-vals='{"op":"temp_apply"}' hx-include="#v2-temp-dl,#v2-temp-ul,#v2-temp-minutes" hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Applica temporaneamente i limiti DL/UL per il numero di minuti indicato (o 0 per mantenerli fino a rimozione)">Applica</button>
-       <button class="btn sm danger" type="button" onclick="var d=document.getElementById('v2-temp-dl'),u=document.getElementById('v2-temp-ul'),m=document.getElementById('v2-temp-minutes');if(d)d.value='0';if(u)u.value='0';if(m)m.value='0';" hx-post="/downloads/settings" hx-vals='{"op":"temp_clear"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il limite temporaneo e ripristina i limiti normali">Rimuovi</button>
-    </div><button class="btn sm downloads-tools-toggle" type="button" data-downloads-tools aria-expanded="false" title="Mostra i limiti di banda">⚙ Opzioni</button></div>
+    <div class="panel-head"><h3>Download in sessione <span class="session-count" id="v2-session-count">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · <span>aggiornato</span> {{.UpdatedAt}}</span></h3><details class="v2-menu speed-menu" data-v2-menu>
+      <summary class="btn sm" title="Velocità della sessione: Auto, limiti della configurazione o un limite rapido">Banda <span id="v2-temp-badge">{{template "v2_temp_badge" .}}</span> <span aria-hidden="true">▾</span></summary>
+      <div class="v2-menu-panel v2-menu-end speed-panel" id="v2-speed-panel">{{template "v2_speed_panel" .}}</div>
+    </details></div>
     <div class="panel-body">{{template "v2_torrents_wrap" .}}</div>
   </div>
     <div id="v2-detail-drawer" class="torrent-drawer" role="dialog" aria-modal="false" aria-labelledby="v2-detail-title" hidden></div>
@@ -432,7 +428,41 @@
 </div>
 {{end}}
 
-{{define "v2_temp_badge"}}{{if .TempAuto}}<span class="badge warn" title="Auto speed: la banda va all'auto-tune, senza tetto">Auto speed</span>{{else if .SpeedAuto}}<span class="badge warn" title="Velocità automatica: nessun tetto, la linea la misura l'auto-tune">Auto</span>{{else if .TempActive}}<span class="badge ok" {{if .TempMinutes}}title="Limite temporaneo attivo: scade dopo i minuti indicati"{{else}}title="Limite temporaneo attivo fino a rimozione manuale"{{end}}>⚡ {{if .TempMinutes}}({{ .TempMinutes }}m){{else}}(<span>perm.</span>){{end}}</span>{{else if .SchedActive}}{{if .SchedAuto}}<span class="badge warn" title="Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune">⏰ <span>Auto</span></span>{{else}}<span class="badge warn" title="Programmazione oraria della banda attiva: {{.SchedDL}} KiB/s DL · {{.SchedUL}} KiB/s UL">⏰ {{.SchedDL}}/{{.SchedUL}}</span>{{end}}{{else}}<span class="badge" title="Limiti standard: {{.BaseDL}} KiB/s DL · {{.BaseUL}} KiB/s UL">{{.BaseDL}}/{{.BaseUL}}</span>{{end}}{{if .Guard.Active}} <span class="badge" role="status" title="Auto riduce la velocità per mantenere basso il ping verso Google/Cloudflare"><span aria-hidden="true">🐢</span> <span>Latenza</span> {{.Guard.LatencyMs}}/{{.Guard.BaselineMs}} ms{{if .Guard.DownloadKib}} · DL {{.Guard.DownloadKib}} KiB/s{{end}}{{if .Guard.UploadKib}} · UL {{.Guard.UploadKib}} KiB/s{{end}}</span>{{end}}{{end}}
+{{/* Bandwidth menu: the mode in force (Auto, the configuration, a quick
+     limit), then the quick limits as a cascade: download, upload, duration
+     and custom values. Every choice applies at once. */}}
+{{define "v2_speed_panel"}}{{$mode := .SpeedMode}}
+<button class="v2-menu-item" type="button" hx-post="/downloads/settings" hx-vals='{"op":"temp_auto","value":"true"}' hx-include="#v2-torrent-form" hx-target="#v2-torrents-wrap" hx-swap="outerHTML" aria-pressed="{{if eq $mode "auto"}}true{{else}}false{{end}}" data-speed-mode="auto" title="Auto speed: la banda va all'auto-tune, senza tetto, come una fascia «Auto» della programmazione; disabilita i limiti temporanei"><span class="v2-menu-mark" aria-hidden="true">{{if eq $mode "auto"}}●{{end}}</span><span class="speed-item"><strong>Auto</strong><small class="muted">L'auto-tune misura la linea, senza tetto</small></span></button>
+<button class="v2-menu-item" type="button" hx-post="/downloads/settings" hx-vals='{"op":"temp_clear"}' hx-include="#v2-torrent-form" hx-target="#v2-torrents-wrap" hx-swap="outerHTML" aria-pressed="{{if eq $mode "normal"}}true{{else}}false{{end}}" data-speed-mode="normal" title="Rimuove il limite temporaneo e ripristina i limiti normali"><span class="v2-menu-mark" aria-hidden="true">{{if eq $mode "normal"}}●{{end}}</span><span class="speed-item"><strong>Come da configurazione</strong><small class="muted">{{if .SchedActive}}<span>Programmazione oraria</span>: {{if .SchedAuto}}<span>Auto</span>{{else}}<span>{{kibRate .SchedDL}}</span> ↓ · <span>{{kibRate .SchedUL}}</span> ↑{{end}}{{else if .SpeedAuto}}<span>Auto</span>{{else}}<span>{{kibRate .BaseDL}}</span> ↓ · <span>{{kibRate .BaseUL}}</span> ↑{{end}}</small></span></button>
+{{if eq $mode "limit"}}<div class="v2-menu-item speed-current" aria-current="true"><span class="v2-menu-mark" aria-hidden="true">●</span><span class="speed-item"><strong>Limite rapido</strong><small class="muted">{{kibRate .TempDL}} ↓ · <span>{{kibRate .TempUL}}</span> ↑ · {{if .TempMinutes}}<span>scade tra</span> {{.TempMinutes}} min{{else}}<span>fino a rimozione</span>{{end}}</small></span></div>{{end}}
+{{if .TempShadowed}}<p class="speed-note muted" role="note">La programmazione oraria vince su un limite senza scadenza: scegli una durata.</p>{{end}}
+<hr />
+<details class="speed-sub">
+  <summary class="v2-menu-sub">Limita download</summary>
+  <div class="speed-choices" role="group" aria-label="Limite rapido di download">{{range .DLPresets}}<button class="v2-menu-item" type="button" hx-post="/downloads/settings" hx-vals='{"op":"temp_set","dl":"{{.}}"}' hx-include="#v2-torrent-form" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if and (eq $mode "limit") (eq $.TempDL .)}} aria-pressed="true"{{end}} title="Limita subito il download a questo valore">{{kibRate .}}</button>{{end}}</div>
+</details>
+<details class="speed-sub">
+  <summary class="v2-menu-sub">Limita upload</summary>
+  <div class="speed-choices" role="group" aria-label="Limite rapido di upload">{{range .ULPresets}}<button class="v2-menu-item" type="button" hx-post="/downloads/settings" hx-vals='{"op":"temp_set","ul":"{{.}}"}' hx-include="#v2-torrent-form" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if and (eq $mode "limit") (eq $.TempUL .)}} aria-pressed="true"{{end}} title="Limita subito l'upload a questo valore">{{kibRate .}}</button>{{end}}</div>
+</details>
+{{if eq $mode "limit"}}<details class="speed-sub">
+  <summary class="v2-menu-sub">Durata</summary>
+  <div class="speed-choices" role="group" aria-label="Durata del limite rapido">{{range .DurationChoices}}<button class="v2-menu-item" type="button" hx-post="/downloads/settings" hx-vals='{"op":"temp_set","minutes":"{{.Minutes}}"}' hx-include="#v2-torrent-form" hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Fa durare il limite rapido per questo tempo">{{.Label}}</button>{{end}}</div>
+</details>{{end}}
+<details class="speed-sub">
+  <summary class="v2-menu-sub">Valori personalizzati…</summary>
+  <div class="speed-custom">
+    <label class="field inline-field" title="Limite temporaneo di download in KiB/s; 0 significa illimitato"><span>DL</span><input id="v2-temp-dl" class="input compact" type="number" min="0" name="download_kib" value="{{.TempDL}}" /> <small class="muted">KiB/s</small></label>
+    <label class="field inline-field" title="Limite temporaneo di upload in KiB/s; 0 significa illimitato"><span>UL</span><input id="v2-temp-ul" class="input compact" type="number" min="0" name="upload_kib" value="{{.TempUL}}" /> <small class="muted">KiB/s</small></label>
+    <label class="field inline-field" title="Durata del limite temporaneo in minuti; 0 per mantenerlo fino a rimozione manuale"><span>min</span><input id="v2-temp-minutes" class="input compact" type="number" min="0" name="minutes" value="{{.TempMinutes}}" /></label>
+    <button id="v2-temp-apply" class="btn sm primary v2-menu-item-btn" type="button" hx-post="/downloads/settings" hx-vals='{"op":"temp_apply"}' hx-include="#v2-temp-dl,#v2-temp-ul,#v2-temp-minutes" hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Applica temporaneamente i limiti DL/UL per il numero di minuti indicato (o 0 per mantenerli fino a rimozione)">Applica</button>
+  </div>
+</details>
+<hr />
+<a class="v2-menu-item" href="/?view=settings&amp;tab=network" title="Limiti normali, velocità automatica e programmazione oraria si impostano in Configurazione → Velocità e rete"><span class="v2-menu-mark" aria-hidden="true"></span><span>Limiti e programmazione</span> <span aria-hidden="true">→</span></a>
+{{end}}
+
+{{define "v2_temp_badge"}}{{if .TempAuto}}<span class="badge warn" title="Auto speed: la banda va all'auto-tune, senza tetto">Auto speed</span>{{else if .SpeedAuto}}<span class="badge warn" title="Velocità automatica: nessun tetto, la linea la misura l'auto-tune">Auto</span>{{else if .TempActive}}<span class="badge ok" {{if .TempMinutes}}title="Limite temporaneo attivo: scade dopo i minuti indicati"{{else}}title="Limite temporaneo attivo fino a rimozione manuale"{{end}}>⚡ {{.TempDL}}/{{.TempUL}} {{if .TempMinutes}}({{ .TempMinutes }}m){{else}}(<span>perm.</span>){{end}}</span>{{else if .SchedActive}}{{if .SchedAuto}}<span class="badge warn" title="Programmazione oraria attiva: fascia «Auto», nessun tetto, la linea la misura l'auto-tune">⏰ <span>Auto</span></span>{{else}}<span class="badge warn" title="Programmazione oraria della banda attiva: {{.SchedDL}} KiB/s DL · {{.SchedUL}} KiB/s UL">⏰ {{.SchedDL}}/{{.SchedUL}}</span>{{end}}{{else}}<span class="badge" title="Limiti standard: {{.BaseDL}} KiB/s DL · {{.BaseUL}} KiB/s UL">{{.BaseDL}}/{{.BaseUL}}</span>{{end}}{{if .Guard.Active}} <span class="badge" role="status" title="Auto riduce la velocità per mantenere basso il ping verso Google/Cloudflare"><span aria-hidden="true">🐢</span> <span>Latenza</span> {{.Guard.LatencyMs}}/{{.Guard.BaselineMs}} ms{{if .Guard.DownloadKib}} · DL {{.Guard.DownloadKib}} KiB/s{{end}}{{if .Guard.UploadKib}} · UL {{.Guard.UploadKib}} KiB/s{{end}}</span>{{end}}{{end}}
 
 {{define "v2_torrents_wrap"}}
 <div id="v2-torrents-wrap">
@@ -441,37 +471,53 @@
          hx-trigger="submit, input changed delay:300ms from:#v2-filter, change from:#v2-tag-filter{{if .Auto}}, every 5s{{end}}">
     {{/* Live counter for the panel head (outside the refreshed fragment). */}}
     <span id="v2-session-count" hx-swap-oob="innerHTML" hidden>{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · <span>aggiornato</span> {{.UpdatedAt}}</span>
-    <label class="torrent-sort"><span>Ordina per</span><select id="v2-sort" class="input compact" name="sort" aria-label="Ordina i torrent" onchange="this.form.requestSubmit()">{{range .Columns}}<option value="{{.Key}}"{{if eq $.Sort .Key}} selected{{end}}>{{.Label}}</option>{{end}}</select><button class="btn sm" type="submit" name="sort_click" value="{{.Sort}}" title="Inverti la direzione dell'ordinamento">{{if eq .Dir "desc"}}↓{{else}}↑{{end}}</button></label>
     <input type="hidden" name="dir" value="{{.Dir}}">
     <input type="hidden" name="auto_state" value="{{if .Auto}}1{{else}}0{{end}}">
     {{/* Live head fragments (outside the refreshed area). */}}
     <span id="v2-temp-badge" hx-swap-oob="innerHTML" hidden>{{template "v2_temp_badge" .}}</span>
+    {{if .Partial}}<div id="v2-speed-panel" hx-swap-oob="innerHTML" hidden>{{template "v2_speed_panel" .}}</div>{{end}}
+    {{/* View row: what the list shows and in which order. Clean-up tools sit in
+         the "Strumenti" menu; the actions on the selection appear below only
+         while something is selected. */}}
     <div class="toolbar download-global-toolbar">
+      <label class="check download-select-all" title="Seleziona o deseleziona tutti i torrent su cui applicare le azioni"><input type="checkbox" data-v2-select-all aria-label="Seleziona tutti i torrent" /></label>
       <input id="v2-filter" class="input" type="search" name="filter" value="{{.Filter}}"
               placeholder="Filtra i torrent… ( -parola esclude )" aria-label="Filtra i torrent" title="Filtra per nome o tag; anteponi - a una parola per escluderla" hx-preserve="true" />
-       <button class="btn sm" type="submit" name="refresh" value="1" title="Ricarica l'elenco dei torrent e lo stato dei download">Aggiorna</button>
-       <button class="btn sm{{if .Auto}} primary{{end}}" type="submit" name="auto" value="{{if .Auto}}0{{else}}1{{end}}" title="{{if .Auto}}Disattiva l'aggiornamento automatico ogni 5 secondi{{else}}Attiva l'aggiornamento automatico ogni 5 secondi{{end}}">Auto: {{if .Auto}}on{{else}}off{{end}}</button>
-       <label class="field inline-field" title="Mostra solo i torrent associati al tag selezionato"><span>Tag</span><select id="v2-tag-filter" class="input" name="tag_filter" aria-label="Filtra per tag"><option value="">Tutti i tag</option><option value="__none__"{{if eq .TagFilter "__none__"}} selected{{end}}>Senza tag</option>{{range .TagOptions}}<option value="{{.}}"{{if eq $.TagFilter .}} selected{{end}}>{{.}}</option>{{end}}</select></label>
-       <button class="btn sm" type="button" hx-post="/downloads/settings" hx-vals='{"op":"clear_completed"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
-       <button class="btn sm" type="button" hx-get="/downloads/orphans" hx-target="#v2-modal" hx-swap="innerHTML" title="Trova i file lasciati nella cartella download da torrent non più in sessione e spostali nel cestino se le copie in libreria sono complete">File orfani</button>
-      <label class="check" title="A fine seed il torrent completato viene tolto dalla sessione"><input type="checkbox" hx-post="/downloads/settings" hx-vals='js:{op:"auto_remove",value:(elt.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .AutoRemoveCompleted}} checked{{end}} /> <span>Elimina completati dopo il seed</span></label>
+      <select id="v2-tag-filter" class="input" name="tag_filter" aria-label="Filtra per tag" title="Mostra solo i torrent associati al tag selezionato"><option value="">Tutti i tag</option><option value="__none__"{{if eq .TagFilter "__none__"}} selected{{end}}>Senza tag</option>{{range .TagOptions}}<option value="{{.}}"{{if eq $.TagFilter .}} selected{{end}}>{{.}}</option>{{end}}</select>
+      <span class="torrent-sort"><label for="v2-sort">Ordina per</label><select id="v2-sort" class="input compact" name="sort" onchange="this.form.requestSubmit()">{{range .Columns}}<option value="{{.Key}}"{{if eq $.Sort .Key}} selected{{end}}>{{.Label}}</option>{{end}}</select><button class="btn sm" type="submit" name="sort_click" value="{{.Sort}}" aria-label="Inverti la direzione dell'ordinamento" title="Inverti la direzione dell'ordinamento">{{if eq .Dir "desc"}}↓{{else}}↑{{end}}</button></span>
+      <span class="download-view-tools">
+        <button class="btn sm" type="submit" name="refresh" value="1" aria-label="Aggiorna" title="Ricarica l'elenco dei torrent e lo stato dei download"><span aria-hidden="true">⟳</span></button>
+        <details class="v2-menu" data-v2-menu>
+          <summary class="btn sm" title="Pulizia della sessione e aggiornamento dell'elenco">Strumenti <span aria-hidden="true">▾</span></summary>
+          <div class="v2-menu-panel v2-menu-end">
+            <button class="v2-menu-item" type="button" hx-post="/downloads/settings" hx-vals='{"op":"clear_completed"}' hx-include="#v2-torrent-form" hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
+            <button class="v2-menu-item" type="button" hx-get="/downloads/orphans" hx-target="#v2-modal" hx-swap="innerHTML" title="Trova i file lasciati nella cartella download da torrent non più in sessione e spostali nel cestino se le copie in libreria sono complete">File orfani…</button>
+            <hr />
+            <button class="v2-menu-item" type="submit" name="auto" value="{{if .Auto}}0{{else}}1{{end}}" aria-pressed="{{if .Auto}}true{{else}}false{{end}}" title="{{if .Auto}}Disattiva l'aggiornamento automatico ogni 5 secondi{{else}}Attiva l'aggiornamento automatico ogni 5 secondi{{end}}"><span class="v2-menu-mark" aria-hidden="true">{{if .Auto}}✓{{end}}</span><span>Aggiorna ogni 5 s</span></button>
+            <a class="v2-menu-item" href="/?view=settings&amp;tab=seeding&amp;highlight=auto_remove_completed#v2-setting-auto_remove_completed" title="La rimozione automatica dei completati a fine seed si imposta in Configurazione → Seeding"><span class="v2-menu-mark" aria-hidden="true">{{if .AutoRemoveCompleted}}✓{{end}}</span><span>Rimozione a fine seed</span> <span aria-hidden="true">→</span></a>
+          </div>
+        </details>
+      </span>
     </div>
-     <div class="toolbar download-bulk-toolbar">
-       <label class="check" title="Seleziona o deseleziona tutti i torrent su cui applicare le azioni"><input type="checkbox" data-v2-select-all aria-label="Seleziona tutti i torrent" /> <span>Seleziona tutti</span></label>
-      <span class="muted" data-v2-selected-count>0 <span>selezionati · Azioni:</span></span>
-       <button class="btn sm" type="submit" name="bulk" value="pause" title="Metti in pausa i torrent selezionati">Pausa</button>
-       <button class="btn sm" type="submit" name="bulk" value="resume" title="Riprendi i torrent selezionati">Riprendi</button>
-       <button class="btn sm" type="submit" name="bulk" value="recheck" title="Forza la verifica dei dati dei torrent selezionati">Recheck</button>
-        <button class="btn sm" type="button" hx-post="/downloads/settings" hx-vals='{"op":"unpin"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il pin globale sul torrent">Sblocca pin</button>
-        <button class="btn sm danger" type="submit" name="bulk" value="remove" title="Rimuove i torrent selezionati dalla sessione mantenendo i file">Rimuovi dalla sessione</button>
-        {{if .Message}}<small class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Message}}</small>{{end}}
-      </div>
-      <div class="toolbar download-tag-toolbar">
-        <label class="field inline-field" title="Scegli il tag da assegnare o rimuovere sui torrent selezionati"><span>Tag</span><select class="input" name="tag" aria-label="Tag da assegnare ai torrent selezionati"><option value="">— rimuovi il tag —</option>{{range .TagOptions}}<option value="{{.}}">{{.}}</option>{{end}}<option value="__new__">➕ Nuovo tag…</option></select></label>
-        <button class="btn sm" type="submit" name="bulk" value="tag" title="Assegna il tag scelto ai torrent selezionati">Assegna tag</button>
-        <button class="btn sm" type="submit" name="bulk" value="untag" title="Rimuove il tag dai torrent selezionati">Rimuovi tag</button>
-        <input class="input compact" name="new_tag" aria-label="Nuovo tag" placeholder="Nuovo tag" title="Nome del nuovo tag da creare e assegnare" />
-      </div>
+    {{if .Message}}<p class="download-status" role="status"><small class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Message}}</small></p>{{end}}
+    <div class="toolbar download-bulk-toolbar" role="toolbar" aria-label="Azioni sui torrent selezionati">
+      <strong data-v2-selected-count aria-live="polite">0 <span>selezionati</span></strong>
+      <button class="btn sm ghost" type="button" data-v2-clear-selection aria-label="Deseleziona tutti" title="Deseleziona tutti i torrent">✕</button>
+      <span class="toolbar-sep" aria-hidden="true"></span>
+      <button class="btn sm" type="submit" name="bulk" value="pause" title="Metti in pausa i torrent selezionati">Pausa</button>
+      <button class="btn sm" type="submit" name="bulk" value="resume" title="Riprendi i torrent selezionati">Riprendi</button>
+      <button class="btn sm" type="submit" name="bulk" value="recheck" title="Forza la verifica dei dati dei torrent selezionati">Ricontrolla</button>
+      <details class="v2-menu" data-v2-menu>
+        <summary class="btn sm" title="Assegna o togli un tag ai torrent selezionati">Tag <span aria-hidden="true">▾</span></summary>
+        <div class="v2-menu-panel">
+          {{range .TagOptions}}<button class="v2-menu-item" type="submit" name="bulk" value="tag:{{.}}" title="Assegna questo tag ai torrent selezionati">{{.}}</button>{{end}}
+          <span class="v2-menu-new"><input class="input compact" name="new_tag" aria-label="Nuovo tag" placeholder="Nuovo tag" title="Nome del nuovo tag da creare e assegnare" /><button class="btn sm" type="submit" name="bulk" value="tag:__new__" title="Crea il tag e assegnalo ai torrent selezionati">Crea</button></span>
+          <hr />
+          <button class="v2-menu-item" type="submit" name="bulk" value="untag" title="Rimuove il tag dai torrent selezionati">Togli il tag</button>
+        </div>
+      </details>
+      <button class="btn sm danger download-bulk-remove" type="submit" name="bulk" value="remove" title="Rimuove i torrent selezionati dalla sessione mantenendo i file">Rimuovi dalla sessione</button>
+    </div>
 
      {{if or .Rows .HTTPDownloads}}
     <div class="table-wrap" role="region" aria-label="Tabella torrent e download HTTP">
@@ -488,6 +534,7 @@
                     <button class="torrent-open" type="button" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-detail-drawer" hx-swap="innerHTML" title="{{.Name}}"><span class="truncate">{{.Name}}</span></button>
                     {{if .Archived}}<span class="badge ok" title="Copia archiviata presente">NAS</span>{{end}}
                     {{if .SeedInfinite}}<span class="badge warn" title="Seed senza limiti">seed ∞</span>{{end}}
+                    {{if .Pinned}}<span class="badge" title="Forzato fuori coda: si sblocca dalla scheda del torrent">📌 pin</span>{{end}}
                     {{if .Tags}}<span class="tag-chips">{{range .Tags}}<span class="tag-chip">{{.}}</span>{{end}}</span>{{end}}
                     {{if or .Reason .Source}}<small class="origin muted"><span>Perché:</span> {{if .Reason}}{{.Reason}}{{else}}—{{end}} · <span>Fonte:</span> {{if .Source}}{{.Source}}{{else}}—{{end}}</small>{{end}}
                   </span>
@@ -568,7 +615,7 @@
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "reannounce" "Body" "{}" "Label" "Annuncia")}}
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "restart" "Body" "{}" "Label" "Riavvia")}}
       {{if .Caps.SuperSeeding}}{{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "super-seeding" "Body" (printf `{"enabled":%t}` (not .Torrent.SuperSeeding)) "Label" (ternary .Torrent.SuperSeeding "Disattiva super seeding" "Super seeding"))}}{{end}}
-      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "pin" "Body" "{}" "Label" "Pin")}}
+      {{if .Torrent.Pinned}}{{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "unpin" "Body" "{}" "Label" "Sblocca pin")}}{{else}}{{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "pin" "Body" "{}" "Label" "Pin")}}{{end}}
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "mark_failed" "Body" "{}" "Label" "Segna come fallito" "Class" "danger" "Confirm" "Segnare questo torrent come fallito?")}}
       <button class="btn sm" type="button" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Rimuovi il torrent e scegli se mantenere o eliminare i file">Rimuovi</button>
     </div>

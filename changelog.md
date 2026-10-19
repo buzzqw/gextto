@@ -14,6 +14,20 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 19 ottobre 2026
 
+- **Scarico più ordinato.** Filtro, tag e ordinamento stanno su una sola riga;
+  **Pulisci completati**, **File orfani** e l'aggiornamento automatico sono nel
+  menu **Strumenti**. Pausa, Riprendi, Ricontrolla, i tag e Rimuovi dalla sessione
+  compaiono solo quando selezioni dei torrent, e la selezione non si perde più
+  quando l'elenco si aggiorna da solo. «Elimina completati dopo il seed» non è più
+  nella barra: si imposta in Configurazione → Seeding, e il menu Strumenti porta
+  lì. «Sblocca pin» si trova nella scheda del torrent fissato, che nell'elenco ha
+  il badge 📌.
+- **Menu Banda.** I campi dei limiti temporanei in cima al pannello lasciano il
+  posto a un pulsante **Banda** che mostra i limiti in vigore. Dal menu scegli
+  **Auto**, torni a **Come da configurazione** o imposti al volo un limite di
+  download o di upload (da 64 KB/s a 10 MB/s) e la sua durata, con un clic. I
+  valori personalizzati restano in **Valori personalizzati…**.
+
 - **Pack scartati senza lasciare tracce sbagliate.** Quando l'ispezione decide
   che un pack in download non serve, Gextto ripristina la versione precedente
   dell'episodio: la libreria non resta più con la qualità e il titolo della

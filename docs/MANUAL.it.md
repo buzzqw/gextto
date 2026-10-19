@@ -28,8 +28,8 @@ dentro il loro pannello. Ogni azione resta raggiungibile col tocco.
 
 La UI ufficiale si apre su `http://<host>:5000/`; il vecchio prefisso `/v2`
 reindirizza alla radice e la vecchia route `/ui` non esiste più. La pagina **Scarico** aggiorna
-automaticamente la sessione ogni 5 secondi; il pulsante **Auto: on/off** consente
-di disattivare o riattivare il polling. Anche i tile CPU/RAM e le velocità nella
+automaticamente la sessione ogni 5 secondi; la voce **Aggiorna ogni 5 s** del menu
+**Strumenti** disattiva o riattiva l'aggiornamento, e il pulsante **⟳** aggiorna subito. Anche i tile CPU/RAM e le velocità nella
 barra superiore vengono aggiornati ogni 5 secondi.
 
 Il percorso consigliato per una nuova installazione è:
@@ -354,13 +354,35 @@ bloccata, già presente o inferiore al file archiviato.
   l'elenco si aggiorna automaticamente ogni 5 secondi.
 - I download HTTP dei fumetti mostrano stato, progressione, byte scaricati e
   velocità nella stessa lista dei torrent.
-- **Filtro per tag** e **limiti di velocità temporanei** (DL/UL per N minuti). Se in
-  Configurazione → Velocità e rete è attiva la velocità automatica (misura la linea),
-  l'interruttore «Auto speed» in Scarico è disattivato e indica «da configurazione»:
-  il comando arriva da lì. Resta usabile quando è in corso una fascia oraria numerica,
-  perché in quel momento è l'unico modo per forzare l'Auto subito.
-- **Colonne tabella**: Nome, Stato, Progresso, ↓, ↑, ETA, Peers, Ratio — clicca
-  l'intestazione per ordinare. **Azioni bulk**: pausa, riprendi, recheck, rimuovi.
+- **Riga della vista**: casella per selezionare tutto, filtro per nome, filtro per
+  tag, **Ordina per** con il verso (↑/↓), **⟳** per aggiornare subito e il menu
+  **Strumenti**: **Pulisci completati**, **File orfani…**, **Aggiorna ogni 5 s**
+  e il collegamento a **Rimozione a fine seed** (l'opzione «Elimina i completati
+  dopo il seed» si imposta in Configurazione → Seeding; il segno ✓ dice se è attiva).
+- **Barra di selezione**: compare solo quando spunti almeno un torrent e resta
+  durante l'aggiornamento automatico. Mostra quanti ne hai scelti, **✕** per
+  deselezionarli, **Pausa**, **Riprendi**, **Ricontrolla**, il menu **Tag** (un clic
+  su un tag lo assegna; in fondo crei un tag nuovo o togli quello presente) e
+  **Rimuovi dalla sessione**.
+- **Banda** (in alto a destra del pannello): il pulsante mostra i limiti in
+  vigore e apre un menu.
+  - **Auto**: l'auto-tune misura la linea, senza tetto; vince anche sulla
+    programmazione oraria.
+  - **Come da configurazione**: toglie ogni override e torna ai limiti di
+    Configurazione → Velocità e rete (o alla programmazione oraria, se è attiva);
+    sotto la voce trovi cosa significa in questo momento.
+  - **Limita download** / **Limita upload**: scegli un valore (da 512 KB/s a 10 MB/s
+    per il download, da 64 KB/s a 1 MB/s per l'upload, oppure **Senza limite**) e
+    il limite rapido parte subito; l'altro verso resta com'era. Un limite rapido
+    dura finché non lo togli; se è attiva la programmazione oraria dura 1 ora,
+    perché la programmazione vincerebbe su un limite senza scadenza.
+  - **Durata** (con un limite rapido attivo): 30 min, 1 h, 3 h o fino a rimozione.
+  - **Valori personalizzati…**: DL e UL in KiB/s e durata in minuti (0 = fino a
+    rimozione), poi **Applica**.
+- **Pin**: un torrent forzato fuori coda mostra il badge **📌 pin**; si sblocca
+  dal pulsante **Sblocca pin** nella sua scheda di dettaglio (dove c'è anche **Pin**).
+- **Colonne tabella**: Nome, Stato, Progresso, ↓, ↑, ETA, Peers, Ratio — si ordinano
+  da **Ordina per**.
 - **Azioni riga**: pausa/riprendi, recheck, rimuovi.
 - **Dettagli**: si aprono cliccando il **nome del torrent** (o un punto qualsiasi
   della riga; da tastiera il nome è il pulsante che li apre) come riquadro

@@ -465,7 +465,7 @@
     var downloadsView = document.querySelector(".downloads-view");
     if (downloadsView) downloadsView.classList.toggle("has-selection", selected.length > 0);
     var label = document.querySelector("[data-v2-selected-count]");
-    if (label) label.textContent = selected.length + " " + t("selezionati · Azioni:");
+    if (label) label.textContent = selected.length + " " + t("selezionati");
     var all = document.querySelector("[data-v2-select-all]");
     var rows = document.querySelectorAll("[data-v2-select]");
     if (all) all.checked = rows.length > 0 && selected.length === rows.length;
@@ -876,6 +876,80 @@
     } else if (event.target.matches && event.target.matches("[data-v2-select]")) {
       updateTorrentSelection();
     }
+  });
+
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest || !event.target.closest("[data-v2-clear-selection]")) return;
+    var rows = document.querySelectorAll("[data-v2-select]:checked");
+    for (var i = 0; i < rows.length; i++) rows[i].checked = false;
+    updateTorrentSelection();
+    var filter = document.getElementById("v2-filter");
+    if (filter) filter.focus();
+  });
+
+  // The torrent list is swapped every few seconds: carry the selection over,
+  // including a box ticked while the request was in flight.
+  var keptSelection = null;
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var target = event.detail && event.detail.target;
+    if (!target || target.id !== "v2-torrents-wrap") return;
+    keptSelection = {};
+    var boxes = target.querySelectorAll("[data-v2-select]:checked");
+    for (var i = 0; i < boxes.length; i++) keptSelection[boxes[i].value] = true;
+  });
+  document.addEventListener("htmx:afterSwap", function () {
+    if (!keptSelection) return;
+    var boxes = document.querySelectorAll("#v2-torrents-wrap [data-v2-select]");
+    for (var i = 0; i < boxes.length; i++) if (keptSelection[boxes[i].value]) boxes[i].checked = true;
+    keptSelection = null;
+    updateTorrentSelection();
+  });
+
+  // ------------------------------------------------------------- menus --
+  // A menu is a <details data-v2-menu>: the summary is the button, the panel
+  // its list. One is open at a time; Esc or a click elsewhere closes it and
+  // a chosen item closes it too.
+  function closeMenus(except) {
+    var open = document.querySelectorAll("details[data-v2-menu][open]");
+    for (var i = 0; i < open.length; i++) if (open[i] !== except) open[i].open = false;
+  }
+  document.addEventListener("toggle", function (event) {
+    var menu = event.target;
+    if (menu && menu.matches && menu.matches("details[data-v2-menu]") && menu.open) closeMenus(menu);
+  }, true);
+  document.addEventListener("click", function (event) {
+    var menu = event.target.closest && event.target.closest("details[data-v2-menu]");
+    if (!menu) { closeMenus(null); return; }
+    if (event.target.closest(".v2-menu-item")) {
+      // Let the item's own request start before the panel goes away.
+      setTimeout(function () { menu.open = false; }, 0);
+    }
+  });
+  document.addEventListener("keydown", function (event) {
+    var menu = event.target.closest && event.target.closest("details[data-v2-menu][open]");
+    if (!menu) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      menu.open = false;
+      var summary = menu.querySelector("summary");
+      if (summary) summary.focus();
+      return;
+    }
+    // Enter in the new-tag field creates that tag, not the form's first button.
+    if (event.key === "Enter" && event.target.matches && event.target.matches(".v2-menu-new input")) {
+      event.preventDefault();
+      var create = event.target.parentNode.querySelector("button");
+      if (create) create.click();
+    }
+  });
+  // The automatic refresh would close an open menu under the pointer (and
+  // refreshes the bandwidth menu out of band): skip it while one is open.
+  document.addEventListener("htmx:beforeRequest", function (event) {
+    var elt = event.detail && event.detail.elt;
+    if (!elt || elt.id !== "v2-torrent-form") return;
+    var trig = event.detail.triggeringEvent || (event.detail.requestConfig && event.detail.requestConfig.triggeringEvent);
+    var polling = !trig || trig.type === "hx:poll:trigger";
+    if (polling && document.querySelector(".downloads-view details[data-v2-menu][open]")) event.preventDefault();
   });
 
   // ------------------------------------------------------ settings editing --
@@ -1662,19 +1736,6 @@
     if (toggle) toggle.setAttribute("aria-expanded", panel.open ? "true" : "false");
   }, true);
 
-  // Scarico: bandwidth limits and clean-up tools sit behind "Opzioni" on a
-  // phone. The class lives outside the auto-refreshed table, so it survives
-  // the 5-second swaps.
-  document.addEventListener("click", function (event) {
-    var toggle = event.target.closest && event.target.closest("[data-downloads-tools]");
-    if (!toggle) return;
-    var view = toggle.closest(".downloads-view");
-    if (!view) return;
-    var open = !view.classList.contains("show-download-tools");
-    view.classList.toggle("show-download-tools", open);
-    toggle.setAttribute("aria-expanded", open ? "true" : "false");
-  });
-
   // Pull to refresh for the installed app, where the browser's own gesture
   // is not available. In a normal browser tab the native gesture is used.
   function initPullToRefresh() {
@@ -1772,26 +1833,5 @@
   });
   document.addEventListener("htmx:afterSwap", function (event) { syncScheduleRows(event.target); });
 
-  // "Auto speed" (temporary limits toolbar): while it is on, the temporary DL/UL
-  // and minutes fields are disabled, because the line is left to the auto-tune.
-  function syncTempAuto() {
-    var auto = document.getElementById("v2-temp-auto");
-    if (!auto) return;
-    var ids = ["v2-temp-dl", "v2-temp-ul", "v2-temp-minutes"];
-    for (var i = 0; i < ids.length; i++) {
-      var el = document.getElementById(ids[i]);
-      if (el) el.disabled = auto.checked;
-    }
-    // The numeric "Applica" needs the three fields, which are disabled while
-    // auto is on: disabling it removes the empty apply that used to turn auto
-    // back off by itself.
-    var apply = document.getElementById("v2-temp-apply");
-    if (apply) apply.disabled = auto.checked;
-  }
-  document.addEventListener("change", function (event) {
-    if (event.target.id && event.target.id === "v2-temp-auto") syncTempAuto();
-  });
-  document.addEventListener("htmx:afterSwap", syncTempAuto);
-
-  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); openAddFormFromAnchor(); initPullToRefresh(); initLiveMetrics(); syncScheduleRows(document); syncTempAuto(); });
+  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); openAddFormFromAnchor(); initPullToRefresh(); initLiveMetrics(); syncScheduleRows(document); });
 })();

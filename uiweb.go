@@ -180,6 +180,9 @@ type uiTorrentRow struct {
 	// SeedInfinite marks a seeding torrent configured to seed without a ratio
 	// or time limit, rendered as the "seed ∞" badge.
 	SeedInfinite bool
+	// Pinned marks the torrent forced out of the queue (the "📌 pin" badge);
+	// it is unpinned from its detail drawer.
+	Pinned bool
 }
 
 type uiTorrentsData struct {
@@ -724,6 +727,7 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			TotalSize:     view.TotalSize,
 			TotalDone:     view.TotalDone,
 			Paused:        view.State == "paused",
+			Pinned:        view.Pinned,
 		}
 		row.ETA, row.ETASeconds = uiTorrentETA(view)
 		row.Tags = uiSplitTags(tag)

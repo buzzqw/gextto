@@ -70,7 +70,8 @@ var v2Templates = template.Must(template.New("v2").Funcs(template.FuncMap{
 		}
 		return value / 1024
 	},
-	"dict": v2Dict,
+	"dict":    v2Dict,
+	"kibRate": v2KibRate,
 }).ParseFS(v2TemplatesFS, "uiweb/v2/templates/*.html"))
 
 // v2Dict builds a map from key/value pairs, used to pass several arguments to a
@@ -1063,6 +1064,68 @@ type v2TorrentsView struct {
 	AutoRemoveCompleted bool
 	Message             string
 	Error               bool
+	// Partial: the fragment answers an HTMX request, so it also refreshes the
+	// bandwidth menu in the panel head (out of band). The full page renders
+	// that menu once, in place.
+	Partial bool
+}
+
+// Quick choices of the bandwidth menu, in KiB/s (0 = no limit) and minutes
+// (0 = until removed).
+var (
+	v2SpeedPresetsDL      = []int64{512, 1024, 2048, 5120, 10240, 0}
+	v2SpeedPresetsUL      = []int64{64, 128, 256, 512, 1024, 0}
+	v2SpeedPresetsMinutes = []int64{30, 60, 180, 0}
+)
+
+func (v v2TorrentsView) DLPresets() []int64 { return v2SpeedPresetsDL }
+func (v v2TorrentsView) ULPresets() []int64 { return v2SpeedPresetsUL }
+
+// v2SpeedDuration is one duration choice of the bandwidth menu.
+type v2SpeedDuration struct {
+	Minutes int64
+	Label   string
+}
+
+func (v v2TorrentsView) DurationChoices() []v2SpeedDuration {
+	choices := make([]v2SpeedDuration, 0, len(v2SpeedPresetsMinutes))
+	for _, minutes := range v2SpeedPresetsMinutes {
+		label := "Fino a rimozione"
+		switch {
+		case minutes > 0 && minutes < 60:
+			label = fmt.Sprintf("%d min", minutes)
+		case minutes >= 60:
+			label = fmt.Sprintf("%d h", minutes/60)
+		}
+		choices = append(choices, v2SpeedDuration{Minutes: minutes, Label: label})
+	}
+	return choices
+}
+
+// SpeedMode is the choice the bandwidth menu marks: "auto" (the temporary
+// Auto), "limit" (a quick limit in force) or "normal" (the configuration and
+// its schedule).
+func (v v2TorrentsView) SpeedMode() string {
+	switch {
+	case v.TempAuto:
+		return "auto"
+	case v.TempActive:
+		return "limit"
+	}
+	return "normal"
+}
+
+// v2KibRate names a KiB/s limit the way the menu shows it: 0 is no limit.
+func v2KibRate(kib int64) string {
+	switch {
+	case kib <= 0:
+		return "Senza limite"
+	case kib >= 1024 && kib%1024 == 0:
+		return fmt.Sprintf("%d MB/s", kib/1024)
+	case kib >= 1024:
+		return fmt.Sprintf("%.1f MB/s", float64(kib)/1024)
+	}
+	return fmt.Sprintf("%d KB/s", kib)
 }
 
 func v2SortArrow(sortKey, dir, key string) string {
@@ -1259,7 +1322,9 @@ func V2DownloadsTable(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_torrents_wrap", v2TorrentsViewFrom(s, r, message, isErr), dict, eng)
+	view := v2TorrentsViewFrom(s, r, message, isErr)
+	view.Partial = true
+	v2Render(w, http.StatusOK, "v2_torrents_wrap", view, dict, eng)
 }
 
 func v2TorrentRowAction(s *AppState, value string) (string, bool) {
@@ -1323,6 +1388,23 @@ func v2TorrentBulkAction(s *AppState, r *http.Request, action string) (string, b
 	if len(hashes) == 0 {
 		return "nessun torrent selezionato", true
 	}
+	// The tag menu sends "tag:<name>" ("tag:__new__" for the new-tag field);
+	// plain "tag" with a separate "tag" field is still accepted.
+	tag := ""
+	if name, ok := strings.CutPrefix(action, "tag:"); ok {
+		action, tag = "tag", name
+	} else if action == "tag" {
+		tag = r.FormValue("tag")
+	}
+	tag = strings.TrimSpace(tag)
+	if action == "tag" && tag == "__new__" {
+		tag = strings.TrimSpace(r.FormValue("new_tag"))
+		if tag == "" {
+			return "scrivi il nome del nuovo tag", true
+		}
+		catalogBody, _ := json.Marshal(map[string]string{"tag": tag})
+		v2InternalJSON(s, http.MethodPost, "/api/download-tags", nil, catalogBody)
+	}
 	engine := s.activeEngine()
 	done := 0
 	for _, hash := range hashes {
@@ -1348,18 +1430,11 @@ func v2TorrentBulkAction(s *AppState, r *http.Request, action string) (string, b
 				done++
 			}
 		case "tag", "untag":
-			tag := strings.TrimSpace(r.FormValue("tag"))
-			if action == "tag" && tag == "__new__" {
-				tag = strings.TrimSpace(r.FormValue("new_tag"))
-				if tag != "" {
-					catalogBody, _ := json.Marshal(map[string]string{"tag": tag})
-					v2InternalJSON(s, http.MethodPost, "/api/download-tags", nil, catalogBody)
-				}
-			}
+			value := tag
 			if action == "untag" {
-				tag = ""
+				value = ""
 			}
-			if err := s.db.SetTorrentTag(hash, tag); err == nil {
+			if err := s.db.SetTorrentTag(hash, value); err == nil {
 				done++
 			}
 		}
@@ -1771,6 +1846,11 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 	case "pin":
 		path = "/api/torrents/pin"
 		body, _ = json.Marshal(map[string]any{"hash": hash})
+	case "unpin":
+		// The engine keeps one pinned torrent: unpinning it from its own
+		// drawer clears the global pin.
+		path = "/api/torrents/unpin"
+		body = []byte(`{}`)
 	case "tag":
 		path = "/api/torrent-tags"
 		body, _ = json.Marshal(map[string]string{"hash": hash, "tag": r.FormValue("tag")})
@@ -1960,7 +2040,9 @@ func V2DownloadsRemove(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
-	if err := v2Templates.ExecuteTemplate(&buffer, "v2_torrents_wrap", v2TorrentsViewFrom(s, r, message, isErr)); err != nil {
+	view := v2TorrentsViewFrom(s, r, message, isErr)
+	view.Partial = true
+	if err := v2Templates.ExecuteTemplate(&buffer, "v2_torrents_wrap", view); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}

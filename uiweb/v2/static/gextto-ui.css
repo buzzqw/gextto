@@ -853,12 +853,6 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .torrent-detail-tabs [role="tab"] { border-bottom-width: 2px; }
 .torrent-detail-tabs [role="tab"].tab-active { background: var(--accent); border-color: var(--accent); color: #04121f; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
 .download-bulk-toolbar { flex-wrap: wrap; }
-.download-bulk-toolbar .compact { width: 150px; min-width: 120px; }
-.download-bulk-toolbar input[name="new_tag"] {
-  width: 150px;
-  min-width: 120px;
-  flex: 0 0 150px;
-}
 .torrent-add-main {
   display: grid;
   grid-template-columns: minmax(280px, 2fr) minmax(190px, 1fr) minmax(190px, 1fr) auto;
@@ -1451,29 +1445,17 @@ pre.log-view { margin: 0; }
   .data-table.movie-table .row-actions { white-space: normal; }
 
   /* Keep the download controls readable instead of producing a long row of
-     tiny buttons. Selection actions are grouped into two thumb-sized columns. */
-  .download-global-toolbar,
-  .download-temp-toolbar,
-  .download-bulk-toolbar {
+     tiny buttons. */
+  .download-temp-toolbar {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: stretch;
   }
-  .download-global-toolbar > :first-child,
-  .download-global-toolbar > .check,
   .download-temp-toolbar > :first-child,
-  .download-temp-toolbar > small,
-  .download-bulk-toolbar > [data-download-selected-count],
-  .download-bulk-toolbar > .field { grid-column: 1 / -1; }
-  .download-global-toolbar .btn,
-  .download-temp-toolbar .btn,
-  .download-bulk-toolbar .btn { width: 100%; min-width: 0; }
-  .download-global-toolbar .field,
+  .download-temp-toolbar > small { grid-column: 1 / -1; }
+  .download-temp-toolbar .btn { width: 100%; min-width: 0; }
   .download-temp-toolbar .field,
-  .download-bulk-toolbar .field { min-width: 0; }
-  .download-temp-toolbar .input,
-  .download-bulk-toolbar .input { min-width: 0; }
-  .download-bulk-toolbar .compact { width: 100%; }
+  .download-temp-toolbar .input { min-width: 0; }
 
 
   /* Episode actions also wrap instead of forcing a very wide table. */

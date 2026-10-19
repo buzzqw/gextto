@@ -13,6 +13,19 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 19 October 2026
 
+- **A tidier Downloads page.** Filter, tag and sorting share one row; **Clean
+  completed**, **Orphaned files** and the automatic refresh are in the **Tools**
+  menu. Pause, Resume, Check again, tags and Remove from session appear only when
+  you select torrents, and the selection is no longer lost when the list refreshes
+  on its own. "Remove completed items after seeding" left the toolbar: it is set in
+  Configuration → Seeding, and the Tools menu takes you there. "Unlock pin" is in the
+  pinned torrent's details; the list marks it with a 📌 badge.
+- **Bandwidth menu.** The temporary-limit fields at the top of the panel give way
+  to a **Bandwidth** button that shows the limits in force. From its menu you pick
+  **Auto**, go back to **As configured** or set a download or upload limit on the
+  fly (64 KB/s to 10 MB/s) and its duration, in one click. Exact values stay under
+  **Custom values…**.
+
 - **Discarded packs leave no wrong traces.** When the inspection decides that a
   downloading pack is not needed, Gextto restores the previous version of the
   episode: the library no longer keeps the quality and title of the discarded

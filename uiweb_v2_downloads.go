@@ -16,26 +16,43 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var path string
 	var body []byte
 	torrentNames := map[string]string{}
+	// The temporary limit being applied, for the confirmation message.
+	var tempDL, tempUL, tempMinutes int64
 	switch op {
-	case "unpin":
-		path = "/api/torrents/unpin"
-		body = []byte(`{}`)
 	case "clear_completed":
 		path = "/api/torrents/remove_completed"
 		body, _ = json.Marshal(RemoveCompletedInput{DeleteFiles: false})
 		for _, torrent := range s.activeEngine().List() {
 			torrentNames[strings.ToLower(strings.TrimSpace(torrent.Hash))] = strings.TrimSpace(torrent.Name)
 		}
-	case "auto_remove":
-		path = "/api/config/settings"
-		body, _ = json.Marshal(SettingInput{Key: "auto_remove_completed", Value: r.FormValue("value")})
 	case "temp_apply":
+		tempDL = v2ParseInt(r.FormValue("download_kib"), 0)
+		tempUL = v2ParseInt(r.FormValue("upload_kib"), 0)
+		tempMinutes = v2ParseInt(r.FormValue("minutes"), 0)
 		path = "/api/torrents/temp-limits"
-		body, _ = json.Marshal(TempLimitsInput{
-			DownloadKib: v2ParseInt(r.FormValue("download_kib"), 0),
-			UploadKib:   v2ParseInt(r.FormValue("upload_kib"), 0),
-			Minutes:     v2ParseInt(r.FormValue("minutes"), 0),
-		})
+		body, _ = json.Marshal(TempLimitsInput{DownloadKib: tempDL, UploadKib: tempUL, Minutes: tempMinutes})
+	case "temp_set":
+		// A quick choice of the bandwidth menu changes one value (download,
+		// upload or duration) of the temporary limit and keeps the others.
+		tempDL, tempUL, tempMinutes = v2QuickLimitBase(s)
+		if value := r.FormValue("dl"); value != "" {
+			tempDL = v2ParseInt(value, tempDL)
+		}
+		if value := r.FormValue("ul"); value != "" {
+			tempUL = v2ParseInt(value, tempUL)
+		}
+		if value := r.FormValue("minutes"); value != "" {
+			tempMinutes = v2ParseInt(value, tempMinutes)
+		}
+		if settingsBool(latestConfig(s), "torrent_temp_auto", false) {
+			// Auto would beat the new limit, and an all-zero limit does not
+			// turn it off by itself.
+			off := false
+			autoBody, _ := json.Marshal(TempLimitsInput{Auto: &off})
+			v2InternalJSON(s, http.MethodPost, "/api/torrents/temp-limits", nil, autoBody)
+		}
+		path = "/api/torrents/temp-limits"
+		body, _ = json.Marshal(TempLimitsInput{DownloadKib: tempDL, UploadKib: tempUL, Minutes: tempMinutes})
 	case "temp_clear":
 		path = "/api/torrents/temp-limits"
 		body, _ = json.Marshal(TempLimitsInput{Clear: true})
@@ -80,14 +97,11 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 				message = "Nessun torrent completato da rimuovere"
 			}
 		}
-	} else if op == "temp_apply" && status < 400 {
-		dl := v2ParseInt(r.FormValue("download_kib"), 0)
-		ul := v2ParseInt(r.FormValue("upload_kib"), 0)
-		mins := v2ParseInt(r.FormValue("minutes"), 0)
-		if mins > 0 {
-			message = fmt.Sprintf("Limite temporaneo applicato: %d KiB/s DL · %d KiB/s UL per %d min", dl, ul, mins)
+	} else if (op == "temp_apply" || op == "temp_set") && status < 400 {
+		if tempMinutes > 0 {
+			message = fmt.Sprintf("Limite temporaneo applicato: %d KiB/s DL · %d KiB/s UL per %d min", tempDL, tempUL, tempMinutes)
 		} else {
-			message = fmt.Sprintf("Limite temporaneo applicato: %d KiB/s DL · %d KiB/s UL (fino a rimozione)", dl, ul)
+			message = fmt.Sprintf("Limite temporaneo applicato: %d KiB/s DL · %d KiB/s UL (fino a rimozione)", tempDL, tempUL)
 		}
 	} else if op == "temp_clear" && status < 400 {
 		message = "Limite temporaneo rimosso (ripristinati limiti normali)"
@@ -105,6 +119,7 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	dict, eng := v2Dictionaries(s)
 	view := v2TorrentsViewFrom(s, r, message, status >= 400)
+	view.Partial = true
 	if op == "clear_completed" && len(clearReply.Items) > 0 {
 		removedMap := make(map[string]struct{}, len(clearReply.Items))
 		for _, item := range clearReply.Items {
@@ -119,7 +134,7 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		view.Rows = filteredRows
 		view.Count = len(view.Rows)
 	}
-	if op == "clear_completed" || op == "temp_apply" || op == "temp_clear" || op == "temp_auto" {
+	if op == "clear_completed" || op == "temp_apply" || op == "temp_set" || op == "temp_clear" || op == "temp_auto" {
 		title := "Limiti di velocità"
 		if op == "clear_completed" {
 			title = "Pulisci completati"
@@ -131,6 +146,29 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	v2Render(w, http.StatusOK, "v2_torrents_wrap", view, dict, eng)
+}
+
+// v2QuickLimitBase is where a quick choice of the bandwidth menu starts from:
+// the temporary limit in force, or else the limits applied now with no expiry.
+// While a schedule window is active a limit without expiry would be beaten by
+// it, so a new quick limit lasts one hour there.
+func v2QuickLimitBase(s *AppState) (download, upload, minutes int64) {
+	page := uiDownloadsPageFor(s)
+	if page.TempActive {
+		return page.TempDL, page.TempUL, page.TempMinutes
+	}
+	cfg := latestConfig(s)
+	download, upload, _, _ = speedPolicy(cfg)
+	if download < 0 {
+		download = 0
+	}
+	if upload < 0 {
+		upload = 0
+	}
+	if page.SchedActive {
+		minutes = 60
+	}
+	return download, upload, minutes
 }
 
 func V2HTTPDownloadDetail(w http.ResponseWriter, r *http.Request, s *AppState) {
