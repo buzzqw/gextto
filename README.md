@@ -134,7 +134,8 @@ An **Update available** button appears when a release is published;
 *Maintenance → Updates* shows the changes and **Update now** backs up the
 databases, installs, and restores the previous version if the new one does not
 answer. Re-running the installer updates from a shell too, with the same
-rollback and the same service user.
+rollback and the same service user. The full list of changes is in the
+[changelog](changelog.en.md).
 
 ```bash
 sudo bash install.sh --help       # all options

@@ -139,7 +139,8 @@ Quando esce una release compare il pulsante **Aggiornamento disponibile**;
 *Manutenzione → Aggiornamenti* mostra le novità e **Aggiorna ora** fa il backup
 dei database, installa e ripristina la versione precedente se la nuova non
 risponde. Rilanciare l'installer aggiorna anche da shell, con lo stesso
-ripristino e lo stesso utente del servizio.
+ripristino e lo stesso utente del servizio. L'elenco completo delle novità è nel
+[changelog](changelog.md).
 
 ```bash
 sudo bash install.sh --help       # tutte le opzioni
