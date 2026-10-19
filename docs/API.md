@@ -591,6 +591,8 @@ a native `/api/v1`. When `ed2k_token` is set, every `/api/v1` call must send
 | POST | `/api/v1/transfers` | start a transfer from a JSON `{"link":"ed2k://|file|…"}`; returns `201` with the transfer (idempotent by MD4) |
 | GET | `/api/v1/transfers/{id}` | one transfer, by MD4 |
 | DELETE | `/api/v1/transfers/{id}` | cancel and forget a transfer (partial files stay on disk) |
+| POST | `/api/v1/transfers/{id}/pause` | stop the worker but keep the row and the `.part` file |
+| POST | `/api/v1/transfers/{id}/resume` | restart a paused or failed transfer from its `.part` file |
 | GET | `/api/v1/nodes` | the current Kad routing table |
 | GET | `/api/v1/update` | compare the running `gx-ed2k` build with `release.json` (`gx_ed2k_build`) and return the standalone archive URL; a local build answers `local_build: true` |
 | POST | `/api/v1/update/apply` | download the newer Linux archive, verify its SHA-256 and version, replace the binary and restart; a local build or Windows answers `409` |

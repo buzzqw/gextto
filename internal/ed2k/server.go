@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/zlib"
 	"context"
-	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -223,16 +222,35 @@ func (c *Client) serverLogin(conn net.Conn) error {
 }
 
 func (c *Client) userHash() []byte {
-	path := filepath.Join(c.cfg.DataDir, "userhash")
-	if raw, err := os.ReadFile(path); err == nil && len(raw) == 16 {
-		return raw
+	c.mu.Lock()
+	hash := c.userHashValue
+	c.mu.Unlock()
+	return hash[:]
+}
+
+// loadOrCreateUserID reads the eMule identity from <data>/userhash, accepting
+// both the 32-hex text written by the daemon and the old 16-byte raw form.
+func loadOrCreateUserID(dataDir string, configured ID) ID {
+	if configured != (ID{}) {
+		return configured
 	}
-	hash := make([]byte, 16)
-	if _, err := rand.Read(hash); err != nil {
-		return make([]byte, 16)
+	path := filepath.Join(dataDir, "userhash")
+	if raw, err := os.ReadFile(path); err == nil {
+		if id, err := ParseID(string(raw)); err == nil {
+			return id
+		}
+		if len(raw) == 16 {
+			var id ID
+			copy(id[:], raw)
+			return id
+		}
 	}
-	_ = os.WriteFile(path, hash, 0o600)
-	return hash
+	id, err := RandomID()
+	if err != nil {
+		return ID{}
+	}
+	_ = os.WriteFile(path, []byte(id.Hex()+"\n"), 0o644)
+	return id
 }
 
 func writeServerPacket(w io.Writer, opcode byte, payload []byte) error {

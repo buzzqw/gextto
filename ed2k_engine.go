@@ -61,7 +61,7 @@ func (e *ed2kEngine) Capabilities() map[string]bool {
 	for _, name := range capabilityNames() {
 		out[name] = false
 	}
-	for _, name := range []string{"add", "list", "remove", "stats", "events", "files"} {
+	for _, name := range []string{"add", "list", "pause", "resume", "remove", "stats", "events", "files"} {
 		out[name] = true
 	}
 	return out
@@ -149,6 +149,8 @@ func (e *ed2kEngine) view(transfer ed2kTransfer) models.TorrentView {
 		state = "downloading"
 	case "queued":
 		state = "queued"
+	case "paused":
+		state = "paused"
 	case "completed":
 		state = "finished"
 	case "error":
@@ -261,6 +263,28 @@ func (e *ed2kEngine) AddWithOptions(link string, cfg *Config, preferredPath *str
 	}
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, 8<<10))
 	return false, fmt.Errorf("gx-ed2k add: HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(raw)))
+}
+
+func (e *ed2kEngine) Pause(hash string) (bool, error) {
+	return e.action(hash, "pause")
+}
+
+func (e *ed2kEngine) Resume(hash string) (bool, error) {
+	return e.action(hash, "resume")
+}
+
+func (e *ed2kEngine) action(hash, name string) (bool, error) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	response, err := e.request(http.MethodPost, "/api/v1/transfers/"+hash+"/"+name, nil)
+	if err != nil {
+		e.setHealthy(false)
+		return false, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode == http.StatusOK {
+		return true, nil
+	}
+	return false, fmt.Errorf("gx-ed2k %s: HTTP %d", name, response.StatusCode)
 }
 
 func (e *ed2kEngine) Remove(hash string, deleteFiles bool) (bool, error) {

@@ -57,6 +57,9 @@ type Config struct {
 	// Nil keeps the search-only behaviour: the callback is accepted and the
 	// connection is closed. The upload plane sets it.
 	ClientHandler func(net.Conn)
+	// UserHash is the eMule client identity used for server login and peer
+	// credits. Zero loads (or creates) it in DataDir.
+	UserHash ID
 }
 
 func (c *Config) applyDefaults() {
@@ -150,7 +153,8 @@ type Client struct {
 
 	peerPackets int64
 
-	servers []string
+	servers       []string
+	userHashValue ID
 }
 
 type collector struct {
@@ -173,12 +177,13 @@ func New(cfg Config) (*Client, error) {
 		return nil, err
 	}
 	c := &Client{
-		cfg:      cfg,
-		self:     self,
-		table:    newRoutingTable(cfg.MaxContacts),
-		pending:  map[ID]chan []Contact{},
-		searches: map[ID][]*collector{},
-		closeCh:  make(chan struct{}),
+		cfg:           cfg,
+		self:          self,
+		userHashValue: loadOrCreateUserID(cfg.DataDir, cfg.UserHash),
+		table:         newRoutingTable(cfg.MaxContacts),
+		pending:       map[ID]chan []Contact{},
+		searches:      map[ID][]*collector{},
+		closeCh:       make(chan struct{}),
 	}
 	c.servers = NormalizeServerList(strings.Join(cfg.Servers, ","))
 	return c, nil

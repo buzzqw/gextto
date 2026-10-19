@@ -160,6 +160,7 @@ func main() {
 		SearchTimeout: *searchTimeout,
 		UPnP:          *upnp,
 		ClientHandler: clientHandler,
+		UserHash:      userHash,
 	})
 	if err != nil {
 		log.Fatalf("gx-ed2k: %v", err)
@@ -183,6 +184,7 @@ func main() {
 				ClientName: "gx-ed2k",
 				TCPPort:    uint16(*tcpPort),
 				UserHash:   userHash,
+				Logf:       log.Printf,
 			},
 			StatePath: filepath.Join(*dataDir, "transfers.json"),
 			OnComplete: func(result download.Result) {

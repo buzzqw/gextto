@@ -29,6 +29,8 @@ func (d *Daemon) routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/transfers", d.withAuth(d.handleTransfers))
 	mux.HandleFunc("GET /api/v1/transfers/{id}", d.withAuth(d.handleTransfer))
 	mux.HandleFunc("DELETE /api/v1/transfers/{id}", d.withAuth(d.handleTransfer))
+	mux.HandleFunc("POST /api/v1/transfers/{id}/pause", d.withAuth(d.handleTransferAction))
+	mux.HandleFunc("POST /api/v1/transfers/{id}/resume", d.withAuth(d.handleTransferAction))
 	mux.HandleFunc("GET /api/v1/nodes", d.withAuth(d.handleNodes))
 	mux.HandleFunc("GET /api/v1/update", d.withAuth(d.handleUpdate))
 	mux.HandleFunc("POST /api/v1/update/apply", d.withAuth(d.handleUpdateApply))
@@ -265,4 +267,32 @@ func (d *Daemon) handleTransfer(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method not allowed"})
 	}
+}
+
+func (d *Daemon) handleTransferAction(w http.ResponseWriter, r *http.Request) {
+	if d.transfers == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]any{"ok": false, "error": "download is disabled on this daemon"})
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "id is required"})
+		return
+	}
+	var ok bool
+	switch {
+	case strings.HasSuffix(r.URL.Path, "/pause"):
+		ok = d.transfers.Pause(id)
+	case strings.HasSuffix(r.URL.Path, "/resume"):
+		ok = d.transfers.Resume(id)
+	default:
+		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "unknown action"})
+		return
+	}
+	if !ok {
+		writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": "transfer cannot perform this action"})
+		return
+	}
+	transfer, _ := d.transfers.Get(id)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "transfer": transfer})
 }
