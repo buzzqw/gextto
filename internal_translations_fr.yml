@@ -5172,6 +5172,7 @@ fra:
   "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Débit de téléchargement maximal observé %d KiB/s : limite à 80%% → %d KiB/s."
   "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Débit d'envoi maximal observé %d KiB/s : limite à 80%% → %d KiB/s."
   "Auto": "Auto"
+  "Auto attivo: Gextto misura la linea e adatta la velocità, senza un tetto fisso": "Auto actif : Gextto mesure la ligne et adapte la vitesse, sans plafond fixe"
   "Una fascia e limiti per ogni giorno; «Modalità» sceglie «Non attiva», «Limite» o «Auto». Oltre la mezzanotte conta il giorno di inizio.": "Une plage et des limites par jour ; « Mode » choisit « Inactif », « Limite » ou « Auto ». Une plage après minuit compte le jour où elle commence."
   "Accende la fascia oraria di questo giorno.": "Active la plage horaire de ce jour."
   "Accende la fascia e le toglie il limite: la banda va all'auto-tune.": "Active la plage et retire sa limite : la bande va à l'auto-tune."

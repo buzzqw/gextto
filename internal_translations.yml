@@ -4516,6 +4516,7 @@ eng:
   "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Highest download rate observed %d KiB/s: limit at 80%% → %d KiB/s."
   "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Highest upload rate observed %d KiB/s: limit at 80%% → %d KiB/s."
   "Auto": "Auto"
+  "Auto attivo: Gextto misura la linea e adatta la velocità, senza un tetto fisso": "Auto active: Gextto measures the line and adapts the speed, with no fixed cap"
   "Una fascia e limiti per ogni giorno; «Modalità» sceglie «Non attiva», «Limite» o «Auto». Oltre la mezzanotte conta il giorno di inizio.": "A window and limits for each day; «Mode» chooses «Off», «Limit» or «Auto». A window past midnight counts on the day it starts."
   "Accende la fascia oraria di questo giorno.": "Switch the time window of this day on."
   "Accende la fascia e le toglie il limite: la banda va all'auto-tune.": "Switch the window on and remove its limit: the bandwidth goes to the auto-tune."

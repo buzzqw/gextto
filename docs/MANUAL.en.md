@@ -296,8 +296,9 @@ release package the installer uses (README, *Install on Linux*).
   30 minutes traffic chart** below (the **download** and **upload** curves, the
   peak, the current speed and the line of the **active bandwidth limit**: base,
   schedule or exception; it is not drawn when the speed is *Auto*, i.e. when
-  Gextto measures the line and adapts). Speeds under 1 KB/s count as zero: that
-  is just protocol chatter, and the chart stays flat instead of twitching. It
+  Gextto measures the line and adapts, and in that case the card shows the
+  **Auto** badge, not "No limit"). Speeds under 1 KB/s count as zero: that is
+  just protocol chatter, and the chart stays flat instead of twitching. It
   refreshes on its own.
 - **To check** — below the strip: **stuck** downloads (with the reason, the
   next attempt and when they will be abandoned), **pending moves to the

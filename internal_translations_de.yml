@@ -5179,6 +5179,7 @@ deu:
   "Picco di download osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Höchste gemessene Downloadrate %d KiB/s: Grenze bei 80%% → %d KiB/s."
   "Picco di upload osservato %d KiB/s: limite all'80%% → %d KiB/s.": "Höchste gemessene Uploadrate %d KiB/s: Grenze bei 80%% → %d KiB/s."
   "Auto": "Auto"
+  "Auto attivo: Gextto misura la linea e adatta la velocità, senza un tetto fisso": "Auto aktiv: Gextto misst die Leitung und passt die Geschwindigkeit an, ohne feste Obergrenze"
   "Una fascia e limiti per ogni giorno; «Modalità» sceglie «Non attiva», «Limite» o «Auto». Oltre la mezzanotte conta il giorno di inizio.": "Ein Zeitfenster und Limits für jeden Tag; «Modus» wählt «Aus», «Limit» oder «Auto». Ein Fenster über Mitternacht zählt am Starttag."
   "Accende la fascia oraria di questo giorno.": "Schaltet das Zeitfenster dieses Tages ein."
   "Accende la fascia e le toglie il limite: la banda va all'auto-tune.": "Schaltet das Fenster ein und entfernt die Grenze: die Bandbreite geht an den Auto-Tune."

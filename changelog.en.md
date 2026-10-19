@@ -23,6 +23,9 @@ manual is online: [English](docs/MANUAL.en.md) ·
   data yet stays empty, instead of a ramp rising from zero to the first value.
   Speeds under 1 KB/s count as zero: that is just protocol chatter, and the
   chart stays flat instead of twitching.
+- **The Dashboard bandwidth tells the truth.** With **Auto** speed the
+  **In session** card shows the **Auto** badge instead of "No limit": the
+  speed is not free, Gextto is measuring the line and adapting to it.
 - **Translations.** The download counter reads "Torrents: 5 · HTTP: 0", right in
   every language; the engine tile on the Dashboard is called "Engine" in English
   and "Motor" in German.

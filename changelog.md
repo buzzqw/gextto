@@ -25,6 +25,9 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   in cui non ci sono ancora dati resta vuoto, invece di una rampa che saliva
   da zero fino al primo valore. Le velocità sotto 1 KB/s valgono 0: è solo
   rumore di protocollo, e il grafico resta piatto invece di tremare.
+- **La banda in Dashboard dice la verità.** Con la velocità **Auto** il
+  riquadro **In sessione** mostra il badge **Auto**, invece di «Nessun limite»:
+  la velocità non è libera, è Gextto che misura la linea e la adatta.
 - **Traduzioni.** Il contatore dei download dice «Torrent: 5 · HTTP: 0», giusto
   in ogni lingua; il riquadro del motore in Dashboard si chiama «Engine» in
   inglese e «Motor» in tedesco.

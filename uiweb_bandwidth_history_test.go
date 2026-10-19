@@ -132,8 +132,34 @@ func TestV2TrafficViewAutoHasNoLimit(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		state.rate_history.add(rateSample{At: now.Add(time.Duration(i) * time.Second), Down: 1024, Up: 512})
 	}
-	if view := v2TrafficViewFrom(state); view.HasLimit {
+	view := v2TrafficViewFrom(state)
+	if view.HasLimit {
 		t.Fatal("Auto speed must not show a limit line")
+	}
+	if !view.Auto {
+		t.Fatal("Auto speed must be reported, not shown as no limit")
+	}
+}
+
+// TestV2LiveTrafficAutoBadge checks the badge the session panel shows when the
+// speed is on Auto: it says Auto instead of "Nessun limite".
+func TestV2LiveTrafficAutoBadge(t *testing.T) {
+	var buffer bytes.Buffer
+	if err := v2Templates.ExecuteTemplate(&buffer, "v2_live_traffic", v2TrafficView{
+		Width:       trafficChartWidth,
+		Height:      trafficChartHeight,
+		Auto:        true,
+		CurrentDown: "0 B/s",
+		CurrentUp:   "0 B/s",
+	}); err != nil {
+		t.Fatalf("render v2_live_traffic: %v", err)
+	}
+	out := buffer.String()
+	if !strings.Contains(out, `title="Auto attivo: Gextto misura la linea e adatta la velocità, senza un tetto fisso">Auto</span>`) {
+		t.Fatalf("Auto badge missing in:\n%s", out)
+	}
+	if strings.Contains(out, "Nessun limite") {
+		t.Fatalf("Auto speed shown as no limit in:\n%s", out)
 	}
 }
 

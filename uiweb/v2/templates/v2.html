@@ -362,7 +362,7 @@
     <span class="traffic-stat up" title="Velocità di upload"><span aria-hidden="true">↑</span> {{.CurrentUp}}</span>
     {{if .HasData}}<span class="muted" title="Picco di download nel periodo">↓ {{.PeakDown}}</span>
     <span class="muted" title="Picco di upload nel periodo">↑ {{.PeakUp}}</span>{{end}}
-    {{if .HasLimit}}<span class="badge warn" title="Limite di banda attivo">Limite <strong>{{.LimitLabel}}</strong></span>{{else}}<span class="badge" title="Nessun limite di banda attivo">Nessun limite</span>{{end}}
+    {{if .HasLimit}}<span class="badge warn" title="Limite di banda attivo">Limite <strong>{{.LimitLabel}}</strong></span>{{else if .Auto}}<span class="badge" title="Auto attivo: Gextto misura la linea e adatta la velocità, senza un tetto fisso">Auto</span>{{else}}<span class="badge" title="Nessun limite di banda attivo">Nessun limite</span>{{end}}
   </div>
   {{if .HasData}}
   <svg class="traffic-chart" viewBox="0 0 {{.Width}} {{.Height}}" preserveAspectRatio="none" role="img" aria-label="Grafico della banda di rete, ultimi 30 minuti">
