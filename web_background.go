@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -603,6 +604,56 @@ func shouldLogQueueCounts(tick int, counts, last string) bool {
 	return tick > 1 && counts != last
 }
 
+// bg_restoredTorrentNames resolves the display names of the torrents whose
+// saved state was restored at start, so the startup line says which torrents
+// are involved instead of only how many. The live engine name wins, then the
+// release title recorded in the database, then the hash.
+func bg_restoredTorrentNames(torrents TorrentSession, db *Database, hashes []string) []string {
+	live := map[string]string{}
+	if torrents != nil {
+		for _, view := range torrents.List() {
+			hash := strings.ToLower(strings.TrimSpace(view.Hash))
+			if name := strings.TrimSpace(view.Name); hash != "" && name != "" {
+				live[hash] = name
+			}
+		}
+	}
+	names := make([]string, 0, len(hashes))
+	for _, hash := range hashes {
+		key := strings.ToLower(strings.TrimSpace(hash))
+		name := live[key]
+		if name == "" && db != nil {
+			if meta, err := db.TorrentMeta(key); err == nil && meta != nil {
+				name = strings.TrimSpace(meta.Release.Title)
+			}
+		}
+		if name == "" {
+			name = key
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// bg_torrentHashes lists the keys of a persisted state map.
+func bg_torrentHashes[T any](states map[string]T) []string {
+	hashes := make([]string, 0, len(states))
+	for hash := range states {
+		hashes = append(hashes, hash)
+	}
+	return hashes
+}
+
+// bg_restoredTorrentNamesLine formats the names for one log field, capping the
+// list so a large restore does not flood the line.
+func bg_restoredTorrentNamesLine(names []string, limit int) string {
+	if limit <= 0 || len(names) <= limit {
+		return strings.Join(names, ", ")
+	}
+	return strings.Join(names[:limit], ", ") + fmt.Sprintf(" (+%d)", len(names)-limit)
+}
+
 // ---------------------------------------------------------------------------
 
 // torrentEventWorker implements `torrent_event_worker`: it drives the
@@ -639,7 +690,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	postSeedMoves := map[string]struct{}{}
 	// Storage moves survive a restart: the retry schedule and the post-seed
 	// protection are saved in the database and restored here.
-	persistedMoves := restoreTorrentMoves(db, storageMoveRetries, postSeedMoves, time.Now())
+	persistedMoves := restoreTorrentMoves(torrents, db, storageMoveRetries, postSeedMoves, time.Now())
 	// Zero time: the first tick runs the completion recovery scan at once.
 	var lastRecoveryScan time.Time
 	metadataWaitStart := map[string]time.Time{}
@@ -651,14 +702,18 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		logging.Warn("could not restore metadata wait state", "error", err)
 	} else if len(restored) > 0 {
 		metadataFirstSeen = restored
-		logging.Info("restored metadata wait state", "torrents", len(restored))
+		names := bg_restoredTorrentNames(torrents, db, bg_torrentHashes(restored))
+		logging.Info("restored metadata wait state", "torrents", len(restored),
+			"names", bg_restoredTorrentNamesLine(names, 8))
 	}
 	stallWaitStart := map[string]StallWatch{}
 	if restored, err := db.LoadStallWatches(); err != nil {
 		logging.Warn("could not restore stalled torrent retry state", "error", err)
 	} else if len(restored) > 0 {
 		stallWaitStart = restored
-		logging.Info("restored stalled torrent retry state", "torrents", len(restored))
+		names := bg_restoredTorrentNames(torrents, db, bg_torrentHashes(restored))
+		logging.Info("restored stalled torrent retry state", "torrents", len(restored),
+			"names", bg_restoredTorrentNamesLine(names, 8))
 	}
 	// Periodic RAM-disk reconciliation: the metadata event fires once, so a
 	// missed event (restart/race) used to leave an oversized torrent on the
@@ -1470,7 +1525,7 @@ type persistedMove struct {
 // restored retry is marked in flight with a short grace: RetryStorageMoves then
 // clears it if the torrent already sits in its destination, or issues the move
 // again. A post-seed protection without its retry is stale and is dropped.
-func restoreTorrentMoves(db *Database, retries map[string]StorageMoveRetry, postSeedMoves map[string]struct{}, now time.Time) map[string]persistedMove {
+func restoreTorrentMoves(torrents TorrentSession, db *Database, retries map[string]StorageMoveRetry, postSeedMoves map[string]struct{}, now time.Time) map[string]persistedMove {
 	persisted := map[string]persistedMove{}
 	saved, err := db.LoadTorrentMoves()
 	if err != nil {
@@ -1498,7 +1553,9 @@ func restoreTorrentMoves(db *Database, retries map[string]StorageMoveRetry, post
 		}
 	}
 	if len(saved) > 0 {
-		logging.Info("restored pending storage moves", "torrents", len(saved))
+		names := bg_restoredTorrentNames(torrents, db, bg_torrentHashes(saved))
+		logging.Info("restored pending storage moves", "torrents", len(saved),
+			"names", bg_restoredTorrentNamesLine(names, 8))
 	}
 	return persisted
 }

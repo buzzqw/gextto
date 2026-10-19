@@ -26,6 +26,9 @@ manual is online: [English](docs/MANUAL.en.md) ·
 - **The Dashboard bandwidth tells the truth.** With **Auto** speed the
   **In session** card shows the **Auto** badge instead of "No limit": the
   speed is not free, Gextto is measuring the line and adapting to it.
+- **Clearer startup logs.** The lines that restore saved state (stalled
+  downloads, metadata waits, pending moves) now list the torrents involved, not
+  just how many there are, so it is immediately clear what they refer to.
 - **Translations.** The download counter reads "Torrents: 5 · HTTP: 0", right in
   every language; the engine tile on the Dashboard is called "Engine" in English
   and "Motor" in German.

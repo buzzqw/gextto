@@ -28,6 +28,9 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 - **La banda in Dashboard dice la verità.** Con la velocità **Auto** il
   riquadro **In sessione** mostra il badge **Auto**, invece di «Nessun limite»:
   la velocità non è libera, è Gextto che misura la linea e la adatta.
+- **Log di avvio più chiari.** Le righe che ripristinano lo stato salvato
+  (download fermi, attese dei metadati, spostamenti in sospeso) ora elencano i
+  torrent coinvolti, non solo quanti sono: si capisce subito di cosa si parla.
 - **Traduzioni.** Il contatore dei download dice «Torrent: 5 · HTTP: 0», giusto
   in ogni lingua; il riquadro del motore in Dashboard si chiama «Engine» in
   inglese e «Motor» in tedesco.

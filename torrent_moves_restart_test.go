@@ -17,13 +17,13 @@ func TestStorageMovesSurviveRestart(t *testing.T) {
 		"bbbb": {destination: "/archive/Movies", attempts: 0, nextAttempt: now},
 	}
 	postSeed := map[string]struct{}{"aaaa": {}, "cccc": {}}
-	persisted := restoreTorrentMoves(db, map[string]StorageMoveRetry{}, map[string]struct{}{}, now)
+	persisted := restoreTorrentMoves(nil, db, map[string]StorageMoveRetry{}, map[string]struct{}{}, now)
 	syncTorrentMoves(db, persisted, retries, postSeed)
 
 	// Worker after the restart.
 	restoredRetries := map[string]StorageMoveRetry{}
 	restoredPostSeed := map[string]struct{}{}
-	restoreTorrentMoves(db, restoredRetries, restoredPostSeed, now)
+	restoreTorrentMoves(nil, db, restoredRetries, restoredPostSeed, now)
 
 	if len(restoredRetries) != 2 {
 		t.Fatalf("restored retries = %+v, want 2", restoredRetries)
@@ -52,7 +52,7 @@ func TestSyncTorrentMovesRemovesFinishedMoves(t *testing.T) {
 	now := time.Now()
 	retries := map[string]StorageMoveRetry{"aaaa": {destination: "/archive/A", nextAttempt: now}}
 	postSeed := map[string]struct{}{}
-	persisted := restoreTorrentMoves(db, map[string]StorageMoveRetry{}, map[string]struct{}{}, now)
+	persisted := restoreTorrentMoves(nil, db, map[string]StorageMoveRetry{}, map[string]struct{}{}, now)
 	syncTorrentMoves(db, persisted, retries, postSeed)
 
 	var updatedAt string
