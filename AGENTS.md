@@ -15,6 +15,13 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   accompagna. Il changelog è pubblico e linkato dalla UI nella lingua
   dell'interfaccia: niente dettagli interni, hash, nomi di funzioni o elenchi di
   file.
+- **Interfaccia o logica operativa? Controlla i manuali.** Se la modifica tocca
+  la UI (`uiweb/v2`, template, JS/CSS, route, etichette, impostazioni) o la
+  logica operativa (acquisizione, coda, archivio, seed, ricerca, comportamento
+  del demone, CLI/TUI), verifica esplicitamente se `docs/MANUAL.it.md` e
+  `docs/MANUAL.en.md` vanno aggiornati. Se sì, aggiornali nello stesso commit;
+  se non serve, non è necessario aggiungere una voce. I manuali sono online:
+  l'aggiornamento non richiede `make build` né riavvio.
 - Non committare `bin/` né directory dati (`data/`, `gextto-data/`).
   `build_number` e `gx-torrent.build_number` invece **sono committati**: sono
   le sorgenti uniche dei numeri di build di Gextto e di gx-core, condivise tra
@@ -320,6 +327,13 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - Una nuova feature visibile va esposta **sia** nella UI di Gextto
   (`uiweb/v2`) **sia**, dove ha senso, nella pagina web del demone
   (`cmd/gx-torrent/ui.go`): non lasciarla raggiungibile solo via API.
+- **Prima di chiudere una modifica a UI o logica operativa, controlla i
+  manuali.** Vale per template, JS/CSS, route, etichette, impostazioni e per
+  acquisizione, coda, archivio, seed, ricerca, demone, CLI/TUI. Se il
+  comportamento visibile cambia, `docs/MANUAL.it.md` e `docs/MANUAL.en.md`
+  vanno aggiornati nello stesso commit; se la modifica riguarda gx-torrent,
+  controlla anche `docs/gx-torrent.md` e la sua pagina web. I manuali sono
+  online: l'aggiornamento non richiede `make build` né riavvio.
 - **Il `README` è documentazione a tutti gli effetti e va aggiornato a ogni
   modifica impattante per l'utente**, soprattutto quando è particolarmente utile
   o quando mette in risalto la bontà e la potenza di Gextto o di gx-core: non va
