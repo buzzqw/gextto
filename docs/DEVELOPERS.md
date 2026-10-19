@@ -340,6 +340,21 @@ published next to Gextto's:
 | `scripts/package-gx-torrent-windows.sh` | `gx-torrent-windows-<arch>.zip` (amd64, arm64) | `gx-torrent.exe` (native Windows service), `install-service.ps1`, `uninstall-service.ps1`, `README.txt` |
 | `scripts/package-gx-ed2k.sh` | `gx-ed2k-linux-<arch>.tar.gz` | eD2k/Kad search daemon, `run.sh`, systemd unit, install/uninstall scripts, README, `VERSION` |
 
+### eD2k Phase 0 gate
+
+`cmd/measure-ed2k` samples one already-aired gap per series from
+`GET /api/gaps`, uses the series alias when present, spaces the searches and
+applies the same exact-episode/quality/size/source floor as the fallback:
+
+```bash
+go run ./cmd/measure-ed2k \
+  -gextto http://127.0.0.1:8889 -daemon http://127.0.0.1:8899 \
+  -limit 30 -spacing 65s -min-sources 3 -out phase0.json
+```
+
+The spacing matters: peers throttle a burst, and a plain spread over the gap
+list overweights the shows with many missing episodes.
+
 Windows support is guarded in CI (`ci.yml`): `build-test` cross-compiles the
 engine and the daemon and runs `go vet` for Windows; `windows-platform` runs the
 platform tests on `windows-latest`; `windows-service` (non-blocking) installs

@@ -527,6 +527,11 @@ datagrams were addressed to byte-reversed IPs.
 
 ### Phase 0 sample — 30 gaps, 19 October 2026
 
+Reproduce with `go run ./cmd/measure-ed2k -gextto … -daemon … -limit 30
+-spacing 65s -min-sources 3`: it samples one already-aired gap per series,
+uses the alias when present, and applies the same floor as the fallback.
+
+
 A first sample of the Fase 0 gate: 30 gaps spread across the 475 open
 episodes, queried as `<series> SxxEyy` against the daemon (Kad + eD2k
 servers), 12 s timeout. At that point the client still used the longest token
