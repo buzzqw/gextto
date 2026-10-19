@@ -98,6 +98,9 @@ func TestMatchesQuery(t *testing.T) {
 	if MatchesQuery("The.Matrix.1999.720p.mkv", "Matrix 1080p") {
 		t.Fatal("unexpected match")
 	}
+	if !MatchesQuery("Matrix.1999.1080p.mkv", "The Matrix 1999") {
+		t.Fatal("stop words must not hide a match")
+	}
 }
 
 func TestKeywordIDIsStable(t *testing.T) {

@@ -1010,12 +1010,13 @@ func QueryTokens(query string) []string {
 	return out
 }
 
-// MatchesQuery reports whether a file name contains every token of the query.
-// Kad keyword results are indexed per word, not by phrase, so a client-side
-// filter is required to avoid showing unrelated files.
+// MatchesQuery reports whether a file name contains every searchable token of
+// the query. Kad keyword results are indexed per word, not by phrase, so a
+// client-side filter is required to avoid showing unrelated files. The token
+// list matches SearchTerms, so a name without "The" still matches "The Matrix".
 func MatchesQuery(name, query string) bool {
 	lower := strings.ToLower(name)
-	for _, token := range QueryTokens(query) {
+	for _, token := range SearchTerms(query) {
 		if !strings.Contains(lower, token) {
 			return false
 		}
