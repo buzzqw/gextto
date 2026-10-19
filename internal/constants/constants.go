@@ -61,6 +61,12 @@ var Commit = ""
 // be newer than the published build.
 var GxReleaseChannel = ""
 
+// GxEd2kChannel is the release channel a gx-ed2k binary was published on
+// ("continuous" or "stable"), stamped only by scripts/build-release.sh. A
+// local build leaves it empty, so the standalone daemon does not offer an
+// update that may be older than the checkout.
+var GxEd2kChannel = ""
+
 // BuiltAt is the build time (RFC 3339, UTC), stamped like Commit. A release is
 // offered as an update only when it was built after the running binary.
 var BuiltAt = ""

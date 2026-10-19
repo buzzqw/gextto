@@ -82,6 +82,13 @@ jobs:
           path: dist/gx-torrent-windows-*.zip*
           if-no-files-found: error
 
+      - name: Upload standalone gx-ed2k archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: gx-ed2k-linux-${{ matrix.arch }}
+          path: dist/gx-ed2k-linux-${{ matrix.arch }}.tar.gz*
+          if-no-files-found: error
+
   publish:
     name: publish release
     needs: package
@@ -113,4 +120,6 @@ jobs:
             dist/gx-torrent-linux-*.tar.gz.sha256
             dist/gx-torrent-windows-*.zip
             dist/gx-torrent-windows-*.zip.sha256
+            dist/gx-ed2k-linux-*.tar.gz
+            dist/gx-ed2k-linux-*.tar.gz.sha256
             dist/release.json

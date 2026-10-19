@@ -1639,7 +1639,10 @@ Nella pagina **Sorgenti** la voce **eD2k e Kad** mostra la spia della
 connessione: **aperta** (UPnP o porte raggiungibili), **limitata**
 (firewall/NAT o LowID) oppure **sconosciuta**. Se è limitata, apri UDP 4672 e TCP
 4662 sul router o attiva UPnP. La stessa spia è nella pagina del demone
-`gx-ed2k`, insieme a nodi, porta e versione.
+`gx-ed2k`, insieme a nodi, porta e versione. Nella pagina standalone del demone,
+**Controlla aggiornamenti** confronta la build con l'ultima release pubblicata e
+mostra il link all'archivio `gx-ed2k-linux-<arch>`; una build locale non propone
+aggiornamenti.
 
 #### Qualità e upgrade
 

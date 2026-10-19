@@ -102,7 +102,7 @@ if [[ "${GEXTTO_SKIP_GXED2K:-0}" != "1" ]]; then
         (
             cd "$ROOT"
             CGO_ENABLED=0 go build -trimpath -buildvcs=false \
-                -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxEd2kBuild=$ED_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$COMMIT -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$BUILT_AT" \
+                -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxEd2kBuild=$ED_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$COMMIT -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$BUILT_AT -X github.com/buzzqw/gextto/internal/constants.GxEd2kChannel=${GEXTTO_GX_CHANNEL:-}" \
                 -o "$ED_OUT.new" ./cmd/gx-ed2k
         )
         mv -f "$ED_OUT.new" "$ED_OUT"

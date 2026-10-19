@@ -35,6 +35,11 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   automatico interroga anche i **titoli alternativi** della serie (per esempio
   «Murdoch Mysteries» per «I misteri di Murdoch»), così un titolo localizzato
   non nasconde i release con il nome originale.
+- **gx-ed2k standalone, con aggiornamenti.** L'archivio Linux del demone di
+  ricerca esce ora insieme alle altre release (stessa cartella di download) e
+  la sua pagina ha **Controlla aggiornamenti**: confronta la build con
+  l'ultima pubblicata e, se è più nuova, dà il link all'archivio giusto per
+  l'architettura. Una build compilata dal codice locale non propone nulla.
 - **Aggiornamenti più sicuri.** Un aggiornamento, dal pulsante **Aggiorna** o
   rilanciando l'installer, è riuscito solo quando l'interfaccia della nuova
   versione risponde. Se la nuova versione cade dopo qualche secondo dall'avvio,

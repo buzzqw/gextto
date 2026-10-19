@@ -41,7 +41,7 @@ disabled for eD2k-only releases.
   - managed/standalone modes, token authentication, standalone Host/Origin
     guards;
   - `/api/v1/health`, `/api/v1/status`, `/api/v1/search`, `/api/v1/link`,
-    `/api/v1/nodes`;
+    `/api/v1/nodes`, `/api/v1/update`;
   - a server-rendered page in Italian, English, German, French, Spanish and
     Polish, with the shared design system (`theme.css`, `common.js`,
     `icons.svg`).
@@ -115,10 +115,22 @@ reads the API-only keys `ed2k_nodes_url`, `ed2k_serverlist_url` and
    `ed2k_fallback` is on **and** the daemon reports `download: true`
    (`ed2kFallbackEligible`). A candidate must match the configured episode
    exactly, have a recognised quality, a plausible size and at least
-   `ed2k_min_sources` sources.
+   `ed2k_min_sources` sources. The query runs the configured series name and
+   its aliases in parallel, so a localized title does not hide releases
+   published under the original one.
 3. The transfer router (`multi_engine.go`) is ready and tested: it merges rows,
    labels `TorrentView.Network`, routes by hash and persists the route. It is
    not installed while the eD2k download capability is unavailable.
+
+## Standalone updates
+
+`release.json` carries `gx_ed2k_build`/`gx_ed2k_version`, and the release
+workflow publishes `gx-ed2k-linux-<arch>.tar.gz` next to the Gextto and
+gx-torrent archives. The standalone page's **Check for updates** calls
+`/api/v1/update`: it fetches the manifest for the stamped channel, compares the
+build and links to the archive when a newer one exists. Binaries built from a
+checkout have no channel and answer `local_build: true`, so they never offer an
+update that may be older than the source.
 
 ## Packaging
 

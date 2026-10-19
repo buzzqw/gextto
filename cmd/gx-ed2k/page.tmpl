@@ -52,6 +52,7 @@ th.c-size{width:7rem}th.c-sources{width:6rem}th.c-origin{width:8rem}th.c-act{wid
   <div class="stat"><b>{{.Mode}}</b><span>{{.T.mode}}</span></div>
   <div class="stat"><b>{{.Version}}</b><span>{{.T.version}}</span></div>
 </div>
+<p class="muted"><button type="button" class="ghost" id="ed2k-update-check" title="{{.T.update_check}}">{{.T.update_check}}</button> <span id="ed2k-update-text" role="status" aria-live="polite"></span></p>
 <div class="note"><strong>{{.T.search_only}}</strong> {{.T.search_only_note}}</div>
 
 <section aria-labelledby="ed2k-search-title">
@@ -184,6 +185,38 @@ window.__ed2kI18n = {{.ClientI18n}};
       info.textContent = t("link_invalid") + ": " + error.message;
     });
   });
+  var updateButton = el("ed2k-update-check");
+  var updateText = el("ed2k-update-text");
+  if(updateButton){
+    updateButton.addEventListener("click", function(){
+      updateButton.disabled = true;
+      updateText.textContent = t("update_checking");
+      fetch("/api/v1/update", {cache:"no-store", headers:{"Accept":"application/json"}})
+        .then(function(response){
+          return response.json().then(function(body){
+            if(!response.ok && !body.error) throw new Error(response.status);
+            return body;
+          });
+        })
+        .then(function(body){
+          if(body.local_build){ updateText.textContent = t("update_local"); return; }
+          if(body.available && body.url){
+            updateText.textContent = "";
+            var link = document.createElement("a");
+            link.href = body.url;
+            link.target = "_blank";
+            link.rel = "noopener";
+            link.textContent = t("update_available") + " " + (body.latest || "");
+            updateText.appendChild(link);
+            return;
+          }
+          if(body.ok){ updateText.textContent = t("update_current") + " " + (body.current || ""); return; }
+          updateText.textContent = t("update_error");
+        })
+        .catch(function(){ updateText.textContent = t("update_error"); })
+        .then(function(){ updateButton.disabled = false; });
+    });
+  }
   el("ed2k-lang").addEventListener("change", function(event){
     var url = new URL(window.location.href);
     url.searchParams.set("lang", event.target.value);

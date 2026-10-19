@@ -27,7 +27,7 @@ gx-torrent:
 gx-ed2k:
 	ED_BUILD="$$(GEXTTO_BUMP_BUILD=1 scripts/next-gx-build-number.sh gx-ed2k.build_number)"; \
 	CGO_ENABLED=0 go build -trimpath -buildvcs=false \
-		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxEd2kBuild=$$ED_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$$(git rev-parse HEAD 2>/dev/null) -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxEd2kBuild=$$ED_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$$(git rev-parse HEAD 2>/dev/null) -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$$(date -u +%Y-%m-%dT%H:%M:%SZ) -X github.com/buzzqw/gextto/internal/constants.GxEd2kChannel=$${GEXTTO_GX_CHANNEL:-}" \
 		-o bin/gx-ed2k ./cmd/gx-ed2k; \
 	printf 'built bin/gx-ed2k (build %s)\n' "$$ED_BUILD"
 

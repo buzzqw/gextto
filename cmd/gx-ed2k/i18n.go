@@ -56,6 +56,12 @@ var uiCatalog = map[string][5]string{
 	"theme_light":       {"Tema: chiaro", "Design: hell", "Thème : clair", "Tema: claro", "Motyw: jasny"},
 	"theme_dark":        {"Tema: scuro", "Design: dunkel", "Thème : sombre", "Tema: oscuro", "Motyw: ciemny"},
 	"theme_switch":      {"Cambia tema (automatico, chiaro, scuro)", "Design wechseln (automatisch, hell, dunkel)", "Changer de thème (automatique, clair, sombre)", "Cambiar tema (automático, claro, oscuro)", "Zmień motyw (automatyczny, jasny, ciemny)"},
+	"update_check":      {"Controlla aggiornamenti", "Nach Updates suchen", "Rechercher des mises à jour", "Buscar actualizaciones", "Sprawdź aktualizacje"},
+	"update_checking":   {"Controllo…", "Prüfe…", "Vérification…", "Comprobando…", "Sprawdzanie…"},
+	"update_available":  {"Aggiornamento disponibile", "Update verfügbar", "Mise à jour disponible", "Actualización disponible", "Dostępna aktualizacja"},
+	"update_current":    {"Aggiornato", "Aktuell", "À jour", "Actualizado", "Aktualna"},
+	"update_local":      {"Build locale: aggiorna dal codice sorgente", "Lokaler Build: aus dem Quellcode aktualisieren", "Build local : mettre à jour depuis le code source", "Compilación local: actualiza desde el código", "Kompilacja lokalna: zaktualizuj z kodu źródłowego"},
+	"update_error":      {"Controllo non riuscito", "Prüfung fehlgeschlagen", "Échec de la vérification", "Error al comprobar", "Sprawdzanie nie powiodło się"},
 }
 
 // clientKeys are the strings the page JavaScript needs; they are injected as
@@ -121,6 +127,12 @@ var uiEnglish = map[string]string{
 	"theme_light":       "Theme: light",
 	"theme_dark":        "Theme: dark",
 	"theme_switch":      "Switch theme (automatic, light, dark)",
+	"update_check":      "Check for updates",
+	"update_checking":   "Checking…",
+	"update_available":  "Update available",
+	"update_current":    "Up to date",
+	"update_local":      "Local build: update from the source code",
+	"update_error":      "Update check failed",
 }
 
 // uiStrings returns the page dictionary for lang. English (or an unknown

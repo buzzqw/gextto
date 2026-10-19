@@ -25,6 +25,7 @@ func (d *Daemon) routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/search", d.withAuth(d.handleSearch))
 	mux.HandleFunc("POST /api/v1/link", d.withAuth(d.handleLink))
 	mux.HandleFunc("GET /api/v1/nodes", d.withAuth(d.handleNodes))
+	mux.HandleFunc("GET /api/v1/update", d.withAuth(d.handleUpdate))
 
 	mux.HandleFunc("GET /{$}", d.handleUI)
 	mux.HandleFunc("GET /ui", d.handleUI)

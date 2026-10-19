@@ -33,6 +33,11 @@ manual is online: [English](docs/MANUAL.en.md) ·
   fallback also queries the series' **alternate titles** (for example
   "Murdoch Mysteries" for the Italian title), so a localized name does not hide
   releases published under the original one.
+- **Standalone gx-ed2k, with updates.** The search daemon's Linux archive now
+  ships with the other releases (same download folder) and its page has
+  **Check for updates**: it compares the build with the latest published one
+  and, when newer, links to the archive for the right architecture. A build
+  compiled from local source offers nothing.
 - **Safer updates.** An update, from the **Update** button or by running the
   installer again, succeeds only when the new version's web interface answers.
   If the new version goes down a few seconds after starting, the previous one

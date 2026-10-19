@@ -1584,7 +1584,9 @@ On the **Sources** page the **eD2k and Kad** entry shows the connection sensor:
 **open** (UPnP or reachable ports), **limited** (firewall/NAT or LowID) or
 **unknown**. When it is limited, open UDP 4672 and TCP 4662 on the router or
 enable UPnP. The same sensor is on the `gx-ed2k` daemon page, next to nodes, port
-and version.
+and version. On the daemon's standalone page, **Check for updates** compares the
+build with the latest published release and links to the
+`gx-ed2k-linux-<arch>` archive; a local build does not offer updates.
 
 #### Quality and upgrades
 

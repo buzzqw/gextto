@@ -61,8 +61,11 @@ type Manifest struct {
 	GxCommit string `json:"gx_torrent_commit"`
 	// GxVersion is gx-core's own version ("1.1.<gx build>") in the release;
 	// empty in manifests published before it was added.
-	GxVersion string   `json:"gx_version,omitempty"`
-	Commits   []Commit `json:"commits"`
+	GxVersion string `json:"gx_version,omitempty"`
+	// GxEd2kVersion is the standalone gx-ed2k build in the release.
+	GxEd2kVersion string   `json:"gx_ed2k_version,omitempty"`
+	GxEd2kBuild   int64    `json:"gx_ed2k_build,omitempty"`
+	Commits       []Commit `json:"commits"`
 }
 
 // AssetURL is the download URL of a release asset on a channel: "stable"
