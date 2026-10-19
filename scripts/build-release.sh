@@ -126,6 +126,17 @@ grep -qx './gx-torrent' <<< "$gx_contents" \
 [[ "$(root_mode "$GX_ARCHIVE")" == "drwxr-xr-x" ]] \
   || { echo "the standalone archive root is $(root_mode "$GX_ARCHIVE"), not drwxr-xr-x" >&2; exit 1; }
 
+# Standalone gx-ed2k: the search daemon on its own (web page and /api/v1), for
+# operators who want eD2k/Kad search without Gextto.
+ED2K_ARCHIVE="$OUTPUT_DIR/gx-ed2k-linux-${ARCH}.tar.gz"
+"$ROOT/scripts/package-gx-ed2k.sh" --binary "$ROOT/bin/gx-ed2k" --arch "$ARCH" \
+  --output "$ED2K_ARCHIVE" ${LABEL:+--label "$LABEL"}
+ed2k_contents="$(tar -tzf "$ED2K_ARCHIVE")"
+grep -qx './gx-ed2k' <<< "$ed2k_contents" \
+  || { echo "gx-ed2k is missing from the standalone archive" >&2; exit 1; }
+[[ "$(root_mode "$ED2K_ARCHIVE")" == "drwxr-xr-x" ]] \
+  || { echo "the gx-ed2k archive root is $(root_mode "$ED2K_ARCHIVE"), not drwxr-xr-x" >&2; exit 1; }
+
 # Windows package: the daemon as a native service, built for the same
 # architecture (the exe is static, so no glibc baseline applies).
 case "$ARCH" in

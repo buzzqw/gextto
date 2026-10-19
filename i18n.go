@@ -285,15 +285,15 @@ func (i *I18nDb) SetBulk(lang string, values map[string]string) error {
 // added.
 func (i *I18nDb) SeedDefaultTranslations() (int, error) {
 	defer i.invalidateCache()
-	// Older installations may still contain translations for the removed
-	// aMule/eD2k integration. They are not part of the current UI and would
-	// otherwise keep obsolete options visible in the translation editor.
+	// Older installations may still contain translations for the removed aMule
+	// integration (and the old "fallback eD2k" option, replaced by the native
+	// gx-ed2k provider). They would otherwise keep obsolete options visible in
+	// the translation editor. Current eD2k/Kad strings are NOT obsolete.
 	if _, err := i.db.Exec(`DELETE FROM translations
-		WHERE lower(key) LIKE '%ed2k%'
-		   OR lower(value) LIKE '%ed2k%'
-		   OR lower(key) LIKE '%amule%'
-		   OR lower(value) LIKE '%amule%'`); err != nil {
-		return 0, fmt.Errorf("remove obsolete aMule/eD2k translations: %w", err)
+		WHERE lower(key) LIKE '%amule%'
+		   OR lower(value) LIKE '%amule%'
+		   OR key = 'Gap Filling — Fallback eD2k (cerca su eD2k se Jackett non trova nulla)'`); err != nil {
+		return 0, fmt.Errorf("remove obsolete aMule translations: %w", err)
 	}
 	inserted := 0
 	for _, catalog := range []struct {

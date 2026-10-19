@@ -58,6 +58,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/event-hooks", EventHooksView)
 	handle(s, mux, "POST /api/event-hooks", SaveEventHooks)
 	handle(s, mux, "GET /api/providers/status", ProvidersStatusView)
+	handle(s, mux, "GET /api/ed2k/status", Ed2kStatus)
 	handle(s, mux, "POST /api/providers/status", ClearProvidersStatus)
 	handle(s, mux, "GET /api/media-info", MediaInfoGet)
 	handle(s, mux, "POST /api/media-info/probe", MediaInfoProbe)

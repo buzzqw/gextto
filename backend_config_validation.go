@@ -21,7 +21,7 @@ func validateBackendSetting(key, value string) error {
 		default:
 			return fmt.Errorf("torrent_backend must be qbittorrent or gx-torrent")
 		}
-	case "qbittorrent_url", "gxtorrent_url":
+	case "qbittorrent_url", "gxtorrent_url", "ed2k_url":
 		if raw == "" {
 			return nil
 		}
@@ -244,6 +244,16 @@ func validateNumericSetting(key, value string) error {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || parsed < 1 || parsed > 65535 {
 			return fmt.Errorf("%s must be a port between 1 and 65535", key)
+		}
+	case key == "ed2k_min_sources":
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 0 || parsed > 1000 {
+			return fmt.Errorf("%s must be between 0 and 1000", key)
+		}
+	case key == "ed2k_search_timeout_secs":
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 5 || parsed > 120 {
+			return fmt.Errorf("%s must be between 5 and 120 seconds", key)
 		}
 	}
 	return nil

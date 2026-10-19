@@ -693,7 +693,13 @@ manualmente il JSON se non stai usando direttamente l'API.
   aggiunta alla libreria. Le liste esistono solo su TMDB: con la sola chiave
   TVDB la ricerca dei titoli passa a TVDB. Le card sono mostrate in una griglia a cinque colonne;
   un titolo già in libreria porta il badge **Già in lista** e il pulsante di
-  aggiunta è disattivato, così non crei duplicati per errore.
+  aggiunta è disattivato, così non crei duplicati per errore. Sotto la ricerca
+  release c'è il campo per **incollare un link `ed2k://`**: Gextto lo verifica e
+  lo mostra come risultato con nome, dimensione e hash. Se la ricerca eD2k/Kad
+  è attiva, i risultati della rete compaiono nella stessa tabella con il badge
+  **eD2k** e il numero di fonti; il pulsante per accodarli resta spento finché
+  il trasferimento eD2k non è disponibile, e in quel caso la riga dice **Solo
+  ricerca**.
 - **Archivio** — ricerca full-text delle release passate con paginazione, accoda
   in blocco, copia magnet, elimina; tab **Serie/Film dal feed**. La ricerca
   nell'archivio locale è **immediata**: parte da sola mentre digiti (dai tre
@@ -1594,6 +1600,39 @@ salvata** finché non li salvi.
 | Filtri contenuto esclusi | Le release che contengono queste parole o script (es. [porno]) vengono escluse. |
 | Filtri per sorgente | Parole chiave da accettare o scartare per una singola sorgente, con attivazione per riga. |
 | Cartelle osservate | Aggiunge automaticamente i .torrent/.magnet trovati nelle cartelle indicate (ricorsiva, elimina dopo). |
+
+**eD2k e Kad**
+
+La rete eD2k/Kad è un **provider di ricerca**: i suoi risultati compaiono accanto
+ai torrent, con il nome del file, la dimensione, l'hash MD4 e il numero di fonti.
+Gextto parla con il demone `gx-ed2k`, che è un client di **sola ricerca**: non
+scarica, non carica e non condivide file. Un risultato eD2k è quindi mostrato e
+verificabile (anche incollando un link `ed2k://`), ma il pulsante per accodarlo
+resta spento finché il trasferimento eD2k non esiste. La funzione è spenta per
+default: senza il tuo consenso Gextto non contatta la rete.
+
+| Impostazione | Cosa fa |
+|---|---|
+| Ricerca eD2k/Kad | Attiva il provider e avvia il demone `gx-ed2k`. Spento di default. |
+| gx-ed2k — URL Web API | Indirizzo del demone, di solito `http://127.0.0.1:8899`. |
+| gx-ed2k — token API | Token del demone, se non ascolta solo in locale. |
+| Usa eD2k quando i torrent non trovano nulla | Secondo interruttore, separato: solo nel passaggio approfondito del gap filling, e solo se torrent episodio e stagione non hanno prodotto nulla, Gextto cerca lo stesso episodio su eD2k/Kad. Spento di default. |
+| Fonti minime per il fallback | Soglia di fonti eD2k per accettare automaticamente un risultato. La ricerca manuale mostra tutto. *(Unità: fonti; 0 = nessun minimo)* |
+| Timeout della ricerca eD2k | Tempo massimo di una ricerca eD2k/Kad; allo scadere restituisce i risultati già arrivati. *(Unità: secondi)* |
+| Apri la porta Kad con UPnP | Chiede al router di aprire UDP 4672 e TCP 4662 con UPnP. Se funziona la connessione risulta **aperta** e i server eD2k assegnano un HighID; se il router non lo supporta resta **limitata** e serve il port forwarding manuale. |
+
+Il fallback automatico accetta solo un risultato che corrisponde esattamente
+all'episodio, ha una qualità riconosciuta, una dimensione plausibile e almeno le
+fonti minime. In tutti gli altri casi il risultato resta visibile nella ricerca
+manuale e il buco non si chiude: meglio un episodio mancante che un file
+sbagliato in libreria. Se `gx-ed2k` non è raggiungibile, i torrent continuano
+senza alcun effetto.
+
+Nella pagina **Sorgenti** la voce **eD2k e Kad** mostra la spia della
+connessione: **aperta** (UPnP o porte raggiungibili), **limitata**
+(firewall/NAT o LowID) oppure **sconosciuta**. Se è limitata, apri UDP 4672 e TCP
+4662 sul router o attiva UPnP. La stessa spia è nella pagina del demone
+`gx-ed2k`, insieme a nodi, porta e versione.
 
 #### Qualità e upgrade
 

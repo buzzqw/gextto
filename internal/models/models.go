@@ -434,6 +434,18 @@ type Release struct {
 	Episode      *int64  `json:"episode"`
 	IsPack       bool    `json:"is_pack"`
 	EpisodeRange []int64 `json:"episode_range"`
+	// Network names the acquisition network: "" or "torrent" for BitTorrent,
+	// "ed2k" for a file found on Kad/eD2k. The provider sets it so the UI can
+	// label a result without guessing from the link.
+	Network string `json:"network,omitempty"`
+	// Ed2kLink is the `ed2k://|file|...` link of an eD2k result. A release has
+	// exactly one transfer identity: Magnet, TorrentURL or Ed2kLink.
+	Ed2kLink string `json:"ed2k_link,omitempty"`
+	// Sources is the eD2k source count (the number of clients sharing the
+	// file). It is deliberately not mapped onto Seeders: a Kad source count is
+	// a different measure and must not feed the torrent score as if it were a
+	// swarm.
+	Sources int64 `json:"sources,omitempty"`
 	// InProgressEpisodes is the episode count an "in progress" pack declares
 	// ([IN CORSO][02/08] -> 2), 0 for every other release. Italian sites update
 	// the listing before the .torrent, so the acquisition loop compares the two.
@@ -517,6 +529,13 @@ type TorrentView struct {
 	Name         string  `json:"name"`
 	Progress     float64 `json:"progress"`
 	State        string  `json:"state"`
+	// Network is the acquisition network of this row: "" or "torrent" for a
+	// torrent, "ed2k" for a file downloaded on eD2k. It is set by the
+	// multi-engine router; a single torrent engine leaves it empty.
+	Network string `json:"network,omitempty"`
+	// Sources is the eD2k source count. It is not NumSeeds: eD2k sources are
+	// clients sharing the whole file, not a BitTorrent swarm.
+	Sources int `json:"sources,omitempty"`
 	DownloadRate uint64  `json:"download_rate"`
 	UploadRate   uint64  `json:"upload_rate"`
 	// Total rates include protocol overhead; the fields above are payload-only.

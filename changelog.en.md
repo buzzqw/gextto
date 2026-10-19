@@ -13,6 +13,23 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 19 October 2026
 
+- **eD2k/Kad search, when torrents are not enough.** An optional search
+  provider, off by default, searches Kad and eD2k servers through the `gx-ed2k`
+  daemon (pure Go, our own). In manual search the eD2k results appear next to
+  the torrent ones with a network badge and the source count; a pasted
+  `ed2k://` link is checked and shown with name, size and hash. Configuration →
+  Sources has an **eD2k and Kad** group: the switch, the daemon URL and token, a
+  second switch to use it in gap filling only when torrents find nothing, the
+  source floor and the timeout. The automatic fallback is off and accepts only
+  an exact episode match with a recognised quality. On the **Sources** page the
+  **eD2k and Kad** entry shows a connection sensor (**open**, **limited** by
+  firewall/NAT, **unknown**) and the daemon tries to open the Kad port with
+  **UPnP** (UDP 4672 and TCP 4662): when it works eD2k servers assign a HighID.
+  Learned Kad nodes are saved and reused on restart. **There is no eD2k
+  transfer**: the daemon says it can only search and the add button stays
+  disabled, so the library cannot fill with wrong files. The **Downloads**
+  search has a **Kad** checkbox: tick it to include the network in that single
+  search, next to DB, web and indexers.
 - **Safer updates.** An update, from the **Update** button or by running the
   installer again, succeeds only when the new version's web interface answers.
   If the new version goes down a few seconds after starting, the previous one

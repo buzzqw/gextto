@@ -14,6 +14,24 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 19 ottobre 2026
 
+- **Ricerca eD2k/Kad, quando i torrent non bastano.** Arriva un provider di
+  ricerca opzionale, spento di default, che cerca su Kad e sui server eD2k con
+  il demone `gx-ed2k` (Go puro, nostro). Nella ricerca manuale i risultati eD2k
+  compaiono accanto ai torrent con il badge della rete e il numero di fonti; un
+  link `ed2k://` incollato viene verificato e mostrato con nome, dimensione e
+  hash. In Configurazione → Sorgenti c'è il gruppo **eD2k e Kad**: accensione,
+  indirizzo e token del demone, un secondo interruttore per usarlo nel gap
+  filling solo quando i torrent non trovano nulla, soglia di fonti e timeout.
+  Il fallback automatico è spento e accetta solo un episodio esatto con qualità
+  riconosciuta. Nella pagina **Sorgenti** la voce **eD2k e Kad** mostra una spia
+  della connessione (**aperta**, **limitata** da firewall/NAT, **sconosciuta**) e
+  il demone prova ad aprire la porta Kad con **UPnP** (UDP 4672 e TCP 4662): se
+  funziona i server eD2k assegnano un HighID. I nodi Kad imparati vengono salvati
+  e riusati al riavvio. **Il trasferimento eD2k non c'è**: il demone dichiara di
+  saper solo cercare e il pulsante per accodare resta disattivato, quindi la
+  libreria non può riempirsi di file sbagliati. Nella ricerca di **Scarico** c'è
+  la casella **Kad**: spuntala per includere la rete anche in quella singola
+  ricerca, oltre a DB, web e indexer.
 - **Aggiornamenti più sicuri.** Un aggiornamento, dal pulsante **Aggiorna** o
   rilanciando l'installer, è riuscito solo quando l'interfaccia della nuova
   versione risponde. Se la nuova versione cade dopo qualche secondo dall'avvio,

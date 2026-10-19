@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.T.title}}</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="/favicon.ico">
+<script>try{var m=localStorage.getItem('gx-theme');if(m==='light'||m==='dark')document.documentElement.setAttribute('data-theme',m);}catch(e){}</script>
+<link rel="stylesheet" href="/assets/theme.css">
+<style>
+main{max-width:1200px;margin:0 auto;padding:20px 16px 40px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px}
+.stat b{display:block;font-size:18px}
+.stat span{color:var(--muted);font-size:12px}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
+input[type=search],input[type=text]{min-width:min(460px,80vw)}
+table{width:100%;border-collapse:separate;border-spacing:0;margin-top:10px;table-layout:fixed;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;background:var(--surface)}
+tbody tr:hover td{background:var(--hover)}
+td.name{overflow-wrap:anywhere}
+th.c-size{width:7rem}th.c-sources{width:6rem}th.c-origin{width:8rem}th.c-act{width:7rem}
+.badge{font-size:11.5px;padding:1px 7px;border-radius:6px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.note{border-left:3px solid var(--warn);padding:8px 12px;margin:12px 0;background:var(--surface);border-radius:var(--radius)}
+@media(max-width:760px){th.c-origin,td.origin{display:none}th.c-sources,td.sources{width:4.5rem}}
+</style></head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/" title="gx-ed2k"><img src="/favicon.ico" alt=""><span>gx-ed2k</span></a>
+  <span class="spacer"></span>
+  <label class="sr-only" for="ed2k-lang">{{.T.language}}</label>
+  <select id="ed2k-lang" title="{{.T.language}}" aria-label="{{.T.language}}">
+    <option value="en"{{if eq .Lang "en"}} selected{{end}}>English</option>
+    <option value="it"{{if eq .Lang "it"}} selected{{end}}>Italiano</option>
+    <option value="de"{{if eq .Lang "de"}} selected{{end}}>Deutsch</option>
+    <option value="fr"{{if eq .Lang "fr"}} selected{{end}}>Français</option>
+    <option value="es"{{if eq .Lang "es"}} selected{{end}}>Español</option>
+    <option value="pl"{{if eq .Lang "pl"}} selected{{end}}>Polski</option>
+  </select>
+  <button type="button" class="ghost icon" data-theme-switch data-label-auto="{{.T.theme_auto}}" data-label-light="{{.T.theme_light}}" data-label-dark="{{.T.theme_dark}}" aria-label="{{.T.theme_auto}}" title="{{.T.theme_switch}}"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
+</header>
+<main>
+<div class="page-head"><div class="grow"><h1>{{.T.title}}</h1><p class="muted">{{.T.subtitle}}</p></div></div>
+<div class="grid">
+  <div class="stat"><b id="ed2k-nodes">{{.Nodes}}</b><span>{{.T.nodes}}</span></div>
+  <div class="stat"><b id="ed2k-port">{{.UDPPort}}</b><span>{{.T.udp_port}}</span></div>
+  <div class="stat"><b id="ed2k-reach" title="{{.T.reach_help}}">{{.Reach}}</b><span>{{.T.reachability}}</span></div>
+  <div class="stat"><b>{{.Mode}}</b><span>{{.T.mode}}</span></div>
+  <div class="stat"><b>{{.Version}}</b><span>{{.T.version}}</span></div>
+</div>
+<div class="note"><strong>{{.T.search_only}}</strong> {{.T.search_only_note}}</div>
+
+<section aria-labelledby="ed2k-search-title">
+<h2 id="ed2k-search-title">{{.T.search}}</h2>
+<form class="row" id="ed2k-search-form" role="search">
+  <label>{{.T.search_query}}<input type="search" id="ed2k-q" name="q" autocomplete="off" required maxlength="256" title="{{.T.search_tooltip}}"></label>
+  <button type="submit" title="{{.T.search_tooltip}}">{{.T.search}}</button>
+</form>
+<p class="muted" id="ed2k-search-info" role="status" aria-live="polite"></p>
+<h3>{{.T.results}}</h3>
+<table>
+  <caption class="sr-only">{{.T.results}}</caption>
+  <thead><tr><th scope="col">{{.T.name}}</th><th scope="col" class="c-size">{{.T.size}}</th><th scope="col" class="c-sources">{{.T.sources}}</th><th scope="col" class="c-origin">{{.T.origin}}</th><th scope="col" class="c-act"><span class="sr-only">{{.T.link}}</span></th></tr></thead>
+  <tbody id="ed2k-rows"></tbody>
+</table>
+</section>
+
+<section aria-labelledby="ed2k-link-title">
+<h2 id="ed2k-link-title">{{.T.link_title}}</h2>
+<p class="muted">{{.T.link_hint}}</p>
+<form class="row" id="ed2k-link-form">
+  <label for="ed2k-link">{{.T.link}}<input type="text" id="ed2k-link" name="link" spellcheck="false" autocomplete="off" placeholder="ed2k://|file|...|/" title="{{.T.link_hint}}"></label>
+  <button type="submit" title="{{.T.link_hint}}">{{.T.validate}}</button>
+</form>
+<p id="ed2k-link-info" role="status" aria-live="polite"></p>
+</section>
+
+<footer><p class="muted">{{.T.footer}}</p></footer>
+</main>
+<script src="/assets/common.js"></script>
+<script>
+window.__ed2kI18n = {{.ClientI18n}};
+(function(){
+  "use strict";
+  function t(k){ return (window.__ed2kI18n && window.__ed2kI18n[k]) || k; }
+  function el(id){ return document.getElementById(id); }
+  function fmtBytes(n){
+    if(!n || n < 0) return "—";
+    var u = ["B","KiB","MiB","GiB","TiB"], i = 0;
+    while(n >= 1024 && i < u.length - 1){ n /= 1024; i++; }
+    return (i ? n.toFixed(1) : n) + " " + u[i];
+  }
+  function cell(text, cls){
+    var td = document.createElement("td");
+    if(cls) td.className = cls;
+    td.textContent = text;
+    return td;
+  }
+  function render(results){
+    var body = el("ed2k-rows");
+    body.textContent = "";
+    if(!results || !results.length){
+      var tr = document.createElement("tr");
+      var td = cell(t("results_empty"), "muted");
+      td.colSpan = 5;
+      tr.appendChild(td);
+      body.appendChild(tr);
+      return;
+    }
+    results.forEach(function(item){
+      var tr = document.createElement("tr");
+      tr.appendChild(cell(item.name, "name"));
+      tr.appendChild(cell(fmtBytes(item.size_bytes), "size"));
+      tr.appendChild(cell(item.sources > 0 ? item.sources : "—", "sources"));
+      tr.appendChild(cell(item.origin || "—", "origin"));
+      var actions = document.createElement("td");
+      actions.className = "act";
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "sm";
+      button.textContent = t("copy");
+      button.title = t("copy");
+      button.addEventListener("click", function(){
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(item.link).then(function(){
+            if(window.gx && window.gx.toast) window.gx.toast(t("copied"));
+          }).catch(function(){
+            if(window.gx && window.gx.toast) window.gx.toast(t("copy_failed"), true);
+          });
+        }
+      });
+      actions.appendChild(button);
+      tr.appendChild(actions);
+      body.appendChild(tr);
+    });
+  }
+  el("ed2k-search-form").addEventListener("submit", function(event){
+    event.preventDefault();
+    var query = el("ed2k-q").value.trim();
+    var info = el("ed2k-search-info");
+    if(!query){ info.textContent = t("invalid_query"); return; }
+    info.textContent = t("searching");
+    fetch("/api/v1/search?q=" + encodeURIComponent(query), {cache:"no-store"})
+      .then(function(response){
+        return response.json().then(function(body){
+          if(!response.ok) throw new Error(body.error || response.status);
+          return body;
+        });
+      })
+      .then(function(body){
+        render(body.results || []);
+        info.textContent = (body.results || []).length + " " + t("results_count");
+      })
+      .catch(function(error){
+        render([]);
+        info.textContent = t("search_failed") + ": " + error.message;
+      });
+  });
+  el("ed2k-link-form").addEventListener("submit", function(event){
+    event.preventDefault();
+    var info = el("ed2k-link-info");
+    var link = el("ed2k-link").value.trim();
+    if(!link){ info.textContent = t("link_invalid"); return; }
+    fetch("/api/v1/link", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({link:link})
+    }).then(function(response){
+      return response.json().then(function(body){
+        if(!response.ok) throw new Error(body.error || response.status);
+        return body;
+      });
+    }).then(function(body){
+      if(body.kind === "server"){
+        info.textContent = t("link_server") + ": " + body.server;
+      } else {
+        info.textContent = t("link_file") + ": " + body.file.name + " — " + t("link_download_off");
+      }
+    }).catch(function(error){
+      info.textContent = t("link_invalid") + ": " + error.message;
+    });
+  });
+  el("ed2k-lang").addEventListener("change", function(event){
+    var url = new URL(window.location.href);
+    url.searchParams.set("lang", event.target.value);
+    window.location.assign(url.toString());
+  });
+})();
+</script>
+</body>
+</html>

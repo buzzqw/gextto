@@ -640,6 +640,33 @@ between two engines that both crash: within the window it goes straight to recov
 `GEXTTO_ENGINE` forces the engine for one run, so a service whose saved backend is broken is
 recovered from a shell without editing the database.
 
+**eD2k/Kad search.** The search plane exists and is opt-in: `gx-ed2k` is our own
+Kad/eD2k search daemon (bootstrap, routing, keyword search, eD2k server search),
+Gextto can show its results in manual search, validate an `ed2k://` link, and
+optionally use it as a last-resort gap filler. The search provider, the link
+parser, the source threshold and the multi-engine router are in place. What is
+**not** in place is the transfer plane: the eMule client-to-client protocol,
+`.part`/AICH, upload, credits and LowID callbacks. Until then `gx-ed2k` reports
+`download: false`, the "add" action is disabled and the automatic fallback is
+inert even when switched on. Both switches (`ed2k_enabled`, `ed2k_fallback`)
+default to off, which also keeps the legal choice explicit.
+
+The gate is measured, not assumed:
+
+1. **Coverage.** On real gaps, how often does Kad return a result with exact
+   episode match, parsable quality, plausible size and sources above the floor?
+   The numbers go in [`measurements.md`](measurements.md). If a useful share of
+   gaps is covered, the transfer engine is worth its cost; otherwise the search
+   provider stays an optional manual tool and the question is closed with data.
+2. **Identity.** eD2k names are not trustworthy: the MD4 hash identifies the
+   bytes, the name is a claim. A result is accepted automatically only with an
+   exact episode match and a recognised quality; everything else stays in manual
+   search. Post-download MediaInfo validation and quarantine are the second line
+   of defence.
+3. **Transfer.** Only after gates 1 and 2: the eMule client protocol, storage and
+   upload. The `multi_engine` router already merges rows, labels the network and
+   routes by hash, so the automation does not need a second rewrite.
+
 **Waiting for a measurement or a host.**
 
 - **Choking on a real swarm.** The controlled evidence is healthy (§4.6 of [`measurements.md`](measurements.md)): a real

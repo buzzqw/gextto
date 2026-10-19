@@ -49,6 +49,8 @@ var i18nAllowlist = map[string]bool{
 	"Italiano": true, "Polski": true, "Comic": true,
 	// Transport protocol name.
 	"TCP": true,
+	// eD2k/Kad protocol names and the link placeholder.
+	"eD2k": true, "Kad": true, "ed2k://|file|…": true,
 }
 
 // i18nMixedAllowlist holds template texts that mix a printed value with words
@@ -59,12 +61,12 @@ var i18nMixedAllowlist = map[string]bool{
 	// The header with the engine version appended (product name + printed
 	// engine label/version, nothing to translate).
 	"EXpert Torrent Transfer Orchestrator · v{}{}": true,
-	"libtorrent {}":          true,
-	"TMDB {}":                true,
-	"TVDB {}":                true,
+	"libtorrent {}":     true,
+	"TMDB {}":           true,
+	"TVDB {}":           true,
 	": {} · HTTP: {} ·": true,
-	"Auto: {}on{}off{}":      true,
-	"CPU{}":                  true,
+	"Auto: {}on{}off{}": true,
+	"CPU{}":             true,
 	// The latency guard badge: units and DL/UL are the same in every language.
 	"{}/{} ms{} · DL {} KiB/s{}{} · UL {} KiB/s{}": true,
 	"{}TMDB {}{}TVDB {}{}{} · {}{}{} · ★ {}{}{} ·": true,

@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
 )
@@ -1031,6 +1032,46 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 		Seeders:            -1,
 		Peers:              -1,
 	}
+}
+
+// ParseEd2kRelease turns a Kad/eD2k result into a Release. eD2k names are
+// free-form, so the title parsing is the same one used for torrents: a
+// synthetic infohash built from the MD4 hash lets ParseRelease run its full
+// identity inference, then the magnet is replaced by the eD2k link. Network
+// and Sources are kept separate from SizeBytes/Seeders so the UI and the score
+// cannot mistake an eD2k source count for a BitTorrent swarm.
+func ParseEd2kRelease(name, link, source string, size, sources int64, discoveredAt time.Time) *models.Release {
+	parsedLink, err := ed2k.ParseFileLink(link)
+	if err != nil {
+		return nil
+	}
+	if size <= 0 {
+		size = parsedLink.Size
+	}
+	fakeMagnet := "magnet:?xt=urn:btih:" + parsedLink.Hash
+	release := ParseReleaseAt(strings.TrimSpace(name), fakeMagnet, source, discoveredAt)
+	if release == nil {
+		// A name with no usable words still identifies a real file; keep a
+		// minimal release instead of dropping the only result.
+		release = &models.Release{
+			Title:        strings.TrimSpace(name),
+			Source:       source,
+			Kind:         "movie",
+			DiscoveredAt: discoveredAt,
+			Seeders:      -1,
+			Peers:        -1,
+			Quality:      ParseQuality(name),
+		}
+	}
+	release.Magnet = ""
+	release.TorrentURL = nil
+	release.Ed2kLink = parsedLink.String()
+	release.Network = "ed2k"
+	release.SizeBytes = size
+	release.Sources = sources
+	release.Seeders = -1
+	release.Peers = -1
+	return release
 }
 
 // parserASCIILower lowercases ASCII letters only, matching the

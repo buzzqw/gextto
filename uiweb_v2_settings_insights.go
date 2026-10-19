@@ -172,9 +172,28 @@ func v2SourcesIndexFrom(s *AppState, cfg *Config) *v2SourcesIndex {
 			engines++
 		}
 	}
+	ed2kLabel := tr("spenta")
+	ed2kAlert := false
+	if ed2kEnabled(cfg) {
+		entry, known := ed2kHealthCached(cfg)
+		switch {
+		case !known:
+			ed2kLabel = tr("stato sconosciuto")
+		case !entry.healthy:
+			ed2kLabel = tr("demone non raggiungibile")
+			ed2kAlert = true
+		case entry.reachability == "open":
+			ed2kLabel = tr("aperta")
+		case entry.reachability == "limited":
+			ed2kLabel = tr("limitata (firewall/NAT)")
+			ed2kAlert = true
+		default:
+			ed2kLabel = tr("stato sconosciuto")
+		}
+	}
 	return &v2SourcesIndex{
 		Title: tr("Le tue fonti"),
-		Hint:  tr("Qui si aprono le tre aree delle fonti; i controlli restano nelle loro pagine."),
+		Hint:  tr("Qui si aprono le aree delle fonti; i controlli restano nelle loro pagine."),
 		Links: []v2SourcesLink{
 			{
 				Label:  tr("Indexer e manager"),
@@ -194,6 +213,13 @@ func v2SourcesIndexFrom(s *AppState, cfg *Config) *v2SourcesIndex {
 				Href:   "#v2-checkbox-panel-websearch_engines",
 				Hint:   tr("I motori di ricerca usati per gli episodi mancanti."),
 				Status: fmt.Sprintf(tr("%d motori attivi"), engines),
+			},
+			{
+				Label:  tr("eD2k e Kad"),
+				Href:   "#v2-setting-ed2k_enabled",
+				Hint:   tr("Ricerca Kad/eD2k e stato della connessione."),
+				Status: ed2kLabel,
+				Alert:  ed2kAlert,
 			},
 		},
 	}

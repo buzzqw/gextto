@@ -443,7 +443,9 @@ func v2SectionReleaseResult(raw []byte, status int) v2SearchView {
 	for _, release := range payload.Results {
 		encoded, _ := json.Marshal(release)
 		result.Results = append(result.Results, v2SearchResult{
-			Title: release.Title, Source: v2SourceLabel(release.Source), Score: release.Score,
+			Title: release.Title, Source: v2SearchSource(release), Score: release.Score,
+			Network: release.Network, Sources: release.Sources, Ed2kLink: release.Ed2kLink,
+			Addable: release.Network != "ed2k" && release.Ed2kLink == "",
 			Seeders: release.Seeders, SizeBytes: release.SizeBytes, ReleaseJSON: string(encoded),
 		})
 	}

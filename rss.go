@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/cache"
+	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
@@ -1937,6 +1938,13 @@ func releaseDedupKey(release *models.Release) (string, bool) {
 		value := strings.TrimSpace(*release.TorrentURL)
 		if IsTorrentURL(value) {
 			return "url:" + value, true
+		}
+	}
+	// An eD2k result is identified by its MD4 hash, which has the same
+	// 32-hex shape as an infohash but lives in its own namespace.
+	if release.Ed2kLink != "" {
+		if link, err := ed2k.ParseFileLink(release.Ed2kLink); err == nil {
+			return "ed2k:" + link.Hash, true
 		}
 	}
 	return "", false

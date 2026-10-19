@@ -10,7 +10,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-FILE="$ROOT/gx-torrent.build_number"
+FILE="${1:-$ROOT/gx-torrent.build_number}"
+if [[ "$FILE" != /* ]]; then
+  FILE="$ROOT/$FILE"
+fi
 
 # Serialize concurrent builds so two builds never get the same number.
 if command -v flock >/dev/null; then

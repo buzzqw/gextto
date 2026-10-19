@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast gx-torrent test test-race test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui check-scripts installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 cache-refresh
+.PHONY: all build fast gx-torrent gx-ed2k test test-race test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui check-scripts installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 cache-refresh
 
 all: build
 
@@ -22,6 +22,14 @@ gx-torrent:
 		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$$(git rev-parse HEAD 2>/dev/null) -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 		-o bin/gx-torrent ./cmd/gx-torrent; \
 	printf 'built bin/gx-torrent (build %s)\n' "$$GX_BUILD"
+
+# Only the gx-ed2k search daemon (pure Go). It has its own build number.
+gx-ed2k:
+	ED_BUILD="$$(GEXTTO_BUMP_BUILD=1 scripts/next-gx-build-number.sh gx-ed2k.build_number)"; \
+	CGO_ENABLED=0 go build -trimpath -buildvcs=false \
+		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxEd2kBuild=$$ED_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$$(git rev-parse HEAD 2>/dev/null) -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+		-o bin/gx-ed2k ./cmd/gx-ed2k; \
+	printf 'built bin/gx-ed2k (build %s)\n' "$$ED_BUILD"
 
 # Build the standalone container image (needs docker). The daemon's build
 # number is taken from gx-torrent.build_number when it exists.

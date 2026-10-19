@@ -52,6 +52,9 @@ func NewAppState(
 		logging.Warn("torrent backend activation refused; transfers stay stopped until the backend is fixed", "error", err)
 		state.setActiveEngine(nil)
 	}
+	// The eD2k/Kad search daemon is independent from the torrent engine: a
+	// failure here leaves torrents untouched and only disables the provider.
+	ensureEd2kDaemon(cfg)
 	// A pending migration manifest for the active backend is re-imported here:
 	// re-adding is idempotent and the manifest is marked completed on success.
 	if engine := ActiveTorrentBackend(state); engine != nil && engine.Name() != "none" {

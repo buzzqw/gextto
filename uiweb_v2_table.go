@@ -613,6 +613,15 @@ func v2HumanBytes(value any) string {
 	return strconv.FormatFloat(n, 'f', 1, 64) + " " + units[index]
 }
 
+// v2NetworkLabel names the acquisition network of a row. An empty Network is a
+// torrent: that is what every row was before the multi-engine router existed.
+func v2NetworkLabel(value string) string {
+	if strings.EqualFold(strings.TrimSpace(value), "ed2k") {
+		return "eD2k/Kad"
+	}
+	return "BitTorrent"
+}
+
 func v2SourceLabel(value string) string {
 	raw := strings.TrimSpace(value)
 	if raw == "" {

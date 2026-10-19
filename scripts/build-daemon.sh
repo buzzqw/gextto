@@ -81,3 +81,32 @@ if [[ "${GEXTTO_SKIP_GXTORRENT:-0}" != "1" ]]; then
         printf 'built %s (build %s)\n' "$GX_OUT" "$GX_BUILD"
     fi
 fi
+
+if [[ "${GEXTTO_SKIP_GXED2K:-0}" != "1" ]]; then
+    # gx-ed2k follows the same rule: it is rebuilt (and its own build number
+    # bumped) only when its code changed, so a Gextto-only update leaves it
+    # alone.
+    ED_OUT="$(dirname "$OUT")/gx-ed2k"
+    ED_HASH_FILE="$ED_OUT.code-sha256"
+    ED_PROBE="$(mktemp "${TMPDIR:-/tmp}/gx-ed2k-probe.XXXXXX")"
+    trap 'rm -f "$GX_PROBE" "$ED_PROBE"' EXIT
+    (
+        cd "$ROOT"
+        CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o "$ED_PROBE" ./cmd/gx-ed2k
+    )
+    ED_HASH="$(sha256sum "$ED_PROBE" | cut -d' ' -f1)"
+    if [[ -x "$ED_OUT" && -f "$ED_HASH_FILE" && "$(cat "$ED_HASH_FILE")" == "$ED_HASH" && "${GEXTTO_FORCE_GXED2K:-0}" != "1" ]]; then
+        printf 'gx-ed2k unchanged, kept %s\n' "$ED_OUT"
+    else
+        ED_BUILD="$("$ROOT/scripts/next-gx-build-number.sh" gx-ed2k.build_number)"
+        (
+            cd "$ROOT"
+            CGO_ENABLED=0 go build -trimpath -buildvcs=false \
+                -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxEd2kBuild=$ED_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$COMMIT -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$BUILT_AT" \
+                -o "$ED_OUT.new" ./cmd/gx-ed2k
+        )
+        mv -f "$ED_OUT.new" "$ED_OUT"
+        printf '%s\n' "$ED_HASH" > "$ED_HASH_FILE"
+        printf 'built %s (build %s)\n' "$ED_OUT" "$ED_BUILD"
+    fi
+fi

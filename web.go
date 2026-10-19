@@ -928,6 +928,10 @@ type DownloadTagInput struct {
 // SearchInput is the input of `manual_search`.
 type SearchInput struct {
 	Query string `json:"query"`
+	// Kad asks the eD2k/Kad provider for this search. It is an explicit
+	// per-search opt-in: the master switch (ed2k_enabled) permits it, the
+	// checkbox in the search form decides whether to use it this time.
+	Kad bool `json:"kad,omitempty"`
 }
 
 // ManualSearchQuery is the query of `manual_search_get`.

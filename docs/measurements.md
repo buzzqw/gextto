@@ -452,6 +452,43 @@ unavailable download, temp or trash folder is a **warning** and is fixable from 
 interface. Verified in a systemd container
 (install, upgrade, restore offline in dry-run).
 
+### eD2k/Kad search PoC (loopback)
+
+The search daemon is verified against **deterministic fake peers**, not the live
+network: a fake Kad UDP node and a fake eD2k TCP server answer real wire packets
+(Kad `BOOTSTRAP_RES`, `REQ/RES`, `SEARCH_RES`; server login and
+`OP_SEARCHRESULT`). On the N97, 2026-10-19, build in this checkout:
+
+```bash
+go test ./internal/ed2k/ -count=1          # 2.7 s including the UDP/TCP round trips
+go test ./cmd/gx-ed2k/ -count=1
+go test . -run 'ED2K|Ed2k|MultiEngine' -count=1
+```
+
+The tests assert the link parser, both tag byte orders, `nodes.dat`/`server.met`
+parsing, keyword hashing, bootstrap, iterative lookup, result parsing, server
+login/search, the API contract (`download: false`), the fallback gate and DB
+routing. **Live coverage is not measured yet**: that is the Fase 0/Fase 1 gate
+in [`evoluzione.md`](evoluzione.md); it needs a sample of real gaps and a manual
+Kad search, and its numbers will be added here.
+
+### eD2k/Kad search — live, 19 October 2026
+
+One live run from the N97 (`bin/gx-ed2k`, standalone, UPnP on, `nodes.dat` from
+`upd.emule-security.org`):
+
+- **UPnP**: mapping accepted by the router, UDP and TCP mapped, external IP
+  `79.40.60.48`, `reachability=open`.
+- **eD2k servers**: login and HighID (`server_id=809248847`, `low_id=false`),
+  `server.met` parsed (16 servers), search `the matrix 1999` returned **12
+  results** (name, size, MD4, sources), including Italian releases. Packed
+  server results (`0xD4` + zlib) and tagged `server.met` (0xE0) are supported.
+- **Kad**: 175 valid contacts loaded, but **no UDP response** to
+  `BOOTSTRAP_REQ`, `PING` or `HELLO_REQ` from the first 20 nodes. A UDP probe to
+  `8.8.8.8:53` also times out: this host/network blocks outbound UDP. The code
+  path is exercised against fake peers; the live Kad gate must be repeated on a
+  network with outbound UDP.
+
 ### Dead torrent links
 
 The quarantine of `.torrent` links that keep failing (see

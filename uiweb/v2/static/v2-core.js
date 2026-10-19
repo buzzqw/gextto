@@ -586,12 +586,12 @@
     while (number >= 1024 && index < units.length - 1) { number /= 1024; index++; }
     return (index ? number.toFixed(1) : Math.round(number)) + " " + units[index];
   }
-  function dashboardSearchRequest(path, query) {
+  function dashboardSearchRequest(path, query, kad) {
     return fetch(path, {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: query })
+      body: JSON.stringify({ query: query, kad: !!kad })
     }).then(function (response) {
       return response.json().then(function (data) {
         if (!response.ok) throw new Error(data.error || t("Ricerca non riuscita"));
@@ -634,39 +634,58 @@
     }
     visible.forEach(function (release) {
       var row = document.createElement("tr");
+      var isEd2k = release.network === "ed2k" || !!release.ed2k_link;
       var title = document.createElement("td");
       title.className = "release-title truncate";
       title.title = String(release.title || "");
       title.textContent = String(release.title || "—");
       row.appendChild(title);
-      [release.source || "—", release.score || 0].forEach(function (value) {
+      [isEd2k ? "eD2k/Kad" : (release.source || "—"), release.score || 0].forEach(function (value) {
         var cell = document.createElement("td");
         cell.textContent = String(value);
         row.appendChild(cell);
       });
+      if (isEd2k) {
+        var badge = document.createElement("span");
+        badge.className = "badge";
+        badge.title = t("Fonti eD2k");
+        badge.textContent = String(release.sources || 0);
+        row.children[1].appendChild(document.createTextNode(" "));
+        row.children[1].appendChild(badge);
+      }
       var actions = document.createElement("td");
       actions.className = "row-actions";
       var add = document.createElement("button");
       add.className = "btn sm primary";
       add.type = "button";
-      add.textContent = t("Aggiungi");
-      add.title = t("Accoda questa release");
-      add.addEventListener("click", function () {
+      if (isEd2k) {
         add.disabled = true;
-        var form = new URLSearchParams();
-        form.set("release", JSON.stringify(release));
-        form.set("redirect", "/?view=dashboard");
-        fetch("/search/add", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() })
-          .then(function (response) { if (!response.ok) throw new Error(t("Impossibile accodare la release")); add.textContent = t("Accodata"); })
-          .catch(function (error) { add.disabled = false; add.textContent = error.message; });
-      });
+        add.textContent = t("Solo ricerca");
+        add.title = t("Il download eD2k non è disponibile in questa versione.");
+      } else {
+        add.textContent = t("Aggiungi");
+        add.title = t("Accoda questa release");
+        add.addEventListener("click", function () {
+          add.disabled = true;
+          var form = new URLSearchParams();
+          form.set("release", JSON.stringify(release));
+          form.set("redirect", "/?view=dashboard");
+          fetch("/search/add", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() })
+            .then(function (response) { if (!response.ok) throw new Error(t("Impossibile accodare la release")); add.textContent = t("Accodata"); })
+            .catch(function (error) { add.disabled = false; add.textContent = error.message; });
+        });
+      }
       actions.appendChild(add);
       var copy = document.createElement("button");
       copy.className = "btn sm";
       copy.type = "button";
       copy.textContent = t("Copia");
-      copy.title = t("Copia il magnet negli appunti");
-      copy.addEventListener("click", function () { if (navigator.clipboard && release.magnet) navigator.clipboard.writeText(String(release.magnet)).then(function () { copy.textContent = t("Copiato"); }); });
+      copy.title = isEd2k ? t("Copia il link eD2k negli appunti") : t("Copia il magnet negli appunti");
+      copy.addEventListener("click", function () {
+        var value = isEd2k ? String(release.ed2k_link || "") : String(release.magnet || "");
+        if (!navigator.clipboard || !value) return;
+        navigator.clipboard.writeText(value).then(function () { copy.textContent = isEd2k ? t("Link eD2k copiato") : t("Copiato"); });
+      });
       actions.appendChild(copy);
       row.appendChild(actions);
       root.appendChild(row);
@@ -679,6 +698,8 @@
     var input = form.querySelector("input[name=q]");
     var query = String(input && input.value || "").trim();
     if (!query) return;
+    var kadInput = form.querySelector("[data-v2-dashboard-search-kad]");
+    var kad = !!(kadInput && kadInput.checked);
     var token = ++dashboardSearchToken;
     var panel = form.closest(".dashboard-search-panel");
     var filter = panel.querySelector("[data-v2-dashboard-search-filter]");
@@ -688,13 +709,13 @@
     status.textContent = t("Ricerca nell’archivio…");
     panel.querySelector("[data-v2-search-body]").innerHTML = '<tr><td class="muted" colspan="4">' + th("Ricerca nell’archivio…") + '</td></tr>';
     var fullDone = false;
-    dashboardSearchRequest("/api/search/archive", query).then(function (data) {
+    dashboardSearchRequest("/api/search/archive", query, false).then(function (data) {
       if (token !== dashboardSearchToken || fullDone) return;
       var results = data.results || [];
       renderDashboardSearchResults(panel, results);
       status.textContent = t("Archivio: ") + results.length + " · " + t("ricerca RSS, indexer e web in corso…");
     }).catch(function () {});
-    dashboardSearchRequest("/api/search/dashboard", query).then(function (data) {
+    dashboardSearchRequest("/api/search/dashboard", query, kad).then(function (data) {
       if (token !== dashboardSearchToken) return;
       fullDone = true;
       var results = data.results || [];

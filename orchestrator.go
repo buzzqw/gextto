@@ -573,6 +573,15 @@ func RunCycleDomain(
 						"query", seasonQuery)
 					appendValid(engine.SearchSeriesSeason(ctx, cfg, candidate.Series, candidate.Season, false))
 				}
+				// Last resort, and only when the operator explicitly enabled the
+				// automatic eD2k fallback and gx-ed2k can complete a download.
+				if len(foundResults[index]) == 0 && ed2kFallbackEligible(cfg) {
+					logging.Debug("gap-fill eD2k fallback started",
+						"series", candidate.Series.Name,
+						"season", candidate.Season,
+						"episode", candidate.Episode)
+					appendValid(engine.SearchSeriesED2K(ctx, cfg, candidate.Series, candidate.Season, candidate.Episode, false))
+				}
 				logging.Debug("gap-fill live search completed",
 					"series", candidate.Series.Name,
 					"season", candidate.Season,

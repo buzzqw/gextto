@@ -46,7 +46,13 @@ func TestAPIRoutesAreDocumented(t *testing.T) {
 	documented := map[string]bool{}
 	contents := string(raw)
 	if idx := strings.Index(contents, "## gx-torrent daemon routes"); idx >= 0 {
-		for _, line := range strings.Split(contents[idx:], "\n") {
+		section := contents[idx:]
+		// The gx-ed2k daemon has its own /api/v1 table after this section; it
+		// must not be compared with gx-torrent's registered routes.
+		if end := strings.Index(section, "## gx-ed2k daemon routes"); end >= 0 {
+			section = section[:end]
+		}
+		for _, line := range strings.Split(section, "\n") {
 			parts := strings.Split(line, "`")
 			if len(parts) != 3 || !strings.HasPrefix(parts[0], "| ") || !strings.HasSuffix(parts[2], " |") {
 				continue

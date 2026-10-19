@@ -279,6 +279,7 @@
     <div class="panel-body">
       <form class="search-row" data-v2-dashboard-search>
         <input type="search" name="q" aria-label="Cerca in archivio, indexer e motori web" placeholder="Cerca in archivio, indexer e motori web…" />
+        <label class="chk"><input type="checkbox" name="kad" value="1" data-v2-dashboard-search-kad title="Cerca anche sulla rete Kad (eD2k), se attiva in Configurazione → Sorgenti">Kad</label>
         <button class="btn primary" type="submit">Cerca</button>
       </form>
       <div class="toolbar dashboard-search-results-toolbar">
@@ -541,6 +542,7 @@
                   <span class="torrent-name">
                     <button class="torrent-open" type="button" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-detail-drawer" hx-swap="innerHTML" title="{{.Name}}"><span class="truncate">{{.Name}}</span></button>
                     {{if .Archived}}<span class="badge ok" title="Copia archiviata presente">NAS</span>{{end}}
+        {{if eq .Network "ed2k"}}<span class="badge" title="Rete eD2k/Kad">eD2k</span> <span class="badge" title="Fonti eD2k">{{.Sources}}</span>{{end}}
                     {{if .SeedInfinite}}<span class="badge warn" title="Seed senza limiti">seed ∞</span>{{end}}
                     {{if .Pinned}}<span class="badge" title="Forzato fuori coda: si sblocca dalla scheda del torrent">📌 pin</span>{{end}}
                     {{if .Tags}}<span class="tag-chips">{{range .Tags}}<span class="tag-chip">{{.}}</span>{{end}}</span>{{end}}
@@ -2327,7 +2329,12 @@
     <div class="panel-body">
       <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-search-results" hx-swap="outerHTML">
         <input type="search" name="q" value="{{.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
+        <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche sulla rete Kad (eD2k), se attiva in Configurazione → Sorgenti">Kad</label>
         <button class="btn primary" type="submit">Cerca</button>
+      </form>
+      <form class="search-row" method="post" action="/search/link" hx-post="/search/link" hx-target="#v2-search-results" hx-swap="outerHTML">
+        <input type="text" name="ed2k_link" aria-label="Link eD2k (ed2k://|file|…)" placeholder="ed2k://|file|…" title="Controlla un link eD2k di file prima di usarlo." />
+        <button class="btn" type="submit" title="Controlla il link eD2k e mostralo come risultato">Apri link eD2k</button>
       </form>
        <div id="v2-search-results">{{template "v2_search_results" .}}</div>
     </div>
@@ -2338,20 +2345,25 @@
 {{define "v2_search_results"}}
 {{if .Error}}<p class="alert">{{.Error}}</p>
 {{else if .Results}}
+{{if .Notice}}<p class="muted">{{.Notice}}</p>{{end}}
 <div class="table-wrap"><table class="data-table">
   <thead><tr><th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col">Seed</th><th scope="col">Azioni</th></tr></thead>
   <tbody>{{range .Results}}<tr>
     <td class="truncate" title="{{.Title}}">{{.Title}}</td>
-    <td>{{.Source}}</td>
+    <td>{{.Source}}{{if eq .Network "ed2k"}} <span class="badge" title="Fonti eD2k">{{.Sources}}</span>{{end}}</td>
     <td class="numeric">{{.Score}}</td>
     <td class="numeric">{{bytes .SizeBytes}}</td>
     <td class="numeric">{{.Seeders}}</td>
     <td class="row-actions">
+      {{if .Addable}}
       <form method="post" action="/search/add" hx-post="/search/add" hx-swap="none" style="display:inline">
         <input type="hidden" name="release" value="{{.ReleaseJSON}}" />
         <input type="hidden" name="redirect" value="{{$.Redirect}}" />
         <button class="btn sm primary" type="submit">Aggiungi</button>
       </form>
+      {{else}}
+      <span class="badge" title="Il download eD2k non è disponibile in questa versione.">Solo ricerca</span>
+      {{end}}
       <form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline">
         <input type="hidden" name="release" value="{{.ExplainJSON}}" />
         <button class="btn sm" type="submit">Perché non questo?</button>

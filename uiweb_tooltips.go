@@ -175,6 +175,13 @@ var uiSettingTooltipText = map[string]string{
 	"gxtorrent_dlna_listen":                "Indirizzo e porta di ascolto del media server DLNA (es. :8200 per tutte le interfacce, 192.168.1.10:8200 per una sola). Vuoto = :8200. La discovery usa UDP 1900 sulla stessa interfaccia.",
 	"gxtorrent_dlna_name":                  "Nome mostrato ai lettori DLNA sulla rete. Vuoto = gx-torrent.",
 	"gxtorrent_dlna_folders":               "Cartelle della libreria (es. l'archivio sul NAS) mostrate dal media server DLNA accanto ai torrent, navigabili per cartelle; separale con ;. Vuoto = automatico: la cartella archivio e le cartelle che contengono gli archivi delle serie. Sola lettura; il cestino, le cartelle nascoste e quelle di sistema del NAS sono escluse.",
+	"ed2k_enabled":                         "Cerca anche nella rete eD2k/Kad tramite il demone gx-ed2k. La ricerca eD2k è spenta per default.",
+	"ed2k_url":                             "Indirizzo Web API del demone gx-ed2k, di solito http://127.0.0.1:8899.",
+	"ed2k_token":                           "Token API di gx-ed2k, se il demone non ascolta solo su loopback.",
+	"ed2k_fallback":                        "Quando i torrent non trovano nulla, cerca lo stesso episodio su eD2k/Kad. È un secondo interruttore, spento per default.",
+	"ed2k_min_sources":                     "Numero minimo di sorgenti eD2k perché un risultato venga accettato automaticamente. La ricerca manuale mostra tutto.",
+	"ed2k_search_timeout_secs":             "Tempo massimo concesso a una ricerca eD2k/Kad prima di restituire i risultati già arrivati.",
+	"ed2k_upnp":                            "Chiede al router di aprire la porta UDP di Kad con UPnP, così il demone è raggiungibile e trova più fonti. Se il router non lo supporta non cambia nulla.",
 }
 
 // uiSettingTooltip returns the tooltip for a setting key. Score weights without

@@ -68,6 +68,11 @@ GX_COMMIT="$(git -C "$ROOT" log -n 1 --format='%H' "$COMMIT" -- "${GX_PATHS[@]}"
 GX_BUILD="${GEXTTO_GX_BUILD:-$(tr -dc '0-9' < "$ROOT/gx-torrent.build_number" 2>/dev/null || true)}"
 [[ "$GX_BUILD" =~ ^[0-9]+$ ]] || GX_BUILD=0
 
+# gx-ed2k has its own committed build number. The manifest publishes it so an
+# operator can tell which search daemon a release carries.
+ED2K_BUILD="${GEXTTO_GXED2K_BUILD:-$(tr -dc '0-9' < "$ROOT/gx-ed2k.build_number" 2>/dev/null || true)}"
+[[ "$ED2K_BUILD" =~ ^[0-9]+$ ]] || ED2K_BUILD=0
+
 # json_escape quotes a string for JSON (backslash, quote, control characters).
 json_escape() {
   local value="$1"
@@ -92,6 +97,8 @@ json_escape() {
   printf '  "gx_torrent_commit": %s,\n' "$(json_escape "$GX_COMMIT")"
   printf '  "gx_version": %s,\n' "$(json_escape "1.1.$GX_BUILD")"
   printf '  "gx_build": %s,\n' "$GX_BUILD"
+  printf '  "gx_ed2k_version": %s,\n' "$(json_escape "1.1.$ED2K_BUILD")"
+  printf '  "gx_ed2k_build": %s,\n' "$ED2K_BUILD"
   printf '  "commits": ['
   first=1
   # A shallow checkout lists only what it has: the update check treats a

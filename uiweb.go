@@ -183,6 +183,10 @@ type uiTorrentRow struct {
 	// Pinned marks the torrent forced out of the queue (the "📌 pin" badge);
 	// it is unpinned from its detail drawer.
 	Pinned bool
+	// Network is "ed2k" for a file downloaded through gx-ed2k; empty and
+	// "torrent" both mean BitTorrent. Sources is the eD2k source count.
+	Network string
+	Sources int
 }
 
 type uiTorrentsData struct {
@@ -728,6 +732,8 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			TotalDone:     view.TotalDone,
 			Paused:        view.State == "paused",
 			Pinned:        view.Pinned,
+			Network:       view.Network,
+			Sources:       view.Sources,
 		}
 		row.ETA, row.ETASeconds = uiTorrentETA(view)
 		row.Tags = uiSplitTags(tag)

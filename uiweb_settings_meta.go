@@ -67,6 +67,14 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"gxtorrent_dlna_name":              {DependsOn: "gxtorrent_dlna"},
 	"gxtorrent_dlna_folders":           {Zero: "vuoto = automatico (archivio)", DependsOn: "gxtorrent_dlna"},
 
+	// eD2k e Kad
+	"ed2k_url":                 {Kind: "url", DependsOn: "ed2k_enabled"},
+	"ed2k_token":               {DependsOn: "ed2k_enabled"},
+	"ed2k_fallback":            {DependsOn: "ed2k_enabled"},
+	"ed2k_min_sources":         {Unit: "fonti", Zero: "0 = nessun minimo", DependsOn: "ed2k_fallback"},
+	"ed2k_search_timeout_secs": {Unit: "secondi", DependsOn: "ed2k_enabled"},
+	"ed2k_upnp":                {DependsOn: "ed2k_enabled"},
+
 	// Velocità e rete
 	"torrent_speed_mode": {Kind: "select", Options: []uiFormOption{
 		{Value: speedModeAuto, Label: "Auto: Gextto misura la linea e si adatta"},

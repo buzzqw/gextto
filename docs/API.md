@@ -46,6 +46,7 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/access/generate-key` | generate a new API access key |
 | GET | `/api/acquisitions` | acquisition history |
 | GET | `/api/archive` | archive entries (search and pages) |
+| GET | `/api/ed2k/status` | eD2k/Kad search provider state (enabled, reachable, download capability) |
 | POST | `/api/archive/add` | add an entry to the archive |
 | POST | `/api/archive/batch-download` | download several archive entries |
 | POST | `/api/archive/delete` | delete archive entries |
@@ -192,6 +193,14 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/search/add` | add a search result |
 | POST | `/api/search/archive` | search the archive |
 | POST | `/api/search/explain` | explain a release decision |
+
+With the eD2k provider enabled (`ed2k_enabled`), manual search results can carry
+`network: "ed2k"`, `ed2k_link` and `sources` next to the torrent fields. The
+provider is used only when the request asks for it: send `{"query":"…","kad":true}`
+to `POST /api/search` or `/api/search/dashboard` (the UI has a **Kad** checkbox).
+Such a result has no `magnet`: `POST /api/search/add` answers `501` while `gx-ed2k`
+reports `"download": false`, because the search daemon cannot complete an eD2k
+transfer. Use `GET /api/ed2k/status` for the live provider state.
 | GET | `/api/seed-rules` | seed rules: per-source/category seeding limits |
 | POST | `/api/seed-rules` | save the seed rules (list of name, source, category, ratio, seed_days, idle_minutes; null = global, 0 = no limit) |
 | POST | `/api/send-magnet` | send a magnet to the engine |
@@ -563,3 +572,23 @@ off) and the web seed editing calls: `torrents/addWebSeeds` and
 `torrents/editWebSeed` takes `hash`, `origUrl` and `newUrl`. They answer 404 for
 an unknown torrent, 400 for a URL that is not http(s), 409 when `origUrl` is not
 a web seed of the torrent.
+
+## gx-ed2k daemon routes
+
+`gx-ed2k` is the optional eD2k/Kad **search** daemon (also usable standalone:
+`gx-ed2k -mode standalone -listen 0.0.0.0:8899`). It has its own page at `/` and
+a native `/api/v1`. When `ed2k_token` is set, every `/api/v1` call must send
+`X-Gx-Token: <token>` (or `Authorization: Bearer <token>`); the page accepts
+`?token=…` once and keeps a session cookie.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/health` | health, version, Kad id/UDP port, `download: false`, `search: true`, `reachability` (open/limited/unknown), `low_id` and the UPnP mapping state |
+| GET | `/api/v1/status` | counters (nodes, queries, results), capabilities and last error |
+| GET | `/api/v1/search?q=…&timeout_ms=…` | keyword search on Kad and the eD2k servers; results carry `name`, `size_bytes`, `hash`, `link`, `sources`, `origin` |
+| POST | `/api/v1/link` | validate a JSON `{"link":"ed2k://…"}` file or server link; returns the parsed identity |
+| GET | `/api/v1/nodes` | the current Kad routing table |
+
+`/api/v1/health` reports `"download": false` in this version. That is the
+contract Gextto reads before offering to queue an eD2k result: the daemon
+searches, it does not implement the eMule client-to-client transfer protocol.

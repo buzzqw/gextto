@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/backoff"
+	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
@@ -958,6 +959,8 @@ func (d *Database) migrate() error {
 		{"torrent_meta", "removed_at", "TEXT"},
 		{"torrent_meta", "reason", "TEXT DEFAULT ''"},
 		{"torrent_meta", "no_rename", "INTEGER DEFAULT 0"},
+		{"torrent_meta", "network", "TEXT NOT NULL DEFAULT 'torrent'"},
+		{"torrent_meta", "link", "TEXT NOT NULL DEFAULT ''"},
 		{"torrent_meta", "created_at", "TEXT"},
 		// A seed stopped for inactivity (seed_rules.go): kept so a restart
 		// does not leave it paused without its end-of-seed handling.
@@ -1801,9 +1804,13 @@ func (d *Database) RegisterTorrent(release *models.Release) error {
 
 // RegisterTorrentScored implements `Database::register_torrent_scored`.
 func (d *Database) RegisterTorrentScored(release *models.Release, qualityScore int64) error {
-	hash, err := magnetHashOrError(release.Magnet)
+	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return err
+	}
+	network := release.Network
+	if network == "" {
+		network = networkTorrent
 	}
 	now := nowSQLite()
 	metadata, err := json.Marshal(models.TorrentMeta{Release: *release})
@@ -1811,10 +1818,28 @@ func (d *Database) RegisterTorrentScored(release *models.Release, qualityScore i
 		return err
 	}
 	_, err = d.db.Exec(
-		"INSERT INTO torrent_meta(hash,kind,title,series_name,season,episode,year,quality_score,source,metadata_json,status,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,'queued',?11,?11) ON CONFLICT(hash) DO UPDATE SET kind=excluded.kind,title=excluded.title,series_name=excluded.series_name,season=excluded.season,episode=excluded.episode,year=excluded.year,quality_score=excluded.quality_score,source=excluded.source,metadata_json=excluded.metadata_json,status=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.status ELSE 'queued' END,error=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.error ELSE NULL END,removed_at=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.removed_at ELSE NULL END,updated_at=excluded.updated_at",
-		hash, release.Kind, release.Title, release.Series, release.Season, release.Episode, release.Year, qualityScore, release.Source, string(metadata), now,
+		"INSERT INTO torrent_meta(hash,kind,title,series_name,season,episode,year,quality_score,source,network,link,metadata_json,status,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,'queued',?13,?13) ON CONFLICT(hash) DO UPDATE SET kind=excluded.kind,title=excluded.title,series_name=excluded.series_name,season=excluded.season,episode=excluded.episode,year=excluded.year,quality_score=excluded.quality_score,source=excluded.source,network=excluded.network,link=excluded.link,metadata_json=excluded.metadata_json,status=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.status ELSE 'queued' END,error=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.error ELSE NULL END,removed_at=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.removed_at ELSE NULL END,updated_at=excluded.updated_at",
+		hash, release.Kind, release.Title, release.Series, release.Season, release.Episode, release.Year, qualityScore, release.Source, network, release.Ed2kLink, string(metadata), now,
 	)
 	return err
+}
+
+// releaseIdentityHash returns the 32-hex identity of a release: the torrent
+// infohash when there is a magnet, otherwise the MD4 hash of an eD2k link.
+// Both are stored in the historical `magnet_hash`/`hash` columns.
+func releaseIdentityHash(release *models.Release) (string, error) {
+	if release == nil {
+		return "", errors.New("invalid magnet hash")
+	}
+	if hash, ok := utils.MagnetHash(release.Magnet); ok {
+		return hash, nil
+	}
+	if strings.TrimSpace(release.Ed2kLink) != "" {
+		if link, err := ed2k.ParseFileLink(release.Ed2kLink); err == nil {
+			return link.Hash, nil
+		}
+	}
+	return "", errors.New("invalid magnet hash")
 }
 
 // SetTorrentSkippedEpisodes records in the torrent metadata which episodes the
@@ -4228,6 +4253,41 @@ func (d *Database) TorrentMeta(hash string) (*models.TorrentMeta, error) {
 		return nil, movieErr
 	}
 	return nil, nil
+}
+
+// TorrentNetwork returns the stored network of a file ("torrent" or "ed2k").
+// It backs the multi-engine router's restored routes; an unknown hash is a
+// torrent, which keeps existing sessions unchanged.
+func (d *Database) TorrentNetwork(hash string) string {
+	if d == nil || d.db == nil {
+		return networkTorrent
+	}
+	var network string
+	err := d.db.QueryRow("SELECT COALESCE(network,'torrent') FROM torrent_meta WHERE lower(hash)=?1", strings.ToLower(strings.TrimSpace(hash))).Scan(&network)
+	if err != nil || strings.TrimSpace(network) == "" {
+		return networkTorrent
+	}
+	return network
+}
+
+// TorrentRoutes returns every stored non-torrent route, for multiEngine.
+func (d *Database) TorrentRoutes() map[string]string {
+	if d == nil || d.db == nil {
+		return nil
+	}
+	rows, err := d.db.Query("SELECT lower(hash), network FROM torrent_meta WHERE network IS NOT NULL AND network <> '' AND network <> 'torrent'")
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var hash, network string
+		if rows.Scan(&hash, &network) == nil {
+			out[hash] = network
+		}
+	}
+	return out
 }
 
 // ReconcilePackRelease persists the identity found in the actual torrent name

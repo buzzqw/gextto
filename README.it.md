@@ -112,7 +112,7 @@ Go 1.26.8+; la build è Go puro e la web UI è incorporata. Vedi il
 [manuale per sviluppatori](docs/DEVELOPERS.md).
 
 ```bash
-make build                 # gexttod e gx-torrent in bin/
+make build                 # gexttod, gx-torrent e gx-ed2k in bin/
 ```
 
 `make build` fa avanzare il numero di build **committato** e condiviso con la
@@ -176,6 +176,15 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   opzionale. I gestori vengono interrogati **un indexer alla volta**, ognuno al
   ritmo che regge davvero, un tracker presente in entrambi una volta sola, e un
   tracker lento perde solo i propri risultati.
+- **Ricerca eD2k/Kad, quando i torrent non trovano nulla.** Un provider di
+  ricerca opzionale e spento di default (`gx-ed2k`, demone nostro in Go puro)
+  cerca su Kad e sui server eD2k. I risultati mostrano nome, dimensione, hash
+  MD4 e numero di fonti; si può verificare anche un link `ed2k://` incollato. Il
+  fallback automatico nel gap filling è un secondo interruttore separato e
+  accetta solo un episodio esatto, con qualità riconosciuta e fonti sufficienti.
+  Il trasferimento non è implementato: il demone dichiara `download: false` e il
+  pulsante per accodare resta spento, così un episodio mancante non viene mai
+  sostituito da un file sbagliato.
 
 ### Sicurezza della libreria
 
@@ -394,6 +403,7 @@ manuali con screen reader e tecnologie assistive
 | Spostare un'installazione | [Guida alla migrazione](docs/MIGRATION.md) |
 | Client da terminale | [Riferimento TUI](docs/tui.md) |
 | Motore gx-torrent e client autonomo | [Documento tecnico di gx-torrent](docs/gx-torrent.md) · [gx-core](docs/gx-core.md) |
+| Demone di ricerca eD2k/Kad | [Documento tecnico di gx-ed2k](docs/gx-ed2k.md) |
 | Backend qBittorrent-nox | [Guida](docs/qbittorrent-nox.md) |
 | Compilare o contribuire | [Manuale per sviluppatori](docs/DEVELOPERS.md) |
 | Sicurezza di rete e dei dati | [Politica di sicurezza](docs/SECURITY.md) |

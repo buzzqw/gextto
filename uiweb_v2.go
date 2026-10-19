@@ -213,6 +213,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /search", V2Search)
 	v2Handle(s, mux, "POST /search/add", V2SearchAdd)
 	v2Handle(s, mux, "POST /search/explain", V2SearchExplain)
+	v2Handle(s, mux, "POST /search/link", V2SearchLink)
 
 	// Esplora TMDB (calendario, tendenze, ricerca).
 	v2Handle(s, mux, "GET /tmdb/calendar", V2TmdbCalendar)
@@ -1606,6 +1607,8 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		{Label: "Peer / Seed", Value: fmt.Sprintf("%d / %d", torrent.NumPeers, torrent.NumSeeds)},
 		{Label: "Sciame (seed / peer)", Value: v2SwarmLabel(torrent.NumComplete, torrent.NumIncomplete)},
 		{Label: "Posizione coda", Value: fmt.Sprintf("%d", torrent.QueuePosition)},
+		{Label: "Rete", Value: v2NetworkLabel(torrent.Network)},
+		{Label: "Fonti", Value: fmt.Sprintf("%d", torrent.Sources)},
 		{Label: "Metadata", Value: ternaryString(torrent.HasMetadata, "presenti", "in attesa")},
 		{Label: "Versione torrent", Value: torrent.TorrentVersion},
 		{Label: "Auto-gestito", Value: v2AutoManagedLabel(torrent)},
@@ -2560,6 +2563,10 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		_ = MarkSettingOrigin(s.cfg.DataDir, key, OriginManual, "")
 	}
 	field = uiSettingFieldFor(key, v2SettingLabelFor(key), value)
+	if strings.HasPrefix(key, "ed2k_") {
+		ed2kInvalidateHealth()
+		go ensureEd2kDaemon(latestConfig(s))
+	}
 	render("salvata", false)
 }
 

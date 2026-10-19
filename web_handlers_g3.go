@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/rules"
@@ -1067,17 +1068,18 @@ func gh3ManualSearch(s *AppState, query string) (int, any) {
 		results = nil
 	}
 	results = append(results, gh3ArchiveReleasesForQuery(s, cfg, query)...)
+	results = append(results, SearchED2K(ctx, cfg, query)...)
 	seen := map[string]struct{}{}
 	deduped := results[:0]
 	for _, release := range results {
-		hash, ok := utils.MagnetHash(release.Magnet)
+		key, ok := releaseDedupKey(&release)
 		if !ok {
 			continue
 		}
-		if _, exists := seen[hash]; exists {
+		if _, exists := seen[key]; exists {
 			continue
 		}
-		seen[hash] = struct{}{}
+		seen[key] = struct{}{}
 		deduped = append(deduped, release)
 	}
 	results = deduped
@@ -1134,6 +1136,24 @@ func gh3AddRelease(s *AppState, release models.Release) (int, any) {
 
 // gh3AddParsedRelease implements `add_parsed_release`.
 func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
+	if strings.TrimSpace(release.Ed2kLink) != "" {
+		link, err := ed2k.ParseFileLink(release.Ed2kLink)
+		if err != nil {
+			return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
+		}
+		if _, download := ed2kAvailability(latestConfig(s)); !download {
+			return http.StatusNotImplemented, map[string]any{
+				"ok":    false,
+				"error": "gx-ed2k is a search-only client in this version: eD2k downloads are not available",
+				"link":  link.String(),
+			}
+		}
+		return http.StatusNotImplemented, map[string]any{
+			"ok":    false,
+			"error": "the eD2k transfer engine is not installed",
+			"link":  link.String(),
+		}
+	}
 	source := strings.TrimSpace(release.Magnet)
 	if source == "" && release.TorrentURL != nil {
 		source = strings.TrimSpace(*release.TorrentURL)

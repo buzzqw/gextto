@@ -582,6 +582,13 @@ func manualSearch(w http.ResponseWriter, r *http.Request, s *AppState, includeRe
 	} else {
 		results = s.engine.SearchQueryManual(ctx, cfg, query)
 	}
+	// eD2k/Kad is a search provider, not a torrent engine: when it is enabled
+	// and this search explicitly asked for it, its results sit next to torrent
+	// ones, labelled by Network. The UI only offers them for inspection while
+	// gx-ed2k reports download=false.
+	if input.Kad {
+		results = append(results, SearchED2K(ctx, cfg, query)...)
+	}
 	if ctx.Err() == context.DeadlineExceeded {
 		logging.Warn("manual search budget expired; keeping completed search results", "query", query, "timeout_secs", int64(manualSearchBudget.Seconds()), "results", len(results))
 		// searchOneWithDB deliberately preserves releases received before the
@@ -596,14 +603,14 @@ func manualSearch(w http.ResponseWriter, r *http.Request, s *AppState, includeRe
 	seen := map[string]struct{}{}
 	deduped := make([]models.Release, 0, len(results))
 	for _, release := range results {
-		hash, ok := utils.MagnetHash(release.Magnet)
+		key, ok := releaseDedupKey(&release)
 		if !ok {
 			continue
 		}
-		if _, exists := seen[hash]; exists {
+		if _, exists := seen[key]; exists {
 			continue
 		}
-		seen[hash] = struct{}{}
+		seen[key] = struct{}{}
 		deduped = append(deduped, release)
 	}
 	results = deduped

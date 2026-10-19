@@ -40,8 +40,9 @@ func TestSeedDefaultTranslationsRemovesObsoleteEd2kEntries(t *testing.T) {
 	db := openTestI18nDb(t)
 	if err := db.SetBulk("it", map[string]string{
 		"Gap Filling — Fallback eD2k (cerca su eD2k se Jackett non trova nulla)": "legacy",
-		"aMule / ed2k": "legacy",
-		"current.key":  "keep",
+		"aMule / ed2k":     "legacy",
+		"Ricerca eD2k/Kad": "keep-ed2k",
+		"current.key":      "keep",
 	}); err != nil {
 		t.Fatalf("seed legacy translations: %v", err)
 	}
@@ -49,7 +50,7 @@ func TestSeedDefaultTranslationsRemovesObsoleteEd2kEntries(t *testing.T) {
 		t.Fatalf("seed defaults: %v", err)
 	}
 	var count int
-	if err := db.db.QueryRow("SELECT COUNT(*) FROM translations WHERE lower(key) LIKE '%ed2k%' OR lower(value) LIKE '%ed2k%' OR lower(key) LIKE '%amule%' OR lower(value) LIKE '%amule%'").Scan(&count); err != nil {
+	if err := db.db.QueryRow("SELECT COUNT(*) FROM translations WHERE lower(key) LIKE '%amule%' OR lower(value) LIKE '%amule%' OR key = 'Gap Filling — Fallback eD2k (cerca su eD2k se Jackett non trova nulla)'").Scan(&count); err != nil {
 		t.Fatalf("count obsolete translations: %v", err)
 	}
 	if count != 0 {
@@ -61,6 +62,14 @@ func TestSeedDefaultTranslationsRemovesObsoleteEd2kEntries(t *testing.T) {
 	}
 	if value != "keep" {
 		t.Fatalf("current translation = %q, want keep", value)
+	}
+	// The native eD2k/Kad provider is current UI: its rows must survive the
+	// cleanup that removes the obsolete aMule integration.
+	if err := db.db.QueryRow("SELECT value FROM translations WHERE lang='ita' AND key='Ricerca eD2k/Kad'").Scan(&value); err != nil {
+		t.Fatalf("eD2k translation was removed: %v", err)
+	}
+	if value != "keep-ed2k" {
+		t.Fatalf("eD2k translation = %q, want keep-ed2k", value)
 	}
 }
 

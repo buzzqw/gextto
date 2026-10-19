@@ -36,7 +36,7 @@ daemon built next to `gexttod`. The normal build embeds the web UI; it does not
 need a separate frontend build.
 
 ```bash
-make build                 # pure Go (default): gexttod + gx-torrent
+make build                 # pure Go (default): gexttod + gx-torrent + gx-ed2k
 go test ./...              # pure-Go tests
 ```
 
@@ -338,6 +338,7 @@ published next to Gextto's:
 |---|---|---|
 | `scripts/package-gx-torrent.sh` | `gx-torrent-linux-<arch>.tar.gz` | binary, `run.sh`, systemd unit, README, `VERSION` |
 | `scripts/package-gx-torrent-windows.sh` | `gx-torrent-windows-<arch>.zip` (amd64, arm64) | `gx-torrent.exe` (native Windows service), `install-service.ps1`, `uninstall-service.ps1`, `README.txt` |
+| `scripts/package-gx-ed2k.sh` | `gx-ed2k-linux-<arch>.tar.gz` | eD2k/Kad search daemon, `run.sh`, systemd unit, install/uninstall scripts, README, `VERSION` |
 
 Windows support is guarded in CI (`ci.yml`): `build-test` cross-compiles the
 engine and the daemon and runs `go vet` for Windows; `windows-platform` runs the

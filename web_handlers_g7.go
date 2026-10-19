@@ -1167,6 +1167,10 @@ func SaveSettingHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else {
 		_ = MarkSettingOrigin(s.cfg.DataDir, input.Key, OriginManual, "")
 	}
+	if strings.HasPrefix(input.Key, "ed2k_") {
+		ed2kInvalidateHealth()
+		go ensureEd2kDaemon(latestConfig(s))
+	}
 	jsonResponse(w, map[string]any{"ok": true, "restart_required": true})
 }
 

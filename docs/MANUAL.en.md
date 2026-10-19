@@ -680,7 +680,12 @@ are using the API directly.
   search, generic release search, add-to-library. The lists exist only on TMDB:
   with only the TVDB key the title search goes to TVDB. Cards are shown in a five-column
   wall; a title already in the library carries a **Già in lista** badge and its
-  add button is disabled, so you never create a duplicate by mistake.
+  add button is disabled, so you never create a duplicate by mistake. Under the
+  release search there is a field to **paste an `ed2k://` link**: Gextto checks
+  it and shows it as a result with name, size and hash. When the eD2k/Kad search
+  is enabled, network results appear in the same table with the **eD2k** badge
+  and the source count; their add button stays disabled until eD2k transfers
+  exist, and the row says **Search only**.
 - **Archive** — full-text search of past releases with pagination, batch queue,
   copy magnet, delete; **Series/Movies from feed** tabs. The local archive search
   is **instant**: it starts on its own as you type (from three characters on)
@@ -1541,6 +1546,38 @@ them.
 | Excluded content filters | Releases containing these words or scripts (e.g. [porno]) are excluded. |
 | Source filters | Keywords to accept or reject for a single source, enabled per row. |
 | Watched folders | Automatically adds the .torrent/.magnet files found in the given folders (recursive, delete after). |
+
+**eD2k and Kad**
+
+The eD2k/Kad network is a **search provider**: its results appear next to the
+torrent ones with the file name, size, MD4 hash and source count. Gextto talks to
+the `gx-ed2k` daemon, which is a **search-only** client: it does not download,
+upload or share files. An eD2k result is therefore visible and can be checked
+(including by pasting an `ed2k://` link), but the button that queues it stays
+disabled until eD2k transfers exist. The feature is off by default: without your
+consent Gextto does not contact the network.
+
+| Setting | What it does |
+|---|---|
+| eD2k/Kad search | Enables the provider and starts the `gx-ed2k` daemon. Off by default. |
+| gx-ed2k — Web API URL | Daemon address, usually `http://127.0.0.1:8899`. |
+| gx-ed2k — API token | Daemon token, when it does not listen on loopback only. |
+| Use eD2k when torrents find nothing | A second, separate switch: only in the deep gap-filling pass, and only when the torrent episode and season searches produced nothing, Gextto searches the same episode on eD2k/Kad. Off by default. |
+| Minimum sources for the fallback | eD2k source floor for accepting a result automatically. Manual search shows everything. *(Unit: sources; 0 = no minimum)* |
+| eD2k search timeout | Maximum time for an eD2k/Kad search; on expiry it returns the results that already arrived. *(Unit: seconds)* |
+| Open the Kad port with UPnP | Asks the router to map UDP 4672 and TCP 4662 with UPnP. When it works the connection reads **open** and eD2k servers assign a HighID; when the router does not support it the state stays **limited** and manual port forwarding is required. |
+
+The automatic fallback only accepts a result that matches the episode exactly,
+has a recognised quality, a plausible size and at least the source floor. In
+every other case the result stays visible in manual search and the gap stays
+open: a missing episode is better than a wrong file in the library. If gx-ed2k
+is unreachable, torrents continue unaffected.
+
+On the **Sources** page the **eD2k and Kad** entry shows the connection sensor:
+**open** (UPnP or reachable ports), **limited** (firewall/NAT or LowID) or
+**unknown**. When it is limited, open UDP 4672 and TCP 4662 on the router or
+enable UPnP. The same sensor is on the `gx-ed2k` daemon page, next to nodes, port
+and version.
 
 #### Quality and upgrades
 
