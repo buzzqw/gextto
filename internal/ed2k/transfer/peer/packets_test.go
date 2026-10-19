@@ -77,3 +77,23 @@ func TestPartPackets(t *testing.T) {
 		t.Fatalf("compressed part = %+v, %v", decodedCompressed, err)
 	}
 }
+
+func TestQueueAndCallbackPackets(t *testing.T) {
+	hash := testHash(t, "0123456789abcdef0123456789abcdef")
+	ping, err := DecodeReaskFilePing(EncodeReaskFilePing(ReaskFilePing{Hash: hash}))
+	if err != nil || ping.Hash != hash {
+		t.Fatalf("reask ping = %+v, %v", ping, err)
+	}
+	ack, err := DecodeReaskAck(EncodeReaskAck(ReaskAck{Rank: 42}))
+	if err != nil || ack.Rank != 42 {
+		t.Fatalf("reask ack = %+v, %v", ack, err)
+	}
+	callback := DirectCallbackRequest{Port: 4662, UserHash: hash, Options: 3}
+	got, err := DecodeDirectCallbackRequest(EncodeDirectCallbackRequest(callback))
+	if err != nil || got.Port != 4662 || got.UserHash != hash || got.Options != 3 {
+		t.Fatalf("callback = %+v, %v", got, err)
+	}
+	if _, err := DecodeDirectCallbackRequest([]byte{1}); err == nil {
+		t.Fatal("short callback must fail")
+	}
+}

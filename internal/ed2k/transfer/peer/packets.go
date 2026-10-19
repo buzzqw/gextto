@@ -229,3 +229,74 @@ func DecodeCompressedPart(payload []byte) (CompressedPart, error) {
 	part.Data = append([]byte(nil), payload[24:24+int(part.Size)]...)
 	return part, nil
 }
+
+// Queue and callback opcodes.
+const (
+	OpReaskFilePing     = 0x90
+	OpReaskAck          = 0x91
+	OpFileNotFound      = 0x92
+	OpQueueFull         = 0x93
+	OpDirectCallbackReq = 0x95
+)
+
+// ReaskFilePing asks a queued peer whether the file is still available.
+type ReaskFilePing struct {
+	Hash ed2k.ID
+}
+
+func EncodeReaskFilePing(ping ReaskFilePing) []byte { return append([]byte(nil), ping.Hash[:]...) }
+
+func DecodeReaskFilePing(payload []byte) (ReaskFilePing, error) {
+	if len(payload) < 16 {
+		return ReaskFilePing{}, errors.New("peer: short reask ping")
+	}
+	var ping ReaskFilePing
+	copy(ping.Hash[:], payload[:16])
+	return ping, nil
+}
+
+// ReaskAck is the queue position answer.
+type ReaskAck struct {
+	Rank uint16
+}
+
+func EncodeReaskAck(ack ReaskAck) []byte {
+	var out [2]byte
+	binary.LittleEndian.PutUint16(out[:], ack.Rank)
+	return out[:]
+}
+
+func DecodeReaskAck(payload []byte) (ReaskAck, error) {
+	if len(payload) < 2 {
+		return ReaskAck{}, errors.New("peer: short reask ack")
+	}
+	return ReaskAck{Rank: binary.LittleEndian.Uint16(payload)}, nil
+}
+
+// DirectCallbackRequest is OP_DIRECTCALLBACKREQ: the TCP port, identity and
+// connection options a LowID client asks a HighID peer to call back.
+type DirectCallbackRequest struct {
+	Port     uint16
+	UserHash ed2k.ID
+	Options  byte
+}
+
+func EncodeDirectCallbackRequest(request DirectCallbackRequest) []byte {
+	out := make([]byte, 0, 19)
+	var port [2]byte
+	binary.LittleEndian.PutUint16(port[:], request.Port)
+	out = append(out, port[:]...)
+	out = append(out, request.UserHash[:]...)
+	return append(out, request.Options)
+}
+
+func DecodeDirectCallbackRequest(payload []byte) (DirectCallbackRequest, error) {
+	if len(payload) < 19 {
+		return DirectCallbackRequest{}, errors.New("peer: short direct callback request")
+	}
+	var request DirectCallbackRequest
+	request.Port = binary.LittleEndian.Uint16(payload)
+	copy(request.UserHash[:], payload[2:18])
+	request.Options = payload[18]
+	return request, nil
+}
