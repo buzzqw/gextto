@@ -262,15 +262,6 @@ func TestFetchRejectsCorruptPart(t *testing.T) {
 	}
 }
 
-func TestFetchRejectsLargeFile(t *testing.T) {
-	_, err := Fetch(context.Background(), "127.0.0.1:1", Link{
-		Hash: ed2k.ID{1}, Name: "big", Size: 5 << 32,
-	}, Config{})
-	if !errors.Is(err, ErrLargeFile) {
-		t.Fatalf("err = %v, want ErrLargeFile", err)
-	}
-}
-
 func TestSafeName(t *testing.T) {
 	cases := map[string]string{
 		"film.mkv":         "film.mkv",

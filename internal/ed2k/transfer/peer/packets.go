@@ -401,3 +401,118 @@ func DecodeDirectCallbackRequest(payload []byte) (DirectCallbackRequest, error) 
 	request.Options = payload[18]
 	return request, nil
 }
+
+// 64-bit part opcodes for files above 4 GiB. They travel on the eMule 0xC5
+// protocol.
+const (
+	OpCompressedPartI64 = 0xA1
+	OpSendingPartI64    = 0xA2
+	OpRequestPartsI64   = 0xA3
+)
+
+// PartRequest64 is OP_REQUESTPARTS_I64: three 64-bit ranges.
+type PartRequest64 struct {
+	Hash   ed2k.ID
+	Starts [3]uint64
+	Ends   [3]uint64
+}
+
+func EncodePartRequest64(request PartRequest64) []byte {
+	out := make([]byte, 0, 16+48)
+	out = append(out, request.Hash[:]...)
+	var value [8]byte
+	for _, start := range request.Starts {
+		binary.LittleEndian.PutUint64(value[:], start)
+		out = append(out, value[:]...)
+	}
+	for _, end := range request.Ends {
+		binary.LittleEndian.PutUint64(value[:], end)
+		out = append(out, value[:]...)
+	}
+	return out
+}
+
+func DecodePartRequest64(payload []byte) (PartRequest64, error) {
+	if len(payload) < 64 {
+		return PartRequest64{}, errors.New("peer: short 64-bit part request")
+	}
+	var request PartRequest64
+	copy(request.Hash[:], payload[:16])
+	for i := 0; i < 3; i++ {
+		request.Starts[i] = binary.LittleEndian.Uint64(payload[16+i*8:])
+		request.Ends[i] = binary.LittleEndian.Uint64(payload[40+i*8:])
+	}
+	return request, nil
+}
+
+// SendingPart64 is OP_SENDINGPART_I64.
+type SendingPart64 struct {
+	Hash  ed2k.ID
+	Start uint64
+	End   uint64
+	Data  []byte
+}
+
+func EncodeSendingPart64(part SendingPart64) ([]byte, error) {
+	if part.End < part.Start || uint64(len(part.Data)) != part.End-part.Start {
+		return nil, errors.New("peer: sending part64 length mismatch")
+	}
+	out := make([]byte, 0, 32+len(part.Data))
+	out = append(out, part.Hash[:]...)
+	var value [8]byte
+	binary.LittleEndian.PutUint64(value[:], part.Start)
+	out = append(out, value[:]...)
+	binary.LittleEndian.PutUint64(value[:], part.End)
+	out = append(out, value[:]...)
+	return append(out, part.Data...), nil
+}
+
+func DecodeSendingPart64(payload []byte) (SendingPart64, error) {
+	if len(payload) < 32 {
+		return SendingPart64{}, errors.New("peer: short sending part64")
+	}
+	var part SendingPart64
+	copy(part.Hash[:], payload[:16])
+	part.Start = binary.LittleEndian.Uint64(payload[16:])
+	part.End = binary.LittleEndian.Uint64(payload[24:])
+	if part.End < part.Start || 32+int(part.End-part.Start) > len(payload) {
+		return SendingPart64{}, errors.New("peer: invalid sending part64 range")
+	}
+	part.Data = append([]byte(nil), payload[32:32+int(part.End-part.Start)]...)
+	return part, nil
+}
+
+// CompressedPart64 is OP_COMPRESSEDPART_I64.
+type CompressedPart64 struct {
+	Hash  ed2k.ID
+	Start uint64
+	Size  uint32
+	Data  []byte
+}
+
+func EncodeCompressedPart64(part CompressedPart64) ([]byte, error) {
+	if part.Size != uint32(len(part.Data)) {
+		return nil, errors.New("peer: compressed part64 size mismatch")
+	}
+	out := make([]byte, 0, 28+len(part.Data))
+	out = append(out, part.Hash[:]...)
+	var start [8]byte
+	binary.LittleEndian.PutUint64(start[:], part.Start)
+	out = append(out, start[:]...)
+	var size [4]byte
+	binary.LittleEndian.PutUint32(size[:], part.Size)
+	out = append(out, size[:]...)
+	return append(out, part.Data...), nil
+}
+
+func DecodeCompressedPart64(payload []byte) (CompressedPart64, error) {
+	if len(payload) < 28 {
+		return CompressedPart64{}, errors.New("peer: short compressed part64")
+	}
+	var part CompressedPart64
+	copy(part.Hash[:], payload[:16])
+	part.Start = binary.LittleEndian.Uint64(payload[16:])
+	part.Size = binary.LittleEndian.Uint32(payload[24:])
+	part.Data = append([]byte(nil), payload[28:]...)
+	return part, nil
+}

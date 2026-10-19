@@ -55,6 +55,9 @@ type Hello struct {
 	// to. eMule writes them after the tag list even when they are zero.
 	ServerIP   net.IP
 	ServerPort uint16
+	// Legacy sends only name, version and UDP ports, without the eMule
+	// feature tags. It is a compatibility fallback for old or strict peers.
+	Legacy bool
 }
 
 // EncodeHello builds the OP_HELLOANSWER payload (without the 0xC5 framing).
@@ -68,6 +71,21 @@ func EncodeHello(hello Hello) []byte {
 	binary.LittleEndian.PutUint16(fixed[:2], hello.Port)
 	out = append(out, fixed[:2]...)
 
+	if hello.Legacy {
+		tags := []ed2k.Tag{
+			{Name: TagName, Type: ed2k.TagString, Str: hello.Name},
+			{Name: TagVersion, Type: ed2k.TagUint32, Int: uint64(hello.Version)},
+			{Name: TagUDPPorts, Type: ed2k.TagUint32, Int: uint64(hello.KadPort)<<16 | uint64(hello.UDPPort)},
+		}
+		out = append(out, ed2k.WriteTagList(tags, binary.LittleEndian)...)
+		ip := hello.ServerIP.To4()
+		if ip == nil {
+			ip = net.IPv4zero.To4()
+		}
+		out = append(out, ip...)
+		binary.LittleEndian.PutUint16(fixed[:2], hello.ServerPort)
+		return append(out, fixed[:2]...)
+	}
 	misc1 := hello.MiscOption
 	if misc1 == 0 {
 		// AICH 1, Unicode, UDP 4, no data compression (the reader does not
@@ -213,7 +231,7 @@ func EncodeMuleInfo() []byte {
 // protocolFor returns the header byte for one client opcode.
 func protocolFor(opcode byte) byte {
 	switch opcode {
-	case OpQueueRanking, OpCompressedPart,
+	case OpQueueRanking, OpCompressedPart, OpCompressedPartI64, OpSendingPartI64, OpRequestPartsI64,
 		OpRequestsSources, OpAnswersSources, OpRequestsSources2, OpAnswersSources2:
 		return EmuleProtocol
 	}

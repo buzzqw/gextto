@@ -29,10 +29,14 @@ part requests, compressed parts, per-part MD4 verification, resume from
 `.part.met` and a final whole-file MD4 gate. A `Manager` drives source
 discovery and the per-peer retry/queue state; a deterministic fake peer in the
 tests serves, queues and corrupts parts. The wire format was checked against a
-real aMule peer: the client header is protocol/length/opcode (length includes
+real aMule peer (including a full 400 KB download whose MD4 matched): the
+client header is protocol/length/opcode (length includes
 the opcode), OP_HELLO has a leading hash-size byte and a six-byte server
 IP/port suffix, the file-name length is 16-bit, and an extended file request
-carries the part-status and complete-source words. eD2k 0xC5 extension packets
+carries the part-status and complete-source words. Files above 4 GiB use the
+I64 request/part opcodes. A queued transfer keeps retrying; the current
+limitation is that some public peers accept the slot and then close on the
+first part request, so a real-world completion depends on the source. eD2k 0xC5 extension packets
 (EMULEINFO, queue ranking, compressed parts) use a separate header byte from
 the 0xE3 standard packets. None of it is imported by
 `cmd/gx-ed2k` yet.

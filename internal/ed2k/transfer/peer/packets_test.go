@@ -97,3 +97,30 @@ func TestQueueAndCallbackPackets(t *testing.T) {
 		t.Fatal("short callback must fail")
 	}
 }
+
+func TestPartPackets64(t *testing.T) {
+	hash := testHash(t, "0123456789abcdef0123456789abcdef")
+	request := PartRequest64{Hash: hash, Starts: [3]uint64{1, 2, 3}, Ends: [3]uint64{4, 5, 6}}
+	got, err := DecodePartRequest64(EncodePartRequest64(request))
+	if err != nil || got.Hash != hash || got.Starts != request.Starts || got.Ends != request.Ends {
+		t.Fatalf("part request64 = %+v, %v", got, err)
+	}
+	part := SendingPart64{Hash: hash, Start: 1 << 33, End: (1 << 33) + 4, Data: []byte("data")}
+	raw, err := EncodeSendingPart64(part)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeSendingPart64(raw)
+	if err != nil || !bytes.Equal(decoded.Data, part.Data) || decoded.Start != part.Start || decoded.End != part.End {
+		t.Fatalf("sending part64 = %+v, %v", decoded, err)
+	}
+	compressed := CompressedPart64{Hash: hash, Start: 1 << 40, Size: 3, Data: []byte("zip")}
+	raw, err = EncodeCompressedPart64(compressed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decodedCompressed, err := DecodeCompressedPart64(raw)
+	if err != nil || decodedCompressed.Start != compressed.Start || !bytes.Equal(decodedCompressed.Data, compressed.Data) {
+		t.Fatalf("compressed part64 = %+v, %v", decodedCompressed, err)
+	}
+}

@@ -23,9 +23,6 @@ import (
 // blocks inside a 9,728,000-byte part.
 const DefaultBlockSize int64 = 184_320
 
-// ErrLargeFile is returned for files that need the 64-bit part opcodes.
-var ErrLargeFile = errors.New("download: files above 4 GiB are not supported yet")
-
 // Link is the immutable identity of the file to download.
 type Link struct {
 	Hash ed2k.ID
@@ -161,9 +158,6 @@ type session struct {
 func Fetch(ctx context.Context, address string, link Link, cfg Config) (*Result, error) {
 	if link.Hash == (ed2k.ID{}) || link.Size <= 0 {
 		return nil, errors.New("download: invalid link")
-	}
-	if link.Size > math.MaxUint32 {
-		return nil, ErrLargeFile
 	}
 	cfg.applyDefaults()
 	if err := os.MkdirAll(cfg.TempDir, 0o755); err != nil {
@@ -478,8 +472,41 @@ func (s *session) download(ctx context.Context) error {
 			if err := s.writeBlock(int64(part.Start), int64(part.End), part.Data); err != nil {
 				return err
 			}
+		case peer.OpSendingPartI64:
+			part, err := peer.DecodeSendingPart64(payload)
+			if err != nil {
+				return err
+			}
+			if part.Hash != s.link.Hash {
+				continue
+			}
+			if err := s.writeBlock(int64(part.Start), int64(part.End), part.Data); err != nil {
+				return err
+			}
 		case peer.OpCompressedPart:
 			part, err := peer.DecodeCompressedPart(payload)
+			if err != nil {
+				return err
+			}
+			if part.Hash != s.link.Hash {
+				continue
+			}
+			start, end, err := s.blockBounds(int64(part.Start))
+			if err != nil {
+				return err
+			}
+			data, err := peer.DecompressData(part.Data, end-start)
+			if err != nil {
+				return err
+			}
+			if int64(len(data)) != end-start {
+				return errors.New("download: compressed block has the wrong size")
+			}
+			if err := s.writeBlock(start, end, data); err != nil {
+				return err
+			}
+		case peer.OpCompressedPartI64:
+			part, err := peer.DecodeCompressedPart64(payload)
 			if err != nil {
 				return err
 			}
@@ -513,18 +540,31 @@ func (s *session) requestMore() error {
 		if len(ranges) == 0 {
 			return nil
 		}
+		large := s.link.Size > math.MaxUint32
 		request := peer.PartRequest{Hash: s.link.Hash}
+		request64 := peer.PartRequest64{Hash: s.link.Hash}
 		for i, r := range ranges {
-			request.Starts[i] = uint32(r.start)
-			request.Ends[i] = uint32(r.end)
 			length := int(r.end - r.start)
 			s.pending[r.key] = pendingBlock{
 				key: r.key, start: r.start, end: r.end,
 				data: make([]byte, length), have: make([]bool, length),
 			}
+			if large {
+				request64.Starts[i] = uint64(r.start)
+				request64.Ends[i] = uint64(r.end)
+			} else {
+				request.Starts[i] = uint32(r.start)
+				request.Ends[i] = uint32(r.end)
+			}
 		}
 		s.logf("download: requesting %d ranges (%d-%d ...)", len(ranges), ranges[0].start, ranges[0].end)
-		if err := s.conn.Send(peer.OpRequestParts, peer.EncodePartRequest(request)); err != nil {
+		opcode := byte(peer.OpRequestParts)
+		payload := peer.EncodePartRequest(request)
+		if large {
+			opcode = peer.OpRequestPartsI64
+			payload = peer.EncodePartRequest64(request64)
+		}
+		if err := s.conn.Send(opcode, payload); err != nil {
 			return fmt.Errorf("download: part request: %w", err)
 		}
 	}
