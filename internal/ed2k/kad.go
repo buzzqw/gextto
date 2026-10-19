@@ -287,16 +287,25 @@ func (c *Client) acceptLoop() {
 // result is stored for /api/v1/status, and a router without UPnP simply leaves
 // it empty with an explanatory error.
 func (c *Client) openKadPort() {
-	result := mapKadPort(context.Background(), c.UDPPort(), c.cfg.TCPPort, c.cfg.UPnPDescription)
-	c.upnpMu.Lock()
-	c.upnp = result
-	c.upnpDone = true
-	c.upnpMu.Unlock()
-	if result.Error != "" {
-		log.Printf("gx-ed2k: UPnP: %s", result.Error)
-		return
+	for {
+		result := mapKadPort(context.Background(), c.UDPPort(), c.cfg.TCPPort, c.cfg.UPnPDescription)
+		c.upnpMu.Lock()
+		c.upnp = result
+		c.upnpDone = true
+		c.upnpMu.Unlock()
+		if result.Error != "" {
+			log.Printf("gx-ed2k: port mapping: %s", result.Error)
+		} else {
+			log.Printf("gx-ed2k: %s mapped UDP %d and TCP %d (external IP %s)",
+				result.Method, c.UDPPort(), c.cfg.TCPPort, result.ExternalIP)
+		}
+		// NAT-PMP/PCP leases are one hour; refresh well before they expire.
+		select {
+		case <-c.closeCh:
+			return
+		case <-time.After(20 * time.Minute):
+		}
 	}
-	log.Printf("gx-ed2k: UPnP mapped UDP %d and TCP %d (external IP %s)", c.UDPPort(), c.cfg.TCPPort, result.ExternalIP)
 }
 
 // Close stops the packet loop.

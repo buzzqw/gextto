@@ -5389,3 +5389,5 @@ fra:
   "Incolla uno o più link eD2k, uno per riga (o separati da spazi).": "Collez un ou plusieurs liens eD2k, un par ligne (ou séparés par des espaces)."
   "Link eD2k, uno per riga": "Liens eD2k, un par ligne"
   "Aggiungi tutti": "Tout ajouter"
+  "Apri la porta Kad sul router": "Ouvrir le port Kad sur le routeur"
+  "Chiede al router di aprire UDP 4672 e TCP 4662 con UPnP, NAT-PMP o PCP, così il demone è raggiungibile e trova più fonti. Se il router non lo supporta resta limitato: configura il port forwarding manuale.": "Demande au routeur d'ouvrir UDP 4672 et TCP 4662 via UPnP, NAT-PMP ou PCP, afin que le démon soit joignable et trouve plus de sources. Sans support, l'état reste limité : configurez la redirection de ports manuellement."

@@ -1630,7 +1630,7 @@ per default: senza il tuo consenso Gextto non contatta la rete.
 | Usa eD2k quando i torrent non trovano nulla | Secondo interruttore, separato: solo nel passaggio approfondito del gap filling, e solo se torrent episodio e stagione non hanno prodotto nulla, Gextto cerca lo stesso episodio su eD2k/Kad. Spento di default. |
 | Fonti minime per il fallback | Soglia di fonti eD2k per accettare automaticamente un risultato. La ricerca manuale mostra tutto. *(Unità: fonti; 0 = nessun minimo)* |
 | Timeout della ricerca eD2k | Tempo massimo di una ricerca eD2k/Kad; allo scadere restituisce i risultati già arrivati. *(Unità: secondi)* |
-| Apri la porta Kad con UPnP | Chiede al router di aprire UDP 4672 e TCP 4662 con UPnP. Se funziona la connessione risulta **aperta** e i server eD2k assegnano un HighID; se il router non lo supporta resta **limitata** e serve il port forwarding manuale. |
+| Apri la porta Kad sul router | Chiede al router di aprire UDP 4672 e TCP 4662 con **UPnP**, **NAT-PMP** o **PCP**. Se funziona la connessione risulta **aperta** e i server eD2k assegnano un HighID; se il router non lo supporta resta **limitata** e serve il port forwarding manuale. |
 
 Il fallback automatico accetta solo un risultato che corrisponde esattamente
 all'episodio, ha una qualità riconosciuta, una dimensione plausibile e almeno le

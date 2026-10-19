@@ -181,7 +181,7 @@ var uiSettingTooltipText = map[string]string{
 	"ed2k_fallback":                        "Quando i torrent non trovano nulla, cerca lo stesso episodio su eD2k/Kad. È un secondo interruttore, spento per default.",
 	"ed2k_min_sources":                     "Numero minimo di sorgenti eD2k perché un risultato venga accettato automaticamente. La ricerca manuale mostra tutto.",
 	"ed2k_search_timeout_secs":             "Tempo massimo concesso a una ricerca eD2k/Kad prima di restituire i risultati già arrivati.",
-	"ed2k_upnp":                            "Chiede al router di aprire la porta UDP di Kad con UPnP, così il demone è raggiungibile e trova più fonti. Se il router non lo supporta non cambia nulla.",
+	"ed2k_upnp":                            "Chiede al router di aprire UDP 4672 e TCP 4662 con UPnP, NAT-PMP o PCP, così il demone è raggiungibile e trova più fonti. Se il router non lo supporta resta limitato: configura il port forwarding manuale.",
 }
 
 // uiSettingTooltip returns the tooltip for a setting key. Score weights without

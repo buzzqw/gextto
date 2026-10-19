@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	natpmp "github.com/jackpal/go-nat-pmp"
 )
 
 const (
@@ -28,12 +30,15 @@ const (
 	upnpTimeout = 5 * time.Second
 )
 
-// UPnPResult is the outcome of the port-mapping attempt.
+// UPnPResult is the outcome of the automatic port-mapping attempt. Method is
+// "upnp", "natpmp" or "pcp"; UDPMapped/TCPMapped say which protocols are open.
 type UPnPResult struct {
 	Available  bool   `json:"available"`
+	Method     string `json:"method,omitempty"`
 	ExternalIP string `json:"external_ip,omitempty"`
 	ControlURL string `json:"control_url,omitempty"`
 	Service    string `json:"service,omitempty"`
+	UDPMapped  bool   `json:"udp_mapped"`
 	TCPMapped  bool   `json:"tcp_mapped"`
 	Error      string `json:"error,omitempty"`
 }
@@ -215,7 +220,94 @@ func externalIP(payload []byte) string {
 // mapKadPort discovers the gateway and asks it to forward udpPort. It returns a
 // descriptive result for /api/v1/status and the log; a failure is not fatal.
 func mapKadPort(ctx context.Context, udpPort, tcpPort int, description string) UPnPResult {
-	result := UPnPResult{}
+	upnp := mapUPnPPorts(ctx, udpPort, tcpPort, description)
+	if upnp.UDPMapped && (tcpPort <= 0 || upnp.TCPMapped) {
+		return upnp
+	}
+	var failures []string
+	if upnp.Error != "" {
+		failures = append(failures, "UPnP: "+oneLine(upnp.Error))
+	}
+	if nat, err := mapNATPMP(udpPort, tcpPort); err == nil && nat.UDPMapped && (tcpPort <= 0 || nat.TCPMapped) {
+		return nat
+	} else if err != nil {
+		failures = append(failures, "NAT-PMP: "+oneLine(err.Error()))
+	}
+	pcpCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
+	pcpResult, pcpErr := mapPCP(pcpCtx, udpPort, tcpPort)
+	cancel()
+	if pcpErr == nil && pcpResult.UDPMapped && (tcpPort <= 0 || pcpResult.TCPMapped) {
+		return pcpResult
+	} else if pcpErr != nil {
+		failures = append(failures, "PCP: "+oneLine(pcpErr.Error()))
+	}
+	if upnp.Available || upnp.UDPMapped {
+		if len(failures) > 0 {
+			upnp.Error = strings.Join(failures, "; ")
+		}
+		return upnp
+	}
+	return UPnPResult{Error: strings.Join(failures, "; ")}
+}
+
+// oneLine collapses whitespace so a SOAP/network error stays on one log line.
+func oneLine(value string) string {
+	return strings.Join(strings.Fields(value), " ")
+}
+
+// mapNATPMP asks the default gateway to map UDP and TCP with NAT-PMP.
+func mapNATPMP(udpPort, tcpPort int) (UPnPResult, error) {
+	result := UPnPResult{Method: "natpmp"}
+	gateway, err := defaultGateway()
+	if err != nil {
+		return result, err
+	}
+	client := natpmp.NewClientWithTimeout(gateway, 4*time.Second)
+	if _, err := client.AddPortMapping("udp", udpPort, udpPort, 3600); err != nil {
+		return result, err
+	}
+	result.Available = true
+	result.UDPMapped = true
+	if tcpPort > 0 && tcpPort <= 65535 {
+		if _, err := client.AddPortMapping("tcp", tcpPort, tcpPort, 3600); err != nil {
+			result.Error = "TCP: " + err.Error()
+		} else {
+			result.TCPMapped = true
+		}
+	}
+	if external, err := client.GetExternalAddress(); err == nil {
+		result.ExternalIP = net.IPv4(external.ExternalIPAddress[0], external.ExternalIPAddress[1], external.ExternalIPAddress[2], external.ExternalIPAddress[3]).String()
+	}
+	return result, nil
+}
+
+// mapPCP is the PCP fallback for routers that speak RFC 6887 but not NAT-PMP.
+func mapPCP(ctx context.Context, udpPort, tcpPort int) (UPnPResult, error) {
+	result := UPnPResult{Method: "pcp"}
+	gateway, err := defaultGateway()
+	if err != nil {
+		return result, err
+	}
+	local, _ := localIPv4()
+	if _, external, err := pcpMap(ctx, gateway, pcpPort, pcpProtoUDP, uint16(udpPort), 3600, net.ParseIP(local)); err != nil {
+		return result, err
+	} else if external != nil {
+		result.ExternalIP = external.String()
+	}
+	result.Available = true
+	result.UDPMapped = true
+	if tcpPort > 0 && tcpPort <= 65535 {
+		if _, _, err := pcpMap(ctx, gateway, pcpPort, pcpProtoTCP, uint16(tcpPort), 3600, net.ParseIP(local)); err != nil {
+			result.Error = "TCP: " + err.Error()
+		} else {
+			result.TCPMapped = true
+		}
+	}
+	return result, nil
+}
+
+func mapUPnPPorts(ctx context.Context, udpPort, tcpPort int, description string) UPnPResult {
+	result := UPnPResult{Method: "upnp"}
 	if udpPort <= 0 || udpPort > 65535 {
 		result.Error = "invalid UDP port"
 		return result
@@ -282,6 +374,7 @@ func mapKadPort(ctx context.Context, udpPort, tcpPort int, description string) U
 		result.Error = err.Error()
 		return result
 	}
+	result.UDPMapped = true
 	if tcpPort > 0 && tcpPort <= 65535 {
 		if err := add("TCP", tcpPort); err != nil {
 			// The Kad mapping succeeded; a TCP-only failure leaves the daemon

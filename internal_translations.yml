@@ -4733,3 +4733,5 @@ eng:
   "Incolla uno o più link eD2k, uno per riga (o separati da spazi).": "Paste one or more eD2k links, one per line (or separated by spaces)."
   "Link eD2k, uno per riga": "eD2k links, one per line"
   "Aggiungi tutti": "Add all"
+  "Apri la porta Kad sul router": "Open the Kad port on the router"
+  "Chiede al router di aprire UDP 4672 e TCP 4662 con UPnP, NAT-PMP o PCP, così il demone è raggiungibile e trova più fonti. Se il router non lo supporta resta limitato: configura il port forwarding manuale.": "Asks the router to map UDP 4672 and TCP 4662 with UPnP, NAT-PMP or PCP, so the daemon is reachable and finds more sources. If the router does not support it the state stays limited: configure manual port forwarding."

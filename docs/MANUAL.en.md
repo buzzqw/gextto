@@ -1576,7 +1576,7 @@ default: without your consent Gextto does not contact the network.
 | Use eD2k when torrents find nothing | A second, separate switch: only in the deep gap-filling pass, and only when the torrent episode and season searches produced nothing, Gextto searches the same episode on eD2k/Kad. Off by default. |
 | Minimum sources for the fallback | eD2k source floor for accepting a result automatically. Manual search shows everything. *(Unit: sources; 0 = no minimum)* |
 | eD2k search timeout | Maximum time for an eD2k/Kad search; on expiry it returns the results that already arrived. *(Unit: seconds)* |
-| Open the Kad port with UPnP | Asks the router to map UDP 4672 and TCP 4662 with UPnP. When it works the connection reads **open** and eD2k servers assign a HighID; when the router does not support it the state stays **limited** and manual port forwarding is required. |
+| Open the Kad port on the router | Asks the router to map UDP 4672 and TCP 4662 with **UPnP**, **NAT-PMP** or **PCP**. When it works the connection reads **open** and eD2k servers assign a HighID; when the router does not support it the state stays **limited** and manual port forwarding is required. |
 
 The automatic fallback only accepts a result that matches the episode exactly,
 has a recognised quality, a plausible size and at least the source floor. In
