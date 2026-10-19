@@ -892,7 +892,8 @@ func Gaps(w http.ResponseWriter, r *http.Request, s *AppState) {
 	result := []map[string]any{}
 	for _, gap := range items {
 		season := gap.Season
-		if cfg.FindSeriesMatch(gap.Series, &season) == nil {
+		series := cfg.FindSeriesMatch(gap.Series, &season)
+		if series == nil {
 			continue
 		}
 		airDate := airDates[airDateKey{Series: gap.Series, Season: gap.Season, Episode: gap.Episode}]
@@ -901,6 +902,7 @@ func Gaps(w http.ResponseWriter, r *http.Request, s *AppState) {
 			"season":   gap.Season,
 			"episode":  gap.Episode,
 			"air_date": airDate,
+			"aliases":  series.Aliases,
 		})
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "count": len(result), "items": result})
