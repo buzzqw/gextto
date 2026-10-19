@@ -48,10 +48,13 @@ func V2Search(w http.ResponseWriter, r *http.Request, s *AppState) {
 	query := strings.TrimSpace(r.FormValue("q"))
 	kad := r.FormValue("kad") != ""
 	redirect := "/?view=search"
-	if r.FormValue("view") == "downloads" {
+	switch r.FormValue("view") {
+	case "downloads":
 		// The same form is embedded in Scarico: keep the user there after
 		// adding a result instead of jumping to Esplora.
 		redirect = "/?view=downloads"
+	case "dashboard":
+		redirect = "/?view=dashboard"
 	}
 	view := v2SearchViewFrom(s, query, redirect, kad)
 	dict, eng := v2Dictionaries(s)
@@ -139,6 +142,16 @@ func V2SearchLink(w http.ResponseWriter, r *http.Request, s *AppState) {
 	v2Render(w, http.StatusOK, "v2_search_results", view, dict, eng)
 }
 
+// v2SearchRedirectTarget keeps the post-add navigation inside a known view:
+// the value comes from a hidden form field, so it must not be an open redirect.
+func v2SearchRedirectTarget(value, fallback string) string {
+	switch value {
+	case "/?view=search", "/?view=dashboard", "/?view=downloads":
+		return value
+	}
+	return fallback
+}
+
 // V2SearchAdd adds a release to the acquisition queue.
 func V2SearchAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 	release := strings.TrimSpace(r.FormValue("release"))
@@ -146,10 +159,7 @@ func V2SearchAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		body, _ := json.Marshal(map[string]json.RawMessage{"release": json.RawMessage(release)})
 		v2InternalJSON(s, http.MethodPost, "/api/search/add", nil, body)
 	}
-	redirect := "/?view=search"
-	if r.FormValue("redirect") == "/?view=dashboard" {
-		redirect = "/?view=dashboard"
-	}
+	redirect := v2SearchRedirectTarget(r.FormValue("redirect"), "/?view=search")
 	if r.Header.Get("HX-Request") == "" {
 		http.Redirect(w, r, redirect, http.StatusSeeOther)
 		return
