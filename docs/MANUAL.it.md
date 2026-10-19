@@ -1641,7 +1641,9 @@ connessione: **aperta** (UPnP o porte raggiungibili), **limitata**
 4662 sul router o attiva UPnP. La stessa spia è nella pagina del demone
 `gx-ed2k`, insieme a nodi, porta e versione. Nella pagina standalone del demone,
 **Controlla aggiornamenti** confronta la build con l'ultima release pubblicata e
-mostra il link all'archivio `gx-ed2k-linux-<arch>`; una build locale non propone
+mostra il link all'archivio; su Linux può anche installarlo (verifica checksum e
+versione, sostituisce il binario e riavvia il demone). Su Windows resta il
+download dello zip con l'installer del servizio. Una build locale non propone
 aggiornamenti.
 
 #### Qualità e upgrade

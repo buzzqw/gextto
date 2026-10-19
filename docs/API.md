@@ -589,6 +589,7 @@ a native `/api/v1`. When `ed2k_token` is set, every `/api/v1` call must send
 | POST | `/api/v1/link` | validate a JSON `{"link":"ed2k://…"}` file or server link; returns the parsed identity |
 | GET | `/api/v1/nodes` | the current Kad routing table |
 | GET | `/api/v1/update` | compare the running `gx-ed2k` build with `release.json` (`gx_ed2k_build`) and return the standalone archive URL; a local build answers `local_build: true` |
+| POST | `/api/v1/update/apply` | download the newer Linux archive, verify its SHA-256 and version, replace the binary and restart; a local build or Windows answers `409` |
 
 `/api/v1/health` reports `"download": false` in this version. That is the
 contract Gextto reads before offering to queue an eD2k result: the daemon

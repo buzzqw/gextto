@@ -41,8 +41,10 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   l'ultima pubblicata e, se è più nuova, dà il link all'archivio giusto per
   l'architettura. C'è anche l'archivio **Windows** (`gx-ed2k-windows-<arch>.zip`)
   con `install-service.ps1`, che registra il servizio e apre UDP 4672/TCP 4662
-  nel firewall di Windows. Una build compilata dal codice locale non propone
-  nulla.
+  nel firewall di Windows. Su Linux il controllo può anche **installare**
+  l'aggiornamento (checksum e versione verificati, vecchio binario conservato,
+  riavvio automatico); su Windows resta il download dello zip. Una build
+  compilata dal codice locale non propone nulla.
 - **Aggiornamenti più sicuri.** Un aggiornamento, dal pulsante **Aggiorna** o
   rilanciando l'installer, è riuscito solo quando l'interfaccia della nuova
   versione risponde. Se la nuova versione cade dopo qualche secondo dall'avvio,

@@ -20,6 +20,7 @@ type updateView struct {
 	Current    string `json:"current"`
 	Latest     string `json:"latest,omitempty"`
 	Available  bool   `json:"available,omitempty"`
+	Apply      bool   `json:"apply,omitempty"`
 	URL        string `json:"url,omitempty"`
 	Channel    string `json:"channel,omitempty"`
 	Error      string `json:"error,omitempty"`
@@ -54,6 +55,7 @@ func updateViewFor(current string, currentBuild int64, channel string, manifest 
 	}
 	if available {
 		view.URL = updatecheck.AssetURL(channel, updateAssetName())
+		view.Apply = runtime.GOOS != "windows"
 	}
 	return view
 }

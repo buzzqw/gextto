@@ -208,6 +208,40 @@ window.__ed2kI18n = {{.ClientI18n}};
             link.rel = "noopener";
             link.textContent = t("update_available") + " " + (body.latest || "");
             updateText.appendChild(link);
+            if(body.apply){
+              var applyButton = document.createElement("button");
+              applyButton.type = "button";
+              applyButton.className = "ghost";
+              applyButton.style.marginLeft = "8px";
+              applyButton.textContent = t("update_apply");
+              applyButton.addEventListener("click", function(){
+                applyButton.disabled = true;
+                updateText.textContent = t("update_applying");
+                fetch("/api/v1/update/apply", {method:"POST", cache:"no-store", headers:{"Accept":"application/json"}})
+                  .then(function(response){
+                    return response.json().then(function(result){
+                      if(!response.ok) throw new Error(result.error || response.status);
+                      return result;
+                    });
+                  })
+                  .then(function(){
+                    updateText.textContent = t("update_restarting");
+                    var tries = 0;
+                    var timer = setInterval(function(){
+                      tries++;
+                      fetch("/api/v1/health", {cache:"no-store"}).then(function(response){
+                        if(response.ok){ clearInterval(timer); window.location.reload(); }
+                      }).catch(function(){});
+                      if(tries > 20){ clearInterval(timer); updateText.textContent = t("update_error"); }
+                    }, 1000);
+                  })
+                  .catch(function(error){
+                    updateText.textContent = t("update_apply_failed") + ": " + error.message;
+                    applyButton.disabled = false;
+                  });
+              });
+              updateText.appendChild(applyButton);
+            }
             return;
           }
           if(body.ok){ updateText.textContent = t("update_current") + " " + (body.current || ""); return; }

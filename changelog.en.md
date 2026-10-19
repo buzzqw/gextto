@@ -39,8 +39,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
   and, when newer, links to the archive for the right architecture. A
   **Windows** archive (`gx-ed2k-windows-<arch>.zip`) is published too, with
   `install-service.ps1`, which registers the service and opens UDP 4672/TCP
-  4662 in the Windows firewall. A build compiled from local source offers
-  nothing.
+  4662 in the Windows firewall. On Linux the check can also **install** the
+  update (checksum and version verified, old binary kept, automatic restart);
+  on Windows the zip download remains. A build compiled from local source
+  offers nothing.
 - **Safer updates.** An update, from the **Update** button or by running the
   installer again, succeeds only when the new version's web interface answers.
   If the new version goes down a few seconds after starting, the previous one

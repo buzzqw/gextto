@@ -132,6 +132,13 @@ build and links to the archive when a newer one exists. Binaries built from a
 checkout have no channel and answer `local_build: true`, so they never offer an
 update that may be older than the source.
 
+On Linux the page also offers **Install update** (`POST
+/api/v1/update/apply`): the daemon downloads the archive, verifies the published
+SHA-256, checks that the extracted binary reports the version in the manifest,
+keeps the old binary as `gx-ed2k.old`, replaces the executable and execs it with
+the same arguments. Windows is deliberately excluded: a running `.exe` cannot
+be replaced, so the page keeps the zip download link there.
+
 ## Packaging
 
 - `scripts/package-gx-ed2k.sh` produces the Linux tarball;
