@@ -34,9 +34,11 @@ client header is protocol/length/opcode (length includes
 the opcode), OP_HELLO has a leading hash-size byte and a six-byte server
 IP/port suffix, the file-name length is 16-bit, and an extended file request
 carries the part-status and complete-source words. Files above 4 GiB use the
-I64 request/part opcodes. A queued transfer keeps retrying; the current
-limitation is that some public peers accept the slot and then close on the
-first part request, so a real-world completion depends on the source. eD2k 0xC5 extension packets
+I64 request/part opcodes. A queued transfer keeps retrying. Do not send OP_SETREQFILEID before
+OP_STARTUPLOADREQ: real eMule peers close the socket after accepting the slot
+when that packet arrives, while aMule tolerates it. With the packet removed, a
+live download of the 4.2 MB eMule 0.70b installer completed, passed the final
+MD4 and appeared in Gextto as a finished ed2k row. eD2k 0xC5 extension packets
 (EMULEINFO, queue ranking, compressed parts) use a separate header byte from
 the 0xE3 standard packets. None of it is imported by
 `cmd/gx-ed2k` yet.

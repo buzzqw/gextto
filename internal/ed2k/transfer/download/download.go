@@ -245,9 +245,6 @@ func (s *session) run(ctx context.Context) error {
 			return err
 		}
 	}
-	if err := s.setRequestFile(ctx); err != nil {
-		return err
-	}
 	if err := s.startUpload(ctx); err != nil {
 		return err
 	}

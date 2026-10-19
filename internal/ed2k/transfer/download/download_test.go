@@ -102,6 +102,8 @@ func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.
 			if err := client.Send(peer.OpHashsetAnswer, raw); err != nil {
 				return err
 			}
+		case peer.OpSetReqFileID:
+			return errors.New("fake peer: unexpected OP_SETREQFILEID")
 		case peer.OpStartUploadReq:
 			if queue {
 				if err := client.Send(peer.OpQueueRanking, peer.EncodeQueueRanking(peer.QueueRanking{Rank: 4})); err != nil {
