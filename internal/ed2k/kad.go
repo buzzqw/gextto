@@ -564,7 +564,10 @@ func (c *Client) Search(ctx context.Context, query string) ([]SearchFile, error)
 	kad := <-kadCh
 	servers := <-serverCh
 	merged := mergeFiles(c.cfg.MaxResults, kad.files, servers.files)
-	if filtered := filterQueryMatches(merged, query); len(filtered) > 0 {
+	// An episode query is specific: never fall back to the unfiltered title
+	// results when the broad retry returned other episodes. A free-text query
+	// keeps the old fuzzy fallback.
+	if filtered := filterQueryMatches(merged, query); len(filtered) > 0 || queryHasEpisode(query) {
 		merged = filtered
 	}
 	c.mu.Lock()
@@ -1078,6 +1081,15 @@ func QueryTokens(query string) []string {
 		out = append(out, word)
 	}
 	return out
+}
+
+func queryHasEpisode(query string) bool {
+	for _, token := range SearchTerms(query) {
+		if kadEpisodeToken.MatchString(token) {
+			return true
+		}
+	}
+	return false
 }
 
 // MatchesQuery reports whether a file name contains every searchable token of

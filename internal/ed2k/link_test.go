@@ -142,3 +142,12 @@ func TestBroadTermsDropsEpisodeAndQuality(t *testing.T) {
 		t.Fatalf("episode-only broadTerms = %#v", got)
 	}
 }
+
+func TestQueryHasEpisode(t *testing.T) {
+	if !queryHasEpisode("Tracker S04E01") || !queryHasEpisode("Tracker 4x01") {
+		t.Fatal("episode query not recognized")
+	}
+	if queryHasEpisode("The Matrix 1999 1080p") {
+		t.Fatal("year/quality must not count as an episode")
+	}
+}
