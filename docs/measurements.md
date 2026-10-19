@@ -480,9 +480,11 @@ One live run from the N97 (`bin/gx-ed2k`, standalone, UPnP on, `nodes.dat` from
 - **UPnP**: mapping accepted by the router, UDP and TCP mapped, external IP
   `79.40.60.48`, `reachability=open`.
 - **eD2k servers**: login and HighID (`server_id=809248847`, `low_id=false`),
-  `server.met` parsed (16 servers), search `the matrix 1999` returned **12
-  results** (name, size, MD4, sources), including Italian releases. Packed
-  server results (`0xD4` + zlib) and tagged `server.met` (0xE0) are supported.
+  `server.met` parsed (16 servers), search `the matrix 1999` returned **14
+  results** (name, size, MD4, sources), including Italian releases; the query
+  took **10.5 s** with five servers in parallel and a short idle window after
+  the first result. Packed server results (`0xD4` + zlib) and tagged
+  `server.met` (0xE0) are supported.
 - **Kad**: 175 valid contacts loaded, but **no UDP response** to
   `BOOTSTRAP_REQ`, `PING` or `HELLO_REQ` from the first 20 nodes. A UDP probe to
   `8.8.8.8:53` also times out: this host/network blocks outbound UDP. The code

@@ -37,8 +37,8 @@ func (c *Client) searchServers(ctx context.Context, keyword string) ([]SearchFil
 	if len(servers) == 0 {
 		return nil, errors.New("ed2k: no eD2k servers configured")
 	}
-	if len(servers) > 3 {
-		servers = servers[:3]
+	if len(servers) > 5 {
+		servers = servers[:5]
 	}
 	type outcome struct {
 		files []SearchFile
@@ -131,9 +131,14 @@ func (c *Client) searchOneServer(ctx context.Context, address, keyword string) (
 	if err := c.serverLogin(conn); err != nil {
 		return nil, fmt.Errorf("%s: %w", address, err)
 	}
-	// Login set its own short deadline; restore the search budget for the
-	// result phase.
-	_ = conn.SetDeadline(deadline)
+	// Servers send banners and messages before (and between) results. Give the
+	// first result a short window, then extend by a short idle window after
+	// each result instead of keeping the connection open for the whole budget.
+	firstDeadline := time.Now().Add(5 * time.Second)
+	if firstDeadline.After(deadline) {
+		firstDeadline = deadline
+	}
+	_ = conn.SetDeadline(firstDeadline)
 	if err := writeServerPacket(conn, OpSearchRequest, encodeSearchExpression(binary.LittleEndian, keyword)); err != nil {
 		return nil, fmt.Errorf("%s: %w", address, err)
 	}
@@ -159,6 +164,11 @@ func (c *Client) searchOneServer(ctx context.Context, address, keyword string) (
 				continue
 			}
 			files = append(files, parsed...)
+			idle := time.Now().Add(2 * time.Second)
+			if idle.After(deadline) {
+				idle = deadline
+			}
+			_ = conn.SetDeadline(idle)
 		case OpReject:
 			return files, fmt.Errorf("%s rejected the search", address)
 		}

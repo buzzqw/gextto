@@ -597,6 +597,12 @@ func (c *Client) searchKad(ctx context.Context, keyword string, target ID) ([]Se
 	}
 
 	deadline := time.Now().Add(c.cfg.QueryTimeout)
+	// A Kad keyword search normally answers within a few seconds. Waiting the
+	// whole budget when the network is silent (UDP blocked, no responder) only
+	// delays the server results, which arrive in parallel.
+	if max := time.Now().Add(8 * time.Second); deadline.After(max) {
+		deadline = max
+	}
 	var files []SearchFile
 	for time.Now().Before(deadline) && len(files) < c.cfg.MaxResults {
 		select {

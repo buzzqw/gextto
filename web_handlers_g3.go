@@ -370,7 +370,8 @@ func ManualSearchGet(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if qs, ok := values["q"]; ok && len(qs) > 0 {
 		query = qs[0]
 	}
-	status, value := gh3ManualSearch(s, query)
+	kad := values.Get("kad")
+	status, value := gh3ManualSearch(s, query, settingIsTrue(kad) || kad == "1")
 	jsonStatus(w, status, value)
 }
 
@@ -1047,7 +1048,7 @@ func gh3SeenGrouped(state *AppState, kind string, r *http.Request) (int, any) {
 }
 
 // gh3ManualSearch implements `manual_search`, reused by `manual_search_get`.
-func gh3ManualSearch(s *AppState, query string) (int, any) {
+func gh3ManualSearch(s *AppState, query string, kad ...bool) (int, any) {
 	if !gh3SetupComplete(s.cfg) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
@@ -1068,7 +1069,9 @@ func gh3ManualSearch(s *AppState, query string) (int, any) {
 		results = nil
 	}
 	results = append(results, gh3ArchiveReleasesForQuery(s, cfg, query)...)
-	results = append(results, SearchED2K(ctx, cfg, query)...)
+	if len(kad) > 0 && kad[0] {
+		results = append(results, SearchED2K(ctx, cfg, query)...)
+	}
 	seen := map[string]struct{}{}
 	deduped := results[:0]
 	for _, release := range results {
