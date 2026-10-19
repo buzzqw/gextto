@@ -557,6 +557,17 @@ The tree target is the first real title word; episode markers, years and
 quality tags are skipped for the target but kept in the AND filter, and stop
 words are dropped so `The.Matrix.1999.mkv` still matches.
 
+**Localized vs original title.** The library name is not always the name on
+Kad. Two spot checks against the same routing table:
+
+| Localized query | Kad hits | Original/alias query | Kad hits |
+|---|---|---|---|
+| `I misteri di Murdoch S13E12` | 0 | `Murdoch Mysteries S13E12` | 1 (`...Fox.Hunt.DVDRip...`, 2 sources) |
+| `Agenzia Roman S03E01` | 0 | `Surrealestate S03E01` | 1 (`...Buckaroo.Web.h264-Rbb...`, 1 source) |
+
+The automatic gap filler now queries the configured name and its aliases in
+parallel, so the gate sample must use the same alias-aware query to be fair.
+
 **Throttling.** A second 30-query batch run a few minutes later returned almost
 no Kad results from the same endpoint, while `PING` still answered and a fresh
 client on another UDP port found 35 `FBI S06E13` results. Peers appear to
