@@ -603,9 +603,7 @@ func (c *Client) searchKad(ctx context.Context, keyword string, target ID, terms
 	if len(contacts) == 0 {
 		return nil, errors.New("ed2k: no Kad contacts")
 	}
-	for _, contact := range contacts {
-		c.send(contact, KadSearchKeyReq, encodeSearchRequest(target, terms))
-	}
+	c.sendSearch(ctx, contacts, target, terms)
 
 	deadline := time.Now().Add(c.cfg.QueryTimeout)
 	// A Kad keyword search normally answers within a few seconds. Waiting the
@@ -614,17 +612,59 @@ func (c *Client) searchKad(ctx context.Context, keyword string, target ID, terms
 	if max := time.Now().Add(8 * time.Second); deadline.After(max) {
 		deadline = max
 	}
-	var files []SearchFile
-	for time.Now().Before(deadline) && len(files) < c.cfg.MaxResults {
+	files := c.collectFiles(ctx, collector, deadline, nil)
+	if len(files) > 0 || ctx.Err() != nil {
+		return files, nil
+	}
+
+	// One retry: a lost datagram or a temporarily stale closest set must not
+	// turn a real result into a gap. The Datagram is cheap and the extra
+	// window is short, while the caller's context still bounds the total.
+	c.lookup(ctx, target, 1200*time.Millisecond)
+	retry := c.table.closest(target, 32)
+	if len(retry) > 16 {
+		retry = retry[:16]
+	}
+	if len(retry) > 0 {
+		c.sendSearch(ctx, retry, target, terms)
+		retryUntil := time.Now().Add(2 * time.Second)
+		if ctxDeadline, ok := ctx.Deadline(); ok && retryUntil.After(ctxDeadline) {
+			retryUntil = ctxDeadline
+		}
+		files = c.collectFiles(ctx, collector, retryUntil, files)
+	}
+	return files, nil
+}
+
+// kadSendGap paces the search datagrams a little: eMule peers are more likely
+// to answer a handful of packets spread over a few milliseconds than a burst.
+const kadSendGap = 15 * time.Millisecond
+
+func (c *Client) sendSearch(ctx context.Context, contacts []Contact, target ID, terms []string) {
+	payload := encodeSearchRequest(target, terms)
+	for index, contact := range contacts {
+		if index > 0 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(kadSendGap):
+			}
+		}
+		c.send(contact, KadSearchKeyReq, payload)
+	}
+}
+
+func (c *Client) collectFiles(ctx context.Context, collector *collector, until time.Time, files []SearchFile) []SearchFile {
+	for time.Now().Before(until) && len(files) < c.cfg.MaxResults {
 		select {
 		case <-ctx.Done():
-			return files, ctx.Err()
+			return files
 		case file := <-collector.files:
 			files = append(files, file)
 		case <-time.After(150 * time.Millisecond):
 		}
 	}
-	return files, nil
+	return files
 }
 
 // lookup walks the Kad network towards target, learning closer contacts. It
@@ -642,6 +682,14 @@ func (c *Client) lookup(ctx context.Context, target ID, budget time.Duration) {
 			}
 			if _, ok := tried[contact.ID]; ok {
 				continue
+			}
+			if sent > 0 {
+				select {
+				case <-ctx.Done():
+					c.dropNodeWaiter(target, channel)
+					return
+				case <-time.After(kadSendGap):
+				}
 			}
 			tried[contact.ID] = struct{}{}
 			c.send(contact, KadReq, encodeNodeRequest(target, contact.ID, byte(c.cfg.NodesPerRequest)))

@@ -20,6 +20,10 @@ type fakeKadNode struct {
 	fileHash ID
 	files    []SearchFile
 	queries  chan string
+	// dropSearches makes the fake ignore the first N keyword searches, to
+	// exercise the client's retry path.
+	dropSearches int
+	searchCount  int
 }
 
 func newFakeKadNode(t *testing.T) *fakeKadNode {
@@ -65,6 +69,10 @@ func (n *fakeKadNode) loop() {
 		case KadSearchKeyReq:
 			target, _, _, err := decodeSearchRequest(payload)
 			if err != nil {
+				continue
+			}
+			n.searchCount++
+			if n.searchCount <= n.dropSearches {
 				continue
 			}
 			keyword := ""
@@ -298,5 +306,37 @@ func TestContactValidRejectsNonRoutableIPs(t *testing.T) {
 		if got := contact.valid(); got != want {
 			t.Errorf("valid(%s) = %v, want %v", raw, got, want)
 		}
+	}
+}
+
+func TestKadSearchRetriesWhenFirstRoundIsSilent(t *testing.T) {
+	node := newFakeKadNode(t)
+	node.dropSearches = 1
+	dataDir := t.TempDir()
+	seed := Contact{ID: node.id, IP: net.IPv4(127, 0, 0, 1), UDPPort: uint16(node.address().Port), TCPPort: 4662, Version: KadVersion}
+	if err := WriteNodesFile(filepath.Join(dataDir, "nodes.dat"), []Contact{seed}); err != nil {
+		t.Fatal(err)
+	}
+	client, err := New(Config{
+		DataDir:       dataDir,
+		UDPListen:     "127.0.0.1:0",
+		SearchTimeout: 10 * time.Second,
+		QueryTimeout:  700 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Second)
+	defer cancel()
+	files, err := client.Search(ctx, "The Matrix 1999 1080p")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(files) != 1 || files[0].Name != "The Matrix 1999 1080p.mkv" {
+		t.Fatalf("retry returned %+v", files)
+	}
+	if node.searchCount < 2 {
+		t.Fatalf("search requests = %d, want at least 2", node.searchCount)
 	}
 }
