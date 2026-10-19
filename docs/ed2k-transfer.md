@@ -11,8 +11,9 @@ Spike (19 October 2026): `internal/ed2k/transfer/partfile` implements the
 non-splitted `.part.met` reader/writer (0xE0/0xE2, tags via the shared codec),
 plus a `PartFile` that creates the sparse `.part`, verifies each part before
 writing it, rebuilds the bitmap on reopen and verifies the whole file before
-completion. It is not imported by `cmd/gx-ed2k`; the splitted format (0xE1), AICH and the
-rest of the peer protocol are still to do. `internal/ed2k/transfer/peer` adds
+completion. It is not imported by `cmd/gx-ed2k`; the splitted format (0xE1) and the rest of
+the peer protocol are still to do. AICH is implemented as the eMule SHA-1
+block/part tree (`AICHRootReader`, `AICHRootFile`) with small-size tree tests. `internal/ed2k/transfer/peer` adds
 the 0xC5 TCP framing, the hello exchange and the file/hashset/part packet
 codecs (round-trip and malformed-packet tests).
 
