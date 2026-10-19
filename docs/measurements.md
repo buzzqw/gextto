@@ -539,10 +539,23 @@ as the Kad lookup target and did not send an expression tree.
 | Same, with at least 2 sources | 4/30 |
 | Queries where the top 500 results were all unrelated | many |
 
+The default fallback floor is **3 sources** (`ed2k_min_sources`), so the
+"2 sources" row is already generous; with the real floor the accepted set is
+smaller.
+
 Caveats: the result set is capped at 500, the match is a regex on the name
 (no download validation), localized series titles were used as-is, and the
-sample is a single run. Most of the 27 "Kad hits" were unrelated files that
-shared the longest token (for example every show with `S04E01`).
+sample is a single run. The even spread also put nine episodes of the same
+series (`I misteri di Murdoch`) in the 30, so the next run should stratify by
+series (one episode per show). Most of the 27 "Kad hits" were unrelated files
+that shared the longest token (for example every show with `S04E01`).
+
+### Robustness — pacing and one retry
+
+The client now spaces Kad search datagrams by 15 ms and, when a keyword round
+returns nothing, learns one more lookup round and asks the closest contacts
+again for a bounded 2 s. The stratified sample below was taken just before
+this change, so it measures the pre-retry behaviour.
 
 ### Search precision — plain keyword vs restrictive tree
 

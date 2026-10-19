@@ -25,7 +25,8 @@ disabled for eD2k-only releases.
   - routing table with bounded contacts;
   - bootstrap from `nodes.dat` (version 1/2/3), downloaded or cached;
   - `BOOTSTRAP_REQ/RES`, `HELLO_REQ/RES`, `PING/PONG`, `REQ/RES`;
-  - `SEARCH_KEY_REQ` / `SEARCH_RES` with bounded iterative lookups; the
+  - `SEARCH_KEY_REQ` / `SEARCH_RES` with bounded iterative lookups, 15 ms
+    pacing between datagrams and one bounded retry when a round is silent; the
     request carries a restrictive AND expression tree (start position
     `0x8000`) so the peer filters the keyword bucket instead of returning
     every file indexed under the primary keyword;
