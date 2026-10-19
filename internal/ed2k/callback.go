@@ -49,7 +49,8 @@ func (c *Client) SendDirectCallback(ctx context.Context, source PeerSource, ourP
 // CanCallback reports whether our TCP port is reachable (HighID). A direct
 // callback advertises that port, so it is only useful when it is open.
 func (c *Client) CanCallback() bool {
-	return c.Stats().Reachability == "open"
+	stats := c.Stats()
+	return stats.Reachability == "open" || (stats.ServerIDSet && !stats.LowID)
 }
 
 // CallbackIdentity returns the user hash and TCP port advertised in a direct

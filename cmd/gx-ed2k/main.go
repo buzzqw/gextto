@@ -146,9 +146,17 @@ func main() {
 			log.Printf("gx-ed2k: upload index: %v", err)
 		}
 	}
-	var clientHandler func(net.Conn)
-	if uploader != nil {
-		clientHandler = uploader.Handle
+	var manager *download.Manager
+	clientHandler := func(conn net.Conn) {
+		if manager != nil && manager.WantsIncoming(conn) {
+			manager.HandleIncoming(conn)
+			return
+		}
+		if uploader != nil {
+			uploader.Handle(conn)
+			return
+		}
+		_ = conn.Close()
 	}
 	client, err := ed2k.New(ed2k.Config{
 		DataDir:       *dataDir,
@@ -176,7 +184,6 @@ func main() {
 		Lang:        *lang,
 		Commit:      commit,
 	}, client)
-	var manager *download.Manager
 	if *downloadEnabled {
 		manager = download.NewManager(ctx, download.ManagerConfig{
 			Fetch: download.Config{

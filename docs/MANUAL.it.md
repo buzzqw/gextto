@@ -1619,7 +1619,10 @@ ricerca**; con l'opzione `-download` (che Gextto passa al demone gestito quando
 il provider è attivo) espone anche il piano di trasferimento: accetta link
 `ed2k://` (anche più di uno alla volta), scarica con verifica MD4, riprende i
 `.part` e condivide i file completati con un upload minimo. Restano fuori, per
-ora, coda/crediti completi, obfuscation e callback LowID. La funzione è spenta
+ora, coda/crediti completi, obfuscation e buddy/hole punching per un client
+LowID. Le **fonti LowID** (Kad tipo 3/5/6) vengono invitate con un **direct UDP
+callback**: se la nostra porta TCP è raggiungibile (HighID) il peer si connette
+a noi e il download prosegue su quella connessione. La funzione è spenta
 per default: senza il tuo consenso Gextto non contatta la rete.
 
 | Impostazione | Cosa fa |
