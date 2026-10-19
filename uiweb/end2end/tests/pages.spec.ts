@@ -7,7 +7,6 @@ const navViews: Record<string, string> = {
   "Film": "movies",
   "Archivio": "archive",
   "Manutenzione": "maintenance",
-  "Manuale": "manual",
   "Log": "logs",
 };
 const nav = (page: import("@playwright/test").Page, label: string) =>
@@ -123,12 +122,14 @@ test("selettore lingua presente e selezionabile", async ({ page }) => {
   await expect(page.locator("aside .nav-item").filter({ hasText: "Scarico" }).first()).toBeVisible({ timeout: 15000 });
 });
 
-test("manuale utente raggiungibile e renderizzato", async ({ page }) => {
+test("manuale e changelog puntano alla documentazione online", async ({ page }) => {
   await page.goto("/");
-  await nav(page, "Manuale").click();
-  // Il Markdown è convertito in HTML con titoli; il testo segue la lingua attiva.
-  await expect(page.locator(".manual-body h1")).toContainText(/Manuale|Manual/i);
-  expect(await page.locator(".manual-body h2").count()).toBeGreaterThan(0);
+  const manual = page.locator('aside .nav-item[data-nav="manual"]');
+  await expect(manual).toHaveAttribute("href", "https://github.com/buzzqw/gextto/blob/main/docs/MANUAL.it.md");
+  await expect(manual).toHaveAttribute("target", "_blank");
+  const changelog = page.locator('aside .nav-item[data-nav="changelog"]');
+  await expect(changelog).toHaveAttribute("href", "https://github.com/buzzqw/gextto/blob/main/changelog.md");
+  await expect(changelog).toHaveAttribute("target", "_blank");
 });
 
 test("manutenzione espone la revisione rinomina cartella", async ({ page }) => {

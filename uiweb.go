@@ -31,12 +31,6 @@ var uiLicenseText string
 //go:embed THIRD-PARTY-NOTICES
 var uiThirdPartyText string
 
-//go:embed docs/MANUAL.it.md
-var uiManualTextIT string
-
-//go:embed docs/MANUAL.en.md
-var uiManualTextEN string
-
 // uiNavItem is one navigation entry of the new shell.
 type uiNavItem struct {
 	ID           string
@@ -47,6 +41,9 @@ type uiNavItem struct {
 	MobileHidden bool
 	MobileAlways bool
 	Count        string
+	// External marks a link that leaves Gextto (the online manual and the
+	// changelog): the template opens it in a new tab.
+	External bool
 }
 
 type uiNavGroup struct {
@@ -241,17 +238,6 @@ type uiLogsData struct {
 	Count int
 }
 
-// uiMdLine is one line of the minimal manual renderer.
-type uiMdLine struct {
-	Heading int
-	Text    string
-}
-
-// uiManualData is the view-model of the Manuale page.
-type uiManualData struct {
-	Lines []uiMdLine
-}
-
 // uiLicenseData is the view-model of the Licenza page.
 type uiLicenseData struct {
 	Text string
@@ -299,6 +285,7 @@ var uiNavGroups = []uiNavDefinition{
 		{ID: "health", Label: "Salute"},
 		{ID: "blocklist", Label: "Blocklist", Optional: true},
 		{ID: "manual", Label: "Manuale"},
+		{ID: "changelog", Label: "Changelog"},
 		{ID: "license", Label: "Licenza", Optional: true},
 	}},
 }
@@ -679,47 +666,6 @@ func uiHealthDiskTileFrom(s *AppState) uiHealthData {
 func uiLogsDataFrom(s *AppState) uiLogsData {
 	lines := coreTailLines(filepath.Join(s.cfg.DataDir, "gextto.log"), 500)
 	return uiLogsData{Lines: lines, Count: len(lines)}
-}
-
-// uiManualDataFrom renders the bundled manual in the language selected by the
-// interface, with a minimal, escaped Markdown pass (headings and paragraphs
-// only; lists and code stay readable).
-func uiManualDataFrom(s *AppState) uiManualData {
-	text := uiManualTextIT
-	if s != nil {
-		if lang, err := s.i18n.Language(); err == nil {
-			switch strings.ToLower(strings.TrimSpace(lang)) {
-			case "en", "de", "fr", "es", "pl":
-				// Non-Italian languages currently fall back to the English manual
-				// until their long-form documentation is translated separately.
-				text = uiManualTextEN
-			}
-		}
-	}
-	return uiManualData{Lines: uiManualLines(text)}
-}
-
-func uiManualLines(text string) []uiMdLine {
-	lines := make([]uiMdLine, 0, 256)
-	for _, raw := range strings.Split(text, "\n") {
-		trimmed := strings.TrimSpace(raw)
-		if trimmed == "" {
-			continue
-		}
-		if strings.HasPrefix(trimmed, "#") {
-			level := 0
-			for level < len(trimmed) && trimmed[level] == '#' {
-				level++
-			}
-			if level > 6 {
-				level = 6
-			}
-			lines = append(lines, uiMdLine{Heading: level, Text: strings.TrimSpace(trimmed[level:])})
-			continue
-		}
-		lines = append(lines, uiMdLine{Text: trimmed})
-	}
-	return lines
 }
 
 // uiTorrentsDataFrom builds the Scarico view-model for both the full page and

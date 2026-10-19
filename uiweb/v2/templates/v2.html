@@ -65,9 +65,9 @@
        {{if .System}}<button class="nav-more" type="button" data-mobile-system-toggle aria-expanded="{{if .Open}}true{{else}}false{{end}}" aria-controls="app-system-menu"><span class="nav-icon" aria-hidden="true">⋯</span><span>Altro</span><span class="nav-more-indicator" aria-hidden="true">＋</span></button>{{end}}
        <div{{if .System}} id="app-system-menu"{{end}} class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
         {{range .Items}}
-         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}"{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "dashboard"}}🏠{{else if eq .ID "downloads"}}⬇️{{else if eq .ID "series"}}📺{{else if eq .ID "movies"}}🎬{{else if eq .ID "logs"}}📋{{else if eq .ID "health"}}🩺{{else if eq .ID "settings"}}⚙️{{else if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "maintenance"}}🛠️{{else if eq .ID "gaps"}}⚠️{{else if eq .ID "integrations"}}🔌{{else if eq .ID "manual"}}📖{{else if eq .ID "license"}}📜{{else if eq .ID "blocklist"}}🚫{{else}}•{{end}}</span><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if eq .ID "downloads"}} title="Download in corso"{{end}}{{if or (not .Count) (eq .Count "0") (eq .Count "0/0")}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
+         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "dashboard"}}🏠{{else if eq .ID "downloads"}}⬇️{{else if eq .ID "series"}}📺{{else if eq .ID "movies"}}🎬{{else if eq .ID "logs"}}📋{{else if eq .ID "health"}}🩺{{else if eq .ID "settings"}}⚙️{{else if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "maintenance"}}🛠️{{else if eq .ID "gaps"}}⚠️{{else if eq .ID "integrations"}}🔌{{else if eq .ID "manual"}}📖{{else if eq .ID "changelog"}}📝{{else if eq .ID "license"}}📜{{else if eq .ID "blocklist"}}🚫{{else}}•{{end}}</span><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if eq .ID "downloads"}} title="Download in corso"{{end}}{{if or (not .Count) (eq .Count "0") (eq .Count "0/0")}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
          {{end}}
-         {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "gaps"}}⚠️{{else}}•{{end}}</span><span>{{.Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
+         {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" title="{{.Label}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "gaps"}}⚠️{{else}}•{{end}}</span><span>{{.Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
          {{if .System}}<div class="nav-prefs" aria-label="Aspetto">
            <button class="btn sm" type="button" hx-get="/theme" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli il tema dell'interfaccia o creane uno" aria-haspopup="dialog">Tema</button>
            <button class="btn sm" type="button" data-font="-5" title="Testo più piccolo">A−</button>
@@ -136,7 +136,6 @@
       {{else if eq .Body "v2_settings"}}{{template "v2_settings" .Content}}
       {{else if eq .Body "v2_health"}}{{template "v2_health" .Content}}
       {{else if eq .Body "v2_logs"}}{{template "v2_logs" .Content}}
-      {{else if eq .Body "v2_manual"}}{{template "v2_manual" .Content}}
       {{else if eq .Body "v2_license"}}{{template "v2_license" .Content}}
        {{else if eq .Body "v2_comics"}}{{template "v2_comics" .Content}}
        {{else if eq .Body "v2_table_page"}}{{template "v2_table_panel" .Content}}
@@ -1385,17 +1384,6 @@
 {{/* ------------------------------------------------------------------ */}}
 {{/* Manuale / Licenza                                                   */}}
 {{/* ------------------------------------------------------------------ */}}
-
-{{define "v2_manual"}}
-<div class="view">
-  <div class="panel">
-    <div class="panel-head"><h3>Manuale</h3></div>
-    <div class="panel-body manual-body">
-      {{range .Lines}}{{if eq .Heading 1}}<h1>{{.Text}}</h1>{{else if eq .Heading 2}}<h2>{{.Text}}</h2>{{else if eq .Heading 3}}<h3>{{.Text}}</h3>{{else if gt .Heading 0}}<h4>{{.Text}}</h4>{{else}}<p>{{.Text}}</p>{{end}}{{end}}
-    </div>
-  </div>
-</div>
-{{end}}
 
 {{define "v2_license"}}
 <div class="view">

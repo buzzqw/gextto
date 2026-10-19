@@ -47,6 +47,7 @@ eng:
   "Housekeeping — visti nel feed (giorni, 0 = mai)": "Housekeeping — feed-seen entries (days, 0 = never)"
   "Housekeeping — storico download (giorni, 0 = conserva)": "Housekeeping — download history (days, 0 = keep)"
   "Housekeeping: cosa pulisce e cosa non tocca": "Housekeeping: what it cleans and what it does not touch"
+  "Changelog": "Changelog"
   "Cicli di ricerca: conserva solo le statistiche di ogni ciclo (release analizzate, candidate, download avviati, gap riempiti ed errori). Con 200, quando arriva il 201° ciclo vengono eliminati solo i contatori del ciclo più vecchio, non la release.": "Search cycles: keeps only the statistics for each cycle (releases scanned, candidates, started downloads, filled gaps, and errors). With 200, when cycle 201 arrives, only the oldest cycle's counters are removed—not the release."
   "Visti nei feed: con 30 elimina le righe storiche dei feed oltre 30 giorni; con 0 non elimina nulla.": "Feed-seen entries: with 30, removes historical feed rows older than 30 days; with 0, removes nothing."
   "Storico download della sezione Scarico: con 90 elimina le righe dei torrent già rimossi oltre 90 giorni; con 0 conserva lo storico. Non riguarda l'Archivio.": "Download history in the Downloads section: with 90, removes rows for torrents already removed more than 90 days ago; with 0, keeps the history. It does not affect the Archive."

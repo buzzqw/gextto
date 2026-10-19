@@ -80,7 +80,7 @@ func BenchmarkV2RenderShell(b *testing.B) {
 		Title:   "Licenza",
 		Page:    "license",
 		Body:    "v2_license",
-		Groups:  v2NavGroups("license", nil),
+		Groups:  v2NavGroups(nil, "license", nil),
 		Content: uiLicenseData{Text: strings.Repeat("testo della licenza\n", 500)},
 	}
 	b.ReportAllocs()

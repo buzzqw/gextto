@@ -247,7 +247,7 @@ func TestV2CoversEveryClassicMenuScreen(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
-	for _, view := range []string{"dashboard", "downloads", "series", "movies", "gaps", "search", "archive", "comics", "settings", "integrations", "maintenance", "health", "logs", "blocklist", "manual", "license"} {
+	for _, view := range []string{"dashboard", "downloads", "series", "movies", "gaps", "search", "archive", "comics", "settings", "integrations", "maintenance", "health", "logs", "blocklist", "license"} {
 		code, body := v2Request(t, server, http.MethodGet, "/?view="+view, nil)
 		if code != http.StatusOK {
 			t.Fatalf("%s -> %d", view, code)
@@ -255,6 +255,60 @@ func TestV2CoversEveryClassicMenuScreen(t *testing.T) {
 		if strings.Contains(body, "non è ancora migrata nella UI v2") {
 			t.Fatalf("%s still renders the unavailable placeholder", view)
 		}
+	}
+}
+
+func TestV2ManualRedirectsToTheOnlineManual(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	response, err := client.Get(server.URL + "/?view=manual")
+	if err != nil {
+		t.Fatalf("GET manual: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusSeeOther {
+		t.Fatalf("manual -> %d, want %d", response.StatusCode, http.StatusSeeOther)
+	}
+	if got, want := response.Header.Get("Location"), manualOnlineHref(state); got != want {
+		t.Fatalf("manual redirect = %q, want %q", got, want)
+	}
+}
+
+func TestV2NavigationLinksDocumentationOnline(t *testing.T) {
+	manual, changelog := uiNavItem{}, uiNavItem{}
+	for _, group := range v2NavGroups(nil, "dashboard", nil) {
+		for _, item := range group.Items {
+			switch item.ID {
+			case "manual":
+				manual = item
+			case "changelog":
+				changelog = item
+			}
+		}
+	}
+	if manual.Href != "https://github.com/buzzqw/gextto/blob/main/docs/MANUAL.it.md" || !manual.External {
+		t.Fatalf("manual nav = %+v, want the online Italian manual", manual)
+	}
+	if changelog.Href != "https://github.com/buzzqw/gextto/blob/main/changelog.md" || !changelog.External {
+		t.Fatalf("changelog nav = %+v, want the online changelog", changelog)
+	}
+	if got := v2NavExternalHref(nil, "license"); got != "" {
+		t.Fatalf("license is not an external link: %q", got)
+	}
+
+	state := newTestAppState(t)
+	if err := state.i18n.SetLanguage("en"); err != nil {
+		t.Fatalf("set language: %v", err)
+	}
+	if got, want := changelogOnlineHref(state), "https://github.com/buzzqw/gextto/blob/main/changelog.en.md"; got != want {
+		t.Fatalf("English changelog = %q, want %q", got, want)
+	}
+	if got, want := manualOnlineHref(state), "https://github.com/buzzqw/gextto/blob/main/docs/MANUAL.en.md"; got != want {
+		t.Fatalf("English manual = %q, want %q", got, want)
 	}
 }
 

@@ -343,6 +343,7 @@ assistive-technology testing is still required
 | Need | Document |
 |---|---|
 | Operate the service | [English manual](docs/MANUAL.en.md) · [Manuale italiano](docs/MANUAL.it.md) |
+| What changed | [Changelog](changelog.en.md) |
 | Measurements and method | [Measurements](docs/measurements.md) |
 | State, decisions and what is next | [Evolution](docs/evoluzione.md) |
 | Architecture and design | [Architecture](docs/ARCHITECTURE.md) |

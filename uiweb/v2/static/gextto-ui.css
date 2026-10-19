@@ -867,8 +867,6 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 }
 .torrent-add-action { display: flex; align-items: center; gap: 8px; min-height: 72px; white-space: nowrap; }
 .torrent-options { margin-top: 12px; flex-wrap: wrap; }
-.manual-body h1, .manual-body h2, .manual-body h3, .manual-body h4 { margin: 16px 0 6px; }
-.manual-body p { margin: 6px 0; color: var(--text); }
 
 /* ------------------------------------------------------------- settings */
 

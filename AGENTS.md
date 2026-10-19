@@ -5,6 +5,16 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 
 ## Regole commit e PR
 - Autore dei commit: `buzzqw <azanzani@gmail.com>`.
+- **Ogni commit aggiorna il changelog in entrambe le lingue.**
+  `changelog.md` (italiano) e `changelog.en.md` (inglese) devono avere le stesse
+  sezioni e la stessa sostanza: quando aggiungi o cambi una voce, aggiorni tutti
+  e due. La voce va spiegata per chi usa Gextto (non per chi legge il codice) e
+  racconta l'effetto visibile: cosa cambia, per chi, e cosa deve fare l'utente se
+  serve. Un commit di sola build, test o documentazione interna non aggiunge una
+  voce separata: la sua parte visibile va nella voce del commit funzionale che
+  accompagna. Il changelog è pubblico e linkato dalla UI nella lingua
+  dell'interfaccia: niente dettagli interni, hash, nomi di funzioni o elenchi di
+  file.
 - Non committare `bin/` né directory dati (`data/`, `gextto-data/`).
   `build_number` e `gx-torrent.build_number` invece **sono committati**: sono
   le sorgenti uniche dei numeri di build di Gextto e di gx-core, condivise tra
@@ -264,21 +274,19 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   separato che resta vivo ai riavvii del servizio.
 - **Quando serve, builda e riavvia**: dopo modifiche a motore/demone (o per
   verificare) esegui `make build` e `systemctl --user restart gextto`; non
-  lasciare il servizio su un binario vecchio. Non c'è bisogno di buildare né di
-  riavviare se la modifica riguarda esclusivamente la documentazione, **tranne
-  se tocca i manuali** (`docs/MANUAL.*.md`): essendo incorporati nel binario
-  (`go:embed`) e serviti dalla UI, modifiche ai manuali richiedono `make build`
-  e riavvio del servizio per essere visibili. Il riavvio può richiedere ~1 minuto
+  lasciare il servizio su un binario vecchio. Il riavvio può richiedere ~1 minuto
   (caricamento del filtro IP e handover dello scope `gx-torrent`), quindi
   verifica dopo un'attesa, non subito.
 - Dopo una build: `systemctl --user restart gextto` (niente `sudo`). Se
   `bin/gx-torrent` non è cambiato il log dice "gx-torrent … was already
   running: kept as it is"; altrimenti il demone viene riavviato.
-- **Solo i manuali sono nella build.** `docs/MANUAL.it.md` e
-  `docs/MANUAL.en.md` sono incorporati nel binario (`go:embed`): una modifica che
-  li tocca richiede `make build` e riavvio (uno solo, quando il lavoro è finito).
-  Ogni altro documento — `README`, `docs/*.md`, `AGENTS.md` — non entra nel
-  binario: si committa e si pusha, **senza build né riavvio**.
+- **Nessun documento è nella build.** Manuali e changelog sono mantenuti online
+  e la UI apre i link a GitHub nella lingua dell'interfaccia
+  (`docs/MANUAL.it.md`/`docs/MANUAL.en.md`, `changelog.md`/`changelog.en.md`):
+  una modifica a un documento — `README`, `docs/*.md`, `AGENTS.md`,
+  `changelog*.md` — si committa e si pusha, **senza `make build` né riavvio**.
+  La pagina `/?view=manual` reindirizza al manuale online; non reintrodurre
+  `go:embed` per i manuali, o si torna a ricompilare a ogni modifica.
 - Log: `gextto-data/gextto.log` e `gextto-data/gx-torrent/gx-torrent.log`
   (entrambi ruotati a 5 MB × 4); `gx-torrent.crash.log` solo per i crash.
 - Verifica: `systemctl --user status gextto`;
@@ -317,10 +325,9 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   o quando mette in risalto la bontà e la potenza di Gextto o di gx-core: non va
   lasciato indietro. Vale insieme per `README.md` e `README.it.md` (stessa
   sostanza nelle due lingue) e per `docs/MANUAL.it.md`/`docs/MANUAL.en.md` quando
-  cambia il comportamento visibile (i manuali sono **embeddati** nel binario:
-  vedi *Servizio in esecuzione*, quindi servono `make build` e riavvio).
-  Documento tecnico motore: `docs/gx-torrent.md`; architettura:
-  `docs/ARCHITECTURE.md`.
+  cambia il comportamento visibile (i manuali sono **online**: una modifica non
+  richiede build né riavvio). Documento tecnico motore: `docs/gx-torrent.md`;
+  architettura: `docs/ARCHITECTURE.md`.
 - **La documentazione va sempre tenuta aggiornata.** Nessuna modifica (codice,
   configurazione, comportamento visibile, roadmap) è da considerarsi finita
   finché i documenti di riferimento non la riflettono; vale anche per i

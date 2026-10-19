@@ -358,6 +358,7 @@ manuali con screen reader e tecnologie assistive
 | Bisogno | Documento |
 |---|---|
 | Usare il servizio | [Manuale italiano](docs/MANUAL.it.md) · [English manual](docs/MANUAL.en.md) |
+| Cosa è cambiato | [Changelog](changelog.md) · [English](changelog.en.md) |
 | Misure e metodo | [Misure](docs/measurements.md) |
 | Stato, decisioni e prossimi passi | [Evoluzione](docs/evoluzione.md) |
 | Architettura e progetto | [Architettura](docs/ARCHITECTURE.md) |

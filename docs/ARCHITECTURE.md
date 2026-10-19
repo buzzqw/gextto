@@ -165,7 +165,7 @@ qBittorrent-nox.
 ### Server-side UI (`uiweb` v2)
 | File | Role |
 |---|---|
-| `uiweb.go` | view-model and formatters shared by the v2 SSR/HTMX UI; embed of manuals and licence. |
+| `uiweb.go` | view-model and formatters shared by the v2 SSR/HTMX UI; embed of the licence. |
 | `uiweb_pages.go` | data-driven list/action pages. |
 | `uiweb_sections.go` | reusable sections (table, actions, form, progress...). |
 | `uiweb_detail.go` | series/movie detail pages. |
@@ -261,11 +261,15 @@ one.
 
 - `uiweb/v2/templates/*.html`, `uiweb/v2/static/*` — Gextto's web UI.
 - `internal/webui/assets/*` — gx-torrent daemon UI (`ui.tmpl`, `login.html`, `setup.html`, `rss.html`, `settings.html`, `archive.html`, `token.html`, `wanted.html`, `theme.css`, `common.js`, `icons.svg`, `favicon.svg`).
-- `docs/MANUAL.it.md`, `docs/MANUAL.en.md` — manual shown in the UI.
 - `internal_translations*.yml` — translations.
 - `LICENSE` — licence served by the app.
 
 If you modify these files **you need to recompile** the binary to see them.
+
+The user manual (`docs/MANUAL.it.md`, `docs/MANUAL.en.md`) and the changelog
+(`changelog.md`, `changelog.en.md`) are **not** embedded: the UI links the
+edition matching the interface language on GitHub. Editing them needs no rebuild;
+the old `/?view=manual` page redirects to the online manual.
 
 ## 8. Where to make changes (common tasks)
 

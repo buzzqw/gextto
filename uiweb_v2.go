@@ -333,21 +333,30 @@ func v2PageLabel(view string) string {
 	return view
 }
 
-// v2NavGroups mirrors uiNavigation but points the links at /v2.
-func v2NavGroups(view string, counts map[string]string) []uiNavGroup {
+// v2NavGroups mirrors uiNavigation but points the links at /v2. The manual and
+// the changelog are documentation kept online: their entries are external
+// links, so editing either file never requires rebuilding Gextto.
+func v2NavGroups(s *AppState, view string, counts map[string]string) []uiNavGroup {
 	groups := make([]uiNavGroup, 0, len(uiNavGroups))
 	for index, group := range uiNavGroups {
 		out := uiNavGroup{Label: group.Label}
 		for _, item := range group.Items {
+			href := "/?view=" + item.ID
+			external := false
+			if online := v2NavExternalHref(s, item.ID); online != "" {
+				href = online
+				external = true
+			}
 			out.Items = append(out.Items, uiNavItem{
 				ID:           item.ID,
 				Label:        item.Label,
-				Href:         "/?view=" + item.ID,
+				Href:         href,
 				Active:       item.ID == view,
 				Optional:     item.Optional,
 				MobileHidden: item.MobileHidden,
 				MobileAlways: item.MobileAlways,
 				Count:        counts[item.ID],
+				External:     external,
 			})
 		}
 		if index == len(uiNavGroups)-1 {
@@ -357,6 +366,36 @@ func v2NavGroups(view string, counts map[string]string) []uiNavGroup {
 		groups = append(groups, out)
 	}
 	return groups
+}
+
+// v2NavExternalHref returns the online address of a documentation entry, or ""
+// when the entry is an internal page.
+func v2NavExternalHref(s *AppState, id string) string {
+	switch id {
+	case "manual":
+		return manualOnlineHref(s)
+	case "changelog":
+		return changelogOnlineHref(s)
+	}
+	return ""
+}
+
+// manualOnlineHref points at the maintained manual on GitHub. Italian opens the
+// Italian edition, every other language the English one.
+func manualOnlineHref(s *AppState) string {
+	if strings.HasPrefix(strings.ToLower(v2Language(s)), "it") {
+		return "https://github.com/buzzqw/gextto/blob/main/docs/MANUAL.it.md"
+	}
+	return "https://github.com/buzzqw/gextto/blob/main/docs/MANUAL.en.md"
+}
+
+// changelogOnlineHref points at the user-facing changelog on GitHub. Italian
+// opens the Italian edition, every other language the English one.
+func changelogOnlineHref(s *AppState) string {
+	if strings.HasPrefix(strings.ToLower(v2Language(s)), "it") {
+		return "https://github.com/buzzqw/gextto/blob/main/changelog.md"
+	}
+	return "https://github.com/buzzqw/gextto/blob/main/changelog.en.md"
 }
 
 // The dashboard, health and downloads pages embed their base view-model and add
@@ -572,8 +611,6 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 	case "logs":
 		linesNum, _ := strconv.Atoi(r.FormValue("lines"))
 		return "v2_logs", v2LogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"), r.FormValue("level") == "problems")
-	case "manual":
-		return "v2_manual", uiManualDataFrom(s)
 	case "license":
 		return "v2_license", uiLicenseData{Text: uiLicenseText, ThirdParty: uiThirdPartyText}
 	case "movies":
@@ -604,12 +641,18 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		view = "dashboard"
 	}
+	// The manual is maintained online: old bookmarks keep working through a
+	// redirect, while the menu links straight to GitHub.
+	if view == "manual" {
+		http.Redirect(w, r, manualOnlineHref(s), http.StatusSeeOther)
+		return
+	}
 	body, content := v2Content(s, r, view)
 	cfg := latestConfig(s)
 	page := v2ShellData{
 		Title:    uiText(s, v2PageLabel(view)),
 		Page:     view,
-		Groups:   v2NavGroups(view, uiNavCounts(s, cfg)),
+		Groups:   v2NavGroups(s, view, uiNavCounts(s, cfg)),
 		Content:  content,
 		Chrome:   uiShellChromeFrom(s),
 		Body:     body,
