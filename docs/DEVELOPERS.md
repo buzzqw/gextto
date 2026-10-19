@@ -353,6 +353,9 @@ go run ./cmd/measure-ed2k \
   -limit 30 -spacing 65s -min-sources 3 -out phase0.json
 ```
 
+A second run can pick different episodes with `-sample last` or
+`-sample random -seed 2026`; the series set stays the same.
+
 The spacing matters: peers throttle a burst, and a plain spread over the gap
 list overweights the shows with many missing episodes.
 
