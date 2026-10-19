@@ -56,6 +56,11 @@ func (l *List) Add(source Source, now time.Time) bool {
 	if !ip.IsLoopback() && (!ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsMulticast() || ip.IsUnspecified()) {
 		return false
 	}
+	// Network and broadcast addresses in a /24 are not hosts; server lists
+	// are full of them as padding.
+	if ip[3] == 0 || ip[3] == 255 {
+		return false
+	}
 	source.IP = ip
 	key := source.Key()
 	if existing, ok := l.items[key]; ok {

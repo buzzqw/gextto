@@ -68,7 +68,7 @@ func (c *Config) applyDefaults() {
 		c.MaxPartAttempts = 3
 	}
 	if c.ConnectTimeout <= 0 {
-		c.ConnectTimeout = 20 * time.Second
+		c.ConnectTimeout = 8 * time.Second
 	}
 	if c.HandshakeTimeout <= 0 {
 		c.HandshakeTimeout = 15 * time.Second
