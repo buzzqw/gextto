@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -94,5 +95,33 @@ func TestManagerSourceFailure(t *testing.T) {
 	failed := waitState(t, manager, transfer.ID, StateError)
 	if failed.Error == "" {
 		t.Fatalf("error state without a reason: %+v", failed)
+	}
+}
+
+func TestManagerPersistsRows(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "transfers.json")
+	ctx, cancel := context.WithCancel(context.Background())
+	manager := NewManager(ctx, ManagerConfig{StatePath: statePath}, fakeDiscoverer{})
+	transfer, err := manager.Add(Link{Hash: ed2k.ID{3}, Name: "persisted.mkv", Size: 1000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitState(t, manager, transfer.ID, StateError)
+	manager.Close()
+	cancel()
+
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	defer cancel2()
+	reloaded := NewManager(ctx2, ManagerConfig{StatePath: statePath}, fakeDiscoverer{})
+	defer reloaded.Close()
+	got, ok := reloaded.Get(transfer.ID)
+	if !ok {
+		t.Fatal("persisted transfer not loaded")
+	}
+	if got.State != StateError || got.Name != "persisted.mkv" {
+		t.Fatalf("reloaded = %+v", got)
+	}
+	if got.Error == "" {
+		t.Fatal("interrupted transfer has no reason")
 	}
 }

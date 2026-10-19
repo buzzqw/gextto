@@ -2,8 +2,11 @@ package download
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -23,6 +26,9 @@ type ManagerConfig struct {
 	// OnComplete is called after a transfer is verified and renamed. The
 	// daemon uses it to add the file to the upload index.
 	OnComplete func(Result)
+	// StatePath persists the transfer rows across daemon restarts. Empty
+	// keeps the manager in memory only.
+	StatePath string
 }
 
 // Transfer is the public state of one eD2k download.
@@ -77,10 +83,12 @@ func NewManager(ctx context.Context, cfg ManagerConfig, discover Discoverer) *Ma
 		cfg.FetchBudget = 15 * time.Minute
 	}
 	managerCtx, cancel := context.WithCancel(ctx)
-	return &Manager{
+	manager := &Manager{
 		cfg: cfg, discover: discover, ctx: managerCtx, cancel: cancel,
 		transfers: make(map[string]*managedTransfer),
 	}
+	manager.load()
+	return manager
 }
 
 // Add starts a transfer, or returns the existing one for the same hash.
@@ -91,8 +99,25 @@ func (m *Manager) Add(link Link) (Transfer, error) {
 	id := link.Hash.Hex()
 	m.mu.Lock()
 	if existing, ok := m.transfers[id]; ok {
+		if existing.State != StateError {
+			transfer := existing.Transfer
+			m.mu.Unlock()
+			return transfer, nil
+		}
+		// An interrupted transfer is restarted explicitly by adding it again.
+		ctx, cancel := context.WithCancel(m.ctx)
+		existing.cancel = cancel
+		existing.State = StateDiscovering
+		existing.Error = ""
+		existing.Updated = time.Now()
 		transfer := existing.Transfer
+		m.saveLocked()
 		m.mu.Unlock()
+		m.wg.Add(1)
+		go func() {
+			defer m.wg.Done()
+			m.run(ctx, id, link)
+		}()
 		return transfer, nil
 	}
 	if m.closed {
@@ -189,7 +214,57 @@ func (m *Manager) update(id string, change func(*Transfer)) {
 	if transfer, ok := m.transfers[id]; ok {
 		change(&transfer.Transfer)
 		transfer.Updated = time.Now()
+		m.saveLocked()
 	}
+}
+
+// load reads the persisted rows. A transfer that was running when the daemon
+// stopped becomes an error row: its .part file is still on disk, and adding
+// the same link again resumes it.
+func (m *Manager) load() {
+	path := m.cfg.StatePath
+	if path == "" {
+		return
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var rows []Transfer
+	if err := json.Unmarshal(raw, &rows); err != nil {
+		return
+	}
+	for _, row := range rows {
+		row := row
+		if row.State != StateCompleted {
+			row.State = StateError
+			row.Error = "interrupted by a daemon restart; add the link again to resume"
+		}
+		m.transfers[row.ID] = &managedTransfer{Transfer: row}
+	}
+}
+
+func (m *Manager) saveLocked() {
+	path := m.cfg.StatePath
+	if path == "" {
+		return
+	}
+	rows := make([]Transfer, 0, len(m.transfers))
+	for _, transfer := range m.transfers {
+		rows = append(rows, transfer.Transfer)
+	}
+	raw, err := json.Marshal(rows)
+	if err != nil {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o644); err != nil {
+		return
+	}
+	_ = os.Rename(tmp, path)
 }
 
 func (m *Manager) fail(id string, err error) {
@@ -234,9 +309,12 @@ func (m *Manager) Remove(id string) bool {
 		delete(m.transfers, id)
 	}
 	m.mu.Unlock()
-	if ok {
+	if ok && transfer.cancel != nil {
 		transfer.cancel()
 	}
+	m.mu.Lock()
+	m.saveLocked()
+	m.mu.Unlock()
 	return ok
 }
 
@@ -249,7 +327,9 @@ func (m *Manager) Close() {
 	}
 	m.closed = true
 	for _, transfer := range m.transfers {
-		transfer.cancel()
+		if transfer.cancel != nil {
+			transfer.cancel()
+		}
 	}
 	m.mu.Unlock()
 	m.cancel()

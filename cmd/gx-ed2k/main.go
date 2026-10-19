@@ -135,7 +135,7 @@ func main() {
 		}
 	}
 
-	userHash, _ := ed2k.RandomID()
+	userHash := loadOrCreateUserHash(*dataDir)
 	var uploader *upload.Server
 	if *downloadEnabled {
 		uploader = upload.New(2)
@@ -184,6 +184,7 @@ func main() {
 				TCPPort:    uint16(*tcpPort),
 				UserHash:   userHash,
 			},
+			StatePath: filepath.Join(*dataDir, "transfers.json"),
 			OnComplete: func(result download.Result) {
 				if uploader != nil {
 					if err := uploader.AddFile(result.Path); err != nil {
@@ -223,6 +224,23 @@ func main() {
 		manager.Close()
 	}
 	_ = client.Close()
+}
+
+// loadOrCreateUserHash keeps the eMule client identity stable across restarts:
+// peers store upload credits against this 16-byte hash.
+func loadOrCreateUserHash(dir string) ed2k.ID {
+	path := filepath.Join(dir, "userhash")
+	if raw, err := os.ReadFile(path); err == nil {
+		if id, err := ed2k.ParseID(strings.TrimSpace(string(raw))); err == nil {
+			return id
+		}
+	}
+	id, err := ed2k.RandomID()
+	if err != nil {
+		return id
+	}
+	_ = os.WriteFile(path, []byte(id.Hex()+"\n"), 0o644)
+	return id
 }
 
 func envInt(name string, fallback int) int {
