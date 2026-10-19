@@ -145,7 +145,9 @@ be replaced, so the page keeps the zip download link there.
 - `scripts/package-gx-ed2k.sh` produces the Linux tarball;
   `scripts/package-gx-ed2k-windows.sh` cross-builds `gx-ed2k.exe` (amd64 and
   arm64) and packages a Windows service installer with the firewall rules for
-  UDP 4672 and TCP 4662.
+  UDP 4672 and TCP 4662. CI also runs the real `gx-ed2k.exe` on
+  `windows-latest` and checks `/api/v1/health`, so Winsock/path handling is
+  tested and not only cross-compiled.
 - `make gx-ed2k` builds `bin/gx-ed2k` with its own committed build number
   (`gx-ed2k.build_number`).
 - `make build` rebuilds it only when its code changed, like gx-torrent.

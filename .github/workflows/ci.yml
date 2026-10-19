@@ -150,6 +150,57 @@ jobs:
         working-directory: uiweb/end2end
         run: npx playwright test
 
+  # The standalone gx-ed2k is pure Go and cross-compiles, but that says nothing
+  # about Winsock, the path handling or the service entry point. Run the real
+  # binary on a Windows runner and ask /api/v1/health.
+  windows-ed2k:
+    name: gx-ed2k smoke test (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        shell: pwsh
+        run: go build -o gx-ed2k.exe ./cmd/gx-ed2k
+
+      - name: Version
+        shell: pwsh
+        run: .\gx-ed2k.exe --version
+
+      - name: Health
+        shell: pwsh
+        run: |
+          $data = Join-Path $env:RUNNER_TEMP "gx-ed2k"
+          $process = Start-Process -FilePath .\gx-ed2k.exe -PassThru -ArgumentList @(
+            "-mode", "standalone",
+            "-listen", "127.0.0.1:18899",
+            "-data", $data,
+            "-kad-listen", "127.0.0.1:14672",
+            "-tcp-port", "14662",
+            "-upnp=false"
+          )
+          $ok = $false
+          try {
+            for ($i = 0; $i -lt 40; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:18899/api/v1/health" -TimeoutSec 2
+                if ($health.ok -and $health.search -and -not $health.download) { $ok = $true; break }
+              } catch {}
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $ok) { throw "gx-ed2k did not answer /api/v1/health" }
+            $health | ConvertTo-Json -Compress
+          } finally {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+          }
+
   # The Win32 layer of the daemon (junctions, memory, gateway, storage class)
   # only cross-compiles on Linux; this job runs its tests on real Windows. The
   # rest of the suite assumes Unix paths, so only the platform tests run here.
