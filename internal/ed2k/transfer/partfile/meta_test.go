@@ -61,3 +61,34 @@ func TestMetaSizeHigh(t *testing.T) {
 		t.Fatal("name missing from the encoded tags")
 	}
 }
+
+func TestMetaSplitRoundTrip(t *testing.T) {
+	file, _ := ed2k.ParseID("0123456789abcdef0123456789abcdef")
+	part, _ := ed2k.ParseID("fedcba9876543210fedcba9876543210")
+	meta := &Meta{Version: MetaVersionSplit, File: file, Parts: []ed2k.ID{part}, Name: "split.mkv", Size: 1234,
+		Tags: []ed2k.Tag{
+			{Name: ed2k.TagFileName, Type: ed2k.TagString, Str: "split.mkv"},
+			{Name: ed2k.TagFileSize, Type: ed2k.TagUint32, Int: 1234},
+		}}
+	raw, err := meta.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ParseMeta(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != MetaVersionSplit || got.File != file || len(got.Parts) != 1 || got.Name != "split.mkv" || got.Size != 1234 {
+		t.Fatalf("split meta = %+v", got)
+	}
+}
+
+func TestParseMetaRejectsSplitMarker(t *testing.T) {
+	file, _ := ed2k.ParseID("0123456789abcdef0123456789abcdef")
+	raw := []byte{MetaVersionSplit, 1, 0, 0, 0}
+	raw = append(raw, file[:]...)
+	raw = append(raw, 0, 0, 0, 0, 0, 0)
+	if _, err := ParseMeta(raw); err == nil {
+		t.Fatal("non-zero marker must be rejected")
+	}
+}

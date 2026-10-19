@@ -54,14 +54,26 @@ func ParseMeta(data []byte) (*Meta, error) {
 		return nil, errors.New("partfile: .part.met too short")
 	}
 	version := data[0]
-	if version == MetaVersionSplit {
-		return nil, errors.New("partfile: splitted .part.met is not supported")
-	}
-	if version != MetaVersion && version != MetaVersionLarge {
+	if version != MetaVersion && version != MetaVersionLarge && version != MetaVersionSplit {
 		return nil, fmt.Errorf("partfile: unsupported .part.met version 0x%02x", version)
 	}
-	meta := &Meta{Version: version, Modified: binary.LittleEndian.Uint32(data[1:])}
-	offset := 5
+	meta := &Meta{Version: version}
+	offset := 1
+	if version == MetaVersionSplit {
+		// The 0xE1 variant with a zero marker stores the MD4 hashset without
+		// the last-modified field; the non-zero marker is an older layout we
+		// do not write and cannot reconstruct reliably.
+		if len(data) < 1+4+16+2+4 {
+			return nil, errors.New("partfile: splitted .part.met too short")
+		}
+		if marker := binary.LittleEndian.Uint32(data[1:]); marker != 0 {
+			return nil, errors.New("partfile: unsupported splitted .part.met variant")
+		}
+		offset = 5
+	} else {
+		meta.Modified = binary.LittleEndian.Uint32(data[1:])
+		offset = 5
+	}
 	copy(meta.File[:], data[offset:offset+16])
 	offset += 16
 	count := int(binary.LittleEndian.Uint16(data[offset:]))
@@ -113,7 +125,7 @@ func (m *Meta) Bytes() ([]byte, error) {
 	if m == nil {
 		return nil, errors.New("partfile: nil metadata")
 	}
-	if m.Version != MetaVersion && m.Version != MetaVersionLarge {
+	if m.Version != MetaVersion && m.Version != MetaVersionLarge && m.Version != MetaVersionSplit {
 		return nil, fmt.Errorf("partfile: unsupported .part.met version 0x%02x", m.Version)
 	}
 	if len(m.Parts) > math.MaxUint16 {
@@ -122,8 +134,12 @@ func (m *Meta) Bytes() ([]byte, error) {
 	out := make([]byte, 0, 1+4+16+2+len(m.Parts)*16+4+64)
 	out = append(out, m.Version)
 	var fixed [4]byte
-	binary.LittleEndian.PutUint32(fixed[:], m.Modified)
-	out = append(out, fixed[:]...)
+	if m.Version == MetaVersionSplit {
+		out = append(out, 0, 0, 0, 0)
+	} else {
+		binary.LittleEndian.PutUint32(fixed[:], m.Modified)
+		out = append(out, fixed[:]...)
+	}
 	out = append(out, m.File[:]...)
 	binary.LittleEndian.PutUint16(fixed[:2], uint16(len(m.Parts)))
 	out = append(out, fixed[:2]...)
