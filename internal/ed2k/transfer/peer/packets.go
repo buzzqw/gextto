@@ -28,6 +28,14 @@ type FileRequest struct {
 
 func EncodeFileRequest(request FileRequest) []byte { return append([]byte(nil), request.Hash[:]...) }
 
+// EncodeFileRequestExtended adds the extended part status and complete-source
+// count that eMule expects when the hello advertised extended requests.
+func EncodeFileRequestExtended(request FileRequest) []byte {
+	out := make([]byte, 0, 20)
+	out = append(out, request.Hash[:]...)
+	return append(out, 0, 0, 0, 0) // no parts, no complete sources
+}
+
 func DecodeFileRequest(payload []byte) (FileRequest, error) {
 	if len(payload) < 16 {
 		return FileRequest{}, errors.New("peer: short file request")
@@ -45,25 +53,25 @@ type FileNameAnswer struct {
 }
 
 func EncodeFileNameAnswer(answer FileNameAnswer) []byte {
-	out := make([]byte, 0, 16+4+len(answer.Name))
+	out := make([]byte, 0, 18+len(answer.Name))
 	out = append(out, answer.Hash[:]...)
-	var size [4]byte
-	binary.LittleEndian.PutUint32(size[:], uint32(len(answer.Name)))
+	var size [2]byte
+	binary.LittleEndian.PutUint16(size[:], uint16(len(answer.Name)))
 	out = append(out, size[:]...)
 	return append(out, answer.Name...)
 }
 
 func DecodeFileNameAnswer(payload []byte) (FileNameAnswer, error) {
 	var answer FileNameAnswer
-	if len(payload) < 20 {
+	if len(payload) < 18 {
 		return answer, errors.New("peer: short file-name answer")
 	}
 	copy(answer.Hash[:], payload[:16])
-	length := int(binary.LittleEndian.Uint32(payload[16:]))
-	if length < 0 || 20+length > len(payload) {
+	length := int(binary.LittleEndian.Uint16(payload[16:]))
+	if 18+length > len(payload) {
 		return answer, errors.New("peer: truncated file name")
 	}
-	answer.Name = string(payload[20 : 20+length])
+	answer.Name = string(payload[18 : 18+length])
 	return answer, nil
 }
 
@@ -269,10 +277,9 @@ func DecodeCompressedPart(payload []byte) (CompressedPart, error) {
 	copy(part.Hash[:], payload[:16])
 	part.Start = binary.LittleEndian.Uint32(payload[16:])
 	part.Size = binary.LittleEndian.Uint32(payload[20:])
-	if 24+int(part.Size) > len(payload) {
-		return CompressedPart{}, errors.New("peer: truncated compressed part")
-	}
-	part.Data = append([]byte(nil), payload[24:24+int(part.Size)]...)
+	// The size field describes the whole compressed stream; a large stream
+	// may be split across packets, so the payload length is authoritative.
+	part.Data = append([]byte(nil), payload[24:]...)
 	return part, nil
 }
 
@@ -314,6 +321,14 @@ func DecodeQueueRanking(payload []byte) (QueueRanking, error) {
 	}
 	return QueueRanking{Rank: binary.LittleEndian.Uint16(payload)}, nil
 }
+
+// Source-exchange opcodes (eMule extended protocol).
+const (
+	OpRequestsSources  = 0x81
+	OpAnswersSources   = 0x82
+	OpRequestsSources2 = 0x83
+	OpAnswersSources2  = 0x84
+)
 
 // Queue and callback opcodes. These belong to the client UDP protocol: they
 // are not valid on the TCP session and are kept apart from the TCP opcodes.

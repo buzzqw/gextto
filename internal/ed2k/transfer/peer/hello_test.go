@@ -33,7 +33,7 @@ func TestFrameUnframe(t *testing.T) {
 	if _, _, err := Unframe(packet[:5]); err == nil {
 		t.Fatal("short packet must fail")
 	}
-	if _, _, err := Unframe([]byte{0xE3, OpHello, 0, 0, 0, 0}); err == nil {
+	if _, _, err := Unframe([]byte{0xAA, OpHello, 0, 0, 0, 0}); err == nil {
 		t.Fatal("wrong protocol must fail")
 	}
 	truncated := append([]byte{}, packet...)

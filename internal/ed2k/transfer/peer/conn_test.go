@@ -77,7 +77,7 @@ func TestConnHandshake(t *testing.T) {
 			t.Errorf("server opcode 0x%02X", opcode)
 			return
 		}
-		hello, err := DecodeHello(payload)
+		hello, err := DecodeHelloRequest(payload)
 		if err != nil {
 			t.Errorf("decode hello: %v", err)
 			return
@@ -121,7 +121,7 @@ func TestHandshakeRejectsSelfAndZero(t *testing.T) {
 			if err != nil {
 				return
 			}
-			if _, err := DecodeHello(payload); err != nil {
+			if _, err := DecodeHelloRequest(payload); err != nil {
 				return
 			}
 			answer := Hello{UserHash: hash, Port: 4662}
@@ -148,7 +148,7 @@ func TestReceiveRejectsBadPackets(t *testing.T) {
 	t.Run("wrong protocol", func(t *testing.T) {
 		left, right := pipePair(t)
 		client := NewConn(left)
-		go right.Write([]byte{0xE3, OpHello, 0, 0, 0, 0})
+		go right.Write([]byte{0xAA, OpHello, 0, 0, 0, 0})
 		if _, _, err := client.Receive(); err == nil {
 			t.Fatal("server protocol accepted")
 		}
@@ -160,8 +160,8 @@ func TestReceiveRejectsBadPackets(t *testing.T) {
 		if err := client.SetMaxPacketSize(8); err != nil {
 			t.Fatal(err)
 		}
-		header := []byte{ClientProtocol, OpHello, 0, 0, 0, 0}
-		binary.LittleEndian.PutUint32(header[2:], 9)
+		header := []byte{EdonkeyProtocol, 0, 0, 0, 0, OpHello}
+		binary.LittleEndian.PutUint32(header[1:], 10)
 		go right.Write(header)
 		if _, _, err := client.Receive(); err == nil {
 			t.Fatal("oversized packet accepted")
@@ -171,8 +171,8 @@ func TestReceiveRejectsBadPackets(t *testing.T) {
 	t.Run("truncated", func(t *testing.T) {
 		left, right := pipePair(t)
 		client := NewConn(left)
-		header := []byte{ClientProtocol, OpHello, 0, 0, 0, 0}
-		binary.LittleEndian.PutUint32(header[2:], 10)
+		header := []byte{EdonkeyProtocol, 0, 0, 0, 0, OpHello}
+		binary.LittleEndian.PutUint32(header[1:], 11)
 		go func() {
 			right.Write(append(header, []byte("abc")...))
 			right.Close()

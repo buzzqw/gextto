@@ -23,6 +23,9 @@ type ManagerConfig struct {
 	Fetch       Config
 	MaxSources  int
 	FetchBudget time.Duration
+	// RetryDelay is the pause between queue rounds. Queued transfers keep
+	// retrying until the manager is closed.
+	RetryDelay time.Duration
 	// OnComplete is called after a transfer is verified and renamed. The
 	// daemon uses it to add the file to the upload index.
 	OnComplete func(Result)
@@ -50,6 +53,7 @@ const (
 	StateDiscovering = "discovering"
 	StateDownloading = "downloading"
 	StateQueued      = "queued"
+	StatePaused      = "paused"
 	StateCompleted   = "completed"
 	StateError       = "error"
 )
@@ -80,7 +84,10 @@ func NewManager(ctx context.Context, cfg ManagerConfig, discover Discoverer) *Ma
 		cfg.MaxSources = 50
 	}
 	if cfg.FetchBudget <= 0 {
-		cfg.FetchBudget = 15 * time.Minute
+		cfg.FetchBudget = 2 * time.Hour
+	}
+	if cfg.RetryDelay <= 0 {
+		cfg.RetryDelay = 30 * time.Second
 	}
 	managerCtx, cancel := context.WithCancel(ctx)
 	manager := &Manager{
@@ -161,51 +168,78 @@ func (m *Manager) run(ctx context.Context, id string, link Link) {
 	m.update(id, func(t *Transfer) { t.Sources = len(sources) })
 
 	var lastErr error
-	queued := false
-	for _, source := range sources {
+	for round := 0; ; round++ {
 		if ctx.Err() != nil {
 			return
 		}
-		address := fmt.Sprintf("%s:%d", source.IP.String(), source.TCPPort)
-		m.update(id, func(t *Transfer) { t.State = StateDownloading; t.Error = "" })
-
-		fetchCtx, cancel := context.WithTimeout(ctx, m.cfg.FetchBudget)
-		cfg := m.cfg.Fetch
-		cfg.OnProgress = func(done, total int64) {
-			m.update(id, func(t *Transfer) { t.Done = done; t.Size = total })
-		}
-		result, err := Fetch(fetchCtx, address, link, cfg)
-		cancel()
-		if err == nil {
-			m.update(id, func(t *Transfer) {
-				t.State = StateCompleted
-				t.Done = t.Size
-				t.Path = result.Path
-				t.Error = ""
-			})
-			if m.cfg.OnComplete != nil {
-				m.cfg.OnComplete(*result)
+		if round > 0 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(m.cfg.RetryDelay):
 			}
-			return
+			if refreshed, err := m.discover.Sources(ctx, link.Hash.Hex(), link.Size); err == nil && len(refreshed) > 0 {
+				sources = refreshed
+				if len(sources) > m.cfg.MaxSources {
+					sources = sources[:m.cfg.MaxSources]
+				}
+				m.update(id, func(t *Transfer) { t.Sources = len(sources) })
+			}
 		}
-		if ctx.Err() != nil {
-			return
+		queued := false
+		for _, source := range sources {
+			if ctx.Err() != nil {
+				return
+			}
+			address := fmt.Sprintf("%s:%d", source.IP.String(), source.TCPPort)
+			m.update(id, func(t *Transfer) { t.State = StateDownloading; t.Error = "" })
+
+			fetchCtx, cancel := context.WithTimeout(ctx, m.cfg.FetchBudget)
+			cfg := m.cfg.Fetch
+			if provider, ok := m.discover.(interface{ Stats() ed2k.Stats }); ok {
+				cfg.ClientID = provider.Stats().ServerID
+			}
+			cfg.OnProgress = func(done, total int64) {
+				m.update(id, func(t *Transfer) { t.Done = done; t.Size = total })
+			}
+			result, err := Fetch(fetchCtx, address, link, cfg)
+			cancel()
+			if err == nil {
+				m.update(id, func(t *Transfer) {
+					t.State = StateCompleted
+					t.Done = t.Size
+					t.Path = result.Path
+					t.Error = ""
+				})
+				if m.cfg.OnComplete != nil {
+					m.cfg.OnComplete(*result)
+				}
+				return
+			}
+			if ctx.Err() != nil {
+				return
+			}
+			if m.cfg.Fetch.Logf != nil {
+				m.cfg.Fetch.Logf("download: %s failed: %v", address, err)
+			}
+			if IsQueued(err) {
+				queued = true
+				m.update(id, func(t *Transfer) { t.State = StateQueued; t.Error = err.Error() })
+				continue
+			}
+			lastErr = err
 		}
-		if IsQueued(err) {
-			queued = true
-			m.update(id, func(t *Transfer) { t.State = StateQueued; t.Error = err.Error() })
+		if queued {
+			m.update(id, func(t *Transfer) { t.State = StateQueued })
 			continue
 		}
-		lastErr = err
+		if lastErr == nil {
+			lastErr = errors.New("no source accepted the transfer")
+		}
+		// Keep the row in the error state but retry: a source may come back,
+		// a queue may free a slot, or a new source may appear in Kad.
+		m.fail(id, lastErr)
 	}
-	if queued {
-		m.update(id, func(t *Transfer) { t.State = StateQueued })
-		return
-	}
-	if lastErr == nil {
-		lastErr = errors.New("no source accepted the transfer")
-	}
-	m.fail(id, lastErr)
 }
 
 func (m *Manager) update(id string, change func(*Transfer)) {
@@ -299,6 +333,49 @@ func (m *Manager) Get(id string) (Transfer, bool) {
 		return Transfer{}, false
 	}
 	return transfer.Transfer, true
+}
+
+// Pause stops the worker but keeps the row and the partial file.
+func (m *Manager) Pause(id string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	transfer, ok := m.transfers[id]
+	if !ok || transfer.State == StateCompleted || transfer.State == StatePaused {
+		return false
+	}
+	transfer.cancel()
+	transfer.State = StatePaused
+	transfer.Error = ""
+	transfer.Updated = time.Now()
+	m.saveLocked()
+	return true
+}
+
+// Resume restarts a paused or failed transfer.
+func (m *Manager) Resume(id string) bool {
+	m.mu.Lock()
+	transfer, ok := m.transfers[id]
+	if !ok || (transfer.State != StatePaused && transfer.State != StateError) || m.closed {
+		m.mu.Unlock()
+		return false
+	}
+	ctx, cancel := context.WithCancel(m.ctx)
+	transfer.cancel = cancel
+	transfer.State = StateDiscovering
+	transfer.Error = ""
+	transfer.Updated = time.Now()
+	link := Link{Hash: ed2k.ID{}, Size: transfer.Size, Name: transfer.Name}
+	if hash, err := ed2k.ParseID(transfer.Hash); err == nil {
+		link.Hash = hash
+	}
+	m.saveLocked()
+	m.mu.Unlock()
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		m.run(ctx, id, link)
+	}()
+	return true
 }
 
 // Remove cancels a transfer and forgets it. Partial files stay on disk.

@@ -133,7 +133,7 @@ func (s *Server) Handle(conn net.Conn) {
 	if err != nil || opcode != peer.OpHello {
 		return
 	}
-	hello, err := peer.DecodeHello(payload)
+	hello, err := peer.DecodeHelloRequest(payload)
 	if err != nil || hello.UserHash == s.UserHash {
 		return
 	}
@@ -144,6 +144,7 @@ func (s *Server) Handle(conn net.Conn) {
 	if err := client.Send(peer.OpHelloAnswer, peer.EncodeHello(answer)); err != nil {
 		return
 	}
+	_ = client.SendExtended(peer.OpEmuleInfo, peer.EncodeMuleInfo())
 
 	for {
 		_ = client.SetDeadline(time.Now().Add(s.Idle))

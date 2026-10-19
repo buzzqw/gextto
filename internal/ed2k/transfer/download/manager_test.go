@@ -125,3 +125,26 @@ func TestManagerPersistsRows(t *testing.T) {
 		t.Fatal("interrupted transfer has no reason")
 	}
 }
+
+func TestManagerPauseAndResume(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	manager := NewManager(ctx, ManagerConfig{}, fakeDiscoverer{})
+	defer manager.Close()
+	transfer, err := manager.Add(Link{Hash: ed2k.ID{4}, Name: "pause.mkv", Size: 1000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitState(t, manager, transfer.ID, StateError)
+	if !manager.Pause(transfer.ID) {
+		t.Fatal("pause refused")
+	}
+	paused, _ := manager.Get(transfer.ID)
+	if paused.State != StatePaused {
+		t.Fatalf("paused = %+v", paused)
+	}
+	if !manager.Resume(transfer.ID) {
+		t.Fatal("resume refused")
+	}
+	waitState(t, manager, transfer.ID, StateError)
+}

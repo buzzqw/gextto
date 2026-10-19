@@ -45,10 +45,13 @@ type Config struct {
 	IdleTimeout      time.Duration
 	ClientName       string
 	TCPPort          uint16
+	ClientID         uint32
 	UserHash         ed2k.ID
 	// OnProgress is called when a part is completed and when the transfer
 	// starts, so a manager can expose a progress percentage.
 	OnProgress func(done, total int64)
+	// Logf receives protocol milestones and errors. Nil disables logging.
+	Logf func(format string, args ...any)
 }
 
 func (c *Config) applyDefaults() {
@@ -74,10 +77,10 @@ func (c *Config) applyDefaults() {
 		c.HandshakeTimeout = 15 * time.Second
 	}
 	if c.QueueTimeout <= 0 {
-		c.QueueTimeout = 2 * time.Minute
+		c.QueueTimeout = 10 * time.Minute
 	}
 	if c.IdleTimeout <= 0 {
-		c.IdleTimeout = 30 * time.Second
+		c.IdleTimeout = 60 * time.Second
 	}
 	if c.ClientName == "" {
 		c.ClientName = "gx-ed2k"
@@ -125,6 +128,9 @@ type pendingBlock struct {
 	key   blockKey
 	start int64
 	end   int64
+	data  []byte
+	have  []bool
+	got   int
 }
 
 type partDownload struct {
@@ -179,6 +185,10 @@ func Fetch(ctx context.Context, address string, link Link, cfg Config) (*Result,
 		resumed = true
 	}
 
+	cfg.applyDefaults()
+	if cfg.Logf != nil {
+		cfg.Logf("download: dialing %s for %q (%d bytes)", address, link.Name, link.Size)
+	}
 	dialer := net.Dialer{Timeout: cfg.ConnectTimeout}
 	conn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
@@ -198,6 +208,16 @@ func Fetch(ctx context.Context, address string, link Link, cfg Config) (*Result,
 		pending:  make(map[blockKey]pendingBlock),
 	}
 	defer s.conn.Close()
+	// A paused/removed transfer must stop now, not after the next idle timeout.
+	stopped := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			s.conn.Close()
+		case <-stopped:
+		}
+	}()
+	defer close(stopped)
 
 	if err := s.run(ctx); err != nil {
 		if s.pf != nil {
@@ -215,20 +235,38 @@ func (s *session) run(ctx context.Context) error {
 	if err := s.handshake(ctx); err != nil {
 		return err
 	}
+	s.logf("download: handshake with %s complete", s.conn.RemoteAddr())
+	if err := s.conn.SendExtended(peer.OpEmuleInfo, peer.EncodeMuleInfo()); err != nil {
+		return fmt.Errorf("download: send eMule info: %w", err)
+	}
 	if err := s.requestFile(ctx); err != nil {
 		return err
 	}
+	s.logf("download: peer shares %q", s.name)
+	// A single-part file has no separate hashset: the part hash is the file
+	// hash. Ask for the hashset after the upload slot for multi-part files;
+	// eMule only answers it reliably once the upload file is set.
+	if s.pf == nil && partfile.PartCount(s.link.Size) == 1 {
+		if err := s.createPart([]ed2k.ID{s.link.Hash}); err != nil {
+			return err
+		}
+	}
+	if err := s.setRequestFile(ctx); err != nil {
+		return err
+	}
+	if err := s.startUpload(ctx); err != nil {
+		return err
+	}
+	s.logf("download: upload slot granted by %s", s.conn.RemoteAddr())
 	if s.pf == nil {
 		hashes, err := s.requestHashset(ctx)
 		if err != nil {
 			return err
 		}
+		s.logf("download: hashset with %d parts", len(hashes))
 		if err := s.createPart(hashes); err != nil {
 			return err
 		}
-	}
-	if err := s.startUpload(ctx); err != nil {
-		return err
 	}
 	return s.download(ctx)
 }
@@ -245,6 +283,7 @@ func (s *session) handshake(ctx context.Context) error {
 	s.setDeadline(ctx, s.cfg.HandshakeTimeout)
 	answer, err := s.conn.Handshake(ctx, peer.Hello{
 		UserHash: s.cfg.UserHash,
+		ClientID: s.cfg.ClientID,
 		Port:     s.cfg.TCPPort,
 		Name:     s.cfg.ClientName,
 		Version:  ed2k.KadProtocolVersion,
@@ -258,7 +297,7 @@ func (s *session) handshake(ctx context.Context) error {
 
 func (s *session) requestFile(ctx context.Context) error {
 	s.setDeadline(ctx, s.cfg.HandshakeTimeout)
-	if err := s.conn.Send(peer.OpRequestFileName, peer.EncodeFileRequest(peer.FileRequest{Hash: s.link.Hash})); err != nil {
+	if err := s.conn.Send(peer.OpRequestFileName, peer.EncodeFileRequestExtended(peer.FileRequest{Hash: s.link.Hash})); err != nil {
 		return fmt.Errorf("download: file request: %w", err)
 	}
 	for {
@@ -289,6 +328,14 @@ func (s *session) requestFile(ctx context.Context) error {
 			return errors.New("download: peer does not have the file")
 		}
 	}
+}
+
+func (s *session) setRequestFile(ctx context.Context) error {
+	s.setDeadline(ctx, s.cfg.HandshakeTimeout)
+	if err := s.conn.Send(peer.OpSetReqFileID, peer.EncodeFileRequest(peer.FileRequest{Hash: s.link.Hash})); err != nil {
+		return fmt.Errorf("download: set file id: %w", err)
+	}
+	return nil
 }
 
 func (s *session) requestHashset(ctx context.Context) ([]ed2k.ID, error) {
@@ -343,6 +390,7 @@ func (s *session) startUpload(ctx context.Context) error {
 		return nil
 	}
 	s.setDeadline(ctx, s.cfg.QueueTimeout)
+	s.logf("download: asking for an upload slot (queue rank %d)", s.rank)
 	if err := s.conn.Send(peer.OpStartUploadReq, peer.EncodeFileRequest(peer.FileRequest{Hash: s.link.Hash})); err != nil {
 		return fmt.Errorf("download: start upload: %w", err)
 	}
@@ -469,8 +517,13 @@ func (s *session) requestMore() error {
 		for i, r := range ranges {
 			request.Starts[i] = uint32(r.start)
 			request.Ends[i] = uint32(r.end)
-			s.pending[r.key] = pendingBlock{key: r.key, start: r.start, end: r.end}
+			length := int(r.end - r.start)
+			s.pending[r.key] = pendingBlock{
+				key: r.key, start: r.start, end: r.end,
+				data: make([]byte, length), have: make([]bool, length),
+			}
 		}
+		s.logf("download: requesting %d ranges (%d-%d ...)", len(ranges), ranges[0].start, ranges[0].end)
 		if err := s.conn.Send(peer.OpRequestParts, peer.EncodePartRequest(request)); err != nil {
 			return fmt.Errorf("download: part request: %w", err)
 		}
@@ -557,34 +610,58 @@ func (s *session) writeBlock(start, end int64, data []byte) error {
 	if start < 0 || end <= start || end > s.pf.Meta.Size {
 		return fmt.Errorf("download: invalid block range %d-%d", start, end)
 	}
-	part := int(start / partfile.PartSize)
-	partStart := int64(part) * partfile.PartSize
-	block := int((start - partStart) / s.cfg.BlockSize)
-	expectedStart, expectedEnd := s.blockOffsets(part, block)
-	if start != expectedStart || end != expectedEnd {
-		return fmt.Errorf("download: unexpected block range %d-%d", start, end)
+	for len(data) > 0 {
+		part := int(start / partfile.PartSize)
+		partStart := int64(part) * partfile.PartSize
+		block := int((start - partStart) / s.cfg.BlockSize)
+		key := blockKey{part: part, block: block}
+		pending, ok := s.pending[key]
+		if !ok {
+			return fmt.Errorf("download: block %d/%d was not requested", part, block)
+		}
+		if start < pending.start || start >= pending.end {
+			return fmt.Errorf("download: chunk %d-%d outside the requested block", start, end)
+		}
+		chunkEnd := end
+		if chunkEnd > pending.end {
+			chunkEnd = pending.end
+		}
+		length := int(chunkEnd - start)
+		if len(data) < length {
+			return errors.New("download: short chunk")
+		}
+		offset := int(start - pending.start)
+		copy(pending.data[offset:], data[:length])
+		for i := 0; i < length; i++ {
+			if !pending.have[offset+i] {
+				pending.have[offset+i] = true
+				pending.got++
+			}
+		}
+		if pending.got == len(pending.data) {
+			delete(s.pending, key)
+			if err := s.completeBlock(part, block, pending); err != nil {
+				return err
+			}
+		} else {
+			s.pending[key] = pending
+		}
+		start = chunkEnd
+		data = data[length:]
 	}
-	key := blockKey{part: part, block: block}
-	pending, ok := s.pending[key]
-	if !ok {
-		return fmt.Errorf("download: block %d/%d was not requested", part, block)
-	}
-	if pending.start != start || pending.end != end {
-		return fmt.Errorf("download: block %d/%d has the wrong range", part, block)
-	}
-	if int64(len(data)) != end-start {
-		return fmt.Errorf("download: block %d/%d has %d bytes, want %d", part, block, len(data), end-start)
-	}
+	return nil
+}
+
+func (s *session) completeBlock(part, block int, pending pendingBlock) error {
 	state, err := s.partState(part)
 	if err != nil {
 		return err
 	}
-	delete(s.pending, key)
 	if state.have[block] {
 		return nil
 	}
-	offset := start - partStart
-	copy(state.data[offset:], data)
+	partStart := int64(part) * partfile.PartSize
+	copy(state.data[pending.start-partStart:], pending.data)
 	state.have[block] = true
 	state.got++
 	if state.got == len(state.have) {
@@ -599,6 +676,12 @@ func (s *session) writeBlock(start, end int64, data []byte) error {
 		s.report()
 	}
 	return nil
+}
+
+func (s *session) logf(format string, args ...any) {
+	if s.cfg.Logf != nil {
+		s.cfg.Logf(format, args...)
+	}
 }
 
 func (s *session) report() {

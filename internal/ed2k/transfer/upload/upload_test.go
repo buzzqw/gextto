@@ -53,12 +53,15 @@ func TestUploadServesFile(t *testing.T) {
 	_ = client.SetDeadline(time.Now().Add(5 * time.Second))
 	user := file.Hash
 	user[0] ^= 0xFF
-	if err := client.Send(peer.OpHello, peer.EncodeHello(peer.Hello{UserHash: user, Port: 5000, Name: "client"})); err != nil {
+	if err := client.Send(peer.OpHello, peer.EncodeHelloRequest(peer.Hello{UserHash: user, Port: 5000, Name: "client"})); err != nil {
 		t.Fatal(err)
 	}
 	opcode, _, err := client.Receive()
 	if err != nil || opcode != peer.OpHelloAnswer {
 		t.Fatalf("hello answer: opcode=%#x err=%v", opcode, err)
+	}
+	if opcode, _, err := client.Receive(); err != nil || opcode != peer.OpEmuleInfo {
+		t.Fatalf("emule info: opcode=%#x err=%v", opcode, err)
 	}
 
 	if err := client.Send(peer.OpRequestFileName, peer.EncodeFileRequest(peer.FileRequest{Hash: file.Hash})); err != nil {
@@ -122,7 +125,10 @@ func TestUploadRejectsUnknownFile(t *testing.T) {
 	go server.Handle(right)
 	client := peer.NewConn(left)
 	_ = client.SetDeadline(time.Now().Add(5 * time.Second))
-	if err := client.Send(peer.OpHello, peer.EncodeHello(peer.Hello{UserHash: ed2k.ID{9}, Port: 5000})); err != nil {
+	if err := client.Send(peer.OpHello, peer.EncodeHelloRequest(peer.Hello{UserHash: ed2k.ID{9}, Port: 5000})); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := client.Receive(); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := client.Receive(); err != nil {

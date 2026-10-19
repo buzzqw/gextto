@@ -64,6 +64,23 @@ func (c *Conn) Send(opcode byte, payload []byte) error {
 	return nil
 }
 
+// SendExtended writes one packet on the eMule 0xC5 protocol. It is needed for
+// opcodes that collide with the eDonkey ones, such as EMULEINFO and HELLO.
+func (c *Conn) SendExtended(opcode byte, payload []byte) error {
+	if len(payload) > c.max {
+		return fmt.Errorf("peer: packet of %d bytes exceeds the limit", len(payload))
+	}
+	frame := frameWithProtocol(EmuleProtocol, opcode, payload)
+	for len(frame) > 0 {
+		written, err := c.conn.Write(frame)
+		if err != nil {
+			return err
+		}
+		frame = frame[written:]
+	}
+	return nil
+}
+
 // Receive reads one framed packet. The payload is capped before allocation;
 // a peer that announces a larger packet is disconnected by the caller.
 func (c *Conn) Receive() (byte, []byte, error) {
@@ -71,10 +88,14 @@ func (c *Conn) Receive() (byte, []byte, error) {
 	if _, err := io.ReadFull(c.reader, header[:]); err != nil {
 		return 0, nil, err
 	}
-	if header[0] != ClientProtocol {
+	if header[0] != EdonkeyProtocol && header[0] != EmuleProtocol {
 		return 0, nil, errors.New("peer: not an eMule client packet")
 	}
-	size := int(uint32(header[2]) | uint32(header[3])<<8 | uint32(header[4])<<16 | uint32(header[5])<<24)
+	size := int(uint32(header[1]) | uint32(header[2])<<8 | uint32(header[3])<<16 | uint32(header[4])<<24)
+	if size < 1 {
+		return 0, nil, errors.New("peer: invalid packet size")
+	}
+	size--
 	if size > c.max {
 		return 0, nil, fmt.Errorf("peer: packet of %d bytes exceeds the limit", size)
 	}
@@ -82,7 +103,7 @@ func (c *Conn) Receive() (byte, []byte, error) {
 	if _, err := io.ReadFull(c.reader, payload); err != nil {
 		return 0, nil, err
 	}
-	return header[1], payload, nil
+	return header[5], payload, nil
 }
 
 // Handshake sends our hello and returns the peer's answer. The context
@@ -98,7 +119,7 @@ func (c *Conn) Handshake(ctx context.Context, hello Hello) (Hello, error) {
 		}
 		defer c.conn.SetDeadline(time.Time{})
 	}
-	if err := c.Send(OpHello, EncodeHello(hello)); err != nil {
+	if err := c.Send(OpHello, EncodeHelloRequest(hello)); err != nil {
 		return Hello{}, fmt.Errorf("peer: send hello: %w", err)
 	}
 	opcode, payload, err := c.Receive()

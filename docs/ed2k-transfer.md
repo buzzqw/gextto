@@ -28,7 +28,13 @@ part hashes, as eMule writes it), queue rank, upload acceptance, three-block
 part requests, compressed parts, per-part MD4 verification, resume from
 `.part.met` and a final whole-file MD4 gate. A `Manager` drives source
 discovery and the per-peer retry/queue state; a deterministic fake peer in the
-tests serves, queues and corrupts parts. None of it is imported by
+tests serves, queues and corrupts parts. The wire format was checked against a
+real aMule peer: the client header is protocol/length/opcode (length includes
+the opcode), OP_HELLO has a leading hash-size byte and a six-byte server
+IP/port suffix, the file-name length is 16-bit, and an extended file request
+carries the part-status and complete-source words. eD2k 0xC5 extension packets
+(EMULEINFO, queue ranking, compressed parts) use a separate header byte from
+the 0xE3 standard packets. None of it is imported by
 `cmd/gx-ed2k` yet.
 
 The goal is a pure-Go eMule-compatible client inside `gx-ed2k`, so Gextto can

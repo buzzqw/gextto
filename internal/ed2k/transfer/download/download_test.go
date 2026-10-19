@@ -64,7 +64,7 @@ func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.
 	if opcode != peer.OpHello {
 		return errors.New("fake peer: expected hello")
 	}
-	if _, err := peer.DecodeHello(payload); err != nil {
+	if _, err := peer.DecodeHelloRequest(payload); err != nil {
 		return err
 	}
 	answer := peer.Hello{UserHash: hashes.File, Port: 5000, Name: "fake"}
