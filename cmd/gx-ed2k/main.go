@@ -1,11 +1,13 @@
+//go:debug rsa1024min=0
+
 // Command gx-ed2k is Gextto's native eD2k/Kad daemon.
 //
 // By default it is a search client: it bootstraps Kad, searches keywords on
 // Kad and on the configured eD2k servers, and answers over the same /api/v1
 // shape as gx-torrent. With -download it also runs the transfer plane and
-// accepts ed2k:// links on /api/v1/transfers. Upload, credits, LowID callback
-// and obfuscation are not implemented yet, so health reports "download": false
-// unless the flag is set.
+// accepts ed2k:// links on /api/v1/transfers, with upload, credits, LowID
+// callbacks, obfuscation and client-to-client secure identification. Health
+// reports "download": false unless the flag is set.
 package main
 
 import (
@@ -26,6 +28,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/secident"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/download"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/upload"
@@ -138,6 +141,13 @@ func main() {
 	}
 
 	userHash := loadOrCreateUserHash(*dataDir)
+	secureIdent, err := secident.LoadOrCreate(filepath.Join(*dataDir, "cryptkey.pem"))
+	if err != nil {
+		// Downloads and uploads still work without an identity; peers just
+		// cannot tie our credits to a stable key.
+		log.Printf("gx-ed2k: secure identification disabled: %v", err)
+		secureIdent = nil
+	}
 	var uploader *upload.Server
 	if *downloadEnabled {
 		uploader = upload.New(2)
@@ -145,6 +155,7 @@ func main() {
 		uploader.UserHash = userHash
 		uploader.TCPPort = uint16(*tcpPort)
 		uploader.SetCreditPath(filepath.Join(*dataDir, "credits.json"))
+		uploader.SecIdent = secureIdent
 		dirs := []string{*downloadDir}
 		for _, dir := range strings.Split(*shareDirs, ",") {
 			if dir = strings.TrimSpace(dir); dir != "" {
@@ -208,6 +219,7 @@ func main() {
 				ClientName: "gx-ed2k",
 				TCPPort:    uint16(*tcpPort),
 				UserHash:   userHash,
+				SecIdent:   secureIdent,
 				Logf:       log.Printf,
 			},
 			StatePath: filepath.Join(*dataDir, "transfers.json"),

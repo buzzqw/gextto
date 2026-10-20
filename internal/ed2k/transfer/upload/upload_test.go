@@ -1,3 +1,5 @@
+//go:debug rsa1024min=0
+
 package upload
 
 import (
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/secident"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
 )
@@ -234,5 +237,112 @@ func TestUploadQueueAndCredits(t *testing.T) {
 	}
 	if !bytes.Contains(raw, []byte(hash.Hex())) {
 		t.Fatalf("credits = %s", raw)
+	}
+}
+
+func TestUploadSecureIdent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "shared.mkv")
+	if err := os.WriteFile(path, []byte("shared"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	serverKey, err := secident.LoadOrCreate(filepath.Join(t.TempDir(), "server.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientKey, err := secident.LoadOrCreate(filepath.Join(t.TempDir(), "client.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := New(1)
+	server.SecIdent = serverKey
+	if err := server.IndexDir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		server.Handle(conn)
+	}()
+
+	conn, err := net.Dial("tcp", listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	client := peer.NewConn(conn)
+	_ = client.SetDeadline(time.Now().Add(5 * time.Second))
+	user := ed2k.ID{9}
+	if err := client.Send(peer.OpHello, peer.EncodeHelloRequest(peer.Hello{UserHash: user, Port: 5000, Name: "client", SecIdent: true})); err != nil {
+		t.Fatal(err)
+	}
+	opcode, payload, err := client.Receive()
+	if err != nil || opcode != peer.OpHelloAnswer {
+		t.Fatalf("hello answer: opcode=%#x err=%v", opcode, err)
+	}
+	hello, err := peer.DecodeHello(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hello.MiscOption&0x000F0000 != 0x00010000 {
+		t.Fatalf("server did not advertise secure identification: %#x", hello.MiscOption)
+	}
+	if opcode, _, err := client.Receive(); err != nil || opcode != peer.OpEmuleInfo {
+		t.Fatalf("emule info: opcode=%#x err=%v", opcode, err)
+	}
+
+	opcode, payload, err = client.Receive()
+	if err != nil || opcode != peer.OpSecIdentState {
+		t.Fatalf("secure ident state: opcode=%#x err=%v", opcode, err)
+	}
+	ident := peer.NewSecIdent(clientKey)
+	replies, err := ident.HandleState(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, packet := range replies {
+		if err := client.SendExtended(packet.Opcode, packet.Payload); err != nil {
+			t.Fatal(err)
+		}
+	}
+	start, err := ident.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.SendExtended(start.Opcode, start.Payload); err != nil {
+		t.Fatal(err)
+	}
+
+	for !ident.Verified() {
+		opcode, payload, err = client.Receive()
+		if err != nil {
+			t.Fatalf("secure ident exchange: %v", err)
+		}
+		switch opcode {
+		case peer.OpPublicKey:
+			replies, err = ident.HandlePublicKey(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, packet := range replies {
+				if err := client.SendExtended(packet.Opcode, packet.Payload); err != nil {
+					t.Fatal(err)
+				}
+			}
+		case peer.OpSignature:
+			if _, err := ident.HandleSignature(payload); err != nil {
+				t.Fatal(err)
+			}
+		default:
+			t.Fatalf("unexpected opcode %#x during secure identification", opcode)
+		}
 	}
 }

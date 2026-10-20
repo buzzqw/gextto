@@ -45,12 +45,16 @@ receives progress/completion events like it does for torrents.
 
 ## What is deliberately not implemented
 
-- secure identification (RSA signatures/credits); the RC4 obfuscation layer
-  is implemented and advertised in the hello tags;
+- secure identification with eD2k servers (server credits); the
+  client-to-client RSA handshake is implemented;
 - full LowID↔LowID data relay through a third client;
-- a full LowID↔LowID relay through a third client;
 - file publishing (`PUBLISH_*`) and the full `known.met` shared-file manager;
 - per-file bandwidth limits and priorities.
+
+The client keeps its RSA identity in `<data>/cryptkey.pem`, created on first
+start (384-bit, the size eMule and aMule use). The key signs the
+client-to-client identification challenge; peers can then bind credits to the
+same identity across sessions.
 
 `capabilityLevels` in Gextto has no eD2k entry yet: the transfer plane is not
 advertised until a real engine exists. The search plane is a provider, not a

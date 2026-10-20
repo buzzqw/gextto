@@ -34,6 +34,10 @@ func NewConn(conn net.Conn) *Conn {
 // RemoteAddr exposes the peer address for logs and source bookkeeping.
 func (c *Conn) RemoteAddr() net.Addr { return c.conn.RemoteAddr() }
 
+// LocalAddr exposes our endpoint, which secure identification v2 may bind
+// into a peer signature.
+func (c *Conn) LocalAddr() net.Addr { return c.conn.LocalAddr() }
+
 // SetDeadline bounds both reads and writes on the session.
 func (c *Conn) SetDeadline(deadline time.Time) error { return c.conn.SetDeadline(deadline) }
 

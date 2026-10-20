@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/secident"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
 )
@@ -45,6 +46,10 @@ type Config struct {
 	TCPPort          uint16
 	ClientID         uint32
 	UserHash         ed2k.ID
+	// SecIdent is the local RSA identity used by the eMule secure
+	// identification handshake. Nil disables the handshake and its
+	// advertisement in the hello options.
+	SecIdent *secident.Key
 	// OnProgress is called when a part is completed and when the transfer
 	// starts, so a manager can expose a progress percentage.
 	OnProgress func(done, total int64)
@@ -172,6 +177,9 @@ type session struct {
 	aichRoot  *[20]byte
 	aichTree  *partfile.AICHTree
 	aichParts map[int][][20]byte
+
+	ident     *peer.SecIdent
+	peerIdent bool
 }
 
 // Fetch downloads one file from one peer. If a matching .part/.part.met pair
@@ -238,16 +246,19 @@ func FetchCallback(ctx context.Context, conn net.Conn, link Link, cfg Config) (*
 	}
 	s := newSession(cfg, link, client, pf, partPath)
 	s.incoming = true
-	if _, err := client.HandshakeIncoming(ctx, peer.Hello{
+	remote, err := client.HandshakeIncoming(ctx, peer.Hello{
 		UserHash: cfg.UserHash, ClientID: cfg.ClientID, Port: cfg.TCPPort,
 		Name: cfg.ClientName, Version: ed2k.KadProtocolVersion, KadPort: 0,
-	}); err != nil {
+		SecIdent: cfg.SecIdent != nil,
+	})
+	if err != nil {
 		if pf != nil {
 			pf.Close()
 		}
 		client.Close()
 		return nil, fmt.Errorf("download: callback handshake: %w", err)
 	}
+	s.peerIdent = remote.MiscOption&0x000F0000 != 0
 	return runSession(ctx, s, resumed)
 }
 
@@ -277,8 +288,17 @@ func newSession(cfg Config, link Link, conn *peer.Conn, pf *partfile.PartFile, p
 	return &session{
 		cfg: cfg, link: link, conn: conn, pf: pf, partPath: partPath, name: link.Name,
 		parts: make(map[int]*partDownload), pending: make(map[blockKey]pendingBlock),
-		aichParts: make(map[int][][20]byte),
+		aichParts: make(map[int][][20]byte), ident: newSecIdent(cfg),
 	}
+}
+
+// newSecIdent builds the per-connection handshake from the configured
+// identity, or nil when secure identification is disabled.
+func newSecIdent(cfg Config) *peer.SecIdent {
+	if cfg.SecIdent == nil {
+		return nil
+	}
+	return peer.NewSecIdent(cfg.SecIdent)
 }
 
 func runSession(ctx context.Context, s *session, resumed bool) (*Result, error) {
@@ -312,6 +332,13 @@ func (s *session) run(ctx context.Context) error {
 	s.logf("download: handshake with %s complete", s.conn.RemoteAddr())
 	if err := s.conn.SendExtended(peer.OpEmuleInfo, peer.EncodeMuleInfo()); err != nil {
 		return fmt.Errorf("download: send eMule info: %w", err)
+	}
+	if packet, ok, err := s.startSecIdent(); err != nil {
+		return err
+	} else if ok {
+		if err := s.conn.SendExtended(packet.Opcode, packet.Payload); err != nil {
+			return fmt.Errorf("download: send secure ident state: %w", err)
+		}
 	}
 	if err := s.requestFile(ctx); err != nil {
 		return err
@@ -364,11 +391,12 @@ func (s *session) handshake(ctx context.Context) error {
 		Port:     s.cfg.TCPPort,
 		Name:     s.cfg.ClientName,
 		Version:  ed2k.KadProtocolVersion,
+		SecIdent: s.ident != nil,
 	})
 	if err != nil {
 		return fmt.Errorf("download: handshake: %w", err)
 	}
-	_ = answer
+	s.peerIdent = answer.MiscOption&0x000F0000 != 0
 	return nil
 }
 
@@ -611,6 +639,8 @@ func (s *session) control(opcode byte, payload []byte) (bool, error) {
 			s.cfg.OnSources(sources)
 		}
 		return true, nil
+	case peer.OpSecIdentState, peer.OpPublicKey, peer.OpSignature:
+		return true, s.secureIdent(opcode, payload)
 	case peer.OpMessage, peer.OpHello, peer.OpHelloAnswer:
 		return true, nil
 	}
@@ -618,6 +648,56 @@ func (s *session) control(opcode byte, payload []byte) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func (s *session) startSecIdent() (peer.Packet, bool, error) {
+	if s.ident == nil || !s.peerIdent {
+		return peer.Packet{}, false, nil
+	}
+	s.ident.SetPeerAddresses(addrIP(s.conn.LocalAddr()), addrIP(s.conn.RemoteAddr()))
+	packet, err := s.ident.Start()
+	return packet, true, err
+}
+
+// addrIP extracts the IPv4 endpoint from a TCP address; other transports
+// leave it nil and v2 signatures stay unverified.
+func addrIP(addr net.Addr) net.IP {
+	if tcp, ok := addr.(*net.TCPAddr); ok {
+		return tcp.IP
+	}
+	return nil
+}
+
+// secureIdent answers the three eMule identification packets. Failures to
+// verify a signature leave the peer unverified but do not abort the transfer.
+func (s *session) secureIdent(opcode byte, payload []byte) error {
+	if s.ident == nil {
+		return nil
+	}
+	var packets []peer.Packet
+	var err error
+	switch opcode {
+	case peer.OpSecIdentState:
+		packets, err = s.ident.HandleState(payload)
+	case peer.OpPublicKey:
+		packets, err = s.ident.HandlePublicKey(payload)
+	case peer.OpSignature:
+		var verified bool
+		verified, err = s.ident.HandleSignature(payload)
+		if err == nil && verified {
+			s.logf("download: peer %s passed secure identification", s.conn.RemoteAddr())
+		}
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	for _, packet := range packets {
+		if err := s.conn.SendExtended(packet.Opcode, packet.Payload); err != nil {
+			return fmt.Errorf("download: secure ident reply: %w", err)
+		}
+	}
+	return nil
 }
 
 // readPeerStatus asks for OP_FILESTATUS and records which parts the peer has.

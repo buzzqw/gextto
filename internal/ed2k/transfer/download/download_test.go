@@ -1,3 +1,5 @@
+//go:debug rsa1024min=0
+
 package download
 
 import (
@@ -12,6 +14,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/secident"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
 )
@@ -23,6 +26,11 @@ type fakePeer struct {
 }
 
 func startFakePeer(t *testing.T, data []byte, name string, hashes partfile.Hashes, queue bool, corrupt bool) *fakePeer {
+	t.Helper()
+	return startFakePeerIdent(t, data, name, hashes, queue, corrupt, nil)
+}
+
+func startFakePeerIdent(t *testing.T, data []byte, name string, hashes partfile.Hashes, queue bool, corrupt bool, ident *peer.SecIdent) *fakePeer {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -38,7 +46,7 @@ func startFakePeer(t *testing.T, data []byte, name string, hashes partfile.Hashe
 		}
 		defer conn.Close()
 		client := peer.NewConn(conn)
-		if err := serveFakePeer(client, data, name, hashes, queue, corrupt); err != nil && !errors.Is(err, io.EOF) {
+		if err := serveFakePeer(client, data, name, hashes, queue, corrupt, ident); err != nil && !errors.Is(err, io.EOF) {
 			fake.errs <- err
 		}
 	}()
@@ -71,7 +79,7 @@ func startObfuscatedFakePeer(t *testing.T, data []byte, name string, hashes part
 			return
 		}
 		client := peer.NewConn(wrapped)
-		if err := serveFakePeer(client, data, name, hashes, false, false); err != nil && !errors.Is(err, io.EOF) {
+		if err := serveFakePeer(client, data, name, hashes, false, false, nil); err != nil && !errors.Is(err, io.EOF) {
 			fake.errs <- err
 		}
 	}()
@@ -89,7 +97,7 @@ func (f *fakePeer) wait(t *testing.T) {
 	}
 }
 
-func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.Hashes, queue bool, corrupt bool) error {
+func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.Hashes, queue bool, corrupt bool, ident *peer.SecIdent) error {
 	opcode, payload, err := client.Receive()
 	if err != nil {
 		return err
@@ -100,7 +108,7 @@ func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.
 	if _, err := peer.DecodeHelloRequest(payload); err != nil {
 		return err
 	}
-	answer := peer.Hello{UserHash: hashes.File, Port: 5000, Name: "fake"}
+	answer := peer.Hello{UserHash: hashes.File, Port: 5000, Name: "fake", SecIdent: ident != nil}
 	answer.UserHash[0] ^= 0xFF
 	if answer.UserHash == (ed2k.ID{}) {
 		answer.UserHash[0] = 1
@@ -116,7 +124,26 @@ func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.
 		if err != nil {
 			return err
 		}
+		if ident != nil {
+			switch opcode {
+			case peer.OpSecIdentState, peer.OpPublicKey, peer.OpSignature:
+				if err := serveFakeSecIdent(client, ident, opcode, payload); err != nil {
+					return err
+				}
+				continue
+			}
+		}
 		switch opcode {
+		case peer.OpEmuleInfo:
+			if ident != nil {
+				packet, err := ident.Start()
+				if err != nil {
+					return err
+				}
+				if err := client.SendExtended(packet.Opcode, packet.Payload); err != nil {
+					return err
+				}
+			}
 		case peer.OpRequestFileName:
 			request, err := peer.DecodeFileRequest(payload)
 			if err != nil {
@@ -230,6 +257,28 @@ func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.
 			return nil
 		}
 	}
+}
+
+func serveFakeSecIdent(client *peer.Conn, ident *peer.SecIdent, opcode byte, payload []byte) error {
+	var packets []peer.Packet
+	var err error
+	switch opcode {
+	case peer.OpSecIdentState:
+		packets, err = ident.HandleState(payload)
+	case peer.OpPublicKey:
+		packets, err = ident.HandlePublicKey(payload)
+	case peer.OpSignature:
+		_, err = ident.HandleSignature(payload)
+	}
+	if err != nil {
+		return err
+	}
+	for _, packet := range packets {
+		if err := client.SendExtended(packet.Opcode, packet.Payload); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func testData(size int) []byte {
@@ -405,5 +454,37 @@ func TestSafeName(t *testing.T) {
 		if got := SafeName(input); got != want {
 			t.Errorf("SafeName(%q) = %q, want %q", input, got, want)
 		}
+	}
+}
+
+func TestFetchWithSecureIdent(t *testing.T) {
+	data := testData(500_000)
+	hashes := testHashes(t, data)
+	peerKey, err := secident.LoadOrCreate(filepath.Join(t.TempDir(), "peer-cryptkey.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ourKey, err := secident.LoadOrCreate(filepath.Join(t.TempDir(), "our-cryptkey.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ident := peer.NewSecIdent(peerKey)
+	peerServer := startFakePeerIdent(t, data, "identified.mkv", hashes, false, false, ident)
+
+	result, err := Fetch(context.Background(), peerServer.listener.Addr().String(), Link{
+		Hash: hashes.File, Name: "identified.mkv", Size: int64(len(data)),
+	}, Config{
+		TempDir: t.TempDir(), HandshakeTimeout: 5 * time.Second, IdleTimeout: 5 * time.Second,
+		SecIdent: ourKey,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if int64(len(data)) != result.Size {
+		t.Fatalf("downloaded %d bytes, want %d", result.Size, len(data))
+	}
+	peerServer.wait(t)
+	if !ident.Verified() {
+		t.Fatal("client did not pass secure identification")
 	}
 }

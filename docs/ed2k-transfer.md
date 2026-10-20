@@ -81,7 +81,8 @@ In scope:
 
 Out of scope for the first usable version:
 
-- secure identification (RSA signatures) and the full credit identity;
+- secure identification with eD2k servers (server credits); the
+  client-to-client RSA handshake is implemented;
 - preview/streaming, shared-file publishing beyond what upload requires;
 - a second UI: the transfer state appears in Gextto's existing download list.
 
@@ -176,8 +177,14 @@ note.
   The keys follow aMule's magic bytes 34/203 and discard the first 1024 RC4
   bytes; the clear 0xE3/0xC5 header remains a valid fallback. The obfuscated
   outgoing path was verified against aMule 2.3.3 with the 400,000-byte lab
-  file (hello, upload slot, AICH and final MD4 all succeeded). Secure
-  identification (RSA signatures/credits) is not part of this layer.
+  file (hello, upload slot, AICH and final MD4 all succeeded).
+- **Secure identification**: the client keeps a 384-bit RSA identity in
+  `cryptkey.pem` (the size eMule and aMule use), advertises version 1 in the
+  hello options and answers `OP_SECIDENTSTATE` with `OP_PUBLICKEY` and
+  `OP_SIGNATURE`. The signature covers the peer key and the challenge the peer
+  sent, so it cannot be replayed to another client. Downloads and uploads are
+  fully symmetric. Identification with eD2k servers (`0x97`) is still missing,
+  so server-side credits are not earned.
 - **Credits**: implement the eMule credit identity and upload accounting at
   least well enough not to be treated as a leech; the exact formula is in the
   eMule source.

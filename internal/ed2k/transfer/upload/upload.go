@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/secident"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
 )
@@ -69,6 +70,9 @@ type Server struct {
 	UserHash   ed2k.ID
 	TCPPort    uint16
 	Idle       time.Duration
+	// SecIdent is the local RSA identity for secure identification. Nil
+	// disables the handshake and its advertisement in the hello options.
+	SecIdent *secident.Key
 }
 
 // New returns a server with the given number of concurrent upload slots.
@@ -150,6 +154,22 @@ func (s *Server) Len() int {
 	return len(s.files)
 }
 
+// serveSecIdent advances the handshake and returns the replies to send. A
+// signature that does not verify leaves the peer unverified but keeps the
+// connection usable.
+func serveSecIdent(ident *peer.SecIdent, opcode byte, payload []byte) ([]peer.Packet, error) {
+	switch opcode {
+	case peer.OpSecIdentState:
+		return ident.HandleState(payload)
+	case peer.OpPublicKey:
+		return ident.HandlePublicKey(payload)
+	case peer.OpSignature:
+		_, err := ident.HandleSignature(payload)
+		return nil, err
+	}
+	return nil, nil
+}
+
 func (s *Server) lookup(hash ed2k.ID) *File {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -171,14 +191,31 @@ func (s *Server) Handle(conn net.Conn) {
 	if err != nil || hello.UserHash == s.UserHash {
 		return
 	}
+	var ident *peer.SecIdent
+	if s.SecIdent != nil && hello.MiscOption&0x000F0000 != 0 {
+		ident = peer.NewSecIdent(s.SecIdent)
+		var localIP, peerIP net.IP
+		if tcp, ok := conn.LocalAddr().(*net.TCPAddr); ok {
+			localIP = tcp.IP
+		}
+		if tcp, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+			peerIP = tcp.IP
+		}
+		ident.SetPeerAddresses(localIP, peerIP)
+	}
 	answer := peer.Hello{
 		UserHash: s.UserHash, Port: s.TCPPort, Name: s.ClientName,
-		Version: ed2k.KadProtocolVersion,
+		Version: ed2k.KadProtocolVersion, SecIdent: ident != nil,
 	}
 	if err := client.Send(peer.OpHelloAnswer, peer.EncodeHello(answer)); err != nil {
 		return
 	}
 	_ = client.SendExtended(peer.OpEmuleInfo, peer.EncodeMuleInfo())
+	if ident != nil {
+		if packet, err := ident.Start(); err == nil {
+			_ = client.SendExtended(packet.Opcode, packet.Payload)
+		}
+	}
 	acquired := false
 	defer func() {
 		if acquired {
@@ -193,6 +230,19 @@ func (s *Server) Handle(conn net.Conn) {
 			return
 		}
 		switch opcode {
+		case peer.OpSecIdentState, peer.OpPublicKey, peer.OpSignature:
+			if ident == nil {
+				continue
+			}
+			packets, err := serveSecIdent(ident, opcode, payload)
+			if err != nil {
+				return
+			}
+			for _, packet := range packets {
+				if err := client.SendExtended(packet.Opcode, packet.Payload); err != nil {
+					return
+				}
+			}
 		case peer.OpRequestFileName:
 			request, err := peer.DecodeFileRequest(payload)
 			if err != nil {

@@ -55,6 +55,9 @@ type Hello struct {
 	// to. eMule writes them after the tag list even when they are zero.
 	ServerIP   net.IP
 	ServerPort uint16
+	// SecIdent advertises secure identification version 1 in the hello
+	// options. It is set when the daemon has an RSA identity loaded.
+	SecIdent bool
 	// Legacy sends only name, version and UDP ports, without the eMule
 	// feature tags. It is a compatibility fallback for old or strict peers.
 	Legacy bool
@@ -89,9 +92,13 @@ func EncodeHello(hello Hello) []byte {
 	misc1 := hello.MiscOption
 	if misc1 == 0 {
 		// AICH 1, Unicode, UDP 4, no data compression (the reader does not
-		// reassemble split zlib streams yet), no secure identification,
-		// source exchange 3, extended requests 2, comments 1, multipacket 1.
+		// reassemble split zlib streams yet), source exchange 3, extended
+		// requests 2, comments 1, multipacket 1. Secure identification is a
+		// separate 4-bit field (bits 16-19): version 1 when we have a key.
 		misc1 = 0x33F03212
+		if hello.SecIdent {
+			misc1 |= 0x00010000
+		}
 	}
 	misc2 := hello.MiscOption2
 	if misc2 == 0 {
