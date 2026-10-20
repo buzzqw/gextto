@@ -2029,3 +2029,9 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* A search row keeps its button label on one line: the field takes the
+   remaining width instead of squeezing “Apri link eD2k” onto two. */
+.search-row textarea { flex: 1 1 auto; min-width: 0; }
+.search-row .btn,
+.search-row .chk { flex: 0 0 auto; white-space: nowrap; }

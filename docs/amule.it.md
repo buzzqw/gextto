@@ -129,7 +129,7 @@ incollati), **File condivisi** e **Log di aMule**.
 Tre punti, tutti attraverso aMule:
 
 - **Ricerca manuale** (la casella di ricerca di **Scarico** e la pagina di
-  ricerca): spunta **Kad** per aggiungere ai torrent i risultati eD2k/Kad.
+  ricerca): spunta **eD2k** per aggiungere ai torrent i risultati eD2k/Kad.
 - **Pagina eD2k → Cerca su eD2k e Kad**: scegli la rete e cerca; aMule
   raccoglie i risultati per qualche secondo.
 - **Archivio**: spunta **Cerca anche su eD2k** per avere un blocco di risultati

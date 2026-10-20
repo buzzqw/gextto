@@ -281,7 +281,7 @@
     <div class="panel-body">
       <form class="search-row" data-v2-dashboard-search>
         <input type="search" name="q" aria-label="Cerca in archivio, indexer e motori web" placeholder="Cerca in archivio, indexer e motori web…" />
-        <label class="chk"><input type="checkbox" name="kad" value="1" data-v2-dashboard-search-kad title="Cerca anche sulla rete Kad (eD2k), se attiva in Configurazione → Sorgenti">Kad</label>
+        <label class="chk"><input type="checkbox" name="kad" value="1" data-v2-dashboard-search-kad title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → Fonti → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
         <button class="btn primary" type="submit">Cerca</button>
       </form>
       <div class="toolbar dashboard-search-results-toolbar">
@@ -397,7 +397,7 @@
     <div class="panel-body">
       <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-downloads-search-results" hx-swap="innerHTML">
         <input type="search" name="q" value="{{.Search.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
-        <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche sulla rete Kad (eD2k), se attiva in Configurazione → Sorgenti">Kad</label>
+        <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → Fonti → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
         <input type="hidden" name="view" value="downloads" />
         <button class="btn primary" type="submit">Cerca</button>
       </form>
@@ -2607,7 +2607,7 @@
     <div class="panel-body">
       <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-search-results" hx-swap="outerHTML">
         <input type="search" name="q" value="{{.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
-        <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche sulla rete Kad (eD2k), se attiva in Configurazione → Sorgenti">Kad</label>
+        <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → Fonti → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
         <button class="btn primary" type="submit">Cerca</button>
       </form>
       <form class="search-row" method="post" action="/search/link" hx-post="/search/link" hx-target="#v2-search-results" hx-swap="outerHTML">

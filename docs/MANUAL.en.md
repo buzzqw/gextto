@@ -330,7 +330,7 @@ configuration or starting a download:
 
 1. enter a title or technical query;
 2. when the aMule integration is on (see [eD2k and Kad with aMule](#ed2k-and-kad-with-amule)),
-   tick **Kad** next to the search button to search eD2k/Kad as well, on the
+   tick **eD2k** next to the search button to search eD2k/Kad as well, on the
    network chosen in Configuration;
 3. wait for sources to finish, or for slow-source timeouts to appear;
 4. compare title, source, quality, size and seed/peer counts;
@@ -355,7 +355,7 @@ inferior to the archived file.
 ## 3. Downloads
 
 - **Search a release**: the panel at the top of Downloads searches the archive,
-  indexers, web engines and — when **Kad** is ticked and aMule is on —
+  indexers, web engines and — when **eD2k** is ticked and aMule is on —
   eD2k/Kad, without leaving the page. Results open under the field and an add
   keeps you in Downloads.
 - The **Add torrent** form opens from the button of the same name in the top bar,
@@ -708,7 +708,7 @@ are using the API directly.
   release search there is a field to **paste one or more `ed2k://` links** (one
   per line or separated by spaces): Gextto checks them, drops duplicates and
   shows each as a result with name, size and hash. **Add all** hands the whole
-  block to aMule, or use the per-row **Add** button. When **Kad** is ticked,
+  block to aMule, or use the per-row **Add** button. When **eD2k** is ticked,
   eD2k results appear in the same table with the **eD2k** badge and the source
   count. While aMule is off or not answering the row says **Search only**.
 - **Archive** — full-text search of past releases with pagination, batch queue,

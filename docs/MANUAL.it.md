@@ -333,7 +333,7 @@ configurazione o avviare un download:
 
 1. inserisci un titolo o una query tecnica;
 2. se l'integrazione con aMule è attiva (vedi [eD2k e Kad](#ed2k-e-kad-con-amule)),
-   spunta **Kad** accanto al pulsante di ricerca per cercare anche su eD2k/Kad,
+   spunta **eD2k** accanto al pulsante di ricerca per cercare anche su eD2k/Kad,
    sulla rete scelta in Configurazione;
 3. attendi che le sorgenti terminino o che il timeout segnali quelle lente;
 4. confronta titolo, sorgente, qualità, dimensione e seed/peer;
@@ -359,7 +359,7 @@ bloccata, già presente o inferiore al file archiviato.
 ## 3. Scarico
 
 - **Cerca una release**: il pannello in cima a Scarico cerca su archivio,
-  indexer, motori web e — se spunti **Kad** e aMule è attivo — su eD2k/Kad,
+  indexer, motori web e — se spunti **eD2k** e aMule è attivo — su eD2k/Kad,
   senza cambiare pagina. I risultati si aprono sotto il campo; dopo un'aggiunta
   resti in Scarico.
 - Il modulo **Aggiungi torrent** si apre dal pulsante con lo stesso nome nella
@@ -722,7 +722,7 @@ manualmente il JSON se non stai usando direttamente l'API.
   o separati da spazi): Gextto li verifica, elimina i duplicati e li mostra come
   risultati con nome, dimensione e hash. Con **Aggiungi tutti** li passa in
   blocco ad aMule, oppure usi il pulsante **Aggiungi** della singola riga. Se
-  spunti **Kad**, i risultati eD2k compaiono nella stessa tabella con il badge
+  spunti **eD2k**, i risultati eD2k compaiono nella stessa tabella con il badge
   **eD2k** e il numero di fonti. Quando aMule è spento o non risponde la riga
   dice **Solo ricerca**.
 - **Archivio** — ricerca full-text delle release passate con paginazione, accoda

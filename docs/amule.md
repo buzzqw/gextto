@@ -129,7 +129,7 @@ pasted links), **Shared files** and **aMule log**.
 Three places, all through aMule:
 
 - **Manual search** (the search box of **Downloads** and the search page):
-  tick **Kad** to add eD2k/Kad results to the torrents.
+  tick **eD2k** to add eD2k/Kad results to the torrents.
 - **eD2k page → Search eD2k and Kad**: pick the network and search; aMule
   collects results for a few seconds.
 - **Archive**: tick **Also search eD2k** to get a block of eD2k results under

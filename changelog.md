@@ -14,6 +14,12 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **eD2k: la spunta si chiama eD2k, e il pulsante dei link sta su una riga.**
+  Nella ricerca di Scarico (e nelle altre caselle di ricerca) la spunta non si
+  chiama più «Kad» ma **eD2k**: la rete usata è quella scelta in
+  Configurazione → Fonti → eD2k e Kad (Kad, server o entrambi), come dice anche
+  il suo suggerimento. Il pulsante **Apri link eD2k** non va più a capo: il campo
+  del link occupa lo spazio disponibile e il pulsante resta su una riga.
 - **Pagina eD2k a schede, e aMule nella TUI.** La pagina eD2k ora ha tre
   schede — **aMule e ricerca**, **File condivisi** e **Log di aMule** — invece
   dei pannelli in fondo alla pagina. Nella TUI, con eD2k attivo, la scheda

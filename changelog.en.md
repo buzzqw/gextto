@@ -13,6 +13,12 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **eD2k: the box says eD2k, and the link button stays on one line.** In the
+  Downloads search (and the other search boxes) the checkbox is no longer
+  called “Kad” but **eD2k**: the network is the one chosen in Configuration →
+  Sources → eD2k and Kad (Kad, servers or both), as its tooltip now says. The
+  **Open eD2k links** button no longer wraps: the link field takes the available
+  width and the button stays on one line.
 - **eD2k page with tabs, and aMule in the TUI.** The eD2k page now has three
   tabs — **aMule and search**, **Shared files** and **aMule log** — instead of
   the panels at the bottom of the page. In the TUI, with eD2k on, the **Status**
