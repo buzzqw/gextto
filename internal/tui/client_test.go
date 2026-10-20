@@ -432,3 +432,42 @@ func TestLibraryClientRequests(t *testing.T) {
 		}
 	}
 }
+
+// TestClientMergesEd2kDownloads: aMule's downloads join the HTTP downloads in
+// the download list, and their actions go to the eD2k API.
+func TestClientMergesEd2kDownloads(t *testing.T) {
+	client, recorded := newTestClient(t, func(w http.ResponseWriter, r *http.Request, _ string) {
+		switch r.URL.Path {
+		case "/api/comics/downloads":
+			writeJSON(t, w, []map[string]any{{"id": "http-1", "title": "Comic", "status": "downloading"}})
+		case "/api/ed2k/downloads":
+			writeJSON(t, w, map[string]any{"ok": true, "enabled": true, "downloads": []map[string]any{{
+				"hash": "ffffffffffffffffffffffffffffffff", "name": "Show S01E01.mkv", "size": 200,
+				"done": 50, "progress": 25, "speed": 1024, "state": "downloading",
+			}}})
+		default:
+			writeJSON(t, w, map[string]any{"ok": true})
+		}
+	})
+	ctx := context.Background()
+	downloads, err := client.ComicDownloads(ctx)
+	if err != nil || len(downloads) != 2 {
+		t.Fatalf("ComicDownloads: %v %+v", err, downloads)
+	}
+	ed2k := downloads[1]
+	if ed2k.ID != "ed2k:ffffffffffffffffffffffffffffffff" || ed2k.Method != "eD2k" || ed2k.SpeedBytes != 1024 ||
+		ed2k.TotalBytes == nil || *ed2k.TotalBytes != 200 || ed2k.Status != "downloading" {
+		t.Fatalf("eD2k row = %+v", ed2k)
+	}
+	if err := client.PauseHTTPDownload(ctx, ed2k.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.RemoveHTTPDownload(ctx, ed2k.ID); err != nil {
+		t.Fatal(err)
+	}
+	last := (*recorded)[len(*recorded)-2:]
+	if last[0].path != "/api/ed2k/downloads/ffffffffffffffffffffffffffffffff/pause" ||
+		last[1].path != "/api/ed2k/downloads/ffffffffffffffffffffffffffffffff/remove" {
+		t.Fatalf("eD2k actions = %+v", last)
+	}
+}

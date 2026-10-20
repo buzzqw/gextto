@@ -394,6 +394,53 @@ func (c *Client) Delete(ctx context.Context, hash string) error {
 	return c.partfileCommand(ctx, OpPartfileDelete, hash)
 }
 
+// Download priorities (PR_* in the core); a download reports its priority
+// plus 10 while aMule chooses it automatically.
+const (
+	PriorityLow    = 0
+	PriorityNormal = 1
+	PriorityHigh   = 2
+	PriorityAuto   = 5
+)
+
+// PriorityName names a download's reported priority: low, normal, high or
+// auto.
+func PriorityName(value int) string {
+	if value >= 10 {
+		return "auto"
+	}
+	switch value {
+	case PriorityLow:
+		return "low"
+	case PriorityHigh:
+		return "high"
+	}
+	return "normal"
+}
+
+// ParsePriority maps low/normal/high/auto to the core's value.
+func ParsePriority(name string) (int, bool) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "low":
+		return PriorityLow, true
+	case "normal":
+		return PriorityNormal, true
+	case "high":
+		return PriorityHigh, true
+	case "auto":
+		return PriorityAuto, true
+	}
+	return 0, false
+}
+
+// SetPriority changes the download priority of a file.
+func (c *Client) SetPriority(ctx context.Context, hash string, priority int) error {
+	if priority < PriorityLow || (priority > PriorityHigh && priority != PriorityAuto) {
+		return fmt.Errorf("amule: invalid priority %d", priority)
+	}
+	return c.partfileCommand(ctx, OpPartfilePrioSet, hash, IntTag(TagPartfilePrio, uint64(priority)))
+}
+
 // ClearCompleted removes the completed files from the download list (the
 // files stay in the incoming directory).
 func (c *Client) ClearCompleted(ctx context.Context) error {

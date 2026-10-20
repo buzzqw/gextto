@@ -49,6 +49,7 @@ var catalog = map[string][6]string{
 	"label.candidates":            {"candidate", "candidates", "Kandidaten", "candidats", "candidatos", "kandydaci"},
 	"label.downloads":             {"download", "downloads", "Downloads", "téléchargements", "descargas", "pobrania"},
 	"label.http":                  {"HTTP", "HTTP", "HTTP", "HTTP", "HTTP", "HTTP"},
+	"label.ed2k":                  {"eD2k", "eD2k", "eD2k", "eD2k", "eD2k", "eD2k"},
 	"label.gaps":                  {"gap", "gaps", "Lücke", "écart", "brecha", "luka"},
 	"label.errors":                {"errori", "errors", "Fehler", "erreurs", "errores", "błędy"},
 	"label.seen":                  {"Visti nei feed", "Seen in feeds", "In Feeds gesehen", "Vus dans les flux", "Vistos en los feeds", "Widziane w kanałach"},

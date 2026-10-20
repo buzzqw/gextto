@@ -443,7 +443,8 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 	// Query the configured name and its aliases: a library often uses the
 	// localized title while eD2k files carry the original one ("I misteri di
 	// Murdoch" vs "Murdoch Mysteries"). aMule runs one search at a time, so
-	// the names are searched one after the other and merged by link.
+	// the names (and networks) are searched one after the other and merged by
+	// link.
 	names := make([]string, 0, 1+len(series.Aliases))
 	seenName := map[string]struct{}{}
 	for _, name := range append([]string{series.Name}, series.Aliases...) {
@@ -458,13 +459,34 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 		seenName[key] = struct{}{}
 		names = append(names, name)
 	}
+	// The automatic fallback asks both Kad and the eD2k servers (global
+	// search): they index different files, and a gap is worth the extra wait.
+	// A manual search uses the network chosen in the settings.
+	settings, err := ed2kSettingsFromConfig(cfg)
+	if err != nil {
+		return nil
+	}
+	networks := []uint8{settings.Network}
+	if !manual {
+		networks = []uint8{amule.SearchKad, amule.SearchGlobal}
+	}
 	candidates := make([]models.Release, 0)
 	seenRelease := map[string]struct{}{}
 	for _, name := range names {
 		if ctx.Err() != nil {
 			break
 		}
-		for _, release := range SearchED2K(ctx, cfg, fmt.Sprintf("%s S%02dE%02d", name, season, episode)) {
+		var found []models.Release
+		for _, network := range networks {
+			network := network
+			results, err := searchAmule(ctx, cfg, fmt.Sprintf("%s S%02dE%02d", name, season, episode), &network)
+			if err != nil {
+				logging.SourceFail("ed2k", "aMule", err.Error())
+				continue
+			}
+			found = append(found, ed2kReleases(results, "ed2k:amule")...)
+		}
+		for _, release := range found {
 			key, ok := releaseDedupKey(&release)
 			if !ok {
 				continue

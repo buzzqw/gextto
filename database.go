@@ -386,12 +386,11 @@ func nullInt64Ptr(value sql.NullInt64) *int64 {
 	return &v
 }
 
-func magnetHashOrError(magnet string) (string, error) {
-	hash, ok := utils.MagnetHash(magnet)
-	if !ok {
-		return "", fmt.Errorf("invalid magnet hash")
-	}
-	return hash, nil
+// releaseHash is releaseIdentityHash as a found flag: the infohash of a
+// torrent or the MD4 hash of an eD2k file.
+func releaseHash(release *models.Release) (string, bool) {
+	hash, err := releaseIdentityHash(release)
+	return hash, err == nil
 }
 
 func parseOptionalYear(value string) *int64 {
@@ -1023,7 +1022,7 @@ func (d *Database) CheckSeriesManualScored(release *models.Release, score, minSc
 }
 
 func (d *Database) checkSeriesScoredInner(release *models.Release, score, minScoreDiff int64, context *models.ApprovalContext, manual bool) (bool, string, error) {
-	hash, err := magnetHashOrError(release.Magnet)
+	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return false, "", err
 	}
@@ -1692,7 +1691,7 @@ func (d *Database) CheckMovieScoredWith(release *models.Release, score, minScore
 // in dry-run the decision is computed but no movie row is created, restored or
 // upgraded.
 func (d *Database) checkMovieScoredWith(release *models.Release, score, minScoreDiff, upgradeUntil int64, forbidUpgrade bool, dryRun bool) (bool, string, error) {
-	hash, err := magnetHashOrError(release.Magnet)
+	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return false, "", err
 	}
@@ -2273,7 +2272,7 @@ func (d *Database) BlocklistedHashes() (map[string]struct{}, error) {
 
 // Blocklist adds a release to the blocklist.
 func (d *Database) Blocklist(release *models.Release, reason string) error {
-	hash, err := magnetHashOrError(release.Magnet)
+	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return err
 	}
@@ -2345,7 +2344,7 @@ func (d *Database) RemoveBlocklist(hash string) (bool, error) {
 
 // RollbackRelease removes the placeholder rows of a non-downloaded release.
 func (d *Database) RollbackRelease(release *models.Release) error {
-	hash, err := magnetHashOrError(release.Magnet)
+	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return err
 	}
@@ -4754,7 +4753,7 @@ func (d *Database) MarkReleaseCompleted(release *models.Release, path string, si
 			_ = tx.Rollback()
 		}
 	}()
-	hash, err := magnetHashOrError(release.Magnet)
+	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return err
 	}
@@ -4846,7 +4845,7 @@ func (d *Database) MarkPackCompleted(release *models.Release, episodes []PackEpi
 			_ = tx.Rollback()
 		}
 	}()
-	hash, err := magnetHashOrError(release.Magnet)
+	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return err
 	}

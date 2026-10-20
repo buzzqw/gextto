@@ -23,7 +23,11 @@ affected.
   torrent added by hand, instead of failing the library import.
 - **Downloads in Scarico**: aMule's queue is shown next to the torrents and the
   HTTP downloads, with progress, speed, sources (transferring / total) and
-  pause / resume / remove. A completed file is only taken off aMule's list; an
+  pause / resume / remove; ⓘ opens the details (last data received, hash, link
+  to copy) and sets the file's priority in aMule. The downloads count on the
+  dashboard and in the menu badge, and appear in the TUI download list.
+- **Bandwidth**: aMule follows the torrents' speed limits (rule, exception,
+  schedule, Auto), sent when they change and re-sent every 10 minutes. A completed file is only taken off aMule's list; an
   incomplete one is cancelled with its partial data.
 - **Completion like a torrent**: when aMule completes a file, Gextto raises the
   same `torrent_finished` event a torrent produces (aMule 2.3 keeps a finished
@@ -33,6 +37,7 @@ affected.
   shared. eD2k episodes are always imported by **hardlink or copy** (never
   moved), so aMule keeps sharing the original from its incoming folder; a
   hardlink costs no extra space when both folders are on the same filesystem.
+- **aMule's log** on the eD2k page (Load the log) and in `GET /api/ed2k/log`.
 - **Connection and status** on the eD2k page: aMule version, eD2k server and
   High/Low ID, Kad state (firewalled or not), speeds and limits, network size,
   upload queue; connect / disconnect, start / stop Kad, connect to a given
@@ -45,7 +50,8 @@ affected.
   hand and paused ones are left alone.
 - **Automatic fallback** (`ed2k_fallback`, off by default): in the deep
   gap-filling pass, when the torrent episode and season searches found
-  nothing, Gextto searches eD2k for the configured name and every alias, and
+  nothing, Gextto searches Kad and the eD2k servers (global search) for the
+  configured name and every alias, and
   starts a result only with the exact episode, a recognised quality, a video
   file and at least `ed2k_min_sources` sources.
 

@@ -508,14 +508,22 @@ func (m *Model) statusInfoLines(width int) []Line {
 			stats.Queued, tr.T("label.queued"),
 			stats.Seeding, tr.T("label.seeding"))
 	}
-	httpActive := 0
+	httpActive, ed2kActive := 0, 0
 	for _, item := range m.HTTPDownloads {
-		if item.SpeedBytes > 0 {
+		if item.SpeedBytes == 0 {
+			continue
+		}
+		if strings.HasPrefix(item.ID, ed2kIDPrefix) {
+			ed2kActive++
+		} else {
 			httpActive++
 		}
 	}
 	if httpActive > 0 {
 		downloads += fmt.Sprintf(" · %s %d", tr.T("label.http"), httpActive)
+	}
+	if ed2kActive > 0 {
+		downloads += fmt.Sprintf(" · %s %d", tr.T("label.ed2k"), ed2kActive)
 	}
 	lines = append(lines, m.statusRow(tr.T("status.downloads"), downloads, StyleNormal))
 

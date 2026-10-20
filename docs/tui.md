@@ -39,7 +39,8 @@ network, pass the API key with `GEXTTO_API_KEY=<key>`: it is sent in the
    short the upper part scrolls with `↑↓`/`PgUp`/`PgDn`; on a phone-width
    terminal the traffic line (download/upload rates and trend) is shown first,
    so it stays visible without scrolling.
-2. **Torrents** — unified list of torrents and HTTP comic downloads with state,
+2. **Torrents** — unified list of torrents, HTTP comic downloads and aMule's
+   eD2k downloads (method `eD2k`, counted apart in the status line) with state,
    progress, bytes, speed and name; filter (`/` or `F`), sort (`o`/`O`),
    torrent details (`Enter`), pause/resume and removal of HTTP downloads. Several
    torrents can be marked (`Space`, `*` all/none) and paused, resumed, rechecked,

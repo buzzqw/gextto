@@ -24,12 +24,31 @@ import (
 	"github.com/buzzqw/gextto/internal/utils"
 )
 
+// ed2kQueueCache keeps the last read of aMule's queue for a moment: the page
+// chrome, the counters and the Scarico list all read it on each render.
+var ed2kQueueCache struct {
+	sync.Mutex
+	key       string
+	at        time.Time
+	downloads []amule.Download
+}
+
+const ed2kQueueCacheTTL = 2 * time.Second
+
 // Ed2kDownloads returns aMule's download queue, or nil when the integration
 // is off or the core cannot be reached.
 func Ed2kDownloads(cfg *Config) []amule.Download {
 	if !ed2kEnabled(cfg) {
 		return nil
 	}
+	settings, _ := ed2kSettingsFromConfig(cfg)
+	ed2kQueueCache.Lock()
+	if ed2kQueueCache.key == settings.Address && time.Since(ed2kQueueCache.at) < ed2kQueueCacheTTL {
+		cached := ed2kQueueCache.downloads
+		ed2kQueueCache.Unlock()
+		return cached
+	}
+	ed2kQueueCache.Unlock()
 	var downloads []amule.Download
 	if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
 		var callErr error
@@ -38,7 +57,17 @@ func Ed2kDownloads(cfg *Config) []amule.Download {
 	}); err != nil {
 		return nil
 	}
+	ed2kQueueCache.Lock()
+	ed2kQueueCache.key, ed2kQueueCache.at, ed2kQueueCache.downloads = settings.Address, time.Now(), downloads
+	ed2kQueueCache.Unlock()
 	return downloads
+}
+
+// ed2kForgetQueue drops the cached queue after a change made by Gextto.
+func ed2kForgetQueue() {
+	ed2kQueueCache.Lock()
+	ed2kQueueCache.at = time.Time{}
+	ed2kQueueCache.Unlock()
 }
 
 // AddEd2kLink queues one ed2k:// file link in aMule. A refusal or a timeout
@@ -53,6 +82,7 @@ func AddEd2kLink(cfg *Config, link string) error {
 	err = ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
 		return client.AddLink(ctx, parsed.String(), 0)
 	})
+	ed2kForgetQueue()
 	if err == nil {
 		return nil
 	}
@@ -116,6 +146,7 @@ func Ed2kDownloadAction(cfg *Config, action, hash string) error {
 	if !ed2k.ValidHash(hash) {
 		return errors.New("invalid eD2k hash")
 	}
+	defer ed2kForgetQueue()
 	return ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
 		switch action {
 		case "pause":

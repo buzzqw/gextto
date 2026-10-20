@@ -21,6 +21,7 @@ import (
 
 	_ "embed"
 
+	"github.com/buzzqw/gextto/internal/amule"
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
@@ -217,9 +218,8 @@ type uiEd2kRow struct {
 	Complete    bool
 }
 
-// uiEd2kRows reads aMule's queue for the Scarico page.
-func uiEd2kRows(cfg *Config) []uiEd2kRow {
-	downloads := Ed2kDownloads(cfg)
+// uiEd2kRows turns aMule's queue into Scarico rows.
+func uiEd2kRows(downloads []amule.Download) []uiEd2kRow {
 	rows := make([]uiEd2kRow, 0, len(downloads))
 	for _, download := range downloads {
 		state := ed2kDownloadState(download)
@@ -404,6 +404,21 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 		}
 		data.DownloadRate += view.DownloadRate
 		data.UploadRate += view.UploadRate
+	}
+	// aMule's downloads count like the torrents: in progress only while data
+	// is moving.
+	for _, download := range Ed2kDownloads(cfg) {
+		switch ed2kDownloadState(download) {
+		case "downloading":
+			data.Downloading++
+		case "queued", "checking":
+			data.Idle++
+		case "paused":
+			data.Paused++
+		case "error":
+			data.Errors++
+		}
+		data.DownloadRate += uint64(max(download.Speed, 0))
 	}
 	cycle := s.last_cycle.Snapshot()
 	data.CycleScraped = cycle.Scraped
@@ -744,7 +759,7 @@ func uiTorrentsDataFrom(s *AppState) uiTorrentsData {
 	return uiTorrentsData{
 		Rows:          rows,
 		HTTPDownloads: HTTPDownloads(),
-		Ed2kDownloads: uiEd2kRows(cfg),
+		Ed2kDownloads: uiEd2kRows(Ed2kDownloads(cfg)),
 		Ed2kEnabled:   ed2kEnabled(cfg),
 		Count:         len(rows),
 		UpdatedAt:     uiNowClock(),

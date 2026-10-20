@@ -17,7 +17,6 @@ import (
 
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/rules"
-	"github.com/buzzqw/gextto/internal/utils"
 )
 
 // DecisionStep is one labelled check of the decision trace.
@@ -341,7 +340,7 @@ func ExplainWithArchive(
 	}
 
 	var hash *string
-	if value, ok := utils.MagnetHash(release.Magnet); ok {
+	if value, ok := releaseHash(release); ok {
 		hash = &value
 	}
 	if hash != nil {

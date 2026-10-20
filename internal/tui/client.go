@@ -477,14 +477,80 @@ func (c *Client) Torrents(ctx context.Context) ([]Torrent, error) {
 	return torrents, err
 }
 
-// ComicDownloads fetches the live HTTP/MEGA comic downloads.
+// ComicDownloads fetches the live HTTP/MEGA comic downloads, followed by
+// aMule's eD2k downloads when the integration is on. An eD2k row has the ID
+// "ed2k:<hash>" and the method "eD2k"; the HTTP actions route it to the eD2k
+// API.
 func (c *Client) ComicDownloads(ctx context.Context) ([]ComicDownload, error) {
 	var downloads []ComicDownload
 	err := c.get(ctx, "/api/comics/downloads", &downloads)
 	if downloads == nil {
 		downloads = []ComicDownload{}
 	}
-	return downloads, err
+	if err != nil {
+		return downloads, err
+	}
+	if ed2k, ed2kErr := c.Ed2kDownloads(ctx); ed2kErr == nil {
+		for _, item := range ed2k {
+			downloads = append(downloads, item.AsDownload())
+		}
+	}
+	return downloads, nil
+}
+
+// Ed2kDownload mirrors one row of GET /api/ed2k/downloads.
+type Ed2kDownload struct {
+	Hash     string  `json:"hash"`
+	Name     string  `json:"name"`
+	Size     int64   `json:"size"`
+	Done     int64   `json:"done"`
+	Progress float64 `json:"progress"`
+	Speed    int64   `json:"speed"`
+	State    string  `json:"state"`
+	Sources  int64   `json:"sources"`
+}
+
+// ed2kIDPrefix marks an eD2k row in the unified download list.
+const ed2kIDPrefix = "ed2k:"
+
+// AsDownload presents an eD2k download as a row of the download list.
+func (d Ed2kDownload) AsDownload() ComicDownload {
+	total := nonNegative(d.Size)
+	return ComicDownload{
+		ID:              ed2kIDPrefix + d.Hash,
+		Title:           d.Name,
+		Method:          "eD2k",
+		Status:          d.State,
+		Progress:        d.Progress,
+		DownloadedBytes: nonNegative(d.Done),
+		TotalBytes:      &total,
+		SpeedBytes:      nonNegative(d.Speed),
+	}
+}
+
+func nonNegative(value int64) uint64 {
+	if value < 0 {
+		return 0
+	}
+	return uint64(value)
+}
+
+// Ed2kDownloads fetches aMule's download queue (empty while eD2k is off).
+func (c *Client) Ed2kDownloads(ctx context.Context) ([]Ed2kDownload, error) {
+	var payload struct {
+		Downloads []Ed2kDownload `json:"downloads"`
+	}
+	err := c.get(ctx, "/api/ed2k/downloads", &payload)
+	return payload.Downloads, err
+}
+
+// ed2kAction runs pause/resume/remove on an eD2k row of the download list.
+func (c *Client) ed2kAction(ctx context.Context, id, action string) (bool, error) {
+	if !strings.HasPrefix(id, ed2kIDPrefix) {
+		return false, nil
+	}
+	hash := strings.TrimPrefix(id, ed2kIDPrefix)
+	return true, c.postJSON(ctx, "/api/ed2k/downloads/"+url.PathEscape(hash)+"/"+action, map[string]any{}, nil)
 }
 
 // Series fetches the monitored TV series summary rows.
@@ -688,16 +754,25 @@ func (c *Client) Resume(ctx context.Context, hash string) error {
 
 // PauseHTTPDownload pauses a live comic HTTP download.
 func (c *Client) PauseHTTPDownload(ctx context.Context, id string) error {
+	if handled, err := c.ed2kAction(ctx, id, "pause"); handled {
+		return err
+	}
 	return c.postJSON(ctx, "/api/comics/downloads/"+url.PathEscape(id)+"/pause", map[string]any{}, nil)
 }
 
 // ResumeHTTPDownload resumes a paused comic HTTP download.
 func (c *Client) ResumeHTTPDownload(ctx context.Context, id string) error {
+	if handled, err := c.ed2kAction(ctx, id, "resume"); handled {
+		return err
+	}
 	return c.postJSON(ctx, "/api/comics/downloads/"+url.PathEscape(id)+"/resume", map[string]any{}, nil)
 }
 
 // RemoveHTTPDownload removes a live comic HTTP download without deleting files.
 func (c *Client) RemoveHTTPDownload(ctx context.Context, id string) error {
+	if handled, err := c.ed2kAction(ctx, id, "remove"); handled {
+		return err
+	}
 	return c.postJSON(ctx, "/api/comics/downloads/"+url.PathEscape(id)+"/remove", map[string]any{"delete_files": false}, nil)
 }
 

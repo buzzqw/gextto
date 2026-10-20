@@ -26,6 +26,8 @@ type File struct {
 	Sources int64
 	// LastRecv is the Unix time of the last data received (0 = never).
 	LastRecv int64
+	// Priority is the reported priority (PR_* value, +10 when automatic).
+	Priority int
 }
 
 // Result is one canned search result.
@@ -52,6 +54,8 @@ type Core struct {
 	commands  []string
 	conns     map[net.Conn]struct{}
 	shared    []sharedFile
+	maxDL     int64
+	maxUL     int64
 }
 
 type sharedFile struct {
@@ -272,10 +276,6 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 	case amule.OpServerUpdateFromURL, amule.OpKadUpdateFromURL:
 		c.commands = append(c.commands, "update")
 		return amule.Packet{Op: amule.OpNoop}
-	case amule.OpGetPreferences:
-		return amule.Packet{Op: amule.OpSetPreferences, Tags: []amule.Tag{
-			amule.EmptyTag(amule.TagPrefsDirectories, amule.StringTag(amule.TagDirectoriesIncoming, c.Incoming)),
-		}}
 	case amule.OpAddLink:
 		for _, tag := range request.Tags {
 			link := tag.String()
@@ -312,6 +312,7 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 				amule.IntTag(amule.TagPartfileStatus, uint64(file.Status)),
 				amule.IntTag(amule.TagPartfileSourceCount, uint64(file.Sources)),
 				amule.IntTag(amule.TagPartfileLastRecv, uint64(file.LastRecv)),
+				amule.IntTag(amule.TagPartfilePrio, uint64(file.Priority)),
 			))
 		}
 		return reply
@@ -326,6 +327,45 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 			))
 		}
 		return reply
+	case amule.OpPartfilePrioSet:
+		tag, _ := request.Tag(amule.TagPartfile)
+		value, _ := tag.Hash()
+		hash := hex.EncodeToString(value[:])
+		if len(tag.Children) == 0 {
+			return failed("missing priority")
+		}
+		for index, file := range c.downloads {
+			if file.Hash == hash {
+				priority := int(tag.Children[0].Int())
+				if priority == amule.PriorityAuto {
+					priority = amule.PriorityNormal + 10
+				}
+				c.downloads[index].Priority = priority
+				return amule.Packet{Op: amule.OpNoop}
+			}
+		}
+		return failed("FileHash not found: " + hash)
+	case amule.OpGetPreferences:
+		reply := amule.Packet{Op: amule.OpSetPreferences, Tags: []amule.Tag{
+			amule.EmptyTag(amule.TagPrefsDirectories, amule.StringTag(amule.TagDirectoriesIncoming, c.Incoming)),
+			amule.EmptyTag(amule.TagPrefsConnections,
+				amule.IntTag(amule.TagConnMaxDL, uint64(c.maxDL)),
+				amule.IntTag(amule.TagConnMaxUL, uint64(c.maxUL)),
+			),
+		}}
+		return reply
+	case amule.OpSetPreferences:
+		if conn, ok := request.Tag(amule.TagPrefsConnections); ok {
+			if value, ok := conn.ChildInt(amule.TagConnMaxDL); ok {
+				c.maxDL = int64(value)
+			}
+			if value, ok := conn.ChildInt(amule.TagConnMaxUL); ok {
+				c.maxUL = int64(value)
+			}
+		}
+		return amule.Packet{Op: amule.OpNoop}
+	case amule.OpGetLog:
+		return amule.Packet{Op: amule.OpLog, Tags: []amule.Tag{amule.StringTag(amule.TagString, "Connected to Kad\nNow sharing file")}}
 	case amule.OpPartfilePause, amule.OpPartfileResume, amule.OpPartfileDelete:
 		tag, _ := request.Tag(amule.TagPartfile)
 		value, _ := tag.Hash()

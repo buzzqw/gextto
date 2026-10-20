@@ -365,8 +365,11 @@ inferior to the archived file.
   state, progress, speed and sources (transferring / total), plus **Pause**,
   **Resume** and **🗑️**. On a download in progress 🗑️ cancels it and deletes
   the partial data; on a completed file it only takes it off aMule's list (the
-  file stays in the incoming folder). The counter at the top also shows
-  **eD2k: N** while the integration is on.
+  file stays in the incoming folder). **ⓘ** opens the details: state, sources,
+  last data received, hash, the eD2k link to copy and the **priority in aMule**
+  (low, normal, high, automatic). The counter at the top also shows **eD2k: N**
+  while the integration is on; eD2k downloads also count on the dashboard and in
+  the number next to **Downloads**.
 - **View row**: a box to select everything, name filter, tag filter, **Sort by**
   with its direction (↑/↓), **⟳** to refresh at once and the **Tools** menu:
   **Clean completed**, **Orphaned files…**, **Refresh every 5 s** and a link to
@@ -381,7 +384,9 @@ inferior to the archived file.
   Configuration → Speed and network (Auto, fixed limits or hourly schedule); here
   you make an **exception** for now, which beats the rule until it ends or you
   remove it. The button shows what applies: ⚡ an exception (with the minutes
-  left), ⏰ a schedule window, otherwise the rule. The menu:
+  left), ⏰ a schedule window, otherwise the rule. With eD2k on, **aMule follows
+  the same limits** (rule, exception, schedule), applied within a minute of each
+  change. The menu:
   - **Now**: what applies and where it comes from; with an exception on it says
     when it ends and which rule comes back afterwards. **Remove the exception**
     goes back to the rule at once.
@@ -793,6 +798,7 @@ which means more sources.
   **already known** marks a file aMule already has.
 - **Paste eD2k links**: one or more `ed2k://` links, even mixed with text;
   **Download with aMule** adds them all.
+- **aMule log**: **Load the log** shows the last lines of amuled's log.
 
 Added downloads appear in **Downloads**. A link to a file that is not a video
 (a pdf, a program, an archive) is only downloaded by aMule and stays in the
@@ -1637,7 +1643,7 @@ network.
 | aMule — external connections (EC) port | `ECPort` in `amule.conf`, 4712 by default. |
 | aMule — external connections (EC) password | The password in clear; aMule keeps its MD5 in `ECPassword`. Not displayed. |
 | eD2k search network | **Kad** (default, no server needed), **eD2k servers (global)** (every server) or **eD2k server (connected)**. Applies to the manual search and the fallback. |
-| Use eD2k when torrents find nothing | A second, separate switch: only in the deep gap-filling pass, and only when the torrent episode and season searches produced nothing, Gextto searches the same episode on eD2k/Kad (with the series name and every alias). Off by default. |
+| Use eD2k when torrents find nothing | A second, separate switch: only in the deep gap-filling pass, and only when the torrent episode and season searches produced nothing, Gextto searches the same episode on Kad and on the eD2k servers (with the series name and every alias). Off by default. |
 | Minimum sources for the fallback | eD2k source floor for accepting a result automatically. Manual search shows everything. *(Unit: sources; 0 = no minimum)* |
 | eD2k search duration | How many seconds aMule collects results before Gextto shows them. *(Unit: seconds)* |
 | Give up on a stalled eD2k download after | An eD2k download chosen by Gextto that receives no data for this many days is cancelled in aMule, the release is blocklisted and the episode is searched again. Downloads added by hand and paused ones stay. *(Unit: days; 0 = never)* |

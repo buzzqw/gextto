@@ -962,6 +962,8 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			// stays only on real changes, of the values or of their source (the
 			// schedule starting or ending is logged even with equal values).
 			sourceChanged := lastSpeed == nil || lastSpeed.source != source
+			// aMule follows the same limits as the torrents.
+			applyEd2kSpeedLimits(cfg, downloadKib, uploadKib, now)
 			if _, err := torrents.SetGlobalSpeedLimits(downloadKib, uploadKib); err != nil {
 				logging.Debug("speed policy apply failed", "error", err)
 			} else {

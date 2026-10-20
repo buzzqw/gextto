@@ -46,6 +46,14 @@ manual is online: [English](docs/MANUAL.en.md) ·
   imports it into the library when it completes. With aMule on a network disk
   set `AllocateFullFile=0` in `amule.conf`: preallocation blocks aMule for tens
   of seconds.
+- **eD2k: bandwidth, details, log, counters and TUI.** aMule follows the same
+  bandwidth limits as the torrents (rule, exception, schedule). In Downloads ⓘ
+  opens an eD2k download's details, with sources, last data received, link to
+  copy and the priority in aMule. The eD2k page shows aMule's log; the dashboard
+  and the menu count eD2k downloads too, and the TUI lists them with pause,
+  resume and remove. The automatic fallback searches Kad and the eD2k servers
+  together. Fixed an error that marked an eD2k episode as failed right after its
+  library import and kept the automatic fallback from starting a download.
 
 ## 19 October 2026
 

@@ -487,6 +487,7 @@
 </details>
 <hr />
 <a class="v2-menu-item" href="/?view=settings&amp;tab=network&amp;highlight=torrent_speed_mode#v2-setting-torrent_speed_mode" title="La regola (Auto, limiti fissi o programmazione oraria) si sceglie in Configurazione → Velocità e rete"><span class="v2-menu-mark" aria-hidden="true"></span><span>Cambia la regola</span> <span aria-hidden="true">→</span></a>
+{{if .Ed2kEnabled}}<p class="muted v2-menu-note">Gli stessi limiti valgono anche per aMule (eD2k).</p>{{end}}
 {{end}}
 
 {{define "v2_temp_badge"}}{{$s := .Speed}}{{if $s.ExceptionAuto}}<span class="badge warn" title="Eccezione attiva: Auto">⚡ <span>Auto</span>{{minutesLeft $s.ExceptionMinutes}}</span>{{else if $s.ExceptionLimit}}<span class="badge warn" title="Eccezione attiva: limite di velocità">⚡ {{badgeLimits $s.ExceptionDL $s.ExceptionUL}}{{minutesLeft $s.ExceptionMinutes}}</span>{{else if $s.RuleAuto}}<span class="badge{{if eq $s.Mode "schedule"}} ok{{end}}" title="{{if $s.InWindow}}Dalla programmazione oraria{{else}}Regola della configurazione{{end}}">{{if $s.InWindow}}⏰ {{end}}<span>Auto</span></span>{{else}}<span class="badge{{if $s.InWindow}} ok{{end}}" title="{{if $s.InWindow}}Dalla programmazione oraria{{else}}Regola della configurazione{{end}}">{{if $s.InWindow}}⏰ {{end}}{{badgeLimits $s.RuleDL $s.RuleUL}}</span>{{end}}{{if $s.Guard.Active}} <span class="badge" role="status" title="Auto riduce la velocità per mantenere basso il ping verso Google/Cloudflare"><span aria-hidden="true">🐢</span> <span>Latenza</span> {{$s.Guard.LatencyMs}}/{{$s.Guard.BaselineMs}} ms{{if $s.Guard.DownloadKib}} · DL {{$s.Guard.DownloadKib}} KiB/s{{end}}{{if $s.Guard.UploadKib}} · UL {{$s.Guard.UploadKib}} KiB/s{{end}}</span>{{end}}{{end}}
@@ -631,6 +632,7 @@
                 <div class="row-actions">
                   {{if not .Complete}}{{if .Paused}}<button class="btn sm icon-action" type="submit" name="ed2k_action" value="resume:{{.Hash}}" title="Riprendi il download eD2k" aria-label="Riprendi il download eD2k"><span aria-hidden="true">▶</span></button>
                   {{else}}<button class="btn sm icon-action" type="submit" name="ed2k_action" value="pause:{{.Hash}}" title="Metti in pausa il download eD2k" aria-label="Metti in pausa il download eD2k"><span aria-hidden="true">⏸</span></button>{{end}}{{end}}
+                  <button class="btn sm icon-action" type="button" hx-get="/downloads/ed2k-detail?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Mostra i dettagli del download eD2k" aria-label="Mostra i dettagli del download eD2k"><span aria-hidden="true">ⓘ</span></button>
                   <button class="btn sm icon-action danger" type="submit" name="ed2k_action" value="remove:{{.Hash}}" hx-disabled-elt="this" hx-confirm="{{if .Complete}}Togliere il file completato dall'elenco di aMule? Il file resta nella cartella di arrivo.{{else}}Annullare il download eD2k e cancellare la parte già scaricata?{{end}}" title="{{if .Complete}}Togli dall'elenco di aMule{{else}}Annulla il download eD2k{{end}}" aria-label="{{if .Complete}}Togli dall'elenco di aMule{{else}}Annulla il download eD2k{{end}}"><span aria-hidden="true">🗑️</span></button>
                 </div>
               </div>
@@ -1576,6 +1578,13 @@
       <div id="v2-ed2k-links-result" aria-live="polite"></div>
     </div>
   </div>
+  <details class="panel">
+    <summary class="panel-head"><h3>Log di aMule</h3><small class="muted">Le ultime righe del log di amuled</small></summary>
+    <div class="panel-body">
+      <button class="btn sm" type="button" hx-get="/ed2k/log" hx-target="#v2-ed2k-log" hx-swap="innerHTML" title="Legge il log da aMule">Carica il log</button>
+      <div id="v2-ed2k-log" aria-live="polite"></div>
+    </div>
+  </details>
   {{end}}
 </div>
 {{end}}
@@ -2344,6 +2353,44 @@
     {{if .URL}}<p class="muted"><strong>URL:</strong> <code>{{.URL}}</code></p>{{end}}{{if .Destination}}<p class="muted"><strong>Destinazione:</strong> <code>{{.Destination}}</code></p>{{end}}{{if .Temporary}}<p class="muted"><strong>Temporaneo:</strong> <code>{{.Temporary}}</code></p>{{end}}{{if .Error}}<p class="alert">{{.Error}}</p>{{end}}
   </div>
 </div></div>
+{{end}}
+
+{{define "v2_ed2k_detail"}}
+<div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-ed2k-detail-title">
+  <div class="modal-head"><h3 id="v2-ed2k-detail-title" class="truncate" title="{{.Name}}">{{.Name}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi i dettagli del download eD2k">Chiudi</button></div>
+  <div class="modal-body" id="v2-ed2k-detail-body">{{template "v2_ed2k_detail_body" .}}</div>
+</div></div>
+{{end}}
+
+{{define "v2_ed2k_detail_body"}}
+{{if .Message}}<p class="{{if .Error}}alert{{else}}muted{{end}}" role="{{if .Error}}alert{{else}}status{{end}}"><span>{{.Message}}</span>{{if .Detail}} {{.Detail}}{{end}}</p>{{end}}
+{{if .Found}}
+<div class="stat-grid">
+  <div class="row"><span>Stato</span><strong>{{.State}}</strong></div>
+  <div class="row"><span>Progresso</span><strong>{{.ProgressPct}}% · {{bytes .Done}} / {{bytes .Size}}</strong></div>
+  <div class="row"><span>Velocità</span><strong>{{rateI .Speed}}</strong></div>
+  <div class="row"><span>Fonti eD2k: in trasferimento / totali</span><strong>{{.Active}} / {{.Sources}}</strong></div>
+  <div class="row"><span>Ultimo dato ricevuto</span><strong>{{if .LastReceived}}{{.LastReceived}}{{else}}<span>mai</span>{{end}}</strong></div>
+  <div class="row"><span>Hash MD4</span><strong><code>{{.Hash}}</code></strong></div>
+</div>
+<form class="form-grid" method="post" action="/downloads/ed2k-priority" hx-post="/downloads/ed2k-priority" hx-target="#v2-ed2k-detail-body" hx-swap="innerHTML">
+  <input type="hidden" name="hash" value="{{.Hash}}">
+  <label class="field"><span>Priorità in aMule</span><select class="input" name="priority" title="Priorità con cui aMule chiede le parti di questo file rispetto agli altri download">
+    <option value="low"{{if eq .Priority "low"}} selected{{end}}>Bassa</option>
+    <option value="normal"{{if eq .Priority "normal"}} selected{{end}}>Normale</option>
+    <option value="high"{{if eq .Priority "high"}} selected{{end}}>Alta</option>
+    <option value="auto"{{if eq .Priority "auto"}} selected{{end}}>Automatica</option>
+  </select></label>
+  <div class="form-actions"><button class="btn sm primary" type="submit">Salva la priorità</button></div>
+</form>
+<p class="muted"><span>Link eD2k</span>: <code class="truncate" title="{{.Link}}">{{.Link}}</code> <button class="btn sm" type="button" data-v2-copy="{{.Link}}" title="Copia il link eD2k negli appunti">Copia</button></p>
+{{else}}<p class="muted">Il file non è più nella coda di aMule: se è completato lo trovi nella cartella di arrivo.</p>{{end}}
+{{end}}
+
+{{define "v2_ed2k_log"}}
+{{if .Error}}<p class="alert" role="alert"><span>Log di aMule non disponibile:</span> {{.Error}}</p>
+{{else if .Lines}}<pre class="log-view" tabindex="0" role="region" aria-label="Log di aMule">{{range .Lines}}<span class="log-line">{{.}}</span>{{end}}</pre>
+{{else}}<p class="muted">Il log di aMule è vuoto.</p>{{end}}
 {{end}}
 
 {{define "v2_tmdb_calendar"}}

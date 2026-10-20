@@ -245,3 +245,87 @@ func V2Ed2kAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_ed2k_message", map[string]any{"Message": message, "Detail": detail, "Error": isErr}, dict, eng)
 }
+
+// v2Ed2kDetailView is the detail dialog of one aMule download.
+type v2Ed2kDetailView struct {
+	Found        bool
+	Hash         string
+	Name         string
+	State        string
+	ProgressPct  string
+	Done         int64
+	Size         int64
+	Speed        int64
+	Active       int64
+	Sources      int64
+	LastReceived string
+	Priority     string
+	Link         string
+	Message      string
+	Detail       string
+	Error        bool
+}
+
+func v2Ed2kDetailFor(cfg *Config, hash string) v2Ed2kDetailView {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	view := v2Ed2kDetailView{Hash: hash, Name: hash}
+	for _, download := range Ed2kDownloads(cfg) {
+		if download.Hash != hash {
+			continue
+		}
+		row := ed2kDownloadJSONFrom(download)
+		for _, uiRow := range uiEd2kRows([]amule.Download{download}) {
+			view.State = uiRow.State
+			view.ProgressPct = uiRow.ProgressPct
+		}
+		view.Found = true
+		view.Name = download.Name
+		view.Done, view.Size, view.Speed = download.Done, download.Size, download.Speed
+		view.Active, view.Sources = download.Active, download.Sources
+		view.Priority = row.Priority
+		view.Link = row.Link
+		if download.LastRecv > 0 {
+			view.LastReceived = time.Unix(download.LastRecv, 0).Format("2006-01-02 15:04")
+		}
+		break
+	}
+	return view
+}
+
+// V2Ed2kDetail renders the detail dialog of an aMule download.
+func V2Ed2kDetail(w http.ResponseWriter, r *http.Request, s *AppState) {
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_ed2k_detail", v2Ed2kDetailFor(latestConfig(s), r.FormValue("hash")), dict, eng)
+}
+
+// V2Ed2kPriority changes the priority of an aMule download from the detail
+// dialog and renders its body again.
+func V2Ed2kPriority(w http.ResponseWriter, r *http.Request, s *AppState) {
+	cfg := latestConfig(s)
+	hash := r.FormValue("hash")
+	err := Ed2kSetPriority(cfg, hash, r.FormValue("priority"))
+	view := v2Ed2kDetailFor(cfg, hash)
+	if err != nil {
+		view.Message, view.Detail, view.Error = "Priorità non cambiata:", err.Error(), true
+	} else {
+		view.Message = "Priorità salvata."
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_ed2k_detail_body", view, dict, eng)
+}
+
+// V2Ed2kLog renders aMule's log on the eD2k page.
+func V2Ed2kLog(w http.ResponseWriter, r *http.Request, s *AppState) {
+	view := map[string]any{}
+	lines, err := Ed2kLogLines(latestConfig(s))
+	if err != nil {
+		view["Error"] = err.Error()
+	} else {
+		if len(lines) > 300 {
+			lines = lines[len(lines)-300:]
+		}
+		view["Lines"] = lines
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_ed2k_log", view, dict, eng)
+}

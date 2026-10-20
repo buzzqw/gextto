@@ -321,7 +321,7 @@ func RunCycleDomain(
 			}
 			continue
 		}
-		if hash, ok := utils.MagnetHash(release.Magnet); ok {
+		if hash, ok := releaseHash(release); ok {
 			if _, blocked := blocklistedHashes[hash]; blocked {
 				continue
 			}
@@ -345,7 +345,7 @@ func RunCycleDomain(
 			}
 			continue
 		}
-		if hash, ok := utils.MagnetHash(release.Magnet); ok {
+		if hash, ok := releaseHash(release); ok {
 			if _, blocked := blocklistedHashes[hash]; blocked {
 				continue
 			}
@@ -866,7 +866,7 @@ func RunCycleDomain(
 		}
 		reconcilePackIdentityFromMagnet(&release)
 		isReadyPending := false
-		if hash, ok := utils.MagnetHash(release.Magnet); ok {
+		if hash, ok := releaseHash(&release); ok {
 			if _, ok := readyPending[hash]; ok {
 				isReadyPending = true
 			}
@@ -1066,7 +1066,7 @@ func RunCycleDomain(
 			}
 			if !cfg.DryRun {
 				approvalReason = commitReason
-				if hash, ok := utils.MagnetHash(release.Magnet); ok {
+				if hash, ok := releaseHash(&release); ok {
 					_ = db.SetTorrentReason(hash, decisionReason)
 				}
 			}
@@ -1098,7 +1098,7 @@ func RunCycleDomain(
 			if destination := downloadDestinationLabel(cfg, preferredPath); destination != "" {
 				logMessage += " → " + destination
 			}
-			logHash, _ := utils.MagnetHash(release.Magnet)
+			logHash, _ := releaseHash(&release)
 			logging.Info(logMessage, "release", release.Title, "from", release.Source, "score", score, "hash", logHash)
 			logging.Debug("download decision",
 				"target", releaseTarget(&release),
@@ -1130,7 +1130,7 @@ func RunCycleDomain(
 				stats.GapsFilled++
 			}
 			var magnetHashValue any
-			if hash, ok := utils.MagnetHash(release.Magnet); ok {
+			if hash, ok := releaseHash(&release); ok {
 				magnetHashValue = hash
 			}
 			payload := map[string]any{
@@ -1473,6 +1473,11 @@ func commitReleaseApproval(db *Database, release *models.Release, score, minScor
 // could not be recorded in the database. Without its rows it would be treated
 // as a foreign torrent and never archived.
 func withdrawAddedTorrent(torrents TorrentEngine, release *models.Release) {
+	if release.Ed2kLink != "" {
+		// An eD2k file is not in the torrent engine: it stays in aMule and,
+		// without its database rows, is treated like a file added by hand.
+		return
+	}
 	hash, ok := utils.MagnetHash(release.Magnet)
 	if !ok {
 		return

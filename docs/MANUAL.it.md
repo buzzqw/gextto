@@ -368,8 +368,11 @@ bloccata, già presente o inferiore al file archiviato.
   **eD2k**: stato, progressione, velocità e fonti (in trasferimento / totali),
   più **Pausa**, **Riprendi** e **🗑️**. Su un download in corso 🗑️ lo annulla e
   cancella la parte scaricata; su un file completato lo toglie solo dall'elenco
-  di aMule (il file resta nella cartella di arrivo). Il contatore in alto mostra
-  anche **eD2k: N** quando l'integrazione è attiva.
+  di aMule (il file resta nella cartella di arrivo). **ⓘ** apre il dettaglio:
+  stato, fonti, ultimo dato ricevuto, hash, link eD2k da copiare e la
+  **priorità in aMule** (bassa, normale, alta, automatica). Il contatore in alto
+  mostra anche **eD2k: N** quando l'integrazione è attiva; i download eD2k
+  contano anche nella dashboard e nel numero accanto a **Scarico**.
 - **Riga della vista**: casella per selezionare tutto, filtro per nome, filtro per
   tag, **Ordina per** con il verso (↑/↓), **⟳** per aggiornare subito e il menu
   **Strumenti**: **Pulisci completati**, **File orfani…**, **Aggiorna ogni 5 s**
@@ -385,7 +388,8 @@ bloccata, già presente o inferiore al file archiviato.
   oraria); da qui fai un'**eccezione** per adesso, che vince sulla regola finché
   non scade o non la togli. Il pulsante mostra cosa vale: ⚡ un'eccezione (con i
   minuti che restano), ⏰ una fascia della programmazione, altrimenti la regola.
-  Il menu:
+  Con eD2k attivo **aMule segue gli stessi limiti** (regola, eccezione,
+  programmazione), riapplicati entro un minuto da ogni cambio. Il menu:
   - **Adesso**: cosa vale e da dove viene; con un'eccezione attiva dice quando
     finisce e quale regola torna dopo. **Togli l'eccezione** torna subito alla regola.
   - **Auto**: Gextto misura la linea e si adatta, senza tetto. È grigio con
@@ -810,6 +814,7 @@ alto e un Kad non dietro firewall, cioè più fonti.
   **Scarica**; **già noto** segnala un file che aMule ha già.
 - **Incolla link eD2k**: uno o più link `ed2k://`, anche mescolati a testo;
   **Scarica con aMule** li aggiunge tutti.
+- **Log di aMule**: **Carica il log** mostra le ultime righe del log di amuled.
 
 I download aggiunti compaiono in **Scarico**. Un link a un file che non è un
 video (pdf, programma, archivio) viene solo scaricato da aMule e resta nella
@@ -1690,7 +1695,7 @@ spento per default: senza il tuo consenso Gextto non contatta la rete.
 | aMule — porta connessioni esterne (EC) | `ECPort` di `amule.conf`, 4712 di default. |
 | aMule — password connessioni esterne (EC) | La password in chiaro; aMule conserva il suo MD5 in `ECPassword`. Non visualizzata. |
 | Rete delle ricerche eD2k | **Kad** (default, non serve un server), **Server eD2k (globale)** (tutti i server) o **Server eD2k (connesso)**. Vale per la ricerca manuale e per il fallback. |
-| Usa eD2k quando i torrent non trovano nulla | Secondo interruttore, separato: solo nel passaggio approfondito del gap filling, e solo se torrent episodio e stagione non hanno prodotto nulla, Gextto cerca lo stesso episodio su eD2k/Kad (con il nome della serie e tutti gli alias). Spento di default. |
+| Usa eD2k quando i torrent non trovano nulla | Secondo interruttore, separato: solo nel passaggio approfondito del gap filling, e solo se torrent episodio e stagione non hanno prodotto nulla, Gextto cerca lo stesso episodio su Kad e sui server eD2k (con il nome della serie e tutti gli alias). Spento di default. |
 | Fonti minime per il fallback | Soglia di fonti eD2k per accettare automaticamente un risultato. La ricerca manuale mostra tutto. *(Unità: fonti; 0 = nessun minimo)* |
 | Durata della ricerca eD2k | Per quanti secondi aMule raccoglie i risultati prima che Gextto li mostri. *(Unità: secondi)* |
 | Rinuncia a un download eD2k fermo dopo | Un download eD2k scelto da Gextto che non riceve dati per questi giorni viene annullato in aMule, la release va in blocklist e l'episodio torna da cercare. I download aggiunti a mano e quelli in pausa restano. *(Unità: giorni; 0 = mai)* |

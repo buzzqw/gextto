@@ -194,6 +194,17 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 			activeDl++
 		}
 	}
+	for _, download := range Ed2kDownloads(cfg) {
+		if download.Complete() {
+			continue
+		}
+		totalDl++
+		activeDl++
+		if download.Speed > 0 {
+			downloadRate += uint64(download.Speed)
+			chrome.Transferring++
+		}
+	}
 	chrome.ActiveDownloads = strconv.Itoa(activeDl) + "/" + strconv.Itoa(totalDl)
 	chrome.Download = logging.HumanRate(saturatingInt64(downloadRate))
 	chrome.Upload = logging.HumanRate(saturatingInt64(uploadRate))
@@ -233,6 +244,12 @@ func uiNavCounts(s *AppState, cfg *Config) map[string]string {
 	for _, view := range s.activeEngine().List() {
 		total++
 		if view.Progress < 100 {
+			active++
+		}
+	}
+	for _, download := range Ed2kDownloads(cfg) {
+		total++
+		if !download.Complete() {
 			active++
 		}
 	}

@@ -47,6 +47,12 @@ change. `/ui` is not served. For operational checks use
 | GET | `/api/acquisitions` | acquisition history |
 | GET | `/api/archive` | archive entries (search and pages) |
 | GET | `/api/ed2k/status` | aMule integration state: enabled, reachable, download, last_error and, when aMule answers, status (version, eD2k server and High/Low ID, Kad state, speeds and limits, network size) |
+| GET | `/api/ed2k/downloads` | aMule's download queue: hash, name, size, done, progress, speed, state (queued, downloading, paused, checking, finished, error), sources and active sources, priority, ed2k link, last data received (Unix time); enabled is false while the integration is off |
+| POST | `/api/ed2k/downloads/{hash}/priority` | set a download's priority: JSON {"priority": "low", "normal", "high" or "auto"} |
+| POST | `/api/ed2k/downloads/{hash}/{action}` | pause, resume or remove an aMule download (remove cancels a download in progress and deletes its partial data; a completed file only leaves aMule's list) |
+| GET | `/api/ed2k/limits` | aMule's global bandwidth limits: download_kib, upload_kib (0 = unlimited) |
+| POST | `/api/ed2k/limits` | set aMule's global bandwidth limits: JSON {"download_kib": N, "upload_kib": N}, 0 = unlimited |
+| GET | `/api/ed2k/log` | aMule's own log lines |
 | POST | `/api/archive/add` | add an entry to the archive |
 | POST | `/api/archive/batch-download` | download several archive entries |
 | POST | `/api/archive/delete` | delete archive entries |

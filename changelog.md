@@ -48,6 +48,14 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   in libreria al completamento. Con aMule su un disco di rete conviene
   `AllocateFullFile=0` in `amule.conf`: la preallocazione blocca aMule per
   decine di secondi.
+- **eD2k: banda, dettagli, log, contatori e TUI.** aMule segue gli stessi limiti
+  di banda dei torrent (regola, eccezione, programmazione). In Scarico ⓘ apre il
+  dettaglio di un download eD2k, con fonti, ultimo dato ricevuto, link da copiare
+  e la priorità in aMule. La pagina eD2k mostra il log di aMule; dashboard e
+  menu contano anche i download eD2k, e la TUI li elenca con pausa, ripresa e
+  rimozione. Il ripiego automatico cerca su Kad e sui server eD2k insieme.
+  Corretto un errore che segnava come fallito un episodio eD2k appena importato
+  in libreria e che impediva al ripiego automatico di avviare un download.
 
 ## 19 ottobre 2026
 

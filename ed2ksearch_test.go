@@ -70,6 +70,7 @@ func ed2kTestCore(t *testing.T, extra map[string]string) (*amuletest.Core, *Conf
 		cfg.Settings[key] = value
 	}
 	ed2kInvalidateHealth()
+	ed2kForgetQueue()
 	return core, cfg
 }
 
@@ -162,6 +163,10 @@ func TestSearchSeriesED2KFiltersAutomaticCandidates(t *testing.T) {
 	if *got[0].Series != "Rare Show" {
 		t.Fatalf("series = %q", *got[0].Series)
 	}
+	// The automatic fallback asks Kad and the eD2k servers.
+	if searches := core.Searches(); len(searches) != 2 {
+		t.Fatalf("automatic searches = %v, want one per network", searches)
+	}
 }
 
 func TestDatabaseStoresEd2kIdentity(t *testing.T) {
@@ -215,14 +220,14 @@ func TestEd2kLinkAddAndDownloadActions(t *testing.T) {
 	if added, err := addEd2kRelease(cfg, &models.Release{Ed2kLink: link}); added || err != nil {
 		t.Fatalf("a duplicate must be reported as not added: %v, %v", added, err)
 	}
-	rows := uiEd2kRows(cfg)
+	rows := uiEd2kRows(Ed2kDownloads(cfg))
 	if len(rows) != 1 || rows[0].Name != "Rare Show S02E03.mkv" || rows[0].Size != 900000000 {
 		t.Fatalf("rows = %+v", rows)
 	}
 	if err := Ed2kDownloadAction(cfg, "pause", rows[0].Hash); err != nil {
 		t.Fatalf("pause: %v", err)
 	}
-	if rows = uiEd2kRows(cfg); !rows[0].Paused {
+	if rows = uiEd2kRows(Ed2kDownloads(cfg)); !rows[0].Paused {
 		t.Fatalf("not paused: %+v", rows[0])
 	}
 	if err := Ed2kDownloadAction(cfg, "remove", rows[0].Hash); err != nil {
@@ -239,6 +244,7 @@ func TestEd2kSessionReportsCompletion(t *testing.T) {
 		ed2kEventsMu.Lock()
 		ed2kLastPoll = time.Time{}
 		ed2kEventsMu.Unlock()
+		ed2kForgetQueue()
 	}
 	ed2kEventsMu.Lock()
 	ed2kLastStatus = map[string]bool{}
@@ -286,6 +292,7 @@ func TestEd2kSessionFindsFilesThatLeftTheQueue(t *testing.T) {
 		ed2kEventsMu.Lock()
 		ed2kLastPoll = time.Time{}
 		ed2kEventsMu.Unlock()
+		ed2kForgetQueue()
 		return session.PollEvents()
 	}
 	reset()
@@ -373,6 +380,7 @@ func TestMonitorEd2kStalledGivesUpOnAutomaticDownloads(t *testing.T) {
 	}
 	cfg.Settings["ed2k_stall_days"] = "0"
 	core.SetDownloads([]amuletest.File{{Hash: recent, Name: "x", Size: 100, LastRecv: old}})
+	ed2kForgetQueue()
 	MonitorEd2kStalled(cfg, db, FromConfig(&notifierCfg), time.Now())
 	if len(core.Downloads()) != 1 {
 		t.Fatal("0 days must never give up")
@@ -422,5 +430,40 @@ func TestAddEd2kLinkAlreadyQueuedIsAccepted(t *testing.T) {
 	}
 	if err := AddEd2kLink(cfg, "ed2k://|file|other.mkv|10|eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee|/"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestEd2kReleaseCompletesInTheDatabase pins the bug found with a real
+// download: the completion (and blocklist, rollback, add intents) took the
+// release identity from the magnet only and failed on an eD2k release.
+func TestEd2kReleaseCompletesInTheDatabase(t *testing.T) {
+	db, err := OpenDatabase(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	const hash = "f7003a131b7d720c48e9edcd3a11cb62"
+	name := "The.Pitt.S02E14.ITA.ENG.1080p.AMZN.WEB-DL.DDP5.1.H.264-MeM.mkv"
+	release := ParseEd2kRelease(name, "ed2k://|file|"+name+"|2941579665|"+hash+"|/", "ed2k:link", 2941579665, 11, time.Now().UTC())
+	if release == nil || release.Kind != "series" {
+		t.Fatalf("release = %+v", release)
+	}
+	if err := db.BeginTorrentAdd(release, 10); err != nil {
+		t.Fatalf("BeginTorrentAdd: %v", err)
+	}
+	if err := db.RegisterTorrentScored(release, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.EndTorrentAdd(release); err != nil {
+		t.Fatalf("EndTorrentAdd: %v", err)
+	}
+	if err := db.MarkReleaseCompleted(release, "/library/The Pitt/S02E14.mkv", 2941579665); err != nil {
+		t.Fatalf("MarkReleaseCompleted: %v", err)
+	}
+	if status, _ := db.TorrentStatus(hash); status == nil || *status != "completed" {
+		t.Fatalf("status = %v", status)
+	}
+	if err := db.Blocklist(release, "test"); err != nil {
+		t.Fatalf("Blocklist: %v", err)
 	}
 }

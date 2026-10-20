@@ -35,7 +35,7 @@ type torrentAddIntent struct {
 // for a release without a magnet hash: such a torrent could be neither
 // registered nor withdrawn, so it must not reach the engine.
 func (d *Database) BeginTorrentAdd(release *models.Release, score int64) error {
-	hash, err := magnetHashOrError(release.Magnet)
+	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (d *Database) BeginTorrentAdd(release *models.Release, score int64) error {
 
 // EndTorrentAdd clears the intent once the add's outcome is recorded.
 func (d *Database) EndTorrentAdd(release *models.Release) error {
-	hash, err := magnetHashOrError(release.Magnet)
+	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return err
 	}
