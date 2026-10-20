@@ -39,13 +39,26 @@ var (
 // localProcessUsageForName sums every live process whose name (the kernel
 // `comm`, at most 15 characters) matches. It reports false when none runs.
 func localProcessUsageForName(name string) (localProcessUsage, bool) {
+	pids := localProcessPIDs(name)
+	if len(pids) == 0 {
+		return localProcessUsage{}, false
+	}
+	usage, ok := localProcessUsageForPIDs(pids)
+	if !ok {
+		return localProcessUsage{}, false
+	}
+	return usage, true
+}
+
+// localProcessPIDs lists the local processes whose kernel name matches.
+func localProcessPIDs(name string) []int {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return localProcessUsage{}, false
+		return nil
 	}
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
-		return localProcessUsage{}, false
+		return nil
 	}
 	pids := make([]int, 0, 4)
 	for _, entry := range entries {
@@ -64,14 +77,27 @@ func localProcessUsageForName(name string) (localProcessUsage, bool) {
 			pids = append(pids, pid)
 		}
 	}
-	if len(pids) == 0 {
-		return localProcessUsage{}, false
+	return pids
+}
+
+// processRunsInContainer reports whether a process belongs to a container, by
+// looking at its cgroup. A container's filesystem is not this machine's, so
+// paths inside it must not be checked or created from here.
+func processRunsInContainer(pid int) bool {
+	if pid <= 0 {
+		return false
 	}
-	usage, ok := localProcessUsageForPIDs(pids)
-	if !ok {
-		return localProcessUsage{}, false
+	raw, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "cgroup"))
+	if err != nil {
+		return false
 	}
-	return usage, true
+	value := strings.ToLower(string(raw))
+	for _, marker := range []string{"docker", "kubepods", "containerd", "libpod", "lxc"} {
+		if strings.Contains(value, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // localProcessUsageForPIDs sums the resident memory and the CPU ticks of the

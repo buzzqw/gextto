@@ -6,6 +6,7 @@ package gextto
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -36,8 +37,12 @@ type v2Ed2kView struct {
 	NodesURL   string
 	// Prefs are aMule's directories and file options, for the status panel.
 	Prefs amule.Preferences
-	// DirIssues lists aMule's incoming/temp folders that are missing here.
-	DirIssues []string
+	// DirIssues lists aMule's incoming/temp folders that cannot be used, and
+	// whether the fix belongs to this machine or to its container.
+	DirIssues      []amuleDirIssue
+	DirHostMissing bool
+	DirContainer   bool
+	DirUnmapped    bool
 	// Shared and Log back the two dedicated tabs.
 	Shared v2Ed2kSharedView
 	Log    map[string]any
@@ -135,7 +140,17 @@ func v2Ed2kViewFrom(s *AppState, message, detail string, isErr bool, tab string)
 	_ = ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
 		if prefs, prefsErr := client.Preferences(ctx); prefsErr == nil {
 			view.Prefs = prefs
-			view.DirIssues = amuleMissingDirectories(cfg, prefs)
+			view.DirIssues = amuleDirectoryIssues(cfg, prefs)
+			for _, issue := range view.DirIssues {
+				switch issue.Kind {
+				case "host":
+					view.DirHostMissing = true
+				case "container":
+					view.DirContainer = true
+				default:
+					view.DirUnmapped = true
+				}
+			}
 		}
 		servers, callErr := client.Servers(ctx)
 		view.Servers = servers
@@ -281,7 +296,13 @@ func v2Ed2kSearchFor(ctx context.Context, cfg *Config, query string, network *ui
 		view.Error = "Scrivi cosa cercare."
 	default:
 		results, err := searchAmule(ctx, cfg, query, network)
-		if err != nil {
+		switch {
+		case errors.Is(err, amule.ErrSearchBusy):
+			// Another EC client (aMuleGUI, an external tool) kept replacing
+			// the one result list aMule has: say so rather than showing its
+			// unrelated files as answers to this query.
+			view.Error = "aMule sta eseguendo un'altra ricerca (per esempio dalla sua interfaccia): riprova tra qualche secondo."
+		case err != nil:
 			view.Error = "Ricerca non riuscita:"
 			view.Detail = err.Error()
 		}
@@ -527,4 +548,39 @@ func V2Ed2kSharedReload(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view.Message, view.MessageErr, view.Detail = message, isErr, detail
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_ed2k_shared", view, dict, eng)
+}
+
+// V2SettingsEd2kPreallocation applies aMule's full-file preallocation from the
+// eD2k settings tab, where the switch lives (it is aMule's setting, not one
+// saved in Gextto's configuration).
+func V2SettingsEd2kPreallocation(w http.ResponseWriter, r *http.Request, s *AppState) {
+	cfg := latestConfig(s)
+	allocate := r.FormValue("allocate") == "1"
+	if r.FormValue("recommended") == "1" {
+		allocate = false
+	}
+	message, isErr := "", false
+	switch {
+	case !ed2kEnabled(cfg):
+		message, isErr = "L'integrazione con aMule è spenta.", true
+	default:
+		err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+			return client.SetFilePreallocation(ctx, allocate)
+		})
+		switch {
+		case err != nil:
+			message, isErr = "Comando non riuscito: "+err.Error(), true
+		case allocate:
+			message = "Preallocazione completa attivata in aMule."
+			logging.Info("aMule file preallocation turned on")
+		default:
+			message = "Preallocazione completa disattivata in aMule."
+			logging.Info("aMule file preallocation turned off")
+		}
+	}
+	target := "/?view=settings&tab=ed2k&msg=" + url.QueryEscape(message)
+	if isErr {
+		target += "&msg_err=1"
+	}
+	http.Redirect(w, r, target, http.StatusSeeOther)
 }

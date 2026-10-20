@@ -14,6 +14,18 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **eD2k: risultati coerenti anche con un'altra ricerca in corso.** aMule ha
+  una sola lista di risultati, condivisa con la sua interfaccia e con ogni
+  altro strumento collegato: se un'altra ricerca la sostituisce mentre Gextto
+  cerca, Gextto rifà la ricerca e, se il disturbo continua, lo dice invece di
+  mostrare file non attinenti. Vale per la ricerca dalla pagina eD2k e per
+  quella in archivio con **eD2k** spuntato.
+- **eD2k: preallocazione di aMule nella scheda di configurazione.** In
+  **Configurazione → eD2k e Kad** c'è il pannello aMule con l'interruttore
+  **Prealloca l'intero file in aMule** e **Impostazioni consigliate**: il valore
+  viene applicato subito ad aMule (è una sua impostazione, non una salvata in
+  Gextto). Con aMule in Docker le cartelle vengono controllate dentro il
+  container: se mancano lì Gextto le segnala ma non le crea da fuori.
 - **eD2k: cartelle di aMule mancanti segnalate e ricreate.** Se la cartella di
   arrivo o quella temporanea di aMule non esistono (disco di rete smontato,
   cartella rimossa), la pagina eD2k lo dice e **Crea le cartelle** le ricrea:

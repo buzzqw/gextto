@@ -807,7 +807,11 @@ which means more sources.
 - **Search eD2k and Kad**: pick the network (Kad, Kad + eD2k servers, every
   eD2k server, only the connected server) and search; aMule collects results for a few seconds. Each
   result shows name, size and sources (total / complete) and has **Download**;
-  **already known** marks a file aMule already has.
+  **already known** marks a file aMule already has. aMule has **one** result
+  list, shared with its own interface and with every other connected tool: if
+  another search replaces it while Gextto is searching, Gextto runs the search
+  again and, if the interference continues, asks to try again in a few seconds
+  instead of showing unrelated files.
 - **Paste eD2k links**: one or more `ed2k://` links, even mixed with text;
   **Download with aMule** adds them all.
 - **aMule log**: **Load the log** shows the last lines of amuled's log.
@@ -856,7 +860,10 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
 - **eD2k and Kad** — the connection to aMule (address, port and external
   connections password), the search network (Kad, servers or both), the
   automatic fallback when torrents find nothing and giving up on stalled
-  downloads. aMule's state and commands are on the eD2k page.
+  downloads. The tab's **aMule** panel has the **Preallocate the whole file in
+  aMule** switch (with **Recommended settings** to turn it off) and the values
+  are applied to aMule at once, without a separate save. aMule's state and
+  commands are on the eD2k page.
 - **Speed, network and performance** — connections/performance,
   protocols/trackers, security, RAM disk and ports, speed limits and scheduler;
   apply and optimise.

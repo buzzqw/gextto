@@ -879,6 +879,7 @@
       <span class="eyebrow">Configurazione</span>
       <h2 id="v2-settings-heading" tabindex="-1">{{.ActiveLabel}}</h2>
       {{if .Intro}}<p class="settings-intro">{{.Intro}}</p>{{end}}
+      {{if .Flash}}<p class="{{if .FlashErr}}alert{{else}}muted{{end}}" role="{{if .FlashErr}}alert{{else}}status{{end}}"><span>{{.Flash}}</span></p>{{end}}
     </div>
     {{if gt (len .Groups) 1}}<nav class="settings-group-index" aria-label="Gruppi di questa sezione">
       <span class="settings-group-index-label">In questa sezione</span>
@@ -886,6 +887,7 @@
     </nav>{{end}}
     {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
     {{if .Sources}}{{template "v2_sources_index" .Sources}}{{end}}
+    {{if .Ed2k}}{{template "v2_settings_ed2k" .Ed2k}}{{end}}
     {{if .ScoreExamples}}{{template "v2_score_examples" .ScoreExamples}}{{end}}
     {{if .Tuning}}{{template "v2_tuning_panel" .Tuning}}{{end}}
     {{if .Actions}}
@@ -961,6 +963,29 @@
     </form>
     {{end}}
     {{else}}<p class="muted">{{.Empty}}</p>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_settings_ed2k"}}
+<div class="panel settings-panel" id="v2-settings-ed2k">
+  <div class="panel-head"><h3>aMule</h3><small class="muted">Impostazioni consigliate per i file</small></div>
+  <div class="panel-body">
+  {{if not .Enabled}}
+    <p class="muted">L'integrazione con aMule è spenta.</p>
+  {{else if .Error}}
+    <p class="alert" role="alert"><span>aMule non raggiungibile:</span> {{.Error}}</p>
+  {{else}}
+    <p class="hint">La preallocazione completa riserva subito l'intero file: su un disco di rete può bloccare amuled per decine di secondi. Spenta è il comportamento consigliato.</p>
+    <div class="row"><span>Preallocazione file</span><strong>{{if .AllocateFull}}<span class="badge warn">attiva</span>{{else}}<span class="badge ok">spenta</span>{{end}}</strong></div>
+    <form method="post" action="/settings/ed2k/preallocation" class="form-grid">
+      <label class="check" title="Attiva o disattiva la preallocazione completa dei file in aMule; il salvataggio avviene subito"><input type="checkbox" name="allocate" value="1"{{if .AllocateFull}} checked{{end}} /> <span>Prealloca l'intero file in aMule</span></label>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" title="Applica subito la preallocazione scelta ad aMule">Salva la preallocazione</button>
+        <button class="btn" type="submit" name="recommended" value="1" title="Disattiva la preallocazione completa in aMule: sui dischi di rete blocca amuled mentre alloca; Gextto importa comunque i file completati.">Impostazioni consigliate</button>
+      </div>
+    </form>
+  {{end}}
   </div>
 </div>
 {{end}}
@@ -1406,7 +1431,7 @@
       <div class="row"><span>Sessione</span><strong>↓ {{bytes .TotalDown}} · ↑ {{bytes .TotalUp}}</strong></div>
       <div class="row"><span>Coda di upload</span><strong>{{.UploadQueue}}</strong></div>
     </div>
-    {{if .DirIssues}}<p class="alert" role="alert"><span>Cartelle di aMule mancanti:</span> {{range .DirIssues}}<code title="{{.}}">{{.}}</code> {{end}}<a href="/?view=ed2k">apri la pagina eD2k per crearle</a>.</p>{{end}}
+    {{if .DirIssues}}<p class="alert" role="alert"><span>Cartelle di aMule non utilizzabili:</span> {{range .DirIssues}}<code title="{{.Path}}">{{.Path}}</code> {{end}}<a href="/?view=ed2k">apri la pagina eD2k</a>.</p>{{end}}
     <h4>Avvisi recenti dal log di aMule</h4>
     {{if .Warnings}}
     <ul class="plain-list">{{range .Warnings}}<li class="truncate" title="{{.}}">{{.}}</li>{{end}}</ul>
@@ -1645,8 +1670,10 @@
   <div class="panel-head"><h3>aMule</h3><small class="muted">{{if .Address}}{{.Address}}{{end}}</small></div>
   <div class="panel-body">
   {{if .DirIssues}}
-  <p class="alert" role="alert"><span>Cartelle di aMule mancanti:</span> {{range .DirIssues}}<code title="{{.}}">{{.}}</code> {{end}}<span>aMule registra «Failed to get file system statistics» a ogni controllo.</span></p>
-  <form method="post" action="/ed2k/directories/create" hx-post="/ed2k/directories/create" hx-target="#v2-ed2k-state" hx-swap="innerHTML" hx-disabled-elt="find button"><button class="btn" type="submit" title="Crea su questa macchina le cartelle di aMule che mancano (arrivo e temporanea)">Crea le cartelle</button></form>
+  <p class="alert" role="alert"><span>Cartelle di aMule non utilizzabili:</span> {{range .DirIssues}}<code title="{{.Path}}">{{.Path}}</code> {{end}}<span>aMule registra «Failed to get file system statistics» a ogni controllo.</span></p>
+  {{if .DirContainer}}<p class="muted">aMule gira in un container: crea le cartelle indicate nel container (o correggi il mount). Gextto non può crearle da qui.</p>{{end}}
+  {{if .DirUnmapped}}<p class="muted">La cartella esiste nel container ma non allo stesso percorso su questa macchina: l'import non può funzionare. Montala allo stesso percorso in Docker.</p>{{end}}
+  {{if .DirHostMissing}}<form method="post" action="/ed2k/directories/create" hx-post="/ed2k/directories/create" hx-target="#v2-ed2k-state" hx-swap="innerHTML" hx-disabled-elt="find button"><button class="btn" type="submit" title="Crea su questa macchina le cartelle di aMule che mancano (arrivo e temporanea)">Crea le cartelle</button></form>{{end}}
   {{end}}
   {{if not .Enabled}}
     <p class="muted">L'integrazione con aMule è spenta. Avvia amuled con le connessioni esterne (EC) attive, poi accendila e inserisci indirizzo e password in Configurazione → eD2k e Kad.</p>

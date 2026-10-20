@@ -3,6 +3,7 @@ package gextto
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,6 +98,9 @@ func TestHealthPageShowsTheAmuleCard(t *testing.T) {
 
 func TestEd2kMissingDirectoriesAreReportedAndCreated(t *testing.T) {
 	core, handler := ed2kTestRouter(t)
+	previous := amuleProcessPIDs
+	amuleProcessPIDs = func() []int { return nil }
+	t.Cleanup(func() { amuleProcessPIDs = previous })
 	missing := filepath.Join(t.TempDir(), "amule-temp")
 	core.SetTempDir(missing)
 
@@ -104,7 +108,7 @@ func TestEd2kMissingDirectoriesAreReportedAndCreated(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	body := recorder.Body.String()
-	if !strings.Contains(body, "Cartelle di aMule mancanti:") || !strings.Contains(body, missing) || !strings.Contains(body, "Crea le cartelle") {
+	if !strings.Contains(body, "Cartelle di aMule non utilizzabili:") || !strings.Contains(body, missing) || !strings.Contains(body, "Crea le cartelle") {
 		t.Fatalf("missing folder not reported: %s", body)
 	}
 
@@ -122,7 +126,43 @@ func TestEd2kMissingDirectoriesAreReportedAndCreated(t *testing.T) {
 	request = httptest.NewRequest(http.MethodGet, "/?view=health", nil)
 	recorder = httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
-	if strings.Contains(recorder.Body.String(), "Cartelle di aMule mancanti:") {
+	if strings.Contains(recorder.Body.String(), "Cartelle di aMule non utilizzabili:") {
 		t.Fatal("health still reports the folder after creating it")
+	}
+}
+
+func TestEd2kSettingsTabAppliesPreallocation(t *testing.T) {
+	core, handler := ed2kTestRouter(t)
+	core.SetAllocateFull(false)
+
+	request := httptest.NewRequest(http.MethodGet, "/?view=settings&tab=ed2k", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	body := recorder.Body.String()
+	for _, want := range []string{"Preallocazione file", "preallocazione completa riserva subito", "Salva la preallocazione", "Impostazioni consigliate"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("settings panel is missing %q", want)
+		}
+	}
+
+	form := url.Values{"allocate": {"1"}}
+	request = httptest.NewRequest(http.MethodPost, "/settings/ed2k/preallocation", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recorder = httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusSeeOther || !strings.Contains(recorder.Header().Get("Location"), "tab=ed2k") {
+		t.Fatalf("preallocation redirect = %d %q", recorder.Code, recorder.Header().Get("Location"))
+	}
+	if !core.AllocateFull() {
+		t.Fatal("preallocation was not turned on")
+	}
+
+	form = url.Values{"recommended": {"1"}}
+	request = httptest.NewRequest(http.MethodPost, "/settings/ed2k/preallocation", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recorder = httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if core.AllocateFull() {
+		t.Fatal("recommended settings did not turn preallocation off")
 	}
 }

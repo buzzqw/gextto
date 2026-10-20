@@ -87,6 +87,13 @@ Con l'immagine `ngosang/amule` (o qualunque container con aMule):
 - pubblica la porta EC (4712) e imposta `ECAddress=0.0.0.0` se Gextto è fuori
   dal container.
 
+Con aMule in un container, Gextto controlla le cartelle di arrivo e temporanea
+**dentro il container** (tramite `/proc/<pid>/root`): una cartella mancante lì
+viene segnalata nella pagina eD2k ma non viene mai creata da fuori. Se la
+cartella di arrivo del container non è montata allo stesso percorso sull'host, la
+pagina dice che l'import non può funzionare: si corregge il mount di Docker, non
+la cartella sull'host.
+
 ### Su un disco di rete
 
 Imposta `AllocateFullFile=0` in `amule.conf`: preallocare un file parziale di
@@ -116,7 +123,9 @@ offre **Riprova**. Nient'altro in Gextto smette di funzionare.
 
 Il pannello di stato mostra anche i byte scambiati da aMule nella sessione e se
 aMule prealloca i file; **Impostazioni consigliate** disattiva la preallocazione
-completa (quella che blocca `amuled` sui dischi di rete). La pagina **Salute** ha
+completa (quella che blocca `amuled` sui dischi di rete). Lo stesso interruttore
+è in **Configurazione → eD2k e Kad → aMule**, dove viene applicato subito ad
+aMule: è un'impostazione di aMule, non una salvata in Gextto. La pagina **Salute** ha
 una scheda eD2k con lo stesso stato, i totali di sessione e le ultime righe di
 problema dal log di aMule.
 
@@ -301,10 +310,15 @@ sono documentate in [`API.md`](API.md) (`/api/ed2k/status`,
   (avvio, risultati, progressione, stop), preferenze (cartelle di arrivo e
   temporanea, limiti di banda) e il log.
 - aMule tiene **una sola** lista di risultati: una nuova ricerca sostituisce la
-  precedente. Gextto serializza le ricerche (`ed2kSearchMu`), così le query
-  degli alias del gap filler vanno una dopo l'altra. Una ricerca Kad finisce
-  quando il core riporta `0xfffe` e il numero di risultati è stabile; una
-  ricerca sui server viene letta fino allo scadere della durata configurata.
+  precedente, **anche quando la fa un altro client** (la GUI di aMule,
+  `amulecmd`, uno strumento esterno). Gextto serializza le proprie ricerche
+  (`ed2kSearchMu`), così le query degli alias del gap filler vanno una dopo
+  l'altra; se la lista viene sostituita mentre una ricerca è in corso (si
+  accorcia o non contiene più nessun hash già visto) la ricerca viene rifatta e,
+  se il disturbo continua, rifiutata con `ErrSearchBusy` invece di restituire i
+  file dell'altro client. Una ricerca Kad finisce quando il core riporta
+  `0xfffe` e il numero di risultati è stabile; una ricerca sui server viene
+  letta fino allo scadere della durata configurata.
 
 ### Lato Gextto
 

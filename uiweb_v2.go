@@ -228,6 +228,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /ed2k/action", V2Ed2kAction)
 	v2Handle(s, mux, "POST /ed2k/preferences/recommended", V2Ed2kRecommended)
 	v2Handle(s, mux, "POST /ed2k/directories/create", V2Ed2kCreateDirs)
+	v2Handle(s, mux, "POST /settings/ed2k/preallocation", V2SettingsEd2kPreallocation)
 	v2Handle(s, mux, "POST /ed2k/search", V2Ed2kSearch)
 	v2Handle(s, mux, "POST /ed2k/add", V2Ed2kAdd)
 	v2Handle(s, mux, "GET /ed2k/log", V2Ed2kLog)
@@ -643,7 +644,10 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 	case "downloads":
 		return "v2_downloads", v2DownloadsViewFrom(s, r)
 	case "settings":
-		return "v2_settings", v2SettingsViewFrom(s, r.FormValue("tab"), r.FormValue("highlight"), v2SettingsMode(r))
+		settings := v2SettingsViewFrom(s, r.FormValue("tab"), r.FormValue("highlight"), v2SettingsMode(r))
+		settings.Flash = strings.TrimSpace(r.FormValue("msg"))
+		settings.FlashErr = r.FormValue("msg_err") == "1"
+		return "v2_settings", settings
 	case "health":
 		return "v2_health", v2HealthViewFrom(s, r)
 	case "logs":
@@ -2203,6 +2207,12 @@ type v2SettingsView struct {
 	Sources *v2SourcesIndex
 	// Tuning is the guided optimization panel of the performance tab.
 	Tuning *v2TuningPanel
+	// Ed2k is the aMule panel of the eD2k tab (preallocation is aMule's own
+	// setting, applied through the EC protocol).
+	Ed2k *v2SettingsEd2k
+	// Flash carries a one-shot feedback message after an action.
+	Flash    string
+	FlashErr bool
 	// Structured editors (feeds, checkbox groups, list editors, rename,
 	// translations), rendered on the tab that owns them.
 	EditorsFirst   bool
@@ -2277,6 +2287,9 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 			out[index].Redirect = redirect
 		}
 		return out
+	}
+	if page.ActiveID == "ed2k" {
+		view.Ed2k = v2SettingsEd2kFrom(s)
 	}
 	if page.Actions != nil {
 		view.Actions = &v2SettingsActions{Title: page.Actions.Label, Hint: page.Actions.Hint, Buttons: buttons(page.Actions.Buttons)}

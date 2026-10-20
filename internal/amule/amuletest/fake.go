@@ -66,15 +66,22 @@ type Core struct {
 	results      []Result
 	searches     []string
 	searchErr    string
-	connected    bool
-	kad          bool
-	commands     []string
-	conns        map[net.Conn]struct{}
-	shared       []sharedFile
-	sharedDirs   []string
-	uploads      []amule.UploadClient
-	maxDL        int64
-	maxUL        int64
+	// foreign/searchPolls emulate another EC client starting a search while
+	// ours runs: the shared result list is replaced for a few polls.
+	foreign         []Result
+	foreignAfter    int
+	foreignPolls    int
+	foreignSearches int
+	searchPolls     int
+	connected       bool
+	kad             bool
+	commands        []string
+	conns           map[net.Conn]struct{}
+	shared          []sharedFile
+	sharedDirs      []string
+	uploads         []amule.UploadClient
+	maxDL           int64
+	maxUL           int64
 }
 
 type sharedFile struct {
@@ -115,6 +122,19 @@ func (c *Core) SetResults(results []Result, refusal string) {
 	defer c.mu.Unlock()
 	c.results = results
 	c.searchErr = refusal
+}
+
+// SetSearchInterference emulates another external client searching aMule:
+// during the first `searches` searches (0 means every search), after `after`
+// result polls the core shows `results` for `polls` polls, the way a second
+// client wipes and refills the one shared result list.
+func (c *Core) SetSearchInterference(results []Result, after, polls, searches int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.foreign = results
+	c.foreignAfter = after
+	c.foreignPolls = polls
+	c.foreignSearches = searches
 }
 
 // SetAllocateFull sets aMule's full-file preallocation.
@@ -546,12 +566,19 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 		}
 		tag, _ := request.Tag(amule.TagSearchType)
 		c.searches = append(c.searches, tag.ChildString(amule.TagSearchName))
+		c.searchPolls = 0
 		return amule.Packet{Op: amule.OpStrings, Tags: []amule.Tag{amule.StringTag(amule.TagString, "Search in progress.")}}
 	case amule.OpSearchProgress:
 		return amule.Packet{Op: amule.OpSearchProgress, Tags: []amule.Tag{amule.IntTag(amule.TagSearchStatus, 0xfffe)}}
 	case amule.OpSearchResults:
 		reply := amule.Packet{Op: amule.OpSearchResults}
-		for _, result := range c.results {
+		c.searchPolls++
+		visible := c.results
+		if len(c.foreign) > 0 && (c.foreignSearches == 0 || len(c.searches) <= c.foreignSearches) &&
+			c.searchPolls > c.foreignAfter && c.searchPolls <= c.foreignAfter+c.foreignPolls {
+			visible = c.foreign
+		}
+		for _, result := range visible {
 			reply.Tags = append(reply.Tags, amule.IntTag(amule.TagSearchFile, 1,
 				amule.IntTag(amule.TagPartfileSourceCount, uint64(result.Sources)),
 				amule.StringTag(amule.TagPartfileName, result.Name),

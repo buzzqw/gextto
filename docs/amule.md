@@ -87,6 +87,12 @@ With the `ngosang/amule` image (or any aMule container):
 - publish the EC port (4712) and set `ECAddress=0.0.0.0` if Gextto is outside
   the container.
 
+With aMule in a container, Gextto checks the incoming and temporary folders
+**inside the container** (through `/proc/<pid>/root`): a folder missing there is
+reported on the eD2k page but never created from outside. If the container's
+incoming folder is not mounted at the same path on the host, the page says the
+import cannot work: fix the Docker mount, not the host folder.
+
 ### On a network disk
 
 Set `AllocateFullFile=0` in `amule.conf`: preallocating a multi-GB part file on
@@ -116,7 +122,9 @@ offers **Retry**. Nothing else in Gextto stops working.
 
 The state panel also shows the bytes aMule exchanged in this session and
 whether aMule preallocates files; **Recommended settings** switches full
-preallocation off (the setting that blocks `amuled` on network disks). The
+preallocation off (the setting that blocks `amuled` on network disks). The same
+switch is in **Configuration → eD2k and Kad → aMule**, where it is saved to
+aMule at once: it is aMule's setting, not one stored in Gextto. The
 **Health** page has an eD2k card with the same state, the session totals and the
 latest problem lines from aMule's log.
 
@@ -294,10 +302,14 @@ in [`API.md`](API.md) (`/api/ed2k/status`, `/api/ed2k/downloads`,
   clear completed, shared files, search (start, results, progress, stop), preferences
   (incoming/temp folders, bandwidth limits) and the log.
 - aMule keeps **one** search result list: a new search replaces the previous
-  one. Gextto serialises searches (`ed2kSearchMu`), so the alias queries of the
-  gap filler run one after the other. A Kad search ends when the core reports
-  `0xfffe` and the result count is stable; a server search is read until the
-  configured duration elapses.
+  one, **even when another client starts it** (aMuleGUI, `amulecmd`, an
+  external tool). Gextto serialises its own searches (`ed2kSearchMu`), so the
+  alias queries of the gap filler run one after the other; if the list is
+  replaced while a search is running (it shrinks or no longer holds a single
+  known hash) the search is restarted and, if the interference continues,
+  refused with `ErrSearchBusy` instead of returning the other client's files. A
+  Kad search ends when the core reports `0xfffe` and the result count is
+  stable; a server search is read until the configured duration elapses.
 
 ### Gextto side
 

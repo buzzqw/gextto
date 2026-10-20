@@ -226,3 +226,28 @@ func v2SourcesIndexFrom(s *AppState, cfg *Config) *v2SourcesIndex {
 		},
 	}
 }
+
+// v2SettingsEd2k is the aMule panel of the eD2k settings tab.
+type v2SettingsEd2k struct {
+	Enabled      bool
+	Reachable    bool
+	Error        string
+	AllocateFull bool
+}
+
+// v2SettingsEd2kFrom reads aMule's file preallocation for the settings panel.
+func v2SettingsEd2kFrom(s *AppState) *v2SettingsEd2k {
+	cfg := latestConfig(s)
+	panel := &v2SettingsEd2k{Enabled: ed2kEnabled(cfg)}
+	if !panel.Enabled {
+		return panel
+	}
+	prefs, err := ed2kPreferences(cfg)
+	if err != nil {
+		panel.Error = err.Error()
+		return panel
+	}
+	panel.Reachable = true
+	panel.AllocateFull = prefs.AllocateFull
+	return panel
+}

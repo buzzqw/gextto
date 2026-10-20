@@ -69,3 +69,60 @@ func TestClientAgainstFakeCore(t *testing.T) {
 		t.Fatal("a closed core still answered")
 	}
 }
+
+func TestSearchRetriesWhenAnotherClientReplacesResults(t *testing.T) {
+	core, err := amuletest.Start("secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer core.Close()
+	client := amule.New(amule.Config{Address: core.Address(), Password: "secret"})
+	defer client.Close()
+
+	core.SetResults([]amuletest.Result{
+		{Hash: "11111111111111111111111111111111", Name: "The.Pitt.S01E01.mkv", Size: 10, Sources: 3},
+	}, "")
+	// Another client starts a search right after the first poll of ours.
+	core.SetSearchInterference([]amuletest.Result{
+		{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Name: "Unrelated.S01E01.mkv", Size: 10, Sources: 1},
+		{Hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Name: "Other.S02E02.mkv", Size: 20, Sources: 1},
+	}, 1, 1, 1)
+
+	results, err := client.Search(context.Background(), "the pitt",
+		amule.SearchOptions{Type: amule.SearchKad, Wait: 2 * time.Second, Poll: 5 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Name != "The.Pitt.S01E01.mkv" {
+		t.Fatalf("results = %+v", results)
+	}
+	if got := core.Searches(); len(got) != 2 {
+		t.Fatalf("searches = %v, want the query restarted once", got)
+	}
+}
+
+func TestSearchRefusesWhenAnotherClientKeepsSearching(t *testing.T) {
+	core, err := amuletest.Start("secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer core.Close()
+	client := amule.New(amule.Config{Address: core.Address(), Password: "secret"})
+	defer client.Close()
+
+	core.SetResults([]amuletest.Result{
+		{Hash: "11111111111111111111111111111111", Name: "The.Pitt.S01E01.mkv", Size: 10, Sources: 3},
+	}, "")
+	core.SetSearchInterference([]amuletest.Result{
+		{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Name: "Unrelated.S01E01.mkv", Size: 10, Sources: 1},
+	}, 1, 1, 0)
+
+	_, err = client.Search(context.Background(), "the pitt",
+		amule.SearchOptions{Type: amule.SearchKad, Wait: 2 * time.Second, Poll: 5 * time.Millisecond})
+	if !errors.Is(err, amule.ErrSearchBusy) {
+		t.Fatalf("err = %v, want ErrSearchBusy", err)
+	}
+	if got := core.Searches(); len(got) != 3 {
+		t.Fatalf("searches = %v, want three attempts", got)
+	}
+}

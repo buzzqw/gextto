@@ -826,7 +826,11 @@ alto e un Kad non dietro firewall, cioè più fonti.
 - **Cerca su eD2k e Kad**: scegli la rete (Kad, Kad + server eD2k, tutti i
   server eD2k, solo il server connesso) e cerca; aMule raccoglie i risultati per qualche secondo.
   Ogni risultato mostra nome, dimensione e fonti (totali / complete) e ha
-  **Scarica**; **già noto** segnala un file che aMule ha già.
+  **Scarica**; **già noto** segnala un file che aMule ha già. aMule ha **una
+  sola** lista di risultati, condivisa con la sua interfaccia e con ogni altro
+  strumento collegato: se un'altra ricerca la sostituisce mentre Gextto cerca,
+  Gextto rifà la ricerca e, se il disturbo continua, chiede di riprovare tra
+  qualche secondo invece di mostrare file non attinenti.
 - **Incolla link eD2k**: uno o più link `ed2k://`, anche mescolati a testo;
   **Scarica con aMule** li aggiunge tutti.
 - **Log di aMule**: **Carica il log** mostra le ultime righe del log di amuled.
@@ -875,7 +879,10 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
 - **eD2k e Kad** — collegamento ad aMule (indirizzo, porta e password delle
   connessioni esterne), rete di ricerca (Kad, server o entrambi), ripiego
   automatico quando i torrent non trovano nulla e rinuncia ai download fermi.
-  Lo stato e i comandi di aMule sono nella pagina eD2k.
+  Il pannello **aMule** della scheda ha l'interruttore **Prealloca l'intero file
+  in aMule** (con **Impostazioni consigliate** per spegnerla) e i valori si
+  applicano subito ad aMule, senza salvataggio separato. Lo stato e i comandi di
+  aMule sono nella pagina eD2k.
 - **Velocità, rete e prestazioni** — connessioni/prestazioni,
   protocolli/tracker, sicurezza, RAM disk e porte, limiti di velocità e
   scheduler; applica e ottimizza. Se sposti lo storage di un torrent in una cartella che

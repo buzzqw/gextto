@@ -13,6 +13,18 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **eD2k: consistent results even with another search running.** aMule has a
+  single result list, shared with its own interface and with every other
+  connected tool: if another search replaces it while Gextto is searching,
+  Gextto runs the search again and, if the interference continues, says so
+  instead of showing unrelated files. It applies to the search on the eD2k page
+  and to the archive search with **eD2k** ticked.
+- **eD2k: aMule preallocation in the configuration tab.** **Configuration →
+  eD2k and Kad** has the aMule panel with the **Preallocate the whole file in
+  aMule** switch and **Recommended settings**: the value is applied to aMule at
+  once (it is aMule's setting, not one stored in Gextto). With aMule in Docker
+  the folders are checked inside the container: if they are missing there Gextto
+  reports them but does not create them from outside.
 - **eD2k: missing aMule folders reported and recreated.** When aMule's incoming
   or temporary folder is missing (a network disk unmounted, a folder removed),
   the eD2k page says so and **Create the folders** makes them again: the flow of

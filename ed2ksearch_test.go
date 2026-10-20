@@ -3,6 +3,9 @@ package gextto
 import (
 	"context"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -465,5 +468,29 @@ func TestEd2kReleaseCompletesInTheDatabase(t *testing.T) {
 	}
 	if err := db.Blocklist(release, "test"); err != nil {
 		t.Fatalf("Blocklist: %v", err)
+	}
+}
+
+func TestEd2kSearchReportsAnotherClientSearching(t *testing.T) {
+	core, handler := ed2kTestRouter(t)
+	core.SetResults([]amuletest.Result{{
+		Hash: "dddddddddddddddddddddddddddddddd", Name: "The.Pitt.S01E01.mkv", Size: 7000000000, Sources: 12,
+	}}, "")
+	core.SetSearchInterference([]amuletest.Result{{
+		Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Name: "Unrelated.Show.S01E01.mkv", Size: 10, Sources: 1,
+	}}, 1, 1, 0)
+
+	form := url.Values{"query": {"the pitt"}, "network": {"kad"}}
+	request := httptest.NewRequest(http.MethodPost, "/ed2k/search", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	body := recorder.Body.String()
+	if strings.Contains(body, "Unrelated") {
+		t.Fatal("another client's results were shown as answers to the query")
+	}
+	if !strings.Contains(body, "sta eseguendo un") || !strings.Contains(body, "riprova tra qualche secondo") {
+		t.Fatalf("the busy message is missing from the page: %s", body)
 	}
 }

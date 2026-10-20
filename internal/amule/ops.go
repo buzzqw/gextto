@@ -595,9 +595,17 @@ type SearchOptions struct {
 // running or no eD2k server connected).
 var ErrSearchRefused = errors.New("amule: search refused")
 
+// ErrSearchBusy means another external client kept replacing aMule's result
+// list while the search was running. aMule keeps one list shared by every EC
+// client, so the only honest answer is to ask the caller to try again instead
+// of returning another search's files.
+var ErrSearchBusy = errors.New("amule: another client is searching")
+
 // Search runs a search and collects the results. The core keeps a single
 // result list, so a new search replaces the previous one: callers must not
-// run searches concurrently on the same core.
+// run searches concurrently on the same core. If another client (aMuleGUI, an
+// external tool) starts one anyway, the search is retried a couple of times
+// and then refused with ErrSearchBusy.
 func (c *Client) Search(ctx context.Context, query string, options SearchOptions) ([]SearchResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
@@ -619,20 +627,50 @@ func (c *Client) Search(ctx context.Context, query string, options SearchOptions
 	if options.MaxSize > 0 {
 		search.Children = append(search.Children, IntTag(TagSearchMaxSize, options.MaxSize))
 	}
+	// aMule keeps a single result list shared by every external client: if
+	// another one (aMuleGUI, an external tool) starts a search, it wipes ours.
+	// Detect that instead of returning its files as if they answered the query.
+	const attempts = 3
+	for attempt := 0; attempt < attempts; attempt++ {
+		results, replaced, err := c.searchAttempt(ctx, search, options)
+		if err != nil {
+			return results, err
+		}
+		if !replaced {
+			return results, nil
+		}
+		if attempt == attempts-1 {
+			break
+		}
+		timer := time.NewTimer(500 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ErrSearchBusy
+		case <-timer.C:
+		}
+	}
+	return nil, ErrSearchBusy
+}
+
+// searchAttempt starts one search and polls its results. It reports replaced
+// when the list shrinks or loses every hash it had, the signature of another
+// client starting a search in the meantime.
+func (c *Client) searchAttempt(ctx context.Context, search Tag, options SearchOptions) ([]SearchResult, bool, error) {
 	reply, err := c.Request(ctx, Packet{Op: OpSearchStart, Tags: []Tag{search}})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if reply.Op == OpFailed {
 		message := strings.TrimSpace(reply.Message())
 		if message == "" {
 			message = "unknown reason"
 		}
-		return nil, fmt.Errorf("%w: %s", ErrSearchRefused, message)
+		return nil, false, fmt.Errorf("%w: %s", ErrSearchRefused, message)
 	}
-
 	deadline := time.Now().Add(options.Wait)
 	var results []SearchResult
+	seen := map[string]struct{}{}
 	stable := 0
 	for {
 		wait := options.Poll
@@ -644,13 +682,19 @@ func (c *Client) Search(ctx context.Context, query string, options SearchOptions
 			select {
 			case <-ctx.Done():
 				timer.Stop()
-				return results, nil
+				return results, false, nil
 			case <-timer.C:
 			}
 		}
 		current, err := c.searchResults(ctx)
 		if err != nil {
-			return results, err
+			return results, false, err
+		}
+		if searchListReplaced(seen, current) {
+			return nil, true, nil
+		}
+		for _, result := range current {
+			seen[result.Hash] = struct{}{}
 		}
 		if len(current) == len(results) {
 			stable++
@@ -666,7 +710,25 @@ func (c *Client) Search(ctx context.Context, query string, options SearchOptions
 		}
 	}
 	_, _ = c.Request(ctx, Packet{Op: OpSearchStop})
-	return results, nil
+	return results, false, nil
+}
+
+// searchListReplaced reports whether current no longer belongs to the search
+// that produced seen: results only accumulate during a search, so a shorter
+// list or one without a single known hash means another client started one.
+func searchListReplaced(seen map[string]struct{}, current []SearchResult) bool {
+	if len(seen) == 0 || len(current) == 0 {
+		return false
+	}
+	if len(current) < len(seen) {
+		return true
+	}
+	for _, result := range current {
+		if _, ok := seen[result.Hash]; ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *Client) kadSearchFinished(ctx context.Context) bool {

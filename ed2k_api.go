@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -457,7 +459,7 @@ type v2Ed2kHealth struct {
 	TotalUp      int64
 	UploadQueue  int64
 	Warnings     []string
-	DirIssues    []string
+	DirIssues    []amuleDirIssue
 }
 
 // v2Ed2kHealthFrom reads aMule's state and the recent warnings from its log.
@@ -496,7 +498,7 @@ func v2Ed2kHealthFrom(s *AppState) *v2Ed2kHealth {
 	card.TotalUp = status.TotalSent
 	card.UploadQueue = status.UploadQueue
 	if prefs, prefsErr := ed2kPreferences(cfg); prefsErr == nil {
-		card.DirIssues = amuleMissingDirectories(cfg, prefs)
+		card.DirIssues = amuleDirectoryIssues(cfg, prefs)
 	}
 	if lines, logErr := Ed2kLogLines(cfg); logErr == nil {
 		card.Warnings = ed2kLogWarnings(lines, 5)
@@ -528,40 +530,89 @@ func ed2kLogWarnings(lines []string, limit int) []string {
 	return out
 }
 
-// amuleMissingDirectories lists aMule's incoming and temporary folders that do
-// not exist on this machine. aMule logs "Failed to get file system statistics"
-// at every disk check when one is missing, and a missing incoming folder also
-// breaks the import of completed files.
-func amuleMissingDirectories(cfg *Config, prefs amule.Preferences) []string {
+// amuleDirIssue is one aMule folder that cannot be used, with the scope that
+// says what the operator has to fix.
+type amuleDirIssue struct {
+	Path string `json:"path"`
+	// Kind is "host" (missing on this machine: Gextto can create it),
+	// "container" (missing inside aMule's container: fix it there) or
+	// "unmapped" (it exists in the container but not at the same path here,
+	// so the import cannot work).
+	Kind string `json:"kind"`
+}
+
+// amuleDirectoryIssues checks aMule's incoming and temporary folders. With
+// aMule in a container the paths belong to the container's filesystem, so they
+// are checked through /proc/<pid>/root and never created from here.
+func amuleDirectoryIssues(cfg *Config, prefs amule.Preferences) []amuleDirIssue {
 	if cfg == nil || !hostIsLocal(uiSettingString(cfg, "amule_host")) {
 		return nil
 	}
-	out := make([]string, 0, 2)
+	pid := 0
+	if pids := amuleProcessPIDs(); len(pids) > 0 {
+		pid = pids[0]
+	}
+	containerized := processRunsInContainer(pid)
+	out := make([]amuleDirIssue, 0, 2)
 	for _, dir := range []string{prefs.IncomingDir, prefs.TempDir} {
 		dir = strings.TrimSpace(dir)
 		if dir == "" {
 			continue
 		}
-		if info, err := os.Stat(dir); err != nil || !info.IsDir() {
-			out = append(out, dir)
+		hostExists := dirExists(dir)
+		if !containerized {
+			if !hostExists {
+				out = append(out, amuleDirIssue{Path: dir, Kind: "host"})
+			}
+			continue
+		}
+		containerExists, known := false, false
+		if pid > 0 {
+			root := filepath.Join("/proc", strconv.Itoa(pid), "root")
+			if _, err := os.Stat(root); err == nil {
+				known = true
+				containerExists = dirExists(filepath.Join(root, dir))
+			}
+		}
+		switch {
+		case known && !containerExists:
+			out = append(out, amuleDirIssue{Path: dir, Kind: "container"})
+		case known && !hostExists:
+			// The container has it but this machine does not: the completed
+			// files land where Gextto cannot read them, so the import fails.
+			out = append(out, amuleDirIssue{Path: dir, Kind: "unmapped"})
 		}
 	}
 	return out
 }
 
-// amuleCreateMissingDirectories creates the folders amuleMissingDirectories
-// reports, so aMule stops failing its disk checks.
+// amuleProcessPIDs finds aMule's local process. It is a variable so tests can
+// decide whether this machine has one (and whether it is containerized).
+var amuleProcessPIDs = func() []int { return localProcessPIDs("amuled") }
+
+// dirExists reports whether path is an existing directory.
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+// amuleCreateMissingDirectories creates the folders missing on this machine
+// (kind "host"). Container paths are never created: they belong to the
+// container.
 func amuleCreateMissingDirectories(cfg *Config) ([]string, error) {
 	prefs, err := ed2kPreferences(cfg)
 	if err != nil {
 		return nil, err
 	}
 	created := []string{}
-	for _, dir := range amuleMissingDirectories(cfg, prefs) {
-		if mkErr := os.MkdirAll(dir, 0o775); mkErr != nil {
+	for _, issue := range amuleDirectoryIssues(cfg, prefs) {
+		if issue.Kind != "host" {
+			continue
+		}
+		if mkErr := os.MkdirAll(issue.Path, 0o775); mkErr != nil {
 			return created, mkErr
 		}
-		created = append(created, dir)
+		created = append(created, issue.Path)
 	}
 	return created, nil
 }
