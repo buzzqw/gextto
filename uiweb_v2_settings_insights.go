@@ -185,7 +185,18 @@ func v2SourcesIndexFrom(s *AppState, cfg *Config) *v2SourcesIndex {
 		case entry.reachability == "open":
 			ed2kLabel = tr("aperta")
 			if entry.mapping != "" {
-				ed2kLabel += " · " + strings.ToUpper(entry.mapping)
+				method := entry.mapping
+				switch method {
+				case "upnp":
+					method = "UPnP"
+				case "natpmp":
+					method = "NAT-PMP"
+				case "pcp":
+					method = "PCP"
+				default:
+					method = strings.ToUpper(method)
+				}
+				ed2kLabel += " · " + method
 			}
 		case entry.reachability == "limited":
 			ed2kLabel = tr("limitata (firewall/NAT)")
