@@ -2,16 +2,13 @@
 
 `gx-ed2k` is Gextto's native eD2k/Kad client. Like `gx-torrent`, it is our own
 Go code, it can run managed by Gextto or standalone, and it has its own page and
-`/api/v1`. Unlike `gx-torrent`, it is a **search client**: it finds files and
-reports their identity, it does not move their bytes.
+`/api/v1`. It started as a search-only client; the transfer plane is now
+enabled for completed eD2k downloads, with AICH, upload queue/credits and
+source exchange, while obfuscation and the server-callback path remain open.
 
-The design decision is intentional. The eMule client-to-client transfer
-protocol (hello, file request, hashset, parts, compression, obfuscation, secure
-identification, upload queue, credits, AICH) is a project on its own. Shipping a
-half transfer engine would be worse than not shipping one: a result that cannot
-be completed must stay a result, not become a stalled download. `/api/v1/health`
-therefore answers `"download": false`, and Gextto keeps the "add" action
-disabled for eD2k-only releases.
+`/api/v1/health` reports `"download": true` when the transfer plane and its
+storage are available. Gextto can add an eD2k result as a native download and
+receives progress/completion events like it does for torrents.
 
 ## What is implemented
 
@@ -48,13 +45,14 @@ disabled for eD2k-only releases.
 
 ## What is deliberately not implemented
 
-- the eMule transfer protocol, `.part`/`.part.met`, MD4 block trees, AICH
-  (design in [`ed2k-transfer.md`](ed2k-transfer.md), gated on Phase 0);
-- upload, sharing, credits, upload queue;
-- LowID callbacks, buddy/hole punching, direct UDP callback;
-- obfuscation/encryption (`KadVersion` stays below 6, so peers answer in
-  clear), secure identification;
-- file publishing (`PUBLISH_*`).
+- obfuscation/RC4 and secure identification (`KadVersion` stays below 6, so
+  peers answer in clear);
+- server-originated callback (direct UDP and buddy callbacks are implemented;
+  the server callback needs a source client ID that the current source record
+  does not carry);
+- a full LowID↔LowID relay through a third client;
+- file publishing (`PUBLISH_*`) and the full `known.met` shared-file manager;
+- per-file bandwidth limits and priorities.
 
 `capabilityLevels` in Gextto has no eD2k entry yet: the transfer plane is not
 advertised until a real engine exists. The search plane is a provider, not a
