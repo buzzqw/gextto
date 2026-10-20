@@ -969,7 +969,8 @@ what is transferring the files is visible at a glance).
   stops it with the service and updates it with backup and rollback; a watchdog
   restarts it after an unexpected exit and, after repeated crashes, runs the
   engine fallback chain. If qBittorrent is down at startup, Gextto keeps retrying
-  instead of failing.
+  instead of failing. The full steps (installation, Web UI, mappings, managed
+  mode, common problems) are in [`docs/qbittorrent-nox.md`](qbittorrent-nox.md).
 If the saved configuration selects a backend that is no longer supported,
 Gextto falls back to gx-torrent and logs a warning.
 

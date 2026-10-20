@@ -992,7 +992,9 @@ attivo, così si vede a colpo d'occhio cosa sta trasferendo i file).
   dell'applicazione (accanto a `gexttod`), la avvia/ferma col servizio e la
   aggiorna con backup e rollback; un watchdog la riavvia dopo un'uscita inattesa
   e, dopo ripetuti crash, esegue la catena di fallback tra i motori. Se qBittorrent è spento
-  all'avvio, Gextto continua a riprovare invece di fallire.
+  all'avvio, Gextto continua a riprovare invece di fallire. I passi completi
+  (installazione, Web UI, mappature, modalità gestita, problemi comuni) sono in
+  [`docs/qbittorrent-nox.md`](qbittorrent-nox.md).
 Se la configurazione salvata seleziona un backend non più supportato, Gextto
 torna a gx-torrent e registra un avviso nel log.
 

@@ -16,7 +16,7 @@ needs.
 | [Advanced guide](ADVANCED.en.md) | English advanced-operation guide. |
 | [HTTP API](API.md) | The route tables of the Gextto daemon and of the gx-torrent daemon (`/api/v1` and `/api/v2`) for automations and integrations. |
 | [Migration](MIGRATION.md) | A safe move from a previous install. |
-| [qBittorrent-nox for Gextto](qbittorrent-nox.md) | How to configure the qBittorrent-nox backend: settings, path mapping, examples and typical cases. |
+| [qBittorrent-nox for Gextto](qbittorrent-nox.md) | How to install and configure the qBittorrent-nox backend: Web UI, settings, path mapping, what Gextto drives, managed mode, switching, troubleshooting and the capability gaps. |
 | [Security](SECURITY.md) | Network exposure, secrets and vulnerability reporting. |
 | [Accessibility](ACCESSIBILITY.md) | Keyboard, screen reader, automated axe tests and the manual checklist for the web UI, the gx-torrent page and the TUI. |
 | [TUI](tui.md) | Terminal client and keyboard shortcuts. |
