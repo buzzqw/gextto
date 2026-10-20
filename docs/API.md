@@ -585,12 +585,13 @@ a native `/api/v1`. When `ed2k_token` is set, every `/api/v1` call must send
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/health` | health, version, Kad id/UDP port, `download: false`, `search: true`, `reachability` (open/limited/unknown), `low_id`, the UPnP mapping state, `ipfilter_ranges` and `publish` (server, files, last offer) |
+| GET | `/api/v1/health` | health, version, Kad id/UDP port, `download: false`, `search: true`, `reachability` (open/limited/unknown), `low_id`, the UPnP mapping state, `ipfilter_ranges`, `publish` (server, files, last offer) and `limits` (`max_down_kb`, `max_up_kb`, `max_active`) |
 | GET | `/api/v1/status` | counters (nodes, queries, results), capabilities and last error |
 | GET | `/api/v1/search?q=…&timeout_ms=…` | keyword search on Kad and the eD2k servers; results carry `name`, `size_bytes`, `hash`, `link`, `sources`, `origin` |
 | POST | `/api/v1/link` | validate a JSON `{"link":"ed2k://…"}` file or server link; returns the parsed identity |
-| GET | `/api/v1/transfers` | list the eD2k transfers and their state (`discovering`, `downloading`, `queued`, `completed`, `error`) with `done`, `size`, `sources` and `path` |
-| POST | `/api/v1/transfers` | start a transfer from a JSON `{"link":"ed2k://|file|…"}`; returns `201` with the transfer (idempotent by MD4) |
+| GET | `/api/v1/transfers` | list the eD2k transfers and their state (`discovering`, `downloading`, `queued`, `completed`, `error`) with `done`, `size`, `sources`, `path`, `priority` and `limit_kb` |
+| POST | `/api/v1/transfers` | start a transfer from a JSON `{"link":"ed2k://|file|…"}`; optional `priority` (`low`/`normal`/`high`) and `limit_kb`; returns `201` with the transfer (idempotent by MD4) |
+| POST | `/api/v1/transfers/{id}/settings` | change `priority` and/or `limit_kb` (0 = unlimited) of a transfer |
 | GET | `/api/v1/transfers/{id}` | one transfer, by MD4 |
 | DELETE | `/api/v1/transfers/{id}` | cancel and forget a transfer (partial files stay on disk) |
 | POST | `/api/v1/transfers/{id}/pause` | stop the worker but keep the row and the `.part` file |
@@ -605,4 +606,7 @@ before offering to queue an eD2k result. With the transfer plane enabled the
 daemon accepts `ed2k://` links on `/api/v1/transfers`, downloads them in
 `-download-dir` (default `<data>/incoming`) and reports progress there. Upload,
 credits, LowID callbacks, obfuscation and client-to-client secure identification
-are implemented; file publishing and LowID↔LowID relay are not.
+are implemented; publishing to eD2k servers is implemented, Kad publishing and
+LowID↔LowID relay are not. A file's priority only affects the order in which
+pending transfers start; `max_active` caps how many run at once, and the rate
+limits are token buckets applied after each block.

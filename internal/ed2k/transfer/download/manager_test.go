@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -188,5 +189,101 @@ func TestManagerDownloadsPartsFromTwoPeers(t *testing.T) {
 	}
 	if !bytes.Equal(got, data) {
 		t.Fatal("parallel download differs")
+	}
+}
+
+type orderDiscoverer struct {
+	mu    sync.Mutex
+	calls []string
+	gate  chan struct{}
+}
+
+func (d *orderDiscoverer) Sources(_ context.Context, hash string, _ int64) ([]ed2k.PeerSource, error) {
+	d.mu.Lock()
+	first := len(d.calls) == 0
+	d.calls = append(d.calls, hash)
+	d.mu.Unlock()
+	if first {
+		<-d.gate
+	}
+	return nil, errors.New("no sources")
+}
+
+func TestManagerStartsByPriority(t *testing.T) {
+	discoverer := &orderDiscoverer{gate: make(chan struct{})}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	manager := NewManager(ctx, ManagerConfig{
+		Fetch: Config{TempDir: t.TempDir()}, MaxActive: 1,
+	}, discoverer)
+	defer manager.Close()
+
+	low, _ := manager.Add(Link{Hash: ed2k.ID{1}, Name: "low", Size: 1000})
+	manager.SetPriority(low.ID, PriorityLow)
+	// The first Add starts immediately; wait until it is blocked in Sources.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		discoverer.mu.Lock()
+		started := len(discoverer.calls) == 1
+		discoverer.mu.Unlock()
+		if started {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the first transfer did not start")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	normal, _ := manager.Add(Link{Hash: ed2k.ID{2}, Name: "normal", Size: 1000})
+	high, _ := manager.Add(Link{Hash: ed2k.ID{3}, Name: "high", Size: 1000})
+	manager.SetPriority(high.ID, PriorityHigh)
+	manager.SetPriority(normal.ID, PriorityNormal)
+
+	close(discoverer.gate)
+	deadline = time.Now().Add(3 * time.Second)
+	for {
+		discoverer.mu.Lock()
+		calls := append([]string(nil), discoverer.calls...)
+		discoverer.mu.Unlock()
+		if len(calls) == 3 {
+			if calls[0] != low.ID || calls[1] != high.ID || calls[2] != normal.ID {
+				t.Fatalf("start order = %v", calls)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("only %d transfers started: %v", len(calls), calls)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestManagerSetPriorityAndLimit(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	manager := NewManager(ctx, ManagerConfig{Fetch: Config{TempDir: t.TempDir()}}, fakeDiscoverer{err: errors.New("no sources")})
+	defer manager.Close()
+	transfer, err := manager.Add(Link{Hash: ed2k.ID{4}, Name: "settings", Size: 1000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if transfer.Priority != PriorityNormal {
+		t.Fatalf("default priority = %q", transfer.Priority)
+	}
+	if !manager.SetPriority(transfer.ID, PriorityHigh) {
+		t.Fatal("valid priority rejected")
+	}
+	if manager.SetPriority(transfer.ID, "urgent") {
+		t.Fatal("invalid priority accepted")
+	}
+	if !manager.SetLimitKB(transfer.ID, 64) {
+		t.Fatal("valid limit rejected")
+	}
+	if manager.SetLimitKB(transfer.ID, -1) {
+		t.Fatal("negative limit accepted")
+	}
+	updated, ok := manager.Get(transfer.ID)
+	if !ok || updated.Priority != PriorityHigh || updated.LimitKB != 64 {
+		t.Fatalf("settings = %+v", updated)
 	}
 }

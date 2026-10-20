@@ -31,6 +31,7 @@ func (d *Daemon) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/transfers/{id}", d.withAuth(d.handleTransfer))
 	mux.HandleFunc("POST /api/v1/transfers/{id}/pause", d.withAuth(d.handleTransferAction))
 	mux.HandleFunc("POST /api/v1/transfers/{id}/resume", d.withAuth(d.handleTransferAction))
+	mux.HandleFunc("POST /api/v1/transfers/{id}/settings", d.withAuth(d.handleTransferSettings))
 	mux.HandleFunc("GET /api/v1/nodes", d.withAuth(d.handleNodes))
 	mux.HandleFunc("GET /api/v1/update", d.withAuth(d.handleUpdate))
 	mux.HandleFunc("POST /api/v1/update/apply", d.withAuth(d.handleUpdateApply))
@@ -161,7 +162,9 @@ func (d *Daemon) handleSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 type linkInput struct {
-	Link string `json:"link"`
+	Link     string `json:"link"`
+	Priority string `json:"priority,omitempty"`
+	LimitKB  *int   `json:"limit_kb,omitempty"`
 }
 
 func (d *Daemon) handleLink(w http.ResponseWriter, r *http.Request) {
@@ -234,6 +237,17 @@ func (d *Daemon) handleTransfers(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
+		if input.Priority != "" && !d.transfers.SetPriority(transfer.ID, input.Priority) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid priority"})
+			return
+		}
+		if input.LimitKB != nil && !d.transfers.SetLimitKB(transfer.ID, *input.LimitKB) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid limit_kb"})
+			return
+		}
+		if updated, ok := d.transfers.Get(transfer.ID); ok {
+			transfer = updated
+		}
 		writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "transfer": transfer})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method not allowed"})
@@ -267,6 +281,50 @@ func (d *Daemon) handleTransfer(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method not allowed"})
 	}
+}
+
+// handleTransferSettings changes the priority or the per-file rate limit.
+func (d *Daemon) handleTransferSettings(w http.ResponseWriter, r *http.Request) {
+	if d.transfers == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]any{"ok": false, "error": "download is disabled on this daemon"})
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "id is required"})
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, apiBodyLimit))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "cannot read request"})
+		return
+	}
+	var input struct {
+		Priority *string `json:"priority"`
+		LimitKB  *int    `json:"limit_kb"`
+	}
+	if err := json.Unmarshal(body, &input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid JSON"})
+		return
+	}
+	if input.Priority == nil && input.LimitKB == nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "nothing to change"})
+		return
+	}
+	if input.Priority != nil && !d.transfers.SetPriority(id, *input.Priority) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid priority"})
+		return
+	}
+	if input.LimitKB != nil && !d.transfers.SetLimitKB(id, *input.LimitKB) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid limit_kb"})
+		return
+	}
+	transfer, ok := d.transfers.Get(id)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "transfer not found"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "transfer": transfer})
 }
 
 func (d *Daemon) handleTransferAction(w http.ResponseWriter, r *http.Request) {

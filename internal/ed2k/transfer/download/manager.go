@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/ratelimit"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 )
 
@@ -47,22 +48,35 @@ type ManagerConfig struct {
 	// StatePath persists the transfer rows across daemon restarts. Empty
 	// keeps the manager in memory only.
 	StatePath string
+	// MaxActive caps how many transfers download at once; 0 means no cap.
+	MaxActive int
+	// GlobalLimiter caps all transfers together. Nil is unlimited.
+	GlobalLimiter *ratelimit.Bucket
 }
 
 // Transfer is the public state of one eD2k download.
 type Transfer struct {
-	ID      string    `json:"id"`
-	Hash    string    `json:"hash"`
-	Name    string    `json:"name"`
-	Size    int64     `json:"size"`
-	State   string    `json:"state"`
-	Done    int64     `json:"done"`
-	Sources int       `json:"sources"`
-	Error   string    `json:"error,omitempty"`
-	Path    string    `json:"path,omitempty"`
-	Created time.Time `json:"created"`
-	Updated time.Time `json:"updated"`
+	ID       string    `json:"id"`
+	Hash     string    `json:"hash"`
+	Name     string    `json:"name"`
+	Size     int64     `json:"size"`
+	State    string    `json:"state"`
+	Done     int64     `json:"done"`
+	Sources  int       `json:"sources"`
+	Priority string    `json:"priority"`
+	LimitKB  int       `json:"limit_kb"`
+	Error    string    `json:"error,omitempty"`
+	Path     string    `json:"path,omitempty"`
+	Created  time.Time `json:"created"`
+	Updated  time.Time `json:"updated"`
 }
+
+// Priorities accepted by SetPriority.
+const (
+	PriorityLow    = "low"
+	PriorityNormal = "normal"
+	PriorityHigh   = "high"
+)
 
 const (
 	StateDiscovering = "discovering"
@@ -75,7 +89,10 @@ const (
 
 type managedTransfer struct {
 	Transfer
-	cancel context.CancelFunc
+	cancel  context.CancelFunc
+	link    Link
+	running bool
+	limiter *ratelimit.Bucket
 }
 
 // Manager runs eD2k transfers in the background and keeps their state for the
@@ -90,6 +107,7 @@ type Manager struct {
 
 	mu        sync.Mutex
 	transfers map[string]*managedTransfer
+	active    int
 	closed    bool
 
 	callbackMu sync.Mutex
@@ -142,44 +160,104 @@ func (m *Manager) Add(link Link) (Transfer, error) {
 			return transfer, nil
 		}
 		// An interrupted transfer is restarted explicitly by adding it again.
-		ctx, cancel := context.WithCancel(m.ctx)
-		existing.cancel = cancel
+		existing.link = link
 		existing.State = StateDiscovering
 		existing.Error = ""
 		existing.Updated = time.Now()
-		transfer := existing.Transfer
 		m.saveLocked()
+		m.dispatchLocked()
+		transfer := existing.Transfer
 		m.mu.Unlock()
-		m.wg.Add(1)
-		go func() {
-			defer m.wg.Done()
-			m.run(ctx, id, link)
-		}()
 		return transfer, nil
 	}
 	if m.closed {
 		m.mu.Unlock()
 		return Transfer{}, errors.New("download: manager closed")
 	}
-	ctx, cancel := context.WithCancel(m.ctx)
 	now := time.Now()
 	managed := &managedTransfer{
 		Transfer: Transfer{
 			ID: id, Hash: id, Name: link.Name, Size: link.Size,
 			State: StateDiscovering, Created: now, Updated: now,
+			Priority: PriorityNormal,
 		},
-		cancel: cancel,
+		link: link,
 	}
 	m.transfers[id] = managed
+	m.dispatchLocked()
 	transfer := managed.Transfer
 	m.mu.Unlock()
+	return transfer, nil
+}
 
+// dispatchLocked starts pending transfers, highest priority and oldest first,
+// while a slot is free. The caller holds m.mu.
+func (m *Manager) dispatchLocked() {
+	for !m.closed {
+		if m.cfg.MaxActive > 0 && m.active >= m.cfg.MaxActive {
+			return
+		}
+		next := m.nextPendingLocked()
+		if next == nil {
+			return
+		}
+		m.startLocked(next)
+	}
+}
+
+func (m *Manager) nextPendingLocked() *managedTransfer {
+	var best *managedTransfer
+	for _, transfer := range m.transfers {
+		if transfer.running || transfer.State == StateCompleted ||
+			transfer.State == StatePaused || transfer.State == StateError {
+			continue
+		}
+		if best == nil || priorityRank(transfer.Priority) < priorityRank(best.Priority) ||
+			(priorityRank(transfer.Priority) == priorityRank(best.Priority) && transfer.Created.Before(best.Created)) {
+			best = transfer
+		}
+	}
+	return best
+}
+
+func priorityRank(priority string) int {
+	switch priority {
+	case PriorityHigh:
+		return 0
+	case PriorityLow:
+		return 2
+	default:
+		return 1
+	}
+}
+
+func (m *Manager) startLocked(transfer *managedTransfer) {
+	ctx, cancel := context.WithCancel(m.ctx)
+	transfer.cancel = cancel
+	transfer.running = true
+	m.active++
+	if transfer.LimitKB > 0 && transfer.limiter == nil {
+		transfer.limiter = ratelimit.New(int64(transfer.LimitKB) * 1024)
+	}
+	id, link := transfer.ID, transfer.link
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
 		m.run(ctx, id, link)
+		m.finished(id)
 	}()
-	return transfer, nil
+}
+
+func (m *Manager) finished(id string) {
+	m.mu.Lock()
+	if transfer, ok := m.transfers[id]; ok && transfer.running {
+		transfer.running = false
+		if m.active > 0 {
+			m.active--
+		}
+		m.dispatchLocked()
+	}
+	m.mu.Unlock()
 }
 
 func (m *Manager) run(ctx context.Context, id string, link Link) {
@@ -337,6 +415,15 @@ func (m *Manager) waitRetry(ctx context.Context) bool {
 
 func (m *Manager) workerConfig(id string) Config {
 	cfg := m.cfg.Fetch
+	m.mu.Lock()
+	if transfer, ok := m.transfers[id]; ok {
+		if transfer.LimitKB > 0 && transfer.limiter == nil {
+			transfer.limiter = ratelimit.New(int64(transfer.LimitKB) * 1024)
+		}
+		cfg.Limiter = transfer.limiter
+	}
+	m.mu.Unlock()
+	cfg.GlobalLimiter = m.cfg.GlobalLimiter
 	if provider, ok := m.discover.(interface{ Stats() ed2k.Stats }); ok {
 		cfg.ClientID = provider.Stats().ServerID
 	}
@@ -544,6 +631,9 @@ func (m *Manager) load() {
 	}
 	for _, row := range rows {
 		row := row
+		if row.Priority == "" {
+			row.Priority = PriorityNormal
+		}
 		if row.State != StateCompleted {
 			row.State = StateError
 			row.Error = "interrupted by a daemon restart; add the link again to resume"
@@ -672,6 +762,49 @@ func (m *Manager) Get(id string) (Transfer, bool) {
 	return transfer.Transfer, true
 }
 
+// SetPriority changes the scheduling priority of a transfer.
+func (m *Manager) SetPriority(id, priority string) bool {
+	priority = strings.ToLower(strings.TrimSpace(priority))
+	switch priority {
+	case PriorityLow, PriorityNormal, PriorityHigh:
+	default:
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	transfer, ok := m.transfers[id]
+	if !ok || transfer.State == StateCompleted {
+		return false
+	}
+	transfer.Priority = priority
+	transfer.Updated = time.Now()
+	m.saveLocked()
+	return true
+}
+
+// SetLimitKB caps a transfer at kb KiB/s; 0 removes the cap. Workers already
+// running keep the previous bucket until they reconnect.
+func (m *Manager) SetLimitKB(id string, kb int) bool {
+	if kb < 0 || kb > 1_000_000 {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	transfer, ok := m.transfers[id]
+	if !ok || transfer.State == StateCompleted {
+		return false
+	}
+	transfer.LimitKB = kb
+	if kb == 0 {
+		transfer.limiter = nil
+	} else {
+		transfer.limiter = ratelimit.New(int64(kb) * 1024)
+	}
+	transfer.Updated = time.Now()
+	m.saveLocked()
+	return true
+}
+
 // Pause stops the worker but keeps the row and the partial file.
 func (m *Manager) Pause(id string) bool {
 	m.mu.Lock()
@@ -680,7 +813,9 @@ func (m *Manager) Pause(id string) bool {
 	if !ok || transfer.State == StateCompleted || transfer.State == StatePaused {
 		return false
 	}
-	transfer.cancel()
+	if transfer.running && transfer.cancel != nil {
+		transfer.cancel()
+	}
 	transfer.State = StatePaused
 	transfer.Error = ""
 	transfer.Updated = time.Now()
@@ -696,22 +831,21 @@ func (m *Manager) Resume(id string) bool {
 		m.mu.Unlock()
 		return false
 	}
-	ctx, cancel := context.WithCancel(m.ctx)
-	transfer.cancel = cancel
-	transfer.State = StateDiscovering
-	transfer.Error = ""
-	transfer.Updated = time.Now()
+	if transfer.running {
+		m.mu.Unlock()
+		return false
+	}
 	link := Link{Hash: ed2k.ID{}, Size: transfer.Size, Name: transfer.Name}
 	if hash, err := ed2k.ParseID(transfer.Hash); err == nil {
 		link.Hash = hash
 	}
+	transfer.link = link
+	transfer.State = StateDiscovering
+	transfer.Error = ""
+	transfer.Updated = time.Now()
 	m.saveLocked()
+	m.dispatchLocked()
 	m.mu.Unlock()
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
-		m.run(ctx, id, link)
-	}()
 	return true
 }
 
@@ -721,13 +855,18 @@ func (m *Manager) Remove(id string) bool {
 	transfer, ok := m.transfers[id]
 	if ok {
 		delete(m.transfers, id)
+		if transfer.running {
+			transfer.running = false
+			if m.active > 0 {
+				m.active--
+			}
+			if transfer.cancel != nil {
+				transfer.cancel()
+			}
+		}
+		m.saveLocked()
+		m.dispatchLocked()
 	}
-	m.mu.Unlock()
-	if ok && transfer.cancel != nil {
-		transfer.cancel()
-	}
-	m.mu.Lock()
-	m.saveLocked()
 	m.mu.Unlock()
 	return ok
 }

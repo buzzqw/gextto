@@ -17,6 +17,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/ed2k/ipfilter"
+	"github.com/buzzqw/gextto/internal/ed2k/ratelimit"
 	"github.com/buzzqw/gextto/internal/ed2k/secident"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
@@ -54,6 +55,10 @@ type Config struct {
 	// IPFilter blocks peers learned through source exchange. Sources from
 	// Kad and servers are already filtered by ed2k.Client. Nil allows all.
 	IPFilter *ipfilter.Filter
+	// Limiter caps this transfer, shared by its workers. Nil is unlimited.
+	Limiter *ratelimit.Bucket
+	// GlobalLimiter caps every eD2k transfer together. Nil is unlimited.
+	GlobalLimiter *ratelimit.Bucket
 	// OnProgress is called when a part is completed and when the transfer
 	// starts, so a manager can expose a progress percentage.
 	OnProgress func(done, total int64)
@@ -772,6 +777,9 @@ func (s *session) download(ctx context.Context) error {
 			if err := s.writeBlock(int64(part.Start), int64(part.End), part.Data); err != nil {
 				return err
 			}
+			if err := s.throttle(ctx, len(part.Data)); err != nil {
+				return err
+			}
 		case peer.OpSendingPartI64:
 			part, err := peer.DecodeSendingPart64(payload)
 			if err != nil {
@@ -781,6 +789,9 @@ func (s *session) download(ctx context.Context) error {
 				continue
 			}
 			if err := s.writeBlock(int64(part.Start), int64(part.End), part.Data); err != nil {
+				return err
+			}
+			if err := s.throttle(ctx, len(part.Data)); err != nil {
 				return err
 			}
 		case peer.OpCompressedPart:
@@ -805,6 +816,9 @@ func (s *session) download(ctx context.Context) error {
 			if err := s.writeBlock(start, end, data); err != nil {
 				return err
 			}
+			if err := s.throttle(ctx, len(data)); err != nil {
+				return err
+			}
 		case peer.OpCompressedPartI64:
 			part, err := peer.DecodeCompressedPart64(payload)
 			if err != nil {
@@ -827,8 +841,22 @@ func (s *session) download(ctx context.Context) error {
 			if err := s.writeBlock(start, end, data); err != nil {
 				return err
 			}
+			if err := s.throttle(ctx, len(data)); err != nil {
+				return err
+			}
 		}
 	}
+}
+
+// throttle waits for the per-transfer and global limits after a block.
+func (s *session) throttle(ctx context.Context, n int) error {
+	if err := s.cfg.Limiter.Wait(ctx, n); err != nil {
+		return fmt.Errorf("download: rate limit: %w", err)
+	}
+	if err := s.cfg.GlobalLimiter.Wait(ctx, n); err != nil {
+		return fmt.Errorf("download: rate limit: %w", err)
+	}
+	return nil
 }
 
 func (s *session) requestMore() error {

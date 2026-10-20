@@ -259,6 +259,31 @@ func TestTransferEndpoints(t *testing.T) {
 		t.Fatalf("GET one status = %d", recorder.Code)
 	}
 
+	request = httptest.NewRequest(http.MethodPost, "/api/v1/transfers/"+created.Transfer.ID+"/settings", strings.NewReader(`{"priority":"high","limit_kb":128}`))
+	request.SetPathValue("id", created.Transfer.ID)
+	recorder = httptest.NewRecorder()
+	daemon.handleTransferSettings(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("settings status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var settings struct {
+		Transfer download.Transfer `json:"transfer"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &settings); err != nil {
+		t.Fatal(err)
+	}
+	if settings.Transfer.Priority != download.PriorityHigh || settings.Transfer.LimitKB != 128 {
+		t.Fatalf("settings = %+v", settings.Transfer)
+	}
+
+	request = httptest.NewRequest(http.MethodPost, "/api/v1/transfers/"+created.Transfer.ID+"/settings", strings.NewReader(`{"priority":"urgent"}`))
+	request.SetPathValue("id", created.Transfer.ID)
+	recorder = httptest.NewRecorder()
+	daemon.handleTransferSettings(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("invalid priority status = %d", recorder.Code)
+	}
+
 	request = httptest.NewRequest(http.MethodDelete, "/api/v1/transfers/"+created.Transfer.ID, nil)
 	request.SetPathValue("id", created.Transfer.ID)
 	recorder = httptest.NewRecorder()

@@ -35,6 +35,9 @@ type daemonOptions struct {
 
 type Daemon struct {
 	publisher *ed2k.Publisher
+	maxDownKB int
+	maxUpKB   int
+	maxActive int
 	opts      daemonOptions
 	client    searcher
 	transfers *download.Manager
@@ -110,6 +113,11 @@ func (d *Daemon) healthPayload() map[string]any {
 		"peer_packets":    stats.PeerPackets,
 		"upnp":            stats.UPnP,
 		"ipfilter_ranges": stats.IPFilterRanges,
+		"limits": map[string]any{
+			"max_down_kb": d.maxDownKB,
+			"max_up_kb":   d.maxUpKB,
+			"max_active":  d.maxActive,
+		},
 	}
 	if d.publisher != nil {
 		server, files, last, lastErr := d.publisher.Status()

@@ -62,8 +62,7 @@ receives progress/completion events like it does for torrents.
 
 - full LowID↔LowID data relay through a third client;
 - Kad publishing (keyword and source store); servers publishing is
-  implemented;
-- per-file bandwidth limits and priorities.
+  implemented.
 
 The client keeps its RSA identity in `<data>/cryptkey.pem`, created on first
 start (384-bit, the size eMule and aMule use). The key signs the
@@ -111,7 +110,17 @@ Gextto passes these flags when it starts the managed daemon:
 | `-serverlist-url` | `server.met` URL |
 | `-servers` | explicit `host:port` server list |
 | `-search-timeout` | whole search budget |
+| `-download` | enable the transfer plane |
+| `-max-down` / `-max-up` | global download/upload limit in KiB/s (0 = unlimited) |
+| `-max-active` | concurrent downloads (0 = unlimited) |
+| `-ipfilter` | eMule `ipfilter.dat` |
 | `-lang` | page language |
+
+Each transfer has a `priority` (`low`, `normal`, `high`) and a `limit_kb`
+(0 = unlimited), changed with `POST /api/v1/transfers/{id}/settings`. Priority
+decides which pending transfer starts first when `-max-active` is reached; the
+per-file limit is a token bucket shared by the workers of that transfer, and the
+global limits are shared by all transfers.
 
 The matching Gextto settings are `ed2k_enabled`, `ed2k_url`, `ed2k_token`,
 `ed2k_fallback`, `ed2k_min_sources`, `ed2k_search_timeout_secs`; the daemon also

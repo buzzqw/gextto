@@ -4,6 +4,7 @@
 package upload
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/ed2k/known"
+	"github.com/buzzqw/gextto/internal/ed2k/ratelimit"
 	"github.com/buzzqw/gextto/internal/ed2k/secident"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
@@ -69,10 +71,12 @@ type Server struct {
 	credits    map[string]int64
 	creditPath string
 
-	ClientName  string
-	UserHash    ed2k.ID
-	TCPPort     uint16
-	Idle        time.Duration
+	ClientName string
+	UserHash   ed2k.ID
+	TCPPort    uint16
+	Idle       time.Duration
+	// Limiter caps the total upload rate. Nil is unlimited.
+	Limiter     *ratelimit.Bucket
 	knownPath   string
 	knownMu     sync.Mutex
 	knownSaveMu sync.Mutex
@@ -610,6 +614,9 @@ func (s *Server) sendParts(client *peer.Conn, request peer.PartRequest) (int64, 
 			return sent, err
 		}
 		if err := client.Send(peer.OpSendingPart, raw); err != nil {
+			return sent, err
+		}
+		if err := s.Limiter.Wait(context.Background(), len(data)); err != nil {
 			return sent, err
 		}
 		sent += int64(len(data))

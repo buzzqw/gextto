@@ -190,6 +190,10 @@ note.
 - **Credits**: implement the eMule credit identity and upload accounting at
   least well enough not to be treated as a leech; the exact formula is in the
   eMule source.
+- **Priorities and limits**: each transfer has a priority (`low`, `normal`,
+  `high`) and a per-file KiB/s cap; the daemon also has global download/upload
+  caps and a cap on concurrent downloads. Priority only orders the pending
+  queue, it does not preempt a running transfer.
 - **IP filter**: `-ipfilter` reads the eMule/aMule `ipfilter.dat` and applies
   it to Kad contacts, server connections, discovered sources, source exchange
   and incoming client connections. Ranges with level 128 or more are allow

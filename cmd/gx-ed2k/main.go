@@ -29,6 +29,7 @@ import (
 	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/ed2k/ipfilter"
+	"github.com/buzzqw/gextto/internal/ed2k/ratelimit"
 	"github.com/buzzqw/gextto/internal/ed2k/secident"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/download"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
@@ -83,6 +84,9 @@ func main() {
 	downloadEnabled := flag.Bool("download", envBool("GX_ED2K_DOWNLOAD", false), "enable the eD2k transfer plane")
 	downloadDir := flag.String("download-dir", envOr("GX_ED2K_DOWNLOAD_DIR", ""), "directory for .part files and completed downloads")
 	shareDirs := flag.String("share-dir", envOr("GX_ED2K_SHARE_DIR", ""), "comma-separated extra directories to share")
+	maxDown := flag.Int("max-down", envInt("GX_ED2K_MAX_DOWN", 0), "global download limit in KiB/s (0 = unlimited)")
+	maxUp := flag.Int("max-up", envInt("GX_ED2K_MAX_UP", 0), "global upload limit in KiB/s (0 = unlimited)")
+	maxActive := flag.Int("max-active", envInt("GX_ED2K_MAX_ACTIVE", 3), "concurrent downloads (0 = unlimited)")
 	ipFilterPath := flag.String("ipfilter", envOr("GX_ED2K_IPFILTER", ""), "eMule ipfilter.dat blocking peers, servers and Kad contacts")
 	lang := flag.String("lang", messages.Language(), "UI language (it, en, de, fr, es, pl)")
 	fingerprint := flag.String("fingerprint", "", "configuration fingerprint (managed mode)")
@@ -133,6 +137,9 @@ func main() {
 	if *searchTimeout < 2*time.Second || *searchTimeout > 120*time.Second {
 		log.Fatalf("gx-ed2k: -search-timeout must be between 2s and 120s")
 	}
+	if *maxDown < 0 || *maxUp < 0 || *maxActive < 0 {
+		log.Fatalf("gx-ed2k: -max-down, -max-up and -max-active must not be negative")
+	}
 	if *downloadDir == "" {
 		*downloadDir = filepath.Join(*dataDir, "incoming")
 	}
@@ -168,6 +175,7 @@ func main() {
 		uploader.SetCreditPath(filepath.Join(*dataDir, "credits.json"))
 		uploader.SetKnownPath(filepath.Join(*dataDir, "known.met"))
 		uploader.SecIdent = secureIdent
+		uploader.Limiter = ratelimit.New(int64(*maxUp) * 1024)
 		dirs := []string{*downloadDir}
 		for _, dir := range strings.Split(*shareDirs, ",") {
 			if dir = strings.TrimSpace(dir); dir != "" {
@@ -236,6 +244,9 @@ func main() {
 		Commit:      commit,
 	}, client)
 	daemon.publisher = publisher
+	daemon.maxDownKB = *maxDown
+	daemon.maxUpKB = *maxUp
+	daemon.maxActive = *maxActive
 	if *downloadEnabled {
 		manager = download.NewManager(ctx, download.ManagerConfig{
 			Fetch: download.Config{
@@ -247,7 +258,9 @@ func main() {
 				IPFilter:   ipFilter,
 				Logf:       log.Printf,
 			},
-			StatePath: filepath.Join(*dataDir, "transfers.json"),
+			StatePath:     filepath.Join(*dataDir, "transfers.json"),
+			MaxActive:     *maxActive,
+			GlobalLimiter: ratelimit.New(int64(*maxDown) * 1024),
 			OnComplete: func(result download.Result) {
 				if uploader != nil {
 					if err := uploader.AddFile(result.Path); err != nil {
