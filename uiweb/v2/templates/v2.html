@@ -110,6 +110,12 @@
         <button class="btn" type="button" data-font="+5" title="Testo più grande">A+</button>
         <button class="btn" type="button" data-font-open title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog">Font</button>
         <button class="btn" type="button" hx-get="/theme" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli il tema dell'interfaccia o creane uno" aria-haspopup="dialog">Tema</button>
+        {{with .Dashboard}}
+        <div class="top-kpis">
+          <div class="top-kpi"><span class="top-kpi-label">Spazio libero</span><strong>{{bytesU .FreeSpace}}</strong></div>
+          <div class="top-kpi"><span class="top-kpi-label">Magnet in archivio</span><strong>{{.ArchiveTotal}}</strong><small class="muted">{{.SeenGroups}}</small></div>
+        </div>
+        {{end}}
       </div>
     </header>
     <section class="mobile-performance" aria-label="Connessioni e prestazioni">
@@ -253,13 +259,6 @@
     <div class="panel-head"><h3>Da controllare</h3><small class="muted">Download fermi, spostamenti in sospeso e avvisi</small></div>
     <div class="panel-body" id="v2-dashboard-problems" hx-get="/dashboard/problems" hx-trigger="load, every 60s" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
   </div>
-  <div class="grid-4 dashboard-summary-grid">
-    <div class="metric mint"><span class="metric-sub">Serie TV / Film</span><strong>{{.SeriesConfigured}} / {{.MoviesConfigured}}</strong></div>
-    <div class="metric amber"><span class="metric-sub">Spazio libero</span><strong>{{bytesU .FreeSpace}}</strong><small class="muted" title="Cestino">{{bytesU .TrashBytes}}</small></div>
-    <div class="metric blue"><span class="metric-sub">Magnet in archivio</span><strong>{{.ArchiveTotal}}</strong><small class="muted" title="Visti nei feed">{{.SeenGroups}}</small></div>
-    <div class="metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">{{if .EngineVersion}}{{.EngineLabel}} {{.EngineVersion}}{{end}}</small></div>
-  </div>
-
   <div class="panel dashboard-cycle-panel">
     <div class="panel-head"><h3>Ricerca automatica</h3><small class="muted">Serie TV, film e fumetti · riempimento gap</small></div>
     <div class="panel-body">
@@ -2967,11 +2966,11 @@
 {{if .Error}}<p class="alert">{{.Error}}</p>{{end}}
 {{if .Empty}}<p class="muted"><span class="badge ok">ok</span> <span>Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.</span></p>{{end}}
 {{if .Stalled}}<h4>Fermi</h4>
-<div class="table-wrap"><table class="data-table dashboard-problems-table"><caption class="sr-only">Download fermi</caption><thead><tr><th scope="col">Download</th><th scope="col">Progresso</th><th scope="col">Fermo dalle</th><th scope="col">Motivo</th><th scope="col" title="Quando Gextto lo abbandona e cerca un'altra versione">Abbandono previsto</th><th scope="col">Prossimo tentativo</th><th scope="col">Azioni</th></tr></thead>
-<tbody>{{range .Stalled}}<tr><td class="truncate" title="{{.Name}}">{{.Name}}</td><td class="numeric">{{.Progress}}</td><td class="nowrap">{{.Since}}</td><td>{{.Reason}}</td><td class="nowrap">{{.GiveUpAt}}</td><td class="nowrap">{{.NextRetry}}</td><td class="row-actions"><button class="btn sm" type="button" hx-get="/series/history?hash={{.Hash}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia di questo download">Storia</button></td></tr>{{end}}</tbody></table></div>{{end}}
+<div class="table-wrap"><table class="data-table dashboard-problems-table"><caption class="sr-only">Download fermi</caption><thead><tr><th scope="col">Download</th><th scope="col">Progresso</th><th scope="col">Fermo dalle</th><th scope="col" class="problems-reason">Motivo</th><th scope="col" title="Quando Gextto lo abbandona e cerca un'altra versione">Abbandono previsto</th><th scope="col">Prossimo tentativo</th><th scope="col">Azioni</th></tr></thead>
+<tbody>{{range .Stalled}}<tr><td class="problems-name" title="{{.Name}}">{{.ShortName}}</td><td class="numeric">{{.Progress}}</td><td class="nowrap">{{.Since}}</td><td class="problems-reason">{{.Reason}}</td><td class="nowrap">{{.GiveUpAt}}</td><td class="nowrap">{{.NextRetry}}</td><td class="row-actions"><button class="btn sm" type="button" hx-get="/series/history?hash={{.Hash}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia di questo download">Storia</button></td></tr>{{end}}</tbody></table></div>{{end}}
 {{if .Moves}}<h4>Spostamenti in sospeso</h4>
 <div class="table-wrap"><table class="data-table dashboard-problems-table"><caption class="sr-only">Spostamenti in libreria in sospeso</caption><thead><tr><th scope="col">Download</th><th scope="col">Destinazione</th><th scope="col">Tentativi</th><th scope="col">Azioni</th></tr></thead>
-<tbody>{{range .Moves}}<tr><td class="truncate" title="{{.Name}}">{{.Name}}</td><td class="truncate" title="{{.Destination}}"><code>{{.Destination}}</code></td><td class="numeric">{{.Attempts}}</td><td class="row-actions"><button class="btn sm" type="button" hx-get="/series/history?hash={{.Hash}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia di questo download">Storia</button></td></tr>{{end}}</tbody></table></div>{{end}}
+<tbody>{{range .Moves}}<tr><td class="problems-name" title="{{.Name}}">{{.ShortName}}</td><td class="truncate" title="{{.Destination}}"><code>{{.Destination}}</code></td><td class="numeric">{{.Attempts}}</td><td class="row-actions"><button class="btn sm" type="button" hx-get="/series/history?hash={{.Hash}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia di questo download">Storia</button></td></tr>{{end}}</tbody></table></div>{{end}}
 {{if .Recent}}<div class="problems-section-head"><h4>Avvisi</h4><button class="btn sm" type="button" hx-post="/dashboard/problems/ack" hx-target="#v2-dashboard-problems" hx-swap="innerHTML" hx-disabled-elt="this" title="Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi">Pulisci</button></div>
 <div class="table-wrap"><table class="data-table dashboard-problems-table acquisition-events"><caption class="sr-only">Avvisi dei download non risolti</caption><thead><tr><th scope="col">Quando</th><th scope="col">Download</th><th scope="col">Evento</th><th scope="col">Azioni</th></tr></thead>
 <tbody>{{range .Recent}}<tr class="acq-{{.LevelClass}}"><td class="nowrap">{{.At}}{{if gt .Repeat 1}} <span class="badge" title="Avvisi di questo download">×{{.Repeat}}</span>{{end}}</td><td class="truncate" title="{{.Title}}">{{if .SeriesName}}{{.SeriesName}} {{.EpisodeLabel}}{{else}}{{.Title}}{{end}}</td><td>{{if eq .Level "WARN"}}<span class="badge warn">avviso</span> {{else if eq .Level "ERROR"}}<span class="badge err">errore</span> {{end}}{{.Message}}</td><td class="row-actions"><button class="btn sm" type="button" hx-get="/series/history?hash={{.Hash}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia di questo download">Storia</button></td></tr>{{end}}</tbody></table></div>{{end}}

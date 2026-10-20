@@ -126,6 +126,53 @@ test("Aggiorna e lo stato restano nella riga di Aggiungi torrent", async ({ page
   expect(Math.abs(chrome.refresh!.middle - chrome.pill!.middle)).toBeLessThanOrEqual(3);
 });
 
+test("il riepilogo della Dashboard vive nella barra in alto, dopo la lingua", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await page.goto("/");
+  const kpis = page.locator(".top-kpis");
+  await expect(kpis).toBeVisible();
+  // The badges are part of the header controls, after the Theme button, and no
+  // longer occupy a row of their own in the page body.
+  await expect(page.locator(".dashboard-summary-grid")).toHaveCount(0);
+  await expect(page.locator(".top-kpi")).toHaveCount(2);
+  const positions = await page.evaluate(() => {
+    const kpis = document.querySelector(".top-kpis");
+    const lang = document.querySelector(".top-controls .lang-form");
+    const theme = document.querySelector(".top-controls .btn:last-of-type");
+    const controls = document.querySelector(".top-controls");
+    const clock = document.querySelector(".current-time");
+    if (!kpis || !lang || !theme || !controls || !clock) return null;
+    const kpiBox = kpis.getBoundingClientRect();
+    const clockBox = clock.getBoundingClientRect();
+    return {
+      insideControls: kpis.closest(".top-controls") === controls,
+      langX: Math.round(lang.getBoundingClientRect().x),
+      themeX: Math.round(theme.getBoundingClientRect().x),
+      kpiRight: Math.round(kpiBox.right),
+      clockRight: Math.round(clockBox.right),
+    };
+  });
+  expect(positions).not.toBeNull();
+  expect(positions!.insideControls).toBe(true);
+  // Language and controls stay at the left; the two badges sit at the far
+  // right of the row, under the clock.
+  expect(positions!.langX).toBeLessThan(positions!.themeX);
+  expect(positions!.kpiRight).toBeGreaterThan(positions!.themeX);
+  expect(Math.abs(positions!.kpiRight - positions!.clockRight)).toBeLessThanOrEqual(2);
+  // On a wide window the language select opens the controls row under the
+  // first metric (Gextto CPU/RAM), not under the page title.
+  const alignment = await page.evaluate(() => {
+    const lang = document.querySelector(".top-controls .lang-form")?.getBoundingClientRect();
+    const metric = document.querySelector(".top-actions .top-metric")?.getBoundingClientRect();
+    return lang && metric ? { langX: Math.round(lang.x), metricX: Math.round(metric.x) } : null;
+  });
+  expect(alignment).not.toBeNull();
+  expect(alignment!.langX).toBe(alignment!.metricX);
+  // Only the Dashboard carries them.
+  await page.goto("/?view=downloads");
+  await expect(page.locator(".top-kpis")).toHaveCount(0);
+});
+
 test("la selezione torrent aggiorna il riepilogo delle azioni", async ({ page }) => {
   await page.route("**/downloads/table", async (route) => {
     await route.fulfill({

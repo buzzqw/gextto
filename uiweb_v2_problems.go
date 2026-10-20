@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -23,8 +24,11 @@ const (
 )
 
 type v2StalledRow struct {
-	Hash      string
+	Hash string
+	// Name is the full torrent name (the cell tooltip); ShortName is what the
+	// table shows, so the reason column keeps the room it needs.
 	Name      string
+	ShortName string
 	Progress  string
 	Since     string
 	Reason    string
@@ -35,6 +39,7 @@ type v2StalledRow struct {
 type v2MoveRow struct {
 	Hash        string
 	Name        string
+	ShortName   string
 	Destination string
 	Attempts    int
 }
@@ -45,6 +50,34 @@ type v2ProblemsView struct {
 	Recent  []AcquisitionEvent
 	Error   string
 }
+
+// v2ProblemNameShort is the label the "Da controllare" tables show: the
+// release name up to its season/episode marker, which keeps the download
+// recognisable without the long quality tail squeezing the reason column.
+// Other names are cut at v2ProblemNameLimit runes. The full name stays in the
+// cell tooltip.
+func v2ProblemNameShort(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	if loc := v2ProblemEpisodeMarker.FindStringIndex(name); loc != nil {
+		return name[:loc[1]]
+	}
+	runes := []rune(name)
+	if len(runes) <= v2ProblemNameLimit {
+		return name
+	}
+	return strings.TrimRight(string(runes[:v2ProblemNameLimit]), " ._-") + "…"
+}
+
+// v2ProblemEpisodeMarker matches the season/episode marker of a release name
+// ("S01E01", also with separators such as "S01.E01" or "S01-E01").
+var v2ProblemEpisodeMarker = regexp.MustCompile(`(?i)s\d{1,2}[ ._-]?e\d{1,3}`)
+
+// v2ProblemNameLimit bounds the label of a name without a season/episode
+// marker, so a movie release does not push the other columns out of the panel.
+const v2ProblemNameLimit = 44
 
 // Empty reports whether there is nothing to show.
 func (v v2ProblemsView) Empty() bool {
@@ -89,6 +122,7 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 		row := v2StalledRow{
 			Hash:      torrent.Hash,
 			Name:      torrent.Name,
+			ShortName: v2ProblemNameShort(torrent.Name),
 			Progress:  logPercent(torrent.Progress),
 			Since:     v2ProblemTime(*entry.stalledSince, now),
 			Reason:    reason,
@@ -118,7 +152,7 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 		} else if meta, metaErr := s.db.TorrentMeta(key); metaErr == nil && meta != nil && meta.Release.Title != "" {
 			name = meta.Release.Title
 		}
-		view.Moves = append(view.Moves, v2MoveRow{Hash: key, Name: name, Destination: state.Retry.destination, Attempts: int(state.Retry.attempts)})
+		view.Moves = append(view.Moves, v2MoveRow{Hash: key, Name: name, ShortName: v2ProblemNameShort(name), Destination: state.Retry.destination, Attempts: int(state.Retry.attempts)})
 		listed[key] = struct{}{}
 	}
 	sort.Slice(view.Moves, func(i, j int) bool { return view.Moves[i].Name < view.Moves[j].Name })

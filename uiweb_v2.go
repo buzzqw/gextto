@@ -334,6 +334,11 @@ type v2ShellData struct {
 	// ClientI18n is the JSON dictionary window.__v2i18n for the strings the
 	// client script renders at runtime (see uiweb_v2_client_i18n.go).
 	ClientI18n template.JS
+	// Dashboard, only on the dashboard page, carries the summary badges
+	// (series/movies, free space, archived magnets, engine) shown in the top
+	// bar: keeping them in the header saves the row they used to occupy in the
+	// page body.
+	Dashboard *v2DashboardView
 }
 
 func v2Render(w http.ResponseWriter, status int, name string, data any, dict, eng map[string]string) {
@@ -705,6 +710,9 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Update:   updates.Status(cfg),
 
 		ClientI18n: v2ClientI18nJSON(s),
+	}
+	if dashboard, ok := content.(v2DashboardView); ok {
+		page.Dashboard = &dashboard
 	}
 	if notes, ok := PendingUpdateNotes(cfg); ok {
 		page.UpdateNotes = notes

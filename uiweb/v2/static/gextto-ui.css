@@ -1426,7 +1426,6 @@ pre.log-view { margin: 0; }
   .dashboard-collection-grid,
   .dashboard-feed-panel,
   .dashboard-consumption-panel { display: none; }
-  .dashboard-summary-grid .dashboard-secondary-metric { display: none; }
 
   /* Library lists keep the title, the useful status and the row actions in
      view. Secondary metadata remains available on the detail page instead of

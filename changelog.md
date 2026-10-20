@@ -14,6 +14,15 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **Dashboard: riepilogo nella barra in alto e nomi più leggibili.** **Spazio
+  libero** e **Magnet in archivio** sono passati dal corpo della pagina
+  all'estrema destra della riga dei comandi della barra in alto, sotto
+  l'orologio, e compaiono solo nella Dashboard; su schermo largo **Italiano**
+  apre quella riga sotto il primo riquadro, quello di Gextto. Serie TV/Film e
+  Motore non sono più mostrati in alto. In **Da controllare** il
+  nome del download si ferma alla stagione/episodio (il nome completo compare
+  passando il mouse), così il motivo ha spazio e la tabella non va più scorsa di
+  lato.
 - **Barra in alto: Aggiorna e stato accanto ad Aggiungi torrent.** Il pulsante
   **Aggiorna** e il tondino dello stato del servizio (il pallino verde **ok**)
   stanno ora nella prima riga, subito a destra di **Aggiungi torrent**, invece

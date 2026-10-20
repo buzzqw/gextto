@@ -294,6 +294,11 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
   all'interfaccia e ai log. Il rilevamento dei font installati dipende dal
   supporto del browser alla Local Font Access API e può richiedere
   un'autorizzazione.
+- **Riepilogo in barra** — all'estrema destra della riga dei comandi della
+  barra, sotto l'orologio, la Dashboard mostra due riquadri compatti: **Spazio
+  libero** e **Magnet in archivio** (con quelli visti nei feed). Compaiono solo
+  nella Dashboard; le altre pagine non li mostrano. Su schermo largo
+  **Italiano** apre quella riga sotto il primo riquadro (CPU e RAM di Gextto).
 - **Ricerca manuale globale** — cerca in archivio + indexer + motori web.
 - **Ricerca automatica** — avvia un ciclo completo o di un solo dominio (Serie,
   Film, Fumetti); mostra prossima esecuzione, intervallo ed esito dell'ultimo
@@ -311,8 +316,10 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
   velocità nella barra in alto sono invece la somma di torrent e aMule. Si
   aggiorna da solo.
 - **Da controllare** — sotto la striscia: i download **fermi** (con il motivo,
-  il prossimo tentativo e quando verranno abbandonati), gli **spostamenti in
-  libreria in sospeso** (destinazione e tentativi) e gli avvisi, gli errori e i
+  il prossimo tentativo e quando verranno abbandonati; il nome si ferma alla
+  stagione/episodio e quello completo compare passando il mouse), gli
+  **spostamenti in libreria in sospeso** (destinazione e tentativi) e gli
+  avvisi, gli errori e i
   recuperi di pack 🛟, uno per download. Un avviso **resta finché il download è
   ancora in sessione** (o ha uno stallo o uno spostamento in sospeso): quando il
   download esce dalla sessione senza nulla in sospeso **sparisce da solo**, e un

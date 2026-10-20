@@ -13,6 +13,14 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **Dashboard: summary in the top bar and readable names.** **Free space** and
+  **Archived magnets** moved from the page body to the far right of the top bar
+  controls row, under the clock, and appear only on the Dashboard; on a wide
+  screen **Italiano** opens that row under the first badge, the Gextto one.
+  Series/Movies and Engine are no longer shown at the top. In **To check** the
+  download name stops at its season/episode (the
+  full name appears on hover), so the reason has room and the table no longer
+  needs side scrolling.
 - **Top bar: Aggiorna and the state next to Add torrent.** The **Aggiorna**
   (refresh) button and the service state dot (the green **ok**) now sit in the
   first row, right after **Add torrent**, instead of the controls row below.

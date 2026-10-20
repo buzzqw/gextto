@@ -77,11 +77,6 @@ html, body {
   backdrop-filter: blur(6px);
 }
 
-/* The dashboard summary is a compact KPI strip: on a desktop it fits all
-   eight indicators on one row, while narrower layouts keep the normal grid. */
-.dashboard-summary-grid {
-  gap: 8px;
-}
 .dashboard-cycle-foot {
   margin-top: 4px;
   align-items: center;
@@ -508,26 +503,6 @@ html, body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-@media (min-width: 1180px) {
-  .dashboard-summary-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .dashboard-summary-grid .metric {
-    gap: 4px;
-    padding: 12px 14px;
-  }
-  .dashboard-summary-grid .metric .metric-sub {
-    font-size: 0.75rem;
-    line-height: 1.2;
-  }
-  .dashboard-summary-grid .metric strong {
-    font-size: 1.5rem;
-  }
-  .dashboard-summary-grid .metric small {
-    font-size: 0.72rem;
-    line-height: 1.2;
-  }
-}
 
 /* The title sizes to its own label, so a long one like "Configurazione" is not
    truncated while a short one like "Dashboard" does not push the operational
@@ -562,8 +537,11 @@ html, body {
 }
 .v2-topbar-sticky .top-controls {
   gap: 5px;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  justify-content: flex-start;
 }
+/* The controls row reads left to right: language, the dashboard summary (only
+   on the Dashboard), then text size, font and theme. */
 .v2-topbar-sticky .top-metric {
   min-width: 84px;
   padding-left: 10px;
@@ -585,9 +563,65 @@ html, body {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* "Da controllare": the reason is what the table is for, so its column keeps a
+   readable width while the long headers wrap instead of pushing the table (and
+   the reason) out of the panel. */
+.dashboard-problems-table thead th { white-space: normal; }
+.dashboard-problems-table .problems-reason { min-width: 16ch; }
+
+/* Dashboard summary moved into the header (series/movies, free space,
+   archived magnets, engine): compact cards matching the top metrics, so the
+   page keeps the row they used to take. */
+.top-kpis {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 5px;
+  flex: none;
+  /* The Dashboard summary sits at the far right of the controls row, under the
+     clock, leaving language and controls at the left. */
+  margin-left: auto;
+}
+.top-kpi {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 48px;
+  padding: 4px 10px;
+  border: 1px solid var(--btn-line);
+  border-radius: var(--radius-sm);
+  background: var(--btn);
+  color: var(--btn-text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.top-kpi-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.top-kpi strong { font-size: 0.86rem; }
+.top-kpi small { font-size: 0.62rem; color: var(--muted); }
 /* Medium desktops cannot fit the title and the full control strip on one line
    without truncating the title, so the chrome stacks: title on its own row,
    controls below. */
+/* Wide screens: the controls row starts in the same column as the metrics, so
+   the language select sits right under the first badge instead of under the
+   page title. :has keeps the settings page (which adds a menu button before the
+   title) on the flex layout. */
+@media (min-width: 1500px) {
+  .v2-topbar-sticky:not(:has(.app-menu-toggle)) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 10px;
+  }
+  .v2-topbar-sticky:not(:has(.app-menu-toggle)) .topbar-title { grid-column: 1; grid-row: 1; }
+  .v2-topbar-sticky:not(:has(.app-menu-toggle)) .top-actions { grid-column: 2; grid-row: 1; }
+  .v2-topbar-sticky:not(:has(.app-menu-toggle)) .top-controls { grid-column: 2; grid-row: 2; }
+}
+
 @media (min-width: 701px) and (max-width: 1499px) {
   .v2-topbar-sticky {
     flex-wrap: wrap;
@@ -1470,7 +1504,6 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
   .dashboard-view { display: flex; flex-direction: column; }
   .dashboard-view > .session-strip-panel { order: 0; }
   .dashboard-view > .dashboard-cycle-panel { order: 1; }
-  .dashboard-view > .dashboard-summary-grid { order: 3; }
   .dashboard-view > .panel:not(.dashboard-search-panel):not(.dashboard-explore-panel):not(.dashboard-feed-panel) { order: 4; }
   .dashboard-view > .dashboard-search-panel { order: 5; }
   .dashboard-view > * { order: 6; }

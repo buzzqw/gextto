@@ -293,6 +293,11 @@ release package the installer uses (README, *Install on Linux*).
   **Font** applies a generic preset, a detected local font or a manually entered
   family to the interface and logs. Installed-font detection depends on browser
   support for the Local Font Access API and may require permission.
+- **Summary in the top bar** — at the far right of the top bar controls row,
+  under the clock, the Dashboard shows two compact badges: **Free space** and
+  **Archived magnets** (with the ones seen in the feeds). They appear only on
+  the Dashboard; other pages do not show them. On a wide screen **Italiano**
+  opens that row under the first badge (Gextto CPU and RAM).
 - **Manual global search** — searches archive + indexers + web engines.
 - **Automatic search** — run a full cycle or a single domain (Series, Movies,
   Comics); shows next run, interval and last-cycle outcome; backup now.
@@ -308,7 +313,8 @@ release package the installer uses (README, *Install on Linux*).
   the **Torrent** one; the speeds in the top bar are the sum of torrents and
   aMule. It refreshes on its own.
 - **To check** — below the strip: **stuck** downloads (with the reason, the
-  next attempt and when they will be abandoned), **pending moves to the
+  next attempt and when they will be abandoned; the name stops at its
+  season/episode and the full one appears on hover), **pending moves to the
   library** (destination and attempts) and the warnings, errors and 🛟 pack
   salvages, one per download. A warning **stays while the download is still in
   the session** (or has a pending stall or move): when the download leaves the

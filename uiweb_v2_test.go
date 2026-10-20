@@ -173,12 +173,12 @@ func TestV2ShellRendersNavigationAndOfficialCss(t *testing.T) {
 	if strings.Contains(body, `class="crumb v2-product-crumb"`) {
 		t.Fatalf("v2 topbar should not duplicate the product name above the page title")
 	}
-	if strings.Count(body, `class="metric"`)+strings.Count(body, `class="metric `) != 4 {
-		t.Fatalf("dashboard summary should contain 4 metric tiles")
+	if got := strings.Count(body, `class="top-kpi"`); got != 2 {
+		t.Fatalf("dashboard summary should contain 2 top-bar badges, got %d", got)
 	}
 	code, css := v2Request(t, server, http.MethodGet, "/static/v2.css", nil)
-	if code != http.StatusOK || !strings.Contains(css, "grid-template-columns: repeat(4, minmax(0, 1fr))") {
-		t.Fatalf("dashboard four-column layout missing -> %d", code)
+	if code != http.StatusOK || !strings.Contains(css, ".top-kpis") {
+		t.Fatalf("top-bar summary layout missing -> %d", code)
 	}
 	if strings.Contains(body, `src="/ui/static/gextto-ui.js"`) {
 		t.Fatal("v2 page must not load the classic UI script")
@@ -348,7 +348,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(script, "/api/search/archive") || !strings.Contains(script, "/api/search/dashboard") || !strings.Contains(script, "data-v2-dashboard-search-filter") {
 		t.Fatalf("dashboard two-phase search missing -> %d", code)
 	}
-	if strings.Index(body, "session-strip-panel") > strings.Index(body, "dashboard-summary-grid") || strings.Index(body, "dashboard-cycle-panel") > strings.Index(body, "dashboard-search-panel") {
+	if strings.Index(body, "session-strip-panel") > strings.Index(body, "dashboard-cycle-panel") || strings.Index(body, "dashboard-cycle-panel") > strings.Index(body, "dashboard-search-panel") {
 		t.Fatalf("dashboard panel order is incorrect")
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
