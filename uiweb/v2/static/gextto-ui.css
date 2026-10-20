@@ -312,11 +312,22 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
   scrollbar-width: thin;
 }
 .top-actions > * { flex: none; }
-/* The chrome carries many controls (language, text size, font, theme, refresh,
-   add torrent): a slightly smaller type on the buttons and the select keeps
-   them all on one line without wrapping. */
+/* The controls (language, text size, font, theme, refresh, state) live on
+   their own line under the metric badges: the badges get the full width and
+   can be larger, while the controls keep a compact type. */
+.top-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 100%;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.top-controls > * { flex: none; }
 .top-actions .btn,
-.top-actions .lang-select { font-size: 0.84rem; }
+.top-actions .lang-select,
+.top-controls .btn,
+.top-controls .lang-select { font-size: 0.84rem; }
 .top-live-metrics { display: contents; }
 
 .icon-btn {
@@ -328,12 +339,12 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 
 .top-metric {
   display: inline-flex; flex-direction: column; justify-content: center;
-  min-width: 74px; height: 44px; padding: 5px 11px;
+  min-width: 86px; height: 48px; padding: 6px 12px;
   border: 1px solid var(--btn-line); border-radius: var(--radius-sm);
   background: var(--btn); color: var(--btn-text); font-variant-numeric: tabular-nums;
 }
-.top-metric-label { color: var(--muted); font-size: 0.64rem; white-space: nowrap; }
-.top-metric strong { font-size: 0.85rem; white-space: nowrap; }
+.top-metric-label { color: var(--muted); font-size: 0.68rem; white-space: nowrap; }
+.top-metric strong { font-size: 0.92rem; white-space: nowrap; }
 .system-pill {
   display: inline-flex; align-items: center; gap: 7px; height: 44px; padding: 0 14px;
   border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 0.78rem;
@@ -347,10 +358,13 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
   .top-actions { flex-wrap: nowrap; overflow-x: auto; }
   .top-actions > .top-metric { display: none; }
   .top-actions .top-live-metrics .top-metric { display: none; }
-  .top-actions > [data-font] { display: none; }
+  .top-actions > [data-font],
+  .top-controls > [data-font] { display: none; }
   .top-actions .lang-select,
   .top-actions .btn,
-  .top-actions .system-pill { min-height: 40px; }
+  .top-controls .lang-select,
+  .top-controls .btn,
+  .top-controls .system-pill { min-height: 40px; }
   .mobile-performance {
     display: block;
     padding: 10px 12px 12px;

@@ -14,6 +14,17 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **eD2k: filtro tra i risultati e Scarica sempre presente.** Sopra i risultati
+  della ricerca eD2k (pagina eD2k e archivio) c'è un riquadro per filtrare per
+  parole nel nome, fonti minime, dimensione minima e file già noti, con
+  l'ordinamento per fonti, dimensione o nome: agisce sui risultati già ricevuti,
+  senza rifare la ricerca. Il pulsante **Scarica** resta su ogni risultato,
+  anche nella ricerca release, che non perde più il riquadro dei risultati dopo
+  la prima ricerca.
+- **Barra in alto più leggibile.** I badge di stato (Gextto, gx-torrent,
+  aMule, velocità, torrent, peer e prossimo ciclo) hanno una riga propria e sono
+  più larghi; **Aggiungi torrent** resta accanto a loro, mentre lingua,
+  dimensione del testo, font, tema e **Aggiorna** passano nella riga sotto.
 - **eD2k: risultati coerenti anche con un'altra ricerca in corso.** aMule ha
   una sola lista di risultati, condivisa con la sua interfaccia e con ogni
   altro strumento collegato: se un'altra ricerca la sostituisce mentre Gextto

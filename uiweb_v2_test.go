@@ -1013,6 +1013,11 @@ func TestV2PanelsPagesRender(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "Ricerca release") {
 		t.Fatalf("search page -> %d", code)
 	}
+	// The results container must survive the swap: with outerHTML the first
+	// search removed #v2-search-results and the next one had no target.
+	if !strings.Contains(body, `hx-post="/search" hx-target="#v2-search-results" hx-swap="innerHTML"`) {
+		t.Fatal("the release search must swap inside #v2-search-results")
+	}
 	// An empty query renders the prompt, not an error.
 	if code, body := v2Request(t, server, http.MethodPost, "/search", url.Values{"q": {""}}); code != http.StatusOK || !strings.Contains(body, "Inserisci una ricerca") {
 		t.Fatalf("empty search -> %d", code)

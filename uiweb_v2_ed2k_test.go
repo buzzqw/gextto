@@ -37,6 +37,19 @@ func TestV2Ed2kPageRenders(t *testing.T) {
 	if err := v2Templates.ExecuteTemplate(&buffer, "v2_ed2k_results", results); err != nil {
 		t.Fatal(err)
 	}
+	body := buffer.String()
+	// Every eD2k result keeps its download button, and the list can be
+	// narrowed without asking aMule for a new search.
+	for _, want := range []string{
+		`data-ed2k-filter`, `data-ed2k-filter-name`, `data-ed2k-filter-sources`,
+		`data-ed2k-name="a.mkv"`, `data-ed2k-size="10"`, `data-ed2k-sources="2"`,
+		">Scarica<", "Parole nel nome", "Fonti minime", "Dimensione minima",
+		"Nascondi già noti", "Ordina per", "Azzera", `data-ed2k-shown`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("results fragment is missing %q", want)
+		}
+	}
 	buffer.Reset()
 	if err := v2Templates.ExecuteTemplate(&buffer, "v2_ed2k_message", map[string]any{"Message": "m", "Detail": "d", "Error": true}); err != nil {
 		t.Fatal(err)

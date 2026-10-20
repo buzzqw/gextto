@@ -71,6 +71,9 @@ html, body {
   position: sticky;
   top: 0;
   z-index: 40;
+  /* Title and metric badges share the first line; the controls take the
+     second one at full width. */
+  flex-wrap: wrap;
   backdrop-filter: blur(6px);
 }
 
@@ -550,21 +553,27 @@ html, body {
 .v2-topbar-sticky .top-actions {
   gap: 5px;
   min-width: 0;
-  /* When the title needs its width and the controls would run off the right
-     edge, they wrap onto a second line instead of being clipped. */
+  /* The badges take the free width next to the title and stay on one line:
+     the controls are below, so they no longer compete for this row. */
+  flex: 1 1 auto;
   flex-wrap: wrap;
+  justify-content: flex-end;
   overflow: visible;
 }
+.v2-topbar-sticky .top-controls {
+  gap: 5px;
+  justify-content: flex-end;
+}
 .v2-topbar-sticky .top-metric {
-  min-width: 64px;
-  padding-left: 7px;
-  padding-right: 7px;
+  min-width: 84px;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 .v2-topbar-sticky .top-metric-rate {
-  min-width: 82px;
+  min-width: 104px;
 }
 .v2-topbar-sticky .top-metric-cycle {
-  min-width: 92px;
+  min-width: 112px;
 }
 .v2-topbar-sticky .top-live-status {
   display: contents;
@@ -875,7 +884,8 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
 
 /* Small screens: the top bar actions scroll instead of overflowing. */
 @media (max-width: 900px) {
-  .top-actions {
+  .top-actions,
+  .top-controls {
     display: flex;
     gap: 6px;
     overflow-x: auto;
@@ -890,7 +900,8 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
   .v2-topbar-sticky {
     padding-top: calc(10px + env(safe-area-inset-top));
   }
-  .v2-topbar-sticky .top-actions {
+  .v2-topbar-sticky .top-actions,
+  .v2-topbar-sticky .top-controls {
     flex-wrap: nowrap;
     overflow-x: auto;
   }
@@ -911,6 +922,15 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
     display: contents;
   }
 }
+
+/* eD2k results: the filter bar narrows the list already fetched from aMule. */
+.ed2k-filter { align-items: flex-end; }
+.ed2k-filter .field.compact { min-width: 0; }
+.ed2k-filter .field.compact > span { font-size: 0.72rem; }
+.ed2k-filter input[type="number"] { width: 7rem; }
+.ed2k-filter-size { display: inline-flex; align-items: center; gap: 4px; }
+.ed2k-filter-size select { width: 5.5rem; }
+.data-table tr[hidden] { display: none; }
 
 /* v2 widgets: card grids and the maintenance review tables. */
 .v2-content-filter-tools-grid {
@@ -1300,8 +1320,10 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
   details.add-torrent-panel:not([open]) { display: none; }
 }
 /* On a phone the toggle keeps only its "＋" (the accessible name stays on the
-   button), so it fits beside Tema and Aggiorna at 320 px. */
-@media (max-width: 560px) {
+   button), so it fits beside Tema and Aggiorna at 320 px. Below 1500 px the
+   label costs as much as a badge: the plus alone keeps the button beside the
+   badges on the upper row instead of pushing it to a line of its own. */
+@media (max-width: 1499px) {
   .add-torrent-toggle-label { display: none; }
   .add-torrent-toggle { padding: 0 12px; }
 }
@@ -1342,10 +1364,17 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
   /* --- Top bar: title, service state and a small refresh, on one row ---- */
   .topbar.v2-topbar-sticky {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     padding-top: calc(8px + env(safe-area-inset-top));
     padding-bottom: 8px;
+  }
+  .v2-topbar-sticky .top-controls {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    gap: 6px;
+    overflow-x: auto;
   }
   .v2-topbar-sticky .topbar-title { flex: 1 1 auto; min-width: 0; }
   .v2-topbar-sticky .topbar-title h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

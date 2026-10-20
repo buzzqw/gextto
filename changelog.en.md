@@ -13,6 +13,17 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **eD2k: filter the results and Scarica always there.** Above the eD2k search
+  results (eD2k page and archive) there is a box to filter by words in the name,
+  minimum sources, minimum size and already-known files, with sorting by
+  sources, size or name: it works on the results already received, without
+  running the search again. The **Scarica** button stays on every result, also
+  in the release search, which no longer loses its results box after the first
+  search.
+- **Clearer top bar.** The status badges (Gextto, gx-torrent, aMule, speeds,
+  torrents, peers and next cycle) have a row of their own and are wider;
+  **Add torrent** stays beside them, while language, text size, font, theme and
+  **Refresh** move to the row below.
 - **eD2k: consistent results even with another search running.** aMule has a
   single result list, shared with its own interface and with every other
   connected tool: if another search replaces it while Gextto is searching,

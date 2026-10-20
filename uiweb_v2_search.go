@@ -100,17 +100,18 @@ func v2SearchViewFrom(s *AppState, query, redirect string, kad bool) v2SearchVie
 				Results []models.Release `json:"results"`
 			}
 			if json.Unmarshal(raw, &payload) == nil {
-				_, ed2kDownload := ed2kAvailability(latestConfig(s))
 				for _, release := range payload.Results {
 					encoded, _ := json.Marshal(release)
-					ed2kResult := release.Network == "ed2k" || release.Ed2kLink != ""
 					view.Results = append(view.Results, v2SearchResult{
-						Title:       release.Title,
-						Source:      v2SearchSource(release),
-						Network:     release.Network,
-						Sources:     release.Sources,
-						Ed2kLink:    release.Ed2kLink,
-						Addable:     !ed2kResult || ed2kDownload,
+						Title:    release.Title,
+						Source:   v2SearchSource(release),
+						Network:  release.Network,
+						Sources:  release.Sources,
+						Ed2kLink: release.Ed2kLink,
+						// eD2k files came from aMule, so they can always be queued:
+						// re-checking the integration here used to hide the button
+						// after a search when that check failed for a moment.
+						Addable:     true,
 						Score:       release.Score,
 						Seeders:     release.Seeders,
 						SizeBytes:   release.SizeBytes,

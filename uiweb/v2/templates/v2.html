@@ -90,6 +90,9 @@
       </div>
       <div class="top-actions">
         {{template "v2_live_top_metrics" .Chrome}}
+        <button class="btn add-torrent-toggle" type="button" data-add-torrent-toggle aria-label="Aggiungi torrent" title="Apri o chiudi il modulo per aggiungere un torrent"{{if eq .Page "downloads"}} aria-expanded="false" aria-controls="v2-add-torrent"{{end}}><span aria-hidden="true">＋</span><span class="add-torrent-toggle-label">Aggiungi torrent</span></button>
+      </div>
+      <div class="top-controls">
         <form method="post" action="/language" class="lang-form">
           <select class="lang-select" name="lang" aria-label="Lingua dell'interfaccia" title="Lingua dell'interfaccia" onchange="this.form.submit()">
             <option value="it"{{if eq .Chrome.Lang "it"}} selected{{end}}>Italiano</option>
@@ -105,7 +108,6 @@
         <button class="btn" type="button" data-font="+5" title="Testo più grande">A+</button>
         <button class="btn" type="button" data-font-open title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog">Font</button>
         <button class="btn" type="button" hx-get="/theme" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli il tema dell'interfaccia o creane uno" aria-haspopup="dialog">Tema</button>
-        <button class="btn add-torrent-toggle" type="button" data-add-torrent-toggle aria-label="Aggiungi torrent" title="Apri o chiudi il modulo per aggiungere un torrent"{{if eq .Page "downloads"}} aria-expanded="false" aria-controls="v2-add-torrent"{{end}}><span aria-hidden="true">＋</span><span class="add-torrent-toggle-label">Aggiungi torrent</span></button>
         <button class="btn btn-refresh" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati" aria-label="Ricarica i dati mostrati"><span class="btn-refresh-icon" aria-hidden="true">↺</span><span class="btn-refresh-label">Aggiorna</span></button>
         {{template "v2_live_status" .Chrome}}
       </div>
@@ -188,7 +190,7 @@
   <div class="top-metric top-metric-rate" title="Velocità di upload"><span class="top-metric-label">↑ Upload</span><strong>{{.Upload}}</strong></div>
   <div class="top-metric" title="Torrent nella sessione"><span class="top-metric-label">Torrent</span><strong>{{.Torrents}}</strong></div>
   <div class="top-metric" title="Peer connessi / Seed"><span class="top-metric-label">P/S</span><strong>{{.Peers}}/{{.Seeds}}</strong></div>
-  <div class="top-metric" title="Tempo stimato al prossimo ciclo"><span class="top-metric-label">Prossimo ciclo</span><strong>{{.NextCycle}}</strong></div>
+  <div class="top-metric top-metric-cycle" title="Tempo stimato al prossimo ciclo"><span class="top-metric-label">Prossimo ciclo</span><strong>{{.NextCycle}}</strong></div>
 </div>
 {{end}}
 
@@ -1743,17 +1745,28 @@
 {{define "v2_ed2k_results"}}
 {{if .Error}}<p class="alert" role="alert"><span>{{.Error}}</span>{{if .Detail}} {{.Detail}}{{end}}</p>{{end}}
 {{if .Results}}
+<div data-ed2k-results>
 <p class="muted" role="status">{{len .Results}} <span>risultati per</span> «{{.Query}}»</p>
+<div class="toolbar ed2k-filter" data-ed2k-filter role="group" aria-label="Filtra risultati">
+  <label class="field compact"><span>Parole nel nome</span><input class="input" type="search" data-ed2k-filter-name placeholder="Filtra…" aria-label="Filtra i risultati per parole nel nome" /></label>
+  <label class="field compact"><span>Fonti minime</span><input class="input" type="number" min="0" step="1" value="0" data-ed2k-filter-sources aria-label="Numero minimo di fonti" /></label>
+  <label class="field compact"><span>Dimensione minima</span><span class="ed2k-filter-size"><input class="input" type="number" min="0" step="1" value="0" data-ed2k-filter-size aria-label="Dimensione minima" /><select class="input" data-ed2k-filter-unit aria-label="Unità della dimensione minima"><option value="1048576">MB</option><option value="1073741824">GB</option></select></span></label>
+  <label class="check"><input type="checkbox" data-ed2k-filter-known /> <span>Nascondi già noti</span></label>
+  <label class="field compact"><span>Ordina per</span><select class="input" data-ed2k-filter-sort aria-label="Ordina i risultati"><option value="">Fonti</option><option value="size-desc">Dimensione ↓</option><option value="size-asc">Dimensione ↑</option><option value="name">Nome</option></select></label>
+  <button class="btn sm" type="button" data-ed2k-filter-reset>Azzera</button>
+  <span class="muted" role="status"><span data-ed2k-shown>{{len .Results}}</span> / {{len .Results}} <span>risultati</span></span>
+</div>
 <div class="table-wrap" role="region" aria-label="Risultati eD2k"><table class="data-table">
   <caption class="sr-only">Risultati della ricerca eD2k</caption>
   <thead><tr><th scope="col">Nome</th><th scope="col" class="numeric">Dimensione</th><th scope="col" class="numeric">Fonti</th><th scope="col">Azioni</th></tr></thead>
-  <tbody>{{range .Results}}<tr>
+  <tbody>{{range .Results}}<tr{{if .Known}} data-ed2k-known="1"{{end}} data-ed2k-name="{{.Name}}" data-ed2k-size="{{.Size}}" data-ed2k-sources="{{.Sources}}">
     <td><span class="truncate" title="{{.Name}}">{{.Name}}</span>{{if .Known}} <span class="badge" title="aMule conosce già questo file: è in coda, scaricato o condiviso">già noto</span>{{end}}</td>
     <td class="numeric">{{bytes .Size}}</td>
     <td class="numeric" title="Fonti totali / complete">{{.Sources}} / {{.Complete}}</td>
     <td class="row-actions"><form method="post" action="/ed2k/add" hx-post="/ed2k/add" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="links" value="{{.Link}}"><button class="btn sm primary" type="submit" title="Aggiungi questo file ai download di aMule" aria-label="Scarica {{.Name}}">Scarica</button></form></td>
   </tr>{{end}}</tbody>
 </table></div>
+</div>
 {{else if and .Done (not .Error)}}<p class="muted" role="status"><span>Nessun risultato per</span> «{{.Query}}».</p>{{end}}
 {{end}}
 
@@ -2664,12 +2677,12 @@
   <div class="panel">
     <div class="panel-head"><h3>Ricerca release</h3><small class="muted">Feed, indexer e motori web (fino a 90 s)</small></div>
     <div class="panel-body">
-      <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-search-results" hx-swap="outerHTML">
+      <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-search-results" hx-swap="innerHTML">
         <input type="search" name="q" value="{{.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
         <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
         <button class="btn primary" type="submit">Cerca</button>
       </form>
-      <form class="search-row" method="post" action="/search/link" hx-post="/search/link" hx-target="#v2-search-results" hx-swap="outerHTML">
+      <form class="search-row" method="post" action="/search/link" hx-post="/search/link" hx-target="#v2-search-results" hx-swap="innerHTML">
         <textarea class="input" name="ed2k_link" rows="2" aria-label="Link eD2k, uno per riga" placeholder="ed2k://|file|…" title="Incolla uno o più link eD2k, uno per riga (o separati da spazi)."></textarea>
         <button class="btn" type="submit" title="Controlla i link eD2k e mostrali come risultati">Apri link eD2k</button>
       </form>
@@ -2701,7 +2714,7 @@
       <form method="post" action="/search/add" hx-post="/search/add" hx-swap="none" style="display:inline">
         <input type="hidden" name="release" value="{{.ReleaseJSON}}" />
         <input type="hidden" name="redirect" value="{{$.Redirect}}" />
-        <button class="btn sm primary" type="submit">Aggiungi</button>
+        <button class="btn sm primary" type="submit">{{if eq .Network "ed2k"}}Scarica{{else}}Aggiungi{{end}}</button>
       </form>
       {{else}}
       <span class="badge" title="aMule non è attivo o non è raggiungibile.">Solo ricerca</span>

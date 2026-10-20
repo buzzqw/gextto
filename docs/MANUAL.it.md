@@ -830,7 +830,10 @@ alto e un Kad non dietro firewall, cioè più fonti.
   sola** lista di risultati, condivisa con la sua interfaccia e con ogni altro
   strumento collegato: se un'altra ricerca la sostituisce mentre Gextto cerca,
   Gextto rifà la ricerca e, se il disturbo continua, chiede di riprovare tra
-  qualche secondo invece di mostrare file non attinenti.
+  qualche secondo invece di mostrare file non attinenti. Sopra i risultati c'è
+  il filtro (**Parole nel nome**, **Fonti minime**, **Dimensione minima**,
+  **Nascondi già noti**, **Ordina per**): lavora sui risultati già ricevuti da
+  aMule, quindi non fa ripartire la ricerca.
 - **Incolla link eD2k**: uno o più link `ed2k://`, anche mescolati a testo;
   **Scarica con aMule** li aggiunge tutti.
 - **Log di aMule**: **Carica il log** mostra le ultime righe del log di amuled.

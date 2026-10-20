@@ -1861,5 +1861,88 @@
   });
   document.addEventListener("htmx:afterSwap", function (event) { syncScheduleRows(event.target); });
 
-  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); openAddFormFromAnchor(); initPullToRefresh(); initLiveMetrics(); syncScheduleRows(document); });
+  // ------------------------------------------------------ eD2k results --
+  // The eD2k filters work on the files aMule already returned: narrowing the
+  // list costs no new search (which would take the configured seconds again)
+  // and behaves the same on the eD2k page and in the archive block.
+  function applyEd2kFilter(panel) {
+    var bar = panel.querySelector("[data-ed2k-filter]");
+    var tbody = panel.querySelector("tbody");
+    if (!bar || !tbody) return;
+    var name = bar.querySelector("[data-ed2k-filter-name]");
+    var sources = bar.querySelector("[data-ed2k-filter-sources]");
+    var size = bar.querySelector("[data-ed2k-filter-size]");
+    var unit = bar.querySelector("[data-ed2k-filter-unit]");
+    var known = bar.querySelector("[data-ed2k-filter-known]");
+    var sort = bar.querySelector("[data-ed2k-filter-sort]");
+    var shown = panel.querySelector("[data-ed2k-shown]");
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr[data-ed2k-name]"));
+    var original = rows.slice();
+    if (!name || !sources || !size || !unit || !known || !sort) return;
+    function value(row, key) {
+      return row.getAttribute("data-ed2k-" + key) || "";
+    }
+    function run() {
+      var term = (name.value || "").trim().toLowerCase();
+      var minSources = parseInt(sources.value, 10) || 0;
+      var minSize = (parseFloat(size.value) || 0) * (parseInt(unit.value, 10) || 1048576);
+      var hideKnown = known.checked;
+      var visible = 0;
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        var ok = (!term || value(row, "name").toLowerCase().indexOf(term) >= 0) &&
+          (parseInt(value(row, "sources"), 10) || 0) >= minSources &&
+          (parseInt(value(row, "size"), 10) || 0) >= minSize &&
+          (!hideKnown || value(row, "known") !== "1");
+        row.hidden = !ok;
+        if (ok) visible++;
+      }
+      if (shown) shown.textContent = String(visible);
+      var order = sort.value;
+      if (order === "name") {
+        rows.slice().sort(function (a, b) {
+          return value(a, "name").localeCompare(value(b, "name"));
+        }).forEach(function (row) { tbody.appendChild(row); });
+      } else if (order === "size-desc" || order === "size-asc") {
+        var sign = order === "size-asc" ? 1 : -1;
+        rows.slice().sort(function (a, b) {
+          return sign * ((parseInt(value(a, "size"), 10) || 0) - (parseInt(value(b, "size"), 10) || 0));
+        }).forEach(function (row) { tbody.appendChild(row); });
+      } else {
+        original.forEach(function (row) { tbody.appendChild(row); });
+      }
+    }
+    var controls = [name, sources, size, unit, known, sort];
+    for (var i = 0; i < controls.length; i++) {
+      controls[i].addEventListener("input", run);
+      controls[i].addEventListener("change", run);
+    }
+    var reset = bar.querySelector("[data-ed2k-filter-reset]");
+    if (reset) {
+      reset.addEventListener("click", function () {
+        name.value = "";
+        sources.value = "0";
+        size.value = "0";
+        unit.value = "1048576";
+        known.checked = false;
+        sort.value = "";
+        run();
+        name.focus();
+      });
+    }
+    run();
+  }
+  function initEd2kFilters(root) {
+    var scope = (root && root.querySelectorAll) ? root : document;
+    var panels = Array.prototype.slice.call(scope.querySelectorAll("[data-ed2k-results]"));
+    if (scope.matches && scope.matches("[data-ed2k-results]")) panels.push(scope);
+    for (var i = 0; i < panels.length; i++) {
+      if (panels[i].getAttribute("data-ed2k-ready")) continue;
+      panels[i].setAttribute("data-ed2k-ready", "1");
+      applyEd2kFilter(panels[i]);
+    }
+  }
+  document.addEventListener("htmx:afterSwap", function (event) { initEd2kFilters(event.target); });
+
+  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); openAddFormFromAnchor(); initPullToRefresh(); initLiveMetrics(); syncScheduleRows(document); initEd2kFilters(document); });
 })();

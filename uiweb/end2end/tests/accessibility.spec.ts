@@ -74,7 +74,9 @@ test.describe("accessibilità automatizzata", () => {
     await page.route("**/search", async (route) => {
       await route.fulfill({
         contentType: "text/html; charset=utf-8",
-        body: `<div id="v2-search-results"><p>Risultati per test</p><table class="data-table"><tbody><tr><td>Test release</td></tr></tbody></table></div>`,
+        // The form swaps inside #v2-search-results, so the response is the
+        // content of the container, not a new container.
+        body: `<p>Risultati per test</p><table class="data-table"><tbody><tr><td>Test release</td></tr></tbody></table>`,
       });
     });
     await page.goto("/?view=search");

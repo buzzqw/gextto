@@ -811,7 +811,10 @@ which means more sources.
   list, shared with its own interface and with every other connected tool: if
   another search replaces it while Gextto is searching, Gextto runs the search
   again and, if the interference continues, asks to try again in a few seconds
-  instead of showing unrelated files.
+  instead of showing unrelated files. Above the results there is a filter
+  (**Words in the name**, **Minimum sources**, **Minimum size**, **Hide
+  already known**, **Sort the results**): it works on the results aMule already
+  returned, so it does not start a new search.
 - **Paste eD2k links**: one or more `ed2k://` links, even mixed with text;
   **Download with aMule** adds them all.
 - **aMule log**: **Load the log** shows the last lines of amuled's log.
