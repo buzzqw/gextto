@@ -14,6 +14,11 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **Episodi multipli nello stesso file: il nome porta l'intervallo.** Quando un
+  download copre più episodi contigui (per esempio `S01E01E02`), il file in
+  libreria viene rinominato `S01E01-E02`: Jellyfin e Plex elencano entrambi gli
+  episodi e la scansione degli archivi registra il file sotto ciascuno di essi.
+  Un intervallo non contiguo resta nominato con il primo episodio.
 - **eD2k: i film completati da aMule entrano in libreria.** Prima un film
   scaricato via aMule con la cartella libreria configurata non veniva importato:
   restava in un ciclo di spostamenti falliti. Ora viene copiato o linkato come

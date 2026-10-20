@@ -13,6 +13,11 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **Several episodes in one file: the name carries the range.** When a download
+  covers contiguous episodes (for example `S01E01E02`), the library file is
+  renamed `S01E01-E02`: Jellyfin and Plex list both episodes and the archive
+  scan registers the file under each of them. A non-contiguous range keeps the
+  first episode in the name.
 - **eD2k: movies completed by aMule reach the library.** A movie downloaded
   through aMule with the library folder configured was not imported: it stayed
   in a loop of failed moves. It is now copied or linked like an episode and goes

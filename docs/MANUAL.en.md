@@ -869,7 +869,10 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   searches, upgrades, post-processing, archive records and rescoring; it also
   includes the size bonus. Use **Maintenance → Rescore** after changing weights.
   - **Rename** — rename enable, template editor with tokens and live preview,
-  TMDB/TVDB keys, language and upgrade thresholds. Verification recovers
+  TMDB/TVDB keys, language and upgrade thresholds. One file holding several
+  contiguous episodes is named with the range (`S01E01-E02`), so media servers
+  list both episodes; a non-contiguous range falls back to the first episode.
+  Verification recovers
   the source token from the original release title stored in the database and
   drops empty placeholder blocks (`[]`), so a lost `[WEB-DL]` is restored instead
   of staying `unknown`.

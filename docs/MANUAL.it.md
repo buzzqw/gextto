@@ -888,7 +888,10 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   post-processing, archivio e rescore; comprende anche il bonus dimensione. Usa
   **Manutenzione → Ricalcola scoring** dopo aver cambiato i pesi.
   - **Rinomina** — abilita rinomina, editor del template con token e anteprima,
-  chiavi TMDB/TVDB, lingua e soglie di upgrade. La verifica recupera il
+  chiavi TMDB/TVDB, lingua e soglie di upgrade. Un file che copre più episodi
+  contigui viene nominato con l'intervallo (`S01E01-E02`), così i media server
+  elencano entrambi gli episodi; un intervallo non contiguo torna al primo
+  episodio. La verifica recupera il
   token sorgente dal titolo originale della release nel database ed elimina i
   blocchi placeholder vuoti (`[]`), così un `[WEB-DL]` perso viene ripristinato
   invece di restare `unknown`.

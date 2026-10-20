@@ -1074,10 +1074,26 @@ func PreviewEpisodeRename(
 // season/episode identity (S01E02, 1x02, …).
 func filenameMatchesEpisode(name string, season, episode int64) bool {
 	lower := strings.ToLower(name)
-	return strings.Contains(lower, fmt.Sprintf("s%02de%02d", season, episode)) ||
+	if strings.Contains(lower, fmt.Sprintf("s%02de%02d", season, episode)) ||
 		strings.Contains(lower, fmt.Sprintf("s%de%d", season, episode)) ||
 		strings.Contains(lower, fmt.Sprintf("%dx%02d", season, episode)) ||
-		strings.Contains(lower, fmt.Sprintf("%dx%d", season, episode))
+		strings.Contains(lower, fmt.Sprintf("%dx%d", season, episode)) {
+		return true
+	}
+	// A multi-episode file ("S01E01-E02", also the scene form "S01E01E02")
+	// covers every episode of its range.
+	pattern := utils.MustCachedRegex(`(?i)s(\d{1,2})e(\d{1,4})(?:[-–]e?|e)(\d{1,4})`)
+	captures := pattern.FindStringSubmatch(name)
+	if captures == nil {
+		return false
+	}
+	nameSeason, errSeason := strconv.Atoi(captures[1])
+	first, errFirst := strconv.Atoi(captures[2])
+	last, errLast := strconv.Atoi(captures[3])
+	if errSeason != nil || errFirst != nil || errLast != nil {
+		return false
+	}
+	return int64(nameSeason) == season && int64(first) <= episode && episode <= int64(last)
 }
 
 // episodeTarget computes the (source, target) rename pair for an episode
@@ -1209,18 +1225,68 @@ func episodeTarget(
 	}
 	effective := release.Quality
 	effective.Resolution, effective.Codec, effective.Audio, effective.HDR = resolution, codec, audio, hdr
-	targetStem := renderEpisodeName(cfg, series.Name, title, season, episode, effective, audioFull, channels, language)
+	targetStem := renderEpisodeName(cfg, series.Name, title, season, episodeFileRun(release), effective, audioFull, channels, language)
 	targetStem = cleanupFilename(sanitizeInvalid(targetStem))
 	targetName := fmt.Sprintf("%s.%s", targetStem, extension)
 	target := filepath.Join(filepath.Dir(source), targetName)
 	return source, target, true, nil
 }
 
+// episodeFileRun is the run of episodes one file holds, used to name it: a
+// single episode, or a contiguous multi-episode run ("S01E01-E02") that media
+// servers list as every episode. Anything that is not a clean contiguous run
+// falls back to the first episode, so a name never claims an episode the file
+// may not contain.
+func episodeFileRun(release *models.Release) []int64 {
+	if release == nil {
+		return nil
+	}
+	first := int64(0)
+	if release.Episode != nil {
+		first = *release.Episode
+	}
+	seen := make(map[int64]bool, len(release.EpisodeRange))
+	run := make([]int64, 0, len(release.EpisodeRange))
+	for _, episode := range release.EpisodeRange {
+		if episode < 0 || seen[episode] {
+			continue
+		}
+		seen[episode] = true
+		run = append(run, episode)
+	}
+	sort.Slice(run, func(i, j int) bool { return run[i] < run[j] })
+	if len(run) < 2 || first <= 0 || run[0] != first {
+		if first > 0 || len(run) == 0 {
+			return []int64{first}
+		}
+		return run[:1]
+	}
+	for index := 1; index < len(run); index++ {
+		if run[index] != run[index-1]+1 {
+			return []int64{first}
+		}
+	}
+	return run
+}
+
+// episodeNameMarker renders the episode part of a file name: "E01", or
+// "E01-E02" for a contiguous multi-episode file.
+func episodeNameMarker(episodes []int64) string {
+	if len(episodes) == 0 {
+		return ""
+	}
+	if len(episodes) == 1 {
+		return fmt.Sprintf("E%02d", episodes[0])
+	}
+	return fmt.Sprintf("E%02d-E%02d", episodes[0], episodes[len(episodes)-1])
+}
+
 // renderEpisodeName renders the configured rename format for one episode from
 // already-resolved components. It is the single place the {Token} template is
 // applied, so the import/rename path and the folder-rename review tool produce
 // the same name.
-func renderEpisodeName(cfg *Config, seriesName, title string, season, episode int64, quality models.Quality, audioFull, channels, language string) string {
+func renderEpisodeName(cfg *Config, seriesName, title string, season int64, episodes []int64, quality models.Quality, audioFull, channels, language string) string {
+	marker := episodeNameMarker(episodes)
 	token := func(value string) string {
 		value = strings.TrimSpace(value)
 		if value == "" || strings.EqualFold(value, "unknown") {
@@ -1229,19 +1295,19 @@ func renderEpisodeName(cfg *Config, seriesName, title string, season, episode in
 		return value
 	}
 	if cfg == nil {
-		return fmt.Sprintf("%s - S%02dE%02d - %s", seriesName, season, episode, title)
+		return fmt.Sprintf("%s - S%02d%s - %s", seriesName, season, marker, title)
 	}
 	seriesName = sanitizeInvalid(seriesName)
 	switch cfg.RenameFormat {
 	case "standard":
 		return fmt.Sprintf(
-			"%s - S%02dE%02d - %s [%s][%s]",
-			seriesName, season, episode, title, token(quality.Resolution), token(quality.Codec),
+			"%s - S%02d%s - %s [%s][%s]",
+			seriesName, season, marker, title, token(quality.Resolution), token(quality.Codec),
 		)
 	case "full", "completo":
 		return fmt.Sprintf(
-			"%s - S%02dE%02d - %s [%s][%s][%s][%s][%s]",
-			seriesName, season, episode, title, token(quality.Resolution), token(quality.Audio), token(quality.HDR), token(quality.Codec), token(language),
+			"%s - S%02d%s - %s [%s][%s][%s][%s][%s]",
+			seriesName, season, marker, title, token(quality.Resolution), token(quality.Audio), token(quality.HDR), token(quality.Codec), token(language),
 		)
 	case "custom":
 		sourceToken := token(sourceLabel(quality.Source))
@@ -1249,7 +1315,7 @@ func renderEpisodeName(cfg *Config, seriesName, title string, season, episode in
 		replacements := []struct{ from, to string }{
 			{"{Serie}", seriesName},
 			{"{Stagione}", fmt.Sprintf("S%02d", season)},
-			{"{Episodio}", fmt.Sprintf("E%02d", episode)},
+			{"{Episodio}", marker},
 			{"{Titolo}", title},
 			{"{Source}", sourceToken},
 			{"{Sorgente}", sourceToken},
@@ -1267,7 +1333,7 @@ func renderEpisodeName(cfg *Config, seriesName, title string, season, episode in
 		}
 		return rendered
 	default:
-		return fmt.Sprintf("%s - S%02dE%02d - %s", seriesName, season, episode, title)
+		return fmt.Sprintf("%s - S%02d%s - %s", seriesName, season, marker, title)
 	}
 }
 

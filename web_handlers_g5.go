@@ -168,6 +168,30 @@ func gh5_parseSeasonEpisode(name string) (int64, int64, bool) {
 	return 0, 0, false
 }
 
+// gh5_parseSeasonEpisodes parses the season and every episode a file name
+// carries: one episode, or the contiguous range of a multi-episode file
+// ("S01E01-E02"), so an archive scan registers the file under each of them.
+func gh5_parseSeasonEpisodes(name string) (int64, []int64, bool) {
+	rangePattern := regexp.MustCompile(`(?i)\bs(?:tagione)?\s*(\d{1,2})\s*e(?:p(?:isodio)?)?\.?\s*(\d{1,4})(?:[-–]e?|e)(\d{1,4})\b`)
+	if match := rangePattern.FindStringSubmatch(name); match != nil {
+		season, errSeason := strconv.ParseInt(match[1], 10, 64)
+		first, errFirst := strconv.ParseInt(match[2], 10, 64)
+		last, errLast := strconv.ParseInt(match[3], 10, 64)
+		if errSeason == nil && errFirst == nil && errLast == nil && last >= first && last-first < 100 {
+			episodes := make([]int64, 0, last-first+1)
+			for episode := first; episode <= last; episode++ {
+				episodes = append(episodes, episode)
+			}
+			return season, episodes, true
+		}
+	}
+	season, episode, ok := gh5_parseSeasonEpisode(name)
+	if !ok {
+		return 0, nil, false
+	}
+	return season, []int64{episode}, true
+}
+
 // gh5_scanArchivePath mirrors the web module `scan_archive_path`.
 func gh5_scanArchivePath(db *Database, series *SeriesConfig, path string, cfg *Config) (int, int, error) {
 	info, err := os.Stat(path)
@@ -182,8 +206,8 @@ func gh5_scanArchivePath(db *Database, series *SeriesConfig, path string, cfg *C
 	updated := 0
 	for _, file := range files {
 		name := filepath.Base(file)
-		season, episode, ok := gh5_parseSeasonEpisode(name)
-		if !ok || season <= 0 || episode <= 0 {
+		season, episodes, ok := gh5_parseSeasonEpisodes(name)
+		if !ok || season <= 0 || len(episodes) == 0 || episodes[0] <= 0 {
 			continue
 		}
 		// Never register a broken file as the archived copy: a zero-filled or
@@ -203,8 +227,10 @@ func gh5_scanArchivePath(db *Database, series *SeriesConfig, path string, cfg *C
 			title = name
 		}
 		qualityScore := cfg.FileScore(file, "series", series.Name)
-		if syncErr := db.SyncArchiveFileScored(series.Name, season, episode, title, file, size, qualityScore); syncErr != nil {
-			return found, updated, syncErr
+		for _, episode := range episodes {
+			if syncErr := db.SyncArchiveFileScored(series.Name, season, episode, title, file, size, qualityScore); syncErr != nil {
+				return found, updated, syncErr
+			}
 		}
 		updated++
 	}

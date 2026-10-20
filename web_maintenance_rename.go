@@ -526,7 +526,7 @@ func folderRenameTarget(cfg *Config, path string, item folderRenameItem, candida
 		} else if strings.TrimSpace(quality.Language) != "" {
 			language = strings.ToUpper(quality.Language)
 		}
-		stem := renderEpisodeName(cfg, candidate.Title, safeComponent(title), *item.Season, *item.Episode, quality, folderRenameAudioLabel(quality.Audio), "", language)
+		stem := renderEpisodeName(cfg, candidate.Title, safeComponent(title), *item.Season, []int64{*item.Episode}, quality, folderRenameAudioLabel(quality.Audio), "", language)
 		return filepath.Join(filepath.Dir(path), cleanupFilename(sanitizeInvalid(stem))+"."+ext)
 	}
 	name := candidate.Title

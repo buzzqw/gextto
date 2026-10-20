@@ -72,9 +72,9 @@ and maintenance built in).
 (named quality profiles, custom formats, a delay per profile), at **manual
 import** (matching an existing file and choosing what it replaces) and at the
 **ecosystem/API** (Overseerr/Jellyseerr speak `/api/v3`). Gextto parses
-multi-episode, specials and daily releases and records every episode of a
-multi-episode file, but it names the archived file after the first episode only
-and it has no manual import. It is better at single scope, integrated engine,
+multi-episode, specials and daily releases, records every episode of a
+multi-episode file and names it with the episode range, but it has no manual
+import. It is better at single scope, integrated engine,
 explainability, footprint and simplicity. The verdict is unchanged: **an
 alternative for new installations**, without claiming parity. What it would take
 to close each gap is in §8.
@@ -748,12 +748,10 @@ without copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
   `languageprofile`, `rootfolder`, `tag`, `series/lookup` + `POST series`,
   `movie/lookup` + `POST movie`, `queue`), after named profiles, root folders and tags,
   and tested against a real Jellyseerr; full compatibility is not realistic.
-- **Manual import, and multi-episode naming**: study the behaviour and reimplement
-  it, building our own corpus from real names. Multi-episode, specials and daily
-  names are already parsed and every episode of a multi-episode file is recorded;
-  what is missing is a file name that carries the range (so a media server lists
-  every episode) and a manual import that matches an existing file and chooses
-  what it replaces.
+- **Manual import**: matching an existing file, choosing what it replaces and
+  where it goes. Multi-episode, specials and daily names are already parsed,
+  every episode of a multi-episode file is recorded, and the archived name
+  carries the range (`S01E01-E02`), so a media server lists all of them.
 
 **Closed with data**, so the ground is not re-covered: replacing `internal/dht` with an
 external DHT (the API model differs and it would drop the dual-stack/shared-socket
