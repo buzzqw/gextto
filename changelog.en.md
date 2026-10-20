@@ -13,6 +13,17 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **Pieces: the map shows on a stopped torrent too.** Opening the details of a
+  paused or parked torrent, the **Pieces** tab said “metadata not yet present”
+  even at 99% downloaded. The verified pieces are there: the map now shows them,
+  with the missing ones in grey.
+- **Search: eD2k results can be queued too.** In the manual search, eD2k results
+  showed “Search only” with no **Add**, as if they could not be downloaded. They
+  now queue like torrents: the `ed2k://` link goes to aMule. With the
+  integration off the eD2k results do not appear, instead of sitting there
+  without an action.
+- **Search bar: the button is one line tall again.** **Open eD2k links** is no
+  longer as tall as the link field: it keeps a normal button height.
 - **eD2k: the box says eD2k, and the link button stays on one line.** In the
   Downloads search (and the other search boxes) the checkbox is no longer
   called “Kad” but **eD2k**: the network is the one chosen in Configuration →

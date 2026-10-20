@@ -3,6 +3,7 @@ package torrent
 import (
 	"testing"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 )
 
@@ -32,5 +33,36 @@ func TestFileStatsFromPieces(t *testing.T) {
 		if stat.Path() == "d" && stat.BytesCompleted != 5 {
 			t.Errorf("d: completed %d, want 5", stat.BytesCompleted)
 		}
+	}
+}
+
+func TestPieceStatesFromBitfield(t *testing.T) {
+	info := &metainfo.Info{NumPieces: 5}
+	bits := bitfield.New(5)
+	for _, index := range []uint32{0, 1, 3} {
+		bits.Set(index)
+	}
+	skip := bitfield.New(5)
+	skip.Set(4)
+
+	states := pieceStatesFromBitfield(info, bits, skip)
+	want := []string{"have", "have", "", "have", "skipped"}
+	if len(states) != len(want) {
+		t.Fatalf("states = %v, want %v", states, want)
+	}
+	for index := range want {
+		if states[index] != want[index] {
+			t.Fatalf("states = %v, want %v", states, want)
+		}
+	}
+	if got := pieceStatesFromBitfield(nil, bits, nil); got != nil {
+		t.Fatalf("without info = %v, want nil", got)
+	}
+	if got := pieceStatesFromBitfield(info, nil, nil); got != nil {
+		t.Fatalf("without bitfield = %v, want nil", got)
+	}
+	// No skip bitfield at all: everything not have/missing.
+	if got := pieceStatesFromBitfield(info, bits, nil); len(got) != 5 || got[4] != "" {
+		t.Fatalf("without skip = %v", got)
 	}
 }

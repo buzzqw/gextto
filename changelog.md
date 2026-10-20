@@ -14,6 +14,18 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **Pezzi: la mappa si vede anche a torrent fermo.** Aprendo i dettagli di un
+  torrent in pausa o parcheggiato, la scheda **Pezzi** diceva «metadata non
+  ancora presenti» anche con il 99% scaricato. I pezzi verificati ci sono: la
+  mappa ora li mostra, con i mancanti in grigio.
+- **Ricerca: anche i risultati eD2k si possono accodare.** Nella ricerca
+  manuale i risultati eD2k mostravano «Solo ricerca» senza **Aggiungi**, come se
+  non fosse possibile scaricarli. Ora si accodano come i torrent: il link
+  `ed2k://` passa ad aMule. Con l'integrazione spenta i risultati eD2k non
+  compaiono, invece di restare lì senza un'azione.
+- **Barra di ricerca: il pulsante torna alto una riga.** **Apri link eD2k** non
+  è più alto quanto la casella del link: mantiene l'altezza di un pulsante
+  normale.
 - **eD2k: la spunta si chiama eD2k, e il pulsante dei link sta su una riga.**
   Nella ricerca di Scarico (e nelle altre caselle di ricerca) la spunta non si
   chiama più «Kad» ma **eD2k**: la rete usata è quella scelta in

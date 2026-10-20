@@ -432,7 +432,9 @@ bloccata, già presente o inferiore al file archiviato.
   **solo il livello** è immediato, senza fermare il torrent; escludere o
   reincludere un file lo riavvia per un attimo per spostarne i dati.
   In **Pezzi** c'è la mappa dei pezzi (verde scaricato, giallo in corso, grigio
-  mancante, spento saltato): compare con i motori che la espongono (gx-torrent).
+  mancante, spento saltato): compare con i motori che la espongono (gx-torrent) e
+  resta leggibile anche con il torrent in pausa o parcheggiato, perché usa i
+  pezzi già verificati.
   Con gx-torrent ogni file ha un pulsante **▶** che apre lo **streaming HTTP**
   del file (con Range): i pezzi della parte letta vengono scaricati per primi,
   così puoi iniziare a guardare prima che il download finisca. Lo stesso motore
@@ -723,8 +725,9 @@ manualmente il JSON se non stai usando direttamente l'API.
   risultati con nome, dimensione e hash. Con **Aggiungi tutti** li passa in
   blocco ad aMule, oppure usi il pulsante **Aggiungi** della singola riga. Se
   spunti **eD2k**, i risultati eD2k compaiono nella stessa tabella con il badge
-  **eD2k** e il numero di fonti. Quando aMule è spento o non risponde la riga
-  dice **Solo ricerca**.
+  **eD2k** e il numero di fonti, e si accodano con **Aggiungi** come i torrent:
+  il link `ed2k://` passa ad aMule. Se l'integrazione è spenta o non risponde i
+  risultati eD2k non compaiono.
 - **Archivio** — ricerca full-text delle release passate con paginazione, accoda
   in blocco, copia magnet, elimina; tab **Serie/Film dal feed**. La ricerca
   nell'archivio locale è **immediata**: parte da sola mentre digiti (dai tre

@@ -445,7 +445,9 @@ func v2SectionReleaseResult(raw []byte, status int) v2SearchView {
 		result.Results = append(result.Results, v2SearchResult{
 			Title: release.Title, Source: v2SearchSource(release), Score: release.Score,
 			Network: release.Network, Sources: release.Sources, Ed2kLink: release.Ed2kLink,
-			Addable: release.Network != "ed2k" && release.Ed2kLink == "",
+			// Both torrents and eD2k releases can be queued: /api/search/add
+			// routes a release with an ed2k link to aMule.
+			Addable: true,
 			Seeders: release.Seeders, SizeBytes: release.SizeBytes, ReleaseJSON: string(encoded),
 		})
 	}

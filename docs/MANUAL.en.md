@@ -429,7 +429,8 @@ inferior to the archived file.
   torrent; excluding or re-including a file restarts it for a moment to move its
   data. **Pieces** shows the piece map (green have, yellow
   downloading, grey missing, dimmed skipped) on engines that expose it
-  (gx-torrent). With gx-torrent every file has a **▶** button that opens the
+  (gx-torrent), and it stays readable while the torrent is paused or parked:
+  it is drawn from the verified pieces. With gx-torrent every file has a **▶** button that opens the
   file's **HTTP streaming** (with Range): the pieces of the part being read are
   downloaded first, so playback can start before the download finishes. The same
   streaming engine backs the **DLNA/UPnP media server** (option *gx-torrent —

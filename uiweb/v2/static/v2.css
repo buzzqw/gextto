@@ -2035,3 +2035,6 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 .search-row textarea { flex: 1 1 auto; min-width: 0; }
 .search-row .btn,
 .search-row .chk { flex: 0 0 auto; white-space: nowrap; }
+/* The button of a multi-line search field keeps its own height instead of
+   stretching to the textarea. */
+.search-row .btn { align-self: flex-start; }

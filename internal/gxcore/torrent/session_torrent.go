@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resumer/boltdbresumer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 	"go.etcd.io/bbolt"
@@ -304,25 +306,51 @@ func (t *Torrent) RefreshSelection() {
 func (t *Torrent) PieceStates() ([]string, bool) {
 	states := query(t.torrent, func() []string {
 		pieces := t.torrent.pieces
-		if len(pieces) == 0 {
-			return nil
-		}
-		out := make([]string, len(pieces))
-		for i := range pieces {
-			switch {
-			case pieces[i].Done:
-				out[i] = "have"
-			case pieces[i].Skip:
-				out[i] = "skipped"
-			case t.torrent.piecePicker != nil && t.torrent.piecePicker.PieceDownloading(uint32(i)):
-				out[i] = "downloading"
-			default:
-				out[i] = ""
+		if len(pieces) > 0 {
+			out := make([]string, len(pieces))
+			for i := range pieces {
+				switch {
+				case pieces[i].Done:
+					out[i] = "have"
+				case pieces[i].Skip:
+					out[i] = "skipped"
+				case t.torrent.piecePicker != nil && t.torrent.piecePicker.PieceDownloading(uint32(i)):
+					out[i] = "downloading"
+				default:
+					out[i] = ""
+				}
 			}
+			return out
 		}
-		return out
+		// A stopped torrent (paused or parked) releases its piece list but keeps
+		// the verified bitfield, so the map stays readable instead of looking
+		// like a torrent whose metadata never arrived.
+		t.torrent.mBitfield.RLock()
+		defer t.torrent.mBitfield.RUnlock()
+		return pieceStatesFromBitfield(t.torrent.info(), t.torrent.bitfield, t.torrent.skipBits)
 	})
 	return states, states != nil
+}
+
+// pieceStatesFromBitfield maps a verified bitfield to piece states: "have",
+// "skipped" (deselected file) or "" (missing). Nil when there is nothing to
+// describe.
+func pieceStatesFromBitfield(info *metainfo.Info, bits, skip *bitfield.Bitfield) []string {
+	if info == nil || bits == nil || info.NumPieces == 0 {
+		return nil
+	}
+	out := make([]string, info.NumPieces)
+	for index := range out {
+		switch {
+		case bits.Test(uint32(index)):
+			out[index] = "have"
+		case skip != nil && skip.Test(uint32(index)):
+			out[index] = "skipped"
+		default:
+			out[index] = ""
+		}
+	}
+	return out
 }
 
 // PieceHashes returns the per-piece hashes (hex) in index order. Nil when the
