@@ -13,6 +13,13 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **Backup: files and folders outside the data folder too.** In the backup
+  panel of Maintenance, **Files and folders to include** takes one absolute
+  path per line for files or folders to put in the backup ZIP, for example the
+  Docker scripts you use to install services. In the archive they appear under
+  `extra/` with their original path; a path that no longer exists is skipped
+  with a log warning, without failing the backup. Leave it empty to include
+  only the Gextto configuration.
 - **eD2k: filter the results and Scarica always there.** Above the eD2k search
   results (eD2k page and archive) there is a box to filter by words in the name,
   minimum sources, minimum size and already-known files, with sorting by

@@ -131,10 +131,25 @@ func addZipFile(writer *zip.Writer, name, path string) error {
 	return err
 }
 
+// extraBackupEntry is the folder inside the archive that holds the files and
+// folders listed in backup_extra_paths: they never mix with, or overwrite, the
+// configuration files copied from the data directory.
+const extraBackupEntry = "extra"
+
 // CreateSnapshot creates a zip archive of the configuration files plus
 // transaction-consistent snapshots of the live databases, then prunes the
 // existing archives keeping the newest `retain` ones.
 func CreateSnapshot(dataDir, backupRoot string, retain int) (string, error) {
+	return createSnapshot(dataDir, backupRoot, retain, nil)
+}
+
+// CreateSnapshotWithExtras is CreateSnapshot plus the files and folders listed
+// in backup_extra_paths, stored under extra/ in the archive.
+func CreateSnapshotWithExtras(dataDir, backupRoot string, retain int, extras []string) (string, error) {
+	return createSnapshot(dataDir, backupRoot, retain, extras)
+}
+
+func createSnapshot(dataDir, backupRoot string, retain int, extras []string) (string, error) {
 	// Serialize in-process backups: a manual and a scheduled backup starting
 	// together must not write the same archive.
 	if !backupMu.TryLock() {
@@ -212,6 +227,9 @@ func CreateSnapshot(dataDir, backupRoot string, retain int) (string, error) {
 		return "", err
 	}
 	if err := addDirectory(archive, dataDir, dataDir, backupRoot, temp); err != nil {
+		return fail(err)
+	}
+	if err := addExtraPaths(archive, dataDir, extras); err != nil {
 		return fail(err)
 	}
 	for _, snapshot := range snapshots {
@@ -463,6 +481,115 @@ func UploadFTP(archive, host, user, password, remotePath string) error {
 		return err
 	}
 	return conn.Quit()
+}
+
+// BackupExtraPaths parses the backup_extra_paths setting: absolute paths of
+// files or folders to add to the archive, one per line (commas are accepted
+// too). Empty fields and relative paths are ignored, so a stray line never
+// points the backup at an unexpected place.
+func BackupExtraPaths(value string) []string {
+	fields := strings.FieldsFunc(value, func(r rune) bool {
+		return r == '\n' || r == '\r' || r == ','
+	})
+	seen := make(map[string]bool, len(fields))
+	paths := make([]string, 0, len(fields))
+	for _, field := range fields {
+		path := strings.TrimSpace(field)
+		if path == "" {
+			continue
+		}
+		if !filepath.IsAbs(path) {
+			logging.Warn("backup_extra_paths: percorso relativo ignorato", "path", path)
+			continue
+		}
+		path = filepath.Clean(path)
+		if seen[path] {
+			continue
+		}
+		seen[path] = true
+		paths = append(paths, path)
+	}
+	return paths
+}
+
+// addExtraPaths adds the configured files and folders to the archive under
+// extra/<absolute path without the leading separator>, so the original
+// location is still visible when the backup is unpacked. A path that no longer
+// exists (an unmounted disk, a moved folder) is skipped with a warning instead
+// of failing the whole backup; a read error on an existing path fails it,
+// because a silently incomplete backup would be worse.
+func addExtraPaths(writer *zip.Writer, dataDir string, extras []string) error {
+	// A file listed after its own folder would be added twice under the same
+	// name: keep the first entry only.
+	added := map[string]bool{}
+	for _, path := range extras {
+		// Files inside the data directory are already in the archive.
+		if backupPathWithin(path, dataDir) {
+			logging.Debug("backup extra path already inside the data directory", "path", path)
+			continue
+		}
+		info, err := os.Lstat(path)
+		if errors.Is(err, os.ErrNotExist) {
+			logging.Warn("backup extra path not found, skipped", "path", path)
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("backup: impossibile leggere %s: %w", path, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			// Following a symlink could pull in a whole disk outside the
+			// configured path.
+			logging.Warn("backup extra path is a symlink, skipped", "path", path)
+			continue
+		}
+		if err := addExtraPath(writer, path, info, added); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addExtraPath(writer *zip.Writer, path string, info os.FileInfo, added map[string]bool) error {
+	name := extraBackupEntry + "/" + filepath.ToSlash(strings.TrimPrefix(filepath.Clean(path), string(filepath.Separator)))
+	if !info.IsDir() {
+		if !info.Mode().IsRegular() {
+			logging.Warn("backup extra path is not a regular file, skipped", "path", path)
+			return nil
+		}
+		if added[name] {
+			return nil
+		}
+		added[name] = true
+		return addZipFile(writer, name, path)
+	}
+	return filepath.WalkDir(path, func(current string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		relative, err := filepath.Rel(path, current)
+		if err != nil {
+			return err
+		}
+		entryName := name + "/" + filepath.ToSlash(relative)
+		if added[entryName] {
+			return nil
+		}
+		added[entryName] = true
+		return addZipFile(writer, entryName, current)
+	})
 }
 
 // addDirectory walks the data directory and adds every configuration file to

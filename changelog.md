@@ -14,6 +14,14 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **Backup: anche file e cartelle fuori dalla cartella dati.** Nella scheda
+  backup di Manutenzione, alla voce **File e cartelle da includere**, puoi
+  elencare uno per riga i percorsi assoluti di file o cartelle da mettere nello
+  ZIP di backup, per esempio gli script Docker con cui installi i servizi.
+  Nell'archivio compaiono sotto `extra/` con il loro percorso originale; un
+  percorso che non esiste più viene saltato con un avviso nel log, senza far
+  fallire il backup. Lascia vuoto per includere solo la configurazione di
+  Gextto.
 - **eD2k: filtro tra i risultati e Scarica sempre presente.** Sopra i risultati
   della ricerca eD2k (pagina eD2k e archivio) c'è un riquadro per filtrare per
   parole nel nome, fonti minime, dimensione minima e file già noti, con

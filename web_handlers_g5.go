@@ -172,18 +172,12 @@ func gh5_parseSeasonEpisode(name string) (int64, int64, bool) {
 // carries: one episode, or the contiguous range of a multi-episode file
 // ("S01E01-E02"), so an archive scan registers the file under each of them.
 func gh5_parseSeasonEpisodes(name string) (int64, []int64, bool) {
-	rangePattern := regexp.MustCompile(`(?i)\bs(?:tagione)?\s*(\d{1,2})\s*e(?:p(?:isodio)?)?\.?\s*(\d{1,4})(?:[-–]e?|e)(\d{1,4})\b`)
-	if match := rangePattern.FindStringSubmatch(name); match != nil {
-		season, errSeason := strconv.ParseInt(match[1], 10, 64)
-		first, errFirst := strconv.ParseInt(match[2], 10, 64)
-		last, errLast := strconv.ParseInt(match[3], 10, 64)
-		if errSeason == nil && errFirst == nil && errLast == nil && last >= first && last-first < 100 {
-			episodes := make([]int64, 0, last-first+1)
-			for episode := first; episode <= last; episode++ {
-				episodes = append(episodes, episode)
-			}
-			return season, episodes, true
+	if season, first, last, ok := multiEpisodeRange(name); ok {
+		episodes := make([]int64, 0, last-first+1)
+		for episode := first; episode <= last; episode++ {
+			episodes = append(episodes, episode)
 		}
+		return season, episodes, true
 	}
 	season, episode, ok := gh5_parseSeasonEpisode(name)
 	if !ok {
@@ -297,8 +291,8 @@ func gh5_backupRetention(cfg *Config) int {
 }
 
 // gh5_runBackupSteps mirrors the web module `run_backup_steps`.
-func gh5_runBackupSteps(dataDir, root string, retain int, ftp *gh5_ftpConfig, cloudDir *string) (gh5_backupSteps, error) {
-	path, err := CreateSnapshot(dataDir, root, retain)
+func gh5_runBackupSteps(dataDir, root string, retain int, ftp *gh5_ftpConfig, cloudDir *string, extras []string) (gh5_backupSteps, error) {
+	path, err := CreateSnapshotWithExtras(dataDir, root, retain, extras)
 	if err != nil {
 		return gh5_backupSteps{}, err
 	}
@@ -446,7 +440,7 @@ func CreateBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
 		sendTelegram = settingTruthy(value)
 	}
 
-	steps, err := gh5_runBackupSteps(dataDir, root, retain, ftp, cloudDir)
+	steps, err := gh5_runBackupSteps(dataDir, root, retain, ftp, cloudDir, BackupExtraPaths(cfg.Settings["backup_extra_paths"]))
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return

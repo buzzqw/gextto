@@ -340,7 +340,7 @@ func (u *updateChecker) RequestUpdate(cfg *Config) error {
 	}
 	// A database snapshot first: an update that migrates the schema can be
 	// undone by restoring it.
-	if path, err := CreateSnapshot(cfg.DataDir, filepath.Join(cfg.DataDir, "backups"), gh5_backupRetention(cfg)); err != nil {
+	if path, err := CreateSnapshotWithExtras(cfg.DataDir, filepath.Join(cfg.DataDir, "backups"), gh5_backupRetention(cfg), BackupExtraPaths(cfg.Settings["backup_extra_paths"])); err != nil {
 		return fmt.Errorf("%w: %w", errUpdateBackup, err)
 	} else {
 		logging.Info(fmt.Sprintf("💾 Backup before the update: %s", filepath.Base(path)))

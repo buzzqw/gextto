@@ -358,7 +358,7 @@ func BackupSendTelegram(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if retain > 100 {
 		retain = 100
 	}
-	path, err := CreateSnapshot(dataDir, root, retain)
+	path, err := CreateSnapshotWithExtras(dataDir, root, retain, BackupExtraPaths(cfg.Settings["backup_extra_paths"]))
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return

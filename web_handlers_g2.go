@@ -323,6 +323,7 @@ func BackupSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"ftp_user":                value("backup_ftp_user", ""),
 		"ftp_path":                value("backup_ftp_path", ""),
 		"cloud_dir":               value("backup_cloud_dir", ""),
+		"extra_paths":             value("backup_extra_paths", ""),
 		"ftp_password_configured": passwordPresent && password != "",
 	})
 }
@@ -818,6 +819,7 @@ func SaveBackupSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"backup_ftp_password":   {},
 		"backup_ftp_path":       {},
 		"backup_cloud_dir":      {},
+		"backup_extra_paths":    {},
 	}
 	keys := make([]string, 0, len(input.Values))
 	for key := range input.Values {
@@ -841,6 +843,17 @@ func SaveBackupSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if len(value) > 4096 {
 			jsonError(w, http.StatusBadRequest, "backup setting too long")
 			return
+		}
+		if key == "backup_extra_paths" {
+			for _, field := range strings.FieldsFunc(value, func(r rune) bool {
+				return r == '\n' || r == '\r' || r == ','
+			}) {
+				path := strings.TrimSpace(field)
+				if path != "" && !filepath.IsAbs(path) {
+					jsonError(w, http.StatusBadRequest, "backup_extra_paths: usa percorsi assoluti: "+path)
+					return
+				}
+			}
 		}
 		if err := SaveSetting(s.cfg.DataDir, key, value); err != nil {
 			jsonError(w, http.StatusInternalServerError, err.Error())

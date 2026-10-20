@@ -335,6 +335,58 @@ func TestBackupFtpEndpointDefaultsToPort21(t *testing.T) {
 	}
 }
 
+// TestBackupExtraPathsAreIncluded covers backup_extra_paths: files and folders
+// outside the data directory are added under extra/ with their absolute path,
+// a missing path is skipped instead of failing the backup, and paths already
+// inside the data directory are not duplicated.
+func TestBackupExtraPathsAreIncluded(t *testing.T) {
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "data")
+	backupRoot := filepath.Join(root, "backups")
+	outside := filepath.Join(root, "scripts")
+	writeBackupFile(t, filepath.Join(dataDir, "gextto.json"), "{}\n")
+	writeBackupFile(t, filepath.Join(outside, "docker-inst-amule-gextto.sh"), "#!/bin/sh\n")
+	writeBackupFile(t, filepath.Join(outside, "nested", "helper.sh"), "#!/bin/sh\n")
+
+	archive, err := CreateSnapshotWithExtras(dataDir, backupRoot, 3, []string{
+		filepath.Join(outside, "docker-inst-amule-gextto.sh"),
+		outside,
+		filepath.Join(root, "does-not-exist.sh"),
+		filepath.Join(dataDir, "gextto.json"),
+	})
+	if err != nil {
+		t.Fatalf("CreateSnapshotWithExtras: %v", err)
+	}
+	files := readBackupZip(t, archive)
+	prefix := "extra/" + strings.TrimPrefix(filepath.ToSlash(outside), "/") + "/"
+	for _, name := range []string{"docker-inst-amule-gextto.sh", "nested/helper.sh"} {
+		if _, ok := files[prefix+name]; !ok {
+			t.Errorf("archive is missing %q; entries: %v", prefix+name, backupZipNames(files))
+		}
+	}
+	if count := strings.Count(strings.Join(backupZipNames(files), "\n"), "gextto.json"); count != 1 {
+		t.Errorf("config file included %d times, want once: %v", count, backupZipNames(files))
+	}
+}
+
+// TestBackupExtraPathsParsing covers the setting format: one path per line,
+// commas accepted, blank lines and relative paths ignored.
+func TestBackupExtraPathsParsing(t *testing.T) {
+	got := BackupExtraPaths(" /home/a/docker.sh\n\n/home/b/all/\r\nrelative/path\n/home/a/docker.sh\n")
+	want := []string{"/home/a/docker.sh", "/home/b/all"}
+	if len(got) != len(want) {
+		t.Fatalf("BackupExtraPaths = %v, want %v", got, want)
+	}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("BackupExtraPaths = %v, want %v", got, want)
+		}
+	}
+	if extra := BackupExtraPaths(""); len(extra) != 0 {
+		t.Fatalf("empty setting returned %v", extra)
+	}
+}
+
 // backupZipNames returns the sorted names of the archive entries.
 func backupZipNames(files map[string][]byte) []string {
 	names := make([]string, 0, len(files))

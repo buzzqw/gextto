@@ -4678,6 +4678,8 @@ fra:
   "Calendario Simkl": "Calendrier Simkl"
   "Cartella": "Dossier"
   "Cartella cloud": "Dossier cloud"
+  "File e cartelle da includere": "Fichiers et dossiers à inclure"
+  "Percorsi assoluti di file o cartelle da aggiungere allo ZIP di backup, uno per riga (per esempio /home/andres/temp/docker). Nell'archivio finiscono nella cartella extra/, con il loro percorso originale. Lascia vuoto per includere solo la configurazione di Gextto.": "Chemins absolus de fichiers ou dossiers à ajouter au ZIP de sauvegarde, un par ligne (par exemple /home/andres/temp/docker). Dans l'archive, ils vont dans le dossier extra/, avec leur chemin d'origine. Laisser vide pour n'inclure que la configuration de Gextto."
   "Cartella finale": "Dossier final"
   "Cartella remota del server FTP in cui caricare il file ZIP. Lascia vuoto per usare la cartella predefinita.": "Dossier distant du serveur FTP où téléverser le fichier ZIP. Laissez vide pour utiliser le dossier par défaut."
   "Cerca il post del Weekly Pack su GetComics per la data scelta ed estrae i magnet/.torrent disponibili. Non avvia il download.": "Recherche le post Weekly Pack sur GetComics pour la date choisie et extrait les magnet/.torrent disponibles. Ne lance pas le téléchargement."

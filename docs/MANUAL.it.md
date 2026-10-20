@@ -1319,6 +1319,9 @@ prima di avviare upgrade e ricerche mancanti.
 - gli altri file di configurazione della cartella dati: il marker della
   procedura guidata, i domini Cloudflare, lo stato del motore gx-torrent
   (`gx-torrent/state.json`, `lifetime.json`).
+- i file e le cartelle fuori dalla cartella dati elencati in *File e cartelle
+  da includere* (uno per riga), sotto `extra/` con il loro percorso originale;
+  i percorsi che non esistono più vengono saltati.
 
 Lascia fuori ciò che si riscarica o si ricostruisce: la sessione torrent e i suoi
 dati di ripresa (`gextto_torrents_state`, `gx-torrent/session.db`), il filtro IP,
@@ -2457,6 +2460,7 @@ Key») invece del solo codice HTTP.
 | FTP password | Password FTP (non visualizzata; vuoto = mantiene quella salvata). |
 | FTP percorso | Cartella remota di destinazione dello ZIP. |
 | Cartella cloud | Percorso locale di una cartella già sincronizzata da un servizio cloud. |
+| File e cartelle da includere | Percorsi assoluti di file o cartelle da aggiungere allo ZIP (uno per riga). Finiscono nella cartella `extra/` dell'archivio, con il loro percorso originale; i percorsi che non esistono più vengono saltati. |
 | Invia su Telegram | Invia una copia su Telegram usando il bot configurato. |
 | Test FTP | Verifica connessione, login, percorso remoto, upload di prova e rimozione. |
 | Backup disponibili / Verifica | Tabella degli snapshot con etichetta, nome, dimensione e data; il pulsante Verifica controlla l'archivio. |

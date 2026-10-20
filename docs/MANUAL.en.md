@@ -1277,6 +1277,9 @@ moved, fix paths or scan the archive before starting upgrades and missing search
 - the other configuration files of the data folder: the setup marker, the
   Cloudflare domains, the gx-torrent engine state (`gx-torrent/state.json`,
   `lifetime.json`).
+- the files and folders outside the data folder listed in *Files and folders
+  to include* (one per line), under `extra/` with their original path; paths
+  that no longer exist are skipped.
 
 It leaves out what is downloaded or rebuilt: the torrent session and its
 resume data (`gextto_torrents_state`, `gx-torrent/session.db`), the IP filter,
@@ -2395,6 +2398,7 @@ Key") instead of the bare HTTP code.
 | FTP password | FTP password (not shown; empty keeps the stored one). |
 | FTP path | Remote destination folder for the ZIP. |
 | Cloud folder | Local path of a folder already synced by a cloud service. |
+| Files and folders to include | Absolute paths of files or folders to add to the ZIP (one per line). They end up in the archive's `extra/` folder with their original path; paths that no longer exist are skipped. |
 | Send to Telegram | Sends a copy to Telegram using the configured bot. |
 | Test FTP | Checks connection, login, remote path, a test upload and removal. |
 | Available backups / Verify | Table of snapshots with label, name, size and date; the Verify button checks the archive. |

@@ -246,7 +246,7 @@ func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 	cloudDir := gh5_backupCloudDir(cfg)
 	sendTelegram := bwm_truthy(cfg.Settings["backup_send_telegram"])
 
-	steps, err := gh5_runBackupSteps(dataDir, root, retain, ftp, cloudDir)
+	steps, err := gh5_runBackupSteps(dataDir, root, retain, ftp, cloudDir, BackupExtraPaths(cfg.Settings["backup_extra_paths"]))
 	if err != nil {
 		return err
 	}
