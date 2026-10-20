@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -434,4 +435,133 @@ func Ed2kSharedReloadAPI(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	logging.Info("eD2k shared files reload requested")
 	jsonResponse(w, map[string]any{"ok": true})
+}
+
+// ---------------------------------------------------------------------------
+// Health
+// ---------------------------------------------------------------------------
+
+// v2Ed2kHealth is the aMule card on the Health page.
+type v2Ed2kHealth struct {
+	Enabled      bool
+	Reachable    bool
+	Error        string
+	Version      string
+	Connected    bool
+	Server       string
+	HighID       bool
+	Kad          string
+	DownloadRate int64
+	UploadRate   int64
+	TotalDown    int64
+	TotalUp      int64
+	UploadQueue  int64
+	Warnings     []string
+	DirIssues    []string
+}
+
+// v2Ed2kHealthFrom reads aMule's state and the recent warnings from its log.
+func v2Ed2kHealthFrom(s *AppState) *v2Ed2kHealth {
+	cfg := latestConfig(s)
+	card := &v2Ed2kHealth{Enabled: ed2kEnabled(cfg)}
+	if !card.Enabled {
+		return card
+	}
+	status, err := ed2kStatus(cfg)
+	if err != nil {
+		card.Error = err.Error()
+		return card
+	}
+	card.Reachable = true
+	card.Version = status.Version
+	card.Connected = status.Ed2kConnected
+	card.Server = status.ServerName
+	if card.Server == "" {
+		card.Server = status.ServerAddress
+	}
+	card.HighID = status.HighID
+	switch {
+	case status.KadConnected && status.KadFirewalled:
+		card.Kad = "firewalled"
+	case status.KadConnected:
+		card.Kad = "connected"
+	case status.KadRunning:
+		card.Kad = "connecting"
+	default:
+		card.Kad = "stopped"
+	}
+	card.DownloadRate = status.DownloadRate
+	card.UploadRate = status.UploadRate
+	card.TotalDown = status.TotalRecv
+	card.TotalUp = status.TotalSent
+	card.UploadQueue = status.UploadQueue
+	if prefs, prefsErr := ed2kPreferences(cfg); prefsErr == nil {
+		card.DirIssues = amuleMissingDirectories(cfg, prefs)
+	}
+	if lines, logErr := Ed2kLogLines(cfg); logErr == nil {
+		card.Warnings = ed2kLogWarnings(lines, 5)
+	}
+	return card
+}
+
+// ed2kLogWarnings keeps the most recent aMule log lines that look like a
+// problem. It is deliberately conservative: only clear markers are reported,
+// and the last `limit` lines are kept.
+func ed2kLogWarnings(lines []string, limit int) []string {
+	if limit <= 0 {
+		return nil
+	}
+	markers := []string{"error", "failed", "failure", "cannot", "can't", "lost", "disconnect", "no valid server", "refused"}
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		lower := strings.ToLower(line)
+		for _, marker := range markers {
+			if strings.Contains(lower, marker) {
+				out = append(out, strings.TrimSpace(line))
+				break
+			}
+		}
+	}
+	if len(out) > limit {
+		out = out[len(out)-limit:]
+	}
+	return out
+}
+
+// amuleMissingDirectories lists aMule's incoming and temporary folders that do
+// not exist on this machine. aMule logs "Failed to get file system statistics"
+// at every disk check when one is missing, and a missing incoming folder also
+// breaks the import of completed files.
+func amuleMissingDirectories(cfg *Config, prefs amule.Preferences) []string {
+	if cfg == nil || !hostIsLocal(uiSettingString(cfg, "amule_host")) {
+		return nil
+	}
+	out := make([]string, 0, 2)
+	for _, dir := range []string{prefs.IncomingDir, prefs.TempDir} {
+		dir = strings.TrimSpace(dir)
+		if dir == "" {
+			continue
+		}
+		if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+			out = append(out, dir)
+		}
+	}
+	return out
+}
+
+// amuleCreateMissingDirectories creates the folders amuleMissingDirectories
+// reports, so aMule stops failing its disk checks.
+func amuleCreateMissingDirectories(cfg *Config) ([]string, error) {
+	prefs, err := ed2kPreferences(cfg)
+	if err != nil {
+		return nil, err
+	}
+	created := []string{}
+	for _, dir := range amuleMissingDirectories(cfg, prefs) {
+		if mkErr := os.MkdirAll(dir, 0o775); mkErr != nil {
+			return created, mkErr
+		}
+		created = append(created, dir)
+	}
+	return created, nil
 }

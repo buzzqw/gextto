@@ -218,7 +218,7 @@ func v2SourcesIndexFrom(s *AppState, cfg *Config) *v2SourcesIndex {
 			},
 			{
 				Label:  tr("eD2k e Kad"),
-				Href:   "#v2-setting-ed2k_enabled",
+				Href:   "/?view=settings&tab=ed2k#v2-setting-ed2k_enabled",
 				Hint:   tr("Ricerca Kad/eD2k e stato della connessione."),
 				Status: ed2kLabel,
 				Alert:  ed2kAlert,

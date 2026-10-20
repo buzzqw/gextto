@@ -98,7 +98,7 @@ evita del tutto l'attesa.
 
 ## Attivarlo in Gextto
 
-**Configurazione → Fonti → eD2k e Kad**:
+**Configurazione → eD2k e Kad**:
 
 1. accendi **eD2k e Kad tramite aMule**;
 2. inserisci **indirizzo** (di solito `127.0.0.1`), **porta EC** (4712) e la
@@ -113,6 +113,12 @@ letto). Se la spia dice *limitata*, apri sul router le porte TCP e UDP di aMule.
 
 Quando aMule non risponde, la pagina eD2k lo dice, spiega cosa controllare e
 offre **Riprova**. Nient'altro in Gextto smette di funzionare.
+
+Il pannello di stato mostra anche i byte scambiati da aMule nella sessione e se
+aMule prealloca i file; **Impostazioni consigliate** disattiva la preallocazione
+completa (quella che blocca `amuled` sui dischi di rete). La pagina **Salute** ha
+una scheda eD2k con lo stesso stato, i totali di sessione e le ultime righe di
+problema dal log di aMule.
 
 Quando `amuled` gira sulla macchina di Gextto, la barra in alto mostra il badge
 **aMule** con CPU e RAM del demone, aggiornato insieme agli altri valori. Con
@@ -245,6 +251,7 @@ La scheda **Log di aMule** mostra le ultime righe del log di `amuled`, con
 | **Kad dietro firewall** | La porta UDP di aMule (4672 di default) non è raggiungibile: aprila sul router. Kad funziona ma trova meno fonti. |
 | **La ricerca non trova nulla** | la rete scelta (per Kad basta che Kad sia connesso); una durata di ricerca troppo breve; un Kad dietro firewall. Kad e i server indicizzano file diversi, quindi prova **Kad + server eD2k**. |
 | **Il download resta in coda** | è normale su eD2k: aMule aspetta il proprio turno nelle code delle fonti. Controlla le fonti e l'ID; con l'ID basso le code sono lunghe. |
+| **Il log di aMule si riempie di `Failed to get file system statistics`** | la cartella di arrivo o quella temporanea non esiste (disco di rete smontato, cartella rimossa): la pagina eD2k elenca le cartelle mancanti e **Crea le cartelle** le ricrea. |
 | **I file si completano in aMule ma non arrivano in libreria** | la cartella di arrivo non è visibile allo stesso percorso da Gextto, o non è leggibile; il file non è un video (resta nella cartella di arrivo per scelta); aMule stava ancora preallocando (`AllocateFullFile=0` sui dischi di rete). |
 | **La pagina eD2k dice che l'integrazione è spenta** | l'interruttore è spento, o le impostazioni non sono state salvate. La pagina ha il link diretto all'impostazione. |
 

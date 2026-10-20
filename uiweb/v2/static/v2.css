@@ -2038,3 +2038,5 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 /* The button of a multi-line search field keeps its own height instead of
    stretching to the textarea. */
 .search-row .btn { align-self: flex-start; }
+/* Compact bulletless list (aMule warnings on the Health page). */
+.plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }

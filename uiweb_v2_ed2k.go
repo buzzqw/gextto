@@ -34,6 +34,10 @@ type v2Ed2kView struct {
 	Search     v2Ed2kSearchView
 	ServersURL string
 	NodesURL   string
+	// Prefs are aMule's directories and file options, for the status panel.
+	Prefs amule.Preferences
+	// DirIssues lists aMule's incoming/temp folders that are missing here.
+	DirIssues []string
 	// Shared and Log back the two dedicated tabs.
 	Shared v2Ed2kSharedView
 	Log    map[string]any
@@ -129,11 +133,62 @@ func v2Ed2kViewFrom(s *AppState, message, detail string, isErr bool, tab string)
 	}
 	view.Status = status
 	_ = ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+		if prefs, prefsErr := client.Preferences(ctx); prefsErr == nil {
+			view.Prefs = prefs
+			view.DirIssues = amuleMissingDirectories(cfg, prefs)
+		}
 		servers, callErr := client.Servers(ctx)
 		view.Servers = servers
 		return callErr
 	})
 	return view
+}
+
+// V2Ed2kCreateDirs creates aMule's missing incoming/temp folders, so its disk
+// checks stop failing, and re-renders the state panel.
+func V2Ed2kCreateDirs(w http.ResponseWriter, r *http.Request, s *AppState) {
+	cfg := latestConfig(s)
+	message, detail, isErr := "", "", false
+	created, err := amuleCreateMissingDirectories(cfg)
+	switch {
+	case err != nil:
+		message, detail, isErr = "Comando non riuscito:", err.Error(), true
+	case len(created) == 0:
+		message = "Nessuna cartella di aMule da creare."
+	default:
+		message = "Cartelle di aMule create:"
+		detail = strings.Join(created, " · ")
+		logging.Info("created the missing aMule directories", "dirs", strings.Join(created, "; "))
+	}
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, "/?view=ed2k", http.StatusSeeOther)
+		return
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_ed2k_state", v2Ed2kViewFrom(s, message, detail, isErr, "status"), dict, eng)
+}
+
+// V2Ed2kRecommended applies aMule's recommended file settings (no full
+// preallocation) and re-renders the state panel.
+func V2Ed2kRecommended(w http.ResponseWriter, r *http.Request, s *AppState) {
+	cfg := latestConfig(s)
+	message, detail, isErr := "", "", false
+	if !ed2kEnabled(cfg) {
+		message, isErr = "L'integrazione con aMule è spenta.", true
+	} else if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+		return client.SetFilePreallocation(ctx, false)
+	}); err != nil {
+		message, detail, isErr = "Comando non riuscito:", err.Error(), true
+	} else {
+		message = "Impostazioni consigliate applicate: aMule non prealloca più i file."
+		logging.Info("eD2k recommended aMule file settings applied")
+	}
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, "/?view=ed2k", http.StatusSeeOther)
+		return
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_ed2k_state", v2Ed2kViewFrom(s, message, detail, isErr, "status"), dict, eng)
 }
 
 // V2Ed2kAction runs a connection command and re-renders the state panel.

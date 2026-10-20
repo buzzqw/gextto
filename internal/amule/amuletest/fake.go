@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"net"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 
@@ -53,21 +54,27 @@ type Core struct {
 	Password string
 	Incoming string
 
-	mu         sync.Mutex
-	listener   net.Listener
-	downloads  []File
-	results    []Result
-	searches   []string
-	searchErr  string
-	connected  bool
-	kad        bool
-	commands   []string
-	conns      map[net.Conn]struct{}
-	shared     []sharedFile
-	sharedDirs []string
-	uploads    []amule.UploadClient
-	maxDL      int64
-	maxUL      int64
+	mu           sync.Mutex
+	listener     net.Listener
+	allocateFull bool
+	keptIch      bool
+	totalSent    int64
+	totalRecv    int64
+	logLines     []string
+	tempDir      string
+	downloads    []File
+	results      []Result
+	searches     []string
+	searchErr    string
+	connected    bool
+	kad          bool
+	commands     []string
+	conns        map[net.Conn]struct{}
+	shared       []sharedFile
+	sharedDirs   []string
+	uploads      []amule.UploadClient
+	maxDL        int64
+	maxUL        int64
 }
 
 type sharedFile struct {
@@ -81,7 +88,7 @@ func Start(password string) (*Core, error) {
 	if err != nil {
 		return nil, err
 	}
-	core := &Core{Password: password, Incoming: "/tmp/incoming", listener: listener, connected: true, kad: true}
+	core := &Core{Password: password, Incoming: os.TempDir(), listener: listener, connected: true, kad: true}
 	go core.serve()
 	return core, nil
 }
@@ -108,6 +115,48 @@ func (c *Core) SetResults(results []Result, refusal string) {
 	defer c.mu.Unlock()
 	c.results = results
 	c.searchErr = refusal
+}
+
+// SetAllocateFull sets aMule's full-file preallocation.
+func (c *Core) SetAllocateFull(value bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.allocateFull = value
+}
+
+// AllocateFull reports the preallocation flag after a write.
+func (c *Core) AllocateFull() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.allocateFull
+}
+
+// KeptIch reports whether the last file-preferences write kept ICH enabled.
+func (c *Core) KeptIch() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.keptIch
+}
+
+// SetTempDir sets aMule's temporary folder.
+func (c *Core) SetTempDir(dir string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.tempDir = dir
+}
+
+// SetLog replaces the lines the fake core returns for its log.
+func (c *Core) SetLog(lines []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.logLines = append([]string(nil), lines...)
+}
+
+// SetSessionTotals sets the bytes the fake core reports for its session.
+func (c *Core) SetSessionTotals(sent, received int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.totalSent, c.totalRecv = sent, received
 }
 
 // SetSharedDirs sets the extra folders the fake core says it shares.
@@ -274,6 +323,8 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 			amule.IntTag(amule.TagStatsULSpeed, 512),
 			amule.IntTag(amule.TagStatsKadNodes, 120),
 			amule.IntTag(amule.TagStatsSharedFiles, uint64(len(c.shared))),
+			amule.IntTag(amule.TagStatsTotalSent, uint64(c.totalSent)),
+			amule.IntTag(amule.TagStatsTotalRecv, uint64(c.totalRecv)),
 			c.connState(),
 		}}
 	case amule.OpGetConnState:
@@ -423,9 +474,15 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 		for _, dir := range c.sharedDirs {
 			shared.Children = append(shared.Children, amule.StringTag(amule.TagString, dir))
 		}
+		files := amule.EmptyTag(amule.TagPrefsFiles, amule.EmptyTag(amule.TagFilesIchEnabled))
+		if c.allocateFull {
+			files.Children = append(files.Children, amule.EmptyTag(amule.TagFilesAllocFull))
+		}
 		reply := amule.Packet{Op: amule.OpSetPreferences, Tags: []amule.Tag{
+			files,
 			amule.EmptyTag(amule.TagPrefsDirectories,
 				amule.StringTag(amule.TagDirectoriesIncoming, c.Incoming),
+				amule.StringTag(amule.TagDirectoriesTemp, c.tempDir),
 				shared,
 			),
 			amule.EmptyTag(amule.TagPrefsConnections,
@@ -435,6 +492,11 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 		}}
 		return reply
 	case amule.OpSetPreferences:
+		if files, ok := request.Tag(amule.TagPrefsFiles); ok {
+			_, c.allocateFull = files.Child(amule.TagFilesAllocFull)
+			_, c.keptIch = files.Child(amule.TagFilesIchEnabled)
+			c.commands = append(c.commands, "set-file-prefs")
+		}
 		if conn, ok := request.Tag(amule.TagPrefsConnections); ok {
 			if value, ok := conn.ChildInt(amule.TagConnMaxDL); ok {
 				c.maxDL = int64(value)
@@ -445,7 +507,11 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 		}
 		return amule.Packet{Op: amule.OpNoop}
 	case amule.OpGetLog:
-		return amule.Packet{Op: amule.OpLog, Tags: []amule.Tag{amule.StringTag(amule.TagString, "Connected to Kad\nNow sharing file")}}
+		lines := c.logLines
+		if len(lines) == 0 {
+			lines = []string{"Connected to Kad", "Now sharing file"}
+		}
+		return amule.Packet{Op: amule.OpLog, Tags: []amule.Tag{amule.StringTag(amule.TagString, strings.Join(lines, "\n"))}}
 	case amule.OpPartfilePause, amule.OpPartfileResume, amule.OpPartfileDelete:
 		tag, _ := request.Tag(amule.TagPartfile)
 		value, _ := tag.Hash()

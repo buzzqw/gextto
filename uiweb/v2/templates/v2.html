@@ -181,7 +181,7 @@
 
 {{define "v2_live_top_metrics"}}
 <div id="v2-live-top-metrics" class="top-live-metrics" data-active-downloads="{{.ActiveDownloads}}">
-  <div class="top-metric" title="CPU e RAM del processo Gextto{{if .CPUFrequency}} · {{.CPUFrequency}}{{end}}"><span class="top-metric-label">Gextto</span><strong>{{.CPU}} · {{.RAM}}</strong></div>
+  <div class="top-metric" title="CPU e RAM del processo Gextto"><span class="top-metric-label"><span>Gextto</span>{{if .CPUFrequency}} <small class="metric-frequency">{{.CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}} · {{.RAM}}</strong></div>
   {{if .GxLoad}}<div class="top-metric" title="CPU e RAM del demone gx-torrent"><span class="top-metric-label">gx-torrent</span><strong>{{.GxLoad}}</strong></div>{{end}}
   {{if .AmuleLoad}}<div class="top-metric" title="CPU e RAM del processo amuled su questa macchina"><span class="top-metric-label">aMule</span><strong>{{.AmuleLoad}}</strong></div>{{end}}
   <div class="top-metric top-metric-rate" title="Velocità di download"><span class="top-metric-label">↓ Download</span><strong>{{.Download}}</strong></div>
@@ -281,7 +281,7 @@
     <div class="panel-body">
       <form class="search-row" data-v2-dashboard-search>
         <input type="search" name="q" aria-label="Cerca in archivio, indexer e motori web" placeholder="Cerca in archivio, indexer e motori web…" />
-        <label class="chk"><input type="checkbox" name="kad" value="1" data-v2-dashboard-search-kad title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → Fonti → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
+        <label class="chk"><input type="checkbox" name="kad" value="1" data-v2-dashboard-search-kad title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
         <button class="btn primary" type="submit">Cerca</button>
       </form>
       <div class="toolbar dashboard-search-results-toolbar">
@@ -397,7 +397,7 @@
     <div class="panel-body">
       <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-downloads-search-results" hx-swap="innerHTML">
         <input type="search" name="q" value="{{.Search.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
-        <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → Fonti → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
+        <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
         <input type="hidden" name="view" value="downloads" />
         <button class="btn primary" type="submit">Cerca</button>
       </form>
@@ -1360,6 +1360,7 @@
   {{template "v2_health_engine" .Engine}}
   {{end}}
   {{if gt (len .PanelTables) 0}}{{template "v2_table_panel" (index .PanelTables 0)}}{{end}}
+  {{if and .Ed2k .Ed2k.Enabled}}{{template "v2_health_ed2k" .Ed2k}}{{end}}
   <div class="panel">
     <div class="panel-head"><h3>Ricerche</h3></div>
     <div class="panel-body">
@@ -1391,6 +1392,30 @@
 {{/* Riquadri della Salute: Stato, Memoria e Uptime si aggiornano ogni 5s
      mentre la pagina e' aperta; Disco dati ogni ora. All'ingresso nella pagina
      tutti i riquadri sono resi freschi dal render completo. */}}
+{{define "v2_health_ed2k"}}
+<div class="panel">
+  <div class="panel-head"><h3>eD2k e Kad (aMule)</h3><small class="muted">{{if .Reachable}}{{if .Version}}{{.Version}}{{end}}{{else}}non raggiungibile{{end}}</small></div>
+  <div class="panel-body">
+  {{if .Error}}
+    <p class="alert" role="alert"><span>aMule non raggiungibile:</span> {{.Error}}</p>
+  {{else}}
+    <div class="stat-grid">
+      <div class="row"><span>eD2k</span><strong>{{if .Connected}}<span>Connesso a</span> {{.Server}} · {{if .HighID}}<span class="badge ok">ID alto</span>{{else}}<span class="badge warn">ID basso</span>{{end}}{{else}}<span>Non connesso</span>{{end}}</strong></div>
+      <div class="row"><span>Kad</span><strong>{{if eq .Kad "connected"}}<span class="badge ok">Connesso</span>{{else if eq .Kad "firewalled"}}<span class="badge warn">Connesso, dietro firewall</span>{{else if eq .Kad "connecting"}}<span>In connessione…</span>{{else}}<span>Fermo</span>{{end}}</strong></div>
+      <div class="row"><span>Velocità</span><strong>↓ {{rateI .DownloadRate}} · ↑ {{rateI .UploadRate}}</strong></div>
+      <div class="row"><span>Sessione</span><strong>↓ {{bytes .TotalDown}} · ↑ {{bytes .TotalUp}}</strong></div>
+      <div class="row"><span>Coda di upload</span><strong>{{.UploadQueue}}</strong></div>
+    </div>
+    {{if .DirIssues}}<p class="alert" role="alert"><span>Cartelle di aMule mancanti:</span> {{range .DirIssues}}<code title="{{.}}">{{.}}</code> {{end}}<a href="/?view=ed2k">apri la pagina eD2k per crearle</a>.</p>{{end}}
+    <h4>Avvisi recenti dal log di aMule</h4>
+    {{if .Warnings}}
+    <ul class="plain-list">{{range .Warnings}}<li class="truncate" title="{{.}}">{{.}}</li>{{end}}</ul>
+    {{else}}<p class="muted">Nessun avviso recente.</p>{{end}}
+  {{end}}
+  </div>
+</div>
+{{end}}
+
 {{define "v2_health_tile_status"}}
 <div class="metric{{if ne .Health.Status "ok"}} amber{{end}}" id="v2-health-tile-status" hx-get="/partial/health/tile?name=status" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Stato</span><strong>{{.Health.Status}}</strong>{{if .StatusReason}}<small class="muted">{{.StatusReason}}</small>{{end}}</div>
 {{end}}
@@ -1619,12 +1644,16 @@
 <div class="panel">
   <div class="panel-head"><h3>aMule</h3><small class="muted">{{if .Address}}{{.Address}}{{end}}</small></div>
   <div class="panel-body">
+  {{if .DirIssues}}
+  <p class="alert" role="alert"><span>Cartelle di aMule mancanti:</span> {{range .DirIssues}}<code title="{{.}}">{{.}}</code> {{end}}<span>aMule registra «Failed to get file system statistics» a ogni controllo.</span></p>
+  <form method="post" action="/ed2k/directories/create" hx-post="/ed2k/directories/create" hx-target="#v2-ed2k-state" hx-swap="innerHTML" hx-disabled-elt="find button"><button class="btn" type="submit" title="Crea su questa macchina le cartelle di aMule che mancano (arrivo e temporanea)">Crea le cartelle</button></form>
+  {{end}}
   {{if not .Enabled}}
-    <p class="muted">L'integrazione con aMule è spenta. Avvia amuled con le connessioni esterne (EC) attive, poi accendila e inserisci indirizzo e password in Configurazione → Fonti → eD2k e Kad.</p>
-    <p><a class="btn" href="/?view=settings&amp;tab=sources&amp;highlight=ed2k_enabled">Apri la configurazione</a></p>
+    <p class="muted">L'integrazione con aMule è spenta. Avvia amuled con le connessioni esterne (EC) attive, poi accendila e inserisci indirizzo e password in Configurazione → eD2k e Kad.</p>
+    <p><a class="btn" href="/?view=settings&amp;tab=ed2k&amp;highlight=ed2k_enabled">Apri la configurazione</a></p>
   {{else if .Error}}
     <p class="alert" role="alert"><span>aMule non raggiungibile:</span> {{.Error}}</p>
-    <p class="muted">Controlla che amuled sia in esecuzione, che le connessioni esterne (EC) siano abilitate e che porta e password coincidano con quelle in Configurazione → Fonti → eD2k e Kad.</p>
+    <p class="muted">Controlla che amuled sia in esecuzione, che le connessioni esterne (EC) siano abilitate e che porta e password coincidano con quelle in Configurazione → eD2k e Kad.</p>
     <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML"><input type="hidden" name="action" value="connect"><button class="btn" type="submit" title="Riprova a contattare aMule e a connettere le reti">Riprova</button></form>
   {{else}}
     <div class="stat-grid">
@@ -1636,6 +1665,8 @@
       <div class="row"><span>Rete eD2k</span><strong>{{.Status.Ed2kUsers}} <span>utenti</span> · {{.Status.Ed2kFiles}} <span>file</span></strong></div>
       <div class="row"><span>Rete Kad</span><strong>{{.Status.KadUsers}} <span>utenti</span> · {{.Status.KadNodes}} <span>nodi</span></strong></div>
       <div class="row"><span>Coda di upload</span><strong>{{.Status.UploadQueue}}</strong></div>
+      <div class="row"><span>Sessione</span><strong>↓ {{bytes .Status.TotalRecv}} · ↑ {{bytes .Status.TotalSent}}</strong></div>
+      <div class="row"><span>Preallocazione file</span><strong>{{if .Prefs.AllocateFull}}<span class="badge warn" title="aMule alloca l'intero file prima di scaricarlo: su un disco di rete può bloccare la coda per decine di secondi">attiva</span>{{else}}<span class="badge ok" title="aMule non prealloca l'intero file: sui dischi di rete è il comportamento consigliato">spenta</span>{{end}}</strong></div>
     </div>
     <div class="toolbar">
       <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="connect"><button class="btn primary" type="submit" title="Connette eD2k a un server e avvia Kad">Connetti</button></form>
@@ -1644,6 +1675,7 @@
       {{else}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="kad_start"><button class="btn" type="submit" title="Avvia la rete Kad">Avvia Kad</button></form>{{end}}
       {{if .Status.Ed2kConnected}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="server_disconnect"><button class="btn" type="submit" title="Lascia il server eD2k attuale; Kad resta attivo">Lascia il server</button></form>{{end}}
       <button class="btn" type="button" hx-get="/?view=ed2k" hx-select="#v2-ed2k-state" hx-target="#v2-ed2k-state" hx-swap="outerHTML" title="Rilegge lo stato da aMule">Aggiorna</button>
+      <form method="post" action="/ed2k/preferences/recommended" hx-post="/ed2k/preferences/recommended" hx-target="#v2-ed2k-state" hx-swap="innerHTML" hx-disabled-elt="find button" style="display:inline"><button class="btn" type="submit" title="Disattiva la preallocazione completa in aMule: sui dischi di rete blocca amuled mentre alloca; Gextto importa comunque i file completati.">Impostazioni consigliate</button></form>
     </div>
   {{end}}
   </div>
@@ -2607,7 +2639,7 @@
     <div class="panel-body">
       <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-search-results" hx-swap="outerHTML">
         <input type="search" name="q" value="{{.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
-        <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → Fonti → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
+        <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
         <button class="btn primary" type="submit">Cerca</button>
       </form>
       <form class="search-row" method="post" action="/search/link" hx-post="/search/link" hx-target="#v2-search-results" hx-swap="outerHTML">

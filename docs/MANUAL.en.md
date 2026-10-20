@@ -786,7 +786,7 @@ there, so Gextto finds the completed files; use a dedicated incoming folder,
 because aMule shares everything it holds. To open the ports on the router with
 **UPnP** the container must use the host network (`network_mode: host`) with
 `UPnPEnabled=1` in `amule.conf`. Start
-`amuled`, then in **Configuration → Sources → eD2k and Kad** switch on **eD2k
+`amuled`, then in **Configuration → eD2k and Kad** switch on **eD2k
 and Kad through aMule** and enter address, port and the password **in clear**.
 Gextto must see aMule's incoming folder at the same path (true when both run on
 the same machine): completed files are imported from there. Open aMule's TCP
@@ -811,6 +811,10 @@ which means more sources.
 - **Paste eD2k links**: one or more `ed2k://` links, even mixed with text;
   **Download with aMule** adds them all.
 - **aMule log**: **Load the log** shows the last lines of amuled's log.
+- **aMule folders**: when the incoming or the temporary folder is missing (a
+  network disk unmounted, a folder removed) the page says so and **Create the
+  folders** makes them; without them aMule fills its log with *Failed to get
+  file system statistics* and never imports completed files.
 - **Shared files**: what aMule shares, with the bytes uploaded in this session
   and over all time, requests and accepted ones, queued clients, priority and
   the `ed2k://` link to copy; below it the clients you are uploading to, with
@@ -835,7 +839,7 @@ protocol details — see [`docs/amule.md`](amule.md).
 ## 7. Configuration
 
 The page is split into four areas: **What to look for** (General, Sources,
-Quality and upgrades), **How to download** (Torrent engine, Speed and network,
+eD2k and Kad, Quality and upgrades), **How to download** (Torrent engine, Speed and network,
 Queues and performance, Seeding and completion), **Where to store** (Library and
 renaming, Archive and space) and **System** (Automatic maintenance,
 Notifications, Access and services, Diagnostics and translations). Unsaved changes are
@@ -849,6 +853,10 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   `/api/v2.0/indexers/all/results/torznab/api`. The health check uses `t=caps`
   with the same key, so it checks the API rather than only Jackett's home page.
   Results may identify the source as `jackett:TrackerName`.
+- **eD2k and Kad** — the connection to aMule (address, port and external
+  connections password), the search network (Kad, servers or both), the
+  automatic fallback when torrents find nothing and giving up on stalled
+  downloads. aMule's state and commands are on the eD2k page.
 - **Speed, network and performance** — connections/performance,
   protocols/trackers, security, RAM disk and ports, speed limits and scheduler;
   apply and optimise.
@@ -1373,6 +1381,12 @@ For each indexer the table distinguishes:
 This distinction matters: restarting Gextto does not fix a wrong API key, while a
 network problem may require checking DNS, containers, ports or the firewall.
 
+With eD2k on, the **Health** page also has an **eD2k and Kad (aMule)** card with
+the connection state, the speeds, the bytes exchanged in this session, the
+missing aMule folders and the latest problem lines from aMule's log
+(disconnections, no valid servers, errors), so a problem is visible without
+opening the log.
+
 ## 11. Notifications
 
 Configure Telegram, e-mail (SMTP) or a webhook — including Discord, Slack,
@@ -1661,7 +1675,9 @@ them.
 | Source filters | Keywords to accept or reject for a single source, enabled per row. |
 | Watched folders | Automatically adds the .torrent/.magnet files found in the given folders (recursive, delete after). |
 
-**eD2k and Kad**
+#### eD2k and Kad
+
+*Connection to aMule, search on Kad and the eD2k servers, automatic fallback and stalled downloads.*
 
 eD2k and Kad go through **aMule** (see [eD2k and Kad with aMule](#ed2k-and-kad-with-amule)):
 Gextto drives an `amuled` that is already running, through external connections

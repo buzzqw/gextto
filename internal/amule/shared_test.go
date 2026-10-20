@@ -125,3 +125,58 @@ func TestUploadQueueListsActiveClientsFirst(t *testing.T) {
 		t.Fatalf("upload fields = %+v", uploads[0])
 	}
 }
+
+func TestSetFilePreallocationKeepsTheOtherFilePreferences(t *testing.T) {
+	core, err := amuletest.Start("secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer core.Close()
+	client := amule.New(amule.Config{Address: core.Address(), Password: "secret"})
+	defer client.Close()
+	ctx := context.Background()
+
+	core.SetAllocateFull(true)
+	prefs, err := client.Preferences(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !prefs.AllocateFull {
+		t.Fatal("the fake core reports preallocation on")
+	}
+
+	if err := client.SetFilePreallocation(ctx, false); err != nil {
+		t.Fatal(err)
+	}
+	if core.AllocateFull() {
+		t.Fatal("preallocation is still on")
+	}
+	if !core.KeptIch() {
+		t.Fatal("the write dropped the other file preferences")
+	}
+	prefs, err = client.Preferences(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prefs.AllocateFull {
+		t.Fatal("preallocation still reported on")
+	}
+}
+
+func TestStatusReportsSessionTotals(t *testing.T) {
+	core, err := amuletest.Start("secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer core.Close()
+	client := amule.New(amule.Config{Address: core.Address(), Password: "secret"})
+	defer client.Close()
+	core.SetSessionTotals(1234, 5678)
+	status, err := client.Status(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.TotalSent != 1234 || status.TotalRecv != 5678 {
+		t.Fatalf("totals = %d/%d", status.TotalSent, status.TotalRecv)
+	}
+}

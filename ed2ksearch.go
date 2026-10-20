@@ -212,6 +212,17 @@ func ed2kClient(cfg *Config) (*amule.Client, error) {
 
 // ed2kCall runs one request against the core. While the core is known to be
 // down it fails fast instead of waiting on a dial timeout.
+// ed2kPreferences reads aMule's directories and options.
+func ed2kPreferences(cfg *Config) (amule.Preferences, error) {
+	var prefs amule.Preferences
+	err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+		value, callErr := client.Preferences(ctx)
+		prefs = value
+		return callErr
+	})
+	return prefs, err
+}
+
 func ed2kCall(cfg *Config, call func(ctx context.Context, client *amule.Client) error) error {
 	client, err := ed2kClient(cfg)
 	if err != nil {

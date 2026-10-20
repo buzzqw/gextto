@@ -79,6 +79,8 @@ const (
 	TagStatsKadFiles     = 0x020C
 	TagStatsKadNodes     = 0x021B
 	TagStatsSharedFiles  = 0x021A
+	TagStatsTotalSent    = 0x0218
+	TagStatsTotalRecv    = 0x0219
 
 	TagPartfile            = 0x0300
 	TagPartfileName        = 0x0301
@@ -144,6 +146,9 @@ const (
 	TagPrefsConnections    = 0x1300
 	TagConnMaxDL           = 0x1303
 	TagConnMaxUL           = 0x1304
+	TagPrefsFiles          = 0x1800
+	TagFilesIchEnabled     = 0x1801
+	TagFilesAllocFull      = 0x180C
 	TagPrefsDirectories    = 0x1A00
 	TagDirectoriesIncoming = 0x1A01
 	TagDirectoriesTemp     = 0x1A02
@@ -167,6 +172,7 @@ const (
 // Preference selections.
 const (
 	PrefsConnections = 0x00000004
+	PrefsFiles       = 0x00000080
 	PrefsDirectories = 0x00000200
 )
 

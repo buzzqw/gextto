@@ -14,6 +14,20 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **eD2k: cartelle di aMule mancanti segnalate e ricreate.** Se la cartella di
+  arrivo o quella temporanea di aMule non esistono (disco di rete smontato,
+  cartella rimossa), la pagina eD2k lo dice e **Crea le cartelle** le ricrea:
+  l'accumulo di *Failed to get file system statistics* nel log si ferma e
+  l'import dei completati torna a funzionare.
+- **eD2k e Kad hanno una scheda loro in Configurazione.** Le nove voci di
+  aMule ed eD2k (collegamento, rete di ricerca, ripiego, download fermi) non
+  stanno più dentro **Fonti**: c'è una scheda **eD2k e Kad** dedicata, e i link
+  «Apri la configurazione» portano lì.
+- **eD2k: totali di sessione, preallocazione e avvisi.** La pagina eD2k mostra
+  i byte scambiati da aMule nella sessione e se aMule prealloca i file;
+  **Impostazioni consigliate** disattiva la preallocazione completa (quella che
+  blocca `amuled` sui dischi di rete). In **Salute** c'è una scheda eD2k con
+  stato, velocità, totali e gli ultimi avvisi presi dal log di aMule.
 - **Pezzi: la mappa si vede anche a torrent fermo.** Aprendo i dettagli di un
   torrent in pausa o parcheggiato, la scheda **Pezzi** diceva «metadata non
   ancora presenti» anche con il 99% scaricato. I pezzi verificati ci sono: la

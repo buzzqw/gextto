@@ -1147,7 +1147,7 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 		if !ed2kEnabled(latestConfig(s)) {
 			return http.StatusConflict, map[string]any{
 				"ok":    false,
-				"error": "eD2k downloads need aMule: enable it in Settings → Sources → eD2k and Kad",
+				"error": "eD2k downloads need aMule: enable it in Settings → eD2k and Kad",
 				"link":  link.String(),
 			}
 		}

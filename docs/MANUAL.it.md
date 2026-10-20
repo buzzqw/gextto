@@ -805,7 +805,7 @@ container **allo stesso percorso** dell'host e imposta lì `INCOMING_DIR` e
 dedicata, perché aMule condivide tutto quello che contiene. Per aprire le porte
 sul router con l'**UPnP** il container deve usare la rete dell'host
 (`network_mode: host`) con `UPnPEnabled=1` in `amule.conf`. Avvia
-`amuled`, poi in **Configurazione → Fonti → eD2k e Kad** accendi
+`amuled`, poi in **Configurazione → eD2k e Kad** accendi
 **eD2k e Kad tramite aMule** e inserisci indirizzo, porta e password **in
 chiaro**. Gextto deve vedere la cartella di arrivo di aMule allo stesso
 percorso (succede quando girano sulla stessa macchina): è da lì che importa i
@@ -830,6 +830,10 @@ alto e un Kad non dietro firewall, cioè più fonti.
 - **Incolla link eD2k**: uno o più link `ed2k://`, anche mescolati a testo;
   **Scarica con aMule** li aggiunge tutti.
 - **Log di aMule**: **Carica il log** mostra le ultime righe del log di amuled.
+- **Cartelle di aMule**: se la cartella di arrivo o quella temporanea non
+  esistono (disco di rete smontato, cartella rimossa) la pagina lo segnala con
+  **Crea le cartelle**: senza, aMule riempie il log di *Failed to get file
+  system statistics* e non importa i file completati.
 - **File condivisi**: quello che aMule condivide, con i byte caricati nella
   sessione e in totale, richieste e accettate, client in coda, priorità e il
   link `ed2k://` da copiare; sotto, i client a cui stai caricando con velocità e
@@ -854,7 +858,7 @@ problemi e dettagli del protocollo — vedi [`docs/amule.it.md`](amule.it.md).
 ## 7. Configurazione
 
 La pagina è divisa in quattro aree: **Cosa cercare** (Generale, Sorgenti,
-Qualità e upgrade), **Come scaricare** (Motore torrent, Velocità e rete, Code e
+eD2k e Kad, Qualità e upgrade), **Come scaricare** (Motore torrent, Velocità e rete, Code e
 prestazioni, Seed e completamento), **Dove salvare** (Libreria e rinomina,
 Archivio e spazio) e **Sistema** (Manutenzione automatica, Notifiche, Accesso e
 servizi, Diagnostica e traduzioni). Le modifiche non salvate sono
@@ -868,6 +872,10 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   `/api/v2.0/indexers/all/results/torznab/api`. Il controllo di salute usa
   `t=caps` con la stessa API key, quindi verifica l'API e non soltanto la home di
   Jackett. Nei risultati la sorgente può apparire come `jackett:NomeTracker`.
+- **eD2k e Kad** — collegamento ad aMule (indirizzo, porta e password delle
+  connessioni esterne), rete di ricerca (Kad, server o entrambi), ripiego
+  automatico quando i torrent non trovano nulla e rinuncia ai download fermi.
+  Lo stato e i comandi di aMule sono nella pagina eD2k.
 - **Velocità, rete e prestazioni** — connessioni/prestazioni,
   protocolli/tracker, sicurezza, RAM disk e porte, limiti di velocità e
   scheduler; applica e ottimizza. Se sposti lo storage di un torrent in una cartella che
@@ -1421,6 +1429,12 @@ Questa distinzione è importante: riavviare Gextto non risolve un errore API key
 mentre un problema di rete può richiedere di controllare DNS, container, porta o
 firewall.
 
+Con eD2k attivo la pagina **Salute** ha anche una scheda **eD2k e Kad (aMule)**
+con lo stato della connessione, le velocità, i byte scambiati nella sessione, le
+cartelle di aMule mancanti e le ultime righe di problema dal log di aMule
+(disconnessioni, server non validi, errori), così non devi aprire il log per
+accorgerti che qualcosa non va.
+
 ## 11. Notifiche
 
 Configura Telegram, e-mail (SMTP) o un webhook — anche verso Discord, Slack,
@@ -1718,7 +1732,9 @@ salvata** finché non li salvi.
 | Filtri per sorgente | Parole chiave da accettare o scartare per una singola sorgente, con attivazione per riga. |
 | Cartelle osservate | Aggiunge automaticamente i .torrent/.magnet trovati nelle cartelle indicate (ricorsiva, elimina dopo). |
 
-**eD2k e Kad**
+#### eD2k e Kad
+
+*Collegamento ad aMule, ricerca su Kad e sui server eD2k, ripiego automatico e download fermi.*
 
 eD2k e Kad passano da **aMule** (vedi [eD2k e Kad con aMule](#ed2k-e-kad-con-amule)):
 Gextto comanda un `amuled` già avviato tramite le connessioni esterne (EC). È

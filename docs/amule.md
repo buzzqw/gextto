@@ -98,7 +98,7 @@ wait altogether.
 
 ## Turn it on in Gextto
 
-**Configuration → Sources → eD2k and Kad**:
+**Configuration → eD2k and Kad**:
 
 1. switch on **eD2k and Kad through aMule**;
 2. fill in **address** (usually `127.0.0.1`), **EC port** (4712) and the
@@ -113,6 +113,12 @@ sensor says *limited*, open aMule's TCP and UDP ports on the router.
 
 When aMule does not answer, the eD2k page says so, explains what to check and
 offers **Retry**. Nothing else in Gextto stops working.
+
+The state panel also shows the bytes aMule exchanged in this session and
+whether aMule preallocates files; **Recommended settings** switches full
+preallocation off (the setting that blocks `amuled` on network disks). The
+**Health** page has an eD2k card with the same state, the session totals and the
+latest problem lines from aMule's log.
 
 When `amuled` runs on Gextto's machine, the header shows an **aMule** badge with
 the daemon's CPU and RAM, updated with the other metrics. With aMule on another
@@ -241,6 +247,7 @@ to read them again.
 | **Kad behind a firewall** | aMule's UDP port (4672 by default) is not reachable: open it on the router. Kad works but finds fewer sources. |
 | **Search returns nothing** | the chosen network (Kad only needs Kad to be connected); a search duration that is too short; a Kad firewalled. Kad and the servers index different files, so try **Kad + eD2k servers**. |
 | **Download stays queued** | normal on eD2k: aMule waits for its turn in the sources' queues. Check sources and the ID; low ID means long queues. |
+| **aMule's log fills with `Failed to get file system statistics`** | its incoming or temporary folder does not exist (a network disk unmounted, a folder removed): the eD2k page lists the missing folders and **Create the folders** makes them again. |
 | **Files complete in aMule but never appear in the library** | the incoming folder is not visible at the same path from Gextto, or is not readable; the file is not a video (it stays in the incoming folder by design); aMule was still preallocating (`AllocateFullFile=0` on network disks). |
 | **The eD2k page shows the integration as off** | the switch is off, or the settings were not saved. The page links straight to the setting. |
 

@@ -71,6 +71,7 @@ var uiSettingsAreas = []uiSettingsArea{
 var uiSettingsTabs = []uiSettingsTab{
 	{ID: "daemon", Label: "Generale", Area: "search", Intro: "Quando e quanto spesso Gextto cerca nuove release e gli episodi mancanti."},
 	{ID: "sources", Label: "Sorgenti", Area: "search", Intro: "Da dove arrivano le release: feed RSS, motori web, filtri e cartelle osservate."},
+	{ID: "ed2k", Label: "eD2k e Kad", Area: "search", Intro: "Collegamento ad aMule, ricerca su Kad e sui server eD2k, ripiego automatico e download fermi."},
 	{ID: "scores", Label: "Qualità e upgrade", Area: "search", Intro: "Come vengono confrontate le release e quando una versione migliore sostituisce quella in libreria."},
 	{ID: "backend", Label: "Motore torrent", Area: "download", Intro: "Quale motore scarica i torrent e come Gextto lo raggiunge."},
 	{ID: "network", Label: "Velocità e rete", Area: "download", Intro: "Limiti di banda, fasce orarie, porte e protocolli della sessione torrent."},
@@ -126,15 +127,15 @@ var uiSettingsIndex = []uiSettingDef{
 	// --- Sorgenti -----------------------------------------------------------
 	{Key: "blacklist", Label: "Blacklist (una parola per riga)", Tab: "sources", Group: "Feed e blacklist"},
 	{Key: "stop_on_old_page_threshold", Label: "Pagine feed da leggere", Tab: "sources", Group: "Feed e blacklist"},
-	{Key: "ed2k_enabled", Label: "eD2k e Kad tramite aMule", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "amule_host", Label: "aMule — indirizzo", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "amule_port", Label: "aMule — porta connessioni esterne (EC)", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "amule_password", Label: "aMule — password connessioni esterne (EC)", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "ed2k_search_network", Label: "Rete delle ricerche eD2k", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "ed2k_fallback", Label: "Usa eD2k quando i torrent non trovano nulla", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "ed2k_min_sources", Label: "Fonti minime per il fallback", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "ed2k_search_timeout_secs", Label: "Durata della ricerca eD2k", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "ed2k_stall_days", Label: "Rinuncia a un download eD2k fermo dopo", Tab: "sources", Group: "eD2k e Kad"},
+	{Key: "ed2k_enabled", Label: "eD2k e Kad tramite aMule", Tab: "ed2k", Group: "eD2k e Kad"},
+	{Key: "amule_host", Label: "aMule — indirizzo", Tab: "ed2k", Group: "eD2k e Kad"},
+	{Key: "amule_port", Label: "aMule — porta connessioni esterne (EC)", Tab: "ed2k", Group: "eD2k e Kad"},
+	{Key: "amule_password", Label: "aMule — password connessioni esterne (EC)", Tab: "ed2k", Group: "eD2k e Kad"},
+	{Key: "ed2k_search_network", Label: "Rete delle ricerche eD2k", Tab: "ed2k", Group: "eD2k e Kad"},
+	{Key: "ed2k_fallback", Label: "Usa eD2k quando i torrent non trovano nulla", Tab: "ed2k", Group: "eD2k e Kad"},
+	{Key: "ed2k_min_sources", Label: "Fonti minime per il fallback", Tab: "ed2k", Group: "eD2k e Kad"},
+	{Key: "ed2k_search_timeout_secs", Label: "Durata della ricerca eD2k", Tab: "ed2k", Group: "eD2k e Kad"},
+	{Key: "ed2k_stall_days", Label: "Rinuncia a un download eD2k fermo dopo", Tab: "ed2k", Group: "eD2k e Kad"},
 
 	// --- Qualità e upgrade (the score weights come from uiScoreSettingDefs) --
 	{Key: "upgrade_min_score_diff", Label: "Differenza minima score per upgrade", Tab: "scores", Group: "Upgrade e sostituzione"},

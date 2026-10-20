@@ -39,6 +39,10 @@ type Status struct {
 	KadNodes      int64  `json:"kad_nodes"`
 	// SharedFiles is how many files the core is sharing.
 	SharedFiles int64 `json:"shared_files"`
+	// TotalSent and TotalRecv are the bytes aMule has sent and received since
+	// it started (the session totals shown in its own GUI).
+	TotalSent int64 `json:"total_sent"`
+	TotalRecv int64 `json:"total_recv"`
 }
 
 // Status asks the core for its statistics and connection state.
@@ -66,6 +70,8 @@ func (c *Client) Status(ctx context.Context) (Status, error) {
 	status.KadFiles = value(TagStatsKadFiles)
 	status.KadNodes = value(TagStatsKadNodes)
 	status.SharedFiles = value(TagStatsSharedFiles)
+	status.TotalSent = value(TagStatsTotalSent)
+	status.TotalRecv = value(TagStatsTotalRecv)
 	if conn, ok := reply.Tag(TagConnState); ok {
 		applyConnState(&status, conn)
 	}
@@ -711,6 +717,9 @@ type Preferences struct {
 	TempDir     string `json:"temp_dir"`
 	// SharedDirs are the extra folders shared besides the incoming one.
 	SharedDirs []string `json:"shared_dirs"`
+	// AllocateFull is aMule's "allocate the full file up front" switch, the one
+	// that stalls a NAS while it preallocates.
+	AllocateFull bool `json:"allocate_full"`
 	// MaxDownload and MaxUpload are in KiB/s; 0 means unlimited.
 	MaxDownload int64 `json:"max_download_kib"`
 	MaxUpload   int64 `json:"max_upload_kib"`
@@ -719,7 +728,7 @@ type Preferences struct {
 // Preferences reads the directories and the bandwidth limits.
 func (c *Client) Preferences(ctx context.Context) (Preferences, error) {
 	reply, err := c.Request(ctx, Packet{Op: OpGetPreferences, Tags: []Tag{
-		IntTag(TagSelectPrefs, PrefsConnections|PrefsDirectories),
+		IntTag(TagSelectPrefs, PrefsConnections|PrefsDirectories|PrefsFiles),
 	}})
 	if err != nil {
 		return Preferences{}, err
@@ -738,6 +747,9 @@ func (c *Client) Preferences(ctx context.Context) (Preferences, error) {
 				}
 			}
 		}
+	}
+	if files, ok := reply.Tag(TagPrefsFiles); ok {
+		_, prefs.AllocateFull = files.Child(TagFilesAllocFull)
 	}
 	if conn, ok := reply.Tag(TagPrefsConnections); ok {
 		down, _ := conn.ChildInt(TagConnMaxDL)
@@ -758,6 +770,39 @@ func (c *Client) SetLimits(ctx context.Context, downloadKiB, uploadKiB int64) er
 			IntTag(TagConnMaxDL, uint64(downloadKiB)),
 			IntTag(TagConnMaxUL, uint64(uploadKiB)),
 		),
+	}})
+	return err
+}
+
+// SetFilePreallocation switches aMule's full-file preallocation. It reads the
+// current file preferences and sends them back with only that flag changed: a
+// partial block would reset every other file option to false.
+func (c *Client) SetFilePreallocation(ctx context.Context, enabled bool) error {
+	reply, err := c.Request(ctx, Packet{Op: OpGetPreferences, Tags: []Tag{
+		IntTag(TagSelectPrefs, PrefsFiles),
+		IntTag(TagDetailLevel, DetailFull),
+	}})
+	if err != nil {
+		return err
+	}
+	files, ok := reply.Tag(TagPrefsFiles)
+	if !ok {
+		return errors.New("amule: file preferences unavailable")
+	}
+	children := make([]Tag, 0, len(files.Children)+1)
+	for _, child := range files.Children {
+		if child.Name == TagFilesAllocFull {
+			continue
+		}
+		children = append(children, child)
+	}
+	if enabled {
+		children = append(children, EmptyTag(TagFilesAllocFull))
+	}
+	files.Children = children
+	_, err = c.requestOK(ctx, Packet{Op: OpSetPreferences, Tags: []Tag{
+		IntTag(TagDetailLevel, DetailFull),
+		files,
 	}})
 	return err
 }

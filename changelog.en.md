@@ -13,6 +13,20 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **eD2k: missing aMule folders reported and recreated.** When aMule's incoming
+  or temporary folder is missing (a network disk unmounted, a folder removed),
+  the eD2k page says so and **Create the folders** makes them again: the flow of
+  *Failed to get file system statistics* in the log stops and completed files
+  are imported again.
+- **eD2k and Kad get their own Configuration tab.** The nine aMule/eD2k rows
+  (connection, search network, fallback, stalled downloads) are no longer inside
+  **Sources**: there is a dedicated **eD2k and Kad** tab, and the “Open the
+  configuration” links land there.
+- **eD2k: session totals, preallocation and warnings.** The eD2k page shows the
+  bytes aMule exchanged in this session and whether aMule preallocates files;
+  **Recommended settings** switches full preallocation off (the one that blocks
+  `amuled` on network disks). **Health** gains an eD2k card with state, speeds,
+  totals and the latest warnings from aMule's log.
 - **Pieces: the map shows on a stopped torrent too.** Opening the details of a
   paused or parked torrent, the **Pieces** tab said “metadata not yet present”
   even at 99% downloaded. The verified pieces are there: the map now shows them,

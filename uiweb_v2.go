@@ -226,6 +226,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 
 	// Fumetti: link finder, download diretto e modifica della libreria.
 	v2Handle(s, mux, "POST /ed2k/action", V2Ed2kAction)
+	v2Handle(s, mux, "POST /ed2k/preferences/recommended", V2Ed2kRecommended)
+	v2Handle(s, mux, "POST /ed2k/directories/create", V2Ed2kCreateDirs)
 	v2Handle(s, mux, "POST /ed2k/search", V2Ed2kSearch)
 	v2Handle(s, mux, "POST /ed2k/add", V2Ed2kAdd)
 	v2Handle(s, mux, "GET /ed2k/log", V2Ed2kLog)
@@ -494,6 +496,8 @@ type v2HealthView struct {
 	uiHealthData
 	PanelTables []v2TableData
 	Engine      uiEngineStats
+	// Ed2k is the aMule card: state, session totals and recent log warnings.
+	Ed2k *v2Ed2kHealth
 }
 
 type v2DownloadsView struct {
@@ -543,6 +547,7 @@ func v2HealthViewFrom(s *AppState, r *http.Request) v2HealthView {
 		uiHealthData: base,
 		PanelTables:  v2SectionTables(s, r, base.Panels, []string{"health-sources", "health-providers"}),
 		Engine:       uiEngineStatsFrom(s),
+		Ed2k:         v2Ed2kHealthFrom(s),
 	}
 }
 
