@@ -2,14 +2,12 @@ package gextto
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
+	"net"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/amule/amuletest"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -52,44 +50,55 @@ func TestReleaseDedupKeyForEd2k(t *testing.T) {
 	}
 }
 
-func TestSearchED2KAgainstFakeDaemon(t *testing.T) {
-	link := "ed2k://|file|The%20Matrix%201999%201080p.mkv|7000000000|dddddddddddddddddddddddddddddddd|/"
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/api/v1/health":
-			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "version": "1.1.1", "download": false})
-		case "/api/v1/search":
-			if r.URL.Query().Get("q") != "The Matrix 1999" {
-				t.Errorf("query = %q", r.URL.Query().Get("q"))
-			}
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"ok": true,
-				"results": []map[string]any{{
-					"name": "The Matrix 1999 1080p.mkv", "size_bytes": 7000000000,
-					"hash": "dddddddddddddddddddddddddddddddd", "link": link,
-					"sources": 12, "origin": "kad",
-				}},
-			})
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer server.Close()
-	ed2kInvalidateHealth()
+// ed2kTestCore starts a fake aMule core and returns a configuration that
+// points at it, with the integration switched on.
+func ed2kTestCore(t *testing.T, extra map[string]string) (*amuletest.Core, *Config) {
+	t.Helper()
+	core, err := amuletest.Start("secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = core.Close() })
+	host, port, _ := net.SplitHostPort(core.Address())
 	cfgValue := DefaultConfig()
 	cfg := &cfgValue
 	cfg.Settings = map[string]string{
-		"ed2k_enabled": "true", "ed2k_url": server.URL,
+		"ed2k_enabled": "true", "amule_host": host, "amule_port": port, "amule_password": "secret",
+		"ed2k_search_timeout_secs": "5",
 	}
+	for key, value := range extra {
+		cfg.Settings[key] = value
+	}
+	ed2kInvalidateHealth()
+	return core, cfg
+}
+
+func TestSearchED2KThroughAmule(t *testing.T) {
+	core, cfg := ed2kTestCore(t, nil)
+	core.SetResults([]amuletest.Result{{
+		Hash: "dddddddddddddddddddddddddddddddd", Name: "The Matrix 1999 1080p.mkv", Size: 7000000000, Sources: 12,
+	}}, "")
 	releases := SearchED2K(context.Background(), cfg, "The Matrix 1999")
 	if len(releases) != 1 {
 		t.Fatalf("got %d releases", len(releases))
 	}
-	if releases[0].Network != "ed2k" || releases[0].Ed2kLink != link || releases[0].Sources != 12 {
+	want := "ed2k://|file|The%20Matrix%201999%201080p.mkv|7000000000|dddddddddddddddddddddddddddddddd|/"
+	if releases[0].Network != "ed2k" || releases[0].Ed2kLink != want || releases[0].Sources != 12 {
 		t.Fatalf("release = %+v", releases[0])
 	}
 	if releases[0].Quality.Resolution != "1080p" {
 		t.Fatalf("quality = %+v", releases[0].Quality)
+	}
+	if got := core.Searches(); len(got) != 1 || got[0] != "The Matrix 1999" {
+		t.Fatalf("searches = %v", got)
+	}
+}
+
+func TestSearchED2KRefusedByCore(t *testing.T) {
+	core, cfg := ed2kTestCore(t, nil)
+	core.SetResults(nil, "Kad search can't be done if Kad is not running")
+	if got := SearchED2K(context.Background(), cfg, "anything"); len(got) != 0 {
+		t.Fatalf("a refused search returned %d releases", len(got))
 	}
 }
 
@@ -100,19 +109,13 @@ func TestSearchED2KDisabledByDefault(t *testing.T) {
 	if got := SearchED2K(context.Background(), cfg, "anything"); len(got) != 0 {
 		t.Fatalf("disabled provider returned %d releases", len(got))
 	}
+	if got := SearchED2KManual(context.Background(), cfg, "anything"); len(got) != 0 {
+		t.Fatalf("a manual search with aMule off returned %d releases", len(got))
+	}
 }
 
-func TestEd2kFallbackRequiresDownload(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "download": true})
-	}))
-	defer server.Close()
-	ed2kInvalidateHealth()
-	cfgValue := DefaultConfig()
-	cfg := &cfgValue
-	cfg.Settings = map[string]string{
-		"ed2k_enabled": "true", "ed2k_fallback": "true", "ed2k_url": server.URL,
-	}
+func TestEd2kFallbackRequiresReachableAmule(t *testing.T) {
+	core, cfg := ed2kTestCore(t, map[string]string{"ed2k_fallback": "true"})
 	if search, download := ed2kAvailability(cfg); !search || !download {
 		t.Fatalf("availability = %v/%v", search, download)
 	}
@@ -123,35 +126,29 @@ func TestEd2kFallbackRequiresDownload(t *testing.T) {
 	if ed2kFallbackEligible(cfg) {
 		t.Fatal("fallback must be off when the switch is off")
 	}
+	cfg.Settings["ed2k_fallback"] = "true"
+	_ = core.Close()
+	ed2kInvalidateHealth()
+	if ed2kFallbackEligible(cfg) {
+		t.Fatal("fallback must be off while aMule is unreachable")
+	}
+}
+
+func TestEd2kWrongPasswordIsReported(t *testing.T) {
+	_, cfg := ed2kTestCore(t, map[string]string{"amule_password": "wrong"})
+	status := Ed2kRuntimeStatus(cfg)
+	if status["reachable"] != false || !strings.Contains(status["last_error"].(string), "authentication") {
+		t.Fatalf("status = %+v", status)
+	}
 }
 
 func TestSearchSeriesED2KFiltersAutomaticCandidates(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"ok": true,
-			"results": []map[string]any{
-				{
-					"name": "Rare Show S02E03 1080p.mkv", "size_bytes": 5000000000,
-					"hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "sources": 1, "origin": "kad",
-				},
-				{
-					"name": "Rare Show S02E03 720p.mkv", "size_bytes": 900000000,
-					"hash": "ffffffffffffffffffffffffffffffff", "sources": 8, "origin": "kad",
-				},
-				{
-					"name": "Rare Show S02E04 1080p.mkv", "size_bytes": 5000000000,
-					"hash": "11111111111111111111111111111111", "sources": 9, "origin": "kad",
-				},
-			},
-		})
-	}))
-	defer server.Close()
-	ed2kInvalidateHealth()
-	cfgValue := DefaultConfig()
-	cfg := &cfgValue
-	cfg.Settings = map[string]string{
-		"ed2k_enabled": "true", "ed2k_url": server.URL, "ed2k_min_sources": "3",
-	}
+	core, cfg := ed2kTestCore(t, map[string]string{"ed2k_min_sources": "3"})
+	core.SetResults([]amuletest.Result{
+		{Hash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", Name: "Rare Show S02E03 1080p.mkv", Size: 5000000000, Sources: 1},
+		{Hash: "ffffffffffffffffffffffffffffffff", Name: "Rare Show S02E03 720p.mkv", Size: 900000000, Sources: 8},
+		{Hash: "11111111111111111111111111111111", Name: "Rare Show S02E04 1080p.mkv", Size: 5000000000, Sources: 9},
+	}, "")
 	series := &SeriesConfig{Name: "Rare Show"}
 	engine := &Engine{}
 	got := engine.SearchSeriesED2K(context.Background(), cfg, series, 2, 3, false)
@@ -190,73 +187,82 @@ func TestDatabaseStoresEd2kIdentity(t *testing.T) {
 }
 
 func TestSearchSeriesED2KQueriesAliasesAndDedupes(t *testing.T) {
-	var mu sync.Mutex
-	queries := []string{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		queries = append(queries, r.URL.Query().Get("q"))
-		mu.Unlock()
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"ok": true,
-			"results": []map[string]any{
-				{
-					"name": "Murdoch Mysteries S13E12 1080p.mkv", "size_bytes": 2000000000,
-					"hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "sources": 4, "origin": "kad",
-				},
-			},
-		})
-	}))
-	defer server.Close()
-	ed2kInvalidateHealth()
-	cfgValue := DefaultConfig()
-	cfg := &cfgValue
-	cfg.Settings = map[string]string{"ed2k_enabled": "true", "ed2k_url": server.URL}
+	core, cfg := ed2kTestCore(t, nil)
+	core.SetResults([]amuletest.Result{{
+		Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Name: "Murdoch Mysteries S13E12 1080p.mkv", Size: 2000000000, Sources: 4,
+	}}, "")
 	series := &SeriesConfig{Name: "I misteri di Murdoch", Aliases: []string{"Murdoch Mysteries"}}
 	engine := &Engine{}
 	got := engine.SearchSeriesED2K(context.Background(), cfg, series, 13, 12, true)
 	if len(got) != 1 {
 		t.Fatalf("aliases returned %d candidates, want 1 after dedup: %+v", len(got), got)
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	joined := strings.Join(queries, "\n")
+	joined := strings.Join(core.Searches(), "\n")
 	for _, want := range []string{"I misteri di Murdoch S13E12", "Murdoch Mysteries S13E12"} {
 		if !strings.Contains(joined, want) {
-			t.Fatalf("queries missing %q: %v", want, queries)
+			t.Fatalf("queries missing %q: %v", want, core.Searches())
 		}
 	}
 }
 
-func TestSearchED2KManualBypassesDisabledProvider(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/api/v1/health":
-			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "search": true, "download": false})
-		case "/api/v1/search":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"ok": true,
-				"results": []map[string]any{{
-					"name": "Rare Movie 1974 1080p.avi", "size_bytes": 700000000,
-					"hash": "0123456789abcdef0123456789abcdef", "sources": 4, "origin": "kad",
-				}},
-			})
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer server.Close()
-	ed2kInvalidateHealth()
-	cfgValue := DefaultConfig()
-	cfg := &cfgValue
-	cfg.Settings = map[string]string{"ed2k_enabled": "false", "ed2k_url": server.URL}
-	if got := SearchED2K(context.Background(), cfg, "rare movie"); len(got) != 0 {
-		t.Fatalf("disabled provider returned %d releases", len(got))
+func TestEd2kLinkAddAndDownloadActions(t *testing.T) {
+	core, cfg := ed2kTestCore(t, nil)
+	const link = "ed2k://|file|Rare%20Show%20S02E03.mkv|900000000|ffffffffffffffffffffffffffffffff|/"
+	if err := AddEd2kLink(cfg, link); err != nil {
+		t.Fatalf("add: %v", err)
 	}
-	got := SearchED2KManual(context.Background(), cfg, "rare movie")
-	if len(got) != 1 || got[0].Title == "" {
-		t.Fatalf("manual search = %+v", got)
+	if added, err := addEd2kRelease(cfg, &models.Release{Ed2kLink: link}); added || err != nil {
+		t.Fatalf("a duplicate must be reported as not added: %v, %v", added, err)
 	}
-	if ed2kEnabled(cfg) {
-		t.Fatal("the per-search opt-in must not persist the setting")
+	rows := uiEd2kRows(cfg)
+	if len(rows) != 1 || rows[0].Name != "Rare Show S02E03.mkv" || rows[0].Size != 900000000 {
+		t.Fatalf("rows = %+v", rows)
+	}
+	if err := Ed2kDownloadAction(cfg, "pause", rows[0].Hash); err != nil {
+		t.Fatalf("pause: %v", err)
+	}
+	if rows = uiEd2kRows(cfg); !rows[0].Paused {
+		t.Fatalf("not paused: %+v", rows[0])
+	}
+	if err := Ed2kDownloadAction(cfg, "remove", rows[0].Hash); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	if len(core.Downloads()) != 0 {
+		t.Fatalf("queue after remove = %+v", core.Downloads())
+	}
+}
+
+func TestEd2kSessionReportsCompletion(t *testing.T) {
+	core, cfg := ed2kTestCore(t, nil)
+	resetPoll := func() {
+		ed2kEventsMu.Lock()
+		ed2kLastPoll = time.Time{}
+		ed2kEventsMu.Unlock()
+	}
+	ed2kEventsMu.Lock()
+	ed2kLastStatus = map[string]bool{}
+	ed2kEventsKey = ""
+	ed2kEventsMu.Unlock()
+	resetPoll()
+	core.SetDownloads([]amuletest.File{{Hash: "ffffffffffffffffffffffffffffffff", Name: "Rare Show S02E03.mkv", Size: 100, Done: 50, Status: 0}})
+	session := ed2kSession{cfg: cfg}
+	if events := session.PollEvents(); len(events) != 0 {
+		t.Fatalf("an incomplete file produced events: %+v", events)
+	}
+	core.SetDownloads([]amuletest.File{{Hash: "ffffffffffffffffffffffffffffffff", Name: "Rare Show S02E03.mkv", Size: 100, Done: 100, Status: 9}})
+	if early := session.PollEvents(); len(early) != 0 {
+		t.Fatalf("a poll inside the interval read aMule again: %+v", early)
+	}
+	resetPoll()
+	events := session.PollEvents()
+	if len(events) != 1 || events[0].Kind != "torrent_finished" || events[0].SavePath != core.Incoming || events[0].Name != "Rare Show S02E03.mkv" {
+		t.Fatalf("events = %+v", events)
+	}
+	resetPoll()
+	if again := session.PollEvents(); len(again) != 0 {
+		t.Fatalf("completion reported twice: %+v", again)
+	}
+	if cfgCopy := ed2kImportConfig(cfg); cfgCopy.Settings["move_episodes"] != "false" || cfg.Settings["move_episodes"] == "false" {
+		t.Fatal("eD2k files must be imported by copy without changing the caller's configuration")
 	}
 }

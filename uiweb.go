@@ -183,8 +183,8 @@ type uiTorrentRow struct {
 	// Pinned marks the torrent forced out of the queue (the "📌 pin" badge);
 	// it is unpinned from its detail drawer.
 	Pinned bool
-	// Network is "ed2k" for a file downloaded through gx-ed2k; empty and
-	// "torrent" both mean BitTorrent. Sources is the eD2k source count.
+	// Network is "ed2k" for an eD2k file; empty and "torrent" both mean
+	// BitTorrent. Sources is the eD2k source count.
 	Network string
 	Sources int
 }
@@ -192,8 +192,68 @@ type uiTorrentRow struct {
 type uiTorrentsData struct {
 	Rows          []uiTorrentRow
 	HTTPDownloads []ComicDownload
+	// Ed2kDownloads are aMule's files, shown next to the torrents like the
+	// HTTP downloads; Ed2kEnabled says whether the aMule integration is on.
+	Ed2kDownloads []uiEd2kRow
+	Ed2kEnabled   bool
 	Count         int
 	UpdatedAt     string
+}
+
+// uiEd2kRow is one aMule download on the Scarico page.
+type uiEd2kRow struct {
+	Hash        string
+	Name        string
+	State       string
+	StateClass  string
+	ProgressPct string
+	Progress    float64
+	Done        int64
+	Size        int64
+	Speed       uint64
+	Sources     int64
+	Active      int64
+	Paused      bool
+	Complete    bool
+}
+
+// uiEd2kRows reads aMule's queue for the Scarico page.
+func uiEd2kRows(cfg *Config) []uiEd2kRow {
+	downloads := Ed2kDownloads(cfg)
+	rows := make([]uiEd2kRow, 0, len(downloads))
+	for _, download := range downloads {
+		state := ed2kDownloadState(download)
+		label, class := "In coda", "warn"
+		switch state {
+		case "finished":
+			label, class = "Completato", "ok"
+		case "paused":
+			label, class = "In pausa", "warn"
+		case "error":
+			label, class = "Errore", "err"
+		case "checking":
+			label, class = "In verifica", ""
+		case "downloading":
+			label, class = "In scarico", ""
+		}
+		progress := download.Progress()
+		rows = append(rows, uiEd2kRow{
+			Hash:        download.Hash,
+			Name:        download.Name,
+			State:       label,
+			StateClass:  class,
+			Progress:    progress,
+			ProgressPct: strconv.FormatFloat(progress, 'f', 1, 64),
+			Done:        download.Done,
+			Size:        download.Size,
+			Speed:       uint64(max(download.Speed, 0)),
+			Sources:     download.Sources,
+			Active:      download.Active,
+			Paused:      download.Paused(),
+			Complete:    download.Complete(),
+		})
+	}
+	return rows
 }
 
 // uiHealthData is the view-model of the Salute page.
@@ -284,6 +344,7 @@ var uiNavGroups = []uiNavDefinition{
 		{ID: "search", Label: "Esplora", MobileHidden: true},
 		{ID: "archive", Label: "Archivio", MobileHidden: true},
 		{ID: "comics", Label: "Fumetti", MobileHidden: true},
+		{ID: "ed2k", Label: "eD2k", MobileHidden: true},
 	}},
 	{Label: "Sistema", Items: []uiNavDefinitionItem{
 		{ID: "settings", Label: "Configurazione"},
@@ -679,9 +740,12 @@ func uiLogsDataFrom(s *AppState) uiLogsData {
 // the polling partial.
 func uiTorrentsDataFrom(s *AppState) uiTorrentsData {
 	rows := uiTorrentRows(s)
+	cfg := latestConfig(s)
 	return uiTorrentsData{
 		Rows:          rows,
 		HTTPDownloads: HTTPDownloads(),
+		Ed2kDownloads: uiEd2kRows(cfg),
+		Ed2kEnabled:   ed2kEnabled(cfg),
 		Count:         len(rows),
 		UpdatedAt:     uiNowClock(),
 	}

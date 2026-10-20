@@ -136,9 +136,9 @@ func v2SearchSource(release models.Release) string {
 }
 
 // V2SearchLink validates a pasted ed2k:// link and shows it as a search
-// result. Until gx-ed2k can download, the row is visible but not addable: the
-// link is checked, the user sees name, size and hash, and Gextto does not
-// queue something it cannot finish.
+// result. While aMule is off or unreachable the row is visible but not
+// addable: the link is checked, the user sees name, size and hash, and Gextto
+// does not queue something it cannot hand to aMule.
 func V2SearchLink(w http.ResponseWriter, r *http.Request, s *AppState) {
 	raw := strings.TrimSpace(r.FormValue("ed2k_link"))
 	redirect := "/?view=search"
@@ -180,7 +180,7 @@ func V2SearchLink(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if download {
 		view.Notice = fmt.Sprintf("%d link eD2k validi: puoi aggiungerli singolarmente o tutti insieme.", len(view.Results))
 	} else {
-		view.Notice = fmt.Sprintf("%d link eD2k validi, ma il download eD2k non è disponibile in questa versione.", len(view.Results))
+		view.Notice = fmt.Sprintf("%d link eD2k validi, ma aMule non è attivo o non è raggiungibile: controlla la pagina eD2k.", len(view.Results))
 	}
 	if len(view.Results) == 0 {
 		view.Error = "Nessun link eD2k valido trovato nel testo incollato."

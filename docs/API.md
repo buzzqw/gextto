@@ -46,7 +46,7 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/access/generate-key` | generate a new API access key |
 | GET | `/api/acquisitions` | acquisition history |
 | GET | `/api/archive` | archive entries (search and pages) |
-| GET | `/api/ed2k/status` | eD2k/Kad search provider state (enabled, reachable, download capability) |
+| GET | `/api/ed2k/status` | aMule integration state: enabled, reachable, download, last_error and, when aMule answers, status (version, eD2k server and High/Low ID, Kad state, speeds and limits, network size) |
 | POST | `/api/archive/add` | add an entry to the archive |
 | POST | `/api/archive/batch-download` | download several archive entries |
 | POST | `/api/archive/delete` | delete archive entries |
@@ -194,15 +194,15 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/search/archive` | search the archive |
 | POST | `/api/search/explain` | explain a release decision |
 
-With the eD2k provider enabled (`ed2k_enabled`), manual search results can carry
-`network: "ed2k"`, `ed2k_link` and `sources` next to the torrent fields. The
-provider is used only when the request asks for it: send `{"query":"…","kad":true}`
-to `POST /api/search` or `/api/search/dashboard` (the UI has a **Kad** checkbox).
-Such a result has no `magnet`: `POST /api/search/add` queues it when `gx-ed2k`
-reports `"download": true`, and answers `501` while the daemon is search-only.
-The daemon accepts one link per call; the v2 UI can paste a block of links and
-offers **Add all**, which calls the same endpoint once per MD4. Use
-`GET /api/ed2k/status` for the live provider state.
+With the aMule integration enabled (`ed2k_enabled`), manual search results can
+carry `network: "ed2k"`, `ed2k_link` and `sources` next to the torrent fields.
+eD2k is searched only when the request asks for it: send
+`{"query":"…","kad":true}` to `POST /api/search` or `/api/search/dashboard` (the
+UI has a **Kad** checkbox); the network is the one set in `ed2k_search_network`.
+Such a result has no `magnet`: `POST /api/search/add` hands its link to aMule,
+answers `409` when the integration is off or aMule already has the file, and
+`502` when aMule cannot be reached. Use `GET /api/ed2k/status` for the live
+state.
 | GET | `/api/seed-rules` | seed rules: per-source/category seeding limits |
 | POST | `/api/seed-rules` | save the seed rules (list of name, source, category, ratio, seed_days, idle_minutes; null = global, 0 = no limit) |
 | POST | `/api/send-magnet` | send a magnet to the engine |
@@ -575,38 +575,3 @@ off) and the web seed editing calls: `torrents/addWebSeeds` and
 an unknown torrent, 400 for a URL that is not http(s), 409 when `origUrl` is not
 a web seed of the torrent.
 
-## gx-ed2k daemon routes
-
-`gx-ed2k` is the optional eD2k/Kad **search** daemon (also usable standalone:
-`gx-ed2k -mode standalone -listen 0.0.0.0:8899`). It has its own page at `/` and
-a native `/api/v1`. When `ed2k_token` is set, every `/api/v1` call must send
-`X-Gx-Token: <token>` (or `Authorization: Bearer <token>`); the page accepts
-`?token=…` once and keeps a session cookie.
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/v1/health` | health, version, Kad id/UDP port, `download: false`, `search: true`, `reachability` (open/limited/unknown), `low_id`, the UPnP mapping state, `ipfilter_ranges`, `publish` (server, files, last offer) and `limits` (`max_down_kb`, `max_up_kb`, `max_active`) |
-| GET | `/api/v1/status` | counters (nodes, queries, results), capabilities and last error |
-| GET | `/api/v1/search?q=…&timeout_ms=…` | keyword search on Kad and the eD2k servers; results carry `name`, `size_bytes`, `hash`, `link`, `sources`, `origin` |
-| POST | `/api/v1/link` | validate a JSON `{"link":"ed2k://…"}` file or server link; returns the parsed identity |
-| GET | `/api/v1/transfers` | list the eD2k transfers and their state (`discovering`, `downloading`, `queued`, `completed`, `error`) with `done`, `size`, `sources`, `path`, `priority` and `limit_kb` |
-| POST | `/api/v1/transfers` | start a transfer from a JSON `{"link":"ed2k://|file|…"}`; optional `priority` (`low`/`normal`/`high`) and `limit_kb`; returns `201` with the transfer (idempotent by MD4) |
-| POST | `/api/v1/transfers/{id}/settings` | change `priority` and/or `limit_kb` (0 = unlimited) of a transfer |
-| GET | `/api/v1/transfers/{id}` | one transfer, by MD4 |
-| DELETE | `/api/v1/transfers/{id}` | cancel and forget a transfer (partial files stay on disk) |
-| POST | `/api/v1/transfers/{id}/pause` | stop the worker but keep the row and the `.part` file |
-| POST | `/api/v1/transfers/{id}/resume` | restart a paused or failed transfer from its `.part` file |
-| GET | `/api/v1/nodes` | the current Kad routing table |
-| GET | `/api/v1/update` | compare the running `gx-ed2k` build with `release.json` (`gx_ed2k_build`) and return the standalone archive URL; a local build answers `local_build: true` |
-| POST | `/api/v1/update/apply` | download the newer Linux archive, verify its SHA-256 and version, replace the binary and restart; a local build or Windows answers `409` |
-
-`/api/v1/health` reports `"download": false` unless the daemon is started with
-`-download` (or `GX_ED2K_DOWNLOAD=yes`). That is the contract Gextto reads
-before offering to queue an eD2k result. With the transfer plane enabled the
-daemon accepts `ed2k://` links on `/api/v1/transfers`, downloads them in
-`-download-dir` (default `<data>/incoming`) and reports progress there. Upload,
-credits, LowID callbacks, obfuscation and client-to-client secure identification
-are implemented; publishing to eD2k servers is implemented, Kad publishing and
-LowID↔LowID relay are not. A file's priority only affects the order in which
-pending transfers start; `max_active` caps how many run at once, and the rate
-limits are token buckets applied after each block.

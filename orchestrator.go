@@ -574,7 +574,7 @@ func RunCycleDomain(
 					appendValid(engine.SearchSeriesSeason(ctx, cfg, candidate.Series, candidate.Season, false))
 				}
 				// Last resort, and only when the operator explicitly enabled the
-				// automatic eD2k fallback and gx-ed2k can complete a download.
+				// automatic eD2k fallback and aMule is reachable.
 				if len(foundResults[index]) == 0 && ed2kFallbackEligible(cfg) {
 					logging.Debug("gap-fill eD2k fallback started",
 						"series", candidate.Series.Name,
@@ -1046,6 +1046,9 @@ func RunCycleDomain(
 				}
 			}
 			add := func() (bool, error) {
+				if release.Ed2kLink != "" {
+					return addEd2kRelease(cfg, &release)
+				}
 				if torrentFile != nil && *torrentFile != "" {
 					return torrents.AddFileWithPath(*torrentFile, cfg, preferredPath)
 				}
@@ -1332,7 +1335,12 @@ func prioritizeArchiveGapDownloads(
 		if directory, ok := DownloadDirFor(&release, cfg); ok {
 			preferredPath = &directory
 		}
-		add := func() (bool, error) { return torrents.AddWithPath(release.Magnet, cfg, preferredPath) }
+		add := func() (bool, error) {
+			if release.Ed2kLink != "" {
+				return addEd2kRelease(cfg, &release)
+			}
+			return torrents.AddWithPath(release.Magnet, cfg, preferredPath)
+		}
 		commit := func() (bool, string, error) {
 			return commitReleaseApproval(db, &release, candidate.score, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades)
 		}

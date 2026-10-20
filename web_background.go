@@ -1211,10 +1211,28 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				}
 			}
 		}
+		// aMule's completed files join the same completion flow: each event is
+		// handled by its own session, and eD2k episodes are imported by link or
+		// copy so aMule keeps sharing them.
+		ed2kHashes := map[string]struct{}{}
+		var ed2kFiles TorrentEngine
+		if ed2kEnabled(cfg) {
+			ed2kFiles = ed2kSession{cfg: cfg}
+			for _, event := range ed2kFiles.PollEvents() {
+				ed2kHashes[strings.ToLower(event.Hash)] = struct{}{}
+				torrentEvents = append(torrentEvents, event)
+			}
+		}
 		completionSeen := false
 		for _, event := range torrentEvents {
 			publicEvent := event
 			hash := event.Hash
+			torrents := torrents
+			cfg := cfg
+			if _, isEd2k := ed2kHashes[strings.ToLower(hash)]; isEd2k {
+				torrents = ed2kFiles
+				cfg = ed2kImportConfig(cfg)
+			}
 			if event.Kind == "torrent_finished" || event.Kind == "storage_moved" {
 				completionSeen = true
 			}

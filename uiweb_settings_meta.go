@@ -68,12 +68,17 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"gxtorrent_dlna_folders":           {Zero: "vuoto = automatico (archivio)", DependsOn: "gxtorrent_dlna"},
 
 	// eD2k e Kad
-	"ed2k_url":                 {Kind: "url", DependsOn: "ed2k_enabled"},
-	"ed2k_token":               {DependsOn: "ed2k_enabled"},
+	"amule_host":     {DependsOn: "ed2k_enabled"},
+	"amule_port":     {DependsOn: "ed2k_enabled"},
+	"amule_password": {DependsOn: "ed2k_enabled"},
+	"ed2k_search_network": {Kind: "select", DependsOn: "ed2k_enabled", Options: []uiFormOption{
+		{Value: "kad", Label: "Kad"},
+		{Value: "global", Label: "Server eD2k (globale)"},
+		{Value: "local", Label: "Server eD2k (connesso)"},
+	}},
 	"ed2k_fallback":            {DependsOn: "ed2k_enabled"},
 	"ed2k_min_sources":         {Unit: "fonti", Zero: "0 = nessun minimo", DependsOn: "ed2k_fallback"},
 	"ed2k_search_timeout_secs": {Unit: "secondi", DependsOn: "ed2k_enabled"},
-	"ed2k_upnp":                {DependsOn: "ed2k_enabled"},
 
 	// Velocità e rete
 	"torrent_speed_mode": {Kind: "select", Options: []uiFormOption{

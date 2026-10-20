@@ -126,13 +126,14 @@ var uiSettingsIndex = []uiSettingDef{
 	// --- Sorgenti -----------------------------------------------------------
 	{Key: "blacklist", Label: "Blacklist (una parola per riga)", Tab: "sources", Group: "Feed e blacklist"},
 	{Key: "stop_on_old_page_threshold", Label: "Pagine feed da leggere", Tab: "sources", Group: "Feed e blacklist"},
-	{Key: "ed2k_enabled", Label: "Ricerca eD2k/Kad", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "ed2k_url", Label: "gx-ed2k — URL Web API", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "ed2k_token", Label: "gx-ed2k — token API", Tab: "sources", Group: "eD2k e Kad"},
+	{Key: "ed2k_enabled", Label: "eD2k e Kad tramite aMule", Tab: "sources", Group: "eD2k e Kad"},
+	{Key: "amule_host", Label: "aMule — indirizzo", Tab: "sources", Group: "eD2k e Kad"},
+	{Key: "amule_port", Label: "aMule — porta connessioni esterne (EC)", Tab: "sources", Group: "eD2k e Kad"},
+	{Key: "amule_password", Label: "aMule — password connessioni esterne (EC)", Tab: "sources", Group: "eD2k e Kad"},
+	{Key: "ed2k_search_network", Label: "Rete delle ricerche eD2k", Tab: "sources", Group: "eD2k e Kad"},
 	{Key: "ed2k_fallback", Label: "Usa eD2k quando i torrent non trovano nulla", Tab: "sources", Group: "eD2k e Kad"},
 	{Key: "ed2k_min_sources", Label: "Fonti minime per il fallback", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "ed2k_search_timeout_secs", Label: "Timeout della ricerca eD2k", Tab: "sources", Group: "eD2k e Kad"},
-	{Key: "ed2k_upnp", Label: "Apri la porta Kad sul router", Tab: "sources", Group: "eD2k e Kad"},
+	{Key: "ed2k_search_timeout_secs", Label: "Durata della ricerca eD2k", Tab: "sources", Group: "eD2k e Kad"},
 
 	// --- Qualità e upgrade (the score weights come from uiScoreSettingDefs) --
 	{Key: "upgrade_min_score_diff", Label: "Differenza minima score per upgrade", Tab: "scores", Group: "Upgrade e sostituzione"},

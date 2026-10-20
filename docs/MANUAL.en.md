@@ -323,8 +323,9 @@ Manual search is useful for understanding what Gextto sees before changing a
 configuration or starting a download:
 
 1. enter a title or technical query;
-2. tick **Kad** next to the search button to include the eD2k/Kad network
-   (requires the provider enabled in Configuration → Sources);
+2. when the aMule integration is on (see [eD2k and Kad with aMule](#ed2k-and-kad-with-amule)),
+   tick **Kad** next to the search button to search eD2k/Kad as well, on the
+   network chosen in Configuration;
 3. wait for sources to finish, or for slow-source timeouts to appear;
 4. compare title, source, quality, size and seed/peer counts;
 5. use **Filter loaded results** to narrow the list locally;
@@ -348,10 +349,9 @@ inferior to the archived file.
 ## 3. Downloads
 
 - **Search a release**: the panel at the top of Downloads searches the archive,
-  indexers, web engines and — when **Kad** is ticked — the eD2k/Kad network
-  without leaving the page. Results open under the field and an add keeps you
-  in Downloads. The **Kad** checkbox applies to that search: if the provider is
-  off, the single search starts it without changing the configuration.
+  indexers, web engines and — when **Kad** is ticked and aMule is on —
+  eD2k/Kad, without leaving the page. Results open under the field and an add
+  keeps you in Downloads.
 - The **Add torrent** form opens from the button of the same name in the top bar,
   present on **every page** (from another page it takes you to Downloads and
   opens the form): while closed it takes no room. It accepts a magnet/.torrent
@@ -361,6 +361,12 @@ inferior to the archived file.
   list refreshes automatically every 5 seconds.
 - Comic HTTP downloads show status, progress, downloaded bytes and speed in the
   same list as torrents.
+- **aMule's eD2k downloads** appear in the same list with the **eD2k** badge:
+  state, progress, speed and sources (transferring / total), plus **Pause**,
+  **Resume** and **🗑️**. On a download in progress 🗑️ cancels it and deletes
+  the partial data; on a completed file it only takes it off aMule's list (the
+  file stays in the incoming folder). The counter at the top also shows
+  **eD2k: N** while the integration is on.
 - **View row**: a box to select everything, name filter, tag filter, **Sort by**
   with its direction (↑/↓), **⟳** to refresh at once and the **Tools** menu:
   **Clean completed**, **Orphaned files…**, **Refresh every 5 s** and a link to
@@ -690,11 +696,10 @@ are using the API directly.
   add button is disabled, so you never create a duplicate by mistake. Under the
   release search there is a field to **paste one or more `ed2k://` links** (one
   per line or separated by spaces): Gextto checks them, drops duplicates and
-  shows each as a result with name, size and hash. **Add all** queues the whole
-  block, or use the per-row **Add** button. When the eD2k/Kad search is enabled,
-  network results appear in the same table with the **eD2k** badge and the
-  source count; when eD2k transfers are available the row is addable, otherwise
-  it says **Search only**.
+  shows each as a result with name, size and hash. **Add all** hands the whole
+  block to aMule, or use the per-row **Add** button. When **Kad** is ticked,
+  eD2k results appear in the same table with the **eD2k** badge and the source
+  count. While aMule is off or not answering the row says **Search only**.
 - **Archive** — full-text search of past releases with pagination, batch queue,
   copy magnet, delete; **Series/Movies from feed** tabs. The local archive search
   is **instant**: it starts on its own as you type (from three characters on)
@@ -735,6 +740,60 @@ are using the API directly.
   sort issues. A file that already has its own `ComicInfo.xml` is left alone;
   comics downloaded by torrent stay identical because they are seeding, and CBR
   (RAR) files cannot be modified.
+
+- **eD2k** — the aMule page: see the next section.
+
+### eD2k and Kad with aMule
+
+Gextto uses **aMule** for the eD2k and Kad networks: `amuled` does the network
+work (servers, Kad, sources, queues, credits, transfers) and Gextto drives it
+through the **External Connections (EC)** protocol, the same one `amulecmd` and
+`amuleweb` use. Everything is optional and off by default; with aMule off,
+torrents do not change.
+
+**Setting it up.** Install aMule (`amule-daemon` on Debian/Ubuntu) and enable
+external connections in `amule.conf`:
+
+```ini
+[ExternalConnect]
+AcceptExternalConnections=1
+ECAddress=127.0.0.1
+ECPort=4712
+ECPassword=<md5 of the password>
+```
+
+`ECPassword` is the MD5 of the password (`printf '%s' 'secret' | md5sum`). Start
+`amuled`, then in **Configuration → Sources → eD2k and Kad** switch on **eD2k
+and Kad through aMule** and enter address, port and the password **in clear**.
+Gextto must see aMule's incoming folder at the same path (true when both run on
+the same machine): completed files are imported from there. Open aMule's TCP
+and UDP ports on the router for a high ID and a Kad that is not firewalled,
+which means more sources.
+
+**The eD2k page** (menu **Discovery → eD2k**):
+
+- **aMule**: version, the eD2k server you are connected to with **high/low
+  ID**, Kad state (connected, behind a firewall, stopped), speeds and limits,
+  network users and files, upload queue. **Connect**, **Disconnect**,
+  **Start/Stop Kad** and **Leave the server** drive aMule; **Refresh** reads
+  the state again. When aMule does not answer, the page says so and explains
+  what to check.
+- **eD2k servers**: aMule's list with users, files and ping; **Connect** on a
+  row connects aMule to that server. A new `server.met`, or a `nodes.dat` for
+  Kad, can be downloaded from an address here too.
+- **Search eD2k and Kad**: pick the network (Kad, every eD2k server, only the
+  connected server) and search; aMule collects results for a few seconds. Each
+  result shows name, size and sources (total / complete) and has **Download**;
+  **already known** marks a file aMule already has.
+- **Paste eD2k links**: one or more `ed2k://` links, even mixed with text;
+  **Download with aMule** adds them all.
+
+Added downloads appear in **Downloads**. When aMule completes a file, Gextto
+treats it like a completed torrent: it renames it, imports it into the library,
+checks it with MediaInfo and sends the notification. eD2k episodes always enter
+the library by **hardlink or copy**, never moved, so aMule keeps sharing them
+from its incoming folder (a hardlink takes no extra space when both folders are
+on the same disk).
 
 ## 7. Configuration
 
@@ -1558,45 +1617,32 @@ them.
 
 **eD2k and Kad**
 
-The eD2k/Kad network is a **search provider**: its results appear next to the
-torrent ones with the file name, size, MD4 hash and source count. Gextto talks to
-the `gx-ed2k` daemon. By default it is a **search-only** client; with
-`-download` (which Gextto passes to the managed daemon when the provider is
-enabled) it also exposes the transfer plane: it accepts `ed2k://` links (more
-than one at a time too), downloads with MD4 verification, resumes `.part` files
-and shares completed files with a minimal upload. Full queue/credits,
-obfuscation and buddy/hole punching for a LowID client are still missing.
-**LowID sources** (Kad type 3/5/6) are invited with a **direct UDP callback**
-and, when they expose a buddy, with a **KADEMLIA_CALLBACK_REQ** to that buddy:
-when our TCP port is reachable (HighID) the peer connects to us and the
-download continues over that connection. The feature is off by
-default: without your consent Gextto does not contact the network.
+eD2k and Kad go through **aMule** (see [eD2k and Kad with aMule](#ed2k-and-kad-with-amule)):
+Gextto drives an `amuled` that is already running, through external connections
+(EC). It is off by default: without your consent Gextto does not contact the
+network.
 
 | Setting | What it does |
 |---|---|
-| eD2k/Kad search | Enables the provider and starts the `gx-ed2k` daemon. Off by default. |
-| gx-ed2k — Web API URL | Daemon address, usually `http://127.0.0.1:8899`. |
-| gx-ed2k — API token | Daemon token, when it does not listen on loopback only. |
-| Use eD2k when torrents find nothing | A second, separate switch: only in the deep gap-filling pass, and only when the torrent episode and season searches produced nothing, Gextto searches the same episode on eD2k/Kad. Off by default. |
+| eD2k and Kad through aMule | Connects Gextto to aMule: search, `ed2k://` links, downloads in Downloads and the eD2k page. Off by default. |
+| aMule — address | Machine running `amuled`, usually `127.0.0.1`. Gextto must see aMule's incoming folder at the same path. |
+| aMule — external connections (EC) port | `ECPort` in `amule.conf`, 4712 by default. |
+| aMule — external connections (EC) password | The password in clear; aMule keeps its MD5 in `ECPassword`. Not displayed. |
+| eD2k search network | **Kad** (default, no server needed), **eD2k servers (global)** (every server) or **eD2k server (connected)**. Applies to the manual search and the fallback. |
+| Use eD2k when torrents find nothing | A second, separate switch: only in the deep gap-filling pass, and only when the torrent episode and season searches produced nothing, Gextto searches the same episode on eD2k/Kad (with the series name and every alias). Off by default. |
 | Minimum sources for the fallback | eD2k source floor for accepting a result automatically. Manual search shows everything. *(Unit: sources; 0 = no minimum)* |
-| eD2k search timeout | Maximum time for an eD2k/Kad search; on expiry it returns the results that already arrived. *(Unit: seconds)* |
-| Open the Kad port on the router | Asks the router to map UDP 4672 and TCP 4662 with **UPnP**, **NAT-PMP** or **PCP**. When it works the connection reads **open** and eD2k servers assign a HighID; when the router does not support it the state stays **limited** and manual port forwarding is required. |
+| eD2k search duration | How many seconds aMule collects results before Gextto shows them. *(Unit: seconds)* |
 
 The automatic fallback only accepts a result that matches the episode exactly,
 has a recognised quality, a plausible size and at least the source floor. In
 every other case the result stays visible in manual search and the gap stays
-open: a missing episode is better than a wrong file in the library. If gx-ed2k
-is unreachable, torrents continue unaffected.
+open: a missing episode is better than a wrong file in the library. If aMule is
+unreachable, torrents continue unaffected.
 
 On the **Sources** page the **eD2k and Kad** entry shows the connection sensor:
-**open** (UPnP or reachable ports), **limited** (firewall/NAT or LowID) or
-**unknown**. When it is limited, open UDP 4672 and TCP 4662 on the router or
-enable UPnP. The same sensor is on the `gx-ed2k` daemon page, next to nodes, port
-and version. On the daemon's standalone page, **Check for updates** compares the
-build with the latest published release and links to the archive; on Linux it
-can also install it (checksum and version check, replaces the binary and
-restarts the daemon). On Windows the zip with the service installer is the
-download. A local build does not offer updates.
+**open** (connected to a server with a high ID), **limited** (firewall/NAT: low
+ID or Kad only), **not connected**, **aMule unreachable** or **unknown**. When
+it is limited, open aMule's TCP and UDP ports on the router.
 
 #### Quality and upgrades
 

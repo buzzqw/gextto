@@ -532,6 +532,11 @@ func updateInstallRelease(root, installDir string) error {
 	} else {
 		logging.Warn("gx-torrent is missing from the update payload: Gextto will use the configured alternative engine")
 	}
+	// gx-ed2k was retired in favour of aMule: drop the binary an older release
+	// installed.
+	for _, name := range []string{"gx-ed2k", "gx-ed2k.prev"} {
+		updateRemovePath(filepath.Join(installDir, name))
+	}
 
 	// Keep the launcher, the release notes and the licence notices alongside
 	// the payload when shipped.

@@ -65,9 +65,9 @@
        {{if .System}}<button class="nav-more" type="button" data-mobile-system-toggle aria-expanded="{{if .Open}}true{{else}}false{{end}}" aria-controls="app-system-menu"><span class="nav-icon" aria-hidden="true">⋯</span><span>Altro</span><span class="nav-more-indicator" aria-hidden="true">＋</span></button>{{end}}
        <div{{if .System}} id="app-system-menu"{{end}} class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
         {{range .Items}}
-         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "dashboard"}}🏠{{else if eq .ID "downloads"}}⬇️{{else if eq .ID "series"}}📺{{else if eq .ID "movies"}}🎬{{else if eq .ID "logs"}}📋{{else if eq .ID "health"}}🩺{{else if eq .ID "settings"}}⚙️{{else if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "maintenance"}}🛠️{{else if eq .ID "gaps"}}⚠️{{else if eq .ID "integrations"}}🔌{{else if eq .ID "manual"}}📖{{else if eq .ID "changelog"}}📝{{else if eq .ID "license"}}📜{{else if eq .ID "blocklist"}}🚫{{else}}•{{end}}</span><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if eq .ID "downloads"}} title="Download in corso"{{end}}{{if or (not .Count) (eq .Count "0") (eq .Count "0/0")}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
+         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "dashboard"}}🏠{{else if eq .ID "downloads"}}⬇️{{else if eq .ID "series"}}📺{{else if eq .ID "movies"}}🎬{{else if eq .ID "logs"}}📋{{else if eq .ID "health"}}🩺{{else if eq .ID "settings"}}⚙️{{else if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "ed2k"}}🐴{{else if eq .ID "maintenance"}}🛠️{{else if eq .ID "gaps"}}⚠️{{else if eq .ID "integrations"}}🔌{{else if eq .ID "manual"}}📖{{else if eq .ID "changelog"}}📝{{else if eq .ID "license"}}📜{{else if eq .ID "blocklist"}}🚫{{else}}•{{end}}</span><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if eq .ID "downloads"}} title="Download in corso"{{end}}{{if or (not .Count) (eq .Count "0") (eq .Count "0/0")}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
          {{end}}
-         {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" title="{{.Label}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "gaps"}}⚠️{{else}}•{{end}}</span><span>{{.Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
+         {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" title="{{.Label}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "ed2k"}}🐴{{else if eq .ID "gaps"}}⚠️{{else}}•{{end}}</span><span>{{.Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
          {{if .System}}<div class="nav-prefs" aria-label="Aspetto">
            <button class="btn sm" type="button" hx-get="/theme" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli il tema dell'interfaccia o creane uno" aria-haspopup="dialog">Tema</button>
            <button class="btn sm" type="button" data-font="-5" title="Testo più piccolo">A−</button>
@@ -138,6 +138,7 @@
       {{else if eq .Body "v2_logs"}}{{template "v2_logs" .Content}}
       {{else if eq .Body "v2_license"}}{{template "v2_license" .Content}}
        {{else if eq .Body "v2_comics"}}{{template "v2_comics" .Content}}
+       {{else if eq .Body "v2_ed2k"}}{{template "v2_ed2k" .Content}}
        {{else if eq .Body "v2_table_page"}}{{template "v2_table_panel" .Content}}
        {{else if eq .Body "v2_panels_page"}}{{template "v2_panels_page" .Content}}
 		{{else if eq .Body "v2_movies"}}{{template "v2_movies" .Content}}
@@ -435,7 +436,7 @@
     </div>
   </details>
   <div class="panel session-panel">
-    <div class="panel-head"><h3>Download in sessione <span class="session-count" id="v2-session-count"><span>Torrent</span>: {{.Count}} · HTTP: {{len .HTTPDownloads}} · <span>aggiornato</span> {{.UpdatedAt}}</span></h3><details class="v2-menu speed-menu" data-v2-menu>
+    <div class="panel-head"><h3>Download in sessione <span class="session-count" id="v2-session-count"><span>Torrent</span>: {{.Count}} · <span>HTTP</span>: {{len .HTTPDownloads}}{{if .Ed2kEnabled}} · <span>eD2k</span>: {{len .Ed2kDownloads}}{{end}} · <span>aggiornato</span> {{.UpdatedAt}}</span></h3><details class="v2-menu speed-menu" data-v2-menu>
       <summary class="btn sm" title="Velocità: cosa vale adesso e un'eccezione temporanea">Banda <span id="v2-temp-badge">{{template "v2_temp_badge" .}}</span> <span aria-hidden="true">▾</span></summary>
       <div class="v2-menu-panel v2-menu-end speed-panel" id="v2-speed-panel">{{template "v2_speed_panel" .}}</div>
     </details></div>
@@ -496,7 +497,7 @@
         hx-post="/downloads/table" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"
          hx-trigger="submit, input changed delay:300ms from:#v2-filter, change from:#v2-tag-filter{{if .Auto}}, every 5s{{end}}">
     {{/* Live counter for the panel head (outside the refreshed fragment). */}}
-    <span id="v2-session-count" hx-swap-oob="innerHTML" hidden><span>Torrent</span>: {{.Count}} · HTTP: {{len .HTTPDownloads}} · <span>aggiornato</span> {{.UpdatedAt}}</span>
+    <span id="v2-session-count" hx-swap-oob="innerHTML" hidden><span>Torrent</span>: {{.Count}} · <span>HTTP</span>: {{len .HTTPDownloads}}{{if .Ed2kEnabled}} · <span>eD2k</span>: {{len .Ed2kDownloads}}{{end}} · <span>aggiornato</span> {{.UpdatedAt}}</span>
     <input type="hidden" name="dir" value="{{.Dir}}">
     <input type="hidden" name="auto_state" value="{{if .Auto}}1{{else}}0{{end}}">
     {{/* Live head fragments (outside the refreshed area). */}}
@@ -545,7 +546,7 @@
       <button class="btn sm danger download-bulk-remove" type="submit" name="bulk" value="remove" title="Rimuove i torrent selezionati dalla sessione mantenendo i file">Rimuovi dalla sessione</button>
     </div>
 
-     {{if or .Rows .HTTPDownloads}}
+     {{if or .Rows .HTTPDownloads .Ed2kDownloads}}
     <div class="table-wrap" role="region" aria-label="Tabella torrent e download HTTP">
       <table class="data-table torrent-table">
         <caption class="sr-only">Torrent e download HTTP nella sessione</caption>
@@ -606,6 +607,31 @@
                   {{if eq .Status "paused"}}<button class="btn sm icon-action" type="submit" name="http_action" value="resume:{{.ID}}" title="Riprendi il download HTTP" aria-label="Riprendi il download HTTP"><span aria-hidden="true">▶</span></button>{{end}}
                   <button class="btn sm icon-action" type="button" hx-get="/downloads/http-detail?id={{.ID}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Mostra i dettagli del download HTTP" aria-label="Mostra i dettagli del download HTTP"><span aria-hidden="true">ⓘ</span></button>
                   <button class="btn sm icon-action danger" type="submit" name="http_action" value="remove:{{.ID}}" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-http-download-{{.ID}}')?.remove()" title="Rimuovi il download HTTP" aria-label="Rimuovi il download HTTP"><span aria-hidden="true">🗑️</span></button>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {{end}}
+          {{range .Ed2kDownloads}}
+          <tr id="v2-ed2k-download-{{.Hash}}" data-ed2k-download="{{.Hash}}">
+            <td class="torrent-card-cell">
+              <div class="torrent-card">
+                <div class="torrent-head">
+                  <span class="torrent-select"></span>
+                  <span class="torrent-name"><span class="truncate" title="{{.Name}}">{{.Name}}</span> <span class="badge" title="Rete eD2k/Kad tramite aMule">eD2k</span></span>
+                  <span class="torrent-state badge {{.StateClass}}">{{.State}}</span>
+                </div>
+                <div class="torrent-body">
+                  <div class="torrent-progress"><div class="progress"><span style="width:{{.ProgressPct}}%"></span></div><small class="muted">{{.ProgressPct}}% · {{bytes .Done}} / {{bytes .Size}}</small></div>
+                  <div class="torrent-metrics">
+                    <span class="torrent-metric" title="↓ Download"><span class="sr-only">↓ Download</span><span aria-hidden="true">↓</span> {{rate .Speed}}</span>
+                    <span class="torrent-metric" title="Fonti eD2k: in trasferimento / totali"><span class="sr-only">Fonti eD2k: in trasferimento / totali</span><span aria-hidden="true">👥</span> {{.Active}} / {{.Sources}}</span>
+                  </div>
+                </div>
+                <div class="row-actions">
+                  {{if not .Complete}}{{if .Paused}}<button class="btn sm icon-action" type="submit" name="ed2k_action" value="resume:{{.Hash}}" title="Riprendi il download eD2k" aria-label="Riprendi il download eD2k"><span aria-hidden="true">▶</span></button>
+                  {{else}}<button class="btn sm icon-action" type="submit" name="ed2k_action" value="pause:{{.Hash}}" title="Metti in pausa il download eD2k" aria-label="Metti in pausa il download eD2k"><span aria-hidden="true">⏸</span></button>{{end}}{{end}}
+                  <button class="btn sm icon-action danger" type="submit" name="ed2k_action" value="remove:{{.Hash}}" hx-disabled-elt="this" hx-confirm="{{if .Complete}}Togliere il file completato dall'elenco di aMule? Il file resta nella cartella di arrivo.{{else}}Annullare il download eD2k e cancellare la parte già scaricata?{{end}}" title="{{if .Complete}}Togli dall'elenco di aMule{{else}}Annulla il download eD2k{{end}}" aria-label="{{if .Complete}}Togli dall'elenco di aMule{{else}}Annulla il download eD2k{{end}}"><span aria-hidden="true">🗑️</span></button>
                 </div>
               </div>
             </td>
@@ -1520,6 +1546,126 @@
 {{/* Tabelle generiche (Serie TV, Film, Mancanti, Archivio, Blocklist…) */}}
 {{/* ------------------------------------------------------------------ */}}
 
+{{define "v2_ed2k"}}
+<div class="view ed2k-view">
+  <div id="v2-ed2k-state">{{template "v2_ed2k_state" .}}</div>
+  {{if .Enabled}}
+  <div class="panel">
+    <div class="panel-head"><h3>Cerca su eD2k e Kad</h3><small class="muted">La ricerca la esegue aMule; i risultati restano finché non ne avvii un'altra</small></div>
+    <div class="panel-body">
+      <form class="search-row" method="post" action="/ed2k/search" hx-post="/ed2k/search" hx-target="#v2-ed2k-results" hx-swap="innerHTML" hx-indicator="#v2-ed2k-searching" hx-disabled-elt="find button">
+        <input type="search" name="query" aria-label="Cosa cercare su eD2k e Kad" placeholder="Serie S01E02, titolo del film…" title="Parole da cercare: aMule restituisce i file che le contengono tutte" required />
+        <label class="field compact"><span class="sr-only">Rete di ricerca</span><select class="input" name="network" aria-label="Rete di ricerca" title="Kad cerca nella rete distribuita; Globale interroga tutti i server eD2k; Server solo quello a cui sei connesso">
+          <option value="kad"{{if eq .Network "kad"}} selected{{end}}>Kad</option>
+          <option value="global"{{if eq .Network "global"}} selected{{end}}>Server eD2k (globale)</option>
+          <option value="local"{{if eq .Network "local"}} selected{{end}}>Server eD2k (connesso)</option>
+        </select></label>
+        <button class="btn primary" type="submit">Cerca</button>
+      </form>
+      <p id="v2-ed2k-searching" class="htmx-indicator muted" role="status" aria-live="polite">Ricerca in corso: aMule raccoglie i risultati per qualche secondo…</p>
+      <div id="v2-ed2k-results" aria-live="polite"></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Incolla link eD2k</h3><small class="muted">Uno o più link ed2k://, anche mescolati a testo</small></div>
+    <div class="panel-body">
+      <form method="post" action="/ed2k/add" hx-post="/ed2k/add" hx-target="#v2-ed2k-links-result" hx-swap="innerHTML" hx-disabled-elt="find button">
+        <label class="field span-full"><span>Link eD2k</span><textarea class="input" name="links" rows="4" placeholder="ed2k://|file|nome.mkv|123456789|0123456789ABCDEF0123456789ABCDEF|/" title="Incolla uno o più link eD2k, uno per riga (o separati da spazi): vengono aggiunti ad aMule" required></textarea></label>
+        <div class="form-actions"><button class="btn primary" type="submit">Scarica con aMule</button></div>
+      </form>
+      <div id="v2-ed2k-links-result" aria-live="polite"></div>
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "v2_ed2k_message"}}<p class="{{if .Error}}alert{{else}}muted{{end}}" role="{{if .Error}}alert{{else}}status{{end}}"><span>{{.Message}}</span>{{if .Detail}} {{.Detail}}{{end}}</p>{{end}}
+
+{{define "v2_ed2k_state"}}
+{{if .Message}}<p class="{{if .MessageErr}}alert{{else}}muted{{end}}" role="{{if .MessageErr}}alert{{else}}status{{end}}"><span>{{.Message}}</span>{{if .Detail}} {{.Detail}}{{end}}</p>{{end}}
+<div class="panel">
+  <div class="panel-head"><h3>aMule</h3><small class="muted">{{if .Address}}{{.Address}}{{end}}</small></div>
+  <div class="panel-body">
+  {{if not .Enabled}}
+    <p class="muted">L'integrazione con aMule è spenta. Avvia amuled con le connessioni esterne (EC) attive, poi accendila e inserisci indirizzo e password in Configurazione → Fonti → eD2k e Kad.</p>
+    <p><a class="btn" href="/?view=settings&amp;tab=sources&amp;highlight=ed2k_enabled">Apri la configurazione</a></p>
+  {{else if .Error}}
+    <p class="alert" role="alert"><span>aMule non raggiungibile:</span> {{.Error}}</p>
+    <p class="muted">Controlla che amuled sia in esecuzione, che le connessioni esterne (EC) siano abilitate e che porta e password coincidano con quelle in Configurazione → Fonti → eD2k e Kad.</p>
+    <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML"><input type="hidden" name="action" value="connect"><button class="btn" type="submit" title="Riprova a contattare aMule e a connettere le reti">Riprova</button></form>
+  {{else}}
+    <div class="stat-grid">
+      <div class="row"><span>Versione di aMule</span><strong>{{.Status.Version}}</strong></div>
+      <div class="row"><span>eD2k</span><strong>{{if .Status.Ed2kConnected}}<span>Connesso a</span> {{if .Status.ServerName}}{{.Status.ServerName}}{{else}}{{.Status.ServerAddress}}{{end}} · {{if .Status.HighID}}<span class="badge ok" title="Gli altri client possono contattarti direttamente">ID alto</span>{{else}}<span class="badge warn" title="Porta TCP non raggiungibile da fuori: meno fonti. Apri la porta TCP di aMule sul router">ID basso</span>{{end}}{{else if .Status.Ed2kConnecting}}<span>In connessione…</span>{{else}}<span>Non connesso</span>{{end}}</strong></div>
+      <div class="row"><span>Kad</span><strong>{{if .Status.KadConnected}}{{if .Status.KadFirewalled}}<span class="badge warn" title="Porta UDP non raggiungibile da fuori: Kad funziona ma con meno fonti. Apri la porta UDP di aMule sul router">Connesso, dietro firewall</span>{{else}}<span class="badge ok">Connesso</span>{{end}}{{else if .Status.KadRunning}}<span>In connessione…</span>{{else}}<span>Fermo</span>{{end}}</strong></div>
+      <div class="row"><span>Velocità</span><strong>↓ {{rateI .Status.DownloadRate}} · ↑ {{rateI .Status.UploadRate}}</strong></div>
+      <div class="row"><span>Limiti</span><strong>↓ {{if .Status.DownloadLimit}}{{rateI .Status.DownloadLimit}}{{else}}nessuno{{end}} · ↑ {{if .Status.UploadLimit}}{{rateI .Status.UploadLimit}}{{else}}nessuno{{end}}</strong></div>
+      <div class="row"><span>Rete eD2k</span><strong>{{.Status.Ed2kUsers}} <span>utenti</span> · {{.Status.Ed2kFiles}} <span>file</span></strong></div>
+      <div class="row"><span>Rete Kad</span><strong>{{.Status.KadUsers}} <span>utenti</span> · {{.Status.KadNodes}} <span>nodi</span></strong></div>
+      <div class="row"><span>Coda di upload</span><strong>{{.Status.UploadQueue}}</strong></div>
+    </div>
+    <div class="toolbar">
+      <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="connect"><button class="btn primary" type="submit" title="Connette eD2k a un server e avvia Kad">Connetti</button></form>
+      <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="disconnect"><button class="btn" type="submit" title="Disconnette eD2k e Kad; i download restano in coda">Disconnetti</button></form>
+      {{if .Status.KadRunning}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="kad_stop"><button class="btn" type="submit" title="Ferma la rete Kad">Ferma Kad</button></form>
+      {{else}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="kad_start"><button class="btn" type="submit" title="Avvia la rete Kad">Avvia Kad</button></form>{{end}}
+      {{if .Status.Ed2kConnected}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="server_disconnect"><button class="btn" type="submit" title="Lascia il server eD2k attuale; Kad resta attivo">Lascia il server</button></form>{{end}}
+      <button class="btn" type="button" hx-get="/?view=ed2k" hx-select="#v2-ed2k-state" hx-target="#v2-ed2k-state" hx-swap="outerHTML" title="Rilegge lo stato da aMule">Aggiorna</button>
+    </div>
+  {{end}}
+  </div>
+</div>
+{{if and .Enabled (not .Error)}}
+<div class="panel">
+  <div class="panel-head"><h3>Server eD2k</h3><small class="muted">{{len .Servers}} <span>server nella lista di aMule</span></small></div>
+  <div class="panel-body">
+    {{if .Servers}}
+    <div class="table-wrap" role="region" aria-label="Server eD2k"><table class="data-table">
+      <caption class="sr-only">Server eD2k conosciuti da aMule</caption>
+      <thead><tr><th scope="col">Server</th><th scope="col">Indirizzo</th><th scope="col" class="numeric">Utenti</th><th scope="col" class="numeric">File</th><th scope="col" class="numeric">Ping</th><th scope="col">Azioni</th></tr></thead>
+      <tbody>{{range .Servers}}<tr>
+        <td><span class="truncate" title="{{.Description}}">{{if .Name}}{{.Name}}{{else}}{{.Address}}{{end}}</span>{{if .Connected}} <span class="badge ok">connesso</span>{{end}}{{if .Static}} <span class="badge">statico</span>{{end}}</td>
+        <td>{{.Address}}</td>
+        <td class="numeric">{{.Users}}</td>
+        <td class="numeric">{{.Files}}</td>
+        <td class="numeric">{{if .Ping}}{{.Ping}} ms{{else}}—{{end}}</td>
+        <td class="row-actions">{{if not .Connected}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="server_connect"><input type="hidden" name="address" value="{{.Address}}"><button class="btn sm" type="submit" title="Connetti aMule a questo server" aria-label="Connetti a {{.Address}}">Connetti</button></form>{{end}}</td>
+      </tr>{{end}}</tbody>
+    </table></div>
+    {{else}}<p class="muted">La lista dei server è vuota: scaricane una qui sotto.</p>{{end}}
+    <form class="form-grid" method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML">
+      <input type="hidden" name="action" value="servers_update">
+      <label class="field span-full"><span>Aggiorna la lista dei server da un indirizzo (server.met)</span><input class="input" type="url" name="url" value="{{.ServersURL}}" required title="Indirizzo di un file server.met: aMule lo scarica e aggiunge i server alla sua lista" /></label>
+      <div class="form-actions"><button class="btn" type="submit">Scarica server.met</button></div>
+    </form>
+    <form class="form-grid" method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML">
+      <input type="hidden" name="action" value="nodes_update">
+      <label class="field span-full"><span>Aggiorna i nodi Kad da un indirizzo (nodes.dat)</span><input class="input" type="url" name="url" value="{{.NodesURL}}" required title="Indirizzo di un file nodes.dat: serve a Kad per trovare i primi contatti" /></label>
+      <div class="form-actions"><button class="btn" type="submit">Scarica nodes.dat</button></div>
+    </form>
+  </div>
+</div>
+{{end}}
+{{end}}
+
+{{define "v2_ed2k_results"}}
+{{if .Error}}<p class="alert" role="alert"><span>{{.Error}}</span>{{if .Detail}} {{.Detail}}{{end}}</p>{{end}}
+{{if .Results}}
+<p class="muted" role="status">{{len .Results}} <span>risultati per</span> «{{.Query}}»</p>
+<div class="table-wrap" role="region" aria-label="Risultati eD2k"><table class="data-table">
+  <caption class="sr-only">Risultati della ricerca eD2k</caption>
+  <thead><tr><th scope="col">Nome</th><th scope="col" class="numeric">Dimensione</th><th scope="col" class="numeric">Fonti</th><th scope="col">Azioni</th></tr></thead>
+  <tbody>{{range .Results}}<tr>
+    <td><span class="truncate" title="{{.Name}}">{{.Name}}</span>{{if .Known}} <span class="badge" title="aMule conosce già questo file: è in coda, scaricato o condiviso">già noto</span>{{end}}</td>
+    <td class="numeric">{{bytes .Size}}</td>
+    <td class="numeric" title="Fonti totali / complete">{{.Sources}} / {{.Complete}}</td>
+    <td class="row-actions"><form method="post" action="/ed2k/add" hx-post="/ed2k/add" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="links" value="{{.Link}}"><button class="btn sm primary" type="submit" title="Aggiungi questo file ai download di aMule" aria-label="Scarica {{.Name}}">Scarica</button></form></td>
+  </tr>{{end}}</tbody>
+</table></div>
+{{else if and .Done (not .Error)}}<p class="muted" role="status"><span>Nessun risultato per</span> «{{.Query}}».</p>{{end}}
+{{end}}
+
 {{define "v2_comics"}}
 <div class="view">
   {{range .Groups}}
@@ -2384,7 +2530,7 @@
         <button class="btn sm primary" type="submit">Aggiungi</button>
       </form>
       {{else}}
-      <span class="badge" title="Il download eD2k non è disponibile in questa versione.">Solo ricerca</span>
+      <span class="badge" title="aMule non è attivo o non è raggiungibile.">Solo ricerca</span>
       {{end}}
       <form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline">
         <input type="hidden" name="release" value="{{.ExplainJSON}}" />

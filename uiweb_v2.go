@@ -55,6 +55,7 @@ var v2Templates = template.Must(template.New("v2").Funcs(template.FuncMap{
 	"bytes":       logging.HumanBytesI64,
 	"bytesU":      func(value uint64) string { return logging.HumanBytesI64(saturatingInt64(value)) },
 	"rate":        func(value uint64) string { return logging.HumanRate(saturatingInt64(value)) },
+	"rateI":       logging.HumanRate,
 	"arrow":       v2SortArrow,
 	"sourceLabel": uiSourceLabel,
 	"ternary": func(cond bool, whenTrue, whenFalse string) string {
@@ -224,6 +225,9 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "GET /tmdb/manual", V2TmdbManual)
 
 	// Fumetti: link finder, download diretto e modifica della libreria.
+	v2Handle(s, mux, "POST /ed2k/action", V2Ed2kAction)
+	v2Handle(s, mux, "POST /ed2k/search", V2Ed2kSearch)
+	v2Handle(s, mux, "POST /ed2k/add", V2Ed2kAdd)
 	v2Handle(s, mux, "POST /comics/links", V2ComicsLinks)
 	v2Handle(s, mux, "POST /comics/download", V2ComicsDownload)
 	v2Handle(s, mux, "POST /comics/weekly/force", V2ComicsWeeklyForce)
@@ -648,6 +652,8 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 		return "v2_setup", v2SetupViewFrom(s, r)
 	case "comics":
 		return "v2_comics", v2ComicsViewFrom(s, r)
+	case "ed2k":
+		return "v2_ed2k", v2Ed2kViewFrom(s, "", "", false)
 	}
 	if spec, ok := uiTableSpecFor(view); ok {
 		return "v2_table_page", v2TableDataFrom(s, r, view, spec)
@@ -1059,6 +1065,8 @@ var v2TorrentColumns = []v2Column{
 type v2TorrentsView struct {
 	Rows          []uiTorrentRow
 	HTTPDownloads []ComicDownload
+	Ed2kDownloads []uiEd2kRow
+	Ed2kEnabled   bool
 	Count         int
 	UpdatedAt     string
 	Sort          string
@@ -1248,6 +1256,8 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 	return v2TorrentsView{
 		Rows:                rows,
 		HTTPDownloads:       data.HTTPDownloads,
+		Ed2kDownloads:       data.Ed2kDownloads,
+		Ed2kEnabled:         data.Ed2kEnabled,
 		Count:               data.Count,
 		UpdatedAt:           data.UpdatedAt,
 		Sort:                sortKey,
@@ -1273,6 +1283,8 @@ func V2DownloadsTable(w http.ResponseWriter, r *http.Request, s *AppState) {
 		message, isErr = v2TorrentRowAction(s, r.FormValue("row_action"))
 	case r.FormValue("http_action") != "":
 		message, isErr = v2HTTPAction(r.FormValue("http_action"))
+	case r.FormValue("ed2k_action") != "":
+		message, isErr = v2Ed2kAction(latestConfig(s), r.FormValue("ed2k_action"))
 	case r.FormValue("bulk") != "":
 		message, isErr = v2TorrentBulkAction(s, r, r.FormValue("bulk"))
 	}
@@ -1340,6 +1352,23 @@ func v2HTTPAction(value string) (string, bool) {
 		return "download HTTP rimosso", false
 	}
 	return "azione HTTP sconosciuta: " + action, true
+}
+
+func v2Ed2kAction(cfg *Config, value string) (string, bool) {
+	action, hash, ok := strings.Cut(value, ":")
+	if !ok || hash == "" {
+		return "azione eD2k non valida", true
+	}
+	if err := Ed2kDownloadAction(cfg, action, hash); err != nil {
+		return "azione eD2k non riuscita: " + err.Error(), true
+	}
+	switch action {
+	case "pause":
+		return "download eD2k in pausa", false
+	case "resume":
+		return "download eD2k ripreso", false
+	}
+	return "download eD2k rimosso", false
 }
 
 func v2TorrentBulkAction(s *AppState, r *http.Request, action string) (string, bool) {
@@ -2568,9 +2597,8 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		_ = MarkSettingOrigin(s.cfg.DataDir, key, OriginManual, "")
 	}
 	field = uiSettingFieldFor(key, v2SettingLabelFor(key), value)
-	if strings.HasPrefix(key, "ed2k_") {
+	if strings.HasPrefix(key, "ed2k_") || strings.HasPrefix(key, "amule_") {
 		ed2kInvalidateHealth()
-		go ensureEd2kDaemon(latestConfig(s))
 	}
 	render("salvata", false)
 }

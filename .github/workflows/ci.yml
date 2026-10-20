@@ -70,48 +70,6 @@ jobs:
           scripts/package-gx-torrent-windows.sh --arch amd64 --output /tmp/gx-torrent-windows-amd64.zip
           scripts/package-gx-torrent-windows.sh --arch arm64 --output /tmp/gx-torrent-windows-arm64.zip
 
-  # gx-ed2k is a separate, pure-Go daemon with its own version and archive.
-  # Keep it building, tested and packaged on its own so a change in the eD2k
-  # protocol cannot hide behind the main Gextto build. The Windows cross-build
-  # is a compile check: the standalone package is Linux/systemd only.
-  gx-ed2k:
-    name: gx-ed2k daemon (package + Windows cross-build)
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Install Go
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Test protocol and daemon
-        run: go test ./internal/ed2k/ ./cmd/gx-ed2k/
-
-      - name: Build
-        run: make gx-ed2k
-
-      - name: Package
-        run: |
-          scripts/package-gx-ed2k.sh --arch "$(uname -m)" --output /tmp/gx-ed2k-linux.tar.gz
-          tar -tzf /tmp/gx-ed2k-linux.tar.gz | grep -qx './gx-ed2k'
-          tar -tzf /tmp/gx-ed2k-linux.tar.gz | grep -qx './gx-ed2k.service'
-
-      - name: Cross-build for Windows
-        run: |
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/gx-ed2k/
-          GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -o /dev/null ./cmd/gx-ed2k/
-
-      - name: Package for Windows
-        run: |
-          scripts/package-gx-ed2k-windows.sh --arch amd64 --output /tmp/gx-ed2k-windows-amd64.zip
-          scripts/package-gx-ed2k-windows.sh --arch arm64 --output /tmp/gx-ed2k-windows-arm64.zip
-
-      - name: Vet for Windows
-        run: GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go vet ./internal/ed2k/ ./cmd/gx-ed2k/
-
   # The end-to-end UI suite (Playwright) drives the real SSR interface in a
   # browser: pages, mobile layout, i18n and the axe accessibility checks. Kept
   # separate from build-test because it needs Node and a browser.
@@ -149,57 +107,6 @@ jobs:
       - name: Run the end2end suite
         working-directory: uiweb/end2end
         run: npx playwright test
-
-  # The standalone gx-ed2k is pure Go and cross-compiles, but that says nothing
-  # about Winsock, the path handling or the service entry point. Run the real
-  # binary on a Windows runner and ask /api/v1/health.
-  windows-ed2k:
-    name: gx-ed2k smoke test (Windows)
-    runs-on: windows-latest
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Install Go
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Build
-        shell: pwsh
-        run: go build -o gx-ed2k.exe ./cmd/gx-ed2k
-
-      - name: Version
-        shell: pwsh
-        run: .\gx-ed2k.exe --version
-
-      - name: Health
-        shell: pwsh
-        run: |
-          $data = Join-Path $env:RUNNER_TEMP "gx-ed2k"
-          $process = Start-Process -FilePath .\gx-ed2k.exe -PassThru -ArgumentList @(
-            "-mode", "standalone",
-            "-listen", "127.0.0.1:18899",
-            "-data", $data,
-            "-kad-listen", "127.0.0.1:14672",
-            "-tcp-port", "14662",
-            "-upnp=false"
-          )
-          $ok = $false
-          try {
-            for ($i = 0; $i -lt 40; $i++) {
-              try {
-                $health = Invoke-RestMethod -Uri "http://127.0.0.1:18899/api/v1/health" -TimeoutSec 2
-                if ($health.ok -and $health.search -and -not $health.download) { $ok = $true; break }
-              } catch {}
-              Start-Sleep -Milliseconds 500
-            }
-            if (-not $ok) { throw "gx-ed2k did not answer /api/v1/health" }
-            $health | ConvertTo-Json -Compress
-          } finally {
-            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-          }
 
   # The Win32 layer of the daemon (junctions, memory, gateway, storage class)
   # only cross-compiles on Linux; this job runs its tests on real Windows. The

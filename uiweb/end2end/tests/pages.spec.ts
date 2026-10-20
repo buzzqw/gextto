@@ -194,10 +194,22 @@ test.describe("mobile", () => {
     expect(overflow).toBeLessThanOrEqual(2);
 
     await page.goto("/?view=settings");
-    await page.locator("input.settings-search").fill("Apri la porta Kad");
-    await expect(page.locator("#v2-settings-search").getByText("Apri la porta Kad sul router")).toBeVisible();
+    await page.locator("input.settings-search").fill("aMule");
+    await expect(page.locator("#v2-settings-search").getByText("aMule — porta connessioni esterne (EC)")).toBeVisible();
     const settingsOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(settingsOverflow).toBeLessThanOrEqual(2);
+  });
+
+  test("la pagina eD2k spiega come collegare aMule quando è spento", async ({ page }) => {
+    await page.goto("/?view=ed2k");
+    await expect(page.locator("#v2-ed2k-state")).toContainText("L'integrazione con aMule è spenta");
+    const settingsLink = page.locator('#v2-ed2k-state a[href*="highlight=ed2k_enabled"]');
+    await expect(settingsLink).toBeVisible();
+    await settingsLink.focus();
+    await expect(settingsLink).toBeFocused();
+    await expect(page.locator('a[data-nav="ed2k"]').first()).toBeAttached();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(2);
   });
 
   test("Scarico usa schede compatte e conserva l'ordinamento touch", async ({ page }) => {

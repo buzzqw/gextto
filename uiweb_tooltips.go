@@ -175,13 +175,14 @@ var uiSettingTooltipText = map[string]string{
 	"gxtorrent_dlna_listen":                "Indirizzo e porta di ascolto del media server DLNA (es. :8200 per tutte le interfacce, 192.168.1.10:8200 per una sola). Vuoto = :8200. La discovery usa UDP 1900 sulla stessa interfaccia.",
 	"gxtorrent_dlna_name":                  "Nome mostrato ai lettori DLNA sulla rete. Vuoto = gx-torrent.",
 	"gxtorrent_dlna_folders":               "Cartelle della libreria (es. l'archivio sul NAS) mostrate dal media server DLNA accanto ai torrent, navigabili per cartelle; separale con ;. Vuoto = automatico: la cartella archivio e le cartelle che contengono gli archivi delle serie. Sola lettura; il cestino, le cartelle nascoste e quelle di sistema del NAS sono escluse.",
-	"ed2k_enabled":                         "Cerca anche nella rete eD2k/Kad tramite il demone gx-ed2k. La ricerca eD2k è spenta per default.",
-	"ed2k_url":                             "Indirizzo Web API del demone gx-ed2k, di solito http://127.0.0.1:8899.",
-	"ed2k_token":                           "Token API di gx-ed2k, se il demone non ascolta solo su loopback.",
+	"ed2k_enabled":                         "Collega Gextto ad aMule (amuled) per cercare su eD2k e Kad, incollare link ed2k:// e vedere i download in Scarico. aMule va installato e avviato a parte, con le connessioni esterne (EC) attive. Spento per default.",
+	"amule_host":                           "Indirizzo della macchina su cui gira amuled, di solito 127.0.0.1. Per importare i file completati Gextto deve vedere la cartella di arrivo di aMule allo stesso percorso.",
+	"amule_port":                           "Porta delle connessioni esterne (EC) di aMule: ECPort in amule.conf, 4712 per default.",
+	"amule_password":                       "Password delle connessioni esterne (EC) di aMule, in chiaro: Gextto la confronta con l'hash ECPassword di amule.conf. Non visualizzata.",
+	"ed2k_search_network":                  "Dove cercano la ricerca manuale e il fallback automatico: Kad (rete distribuita, non serve un server), tutti i server eD2k (globale) o solo il server a cui aMule è connesso.",
 	"ed2k_fallback":                        "Quando i torrent non trovano nulla, cerca lo stesso episodio su eD2k/Kad. È un secondo interruttore, spento per default.",
 	"ed2k_min_sources":                     "Numero minimo di sorgenti eD2k perché un risultato venga accettato automaticamente. La ricerca manuale mostra tutto.",
-	"ed2k_search_timeout_secs":             "Tempo massimo concesso a una ricerca eD2k/Kad prima di restituire i risultati già arrivati.",
-	"ed2k_upnp":                            "Chiede al router di aprire UDP 4672 e TCP 4662 con UPnP, NAT-PMP o PCP, così il demone è raggiungibile e trova più fonti. Se il router non lo supporta resta limitato: configura il port forwarding manuale.",
+	"ed2k_search_timeout_secs":             "Per quanti secondi aMule raccoglie i risultati di una ricerca eD2k/Kad prima che Gextto li mostri.",
 }
 
 // uiSettingTooltip returns the tooltip for a setting key. Score weights without

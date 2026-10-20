@@ -110,7 +110,7 @@ Go 1.26.8+; the build is pure Go and the web UI is embedded. See the
 [developer manual](docs/DEVELOPERS.md).
 
 ```bash
-make build                 # gexttod, gx-torrent and gx-ed2k in bin/
+make build                 # gexttod and gx-torrent in bin/
 ```
 
 `make build` advances the **committed** build number shared with CI, so a
@@ -171,14 +171,15 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   FlareSolverr. The managers are searched **one indexer at a time**, each at the
   pace it really serves, a tracker present in both only once, a slow tracker
   costing only its own results.
-- **eD2k/Kad search, when torrents find nothing.** An optional, off-by-default
-  search provider (`gx-ed2k`, our own pure-Go daemon) searches Kad and eD2k
-  servers. Results show name, size, MD4 hash and source count; a pasted
-  `ed2k://` link can be checked. The automatic gap-filling fallback is a second,
+- **eD2k and Kad through aMule, when torrents find nothing.** Optional and off by
+  default: Gextto drives an `amuled` you run (External Connections protocol,
+  our own Go client). Search Kad or the eD2k servers, paste `ed2k://` links,
+  connect to servers and follow aMule's state on the eD2k page; aMule's
+  downloads appear in Scarico next to the torrents and, once complete, are
+  renamed and imported into the library like any torrent (by hardlink or copy,
+  so aMule keeps sharing them). The automatic gap-filling fallback is a second,
   separate switch and accepts only an exact episode match with a recognised
-  quality and enough sources. Transfers are not implemented: the daemon says
-  `download: false` and the "add" action stays disabled, so a missing episode is
-  never replaced by a wrong file.
+  quality and enough sources.
 
 ### Library safety
 
@@ -386,7 +387,7 @@ assistive-technology testing is still required
 | Move an existing installation | [Migration guide](docs/MIGRATION.md) |
 | Terminal client | [TUI reference](docs/tui.md) |
 | gx-torrent engine and standalone client | [gx-torrent technical document](docs/gx-torrent.md) · [gx-core](docs/gx-core.md) |
-| eD2k/Kad search daemon | [gx-ed2k technical document](docs/gx-ed2k.md) |
+| eD2k and Kad through aMule | [aMule integration](docs/amule.md) |
 | qBittorrent-nox backend | [Setup guide](docs/qbittorrent-nox.md) |
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |

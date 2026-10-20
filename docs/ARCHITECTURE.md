@@ -116,9 +116,9 @@ qBittorrent-nox.
 |---|---|
 | `rss.go` | RSS/XML feeds of the sources. |
 | `websearch.go` | web search engines and shared limiter. |
-| `ed2ksearch.go` | eD2k/Kad search provider: talks to `gx-ed2k`, normalizes results into `models.Release` (`network`, `ed2k_link`, `sources`), records source health. |
-| `gxed2k_runtime.go` | starts and supervises the managed `gx-ed2k` search daemon; independent from the torrent engine. |
-| `multi_engine.go` | transfer-plane router (torrent + eD2k by hash); tested and ready, installed when `gx-ed2k` can download. |
+| `ed2ksearch.go` | eD2k/Kad through aMule: settings, shared EC client, cached status, search into `models.Release` (`network`, `ed2k_link`, `sources`), gap-filling fallback. |
+| `ed2k_downloads.go` | aMule's download queue: list for Scarico, add/pause/resume/remove, completion events fed to the torrent event loop with a copy-mode import. |
+| `uiweb_v2_ed2k.go` | the eD2k page: aMule status, servers, Kad, search, pasted links. |
 | `indexer_health.go` | indexer health (Prowlarr). |
 | `tmdb.go` / `tvdb.go` | TMDB and TheTVDB metadata. |
 | `integrations.go` | base URLs of the external integrations. |
@@ -214,7 +214,8 @@ qBittorrent-nox.
 | `internal/tui` | terminal client (TUI). |
 | `internal/auth` | access control of the standalone daemon: password hashing and login sessions (`/ui/login`); the managed mode does not use it. |
 | `internal/dht` | DHT implementation, a module of its own under the main module. |
-| `internal/ed2k` | eD2k/Kad protocol: links, tags, 128-bit IDs, routing, Kad RPC, `nodes.dat`/`server.met`, eD2k server search. |
+| `internal/ed2k` | eD2k links (`ed2k://|file|…|/`, server links) and the name filter for search results. |
+| `internal/amule` | aMule External Connections (EC) client: packet codec, login, status, servers, Kad, downloads, search, preferences; `amuletest` is a fake core for tests. |
 | `internal/gxcore` | gx-core torrent engine (the `gx-torrent` binary): our original code (early versions built on MIT/BSD bases, since rewritten). |
 | `internal/queue` | manager of the gx-torrent queue (which torrents to run). |
 | `internal/bwschedule` | weekly bandwidth scheduler (a window and limits per weekday), shared by Gextto and gx-torrent. |
@@ -261,15 +262,14 @@ one.
 | `standalone_auth.go` | standalone session tokens, password hashing and login management. |
 | `tracker_health.go` | tracker failure tracking and retry delay management. |
 
-## 7. The gx-ed2k daemon (`cmd/gx-ed2k`)
+## 7. eD2k and Kad through aMule (`internal/amule`)
 
-`gx-ed2k` is the eD2k/Kad **search** daemon. It follows the gx-torrent pattern:
-`main.go` (flags, managed/standalone, HTTP), `daemon.go` (searcher interface and
-payloads), `api.go` (native `/api/v1`), `ui.go` + `page.tmpl` (its own page),
-`i18n.go` (six languages), `mode.go`. The protocol lives in `internal/ed2k`:
-links, tags, Kad routing and RPC, `nodes.dat` and `server.met`, the eD2k server
-login/search. It is search-only and reports `download: false`; see
-[`gx-ed2k.md`](gx-ed2k.md).
+Gextto does not run an eD2k engine of its own: it drives an `amuled` over the
+External Connections protocol. `internal/amule` is the EC client (framing, tag
+codec, salted MD5 login, one serialised connection that logs in again after a
+transport error). The Gextto side is in `ed2ksearch.go`, `ed2k_downloads.go`
+and `uiweb_v2_ed2k.go`; completed aMule files enter the same event loop as the
+torrents (`web_background.go`). See [`amule.md`](amule.md).
 
 ## 8. Assets embedded in the binary (`go:embed`)
 

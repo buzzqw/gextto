@@ -640,48 +640,38 @@ between two engines that both crash: within the window it goes straight to recov
 `GEXTTO_ENGINE` forces the engine for one run, so a service whose saved backend is broken is
 recovered from a shell without editing the database.
 
-**eD2k/Kad search.** The search plane exists and is opt-in: `gx-ed2k` is our own
-Kad/eD2k search daemon (bootstrap, routing, keyword search, eD2k server search),
-Gextto can show its results in manual search, validate an `ed2k://` link, and
-optionally use it as a last-resort gap filler. The gap filler queries the
-configured series name and its aliases in parallel and keeps the results that
-match any of them, so a localized library title does not hide releases published
-under the original one. The search provider, the link parser, the source
-threshold and the multi-engine router are in place. What is
-**not** in place is the transfer plane: the eMule client-to-client protocol,
-`.part`/AICH, upload, credits and LowID callbacks. Until then `gx-ed2k` reports
-`download: false`, the "add" action is disabled and the automatic fallback is
-inert even when switched on. Both switches (`ed2k_enabled`, `ed2k_fallback`)
-default to off, which also keeps the legal choice explicit.
+**eD2k and Kad through aMule.** Gextto has no eD2k engine of its own: it drives
+an `amuled` over the External Connections protocol (`internal/amule`, our own
+client). aMule brings what makes eD2k work on the real network (hundreds of
+queued sources, UDP reasks, credits, Kad as a full node, AICH); Gextto adds the
+search with its release parsing, pasted `ed2k://` links, aMule's downloads in
+Scarico, the eD2k page (status, servers, Kad) and the import of completed files
+through the same completion flow as torrents, by hardlink or copy so aMule keeps
+sharing them. Everything is opt-in (`ed2k_enabled`), and the automatic
+gap-filling fallback is a second switch (`ed2k_fallback`) that accepts only an
+exact episode with a recognised quality and enough sources: eD2k names are a
+claim, the MD4 hash is the identity, and MediaInfo validation after the download
+is the second line of defence.
 
-The gate is measured, not assumed:
+The decision to use aMule instead of a native client rests on two facts kept in
+[`measurements.md`](measurements.md): the measured Kad coverage of missing
+episodes is modest, and a native client competitive with eMule needs a source
+and queue scheduler of the same depth, which is not worth its cost for a
+last-resort source. The native daemon is preserved under the git tag
+`archive/gx-ed2k`.
 
-1. **Coverage.** On real gaps, how often does Kad return a result with exact
-   episode match, parsable quality, plausible size and sources above the floor?
-   The numbers go in [`measurements.md`](measurements.md). If a useful share of
-   gaps is covered, the transfer engine is worth its cost; otherwise the search
-   provider stays an optional manual tool and the question is closed with data.
-2. **Identity.** eD2k names are not trustworthy: the MD4 hash identifies the
-   bytes, the name is a claim. A result is accepted automatically only with an
-   exact episode match and a recognised quality; everything else stays in manual
-   search. Post-download MediaInfo validation and quarantine are the second line
-   of defence.
-3. **Transfer.** Only after gates 1 and 2: the eMule client protocol, storage and
-   upload. The `multi_engine` router already merges rows, labels the network and
-   routes by hash, so the automation does not need a second rewrite.
+Open points:
 
-**Gate 1 result (19 October 2026).** Two independent stratified samples of 30
-real gaps (one per series, aliases where available) put the real-fallback
-coverage at **7–13%**: 4/30 with ≥3 sources on the first sample (1.1.16) and
-2/30 on the second, different episodes (1.1.23, broad retry). Exact episodes
-with a parsed quality were 6/30 and 3/30. The broad retry recovers individual
-cases (`Tracker S04E01` went from 0 to 5 Kad results) but does not change the
-aggregate. That is below the level that justifies the 6.5–10 month eMule
-transfer engine: Kad stays an optional **manual** search provider,
-`ed2k_fallback` stays off, and the T0/T1 spikes stay isolated from the daemon.
-The numbers and caveats are in [`measurements.md`](measurements.md); the
-transfer design in [`ed2k-transfer.md`](ed2k-transfer.md) is archived and is
-reopened only by a material metadata change or a much larger sample.
+- **Managed amuled.** Gextto expects an `amuled` the operator runs. Starting and
+  supervising it like qBittorrent-nox (own `--config-dir`, generated EC
+  password, ports) would remove the manual setup. Gate: users who want eD2k
+  without configuring aMule by hand.
+- **Remote aMule.** Completed files are imported from aMule's incoming folder at
+  the same path, which holds when both run on one machine. A remote core would
+  need a path mapping like `qbittorrent_path_mappings`.
+- **Fallback coverage.** Whether to turn `ed2k_fallback` on by default depends on
+  a larger sample of real gaps searched through aMule (Kad and global server
+  search), not on the native client's earlier samples.
 
 **Waiting for a measurement or a host.**
 

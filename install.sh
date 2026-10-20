@@ -382,9 +382,6 @@ install_files() {
   if [[ "$DRY_RUN" != "1" && -f "$INSTALL_DIR/gx-torrent" ]]; then
     cp -a "$INSTALL_DIR/gx-torrent" "$INSTALL_DIR/gx-torrent.prev"
   fi
-  if [[ "$DRY_RUN" != "1" && -f "$INSTALL_DIR/gx-ed2k" ]]; then
-    cp -a "$INSTALL_DIR/gx-ed2k" "$INSTALL_DIR/gx-ed2k.prev"
-  fi
 
   run install -m 0755 "$work/gexttod" "$INSTALL_DIR/gexttod"
   # gx-torrent is the torrent engine: Gextto starts it from here in managed
@@ -395,11 +392,9 @@ install_files() {
   else
     warn "gx-torrent is missing from the payload: Gextto will use its fallback engine"
   fi
-  # gx-ed2k is the optional eD2k/Kad search daemon: installing it does not
-  # enable the provider; the settings switch does.
-  if [[ -f "$work/gx-ed2k" ]]; then
-    run install -m 0755 "$work/gx-ed2k" "$INSTALL_DIR/gx-ed2k"
-  fi
+  # gx-ed2k was retired in favour of aMule: drop the binary an older
+  # release installed.
+  run rm -f "$INSTALL_DIR/gx-ed2k" "$INSTALL_DIR/gx-ed2k.prev"
   [[ -f "$work/run.sh" ]] && run install -m 0755 "$work/run.sh" "$INSTALL_DIR/run.sh"
   [[ -f "$work/VERSION" ]] && run install -m 0644 "$work/VERSION" "$INSTALL_DIR/VERSION"
   # Licence and third-party notices of the shipped binaries.

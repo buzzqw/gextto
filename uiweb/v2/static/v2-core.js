@@ -658,23 +658,17 @@
       var add = document.createElement("button");
       add.className = "btn sm primary";
       add.type = "button";
-      if (isEd2k) {
+      add.textContent = t("Aggiungi");
+      add.title = isEd2k ? t("Scarica con aMule") : t("Accoda questa release");
+      add.addEventListener("click", function () {
         add.disabled = true;
-        add.textContent = t("Solo ricerca");
-        add.title = t("Il download eD2k non è disponibile in questa versione.");
-      } else {
-        add.textContent = t("Aggiungi");
-        add.title = t("Accoda questa release");
-        add.addEventListener("click", function () {
-          add.disabled = true;
-          var form = new URLSearchParams();
-          form.set("release", JSON.stringify(release));
-          form.set("redirect", "/?view=dashboard");
-          fetch("/search/add", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() })
-            .then(function (response) { if (!response.ok) throw new Error(t("Impossibile accodare la release")); add.textContent = t("Accodata"); })
-            .catch(function (error) { add.disabled = false; add.textContent = error.message; });
-        });
-      }
+        var form = new URLSearchParams();
+        form.set("release", JSON.stringify(release));
+        form.set("redirect", "/?view=dashboard");
+        fetch("/search/add", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() })
+          .then(function (response) { if (!response.ok) throw new Error(t("Impossibile accodare la release")); add.textContent = t("Accodata"); })
+          .catch(function (error) { add.disabled = false; add.textContent = error.message; });
+      });
       actions.appendChild(add);
       var copy = document.createElement("button");
       copy.className = "btn sm";

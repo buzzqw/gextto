@@ -36,7 +36,7 @@ daemon built next to `gexttod`. The normal build embeds the web UI; it does not
 need a separate frontend build.
 
 ```bash
-make build                 # pure Go (default): gexttod + gx-torrent + gx-ed2k
+make build                 # pure Go (default): gexttod + gx-torrent
 go test ./...              # pure-Go tests
 ```
 
@@ -338,26 +338,17 @@ published next to Gextto's:
 |---|---|---|
 | `scripts/package-gx-torrent.sh` | `gx-torrent-linux-<arch>.tar.gz` | binary, `run.sh`, systemd unit, README, `VERSION` |
 | `scripts/package-gx-torrent-windows.sh` | `gx-torrent-windows-<arch>.zip` (amd64, arm64) | `gx-torrent.exe` (native Windows service), `install-service.ps1`, `uninstall-service.ps1`, `README.txt` |
-| `scripts/package-gx-ed2k.sh` | `gx-ed2k-linux-<arch>.tar.gz` | eD2k/Kad search daemon, `run.sh`, systemd unit, install/uninstall scripts, README, `VERSION` |
-| `scripts/package-gx-ed2k-windows.sh` | `gx-ed2k-windows-<arch>.zip` (amd64, arm64) | `gx-ed2k.exe` (native Windows service), `install-service.ps1`, `uninstall-service.ps1`, README, `VERSION` |
 
-### eD2k Phase 0 gate
+### aMule (EC) against a real core
 
-`cmd/measure-ed2k` samples one already-aired gap per series from
-`GET /api/gaps`, uses the series alias when present, spaces the searches and
-applies the same exact-episode/quality/size/source floor as the fallback:
+The default suite uses the fake core in `internal/amule/amuletest`. To check
+the EC client against a real `amuled` (for example a throw-away instance with
+its own `--config-dir` and EC port):
 
 ```bash
-go run ./cmd/measure-ed2k \
-  -gextto http://127.0.0.1:8889 -daemon http://127.0.0.1:8899 \
-  -limit 30 -spacing 65s -min-sources 3 -out phase0.json
+GEXTTO_AMULE_EC=127.0.0.1:4712 GEXTTO_AMULE_PASSWORD=secret \
+  go test ./internal/amule/ -run Live -v
 ```
-
-A second run can pick different episodes with `-sample last` or
-`-sample random -seed 2026`; the series set stays the same.
-
-The spacing matters: peers throttle a burst, and a plain spread over the gap
-list overweights the shows with many missing episodes.
 
 Windows support is guarded in CI (`ci.yml`): `build-test` cross-compiles the
 engine and the daemon and runs `go vet` for Windows; `windows-platform` runs the

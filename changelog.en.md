@@ -11,6 +11,26 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
+## 20 October 2026
+
+- **eD2k and Kad move to aMule.** The `gx-ed2k` daemon is retired: for the
+  eD2k/Kad network Gextto now drives **aMule** (`amuled`), installed and started
+  on its own with external connections (EC) enabled. With aMule on you can
+  **search** Kad or the eD2k servers, **paste `ed2k://` links** (more than one,
+  even mixed with text) and **actually download them**: aMule's downloads appear
+  in **Downloads** next to the torrents and the HTTP downloads, with progress,
+  speed, sources and the pause, resume and remove buttons. When aMule completes
+  a file, Gextto renames it and imports it into the library like a torrent (by
+  hardlink or copy, so aMule keeps sharing it). The new **eD2k** page (Discovery
+  menu) shows aMule's state (server and high/low ID, Kad, speeds, network), the
+  server list with a button to connect, the commands to connect and disconnect
+  eD2k and Kad, the download of `server.met` and `nodes.dat`, the search and the
+  box for links. **What to do:** in Configuration → Sources → eD2k and Kad switch
+  on **eD2k and Kad through aMule** and enter the address, port and password of
+  aMule's external connections (the old gx-ed2k URL and token options and the
+  UPnP one are gone). The automatic gap-filling fallback stays a second switch,
+  off by default. An update removes the old `gx-ed2k` binary.
+
 ## 19 October 2026
 
 - **eD2k/Kad search, when torrents are not enough.** An optional search

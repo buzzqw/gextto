@@ -1144,20 +1144,19 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 		if err != nil {
 			return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
 		}
-		if _, download := ed2kAvailability(latestConfig(s)); !download {
-			return http.StatusNotImplemented, map[string]any{
+		if !ed2kEnabled(latestConfig(s)) {
+			return http.StatusConflict, map[string]any{
 				"ok":    false,
-				"error": "gx-ed2k is a search-only client in this version: eD2k downloads are not available",
+				"error": "eD2k downloads need aMule: enable it in Settings → Sources → eD2k and Kad",
 				"link":  link.String(),
 			}
 		}
-		engine := s.activeEngine()
-		added, err := engine.AddWithOptions(link.String(), latestConfig(s), nil, AddOptions{})
-		if err != nil {
-			return http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error(), "link": link.String()}
-		}
-		if !added {
-			return http.StatusConflict, map[string]any{"ok": false, "error": "eD2k download already queued", "link": link.String()}
+		if err := AddEd2kLink(latestConfig(s), link.String()); err != nil {
+			status := http.StatusBadGateway
+			if strings.Contains(strings.ToLower(err.Error()), "already") {
+				status = http.StatusConflict
+			}
+			return status, map[string]any{"ok": false, "error": err.Error(), "link": link.String()}
 		}
 		release.Network = networkEd2k
 		if release.Title == "" {

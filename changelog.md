@@ -12,6 +12,27 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 20 ottobre 2026
+
+- **eD2k e Kad passano ad aMule.** Il demone `gx-ed2k` viene ritirato: per la
+  rete eD2k/Kad Gextto ora comanda **aMule** (`amuled`), che va installato e
+  avviato a parte con le connessioni esterne (EC) attive. Con aMule acceso puoi
+  **cercare** su Kad o sui server eD2k, **incollare link `ed2k://`** (anche più
+  di uno, mescolati a testo) e **scaricarli davvero**: i download di aMule
+  compaiono in **Scarico** accanto ai torrent e ai download HTTP, con
+  progressione, velocità, fonti e i pulsanti pausa, riprendi e rimuovi. Quando
+  aMule completa un file, Gextto lo rinomina e lo importa in libreria come un
+  torrent (con hardlink o copia, così aMule continua a condividerlo). La nuova
+  pagina **eD2k** (menu Scoperta) mostra lo stato di aMule (server e ID
+  alto/basso, Kad, velocità, rete), la lista dei server con il pulsante per
+  collegarsi, i comandi per connettere e disconnettere eD2k e Kad, il download di
+  `server.met` e `nodes.dat`, la ricerca e il riquadro per i link. **Cosa fare:**
+  in Configurazione → Fonti → eD2k e Kad accendi **eD2k e Kad tramite aMule** e
+  inserisci indirizzo, porta e password delle connessioni esterne di aMule (le
+  vecchie opzioni URL e token di gx-ed2k e quella UPnP spariscono). Il ripiego
+  automatico nel gap filling resta un secondo interruttore, spento di default.
+  Un aggiornamento rimuove il vecchio binario `gx-ed2k`.
+
 ## 19 ottobre 2026
 
 - **Ricerca eD2k/Kad, quando i torrent non bastano.** Arriva un provider di

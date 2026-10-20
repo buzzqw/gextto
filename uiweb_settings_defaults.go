@@ -61,12 +61,13 @@ var uiSettingDefaults = map[string]string{
 	// eD2k/Kad is off by default: it is an opt-in search provider and the
 	// automatic fallback is a second, explicit switch.
 	"ed2k_enabled":             "false",
-	"ed2k_url":                 "http://127.0.0.1:8899",
-	"ed2k_token":               "",
+	"amule_host":               "127.0.0.1",
+	"amule_port":               "4712",
+	"amule_password":           "",
+	"ed2k_search_network":      "kad",
 	"ed2k_fallback":            "false",
 	"ed2k_min_sources":         "3",
 	"ed2k_search_timeout_secs": "20",
-	"ed2k_upnp":                "true",
 
 	// --- Transfer -----------------------------------------------------------
 	"torrent_dynamic_queue":               "false",

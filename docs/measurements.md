@@ -452,6 +452,28 @@ unavailable download, temp or trash folder is a **warning** and is fixable from 
 interface. Verified in a systemd container
 (install, upgrade, restore offline in dry-run).
 
+### eD2k and Kad through aMule — live, 20 October 2026
+
+The native `gx-ed2k` daemon measured in the sections below is retired (code under
+the git tag `archive/gx-ed2k`); eD2k now goes through aMule. Its numbers stay
+here as the history of the decision.
+
+EC client against a real `amuled` 2.3.3 (Debian trixie package) on the N97,
+throw-away `--config-dir`, ports not forwarded (Low ID, Kad firewalled),
+`nodes.dat` and `server.met` copied from an existing aMule profile:
+
+- login, status, preferences, server list, add / pause / resume / delete of a
+  link, bandwidth limits, log and the refusal of a wrong password all pass
+  (`GEXTTO_AMULE_EC=… go test ./internal/amule/ -run Live`, 0.05 s);
+- after `Connect`, Kad and the eD2k server (eMule Sunrise, ~47 600 users) were
+  up within ~15 s;
+- `FBI S06E13`: **14** Kad results and **12** global server results, each
+  collected over a 40 s window, with the episode (WEB, HDTV, 1080p variants) at
+  1–2 sources on a firewalled client.
+
+One run, one network, not a coverage sample: the coverage question for aMule is
+an open point in [`evoluzione.md`](evoluzione.md).
+
 ### eD2k/Kad search PoC (loopback)
 
 The search daemon is verified against **deterministic fake peers**, not the live

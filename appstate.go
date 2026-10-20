@@ -52,9 +52,9 @@ func NewAppState(
 		logging.Warn("torrent backend activation refused; transfers stay stopped until the backend is fixed", "error", err)
 		state.setActiveEngine(nil)
 	}
-	// The eD2k/Kad search daemon is independent from the torrent engine: a
-	// failure here leaves torrents untouched and only disables the provider.
-	ensureEd2kDaemon(cfg)
+	// gx-ed2k was retired in favour of aMule; stop a daemon an older Gextto
+	// left running in its own scope (it would hold the Kad port aMule needs).
+	go stopRetiredGxEd2k()
 	// A pending migration manifest for the active backend is re-imported here:
 	// re-adding is idempotent and the manifest is marked completed on success.
 	if engine := ActiveTorrentBackend(state); engine != nil && engine.Name() != "none" {

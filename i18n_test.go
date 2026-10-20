@@ -50,11 +50,15 @@ func TestSeedDefaultTranslationsRemovesObsoleteEd2kEntries(t *testing.T) {
 		t.Fatalf("seed defaults: %v", err)
 	}
 	var count int
-	if err := db.db.QueryRow("SELECT COUNT(*) FROM translations WHERE lower(key) LIKE '%amule%' OR lower(value) LIKE '%amule%' OR key = 'Gap Filling — Fallback eD2k (cerca su eD2k se Jackett non trova nulla)'").Scan(&count); err != nil {
+	if err := db.db.QueryRow("SELECT COUNT(*) FROM translations WHERE key IN ('aMule / ed2k', 'Gap Filling — Fallback eD2k (cerca su eD2k se Jackett non trova nulla)')").Scan(&count); err != nil {
 		t.Fatalf("count obsolete translations: %v", err)
 	}
 	if count != 0 {
 		t.Fatalf("obsolete translation rows remaining: %d", count)
+	}
+	// The strings of the current aMule integration are bundled and must stay.
+	if err := db.db.QueryRow("SELECT COUNT(*) FROM translations WHERE key = 'Scarica con aMule'").Scan(&count); err != nil || count == 0 {
+		t.Fatalf("current aMule translations removed: %d, %v", count, err)
 	}
 	var value string
 	if err := db.db.QueryRow("SELECT value FROM translations WHERE lang='ita' AND key='current.key'").Scan(&value); err != nil {

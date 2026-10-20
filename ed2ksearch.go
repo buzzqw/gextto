@@ -1,90 +1,122 @@
 package gextto
 
-// ed2ksearch.go is the search-plane half of the eD2k integration. It talks to
-// the supervised gx-ed2k daemon (the same pattern as gxtorrent_engine.go) and
-// turns its results into models.Release values. The transfer plane is separate
-// and deliberately not connected while gx-ed2k reports "download": false: a
-// release that cannot be downloaded must never enter the acquisition queue.
+// ed2ksearch.go connects Gextto to the eD2k and Kad networks through aMule.
+// amuled does the networking (servers, Kad, sources, transfers); Gextto talks
+// to it over the External Connections protocol (internal/amule) to search,
+// queue ed2k:// links, follow the downloads and show the connection state.
+// Nothing here is required for torrents: when aMule is off or unreachable the
+// eD2k features are simply unavailable.
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"net"
 	"net/http"
-	"net/url"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/amule"
+	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
 const (
-	defaultEd2kURL            = "http://127.0.0.1:8899"
-	defaultEd2kSearchTimeout  = 20
-	ed2kHealthCacheTTL        = 30 * time.Second
-	ed2kHealthProbeTimeout    = 2 * time.Second
-	ed2kSearchResponseMaxBody = 8 << 20
+	defaultAmuleHost         = "127.0.0.1"
+	defaultAmulePort         = 4712
+	defaultEd2kSearchTimeout = 20
+	ed2kStatusCacheTTL       = 10 * time.Second
+	// ed2kDownBackoff keeps the UI and the background loop from waiting on a
+	// dial timeout at every refresh while amuled is down.
+	ed2kDownBackoff = 15 * time.Second
+	ed2kRequestTime = 8 * time.Second
 )
 
-// ed2kSettings is the resolved adapter configuration.
+// Networks a file can be downloaded from.
+const (
+	networkTorrent = "torrent"
+	networkEd2k    = "ed2k"
+)
+
+// stopRetiredGxEd2k stops the gx-ed2k daemon an older Gextto started in a
+// systemd scope. The scope outlives Gextto restarts on purpose, so without
+// this it would keep running (and keep UDP 4672, aMule's Kad port) after the
+// update that removed it.
+func stopRetiredGxEd2k() {
+	defer recoverGoroutine("stop retired gx-ed2k")
+	if !gxCanUseScope() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := exec.CommandContext(ctx, "systemctl", "--user", "stop", "gextto-gx-ed2k-*.scope").Run(); err != nil {
+		logging.Debug("no retired gx-ed2k scope to stop", "error", err)
+	}
+}
+
+// ed2kSettings is the resolved aMule configuration.
 type ed2kSettings struct {
-	BaseURL string
-	Token   string
-	Timeout time.Duration
+	Address  string
+	Password string
+	Network  uint8
+	Timeout  time.Duration
 }
 
 func ed2kSettingsFromConfig(cfg *Config) (ed2kSettings, error) {
 	if cfg == nil {
 		return ed2kSettings{}, errors.New("eD2k configuration is unavailable")
 	}
-	baseURL := strings.TrimRight(strings.TrimSpace(cfg.Settings["ed2k_url"]), "/")
-	if baseURL == "" {
-		baseURL = defaultEd2kURL
+	host := strings.TrimSpace(cfg.Settings["amule_host"])
+	if host == "" {
+		host = defaultAmuleHost
 	}
-	parsed, err := url.Parse(baseURL)
-	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return ed2kSettings{}, errors.New("ed2k_url must be a complete http(s) URL")
+	port := defaultAmulePort
+	if raw := strings.TrimSpace(cfg.Settings["amule_port"]); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > 65535 {
+			return ed2kSettings{}, errors.New("amule_port must be between 1 and 65535")
+		}
+		port = parsed
 	}
 	timeout := defaultEd2kSearchTimeout
 	if raw := strings.TrimSpace(cfg.Settings["ed2k_search_timeout_secs"]); raw != "" {
-		parsedTimeout, err := strconv.Atoi(raw)
-		if err != nil || parsedTimeout < 5 || parsedTimeout > 120 {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 5 || parsed > 120 {
 			return ed2kSettings{}, errors.New("ed2k_search_timeout_secs must be between 5 and 120")
 		}
-		timeout = parsedTimeout
+		timeout = parsed
 	}
 	return ed2kSettings{
-		BaseURL: baseURL,
-		Token:   strings.TrimSpace(cfg.Settings["ed2k_token"]),
-		Timeout: time.Duration(timeout) * time.Second,
+		Address:  net.JoinHostPort(host, strconv.Itoa(port)),
+		Password: cfg.Settings["amule_password"],
+		Network:  ed2kSearchNetwork(cfg.Settings["ed2k_search_network"]),
+		Timeout:  time.Duration(timeout) * time.Second,
 	}, nil
 }
 
-// ed2kEnabled reports whether the search provider is switched on. The default
-// is off: a fresh installation must not contact a new network on its own.
+// ed2kSearchNetwork maps the setting to an aMule search type. Kad is the
+// default: it does not depend on the server the core is connected to.
+func ed2kSearchNetwork(value string) uint8 {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "global":
+		return amule.SearchGlobal
+	case "local", "server":
+		return amule.SearchLocal
+	}
+	return amule.SearchKad
+}
+
+// ed2kEnabled reports whether the aMule integration is switched on. The
+// default is off: a fresh installation must not contact a new network.
 func ed2kEnabled(cfg *Config) bool {
 	if cfg == nil {
 		return false
 	}
 	return settingIsTrue(cfg.Settings["ed2k_enabled"])
-}
-
-// ed2kEnabledCopy returns a shallow copy with the provider switched on for one
-// manual search. The caller's config and its persisted settings are untouched.
-func ed2kEnabledCopy(cfg *Config) *Config {
-	copy := *cfg
-	copy.Settings = make(map[string]string, len(cfg.Settings)+1)
-	for key, value := range cfg.Settings {
-		copy.Settings[key] = value
-	}
-	copy.Settings["ed2k_enabled"] = "true"
-	return &copy
 }
 
 // ed2kFallbackEnabled is the automatic gap-filling switch. It is separate from
@@ -95,19 +127,6 @@ func ed2kFallbackEnabled(cfg *Config) bool {
 		return false
 	}
 	return settingIsTrue(cfg.Settings["ed2k_fallback"])
-}
-
-// ed2kUPnPEnabled reports whether the managed daemon should ask the router to
-// forward the Kad UDP port. It defaults to on.
-func ed2kUPnPEnabled(cfg *Config) bool {
-	if cfg == nil {
-		return true
-	}
-	switch strings.ToLower(strings.TrimSpace(cfg.Settings["ed2k_upnp"])) {
-	case "false", "no", "0", "off":
-		return false
-	}
-	return true
 }
 
 // ed2kMinSources is the source floor the automatic fallback requires. A manual
@@ -135,134 +154,179 @@ func settingIsTrue(value string) bool {
 	return false
 }
 
-var (
-	ed2kHealthMu    sync.Mutex
-	ed2kHealthCache = map[string]ed2kHealthEntry{}
-	ed2kHealthHTTP  = &http.Client{Timeout: ed2kHealthProbeTimeout}
-)
-
-type ed2kHealthEntry struct {
-	checkedAt    time.Time
-	healthy      bool
-	download     bool
-	version      string
-	fingerprint  string
-	dataDir      string
-	pid          int
-	reachability string
-	reachDetail  string
-	lowID        bool
-	upnp         map[string]any
-	mapping      string
-	err          string
+// ed2kState is the shared client and the last known state of the core.
+var ed2kState struct {
+	mu       sync.Mutex
+	key      string
+	client   *amule.Client
+	status   amule.Status
+	checked  time.Time
+	err      string
+	failedAt time.Time
+	incoming string
 }
 
-// ed2kHealth probes gx-ed2k's /api/v1/health, caching the answer briefly so a
-// search never waits on a daemon that is down.
-func ed2kHealth(cfg *Config) ed2kHealthEntry {
+// ed2kSearchMu serialises searches: amuled keeps a single result list, so a
+// second search would replace the first one's results.
+var ed2kSearchMu sync.Mutex
+
+// ed2kClient returns the client for the configured core, reusing the open
+// session while the address and password stay the same.
+func ed2kClient(cfg *Config) (*amule.Client, error) {
 	if !ed2kEnabled(cfg) {
-		return ed2kHealthEntry{checkedAt: time.Now()}
+		return nil, errors.New("eD2k/aMule is disabled")
 	}
 	settings, err := ed2kSettingsFromConfig(cfg)
 	if err != nil {
-		return ed2kHealthEntry{checkedAt: time.Now(), err: err.Error()}
+		return nil, err
 	}
-	ed2kHealthMu.Lock()
-	if cached, ok := ed2kHealthCache[settings.BaseURL]; ok && time.Since(cached.checkedAt) < ed2kHealthCacheTTL {
-		ed2kHealthMu.Unlock()
+	key := settings.Address + "\x00" + settings.Password
+	ed2kState.mu.Lock()
+	defer ed2kState.mu.Unlock()
+	if ed2kState.client == nil || ed2kState.key != key {
+		if ed2kState.client != nil {
+			_ = ed2kState.client.Close()
+		}
+		ed2kState.client = amule.New(amule.Config{
+			Address:       settings.Address,
+			Password:      settings.Password,
+			ClientName:    "Gextto",
+			ClientVersion: constants.AppVersion(),
+			Timeout:       ed2kRequestTime,
+		})
+		ed2kState.key = key
+		ed2kState.checked = time.Time{}
+		ed2kState.failedAt = time.Time{}
+		ed2kState.incoming = ""
+	}
+	return ed2kState.client, nil
+}
+
+// ed2kCall runs one request against the core. While the core is known to be
+// down it fails fast instead of waiting on a dial timeout.
+func ed2kCall(cfg *Config, call func(ctx context.Context, client *amule.Client) error) error {
+	client, err := ed2kClient(cfg)
+	if err != nil {
+		return err
+	}
+	ed2kState.mu.Lock()
+	failedAt, lastErr := ed2kState.failedAt, ed2kState.err
+	ed2kState.mu.Unlock()
+	if !failedAt.IsZero() && time.Since(failedAt) < ed2kDownBackoff {
+		return fmt.Errorf("aMule unreachable: %s", lastErr)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), ed2kRequestTime)
+	defer cancel()
+	err = call(ctx, client)
+	ed2kState.mu.Lock()
+	defer ed2kState.mu.Unlock()
+	if err != nil && ed2kTransportError(err) {
+		ed2kState.failedAt = time.Now()
+		ed2kState.err = err.Error()
+		ed2kState.checked = time.Time{}
+	} else if err == nil {
+		ed2kState.failedAt = time.Time{}
+	}
+	return err
+}
+
+// ed2kTransportError tells a dead or refusing core apart from a command the
+// core answered with an error (which says nothing about reachability).
+func ed2kTransportError(err error) bool {
+	if errors.Is(err, amule.ErrAuth) {
+		return true
+	}
+	message := err.Error()
+	return strings.Contains(message, "amule: connect") || strings.Contains(message, "amule: send") ||
+		strings.Contains(message, "amule: receive")
+}
+
+// ed2kInvalidateHealth drops the cached state so a settings change takes
+// effect immediately.
+func ed2kInvalidateHealth() {
+	ed2kState.mu.Lock()
+	ed2kState.checked = time.Time{}
+	ed2kState.failedAt = time.Time{}
+	ed2kState.incoming = ""
+	ed2kState.mu.Unlock()
+}
+
+// ed2kStatus returns the core state, cached for a few seconds.
+func ed2kStatus(cfg *Config) (amule.Status, error) {
+	if !ed2kEnabled(cfg) {
+		return amule.Status{}, errors.New("eD2k/aMule is disabled")
+	}
+	ed2kState.mu.Lock()
+	if !ed2kState.checked.IsZero() && time.Since(ed2kState.checked) < ed2kStatusCacheTTL {
+		status, lastErr := ed2kState.status, ed2kState.err
+		ed2kState.mu.Unlock()
+		if lastErr != "" {
+			return status, errors.New(lastErr)
+		}
+		return status, nil
+	}
+	ed2kState.mu.Unlock()
+	var status amule.Status
+	err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+		var callErr error
+		status, callErr = client.Status(ctx)
+		return callErr
+	})
+	ed2kState.mu.Lock()
+	ed2kState.status = status
+	ed2kState.checked = time.Now()
+	if err != nil {
+		ed2kState.err = err.Error()
+	} else {
+		ed2kState.err = ""
+	}
+	ed2kState.mu.Unlock()
+	return status, err
+}
+
+// ed2kStatusCached returns the last state without contacting the core, for
+// pages that must render even when amuled hangs.
+func ed2kStatusCached() (amule.Status, string, bool) {
+	ed2kState.mu.Lock()
+	defer ed2kState.mu.Unlock()
+	return ed2kState.status, ed2kState.err, !ed2kState.checked.IsZero()
+}
+
+// ed2kIncomingDir is where amuled puts completed files (cached: it only
+// changes when the core's preferences change).
+func ed2kIncomingDir(cfg *Config) string {
+	ed2kState.mu.Lock()
+	cached := ed2kState.incoming
+	ed2kState.mu.Unlock()
+	if cached != "" {
 		return cached
 	}
-	ed2kHealthMu.Unlock()
-
-	entry := ed2kHealthEntry{checkedAt: time.Now()}
-	ctx, cancel := context.WithTimeout(context.Background(), ed2kHealthProbeTimeout)
-	defer cancel()
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, settings.BaseURL+"/api/v1/health", nil)
-	if err != nil {
-		entry.err = err.Error()
-	} else {
-		if settings.Token != "" {
-			request.Header.Set("X-Gx-Token", settings.Token)
-		}
-		response, err := ed2kHealthHTTP.Do(request)
-		if err != nil {
-			entry.err = err.Error()
-		} else {
-			defer response.Body.Close()
-			if response.StatusCode != http.StatusOK {
-				entry.err = fmt.Sprintf("health: HTTP %d", response.StatusCode)
-			} else {
-				var payload struct {
-					OK           bool           `json:"ok"`
-					Version      string         `json:"version"`
-					Download     bool           `json:"download"`
-					Fingerprint  string         `json:"fingerprint"`
-					DataDir      string         `json:"data_dir"`
-					PID          int            `json:"pid"`
-					Reachability string         `json:"reachability"`
-					LowID        bool           `json:"low_id"`
-					UPnP         map[string]any `json:"upnp"`
-				}
-				if err := json.NewDecoder(io.LimitReader(response.Body, 64<<10)).Decode(&payload); err != nil {
-					entry.err = err.Error()
-				} else {
-					entry.healthy = payload.OK
-					entry.download = payload.Download
-					entry.version = payload.Version
-					entry.fingerprint = payload.Fingerprint
-					entry.dataDir = payload.DataDir
-					entry.pid = payload.PID
-					entry.reachability = payload.Reachability
-					entry.lowID = payload.LowID
-					entry.upnp = payload.UPnP
-					if method, ok := payload.UPnP["method"].(string); ok {
-						entry.mapping = method
-					}
-				}
-			}
-		}
+	var prefs amule.Preferences
+	if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+		var callErr error
+		prefs, callErr = client.Preferences(ctx)
+		return callErr
+	}); err != nil {
+		return ""
 	}
-	ed2kHealthMu.Lock()
-	ed2kHealthCache[settings.BaseURL] = entry
-	ed2kHealthMu.Unlock()
-	return entry
+	ed2kState.mu.Lock()
+	ed2kState.incoming = prefs.IncomingDir
+	ed2kState.mu.Unlock()
+	return prefs.IncomingDir
 }
 
-// ed2kHealthCached returns the last probe without waiting on the network. The
-// settings page uses it so rendering never blocks on a daemon that is down.
-func ed2kHealthCached(cfg *Config) (ed2kHealthEntry, bool) {
-	settings, err := ed2kSettingsFromConfig(cfg)
-	if err != nil {
-		return ed2kHealthEntry{}, false
-	}
-	ed2kHealthMu.Lock()
-	entry, ok := ed2kHealthCache[settings.BaseURL]
-	ed2kHealthMu.Unlock()
-	return entry, ok
-}
-
-// ed2kInvalidateHealth drops the cached probe so a settings change takes
-// effect immediately instead of after the cache TTL.
-func ed2kInvalidateHealth() {
-	ed2kHealthMu.Lock()
-	ed2kHealthCache = map[string]ed2kHealthEntry{}
-	ed2kHealthMu.Unlock()
-}
-
-// ed2kAvailability reports whether eD2k can be used for a manual search and
-// whether it can also complete a download. The two answers are separate on
-// purpose: search works long before the transfer engine exists.
+// ed2kAvailability reports whether eD2k can be searched and downloaded: both
+// need a reachable, authenticated aMule core.
 func ed2kAvailability(cfg *Config) (search bool, download bool) {
 	if !ed2kEnabled(cfg) {
 		return false, false
 	}
-	health := ed2kHealth(cfg)
-	return health.healthy, health.healthy && health.download
+	_, err := ed2kStatus(cfg)
+	return err == nil, err == nil
 }
 
 // ed2kFallbackEligible is the single gate for the automatic gap-filling
-// fallback: enabled, explicitly allowed, and able to finish the download. If
-// any part is false the deep pass never asks eD2k for a release.
+// fallback: enabled, explicitly allowed and aMule reachable.
 func ed2kFallbackEligible(cfg *Config) bool {
 	if !ed2kFallbackEnabled(cfg) {
 		return false
@@ -271,134 +335,96 @@ func ed2kFallbackEligible(cfg *Config) bool {
 	return download
 }
 
-// ed2kAPIFile is gx-ed2k's result shape.
-type ed2kAPIFile struct {
-	Name      string `json:"name"`
-	SizeBytes int64  `json:"size_bytes"`
-	Hash      string `json:"hash"`
-	Link      string `json:"link"`
-	Sources   int64  `json:"sources"`
-	Origin    string `json:"origin"`
-}
-
-// SearchED2K queries gx-ed2k and normalizes its results. It returns nil when
-// the provider is disabled, unreachable or finds nothing: a search-plane
-// failure must never fail the torrent search that called it.
+// SearchED2K searches eD2k/Kad through aMule and normalizes the results. It
+// returns nil when the integration is disabled, unreachable or finds nothing:
+// an eD2k failure must never fail the torrent search that called it.
 func SearchED2K(ctx context.Context, cfg *Config, query string) []models.Release {
-	return searchED2K(ctx, cfg, query, false)
-}
-
-// SearchED2KManual is the same search for a request that explicitly asked for
-// Kad (the checkbox in the manual search). When the global provider is off it
-// starts the managed daemon for this request without persisting the setting;
-// the automatic fallback keeps using the gated SearchED2K.
-func SearchED2KManual(ctx context.Context, cfg *Config, query string) []models.Release {
-	return searchED2K(ctx, cfg, query, true)
-}
-
-func searchED2K(ctx context.Context, cfg *Config, query string, manual bool) []models.Release {
-	if cfg == nil {
+	if !ed2kEnabled(cfg) {
 		return nil
 	}
-	started := false
-	if !ed2kEnabled(cfg) {
-		if !manual {
-			return nil
-		}
-		cfg = ed2kEnabledCopy(cfg)
-		ensureEd2kDaemon(cfg)
-		ed2kInvalidateHealth()
-		started = true
+	results, err := searchAmule(ctx, cfg, query, nil)
+	if err != nil {
+		logging.SourceFail("ed2k", "aMule", err.Error())
+		return nil
 	}
+	releases := ed2kReleases(results, "ed2k:amule")
+	logging.SourceOK("ed2k", "aMule", len(releases))
+	return releases
+}
+
+// SearchED2KManual is the search behind the eD2k checkbox of the manual
+// search. It needs the integration switched on, like every eD2k feature.
+func SearchED2KManual(ctx context.Context, cfg *Config, query string) []models.Release {
+	return SearchED2K(ctx, cfg, query)
+}
+
+// searchAmule runs one search on the configured network. network overrides
+// the setting when it is not nil.
+func searchAmule(ctx context.Context, cfg *Config, query string, network *uint8) ([]amule.SearchResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
-		return nil
+		return nil, nil
 	}
 	settings, err := ed2kSettingsFromConfig(cfg)
 	if err != nil {
-		logging.SourceFail("ed2k", "gx-ed2k", err.Error())
-		return nil
+		return nil, err
 	}
-	if started {
-		if _, managed := ed2kListenFromURL(settings.BaseURL); managed {
-			deadline := time.Now().Add(5 * time.Second)
-			for time.Now().Before(deadline) {
-				if ed2kHealth(cfg).healthy {
-					break
-				}
-				select {
-				case <-ctx.Done():
-					return nil
-				case <-time.After(150 * time.Millisecond):
-				}
-			}
-		}
+	client, err := ed2kClient(cfg)
+	if err != nil {
+		return nil, err
 	}
-	timeout := settings.Timeout
+	searchType := settings.Network
+	if network != nil {
+		searchType = *network
+	}
+	wait := settings.Timeout
 	if deadline, ok := ctx.Deadline(); ok {
-		if remaining := time.Until(deadline); remaining < timeout {
-			timeout = remaining
+		if remaining := time.Until(deadline) - time.Second; remaining < wait {
+			wait = remaining
 		}
 	}
-	if timeout < time.Second {
-		timeout = time.Second
+	if wait < 2*time.Second {
+		wait = 2 * time.Second
 	}
-	requestCtx, cancel := context.WithTimeout(ctx, timeout)
+	ed2kSearchMu.Lock()
+	defer ed2kSearchMu.Unlock()
+	searchCtx, cancel := context.WithTimeout(ctx, wait+ed2kRequestTime)
 	defer cancel()
+	return client.Search(searchCtx, query, amule.SearchOptions{Type: searchType, Wait: wait})
+}
 
-	endpoint := settings.BaseURL + "/api/v1/search?q=" + url.QueryEscape(query) + "&timeout_ms=" + strconv.FormatInt(timeout.Milliseconds(), 10)
-	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		logging.SourceFail("ed2k", "gx-ed2k", err.Error())
-		return nil
-	}
-	if settings.Token != "" {
-		request.Header.Set("X-Gx-Token", settings.Token)
-	}
-	client := &http.Client{Timeout: timeout + 2*time.Second}
-	response, err := client.Do(request)
-	if err != nil {
-		logging.SourceFail("ed2k", "gx-ed2k", err.Error())
-		return nil
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
-		logging.SourceFail("ed2k", "gx-ed2k", fmt.Sprintf("HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body))))
-		return nil
-	}
-	var payload struct {
-		OK      bool          `json:"ok"`
-		Results []ed2kAPIFile `json:"results"`
-	}
-	if err := json.NewDecoder(io.LimitReader(response.Body, ed2kSearchResponseMaxBody)).Decode(&payload); err != nil {
-		logging.SourceFail("ed2k", "gx-ed2k", err.Error())
-		return nil
-	}
-	if !payload.OK {
-		logging.SourceFail("ed2k", "gx-ed2k", "daemon answered ok=false")
-		return nil
-	}
+func ed2kReleases(results []amule.SearchResult, source string) []models.Release {
 	now := time.Now().UTC()
-	releases := make([]models.Release, 0, len(payload.Results))
-	for _, item := range payload.Results {
-		name := strings.TrimSpace(item.Name)
-		link := strings.TrimSpace(item.Link)
-		if link == "" && ed2k.ValidHash(item.Hash) {
-			link = ed2k.FileLink{Name: name, Size: item.SizeBytes, Hash: item.Hash}.String()
-		}
-		release := ParseEd2kRelease(name, link, "ed2k:"+strings.TrimSpace(item.Origin), item.SizeBytes, item.Sources, now)
+	releases := make([]models.Release, 0, len(results))
+	for _, item := range results {
+		release := ParseEd2kRelease(strings.TrimSpace(item.Name), item.Link(), source, item.Size, item.Sources, now)
 		if release == nil {
 			continue
 		}
 		releases = append(releases, *release)
 	}
-	logging.SourceOK("ed2k", "gx-ed2k", len(releases))
 	return releases
 }
 
-// Ed2kStatus implements `GET /api/ed2k/status`: the eD2k provider state used
-// by the settings page and by diagnostics.
+// Ed2kRuntimeStatus is the state shown by diagnostics and the settings page.
+func Ed2kRuntimeStatus(cfg *Config) map[string]any {
+	enabled := ed2kEnabled(cfg)
+	out := map[string]any{"enabled": enabled, "reachable": false, "download": false}
+	if !enabled {
+		return out
+	}
+	status, err := ed2kStatus(cfg)
+	if err != nil {
+		out["last_error"] = err.Error()
+		return out
+	}
+	out["reachable"] = true
+	out["download"] = true
+	out["status"] = status
+	return out
+}
+
+// Ed2kStatus implements `GET /api/ed2k/status`.
 func Ed2kStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	jsonResponse(w, map[string]any{"ok": true, "provider": Ed2kRuntimeStatus(cfg)})
@@ -414,9 +440,9 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 		return nil
 	}
 	// Query the configured name and its aliases: a library often uses the
-	// localized title while releases on Kad carry the original one ("I misteri
-	// di Murdoch" vs "Murdoch Mysteries"). The queries run in parallel and the
-	// results are merged in a stable order, then deduplicated by link.
+	// localized title while eD2k files carry the original one ("I misteri di
+	// Murdoch" vs "Murdoch Mysteries"). aMule runs one search at a time, so
+	// the names are searched one after the other and merged by link.
 	names := make([]string, 0, 1+len(series.Aliases))
 	seenName := map[string]struct{}{}
 	for _, name := range append([]string{series.Name}, series.Aliases...) {
@@ -431,20 +457,13 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 		seenName[key] = struct{}{}
 		names = append(names, name)
 	}
-	perName := make([][]models.Release, len(names))
-	var wait sync.WaitGroup
-	for index, name := range names {
-		wait.Add(1)
-		go func(index int, name string) {
-			defer wait.Done()
-			perName[index] = SearchED2K(ctx, cfg, fmt.Sprintf("%s S%02dE%02d", name, season, episode))
-		}(index, name)
-	}
-	wait.Wait()
 	candidates := make([]models.Release, 0)
 	seenRelease := map[string]struct{}{}
-	for _, group := range perName {
-		for _, release := range group {
+	for _, name := range names {
+		if ctx.Err() != nil {
+			break
+		}
+		for _, release := range SearchED2K(ctx, cfg, fmt.Sprintf("%s S%02dE%02d", name, season, episode)) {
 			key, ok := releaseDedupKey(&release)
 			if !ok {
 				continue

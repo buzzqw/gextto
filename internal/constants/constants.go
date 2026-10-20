@@ -41,15 +41,6 @@ var GxTorrentBuild = "0"
 // /api/v1/health report.
 func GxTorrentVersion() string { return "1.1." + GxTorrentBuild }
 
-// GxEd2kBuild is the gx-ed2k daemon's own monotonic build number, independent
-// from both Gextto's and gx-torrent's. It is stamped with
-// `-X github.com/buzzqw/gextto/internal/constants.GxEd2kBuild=...`.
-var GxEd2kBuild = "0"
-
-// GxEd2kVersion is what the gx-ed2k daemon's CLI, web UI and /api/v1/health
-// report.
-func GxEd2kVersion() string { return "1.1." + GxEd2kBuild }
-
 // Commit is the git commit the binary was built from, stamped with
 // `-X gextto/internal/constants.Commit=...` by scripts/build-daemon.sh. The
 // in-app update check compares it with the published release manifest.
@@ -60,12 +51,6 @@ var Commit = ""
 // local build leaves it empty, so its in-app update stays off: a checkout may
 // be newer than the published build.
 var GxReleaseChannel = ""
-
-// GxEd2kChannel is the release channel a gx-ed2k binary was published on
-// ("continuous" or "stable"), stamped only by scripts/build-release.sh. A
-// local build leaves it empty, so the standalone daemon does not offer an
-// update that may be older than the checkout.
-var GxEd2kChannel = ""
 
 // BuiltAt is the build time (RFC 3339, UTC), stamped like Commit. A release is
 // offered as an update only when it was built after the running binary.

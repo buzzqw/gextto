@@ -1,7 +1,6 @@
 package ed2k
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -75,22 +74,6 @@ func TestNormalizeServerList(t *testing.T) {
 	}
 }
 
-func TestBestKeyword(t *testing.T) {
-	cases := map[string]string{
-		"The Matrix 1999 1080p":    "matrix",
-		"a  b":                     "",
-		"serie S01E01":             "serie",
-		"Amélie":                   "amélie",
-		"Silo S04E01":              "silo",
-		"Murdoch Mysteries S13E12": "murdoch",
-	}
-	for query, want := range cases {
-		if got := BestKeyword(query); got != want {
-			t.Errorf("BestKeyword(%q) = %q, want %q", query, got, want)
-		}
-	}
-}
-
 func TestMatchesQuery(t *testing.T) {
 	if !MatchesQuery("The.Matrix.1999.1080p.mkv", "Matrix 1080p") {
 		t.Fatal("expected match")
@@ -100,16 +83,6 @@ func TestMatchesQuery(t *testing.T) {
 	}
 	if !MatchesQuery("Matrix.1999.1080p.mkv", "The Matrix 1999") {
 		t.Fatal("stop words must not hide a match")
-	}
-}
-
-func TestKeywordIDIsStable(t *testing.T) {
-	id := KeywordID("matrix")
-	if id.Hex() != strings.ToLower(id.Hex()) || len(id.Hex()) != 32 {
-		t.Fatalf("bad id %q", id.Hex())
-	}
-	if KeywordID("Matrix") != id {
-		t.Fatal("keyword hash must be case-insensitive")
 	}
 }
 
@@ -130,16 +103,6 @@ func TestMatchesQueryEpisodeVariants(t *testing.T) {
 		if got := MatchesQuery(tc.name, tc.query); got != tc.want {
 			t.Errorf("MatchesQuery(%q, %q) = %v, want %v", tc.name, tc.query, got, tc.want)
 		}
-	}
-}
-
-func TestBroadTermsDropsEpisodeAndQuality(t *testing.T) {
-	got := broadTerms([]string{"tracker", "s04e01", "1080p", "2024"})
-	if len(got) != 1 || got[0] != "tracker" {
-		t.Fatalf("broadTerms = %#v", got)
-	}
-	if got := broadTerms([]string{"s04e01"}); len(got) != 0 {
-		t.Fatalf("episode-only broadTerms = %#v", got)
 	}
 }
 

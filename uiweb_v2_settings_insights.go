@@ -175,34 +175,22 @@ func v2SourcesIndexFrom(s *AppState, cfg *Config) *v2SourcesIndex {
 	ed2kLabel := tr("spenta")
 	ed2kAlert := false
 	if ed2kEnabled(cfg) {
-		entry, known := ed2kHealthCached(cfg)
+		// The cached state only: rendering must not wait on aMule.
+		status, lastErr, known := ed2kStatusCached()
 		switch {
 		case !known:
 			ed2kLabel = tr("stato sconosciuto")
-		case !entry.healthy:
-			ed2kLabel = tr("demone non raggiungibile")
+		case lastErr != "":
+			ed2kLabel = tr("aMule non raggiungibile")
 			ed2kAlert = true
-		case entry.reachability == "open":
+		case status.Ed2kConnected && status.HighID:
 			ed2kLabel = tr("aperta")
-			if entry.mapping != "" {
-				method := entry.mapping
-				switch method {
-				case "upnp":
-					method = "UPnP"
-				case "natpmp":
-					method = "NAT-PMP"
-				case "pcp":
-					method = "PCP"
-				default:
-					method = strings.ToUpper(method)
-				}
-				ed2kLabel += " · " + method
-			}
-		case entry.reachability == "limited":
+		case status.Ed2kConnected || status.KadConnected:
 			ed2kLabel = tr("limitata (firewall/NAT)")
 			ed2kAlert = true
 		default:
-			ed2kLabel = tr("stato sconosciuto")
+			ed2kLabel = tr("non connessa")
+			ed2kAlert = true
 		}
 	}
 	return &v2SourcesIndex{

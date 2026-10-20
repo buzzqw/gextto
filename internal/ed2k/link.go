@@ -1,14 +1,7 @@
-// Package ed2k implements the parts of the eD2k/Kad network Gextto needs to
-// search for files: eD2k links, the Kad DHT (Kademlia2) and the eD2k server
-// protocol. It is original code written for Gextto; it does not embed or link
-// any eMule/aMule source. The wire formats follow the published eD2k/Kad
-// protocol (opcodes and tag layout), which is what makes interoperability
-// possible.
-//
-// This package is deliberately a search client. It does not implement the
-// eMule client-to-client transfer protocol, upload, credits or AICH: those are
-// separate, much larger pieces and gx-ed2k advertises them as unavailable
-// instead of pretending otherwise.
+// Package ed2k parses and formats eD2k links (`ed2k://|file|...|/` and
+// `ed2k://|server|...|/`). Transfers and searches go through aMule
+// (internal/amule); this package only validates what the user pastes and
+// what the core returns.
 package ed2k
 
 import (

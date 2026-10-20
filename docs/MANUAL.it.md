@@ -325,9 +325,9 @@ La ricerca manuale è utile per capire cosa vede Gextto prima di modificare una
 configurazione o avviare un download:
 
 1. inserisci un titolo o una query tecnica;
-2. se vuoi includere anche la rete eD2k/Kad, spunta **Kad** accanto al pulsante
-   di ricerca: se il provider è spento, questa singola ricerca lo avvia senza
-   cambiare l'impostazione globale;
+2. se l'integrazione con aMule è attiva (vedi [eD2k e Kad](#ed2k-e-kad-con-amule)),
+   spunta **Kad** accanto al pulsante di ricerca per cercare anche su eD2k/Kad,
+   sulla rete scelta in Configurazione;
 3. attendi che le sorgenti terminino o che il timeout segnali quelle lente;
 4. confronta titolo, sorgente, qualità, dimensione e seed/peer;
 5. usa **Filtra i risultati già caricati** per restringere localmente la lista;
@@ -352,10 +352,9 @@ bloccata, già presente o inferiore al file archiviato.
 ## 3. Scarico
 
 - **Cerca una release**: il pannello in cima a Scarico cerca su archivio,
-  indexer, motori web e — se spunti **Kad** — sulla rete eD2k/Kad, senza
-  cambiare pagina. I risultati si aprono sotto il campo; dopo un'aggiunta
-  resti in Scarico. La casella **Kad** vale per quella ricerca: se il provider
-  è spento, la singola ricerca lo avvia senza cambiare la configurazione.
+  indexer, motori web e — se spunti **Kad** e aMule è attivo — su eD2k/Kad,
+  senza cambiare pagina. I risultati si aprono sotto il campo; dopo un'aggiunta
+  resti in Scarico.
 - Il modulo **Aggiungi torrent** si apre dal pulsante con lo stesso nome nella
   barra in alto, presente in **ogni pagina** (da un'altra pagina ti porta in
   Scarico e apre il modulo): da chiuso non occupa spazio. Accetta un magnet/URL
@@ -365,6 +364,12 @@ bloccata, già presente o inferiore al file archiviato.
   l'elenco si aggiorna automaticamente ogni 5 secondi.
 - I download HTTP dei fumetti mostrano stato, progressione, byte scaricati e
   velocità nella stessa lista dei torrent.
+- I **download eD2k di aMule** compaiono nella stessa lista, con il badge
+  **eD2k**: stato, progressione, velocità e fonti (in trasferimento / totali),
+  più **Pausa**, **Riprendi** e **🗑️**. Su un download in corso 🗑️ lo annulla e
+  cancella la parte scaricata; su un file completato lo toglie solo dall'elenco
+  di aMule (il file resta nella cartella di arrivo). Il contatore in alto mostra
+  anche **eD2k: N** quando l'integrazione è attiva.
 - **Riga della vista**: casella per selezionare tutto, filtro per nome, filtro per
   tag, **Ordina per** con il verso (↑/↓), **⟳** per aggiornare subito e il menu
   **Strumenti**: **Pulisci completati**, **File orfani…**, **Aggiorna ogni 5 s**
@@ -704,11 +709,11 @@ manualmente il JSON se non stai usando direttamente l'API.
   aggiunta è disattivato, così non crei duplicati per errore. Sotto la ricerca
   release c'è il campo per **incollare uno o più link `ed2k://`** (uno per riga
   o separati da spazi): Gextto li verifica, elimina i duplicati e li mostra come
-  risultati con nome, dimensione e hash. Con **Aggiungi tutti** li accoda in
-  blocco, oppure usi il pulsante **Aggiungi** della singola riga. Se la ricerca
-  eD2k/Kad è attiva, i risultati della rete compaiono nella stessa tabella con
-  il badge **eD2k** e il numero di fonti; quando il trasferimento eD2k è
-  disponibile la riga è accodabile, altrimenti dice **Solo ricerca**.
+  risultati con nome, dimensione e hash. Con **Aggiungi tutti** li passa in
+  blocco ad aMule, oppure usi il pulsante **Aggiungi** della singola riga. Se
+  spunti **Kad**, i risultati eD2k compaiono nella stessa tabella con il badge
+  **eD2k** e il numero di fonti. Quando aMule è spento o non risponde la riga
+  dice **Solo ricerca**.
 - **Archivio** — ricerca full-text delle release passate con paginazione, accoda
   in blocco, copia magnet, elimina; tab **Serie/Film dal feed**. La ricerca
   nell'archivio locale è **immediata**: parte da sola mentre digiti (dai tre
@@ -752,6 +757,60 @@ manualmente il JSON se non stai usando direttamente l'API.
   raggruppare e ordinare gli albi. Un file che ha già il suo `ComicInfo.xml` non viene
   toccato; i fumetti scaricati via torrent restano identici, perché sono in
   seed, e i CBR (RAR) non si possono modificare.
+
+- **eD2k** — la pagina di aMule: vedi la sezione seguente.
+
+### eD2k e Kad con aMule
+
+Gextto usa **aMule** per la rete eD2k e Kad: `amuled` fa il lavoro di rete
+(server, Kad, fonti, code, crediti, trasferimenti) e Gextto lo comanda con il
+protocollo delle **connessioni esterne (EC)**, lo stesso di `amulecmd` e
+`amuleweb`. È tutto facoltativo e spento di default; con aMule spento i
+torrent non cambiano.
+
+**Come si prepara.** Installa aMule (`amule-daemon` su Debian/Ubuntu) e
+abilita le connessioni esterne in `amule.conf`:
+
+```ini
+[ExternalConnect]
+AcceptExternalConnections=1
+ECAddress=127.0.0.1
+ECPort=4712
+ECPassword=<md5 della password>
+```
+
+`ECPassword` è l'MD5 della password (`printf '%s' 'segreta' | md5sum`). Avvia
+`amuled`, poi in **Configurazione → Fonti → eD2k e Kad** accendi
+**eD2k e Kad tramite aMule** e inserisci indirizzo, porta e password **in
+chiaro**. Gextto deve vedere la cartella di arrivo di aMule allo stesso
+percorso (succede quando girano sulla stessa macchina): è da lì che importa i
+file completati. Apri sul router le porte TCP e UDP di aMule per avere un ID
+alto e un Kad non dietro firewall, cioè più fonti.
+
+**La pagina eD2k** (menu **Scoperta → eD2k**):
+
+- **aMule**: versione, server eD2k a cui sei connesso con **ID alto/basso**,
+  stato di Kad (connesso, dietro firewall, fermo), velocità e limiti, utenti e
+  file della rete, coda di upload. I pulsanti **Connetti**, **Disconnetti**,
+  **Avvia/Ferma Kad** e **Lascia il server** comandano aMule; **Aggiorna**
+  rilegge lo stato. Se aMule non risponde la pagina lo dice e spiega cosa
+  controllare.
+- **Server eD2k**: la lista di aMule con utenti, file e ping; **Connetti** su
+  una riga collega aMule a quel server. Da qui scarichi anche un nuovo
+  `server.met` o un `nodes.dat` per Kad da un indirizzo.
+- **Cerca su eD2k e Kad**: scegli la rete (Kad, tutti i server eD2k, solo il
+  server connesso) e cerca; aMule raccoglie i risultati per qualche secondo.
+  Ogni risultato mostra nome, dimensione e fonti (totali / complete) e ha
+  **Scarica**; **già noto** segnala un file che aMule ha già.
+- **Incolla link eD2k**: uno o più link `ed2k://`, anche mescolati a testo;
+  **Scarica con aMule** li aggiunge tutti.
+
+I download aggiunti compaiono in **Scarico**. Quando aMule completa un file,
+Gextto lo tratta come un torrent completato: lo rinomina, lo importa in
+libreria, lo controlla con MediaInfo e manda la notifica. Gli episodi eD2k
+entrano in libreria sempre con **hardlink o copia**, mai spostati, così aMule
+continua a condividerli dalla cartella di arrivo (l'hardlink non occupa spazio
+in più se le due cartelle sono sullo stesso disco).
 
 ## 7. Configurazione
 
@@ -1612,47 +1671,33 @@ salvata** finché non li salvi.
 
 **eD2k e Kad**
 
-La rete eD2k/Kad è un **provider di ricerca**: i suoi risultati compaiono accanto
-ai torrent, con il nome del file, la dimensione, l'hash MD4 e il numero di fonti.
-Gextto parla con il demone `gx-ed2k`. Per default è un client di **sola
-ricerca**; con l'opzione `-download` (che Gextto passa al demone gestito quando
-il provider è attivo) espone anche il piano di trasferimento: accetta link
-`ed2k://` (anche più di uno alla volta), scarica con verifica MD4, riprende i
-`.part` e condivide i file completati con un upload minimo. Restano fuori, per
-ora, coda/crediti completi, obfuscation e buddy/hole punching per un client
-LowID. Le **fonti LowID** (Kad tipo 3/5/6) vengono invitate con un **direct UDP
-callback** e, quando espongono un buddy, con una **KADEMLIA_CALLBACK_REQ** al
-loro buddy: se la nostra porta TCP è raggiungibile (HighID) il peer si connette
-a noi e il download prosegue su quella connessione. La funzione è spenta
-per default: senza il tuo consenso Gextto non contatta la rete.
+eD2k e Kad passano da **aMule** (vedi [eD2k e Kad con aMule](#ed2k-e-kad-con-amule)):
+Gextto comanda un `amuled` già avviato tramite le connessioni esterne (EC). È
+spento per default: senza il tuo consenso Gextto non contatta la rete.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Ricerca eD2k/Kad | Attiva il provider e avvia il demone `gx-ed2k`. Spento di default. |
-| gx-ed2k — URL Web API | Indirizzo del demone, di solito `http://127.0.0.1:8899`. |
-| gx-ed2k — token API | Token del demone, se non ascolta solo in locale. |
-| Usa eD2k quando i torrent non trovano nulla | Secondo interruttore, separato: solo nel passaggio approfondito del gap filling, e solo se torrent episodio e stagione non hanno prodotto nulla, Gextto cerca lo stesso episodio su eD2k/Kad. Spento di default. |
+| eD2k e Kad tramite aMule | Collega Gextto ad aMule: ricerca, link `ed2k://`, download in Scarico e pagina eD2k. Spento di default. |
+| aMule — indirizzo | Macchina su cui gira `amuled`, di solito `127.0.0.1`. Gextto deve vedere la cartella di arrivo di aMule allo stesso percorso. |
+| aMule — porta connessioni esterne (EC) | `ECPort` di `amule.conf`, 4712 di default. |
+| aMule — password connessioni esterne (EC) | La password in chiaro; aMule conserva il suo MD5 in `ECPassword`. Non visualizzata. |
+| Rete delle ricerche eD2k | **Kad** (default, non serve un server), **Server eD2k (globale)** (tutti i server) o **Server eD2k (connesso)**. Vale per la ricerca manuale e per il fallback. |
+| Usa eD2k quando i torrent non trovano nulla | Secondo interruttore, separato: solo nel passaggio approfondito del gap filling, e solo se torrent episodio e stagione non hanno prodotto nulla, Gextto cerca lo stesso episodio su eD2k/Kad (con il nome della serie e tutti gli alias). Spento di default. |
 | Fonti minime per il fallback | Soglia di fonti eD2k per accettare automaticamente un risultato. La ricerca manuale mostra tutto. *(Unità: fonti; 0 = nessun minimo)* |
-| Timeout della ricerca eD2k | Tempo massimo di una ricerca eD2k/Kad; allo scadere restituisce i risultati già arrivati. *(Unità: secondi)* |
-| Apri la porta Kad sul router | Chiede al router di aprire UDP 4672 e TCP 4662 con **UPnP**, **NAT-PMP** o **PCP**. Se funziona la connessione risulta **aperta** e i server eD2k assegnano un HighID; se il router non lo supporta resta **limitata** e serve il port forwarding manuale. |
+| Durata della ricerca eD2k | Per quanti secondi aMule raccoglie i risultati prima che Gextto li mostri. *(Unità: secondi)* |
 
 Il fallback automatico accetta solo un risultato che corrisponde esattamente
 all'episodio, ha una qualità riconosciuta, una dimensione plausibile e almeno le
 fonti minime. In tutti gli altri casi il risultato resta visibile nella ricerca
 manuale e il buco non si chiude: meglio un episodio mancante che un file
-sbagliato in libreria. Se `gx-ed2k` non è raggiungibile, i torrent continuano
-senza alcun effetto.
+sbagliato in libreria. Se aMule non è raggiungibile, i torrent continuano senza
+alcun effetto.
 
 Nella pagina **Sorgenti** la voce **eD2k e Kad** mostra la spia della
-connessione: **aperta** (UPnP o porte raggiungibili), **limitata**
-(firewall/NAT o LowID) oppure **sconosciuta**. Se è limitata, apri UDP 4672 e TCP
-4662 sul router o attiva UPnP. La stessa spia è nella pagina del demone
-`gx-ed2k`, insieme a nodi, porta e versione. Nella pagina standalone del demone,
-**Controlla aggiornamenti** confronta la build con l'ultima release pubblicata e
-mostra il link all'archivio; su Linux può anche installarlo (verifica checksum e
-versione, sostituisce il binario e riavvia il demone). Su Windows resta il
-download dello zip con l'installer del servizio. Una build locale non propone
-aggiornamenti.
+connessione: **aperta** (connesso a un server con ID alto), **limitata**
+(firewall/NAT: ID basso o solo Kad), **non connessa**, **aMule non
+raggiungibile** oppure **sconosciuta**. Se è limitata, apri sul router le porte
+TCP e UDP di aMule.
 
 #### Qualità e upgrade
 

@@ -285,17 +285,12 @@ func (i *I18nDb) SetBulk(lang string, values map[string]string) error {
 // added.
 func (i *I18nDb) SeedDefaultTranslations() (int, error) {
 	defer i.invalidateCache()
-	// Older installations may still contain translations for the removed aMule
-	// integration (and the old "fallback eD2k" option, replaced by the native
-	// gx-ed2k provider). They would otherwise keep obsolete options visible in
-	// the translation editor. Current eD2k/Kad strings are NOT obsolete.
-	if _, err := i.db.Exec(`DELETE FROM translations
-		WHERE lower(key) LIKE '%amule%'
-		   OR lower(value) LIKE '%amule%'
-		   OR key = 'Gap Filling — Fallback eD2k (cerca su eD2k se Jackett non trova nulla)'`); err != nil {
-		return 0, fmt.Errorf("remove obsolete aMule translations: %w", err)
+	type parsedCatalog struct {
+		name     string
+		defaults map[string]map[string]string
 	}
-	inserted := 0
+	catalogs := make([]parsedCatalog, 0, 5)
+	bundled := map[string]struct{}{}
 	for _, catalog := range []struct {
 		name string
 		raw  string
@@ -308,8 +303,26 @@ func (i *I18nDb) SeedDefaultTranslations() (int, error) {
 	} {
 		var defaults map[string]map[string]string
 		if err := yaml.Unmarshal([]byte(catalog.raw), &defaults); err != nil {
-			return inserted, fmt.Errorf("parse %s translations: %w", catalog.name, err)
+			return 0, fmt.Errorf("parse %s translations: %w", catalog.name, err)
 		}
+		for _, entries := range defaults {
+			for key := range entries {
+				bundled[key] = struct{}{}
+			}
+		}
+		catalogs = append(catalogs, parsedCatalog{name: catalog.name, defaults: defaults})
+	}
+	// Older installations may still contain translations for the first aMule
+	// integration (and the old "fallback eD2k" option). They would otherwise
+	// keep obsolete options visible in the translation editor. Only rows that
+	// mention aMule and are no longer in the bundled catalogs go: the strings
+	// of the current aMule integration stay.
+	if err := i.removeObsoleteAmuleRows(bundled); err != nil {
+		return 0, err
+	}
+	inserted := 0
+	for _, catalog := range catalogs {
+		defaults := catalog.defaults
 		langs := make([]string, 0, len(defaults))
 		for lang := range defaults {
 			langs = append(langs, lang)
@@ -350,6 +363,39 @@ func (i *I18nDb) SeedDefaultTranslations() (int, error) {
 		return inserted, err
 	}
 	return inserted + fixed, nil
+}
+
+// removeObsoleteAmuleRows deletes the translation rows of the first aMule
+// integration: rows that mention aMule (or the old eD2k fallback option)
+// whose key is not in the bundled catalogs any more.
+func (i *I18nDb) removeObsoleteAmuleRows(bundled map[string]struct{}) error {
+	rows, err := i.db.Query(`SELECT DISTINCT key FROM translations
+		WHERE lower(key) LIKE '%amule%'
+		   OR lower(value) LIKE '%amule%'
+		   OR key = 'Gap Filling — Fallback eD2k (cerca su eD2k se Jackett non trova nulla)'`)
+	if err != nil {
+		return fmt.Errorf("find obsolete aMule translations: %w", err)
+	}
+	var obsolete []string
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("find obsolete aMule translations: %w", err)
+		}
+		if _, current := bundled[key]; !current {
+			obsolete = append(obsolete, key)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("find obsolete aMule translations: %w", err)
+	}
+	for _, key := range obsolete {
+		if _, err := i.db.Exec("DELETE FROM translations WHERE key = ?1", key); err != nil {
+			return fmt.Errorf("remove obsolete aMule translations: %w", err)
+		}
+	}
+	return nil
 }
 
 // applyTranslationFixes brings corrected bundled translations to databases
