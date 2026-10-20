@@ -30,7 +30,10 @@ La UI ufficiale si apre su `http://<host>:5000/`; il vecchio prefisso `/v2`
 reindirizza alla radice e la vecchia route `/ui` non esiste più. La pagina **Scarico** aggiorna
 automaticamente la sessione ogni 5 secondi; la voce **Aggiorna ogni 5 s** del menu
 **Strumenti** disattiva o riattiva l'aggiornamento, e il pulsante **⟳** aggiorna subito. Anche i tile CPU/RAM e le velocità nella
-barra superiore vengono aggiornati ogni 5 secondi.
+barra superiore vengono aggiornati ogni 5 secondi. Quando **eD2k e Kad tramite
+aMule** è attivo e `amuled` gira sulla stessa macchina di Gextto, nella barra
+compare anche il badge **aMule** con CPU e RAM del demone; se aMule è su un altro
+host il badge non c'è, perché quei dati non sono leggibili da lì.
 
 Il percorso consigliato per una nuova installazione è:
 

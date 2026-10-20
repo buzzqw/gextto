@@ -114,6 +114,11 @@ letto). Se la spia dice *limitata*, apri sul router le porte TCP e UDP di aMule.
 Quando aMule non risponde, la pagina eD2k lo dice, spiega cosa controllare e
 offre **Riprova**. Nient'altro in Gextto smette di funzionare.
 
+Quando `amuled` gira sulla macchina di Gextto, la barra in alto mostra il badge
+**aMule** con CPU e RAM del demone, aggiornato insieme agli altri valori. Con
+aMule su un altro host il badge non c'è: quei dati non sono disponibili tramite
+il protocollo EC.
+
 ## Come si usa
 
 ### Ricerca

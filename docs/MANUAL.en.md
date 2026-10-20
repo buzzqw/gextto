@@ -30,7 +30,10 @@ The official UI is served at `http://<host>:5000/`; the old `/v2` prefix
 redirects to the root and the old `/ui` route no longer exists. The **Downloads** page refreshes
 the session automatically every 5 seconds; **Refresh every 5 s** in the **Tools**
 menu turns that off or back on, and the **⟳** button refreshes at once. CPU/RAM tiles and the transfer rates in the top bar use the
-same 5-second refresh.
+same 5-second refresh. When **eD2k and Kad through aMule** is on and `amuled`
+runs on the same machine as Gextto, the bar also shows an **aMule** badge with
+the daemon's CPU and RAM; with aMule on another host there is no badge, because
+those figures cannot be read from there.
 
 The recommended path for a new installation is:
 

@@ -114,6 +114,11 @@ sensor says *limited*, open aMule's TCP and UDP ports on the router.
 When aMule does not answer, the eD2k page says so, explains what to check and
 offers **Retry**. Nothing else in Gextto stops working.
 
+When `amuled` runs on Gextto's machine, the header shows an **aMule** badge with
+the daemon's CPU and RAM, updated with the other metrics. With aMule on another
+host the badge is absent: those figures are not available through the EC
+protocol.
+
 ## Using it
 
 ### Search

@@ -72,13 +72,16 @@ type uiShellChrome struct {
 	CPU           string
 	CPUFrequency  string
 	RAM           string
-	Download      string
-	Upload        string
-	NextCycle     string
-	Lang          string
-	Torrents      int
-	Peers         int
-	Seeds         int
+	// AmuleLoad is "CPU% · RAM" of the local amuled process, shown only when
+	// the aMule integration is on and aMule runs on this machine.
+	AmuleLoad string
+	Download  string
+	Upload    string
+	NextCycle string
+	Lang      string
+	Torrents  int
+	Peers     int
+	Seeds     int
 	// Transferring and Stuck split the unfinished torrents for the phone
 	// status strip; Problems is logging.ProblemCount (the page compares it
 	// with the value seen last time to show only new warnings).
@@ -159,6 +162,11 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 		chrome.CPU = strconv.FormatFloat(*metrics.ProcessCPUPercent, 'f', 1, 64) + "%"
 	}
 	chrome.RAM = logging.HumanBytesI64(saturatingInt64(metrics.ResidentBytes))
+	if ed2kEnabled(cfg) && hostIsLocal(uiSettingString(cfg, "amule_host")) {
+		if usage, ok := localProcessUsageForName("amuled"); ok {
+			chrome.AmuleLoad = localProcessLoadLabel(usage)
+		}
+	}
 
 	var downloadRate, uploadRate uint64
 	var parked map[string]StallWatch

@@ -14,6 +14,11 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **Barra in alto: anche i carichi di aMule.** Quando l'integrazione eD2k è
+  attiva e `amuled` gira sulla stessa macchina di Gextto, nella barra superiore
+  compare il badge **aMule** con CPU e RAM del demone, aggiornato ogni 5 secondi
+  come gli altri valori. Se aMule è su un altro host il badge non c'è, perché
+  quei dati non sono leggibili da lì.
 - **eD2k: i download completati entrano subito nello Storico download.** Un
   file eD2k completato e importato in libreria compariva nello Storico solo alla
   riconciliazione successiva, fino a sei ore dopo. Ora viene registrato come

@@ -13,6 +13,11 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **Top bar: aMule's load too.** When the eD2k integration is on and `amuled`
+  runs on Gextto's machine, the top bar shows an **aMule** badge with the
+  daemon's CPU and RAM, refreshed every 5 seconds like the other figures. With
+  aMule on another host there is no badge, because those figures cannot be read
+  from there.
 - **eD2k: completed downloads reach the history at once.** An eD2k file that
   completed and was imported into the library appeared in the history only at
   the next reconciliation, up to six hours later. It is now recorded as finished
