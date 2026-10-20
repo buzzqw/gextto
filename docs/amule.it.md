@@ -173,14 +173,16 @@ così aMule continua a condividere l'originale dalla cartella di arrivo;
 l'hardlink non occupa spazio in più quando le due cartelle sono sullo stesso
 filesystem.
 
-Le notifiche usano gli stessi eventi dei torrent: **Download completato** con
-titolo, percorso in libreria, dimensione, durata e velocità media (e la release
-sostituita quando ne ha rimpiazzata una peggiore), **Download fallito** quando un
-download eD2k automatico si ferma per i giorni configurati, **Errore torrent**
-quando l'import fallisce. Un file scartato perché inferiore produce solo una
-riga di log, e un file che non è un video non viene registrato come release: se
-aMule lo tiene in coda arriva la semplice notifica "manuale" di completamento,
-con aMule 3.x (che lo toglie subito) nessuna notifica.
+Le notifiche usano gli stessi eventi dei torrent: **Download avviato** quando è
+Gextto a scegliere un risultato (compreso il ripiego automatico eD2k),
+**Download completato** con titolo, percorso in libreria, dimensione, durata e
+velocità media (e la release sostituita quando ne ha rimpiazzata una peggiore),
+**Download fallito** quando un download eD2k automatico si ferma per i giorni
+configurati, **Errore torrent** quando l'import fallisce. Un file scartato
+perché inferiore produce solo una riga di log, e un file che non è un video non
+viene registrato come release: se aMule lo tiene in coda arriva la semplice
+notifica "manuale" di completamento, con aMule 3.x (che lo toglie subito)
+nessuna notifica.
 
 ### Banda
 

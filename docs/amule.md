@@ -173,14 +173,15 @@ episodes are always imported by **hardlink or copy** (never moved), so aMule
 keeps sharing the original from its incoming folder; a hardlink costs no extra
 space when both folders are on the same filesystem.
 
-Notifications use the same events as torrents: **Download complete** with the
-title, the library path, the size, the duration and the average speed (and the
-replaced release when it replaced a worse one), **Download failed** when an
-automatic eD2k download stalls for the configured days, **Torrent error** when
-the import fails. A file discarded as inferior produces only a log line, and a
-file that is not a video is never registered as a release: if aMule keeps it in
-its queue you get the plain "manual" completion notice, with aMule 3.x (which
-drops it at once) no notice at all.
+Notifications use the same events as torrents: **Download started** when Gextto
+itself picks a result (the automatic eD2k fallback included), **Download
+complete** with the title, the library path, the size, the duration and the
+average speed (and the replaced release when it replaced a worse one),
+**Download failed** when an automatic eD2k download stalls for the configured
+days, **Torrent error** when the import fails. A file discarded as inferior
+produces only a log line, and a file that is not a video is never registered as
+a release: if aMule keeps it in its queue you get the plain "manual" completion
+notice, with aMule 3.x (which drops it at once) no notice at all.
 
 ### Bandwidth
 
