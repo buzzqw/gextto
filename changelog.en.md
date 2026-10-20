@@ -40,6 +40,12 @@ manual is online: [English](docs/MANUAL.en.md) ·
   in quarantine. The old extto and gx-ed2k settings are deleted (aMule's
   address, port and password are kept). The manual explains how to run aMule in
   Docker and open the ports with UPnP.
+- **eD2k: a link aMule already has is still followed.** When aMule answers that
+  the file is already listed, or is slow to answer while it creates a large part
+  file, Gextto checks the queue and, if the file is there, registers it and
+  imports it into the library when it completes. With aMule on a network disk
+  set `AllocateFullFile=0` in `amule.conf`: preallocation blocks aMule for tens
+  of seconds.
 
 ## 19 October 2026
 

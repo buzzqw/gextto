@@ -73,6 +73,12 @@ aMule shares everything in it. With `network_mode: host` and `UPnPEnabled=1`
 aMule opens its eD2k/Kad ports on the router by UPnP (in bridge mode it would
 ask the router to forward to the container's address, which does not work).
 
+On a network disk set `AllocateFullFile=0`: preallocating a multi-GB part file
+blocks amuled (and its EC answers) for tens of seconds. Gextto copes with it:
+an add that times out, or that aMule refuses because the file is already
+listed, is checked against the download queue and counts as done when the file
+is there.
+
 For completed files to be imported, Gextto must see aMule's incoming folder
 (`IncomingDir`) at the same path, which is the case when both run on the same
 machine. Opening aMule's TCP and UDP ports on the router gives a High ID and a

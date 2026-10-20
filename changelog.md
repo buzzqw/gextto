@@ -42,6 +42,12 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   in quarantena. Le vecchie impostazioni di extto e di gx-ed2k vengono cancellate
   (indirizzo, porta e password di aMule restano). Il manuale spiega come usare
   aMule in Docker e come aprire le porte con l'UPnP.
+- **eD2k: un link già in aMule viene comunque seguito.** Se aMule risponde che
+  il file è già in lista, o è lento a rispondere mentre crea un file parziale
+  grande, Gextto controlla la coda e, se il file c'è, lo registra e lo importa
+  in libreria al completamento. Con aMule su un disco di rete conviene
+  `AllocateFullFile=0` in `amule.conf`: la preallocazione blocca aMule per
+  decine di secondi.
 
 ## 19 ottobre 2026
 

@@ -404,3 +404,23 @@ func TestAddNonVideoEd2kLinkIsNotRegistered(t *testing.T) {
 		t.Fatalf("a non-video link was registered: %v", pending)
 	}
 }
+
+// TestAddEd2kLinkAlreadyQueuedIsAccepted: aMule refuses a link it already
+// has, yet the file is in its queue, so the add (and the registration that
+// follows) goes ahead.
+func TestAddEd2kLinkAlreadyQueuedIsAccepted(t *testing.T) {
+	core, cfg := ed2kTestCore(t, nil)
+	const link = "ed2k://|file|Rare%20Show%20S02E03.mkv|900000000|ffffffffffffffffffffffffffffffff|/"
+	if err := AddEd2kLink(cfg, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddEd2kLink(cfg, link); err != nil {
+		t.Fatalf("a link already in aMule's queue must be accepted: %v", err)
+	}
+	if len(core.Downloads()) != 1 {
+		t.Fatalf("queue = %+v", core.Downloads())
+	}
+	if err := AddEd2kLink(cfg, "ed2k://|file|other.mkv|10|eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee|/"); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -41,15 +41,51 @@ func Ed2kDownloads(cfg *Config) []amule.Download {
 	return downloads
 }
 
-// AddEd2kLink queues one ed2k:// file link in aMule.
+// AddEd2kLink queues one ed2k:// file link in aMule. A refusal or a timeout
+// is checked against aMule's queue: aMule refuses a file it already has, and
+// it can stall for a while when it creates a large part file, yet in both
+// cases the file is queued and the add has done its job.
 func AddEd2kLink(cfg *Config, link string) error {
 	parsed, err := ed2k.ParseFileLink(link)
 	if err != nil {
 		return err
 	}
-	return ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	err = ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
 		return client.AddLink(ctx, parsed.String(), 0)
 	})
+	if err == nil {
+		return nil
+	}
+	if ed2kQueued(cfg, parsed.Hash) {
+		return nil
+	}
+	return err
+}
+
+// ed2kQueued reports whether aMule's download queue holds the file. It reads
+// the queue directly (with a longer wait) instead of through the fail-fast
+// backoff, which a timeout of the add itself may have just armed.
+func ed2kQueued(cfg *Config, hash string) bool {
+	client, err := ed2kClient(cfg)
+	if err != nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	downloads, err := client.Downloads(ctx)
+	if err != nil {
+		return false
+	}
+	ed2kState.mu.Lock()
+	ed2kState.failedAt = time.Time{}
+	ed2kState.mu.Unlock()
+	hash = strings.ToLower(hash)
+	for _, download := range downloads {
+		if download.Hash == hash {
+			return true
+		}
+	}
+	return false
 }
 
 // errEd2kNotQueued reports a remove of a file aMule no longer has in its
@@ -60,6 +96,9 @@ var errEd2kNotQueued = errors.New("the file is not in aMule's download queue")
 // filler. It reports false, nil when aMule already has the file, like a
 // torrent engine does for a duplicate.
 func addEd2kRelease(cfg *Config, release *models.Release) (bool, error) {
+	if link, err := ed2k.ParseFileLink(release.Ed2kLink); err == nil && ed2kQueued(cfg, link.Hash) {
+		return false, nil
+	}
 	if err := AddEd2kLink(cfg, release.Ed2kLink); err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "already") {
 			return false, nil
