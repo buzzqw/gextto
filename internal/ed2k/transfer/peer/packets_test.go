@@ -49,6 +49,43 @@ func TestHashsetPackets(t *testing.T) {
 	}
 }
 
+func TestAICHMasterPackets(t *testing.T) {
+	hash := testHash(t, "0123456789abcdef0123456789abcdef")
+	request, err := DecodeAICHFileHashRequest(EncodeAICHFileHashRequest(hash))
+	if err != nil || request != hash {
+		t.Fatalf("AICH request = %+v, %v", request, err)
+	}
+	want := AICHMasterHash{Hash: hash}
+	want.Root[0], want.Root[19] = 1, 2
+	got, err := DecodeAICHFileHashAnswer(EncodeAICHFileHashAnswer(want))
+	if err != nil || got != want {
+		t.Fatalf("AICH answer = %+v, %v", got, err)
+	}
+	if _, err := DecodeAICHFileHashAnswer([]byte{1}); err == nil {
+		t.Fatal("short AICH answer must fail")
+	}
+}
+
+func TestAICHRecoveryPackets(t *testing.T) {
+	hash := testHash(t, "0123456789abcdef0123456789abcdef")
+	root := [20]byte{1, 2, 3}
+	request := AICHRequest{Hash: hash, Part: 7, Root: root}
+	gotRequest, err := DecodeAICHRequest(EncodeAICHRequest(request))
+	if err != nil || gotRequest != request {
+		t.Fatalf("AICH request = %+v, %v", gotRequest, err)
+	}
+	answer := AICHAnswer{Hash: hash, Part: 7, Root: root, Data: []byte("recovery")}
+	raw := EncodeAICHAnswer(answer)
+	gotAnswer, err := DecodeAICHAnswer(raw)
+	if err != nil || gotAnswer.Hash != hash || gotAnswer.Part != 7 || gotAnswer.Root != root ||
+		!bytes.Equal(gotAnswer.Data, answer.Data) {
+		t.Fatalf("AICH answer = %+v, %v", gotAnswer, err)
+	}
+	if _, err := DecodeAICHAnswer(raw[:10]); err == nil {
+		t.Fatal("short AICH answer must fail")
+	}
+}
+
 func TestPartPackets(t *testing.T) {
 	hash := testHash(t, "0123456789abcdef0123456789abcdef")
 	request := PartRequest{Hash: hash, Starts: [3]uint32{0, 100, 200}, Ends: [3]uint32{100, 200, 300}}

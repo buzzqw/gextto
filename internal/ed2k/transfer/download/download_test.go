@@ -76,6 +76,7 @@ func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.
 		return err
 	}
 
+	aichTree, _ := partfile.BuildAICHTreeReader(bytes.NewReader(data), int64(len(data)))
 	accepted := false
 	for {
 		opcode, payload, err := client.Receive()
@@ -93,6 +94,34 @@ func serveFakePeer(client *peer.Conn, data []byte, name string, hashes partfile.
 			}
 			raw := peer.EncodeFileNameAnswer(peer.FileNameAnswer{Hash: hashes.File, Name: name})
 			if err := client.Send(peer.OpFileNameAnswer, raw); err != nil {
+				return err
+			}
+		case peer.OpAICHRequest:
+			request, err := peer.DecodeAICHRequest(payload)
+			if err != nil || request.Hash != hashes.File || aichTree == nil {
+				return errors.New("fake peer: invalid AICH request")
+			}
+			recovery, err := aichTree.RecoveryData(int(request.Part))
+			if err != nil {
+				return err
+			}
+			raw := peer.EncodeAICHAnswer(peer.AICHAnswer{
+				Hash: hashes.File, Part: request.Part, Root: request.Root, Data: recovery,
+			})
+			if err := client.Send(peer.OpAICHAnswer, raw); err != nil {
+				return err
+			}
+		case peer.OpAICHFileHashReq:
+			request, err := peer.DecodeAICHFileHashRequest(payload)
+			if err != nil || request != hashes.File {
+				return errors.New("fake peer: invalid AICH hash request")
+			}
+			root, err := partfile.AICHRootReader(bytes.NewReader(data), int64(len(data)))
+			if err != nil {
+				return err
+			}
+			raw := peer.EncodeAICHFileHashAnswer(peer.AICHMasterHash{Hash: hashes.File, Root: [20]byte(root)})
+			if err := client.Send(peer.OpAICHFileHashAns, raw); err != nil {
 				return err
 			}
 		case peer.OpHashsetRequest:
@@ -281,6 +310,23 @@ func TestFetchRejectsCorruptPart(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("corrupt part accepted")
+	}
+}
+
+func TestFetchAICHRejectsCorruptBlocks(t *testing.T) {
+	data := testData(500_000)
+	hashes := testHashes(t, data)
+	peerServer := startFakePeer(t, data, "bad-aich.mkv", hashes, false, true)
+
+	_, err := Fetch(context.Background(), peerServer.listener.Addr().String(), Link{
+		Hash: hashes.File, Name: "bad-aich.mkv", Size: int64(len(data)),
+	}, Config{
+		TempDir: t.TempDir(), HandshakeTimeout: 5 * time.Second, IdleTimeout: 5 * time.Second,
+		MaxPartAttempts: 2,
+		OnAICH:          func([20]byte) {},
+	})
+	if err == nil {
+		t.Fatal("corrupt AICH blocks accepted")
 	}
 }
 

@@ -5,6 +5,7 @@ package download
 
 import (
 	"context"
+	"crypto/sha1"
 	"errors"
 	"fmt"
 	"math"
@@ -57,6 +58,8 @@ type Config struct {
 	Managed bool
 	// OnSources receives peers learned through source exchange.
 	OnSources func([]ed2k.PeerSource)
+	// OnAICH receives the AICH master hash advertised by a peer.
+	OnAICH func([20]byte)
 }
 
 func (c *Config) applyDefaults() {
@@ -143,6 +146,7 @@ type partDownload struct {
 	have     []bool
 	got      int
 	attempts int
+	bad      map[int]int
 }
 
 type session struct {
@@ -160,6 +164,10 @@ type session struct {
 
 	parts   map[int]*partDownload
 	pending map[blockKey]pendingBlock
+
+	aichRoot  *[20]byte
+	aichTree  *partfile.AICHTree
+	aichParts map[int][][20]byte
 }
 
 // Fetch downloads one file from one peer. If a matching .part/.part.met pair
@@ -246,6 +254,7 @@ func newSession(cfg Config, link Link, conn *peer.Conn, pf *partfile.PartFile, p
 	return &session{
 		cfg: cfg, link: link, conn: conn, pf: pf, partPath: partPath, name: link.Name,
 		parts: make(map[int]*partDownload), pending: make(map[blockKey]pendingBlock),
+		aichParts: make(map[int][][20]byte),
 	}
 }
 
@@ -298,6 +307,7 @@ func (s *session) run(ctx context.Context) error {
 	}
 	s.logf("download: upload slot granted by %s", s.conn.RemoteAddr())
 	s.requestSources(ctx)
+	s.requestAICH(ctx)
 	if s.pf == nil {
 		hashes, err := s.requestHashset(ctx)
 		if err != nil {
@@ -311,6 +321,7 @@ func (s *session) run(ctx context.Context) error {
 	if partfile.PartCount(s.link.Size) > 1 {
 		s.readPeerStatus(ctx)
 	}
+	s.loadAICH(ctx)
 	return s.download(ctx)
 }
 
@@ -384,6 +395,64 @@ func (s *session) setRequestFile(ctx context.Context) error {
 func (s *session) requestSources(ctx context.Context) {
 	if err := s.conn.Send(peer.OpRequestsSources, s.link.Hash[:]); err != nil {
 		return
+	}
+}
+
+func (s *session) requestAICH(ctx context.Context) {
+	_ = s.conn.Send(peer.OpAICHFileHashReq, peer.EncodeAICHFileHashRequest(s.link.Hash))
+}
+
+// loadAICH asks the peer for the recovery data of every part. If the peer
+// does not support AICH, the transfer continues with MD4 verification.
+func (s *session) loadAICH(ctx context.Context) {
+	if s.aichTree == nil || s.cfg.BlockSize != partfile.AICHBlockSize {
+		return
+	}
+	parts := partfile.PartCount(s.link.Size)
+	for part := 0; part < parts; part++ {
+		if s.cfg.PartFilter != nil && !s.cfg.PartFilter(part) {
+			continue
+		}
+		if partfile.PartLength(s.link.Size, part) <= partfile.AICHBlockSize {
+			continue
+		}
+		s.setDeadline(ctx, 5*time.Second)
+		request := peer.AICHRequest{Hash: s.link.Hash, Part: uint16(part), Root: *s.aichRoot}
+		if err := s.conn.Send(peer.OpAICHRequest, peer.EncodeAICHRequest(request)); err != nil {
+			s.aichTree = nil
+			return
+		}
+		if !s.waitAICH(ctx, part) {
+			s.aichTree = nil
+			return
+		}
+	}
+}
+
+func (s *session) waitAICH(ctx context.Context, part int) bool {
+	for {
+		s.setDeadline(ctx, 5*time.Second)
+		opcode, payload, err := s.conn.Receive()
+		if err != nil {
+			return false
+		}
+		if opcode == peer.OpAICHAnswer {
+			answer, err := peer.DecodeAICHAnswer(payload)
+			if err != nil || answer.Hash != s.link.Hash || int(answer.Part) != part ||
+				s.aichRoot == nil || answer.Root != *s.aichRoot {
+				return false
+			}
+			if err := s.aichTree.ReadRecoveryData(part, answer.Data); err != nil {
+				return false
+			}
+			return true
+		}
+		if handled, err := s.control(opcode, payload); handled {
+			if err != nil {
+				return false
+			}
+			continue
+		}
 	}
 }
 
@@ -484,6 +553,23 @@ func (s *session) control(opcode byte, payload []byte) (bool, error) {
 		return true, nil
 	case peer.OpCancelTransfer, peer.OpEndOfDownload:
 		return true, errors.New("download: peer cancelled the transfer")
+	case peer.OpAICHFileHashAns:
+		answer, err := peer.DecodeAICHFileHashAnswer(payload)
+		if err == nil && answer.Hash == s.link.Hash {
+			if s.aichRoot == nil {
+				root := answer.Root
+				s.aichRoot = &root
+				if tree, treeErr := partfile.NewAICHTree(s.link.Size, root); treeErr == nil {
+					s.aichTree = tree
+				}
+			} else if *s.aichRoot != answer.Root {
+				s.aichTree = nil
+			}
+			if s.cfg.OnAICH != nil {
+				s.cfg.OnAICH(answer.Root)
+			}
+		}
+		return true, nil
 	case peer.OpAnswersSources:
 		if s.cfg.OnSources == nil {
 			return true, nil
@@ -727,7 +813,7 @@ func (s *session) partState(part int) (*partDownload, error) {
 		return nil, fmt.Errorf("download: invalid part %d", part)
 	}
 	blocks := int((length + s.cfg.BlockSize - 1) / s.cfg.BlockSize)
-	state := &partDownload{data: make([]byte, length), have: make([]bool, blocks)}
+	state := &partDownload{data: make([]byte, length), have: make([]bool, blocks), bad: make(map[int]int)}
 	s.parts[part] = state
 	return state, nil
 }
@@ -815,6 +901,33 @@ func (s *session) completeBlock(part, block int, pending pendingBlock) error {
 	state.have[block] = true
 	state.got++
 	if state.got == len(state.have) {
+		if s.aichTree != nil {
+			if hashes, ok := s.aichPartHashes(part); ok {
+				bad := 0
+				for index := range state.have {
+					start, end := s.blockOffsets(part, index)
+					sum := sha1.Sum(state.data[start-partStart : end-partStart])
+					if [20]byte(sum) != hashes[index] {
+						state.have[index] = false
+						state.got--
+						bad++
+					}
+				}
+				if bad > 0 {
+					for index := range state.have {
+						if state.have[index] {
+							continue
+						}
+						state.bad[index]++
+						if state.bad[index] >= s.cfg.MaxPartAttempts {
+							return fmt.Errorf("download: AICH rejected block %d/%d too many times", part, index)
+						}
+					}
+					s.logf("download: AICH rejected %d block(s) in part %d", bad, part)
+					return nil
+				}
+			}
+		}
 		if err := s.pf.WritePart(part, state.data); err != nil {
 			state.attempts++
 			state.data = make([]byte, len(state.data))
@@ -826,6 +939,18 @@ func (s *session) completeBlock(part, block int, pending pendingBlock) error {
 		s.report()
 	}
 	return nil
+}
+
+func (s *session) aichPartHashes(part int) ([][20]byte, bool) {
+	if hashes, ok := s.aichParts[part]; ok {
+		return hashes, len(hashes) > 0
+	}
+	hashes, err := s.aichTree.PartHashes(part)
+	if err != nil {
+		return nil, false
+	}
+	s.aichParts[part] = hashes
+	return hashes, len(hashes) > 0
 }
 
 func (s *session) logf(format string, args ...any) {
@@ -861,6 +986,12 @@ func (s *session) finish(resumed bool) (*Result, error) {
 	if !ok {
 		return nil, errors.New("download: final MD4 does not match the link")
 	}
+	if s.aichRoot != nil {
+		root, err := partfile.AICHRootFile(s.partPath)
+		if err != nil || [20]byte(root) != *s.aichRoot {
+			return nil, errors.New("download: AICH master hash does not match")
+		}
+	}
 	name := SafeName(s.name)
 	if name == "" {
 		name = s.link.Hash.Hex()
@@ -881,7 +1012,7 @@ func (s *session) finish(resumed bool) (*Result, error) {
 
 // Finalize verifies the completed .part and moves it to its final name. The
 // manager calls it once all partitioned workers are done.
-func Finalize(partPath string, link Link, name string, cfg Config) (*Result, error) {
+func Finalize(partPath string, link Link, name string, cfg Config, aichRoot *[20]byte) (*Result, error) {
 	pf, err := partfile.Open(partPath)
 	if err != nil {
 		return nil, err
@@ -894,6 +1025,13 @@ func Finalize(partPath string, link Link, name string, cfg Config) (*Result, err
 	if !ok {
 		pf.Close()
 		return nil, errors.New("download: final MD4 does not match the link")
+	}
+	if aichRoot != nil {
+		root, err := partfile.AICHRootFile(partPath)
+		if err != nil || [20]byte(root) != *aichRoot {
+			pf.Close()
+			return nil, errors.New("download: AICH master hash does not match")
+		}
 	}
 	name = SafeName(name)
 	if name == "" {

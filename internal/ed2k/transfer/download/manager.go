@@ -96,6 +96,9 @@ type Manager struct {
 
 	addedMu sync.Mutex
 	added   map[string][]ed2k.PeerSource
+
+	aichMu sync.Mutex
+	aich   map[string][20]byte
 }
 
 // NewManager creates a manager. The context bounds every transfer.
@@ -118,6 +121,7 @@ func NewManager(ctx context.Context, cfg ManagerConfig, discover Discoverer) *Ma
 		transfers: make(map[string]*managedTransfer),
 		pending:   make(map[string]chan net.Conn),
 		added:     make(map[string][]ed2k.PeerSource),
+		aich:      make(map[string][20]byte),
 	}
 	manager.load()
 	return manager
@@ -345,6 +349,11 @@ func (m *Manager) workerConfig(id string) Config {
 			}
 		})
 	}
+	cfg.OnAICH = func(root [20]byte) {
+		m.aichMu.Lock()
+		m.aich[id] = root
+		m.aichMu.Unlock()
+	}
 	cfg.OnSources = func(list []ed2k.PeerSource) {
 		m.addedMu.Lock()
 		m.added[id] = append(m.added[id], list...)
@@ -385,7 +394,15 @@ func (m *Manager) seedMetadata(ctx context.Context, id string, link Link, source
 }
 
 func (m *Manager) complete(id string, link Link, partPath string) {
-	result, err := Finalize(partPath, link, link.Name, m.cfg.Fetch)
+	m.aichMu.Lock()
+	root, hasRoot := m.aich[id]
+	delete(m.aich, id)
+	m.aichMu.Unlock()
+	var aichRoot *[20]byte
+	if hasRoot {
+		aichRoot = &root
+	}
+	result, err := Finalize(partPath, link, link.Name, m.cfg.Fetch, aichRoot)
 	if err != nil {
 		m.fail(id, err)
 		return

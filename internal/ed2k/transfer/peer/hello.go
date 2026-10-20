@@ -232,7 +232,8 @@ func EncodeMuleInfo() []byte {
 func protocolFor(opcode byte) byte {
 	switch opcode {
 	case OpQueueRanking, OpCompressedPart, OpCompressedPartI64, OpSendingPartI64, OpRequestPartsI64,
-		OpRequestsSources, OpAnswersSources, OpRequestsSources2, OpAnswersSources2:
+		OpRequestsSources, OpAnswersSources, OpRequestsSources2, OpAnswersSources2,
+		OpAICHFileHashReq, OpAICHFileHashAns, OpAICHRequest, OpAICHAnswer:
 		return EmuleProtocol
 	}
 	return EdonkeyProtocol

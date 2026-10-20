@@ -14,7 +14,12 @@ writing it, rebuilds the bitmap on reopen and verifies the whole file before
 completion. It is not imported by `cmd/gx-ed2k`; the remaining peer protocol is still to
 do. The splitted 0xE1 metadata variant with the zero marker is read and written
 (the older non-zero marker is rejected). AICH is implemented as the eMule SHA-1
-block/part tree (`AICHRootReader`, `AICHRootFile`) with small-size tree tests. `internal/ed2k/transfer/peer` adds
+block/part tree (`AICHRootReader`, `AICHRootFile`, `AICHTree`): the download
+session asks for `OP_AICHFILEHASHREQ`, requests `OP_AICHREQUEST` recovery data
+per part, verifies every 180 KiB block before writing it, retries rejected
+blocks and checks the master hash again at completion. The upload server
+answers `OP_AICHFILEHASHREQ`/`OP_AICHREQUEST` from a lazily built tree.
+`internal/ed2k/transfer/peer` adds
 the 0xC5 TCP framing, the hello exchange and the file/hashset/part packet
 codecs (round-trip and malformed-packet tests), plus a framed `Conn` with a
 bounded payload (16 MiB, one compressed part) and a deadline-aware hello
@@ -63,7 +68,7 @@ In scope:
 - eD2k server login and source discovery (the login/search part already exists);
 - client-to-client protocol: hello, file request, hashset, part requests,
   compressed parts, queue, source exchange;
-- `.part` and `.part.met` storage, block MD4, AICH, resume and verification;
+- `.part` and `.part.met` storage, block MD4, AICH master/recovery, resume and verification;
 - a download manager (sources, retries, timeouts, bans, per-file queue);
 - minimal upload and credits so peers do not penalise or ban us;
 - LowID callback and the buddy path needed to download behind NAT;
@@ -127,8 +132,9 @@ manager.
   independent of the network.
 - **Hashing**: MD4 over the whole file and over each 9,728,000-byte part; the
   ed2k link hash must match the finished file exactly. AICH (SHA-1 tree) is
-  verified per part when available; a part that fails is re-downloaded, not
-  trusted.
+  fetched as a master hash and per-part recovery data, verified block by block
+  before a part is written, and checked again at completion; a rejected block
+  is re-requested and a part that still fails is not trusted.
 - **Resume**: on start, verify the `.part` against the part hashes; a corrupt
   part is marked missing. Never rename/import a file before the full hash
   matches.

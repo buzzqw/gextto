@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
 )
 
@@ -86,6 +87,42 @@ func TestUploadServesFile(t *testing.T) {
 	hashset, err := peer.DecodeHashsetAnswer(payload)
 	if err != nil || hashset.Hash != file.Hash || len(hashset.Hashes) != 1 {
 		t.Fatalf("hashset = %+v, %v", hashset, err)
+	}
+
+	tree, err := partfile.BuildAICHTreeReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Send(peer.OpAICHFileHashReq, peer.EncodeAICHFileHashRequest(file.Hash)); err != nil {
+		t.Fatal(err)
+	}
+	opcode, payload, err = client.Receive()
+	if err != nil || opcode != peer.OpAICHFileHashAns {
+		t.Fatalf("AICH master: opcode=%#x err=%v", opcode, err)
+	}
+	master, err := peer.DecodeAICHFileHashAnswer(payload)
+	if err != nil || master.Hash != file.Hash || master.Root != [20]byte(tree.RootHash()) {
+		t.Fatalf("AICH master = %+v, %v", master, err)
+	}
+	if err := client.Send(peer.OpAICHRequest, peer.EncodeAICHRequest(peer.AICHRequest{
+		Hash: file.Hash, Part: 0, Root: [20]byte(tree.RootHash()),
+	})); err != nil {
+		t.Fatal(err)
+	}
+	opcode, payload, err = client.Receive()
+	if err != nil || opcode != peer.OpAICHAnswer {
+		t.Fatalf("AICH answer: opcode=%#x err=%v", opcode, err)
+	}
+	aichAnswer, err := peer.DecodeAICHAnswer(payload)
+	if err != nil || aichAnswer.Hash != file.Hash || aichAnswer.Part != 0 {
+		t.Fatalf("AICH answer = %+v, %v", aichAnswer, err)
+	}
+	recovered, err := partfile.NewAICHTree(int64(len(data)), [20]byte(tree.RootHash()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := recovered.ReadRecoveryData(0, aichAnswer.Data); err != nil {
+		t.Fatal(err)
 	}
 
 	if err := client.Send(peer.OpStartUploadReq, peer.EncodeFileRequest(peer.FileRequest{Hash: file.Hash})); err != nil {

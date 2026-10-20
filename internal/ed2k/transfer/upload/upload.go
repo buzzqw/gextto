@@ -29,6 +29,22 @@ type File struct {
 	Size  int64
 	Hash  ed2k.ID
 	Parts []ed2k.ID
+
+	aichMu   sync.Mutex
+	aichTree *partfile.AICHTree
+	aichErr  error
+	aichDone bool
+}
+
+func (f *File) aich() (*partfile.AICHTree, error) {
+	f.aichMu.Lock()
+	defer f.aichMu.Unlock()
+	if f.aichDone {
+		return f.aichTree, f.aichErr
+	}
+	f.aichDone = true
+	f.aichTree, f.aichErr = partfile.BuildAICHTreeFile(f.Path)
+	return f.aichTree, f.aichErr
 }
 
 // Server indexes completed files and answers client connections.
@@ -223,6 +239,46 @@ func (s *Server) Handle(conn net.Conn) {
 				return
 			}
 			if err := client.Send(peer.OpHashsetAnswer, raw); err != nil {
+				return
+			}
+		case peer.OpAICHFileHashReq:
+			hash, err := peer.DecodeAICHFileHashRequest(payload)
+			if err != nil {
+				return
+			}
+			file := s.lookup(hash)
+			if file == nil {
+				continue
+			}
+			tree, err := file.aich()
+			if err != nil {
+				continue
+			}
+			raw := peer.EncodeAICHFileHashAnswer(peer.AICHMasterHash{Hash: file.Hash, Root: [20]byte(tree.RootHash())})
+			if err := client.Send(peer.OpAICHFileHashAns, raw); err != nil {
+				return
+			}
+		case peer.OpAICHRequest:
+			request, err := peer.DecodeAICHRequest(payload)
+			if err != nil {
+				return
+			}
+			file := s.lookup(request.Hash)
+			if file == nil {
+				continue
+			}
+			tree, err := file.aich()
+			if err != nil || [20]byte(tree.RootHash()) != request.Root {
+				continue
+			}
+			recovery, err := tree.RecoveryData(int(request.Part))
+			if err != nil {
+				continue
+			}
+			raw := peer.EncodeAICHAnswer(peer.AICHAnswer{
+				Hash: file.Hash, Part: request.Part, Root: request.Root, Data: recovery,
+			})
+			if err := client.Send(peer.OpAICHAnswer, raw); err != nil {
 				return
 			}
 		case peer.OpStartUploadReq:

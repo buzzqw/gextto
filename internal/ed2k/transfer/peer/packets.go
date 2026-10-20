@@ -577,3 +577,104 @@ func DecodeAnswersSources(payload []byte) ([]SourceEntry, error) {
 	}
 	return out, nil
 }
+
+// AICH exchange.
+const (
+	OpAICHRequest     = 0x9B
+	OpAICHAnswer      = 0x9C
+	OpAICHFileHashReq = 0x9E
+	OpAICHFileHashAns = 0x9D
+)
+
+// AICHRequest asks a peer for the recovery data of one part.
+type AICHRequest struct {
+	Hash ed2k.ID
+	Part uint16
+	Root [20]byte
+}
+
+func EncodeAICHRequest(request AICHRequest) []byte {
+	out := make([]byte, 0, 38)
+	out = append(out, request.Hash[:]...)
+	var part [2]byte
+	binary.LittleEndian.PutUint16(part[:], request.Part)
+	out = append(out, part[:]...)
+	return append(out, request.Root[:]...)
+}
+
+func DecodeAICHRequest(payload []byte) (AICHRequest, error) {
+	var request AICHRequest
+	if len(payload) < 38 {
+		return request, errors.New("peer: short AICH request")
+	}
+	copy(request.Hash[:], payload[:16])
+	request.Part = binary.LittleEndian.Uint16(payload[16:])
+	copy(request.Root[:], payload[18:38])
+	return request, nil
+}
+
+// AICHAnswer carries the recovery data for one part.
+type AICHAnswer struct {
+	Hash ed2k.ID
+	Part uint16
+	Root [20]byte
+	Data []byte
+}
+
+func EncodeAICHAnswer(answer AICHAnswer) []byte {
+	out := make([]byte, 0, 38+len(answer.Data))
+	out = append(out, answer.Hash[:]...)
+	var part [2]byte
+	binary.LittleEndian.PutUint16(part[:], answer.Part)
+	out = append(out, part[:]...)
+	out = append(out, answer.Root[:]...)
+	return append(out, answer.Data...)
+}
+
+func DecodeAICHAnswer(payload []byte) (AICHAnswer, error) {
+	var answer AICHAnswer
+	if len(payload) < 38 {
+		return answer, errors.New("peer: short AICH answer")
+	}
+	copy(answer.Hash[:], payload[:16])
+	answer.Part = binary.LittleEndian.Uint16(payload[16:])
+	copy(answer.Root[:], payload[18:38])
+	answer.Data = append([]byte(nil), payload[38:]...)
+	return answer, nil
+}
+
+// AICHMasterHash is OP_AICHFILEHASHANS: the file hash and the 20-byte AICH
+// master hash. Part recovery data is a separate request.
+type AICHMasterHash struct {
+	Hash ed2k.ID
+	Root [20]byte
+}
+
+func EncodeAICHFileHashRequest(hash ed2k.ID) []byte {
+	return append([]byte(nil), hash[:]...)
+}
+
+func DecodeAICHFileHashRequest(payload []byte) (ed2k.ID, error) {
+	var hash ed2k.ID
+	if len(payload) < 16 {
+		return hash, errors.New("peer: short AICH hash request")
+	}
+	copy(hash[:], payload[:16])
+	return hash, nil
+}
+
+func DecodeAICHFileHashAnswer(payload []byte) (AICHMasterHash, error) {
+	var answer AICHMasterHash
+	if len(payload) < 36 {
+		return answer, errors.New("peer: short AICH hash answer")
+	}
+	copy(answer.Hash[:], payload[:16])
+	copy(answer.Root[:], payload[16:36])
+	return answer, nil
+}
+
+func EncodeAICHFileHashAnswer(answer AICHMasterHash) []byte {
+	out := make([]byte, 0, 36)
+	out = append(out, answer.Hash[:]...)
+	return append(out, answer.Root[:]...)
+}
