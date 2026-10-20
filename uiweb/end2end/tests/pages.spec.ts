@@ -421,6 +421,21 @@ test("il dettaglio torrent è un frame sopra lo storico, non un modale", async (
   await expect(page.locator(".modal.torrent-modal")).toHaveCount(0);
 });
 
+test("lo storico download lascia una colonna nome leggibile a ogni larghezza", async ({ page }) => {
+  // Between 701px and ~1000px the history table switches to a fixed layout: if
+  // the secondary columns are not folded early enough the name column keeps
+  // only a few pixels and wraps one character per line.
+  for (const width of [720, 800, 900, 1024]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/?view=downloads");
+    const name = page.locator("table.download-history-table thead th").first();
+    await expect(name).toBeVisible();
+    const box = await name.boundingBox();
+    expect(box, `history name column at ${width}px`).not.toBeNull();
+    expect(box!.width, `history name column at ${width}px`).toBeGreaterThan(150);
+  }
+});
+
 test("Salute affianca Motore torrent e Stato provider", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/?view=health");

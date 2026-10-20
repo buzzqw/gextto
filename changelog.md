@@ -12,6 +12,16 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 21 ottobre 2026
+
+- **Storico download: il nome del torrent resta leggibile.** Su schermi di
+  larghezza media (telefono tenuto di lato o finestra stretta) la colonna
+  **Nome** si riduceva a pochi pixel e il titolo andava a capo una lettera per
+  riga, perché la tabella teneva comunque visibili tag, punteggio e sorgente.
+  Ora quelle colonne si ritirano una alla volta man mano che lo spazio cala,
+  così il nome ha sempre una riga utile (il nome completo resta nel suggerimento
+  del passaggio del mouse). Su schermo largo nulla cambia.
+
 ## 20 ottobre 2026
 
 - **Dashboard: riepilogo nella barra in alto e nomi più leggibili.** **Spazio

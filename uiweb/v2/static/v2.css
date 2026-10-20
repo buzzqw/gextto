@@ -2044,13 +2044,29 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   .torrent-table th:nth-child(4) { width: 7rem; }
   .torrent-table th:last-child { width: 7.6rem; }
   .torrent-table td.row-actions { white-space: normal; }
-  .download-history-table th:nth-child(3), .download-history-table td:nth-child(3),
-  .download-history-table th:nth-child(4), .download-history-table td:nth-child(4),
+}
+/* Download history folds one column at a time. Each threshold is the sum of
+   the visible fixed columns plus room for the name (about 14em, enough for a
+   readable line with an ellipsis): dropping all three secondary columns at the
+   same 44em threshold left the name with ~3em between 44em and 56em, i.e. one
+   character per line on a phone held sideways. */
+@container (max-width: 45.5em) {
   .download-history-table th:nth-child(7), .download-history-table td:nth-child(7) { display: none; }
+}
+@container (max-width: 51em) {
+  .download-history-table th:nth-child(3), .download-history-table td:nth-child(3) { display: none; }
+}
+@container (max-width: 56em) {
+  .download-history-table th:nth-child(4), .download-history-table td:nth-child(4) { display: none; }
 }
 @container (max-width: 64em) {
   .download-history-table th:nth-child(2), .download-history-table td:nth-child(2) { display: none; }
 }
+/* An empty table renders one message row with colspan: under a fixed layout the
+   browser spreads that cell over every column and squeezes the name column, so
+   the header itself ends up unreadable. With no rows there is nothing to align:
+   fall back to the automatic layout until the history has entries. */
+.data-table.download-history-table:has(tbody > tr > td[colspan]) { table-layout: auto; }
 
 /* Archive: the action column grows with the text scale (four icon buttons)
    and a long source ends with an ellipsis instead of running over the score. */

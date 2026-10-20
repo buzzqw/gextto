@@ -11,6 +11,15 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
+## 21 October 2026
+
+- **Download history: the torrent name stays readable.** On medium-width
+  screens (a phone held sideways or a narrow window) the **Name** column shrank
+  to a few pixels and the title wrapped one letter per line, because the table
+  kept tag, score and source visible anyway. Those columns now fold one at a
+  time as the space shrinks, so the name always gets a useful line (the full
+  name stays in the hover tooltip). Nothing changes on a wide screen.
+
 ## 20 October 2026
 
 - **Dashboard: summary in the top bar and readable names.** **Free space** and
