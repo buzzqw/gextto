@@ -46,7 +46,7 @@ func (c *Client) Sources(ctx context.Context, hash string, size int64) ([]PeerSo
 
 	kad := <-kadCh
 	servers := <-serverCh
-	merged := mergeSources(kad.sources, servers.sources)
+	merged := c.filterSources(mergeSources(kad.sources, servers.sources))
 	c.mu.Lock()
 	if len(merged) > 0 {
 		c.results += int64(len(merged))
@@ -177,6 +177,9 @@ func (c *Client) sourcesFromOneServer(ctx context.Context, address string, hash 
 			return nil, fmt.Errorf("%s: %w", address, resolveErr)
 		}
 		serverIP = resolved.IP
+	}
+	if c.cfg.IPFilter.Blocked(serverIP) {
+		return nil, fmt.Errorf("%s: blocked by the IP filter", address)
 	}
 	dialer := &net.Dialer{Timeout: 8 * time.Second}
 	conn, err := dialer.DialContext(ctx, "tcp", address)

@@ -17,6 +17,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/ed2k/ipfilter"
 )
 
 // Config configures the search client.
@@ -60,6 +62,10 @@ type Config struct {
 	// UserHash is the eMule client identity used for server login and peer
 	// credits. Zero loads (or creates) it in DataDir.
 	UserHash ID
+	// IPFilter blocks ranges from an ipfilter.dat. Nil allows everything.
+	// It is applied to Kad contacts, server connections and discovered
+	// sources; incoming client connections are checked by the caller.
+	IPFilter *ipfilter.Filter
 }
 
 func (c *Config) applyDefaults() {
@@ -105,13 +111,15 @@ type Stats struct {
 	LastQueryName string `json:"last_query,omitempty"`
 	// ServerID is the client ID the last eD2k server assigned: a value below
 	// 0x01000000 is a LowID, i.e. the server could not call us back.
-	ServerID     uint32     `json:"server_id,omitempty"`
-	ServerIDSet  bool       `json:"server_id_known"`
-	LowID        bool       `json:"low_id"`
-	PeerPackets  int64      `json:"peer_packets"`
-	Reachability string     `json:"reachability"`
-	ReachDetail  string     `json:"reachability_detail,omitempty"`
-	UPnP         UPnPResult `json:"upnp"`
+	ServerID    uint32 `json:"server_id,omitempty"`
+	ServerIDSet bool   `json:"server_id_known"`
+	LowID       bool   `json:"low_id"`
+	// IPFilterRanges is how many merged ranges the ipfilter.dat blocks.
+	IPFilterRanges int        `json:"ipfilter_ranges"`
+	PeerPackets    int64      `json:"peer_packets"`
+	Reachability   string     `json:"reachability"`
+	ReachDetail    string     `json:"reachability_detail,omitempty"`
+	UPnP           UPnPResult `json:"upnp"`
 }
 
 // Client is a Kad search node plus an eD2k server search client.
@@ -180,7 +188,7 @@ func New(cfg Config) (*Client, error) {
 		cfg:           cfg,
 		self:          self,
 		userHashValue: loadOrCreateUserID(cfg.DataDir, cfg.UserHash),
-		table:         newRoutingTable(cfg.MaxContacts),
+		table:         newRoutingTable(cfg.MaxContacts, cfg.IPFilter),
 		pending:       map[ID]chan []Contact{},
 		searches:      map[ID][]*collector{},
 		closeCh:       make(chan struct{}),
@@ -345,13 +353,14 @@ func (c *Client) UDPPort() int {
 func (c *Client) Stats() Stats {
 	c.mu.Lock()
 	stats := Stats{
-		Nodes:         c.table.len(),
-		Bootstrapped:  c.bootstrapped,
-		Servers:       len(c.servers),
-		Queries:       c.queries,
-		Results:       c.results,
-		LastError:     c.lastErr,
-		LastQueryName: c.lastQueryName,
+		Nodes:          c.table.len(),
+		Bootstrapped:   c.bootstrapped,
+		Servers:        len(c.servers),
+		Queries:        c.queries,
+		Results:        c.results,
+		LastError:      c.lastErr,
+		LastQueryName:  c.lastQueryName,
+		IPFilterRanges: c.cfg.IPFilter.Len(),
 	}
 	if !c.lastQueryAt.IsZero() {
 		stats.LastQueryAt = c.lastQueryAt.UTC().Format(time.RFC3339)

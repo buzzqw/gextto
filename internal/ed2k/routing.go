@@ -3,6 +3,8 @@ package ed2k
 import (
 	"sort"
 	"sync"
+
+	"github.com/buzzqw/gextto/internal/ed2k/ipfilter"
 )
 
 // routingTable is the Kad contact set. Kad uses 128 k-buckets; for a search
@@ -14,13 +16,14 @@ type routingTable struct {
 	mu       sync.RWMutex
 	contacts map[ID]Contact
 	limit    int
+	blocked  *ipfilter.Filter
 }
 
-func newRoutingTable(limit int) *routingTable {
+func newRoutingTable(limit int, blocked *ipfilter.Filter) *routingTable {
 	if limit <= 0 {
 		limit = 256
 	}
-	return &routingTable{contacts: map[ID]Contact{}, limit: limit}
+	return &routingTable{contacts: map[ID]Contact{}, limit: limit, blocked: blocked}
 }
 
 // add inserts or refreshes a contact. Contacts with an invalid address or an
@@ -28,6 +31,9 @@ func newRoutingTable(limit int) *routingTable {
 // farthest from our own ID is evicted.
 func (t *routingTable) add(contact Contact, self ID) bool {
 	if !contact.valid() || contact.ID == self {
+		return false
+	}
+	if t.blocked.Blocked(contact.IP) {
 		return false
 	}
 	t.mu.Lock()

@@ -34,6 +34,14 @@ receives progress/completion events like it does for torrents.
   - login (`OP_LOGINREQUEST`), `OP_IDCHANGE`/`OP_SERVERIDENT`;
   - keyword search (`OP_SEARCHREQUEST`) and `OP_SEARCHRESULT` parsing;
   - results merged with Kad by MD4 hash, higher source count wins.
+- **IP filter**: `-ipfilter <file>` (or `GX_ED2K_IPFILTER`) reads an
+  eMule/aMule `ipfilter.dat`. Blocked ranges are dropped from Kad contacts,
+  from server connections, from Kad/server source lists and from source
+  exchange, and incoming client connections from them are closed. Levels from
+  128 up are allow rules, as in eMule. `/api/v1/health` reports
+  `ipfilter_ranges`. In managed mode Gextto passes its own
+  `<data>/ipfilter.dat` when the file exists, so both engines block the same
+  ranges; the daemon reads it at start.
 - **Daemon**:
   - managed/standalone modes, token authentication, standalone Host/Origin
     guards;
@@ -45,8 +53,6 @@ receives progress/completion events like it does for torrents.
 
 ## What is deliberately not implemented
 
-- secure identification with eD2k servers (server credits); the
-  client-to-client RSA handshake is implemented;
 - full LowID↔LowID data relay through a third client;
 - file publishing (`PUBLISH_*`) and the full `known.met` shared-file manager;
 - per-file bandwidth limits and priorities.

@@ -115,6 +115,9 @@ func (c *Client) loadServers(ctx context.Context) []string {
 }
 
 func (c *Client) searchOneServer(ctx context.Context, address, keyword string) ([]SearchFile, error) {
+	if c.serverBlocked(ctx, address) {
+		return nil, fmt.Errorf("%s: blocked by the IP filter", address)
+	}
 	dialer := &net.Dialer{Timeout: 8 * time.Second}
 	conn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
@@ -182,6 +185,34 @@ func (c *Client) searchOneServer(ctx context.Context, address, keyword string) (
 		files[index].Origin = "server"
 	}
 	return files, nil
+}
+
+// serverBlocked reports whether address resolves to a range the IP filter
+// blocks. A resolution failure is left to the dialer, which reports it with
+// the usual connection error.
+func (c *Client) serverBlocked(ctx context.Context, address string) bool {
+	if c.cfg.IPFilter == nil {
+		return false
+	}
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		host = address
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return c.cfg.IPFilter.Blocked(ip)
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	ips, err := net.DefaultResolver.LookupIPAddr(lookupCtx, host)
+	if err != nil {
+		return false
+	}
+	for _, entry := range ips {
+		if c.cfg.IPFilter.Blocked(entry.IP) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Client) serverLogin(conn net.Conn) error {

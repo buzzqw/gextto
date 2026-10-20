@@ -199,3 +199,24 @@ func sourceFromTags(userHash ID, tags []Tag) (PeerSource, bool) {
 	}
 	return source, true
 }
+
+// filterSources drops peers in blocked ranges. A blocked buddy is forgotten so
+// the manager does not send a callback through it.
+func (c *Client) filterSources(sources []PeerSource) []PeerSource {
+	if c.cfg.IPFilter == nil {
+		return sources
+	}
+	out := sources[:0]
+	for _, source := range sources {
+		if c.cfg.IPFilter.Blocked(source.IP) {
+			continue
+		}
+		if c.cfg.IPFilter.Blocked(source.BuddyIP) {
+			source.BuddyIP = nil
+			source.BuddyID = ID{}
+			source.BuddyPort = 0
+		}
+		out = append(out, source)
+	}
+	return out
+}

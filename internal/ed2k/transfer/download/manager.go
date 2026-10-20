@@ -356,6 +356,15 @@ func (m *Manager) workerConfig(id string) Config {
 		m.aichMu.Unlock()
 	}
 	cfg.OnSources = func(list []ed2k.PeerSource) {
+		if filter := m.cfg.Fetch.IPFilter; filter != nil {
+			kept := list[:0]
+			for _, source := range list {
+				if !filter.Blocked(source.IP) {
+					kept = append(kept, source)
+				}
+			}
+			list = kept
+		}
 		m.addedMu.Lock()
 		m.added[id] = append(m.added[id], list...)
 		m.addedMu.Unlock()
@@ -364,6 +373,9 @@ func (m *Manager) workerConfig(id string) Config {
 }
 
 func (m *Manager) fetchWorker(ctx context.Context, source ed2k.PeerSource, link Link, cfg Config) (*Result, error) {
+	if m.cfg.Fetch.IPFilter.Blocked(source.IP) {
+		return nil, errors.New("download: source blocked by the IP filter")
+	}
 	cfg.PeerHash = source.UserHash
 	if source.Encryption&0x01 != 0 && source.UserHash != (ed2k.ID{}) {
 		cfg.Obfuscation = true

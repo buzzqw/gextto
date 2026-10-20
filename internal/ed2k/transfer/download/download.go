@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/ipfilter"
 	"github.com/buzzqw/gextto/internal/ed2k/secident"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
@@ -50,6 +51,9 @@ type Config struct {
 	// identification handshake. Nil disables the handshake and its
 	// advertisement in the hello options.
 	SecIdent *secident.Key
+	// IPFilter blocks peers learned through source exchange. Sources from
+	// Kad and servers are already filtered by ed2k.Client. Nil allows all.
+	IPFilter *ipfilter.Filter
 	// OnProgress is called when a part is completed and when the transfer
 	// starts, so a manager can expose a progress percentage.
 	OnProgress func(done, total int64)

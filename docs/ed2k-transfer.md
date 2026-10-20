@@ -81,8 +81,6 @@ In scope:
 
 Out of scope for the first usable version:
 
-- secure identification with eD2k servers (server credits); the
-  client-to-client RSA handshake is implemented;
 - preview/streaming, shared-file publishing beyond what upload requires;
 - a second UI: the transfer state appears in Gextto's existing download list.
 
@@ -183,11 +181,15 @@ note.
   hello options and answers `OP_SECIDENTSTATE` with `OP_PUBLICKEY` and
   `OP_SIGNATURE`. The signature covers the peer key and the challenge the peer
   sent, so it cannot be replayed to another client. Downloads and uploads are
-  fully symmetric. Identification with eD2k servers (`0x97`) is still missing,
-  so server-side credits are not earned.
+  fully symmetric. The protocol has no server-side RSA handshake: server
+  credits are tied to the user hash, as in eMule and aMule.
 - **Credits**: implement the eMule credit identity and upload accounting at
   least well enough not to be treated as a leech; the exact formula is in the
   eMule source.
+- **IP filter**: `-ipfilter` reads the eMule/aMule `ipfilter.dat` and applies
+  it to Kad contacts, server connections, discovered sources, source exchange
+  and incoming client connections. Ranges with level 128 or more are allow
+  rules. IPv6 peers are not filtered.
 
 ## 6. Download state machine
 

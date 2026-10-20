@@ -28,6 +28,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/ipfilter"
 	"github.com/buzzqw/gextto/internal/ed2k/secident"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/download"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
@@ -82,6 +83,7 @@ func main() {
 	downloadEnabled := flag.Bool("download", envBool("GX_ED2K_DOWNLOAD", false), "enable the eD2k transfer plane")
 	downloadDir := flag.String("download-dir", envOr("GX_ED2K_DOWNLOAD_DIR", ""), "directory for .part files and completed downloads")
 	shareDirs := flag.String("share-dir", envOr("GX_ED2K_SHARE_DIR", ""), "comma-separated extra directories to share")
+	ipFilterPath := flag.String("ipfilter", envOr("GX_ED2K_IPFILTER", ""), "eMule ipfilter.dat blocking peers, servers and Kad contacts")
 	lang := flag.String("lang", messages.Language(), "UI language (it, en, de, fr, es, pl)")
 	fingerprint := flag.String("fingerprint", "", "configuration fingerprint (managed mode)")
 	logFile := flag.String("log-file", "", "write the log to this file instead of stderr")
@@ -141,6 +143,15 @@ func main() {
 	}
 
 	userHash := loadOrCreateUserHash(*dataDir)
+	var ipFilter *ipfilter.Filter
+	if *ipFilterPath != "" {
+		filter, err := ipfilter.Load(*ipFilterPath)
+		if err != nil {
+			log.Fatalf("gx-ed2k: %v", err)
+		}
+		ipFilter = filter
+		log.Printf("gx-ed2k: IP filter loaded from %s (%d ranges)", *ipFilterPath, filter.Len())
+	}
 	secureIdent, err := secident.LoadOrCreate(filepath.Join(*dataDir, "cryptkey.pem"))
 	if err != nil {
 		// Downloads and uploads still work without an identity; peers just
@@ -170,6 +181,10 @@ func main() {
 	}
 	var manager *download.Manager
 	clientHandler := func(conn net.Conn) {
+		if tcp, ok := conn.RemoteAddr().(*net.TCPAddr); ok && ipFilter.Blocked(tcp.IP) {
+			_ = conn.Close()
+			return
+		}
 		wrapped, err := peer.AcceptObfuscated(conn, userHash)
 		if err != nil {
 			_ = conn.Close()
@@ -197,6 +212,7 @@ func main() {
 		UPnP:          *upnp,
 		ClientHandler: clientHandler,
 		UserHash:      userHash,
+		IPFilter:      ipFilter,
 	})
 	if err != nil {
 		log.Fatalf("gx-ed2k: %v", err)
@@ -220,6 +236,7 @@ func main() {
 				TCPPort:    uint16(*tcpPort),
 				UserHash:   userHash,
 				SecIdent:   secureIdent,
+				IPFilter:   ipFilter,
 				Logf:       log.Printf,
 			},
 			StatePath: filepath.Join(*dataDir, "transfers.json"),

@@ -77,6 +77,17 @@ func ed2kListenFromURL(rawURL string) (string, bool) {
 
 // ensureEd2kDaemon makes the provider usable when it can: disabled is a no-op,
 // an external daemon is left alone, and a managed one is started if missing.
+// ed2kIPFilterArg passes Gextto's ipfilter.dat to the managed daemon when the
+// file exists, so Gextto and gx-ed2k block the same ranges. The daemon reads
+// the file at start, like the engine does.
+func ed2kIPFilterArg(dataDir string) string {
+	path := filepath.Join(dataDir, "ipfilter.dat")
+	if info, err := os.Stat(path); err == nil && !info.IsDir() {
+		return path
+	}
+	return ""
+}
+
 func ensureEd2kDaemon(cfg *Config) {
 	if cfg == nil || !ed2kEnabled(cfg) {
 		ed2kDesired.Store(false)
@@ -111,9 +122,8 @@ func ensureEd2kDaemon(cfg *Config) {
 		"-log-file", filepath.Join(ownedData, "gx-ed2k.log"),
 		"-lang", messages.Language(),
 		// The transfer plane is enabled together with the provider. Upload,
-		// credits and LowID callback are still missing, so a peer may keep a
-		// transfer queued, but the search-only contract would make the manual
-		// add path unreachable.
+		// credits, LowID callbacks and secure identification are implemented;
+		// file publishing and LowID↔LowID relay are still missing.
 		"-download",
 		"-download-dir", filepath.Join(ownedData, "incoming"),
 	}
@@ -125,6 +135,9 @@ func ensureEd2kDaemon(cfg *Config) {
 	}
 	if servers := strings.TrimSpace(cfg.Settings["ed2k_servers"]); servers != "" {
 		args = append(args, "-servers", servers)
+	}
+	if filter := ed2kIPFilterArg(cfg.DataDir); filter != "" {
+		args = append(args, "-ipfilter", filter)
 	}
 	fingerprint, err := gxFingerprint(binary, args, settings.Token, "")
 	if err != nil {

@@ -59,6 +59,9 @@ func (c *Client) SendServerCallback(ctx context.Context, source PeerSource) erro
 		return errors.New("ed2k: source has no server for the callback")
 	}
 	address := net.JoinHostPort(source.ServerIP.String(), strconv.Itoa(int(source.ServerPort)))
+	if c.serverBlocked(ctx, address) {
+		return fmt.Errorf("ed2k: callback server %s blocked by the IP filter", address)
+	}
 	dialer := &net.Dialer{Timeout: 8 * time.Second}
 	conn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {

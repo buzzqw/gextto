@@ -585,7 +585,7 @@ a native `/api/v1`. When `ed2k_token` is set, every `/api/v1` call must send
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/health` | health, version, Kad id/UDP port, `download: false`, `search: true`, `reachability` (open/limited/unknown), `low_id` and the UPnP mapping state |
+| GET | `/api/v1/health` | health, version, Kad id/UDP port, `download: false`, `search: true`, `reachability` (open/limited/unknown), `low_id`, the UPnP mapping state and `ipfilter_ranges` |
 | GET | `/api/v1/status` | counters (nodes, queries, results), capabilities and last error |
 | GET | `/api/v1/search?q=…&timeout_ms=…` | keyword search on Kad and the eD2k servers; results carry `name`, `size_bytes`, `hash`, `link`, `sources`, `origin` |
 | POST | `/api/v1/link` | validate a JSON `{"link":"ed2k://…"}` file or server link; returns the parsed identity |
@@ -604,5 +604,5 @@ a native `/api/v1`. When `ed2k_token` is set, every `/api/v1` call must send
 before offering to queue an eD2k result. With the transfer plane enabled the
 daemon accepts `ed2k://` links on `/api/v1/transfers`, downloads them in
 `-download-dir` (default `<data>/incoming`) and reports progress there. Upload,
-credits, LowID callback and obfuscation are not implemented yet, so a real peer
-may keep the transfer queued.
+credits, LowID callbacks, obfuscation and client-to-client secure identification
+are implemented; file publishing and LowID↔LowID relay are not.
