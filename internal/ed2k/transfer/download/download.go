@@ -60,6 +60,10 @@ type Config struct {
 	OnSources func([]ed2k.PeerSource)
 	// OnAICH receives the AICH master hash advertised by a peer.
 	OnAICH func([20]byte)
+	// Obfuscation wraps outgoing connections in the eMule RC4 crypt layer.
+	// PeerHash is the remote user hash needed to derive the keys.
+	Obfuscation bool
+	PeerHash    ed2k.ID
 }
 
 func (c *Config) applyDefaults() {
@@ -193,6 +197,17 @@ func Fetch(ctx context.Context, address string, link Link, cfg Config) (*Result,
 		}
 		return nil, fmt.Errorf("download: dial %s: %w", address, err)
 	}
+	if cfg.Obfuscation && cfg.PeerHash != (ed2k.ID{}) {
+		obfuscated, cryptErr := peer.NewOutgoingObfuscated(ctx, conn, cfg.PeerHash)
+		if cryptErr != nil {
+			_ = conn.Close()
+			if pf != nil {
+				pf.Close()
+			}
+			return nil, fmt.Errorf("download: obfuscation: %w", cryptErr)
+		}
+		conn = obfuscated
+	}
 	s := newSession(cfg, link, peer.NewConn(conn), pf, partPath)
 	return runSession(ctx, s, resumed)
 }
@@ -209,7 +224,15 @@ func FetchCallback(ctx context.Context, conn net.Conn, link Link, cfg Config) (*
 	if err != nil {
 		return nil, err
 	}
-	client := peer.NewConn(conn)
+	wrapped, err := peer.AcceptObfuscated(conn, cfg.UserHash)
+	if err != nil {
+		if pf != nil {
+			pf.Close()
+		}
+		_ = conn.Close()
+		return nil, fmt.Errorf("download: callback obfuscation: %w", err)
+	}
+	client := peer.NewConn(wrapped)
 	if cfg.Logf != nil {
 		cfg.Logf("download: incoming callback from %s for %q", conn.RemoteAddr(), link.Name)
 	}

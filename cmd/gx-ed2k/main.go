@@ -27,6 +27,7 @@ import (
 	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/download"
+	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/upload"
 	"github.com/buzzqw/gextto/internal/messages"
 )
@@ -158,6 +159,12 @@ func main() {
 	}
 	var manager *download.Manager
 	clientHandler := func(conn net.Conn) {
+		wrapped, err := peer.AcceptObfuscated(conn, userHash)
+		if err != nil {
+			_ = conn.Close()
+			return
+		}
+		conn = wrapped
 		if manager != nil && manager.WantsIncoming(conn) {
 			manager.HandleIncoming(conn)
 			return

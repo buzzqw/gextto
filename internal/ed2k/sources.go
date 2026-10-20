@@ -23,7 +23,15 @@ type PeerSource struct {
 	BuddyID    ID
 	BuddyIP    net.IP
 	BuddyPort  uint16
-	Origin     string // "server" or "kad"
+	Origin     string // "server", "server-lowid", "kad" or "exchange"
+
+	// LowID sources are identified by the eD2k server client ID instead of
+	// an IP/TCP endpoint. ServerIP/ServerPort identify the server that can
+	// relay a callback to that ID.
+	LowID      bool
+	ClientID   uint32
+	ServerIP   net.IP
+	ServerPort uint16
 }
 
 // encodeGetSources builds OP_GETSOURCES. Modern servers want the file size
@@ -47,6 +55,14 @@ func encodeGetSources(hash ID, size int64) []byte {
 // decodeFoundSources parses OP_FOUNDSOURCES: file hash, one-byte count, then
 // count pairs of IPv4 (network order) and TCP port (little-endian).
 func decodeFoundSources(payload []byte) (ID, []PeerSource, error) {
+	return decodeFoundSourcesFromServer(payload, nil, 0)
+}
+
+// decodeFoundSourcesFromServer parses OP_FOUNDSOURCES. An entry whose numeric
+// user ID is below 0x01000000 is a LowID: the server can call that client back
+// but it has no reachable IP/TCP endpoint. HighID entries keep the usual
+// network-order IPv4 representation.
+func decodeFoundSourcesFromServer(payload []byte, serverIP net.IP, serverPort uint16) (ID, []PeerSource, error) {
 	var hash ID
 	if len(payload) < 17 {
 		return hash, nil, ErrTruncatedPacket
@@ -59,13 +75,26 @@ func decodeFoundSources(payload []byte) (ID, []PeerSource, error) {
 	sources := make([]PeerSource, 0, count)
 	offset := 17
 	for i := 0; i < count; i++ {
-		ip := net.IPv4(payload[offset], payload[offset+1], payload[offset+2], payload[offset+3])
+		raw := payload[offset : offset+4]
 		port := binary.LittleEndian.Uint16(payload[offset+4:])
 		offset += 6
+		userID := binary.LittleEndian.Uint32(raw)
+		if userID != 0 && userID < 0x01000000 {
+			sources = append(sources, PeerSource{
+				LowID: true, ClientID: userID, TCPPort: 0,
+				ServerIP: serverIP, ServerPort: serverPort,
+				Origin: "server-lowid",
+			})
+			continue
+		}
 		if port == 0 {
 			continue
 		}
-		sources = append(sources, PeerSource{IP: ip, TCPPort: port, Origin: "server"})
+		ip := net.IPv4(raw[0], raw[1], raw[2], raw[3])
+		sources = append(sources, PeerSource{
+			IP: ip, TCPPort: port, ServerIP: serverIP, ServerPort: serverPort,
+			Origin: "server",
+		})
 	}
 	return hash, sources, nil
 }

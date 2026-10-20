@@ -45,6 +45,39 @@ func startFakePeer(t *testing.T, data []byte, name string, hashes partfile.Hashe
 	return fake
 }
 
+func startObfuscatedFakePeer(t *testing.T, data []byte, name string, hashes partfile.Hashes) *fakePeer {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &fakePeer{listener: listener, errs: make(chan error, 1), done: make(chan struct{})}
+	t.Cleanup(func() { listener.Close() })
+	peerHash := hashes.File
+	peerHash[0] ^= 0xFF
+	if peerHash == (ed2k.ID{}) {
+		peerHash[0] = 1
+	}
+	go func() {
+		defer close(fake.done)
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		wrapped, err := peer.AcceptObfuscated(conn, peerHash)
+		if err != nil {
+			fake.errs <- err
+			return
+		}
+		client := peer.NewConn(wrapped)
+		if err := serveFakePeer(client, data, name, hashes, false, false); err != nil && !errors.Is(err, io.EOF) {
+			fake.errs <- err
+		}
+	}()
+	return fake
+}
+
 func (f *fakePeer) wait(t *testing.T) {
 	t.Helper()
 	select {
@@ -242,6 +275,33 @@ func TestFetchFromFakePeer(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, hashes.File.Hex()+".part.met")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("metadata not removed: %v", err)
+	}
+}
+
+func TestFetchObfuscated(t *testing.T) {
+	data := testData(300_000)
+	hashes := testHashes(t, data)
+	peerServer := startObfuscatedFakePeer(t, data, "obfuscated.mkv", hashes)
+	peerHash := hashes.File
+	peerHash[0] ^= 0xFF
+
+	dir := t.TempDir()
+	result, err := Fetch(context.Background(), peerServer.listener.Addr().String(), Link{
+		Hash: hashes.File, Name: "obfuscated.mkv", Size: int64(len(data)),
+	}, Config{
+		TempDir: dir, HandshakeTimeout: 5 * time.Second, IdleTimeout: 5 * time.Second,
+		Obfuscation: true, PeerHash: peerHash,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	peerServer.wait(t)
+	got, err := os.ReadFile(result.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, data) {
+		t.Fatal("obfuscated download differs")
 	}
 }
 

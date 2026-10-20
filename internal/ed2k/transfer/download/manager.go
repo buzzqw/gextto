@@ -26,6 +26,7 @@ type Discoverer interface {
 type Callbacker interface {
 	SendDirectCallback(ctx context.Context, source ed2k.PeerSource, ourPort uint16) error
 	SendBuddyCallback(ctx context.Context, source ed2k.PeerSource, fileHash ed2k.ID, ourPort uint16) error
+	SendServerCallback(ctx context.Context, source ed2k.PeerSource) error
 	CallbackIdentity() (ed2k.ID, uint16)
 	CanCallback() bool
 }
@@ -363,6 +364,10 @@ func (m *Manager) workerConfig(id string) Config {
 }
 
 func (m *Manager) fetchWorker(ctx context.Context, source ed2k.PeerSource, link Link, cfg Config) (*Result, error) {
+	cfg.PeerHash = source.UserHash
+	if source.Encryption&0x01 != 0 && source.UserHash != (ed2k.ID{}) {
+		cfg.Obfuscation = true
+	}
 	if source.TCPPort == 0 {
 		return m.fetchViaCallback(ctx, source, link, cfg)
 	}
@@ -426,12 +431,16 @@ func (m *Manager) fetchViaCallback(ctx context.Context, source ed2k.PeerSource, 
 	if !callback.CanCallback() {
 		return nil, errors.New("download: our TCP port is not reachable (LowID), callback skipped")
 	}
-	direct := source.UDPPort != 0
+	direct := source.UDPPort != 0 && source.IP != nil
 	buddy := source.BuddyID != (ed2k.ID{})
-	if !direct && !buddy {
-		return nil, errors.New("download: LowID source has no UDP port or buddy")
+	serverCallback := source.LowID && source.ClientID != 0 && source.ServerIP != nil && source.ServerPort != 0
+	if !direct && !buddy && !serverCallback {
+		return nil, errors.New("download: LowID source has no UDP port, buddy or server callback")
 	}
-	ip := source.IP.String()
+	ip := ""
+	if source.IP != nil {
+		ip = source.IP.String()
+	}
 	channel, done := m.expectCallback(ip)
 	defer done()
 	_, ourPort := callback.CallbackIdentity()
@@ -473,7 +482,23 @@ func (m *Manager) fetchViaCallback(ctx context.Context, source ed2k.PeerSource, 
 			cfg.Logf("download: buddy callback sent via %s:%d", source.BuddyIP, source.BuddyPort)
 		}
 	}
-	if result, _, err := wait(75 * time.Second); result != nil || err != nil {
+	if serverCallback {
+		if err := callback.SendServerCallback(ctx, source); err != nil {
+			if cfg.Logf != nil {
+				cfg.Logf("download: server callback to LowID %d failed: %v", source.ClientID, err)
+			}
+			if !direct && !buddy {
+				return nil, err
+			}
+		} else if cfg.Logf != nil {
+			cfg.Logf("download: server callback for LowID %d via %s:%d", source.ClientID, source.ServerIP, source.ServerPort)
+		}
+	}
+	waitFor := 75 * time.Second
+	if serverCallback && !direct && !buddy {
+		waitFor = 45 * time.Second
+	}
+	if result, _, err := wait(waitFor); result != nil || err != nil {
 		return result, err
 	}
 	return nil, errors.New("download: callback timed out")
@@ -554,7 +579,12 @@ func (m *Manager) WantsIncoming(conn net.Conn) bool {
 	}
 	m.callbackMu.Lock()
 	defer m.callbackMu.Unlock()
-	_, ok := m.pending[ip]
+	if _, ok := m.pending[ip]; ok {
+		return true
+	}
+	// A server callback for a LowID source does not reveal the source IP,
+	// so a wildcard slot accepts the first incoming connection.
+	_, ok := m.pending[""]
 	return ok
 }
 
@@ -563,6 +593,9 @@ func (m *Manager) HandleIncoming(conn net.Conn) {
 	ip := remoteIP(conn.RemoteAddr())
 	m.callbackMu.Lock()
 	channel := m.pending[ip]
+	if channel == nil {
+		channel = m.pending[""]
+	}
 	m.callbackMu.Unlock()
 	if channel == nil {
 		_ = conn.Close()

@@ -45,8 +45,12 @@ OP_DIRECTCALLBACKREQ over UDP, waits for the source to connect back and runs a
 server-side hello plus the normal download over that connection. If the source
 advertises a buddy (Kad TAG_BUDDYHASH/SERVERIP/SERVERPORT), the manager also
 sends KADEMLIA_CALLBACK_REQ to that buddy, which makes the source connect to us
-on TCP. This is the buddy/TCP callback path; a full LowID↔LowID relay through a
-third client is still out of scope. A queued transfer keeps retrying. Do not send OP_SETREQFILEID before
+on TCP. For a server LowID source (a `OP_FOUNDSOURCES` entry below 0x01000000)
+the manager logs in to that source's server and sends `OP_CALLBACKREQUEST` with
+the source client ID; the server asks the source to connect to us, and a
+wildcard pending slot accepts the incoming connection. This is the
+server-callback path. A full LowID↔LowID relay through a third client is still
+out of scope. A queued transfer keeps retrying. Do not send OP_SETREQFILEID before
 OP_STARTUPLOADREQ: real eMule peers close the socket after accepting the slot
 when that packet arrives, while aMule tolerates it. With the packet removed, a
 live download of the 4.2 MB eMule 0.70b installer completed, passed the final
@@ -77,7 +81,7 @@ In scope:
 
 Out of scope for the first usable version:
 
-- full obfuscation/RC4 and secure identification;
+- secure identification (RSA signatures) and the full credit identity;
 - preview/streaming, shared-file publishing beyond what upload requires;
 - a second UI: the transfer state appears in Gextto's existing download list.
 
@@ -163,8 +167,15 @@ note.
   source exchange; merge by IP/port, cap per file, expire stale sources.
 - **LowID/callback**: if the server assigns a LowID, ask a HighID peer to
   callback; the buddy path is required for a useful download success rate
-  behind NAT. The existing reachability sensor already tells the UI whether
+  behind NAT. Server LowID sources are handled with `OP_CALLBACKREQUEST` to
+  their server. The existing reachability sensor already tells the UI whether
   this path is needed.
+- **Obfuscation**: the client advertises crypt-layer support and implements the
+  eMule RC4 handshake for outgoing connections when the source tag says the
+  peer supports it, plus the receiving side for incoming callbacks/uploads.
+  The keys follow aMule's magic bytes 34/203 and discard the first 1024 RC4
+  bytes; the clear 0xE3/0xC5 header remains a valid fallback. Secure
+  identification (RSA signatures/credits) is not part of this layer.
 - **Credits**: implement the eMule credit identity and upload accounting at
   least well enough not to be treated as a leech; the exact formula is in the
   eMule source.

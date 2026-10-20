@@ -45,11 +45,9 @@ receives progress/completion events like it does for torrents.
 
 ## What is deliberately not implemented
 
-- obfuscation/RC4 and secure identification (`KadVersion` stays below 6, so
-  peers answer in clear);
-- server-originated callback (direct UDP and buddy callbacks are implemented;
-  the server callback needs a source client ID that the current source record
-  does not carry);
+- secure identification (RSA signatures/credits); the RC4 obfuscation layer
+  is implemented and advertised in the hello tags;
+- full LowID↔LowID data relay through a third client;
 - a full LowID↔LowID relay through a third client;
 - file publishing (`PUBLISH_*`) and the full `known.met` shared-file manager;
 - per-file bandwidth limits and priorities.

@@ -23,7 +23,9 @@ func (c callbackDiscoverer) Sources(context.Context, string, int64) ([]ed2k.Peer
 func (c callbackDiscoverer) SendDirectCallback(context.Context, ed2k.PeerSource, uint16) error {
 	return nil
 }
-func (c callbackDiscoverer) CallbackIdentity() (ed2k.ID, uint16) { return ed2k.ID{9}, 4662 }
+func (c callbackDiscoverer) SendServerCallback(context.Context, ed2k.PeerSource) error { return nil }
+func (c callbackDiscoverer) CallbackIdentity() (ed2k.ID, uint16)                       { return ed2k.ID{9}, 4662 }
+func (c callbackDiscoverer) CanCallback() bool                                         { return true }
 
 func serveCallbackUploader(t *testing.T, conn net.Conn, data []byte, name string, hashes partfile.Hashes) {
 	t.Helper()
@@ -167,6 +169,11 @@ func (d *dialingCallback) SendDirectCallback(context.Context, ed2k.PeerSource, u
 	return nil
 }
 
+func (d *dialingCallback) SendServerCallback(context.Context, ed2k.PeerSource) error {
+	d.dial()
+	return nil
+}
+
 func (d *dialingCallback) dial() {
 	go func() {
 		conn, err := net.Dial("tcp", d.addr)
@@ -240,4 +247,70 @@ func (b *buddyOnlyDiscoverer) Sources(context.Context, string, int64) ([]ed2k.Pe
 		IP: net.IPv4(127, 0, 0, 1), Type: 3, UserHash: ed2k.ID{7},
 		BuddyID: ed2k.ID{8}, BuddyIP: net.IPv4(127, 0, 0, 1), BuddyPort: 4672,
 	}}, nil
+}
+
+type serverOnlyDiscoverer struct {
+	*dialingCallback
+	source ed2k.PeerSource
+}
+
+func (d *serverOnlyDiscoverer) Sources(context.Context, string, int64) ([]ed2k.PeerSource, error) {
+	return []ed2k.PeerSource{d.source}, nil
+}
+
+func TestManagerDownloadsViaServerCallback(t *testing.T) {
+	data := testData(300_000)
+	hashes := testHashes(t, data)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	base := &dialingCallback{t: t, addr: listener.Addr().String(), data: data, name: "server-callback.mkv", hashes: hashes}
+	discoverer := &serverOnlyDiscoverer{
+		dialingCallback: base,
+		source: ed2k.PeerSource{
+			LowID: true, ClientID: 0x00ABCDEF,
+			ServerIP: net.IPv4(127, 0, 0, 1), ServerPort: 5000, Origin: "server-lowid",
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	manager := NewManager(ctx, ManagerConfig{
+		Fetch: Config{TempDir: t.TempDir(), HandshakeTimeout: 5 * time.Second, IdleTimeout: 10 * time.Second},
+	}, discoverer)
+	defer manager.Close()
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				if manager.WantsIncoming(conn) {
+					manager.HandleIncoming(conn)
+					return
+				}
+				conn.Close()
+			}()
+		}
+	}()
+
+	transfer, err := manager.Add(Link{Hash: hashes.File, Name: "server-callback.mkv", Size: int64(len(data))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := waitState(t, manager, transfer.ID, StateCompleted)
+	if done.Path == "" {
+		t.Fatalf("completed without a path: %+v", done)
+	}
+	got, err := os.ReadFile(done.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, data) {
+		t.Fatal("server callback download differs")
+	}
 }

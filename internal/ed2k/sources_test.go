@@ -82,6 +82,22 @@ func TestDecodeFoundSources(t *testing.T) {
 	}
 }
 
+func TestDecodeFoundSourcesLowID(t *testing.T) {
+	hash, _ := ParseID("0123456789abcdef0123456789abcdef")
+	payload := append([]byte(nil), hash[:]...)
+	payload = append(payload, 1)
+	payload = append(payload, 1, 0, 0, 0, 0x36, 0x12) // LowID 1, port 4662
+	_, sources, err := decodeFoundSourcesFromServer(payload, net.IPv4(9, 8, 7, 6), 5000)
+	if err != nil || len(sources) != 1 {
+		t.Fatalf("sources = %+v, %v", sources, err)
+	}
+	source := sources[0]
+	if !source.LowID || source.ClientID != 1 || source.TCPPort != 0 ||
+		!source.ServerIP.Equal(net.IPv4(9, 8, 7, 6)) || source.ServerPort != 5000 {
+		t.Fatalf("LowID source = %+v", source)
+	}
+}
+
 func TestDecodeSourceResponse(t *testing.T) {
 	sender, _ := ParseID("11111111111111111111111111111111")
 	target, _ := ParseID("22222222222222222222222222222222")

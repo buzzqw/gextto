@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -161,6 +162,22 @@ func (c *Client) sourcesFromServers(ctx context.Context, hash ID, size int64) ([
 }
 
 func (c *Client) sourcesFromOneServer(ctx context.Context, address string, hash ID, size int64) ([]PeerSource, error) {
+	serverHost, serverPortText, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", address, err)
+	}
+	serverPort, err := strconv.Atoi(serverPortText)
+	if err != nil || serverPort <= 0 || serverPort > 65535 {
+		return nil, fmt.Errorf("%s: invalid port", address)
+	}
+	serverIP := net.ParseIP(serverHost)
+	if serverIP == nil {
+		resolved, resolveErr := net.ResolveIPAddr("ip4", serverHost)
+		if resolveErr != nil {
+			return nil, fmt.Errorf("%s: %w", address, resolveErr)
+		}
+		serverIP = resolved.IP
+	}
 	dialer := &net.Dialer{Timeout: 8 * time.Second}
 	conn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
@@ -194,7 +211,7 @@ func (c *Client) sourcesFromOneServer(ctx context.Context, address string, hash 
 		}
 		switch opcode {
 		case OpFoundSources:
-			foundHash, found, err := decodeFoundSources(payload)
+			foundHash, found, err := decodeFoundSourcesFromServer(payload, serverIP, uint16(serverPort))
 			if err != nil || foundHash != hash {
 				continue
 			}
@@ -219,9 +236,17 @@ func mergeSources(groups ...[]PeerSource) []PeerSource {
 			if source.IP == nil || (source.TCPPort == 0 && source.UDPPort == 0) {
 				continue
 			}
-			key := fmt.Sprintf("%s:%d", source.IP.String(), source.TCPPort)
-			if source.TCPPort == 0 {
-				key = fmt.Sprintf("%s:udp/%d", source.IP.String(), source.UDPPort)
+			key := ""
+			if source.LowID {
+				key = fmt.Sprintf("lowid/%d@%s:%d", source.ClientID, source.ServerIP, source.ServerPort)
+			} else if source.IP != nil {
+				key = fmt.Sprintf("%s:%d", source.IP.String(), source.TCPPort)
+				if source.TCPPort == 0 {
+					key = fmt.Sprintf("%s:udp/%d", source.IP.String(), source.UDPPort)
+				}
+			}
+			if key == "" {
+				continue
 			}
 			if index, ok := seen[key]; ok {
 				existing := &out[index]
@@ -235,6 +260,12 @@ func mergeSources(groups ...[]PeerSource) []PeerSource {
 					existing.BuddyID = source.BuddyID
 					existing.BuddyIP = source.BuddyIP
 					existing.BuddyPort = source.BuddyPort
+				}
+				if existing.ClientID == 0 && source.ClientID != 0 {
+					existing.ClientID = source.ClientID
+					existing.LowID = source.LowID
+					existing.ServerIP = source.ServerIP
+					existing.ServerPort = source.ServerPort
 				}
 				if existing.Origin != source.Origin {
 					existing.Origin = "mixed"

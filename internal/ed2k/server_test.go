@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/binary"
 	"net"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -159,5 +160,65 @@ func TestServerSourcesAgainstFakeServer(t *testing.T) {
 	}
 	if !sources[1].IP.Equal(net.IPv4(5, 6, 7, 8)) || sources[1].TCPPort != 5000 {
 		t.Fatalf("source = %+v", sources[1])
+	}
+}
+
+func TestSendServerCallback(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	done := make(chan uint32, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		opcode, _, err := readServerPacket(conn)
+		if err != nil || opcode != OpLoginRequest {
+			return
+		}
+		_ = writeServerPacket(conn, OpIDChange, []byte{0, 0, 1, 0})
+		opcode, payload, err := readServerPacket(conn)
+		if err != nil || opcode != OpCallbackReq || len(payload) != 4 {
+			return
+		}
+		done <- binary.LittleEndian.Uint32(payload)
+		_ = writeServerPacket(conn, OpCallbackOK, nil)
+	}()
+
+	client, err := New(Config{
+		DataDir:       t.TempDir(),
+		UDPListen:     "127.0.0.1:0",
+		Servers:       []string{listener.Addr().String()},
+		SearchTimeout: 4 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	host, portText, _ := net.SplitHostPort(listener.Addr().String())
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	source := PeerSource{
+		LowID: true, ClientID: 0x00ABCDEF,
+		ServerIP: net.ParseIP(host), ServerPort: uint16(port),
+	}
+	if err := client.SendServerCallback(ctx, source); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case id := <-done:
+		if id != source.ClientID {
+			t.Fatalf("callback id = %#x", id)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("server did not receive callback request")
 	}
 }

@@ -95,9 +95,11 @@ func EncodeHello(hello Hello) []byte {
 	}
 	misc2 := hello.MiscOption2
 	if misc2 == 0 {
-		// Kad 3, large files, extended multipacket, source exchange 2; no
-		// crypt layer, because we cannot complete those handshakes yet.
-		misc2 = 0x00000438
+		// Kad 3, large files, extended multipacket, source exchange 2 and
+		// client crypt-layer support. We do not require or request it here;
+		// the source tag decides whether an outgoing connection is
+		// obfuscated, and the listener accepts either form.
+		misc2 = 0x000004B8
 	}
 	muleVersion := hello.MuleVersion
 	if muleVersion == 0 {
@@ -184,6 +186,10 @@ func DecodeHello(payload []byte) (Hello, error) {
 		case TagMiscOptions:
 			if tag.Type == ed2k.TagUint32 || tag.Type == ed2k.TagUint64 {
 				hello.MiscOption = uint32(tag.Int)
+			}
+		case TagMiscOptions2:
+			if tag.Type == ed2k.TagUint32 || tag.Type == ed2k.TagUint64 {
+				hello.MiscOption2 = uint32(tag.Int)
 			}
 		}
 	}

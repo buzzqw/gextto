@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
+	"time"
 )
 
 // SendDirectCallback asks a firewalled (LowID) source to call us back on our
@@ -44,6 +46,55 @@ func (c *Client) SendDirectCallback(ctx context.Context, source PeerSource, ourP
 		return fmt.Errorf("ed2k: direct callback to %s: %w", addr, err)
 	}
 	return nil
+}
+
+// SendServerCallback asks an eD2k server to tell a LowID source to connect to
+// us. The source is identified by the ID the server assigned to it; the server
+// sends OP_CALLBACKREQUESTED to the source with our IP/TCP port.
+func (c *Client) SendServerCallback(ctx context.Context, source PeerSource) error {
+	if !source.LowID || source.ClientID == 0 {
+		return errors.New("ed2k: source has no server callback ID")
+	}
+	if source.ServerIP == nil || source.ServerPort == 0 {
+		return errors.New("ed2k: source has no server for the callback")
+	}
+	address := net.JoinHostPort(source.ServerIP.String(), strconv.Itoa(int(source.ServerPort)))
+	dialer := &net.Dialer{Timeout: 8 * time.Second}
+	conn, err := dialer.DialContext(ctx, "tcp", address)
+	if err != nil {
+		return fmt.Errorf("ed2k: callback server %s: %w", address, err)
+	}
+	defer conn.Close()
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	} else {
+		_ = conn.SetDeadline(time.Now().Add(15 * time.Second))
+	}
+	if err := c.serverLogin(conn); err != nil {
+		return fmt.Errorf("ed2k: callback server login: %w", err)
+	}
+	var payload [4]byte
+	binary.LittleEndian.PutUint32(payload[:], source.ClientID)
+	if err := writeServerPacket(conn, OpCallbackReq, payload[:]); err != nil {
+		return fmt.Errorf("ed2k: callback request: %w", err)
+	}
+	for {
+		opcode, _, err := readServerPacket(conn)
+		if err != nil {
+			if isTimeout(err) {
+				// Some servers do not acknowledge a successful request; the
+				// source can already be connecting to us.
+				return nil
+			}
+			return fmt.Errorf("ed2k: callback answer: %w", err)
+		}
+		switch opcode {
+		case OpCallbackOK:
+			return nil
+		case OpCallbackFail:
+			return errors.New("ed2k: server rejected the callback")
+		}
+	}
 }
 
 // CanCallback reports whether our TCP port is reachable (HighID). A direct
