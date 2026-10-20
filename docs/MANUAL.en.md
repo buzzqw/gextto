@@ -762,7 +762,13 @@ ECPort=4712
 ECPassword=<md5 of the password>
 ```
 
-`ECPassword` is the MD5 of the password (`printf '%s' 'secret' | md5sum`). Start
+`ECPassword` is the MD5 of the password (`printf '%s' 'secret' | md5sum`). With
+aMule in **Docker** (`ngosang/amule`) mount the download folder in the container
+**at the same path** as on the host and point `INCOMING_DIR` and `TEMP_DIR`
+there, so Gextto finds the completed files; use a dedicated incoming folder,
+because aMule shares everything it holds. To open the ports on the router with
+**UPnP** the container must use the host network (`network_mode: host`) with
+`UPnPEnabled=1` in `amule.conf`. Start
 `amuled`, then in **Configuration → Sources → eD2k and Kad** switch on **eD2k
 and Kad through aMule** and enter address, port and the password **in clear**.
 Gextto must see aMule's incoming folder at the same path (true when both run on
@@ -788,8 +794,10 @@ which means more sources.
 - **Paste eD2k links**: one or more `ed2k://` links, even mixed with text;
   **Download with aMule** adds them all.
 
-Added downloads appear in **Downloads**. When aMule completes a file, Gextto
-treats it like a completed torrent: it renames it, imports it into the library,
+Added downloads appear in **Downloads**. A link to a file that is not a video
+(a pdf, a program, an archive) is only downloaded by aMule and stays in the
+incoming folder, like a torrent added by hand. When aMule completes a video,
+Gextto treats it like a completed torrent: it renames it, imports it into the library,
 checks it with MediaInfo and sends the notification. eD2k episodes always enter
 the library by **hardlink or copy**, never moved, so aMule keeps sharing them
 from its incoming folder (a hardlink takes no extra space when both folders are
@@ -1632,6 +1640,7 @@ network.
 | Use eD2k when torrents find nothing | A second, separate switch: only in the deep gap-filling pass, and only when the torrent episode and season searches produced nothing, Gextto searches the same episode on eD2k/Kad (with the series name and every alias). Off by default. |
 | Minimum sources for the fallback | eD2k source floor for accepting a result automatically. Manual search shows everything. *(Unit: sources; 0 = no minimum)* |
 | eD2k search duration | How many seconds aMule collects results before Gextto shows them. *(Unit: seconds)* |
+| Give up on a stalled eD2k download after | An eD2k download chosen by Gextto that receives no data for this many days is cancelled in aMule, the release is blocklisted and the episode is searched again. Downloads added by hand and paused ones stay. *(Unit: days; 0 = never)* |
 
 The automatic fallback only accepts a result that matches the episode exactly,
 has a recognised quality, a plausible size and at least the source floor. In

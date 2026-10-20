@@ -148,6 +148,7 @@ func TestSearchSeriesED2KFiltersAutomaticCandidates(t *testing.T) {
 		{Hash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", Name: "Rare Show S02E03 1080p.mkv", Size: 5000000000, Sources: 1},
 		{Hash: "ffffffffffffffffffffffffffffffff", Name: "Rare Show S02E03 720p.mkv", Size: 900000000, Sources: 8},
 		{Hash: "11111111111111111111111111111111", Name: "Rare Show S02E04 1080p.mkv", Size: 5000000000, Sources: 9},
+		{Hash: "44444444444444444444444444444444", Name: "Rare Show S02E03 720p.rar", Size: 900000000, Sources: 20},
 	}, "")
 	series := &SeriesConfig{Name: "Rare Show"}
 	engine := &Engine{}
@@ -264,5 +265,142 @@ func TestEd2kSessionReportsCompletion(t *testing.T) {
 	}
 	if cfgCopy := ed2kImportConfig(cfg); cfgCopy.Settings["move_episodes"] != "false" || cfg.Settings["move_episodes"] == "false" {
 		t.Fatal("eD2k files must be imported by copy without changing the caller's configuration")
+	}
+}
+
+// TestEd2kSessionFindsFilesThatLeftTheQueue covers aMule 3.x, which drops a
+// finished file from the download queue at once: the completion is found
+// among the shared files, both for a file seen in the queue and for a file
+// the database still lists as pending after a Gextto restart.
+func TestEd2kSessionFindsFilesThatLeftTheQueue(t *testing.T) {
+	core, cfg := ed2kTestCore(t, nil)
+	reset := func() {
+		ed2kEventsMu.Lock()
+		ed2kLastStatus = map[string]bool{}
+		ed2kReported = map[string]time.Time{}
+		ed2kEventsKey = ""
+		ed2kLastPoll = time.Time{}
+		ed2kEventsMu.Unlock()
+	}
+	poll := func(session ed2kSession) []models.TorrentEvent {
+		ed2kEventsMu.Lock()
+		ed2kLastPoll = time.Time{}
+		ed2kEventsMu.Unlock()
+		return session.PollEvents()
+	}
+	reset()
+	const seen = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const restarted = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	core.SetDownloads([]amuletest.File{
+		{Hash: seen, Name: "Seen S01E01.mkv", Size: 100, Done: 10},
+		{Hash: restarted, Name: "Restarted S01E02.mkv", Size: 100, Done: 10},
+	})
+	pending := []string{seen, restarted}
+	session := ed2kSession{cfg: cfg, pending: func() ([]string, error) { return pending, nil }}
+	if events := poll(session); len(events) != 0 {
+		t.Fatalf("events before completion: %+v", events)
+	}
+	core.Finish(seen, "/data/amule")
+	events := poll(session)
+	if len(events) != 1 || events[0].Hash != seen || events[0].SavePath != "/data/amule" || events[0].Name != "Seen S01E01.mkv" {
+		t.Fatalf("events = %+v", events)
+	}
+	if again := poll(session); len(again) != 0 {
+		t.Fatalf("the completion was reported again at once: %+v", again)
+	}
+	// The completion handler archived it: the database no longer lists it.
+	pending = []string{restarted}
+
+	// Gextto restarts while aMule finishes the second file: only the pending
+	// list from the database knows about it.
+	reset()
+	core.Finish(restarted, "/data/amule")
+	events = poll(session)
+	if len(events) != 1 || events[0].Hash != restarted {
+		t.Fatalf("events after restart = %+v", events)
+	}
+	pending = nil
+	if again := poll(session); len(again) != 0 {
+		t.Fatalf("a file no longer pending was reported: %+v", again)
+	}
+}
+
+// TestMonitorEd2kStalledGivesUpOnAutomaticDownloads checks the give-up rule:
+// an automatically chosen download idle for longer than ed2k_stall_days is
+// cancelled in aMule and blocklisted; a manual one and a recent one stay.
+func TestMonitorEd2kStalledGivesUpOnAutomaticDownloads(t *testing.T) {
+	core, cfg := ed2kTestCore(t, map[string]string{"ed2k_stall_days": "7"})
+	db, err := OpenDatabase(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	register := func(name, hash, reason string) {
+		link := "ed2k://|file|" + name + "|100|" + hash + "|/"
+		release := ParseEd2kRelease(name, link, "ed2k:amule", 100, 3, time.Now().UTC())
+		if err := db.RegisterTorrentScored(release, 10); err != nil {
+			t.Fatal(err)
+		}
+		_ = db.SetTorrentReason(hash, reason)
+	}
+	const stale = "11111111111111111111111111111111"
+	const manual = "22222222222222222222222222222222"
+	const recent = "33333333333333333333333333333333"
+	register("Rare Show S01E01 720p.mkv", stale, "gap_filled")
+	register("Rare Show S01E02 720p.mkv", manual, "manual")
+	register("Rare Show S01E03 720p.mkv", recent, "gap_filled")
+	old := time.Now().Add(-10 * 24 * time.Hour).Unix()
+	core.SetDownloads([]amuletest.File{
+		{Hash: stale, Name: "Rare Show S01E01 720p.mkv", Size: 100, Done: 20, LastRecv: old},
+		{Hash: manual, Name: "Rare Show S01E02 720p.mkv", Size: 100, Done: 20, LastRecv: old},
+		{Hash: recent, Name: "Rare Show S01E03 720p.mkv", Size: 100, Done: 20, LastRecv: time.Now().Unix()},
+	})
+	notifierCfg := DefaultConfig()
+	MonitorEd2kStalled(cfg, db, FromConfig(&notifierCfg), time.Now())
+	left := map[string]bool{}
+	for _, file := range core.Downloads() {
+		left[file.Hash] = true
+	}
+	if left[stale] || !left[manual] || !left[recent] {
+		t.Fatalf("queue after the check = %v", left)
+	}
+	if status, _ := db.TorrentStatus(stale); status == nil || *status != "error" {
+		t.Fatalf("stale status = %v", status)
+	}
+	pending, _ := db.PendingEd2kHashes()
+	if len(pending) != 2 {
+		t.Fatalf("pending = %v", pending)
+	}
+	cfg.Settings["ed2k_stall_days"] = "0"
+	core.SetDownloads([]amuletest.File{{Hash: recent, Name: "x", Size: 100, LastRecv: old}})
+	MonitorEd2kStalled(cfg, db, FromConfig(&notifierCfg), time.Now())
+	if len(core.Downloads()) != 1 {
+		t.Fatal("0 days must never give up")
+	}
+}
+
+// TestAddNonVideoEd2kLinkIsNotRegistered keeps a pasted non-video link out of
+// the library flow: aMule downloads it, Gextto does not register a release
+// that the import would reject (and quarantine).
+func TestAddNonVideoEd2kLinkIsNotRegistered(t *testing.T) {
+	core, cfg := ed2kTestCore(t, nil)
+	state := newTestAppState(t)
+	for key, value := range cfg.Settings {
+		if err := SaveSetting(state.cfg.DataDir, key, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	link := "ed2k://|file|eMule0.70b-Installer.exe|4266968|df0064f8199c5d4aff7359ca0ede089c|/"
+	release := ParseEd2kRelease("eMule0.70b-Installer.exe", link, "ed2k:link", 4266968, 0, time.Now().UTC())
+	status, value := gh3AddParsedRelease(state, *release)
+	payload, _ := value.(map[string]any)
+	if status != 202 || payload["registered"] != false {
+		t.Fatalf("status %d, payload %+v", status, payload)
+	}
+	if len(core.Downloads()) != 1 {
+		t.Fatalf("aMule queue = %+v", core.Downloads())
+	}
+	if pending, _ := state.db.PendingEd2kHashes(); len(pending) != 0 {
+		t.Fatalf("a non-video link was registered: %v", pending)
 	}
 }

@@ -471,6 +471,15 @@ throw-away `--config-dir`, ports not forwarded (Low ID, Kad firewalled),
   collected over a 40 s window, with the episode (WEB, HDTV, 1080p variants) at
   1–2 sources on a firewalled client.
 
+**End to end with the service (same day).** aMule 3.1.0 in Docker
+(`ngosang/amule`, bridge network, High ID, Kad firewalled), driven by the running
+Gextto: a global server search for `eMule0.70b Installer` returned 5 results in
+the eD2k page (the installer with 74 sources); `eMule0.70b-Installer.exe`
+(4.27 MB) added from the page completed in **~3.5 minutes** (11:57:38 →
+12:01:06, aMule log) into the incoming folder. aMule 3.x removed it from the
+download queue at once and only shared it, which is why completions are looked
+up among the shared files.
+
 One run, one network, not a coverage sample: the coverage question for aMule is
 an open point in [`evoluzione.md`](evoluzione.md).
 

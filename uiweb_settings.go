@@ -134,6 +134,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "ed2k_fallback", Label: "Usa eD2k quando i torrent non trovano nulla", Tab: "sources", Group: "eD2k e Kad"},
 	{Key: "ed2k_min_sources", Label: "Fonti minime per il fallback", Tab: "sources", Group: "eD2k e Kad"},
 	{Key: "ed2k_search_timeout_secs", Label: "Durata della ricerca eD2k", Tab: "sources", Group: "eD2k e Kad"},
+	{Key: "ed2k_stall_days", Label: "Rinuncia a un download eD2k fermo dopo", Tab: "sources", Group: "eD2k e Kad"},
 
 	// --- Qualità e upgrade (the score weights come from uiScoreSettingDefs) --
 	{Key: "upgrade_min_score_diff", Label: "Differenza minima score per upgrade", Tab: "scores", Group: "Upgrade e sostituzione"},

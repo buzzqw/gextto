@@ -17,14 +17,18 @@ affected.
   name, size, MD4 hash and sources, and are parsed like torrent names (series,
   episode, quality).
 - **ed2k:// links**: paste one or more (even mixed with text) on the eD2k page
-  or in the search box of Scarico; they go to aMule and are registered like a
-  manual download.
+  or in the search box of Scarico; they go to aMule and a video is registered
+  like a manual download. A file that is not a video (a pdf, a program, an
+  archive) is only aMule's download: it stays in the incoming folder, like a
+  torrent added by hand, instead of failing the library import.
 - **Downloads in Scarico**: aMule's queue is shown next to the torrents and the
   HTTP downloads, with progress, speed, sources (transferring / total) and
   pause / resume / remove. A completed file is only taken off aMule's list; an
   incomplete one is cancelled with its partial data.
 - **Completion like a torrent**: when aMule completes a file, Gextto raises the
-  same `torrent_finished` event a torrent produces, so renaming, the library
+  same `torrent_finished` event a torrent produces (aMule 2.3 keeps a finished
+  file in the download queue; aMule 3.x drops it at once, so Gextto finds it
+  among the shared files, with its folder, also after a Gextto restart), so renaming, the library
   import, MediaInfo checks, notifications and the media library refresh are
   shared. eD2k episodes are always imported by **hardlink or copy** (never
   moved), so aMule keeps sharing the original from its incoming folder; a
@@ -34,11 +38,16 @@ affected.
   upload queue; connect / disconnect, start / stop Kad, connect to a given
   server, leave the server, download a `server.met` or a `nodes.dat` from an
   address.
+- **Stalled downloads**: an eD2k download Gextto started by itself that
+  receives nothing for `ed2k_stall_days` (7, 0 = never; aMule's "last
+  received" time, so restarts do not reset it) is cancelled in aMule, its
+  release is blocklisted and the gap is searched again. Downloads added by
+  hand and paused ones are left alone.
 - **Automatic fallback** (`ed2k_fallback`, off by default): in the deep
   gap-filling pass, when the torrent episode and season searches found
   nothing, Gextto searches eD2k for the configured name and every alias, and
-  starts a result only with the exact episode, a recognised quality and at
-  least `ed2k_min_sources` sources.
+  starts a result only with the exact episode, a recognised quality, a video
+  file and at least `ed2k_min_sources` sources.
 
 ## Setting up aMule
 
@@ -57,6 +66,13 @@ ECPassword=<md5 of the password>
 md5sum`). In Gextto the password is entered **in clear** (`amule_password`):
 the client hashes it for the login.
 
+In Docker (`ngosang/amule`), mount the download share at the **same path** inside
+the container and set `INCOMING_DIR`/`TEMP_DIR` to those paths, so the folder
+aMule reports is valid on the host; use a dedicated incoming folder, because
+aMule shares everything in it. With `network_mode: host` and `UPnPEnabled=1`
+aMule opens its eD2k/Kad ports on the router by UPnP (in bridge mode it would
+ask the router to forward to the container's address, which does not work).
+
 For completed files to be imported, Gextto must see aMule's incoming folder
 (`IncomingDir`) at the same path, which is the case when both run on the same
 machine. Opening aMule's TCP and UDP ports on the router gives a High ID and a
@@ -74,6 +90,11 @@ non-firewalled Kad, hence more sources.
 | `ed2k_search_timeout_secs` | how long aMule collects results (5–120 s, default 20) |
 | `ed2k_fallback` | automatic gap-filling fallback (off) |
 | `ed2k_min_sources` | source floor of the fallback (3) |
+| `ed2k_stall_days` | give up on an automatic download idle for this many days (7, 0 = never) |
+
+The settings of the earlier integrations (extto's `amule_*` service options,
+gx-ed2k's `ed2k_url`, `ed2k_token`, `ed2k_upnp`, …) are deleted at load;
+`amule_host`, `amule_port` and `amule_password` are kept.
 
 ## The EC client (`internal/amule`)
 
@@ -93,7 +114,7 @@ non-firewalled Kad, hence more sources.
 - Operations: status (`EC_OP_STAT_REQ` with the connection state), server
   list, connect/disconnect, server connect/disconnect, `server.met`/`nodes.dat`
   from URL, Kad start/stop, download queue, add link, pause/resume/delete,
-  clear completed, search (start, results, progress, stop), preferences
+  clear completed, shared files, search (start, results, progress, stop), preferences
   (incoming/temp folders, bandwidth limits) and the log.
 - aMule keeps **one** search result list: a new search replaces the previous
   one. Gextto serialises searches (`ed2kSearchMu`), so the alias queries of the

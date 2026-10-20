@@ -260,6 +260,11 @@ func validateNumericSetting(key, value string) error {
 		default:
 			return fmt.Errorf("ed2k_search_network must be kad, global or local")
 		}
+	case key == "ed2k_stall_days":
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 0 || parsed > 365 {
+			return fmt.Errorf("%s must be between 0 and 365 days", key)
+		}
 	case key == "ed2k_search_timeout_secs":
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || parsed < 5 || parsed > 120 {

@@ -11,13 +11,17 @@ package gextto
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/amule"
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
+	"github.com/buzzqw/gextto/internal/utils"
 )
 
 // Ed2kDownloads returns aMule's download queue, or nil when the integration
@@ -47,6 +51,10 @@ func AddEd2kLink(cfg *Config, link string) error {
 		return client.AddLink(ctx, parsed.String(), 0)
 	})
 }
+
+// errEd2kNotQueued reports a remove of a file aMule no longer has in its
+// download queue.
+var errEd2kNotQueued = errors.New("the file is not in aMule's download queue")
 
 // addEd2kRelease starts an approved eD2k release found by the automatic gap
 // filler. It reports false, nil when aMule already has the file, like a
@@ -81,11 +89,17 @@ func Ed2kDownloadAction(cfg *Config, action, hash string) error {
 				return err
 			}
 			for _, download := range downloads {
-				if download.Hash == hash && download.Complete() {
+				if download.Hash != hash {
+					continue
+				}
+				if download.Complete() {
 					return client.ClearCompleted(ctx)
 				}
+				return client.Delete(ctx, hash)
 			}
-			return client.Delete(ctx, hash)
+			// Not in the queue any more (aMule 3.x drops finished files at
+			// once): nothing to remove.
+			return errEd2kNotQueued
 		}
 		return errors.New("unknown eD2k action")
 	})
@@ -115,6 +129,9 @@ func ed2kDownloadState(download amule.Download) string {
 type ed2kSession struct {
 	nullEngine
 	cfg *Config
+	// pending lists the eD2k files Gextto queued and has not seen complete
+	// (from the database). It may be nil.
+	pending func() ([]string, error)
 }
 
 var (
@@ -122,7 +139,14 @@ var (
 	ed2kLastStatus = map[string]bool{}
 	ed2kEventsKey  string
 	ed2kLastPoll   time.Time
+	// ed2kReported remembers when a completion found among the shared files
+	// was reported, so it is not reported again at every poll; a file still
+	// pending after ed2kReportRetry is reported again (the completion
+	// handler skips what it already archived).
+	ed2kReported = map[string]time.Time{}
 )
+
+const ed2kReportRetry = 10 * time.Minute
 
 // ed2kPollInterval spaces the completion checks: the event loop ticks far more
 // often than an eD2k file can complete, and each check reads aMule's whole
@@ -152,9 +176,14 @@ func (s ed2kSession) List() []models.TorrentView {
 	return out
 }
 
-// PollEvents reports the files that completed since the previous call. A
-// file already complete the first time it is seen (after a Gextto restart)
-// is reported too: the completion handler ignores what it already archived.
+// PollEvents reports the files that completed since the previous call.
+//
+// aMule 2.3 keeps a finished file in its download queue with the "complete"
+// status; aMule 3.x drops it from the queue at once and only shares it. Both
+// are handled: a completed queue entry is reported directly, and a file that
+// left the queue (or that the database still lists as pending after a Gextto
+// restart) is looked up among aMule's shared files, which also give the
+// folder it was saved in.
 func (s ed2kSession) PollEvents() []models.TorrentEvent {
 	ed2kEventsMu.Lock()
 	due := time.Since(ed2kLastPoll) >= ed2kPollInterval
@@ -169,39 +198,93 @@ func (s ed2kSession) PollEvents() []models.TorrentEvent {
 	if downloads == nil {
 		return nil
 	}
-	incoming := ed2kIncomingDir(s.cfg)
-	if incoming == "" {
-		// Without the incoming folder the completed file cannot be found;
-		// wait for the next poll instead of reporting a wrong path.
-		return nil
+	var pending []string
+	if s.pending != nil {
+		if hashes, err := s.pending(); err == nil {
+			pending = hashes
+		}
 	}
 	settings, _ := ed2kSettingsFromConfig(s.cfg)
+
 	ed2kEventsMu.Lock()
-	defer ed2kEventsMu.Unlock()
 	if ed2kEventsKey != settings.Address {
 		ed2kLastStatus = map[string]bool{}
+		ed2kReported = map[string]time.Time{}
 		ed2kEventsKey = settings.Address
 	}
 	var events []models.TorrentEvent
 	present := make(map[string]struct{}, len(downloads))
+	completeInQueue := false
 	for _, download := range downloads {
 		present[download.Hash] = struct{}{}
 		complete := download.Complete()
 		wasComplete, seen := ed2kLastStatus[download.Hash]
 		ed2kLastStatus[download.Hash] = complete
 		if complete && (!seen || !wasComplete) {
-			events = append(events, models.TorrentEvent{
-				Kind:     "torrent_finished",
-				Hash:     download.Hash,
-				Name:     download.Name,
-				SavePath: incoming,
-			})
+			completeInQueue = true
+			events = append(events, models.TorrentEvent{Kind: "torrent_finished", Hash: download.Hash, Name: download.Name})
 		}
 	}
+	candidates := map[string]struct{}{}
 	for hash := range ed2kLastStatus {
 		if _, ok := present[hash]; !ok {
 			delete(ed2kLastStatus, hash)
+			candidates[hash] = struct{}{}
 		}
+	}
+	pendingSet := make(map[string]struct{}, len(pending))
+	for _, hash := range pending {
+		hash = strings.ToLower(hash)
+		pendingSet[hash] = struct{}{}
+		if _, inQueue := present[hash]; inQueue {
+			continue
+		}
+		if reportedAt, ok := ed2kReported[hash]; ok && time.Since(reportedAt) < ed2kReportRetry {
+			continue
+		}
+		candidates[hash] = struct{}{}
+	}
+	for hash := range ed2kReported {
+		if _, ok := pendingSet[hash]; !ok {
+			delete(ed2kReported, hash)
+		}
+	}
+	ed2kEventsMu.Unlock()
+
+	if completeInQueue {
+		// aMule 2.3: the file is in the incoming folder under its name.
+		incoming := ed2kIncomingDir(s.cfg)
+		if incoming == "" {
+			return nil
+		}
+		for index := range events {
+			events[index].SavePath = incoming
+		}
+	}
+	if len(candidates) == 0 {
+		return events
+	}
+	var shared []amule.SharedFile
+	if err := ed2kCall(s.cfg, func(ctx context.Context, client *amule.Client) error {
+		var callErr error
+		shared, callErr = client.SharedFiles(ctx)
+		return callErr
+	}); err != nil {
+		return events
+	}
+	ed2kEventsMu.Lock()
+	defer ed2kEventsMu.Unlock()
+	for _, file := range shared {
+		if _, wanted := candidates[file.Hash]; !wanted || file.Dir == "" || file.Name == "" {
+			continue
+		}
+		ed2kReported[file.Hash] = time.Now()
+		events = append(events, models.TorrentEvent{
+			Kind:     "torrent_finished",
+			Hash:     file.Hash,
+			Name:     file.Name,
+			SavePath: file.Dir,
+		})
 	}
 	return events
 }
@@ -216,6 +299,9 @@ func (s ed2kSession) Resume(hash string) (bool, error) {
 
 func (s ed2kSession) Remove(hash string, deleteFiles bool) (bool, error) {
 	if err := Ed2kDownloadAction(s.cfg, "remove", hash); err != nil {
+		if errors.Is(err, errEd2kNotQueued) {
+			return false, nil
+		}
 		return false, err
 	}
 	return true, nil
@@ -233,4 +319,88 @@ func ed2kImportConfig(cfg *Config) *Config {
 	}
 	copy.Settings["move_episodes"] = "false"
 	return &copy
+}
+
+// ed2kStallDays is how long an automatically chosen eD2k download may go
+// without receiving data before Gextto gives up on it (0 = never).
+func ed2kStallDays(cfg *Config) int {
+	if cfg == nil {
+		return 7
+	}
+	raw := strings.TrimSpace(cfg.Settings["ed2k_stall_days"])
+	if raw == "" {
+		return 7
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		return 7
+	}
+	return value
+}
+
+// MonitorEd2kStalled gives up on eD2k downloads Gextto started by itself that
+// received nothing for ed2k_stall_days: a rare file can sit in aMule's queue
+// for ever, and while it does the episode counts as being downloaded, so the
+// gap filler would never look for it elsewhere. The download is cancelled in
+// aMule, the release is blocklisted and the gap is searched again at the next
+// cycle. Downloads added by hand and paused ones are left alone: the user
+// chose to wait for them.
+func MonitorEd2kStalled(cfg *Config, db *Database, notifier *Notifier, now time.Time) {
+	days := ed2kStallDays(cfg)
+	if days <= 0 || db == nil {
+		return
+	}
+	limit := time.Duration(days) * 24 * time.Hour
+	pending, err := db.PendingEd2kHashes()
+	if err != nil || len(pending) == 0 {
+		return
+	}
+	wanted := make(map[string]struct{}, len(pending))
+	for _, hash := range pending {
+		wanted[hash] = struct{}{}
+	}
+	for _, download := range Ed2kDownloads(cfg) {
+		if _, ok := wanted[download.Hash]; !ok || download.Complete() || download.Paused() {
+			continue
+		}
+		if reason, err := db.TorrentReason(download.Hash); err != nil || (reason != nil && *reason == "manual") {
+			continue
+		}
+		last := time.Time{}
+		if download.LastRecv > 0 {
+			last = time.Unix(download.LastRecv, 0)
+		} else if times, err := db.TorrentTimes(download.Hash); err == nil && times != nil {
+			if created, ok := utils.ParseTimestamp(times.CreatedAt); ok {
+				last = created
+			}
+		}
+		if last.IsZero() || now.Sub(last) < limit {
+			continue
+		}
+		metadata, _ := db.TorrentMeta(download.Hash)
+		if err := Ed2kDownloadAction(cfg, "remove", download.Hash); err != nil {
+			logging.Warn("cannot cancel a stalled eD2k download in aMule", "name", download.Name, "error", err)
+			continue
+		}
+		restored, _ := db.RestoreUpgrade(download.Hash)
+		_ = db.MarkTorrentError(download.Hash, "stalled eD2k download")
+		_ = db.MarkTorrentRemovedAt(download.Hash)
+		title := download.Name
+		if metadata != nil {
+			title = metadata.Release.Title
+			_ = db.Blocklist(&metadata.Release, "stalled_ed2k")
+			release := metadata.Release
+			if release.Series != nil && release.Season != nil && release.Episode != nil {
+				_ = db.ClearGapSearched(*release.Series, *release.Season, *release.Episode)
+			}
+		}
+		logging.Warn(fmt.Sprintf("❌ Gave up on the eD2k download «%s»: nothing received for %s (%s done). It is cancelled in aMule and the next search will look for another version",
+			download.Name, logDuration(limit), logPercent(download.Progress())), "title", title, "hash", download.Hash)
+		_ = notifier.NotifyEvent("download_failed", map[string]any{
+			"hash":             download.Hash,
+			"title":            title,
+			"error":            "stalled eD2k download",
+			"upgrade_restored": restored,
+		})
+	}
 }

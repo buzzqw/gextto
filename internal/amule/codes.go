@@ -20,11 +20,13 @@ const (
 	OpGetConnState        = 0x0B
 	OpStats               = 0x0C
 	OpGetDloadQueue       = 0x0D
+	OpGetSharedFiles      = 0x10
 	OpPartfilePause       = 0x19
 	OpPartfileResume      = 0x1A
 	OpPartfilePrioSet     = 0x1C
 	OpPartfileDelete      = 0x1D
 	OpDloadQueue          = 0x1F
+	OpSharedFiles         = 0x22
 	OpSearchStart         = 0x26
 	OpSearchStop          = 0x27
 	OpSearchResults       = 0x28
@@ -89,6 +91,7 @@ const (
 	TagPartfileLastRecv    = 0x0310
 	TagPartfileStopped     = 0x0317
 	TagPartfileHash        = 0x031E
+	TagKnownfile           = 0x0400
 	TagKnownfileFilename   = 0x0408
 
 	TagServer         = 0x0500

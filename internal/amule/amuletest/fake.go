@@ -24,6 +24,8 @@ type File struct {
 	Speed   int64
 	Status  int
 	Sources int64
+	// LastRecv is the Unix time of the last data received (0 = never).
+	LastRecv int64
 }
 
 // Result is one canned search result.
@@ -49,6 +51,12 @@ type Core struct {
 	kad       bool
 	commands  []string
 	conns     map[net.Conn]struct{}
+	shared    []sharedFile
+}
+
+type sharedFile struct {
+	File
+	Dir string
 }
 
 // Start listens on a loopback port.
@@ -91,6 +99,21 @@ func (c *Core) SetDownloads(files []File) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.downloads = append([]File(nil), files...)
+}
+
+// Finish completes a download the way aMule 3.x does: the file leaves the
+// download queue and is shared from dir.
+func (c *Core) Finish(hash, dir string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for index, file := range c.downloads {
+		if file.Hash == hash {
+			c.downloads = append(c.downloads[:index], c.downloads[index+1:]...)
+			file.Done, file.Status = file.Size, amule.StatusComplete
+			c.shared = append(c.shared, sharedFile{File: file, Dir: dir})
+			return
+		}
+	}
 }
 
 // Downloads returns a copy of the queue.
@@ -288,6 +311,18 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 				amule.IntTag(amule.TagPartfileSpeed, uint64(file.Speed)),
 				amule.IntTag(amule.TagPartfileStatus, uint64(file.Status)),
 				amule.IntTag(amule.TagPartfileSourceCount, uint64(file.Sources)),
+				amule.IntTag(amule.TagPartfileLastRecv, uint64(file.LastRecv)),
+			))
+		}
+		return reply
+	case amule.OpGetSharedFiles:
+		reply := amule.Packet{Op: amule.OpSharedFiles}
+		for _, file := range c.shared {
+			reply.Tags = append(reply.Tags, amule.IntTag(amule.TagKnownfile, 1,
+				amule.StringTag(amule.TagPartfileName, file.Name),
+				amule.HashTag(amule.TagPartfileHash, hashBytes(file.Hash)),
+				amule.StringTag(amule.TagKnownfileFilename, file.Dir),
+				amule.IntTag(amule.TagPartfileSizeFull, uint64(file.Size)),
 			))
 		}
 		return reply

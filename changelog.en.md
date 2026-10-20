@@ -30,6 +30,16 @@ manual is online: [English](docs/MANUAL.en.md) ·
   aMule's external connections (the old gx-ed2k URL and token options and the
   UPnP one are gone). The automatic gap-filling fallback stays a second switch,
   off by default. An update removes the old `gx-ed2k` binary.
+- **eD2k: completions, stalled downloads and non-video links.** Files completed
+  by aMule 3.x (which drops them from its queue at once) are recognised and
+  imported, also after a Gextto restart. An eD2k download chosen by Gextto that
+  receives no data for 7 days (option **Give up on a stalled eD2k download
+  after**, 0 = never) is cancelled in aMule, blocklisted and the episode is
+  searched again; downloads added by hand and paused ones are left alone. A link
+  to a file that is not a video stays aMule's download only and no longer ends up
+  in quarantine. The old extto and gx-ed2k settings are deleted (aMule's
+  address, port and password are kept). The manual explains how to run aMule in
+  Docker and open the ports with UPnP.
 
 ## 19 October 2026
 

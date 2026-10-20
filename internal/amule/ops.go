@@ -314,6 +314,43 @@ func (c *Client) Downloads(ctx context.Context) ([]Download, error) {
 	return out, nil
 }
 
+// SharedFile is one file aMule shares: its completed downloads among them.
+type SharedFile struct {
+	Hash string `json:"hash"`
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+	// Dir is the folder that holds the file on the core's filesystem.
+	Dir string `json:"dir"`
+}
+
+// SharedFiles returns the files aMule shares. A finished download leaves the
+// download queue and shows up here, in the incoming folder.
+func (c *Client) SharedFiles(ctx context.Context) ([]SharedFile, error) {
+	reply, err := c.Request(ctx, Packet{Op: OpGetSharedFiles, Tags: []Tag{IntTag(TagDetailLevel, DetailFull)}})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]SharedFile, 0, len(reply.Tags))
+	for _, tag := range reply.Tags {
+		if tag.Name != TagKnownfile {
+			continue
+		}
+		hashTag, _ := tag.Child(TagPartfileHash)
+		hash, ok := hashTag.Hash()
+		if !ok {
+			continue
+		}
+		size, _ := tag.ChildInt(TagPartfileSizeFull)
+		out = append(out, SharedFile{
+			Hash: hex.EncodeToString(hash[:]),
+			Name: tag.ChildString(TagPartfileName),
+			Size: int64(size),
+			Dir:  tag.ChildString(TagKnownfileFilename),
+		})
+	}
+	return out, nil
+}
+
 // AddLink queues an ed2k:// link (file, server or server list).
 func (c *Client) AddLink(ctx context.Context, link string, category int) error {
 	tag := StringTag(TagString, strings.TrimSpace(link))

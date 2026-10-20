@@ -1985,6 +1985,36 @@ func migrateLibtorrentKeys(conn *sql.DB, cfg *Config) error {
 	return nil
 }
 
+// retiredEd2kKey reports the settings of the integrations eD2k had before the
+// current aMule one: the first aMule client (extto: managed service, config
+// dir, ports, folders) and the gx-ed2k daemon. Nothing reads them any more.
+// amule_host, amule_port and amule_password are current and kept, so an old
+// installation keeps its connection details.
+func retiredEd2kKey(key string) bool {
+	switch key {
+	case "amule_host", "amule_port", "amule_password":
+		return false
+	case "ed2k_url", "ed2k_token", "ed2k_upnp", "ed2k_nodes_url", "ed2k_serverlist_url", "ed2k_servers":
+		return true
+	}
+	return strings.HasPrefix(key, "amule_")
+}
+
+// dropRetiredEd2kKeys removes the retired eD2k/aMule settings from the
+// configuration and from the database, once, at load.
+func dropRetiredEd2kKeys(conn *sql.DB, cfg *Config) error {
+	for key := range cfg.Settings {
+		if !retiredEd2kKey(key) {
+			continue
+		}
+		delete(cfg.Settings, key)
+		if _, err := conn.Exec("DELETE FROM settings WHERE key = ?1", key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // loadConfigDB overlays the settings stored in `gextto_config.db`, the legacy
 // series database and the movies table on top of this configuration.
 func (c *Config) loadConfigDB() error {
@@ -2025,6 +2055,9 @@ func (c *Config) loadConfigDB() error {
 		}
 	}
 	if err := migrateLibtorrentKeys(conn, c); err != nil {
+		return err
+	}
+	if err := dropRetiredEd2kKeys(conn, c); err != nil {
 		return err
 	}
 	if value, ok := c.Settings["url"]; ok {

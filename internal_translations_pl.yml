@@ -5456,3 +5456,7 @@ pol:
   "connesso": "połączony"
   "statico": "statyczny"
   "risultati per": "wyników dla"
+
+  # eD2k and Kad through aMule (External Connections)
+  "Rinuncia a un download eD2k fermo dopo": "Zrezygnuj z zatrzymanego pobierania eD2k po"
+  "Un download eD2k scelto da Gextto che non riceve dati per questi giorni viene annullato in aMule, la release finisce in blocklist e l'episodio torna da cercare. I download aggiunti a mano e quelli in pausa non vengono toccati. 0 = mai.": "Pobieranie eD2k wybrane przez Gextto, które przez tyle dni nie otrzymuje danych, zostaje anulowane w aMule, wydanie trafia na listę blokad, a odcinek jest wyszukiwany ponownie. Pobierania dodane ręcznie i wstrzymane nie są ruszane. 0 = nigdy."

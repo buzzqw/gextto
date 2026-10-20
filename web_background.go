@@ -720,6 +720,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	// tmpfs forever. `ramdiskAttempts` rate-limits retries per hash.
 	ramdiskAttempts := map[string]time.Time{}
 	lastRamdiskCheck := time.Now().Add(-120 * time.Second)
+	lastEd2kStallCheck := time.Time{}
 	lastDynamicAdjustment := time.Now().Add(-90 * time.Second)
 	// lastQueueCounts is the last logged "transferring/stuck/waiting" triple.
 	lastQueueCounts := ""
@@ -1087,6 +1088,10 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		torrents.SetFirstLastDefault(settingTruthy(cfg.Settings["torrent_first_last"]))
 		MonitorMetadata(cfg, torrents, db, notifier, metadataWaitStart, metadataFirstSeen, metadataLastWarning)
 		MonitorStalled(cfg, torrents, db, notifier, stallWaitStart)
+		if ed2kEnabled(cfg) && now.Sub(lastEd2kStallCheck) >= 10*time.Minute {
+			lastEd2kStallCheck = now
+			MonitorEd2kStalled(cfg, db, notifier, now)
+		}
 		if now.Sub(lastRamdiskCheck) >= 30*time.Second {
 			ReconcileRamdisk(cfg, torrents, ramdiskAttempts)
 			lastRamdiskCheck = now
@@ -1217,7 +1222,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		ed2kHashes := map[string]struct{}{}
 		var ed2kFiles TorrentEngine
 		if ed2kEnabled(cfg) {
-			ed2kFiles = ed2kSession{cfg: cfg}
+			ed2kFiles = ed2kSession{cfg: cfg, pending: db.PendingEd2kHashes}
 			for _, event := range ed2kFiles.PollEvents() {
 				ed2kHashes[strings.ToLower(event.Hash)] = struct{}{}
 				torrentEvents = append(torrentEvents, event)
@@ -1388,7 +1393,14 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				if meta, err := db.TorrentMeta(event.Hash); err == nil && meta != nil {
 					isPack = meta.Release.IsPack
 				}
-				if !isPack {
+				_, isEd2k := ed2kHashes[strings.ToLower(event.Hash)]
+				if isEd2k {
+					// aMule keeps sharing the file from its incoming folder: only
+					// the entry in its download list goes.
+					if removed, err := torrents.Remove(event.Hash, false); err == nil && removed {
+						logging.Debug("completed eD2k file taken off aMule's download list", "name", event.Name)
+					}
+				} else if !isPack {
 					if _, err := os.Stat(CompletionPath(&event)); err != nil {
 						if removed, err := torrents.Remove(event.Hash, false); err == nil && removed {
 							_ = db.MarkTorrentRemovedAt(event.Hash)

@@ -21,6 +21,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/amule"
 	"github.com/buzzqw/gextto/internal/constants"
+	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
@@ -483,6 +484,10 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 	for index := range candidates {
 		release := candidates[index]
 		if !releaseMatchesConfiguredEpisode(&release, series, season, episode) {
+			continue
+		}
+		if link, err := ed2k.ParseFileLink(release.Ed2kLink); err != nil || !isVideoExtension(link.Name) {
+			// An archive or a sample in another format cannot be imported.
 			continue
 		}
 		if release.Quality.Resolution == "" || strings.EqualFold(release.Quality.Resolution, "unknown") {

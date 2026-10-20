@@ -32,6 +32,16 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   vecchie opzioni URL e token di gx-ed2k e quella UPnP spariscono). Il ripiego
   automatico nel gap filling resta un secondo interruttore, spento di default.
   Un aggiornamento rimuove il vecchio binario `gx-ed2k`.
+- **eD2k: completamenti, download fermi e link non video.** I file completati da
+  aMule 3.x (che li toglie subito dalla coda) vengono riconosciuti e importati,
+  anche dopo un riavvio di Gextto. Un download eD2k scelto da Gextto che non
+  riceve dati per 7 giorni (opzione **Rinuncia a un download eD2k fermo dopo**,
+  0 = mai) viene annullato in aMule, finisce in blocklist e l'episodio torna da
+  cercare; quelli aggiunti a mano e quelli in pausa non vengono toccati. Un link
+  a un file che non è un video resta solo un download di aMule e non finisce più
+  in quarantena. Le vecchie impostazioni di extto e di gx-ed2k vengono cancellate
+  (indirizzo, porta e password di aMule restano). Il manuale spiega come usare
+  aMule in Docker e come aprire le porte con l'UPnP.
 
 ## 19 ottobre 2026
 

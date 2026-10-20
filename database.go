@@ -4255,9 +4255,8 @@ func (d *Database) TorrentMeta(hash string) (*models.TorrentMeta, error) {
 	return nil, nil
 }
 
-// TorrentNetwork returns the stored network of a file ("torrent" or "ed2k").
-// It backs the multi-engine router's restored routes; an unknown hash is a
-// torrent, which keeps existing sessions unchanged.
+// TorrentNetwork returns the stored network of a file ("torrent" or "ed2k");
+// an unknown hash is a torrent.
 func (d *Database) TorrentNetwork(hash string) string {
 	if d == nil || d.db == nil {
 		return networkTorrent
@@ -4270,24 +4269,27 @@ func (d *Database) TorrentNetwork(hash string) string {
 	return network
 }
 
-// TorrentRoutes returns every stored non-torrent route, for multiEngine.
-func (d *Database) TorrentRoutes() map[string]string {
+// PendingEd2kHashes returns the eD2k files Gextto handed to aMule and has not
+// seen complete yet. Completed files leave aMule's download queue at once, so
+// these are the hashes whose completion is looked up in aMule's shared files.
+func (d *Database) PendingEd2kHashes() ([]string, error) {
 	if d == nil || d.db == nil {
-		return nil
+		return nil, nil
 	}
-	rows, err := d.db.Query("SELECT lower(hash), network FROM torrent_meta WHERE network IS NOT NULL AND network <> '' AND network <> 'torrent'")
+	rows, err := d.db.Query("SELECT lower(hash) FROM torrent_meta WHERE network = 'ed2k' AND status NOT IN ('completed', 'error', 'removed')")
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
-	out := map[string]string{}
+	var out []string
 	for rows.Next() {
-		var hash, network string
-		if rows.Scan(&hash, &network) == nil {
-			out[hash] = network
+		var hash string
+		if err := rows.Scan(&hash); err != nil {
+			return nil, err
 		}
+		out = append(out, hash)
 	}
-	return out
+	return out, rows.Err()
 }
 
 // ReconcilePackRelease persists the identity found in the actual torrent name

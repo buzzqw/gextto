@@ -1158,6 +1158,19 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 			}
 			return status, map[string]any{"ok": false, "error": err.Error(), "link": link.String()}
 		}
+		if !isVideoExtension(link.Name) {
+			// Not a video (a pdf, a program, an archive): it is aMule's
+			// download only, like a torrent added by hand, and stays in the
+			// incoming folder instead of going through the library import.
+			return http.StatusAccepted, map[string]any{
+				"ok":         true,
+				"title":      link.Name,
+				"hash":       strings.ToLower(link.Hash),
+				"link":       link.String(),
+				"queued":     true,
+				"registered": false,
+			}
+		}
 		release.Network = networkEd2k
 		if release.Title == "" {
 			release.Title = link.Name
