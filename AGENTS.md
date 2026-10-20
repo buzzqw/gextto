@@ -259,11 +259,14 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - Workflow `.github/workflows/codeql.yml` (linguaggio Go; gira su push/PR su
   `main` e una volta a settimana). Non serve `sudo` né CGO per l'analisi.
 - **Model pack locale**: `.github/codeql/extensions/gextto-models` dichiara i
-  validatori di percorso che CodeQL non riconosce da solo (`pathStartsWith`,
-  `folderRenameWithin`, `comicDownloadFilename`). L'action non carica i pack
+  validatori di percorso e di redirect che CodeQL non riconosce da solo
+  (`pathStartsWith`, `folderRenameWithin`, `comicDownloadFilename`,
+  `v2SearchRedirectTarget`). L'`input` di un `barrierModel` è il nodo che ferma
+  il flusso (`ReturnValue`) e il `kind` è quello della query (`path-injection`,
+  `url-redirection`, …), non un'etichetta libera. L'azione non carica i pack
   locali da sola: servono gli `CODEQL_ACTION_EXTRA_OPTIONS` già impostati nello
-  step *Analyze*. Se aggiungi un nuovo validatore di percorso, aggiungilo al
-  model pack (`models/gextto.model.yml`) invece di sopprimere a tappeto.
+  step *Analyze*. Se aggiungi un nuovo validatore, aggiungilo al model pack
+  (`models/gextto.model.yml`) invece di sopprimere a tappeto.
 - **Triage**: correggi gli alert reali (data-flow da input non fidato verso un
   sink); per i by-design o i falsi positivi dimetti con un motivo esplicito:
   `gh api -X PATCH repos/buzzqw/gextto/code-scanning/alerts/<n> -f state=dismissed
