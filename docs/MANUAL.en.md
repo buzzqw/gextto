@@ -816,6 +816,9 @@ the library by **hardlink or copy**, never moved, so aMule keeps sharing them
 from its incoming folder (a hardlink takes no extra space when both folders are
 on the same disk).
 
+For the complete guide — installing aMule, Docker, troubleshooting and the
+protocol details — see [`docs/amule.md`](amule.md).
+
 ## 7. Configuration
 
 The page is split into four areas: **What to look for** (General, Sources,

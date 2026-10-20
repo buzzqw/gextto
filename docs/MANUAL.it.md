@@ -833,6 +833,9 @@ entrano in libreria sempre con **hardlink o copia**, mai spostati, così aMule
 continua a condividerli dalla cartella di arrivo (l'hardlink non occupa spazio
 in più se le due cartelle sono sullo stesso disco).
 
+Per la guida completa — installazione di aMule, Docker, risoluzione dei
+problemi e dettagli del protocollo — vedi [`docs/amule.md`](amule.md).
+
 ## 7. Configurazione
 
 La pagina è divisa in quattro aree: **Cosa cercare** (Generale, Sorgenti,
