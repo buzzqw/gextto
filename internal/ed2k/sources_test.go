@@ -235,3 +235,13 @@ func TestSourceResponseKeepsBuddy(t *testing.T) {
 		t.Fatalf("buddy = %+v", source)
 	}
 }
+
+func TestMergeSourcesKeepsLowID(t *testing.T) {
+	low := PeerSource{
+		LowID: true, ClientID: 7, ServerIP: net.IPv4(9, 8, 7, 6), ServerPort: 5000,
+	}
+	merged := mergeSources([]PeerSource{low})
+	if len(merged) != 1 || !merged[0].LowID || merged[0].ClientID != 7 {
+		t.Fatalf("merged = %+v", merged)
+	}
+}

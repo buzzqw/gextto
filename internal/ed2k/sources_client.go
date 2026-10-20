@@ -233,7 +233,11 @@ func mergeSources(groups ...[]PeerSource) []PeerSource {
 	var out []PeerSource
 	for _, group := range groups {
 		for _, source := range group {
-			if source.IP == nil || (source.TCPPort == 0 && source.UDPPort == 0) {
+			if source.LowID {
+				if source.ClientID == 0 || source.ServerIP == nil || source.ServerPort == 0 {
+					continue
+				}
+			} else if source.IP == nil || (source.TCPPort == 0 && source.UDPPort == 0) {
 				continue
 			}
 			key := ""

@@ -222,3 +222,58 @@ func TestSendServerCallback(t *testing.T) {
 		t.Fatal("server did not receive callback request")
 	}
 }
+
+func TestServerSourcesKeepsLowID(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	hash, _ := ParseID("66666666666666666666666666666666")
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		opcode, _, err := readServerPacket(conn)
+		if err != nil || opcode != OpLoginRequest {
+			return
+		}
+		_ = writeServerPacket(conn, OpIDChange, []byte{0, 0, 1, 0})
+		opcode, payload, err := readServerPacket(conn)
+		if err != nil || opcode != OpGetSources || len(payload) != 20 {
+			return
+		}
+		reply := append([]byte(nil), hash[:]...)
+		reply = append(reply, 1)
+		reply = append(reply, 7, 0, 0, 0, 0x36, 0x12)
+		_ = writeServerPacket(conn, OpFoundSources, reply)
+	}()
+
+	client, err := New(Config{
+		DataDir:       t.TempDir(),
+		UDPListen:     "127.0.0.1:0",
+		Servers:       []string{listener.Addr().String()},
+		SearchTimeout: 4 * time.Second,
+		QueryTimeout:  time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	sources, err := client.Sources(ctx, hash.Hex(), 1234)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sources) != 1 || !sources[0].LowID || sources[0].ClientID != 7 {
+		t.Fatalf("sources = %+v", sources)
+	}
+	host, portText, _ := net.SplitHostPort(listener.Addr().String())
+	port, _ := strconv.Atoi(portText)
+	if !sources[0].ServerIP.Equal(net.ParseIP(host)) || sources[0].ServerPort != uint16(port) {
+		t.Fatalf("server = %v:%d", sources[0].ServerIP, sources[0].ServerPort)
+	}
+}
