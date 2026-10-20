@@ -1473,6 +1473,11 @@ Oltre agli eventi di download, Gextto notifica i problemi del servizio:
   trasferimenti fermi);
 - **problemi di salute** — quando il controllo di salute rileva un problema e
   quando torna operativo.
+- **login a MirCrew** — quando il login al forum del servizio
+  `mircrew-indexer` resta rotto per più di 15 minuti, e di nuovo quando torna a
+  funzionare. Il servizio continua a rispondere alle ricerche dal suo indice
+  locale, quindi senza questo controllo un login rotto non produrrebbe altri
+  avvisi.
 
 Un processo morto non può notificare la propria caduta: il crash di Gextto si
 riceve quindi al riavvio successivo. Se Gextto non riparte (per esempio il

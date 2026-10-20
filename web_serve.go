@@ -63,6 +63,7 @@ func startBackgroundWorkers(state *AppState) {
 	register("db_checkpoint_worker", func() { dbCheckpointWorker(state) })
 	register("health_monitor_worker", func() { healthMonitorWorker(state) })
 	register("cycle_monitor_worker", func() { cycleHealthWorker(state) })
+	register("provider_login_worker", func() { providerLoginWorker(state) })
 	register("update_check_worker", func() { updateCheckWorker(state) })
 	register("bandwidth_history_worker", func() { bandwidthHistoryWorker(state) })
 	register("latency_guard_worker", func() { latencyGuardWorker(state) })

@@ -1424,6 +1424,10 @@ Besides download events, Gextto notifies service problems:
   transfers stopped);
 - **health problems** — when the health check finds a problem and when it is
   healthy again.
+- **MirCrew login** — when the forum login of the `mircrew-indexer` service
+  stays broken for more than 15 minutes, and again when it works. The service
+  keeps answering searches from its local index, so without this check a broken
+  login would produce no other warning.
 
 A dead process cannot notify its own crash: a Gextto crash is therefore reported
 on the next start. If Gextto does not come back (for example the service is

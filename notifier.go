@@ -665,6 +665,18 @@ func formatEmailSubject(event string, data map[string]any) string {
 			return fmt.Sprintf("Gextto: %s — %s", label, source)
 		}
 		return fmt.Sprintf("Gextto: %s", label)
+	case "provider_login_failed":
+		label := messages.Pick("Login al provider non riuscito", "Provider login failed")
+		if source := text("source"); source != "" {
+			return fmt.Sprintf("Gextto: %s — %s", label, source)
+		}
+		return fmt.Sprintf("Gextto: %s", label)
+	case "provider_login_recovered":
+		label := messages.Pick("Login al provider di nuovo attivo", "Provider login working again")
+		if source := text("source"); source != "" {
+			return fmt.Sprintf("Gextto: %s — %s", label, source)
+		}
+		return fmt.Sprintf("Gextto: %s", label)
 	default:
 		return fmt.Sprintf("Gextto [%s]", event)
 	}
@@ -1163,6 +1175,19 @@ func formatEvent(event string, data map[string]any) string {
 			messages.Pick("Motivo", "Reason"), text("reason"))
 	case "cycle_recovered":
 		return messages.Pick("✅ La ricerca automatica è di nuovo regolare", "✅ The automatic search is healthy again")
+	case "provider_login_failed":
+		return fmt.Sprintf("%s\n\n📡 %s: %s\n📝 %s: %s\n\n💡 %s",
+			messages.Pick("⚠️ LOGIN AL PROVIDER NON RIUSCITO", "⚠️ PROVIDER LOGIN FAILED"),
+			messages.Pick("Fonte", "Source"), text("source"),
+			messages.Pick("Motivo", "Reason"), text("error"),
+			messages.Pick(
+				"Controlla utente e password nella web UI del servizio e usa «Rifai login»; finché non funziona, disabilita l'indexer nelle ricerche.",
+				"Check the username and password in the service web UI and use «Rifai login»; until it works, disable the indexer in the searches.",
+			))
+	case "provider_login_recovered":
+		return fmt.Sprintf("%s\n\n📡 %s: %s",
+			messages.Pick("✅ LOGIN AL PROVIDER DI NUOVO ATTIVO", "✅ PROVIDER LOGIN WORKING AGAIN"),
+			messages.Pick("Fonte", "Source"), text("source"))
 	case "indexer_failing":
 		failures, _ := jsonInt(mapLookup(data, "failed_links"))
 		return fmt.Sprintf("%s\n\n📡 %s: %s\n🔗 %s: %d\n📝 %s: %s\n\n💡 %s",
