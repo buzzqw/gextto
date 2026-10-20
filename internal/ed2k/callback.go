@@ -60,3 +60,34 @@ func (c *Client) CallbackIdentity() (ID, uint16) {
 	defer c.mu.Unlock()
 	return c.userHashValue, uint16(c.cfg.TCPPort)
 }
+
+// SendBuddyCallback asks a LowID source's buddy to tell the source to connect
+// to us. Payload: buddy ID, file hash and our TCP port (KADEMLIA_CALLBACK_REQ).
+func (c *Client) SendBuddyCallback(ctx context.Context, source PeerSource, fileHash ID, ourPort uint16) error {
+	if source.BuddyID == (ID{}) || source.BuddyIP == nil || source.BuddyPort == 0 {
+		return errors.New("ed2k: source has no buddy")
+	}
+	if ourPort == 0 {
+		return errors.New("ed2k: invalid callback TCP port")
+	}
+	if err := c.Start(ctx); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	conn := c.conn
+	c.mu.Unlock()
+	if conn == nil {
+		return errors.New("ed2k: Kad socket is not open")
+	}
+	payload := make([]byte, 0, 34)
+	payload = append(payload, source.BuddyID[:]...)
+	payload = append(payload, fileHash[:]...)
+	var port [2]byte
+	binary.LittleEndian.PutUint16(port[:], ourPort)
+	payload = append(payload, port[:]...)
+	addr := &net.UDPAddr{IP: source.BuddyIP, Port: int(source.BuddyPort)}
+	if _, err := conn.WriteToUDP(kadPacket(KadCallbackReq, payload), addr); err != nil {
+		return fmt.Errorf("ed2k: buddy callback to %s: %w", addr, err)
+	}
+	return nil
+}

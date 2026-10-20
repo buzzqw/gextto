@@ -1566,7 +1566,8 @@ enabled) it also exposes the transfer plane: it accepts `ed2k://` links (more
 than one at a time too), downloads with MD4 verification, resumes `.part` files
 and shares completed files with a minimal upload. Full queue/credits,
 obfuscation and buddy/hole punching for a LowID client are still missing.
-**LowID sources** (Kad type 3/5/6) are invited with a **direct UDP callback**:
+**LowID sources** (Kad type 3/5/6) are invited with a **direct UDP callback**
+and, when they expose a buddy, with a **KADEMLIA_CALLBACK_REQ** to that buddy:
 when our TCP port is reachable (HighID) the peer connects to us and the
 download continues over that connection. The feature is off by
 default: without your consent Gextto does not contact the network.

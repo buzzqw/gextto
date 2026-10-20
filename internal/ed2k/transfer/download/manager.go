@@ -24,6 +24,7 @@ type Discoverer interface {
 // implements it; a fake can implement it in tests.
 type Callbacker interface {
 	SendDirectCallback(ctx context.Context, source ed2k.PeerSource, ourPort uint16) error
+	SendBuddyCallback(ctx context.Context, source ed2k.PeerSource, fileHash ed2k.ID, ourPort uint16) error
 	CallbackIdentity() (ed2k.ID, uint16)
 	CanCallback() bool
 }
@@ -268,31 +269,59 @@ func (m *Manager) fetchViaCallback(ctx context.Context, source ed2k.PeerSource, 
 		return nil, errors.New("download: direct callback is not available")
 	}
 	if !callback.CanCallback() {
-		return nil, errors.New("download: our TCP port is not reachable (LowID), direct callback skipped")
+		return nil, errors.New("download: our TCP port is not reachable (LowID), callback skipped")
 	}
-	if source.UDPPort == 0 {
-		return nil, errors.New("download: LowID source has no UDP port")
+	direct := source.UDPPort != 0
+	buddy := source.BuddyID != (ed2k.ID{})
+	if !direct && !buddy {
+		return nil, errors.New("download: LowID source has no UDP port or buddy")
 	}
 	ip := source.IP.String()
 	channel, done := m.expectCallback(ip)
 	defer done()
 	_, ourPort := callback.CallbackIdentity()
-	if err := callback.SendDirectCallback(ctx, source, ourPort); err != nil {
-		return nil, err
+	if direct {
+		if err := callback.SendDirectCallback(ctx, source, ourPort); err != nil {
+			if cfg.Logf != nil {
+				cfg.Logf("download: direct callback to %s failed: %v", ip, err)
+			}
+			if !buddy {
+				return nil, err
+			}
+		} else if cfg.Logf != nil {
+			cfg.Logf("download: direct callback sent to %s:%d", ip, source.UDPPort)
+		}
 	}
-	if cfg.Logf != nil {
-		cfg.Logf("download: direct callback sent to %s:%d, waiting for the source", ip, source.UDPPort)
+	wait := func(duration time.Duration) (*Result, bool, error) {
+		timer := time.NewTimer(duration)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return nil, true, ctx.Err()
+		case <-timer.C:
+			return nil, false, nil
+		case conn := <-channel:
+			result, err := FetchCallback(ctx, conn, link, cfg)
+			return result, true, err
+		}
 	}
-	timer := time.NewTimer(90 * time.Second)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-timer.C:
-		return nil, errors.New("download: direct callback timed out")
-	case conn := <-channel:
-		return FetchCallback(ctx, conn, link, cfg)
+	if direct {
+		if result, done, err := wait(15 * time.Second); done {
+			return result, err
+		}
 	}
+	if buddy {
+		if err := callback.SendBuddyCallback(ctx, source, link.Hash, ourPort); err != nil {
+			return nil, err
+		}
+		if cfg.Logf != nil {
+			cfg.Logf("download: buddy callback sent via %s:%d", source.BuddyIP, source.BuddyPort)
+		}
+	}
+	if result, _, err := wait(75 * time.Second); result != nil || err != nil {
+		return result, err
+	}
+	return nil, errors.New("download: callback timed out")
 }
 
 func (m *Manager) update(id string, change func(*Transfer)) {

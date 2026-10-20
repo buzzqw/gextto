@@ -39,6 +39,9 @@ const (
 	TagEncryption     = 0xF3
 	TagFileSizeHigh   = 0x3A
 	TagCompleteSource = 0x30
+	TagBuddyHash      = 0xF8
+	TagServerPort     = 0xFA
+	TagServerIP       = 0xFB
 )
 
 // Tag is one decoded key/value pair.

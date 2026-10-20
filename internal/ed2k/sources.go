@@ -20,6 +20,9 @@ type PeerSource struct {
 	UserHash   ID
 	Type       uint8
 	Encryption uint8
+	BuddyID    ID
+	BuddyIP    net.IP
+	BuddyPort  uint16
 	Origin     string // "server" or "kad"
 }
 
@@ -147,6 +150,17 @@ func sourceFromTags(userHash ID, tags []Tag) (PeerSource, bool) {
 	}
 	if encryption, ok := tagUint(byID, TagEncryption); ok && encryption <= math.MaxUint8 {
 		source.Encryption = uint8(encryption)
+	}
+	if buddy, ok := tagUint(byID, TagServerIP); ok {
+		source.BuddyIP = net.IPv4(byte(buddy>>24), byte(buddy>>16), byte(buddy>>8), byte(buddy))
+	}
+	if buddyPort, ok := tagUint(byID, TagServerPort); ok && buddyPort <= math.MaxUint16 {
+		source.BuddyPort = uint16(buddyPort)
+	}
+	if buddyHash, ok := tagString(byID, TagBuddyHash); ok {
+		if id, err := ParseID(buddyHash); err == nil {
+			source.BuddyID = id
+		}
 	}
 	// Types 3, 5 and 6 are firewalled: they have no inbound TCP port but can
 	// be reached with a direct UDP callback.

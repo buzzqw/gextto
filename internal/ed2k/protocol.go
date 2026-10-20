@@ -29,6 +29,7 @@ const (
 	KadSearchKeyReq   = 0x33
 	KadSearchSource   = 0x34
 	KadSearchNotesReq = 0x35
+	KadCallbackReq    = 0x52
 	KadSearchRes      = 0x3B
 	KadPublishKeyReq  = 0x43
 	KadPublishSrcReq  = 0x44

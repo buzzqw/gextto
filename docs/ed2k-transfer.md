@@ -37,8 +37,11 @@ carries the part-status and complete-source words. Files above 4 GiB use the
 I64 request/part opcodes. LowID Kad sources (type 3/5/6) are kept even without
 an inbound TCP port: when our own port is open (HighID), the manager sends
 OP_DIRECTCALLBACKREQ over UDP, waits for the source to connect back and runs a
-server-side hello plus the normal download over that connection. Buddy relay
-and TCP hole punching for a LowID client are still missing. A queued transfer keeps retrying. Do not send OP_SETREQFILEID before
+server-side hello plus the normal download over that connection. If the source
+advertises a buddy (Kad TAG_BUDDYHASH/SERVERIP/SERVERPORT), the manager also
+sends KADEMLIA_CALLBACK_REQ to that buddy, which makes the source connect to us
+on TCP. This is the buddy/TCP callback path; a full LowID↔LowID relay through a
+third client is still out of scope. A queued transfer keeps retrying. Do not send OP_SETREQFILEID before
 OP_STARTUPLOADREQ: real eMule peers close the socket after accepting the slot
 when that packet arrives, while aMule tolerates it. With the packet removed, a
 live download of the 4.2 MB eMule 0.70b installer completed, passed the final

@@ -184,6 +184,9 @@ func v2SourcesIndexFrom(s *AppState, cfg *Config) *v2SourcesIndex {
 			ed2kAlert = true
 		case entry.reachability == "open":
 			ed2kLabel = tr("aperta")
+			if entry.mapping != "" {
+				ed2kLabel += " · " + strings.ToUpper(entry.mapping)
+			}
 		case entry.reachability == "limited":
 			ed2kLabel = tr("limitata (firewall/NAT)")
 			ed2kAlert = true

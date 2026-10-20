@@ -231,6 +231,11 @@ func mergeSources(groups ...[]PeerSource) []PeerSource {
 				if existing.UDPPort == 0 && source.UDPPort != 0 {
 					existing.UDPPort = source.UDPPort
 				}
+				if existing.BuddyID == (ID{}) && source.BuddyID != (ID{}) {
+					existing.BuddyID = source.BuddyID
+					existing.BuddyIP = source.BuddyIP
+					existing.BuddyPort = source.BuddyPort
+				}
 				if existing.Origin != source.Origin {
 					existing.Origin = "mixed"
 				}

@@ -188,3 +188,34 @@ func TestSourceResponseKeepsLowID(t *testing.T) {
 		t.Fatalf("lowID source = %+v", sources[0])
 	}
 }
+
+func TestSourceResponseKeepsBuddy(t *testing.T) {
+	sender, _ := ParseID("11111111111111111111111111111111")
+	target, _ := ParseID("22222222222222222222222222222222")
+	user, _ := ParseID("33333333333333333333333333333333")
+	buddy, _ := ParseID("44444444444444444444444444444444")
+	tags := []Tag{
+		{Name: TagSourceIP, Type: TagUint32, Int: 0x01020304},
+		{Name: TagSourcePort, Type: TagUint16, Int: 0},
+		{Name: TagSourceUDPPort, Type: TagUint16, Int: 4672},
+		{Name: TagSourceType, Type: TagUint8, Int: 3},
+		{Name: TagServerIP, Type: TagUint32, Int: 0x05060708},
+		{Name: TagServerPort, Type: TagUint16, Int: 5000},
+		{Name: TagBuddyHash, Type: TagString, Str: buddy.Hex()},
+	}
+	w := newWriter(binary.LittleEndian)
+	w.kadID(sender)
+	w.kadID(target)
+	w.u16(1)
+	w.kadID(user)
+	w.u8(uint8(len(tags)))
+	w.raw(WriteTagList(tags, binary.LittleEndian))
+	_, sources, err := decodeSourceResponse(w.buf)
+	if err != nil || len(sources) != 1 {
+		t.Fatalf("sources = %+v, %v", sources, err)
+	}
+	source := sources[0]
+	if source.BuddyID != buddy || !source.BuddyIP.Equal(net.IPv4(5, 6, 7, 8)) || source.BuddyPort != 5000 {
+		t.Fatalf("buddy = %+v", source)
+	}
+}

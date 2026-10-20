@@ -153,6 +153,7 @@ type ed2kHealthEntry struct {
 	reachDetail  string
 	lowID        bool
 	upnp         map[string]any
+	mapping      string
 	err          string
 }
 
@@ -214,6 +215,9 @@ func ed2kHealth(cfg *Config) ed2kHealthEntry {
 					entry.reachability = payload.Reachability
 					entry.lowID = payload.LowID
 					entry.upnp = payload.UPnP
+					if method, ok := payload.UPnP["method"].(string); ok {
+						entry.mapping = method
+					}
 				}
 			}
 		}
