@@ -154,3 +154,48 @@ func onlyHash(t *testing.T, server *Server) string {
 	}
 	return ""
 }
+
+func TestUploadQueueAndCredits(t *testing.T) {
+	server := New(1)
+	hash := ed2k.ID{1}
+	left, right := net.Pipe()
+	defer left.Close()
+	defer right.Close()
+	first := peer.NewConn(left)
+	if !server.acquire(first, hash) {
+		t.Fatal("first slot refused")
+	}
+	serverSide := peer.NewConn(right)
+	testSide := peer.NewConn(left)
+	_ = testSide
+	ready := make(chan bool, 1)
+	go func() { ready <- server.acquire(serverSide, hash) }()
+	opcode, payload, err := peer.NewConn(left).Receive()
+	if err != nil || opcode != peer.OpQueueRanking {
+		t.Fatalf("queue rank: opcode=%#x err=%v", opcode, err)
+	}
+	if rank, err := peer.DecodeQueueRanking(payload); err != nil || rank.Rank != 1 {
+		t.Fatalf("rank = %+v, %v", rank, err)
+	}
+	server.release()
+	select {
+	case ok := <-ready:
+		if !ok {
+			t.Fatal("queued client was not granted")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("queued client timed out")
+	}
+	server.release()
+
+	path := filepath.Join(t.TempDir(), "credits.json")
+	server.SetCreditPath(path)
+	server.addCredit(hash, 1234)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(raw, []byte(hash.Hex())) {
+		t.Fatalf("credits = %s", raw)
+	}
+}

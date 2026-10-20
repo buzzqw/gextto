@@ -77,6 +77,7 @@ func main() {
 	searchTimeout := flag.Duration("search-timeout", 20*time.Second, "whole search budget")
 	downloadEnabled := flag.Bool("download", envBool("GX_ED2K_DOWNLOAD", false), "enable the eD2k transfer plane")
 	downloadDir := flag.String("download-dir", envOr("GX_ED2K_DOWNLOAD_DIR", ""), "directory for .part files and completed downloads")
+	shareDirs := flag.String("share-dir", envOr("GX_ED2K_SHARE_DIR", ""), "comma-separated extra directories to share")
 	lang := flag.String("lang", messages.Language(), "UI language (it, en, de, fr, es, pl)")
 	fingerprint := flag.String("fingerprint", "", "configuration fingerprint (managed mode)")
 	logFile := flag.String("log-file", "", "write the log to this file instead of stderr")
@@ -142,8 +143,17 @@ func main() {
 		uploader.ClientName = "gx-ed2k"
 		uploader.UserHash = userHash
 		uploader.TCPPort = uint16(*tcpPort)
-		if err := uploader.IndexDir(*downloadDir); err != nil {
-			log.Printf("gx-ed2k: upload index: %v", err)
+		uploader.SetCreditPath(filepath.Join(*dataDir, "credits.json"))
+		dirs := []string{*downloadDir}
+		for _, dir := range strings.Split(*shareDirs, ",") {
+			if dir = strings.TrimSpace(dir); dir != "" {
+				dirs = append(dirs, dir)
+			}
+		}
+		for _, dir := range dirs {
+			if err := uploader.IndexDir(dir); err != nil {
+				log.Printf("gx-ed2k: upload index %s: %v", dir, err)
+			}
 		}
 	}
 	var manager *download.Manager

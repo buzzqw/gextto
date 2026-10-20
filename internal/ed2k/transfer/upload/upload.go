@@ -1,10 +1,10 @@
 // Package upload serves completed eD2k files to other peers over the eMule
-// client protocol. It is the minimal upload plane: no queue, no credits, no
-// sharing of partial files. Its purpose is to keep the client from behaving
-// as a pure leech and to make the advertised HighID useful.
+// client protocol. It has a bounded upload queue, per-user credit accounting
+// and a shared-file index; partial files are never served.
 package upload
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -31,10 +32,22 @@ type File struct {
 }
 
 // Server indexes completed files and answers client connections.
+type waiter struct {
+	hash  ed2k.ID
+	ready chan struct{}
+	at    time.Time
+}
+
 type Server struct {
 	mu    sync.RWMutex
 	files map[string]*File
-	slots chan struct{}
+
+	queueMu    sync.Mutex
+	maxSlots   int
+	active     int
+	queue      []*waiter
+	credits    map[string]int64
+	creditPath string
 
 	ClientName string
 	UserHash   ed2k.ID
@@ -49,7 +62,8 @@ func New(slots int) *Server {
 	}
 	return &Server{
 		files:      make(map[string]*File),
-		slots:      make(chan struct{}, slots),
+		maxSlots:   slots,
+		credits:    make(map[string]int64),
 		ClientName: "gx-ed2k",
 		TCPPort:    4662,
 		Idle:       60 * time.Second,
@@ -103,6 +117,16 @@ func (s *Server) AddFile(path string) error {
 	return nil
 }
 
+// SetCreditPath enables persistence of uploaded-bytes credits.
+func (s *Server) SetCreditPath(path string) {
+	s.queueMu.Lock()
+	s.creditPath = path
+	if raw, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(raw, &s.credits)
+	}
+	s.queueMu.Unlock()
+}
+
 // Len is the number of shared files.
 func (s *Server) Len() int {
 	s.mu.RLock()
@@ -120,12 +144,6 @@ func (s *Server) lookup(hash ed2k.ID) *File {
 // this method closes it.
 func (s *Server) Handle(conn net.Conn) {
 	defer conn.Close()
-	select {
-	case s.slots <- struct{}{}:
-		defer func() { <-s.slots }()
-	default:
-		return
-	}
 	client := peer.NewConn(conn)
 	_ = client.SetDeadline(time.Now().Add(30 * time.Second))
 
@@ -145,6 +163,12 @@ func (s *Server) Handle(conn net.Conn) {
 		return
 	}
 	_ = client.SendExtended(peer.OpEmuleInfo, peer.EncodeMuleInfo())
+	acquired := false
+	defer func() {
+		if acquired {
+			s.release()
+		}
+	}()
 
 	for {
 		_ = client.SetDeadline(time.Now().Add(s.Idle))
@@ -210,6 +234,12 @@ func (s *Server) Handle(conn net.Conn) {
 				_ = client.Send(peer.OpFileNoSuchFile, request.Hash[:])
 				continue
 			}
+			if !acquired {
+				if !s.acquire(client, hello.UserHash) {
+					return
+				}
+				acquired = true
+			}
 			if err := client.Send(peer.OpQueueRanking, peer.EncodeQueueRanking(peer.QueueRanking{Rank: 0})); err != nil {
 				return
 			}
@@ -217,16 +247,116 @@ func (s *Server) Handle(conn net.Conn) {
 				return
 			}
 		case peer.OpRequestParts:
+			if !acquired {
+				continue
+			}
 			request, err := peer.DecodePartRequest(payload)
 			if err != nil {
 				return
 			}
-			if err := s.sendParts(client, request); err != nil {
+			sent, err := s.sendParts(client, request)
+			if err != nil {
 				return
+			}
+			if sent > 0 {
+				s.addCredit(hello.UserHash, sent)
 			}
 		case peer.OpCancelTransfer, peer.OpEndOfDownload:
 			return
 		}
+	}
+}
+
+// acquire grants an upload slot or waits in the credit-ordered queue.
+func (s *Server) acquire(client *peer.Conn, hash ed2k.ID) bool {
+	s.queueMu.Lock()
+	if s.active < s.maxSlots {
+		s.active++
+		s.queueMu.Unlock()
+		return true
+	}
+	waiter := &waiter{hash: hash, ready: make(chan struct{}, 1), at: time.Now()}
+	s.queue = append(s.queue, waiter)
+	rank := len(s.queue)
+	s.queueMu.Unlock()
+	if err := client.Send(peer.OpQueueRanking, peer.EncodeQueueRanking(peer.QueueRanking{Rank: uint16(rank)})); err != nil {
+		s.removeWaiter(waiter)
+		return false
+	}
+	select {
+	case <-waiter.ready:
+		return true
+	case <-time.After(5 * time.Minute):
+		s.queueMu.Lock()
+		for i, candidate := range s.queue {
+			if candidate == waiter {
+				s.queue = append(s.queue[:i], s.queue[i+1:]...)
+				s.queueMu.Unlock()
+				return false
+			}
+		}
+		s.queueMu.Unlock()
+		// The dispatcher granted the slot just as the timeout expired.
+		return true
+	}
+}
+
+func (s *Server) removeWaiter(waiter *waiter) {
+	s.queueMu.Lock()
+	defer s.queueMu.Unlock()
+	for i, candidate := range s.queue {
+		if candidate == waiter {
+			s.queue = append(s.queue[:i], s.queue[i+1:]...)
+			return
+		}
+	}
+}
+
+func (s *Server) release() {
+	s.queueMu.Lock()
+	if s.active > 0 {
+		s.active--
+	}
+	if len(s.queue) > 0 {
+		sort.SliceStable(s.queue, func(i, j int) bool {
+			left := s.credits[s.queue[i].hash.Hex()]
+			right := s.credits[s.queue[j].hash.Hex()]
+			if left == right {
+				return s.queue[i].at.Before(s.queue[j].at)
+			}
+			return left > right
+		})
+		next := s.queue[0]
+		s.queue = s.queue[1:]
+		s.active++
+		close(next.ready)
+	}
+	s.saveCreditsLocked()
+	s.queueMu.Unlock()
+}
+
+func (s *Server) addCredit(hash ed2k.ID, bytes int64) {
+	if bytes <= 0 {
+		return
+	}
+	s.queueMu.Lock()
+	s.credits[hash.Hex()] += bytes
+	s.saveCreditsLocked()
+	s.queueMu.Unlock()
+}
+
+func (s *Server) saveCreditsLocked() {
+	if s.creditPath == "" {
+		return
+	}
+	raw, err := json.Marshal(s.credits)
+	if err != nil {
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(s.creditPath), 0o755)
+	tmp := s.creditPath + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o644); err == nil {
+		_ = os.Rename(tmp, s.creditPath)
 	}
 }
 
@@ -242,37 +372,39 @@ func fileStatus(file *File) ([]byte, error) {
 	return peer.EncodeFileStatus(peer.FileStatus{Hash: file.Hash, Parts: parts, Bits: bits})
 }
 
-func (s *Server) sendParts(client *peer.Conn, request peer.PartRequest) error {
+func (s *Server) sendParts(client *peer.Conn, request peer.PartRequest) (int64, error) {
 	file := s.lookup(request.Hash)
 	if file == nil {
-		return nil
+		return 0, nil
 	}
 	handle, err := os.Open(file.Path)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer handle.Close()
+	var sent int64
 	for i := 0; i < 3; i++ {
 		start, end := int64(request.Starts[i]), int64(request.Ends[i])
 		if end <= start {
 			continue
 		}
 		if start < 0 || end > file.Size {
-			return fmt.Errorf("upload: range %d-%d out of file", start, end)
+			return sent, fmt.Errorf("upload: range %d-%d out of file", start, end)
 		}
 		data := make([]byte, end-start)
 		if _, err := handle.ReadAt(data, start); err != nil && !errors.Is(err, io.EOF) {
-			return err
+			return sent, err
 		}
 		raw, err := peer.EncodeSendingPart(peer.SendingPart{
 			Hash: file.Hash, Start: uint32(start), End: uint32(end), Data: data,
 		})
 		if err != nil {
-			return err
+			return sent, err
 		}
 		if err := client.Send(peer.OpSendingPart, raw); err != nil {
-			return err
+			return sent, err
 		}
+		sent += int64(len(data))
 	}
-	return nil
+	return sent, nil
 }
