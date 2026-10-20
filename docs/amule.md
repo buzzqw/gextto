@@ -165,12 +165,22 @@ produces, so renaming, the library import, the MediaInfo check, the
 notification and the media library refresh are shared. The quality gate runs
 before anything is written to the library, movies included: if the library
 already holds an equal or better file, the download is discarded (moved to the
-trash, or deleted according to the cleanup action) and never copied. aMule 2.3 keeps a
-finished file in its download queue; aMule 3.x drops it at once, so Gextto
-finds it among the shared files, also after a restart. eD2k episodes are always
-imported by **hardlink or copy** (never moved), so aMule keeps sharing the
-original from its incoming folder; a hardlink costs no extra space when both
-folders are on the same filesystem.
+trash, or deleted according to the cleanup action) and never copied.
+
+aMule 2.3 keeps a finished file in its download queue; aMule 3.x drops it at
+once, so Gextto finds it among the shared files, also after a restart. eD2k
+episodes are always imported by **hardlink or copy** (never moved), so aMule
+keeps sharing the original from its incoming folder; a hardlink costs no extra
+space when both folders are on the same filesystem.
+
+Notifications use the same events as torrents: **Download complete** with the
+title, the library path, the size, the duration and the average speed (and the
+replaced release when it replaced a worse one), **Download failed** when an
+automatic eD2k download stalls for the configured days, **Torrent error** when
+the import fails. A file discarded as inferior produces only a log line, and a
+file that is not a video is never registered as a release: if aMule keeps it in
+its queue you get the plain "manual" completion notice, with aMule 3.x (which
+drops it at once) no notice at all.
 
 ### Bandwidth
 

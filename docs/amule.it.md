@@ -165,12 +165,22 @@ MediaInfo, notifica e aggiornamento dei media server sono condivisi. Il
 controllo di qualità gira prima che qualcosa venga scritto in libreria, film
 compresi: se c'è già un file uguale o migliore il download viene scartato
 (spostato nel Cestino, o eliminato secondo l'azione di pulizia) e mai copiato.
-aMule 2.3
-tiene il file finito nella coda dei download; aMule 3.x lo toglie subito, quindi
-Gextto lo ritrova tra i file condivisi, anche dopo un riavvio. Gli episodi eD2k
-entrano in libreria sempre con **hardlink o copia** (mai spostati), così aMule
-continua a condividere l'originale dalla cartella di arrivo; l'hardlink non
-occupa spazio in più quando le due cartelle sono sullo stesso filesystem.
+
+aMule 2.3 tiene il file finito nella coda dei download; aMule 3.x lo toglie
+subito, quindi Gextto lo ritrova tra i file condivisi, anche dopo un riavvio. Gli
+episodi eD2k entrano in libreria sempre con **hardlink o copia** (mai spostati),
+così aMule continua a condividere l'originale dalla cartella di arrivo;
+l'hardlink non occupa spazio in più quando le due cartelle sono sullo stesso
+filesystem.
+
+Le notifiche usano gli stessi eventi dei torrent: **Download completato** con
+titolo, percorso in libreria, dimensione, durata e velocità media (e la release
+sostituita quando ne ha rimpiazzata una peggiore), **Download fallito** quando un
+download eD2k automatico si ferma per i giorni configurati, **Errore torrent**
+quando l'import fallisce. Un file scartato perché inferiore produce solo una
+riga di log, e un file che non è un video non viene registrato come release: se
+aMule lo tiene in coda arriva la semplice notifica "manuale" di completamento,
+con aMule 3.x (che lo toglie subito) nessuna notifica.
 
 ### Banda
 
