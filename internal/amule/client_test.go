@@ -49,7 +49,8 @@ func TestClientAgainstFakeCore(t *testing.T) {
 		{Hash: "11111111111111111111111111111111", Name: "few.mkv", Size: 10, Sources: 1},
 		{Hash: "22222222222222222222222222222222", Name: "many.mkv", Size: 20, Sources: 9},
 	}, "")
-	results, err := client.Search(ctx, "query", amule.SearchOptions{Type: amule.SearchKad, Wait: 5 * time.Second, Poll: 10 * time.Millisecond})
+	// aMule answers with files whose names carry the query's words.
+	results, err := client.Search(ctx, "mkv", amule.SearchOptions{Type: amule.SearchKad, Wait: 5 * time.Second, Poll: 10 * time.Millisecond})
 	if err != nil || len(results) != 2 || results[0].Name != "many.mkv" {
 		t.Fatalf("results = %+v, %v", results, err)
 	}
@@ -124,5 +125,63 @@ func TestSearchRefusesWhenAnotherClientKeepsSearching(t *testing.T) {
 	}
 	if got := core.Searches(); len(got) != 3 {
 		t.Fatalf("searches = %v, want three attempts", got)
+	}
+}
+
+func TestSearchDetectsAForeignListOnTheFirstPoll(t *testing.T) {
+	core, err := amuletest.Start("secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer core.Close()
+	client := amule.New(amule.Config{Address: core.Address(), Password: "secret"})
+	defer client.Close()
+
+	core.SetResults([]amuletest.Result{
+		{Hash: "11111111111111111111111111111111", Name: "The.Pitt.S01E01.mkv", Size: 10, Sources: 3},
+	}, "")
+	// Another client's search fills the list before our first poll: there is
+	// no earlier list to compare with, but none of its files names the query.
+	core.SetSearchInterference([]amuletest.Result{
+		{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Name: "Unrelated.S01E01.mkv", Size: 10, Sources: 1},
+	}, 0, 1, 1)
+
+	results, err := client.Search(context.Background(), "the pitt",
+		amule.SearchOptions{Type: amule.SearchKad, Wait: 2 * time.Second, Poll: 5 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Name != "The.Pitt.S01E01.mkv" {
+		t.Fatalf("results = %+v", results)
+	}
+	if got := core.Searches(); len(got) != 2 {
+		t.Fatalf("searches = %v, want the query restarted once", got)
+	}
+}
+
+func TestSearchReportsTheContextWhileWaitingToRetry(t *testing.T) {
+	core, err := amuletest.Start("secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer core.Close()
+	client := amule.New(amule.Config{Address: core.Address(), Password: "secret"})
+	defer client.Close()
+
+	core.SetResults([]amuletest.Result{
+		{Hash: "11111111111111111111111111111111", Name: "The.Pitt.S01E01.mkv", Size: 10, Sources: 3},
+	}, "")
+	core.SetSearchInterference([]amuletest.Result{
+		{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Name: "Unrelated.S01E01.mkv", Size: 10, Sources: 1},
+	}, 1, 1, 0)
+
+	// The first attempt is replaced at once; the deadline expires during the
+	// pause before the retry.
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	_, err = client.Search(ctx, "the pitt",
+		amule.SearchOptions{Type: amule.SearchKad, Wait: 2 * time.Second, Poll: 5 * time.Millisecond})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want the context deadline", err)
 	}
 }

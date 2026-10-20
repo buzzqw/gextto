@@ -645,8 +645,7 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 		return "v2_downloads", v2DownloadsViewFrom(s, r)
 	case "settings":
 		settings := v2SettingsViewFrom(s, r.FormValue("tab"), r.FormValue("highlight"), v2SettingsMode(r))
-		settings.Flash = strings.TrimSpace(r.FormValue("msg"))
-		settings.FlashErr = r.FormValue("msg_err") == "1"
+		settings.Flash, settings.FlashErr = v2Ed2kFlash(r.FormValue("msg"))
 		return "v2_settings", settings
 	case "health":
 		return "v2_health", v2HealthViewFrom(s, r)
@@ -666,7 +665,8 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 	case "comics":
 		return "v2_comics", v2ComicsViewFrom(s, r)
 	case "ed2k":
-		return "v2_ed2k", v2Ed2kViewFrom(s, r.FormValue("msg"), "", r.FormValue("msg_err") == "1", r.FormValue("tab"))
+		message, isErr := v2Ed2kFlash(r.FormValue("msg"))
+		return "v2_ed2k", v2Ed2kViewFrom(s, message, "", isErr, r.FormValue("tab"))
 	}
 	if spec, ok := uiTableSpecFor(view); ok {
 		return "v2_table_page", v2TableDataFrom(s, r, view, spec)

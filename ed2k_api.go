@@ -588,7 +588,7 @@ func amuleDirectoryIssues(cfg *Config, prefs amule.Preferences) []amuleDirIssue 
 
 // amuleProcessPIDs finds aMule's local process. It is a variable so tests can
 // decide whether this machine has one (and whether it is containerized).
-var amuleProcessPIDs = func() []int { return localProcessPIDs("amuled") }
+var amuleProcessPIDs = func() []int { return localProcessPIDsCached("amuled") }
 
 // dirExists reports whether path is an existing directory.
 func dirExists(path string) bool {

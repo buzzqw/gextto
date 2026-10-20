@@ -1561,11 +1561,6 @@ type persistedMove struct {
 	guard       bool
 }
 
-// restoreTorrentMoves loads the saved storage moves into the worker maps and
-// returns what is persisted. No move is running after a restart, so every
-// restored retry is marked in flight with a short grace: RetryStorageMoves then
-// clears it if the torrent already sits in its destination, or issues the move
-// again. A post-seed protection without its retry is stale and is dropped.
 // recordEd2kCompletion marks a completed eD2k download as removed from the
 // transfer queue. aMule has no seeding session to keep it in, and the download
 // history lists rows with removed_at set: without this the completion only
@@ -1580,6 +1575,11 @@ func recordEd2kCompletion(db *Database, hash, name string) {
 	}
 }
 
+// restoreTorrentMoves loads the saved storage moves into the worker maps and
+// returns what is persisted. No move is running after a restart, so every
+// restored retry is marked in flight with a short grace: RetryStorageMoves then
+// clears it if the torrent already sits in its destination, or issues the move
+// again. A post-seed protection without its retry is stale and is dropped.
 func restoreTorrentMoves(torrents TorrentSession, db *Database, retries map[string]StorageMoveRetry, postSeedMoves map[string]struct{}, now time.Time) map[string]persistedMove {
 	persisted := map[string]persistedMove{}
 	saved, err := db.LoadTorrentMoves()

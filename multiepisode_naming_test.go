@@ -134,6 +134,10 @@ func TestFilenameMatchesEpisodeRange(t *testing.T) {
 		{"TestShow.S01E01E02.1080p.mkv", 2, true},
 		{"TestShow - S01E03 - solo.mkv", 2, false},
 		{"TestShow - S02E01-E02.mkv", 2, false},
+		// A dash before the resolution or a year is not an episode range.
+		{"TestShow.S01E01-1080p.mkv", 5, false},
+		{"TestShow.S01E01-1080p.mkv", 1, true},
+		{"TestShow.S01E05-2019.mkv", 50, false},
 	}
 	for _, tc := range cases {
 		if got := filenameMatchesEpisode(tc.name, 1, tc.episode); got != tc.want {

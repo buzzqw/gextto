@@ -14,6 +14,25 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **Avviso quando il login a MirCrew si rompe.** Se il login al forum del
+  servizio `mircrew-indexer` resta rotto per più di 15 minuti arriva una
+  notifica (Telegram, email o webhook, secondo la configurazione), con il motivo
+  riportato dal servizio e cosa fare; un secondo avviso arriva quando il login
+  torna a funzionare. Prima l'unico avviso possibile era il fallimento di due
+  link `.torrent` nello stesso ciclo, che non scatta quando le ricerche
+  rispondono ancora dall'indice locale.
+- **Correzioni a eD2k e ai file con più episodi.** Un file con un trattino
+  prima della risoluzione o dell'anno (per esempio `S01E01-1080p`) non viene più
+  scambiato per un file che contiene centinaia di episodi, quindi rinomina e
+  importazione scelgono sempre il file giusto. Il pulsante che riaggiorna i file
+  condivisi di aMule mostra subito la lista letta dopo la richiesta, non quella
+  di prima. Se la ricerca eD2k scade mentre aspetta di riprovare, Gextto lo dice
+  invece di parlare di un'altra ricerca in corso, e riconosce prima i risultati
+  di una ricerca avviata da un altro programma collegato ad aMule. Gli esiti
+  delle azioni su aMule mostrano solo messaggi fissi e tradotti: in caso di
+  errore i dettagli sono nel log. CPU e RAM di aMule e di gx-torrent nella barra
+  in alto pesano meno sulla macchina e restano stabili anche con più schede
+  aperte.
 - **Backup: anche file e cartelle fuori dalla cartella dati.** Nella scheda
   backup di Manutenzione, alla voce **File e cartelle da includere**, puoi
   elencare uno per riga i percorsi assoluti di file o cartelle da mettere nello

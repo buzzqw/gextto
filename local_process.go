@@ -24,30 +24,75 @@ type localProcessUsage struct {
 }
 
 // localProcessSample remembers the previous CPU ticks of a process group, so a
-// percentage can be computed from the delta.
+// percentage can be computed from the delta, and the percentage it produced.
 type localProcessSample struct {
 	ticks   uint64
 	at      time.Time
 	percent *float64
 }
 
+// localProcessMinWindow is the shortest interval a CPU percentage is measured
+// over. Several tabs refresh the header within moments of each other: a closer
+// call reuses the last percentage instead of a noisy one from a tiny window.
+const localProcessMinWindow = 2 * time.Second
+
+// localProcessSampleTTL drops the samples of process groups no longer read
+// (a restarted aMule or gx-torrent has new pids, so a new key).
+const localProcessSampleTTL = 5 * time.Minute
+
+// localProcessPIDsTTL is how long the pids found for a name are reused: the
+// header refreshes every few seconds and walking /proc each time is wasted.
+const localProcessPIDsTTL = 15 * time.Second
+
+type localProcessPIDsEntry struct {
+	pids []int
+	at   time.Time
+}
+
 var (
 	localProcessMu      sync.Mutex
 	localProcessSamples = map[string]localProcessSample{}
+
+	localProcessPIDsMu    sync.Mutex
+	localProcessPIDsCache = map[string]localProcessPIDsEntry{}
 )
 
 // localProcessUsageForName sums every live process whose name (the kernel
 // `comm`, at most 15 characters) matches. It reports false when none runs.
 func localProcessUsageForName(name string) (localProcessUsage, bool) {
-	pids := localProcessPIDs(name)
+	pids := localProcessPIDsCached(name)
 	if len(pids) == 0 {
 		return localProcessUsage{}, false
 	}
-	usage, ok := localProcessUsageForPIDs(pids)
-	if !ok {
+	if usage, ok := localProcessUsageForPIDs(pids); ok {
+		return usage, true
+	}
+	// The cached pids are gone (the process restarted): look again once.
+	localProcessForgetPIDs(name)
+	pids = localProcessPIDsCached(name)
+	if len(pids) == 0 {
 		return localProcessUsage{}, false
 	}
-	return usage, true
+	return localProcessUsageForPIDs(pids)
+}
+
+// localProcessPIDsCached is localProcessPIDs reused for localProcessPIDsTTL.
+func localProcessPIDsCached(name string) []int {
+	localProcessPIDsMu.Lock()
+	defer localProcessPIDsMu.Unlock()
+	if entry, ok := localProcessPIDsCache[name]; ok && time.Since(entry.at) < localProcessPIDsTTL {
+		return entry.pids
+	}
+	pids := localProcessPIDs(name)
+	localProcessPIDsCache[name] = localProcessPIDsEntry{pids: pids, at: time.Now()}
+	return pids
+}
+
+// localProcessForgetPIDs drops the cached pids of a name.
+func localProcessForgetPIDs(name string) {
+	localProcessPIDsMu.Lock()
+	delete(localProcessPIDsCache, name)
+	localProcessPIDsMu.Unlock()
 }
 
 // localProcessPIDs lists the local processes whose kernel name matches.
@@ -140,14 +185,21 @@ func localProcessUsageForPIDs(pids []int) (localProcessUsage, bool) {
 	var percent *float64
 	localProcessMu.Lock()
 	previous, seen := localProcessSamples[key]
-	if seen {
-		elapsed := now.Sub(previous.at).Seconds()
-		if elapsed > 0 {
-			value := float64(healthSatSub(ticks, previous.ticks)) / clockTicks / elapsed * 100.0
+	if seen && now.Sub(previous.at) < localProcessMinWindow {
+		// Too close to the last sample: keep it and its percentage.
+		percent = previous.percent
+	} else {
+		if seen {
+			value := float64(healthSatSub(ticks, previous.ticks)) / clockTicks / now.Sub(previous.at).Seconds() * 100.0
 			percent = &value
 		}
+		localProcessSamples[key] = localProcessSample{ticks: ticks, at: now, percent: percent}
+		for other, sample := range localProcessSamples {
+			if now.Sub(sample.at) > localProcessSampleTTL {
+				delete(localProcessSamples, other)
+			}
+		}
 	}
-	localProcessSamples[key] = localProcessSample{ticks: ticks, at: now, percent: percent}
 	localProcessMu.Unlock()
 	return localProcessUsage{RSSBytes: rss, CPUPercent: percent, PIDs: pids}, true
 }

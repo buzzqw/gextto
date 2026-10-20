@@ -522,30 +522,53 @@ func v2Ed2kSharedViewFor(cfg *Config, message string, messageErr bool) v2Ed2kSha
 	return view
 }
 
+// v2Ed2kFlashMessages are the outcomes the eD2k actions report across a
+// redirect. The URL carries only the code, so a crafted link cannot put
+// arbitrary text on the page; error details go to the log.
+var v2Ed2kFlashMessages = map[string]struct {
+	Text  string
+	Error bool
+}{
+	"ed2k_off":       {"L'integrazione con aMule è spenta.", true},
+	"command_failed": {"Comando non riuscito: i dettagli sono nel log di Gextto.", true},
+	"prealloc_on":    {"Preallocazione completa attivata in aMule.", false},
+	"prealloc_off":   {"Preallocazione completa disattivata in aMule.", false},
+	"shared_reload":  {"Scansione dei file condivisi richiesta ad aMule.", false},
+}
+
+// v2Ed2kFlash resolves a flash code to its fixed (translatable) message.
+// Unknown codes show nothing.
+func v2Ed2kFlash(code string) (string, bool) {
+	flash, ok := v2Ed2kFlashMessages[strings.TrimSpace(code)]
+	if !ok {
+		return "", false
+	}
+	return flash.Text, flash.Error
+}
+
 // V2Ed2kSharedReload asks aMule to rescan its shared folders, then renders the
 // panel again with the fresh list.
 func V2Ed2kSharedReload(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	view := v2Ed2kSharedViewFor(cfg, "", false)
-	if !view.Enabled {
-		dict, eng := v2Dictionaries(s)
-		v2Render(w, http.StatusOK, "v2_ed2k_shared", view, dict, eng)
-		return
-	}
-	message, isErr, detail := "Scansione dei file condivisi richiesta ad aMule.", false, ""
-	if err := ed2kReloadShared(cfg); err != nil {
+	code, detail := "shared_reload", ""
+	if !ed2kEnabled(cfg) {
+		code = "ed2k_off"
+	} else if err := ed2kReloadShared(cfg); err != nil {
 		logging.Warn("eD2k shared files reload failed", "error", err.Error())
-		message, isErr, detail = "Comando non riuscito:", true, err.Error()
+		code, detail = "command_failed", err.Error()
 	}
 	if r.Header.Get("HX-Request") == "" {
-		target := "/?view=ed2k&tab=shared&msg=" + url.QueryEscape(message)
-		if isErr {
-			target += "&msg_err=1"
-		}
-		http.Redirect(w, r, target, http.StatusSeeOther)
+		http.Redirect(w, r, "/?view=ed2k&tab=shared&msg="+url.QueryEscape(code), http.StatusSeeOther)
 		return
 	}
-	view.Message, view.MessageErr, view.Detail = message, isErr, detail
+	// The list is read after the reload request, so it already shows what
+	// aMule picked up (the rescan itself may still be running).
+	view := v2Ed2kSharedViewFor(cfg, "", false)
+	view.Message, view.MessageErr = v2Ed2kFlash(code)
+	if code == "command_failed" {
+		// Rendered straight into this response, the error itself can be shown.
+		view.Message, view.Detail = "Comando non riuscito:", detail
+	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_ed2k_shared", view, dict, eng)
 }
@@ -559,28 +582,25 @@ func V2SettingsEd2kPreallocation(w http.ResponseWriter, r *http.Request, s *AppS
 	if r.FormValue("recommended") == "1" {
 		allocate = false
 	}
-	message, isErr := "", false
+	code := ""
 	switch {
 	case !ed2kEnabled(cfg):
-		message, isErr = "L'integrazione con aMule è spenta.", true
+		code = "ed2k_off"
 	default:
 		err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
 			return client.SetFilePreallocation(ctx, allocate)
 		})
 		switch {
 		case err != nil:
-			message, isErr = "Comando non riuscito: "+err.Error(), true
+			code = "command_failed"
+			logging.Warn("cannot change aMule file preallocation", "allocate", allocate, "error", err.Error())
 		case allocate:
-			message = "Preallocazione completa attivata in aMule."
+			code = "prealloc_on"
 			logging.Info("aMule file preallocation turned on")
 		default:
-			message = "Preallocazione completa disattivata in aMule."
+			code = "prealloc_off"
 			logging.Info("aMule file preallocation turned off")
 		}
 	}
-	target := "/?view=settings&tab=ed2k&msg=" + url.QueryEscape(message)
-	if isErr {
-		target += "&msg_err=1"
-	}
-	http.Redirect(w, r, target, http.StatusSeeOther)
+	http.Redirect(w, r, "/?view=settings&tab=ed2k&msg="+url.QueryEscape(code), http.StatusSeeOther)
 }

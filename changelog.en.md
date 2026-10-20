@@ -13,6 +13,24 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **Notice when the MirCrew login breaks.** If the forum login of the
+  `mircrew-indexer` service stays broken for more than 15 minutes a notification
+  arrives (Telegram, email or webhook, as configured), with the reason reported
+  by the service and what to do; a second notice arrives when the login works
+  again. Before, the only possible notice was two failed `.torrent` links in the
+  same cycle, which does not fire while searches still answer from the local
+  index.
+- **Fixes to eD2k and multi-episode files.** A file with a dash before the
+  resolution or the year (for example `S01E01-1080p`) is no longer taken for a
+  file holding hundreds of episodes, so renaming and import always pick the
+  right file. The button that reloads aMule's shared files now shows the list
+  read after the request, not the previous one. If an eD2k search runs out of
+  time while waiting to retry, Gextto says so instead of blaming another
+  search, and it spots sooner the results of a search started by another
+  program connected to aMule. The outcomes of aMule actions show only fixed,
+  translated messages: on an error the details are in the log. aMule's and
+  gx-torrent's CPU and RAM in the top bar cost the machine less and stay steady
+  with several tabs open.
 - **Backup: files and folders outside the data folder too.** In the backup
   panel of Maintenance, **Files and folders to include** takes one absolute
   path per line for files or folders to put in the backup ZIP, for example the

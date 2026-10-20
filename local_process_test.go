@@ -19,11 +19,24 @@ func TestLocalProcessUsageForOwnPID(t *testing.T) {
 	if first.CPUPercent != nil {
 		t.Fatalf("the first sample must not report a CPU percentage: %v", *first.CPUPercent)
 	}
-	// Burn a moment of CPU so the delta is measurable, then sample again.
+	// A call right after the first one is inside the minimum window: it keeps
+	// the first sample instead of measuring a tiny, noisy interval.
+	again, ok := localProcessUsageForPIDs([]int{pid})
+	if !ok || again.CPUPercent != nil {
+		t.Fatalf("a sample inside the minimum window must reuse the previous one: %+v", again)
+	}
+	// Burn a moment of CPU, move the stored sample past the window, then
+	// sample again.
 	deadline := time.Now().Add(20 * time.Millisecond)
 	for time.Now().Before(deadline) {
 		_ = os.Getpid()
 	}
+	key := localProcessKey([]int{pid})
+	localProcessMu.Lock()
+	sample := localProcessSamples[key]
+	sample.at = sample.at.Add(-localProcessMinWindow - time.Second)
+	localProcessSamples[key] = sample
+	localProcessMu.Unlock()
 	second, ok := localProcessUsageForPIDs([]int{pid})
 	if !ok {
 		t.Fatal("second sample failed")
@@ -33,6 +46,30 @@ func TestLocalProcessUsageForOwnPID(t *testing.T) {
 	}
 	if *second.CPUPercent < 0 || *second.CPUPercent > 100 {
 		t.Fatalf("cpu = %v", *second.CPUPercent)
+	}
+}
+
+func TestLocalProcessSamplesOfGoneProcessesArePruned(t *testing.T) {
+	localProcessMu.Lock()
+	localProcessSamples["pid:999999999"] = localProcessSample{at: time.Now().Add(-localProcessSampleTTL - time.Minute)}
+	localProcessMu.Unlock()
+	if _, ok := localProcessUsageForPIDs([]int{os.Getpid()}); !ok {
+		t.Fatal("current process not sampled")
+	}
+	// A fresh sample of the own pid may sit inside the minimum window and not
+	// prune; force a new one.
+	key := localProcessKey([]int{os.Getpid()})
+	localProcessMu.Lock()
+	sample := localProcessSamples[key]
+	sample.at = sample.at.Add(-localProcessMinWindow - time.Second)
+	localProcessSamples[key] = sample
+	localProcessMu.Unlock()
+	localProcessUsageForPIDs([]int{os.Getpid()})
+	localProcessMu.Lock()
+	_, stale := localProcessSamples["pid:999999999"]
+	localProcessMu.Unlock()
+	if stale {
+		t.Fatal("the sample of a process not read for a long time must be dropped")
 	}
 }
 

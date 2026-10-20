@@ -632,7 +632,7 @@ func (c *Client) Search(ctx context.Context, query string, options SearchOptions
 	// Detect that instead of returning its files as if they answered the query.
 	const attempts = 3
 	for attempt := 0; attempt < attempts; attempt++ {
-		results, replaced, err := c.searchAttempt(ctx, search, options)
+		results, replaced, err := c.searchAttempt(ctx, query, search, options)
 		if err != nil {
 			return results, err
 		}
@@ -645,8 +645,10 @@ func (c *Client) Search(ctx context.Context, query string, options SearchOptions
 		timer := time.NewTimer(500 * time.Millisecond)
 		select {
 		case <-ctx.Done():
+			// The caller gave up (or ran out of time) while waiting to retry:
+			// report that, not a busy core.
 			timer.Stop()
-			return nil, ErrSearchBusy
+			return nil, ctx.Err()
 		case <-timer.C:
 		}
 	}
@@ -655,8 +657,10 @@ func (c *Client) Search(ctx context.Context, query string, options SearchOptions
 
 // searchAttempt starts one search and polls its results. It reports replaced
 // when the list shrinks or loses every hash it had, the signature of another
-// client starting a search in the meantime.
-func (c *Client) searchAttempt(ctx context.Context, search Tag, options SearchOptions) ([]SearchResult, bool, error) {
+// client starting a search in the meantime; on the first poll, when there is
+// nothing to compare with yet, a list where no file name carries any word of
+// the query is taken as another search's.
+func (c *Client) searchAttempt(ctx context.Context, query string, search Tag, options SearchOptions) ([]SearchResult, bool, error) {
 	reply, err := c.Request(ctx, Packet{Op: OpSearchStart, Tags: []Tag{search}})
 	if err != nil {
 		return nil, false, err
@@ -690,7 +694,7 @@ func (c *Client) searchAttempt(ctx context.Context, search Tag, options SearchOp
 		if err != nil {
 			return results, false, err
 		}
-		if searchListReplaced(seen, current) {
+		if searchListReplaced(seen, current) || (len(seen) == 0 && searchListForeign(query, current)) {
 			return nil, true, nil
 		}
 		for _, result := range current {
@@ -729,6 +733,51 @@ func searchListReplaced(seen map[string]struct{}, current []SearchResult) bool {
 		}
 	}
 	return true
+}
+
+// searchListForeign reports whether no result names a single word of the
+// query. aMule matches keywords against file names, so a list of answers to
+// this query has at least one file carrying one of them. Only words of three
+// or more letters count, compared without accents or separators; a query with
+// none of them is never judged.
+func searchListForeign(query string, current []SearchResult) bool {
+	if len(current) == 0 {
+		return false
+	}
+	words := strings.Fields(searchFoldText(query))
+	terms := words[:0]
+	for _, word := range words {
+		if len(word) >= 3 {
+			terms = append(terms, word)
+		}
+	}
+	if len(terms) == 0 {
+		return false
+	}
+	for _, result := range current {
+		name := searchFoldText(result.Name)
+		for _, term := range terms {
+			if strings.Contains(name, term) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// searchFoldText lowercases text and keeps only ASCII letters and digits,
+// turning everything else (accents, dots, dashes) into spaces, so "Città" and
+// "citta" share the word "citt".
+func searchFoldText(text string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r + ('a' - 'A')
+		}
+		return ' '
+	}, text)
 }
 
 func (c *Client) kadSearchFinished(ctx context.Context) bool {

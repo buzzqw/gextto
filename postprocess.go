@@ -1082,18 +1082,27 @@ func filenameMatchesEpisode(name string, season, episode int64) bool {
 	}
 	// A multi-episode file ("S01E01-E02", also the scene form "S01E01E02")
 	// covers every episode of its range.
-	pattern := utils.MustCachedRegex(`(?i)s(\d{1,2})e(\d{1,4})(?:[-–]e?|e)(\d{1,4})`)
-	captures := pattern.FindStringSubmatch(name)
-	if captures == nil {
-		return false
+	nameSeason, first, last, ok := multiEpisodeRange(name)
+	return ok && nameSeason == season && first <= episode && episode <= last
+}
+
+// multiEpisodeRange parses the episode range of a multi-episode file name
+// ("S01E01-E02", the scene form "S01E01E02"). The range must end at a word
+// boundary and stay short, so a dash before the resolution ("S01E01-1080p")
+// or a year is never read as a run of hundreds of episodes.
+func multiEpisodeRange(name string) (season, first, last int64, ok bool) {
+	pattern := utils.MustCachedRegex(`(?i)\bs(?:tagione)?\s*(\d{1,2})\s*e(?:p(?:isodio)?)?\.?\s*(\d{1,4})(?:[-–]e?|e)(\d{1,4})\b`)
+	match := pattern.FindStringSubmatch(name)
+	if match == nil {
+		return 0, 0, 0, false
 	}
-	nameSeason, errSeason := strconv.Atoi(captures[1])
-	first, errFirst := strconv.Atoi(captures[2])
-	last, errLast := strconv.Atoi(captures[3])
-	if errSeason != nil || errFirst != nil || errLast != nil {
-		return false
+	season, errSeason := strconv.ParseInt(match[1], 10, 64)
+	first, errFirst := strconv.ParseInt(match[2], 10, 64)
+	last, errLast := strconv.ParseInt(match[3], 10, 64)
+	if errSeason != nil || errFirst != nil || errLast != nil || last < first || last-first >= 100 {
+		return 0, 0, 0, false
 	}
-	return int64(nameSeason) == season && int64(first) <= episode && episode <= int64(last)
+	return season, first, last, true
 }
 
 // episodeTarget computes the (source, target) rename pair for an episode

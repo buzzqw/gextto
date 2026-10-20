@@ -985,16 +985,18 @@ func gh5_mirCrewIndexer(cfg *Config) *IndexerConfig {
 	return nil
 }
 
-// gh5_mirCrewLoginState reads the /status of the mircrew-indexer service at
-// base and reports whether its forum login has failed. A service without
-// /status (older versions) or an unreadable reply is not reported as failed.
-func gh5_mirCrewLoginState(base string) (string, bool) {
+// gh5_mirCrewLoginProbe reads the /status of the mircrew-indexer service at
+// base and reports whether its forum login has failed. reachable is false when
+// the service cannot be read at all (down, older version without /status, or a
+// malformed reply): that is not a login failure and the caller must not read it
+// as a recovery either.
+func gh5_mirCrewLoginProbe(base string) (loginError string, failed bool, reachable bool) {
 	if strings.TrimSpace(base) == "" {
-		return "", false
+		return "", false, false
 	}
 	status, reachable, body := gh6_servicesProbe(strings.TrimRight(base, "/")+"/status", 5*time.Second)
 	if !reachable || status != http.StatusOK {
-		return "", false
+		return "", false, false
 	}
 	var payload struct {
 		LoggedIn   *bool  `json:"logged_in"`
@@ -1002,18 +1004,25 @@ func gh5_mirCrewLoginState(base string) (string, bool) {
 		LastRun    string `json:"last_run"`
 	}
 	if json.Unmarshal([]byte(body), &payload) != nil || payload.LoggedIn == nil {
-		return "", false
+		return "", false, false
 	}
-	loginError := strings.TrimSpace(payload.LoginError)
+	loginError = strings.TrimSpace(payload.LoginError)
 	switch {
 	case loginError != "":
-		return utils.RedactURLSecrets(loginError), true
+		return utils.RedactURLSecrets(loginError), true, true
 	case !*payload.LoggedIn && strings.TrimSpace(payload.LastRun) != "":
 		// Logged out after a pass had already run: the login was lost.
-		return "", true
+		return "", true, true
 	}
 	// Logged in, or still logging in right after the service started.
-	return "", false
+	return "", false, true
+}
+
+// gh5_mirCrewLoginState reports whether the forum login of the service at base
+// has failed, with the reason when the service provides one.
+func gh5_mirCrewLoginState(base string) (string, bool) {
+	loginError, failed, _ := gh5_mirCrewLoginProbe(base)
+	return loginError, failed
 }
 
 func gh5_mirCrewServiceStatus(cfg *Config) *models.ProviderStatus {
