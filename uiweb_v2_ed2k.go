@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,8 @@ import (
 
 // v2Ed2kView is the eD2k page.
 type v2Ed2kView struct {
+	// Tab selects the eD2k sub-page: "status" (default), "shared" or "log".
+	Tab        string
 	Enabled    bool
 	Error      string
 	Status     amule.Status
@@ -31,6 +34,9 @@ type v2Ed2kView struct {
 	Search     v2Ed2kSearchView
 	ServersURL string
 	NodesURL   string
+	// Shared and Log back the two dedicated tabs.
+	Shared v2Ed2kSharedView
+	Log    map[string]any
 }
 
 // v2Ed2kSearchView is the result block of an eD2k search.
@@ -70,9 +76,16 @@ func v2Ed2kNetworkName(value uint8) string {
 	return "kad"
 }
 
-func v2Ed2kViewFrom(s *AppState, message, detail string, isErr bool) v2Ed2kView {
+func v2Ed2kViewFrom(s *AppState, message, detail string, isErr bool, tab string) v2Ed2kView {
 	cfg := latestConfig(s)
+	switch strings.TrimSpace(tab) {
+	case "shared", "log":
+		tab = strings.TrimSpace(tab)
+	default:
+		tab = "status"
+	}
 	view := v2Ed2kView{
+		Tab:        tab,
 		Enabled:    ed2kEnabled(cfg),
 		Message:    message,
 		Detail:     detail,
@@ -89,6 +102,23 @@ func v2Ed2kViewFrom(s *AppState, message, detail string, isErr bool) v2Ed2kView 
 	view.Network = v2Ed2kNetworkName(settings.Network)
 	view.Search.Network = view.Network
 	if !view.Enabled {
+		return view
+	}
+	switch tab {
+	case "shared":
+		view.Shared = v2Ed2kSharedViewFor(cfg, message, isErr)
+		return view
+	case "log":
+		view.Log = map[string]any{}
+		lines, logErr := Ed2kLogLines(cfg)
+		if logErr != nil {
+			view.Log["Error"] = logErr.Error()
+		} else {
+			if len(lines) > 300 {
+				lines = lines[len(lines)-300:]
+			}
+			view.Log["Lines"] = lines
+		}
 		return view
 	}
 	ed2kInvalidateHealth()
@@ -116,7 +146,7 @@ func V2Ed2kAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_state", v2Ed2kViewFrom(s, message, detail, isErr), dict, eng)
+	v2Render(w, http.StatusOK, "v2_ed2k_state", v2Ed2kViewFrom(s, message, detail, isErr, "status"), dict, eng)
 }
 
 // v2Ed2kCommand returns a fixed (translatable) message, an optional detail
@@ -416,13 +446,6 @@ func v2Ed2kSharedViewFor(cfg *Config, message string, messageErr bool) v2Ed2kSha
 	return view
 }
 
-// V2Ed2kShared renders the shared files, the uploads and the shared folders.
-func V2Ed2kShared(w http.ResponseWriter, r *http.Request, s *AppState) {
-	view := v2Ed2kSharedViewFor(latestConfig(s), "", false)
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_shared", view, dict, eng)
-}
-
 // V2Ed2kSharedReload asks aMule to rescan its shared folders, then renders the
 // panel again with the fresh list.
 func V2Ed2kSharedReload(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -433,12 +456,20 @@ func V2Ed2kSharedReload(w http.ResponseWriter, r *http.Request, s *AppState) {
 		v2Render(w, http.StatusOK, "v2_ed2k_shared", view, dict, eng)
 		return
 	}
+	message, isErr, detail := "Scansione dei file condivisi richiesta ad aMule.", false, ""
 	if err := ed2kReloadShared(cfg); err != nil {
 		logging.Warn("eD2k shared files reload failed", "error", err.Error())
-		view.Message, view.MessageErr, view.Detail = "Comando non riuscito:", true, err.Error()
-	} else {
-		view.Message = "Scansione dei file condivisi richiesta ad aMule."
+		message, isErr, detail = "Comando non riuscito:", true, err.Error()
 	}
+	if r.Header.Get("HX-Request") == "" {
+		target := "/?view=ed2k&tab=shared&msg=" + url.QueryEscape(message)
+		if isErr {
+			target += "&msg_err=1"
+		}
+		http.Redirect(w, r, target, http.StatusSeeOther)
+		return
+	}
+	view.Message, view.MessageErr, view.Detail = message, isErr, detail
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_ed2k_shared", view, dict, eng)
 }

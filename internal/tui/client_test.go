@@ -471,3 +471,31 @@ func TestClientMergesEd2kDownloads(t *testing.T) {
 		t.Fatalf("eD2k actions = %+v", last)
 	}
 }
+
+func TestClientReadsEd2kStatus(t *testing.T) {
+	client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request, _ string) {
+		if r.URL.Path == "/api/ed2k/status" {
+			writeJSON(t, w, map[string]any{"ok": true, "provider": map[string]any{
+				"enabled": true, "reachable": true, "download": true,
+				"status": map[string]any{
+					"version": "2.3.3", "ed2k_connected": true, "high_id": true,
+					"server_name": "Fake Server", "kad_connected": true, "kad_firewalled": true,
+					"upload_rate": 512, "upload_queue": 2,
+				},
+			}})
+			return
+		}
+		writeJSON(t, w, map[string]any{"ok": true})
+	})
+	status, err := client.Ed2kStatus(context.Background())
+	if err != nil {
+		t.Fatalf("Ed2kStatus: %v", err)
+	}
+	if !status.Enabled || !status.Reachable || status.Status == nil {
+		t.Fatalf("status = %+v", status)
+	}
+	if status.Status.Version != "2.3.3" || !status.Status.HighID || !status.Status.KadFirewalled ||
+		status.Status.ServerName != "Fake Server" || status.Status.UploadQueue != 2 {
+		t.Fatalf("status = %+v", status.Status)
+	}
+}

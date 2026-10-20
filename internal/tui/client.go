@@ -482,32 +482,78 @@ func (c *Client) Torrents(ctx context.Context) ([]Torrent, error) {
 // "ed2k:<hash>" and the method "eD2k"; the HTTP actions route it to the eD2k
 // API.
 func (c *Client) ComicDownloads(ctx context.Context) ([]ComicDownload, error) {
+	downloads, _, err := c.ComicDownloadsWithEd2k(ctx)
+	return downloads, err
+}
+
+// ComicDownloadsWithEd2k also returns the raw eD2k rows, so the detail view can
+// show sources, priority and the ed2k link.
+func (c *Client) ComicDownloadsWithEd2k(ctx context.Context) ([]ComicDownload, []Ed2kDownload, error) {
 	var downloads []ComicDownload
 	err := c.get(ctx, "/api/comics/downloads", &downloads)
 	if downloads == nil {
 		downloads = []ComicDownload{}
 	}
 	if err != nil {
-		return downloads, err
+		return downloads, nil, err
 	}
-	if ed2k, ed2kErr := c.Ed2kDownloads(ctx); ed2kErr == nil {
+	ed2k, ed2kErr := c.Ed2kDownloads(ctx)
+	if ed2kErr == nil {
 		for _, item := range ed2k {
 			downloads = append(downloads, item.AsDownload())
 		}
 	}
-	return downloads, nil
+	return downloads, ed2k, nil
 }
 
 // Ed2kDownload mirrors one row of GET /api/ed2k/downloads.
 type Ed2kDownload struct {
-	Hash     string  `json:"hash"`
-	Name     string  `json:"name"`
-	Size     int64   `json:"size"`
-	Done     int64   `json:"done"`
-	Progress float64 `json:"progress"`
-	Speed    int64   `json:"speed"`
-	State    string  `json:"state"`
-	Sources  int64   `json:"sources"`
+	Hash          string  `json:"hash"`
+	Name          string  `json:"name"`
+	Size          int64   `json:"size"`
+	Done          int64   `json:"done"`
+	Progress      float64 `json:"progress"`
+	Speed         int64   `json:"speed"`
+	State         string  `json:"state"`
+	Sources       int64   `json:"sources"`
+	ActiveSources int64   `json:"active_sources"`
+	Priority      string  `json:"priority"`
+	Link          string  `json:"link"`
+	LastReceived  int64   `json:"last_received"`
+}
+
+// Ed2kStatus is the aMule state behind GET /api/ed2k/status.
+type Ed2kStatus struct {
+	Enabled   bool            `json:"enabled"`
+	Reachable bool            `json:"reachable"`
+	LastError string          `json:"last_error"`
+	Download  bool            `json:"download"`
+	Status    *Ed2kCoreStatus `json:"status"`
+}
+
+// Ed2kCoreStatus is the core's own state when it answers.
+type Ed2kCoreStatus struct {
+	Version       string `json:"version"`
+	Ed2kConnected bool   `json:"ed2k_connected"`
+	HighID        bool   `json:"high_id"`
+	ServerName    string `json:"server_name"`
+	ServerAddress string `json:"server_address"`
+	KadRunning    bool   `json:"kad_running"`
+	KadConnected  bool   `json:"kad_connected"`
+	KadFirewalled bool   `json:"kad_firewalled"`
+	UploadRate    int64  `json:"upload_rate"`
+	DownloadRate  int64  `json:"download_rate"`
+	UploadQueue   int64  `json:"upload_queue"`
+}
+
+// Ed2kStatus fetches aMule's connection state.
+func (c *Client) Ed2kStatus(ctx context.Context) (Ed2kStatus, error) {
+	// The API wraps the state under "provider".
+	var payload struct {
+		Provider Ed2kStatus `json:"provider"`
+	}
+	err := c.get(ctx, "/api/ed2k/status", &payload)
+	return payload.Provider, err
 }
 
 // ed2kIDPrefix marks an eD2k row in the unified download list.

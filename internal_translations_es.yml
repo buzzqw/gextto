@@ -5522,3 +5522,8 @@ spa:
   "Byte caricati dall'inizio": "Bytes subidos desde el inicio"
   "Link": "Enlace"
   "CPU e RAM del processo amuled su questa macchina": "CPU y RAM del proceso amuled en esta máquina"
+  "CPU e RAM del processo Gextto": "CPU y RAM del proceso Gextto"
+  "CPU e RAM del demone gx-torrent": "CPU y RAM del demonio gx-torrent"
+  "aMule e ricerca": "aMule y búsqueda"
+  "Sezioni eD2k": "Secciones eD2k"
+  "Rilegge il log da aMule": "Vuelve a leer el registro de aMule"

@@ -478,6 +478,8 @@ type refreshResult struct {
 	healthErr     string
 	httpDownloads []ComicDownload
 	hasHTTP       bool
+	ed2k          *Ed2kStatus
+	ed2kRows      []Ed2kDownload
 	series        []SeriesLibraryItem
 	hasSeries     bool
 	movies        []MovieConfig
@@ -534,9 +536,13 @@ func fetchModel(ctx context.Context, client *Client, request fetchRequest) refre
 			result.torrents = torrents
 			result.hasTorrents = true
 		}
-		if downloads, err := client.ComicDownloads(callCtx); err == nil {
+		if downloads, rows, err := client.ComicDownloadsWithEd2k(callCtx); err == nil {
 			result.httpDownloads = downloads
+			result.ed2kRows = rows
 			result.hasHTTP = true
+		}
+		if status, err := client.Ed2kStatus(callCtx); err == nil {
+			result.ed2k = &status
 		}
 	}
 	if tab == TabTorrents && request.includeSlow {
@@ -629,6 +635,9 @@ func (m *Model) applyRefresh(result refreshResult) {
 	}
 	if result.hasHTTP {
 		m.SetHTTPDownloads(result.httpDownloads)
+	}
+	if result.ed2k != nil || result.ed2kRows != nil {
+		m.SetEd2k(result.ed2k, result.ed2kRows)
 	}
 	if result.hasMetrics && result.metrics != nil {
 		m.SetMetrics(*result.metrics)

@@ -72,9 +72,10 @@ type uiShellChrome struct {
 	CPU           string
 	CPUFrequency  string
 	RAM           string
-	// AmuleLoad is "CPU% · RAM" of the local amuled process, shown only when
-	// the aMule integration is on and aMule runs on this machine.
+	// AmuleLoad and GxLoad are "CPU% · RAM" of the local amuled and gx-torrent
+	// processes. Each is shown only when that process runs on this machine.
 	AmuleLoad string
+	GxLoad    string
 	Download  string
 	Upload    string
 	NextCycle string
@@ -162,6 +163,13 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 		chrome.CPU = strconv.FormatFloat(*metrics.ProcessCPUPercent, 'f', 1, 64) + "%"
 	}
 	chrome.RAM = logging.HumanBytesI64(saturatingInt64(metrics.ResidentBytes))
+	if reporter, ok := s.activeEngine().(LocalProcessReporter); ok {
+		if pid, ok := reporter.LocalProcessPID(); ok {
+			if usage, ok := localProcessUsageForPIDs([]int{pid}); ok {
+				chrome.GxLoad = localProcessLoadLabel(usage)
+			}
+		}
+	}
 	if ed2kEnabled(cfg) && hostIsLocal(uiSettingString(cfg, "amule_host")) {
 		if usage, ok := localProcessUsageForName("amuled"); ok {
 			chrome.AmuleLoad = localProcessLoadLabel(usage)

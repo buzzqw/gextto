@@ -57,6 +57,8 @@ func (m *Model) Render(width, height int) Screen {
 		content = m.renderMaintenanceReport(width, contentHeight)
 	case m.Form != nil:
 		content = m.renderForm(width, contentHeight)
+	case m.Ed2kDetail != nil:
+		content = m.renderEd2kDetail(width)
 	case m.Detail != nil:
 		content = m.renderDetail(width, contentHeight)
 	case m.ArchiveDetail != nil:
@@ -526,6 +528,9 @@ func (m *Model) statusInfoLines(width int) []Line {
 		downloads += fmt.Sprintf(" · %s %d", tr.T("label.ed2k"), ed2kActive)
 	}
 	lines = append(lines, m.statusRow(tr.T("status.downloads"), downloads, StyleNormal))
+	if m.Ed2k != nil && m.Ed2k.Enabled {
+		lines = append(lines, m.statusRow(tr.T("label.amule"), ed2kStatusText(tr, m.Ed2k), ed2kStatusStyle(m.Ed2k)))
+	}
 
 	// Traffic and consumption (already first on a phone).
 	if width >= compactWidth {
@@ -1337,6 +1342,103 @@ func (m *Model) renderArchive(width, contentHeight int) []Line {
 		texts[index] = fmt.Sprintf("%s · %s · %s", entry.Title, entry.Source, firstNonEmpty(entry.AddedAt, "-"))
 	}
 	return append(lines, catalogRows(texts, m.ArchiveSelected, &m.ArchiveScroll, contentHeight-len(lines), width)...)
+}
+
+// ed2kStatusText summarises aMule for the Status tab.
+func ed2kStatusText(tr *Translator, status *Ed2kStatus) string {
+	if status == nil {
+		return "-"
+	}
+	if !status.Reachable {
+		return tr.T("label.amuleunreachable")
+	}
+	if status.Status == nil {
+		return "-"
+	}
+	value := status.Status
+	parts := make([]string, 0, 6)
+	if value.Version != "" {
+		parts = append(parts, value.Version)
+	}
+	switch {
+	case value.Ed2kConnected:
+		server := firstNonEmpty(value.ServerName, value.ServerAddress, "-")
+		id := tr.T("label.lowid")
+		if value.HighID {
+			id = tr.T("label.highid")
+		}
+		parts = append(parts, server+" · "+id)
+	default:
+		parts = append(parts, tr.T("label.ed2kdisconnected"))
+	}
+	switch {
+	case value.KadConnected && value.KadFirewalled:
+		parts = append(parts, tr.T("label.kadfirewalled"))
+	case value.KadConnected:
+		parts = append(parts, tr.T("label.kadconnected"))
+	case value.KadRunning:
+		parts = append(parts, tr.T("label.kadconnecting"))
+	default:
+		parts = append(parts, tr.T("label.kadstopped"))
+	}
+	parts = append(parts, fmt.Sprintf("%s %s", tr.T("label.up"), HumanRate(float64(value.UploadRate))))
+	parts = append(parts, fmt.Sprintf("%s %d", tr.T("label.uploadqueue"), value.UploadQueue))
+	return strings.Join(parts, " · ")
+}
+
+func ed2kStatusStyle(status *Ed2kStatus) Style {
+	if status == nil || !status.Reachable {
+		return StyleErr
+	}
+	if status.Status != nil && status.Status.KadConnected && status.Status.KadFirewalled {
+		return StyleWarn
+	}
+	return StyleOK
+}
+
+// ed2kDetailRows lists the fields of the eD2k detail overlay.
+func ed2kDetailRows(tr *Translator, row *Ed2kDownload) [][2]string {
+	last := "-"
+	if row.LastReceived > 0 {
+		last = time.Unix(row.LastReceived, 0).Format("2006-01-02 15:04")
+	}
+	priority := row.Priority
+	if priority == "" {
+		priority = "-"
+	}
+	return [][2]string{
+		{tr.T("label.state"), firstNonEmpty(row.State, "-")},
+		{tr.T("label.progress"), fmt.Sprintf("%.1f%%", row.Progress)},
+		{tr.T("label.done"), HumanBytes(float64(row.Done)) + " / " + HumanBytes(float64(row.Size))},
+		{tr.T("label.down"), HumanRate(float64(row.Speed))},
+		{tr.T("label.sources"), fmt.Sprintf("%d / %d", row.ActiveSources, row.Sources)},
+		{tr.T("label.priority"), priority},
+		{tr.T("label.lastreceived"), last},
+		{tr.T("label.hash"), row.Hash},
+		{tr.T("label.link"), firstNonEmpty(row.Link, "-")},
+	}
+}
+
+func ed2kDetailLineCount(m *Model) int {
+	if m.Ed2kDetail == nil {
+		return 0
+	}
+	return len(ed2kDetailRows(m.Tr, m.Ed2kDetail)) + 1
+}
+
+func (m *Model) renderEd2kDetail(width int) []Line {
+	if m.Ed2kDetail == nil {
+		return nil
+	}
+	row := m.Ed2kDetail
+	rows := ed2kDetailRows(m.Tr, row)
+	labelWidth := min(20, max(8, width/3))
+	lines := []Line{{Text: fmt.Sprintf("%s: %s", m.Tr.T("title.ed2kdetail"), row.Name), Style: StyleHeader, Wrap: true}}
+	start := min(m.Ed2kDetailScroll, max(0, len(rows)-1))
+	for _, item := range rows[start:] {
+		lines = append(lines, Line{Text: PadRight(item[0]+":", labelWidth) + " " + item[1], Style: StyleNormal, Wrap: true, Indent: labelWidth + 1})
+	}
+	return lines
 }
 
 func (m *Model) renderArchiveDetail(width int) []Line {

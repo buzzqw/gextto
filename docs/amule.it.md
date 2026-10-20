@@ -121,6 +121,9 @@ il protocollo EC.
 
 ## Come si usa
 
+La pagina eD2k ha tre schede: **aMule e ricerca** (stato, server, ricerca, link
+incollati), **File condivisi** e **Log di aMule**.
+
 ### Ricerca
 
 Tre punti, tutti attraverso aMule:
@@ -215,7 +218,7 @@ I download aggiunti a mano e quelli in pausa restano.
 
 ### File condivisi e caricamenti
 
-La pagina eD2k ha il pannello **File condivisi**: elenca quello che aMule
+La scheda **File condivisi** elenca quello che aMule
 condivide con i byte caricati nella sessione e in totale, le richieste
 soddisfatte, i client in coda per ogni file e la priorità di upload, più il link
 `ed2k://` da copiare. Sotto, **Chi sta scaricando da te** elenca i client nella
@@ -229,10 +232,8 @@ pulsante di ricarica della sua interfaccia: i file aggiunti o tolti a mano
 compaiono o spariscono. Gextto non modifica mai la configurazione di
 condivisione di aMule.
 
-### Il log di aMule
-
-**Pagina eD2k → Log di aMule → Carica il log** mostra le ultime righe del log di
-`amuled`. Le stesse righe sono disponibili su `GET /api/ed2k/log`.
+La scheda **Log di aMule** mostra le ultime righe del log di `amuled`, con
+**Aggiorna** per rileggerle.
 
 ## Problemi comuni
 

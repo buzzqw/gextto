@@ -13,11 +13,19 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
-- **Top bar: aMule's load too.** When the eD2k integration is on and `amuled`
-  runs on Gextto's machine, the top bar shows an **aMule** badge with the
-  daemon's CPU and RAM, refreshed every 5 seconds like the other figures. With
-  aMule on another host there is no badge, because those figures cannot be read
-  from there.
+- **eD2k page with tabs, and aMule in the TUI.** The eD2k page now has three
+  tabs — **aMule and search**, **Shared files** and **aMule log** — instead of
+  the panels at the bottom of the page. In the TUI, with eD2k on, the **Status**
+  tab shows the **aMule** line (version, server, High/Low ID, Kad, upload and
+  queue) and aMule's downloads appear in the **Torrents** tab: `Enter` opens the
+  detail with sources, priority, last data received and the `ed2k://` link, `y`
+  copies the link, `p` pauses or resumes, `d` takes it off aMule.
+- **Top bar: CPU and RAM per process.** The two CPU and RAM boxes are now one
+  **Gextto** badge with `CPU% · RAM`, and next to it **gx-torrent** (the torrent
+  engine, when the daemon is local) and **aMule** (when the eD2k integration is
+  on and `amuled` runs on the same machine). Each badge refreshes every 5
+  seconds like the other figures; a process on another host gets no badge,
+  because those figures cannot be read from there.
 - **eD2k: completed downloads reach the history at once.** An eD2k file that
   completed and was imported into the library appeared in the history only at
   the next reconciliation, up to six hours later. It is now recorded as finished

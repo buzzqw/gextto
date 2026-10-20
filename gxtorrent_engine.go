@@ -235,6 +235,17 @@ func newGxTorrentEngine(cfg *Config, notifier *Notifier) (*gxTorrentEngine, erro
 	return engine, nil
 }
 
+// LocalProcessPID reports the managed gx-torrent process, for the header
+// metrics. An external daemon (configured by URL) has no local pid.
+func (e *gxTorrentEngine) LocalProcessPID() (int, bool) {
+	e.processMu.Lock()
+	defer e.processMu.Unlock()
+	if e.process != nil && e.process.pid > 0 {
+		return e.process.pid, true
+	}
+	return 0, false
+}
+
 func (e *gxTorrentEngine) Name() string { return BackendGxTorrent }
 
 func (e *gxTorrentEngine) Capabilities() map[string]bool {

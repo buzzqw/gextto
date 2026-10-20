@@ -86,6 +86,9 @@ func (m *Model) Update(k Key) Action {
 		return Action{Kind: ActionQuit}
 	}
 
+	if m.Ed2kDetail != nil {
+		return m.updateEd2kDetail(k)
+	}
 	if m.Detail != nil {
 		return m.updateDetail(k)
 	}
@@ -130,12 +133,15 @@ func (m *Model) Update(k Key) Action {
 		return m.loadTabAction()
 	case k.Kind == KeyTab:
 		m.Tab = Tab((int(m.Tab) + 1) % tabCount)
+		m.Ed2kDetail = nil
 		return m.loadTabAction()
 	case k.Kind == KeyBackTab:
 		m.Tab = Tab((int(m.Tab) + tabCount - 1) % tabCount)
+		m.Ed2kDetail = nil
 		return m.loadTabAction()
 	case k.Kind == KeyRune && k.Rune >= '1' && k.Rune <= '9':
 		m.Tab = Tab(k.Rune - '1')
+		m.Ed2kDetail = nil
 		return m.loadTabAction()
 	}
 
@@ -471,6 +477,29 @@ func (m *Model) updateSearchOverlay(k Key) Action {
 	return Action{}
 }
 
+// updateEd2kDetail handles the keys of the eD2k detail overlay: Enter or Esc
+// closes it, the arrows scroll, y copies the ed2k link.
+func (m *Model) updateEd2kDetail(k Key) Action {
+	maxScroll := max(0, ed2kDetailLineCount(m)-1)
+	switch {
+	case k.Kind == KeyEsc || k.Kind == KeyEnter || (k.Kind == KeyRune && k.Rune == 'q'):
+		m.Ed2kDetail = nil
+	case k.Kind == KeyUp:
+		m.Ed2kDetailScroll = max(0, m.Ed2kDetailScroll-1)
+	case k.Kind == KeyDown:
+		m.Ed2kDetailScroll = min(maxScroll, m.Ed2kDetailScroll+1)
+	case k.Kind == KeyPgUp:
+		m.Ed2kDetailScroll = max(0, m.Ed2kDetailScroll-10)
+	case k.Kind == KeyPgDn:
+		m.Ed2kDetailScroll = min(maxScroll, m.Ed2kDetailScroll+10)
+	case k.Kind == KeyRune && k.Rune == 'y':
+		if m.Ed2kDetail != nil && m.Ed2kDetail.Link != "" {
+			return Action{Kind: ActionCopy, Text: m.Ed2kDetail.Link}
+		}
+	}
+	return Action{}
+}
+
 func (m *Model) updateDetail(k Key) Action {
 	if action, handled := m.updateDetailExtras(k); handled {
 		return action
@@ -533,6 +562,11 @@ func (m *Model) updateTorrents(k Key) Action {
 	case k.Kind == KeyEnter:
 		if torrent := m.SelectedTorrent(); torrent != nil && torrent.Hash != "" {
 			return Action{Kind: ActionOpenDetails, Hash: torrent.Hash}
+		}
+		if row := m.SelectedEd2k(); row != nil {
+			copy := *row
+			m.Ed2kDetail = &copy
+			m.Ed2kDetailScroll = 0
 		}
 	case k.Kind != KeyRune:
 		return Action{}

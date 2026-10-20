@@ -365,6 +365,12 @@ type Model struct {
 	DetailView   DetailView
 	DetailItems  []map[string]any
 	DetailScroll int
+	// eD2k: aMule's state, the raw rows (for the detail view) and the open
+	// detail overlay. The rows are also part of the unified download list.
+	Ed2k             *Ed2kStatus
+	Ed2kRows         []Ed2kDownload
+	Ed2kDetail       *Ed2kDownload
+	Ed2kDetailScroll int
 	// DetailSelected is the highlighted tracker or file.
 	DetailSelected int
 
@@ -443,6 +449,41 @@ func (m *Model) SetTorrents(torrents []Torrent) {
 
 // SetHTTPDownloads replaces the live HTTP download list and emits notifications
 // only for transitions observed after the first snapshot.
+// SetEd2k stores aMule's state and the raw eD2k rows.
+func (m *Model) SetEd2k(status *Ed2kStatus, rows []Ed2kDownload) {
+	m.Ed2k = status
+	m.Ed2kRows = rows
+	if m.Ed2kDetail != nil {
+		found := false
+		for _, row := range rows {
+			if row.Hash == m.Ed2kDetail.Hash {
+				copy := row
+				m.Ed2kDetail = &copy
+				found = true
+				break
+			}
+		}
+		if !found {
+			m.Ed2kDetail = nil
+		}
+	}
+}
+
+// SelectedEd2k returns the eD2k row behind the selected download, if any.
+func (m *Model) SelectedEd2k() *Ed2kDownload {
+	row := m.SelectedDownload()
+	if row.HTTP == nil || !strings.HasPrefix(row.HTTP.ID, ed2kIDPrefix) {
+		return nil
+	}
+	hash := strings.TrimPrefix(row.HTTP.ID, ed2kIDPrefix)
+	for index := range m.Ed2kRows {
+		if m.Ed2kRows[index].Hash == hash {
+			return &m.Ed2kRows[index]
+		}
+	}
+	return nil
+}
+
 func (m *Model) SetHTTPDownloads(downloads []ComicDownload) {
 	selectedID := ""
 	if selected := m.SelectedDownload(); selected.HTTP != nil {

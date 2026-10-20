@@ -886,3 +886,49 @@ func TestUnseenProblemsUntilTheLogIsViewed(t *testing.T) {
 		t.Fatalf("viewing the log must clear the counter, got %d", m.UnseenProblems)
 	}
 }
+
+func TestEd2kRowsListDetailsAndCopyLink(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabTorrents
+	row := Ed2kDownload{
+		Hash: "ac9506f90a4e91273d5114f9bc1438a8", Name: "Scrubs S02E04.mkv", Size: 1000, Done: 400,
+		Progress: 40, Speed: 2048, State: "downloading", Sources: 9, ActiveSources: 3,
+		Priority: "normal", Link: "ed2k://|file|Scrubs S02E04.mkv|1000|AC9506F90A4E91273D5114F9BC1438A8|/",
+	}
+	m.SetEd2k(&Ed2kStatus{Enabled: true, Reachable: true}, []Ed2kDownload{row})
+	m.SetHTTPDownloads([]ComicDownload{row.AsDownload()})
+
+	if got := m.SelectedEd2k(); got == nil || got.Hash != row.Hash {
+		t.Fatalf("SelectedEd2k = %+v", got)
+	}
+	m.Update(kindKey(KeyEnter))
+	if m.Ed2kDetail == nil || m.Ed2kDetail.Name != row.Name {
+		t.Fatalf("Enter must open the eD2k detail: %+v", m.Ed2kDetail)
+	}
+	action := m.Update(runeKey('y'))
+	if action.Kind != ActionCopy || action.Text != row.Link {
+		t.Fatalf("y must copy the ed2k link: %+v", action)
+	}
+	m.Update(kindKey(KeyEsc))
+	if m.Ed2kDetail != nil {
+		t.Fatal("Esc must close the eD2k detail")
+	}
+
+	screen := m.Render(100, 30)
+	if !lineContains(screen, "Scrubs S02E04.mkv") {
+		t.Fatalf("the download list should show the eD2k row: %+v", screen)
+	}
+
+	m.Tab = TabStatus
+	m.Loading = false
+	m.SetStatus(Status{Name: "gextto", Version: "1.0", Active: true})
+	m.SetDaemonState(true, "")
+	m.SetEd2k(&Ed2kStatus{Enabled: true, Reachable: true, Status: &Ed2kCoreStatus{
+		Version: "2.3.3", Ed2kConnected: true, HighID: true, ServerName: "Fake Server",
+		KadConnected: true, UploadRate: 512, UploadQueue: 2,
+	}}, []Ed2kDownload{row})
+	status := m.Render(120, 30)
+	if !lineContains(status, "Fake Server") || !lineContains(status, "2.3.3") {
+		t.Fatalf("the status tab should show aMule: %+v", status)
+	}
+}

@@ -121,6 +121,9 @@ protocol.
 
 ## Using it
 
+The eD2k page has three tabs: **aMule and search** (state, servers, search,
+pasted links), **Shared files** and **aMule log**.
+
 ### Search
 
 Three places, all through aMule:
@@ -213,11 +216,11 @@ Downloads added by hand and paused ones are left alone.
 
 ### Shared files and uploads
 
-The eD2k page has a **Shared files** panel: it lists what aMule shares with the
+The **Shared files** tab lists what aMule shares with the
 bytes uploaded in this session and over all time, the requests it answered, the
 clients queued for each file and the upload priority, and the file's `ed2k://`
 link to copy. Below it, **Who is downloading from you** lists the clients in
-the upload queue with their software, file, speed and queue position. The panel
+the upload queue with their software, file, speed and queue position. The tab
 also shows the current upload rate and queue length, and the shared folders
 read-only: the incoming folder plus the extra ones configured in aMule.
 
@@ -225,10 +228,8 @@ read-only: the incoming folder plus the extra ones configured in aMule.
 reload button of its GUI: files you added or removed by hand show up or
 disappear. Gextto never changes aMule's sharing configuration.
 
-### aMule's log
-
-**eD2k page → aMule log → Load the log** shows the last lines of `amuled`'s log.
-The same lines are available at `GET /api/ed2k/log`.
+The **aMule log** tab shows the last lines of `amuled`'s own log, with **Refresh**
+to read them again.
 
 ## Troubleshooting
 

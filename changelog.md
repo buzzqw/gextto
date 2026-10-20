@@ -14,11 +14,19 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
-- **Barra in alto: anche i carichi di aMule.** Quando l'integrazione eD2k è
-  attiva e `amuled` gira sulla stessa macchina di Gextto, nella barra superiore
-  compare il badge **aMule** con CPU e RAM del demone, aggiornato ogni 5 secondi
-  come gli altri valori. Se aMule è su un altro host il badge non c'è, perché
-  quei dati non sono leggibili da lì.
+- **Pagina eD2k a schede, e aMule nella TUI.** La pagina eD2k ora ha tre
+  schede — **aMule e ricerca**, **File condivisi** e **Log di aMule** — invece
+  dei pannelli in fondo alla pagina. Nella TUI, con eD2k attivo, la scheda
+  **Stato** mostra la riga **aMule** (versione, server, ID alto/basso, Kad,
+  upload e coda) e i download di aMule compaiono nella scheda **Torrent**:
+  `Invio` apre il dettaglio con fonti, priorità, ultimo dato e link `ed2k://`,
+  `y` copia il link, `p` mette in pausa o riprende, `d` lo toglie da aMule.
+- **Barra in alto: CPU e RAM per processo.** I due riquadri CPU e RAM sono
+  diventati un badge unico **Gextto** con `CPU% · RAM`, e accanto compaiono
+  **gx-torrent** (il motore torrent, quando il demone è locale) e **aMule**
+  (quando l'integrazione eD2k è attiva e `amuled` gira sulla stessa macchina).
+  Ogni badge si aggiorna ogni 5 secondi come gli altri valori; per i processi
+  su un altro host non compare, perché quei dati non sono leggibili da lì.
 - **eD2k: i download completati entrano subito nello Storico download.** Un
   file eD2k completato e importato in libreria compariva nello Storico solo alla
   riconciliazione successiva, fino a sei ore dopo. Ora viene registrato come

@@ -181,8 +181,8 @@
 
 {{define "v2_live_top_metrics"}}
 <div id="v2-live-top-metrics" class="top-live-metrics" data-active-downloads="{{.ActiveDownloads}}">
-  <div class="top-metric" title="CPU del processo Gextto"><span class="top-metric-label">CPU{{if .CPUFrequency}} <small class="metric-frequency">{{.CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}}</strong></div>
-  <div class="top-metric" title="RAM residente del processo Gextto"><span class="top-metric-label">RAM</span><strong>{{.RAM}}</strong></div>
+  <div class="top-metric" title="CPU e RAM del processo Gextto{{if .CPUFrequency}} · {{.CPUFrequency}}{{end}}"><span class="top-metric-label">Gextto</span><strong>{{.CPU}} · {{.RAM}}</strong></div>
+  {{if .GxLoad}}<div class="top-metric" title="CPU e RAM del demone gx-torrent"><span class="top-metric-label">gx-torrent</span><strong>{{.GxLoad}}</strong></div>{{end}}
   {{if .AmuleLoad}}<div class="top-metric" title="CPU e RAM del processo amuled su questa macchina"><span class="top-metric-label">aMule</span><strong>{{.AmuleLoad}}</strong></div>{{end}}
   <div class="top-metric top-metric-rate" title="Velocità di download"><span class="top-metric-label">↓ Download</span><strong>{{.Download}}</strong></div>
   <div class="top-metric top-metric-rate" title="Velocità di upload"><span class="top-metric-label">↑ Upload</span><strong>{{.Upload}}</strong></div>
@@ -1557,6 +1557,27 @@
 
 {{define "v2_ed2k"}}
 <div class="view ed2k-view">
+  {{if .Enabled}}
+  <nav class="toolbar" role="tablist" aria-label="Sezioni eD2k">
+    <a class="chip{{if eq .Tab "status"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "status"}}true{{else}}false{{end}}" href="/?view=ed2k">aMule e ricerca</a>
+    <a class="chip{{if eq .Tab "shared"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "shared"}}true{{else}}false{{end}}" href="/?view=ed2k&amp;tab=shared">File condivisi</a>
+    <a class="chip{{if eq .Tab "log"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "log"}}true{{else}}false{{end}}" href="/?view=ed2k&amp;tab=log">Log di aMule</a>
+  </nav>
+  {{end}}
+  {{if and .Enabled (eq .Tab "shared")}}
+  <div class="panel">
+    <div class="panel-head"><h3>File condivisi</h3><small class="muted">Cosa aMule sta caricando e le cartelle che condivide</small></div>
+    <div class="panel-body">{{template "v2_ed2k_shared" .Shared}}</div>
+  </div>
+  {{else if and .Enabled (eq .Tab "log")}}
+  <div class="panel">
+    <div class="panel-head"><h3>Log di aMule</h3><small class="muted">Le ultime righe del log di amuled</small></div>
+    <div class="panel-body">
+      <a class="btn sm" href="/?view=ed2k&amp;tab=log" title="Rilegge il log da aMule">Aggiorna</a>
+      {{template "v2_ed2k_log" .Log}}
+    </div>
+  </div>
+  {{else}}
   <div id="v2-ed2k-state">{{template "v2_ed2k_state" .}}</div>
   {{if .Enabled}}
   <div class="panel">
@@ -1586,20 +1607,7 @@
       <div id="v2-ed2k-links-result" aria-live="polite"></div>
     </div>
   </div>
-  <details class="panel">
-    <summary class="panel-head"><h3>File condivisi</h3><small class="muted">Cosa aMule sta caricando e le cartelle che condivide</small></summary>
-    <div class="panel-body">
-      <button class="btn sm" type="button" hx-get="/ed2k/shared" hx-target="#v2-ed2k-shared" hx-swap="innerHTML" hx-disabled-elt="this" title="Legge da aMule i file condivisi, i caricamenti in corso e le cartelle condivise">Mostra i file condivisi</button>
-      <div id="v2-ed2k-shared" aria-live="polite"></div>
-    </div>
-  </details>
-  <details class="panel">
-    <summary class="panel-head"><h3>Log di aMule</h3><small class="muted">Le ultime righe del log di amuled</small></summary>
-    <div class="panel-body">
-      <button class="btn sm" type="button" hx-get="/ed2k/log" hx-target="#v2-ed2k-log" hx-swap="innerHTML" title="Legge il log da aMule">Carica il log</button>
-      <div id="v2-ed2k-log" aria-live="polite"></div>
-    </div>
-  </details>
+  {{end}}
   {{end}}
 </div>
 {{end}}
@@ -2409,7 +2417,7 @@
 {{else if .Error}}<p class="alert" role="alert"><span>File condivisi non disponibili:</span> {{.Error}}</p>
 {{else}}
 <div class="toolbar">
-  <form method="post" action="/ed2k/shared/reload" hx-post="/ed2k/shared/reload" hx-target="#v2-ed2k-shared" hx-swap="innerHTML" hx-disabled-elt="find button" style="display:inline">
+  <form method="post" action="/ed2k/shared/reload" style="display:inline">
     <button class="btn sm" type="submit" title="Chiede ad aMule di rileggere le cartelle condivise: i file aggiunti o tolti compaiono qui">Ricarica file condivisi</button>
   </form>
 </div>

@@ -5568,3 +5568,8 @@ fra:
   "Byte caricati dall'inizio": "Octets envoyés depuis le début"
   "Link": "Lien"
   "CPU e RAM del processo amuled su questa macchina": "CPU et RAM du processus amuled sur cette machine"
+  "CPU e RAM del processo Gextto": "CPU et RAM du processus Gextto"
+  "CPU e RAM del demone gx-torrent": "CPU et RAM du démon gx-torrent"
+  "aMule e ricerca": "aMule et recherche"
+  "Sezioni eD2k": "Sections eD2k"
+  "Rilegge il log da aMule": "Relit le journal depuis aMule"

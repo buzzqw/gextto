@@ -78,7 +78,7 @@ func TestEd2kSharedAPIIsOffByDefault(t *testing.T) {
 	}
 }
 
-func TestEd2kSharedPanelRendersAndReloads(t *testing.T) {
+func TestEd2kSharedTabRendersAndReloads(t *testing.T) {
 	core, handler := ed2kTestRouter(t)
 	core.SetShared([]amuletest.File{{
 		Hash: "ac9506f90a4e91273d5114f9bc1438a8", Name: "The.Pitt.S02E14.mkv", Size: 2941579665,
@@ -86,30 +86,47 @@ func TestEd2kSharedPanelRendersAndReloads(t *testing.T) {
 	}}, core.Incoming)
 	core.SetSharedDirs([]string{"/media/movies"})
 
-	request := httptest.NewRequest(http.MethodGet, "/ed2k/shared", nil)
+	request := httptest.NewRequest(http.MethodGet, "/?view=ed2k&tab=shared", nil)
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, body %q", recorder.Code, recorder.Body.String())
 	}
 	body := recorder.Body.String()
-	for _, want := range []string{"The.Pitt.S02E14.mkv", core.Incoming, "/media/movies", "Ricarica file condivisi", "Copia"} {
+	for _, want := range []string{"The.Pitt.S02E14.mkv", core.Incoming, "/media/movies", "Ricarica file condivisi", "Copia", `aria-selected="true"`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("panel is missing %q: %s", want, body)
 		}
+	}
+	if strings.Contains(body, "Incolla link eD2k") {
+		t.Fatal("the shared tab must not render the search and link panels")
 	}
 
 	request = httptest.NewRequest(http.MethodPost, "/ed2k/shared/reload", nil)
 	recorder = httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("reload status = %d, body %q", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusSeeOther {
+		t.Fatalf("reload status = %d, want a redirect", recorder.Code)
 	}
-	if !strings.Contains(recorder.Body.String(), "Scansione dei file condivisi richiesta ad aMule.") {
-		t.Fatalf("reload did not confirm: %s", recorder.Body.String())
+	if location := recorder.Header().Get("Location"); !strings.Contains(location, "view=ed2k") || !strings.Contains(location, "tab=shared") {
+		t.Fatalf("reload redirected to %q", location)
 	}
 	commands := core.Commands()
 	if len(commands) != 1 || commands[0] != "reload-shared" {
 		t.Fatalf("commands = %v", commands)
+	}
+}
+
+func TestEd2kLogTabRenders(t *testing.T) {
+	_, handler := ed2kTestRouter(t)
+	request := httptest.NewRequest(http.MethodGet, "/?view=ed2k&tab=log", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %q", recorder.Code, recorder.Body.String())
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, "Log di aMule") || !strings.Contains(body, "Connected to Kad") {
+		t.Fatalf("log tab = %s", body)
 	}
 }

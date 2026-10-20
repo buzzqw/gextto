@@ -29,11 +29,12 @@ dentro il loro pannello. Ogni azione resta raggiungibile col tocco.
 La UI ufficiale si apre su `http://<host>:5000/`; il vecchio prefisso `/v2`
 reindirizza alla radice e la vecchia route `/ui` non esiste più. La pagina **Scarico** aggiorna
 automaticamente la sessione ogni 5 secondi; la voce **Aggiorna ogni 5 s** del menu
-**Strumenti** disattiva o riattiva l'aggiornamento, e il pulsante **⟳** aggiorna subito. Anche i tile CPU/RAM e le velocità nella
-barra superiore vengono aggiornati ogni 5 secondi. Quando **eD2k e Kad tramite
-aMule** è attivo e `amuled` gira sulla stessa macchina di Gextto, nella barra
-compare anche il badge **aMule** con CPU e RAM del demone; se aMule è su un altro
-host il badge non c'è, perché quei dati non sono leggibili da lì.
+**Strumenti** disattiva o riattiva l'aggiornamento, e il pulsante **⟳** aggiorna subito. Anche le velocità e i carichi nella
+barra superiore vengono aggiornati ogni 5 secondi. La barra mostra **CPU e RAM
+per processo**: **Gextto** (il demone), **gx-torrent** (il motore torrent, quando
+il demone è locale) e **aMule** (quando **eD2k e Kad tramite aMule** è attivo e
+`amuled` gira sulla stessa macchina). I badge dei processi remoti non compaiono,
+perché quei dati non sono leggibili da lì.
 
 Il percorso consigliato per una nuova installazione è:
 
@@ -1394,6 +1395,11 @@ la pulizia degli altri.
 ### TUI: uso rapido
 
 Nella TUI `1`-`9` o `Tab` cambiano scheda, `r` aggiorna e `?` apre l'aiuto.
+Con eD2k attivo, nella scheda **Stato** compare la riga **aMule** (versione,
+server e ID alto/basso, Kad, velocità di upload e coda) e nella scheda
+**Torrent** i download di aMule sono elencati con gli altri: `Invio` apre il
+dettaglio (stato, fonti, priorità, ultimo dato, link `ed2k://`), `y` copia il
+link, `p` mette in pausa o riprende, `d` lo toglie da aMule.
 Nella scheda **Log**, `/` filtra le righe e `f` attiva o ferma il follow; quando
 il follow è fermo la posizione resta congelata anche se arrivano nuovi log.
 Archivio, Mancanti e Blocklist dispongono di selezione e scrolling con le frecce

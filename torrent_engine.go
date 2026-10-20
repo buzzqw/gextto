@@ -53,6 +53,14 @@ type TorrentSessionHealth interface {
 	SessionHealthy() bool
 }
 
+// LocalProcessReporter is optionally implemented by a backend that runs a
+// process on this machine and can name it, so the header can show its CPU and
+// memory. A backend reached over the network (an external qBittorrent, a
+// daemon on another host) reports false.
+type LocalProcessReporter interface {
+	LocalProcessPID() (int, bool)
+}
+
 // TorrentEngineIdentity is optionally implemented by backends whose underlying
 // software has a version worth naming in the UI: "gx-core" for the gx-torrent
 // daemon, "qBittorrent-nox" for the external engine. It is separate from

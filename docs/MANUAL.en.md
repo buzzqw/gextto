@@ -29,11 +29,12 @@ panel. Every action stays reachable by touch.
 The official UI is served at `http://<host>:5000/`; the old `/v2` prefix
 redirects to the root and the old `/ui` route no longer exists. The **Downloads** page refreshes
 the session automatically every 5 seconds; **Refresh every 5 s** in the **Tools**
-menu turns that off or back on, and the **⟳** button refreshes at once. CPU/RAM tiles and the transfer rates in the top bar use the
-same 5-second refresh. When **eD2k and Kad through aMule** is on and `amuled`
-runs on the same machine as Gextto, the bar also shows an **aMule** badge with
-the daemon's CPU and RAM; with aMule on another host there is no badge, because
-those figures cannot be read from there.
+menu turns that off or back on, and the **⟳** button refreshes at once. The transfer rates and the process loads in the top bar use the
+same 5-second refresh. The bar shows **CPU and RAM per process**: **Gextto** (the
+daemon), **gx-torrent** (the torrent engine, when the daemon is local) and
+**aMule** (when **eD2k and Kad through aMule** is on and `amuled` runs on the
+same machine). Badges for remote processes are absent, because those figures
+cannot be read from there.
 
 The recommended path for a new installation is:
 
@@ -1348,7 +1349,12 @@ the others.
 
 ### TUI: quick usage
 
-In the TUI, `1`-`9` or `Tab` switch tabs, `r` refreshes and `?` opens help. In
+In the TUI, `1`-`9` or `Tab` switch tabs, `r` refreshes and `?` opens help.
+With eD2k on, the **Status** tab shows an **aMule** line (version, server and
+High/Low ID, Kad, upload rate and queue) and the **Torrents** tab lists aMule's
+downloads with the others: `Enter` opens the detail (state, sources, priority,
+last data received, `ed2k://` link), `y` copies the link, `p` pauses or
+resumes, `d` takes it off aMule. In
 **Logs**, `/` filters lines and `f` enables or pauses follow; when paused, the
 viewport remains fixed while new log lines arrive. Archive, Missing and
 Blocklist support arrow/page scrolling and selection. See [`docs/tui.md`](tui.md)

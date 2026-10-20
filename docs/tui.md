@@ -38,14 +38,20 @@ network, pass the API key with `GEXTTO_API_KEY=<key>`: it is sent in the
    ETA and, anchored at the bottom, the **latest log lines**. If the window is
    short the upper part scrolls with `↑↓`/`PgUp`/`PgDn`; on a phone-width
    terminal the traffic line (download/upload rates and trend) is shown first,
-   so it stays visible without scrolling.
+   so it stays visible without scrolling. With the eD2k integration on, a
+   **aMule** line follows the downloads: version, server and High/Low ID, Kad
+   state, upload rate and upload-queue length; when aMule does not answer the
+   line says so.
 2. **Torrents** — unified list of torrents, HTTP comic downloads and aMule's
    eD2k downloads (method `eD2k`, counted apart in the status line) with state,
    progress, bytes, speed and name; filter (`/` or `F`), sort (`o`/`O`),
    torrent details (`Enter`), pause/resume and removal of HTTP downloads. Several
    torrents can be marked (`Space`, `*` all/none) and paused, resumed, rechecked,
    tagged or removed together; `#` tags, `A` sets the auto-removal, `H` opens the
-   history, `b` restarts. The header shows the bandwidth limits in force (base,
+   history, `b` restarts. `Enter` on an eD2k row opens its detail (state,
+   progress, speed, sources, priority, last data received, hash and ed2k link);
+   `y` copies the link, `p` pauses or resumes, `d` removes it from aMule, `Esc`
+   closes. The header shows the bandwidth limits in force (base,
    scheduled or temporary with the minutes left). `T` sets a temporary limit as
    in the web UI: `DL UL [minutes]` in KiB/s, where `0` is unlimited and without
    minutes (or with `0`) the limit stays until you remove it; `off` removes it

@@ -5575,3 +5575,8 @@ deu:
   "Byte caricati dall'inizio": "Seit dem Start hochgeladene Bytes"
   "Link": "Link"
   "CPU e RAM del processo amuled su questa macchina": "CPU und RAM des amuled-Prozesses auf dieser Maschine"
+  "CPU e RAM del processo Gextto": "CPU und RAM des Gextto-Prozesses"
+  "CPU e RAM del demone gx-torrent": "CPU und RAM des gx-torrent-Dämons"
+  "aMule e ricerca": "aMule und Suche"
+  "Sezioni eD2k": "eD2k-Bereiche"
+  "Rilegge il log da aMule": "Liest das Log erneut von aMule"
