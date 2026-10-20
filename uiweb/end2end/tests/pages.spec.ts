@@ -184,6 +184,22 @@ test.describe("mobile", () => {
     await expect(page.locator("details.add-torrent-panel")).toHaveAttribute("open", "");
   });
 
+  test("Scarico accetta più link eD2k e le impostazioni eD2k sono leggibili", async ({ page }) => {
+    await page.goto("/?view=downloads");
+    const links = page.locator('textarea[name="ed2k_link"]');
+    await expect(links).toBeVisible();
+    await expect(links).toHaveAttribute("rows", "2");
+    await expect(page.locator('button:has-text("Apri link eD2k")')).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(2);
+
+    await page.goto("/?view=settings");
+    await page.locator("input.settings-search").fill("Apri la porta Kad");
+    await expect(page.locator("#v2-settings-search").getByText("Apri la porta Kad sul router")).toBeVisible();
+    const settingsOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(settingsOverflow).toBeLessThanOrEqual(2);
+  });
+
   test("Scarico usa schede compatte e conserva l'ordinamento touch", async ({ page }) => {
     await page.goto("/?view=downloads");
     await expect(page.locator("#v2-sort")).toBeVisible();
