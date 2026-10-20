@@ -55,7 +55,7 @@ func saveRunState(dataDir string, s runState) {
 // buildIdentity renders the version stamped into the binary, with the short
 // commit when the build provides one.
 func buildIdentity() string {
-	identity := constants.AppVersion()
+	identity := constants.VersionLabel()
 	if c := strings.TrimSpace(constants.Commit); c != "" {
 		if len(c) > 8 {
 			c = c[:8]

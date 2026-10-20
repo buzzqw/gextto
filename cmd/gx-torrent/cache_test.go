@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/queue"
 )
 
@@ -133,9 +134,25 @@ func TestAdaptiveCacheDisabledUsesStatic(t *testing.T) {
 }
 
 func TestRuntimeVersionUsesGxTorrentBuild(t *testing.T) {
-	v := runtimeVersion()
-	if len(v) < 5 || v[:4] != "1.1." {
-		t.Fatalf("runtime version = %q, want 1.1.<gx-torrent build>", v)
+	if got, want := runtimeVersion(), constants.GxTorrentVersion(); got != want {
+		t.Fatalf("runtime version = %q, want %q", got, want)
+	}
+	if v := runtimeVersion(); !gexVersionPattern.MatchString(v) {
+		t.Fatalf("runtime version = %q, want a three-number version", v)
+	}
+}
+
+func TestDisplayVersionKeepsBuildAfterRollover(t *testing.T) {
+	previous := constants.GxTorrentBuild
+	t.Cleanup(func() { constants.GxTorrentBuild = previous })
+
+	constants.GxTorrentBuild = "999"
+	if got := displayVersion(); got != "1.1.999" {
+		t.Fatalf("display version at build 999 = %q", got)
+	}
+	constants.GxTorrentBuild = "1000"
+	if got := displayVersion(); got != "1.2.0 (build 1000)" {
+		t.Fatalf("display version at build 1000 = %q", got)
 	}
 }
 

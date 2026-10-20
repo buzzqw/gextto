@@ -998,7 +998,8 @@ coperti dalla stessa licenza EUPL-1.2 di Gextto (vedi la pagina *Licenza*
 dell'interfaccia web).
 
 Nell'intestazione dell'interfaccia, accanto alla versione di Gextto, compare il
-**motore in uso con la sua versione**: `gx-core 1.1.<n>` con gx-torrent,
+**motore in uso con la sua versione**: `gx-core` seguito dal numero di versione
+(per esempio `1.1.242`) con gx-torrent,
 `qBittorrent-nox v…` con qBittorrent (il marchio e la versione del motore
 attivo, così si vede a colpo d'occhio cosa sta trasferendo i file).
 
@@ -1234,6 +1235,12 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   **Aggiornamento disponibile** sopra **Dona**.
   Su un'installazione da sorgenti il pannello indica di usare `git pull` e
   `make build`.
+- **Versione esatta** — in fondo alla pagina una riga riporta la versione, la
+  **build** completa e il **commit** da cui è compilata (il commit breve; il
+  suggerimento del mouse mostra quello intero). Serve a riconoscere senza
+  ambiguità la build installata: da quando il terzo numero della versione
+  riparte da 0 ogni 1000 build (per esempio `1.2.0 (build 2000)`), la build
+  piena e il commit sono l'identità esatta del programma in esecuzione.
 
 - Backup immediato, pulisci cestino, ricalcola scoring, scansiona archivi,
   **Aggiorna MediaInfo** (analizza con `ffprobe` i file archiviati senza dati e

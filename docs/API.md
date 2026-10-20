@@ -249,7 +249,7 @@ state.
 | POST | `/api/simkl/watchlist/import` | import the SimKL watchlist |
 | GET | `/api/sources/health` | health of the sources |
 | GET | `/api/stats` | library statistics |
-| GET | `/api/status` | daemon status |
+| GET | `/api/status` | daemon status, version and build |
 | GET | `/api/system/lt_mem_suggest` | suggested engine memory limits |
 | GET | `/api/system/stats` | host statistics |
 | GET | `/api/tag-dir-rules` | folder tag rules |
@@ -389,7 +389,7 @@ server-rendered UI under `/ui`; those HTML routes are not part of this table.
 | POST | `/api/v1/create-torrent` | create a .torrent from a folder |
 | GET | `/api/v1/dht-feed` | recent DHT discovery feed |
 | GET | `/api/v1/events` | engine events (Server-Sent Events) |
-| GET | `/api/v1/health` | health, version and fingerprint |
+| GET | `/api/v1/health` | health, version, build and fingerprint |
 | POST | `/api/v1/ipfilter` | update the IP filter |
 | GET | `/api/v1/metrics` | Prometheus metrics |
 | POST | `/api/v1/pins/clear` | clear the pinned torrents |

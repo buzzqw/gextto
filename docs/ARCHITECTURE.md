@@ -61,6 +61,13 @@ build via `scripts/next-gx-build-number.sh` and lives in
 incrementing, so a release carries the checkout's number (`gx_version` in
 `release.json`).
 
+The version shown to people is derived from the build (`versionFromBuild` in
+`internal/constants`): `1.1.<build>` until the counter reaches the first round
+thousand (2000 for Gextto, 1000 for gx-torrent), then the third number runs
+0..999 and the middle one grows (`1.2.0`, `1.2.999`, `1.3.0`, …). The full
+build stays visible in the label and, for Gextto, in the footer of
+**Maintenance** together with the commit the binary was compiled from.
+
 The build is in **pure Go**: `gexttod` and the `gx-torrent` daemon, with no C or
 C++ dependency (`CGO_ENABLED=0`). `gx-torrent` is the default engine and the
 standalone client; the only other backend is the external/managed

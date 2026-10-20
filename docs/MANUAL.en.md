@@ -972,7 +972,8 @@ covered by the same EUPL-1.2 licence as Gextto (see the *Licence* page of the
 web interface).
 
 In the interface header, next to Gextto's version, the **active engine with its
-version** is shown: `gx-core 1.1.<n>` with gx-torrent, `qBittorrent-nox v…` with
+version** is shown: `gx-core` followed by its version number (for example
+`1.1.242`) with gx-torrent, `qBittorrent-nox v…` with
 qBittorrent (the brand and version of the engine actually moving the bytes, so
 what is transferring the files is visible at a glance).
 
@@ -1195,6 +1196,12 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   `Esc`) closes it for good. When a new version exists an **Update available** button also
   appears above **Donate**. On a source installation the panel says to use
   `git pull` and `make build`.
+- **Exact version** — at the bottom of the page one line shows the version,
+  the full **build** number and the **commit** the binary was compiled from
+  (the short hash; the hover tooltip shows the full one). It tells exactly
+  which build is installed: since the third version number restarts from 0
+  every 1000 builds (for example `1.2.0 (build 2000)`), the full build and the
+  commit are the exact identity of the running program.
 
 - Backup now, clean trash, rescore, scan archives, **Refresh MediaInfo**
   (probes archived files without data via `ffprobe` and stores it) and restart

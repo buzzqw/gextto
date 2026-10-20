@@ -90,8 +90,12 @@ Code:
    its **own build number** (`gx-torrent.build_number`, committed), independent
    of Gextto's: it increases by one at every local recompilation and stays
    unchanged when the build does not touch it; CI reads the committed value, so
-   the published daemon has the same number (`gx_version` in `release.json`). It is the `1.1.<n>` version reported by
-   `gx-torrent --version`, by its web page and by `/api/v1/health`.
+   the published daemon has the same number (`gx_version` in `release.json`). It is
+   the version reported by `gx-torrent --version`, by its web page and by
+   `/api/v1/health`: `1.1.<build>` up to build 999, then the third number runs
+   0..999 and the middle one grows (`1.2.0`, `1.2.999`, `1.3.0`, …). After the
+   rollover the full build stays visible in the label (`1.2.0 (build 1000)`)
+   and in the `build` field of `/api/v1/health`.
 2. `gx-torrent` is the default engine of a new installation: there is no need to
    choose it. A configuration that has already saved an engine stays as it was:
    the default applies only to new installations.
@@ -459,7 +463,11 @@ each commit that touches the daemon's code (`"gx": true`, from the
 `GX_PATHS` of `scripts/release-manifest.sh`, kept in sync with
 `go list -deps ./cmd/gx-torrent` by `TestReleaseManifestCoversDaemonPackages`),
 so a release whose new commits only touch Gextto is no update for the daemon;
-the button turns into **Update** and lists those commits. **Update**
+the button turns into **Update** and lists those commits. Whether a release is
+newer is decided by the commit (and the build time), never by ordering the
+version string: the version numbering is display-only, so the rollover
+(`1.1.999` → `1.2.0`, see *Startup*) changes nothing in the update decision.
+**Update**
 downloads `gx-torrent-<os>-<arch>` of the binary's channel and its `.sha256`
 (mismatch → refused), extracts `gx-torrent` to `<binary>.new`, runs it with
 `--version` (failure → refused), records `update-notes.json` in the data

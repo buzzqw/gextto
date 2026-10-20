@@ -33,6 +33,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -60,6 +61,10 @@ const (
 	// updateHealthyAfter is how long a new version must run to count as good.
 	updateHealthyAfter = 30 * time.Second
 )
+
+// gexVersionPattern accepts the three-number version any published daemon
+// reports (1.1.242 before the rollover, 1.2.0 after it).
+var gexVersionPattern = regexp.MustCompile(`\b[0-9]+\.[0-9]+\.[0-9]+\b`)
 
 // gxUpdater is the update state of one daemon. The zero value is ready.
 type gxUpdater struct {
@@ -175,7 +180,7 @@ func (d *Daemon) updateCheckEnabled() bool {
 // updateStatus combines the binary, the last check and a running update.
 func (d *Daemon) updateStatus() gxUpdateStatus {
 	st := gxUpdateStatus{
-		Version: runtimeVersion(), Commit: constants.Commit, BuiltAt: constants.BuiltAt,
+		Version: displayVersion(), Commit: constants.Commit, BuiltAt: constants.BuiltAt,
 		Channel: constants.GxReleaseChannel, Reason: d.updateUnavailable(),
 		CanApply: runtime.GOOS == "linux", CheckEnabled: d.updateCheckEnabled(), Hours: d.updateHours(),
 	}
@@ -187,7 +192,7 @@ func (d *Daemon) updateStatus() gxUpdateStatus {
 	if m != nil && st.Reason == "" {
 		st.Available, st.Changes, st.Complete = updatecheck.Changes(st.Commit, m, true)
 		st.Latest = m.GxCommit
-		st.LatestVersion = m.GxVersion
+		st.LatestVersion = constants.VersionLabelWithBuild(m.GxVersion, strconv.FormatInt(m.GxBuild, 10))
 		for _, c := range m.Commits {
 			if c.Sha == m.GxCommit {
 				st.LatestDate = c.Day()
@@ -371,11 +376,13 @@ func (d *Daemon) installUpdate(ctx context.Context, st gxUpdateStatus) error {
 		os.Remove(newPath)
 		return err
 	}
-	// The new binary must at least run here before it replaces this one.
+	// The new binary must at least run here before it replaces this one. The
+	// scheme moved from 1.1.<build> to 1.2.0 at the rollover, so accept any
+	// three-number version instead of a fixed prefix.
 	tryCtx, tryCancel := context.WithTimeout(ctx, 15*time.Second)
 	out, err := exec.CommandContext(tryCtx, newPath, "--version").Output()
 	tryCancel()
-	if err != nil || !strings.Contains(string(out), "1.1.") {
+	if err != nil || !gexVersionPattern.MatchString(string(out)) {
 		os.Remove(newPath)
 		return fmt.Errorf("the new version does not run on this system: %v", err)
 	}
@@ -550,7 +557,7 @@ func (d *Daemon) updateMarkHealthy(stop <-chan struct{}) {
 		return
 	}
 	n.Pending = false
-	n.ToVersion, n.ToCommit = runtimeVersion(), constants.Commit
+	n.ToVersion, n.ToCommit = displayVersion(), constants.Commit
 	if n.Seen {
 		_ = os.Remove(updateNotesPath(d.opts.DataDir))
 	} else {
@@ -709,7 +716,7 @@ func (d *Daemon) updateNotesDialogHTML() string {
 		return ""
 	}
 	if n.ToVersion == "" {
-		n.ToVersion, n.ToCommit = runtimeVersion(), constants.Commit
+		n.ToVersion, n.ToCommit = displayVersion(), constants.Commit
 	}
 	esc := html.EscapeString
 	var b strings.Builder

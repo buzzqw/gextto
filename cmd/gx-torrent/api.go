@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
@@ -288,7 +289,7 @@ func (d *Daemon) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	ok := d.session != nil
 	count := len(d.state.Torrents)
 	d.mu.Unlock()
-	writeJSON(w, http.StatusOK, map[string]any{"ok": ok, "version": runtimeVersion(), "torrents": count,
+	writeJSON(w, http.StatusOK, map[string]any{"ok": ok, "version": displayVersion(), "build": constants.GxTorrentBuild, "torrents": count,
 		"pid": os.Getpid(), "mode": string(d.opts.Mode), "fingerprint": d.opts.Fingerprint, "data_dir": d.opts.DataDir})
 }
 

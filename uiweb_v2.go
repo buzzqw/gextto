@@ -40,6 +40,7 @@ import (
 
 	xhtml "golang.org/x/net/html"
 
+	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/messages"
 	"github.com/buzzqw/gextto/internal/models"
@@ -588,6 +589,36 @@ type v2PanelsView struct {
 	Groups []v2Group
 	Jobs   *v2JobsView
 	Stack  bool
+	// Build is the exact build identity shown at the bottom of Maintenance.
+	Build *v2BuildInfo
+}
+
+// v2BuildInfo is the line that pins down exactly which binary is running: the
+// version alone restarts its third number every thousand builds, so the full
+// build and the commit it was compiled from are shown together.
+type v2BuildInfo struct {
+	Version    string
+	Build      string
+	Commit     string
+	CommitFull string
+}
+
+// v2BuildInfoFor builds the Maintenance footer from the values stamped into
+// the binary.
+func v2BuildInfoFor(version, build, commit string) *v2BuildInfo {
+	info := &v2BuildInfo{
+		Version:    strings.TrimSpace(version),
+		Build:      strings.TrimSpace(build),
+		CommitFull: strings.TrimSpace(commit),
+	}
+	info.Commit = info.CommitFull
+	if len(info.Commit) > 8 {
+		info.Commit = info.Commit[:8]
+	}
+	if info.Commit == "" {
+		info.Commit = "—"
+	}
+	return info
 }
 
 // v2MovieLibraryView keeps the monitored library and its download history in
@@ -619,6 +650,7 @@ func v2PanelsViewFrom(s *AppState, r *http.Request, view string) v2PanelsView {
 	if view == "maintenance" {
 		jobs := v2JobsViewFrom(s)
 		page.Jobs = &jobs
+		page.Build = v2BuildInfoFor(constants.AppVersion(), constants.Build, constants.Commit)
 	}
 	return page
 }

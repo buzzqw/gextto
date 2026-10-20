@@ -2118,3 +2118,24 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 .search-row .btn { align-self: flex-start; }
 /* Compact bulletless list (aMule warnings on the Health page). */
 .plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+
+/* Maintenance closes with the exact build identity: version, full build and
+   the commit the binary was compiled from (the short hash, the full one in the
+   tooltip). Quiet on purpose, but always there to answer "which build is
+   this?" without opening Log or Salute. */
+.v2-build-info {
+  margin: 22px 0 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.v2-build-info strong,
+.v2-build-info code { color: var(--text); font-weight: 600; }
+/* On a phone the line is the last thing on the page, where the fixed Donate
+   button sits: keep the commit clear of it and let the text wrap. */
+@media (max-width: 560px) {
+  .v2-build-info { padding-right: 52px; padding-left: 12px; text-align: left; }
+}

@@ -2192,3 +2192,46 @@ func TestV2DownloadsQuickLimits(t *testing.T) {
 		t.Fatalf("duration preset: dl=%s ul=%s until=%s", setting("torrent_temp_dl_limit"), setting("torrent_temp_ul_limit"), setting("torrent_temp_limit_until"))
 	}
 }
+
+// TestV2BuildInfoOnMaintenance pins the line at the bottom of Maintenance: it
+// must show the full build and the short commit (full hash in the tooltip), so
+// the exact binary is identifiable after the version's third number rolls over.
+func TestV2BuildInfoOnMaintenance(t *testing.T) {
+	info := v2BuildInfoFor("1.2.0", "2000", "0123456789abcdef0123456789abcdef01234567")
+	if info.Version != "1.2.0" || info.Build != "2000" {
+		t.Fatalf("build info = %+v", info)
+	}
+	if info.Commit != "01234567" || info.CommitFull != "0123456789abcdef0123456789abcdef01234567" {
+		t.Fatalf("commit = %q, full = %q", info.Commit, info.CommitFull)
+	}
+	// A binary built outside the scripts has no commit: the line still renders.
+	empty := v2BuildInfoFor("1.2.0", "2000", "")
+	if empty.Commit != "—" {
+		t.Fatalf("empty commit = %q", empty.Commit)
+	}
+
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=maintenance", nil)
+	if code != http.StatusOK {
+		t.Fatalf("maintenance -> %d: %s", code, body)
+	}
+	if !strings.Contains(body, `class="v2-build-info"`) {
+		t.Fatal("Maintenance must end with the build identity line")
+	}
+}
+
+// TestOtherPanelsHaveNoBuildInfo: the footer belongs to Maintenance only.
+func TestOtherPanelsHaveNoBuildInfo(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=integrations", nil)
+	if code != http.StatusOK {
+		t.Fatalf("integrations -> %d: %s", code, body)
+	}
+	if strings.Contains(body, `class="v2-build-info"`) {
+		t.Fatal("Integrations must not show Maintenance's build footer")
+	}
+}

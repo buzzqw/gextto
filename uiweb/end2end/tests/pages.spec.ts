@@ -222,6 +222,19 @@ test("manutenzione espone la revisione rinomina cartella", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Scansiona e proponi" })).toBeVisible();
 });
 
+test("manutenzione chiude con build completa e commit", async ({ page }) => {
+  await page.goto("/?view=maintenance");
+  const info = page.locator(".v2-build-info");
+  await expect(info).toBeVisible();
+  await expect(info).toContainText("Versione");
+  await expect(info).toContainText("build");
+  await expect(info).toContainText("commit");
+  // The short hash is shown, the full commit is in the tooltip.
+  const commit = info.locator("code");
+  await expect(commit).toHaveText(/^[0-9a-f]{7,8}$|^—$/);
+  await expect(commit).toHaveAttribute("title", /^([0-9a-f]{40})?$/);
+});
+
 test("ricerca impostazioni apre la tab e raggiunge il campo", async ({ page }) => {
   await page.goto("/?view=settings");
   const search = page.locator("input.settings-search");

@@ -25,8 +25,9 @@ import (
 )
 
 // version may be overridden at build time with -ldflags "-X main.version=...".
-// Empty means: use the daemon's own version (1.1.<gx-torrent build>), which
-// counts gx-torrent's builds independently from Gextto's.
+// Empty means: use the daemon's own version (1.1.<gx-torrent build> until the
+// rollover at build 1000, then 1.2.0, 1.2.999, 1.3.0, …), which counts
+// gx-torrent's builds independently from Gextto's.
 var version = ""
 
 func runtimeVersion() string {
@@ -34,6 +35,17 @@ func runtimeVersion() string {
 		return version
 	}
 	return constants.GxTorrentVersion()
+}
+
+// displayVersion is what people see (--version, health, the settings page):
+// the version with the daemon build once the rollover makes them differ, so
+// the build number is never lost. Machine fields and the User-Agent keep
+// runtimeVersion, which stays a plain three-number version.
+func displayVersion() string {
+	if version != "" {
+		return version
+	}
+	return constants.GxTorrentVersionLabel()
 }
 
 func logf(format string, args ...any) {
@@ -267,7 +279,7 @@ func main() {
 	applyGCDefault()
 
 	if *showVersion {
-		fmt.Println(runtimeVersion())
+		fmt.Println(displayVersion())
 		return
 	}
 	log.SetFlags(log.LstdFlags)

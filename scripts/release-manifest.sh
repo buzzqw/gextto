@@ -50,6 +50,8 @@ done
 [[ -n "$BUILT_AT" ]] || BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION" 2>/dev/null || true)"
 COMMIT="${GEXTTO_COMMIT:-${GITHUB_SHA:-$(git -C "$ROOT" rev-parse HEAD)}}"
+# shellcheck source=scripts/version.sh
+. "$ROOT/scripts/version.sh"
 
 # GX_PATHS is the code of the gx-torrent daemon: its package and every package
 # of this repository it imports (`go list -deps ./cmd/gx-torrent`, kept in
@@ -85,12 +87,12 @@ json_escape() {
   printf '  "channel": %s,\n' "$(json_escape "$CHANNEL")"
   printf '  "label": %s,\n' "$(json_escape "$LABEL")"
   printf '  "version": %s,\n' "$(json_escape "$VERSION")"
-  printf '  "app_version": %s,\n' "$(json_escape "1.1.$BUILD")"
+  printf '  "app_version": %s,\n' "$(json_escape "$(gextto_version_for_build "$BUILD")")"
   printf '  "build": %s,\n' "$BUILD"
   printf '  "commit": %s,\n' "$(json_escape "$COMMIT")"
   printf '  "built_at": %s,\n' "$(json_escape "$BUILT_AT")"
   printf '  "gx_torrent_commit": %s,\n' "$(json_escape "$GX_COMMIT")"
-  printf '  "gx_version": %s,\n' "$(json_escape "1.1.$GX_BUILD")"
+  printf '  "gx_version": %s,\n' "$(json_escape "$(gx_version_for_build "$GX_BUILD")")"
   printf '  "gx_build": %s,\n' "$GX_BUILD"
   printf '  "commits": ['
   first=1

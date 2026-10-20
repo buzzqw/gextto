@@ -6,13 +6,24 @@ only build, test, document or maintain the project internally do not get a
 separate line, but are represented in the entry of the change they accompany.
 Technical detail stays in the commits and in `docs/`.
 
-The installed version is the one shown by Gextto (`1.1.<build>`). The updated
+The installed version is the one shown by Gextto (`1.1.<build>` up to build
+1999, then `1.2.0`, `1.2.999`, `1.3.0`, …). The updated
 manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 21 October 2026
 
+- **Version: the third number restarts every 1000 builds, the build stays
+  visible.** When the counter reaches 2000 the version goes from `1.1.1999` to
+  `1.2.0`, then `1.2.999` and `1.3.0`, and so on: the third number no longer
+  grows forever, and gx-torrent follows the same rule from its build 1000. So
+  the exact reference is never lost, after the rollover the version shows the
+  **build** in parentheses (`1.2.925 (build 2925)`, also in `--version`, in the
+  API and in the header) and the bottom of the **Maintenance** page shows the
+  version, the full build and the **commit** the binary was compiled from (the
+  short hash; the full one on hover). The current version, `1.1.1925`, stays as
+  it is.
 - **Download history: the torrent name stays readable.** On medium-width
   screens (a phone held sideways or a narrow window) the **Name** column shrank
   to a few pixels and the title wrapped one letter per line, because the table

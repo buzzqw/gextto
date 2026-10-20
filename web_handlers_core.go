@@ -421,7 +421,8 @@ func Status(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	jsonResponse(w, map[string]any{
 		"name":            "gextto",
-		"version":         constants.AppVersion(),
+		"version":         constants.VersionLabel(),
+		"build":           constants.Build,
 		"active":          cfg.Active,
 		"dry_run":         cfg.DryRun,
 		"setup_completed": SetupComplete(cfg),

@@ -224,7 +224,7 @@ func (u *updateChecker) Check(ctx context.Context) {
 func (u *updateChecker) Status(cfg *Config) UpdateStatus {
 	marker, managed := updateMarkerSource()
 	status := UpdateStatus{
-		Version:      constants.AppVersion(),
+		Version:      constants.VersionLabel(),
 		Commit:       updateInstalledCommit(),
 		BuiltAt:      constants.BuiltAt,
 		Marker:       marker,
@@ -254,7 +254,7 @@ func (u *updateChecker) Status(cfg *Config) UpdateStatus {
 	if manifest == nil {
 		return status
 	}
-	status.LatestVersion = manifest.AppVersion
+	status.LatestVersion = constants.VersionLabelWithBuild(manifest.AppVersion, strconv.FormatInt(manifest.Build, 10))
 	status.LatestCommit = manifest.Commit
 	status.LatestBuiltAt = manifest.BuiltAt
 	status.LatestLabel = manifest.Label
@@ -399,7 +399,7 @@ func PendingUpdateNotes(cfg *Config) (*UpdateNotes, bool) {
 		}
 		return nil, false
 	}
-	notes.ToVersion = constants.AppVersion()
+	notes.ToVersion = constants.VersionLabel()
 	return &notes, true
 }
 

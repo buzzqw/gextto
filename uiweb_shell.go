@@ -131,7 +131,7 @@ func dataDirWritable(path string) bool {
 func uiShellChromeFrom(s *AppState) uiShellChrome {
 	cfg := latestConfig(s)
 	chrome := uiShellChrome{
-		Version:      constants.AppVersion(),
+		Version:      constants.VersionLabel(),
 		DryRun:       cfg.DryRun,
 		Status:       "offline",
 		CurrentTime:  uiNowClock(),

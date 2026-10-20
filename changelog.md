@@ -6,7 +6,8 @@ sola build, test, documentazione o manutenzione interna non hanno una voce
 separata, ma sono rappresentati nella voce della modifica a cui appartengono.
 Per il dettaglio tecnico restano i commit e i documenti in `docs/`.
 
-La versione installata è quella mostrata da Gextto (`1.1.<build>`). Il manuale
+La versione installata è quella mostrata da Gextto (`1.1.<build>` fino alla
+build 1999, poi `1.2.0`, `1.2.999`, `1.3.0`, …). Il manuale
 aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [English](docs/MANUAL.en.md). La versione inglese di questo changelog è
 [changelog.en.md](changelog.en.md). Per segnalazioni:
@@ -14,6 +15,16 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Versione: la terza cifra riparte ogni 1000 build, la build resta visibile.**
+  Quando il contatore arriva a 2000 la versione passa da `1.1.1999` a `1.2.0`,
+  poi `1.2.999` e `1.3.0`, e così via: il terzo numero non cresce all'infinito,
+  e gx-torrent segue la stessa regola dalla sua build 1000. Per non perdere il
+  riferimento esatto, dopo il rollover la versione mostra la **build** tra
+  parentesi (`1.2.925 (build 2925)`, anche in `--version`, nell'API e
+  nell'intestazione) e in fondo alla pagina **Manutenzione** una riga riporta
+  versione, build completa e **commit** da cui è compilata (il commit breve;
+  quello intero si vede passando il mouse). La versione attuale, `1.1.1925`,
+  resta com'è.
 - **Storico download: il nome del torrent resta leggibile.** Su schermi di
   larghezza media (telefono tenuto di lato o finestra stretta) la colonna
   **Nome** si riduceva a pochi pixel e il titolo andava a capo una lettera per

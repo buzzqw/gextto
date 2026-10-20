@@ -30,6 +30,21 @@ const (
 	updHead  = "4444444444444444444444444444444444444444"
 )
 
+// The update tries the new binary with --version: both the old 1.1.<build>
+// form and the rolled-over 1.2.0 are valid answers.
+func TestGexVersionPatternAcceptsBothSchemes(t *testing.T) {
+	for _, version := range []string{"1.1.242", "1.2.0", "1.2.999", "1.3.0", "gx-torrent 1.2.0"} {
+		if !gexVersionPattern.MatchString(version) {
+			t.Errorf("%q must be a valid version", version)
+		}
+	}
+	for _, output := range []string{"", "unknown", "1.2", "version unknown"} {
+		if gexVersionPattern.MatchString(output) {
+			t.Errorf("%q must not be accepted as a version", output)
+		}
+	}
+}
+
 // updateRelease serves a fake release: release.json (head, a Gextto-only
 // commit, a gx-torrent commit, then the running one), the standalone archive
 // with a gx-torrent that prints a version, and its checksum.

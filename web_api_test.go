@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -266,6 +267,14 @@ func TestWebApiStatus(t *testing.T) {
 	}
 	if decoded["dry_run"] != true {
 		t.Fatalf("dry_run = %v", decoded["dry_run"])
+	}
+	// The status carries both the version and the full build: after the
+	// rollover the version's third number is no longer the build.
+	if decoded["version"] != constants.VersionLabel() {
+		t.Fatalf("version = %v, want %q", decoded["version"], constants.VersionLabel())
+	}
+	if decoded["build"] != constants.Build {
+		t.Fatalf("build = %v, want %q", decoded["build"], constants.Build)
 	}
 }
 

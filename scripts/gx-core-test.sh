@@ -43,6 +43,8 @@ set -euo pipefail
 # Resolve a symlink (e.g. ~/gx-core-test.sh) to find the checkout.
 SCRIPT="$(readlink -f "$0")"
 ROOT="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
+# shellcheck source=scripts/version.sh
+. "$ROOT/scripts/version.sh"
 DIR="${GX_TEST_DIR:-$HOME/gx-core-test}"
 LISTEN="${GX_TEST_LISTEN:-0.0.0.0:8899}"
 PEER_PORTS="${GX_TEST_PEER_PORTS:-51500-51510}"
@@ -147,8 +149,8 @@ daemon_answers() {
 # (GX_TEST_BIN) and by status, which must not build.
 warn_if_stale() {
   local built want
-  built="$("$BIN" -version 2>/dev/null | awk -F. '{print $NF}')"
-  want="$(tr -d '[:space:]' < "$ROOT/gx-torrent.build_number" 2>/dev/null)"
+  built="$("$BIN" -version 2>/dev/null | head -1 | tr -d '[:space:]')"
+  want="$(gx_version_label_for_build "$(tr -d '[:space:]' < "$ROOT/gx-torrent.build_number" 2>/dev/null)")"
   if [[ -n "$built" && -n "$want" && "$built" != "$want" ]]; then
     echo "note: $BIN is gx-torrent build $built while this checkout is $want: run '$0 restart' to rebuild and load it" >&2
   elif [[ -n "$(git -C "$ROOT" status --porcelain -- cmd/gx-torrent internal 2>/dev/null)" ]]; then

@@ -35,7 +35,7 @@ const ArchiveStem = "gextto-linux"
 // written next to the executable by the installer (when present) and the
 // compiled-in build and commit.
 func VersionString() string {
-	value := fmt.Sprintf("%s %s (build %s)", constants.AppName, constants.Version, constants.Build)
+	value := fmt.Sprintf("%s %s", constants.AppName, constants.VersionLabel())
 	if marker, ok := updateInstalledMarker(); ok {
 		value += fmt.Sprintf(" [%s]", marker)
 	}

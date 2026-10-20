@@ -46,7 +46,7 @@ OUT_DIR="$(mkdir -p "$(dirname "$OUTPUT")" && cd "$(dirname "$OUTPUT")" && pwd)"
 OUTPUT="${OUT_DIR}/$(basename "$OUTPUT")"
 
 # The daemon's own build number, when it has already been built, so the package
-# reports the same 1.1.<n> as the checkout.
+# reports the same version as the checkout.
 GX_BUILD="$(cat "${ROOT}/gx-torrent.build_number" 2>/dev/null || echo 0)"
 # Commit and build time for the in-app update check (as scripts/build-daemon.sh).
 GX_COMMIT="${GEXTTO_COMMIT:-${GITHUB_SHA:-$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)}}"

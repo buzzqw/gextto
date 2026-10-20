@@ -117,10 +117,12 @@ make build                 # gexttod e gx-torrent in bin/
 ```
 
 `make build` fa avanzare il numero di build **committato** e condiviso con la
-CI, così checkout e release mostrano lo stesso `1.1.<n>`; `gx-torrent` ha un
-contatore suo, che avanza solo quando cambia il suo codice. `make test` esegue
-la suite completa, `make test-ui` quella nel browser, `make fuzz-smoke` i
-fuzzer.
+CI, così checkout e release mostrano la stessa versione: `1.1.<n>` fino alla
+build 1999, poi il terzo numero va da 0 a 999 e finisce nel numero centrale
+(`1.2.0` … `1.2.999`, `1.3.0` …). `gx-torrent` ha un contatore suo, che avanza
+solo quando cambia il suo codice; segue la stessa regola dalla sua build 1000.
+`make test` esegue la suite completa, `make test-ui` quella nel browser,
+`make fuzz-smoke` i fuzzer.
 
 ### Primo avvio sicuro
 

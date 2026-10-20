@@ -28,6 +28,27 @@ func TestChannelFromMarker(t *testing.T) {
 	}
 }
 
+// TestUpdateCheckComparesCommitsNotVersionNumbers: "is there a new version?"
+// is decided by the commit (and its build time), never by ordering the version
+// string, so the numbering change at the rollover cannot hide or invent an
+// update.
+func TestUpdateCheckComparesCommitsNotVersionNumbers(t *testing.T) {
+	manifest := &updateManifest{AppVersion: "1.2.0", Build: 2000, Commit: "bbbb2222",
+		Commits: []UpdateCommit{{Sha: "bbbb2222", Subject: "a new build"}}}
+	if available, _, _ := updateCompare("aaaa1111", manifest); !available {
+		t.Fatal("a newer commit must be an update even when the version string changed scheme")
+	}
+	if available, _, _ := updateCompare("bbbb2222", manifest); available {
+		t.Fatal("the installed commit must not be offered again")
+	}
+	// The rule follows the commit, not the numbers: a manifest whose version
+	// looks lower still carries the newer code.
+	manifest.AppVersion, manifest.Build = "1.1.1999", 1999
+	if available, _, _ := updateCompare("aaaa1111", manifest); !available {
+		t.Fatal("the update check must not order version strings")
+	}
+}
+
 func TestUpdateCompareListsCommitsSinceInstalled(t *testing.T) {
 	manifest := &updateManifest{Commit: "cccc1111", Commits: []UpdateCommit{
 		{Sha: "cccc1111", Subject: "third"}, {Sha: "bbbb2222", Subject: "second"}, {Sha: "aaaa3333", Subject: "first"},

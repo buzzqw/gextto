@@ -192,6 +192,15 @@ check_package_script() {
   else
     fail "release-manifest.sh: manifest has version and commits"
   fi
+  # The version rolls over every thousand builds; the manifest must follow the
+  # same rule as internal/constants (build 2000 -> 1.2.0).
+  capture bash "$ROOT/scripts/release-manifest.sh" --build 2000 --commits 1 --output "$TMP/release-2000.json"
+  expect "release-manifest.sh: writes the rolled-over manifest" 0 "manifest:"
+  if grep -q '"app_version": "1.2.0"' "$TMP/release-2000.json" 2>/dev/null; then
+    pass "release-manifest.sh: app_version rolls over at 2000"
+  else
+    fail "release-manifest.sh: app_version rolls over at 2000"
+  fi
 
   capture bash -n "$ROOT/scripts/holepunch-netns-test.sh"
   expect "holepunch-netns-test.sh: syntax" 0

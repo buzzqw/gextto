@@ -371,6 +371,7 @@ eng:
   "VACUUM compatta i database; ANALYZE aggiorna le statistiche SQLite.": "VACUUM compacts the databases; ANALYZE updates SQLite statistics."
   "Verifica connessione FTP": "Test FTP connection"
   "Verifica la connessione FTP con i valori inseriti (usa la password salvata se il campo è vuoto)": "Test the FTP connection with the entered values (use the saved password when the field is empty)"
+  "Versione": "Version"
   "Versione applicazione": "Application version"
   "Vista": "Seen"
   "Visti dal feed": "Seen from feed"
