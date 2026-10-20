@@ -73,6 +73,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"amule_password": {DependsOn: "ed2k_enabled"},
 	"ed2k_search_network": {Kind: "select", DependsOn: "ed2k_enabled", Options: []uiFormOption{
 		{Value: "kad", Label: "Kad"},
+		{Value: "both", Label: "Kad + server eD2k"},
 		{Value: "global", Label: "Server eD2k (globale)"},
 		{Value: "local", Label: "Server eD2k (connesso)"},
 	}},

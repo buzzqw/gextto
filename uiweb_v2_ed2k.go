@@ -64,6 +64,8 @@ func v2Ed2kNetworkName(value uint8) string {
 		return "global"
 	case amule.SearchLocal:
 		return "local"
+	case ed2kSearchBoth:
+		return "both"
 	}
 	return "kad"
 }
@@ -174,17 +176,26 @@ func v2HTTPURL(value string) bool {
 
 // V2Ed2kSearch searches eD2k/Kad through aMule and renders the results.
 func V2Ed2kSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
-	cfg := latestConfig(s)
-	query := strings.TrimSpace(r.FormValue("query"))
 	network := ed2kSearchNetwork(r.FormValue("network"))
-	view := v2Ed2kSearchView{Query: query, Network: v2Ed2kNetworkName(network), Done: true}
+	view := v2Ed2kSearchFor(r.Context(), latestConfig(s), strings.TrimSpace(r.FormValue("query")), &network)
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_ed2k_results", view, dict, eng)
+}
+
+// v2Ed2kSearchFor runs one search for the eD2k page or the archive; a nil
+// network uses the one chosen in the settings.
+func v2Ed2kSearchFor(ctx context.Context, cfg *Config, query string, network *uint8) v2Ed2kSearchView {
+	view := v2Ed2kSearchView{Query: query, Done: true}
+	if network != nil {
+		view.Network = v2Ed2kNetworkName(*network)
+	}
 	switch {
 	case !ed2kEnabled(cfg):
 		view.Error = "L'integrazione con aMule è spenta."
 	case query == "":
 		view.Error = "Scrivi cosa cercare."
 	default:
-		results, err := searchAmule(r.Context(), cfg, query, &network)
+		results, err := searchAmule(ctx, cfg, query, network)
 		if err != nil {
 			view.Error = "Ricerca non riuscita:"
 			view.Detail = err.Error()
@@ -200,8 +211,7 @@ func V2Ed2kSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 			})
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_results", view, dict, eng)
+	return view
 }
 
 // V2Ed2kAdd queues one or more ed2k:// links (one result's button, or the

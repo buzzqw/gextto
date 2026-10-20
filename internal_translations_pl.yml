@@ -5481,3 +5481,14 @@ pol:
   "Priorità in aMule": "Priorytet w aMule"
   "Salva la priorità": "Zapisz priorytet"
   "Ultimo dato ricevuto": "Ostatnio odebrane dane"
+
+  # eD2k and Kad through aMule (External Connections)
+  "Dove cerca la ricerca manuale: Kad (rete distribuita, non serve un server), Kad + server eD2k (entrambe le ricerche, risultati uniti), tutti i server eD2k (globale) o solo il server a cui aMule è connesso. Il fallback automatico cerca sempre su Kad e sui server.": "Gdzie szuka wyszukiwanie ręczne: Kad (sieć rozproszona, serwer niepotrzebny), Kad + serwery eD2k (oba wyszukiwania, wyniki połączone), wszystkie serwery eD2k (globalnie) lub tylko serwer, z którym połączony jest aMule. Automatyczny fallback zawsze szuka w Kad i na serwerach."
+  "Kad + server eD2k": "Kad + serwery eD2k"
+  "Cerca anche su eD2k": "Szukaj też w eD2k"
+  "Cerca anche su eD2k e Kad tramite aMule (sulla rete scelta in Configurazione); i risultati compaiono sotto l'archivio": "Szukaj też w eD2k i Kad przez aMule (w sieci wybranej w Konfiguracji); wyniki pojawiają się pod archiwum"
+  "Kad cerca nella rete distribuita; Kad + server fa entrambe le ricerche e unisce i risultati; Globale interroga tutti i server eD2k; Server solo quello a cui sei connesso": "Kad szuka w sieci rozproszonej; Kad + serwery wykonuje oba wyszukiwania i łączy wyniki; Globalnie pyta wszystkie serwery eD2k; Serwer tylko ten, z którym jesteś połączony"
+  "La ricerca nell'archivio parte da sola da 3 caratteri. Per termini più corti (es. IT) premi Invio o Cerca. Con «Cerca anche nel web» o «Cerca anche su eD2k» la ricerca online parte solo da Cerca.": "Wyszukiwanie w archiwum startuje samo od 3 znaków. Dla krótszych haseł (np. IT) naciśnij Enter lub Szukaj. Z „Szukaj też w sieci” lub „Szukaj też w eD2k” wyszukiwanie online startuje tylko po Szukaj."
+  "Velocità di download di aMule (linea tratteggiata)": "Prędkość pobierania aMule (linia przerywana)"
+  "Velocità di upload di aMule (linea tratteggiata)": "Prędkość wysyłania aMule (linia przerywana)"
+  "eD2k e Kad (aMule)": "eD2k i Kad (aMule)"

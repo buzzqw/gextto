@@ -179,7 +179,7 @@ var uiSettingTooltipText = map[string]string{
 	"amule_host":                           "Indirizzo della macchina su cui gira amuled, di solito 127.0.0.1. Per importare i file completati Gextto deve vedere la cartella di arrivo di aMule allo stesso percorso.",
 	"amule_port":                           "Porta delle connessioni esterne (EC) di aMule: ECPort in amule.conf, 4712 per default.",
 	"amule_password":                       "Password delle connessioni esterne (EC) di aMule, in chiaro: Gextto la confronta con l'hash ECPassword di amule.conf. Non visualizzata.",
-	"ed2k_search_network":                  "Dove cercano la ricerca manuale e il fallback automatico: Kad (rete distribuita, non serve un server), tutti i server eD2k (globale) o solo il server a cui aMule è connesso.",
+	"ed2k_search_network":                  "Dove cerca la ricerca manuale: Kad (rete distribuita, non serve un server), Kad + server eD2k (entrambe le ricerche, risultati uniti), tutti i server eD2k (globale) o solo il server a cui aMule è connesso. Il fallback automatico cerca sempre su Kad e sui server.",
 	"ed2k_fallback":                        "Quando i torrent non trovano nulla, cerca lo stesso episodio su eD2k/Kad. È un secondo interruttore, spento per default.",
 	"ed2k_min_sources":                     "Numero minimo di sorgenti eD2k perché un risultato venga accettato automaticamente. La ricerca manuale mostra tutto.",
 	"ed2k_search_timeout_secs":             "Per quanti secondi aMule raccoglie i risultati di una ricerca eD2k/Kad prima che Gextto li mostri.",

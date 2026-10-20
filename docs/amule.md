@@ -12,8 +12,10 @@ affected.
 
 ## What the user gets
 
-- **Search** on Kad, on every eD2k server (global) or on the connected server,
-  from the eD2k page and from the manual search (the *Kad* box). Results carry
+- **Search** on Kad, on Kad + every eD2k server (both searches merged by hash),
+  on every eD2k server (global) or on the connected server, from the eD2k page,
+  from the manual search (the *Kad* box) and from the Archive (the *Also search
+  eD2k* box, results in a block below the archive). Results carry
   name, size, MD4 hash and sources, and are parsed like torrent names (series,
   episode, quality).
 - **ed2k:// links**: paste one or more (even mixed with text) on the eD2k page
@@ -26,6 +28,9 @@ affected.
   pause / resume / remove; ⓘ opens the details (last data received, hash, link
   to copy) and sets the file's priority in aMule. The downloads count on the
   dashboard and in the menu badge, and appear in the TUI download list.
+- **Dashboard**: the traffic chart draws aMule's download and upload as dashed
+  lines next to the torrents', from aMule's global rates; the top bar shows the
+  sum.
 - **Bandwidth**: aMule follows the torrents' speed limits (rule, exception,
   schedule, Auto), sent when they change and re-sent every 10 minutes. A completed file is only taken off aMule's list; an
   incomplete one is cancelled with its partial data.

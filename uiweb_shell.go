@@ -201,10 +201,14 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 		totalDl++
 		activeDl++
 		if download.Speed > 0 {
-			downloadRate += uint64(download.Speed)
 			chrome.Transferring++
 		}
 	}
+	// The top bar shows the whole traffic: aMule's global rates (uploads
+	// included) on top of the torrents'.
+	ed2kDown, ed2kUp := v2Ed2kRates(s)
+	downloadRate += ed2kDown
+	uploadRate += ed2kUp
 	chrome.ActiveDownloads = strconv.Itoa(activeDl) + "/" + strconv.Itoa(totalDl)
 	chrome.Download = logging.HumanRate(saturatingInt64(downloadRate))
 	chrome.Upload = logging.HumanRate(saturatingInt64(uploadRate))

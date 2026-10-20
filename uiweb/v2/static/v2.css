@@ -2015,6 +2015,11 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 .dashboard-traffic-panel .traffic-line { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .dashboard-traffic-panel .traffic-line.down { stroke: var(--accent-2); }
 .dashboard-traffic-panel .traffic-line.up { stroke: var(--accent); }
+/* aMule (eD2k): same colours as the torrents, dashed. */
+.dashboard-traffic-panel .traffic-line.ed2k-down { stroke: var(--accent-2); stroke-dasharray: 6 4; }
+.dashboard-traffic-panel .traffic-line.ed2k-up { stroke: var(--accent); stroke-dasharray: 6 4; }
+.dashboard-traffic-panel .traffic-stat.ed2k-down { color: var(--accent-2); }
+.dashboard-traffic-panel .traffic-stat.ed2k-up { color: var(--accent); }
 .dashboard-traffic-panel .traffic-limit { stroke: var(--warn); stroke-width: 1; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
 .dashboard-traffic-panel .traffic-axis {
   display: flex;

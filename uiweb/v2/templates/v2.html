@@ -360,8 +360,12 @@
 {{define "v2_live_traffic"}}
 <div id="v2-live-traffic" class="traffic">
   <div class="traffic-legend">
+    {{if .HasEd2k}}<span class="muted">Torrent</span>{{end}}
     <span class="traffic-stat down" title="Velocità di download"><span aria-hidden="true">↓</span> {{.CurrentDown}}</span>
     <span class="traffic-stat up" title="Velocità di upload"><span aria-hidden="true">↑</span> {{.CurrentUp}}</span>
+    {{if .HasEd2k}}<span class="muted">eD2k</span>
+    <span class="traffic-stat ed2k-down" title="Velocità di download di aMule (linea tratteggiata)"><span aria-hidden="true">↓</span> {{.CurrentEd2kDown}}</span>
+    <span class="traffic-stat ed2k-up" title="Velocità di upload di aMule (linea tratteggiata)"><span aria-hidden="true">↑</span> {{.CurrentEd2kUp}}</span>{{end}}
     {{if .HasData}}<span class="muted" title="Picco di download nel periodo">↓ {{.PeakDown}}</span>
     <span class="muted" title="Picco di upload nel periodo">↑ {{.PeakUp}}</span>{{end}}
     {{if .HasLimit}}<span class="badge warn" title="Limite di banda attivo">Limite <strong>{{.LimitLabel}}</strong></span>{{else if .Auto}}<span class="badge" title="Auto attivo: Gextto misura la linea e adatta la velocità, senza un tetto fisso">Auto</span>{{else}}<span class="badge" title="Nessun limite di banda attivo">Nessun limite</span>{{end}}
@@ -372,6 +376,8 @@
     {{if .HasLimit}}<line class="traffic-limit" x1="0" y1="{{.LimitY}}" x2="{{.Width}}" y2="{{.LimitY}}" />{{end}}
     <polyline class="traffic-line up" points="{{.UpPoints}}" />
     <polyline class="traffic-line down" points="{{.DownPoints}}" />
+    {{if .Ed2kDownPoints}}<polyline class="traffic-line ed2k-up" points="{{.Ed2kUpPoints}}" />
+    <polyline class="traffic-line ed2k-down" points="{{.Ed2kDownPoints}}" />{{end}}
   </svg>
   <div class="traffic-axis"><span>0</span><span>{{.ScaleLabel}}</span></div>
   {{else}}<p class="muted">Raccolta dati in corso…</p>{{end}}
@@ -1557,8 +1563,9 @@
     <div class="panel-body">
       <form class="search-row" method="post" action="/ed2k/search" hx-post="/ed2k/search" hx-target="#v2-ed2k-results" hx-swap="innerHTML" hx-indicator="#v2-ed2k-searching" hx-disabled-elt="find button">
         <input type="search" name="query" aria-label="Cosa cercare su eD2k e Kad" placeholder="Serie S01E02, titolo del film…" title="Parole da cercare: aMule restituisce i file che le contengono tutte" required />
-        <label class="field compact"><span class="sr-only">Rete di ricerca</span><select class="input" name="network" aria-label="Rete di ricerca" title="Kad cerca nella rete distribuita; Globale interroga tutti i server eD2k; Server solo quello a cui sei connesso">
+        <label class="field compact"><span class="sr-only">Rete di ricerca</span><select class="input" name="network" aria-label="Rete di ricerca" title="Kad cerca nella rete distribuita; Kad + server fa entrambe le ricerche e unisce i risultati; Globale interroga tutti i server eD2k; Server solo quello a cui sei connesso">
           <option value="kad"{{if eq .Network "kad"}} selected{{end}}>Kad</option>
+          <option value="both"{{if eq .Network "both"}} selected{{end}}>Kad + server eD2k</option>
           <option value="global"{{if eq .Network "global"}} selected{{end}}>Server eD2k (globale)</option>
           <option value="local"{{if eq .Network "local"}} selected{{end}}>Server eD2k (connesso)</option>
         </select></label>
@@ -1755,13 +1762,14 @@
         {{if .Manual}}<input type="hidden" name="load" value="1" />{{end}}
         <input type="hidden" name="sort" value="{{.Sort}}" />
         <input type="hidden" name="dir" value="{{.Dir}}" />
-        {{if .Search}}<input class="input{{if eq .BaseView "archive"}} archive-search-input{{end}}" type="search" name="q" value="{{.Query}}" placeholder="{{if eq .BaseView "archive"}}Cerca in archivio, almeno 3 caratteri{{else}}Cerca…{{end}}" aria-label="Cerca"{{if eq .BaseView "archive"}} title="La ricerca nell'archivio parte da sola da 3 caratteri. Per termini più corti (es. IT) premi Invio o Cerca. Con «Cerca anche nel web» la ricerca online parte solo da Cerca."{{end}} />{{end}}
+        {{if .Search}}<input class="input{{if eq .BaseView "archive"}} archive-search-input{{end}}" type="search" name="q" value="{{.Query}}" placeholder="{{if eq .BaseView "archive"}}Cerca in archivio, almeno 3 caratteri{{else}}Cerca…{{end}}" aria-label="Cerca"{{if eq .BaseView "archive"}} title="La ricerca nell'archivio parte da sola da 3 caratteri. Per termini più corti (es. IT) premi Invio o Cerca. Con «Cerca anche nel web» o «Cerca anche su eD2k» la ricerca online parte solo da Cerca."{{end}} />{{end}}
         {{if .Filter}}<input class="input" type="search" name="f" value="{{.FilterQuery}}" placeholder="Filtra l'elenco…" aria-label="Filtra l'elenco" />{{end}}
         {{if .DayFilter}}<label class="check" title="Mostra solo i download conclusi oggi"><input type="checkbox" name="today" value="1"{{if .Today}} checked{{end}} /> <span>Oggi</span></label>{{end}}
         {{if eq .BaseView "archive"}}
         <label class="check archive-web-check" title="Cerca anche nei motori web e indexer online"><input type="checkbox" name="web" value="1"{{if .WebSearch}} checked{{end}} /> <span>Cerca anche nel web</span></label>
+        {{if .Ed2kAvailable}}<label class="check archive-web-check" title="Cerca anche su eD2k e Kad tramite aMule (sulla rete scelta in Configurazione); i risultati compaiono sotto l'archivio"><input type="checkbox" name="ed2k" value="1"{{if .Ed2kSearch}} checked{{end}} /> <span>Cerca anche su eD2k</span></label>{{end}}
         <button class="btn sm primary" type="submit">Cerca</button>
-        <span class="htmx-indicator muted archive-indicator">Ricerca web in corso…</span>
+        <span class="htmx-indicator muted archive-indicator">Ricerca online in corso…</span>
         {{else}}
         {{if .Refresh}}<button class="btn sm" type="submit">Aggiorna</button>{{end}}
         {{end}}
@@ -1808,7 +1816,7 @@
   <div class="table-wrap" tabindex="0" role="region" aria-label="{{.Title}}">
     <table class="data-table {{.Class}}">
       <caption class="sr-only">{{.Title}}</caption>
-      <thead><tr>{{range .Columns}}<th scope="col"{{if .Sortable}} class="th-sort"{{end}}>{{if .Sortable}}<button class="table-sort-button" type="button" hx-get="/table?view={{$.View}}&amp;sort={{.Key}}&amp;dir={{if and (eq $.Sort .Key) (eq $.Dir "asc")}}desc{{else}}asc{{end}}{{if $.Query}}&amp;q={{$.Query}}{{end}}{{if $.FilterQuery}}&amp;f={{$.FilterQuery}}{{end}}{{if $.WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{$.View}}" hx-swap="outerHTML">{{.Label}}{{arrow $.Sort $.Dir .Key}}</button>{{else}}{{.Label}}{{end}}</th>{{end}}{{if .HasActions}}<th scope="col">Azioni</th>{{end}}</tr></thead>
+      <thead><tr>{{range .Columns}}<th scope="col"{{if .Sortable}} class="th-sort"{{end}}>{{if .Sortable}}<button class="table-sort-button" type="button" hx-get="/table?view={{$.View}}&amp;sort={{.Key}}&amp;dir={{if and (eq $.Sort .Key) (eq $.Dir "asc")}}desc{{else}}asc{{end}}{{if $.Query}}&amp;q={{$.Query}}{{end}}{{if $.FilterQuery}}&amp;f={{$.FilterQuery}}{{end}}{{if $.WebSearch}}&amp;web=1{{end}}{{if $.Ed2kSearch}}&amp;ed2k=1{{end}}" hx-target="#v2-table-body-{{$.View}}" hx-swap="outerHTML">{{.Label}}{{arrow $.Sort $.Dir .Key}}</button>{{else}}{{.Label}}{{end}}</th>{{end}}{{if .HasActions}}<th scope="col">Azioni</th>{{end}}</tr></thead>
       <tbody>
         {{if .Rows}}{{range .Rows}}<tr>{{range .Cells}}<td>{{.HTML}}</td>{{end}}{{if $.HasActions}}<td class="row-actions">{{.Actions}}</td>{{end}}</tr>{{end}}
         {{else}}<tr><td class="muted" colspan="{{.Colspan}}">{{.Empty}}</td></tr>{{end}}
@@ -1822,6 +1830,7 @@
     <button class="btn sm" type="button"{{if ge .Page .Pages}} disabled{{end}} hx-get="/table?view={{.View}}&amp;page={{.Next}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">Successiva ›</button>
   </div>
   {{end}}
+  {{if .Ed2k}}<div class="archive-ed2k-results"><h4>eD2k e Kad (aMule)</h4>{{template "v2_ed2k_results" .Ed2k}}</div>{{end}}
 </div>
 {{if .Notice}}<div id="v2-toast-region" hx-swap-oob="innerHTML">{{template "v2_action_notice" .Notice}}</div>{{end}}
 {{end}}

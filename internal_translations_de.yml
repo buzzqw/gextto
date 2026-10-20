@@ -5540,3 +5540,14 @@ deu:
   "Priorità in aMule": "Priorität in aMule"
   "Salva la priorità": "Priorität speichern"
   "Ultimo dato ricevuto": "Zuletzt empfangene Daten"
+
+  # eD2k and Kad through aMule (External Connections)
+  "Dove cerca la ricerca manuale: Kad (rete distribuita, non serve un server), Kad + server eD2k (entrambe le ricerche, risultati uniti), tutti i server eD2k (globale) o solo il server a cui aMule è connesso. Il fallback automatico cerca sempre su Kad e sui server.": "Wo die manuelle Suche sucht: Kad (verteiltes Netz, kein Server nötig), Kad + eD2k-Server (beide Suchen, Ergebnisse zusammengeführt), alle eD2k-Server (global) oder nur der Server, mit dem aMule verbunden ist. Der automatische Fallback sucht immer in Kad und auf den Servern."
+  "Kad + server eD2k": "Kad + eD2k-Server"
+  "Cerca anche su eD2k": "Auch in eD2k suchen"
+  "Cerca anche su eD2k e Kad tramite aMule (sulla rete scelta in Configurazione); i risultati compaiono sotto l'archivio": "Auch in eD2k und Kad über aMule suchen (im in der Konfiguration gewählten Netz); die Ergebnisse erscheinen unter dem Archiv"
+  "Kad cerca nella rete distribuita; Kad + server fa entrambe le ricerche e unisce i risultati; Globale interroga tutti i server eD2k; Server solo quello a cui sei connesso": "Kad sucht im verteilten Netz; Kad + Server führt beide Suchen aus und führt die Ergebnisse zusammen; Global fragt alle eD2k-Server; Server nur den, mit dem du verbunden bist"
+  "La ricerca nell'archivio parte da sola da 3 caratteri. Per termini più corti (es. IT) premi Invio o Cerca. Con «Cerca anche nel web» o «Cerca anche su eD2k» la ricerca online parte solo da Cerca.": "Die Archivsuche startet ab 3 Zeichen von selbst. Für kürzere Begriffe (z. B. IT) Enter oder Suchen drücken. Mit „Auch im Web suchen“ oder „Auch in eD2k suchen“ startet die Online-Suche nur über Suchen."
+  "Velocità di download di aMule (linea tratteggiata)": "aMule-Downloadgeschwindigkeit (gestrichelte Linie)"
+  "Velocità di upload di aMule (linea tratteggiata)": "aMule-Uploadgeschwindigkeit (gestrichelte Linie)"
+  "eD2k e Kad (aMule)": "eD2k und Kad (aMule)"

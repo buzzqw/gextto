@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -99,6 +100,10 @@ func ed2kSettingsFromConfig(cfg *Config) (ed2kSettings, error) {
 	}, nil
 }
 
+// ed2kSearchBoth searches Kad and then every eD2k server (global search) and
+// merges the two result lists; it is Gextto's, not an aMule search type.
+const ed2kSearchBoth uint8 = 0xFF
+
 // ed2kSearchNetwork maps the setting to an aMule search type. Kad is the
 // default: it does not depend on the server the core is connected to.
 func ed2kSearchNetwork(value string) uint8 {
@@ -107,6 +112,8 @@ func ed2kSearchNetwork(value string) uint8 {
 		return amule.SearchGlobal
 	case "local", "server":
 		return amule.SearchLocal
+	case "both":
+		return ed2kSearchBoth
 	}
 	return amule.SearchKad
 }
@@ -378,6 +385,44 @@ func searchAmule(ctx context.Context, cfg *Config, query string, network *uint8)
 	if network != nil {
 		searchType = *network
 	}
+	if searchType == ed2kSearchBoth {
+		// Kad and the servers index different files: ask both and keep each
+		// file once, with the larger source count.
+		kad, kadErr := searchAmuleOnce(ctx, settings, client, query, amule.SearchKad)
+		global, globalErr := searchAmuleOnce(ctx, settings, client, query, amule.SearchGlobal)
+		if kadErr != nil && globalErr != nil {
+			return nil, kadErr
+		}
+		return mergeEd2kResults(kad, global), nil
+	}
+	return searchAmuleOnce(ctx, settings, client, query, searchType)
+}
+
+// mergeEd2kResults joins result lists by MD4 hash, keeping the larger source
+// count, sorted by sources.
+func mergeEd2kResults(groups ...[]amule.SearchResult) []amule.SearchResult {
+	byHash := map[string]int{}
+	var out []amule.SearchResult
+	for _, group := range groups {
+		for _, result := range group {
+			if index, seen := byHash[result.Hash]; seen {
+				if result.Sources > out[index].Sources {
+					out[index].Sources = result.Sources
+				}
+				if result.CompleteSources > out[index].CompleteSources {
+					out[index].CompleteSources = result.CompleteSources
+				}
+				continue
+			}
+			byHash[result.Hash] = len(out)
+			out = append(out, result)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Sources > out[j].Sources })
+	return out
+}
+
+func searchAmuleOnce(ctx context.Context, settings ed2kSettings, client *amule.Client, query string, searchType uint8) ([]amule.SearchResult, error) {
 	wait := settings.Timeout
 	if deadline, ok := ctx.Deadline(); ok {
 		if remaining := time.Until(deadline) - time.Second; remaining < wait {
@@ -466,9 +511,9 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 	if err != nil {
 		return nil
 	}
-	networks := []uint8{settings.Network}
+	network := settings.Network
 	if !manual {
-		networks = []uint8{amule.SearchKad, amule.SearchGlobal}
+		network = ed2kSearchBoth
 	}
 	candidates := make([]models.Release, 0)
 	seenRelease := map[string]struct{}{}
@@ -476,17 +521,12 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 		if ctx.Err() != nil {
 			break
 		}
-		var found []models.Release
-		for _, network := range networks {
-			network := network
-			results, err := searchAmule(ctx, cfg, fmt.Sprintf("%s S%02dE%02d", name, season, episode), &network)
-			if err != nil {
-				logging.SourceFail("ed2k", "aMule", err.Error())
-				continue
-			}
-			found = append(found, ed2kReleases(results, "ed2k:amule")...)
+		results, err := searchAmule(ctx, cfg, fmt.Sprintf("%s S%02dE%02d", name, season, episode), &network)
+		if err != nil {
+			logging.SourceFail("ed2k", "aMule", err.Error())
+			continue
 		}
-		for _, release := range found {
+		for _, release := range ed2kReleases(results, "ed2k:amule") {
 			key, ok := releaseDedupKey(&release)
 			if !ok {
 				continue

@@ -510,6 +510,9 @@
     if (event && event.target && event.target.type === "checkbox") return false;
     var web = form && form.querySelector ? form.querySelector('input[name="web"]') : null;
     if (web && web.checked) return false;
+    // An eD2k search through aMule takes seconds too: only on Cerca.
+    var ed2k = form && form.querySelector ? form.querySelector('input[name="ed2k"]') : null;
+    if (ed2k && ed2k.checked) return false;
     var input = form && form.querySelector ? form.querySelector('input[name="q"]') : null;
     var term = String(input && input.value || "").trim();
     return term.length === 0 || term.length >= 3;

@@ -54,6 +54,12 @@ manual is online: [English](docs/MANUAL.en.md) ·
   resume and remove. The automatic fallback searches Kad and the eD2k servers
   together. Fixed an error that marked an eD2k episode as failed right after its
   library import and kept the automatic fallback from starting a download.
+- **eD2k: Kad + servers, Archive and dashboard.** The eD2k page and **eD2k search
+  network** offer **Kad + eD2k servers**, which runs both searches and merges the
+  results. In **Archive** the **Also search eD2k** box shows aMule's results
+  below the archive, with **Download**. On the dashboard the traffic chart has
+  dashed lines for aMule, apart from the torrents', and the top bar also adds
+  aMule's upload.
 
 ## 19 October 2026
 

@@ -39,11 +39,14 @@ const (
 	rateNoiseFloor = 1024
 )
 
-// rateSample is one point of the history: the summed engine rates at a moment.
+// rateSample is one point of the history: the summed engine rates at a
+// moment, and aMule's rates apart (zero while eD2k is off).
 type rateSample struct {
-	At   time.Time
-	Down uint64
-	Up   uint64
+	At       time.Time
+	Down     uint64
+	Up       uint64
+	Ed2kDown uint64
+	Ed2kUp   uint64
 }
 
 // rateHistory is a fixed-size ring of rate samples, oldest first.
@@ -109,6 +112,19 @@ func v2CurrentRates(s *AppState) (uint64, uint64) {
 	return v2RateOrZero(down), v2RateOrZero(up)
 }
 
+// v2Ed2kRates returns aMule's global download and upload rates, from the
+// cached status (it never waits on aMule), floored like the torrent rates.
+func v2Ed2kRates(s *AppState) (uint64, uint64) {
+	if s == nil || !ed2kEnabled(latestConfig(s)) {
+		return 0, 0
+	}
+	status, err := ed2kStatus(latestConfig(s))
+	if err != nil {
+		return 0, 0
+	}
+	return v2RateOrZero(uint64(max(status.DownloadRate, 0))), v2RateOrZero(uint64(max(status.UploadRate, 0)))
+}
+
 // v2RateOrZero treats anything under the noise floor as no traffic, so the
 // session panel and its chart stay still instead of twitching at a few
 // hundred bytes per second.
@@ -138,6 +154,12 @@ type v2TrafficView struct {
 	PeakDown    string
 	PeakUp      string
 	ScaleLabel  string
+	// eD2k (aMule) has its own lines and legend, next to the torrents'.
+	HasEd2k         bool
+	Ed2kDownPoints  string
+	Ed2kUpPoints    string
+	CurrentEd2kDown string
+	CurrentEd2kUp   string
 }
 
 // v2TrafficViewFrom builds the chart from the rate history and the effective
@@ -151,6 +173,12 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 	down, up := v2CurrentRates(s)
 	view.CurrentDown = logging.HumanRate(saturatingInt64(down))
 	view.CurrentUp = logging.HumanRate(saturatingInt64(up))
+	view.HasEd2k = s != nil && ed2kEnabled(latestConfig(s))
+	if view.HasEd2k {
+		ed2kDown, ed2kUp := v2Ed2kRates(s)
+		view.CurrentEd2kDown = logging.HumanRate(saturatingInt64(ed2kDown))
+		view.CurrentEd2kUp = logging.HumanRate(saturatingInt64(ed2kUp))
+	}
 
 	// The limit line mirrors the same precedence the daemon applies to the
 	// engine: Auto/schedule-Auto means no cap, so no line. The badge still has
@@ -183,6 +211,12 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 		}
 		if up := v2RateOrZero(sample.Up); up > peakUp {
 			peakUp = up
+		}
+		if sample.Ed2kDown > peakDown {
+			peakDown = sample.Ed2kDown
+		}
+		if sample.Ed2kUp > peakUp {
+			peakUp = sample.Ed2kUp
 		}
 	}
 
@@ -217,20 +251,28 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 		return height - (float64(value)/scale)*height
 	}
 
-	var downPoints, upPoints strings.Builder
+	var downPoints, upPoints, ed2kDownPoints, ed2kUpPoints strings.Builder
 	firstX, lastX := xOf(samples[0].At), 0.0
 	for index, sample := range samples {
 		if index > 0 {
 			downPoints.WriteByte(' ')
 			upPoints.WriteByte(' ')
+			ed2kDownPoints.WriteByte(' ')
+			ed2kUpPoints.WriteByte(' ')
 		}
 		x := xOf(sample.At)
 		lastX = x
 		downPoints.WriteString(svgPoint(x, yOf(v2RateOrZero(sample.Down))))
 		upPoints.WriteString(svgPoint(x, yOf(v2RateOrZero(sample.Up))))
+		ed2kDownPoints.WriteString(svgPoint(x, yOf(sample.Ed2kDown)))
+		ed2kUpPoints.WriteString(svgPoint(x, yOf(sample.Ed2kUp)))
 	}
 	view.DownPoints = downPoints.String()
 	view.UpPoints = upPoints.String()
+	if view.HasEd2k {
+		view.Ed2kDownPoints = ed2kDownPoints.String()
+		view.Ed2kUpPoints = ed2kUpPoints.String()
+	}
 	// The area starts under the first sample: the time before it has no data,
 	// and closing it at the left edge drew a ramp from zero.
 	view.DownArea = svgNumber(firstX) + "," + svgNumber(height) + " " + view.DownPoints + " " + svgNumber(lastX) + "," + svgNumber(height)
@@ -273,7 +315,8 @@ func bandwidthHistoryWorker(s *AppState) {
 			return
 		case <-ticker.C:
 			down, up := v2CurrentRates(s)
-			s.rate_history.add(rateSample{At: time.Now(), Down: down, Up: up})
+			ed2kDown, ed2kUp := v2Ed2kRates(s)
+			s.rate_history.add(rateSample{At: time.Now(), Down: down, Up: up, Ed2kDown: ed2kDown, Ed2kUp: ed2kUp})
 		}
 	}
 }

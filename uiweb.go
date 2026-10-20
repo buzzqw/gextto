@@ -418,8 +418,10 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 		case "error":
 			data.Errors++
 		}
-		data.DownloadRate += uint64(max(download.Speed, 0))
 	}
+	ed2kDown, ed2kUp := v2Ed2kRates(s)
+	data.DownloadRate += ed2kDown
+	data.UploadRate += ed2kUp
 	cycle := s.last_cycle.Snapshot()
 	data.CycleScraped = cycle.Scraped
 	data.CycleCandidates = cycle.Candidates

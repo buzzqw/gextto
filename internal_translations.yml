@@ -4877,3 +4877,14 @@ eng:
   "Priorità in aMule": "Priority in aMule"
   "Salva la priorità": "Save the priority"
   "Ultimo dato ricevuto": "Last data received"
+
+  # eD2k and Kad through aMule (External Connections)
+  "Dove cerca la ricerca manuale: Kad (rete distribuita, non serve un server), Kad + server eD2k (entrambe le ricerche, risultati uniti), tutti i server eD2k (globale) o solo il server a cui aMule è connesso. Il fallback automatico cerca sempre su Kad e sui server.": "Where the manual search looks: Kad (distributed network, no server needed), Kad + eD2k servers (both searches, results merged), every eD2k server (global) or only the server aMule is connected to. The automatic fallback always searches Kad and the servers."
+  "Kad + server eD2k": "Kad + eD2k servers"
+  "Cerca anche su eD2k": "Also search eD2k"
+  "Cerca anche su eD2k e Kad tramite aMule (sulla rete scelta in Configurazione); i risultati compaiono sotto l'archivio": "Also search eD2k and Kad through aMule (on the network chosen in Configuration); the results appear below the archive"
+  "Kad cerca nella rete distribuita; Kad + server fa entrambe le ricerche e unisce i risultati; Globale interroga tutti i server eD2k; Server solo quello a cui sei connesso": "Kad searches the distributed network; Kad + servers runs both searches and merges the results; Global asks every eD2k server; Server only the one you are connected to"
+  "La ricerca nell'archivio parte da sola da 3 caratteri. Per termini più corti (es. IT) premi Invio o Cerca. Con «Cerca anche nel web» o «Cerca anche su eD2k» la ricerca online parte solo da Cerca.": "The archive search starts by itself from 3 characters. For shorter terms (e.g. IT) press Enter or Search. With “Also search the web” or “Also search eD2k” the online search starts only from Search."
+  "Velocità di download di aMule (linea tratteggiata)": "aMule download speed (dashed line)"
+  "Velocità di upload di aMule (linea tratteggiata)": "aMule upload speed (dashed line)"
+  "eD2k e Kad (aMule)": "eD2k and Kad (aMule)"

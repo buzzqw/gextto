@@ -56,6 +56,13 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   rimozione. Il ripiego automatico cerca su Kad e sui server eD2k insieme.
   Corretto un errore che segnava come fallito un episodio eD2k appena importato
   in libreria e che impediva al ripiego automatico di avviare un download.
+- **eD2k: Kad + server, Archivio e dashboard.** Nella pagina eD2k e in
+  **Rete delle ricerche eD2k** c'è la scelta **Kad + server eD2k**, che fa
+  entrambe le ricerche e unisce i risultati. In **Archivio** la casella
+  **Cerca anche su eD2k** mostra i risultati di aMule sotto l'archivio, con
+  **Scarica**. Nella dashboard il grafico del traffico ha linee tratteggiate
+  per aMule, distinte da quelle dei torrent, e la barra in alto somma anche
+  l'upload di aMule.
 
 ## 19 ottobre 2026
 

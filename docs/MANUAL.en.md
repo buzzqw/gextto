@@ -298,8 +298,10 @@ release package the installer uses (README, *Install on Linux*).
   schedule or exception; it is not drawn when the speed is *Auto*, i.e. when
   Gextto measures the line and adapts, and in that case the card shows the
   **Auto** badge, not "No limit"). Speeds under 1 KB/s count as zero: that is
-  just protocol chatter, and the chart stays flat instead of twitching. It
-  refreshes on its own.
+  just protocol chatter, and the chart stays flat instead of twitching. With
+  eD2k on, aMule has its own **dashed lines** and an **eD2k ↓ ↑** entry next to
+  the **Torrent** one; the speeds in the top bar are the sum of torrents and
+  aMule. It refreshes on its own.
 - **To check** — below the strip: **stuck** downloads (with the reason, the
   next attempt and when they will be abandoned), **pending moves to the
   library** (destination and attempts) and the warnings, errors and 🛟 pack
@@ -713,7 +715,10 @@ are using the API directly.
   automatic search, not the explicit one. A `-word` filter
   excludes titles containing it. The **Also search the web** checkbox extends the
   search to indexers and online engines: it is much slower and therefore only
-  runs when you press **Search**, not on every keystroke. The **Source** column
+  runs when you press **Search**, not on every keystroke. With aMule on there is
+  also **Also search eD2k**: it too runs only from **Search**, and the eD2k
+  results appear in a block below the archive, each with **Download**. The
+  **Source** column
   shows only the provider/domain (the full URL is in the tooltip), and every row
   offers **Why not this one?** like the search table. The title wraps over
   multiple lines and the row actions are compact icons (⬇️ queue, 🔍 why not
@@ -792,8 +797,8 @@ which means more sources.
 - **eD2k servers**: aMule's list with users, files and ping; **Connect** on a
   row connects aMule to that server. A new `server.met`, or a `nodes.dat` for
   Kad, can be downloaded from an address here too.
-- **Search eD2k and Kad**: pick the network (Kad, every eD2k server, only the
-  connected server) and search; aMule collects results for a few seconds. Each
+- **Search eD2k and Kad**: pick the network (Kad, Kad + eD2k servers, every
+  eD2k server, only the connected server) and search; aMule collects results for a few seconds. Each
   result shows name, size and sources (total / complete) and has **Download**;
   **already known** marks a file aMule already has.
 - **Paste eD2k links**: one or more `ed2k://` links, even mixed with text;
@@ -1642,7 +1647,7 @@ network.
 | aMule — address | Machine running `amuled`, usually `127.0.0.1`. Gextto must see aMule's incoming folder at the same path. |
 | aMule — external connections (EC) port | `ECPort` in `amule.conf`, 4712 by default. |
 | aMule — external connections (EC) password | The password in clear; aMule keeps its MD5 in `ECPassword`. Not displayed. |
-| eD2k search network | **Kad** (default, no server needed), **eD2k servers (global)** (every server) or **eD2k server (connected)**. Applies to the manual search and the fallback. |
+| eD2k search network | **Kad** (default, no server needed), **Kad + eD2k servers** (both searches, results merged), **eD2k servers (global)** (every server) or **eD2k server (connected)**. Applies to the manual search; the automatic fallback always searches Kad and the servers. The same choice is on the eD2k page. |
 | Use eD2k when torrents find nothing | A second, separate switch: only in the deep gap-filling pass, and only when the torrent episode and season searches produced nothing, Gextto searches the same episode on Kad and on the eD2k servers (with the series name and every alias). Off by default. |
 | Minimum sources for the fallback | eD2k source floor for accepting a result automatically. Manual search shows everything. *(Unit: sources; 0 = no minimum)* |
 | eD2k search duration | How many seconds aMule collects results before Gextto shows them. *(Unit: seconds)* |

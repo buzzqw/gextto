@@ -300,7 +300,10 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
   velocità è *Auto*, cioè quando Gextto misura la linea e si adatta; in quel
   caso il riquadro mostra il badge **Auto**, non «Nessun limite»). Le velocità
   sotto 1 KB/s valgono 0: è solo rumore di protocollo, e il grafico resta
-  piatto invece di tremare. Si aggiorna da solo.
+  piatto invece di tremare. Con eD2k attivo aMule ha **linee proprie
+  tratteggiate** e una voce **eD2k ↓ ↑** accanto a quella dei **Torrent**; le
+  velocità nella barra in alto sono invece la somma di torrent e aMule. Si
+  aggiorna da solo.
 - **Da controllare** — sotto la striscia: i download **fermi** (con il motivo,
   il prossimo tentativo e quando verranno abbandonati), gli **spostamenti in
   libreria in sospeso** (destinazione e tentativi) e gli avvisi, gli errori e i
@@ -726,7 +729,10 @@ manualmente il JSON se non stai usando direttamente l'API.
   per la ricerca automatica, non per quella esplicita. Il filtro `-parola`
   esclude i titoli che la contengono. La casella **Cerca anche nel
   web** estende la ricerca a indexer e motori online: è molto più lenta e per
-  questo parte solo quando premi **Cerca**, non a ogni tasto. La colonna
+  questo parte solo quando premi **Cerca**, non a ogni tasto. Con aMule attivo
+  c'è anche **Cerca anche su eD2k**: anche questa parte solo da **Cerca**, e i
+  risultati eD2k compaiono in un blocco sotto l'archivio, ognuno con
+  **Scarica**. La colonna
   **Sorgente** mostra solo il provider/dominio (l'URL completo è nel tooltip) e
   ogni riga offre **Perché non questa?** come nella tabella dei risultati. Il
   titolo va a capo su più righe e le azioni di riga sono icone compatte (⬇️
@@ -808,8 +814,8 @@ alto e un Kad non dietro firewall, cioè più fonti.
 - **Server eD2k**: la lista di aMule con utenti, file e ping; **Connetti** su
   una riga collega aMule a quel server. Da qui scarichi anche un nuovo
   `server.met` o un `nodes.dat` per Kad da un indirizzo.
-- **Cerca su eD2k e Kad**: scegli la rete (Kad, tutti i server eD2k, solo il
-  server connesso) e cerca; aMule raccoglie i risultati per qualche secondo.
+- **Cerca su eD2k e Kad**: scegli la rete (Kad, Kad + server eD2k, tutti i
+  server eD2k, solo il server connesso) e cerca; aMule raccoglie i risultati per qualche secondo.
   Ogni risultato mostra nome, dimensione e fonti (totali / complete) e ha
   **Scarica**; **già noto** segnala un file che aMule ha già.
 - **Incolla link eD2k**: uno o più link `ed2k://`, anche mescolati a testo;
@@ -1694,7 +1700,7 @@ spento per default: senza il tuo consenso Gextto non contatta la rete.
 | aMule — indirizzo | Macchina su cui gira `amuled`, di solito `127.0.0.1`. Gextto deve vedere la cartella di arrivo di aMule allo stesso percorso. |
 | aMule — porta connessioni esterne (EC) | `ECPort` di `amule.conf`, 4712 di default. |
 | aMule — password connessioni esterne (EC) | La password in chiaro; aMule conserva il suo MD5 in `ECPassword`. Non visualizzata. |
-| Rete delle ricerche eD2k | **Kad** (default, non serve un server), **Server eD2k (globale)** (tutti i server) o **Server eD2k (connesso)**. Vale per la ricerca manuale e per il fallback. |
+| Rete delle ricerche eD2k | **Kad** (default, non serve un server), **Kad + server eD2k** (entrambe le ricerche, risultati uniti), **Server eD2k (globale)** (tutti i server) o **Server eD2k (connesso)**. Vale per la ricerca manuale; il fallback automatico cerca sempre su Kad e sui server. La stessa scelta è nella pagina eD2k. |
 | Usa eD2k quando i torrent non trovano nulla | Secondo interruttore, separato: solo nel passaggio approfondito del gap filling, e solo se torrent episodio e stagione non hanno prodotto nulla, Gextto cerca lo stesso episodio su Kad e sui server eD2k (con il nome della serie e tutti gli alias). Spento di default. |
 | Fonti minime per il fallback | Soglia di fonti eD2k per accettare automaticamente un risultato. La ricerca manuale mostra tutto. *(Unità: fonti; 0 = nessun minimo)* |
 | Durata della ricerca eD2k | Per quanti secondi aMule raccoglie i risultati prima che Gextto li mostri. *(Unità: secondi)* |

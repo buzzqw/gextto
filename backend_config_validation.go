@@ -256,9 +256,9 @@ func validateNumericSetting(key, value string) error {
 		}
 	case key == "ed2k_search_network":
 		switch raw {
-		case "kad", "global", "local":
+		case "kad", "both", "global", "local":
 		default:
-			return fmt.Errorf("ed2k_search_network must be kad, global or local")
+			return fmt.Errorf("ed2k_search_network must be kad, both, global or local")
 		}
 	case key == "ed2k_stall_days":
 		parsed, err := strconv.ParseInt(raw, 10, 64)

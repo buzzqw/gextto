@@ -146,6 +146,11 @@ type v2TableData struct {
 	FooterForm    *uiFormSection
 	FooterActions []uiActionButton
 	WebSearch     bool
+	// Ed2kAvailable shows the archive's eD2k box (aMule integration on);
+	// Ed2kSearch is the box ticked and Ed2k the results of that search.
+	Ed2kAvailable bool
+	Ed2kSearch    bool
+	Ed2k          *v2Ed2kSearchView
 	Notice        *v2ActionNotice
 }
 
@@ -270,6 +275,15 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 		Colspan:    len(columns),
 		Total:      0,
 		WebSearch:  web,
+	}
+	if view == "archive" || strings.HasPrefix(view, "archive-") {
+		cfg := latestConfig(s)
+		data.Ed2kAvailable = ed2kEnabled(cfg)
+		data.Ed2kSearch = data.Ed2kAvailable && (r.FormValue("ed2k") == "1" || strings.EqualFold(r.FormValue("ed2k"), "true"))
+		if q := strings.TrimSpace(r.FormValue("q")); data.Ed2kSearch && q != "" && page == 1 {
+			result := v2Ed2kSearchFor(r.Context(), cfg, q, nil)
+			data.Ed2k = &result
+		}
 	}
 	if data.HasActions {
 		data.Colspan++

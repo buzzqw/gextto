@@ -5487,3 +5487,14 @@ spa:
   "Priorità in aMule": "Prioridad en aMule"
   "Salva la priorità": "Guardar la prioridad"
   "Ultimo dato ricevuto": "Último dato recibido"
+
+  # eD2k and Kad through aMule (External Connections)
+  "Dove cerca la ricerca manuale: Kad (rete distribuita, non serve un server), Kad + server eD2k (entrambe le ricerche, risultati uniti), tutti i server eD2k (globale) o solo il server a cui aMule è connesso. Il fallback automatico cerca sempre su Kad e sui server.": "Dónde busca la búsqueda manual: Kad (red distribuida, no hace falta un servidor), Kad + servidores eD2k (ambas búsquedas, resultados unidos), todos los servidores eD2k (global) o solo el servidor al que está conectado aMule. El respaldo automático busca siempre en Kad y en los servidores."
+  "Kad + server eD2k": "Kad + servidores eD2k"
+  "Cerca anche su eD2k": "Buscar también en eD2k"
+  "Cerca anche su eD2k e Kad tramite aMule (sulla rete scelta in Configurazione); i risultati compaiono sotto l'archivio": "Buscar también en eD2k y Kad mediante aMule (en la red elegida en Configuración); los resultados aparecen debajo del archivo"
+  "Kad cerca nella rete distribuita; Kad + server fa entrambe le ricerche e unisce i risultati; Globale interroga tutti i server eD2k; Server solo quello a cui sei connesso": "Kad busca en la red distribuida; Kad + servidores hace ambas búsquedas y une los resultados; Global consulta todos los servidores eD2k; Servidor solo aquel al que estás conectado"
+  "La ricerca nell'archivio parte da sola da 3 caratteri. Per termini più corti (es. IT) premi Invio o Cerca. Con «Cerca anche nel web» o «Cerca anche su eD2k» la ricerca online parte solo da Cerca.": "La búsqueda en el archivo empieza sola a partir de 3 caracteres. Para términos más cortos (p. ej. IT) pulsa Intro o Buscar. Con «Buscar también en la web» o «Buscar también en eD2k» la búsqueda en línea solo empieza con Buscar."
+  "Velocità di download di aMule (linea tratteggiata)": "Velocidad de descarga de aMule (línea discontinua)"
+  "Velocità di upload di aMule (linea tratteggiata)": "Velocidad de subida de aMule (línea discontinua)"
+  "eD2k e Kad (aMule)": "eD2k y Kad (aMule)"
