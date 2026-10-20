@@ -174,7 +174,9 @@ note.
   eMule RC4 handshake for outgoing connections when the source tag says the
   peer supports it, plus the receiving side for incoming callbacks/uploads.
   The keys follow aMule's magic bytes 34/203 and discard the first 1024 RC4
-  bytes; the clear 0xE3/0xC5 header remains a valid fallback. Secure
+  bytes; the clear 0xE3/0xC5 header remains a valid fallback. The obfuscated
+  outgoing path was verified against aMule 2.3.3 with the 400,000-byte lab
+  file (hello, upload slot, AICH and final MD4 all succeeded). Secure
   identification (RSA signatures/credits) is not part of this layer.
 - **Credits**: implement the eMule credit identity and upload accounting at
   least well enough not to be treated as a leech; the exact formula is in the
