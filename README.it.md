@@ -93,7 +93,7 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 Installa in `/opt/gextto`, tiene i dati in `/var/lib/gextto` e serve la UI
 sulla porta 5000, con `gx-torrent` accanto a `gexttod` — Go puro, nient'altro da
 installare per i torrent. eD2k e Kad sono facoltativi e richiedono un `amuled`
-che fai girare tu ([integrazione con aMule](docs/amule.md)). L'installer esegue
+che fai girare tu ([integrazione con aMule](docs/amule.it.md)). L'installer esegue
 prima il programma una volta, così una libreria mancante o una glibc vecchia
 vengono segnalate subito. Per default il servizio gira come **l'utente che
 lancia l'installer**; `--user gextto` usa un account di sistema isolato e
@@ -404,7 +404,7 @@ manuali con screen reader e tecnologie assistive
 | Spostare un'installazione | [Guida alla migrazione](docs/MIGRATION.md) |
 | Client da terminale | [Riferimento TUI](docs/tui.md) |
 | Motore gx-torrent e client autonomo | [Documento tecnico di gx-torrent](docs/gx-torrent.md) · [gx-core](docs/gx-core.md) |
-| eD2k e Kad tramite aMule | [Integrazione con aMule](docs/amule.md) |
+| eD2k e Kad tramite aMule | [Integrazione con aMule](docs/amule.it.md) |
 | Backend qBittorrent-nox | [Guida](docs/qbittorrent-nox.md) |
 | Compilare o contribuire | [Manuale per sviluppatori](docs/DEVELOPERS.md) |
 | Sicurezza di rete e dei dati | [Politica di sicurezza](docs/SECURITY.md) |

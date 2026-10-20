@@ -834,7 +834,7 @@ continua a condividerli dalla cartella di arrivo (l'hardlink non occupa spazio
 in più se le due cartelle sono sullo stesso disco).
 
 Per la guida completa — installazione di aMule, Docker, risoluzione dei
-problemi e dettagli del protocollo — vedi [`docs/amule.md`](amule.md).
+problemi e dettagli del protocollo — vedi [`docs/amule.it.md`](amule.it.md).
 
 ## 7. Configurazione
 
