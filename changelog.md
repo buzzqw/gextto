@@ -14,6 +14,11 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **Barra in alto: Aggiorna e stato accanto ad Aggiungi torrent.** Il pulsante
+  **Aggiorna** e il tondino dello stato del servizio (il pallino verde **ok**)
+  stanno ora nella prima riga, subito a destra di **Aggiungi torrent**, invece
+  che nella riga dei comandi sotto. Sotto restano lingua, dimensione del testo,
+  font e tema.
 - **Avviso quando il login a MirCrew si rompe.** Se il login al forum del
   servizio `mircrew-indexer` resta rotto per più di 15 minuti arriva una
   notifica (Telegram, email o webhook, secondo la configurazione), con il motivo

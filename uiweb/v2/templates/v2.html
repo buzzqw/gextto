@@ -91,6 +91,8 @@
       <div class="top-actions">
         {{template "v2_live_top_metrics" .Chrome}}
         <button class="btn add-torrent-toggle" type="button" data-add-torrent-toggle aria-label="Aggiungi torrent" title="Apri o chiudi il modulo per aggiungere un torrent"{{if eq .Page "downloads"}} aria-expanded="false" aria-controls="v2-add-torrent"{{end}}><span aria-hidden="true">＋</span><span class="add-torrent-toggle-label">Aggiungi torrent</span></button>
+        <button class="btn btn-refresh" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati" aria-label="Ricarica i dati mostrati"><span class="btn-refresh-icon" aria-hidden="true">↺</span><span class="btn-refresh-label">Aggiorna</span></button>
+        {{template "v2_live_status" .Chrome}}
       </div>
       <div class="top-controls">
         <form method="post" action="/language" class="lang-form">
@@ -108,8 +110,6 @@
         <button class="btn" type="button" data-font="+5" title="Testo più grande">A+</button>
         <button class="btn" type="button" data-font-open title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog">Font</button>
         <button class="btn" type="button" hx-get="/theme" hx-target="#v2-modal" hx-swap="innerHTML" title="Scegli il tema dell'interfaccia o creane uno" aria-haspopup="dialog">Tema</button>
-        <button class="btn btn-refresh" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati" aria-label="Ricarica i dati mostrati"><span class="btn-refresh-icon" aria-hidden="true">↺</span><span class="btn-refresh-label">Aggiorna</span></button>
-        {{template "v2_live_status" .Chrome}}
       </div>
     </header>
     <section class="mobile-performance" aria-label="Connessioni e prestazioni">

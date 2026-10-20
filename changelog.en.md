@@ -13,6 +13,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **Top bar: Aggiorna and the state next to Add torrent.** The **Aggiorna**
+  (refresh) button and the service state dot (the green **ok**) now sit in the
+  first row, right after **Add torrent**, instead of the controls row below.
+  Language, text size, font and theme stay below.
 - **Notice when the MirCrew login breaks.** If the forum login of the
   `mircrew-indexer` service stays broken for more than 15 minutes a notification
   arrives (Telegram, email or webhook, as configured), with the reason reported

@@ -29,8 +29,10 @@ dentro il loro pannello. Ogni azione resta raggiungibile col tocco.
 La UI ufficiale si apre su `http://<host>:5000/`; il vecchio prefisso `/v2`
 reindirizza alla radice e la vecchia route `/ui` non esiste più. La pagina **Scarico** aggiorna
 automaticamente la sessione ogni 5 secondi; la voce **Aggiorna ogni 5 s** del menu
-**Strumenti** disattiva o riattiva l'aggiornamento, e il pulsante **⟳** aggiorna subito. Anche le velocità e i carichi nella
-barra superiore vengono aggiornati ogni 5 secondi. La barra mostra **CPU e RAM
+**Strumenti** disattiva o riattiva l'aggiornamento, e il pulsante **Aggiorna**
+della barra in alto (accanto a **Aggiungi torrent**) ricarica subito i dati.
+Anche le velocità e i carichi nella barra superiore vengono aggiornati ogni 5
+secondi. La barra mostra **CPU e RAM
 per processo**: **Gextto** (il demone), **gx-torrent** (il motore torrent, quando
 il demone è locale) e **aMule** (quando **eD2k e Kad tramite aMule** è attivo e
 `amuled` gira sulla stessa macchina). I badge dei processi remoti non compaiono,

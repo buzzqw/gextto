@@ -91,6 +91,41 @@ test("il pulsante Aggiungi torrent è in ogni pagina e apre il modulo su Scarico
   await expect(page.locator('input[name="magnet"]')).toBeFocused();
 });
 
+test("Aggiorna e lo stato restano nella riga di Aggiungi torrent", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await page.goto("/");
+  const chrome = await page.evaluate(() => {
+    const box = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return {
+        inActions: element.closest(".top-actions") !== null,
+        x: Math.round(rect.x),
+        middle: Math.round(rect.y + rect.height / 2),
+      };
+    };
+    return {
+      add: box("[data-add-torrent-toggle]"),
+      refresh: box(".btn-refresh"),
+      status: box("#v2-live-status"),
+      // #v2-live-status uses display:contents on the desktop, so its own box
+      // is empty: the pill is the element that has a position.
+      pill: box(".system-pill"),
+    };
+  });
+  // Refresh and the service state are part of the same row as the add button,
+  // to its right, not in the controls row below.
+  expect(chrome.add).not.toBeNull();
+  expect(chrome.refresh?.inActions).toBe(true);
+  expect(chrome.status?.inActions).toBe(true);
+  expect(chrome.pill).not.toBeNull();
+  expect(chrome.add!.x).toBeLessThan(chrome.refresh!.x);
+  expect(chrome.refresh!.x).toBeLessThan(chrome.pill!.x);
+  expect(Math.abs(chrome.add!.middle - chrome.refresh!.middle)).toBeLessThanOrEqual(3);
+  expect(Math.abs(chrome.refresh!.middle - chrome.pill!.middle)).toBeLessThanOrEqual(3);
+});
+
 test("la selezione torrent aggiorna il riepilogo delle azioni", async ({ page }) => {
   await page.route("**/downloads/table", async (route) => {
     await route.fulfill({

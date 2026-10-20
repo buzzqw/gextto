@@ -29,8 +29,9 @@ panel. Every action stays reachable by touch.
 The official UI is served at `http://<host>:5000/`; the old `/v2` prefix
 redirects to the root and the old `/ui` route no longer exists. The **Downloads** page refreshes
 the session automatically every 5 seconds; **Refresh every 5 s** in the **Tools**
-menu turns that off or back on, and the **⟳** button refreshes at once. The transfer rates and the process loads in the top bar use the
-same 5-second refresh. The bar shows **CPU and RAM per process**: **Gextto** (the
+menu turns that off or back on, and the **Aggiorna** button in the top bar
+(next to **Add torrent**) reloads at once. The transfer rates and the process
+loads in the top bar use the same 5-second refresh. The bar shows **CPU and RAM per process**: **Gextto** (the
 daemon), **gx-torrent** (the torrent engine, when the daemon is local) and
 **aMule** (when **eD2k and Kad through aMule** is on and `amuled` runs on the
 same machine). Badges for remote processes are absent, because those figures
