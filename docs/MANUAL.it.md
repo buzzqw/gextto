@@ -828,7 +828,9 @@ I download aggiunti compaiono in **Scarico**. Un link a un file che non è un
 video (pdf, programma, archivio) viene solo scaricato da aMule e resta nella
 cartella di arrivo, come un torrent aggiunto a mano. Quando aMule completa un
 video, Gextto lo tratta come un torrent completato: lo rinomina, lo importa in
-libreria, lo controlla con MediaInfo e manda la notifica. Gli episodi eD2k
+libreria, lo controlla con MediaInfo e manda la notifica. Lo stesso controllo di
+qualità dei torrent gira prima della copia: se in libreria c'è già un file
+uguale o migliore il download viene scartato nel Cestino e non importato. Gli episodi eD2k
 entrano in libreria sempre con **hardlink o copia**, mai spostati, così aMule
 continua a condividerli dalla cartella di arrivo (l'hardlink non occupa spazio
 in più se le due cartelle sono sullo stesso disco).

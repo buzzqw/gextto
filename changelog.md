@@ -14,6 +14,13 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **eD2k: i film completati da aMule entrano in libreria.** Prima un film
+  scaricato via aMule con la cartella libreria configurata non veniva importato:
+  restava in un ciclo di spostamenti falliti. Ora viene copiato o linkato come
+  gli episodi e passa dallo stesso controllo di qualità prima di toccare il NAS:
+  se c'è già una versione uguale o migliore il download viene scartato (nel
+  Cestino) e non copiato. Senza cartella libreria il film resta in quella di
+  arrivo di aMule e risulta completato.
 - **eD2k e Kad passano ad aMule.** Il demone `gx-ed2k` viene ritirato: per la
   rete eD2k/Kad Gextto ora comanda **aMule** (`amuled`), che va installato e
   avviato a parte con le connessioni esterne (EC) attive. Con aMule acceso puoi

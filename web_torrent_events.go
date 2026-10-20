@@ -2265,6 +2265,71 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 	return processed, nil
 }
 
+// tev_importsByCopy reports whether the active session cannot relocate storage
+// itself, so a completed file must be imported by link or copy while the
+// download stays where the backend saved it. aMule's eD2k session is the only
+// one today: it has no storage move.
+func tev_importsByCopy(torrents TorrentSession) bool {
+	importer, ok := torrents.(interface{ ImportCompletedByCopy() bool })
+	return ok && importer.ImportCompletedByCopy()
+}
+
+// tev_completeMovieWithArchive imports a completed movie by link or copy: the
+// same quality gate as an episode runs before the file reaches the library, and
+// the source stays in the backend's folder so it keeps being shared.
+func tev_completeMovieWithArchive(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, destination string, tmdb *TmdbClient) (bool, error) {
+	source := CompletionPath(event)
+	video, err := resolveMovieCompletedFile(source)
+	if err != nil {
+		return false, err
+	}
+	if err := ValidateDestinationFrom(video, destination); err != nil {
+		return false, err
+	}
+	target := filepath.Join(destination, filepath.Base(video))
+	if resolved, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "movie", release.Title); resolveErr != nil {
+		return false, resolveErr
+	} else if resolved {
+		restored, err := db.RestoreUpgrade(event.Hash)
+		if err != nil {
+			return false, err
+		}
+		if !restored {
+			if err := db.RollbackRelease(release); err != nil {
+				return false, err
+			}
+		}
+		if err := db.MarkTorrentError(event.Hash, "release inferior to existing file"); err != nil {
+			return false, err
+		}
+		tev_discardCompletedSource(cfg, db, torrents, event, "release inferior to existing file")
+		logging.Warn("completed release discarded as inferior",
+			"hash", event.Hash, "name", event.Name, "title", release.Title)
+		return false, nil
+	}
+	linked, err := linkOrCopyFile(cfg, video, target)
+	if err != nil {
+		return false, err
+	}
+	processedEvent := *event
+	processedEvent.SavePath = destination
+	processedEvent.Name = filepath.Base(target)
+	processed, err := tev_completeTorrentOptions(cfg, db, torrents, &processedEvent, release, tmdb, true)
+	if err != nil {
+		return false, err
+	}
+	if processed {
+		if linked {
+			logging.Info(fmt.Sprintf("📁 «%s» linked into the library (hardlink, no extra space); the download stays to keep sharing it", event.Name),
+				"library_file", target, "hash", event.Hash)
+		} else {
+			logging.Info(fmt.Sprintf("📁 «%s» copied to the library; the download stays to keep sharing it", event.Name),
+				"library_file", target, "hash", event.Hash)
+		}
+	}
+	return processed, nil
+}
+
 func tev_completeTorrent(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, tmdb *TmdbClient) (bool, error) {
 	return tev_completeTorrentOptions(cfg, db, torrents, event, release, tmdb, false)
 }
@@ -3085,6 +3150,24 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		}
 		if SamePath(current, destination) {
 			return tev_completeTorrent(cfg, db, torrents, &event, &release, tmdb)
+		}
+		// A session that cannot relocate storage (aMule's eD2k queue) imports the
+		// movie by link or copy, like an episode in copy mode: the quality gate
+		// below still runs before anything reaches the library, and the download
+		// stays in aMule's incoming folder so it keeps being shared.
+		if release.Kind == "movie" && tev_importsByCopy(torrents) {
+			if hasArchiveDestination {
+				return tev_completeMovieWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb)
+			}
+			size, sizeErr := SizeOfPath(source)
+			if sizeErr != nil {
+				return false, sizeErr
+			}
+			if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
+				return false, err
+			}
+			logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
+			return true, nil
 		}
 		// Movies are always relocated to the configured destination (or to the
 		// default download volume when no archive is set); unlike episodes they

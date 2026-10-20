@@ -161,7 +161,11 @@ torrent e aMule.
 
 Quando aMule completa un video, Gextto solleva lo stesso evento di
 completamento di un torrent, così rinomina, import in libreria, controllo con
-MediaInfo, notifica e aggiornamento dei media server sono condivisi. aMule 2.3
+MediaInfo, notifica e aggiornamento dei media server sono condivisi. Il
+controllo di qualità gira prima che qualcosa venga scritto in libreria, film
+compresi: se c'è già un file uguale o migliore il download viene scartato
+(spostato nel Cestino, o eliminato secondo l'azione di pulizia) e mai copiato.
+aMule 2.3
 tiene il file finito nella coda dei download; aMule 3.x lo toglie subito, quindi
 Gextto lo ritrova tra i file condivisi, anche dopo un riavvio. Gli episodi eD2k
 entrano in libreria sempre con **hardlink o copia** (mai spostati), così aMule

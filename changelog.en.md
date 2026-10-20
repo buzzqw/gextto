@@ -13,6 +13,13 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **eD2k: movies completed by aMule reach the library.** A movie downloaded
+  through aMule with the library folder configured was not imported: it stayed
+  in a loop of failed moves. It is now copied or linked like an episode and goes
+  through the same quality check before touching the NAS: if an equal or better
+  version is already there, the download is discarded (to the trash) and not
+  copied. With no library folder the movie stays in aMule's incoming folder and
+  is marked completed.
 - **eD2k and Kad move to aMule.** The `gx-ed2k` daemon is retired: for the
   eD2k/Kad network Gextto now drives **aMule** (`amuled`), installed and started
   on its own with external connections (EC) enabled. With aMule on you can

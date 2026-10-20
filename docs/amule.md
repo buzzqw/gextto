@@ -162,7 +162,10 @@ torrents and aMule.
 
 When aMule completes a video, Gextto raises the same completion event a torrent
 produces, so renaming, the library import, the MediaInfo check, the
-notification and the media library refresh are shared. aMule 2.3 keeps a
+notification and the media library refresh are shared. The quality gate runs
+before anything is written to the library, movies included: if the library
+already holds an equal or better file, the download is discarded (moved to the
+trash, or deleted according to the cleanup action) and never copied. aMule 2.3 keeps a
 finished file in its download queue; aMule 3.x drops it at once, so Gextto
 finds it among the shared files, also after a restart. eD2k episodes are always
 imported by **hardlink or copy** (never moved), so aMule keeps sharing the

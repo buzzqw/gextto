@@ -811,7 +811,9 @@ Added downloads appear in **Downloads**. A link to a file that is not a video
 (a pdf, a program, an archive) is only downloaded by aMule and stays in the
 incoming folder, like a torrent added by hand. When aMule completes a video,
 Gextto treats it like a completed torrent: it renames it, imports it into the library,
-checks it with MediaInfo and sends the notification. eD2k episodes always enter
+checks it with MediaInfo and sends the notification. The same quality check as a
+torrent runs before the copy: if the library already holds an equal or better
+file, the download is discarded to the trash and never imported. eD2k episodes always enter
 the library by **hardlink or copy**, never moved, so aMule keeps sharing them
 from its incoming folder (a hardlink takes no extra space when both folders are
 on the same disk).

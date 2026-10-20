@@ -363,6 +363,10 @@ func (s ed2kSession) Pause(hash string) (bool, error) {
 	return true, Ed2kDownloadAction(s.cfg, "pause", hash)
 }
 
+// ImportCompletedByCopy reports that aMule cannot relocate a finished file:
+// a completed download is imported by link or copy, never by a storage move.
+func (ed2kSession) ImportCompletedByCopy() bool { return true }
+
 func (s ed2kSession) Resume(hash string) (bool, error) {
 	return true, Ed2kDownloadAction(s.cfg, "resume", hash)
 }
