@@ -645,7 +645,7 @@ an `amuled` over the External Connections protocol (`internal/amule`, our own
 client). aMule brings what makes eD2k work on the real network (hundreds of
 queued sources, UDP reasks, credits, Kad as a full node, AICH); Gextto adds the
 search with its release parsing, pasted `ed2k://` links, aMule's downloads in
-Scarico, the eD2k page (status, servers, Kad) and the import of completed files
+Downloads, the eD2k page (status, servers, Kad) and the import of completed files
 through the same completion flow as torrents, by hardlink or copy so aMule keeps
 sharing them. Everything is opt-in (`ed2k_enabled`), and the automatic
 gap-filling fallback is a second switch (`ed2k_fallback`) that accepts only an
@@ -657,8 +657,8 @@ The decision to use aMule instead of a native client rests on two facts kept in
 [`measurements.md`](measurements.md): the measured Kad coverage of missing
 episodes is modest, and a native client competitive with eMule needs a source
 and queue scheduler of the same depth, which is not worth its cost for a
-last-resort source. The native daemon is preserved under the git tag
-`archive/gx-ed2k`.
+last-resort source. The native daemon is preserved in the history, at commit
+`9f4e2b9` (the last `gx-ed2k` build, removed from the tree right after).
 
 Open points:
 

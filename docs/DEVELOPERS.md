@@ -117,7 +117,7 @@ and `v2.css`.
 
 The official UI is served at `/`; the old `/v2` prefix redirects to the root and
 the removed legacy `/ui` route must not be reintroduced. Live shell metrics are
-rendered by the `/partial/chrome` HTMX fragment, while the Scarico table uses its own
+rendered by the `/partial/chrome` HTMX fragment, while the Downloads table uses its own
 5-second polling fragment. Keep both polling fragments free of a recursive
 `load` trigger when they replace themselves with `outerHTML`.
 

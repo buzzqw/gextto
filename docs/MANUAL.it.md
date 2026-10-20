@@ -776,7 +776,9 @@ Gextto usa **aMule** per la rete eD2k e Kad: `amuled` fa il lavoro di rete
 (server, Kad, fonti, code, crediti, trasferimenti) e Gextto lo comanda con il
 protocollo delle **connessioni esterne (EC)**, lo stesso di `amulecmd` e
 `amuleweb`. È tutto facoltativo e spento di default; con aMule spento i
-torrent non cambiano.
+torrent non cambiano. Se aggiorni da una versione che usava il nostro demone
+`gx-ed2k`, l'aggiornamento rimuove il binario e le sue opzioni: per eD2k e Kad
+resta aMule.
 
 **Come si prepara.** Installa aMule (`amule-daemon` su Debian/Ubuntu) e
 abilita le connessioni esterne in `amule.conf`:

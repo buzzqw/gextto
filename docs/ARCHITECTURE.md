@@ -117,7 +117,7 @@ qBittorrent-nox.
 | `rss.go` | RSS/XML feeds of the sources. |
 | `websearch.go` | web search engines and shared limiter. |
 | `ed2ksearch.go` | eD2k/Kad through aMule: settings, shared EC client, cached status, search into `models.Release` (`network`, `ed2k_link`, `sources`), gap-filling fallback. |
-| `ed2k_downloads.go` | aMule's download queue: list for Scarico, add/pause/resume/remove, completion events fed to the torrent event loop with a copy-mode import. |
+| `ed2k_downloads.go` | aMule's download queue: list for Downloads, add/pause/resume/remove, completion events fed to the torrent event loop with a copy-mode import. |
 | `uiweb_v2_ed2k.go` | the eD2k page: aMule status, servers, Kad, search, pasted links. |
 | `indexer_health.go` | indexer health (Prowlarr). |
 | `tmdb.go` / `tvdb.go` | TMDB and TheTVDB metadata. |

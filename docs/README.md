@@ -26,7 +26,7 @@ needs.
 | [State and backlog](evoluzione.md) | What Gextto and the gx-torrent / gx-core engine have today and what is planned next (positioning, capabilities, engine, open items). |
 | [Measurements and verification](measurements.md) | How each number is taken: harnesses, benchmarks and footprint, swarm, DHT, merge on real data, accessibility verification. |
 | [gx-torrent engine](gx-torrent.md) | Technical document of the pure-Go torrent engine (gx-core, daemon, adapter). |
-| [eD2k and Kad through aMule](amule.md) | How Gextto drives amuled over the External Connections protocol: search, links, downloads in Scarico, completion, status page, settings and tests. |
+| [eD2k and Kad through aMule](amule.md) | How Gextto drives amuled over the External Connections protocol: search, links, aMule's queue in Downloads, completion, status page, settings and tests. |
 | [BEP compliance](bep.md) | Which BitTorrent specifications (BEPs) the engine supports, which are missing and the roadmap. |
 | [gx-core](gx-core.md) | The standalone torrent client (the `gx-torrent` binary used without Gextto): modes, security, packaging, what is still open. |
 

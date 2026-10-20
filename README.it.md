@@ -52,7 +52,7 @@ altro.
 | **Protocollo** | BitTorrent v1, v2 e ibrido (BEP 52) · 34 BEP implementati e testati ([elenco](docs/bep.md)) |
 | **Rete** | TCP + uTP su una porta · UPnP, NAT-PMP, PCP · holepunching BEP 55 · proxy SOCKS5/HTTP · killswitch VPN |
 | **Automazione** | Serie TV, film, fumetti · Torznab (Jackett, Prowlarr) · RSS · ricerca web · sostituzione dei download bloccati |
-| **Integrazioni** | Jellyfin, Plex, Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
+| **Integrazioni** | Jellyfin, Plex, aMule (eD2k e Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
 | **Interfacce** | Web UI (SSR + HTMX, Go puro, PWA installabile) · TUI da terminale via SSH · API JSON |
 | **Build** | Go puro (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent anche su Windows |
 
@@ -92,11 +92,12 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 
 Installa in `/opt/gextto`, tiene i dati in `/var/lib/gextto` e serve la UI
 sulla porta 5000, con `gx-torrent` accanto a `gexttod` — Go puro, nient'altro da
-installare. L'installer esegue prima il programma una volta, così una libreria
-mancante o una glibc vecchia vengono segnalate subito. Per default il servizio
-gira come **l'utente che lancia l'installer**; `--user gextto` usa un account di
-sistema isolato e `--media-group <gruppo>` dà accesso alla libreria su un NAS
-altrui.
+installare per i torrent. eD2k e Kad sono facoltativi e richiedono un `amuled`
+che fai girare tu ([integrazione con aMule](docs/amule.md)). L'installer esegue
+prima il programma una volta, così una libreria mancante o una glibc vecchia
+vengono segnalate subito. Per default il servizio gira come **l'utente che
+lancia l'installer**; `--user gextto` usa un account di sistema isolato e
+`--media-group <gruppo>` dà accesso alla libreria su un NAS altrui.
 
 > [!IMPORTANT]
 > Gextto è pensato per una rete fidata: web UI e API sono aperte per default.

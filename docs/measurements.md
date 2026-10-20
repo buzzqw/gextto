@@ -454,8 +454,8 @@ interface. Verified in a systemd container
 
 ### eD2k and Kad through aMule — live, 20 October 2026
 
-The native `gx-ed2k` daemon measured in the sections below is retired (code under
-the git tag `archive/gx-ed2k`); eD2k now goes through aMule. Its numbers stay
+The native `gx-ed2k` daemon measured in the sections below is retired (its last
+build is commit `9f4e2b9`); eD2k now goes through aMule. Its numbers stay
 here as the history of the decision.
 
 EC client against a real `amuled` 2.3.3 (Debian trixie package) on the N97,

@@ -137,7 +137,7 @@ qBittorrent and reads the results back:
   while it runs and restores the previous value on shutdown, so the two never
   fight.
 - **Seed** (*Seed*): the global ratio and max seed time travel with every
-  torrent, together with the per-torrent limits set in Scarico.
+  torrent, together with the per-torrent limits set in Downloads.
 - **Per torrent**: pause/resume, recheck, reannounce, move, sequential and
   first/last pieces, super-seeding, file priorities, tracker add/remove, and
   the category/tag from §2.

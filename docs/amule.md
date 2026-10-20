@@ -19,11 +19,11 @@ affected.
   name, size, MD4 hash and sources, and are parsed like torrent names (series,
   episode, quality).
 - **ed2k:// links**: paste one or more (even mixed with text) on the eD2k page
-  or in the search box of Scarico; they go to aMule and a video is registered
+  or in the search box of Downloads; they go to aMule and a video is registered
   like a manual download. A file that is not a video (a pdf, a program, an
   archive) is only aMule's download: it stays in the incoming folder, like a
   torrent added by hand, instead of failing the library import.
-- **Downloads in Scarico**: aMule's queue is shown next to the torrents and the
+- **Queue in Downloads**: aMule's queue is shown next to the torrents and the
   HTTP downloads, with progress, speed, sources (transferring / total) and
   pause / resume / remove; ⓘ opens the details (last data received, hash, link
   to copy) and sets the file's priority in aMule. The downloads count on the
@@ -103,7 +103,7 @@ non-firewalled Kad, hence more sources.
 | `amule_host` | host of `amuled` (`127.0.0.1`) |
 | `amule_port` | EC port (`4712`) |
 | `amule_password` | EC password, in clear (secret) |
-| `ed2k_search_network` | `kad` (default), `global` or `local` |
+| `ed2k_search_network` | `kad` (default), `both` (Kad + eD2k servers), `global` or `local` |
 | `ed2k_search_timeout_secs` | how long aMule collects results (5–120 s, default 20) |
 | `ed2k_fallback` | automatic gap-filling fallback (off) |
 | `ed2k_min_sources` | source floor of the fallback (3) |
@@ -167,4 +167,4 @@ Gextto first shipped its own eD2k/Kad daemon, `gx-ed2k`. Its protocol layer
 worked, but the download scheduler (sources, queues, UDP reasks) never reached
 the level of a real eMule client, and the measured Kad coverage of missing
 episodes was 7–13% (see [`measurements.md`](measurements.md)). It was retired in
-favour of aMule; the code is kept under the git tag `archive/gx-ed2k`.
+favour of aMule; the code is kept in the git history, at commit `9f4e2b9`.

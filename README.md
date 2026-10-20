@@ -52,7 +52,7 @@ one.
 | **Protocol** | BitTorrent v1, v2 and hybrid (BEP 52) · 34 BEPs implemented and tested ([list](docs/bep.md)) |
 | **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP proxy · VPN killswitch |
 | **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr) · RSS · web search · stuck-download replacement |
-| **Integrations** | Jellyfin, Plex, Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
+| **Integrations** | Jellyfin, Plex, aMule (eD2k and Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
 | **Interfaces** | Web UI (SSR + HTMX, pure Go, installable PWA) · terminal TUI over SSH · JSON API |
 | **Build** | Pure Go (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent also on Windows |
 
@@ -91,10 +91,12 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 
 It installs to `/opt/gextto`, keeps data in `/var/lib/gextto` and serves the UI
 on port 5000, with `gx-torrent` alongside `gexttod` — pure Go, nothing else to
-install. The installer runs the program once first, so a missing library or an
-old glibc is reported at once. The service runs as **the user invoking the
-installer** by default; `--user gextto` uses an isolated system account and
-`--media-group <group>` grants access to someone else's NAS library.
+install for torrents. eD2k and Kad are optional and need an `amuled` you run
+yourself ([aMule integration](docs/amule.md)). The installer runs the program
+once first, so a missing library or an old glibc is reported at once. The
+service runs as **the user invoking the installer** by default; `--user gextto`
+uses an isolated system account and `--media-group <group>` grants access to
+someone else's NAS library.
 
 > [!IMPORTANT]
 > Gextto is meant for a trusted network: the web UI and API are open by
@@ -175,7 +177,7 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   default: Gextto drives an `amuled` you run (External Connections protocol,
   our own Go client). Search Kad or the eD2k servers, paste `ed2k://` links,
   connect to servers and follow aMule's state on the eD2k page; aMule's
-  downloads appear in Scarico next to the torrents and, once complete, are
+  downloads appear in **Downloads** next to the torrents and, once complete, are
   renamed and imported into the library like any torrent (by hardlink or copy,
   so aMule keeps sharing them). The automatic gap-filling fallback is a second,
   separate switch and accepts only an exact episode match with a recognised
