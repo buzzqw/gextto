@@ -34,6 +34,13 @@ receives progress/completion events like it does for torrents.
   - login (`OP_LOGINREQUEST`), `OP_IDCHANGE`/`OP_SERVERIDENT`;
   - keyword search (`OP_SEARCHREQUEST`) and `OP_SEARCHRESULT` parsing;
   - results merged with Kad by MD4 hash, higher source count wins.
+- **Shared files and publishing**: the upload index keeps its metadata in
+  `<data>/known.met` (the eMule layout), so a restart reuses the hashes of
+  files whose name, size and modification time did not change instead of
+  re-reading them. A background session keeps one eD2k server open and sends
+  `OP_OFFERFILES` for the shared files, re-offering them after a reconnect;
+  `/api/v1/health` reports the server, file count, last offer and last error
+  under `publish`. Kad keyword/source publishing is not implemented.
 - **IP filter**: `-ipfilter <file>` (or `GX_ED2K_IPFILTER`) reads an
   eMule/aMule `ipfilter.dat`. Blocked ranges are dropped from Kad contacts,
   from server connections, from Kad/server source lists and from source
@@ -54,7 +61,8 @@ receives progress/completion events like it does for torrents.
 ## What is deliberately not implemented
 
 - full LowID↔LowID data relay through a third client;
-- file publishing (`PUBLISH_*`) and the full `known.met` shared-file manager;
+- Kad publishing (keyword and source store); servers publishing is
+  implemented;
 - per-file bandwidth limits and priorities.
 
 The client keeps its RSA identity in `<data>/cryptkey.pem`, created on first

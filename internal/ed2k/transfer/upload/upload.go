@@ -13,11 +13,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/known"
 	"github.com/buzzqw/gextto/internal/ed2k/secident"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 	"github.com/buzzqw/gextto/internal/ed2k/transfer/peer"
@@ -28,6 +30,7 @@ type File struct {
 	Name  string
 	Path  string
 	Size  int64
+	MTime time.Time
 	Hash  ed2k.ID
 	Parts []ed2k.ID
 
@@ -66,10 +69,14 @@ type Server struct {
 	credits    map[string]int64
 	creditPath string
 
-	ClientName string
-	UserHash   ed2k.ID
-	TCPPort    uint16
-	Idle       time.Duration
+	ClientName  string
+	UserHash    ed2k.ID
+	TCPPort     uint16
+	Idle        time.Duration
+	knownPath   string
+	knownMu     sync.Mutex
+	knownSaveMu sync.Mutex
+	known       map[string]known.Entry
 	// SecIdent is the local RSA identity for secure identification. Nil
 	// disables the handshake and its advertisement in the hello options.
 	SecIdent *secident.Key
@@ -82,6 +89,7 @@ func New(slots int) *Server {
 	}
 	return &Server{
 		files:      make(map[string]*File),
+		known:      make(map[string]known.Entry),
 		maxSlots:   slots,
 		credits:    make(map[string]int64),
 		ClientName: "gx-ed2k",
@@ -107,15 +115,22 @@ func (s *Server) IndexDir(dir string) error {
 			continue
 		}
 		path := filepath.Join(dir, name)
-		if err := s.AddFile(path); err != nil {
-			continue
-		}
+		_ = s.addPath(path, false)
+	}
+	s.saveKnown()
+	return nil
+}
+
+// AddFile hashes one file (unless the known-files cache has an unchanged
+// entry) and adds it to the index.
+func (s *Server) AddFile(path string) error {
+	if err := s.addPath(path, true); err != nil {
+		return err
 	}
 	return nil
 }
 
-// AddFile hashes one file and adds it to the index.
-func (s *Server) AddFile(path string) error {
+func (s *Server) addPath(path string, persist bool) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return err
@@ -123,18 +138,105 @@ func (s *Server) AddFile(path string) error {
 	if !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > math.MaxUint32 {
 		return errors.New("upload: unsupported file")
 	}
+	name := filepath.Base(path)
+	key := knownKey(name, info.Size())
+
+	s.knownMu.Lock()
+	cached, ok := s.known[key]
+	s.knownMu.Unlock()
+	if ok && cached.MTime.Unix() == info.ModTime().Unix() && len(cached.Parts) == known.PartHashCount(info.Size()) {
+		file := &File{
+			Name: name, Path: path, Size: info.Size(), MTime: info.ModTime().UTC(),
+			Hash: cached.Hash, Parts: cached.Parts,
+		}
+		s.mu.Lock()
+		s.files[file.Hash.Hex()] = file
+		s.mu.Unlock()
+		return nil
+	}
+
 	hashes, err := partfile.HashFile(path)
 	if err != nil {
 		return err
 	}
+	parts := known.PartsFor(info.Size(), hashes.Parts)
 	file := &File{
-		Name: filepath.Base(path), Path: path, Size: info.Size(),
-		Hash: hashes.File, Parts: hashes.Parts,
+		Name: name, Path: path, Size: info.Size(), MTime: info.ModTime().UTC(),
+		Hash: hashes.File, Parts: parts,
 	}
 	s.mu.Lock()
 	s.files[file.Hash.Hex()] = file
 	s.mu.Unlock()
+	s.knownMu.Lock()
+	s.known[key] = known.Entry{
+		Hash: hashes.File, Parts: parts, Size: info.Size(),
+		Name: name, MTime: info.ModTime().UTC(),
+	}
+	s.knownMu.Unlock()
+	if persist {
+		s.saveKnown()
+	}
 	return nil
+}
+
+// SetKnownPath enables the shared-file metadata cache, so a restart does not
+// re-hash files whose name, size and modification time did not change.
+func (s *Server) SetKnownPath(path string) {
+	entries, err := known.Load(path)
+	if err != nil {
+		return
+	}
+	s.knownMu.Lock()
+	s.knownPath = path
+	s.known = make(map[string]known.Entry, len(entries))
+	for _, entry := range entries {
+		s.known[knownKey(entry.Name, entry.Size)] = entry
+	}
+	s.knownMu.Unlock()
+}
+
+func knownKey(name string, size int64) string {
+	return name + "\x00" + strconv.FormatInt(size, 10)
+}
+
+// saveKnown writes the metadata of every currently shared file.
+func (s *Server) saveKnown() {
+	s.knownMu.Lock()
+	path := s.knownPath
+	if path == "" {
+		s.knownMu.Unlock()
+		return
+	}
+	s.mu.RLock()
+	entries := make([]known.Entry, 0, len(s.files))
+	for _, file := range s.files {
+		entries = append(entries, known.Entry{
+			Hash: file.Hash, Parts: file.Parts, Size: file.Size,
+			Name: file.Name, MTime: file.MTime,
+		})
+	}
+	s.mu.RUnlock()
+	s.knownMu.Unlock()
+
+	// Serialise writers without holding the file index lock during I/O.
+	s.knownSaveMu.Lock()
+	err := known.Save(path, entries)
+	s.knownSaveMu.Unlock()
+	if err != nil {
+		return
+	}
+}
+
+// Shared returns a snapshot of the files advertised to the network.
+func (s *Server) Shared() []ed2k.SharedFile {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]ed2k.SharedFile, 0, len(s.files))
+	for _, file := range s.files {
+		out = append(out, ed2k.SharedFile{Hash: file.Hash, Name: file.Name, Size: file.Size})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 // SetCreditPath enables persistence of uploaded-bytes credits.

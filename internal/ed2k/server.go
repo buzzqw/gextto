@@ -252,6 +252,13 @@ func (c *Client) serverLogin(conn net.Conn) error {
 	}
 }
 
+// ServerID returns the client ID assigned by the last eD2k server.
+func (c *Client) ServerID() (uint32, bool) {
+	c.serverMu.Lock()
+	defer c.serverMu.Unlock()
+	return c.serverID, c.serverIDSet
+}
+
 func (c *Client) userHash() []byte {
 	c.mu.Lock()
 	hash := c.userHashValue

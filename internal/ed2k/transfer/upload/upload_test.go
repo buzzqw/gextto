@@ -88,7 +88,9 @@ func TestUploadServesFile(t *testing.T) {
 		t.Fatalf("hashset: opcode=%#x err=%v", opcode, err)
 	}
 	hashset, err := peer.DecodeHashsetAnswer(payload)
-	if err != nil || hashset.Hash != file.Hash || len(hashset.Hashes) != 1 {
+	// A file smaller than one eD2k part has no part hashes: the file hash is
+	// the only hash eMule expects.
+	if err != nil || hashset.Hash != file.Hash || len(hashset.Hashes) != 0 {
 		t.Fatalf("hashset = %+v, %v", hashset, err)
 	}
 
@@ -344,5 +346,69 @@ func TestUploadSecureIdent(t *testing.T) {
 		default:
 			t.Fatalf("unexpected opcode %#x during secure identification", opcode)
 		}
+	}
+}
+
+func TestKnownFileCacheSkipsRehash(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "film.bin")
+	data := make([]byte, 300_000)
+	for i := range data {
+		data[i] = byte(i * 7)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mtime := time.Now().Add(-time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(path, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	knownPath := filepath.Join(t.TempDir(), "known.met")
+
+	first := New(1)
+	first.SetKnownPath(knownPath)
+	if err := first.IndexDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	firstHash := onlyHash(t, first)
+	if first.Len() != 1 {
+		t.Fatalf("shared files = %d", first.Len())
+	}
+	if _, err := os.Stat(knownPath); err != nil {
+		t.Fatalf("known.met not written: %v", err)
+	}
+
+	// Same size and modification time: the cache must be trusted.
+	changed := make([]byte, len(data))
+	for i := range changed {
+		changed[i] = byte(i * 11)
+	}
+	if err := os.WriteFile(path, changed, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	second := New(1)
+	second.SetKnownPath(knownPath)
+	if err := second.IndexDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	if cached := onlyHash(t, second); cached != firstHash {
+		t.Fatal("unchanged metadata was hashed again instead of using known.met")
+	}
+
+	// A new modification time invalidates the entry.
+	later := mtime.Add(time.Minute)
+	if err := os.Chtimes(path, later, later); err != nil {
+		t.Fatal(err)
+	}
+	third := New(1)
+	third.SetKnownPath(knownPath)
+	if err := third.IndexDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	if refreshed := onlyHash(t, third); refreshed == firstHash {
+		t.Fatal("changed modification time did not trigger a new hash")
 	}
 }

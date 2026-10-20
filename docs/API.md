@@ -585,7 +585,7 @@ a native `/api/v1`. When `ed2k_token` is set, every `/api/v1` call must send
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/health` | health, version, Kad id/UDP port, `download: false`, `search: true`, `reachability` (open/limited/unknown), `low_id`, the UPnP mapping state and `ipfilter_ranges` |
+| GET | `/api/v1/health` | health, version, Kad id/UDP port, `download: false`, `search: true`, `reachability` (open/limited/unknown), `low_id`, the UPnP mapping state, `ipfilter_ranges` and `publish` (server, files, last offer) |
 | GET | `/api/v1/status` | counters (nodes, queries, results), capabilities and last error |
 | GET | `/api/v1/search?q=…&timeout_ms=…` | keyword search on Kad and the eD2k servers; results carry `name`, `size_bytes`, `hash`, `link`, `sources`, `origin` |
 | POST | `/api/v1/link` | validate a JSON `{"link":"ed2k://…"}` file or server link; returns the parsed identity |

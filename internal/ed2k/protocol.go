@@ -58,6 +58,7 @@ const (
 	OpLoginRequest   = 0x01
 	OpReject         = 0x05
 	OpGetServerList  = 0x14
+	OpOfferFiles     = 0x15
 	OpSearchRequest  = 0x16
 	OpGetSources     = 0x19
 	OpSearchUser     = 0x1A

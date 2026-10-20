@@ -166,6 +166,7 @@ func main() {
 		uploader.UserHash = userHash
 		uploader.TCPPort = uint16(*tcpPort)
 		uploader.SetCreditPath(filepath.Join(*dataDir, "credits.json"))
+		uploader.SetKnownPath(filepath.Join(*dataDir, "known.met"))
 		uploader.SecIdent = secureIdent
 		dirs := []string{*downloadDir}
 		for _, dir := range strings.Split(*shareDirs, ",") {
@@ -220,6 +221,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	var publisher *ed2k.Publisher
+	if uploader != nil {
+		publisher = ed2k.NewPublisher(client, uploader.Shared)
+		publisher.SetLogf(log.Printf)
+		go publisher.Run(ctx)
+	}
 	daemon := newDaemon(daemonOptions{
 		DataDir:     *dataDir,
 		Mode:        modeValue,
@@ -228,6 +235,7 @@ func main() {
 		Lang:        *lang,
 		Commit:      commit,
 	}, client)
+	daemon.publisher = publisher
 	if *downloadEnabled {
 		manager = download.NewManager(ctx, download.ManagerConfig{
 			Fetch: download.Config{

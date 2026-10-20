@@ -34,6 +34,7 @@ type daemonOptions struct {
 }
 
 type Daemon struct {
+	publisher *ed2k.Publisher
 	opts      daemonOptions
 	client    searcher
 	transfers *download.Manager
@@ -109,6 +110,17 @@ func (d *Daemon) healthPayload() map[string]any {
 		"peer_packets":    stats.PeerPackets,
 		"upnp":            stats.UPnP,
 		"ipfilter_ranges": stats.IPFilterRanges,
+	}
+	if d.publisher != nil {
+		server, files, last, lastErr := d.publisher.Status()
+		publish := map[string]any{"files": files, "server": server}
+		if !last.IsZero() {
+			publish["last_offer"] = last.UTC().Format(time.RFC3339)
+		}
+		if lastErr != "" {
+			publish["error"] = lastErr
+		}
+		payload["publish"] = publish
 	}
 	if startup := d.startup(); startup != "" {
 		payload["startup_error"] = startup

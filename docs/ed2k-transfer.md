@@ -141,7 +141,11 @@ manager.
 - **Resume**: on start, verify the `.part` against the part hashes; a corrupt
   part is marked missing. Never rename/import a file before the full hash
   matches.
-- **`known.met` / shared files**: only the minimum needed for credits/upload;
+- **`known.met` / shared files**: the upload index persists hashes, sizes and
+  names in the eMule `known.met` layout, so unchanged files are not hashed
+  again after a restart. A background session offers the shared files to one
+  eD2k server (`OP_OFFERFILES`) and re-offers them after a reconnect. Kad
+  keyword/source publishing is still missing;
   the search daemon does not index third-party files.
 
 ## 5. Client protocol

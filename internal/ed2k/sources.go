@@ -6,6 +6,13 @@ import (
 	"net"
 )
 
+// SharedFile is the metadata a publisher offers to eD2k servers.
+type SharedFile struct {
+	Hash ID
+	Name string
+	Size int64
+}
+
 // PeerSource is one eD2k peer that may hold a file. It is learned from a
 // server (OP_FOUNDSOURCES), from Kad (SEARCH_SOURCE results) or from another
 // peer (source exchange).
