@@ -68,14 +68,16 @@ qBittorrent-nox, §6); explainability of the choices; search also from web engin
 lightness (a Go binary and SQLite against a .NET stack); simplicity (health, backup
 and maintenance built in).
 
-**Honest snapshot against Sonarr/Radarr** (2026-10): they are better at
-**selection** (profiles, custom formats, delay profiles, a profile per series and
-per movie), at the **edge cases of import and rename** (multi-episode, specials,
-daily, manual import with matching and replacement) and at the **ecosystem/API**
-(Overseerr/Jellyseerr speak `/api/v3`). Gextto is better at single scope,
-integrated engine, explainability, footprint and simplicity. The verdict is
-unchanged: **an alternative for new installations**, without claiming parity. What
-it would take to close each gap is in §8.
+**Honest snapshot against Sonarr/Radarr:** they are better at **selection**
+(named quality profiles, custom formats, a delay per profile), at **manual
+import** (matching an existing file and choosing what it replaces) and at the
+**ecosystem/API** (Overseerr/Jellyseerr speak `/api/v3`). Gextto parses
+multi-episode, specials and daily releases and records every episode of a
+multi-episode file, but it names the archived file after the first episode only
+and it has no manual import. It is better at single scope, integrated engine,
+explainability, footprint and simplicity. The verdict is unchanged: **an
+alternative for new installations**, without claiming parity. What it would take
+to close each gap is in §8.
 
 **Differences that are choices, not gaps:** indexers through an external manager
 (cleaner and safer separation) and **no usenet** (torrent, HTTP and web seed; in the
@@ -746,9 +748,12 @@ without copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
   `languageprofile`, `rootfolder`, `tag`, `series/lookup` + `POST series`,
   `movie/lookup` + `POST movie`, `queue`), after named profiles, root folders and tags,
   and tested against a real Jellyseerr; full compatibility is not realistic.
-- **Import and rename edge cases** (multi-episode, specials, daily, manual import with
-  matching and replacement): study the behaviour and reimplement it, building our own
-  corpus from real names.
+- **Manual import, and multi-episode naming**: study the behaviour and reimplement
+  it, building our own corpus from real names. Multi-episode, specials and daily
+  names are already parsed and every episode of a multi-episode file is recorded;
+  what is missing is a file name that carries the range (so a media server lists
+  every episode) and a manual import that matches an existing file and chooses
+  what it replaces.
 
 **Closed with data**, so the ground is not re-covered: replacing `internal/dht` with an
 external DHT (the API model differs and it would drop the dual-stack/shared-socket
