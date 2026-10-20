@@ -53,6 +53,8 @@ change. `/ui` is not served. For operational checks use
 | GET | `/api/ed2k/limits` | aMule's global bandwidth limits: download_kib, upload_kib (0 = unlimited) |
 | POST | `/api/ed2k/limits` | set aMule's global bandwidth limits: JSON {"download_kib": N, "upload_kib": N}, 0 = unlimited |
 | GET | `/api/ed2k/log` | aMule's own log lines |
+| GET | `/api/ed2k/shared` | the files aMule shares with what it uploaded for each (session and total bytes, requests, accepted, queued clients, priority, ed2k link), the upload queue (client, software, file, speed, upload position) and the shared folders; enabled is false while the integration is off |
+| POST | `/api/ed2k/shared/reload` | ask aMule to rescan its shared folders, so files added or removed outside aMule show up (the reload button of the aMule GUI) |
 | POST | `/api/archive/add` | add an entry to the archive |
 | POST | `/api/archive/batch-download` | download several archive entries |
 | POST | `/api/archive/delete` | delete archive entries |

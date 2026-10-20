@@ -339,3 +339,106 @@ func V2Ed2kLog(w http.ResponseWriter, r *http.Request, s *AppState) {
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_ed2k_log", view, dict, eng)
 }
+
+// v2Ed2kSharedRow is one shared file on the eD2k page.
+type v2Ed2kSharedRow struct {
+	Name           string
+	Size           int64
+	Transferred    int64
+	TransferredAll int64
+	Requests       int64
+	RequestsAll    int64
+	Accepts        int64
+	Queued         int64
+	Priority       string
+	Link           string
+}
+
+// v2Ed2kSharedView backs the shared-files panel of the eD2k page.
+type v2Ed2kSharedView struct {
+	Enabled     bool
+	Error       string
+	Message     string
+	Detail      string
+	MessageErr  bool
+	Incoming    string
+	Dirs        []string
+	UploadRate  int64
+	UploadQueue int64
+	Files       []v2Ed2kSharedRow
+	Uploads     []amule.UploadClient
+}
+
+// v2Ed2kPriorityLabel names a shared file's upload priority, ready for the
+// HTML translation pass.
+func v2Ed2kPriorityLabel(priority int, auto bool) string {
+	if auto {
+		return "Automatica"
+	}
+	switch priority {
+	case amule.PriorityLow:
+		return "Bassa"
+	case amule.PriorityHigh:
+		return "Alta"
+	}
+	return "Normale"
+}
+
+func v2Ed2kSharedViewFor(cfg *Config, message string, messageErr bool) v2Ed2kSharedView {
+	view := v2Ed2kSharedView{Message: message, MessageErr: messageErr, Enabled: ed2kEnabled(cfg)}
+	if !view.Enabled {
+		return view
+	}
+	snapshot, err := ed2kSharedSnapshotFor(cfg)
+	if err != nil {
+		view.Error = err.Error()
+		return view
+	}
+	view.Incoming = snapshot.Incoming
+	view.Dirs = snapshot.SharedDirs
+	view.UploadRate = snapshot.UploadRate
+	view.UploadQueue = snapshot.UploadQueue
+	view.Uploads = snapshot.Uploads
+	for _, file := range snapshot.Files {
+		view.Files = append(view.Files, v2Ed2kSharedRow{
+			Name:           file.Name,
+			Size:           file.Size,
+			Transferred:    file.Transferred,
+			TransferredAll: file.TransferredAll,
+			Requests:       file.Requests,
+			RequestsAll:    file.RequestsAll,
+			Accepts:        file.Accepts,
+			Queued:         file.Queued,
+			Priority:       v2Ed2kPriorityLabel(file.Priority, file.AutoPriority),
+			Link:           ed2k.FileLink{Name: file.Name, Size: file.Size, Hash: file.Hash}.String(),
+		})
+	}
+	return view
+}
+
+// V2Ed2kShared renders the shared files, the uploads and the shared folders.
+func V2Ed2kShared(w http.ResponseWriter, r *http.Request, s *AppState) {
+	view := v2Ed2kSharedViewFor(latestConfig(s), "", false)
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_ed2k_shared", view, dict, eng)
+}
+
+// V2Ed2kSharedReload asks aMule to rescan its shared folders, then renders the
+// panel again with the fresh list.
+func V2Ed2kSharedReload(w http.ResponseWriter, r *http.Request, s *AppState) {
+	cfg := latestConfig(s)
+	view := v2Ed2kSharedViewFor(cfg, "", false)
+	if !view.Enabled {
+		dict, eng := v2Dictionaries(s)
+		v2Render(w, http.StatusOK, "v2_ed2k_shared", view, dict, eng)
+		return
+	}
+	if err := ed2kReloadShared(cfg); err != nil {
+		logging.Warn("eD2k shared files reload failed", "error", err.Error())
+		view.Message, view.MessageErr, view.Detail = "Comando non riuscito:", true, err.Error()
+	} else {
+		view.Message = "Scansione dei file condivisi richiesta ad aMule."
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_ed2k_shared", view, dict, eng)
+}

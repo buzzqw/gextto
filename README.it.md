@@ -183,7 +183,9 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   incolli link `ed2k://`, ti colleghi ai server e segui lo stato di aMule nella
   pagina eD2k; i download di aMule compaiono in Scarico accanto ai torrent e,
   completati, vengono rinominati e importati in libreria come un torrent (con
-  hardlink o copia, così aMule continua a condividerli). Il fallback automatico
+  hardlink o copia, così aMule continua a condividerli). La pagina eD2k mostra
+  anche **cosa aMule sta condividendo e caricando** e permette di ricaricare le
+  cartelle condivise. Il fallback automatico
   nel gap filling è un secondo interruttore separato e accetta solo un episodio
   esatto, con qualità riconosciuta e fonti sufficienti.
 

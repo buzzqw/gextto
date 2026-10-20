@@ -3,6 +3,7 @@ package gextto
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -250,5 +251,27 @@ func TestEd2kMovieCompletionTakesTheCopyPath(t *testing.T) {
 	}
 	if _, err := os.Stat(f.source); err != nil {
 		t.Fatalf("the download must stay in aMule's incoming folder: %v", err)
+	}
+}
+
+func TestCompletedEd2kDownloadReachesTheHistory(t *testing.T) {
+	f := newMovieImportFixture(t)
+	if _, err := tev_completeMovieWithArchive(&f.cfg, f.db, &movieCopySession{}, &f.event, f.release, f.archive, NewTmdbClient(nil)); err != nil {
+		t.Fatalf("completion: %v", err)
+	}
+	// The entry point of the event worker: without this the row keeps
+	// removed_at NULL and the download history (which lists removed rows)
+	// never shows the completed eD2k download.
+	recordEd2kCompletion(f.db, f.hash, f.event.Name)
+
+	items, total, err := f.db.CompletedTorrents(0, 10, "")
+	if err != nil {
+		t.Fatalf("CompletedTorrents: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Fatalf("history total=%d items=%d, want the completed eD2k download", total, len(items))
+	}
+	if !strings.EqualFold(items[0].Hash, f.hash) || items[0].Name == "" {
+		t.Fatalf("history item = %+v", items[0])
 	}
 }

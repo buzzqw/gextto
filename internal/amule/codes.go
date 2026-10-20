@@ -20,13 +20,16 @@ const (
 	OpGetConnState        = 0x0B
 	OpStats               = 0x0C
 	OpGetDloadQueue       = 0x0D
+	OpGetUloadQueue       = 0x0E
 	OpGetSharedFiles      = 0x10
 	OpPartfilePause       = 0x19
 	OpPartfileResume      = 0x1A
 	OpPartfilePrioSet     = 0x1C
 	OpPartfileDelete      = 0x1D
 	OpDloadQueue          = 0x1F
+	OpUloadQueue          = 0x20
 	OpSharedFiles         = 0x22
+	OpSharedFilesReload   = 0x23
 	OpSearchStart         = 0x26
 	OpSearchStop          = 0x27
 	OpSearchResults       = 0x28
@@ -75,6 +78,7 @@ const (
 	TagStatsEd2kFiles    = 0x020B
 	TagStatsKadFiles     = 0x020C
 	TagStatsKadNodes     = 0x021B
+	TagStatsSharedFiles  = 0x021A
 
 	TagPartfile            = 0x0300
 	TagPartfileName        = 0x0301
@@ -92,7 +96,15 @@ const (
 	TagPartfileStopped     = 0x0317
 	TagPartfileHash        = 0x031E
 	TagKnownfile           = 0x0400
+	TagKnownfileXferred    = 0x0401
+	TagKnownfileXferredAll = 0x0402
+	TagKnownfileReqCount   = 0x0403
+	TagKnownfileReqAll     = 0x0404
+	TagKnownfileAccepts    = 0x0405
+	TagKnownfileAcceptsAll = 0x0406
 	TagKnownfileFilename   = 0x0408
+	TagKnownfilePrio       = 0x040B
+	TagKnownfileOnQueue    = 0x040C
 
 	TagServer         = 0x0500
 	TagServerName     = 0x0501
@@ -117,6 +129,17 @@ const (
 	TagSearchAvailability = 0x0707
 	TagSearchStatus       = 0x0708
 
+	TagClient              = 0x0600
+	TagClientSoftware      = 0x0601
+	TagClientUploadSession = 0x0609
+	TagClientUploadTotal   = 0x060A
+	TagClientUpSpeed       = 0x060D
+	TagClientUserIP        = 0x0610
+	TagClientSoftVerStr    = 0x0615
+	TagClientWaitingPos    = 0x0616
+	TagClientUploadState   = 0x061C
+	TagClientUploadFile    = 0x061F
+
 	TagSelectPrefs         = 0x1000
 	TagPrefsConnections    = 0x1300
 	TagConnMaxDL           = 0x1303
@@ -124,6 +147,7 @@ const (
 	TagPrefsDirectories    = 0x1A00
 	TagDirectoriesIncoming = 0x1A01
 	TagDirectoriesTemp     = 0x1A02
+	TagDirectoriesShared   = 0x1A03
 )
 
 // Detail levels.

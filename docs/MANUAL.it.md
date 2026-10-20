@@ -823,6 +823,12 @@ alto e un Kad non dietro firewall, cioè più fonti.
 - **Incolla link eD2k**: uno o più link `ed2k://`, anche mescolati a testo;
   **Scarica con aMule** li aggiunge tutti.
 - **Log di aMule**: **Carica il log** mostra le ultime righe del log di amuled.
+- **File condivisi**: quello che aMule condivide, con i byte caricati nella
+  sessione e in totale, richieste e accettate, client in coda, priorità e il
+  link `ed2k://` da copiare; sotto, i client a cui stai caricando con velocità e
+  posizione in coda. **Ricarica file condivisi** fa rileggere ad aMule le
+  cartelle (utile se hai aggiunto o tolto file a mano); le cartelle condivise
+  sono elencate in sola lettura.
 
 I download aggiunti compaiono in **Scarico**. Un link a un file che non è un
 video (pdf, programma, archivio) viene solo scaricato da aMule e resta nella

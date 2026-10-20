@@ -1381,6 +1381,15 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			if processed && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
 				requestMediaLibraryRefresh(cfg, mediaRefreshFolder(db, hash))
 			}
+			// A completed eD2k download has no seeding session to stay in: aMule
+			// drops it from its queue (3.x) or keeps it only to share the file
+			// (2.3). Record it as removed at once so it reaches the download
+			// history, instead of waiting for the next reconciliation.
+			if processed && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
+				if _, isEd2k := ed2kHashes[strings.ToLower(event.Hash)]; isEd2k {
+					recordEd2kCompletion(db, event.Hash, event.Name)
+				}
+			}
 			// A completed single episode/movie is moved into the archive and
 			// renamed, so the file is no longer at the path libtorrent tracks. It
 			// can no longer seed and would re-download the release on the next
@@ -1557,6 +1566,20 @@ type persistedMove struct {
 // restored retry is marked in flight with a short grace: RetryStorageMoves then
 // clears it if the torrent already sits in its destination, or issues the move
 // again. A post-seed protection without its retry is stale and is dropped.
+// recordEd2kCompletion marks a completed eD2k download as removed from the
+// transfer queue. aMule has no seeding session to keep it in, and the download
+// history lists rows with removed_at set: without this the completion only
+// reached the history at the next reconciliation.
+func recordEd2kCompletion(db *Database, hash, name string) {
+	if db == nil || strings.TrimSpace(hash) == "" {
+		return
+	}
+	if err := db.MarkTorrentRemovedAt(hash); err != nil {
+		logging.Warn("cannot record the completed eD2k download as removed",
+			"hash", hash, "name", name, "error", err.Error())
+	}
+}
+
 func restoreTorrentMoves(torrents TorrentSession, db *Database, retries map[string]StorageMoveRetry, postSeedMoves map[string]struct{}, now time.Time) map[string]persistedMove {
 	persisted := map[string]persistedMove{}
 	saved, err := db.LoadTorrentMoves()

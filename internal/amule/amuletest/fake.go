@@ -26,8 +26,18 @@ type File struct {
 	Sources int64
 	// LastRecv is the Unix time of the last data received (0 = never).
 	LastRecv int64
-	// Priority is the reported priority (PR_* value, +10 when automatic).
-	Priority int
+	// Priority is the reported priority (PR_* value); AutoPriority makes the
+	// core set the +10 marker it uses for an automatic priority.
+	Priority     int
+	AutoPriority bool
+	// Upload counters, used when the file is shared.
+	Transferred    int64
+	TransferredAll int64
+	Requests       int64
+	RequestsAll    int64
+	Accepts        int64
+	AcceptsAll     int64
+	Queued         int64
 }
 
 // Result is one canned search result.
@@ -43,19 +53,21 @@ type Core struct {
 	Password string
 	Incoming string
 
-	mu        sync.Mutex
-	listener  net.Listener
-	downloads []File
-	results   []Result
-	searches  []string
-	searchErr string
-	connected bool
-	kad       bool
-	commands  []string
-	conns     map[net.Conn]struct{}
-	shared    []sharedFile
-	maxDL     int64
-	maxUL     int64
+	mu         sync.Mutex
+	listener   net.Listener
+	downloads  []File
+	results    []Result
+	searches   []string
+	searchErr  string
+	connected  bool
+	kad        bool
+	commands   []string
+	conns      map[net.Conn]struct{}
+	shared     []sharedFile
+	sharedDirs []string
+	uploads    []amule.UploadClient
+	maxDL      int64
+	maxUL      int64
 }
 
 type sharedFile struct {
@@ -96,6 +108,30 @@ func (c *Core) SetResults(results []Result, refusal string) {
 	defer c.mu.Unlock()
 	c.results = results
 	c.searchErr = refusal
+}
+
+// SetSharedDirs sets the extra folders the fake core says it shares.
+func (c *Core) SetSharedDirs(dirs []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sharedDirs = append([]string(nil), dirs...)
+}
+
+// SetUploads sets the upload queue the fake core reports.
+func (c *Core) SetUploads(clients []amule.UploadClient) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.uploads = append([]amule.UploadClient(nil), clients...)
+}
+
+// SetShared replaces the shared files.
+func (c *Core) SetShared(files []File, dir string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.shared = nil
+	for _, file := range files {
+		c.shared = append(c.shared, sharedFile{File: file, Dir: dir})
+	}
 }
 
 // SetDownloads replaces the download queue.
@@ -237,6 +273,7 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 			amule.IntTag(amule.TagStatsDLSpeed, 2048),
 			amule.IntTag(amule.TagStatsULSpeed, 512),
 			amule.IntTag(amule.TagStatsKadNodes, 120),
+			amule.IntTag(amule.TagStatsSharedFiles, uint64(len(c.shared))),
 			c.connState(),
 		}}
 	case amule.OpGetConnState:
@@ -319,11 +356,47 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 	case amule.OpGetSharedFiles:
 		reply := amule.Packet{Op: amule.OpSharedFiles}
 		for _, file := range c.shared {
+			priority := uint64(file.Priority)
+			if file.AutoPriority {
+				priority += 10
+			}
 			reply.Tags = append(reply.Tags, amule.IntTag(amule.TagKnownfile, 1,
 				amule.StringTag(amule.TagPartfileName, file.Name),
 				amule.HashTag(amule.TagPartfileHash, hashBytes(file.Hash)),
 				amule.StringTag(amule.TagKnownfileFilename, file.Dir),
 				amule.IntTag(amule.TagPartfileSizeFull, uint64(file.Size)),
+				amule.IntTag(amule.TagKnownfileXferred, uint64(file.Transferred)),
+				amule.IntTag(amule.TagKnownfileXferredAll, uint64(file.TransferredAll)),
+				amule.IntTag(amule.TagKnownfileReqCount, uint64(file.Requests)),
+				amule.IntTag(amule.TagKnownfileReqAll, uint64(file.RequestsAll)),
+				amule.IntTag(amule.TagKnownfileAccepts, uint64(file.Accepts)),
+				amule.IntTag(amule.TagKnownfileAcceptsAll, uint64(file.AcceptsAll)),
+				amule.IntTag(amule.TagKnownfileOnQueue, uint64(file.Queued)),
+				amule.IntTag(amule.TagKnownfilePrio, priority),
+			))
+		}
+		return reply
+	case amule.OpSharedFilesReload:
+		c.commands = append(c.commands, "reload-shared")
+		return amule.Packet{Op: amule.OpNoop}
+	case amule.OpGetUloadQueue:
+		reply := amule.Packet{Op: amule.OpUloadQueue}
+		for _, client := range c.uploads {
+			ip := net.ParseIP(client.IP).To4()
+			if ip == nil {
+				ip = net.IPv4(127, 0, 0, 1).To4()
+			}
+			reply.Tags = append(reply.Tags, amule.IntTag(amule.TagClient, 1,
+				amule.StringTag(amule.TagClientName, client.Name),
+				amule.StringTag(amule.TagClientSoftVerStr, client.Software),
+				amule.Tag{Name: amule.TagClientUserIP, Type: amule.TypeIPv4, Data: []byte(ip)},
+				amule.IntTag(amule.TagClientUploadState, uint64(client.State)),
+				amule.StringTag(amule.TagPartfileName, client.FileName),
+				amule.IntTag(amule.TagClientUploadFile, uint64(client.FileID)),
+				amule.IntTag(amule.TagClientUpSpeed, uint64(client.UpSpeed)),
+				amule.IntTag(amule.TagClientUploadSession, uint64(client.Uploaded)),
+				amule.IntTag(amule.TagClientUploadTotal, uint64(client.UploadedAll)),
+				amule.IntTag(amule.TagClientWaitingPos, uint64(client.WaitingPosition)),
 			))
 		}
 		return reply
@@ -346,8 +419,15 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 		}
 		return failed("FileHash not found: " + hash)
 	case amule.OpGetPreferences:
+		shared := amule.IntTag(amule.TagDirectoriesShared, uint64(len(c.sharedDirs)))
+		for _, dir := range c.sharedDirs {
+			shared.Children = append(shared.Children, amule.StringTag(amule.TagString, dir))
+		}
 		reply := amule.Packet{Op: amule.OpSetPreferences, Tags: []amule.Tag{
-			amule.EmptyTag(amule.TagPrefsDirectories, amule.StringTag(amule.TagDirectoriesIncoming, c.Incoming)),
+			amule.EmptyTag(amule.TagPrefsDirectories,
+				amule.StringTag(amule.TagDirectoriesIncoming, c.Incoming),
+				shared,
+			),
 			amule.EmptyTag(amule.TagPrefsConnections,
 				amule.IntTag(amule.TagConnMaxDL, uint64(c.maxDL)),
 				amule.IntTag(amule.TagConnMaxUL, uint64(c.maxUL)),

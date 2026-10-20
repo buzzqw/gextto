@@ -65,6 +65,8 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/ed2k/limits", Ed2kLimitsAPI)
 	handle(s, mux, "POST /api/ed2k/limits", Ed2kLimitsAPI)
 	handle(s, mux, "GET /api/ed2k/log", Ed2kLogAPI)
+	handle(s, mux, "GET /api/ed2k/shared", Ed2kSharedAPI)
+	handle(s, mux, "POST /api/ed2k/shared/reload", Ed2kSharedReloadAPI)
 	handle(s, mux, "POST /api/providers/status", ClearProvidersStatus)
 	handle(s, mux, "GET /api/media-info", MediaInfoGet)
 	handle(s, mux, "POST /api/media-info/probe", MediaInfoProbe)

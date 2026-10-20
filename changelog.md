@@ -14,6 +14,18 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 20 ottobre 2026
 
+- **eD2k: i download completati entrano subito nello Storico download.** Un
+  file eD2k completato e importato in libreria compariva nello Storico solo alla
+  riconciliazione successiva, fino a sei ore dopo. Ora viene registrato come
+  concluso appena la lavorazione finisce, come un torrent rimosso dopo il
+  completamento.
+- **eD2k: vedi cosa aMule sta caricando.** Nella pagina eD2k c'è il pannello
+  **File condivisi**: per ogni file i byte caricati nella sessione e in totale,
+  richieste e accettate, client in coda, priorità e il link `ed2k://` da
+  copiare; sotto, i client a cui stai caricando con software, velocità e
+  posizione in coda. **Ricarica file condivisi** fa rileggere ad aMule le sue
+  cartelle, così i file aggiunti o tolti a mano compaiono subito; le cartelle
+  condivise sono elencate in sola lettura.
 - **Episodi multipli nello stesso file: il nome porta l'intervallo.** Quando un
   download copre più episodi contigui (per esempio `S01E01E02`), il file in
   libreria viene rinominato `S01E01-E02`: Jellyfin e Plex elencano entrambi gli

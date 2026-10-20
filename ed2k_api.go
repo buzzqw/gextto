@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -291,4 +292,146 @@ func applyEd2kSpeedLimits(cfg *Config, downloadKib, uploadKib int64, now time.Ti
 	if changed {
 		logging.Debug("aMule follows the torrent speed limits", "download_kib", downloadKib, "upload_kib", uploadKib)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Shared files
+// ---------------------------------------------------------------------------
+
+// ed2kSharedSnapshot is the shared-file view of the core: the files, what
+// aMule has uploaded for them and the folders it shares.
+type ed2kSharedSnapshot struct {
+	Enabled     bool
+	Incoming    string
+	SharedDirs  []string
+	UploadRate  int64
+	UploadQueue int64
+	Files       []amule.SharedFile
+	Uploads     []amule.UploadClient
+}
+
+// ed2kSharedSnapshotFor reads the shared files from aMule. The status and the
+// preferences are best effort: the file list is the data the caller wants.
+func ed2kSharedSnapshotFor(cfg *Config) (ed2kSharedSnapshot, error) {
+	snapshot := ed2kSharedSnapshot{Enabled: ed2kEnabled(cfg)}
+	if !snapshot.Enabled {
+		return snapshot, nil
+	}
+	err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+		if status, statusErr := client.Status(ctx); statusErr == nil {
+			snapshot.UploadRate = status.UploadRate
+			snapshot.UploadQueue = status.UploadQueue
+		}
+		if prefs, prefsErr := client.Preferences(ctx); prefsErr == nil {
+			snapshot.Incoming = prefs.IncomingDir
+			snapshot.SharedDirs = prefs.SharedDirs
+		}
+		files, filesErr := client.SharedFiles(ctx)
+		if filesErr != nil {
+			return filesErr
+		}
+		snapshot.Files = files
+		if uploads, uploadsErr := client.UploadQueue(ctx); uploadsErr == nil {
+			snapshot.Uploads = uploads
+		}
+		return nil
+	})
+	// What aMule uploaded in this session comes first: that is the answer to
+	// "what is it uploading now".
+	sort.SliceStable(snapshot.Files, func(i, j int) bool {
+		if snapshot.Files[i].Transferred != snapshot.Files[j].Transferred {
+			return snapshot.Files[i].Transferred > snapshot.Files[j].Transferred
+		}
+		return strings.ToLower(snapshot.Files[i].Name) < strings.ToLower(snapshot.Files[j].Name)
+	})
+	return snapshot, err
+}
+
+// ed2kReloadShared asks the core to rescan its shared folders.
+func ed2kReloadShared(cfg *Config) error {
+	return ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+		return client.ReloadSharedFiles(ctx)
+	})
+}
+
+// ed2kSharedFileJSON is one entry of GET /api/ed2k/shared.
+type ed2kSharedFileJSON struct {
+	Hash           string `json:"hash"`
+	Name           string `json:"name"`
+	Size           int64  `json:"size"`
+	Dir            string `json:"dir"`
+	Transferred    int64  `json:"transferred"`
+	TransferredAll int64  `json:"transferred_all"`
+	Requests       int64  `json:"requests"`
+	RequestsAll    int64  `json:"requests_all"`
+	Accepts        int64  `json:"accepts"`
+	AcceptsAll     int64  `json:"accepts_all"`
+	Queued         int64  `json:"queued"`
+	Priority       string `json:"priority"`
+	AutoPriority   bool   `json:"auto_priority"`
+	Link           string `json:"link"`
+}
+
+// Ed2kSharedAPI implements `GET /api/ed2k/shared`.
+func Ed2kSharedAPI(w http.ResponseWriter, r *http.Request, s *AppState) {
+	cfg := latestConfig(s)
+	snapshot, err := ed2kSharedSnapshotFor(cfg)
+	if !snapshot.Enabled {
+		jsonResponse(w, map[string]any{"ok": true, "enabled": false, "files": []ed2kSharedFileJSON{}})
+		return
+	}
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	files := make([]ed2kSharedFileJSON, 0, len(snapshot.Files))
+	for _, file := range snapshot.Files {
+		priority := "normal"
+		if file.AutoPriority {
+			priority = "auto"
+		} else if value := amule.PriorityName(file.Priority); value != "" {
+			priority = value
+		}
+		files = append(files, ed2kSharedFileJSON{
+			Hash:           file.Hash,
+			Name:           file.Name,
+			Size:           file.Size,
+			Dir:            file.Dir,
+			Transferred:    file.Transferred,
+			TransferredAll: file.TransferredAll,
+			Requests:       file.Requests,
+			RequestsAll:    file.RequestsAll,
+			Accepts:        file.Accepts,
+			AcceptsAll:     file.AcceptsAll,
+			Queued:         file.Queued,
+			Priority:       priority,
+			AutoPriority:   file.AutoPriority,
+			Link:           ed2k.FileLink{Name: file.Name, Size: file.Size, Hash: file.Hash}.String(),
+		})
+	}
+	jsonResponse(w, map[string]any{
+		"ok":           true,
+		"enabled":      true,
+		"incoming":     snapshot.Incoming,
+		"shared_dirs":  snapshot.SharedDirs,
+		"upload_rate":  snapshot.UploadRate,
+		"upload_queue": snapshot.UploadQueue,
+		"files":        files,
+		"uploads":      snapshot.Uploads,
+	})
+}
+
+// Ed2kSharedReloadAPI implements `POST /api/ed2k/shared/reload`.
+func Ed2kSharedReloadAPI(w http.ResponseWriter, r *http.Request, s *AppState) {
+	cfg := latestConfig(s)
+	if !ed2kEnabled(cfg) {
+		jsonError(w, http.StatusConflict, "the aMule integration is off")
+		return
+	}
+	if err := ed2kReloadShared(cfg); err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	logging.Info("eD2k shared files reload requested")
+	jsonResponse(w, map[string]any{"ok": true})
 }

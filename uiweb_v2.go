@@ -229,6 +229,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /ed2k/search", V2Ed2kSearch)
 	v2Handle(s, mux, "POST /ed2k/add", V2Ed2kAdd)
 	v2Handle(s, mux, "GET /ed2k/log", V2Ed2kLog)
+	v2Handle(s, mux, "GET /ed2k/shared", V2Ed2kShared)
+	v2Handle(s, mux, "POST /ed2k/shared/reload", V2Ed2kSharedReload)
 	v2Handle(s, mux, "GET /downloads/ed2k-detail", V2Ed2kDetail)
 	v2Handle(s, mux, "POST /downloads/ed2k-priority", V2Ed2kPriority)
 	v2Handle(s, mux, "POST /comics/links", V2ComicsLinks)

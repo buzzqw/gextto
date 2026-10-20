@@ -179,7 +179,9 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   connect to servers and follow aMule's state on the eD2k page; aMule's
   downloads appear in **Downloads** next to the torrents and, once complete, are
   renamed and imported into the library like any torrent (by hardlink or copy,
-  so aMule keeps sharing them). The automatic gap-filling fallback is a second,
+  so aMule keeps sharing them). The eD2k page also shows **what aMule is
+  sharing and uploading** and lets you reload its shared folders. The automatic
+  gap-filling fallback is a second,
   separate switch and accepts only an exact episode match with a recognised
   quality and enough sources.
 

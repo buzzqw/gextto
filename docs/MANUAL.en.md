@@ -806,6 +806,12 @@ which means more sources.
 - **Paste eD2k links**: one or more `ed2k://` links, even mixed with text;
   **Download with aMule** adds them all.
 - **aMule log**: **Load the log** shows the last lines of amuled's log.
+- **Shared files**: what aMule shares, with the bytes uploaded in this session
+  and over all time, requests and accepted ones, queued clients, priority and
+  the `ed2k://` link to copy; below it the clients you are uploading to, with
+  speed and queue position. **Reload shared files** asks aMule to rescan the
+  folders (useful after adding or removing files by hand); the shared folders
+  are listed read-only.
 
 Added downloads appear in **Downloads**. A link to a file that is not a video
 (a pdf, a program, an archive) is only downloaded by aMule and stays in the

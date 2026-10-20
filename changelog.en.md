@@ -13,6 +13,17 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 20 October 2026
 
+- **eD2k: completed downloads reach the history at once.** An eD2k file that
+  completed and was imported into the library appeared in the history only at
+  the next reconciliation, up to six hours later. It is now recorded as finished
+  as soon as the processing ends, like a torrent removed after completion.
+- **eD2k: see what aMule is uploading.** The eD2k page has a **Shared files**
+  panel: for every file the bytes uploaded in this session and over all time,
+  requests and accepted ones, queued clients, priority and the `ed2k://` link to
+  copy; below it, the clients you are uploading to with software, speed and
+  queue position. **Reload shared files** asks aMule to rescan its folders, so
+  files added or removed by hand show up at once; the shared folders are listed
+  read-only.
 - **Several episodes in one file: the name carries the range.** When a download
   covers contiguous episodes (for example `S01E01E02`), the library file is
   renamed `S01E01-E02`: Jellyfin and Plex list both episodes and the archive

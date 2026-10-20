@@ -37,6 +37,8 @@ type Status struct {
 	KadUsers      int64  `json:"kad_users"`
 	KadFiles      int64  `json:"kad_files"`
 	KadNodes      int64  `json:"kad_nodes"`
+	// SharedFiles is how many files the core is sharing.
+	SharedFiles int64 `json:"shared_files"`
 }
 
 // Status asks the core for its statistics and connection state.
@@ -63,6 +65,7 @@ func (c *Client) Status(ctx context.Context) (Status, error) {
 	status.KadUsers = value(TagStatsKadUsers)
 	status.KadFiles = value(TagStatsKadFiles)
 	status.KadNodes = value(TagStatsKadNodes)
+	status.SharedFiles = value(TagStatsSharedFiles)
 	if conn, ok := reply.Tag(TagConnState); ok {
 		applyConnState(&status, conn)
 	}
@@ -319,8 +322,22 @@ type SharedFile struct {
 	Hash string `json:"hash"`
 	Name string `json:"name"`
 	Size int64  `json:"size"`
-	// Dir is the folder that holds the file on the core's filesystem.
+	// Dir is the folder that holds the file on the core's filesystem. A file
+	// still being downloaded carries its part-met name instead.
 	Dir string `json:"dir"`
+	// Upload counters of the shared file: bytes sent in this session and over
+	// all time, requests answered, clients queued for it.
+	Transferred    int64 `json:"transferred"`
+	TransferredAll int64 `json:"transferred_all"`
+	Requests       int64 `json:"requests"`
+	RequestsAll    int64 `json:"requests_all"`
+	Accepts        int64 `json:"accepts"`
+	AcceptsAll     int64 `json:"accepts_all"`
+	Queued         int64 `json:"queued"`
+	// Priority is the upload priority (PR_*); AutoPriority is set when the
+	// core chooses it by itself (the reported value carries +10).
+	Priority     int  `json:"priority"`
+	AutoPriority bool `json:"auto_priority"`
 }
 
 // SharedFiles returns the files aMule shares. A finished download leaves the
@@ -341,14 +358,103 @@ func (c *Client) SharedFiles(ctx context.Context) ([]SharedFile, error) {
 			continue
 		}
 		size, _ := tag.ChildInt(TagPartfileSizeFull)
+		number := func(name uint16) int64 {
+			child, _ := tag.ChildInt(name)
+			return int64(child)
+		}
+		priority := int(number(TagKnownfilePrio))
+		auto := false
+		if priority >= 10 {
+			priority -= 10
+			auto = true
+		}
 		out = append(out, SharedFile{
-			Hash: hex.EncodeToString(hash[:]),
-			Name: tag.ChildString(TagPartfileName),
-			Size: int64(size),
-			Dir:  tag.ChildString(TagKnownfileFilename),
+			Hash:           hex.EncodeToString(hash[:]),
+			Name:           tag.ChildString(TagPartfileName),
+			Size:           int64(size),
+			Dir:            tag.ChildString(TagKnownfileFilename),
+			Transferred:    number(TagKnownfileXferred),
+			TransferredAll: number(TagKnownfileXferredAll),
+			Requests:       number(TagKnownfileReqCount),
+			RequestsAll:    number(TagKnownfileReqAll),
+			Accepts:        number(TagKnownfileAccepts),
+			AcceptsAll:     number(TagKnownfileAcceptsAll),
+			Queued:         number(TagKnownfileOnQueue),
+			Priority:       priority,
+			AutoPriority:   auto,
 		})
 	}
 	return out, nil
+}
+
+// ReloadSharedFiles asks the core to rescan its shared folders, the same as
+// the reload button in aMule: new files appear and removed ones disappear.
+func (c *Client) ReloadSharedFiles(ctx context.Context) error {
+	_, err := c.requestOK(ctx, Packet{Op: OpSharedFilesReload})
+	return err
+}
+
+// UploadClient is one client aMule is uploading to or holding in its upload
+// queue.
+type UploadClient struct {
+	Name        string `json:"name"`
+	Software    string `json:"software"`
+	IP          string `json:"ip"`
+	State       int    `json:"state"`
+	FileName    string `json:"file_name"`
+	FileID      int64  `json:"file_id"`
+	UpSpeed     int64  `json:"up_speed"`
+	Uploaded    int64  `json:"uploaded"`
+	UploadedAll int64  `json:"uploaded_all"`
+	// WaitingPosition is the place in the upload queue (0 = not queued).
+	WaitingPosition int64 `json:"waiting_position"`
+}
+
+// UploadQueue returns the clients in aMule's upload queue, the ones being
+// uploaded to first.
+func (c *Client) UploadQueue(ctx context.Context) ([]UploadClient, error) {
+	reply, err := c.Request(ctx, Packet{Op: OpGetUloadQueue, Tags: []Tag{IntTag(TagDetailLevel, DetailFull)}})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]UploadClient, 0, len(reply.Tags))
+	for _, tag := range reply.Tags {
+		if tag.Name != TagClient {
+			continue
+		}
+		number := func(name uint16) int64 {
+			child, _ := tag.ChildInt(name)
+			return int64(child)
+		}
+		out = append(out, UploadClient{
+			Name:            tag.ChildString(TagClientName),
+			Software:        tag.ChildString(TagClientSoftVerStr),
+			IP:              ipTag(tag),
+			State:           int(number(TagClientUploadState)),
+			FileName:        tag.ChildString(TagPartfileName),
+			FileID:          number(TagClientUploadFile),
+			UpSpeed:         number(TagClientUpSpeed),
+			Uploaded:        number(TagClientUploadSession),
+			UploadedAll:     number(TagClientUploadTotal),
+			WaitingPosition: number(TagClientWaitingPos),
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if (out[i].UpSpeed > 0) != (out[j].UpSpeed > 0) {
+			return out[i].UpSpeed > 0
+		}
+		return out[i].WaitingPosition < out[j].WaitingPosition
+	})
+	return out, nil
+}
+
+// ipTag renders EC_TAG_CLIENT_USER_IP, whose payload is four bytes.
+func ipTag(tag Tag) string {
+	child, ok := tag.Child(TagClientUserIP)
+	if !ok || len(child.Data) != 4 {
+		return ""
+	}
+	return net.IPv4(child.Data[0], child.Data[1], child.Data[2], child.Data[3]).String()
 }
 
 // AddLink queues an ed2k:// link (file, server or server list).
@@ -603,6 +709,8 @@ func (c *Client) searchResults(ctx context.Context) ([]SearchResult, error) {
 type Preferences struct {
 	IncomingDir string `json:"incoming_dir"`
 	TempDir     string `json:"temp_dir"`
+	// SharedDirs are the extra folders shared besides the incoming one.
+	SharedDirs []string `json:"shared_dirs"`
 	// MaxDownload and MaxUpload are in KiB/s; 0 means unlimited.
 	MaxDownload int64 `json:"max_download_kib"`
 	MaxUpload   int64 `json:"max_upload_kib"`
@@ -620,6 +728,16 @@ func (c *Client) Preferences(ctx context.Context) (Preferences, error) {
 	if dirs, ok := reply.Tag(TagPrefsDirectories); ok {
 		prefs.IncomingDir = dirs.ChildString(TagDirectoriesIncoming)
 		prefs.TempDir = dirs.ChildString(TagDirectoriesTemp)
+		if shared, ok := dirs.Child(TagDirectoriesShared); ok {
+			for _, child := range shared.Children {
+				if child.Type != TypeString {
+					continue
+				}
+				if dir := strings.TrimSpace(child.String()); dir != "" {
+					prefs.SharedDirs = append(prefs.SharedDirs, dir)
+				}
+			}
+		}
 	}
 	if conn, ok := reply.Tag(TagPrefsConnections); ok {
 		down, _ := conn.ChildInt(TagConnMaxDL)

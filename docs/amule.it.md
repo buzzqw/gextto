@@ -208,6 +208,22 @@ sull'ora di "ultimo dato ricevuto" di aMule, quindi i riavvii non la azzerano)
 viene annullato in aMule, la release va in blocklist e il buco torna da cercare.
 I download aggiunti a mano e quelli in pausa restano.
 
+### File condivisi e caricamenti
+
+La pagina eD2k ha il pannello **File condivisi**: elenca quello che aMule
+condivide con i byte caricati nella sessione e in totale, le richieste
+soddisfatte, i client in coda per ogni file e la priorità di upload, più il link
+`ed2k://` da copiare. Sotto, **Chi sta scaricando da te** elenca i client nella
+coda di upload con software, file, velocità e posizione in coda. Il pannello
+mostra anche la velocità di upload e la lunghezza della coda, e le cartelle
+condivise in sola lettura: quella di arrivo più le eventuali altre configurate
+in aMule.
+
+**Ricarica file condivisi** chiede ad aMule di rileggere le cartelle, come il
+pulsante di ricarica della sua interfaccia: i file aggiunti o tolti a mano
+compaiono o spariscono. Gextto non modifica mai la configurazione di
+condivisione di aMule.
+
 ### Il log di aMule
 
 **Pagina eD2k → Log di aMule → Carica il log** mostra le ultime righe del log di
