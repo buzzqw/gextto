@@ -2,6 +2,7 @@ package peer
 
 import (
 	"bytes"
+	"net"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
@@ -122,5 +123,24 @@ func TestPartPackets64(t *testing.T) {
 	decodedCompressed, err := DecodeCompressedPart64(raw)
 	if err != nil || decodedCompressed.Start != compressed.Start || !bytes.Equal(decodedCompressed.Data, compressed.Data) {
 		t.Fatalf("compressed part64 = %+v, %v", decodedCompressed, err)
+	}
+}
+
+func TestSourceExchangeRoundTrip(t *testing.T) {
+	sources := []SourceEntry{{
+		IP: net.IPv4(1, 2, 3, 4), TCPPort: 4662,
+		ServerIP: net.IPv4(5, 6, 7, 8), ServerPort: 4661,
+	}}
+	raw, err := EncodeAnswersSources(sources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := DecodeAnswersSources(raw)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("sources = %+v, %v", got, err)
+	}
+	if !got[0].IP.Equal(sources[0].IP) || got[0].TCPPort != 4662 ||
+		!got[0].ServerIP.Equal(sources[0].ServerIP) || got[0].ServerPort != 4661 {
+		t.Fatalf("source = %+v", got[0])
 	}
 }

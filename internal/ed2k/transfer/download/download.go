@@ -49,6 +49,14 @@ type Config struct {
 	OnProgress func(done, total int64)
 	// Logf receives protocol milestones and errors. Nil disables logging.
 	Logf func(format string, args ...any)
+	// PartFilter restricts a worker to a subset of parts. It is used by the
+	// manager to run several peers on disjoint parts of the same file.
+	PartFilter func(part int) bool
+	// Managed skips final verification and rename: the manager owns those
+	// steps once every worker has finished.
+	Managed bool
+	// OnSources receives peers learned through source exchange.
+	OnSources func([]ed2k.PeerSource)
 }
 
 func (c *Config) applyDefaults() {
@@ -289,6 +297,7 @@ func (s *session) run(ctx context.Context) error {
 		return err
 	}
 	s.logf("download: upload slot granted by %s", s.conn.RemoteAddr())
+	s.requestSources(ctx)
 	if s.pf == nil {
 		hashes, err := s.requestHashset(ctx)
 		if err != nil {
@@ -370,6 +379,12 @@ func (s *session) setRequestFile(ctx context.Context) error {
 		return fmt.Errorf("download: set file id: %w", err)
 	}
 	return nil
+}
+
+func (s *session) requestSources(ctx context.Context) {
+	if err := s.conn.Send(peer.OpRequestsSources, s.link.Hash[:]); err != nil {
+		return
+	}
 }
 
 func (s *session) requestHashset(ctx context.Context) ([]ed2k.ID, error) {
@@ -469,6 +484,24 @@ func (s *session) control(opcode byte, payload []byte) (bool, error) {
 		return true, nil
 	case peer.OpCancelTransfer, peer.OpEndOfDownload:
 		return true, errors.New("download: peer cancelled the transfer")
+	case peer.OpAnswersSources:
+		if s.cfg.OnSources == nil {
+			return true, nil
+		}
+		entries, err := peer.DecodeAnswersSources(payload)
+		if err != nil {
+			return true, nil
+		}
+		sources := make([]ed2k.PeerSource, 0, len(entries))
+		for _, entry := range entries {
+			sources = append(sources, ed2k.PeerSource{
+				IP: entry.IP, TCPPort: entry.TCPPort, Origin: "exchange",
+			})
+		}
+		if len(sources) > 0 {
+			s.cfg.OnSources(sources)
+		}
+		return true, nil
 	case peer.OpMessage, peer.OpHello, peer.OpHelloAnswer:
 		return true, nil
 	}
@@ -518,6 +551,9 @@ func (s *session) download(ctx context.Context) error {
 			return err
 		}
 		if len(s.pending) == 0 {
+			if s.cfg.PartFilter != nil {
+				return nil
+			}
 			return errors.New("download: no block available")
 		}
 		s.setDeadline(ctx, s.cfg.IdleTimeout)
@@ -651,6 +687,9 @@ type blockRange struct {
 func (s *session) nextRanges(limit int) ([]blockRange, error) {
 	out := make([]blockRange, 0, limit)
 	for part := 0; part < len(s.pf.Meta.Parts); part++ {
+		if s.cfg.PartFilter != nil && !s.cfg.PartFilter(part) {
+			continue
+		}
 		if s.pf.Have(part) || (s.peerParts != nil && !s.peerParts[part]) {
 			continue
 		}
@@ -809,6 +848,12 @@ func (s *session) report() {
 }
 
 func (s *session) finish(resumed bool) (*Result, error) {
+	if s.cfg.Managed {
+		if s.pf != nil {
+			_ = s.pf.Close()
+		}
+		return &Result{Path: s.partPath, Name: s.name, Size: s.link.Size, Hash: s.link.Hash}, nil
+	}
 	ok, err := s.pf.Verify()
 	if err != nil {
 		return nil, err
@@ -832,6 +877,37 @@ func (s *session) finish(resumed bool) (*Result, error) {
 		Path: finalPath, Name: filepath.Base(finalPath), Size: s.link.Size,
 		Hash: s.link.Hash, Resumed: resumed, Verified: true,
 	}, nil
+}
+
+// Finalize verifies the completed .part and moves it to its final name. The
+// manager calls it once all partitioned workers are done.
+func Finalize(partPath string, link Link, name string, cfg Config) (*Result, error) {
+	pf, err := partfile.Open(partPath)
+	if err != nil {
+		return nil, err
+	}
+	ok, err := pf.Verify()
+	if err != nil {
+		pf.Close()
+		return nil, err
+	}
+	if !ok {
+		pf.Close()
+		return nil, errors.New("download: final MD4 does not match the link")
+	}
+	name = SafeName(name)
+	if name == "" {
+		name = link.Hash.Hex()
+	}
+	if err := pf.Close(); err != nil {
+		return nil, err
+	}
+	finalPath := uniquePath(filepath.Join(cfg.TempDir, name))
+	if err := os.Rename(partPath, finalPath); err != nil {
+		return nil, err
+	}
+	_ = os.Remove(partPath + ".met")
+	return &Result{Path: finalPath, Name: filepath.Base(finalPath), Size: link.Size, Hash: link.Hash, Verified: true}, nil
 }
 
 // SafeName turns a peer-provided name into a safe single path element.

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 )
 
 // Discoverer finds peers for a file. *ed2k.Client implements it.
@@ -37,6 +38,8 @@ type ManagerConfig struct {
 	// RetryDelay is the pause between queue rounds. Queued transfers keep
 	// retrying until the manager is closed.
 	RetryDelay time.Duration
+	// MaxPeers is how many sources download disjoint parts in parallel.
+	MaxPeers int
 	// OnComplete is called after a transfer is verified and renamed. The
 	// daemon uses it to add the file to the upload index.
 	OnComplete func(Result)
@@ -90,6 +93,9 @@ type Manager struct {
 
 	callbackMu sync.Mutex
 	pending    map[string]chan net.Conn
+
+	addedMu sync.Mutex
+	added   map[string][]ed2k.PeerSource
 }
 
 // NewManager creates a manager. The context bounds every transfer.
@@ -103,11 +109,15 @@ func NewManager(ctx context.Context, cfg ManagerConfig, discover Discoverer) *Ma
 	if cfg.RetryDelay <= 0 {
 		cfg.RetryDelay = 30 * time.Second
 	}
+	if cfg.MaxPeers <= 0 {
+		cfg.MaxPeers = 3
+	}
 	managerCtx, cancel := context.WithCancel(ctx)
 	manager := &Manager{
 		cfg: cfg, discover: discover, ctx: managerCtx, cancel: cancel,
 		transfers: make(map[string]*managedTransfer),
 		pending:   make(map[string]chan net.Conn),
+		added:     make(map[string][]ed2k.PeerSource),
 	}
 	manager.load()
 	return manager
@@ -182,84 +192,212 @@ func (m *Manager) run(ctx context.Context, id string, link Link) {
 	}
 	m.update(id, func(t *Transfer) { t.Sources = len(sources) })
 
-	var lastErr error
-	for round := 0; ; round++ {
+	partPath := filepath.Join(m.cfg.Fetch.TempDir, link.Hash.Hex()+".part")
+	for attempt := 0; ; attempt++ {
 		if ctx.Err() != nil {
 			return
 		}
-		if round > 0 {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(m.cfg.RetryDelay):
+		m.update(id, func(t *Transfer) { t.State = StateDownloading; t.Error = "" })
+		if extra := m.takeSources(id); len(extra) > 0 {
+			sources = append(sources, extra...)
+			if len(sources) > m.cfg.MaxSources {
+				sources = sources[:m.cfg.MaxSources]
 			}
-			if refreshed, err := m.discover.Sources(ctx, link.Hash.Hex(), link.Size); err == nil && len(refreshed) > 0 {
-				sources = refreshed
-				if len(sources) > m.cfg.MaxSources {
-					sources = sources[:m.cfg.MaxSources]
-				}
-				m.update(id, func(t *Transfer) { t.Sources = len(sources) })
-			}
+			m.update(id, func(t *Transfer) { t.Sources = len(sources) })
 		}
-		queued := false
-		for _, source := range sources {
-			if ctx.Err() != nil {
-				return
-			}
-			m.update(id, func(t *Transfer) { t.State = StateDownloading; t.Error = "" })
 
-			fetchCtx, cancel := context.WithTimeout(ctx, m.cfg.FetchBudget)
-			cfg := m.cfg.Fetch
-			if provider, ok := m.discover.(interface{ Stats() ed2k.Stats }); ok {
-				cfg.ClientID = provider.Stats().ServerID
-			}
-			cfg.OnProgress = func(done, total int64) {
-				m.update(id, func(t *Transfer) { t.Done = done; t.Size = total })
-			}
-			var result *Result
-			var err error
-			if source.TCPPort == 0 {
-				result, err = m.fetchViaCallback(fetchCtx, source, link, cfg)
-			} else {
-				address := fmt.Sprintf("%s:%d", source.IP.String(), source.TCPPort)
-				result, err = Fetch(fetchCtx, address, link, cfg)
-			}
-			cancel()
-			if err == nil {
-				m.update(id, func(t *Transfer) {
-					t.State = StateCompleted
-					t.Done = t.Size
-					t.Path = result.Path
-					t.Error = ""
-				})
-				if m.cfg.OnComplete != nil {
-					m.cfg.OnComplete(*result)
+		if _, statErr := os.Stat(partPath + ".met"); statErr != nil {
+			if err := m.seedMetadata(ctx, id, link, sources); err != nil {
+				m.fail(id, err)
+				if !m.waitRetry(ctx) {
+					return
 				}
-				return
-			}
-			if ctx.Err() != nil {
-				return
-			}
-			if m.cfg.Fetch.Logf != nil {
-				m.cfg.Fetch.Logf("download: source %s failed: %v", source.IP, err)
-			}
-			if IsQueued(err) {
-				queued = true
-				m.update(id, func(t *Transfer) { t.State = StateQueued; t.Error = err.Error() })
+				if refreshed, err := m.discover.Sources(ctx, link.Hash.Hex(), link.Size); err == nil && len(refreshed) > 0 {
+					sources = refreshed
+					if len(sources) > m.cfg.MaxSources {
+						sources = sources[:m.cfg.MaxSources]
+					}
+				}
 				continue
 			}
+		}
+
+		pf, err := partfile.Open(partPath)
+		if err != nil {
+			m.fail(id, err)
+			return
+		}
+		missing := make([]int, 0, len(pf.Meta.Parts))
+		for index := range pf.Meta.Parts {
+			if !pf.Have(index) {
+				missing = append(missing, index)
+			}
+		}
+		_ = pf.Close()
+		if len(missing) == 0 {
+			m.complete(id, link, partPath)
+			return
+		}
+
+		workers := len(sources)
+		if workers > m.cfg.MaxPeers {
+			workers = m.cfg.MaxPeers
+		}
+		if workers < 1 {
+			workers = 1
+		}
+		type workerJob struct {
+			source ed2k.PeerSource
+			parts  map[int]bool
+		}
+		jobs := make([]workerJob, workers)
+		for i := 0; i < workers; i++ {
+			jobs[i] = workerJob{source: sources[i%len(sources)], parts: make(map[int]bool)}
+		}
+		for index, part := range missing {
+			jobs[(index+1)%workers].parts[part] = true
+		}
+
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		var lastErr error
+		for _, jobItem := range jobs {
+			if len(jobItem.parts) == 0 {
+				continue
+			}
+			wg.Add(1)
+			go func(jobItem workerJob) {
+				defer wg.Done()
+				cfg := m.workerConfig(id)
+				parts := jobItem.parts
+				cfg.PartFilter = func(part int) bool { return parts[part] }
+				cfg.Managed = true
+				_, err := m.fetchWorker(ctx, jobItem.source, link, cfg)
+				if err != nil && ctx.Err() == nil {
+					mu.Lock()
+					lastErr = err
+					mu.Unlock()
+				}
+			}(jobItem)
+		}
+		wg.Wait()
+		if ctx.Err() != nil {
+			return
+		}
+
+		// Re-open and check whether this round closed the file.
+		pf, err = partfile.Open(partPath)
+		if err != nil {
+			m.fail(id, err)
+			return
+		}
+		complete := pf.Complete()
+		_ = pf.Close()
+		if complete {
+			m.complete(id, link, partPath)
+			return
+		}
+		if lastErr != nil {
+			m.update(id, func(t *Transfer) { t.Error = lastErr.Error() })
+		}
+		if !m.waitRetry(ctx) {
+			return
+		}
+		if refreshed, err := m.discover.Sources(ctx, link.Hash.Hex(), link.Size); err == nil && len(refreshed) > 0 {
+			sources = refreshed
+			if len(sources) > m.cfg.MaxSources {
+				sources = sources[:m.cfg.MaxSources]
+			}
+			m.update(id, func(t *Transfer) { t.Sources = len(sources) })
+		}
+	}
+}
+
+func (m *Manager) takeSources(id string) []ed2k.PeerSource {
+	m.addedMu.Lock()
+	defer m.addedMu.Unlock()
+	list := m.added[id]
+	delete(m.added, id)
+	return list
+}
+
+func (m *Manager) waitRetry(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(m.cfg.RetryDelay):
+		return true
+	}
+}
+
+func (m *Manager) workerConfig(id string) Config {
+	cfg := m.cfg.Fetch
+	if provider, ok := m.discover.(interface{ Stats() ed2k.Stats }); ok {
+		cfg.ClientID = provider.Stats().ServerID
+	}
+	cfg.OnProgress = func(done, total int64) {
+		m.update(id, func(t *Transfer) {
+			if done > t.Done {
+				t.Done = done
+			}
+			if total > 0 {
+				t.Size = total
+			}
+		})
+	}
+	cfg.OnSources = func(list []ed2k.PeerSource) {
+		m.addedMu.Lock()
+		m.added[id] = append(m.added[id], list...)
+		m.addedMu.Unlock()
+	}
+	return cfg
+}
+
+func (m *Manager) fetchWorker(ctx context.Context, source ed2k.PeerSource, link Link, cfg Config) (*Result, error) {
+	if source.TCPPort == 0 {
+		return m.fetchViaCallback(ctx, source, link, cfg)
+	}
+	return Fetch(ctx, fmt.Sprintf("%s:%d", source.IP.String(), source.TCPPort), link, cfg)
+}
+
+func (m *Manager) seedMetadata(ctx context.Context, id string, link Link, sources []ed2k.PeerSource) error {
+	var lastErr error
+	for _, source := range sources {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		cfg := m.workerConfig(id)
+		cfg.Managed = true
+		cfg.PartFilter = func(part int) bool { return part == 0 }
+		if _, err := m.fetchWorker(ctx, source, link, cfg); err == nil {
+			return nil
+		} else {
 			lastErr = err
+			if m.cfg.Fetch.Logf != nil {
+				m.cfg.Fetch.Logf("download: %s could not seed metadata: %v", source.IP, err)
+			}
 		}
-		if queued {
-			m.update(id, func(t *Transfer) { t.State = StateQueued })
-			continue
-		}
-		if lastErr == nil {
-			lastErr = errors.New("no source accepted the transfer")
-		}
-		// Keep the row in the error state but retry: a source may come back,
-		// a queue may free a slot, or a new source may appear in Kad.
-		m.fail(id, lastErr)
+	}
+	if lastErr == nil {
+		lastErr = errors.New("no source provided the file metadata")
+	}
+	return lastErr
+}
+
+func (m *Manager) complete(id string, link Link, partPath string) {
+	result, err := Finalize(partPath, link, link.Name, m.cfg.Fetch)
+	if err != nil {
+		m.fail(id, err)
+		return
+	}
+	m.update(id, func(t *Transfer) {
+		t.State = StateCompleted
+		t.Done = t.Size
+		t.Path = result.Path
+		t.Error = ""
+	})
+	if m.cfg.OnComplete != nil {
+		m.cfg.OnComplete(*result)
 	}
 }
 

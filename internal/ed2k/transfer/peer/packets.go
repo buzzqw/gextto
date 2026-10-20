@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"net"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
 )
@@ -515,4 +516,64 @@ func DecodeCompressedPart64(payload []byte) (CompressedPart64, error) {
 	part.Size = binary.LittleEndian.Uint32(payload[24:])
 	part.Data = append([]byte(nil), payload[28:]...)
 	return part, nil
+}
+
+// SourceEntry is one peer returned by source exchange.
+type SourceEntry struct {
+	IP         net.IP
+	TCPPort    uint16
+	ServerIP   net.IP
+	ServerPort uint16
+}
+
+// EncodeAnswersSources builds OP_ANSWERSOURCES (source exchange v1).
+func EncodeAnswersSources(sources []SourceEntry) ([]byte, error) {
+	if len(sources) > 0xFFFF {
+		return nil, errors.New("peer: too many exchange sources")
+	}
+	out := make([]byte, 2, 2+len(sources)*12)
+	binary.LittleEndian.PutUint16(out, uint16(len(sources)))
+	for _, source := range sources {
+		ip := source.IP.To4()
+		if ip == nil {
+			ip = net.IPv4zero.To4()
+		}
+		out = append(out, ip...)
+		var port [2]byte
+		binary.LittleEndian.PutUint16(port[:], source.TCPPort)
+		out = append(out, port[:]...)
+		server := source.ServerIP.To4()
+		if server == nil {
+			server = net.IPv4zero.To4()
+		}
+		out = append(out, server...)
+		binary.LittleEndian.PutUint16(port[:], source.ServerPort)
+		out = append(out, port[:]...)
+	}
+	return out, nil
+}
+
+// DecodeAnswersSources parses source exchange v1.
+func DecodeAnswersSources(payload []byte) ([]SourceEntry, error) {
+	if len(payload) < 2 {
+		return nil, errors.New("peer: short source answer")
+	}
+	count := int(binary.LittleEndian.Uint16(payload))
+	if 2+count*12 > len(payload) {
+		return nil, errors.New("peer: truncated source answer")
+	}
+	out := make([]SourceEntry, 0, count)
+	offset := 2
+	for i := 0; i < count; i++ {
+		ip := net.IPv4(payload[offset], payload[offset+1], payload[offset+2], payload[offset+3])
+		port := binary.LittleEndian.Uint16(payload[offset+4:])
+		serverIP := net.IPv4(payload[offset+6], payload[offset+7], payload[offset+8], payload[offset+9])
+		serverPort := binary.LittleEndian.Uint16(payload[offset+10:])
+		offset += 12
+		if port == 0 {
+			continue
+		}
+		out = append(out, SourceEntry{IP: ip, TCPPort: port, ServerIP: serverIP, ServerPort: serverPort})
+	}
+	return out, nil
 }

@@ -1,15 +1,18 @@
 package download
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/ed2k/transfer/partfile"
 )
 
 type fakeDiscoverer struct {
@@ -147,4 +150,43 @@ func TestManagerPauseAndResume(t *testing.T) {
 		t.Fatal("resume refused")
 	}
 	waitState(t, manager, transfer.ID, StateError)
+}
+
+func TestManagerDownloadsPartsFromTwoPeers(t *testing.T) {
+	data := testData(int(partfile.PartSize) + 300_000)
+	hashes := testHashes(t, data)
+	first := startFakePeer(t, data, "multi.mkv", hashes, false, false)
+	second := startFakePeer(t, data, "multi.mkv", hashes, false, false)
+	portOf := func(address string) uint16 {
+		_, portText, _ := net.SplitHostPort(address)
+		port, err := strconv.Atoi(portText)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return uint16(port)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	manager := NewManager(ctx, ManagerConfig{
+		MaxPeers: 2,
+		Fetch:    Config{TempDir: t.TempDir(), HandshakeTimeout: 5 * time.Second, IdleTimeout: 20 * time.Second},
+	}, fakeDiscoverer{sources: []ed2k.PeerSource{
+		{IP: net.IPv4(127, 0, 0, 1), TCPPort: portOf(first.listener.Addr().String()), Origin: "test"},
+		{IP: net.IPv4(127, 0, 0, 1), TCPPort: portOf(second.listener.Addr().String()), Origin: "test"},
+	}})
+	defer manager.Close()
+	transfer, err := manager.Add(Link{Hash: hashes.File, Name: "multi.mkv", Size: int64(len(data))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := waitState(t, manager, transfer.ID, StateCompleted)
+	first.wait(t)
+	second.wait(t)
+	got, err := os.ReadFile(done.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, data) {
+		t.Fatal("parallel download differs")
+	}
 }
