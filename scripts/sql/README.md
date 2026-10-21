@@ -40,7 +40,9 @@ pannello delle operazioni:
    operazioni che analizzano o eliminano una lingua);
 2. scegli un'operazione e premi **Anteprima** (o **Esegui** per le operazioni
    di sola lettura);
-3. il pannello mostra il numero di righe corrispondenti e le prime 200;
+3. mentre la query è in corso compare un indicatore; al termine il pannello
+   mostra il numero di righe corrispondenti e le prime 200 e scorre al
+   risultato;
 4. per le operazioni che modificano l'archivio compare **Elimina
    definitivamente**, con una conferma;
 5. dopo l'eliminazione il pannello mostra quante righe sono state rimosse e

@@ -1240,7 +1240,9 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   titles, plus read-only diagnostics (age distribution, releases per source,
   archive health, duplicate titles). A deletion operation first shows the
   preview with the number of matching rows and the first 200; only then
-  **Delete permanently** appears, with a confirmation. It is not a free SQL
+  **Delete permanently** appears, with a confirmation. While the query runs an
+  indicator shows the work in progress; when it finishes the panel scrolls to
+  the result. It is not a free SQL
   console: it runs only the bundled files and does not touch the library,
   active torrents or settings. The language is inferred from the title, so a
   release with no marker falls into the “not in the selected language” list.

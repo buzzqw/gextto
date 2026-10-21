@@ -29,9 +29,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
   releases in the selected language or without it, empty titles, plus read-only
   diagnostics (age distribution, releases per source, archive health, duplicate
   titles). Every deletion operation first shows the preview with the count and
-  the first 200 rows, then asks for confirmation. It is not a free SQL console:
-  it runs only the bundled scripts and does not touch the library, active
-  torrents or settings. The language is inferred from the title, so releases
+  the first 200 rows, then asks for confirmation. While the query runs a fixed
+  indicator shows the work in progress; when it finishes the panel scrolls to
+  the result. It is not a free SQL console: it runs only the bundled scripts and
+  does not touch the library, active torrents or settings. The language is inferred from the title, so releases
   with no marker fall into the “not in the selected language” list.
 - **Version: the third number restarts every 1000 builds, the build stays
   visible.** When the counter reaches 2000 the version goes from `1.1.1999` to

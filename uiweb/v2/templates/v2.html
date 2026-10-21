@@ -1572,7 +1572,7 @@
               <code class="v2-archive-sql-id">{{.ID}}</code>
             </div>
             <div class="v2-archive-sql-op-actions">
-              <form hx-post="/maintenance/archive-sql/preview" hx-target="#v2-archive-sql-output" hx-swap="innerHTML" hx-indicator="#v2-archive-sql-working" hx-disabled-elt="find button"{{if .NeedsLanguage}} hx-include="#v2-archive-sql-language"{{end}}>
+              <form hx-post="/maintenance/archive-sql/preview" hx-target="#v2-archive-sql-output" hx-swap="innerHTML show:#v2-archive-sql-output:top" hx-indicator="#v2-archive-sql-working" hx-disabled-elt="find button"{{if .NeedsLanguage}} hx-include="#v2-archive-sql-language"{{end}}>
                 <input type="hidden" name="op" value="{{.ID}}" />
                 {{if .Destructive}}<button class="btn sm" type="submit">Anteprima</button>{{else}}<button class="btn sm" type="submit">Esegui</button>{{end}}
               </form>
@@ -1616,7 +1616,7 @@
       </div>
       {{else}}<p class="muted">Nessuna riga.</p>{{end}}
       {{if .CanDelete}}
-      <form class="v2-archive-sql-delete" hx-post="/maintenance/archive-sql/delete" hx-target="#v2-archive-sql-output" hx-swap="innerHTML" hx-indicator="#v2-archive-sql-working" hx-disabled-elt="find button" hx-confirm="Eliminare definitivamente le righe corrispondenti? L'operazione non è reversibile.">
+      <form class="v2-archive-sql-delete" hx-post="/maintenance/archive-sql/delete" hx-target="#v2-archive-sql-output" hx-swap="innerHTML show:#v2-archive-sql-output:top" hx-indicator="#v2-archive-sql-working" hx-disabled-elt="find button" hx-confirm="Eliminare definitivamente le righe corrispondenti? L'operazione non è reversibile.">
         <input type="hidden" name="op" value="{{.ID}}" />
         {{if .NeedsLanguage}}<input type="hidden" name="language" value="{{.LanguageCode}}" />{{end}}
         <input type="hidden" name="confirm" value="1" />

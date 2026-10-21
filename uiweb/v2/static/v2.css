@@ -2166,7 +2166,7 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 .v2-archive-sql-op-text .hint { margin: 2px 0 0; }
 .v2-archive-sql-id { color: var(--muted); font-size: 0.75rem; }
 .v2-archive-sql-op-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
-.v2-archive-sql-output { margin-top: 18px; }
+.v2-archive-sql-output { margin-top: 18px; scroll-margin-top: 84px; }
 /* The request can take several seconds on a large archive: a fixed, visible
    banner is clearer than a text at the bottom of a long panel. HTMX toggles
    the htmx-request class and the bundled .htmx-indicator rules handle opacity. */

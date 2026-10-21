@@ -1280,7 +1280,8 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   per età, release per fonte, stato dell'archivio, titoli duplicati).
   Un'operazione che elimina mostra prima l'anteprima con il numero di righe
   corrispondenti e le prime 200; solo dopo compare **Elimina definitivamente**,
-  con conferma. Non è una console SQL libera: esegue solo i file inclusi e non
+  con conferma. Mentre la query è in corso compare un indicatore; al termine il
+  pannello scorre al risultato. Non è una console SQL libera: esegue solo i file inclusi e non
   tocca libreria, torrent attivi o impostazioni. La lingua è dedotta dal titolo,
   quindi anche una release senza marcatore rientra nell'elenco “non nella
   lingua selezionata”. Fai un backup prima di una cancellazione grande; dopo,

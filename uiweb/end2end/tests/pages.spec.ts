@@ -235,6 +235,17 @@ test("manutenzione SQL dell'archivio ha un tab e usa la lingua scelta", async ({
   await expect(page.locator("#v2-archive-sql-output")).toContainText("English");
 });
 
+test("le diagnostiche SQL mostrano il risultato in vista", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 480 });
+  await page.goto("/?view=maintenance&tab=archive-sql");
+  const operation = page.locator(".v2-archive-sql-op", { hasText: "Stato dell'archivio" });
+  await operation.scrollIntoViewIfNeeded();
+  await operation.getByRole("button", { name: "Esegui", exact: true }).click();
+  const output = page.locator("#v2-archive-sql-output");
+  await expect(output).toContainText("righe corrispondenti");
+  await expect(output).toBeInViewport();
+});
+
 test("manutenzione SQL mostra l'indicatore mentre la query lavora", async ({ page }) => {
   await page.goto("/?view=maintenance&tab=archive-sql");
   await page.route("**/maintenance/archive-sql/preview", async (route) => {
