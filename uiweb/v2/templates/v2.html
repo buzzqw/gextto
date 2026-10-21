@@ -714,7 +714,7 @@
   {{else}}<p class="muted">Nessun file.</p>{{end}}
 {{else if eq .Tab "peers"}}
   {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
-  {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col" title="Velocità di download da questo peer.">↓</th><th scope="col" title="Velocità di upload verso questo peer.">↑</th><th scope="col" title="Percentuale del torrent che questo peer dichiara di avere.">Progresso</th><th scope="col" title="Il peer ha già tutti i pezzi del torrent.">Seed</th><th scope="col" title="Protocollo, cifratura e direzione della connessione">Connessione</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{.Address}}</td><td class="truncate">{{if .Client}}{{.Client}}{{else}}—{{end}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}sì{{else}}no{{end}}</td><td>{{if .Utp}}uTP{{else}}TCP{{end}}{{if .Encrypted}} · cifrata{{end}}{{if .Incoming}} · in entrata{{else}} · in uscita{{end}}</td></tr>{{end}}</tbody></table></div>
+  {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col" title="Velocità di download da questo peer.">↓</th><th scope="col" title="Velocità di upload verso questo peer.">↑</th><th scope="col" title="Percentuale del torrent che questo peer dichiara di avere.">Progresso</th><th scope="col" title="Il peer ha già tutti i pezzi del torrent.">Seed</th><th scope="col" title="Protocollo, cifratura e direzione della connessione">Connessione</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{.Address}}</td><td class="truncate">{{if .Client}}{{.Client}}{{else}}—{{end}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}sì{{else}}no{{end}}</td><td>{{if .Utp}}uTP{{else}}TCP{{end}}{{if .Encrypted}}<span> · cifrata</span>{{end}}<span>{{if .Incoming}} · in entrata{{else}} · in uscita{{end}}</span></td></tr>{{end}}</tbody></table></div>
   {{else}}<p class="muted">Nessun peer connesso.</p>{{end}}
 {{else if eq .Tab "pieces"}}
   {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
@@ -1373,7 +1373,7 @@
   <div class="grid-2">
     <div class="panel">
       <div class="panel-head"><h3>Percorsi</h3></div>
-      <div class="panel-body">{{range .Health.Paths}}<div class="row"><span>{{.Label}}</span><span class="muted truncate" title="{{.Path}}">{{.Path}} · <span>{{if .Exists}}presente{{else}}assente{{end}}</span> · <span>{{if .Writable}}scrivibile{{else}}non scrivibile{{end}}</span></span></div>{{end}}</div>
+      <div class="panel-body">{{range .Health.Paths}}<div class="row"><span>{{if eq .Label "Data"}}Cartella dati{{else if eq .Label "Trash"}}Cestino{{else}}{{.Label}}{{end}}</span><span class="muted truncate" title="{{.Path}}">{{.Path}} · <span>{{if .Exists}}presente{{else}}assente{{end}}</span> · <span>{{if .Writable}}scrivibile{{else}}non scrivibile{{end}}</span></span></div>{{end}}</div>
     </div>
     <div class="panel">
       <div class="panel-head"><h3>Dischi</h3></div>
@@ -1450,7 +1450,7 @@
 {{end}}
 
 {{define "v2_health_tile_memory"}}
-<div class="metric" id="v2-health-tile-memory" hx-get="/partial/health/tile?name=memory" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Memoria processo</span><strong>{{bytesU .Health.ResidentBytes}}</strong><small class="muted">su {{bytesU .Health.MemoryTotalBytes}}</small></div>
+<div class="metric" id="v2-health-tile-memory" hx-get="/partial/health/tile?name=memory" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Memoria processo</span><strong>{{bytesU .Health.ResidentBytes}}</strong><small class="muted"><span>su</span> {{bytesU .Health.MemoryTotalBytes}}</small></div>
 {{end}}
 
 {{define "v2_health_tile_disk"}}
@@ -1463,7 +1463,7 @@
   <div class="panel-head"><h3>Motore torrent</h3>{{if .Backend}}<small class="muted">{{.Backend}}</small>{{end}}</div>
   <div class="panel-body">
     {{if .Error}}<div class="row"><span class="hl-err">{{.Error}}</span></div>{{end}}
-    {{range .Rows}}<div class="row"><span>{{.Label}}</span><span class="{{if .Warn}}hl-err{{else}}muted{{end}}"{{if .Detail}} title="{{.Detail}}"{{end}}>{{.Value}}</span></div>{{end}}
+    {{range .Rows}}<div class="row"><span>{{.Label}}</span><span class="{{if .Warn}}hl-err{{else}}muted{{end}}"{{if .Detail}} title="{{.Detail}}"{{end}}>{{if .Parts}}{{range .Parts}}<span>{{.}}</span>{{end}}{{else}}{{.Value}}{{end}}</span></div>{{end}}
   </div>
 </div>
 {{end}}
@@ -2005,7 +2005,7 @@
   <div class="table-wrap" tabindex="0" role="region" aria-label="{{.Title}}">
     <table class="data-table {{.Class}}">
       <caption class="sr-only">{{.Title}}</caption>
-      <thead><tr>{{range .Columns}}<th scope="col"{{if .Sortable}} class="th-sort"{{end}}>{{if .Sortable}}<button class="table-sort-button" type="button" hx-get="/table?view={{$.View}}&amp;sort={{.Key}}&amp;dir={{if and (eq $.Sort .Key) (eq $.Dir "asc")}}desc{{else}}asc{{end}}{{if $.Query}}&amp;q={{$.Query}}{{end}}{{if $.FilterQuery}}&amp;f={{$.FilterQuery}}{{end}}{{if $.WebSearch}}&amp;web=1{{end}}{{if $.Ed2kSearch}}&amp;ed2k=1{{end}}" hx-target="#v2-table-body-{{$.View}}" hx-swap="outerHTML">{{.Label}}{{arrow $.Sort $.Dir .Key}}</button>{{else}}{{.Label}}{{end}}</th>{{end}}{{if .HasActions}}<th scope="col">Azioni</th>{{end}}</tr></thead>
+      <thead><tr>{{range .Columns}}<th scope="col"{{if .Sortable}} class="th-sort"{{end}}>{{if .Sortable}}<button class="table-sort-button" type="button" hx-get="/table?view={{$.View}}&amp;sort={{.Key}}&amp;dir={{if and (eq $.Sort .Key) (eq $.Dir "asc")}}desc{{else}}asc{{end}}{{if $.Query}}&amp;q={{$.Query}}{{end}}{{if $.FilterQuery}}&amp;f={{$.FilterQuery}}{{end}}{{if $.WebSearch}}&amp;web=1{{end}}{{if $.Ed2kSearch}}&amp;ed2k=1{{end}}" hx-target="#v2-table-body-{{$.View}}" hx-swap="outerHTML"><span>{{.Label}}</span>{{arrow $.Sort $.Dir .Key}}</button>{{else}}{{.Label}}{{end}}</th>{{end}}{{if .HasActions}}<th scope="col">Azioni</th>{{end}}</tr></thead>
       <tbody>
         {{if .Rows}}{{range .Rows}}<tr>{{range .Cells}}<td>{{.HTML}}</td>{{end}}{{if $.HasActions}}<td class="row-actions">{{.Actions}}</td>{{end}}</tr>{{end}}
         {{else}}<tr><td class="muted" colspan="{{.Colspan}}">{{.Empty}}</td></tr>{{end}}

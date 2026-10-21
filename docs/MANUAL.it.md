@@ -1068,7 +1068,7 @@ raggiungibilità/percorsi, così puoi validare un backend prima di passare. Il
 pannello **Salute → Motore torrent** (icona 🩺 nella barra) riassume lo stato del
 motore attivo (coda, velocità, porta/router, DHT/uTP/LSD, cifratura, proxy,
 filtro IP, cache, connessioni in entrata, I/O disco con job in coda e totali di
-letture/scritture, totali di sessione). Quale
+letture/scritture, totali di sessione), tutto nella lingua dell'interfaccia. Quale
 che sia il motore attivo, la schermata **Scarico** e tutte le automazioni restano
 identiche.
 

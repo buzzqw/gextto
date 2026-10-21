@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -14,16 +15,18 @@ func TestUIMergeReuseRow(t *testing.T) {
 	if _, ok := uiMergeReuseRow(map[string]any{"merged_pieces": int64(0)}); ok {
 		t.Fatal("zero merged pieces must hide the row")
 	}
-	row, ok := uiMergeReuseRow(map[string]any{"merged_pieces": int64(3), "merged_bytes": int64(2048)})
+	parts, ok := uiMergeReuseRow(map[string]any{"merged_pieces": int64(3), "merged_bytes": int64(2048)})
+	row := strings.Join(parts, "")
 	if !ok {
 		t.Fatal("merged pieces must show the row")
 	}
 	if !strings.Contains(row, "3 pezzi") || !strings.Contains(row, "2.0 KB") {
 		t.Fatalf("row = %q, want the piece count and the bytes", row)
 	}
-	withPartial, _ := uiMergeReuseRow(map[string]any{
+	withPartialParts, _ := uiMergeReuseRow(map[string]any{
 		"merged_pieces": int64(3), "merged_bytes": int64(2048), "merged_partial_pieces": int64(2),
 	})
+	withPartial := strings.Join(withPartialParts, "")
 	if !strings.Contains(withPartial, "2 pezzi riusati a blocchi") {
 		t.Fatalf("row = %q, want the block-level reuse count", withPartial)
 	}
@@ -38,16 +41,18 @@ func TestUIUTPSocketRow(t *testing.T) {
 	if _, ok, _ := uiUTPSocketRow(map[string]any{}); ok {
 		t.Fatal("no socket activity must hide the row")
 	}
-	row, ok, warn := uiUTPSocketRow(map[string]any{"utp_dials": int64(10), "utp_accepts": int64(3)})
+	rowParts, ok, warn := uiUTPSocketRow(map[string]any{"utp_dials": int64(10), "utp_accepts": int64(3)})
+	row := strings.Join(rowParts, "")
 	if !ok || warn {
 		t.Fatalf("healthy socket must show without warn, got %q warn=%v", row, warn)
 	}
 	if !strings.Contains(row, "10 dial") || !strings.Contains(row, "3 accept") {
 		t.Fatalf("row = %q, want dial/accept counts", row)
 	}
-	withErrs, _, warn := uiUTPSocketRow(map[string]any{
+	withErrsParts, _, warn := uiUTPSocketRow(map[string]any{
 		"utp_dials": int64(10), "utp_accepts": int64(3), "utp_dial_errors": int64(2),
 	})
+	withErrs := strings.Join(withErrsParts, "")
 	if warn {
 		t.Fatalf("errors with flowing accepts must not warn: %q", withErrs)
 	}
@@ -58,14 +63,16 @@ func TestUIUTPSocketRow(t *testing.T) {
 	if !warn {
 		t.Fatalf("dial errors without accepts must warn: %q", blocked)
 	}
-	withResends, _, _ := uiUTPSocketRow(map[string]any{
+	withResendsParts, _, _ := uiUTPSocketRow(map[string]any{
 		"utp_dials": int64(10), "utp_accepts": int64(3),
 		"utp_resends_timeout": int64(5), "utp_resends_fast": int64(2), "utp_syn_drops": int64(4),
 	})
+	withResends := strings.Join(withResendsParts, "")
 	if !strings.Contains(withResends, "resend RTO 5 / fast 2") || !strings.Contains(withResends, "SYN scartati 4") {
 		t.Fatalf("row = %q, want the resend and SYN-drop counts", withResends)
 	}
-	quiet, _, _ := uiUTPSocketRow(map[string]any{"utp_dials": int64(10), "utp_accepts": int64(3)})
+	quietParts, _, _ := uiUTPSocketRow(map[string]any{"utp_dials": int64(10), "utp_accepts": int64(3)})
+	quiet := strings.Join(quietParts, "")
 	if strings.Contains(quiet, "resend") || strings.Contains(quiet, "SYN") {
 		t.Fatalf("row = %q, must hide the counters when zero", quiet)
 	}
@@ -141,6 +148,75 @@ func TestUIGxEngineStatsAllTimeKeysReachTheRuntimeDictionary(t *testing.T) {
 			if dict[key] == "" {
 				t.Errorf("%s dictionary is missing %q", lang, key)
 			}
+		}
+	}
+}
+
+// TestEngineParts: the pieces join back into the Sprintf result, values stand
+// alone and the literal text is cut at the "·" separators.
+func TestEngineParts(t *testing.T) {
+	parts := engineParts("%d · in download %d · hit %d%% · %s", 6, 2, 40, "x")
+	if got, want := strings.Join(parts, ""), fmt.Sprintf("%d · in download %d · hit %d%% · %s", 6, 2, 40, "x"); got != want {
+		t.Fatalf("joined = %q, want %q", got, want)
+	}
+	want := []string{"6", " ", "·", " in download ", "2", " ", "·", " hit ", "40", "% ", "·", " ", "x"}
+	if strings.Join(parts, "|") != strings.Join(want, "|") {
+		t.Fatalf("parts = %q, want %q", parts, want)
+	}
+}
+
+// TestUIGxEngineStatsPhrasesAreTranslated: the Health page translates whole
+// text nodes, so every phrase of a composed engine row must be a piece of its
+// own and a catalog key; otherwise it stays Italian in every language.
+func TestUIGxEngineStatsPhrasesAreTranslated(t *testing.T) {
+	engine := fakeStatsEngine{stats: map[string]any{
+		"session_loaded": true, "version": "1.1.249", "peer_port": float64(51600), "listen_address": "0.0.0.0",
+		"dht": true, "utp": true, "proxy": true, "encryption": float64(1), "cache_auto": true, "preallocate": true,
+		"port_mapping": map[string]any{"method": "upnp", "external_ip": "203.0.113.1"},
+		"lsd":          map[string]any{"enabled": true},
+		"session": map[string]any{
+			"peers_incoming_tcp": float64(2), "utp_dials": float64(3), "utp_dial_errors": float64(1),
+			"utp_syn_drops": float64(1), "merged_pieces": float64(2), "merged_partial_pieces": float64(1),
+		},
+	}}
+	pieces := map[string]bool{}
+	labels := map[string]bool{}
+	for _, row := range uiGxEngineStats(engine).Rows {
+		labels[row.Label] = true
+		if strings.Join(row.Parts, "") != row.Value {
+			t.Errorf("row %q: parts %q do not join into %q", row.Label, row.Parts, row.Value)
+		}
+		for _, part := range row.Parts {
+			pieces[strings.TrimSpace(part)] = true
+		}
+	}
+	keys := i18nCatalogKeys(t)
+	for label := range labels {
+		if !keys[label] {
+			t.Errorf("no catalog entry for the label %q", label)
+		}
+	}
+	for _, phrase := range []string{
+		"attivo da", "in download", "in seed", "in coda", "bloccati", "lenti", "download", "seed", "totale",
+		"TCP e UDP", "indirizzo", "porta aperta con", "indirizzo esterno", "attivo", "nodi",
+		"connessioni in uscita uTP", "in entrata uTP", "errori", "SYN scartati", "peer trovati in rete locale",
+		"sì", "attiva", "attivo (DHT e tracker UDP spenti)", "regole", "automatica (dalla RAM)", "lettura",
+		"scrittura", "preallocazione", "job in coda", "letture", "scritture", "cache lettura", "hit",
+		"buffer scrittura", "scaricati", "inviati", "overhead protocollo", "peer connessi", "pezzi",
+		"riusati da altri torrent (senza rete)", "pezzi riusati a blocchi",
+	} {
+		if !pieces[phrase] {
+			t.Errorf("phrase %q is not a piece of its own in the engine rows", phrase)
+		}
+		if !keys[phrase] {
+			t.Errorf("no catalog entry for %q", phrase)
+		}
+	}
+	for _, phrase := range []string{"spento", "disattivata", "obbligatoria", "nessuno", "impostata a mano",
+		"nessuna finora (porta forse chiusa sul router)",
+		"porta non aperta automaticamente (né UPnP né NAT-PMP): aprila a mano, TCP e UDP"} {
+		if !keys[phrase] {
+			t.Errorf("no catalog entry for %q", phrase)
 		}
 	}
 }

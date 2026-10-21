@@ -15,6 +15,12 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **La pagina Salute è tradotta per intero.** Le righe del pannello *Motore
+  torrent* (coda, porta, router, uTP, cache, disco, totali di sessione…), le
+  etichette dei percorsi, la memoria del processo e le intestazioni ordinabili
+  delle tabelle restavano in italiano anche con l'interfaccia in un'altra
+  lingua: ora seguono la lingua scelta (inglese, tedesco, francese, spagnolo,
+  polacco). Lo stesso vale per la colonna *Connessione* nella scheda Peer.
 - **«Cerca mancanti» ora usa davvero eD2k.** Prima eD2k entrava in gioco solo
   nel passaggio automatico del gap filling: *Cerca mancanti* e la ricerca del
   singolo episodio ignoravano aMule, anche con l'integrazione attiva. Ora, se

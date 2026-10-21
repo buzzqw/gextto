@@ -14,6 +14,12 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **The Health page is fully translated.** The rows of the *Torrent engine*
+  panel (queue, port, router, uTP, cache, disk, session totals…), the path
+  labels, the process memory and the sortable table headers stayed in Italian
+  even with the interface in another language: they now follow the chosen
+  language (English, German, French, Spanish, Polish). The same goes for the
+  *Connection* column in the Peers tab.
 - **«Search missing» now really uses eD2k.** Before, eD2k only came into play in
   the automatic gap-filling pass: *Search missing* and single-episode search
   ignored aMule even with the integration on. Now, when **Use eD2k when torrents

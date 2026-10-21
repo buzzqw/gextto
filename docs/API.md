@@ -56,7 +56,7 @@ change. `/ui` is not served. For operational checks use
 | GET | `/api/ed2k/shared` | the files aMule shares with what it uploaded for each (session and total bytes, requests, accepted, queued clients, priority, ed2k link), the upload queue (client, software, file, speed, upload position) and the shared folders; enabled is false while the integration is off |
 | POST | `/api/ed2k/shared/reload` | ask aMule to rescan its shared folders, so files added or removed outside aMule show up (the reload button of the aMule GUI) |
 | POST | `/api/archive/add` | add an entry to the archive |
-| POST | `/api/archive/batch-download` | download several archive entries (magnet or `ed2k_link`) |
+| POST | `/api/archive/batch-download` | download several archive entries (magnet or ed2k_link) |
 | POST | `/api/archive/delete` | delete archive entries |
 | GET | `/api/backup` | list backups |
 | POST | `/api/backup` | create a backup |
