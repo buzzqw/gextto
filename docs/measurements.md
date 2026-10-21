@@ -89,6 +89,7 @@ with the live service or a standalone instance as stated.
 | DHT | **1,290 nodes in ~80 s**, 314/1,432 queries answered (21.9 %), peers found for a real infohash | — | `make measure-dht` |
 | Real swarm throughput | **9.3–9.4 MB/s** on the Ubuntu ISO, against 6.3–7.1 MB/s of libtorrent on the same swarm (one campaign) | — | `make measure-realswarm` |
 | Web UI rows | **9,831 B per tick**, ~1.7 KB per row | — | `/ui/rows` on the live page |
+| Web UI transfer (2026-10-21, build 1945) | dashboard **33.3 KB → 8.0 KB**, downloads **70.7 KB → 12.3 KB**, archive **473.2 KB → 38.8 KB**, maintenance **118.7 KB → 17.2 KB** gzipped; CSS+JS **285.2 KB → 75.3 KB** and cached immutable (repeat request **304, 0 bytes**) | 1945 | N97, live service: `curl -H 'Accept-Encoding: gzip' -w '%{size_download}' 'http://127.0.0.1:5000/?view=archive'`; asset revalidation with `If-None-Match` |
 | Prometheus scrape | **~0.24 ms, 121 KB, 813 allocs** per scrape | 232 | `BenchmarkMetricsScrape` |
 
 ## 3. Benchmark reference

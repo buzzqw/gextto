@@ -14,6 +14,13 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **Lighter web interface, especially on slow networks.** Pages now travel
+  compressed: the Archive drops from about 473 KB to 39 KB and the dashboard
+  from 33 KB to 8 KB. Stylesheets and scripts are compressed and stay in the
+  browser cache tagged with the build number: after the first load they are no
+  longer downloaded on every page, and on the next check the server answers
+  «not modified» with no body. Gextto stays responsive even on slow links or
+  from a phone.
 - **Archive: the Download button of eD2k results no longer ends up off
   screen.** With long file names the eD2k results table grew wider than the
   window and the **Actions** column with **Download** stayed out of sight: you

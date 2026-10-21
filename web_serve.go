@@ -293,8 +293,9 @@ func Serve(state *AppState) error {
 	defer cancelRequests()
 
 	// The cross-origin guard runs outermost so a cross-site write is refused
-	// before it can reach the (often login-free from the LAN) API.
-	app := crossOriginGuard(AuthMiddleware(state, Router(state)))
+	// before it can reach the (often login-free from the LAN) API. Compression
+	// sits above everything: the interface is often used over a weak link.
+	app := compressResponses(crossOriginGuard(AuthMiddleware(state, Router(state))))
 	// Timeouts defend against slowloris and idle-connection exhaustion. Write is
 	// intentionally unlimited: the log/notification SSE streams and long
 	// downloads must be able to stay open.

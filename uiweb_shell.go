@@ -92,6 +92,9 @@ type uiShellChrome struct {
 	// ActiveDownloads is the badge on "Scarico": unfinished torrents plus the
 	// direct HTTP downloads still running (seeding torrents are not counted).
 	ActiveDownloads string
+	// AssetVersion is the build number appended to the static asset URLs
+	// (?v=...), which lets the browser cache the CSS and JS immutably.
+	AssetVersion string
 }
 
 // dataDirWritableTTL is how long the data-dir writability result is reused. The
@@ -132,6 +135,7 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 	cfg := latestConfig(s)
 	chrome := uiShellChrome{
 		Version:      constants.VersionLabel(),
+		AssetVersion: constants.Build,
 		DryRun:       cfg.DryRun,
 		Status:       "offline",
 		CurrentTime:  uiNowClock(),

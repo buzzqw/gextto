@@ -24,7 +24,10 @@ separati per il funzionamento normale.
 L'interfaccia web funziona anche da telefono: sotto i 900 px il layout diventa
 compatto, con navigazione in alto scorrevole, metriche della dashboard su due
 colonne, finestre a tutta larghezza e tabelle che scorrono orizzontalmente
-dentro il loro pannello. Ogni azione resta raggiungibile col tocco.
+dentro il loro pannello. Ogni azione resta raggiungibile col tocco. Le pagine
+e i file dell'interfaccia viaggiano compressi e i fogli di stile e gli script
+restano nella cache del browser, così la UI resta usabile anche su una rete
+lenta.
 
 La UI ufficiale si apre su `http://<host>:5000/`; il vecchio prefisso `/v2`
 reindirizza alla radice e la vecchia route `/ui` non esiste più. La pagina **Scarico** aggiorna

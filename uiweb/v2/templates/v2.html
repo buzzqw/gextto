@@ -40,11 +40,11 @@
     } catch (error) { /* storage may be unavailable */ }
   }());
 </script>
-<link rel="stylesheet" href="/static/gextto-ui.css">
-<link rel="stylesheet" href="/static/v2.css">
-<script src="/static/htmx.min.js" defer></script>
+<link rel="stylesheet" href="/static/gextto-ui.css{{if .Chrome.AssetVersion}}?v={{.Chrome.AssetVersion}}{{end}}">
+<link rel="stylesheet" href="/static/v2.css{{if .Chrome.AssetVersion}}?v={{.Chrome.AssetVersion}}{{end}}">
+<script src="/static/htmx.min.js{{if .Chrome.AssetVersion}}?v={{.Chrome.AssetVersion}}{{end}}" defer></script>
 <script>window.__v2i18n={{if .ClientI18n}}{{.ClientI18n}}{{else}}{}{{end}};</script>
-<script src="/static/v2-core.js" defer></script>
+<script src="/static/v2-core.js{{if .Chrome.AssetVersion}}?v={{.Chrome.AssetVersion}}{{end}}" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#v2-page">Vai al contenuto</a>

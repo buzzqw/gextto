@@ -24,7 +24,9 @@ separate orchestrator processes.
 The web interface works on a phone too: below 900 px the shell switches to a
 compact layout with a scrollable top navigation, the dashboard metrics in two
 columns, full-width dialogs and tables that scroll horizontally inside their
-panel. Every action stays reachable by touch.
+panel. Every action stays reachable by touch. Pages and UI files travel
+compressed and the stylesheets and scripts stay in the browser cache, so the
+interface stays usable on a slow network as well.
 
 The official UI is served at `http://<host>:5000/`; the old `/v2` prefix
 redirects to the root and the old `/ui` route no longer exists. The **Downloads** page refreshes

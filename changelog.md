@@ -15,6 +15,13 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Interfaccia web più leggera, soprattutto su reti lente.** Le pagine ora
+  viaggiano compresse: l'Archivio passa da circa 473 KB a 39 KB e la dashboard
+  da 33 KB a 8 KB. I fogli di stile e gli script sono compressi e restano nella
+  cache del browser con il numero di build: dopo la prima apertura non vengono
+  più riscaricati a ogni pagina, e al controllo successivo il server risponde
+  «non modificato» senza corpo. Gextto resta reattivo anche su collegamenti
+  lenti o da telefono.
 - **Archivio: il pulsante Scarica dei risultati eD2k non finisce più fuori
   schermo.** Con nomi di file lunghi la tabella dei risultati eD2k si allargava
   oltre la finestra e la colonna **Azioni** con **Scarica** restava fuori vista:

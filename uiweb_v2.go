@@ -138,7 +138,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// The v2 handlers call the existing JSON APIs through this router so the
 	// list pages reuse the same data access as the classic UI.
 	s.internalMux.Store(mux)
-	mux.Handle("GET /static/", UiNoCache(http.StripPrefix("/static/", http.FileServer(http.FS(v2StaticFSRoot())))))
+	mux.Handle("GET /static/", v2StaticHandler(http.StripPrefix("/static/", http.FileServer(http.FS(v2StaticFSRoot())))))
 	// Legacy /v2 prefix: permanent redirect that strips it (query preserved), so
 	// old bookmarks and already-loaded pages keep working.
 	v2Handle(s, mux, "/v2", v2LegacyRedirect)
