@@ -965,9 +965,10 @@ type ArchiveDeleteInput struct {
 
 // ArchiveBatchItem is one item of `batch_archive_download`.
 type ArchiveBatchItem struct {
-	Title  string `json:"title"`
-	Magnet string `json:"magnet"`
-	Source string `json:"source"`
+	Title    string `json:"title"`
+	Magnet   string `json:"magnet"`
+	Source   string `json:"source"`
+	Ed2kLink string `json:"ed2k_link"`
 }
 
 // ArchiveBatchInput is the input of `batch_archive_download`.

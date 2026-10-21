@@ -134,19 +134,30 @@ func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool
 		if link == "" {
 			link = v2String(release["torrent_url"])
 		}
+		ed2kLink := v2String(release["ed2k_link"])
+		sourceLabel := v2SourceLabel(source)
+		if v2String(release["network"]) == "ed2k" || ed2kLink != "" {
+			// An eD2k result has a network name, not a host: v2SourceLabel would
+			// misread it.
+			sourceLabel = "eD2k/Kad"
+		}
+		keyLink := link
+		if strings.TrimSpace(keyLink) == "" {
+			keyLink = ed2kLink
+		}
 		body, _ := json.Marshal(map[string]any{
-			"items": []map[string]string{{"title": title, "magnet": link, "source": source}},
+			"items": []map[string]string{{"title": title, "magnet": link, "source": source, "ed2k_link": ed2kLink}},
 		})
 		row := v2SourceRow{
 			Title:     title,
-			Source:    v2SourceLabel(source),
+			Source:    sourceLabel,
 			Origin:    v2String(entry["origin"]),
 			Score:     int64(v2Float(entry["score"])),
 			SizeBytes: int64(v2Float(release["size_bytes"])),
 			Magnet:    uiMagnetURL(link),
-			Key:       v2SourceKey(link, title),
+			Key:       v2SourceKey(keyLink, title),
 		}
-		if strings.TrimSpace(link) != "" {
+		if strings.TrimSpace(link) != "" || strings.TrimSpace(ed2kLink) != "" {
 			row.Body = string(body)
 		}
 		view.Results = append(view.Results, row)

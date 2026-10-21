@@ -15,6 +15,16 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **«Cerca mancanti» ora usa davvero eD2k.** Prima eD2k entrava in gioco solo
+  nel passaggio automatico del gap filling: *Cerca mancanti* e la ricerca del
+  singolo episodio ignoravano aMule, anche con l'integrazione attiva. Ora, se
+  **Usa eD2k quando i torrent non trovano nulla** è attivo e i torrent non
+  trovano niente, la ricerca chiede l'episodio anche a eD2k/Kad. La ricerca di
+  una serie fa **una sola interrogazione per stagione** (non una per episodio,
+  che sarebbe molto più lenta): i risultati compaiono con la sorgente
+  **eD2k/Kad** e il pulsante **Scarica** li passa ad aMule. Anche il fallback
+  automatico ora scrive nel log quando parte e quanti risultati trova, così si
+  può verificare che venga usato.
 - **Interfaccia web più leggera, soprattutto su reti lente.** Le pagine ora
   viaggiano compresse: l'Archivio passa da circa 473 KB a 39 KB e la dashboard
   da 33 KB a 8 KB. I fogli di stile e gli script sono compressi e restano nella

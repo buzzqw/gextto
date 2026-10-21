@@ -758,29 +758,42 @@ func SearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 	}
-	seen := map[string]bool{}
-	filtered := []models.Release{}
-	for i := range results {
-		release := results[i]
-		if !gh0_releaseMatchesSeriesEpisode(release, series, input.Season, input.Episode) {
-			continue
+	// The filter is applied twice: the eD2k fallback only runs when the torrent
+	// plane leaves nothing usable, not merely when it returns raw rows that the
+	// quality or language rules then reject.
+	filter := func(candidates []models.Release) []models.Release {
+		seen := map[string]bool{}
+		filtered := []models.Release{}
+		for i := range candidates {
+			release := candidates[i]
+			if !gh0_releaseMatchesSeriesEpisode(release, series, input.Season, input.Episode) {
+				continue
+			}
+			if !cfg.ReleaseAllowed(&release) {
+				continue
+			}
+			if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
+				continue
+			}
+			key, ok := releaseDedupKey(&release)
+			if !ok || seen[key] {
+				continue
+			}
+			seen[key] = true
+			filtered = append(filtered, release)
 		}
-		if !cfg.ReleaseAllowed(&release) {
-			continue
-		}
-		if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
-			continue
-		}
-		key, ok := releaseDedupKey(&release)
-		if !ok || seen[key] {
-			continue
-		}
-		seen[key] = true
-		filtered = append(filtered, release)
+		sort.SliceStable(filtered, func(a, b int) bool {
+			return s.cfg.ReleaseScore(&filtered[a]) > s.cfg.ReleaseScore(&filtered[b])
+		})
+		return filtered
 	}
-	sort.SliceStable(filtered, func(a, b int) bool {
-		return s.cfg.ReleaseScore(&filtered[a]) > s.cfg.ReleaseScore(&filtered[b])
-	})
+	filtered := filter(results)
+	// Nothing usable from the torrent plane: try eD2k/Kad, exactly like the
+	// series missing search and the automatic gap fallback.
+	if len(filtered) == 0 {
+		results = append(results, ed2kManualEpisodeFallback(r.Context(), s.engine, cfg, series, input.Season, input.Episode)...)
+		filtered = filter(results)
+	}
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "query": query, "results": filtered})
 }
 

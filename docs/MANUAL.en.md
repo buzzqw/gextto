@@ -646,6 +646,13 @@ From **Search missing** or an episode detail:
 3. compare individual releases and season packs;
 4. if an episode exists on disk but not in the database, scan the archive;
 5. use **Force** only for an intentional manual action.
+6. if torrents and archive find nothing and **Use eD2k when torrents find
+   nothing** is on, the search asks eD2k/Kad too: the results show the
+   **eD2k/Kad** source and the **Download** button hands them to aMule.
+
+With the eD2k fallback on, the search can take longer: aMule collects results
+for the time set in **eD2k search duration**, and a series search runs one query
+per season.
 
 Gextto normally avoids downloading older episodes when later episodes already
 exist, unless this is a recognised gap or a genuine upgrade. A season pack can
@@ -1754,7 +1761,7 @@ network.
 | aMule — external connections (EC) password | The password in clear; aMule keeps its MD5 in `ECPassword`. Not displayed. |
 | aMule folders | The incoming (download) and temporary folders are shown read-only: they belong to aMule and are changed in aMule/amuled. After the change restart Gextto (or reopen this page) so it uses the new path. |
 | eD2k search network | **Kad** (default, no server needed), **Kad + eD2k servers** (both searches, results merged), **eD2k servers (global)** (every server) or **eD2k server (connected)**. Applies to the manual search; the automatic fallback always searches Kad and the servers. The same choice is on the eD2k page. |
-| Use eD2k when torrents find nothing | A second, separate switch: only in the deep gap-filling pass, and only when the torrent episode and season searches produced nothing, Gextto searches the same episode on Kad and on the eD2k servers (with the series name and every alias). Off by default. |
+| Use eD2k when torrents find nothing | A second, separate switch: when the torrent search for the episode and the season produces nothing, Gextto searches the same episode on eD2k/Kad (with the series name and every alias). It applies both to the deep gap-filling pass and to **Search missing** and single-episode search. Off by default. |
 | Minimum sources for the fallback | eD2k source floor for accepting a result automatically. Manual search shows everything. *(Unit: sources; 0 = no minimum)* |
 | eD2k search duration | How many seconds aMule collects results before Gextto shows them. *(Unit: seconds)* |
 | Give up on a stalled eD2k download after | An eD2k download chosen by Gextto that receives no data for this many days is cancelled in aMule, the release is blocklisted and the episode is searched again. Downloads added by hand and paused ones stay. *(Unit: days; 0 = never)* |

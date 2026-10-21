@@ -367,6 +367,40 @@ func ed2kFallbackEligible(cfg *Config) bool {
 	return download
 }
 
+// ed2kManualEpisodeFallback is the manual-search counterpart of the automatic
+// fallback: when the torrent plane found nothing for an episode, it asks eD2k
+// for it too. It shares the same explicit switch (ed2k_fallback), uses the
+// network chosen in the settings and keeps every candidate (no source floor):
+// a manual search only shows results, it does not start anything by itself.
+// The canonical series name is set on every release so the caller can keep its
+// usual matching and dedup rules.
+func ed2kManualEpisodeFallback(ctx context.Context, engine *Engine, cfg *Config, series *SeriesConfig, season, episode int64) []models.Release {
+	if engine == nil || series == nil || !ed2kFallbackEligible(cfg) {
+		return nil
+	}
+	started := time.Now()
+	candidates := engine.SearchSeriesED2K(ctx, cfg, series, season, episode, true)
+	accepted := make([]models.Release, 0, len(candidates))
+	for index := range candidates {
+		release := candidates[index]
+		name := series.Name
+		release.Series = &name
+		if !releaseMatchesConfiguredEpisode(&release, series, season, episode) {
+			continue
+		}
+		accepted = append(accepted, release)
+	}
+	if len(accepted) > 0 || time.Since(started) > 2*time.Second {
+		logging.Info("manual eD2k fallback",
+			"series", series.Name,
+			"season", season,
+			"episode", episode,
+			"found", len(accepted),
+			"elapsed_ms", time.Since(started).Milliseconds())
+	}
+	return accepted
+}
+
 // SearchED2K searches eD2k/Kad through aMule and normalizes the results. It
 // returns nil when the integration is disabled, unreachable or finds nothing:
 // an eD2k failure must never fail the torrent search that called it.
@@ -509,25 +543,6 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 	if series == nil || season < 1 || episode < 1 || !ed2kEnabled(cfg) {
 		return nil
 	}
-	// Query the configured name and its aliases: a library often uses the
-	// localized title while eD2k files carry the original one ("I misteri di
-	// Murdoch" vs "Murdoch Mysteries"). aMule runs one search at a time, so
-	// the names (and networks) are searched one after the other and merged by
-	// link.
-	names := make([]string, 0, 1+len(series.Aliases))
-	seenName := map[string]struct{}{}
-	for _, name := range append([]string{series.Name}, series.Aliases...) {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
-		}
-		key := strings.ToLower(name)
-		if _, exists := seenName[key]; exists {
-			continue
-		}
-		seenName[key] = struct{}{}
-		names = append(names, name)
-	}
 	// The automatic fallback asks both Kad and the eD2k servers (global
 	// search): they index different files, and a gap is worth the extra wait.
 	// A manual search uses the network chosen in the settings.
@@ -539,29 +554,9 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 	if !manual {
 		network = ed2kSearchBoth
 	}
-	candidates := make([]models.Release, 0)
-	seenRelease := map[string]struct{}{}
-	for _, name := range names {
-		if ctx.Err() != nil {
-			break
-		}
-		results, err := searchAmule(ctx, cfg, fmt.Sprintf("%s S%02dE%02d", name, season, episode), &network)
-		if err != nil {
-			logging.SourceFail("ed2k", "aMule", err.Error())
-			continue
-		}
-		for _, release := range ed2kReleases(results, "ed2k:amule") {
-			key, ok := releaseDedupKey(&release)
-			if !ok {
-				continue
-			}
-			if _, exists := seenRelease[key]; exists {
-				continue
-			}
-			seenRelease[key] = struct{}{}
-			candidates = append(candidates, release)
-		}
-	}
+	candidates := e.searchED2KSeriesQueries(ctx, cfg, series, network, func(name string) string {
+		return fmt.Sprintf("%s S%02dE%02d", name, season, episode)
+	})
 	if manual {
 		return candidates
 	}
@@ -585,6 +580,117 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 		canonicalName := series.Name
 		release.Series = &canonicalName
 		accepted = append(accepted, release)
+	}
+	return accepted
+}
+
+// SearchSeasonED2K looks up a whole season with one query ("Name Sxx"). The
+// manual series missing search uses it so aMule runs one search per season
+// instead of one per episode, which keeps the wait bounded.
+func (e *Engine) SearchSeasonED2K(ctx context.Context, cfg *Config, series *SeriesConfig, season int64) []models.Release {
+	if series == nil || season < 1 || !ed2kEnabled(cfg) {
+		return nil
+	}
+	settings, err := ed2kSettingsFromConfig(cfg)
+	if err != nil {
+		return nil
+	}
+	return e.searchED2KSeriesQueries(ctx, cfg, series, settings.Network, func(name string) string {
+		return fmt.Sprintf("%s S%02d", name, season)
+	})
+}
+
+// searchED2KSeriesQueries runs one eD2k search per configured name and alias
+// and merges the results by release identity. A library often uses the
+// localized title while eD2k files carry the original one ("I misteri di
+// Murdoch" vs "Murdoch Mysteries"). aMule runs one search at a time, so the
+// names are searched one after the other.
+func (e *Engine) searchED2KSeriesQueries(ctx context.Context, cfg *Config, series *SeriesConfig, network uint8, query func(name string) string) []models.Release {
+	names := make([]string, 0, 1+len(series.Aliases))
+	seenName := map[string]struct{}{}
+	for _, name := range append([]string{series.Name}, series.Aliases...) {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, exists := seenName[key]; exists {
+			continue
+		}
+		seenName[key] = struct{}{}
+		names = append(names, name)
+	}
+	candidates := make([]models.Release, 0)
+	seenRelease := map[string]struct{}{}
+	for _, name := range names {
+		if ctx.Err() != nil {
+			break
+		}
+		results, err := searchAmule(ctx, cfg, query(name), &network)
+		if err != nil {
+			logging.SourceFail("ed2k", "aMule", err.Error())
+			continue
+		}
+		for _, release := range ed2kReleases(results, "ed2k:amule") {
+			key, ok := releaseDedupKey(&release)
+			if !ok {
+				continue
+			}
+			if _, exists := seenRelease[key]; exists {
+				continue
+			}
+			seenRelease[key] = struct{}{}
+			candidates = append(candidates, release)
+		}
+	}
+	return candidates
+}
+
+// releaseMatchesConfiguredSeason reports whether the release belongs to the
+// series/alias and to the requested season.
+func releaseMatchesConfiguredSeason(release *models.Release, series *SeriesConfig, season int64) bool {
+	if release == nil || series == nil || release.Kind != "series" || release.Series == nil || release.Season == nil {
+		return false
+	}
+	if *release.Season != season {
+		return false
+	}
+	if SeriesNamesMatch(series.Name, *release.Series) {
+		return true
+	}
+	for _, alias := range series.Aliases {
+		if SeriesNamesMatch(alias, *release.Series) {
+			return true
+		}
+	}
+	return false
+}
+
+// ed2kManualSeasonFallback is the batch version of ed2kManualEpisodeFallback
+// for the series missing search: one query per season, then the caller
+// distributes the results to the gaps. It is gated by the same explicit switch.
+func ed2kManualSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, series *SeriesConfig, season int64) []models.Release {
+	if engine == nil || series == nil || !ed2kFallbackEligible(cfg) {
+		return nil
+	}
+	started := time.Now()
+	candidates := engine.SearchSeasonED2K(ctx, cfg, series, season)
+	accepted := make([]models.Release, 0, len(candidates))
+	for index := range candidates {
+		release := candidates[index]
+		name := series.Name
+		release.Series = &name
+		if !releaseMatchesConfiguredSeason(&release, series, season) {
+			continue
+		}
+		accepted = append(accepted, release)
+	}
+	if len(accepted) > 0 || time.Since(started) > 2*time.Second {
+		logging.Info("manual eD2k season fallback",
+			"series", series.Name,
+			"season", season,
+			"found", len(accepted),
+			"elapsed_ms", time.Since(started).Milliseconds())
 	}
 	return accepted
 }

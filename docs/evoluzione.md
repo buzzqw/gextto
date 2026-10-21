@@ -652,11 +652,14 @@ queued sources, UDP reasks, credits, Kad as a full node, AICH); Gextto adds the
 search with its release parsing, pasted `ed2k://` links, aMule's downloads in
 Downloads, the eD2k page (status, servers, Kad) and the import of completed files
 through the same completion flow as torrents, by hardlink or copy so aMule keeps
-sharing them. Everything is opt-in (`ed2k_enabled`), and the automatic
-gap-filling fallback is a second switch (`ed2k_fallback`) that accepts only an
-exact episode with a recognised quality and enough sources: eD2k names are a
-claim, the MD4 hash is the identity, and MediaInfo validation after the download
-is the second line of defence.
+sharing them. Everything is opt-in (`ed2k_enabled`); a second switch
+(`ed2k_fallback`) adds eD2k as the last source when the torrent plane finds
+nothing, both in the automatic gap-filling pass and in the manual **Search
+missing** and single-episode search (the series search asks once per season, the
+single search once per episode). Accepted automatic results need an exact
+episode, a recognised quality and enough sources; a manual search shows every
+match. eD2k names are a claim, the MD4 hash is the identity, and MediaInfo
+validation after the download is the second line of defence.
 
 The decision to use aMule instead of a native client rests on two facts kept in
 [`measurements.md`](measurements.md): the measured Kad coverage of missing

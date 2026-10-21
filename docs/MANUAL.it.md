@@ -662,6 +662,14 @@ Da **Cerca mancanti** o dalla scheda episodio:
 3. confronta release singole e season pack;
 4. se un episodio è già sul disco ma non nel database, usa la scansione archivio;
 5. usa **Forza** solo per un’azione manuale consapevole.
+6. se torrent e archivio non trovano nulla e **Usa eD2k quando i torrent non
+   trovano nulla** è attivo, la ricerca chiede l’episodio anche a eD2k/Kad: i
+   risultati compaiono con la sorgente **eD2k/Kad** e il pulsante **Scarica** li
+   passa ad aMule.
+
+Con il fallback eD2k attivo la ricerca può richiedere più tempo: aMule raccoglie
+i risultati per la durata configurata in **Durata della ricerca eD2k**, e la
+ricerca di una serie fa una sola interrogazione per stagione.
 
 Gextto evita normalmente di riscaricare episodi vecchi quando possiede episodi
 successivi, a meno che si tratti di un buco riconosciuto o di un upgrade reale.
@@ -1815,7 +1823,7 @@ spento per default: senza il tuo consenso Gextto non contatta la rete.
 | aMule — password connessioni esterne (EC) | La password in chiaro; aMule conserva il suo MD5 in `ECPassword`. Non visualizzata. |
 | Cartelle di aMule | La cartella di download (incoming) e quella temporanea sono mostrate in sola lettura: appartengono ad aMule e si cambiano da aMule/amuled. Dopo la modifica riavvia Gextto (oppure riapri questa pagina) perché usi il nuovo percorso. |
 | Rete delle ricerche eD2k | **Kad** (default, non serve un server), **Kad + server eD2k** (entrambe le ricerche, risultati uniti), **Server eD2k (globale)** (tutti i server) o **Server eD2k (connesso)**. Vale per la ricerca manuale; il fallback automatico cerca sempre su Kad e sui server. La stessa scelta è nella pagina eD2k. |
-| Usa eD2k quando i torrent non trovano nulla | Secondo interruttore, separato: solo nel passaggio approfondito del gap filling, e solo se torrent episodio e stagione non hanno prodotto nulla, Gextto cerca lo stesso episodio su Kad e sui server eD2k (con il nome della serie e tutti gli alias). Spento di default. |
+| Usa eD2k quando i torrent non trovano nulla | Secondo interruttore, separato: quando la ricerca torrent di episodio e stagione non ha prodotto nulla, Gextto cerca lo stesso episodio su eD2k/Kad (con il nome della serie e tutti gli alias). Vale sia per il passaggio approfondito del gap filling sia per **Cerca mancanti** e per la ricerca del singolo episodio. Spento di default. |
 | Fonti minime per il fallback | Soglia di fonti eD2k per accettare automaticamente un risultato. La ricerca manuale mostra tutto. *(Unità: fonti; 0 = nessun minimo)* |
 | Durata della ricerca eD2k | Per quanti secondi aMule raccoglie i risultati prima che Gextto li mostri. *(Unità: secondi)* |
 | Rinuncia a un download eD2k fermo dopo | Un download eD2k scelto da Gextto che non riceve dati per questi giorni viene annullato in aMule, la release va in blocklist e l'episodio torna da cercare. I download aggiunti a mano e quelli in pausa restano. *(Unità: giorni; 0 = mai)* |

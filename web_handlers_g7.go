@@ -33,6 +33,7 @@ const (
 	episodeOriginFeed    = "Feed RSS"
 	episodeOriginArchive = "Archivio"
 	episodeOriginIndexer = "Indexer / web"
+	episodeOriginED2K    = "eD2k"
 )
 
 const gh7_external_search_timeout = 12 * time.Second
@@ -327,7 +328,19 @@ func gh7_search_series_episode_sources(ctx context.Context, s *AppState, cfg *Co
 			}
 		}
 	}
-	return gh7_finalize_episode_search_results(results, cfg, series)
+	// Same fallback as the automatic gap pass, but on demand: when the torrent
+	// plane leaves nothing usable for this episode, ask eD2k/Kad too. The check
+	// runs after the usual filters, so a stored release rejected by quality or
+	// language does not hide the episode from the fallback. The switch is the
+	// explicit ed2k_fallback, so a manual search never surprises the operator.
+	final := gh7_finalize_episode_search_results(results, cfg, series)
+	if len(final) == 0 {
+		for _, release := range ed2kManualEpisodeFallback(ctx, s.engine, cfg, &series, season, episode) {
+			results = append(results, gh7_episode_result{Release: release, Origin: episodeOriginED2K})
+		}
+		final = gh7_finalize_episode_search_results(results, cfg, series)
+	}
+	return final
 }
 
 // gh7_torrent_display_name returns the real torrent name, falling back to

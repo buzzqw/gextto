@@ -695,12 +695,19 @@ func BatchArchiveDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if strings.TrimSpace(item.Source) != "" {
 			source = item.Source
 		}
-		release := ParseRelease(item.Title, item.Magnet, source)
 		var status int
-		if release == nil {
-			status, _ = gh4_addRawMagnet(s, item.Magnet)
+		if strings.TrimSpace(item.Ed2kLink) != "" {
+			// An eD2k result has no magnet: queue its ed2k:// link through the
+			// same path as the search results, so aMule gets it.
+			release := models.Release{Title: item.Title, Source: source, Ed2kLink: strings.TrimSpace(item.Ed2kLink)}
+			status, _ = gh3AddRelease(s, release)
 		} else {
-			status, _ = gh4_addRelease(s, *release)
+			release := ParseRelease(item.Title, item.Magnet, source)
+			if release == nil {
+				status, _ = gh4_addRawMagnet(s, item.Magnet)
+			} else {
+				status, _ = gh4_addRelease(s, *release)
+			}
 		}
 		if (status >= 200 && status < 300) || status == http.StatusAccepted {
 			accepted++

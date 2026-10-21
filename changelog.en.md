@@ -14,6 +14,14 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **«Search missing» now really uses eD2k.** Before, eD2k only came into play in
+  the automatic gap-filling pass: *Search missing* and single-episode search
+  ignored aMule even with the integration on. Now, when **Use eD2k when torrents
+  find nothing** is on and the torrents find nothing, the search asks eD2k/Kad
+  too. A series search runs **one query per season** (not one per episode, which
+  would be much slower): the results show the **eD2k/Kad** source and the
+  **Download** button hands them to aMule. The automatic fallback now also logs
+  when it starts and how many results it finds, so its use can be verified.
 - **Lighter web interface, especially on slow networks.** Pages now travel
   compressed: the Archive drops from about 473 KB to 39 KB and the dashboard
   from 33 KB to 8 KB. Stylesheets and scripts are compressed and stay in the

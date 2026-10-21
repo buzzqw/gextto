@@ -1032,6 +1032,7 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		wg.Wait()
 	}
 	results := []gh2_episodeResult{}
+	perGap := make([][]gh2_episodeSource, len(gaps))
 	for index, gap := range gaps {
 		season, episode := gap[0], gap[1]
 		episodeResults := gh2_storedSeriesEpisodeSources(s, series, season, episode)
@@ -1040,7 +1041,55 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 				episodeResults = append(episodeResults, gh2_episodeSource{Release: liveReleases[index][releaseIndex], Origin: episodeOriginIndexer})
 			}
 		}
-		for _, result := range gh2_finalizeEpisodeSearchResults(episodeResults, cfg, series) {
+		perGap[index] = episodeResults
+	}
+	accepted := make([][]gh2_episodeSource, len(gaps))
+	for index := range gaps {
+		accepted[index] = gh2_finalizeEpisodeSearchResults(perGap[index], cfg, series)
+	}
+	// Nothing usable from the torrent plane for some gaps: ask eD2k/Kad too, on
+	// the same explicit switch as the automatic fallback. The check uses the
+	// filtered results, so a stored release rejected by quality or language
+	// does not hide the gap. One query per season (not per episode) keeps the
+	// wait bounded: aMule serialises its searches.
+	if ed2kFallbackEligible(cfg) {
+		searched := map[int64]bool{}
+		for _, gap := range gaps {
+			season := gap[0]
+			if searched[season] {
+				continue
+			}
+			needsFallback := false
+			for index := range gaps {
+				if gaps[index][0] == season && len(accepted[index]) == 0 {
+					needsFallback = true
+					break
+				}
+			}
+			if !needsFallback {
+				continue
+			}
+			searched[season] = true
+			candidates := ed2kManualSeasonFallback(r.Context(), s.engine, cfg, series, season)
+			if len(candidates) == 0 {
+				continue
+			}
+			for index, candidateGap := range gaps {
+				if candidateGap[0] != season || len(accepted[index]) != 0 {
+					continue
+				}
+				for _, release := range candidates {
+					if gh2_releaseMatchesSeriesEpisode(&release, series, season, candidateGap[1]) {
+						perGap[index] = append(perGap[index], gh2_episodeSource{Release: release, Origin: episodeOriginED2K})
+					}
+				}
+				accepted[index] = gh2_finalizeEpisodeSearchResults(perGap[index], cfg, series)
+			}
+		}
+	}
+	for index, gap := range gaps {
+		season, episode := gap[0], gap[1]
+		for _, result := range accepted[index] {
 			results = append(results, gh2_episodeResult{
 				Release: result.Release,
 				Origin:  result.Origin,

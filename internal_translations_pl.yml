@@ -5310,7 +5310,7 @@ pol:
   "Cerca anche nella rete eD2k/Kad tramite il demone gx-ed2k. La ricerca eD2k è spenta per default.": "Wyszukuje także w sieci eD2k/Kad przez demona gx-ed2k. Wyszukiwanie eD2k jest domyślnie wyłączone."
   "Indirizzo Web API del demone gx-ed2k, di solito http://127.0.0.1:8899.": "Adres API sieciowego demona gx-ed2k, zwykle http://127.0.0.1:8899."
   "Token API di gx-ed2k, se il demone non ascolta solo su loopback.": "Token API gx-ed2k, jeśli demon nie nasłuchuje tylko na loopback."
-  "Quando i torrent non trovano nulla, cerca lo stesso episodio su eD2k/Kad. È un secondo interruttore, spento per default.": "Gdy torrenty nic nie znajdą, wyszukaj ten sam odcinek w eD2k/Kad. To drugi przełącznik, domyślnie wyłączony."
+  "Quando i torrent non trovano nulla, cerca lo stesso episodio su eD2k/Kad. Vale per il riempimento automatico e per «Cerca mancanti»; è un secondo interruttore, spento per default.": "Gdy torrenty nic nie znajdą, wyszukaj ten sam odcinek w eD2k/Kad. Dotyczy automatycznego uzupełniania luk i „Szukaj brakujących”; to drugi przełącznik, domyślnie wyłączony."
   "Numero minimo di sorgenti eD2k perché un risultato venga accettato automaticamente. La ricerca manuale mostra tutto.": "Minimalna liczba źródeł eD2k, aby wynik został przyjęty automatycznie. Wyszukiwanie ręczne pokazuje wszystko."
   "Tempo massimo concesso a una ricerca eD2k/Kad prima di restituire i risultati già arrivati.": "Maksymalny czas wyszukiwania eD2k/Kad przed zwróceniem wyników, które już dotarły."
   "fonti": "źródeł"
