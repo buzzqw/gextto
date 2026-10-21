@@ -29,8 +29,10 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   una serie fa **una sola interrogazione per stagione** (non una per episodio,
   che sarebbe molto più lenta): i risultati compaiono con la sorgente
   **eD2k/Kad** e il pulsante **Scarica** li passa ad aMule. Anche il fallback
-  automatico ora scrive nel log quando parte e quanti risultati trova, così si
-  può verificare che venga usato.
+  automatico ora scrive nel log quanti risultati trova, così si può verificare
+  che venga usato; se non trova nulla non scrive niente. Le ricerche manuali su eD2k mostrano solo
+  file della serie cercata: una serie con un nome simile (per esempio «Lost
+  Girl» cercando «Lost») non compare più tra i risultati.
 - **Interfaccia web più leggera, soprattutto su reti lente.** Le pagine ora
   viaggiano compresse: l'Archivio passa da circa 473 KB a 39 KB e la dashboard
   da 33 KB a 8 KB. I fogli di stile e gli script sono compressi e restano nella

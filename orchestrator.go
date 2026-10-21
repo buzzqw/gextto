@@ -578,11 +578,15 @@ func RunCycleDomain(
 				if len(foundResults[index]) == 0 && ed2kFallbackEligible(cfg) {
 					before := len(foundResults[index])
 					appendValid(engine.SearchSeriesED2K(ctx, cfg, candidate.Series, candidate.Season, candidate.Episode, false))
-					logging.Info("gap-fill eD2k fallback",
-						"series", candidate.Series.Name,
-						"season", candidate.Season,
-						"episode", candidate.Episode,
-						"found", len(foundResults[index])-before)
+					// Logged only when it found something: a gap with nothing on
+					// eD2k either would repeat the same line every cycle.
+					if found := len(foundResults[index]) - before; found > 0 {
+						logging.Info("gap-fill eD2k fallback",
+							"series", candidate.Series.Name,
+							"season", candidate.Season,
+							"episode", candidate.Episode,
+							"found", found)
+					}
 				}
 				logging.Debug("gap-fill live search completed",
 					"series", candidate.Series.Name,

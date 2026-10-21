@@ -27,7 +27,11 @@ manual is online: [English](docs/MANUAL.en.md) ·
   too. A series search runs **one query per season** (not one per episode, which
   would be much slower): the results show the **eD2k/Kad** source and the
   **Download** button hands them to aMule. The automatic fallback now also logs
-  when it starts and how many results it finds, so its use can be verified.
+  how many results it finds, so its use can be verified; when it finds nothing
+  it logs nothing.
+  Manual eD2k searches show only files of the series searched for: a series
+  with a similar name (for example «Lost Girl» when searching «Lost») no
+  longer shows up among the results.
 - **Lighter web interface, especially on slow networks.** Pages now travel
   compressed: the Archive drops from about 473 KB to 39 KB and the dashboard
   from 33 KB to 8 KB. Stylesheets and scripts are compressed and stay in the

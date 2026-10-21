@@ -383,11 +383,13 @@ func ed2kManualEpisodeFallback(ctx context.Context, engine *Engine, cfg *Config,
 	accepted := make([]models.Release, 0, len(candidates))
 	for index := range candidates {
 		release := candidates[index]
-		name := series.Name
-		release.Series = &name
+		// Match on the parsed name first: a different show with the same
+		// episode number ("Lost Girl" for "Lost") must not pass as this one.
 		if !releaseMatchesConfiguredEpisode(&release, series, season, episode) {
 			continue
 		}
+		name := series.Name
+		release.Series = &name
 		accepted = append(accepted, release)
 	}
 	if len(accepted) > 0 || time.Since(started) > 2*time.Second {
@@ -678,11 +680,11 @@ func ed2kManualSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, 
 	accepted := make([]models.Release, 0, len(candidates))
 	for index := range candidates {
 		release := candidates[index]
-		name := series.Name
-		release.Series = &name
 		if !releaseMatchesConfiguredSeason(&release, series, season) {
 			continue
 		}
+		name := series.Name
+		release.Series = &name
 		accepted = append(accepted, release)
 	}
 	if len(accepted) > 0 || time.Since(started) > 2*time.Second {

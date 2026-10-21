@@ -40,6 +40,8 @@ func TestManualED2KFallbackForEpisode(t *testing.T) {
 	core.SetResults([]amuletest.Result{
 		{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Name: "Scrubs S02E01 720p ITA.mkv", Size: 900000000, Sources: 4},
 		{Hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Name: "Scrubs S02E02 720p ITA.mkv", Size: 900000000, Sources: 4},
+		// Another show with the same episode number: it must not pass as Scrubs.
+		{Hash: "dddddddddddddddddddddddddddddddd", Name: "Scrubs Interns S02E01 720p ITA.mkv", Size: 300000000, Sources: 9},
 	}, "")
 	series := &SeriesConfig{Name: "Scrubs"}
 	got := ed2kManualEpisodeFallback(context.Background(), &Engine{}, cfg, series, 2, 1)
@@ -155,6 +157,7 @@ func TestSeriesSearchMissingFallsBackToED2K(t *testing.T) {
 		{Hash: "dddddddddddddddddddddddddddddddd", Name: "Scrubs S02E01 720p ITA.mkv", Size: 900000000, Sources: 5},
 		{Hash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", Name: "Scrubs S02E02 720p ITA.mkv", Size: 900000000, Sources: 5},
 		{Hash: "ffffffffffffffffffffffffffffffff", Name: "Scrubs S02E03 720p ITA.mkv", Size: 900000000, Sources: 5},
+		{Hash: "abababababababababababababababab", Name: "Scrubs Interns S02E02 720p ITA.mkv", Size: 300000000, Sources: 9},
 	}, "")
 	state := ed2kFallbackState(t, coreCfg)
 	key := "test-key"
@@ -184,8 +187,9 @@ func TestSeriesSearchMissingFallsBackToED2K(t *testing.T) {
 		if result.Origin != episodeOriginED2K {
 			continue
 		}
-		if link := v2String(result.Release["ed2k_link"]); !strings.HasPrefix(link, "ed2k://|file|Scrubs") {
-			t.Fatalf("ed2k link = %q", link)
+		link := v2String(result.Release["ed2k_link"])
+		if !strings.HasPrefix(link, "ed2k://|file|Scrubs%20S02") {
+			t.Fatalf("ed2k link = %q, want only Scrubs releases", link)
 		}
 		episodes[result.Episode] = true
 	}
