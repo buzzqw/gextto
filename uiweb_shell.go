@@ -78,6 +78,9 @@ type uiShellChrome struct {
 	GxLoad    string
 	Download  string
 	Upload    string
+	// LatencyMs is the ping Auto measured, shown next to the download metric;
+	// 0 when Auto is off or has no sample yet.
+	LatencyMs int64
 	NextCycle string
 	Lang      string
 	Torrents  int
@@ -232,6 +235,9 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 	chrome.ActiveDownloads = strconv.Itoa(activeDl) + "/" + strconv.Itoa(totalDl)
 	chrome.Download = logging.HumanRate(saturatingInt64(downloadRate))
 	chrome.Upload = logging.HumanRate(saturatingInt64(uploadRate))
+	if guard := s.latency_guard.status(); guard.Measuring {
+		chrome.LatencyMs = guard.LatencyMs
+	}
 
 	if cfg.RefreshSecs > 0 {
 		start, ok := s.db.LastCycleAt()

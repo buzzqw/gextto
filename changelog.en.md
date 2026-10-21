@@ -20,7 +20,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
   downloaded; the **eD2k** badge has a colour of its own, so it stands out from
   the torrents.
 - **Bandwidth: the ping next to Auto and an autotune that watches upload.** With
-  the speed on Auto the badge shows the measured **ping**; on an asymmetric line
+  the speed on Auto, the measured **ping** appears next to the **↓ Download**
+  speed in the top bar; on an asymmetric line
   upload counts as load from a tenth of the capacity (between 32 and 256 KiB/s),
   so Auto caps it before it saturates the network. If upload starts loading
   during the control phase it is capped at once, without waiting for a new

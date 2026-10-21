@@ -21,7 +21,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   scaricato; il badge **eD2k** ha un colore suo, così si distingue subito dai
   torrent.
 - **Banda: il ping accanto ad Auto e un autotune più attento all'upload.** Con
-  la velocità su Auto il badge mostra il **ping** misurato; quando la linea è
+  la velocità su Auto, accanto alla velocità **↓ Download** nella barra in alto
+  compare il **ping** misurato; quando la linea è
   asimmetrica l'upload conta come carico già a un decimo della capacità (tra 32
   e 256 KiB/s), quindi Auto lo limita prima che saturi la rete. Se l'upload
   comincia a caricare durante il controllo, viene limitato subito, senza
