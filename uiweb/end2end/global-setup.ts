@@ -7,7 +7,7 @@ import { request } from "@playwright/test";
  * else: the tests rely on the daemon staying in dry-run.
  */
 export default async function globalSetup() {
-  const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${process.env.GEXTTO_TEST_PORT || 15003}`;
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:15003";
   const context = await request.newContext({
     baseURL,
     extraHTTPHeaders: { Origin: baseURL },
