@@ -1436,79 +1436,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				completionMeta, _ := db.TorrentMeta(event.Hash)
 				isPack := completionMeta != nil && completionMeta.Release.IsPack
 				if !isPack {
-					processedPath, err := db.TorrentProcessed(event.Hash)
-					processed := event.SavePath
-					if err == nil && processedPath != nil {
-						processed = *processedPath
-					}
-					sizeBytes, _ := SizeOfPath(processed)
-					title := event.Name
-					if completionMeta != nil {
-						title = completionMeta.Release.Title
-					}
-					// Download duration and average speed for the notification.
-					var durationSeconds *int64
-					var averageSpeedBps *int64
-					if times, err := db.TorrentTimes(event.Hash); err == nil && times != nil {
-						if created, ok := utils.ParseTimestamp(times.CreatedAt); ok {
-							completed := time.Now().UTC()
-							if times.CompletedAt != nil {
-								if parsed, ok := utils.ParseTimestamp(*times.CompletedAt); ok {
-									completed = parsed
-								}
-							}
-							seconds := int64(completed.Sub(created).Seconds())
-							if seconds < 1 {
-								seconds = 1
-							}
-							speed := int64(float64(sizeBytes) / float64(seconds))
-							durationSeconds = &seconds
-							averageSpeedBps = &speed
-						}
-					}
-					var kindValue any
-					var seriesValue any
-					var seasonValue any
-					var episodeValue any
-					if completionMeta != nil {
-						kindValue = completionMeta.Release.Kind
-						if completionMeta.Release.Series != nil {
-							seriesValue = *completionMeta.Release.Series
-						}
-						if completionMeta.Release.Season != nil {
-							seasonValue = *completionMeta.Release.Season
-						}
-						if completionMeta.Release.Episode != nil {
-							episodeValue = *completionMeta.Release.Episode
-						}
-					}
-					var replacedTitleValue any
-					if replacedName, ok := db.UpgradeReplacedInfo(event.Hash); ok {
-						replacedTitleValue = replacedName
-					}
-					if alreadyAnnounced {
-						logging.Debug("completion already announced; notification skipped", "hash", event.Hash, "kind", event.Kind)
-					} else {
-						completionNotified[strings.ToLower(event.Hash)] = struct{}{}
-						if err := notifier.NotifyEvent("torrent_completed", map[string]any{
-							"hash":              event.Hash,
-							"name":              event.Name,
-							"title":             title,
-							"kind":              kindValue,
-							"series":            seriesValue,
-							"season":            seasonValue,
-							"episode":           episodeValue,
-							"path":              processed,
-							"size_bytes":        sizeBytes,
-							"duration_seconds":  durationSeconds,
-							"average_speed_bps": averageSpeedBps,
-							"replaced_title":    replacedTitleValue,
-						}); err != nil {
-							logging.Warn("completion notification failed", "hash", event.Hash, "event", "torrent_completed", "title", title, "error", err)
-						} else {
-							logging.Debug("completion notification sent", "hash", event.Hash, "event", "torrent_completed", "title", title)
-						}
-					}
+					processed := bg_announceCompletion(db, notifier, event, completionMeta, alreadyAnnounced, completionNotified)
 					// Ground-truth media inspection of the placed file. A missing
 					// ffprobe just leaves the filename-derived quality in place.
 					if completionMeta != nil {
@@ -1571,6 +1499,87 @@ type persistedMove struct {
 	postSeed    bool
 	attempts    uint8
 	guard       bool
+}
+
+// bg_announceCompletion sends the torrent_completed notification for a
+// finished single episode or movie, torrent or eD2k alike, and returns the
+// path the file was placed at. A completion already announced is not sent
+// again.
+func bg_announceCompletion(db *Database, notifier *Notifier, event models.TorrentEvent, completionMeta *models.TorrentMeta, alreadyAnnounced bool, completionNotified map[string]struct{}) string {
+	processedPath, err := db.TorrentProcessed(event.Hash)
+	processed := event.SavePath
+	if err == nil && processedPath != nil {
+		processed = *processedPath
+	}
+	sizeBytes, _ := SizeOfPath(processed)
+	title := event.Name
+	if completionMeta != nil {
+		title = completionMeta.Release.Title
+	}
+	// Download duration and average speed for the notification.
+	var durationSeconds *int64
+	var averageSpeedBps *int64
+	if times, err := db.TorrentTimes(event.Hash); err == nil && times != nil {
+		if created, ok := utils.ParseTimestamp(times.CreatedAt); ok {
+			completed := time.Now().UTC()
+			if times.CompletedAt != nil {
+				if parsed, ok := utils.ParseTimestamp(*times.CompletedAt); ok {
+					completed = parsed
+				}
+			}
+			seconds := int64(completed.Sub(created).Seconds())
+			if seconds < 1 {
+				seconds = 1
+			}
+			speed := int64(float64(sizeBytes) / float64(seconds))
+			durationSeconds = &seconds
+			averageSpeedBps = &speed
+		}
+	}
+	var kindValue any
+	var seriesValue any
+	var seasonValue any
+	var episodeValue any
+	if completionMeta != nil {
+		kindValue = completionMeta.Release.Kind
+		if completionMeta.Release.Series != nil {
+			seriesValue = *completionMeta.Release.Series
+		}
+		if completionMeta.Release.Season != nil {
+			seasonValue = *completionMeta.Release.Season
+		}
+		if completionMeta.Release.Episode != nil {
+			episodeValue = *completionMeta.Release.Episode
+		}
+	}
+	var replacedTitleValue any
+	if replacedName, ok := db.UpgradeReplacedInfo(event.Hash); ok {
+		replacedTitleValue = replacedName
+	}
+	if alreadyAnnounced {
+		logging.Debug("completion already announced; notification skipped", "hash", event.Hash, "kind", event.Kind)
+	} else {
+		completionNotified[strings.ToLower(event.Hash)] = struct{}{}
+		if err := notifier.NotifyEvent("torrent_completed", map[string]any{
+			"hash":              event.Hash,
+			"name":              event.Name,
+			"title":             title,
+			"kind":              kindValue,
+			"series":            seriesValue,
+			"season":            seasonValue,
+			"episode":           episodeValue,
+			"path":              processed,
+			"size_bytes":        sizeBytes,
+			"duration_seconds":  durationSeconds,
+			"average_speed_bps": averageSpeedBps,
+			"replaced_title":    replacedTitleValue,
+		}); err != nil {
+			logging.Warn("completion notification failed", "hash", event.Hash, "event", "torrent_completed", "title", title, "error", err)
+		} else {
+			logging.Debug("completion notification sent", "hash", event.Hash, "event", "torrent_completed", "title", title)
+		}
+	}
+	return processed
 }
 
 // recordEd2kCompletion marks a completed eD2k download as removed from the
