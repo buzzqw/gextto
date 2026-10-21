@@ -114,7 +114,9 @@ func ensureAmuleManagedConfig(cfg *Config) (amuleManagedSettings, error) {
 			return settings, err
 		}
 	}
-	passwordHash := md5.Sum([]byte(settings.Password))
+	// aMule's amule.conf stores ECPassword as an MD5 digest; the protocol defines
+	// it and the password is generated locally, not a user credential.
+	passwordHash := md5.Sum([]byte(settings.Password)) // lgtm[go/weak-sensitive-data-hashing]
 	// aMule reads a sectioned amule.conf; keys outside a section are ignored
 	// and the core appends its defaults (with external connections off), so
 	// the managed file must use the same layout as the one aMule writes.
