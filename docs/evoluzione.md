@@ -672,10 +672,11 @@ last-resort source. The native daemon is preserved in the history, at commit
 
 Open points:
 
-- **Managed amuled.** Gextto expects an `amuled` the operator runs and configures.
-  Starting and supervising it like qBittorrent-nox (own `--config-dir`,
-  generated EC password, ports) would remove the manual setup. Gate: users who
-  want eD2k without configuring aMule by hand.
+- **Managed amuled (optional, not a Gextto engine).** Gextto does not ship or
+  require aMule: the operator runs and configures it, and Gextto reads it over
+  EC. A convenience starter (a private config directory, a generated EC
+  password and the ports) would remove the manual setup for those who want it.
+  Gate: users who want eD2k without configuring aMule by hand.
 - **Remote aMule.** Completed files are imported from aMule's incoming folder at
   the same path, which holds when both run on one machine. A remote core would
   need a path mapping like `qbittorrent_path_mappings`.
