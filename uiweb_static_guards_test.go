@@ -89,7 +89,9 @@ func TestEnd2EndSelectorsReferenceRealSettings(t *testing.T) {
 		keys[def.Key] = true
 	}
 	selector := regexp.MustCompile(`#(?:input|v2-setting)-([a-zA-Z0-9_]+)`)
-	tab := regexp.MustCompile(`tab=([a-zA-Z0-9_]+)`)
+	tab := regexp.MustCompile(`tab=([a-zA-Z0-9_-]+)`)
+	// `tab=` is also used by the Maintenance tabs, which are not settings tabs.
+	maintenanceTabs := map[string]bool{"general": true, "archive-sql": true}
 	var missing []string
 	checked := 0
 	for _, path := range tests {
@@ -105,6 +107,9 @@ func TestEnd2EndSelectorsReferenceRealSettings(t *testing.T) {
 			}
 		}
 		for _, m := range tab.FindAllStringSubmatch(text, -1) {
+			if maintenanceTabs[m[1]] {
+				continue
+			}
 			checked++
 			if uiSettingsCanonicalTab(m[1]) == "" {
 				missing = append(missing, filepath.Base(path)+": tab "+m[1])

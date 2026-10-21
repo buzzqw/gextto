@@ -27,7 +27,7 @@ gextto/
 │   └── static/*            CSS, htmx, JS (v2-core.js)
 ├── uiweb/end2end/          Playwright tests (Node, not Go)
 ├── docs/                   documentation (this file, manuals, API...)
-├── scripts/                build, update, packaging and service helper
+├── scripts/                build, update, packaging and service helpers; scripts/sql holds the archive maintenance SQL
 ├── systemd/                example unit files for the service
 ├── .github/                CI, CodeQL, dependabot, release
 ├── go.mod / go.sum         Go dependencies
@@ -99,6 +99,7 @@ qBittorrent-nox.
 | `sqlite.go` | opening a SQLite DB with shared pragmas. |
 | `indexer_lanes.go` | Jackett/Prowlarr searched one indexer at a time: lanes read from the manager's list (10 min cache), per-lane slots, timeout, health and budget skip, cross-manager dedup by tracker. |
 | `archive.go` | durable catalogue of archived releases (SQLite + FTS5 on titles): one row per exact magnet/URL (`magnet_key`, a 16-byte digest) and one per infohash (`idx_archive_hash`; a new listing of a known torrent refreshes its row). |
+| `archive_sql.go` | small engine for the curated `scripts/sql/*.sql` operations: loads them (embedded), validates one read-only SELECT or one DELETE, binds the selected language marker arrays to `:tokens`/`:raw`, runs previews and transactional deletions. |
 | `migrate.go` | migration of the data directory. |
 | `backup.go` | database backups (manual and scheduled). |
 | `library_alias.go` | helper for library persistence. |
@@ -182,7 +183,7 @@ qBittorrent-nox.
 | `uiweb_shell.go` | UI "chrome": top bar, sidebar, status. |
 | `uiweb_settings.go`, `uiweb_settings_meta.go`, `uiweb_settings_defaults.go`, `uiweb_tooltips.go` | Configuration page: areas, sections and index with the panel (`Group`) of each setting; units, special values, control type and the toggle it depends on; defaults; descriptions. |
 | `uiweb_v2.go` | v2 shell (HTMX), fragment routing and rendering. |
-| `uiweb_v2_dashboard.go`, `uiweb_v2_downloads.go`, `uiweb_v2_detail.go`, `uiweb_v2_search.go`, `uiweb_v2_comics.go`, `uiweb_v2_maintenance.go` | dedicated v2 pages. |
+| `uiweb_v2_dashboard.go`, `uiweb_v2_downloads.go`, `uiweb_v2_detail.go`, `uiweb_v2_search.go`, `uiweb_v2_comics.go`, `uiweb_v2_maintenance.go`, `uiweb_v2_archive_sql.go` | dedicated v2 pages. |
 | `uiweb_v2_sections.go` | pages composed of sections (Maintenance, Integrations). |
 | `uiweb_v2_settings_extras.go` | structured editors of the v2 Configuration. |
 | `uiweb_v2_table.go` | generic server-side table renderer. |

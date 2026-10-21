@@ -222,6 +222,33 @@ test("manutenzione espone la revisione rinomina cartella", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Scansiona e proponi" })).toBeVisible();
 });
 
+test("manutenzione SQL dell'archivio ha un tab e usa la lingua scelta", async ({ page }) => {
+  await page.goto("/?view=maintenance");
+  await page.getByRole("tab", { name: "Manutenzione SQL dell'archivio" }).click();
+  await expect(page.locator("#v2-archive-sql-panel")).toBeVisible();
+  const language = page.locator("#v2-archive-sql-language");
+  await expect(language).toBeVisible();
+  await language.selectOption("eng");
+  const languageOp = page.locator(".v2-archive-sql-op", { hasText: "Release nella lingua selezionata più vecchie di 6 mesi" });
+  await languageOp.getByRole("button", { name: "Anteprima", exact: true }).click();
+  await expect(page.locator("#v2-archive-sql-output")).toContainText("righe corrispondenti");
+  await expect(page.locator("#v2-archive-sql-output")).toContainText("English");
+});
+
+test("manutenzione SQL mostra l'indicatore mentre la query lavora", async ({ page }) => {
+  await page.goto("/?view=maintenance&tab=archive-sql");
+  await page.route("**/maintenance/archive-sql/preview", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await route.fulfill({ contentType: "text/html; charset=utf-8", body: "<div>ok</div>" });
+  });
+  const operation = page.locator(".v2-archive-sql-op").first();
+  await operation.getByRole("button", { name: "Anteprima", exact: true }).click();
+  const working = page.locator("#v2-archive-sql-working");
+  await expect(working).toHaveClass(/htmx-request/);
+  await expect(working).toContainText("Query in corso");
+  await expect(working).not.toHaveClass(/htmx-request/);
+});
+
 test("manutenzione chiude con build completa e commit", async ({ page }) => {
   await page.goto("/?view=maintenance");
   const info = page.locator(".v2-build-info");

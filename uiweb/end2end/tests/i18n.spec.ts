@@ -29,3 +29,25 @@ test("le lingue complete traducono le intestazioni delle tabelle", async ({ page
   await page.waitForLoadState("domcontentloaded");
   await expect(head.locator("th").first()).toHaveText("Titolo", { timeout: 15000 });
 });
+
+test("il tab SQL dell'archivio è tradotto in tutte le lingue", async ({ page }) => {
+  const languages = [
+    { code: "en", tab: "Archive SQL maintenance", language: "Language for the operations" },
+    { code: "de", tab: "SQL-Wartung des Archivs", language: "Sprache für die Vorgänge" },
+    { code: "fr", tab: "Maintenance SQL de l'archive", language: "Langue des opérations" },
+    { code: "es", tab: "Mantenimiento SQL del archivo", language: "Idioma de las operaciones" },
+    { code: "pl", tab: "Konserwacja SQL archiwum", language: "Język operacji" },
+  ];
+  await page.goto("/?view=maintenance&tab=archive-sql");
+  await expect(page.getByRole("tab", { name: "Manutenzione SQL dell'archivio" })).toBeVisible();
+  for (const language of languages) {
+    await page.locator(".lang-select").selectOption(language.code);
+    await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("tab", { name: language.tab })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('label[for="v2-archive-sql-language"]')).toHaveText(language.language, { timeout: 15000 });
+  }
+  // Leave the shared test server on its default language for the other specs.
+  await page.locator(".lang-select").selectOption("it");
+  await page.waitForLoadState("domcontentloaded");
+  await expect(page.getByRole("tab", { name: "Manutenzione SQL dell'archivio" })).toBeVisible({ timeout: 15000 });
+});

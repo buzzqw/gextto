@@ -24,6 +24,17 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   impostato un URL diverso lo mantiene; per passare alla nuova lista basta
   incollarlo in **Impostazioni → Rete → IP filter (file/URL)** e premere
   **Carica / aggiorna ora**.
+- **Manutenzione: tab SQL per l'Archivio release, con scelta della lingua.**
+  In **Manutenzione** c'è il tab **Manutenzione SQL dell'archivio**: un
+  selettore in cima sceglie la lingua delle operazioni e l'elenco propone
+  release più vecchie di 6 mesi o di 1 anno, release nella lingua scelta o
+  senza quella lingua, titoli vuoti, più diagnostiche di sola lettura
+  (distribuzione per età, release per fonte, stato dell'archivio, titoli
+  duplicati). Ogni operazione che elimina mostra prima l'anteprima con il
+  conteggio e le prime 200 righe, poi chiede conferma. Non è una console SQL
+  libera: esegue solo gli script inclusi e non tocca libreria, torrent attivi o
+  impostazioni. La lingua è dedotta dal titolo, quindi le release senza
+  marcatore rientrano tra quelle “non nella lingua selezionata”.
 - **Versione: la terza cifra riparte ogni 1000 build, la build resta visibile.**
   Quando il contatore arriva a 2000 la versione passa da `1.1.1999` a `1.2.0`,
   poi `1.2.999` e `1.3.0`, e così via: il terzo numero non cresce all'infinito,

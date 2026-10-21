@@ -30,6 +30,7 @@ needs.
 | [eD2k and Kad through aMule](amule.md) | How to install and configure aMule, enable it in Gextto and use eD2k/Kad: search, links, aMule's queue in Downloads, completion, shared limits, troubleshooting, settings and tests. |
 | [BEP compliance](bep.md) | Which BitTorrent specifications (BEPs) the engine supports, which are missing and the roadmap. |
 | [gx-core](gx-core.md) | The standalone torrent client (the `gx-torrent` binary used without Gextto): modes, security, packaging, what is still open. |
+| [SQL maintenance scripts](../scripts/sql/README.md) | Ready-to-run queries and the Maintenance tab for the release archive: old/language-filtered releases, diagnostics and their manual deletion. |
 
 > [!NOTE]
 > The paths, ports and commands here are examples. Always check the service

@@ -1541,6 +1541,105 @@
 {{if .Lines}}<pre class="log-view" id="v2-gx-log-view" tabindex="0" role="region" aria-label="File di log gx-torrent">{{range .Lines}}<span class="log-line">{{.}}</span>{{end}}</pre>{{else}}<pre class="log-view" id="v2-gx-log-view" tabindex="0" role="region" aria-label="File di log gx-torrent"><span class="muted">Nessuna riga da mostrare: gx-torrent potrebbe non essere il motore attivo o il log non è ancora stato creato.</span></pre>{{end}}
 {{end}}
 
+{{define "v2_archive_sql_panel"}}
+<div class="panel" id="v2-archive-sql-panel">
+  <div class="panel-head"><h3>Manutenzione SQL dell'archivio</h3></div>
+  <div class="panel-body">
+    <p class="hint">Gli script inclusi lavorano solo sull'Archivio release. Non toccano la libreria, i torrent attivi o le impostazioni.</p>
+    <p class="v2-warning" role="note">Operazioni potenti e irreversibili. Esegui sempre l'anteprima e controlla le righe prima di eliminare.</p>
+    {{if .DryRun}}<p class="hint" role="status">La modalità prova è attiva: l'eliminazione è disabilitata.</p>{{end}}
+    {{if .Error}}<p class="hint" role="alert">{{.Error}}</p>{{end}}
+    <form class="toolbar v2-archive-sql-language" method="get" action="/">
+      <input type="hidden" name="view" value="maintenance" />
+      <input type="hidden" name="tab" value="archive-sql" />
+      <label for="v2-archive-sql-language">Lingua per le operazioni</label>
+      <select class="input compact" id="v2-archive-sql-language" name="language">
+        {{range .Languages}}<option value="{{.Code}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+      <button class="btn sm" type="submit">Applica</button>
+    </form>
+    {{if .Categories}}
+    <div class="v2-archive-sql-groups">
+      {{range .Categories}}
+      <section class="v2-archive-sql-group">
+        <h4>{{.Title}}</h4>
+        <ul class="v2-archive-sql-list">
+          {{range .Operations}}
+          <li class="v2-archive-sql-op">
+            <div class="v2-archive-sql-op-text">
+              <strong>{{.Title}}</strong>
+              <p class="hint">{{.Description}}</p>
+              <code class="v2-archive-sql-id">{{.ID}}</code>
+            </div>
+            <div class="v2-archive-sql-op-actions">
+              <form hx-post="/maintenance/archive-sql/preview" hx-target="#v2-archive-sql-output" hx-swap="innerHTML" hx-indicator="#v2-archive-sql-working" hx-disabled-elt="find button"{{if .NeedsLanguage}} hx-include="#v2-archive-sql-language"{{end}}>
+                <input type="hidden" name="op" value="{{.ID}}" />
+                {{if .Destructive}}<button class="btn sm" type="submit">Anteprima</button>{{else}}<button class="btn sm" type="submit">Esegui</button>{{end}}
+              </form>
+              {{if .NeedsLanguage}}<span class="badge">Lingua</span>{{end}}
+              {{if .Destructive}}<span class="badge err">Eliminazione</span>{{else}}<span class="badge">Solo lettura</span>{{end}}
+            </div>
+          </li>
+          {{end}}
+        </ul>
+      </section>
+      {{end}}
+    </div>
+    {{else}}<p class="muted">Nessuna operazione disponibile.</p>{{end}}
+    <div id="v2-archive-sql-working" class="htmx-indicator v2-archive-sql-working" role="status" aria-live="polite">
+      <span class="v2-archive-sql-working-text">
+        <strong>Query in corso…</strong>
+        <small>Attendi: l'archivio può richiedere qualche secondo.</small>
+      </span>
+    </div>
+    <div id="v2-archive-sql-output" class="v2-archive-sql-output" aria-live="polite"></div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_archive_sql_result"}}
+<div class="panel v2-archive-sql-result">
+  {{if .Title}}<div class="panel-head"><h3>{{.Title}}</h3></div>{{end}}
+  <div class="panel-body">
+    {{if .Description}}<p class="hint">{{.Description}}</p>{{end}}
+    {{if .NeedsLanguage}}<p class="hint"><span>Lingua</span>: <strong>{{.LanguageLabel}}</strong></p>{{end}}
+    {{if and .DryRun .Destructive}}<p class="hint" role="status">La modalità prova è attiva: l'eliminazione è disabilitata.</p>{{end}}
+    {{if .DeletedOK}}<p class="v2-archive-sql-deleted" role="status"><strong>{{.Deleted}}</strong> <span>righe eliminate</span></p>{{end}}
+    {{if .Error}}<p class="hint" role="alert">{{.Error}}</p>{{else}}
+      <p class="hint"><strong>{{.Total}}</strong> <span>righe corrispondenti</span>{{if .Limited}} <span>·</span> <span>mostrate le prime</span> <strong>{{.Shown}}</strong>{{end}}</p>
+      {{if .Shown}}
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>{{range .Columns}}<th scope="col">{{.}}</th>{{end}}</tr></thead>
+          <tbody>{{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}</tbody>
+        </table>
+      </div>
+      {{else}}<p class="muted">Nessuna riga.</p>{{end}}
+      {{if .CanDelete}}
+      <form class="v2-archive-sql-delete" hx-post="/maintenance/archive-sql/delete" hx-target="#v2-archive-sql-output" hx-swap="innerHTML" hx-indicator="#v2-archive-sql-working" hx-disabled-elt="find button" hx-confirm="Eliminare definitivamente le righe corrispondenti? L'operazione non è reversibile.">
+        <input type="hidden" name="op" value="{{.ID}}" />
+        {{if .NeedsLanguage}}<input type="hidden" name="language" value="{{.LanguageCode}}" />{{end}}
+        <input type="hidden" name="confirm" value="1" />
+        <button class="btn danger" type="submit">Elimina definitivamente</button>
+      </form>
+      {{end}}
+    {{end}}
+    {{if .SQL}}
+    <details class="v2-archive-sql-query">
+      <summary>Query SQL</summary>
+      <pre>{{.SQL}}</pre>
+    </details>
+    {{end}}
+    {{if .DeleteSQL}}
+    <details class="v2-archive-sql-query">
+      <summary>Query di eliminazione</summary>
+      <pre>{{.DeleteSQL}}</pre>
+    </details>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
 {{/* ------------------------------------------------------------------ */}}
 {{/* Manuale / Licenza                                                   */}}
 {{/* ------------------------------------------------------------------ */}}
@@ -1928,15 +2027,24 @@
 
 {{define "v2_panels_page"}}
 <div class="view">
-  {{range .Groups}}
-    <section class="section-group">
-      {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
-      <div class="{{if $.Stack}}v2-section-stack{{else if gt (len .Sections) 1}}grid-2{{end}}">
-        {{range .Sections}}{{template "v2_section" .}}{{end}}
-      </div>
-    </section>
+  {{if .Tabs}}
+  <nav class="toolbar maintenance-tabs" role="tablist" aria-label="Sezioni manutenzione">
+    {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" role="tab" aria-selected="{{if .Active}}true{{else}}false{{end}}" href="{{.Href}}">{{.Label}}</a>{{end}}
+  </nav>
   {{end}}
-  {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
+  {{if .ArchiveSQL}}
+    {{with .ArchiveSQL}}{{template "v2_archive_sql_panel" .}}{{end}}
+  {{else}}
+    {{range .Groups}}
+      <section class="section-group">
+        {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
+        <div class="{{if $.Stack}}v2-section-stack{{else if gt (len .Sections) 1}}grid-2{{end}}">
+          {{range .Sections}}{{template "v2_section" .}}{{end}}
+        </div>
+      </section>
+    {{end}}
+    {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
+  {{end}}
   {{with .Build}}{{template "v2_build_info" .}}{{end}}
   </div>
 {{end}}

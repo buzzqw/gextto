@@ -22,6 +22,17 @@ manual is online: [English](docs/MANUAL.en.md) ·
   such as `158.173.0.0/16`, which also stopped available peers. Anyone who has
   already set a different URL keeps it; to switch to the new list, paste it in
   **Settings → Network → IP filter (file/URL)** and press **Load / update now**.
+- **Maintenance: an SQL tab for the release Archive, with a language
+  selector.** Under **Maintenance** there is now the **Archive SQL
+  maintenance** tab: a selector at the top chooses the language for the
+  operations, and the list offers releases older than 6 months or 1 year,
+  releases in the selected language or without it, empty titles, plus read-only
+  diagnostics (age distribution, releases per source, archive health, duplicate
+  titles). Every deletion operation first shows the preview with the count and
+  the first 200 rows, then asks for confirmation. It is not a free SQL console:
+  it runs only the bundled scripts and does not touch the library, active
+  torrents or settings. The language is inferred from the title, so releases
+  with no marker fall into the “not in the selected language” list.
 - **Version: the third number restarts every 1000 builds, the build stays
   visible.** When the counter reaches 2000 the version goes from `1.1.1999` to
   `1.2.0`, then `1.2.999` and `1.3.0`, and so on: the third number no longer

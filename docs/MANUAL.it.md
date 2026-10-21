@@ -1272,6 +1272,19 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   La verifica di rinomina esegue la stessa pulizia automaticamente e la pulizia
   degli upgrade ora rispetta anche i motivi "forti" (risoluzione/sorgente/HDR/
   repack).
+- **Manutenzione SQL dell'archivio** — tab avanzato e distruttivo per
+  l'Archivio release. In cima un selettore sceglie la **lingua per le
+  operazioni**; il tab elenca le operazioni incluse in `scripts/sql`: release
+  più vecchie di 6 mesi o di 1 anno, release nella lingua scelta o senza quella
+  lingua, titoli vuoti, più alcune diagnostiche di sola lettura (distribuzione
+  per età, release per fonte, stato dell'archivio, titoli duplicati).
+  Un'operazione che elimina mostra prima l'anteprima con il numero di righe
+  corrispondenti e le prime 200; solo dopo compare **Elimina definitivamente**,
+  con conferma. Non è una console SQL libera: esegue solo i file inclusi e non
+  tocca libreria, torrent attivi o impostazioni. La lingua è dedotta dal titolo,
+  quindi anche una release senza marcatore rientra nell'elenco “non nella
+  lingua selezionata”. Fai un backup prima di una cancellazione grande; dopo,
+  `VACUUM` compatta il file dell'archivio.
 - **Ripristina sorgente** — *Ripristina sorgente nei nomi* rimette il token
   `[Source]` (WEB-DL, HDTV, BluRay…) nei nomi archiviati che l'hanno perso,
   recuperandolo dal titolo originale della release nel database. Non inventa la

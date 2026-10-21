@@ -2139,3 +2139,79 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 @media (max-width: 560px) {
   .v2-build-info { padding-right: 52px; padding-left: 12px; text-align: left; }
 }
+
+/* Maintenance tabs: general panels vs the archive SQL engine. */
+.maintenance-tabs { margin-bottom: 14px; }
+
+/* Archive SQL maintenance: curated operations, preview first, then delete. */
+.v2-warning {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border-radius: 10px;
+}
+.v2-archive-sql-groups { display: grid; gap: 18px; margin-top: 14px; }
+.v2-archive-sql-group h4 { margin: 0 0 8px; font-size: 0.95rem; }
+.v2-archive-sql-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.v2-archive-sql-op {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+}
+.v2-archive-sql-op-text { min-width: 0; }
+.v2-archive-sql-op-text .hint { margin: 2px 0 0; }
+.v2-archive-sql-id { color: var(--muted); font-size: 0.75rem; }
+.v2-archive-sql-op-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+.v2-archive-sql-output { margin-top: 18px; }
+/* The request can take several seconds on a large archive: a fixed, visible
+   banner is clearer than a text at the bottom of a long panel. HTMX toggles
+   the htmx-request class and the bundled .htmx-indicator rules handle opacity. */
+.v2-archive-sql-working {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(92vw, 34rem);
+  padding: 12px 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.28);
+  color: var(--text);
+  pointer-events: none;
+}
+.v2-archive-sql-working::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: v2-archive-sql-spin 0.8s linear infinite;
+}
+.v2-archive-sql-working strong { display: block; }
+.v2-archive-sql-working small { display: block; color: var(--muted); font-weight: 400; }
+@keyframes v2-archive-sql-spin { to { transform: rotate(360deg); } }
+@media (max-width: 720px) {
+  .v2-archive-sql-working { bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2-archive-sql-working::before { animation: none; }
+}
+.v2-archive-sql-deleted { color: var(--ok); font-weight: 600; }
+.v2-archive-sql-delete { margin-top: 12px; }
+.v2-archive-sql-query { margin-top: 14px; }
+.v2-archive-sql-query pre { max-height: 20rem; overflow: auto; }
+@media (max-width: 720px) {
+  .v2-archive-sql-op { flex-direction: column; }
+  .v2-archive-sql-op-actions { justify-content: flex-start; }
+}

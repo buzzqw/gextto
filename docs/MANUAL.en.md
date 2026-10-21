@@ -1233,6 +1233,19 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   session are protected, and emptied sub-folders are removed. The rename
   verification also performs this cleanup automatically, and upgrade cleanup now
   also honours the "hard" upgrade reasons (resolution/source/HDR/repack).
+- **Archive SQL maintenance** — an advanced, destructive tab for the release
+  Archive. A selector at the top chooses the **language for the operations**;
+  the tab lists the operations bundled in `scripts/sql`: releases older than 6
+  months or 1 year, releases in the selected language or without it, empty
+  titles, plus read-only diagnostics (age distribution, releases per source,
+  archive health, duplicate titles). A deletion operation first shows the
+  preview with the number of matching rows and the first 200; only then
+  **Delete permanently** appears, with a confirmation. It is not a free SQL
+  console: it runs only the bundled files and does not touch the library,
+  active torrents or settings. The language is inferred from the title, so a
+  release with no marker falls into the “not in the selected language” list.
+  Back up before a large deletion; afterwards `VACUUM` compacts the archive
+  file.
 - **Restore source** — *Restore source* remounts the `[Source]` token (WEB-DL,
   HDTV, BluRay…) in archived names that lost it, recovering it from the original
   release title in the database. It never invents a source: unknown stays

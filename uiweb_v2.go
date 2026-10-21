@@ -277,6 +277,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /maintenance/update-notes", V2UpdateNotesDismiss)
 	v2Handle(s, mux, "POST /maintenance/folder-rename/scan", V2FolderRenameScan)
 	v2Handle(s, mux, "POST /maintenance/folder-rename/apply", V2FolderRenameApply)
+	v2Handle(s, mux, "POST /maintenance/archive-sql/preview", V2ArchiveSQLPreview)
+	v2Handle(s, mux, "POST /maintenance/archive-sql/delete", V2ArchiveSQLDelete)
 	v2Handle(s, mux, "GET /partial/rename-progress", V2RenameProgress)
 
 	// OAuth / PIN (Simkl).
@@ -585,12 +587,23 @@ func v2ComicsViewFrom(s *AppState, r *http.Request) v2ComicsView {
 	}
 }
 
+type v2PanelTab struct {
+	ID     string
+	Label  string
+	Href   string
+	Active bool
+}
+
 type v2PanelsView struct {
 	Groups []v2Group
 	Jobs   *v2JobsView
 	Stack  bool
 	// Build is the exact build identity shown at the bottom of Maintenance.
 	Build *v2BuildInfo
+	// Tabs splits Maintenance into the general panels and the archive SQL tab.
+	Tabs       []v2PanelTab
+	ActiveTab  string
+	ArchiveSQL *v2ArchiveSQLView
 }
 
 // v2BuildInfo is the line that pins down exactly which binary is running: the
@@ -643,14 +656,27 @@ func v2MovieLibraryViewFrom(s *AppState, r *http.Request) v2MovieLibraryView {
 
 func v2PanelsViewFrom(s *AppState, r *http.Request, view string) v2PanelsView {
 	page := v2PanelsView{}
+	if view == "maintenance" {
+		page.ActiveTab = strings.TrimSpace(r.FormValue("tab"))
+		if page.ActiveTab != "archive-sql" {
+			page.ActiveTab = "general"
+		}
+		page.Tabs = []v2PanelTab{
+			{ID: "general", Label: "Generale", Href: "/?view=maintenance", Active: page.ActiveTab == "general"},
+			{ID: "archive-sql", Label: "Manutenzione SQL dell'archivio", Href: "/?view=maintenance&tab=archive-sql", Active: page.ActiveTab == "archive-sql"},
+		}
+		page.Build = v2BuildInfoFor(constants.AppVersion(), constants.Build, constants.Commit)
+		if page.ActiveTab == "archive-sql" {
+			widget := v2ArchiveSQLViewFrom(s, r)
+			page.ArchiveSQL = &widget
+			return page
+		}
+		jobs := v2JobsViewFrom(s)
+		page.Jobs = &jobs
+	}
 	if panels, ok := uiPanelsPageFor(view, s); ok {
 		page.Groups = v2SectionGroups(s, r, view, panels.Sections)
 		page.Stack = panels.Stack
-	}
-	if view == "maintenance" {
-		jobs := v2JobsViewFrom(s)
-		page.Jobs = &jobs
-		page.Build = v2BuildInfoFor(constants.AppVersion(), constants.Build, constants.Commit)
 	}
 	return page
 }
