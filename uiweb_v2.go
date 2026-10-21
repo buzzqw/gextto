@@ -1514,7 +1514,7 @@ type v2DetailTab struct {
 	Active    bool
 }
 
-type v2KV struct{ Label, Value string }
+type v2KV struct{ Label, Value, Hint string }
 
 // v2PieceRun is one run of consecutive pieces sharing a state, with the width
 // (percentage) used to draw the piece map.
@@ -1709,45 +1709,45 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		}
 	}
 	view.General = []v2KV{
-		{Label: "Stato", Value: stateLabel},
-		{Label: "Progresso", Value: fmt.Sprintf("%.1f%%", progressVal)},
-		{Label: "Dimensione", Value: logging.HumanBytesI64(torrent.TotalSize)},
-		{Label: "Scaricato", Value: logging.HumanBytesI64(doneVal)},
-		{Label: "Download totale", Value: logging.HumanBytesI64(torrent.AllTimeDownload)},
-		{Label: "Caricato", Value: logging.HumanBytesI64(torrent.AllTimeUpload)},
-		{Label: "Ratio", Value: fmt.Sprintf("%.2f", uiTorrentRatio(torrent.AllTimeUpload, torrent.AllTimeDownload, doneVal, torrent.TotalSize))},
-		{Label: "↓ / ↑", Value: logging.HumanRate(saturatingInt64(torrent.DownloadRate)) + " / " + logging.HumanRate(saturatingInt64(torrent.UploadRate))},
-		{Label: "Peer / Seed", Value: fmt.Sprintf("%d / %d", torrent.NumPeers, torrent.NumSeeds)},
-		{Label: "Sciame (seed / peer)", Value: v2SwarmLabel(torrent.NumComplete, torrent.NumIncomplete)},
-		{Label: "Posizione coda", Value: fmt.Sprintf("%d", torrent.QueuePosition)},
-		{Label: "Rete", Value: v2NetworkLabel(torrent.Network)},
-		{Label: "Fonti", Value: fmt.Sprintf("%d", torrent.Sources)},
-		{Label: "Metadata", Value: ternaryString(torrent.HasMetadata, "presenti", "in attesa")},
-		{Label: "Versione torrent", Value: torrent.TorrentVersion},
-		{Label: "Auto-gestito", Value: v2AutoManagedLabel(torrent)},
-		{Label: "Percorso di salvataggio", Value: torrent.SavePath},
-		{Label: "Tracker corrente", Value: torrent.CurrentTracker},
-		{Label: "Non rinominare", Value: fmt.Sprintf("%t", noRename)},
-		{Label: "Magnet", Value: magnet},
-		{Label: "ID acquisizione", Value: view.AcqID},
+		{Label: "Stato", Value: stateLabel, Hint: "Stato del torrent nella sessione: in download, in seed, in pausa, in verifica o in errore. Lo decide il motore torrent."},
+		{Label: "Progresso", Value: fmt.Sprintf("%.1f%%", progressVal), Hint: "Percentuale dei dati verificati sul totale del torrent. I file saltati non contano."},
+		{Label: "Dimensione", Value: logging.HumanBytesI64(torrent.TotalSize), Hint: "Dimensione totale dei file dichiarata dai metadata del torrent."},
+		{Label: "Scaricato", Value: logging.HumanBytesI64(doneVal), Hint: "Byte già scaricati e verificati per questo torrent. Su un torrent completato coincide con la dimensione."},
+		{Label: "Download totale", Value: logging.HumanBytesI64(torrent.AllTimeDownload), Hint: "Byte scaricati da quando il torrent è stato aggiunto, anche quelli poi persi o riscaricati."},
+		{Label: "Caricato", Value: logging.HumanBytesI64(torrent.AllTimeUpload), Hint: "Byte caricati verso i peer da quando il torrent è stato aggiunto."},
+		{Label: "Ratio", Value: fmt.Sprintf("%.2f", uiTorrentRatio(torrent.AllTimeUpload, torrent.AllTimeDownload, doneVal, torrent.TotalSize)), Hint: "Rapporto tra caricato e scaricato: 1,00 significa che hai condiviso quanto hai scaricato. Per un torrent completato si usa la dimensione come denominatore."},
+		{Label: "↓ / ↑", Value: logging.HumanRate(saturatingInt64(torrent.DownloadRate)) + " / " + logging.HumanRate(saturatingInt64(torrent.UploadRate)), Hint: "Velocità istantanea di download e upload di questo torrent, non della sessione intera."},
+		{Label: "Peer / Seed", Value: fmt.Sprintf("%d / %d", torrent.NumPeers, torrent.NumSeeds), Hint: "Peer attualmente connessi a questo torrent e, tra loro, quanti hanno già tutti i pezzi (seed)."},
+		{Label: "Sciame (seed / peer)", Value: v2SwarmLabel(torrent.NumComplete, torrent.NumIncomplete), Hint: "Seed e peer conosciuti dai tracker e dal DHT per questo torrent; non sono necessariamente connessi."},
+		{Label: "Posizione coda", Value: fmt.Sprintf("%d", torrent.QueuePosition), Hint: "Posizione nella coda dei download. -1 o 0 significa che non è in coda: è in esecuzione, in pausa o completato."},
+		{Label: "Rete", Value: v2NetworkLabel(torrent.Network), Hint: "Rete di acquisizione del file: BitTorrent oppure eD2k."},
+		{Label: "Fonti", Value: fmt.Sprintf("%d", torrent.Sources), Hint: "Numero di fonti eD2k che condividono il file. Per i torrent BitTorrent è 0."},
+		{Label: "Metadata", Value: ternaryString(torrent.HasMetadata, "presenti", "in attesa"), Hint: "Se il client ha già i metadata del torrent (nome, file e pezzi). Per un magnet possono arrivare dopo."},
+		{Label: "Versione torrent", Value: torrent.TorrentVersion, Hint: "Formato dei metadata: v1 (SHA-1), v2 (SHA-256) o ibrido v1+v2."},
+		{Label: "Auto-gestito", Value: v2AutoManagedLabel(torrent), Hint: "Se la coda può avviare, fermare o ruotare il torrent da sola in base ai limiti e alla configurazione."},
+		{Label: "Percorso di salvataggio", Value: torrent.SavePath, Hint: "Cartella in cui il client scrive i file di questo torrent."},
+		{Label: "Tracker corrente", Value: torrent.CurrentTracker, Hint: "Ultimo tracker a cui il client ha inviato un annuncio. Vuoto se nessun tracker ha risposto."},
+		{Label: "Non rinominare", Value: fmt.Sprintf("%t", noRename), Hint: "Se attivo, Gextto non rinomina i file di questo torrent quando li archivia in libreria."},
+		{Label: "Magnet", Value: magnet, Hint: "Link magnet del torrent: contiene l'infohash e i tracker e serve per aggiungerlo altrove."},
+		{Label: "ID acquisizione", Value: view.AcqID, Hint: "Identificatore breve con cui il log marca le righe di questo download: usalo per filtrarle."},
 	}
 	if torrent.Error != "" {
-		view.General = append(view.General, v2KV{Label: "Errore", Value: torrent.Error})
+		view.General = append(view.General, v2KV{Label: "Errore", Value: torrent.Error, Hint: "Ultimo errore riportato dal motore torrent per questo download."})
 	}
 	// BEP 38: show the collection/similar hints only when the torrent has some,
 	// so the common torrent keeps its short general list.
 	if len(torrent.Collections) > 0 {
-		view.General = append(view.General, v2KV{Label: "Collezioni BEP 38", Value: strings.Join(torrent.Collections, ", ")})
+		view.General = append(view.General, v2KV{Label: "Collezioni BEP 38", Value: strings.Join(torrent.Collections, ", "), Hint: "Collezioni a cui il torrent appartiene secondo i metadata BEP 38, per esempio una serie TV."})
 	}
 	if len(torrent.Similar) > 0 {
-		view.General = append(view.General, v2KV{Label: "Torrent simili BEP 38", Value: fmt.Sprintf("%d", len(torrent.Similar))})
+		view.General = append(view.General, v2KV{Label: "Torrent simili BEP 38", Value: fmt.Sprintf("%d", len(torrent.Similar)), Hint: "Torrent collegati da BEP 38, per esempio altre puntate della stessa serie."})
 	}
-	view.General = append(view.General, v2KV{Label: "Motore", Value: view.Caps.Backend})
+	view.General = append(view.General, v2KV{Label: "Motore", Value: view.Caps.Backend, Hint: "Motore torrent che sta gestendo questo download: gx-torrent o qBittorrent-nox."})
 	// Engine statistics. gx-core's own page shows them and the detail must not
 	// hide them: ETA and the added/completed dates come from qBittorrent too,
 	// while the piece and disk counters are gx-torrent only.
 	if torrent.EtaSeconds > 0 {
-		view.General = append(view.General, v2KV{Label: "Tempo rimanente", Value: logging.HumanDuration(torrent.EtaSeconds)})
+		view.General = append(view.General, v2KV{Label: "Tempo rimanente", Value: logging.HumanDuration(torrent.EtaSeconds), Hint: "Stima del tempo necessario a completare il download con la velocità attuale."})
 	}
 	if view.Caps.Backend == "gx-torrent" {
 		private := "no"
@@ -1755,20 +1755,20 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 			private = "sì"
 		}
 		view.General = append(view.General,
-			v2KV{Label: "Privato", Value: private},
-			v2KV{Label: "Numero file", Value: fmt.Sprintf("%d", torrent.FileCount)},
-			v2KV{Label: "Pezzi disponibili", Value: v2PiecesLabel(torrent.PiecesAvailable, torrent.PiecesTotal)},
-			v2KV{Label: "Pezzi completati", Value: fmt.Sprintf("%d", torrent.PiecesHave)},
-			v2KV{Label: "Dimensione pezzo", Value: logging.HumanBytesI64(torrent.PieceLength)},
-			v2KV{Label: "Sprecato", Value: logging.HumanBytesI64(torrent.Wasted)},
-			v2KV{Label: "Allocato su disco", Value: logging.HumanBytesI64(torrent.Allocated)},
+			v2KV{Label: "Privato", Value: private, Hint: "Torrent privato: i peer si trovano solo tramite il tracker e lo scambio DHT/PEX è disattivato."},
+			v2KV{Label: "Numero file", Value: fmt.Sprintf("%d", torrent.FileCount), Hint: "Numero di file contenuti nel torrent."},
+			v2KV{Label: "Pezzi disponibili", Value: v2PiecesLabel(torrent.PiecesAvailable, torrent.PiecesTotal), Hint: "Pezzi che almeno un peer connesso dichiara di avere, sul totale dei pezzi."},
+			v2KV{Label: "Pezzi completati", Value: fmt.Sprintf("%d", torrent.PiecesHave), Hint: "Pezzi già scaricati e verificati per questo torrent."},
+			v2KV{Label: "Dimensione pezzo", Value: logging.HumanBytesI64(torrent.PieceLength), Hint: "Dimensione di ogni pezzo: il client scarica e verifica i dati a blocchi di questa dimensione."},
+			v2KV{Label: "Sprecato", Value: logging.HumanBytesI64(torrent.Wasted), Hint: "Byte scaricati ma scartati perché non superavano la verifica o appartenevano a pezzi duplicati."},
+			v2KV{Label: "Allocato su disco", Value: logging.HumanBytesI64(torrent.Allocated), Hint: "Spazio riservato su disco per i file del torrent; con la preallocazione attiva è la dimensione piena."},
 		)
 	}
 	if torrent.AddedAt > 0 {
-		view.General = append(view.General, v2KV{Label: "Aggiunto", Value: v2UnixTimeLabel(torrent.AddedAt)})
+		view.General = append(view.General, v2KV{Label: "Aggiunto", Value: v2UnixTimeLabel(torrent.AddedAt), Hint: "Data e ora in cui il torrent è stato aggiunto alla sessione."})
 	}
 	if torrent.CompletedAt > 0 {
-		view.General = append(view.General, v2KV{Label: "Completato", Value: v2UnixTimeLabel(torrent.CompletedAt)})
+		view.General = append(view.General, v2KV{Label: "Completato", Value: v2UnixTimeLabel(torrent.CompletedAt), Hint: "Data e ora in cui il torrent è stato completato e verificato."})
 	}
 	for index := range view.General {
 		if strings.TrimSpace(view.General[index].Value) == "" {

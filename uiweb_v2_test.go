@@ -1203,6 +1203,42 @@ func TestV2TorrentDetailGeneralShowsEngineStats(t *testing.T) {
 	}
 }
 
+// TestV2TorrentDetailGeneralRowsExplainThemselves: every row of the general
+// tab carries a tooltip that says what the value means, and the action buttons
+// explain what they do instead of repeating their label.
+func TestV2TorrentDetailGeneralRowsExplainThemselves(t *testing.T) {
+	state := newTestAppState(t)
+	state.setActiveEngine(fakeDetailEngine{torrent: models.TorrentView{
+		Hash: "abc123", Name: "Example.mkv", State: "downloading", Progress: 40,
+		EtaSeconds: 90, Private: true, FileCount: 3,
+		PiecesTotal: 100, PiecesHave: 40, PiecesAvailable: 80, PieceLength: 1 << 20,
+		Wasted: 2 << 20, Allocated: 100 << 20, AddedAt: 1700000000, CompletedAt: 1700000100,
+		Error: "boom", Collections: []string{"Example"}, Similar: []string{"other"},
+	}})
+	view := v2DetailViewFrom(state, "abc123", "general")
+	if len(view.General) == 0 {
+		t.Fatal("general tab is empty")
+	}
+	for _, kv := range view.General {
+		if strings.TrimSpace(kv.Hint) == "" {
+			t.Errorf("general row %q has no tooltip", kv.Label)
+		}
+	}
+	rec := httptest.NewRecorder()
+	dict, eng := v2Dictionaries(state)
+	v2Render(rec, http.StatusOK, "v2_detail_panel", view, dict, eng)
+	body := rec.Body.String()
+	for _, want := range []string{
+		"Stato del torrent nella sessione: in download",
+		"Invia subito un annuncio ai tracker per cercare nuovi peer.",
+		"Modalità super seeding: distribuisce i pezzi",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("detail panel is missing the tooltip %q", want)
+		}
+	}
+}
+
 // TestV2DownloadsHasDedicatedDetailFrame: the torrent detail renders in its own
 // framed container placed above the download history, not in the centered
 // #v2-modal and not as a fixed overlay.

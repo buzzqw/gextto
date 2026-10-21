@@ -15,6 +15,11 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Dettagli del torrent: tooltip che spiegano davvero.** Passando il mouse sui
+  valori del tab **Generale**, sui pulsanti delle azioni e sulle intestazioni
+  delle tabelle del dettaglio di un torrent ora compare una spiegazione di cosa
+  significa il dato o cosa fa il pulsante, tradotta in tutte le lingue
+  dell'interfaccia.
 - **Memoria di gx-torrent restituita al sistema.** Dopo un periodo di download
   intenso gx-torrent poteva restare a centinaia di MB di RAM anche senza
   traffico. Ora, dopo 5 minuti con il traffico sotto la soglia dei torrent

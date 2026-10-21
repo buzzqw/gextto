@@ -14,6 +14,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **Torrent details: tooltips that actually explain.** Hovering a value in the
+  **General** tab, an action button or a table header in the torrent details now
+  shows what the value means or what the button does, translated into every
+  interface language.
 - **gx-torrent gives memory back to the system.** After a period of heavy
   downloading gx-torrent could stay at hundreds of MB of RAM even with no
   traffic. After 5 minutes with the transfer rate below the slow-torrent

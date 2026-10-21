@@ -424,7 +424,8 @@ inferior to the archived file.
   visible while you set the values.
 - **Details** tabs: General, Tracker, Content, Peers, Pieces, Limits, Storage;
   includes copy magnet, per-torrent limits/seed-days, reannounce, pin, restart,
-  mark-failed, move storage. **General** also offers **Export .torrent**,
+  mark-failed, move storage. Hovering a value in the **General** tab, an action
+  button or a table header shows what the value means or what the button does. **General** also offers **Export .torrent**,
   **Super seeding** (with gx-torrent it only applies once the torrent is complete
   and it deliberately lowers the seed's upload) and web-seed add/remove; with
   gx-torrent the **General** tab also lists the **BEP 38 hints**

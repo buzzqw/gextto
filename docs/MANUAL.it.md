@@ -429,7 +429,9 @@ bloccata, già presente o inferiore al file archiviato.
   storico restano visibili mentre imposti i valori.
 - **Dettagli** (tab Generale, Tracker, Contenuto, Peers, Pezzi, Limiti, Storage):
   copia magnet, limiti per torrent/giorni di seed, reannounce, pin, riavvia,
-  segna come fallito, sposta storage. In **Generale** trovi anche **Esporta
+  segna come fallito, sposta storage. Passando il mouse su un valore del tab
+  **Generale**, sui pulsanti delle azioni o sulle intestazioni delle tabelle
+  compare una spiegazione di cosa significa il dato o cosa fa il pulsante. In **Generale** trovi anche **Esporta
   .torrent**, **Super seeding** (con gx-torrent vale solo a torrent completato e
   riduce di proposito l'upload del seed) e l'aggiunta/rimozione di **web seed**;
   con gx-torrent la scheda **Generale** elenca anche gli **hint BEP 38**
