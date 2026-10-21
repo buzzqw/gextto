@@ -14,6 +14,12 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **Archive: the Download button of eD2k results no longer ends up off
+  screen.** With long file names the eD2k results table grew wider than the
+  window and the **Actions** column with **Download** stayed out of sight: you
+  had to scroll sideways. Now the name is shortened with an ellipsis (the full
+  text is in the tooltip) and **Download** stays visible on phones too. Added a
+  test that checks the button is present in the archive results.
 - **Maintenance → Backup: no more confusion between saving and backing up.**
   The button in the settings panel is now **Save settings** instead of *Save
   backup*: it saves retention, schedule, FTP, cloud folder, extra paths and

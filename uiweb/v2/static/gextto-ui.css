@@ -751,6 +751,22 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
   border-radius: 3px;
 }
 .th-sort { cursor: default; }
+/* eD2k search results (eD2k page and archive): a fixed layout keeps the
+   Azioni column, and the Scarica button, on screen. With automatic layout a
+   long file name widened the table past the viewport and pushed the button
+   out of sight. */
+[data-ed2k-results] .data-table { width: 100%; min-width: 0; table-layout: fixed; }
+[data-ed2k-results] .data-table th:nth-child(2), [data-ed2k-results] .data-table td:nth-child(2) { width: 100px; }
+[data-ed2k-results] .data-table th:nth-child(3), [data-ed2k-results] .data-table td:nth-child(3) { width: 90px; }
+[data-ed2k-results] .data-table th:last-child, [data-ed2k-results] .data-table td:last-child { width: 110px; }
+[data-ed2k-results] .data-table td:first-child { min-width: 0; }
+[data-ed2k-results] .data-table td:first-child > .truncate { display: block; max-width: 100%; }
+@media (max-width: 640px) {
+  [data-ed2k-results] .data-table th:nth-child(2), [data-ed2k-results] .data-table td:nth-child(2) { width: 82px; }
+  [data-ed2k-results] .data-table th:nth-child(3), [data-ed2k-results] .data-table td:nth-child(3) { width: 70px; }
+  [data-ed2k-results] .data-table th:last-child, [data-ed2k-results] .data-table td:last-child { width: 96px; }
+  [data-ed2k-results] .data-table th, [data-ed2k-results] .data-table td { padding: 8px 6px; }
+}
 /* The title wraps over multiple lines; the action column is compact (icon
    buttons) so the release name gets the room. */
 .archive-table { width: 100%; min-width: 0; table-layout: fixed; }

@@ -750,7 +750,9 @@ manualmente il JSON se non stai usando direttamente l'API.
   questo parte solo quando premi **Cerca**, non a ogni tasto. Con aMule attivo
   c'è anche **Cerca anche su eD2k**: anche questa parte solo da **Cerca**, e i
   risultati eD2k compaiono in un blocco sotto l'archivio, ognuno con
-  **Scarica**. La colonna
+  **Scarica**. Il nome lungo resta su una riga accorciato con i puntini (il
+  testo completo è nel tooltip) e la colonna **Azioni** con **Scarica** resta
+  sempre visibile, anche sul telefono. La colonna
   **Sorgente** mostra solo il provider/dominio (l'URL completo è nel tooltip) e
   ogni riga offre **Perché non questa?** come nella tabella dei risultati. Il
   titolo va a capo su più righe e le azioni di riga sono icone compatte (⬇️

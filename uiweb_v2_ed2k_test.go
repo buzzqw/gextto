@@ -43,7 +43,9 @@ func TestV2Ed2kPageRenders(t *testing.T) {
 	for _, want := range []string{
 		`data-ed2k-filter`, `data-ed2k-filter-name`, `data-ed2k-filter-sources`,
 		`data-ed2k-name="a.mkv"`, `data-ed2k-size="10"`, `data-ed2k-sources="2"`,
-		">Scarica<", "Parole nel nome", "Fonti minime", "Dimensione minima",
+		`action="/ed2k/add"`, `name="links" value="ed2k://|file|a.mkv|10|0123456789abcdef0123456789abcdef|/"`,
+		`aria-label="Scarica a.mkv"`, ">Scarica<",
+		"Parole nel nome", "Fonti minime", "Dimensione minima",
 		"Nascondi già noti", "Ordina per", "Azzera", `data-ed2k-shown`,
 	} {
 		if !strings.Contains(body, want) {
@@ -53,6 +55,33 @@ func TestV2Ed2kPageRenders(t *testing.T) {
 	buffer.Reset()
 	if err := v2Templates.ExecuteTemplate(&buffer, "v2_ed2k_message", map[string]any{"Message": "m", "Detail": "d", "Error": true}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestV2ArchiveShowsScaricaForEd2kResults guards the archive variant of the
+// eD2k results: the block sits under the archive table and must keep the same
+// Scarica button that queues the ed2k link in aMule. It was lost once already.
+func TestV2ArchiveShowsScaricaForEd2kResults(t *testing.T) {
+	link := "ed2k://|file|a.mkv|10|0123456789abcdef0123456789abcdef|/"
+	data := v2TableData{
+		View: "archive-t0", BaseView: "archive", Title: "Archivio", Colspan: 1,
+		Ed2k: &v2Ed2kSearchView{Query: "x", Done: true, Results: []v2Ed2kResult{{Name: "a.mkv", Size: 10, Sources: 2, Link: link}}},
+	}
+	var buffer bytes.Buffer
+	if err := v2Templates.ExecuteTemplate(&buffer, "v2_table_body", data); err != nil {
+		t.Fatal(err)
+	}
+	body := buffer.String()
+	for _, want := range []string{
+		"archive-ed2k-results",
+		`action="/ed2k/add"`,
+		`name="links" value="` + link + `"`,
+		`aria-label="Scarica a.mkv"`,
+		">Scarica<",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("archive eD2k results are missing %q", want)
+		}
 	}
 }
 

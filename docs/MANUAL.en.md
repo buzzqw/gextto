@@ -730,7 +730,10 @@ are using the API directly.
   search to indexers and online engines: it is much slower and therefore only
   runs when you press **Search**, not on every keystroke. With aMule on there is
   also **Also search eD2k**: it too runs only from **Search**, and the eD2k
-  results appear in a block below the archive, each with **Download**. The
+  results appear in a block below the archive, each with **Download**. Long
+  names stay on one line cut with an ellipsis (the full text is in the tooltip)
+  and the **Actions** column with **Download** always stays visible, on phones
+  too. The
   **Source** column
   shows only the provider/domain (the full URL is in the tooltip), and every row
   offers **Why not this one?** like the search table. The title wraps over

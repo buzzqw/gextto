@@ -15,6 +15,13 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Archivio: il pulsante Scarica dei risultati eD2k non finisce più fuori
+  schermo.** Con nomi di file lunghi la tabella dei risultati eD2k si allargava
+  oltre la finestra e la colonna **Azioni** con **Scarica** restava fuori vista:
+  serviva scorrere in orizzontale. Ora il nome viene accorciato con i puntini
+  (il testo completo è nel tooltip) e **Scarica** resta visibile anche sul
+  telefono. Aggiunto un test che verifica che il pulsante ci sia nei risultati
+  dell'archivio.
 - **Manutenzione → Backup: meno confusione tra salvare e fare il backup.** Il
   pulsante del pannello delle impostazioni ora si chiama **Salva impostazioni**
   e non più *Salva backup*: salva conservazione, programmazione, FTP, cartella
