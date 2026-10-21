@@ -309,7 +309,7 @@ func V3SeriesLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
 				if n, err := strconv.Atoi(v3Any(item["year"])); err == nil {
 					year = n
 				}
-				out = append(out, v3Series{ID: int(v3Int(item["tvdb_id"])), TvdbID: v3Int(item["tvdb_id"]),
+				out = append(out, v3Series{ID: v3IntID(item["tvdb_id"]), TvdbID: v3Int(item["tvdb_id"]),
 					Title: title, TitleSlug: v3Slug(title), Year: year, Overview: v3Any(item["overview"]),
 					RemotePoster: v3Any(item["image"]), QualityProfileID: 1, LanguageProfileID: 1, Monitored: true})
 			}
@@ -349,6 +349,16 @@ func v3Any(value any) string {
 func v3Int(value any) int64 {
 	n, _ := strconv.ParseInt(v3Any(value), 10, 64)
 	return n
+}
+
+// v3IntID converts an external id to an int without truncating it: an id that
+// does not fit is dropped rather than wrapped into a negative or wrong one.
+func v3IntID(value any) int {
+	n := v3Int(value)
+	if n <= 0 || n > 1<<31-1 {
+		return 0
+	}
+	return int(n)
 }
 
 func V3SeriesAdd(w http.ResponseWriter, r *http.Request, s *AppState) {

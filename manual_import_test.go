@@ -13,6 +13,7 @@ import (
 func manualImportConfig(t *testing.T, archive string) *Config {
 	t.Helper()
 	return &Config{
+		DownloadDir:    filepath.Dir(archive),
 		Series:         []SeriesConfig{{Name: "Show", Enabled: true, Seasons: "1+", ArchivePath: archive}},
 		Movies:         []MovieConfig{{Name: "Film", Year: "2020", Enabled: true}},
 		RenameEpisodes: true,
@@ -100,7 +101,10 @@ func TestManualImportPageAndPreview(t *testing.T) {
 		t.Fatal(err)
 	}
 	TouchConfigGeneration()
-	source := filepath.Join(state.cfg.DataDir, "Show.S01E04.1080p.WEB-DL.mkv")
+	if err := os.MkdirAll(state.cfg.DownloadDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(state.cfg.DownloadDir, "Show.S01E04.1080p.WEB-DL.mkv")
 	if err := os.WriteFile(source, make([]byte, 100), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -126,6 +130,7 @@ func TestManualImportMovie(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := &Config{
+		DownloadDir:    dir,
 		Movies:         []MovieConfig{{Name: "Film", Year: "2020", Enabled: true}},
 		RenameEpisodes: true,
 		ArchiveRoot:    &archive,

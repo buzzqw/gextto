@@ -10,6 +10,9 @@ extensions:
       - ["github.com/buzzqw/gextto", "", False, "pathStartsWith", "", "", "Argument[0]", "true", "path-injection", "manual"]
       # folderRenameWithin(root, path): same containment check for the folder rename.
       - ["github.com/buzzqw/gextto", "", False, "folderRenameWithin", "", "", "Argument[1]", "true", "path-injection", "manual"]
+      # manualImportAllowed(cfg, path): the manual import only reads files inside
+      # the configured download and archive roots.
+      - ["github.com/buzzqw/gextto", "", False, "manualImportAllowed", "", "", "Argument[1]", "true", "path-injection", "manual"]
   - addsTo:
       pack: codeql/go-all
       extensible: barrierModel

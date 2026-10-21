@@ -37,6 +37,50 @@ type ManualImportCandidate struct {
 	Error       string
 }
 
+// manualImportRoots are the folders a manual import may read: the download
+// area, the temporary folder and every archive destination. The operator does
+// not get an arbitrary-file-move primitive through the API.
+func manualImportRoots(cfg *Config) []string {
+	if cfg == nil {
+		return nil
+	}
+	var roots []string
+	add := func(path string) {
+		if strings.TrimSpace(path) == "" {
+			return
+		}
+		if abs, err := filepath.Abs(path); err == nil {
+			roots = append(roots, abs)
+		}
+	}
+	add(cfg.DownloadDir)
+	if cfg.DownloadTempDir != nil {
+		add(*cfg.DownloadTempDir)
+	}
+	if cfg.ArchiveRoot != nil {
+		add(*cfg.ArchiveRoot)
+	}
+	for _, series := range cfg.Series {
+		add(series.ArchivePath)
+	}
+	return roots
+}
+
+// manualImportAllowed reports whether path is inside one of the allowed roots.
+// pathStartsWith is the CodeQL path validator of this repository.
+func manualImportAllowed(cfg *Config, path string) bool {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	for _, root := range manualImportRoots(cfg) {
+		if pathStartsWith(abs, root) {
+			return true
+		}
+	}
+	return false
+}
+
 // manualImportParse parses a file name. The parser wants a transfer identity
 // even when only the name matters, so a placeholder magnet is supplied.
 func manualImportParse(path string) *models.Release {
@@ -57,6 +101,9 @@ func ManualImportPreview(cfg *Config, path string) ([]ManualImportCandidate, err
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
+	}
+	if !manualImportAllowed(cfg, abs) {
+		return nil, errors.New("the path is outside the configured download and archive folders")
 	}
 	info, err := os.Stat(abs)
 	if err != nil {
@@ -195,6 +242,9 @@ func ManualImport(ctx context.Context, cfg *Config, db *Database, req ManualImpo
 	if err != nil {
 		return "", err
 	}
+	if !manualImportAllowed(cfg, abs) {
+		return "", errors.New("the path is outside the configured download and archive folders")
+	}
 	info, err := os.Stat(abs)
 	if err != nil {
 		return "", err
@@ -298,7 +348,13 @@ func ManualImport(ctx context.Context, cfg *Config, db *Database, req ManualImpo
 		if err != nil {
 			return "", err
 		}
-		if err := db.RecordManualMovie(movie.Name, year, final); err != nil {
+		movieSize := int64(0)
+		if st, statErr := os.Stat(final); statErr == nil {
+			movieSize = st.Size()
+		}
+		movieTitle := strings.TrimSuffix(filepath.Base(final), filepath.Ext(final))
+		movieQuality := ParseQuality(movieTitle)
+		if err := db.RecordManualMovie(movie.Name, year, movieTitle, movieSize, movieQuality.Score()); err != nil {
 			return final, err
 		}
 		RefreshMediaLibraries(cfg, filepath.Dir(final))
