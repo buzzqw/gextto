@@ -59,7 +59,8 @@ type Manifest struct {
 	BuiltAt    string `json:"built_at"`
 	// GxCommit is the newest commit that changed gx-torrent's code.
 	GxCommit string `json:"gx_torrent_commit"`
-	// GxVersion is gx-core's own version ("1.1.<gx build>") in the release;
+	// GxVersion is gx-core's own version ("<series>.<gx build>") in the
+	// release;
 	// empty in manifests published before it was added.
 	GxVersion string `json:"gx_version,omitempty"`
 	// GxBuild is gx-core's own build number in the release (0 when the

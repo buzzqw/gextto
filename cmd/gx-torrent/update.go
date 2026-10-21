@@ -63,7 +63,7 @@ const (
 )
 
 // gexVersionPattern accepts the three-number version any published daemon
-// reports (1.1.242 before the rollover, 1.2.0 after it).
+// reports (1.1.249, 1.2.1000, …).
 var gexVersionPattern = regexp.MustCompile(`\b[0-9]+\.[0-9]+\.[0-9]+\b`)
 
 // gxUpdater is the update state of one daemon. The zero value is ready.
@@ -376,9 +376,9 @@ func (d *Daemon) installUpdate(ctx context.Context, st gxUpdateStatus) error {
 		os.Remove(newPath)
 		return err
 	}
-	// The new binary must at least run here before it replaces this one. The
-	// scheme moved from 1.1.<build> to 1.2.0 at the rollover, so accept any
-	// three-number version instead of a fixed prefix.
+	// The new binary must at least run here before it replaces this one. Accept
+	// any three-number version instead of a fixed prefix: the manual series can
+	// change without the binary being any less valid.
 	tryCtx, tryCancel := context.WithTimeout(ctx, 15*time.Second)
 	out, err := exec.CommandContext(tryCtx, newPath, "--version").Output()
 	tryCancel()

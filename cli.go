@@ -249,7 +249,7 @@ UPDATE OPTIONS:
     --force               Reinstall even if the version is unchanged
     --no-restart          Do not restart the service after updating
 `,
-		constants.AppName, constants.Version, appAbout,
+		constants.AppName, constants.VersionLabel(), appAbout,
 		constants.AppName, constants.AppName, constants.AppName, constants.AppName,
 		DefaultRepo,
 	)

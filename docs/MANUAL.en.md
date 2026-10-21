@@ -1229,8 +1229,8 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
 - **Exact version** — at the bottom of the page one line shows the version,
   the full **build** number and the **commit** the binary was compiled from
   (the short hash; the hover tooltip shows the full one). It tells exactly
-  which build is installed: since the third version number restarts from 0
-  every 1000 builds (for example `1.2.0 (build 2000)`), the full build and the
+  which build is installed: the third version number is always the build
+  (for example `1.1.1961`), so the full build and the
   commit are the exact identity of the running program.
 
 - Backup now, clean trash, rescore, scan archives, **Refresh MediaInfo**

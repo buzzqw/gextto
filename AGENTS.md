@@ -134,14 +134,14 @@ not to break.
   read the same file (`build_number`, the current value). CI does not use
   `github.run_number`: the build and `release.json` take the value from the
   file, so the installed version has the **same** version as the checkout. The
-  version shown is `1.1.<build>` up to build 1999; from 2000 the third number
-  restarts from 0 every 1000 builds and the middle one grows (`1.2.0`,
-  `1.2.999`, `1.3.0`, …), so the third number never exceeds 999. The full build
-  stays visible: in brackets in the version shown after the rollover
-  (`1.2.925 (build 2925)`) and at the bottom of the **Maintenance** page,
-  together with the version, the build and the commit it was compiled from. To
-  move the number forward, run `make build` and commit the updated file. After
-  a `git pull` that changes `build_number`, rebuild to align the badge.
+  version shown is `<series>.<build>`, where the series is `1.1` and the third
+  number is **always the build** (`1.1.1961`). The second number is raised
+  **by hand** in `version_series`, only when a new series is deliberately
+  started (`1.2.2000`); there is no automatic rollover. The version, the full
+  build and the commit it was compiled from are shown at the bottom of the
+  **Maintenance** page. To move the build forward, run `make build` and commit
+  the updated file. After a `git pull` that changes `build_number`, rebuild to
+  align the badge.
 - gx-core (the daemon) has its **own build number**
   (`gx-torrent.build_number`, **committed**), separate from Gextto's: it grows
   by one on every real gx-torrent build done with `make build` or
@@ -152,11 +152,11 @@ not to break.
   publishes it as `gx_version`/`gx_build`. After a build that recompiles
   gx-torrent, commit `gx-torrent.build_number` too. It is what
   `gx-torrent --version`, `/api/v1/health` and its web page report:
-  `1.1.<build>` up to build 999, then `1.2.0` and again 0..999 in the third
-  number. The version formatting is `versionFromBuild` in
-  `internal/constants/constants.go`, replicated by `scripts/version.sh` for
-  `release.json`. Gextto and gx-torrent use the same function, each with its
-  own rollover point.
+  `<series>.<build>`, with the series in `gx_torrent.version_series` (also
+  raised by hand) and the build as the third number. The version formatting is
+  `AppVersion`/`GxTorrentVersion` in `internal/constants/constants.go`,
+  replicated by `scripts/version.sh` for `release.json`; both read the same
+  series files.
 - `make gx-torrent` — the daemon only (`CGO_ENABLED=0`), with the same build
   number of its own.
 - Do not use `go build ./cmd/gx-torrent/` from the root: it writes a
@@ -347,10 +347,9 @@ itself (or rolls back).
   (both rotated at 5 MB × 4); `gx-torrent.crash.log` only for crashes.
 - Check: `systemctl --user status gextto`;
   `curl -s http://127.0.0.1:5000/api/status` (field `version` = Gextto's
-  version: `1.1.<build>` up to 1999, then `1.2.0`, `1.2.999`, `1.3.0`, …);
+  version, `<series>.<build>`: `1.1.1961`, with the series raised by hand);
   `curl -s http://127.0.0.1:8890/api/v1/health` (gx-torrent daemon:
-  `version` = its own version with the same rule from build 1000, `pid`,
-  `fingerprint`).
+  `version` = its own `<series>.<build>`, `pid`, `fingerprint`).
 
 ## Change conventions
 

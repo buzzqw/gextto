@@ -17,8 +17,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${GEXTTO_BINARY:-$ROOT/bin/gexttod}"
 
-VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION" 2>/dev/null || true)"
-[[ -n "$VERSION" ]] || VERSION="0.1.0"
+SERIES="$(tr -d '[:space:]' < "$ROOT/version_series" 2>/dev/null || true)"
+[[ -n "$SERIES" ]] || SERIES="1.1"
+GX_SERIES="$(tr -d '[:space:]' < "$ROOT/gx_torrent.version_series" 2>/dev/null || true)"
+[[ -n "$GX_SERIES" ]] || GX_SERIES="1.1"
 
 if [[ -n "${GEXTTO_BUILD:-}" ]]; then
     BUILD="$GEXTTO_BUILD"
@@ -28,6 +30,8 @@ else
     BUILD="$(tr -dc '0-9' < "$ROOT/build_number" 2>/dev/null || true)"
     [[ -n "$BUILD" ]] || BUILD=1000
 fi
+# The product version is the manual series plus the build.
+VERSION="$SERIES.$BUILD"
 
 # The commit and build time let the in-app update check tell whether a
 # published release is newer than the running binary (release.json).
@@ -41,7 +45,7 @@ mkdir -p "$(dirname "$OUT")"
     TAGS=()
     [[ -n "${GEXTTO_TAGS:-}" ]] && TAGS=(-tags "$GEXTTO_TAGS")
     CGO_ENABLED=0 go build -trimpath "${TAGS[@]}" \
-        -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.Version=$VERSION -X github.com/buzzqw/gextto/internal/constants.Build=$BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$COMMIT -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$BUILT_AT" \
+        -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.Version=$VERSION -X github.com/buzzqw/gextto/internal/constants.VersionSeries=$SERIES -X github.com/buzzqw/gextto/internal/constants.Build=$BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$COMMIT -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$BUILT_AT" \
         -o "$OUT" ./cmd/gexttod
 )
 printf 'built %s (version %s, build %s, pure Go)\n' "$OUT" "$VERSION" "$BUILD"
@@ -73,7 +77,7 @@ if [[ "${GEXTTO_SKIP_GXTORRENT:-0}" != "1" ]]; then
         (
             cd "$ROOT"
             CGO_ENABLED=0 go build -trimpath -buildvcs=false \
-                -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$COMMIT -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$BUILT_AT -X github.com/buzzqw/gextto/internal/constants.GxReleaseChannel=${GEXTTO_GX_CHANNEL:-}" \
+                -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=$GX_SERIES -X github.com/buzzqw/gextto/internal/constants.Commit=$COMMIT -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$BUILT_AT -X github.com/buzzqw/gextto/internal/constants.GxReleaseChannel=${GEXTTO_GX_CHANNEL:-}" \
                 -o "$GX_OUT.new" ./cmd/gx-torrent
         )
         mv -f "$GX_OUT.new" "$GX_OUT"

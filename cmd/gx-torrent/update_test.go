@@ -30,10 +30,10 @@ const (
 	updHead  = "4444444444444444444444444444444444444444"
 )
 
-// The update tries the new binary with --version: both the old 1.1.<build>
-// form and the rolled-over 1.2.0 are valid answers.
-func TestGexVersionPatternAcceptsBothSchemes(t *testing.T) {
-	for _, version := range []string{"1.1.242", "1.2.0", "1.2.999", "1.3.0", "gx-torrent 1.2.0"} {
+// The update tries the new binary with --version: any three-number version is
+// valid, whatever series the project is on.
+func TestGexVersionPatternAcceptsThreeNumbers(t *testing.T) {
+	for _, version := range []string{"1.1.242", "1.1.1000", "1.2.1000", "gx-torrent 1.2.0"} {
 		if !gexVersionPattern.MatchString(version) {
 			t.Errorf("%q must be a valid version", version)
 		}

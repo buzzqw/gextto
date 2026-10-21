@@ -121,10 +121,12 @@ make build                 # gexttod and gx-torrent in bin/
 ```
 
 `make build` advances the **committed** build number shared with CI, so a
-checkout and a release show the same version: `1.1.<n>` until build 1999, then
-the third number runs 0..999 and rolls into the middle one (`1.2.0` …
-`1.2.999`, `1.3.0` …). `gx-torrent` has its own counter, advanced only when its
-code changes; it follows the same rule from its build 1000. `make test` runs the
+checkout and a release show the same version: `1.1.<n>`, where the third number
+is always the build (`1.1.1961`). The second number is raised **by hand**, in
+`version_series`, only when a new series is started (`1.2.2000`); Gextto does
+not move it automatically. `gx-torrent` has its own counter, advanced only when
+its code changes, and its own `gx_torrent.version_series` file. `make test`
+runs the
 full suite, `make test-ui` the browser suite, `make fuzz-smoke` the fuzzers.
 
 ### First safe run

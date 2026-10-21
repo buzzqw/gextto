@@ -1270,8 +1270,8 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
 - **Versione esatta** — in fondo alla pagina una riga riporta la versione, la
   **build** completa e il **commit** da cui è compilata (il commit breve; il
   suggerimento del mouse mostra quello intero). Serve a riconoscere senza
-  ambiguità la build installata: da quando il terzo numero della versione
-  riparte da 0 ogni 1000 build (per esempio `1.2.0 (build 2000)`), la build
+  ambiguità la build installata: il terzo numero della versione è sempre la
+  build (per esempio `1.1.1961`), quindi la build
   piena e il commit sono l'identità esatta del programma in esecuzione.
 
 - Backup immediato, pulisci cestino, ricalcola scoring, scansiona archivi,

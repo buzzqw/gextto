@@ -17,8 +17,9 @@ COPY . .
 RUN go mod download
 # The daemon's own build number, injected like the release build does.
 ARG GX_BUILD=0
+ARG GX_SERIES=1.1
 RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false \
-        -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=${GX_BUILD}" \
+        -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=${GX_BUILD} -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=${GX_SERIES}" \
         -o /out/gx-torrent ./cmd/gx-torrent
 
 FROM debian:12-slim

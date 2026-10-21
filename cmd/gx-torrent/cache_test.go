@@ -142,17 +142,23 @@ func TestRuntimeVersionUsesGxTorrentBuild(t *testing.T) {
 	}
 }
 
-func TestDisplayVersionKeepsBuildAfterRollover(t *testing.T) {
-	previous := constants.GxTorrentBuild
-	t.Cleanup(func() { constants.GxTorrentBuild = previous })
+func TestDisplayVersionKeepsTheBuildAsThirdNumber(t *testing.T) {
+	previousBuild, previousSeries := constants.GxTorrentBuild, constants.GxVersionSeries
+	t.Cleanup(func() {
+		constants.GxTorrentBuild, constants.GxVersionSeries = previousBuild, previousSeries
+	})
 
-	constants.GxTorrentBuild = "999"
+	constants.GxTorrentBuild, constants.GxVersionSeries = "999", "1.1"
 	if got := displayVersion(); got != "1.1.999" {
 		t.Fatalf("display version at build 999 = %q", got)
 	}
 	constants.GxTorrentBuild = "1000"
-	if got := displayVersion(); got != "1.2.0 (build 1000)" {
+	if got := displayVersion(); got != "1.1.1000" {
 		t.Fatalf("display version at build 1000 = %q", got)
+	}
+	constants.GxVersionSeries = "1.2"
+	if got := displayVersion(); got != "1.2.1000" {
+		t.Fatalf("display version with the manual series = %q", got)
 	}
 }
 

@@ -56,7 +56,7 @@ func ClassifyRestart(prev runState) RestartCause {
 // restartChangedBinary reports whether the previous run was a different build,
 // which is what makes a restart an update rather than a stability event.
 func restartChangedBinary(prev runState) bool {
-	if value := strings.TrimSpace(prev.Version); value != "" && value != strings.TrimSpace(constants.Version) {
+	if value := strings.TrimSpace(prev.Version); value != "" && value != strings.TrimSpace(constants.AppVersion()) {
 		return true
 	}
 	if value := strings.TrimSpace(prev.Build); value != "" && value != strings.TrimSpace(constants.Build) {

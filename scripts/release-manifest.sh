@@ -48,10 +48,10 @@ done
 [[ "$BUILD" =~ ^[0-9]+$ ]] || { echo "--build must be a number" >&2; exit 2; }
 [[ "$COMMITS" =~ ^[0-9]+$ ]] || { echo "--commits must be a number" >&2; exit 2; }
 [[ -n "$BUILT_AT" ]] || BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION" 2>/dev/null || true)"
 COMMIT="${GEXTTO_COMMIT:-${GITHUB_SHA:-$(git -C "$ROOT" rev-parse HEAD)}}"
 # shellcheck source=scripts/version.sh
 . "$ROOT/scripts/version.sh"
+VERSION="$(gextto_version_for_build "$BUILD")"
 
 # GX_PATHS is the code of the gx-torrent daemon: its package and every package
 # of this repository it imports (`go list -deps ./cmd/gx-torrent`, kept in

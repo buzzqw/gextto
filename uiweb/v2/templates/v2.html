@@ -2056,9 +2056,8 @@
   </div>
 {{end}}
 
-{{/* Exact build identity at the bottom of Maintenance: the version alone
-     restarts its third number every thousand builds, so the full build and the
-     commit it was compiled from stay here. */}}
+{{/* Exact build identity at the bottom of Maintenance: the version, the full
+     build and the commit it was compiled from. */}}
 {{define "v2_build_info"}}
 <p class="v2-build-info">
   <span>Versione</span> <strong>{{.Version}}</strong><span aria-hidden="true"> · </span><span>build</span> <strong>{{.Build}}</strong><span aria-hidden="true"> · </span><span>commit</span> <code title="{{.CommitFull}}">{{.Commit}}</code>

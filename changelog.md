@@ -6,8 +6,9 @@ sola build, test, documentazione o manutenzione interna non hanno una voce
 separata, ma sono rappresentati nella voce della modifica a cui appartengono.
 Per il dettaglio tecnico restano i commit e i documenti in `docs/`.
 
-La versione installata è quella mostrata da Gextto (`1.1.<build>` fino alla
-build 1999, poi `1.2.0`, `1.2.999`, `1.3.0`, …). Il manuale
+La versione installata è quella mostrata da Gextto (`<serie>.<build>`, per
+esempio `1.1.1961`): il terzo numero è sempre la build, il secondo si alza a
+mano quando si apre una nuova serie. Il manuale
 aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [English](docs/MANUAL.en.md). La versione inglese di questo changelog è
 [changelog.en.md](changelog.en.md). Per segnalazioni:
@@ -15,6 +16,13 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Numerazione: torna `1.1.<build>`, il secondo numero si alza a mano.**
+  Gextto non sposta più da solo il secondo numero ogni 1000 build: la versione
+  è `<serie>.<build>`, il terzo numero è sempre la build (`1.1.1961`) e la
+  serie resta `1.1` finché non la si cambia di proposito in `version_series`
+  (per esempio `1.2.2000`). Vale anche per gx-torrent, con il suo
+  `gx_torrent.version_series`. La build e il commit restano visibili in fondo a
+  **Manutenzione**.
 - **Feed RSS: se IPv6 si blocca, Gextto riprova su IPv4.** Un host raggiungibile
   in IPv6 ma che non manda dati (è il caso di `extto.org` dietro Cloudflare)
   faceva scadere i feed uno dopo l’altro. Dopo il primo tentativo fallito i

@@ -218,8 +218,10 @@ running_pid() {
 build() {
   local want="${1:-}"
   mkdir -p "$DIR/bin"
-  local gx_build commit built_at
+  local gx_build gx_series commit built_at
   gx_build="$(tr -d '[:space:]' < "$ROOT/gx-torrent.build_number")"
+  gx_series="$(tr -d '[:space:]' < "$ROOT/gx_torrent.version_series" 2>/dev/null || true)"
+  [[ -n "$gx_series" ]] || gx_series="1.1"
   commit="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
   if [[ -n "$(git -C "$ROOT" status --porcelain -- cmd/gx-torrent internal 2>/dev/null)" ]]; then
     commit="$commit-dirty"
@@ -227,7 +229,7 @@ build() {
   built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "building gx-torrent from $ROOT ($commit) into $DIR/bin"
   (cd "$ROOT" && CGO_ENABLED=0 go build -trimpath \
-    -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$gx_build -X github.com/buzzqw/gextto/internal/constants.Commit=$commit -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$built_at" \
+    -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$gx_build -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=$gx_series -X github.com/buzzqw/gextto/internal/constants.Commit=$commit -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$built_at" \
     -o "$DIR/bin/gx-torrent.new" ./cmd/gx-torrent)
   # Rename over the old file: a running test daemon keeps its own copy.
   mv -f "$DIR/bin/gx-torrent.new" "$DIR/bin/gx-torrent"

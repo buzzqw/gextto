@@ -6,8 +6,9 @@ only build, test, document or maintain the project internally do not get a
 separate line, but are represented in the entry of the change they accompany.
 Technical detail stays in the commits and in `docs/`.
 
-The installed version is the one shown by Gextto (`1.1.<build>` up to build
-1999, then `1.2.0`, `1.2.999`, `1.3.0`, …). The updated
+The installed version is the one shown by Gextto (`<series>.<build>`, for
+example `1.1.1961`): the third number is always the build and the second is
+raised by hand when a new series is started. The updated
 manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).

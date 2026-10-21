@@ -49,7 +49,7 @@ func updateInstalledMarker() (string, bool) {
 	}
 	// Only the marker next to the executable counts: installers and the release
 	// archive write `VERSION` there. Looking at the parent directory would pick
-	// up the repository's product-version file during development.
+	// up an unrelated VERSION file during development.
 	markerPath := filepath.Join(filepath.Dir(executable), "VERSION")
 	text, err := os.ReadFile(markerPath)
 	if err != nil {
@@ -237,7 +237,7 @@ func updateResolveInstallDir(opts UpdateOptions) (string, error) {
 }
 
 func updateUserAgent() string {
-	return "gexttod/" + constants.Version
+	return "gexttod/" + constants.AppVersion()
 }
 
 func updateDownload(ctx context.Context, url, destination string) error {

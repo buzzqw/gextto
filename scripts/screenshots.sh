@@ -61,18 +61,20 @@ trap cleanup EXIT
 # Build into the work directory with the committed build numbers, without
 # bumping them (scripts/build-daemon.sh would bump gx-torrent's on a new
 # output directory).
-VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION" 2>/dev/null || echo 0.1.0)"
+SERIES="$(tr -d '[:space:]' < "$ROOT/version_series" 2>/dev/null || echo 1.1)"
 BUILD="$(tr -dc '0-9' < "$ROOT/build_number")"
+VERSION="$SERIES.$BUILD"
 GX_BUILD="$(tr -dc '0-9' < "$ROOT/gx-torrent.build_number")"
+GX_SERIES="$(tr -d '[:space:]' < "$ROOT/gx_torrent.version_series" 2>/dev/null || echo 1.1)"
 COMMIT="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
 PKG=github.com/buzzqw/gextto/internal/constants
 (
     cd "$ROOT"
     CGO_ENABLED=0 nice -n 10 go build -trimpath \
-        -ldflags "-s -w -X $PKG.Version=$VERSION -X $PKG.Build=$BUILD -X $PKG.Commit=$COMMIT" \
+        -ldflags "-s -w -X $PKG.Version=$VERSION -X $PKG.VersionSeries=$SERIES -X $PKG.Build=$BUILD -X $PKG.Commit=$COMMIT" \
         -o "$WORK/bin/gexttod" ./cmd/gexttod
     CGO_ENABLED=0 nice -n 10 go build -trimpath -buildvcs=false \
-        -ldflags "-s -w -X $PKG.GxTorrentBuild=$GX_BUILD -X $PKG.Commit=$COMMIT" \
+        -ldflags "-s -w -X $PKG.GxTorrentBuild=$GX_BUILD -X $PKG.GxVersionSeries=$GX_SERIES -X $PKG.Commit=$COMMIT" \
         -o "$WORK/bin/gx-torrent" ./cmd/gx-torrent
 )
 printf 'built gexttod %s (build %s) and gx-torrent (build %s) in %s\n' "$VERSION" "$BUILD" "$GX_BUILD" "$WORK/bin"

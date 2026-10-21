@@ -1,48 +1,50 @@
 #!/usr/bin/env bash
 # Version of a build number, shared by the scripts that publish it.
 #
-# The third number runs from 0 to 999: when it reaches 1000 the middle number
-# grows by one and the third restarts from 0 (1.2.999 -> 1.3.0). The switch
-# happens at the first round thousand after the last published build, so what
-# is already installed is not renumbered: Gextto's 1.1 series ends at build
-# 1999 (rollover at 2000), gx-torrent's at build 999 (rollover at 1000).
+# The third number is always the build. The second number is raised by hand,
+# when the project starts a new series: it lives in `version_series` for Gextto
+# and in `gx_torrent.version_series` for the daemon, so it never moves by a
+# counter and the installed build is never renumbered.
 #
-# This mirrors versionFromBuild in internal/constants/constants.go; the two
-# must agree (release.json is compared with the version the binary reports).
+# This mirrors AppVersion/GxTorrentVersion in internal/constants/constants.go,
+# stamped by scripts/build-daemon.sh from the same two files (release.json is
+# compared with the version the binary reports).
 
-# version_for_build BUILD FIRST_ROLLOVER prints the version of BUILD, keeping
-# the historical "1.1.<build>" form until FIRST_ROLLOVER is reached.
+# series_from_file FILE prints the trimmed series, or 1.1 when unavailable.
+series_from_file() {
+  local value
+  value="$(tr -d '[:space:]' < "$1" 2>/dev/null || true)"
+  [[ -n "$value" ]] || value="1.1"
+  printf '%s\n' "$value"
+}
+
+# version_for_build BUILD SERIES prints SERIES.BUILD.
 version_for_build() {
-  local build="$1" first_rollover="$2"
+  local build="$1" series="$2"
   if ! [[ "$build" =~ ^[0-9]+$ ]]; then
-    printf '1.1.%s\n' "$build"
+    printf '%s.%s\n' "$series" "$build"
     return 0
   fi
-  build=$((10#$build))
-  if (( build < first_rollover )); then
-    printf '1.1.%d\n' "$build"
-    return 0
-  fi
-  printf '1.%d.%d\n' $(( 2 + (build - first_rollover) / 1000 )) $(( build % 1000 ))
+  printf '%s.%d\n' "$series" $((10#$build))
 }
 
 # gextto_version_for_build BUILD prints Gextto's version for BUILD.
 gextto_version_for_build() {
-  version_for_build "$1" 2000
+  version_for_build "$1" "$(series_from_file "$ROOT/version_series")"
 }
 
 # gx_version_for_build BUILD prints gx-torrent's version for its own BUILD.
 gx_version_for_build() {
-  version_for_build "$1" 1000
+  version_for_build "$1" "$(series_from_file "$ROOT/gx_torrent.version_series")"
 }
 
-# version_label_for_build BUILD FIRST_ROLLOVER prints the version with the
-# build number in parentheses once the rollover makes the two differ, so the
-# build is never lost from the label (mirrors VersionLabelWithBuild).
+# version_label_for_build BUILD SERIES prints the version to show. The build is
+# already the third number; only an old manifest whose version dropped it gets
+# it in parentheses, exactly like VersionLabelWithBuild in Go.
 version_label_for_build() {
-  local build="$1" first_rollover="$2" version
-  version="$(version_for_build "$build" "$first_rollover")"
-  if [[ "$version" == "1.1.$build" ]]; then
+  local build="$1" series="$2" version
+  version="$(version_for_build "$build" "$series")"
+  if [[ "$build" == "" || "$build" == "0" || "$version" == *".$build" ]]; then
     printf '%s\n' "$version"
     return 0
   fi
@@ -51,5 +53,5 @@ version_label_for_build() {
 
 # gx_version_label_for_build BUILD is gx-torrent's label for its own BUILD.
 gx_version_label_for_build() {
-  version_label_for_build "$1" 1000
+  version_label_for_build "$1" "$(series_from_file "$ROOT/gx_torrent.version_series")"
 }

@@ -18,15 +18,17 @@ fast:
 # own build number, independent from Gextto's.
 gx-torrent:
 	GX_BUILD="$$(GEXTTO_BUMP_BUILD=1 scripts/next-gx-build-number.sh)"; \
+	GX_SERIES="$$(tr -d '[:space:]' < gx_torrent.version_series 2>/dev/null || true)"; \
+	[ -n "$$GX_SERIES" ] || GX_SERIES="1.1"; \
 	CGO_ENABLED=0 go build -trimpath -buildvcs=false \
-		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$$(git rev-parse HEAD 2>/dev/null) -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=$$GX_SERIES -X github.com/buzzqw/gextto/internal/constants.Commit=$$(git rev-parse HEAD 2>/dev/null) -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 		-o bin/gx-torrent ./cmd/gx-torrent; \
 	printf 'built bin/gx-torrent (build %s)\n' "$$GX_BUILD"
 
 # Build the standalone container image (needs docker). The daemon's build
 # number is taken from gx-torrent.build_number when it exists.
 container:
-	docker build --build-arg GX_BUILD="$$(cat gx-torrent.build_number 2>/dev/null || echo 0)" -t gx-torrent .
+	docker build --build-arg GX_BUILD="$$(cat gx-torrent.build_number 2>/dev/null || echo 0)" --build-arg GX_SERIES="$$(cat gx_torrent.version_series 2>/dev/null || echo 1.1)" -t gx-torrent .
 
 test: check-ui check-scripts installer-test test-dht
 	CGO_ENABLED=0 go test ./...

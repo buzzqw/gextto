@@ -607,8 +607,7 @@ type v2PanelsView struct {
 }
 
 // v2BuildInfo is the line that pins down exactly which binary is running: the
-// version alone restarts its third number every thousand builds, so the full
-// build and the commit it was compiled from are shown together.
+// version, the full build and the commit it was compiled from.
 type v2BuildInfo struct {
 	Version    string
 	Build      string

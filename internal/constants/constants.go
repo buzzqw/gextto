@@ -2,7 +2,6 @@
 package constants
 
 import (
-	"strconv"
 	"strings"
 )
 
@@ -23,28 +22,25 @@ const (
 // AppName is the daemon executable name (also used in release archives).
 const AppName = "gexttod"
 
-// Version is the product version. It is overridden at build time with
-// `-X gextto/internal/constants.Version=...` from the `VERSION` file.
-var Version = "0.1.0"
+// Version is the full product version (`<series>.<build>`), stamped at build
+// time with `-X gextto/internal/constants.Version=...`. AppVersion is the
+// authoritative formatter; this variable is kept for compatibility with code
+// that reads the compiled-in string.
+var Version = "1.1.1000"
 
 // Build is the monotonic build number, overridden at build time with
 // `-X gextto/internal/constants.Build=...`. It identifies the exact binary.
 var Build = "1000"
 
-// First build at which each counter rolls over from the historical 1.1 series:
-// from then on the third number runs 0..999 and the middle one grows by one
-// every thousand builds (1.2.999 -> 1.3.0). Builds published before the
-// rollover keep the old "1.1.<build>" form, so the installed version is not
-// renumbered: Gextto's 1.1 series ends at build 1999, gx-torrent's at 999.
-const (
-	appFirstRollover = 2000
-	gxFirstRollover  = 1000
-)
+// VersionSeries is the manually chosen major.minor of Gextto ("1.1"). It is
+// stamped at build time from the `version_series` file and the third number is
+// always the build: "1.1.1961". The second number is raised only when the
+// project deliberately starts a new series, never by a counter.
+var VersionSeries = "1.1"
 
 // AppVersion is the version shown in the Gextto UI and API:
-// "1.1.<build>" up to build 1999, then "<major>.<minor>.<patch>" with the
-// patch in 0..999 (1.2.0, 1.2.999, 1.3.0, …).
-func AppVersion() string { return versionFromBuild(Build, appFirstRollover) }
+// "<major>.<minor>.<build>".
+func AppVersion() string { return VersionSeries + "." + Build }
 
 // GxTorrentBuild is the gx-torrent daemon's own monotonic build number,
 // independent from Build: it grows by one every time the daemon is rebuilt
@@ -53,46 +49,31 @@ func AppVersion() string { return versionFromBuild(Build, appFirstRollover) }
 // untouched across Gextto updates, its number does not follow Gextto's.
 var GxTorrentBuild = "0"
 
-// GxTorrentVersion is what the gx-torrent daemon's CLI, web UI and
-// /api/v1/health report: "1.1.<build>" up to build 999, then 1.2.0, 1.2.999,
-// 1.3.0, … (gx-torrent's counter is independent and started at zero).
-func GxTorrentVersion() string { return versionFromBuild(GxTorrentBuild, gxFirstRollover) }
+// GxVersionSeries is gx-torrent's manually chosen major.minor ("1.1"), stamped
+// from `gx_torrent.version_series`. Its build is the third number.
+var GxVersionSeries = "1.1"
 
-// GxTorrentVersionLabel is gx-torrent's version with its build number when the
-// rollover makes them differ, like VersionLabel for Gextto.
+// GxTorrentVersion is what the gx-torrent daemon's CLI, web UI and
+// /api/v1/health report: "<major>.<minor>.<build>".
+func GxTorrentVersion() string { return GxVersionSeries + "." + GxTorrentBuild }
+
+// GxTorrentVersionLabel is gx-torrent's version as shown to people. The build
+// is already the third number, so no extra label is needed.
 func GxTorrentVersionLabel() string {
 	return VersionLabelWithBuild(GxTorrentVersion(), GxTorrentBuild)
 }
 
-// versionFromBuild formats a monotonic build number as a three-number version.
-// Below firstRollover it keeps the historical "1.1.<build>" form; from then on
-// the third number restarts at 0 every thousand builds and the middle number
-// grows, starting at 2: 1000 -> 1.2.0, 1999 -> 1.2.999, 2000 -> 1.3.0.
-func versionFromBuild(build string, firstRollover int) string {
-	trimmed := strings.TrimSpace(build)
-	value, err := strconv.Atoi(trimmed)
-	if err != nil || value < 0 {
-		return "1.1." + trimmed
-	}
-	if value < firstRollover {
-		return "1.1." + strconv.Itoa(value)
-	}
-	minor := 2 + (value-firstRollover)/1000
-	return "1." + strconv.Itoa(minor) + "." + strconv.Itoa(value%1000)
-}
-
-// VersionLabelWithBuild is the version to show to people: VERSION plus the
-// build in parentheses, unless VERSION already ends with that build (the
-// historical "1.1.<build>" form). So the build number is never lost from
-// sight once the third number restarts every thousand: "1.1.1925" becomes
-// "1.2.925 (build 2925)".
+// VersionLabelWithBuild is the version to show to people. The current scheme
+// already ends with the build as its third number, so it is returned as it is;
+// an old manifest whose version dropped the build still gets it in
+// parentheses, so the exact reference is never lost.
 func VersionLabelWithBuild(version, build string) string {
 	version = strings.TrimSpace(version)
 	trimmed := strings.TrimSpace(build)
 	if version == "" {
 		return ""
 	}
-	if trimmed == "" || trimmed == "0" || version == "1.1."+trimmed {
+	if trimmed == "" || trimmed == "0" || strings.HasSuffix(version, "."+trimmed) {
 		return version
 	}
 	return version + " (build " + trimmed + ")"

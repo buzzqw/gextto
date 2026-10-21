@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/constants"
 )
 
 func parseStr(line string) Command {
@@ -91,7 +93,7 @@ func TestParsesTuiSubcommand(t *testing.T) {
 func TestUsageMentionsEverySwitchesAndDefaults(t *testing.T) {
 	usage := Usage()
 	for _, needle := range []string{
-		"gexttod 0.1.0 — Gextto (gextto): self-contained Go daemon for media acquisition and archiving",
+		"gexttod " + constants.VersionLabel() + " — Gextto (gextto): self-contained Go daemon for media acquisition and archiving",
 		"    gexttod [OPTIONS]",
 		"    gexttod tui [--url <url>] [--lang it|en]",
 		"    gexttod --update [OPTIONS]",

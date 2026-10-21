@@ -98,7 +98,7 @@ func logStartupBanner(dataDir string) runState {
 	saveRunState(dataDir, runState{
 		Runs:      prev.Runs + 1,
 		StartedAt: now.Format(time.RFC3339),
-		Version:   constants.Version,
+		Version:   constants.AppVersion(),
 		Build:     constants.Build,
 		Commit:    constants.Commit,
 		PID:       os.Getpid(),
