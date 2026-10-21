@@ -15,6 +15,11 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Feed RSS: se IPv6 si blocca, Gextto riprova su IPv4.** Un host raggiungibile
+  in IPv6 ma che non manda dati (è il caso di `extto.org` dietro Cloudflare)
+  faceva scadere i feed uno dopo l’altro. Dopo il primo tentativo fallito i
+  successivi passano da IPv4, così i feed di ext.to non spariscono più per un
+  timeout.
 - **Scarico: i download eD2k mostrano più dati e il badge è colorato.** Ogni
   riga eD2k ora mostra, oltre a stato, progressione, velocità e fonti, anche i
   **byte caricati**, il **tempo stimato** e il **rapporto** tra caricato e

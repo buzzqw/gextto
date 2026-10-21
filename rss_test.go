@@ -531,3 +531,32 @@ func TestFetchFeedExtToPagesStartAtOne(t *testing.T) {
 		t.Fatalf("requested pages = %q, want the second request to be page=2", requested)
 	}
 }
+
+// failingRoundTripper makes the first direct attempt fail as a timeout.
+type failingRoundTripper struct{}
+
+func (failingRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, context.DeadlineExceeded
+}
+
+// TestFeedRetryUsesIPv4AfterATransientFailure: a stalled IPv6 path must not
+// lose the feed; the second attempt goes through the IPv4 client.
+func TestFeedRetryUsesIPv4AfterATransientFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("feed body"))
+	}))
+	defer server.Close()
+
+	previous := feedHTTPClientIPv4
+	feedHTTPClientIPv4 = server.Client()
+	t.Cleanup(func() { feedHTTPClientIPv4 = previous })
+
+	failing := &http.Client{Transport: failingRoundTripper{}}
+	body, err := fetch_body(context.Background(), failing, server.URL, nil)
+	if err != nil {
+		t.Fatalf("fetch_body: %v", err)
+	}
+	if body != "feed body" {
+		t.Fatalf("body = %q, want the IPv4 retry to have fetched it", body)
+	}
+}

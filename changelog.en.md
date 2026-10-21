@@ -14,6 +14,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **RSS feeds: when IPv6 stalls, Gextto retries over IPv4.** A host reachable
+  over IPv6 that never sends data (extto.org behind Cloudflare is one) made the
+  feeds time out one after another. After the first failed attempt the next ones
+  dial IPv4, so ext.to feeds no longer disappear because of a timeout.
 - **Downloads: eD2k rows show more data and the badge has a colour.** Each eD2k
   row now shows, besides state, progress, speed and sources, the **uploaded
   bytes**, the **estimated time** and the **ratio** between uploaded and

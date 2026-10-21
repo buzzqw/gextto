@@ -1139,6 +1139,22 @@ func read_knaben_stream(response *http.Response) (string, error) {
 	return string(body), nil
 }
 
+// feedHTTPClientIPv4 is the direct-fetch client used for retries. A stalled
+// IPv6 path (TCP/TLS established, then no data) does not trigger Go's Happy
+// Eyeballs fallback; extto.org behind Cloudflare can leave an IPv6 request
+// hanging until the attempt timeout, while the same URL answers at once over
+// IPv4. After the first transient failure the next attempts dial tcp4 only.
+var feedHTTPClientIPv4 = newFeedIPv4Client()
+
+func newFeedIPv4Client() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	transport.DialContext = func(ctx context.Context, _, address string) (net.Conn, error) {
+		return dialer.DialContext(ctx, "tcp4", address)
+	}
+	return &http.Client{Timeout: 90 * time.Second, Transport: transport}
+}
+
 // fetch_body downloads a feed body with a few attempts on transient errors.
 // Cloudflare is the last resort, after the direct retries, so it is not
 // hammered on every micro-error.
@@ -1159,7 +1175,11 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 	}
 	lastTransient := ""
 	for attempt := 1; attempt <= FEED_FETCH_ATTEMPTS; attempt++ {
-		result := fetch_body_direct(ctx, client, rawURL, FEED_FETCH_TIMEOUT)
+		attemptClient := client
+		if attempt > 1 {
+			attemptClient = feedHTTPClientIPv4
+		}
+		result := fetch_body_direct(ctx, attemptClient, rawURL, FEED_FETCH_TIMEOUT)
 		switch result.kind {
 		case fetchAttemptBody:
 			return result.value, nil
