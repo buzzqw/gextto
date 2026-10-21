@@ -669,6 +669,16 @@ and queue scheduler of the same depth, which is not worth its cost for a
 last-resort source. The native daemon is preserved in the history, at commit
 `9f4e2b9` (the last `gx-ed2k` build, removed from the tree right after).
 
+Open points:
+
+- **Managed amuled.** Gextto expects an `amuled` the operator runs and configures.
+  Starting and supervising it like qBittorrent-nox (own `--config-dir`,
+  generated EC password, ports) would remove the manual setup. Gate: users who
+  want eD2k without configuring aMule by hand.
+- **Remote aMule.** Completed files are imported from aMule's incoming folder at
+  the same path, which holds when both run on one machine. A remote core would
+  need a path mapping like `qbittorrent_path_mappings`.
+
 The fallback is an explicit opt-in, not a pending decision: measured Kad
 coverage of real gaps is **7–13 %** (`measurements.md` §4.10) and one real
 library reports about **10 of 100** missing episodes found through it. That is

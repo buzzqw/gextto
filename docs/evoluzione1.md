@@ -68,10 +68,12 @@ elencati per valore/sforzo, ciascuno dopo uno studio e senza copiare codice
 
 ## 4. eD2k / aMule
 
-- **amuled gestito**: fatto (`amule_managed`): configurazione privata in
-  `DATA_DIR/amule`, password EC generata, porte scelte e supervisione.
-- **aMule remoto**: fatto (`amule_path_mappings`): la cartella di arrivo
-  riportata da un core remoto viene tradotta prima dell'import.
+- **amuled gestito**: avviarlo e supervisionarlo come qBittorrent-nox
+  (config-dir, password EC generata, porte) invece di pretendere che
+  l'operatore lo configuri a mano. Gate: utenti che vogliono eD2k senza setup
+  manuale.
+- **aMule remoto**: l'import dei completati assume lo stesso path; servirebbe un
+  path mapping tipo `qbittorrent_path_mappings`.
 - **Fallback eD2k**: è una scelta esplicita dell'operatore, non un punto in
   attesa. La copertura misurata sui gap reali è **7–13 %** (`measurements.md`
   §4.10); su una libreria reale il fallback ha trovato circa **10 episodi su
@@ -81,7 +83,7 @@ elencati per valore/sforzo, ciascuno dopo uno studio e senza copiare codice
 ## 5. Perimetro in una riga
 
 Realmente aperto: **DLNA con transcoding/frame extraction**, **WebRTC**, **il gap
-con gli *arr*** (import manuale, profili nominati, `/api/v3` per Jellyseerr) e i
-punti dell'engine in attesa di uno sciame vero o di hardware. Il resto del
-triage è chiuso.
+con gli *arr*** (import manuale, profili nominati, `/api/v3` per Jellyseerr), **la
+gestione di amuled e l'aMule remoto** e i punti dell'engine in attesa di uno
+sciame vero o di hardware. Il resto del triage è chiuso.
 

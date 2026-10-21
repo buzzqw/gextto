@@ -68,14 +68,9 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"gxtorrent_dlna_folders":           {Zero: "vuoto = automatico (archivio)", DependsOn: "gxtorrent_dlna"},
 
 	// eD2k e Kad
-	"amule_host":          {DependsOn: "ed2k_enabled"},
-	"amule_port":          {DependsOn: "ed2k_enabled"},
-	"amule_password":      {DependsOn: "ed2k_enabled"},
-	"amule_path_mappings": {DependsOn: "ed2k_enabled"},
-	"amule_managed":       {DependsOn: "ed2k_enabled"},
-	"amule_binary":        {DependsOn: "amule_managed"},
-	"amule_ed2k_port":     {DependsOn: "amule_managed"},
-	"amule_kad_port":      {DependsOn: "amule_managed"},
+	"amule_host":     {DependsOn: "ed2k_enabled"},
+	"amule_port":     {DependsOn: "ed2k_enabled"},
+	"amule_password": {DependsOn: "ed2k_enabled"},
 	"ed2k_search_network": {Kind: "select", DependsOn: "ed2k_enabled", Options: []uiFormOption{
 		{Value: "kad", Label: "Kad"},
 		{Value: "both", Label: "Kad + server eD2k"},

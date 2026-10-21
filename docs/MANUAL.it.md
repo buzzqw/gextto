@@ -1838,11 +1838,6 @@ spento per default: senza il tuo consenso Gextto non contatta la rete.
 | aMule — indirizzo | Macchina su cui gira `amuled`, di solito `127.0.0.1`. Gextto deve vedere la cartella di arrivo di aMule allo stesso percorso. |
 | aMule — porta connessioni esterne (EC) | `ECPort` di `amule.conf`, 4712 di default. |
 | aMule — password connessioni esterne (EC) | La password in chiaro; aMule conserva il suo MD5 in `ECPassword`. Non visualizzata. |
-| aMule — mappatura percorsi | Solo se amuled gira su un altro host o in un container: una riga per percorso, forma `gextto=amule` (es. `/mnt/nas=/data`). L'import dei completati usa la cartella di arrivo tradotta così. |
-| aMule — avviato e sorvegliato da Gextto | Gextto crea una configurazione privata in `DATA_DIR/amule`, genera la password EC, avvia `amuled` e lo riavvia se termina. Serve solo il programma installato. |
-| aMule — programma amuled | Percorso di `amuled`; vuoto = cerca nel `PATH`. Usato solo con la gestione automatica accesa. |
-| aMule — porta eD2k (TCP) | Porta TCP eD2k del core gestito, 4662 di default. |
-| aMule — porta Kad (UDP) | Porta UDP di Kad del core gestito, 4672 di default. |
 | Cartelle di aMule | La cartella di download (incoming) e quella temporanea sono mostrate in sola lettura: appartengono ad aMule e si cambiano da aMule/amuled. Dopo la modifica riavvia Gextto (oppure riapri questa pagina) perché usi il nuovo percorso. |
 | Rete delle ricerche eD2k | **Kad** (default, non serve un server), **Kad + server eD2k** (entrambe le ricerche, risultati uniti), **Server eD2k (globale)** (tutti i server) o **Server eD2k (connesso)**. Vale per la ricerca manuale; il fallback automatico cerca sempre su Kad e sui server. La stessa scelta è nella pagina eD2k. |
 | Usa eD2k quando i torrent non trovano nulla | Secondo interruttore, separato: quando la ricerca torrent di episodio e stagione non ha prodotto nulla, Gextto cerca lo stesso episodio su eD2k/Kad (con il nome della serie e tutti gli alias). Vale sia per il passaggio approfondito del gap filling sia per **Cerca mancanti** e per la ricerca del singolo episodio. Spento di default. |
