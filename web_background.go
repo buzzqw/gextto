@@ -2153,6 +2153,13 @@ func housekeepingWorker(state *AppState) {
 				)
 			}
 		}
+		// The release archive has its own retention setting; it is independent
+		// of the technical housekeeping above, so it runs on the same cadence
+		// even when that switch is off. It never touches downloaded files, the
+		// library or the download history: only the searchable catalogue rows.
+		if _, err := applyArchiveRetention(cfg, state.archive); err != nil {
+			logging.Warn("release archive cleanup failed", "error", err)
+		}
 		if !state.SleepBackground(housekeepingInterval(cfg)) {
 			return
 		}

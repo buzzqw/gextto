@@ -210,6 +210,19 @@ func ed2kClient(cfg *Config) (*amule.Client, error) {
 	return ed2kState.client, nil
 }
 
+// ed2kRememberIncoming updates the cached incoming folder from a preferences
+// read, so a change made in aMule is picked up without restarting Gextto once
+// the settings or eD2k page has been opened.
+func ed2kRememberIncoming(dir string) {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return
+	}
+	ed2kState.mu.Lock()
+	ed2kState.incoming = dir
+	ed2kState.mu.Unlock()
+}
+
 // ed2kPreferences reads aMule's directories and options.
 func ed2kPreferences(cfg *Config) (amule.Preferences, error) {
 	var prefs amule.Preferences

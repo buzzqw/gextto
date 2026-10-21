@@ -14,6 +14,20 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **eD2k and Kad: aMule folders in plain sight.** In **Configuration → eD2k
+  and Kad** you now see aMule's incoming (download) and temporary folders,
+  read-only. The tooltip explains that they are changed in aMule/amuled and
+  that after the change Gextto must be restarted (or the page reopened) so it
+  uses the new path.
+- **Housekeeping: more useful tooltips.** The housekeeping options now say what
+  they clean and what they leave alone: files, the library, the release Archive
+  and active torrents are outside their scope.
+- **Release archive: automatic cleanup now works.** The «Automatic archive
+  cleanup», «Archive — maximum age» and «Archive — keep at least N entries»
+  settings were saved but never run. They now run with the periodic
+  housekeeping and remove only release-catalogue rows older than the limit:
+  downloaded files, the library, download history and active torrents are
+  untouched.
 - **Torrent details: tooltips that actually explain.** Hovering a value in the
   **General** tab, an action button or a table header in the torrent details now
   shows what the value means or what the button does, translated into every

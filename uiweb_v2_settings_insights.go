@@ -233,6 +233,10 @@ type v2SettingsEd2k struct {
 	Reachable    bool
 	Error        string
 	AllocateFull bool
+	// IncomingDir and TempDir are aMule's folders, shown read-only: they belong
+	// to aMule and Gextto only reads them (the import uses the incoming one).
+	IncomingDir string
+	TempDir     string
 }
 
 // v2SettingsEd2kFrom reads aMule's file preallocation for the settings panel.
@@ -249,5 +253,10 @@ func v2SettingsEd2kFrom(s *AppState) *v2SettingsEd2k {
 	}
 	panel.Reachable = true
 	panel.AllocateFull = prefs.AllocateFull
+	panel.IncomingDir = prefs.IncomingDir
+	panel.TempDir = prefs.TempDir
+	// Drop the cached incoming folder when aMule reports a different one, so
+	// the next import uses the new path without a Gextto restart.
+	ed2kRememberIncoming(prefs.IncomingDir)
 	return panel
 }

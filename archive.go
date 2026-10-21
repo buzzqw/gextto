@@ -7,6 +7,7 @@ import (
 	"encoding/base32"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -890,6 +891,51 @@ func (a *Archive) Delete(magnet string) (bool, error) {
 		return false, err
 	}
 	return removed > 0, nil
+}
+
+// applyArchiveRetention runs the configured automatic release-archive cleanup.
+// It only removes rows from the release catalogue: downloaded files, the
+// library, the download history and the active torrents are separate and stay
+// untouched. The housekeeping worker calls it on every pass; the
+// /api/database/cleanup endpoint uses the same function.
+func applyArchiveRetention(cfg *Config, archive *Archive) (int, error) {
+	if cfg == nil || archive == nil || cfg.DryRun {
+		return 0, nil
+	}
+	if !settingTruthy(cfg.Settings["archive_cleanup_enabled"]) {
+		return 0, nil
+	}
+	days, ok := archiveRetentionDays(cfg.Settings)
+	if !ok || days <= 0 {
+		return 0, nil
+	}
+	keep := int64(0)
+	if value, ok := cfg.Settings["archive_keep_min"]; ok {
+		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil && parsed > 0 {
+			keep = parsed
+		}
+	}
+	removed, err := archive.CleanupOlderThanKeeping(days, keep)
+	if err != nil {
+		return 0, err
+	}
+	logging.Info("release archive cleanup", "removed", removed, "days", days, "keep_min", keep)
+	return removed, nil
+}
+
+// archiveRetentionDays reads `archive_max_age_days`, falling back to the
+// legacy `archive_retention_days` name so an old database keeps working.
+func archiveRetentionDays(settings map[string]string) (int64, bool) {
+	for _, key := range []string{"archive_max_age_days", "archive_retention_days"} {
+		value, ok := settings[key]
+		if !ok {
+			continue
+		}
+		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
+			return parsed, true
+		}
+	}
+	return 0, false
 }
 
 // CleanupOlderThan deletes archive rows older than `days` days.

@@ -977,6 +977,9 @@
   {{else if .Error}}
     <p class="alert" role="alert"><span>aMule non raggiungibile:</span> {{.Error}}</p>
   {{else}}
+    <p class="hint" title="Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled; dopo la modifica riavvia Gextto (oppure riapri questa pagina) perché usi il nuovo percorso.">Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled.</p>
+    <div class="row" title="Cartella in cui aMule salva i file completati. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."><span>Cartella download</span><strong class="truncate" title="{{if .IncomingDir}}{{.IncomingDir}}{{else}}—{{end}}">{{if .IncomingDir}}{{.IncomingDir}}{{else}}—{{end}}</strong></div>
+    <div class="row" title="Cartella in cui aMule tiene i file incompleti. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."><span>Cartella temporanea</span><strong class="truncate" title="{{if .TempDir}}{{.TempDir}}{{else}}—{{end}}">{{if .TempDir}}{{.TempDir}}{{else}}—{{end}}</strong></div>
     <p class="hint">La preallocazione completa riserva subito l'intero file: su un disco di rete può bloccare amuled per decine di secondi. Spenta è il comportamento consigliato.</p>
     <div class="row"><span>Preallocazione file</span><strong>{{if .AllocateFull}}<span class="badge warn">attiva</span>{{else}}<span class="badge ok">spenta</span>{{end}}</strong></div>
     <form method="post" action="/settings/ed2k/preallocation" class="form-grid">

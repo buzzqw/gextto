@@ -361,6 +361,71 @@ func TestArchiveDeduplicatesEphemeralTorrentURLsByGUID(t *testing.T) {
 	}
 }
 
+func TestApplyArchiveRetention(t *testing.T) {
+	archive := openTestArchive(t)
+	for index, row := range []struct {
+		title string
+		days  string
+	}{
+		{"Old One", "-400 days"},
+		{"Old Two", "-399 days"},
+		{"Old Three", "-398 days"},
+		{"Recent One", "-10 days"},
+		{"Recent Two", "-5 days"},
+	} {
+		magnet := fmt.Sprintf("magnet:?xt=urn:btih:retention-%d", index)
+		if _, err := archive.db.Exec(
+			"INSERT INTO archive(title,magnet,magnet_key,source,added_at) VALUES (?1,?2,gextto_magnet_key(?2),'feed',datetime('now',?3))",
+			row.title, magnet, row.days,
+		); err != nil {
+			t.Fatalf("insert %s: %v", row.title, err)
+		}
+	}
+	cfg := &Config{Settings: map[string]string{
+		"archive_cleanup_enabled": "true",
+		"archive_max_age_days":    "365",
+		"archive_keep_min":        "0",
+	}}
+	removed, err := applyArchiveRetention(cfg, archive)
+	if err != nil || removed != 3 {
+		t.Fatalf("applyArchiveRetention = (%d, %v), want (3, nil)", removed, err)
+	}
+	if count, err := archive.Count(); err != nil || count != 2 {
+		t.Fatalf("count after retention = %d, %v; want 2", count, err)
+	}
+
+	// Disabled, zero age and dry-run leave the archive alone.
+	for _, disabled := range []*Config{
+		{Settings: map[string]string{"archive_cleanup_enabled": "false", "archive_max_age_days": "365"}},
+		{Settings: map[string]string{"archive_cleanup_enabled": "true", "archive_max_age_days": "0"}},
+		{Settings: map[string]string{"archive_cleanup_enabled": "true", "archive_max_age_days": "365"}, DryRun: true},
+	} {
+		if removed, err := applyArchiveRetention(disabled, archive); err != nil || removed != 0 {
+			t.Fatalf("disabled retention = (%d, %v), want (0, nil)", removed, err)
+		}
+	}
+
+	// keep_min always preserves the newest rows, even when they are old.
+	kept := openTestArchive(t)
+	if _, err := kept.db.Exec(`INSERT INTO archive(title,magnet,magnet_key,source,added_at) VALUES
+		('Old A','magnet:?xt=urn:btih:keep-a',gextto_magnet_key('magnet:?xt=urn:btih:keep-a'),'feed',datetime('now','-500 days')),
+		('Old B','magnet:?xt=urn:btih:keep-b',gextto_magnet_key('magnet:?xt=urn:btih:keep-b'),'feed',datetime('now','-400 days')),
+		('Old C','magnet:?xt=urn:btih:keep-c',gextto_magnet_key('magnet:?xt=urn:btih:keep-c'),'feed',datetime('now','-300 days'))`); err != nil {
+		t.Fatal(err)
+	}
+	keepCfg := &Config{Settings: map[string]string{
+		"archive_cleanup_enabled": "true",
+		"archive_max_age_days":    "365",
+		"archive_keep_min":        "2",
+	}}
+	if removed, err := applyArchiveRetention(keepCfg, kept); err != nil || removed != 1 {
+		t.Fatalf("keep_min retention = (%d, %v), want (1, nil)", removed, err)
+	}
+	if count, err := kept.Count(); err != nil || count != 2 {
+		t.Fatalf("count after keep_min = %d, %v; want 2", count, err)
+	}
+}
+
 // TestArchiveMigratesToMagnetKey pins the one-off rebuild of an archive created
 // before magnet_key: every row keeps its id and the FTS search still finds it,
 // the exact-magnet dedup holds, and the unused title index is gone.

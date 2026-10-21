@@ -940,7 +940,10 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
    free space to reclaim are compacted with `VACUUM`. Housekeeping runs once per
    interval even when Gextto restarts: a restart does not trigger it again. Archive
   retention is separate and is configured under **Configuration → Automatic
-  maintenance → Release archive cleanup**.
+  maintenance → Release archive cleanup**: the same housekeeping worker applies
+  it on the same cadence, but only when «Automatic archive cleanup» is on. It
+  removes release-catalogue rows only; downloaded files, the library, download
+  history and active torrents stay untouched.
 - **Paths** — library root, trash, download/temp/RAM-disk dirs, per-tag rules.
    A selected RAM-disk path remains configured, but a directory created under
    `/dev/shm` must be recreated after a reboot.
@@ -1744,6 +1747,7 @@ network.
 | aMule — address | Machine running `amuled`, usually `127.0.0.1`. Gextto must see aMule's incoming folder at the same path. |
 | aMule — external connections (EC) port | `ECPort` in `amule.conf`, 4712 by default. |
 | aMule — external connections (EC) password | The password in clear; aMule keeps its MD5 in `ECPassword`. Not displayed. |
+| aMule folders | The incoming (download) and temporary folders are shown read-only: they belong to aMule and are changed in aMule/amuled. After the change restart Gextto (or reopen this page) so it uses the new path. |
 | eD2k search network | **Kad** (default, no server needed), **Kad + eD2k servers** (both searches, results merged), **eD2k servers (global)** (every server) or **eD2k server (connected)**. Applies to the manual search; the automatic fallback always searches Kad and the servers. The same choice is on the eD2k page. |
 | Use eD2k when torrents find nothing | A second, separate switch: only in the deep gap-filling pass, and only when the torrent episode and season searches produced nothing, Gextto searches the same episode on Kad and on the eD2k servers (with the series name and every alias). Off by default. |
 | Minimum sources for the fallback | eD2k source floor for accepting a result automatically. Manual search shows everything. *(Unit: sources; 0 = no minimum)* |
@@ -2095,9 +2099,9 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 
 | Setting | What it does |
 |---|---|
-| Automatic archive cleanup | Enable automatic archive cleanup according to max age and minimum number to keep. |
+| Automatic archive cleanup | Enables automatic archive cleanup on every housekeeping pass: it removes only release-catalogue rows older than the maximum age. Downloaded files, the library, download history and active torrents are untouched. |
 | Archive — maximum age | Maximum age of archive releases, in days (0 = no limit). *(Unit: days; 0 = no limit)* Shown only while «Automatic archive cleanup» is on. |
-| Archive — keep at least N entries | Minimum number of recent releases to always keep in the archive. Shown only while «Automatic archive cleanup» is on. |
+| Archive — keep at least N entries | Minimum number of recent releases to always keep, even when older than the maximum age. Shown only while «Automatic archive cleanup» is on. |
 
 **MediaInfo analysis**
 

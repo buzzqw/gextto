@@ -15,6 +15,20 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **eD2k e Kad: cartelle di aMule in chiaro.** In **Configurazione → eD2k e
+  Kad** ora vedi la cartella di download (incoming) e quella temporanea usate
+  da aMule, in sola lettura. Il tooltip spiega che si cambiano da
+  aMule/amuled e che dopo la modifica va riavviato Gextto (o riaperta la
+  pagina) perché usi il nuovo percorso.
+- **Housekeeping: tooltip più utili.** Le opzioni dell'housekeeping ora dicono
+  cosa puliscono e cosa non toccano: file, libreria, Archivio release e torrent
+  attivi restano fuori.
+- **Archivio release: la pulizia automatica ora funziona.** Le impostazioni
+  «Pulizia automatica archivio», «Archivio — età massima» e «Archivio —
+  mantieni almeno N voci» venivano salvate ma non eseguite. Ora girano con
+  l'housekeeping periodico e rimuovono solo le righe del catalogo release più
+  vecchie del limite: file scaricati, libreria, storico download e torrent
+  attivi non vengono toccati.
 - **Dettagli del torrent: tooltip che spiegano davvero.** Passando il mouse sui
   valori del tab **Generale**, sui pulsanti delle azioni e sulle intestazioni
   delle tabelle del dettaglio di un torrent ora compare una spiegazione di cosa

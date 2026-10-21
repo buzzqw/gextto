@@ -1573,7 +1573,14 @@ func RunHousekeepingNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, "housekeeping failed")
 		return
 	}
-	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "report": report})
+	// The manual button applies the release-archive retention too, exactly like
+	// the periodic worker: only catalogue rows, never files or downloaded
+	// torrents.
+	archiveRemoved, err := applyArchiveRetention(latestConfig(s), s.archive)
+	if err != nil {
+		logging.Warn("release archive cleanup failed", "error", err)
+	}
+	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "report": report, "archive_removed": archiveRemoved})
 }
 
 func gh0_runHousekeeping(s *AppState) (*HousekeepingReport, bool) {

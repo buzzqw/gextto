@@ -967,7 +967,11 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
    recuperare. L'housekeeping gira una volta per intervallo anche se Gextto si
    riavvia: un riavvio non lo fa ripartire.
   La retention dell'Archivio è separata e si trova in **Configurazione →
-  Manutenzione automatica → Pulizia archivio release**.
+  Manutenzione automatica → Pulizia archivio release**: viene eseguita dallo
+  stesso worker dell'housekeeping, con la stessa cadenza, ma solo se «Pulizia
+  automatica archivio» è attiva. Rimuove esclusivamente le righe del catalogo
+  release; file scaricati, libreria, storico download e torrent attivi restano
+  intatti.
 - **Percorsi** — root libreria, cestino, cartelle download/temp/RAM disk, regole
    per tag. Il percorso RAM disk selezionato resta configurato, ma la directory
    creata sotto `/dev/shm` va ricreata dopo un riavvio.
@@ -1804,6 +1808,7 @@ spento per default: senza il tuo consenso Gextto non contatta la rete.
 | aMule — indirizzo | Macchina su cui gira `amuled`, di solito `127.0.0.1`. Gextto deve vedere la cartella di arrivo di aMule allo stesso percorso. |
 | aMule — porta connessioni esterne (EC) | `ECPort` di `amule.conf`, 4712 di default. |
 | aMule — password connessioni esterne (EC) | La password in chiaro; aMule conserva il suo MD5 in `ECPassword`. Non visualizzata. |
+| Cartelle di aMule | La cartella di download (incoming) e quella temporanea sono mostrate in sola lettura: appartengono ad aMule e si cambiano da aMule/amuled. Dopo la modifica riavvia Gextto (oppure riapri questa pagina) perché usi il nuovo percorso. |
 | Rete delle ricerche eD2k | **Kad** (default, non serve un server), **Kad + server eD2k** (entrambe le ricerche, risultati uniti), **Server eD2k (globale)** (tutti i server) o **Server eD2k (connesso)**. Vale per la ricerca manuale; il fallback automatico cerca sempre su Kad e sui server. La stessa scelta è nella pagina eD2k. |
 | Usa eD2k quando i torrent non trovano nulla | Secondo interruttore, separato: solo nel passaggio approfondito del gap filling, e solo se torrent episodio e stagione non hanno prodotto nulla, Gextto cerca lo stesso episodio su Kad e sui server eD2k (con il nome della serie e tutti gli alias). Spento di default. |
 | Fonti minime per il fallback | Soglia di fonti eD2k per accettare automaticamente un risultato. La ricerca manuale mostra tutto. *(Unità: fonti; 0 = nessun minimo)* |
@@ -2158,9 +2163,9 @@ spazio del `tmpfs`, come prima.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Pulizia automatica archivio | Abilita la pulizia automatica dell'archivio secondo età massima e numero minimo da conservare. |
+| Pulizia automatica archivio | Abilita la pulizia automatica dell'archivio a ogni housekeeping: elimina solo le righe del catalogo release più vecchie dell'età massima. File scaricati, libreria, storico download e torrent attivi non vengono toccati. |
 | Archivio — età massima | Età massima delle release in archivio, in giorni (0 = nessun limite). *(Unità: giorni; 0 = nessun limite)* Compare solo con «Pulizia automatica archivio» attivo. |
-| Archivio — mantieni almeno N voci | Numero minimo di release recenti da conservare sempre in archivio. Compare solo con «Pulizia automatica archivio» attivo. |
+| Archivio — mantieni almeno N voci | Numero minimo di release recenti da conservare sempre, anche se più vecchie dell'età massima. Compare solo con «Pulizia automatica archivio» attivo. |
 
 **Analisi MediaInfo**
 

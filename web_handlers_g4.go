@@ -718,37 +718,9 @@ func CleanupDatabase(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	archiveDays := int64(0)
-	archiveDaysSet := false
-	if value, ok := cfg.Settings["archive_max_age_days"]; ok {
-		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-			archiveDays = parsed
-			archiveDaysSet = true
-		}
-	}
-	if !archiveDaysSet {
-		// Legacy fallback: `archive_retention_days` was the original name of
-		// `archive_max_age_days`. Kept only so an old database still works; it is
-		// no longer exposed in the settings UI.
-		if value, ok := cfg.Settings["archive_retention_days"]; ok {
-			if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-				archiveDays = parsed
-			}
-		}
-	}
-	archiveKeepMin := int64(0)
-	if value, ok := cfg.Settings["archive_keep_min"]; ok {
-		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-			archiveKeepMin = parsed
-		}
-	}
-	archiveCleanupEnabled := false
-	if value, ok := cfg.Settings["archive_cleanup_enabled"]; ok {
-		archiveCleanupEnabled = gh4_truthy(value)
-	}
-	archiveRemoved := 0
-	if archiveCleanupEnabled && archiveDays > 0 {
-		archiveRemoved, _ = s.archive.CleanupOlderThanKeeping(archiveDays, archiveKeepMin)
+	archiveRemoved, archiveErr := applyArchiveRetention(cfg, s.archive)
+	if archiveErr != nil {
+		logging.Warn("release archive cleanup failed", "error", archiveErr)
 	}
 	report, err := s.db.Cleanup(1000, 30)
 	if err != nil {

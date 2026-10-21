@@ -40,6 +40,50 @@ func TestStallPolicySummaryTracksValues(t *testing.T) {
 	}
 }
 
+func TestEd2kRememberIncomingRefreshesTheCache(t *testing.T) {
+	ed2kState.mu.Lock()
+	previous := ed2kState.incoming
+	ed2kState.incoming = ""
+	ed2kState.mu.Unlock()
+	t.Cleanup(func() {
+		ed2kState.mu.Lock()
+		ed2kState.incoming = previous
+		ed2kState.mu.Unlock()
+	})
+	ed2kRememberIncoming(" /srv/amule/new ")
+	ed2kState.mu.Lock()
+	got := ed2kState.incoming
+	ed2kState.mu.Unlock()
+	if got != "/srv/amule/new" {
+		t.Fatalf("cached incoming = %q, want the trimmed new path", got)
+	}
+	ed2kRememberIncoming("")
+	ed2kState.mu.Lock()
+	got = ed2kState.incoming
+	ed2kState.mu.Unlock()
+	if got != "/srv/amule/new" {
+		t.Fatalf("an empty read cleared the cache: %q", got)
+	}
+}
+
+func TestSettingsEd2kPanelShowsAMuleFolders(t *testing.T) {
+	var body strings.Builder
+	view := v2SettingsEd2k{Enabled: true, Reachable: true, IncomingDir: "/srv/amule/incoming", TempDir: "/srv/amule/temp"}
+	if err := v2Templates.ExecuteTemplate(&body, "v2_settings_ed2k", view); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"Cartella download", "/srv/amule/incoming",
+		"Cartella temporanea", "/srv/amule/temp",
+		"Si cambiano da aMule/amuled",
+		"Cartella in cui aMule salva i file completati",
+	} {
+		if !strings.Contains(body.String(), want) {
+			t.Fatalf("eD2k settings panel is missing %q", want)
+		}
+	}
+}
+
 func TestSettingsSearchFindsProwlarr(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
