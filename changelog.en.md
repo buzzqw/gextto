@@ -14,6 +14,14 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **IP filter: the default list is now eMule Security.** Gextto and gx-torrent
+  start with the eMule Security list
+  (`https://upd.emule-security.org/ipfilter.gz`) instead of the Aetherinox
+  one. The new list is in P2P format, updated every day and blocks fewer
+  legitimate addresses: it no longer blocks whole provider or hosting ranges
+  such as `158.173.0.0/16`, which also stopped available peers. Anyone who has
+  already set a different URL keeps it; to switch to the new list, paste it in
+  **Settings → Network → IP filter (file/URL)** and press **Load / update now**.
 - **Version: the third number restarts every 1000 builds, the build stays
   visible.** When the counter reaches 2000 the version goes from `1.1.1999` to
   `1.2.0`, then `1.2.999` and `1.3.0`, and so on: the third number no longer

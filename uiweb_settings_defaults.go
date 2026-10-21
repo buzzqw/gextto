@@ -1,5 +1,7 @@
 package gextto
 
+import "github.com/buzzqw/gextto/internal/constants"
+
 // uiweb_settings_defaults.go carries the default value of every setting the
 // Configurazione page exposes, ported from rextto's `setting_tooltip` era and
 // from Gextto's own config defaults (config.go, DefaultTransferSettings and
@@ -104,7 +106,7 @@ var uiSettingDefaults = map[string]string{
 	"torrent_dht_bootstrap_nodes":         "",
 	"torrent_encryption":                  "1",
 	"torrent_apply_ip_filter":             "true",
-	"torrent_ipfilter_url":                "",
+	"torrent_ipfilter_url":                constants.DefaultIPFilterURL,
 	"torrent_listen_interfaces":           "0.0.0.0:6881-6891",
 	"torrent_outgoing_interface":          "",
 	"torrent_ramdisk_dir":                 "",

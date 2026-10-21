@@ -1076,7 +1076,8 @@ libtorrent and qBittorrent).
 
 The **IP filter** (`ipfilter`) is a local file or a **URL** (P2P, eMule or
 CIDR format, plain or gzip). A new standalone daemon starts with the blocklist
-Gextto uses (`constants.DefaultIPFilterURL`), written to settings.json the
+Gextto uses (`constants.DefaultIPFilterURL`, the eMule Security list
+`https://upd.emule-security.org/ipfilter.gz`), written to settings.json the
 first time the key is missing and no `-ipfilter` flag is given: clearing the
 field keeps it cleared. A URL is downloaded to `<data>/ipfilter.dat` at startup
 (the session immediately uses the copy downloaded last time, if any) and again

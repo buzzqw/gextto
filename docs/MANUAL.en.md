@@ -1866,7 +1866,7 @@ Recalculate scores* after changing weights.
 |---|---|
 | Encryption | Encryption policy: 0 disabled, 1 enabled, 2 forced. |
 | Apply IP filter | Apply the IP filter to trackers as well. |
-| IP filter (file/URL) | Local file or URL of the IP blocklist. |
+| IP filter (file/URL) | Local file or URL of the IP blocklist. The default is the eMule Security list (`https://upd.emule-security.org/ipfilter.gz`), in P2P format and updated every day. |
 
 **Actions**
 

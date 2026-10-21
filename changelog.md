@@ -15,6 +15,15 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Filtro IP: la lista predefinita è ora eMule Security.** Gextto e gx-torrent
+  partono con la lista di eMule Security
+  (`https://upd.emule-security.org/ipfilter.gz`) invece di quella Aetherinox.
+  La nuova lista è in formato P2P, si aggiorna ogni giorno e blocca meno
+  indirizzi legittimi: non contiene più blocchi di interi provider o hosting
+  come `158.173.0.0/16`, che fermavano anche peer disponibili. Chi ha già
+  impostato un URL diverso lo mantiene; per passare alla nuova lista basta
+  incollarlo in **Impostazioni → Rete → IP filter (file/URL)** e premere
+  **Carica / aggiorna ora**.
 - **Versione: la terza cifra riparte ogni 1000 build, la build resta visibile.**
   Quando il contatore arriva a 2000 la versione passa da `1.1.1999` a `1.2.0`,
   poi `1.2.999` e `1.3.0`, e così via: il terzo numero non cresce all'infinito,

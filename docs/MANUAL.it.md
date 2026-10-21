@@ -1927,7 +1927,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 |---|---|
 | Cifratura | Politica di cifratura: 0 disabilitata, 1 abilitata, 2 forzata. |
 | Applica IP filter | Applica il filtro IP anche ai tracker. |
-| IP filter (file/URL) | File locale o URL della lista IP da bloccare. |
+| IP filter (file/URL) | File locale o URL della lista IP da bloccare. Il valore predefinito è la lista eMule Security (`https://upd.emule-security.org/ipfilter.gz`), in formato P2P e aggiornata ogni giorno. |
 
 **Azioni**
 
