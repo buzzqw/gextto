@@ -325,6 +325,9 @@ type Daemon struct {
 	// feedPace spaces the requests to one site and cools down the hosts that
 	// answer 429 (see feed_pace.go).
 	feedPace *feedPacer
+	// dhtFeedMu serialises the DHT feed publications: the sequence must grow
+	// and one publish at a time keeps it monotonic.
+	dhtFeedMu sync.Mutex
 	// streamMu guards activeStreams: how many streams (the UI player and the
 	// DLNA server) are reading a file right now, keyed by info hash and file
 	// index (the engine windows are per file), so closing one stream does not

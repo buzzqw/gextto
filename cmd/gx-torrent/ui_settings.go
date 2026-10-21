@@ -508,6 +508,11 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{AUTOSPEED_STATUS}}", html.EscapeString(d.autoSpeedStatus(time.Now())))
 
 	repl("{{DOWNLOAD_DIR}}", get("download-dir"))
+	if strings.TrimSpace(store.Get("download-dir", "")) == "" {
+		repl("{{DOWNLOAD_DIR_DISABLED}}", " disabled")
+	} else {
+		repl("{{DOWNLOAD_DIR_DISABLED}}", "")
+	}
 	repl("{{TEMP_DIR}}", get("temp-dir"))
 	repl("{{EXPORT_DIR}}", get("export-dir"))
 	repl("{{EXPORT_FIN_DIR}}", get("export-dir-fin"))

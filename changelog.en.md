@@ -15,6 +15,29 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **Downloads with thousands of torrents: the table stays smooth.** Above 500
+  torrents the table keeps only the rows near what you are looking at and loads
+  the others as you scroll: filters, sorting and selection still work on the
+  whole session, without the old 300-row limit and without a huge DOM.
+- **DLNA: search by title and Xbox/Windows Media Player.** Players can search
+  for a title (video or audio) and get results from the library folders too;
+  Xbox 360 and Windows Media Player accept the server through the service they
+  require. On the gx-torrent page the **Download folder** button adds the
+  configured download folder to the DLNA folders.
+- **Watch folders: the text says what happens.** The section now explains that
+  the `.torrent` files it finds are **downloaded** and their content added to
+  the session, not only "added automatically".
+- **DHT feeds: you can publish them now.** From the **Tools** menu (or the API)
+  you sign a BEP 46 feed with the selected torrents, or with every torrent of
+  the session, and get the `dht://…` address to give to whoever should follow
+  it; Gextto keeps the key and bumps the sequence on every publish.
+- **eD2k: Gextto can start and supervise aMule.** With the new **aMule — started
+  and supervised by Gextto** option there is no need to configure `amuled` by
+  hand: Gextto writes a private configuration, generates the EC password,
+  chooses the ports and restarts it if it ends. When `amuled` runs on another
+  host or in a container, the **path mapping** lets Gextto see the folder of
+  completed files.
+
 - **RSS feeds: when IPv6 stalls, Gextto retries over IPv4.** A host reachable
   over IPv6 that never sends data (extto.org behind Cloudflare is one) made the
   feeds time out one after another. After the first failed attempt the next ones

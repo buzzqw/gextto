@@ -24,23 +24,21 @@ Tutti e cinque hanno un gate scritto: nessuno si fa «perché sarebbe meglio».
 
 ## 2. Lavoro di feature senza gate esterno
 
-### Superficie prodotto (tre ritocchi piccoli)
+### Chiusi in questo ciclo
 
-- **Tabella torrent virtualizzata** oltre la finestra di 300 righe con *Show
-  more*: serve solo a sessioni con più di mille torrent.
-- **DLNA, cartelle libreria:** il campo dovrebbe proporre almeno la *Download
-  folder* configurata, invece di farsi digitare un path.
-- **Watch folders:** la sezione deve dire che i `.torrent` trovati vengono
-  **scaricati**, non solo «aggiunti automaticamente».
+- **Tabella torrent virtualizzata** oltre le 500 righe: il client tiene solo le
+  righe vicine alla vista, filtri e ordinamento lavorano su tutta la sessione.
+- **DLNA**: ricerca per titolo (`Search`), `X_MS_MediaReceiverRegistrar` per
+  Xbox/WMP e pulsante **Cartella download** accanto alle cartelle della
+  libreria.
+- **Watch folders**: il testo dice che i `.torrent` trovati vengono scaricati.
+- **Publisher dei DHT feed**: firma BEP 46 e put BEP 44, con chiave e sequenza
+  conservate; il resolver e il client BEP 44 avevano già il resto.
 
-### Engine / DLNA
+### Ancora aperto
 
-- **DLNA avanzato**: transcoding, estrazione frame dal video (senza ffmpeg),
-  ricerca, compatibilità Xbox/WMP (`X_MS_MediaReceiverRegistrar`). Browsing,
-  Range, sottotitoli, cartelle e artwork ci sono già.
-- **Publisher dei DHT feed**: oggi esiste solo il resolver; manca la firma di
-  un feed (BEP 46 publisher), e il client BEP 44 in uscita non ha ancora un
-  consumatore.
+- **DLNA avanzato**: transcoding ed estrazione frame dal video. Servono un
+  decoder video (ffmpeg o equivalente), fuori dal perimetro pure-Go del daemon.
 - **WebTorrent/WebRTC**: wishlist dichiarata, nicchia, molto lavoro. Finché non
   c'è, il WebSocket tracker vale poco: il tracker di riferimento serve ai client
   WebSocket solo peer WebRTC.
@@ -70,35 +68,17 @@ elencati per valore/sforzo, ciascuno dopo uno studio e senza copiare codice
 
 ## 4. eD2k / aMule
 
-- **amuled gestito**: avviarlo e supervisionarlo come qBittorrent-nox
-  (config-dir, password EC generata, porte) invece di pretendere che
-  l'operatore lo configuri a mano. Gate: utenti che vogliono eD2k senza setup
-  manuale.
-- **aMule remoto**: l'import dei completati assume lo stesso path; servirebbe un
-  path mapping tipo `qbittorrent_path_mappings`.
+- **amuled gestito**: fatto (`amule_managed`): configurazione privata in
+  `DATA_DIR/amule`, password EC generata, porte scelte e supervisione.
+- **aMule remoto**: fatto (`amule_path_mappings`): la cartella di arrivo
+  riportata da un core remoto viene tradotta prima dell'import.
 - **Copertura del fallback**: se accendere `ed2k_fallback` di default dipende da
   un campione più grande di gap reali cercati via aMule — cioè aspetta dati.
 
-## 5. Cosa non è aperto, anche se sembra
+## 5. Perimetro in una riga
 
-- **Chiusi con i dati** (`evoluzione.md` §8 ultimo paragrafo e
-  `measurements.md` §4.10): DHT esterno al posto di `internal/dht`, enforcing
-  del cap anti-Sybil, multi-path `get_peers`, ordinamento dei candidati del
-  merge, `O_DIRECT`/`io_uring`, write-back cache (`write_cache=0`), file pool,
-  benchmark UI in CI, coalescing delle scritture contigue, indici SQLite
-  inutilizzati. Non si ritentano senza dati nuovi.
-- **Fuori scope per scelta** (`evoluzione.md` §5): `/api/v3` completo, quality
-  profile e custom formats, autenticazione multi-utente, usenet, Trakt, layout
-  nel dialog di add di Gextto, cache cap su NFS.
-- **Fuori scope per protocollo** ([`bep.md`](bep.md)): BEP
-  8/17/18/22/26/28/30/34/35/45/50/51, I2P nativo.
-- **Non è un gap, è una verifica**: l'accessibilità passa i 14 test axe, ma la
-  prova manuale con screen reader è ancora dovuta — e il documento lo dichiara.
+Realmente aperto: **DLNA con transcoding/frame extraction**, **WebRTC**, **il gap
+con gli *arr*** (import manuale, profili nominati, `/api/v3` per Jellyseerr) e i
+punti dell'engine in attesa di uno sciame vero o di hardware. Il resto del
+triage è chiuso.
 
-## 6. Perimetro in una riga
-
-Realmente aperto: **tre ritocchi di UI** (tabella virtualizzata, cartella DLNA,
-testo watch folders), **tre pezzi di feature** (DLNA avanzato, publisher dei
-DHT feed, WebRTC), **il gap con gli *arr*** (import manuale, profili nominati,
-`/api/v3` per Jellyseerr) e **la gestione di amuled**. Tutto il resto
-dell'engine è in attesa di uno sciame vero o di hardware, non di codice.

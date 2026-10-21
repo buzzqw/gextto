@@ -25,6 +25,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -41,6 +42,10 @@ const (
 	dlnaSSDPGroup     = "239.255.255.250:1900"
 	dlnaContentDir    = "urn:schemas-upnp-org:service:ContentDirectory:1"
 	dlnaConnMgr       = "urn:schemas-upnp-org:service:ConnectionManager:1"
+	// dlnaMediaReceiver is the Microsoft service Xbox 360 and Windows Media
+	// Player query before they accept a server: the "is this device
+	// authorized?" registrar. Its three actions always say yes.
+	dlnaMediaReceiver = "urn:microsoft.com:service:X_MS_MediaReceiverRegistrar:1"
 	dlnaDeviceType    = "urn:schemas-upnp-org:device:MediaServer:1"
 	// dlnaRootID is the ContentDirectory root; its parent is "-1".
 	dlnaRootID = "0"
@@ -271,8 +276,10 @@ func (s *dlnaServer) handler() http.Handler {
 	mux.HandleFunc("GET /rootDesc.xml", s.handleRootDesc)
 	mux.HandleFunc("GET /ContentDirectory.xml", s.handleContentDirSCPD)
 	mux.HandleFunc("GET /ConnectionManager.xml", s.handleConnMgrSCPD)
+	mux.HandleFunc("GET /X_MS_MediaReceiverRegistrar.xml", s.handleMediaReceiverSCPD)
 	mux.HandleFunc("POST /control/ContentDirectory", s.handleContentDirControl)
 	mux.HandleFunc("POST /control/ConnectionManager", s.handleConnMgrControl)
+	mux.HandleFunc("POST /control/X_MS_MediaReceiverRegistrar", s.handleMediaReceiverControl)
 	mux.HandleFunc("SUBSCRIBE /event/{service}", s.handleSubscribe)
 	mux.HandleFunc("UNSUBSCRIBE /event/{service}", s.handleUnsubscribe)
 	mux.HandleFunc("GET /res/{hash}/{file}", s.handleMedia) // GET also matches HEAD
@@ -810,6 +817,181 @@ func xmlEscape(s string) string {
 }
 
 // ---------------------------------------------------------------------------
+// ContentDirectory: Search
+// ---------------------------------------------------------------------------
+
+// dlnaSearchQuery is the subset of a UPnP SearchCriteria the server evaluates:
+// the object class, a title comparison and whether it is negated. Every other
+// term is ignored (a client asking for something exotic still gets the title
+// and class filters it sent).
+type dlnaSearchQuery struct {
+	class  string
+	title  string
+	negate bool
+}
+
+var dlnaSearchTerm = regexp.MustCompile(`(?i)\s*(upnp:class|dc:title)\s*(=|!=|contains|doesnotcontain|derivedfrom)\s*"([^"]*)"`)
+
+// parseDLNASearch reads a SearchCriteria string. "*" (or nothing) matches
+// everything; several terms are ANDed.
+func parseDLNASearch(raw string) dlnaSearchQuery {
+	var q dlnaSearchQuery
+	for _, m := range dlnaSearchTerm.FindAllStringSubmatch(raw, -1) {
+		prop, op, value := strings.ToLower(m[1]), strings.ToLower(m[2]), strings.TrimSpace(m[3])
+		switch prop {
+		case "upnp:class":
+			q.class = value
+		case "dc:title":
+			q.title = value
+			q.negate = op == "!=" || op == "doesnotcontain"
+		}
+	}
+	return q
+}
+
+// matches reports whether one media entry satisfies the query.
+func (q dlnaSearchQuery) matches(title string, video bool) bool {
+	switch strings.ToLower(q.class) {
+	case "":
+	case "object.item", "object.item.videoitem":
+		if !video {
+			return false
+		}
+	case "object.item.audioitem", "object.item.audioitem.musictrack":
+		if video {
+			return false
+		}
+	default:
+		// An unknown class is not a reason to return nothing.
+	}
+	if q.title != "" {
+		found := strings.Contains(strings.ToLower(title), strings.ToLower(q.title))
+		if found == q.negate {
+			return false
+		}
+	}
+	return true
+}
+
+// dlnaSearchHit is one entry found by Search: either a torrent file or a file
+// inside a library folder (with the directory listing it came from).
+type dlnaSearchHit struct {
+	entry    dlnaEntry
+	lib      int
+	dirRel   string
+	listing  *dlnaDirListing
+	libEntry bool
+}
+
+const (
+	dlnaSearchMaxDepth = 8
+	dlnaSearchMaxHits  = 20000
+)
+
+// searchObject answers a ContentDirectory Search over the torrents and, when
+// configured, the library folders. It is pure apart from the cached directory
+// listings, so the matching and the paging are tested without a session.
+func (s *dlnaServer) searchObject(lib *dlnaLibrary, containerID, criteria string, start, count int, base string) (string, int, int, *dlnaFault) {
+	if start < 0 || count < 0 {
+		return "", 0, 0, dlnaInvalidArgs
+	}
+	q := parseDLNASearch(criteria)
+	var hits []dlnaSearchHit
+	addTorrents := func(hash string) {
+		for _, f := range lib.folders {
+			if hash != "" && f.hash != hash {
+				continue
+			}
+			for _, e := range f.items {
+				if q.matches(strings.TrimSuffix(path.Base(e.name), path.Ext(e.name)), e.video) {
+					hits = append(hits, dlnaSearchHit{entry: e})
+				}
+			}
+		}
+	}
+	switch {
+	case containerID == "" || containerID == dlnaRootID:
+		addTorrents("")
+		for n := range s.libRoots {
+			s.collectLibSearchHits(n, "", 0, q, &hits)
+		}
+	case containerID == dlnaTorrentsID:
+		addTorrents("")
+	case strings.HasPrefix(containerID, "torrent:"):
+		hash := strings.TrimPrefix(containerID, "torrent:")
+		if _, ok := lib.byHash[hash]; !ok {
+			return "", 0, 0, dlnaNoSuchObject
+		}
+		addTorrents(hash)
+	case strings.HasPrefix(containerID, dlnaLibPrefix):
+		n, rel, ok := parseLibID(containerID, len(s.libRoots))
+		if !ok {
+			return "", 0, 0, dlnaNoSuchObject
+		}
+		s.collectLibSearchHits(n, rel, 0, q, &hits)
+	case strings.HasPrefix(containerID, "file:"):
+		// An item has no children.
+	default:
+		return "", 0, 0, dlnaNoSuchObject
+	}
+	// Stable output: the same search twice gives the same page.
+	sort.SliceStable(hits, func(i, j int) bool {
+		a := strings.ToLower(path.Base(hits[i].entry.name))
+		b := strings.ToLower(path.Base(hits[j].entry.name))
+		if a != b {
+			return a < b
+		}
+		return hits[i].entry.hash < hits[j].entry.hash
+	})
+	total := len(hits)
+	end := total
+	if count > 0 && start+count < end {
+		end = start + count
+	}
+	if start > total {
+		start = total
+	}
+	var b strings.Builder
+	b.WriteString(didlOpen)
+	returned := 0
+	for _, h := range hits[start:end] {
+		if h.libEntry {
+			s.writeLibItem(&b, h.lib, h.dirRel, h.listing, h.entry, base)
+		} else {
+			parent := dlnaContainerID(h.entry.hash)
+			if len(s.libRoots) > 0 {
+				parent = dlnaTorrentsID
+			}
+			writeItemAt(&b, h.entry, dlnaEntryKey(h.entry.hash, h.entry.fileIndex), parent, "",
+				func(index int) string { return mediaURL(base, h.entry.hash, index) })
+		}
+		returned++
+	}
+	b.WriteString(`</DIDL-Lite>`)
+	return b.String(), returned, total, nil
+}
+
+// collectLibSearchHits walks one library directory (bounded in depth and
+// size) and appends the playable files that match.
+func (s *dlnaServer) collectLibSearchHits(n int, rel string, depth int, q dlnaSearchQuery, out *[]dlnaSearchHit) {
+	if depth > dlnaSearchMaxDepth || len(*out) >= dlnaSearchMaxHits {
+		return
+	}
+	listing, ok := s.readLibDir(n, rel)
+	if !ok {
+		return
+	}
+	for _, e := range listing.folder.items {
+		if q.matches(strings.TrimSuffix(path.Base(e.name), path.Ext(e.name)), e.video) {
+			*out = append(*out, dlnaSearchHit{entry: e, lib: n, dirRel: rel, listing: listing, libEntry: true})
+		}
+	}
+	for _, dir := range listing.dirs {
+		s.collectLibSearchHits(n, path.Join(rel, dir), depth+1, q, out)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // HTTP: device and service descriptions
 // ---------------------------------------------------------------------------
 
@@ -829,9 +1011,10 @@ func (s *dlnaServer) handleRootDesc(w http.ResponseWriter, r *http.Request) {
 <serviceList>
 <service><serviceType>%s</serviceType><serviceId>urn:upnp-org:serviceId:ContentDirectory</serviceId><SCPDURL>/ContentDirectory.xml</SCPDURL><controlURL>/control/ContentDirectory</controlURL><eventSubURL>/event/ContentDirectory</eventSubURL></service>
 <service><serviceType>%s</serviceType><serviceId>urn:upnp-org:serviceId:ConnectionManager</serviceId><SCPDURL>/ConnectionManager.xml</SCPDURL><controlURL>/control/ConnectionManager</controlURL><eventSubURL>/event/ConnectionManager</eventSubURL></service>
+<service><serviceType>%s</serviceType><serviceId>urn:microsoft.com:serviceId:X_MS_MediaReceiverRegistrar</serviceId><SCPDURL>/X_MS_MediaReceiverRegistrar.xml</SCPDURL><controlURL>/control/X_MS_MediaReceiverRegistrar</controlURL><eventSubURL>/event/X_MS_MediaReceiverRegistrar</eventSubURL></service>
 </serviceList>
 </device>
-</root>`, dlnaDeviceType, xmlEscape(s.name), s.uuid, dlnaContentDir, dlnaConnMgr)
+</root>`, dlnaDeviceType, xmlEscape(s.name), s.uuid, dlnaContentDir, dlnaConnMgr, dlnaMediaReceiver)
 }
 
 func (s *dlnaServer) handleContentDirSCPD(w http.ResponseWriter, r *http.Request) {
@@ -844,11 +1027,16 @@ func (s *dlnaServer) handleConnMgrSCPD(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(connMgrSCPD))
 }
 
+func (s *dlnaServer) handleMediaReceiverSCPD(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", `text/xml; charset="utf-8"`)
+	_, _ = w.Write([]byte(mediaReceiverSCPD))
+}
+
 // ---------------------------------------------------------------------------
 // HTTP: SOAP control
 // ---------------------------------------------------------------------------
 
-// soapEnvelope is the minimal SOAP parsing the Browse action needs.
+// soapEnvelope is the minimal SOAP parsing the Browse and Search actions need.
 type soapEnvelope struct {
 	Body struct {
 		Browse struct {
@@ -857,6 +1045,12 @@ type soapEnvelope struct {
 			StartingIndex  string `xml:"StartingIndex"`
 			RequestedCount string `xml:"RequestedCount"`
 		} `xml:"Browse"`
+		Search struct {
+			ContainerID    string `xml:"ContainerID"`
+			SearchCriteria string `xml:"SearchCriteria"`
+			StartingIndex  string `xml:"StartingIndex"`
+			RequestedCount string `xml:"RequestedCount"`
+		} `xml:"Search"`
 	} `xml:"Body"`
 }
 
@@ -898,10 +1092,34 @@ func (s *dlnaServer) handleContentDirControl(w http.ResponseWriter, r *http.Requ
 		soapReply(w, dlnaContentDir, "Browse", fmt.Sprintf(
 			"<Result>%s</Result><NumberReturned>%d</NumberReturned><TotalMatches>%d</TotalMatches><UpdateID>%d</UpdateID>",
 			xmlEscape(didl), returned, total, lib.updateID))
+	case "Search":
+		var env soapEnvelope
+		if err := xml.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&env); err != nil {
+			soapFault(w, dlnaInvalidArgs)
+			return
+		}
+		args := env.Body.Search
+		start, ok1 := soapUint(args.StartingIndex)
+		count, ok2 := soapUint(args.RequestedCount)
+		if !ok1 || !ok2 {
+			soapFault(w, dlnaInvalidArgs)
+			return
+		}
+		didl, returned, total, fault := s.searchObject(lib, strings.TrimSpace(args.ContainerID), args.SearchCriteria, start, count, s.dlnaBaseFor(r))
+		if fault != nil {
+			soapFault(w, fault)
+			return
+		}
+		if s.throttle(&s.seenMu, &s.seen, "search"+r.RemoteAddr+args.ContainerID+args.SearchCriteria) {
+			logf("DLNA: %s searches %q in %q: %d of %d item(s)", r.RemoteAddr, args.SearchCriteria, args.ContainerID, returned, total)
+		}
+		soapReply(w, dlnaContentDir, "Search", fmt.Sprintf(
+			"<Result>%s</Result><NumberReturned>%d</NumberReturned><TotalMatches>%d</TotalMatches><UpdateID>%d</UpdateID>",
+			xmlEscape(didl), returned, total, lib.updateID))
 	case "GetSortCapabilities":
 		soapReply(w, dlnaContentDir, "GetSortCapabilities", "<SortCaps></SortCaps>")
 	case "GetSearchCapabilities":
-		soapReply(w, dlnaContentDir, "GetSearchCapabilities", "<SearchCaps></SearchCaps>")
+		soapReply(w, dlnaContentDir, "GetSearchCapabilities", "<SearchCaps>dc:title,upnp:class</SearchCaps>")
 	case "GetSystemUpdateID":
 		soapReply(w, dlnaContentDir, "GetSystemUpdateID", fmt.Sprintf("<Id>%d</Id>", lib.updateID))
 	default:
@@ -945,7 +1163,21 @@ func (s *dlnaServer) handleConnMgrControl(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// soapAction extracts the action name from the SOAPAction header.
+// handleMediaReceiverControl answers the Microsoft registrar: Xbox 360 and
+// Windows Media Player ask whether this server is authorized and validated
+// before they list it. A media server on the LAN is both, so every action says
+// yes (a TV that expects the service refuses a server that omits it).
+func (s *dlnaServer) handleMediaReceiverControl(w http.ResponseWriter, r *http.Request) {
+	switch soapAction(r) {
+	case "IsAuthorized", "IsValidated":
+		soapReply(w, dlnaMediaReceiver, soapAction(r), "<Result>1</Result>")
+	case "RegisterDevice":
+		soapReply(w, dlnaMediaReceiver, "RegisterDevice", "<RegistrationRespMsg></RegistrationRespMsg>")
+	default:
+		soapFault(w, &dlnaFault{401, "Invalid Action"})
+	}
+}
+
 func soapAction(r *http.Request) string {
 	raw := strings.Trim(strings.TrimSpace(r.Header.Get("SOAPAction")), `"`)
 	if i := strings.LastIndex(raw, "#"); i >= 0 {
@@ -989,7 +1221,7 @@ const dlnaSubTimeout = 1800
 // cannot be used to post to a third host.
 func (s *dlnaServer) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 	service := r.PathValue("service")
-	if service != "ContentDirectory" && service != "ConnectionManager" {
+	if service != "ContentDirectory" && service != "ConnectionManager" && service != "X_MS_MediaReceiverRegistrar" {
 		http.NotFound(w, r)
 		return
 	}
@@ -1016,6 +1248,11 @@ func (s *dlnaServer) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 	var props string
 	if service == "ContentDirectory" {
 		props = fmt.Sprintf("<e:property><SystemUpdateID>%d</SystemUpdateID></e:property>", s.library().updateID)
+	} else if service == "X_MS_MediaReceiverRegistrar" {
+		props = "<e:property><AuthorizationGrantedUpdateID>1</AuthorizationGrantedUpdateID></e:property>" +
+			"<e:property><AuthorizationDeniedUpdateID>0</AuthorizationDeniedUpdateID></e:property>" +
+			"<e:property><ValidationSucceededUpdateID>1</ValidationSucceededUpdateID></e:property>" +
+			"<e:property><ValidationRevokedUpdateID>0</ValidationRevokedUpdateID></e:property>"
 	} else {
 		props = "<e:property><SourceProtocolInfo>" + xmlEscape(dlnaSourceProtocols()) + "</SourceProtocolInfo></e:property>" +
 			"<e:property><SinkProtocolInfo></SinkProtocolInfo></e:property>" +
@@ -1084,12 +1321,25 @@ const contentDirSCPD = `<?xml version="1.0"?>
 <argument><name>TotalMatches</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Count</relatedStateVariable></argument>
 <argument><name>UpdateID</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_UpdateID</relatedStateVariable></argument>
 </argumentList></action>
+<action><name>Search</name><argumentList>
+<argument><name>ContainerID</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_ObjectID</relatedStateVariable></argument>
+<argument><name>SearchCriteria</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_SearchCriteria</relatedStateVariable></argument>
+<argument><name>Filter</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_Filter</relatedStateVariable></argument>
+<argument><name>StartingIndex</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_Index</relatedStateVariable></argument>
+<argument><name>RequestedCount</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_Count</relatedStateVariable></argument>
+<argument><name>SortCriteria</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_SortCriteria</relatedStateVariable></argument>
+<argument><name>Result</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Result</relatedStateVariable></argument>
+<argument><name>NumberReturned</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Count</relatedStateVariable></argument>
+<argument><name>TotalMatches</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Count</relatedStateVariable></argument>
+<argument><name>UpdateID</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_UpdateID</relatedStateVariable></argument>
+</argumentList></action>
 <action><name>GetSortCapabilities</name><argumentList><argument><name>SortCaps</name><direction>out</direction><relatedStateVariable>SortCapabilities</relatedStateVariable></argument></argumentList></action>
 <action><name>GetSearchCapabilities</name><argumentList><argument><name>SearchCaps</name><direction>out</direction><relatedStateVariable>SearchCapabilities</relatedStateVariable></argument></argumentList></action>
 <action><name>GetSystemUpdateID</name><argumentList><argument><name>Id</name><direction>out</direction><relatedStateVariable>SystemUpdateID</relatedStateVariable></argument></argumentList></action>
 </actionList>
 <serviceStateTable>
 <stateVariable sendEvents="no"><name>A_ARG_TYPE_ObjectID</name><dataType>string</dataType></stateVariable>
+<stateVariable sendEvents="no"><name>A_ARG_TYPE_SearchCriteria</name><dataType>string</dataType></stateVariable>
 <stateVariable sendEvents="no"><name>A_ARG_TYPE_BrowseFlag</name><dataType>string</dataType></stateVariable>
 <stateVariable sendEvents="no"><name>A_ARG_TYPE_Filter</name><dataType>string</dataType></stateVariable>
 <stateVariable sendEvents="no"><name>A_ARG_TYPE_Index</name><dataType>ui4</dataType></stateVariable>
@@ -1116,5 +1366,24 @@ const connMgrSCPD = `<?xml version="1.0"?>
 <stateVariable sendEvents="yes"><name>SourceProtocolInfo</name><dataType>string</dataType></stateVariable>
 <stateVariable sendEvents="yes"><name>SinkProtocolInfo</name><dataType>string</dataType></stateVariable>
 <stateVariable sendEvents="no"><name>CurrentConnectionIDs</name><dataType>string</dataType></stateVariable>
+</serviceStateTable>
+</scpd>`
+
+const mediaReceiverSCPD = `<?xml version="1.0"?>
+<scpd xmlns="urn:schemas-upnp-org:service-1-0">
+<actionList>
+<action><name>IsAuthorized</name><argumentList><argument><name>DeviceID</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_DeviceID</relatedStateVariable></argument><argument><name>Result</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Result</relatedStateVariable></argument></argumentList></action>
+<action><name>IsValidated</name><argumentList><argument><name>DeviceID</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_DeviceID</relatedStateVariable></argument><argument><name>Result</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Result</relatedStateVariable></argument></argumentList></action>
+<action><name>RegisterDevice</name><argumentList><argument><name>RegistrationReqMsg</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_RegistrationReqMsg</relatedStateVariable></argument><argument><name>RegistrationRespMsg</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_RegistrationRespMsg</relatedStateVariable></argument></argumentList></action>
+</actionList>
+<serviceStateTable>
+<stateVariable sendEvents="no"><name>A_ARG_TYPE_DeviceID</name><dataType>string</dataType></stateVariable>
+<stateVariable sendEvents="no"><name>A_ARG_TYPE_Result</name><dataType>int</dataType></stateVariable>
+<stateVariable sendEvents="no"><name>A_ARG_TYPE_RegistrationReqMsg</name><dataType>bin.base64</dataType></stateVariable>
+<stateVariable sendEvents="no"><name>A_ARG_TYPE_RegistrationRespMsg</name><dataType>bin.base64</dataType></stateVariable>
+<stateVariable sendEvents="yes"><name>AuthorizationGrantedUpdateID</name><dataType>ui4</dataType></stateVariable>
+<stateVariable sendEvents="yes"><name>AuthorizationDeniedUpdateID</name><dataType>ui4</dataType></stateVariable>
+<stateVariable sendEvents="yes"><name>ValidationSucceededUpdateID</name><dataType>ui4</dataType></stateVariable>
+<stateVariable sendEvents="yes"><name>ValidationRevokedUpdateID</name><dataType>ui4</dataType></stateVariable>
 </serviceStateTable>
 </scpd>`

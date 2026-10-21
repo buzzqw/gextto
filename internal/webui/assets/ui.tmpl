@@ -470,6 +470,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <button type="button" role="menuitem" data-tool="ipfilter" title="IP filter blocklist file path or URL (eMule, DAT, P2P or CIDR format)"><svg class="i"><use href="#i-xc"/></svg>IP filter…</button>
   <button type="button" role="menuitem" data-tool="create" title="Create .torrent file from the specified path and start seeding"><svg class="i"><use href="#i-file"/></svg>Create .torrent…</button>
   {{if .FeedsEnabled}}<button type="button" role="menuitem" data-tool="feeds" title="Fetch new items from configured RSS feeds now"><svg class="i"><use href="#i-rss"/></svg>Check feeds</button>{{end}}
+  {{if .Standalone}}<button type="button" role="menuitem" data-tool="dhtfeed" title="Sign a BEP 46 feed of the selected torrents (or all of them) and publish it on the DHT"><svg class="i"><use href="#i-copy"/></svg>Publish DHT feed…</button>{{end}}
   <button type="button" role="menuitem" data-tool="ports" title="Check that the peer port is listening and forwarded by the router"><svg class="i"><use href="#i-signal"/></svg>Test ports</button>
 </div>
 
@@ -766,8 +767,11 @@ document.addEventListener('click',function(e){
   if(sw)setTimeout(function(){pushPrefs('theme');},0);
 });
 
-var state={selected:new Set(),anchor:null,filter:store.get('filter',{status:'all',cat:null,tag:null,tracker:null}),sort:store.get('sort',{key:'name',asc:true}),q:'',drawer:null,rows:window.__rows||0,collapsed:store.get('collapsed',{}),sbmore:false};
+var state={selected:new Set(),anchor:null,filter:store.get('filter',{status:'all',cat:null,tag:null,tracker:null}),sort:store.get('sort',{key:'name',asc:true}),q:'',drawer:null,rows:window.__rows||0,collapsed:store.get('collapsed',{}),sbmore:false,allRows:[],viewRows:[],virtual:false,winStart:-1,winEnd:-1,rowH:0};
 if(state.filter.tracker===undefined)state.filter.tracker=null;
+// virtualMinRows is where the client-side window replaces the old 300-row
+// server cap: below it the simple full-DOM table is cheaper.
+var virtualMinRows=500;
 
 // ---------- server calls ----------
 function post(url,params){
@@ -789,7 +793,17 @@ function renderSelection(){
   var n=state.selected.size;
   $('#selinfo').textContent=n?n+' '+t('selected'):'';
   $$('#toolbar [data-bulk]').forEach(function(b){b.setAttribute('aria-disabled',n?'false':'true');});
-  var all=$('#selall');if(all){var vis=visibleRows();all.checked=vis.length>0&&vis.every(function(r){return state.selected.has(r.dataset.hash);});all.indeterminate=n>0&&!all.checked;}
+  var all=$('#selall');
+  if(all){
+    if(state.virtual){
+      var vis=state.viewRows;
+      all.checked=vis.length>0&&vis.every(function(r){return state.selected.has(r.Hash);});
+    }else{
+      var dom=visibleRows();
+      all.checked=dom.length>0&&dom.every(function(r){return state.selected.has(r.dataset.hash);});
+    }
+    all.indeterminate=n>0&&!all.checked;
+  }
 }
 function select(hash,mode){
   if(mode==='toggle'){if(state.selected.has(hash))state.selected.delete(hash);else state.selected.add(hash);}
@@ -813,7 +827,98 @@ function matchStatus(r,f){
     default:return st===f;
   }
 }
+// matchStatusData is matchStatus on a /ui/rows JSON row (virtualised table).
+function matchStatusData(r,f){
+  var st=r.State,moving=(+r.DLRate>0)||(+r.ULRate>0);
+  switch(f){
+    case 'all':return true;
+    case 'downloading':return st==='downloading'||st==='downloading_metadata'||st==='checking_files';
+    case 'completed':return +r.Progress>=100;
+    case 'running':return st!=='paused'&&st!=='disk_wait';
+    case 'active':return moving;
+    case 'inactive':return !moving;
+    case 'paused':return st==='paused'||st==='disk_wait';
+    case 'checking':return st==='checking_files';
+    default:return st===f;
+  }
+}
+function dataMatches(r,q,f){
+  if(!matchStatusData(r,f.status))return false;
+  if(f.cat!==null&&r.Category!==f.cat)return false;
+  if(f.tag!==null){var tags=','+(r.Tags||'').replace(/,\s+/g,',')+',';if(f.tag===''?(r.Tags||'')!=='':tags.indexOf(','+f.tag+',')<0)return false;}
+  if(f.tracker!==null&&r.Tracker!==f.tracker)return false;
+  if(q&&((r.Name||'')+' '+(r.Hash||'')+' '+(r.Tracker||'')+' '+(r.Category||'')+' '+(r.Tags||'')).toLowerCase().indexOf(q)<0)return false;
+  return true;
+}
+var dataSortKeys={name:'Name',size:'TotalSize',progress:'Progress',state:'State',seeds:'Seeds',peers:'Peers',down:'DLRate',up:'ULRate',eta:'ETAVal',ratio:'RatioVal',category:'Category',tags:'Tags',added:'AddedVal',completed:'CompletedVal',downloaded:'DownloadedVal',uploaded:'UploadedVal',remaining:'RemainingVal',queue:'QueuePos',tracker:'Tracker',path:'SavePath',availability:'AvailabilityVal',active:'ActiveVal',lastactive:'LastActiveVal',wasted:'WastedVal'};
+function sortData(list){
+  var s=state.sort,key=dataSortKeys[s.key]||'Name';
+  list.sort(function(a,b){
+    var av=a[key],bv=b[key];
+    if(av===undefined||av===null)av='';
+    if(bv===undefined||bv===null)bv='';
+    var an=parseFloat(av),bn=parseFloat(bv),r;
+    r=(!isNaN(an)&&!isNaN(bn)&&av!==''&&bv!=='')?an-bn:String(av).localeCompare(String(bv),undefined,{sensitivity:'base',numeric:true});
+    return s.asc?r:-r;
+  });
+}
+function applyDataView(force){
+  var q=state.q.toLowerCase(),f=state.filter;
+  var view=[];
+  for(var i=0;i<state.allRows.length;i++){if(dataMatches(state.allRows[i],q,f))view.push(state.allRows[i]);}
+  sortData(view);
+  state.viewRows=view;
+  state.winStart=-1;state.winEnd=-1;
+  renderVirtual(!!force);
+  filterChrome(view.length);
+  var known=new Set(state.allRows.map(function(r){return r.Hash;}));
+  state.selected.forEach(function(h){if(!known.has(h))state.selected.delete(h);});
+  renderSelection();
+}
+// filterChrome updates the sidebar pressed states and the empty note from the
+// number of matching rows (shared by the plain and the virtual table).
+function filterChrome(shown){
+  var f=state.filter;
+  function press(sel,attr,val){$$(sel).forEach(function(b){var v=b.hasAttribute('data-all')?null:b.getAttribute(attr);b.setAttribute('aria-pressed',v===val?'true':'false');});}
+  press('#side [data-status]','data-status',f.status);
+  press('#side [data-catbtn]','data-cat',f.cat);
+  press('#side [data-tagbtn]','data-tag',f.tag);
+  press('#side [data-trkbtn]','data-tracker',f.tracker);
+  var total=state.virtual?state.allRows.length:rows().length;
+  var empty=$('#filtered-empty');if(empty)empty.hidden=shown>0||total===0;
+}
+// renderVirtual keeps only the rows around the viewport in the DOM, with a
+// spacer row before and after them, so a session of thousands of torrents
+// scrolls and refreshes like a short one.
+function renderVirtual(force){
+  var tb=$('#torrent-rows');if(!tb)return;
+  var view=state.viewRows||[];
+  var rowH=state.rowH||38;
+  var top=tb.getBoundingClientRect().top+window.scrollY;
+  var start=Math.max(0,Math.floor((window.scrollY-top)/rowH)-15);
+  var end=Math.min(view.length,Math.ceil((window.scrollY+window.innerHeight-top)/rowH)+15);
+  if(end-start<40)end=Math.min(view.length,start+40);
+  if(!force&&start===state.winStart&&end===state.winEnd&&view.length===state.winLen)return;
+  var cols=$$('#torrents thead th').length||1;
+  var html='';
+  if(start>0)html+='<tr class="vpad" aria-hidden="true"><td colspan="'+cols+'" style="height:'+(start*rowH)+'px;padding:0;border:0"></td></tr>';
+  for(var i=start;i<end;i++)html+=rowHTML(view[i]);
+  if(end<view.length)html+='<tr class="vpad" aria-hidden="true"><td colspan="'+cols+'" style="height:'+((view.length-end)*rowH)+'px;padding:0;border:0"></td></tr>';
+  tb.innerHTML=html;
+  state.winStart=start;state.winEnd=end;state.winLen=view.length;
+  // The first real row gives the exact height, so the spacers stay aligned
+  // after a theme or zoom change.
+  var first=tb.querySelector('tr[data-hash]');
+  if(first){var h=first.getBoundingClientRect().height;if(h>10&&Math.abs(h-state.rowH)>1){state.rowH=h;state.winStart=-1;renderVirtual(false);}}
+}
+var virtualScrollFrame=0;
+window.addEventListener('scroll',function(){
+  if(!state.virtual||virtualScrollFrame)return;
+  virtualScrollFrame=requestAnimationFrame(function(){virtualScrollFrame=0;renderVirtual(false);});
+},{passive:true});
+
 function applyFilters(){
+  if(state.virtual){applyDataView(true);return;}
   var q=state.q.toLowerCase(),f=state.filter,shown=0;
   rows().forEach(function(r){
     var ok=matchStatus(r,f.status)&&(f.cat===null||r.dataset.cat===f.cat)
@@ -822,20 +927,19 @@ function applyFilters(){
       &&(!q||(r.dataset.name+' '+r.dataset.hash+' '+r.dataset.tracker+' '+r.dataset.cat+' '+r.dataset.tags).toLowerCase().indexOf(q)>=0);
     r.hidden=!ok;if(ok)shown++;
   });
-  function press(sel,attr,val){$$(sel).forEach(function(b){var v=b.hasAttribute('data-all')?null:b.getAttribute(attr);b.setAttribute('aria-pressed',v===val?'true':'false');});}
-  press('#side [data-status]','data-status',f.status);
-  press('#side [data-catbtn]','data-cat',f.cat);
-  press('#side [data-tagbtn]','data-tag',f.tag);
-  press('#side [data-trkbtn]','data-tracker',f.tracker);
-  var empty=$('#filtered-empty');if(empty)empty.hidden=shown>0||rows().length===0;
+  filterChrome(shown);
   // Selection follows what is visible.
   state.selected.forEach(function(h){var r=rowByHash(h);if(!r||r.hidden)state.selected.delete(h);});
   renderSelection();
 }
+function sideRows(){
+  if(state.virtual)return state.allRows;
+  return rows().map(function(r){return {Category:r.dataset.cat,Tags:r.dataset.tags};});
+}
 function countSide(){
   // Category and tag counts are computed here, from the rows.
   var cats={},tags={},untagged=0;
-  rows().forEach(function(r){cats[r.dataset.cat]=(cats[r.dataset.cat]||0)+1;var any=false;(r.dataset.tags||'').split(',').forEach(function(tg){tg=tg.trim();if(tg){any=true;tags[tg]=(tags[tg]||0)+1;}});if(!any)untagged++;});
+  sideRows().forEach(function(r){cats[r.Category]=(cats[r.Category]||0)+1;var any=false;(r.Tags||'').split(',').forEach(function(tg){tg=tg.trim();if(tg){any=true;tags[tg]=(tags[tg]||0)+1;}});if(!any)untagged++;});
   $$('#side [data-catbtn]:not([data-all])').forEach(function(b){var n=$('.n',b);if(n)n.textContent=cats[b.dataset.cat]||0;});
   $$('#side [data-tagbtn]:not([data-all])').forEach(function(b){var n=$('.n',b);if(n)n.textContent=b.dataset.tag===''?untagged:(tags[b.dataset.tag]||0);});
   $$('#side .flist button .n').forEach(function(n){n.parentNode.classList.toggle('zero',n.textContent==='0');});
@@ -844,6 +948,11 @@ function applyCollapsed(){
   $$('#side [data-sec]').forEach(function(b){var shut=!!state.collapsed[b.dataset.sec];b.setAttribute('aria-expanded',shut?'false':'true');var list=document.getElementById(b.getAttribute('aria-controls'));if(list)list.hidden=shut;});
 }
 function applySort(){
+  if(state.virtual){
+    applyDataView(true);
+    $$('#torrents th[data-sort]').forEach(function(th){th.setAttribute('aria-sort',th.dataset.sort===state.sort.key?(state.sort.asc?'ascending':'descending'):'none');});
+    return;
+  }
   var s=state.sort,tb=$('#torrents tbody');if(!tb)return;
   var list=rows(),key='k'+s.key.charAt(0).toUpperCase()+s.key.slice(1);
   list.sort(function(a,b){var av=a.dataset[key]||'',bv=b.dataset[key]||'';var an=parseFloat(av),bn=parseFloat(bv);var r=(!isNaN(an)&&!isNaN(bn)&&av!==''&&bv!=='')?an-bn:String(av).localeCompare(String(bv),undefined,{sensitivity:'base',numeric:true});return s.asc?r:-r;});
@@ -944,7 +1053,14 @@ function updateTable(data){
   var tb=$('#torrent-rows');
   if(!tb){$('#live').innerHTML=tableShell();tb=$('#torrent-rows');}
   if(!tb)return Promise.resolve();
-  tb.innerHTML=rows.map(rowHTML).join('');
+  // The server can return the whole session (?rows=all): above the old
+  // 300-row window the table is virtualised client-side, so the DOM keeps
+  // only the rows near the viewport. Small sessions keep the simple path.
+  state.allRows=rows;
+  state.virtual=rows.length>virtualMinRows;
+  var more=$('#live .more-rows');if(more&&!data.RowsLimited)more.remove();
+  if(!state.virtual){state.viewRows=rows;state.winStart=-1;state.winEnd=-1;tb.innerHTML=rows.map(rowHTML).join('');return Promise.resolve();}
+  applyDataView(true);
   return Promise.resolve();
 }
 var refreshing=false,lastSide='',pointerDown=false;
@@ -969,7 +1085,7 @@ function applyLive(frag){
 function refresh(){
   if(refreshing||document.hidden||pointerDown||resizing)return;refreshing=true;
   var active=document.activeElement,activeRow=rowOf(active),activeHash=activeRow&&activeRow.dataset.hash;
-  var rowsParam=state.rows?('?rows='+state.rows):'';
+  var rowsParam=state.rows?('?rows='+state.rows):'?rows=all';
   // The rows travel as JSON (small, no chrome rebuild); the filters, speeds
   // and status travel as HTML (server-translated). Both derive from the same
   // snapshot, so they never disagree.
@@ -1005,13 +1121,19 @@ function focusKeyOf(el){
   return null;
 }
 function afterRender(){
-  var known=new Set(rows().map(function(r){return r.dataset.hash;}));
-  state.selected.forEach(function(h){if(!known.has(h))state.selected.delete(h);});
-  countSide();applyCollapsed();applySort();applyFilters();roving();savePaths();syncResizers();
+  if(state.virtual){
+    var known=new Set(state.allRows.map(function(r){return r.Hash;}));
+    state.selected.forEach(function(h){if(!known.has(h))state.selected.delete(h);});
+    countSide();applyCollapsed();applySort();roving();savePaths();syncResizers();
+  }else{
+    var known2=new Set(rows().map(function(r){return r.dataset.hash;}));
+    state.selected.forEach(function(h){if(!known2.has(h))state.selected.delete(h);});
+    countSide();applyCollapsed();applySort();applyFilters();roving();savePaths();syncResizers();
+  }
   var sb=$('#sb-more-btn');if(sb)sb.setAttribute('aria-expanded',state.sbmore?'true':'false');
 }
 function roving(){var rs=visibleRows(),cur=rs.find(function(r){return r.tabIndex===0;});rs.forEach(function(r){r.tabIndex=-1;});(cur||rs[0])&&((cur||rs[0]).tabIndex=0);}
-function savePaths(){var dl=$('#savepaths'),seen={},html='';rows().forEach(function(r){var p=r.dataset.kPath;if(p&&!seen[p]){seen[p]=1;var o=document.createElement('option');o.value=p;html+=o.outerHTML;}});dl.innerHTML=html;}
+function savePaths(){var dl=$('#savepaths'),seen={},html='';var list=state.virtual?state.allRows.map(function(r){return {p:r.SavePath};}):rows().map(function(r){return {p:r.dataset.kPath};});list.forEach(function(r){var p=r.p;if(p&&!seen[p]){seen[p]=1;var o=document.createElement('option');o.value=p;html+=o.outerHTML;}});dl.innerHTML=html;}
 
 // ---------- transfer graph and window title ----------
 var samples=[];
@@ -1042,7 +1164,10 @@ function showUndo(items){
   undoTimer=setInterval(function(){if(!undoState){return;}undoState.left--;if(undoState.left<=0){hideUndo();return;}$('#undo-text').textContent=undoState.items.length+' '+t('torrents removed')+' ('+undoState.left+'s)';},1000);
 }
 function snapshotForUndo(hashes){
-  return hashes.map(function(h){var r=rowByHash(h);return r?{hash:h,dest:r.dataset.kPath||'',cat:r.dataset.cat||'',tags:r.dataset.tags||''}:null;}).filter(Boolean);
+  return hashes.map(function(h){
+    if(state.virtual&&state.allRows){var d=state.allRows.find(function(r){return r.Hash===h;});return d?{hash:h,dest:d.SavePath||'',cat:d.Category||'',tags:d.Tags||''}:null;}
+    var r=rowByHash(h);return r?{hash:h,dest:r.dataset.kPath||'',cat:r.dataset.cat||'',tags:r.dataset.tags||''}:null;
+  }).filter(Boolean);
 }
 function fetchMagnets(snap){
   Promise.all(snap.map(function(s){return fetch('/ui/magnet?hash='+encodeURIComponent(s.hash),{cache:'no-store'}).then(function(r){return r.ok?r.text():null;}).then(function(m){s.magnet=(m||'').trim();return s;}).catch(function(){return s;});})).then(function(items){
@@ -1538,6 +1663,14 @@ function navShow(which){
 function tool(name){
   if(name==='ipfilter')openDialog($('#dlg-ipfilter'));
   else if(name==='create')openDialog($('#dlg-create'));
+  else if(name==='dhtfeed'){
+    var hashes=Array.from(state.selected);
+    toast(t('Publishing the DHT feed…'),false);
+    fetch('/ui/dht-feed/publish',{method:'POST',headers:{'Content-Type':'application/json','X-GX-Fetch':'1'},body:JSON.stringify({hashes:hashes})})
+      .then(function(r){return r.json().then(function(j){if(!r.ok||!j.ok)throw new Error(j.error||r.status);return j;});})
+      .then(function(j){copyText(j.url,t('DHT feed published'));toast(t('DHT feed published')+': '+j.url,false);})
+      .catch(function(e){toast(t('Error')+': '+(e.message||''),true);});
+  }
   else if(name==='feeds'){toast(t('Checking…'),false);fetch('/ui/feeds/poll',{method:'POST',headers:{'X-GX-Fetch':'1'}}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(res){if(res.errors&&res.errors.length)toast(res.errors.join(' · '),true);else toast(res.feeds+' '+t('feeds checked')+': '+res.new+' '+t('new')+' · '+res.added+' '+t('added'),false);refresh();}).catch(function(e){toast(t('Error')+': '+(e.message||''),true);});}
   else if(name==='ports'){toast(t('checking…'),false);fetch('/ui/portcheck',{cache:'no-store'}).then(function(r){return r.text();}).then(function(h){var d=document.createElement('div');d.innerHTML=h;toast(d.textContent.trim()||t('Done'),/not|non|nicht|pas|nie|no /i.test(d.textContent)&&false);}).catch(function(e){toast(t('test failed:')+' '+e.message,true);});}
 }
@@ -1566,7 +1699,7 @@ document.addEventListener('visibilitychange',function(){if(!document.hidden)refr
 // The engine pushes state changes on /ui/events: refresh at once instead of
 // waiting for the next poll. Piece events are too frequent to refresh on.
 try{var es=new EventSource('/ui/events');es.onmessage=function(m){try{var ev=JSON.parse(m.data);if(ev.type!=='torrent_piece')refresh();}catch(_){}};}catch(_){}
-window.gxShowMore=function(){state.rows=(state.rows||300)*2;refresh();};
+window.gxShowMore=function(){state.rows=0;state.virtual=false;refresh();};
 window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tracker:null};state.q='';var f=$('#filter');if(f)f.value='';store.set('filter',state.filter);applyFilters();};
 })();
 </script>

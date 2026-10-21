@@ -19,6 +19,7 @@ func (s *dlnaServer) ssdpSTs() []string {
 		dlnaDeviceType,
 		dlnaContentDir,
 		dlnaConnMgr,
+		dlnaMediaReceiver,
 	}
 }
 

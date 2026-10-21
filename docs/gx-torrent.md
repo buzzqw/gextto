@@ -283,9 +283,13 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   of the daemon's recent lines, so it works whether the log goes to stderr or to
   the rotating file already open in a terminal. In managed, when the daemon is
   launched next to Gextto, the same button shows *gextto.log*.
-- **Large lists** (standalone only): the table renders at most `?rows=` torrents
-  (default 300) and shows *Showing X of Y · Show more* to widen the window; in
-  managed it always renders all torrents.
+- **Large lists** (standalone only): above 500 torrents the table is
+  **virtualised client-side**. `/ui/rows?rows=all` carries the whole session,
+  filtering and sorting work on that data, and only the rows around the viewport
+  are in the DOM (with spacer rows above and below), so a session of thousands
+  of torrents scrolls and refreshes like a short one. Below the threshold the
+  simple full-DOM table is kept, and without JavaScript the first 300 rows and
+  *Show more* still work.
 - The page's own actions post with `X-GX-Fetch: 1` and get a JSON outcome
   (`{"ok", "msg"}`, the message translated) instead of a redirect; classic form
   posts keep the redirect with `?msg=`.
@@ -829,6 +833,14 @@ A feed can also be a **DHT feed**: `url` of the form
 signed mutable item listing torrents; each entry becomes a magnet item, so the
 same rules/archive/add path applies. `GET /api/v1/dht-feed?key=<hex>[&salt=<hex>]`
 resolves one for external consumers. It needs the DHT enabled.
+
+The **publisher** signs and stores the same kind of feed: `Publish DHT feed…` in
+the Tools menu, or `POST /api/v1/dht-feed/publish` with
+`{"name": "...", "hashes": ["<40 hex>", ...]}` (empty hashes = every torrent of
+the session). The daemon keeps an ed25519 key in `settings.json`, bumps the BEP
+44 sequence on every successful put and returns the `dht://<pubkey>` URL, which
+a feed (or Gextto) subscribes to. Only standalone mode publishes: in managed
+mode acquisition belongs to Gextto.
 
 With the `rules` key (JSON array) you switch to the **ordered rule set**, like
 BiglyBT: the first rule that matches decides (`fail: true` discards, otherwise
@@ -1532,13 +1544,20 @@ UDP 1900 on the same interface.
 - **ContentDirectory:1**: `Browse` with both flags, **BrowseMetadata** (the
   object itself: many TVs ask for the root first) and **BrowseDirectChildren**,
   with **paging** (`StartingIndex`/`RequestedCount`, `TotalMatches` is the full
-  count) and UPnP errors 701 (no such object) / 402 (bad arguments);
+  count) and UPnP errors 701 (no such object) / 402 (bad arguments).
+  **Search** evaluates `upnp:class` (`object.item.videoItem`,
+  `object.item.audioItem`, `object.item`) and `dc:title` (`=`, `!=`, `contains`,
+  `doesNotContain`, several terms ANDed) over the torrents and, recursively, the
+  library folders; `GetSearchCapabilities` advertises `dc:title,upnp:class`.
   `GetSystemUpdateID` and the Browse `UpdateID` change whenever the listing
   changes, so a control point knows to refresh. **ConnectionManager:1**:
   `GetProtocolInfo` lists every served type, plus `GetCurrentConnectionIDs` and
-  `GetCurrentConnectionInfo`. **GENA**: `SUBSCRIBE`/`UNSUBSCRIBE` on both
-  services are accepted (several TVs refuse a server whose event URL fails) and
-  the initial event is sent; the callback must be the subscriber's own address.
+  `GetCurrentConnectionInfo`. **X_MS_MediaReceiverRegistrar:1** answers
+  `IsAuthorized`, `IsValidated` (both `1`) and `RegisterDevice`, so Xbox 360 and
+  Windows Media Player accept the server. **GENA**: `SUBSCRIBE`/`UNSUBSCRIBE` on
+  all three services are accepted (several TVs refuse a server whose event URL
+  fails) and the initial event is sent; the callback must be the subscriber's
+  own address.
 - **Library folders** (`dlna_library.go`): besides the torrents the server
   shows configured folders, typically the archive on the NAS Gextto files the
   media into, as a **browsable folder tree** (subfolders, then the video/audio
@@ -1546,7 +1565,8 @@ UDP 1900 on the same interface.
   one container per folder plus a **Torrent** container; without, the torrents
   stay directly in the root. Folders come from `-dlna-folder` (repeatable) or
   `GX_TORRENT_DLNA_FOLDERS`, and in standalone from `dlna-folders` on the
-  settings page; `-dlna-exclude` hides paths inside them. In managed mode Gextto
+  settings page (the **Download folder** button adds the configured download
+  folder in one click); `-dlna-exclude` hides paths inside them. In managed mode Gextto
   passes its own library: the `gxtorrent_dlna_folders` list or, when it is
   empty, the archive root plus the folder holding each series' archive path,
   nested folders collapsed, with **Gextto's trash excluded**. Every access goes
@@ -1604,9 +1624,9 @@ UDP 1900 on the same interface.
   start/stop/restart, each M-SEARCH, each Browse and each played file, all
   throttled to once per client and object per minute (a player issues a Range
   request per seek).
-- **Not covered**: transcoding, frames extracted from the video (artwork comes
-  only from existing images), search, and the Microsoft
-  `X_MS_MediaReceiverRegistrar` that Xbox/Windows Media Player require.
+- **Not covered**: transcoding and frames extracted from the video (artwork
+  comes only from existing images). Both need a video decoder; the server stays
+  pure Go and never shells out to ffmpeg.
 
 The media `Content-Type` comes from the file extension (`video/mp4`,
 `video/x-matroska`, `audio/flac`, …); a stream also sets

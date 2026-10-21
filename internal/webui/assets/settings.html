@@ -59,7 +59,7 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
 </fieldset>
 <fieldset>
   <legend>Watch folders</legend>
-  <label>Folders to watch for .torrent files (one per line)<textarea name="watch-folders" rows="3" spellcheck="false" autocomplete="off" title="Folders scanned for .torrent files to add automatically; each line is a folder, or folder=destination to pick where its torrents are saved. The .torrent is removed after a successful add; a file that is not a valid .torrent is renamed to .invalid. Empty disables the feature.">{{WATCH_FOLDERS}}</textarea></label>
+  <label>Folders to watch for .torrent files (one per line)<textarea name="watch-folders" rows="3" spellcheck="false" autocomplete="off" title="Folders whose .torrent files are downloaded and added automatically: each file is read and its content added to the session; each line is a folder, or folder=destination to choose where its torrents are saved. The .torrent is removed after a successful add; a file that is not a valid .torrent is renamed to .invalid. Empty disables the feature.">{{WATCH_FOLDERS}}</textarea></label>
 </fieldset>
 <fieldset id="cookies">
   <legend>Cookies</legend>
@@ -138,8 +138,8 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label>HTTP bind<input type="text" name="dlna-listen" value="{{DLNA_LISTEN}}" autocomplete="off" placeholder=":8200" title="Address and port the media server listens on, e.g. :8200 for all interfaces or 192.168.1.10:8200 for one. Discovery uses UDP 1900 on the same interface."></label>
     <label>Server name<input type="text" name="dlna-name" value="{{DLNA_NAME}}" autocomplete="off" placeholder="gx-torrent" title="Friendly name shown to the DLNA players on the network."></label>
   </div>
-  <label>Library folders<span class="field-row"><textarea name="dlna-folders" id="dlna-folders" rows="3" placeholder="/srv/media/Movies&#10;/srv/media/TV" autocomplete="off" aria-describedby="dlna-folders-help" title="Folders shown to the DLNA players beside the torrents, as browsable folders (e.g. the archive on the NAS). One folder per line. Read only; hidden and NAS system folders are skipped.">{{DLNA_FOLDERS}}</textarea><button type="button" class="browse" data-target="dlna-folders" data-append="1" title="Add an existing folder on the server to the list">Add folder…</button></span></label>
-  <p class="muted" id="dlna-folders-help">Any number of folders, one per line: each one appears to the players as a browsable folder beside the torrents. Add folder… appends the chosen folder to the list; to remove one, delete its line.</p>
+  <label>Library folders<span class="field-row"><textarea name="dlna-folders" id="dlna-folders" rows="3" placeholder="/srv/media/Movies&#10;/srv/media/TV" autocomplete="off" aria-describedby="dlna-folders-help" title="Folders shown to the DLNA players beside the torrents, as browsable folders (e.g. the archive on the NAS). One folder per line. Read only; hidden and NAS system folders are skipped.">{{DLNA_FOLDERS}}</textarea><button type="button" class="browse" data-target="dlna-folders" data-append="1" title="Add an existing folder on the server to the list">Add folder…</button><button type="button" class="browse" data-target="dlna-folders" data-append="1" data-path="{{DOWNLOAD_DIR}}"{{DOWNLOAD_DIR_DISABLED}} title="Add the configured Download folder, where completed media already is">Download folder</button></span></label>
+  <p class="muted" id="dlna-folders-help">Any number of folders, one per line: each one appears to the players as a browsable folder beside the torrents. Add folder… appends the chosen folder to the list; Download folder adds the one configured above. To remove one, delete its line.</p>
   <p class="muted" role="status">{{DLNA_STATUS}}</p>
 </fieldset>
 <fieldset id="optimize">

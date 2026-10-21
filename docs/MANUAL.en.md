@@ -455,7 +455,11 @@ inferior to the archived file.
   Jellyfin, Kodi and Emby layout (`episode-thumb.jpg`, `movie-poster.jpg`,
   `folder.jpg`, `poster.jpg`, the season posters `season01-poster.jpg`): they are
   scaled on the fly and nothing is written to the library. `.srt`/`.vtt` subtitles named like a video
-  are attached to it. It is off by default and has no authentication, so it
+  are attached to it. Players can also **search by title** (ContentDirectory
+  Search), and **Xbox 360 and Windows Media Player** accept the server through
+  the `X_MS_MediaReceiverRegistrar` service. On the gx-torrent settings page the
+  **Download folder** button appends the configured download folder to the list.
+  It is off by default and has no authentication, so it
   answers **only** devices on the local network (requests from public addresses
   are refused) and serves only the listed media. The gx-torrent settings page
   shows the address it runs on.
@@ -1756,7 +1760,7 @@ them.
 | Web engines | Web search engines used by gap-filling when feeds and indexers find nothing. |
 | Excluded content filters | Releases containing these words or scripts (e.g. [porno]) are excluded. |
 | Source filters | Keywords to accept or reject for a single source, enabled per row. |
-| Watched folders | Automatically adds the .torrent/.magnet files found in the given folders (recursive, delete after). |
+| Watched folders | The .torrent and .magnet files found in the given folders are **downloaded** and added to the session automatically (recursive, delete after). |
 
 #### eD2k and Kad
 
@@ -1773,6 +1777,11 @@ network.
 | aMule — address | Machine running `amuled`, usually `127.0.0.1`. Gextto must see aMule's incoming folder at the same path. |
 | aMule — external connections (EC) port | `ECPort` in `amule.conf`, 4712 by default. |
 | aMule — external connections (EC) password | The password in clear; aMule keeps its MD5 in `ECPassword`. Not displayed. |
+| aMule — path mapping | Only when amuled runs on another host or in a container: one line per path, form `gextto=amule` (e.g. `/mnt/nas=/data`). The import of completed files uses the incoming folder translated this way. |
+| aMule — started and supervised by Gextto | Gextto writes a private configuration in `DATA_DIR/amule`, generates the EC password, starts `amuled` and restarts it if it ends. Only the installed program is needed. |
+| aMule — amuled program | Path of `amuled`; empty = look in `PATH`. Used only with automatic management on. |
+| aMule — eD2k port (TCP) | eD2k TCP port of the managed core, 4662 by default. |
+| aMule — Kad port (UDP) | Kad UDP port of the managed core, 4672 by default. |
 | aMule folders | The incoming (download) and temporary folders are shown read-only: they belong to aMule and are changed in aMule/amuled. After the change restart Gextto (or reopen this page) so it uses the new path. |
 | eD2k search network | **Kad** (default, no server needed), **Kad + eD2k servers** (both searches, results merged), **eD2k servers (global)** (every server) or **eD2k server (connected)**. Applies to the manual search; the automatic fallback always searches Kad and the servers. The same choice is on the eD2k page. |
 | Use eD2k when torrents find nothing | A second, separate switch: when the torrent search for the episode and the season produces nothing, Gextto searches the same episode on eD2k/Kad (with the series name and every alias). It applies both to the deep gap-filling pass and to **Search missing** and single-episode search. Off by default. |

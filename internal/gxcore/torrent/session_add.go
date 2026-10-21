@@ -536,9 +536,46 @@ func (s *Session) ResolveDHTFeed(pub ed25519.PublicKey, salt []byte, seq *int64,
 	return items, item.Seq, nil
 }
 
-// add reserves an id, a port and the storage for a new torrent, unwinding
-// the port on failure. An explicit id must be unused; otherwise a v1 UUID
-// is minted.
+// PublishDHTFeed signs and publishes a BEP 46 feed: the value lists the given
+// torrents ({"items": [{"ih": ..., "name": ...}]}), the DHT item is addressed
+// by the signer's public key and salt. seq must be greater than the last
+// published sequence. It is the publisher side of ResolveDHTFeed.
+func (s *Session) PublishDHTFeed(priv ed25519.PrivateKey, seq int64, name string, items []DHTFeedItem, salt []byte, timeout time.Duration) ([20]byte, error) {
+	if s.dht == nil {
+		return [20]byte{}, errors.New("the DHT is disabled")
+	}
+	if len(priv) != ed25519.PrivateKeySize {
+		return [20]byte{}, errors.New("BEP 46: invalid ed25519 private key")
+	}
+	if len(salt) > 64 {
+		return [20]byte{}, errors.New("BEP 46: the salt is longer than 64 bytes")
+	}
+	if seq < 0 {
+		return [20]byte{}, errors.New("BEP 46: the sequence must not be negative")
+	}
+	if timeout <= 0 {
+		timeout = bep46ResolveTimeout
+	}
+	entries := make([]interface{}, 0, len(items))
+	for _, it := range items {
+		entry := map[string]interface{}{"ih": it.InfoHash[:]}
+		if name := strings.TrimSpace(it.Name); name != "" {
+			entry["name"] = name
+		}
+		entries = append(entries, entry)
+	}
+	value := map[string]interface{}{"items": entries}
+	if name = strings.TrimSpace(name); name != "" {
+		value["name"] = name
+	}
+	target, err := s.dht.PublishMutable(priv, seq, value, salt, timeout)
+	if err != nil {
+		return target, fmt.Errorf("BEP 46: cannot publish the DHT feed: %w", err)
+	}
+	return target, nil
+}
+
+
 func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto storage.Storage, err error) {
 	port, err = s.getPort()
 	if err != nil {

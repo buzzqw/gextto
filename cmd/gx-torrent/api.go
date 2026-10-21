@@ -44,6 +44,8 @@ func (d *Daemon) routes() http.Handler {
 	api.HandleFunc("POST /api/v1/config", d.handleSetConfig)
 	api.HandleFunc("POST /api/v1/create-torrent", d.handleCreateTorrent)
 	api.HandleFunc("GET /api/v1/dht-feed", d.handleDHTFeed)
+	api.HandleFunc("GET /api/v1/dht-feed/publish", d.handlePublishDHTFeed)
+	api.HandleFunc("POST /api/v1/dht-feed/publish", d.handlePublishDHTFeed)
 	api.HandleFunc("GET /api/v1/metrics", d.handleMetrics)
 	api.HandleFunc("GET /api/v1/events", d.handleAPIEvents)
 
@@ -73,6 +75,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /ui/search", d.handleUISearch)
 	root.HandleFunc("GET /ui/feeds", d.handleUIFeeds)
 	root.HandleFunc("POST /ui/feeds/poll", d.handleUIFeedPoll)
+	root.HandleFunc("POST /ui/dht-feed/publish", d.handleUIPublishDHTFeed)
 	root.HandleFunc("GET /ui/feed-items", d.handleUIFeedItems)
 	root.HandleFunc("GET /ui/rss", d.handleUIRss)
 	root.HandleFunc("POST /ui/rss-config", d.handleUIRssConfig)

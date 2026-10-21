@@ -48,7 +48,7 @@ func validateBackendSetting(key, value string) error {
 			return nil
 		}
 		return validateBackendInteger(key, raw, 250, 60000)
-	case "qbittorrent_path_mappings", "jellyfin_path_mappings", "plex_path_mappings":
+	case "qbittorrent_path_mappings", "jellyfin_path_mappings", "plex_path_mappings", "amule_path_mappings":
 		_, err := ParsePathMappings(value)
 		return err
 	case "upgrade_until_score":
@@ -240,7 +240,7 @@ func validateNumericSetting(key, value string) error {
 		if err != nil || parsed < 0 {
 			return fmt.Errorf("%s must be zero or a positive number", key)
 		}
-	case key == "torrent_port_min", key == "torrent_port_max", key == "amule_port":
+	case key == "torrent_port_min", key == "torrent_port_max", key == "amule_port", key == "amule_ed2k_port", key == "amule_kad_port":
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || parsed < 1 || parsed > 65535 {
 			return fmt.Errorf("%s must be a port between 1 and 65535", key)

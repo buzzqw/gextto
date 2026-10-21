@@ -351,3 +351,96 @@ func TestDLNARoutesAndLANGuard(t *testing.T) {
 		}
 	}
 }
+
+func TestDLNASearchCriteria(t *testing.T) {
+	q := parseDLNASearch(`upnp:class derivedfrom "object.item.videoItem" and dc:title contains "ep1"`)
+	if q.class != "object.item.videoItem" || q.title != "ep1" || q.negate {
+		t.Fatalf("query = %+v", q)
+	}
+	if !q.matches("Ep1", true) || q.matches("Ep1", false) || q.matches("Ep2", true) {
+		t.Fatal("video + title matching is wrong")
+	}
+	if q := parseDLNASearch(`dc:title doesNotContain "trailer"`); !q.negate || !q.matches("episode", true) || q.matches("Trailer", true) {
+		t.Fatalf("negated title query = %+v", q)
+	}
+	if q := parseDLNASearch("*"); q.title != "" || q.class != "" || !q.matches("anything", true) {
+		t.Fatalf("* must match everything: %+v", q)
+	}
+	if q := parseDLNASearch(`upnp:class = "object.item.audioItem.musicTrack"`); q.matches("song", true) || !q.matches("song", false) {
+		t.Fatalf("audio query = %+v", q)
+	}
+}
+
+func TestDLNASearchAction(t *testing.T) {
+	srv := dlnaTestServer()
+	search := func(container, criteria, start, count string) *httptest.ResponseRecorder {
+		body := `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>` +
+			`<u:Search xmlns:u="` + dlnaContentDir + `"><ContainerID>` + container + `</ContainerID>` +
+			`<SearchCriteria>` + criteria + `</SearchCriteria><Filter>*</Filter>` +
+			`<StartingIndex>` + start + `</StartingIndex><RequestedCount>` + count + `</RequestedCount>` +
+			`<SortCriteria></SortCriteria></u:Search></s:Body></s:Envelope>`
+		req := httptest.NewRequest("POST", "http://10.0.0.5:8200/control/ContentDirectory", strings.NewReader(body))
+		req.Header.Set("SOAPAction", `"`+dlnaContentDir+`#Search"`)
+		rec := httptest.NewRecorder()
+		srv.handleContentDirControl(rec, req)
+		return rec
+	}
+	// Only videos, then only the episode whose title contains ep1.
+	body := search("0", `upnp:class derivedfrom &quot;object.item.videoItem&quot;`, "0", "0").Body.String()
+	if !strings.Contains(body, "<NumberReturned>2</NumberReturned>") || !strings.Contains(body, "<TotalMatches>2</TotalMatches>") {
+		t.Fatalf("video search wrong:\n%s", body)
+	}
+	body = html.UnescapeString(search("0", `dc:title contains &quot;ep1&quot;`, "0", "0").Body.String())
+	if !strings.Contains(body, "<NumberReturned>1</NumberReturned>") || !strings.Contains(body, "<dc:title>ep1</dc:title>") {
+		t.Fatalf("title search wrong:\n%s", body)
+	}
+	// Audio search and paging.
+	body = html.UnescapeString(search("0", `upnp:class derivedfrom &quot;object.item.audioItem&quot;`, "0", "1").Body.String())
+	if !strings.Contains(body, "<dc:title>01 song</dc:title>") || !strings.Contains(body, "object.item.audioItem.musicTrack") {
+		t.Fatalf("audio search wrong:\n%s", body)
+	}
+	body = search(dlnaTorrentsID, "*", "1", "1").Body.String()
+	if !strings.Contains(body, "<NumberReturned>1</NumberReturned>") || !strings.Contains(body, "<TotalMatches>3</TotalMatches>") {
+		t.Fatalf("search paging wrong:\n%s", body)
+	}
+	rec := search("junk", "*", "0", "0")
+	if !strings.Contains(rec.Body.String(), "<errorCode>701</errorCode>") {
+		t.Fatalf("unknown container -> %s", rec.Body.String())
+	}
+	// SearchCapabilities advertises what the server evaluates.
+	req := httptest.NewRequest("POST", "/control/ContentDirectory", nil)
+	req.Header.Set("SOAPAction", `"`+dlnaContentDir+`#GetSearchCapabilities"`)
+	rec = httptest.NewRecorder()
+	srv.handleContentDirControl(rec, req)
+	if !strings.Contains(rec.Body.String(), "dc:title,upnp:class") {
+		t.Fatalf("SearchCaps wrong: %s", rec.Body.String())
+	}
+}
+
+func TestDLNAMediaReceiverRegistrar(t *testing.T) {
+	srv := dlnaTestServer()
+	rec := httptest.NewRecorder()
+	srv.handleRootDesc(rec, httptest.NewRequest("GET", "/rootDesc.xml", nil))
+	if !strings.Contains(rec.Body.String(), dlnaMediaReceiver) || !strings.Contains(rec.Body.String(), "/X_MS_MediaReceiverRegistrar.xml") {
+		t.Fatalf("root desc lacks the registrar service:\n%s", rec.Body.String())
+	}
+	for _, action := range []string{"IsAuthorized", "IsValidated"} {
+		req := httptest.NewRequest("POST", "/control/X_MS_MediaReceiverRegistrar", nil)
+		req.Header.Set("SOAPAction", `"`+dlnaMediaReceiver+`#`+action+`"`)
+		rec = httptest.NewRecorder()
+		srv.handleMediaReceiverControl(rec, req)
+		if rec.Code != 200 || !strings.Contains(rec.Body.String(), "<Result>1</Result>") {
+			t.Fatalf("%s -> %d %s", action, rec.Code, rec.Body.String())
+		}
+	}
+	req := httptest.NewRequest("POST", "/control/X_MS_MediaReceiverRegistrar", nil)
+	req.Header.Set("SOAPAction", `"`+dlnaMediaReceiver+`#RegisterDevice"`)
+	rec = httptest.NewRecorder()
+	srv.handleMediaReceiverControl(rec, req)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "RegistrationRespMsg") {
+		t.Fatalf("RegisterDevice -> %d %s", rec.Code, rec.Body.String())
+	}
+	if !srv.ssdpMatches(dlnaMediaReceiver) {
+		t.Fatal("the registrar must be advertised over SSDP")
+	}
+}

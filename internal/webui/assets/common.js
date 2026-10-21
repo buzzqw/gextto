@@ -138,17 +138,24 @@
     function up() { if (parent) go(parent); }
     function choose() {
       var input = field(target);
-      if (input && current) {
-        if (appendList) {
-          var items = listItems(input.value);
-          if (items.indexOf(current) < 0) items.push(current);
-          input.value = items.join("\n");
-        } else {
-          input.value = current;
-        }
-        input.dispatchEvent(new Event("change", { bubbles: true }));
-      }
+      if (input && current) write(input, current, appendList);
       close();
+    }
+
+    // write puts a path straight into the target field: the same rule as
+    // choose(), for a button that proposes a known folder (data-path) instead
+    // of opening the picker.
+    function write(input, path, append) {
+      path = String(path || "").trim();
+      if (!input || !path) return;
+      if (append) {
+        var items = listItems(input.value);
+        if (items.indexOf(path) < 0) items.push(path);
+        input.value = items.join("\n");
+      } else {
+        input.value = path;
+      }
+      input.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
     window.gx.picker = { open: open, close: close, go: go, up: up, choose: choose };
@@ -157,7 +164,18 @@
       var el = e.target;
       if (!el || !el.closest) return;
       var browse = el.closest(".browse");
-      if (browse) { e.preventDefault(); open(browse.getAttribute("data-target"), browse.hasAttribute("data-append")); return; }
+      if (browse) {
+        e.preventDefault();
+        var fixed = browse.getAttribute("data-path");
+        if (fixed) {
+          // A known folder (the configured Download folder) is added without
+          // opening the picker: the path is already a click away.
+          write(field(browse.getAttribute("data-target")), fixed, browse.hasAttribute("data-append"));
+          return;
+        }
+        open(browse.getAttribute("data-target"), browse.hasAttribute("data-append"));
+        return;
+      }
       if (el.closest("[data-picker-close]")) { close(); return; }
       if (el.closest("[data-picker-up]")) { go(parent); return; }
       if (el.closest("[data-picker-choose]")) { choose(); return; }

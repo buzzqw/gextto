@@ -341,10 +341,18 @@ func ed2kIncomingDir(cfg *Config) string {
 	}); err != nil {
 		return ""
 	}
+	incoming := prefs.IncomingDir
+	// A remote amuled (another host or container) reports its own path: the
+	// mapping brings it into Gextto's view before the import reads it.
+	if mappings, err := ParsePathMappings(cfg.Settings["amule_path_mappings"]); err == nil {
+		if mapped, ok := TranslateBackendToGextto(incoming, mappings); ok {
+			incoming = mapped
+		}
+	}
 	ed2kState.mu.Lock()
-	ed2kState.incoming = prefs.IncomingDir
+	ed2kState.incoming = incoming
 	ed2kState.mu.Unlock()
-	return prefs.IncomingDir
+	return incoming
 }
 
 // ed2kAvailability reports whether eD2k can be searched and downloaded: both

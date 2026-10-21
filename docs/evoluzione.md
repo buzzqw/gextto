@@ -561,7 +561,8 @@ with Gextto's latency guard (§3, *Latency guard*), which passes its own window.
 WebTorrent/bittorrent-tracker protocol, dialled through the same egress as the HTTP
 tracker — proxy, resolver, blocklist), **DHT feeds** (a `dht://<pubkey-hex>[?salt=]` URL
 becomes a normal feed source resolved to magnets, so rules, archive, dedup and add are
-reused; `GET /api/v1/dht-feed` resolves one for external consumers), **v2 partial-file
+reused; `GET /api/v1/dht-feed` resolves one for external consumers and
+`POST /api/v1/dht-feed/publish` signs and stores one), **v2 partial-file
 hash serving** (BEP 52: `serveHashes` answers the requested leaf range, computing each
 leaf from the downloaded pieces and rejecting a leaf whose piece is missing, so a
 partially downloaded v2 file can serve block hashes too; a request is capped at 512
@@ -670,17 +671,9 @@ last-resort source. The native daemon is preserved in the history, at commit
 
 Open points:
 
-- **Managed amuled.** Gextto expects an `amuled` the operator runs. Starting and
-  supervising it like qBittorrent-nox (own `--config-dir`, generated EC
-  password, ports) would remove the manual setup. Gate: users who want eD2k
-  without configuring aMule by hand.
-- **Remote aMule.** Completed files are imported from aMule's incoming folder at
-  the same path, which holds when both run on one machine. A remote core would
-  need a path mapping like `qbittorrent_path_mappings`.
 - **Fallback coverage.** Whether to turn `ed2k_fallback` on by default depends on
   a larger sample of real gaps searched through aMule (Kad and global server
   search), not on the native client's earlier samples.
-
 **Waiting for a measurement or a host.**
 
 - **Choking on a real swarm.** The controlled evidence is healthy (§4.6 of [`measurements.md`](measurements.md)): a real
@@ -704,9 +697,9 @@ Open points:
   `recvfrom`/`sendto` as a real share.
 - **Graduated file priority (0–7)** with mixed-priority files: so far measured only
   indirectly.
-- **DLNA**: transcoding, frames extracted from the video (no ffmpeg), search and
-  Xbox/WMP (`X_MS_MediaReceiverRegistrar`) are missing; browsing, Range playback,
-  subtitles, library folders and artwork are in place (§3).
+- **DLNA**: transcoding and frames extracted from the video (no ffmpeg) are
+  missing; browsing, Search, Range playback, subtitles, library folders,
+  artwork and Xbox/WMP (`X_MS_MediaReceiverRegistrar`) are in place (§3).
 - **Latency guard: what a ping cannot see.** A latency probe tells a full queue from a
   good line, but it cannot tell who filled it: a user of little bandwidth who only needs
   a low latency (a call, a game) fills no queue. In `both`/`router` the router's WAN
@@ -715,8 +708,9 @@ Open points:
   with a real call or game next to a saturated download, in `both` and in `ping`. The
   current controller no longer releases after a calm spell at the ceiling: it keeps the
   cap while Auto is on and drops it when the line is idle or Auto ends.
-- **DHT feeds**: the resolver exists, the **publisher** side (signing a feed) does not,
-  and the BEP 44 outgoing client has no consumer yet (§4.7 of [`measurements.md`](measurements.md)).
+- **DHT feeds**: the resolver and the publisher (signing and storing a feed, with
+  the BEP 44 outgoing client as its consumer) exist; what remains is a real
+  multi-client audience for the feeds (§4.7 of [`measurements.md`](measurements.md)).
 - **WebTorrent/WebRTC**: the WebSocket tracker's practical value stays limited until
   WebRTC is done, since the reference tracker serves only WebRTC peers to a WebSocket
   client (§6).
@@ -730,17 +724,10 @@ Open points:
   faster with `curl` ([`measurements.md`](measurements.md) §4.9). Gate: a torrent served
   mostly by web seeds where the parallel version beats the current one on the same source.
 
-**Product-surface refinements.**
-
-- **Virtualising the torrent table** beyond the 300-row window with *Show more*,
-  for sessions with more than a thousand torrents.
-- **DLNA library folders.** On the gx-torrent settings page, the *Library folders*
-  field of *Media server (DLNA)* should propose the configured **Download
-  folder** at least, so the folder that already holds the completed media is a
-  click away instead of a path to type.
-- **Watch folders.** The *Watch folders* section should say that the `.torrent`
-  files it finds are **downloaded**, not only "added automatically", so what the
-  feature does to the media is explicit.
+**Product surface.** The torrent table is virtualised above 500 rows, the DLNA
+library folder field proposes the configured Download folder, and the Watch
+folders section says that the `.torrent` files are downloaded. No open item
+remains here.
 
 **Closing the gap with Sonarr/Radarr** (§1), by value per effort, each after a study and
 without copying code (Sonarr is GPLv3, Gextto EUPL-1.2):

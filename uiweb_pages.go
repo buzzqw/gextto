@@ -420,7 +420,7 @@ var uiAdvancedEditors = []uiListEditor{
 		},
 	},
 	{
-		Title: "Cartelle osservate", Hint: "Aggiunge automaticamente i .torrent trovati in queste cartelle.",
+		Title: "Cartelle osservate", Hint: "I .torrent trovati in queste cartelle vengono scaricati: il file viene letto e il suo contenuto aggiunto automaticamente alla sessione.",
 		GetPath: "/api/watched-folders", Unwrap: "items", PostPath: "/api/watched-folders",
 		Fields: []uiListField{
 			{Name: "path", Label: "Cartella", Kind: "text", Browse: true, Wide: true},

@@ -1701,6 +1701,11 @@ func (d *Daemon) uiRowLimit(r *http.Request) int {
 	if raw == "" {
 		return defaultUIRowLimit
 	}
+	// "all" asks for the whole session: the page then virtualises the table
+	// client-side (the JSON is small, the DOM stays bounded).
+	if strings.EqualFold(raw, "all") {
+		return 0
+	}
 	n, err := strconv.Atoi(raw)
 	if err != nil || n <= 0 {
 		return defaultUIRowLimit

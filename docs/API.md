@@ -388,6 +388,8 @@ server-rendered UI under `/ui`; those HTML routes are not part of this table.
 | POST | `/api/v1/config` | change the daemon configuration |
 | POST | `/api/v1/create-torrent` | create a .torrent from a folder |
 | GET | `/api/v1/dht-feed` | recent DHT discovery feed |
+| GET | `/api/v1/dht-feed/publish` | sign and publish a BEP 46 feed (?name=…&hash=…), returns the dht:// URL |
+| POST | `/api/v1/dht-feed/publish` | sign and publish a BEP 46 feed (JSON name/hashes), returns the dht:// URL |
 | GET | `/api/v1/events` | engine events (Server-Sent Events) |
 | GET | `/api/v1/health` | health, version, build and fingerprint |
 | POST | `/api/v1/ipfilter` | update the IP filter |
