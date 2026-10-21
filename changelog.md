@@ -49,13 +49,6 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   un feed BEP 46 con i torrent selezionati, o con tutti quelli della sessione, e
   ottieni l'indirizzo `dht://…` da dare a chi lo deve seguire; Gextto conserva
   la chiave e aggiorna la sequenza a ogni pubblicazione.
-- **eD2k: Gextto può avviare e sorvegliare aMule.** Con la nuova opzione
-  **aMule — avviato e sorvegliato da Gextto** non serve configurare `amuled` a
-  mano: Gextto crea una configurazione privata, genera la password EC, sceglie
-  le porte e lo riavvia se termina. Se `amuled` gira su un altro host o in un
-  container, la **mappatura percorsi** fa vedere a Gextto la cartella dei file
-  completati.
-
 - **Numerazione: torna `1.1.<build>`, il secondo numero si alza a mano.**
   Gextto non sposta più da solo il secondo numero ogni 1000 build: la versione
   è `<serie>.<build>`, il terzo numero è sempre la build (`1.1.1961`) e la

@@ -67,7 +67,6 @@ func startBackgroundWorkers(state *AppState) {
 	register("update_check_worker", func() { updateCheckWorker(state) })
 	register("bandwidth_history_worker", func() { bandwidthHistoryWorker(state) })
 	register("latency_guard_worker", func() { latencyGuardWorker(state) })
-	register("amule_managed_worker", func() { amuleManagedWorker(state) })
 }
 
 // BackgroundStop is closed as soon as the daemon begins shutting down. Workers

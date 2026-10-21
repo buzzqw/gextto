@@ -47,13 +47,6 @@ manual is online: [English](docs/MANUAL.en.md) ·
   you sign a BEP 46 feed with the selected torrents, or with every torrent of
   the session, and get the `dht://…` address to give to whoever should follow
   it; Gextto keeps the key and bumps the sequence on every publish.
-- **eD2k: Gextto can start and supervise aMule.** With the new **aMule — started
-  and supervised by Gextto** option there is no need to configure `amuled` by
-  hand: Gextto writes a private configuration, generates the EC password,
-  chooses the ports and restarts it if it ends. When `amuled` runs on another
-  host or in a container, the **path mapping** lets Gextto see the folder of
-  completed files.
-
 - **RSS feeds: when IPv6 stalls, Gextto retries over IPv4.** A host reachable
   over IPv6 that never sends data (extto.org behind Cloudflare is one) made the
   feeds time out one after another. After the first failed attempt the next ones
