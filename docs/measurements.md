@@ -314,9 +314,18 @@ Local swarm (2 MiB, 3 leechers): **3.00× corpus** in ~41–42 ms; with mesh the
 exchange 2.52 MB and the seed drops to **1.84×**. Super-seeding is opt-in: it does not
 reduce the upload on a measurable swarm and costs ~24 % locally.
 
+Re-run of the same harness on 2026-10-21, build 1962: 2 MiB, 3 leechers, **3.00×
+in 11 ms**; the choking campaign served a real libtorrent leecher **48 MiB in
+4.84 s (100 % of the file)** on loopback. The real-swarm half is still out of
+reach: the host has no inbound port, so the harness finds 0 peers. The local
+half is the control, not a substitute for that campaign.
+
 Pipelining at RTT 50 ms, 256 KiB pieces: 305 KiB/s with one block in flight, 3.8 MiB/s
 with the default queue, **6,756 KiB/s** with two pieces per peer (×1.75 over
-single-piece).
+single-piece). The same run on 2026-10-21 (build 1962): **302 KiB/s** at one
+block, **6,745 KiB/s** at the default depth, and **161.6 / 161.9 / 162.4 MB/s**
+on the loopback swarm at shallow/default/deep depth; the loopback pair is at the
+local ceiling and does not rank the queue depth.
 
 Real swarm (Ubuntu 24.04.3, the same machine, 40 s window): gx-core **9.3–9.4 MiB/s**
 against libtorrent 2.0.11 at 6.3–7.1 MiB/s, metadata in 3 s and comparable peer counts.

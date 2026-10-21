@@ -43,7 +43,7 @@ func TestManagedAmuleWritesConfigAndStarts(t *testing.T) {
 	}
 	hash := md5.Sum([]byte(settings.Password))
 	for _, want := range []string{
-		"AcceptExternalConnections=1", "ECPort=4712", "Port=14662", "UDPPort=14672",
+		"[eMule]", "[ExternalConnect]", "AcceptExternalConnections=1", "ECPort=4712", "Port=14662", "UDPPort=14672",
 		"ECPassword=" + hex.EncodeToString(hash[:]), "IncomingDir=" + filepath.Join(dir, "amule", "Incoming"),
 	} {
 		if !strings.Contains(string(conf), want) {
