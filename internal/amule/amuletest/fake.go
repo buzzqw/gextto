@@ -39,6 +39,10 @@ type File struct {
 	Accepts        int64
 	AcceptsAll     int64
 	Queued         int64
+	// UploadRate is the per-file upload rate in bytes/s, LastUpload the Unix
+	// time of the last upload (0 = never).
+	UploadRate int64
+	LastUpload int64
 }
 
 // Result is one canned search result.
@@ -60,6 +64,8 @@ type Core struct {
 	keptIch      bool
 	totalSent    int64
 	totalRecv    int64
+	sessionSent  int64
+	sessionRecv  int64
 	logLines     []string
 	tempDir      string
 	downloads    []File
@@ -172,8 +178,17 @@ func (c *Core) SetLog(lines []string) {
 	c.logLines = append([]string(nil), lines...)
 }
 
-// SetSessionTotals sets the bytes the fake core reports for its session.
+// SetSessionTotals sets the bytes the fake core reports for the current
+// session, the figures its history graph carries.
 func (c *Core) SetSessionTotals(sent, received int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sessionSent, c.sessionRecv = sent, received
+}
+
+// SetTotalTransferred sets the all-time bytes the fake core reports with a
+// full stats request.
+func (c *Core) SetTotalTransferred(sent, received int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.totalSent, c.totalRecv = sent, received
@@ -338,14 +353,30 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 	defer c.mu.Unlock()
 	switch request.Op {
 	case amule.OpStatReq:
-		return amule.Packet{Op: amule.OpStats, Tags: []amule.Tag{
+		detail := uint64(amule.DetailCmd)
+		if tag, ok := request.Tag(amule.TagDetailLevel); ok {
+			detail = tag.Int()
+		}
+		tags := []amule.Tag{
 			amule.IntTag(amule.TagStatsDLSpeed, 2048),
 			amule.IntTag(amule.TagStatsULSpeed, 512),
 			amule.IntTag(amule.TagStatsKadNodes, 120),
-			amule.IntTag(amule.TagStatsSharedFiles, uint64(len(c.shared))),
-			amule.IntTag(amule.TagStatsTotalSent, uint64(c.totalSent)),
-			amule.IntTag(amule.TagStatsTotalRecv, uint64(c.totalRecv)),
 			c.connState(),
+		}
+		// aMule sends the totals and the shared-file count only at full
+		// detail; a command-level reply carries neither.
+		if detail == amule.DetailFull {
+			tags = append(tags,
+				amule.IntTag(amule.TagStatsSharedFiles, uint64(len(c.shared))),
+				amule.IntTag(amule.TagStatsTotalSent, uint64(c.totalSent)),
+				amule.IntTag(amule.TagStatsTotalRecv, uint64(c.totalRecv)),
+			)
+		}
+		return amule.Packet{Op: amule.OpStats, Tags: tags}
+	case amule.OpGetStatsGraphs:
+		return amule.Packet{Op: amule.OpStatsGraphs, Tags: []amule.Tag{
+			amule.IntTag(amule.TagStatsGraphSessionUL, uint64(c.sessionSent/1024)),
+			amule.IntTag(amule.TagStatsGraphSessionDL, uint64(c.sessionRecv/1024)),
 		}}
 	case amule.OpGetConnState:
 		return amule.Packet{Op: amule.OpMiscData, Tags: []amule.Tag{c.connState()}}
@@ -443,6 +474,8 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 				amule.IntTag(amule.TagKnownfileAccepts, uint64(file.Accepts)),
 				amule.IntTag(amule.TagKnownfileAcceptsAll, uint64(file.AcceptsAll)),
 				amule.IntTag(amule.TagKnownfileOnQueue, uint64(file.Queued)),
+				amule.IntTag(amule.TagKnownfileUploadRate, uint64(file.UploadRate)),
+				amule.IntTag(amule.TagKnownfileLastUpload, uint64(file.LastUpload)),
 				amule.IntTag(amule.TagKnownfilePrio, priority),
 			))
 		}

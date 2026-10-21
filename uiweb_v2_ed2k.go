@@ -455,9 +455,14 @@ type v2Ed2kSharedRow struct {
 	Requests       int64
 	RequestsAll    int64
 	Accepts        int64
+	AcceptsAll     int64
 	Queued         int64
-	Priority       string
-	Link           string
+	UploadRate     int64
+	// LastUpload is the last upload as local time, empty when aMule never
+	// uploaded the file.
+	LastUpload string
+	Priority   string
+	Link       string
 }
 
 // v2Ed2kSharedView backs the shared-files panel of the eD2k page.
@@ -514,12 +519,24 @@ func v2Ed2kSharedViewFor(cfg *Config, message string, messageErr bool) v2Ed2kSha
 			Requests:       file.Requests,
 			RequestsAll:    file.RequestsAll,
 			Accepts:        file.Accepts,
+			AcceptsAll:     file.AcceptsAll,
 			Queued:         file.Queued,
+			UploadRate:     file.UploadRate,
+			LastUpload:     v2Ed2kLastUpload(file.LastUpload),
 			Priority:       v2Ed2kPriorityLabel(file.Priority, file.AutoPriority),
 			Link:           ed2k.FileLink{Name: file.Name, Size: file.Size, Hash: file.Hash}.String(),
 		})
 	}
 	return view
+}
+
+// v2Ed2kLastUpload renders aMule's last-upload time in local time; an empty
+// string means the core never uploaded that file.
+func v2Ed2kLastUpload(unix int64) string {
+	if unix <= 0 {
+		return ""
+	}
+	return time.Unix(unix, 0).Format("2006-01-02 15:04")
 }
 
 // v2Ed2kFlashMessages are the outcomes the eD2k actions report across a

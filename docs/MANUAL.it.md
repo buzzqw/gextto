@@ -840,7 +840,8 @@ alto e un Kad non dietro firewall, cioè più fonti.
 
 - **aMule**: versione, server eD2k a cui sei connesso con **ID alto/basso**,
   stato di Kad (connesso, dietro firewall, fermo), velocità e limiti, utenti e
-  file della rete, coda di upload. I pulsanti **Connetti**, **Disconnetti**,
+  file della rete, coda di upload, byte scambiati in questa sessione e in
+  totale. I pulsanti **Connetti**, **Disconnetti**,
   **Avvia/Ferma Kad** e **Lascia il server** comandano aMule; **Aggiorna**
   rilegge lo stato. Se aMule non risponde la pagina lo dice e spiega cosa
   controllare.
@@ -866,9 +867,12 @@ alto e un Kad non dietro firewall, cioè più fonti.
   **Crea le cartelle**: senza, aMule riempie il log di *Failed to get file
   system statistics* e non importa i file completati.
 - **File condivisi**: quello che aMule condivide, con i byte caricati nella
-  sessione e in totale, richieste e accettate, client in coda, priorità e il
+  sessione e in totale, richieste e accettate (sessione e dall'inizio), client
+  in coda, velocità di caricamento del file, ultimo caricamento, priorità e il
   link `ed2k://` da copiare; sotto, i client a cui stai caricando con velocità e
-  posizione in coda. **Ricarica file condivisi** fa rileggere ad aMule le
+  posizione in coda. I contatori sono quelli di aMule: la colonna della sessione
+  riparte da zero a ogni riavvio di `amuled`, quella totale resta. **Ricarica
+  file condivisi** fa rileggere ad aMule le
   cartelle (utile se hai aggiunto o tolto file a mano); le cartelle condivise
   sono elencate in sola lettura.
 

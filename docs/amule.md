@@ -120,13 +120,14 @@ sensor says *limited*, open aMule's TCP and UDP ports on the router.
 When aMule does not answer, the eD2k page says so, explains what to check and
 offers **Retry**. Nothing else in Gextto stops working.
 
-The state panel also shows the bytes aMule exchanged in this session and
+The state panel also shows the bytes aMule exchanged in this session and over
+all time, and
 whether aMule preallocates files; **Recommended settings** switches full
 preallocation off (the setting that blocks `amuled` on network disks). The same
 switch is in **Configuration → eD2k and Kad → aMule**, where it is saved to
 aMule at once: it is aMule's setting, not one stored in Gextto. The
-**Health** page has an eD2k card with the same state, the session totals and the
-latest problem lines from aMule's log.
+**Health** page has an eD2k card with the same state, the session and all-time
+totals and the latest problem lines from aMule's log.
 
 When `amuled` runs on Gextto's machine, the header shows an **aMule** badge with
 the daemon's CPU and RAM, updated with the other metrics. With aMule on another
@@ -231,10 +232,13 @@ Downloads added by hand and paused ones are left alone.
 ### Shared files and uploads
 
 The **Shared files** tab lists what aMule shares with the
-bytes uploaded in this session and over all time, the requests it answered, the
-clients queued for each file and the upload priority, and the file's `ed2k://`
-link to copy. Below it, **Who is downloading from you** lists the clients in
-the upload queue with their software, file, speed and queue position. The tab
+bytes uploaded in this session and over all time, the requests and accepted
+requests (session and since the start), the clients queued for each file, the
+file's live upload speed, the last upload and the upload priority, and the
+file's `ed2k://` link to copy. The counters are aMule's own: the session
+figures restart with `amuled`, the all-time ones are persisted in its
+`known.met`. Below the table, **Who is downloading from you** lists the clients
+in the upload queue with their software, file, speed and queue position. The tab
 also shows the current upload rate and queue length, and the shared folders
 read-only: the incoming folder plus the extra ones configured in aMule.
 

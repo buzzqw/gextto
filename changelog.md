@@ -15,6 +15,15 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **eD2k: i totali scambiati non sono più a zero e i file condivisi dicono
+  l'ultimo caricamento.** La pagina eD2k mostrava **Sessione** sempre a `0 B`
+  perché chiedeva ad aMule le statistiche a un livello che non le contiene; ora
+  ci sono due righe, i byte scambiati **in questa sessione** e quelli
+  **dall'inizio** (tutte le sessioni), sia nella pagina sia nella scheda
+  **Salute**. Nei **File condivisi** richieste e accettate mostrano sessione e
+  totale, con la velocità del file e l'**ultimo caricamento** (`—` se aMule non
+  l'ha mai caricato): i contatori sono quelli di aMule, quindi la colonna della
+  sessione riparte da zero a ogni riavvio di `amuled` mentre quella totale no.
 - **La pagina Salute è tradotta per intero.** Le righe del pannello *Motore
   torrent* (coda, porta, router, uTP, cache, disco, totali di sessione…), le
   etichette dei percorsi, la memoria del processo e le intestazioni ordinabili

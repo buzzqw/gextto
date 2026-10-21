@@ -44,6 +44,8 @@ const (
 	OpLog                 = 0x38
 	OpGetPreferences      = 0x3F
 	OpSetPreferences      = 0x40
+	OpGetStatsGraphs      = 0x44
+	OpStatsGraphs         = 0x45
 	OpKadStart            = 0x48
 	OpKadStop             = 0x49
 	OpConnect             = 0x4A
@@ -107,6 +109,17 @@ const (
 	TagKnownfileFilename   = 0x0408
 	TagKnownfilePrio       = 0x040B
 	TagKnownfileOnQueue    = 0x040C
+	TagKnownfileUploadRate = 0x0417
+	TagKnownfileLastUpload = 0x0419
+
+	// Stats graph: only the session totals are read, as the latest sampled
+	// point carries the bytes aMule exchanged since it started.
+	TagStatsGraphWidth           = 0x1B01
+	TagStatsGraphScale           = 0x1B02
+	TagStatsGraphSessionDL       = 0x1B0B
+	TagStatsGraphSessionUL       = 0x1B0C
+	TagStatsGraphSessionKad      = 0x1B0D
+	TagStatsGraphSessionTimeSpan = 0x1B0E
 
 	TagServer         = 0x0500
 	TagServerName     = 0x0501

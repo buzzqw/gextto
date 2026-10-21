@@ -46,14 +46,14 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/access/generate-key` | generate a new API access key |
 | GET | `/api/acquisitions` | acquisition history |
 | GET | `/api/archive` | archive entries (search and pages) |
-| GET | `/api/ed2k/status` | aMule integration state: enabled, reachable, download, last_error and, when aMule answers, status (version, eD2k server and High/Low ID, Kad state, speeds and limits, network size) |
+| GET | `/api/ed2k/status` | aMule integration state: enabled, reachable, download, last_error and, when aMule answers, status (version, eD2k server and High/Low ID, Kad state, speeds and limits, network size, session_sent/session_recv in bytes since amuled started, total_sent/total_recv over all its runs, shared_files) |
 | GET | `/api/ed2k/downloads` | aMule's download queue: hash, name, size, done, progress, speed, state (queued, downloading, paused, checking, finished, error), sources and active sources, priority, ed2k link, last data received (Unix time); enabled is false while the integration is off |
 | POST | `/api/ed2k/downloads/{hash}/priority` | set a download's priority: JSON {"priority": "low", "normal", "high" or "auto"} |
 | POST | `/api/ed2k/downloads/{hash}/{action}` | pause, resume or remove an aMule download (remove cancels a download in progress and deletes its partial data; a completed file only leaves aMule's list) |
 | GET | `/api/ed2k/limits` | aMule's global bandwidth limits: download_kib, upload_kib (0 = unlimited) |
 | POST | `/api/ed2k/limits` | set aMule's global bandwidth limits: JSON {"download_kib": N, "upload_kib": N}, 0 = unlimited |
 | GET | `/api/ed2k/log` | aMule's own log lines |
-| GET | `/api/ed2k/shared` | the files aMule shares with what it uploaded for each (session and total bytes, requests, accepted, queued clients, priority, ed2k link), the upload queue (client, software, file, speed, upload position) and the shared folders; enabled is false while the integration is off |
+| GET | `/api/ed2k/shared` | the files aMule shares with what it uploaded for each (session and total bytes, requests and accepted requests session/total, queued clients, live upload rate and last upload time, priority, ed2k link), the upload queue (client, software, file, speed, upload position) and the shared folders; enabled is false while the integration is off |
 | POST | `/api/ed2k/shared/reload` | ask aMule to rescan its shared folders, so files added or removed outside aMule show up (the reload button of the aMule GUI) |
 | POST | `/api/archive/add` | add an entry to the archive |
 | POST | `/api/archive/batch-download` | download several archive entries (magnet or ed2k_link) |

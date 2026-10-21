@@ -31,6 +31,8 @@ func TestSharedFilesReportUploadCounters(t *testing.T) {
 		Accepts:        2,
 		AcceptsAll:     6,
 		Queued:         3,
+		UploadRate:     4096,
+		LastUpload:     1792603914,
 	}}, "/incoming")
 
 	files, err := client.SharedFiles(ctx)
@@ -52,6 +54,9 @@ func TestSharedFilesReportUploadCounters(t *testing.T) {
 	}
 	if file.Queued != 3 || file.Priority != 2 || !file.AutoPriority {
 		t.Fatalf("queue/priority = %+v", file)
+	}
+	if file.UploadRate != 4096 || file.LastUpload != 1792603914 {
+		t.Fatalf("upload activity = %+v", file)
 	}
 
 	status, err := client.Status(ctx)
@@ -163,7 +168,7 @@ func TestSetFilePreallocationKeepsTheOtherFilePreferences(t *testing.T) {
 	}
 }
 
-func TestStatusReportsSessionTotals(t *testing.T) {
+func TestStatusReportsSessionAndAllTimeTotals(t *testing.T) {
 	core, err := amuletest.Start("secret")
 	if err != nil {
 		t.Fatal(err)
@@ -171,12 +176,20 @@ func TestStatusReportsSessionTotals(t *testing.T) {
 	defer core.Close()
 	client := amule.New(amule.Config{Address: core.Address(), Password: "secret"})
 	defer client.Close()
-	core.SetSessionTotals(1234, 5678)
+	core.SetSessionTotals(1234*1024, 5678*1024)
+	core.SetTotalTransferred(34989945335, 110092796292)
+	core.SetShared([]amuletest.File{{Hash: "ac9506f90a4e91273d5114f9bc1438a8", Name: "a.mkv", Size: 10}}, "/incoming")
 	status, err := client.Status(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.TotalSent != 1234 || status.TotalRecv != 5678 {
-		t.Fatalf("totals = %d/%d", status.TotalSent, status.TotalRecv)
+	if status.SessionSent != 1234*1024 || status.SessionRecv != 5678*1024 {
+		t.Fatalf("session totals = %d/%d", status.SessionSent, status.SessionRecv)
+	}
+	if status.TotalSent != 34989945335 || status.TotalRecv != 110092796292 {
+		t.Fatalf("all-time totals = %d/%d", status.TotalSent, status.TotalRecv)
+	}
+	if status.SharedFiles != 1 {
+		t.Fatalf("shared files = %d", status.SharedFiles)
 	}
 }

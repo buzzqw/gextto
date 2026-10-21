@@ -1432,7 +1432,8 @@
       <div class="row"><span>eD2k</span><strong>{{if .Connected}}<span>Connesso a</span> {{.Server}} · {{if .HighID}}<span class="badge ok">ID alto</span>{{else}}<span class="badge warn">ID basso</span>{{end}}{{else}}<span>Non connesso</span>{{end}}</strong></div>
       <div class="row"><span>Kad</span><strong>{{if eq .Kad "connected"}}<span class="badge ok">Connesso</span>{{else if eq .Kad "firewalled"}}<span class="badge warn">Connesso, dietro firewall</span>{{else if eq .Kad "connecting"}}<span>In connessione…</span>{{else}}<span>Fermo</span>{{end}}</strong></div>
       <div class="row"><span>Velocità</span><strong>↓ {{rateI .DownloadRate}} · ↑ {{rateI .UploadRate}}</strong></div>
-      <div class="row"><span>Sessione</span><strong>↓ {{bytes .TotalDown}} · ↑ {{bytes .TotalUp}}</strong></div>
+      <div class="row"><span>Sessione</span><strong title="Byte scambiati da aMule da quando è stato avviato">↓ {{bytes .SessionDown}} · ↑ {{bytes .SessionUp}}</strong></div>
+      <div class="row"><span>Totale</span><strong title="Byte scambiati da aMule dall'inizio, somma di tutte le sessioni">↓ {{bytes .TotalDown}} · ↑ {{bytes .TotalUp}}</strong></div>
       <div class="row"><span>Coda di upload</span><strong>{{.UploadQueue}}</strong></div>
     </div>
     {{if .DirIssues}}<p class="alert" role="alert"><span>Cartelle di aMule non utilizzabili:</span> {{range .DirIssues}}<code title="{{.Path}}">{{.Path}}</code> {{end}}<a href="/?view=ed2k">apri la pagina eD2k</a>.</p>{{end}}
@@ -1795,7 +1796,8 @@
       <div class="row"><span>Rete eD2k</span><strong>{{.Status.Ed2kUsers}} <span>utenti</span> · {{.Status.Ed2kFiles}} <span>file</span></strong></div>
       <div class="row"><span>Rete Kad</span><strong>{{.Status.KadUsers}} <span>utenti</span> · {{.Status.KadNodes}} <span>nodi</span></strong></div>
       <div class="row"><span>Coda di upload</span><strong>{{.Status.UploadQueue}}</strong></div>
-      <div class="row"><span>Sessione</span><strong>↓ {{bytes .Status.TotalRecv}} · ↑ {{bytes .Status.TotalSent}}</strong></div>
+      <div class="row"><span>Sessione</span><strong title="Byte scambiati da aMule da quando è stato avviato">↓ {{bytes .Status.SessionRecv}} · ↑ {{bytes .Status.SessionSent}}</strong></div>
+      <div class="row"><span>Totale</span><strong title="Byte scambiati da aMule dall'inizio, somma di tutte le sessioni">↓ {{bytes .Status.TotalRecv}} · ↑ {{bytes .Status.TotalSent}}</strong></div>
       <div class="row"><span>Preallocazione file</span><strong>{{if .Prefs.AllocateFull}}<span class="badge warn" title="aMule alloca l'intero file prima di scaricarlo: su un disco di rete può bloccare la coda per decine di secondi">attiva</span>{{else}}<span class="badge ok" title="aMule non prealloca l'intero file: sui dischi di rete è il comportamento consigliato">spenta</span>{{end}}</strong></div>
     </div>
     <div class="toolbar">
@@ -2623,15 +2625,17 @@
 {{if .Files}}
 <div class="table-wrap"><table class="data-table">
   <caption class="sr-only">File condivisi con quanto aMule ha caricato</caption>
-  <thead><tr><th scope="col">File</th><th scope="col" class="numeric">Dimensione</th><th scope="col" class="numeric" title="Byte caricati in questa sessione">Caricato (sessione)</th><th scope="col" class="numeric" title="Byte caricati dall'inizio">Caricato (totale)</th><th scope="col" class="numeric">Richieste</th><th scope="col" class="numeric">Accettate</th><th scope="col" class="numeric">In coda</th><th scope="col">Priorità</th><th scope="col">Link</th></tr></thead>
+  <thead><tr><th scope="col">File</th><th scope="col" class="numeric">Dimensione</th><th scope="col" class="numeric" title="Byte caricati in questa sessione">Caricato (sessione)</th><th scope="col" class="numeric" title="Byte caricati dall'inizio">Caricato (totale)</th><th scope="col" class="numeric" title="Richieste ricevute: in questa sessione (dall'inizio)">Richieste</th><th scope="col" class="numeric" title="Richieste accettate: in questa sessione (dall'inizio)">Accettate</th><th scope="col" class="numeric">In coda</th><th scope="col" class="numeric" title="Byte al secondo che aMule sta caricando per questo file">Velocità</th><th scope="col" title="Ultimo caricamento di questo file; — se aMule non l'ha mai caricato">Ultimo caricamento</th><th scope="col">Priorità</th><th scope="col">Link</th></tr></thead>
   <tbody>{{range .Files}}<tr>
     <td><span class="truncate" title="{{.Name}}">{{.Name}}</span></td>
     <td class="numeric">{{bytes .Size}}</td>
     <td class="numeric">{{bytes .Transferred}}</td>
     <td class="numeric">{{bytes .TransferredAll}}</td>
-    <td class="numeric">{{.Requests}}{{if ne .Requests .RequestsAll}} / {{.RequestsAll}}{{end}}</td>
-    <td class="numeric">{{.Accepts}}</td>
+    <td class="numeric">{{.Requests}} ({{.RequestsAll}})</td>
+    <td class="numeric">{{.Accepts}} ({{.AcceptsAll}})</td>
     <td class="numeric">{{.Queued}}</td>
+    <td class="numeric">{{rateI .UploadRate}}</td>
+    <td class="numeric">{{if .LastUpload}}{{.LastUpload}}{{else}}—{{end}}</td>
     <td>{{.Priority}}</td>
     <td><button class="btn sm" type="button" data-v2-copy="{{.Link}}" title="Copia il link eD2k negli appunti">Copia</button></td>
   </tr>{{end}}</tbody>

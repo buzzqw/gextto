@@ -340,10 +340,15 @@ func ed2kSharedSnapshotFor(cfg *Config) (ed2kSharedSnapshot, error) {
 		return nil
 	})
 	// What aMule uploaded in this session comes first: that is the answer to
-	// "what is it uploading now".
+	// "what is it uploading now". Files idle in this session fall back to the
+	// all-time figure, so aMule's restart does not shuffle the list into a
+	// plain alphabetical order.
 	sort.SliceStable(snapshot.Files, func(i, j int) bool {
 		if snapshot.Files[i].Transferred != snapshot.Files[j].Transferred {
 			return snapshot.Files[i].Transferred > snapshot.Files[j].Transferred
+		}
+		if snapshot.Files[i].TransferredAll != snapshot.Files[j].TransferredAll {
+			return snapshot.Files[i].TransferredAll > snapshot.Files[j].TransferredAll
 		}
 		return strings.ToLower(snapshot.Files[i].Name) < strings.ToLower(snapshot.Files[j].Name)
 	})
@@ -370,6 +375,8 @@ type ed2kSharedFileJSON struct {
 	Accepts        int64  `json:"accepts"`
 	AcceptsAll     int64  `json:"accepts_all"`
 	Queued         int64  `json:"queued"`
+	UploadRate     int64  `json:"upload_rate"`
+	LastUpload     int64  `json:"last_upload"`
 	Priority       string `json:"priority"`
 	AutoPriority   bool   `json:"auto_priority"`
 	Link           string `json:"link"`
@@ -407,6 +414,8 @@ func Ed2kSharedAPI(w http.ResponseWriter, r *http.Request, s *AppState) {
 			Accepts:        file.Accepts,
 			AcceptsAll:     file.AcceptsAll,
 			Queued:         file.Queued,
+			UploadRate:     file.UploadRate,
+			LastUpload:     file.LastUpload,
 			Priority:       priority,
 			AutoPriority:   file.AutoPriority,
 			Link:           ed2k.FileLink{Name: file.Name, Size: file.Size, Hash: file.Hash}.String(),
@@ -455,6 +464,8 @@ type v2Ed2kHealth struct {
 	Kad          string
 	DownloadRate int64
 	UploadRate   int64
+	SessionDown  int64
+	SessionUp    int64
 	TotalDown    int64
 	TotalUp      int64
 	UploadQueue  int64
@@ -494,6 +505,8 @@ func v2Ed2kHealthFrom(s *AppState) *v2Ed2kHealth {
 	}
 	card.DownloadRate = status.DownloadRate
 	card.UploadRate = status.UploadRate
+	card.SessionDown = status.SessionRecv
+	card.SessionUp = status.SessionSent
 	card.TotalDown = status.TotalRecv
 	card.TotalUp = status.TotalSent
 	card.UploadQueue = status.UploadQueue

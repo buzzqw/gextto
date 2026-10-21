@@ -14,6 +14,15 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **eD2k: exchanged totals are no longer zero and shared files show the last
+  upload.** The eD2k page always showed **Session** as `0 B` because it asked
+  aMule for the statistics at a detail level that does not carry them; now there
+  are two rows, the bytes exchanged **in this session** and **since the start**
+  (every session), both on the page and in the **Health** card. In **Shared
+  files** requests and accepted requests show session and total, next to the
+  file's speed and its **last upload** (`—` when aMule never uploaded it): the
+  counters are aMule's, so the session column starts from zero whenever
+  `amuled` restarts while the total one does not.
 - **The Health page is fully translated.** The rows of the *Torrent engine*
   panel (queue, port, router, uTP, cache, disk, session totals…), the path
   labels, the process memory and the sortable table headers stayed in Italian

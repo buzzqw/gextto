@@ -39,15 +39,22 @@ type Status struct {
 	KadNodes      int64  `json:"kad_nodes"`
 	// SharedFiles is how many files the core is sharing.
 	SharedFiles int64 `json:"shared_files"`
-	// TotalSent and TotalRecv are the bytes aMule has sent and received since
-	// it started (the session totals shown in its own GUI).
+	// TotalSent and TotalRecv are the bytes aMule has sent and received over
+	// all its runs, the totals persisted in statistics.dat and shown in its
+	// GUI next to the session figures.
 	TotalSent int64 `json:"total_sent"`
 	TotalRecv int64 `json:"total_recv"`
+	// SessionSent and SessionRecv are the bytes aMule has sent and received
+	// since it started, from the latest point of its own history graph.
+	SessionSent int64 `json:"session_sent"`
+	SessionRecv int64 `json:"session_recv"`
 }
 
-// Status asks the core for its statistics and connection state.
+// Status asks the core for its statistics and connection state. The totals
+// and the shared-file count travel only at DetailFull: aMule leaves them out
+// of the command-level reply, where reading them as zero would be wrong.
 func (c *Client) Status(ctx context.Context) (Status, error) {
-	reply, err := c.Request(ctx, Packet{Op: OpStatReq, Tags: []Tag{IntTag(TagDetailLevel, DetailCmd)}})
+	reply, err := c.Request(ctx, Packet{Op: OpStatReq, Tags: []Tag{IntTag(TagDetailLevel, DetailFull)}})
 	if err != nil {
 		return Status{}, err
 	}
@@ -72,10 +79,38 @@ func (c *Client) Status(ctx context.Context) (Status, error) {
 	status.SharedFiles = value(TagStatsSharedFiles)
 	status.TotalSent = value(TagStatsTotalSent)
 	status.TotalRecv = value(TagStatsTotalRecv)
+	// The session totals live in a different reply (the history graph). They
+	// are best effort: aMule without a sampled point still answers the status.
+	if sent, received, totalsErr := c.SessionTotals(ctx); totalsErr == nil {
+		status.SessionSent = sent
+		status.SessionRecv = received
+	}
 	if conn, ok := reply.Tag(TagConnState); ok {
 		applyConnState(&status, conn)
 	}
 	return status, nil
+}
+
+// SessionTotals returns the bytes the core has sent and received since it
+// started. aMule reports them as KiB at the latest point of its history graph;
+// one point is enough and keeps the reply small.
+func (c *Client) SessionTotals(ctx context.Context) (sent, received int64, err error) {
+	reply, err := c.Request(ctx, Packet{Op: OpGetStatsGraphs, Tags: []Tag{
+		IntTag(TagDetailLevel, DetailWeb),
+		IntTag(TagStatsGraphWidth, 1),
+		IntTag(TagStatsGraphScale, 1),
+	}})
+	if err != nil {
+		return 0, 0, err
+	}
+	number := func(name uint16) int64 {
+		tag, ok := reply.Tag(name)
+		if !ok {
+			return 0
+		}
+		return int64(tag.Int()) * 1024
+	}
+	return number(TagStatsGraphSessionUL), number(TagStatsGraphSessionDL), nil
 }
 
 func applyConnState(status *Status, conn Tag) {
@@ -340,6 +375,11 @@ type SharedFile struct {
 	Accepts        int64 `json:"accepts"`
 	AcceptsAll     int64 `json:"accepts_all"`
 	Queued         int64 `json:"queued"`
+	// UploadRate is the bytes/s aMule is sending for this file right now
+	// (aMule 3.x; older cores leave it at zero). LastUpload is the Unix time
+	// of the last byte aMule uploaded for it, zero when it never did.
+	UploadRate int64 `json:"upload_rate"`
+	LastUpload int64 `json:"last_upload"`
 	// Priority is the upload priority (PR_*); AutoPriority is set when the
 	// core chooses it by itself (the reported value carries +10).
 	Priority     int  `json:"priority"`
@@ -386,6 +426,8 @@ func (c *Client) SharedFiles(ctx context.Context) ([]SharedFile, error) {
 			Accepts:        number(TagKnownfileAccepts),
 			AcceptsAll:     number(TagKnownfileAcceptsAll),
 			Queued:         number(TagKnownfileOnQueue),
+			UploadRate:     number(TagKnownfileUploadRate),
+			LastUpload:     number(TagKnownfileLastUpload),
 			Priority:       priority,
 			AutoPriority:   auto,
 		})
