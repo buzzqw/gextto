@@ -1,11 +1,13 @@
 package torrent
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/magnet"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
+	bencode "github.com/jackpal/bencode-go"
 )
 
 func TestBEP46InfoHash(t *testing.T) {
@@ -99,5 +101,29 @@ func TestMagnetInfoHashMatches(t *testing.T) {
 	copy(info.V2Hash[:], v1[:])
 	if !magnetInfoHashMatches(v2ma, info) {
 		t.Fatal("a matching v2 info hash must match")
+	}
+}
+
+func TestTrimDHTFeedFitsOneBEP44Item(t *testing.T) {
+	items := make([]DHTFeedItem, 0, 100)
+	for i := 0; i < 100; i++ {
+		var ih [20]byte
+		ih[19] = byte(i)
+		items = append(items, DHTFeedItem{InfoHash: ih, Name: "A rather long release name that will not fit many times"})
+	}
+	got := trimDHTFeed("night feed", items)
+	if len(got) == 0 || len(got) >= len(items) {
+		t.Fatalf("trim kept %d of %d entries", len(got), len(items))
+	}
+	var buf bytes.Buffer
+	if err := bencode.Marshal(&buf, bep46FeedValue("night feed", got)); err != nil {
+		t.Fatal(err)
+	}
+	if buf.Len() > bep46FeedMaxValue {
+		t.Fatalf("trimmed feed is %d bytes, want <= %d", buf.Len(), bep46FeedMaxValue)
+	}
+	// A feed that cannot hold even one entry is refused, not sent empty.
+	if got := trimDHTFeed(strings.Repeat("x", 2000), items[:1]); got != nil {
+		t.Fatalf("an oversized name must trim everything, got %d", len(got))
 	}
 }

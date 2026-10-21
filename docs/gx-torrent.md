@@ -283,13 +283,14 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   of the daemon's recent lines, so it works whether the log goes to stderr or to
   the rotating file already open in a terminal. In managed, when the daemon is
   launched next to Gextto, the same button shows *gextto.log*.
-- **Large lists** (standalone only): above 500 torrents the table is
-  **virtualised client-side**. `/ui/rows?rows=all` carries the whole session,
-  filtering and sorting work on that data, and only the rows around the viewport
-  are in the DOM (with spacer rows above and below), so a session of thousands
-  of torrents scrolls and refreshes like a short one. Below the threshold the
-  simple full-DOM table is kept, and without JavaScript the first 300 rows and
-  *Show more* still work.
+- **Large lists** (standalone only): on the desktop layout, above 500 torrents
+  the table is **virtualised client-side**. `/ui/rows?rows=all` carries the
+  whole session, filtering and sorting work on that data, and only the rows
+  around the viewport are in the DOM (with spacer rows above and below), so a
+  session of thousands of torrents scrolls and refreshes like a short one.
+  Below the threshold the simple full-DOM table is kept; the mobile layout
+  (CSS-grid cards, where the spacer rows have no height) keeps the old paged
+  window, and without JavaScript the first 300 rows and *Show more* still work.
 - The page's own actions post with `X-GX-Fetch: 1` and get a JSON outcome
   (`{"ok", "msg"}`, the message translated) instead of a redirect; classic form
   posts keep the redirect with `?msg=`.
