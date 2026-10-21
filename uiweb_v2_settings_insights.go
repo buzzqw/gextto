@@ -153,14 +153,26 @@ func v2SourcesIndexFrom(s *AppState, cfg *Config) *v2SourcesIndex {
 		}
 	}
 	indexerStatus := tr("Nessun indexer configurato.")
+	indexerHref := "/?view=integrations"
+	indexerLabel := tr("Indexer e manager")
+	indexerHint := tr("Jackett, Prowlarr e FlareSolverr.")
 	alert := false
 	if total > 0 {
 		indexerStatus = fmt.Sprintf(tr("%d attivi su %d configurati"), active, total)
 	}
 	if failures, seen := lastCycleIndexerFailures(s); seen {
 		if failures > 0 {
-			indexerStatus = fmt.Sprintf(tr("ultimo ciclo: %d errori"), failures)
+			if failures == 1 {
+				indexerStatus = tr("ultimo ciclo: 1 errore")
+			} else {
+				indexerStatus = fmt.Sprintf(tr("ultimo ciclo: %d errori"), failures)
+			}
 			alert = true
+			// The errors belong to the Health page; the indexers themselves are
+			// configured in Integrations.
+			indexerHref = "/?view=health"
+			indexerLabel = tr("Errori indexer")
+			indexerHint = tr("Apri Salute per i dettagli dell'ultimo ciclo. Gli indexer si configurano in Integrazioni.")
 		} else {
 			indexerStatus = tr("ultimo ciclo: ok")
 		}
@@ -198,9 +210,9 @@ func v2SourcesIndexFrom(s *AppState, cfg *Config) *v2SourcesIndex {
 		Hint:  tr("Qui si aprono le aree delle fonti; i controlli restano nelle loro pagine."),
 		Links: []v2SourcesLink{
 			{
-				Label:  tr("Indexer e manager"),
-				Href:   "/?view=integrations",
-				Hint:   tr("Jackett, Prowlarr e FlareSolverr."),
+				Label:  indexerLabel,
+				Href:   indexerHref,
+				Hint:   indexerHint,
 				Status: indexerStatus,
 				Alert:  alert,
 			},

@@ -1442,6 +1442,56 @@ func TestV2ActionFlash(t *testing.T) {
 	if isErr || message == "" {
 		t.Fatalf("generic success -> %q err=%v", message, isErr)
 	}
+	message, isErr = v2ActionFlash("/api/backup", []byte(`{"ok":true,"path":"/data/backups/x.zip"}`), http.StatusOK)
+	if isErr || message != "Backup creato" {
+		t.Fatalf("backup success -> %q err=%v", message, isErr)
+	}
+}
+
+// TestV2BackupButtonsAnnounceWork guards the Maintenance → Backup controls:
+// they say they are working before the slow request finishes, and the one in
+// the table footer reloads the Maintenance page instead of its internal table
+// id (which used to end up in the page title).
+func TestV2BackupButtonsAnnounceWork(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=maintenance", nil)
+	if code != http.StatusOK {
+		t.Fatalf("maintenance page -> %d", code)
+	}
+	for _, want := range []string{
+		`data-v2-toast-title="Backup"`,
+		`data-v2-toast-message="Backup in corso..."`,
+		`hx-disabled-elt="this"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("maintenance page missing %q", want)
+		}
+	}
+	if strings.Contains(body, `name="view" value="maintenance-t0"`) {
+		t.Fatal("the backup table footer must reload the Maintenance view, not maintenance-t0")
+	}
+	if !strings.Contains(body, `name="view" value="maintenance"`) {
+		t.Fatal("the backup table footer button must carry the Maintenance view")
+	}
+
+	// The Verify action lives in the rows, so it is rendered by v2RenderAction
+	// and only appears when backups exist.
+	verify := v2RenderAction("maintenance-t0", map[string]any{"name": "x.zip"}, uiAction{
+		Label: "Verifica", Method: "POST", Path: "/api/backup/verify", Body: `{"name":"{name}"}`,
+		ToastTitle: "Backup", ToastMessage: "Verifica dell'archivio di backup in corso...",
+	}, uiTableSpec{})
+	for _, want := range []string{
+		`data-v2-toast-title="Backup"`,
+		`data-v2-toast-message="Verifica dell&#39;archivio di backup in corso..."`,
+		`hx-disabled-elt="this"`,
+	} {
+		if !strings.Contains(verify, want) {
+			t.Fatalf("verify action missing %q: %s", want, verify)
+		}
+	}
 }
 
 // TestV2MaintenanceTrashActionAndFlash checks the Pulisci trash action empties

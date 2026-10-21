@@ -37,6 +37,9 @@ type uiAction struct {
 	// Icon, when set, is shown instead of the label (which becomes the tooltip
 	// and the accessible name): compact action columns on dense tables.
 	Icon string `json:"icon,omitempty"`
+	// ToastTitle/ToastMessage announce a slow action as soon as it starts.
+	ToastTitle   string `json:"toast_title,omitempty"`
+	ToastMessage string `json:"toast_message,omitempty"`
 }
 
 type uiTableSpec struct {
@@ -88,6 +91,11 @@ type uiActionButton struct {
 	Body    string
 	Confirm string
 	Hint    string
+	// ToastTitle/ToastMessage are shown the moment the request starts, so a
+	// slow action (a backup, an archive check) says it is working before the
+	// result arrives.
+	ToastTitle   string
+	ToastMessage string
 }
 
 type uiActionSection struct {

@@ -2436,7 +2436,7 @@ Key") instead of the bare HTTP code.
 
 | Item | What it does |
 |---|---|
-| Backup now | Immediately creates a backup archive, without waiting for the interval or the scheduled time. The same command is in Quick actions. |
+| Backup now | Immediately creates a backup archive, without waiting for the interval or the scheduled time. The same command is in Quick actions. While it works it shows a notice and stays disabled. |
 | Save settings | Saves the backup settings of this section (retention, schedule, FTP, cloud folder, extra paths, Telegram): it does not create an archive. |
 | Backups to keep | Number of local ZIP files to keep in the `backups` folder. |
 | Interval (hours) | Automatic backup interval in hours (0 disables the interval). |
@@ -2449,4 +2449,4 @@ Key") instead of the bare HTTP code.
 | Files and folders to include | Absolute paths of files or folders to add to the ZIP (one per line). They end up in the archive's `extra/` folder with their original path; paths that no longer exist are skipped. |
 | Send to Telegram | Sends a copy to Telegram using the configured bot. |
 | Test FTP | Checks connection, login, remote path, a test upload and removal. |
-| Available backups / Verify | Table of snapshots with label, name, size and date; the Verify button checks the archive. |
+| Available backups / Verify | Table of snapshots with label, name, size and date; the Verify button checks the archive, shows a notice while it works and confirms when the ZIP is intact. |

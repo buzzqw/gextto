@@ -19,7 +19,16 @@ manual is online: [English](docs/MANUAL.en.md) ·
   backup*: it saves retention, schedule, FTP, cloud folder, extra paths and
   Telegram without creating any archive. To create a backup right away use
   **Backup now**, now also below the backups table (as well as in Quick
-  actions).
+  actions). **Backup now** and **Verify** say they are working as soon as they
+  start, stay disabled until the operation finishes, and then report whether
+  the backup was created or the archive is intact. Fixed as well the internal
+  `maintenance-t0` name that could show up in the page title after an action
+  started from the backups table.
+- **Configuration → Your sources: indexer errors open Health.** When the last
+  cycle had errors, the entry becomes **Indexer errors** and opens **Health**
+  with the details, instead of indexer management (which stays under
+  **Integrations**). Fixed as well the wording for a single error, now «1
+  error» instead of «1 errors».
 - **eD2k and Kad: aMule folders in plain sight.** In **Configuration → eD2k
   and Kad** you now see aMule's incoming (download) and temporary folders,
   read-only. The tooltip explains that they are changed in aMule/amuled and

@@ -371,6 +371,8 @@ spa:
   Backup disponibili: Copias de seguridad disponibles
   Backup giornaliero alle (HH:MM, vuoto = disattivo): Copia de seguridad diaria a las (HH:MM, en blanco = desactivado)
   Backup in corso...: Copia de seguridad en curso...
+  "Verifica dell'archivio di backup in corso...": "Comprobando el archivo de copia de seguridad..."
+  "Backup verificato: lo ZIP è leggibile e i file interni sono integri.": "Copia de seguridad verificada: el ZIP es legible y los archivos internos están intactos."
   Backup inviato su Telegram con successo!: ¡Copia de seguridad enviada a Telegram con éxito!
   Backup {label}: Copia de seguridad {label}
   Base: Base
@@ -5071,6 +5073,9 @@ spa:
   "%d attivi su %d configurati": "%d activos de %d configurados"
   "ultimo ciclo: %d errori": "último ciclo: %d errores"
   "ultimo ciclo: ok": "último ciclo: ok"
+  "ultimo ciclo: 1 errore": "último ciclo: 1 error"
+  "Errori indexer": "Errores de indexadores"
+  "Apri Salute per i dettagli dell'ultimo ciclo. Gli indexer si configurano in Integrazioni.": "Abre Salud para ver los detalles del último ciclo. Los indexadores se configuran en Integraciones."
   "Le tue fonti": "Tus fuentes"
   "Qui si aprono le tre aree delle fonti; i controlli restano nelle loro pagine.": "Las tres áreas de fuentes se abren desde aquí; los controles siguen en sus páginas."
   "Indexer e manager": "Indexadores y gestor"

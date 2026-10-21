@@ -380,6 +380,8 @@ deu:
   Backup disponibili: Backups verfügbar
   Backup giornaliero alle (HH:MM, vuoto = disattivo): Tägliches Backup um (HH:MM, leer = aus)
   Backup in corso...: Backup läuft...
+  "Verifica dell'archivio di backup in corso...": "Backup-Archiv wird geprüft..."
+  "Backup verificato: lo ZIP è leggibile e i file interni sono integri.": "Backup geprüft: Die ZIP-Datei ist lesbar und die enthaltenen Dateien sind intakt."
   Backup inviato su Telegram con successo!: Backup erfolgreich an Telegram gesendet!
   Backup {label}: Sicherung {label}
   Base: Basis
@@ -5124,6 +5126,9 @@ deu:
   "%d attivi su %d configurati": "%d aktiv von %d konfiguriert"
   "ultimo ciclo: %d errori": "letzter Zyklus: %d Fehler"
   "ultimo ciclo: ok": "letzter Zyklus: ok"
+  "ultimo ciclo: 1 errore": "letzter Zyklus: 1 Fehler"
+  "Errori indexer": "Indexer-Fehler"
+  "Apri Salute per i dettagli dell'ultimo ciclo. Gli indexer si configurano in Integrazioni.": "Öffne Gesundheit für die Details des letzten Zyklus. Indexer werden in Integrationen konfiguriert."
   "Le tue fonti": "Deine Quellen"
   "Qui si aprono le tre aree delle fonti; i controlli restano nelle loro pagine.": "Von hier öffnen sich die drei Quellenbereiche; die Steuerelemente bleiben auf ihren Seiten."
   "Indexer e manager": "Indexer und Manager"

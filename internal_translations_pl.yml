@@ -370,6 +370,8 @@ pol:
   Backup disponibili: Dostępne kopie zapasowe
   Backup giornaliero alle (HH:MM, vuoto = disattivo): Codzienna kopia zapasowa o (GG:MM, puste = wyłączone)
   Backup in corso...: Tworzenie kopii zapasowej...
+  "Verifica dell'archivio di backup in corso...": "Sprawdzanie archiwum kopii zapasowej..."
+  "Backup verificato: lo ZIP è leggibile e i file interni sono integri.": "Kopia zapasowa sprawdzona: plik ZIP jest czytelny, a pliki wewnątrz są nienaruszone."
   Backup inviato su Telegram con successo!: Kopia zapasowa została pomyślnie wysłana do Telegramu!
   Backup {label}: Kopia zapasowa {label}
   Base: Baza
@@ -5065,6 +5067,9 @@ pol:
   "%d attivi su %d configurati": "%d aktywnych z %d skonfigurowanych"
   "ultimo ciclo: %d errori": "ostatni cykl: %d błędów"
   "ultimo ciclo: ok": "ostatni cykl: ok"
+  "ultimo ciclo: 1 errore": "ostatni cykl: 1 błąd"
+  "Errori indexer": "Błędy indekserów"
+  "Apri Salute per i dettagli dell'ultimo ciclo. Gli indexer si configurano in Integrazioni.": "Otwórz Zdrowie, aby zobaczyć szczegóły ostatniego cyklu. Indeksery konfiguruje się w Integracjach."
   "Le tue fonti": "Twoje źródła"
   "Qui si aprono le tre aree delle fonti; i controlli restano nelle loro pagine.": "Trzy obszary źródeł otwierają się tutaj; elementy sterujące pozostają na swoich stronach."
   "Indexer e manager": "Indeksery i menedżer"

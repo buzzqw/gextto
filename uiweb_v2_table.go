@@ -988,6 +988,14 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 	if action.Confirm != "" {
 		attrs += ` hx-confirm="` + stdhtml.EscapeString(action.Confirm) + `"`
 	}
+	if action.ToastMessage != "" {
+		title := action.ToastTitle
+		if title == "" {
+			title = "Operazione"
+		}
+		attrs += ` data-v2-toast-title="` + stdhtml.EscapeString(title) + `" data-v2-toast-message="` + stdhtml.EscapeString(action.ToastMessage) + `"`
+	}
+	attrs += ` hx-disabled-elt="this"`
 	inner, extra, class, _ := v2ActionInner(action)
 	if action.Class != "" {
 		class += " " + stdhtml.EscapeString(action.Class)
@@ -1106,6 +1114,10 @@ func V2TableAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 		case strings.HasPrefix(path, "/api/blocklist/"):
 			if status >= 200 && status < 300 {
 				notice = &v2ActionNotice{Title: "Blocklist", Message: "Elemento rimosso dalla blocklist."}
+			}
+		case path == "/api/backup/verify":
+			if status >= 200 && status < 300 {
+				notice = &v2ActionNotice{Title: "Backup", Message: "Backup verificato: lo ZIP è leggibile e i file interni sono integri."}
 			}
 		default:
 			if status >= 400 {

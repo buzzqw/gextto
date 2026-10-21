@@ -20,7 +20,16 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   e non più *Salva backup*: salva conservazione, programmazione, FTP, cartella
   cloud, percorsi extra e Telegram, senza creare nessun archivio. Per creare un
   backup al volo c'è **Backup ora**, ora presente anche sotto la tabella dei
-  backup (oltre che tra le Azioni rapide).
+  backup (oltre che tra le Azioni rapide). **Backup ora** e **Verifica** avvisano
+  subito che stanno lavorando, si disattivano finché l'operazione non finisce e
+  al termine dicono se il backup è stato creato o se l'archivio è integro.
+  Corretto anche il nome interno `maintenance-t0` che poteva comparire nel
+  titolo della pagina dopo un'azione avviata dalla tabella dei backup.
+- **Configurazione → Le tue fonti: gli errori degli indexer portano a Salute.**
+  Quando l'ultimo ciclo ha avuto errori, la voce della lista diventa **Errori
+  indexer** e apre **Salute** con i dettagli, invece della gestione degli
+  indexer (che resta in **Integrazioni**). Corretto anche il testo per un solo
+  errore, che ora dice «1 errore» e non «1 errori».
 - **eD2k e Kad: cartelle di aMule in chiaro.** In **Configurazione → eD2k e
   Kad** ora vedi la cartella di download (incoming) e quella temporanea usate
   da aMule, in sola lettura. Il tooltip spiega che si cambiano da

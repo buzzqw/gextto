@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // The three reference examples are scored with the live weights: moving a
@@ -92,6 +94,38 @@ func TestSettingsSearchFindsProwlarr(t *testing.T) {
 	code, body := v2Request(t, server, http.MethodGet, "/settings/search?q=prowlarr", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Indexer e manager") {
 		t.Fatalf("searching Prowlarr -> %d: %s", code, body)
+	}
+}
+
+// TestSourcesIndexLinksIndexerErrorsToHealth checks that a failed last cycle
+// sends the indexer entry point to Health (where the errors are) instead of
+// Integrations, and that a single failure is not called "1 errori".
+func TestSourcesIndexLinksIndexerErrorsToHealth(t *testing.T) {
+	state := newTestAppState(t)
+	if err := state.db.SaveCycle(&models.CycleStats{
+		Sources: []models.CycleSourceStat{{Kind: "indexer", Name: "Jackett", Fail: 1, LastError: "timeout"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=sources", nil)
+	if code != http.StatusOK {
+		t.Fatalf("sources tab -> %d", code)
+	}
+	for _, want := range []string{
+		"Errori indexer",
+		`href="/?view=health"`,
+		"Apri Salute per i dettagli",
+		"ultimo ciclo: 1 errore",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("sources entry point missing %q", want)
+		}
+	}
+	if !strings.Contains(body, `href="/?view=health"`) || !strings.Contains(body, `>Errori indexer</a>`) {
+		t.Fatal("with indexer errors the entry point must open Health, not Integrations")
 	}
 }
 

@@ -379,6 +379,8 @@ fra:
   Backup disponibili: Sauvegarde disponible
   Backup giornaliero alle (HH:MM, vuoto = disattivo): Sauvegarde quotidienne à (HH :MM, vide = désactivé)
   Backup in corso...: Sauvegarde en cours...
+  "Verifica dell'archivio di backup in corso...": "Vérification de l'archive de sauvegarde en cours..."
+  "Backup verificato: lo ZIP è leggibile e i file interni sono integri.": "Sauvegarde vérifiée : le ZIP est lisible et les fichiers internes sont intacts."
   Backup inviato su Telegram con successo!: Sauvegarde envoyée sur Telegram avec succès!
   Backup {label}: Sauvegarde {label}
   Base: Base
@@ -5117,6 +5119,9 @@ fra:
   "%d attivi su %d configurati": "%d actifs sur %d configurés"
   "ultimo ciclo: %d errori": "dernier cycle : %d erreurs"
   "ultimo ciclo: ok": "dernier cycle : ok"
+  "ultimo ciclo: 1 errore": "dernier cycle : 1 erreur"
+  "Errori indexer": "Erreurs des indexeurs"
+  "Apri Salute per i dettagli dell'ultimo ciclo. Gli indexer si configurano in Integrazioni.": "Ouvrez Santé pour les détails du dernier cycle. Les indexeurs se configurent dans Intégrations."
   "Le tue fonti": "Vos sources"
   "Qui si aprono le tre aree delle fonti; i controlli restano nelle loro pagine.": "Les trois espaces de sources s'ouvrent ici ; les contrôles restent sur leurs pages."
   "Indexer e manager": "Indexeurs et gestionnaire"

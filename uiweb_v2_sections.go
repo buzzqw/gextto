@@ -275,6 +275,9 @@ func v2ActionFlash(path string, raw []byte, status int) (string, bool) {
 			return fmt.Sprintf("Ricerca completata: %d risultati tra %d episodi mancanti.", len(payload.Results), len(payload.Episodes)), false
 		}
 	}
+	if path == "/api/backup" {
+		return "Backup creato", false
+	}
 	if path == "/api/maintenance/clean-trash" {
 		var payload struct {
 			Files int `json:"files"`

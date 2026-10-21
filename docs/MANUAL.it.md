@@ -2503,7 +2503,7 @@ Key») invece del solo codice HTTP.
 
 | Voce | Cosa fa |
 |---|---|
-| Backup ora | Crea subito un archivio di backup, senza aspettare l'intervallo o l'orario programmato. Lo stesso comando è tra le Azioni rapide. |
+| Backup ora | Crea subito un archivio di backup, senza aspettare l'intervallo o l'orario programmato. Lo stesso comando è tra le Azioni rapide. Mentre lavora mostra un avviso e resta disattivato. |
 | Salva impostazioni | Salva le impostazioni di backup della sezione (conservazione, programmazione, FTP, cartella cloud, percorsi extra, Telegram): non crea nessun archivio. |
 | Backup da conservare | Numero di file ZIP locali da conservare nella cartella `backups`. |
 | Intervallo (ore) | Intervallo del backup automatico in ore (0 disattiva l'intervallo). |
@@ -2516,4 +2516,4 @@ Key») invece del solo codice HTTP.
 | File e cartelle da includere | Percorsi assoluti di file o cartelle da aggiungere allo ZIP (uno per riga). Finiscono nella cartella `extra/` dell'archivio, con il loro percorso originale; i percorsi che non esistono più vengono saltati. |
 | Invia su Telegram | Invia una copia su Telegram usando il bot configurato. |
 | Test FTP | Verifica connessione, login, percorso remoto, upload di prova e rimozione. |
-| Backup disponibili / Verifica | Tabella degli snapshot con etichetta, nome, dimensione e data; il pulsante Verifica controlla l'archivio. |
+| Backup disponibili / Verifica | Tabella degli snapshot con etichetta, nome, dimensione e data; il pulsante Verifica controlla l'archivio, avvisa mentre lavora e conferma quando lo ZIP è integro. |

@@ -1967,7 +1967,7 @@
        {{if or .FooterForm .FooterActions}}
        <div class="table-panel-footer">
          {{if .FooterForm}}{{template "v2_table_footer_form" .}}{{end}}
-         {{if .FooterActions}}<div class="form-actions">{{range .FooterActions}}{{template "v2_button" (dict "View" $.View "Path" .Path "Method" .Method "Body" .Body "Label" .Label "Class" .Class "Confirm" .Confirm "Hint" .Hint)}}{{end}}</div>{{end}}
+         {{if .FooterActions}}<div class="form-actions">{{range .FooterActions}}{{template "v2_button" (dict "View" $.FooterView "Path" .Path "Method" .Method "Body" .Body "Label" .Label "Class" .Class "Confirm" .Confirm "Hint" .Hint "ToastTitle" .ToastTitle "ToastMessage" .ToastMessage)}}{{end}}</div>{{end}}
        </div>
        {{end}}
     </div>
@@ -2752,7 +2752,7 @@
   <input type="hidden" name="path" value="{{.Path}}">
   <input type="hidden" name="method" value="{{.Method}}">
   <input type="hidden" name="body" value="{{.Body}}">
-  <button class="btn sm {{.Class}}" type="submit" title="{{if .Hint}}{{.Hint}}{{else}}{{.Label}}{{end}}"{{if .Confirm}} hx-confirm="{{.Confirm}}"{{end}}>{{.Label}}</button>
+  <button class="btn sm {{.Class}}" type="submit" title="{{if .Hint}}{{.Hint}}{{else}}{{.Label}}{{end}}"{{if .Confirm}} hx-confirm="{{.Confirm}}"{{end}}{{if .ToastMessage}} data-v2-toast-title="{{if .ToastTitle}}{{.ToastTitle}}{{else}}Operazione{{end}}" data-v2-toast-message="{{.ToastMessage}}"{{end}} hx-disabled-elt="this">{{.Label}}</button>
 </form>
 {{end}}
 

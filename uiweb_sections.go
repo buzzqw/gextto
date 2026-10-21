@@ -420,7 +420,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 	}
 	return []uiPageSection{
 		sectionActions(uiActionSection{Label: "Azioni", Hint: "Operazioni di manutenzione del daemon e della libreria.", Buttons: []uiActionButton{
-			{Label: "Backup ora", Class: "primary", Method: "POST", Path: "/api/backup", Body: "{}", Confirm: "Creare ora uno snapshot di backup dei database?", Hint: "Crea subito uno snapshot di backup dei database."},
+			{Label: "Backup ora", Class: "primary", Method: "POST", Path: "/api/backup", Body: "{}", Confirm: "Creare ora uno snapshot di backup dei database?", Hint: "Crea subito uno snapshot di backup dei database.", ToastTitle: "Backup", ToastMessage: "Backup in corso..."},
 			{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: `{"force":true}`, Confirm: "Eliminare definitivamente tutti gli elementi nel cestino?", Hint: "Svuota completamente il cestino. La conservazione automatica (trash_retention_days) non si applica a questa azione manuale."},
 			{Label: "Ricalcola punteggi", Method: "POST", Path: "/api/database/rescore", Body: "{}", Confirm: "Ricalcolare i punteggi delle release archiviate con i pesi attuali?", Hint: "Ricalcola lo score delle release archiviate con i pesi attuali."},
 			{Label: "Scansiona archivi", Method: "POST", Path: "/api/scan-all-archives", Body: "{}", Confirm: "Rileggere le cartelle archivio e aggiornare la libreria?", Hint: "Rilegge le cartelle archivio e aggiorna la libreria."},
@@ -472,9 +472,9 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 			}),
 			Empty: "Nessun backup creato.", Note: "Nome mostra il percorso completo del file ZIP. I backup locali vengono creati nella cartella backups della directory dati.",
 			ActionsJSON: uiJSON([]uiAction{
-				{Label: "Verifica", Class: "secondary", Method: "POST", Path: "/api/backup/verify", Body: `{"name":"{name}"}`},
+				{Label: "Verifica", Class: "secondary", Method: "POST", Path: "/api/backup/verify", Body: `{"name":"{name}"}`, ToastTitle: "Backup", ToastMessage: "Verifica dell'archivio di backup in corso..."},
 			}),
-			FooterActions: []uiActionButton{{Label: "Backup ora", Class: "primary", Method: "POST", Path: "/api/backup", Body: "{}", Confirm: "Creare ora uno snapshot di backup dei database?", Hint: "Crea subito uno snapshot di backup dei database."}},
+			FooterActions: []uiActionButton{{Label: "Backup ora", Class: "primary", Method: "POST", Path: "/api/backup", Body: "{}", Confirm: "Creare ora uno snapshot di backup dei database?", Hint: "Crea subito uno snapshot di backup dei database.", ToastTitle: "Backup", ToastMessage: "Backup in corso..."}},
 		})),
 	}
 }
