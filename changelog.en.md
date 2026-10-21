@@ -55,7 +55,7 @@ manual is online: [English](docs/MANUAL.en.md) ·
   make room for the queued ones, CPU stays low and the speed does not drop.
   Every change goes to the log («automatic peer cap: 55 connections per
   torrent …», «peer cap for …»), so it is clear why the number moved. Under
-  **Settings → Performance → Connections** there is **Automatic connections
+  **Configuration → Queues and performance → Connections** there is **Automatic connections
   (sized from the machine)**, on by default; **Max connections per torrent**
   stays the ceiling (-1 = no ceiling) and a limit chosen in a single torrent's
   *Limits* tab always wins. The same option is on the gx-torrent daemon page
@@ -74,7 +74,7 @@ manual is online: [English](docs/MANUAL.en.md) ·
   legitimate addresses: it no longer blocks whole provider or hosting ranges
   such as `158.173.0.0/16`, which also stopped available peers. Anyone who has
   already set a different URL keeps it; to switch to the new list, paste it in
-  **Settings → Network → IP filter (file/URL)** and press **Load / update now**.
+  **Configuration → Speed and network → Encryption and IP filter**, field **IP filter (file/URL)**, and press **Load / update now**.
 - **Maintenance: an SQL tab for the release Archive, with a language
   selector.** Under **Maintenance** there is now the **Archive SQL
   maintenance** tab: a selector at the top chooses the language for the

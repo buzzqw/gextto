@@ -56,7 +56,7 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   inutili lasciano il posto a quelle in coda, la CPU resta bassa e la velocità
   non cala. Ogni cambiamento finisce nel log («automatic peer cap: 55
   connections per torrent …», «peer cap for …»), così si vede perché il numero
-  si è mosso. In **Impostazioni → Prestazioni → Connessioni** c'è **Connessioni
+  si è mosso. In **Configurazione → Code e prestazioni → Connessioni** c'è **Connessioni
   automatiche (in base alla macchina)**, attiva di default; **Connessioni max
   per torrent** resta il tetto massimo (-1 = nessun tetto) e un limite scelto
   nella scheda *Limiti* di un singolo torrent ha sempre la precedenza. La stessa
@@ -76,7 +76,7 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   indirizzi legittimi: non contiene più blocchi di interi provider o hosting
   come `158.173.0.0/16`, che fermavano anche peer disponibili. Chi ha già
   impostato un URL diverso lo mantiene; per passare alla nuova lista basta
-  incollarlo in **Impostazioni → Rete → IP filter (file/URL)** e premere
+  incollarlo in **Configurazione → Velocità e rete → Cifratura e filtro IP**, campo **IP filter (file/URL)**, e premere
   **Carica / aggiorna ora**.
 - **Manutenzione: tab SQL per l'Archivio release, con scelta della lingua.**
   In **Manutenzione** c'è il tab **Manutenzione SQL dell'archivio**: un
