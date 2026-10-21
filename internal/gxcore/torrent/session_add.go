@@ -21,6 +21,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resumer/boltdbresumer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/webseedsource"
+	bencode "github.com/jackpal/bencode-go"
 )
 
 // AddTorrentOptions tunes one added torrent.
@@ -539,28 +540,48 @@ func (s *Session) ResolveDHTFeed(pub ed25519.PublicKey, salt []byte, seq *int64,
 // PublishDHTFeed signs and publishes a BEP 46 feed: the value lists the given
 // torrents ({"items": [{"ih": ..., "name": ...}]}), the DHT item is addressed
 // by the signer's public key and salt. seq must be greater than the last
-// published sequence. It is the publisher side of ResolveDHTFeed.
-func (s *Session) PublishDHTFeed(priv ed25519.PrivateKey, seq int64, name string, items []DHTFeedItem, salt []byte, timeout time.Duration) ([20]byte, error) {
+// published sequence. One BEP 44 item is capped at 1000 bytes, so the tail of
+// the list is dropped when needed; kept says how many entries were published.
+// It is the publisher side of ResolveDHTFeed.
+func (s *Session) PublishDHTFeed(priv ed25519.PrivateKey, seq int64, name string, items []DHTFeedItem, salt []byte, timeout time.Duration) ([20]byte, int, error) {
 	if s.dht == nil {
-		return [20]byte{}, errors.New("the DHT is disabled")
+		return [20]byte{}, 0, errors.New("the DHT is disabled")
 	}
 	if len(priv) != ed25519.PrivateKeySize {
-		return [20]byte{}, errors.New("BEP 46: invalid ed25519 private key")
+		return [20]byte{}, 0, errors.New("BEP 46: invalid ed25519 private key")
 	}
 	if len(salt) > 64 {
-		return [20]byte{}, errors.New("BEP 46: the salt is longer than 64 bytes")
+		return [20]byte{}, 0, errors.New("BEP 46: the salt is longer than 64 bytes")
 	}
 	if seq < 0 {
-		return [20]byte{}, errors.New("BEP 46: the sequence must not be negative")
+		return [20]byte{}, 0, errors.New("BEP 46: the sequence must not be negative")
 	}
 	if timeout <= 0 {
 		timeout = bep46ResolveTimeout
 	}
+	items = trimDHTFeed(name, items)
+	if len(items) == 0 {
+		return [20]byte{}, 0, errors.New("BEP 46: the feed does not fit in one BEP 44 item")
+	}
+	value := bep46FeedValue(name, items)
+	target, err := s.dht.PublishMutable(priv, seq, value, salt, timeout)
+	if err != nil {
+		return target, len(items), fmt.Errorf("BEP 46: cannot publish the DHT feed: %w", err)
+	}
+	return target, len(items), nil
+}
+
+// bep46FeedMaxValue is BEP 44's ceiling for a mutable item. A feed is a
+// single item, so a long list is trimmed to the last entry that fits instead
+// of failing the whole publish.
+const bep46FeedMaxValue = 1000
+
+func bep46FeedValue(name string, items []DHTFeedItem) map[string]interface{} {
 	entries := make([]interface{}, 0, len(items))
 	for _, it := range items {
 		entry := map[string]interface{}{"ih": it.InfoHash[:]}
-		if name := strings.TrimSpace(it.Name); name != "" {
-			entry["name"] = name
+		if n := strings.TrimSpace(it.Name); n != "" {
+			entry["name"] = n
 		}
 		entries = append(entries, entry)
 	}
@@ -568,13 +589,23 @@ func (s *Session) PublishDHTFeed(priv ed25519.PrivateKey, seq int64, name string
 	if name = strings.TrimSpace(name); name != "" {
 		value["name"] = name
 	}
-	target, err := s.dht.PublishMutable(priv, seq, value, salt, timeout)
-	if err != nil {
-		return target, fmt.Errorf("BEP 46: cannot publish the DHT feed: %w", err)
-	}
-	return target, nil
+	return value
 }
 
+// trimDHTFeed removes entries from the tail until the encoded value fits BEP
+// 44. It is deterministic, so the first entries (the order the caller chose)
+// win.
+func trimDHTFeed(name string, items []DHTFeedItem) []DHTFeedItem {
+	for len(items) > 0 {
+		var buf bytes.Buffer
+		err := bencode.Marshal(&buf, bep46FeedValue(name, items))
+		if err != nil || buf.Len() <= bep46FeedMaxValue {
+			return items
+		}
+		items = items[:len(items)-1]
+	}
+	return nil
+}
 
 func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto storage.Storage, err error) {
 	port, err = s.getPort()

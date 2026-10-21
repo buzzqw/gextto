@@ -70,7 +70,8 @@ func dhtFeedItemsFromTorrents(all []*torrent.Torrent, hashes []string) ([]torren
 		if h == "" {
 			continue
 		}
-		if len(h) != 40 {
+		raw, err := hex.DecodeString(h)
+		if err != nil || len(raw) != 20 {
 			return nil, fmt.Errorf("invalid info hash %q", h)
 		}
 		wanted[h] = true
@@ -98,6 +99,8 @@ func (d *Daemon) publishDHTFeed(name string, hashes []string) (string, int64, er
 	if d.session == nil {
 		return "", 0, errors.New("the torrent session is not ready")
 	}
+	d.dhtFeedMu.Lock()
+	defer d.dhtFeedMu.Unlock()
 	priv, pub, err := d.dhtFeedKey()
 	if err != nil {
 		return "", 0, err
@@ -106,45 +109,65 @@ func (d *Daemon) publishDHTFeed(name string, hashes []string) (string, int64, er
 	if err != nil {
 		return "", 0, err
 	}
-	d.dhtFeedMu.Lock()
-	defer d.dhtFeedMu.Unlock()
 	seq := int64(1)
 	if raw := strings.TrimSpace(d.opts.Settings.Get(dhtFeedSeqSetting, "")); raw != "" {
 		if n, err := strconv.ParseInt(raw, 10, 64); err == nil && n >= 0 {
 			seq = n + 1
 		}
 	}
-	if _, err := d.session.PublishDHTFeed(priv, seq, name, items, nil, dhtFeedPublishTTL); err != nil {
+	_, kept, err := d.session.PublishDHTFeed(priv, seq, name, items, nil, dhtFeedPublishTTL)
+	if err != nil {
 		return "", 0, err
 	}
+	if kept < len(items) {
+		logf("DHT feed: %d of %d entries fit in one BEP 44 item; the tail was left out", kept, len(items))
+	}
 	d.opts.Settings.Set(dhtFeedSeqSetting, strconv.FormatInt(seq, 10))
-	_ = d.opts.Settings.Save()
+	if err := d.opts.Settings.Save(); err != nil {
+		// The feed is already on the DHT; a lost sequence only means the next
+		// publish may reuse this number, so report it in the log, not as a
+		// publish failure.
+		logf("DHT feed: cannot save the sequence: %v", err)
+	}
 	return dhtFeedURL(pub), seq, nil
+}
+
+// dhtFeedPublishParams reads the feed name and the optional hash list from a
+// JSON body (the API and the page use it) or from a form/query. Empty hashes
+// mean every torrent of the session.
+func dhtFeedPublishParams(w http.ResponseWriter, r *http.Request) (string, []string, error) {
+	var name string
+	var hashes []string
+	if r.Method == http.MethodPost && strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
+		var body struct {
+			Name   string   `json:"name"`
+			Hashes []string `json:"hashes"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil {
+			return "", nil, errors.New("invalid JSON body")
+		}
+		name, hashes = strings.TrimSpace(body.Name), body.Hashes
+	} else {
+		_ = r.ParseForm()
+		name = strings.TrimSpace(r.FormValue("name"))
+		hashes = r.Form["hash"]
+		if len(hashes) == 0 {
+			hashes = strings.Split(strings.TrimSpace(r.FormValue("hashes")), ",")
+		}
+	}
+	if name == "" {
+		name = "gx-torrent feed"
+	}
+	return name, hashes, nil
 }
 
 // handlePublishDHTFeed serves GET /api/v1/dht-feed/publish?name=…[&hash=…] and
 // POST /api/v1/dht-feed/publish with {"name":"…","hashes":["…"]}.
 func (d *Daemon) handlePublishDHTFeed(w http.ResponseWriter, r *http.Request) {
-	name := strings.TrimSpace(r.URL.Query().Get("name"))
-	var hashes []string
-	if r.Method == http.MethodPost {
-		var body struct {
-			Name   string   `json:"name"`
-			Hashes []string `json:"hashes"`
-		}
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil && !errors.Is(err, http.ErrBodyReadAfterClose) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid JSON body"})
-			return
-		}
-		if strings.TrimSpace(body.Name) != "" {
-			name = strings.TrimSpace(body.Name)
-		}
-		hashes = body.Hashes
-	} else {
-		hashes = r.URL.Query()["hash"]
-	}
-	if name == "" {
-		name = "gx-torrent feed"
+	name, hashes, err := dhtFeedPublishParams(w, r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
 	}
 	url, seq, err := d.publishDHTFeed(name, hashes)
 	if err != nil {
@@ -157,14 +180,10 @@ func (d *Daemon) handlePublishDHTFeed(w http.ResponseWriter, r *http.Request) {
 // handleUIPublishDHTFeed publishes the selected torrents (or all of them) from
 // the standalone page: POST /ui/dht-feed/publish.
 func (d *Daemon) handleUIPublishDHTFeed(w http.ResponseWriter, r *http.Request) {
-	_ = r.ParseForm()
-	hashes := r.Form["hash"]
-	if len(hashes) == 0 {
-		hashes = strings.Split(strings.TrimSpace(r.FormValue("hashes")), ",")
-	}
-	name := strings.TrimSpace(r.FormValue("name"))
-	if name == "" {
-		name = "gx-torrent feed"
+	name, hashes, err := dhtFeedPublishParams(w, r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
 	}
 	url, _, err := d.publishDHTFeed(name, hashes)
 	if err != nil {

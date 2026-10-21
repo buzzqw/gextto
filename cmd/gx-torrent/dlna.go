@@ -886,6 +886,9 @@ type dlnaSearchHit struct {
 const (
 	dlnaSearchMaxDepth = 8
 	dlnaSearchMaxHits  = 20000
+	// dlnaSearchMaxDirs bounds the directory walk too: a library with a huge
+	// tree must not turn one Search into an unbounded scan.
+	dlnaSearchMaxDirs = 2000
 )
 
 // searchObject answers a ContentDirectory Search over the torrents and, when
@@ -897,6 +900,7 @@ func (s *dlnaServer) searchObject(lib *dlnaLibrary, containerID, criteria string
 	}
 	q := parseDLNASearch(criteria)
 	var hits []dlnaSearchHit
+	dirs := 0
 	addTorrents := func(hash string) {
 		for _, f := range lib.folders {
 			if hash != "" && f.hash != hash {
@@ -913,7 +917,7 @@ func (s *dlnaServer) searchObject(lib *dlnaLibrary, containerID, criteria string
 	case containerID == "" || containerID == dlnaRootID:
 		addTorrents("")
 		for n := range s.libRoots {
-			s.collectLibSearchHits(n, "", 0, q, &hits)
+			s.collectLibSearchHits(n, "", 0, q, &hits, &dirs)
 		}
 	case containerID == dlnaTorrentsID:
 		addTorrents("")
@@ -928,7 +932,7 @@ func (s *dlnaServer) searchObject(lib *dlnaLibrary, containerID, criteria string
 		if !ok {
 			return "", 0, 0, dlnaNoSuchObject
 		}
-		s.collectLibSearchHits(n, rel, 0, q, &hits)
+		s.collectLibSearchHits(n, rel, 0, q, &hits, &dirs)
 	case strings.HasPrefix(containerID, "file:"):
 		// An item has no children.
 	default:
@@ -973,10 +977,11 @@ func (s *dlnaServer) searchObject(lib *dlnaLibrary, containerID, criteria string
 
 // collectLibSearchHits walks one library directory (bounded in depth and
 // size) and appends the playable files that match.
-func (s *dlnaServer) collectLibSearchHits(n int, rel string, depth int, q dlnaSearchQuery, out *[]dlnaSearchHit) {
-	if depth > dlnaSearchMaxDepth || len(*out) >= dlnaSearchMaxHits {
+func (s *dlnaServer) collectLibSearchHits(n int, rel string, depth int, q dlnaSearchQuery, out *[]dlnaSearchHit, dirs *int) {
+	if depth > dlnaSearchMaxDepth || len(*out) >= dlnaSearchMaxHits || *dirs >= dlnaSearchMaxDirs {
 		return
 	}
+	*dirs++
 	listing, ok := s.readLibDir(n, rel)
 	if !ok {
 		return
@@ -987,7 +992,7 @@ func (s *dlnaServer) collectLibSearchHits(n int, rel string, depth int, q dlnaSe
 		}
 	}
 	for _, dir := range listing.dirs {
-		s.collectLibSearchHits(n, path.Join(rel, dir), depth+1, q, out)
+		s.collectLibSearchHits(n, path.Join(rel, dir), depth+1, q, out, dirs)
 	}
 }
 

@@ -19,6 +19,9 @@ func TestUIRowLimit(t *testing.T) {
 	if got := d.uiRowLimit(httptest.NewRequest(http.MethodGet, "/?rows=500", nil)); got != 500 {
 		t.Fatalf("rows=500 -> %d", got)
 	}
+	if got := d.uiRowLimit(httptest.NewRequest(http.MethodGet, "/?rows=all", nil)); got != 0 {
+		t.Fatalf("rows=all must mean the whole session, got %d", got)
+	}
 	if got := d.uiRowLimit(httptest.NewRequest(http.MethodGet, "/?rows=0", nil)); got != defaultUIRowLimit {
 		t.Fatalf("rows=0 must fall back to the default, got %d", got)
 	}

@@ -767,11 +767,13 @@ document.addEventListener('click',function(e){
   if(sw)setTimeout(function(){pushPrefs('theme');},0);
 });
 
-var state={selected:new Set(),anchor:null,filter:store.get('filter',{status:'all',cat:null,tag:null,tracker:null}),sort:store.get('sort',{key:'name',asc:true}),q:'',drawer:null,rows:window.__rows||0,collapsed:store.get('collapsed',{}),sbmore:false,allRows:[],viewRows:[],virtual:false,winStart:-1,winEnd:-1,rowH:0};
-if(state.filter.tracker===undefined)state.filter.tracker=null;
+var state={selected:new Set(),anchor:null,filter:Object.assign({status:'all',cat:null,tag:null,tracker:null},store.get('filter',{})),sort:store.get('sort',{key:'name',asc:true}),q:'',drawer:null,rows:window.__rows||0,collapsed:store.get('collapsed',{}),sbmore:false,allRows:[],viewRows:[],virtual:false,winStart:-1,winEnd:-1,winLen:0,rowH:0};
 // virtualMinRows is where the client-side window replaces the old 300-row
-// server cap: below it the simple full-DOM table is cheaper.
+// server cap: below it the simple full-DOM table is cheaper. The mobile
+// layout turns rows into CSS-grid cards and a spacer row would have no
+// height, so the window stays desktop-only.
 var virtualMinRows=500;
+function virtualAllowed(){return !(window.matchMedia&&window.matchMedia('(max-width:760px)').matches);}
 
 // ---------- server calls ----------
 function post(url,params){
@@ -787,6 +789,10 @@ function rows(){return $$('#torrents tbody tr');}
 function visibleRows(){return rows().filter(function(r){return !r.hidden;});}
 function rowOf(el){return el&&el.closest?el.closest('#torrents tbody tr'):null;}
 function rowByHash(h){return rows().find(function(r){return r.dataset.hash===h;});}
+function dataByHash(h){
+  if(state.virtual){return state.allRows.find(function(r){return r.Hash===h;})||null;}
+  var r=rowByHash(h);return r?{Name:r.dataset.name,Category:r.dataset.cat,Tags:r.dataset.tags,State:r.dataset.state}:null;
+}
 function selHashes(){return Array.from(state.selected);}
 function renderSelection(){
   rows().forEach(function(r){var on=state.selected.has(r.dataset.hash);r.setAttribute('aria-selected',on?'true':'false');var cb=$('.rowsel',r);if(cb)cb.checked=on;});
@@ -871,8 +877,10 @@ function applyDataView(force){
   state.winStart=-1;state.winEnd=-1;
   renderVirtual(!!force);
   filterChrome(view.length);
-  var known=new Set(state.allRows.map(function(r){return r.Hash;}));
-  state.selected.forEach(function(h){if(!known.has(h))state.selected.delete(h);});
+  // A selection follows what the filter shows: off-screen rows stay selected,
+  // rows hidden by the filter do not.
+  var shown=new Set(view.map(function(r){return r.Hash;}));
+  state.selected.forEach(function(h){if(!shown.has(h))state.selected.delete(h);});
   renderSelection();
 }
 // filterChrome updates the sidebar pressed states and the empty note from the
@@ -1048,6 +1056,7 @@ function captureTableChrome(){
 function updateTable(data){
   var rows=data.Rows||[];
   if(!rows.length||data.RowsLimited||!window.__thead){
+    state.virtual=false;state.allRows=[];state.viewRows=[];state.winStart=-1;state.winEnd=-1;state.winLen=0;
     return legacyTable();
   }
   var tb=$('#torrent-rows');
@@ -1057,7 +1066,7 @@ function updateTable(data){
   // 300-row window the table is virtualised client-side, so the DOM keeps
   // only the rows near the viewport. Small sessions keep the simple path.
   state.allRows=rows;
-  state.virtual=rows.length>virtualMinRows;
+  state.virtual=rows.length>virtualMinRows&&virtualAllowed();
   var more=$('#live .more-rows');if(more&&!data.RowsLimited)more.remove();
   if(!state.virtual){state.viewRows=rows;state.winStart=-1;state.winEnd=-1;tb.innerHTML=rows.map(rowHTML).join('');return Promise.resolve();}
   applyDataView(true);
@@ -1085,7 +1094,10 @@ function applyLive(frag){
 function refresh(){
   if(refreshing||document.hidden||pointerDown||resizing)return;refreshing=true;
   var active=document.activeElement,activeRow=rowOf(active),activeHash=activeRow&&activeRow.dataset.hash;
-  var rowsParam=state.rows?('?rows='+state.rows):'?rows=all';
+  // Desktop asks for the whole session and virtualises it; the mobile layout
+  // keeps the old paged window (300 rows + Show more), because a CSS-grid card
+  // cannot use the spacer rows the windowing relies on.
+  var rowsParam=state.rows?('?rows='+state.rows):(virtualAllowed()?'?rows=all':'');
   // The rows travel as JSON (small, no chrome rebuild); the filters, speeds
   // and status travel as HTML (server-translated). Both derive from the same
   // snapshot, so they never disagree.
@@ -1188,7 +1200,7 @@ function bulk(op,hashes){
   return post('/ui/bulk',f).then(function(res){report(res);refresh();});
 }
 function whatSelected(hashes){
-  if(hashes.length===1){var r=rowByHash(hashes[0]);return r?r.dataset.name:'';}
+  if(hashes.length===1){var r=dataByHash(hashes[0]);return r?r.Name:'';}
   return hashes.length+' '+t('torrents selected');
 }
 function askRemove(hashes){
@@ -1255,7 +1267,7 @@ function act(op,hashes){
     case 'details':openDetail(hashes[0]);break;
     case 'remove':askRemove(hashes);break;
     case 'magnet':copyMagnet(hashes[0]);break;
-    case 'copy-name':copyText(hashes.map(function(h){var r=rowByHash(h);return r?r.dataset.name:h;}).join('\n'),t('Copied'));break;
+    case 'copy-name':copyText(hashes.map(function(h){var r=dataByHash(h);return r?r.Name:h;}).join('\n'),t('Copied'));break;
     case 'copy-hash':copyText(hashes.join('\n'),t('Copied'));break;
     case 'export':window.location.href='/ui/torrent-file?hash='+encodeURIComponent(hashes[0]);break;
     case 'category':editCategory(hashes);break;
@@ -1699,7 +1711,7 @@ document.addEventListener('visibilitychange',function(){if(!document.hidden)refr
 // The engine pushes state changes on /ui/events: refresh at once instead of
 // waiting for the next poll. Piece events are too frequent to refresh on.
 try{var es=new EventSource('/ui/events');es.onmessage=function(m){try{var ev=JSON.parse(m.data);if(ev.type!=='torrent_piece')refresh();}catch(_){}};}catch(_){}
-window.gxShowMore=function(){state.rows=0;state.virtual=false;refresh();};
+window.gxShowMore=function(){if(virtualAllowed()){state.rows=0;state.virtual=false;}else{state.rows=(state.rows||300)*2;}refresh();};
 window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tracker:null};state.q='';var f=$('#filter');if(f)f.value='';store.set('filter',state.filter);applyFilters();};
 })();
 </script>
