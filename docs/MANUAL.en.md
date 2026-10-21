@@ -2436,6 +2436,8 @@ Key") instead of the bare HTTP code.
 
 | Item | What it does |
 |---|---|
+| Backup now | Immediately creates a backup archive, without waiting for the interval or the scheduled time. The same command is in Quick actions. |
+| Save settings | Saves the backup settings of this section (retention, schedule, FTP, cloud folder, extra paths, Telegram): it does not create an archive. |
 | Backups to keep | Number of local ZIP files to keep in the `backups` folder. |
 | Interval (hours) | Automatic backup interval in hours (0 disables the interval). |
 | Time (HH:MM) | Local daily time of the automatic backup; when set it takes precedence over the interval. |

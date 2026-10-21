@@ -42,7 +42,7 @@ test("dashboard and configuration areas are usable", async ({ page }) => {
   // back before moving on.
   await page.locator("[data-app-menu-toggle]").click();
   await nav(page, "Manutenzione").click();
-  await expect(page.getByRole("button", { name: "Backup ora" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Backup ora" }).first()).toBeVisible();
 
   // "Grafici"/"Attività" non sono più pagine a sé: i dati live sono in Salute/Log.
   await nav(page, "Salute").click();

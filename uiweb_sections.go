@@ -447,7 +447,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 		group("Backup", sectionForm(uiFormSection{
 			Title: "Impostazioni backup",
 			Hint:  "Il backup crea uno ZIP locale dei database. Puoi conservarne più copie, programmarlo a intervalli o a un orario preciso e inviarne una copia opzionale via FTP, in una cartella cloud locale sincronizzata o su Telegram. Lascia vuoti i collegamenti che non vuoi usare.",
-			Path:  "/api/backup/settings", Submit: "Salva backup", TestFTP: true,
+			Path:  "/api/backup/settings", Submit: "Salva impostazioni", TestFTP: true,
 			Fields: []uiFormField{
 				{Name: "backup_retention", Label: "Backup da conservare", Kind: "number", Value: settingsOr(cfg, "backup_retention", "5"), Hint: "Numero di file ZIP locali da conservare nella cartella backups; i più vecchi vengono eliminati quando ne viene creato uno nuovo."},
 				{Name: "backup_schedule_hours", Label: "Intervallo (ore)", Kind: "number", Value: settingsOr(cfg, "backup_schedule_hours", "0"), Hint: "Intervallo del backup automatico in ore. 0 disattiva l'intervallo; se imposti Orario, l'orario giornaliero ha la precedenza."},
@@ -474,6 +474,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 			ActionsJSON: uiJSON([]uiAction{
 				{Label: "Verifica", Class: "secondary", Method: "POST", Path: "/api/backup/verify", Body: `{"name":"{name}"}`},
 			}),
+			FooterActions: []uiActionButton{{Label: "Backup ora", Class: "primary", Method: "POST", Path: "/api/backup", Body: "{}", Confirm: "Creare ora uno snapshot di backup dei database?", Hint: "Crea subito uno snapshot di backup dei database."}},
 		})),
 	}
 }

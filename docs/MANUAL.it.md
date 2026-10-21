@@ -2503,6 +2503,8 @@ Key») invece del solo codice HTTP.
 
 | Voce | Cosa fa |
 |---|---|
+| Backup ora | Crea subito un archivio di backup, senza aspettare l'intervallo o l'orario programmato. Lo stesso comando è tra le Azioni rapide. |
+| Salva impostazioni | Salva le impostazioni di backup della sezione (conservazione, programmazione, FTP, cartella cloud, percorsi extra, Telegram): non crea nessun archivio. |
 | Backup da conservare | Numero di file ZIP locali da conservare nella cartella `backups`. |
 | Intervallo (ore) | Intervallo del backup automatico in ore (0 disattiva l'intervallo). |
 | Orario (HH:MM) | Orario locale giornaliero del backup automatico; se impostato ha la precedenza sull'intervallo. |

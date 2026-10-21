@@ -14,6 +14,12 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **Maintenance → Backup: no more confusion between saving and backing up.**
+  The button in the settings panel is now **Save settings** instead of *Save
+  backup*: it saves retention, schedule, FTP, cloud folder, extra paths and
+  Telegram without creating any archive. To create a backup right away use
+  **Backup now**, now also below the backups table (as well as in Quick
+  actions).
 - **eD2k and Kad: aMule folders in plain sight.** In **Configuration → eD2k
   and Kad** you now see aMule's incoming (download) and temporary folders,
   read-only. The tooltip explains that they are changed in aMule/amuled and

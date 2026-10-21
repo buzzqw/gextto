@@ -15,6 +15,12 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Manutenzione → Backup: meno confusione tra salvare e fare il backup.** Il
+  pulsante del pannello delle impostazioni ora si chiama **Salva impostazioni**
+  e non più *Salva backup*: salva conservazione, programmazione, FTP, cartella
+  cloud, percorsi extra e Telegram, senza creare nessun archivio. Per creare un
+  backup al volo c'è **Backup ora**, ora presente anche sotto la tabella dei
+  backup (oltre che tra le Azioni rapide).
 - **eD2k e Kad: cartelle di aMule in chiaro.** In **Configurazione → eD2k e
   Kad** ora vedi la cartella di download (incoming) e quella temporanea usate
   da aMule, in sola lettura. Il tooltip spiega che si cambiano da
