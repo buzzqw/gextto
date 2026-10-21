@@ -420,6 +420,17 @@ var uiAdvancedEditors = []uiListEditor{
 		},
 	},
 	{
+		Title: "Profili di qualità", Hint: "Un nome per ogni combinazione di qualità, lingua, sottotitoli ed esclusioni. I profili sono la lista che vede Jellyseerr (/api/v3/qualityprofile); le combinazioni già presenti nella libreria vengono aggiunte automaticamente.",
+		GetPath: "/api/quality-profiles", Unwrap: "items", PostPath: "/api/quality-profiles",
+		Fields: []uiListField{
+			{Name: "name", Label: "Nome", Kind: "text", Wide: true},
+			{Name: "quality", Label: "Qualità", Kind: "text", Placeholder: "es. 1080p"},
+			{Name: "language", Label: "Lingua", Kind: "text", Placeholder: "es. ita"},
+			{Name: "subtitle", Label: "Sottotitoli", Kind: "text"},
+			{Name: "exclude", Label: "Esclusioni", Kind: "text", Wide: true},
+		},
+	},
+	{
 		Title: "Cartelle osservate", Hint: "I .torrent trovati in queste cartelle vengono scaricati: il file viene letto e il suo contenuto aggiunto automaticamente alla sessione.",
 		GetPath: "/api/watched-folders", Unwrap: "items", PostPath: "/api/watched-folders",
 		Fields: []uiListField{
@@ -524,7 +535,7 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 	// values.
 	structured := map[string]struct{}{
 		"url": {}, "indexers": {}, "source_filters": {},
-		"tag_dir_rules": {}, "event_hooks": {}, "watched_folders": {},
+		"tag_dir_rules": {}, "event_hooks": {}, "watched_folders": {}, "quality_profiles": {},
 		seedRulesKey: {},
 		// Edited as checkbox groups (see uiSourcesCheckboxGroups).
 		"websearch_engines": {}, "content_filters": {},
@@ -939,7 +950,7 @@ var uiSchedSingleWindowKeys = map[string]bool{
 // uiSettingsTabEditors returns the structured list editors shown on a tab.
 func uiSettingsTabEditors(tab string) []uiListEditor {
 	paths := map[string][]string{
-		"sources": {"/api/config/source-filters", "/api/watched-folders"},
+		"sources": {"/api/config/source-filters", "/api/watched-folders", "/api/quality-profiles"},
 		"rename":  {"/api/tag-dir-rules"},
 		"notify":  {"/api/event-hooks"},
 		"seeding": {"/api/seed-rules"},
@@ -966,6 +977,7 @@ var uiSettingsEditorSearchEntries = []uiSearchEntry{
 	{Key: "", Label: "Filtri contenuto esclusi", Tab: "sources"},
 	{Key: "", Label: "Filtri per sorgente", Tab: "sources"},
 	{Key: "", Label: "Cartelle osservate", Tab: "sources"},
+	{Key: "", Label: "Profili di qualità", Tab: "sources", Terms: "profilo qualità jellyseerr sonarr radarr"},
 	{Key: "", Label: "Gruppi custom", Tab: "scores"},
 	{Key: "", Label: "Composizione del nome", Tab: "rename"},
 	{Key: "", Label: "Regole tag → cartella", Tab: "rename"},

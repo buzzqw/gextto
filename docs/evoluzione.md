@@ -68,16 +68,17 @@ qBittorrent-nox, §6); explainability of the choices; search also from web engin
 lightness (a Go binary and SQLite against a .NET stack); simplicity (health, backup
 and maintenance built in).
 
-**Honest snapshot against Sonarr/Radarr:** they are better at **selection**
-(named quality profiles, custom formats, a delay per profile), at **manual
-import** (matching an existing file and choosing what it replaces) and at the
-**ecosystem/API** (Overseerr/Jellyseerr speak `/api/v3`). Gextto parses
-multi-episode, specials and daily releases, records every episode of a
-multi-episode file and names it with the episode range, but it has no manual
-import. It is better at single scope, integrated engine,
+**Honest snapshot against Sonarr/Radarr:** they are still deeper at **selection**
+(ordered qualities, cutoffs, custom formats, a delay per profile) and at the
+**ecosystem/API** (full `/api/v3`, of which Gextto implements the Jellyseerr
+subset). Gextto now has **named profiles generated from its per-title
+overrides**, **manual import** (matching an existing file, choosing what it
+replaces and where it goes) and the v3 subset; it parses multi-episode, specials
+and daily releases, records every episode of a multi-episode file and names it
+with the episode range. It is better at single scope, integrated engine,
 explainability, footprint and simplicity. The verdict is unchanged: **an
-alternative for new installations**, without claiming parity. What it would take
-to close each gap is in §8.
+alternative for new installations**, without claiming parity. What remains is in
+§8.
 
 **Differences that are choices, not gaps:** indexers through an external manager
 (cleaner and safer separation) and **no usenet** (torrent, HTTP and web seed; in the
@@ -729,22 +730,19 @@ library folder field proposes the configured Download folder, and the Watch
 folders section says that the `.torrent` files are downloaded. No open item
 remains here.
 
-**Closing the gap with Sonarr/Radarr** (§1), by value per effort, each after a study and
-without copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
+**The gap with Sonarr/Radarr** (§1), by value per effort, after a study and without
+copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
 
-- **Named profiles on the Gextto model**: the global policy becomes "Default", each
-  combination of overrides a generated profile, with an automatic migration from the
-  per-title data (`series.quality/language/subtitle/exclude`, `movies_config.*`).
-  Reproducing the *Sonarr* semantics (ordered qualities, cutoff, custom formats) costs
-  more; custom formats (a regex engine plus its UI) would be evaluated separately.
+- **Named profiles**: *Configuration → Sources → Quality profiles*, with a generated
+  profile for every override combination in the library and "Default" first. The
+  *Sonarr* semantics (ordered qualities, cutoff, custom formats) stay out by choice.
 - **A `/api/v3` subset for Jellyseerr** (`system/status`, `qualityprofile`,
   `languageprofile`, `rootfolder`, `tag`, `series/lookup` + `POST series`,
-  `movie/lookup` + `POST movie`, `queue`), after named profiles, root folders and tags,
-  and tested against a real Jellyseerr; full compatibility is not realistic.
-- **Manual import**: matching an existing file, choosing what it replaces and
-  where it goes. Multi-episode, specials and daily names are already parsed,
-  every episode of a multi-episode file is recorded, and the archived name
-  carries the range (`S01E01-E02`), so a media server lists all of them.
+  `movie/lookup` + `POST movie`, `queue`); full compatibility is not claimed, and a
+  real Jellyseerr run remains the acceptance test.
+- **Manual import**: the *Import file* page matches an existing file, lets the
+  operator correct series/movie/season/episode and destination, replaces an existing
+  copy only on request and records every episode of a multi-episode file.
 
 **Closed with data**, so the ground is not re-covered: replacing `internal/dht` with an
 external DHT (the API model differs and it would drop the dual-stack/shared-socket

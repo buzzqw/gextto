@@ -16,6 +16,22 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Import manuale di un file già presente.** La nuova pagina **Importa file**
+  (menu Libreria) legge un video o una cartella già sul disco, propone serie,
+  stagione ed episodio (o film e anno) e la destinazione; puoi correggerli e
+  confermare. Gextto rinomina, sposta, registra l'episodio o il film e aggiorna
+  Jellyfin/Plex. Se esiste già un file con lo stesso nome l'import si ferma,
+  salvo la spunta **Sostituisci il file esistente** (la copia vecchia va nel
+  cestino). I file multi-episodio vengono registrati per ogni episodio.
+- **Profili di qualità nominati e API v3 per Jellyseerr.** In Configurazione →
+  Sorgenti puoi dare un nome alle combinazioni di qualità, lingua, sottotitoli
+  ed esclusioni; Gextto genera un profilo per ogni combinazione già presente
+  nella libreria (il primo è **Default**). Jellyseerr trova i profili e può
+  aggiungere serie e film da `/api/v3` (`system/status`, `qualityprofile`,
+  `languageprofile`, `rootfolder`, `tag`, `series/lookup`, `POST series`,
+  `movie/lookup`, `POST movie`, `queue`). Non è una compatibilità completa con
+  Sonarr/Radarr.
+
 - **Download con migliaia di torrent: la tabella resta fluida.** Oltre 500
   torrent la tabella mostra solo le righe vicine a ciò che stai guardando e
   carica le altre mentre scorri: filtri, ordinamento e selezione continuano a

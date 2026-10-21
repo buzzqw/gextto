@@ -2600,6 +2600,29 @@ func (d *Database) SeriesArchivedMinSize(seriesName string) (*int64, error) {
 	return nil, nil
 }
 
+// RecordManualMovie marks a manually imported movie as archived: the movies
+// table holds the library state the acquisition cycle reads, so a manual import
+// must create or refresh that row or the movie would still look missing.
+func (d *Database) RecordManualMovie(name string, year int64, path string) error {
+	size := int64(0)
+	if info, err := os.Stat(path); err == nil {
+		size = info.Size()
+	}
+	quality := ParseQuality(filepath.Base(path))
+	score := quality.Score()
+	res, err := d.db.Exec("UPDATE movies SET title=?1, quality_score=?2, downloaded_at=datetime('now'), size_bytes=?3, removed_at=NULL WHERE name=?4 AND year=?5",
+		strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)), score, size, name, year)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		return nil
+	}
+	_, err = d.db.Exec("INSERT INTO movies(name,year,title,quality_score,downloaded_at,size_bytes) VALUES (?1,?2,?3,?4,datetime('now'),?5)",
+		name, year, strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)), score, size)
+	return err
+}
+
 // MovieArchivedSize returns the archived file size for a movie, used by the
 // adaptive size floor.
 func (d *Database) MovieArchivedSize(name string, year *int64) (*int64, error) {

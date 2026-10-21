@@ -729,6 +729,20 @@ readable value before displaying it. Internal rules distinguish mandatory
 requirements from optional preferences; do not edit the JSON manually unless you
 are using the API directly.
 
+### Importing a file that already exists
+
+**Import file** (Library menu) is for a video already on disk that Gextto did
+not download: an episode fetched by hand, an old season, a movie copied from
+another disk. Choose a file or a folder and press **Analyze**: Gextto reads the
+names, proposes the configured series or movie, the season and the episode and
+shows the destination folder. You can correct the series, season, episode (or
+movie and year) before confirming. **Import now** renames the file with the
+configured rules, moves it to the library, records the episode (or movie) and
+refreshes Jellyfin/Plex when configured. If the destination already holds a file
+with the same name the import stops: tick **Replace the existing file** to move
+the old copy to the trash and put the new one in place. Multi-episode files are
+recorded for every episode they contain.
+
 ## 6. Explore, Archive, Comics
 
 - **Explore** — TMDB trending/today/popular/top-rated/now playing/upcoming, TMDB
@@ -1077,6 +1091,15 @@ If the machine is small:
 When a torrent is not downloading, **Health** shows the engine state and the
 torrent page explains why (dead swarm, no peers, tracker unreachable).
 
+### Quality profiles
+
+In **Configuration → Sources**, under *Quality profiles*, name the combinations
+of quality, language, subtitles and exclusions you use. Gextto generates a
+profile for every combination already present in the library and exposes them to
+Jellyseerr through `/api/v3/qualityprofile`; the first profile is **Default**.
+Profiles are presets: when Jellyseerr adds a series or a movie with a profile,
+Gextto copies those values into the title.
+
 ### Configuring a Torznab indexer
 
 For Jackett:
@@ -1191,6 +1214,16 @@ The complete list of fields and actions is in [Appendix B](#appendix-b-reference
   title such as `The Office` arrives whole, not split in two. When the timeout
   expires, every child process started by the program is stopped too; at most 4
   hooks run at the same time, the others wait their turn.
+
+### Jellyseerr / Sonarr / Radarr
+
+Gextto exposes a subset of the Sonarr/Radarr v3 API for Jellyseerr:
+`/api/v3/system/status`, `qualityprofile`, `languageprofile`, `rootfolder`,
+`tag`, `series/lookup` with `POST series`, `movie/lookup` with `POST movie` and
+`queue`. In Jellyseerr use the Gextto server as the URL and Gextto's **API key**
+(Configuration → Access) as the key. This is not full compatibility: requests
+Gextto does not handle answer 404, and quality profiles/custom formats do not
+reproduce the *arr* semantics.
 
 ### Connecting an external service
 
@@ -1761,6 +1794,7 @@ them.
 | Excluded content filters | Releases containing these words or scripts (e.g. [porno]) are excluded. |
 | Source filters | Keywords to accept or reject for a single source, enabled per row. |
 | Watched folders | The .torrent and .magnet files found in the given folders are **downloaded** and added to the session automatically (recursive, delete after). |
+| Quality profiles | Names for the combinations of quality, language, subtitles and exclusions; the first is Default and the list is the one exposed to Jellyseerr. |
 
 #### eD2k and Kad
 

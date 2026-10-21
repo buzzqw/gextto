@@ -527,3 +527,13 @@ test("il filtro del log funziona anche con lo scorrimento fermo", async ({ page 
   await expect(count).not.toHaveText("0");
 });
 
+
+test("la pagina Importa file analizza un percorso", async ({ page }) => {
+  await page.goto("/?view=import");
+  await expect(page.getByRole("heading", { name: "Importa un file esistente" })).toBeVisible();
+  const input = page.locator('input[name="path"]');
+  await expect(input).toBeVisible();
+  await input.fill("/definitely/not/a/video.mkv");
+  await page.getByRole("button", { name: "Analizza" }).click();
+  await expect(page.locator("#v2-import-result [role=alert]")).toBeVisible();
+});

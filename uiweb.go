@@ -357,6 +357,7 @@ var uiNavGroups = []uiNavDefinition{
 	{Label: "Libreria", Items: []uiNavDefinitionItem{
 		{ID: "series", Label: "Serie TV"},
 		{ID: "movies", Label: "Film"},
+		{ID: "import", Label: "Importa file", MobileHidden: true},
 		{ID: "gaps", Label: "Mancanti", MobileHidden: true},
 	}},
 	{Label: "Scoperta", Items: []uiNavDefinitionItem{

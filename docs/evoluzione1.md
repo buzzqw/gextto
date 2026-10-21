@@ -45,26 +45,21 @@ Tutti e cinque hanno un gate scritto: nessuno si fa «perché sarebbe meglio».
 
 ## 3. Il gap con Sonarr/Radarr
 
-I tre punti in cui `evoluzione.md` §1 ammette che gli *arr* sono migliori,
-elencati per valore/sforzo, ciascuno dopo uno studio e senza copiare codice
-(Sonarr è GPLv3, Gextto EUPL-1.2).
+Fatto in questo ciclo, dopo uno studio e senza copiare codice (Sonarr è GPLv3,
+Gextto EUPL-1.2):
 
-1. **Profili nominati sul modello Gextto**: la policy globale diventa
-   «Default», ogni combinazione di override diventa un profilo generato, con
-   migrazione automatica dai dati per-titolo (`series.quality/language/subtitle/
-   exclude`, `movies_config.*`). Riprodurre la semantica *arr* (qualità
-   ordinate, cutoff, custom formats) costa molto di più: i custom formats sono
-   valutati separatamente.
-2. **Sottoinsieme `/api/v3` per Jellyseerr** (`system/status`,
+1. **Profili nominati**: Configurazione → Sorgenti → *Profili di qualità*; ogni
+   combinazione di override già presente nella libreria diventa un profilo
+   generato, il primo è **Default**. La semantica *arr* (qualità ordinate,
+   cutoff, custom formats) resta fuori per scelta.
+2. **Sottoinsieme `/api/v3` per Jellyseerr**: `system/status`,
    `qualityprofile`, `languageprofile`, `rootfolder`, `tag`, `series/lookup` +
-   `POST series`, `movie/lookup` + `POST movie`, `queue`) — **dopo** profili
-   nominati, root folder e tag, e testato contro un Jellyseerr reale. La
-   compatibilità completa è dichiarata irrealistica.
-3. **Import manuale**: abbinare un file esistente, scegliere cosa sostituisce e
-   dove va. Multi-episodio, speciali e nomi daily sono già parsati e
-   registrati; manca l'operazione.
-
-È l'unico blocco «aperto» che sposta davvero l'ago del prodotto.
+   `POST series`, `movie/lookup` + `POST movie`, `queue`. La compatibilità
+   completa non è dichiarata; la prova contro un Jellyseerr reale resta da fare.
+3. **Import manuale**: pagina **Importa file**, con anteprima, correzione di
+   serie/film/stagione/episodio, scelta della destinazione e sostituzione
+   esplicita della copia esistente; i file multi-episodio sono registrati per
+   ogni episodio.
 
 ## 4. eD2k / aMule
 
@@ -77,8 +72,7 @@ elencati per valore/sforzo, ciascuno dopo uno studio e senza copiare codice
 
 ## 5. Perimetro in una riga
 
-Realmente aperto: **DLNA con transcoding/frame extraction**, **WebRTC**, **il gap
-con gli *arr*** (import manuale, profili nominati, `/api/v3` per Jellyseerr) e i
-punti dell'engine in attesa di uno sciame vero o di hardware. Il resto del
-triage è chiuso.
+Realmente aperto: **DLNA con transcoding/frame extraction**, **WebRTC**, la
+prova dell'API v3 contro un Jellyseerr reale e i punti dell'engine in attesa di
+uno sciame vero o di hardware. Il resto del triage è chiuso.
 
