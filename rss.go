@@ -82,11 +82,19 @@ func apply_torznab_attr(
 	sizeBytes **float64,
 	seeders **int64,
 	peers **int64,
+	magnet *string,
+	infohash *string,
 ) {
 	name, _ := attribute(start, "name")
 	name = strings.ToLower(name)
 	value, _ := attribute(start, "value")
 	switch name {
+	case "magneturl":
+		if found := magnet_in(value); found != "" {
+			*magnet = found
+		}
+	case "infohash":
+		*infohash = strings.TrimSpace(value)
 	case "seeders":
 		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil && parsed >= 0 {
 			*seeders = &parsed
@@ -128,6 +136,8 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 	title := ""
 	magnet := ""
 	torrentURL := ""
+	guid := ""
+	infohash := ""
 	description := ""
 	itemSource := source
 	var sizeBytes *float64
@@ -158,6 +168,8 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 				title = ""
 				magnet = ""
 				torrentURL = ""
+				guid = ""
+				infohash = ""
 				description = ""
 				itemSource = source
 				sizeBytes = nil
@@ -193,7 +205,7 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 							itemSource = fmt.Sprintf("%s:%s", source, strings.TrimSpace(value))
 						}
 					}
-					apply_torznab_attr(event, &sizeBytes, &seeders, &peers)
+					apply_torznab_attr(event, &sizeBytes, &seeders, &peers, &magnet, &infohash)
 				}
 				value, ok := attribute(event, "href")
 				if !ok {
@@ -213,6 +225,9 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 				value := strings.TrimSpace(string(event))
 				if current == "title" {
 					title = value
+				}
+				if current == "guid" || (current == "id" && guid == "") {
+					guid = value
 				}
 				if current == "jackettindexer" && value != "" {
 					itemSource = fmt.Sprintf("%s:%s", source, value)
@@ -275,7 +290,14 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 						value := torrentURL
 						torrentPtr = &value
 					}
+					// Torznab can expose the infohash as an attribute without a
+					// magnet. Rebuild the magnet so the archive and the engine get
+					// the torrent identity instead of an ephemeral download URL.
+					if magnet == "" && infohash != "" {
+						magnet = prowlarrInfoHashMagnet(infohash, title)
+					}
 					if release := ParseReleaseSource(title, magnet, torrentPtr, itemSource, discoveredAt); release != nil {
+						release.GUID = guid
 						if sizeBytes != nil {
 							rounded := int64(math.Round(*sizeBytes))
 							if rounded > 0 {
@@ -1746,6 +1768,16 @@ func prowlarrDownloadURL(item map[string]any) *string {
 	return nil
 }
 
+// prowlarrGUID returns the indexer's stable id for the listing. Prowlarr's
+// `guid` is usually the details URL; `infoUrl` is the same kind of stable
+// address when guid is missing.
+func prowlarrGUID(item map[string]any) string {
+	if guid := strings.TrimSpace(jsonStringValue(item["guid"])); guid != "" {
+		return guid
+	}
+	return strings.TrimSpace(jsonStringValue(item["infoUrl"]))
+}
+
 func parseProwlarrItems(items []map[string]any, source string) []models.Release {
 	var out []models.Release
 	for _, item := range items {
@@ -1783,6 +1815,7 @@ func parseProwlarrItems(items []map[string]any, source string) []models.Release 
 		if release == nil {
 			continue
 		}
+		release.GUID = prowlarrGUID(item)
 		release.TmdbID = jsonIdentifierValue(item["tmdbId"])
 		if size := jsonNumberInt(item["size"]); size != nil && *size > 0 {
 			// Drop samples/NFO fragments that are never the episode.
@@ -1933,6 +1966,11 @@ func releaseDedupKey(release *models.Release) (string, bool) {
 	}
 	if hash, ok := utils.MagnetHash(release.Magnet); ok {
 		return hash, true
+	}
+	// A stable listing id survives the ephemeral download URL. It is the true
+	// identity of a result that exposes only a `.torrent` link.
+	if guid := strings.TrimSpace(release.GUID); guid != "" {
+		return "guid:" + strings.TrimSpace(release.Source) + "\n" + guid, true
 	}
 	if release.TorrentURL != nil {
 		value := strings.TrimSpace(*release.TorrentURL)

@@ -107,7 +107,7 @@ when a change is meant to be an optimisation. A single pass is noise.
 | `BenchmarkTransferLoopback` (uTP, 16 KiB block) | 131–139 MB/s, 5.6 KB, 99 allocs | connection-id probe, lazy `Event` channels, reusable read window, `netip.AddrPort` key |
 | `BenchmarkUTPConnRemoteAddr` | 113 ns/op, 40 B, 3 allocs | addresses converted once at wrap |
 | `BenchmarkStorageWrite` / `StorageWriteMmap` | ~5.8 / ~7.4 GB/s | the disk is far above any network speed: `O_DIRECT` and io_uring are not justified |
-| `BenchmarkArchiveSaveBatch` (1,000 releases, ~400 B magnets) | 40.9–41.8 ms, 3.00 MB, 50,528 allocs | prepared statements per chunk |
+| `BenchmarkArchiveSaveBatch` (1,000 releases, ~400 B magnets) | 45.2–46.1 ms, 3.09 MB, 50,536 allocs | prepared statements per chunk; the guid identity adds ~2% (measured 2026-10-21 on the N97) |
 | `BenchmarkFeedArchiveSearch` (100,000 releases) | 7.4 ms | compact index on bbolt |
 | `BenchmarkMetricsScrape` (one torrent) | ~0.24 ms, 121 KB, 813 allocs | computed only when scraped |
 | `BenchmarkCriteriaMatch` (RSS rule, 4 names) | 142 ns/op, 0 B, 0 allocs | scans the title in place |
@@ -234,8 +234,8 @@ the Go scheduler's own wake-ups. No spinning loop, nothing to change.
 | | Value |
 |---|---|
 | Size | 320 MB, 446,994 rows |
-| Identity | one row per torrent (infohash); the exact magnet for rows without a hash |
-| Insert | 40.9–41.8 ms per 1,000 releases (3.00 MB, 50,528 allocs) |
+| Identity | one row per torrent (infohash); the indexer guid for `.torrent`-only listings, the exact link as a last resort |
+| Insert | 45.2–46.1 ms per 1,000 releases (3.09 MB, 50,536 allocs) |
 | Archive page | 37 ms |
 | Standalone feed search | 7.4 ms on 100,000 releases |
 
@@ -243,9 +243,10 @@ the Go scheduler's own wake-ups. No spinning loop, nothing to change.
 the SHA-256 of the exact magnet: the dedup is unchanged without a 400-byte index. Rows
 with the same infohash are the same content, so the newest is kept, base32 hashes are
 stored as hex and a partial UNIQUE index enforces it; a known torrent under another
-magnet refreshes its row, while URL rows without a hash are never merged. Inserts are
-prepared per chunk (`INSERT OR IGNORE` plus a conditional refresh), faster than a
-two-conflict upsert. The plain title index is gone: titles match through FTS or
+magnet refreshes its row. A `.torrent`-only listing is keyed by the indexer guid
+(when present), because Jackett regenerates its `/dl/?path=...` URL at every request;
+URL rows with no guid still never merge. Inserts are prepared per chunk
+(`INSERT OR IGNORE` plus a conditional refresh), faster than a two-conflict upsert. The plain title index is gone: titles match through FTS or
 `lower(title) LIKE`.
 
 ### 4.4 Indexer managers

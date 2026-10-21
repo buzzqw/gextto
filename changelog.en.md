@@ -14,6 +14,14 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **Archive inflated by repeated releases: fixed.** The archive could hold the
+  same release dozens of times when the indexer (for example Jackett)
+  regenerated the `.torrent` link on every search: the link changed, the
+  content did not. A release is now recognised by its stable identifier and
+  stays one row. **Maintenance → Archive SQL maintenance** has two more
+  operations: **Recent releases**, to see what just came in, and **Duplicates
+  by title and source**, to clean up the rows already accumulated while keeping
+  the newest. Magnets are never touched.
 - **Download notifications say where the torrent comes from.** The «New episode
   download started» / «Movie download started» message (Telegram, email and the
   other channels) now has a **📡 Source** line with the feed, the indexer or the

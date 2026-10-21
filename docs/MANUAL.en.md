@@ -1237,8 +1237,15 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   Archive. A selector at the top chooses the **language for the operations**;
   the tab lists the operations bundled in `scripts/sql`: releases older than 6
   months or 1 year, releases in the selected language or without it, empty
-  titles, plus read-only diagnostics (age distribution, releases per source,
-  archive health, duplicate titles). A deletion operation first shows the
+  titles, duplicates by title and source, plus read-only diagnostics (recent
+  releases, age distribution, releases per source, archive health, duplicate
+  titles). The archive keeps one row per listing seen by the scrapers: for a
+  release with a magnet the identity is the infohash, for a `.torrent`-only
+  listing it is the indexer's stable identifier. Jackett regenerates the
+  download link at every request; without that identifier the same release
+  would look new on every pass. **Duplicates by title and source** cleans up the
+  rows already accumulated, comparing source and title and keeping the newest;
+  it never touches magnets. A deletion operation first shows the
   preview with the number of matching rows and the first 200; only then
   **Delete permanently** appears, with a confirmation. While the query runs an
   indicator shows the work in progress; when it finishes the panel scrolls to

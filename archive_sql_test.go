@@ -53,6 +53,8 @@ func TestArchiveSQLOperationsAreSafe(t *testing.T) {
 		"archive_not_language_older_than_6_months",
 		"archive_older_than_1_year",
 		"archive_empty_title",
+		"archive_recent",
+		"archive_duplicate_listings",
 		"archive_age_distribution",
 		"archive_health",
 	} {
@@ -138,6 +140,40 @@ func TestArchiveSQLPreviewAndDelete(t *testing.T) {
 	}
 	if _, err := archive.db.Exec("INSERT INTO archive_fts(archive_fts) VALUES('integrity-check')"); err != nil {
 		t.Fatalf("FTS integrity after delete: %v", err)
+	}
+}
+
+func TestArchiveSQLDuplicateListingsKeepsTheNewestURL(t *testing.T) {
+	archive := openTestArchive(t)
+	if _, err := archive.db.Exec(`INSERT INTO archive(title,magnet,magnet_key,source,added_at) VALUES
+		('Same Show','http://jackett/dl/1',gextto_magnet_key('http://jackett/dl/1'),'jackett:Test',datetime('now','-2 days')),
+		('same show','http://jackett/dl/2',gextto_magnet_key('http://jackett/dl/2'),'jackett:Test',datetime('now','-1 day')),
+		('Same Show','http://jackett/dl/3',gextto_magnet_key('http://jackett/dl/3'),'jackett:Other',datetime('now','-2 days')),
+		('Same Show','magnet:?xt=urn:btih:keep',gextto_magnet_key('magnet:?xt=urn:btih:keep'),'jackett:Test',datetime('now'))`); err != nil {
+		t.Fatalf("insert fixtures: %v", err)
+	}
+	ctx := context.Background()
+	operation := archiveSQLOperation(t, "archive_duplicate_listings")
+	preview, err := archive.PreviewArchiveSQL(ctx, operation, "")
+	if err != nil {
+		t.Fatalf("preview duplicates: %v", err)
+	}
+	if preview.Total != 1 || preview.Shown != 1 {
+		t.Fatalf("duplicates preview = total %d, shown %d; want 1/1", preview.Total, preview.Shown)
+	}
+	if len(preview.Rows) != 1 || preview.Rows[0][5] != "http://jackett/dl/1" {
+		t.Fatalf("duplicates preview rows = %+v, want the older URL of the Test source", preview.Rows)
+	}
+	removed, err := archive.DeleteArchiveSQL(ctx, operation, "")
+	if err != nil || removed != 1 {
+		t.Fatalf("DeleteArchiveSQL duplicates = (%d, %v), want (1, nil)", removed, err)
+	}
+	if count, err := archive.Count(); err != nil || count != 3 {
+		t.Fatalf("count after duplicate cleanup = %d, %v; want 3", count, err)
+	}
+	var kept string
+	if err := archive.db.QueryRow("SELECT magnet FROM archive WHERE source='jackett:Test' AND magnet LIKE 'http%'").Scan(&kept); err != nil || kept != "http://jackett/dl/2" {
+		t.Fatalf("kept URL = %q, %v; want the newest", kept, err)
 	}
 }
 

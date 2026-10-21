@@ -5705,3 +5705,7 @@ deu:
   Tetto alle connessioni per singolo torrent, usato dal limite automatico o come limite fisso quando l'automatico è spento (-1 = illimitato).: Obergrenze der Verbindungen je Torrent, genutzt vom automatischen Limit oder als festes Limit bei ausgeschaltetem Automatikmodus (-1 = unbegrenzt).
   Adatta il numero di connessioni di ogni torrent alla macchina (core e RAM) e riduce quelle dei torrent che non progrediscono; il valore qui sopra resta il tetto (-1 = nessun tetto).: Bemisst die Verbindungen jedes Torrents nach der Maschine (Kerne und RAM) und reduziert Torrents ohne Fortschritt; der obige Wert bleibt die Obergrenze (-1 = keine Obergrenze).
   -1 = nessun tetto: -1 = keine Obergrenze
+  "Release recenti": "Neueste Releases"
+  "Mostra le release entrate in archivio di recente, dalla più nuova.": "Zeigt die zuletzt ins Archiv aufgenommenen Releases, die neuesten zuerst."
+  "Duplicati per titolo e fonte": "Duplikate nach Titel und Quelle"
+  "Mostra e cancella le release con solo un link .torrent ripetute per titolo e fonte, tenendo la riga più recente.": "Zeigt Releases mit nur einem .torrent-Link an, die sich nach Titel und Quelle wiederholen, und löscht sie; die neueste Zeile bleibt erhalten."

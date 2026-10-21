@@ -423,9 +423,14 @@ func (c *ApprovalContext) StallAdjustedMinDiff(minScoreDiff int64, key LiveEpiso
 
 // Release is a candidate release discovered from a source.
 type Release struct {
-	Title        string  `json:"title"`
-	Magnet       string  `json:"magnet"`
-	TorrentURL   *string `json:"torrent_url"`
+	Title      string  `json:"title"`
+	Magnet     string  `json:"magnet"`
+	TorrentURL *string `json:"torrent_url"`
+	// GUID is the stable identifier the indexer gives to a listing (the RSS or
+	// Torznab <guid>, the Prowlarr guid). It is not a torrent infohash: the
+	// archive uses it to recognise the same listing again when the download URL
+	// is regenerated at every request and no magnet is exposed.
+	GUID         string  `json:"guid,omitempty"`
 	Source       string  `json:"source"`
 	Quality      Quality `json:"quality"`
 	Kind         string  `json:"kind"`
@@ -525,19 +530,19 @@ func (c *CycleStats) Error(category string) {
 
 // TorrentView is the live status of a torrent in the session.
 type TorrentView struct {
-	Hash         string  `json:"hash"`
-	Name         string  `json:"name"`
-	Progress     float64 `json:"progress"`
-	State        string  `json:"state"`
+	Hash     string  `json:"hash"`
+	Name     string  `json:"name"`
+	Progress float64 `json:"progress"`
+	State    string  `json:"state"`
 	// Network is the acquisition network of this row: "" or "torrent" for a
 	// torrent, "ed2k" for a file downloaded on eD2k. It is set by the
 	// multi-engine router; a single torrent engine leaves it empty.
 	Network string `json:"network,omitempty"`
 	// Sources is the eD2k source count. It is not NumSeeds: eD2k sources are
 	// clients sharing the whole file, not a BitTorrent swarm.
-	Sources int `json:"sources,omitempty"`
-	DownloadRate uint64  `json:"download_rate"`
-	UploadRate   uint64  `json:"upload_rate"`
+	Sources      int    `json:"sources,omitempty"`
+	DownloadRate uint64 `json:"download_rate"`
+	UploadRate   uint64 `json:"upload_rate"`
 	// Total rates include protocol overhead; the fields above are payload-only.
 	DownloadRateTotal uint64  `json:"download_rate_total"`
 	UploadRateTotal   uint64  `json:"upload_rate_total"`

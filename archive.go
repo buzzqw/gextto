@@ -100,6 +100,37 @@ func archiveMagnetKeyString(magnet string) []byte {
 	return archiveMagnetKey(append(buf[:0], magnet...))
 }
 
+// archiveGUIDIdentity is the stable identity of one indexer listing. The source
+// is part of it so two indexers that happen to reuse a numeric guid cannot
+// collapse into one row.
+func archiveGUIDIdentity(source, guid string) string {
+	guid = strings.TrimSpace(guid)
+	if guid == "" {
+		return ""
+	}
+	return "guid:" + strings.TrimSpace(source) + "\n" + guid
+}
+
+// archiveIdentity is what magnet_key hashes: the magnet when there is one, the
+// indexer's stable guid for a `.torrent`-only listing, otherwise the download
+// URL. Jackett regenerates the `/dl/?path=...` URL at every request, so the
+// URL alone would archive the same listing again and again.
+func archiveIdentity(release *models.Release) string {
+	if release == nil {
+		return ""
+	}
+	if guid := archiveGUIDIdentity(release.Source, release.GUID); guid != "" {
+		return guid
+	}
+	if magnet := strings.TrimSpace(release.Magnet); magnet != "" {
+		return magnet
+	}
+	if release.TorrentURL != nil {
+		return strings.TrimSpace(*release.TorrentURL)
+	}
+	return ""
+}
+
 // migrateArchiveMagnetKey rebuilds an archive created before magnet_key: the
 // rows (ids included, so the FTS index stays valid) move to the new table, the
 // unused title index goes, and a VACUUM returns the freed pages to the disk.
@@ -287,15 +318,23 @@ func OpenArchive(path string) (*Archive, error) {
 }
 
 // archiveInsertSQL and archiveRefreshSQL archive one release: ?1 title, ?2
-// magnet, ?3 infohash or NULL, ?4 source, ?5 quality score, ?6 magnet key. The
-// refresh runs only when the insert was ignored. A single upsert with two
+// magnet or `.torrent` URL, ?3 infohash or NULL, ?4 source, ?5 quality score,
+// ?6 identity key. The key is the infohash magnet, the indexer guid for a
+// `.torrent`-only listing, or the URL as a last resort (see archiveIdentity).
+// The refresh runs only when the insert was ignored. A single upsert with two
 // conflict targets measured 71 ms per 1000 releases against 54 ms.
+//
+// archiveRefreshSQL keeps magnet_key: the key belongs to the listing, so a
+// magnet arriving from another source must not steal it. archiveRefreshKeySQL
+// refreshes a listing by that stable key and upgrades a guid-keyed row from
+// its ephemeral URL to the magnet once one is known.
 const (
-	archiveInsertSQL  = "INSERT OR IGNORE INTO archive(title,magnet,magnet_key,magnet_hash,source,quality_score,added_at) VALUES (?1,?2,?6,?3,?4,?5,datetime('now'))"
-	archiveRefreshSQL = "UPDATE archive SET title=?1, magnet=?2, magnet_key=?6, source=?4, quality_score=?5, added_at=datetime('now') WHERE magnet_hash<>'' AND magnet_hash=?3 AND magnet_key<>?6"
+	archiveInsertSQL     = "INSERT OR IGNORE INTO archive(title,magnet,magnet_key,magnet_hash,source,quality_score,added_at) VALUES (?1,?2,?6,?3,?4,?5,datetime('now'))"
+	archiveRefreshSQL    = "UPDATE archive SET title=?1, magnet=?2, source=?4, quality_score=?5, added_at=datetime('now') WHERE magnet_hash<>'' AND magnet_hash=?3 AND magnet_key<>?6"
+	archiveRefreshKeySQL = "UPDATE OR IGNORE archive SET title=?1, magnet=CASE WHEN COALESCE(magnet_hash,'')='' THEN ?2 ELSE magnet END, magnet_hash=COALESCE(NULLIF(magnet_hash,''), ?3), source=?4, quality_score=?5, added_at=datetime('now') WHERE magnet_key=?6"
 )
 
-// SaveBatch archives releases: one row per exact magnet/URL and per infohash.
+// SaveBatch archives releases: one row per magnet/listing and per infohash.
 func (a *Archive) SaveBatch(releases []models.Release, cfg *Config) error {
 	// Spezza il batch in transazioni più piccole: un'unica transazione da
 	// migliaia di righe con l'indice FTS5 generava un WAL enorme (osservato
@@ -337,6 +376,12 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 		return err
 	}
 	defer refresh.Close()
+	refreshKey, err := tx.Prepare(archiveRefreshKeySQL)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer refreshKey.Close()
 	for i := range releases {
 		r := &releases[i]
 		// Content filters are also an archive-ingestion boundary: releases that
@@ -362,19 +407,41 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 		if value, ok := archiveInfoHash(source); ok {
 			hash = value
 		}
+		identity := archiveIdentity(r)
+		if identity == "" {
+			continue
+		}
 		// The exact magnet already archived is left as it is. The same torrent
 		// under another magnet (other trackers, source or title spelling)
-		// refreshes its one row, which becomes the newest, as a new row did.
-		args := []any{r.Title, source, hash, r.Source, cfg.ReleaseScore(r), archiveMagnetKeyString(source)}
+		// refreshes its one row, which becomes the newest, as a new row did. A
+		// guid-keyed listing is refreshed in place instead of being appended
+		// again when Jackett regenerates its download URL.
+		args := []any{r.Title, source, hash, r.Source, cfg.ReleaseScore(r), archiveMagnetKeyString(identity)}
 		result, err := insert.Exec(args...)
 		if err != nil {
 			_ = tx.Rollback()
 			return err
 		}
-		if inserted, _ := result.RowsAffected(); inserted == 0 && hash != nil {
-			if _, err := refresh.Exec(args...); err != nil {
-				_ = tx.Rollback()
-				return err
+		if inserted, _ := result.RowsAffected(); inserted == 0 {
+			if hash != nil {
+				refreshed, err := refresh.Exec(args...)
+				if err != nil {
+					_ = tx.Rollback()
+					return err
+				}
+				if affected, _ := refreshed.RowsAffected(); affected > 0 {
+					continue
+				}
+			}
+			// Only a guid-keyed row can need a second pass: it may still hold
+			// the previous ephemeral URL (or no magnet yet). For a magnet-only
+			// release the insert was ignored because that exact row is already
+			// there, and an extra UPDATE would just cost a write.
+			if strings.TrimSpace(r.GUID) != "" {
+				if _, err := refreshKey.Exec(args...); err != nil {
+					_ = tx.Rollback()
+					return err
+				}
 			}
 		}
 	}
@@ -409,6 +476,20 @@ func (a *Archive) RemoveHash(hash string) (int, error) {
 // infohash magnet once the torrent has been downloaded successfully. If the
 // same magnet or torrent is already archived, the obsolete URL row is removed.
 func (a *Archive) CanonicalizeTorrentURL(torrentURL, magnet string) error {
+	return a.canonicalizeTorrentURL(torrentURL, magnet, "", "")
+}
+
+// CanonicalizeRelease is CanonicalizeTorrentURL for a release that still knows
+// its listing guid. The guid is the same key SaveBatch used, so the row is
+// found even when Jackett has already regenerated the download URL.
+func (a *Archive) CanonicalizeRelease(release *models.Release, magnet string) error {
+	if release == nil || release.TorrentURL == nil {
+		return nil
+	}
+	return a.canonicalizeTorrentURL(strings.TrimSpace(*release.TorrentURL), magnet, release.Source, release.GUID)
+}
+
+func (a *Archive) canonicalizeTorrentURL(torrentURL, magnet, source, guid string) error {
 	tx, err := a.db.Begin()
 	if err != nil {
 		return err
@@ -418,18 +499,25 @@ func (a *Archive) CanonicalizeTorrentURL(torrentURL, magnet string) error {
 	if value, ok := archiveInfoHash(magnet); ok {
 		hash, hashText = value, value
 	}
-	// The URL row goes when the magnet, or another listing of the same
-	// torrent, is already archived.
+	urlKey := archiveMagnetKeyString(torrentURL)
+	key := urlKey
+	if identity := archiveGUIDIdentity(source, guid); identity != "" {
+		key = archiveMagnetKeyString(identity)
+	}
+	// The URL-only row goes when the magnet, or another listing of the same
+	// torrent, is already archived. A row already converted to its magnet is
+	// left alone even if canonicalisation runs again.
 	if _, err := tx.Exec(
-		"DELETE FROM archive WHERE magnet_key=?1 AND magnet=?2 AND EXISTS (SELECT 1 FROM archive WHERE (magnet_key=?3 AND magnet=?4) OR (?5<>'' AND magnet_hash=?5))",
-		archiveMagnetKeyString(torrentURL), torrentURL, archiveMagnetKeyString(magnet), magnet, hashText,
+		"DELETE FROM archive WHERE magnet_key IN (?1,?2) AND COALESCE(magnet_hash,'')='' AND EXISTS (SELECT 1 FROM archive WHERE (magnet_key=?3 AND magnet=?4) OR (?5<>'' AND magnet_hash=?5))",
+		key, urlKey, archiveMagnetKeyString(magnet), magnet, hashText,
 	); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
+	// Keep the key: it belongs to the listing (guid or URL), not to the magnet.
 	if _, err := tx.Exec(
-		"UPDATE OR IGNORE archive SET magnet=?1, magnet_key=?2, magnet_hash=?3 WHERE magnet_key=?4 AND magnet=?5",
-		magnet, archiveMagnetKeyString(magnet), hash, archiveMagnetKeyString(torrentURL), torrentURL,
+		"UPDATE OR IGNORE archive SET magnet=?1, magnet_hash=?2 WHERE magnet_key IN (?3,?4)",
+		magnet, hash, key, urlKey,
 	); err != nil {
 		_ = tx.Rollback()
 		return err
@@ -785,10 +873,10 @@ func (a *Archive) Delete(magnet string) (bool, error) {
 		query = "DELETE FROM archive WHERE (magnet_key=?1 AND magnet=?2) OR (magnet_hash<>'' AND magnet_hash=?3)"
 		args = []any{archiveMagnetKeyString(magnet), magnet, hash}
 	} else {
-		// No usable magnet hash: match only by the exact magnet link so an
-		// empty digest cannot delete unrelated rows with an empty magnet_hash.
-		query = "DELETE FROM archive WHERE magnet_key=?1 AND magnet=?2"
-		args = []any{archiveMagnetKeyString(magnet), magnet}
+		// No usable magnet hash: match the exact link. The row can be keyed by
+		// a listing guid instead of the link, so the key alone is not enough.
+		query = "DELETE FROM archive WHERE magnet=?1"
+		args = []any{magnet}
 	}
 	result, err := a.db.Exec(query, args...)
 	if err != nil {

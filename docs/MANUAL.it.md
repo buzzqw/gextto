@@ -1276,8 +1276,16 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   l'Archivio release. In cima un selettore sceglie la **lingua per le
   operazioni**; il tab elenca le operazioni incluse in `scripts/sql`: release
   più vecchie di 6 mesi o di 1 anno, release nella lingua scelta o senza quella
-  lingua, titoli vuoti, più alcune diagnostiche di sola lettura (distribuzione
-  per età, release per fonte, stato dell'archivio, titoli duplicati).
+  lingua, titoli vuoti, duplicati per titolo e fonte, più alcune diagnostiche di
+  sola lettura (release recenti, distribuzione per età, release per fonte, stato
+  dell'archivio, titoli duplicati).
+  L'archivio tiene una riga per ogni listing visto dagli scraper: per una
+  release con magnet l'identità è l'infohash, per una con solo un link
+  `.torrent` è l'identificatore stabile dell'indexer. Jackett rigenera il link
+  di download a ogni richiesta; senza quell'identificatore la stessa release
+  comparirebbe come nuova a ogni passata. **Duplicati per titolo e fonte**
+  ripulisce le righe già accumulate, confrontando fonte e titolo e tenendo la
+  più recente; non tocca i magnet.
   Un'operazione che elimina mostra prima l'anteprima con il numero di righe
   corrispondenti e le prime 200; solo dopo compare **Elimina definitivamente**,
   con conferma. Mentre la query è in corso compare un indicatore; al termine il

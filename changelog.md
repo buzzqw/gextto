@@ -15,6 +15,15 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Archivio gonfiato da release ripetute: corretto.** L'archivio poteva
+  contenere la stessa release decine di volte quando l'indexer (per esempio
+  Jackett) rigenerava il link `.torrent` a ogni ricerca: il link cambiava, ma
+  il contenuto no. Ora la release viene riconosciuta dal suo identificatore
+  stabile e resta una sola riga. In **Manutenzione → Manutenzione SQL
+  dell'archivio** ci sono due operazioni in più: **Release recenti**, per
+  vedere che cosa è appena entrato, e **Duplicati per titolo e fonte**, per
+  ripulire le righe già accumulate tenendo la più recente. I magnet non vengono
+  toccati.
 - **Le notifiche di download dicono da dove arriva il torrent.** Il messaggio
   «Nuovo episodio in download» / «Film in download» (Telegram, email e gli
   altri canali) ora ha la riga **📡 Fonte** con il feed, l'indexer o l'archivio

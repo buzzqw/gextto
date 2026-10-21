@@ -102,10 +102,23 @@ un'operazione serve una build di Gextto.
 | Release nella lingua selezionata più vecchie di 1 anno | Elimina | Come sopra, oltre 1 anno |
 | Release non nella lingua selezionata più vecchie di 1 anno | Elimina | Come sopra, oltre 1 anno |
 | Titoli vuoti | Elimina | Righe con titolo vuoto |
+| Release recenti | Sola lettura | Le righe entrate in archivio di recente, dalla più nuova |
+| Duplicati per titolo e fonte | Elimina | Release con solo un link `.torrent` ripetute per titolo e fonte: tiene la più recente |
 | Distribuzione per età | Sola lettura | Conteggio per fascia di età |
 | Release per fonte | Sola lettura | Conteggio per fonte, con la più vecchia e la più recente |
 | Stato dell'archivio | Sola lettura | Controlli su titoli, magnet, hash e indice full-text |
 | Titoli duplicati | Sola lettura | Titoli ripetuti e numero di copie |
+
+## Perché nascono i duplicati
+
+L'archivio conserva una riga per ogni *listing* visto dagli scraper. Per un
+risultato con magnet l'identità è l'infohash; per un risultato con solo un link
+`.torrent` l'identità è il `<guid>` stabile dell'indexer. Jackett però rigenera
+il link `/dl/?path=...` a ogni richiesta: senza il guid la stessa release
+sembrerebbe nuova a ogni passata. L'operazione **Duplicati per titolo e fonte**
+è la pulizia di quelle righe già accumulate: confronta `source` e
+`lower(title)`, tiene la riga più recente e cancella le altre. Non tocca i
+magnet.
 
 ## Come eseguire una select da terminale
 

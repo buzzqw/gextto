@@ -252,7 +252,7 @@ test("manutenzione SQL mostra l'indicatore mentre la query lavora", async ({ pag
     await new Promise((resolve) => setTimeout(resolve, 1200));
     await route.fulfill({ contentType: "text/html; charset=utf-8", body: "<div>ok</div>" });
   });
-  const operation = page.locator(".v2-archive-sql-op").first();
+  const operation = page.locator(".v2-archive-sql-op", { hasText: "Release più vecchie di 6 mesi" }).first();
   await operation.getByRole("button", { name: "Anteprima", exact: true }).click();
   const working = page.locator("#v2-archive-sql-working");
   await expect(working).toHaveClass(/htmx-request/);

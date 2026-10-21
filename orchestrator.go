@@ -855,7 +855,7 @@ func RunCycleDomain(
 				// archive search can use it without re-downloading an already
 				// expired link. Skipped in dry-run: it rewrites the archive DB.
 				if !cfg.DryRun {
-					if err := archive.CanonicalizeTorrentURL(*release.TorrentURL, release.Magnet); err != nil {
+					if err := archive.CanonicalizeRelease(&release, release.Magnet); err != nil {
 						logging.Warn("could not canonicalize archived torrent URL", "error", err)
 					}
 				}

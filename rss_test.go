@@ -128,6 +128,48 @@ func TestKeepsJackettTrackerIdentityInReleaseSource(t *testing.T) {
 	}
 }
 
+func TestParseFeedBodyKeepsGUIDAndTorznabTorrentIdentity(t *testing.T) {
+	const hash = "0123456789012345678901234567890123456789"
+	body := `<rss xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>
+		<item>
+			<title>Magnet.Show.S01E01.1080p</title>
+			<guid>https://tracker.example/details/1</guid>
+			<link>http://jackett:9117/dl/test/?path=one</link>
+			<torznab:attr name="magneturl" value="magnet:?xt=urn:btih:` + hash + `"/>
+		</item>
+		<item>
+			<title>Hash.Show.S01E02.1080p</title>
+			<guid>https://tracker.example/details/2</guid>
+			<link>http://jackett:9117/dl/test/?path=two</link>
+			<torznab:attr name="infohash" value="` + hash + `"/>
+		</item>
+		<item>
+			<title>Url.Show.S01E03.1080p</title>
+			<guid>https://tracker.example/details/3</guid>
+			<link>http://jackett:9117/dl/test/?path=three</link>
+		</item>
+	</channel></rss>`
+	releases, err := parse_feed_body(body, "jackett")
+	if err != nil {
+		t.Fatalf("parse_feed_body: %v", err)
+	}
+	if len(releases) != 3 {
+		t.Fatalf("len = %d, want 3", len(releases))
+	}
+	if releases[0].GUID != "https://tracker.example/details/1" || !strings.Contains(releases[0].Magnet, hash) {
+		t.Fatalf("magneturl release = %+v", releases[0])
+	}
+	if releases[1].GUID != "https://tracker.example/details/2" || !strings.Contains(releases[1].Magnet, hash) {
+		t.Fatalf("infohash release = %+v", releases[1])
+	}
+	if releases[2].GUID != "https://tracker.example/details/3" || releases[2].TorrentURL == nil || *releases[2].TorrentURL != "http://jackett:9117/dl/test/?path=three" {
+		t.Fatalf("url-only release = %+v", releases[2])
+	}
+	if releases[2].Magnet != "" {
+		t.Fatalf("url-only release has a magnet: %q", releases[2].Magnet)
+	}
+}
+
 func TestJackettHealthProbeValidatesAPIKey(t *testing.T) {
 	jackett := IndexerConfig{Name: "jackett", URL: "http://host:9117", APIKey: "secret", Enabled: true}
 	want := "http://host:9117/api/v2.0/indexers/all/results/torznab/api?t=caps&apikey=secret"

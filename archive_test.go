@@ -287,6 +287,80 @@ func TestStoresAndCanonicalizesTorrentURLs(t *testing.T) {
 	}
 }
 
+func TestArchiveDeduplicatesEphemeralTorrentURLsByGUID(t *testing.T) {
+	archive := openTestArchive(t)
+	const guid = "https://tracker.example/details/42"
+	url1 := "http://jackett:9117/dl/test/?path=one"
+	url2 := "http://jackett:9117/dl/test/?path=two"
+	url3 := "http://jackett:9117/dl/test/?path=three"
+	release := func(url, listing string) models.Release {
+		return models.Release{
+			Title:        "Example.Show.S01E01.1080p",
+			TorrentURL:   &url,
+			Source:       "jackett:Test",
+			GUID:         listing,
+			DiscoveredAt: time.Now().UTC(),
+			Seeders:      -1,
+			Peers:        -1,
+		}
+	}
+	// The same listing, with the regenerated Jackett URL, is one row.
+	if err := archive.SaveBatch([]models.Release{release(url1, guid)}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch first: %v", err)
+	}
+	if err := archive.SaveBatch([]models.Release{release(url2, guid)}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch second: %v", err)
+	}
+	if count, err := archive.Count(); err != nil || count != 1 {
+		t.Fatalf("count after the same guid = %d, %v; want 1", count, err)
+	}
+	var stored string
+	if err := archive.db.QueryRow("SELECT magnet FROM archive").Scan(&stored); err != nil || stored != url2 {
+		t.Fatalf("stored URL = %q, %v; want the newest %q", stored, err, url2)
+	}
+	// A different listing of the same title stays a second row.
+	if err := archive.SaveBatch([]models.Release{release(url1, "https://tracker.example/details/43")}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch other guid: %v", err)
+	}
+	if count, err := archive.Count(); err != nil || count != 2 {
+		t.Fatalf("count after a new guid = %d, %v; want 2", count, err)
+	}
+	// Downloading the first listing replaces its URL with the magnet and keeps
+	// the guid key, so another pass cannot append it again.
+	magnet := "magnet:?xt=urn:btih:0123456789012345678901234567890123456789"
+	first := release(url2, guid)
+	if err := archive.CanonicalizeRelease(&first, magnet); err != nil {
+		t.Fatalf("CanonicalizeRelease: %v", err)
+	}
+	var hash string
+	if err := archive.db.QueryRow(
+		"SELECT magnet, COALESCE(magnet_hash,'') FROM archive WHERE magnet_key=?1",
+		archiveMagnetKeyString(archiveGUIDIdentity("jackett:Test", guid)),
+	).Scan(&stored, &hash); err != nil {
+		t.Fatalf("read canonical row: %v", err)
+	}
+	if stored != magnet || hash != "0123456789012345678901234567890123456789" {
+		t.Fatalf("canonical row = %q, %q", stored, hash)
+	}
+	if err := archive.SaveBatch([]models.Release{release(url3, guid)}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch after canonicalization: %v", err)
+	}
+	if count, err := archive.Count(); err != nil || count != 2 {
+		t.Fatalf("count after canonicalization = %d, %v; want 2", count, err)
+	}
+	if err := archive.db.QueryRow("SELECT magnet FROM archive WHERE magnet_key=?1", archiveMagnetKeyString(archiveGUIDIdentity("jackett:Test", guid))).Scan(&stored); err != nil || stored != magnet {
+		t.Fatalf("canonical magnet was overwritten: %q, %v", stored, err)
+	}
+	// Deleting the other URL row by its exact link works even though its key
+	// is the guid, not the URL digest.
+	if removed, err := archive.Delete(url1); err != nil || !removed {
+		t.Fatalf("Delete(url) = %v, %v; want true", removed, err)
+	}
+	if count, err := archive.Count(); err != nil || count != 1 {
+		t.Fatalf("count after Delete = %d, %v; want 1", count, err)
+	}
+}
+
 // TestArchiveMigratesToMagnetKey pins the one-off rebuild of an archive created
 // before magnet_key: every row keeps its id and the FTS search still finds it,
 // the exact-magnet dedup holds, and the unused title index is gone.

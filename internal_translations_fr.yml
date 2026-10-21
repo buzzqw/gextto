@@ -5698,3 +5698,7 @@ fra:
   Tetto alle connessioni per singolo torrent, usato dal limite automatico o come limite fisso quando l'automatico è spento (-1 = illimitato).: Plafond des connexions par torrent, utilisé par la limite automatique ou comme limite fixe quand l'automatique est désactivé (-1 = illimité).
   Adatta il numero di connessioni di ogni torrent alla macchina (core e RAM) e riduce quelle dei torrent che non progrediscono; il valore qui sopra resta il tetto (-1 = nessun tetto).: Dimensionne les connexions de chaque torrent selon la machine (cœurs et RAM) et réduit les torrents sans progrès ; la valeur ci-dessus reste le plafond (-1 = sans plafond).
   -1 = nessun tetto: -1 = sans plafond
+  "Release recenti": "Releases récentes"
+  "Mostra le release entrate in archivio di recente, dalla più nuova.": "Affiche les releases entrées récemment dans l'archive, de la plus récente à la plus ancienne."
+  "Duplicati per titolo e fonte": "Doublons par titre et source"
+  "Mostra e cancella le release con solo un link .torrent ripetute per titolo e fonte, tenendo la riga più recente.": "Affiche et supprime les releases avec uniquement un lien .torrent répétées par titre et source, en conservant la ligne la plus récente."

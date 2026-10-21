@@ -43,6 +43,8 @@ func TestV2ArchiveSQLMaintenance(t *testing.T) {
 		`value="ita" selected`,
 		`value="eng"`,
 		"Release nella lingua selezionata più vecchie di 6 mesi",
+		"Release recenti",
+		"Duplicati per titolo e fonte",
 		`hx-post="/maintenance/archive-sql/preview"`,
 		"Eliminazione",
 		"Solo lettura",
