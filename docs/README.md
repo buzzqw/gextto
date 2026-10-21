@@ -26,6 +26,7 @@ needs.
 | [Build and test times](tempistiche.md) | What builds and the test suite cost on a real machine, and how long CI takes. |
 | [Architecture](ARCHITECTURE.md) | Map of the code folders and files. |
 | [State and backlog](evoluzione.md) | What Gextto and the gx-torrent / gx-core engine have today and what is planned next (positioning, capabilities, engine, open items). |
+| [Cosa è davvero aperto](evoluzione1.md) | Working triage of `evoluzione.md` §8: which items are really open, which only wait for a measurement or a host, which are closed with data. |
 | [Measurements and verification](measurements.md) | How each number is taken: harnesses, benchmarks and footprint, swarm, DHT, merge on real data, accessibility verification. |
 | [gx-torrent engine](gx-torrent.md) | Technical document of the pure-Go torrent engine (gx-core, daemon, adapter). |
 | [eD2k e Kad con aMule (Italiano)](amule.it.md) | Italian version: install and configure aMule, enable it in Gextto, use eD2k/Kad, troubleshooting and settings. |
