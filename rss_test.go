@@ -148,19 +148,31 @@ func TestParseFeedBodyKeepsGUIDAndTorznabTorrentIdentity(t *testing.T) {
 			<guid>https://tracker.example/details/3</guid>
 			<link>http://jackett:9117/dl/test/?path=three</link>
 		</item>
+		<item>
+			<title>Bare.Show.S01E04.1080p</title>
+			<guid>https://tracker.example/details/4</guid>
+			<torznab:attr name="infohash" value="` + hash + `"/>
+		</item>
 	</channel></rss>`
 	releases, err := parse_feed_body(body, "jackett")
 	if err != nil {
 		t.Fatalf("parse_feed_body: %v", err)
 	}
-	if len(releases) != 3 {
-		t.Fatalf("len = %d, want 3", len(releases))
+	if len(releases) != 4 {
+		t.Fatalf("len = %d, want 4", len(releases))
 	}
 	if releases[0].GUID != "https://tracker.example/details/1" || !strings.Contains(releases[0].Magnet, hash) {
 		t.Fatalf("magneturl release = %+v", releases[0])
 	}
-	if releases[1].GUID != "https://tracker.example/details/2" || !strings.Contains(releases[1].Magnet, hash) {
-		t.Fatalf("infohash release = %+v", releases[1])
+	// An infohash next to a `.torrent` link keeps the link: a bare magnet has
+	// no tracker and finds no peers on a private indexer.
+	if releases[1].GUID != "https://tracker.example/details/2" || releases[1].Magnet != "" ||
+		releases[1].TorrentURL == nil || *releases[1].TorrentURL != "http://jackett:9117/dl/test/?path=two" {
+		t.Fatalf("infohash release with a link = %+v", releases[1])
+	}
+	// Without a link the infohash is all there is: it becomes the magnet.
+	if releases[3].GUID != "https://tracker.example/details/4" || !strings.Contains(releases[3].Magnet, hash) {
+		t.Fatalf("infohash-only release = %+v", releases[3])
 	}
 	if releases[2].GUID != "https://tracker.example/details/3" || releases[2].TorrentURL == nil || *releases[2].TorrentURL != "http://jackett:9117/dl/test/?path=three" {
 		t.Fatalf("url-only release = %+v", releases[2])

@@ -291,9 +291,12 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 						torrentPtr = &value
 					}
 					// Torznab can expose the infohash as an attribute without a
-					// magnet. Rebuild the magnet so the archive and the engine get
-					// the torrent identity instead of an ephemeral download URL.
-					if magnet == "" && infohash != "" {
+					// magnet. Rebuild the magnet only when there is no `.torrent`
+					// link: a bare magnet has no tracker, and on a private
+					// indexer (no DHT, no PEX) it finds no peers, while the file
+					// carries the announce with the passkey. A listing with a
+					// link keeps it, and its guid is its archive identity.
+					if magnet == "" && infohash != "" && torrentPtr == nil {
 						magnet = prowlarrInfoHashMagnet(infohash, title)
 					}
 					if release := ParseReleaseSource(title, magnet, torrentPtr, itemSource, discoveredAt); release != nil {

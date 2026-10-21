@@ -107,7 +107,7 @@ when a change is meant to be an optimisation. A single pass is noise.
 | `BenchmarkTransferLoopback` (uTP, 16 KiB block) | 131–139 MB/s, 5.6 KB, 99 allocs | connection-id probe, lazy `Event` channels, reusable read window, `netip.AddrPort` key |
 | `BenchmarkUTPConnRemoteAddr` | 113 ns/op, 40 B, 3 allocs | addresses converted once at wrap |
 | `BenchmarkStorageWrite` / `StorageWriteMmap` | ~5.8 / ~7.4 GB/s | the disk is far above any network speed: `O_DIRECT` and io_uring are not justified |
-| `BenchmarkArchiveSaveBatch` (1,000 releases, ~400 B magnets) | 45.2–46.1 ms, 3.09 MB, 50,536 allocs (44.0–44.4 ms before the guid identity) | prepared statements per chunk; measured 2026-10-21 on the N97 |
+| `BenchmarkArchiveSaveBatch` (1,000 releases, ~400 B magnets) | 45.2–46.1 ms, 3.09 MB, 50,536 allocs (44.0–44.4 ms before the guid identity); with the magnet ahead of the guid 43.9–45.0 ms against 44.8–46.1 ms, interleaved runs on a busy host | prepared statements per chunk; measured 2026-10-21 on the N97 |
 | `BenchmarkFeedArchiveSearch` (100,000 releases) | 7.4 ms | compact index on bbolt |
 | `BenchmarkMetricsScrape` (one torrent) | ~0.24 ms, 121 KB, 813 allocs | computed only when scraped |
 | `BenchmarkCriteriaMatch` (RSS rule, 4 names) | 142 ns/op, 0 B, 0 allocs | scans the title in place |

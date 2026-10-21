@@ -102,10 +102,11 @@ test-race:
 # daemon, start it in dry-run on their own port and drive the real UI in a
 # browser; they cover the pages, the mobile layout, the i18n and the axe
 # accessibility checks. Kept out of `make test` because they need Node and a
-# browser. Run `npm ci` automatically when node_modules is missing.
+# browser. Run `npm ci` automatically when node_modules is missing. Locally the
+# specs run in three independent groups (own daemon, data dir and ports);
+# GEXTTO_TEST_UI_SERIAL=1 or CI keeps the old single process.
 test-ui:
-	scripts/build-daemon.sh
-	cd uiweb/end2end && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npx playwright test
+	scripts/test-ui.sh
 
 # Seeding/choking measurements. The deterministic unchoker harness
 # runs with `make test-engine`; this runs the opt-in local-swarm harness. Add

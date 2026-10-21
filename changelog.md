@@ -23,7 +23,11 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   dell'archivio** ci sono due operazioni in più: **Release recenti**, per
   vedere che cosa è appena entrato, e **Duplicati per titolo e fonte**, per
   ripulire le righe già accumulate tenendo la più recente. I magnet non vengono
-  toccati.
+  toccati. Una release con magnet resta riconosciuta dal suo torrent: se un
+  feed pubblica un REPACK con lo stesso identificatore, entrano in archivio
+  entrambi, ognuno con il suo titolo. Quando l'indexer offre il link
+  `.torrent`, Gextto scarica quello anche se conosce l'hash: con gli indexer
+  privati un magnet senza tracker non troverebbe nessuno.
 - **Le notifiche di download dicono da dove arriva il torrent.** Il messaggio
   «Nuovo episodio in download» / «Film in download» (Telegram, email e gli
   altri canali) ora ha la riga **📡 Fonte** con il feed, l'indexer o l'archivio

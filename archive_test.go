@@ -559,3 +559,45 @@ func TestArchiveKeepsOneRowPerTorrent(t *testing.T) {
 		t.Fatalf("RemoveHash by base32 = %d, %v", removed, err)
 	}
 }
+
+// TestArchiveSameGUIDAnotherTorrentKeepsBoth: a feed that publishes another
+// torrent under the same guid (a REPACK replacing a release) must not rename
+// the old row and drop the new torrent: the magnet, not the guid, is the
+// identity of a release that has one.
+func TestArchiveSameGUIDAnotherTorrentKeepsBoth(t *testing.T) {
+	archive := openTestArchive(t)
+	release := func(title, hash string) models.Release {
+		return models.Release{
+			Title:        title,
+			Magnet:       "magnet:?xt=urn:btih:" + hash,
+			Source:       "ExtTo",
+			GUID:         "https://feed.example/item/1",
+			DiscoveredAt: time.Now().UTC(),
+			Seeders:      -1,
+			Peers:        -1,
+		}
+	}
+	first := release("Show.S01E01.1080p.WEB", "1111111111111111111111111111111111111111")
+	repack := release("Show.S01E01.REPACK.2160p.WEB", "2222222222222222222222222222222222222222")
+	for _, r := range []models.Release{first, repack, first} {
+		if err := archive.SaveBatch([]models.Release{r}, &Config{}); err != nil {
+			t.Fatalf("SaveBatch %s: %v", r.Title, err)
+		}
+	}
+	rows, err := archive.db.Query("SELECT title, magnet_hash FROM archive ORDER BY title")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	got := map[string]string{}
+	for rows.Next() {
+		var title, hash string
+		if err := rows.Scan(&title, &hash); err != nil {
+			t.Fatal(err)
+		}
+		got[title] = hash
+	}
+	if len(got) != 2 || got[first.Title] != "1111111111111111111111111111111111111111" || got[repack.Title] != "2222222222222222222222222222222222222222" {
+		t.Fatalf("rows = %v, want each title with its own torrent", got)
+	}
+}

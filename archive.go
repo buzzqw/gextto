@@ -114,16 +114,19 @@ func archiveGUIDIdentity(source, guid string) string {
 // archiveIdentity is what magnet_key hashes: the magnet when there is one, the
 // indexer's stable guid for a `.torrent`-only listing, otherwise the download
 // URL. Jackett regenerates the `/dl/?path=...` URL at every request, so the
-// URL alone would archive the same listing again and again.
+// URL alone would archive the same listing again and again. The magnet comes
+// first: it names the torrent, while a feed may reuse one guid for another
+// torrent (a REPACK replacing a release), and keying that by the guid would
+// give the old row the new title and drop the new torrent.
 func archiveIdentity(release *models.Release) string {
 	if release == nil {
 		return ""
 	}
-	if guid := archiveGUIDIdentity(release.Source, release.GUID); guid != "" {
-		return guid
-	}
 	if magnet := strings.TrimSpace(release.Magnet); magnet != "" {
 		return magnet
+	}
+	if guid := archiveGUIDIdentity(release.Source, release.GUID); guid != "" {
+		return guid
 	}
 	if release.TorrentURL != nil {
 		return strings.TrimSpace(*release.TorrentURL)
@@ -434,10 +437,10 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 				}
 			}
 			// Only a guid-keyed row can need a second pass: it may still hold
-			// the previous ephemeral URL (or no magnet yet). For a magnet-only
-			// release the insert was ignored because that exact row is already
+			// the previous ephemeral URL (or no magnet yet). For a release with
+			// a magnet the insert was ignored because that exact row is already
 			// there, and an extra UPDATE would just cost a write.
-			if strings.TrimSpace(r.GUID) != "" {
+			if hash == nil && strings.TrimSpace(r.Magnet) == "" && strings.TrimSpace(r.GUID) != "" {
 				if _, err := refreshKey.Exec(args...); err != nil {
 					_ = tx.Rollback()
 					return err

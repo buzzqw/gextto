@@ -21,7 +21,11 @@ manual is online: [English](docs/MANUAL.en.md) ·
   stays one row. **Maintenance → Archive SQL maintenance** has two more
   operations: **Recent releases**, to see what just came in, and **Duplicates
   by title and source**, to clean up the rows already accumulated while keeping
-  the newest. Magnets are never touched.
+  the newest. Magnets are never touched. A release with a magnet is still
+  recognised by its torrent: when a feed publishes a REPACK under the same
+  identifier, both enter the archive, each with its own title. When the
+  indexer offers the `.torrent` link, Gextto downloads that even if it knows
+  the hash: on private indexers a magnet without trackers would find nobody.
 - **Download notifications say where the torrent comes from.** The «New episode
   download started» / «Movie download started» message (Telegram, email and the
   other channels) now has a **📡 Source** line with the feed, the indexer or the
