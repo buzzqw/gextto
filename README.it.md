@@ -62,10 +62,13 @@ dormire.
 
 ## Uno sguardo
 
-Un'istanza di prova che scarica cinque torrent pubblici e legali: Debian, Ubuntu
-Server e i film open di Blender *Big Buck Bunny*, *Sintel* ed *Elephants Dream*.
+Un'istanza di prova che scarica sei torrent pubblici e legali: Debian, Ubuntu
+Server e i film open di Blender *Big Buck Bunny*, *Sintel*, *Tears of Steel* e
+*Cosmos Laundromat*. Altre schermate — libreria, configurazione, primo avvio,
+manutenzione, salute, la pagina di gx-torrent e le altre lingue — sono nella
+**[visita guidata](docs/TOUR.it.md)**.
 
-![Scarico: cinque torrent in corso, filtri, ordinamento e il pulsante Banda](docs/screenshots/it/downloads.png)
+![Scarico: sei torrent in corso, filtri, ordinamento e il pulsante Banda](docs/screenshots/it/downloads.png)
 
 | | |
 |---|---|
@@ -80,6 +83,8 @@ Sul telefono le stesse pagine diventano schede, i menu si aprono sul posto e le
 azioni sulla selezione restano a portata di pollice. L'interfaccia web si
 installa anche come app (PWA), e un client da terminale fa lo stesso lavoro via SSH.
 <br clear="right">
+
+**[Visita guidata con tutte le schermate →](docs/TOUR.it.md)**
 
 ## Installazione su Linux
 

@@ -214,6 +214,28 @@ and ports, and runs them concurrently. CI keeps the serial process. The script
 kills the test `gx-torrent` at the end; an interrupted run can leave one
 listening until its 15-minute orphan timeout.
 
+### Screenshots
+
+The images of the README and of the guided tour (`docs/TOUR.en.md`,
+`docs/TOUR.it.md`) are generated, not taken by hand:
+
+```bash
+make screenshots          # docs/screenshots/<lang>/<name>.png
+```
+
+`scripts/screenshots.sh` compiles `gexttod` and `gx-torrent` into
+`~/.cache/gextto-screenshots` (no change to `bin/` or to the build numbers),
+starts a real instance there — dry-run cannot add torrents — with automation
+off, its own ports and a 2000 KiB/s cap, adds the legal torrents (Debian,
+Ubuntu Server, the Blender open movies) and a small public-domain library, lets
+them download for `GEXTTO_SHOTS_SETTLE` seconds (150) and runs
+`uiweb/end2end/screenshots.config.ts`. English and Italian get every image, de,
+fr, es and pl the dashboard (`GEXTTO_SHOTS_LANGS`,
+`GEXTTO_SHOTS_DASHBOARD_LANGS`). The work directory is removed at the end;
+`GEXTTO_SHOTS_KEEP=1` keeps the instance running to look at it. Run it after a
+visible UI change and commit the images with it: the downloads are real, a few
+hundred MB on the line.
+
 The suite also gives the test daemon its own gx-torrent: `playwright.config.ts`
 sets `GEXTTO_GXTORRENT_LISTEN=127.0.0.1:18893`, which replaces both the managed
 daemon's listen address and the URL Gextto uses to reach it. Without it, a

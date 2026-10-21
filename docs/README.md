@@ -8,6 +8,8 @@ needs.
 |---|---|
 | [Manuale italiano](MANUAL.it.md) | Setup and day-to-day use of the web UI. |
 | [English manual](MANUAL.en.md) | English version of the complete user guide. |
+| [Visita guidata](TOUR.it.md) | Screenshots of the main screens, generated with `make screenshots`. |
+| [Guided tour](TOUR.en.md) | English version of the screenshot tour. |
 | [Changelog (italiano)](../changelog.md) | What changed for users, day by day. |
 | [Changelog (English)](../changelog.en.md) | English version of the user-facing changelog. |
 | [Chiavi di accesso](api-keys.it.md) | The Gextto API key and the gx-torrent token: what they are, how to generate and use them. |

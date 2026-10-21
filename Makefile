@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast gx-torrent test test-race test-engine test-dht test-ui fuzz-smoke container vet fmt check-ui check-scripts installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 cache-refresh
+.PHONY: all build fast gx-torrent test test-race test-engine test-dht test-ui screenshots fuzz-smoke container vet fmt check-ui check-scripts installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 cache-refresh
 
 all: build
 
@@ -107,6 +107,13 @@ test-race:
 # GEXTTO_TEST_UI_SERIAL=1 or CI keeps the old single process.
 test-ui:
 	scripts/test-ui.sh
+
+# Screenshots of the README and of the guided tour (docs/TOUR.*.md), written to
+# docs/screenshots/<lang>/. A real test instance in ~/.cache downloads a few
+# legal torrents for a couple of minutes, then Playwright drives the UI; bin/
+# and the build numbers are not touched. Not a test: run it when the UI changes.
+screenshots:
+	scripts/screenshots.sh
 
 # Seeding/choking measurements. The deterministic unchoker harness
 # runs with `make test-engine`; this runs the opt-in local-swarm harness. Add

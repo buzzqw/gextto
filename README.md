@@ -61,10 +61,13 @@ It runs on a small machine: every figure here comes from a 4-core Intel N97 with
 
 ## A look
 
-A test instance downloading five public, legal torrents: Debian, Ubuntu Server
-and the Blender open movies *Big Buck Bunny*, *Sintel* and *Elephants Dream*.
+A test instance downloading six public, legal torrents: Debian, Ubuntu Server
+and the Blender open movies *Big Buck Bunny*, *Sintel*, *Tears of Steel* and
+*Cosmos Laundromat*. More screens — library, settings, first start,
+maintenance, health, the gx-torrent page and the other languages — are in the
+**[guided tour](docs/TOUR.en.md)**.
 
-![Downloads: five torrents in progress, filters, sorting and the bandwidth button](docs/screenshots/en/downloads.png)
+![Downloads: six torrents in progress, filters, sorting and the bandwidth button](docs/screenshots/en/downloads.png)
 
 | | |
 |---|---|
@@ -79,6 +82,8 @@ On a phone the same pages reflow into cards, the menus open in place and the
 actions on the selection stay within thumb reach. The web UI is also installable
 as an app (PWA), and a terminal client covers the same work over SSH.
 <br clear="right">
+
+**[Guided tour with every screen →](docs/TOUR.en.md)**
 
 ## Install on Linux
 
