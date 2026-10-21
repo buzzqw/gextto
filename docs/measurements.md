@@ -71,6 +71,7 @@ with the live service or a standalone instance as stated.
 | Area | Figure today | Build | Reproduce with |
 |---|---|---|---|
 | gx-torrent idle | **60–64 MB RSS** (44–48 MB anonymous), 1–2 % CPU | 226 | clean restart with 3 seeds and 1 download, full IP filter; `ps`/`/proc` |
+| gx-torrent idle after a burst | **550 MB → 35–40 MB RSS** after 5 min below the slow-rate threshold; log line `memory released` | 248 | 7 torrents (4 stalled, 3 seeds), full IP filter; `/proc/<pid>/status`, `gx-torrent.log` |
 | gx-torrent under load | **44–48 % of a core at 8–9 MB/s**, ~0.35–0.43 CPU per peer; picker 9 % of the profile | 226 | the peer-reader load test (9–10 releases, Auto, collector every 5 s, pprof 45 s) |
 | Automatic peer cap | **55 per torrent, 300 in all** on this 4-core/16 GiB host; with 9 active torrents **−36 % peers and −12 % CPU** against a fixed 55 per torrent, throughput within the swarm noise (−4 %) | 1934 (engine 245) | `GX_MEASURE_AUTO=1` / `GX_MEASURE_MAXCONN`, 9 public ISOs together, 150 s × 2 interleaved rounds (§4.1) |
 | Memory under load | RssAnon peak **1105 MB** with 10 torrents and the NFS write cache; **507 MB outside the two caches** | 226 | same load, `pprof` heap at the end |
@@ -133,6 +134,7 @@ build-by-build chronicles are compressed to one row per step.
 | Under load | 44–48 % of a core at 8–9 MB/s with ~110–130 peers |
 | CPU per MB/s / per peer | 5.3 / 0.35–0.43 |
 | Memory under load | RssAnon peak ~1.1 GB with 10 torrents and the NFS write cache; ~507 MB outside the two caches |
+| Idle release after a burst | 550 MB RSS → 35–40 MB after 5 min without downloads (build 248, 7 torrents) |
 | Piece picker | 9 % of the profile |
 
 **Choices behind these figures.** The read path uses a progress-based deadline, so a
@@ -140,7 +142,11 @@ dead uTP connection fails at once instead of looping; the socket handles each da
 the receive buffer and copies only what stays queued; `waitEvents` is a plain select.
 The IP filter keeps the parsed rules instead of the file, `GOGC=50` trims the heap
 headroom, and the buffers of a finished burst are released. The collector costs 0.5 %
-(`gcBgMarkWorker`) and 2.2 % (`mallocgc`) of the profile.
+(`gcBgMarkWorker`) and 2.2 % (`mallocgc`) of the profile. After 5 minutes below the
+queue's slow rate the daemon calls `debug.FreeOSMemory` (at most every 10 minutes) to
+return the 1 MB piece buffers that the per-torrent `sync.Pool`s would otherwise keep
+reachable until the next collection: on the N97 the RSS went from 550 MB to 35–40 MB
+with 7 torrents and no active transfer.
 
 **Piece picker.** With ~200 peers it reads the peer bitfield (O(1)), keeps a count per
 piece and a counter of high-priority pieces, and touches only the pieces a disconnecting

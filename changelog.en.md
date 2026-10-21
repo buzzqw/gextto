@@ -14,6 +14,11 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **gx-torrent gives memory back to the system.** After a period of heavy
+  downloading gx-torrent could stay at hundreds of MB of RAM even with no
+  traffic. After 5 minutes with the download rate below the slow-torrent
+  threshold it now returns the unused memory to the system (at most once every
+  10 minutes); the caches rebuild by themselves on the next transfer.
 - **Archive inflated by repeated releases: fixed.** The archive could hold the
   same release dozens of times when the indexer (for example Jackett)
   regenerated the `.torrent` link on every search: the link changed, the

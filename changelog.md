@@ -15,6 +15,12 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Memoria di gx-torrent restituita al sistema.** Dopo un periodo di download
+  intenso gx-torrent poteva restare a centinaia di MB di RAM anche senza
+  traffico. Ora, dopo 5 minuti con il download sotto la soglia dei torrent
+  lenti, restituisce al sistema la memoria non più usata (al massimo una volta
+  ogni 10 minuti); le cache si ricostruiscono da sole al trasferimento
+  successivo.
 - **Archivio gonfiato da release ripetute: corretto.** L'archivio poteva
   contenere la stessa release decine di volte quando l'indexer (per esempio
   Jackett) rigenerava il link `.torrent` a ogni ricerca: il link cambiava, ma

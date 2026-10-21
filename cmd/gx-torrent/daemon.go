@@ -414,6 +414,11 @@ type Daemon struct {
 	cacheCheckedAt time.Time
 	cacheAppliedAt time.Time
 
+	// Idle memory release (gc.go): lastDownloadAt is the last tick with an
+	// active download, lastMemoryReleaseAt the last debug.FreeOSMemory call.
+	lastDownloadAt      time.Time
+	lastMemoryReleaseAt time.Time
+
 	// classCached is the storage class of the download dir, refreshed without
 	// holding d.mu: statfs on an unresponsive network mount can block for a
 	// long time and must never stall the daemon lock.
@@ -449,18 +454,19 @@ func newDaemon(opts Options) (*Daemon, error) {
 		opts.StatePath = filepath.Join(opts.DataDir, "state.json")
 	}
 	d := &Daemon{
-		opts:      opts,
-		selection: map[string][]int{},
-		runtime:   map[string]*runtimeInfo{},
-		moving:    map[string]bool{},
-		startedAt: time.Now(),
-		wake:      make(chan struct{}, 1),
-		feedWake:  make(chan struct{}, 1),
-		feedPace:  newFeedPacer(feedHostGap, feedHostCooldown),
-		trackers:  newTrackerHealth(),
-		appliedDL: -1,
-		appliedUL: -1,
-		autoSpeed: &autoSpeed{},
+		opts:           opts,
+		selection:      map[string][]int{},
+		runtime:        map[string]*runtimeInfo{},
+		moving:         map[string]bool{},
+		startedAt:      time.Now(),
+		lastDownloadAt: time.Now(),
+		wake:           make(chan struct{}, 1),
+		feedWake:       make(chan struct{}, 1),
+		feedPace:       newFeedPacer(feedHostGap, feedHostCooldown),
+		trackers:       newTrackerHealth(),
+		appliedDL:      -1,
+		appliedUL:      -1,
+		autoSpeed:      &autoSpeed{},
 	}
 	if opts.Mode == ModeStandalone {
 		d.sessions = auth.NewSessions(30 * 24 * time.Hour)
@@ -1242,6 +1248,9 @@ func (d *Daemon) tick(now time.Time) {
 	d.rateHist.add(now, int64(engineStats.SpeedDownload), int64(engineStats.SpeedUpload))
 	d.publishViewsLocked(views)
 	d.mu.Unlock()
+
+	// Return the heap of a finished burst when the daemon is quiet (gc.go).
+	d.maybeReleaseMemory(now, aggregate >= cfg.SlowRate)
 
 	// The lifetime flush does file I/O: outside d.mu, and only on its cadence.
 	if saveLifetime {

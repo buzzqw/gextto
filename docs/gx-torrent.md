@@ -1757,6 +1757,14 @@ using fixed values.
   applies it immediately.
 - The cache size changes on the fly; cache expiry and
   preallocation instead reopen the daemon session.
+- **Idle memory release**: piece buffers are 1 MB and live in per-torrent
+  `sync.Pool`s. After a burst they can stay reachable until a collection even
+  when nothing is moving, because an idle daemon allocates too little to
+  trigger one. After **5 minutes with the total download rate below the
+  queue's slow-rate threshold** the daemon calls `debug.FreeOSMemory` (at most
+  once every 10 minutes) and logs `memory released`; the caches rebuild on the
+  next transfer. On the N97 the RSS went from 550 MB to 35–40 MB
+  ([`measurements.md`](measurements.md) §4.1).
 - The Health panel and `GET /api/v1/stats` show the effective cache, the
   chosen target (`cache_read_mb`, `cache_write_mb`), the **reason**
   (`cache_reason`), the storage class (`cache_storage`) and the available
