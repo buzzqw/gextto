@@ -68,10 +68,10 @@ elencati per valore/sforzo, ciascuno dopo uno studio e senza copiare codice
 
 ## 4. eD2k / aMule
 
-- **amuled gestito**: avviarlo e supervisionarlo come qBittorrent-nox
-  (config-dir, password EC generata, porte) invece di pretendere che
-  l'operatore lo configuri a mano. Gate: utenti che vogliono eD2k senza setup
-  manuale.
+- **amuled gestito (opzionale, non un motore di Gextto)**: Gextto non installa
+  né richiede aMule; l'operatore lo avvia e lo configura. Un avvio assistito
+  (config-dir privata, password EC generata, porte) toglierebbe il setup manuale
+  a chi lo vuole. Gate: utenti che vogliono eD2k senza configurare aMule a mano.
 - **aMule remoto**: l'import dei completati assume lo stesso path; servirebbe un
   path mapping tipo `qbittorrent_path_mappings`.
 - **Fallback eD2k**: è una scelta esplicita dell'operatore, non un punto in
