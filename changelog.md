@@ -15,6 +15,31 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Scarico: i download eD2k mostrano più dati e il badge è colorato.** Ogni
+  riga eD2k ora mostra, oltre a stato, progressione, velocità e fonti, anche i
+  **byte caricati**, il **tempo stimato** e il **rapporto** tra caricato e
+  scaricato; il badge **eD2k** ha un colore suo, così si distingue subito dai
+  torrent.
+- **Banda: il ping accanto ad Auto e un autotune più attento all'upload.** Con
+  la velocità su Auto il badge mostra il **ping** misurato; quando la linea è
+  asimmetrica l'upload conta come carico già a un decimo della capacità (tra 32
+  e 256 KiB/s), quindi Auto lo limita prima che saturi la rete. Se l'upload
+  comincia a caricare durante il controllo, viene limitato subito, senza
+  aspettare un nuovo tentativo.
+- **eD2k: tolta «Impostazioni consigliate».** Il pulsante che cambiava la
+  preallocazione di aMule non c'è più; la preallocazione resta un interruttore
+  esplicito in Configurazione → eD2k e Kad.
+- **Hardlink: il log spiega il caso dello stesso NAS in mount separati.** Se
+  download e libreria sono due mount NFS dello stesso server, un hardlink non
+  può attraversarli: Gextto lo dice e indica di montare una cartella padre
+  comune o di tenere la libreria nello stesso export, invece del generico
+  «filesystem diversi».
+- **qBittorrent: «Proponi» compila la mappatura dei percorsi.** Il pulsante
+  legge da qBittorrent le sue cartelle di download e temporanea e propone le
+  righe `percorso_gextto=percorso_qbittorrent`; si controllano e si salvano.
+- **Tooltip su «attivo» e «ok».** Il pallino **attivo** in fondo al menu e il
+  badge **ok** in alto ora dicono cosa indicano: il primo che Gextto sta
+  lavorando davvero, il secondo lo stato di salute del servizio.
 - **eD2k: i totali scambiati non sono più a zero e i file condivisi dicono
   l'ultimo caricamento.** La pagina eD2k mostrava **Sessione** sempre a `0 B`
   perché chiedeva ad aMule le statistiche a un livello che non le contiene; ora

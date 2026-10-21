@@ -122,9 +122,8 @@ offers **Retry**. Nothing else in Gextto stops working.
 
 The state panel also shows the bytes aMule exchanged in this session and over
 all time, and
-whether aMule preallocates files; **Recommended settings** switches full
-preallocation off (the setting that blocks `amuled` on network disks). The same
-switch is in **Configuration → eD2k and Kad → aMule**, where it is saved to
+whether aMule preallocates files. The preallocation switch is in
+**Configuration → eD2k and Kad → aMule**, where it is saved to
 aMule at once: it is aMule's setting, not one stored in Gextto. The
 **Health** page has an eD2k card with the same state, the session and all-time
 totals and the latest problem lines from aMule's log.

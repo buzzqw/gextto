@@ -14,6 +14,30 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **Downloads: eD2k rows show more data and the badge has a colour.** Each eD2k
+  row now shows, besides state, progress, speed and sources, the **uploaded
+  bytes**, the **estimated time** and the **ratio** between uploaded and
+  downloaded; the **eD2k** badge has a colour of its own, so it stands out from
+  the torrents.
+- **Bandwidth: the ping next to Auto and an autotune that watches upload.** With
+  the speed on Auto the badge shows the measured **ping**; on an asymmetric line
+  upload counts as load from a tenth of the capacity (between 32 and 256 KiB/s),
+  so Auto caps it before it saturates the network. If upload starts loading
+  during the control phase it is capped at once, without waiting for a new
+  trial.
+- **eD2k: «Recommended settings» removed.** The button that changed aMule's
+  preallocation is gone; preallocation stays an explicit switch in
+  Configuration → eD2k and Kad.
+- **Hardlink: the log explains the same NAS on separate mounts.** When downloads
+  and library are two NFS mounts of the same server a hardlink cannot cross
+  them: Gextto now says so and suggests mounting a common parent or keeping the
+  library in the same export, instead of the generic "different filesystems".
+- **qBittorrent: «Propose» fills the path mapping.** The button reads
+  qBittorrent's download and temporary folders and proposes the
+  `gextto_path=qbittorrent_path` lines; check them and save.
+- **Tooltips on «active» and «ok».** The **active** dot at the bottom of the
+  menu and the **ok** badge at the top now explain what they mean: the first
+  that Gextto is really working, the second the service health.
 - **eD2k: exchanged totals are no longer zero and shared files show the last
   upload.** The eD2k page always showed **Session** as `0 B` because it asked
   aMule for the statistics at a detail level that does not carry them; now there

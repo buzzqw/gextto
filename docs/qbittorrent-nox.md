@@ -100,7 +100,7 @@ Then fill in the **qBittorrent-nox** tile:
 | **Tag** | Tag applied to every torrent Gextto adds |
 | **Request timeout** | Seconds for a Web API request (default 15) |
 | **Polling interval** | Milliseconds between status reads (default 1500) |
-| **Path mapping** | `gextto_path=qbittorrent_path`, one per line — leave empty in the common case (see §3) |
+| **Path mapping** | `gextto_path=qbittorrent_path`, one per line — leave empty in the common case (see §3). The **Propose** button reads qBittorrent's save and temporary folders and fills the lines for you; check them and save. |
 
 The **Test** button runs the preflight: it connects, reads the version, the
 default save path and the number of torrents. **Activation is refused** when a

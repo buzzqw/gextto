@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -81,10 +82,95 @@ func noteHardlinkFallback(source, target string, err error) {
 	}
 	reason := "the library folder does not accept hardlinks"
 	if errors.Is(err, syscall.EXDEV) {
-		reason = "downloads and library are on different filesystems"
+		reason = hardlinkCrossDeviceReason(source, target)
 	}
 	logging.Info(fmt.Sprintf("🔗 Hardlink not possible (%s): files that keep seeding are copied into %s, using space twice until the seed ends",
 		reason, filepath.Dir(target)))
+}
+
+// hardlinkCrossDeviceReason explains an EXDEV from os.Link. Two folders can sit
+// on the same NAS and still be separate NFS mounts: the kernel refuses a link
+// across mount points even when the server exports one filesystem, and the
+// generic "different filesystems" is then misleading. When both paths are NFS
+// mounts of the same host, say so and name the fix (a single mount of the
+// common parent, or the library inside the download export).
+func hardlinkCrossDeviceReason(source, target string) string {
+	sourceMount, sourceOK := mountInfoFor(source)
+	targetMount, targetOK := mountInfoFor(target)
+	if sourceOK && targetOK && isNFS(sourceMount.fsType) && isNFS(targetMount.fsType) {
+		sourceHost, sourceExport, sourceNFS := splitNFSSource(sourceMount.source)
+		targetHost, _, targetNFS := splitNFSSource(targetMount.source)
+		if sourceNFS && targetNFS && sourceHost == targetHost && sourceExport != "" {
+			return fmt.Sprintf("both paths are on the NFS server %s but in separate mounts (%s and %s); a hardlink cannot cross mount points — mount a common parent (for example %s:/volume1) or keep the library inside the download export",
+				sourceHost, sourceMount.point, targetMount.point, sourceHost)
+		}
+	}
+	return "downloads and library are on different filesystems"
+}
+
+// mountInfo is the piece of /proc/self/mountinfo a path belongs to.
+type mountInfo struct {
+	point  string
+	fsType string
+	source string
+}
+
+// mountInfoFor returns the longest mount point containing path.
+func mountInfoFor(path string) (mountInfo, bool) {
+	data, err := os.ReadFile("/proc/self/mountinfo")
+	if err != nil {
+		return mountInfo{}, false
+	}
+	if absolute, absErr := filepath.Abs(path); absErr == nil {
+		path = absolute
+	}
+	path = filepath.Clean(path)
+	var best mountInfo
+	bestLen := -1
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 7 {
+			continue
+		}
+		separator := -1
+		for index, field := range fields {
+			if field == "-" {
+				separator = index
+				break
+			}
+		}
+		if separator < 0 || separator+2 >= len(fields) {
+			continue
+		}
+		point := unescapeMountField(fields[4])
+		if point != "/" && point != path && !strings.HasPrefix(path, point+"/") {
+			continue
+		}
+		if len(point) > bestLen {
+			best = mountInfo{point: point, fsType: fields[separator+1], source: fields[separator+2]}
+			bestLen = len(point)
+		}
+	}
+	return best, bestLen >= 0
+}
+
+// unescapeMountField decodes the octal escapes of /proc/self/mountinfo.
+func unescapeMountField(field string) string {
+	replacer := strings.NewReplacer(`\040`, " ", `\011`, "\t", `\012`, "\n", `\134`, `\`)
+	return replacer.Replace(field)
+}
+
+func isNFS(fsType string) bool {
+	return fsType == "nfs" || fsType == "nfs4"
+}
+
+// splitNFSSource separates host and export in "host:/export".
+func splitNFSSource(source string) (host, export string, ok bool) {
+	index := strings.IndexByte(source, ':')
+	if index <= 0 || index == len(source)-1 {
+		return "", "", false
+	}
+	return source[:index], source[index+1:], true
 }
 
 func deviceOf(path string) (uint64, bool) {

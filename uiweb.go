@@ -211,11 +211,16 @@ type uiEd2kRow struct {
 	Progress    float64
 	Done        int64
 	Size        int64
+	Uploaded    int64
 	Speed       uint64
-	Sources     int64
-	Active      int64
-	Paused      bool
-	Complete    bool
+	// Eta is the time left at the current rate, empty when unknown or done;
+	// Ratio is uploaded/downloaded, "—" until something moved.
+	Eta      string
+	Ratio    string
+	Sources  int64
+	Active   int64
+	Paused   bool
+	Complete bool
 }
 
 // uiEd2kRows turns aMule's queue into Scarico rows.
@@ -237,6 +242,17 @@ func uiEd2kRows(downloads []amule.Download) []uiEd2kRow {
 			label, class = "In scarico", ""
 		}
 		progress := download.Progress()
+		uploaded := max(download.Uploaded, 0)
+		ratio := "—"
+		if download.Done > 0 {
+			ratio = strconv.FormatFloat(float64(uploaded)/float64(download.Done), 'f', 2, 64)
+		} else if uploaded > 0 {
+			ratio = "∞"
+		}
+		eta := ""
+		if !download.Complete() && download.Speed > 0 && download.Size > download.Done {
+			eta = logging.HumanDuration((download.Size - download.Done) / download.Speed)
+		}
 		rows = append(rows, uiEd2kRow{
 			Hash:        download.Hash,
 			Name:        download.Name,
@@ -246,7 +262,10 @@ func uiEd2kRows(downloads []amule.Download) []uiEd2kRow {
 			ProgressPct: strconv.FormatFloat(progress, 'f', 1, 64),
 			Done:        download.Done,
 			Size:        download.Size,
+			Uploaded:    uploaded,
 			Speed:       uint64(max(download.Speed, 0)),
+			Eta:         eta,
+			Ratio:       ratio,
 			Sources:     download.Sources,
 			Active:      download.Active,
 			Paused:      download.Paused(),

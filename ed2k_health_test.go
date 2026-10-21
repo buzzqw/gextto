@@ -34,7 +34,7 @@ func TestEd2kLogWarnings(t *testing.T) {
 	}
 }
 
-func TestEd2kSettingsTabAndRecommendedSettings(t *testing.T) {
+func TestEd2kSettingsTabIsSeparateFromSources(t *testing.T) {
 	core, handler := ed2kTestRouter(t)
 	core.SetAllocateFull(true)
 
@@ -52,17 +52,6 @@ func TestEd2kSettingsTabAndRecommendedSettings(t *testing.T) {
 	if strings.Contains(recorder.Body.String(), "eD2k e Kad tramite aMule") {
 		t.Fatal("the eD2k settings are still on the Sources tab")
 	}
-
-	request = httptest.NewRequest(http.MethodPost, "/ed2k/preferences/recommended", nil)
-	request.Header.Set("HX-Request", "true")
-	recorder = httptest.NewRecorder()
-	handler.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "Impostazioni consigliate applicate") {
-		t.Fatalf("recommended settings: status %d, body %q", recorder.Code, recorder.Body.String())
-	}
-	if core.AllocateFull() {
-		t.Fatal("preallocation is still on after the recommended settings")
-	}
 }
 
 func TestEd2kStatusPanelShowsSessionAndPreallocation(t *testing.T) {
@@ -74,7 +63,7 @@ func TestEd2kStatusPanelShowsSessionAndPreallocation(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	body := recorder.Body.String()
-	for _, want := range []string{"Sessione", "Preallocazione file", "Impostazioni consigliate", "attiva"} {
+	for _, want := range []string{"Sessione", "Totale", "Preallocazione file", "attiva"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("eD2k page is missing %q", want)
 		}
@@ -139,7 +128,7 @@ func TestEd2kSettingsTabAppliesPreallocation(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	body := recorder.Body.String()
-	for _, want := range []string{"Preallocazione file", "preallocazione completa riserva subito", "Salva la preallocazione", "Impostazioni consigliate"} {
+	for _, want := range []string{"Preallocazione file", "preallocazione completa riserva subito", "Salva la preallocazione"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("settings panel is missing %q", want)
 		}
@@ -155,14 +144,5 @@ func TestEd2kSettingsTabAppliesPreallocation(t *testing.T) {
 	}
 	if !core.AllocateFull() {
 		t.Fatal("preallocation was not turned on")
-	}
-
-	form = url.Values{"recommended": {"1"}}
-	request = httptest.NewRequest(http.MethodPost, "/settings/ed2k/preallocation", strings.NewReader(form.Encode()))
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	recorder = httptest.NewRecorder()
-	handler.ServeHTTP(recorder, request)
-	if core.AllocateFull() {
-		t.Fatal("recommended settings did not turn preallocation off")
 	}
 }

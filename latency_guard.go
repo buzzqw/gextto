@@ -14,11 +14,13 @@ package gextto
 // the fallen latency becomes the idle reference and the line goes back to
 // Gextto; if it stays high while Gextto left room, someone else is filling
 // the line and the guard yields to them, lowering the caps step by step and
-// raising them, then lifting them, once the latency is back at rest. When the
-// router's WAN counters answer (line_usage.go) their verdict on "someone
-// else" comes first, which also sees users of little bandwidth (a call, a
-// game) that a trial cannot. The controller is internal/autospeed, shared with
-// the standalone daemon.
+// raising them, then lifting them, once the latency is back at rest. Both
+// directions are capped, and the upload one starts from a much lower load
+// because home uplinks are asymmetric and fill up first. When the router's WAN
+// counters answer (line_usage.go) their verdict on "someone else" comes first,
+// which also sees users of little bandwidth (a call, a game) that a trial
+// cannot. The controller is internal/autospeed, shared with the standalone
+// daemon.
 
 import (
 	"fmt"
@@ -79,6 +81,14 @@ const (
 
 	// latencyGuardMinLoadKiB: a direction below this is not loading the line.
 	latencyGuardMinLoadKiB = 256
+	// latencyGuardMinLoadUpKiB is the same floor for upload. It is much lower
+	// because home lines are asymmetric: 256 KiB/s on an 800 KiB/s uplink is
+	// already more than a quarter of the capacity, and the provider's queue
+	// starts adding latency well before that. With the line maximum known the
+	// threshold follows it (a tenth, between 32 and 256 KiB/s), so a saturated
+	// upload is capped even when the download is the direction moving the most
+	// bytes.
+	latencyGuardMinLoadUpKiB = 64
 	// latencyGuardMaxDownKiB/UpKiB = 0 means no hard cap in the code. The
 	// controller ramps while the ping is good and stops at twice the rate the
 	// line is actually delivering (a dynamic governor, not a fixed ceiling), so
@@ -340,7 +350,8 @@ func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downByte
 	baseline, trusted := g.baselineLocked(now, windowMin)
 	high := isHigh(current, baseline)
 	rateDown, rateUp := int64(downBytes/1024), int64(upBytes/1024)
-	loadDown, loadUp := rateDown >= latencyGuardMinLoadKiB, rateUp >= latencyGuardMinLoadKiB
+	uploadLoad := guardUploadLoadThreshold(g.lineMaxUp)
+	loadDown, loadUp := rateDown >= latencyGuardMinLoadKiB, rateUp >= uploadLoad
 
 	switch g.mode {
 	case guardFree:
@@ -403,6 +414,19 @@ func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downByte
 			g.releaseLocked(now)
 			break
 		}
+		// A direction that was idle when the trial started has no cap yet. If
+		// it starts loading while the ping is still high, cap it now instead
+		// of leaving it unlimited until the next trial: this is how a high
+		// upload, which fills its narrower pipe, gets its own limit even when
+		// the download was the direction that triggered the trial.
+		if (high || !trusted) && loadDown && !g.down.active {
+			g.downCap = max(int64(float64(rateDown)*latencyGuardTrialShare), latencyGuardMinFloorDownKiB)
+			g.down.start(g.downCap)
+		}
+		if (high || !trusted) && loadUp && !g.up.active {
+			g.upCap = max(int64(float64(rateUp)*latencyGuardTrialShare), latencyGuardMinFloorUpKiB)
+			g.up.start(g.upCap)
+		}
 		g.downCap = g.down.step(now, high, rateDown, g.lineMaxDown, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
 		g.upCap = g.up.step(now, high, rateUp, g.lineMaxUp, latencyGuardMinFloorUpKiB, latencyGuardRiseUpKiB)
 		if !g.down.active && !g.up.active {
@@ -410,6 +434,24 @@ func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downByte
 		}
 	}
 	return g.downCap, g.upCap, g.downCap != prevDown || g.upCap != prevUp
+}
+
+// guardUploadLoadThreshold is the upload rate at which a direction counts as
+// loading the line. It follows the configured uplink (a tenth of it, between
+// 32 and 256 KiB/s) because an asymmetric home line can be queued by an upload
+// far smaller than the download threshold.
+func guardUploadLoadThreshold(lineMaxUpKiB int64) int64 {
+	if lineMaxUpKiB <= 0 {
+		return int64(latencyGuardMinLoadUpKiB)
+	}
+	threshold := lineMaxUpKiB / 10
+	if threshold < 32 {
+		threshold = 32
+	}
+	if threshold > latencyGuardMinLoadKiB {
+		threshold = latencyGuardMinLoadKiB
+	}
+	return threshold
 }
 
 // fellFrom reports a latency clearly below a loaded one: by 30 % or by more

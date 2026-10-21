@@ -183,29 +183,6 @@ func V2Ed2kCreateDirs(w http.ResponseWriter, r *http.Request, s *AppState) {
 	v2Render(w, http.StatusOK, "v2_ed2k_state", v2Ed2kViewFrom(s, message, detail, isErr, "status"), dict, eng)
 }
 
-// V2Ed2kRecommended applies aMule's recommended file settings (no full
-// preallocation) and re-renders the state panel.
-func V2Ed2kRecommended(w http.ResponseWriter, r *http.Request, s *AppState) {
-	cfg := latestConfig(s)
-	message, detail, isErr := "", "", false
-	if !ed2kEnabled(cfg) {
-		message, isErr = "L'integrazione con aMule è spenta.", true
-	} else if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
-		return client.SetFilePreallocation(ctx, false)
-	}); err != nil {
-		message, detail, isErr = "Comando non riuscito:", err.Error(), true
-	} else {
-		message = "Impostazioni consigliate applicate: aMule non prealloca più i file."
-		logging.Info("eD2k recommended aMule file settings applied")
-	}
-	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/?view=ed2k", http.StatusSeeOther)
-		return
-	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_state", v2Ed2kViewFrom(s, message, detail, isErr, "status"), dict, eng)
-}
-
 // V2Ed2kAction runs a connection command and re-renders the state panel.
 func V2Ed2kAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
@@ -596,9 +573,6 @@ func V2Ed2kSharedReload(w http.ResponseWriter, r *http.Request, s *AppState) {
 func V2SettingsEd2kPreallocation(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	allocate := r.FormValue("allocate") == "1"
-	if r.FormValue("recommended") == "1" {
-		allocate = false
-	}
 	code := ""
 	switch {
 	case !ed2kEnabled(cfg):

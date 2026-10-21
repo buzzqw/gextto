@@ -80,7 +80,7 @@
       </div>
       {{end}}
     </nav>
-    <div class="sidebar-foot"><span class="pulse"></span><span>{{if .Chrome.DryRun}}dry-run{{else}}attivo{{end}}</span></div>
+    <div class="sidebar-foot"><span class="pulse"></span><span title="Gextto è attivo: il servizio sta lavorando (scarica, importa, cerca). Non è lo stato di salute: quello è il badge «ok» in alto.">{{if .Chrome.DryRun}}dry-run{{else}}attivo{{end}}</span></div>
   </aside>
   <main class="main-shell">
     <header class="topbar v2-topbar-sticky">
@@ -202,7 +202,7 @@
 
 {{define "v2_live_status"}}
 <div id="v2-live-status" class="top-live-status">
-  <span class="system-pill" title="Stato del servizio"><span class="pulse"></span>{{.Status}}</span>
+  <span class="system-pill" title="{{if eq .Status "ok"}}Stato del servizio: ok, Gextto risponde e il ciclo è regolare{{else if eq .Status "degraded"}}Stato del servizio: degraded, Gextto risponde ma qualcosa non va (cartelle, motore o disco){{else}}Stato del servizio: offline, Gextto non risponde{{end}}"><span class="pulse"></span>{{.Status}}</span>
   <time class="current-time" datetime="{{.CurrentTime}}" aria-label="Ora attuale" title="Ora attuale">{{.CurrentTime}}</time>
 </div>
 {{end}}
@@ -242,7 +242,7 @@
       <h2>Controllo libreria e download</h2>
       <p class="muted">Monitora il servizio, avvia una ricerca o raggiungi la sezione che ti serve.</p>
     </div>
-    <span class="mode-badge{{if .DryRun}} dry{{else}} active{{end}}">{{if .DryRun}}DRY-RUN{{else}}ATTIVO{{end}}</span>
+    <span class="mode-badge{{if .DryRun}} dry{{else}} active{{end}}" title="{{if .DryRun}}Modalità prova: non scarica e non importa nulla{{else}}Gextto è attivo: scarica e importa davvero. Il badge «ok» in alto è lo stato di salute.{{end}}">{{if .DryRun}}DRY-RUN{{else}}ATTIVO{{end}}</span>
   </div>
   <div class="panel session-strip-panel dashboard-traffic-panel">
     <div class="panel-head"><h3>In sessione</h3><small class="muted">Ultimi 30 minuti</small></div>
@@ -498,7 +498,7 @@
 {{if .Ed2kEnabled}}<p class="muted v2-menu-note">Gli stessi limiti valgono anche per aMule (eD2k).</p>{{end}}
 {{end}}
 
-{{define "v2_temp_badge"}}{{$s := .Speed}}{{if $s.ExceptionAuto}}<span class="badge warn" title="Eccezione attiva: Auto">⚡ <span>Auto</span>{{minutesLeft $s.ExceptionMinutes}}</span>{{else if $s.ExceptionLimit}}<span class="badge warn" title="Eccezione attiva: limite di velocità">⚡ {{badgeLimits $s.ExceptionDL $s.ExceptionUL}}{{minutesLeft $s.ExceptionMinutes}}</span>{{else if $s.RuleAuto}}<span class="badge{{if eq $s.Mode "schedule"}} ok{{end}}" title="{{if $s.InWindow}}Dalla programmazione oraria{{else}}Regola della configurazione{{end}}">{{if $s.InWindow}}⏰ {{end}}<span>Auto</span></span>{{else}}<span class="badge{{if $s.InWindow}} ok{{end}}" title="{{if $s.InWindow}}Dalla programmazione oraria{{else}}Regola della configurazione{{end}}">{{if $s.InWindow}}⏰ {{end}}{{badgeLimits $s.RuleDL $s.RuleUL}}</span>{{end}}{{if $s.Guard.Active}} <span class="badge" role="status" title="Auto riduce la velocità per mantenere basso il ping verso Google/Cloudflare"><span aria-hidden="true">🐢</span> <span>Latenza</span> {{$s.Guard.LatencyMs}}/{{$s.Guard.BaselineMs}} ms{{if $s.Guard.DownloadKib}} · DL {{$s.Guard.DownloadKib}} KiB/s{{end}}{{if $s.Guard.UploadKib}} · UL {{$s.Guard.UploadKib}} KiB/s{{end}}</span>{{end}}{{end}}
+{{define "v2_temp_badge"}}{{$s := .Speed}}{{if $s.ExceptionAuto}}<span class="badge warn" title="Eccezione attiva: Auto">⚡ <span>Auto</span>{{minutesLeft $s.ExceptionMinutes}}</span>{{else if $s.ExceptionLimit}}<span class="badge warn" title="Eccezione attiva: limite di velocità">⚡ {{badgeLimits $s.ExceptionDL $s.ExceptionUL}}{{minutesLeft $s.ExceptionMinutes}}</span>{{else if $s.RuleAuto}}<span class="badge{{if eq $s.Mode "schedule"}} ok{{end}}" title="{{if $s.InWindow}}Dalla programmazione oraria{{else}}Regola della configurazione{{end}}">{{if $s.InWindow}}⏰ {{end}}<span>Auto</span></span>{{else}}<span class="badge{{if $s.InWindow}} ok{{end}}" title="{{if $s.InWindow}}Dalla programmazione oraria{{else}}Regola della configurazione{{end}}">{{if $s.InWindow}}⏰ {{end}}{{badgeLimits $s.RuleDL $s.RuleUL}}</span>{{end}}{{if and (not $s.Guard.Active) (gt $s.Guard.LatencyMs 0) (or $s.ExceptionAuto (and (not $s.Exception) $s.RuleAuto))}} <span class="badge" role="status" title="Ping misurato da Auto verso Google/Cloudflare; se sale, Auto riduce la velocità">📶 {{$s.Guard.LatencyMs}} ms</span>{{end}}{{if $s.Guard.Active}} <span class="badge" role="status" title="Auto riduce la velocità per mantenere basso il ping verso Google/Cloudflare"><span aria-hidden="true">🐢</span> <span>Latenza</span> {{$s.Guard.LatencyMs}}/{{$s.Guard.BaselineMs}} ms{{if $s.Guard.DownloadKib}} · DL {{$s.Guard.DownloadKib}} KiB/s{{end}}{{if $s.Guard.UploadKib}} · UL {{$s.Guard.UploadKib}} KiB/s{{end}}</span>{{end}}{{end}}
 
 {{define "v2_torrents_wrap"}}
 <div id="v2-torrents-wrap">
@@ -627,13 +627,16 @@
               <div class="torrent-card">
                 <div class="torrent-head">
                   <span class="torrent-select"></span>
-                  <span class="torrent-name"><span class="truncate" title="{{.Name}}">{{.Name}}</span> <span class="badge" title="Rete eD2k/Kad tramite aMule">eD2k</span></span>
+                  <span class="torrent-name"><span class="truncate" title="{{.Name}}">{{.Name}}</span> <span class="badge ed2k" title="Rete eD2k/Kad tramite aMule">eD2k</span></span>
                   <span class="torrent-state badge {{.StateClass}}">{{.State}}</span>
                 </div>
                 <div class="torrent-body">
                   <div class="torrent-progress"><div class="progress"><span style="width:{{.ProgressPct}}%"></span></div><small class="muted">{{.ProgressPct}}% · {{bytes .Done}} / {{bytes .Size}}</small></div>
                   <div class="torrent-metrics">
                     <span class="torrent-metric" title="↓ Download"><span class="sr-only">↓ Download</span><span aria-hidden="true">↓</span> {{rate .Speed}}</span>
+                    <span class="torrent-metric" title="↑ Dati caricati da questo file in questa sessione"><span class="sr-only">↑ Dati caricati da questo file in questa sessione</span><span aria-hidden="true">↑</span> {{bytes .Uploaded}}</span>
+                    {{if .Eta}}<span class="torrent-metric" title="Tempo stimato al completamento"><span class="sr-only">Tempo stimato al completamento</span><span aria-hidden="true">⏱</span> {{.Eta}}</span>{{end}}
+                    <span class="torrent-metric" title="Rapporto tra caricato e scaricato per questo file"><span class="sr-only">Rapporto tra caricato e scaricato per questo file</span><span aria-hidden="true">⇅</span> {{.Ratio}}</span>
                     <span class="torrent-metric" title="Fonti eD2k: in trasferimento / totali"><span class="sr-only">Fonti eD2k: in trasferimento / totali</span><span aria-hidden="true">👥</span> {{.Active}} / {{.Sources}}</span>
                   </div>
                 </div>
@@ -970,7 +973,7 @@
 
 {{define "v2_settings_ed2k"}}
 <div class="panel settings-panel" id="v2-settings-ed2k">
-  <div class="panel-head"><h3>aMule</h3><small class="muted">Impostazioni consigliate per i file</small></div>
+  <div class="panel-head"><h3>aMule</h3></div>
   <div class="panel-body">
   {{if not .Enabled}}
     <p class="muted">L'integrazione con aMule è spenta.</p>
@@ -986,7 +989,6 @@
       <label class="check" title="Attiva o disattiva la preallocazione completa dei file in aMule; il salvataggio avviene subito"><input type="checkbox" name="allocate" value="1"{{if .AllocateFull}} checked{{end}} /> <span>Prealloca l'intero file in aMule</span></label>
       <div class="form-actions">
         <button class="btn primary" type="submit" title="Applica subito la preallocazione scelta ad aMule">Salva la preallocazione</button>
-        <button class="btn" type="submit" name="recommended" value="1" title="Disattiva la preallocazione completa in aMule: sui dischi di rete blocca amuled mentre alloca; Gextto importa comunque i file completati.">Impostazioni consigliate</button>
       </div>
     </form>
   {{end}}
@@ -1304,6 +1306,7 @@
     <small class="setting-status" id="status-{{.Key}}">{{if .Status}}<span class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Status}}</span>{{else if .Disabled}}{{if .DisabledEngine}}<span>Non attivo con il motore</span> «{{.DisabledEngine}}»{{else}}{{.DisabledNote}}{{end}}{{end}}</small>
     {{if .Generatable}}<small class="setting-status" id="gen-status-{{.Key}}" role="status" aria-live="polite"></small>{{end}}
     {{if .Resettable}}<button class="btn sm ghost setting-reset" type="button" id="reset-{{.Key}}" data-v2-reset="{{.Default}}" aria-labelledby="reset-{{.Key}} label-{{.Key}}" title="Ripristina il valore predefinito (da salvare)"><span aria-hidden="true">↺</span> <span>Predefinito</span></button>{{end}}
+    {{if .Proposable}}<button class="btn sm" type="button" hx-post="/settings/qbittorrent-mappings" hx-target="#v2-setting-{{.Key}}" hx-swap="outerHTML" hx-disabled-elt="this" title="Legge da qBittorrent le sue cartelle e propone la mappatura dei percorsi">Proponi</button>{{end}}
     {{if and (ne .Kind "structured") (not .Managed) (not .Disabled)}}<button class="btn sm primary setting-save" type="submit" id="save-{{.Key}}" aria-labelledby="save-{{.Key}} label-{{.Key}}">Salva</button>{{end}}
   </div>
 </form>
@@ -1807,7 +1810,6 @@
       {{else}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="kad_start"><button class="btn" type="submit" title="Avvia la rete Kad">Avvia Kad</button></form>{{end}}
       {{if .Status.Ed2kConnected}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="server_disconnect"><button class="btn" type="submit" title="Lascia il server eD2k attuale; Kad resta attivo">Lascia il server</button></form>{{end}}
       <button class="btn" type="button" hx-get="/?view=ed2k" hx-select="#v2-ed2k-state" hx-target="#v2-ed2k-state" hx-swap="outerHTML" title="Rilegge lo stato da aMule">Aggiorna</button>
-      <form method="post" action="/ed2k/preferences/recommended" hx-post="/ed2k/preferences/recommended" hx-target="#v2-ed2k-state" hx-swap="innerHTML" hx-disabled-elt="find button" style="display:inline"><button class="btn" type="submit" title="Disattiva la preallocazione completa in aMule: sui dischi di rete blocca amuled mentre alloca; Gextto importa comunque i file completati.">Impostazioni consigliate</button></form>
     </div>
   {{end}}
   </div>

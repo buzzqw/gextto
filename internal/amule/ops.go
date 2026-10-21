@@ -285,15 +285,19 @@ type Download struct {
 	Size        int64  `json:"size"`
 	Done        int64  `json:"done"`
 	Transferred int64  `json:"transferred"`
-	Speed       int64  `json:"speed"`
-	Status      int    `json:"status"`
-	Stopped     bool   `json:"stopped"`
-	Sources     int64  `json:"sources"`
-	Active      int64  `json:"active_sources"`
-	Priority    int    `json:"priority"`
-	Category    int    `json:"category"`
-	Link        string `json:"link"`
-	LastRecv    int64  `json:"last_received"`
+	// Uploaded is how many bytes of this file aMule has sent to other
+	// clients: a file being downloaded is shared too, so it can have an
+	// upload of its own.
+	Uploaded int64  `json:"uploaded"`
+	Speed    int64  `json:"speed"`
+	Status   int    `json:"status"`
+	Stopped  bool   `json:"stopped"`
+	Sources  int64  `json:"sources"`
+	Active   int64  `json:"active_sources"`
+	Priority int    `json:"priority"`
+	Category int    `json:"category"`
+	Link     string `json:"link"`
+	LastRecv int64  `json:"last_received"`
 }
 
 // Complete reports whether the core finished the file.
@@ -344,6 +348,7 @@ func (c *Client) Downloads(ctx context.Context) ([]Download, error) {
 			Size:        number(TagPartfileSizeFull),
 			Done:        number(TagPartfileSizeDone),
 			Transferred: number(TagPartfileSizeXfer),
+			Uploaded:    number(TagPartfileSizeXferUp),
 			Speed:       number(TagPartfileSpeed),
 			Status:      int(number(TagPartfileStatus)),
 			Stopped:     number(TagPartfileStopped) != 0,

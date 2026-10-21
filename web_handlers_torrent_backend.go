@@ -14,6 +14,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -176,6 +177,125 @@ func qbittorrentRuntimeMessage(status qbittorrentRuntimeStatus) string {
 	default:
 		return fmt.Sprintf("qBittorrent non ancora installato. Verrà scaricato in %s: premi «Installa / Ottimizza qBittorrent» (oppure seleziona qBittorrent dalla tendina).", status.Binary)
 	}
+}
+
+// V2SettingsQbittorrentMappings reads qBittorrent's own folder preferences and
+// re-renders the mapping field with the paths that cover Gextto's folders.
+func V2SettingsQbittorrentMappings(w http.ResponseWriter, r *http.Request, s *AppState) {
+	cfg := latestConfig(s)
+	key := "qbittorrent_path_mappings"
+	value := strings.TrimSpace(cfg.Settings[key])
+	status, isErr := "", false
+	proposal, added, err := proposeQbittorrentMappings(cfg)
+	switch {
+	case err != nil:
+		logging.Warn("cannot read qBittorrent folders for the path mapping", "error", err.Error())
+		status, isErr = "qBittorrent non raggiungibile: controlla URL e credenziali.", true
+	case added == 0:
+		status = "I percorsi sono già coperti: nessuna mappatura da aggiungere."
+	default:
+		value = proposal
+		status = "Mappatura proposta da qBittorrent: controlla e premi Salva."
+	}
+	field := uiSettingFieldFor(key, v2SettingLabelFor(key), value)
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_setting_field", v2Field{uiSettingField: field, Status: status, Error: isErr}, dict, eng)
+}
+
+// proposeQbittorrentMappings translates Gextto's download folders into the
+// paths qBittorrent reports through its Web API. It only returns a non-empty
+// proposal when the two really differ (a Docker or separate-host backend):
+// a native qBittorrent sharing the same folders needs no mapping.
+func proposeQbittorrentMappings(cfg *Config) (string, int, error) {
+	settings, err := qbittorrentSettingsFromConfig(cfg)
+	if err != nil {
+		return "", 0, err
+	}
+	if settings.Client.BaseURL == "" {
+		return "", 0, fmt.Errorf("qbittorrent_url is not configured")
+	}
+	client, err := qbittorrent.New(settings.Client)
+	if err != nil {
+		return "", 0, err
+	}
+	timeout := settings.Client.RequestTimeout
+	if timeout <= 0 {
+		timeout = 15 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout+5*time.Second)
+	defer cancel()
+	prefs, err := client.Preferences(ctx)
+	if err != nil {
+		return "", 0, err
+	}
+	savePath := qbittorrentPrefString(prefs, "save_path")
+	tempPath := qbittorrentPrefString(prefs, "temp_path")
+	if savePath == "" {
+		if fallback, fallbackErr := client.DefaultSavePath(ctx); fallbackErr == nil {
+			savePath = strings.TrimSpace(fallback)
+		}
+	}
+	type pair struct{ gextto, backend string }
+	candidates := []pair{{cfg.DownloadDir, savePath}}
+	if cfg.DownloadTempDir != nil && qbittorrentPrefBool(prefs, "temp_path_enabled") {
+		candidates = append(candidates, pair{*cfg.DownloadTempDir, tempPath})
+	}
+	different := false
+	for _, candidate := range candidates {
+		if candidate.gextto != "" && candidate.backend != "" &&
+			filepath.Clean(candidate.gextto) != filepath.Clean(candidate.backend) {
+			different = true
+			break
+		}
+	}
+	if !different {
+		return "", 0, nil
+	}
+	existing, err := ParsePathMappings(cfg.Settings["qbittorrent_path_mappings"])
+	if err != nil {
+		return "", 0, err
+	}
+	mappings := append([]PathMapping(nil), existing...)
+	lines := make([]string, 0, len(existing)+len(candidates)+1)
+	for _, mapping := range existing {
+		lines = append(lines, mapping.Gextto+"="+mapping.Backend)
+	}
+	added := 0
+	add := func(gextto, backend string) {
+		gextto, backend = strings.TrimSpace(gextto), strings.TrimSpace(backend)
+		if gextto == "" || backend == "" {
+			return
+		}
+		if _, covered := TranslateGexttoToBackend(gextto, mappings); covered {
+			return
+		}
+		mappings = append(mappings, PathMapping{Gextto: gextto, Backend: backend})
+		lines = append(lines, gextto+"="+backend)
+		added++
+	}
+	for _, candidate := range candidates {
+		add(candidate.gextto, candidate.backend)
+	}
+	// A mapping set must cover every path Gextto may hand to the backend:
+	// add identity lines for the local folders qBittorrent reports unchanged.
+	for _, path := range requiredBackendPaths(cfg) {
+		add(path, path)
+	}
+	return strings.Join(lines, "\n"), added, nil
+}
+
+func qbittorrentPrefString(prefs map[string]any, key string) string {
+	if value, ok := prefs[key].(string); ok {
+		return strings.TrimSpace(value)
+	}
+	return ""
+}
+
+func qbittorrentPrefBool(prefs map[string]any, key string) bool {
+	if value, ok := prefs[key].(bool); ok {
+		return value
+	}
+	return false
 }
 
 // TorrentBackendTest implements `torrent_backend_test`: it logs into the

@@ -309,7 +309,8 @@ release package the installer uses (README, *Install on Linux*).
   peak, the current speed and the line of the **active bandwidth limit**: base,
   schedule or exception; it is not drawn when the speed is *Auto*, i.e. when
   Gextto measures the line and adapts, and in that case the card shows the
-  **Auto** badge, not "No limit"). Speeds under 1 KB/s count as zero: that is
+  **Auto** badge with the measured **ping** next to it, not "No limit"). Speeds
+  under 1 KB/s count as zero: that is
   just protocol chatter, and the chart stays flat instead of twitching. With
   eD2k on, aMule has its own **dashed lines** and an **eD2k ↓ ↑** entry next to
   the **Torrent** one; the speeds in the top bar are the sum of torrents and
@@ -376,9 +377,10 @@ inferior to the archived file.
   list refreshes automatically every 5 seconds.
 - Comic HTTP downloads show status, progress, downloaded bytes and speed in the
   same list as torrents.
-- **aMule's eD2k downloads** appear in the same list with the **eD2k** badge:
-  state, progress, speed and sources (transferring / total), plus **Pause**,
-  **Resume** and **🗑️**. On a download in progress 🗑️ cancels it and deletes
+- **aMule's eD2k downloads** appear in the same list with the coloured **eD2k**
+  badge: state, progress, speed, **uploaded bytes**, **estimated time** and
+  **ratio** of uploaded to downloaded, plus sources (transferring / total) and
+  **Pause**, **Resume** and **🗑️**. On a download in progress 🗑️ cancels it and deletes
   the partial data; on a completed file it only takes it off aMule's list (the
   file stays in the incoming folder). **ⓘ** opens the details: state, sources,
   last data received, hash, the eD2k link to copy and the **priority in aMule**
@@ -566,6 +568,12 @@ appears in the library at once and does not use the space a second time.
 - It works only when downloads and library are on the **same filesystem** (same
   disk or same NAS share). When it is not possible (different disks, RAM disk, a
   share without hardlinks) Gextto copies as before and logs the reason once.
+- The same NAS is not enough when the two folders are **separate mounts** (for
+  example `192.168.1.119:/volume1/Trasferimento` and
+  `192.168.1.119:/volume1/SerieTVArchivio`): the kernel refuses a hardlink
+  across mount points even when the data is on the same volume. Mount a common
+  parent (for example `192.168.1.119:/volume1`) or keep the library inside the
+  download share; the log now says so explicitly.
 - A program that edits the video **in place** (rewrites bytes in the same file,
   like some taggers or `mkvpropedit`) would also change the seeding file. Gextto
   never does that; if you run such tools on the library, turn the option off.
@@ -888,7 +896,7 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   connections password), the search network (Kad, servers or both), the
   automatic fallback when torrents find nothing and giving up on stalled
   downloads. The tab's **aMule** panel has the **Preallocate the whole file in
-  aMule** switch (with **Recommended settings** to turn it off) and the values
+  aMule** switch and the values
   are applied to aMule at once, without a separate save. aMule's state and
   commands are on the eD2k page.
 - **Speed, network and performance** — connections/performance,
@@ -1847,7 +1855,7 @@ Recalculate scores* after changing weights.
 | qBittorrent-nox — tag | Tag applied to torrents added to qBittorrent-nox. |
 | qBittorrent-nox — request timeout | Timeout in seconds for HTTP requests to qBittorrent-nox. *(Unit: seconds)* |
 | qBittorrent-nox — polling interval | Interval in milliseconds between torrent status reads. *(Unit: ms)* |
-| qBittorrent-nox — path mapping | Needed only when qBittorrent sees the folders under different paths (Docker, NAS, another host): one line per path, local=remote form. Same machine with the same folders — or managed mode —: leave it empty. |
+| qBittorrent-nox — path mapping | Needed only when qBittorrent sees the folders under different paths (Docker, NAS, another host): one line per path, local=remote form. **Propose** reads qBittorrent's download and temporary folders and fills the lines; check them and press **Save**. Same machine with the same folders — or managed mode —: leave it empty. |
 
 **Actions**
 
@@ -1875,7 +1883,7 @@ Recalculate scores* after changing weights.
 | Schedule — days | Active days: 0=Mon … 6=Sun (e.g. 0,1,2,3,4). *(no day = never active)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
 | Schedule — download | Download limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
 | Schedule — upload | Upload limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Not shown on the page: replaced by the «Schedule — per day» table, which shows its value until saved. |
-| Auto respects latency | With the speed on Auto, Gextto measures the ping to Google and Cloudflare every 2 seconds (8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1; the lowest time is used). While the ping is good it raises download and upload; when it rises it cuts 15% and goes down to 128/64 KiB/s. The first time it applies a cap it writes it to the log at once; after that it writes at most one line a minute, only when the speed changes by at least 10% and the trend confirms it. On by default. |
+| Auto respects latency | With the speed on Auto, Gextto measures the ping to Google and Cloudflare every 2 seconds (8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1; the lowest time is used). While the ping is good it raises download and upload; when it rises it cuts 15% and goes down to 128/64 KiB/s. The first time it applies a cap it writes it to the log at once; after that it writes at most one line a minute, only when the speed changes by at least 10% and the trend confirms it. On an asymmetric line upload counts as load from a tenth of the capacity (between 32 and 256 KiB/s) and is capped before it saturates; if it starts loading during the control phase the cap starts at once. On by default. |
 | Auto — what measures the latency | `both` (default): the ping decides, the router counters are only diagnostics. `ping`: ping only, the router is not read. `router`: old behaviour, yield only to the other devices the router sees. |
 | Auto — host to measure latency | Host (or host:port) to measure the latency to with a TCP connection every 2 seconds, only while Auto is on. Empty = Google (8.8.8.8, 8.8.4.4) and Cloudflare (1.1.1.1, 1.0.0.1), port 443; the lowest time is used, so a distant or slow server cannot fake the measurement. |
 | Auto — line maximum, download | The real maximum download speed of the line, in KiB/s (e.g. 9000 for 9 MB/s). 0 = unknown: Auto discovers it. If you enter it, Auto never goes above it and finds the right point sooner. |

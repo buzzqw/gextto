@@ -266,6 +266,53 @@ func TestLatencyGuardHasNoHardCap(t *testing.T) {
 	}
 }
 
+// TestGuardUploadThresholdFollowsTheUplink guards the upload rule: the
+// threshold is a tenth of the uplink, between 32 and 256 KiB/s, so a loaded
+// upload is capped even when the download moves more bytes.
+func TestGuardUploadThresholdFollowsTheUplink(t *testing.T) {
+	cases := []struct{ lineMax, want int64 }{
+		{0, latencyGuardMinLoadUpKiB},
+		{100, 32},
+		{800, 80},
+		{9000, latencyGuardMinLoadKiB},
+	}
+	for _, test := range cases {
+		if got := guardUploadLoadThreshold(test.lineMax); got != test.want {
+			t.Errorf("line %d KiB/s: threshold %d, want %d", test.lineMax, got, test.want)
+		}
+	}
+}
+
+// TestLatencyGuardCapsAnUploadThatStartsLater: the trial begins while the
+// upload is idle, so its cap stays off; when the upload becomes loaded during
+// the control phase, the guard must cap it without waiting for a new trial.
+func TestLatencyGuardCapsAnUploadThatStartsLater(t *testing.T) {
+	r := newGuardRun()
+	r.g.lineMaxUp = 800
+	line := func(downCap int64) time.Duration {
+		if downCap > 0 {
+			return 20 * time.Millisecond
+		}
+		return 60 * time.Millisecond
+	}
+	for i := 0; i < 10; i++ {
+		r.step(line, 2000) // the helper sends 10 KiB/s upload: below the threshold
+	}
+	for i := 0; i < 6; i++ {
+		r.now = r.now.Add(latencyGuardProbeEvery)
+		r.g.probe.Record(r.now, 60*time.Millisecond)
+		downCap, _ := r.g.caps()
+		rateDown := int64(2000)
+		if downCap > 0 && downCap < rateDown {
+			rateDown = downCap
+		}
+		if _, upCap, _ := r.g.update(r.now, true, r.line, uint64(rateDown*1024), 200*1024); upCap > 0 {
+			return
+		}
+	}
+	t.Fatal("the guard never capped an upload that became loaded during control")
+}
+
 // TestV2DownloadsShowsTheLatencyGuard pins the badge: while the guard caps the
 // transfers the downloads page says so, with the latency and the caps.
 func TestV2DownloadsShowsTheLatencyGuard(t *testing.T) {

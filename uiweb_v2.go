@@ -172,6 +172,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "GET /settings/body", V2SettingsBody)
 	v2Handle(s, mux, "GET /settings/search", V2SettingsSearch)
 	v2Handle(s, mux, "POST /settings/save", V2SettingsSave)
+	v2Handle(s, mux, "POST /settings/qbittorrent-mappings", V2SettingsQbittorrentMappings)
 	v2Handle(s, mux, "POST /settings/score-groups", V2SettingsScoreGroup)
 	v2Handle(s, mux, "POST /settings/tuning/apply", V2SettingsTuningApply)
 	v2Handle(s, mux, "POST /settings/feed", V2SettingsFeed)
@@ -227,7 +228,6 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 
 	// Fumetti: link finder, download diretto e modifica della libreria.
 	v2Handle(s, mux, "POST /ed2k/action", V2Ed2kAction)
-	v2Handle(s, mux, "POST /ed2k/preferences/recommended", V2Ed2kRecommended)
 	v2Handle(s, mux, "POST /ed2k/directories/create", V2Ed2kCreateDirs)
 	v2Handle(s, mux, "POST /settings/ed2k/preallocation", V2SettingsEd2kPreallocation)
 	v2Handle(s, mux, "POST /ed2k/search", V2Ed2kSearch)
@@ -2170,6 +2170,12 @@ func (field v2Field) Generatable() bool {
 		return true
 	}
 	return false
+}
+
+// Proposable reports whether the row offers the «Proponi» button that reads the
+// backend's own folders and fills the path mapping with them.
+func (field v2Field) Proposable() bool {
+	return field.Key == "qbittorrent_path_mappings"
 }
 
 // Resettable reports whether the row offers «Predefinito»: whenever the field

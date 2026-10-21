@@ -124,6 +124,34 @@ func TestLinkOrCopyFileFallsBackToCopy(t *testing.T) {
 	}
 }
 
+func TestSplitNFSSource(t *testing.T) {
+	cases := []struct {
+		source       string
+		host, export string
+		ok           bool
+	}{
+		{"192.168.1.119:/volume1/Trasferimento", "192.168.1.119", "/volume1/Trasferimento", true},
+		{"nas.local:/volume1", "nas.local", "/volume1", true},
+		{"/dev/sda1", "", "", false},
+		{"host:", "", "", false},
+	}
+	for _, test := range cases {
+		host, export, ok := splitNFSSource(test.source)
+		if host != test.host || export != test.export || ok != test.ok {
+			t.Errorf("splitNFSSource(%q) = %q, %q, %v", test.source, host, export, ok)
+		}
+	}
+}
+
+func TestUnescapeMountField(t *testing.T) {
+	if got := unescapeMountField(`/home/andres/My\040Films`); got != "/home/andres/My Films" {
+		t.Fatalf("mount field = %q", got)
+	}
+	if got := unescapeMountField(`/mnt/back\134slash`); got != `/mnt/back\slash` {
+		t.Fatalf("mount field = %q", got)
+	}
+}
+
 func TestStagePackFileLinksEpisode(t *testing.T) {
 	cfg := DefaultConfig()
 	source := t.TempDir()

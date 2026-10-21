@@ -613,6 +613,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .badge.ok { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
 .badge.warn { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
 .badge.err { background: color-mix(in srgb, var(--err) 22%, transparent); color: var(--err); }
+.badge.ed2k { background: color-mix(in srgb, var(--accent-2) 22%, transparent); color: var(--accent-2); }
 .acquisition-events td.nowrap { white-space: nowrap; }
 .dashboard-problems-table td.nowrap { white-space: nowrap; }
 .dashboard-problems-panel h4 { margin: 12px 0 6px; }

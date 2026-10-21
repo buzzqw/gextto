@@ -312,7 +312,8 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
   **upload**, il picco, la velocità attuale e la linea del **limite di banda in
   vigore**: limiti fissi, programmazione o eccezione; non compare quando la
   velocità è *Auto*, cioè quando Gextto misura la linea e si adatta; in quel
-  caso il riquadro mostra il badge **Auto**, non «Nessun limite»). Le velocità
+  caso il riquadro mostra il badge **Auto** e accanto il **ping** misurato, non
+  «Nessun limite»). Le velocità
   sotto 1 KB/s valgono 0: è solo rumore di protocollo, e il grafico resta
   piatto invece di tremare. Con eD2k attivo aMule ha **linee proprie
   tratteggiate** e una voce **eD2k ↓ ↑** accanto a quella dei **Torrent**; le
@@ -384,8 +385,9 @@ bloccata, già presente o inferiore al file archiviato.
 - I download HTTP dei fumetti mostrano stato, progressione, byte scaricati e
   velocità nella stessa lista dei torrent.
 - I **download eD2k di aMule** compaiono nella stessa lista, con il badge
-  **eD2k**: stato, progressione, velocità e fonti (in trasferimento / totali),
-  più **Pausa**, **Riprendi** e **🗑️**. Su un download in corso 🗑️ lo annulla e
+  **eD2k** colorato: stato, progressione, velocità, **byte caricati**, **tempo
+  stimato** e **rapporto** caricato/scaricato, più le fonti (in trasferimento /
+  totali) e **Pausa**, **Riprendi** e **🗑️**. Su un download in corso 🗑️ lo annulla e
   cancella la parte scaricata; su un file completato lo toglie solo dall'elenco
   di aMule (il file resta nella cartella di arrivo). **ⓘ** apre il dettaglio:
   stato, fonti, ultimo dato ricevuto, hash, link eD2k da copiare e la
@@ -579,6 +581,12 @@ volta.
   (stesso disco o stessa condivisione NAS). Se non è possibile (dischi diversi,
   RAM disk, condivisione senza hardlink) Gextto copia come prima e lo scrive una
   volta nel log con il motivo.
+- Lo stesso NAS non basta se le due cartelle sono **mount separati** (per
+  esempio `192.168.1.119:/volume1/Trasferimento` e
+  `192.168.1.119:/volume1/SerieTVArchivio`): il kernel rifiuta l'hardlink tra
+  mount point anche se i dati sono sullo stesso volume. Monta una radice comune
+  (per esempio `192.168.1.119:/volume1`) o tieni la libreria dentro la stessa
+  condivisione dei download; il log te lo dice esplicitamente.
 - Un programma che modifica il video **sul posto** (riscrive i byte nello stesso
   file, come alcuni tagger o `mkvpropedit`) cambierebbe anche il file in seed.
   Gextto non lo fa; se usi strumenti del genere sulla libreria, disattiva
@@ -911,7 +919,7 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   connessioni esterne), rete di ricerca (Kad, server o entrambi), ripiego
   automatico quando i torrent non trovano nulla e rinuncia ai download fermi.
   Il pannello **aMule** della scheda ha l'interruttore **Prealloca l'intero file
-  in aMule** (con **Impostazioni consigliate** per spegnerla) e i valori si
+  in aMule** e i valori si
   applicano subito ad aMule, senza salvataggio separato. Lo stato e i comandi di
   aMule sono nella pagina eD2k.
 - **Velocità, rete e prestazioni** — connessioni/prestazioni,
@@ -1910,7 +1918,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | qBittorrent-nox — tag | Tag applicato ai torrent aggiunti a qBittorrent-nox. |
 | qBittorrent-nox — timeout richieste | Timeout in secondi delle richieste HTTP verso qBittorrent-nox. *(Unità: secondi)* |
 | qBittorrent-nox — intervallo polling | Intervallo in millisecondi tra due letture dello stato dei torrent. *(Unità: ms)* |
-| qBittorrent-nox — mappatura percorsi | Serve solo se qBittorrent vede le cartelle con percorsi diversi (Docker, NAS, altro host): una riga per percorso, forma locale=remoto. Stessa macchina e stesse cartelle — o modalità gestita —: lascia pure vuoto. |
+| qBittorrent-nox — mappatura percorsi | Serve solo se qBittorrent vede le cartelle con percorsi diversi (Docker, NAS, altro host): una riga per percorso, forma locale=remoto. **Proponi** legge da qBittorrent le sue cartelle di download e temporanea e compila le righe; controllale e premi **Salva**. Stessa macchina e stesse cartelle — o modalità gestita —: lascia pure vuoto. |
 
 **Azioni**
 
@@ -1938,7 +1946,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | Programmazione — giorni | Giorni attivi: 0=Lun … 6=Dom (es. 0,1,2,3,4). *(nessun giorno = mai attiva)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
 | Programmazione — download | Limite di download in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
 | Programmazione — upload | Limite di upload in KiB/s durante la programmazione. *(Unità: KiB/s; 0 = illimitato)* Non compare nella pagina: è sostituita dalla tabella «Programmazione — per giorno», che ne mostra il valore finché non viene salvata. |
-| Auto rispetta la latenza | Con la velocità su Auto, Gextto misura il ping verso Google e Cloudflare ogni 2 secondi (8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1; si usa il tempo più basso). Finché il ping è buono alza download e upload; quando sale taglia il 15% e scende fino a 128/64 KiB/s. La prima volta che applica un limite lo scrive subito nel log; poi scrive al massimo una riga al minuto, solo se la velocità cambia almeno del 10% e l'andamento lo conferma. Attiva per default. |
+| Auto rispetta la latenza | Con la velocità su Auto, Gextto misura il ping verso Google e Cloudflare ogni 2 secondi (8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1; si usa il tempo più basso). Finché il ping è buono alza download e upload; quando sale taglia il 15% e scende fino a 128/64 KiB/s. La prima volta che applica un limite lo scrive subito nel log; poi scrive al massimo una riga al minuto, solo se la velocità cambia almeno del 10% e l'andamento lo conferma. Con una linea asimmetrica l'upload conta come carico già a un decimo della capacità (tra 32 e 256 KiB/s) e viene limitato prima che saturi; se comincia a caricare durante il controllo, il limite parte subito. Attiva per default. |
 | Auto — cosa misura la latenza | `both` (default): il ping decide, i contatori del router sono solo diagnostica. `ping`: solo ping, il router non viene letto. `router`: vecchio comportamento, si cede solo agli altri dispositivi visti dal router. |
 | Auto — host per misurare la latenza | Host (o host:porta) a cui misurare la latenza con una connessione TCP ogni 2 secondi, solo mentre Auto è attivo. Vuoto = Google (8.8.8.8, 8.8.4.4) e Cloudflare (1.1.1.1, 1.0.0.1), porta 443; si usa il tempo più basso, così un server lontano o lento non falsa la misura. |
 | Auto — velocità massima linea, download | Massima velocità reale della linea in download, in KiB/s (es. 9000 per 9 MB/s). 0 = non nota: la scopre Auto. Se la indichi, Auto non sale oltre e trova il punto giusto più in fretta. |
