@@ -115,7 +115,11 @@ func ensureAmuleManagedConfig(cfg *Config) (amuleManagedSettings, error) {
 		}
 	}
 	passwordHash := md5.Sum([]byte(settings.Password))
+	// aMule reads a sectioned amule.conf; keys outside a section are ignored
+	// and the core appends its defaults (with external connections off), so
+	// the managed file must use the same layout as the one aMule writes.
 	conf := strings.Join([]string{
+		"[eMule]",
 		"AppVersion=2.3.3",
 		"Nick=Gextto",
 		"Port=" + fmt.Sprint(settings.ED2KPort),
@@ -127,6 +131,7 @@ func ensureAmuleManagedConfig(cfg *Config) (amuleManagedSettings, error) {
 		"ConnectToED2K=1",
 		"OnlineSignature=0",
 		"IPFilterAutoLoad=0",
+		"[ExternalConnect]",
 		"AcceptExternalConnections=1",
 		"ECAddress=" + settings.Host,
 		"ECPort=" + fmt.Sprint(settings.ECPort),
