@@ -1,474 +1,487 @@
-# AGENTS.md — guida per agenti su gextto
+# AGENTS.md — guide for agents working on gextto
 
-Istruzioni operative per lavorare su questo repository. OpenCode carica
-automaticamente questo file, che è l'**unica** fonte delle regole operative.
-Le regole valgono per ogni modifica, anche piccola: se un punto sembra in
-conflitto con un altro, vale quello più specifico.
+Operating instructions for working on this repository. OpenCode loads this
+file automatically, and it is the **only** source of the operating rules.
+The rules apply to every change, even a small one: if one point seems to
+conflict with another, the more specific one wins.
 
-## Indice
+## Contents
 
-1. [Prima di ogni commit](#prima-di-ogni-commit) — la checklist da non saltare
-2. [Regole commit e PR](#regole-commit-e-pr)
-3. [Che cos'è gextto](#che-cosè-gextto)
-4. [Motore gx-core](#motore-gx-core-internalgxcore)
-5. [Build e test](#build-e-test)
-6. [Release, installer e aggiornamenti](#release-installer-e-aggiornamenti)
+1. [Before every commit](#before-every-commit) — the checklist you must not skip
+2. [Commit and PR rules](#commit-and-pr-rules)
+3. [What gextto is](#what-gextto-is)
+4. [gx-core engine](#gx-core-engine-internalgxcore)
+5. [Build and test](#build-and-test)
+6. [Release, installer and updates](#release-installer-and-updates)
 7. [Code scanning](#code-scanning-codeql)
-8. [Servizio su questa macchina](#servizio-in-esecuzione-su-questa-macchina)
-9. [Convenzioni di modifica](#convenzioni-di-modifica)
+8. [Service running on this machine](#service-running-on-this-machine)
+9. [Change conventions](#change-conventions)
 10. [`docs/evoluzione.md`](#docsevoluzionemd)
-11. [Accessibilità dell'interfaccia e i18n](#accessibilità-dellinterfaccia)
-12. [Dove sta cosa](#dove-sta-cosa) — indice dei documenti
+11. [Interface accessibility and i18n](#interface-accessibility-and-i18n)
+12. [Where things live](#where-things-live) — index of the documents
 
-## Prima di ogni commit
+## Before every commit
 
-1. **Changelog** in italiano e inglese (`changelog.md`, `changelog.en.md`):
-   stessa voce, spiegata per chi usa Gextto, senza dettagli interni.
-2. **Manuali e README** se cambia qualcosa di visibile o di operativo
+1. **Changelog** in Italian and English (`changelog.md`, `changelog.en.md`):
+   the same entry, explained for the people who use Gextto, with no internal
+   details.
+2. **Manuals and README** if anything visible or operational changes
    (`docs/MANUAL.it.md`, `docs/MANUAL.en.md`, `README.md`, `README.it.md`).
-3. **Documenti tecnici** toccati dalla modifica (vedi *Dove sta cosa* in fondo).
-4. **Test verdi in locale**: `make test`, `make vet` e, se hai toccato la UI,
-   `make test-ui`; più TUI, performance e invarianti descritti in *Build e test*.
-5. **Commit** con autore `buzzqw <azanzani@gmail.com>`, poi push su
+3. **Technical documents** touched by the change (see *Where things live* at the
+   bottom).
+4. **Tests green locally**: `make test`, `make vet` and, if you touched the UI,
+   `make test-ui`; plus the TUI, performance and invariants described in *Build
+   and test*.
+5. **Commit** with author `buzzqw <azanzani@gmail.com>`, then push to
    `origin/main`.
-6. **Riferisci** nel messaggio commit, push, build e riavvio con lo short hash
-   e il ramo.
+6. **Report** commit, push, build and restart in your message, with the short
+   hash and the branch.
 
-## Regole commit e PR
-- **Autore**: `buzzqw <azanzani@gmail.com>`.
-- **Changelog in entrambe le lingue.** Ogni commit aggiunge o aggiorna la voce
-  in `changelog.md` e `changelog.en.md` (stesse sezioni, stessa sostanza). La
-  voce parla a chi usa Gextto: cosa cambia, per chi, cosa deve fare. Niente
-  hash, nomi di funzioni, elenchi di file. Un commit di sola build, test o
-  documentazione interna non ha una voce propria: la sua parte visibile va
-  nella voce del commit funzionale che accompagna.
-- **Commit piccoli e verificati, pushati subito** su `origin/main`.
-- **Non committare** `bin/` né le directory dati (`data/`, `gextto-data/`).
-  `build_number` e `gx-torrent.build_number` invece **sono committati**: sono
-  le sorgenti uniche dei numeri di build di Gextto e di gx-core, condivise tra
-  checkout e CI (vedi *Build e test*).
-- **Test prima del commit.** Con `make test` (che include `check-ui`,
-  `installer-test`, `test-dht` e `go test ./...`) e `make vet`; se la modifica
-  tocca la UI anche `make test-ui` (Playwright in `uiweb/end2end`, fuori da
-  `make test` perché serve Node e un browser, ma gira in CI). Se tocchi build o
-  impacchettamento prova anche `scripts/build-release.sh` o gli script
-  `package-*` coinvolti. Si procede solo se è **tutto verde**; un test rosso si
-  sistema prima. Per una modifica di sola documentazione (`.md`) non serve la
-  suite completa.
-- **Lo stato della CI si controlla a richiesta.** `gh run list` è lento: non
-  interrogarlo a ogni ciclo. Questo non esonera dal lanciare **in locale** gli
-  stessi controlli indicati sopra.
-- **Riferisci sempre le azioni sull'ambiente.** Quando committi, pushi,
-  ricompili (`make build`, `make gx-torrent`, …) o riavvii il servizio
-  (`systemctl --user restart gextto`), scrivilo nel messaggio con lo **short
-  hash** del commit e il ramo/remoto (`origin/main`). L'utente deve sapere se
-  il lavoro è committato, pushato, ricompilato e riavviato.
-- **Manuali, README e documenti tecnici** vanno aggiornati nello stesso commit
-  quando la modifica cambia qualcosa di visibile o di operativo: la regola
-  completa è in [Convenzioni di modifica](#convenzioni-di-modifica).
+## Commit and PR rules
+- **Author**: `buzzqw <azanzani@gmail.com>`.
+- **Changelog in both languages.** Every commit adds or updates the entry in
+  `changelog.md` and `changelog.en.md` (same sections, same substance). The
+  entry speaks to the people who use Gextto: what changes, for whom, what they
+  have to do. No hashes, function names or file lists. A commit that only
+  touches build, tests or internal documentation has no entry of its own: its
+  visible part goes into the entry of the functional commit it accompanies.
+- **Small, verified commits, pushed right away** to `origin/main`.
+- **Do not commit** `bin/` or the data directories (`data/`, `gextto-data/`).
+  `build_number` and `gx-torrent.build_number` **are** committed instead: they
+  are the single sources of the build numbers of Gextto and gx-core, shared
+  between checkouts and CI (see *Build and test*).
+- **Tests before the commit.** With `make test` (which includes `check-ui`,
+  `installer-test`, `test-dht` and `go test ./...`) and `make vet`; if the
+  change touches the UI, also `make test-ui` (Playwright in `uiweb/end2end`,
+  outside `make test` because it needs Node and a browser, but it runs in CI).
+  If you touch build or packaging, also try `scripts/build-release.sh` or the
+  `package-*` scripts involved. Proceed only when **everything is green**; a
+  red test is fixed first. For a documentation-only change (`.md`) the full
+  suite is not needed.
+- **CI status is checked on request.** `gh run list` is slow: do not query it
+  on every cycle. That does not exempt you from running the same checks
+  **locally** as described above.
+- **Always report actions on the environment.** When you commit, push,
+  rebuild (`make build`, `make gx-torrent`, …) or restart the service
+  (`systemctl --user restart gextto`), write it in your message with the
+  **short hash** of the commit and the branch/remote (`origin/main`). The user
+  must know whether the work is committed, pushed, rebuilt and restarted.
+- **Manuals, README and technical documents** are updated in the same commit
+  when the change affects something visible or operational: the full rule is in
+  [Change conventions](#change-conventions).
 
-## Che cos'è gextto
-- Daemon Go per acquisizione media e archiviazione. Il package principale è
-  nella root; il `main` è in `cmd/gexttod`.
-- UI server-side in `uiweb/v2` (SSR + HTMX), i18n it/en/de/fr/es/pl. I test
-  end2end dell'UI sono Playwright (Node) in `uiweb/end2end`, non Go.
-- **Motori torrent**: `gx-torrent` (default, Go puro) e `qBittorrent-nox`
-  (esterno o gestito). Contratto in
-  `torrent_engine.go`; adapter `gxtorrent_engine.go`/`gxtorrent_runtime.go` e
-  `qbittorrent_engine.go`. Matrice capacità in
-  `capabilityLevels` (`torrent_engine.go`): è la **fonte unica**. Da lì derivano
-  l'API (`GET /api/torrent-backend`) e i flag
-  della scheda di dettaglio (`v2DetailCapsFor` in `uiweb_v2.go`, test
-  `TestV2DetailCapsFollowCapabilityMatrix`). Le operazioni che un motore non ha
-  rifiutano con `ErrCapabilityUnavailable`. La **visibilità delle impostazioni**
-  è un asse diverso (`uiSettingAllowedBackends`): quali chiavi un motore legge,
-  non quali operazioni supporta.
-- `gx-torrent` è **sempre avviato e sorvegliato** da Gextto quando è il motore
-  attivo (nessuna opzione per disattivarlo). Un demone esterno già in ascolto
-  sull'URL viene usato così com'è.
-- Il demone gestito **sopravvive ai riavvii di Gextto** (scope systemd
-  `gextto-gx-torrent-*.scope`): al riavvio Gextto lo riaggancia se binario e
-  opzioni sono uguali (`fingerprint` in `/api/v1/health`), altrimenti lo
-  riavvia. Si ferma da solo dopo 15 minuti senza Gextto. Dettagli in
-  `docs/gx-torrent.md`, *Startup*.
+## What gextto is
+- Go daemon for media acquisition and archiving. The main package is in the
+  root; the `main` is in `cmd/gexttod`.
+- Server-side UI in `uiweb/v2` (SSR + HTMX), i18n it/en/de/fr/es/pl. The UI
+  end2end tests are Playwright (Node) in `uiweb/end2end`, not Go.
+- **Torrent engines**: `gx-torrent` (default, pure Go) and `qBittorrent-nox`
+  (external or managed). Contract in `torrent_engine.go`; adapters
+  `gxtorrent_engine.go`/`gxtorrent_runtime.go` and `qbittorrent_engine.go`.
+  Capability matrix in `capabilityLevels` (`torrent_engine.go`): it is the
+  **single source of truth**. The API (`GET /api/torrent-backend`) and the
+  detail-tab flags derive from it (`v2DetailCapsFor` in `uiweb_v2.go`, test
+  `TestV2DetailCapsFollowCapabilityMatrix`). Operations an engine does not have
+  are rejected with `ErrCapabilityUnavailable`. **Settings visibility** is a
+  different axis (`uiSettingAllowedBackends`): which keys an engine reads, not
+  which operations it supports.
+- `gx-torrent` is **always started and supervised** by Gextto when it is the
+  active engine (no option to turn it off). An external daemon already
+  listening on the URL is used as it is.
+- The managed daemon **survives restarts of Gextto** (systemd scope
+  `gextto-gx-torrent-*.scope`): on restart Gextto reattaches to it if the
+  binary and options are the same (`fingerprint` in `/api/v1/health`),
+  otherwise it restarts it. It stops by itself after 15 minutes without Gextto.
+  Details in `docs/gx-torrent.md`, *Startup*.
 
-## Motore gx-core (`internal/gxcore`)
-- `internal/gxcore` è il **motore** di gx-core (il binario `gx-torrent`), codice
-  nostro originale, scritto in questo repository (le basi permissive
-  iniziali sono state riscritte file per file), parte del modulo
-  principale come `github.com/buzzqw/gextto/internal/gxcore`. Lo usano
-  `cmd/gx-torrent` e i test.
-- **Preferenza di progetto: codice nostro.** Quello che serve si scrive in questo
-  repository, non si copia da altri.
-- Panoramica e inventario delle funzionalità del motore:
-  `internal/gxcore/GEXTTO.md`.
-- Il DHT vive in `internal/dht`, un modulo a sé sotto il modulo principale.
-- **Le funzioni standalone sono solo di gx-core.** Pagine e motori che non
-  appartengono al demone gestito — RSS/feed/regole/indexer, Wanted/Cercati,
-  Archivio dei feed, Impostazioni, wizard, ricerca indexer, cartelle watch —
-  esistono **solo** in `-mode=standalone`; in `-mode=managed` sono spenti e le
-  loro rotte rispondono 404, perché lì comanda Gextto (coda, categorie, RSS,
-  ricerca, limiti) e due motori di acquisizione sulla stessa sessione non
-  vanno bene. Non sono una lacuna da colmare: non vanno abilitati in managed.
-  Chi vuole feed/regole/cercati usa un gx-torrent standalone (o l'istanza di
-  prova di `scripts/gx-core-test.sh`). Dettagli: `docs/gx-core.md`.
-- Analisi delle lacune rispetto a libtorrent e qBittorrent e piano di
-  miglioramento: **`docs/evoluzione.md`** (§6–§7); evoluzione verso client
-  standalone (gx-core): **`docs/gx-core.md`**.
+## gx-core engine (`internal/gxcore`)
+- `internal/gxcore` is the **engine** of gx-core (the `gx-torrent` binary), our
+  own original code, written in this repository (the initial permissively
+  licensed bases were rewritten file by file), part of the main module as
+  `github.com/buzzqw/gextto/internal/gxcore`. It is used by `cmd/gx-torrent`
+  and by the tests.
+- **Project preference: our own code.** What we need is written in this
+  repository, not copied from others.
+- Overview and feature inventory of the engine: `internal/gxcore/GEXTTO.md`.
+- The DHT lives in `internal/dht`, a separate module below the main module.
+- **Standalone features belong to gx-core only.** Pages and engines that do not
+  belong to the managed daemon — RSS/feeds/rules/indexers, Wanted/Searches,
+  feed Archive, Settings, wizard, indexer search, watch folders — exist **only**
+  in `-mode=standalone`; in `-mode=managed` they are off and their routes
+  answer 404, because there Gextto is in charge (queue, categories, RSS,
+  search, limits) and two acquisition engines on the same session do not mix.
+  They are not a gap to close: they must not be enabled in managed mode. Anyone
+  who wants feeds/rules/searches runs a standalone gx-torrent (or the test
+  instance of `scripts/gx-core-test.sh`). Details: `docs/gx-core.md`.
+- Gap analysis against libtorrent and qBittorrent and improvement plan:
+  **`docs/evoluzione.md`** (§6–§7); evolution towards a standalone client
+  (gx-core): **`docs/gx-core.md`**.
 
-## Build e test
+## Build and test
 
-Comandi di build, la verifica da chiudere prima di un commit e gli invarianti da
-non rompere.
+Build commands, the verification to complete before a commit, and the invariants
+not to break.
 
-- `make build` — incrementa `build_number` (committato) e compila
-  `bin/gexttod` **e** `bin/gx-torrent`. La build è **Go puro**
-  (`CGO_ENABLED=0`: `gx-torrent` è il motore predefinito).
-  `gx-torrent` viene sostituito solo se il suo codice è cambiato
-  (`bin/gx-torrent.code-sha256`, `GEXTTO_FORCE_GXTORRENT=1` per forzarlo). Il
-  confronto compila con `-buildvcs=false`: senza, Go marchia la revisione git
-  nel binario e ogni commit sembrerebbe un cambiamento di gx-torrent.
-- `build_number` è la **sorgente unica** del numero di build: checkout e CI
-  leggono lo stesso file (`build_number`, il valore corrente). La CI non usa
-  `github.run_number`: build e `release.json` prendono il valore dal file, così
-  la versione installata ha la **stessa** versione del checkout. La versione
-  mostrata è `1.1.<build>` fino alla build 1999; dalla 2000 il terzo numero
-  riparte da 0 ogni 1000 build e cresce quello centrale (`1.2.0`, `1.2.999`,
-  `1.3.0`, …), così il terzo numero non supera mai 999. La build intera resta
-  visibile: tra parentesi nella versione mostrata dopo il rollover
-  (`1.2.925 (build 2925)`) e in fondo alla pagina **Manutenzione**, con la
-  versione, la build e il commit da cui è compilata. Per far avanzare il numero
-  si fa `make build` e si committa il file aggiornato. Dopo
-  un `git pull` che cambia `build_number`, ricompila per allineare il badge.
-- gx-core (il demone) ha un **numero di build proprio**
-  (`gx-torrent.build_number`, **committato**), separato da quello di Gextto:
-  cresce di uno a ogni build reale di gx-torrent fatta con `make build` o
-  `make gx-torrent` (`scripts/next-gx-build-number.sh` con
-  `GEXTTO_BUMP_BUILD=1`) e resta invariato quando gx-torrent non viene
-  ricostruito. La CI e `build-release.sh` **leggono** il valore committato
-  senza incrementarlo, così la release ha la stessa versione del checkout;
-  `release.json` lo pubblica come `gx_version`/`gx_build`. Dopo una build che
-  ricompila gx-torrent si committa anche `gx-torrent.build_number`. È ciò che
-  `gx-torrent --version`, `/api/v1/health` e la sua pagina web riportano:
-  `1.1.<build>` fino alla build 999, poi `1.2.0` e di nuovo 0..999 nel terzo
-  numero. La formattazione della versione è `versionFromBuild` in
-  `internal/constants/constants.go`, replicata da `scripts/version.sh` per
-  `release.json`. Gextto e gx-torrent usano la stessa funzione, ciascuno con il
-  proprio punto di rollover.
-- `make gx-torrent` — solo il demone (`CGO_ENABLED=0`), con lo stesso numero di
-  build proprio.
-- Non usare `go build ./cmd/gx-torrent/` dalla root: scrive un binario
-  `gx-torrent` (o `gx-torrent.exe` su Windows) nella root (ora ignorati). Per il
-  demone usa `make gx-torrent` (produce `bin/gx-torrent`).
-- **Windows**: il motore (`internal/gxcore`) e il demone (`cmd/gx-torrent`) sono
-  Go puro e **cross-compilano** per Windows (amd64/arm64):
+- `make build` — increments `build_number` (committed) and compiles
+  `bin/gexttod` **and** `bin/gx-torrent`. The build is **pure Go**
+  (`CGO_ENABLED=0`: `gx-torrent` is the default engine).
+  `gx-torrent` is replaced only if its code changed
+  (`bin/gx-torrent.code-sha256`, `GEXTTO_FORCE_GXTORRENT=1` to force it). The
+  comparison compiles with `-buildvcs=false`: without it, Go stamps the git
+  revision into the binary and every commit would look like a change to
+  gx-torrent.
+- `build_number` is the **single source** of the build number: checkout and CI
+  read the same file (`build_number`, the current value). CI does not use
+  `github.run_number`: the build and `release.json` take the value from the
+  file, so the installed version has the **same** version as the checkout. The
+  version shown is `1.1.<build>` up to build 1999; from 2000 the third number
+  restarts from 0 every 1000 builds and the middle one grows (`1.2.0`,
+  `1.2.999`, `1.3.0`, …), so the third number never exceeds 999. The full build
+  stays visible: in brackets in the version shown after the rollover
+  (`1.2.925 (build 2925)`) and at the bottom of the **Maintenance** page,
+  together with the version, the build and the commit it was compiled from. To
+  move the number forward, run `make build` and commit the updated file. After
+  a `git pull` that changes `build_number`, rebuild to align the badge.
+- gx-core (the daemon) has its **own build number**
+  (`gx-torrent.build_number`, **committed**), separate from Gextto's: it grows
+  by one on every real gx-torrent build done with `make build` or
+  `make gx-torrent` (`scripts/next-gx-build-number.sh` with
+  `GEXTTO_BUMP_BUILD=1`) and stays unchanged when gx-torrent is not rebuilt.
+  CI and `build-release.sh` **read** the committed value without incrementing
+  it, so the release has the same version as the checkout; `release.json`
+  publishes it as `gx_version`/`gx_build`. After a build that recompiles
+  gx-torrent, commit `gx-torrent.build_number` too. It is what
+  `gx-torrent --version`, `/api/v1/health` and its web page report:
+  `1.1.<build>` up to build 999, then `1.2.0` and again 0..999 in the third
+  number. The version formatting is `versionFromBuild` in
+  `internal/constants/constants.go`, replicated by `scripts/version.sh` for
+  `release.json`. Gextto and gx-torrent use the same function, each with its
+  own rollover point.
+- `make gx-torrent` — the daemon only (`CGO_ENABLED=0`), with the same build
+  number of its own.
+- Do not use `go build ./cmd/gx-torrent/` from the root: it writes a
+  `gx-torrent` binary (or `gx-torrent.exe` on Windows) in the root (now
+  ignored). For the daemon use `make gx-torrent` (it produces
+  `bin/gx-torrent`).
+- **Windows**: the engine (`internal/gxcore`) and the daemon (`cmd/gx-torrent`)
+  are pure Go and **cross-compile** for Windows (amd64/arm64):
   `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/gx-torrent/`.
-  - Lo strato di piattaforma è nei file `cmd/gx-torrent/*_linux.go`,
-    `*_windows.go`, `*_other.go` (`fsinfo_*`, `mem_*`, `storageclass_*`,
-    `gateway_*`, `defaultdir_*`, `link_*`, `storage_xdev_*`): memoria, spazio
-    libero, filesystem di rete, classe HDD/SSD e gateway di default sono letti
-    con le API Win32; il link di libreria è una **junction** (nessun privilegio
-    symlink) e il move tra volumi riconosce `ERROR_NOT_SAME_DEVICE`.
-  - Da Go 1.23 `os.Lstat` riporta una junction come `ModeIrregular`, non
-    `ModeSymlink`: per riconoscere un link usa sempre `isDirLink`. Restano senza
-    equivalente nativo solo `fadvise` e `fallocate` (fallback `Truncate`).
-  - Il demone gira come **servizio Windows nativo** (`svc.IsWindowsService` →
-    `svc.Run`, `service_windows.go`/`service_other.go`), avviato da
-    `startDaemon` (estratto e condiviso col percorso interattivo).
-  - `scripts/package-gx-torrent-windows.sh` produce
+  - The platform layer is in `cmd/gx-torrent/*_linux.go`, `*_windows.go`,
+    `*_other.go` (`fsinfo_*`, `mem_*`, `storageclass_*`, `gateway_*`,
+    `defaultdir_*`, `link_*`, `storage_xdev_*`): memory, free space, network
+    filesystems, HDD/SSD class and default gateway are read with the Win32
+    APIs; the library link is a **junction** (no symlink privilege) and the
+    cross-volume move recognises `ERROR_NOT_SAME_DEVICE`.
+  - Since Go 1.23 `os.Lstat` reports a junction as `ModeIrregular`, not
+    `ModeSymlink`: to recognise a link always use `isDirLink`. Only `fadvise`
+    and `fallocate` have no native equivalent (`Truncate` fallback).
+  - The daemon runs as a **native Windows service**
+    (`svc.IsWindowsService` → `svc.Run`, `service_windows.go`/
+    `service_other.go`), started by `startDaemon` (extracted and shared with the
+    interactive path).
+  - `scripts/package-gx-torrent-windows.sh` produces
     `gx-torrent-windows-<arch>.zip` (exe + `install-service.ps1` +
-    `uninstall-service.ps1` + README), generato da `build-release.sh` e
-    pubblicato nel release (`dist/gx-torrent-windows-*`).
-  - CI: il job `build-test` cross-compila **motore e demone** per Windows; il
-    job `windows-platform` esegue su `windows-latest` i test di piattaforma
+    `uninstall-service.ps1` + README), generated by `build-release.sh` and
+    published in the release (`dist/gx-torrent-windows-*`).
+  - CI: the `build-test` job cross-compiles **engine and daemon** for Windows;
+    the `windows-platform` job runs the platform tests on `windows-latest`
     (`go test -run "Windows|MountPoint|Setup|CrossDevice|DaemonStart"
-    ./cmd/gx-torrent/`); il job `windows-service` (non bloccante) installa
-    davvero il servizio con `scripts/gx-torrent-service-selftest.ps1`
-    (install/start/health/stop). Il buffer della junction è costruito da
-    `mountPointReparseData` (`junction.go`), testato anche su Linux.
-  - Gextto intero (`cmd/gexttod`) **non** è Windows: TUI, gestione
-    processi/systemd, metadati fs e installer/updater sono Unix (vedi
+    ./cmd/gx-torrent/`); the `windows-service` job (non-blocking) actually
+    installs the service with `scripts/gx-torrent-service-selftest.ps1`
+    (install/start/health/stop). The junction buffer is built by
+    `mountPointReparseData` (`junction.go`), tested on Linux too.
+  - The whole of Gextto (`cmd/gexttod`) is **not** Windows: TUI, process/systemd
+    management, fs metadata and installer/updater are Unix (see
     `docs/gx-torrent.md`, *Standalone use → Platforms*).
 - `make test` — `check-ui` + `check-scripts` + `installer-test` + `test-dht` +
-  `CGO_ENABLED=0 go test ./...` (Go puro).
-- **Guardie statiche della UI** (girano con `go test ./...`): `TestUIActionPathsAreRegisteredRoutes`
-  (ogni `Path: "/api/…"` dei bottoni/azioni della UI deve essere una rotta
-  registrata: un endpoint rimosso non può lasciare un bottone morto che risponde
-  404), `TestInternalJSONPathsAreRegisteredRoutes` (metodo e path di ogni
-  chiamata `v2InternalJSON` e dei campi `Endpoint`/`GetPath`/`PostPath` delle
-  pagine v2 devono risolversi sul router reale: il giro HTTP in-process non
-  fallisce in build), `TestSettingsIndexIsWritable` (ogni opzione mostrata nella
-  pagina impostazioni è salvabile) e `TestEnd2EndSelectorsReferenceRealSettings`
-  (i selettori `#input-<key>`/`#v2-setting-<key>` e le `tab=` dei test
-  Playwright devono esistere nell'indice/scheda: un rename non può lasciare la
-  suite rossa solo in CI).
-- `make test-ui` — suite end2end Playwright della UI (`uiweb/end2end`): costruisce
-  il daemon, lo avvia in dry-run e pilota l'interfaccia reale in un browser
-  (pagine, mobile, i18n, accessibilità axe). **Non fa parte di `make test`**
-  (serve Node e un browser) ma la CI la esegue: va lanciata quando la modifica
-  tocca la UI (`uiweb/v2`, template, JS/CSS, i18n, route v2/`/settings`).
-- **Giro di controllo a ogni chiusura di ciclo** (motore o demone): `make test`,
-  `make test-engine`, `make vet` e — quando la UI è toccata — `make test-ui`, più
-  gli invarianti qui sotto. Il resto della verifica obbligatoria (TUI,
-  performance) è nei punti seguenti. Lo stato della CI non si interroga a ogni
-  ciclo: `gh run list` è lento e va lanciato **a richiesta**.
-- `make fuzz-smoke` — fuzzing breve dei parser esposti alla rete (DHT, bencode
-  `.torrent`, magnet, extension BEP 10, file tree BEP 52, tracker, Torznab, RSS,
-  MSE), `FUZZ_TIME` secondi per target (default 30s, es. `FUZZ_TIME=2m` per un
-  passaggio serio). Non fa parte di `make test`; i crash trovati vanno corretti e
-  i loro input committati come seed in `testdata/fuzz`. Vedi `docs/evoluzione.md`
-  §6.
-- Test mirati: `go test ./cmd/gx-torrent/` e `go test -run GxEngine .`.
-- Test del motore (`internal/gxcore`): `make test-engine` (`go test` dalla root sui
-  pacchetti del motore). Fa parte del modulo, quindi `go test ./...` lo include
-  già; `make test-engine` resta per eseguire solo quei pacchetti.
-- Invarianti da non rompere: `scripts/check-ui-settings-index.sh` (indice
-  impostazioni UI), `scripts/check-scripts.sh` (lint degli script: `bash -n`, più
-  `shellcheck` quando è installato) e `scripts/installer-selftest.sh`.
-- **Igiene dei test**: nessun test deve lasciare file fuori dalle proprie
-  cartelle temporanee. Usa `t.TempDir()` (o `os.MkdirTemp` con
-  `t.Cleanup`/`defer os.RemoveAll`), mai percorsi relativi alla CWD. Un `Daemon`
-  costruito a mano senza `StatePath` non deve scrivere stato (`saveLocked` esce
-  subito): senza la guardia creerebbe un `.tmp` nella directory di lavoro e lo
-  lascerebbe lì perché il rename verso il percorso vuoto fallisce.
-- **La TUI di Gextto deve sempre continuare a funzionare.** Dopo ogni ciclo di
-  modifiche esegui `go test ./internal/tui/` e il test d'integrazione
-  `go test . -run TestTUILibraryClientAgainstTheRouter` (pilota il client TUI
-  contro l'API reale), più lo smoke `gexttod tui` contro il daemon. Includi
-  sempre la verifica TUI nel giro finale di controllo.
-- **Performance (CPU e RAM).** Dopo ogni ciclo di modifiche al motore o al
-  demone fai un **controllo approfondito di performance**: CPU, RAM (RSS e
-  allocazioni) e latenza/throughput dei trasferimenti. Ogni sostituzione o
-  ottimizzazione deve essere **almeno equivalente** alla precedente, se non
-  migliore: misura prima e dopo (`go test -bench … -benchmem`, profili `pprof`
-  CPU/heap, footprint del demone e di `gx-torrent`, `make measure-seeding`) e
-  annota i numeri in `docs/measurements.md`.
-- **Ogni volta che fai dei benchmark, aggiorna `docs/measurements.md`.** Vale per
-  qualunque misura (benchmark Go, `make measure-*`, profili, RSS): il documento è
-  il posto dove i numeri restano, con macchina e data — se una misura non è lì,
-  non è stata fatta.
+  `CGO_ENABLED=0 go test ./...` (pure Go).
+- **Static UI guards** (they run with `go test ./...`):
+  `TestUIActionPathsAreRegisteredRoutes` (every `Path: "/api/…"` of a
+  button/action in the UI must be a registered route: a removed endpoint cannot
+  leave a dead button answering 404), `TestInternalJSONPathsAreRegisteredRoutes`
+  (the method and path of every `v2InternalJSON` call and of the
+  `Endpoint`/`GetPath`/`PostPath` fields of the v2 pages must resolve on the
+  real router: the in-process HTTP round trip does not fail at build time),
+  `TestSettingsIndexIsWritable` (every option shown on the settings page can be
+  saved) and `TestEnd2EndSelectorsReferenceRealSettings` (the
+  `#input-<key>`/`#v2-setting-<key>` selectors and the `tab=` values of the
+  Playwright tests must exist in the index/tab: a rename cannot leave the suite
+  red only in CI).
+- `make test-ui` — Playwright end2end suite of the UI (`uiweb/end2end`): it
+  builds the daemon, starts it in dry-run and drives the real interface in a
+  browser (pages, mobile, i18n, axe accessibility). **It is not part of
+  `make test`** (it needs Node and a browser) but CI runs it: launch it when the
+  change touches the UI (`uiweb/v2`, templates, JS/CSS, i18n, v2/`/settings`
+  routes).
+- **Control round at the end of every cycle** (engine or daemon): `make test`,
+  `make test-engine`, `make vet` and — when the UI is touched — `make test-ui`,
+  plus the invariants below. The rest of the mandatory verification (TUI,
+  performance) is in the following points. CI status is not queried on every
+  cycle: `gh run list` is slow and must be run **on request**.
+- `make fuzz-smoke` — short fuzzing of the network-facing parsers (DHT, bencode
+  `.torrent`, magnet, BEP 10 extension, BEP 52 file tree, trackers, Torznab,
+  RSS, MSE), `FUZZ_TIME` seconds per target (default 30s, e.g. `FUZZ_TIME=2m`
+  for a serious pass). It is not part of `make test`; crashes found must be
+  fixed and their inputs committed as seeds in `testdata/fuzz`. See
+  `docs/evoluzione.md` §6.
+- Targeted tests: `go test ./cmd/gx-torrent/` and `go test -run GxEngine .`.
+- Engine tests (`internal/gxcore`): `make test-engine` (`go test` from the root
+  on the engine packages). It is part of the module, so `go test ./...` already
+  includes it; `make test-engine` remains to run only those packages.
+- Invariants not to break: `scripts/check-ui-settings-index.sh` (UI settings
+  index), `scripts/check-scripts.sh` (script lint: `bash -n`, plus `shellcheck`
+  when installed) and `scripts/installer-selftest.sh`.
+- **Test hygiene**: no test may leave files outside its own temporary folders.
+  Use `t.TempDir()` (or `os.MkdirTemp` with `t.Cleanup`/`defer os.RemoveAll`),
+  never paths relative to the CWD. A `Daemon` built by hand without `StatePath`
+  must not write state (`saveLocked` returns immediately): without the guard it
+  would create a `.tmp` in the working directory and leave it there because the
+  rename to the empty path fails.
+- **Gextto's TUI must always keep working.** After every change cycle run
+  `go test ./internal/tui/` and the integration test
+  `go test . -run TestTUILibraryClientAgainstTheRouter` (it drives the TUI
+  client against the real API), plus the `gexttod tui` smoke test against the
+  daemon. Always include the TUI verification in the final control round.
+- **Performance (CPU and RAM).** After every cycle of engine or daemon changes,
+  do a **thorough performance check**: CPU, RAM (RSS and allocations) and
+  transfer latency/throughput. Every replacement or optimisation must be **at
+  least equivalent** to the previous one, if not better: measure before and
+  after (`go test -bench … -benchmem`, `pprof` CPU/heap profiles, footprint of
+  the daemon and of `gx-torrent`, `make measure-seeding`) and record the numbers
+  in `docs/measurements.md`.
+- **Every time you run benchmarks, update `docs/measurements.md`.** This applies
+  to any measurement (Go benchmarks, `make measure-*`, profiles, RSS): the
+  document is where the numbers stay, with machine and date — if a measurement
+  is not there, it was not done.
 
-## Release, installer e aggiornamenti
+## Release, installer and updates
 
-Come nasce un pacchetto, come si installa e come un'installazione si aggiorna
-(o torna indietro).
+How a package is built, how it is installed, and how an installation updates
+itself (or rolls back).
 
-- Il pacchetto di release si compila **su Ubuntu 22.04** (glibc 2.35) con
-  `scripts/build-release.sh`: in locale gira in un container
-  docker/podman, in CI (`continuous.yml`, `release.yml`) i job `package` usano
-  `container: ubuntu:22.04` per x86_64 e aarch64 (`ubuntu-24.04-arm`). Un
-  binario compilato su un sistema più nuovo non parte su Debian 12/Ubuntu 22.04.
-- Ogni architettura esce in un solo pacchetto Go puro:
-  `gextto-linux-<arch>.tar.gz`; `gexttod --update` aggiorna l'installazione allo
-  stesso pacchetto.
-- `scripts/package-gx-torrent.sh` produce l'archivio **standalone**
-  `gx-torrent-linux-<arch>.tar.gz` (binario + unit systemd + README), che
-  `build-release.sh` genera e la CI pubblica accanto a
-  quelli di Gextto: è il client usabile da solo, come qbittorrent-nox, senza
-  Gextto. `scripts/package-gx-torrent-windows.sh` fa lo stesso per Windows
-  (`gx-torrent-windows-<arch>.zip`, amd64/arm64, servizio nativo).
-- `scripts/build-daemon.sh` imprime nel binario `constants.Commit` e
-  `constants.BuiltAt` (anche in `gx-torrent`); `scripts/release-manifest.sh` scrive `release.json`
-  (versione, commit, ultimi commit, con `"gx": true` sui commit che toccano il
-  codice di gx-torrent, cioè i `GX_PATHS` tenuti allineati da
-  `TestReleaseManifestCoversDaemonPackages`) pubblicato accanto ai pacchetti: è
-  ciò che legge il controllo aggiornamenti in-app di Gextto (`update_check.go`)
-  e di gx-torrent standalone (`cmd/gx-torrent/update.go`). Solo
-  `build-release.sh` imprime `constants.GxReleaseChannel`: una build locale di
-  gx-torrent non si aggiorna da sola.
-- `install.sh` installa anche `gextto-update.path`/`.service`: la UI scrive
-  `<data>/update-request`, la unit root esegue `gexttod --update` (log in
-  `/var/log/gextto-update.log`), che tiene `gexttod.prev` (e `gx-torrent.prev`,
-  come `install.sh` quando si rilancia) e lo ripristina se la
-  nuova versione non parte.
-- Utente del servizio: per default è **l'utente locale che esegue l'installer**
-  (`SUDO_USER`), così può creare cartelle nei media di quell'utente; `--user
-  gextto` (o `GEXTTO_USER`) usa l'account di sistema isolato e senza login, con
-  `--media-group` per l'accesso ai media altrui. Il gruppo della unit è il gruppo
-  primario dell'utente (`id -gn`), non necessariamente il nome utente.
-- Prova reale dell'installer: container con systemd (`--privileged
-  --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw`) e
+- The release package is built **on Ubuntu 22.04** (glibc 2.35) with
+  `scripts/build-release.sh`: locally it runs in a docker/podman container, in
+  CI (`continuous.yml`, `release.yml`) the `package` jobs use
+  `container: ubuntu:22.04` for x86_64 and aarch64 (`ubuntu-24.04-arm`). A
+  binary built on a newer system does not start on Debian 12/Ubuntu 22.04.
+- Each architecture ships as a single pure-Go package:
+  `gextto-linux-<arch>.tar.gz`; `gexttod --update` updates the installation to
+  the same package.
+- `scripts/package-gx-torrent.sh` produces the **standalone** archive
+  `gx-torrent-linux-<arch>.tar.gz` (binary + systemd unit + README), which
+  `build-release.sh` generates and CI publishes next to the Gextto ones: it is
+  the client usable on its own, like qbittorrent-nox, without Gextto.
+  `scripts/package-gx-torrent-windows.sh` does the same for Windows
+  (`gx-torrent-windows-<arch>.zip`, amd64/arm64, native service).
+- `scripts/build-daemon.sh` stamps `constants.Commit` and `constants.BuiltAt`
+  into the binary (into `gx-torrent` too); `scripts/release-manifest.sh` writes
+  `release.json` (version, commit, latest commits, with `"gx": true` on the
+  commits that touch gx-torrent's code, that is the `GX_PATHS` kept aligned by
+  `TestReleaseManifestCoversDaemonPackages`) published next to the packages: it
+  is what the in-app update check of Gextto (`update_check.go`) and of
+  standalone gx-torrent (`cmd/gx-torrent/update.go`) reads. Only
+  `build-release.sh` stamps `constants.GxReleaseChannel`: a local gx-torrent
+  build does not update itself.
+- `install.sh` also installs `gextto-update.path`/`.service`: the UI writes
+  `<data>/update-request`, the root unit runs `gexttod --update` (log in
+  `/var/log/gextto-update.log`), which keeps `gexttod.prev` (and
+  `gx-torrent.prev`, like `install.sh` when re-run) and restores it if the new
+  version does not start.
+- Service user: by default it is **the local user running the installer**
+  (`SUDO_USER`), so it can create folders in that user's media; `--user
+  gextto` (or `GEXTTO_USER`) uses the isolated system account with no login,
+  with `--media-group` for access to other people's media. The group of the
+  unit is the user's primary group (`id -gn`), not necessarily the user name.
+- Real installer test: a container with systemd (`--privileged
+  --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw`) and
   `install.sh --local-archive dist/gextto-linux-x86_64.tar.gz`.
-- La procedura guidata di primo avvio è `uiweb_v2_setup.go` (`/?view=setup`).
+- The first-start wizard is `uiweb_v2_setup.go` (`/?view=setup`).
 
 ## Code scanning (CodeQL)
-- Workflow `.github/workflows/codeql.yml` (linguaggio Go; gira su push/PR su
-  `main` e una volta a settimana). Non serve `sudo` né CGO per l'analisi.
-- **Model pack locale**: `.github/codeql/extensions/gextto-models` dichiara i
-  validatori di percorso e di redirect che CodeQL non riconosce da solo
+- Workflow `.github/workflows/codeql.yml` (Go language; it runs on push/PR to
+  `main` and once a week). No `sudo` or CGO is needed for the analysis.
+- **Local model pack**: `.github/codeql/extensions/gextto-models` declares the
+  path and redirect validators CodeQL does not recognise on its own
   (`pathStartsWith`, `folderRenameWithin`, `comicDownloadFilename`,
-  `v2SearchRedirectTarget`). L'`input` di un `barrierModel` è il nodo che ferma
-  il flusso (`ReturnValue`) e il `kind` è quello della query (`path-injection`,
-  `url-redirection`, …), non un'etichetta libera. L'azione non carica i pack
-  locali da sola: servono gli `CODEQL_ACTION_EXTRA_OPTIONS` già impostati nello
-  step *Analyze*. Se aggiungi un nuovo validatore, aggiungilo al model pack
-  (`models/gextto.model.yml`) invece di sopprimere a tappeto.
-- **Triage**: correggi gli alert reali (data-flow da input non fidato verso un
-  sink); per i by-design o i falsi positivi dimetti con un motivo esplicito:
+  `v2SearchRedirectTarget`). The `input` of a `barrierModel` is the node that
+  stops the flow (`ReturnValue`) and the `kind` is the query's kind
+  (`path-injection`, `url-redirection`, …), not a free label. The action does
+  not load local packs by itself: the `CODEQL_ACTION_EXTRA_OPTIONS` already set
+  in the *Analyze* step are needed. If you add a new validator, add it to the
+  model pack (`models/gextto.model.yml`) instead of suppressing alerts
+  wholesale.
+- **Triage**: fix the real alerts (data flow from untrusted input to a sink);
+  for by-design cases or false positives, dismiss with an explicit reason:
   `gh api -X PATCH repos/buzzqw/gextto/code-scanning/alerts/<n> -f state=dismissed
   -f dismissed_reason='false positive|won't fix|used in tests' -f dismissed_comment='…'`.
-  Convenzioni: `go/path-injection` e `go/request-forgery` su percorsi/URL
-  configurati dall'operatore (save path assoluti, fetch di `.torrent`/filtri IP)
-  sono funzionalità intenzionali, API protetta da token; la crittografia di
-  protocollo (RC4 in MSE, SHA-1 nel DHT) non è modificabile.
-- Alert aperti: `gh api 'repos/buzzqw/gextto/code-scanning/alerts?state=open&per_page=100'`.
+  Conventions: `go/path-injection` and `go/request-forgery` on paths/URLs
+  configured by the operator (absolute save paths, fetching `.torrent`/IP
+  filters) are intentional features, on an API protected by a token; protocol
+  cryptography (RC4 in MSE, SHA-1 in the DHT) cannot be changed.
+- Open alerts: `gh api 'repos/buzzqw/gextto/code-scanning/alerts?state=open&per_page=100'`.
 
-## Servizio in esecuzione su questa macchina
-- È un **servizio systemd utente** (non di sistema): `~/.config/systemd/user/gextto.service`,
-  esegue `/home/andres/gextto/bin/gexttod` dal checkout, `GEXTTO_DATA_DIR=/home/andres/gextto-data`,
-  UI su `0.0.0.0:5000`. `gx-torrent` lo avvia `gexttod`, in uno scope systemd
-  separato che resta vivo ai riavvii del servizio.
-- **Quando serve, builda e riavvia**: dopo modifiche a motore/demone (o per
-  verificare) esegui `make build` e `systemctl --user restart gextto`; non
-  lasciare il servizio su un binario vecchio. Il riavvio può richiedere ~1 minuto
-  (caricamento del filtro IP e handover dello scope `gx-torrent`), quindi
-  verifica dopo un'attesa, non subito.
-- Dopo una build: `systemctl --user restart gextto` (niente `sudo`). Se
-  `bin/gx-torrent` non è cambiato il log dice "gx-torrent … was already
-  running: kept as it is"; altrimenti il demone viene riavviato.
-- **Nessun documento è nella build.** Manuali e changelog sono mantenuti online
-  e la UI apre i link a GitHub nella lingua dell'interfaccia
+## Service running on this machine
+- It is a **systemd user service** (not a system one):
+  `~/.config/systemd/user/gextto.service`, running
+  `/home/andres/gextto/bin/gexttod` from the checkout,
+  `GEXTTO_DATA_DIR=/home/andres/gextto-data`, UI on `0.0.0.0:5000`.
+  `gx-torrent` is started by `gexttod`, in a separate systemd scope that stays
+  alive across restarts of the service.
+- **When needed, build and restart**: after engine/daemon changes (or to
+  verify) run `make build` and `systemctl --user restart gextto`; do not leave
+  the service on an old binary. The restart can take ~1 minute (IP filter
+  loading and handover of the `gx-torrent` scope), so verify after a wait, not
+  immediately.
+- After a build: `systemctl --user restart gextto` (no `sudo`). If
+  `bin/gx-torrent` did not change, the log says "gx-torrent … was already
+  running: kept as it is"; otherwise the daemon is restarted.
+- **No document is in the build.** Manuals and changelogs are kept online and
+  the UI opens the GitHub links in the interface language
   (`docs/MANUAL.it.md`/`docs/MANUAL.en.md`, `changelog.md`/`changelog.en.md`):
-  una modifica a un documento — `README`, `docs/*.md`, `AGENTS.md`,
-  `changelog*.md` — si committa e si pusha, **senza `make build` né riavvio**.
-  La pagina `/?view=manual` reindirizza al manuale online; non reintrodurre
-  `go:embed` per i manuali, o si torna a ricompilare a ogni modifica.
-- Log: `gextto-data/gextto.log` e `gextto-data/gx-torrent/gx-torrent.log`
-  (entrambi ruotati a 5 MB × 4); `gx-torrent.crash.log` solo per i crash.
-- Verifica: `systemctl --user status gextto`;
-  `curl -s http://127.0.0.1:5000/api/status` (campo `version` = versione di
-  Gextto: `1.1.<build>` fino a 1999, poi `1.2.0`, `1.2.999`, `1.3.0`, …);
-  `curl -s http://127.0.0.1:8890/api/v1/health` (demone gx-torrent:
-  `version` = la sua versione con la stessa regola dal build 1000, `pid`,
+  a change to a document — `README`, `docs/*.md`, `AGENTS.md`,
+  `changelog*.md` — is committed and pushed **without `make build` or a
+  restart**. The `/?view=manual` page redirects to the online manual; do not
+  reintroduce `go:embed` for the manuals, or every change would require a
+  rebuild again.
+- Logs: `gextto-data/gextto.log` and `gextto-data/gx-torrent/gx-torrent.log`
+  (both rotated at 5 MB × 4); `gx-torrent.crash.log` only for crashes.
+- Check: `systemctl --user status gextto`;
+  `curl -s http://127.0.0.1:5000/api/status` (field `version` = Gextto's
+  version: `1.1.<build>` up to 1999, then `1.2.0`, `1.2.999`, `1.3.0`, …);
+  `curl -s http://127.0.0.1:8890/api/v1/health` (gx-torrent daemon:
+  `version` = its own version with the same rule from build 1000, `pid`,
   `fingerprint`).
 
-## Convenzioni di modifica
+## Change conventions
 
-Le regole qui sotto dicono *dove* mettere una modifica. In caso di dubbio,
-guarda come è già risolta una funzionalità simile.
+The rules below say *where* to put a change. When in doubt, look at how a
+similar feature is already solved.
 
-### Capacità e opzioni di un motore
-- Nuova opzione: demone (`cmd/gx-torrent`), adapter (`gxtorrent_engine.go`),
-  matrice `capabilityLevels` (`torrent_engine.go`), poi documentazione. Le
-  opzioni legate alla creazione del picker valgono solo per i torrent aggiunti
-  dopo: dichiarale `"partial"`, mai falso successo.
-- `capabilityLevels` è l'**unica fonte di verità**: i flag della scheda di
-  dettaglio si **derivano** dalla matrice (`v2DetailCapsFor` in `uiweb_v2.go`),
-  non con mappe a mano. `TestCapabilitiesBooleanMatchesLevels` fissa che il
-  booleano di `Capabilities()` è vero per `full`/`partial` e falso per `none`;
-  `TestV2DetailCapsFollowCapabilityMatrix` blocca i flag UI attesi.
+### Engine capabilities and options
+- A new option: daemon (`cmd/gx-torrent`), adapter (`gxtorrent_engine.go`),
+  `capabilityLevels` matrix (`torrent_engine.go`), then documentation. Options
+  tied to the creation of the picker apply only to torrents added afterwards:
+  declare them `"partial"`, never a false success.
+- `capabilityLevels` is the **only source of truth**: the detail-tab flags are
+  **derived** from the matrix (`v2DetailCapsFor` in `uiweb_v2.go`), not with
+  hand-written maps. `TestCapabilitiesBooleanMatchesLevels` fixes that the
+  boolean of `Capabilities()` is true for `full`/`partial` and false for
+  `none`; `TestV2DetailCapsFollowCapabilityMatrix` locks the expected UI flags.
 
-### Nuova impostazione UI
-Aggiungi, nell'ordine: default (`uiweb_settings_defaults.go`), indice
-(`uiweb_settings.go`, con sezione e `Group` del pannello: lo script rifiuta le
-voci senza gruppo), unità/valori speciali/dipendenza (`uiweb_settings_meta.go`,
-non nell'etichetta), tooltip (`uiweb_tooltips.go`), traduzioni di etichetta e
-descrizione in **tutti** i cataloghi `internal_translations*.yml` e la riga
-nell'Appendice A dei manuali.
-- `TestSettingsEveryPreviousOptionIsStillAvailable` conta le opzioni: se ne
-  aggiungi una, aggiorna i conteggi.
-- Una chiave dell'indice è **scrivibile per costruzione**
-  (`gh7_setting_key_allowed` accetta `uiSettingIndexed`): non va in nessuna
-  allowlist. `settingWritableAPIOnly` serve solo per le chiavi senza riga nella
-  pagina (editor dedicati o sola API).
-- Ogni scrittura — API, pagina impostazioni, wizard — passa da
-  `validateSettingValue`: una nuova regola di validazione va lì, non nel singolo
-  handler.
+### New UI setting
+Add, in this order: default (`uiweb_settings_defaults.go`), index
+(`uiweb_settings.go`, with section and panel `Group`: the script rejects
+entries without a group), unit/special values/dependency
+(`uiweb_settings_meta.go`, not in the label), tooltip (`uiweb_tooltips.go`),
+label and description translations in **all** the `internal_translations*.yml`
+catalogs, and the row in Appendix A of the manuals.
+- `TestSettingsEveryPreviousOptionIsStillAvailable` counts the options: if you
+  add one, update the counts.
+- An index key is **writable by construction** (`gh7_setting_key_allowed`
+  accepts `uiSettingIndexed`): it does not go into any allowlist.
+  `settingWritableAPIOnly` is only for keys without a row on the page
+  (dedicated editors or API-only).
+- Every write — API, settings page, wizard — goes through
+  `validateSettingValue`: a new validation rule goes there, not into the
+  individual handler.
 
-### Una feature visibile
-Va esposta **sia** nella UI di Gextto (`uiweb/v2`) **sia**, dove ha senso, nella
-pagina web del demone (`cmd/gx-torrent/ui.go`): mai raggiungibile solo via API.
+### A visible feature
+It must be exposed **both** in Gextto's UI (`uiweb/v2`) **and**, where it makes
+sense, in the daemon's web page (`cmd/gx-torrent/ui.go`): never reachable only
+through the API.
 
-### Documentazione e manuali
-- **Manuali** (`docs/MANUAL.it.md` e `docs/MANUAL.en.md`): vanno aggiornati nello
-  stesso commit quando cambia qualcosa di visibile o di operativo — template,
-  JS/CSS, route, etichette, impostazioni, ma anche acquisizione, coda, archivio,
-  seed, ricerca, demone, CLI/TUI. Se la modifica riguarda gx-torrent, controlla
-  anche `docs/gx-torrent.md` e la sua pagina web. I manuali sono **online**:
-  aggiornarli non richiede `make build` né riavvio.
-- **README** (`README.md` e `README.it.md`, stessa sostanza): è documentazione a
-  tutti gli effetti e va aggiornato a ogni modifica impattante per l'utente,
-  soprattutto quando mette in risalto Gextto o gx-core.
-- **Documenti tecnici**: ogni evoluzione o miglioria aggiorna anche i documenti
-  di riferimento, non solo il codice. Vedi *Dove sta cosa* in fondo. Una voce
-  data per «assente»/«da fare» va chiusa o riqualificata quando il codice la
-  implementa; tabelle di stato, capacità e conteggi vanno riallineati. Vale anche
-  per il lavoro non visibile (motore, coda, DHT, storage).
-- **API**: ogni nuova rotta, rotta rimossa, cambio di metodo o parametri va
-  allineato in `docs/API.md` nello stesso lavoro — per Gextto (`/api/*`,
-  `web_router.go`) e per il demone (`/api/v1/*` nativo e `/api/v2/*` compatibile
-  qBittorrent). Guardie: `TestAPIDocumentationMatchesRouter` (Gextto) e
-  `TestAPIRoutesAreDocumented` (`cmd/gx-torrent`). Procedura in
+### Documentation and manuals
+- **Manuals** (`docs/MANUAL.it.md` and `docs/MANUAL.en.md`): they are updated
+  in the same commit when anything visible or operational changes — templates,
+  JS/CSS, routes, labels, settings, but also acquisition, queue, archive,
+  seeding, search, daemon, CLI/TUI. If the change concerns gx-torrent, check
+  `docs/gx-torrent.md` and its web page too. The manuals are **online**:
+  updating them requires neither `make build` nor a restart.
+- **README** (`README.md` and `README.it.md`, same substance): it is
+  documentation in every respect and must be updated on every change that
+  affects users, especially when it highlights Gextto or gx-core.
+- **Technical documents**: every evolution or improvement also updates the
+  reference documents, not just the code. See *Where things live* at the bottom.
+  An item described as «missing»/«to do» is closed or requalified when the code
+  implements it; status, capability and count tables are realigned. This also
+  applies to invisible work (engine, queue, DHT, storage).
+- **API**: every new route, removed route, method or parameter change is
+  aligned in `docs/API.md` in the same piece of work — for Gextto (`/api/*`,
+  `web_router.go`) and for the daemon (`/api/v1/*` native and `/api/v2/*`
+  qBittorrent-compatible). Guards: `TestAPIDocumentationMatchesRouter` (Gextto)
+  and `TestAPIRoutesAreDocumented` (`cmd/gx-torrent`). Procedure in
   `docs/DEVELOPERS.md`, *Web UI and API changes*.
-- Quando aggiungi o sposti documenti, aggiorna l'indice `docs/README.md`.
+- When you add or move documents, update the `docs/README.md` index.
 
 ## `docs/evoluzione.md`
 
-Solo due contenuti: lo **stato attuale** (cosa c'è e perché) e le **migliorie
-future** con il loro gate. Non è un changelog né un manuale: niente bug, fix,
-cronache di implementazione, date, numeri di build, hash di commit, istruzioni
-d'uso o misure. Si scrive al presente e si descrive _cosa c'è_, non cosa è stato
-fatto: una frase che fra sei mesi sarebbe falsa perché racconta una transizione
-va tagliata. Quando una funzionalità arriva si aggiorna lo stato e si toglie il
-punto aperto; le decisioni restano con la loro motivazione, i numeri in
-`measurements.md`.
+Only two contents: the **current state** (what exists and why) and the **future
+improvements** with their gate. It is not a changelog or a manual: no bugs,
+fixes, implementation chronicles, dates, build numbers, commit hashes, usage
+instructions or measurements. Write in the present tense and describe _what
+exists_, not what was done: a sentence that would be false in six months
+because it tells the story of a transition must be cut. When a feature lands,
+the state is updated and the open point removed; decisions stay with their
+rationale, the numbers in `measurements.md`.
 
-## Accessibilità dell'interfaccia
-- Le pagine del demone gx-torrent (`internal/webui/assets`) usano il **design
-  system condiviso**: `theme.css` (token di colore per tema chiaro e scuro,
-  componenti), `common.js` (selettore del tema, notifiche) e lo sprite
-  `icons.svg`, serviti su `/assets/`. Niente colori fissi nelle pagine: usa le
-  variabili (`--text`, `--surface`, `--accent`, …) e i componenti esistenti
+## Interface accessibility and i18n
+- The pages of the gx-torrent daemon (`internal/webui/assets`) use the **shared
+  design system**: `theme.css` (colour tokens for light and dark themes,
+  components), `common.js` (theme picker, notifications) and the `icons.svg`
+  sprite, served from `/assets/`. No hard-coded colours in the pages: use the
+  variables (`--text`, `--surface`, `--accent`, …) and the existing components
   (`.topbar`, `ul.items`, `dialog`, `.chip`, `.badge`, `.fsec`).
-- **Procedura, test e criteri di accessibilità: `docs/ACCESSIBILITY.md`.** Ogni
-  modifica alla UI deve controllare e rispettare l'accessibilità.
-  Vale per `uiweb/v2` (SSR + HTMX), per la pagina del demone
-  (`cmd/gx-torrent/ui.go`) e per ogni pagina HTML generata.
-- Requisiti minimi: HTML semantico e attributi ARIA corretti; ogni campo con un
-  `label` associato; contrasto sufficiente e focus visibile; navigazione da
-  tastiera completa (tab order logico, `Esc`/`Enter` coerenti, nessun controllo
-  usabile solo con il mouse); testo alternativo per icone e immagini;
-  messaggi di stato/errore annunciabili (`role="alert"`/`aria-live`).
-- Verifica sempre prima di chiudere il lavoro: test automatici o controllo
-  manuale di tastiera, focus, lettura di etichette e contrasto. Un controllo
-  nuovo o modificato senza questa verifica non è da considerarsi finito.
-- Vale anche per le stringhe tradotte (i18n): etichette e descrizioni devono
-  restare comprensibili e con `label`/`aria-label` adeguati in tutte le lingue.
-- **I campi dell'interfaccia devono essere sempre tradotti in tutte le lingue
-  disponibili** (`it`, `en`, `de`, `fr`, `es`, `pl`). Etichette, descrizioni,
-  tooltip, placeholder, messaggi e nomi dei campi non possono restare in una
-  sola lingua: ogni stringa nuova va nei cataloghi (`internal_translations*.yml`
-  per Gextto, `uiCatalog` per il demone) con la traduzione in **ogni** lingua.
-  Guardie: `TestBundledCatalogsAreWellFormed`/`TestBundledCatalogsShareKeys` e
-  `TestUIIsTranslatable` (Gextto), `TestUIPageIsFullyTranslatable` e
-  `TestUICatalogTranslatedInEveryLanguage` (demone).
-- **Ogni opzione deve avere il proprio tooltip, tradotto in tutte le lingue.**
-  Vale per entrambe le UI (Gextto `uiweb/v2` e pagina del demone). Il tooltip va
-  definito esplicitamente: in Gextto `uiweb_tooltips.go` per ogni chiave
-  dell'indice `uiweb_settings.go`; nel demone un `title` (o `aria-label`) sul
-  controllo, o sul `<label>` che lo racchiude, con la voce nei cataloghi i18n.
-  Guardie automatiche: `TestSettingTooltipsAreTranslated` (Gextto),
-  `TestEveryOptionHasATooltip` e `TestUIPageIsFullyTranslatable` (demone). Un
-  tooltip mancante o non tradotto fa fallire i test.
+- **Accessibility procedure, tests and criteria: `docs/ACCESSIBILITY.md`.**
+  Every UI change must check and respect accessibility. It applies to
+  `uiweb/v2` (SSR + HTMX), to the daemon page (`cmd/gx-torrent/ui.go`) and to
+  every generated HTML page.
+- Minimum requirements: semantic HTML and correct ARIA attributes; every field
+  with an associated `label`; sufficient contrast and visible focus; full
+  keyboard navigation (logical tab order, consistent `Esc`/`Enter`, no control
+  usable only with the mouse); alternative text for icons and images;
+  status/error messages that can be announced (`role="alert"`/`aria-live`).
+- Always verify before closing the work: automated tests or a manual check of
+  keyboard, focus, label reading and contrast. A new or changed control without
+  this verification is not considered finished.
+- It also applies to translated strings (i18n): labels and descriptions must
+  stay understandable and have adequate `label`/`aria-label` values in every
+  language.
+- **Interface fields must always be translated into every available language**
+  (`it`, `en`, `de`, `fr`, `es`, `pl`). Labels, descriptions, tooltips,
+  placeholders, messages and field names cannot stay in one language only:
+  every new string goes into the catalogs (`internal_translations*.yml` for
+  Gextto, `uiCatalog` for the daemon) with a translation in **every** language.
+  Guards: `TestBundledCatalogsAreWellFormed`/`TestBundledCatalogsShareKeys` and
+  `TestUIIsTranslatable` (Gextto), `TestUIPageIsFullyTranslatable` and
+  `TestUICatalogTranslatedInEveryLanguage` (daemon).
+- **Every option must have its own tooltip, translated into every language.**
+  It applies to both UIs (Gextto `uiweb/v2` and the daemon page). The tooltip
+  must be defined explicitly: in Gextto `uiweb_tooltips.go` for every key of
+  the `uiweb_settings.go` index; in the daemon a `title` (or `aria-label`) on
+  the control, or on the `<label>` that wraps it, with the entry in the i18n
+  catalogs. Automatic guards: `TestSettingTooltipsAreTranslated` (Gextto),
+  `TestEveryOptionHasATooltip` and `TestUIPageIsFullyTranslatable` (daemon). A
+  missing or untranslated tooltip makes the tests fail.
 
-## Dove sta cosa
+## Where things live
 
-Indice dei documenti: `docs/README.md`.
+Index of the documents: `docs/README.md`.
 
-| Cosa | Documento |
+| What | Document |
 | --- | --- |
-| Uso dell'interfaccia, comportamento visibile | `docs/MANUAL.it.md`, `docs/MANUAL.en.md` |
-| Presentazione del progetto, build rapida | `README.md`, `README.it.md` |
-| Architettura e mappa dei file | `docs/ARCHITECTURE.md` |
-| Stato attuale e migliorie future del motore | `docs/evoluzione.md` |
-| Misure di CPU/RAM/latenza (solo numeri, con macchina e data) | `docs/measurements.md` |
-| Demone gx-torrent e motore gx-core | `docs/gx-torrent.md`, `docs/gx-core.md`, `internal/gxcore/GEXTTO.md` |
-| Conformità BEP del motore | `docs/bep.md` |
-| Rotte HTTP di Gextto e del demone | `docs/API.md` |
-| Accessibilità (procedura e test) | `docs/ACCESSIBILITY.md` |
-| Sviluppo: UI, API, test | `docs/DEVELOPERS.md` |
+| Interface usage, visible behaviour | `docs/MANUAL.it.md`, `docs/MANUAL.en.md` |
+| Project presentation, quick build | `README.md`, `README.it.md` |
+| Architecture and file map | `docs/ARCHITECTURE.md` |
+| Current state and future engine improvements | `docs/evoluzione.md` |
+| CPU/RAM/latency measurements (numbers only, with machine and date) | `docs/measurements.md` |
+| gx-torrent daemon and gx-core engine | `docs/gx-torrent.md`, `docs/gx-core.md`, `internal/gxcore/GEXTTO.md` |
+| Engine BEP compliance | `docs/bep.md` |
+| HTTP routes of Gextto and the daemon | `docs/API.md` |
+| Accessibility (procedure and tests) | `docs/ACCESSIBILITY.md` |
+| Development: UI, API, tests | `docs/DEVELOPERS.md` |
 | TUI | `docs/tui.md` |
-| Changelog pubblico | `changelog.md`, `changelog.en.md` |
+| Public changelog | `changelog.md`, `changelog.en.md` |
 
-Documenti online: la UI li apre da GitHub nella lingua dell'interfaccia. Non sono
-nella build, quindi aggiornarli non richiede `make build` né riavvio.
+Online documents: the UI opens them from GitHub in the interface language. They
+are not in the build, so updating them requires neither `make build` nor a
+restart.
