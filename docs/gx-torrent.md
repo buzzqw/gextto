@@ -1760,8 +1760,9 @@ using fixed values.
 - **Idle memory release**: piece buffers are 1 MB and live in per-torrent
   `sync.Pool`s. After a burst they can stay reachable until a collection even
   when nothing is moving, because an idle daemon allocates too little to
-  trigger one. After **5 minutes with the total download rate below the
-  queue's slow-rate threshold** the daemon calls `debug.FreeOSMemory` (at most
+  trigger one. After **5 minutes with the total transfer rate (download and
+  upload) below the queue's slow-rate threshold** the daemon calls
+  `debug.FreeOSMemory` (at most
   once every 10 minutes) and logs `memory released`; the caches rebuild on the
   next transfer. On the N97 the RSS went from 550 MB to 35–40 MB
   ([`measurements.md`](measurements.md) §4.1).

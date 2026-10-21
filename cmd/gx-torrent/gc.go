@@ -48,8 +48,9 @@ func memoryReleaseDue(now, lastActive, lastRelease time.Time) bool {
 // nothing allocates enough to trigger a GC. debug.FreeOSMemory collects and
 // hands the free spans back; it is STW, so only after a quiet period and at
 // most every memoryReleaseEvery. Call without d.mu. moving is true while the
-// total download rate is at least the queue's slow-rate threshold: a torrent
-// under that threshold needs no big cache and does not keep the heap alive.
+// total transfer rate (download plus upload) is at least the queue's slow-rate
+// threshold: a quiet daemon needs no big cache and does not keep the heap
+// alive.
 func (d *Daemon) maybeReleaseMemory(now time.Time, moving bool) {
 	if moving {
 		d.lastDownloadAt = now

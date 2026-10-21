@@ -17,7 +17,7 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 - **Memoria di gx-torrent restituita al sistema.** Dopo un periodo di download
   intenso gx-torrent poteva restare a centinaia di MB di RAM anche senza
-  traffico. Ora, dopo 5 minuti con il download sotto la soglia dei torrent
+  traffico. Ora, dopo 5 minuti con il traffico sotto la soglia dei torrent
   lenti, restituisce al sistema la memoria non più usata (al massimo una volta
   ogni 10 minuti); le cache si ricostruiscono da sole al trasferimento
   successivo.

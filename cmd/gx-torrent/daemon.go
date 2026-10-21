@@ -1250,7 +1250,8 @@ func (d *Daemon) tick(now time.Time) {
 	d.mu.Unlock()
 
 	// Return the heap of a finished burst when the daemon is quiet (gc.go).
-	d.maybeReleaseMemory(now, aggregate >= cfg.SlowRate)
+	moving := aggregate >= cfg.SlowRate || int64(engineStats.SpeedUpload) >= cfg.SlowRate
+	d.maybeReleaseMemory(now, moving)
 
 	// The lifetime flush does file I/O: outside d.mu, and only on its cadence.
 	if saveLifetime {

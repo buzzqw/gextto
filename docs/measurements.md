@@ -142,8 +142,9 @@ dead uTP connection fails at once instead of looping; the socket handles each da
 the receive buffer and copies only what stays queued; `waitEvents` is a plain select.
 The IP filter keeps the parsed rules instead of the file, `GOGC=50` trims the heap
 headroom, and the buffers of a finished burst are released. The collector costs 0.5 %
-(`gcBgMarkWorker`) and 2.2 % (`mallocgc`) of the profile. After 5 minutes below the
-queue's slow rate the daemon calls `debug.FreeOSMemory` (at most every 10 minutes) to
+(`gcBgMarkWorker`) and 2.2 % (`mallocgc`) of the profile. After 5 minutes with the
+total transfer rate below the queue's slow rate the daemon calls `debug.FreeOSMemory`
+(at most every 10 minutes) to
 return the 1 MB piece buffers that the per-torrent `sync.Pool`s would otherwise keep
 reachable until the next collection: on the N97 the RSS went from 550 MB to 35–40 MB
 with 7 torrents and no active transfer.
