@@ -76,7 +76,7 @@ with the live service or a standalone instance as stated.
 | Memory under load | RssAnon peak **1105 MB** with 10 torrents and the NFS write cache; **507 MB outside the two caches** | 226 | same load, `pprof` heap at the end |
 | gexttod at rest | **46 CPU ticks/min (~0.7 %)**, 0 directory opens per 20 s, no write probe on the NAS | 1785 | `GEXTTO_PPROF`, `strace`, `/proc` over 60 s |
 | gexttod in the first minutes | **0.39 % of a core**, stale-temp sweep 0.21 s, 8 new TLS connections in 300 s | 1790 | profile from start, `strace -e connect` |
-| Feed archive | **320 MB**, 446,994 rows, one row per infohash; Archive page 37 ms | 1791 | live `gextto_archive.db`, `dbstat`, Archive page |
+| Feed archive | **258 MB**, 307,477 rows after the 2026-10-21 dedup (was 480 MB, 610,254), one row per listing; Archive page 7–23 ms | 1935 | live `gextto_archive.db`, `dbstat`, `/api/archive` |
 | Archive insert | **40.9–41.8 ms per 1,000 releases** (3.00 MB, 50,528 allocs) | 1791 | `BenchmarkArchiveSaveBatch` |
 | Archive search (standalone) | **7.4 ms** on 100,000 releases, 49× faster than before | — | `BenchmarkFeedArchiveSearch` |
 | Piece picker | `RarestManyPeers` **13.8 µs**, bitfield update+disconnect **65–68 µs** | 228 | `go test -bench . ./internal/gxcore/internal/piecepicker` |
@@ -233,10 +233,10 @@ the Go scheduler's own wake-ups. No spinning loop, nothing to change.
 
 | | Value |
 |---|---|
-| Size | 320 MB, 446,994 rows |
+| Size | 258 MB, 307,477 rows after the 2026-10-21 dedup (was 480 MB, 610,254) |
 | Identity | one row per torrent (infohash); the indexer guid for `.torrent`-only listings, the exact link as a last resort |
 | Insert | 45.2–46.1 ms per 1,000 releases (3.09 MB, 50,536 allocs) |
-| Archive page | 37 ms |
+| Archive API page (100 rows) | 7–23 ms |
 | Standalone feed search | 7.4 ms on 100,000 releases |
 
 **Choices behind these figures.** Uniqueness is on `magnet_key`, the first 16 bytes of
