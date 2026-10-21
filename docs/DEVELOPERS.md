@@ -206,6 +206,15 @@ wizard once in `global-setup.ts` and drives the real interface in a browser:
 make test-ui              # pages, mobile layout, i18n, axe-core accessibility
 ```
 
+The suite also gives the test daemon its own gx-torrent: `playwright.config.ts`
+sets `GEXTTO_GXTORRENT_LISTEN=127.0.0.1:18893`, which replaces both the managed
+daemon's listen address and the URL Gextto uses to reach it. Without it, a
+gx-torrent already answering on the default 8890 (a live installation) would be
+adopted by the test instance, which then reloaded its IP filter and restarted
+its session. Gextto now refuses a daemon that carries a fingerprint but belongs
+to another data directory, so that mistake fails loudly instead of disturbing a
+running installation.
+
 It runs in CI in the `ui-e2e` job. `tests/accessibility.spec.ts` holds the
 axe-core checks and the keyboard/reflow regressions: it should pass before
 changing UI templates, styles or client-side interaction code.

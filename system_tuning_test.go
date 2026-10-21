@@ -93,7 +93,7 @@ func TestProposeTuningConnectionsAreBoundedFromRAM(t *testing.T) {
 		mem  uint64
 		want string
 	}{
-		{0, "50"}, {2 * gib, "50"}, {8 * gib, "200"}, {32 * gib, "400"},
+		{0, "50"}, {2 * gib, "50"}, {8 * gib, "100"}, {32 * gib, "150"},
 	}
 	for _, tc := range cases {
 		facts := tuningTestFacts()

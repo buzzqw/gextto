@@ -5648,3 +5648,7 @@ spa:
   "Sezioni manutenzione": "Secciones de mantenimiento"
   "Query in corso…": "Consulta en curso…"
   "Attendi: l'archivio può richiedere qualche secondo.": "Espera: el archivo puede tardar unos segundos."
+  Connessioni automatiche (in base alla macchina): Conexiones automáticas (según la máquina)
+  Tetto alle connessioni per singolo torrent, usato dal limite automatico o come limite fisso quando l'automatico è spento (-1 = illimitato).: Tope de conexiones por torrent, usado por el límite automático o como límite fijo cuando el automático está apagado (-1 = ilimitado).
+  Adatta il numero di connessioni di ogni torrent alla macchina (core e RAM) e riduce quelle dei torrent che non progrediscono; il valore qui sopra resta il tetto (-1 = nessun tetto).: Dimensiona las conexiones de cada torrent según la máquina (núcleos y RAM) y reduce los torrents sin progreso; el valor anterior sigue siendo el tope (-1 = sin tope).
+  -1 = nessun tetto: -1 = sin tope

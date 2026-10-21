@@ -5694,3 +5694,7 @@ fra:
   "Sezioni manutenzione": "Sections de maintenance"
   "Query in corso…": "Requête en cours…"
   "Attendi: l'archivio può richiedere qualche secondo.": "Veuillez patienter : l'archive peut prendre quelques secondes."
+  Connessioni automatiche (in base alla macchina): Connexions automatiques (selon la machine)
+  Tetto alle connessioni per singolo torrent, usato dal limite automatico o come limite fisso quando l'automatico è spento (-1 = illimitato).: Plafond des connexions par torrent, utilisé par la limite automatique ou comme limite fixe quand l'automatique est désactivé (-1 = illimité).
+  Adatta il numero di connessioni di ogni torrent alla macchina (core e RAM) e riduce quelle dei torrent che non progrediscono; il valore qui sopra resta il tetto (-1 = nessun tetto).: Dimensionne les connexions de chaque torrent selon la machine (cœurs et RAM) et réduit les torrents sans progrès ; la valeur ci-dessus reste le plafond (-1 = sans plafond).
+  -1 = nessun tetto: -1 = sans plafond

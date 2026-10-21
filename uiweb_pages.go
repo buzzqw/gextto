@@ -972,6 +972,7 @@ var uiSettingsEditorSearchEntries = []uiSearchEntry{
 var uiSettingCapability = map[string]string{
 	"torrent_holepunch":                   "holepunch",
 	"torrent_max_connections_per_torrent": "connections",
+	"torrent_connections_auto":            "connections",
 	"torrent_ramdisk_enabled":             "ramdisk",
 	"torrent_ramdisk_dir":                 "ramdisk",
 	"torrent_ramdisk_threshold_gb":        "ramdisk",

@@ -25,6 +25,7 @@ import (
 	"io"
 	"math"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -84,10 +85,16 @@ func gxTorrentSettingsFromConfig(cfg *Config) (gxTorrentSettings, error) {
 	if parsed, err := url.Parse(baseURL); err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return gxTorrentSettings{}, fmt.Errorf("gxtorrent_url must be a complete http(s) URL")
 	}
+	listen := gxManagedListenSetting(cfg)
+	if overrideListen, overrideURL, ok, err := gxListenOverride(); err != nil {
+		return gxTorrentSettings{}, err
+	} else if ok {
+		listen, baseURL = overrideListen, overrideURL
+	}
 	return gxTorrentSettings{
 		BaseURL:      baseURL,
 		Token:        strings.TrimSpace(cfg.Settings["gxtorrent_token"]),
-		Listen:       gxManagedListenSetting(cfg),
+		Listen:       listen,
 		Timeout:      timeout,
 		PollInterval: poll,
 		// Gextto always starts and supervises its own gx-torrent daemon. An
@@ -110,6 +117,31 @@ func gxManagedListenSetting(cfg *Config) string {
 		return listen
 	}
 	return "0.0.0.0:8890"
+}
+
+// gxListenOverrideEnv names a listen address that replaces the managed daemon
+// address — both where it listens and the URL used to reach it — for a
+// throw-away instance. The UI end2end suite sets it so it starts (and drives)
+// its own gx-torrent instead of adopting the daemon of a live installation
+// that happens to answer on the default port. It is not a setting: a real
+// installation keeps using the settings page.
+const gxListenOverrideEnv = "GEXTTO_GXTORRENT_LISTEN"
+
+// gxListenOverride reads the override, when set. Wildcard addresses cannot be
+// dialled, so the URL maps them to loopback.
+func gxListenOverride() (listen, baseURL string, ok bool, err error) {
+	raw := strings.TrimSpace(os.Getenv(gxListenOverrideEnv))
+	if raw == "" {
+		return "", "", false, nil
+	}
+	host, port, splitErr := net.SplitHostPort(raw)
+	if splitErr != nil || port == "" {
+		return "", "", false, fmt.Errorf("%s must be a host:port address", gxListenOverrideEnv)
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	return raw, "http://" + net.JoinHostPort(host, port), true, nil
 }
 
 // gxTorrentEngine is a TorrentEngine backed by the gx-torrent daemon.
@@ -195,6 +227,14 @@ func newGxTorrentEngine(cfg *Config, notifier *Notifier) (*gxTorrentEngine, erro
 		}
 	}
 	health, alreadyRunning := engine.health()
+	if alreadyRunning && health.managedByOther(cfg) {
+		// A daemon that carries a fingerprint was started by a Gextto, but not
+		// by this one. Adopting it would let this instance reconfigure, restart
+		// or stop another installation's engine (the UI end2end suite used to
+		// do exactly that with the live daemon). It is not an operator-managed
+		// external daemon, which has no fingerprint.
+		return nil, fmt.Errorf("gx-torrent %s on %s belongs to another Gextto installation (data %s): not touching it; set gxtorrent_url and gxtorrent_listen to a free address", health.Version, settings.BaseURL, health.DataDir)
+	}
 	if settings.Managed && (!alreadyRunning || health.ownedBy(cfg)) {
 		if alreadyRunning {
 			engine.adoptOrReplace(cfg, health)
@@ -351,6 +391,13 @@ func (h gxHealth) ownedBy(cfg *Config) bool {
 		return false
 	}
 	return SamePath(h.DataDir, filepath.Join(cfg.DataDir, "gx-torrent"))
+}
+
+// managedByOther reports a managed daemon (it carries a fingerprint) that
+// belongs to a different data directory: another Gextto installation started
+// it. It must never be adopted, stopped or reconfigured by this one.
+func (h gxHealth) managedByOther(cfg *Config) bool {
+	return h.Fingerprint != "" && h.DataDir != "" && !h.ownedBy(cfg)
 }
 
 func (e *gxTorrentEngine) health() (gxHealth, bool) {
@@ -1036,8 +1083,10 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		"cache_ttl_secs":   max(lt.CacheExpiry, 10),
 		"preallocate":      cfg.TorrentPreallocate(),
 		// Default peer cap of every torrent without one of its own (-1 in the
-		// settings page = no cap, 0 for the daemon).
+		// settings page = no cap, 0 for the daemon). With conn_auto the daemon
+		// sizes the cap from the machine and this value is only the ceiling.
 		"max_connections_per_torrent": max(numberSettingInt(cfg.Settings, "torrent_max_connections_per_torrent", -1), 0),
+		"conn_auto":                   settingsBool(cfg, "torrent_connections_auto", true),
 	}
 	// Disk guard: Gextto's minimum free space also pauses the daemon's running
 	// downloads below it. Not set (0) keeps the daemon's own default, so the

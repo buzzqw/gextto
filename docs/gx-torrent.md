@@ -2018,6 +2018,22 @@ to the connections established; if it is lowered below the current number,
 the excess ones are closed immediately. The upload slots change the
 number of peers the unchoker keeps unblocked.
 
+**Automatic per-torrent cap** (`conn_auto` in the queue policy, on by default;
+*Automatic connections* on the daemon page, *Connessioni automatiche* in
+Gextto). Instead of a fixed number, the daemon sizes the cap of each torrent
+without a limit of its own from the machine — about ten connections per core
+plus a flat fifteen, bounded to 15–200, halved below 4 GiB of RAM and again
+under 768 MiB available — and trims a torrent that keeps at least ten peers
+with no progress for two minutes to half, so dead connections make room for
+queued addresses. The pass runs every 30 seconds on the queue loop, applies
+with `SetMaxConnections` (no session restart, no re-announce) and logs each new
+allowance and each change (`peer cap for «…»: 55 → 27 (no progress with 34
+peers)`). `max_connections_per_torrent` stays the ceiling when above zero, and
+a torrent's own limit always wins. The reason is in
+[`measurements.md`](measurements.md) §4.1: CPU grows with the number of
+established peers (about 0.1 % of a core each) and hardly with the bytes when
+the line is the limit.
+
 ### Auto-speed on latency (anti-bufferbloat)
 
 **Standalone** option (settings.json, like the bandwidth scheduler), inspired by

@@ -88,7 +88,10 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: `GEXTTO_DATA_DIR=${testDataDir} GEXTTO_LISTEN=127.0.0.1:15003 GEXTTO_ENGINE_LISTEN=127.0.0.1:18892 bin/gexttod --dry-run`,
+    // GEXTTO_GXTORRENT_LISTEN gives the suite its own gx-torrent: without it a
+    // daemon already listening on the default 8890 (a live installation) would
+    // be adopted and reconfigured by the test instance.
+    command: `GEXTTO_DATA_DIR=${testDataDir} GEXTTO_LISTEN=127.0.0.1:15003 GEXTTO_ENGINE_LISTEN=127.0.0.1:18892 GEXTTO_GXTORRENT_LISTEN=127.0.0.1:18893 bin/gexttod --dry-run`,
     cwd: "../..",
     port: 15003,
     reuseExistingServer: !process.env.CI,

@@ -72,6 +72,7 @@ with the live service or a standalone instance as stated.
 |---|---|---|---|
 | gx-torrent idle | **60–64 MB RSS** (44–48 MB anonymous), 1–2 % CPU | 226 | clean restart with 3 seeds and 1 download, full IP filter; `ps`/`/proc` |
 | gx-torrent under load | **44–48 % of a core at 8–9 MB/s**, ~0.35–0.43 CPU per peer; picker 9 % of the profile | 226 | the peer-reader load test (9–10 releases, Auto, collector every 5 s, pprof 45 s) |
+| Automatic peer cap | **55 per torrent** on this 4-core/16 GiB host; 25–37 peers at 2.5–6.7 MB/s, no throughput penalty between 25 and 55 | 1932 (engine 244) | `GX_MEASURE_AUTO=1` / `GX_MEASURE_MAXCONN`, Ubuntu ISO, 90 s × 2 rounds (§4.1) |
 | Memory under load | RssAnon peak **1105 MB** with 10 torrents and the NFS write cache; **507 MB outside the two caches** | 226 | same load, `pprof` heap at the end |
 | gexttod at rest | **46 CPU ticks/min (~0.7 %)**, 0 directory opens per 20 s, no write probe on the NAS | 1785 | `GEXTTO_PPROF`, `strace`, `/proc` over 60 s |
 | gexttod in the first minutes | **0.39 % of a core**, stale-temp sweep 0.21 s, 8 new TLS connections in 300 s | 1790 | profile from start, `strace -e connect` |
@@ -147,6 +148,29 @@ peer had. On three public ISOs at 9.4 MB/s it is 9 % of the CPU;
 `BenchmarkRarestManyPeers` is 13.8 µs and the bitfield update+disconnect 65–68 µs.
 Pinned by `TestHoldersMatchAReferenceModel` (20,000 random have/don't-have/disconnect
 steps).
+
+**Automatic peer cap** (2026-10-21, N97, build 1932, engine 244). The daemon sizes the
+per-torrent cap from the machine — ten connections per core plus fifteen, bounded
+to 15–200, halved below 4 GiB of RAM and under 768 MiB available — and trims a
+torrent that keeps at least ten peers with no progress for two minutes to half.
+It is applied live with `SetMaxConnections` (no session restart) every 30 s; the
+configured value stays the ceiling and a per-torrent limit wins
+(`cmd/gx-torrent/connauto.go`). Same public swarm (Ubuntu 24.04.3 desktop ISO,
+90 s window, two interleaved rounds, `GX_MEASURE_AUTO=1` /
+`GX_MEASURE_MAXCONN`), three policies:
+
+| Policy | Peak peers | Downloaded | CPU per 100 MB |
+|---|---|---|---|
+| automatic (55 on this host) | 25 / 37 | 221 / 604 MB | 4.7 / 3.7 s |
+| fixed 200 | 78 / 89 | 314 / 625 MB | 4.5 / 3.9 s |
+| fixed 25 | 25 / 25 | 497 / 548 MB | 4.5 / 5.7 s |
+
+A cap in this range costs no throughput — the spread is swarm luck, and one
+public pass cannot rank a parameter (§1) — while the established peers, and with
+them the absolute CPU (about 0.1 % of a core per peer), stay bounded. The
+automatic cap did not bind in these runs (peers stayed below 55), so the table
+shows that 25–55 per torrent is safe, not the trimming path: that is covered by
+`TestDaemonAutoConnectionsFollowProgress`.
 
 **uTP retransmission.** A 5 ms minimum-RTT floor keeps a fast path from collapsing the
 RTO; a per-connection backoff doubles on timeout and halves on delivery; a healthy
@@ -395,12 +419,13 @@ panicking, the bencode screen bounds lengths and depth before the decoder, and t
 fault guard turns a fault into an I/O error with the same write cost (35.9–37.5 µs,
 0 alloc).
 
-**Auto-tune connection cap**: on a public swarm the bound (50–400) is **safe** — a lower
+**Auto-tune connection cap**: on a public swarm the bound (50–150 since the
+automatic peer cap) is **safe** — a lower
 cap used less than half the memory with comparable throughput, and the spread across
 caps was swarm luck (one 60 s pass cannot rank a parameter); the controlled local sweep
 (8 seeders, 64 MiB, loopback) is **flat** across the cap (99–104 MiB/s), because one seed
-source already saturates the path. **The cap bounds connections (memory), never the
-rate.**
+source already saturates the path. **The cap bounds connections (memory and CPU), never
+the rate.**
 
 **Storage and disk**: buffered **~5.8 GB/s**, mmap **~7.4 GB/s** (ranged mmap sync ~29
 GB/s through the page cache), far above any network speed. Removing `O_SYNC` and batching
@@ -418,7 +443,7 @@ Closed with a measurement, so they are not retried without new data:
 | Idea | Why it was closed |
 |---|---|
 | `io_uring` / AIO | the disk is at 5.8–7.4 GB/s, far above any network speed; Go exposes it only with a dependency or cgo, and the mmap path is already asynchronous |
-| Batched uTP datagram I/O (`recvmmsg`) | on the measured load (TCP carried most of the bytes) batching would save under 1 % of the syscall time; worth re-measuring only on a uTP-heavy session |
+| Batched uTP datagram I/O (`recvmmsg`/`sendmmsg`) | measured again on a uTP-heavy path (2026-10-21): on the loopback benchmark `Socket.writeTo` is 44 % of the CPU (58 % is `Syscall6`), but in the real-swarm profile it is **8.3 %** of the samples (36 % syscalls, reads and TCP included). Batching would remove at most that share, while adding a copy per datagram and a sender queue; at the live rate it saves well under 1 % of a core. Reopen only on a uTP-only session above 8 MB/s |
 | Contiguous-write coalescing | the page cache already merges adjacent writebacks |
 | Rarity buckets, watermark cursor in `pickSequential`/`pickFileEdge`, `PieceDownloader` bitmask, `clear(b.Data)` in `bufferpool`, `FADV_RANDOM`, `saveLocked` outside `d.mu`, `/proc/meminfo` under `d.mu` | no measurement justified the cost |
 | Upsert with two conflict targets (archive) | +17 ms per 1,000 releases against `INSERT OR IGNORE` + refresh |

@@ -209,6 +209,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "torrent_sequential", Label: "Download sequenziale", Tab: "performance", Group: "Modalità di download"},
 	{Key: "torrent_first_last", Label: "Prima/ultima parte dei file", Tab: "performance", Group: "Modalità di download"},
 	{Key: "torrent_preallocate", Label: "Prealloca lo spazio su disco", Tab: "performance", Group: "Modalità di download"},
+	{Key: "torrent_connections_auto", Label: "Connessioni automatiche (in base alla macchina)", Tab: "performance", Group: "Connessioni"},
 	{Key: "torrent_max_connections_per_torrent", Label: "Connessioni max per torrent", Tab: "performance", Group: "Connessioni"},
 	{Key: "torrent_ramdisk_enabled", Label: "Usa il RAM disk", Tab: "performance", Group: "RAM disk"},
 	{Key: "torrent_ramdisk_dir", Label: "Cartella RAM disk", Tab: "performance", Group: "RAM disk"},
@@ -376,6 +377,7 @@ var uiSettingSearchTerms = map[string]string{
 	"torrent_ramdisk_min_free_bytes":      "memoria memo memory ram ramdisk tmpfs spazio space",
 	"torrent_preallocate":                 "memoria memo memory ram spazio space disco disk",
 	"torrent_max_connections_per_torrent": "memoria memo memory ram risorse resources connessioni connections",
+	"torrent_connections_auto":            "memoria memo memory ram risorse resources connessioni connections automatico automatico automatic peers macchina machine",
 	"min_free_space_gb":                   "memoria memo memory ram spazio space disco disk",
 	// Words of the labels used before the reorganization.
 	"active":                        "attivo daemon",

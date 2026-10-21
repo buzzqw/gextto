@@ -5038,3 +5038,7 @@ eng:
   "Sezioni manutenzione": "Maintenance sections"
   "Query in corso…": "Query running…"
   "Attendi: l'archivio può richiedere qualche secondo.": "Please wait: the archive may take a few seconds."
+  "Connessioni automatiche (in base alla macchina)": "Automatic connections (sized from the machine)"
+  "Tetto alle connessioni per singolo torrent, usato dal limite automatico o come limite fisso quando l'automatico è spento (-1 = illimitato).": "Ceiling on the connections per torrent, used by the automatic limit or as a fixed limit when the automatic one is off (-1 = unlimited)."
+  "Adatta il numero di connessioni di ogni torrent alla macchina (core e RAM) e riduce quelle dei torrent che non progrediscono; il valore qui sopra resta il tetto (-1 = nessun tetto).": "Size each torrent's connections from the machine (cores and RAM) and trim torrents that make no progress; the value above stays the ceiling (-1 = no ceiling)."
+  "-1 = nessun tetto": "-1 = no ceiling"

@@ -44,8 +44,13 @@ type Config struct {
 	MaxPeerAccept      int   `json:"max_peer_accept"`
 	// MaxConnectionsPerTorrent caps the peers of every torrent that has no cap
 	// of its own (0 = no cap). It changes in place, without reopening the
-	// session.
+	// session. With ConnAuto on it is the ceiling of the automatic value.
 	MaxConnectionsPerTorrent int `json:"max_connections_per_torrent"`
+	// ConnAuto lets the daemon size the per-torrent connection cap from the
+	// machine (cores and memory) and trim it on a torrent making no progress,
+	// instead of using MaxConnectionsPerTorrent as a fixed number. Default on;
+	// an explicit per-torrent cap always wins.
+	ConnAuto *bool `json:"conn_auto"`
 	// Disk cache: CacheMB <= 0 sizes it from the RAM (automatic), otherwise
 	// it is the read cache and the write buffer in MiB. CacheTTLSecs keeps
 	// read blocks; Preallocate reserves new files in full.
@@ -94,6 +99,7 @@ func DefaultConfig() Config {
 		CacheMB:         -1,
 		CacheTTLSecs:    300,
 		Auto:            BoolPtr(true),
+		ConnAuto:        BoolPtr(true),
 		MinFreeMB:       Int64Ptr(DefaultMinFreeMB),
 	}
 }
@@ -107,6 +113,11 @@ func SameBoolPtr(a, b *bool) bool {
 		return a == b
 	}
 	return *a == *b
+}
+
+// BoolOn reports an optional flag, with a missing value meaning yes.
+func BoolOn(v *bool) bool {
+	return v == nil || *v
 }
 
 // Normalized clamps the configuration into a usable range.
@@ -152,6 +163,9 @@ func (c Config) Normalized() Config {
 	}
 	if c.Auto == nil {
 		c.Auto = BoolPtr(true)
+	}
+	if c.ConnAuto == nil {
+		c.ConnAuto = BoolPtr(true)
 	}
 	if c.MinFreeMB == nil {
 		c.MinFreeMB = Int64Ptr(DefaultMinFreeMB)

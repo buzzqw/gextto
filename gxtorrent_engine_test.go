@@ -752,6 +752,84 @@ func TestGxHealthOwnedOnlyBySameDataDir(t *testing.T) {
 	}
 }
 
+func TestGxHealthManagedByOther(t *testing.T) {
+	cfg := &Config{DataDir: t.TempDir()}
+	own := gxHealth{OK: true, Fingerprint: "abc", DataDir: filepath.Join(cfg.DataDir, "gx-torrent")}
+	if own.managedByOther(cfg) {
+		t.Fatal("this installation's daemon is not somebody else's")
+	}
+	if !(gxHealth{OK: true, Fingerprint: "abc", DataDir: "/srv/other/gx-torrent"}).managedByOther(cfg) {
+		t.Fatal("a fingerprinted daemon of another data directory belongs to another Gextto")
+	}
+	if (gxHealth{OK: true, DataDir: "/srv/other/gx-torrent"}).managedByOther(cfg) {
+		t.Fatal("an operator-managed daemon without fingerprint is external, not another Gextto's")
+	}
+}
+
+// TestGxEngineNeverTouchesAnotherInstallationsDaemon pins that a Gextto never
+// adopts (and therefore never reconfigures, restarts or stops) the gx-torrent
+// of another installation: the UI end2end suite used to do it with the live
+// daemon, reloading its IP filter and restarting its session on every run.
+func TestGxEngineNeverTouchesAnotherInstallationsDaemon(t *testing.T) {
+	var mutations atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/health" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"ok":          true,
+				"version":     "1.1.243",
+				"pid":         12345,
+				"fingerprint": "abc",
+				"data_dir":    "/srv/other/gextto-data/gx-torrent",
+			})
+			return
+		}
+		if r.Method == http.MethodPost {
+			mutations.Add(1)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{})
+	}))
+	defer server.Close()
+
+	cfg := &Config{
+		DataDir:  t.TempDir(),
+		StateDir: t.TempDir(),
+		Settings: map[string]string{"gxtorrent_url": server.URL},
+	}
+	if _, err := newGxTorrentEngine(cfg, nil); err == nil || !strings.Contains(err.Error(), "another Gextto") {
+		t.Fatalf("expected a refusal naming the other installation, got %v", err)
+	}
+	if got := mutations.Load(); got != 0 {
+		t.Fatalf("the engine of another installation received %d mutating requests", got)
+	}
+}
+
+func TestGxListenOverride(t *testing.T) {
+	cfg := &Config{DataDir: t.TempDir(), Settings: map[string]string{}}
+
+	t.Setenv(gxListenOverrideEnv, "127.0.0.1:18893")
+	settings, err := gxTorrentSettingsFromConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.Listen != "127.0.0.1:18893" || settings.BaseURL != "http://127.0.0.1:18893" {
+		t.Fatalf("override not applied: listen=%q url=%q", settings.Listen, settings.BaseURL)
+	}
+
+	t.Setenv(gxListenOverrideEnv, "0.0.0.0:18893")
+	settings, err = gxTorrentSettingsFromConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.BaseURL != "http://127.0.0.1:18893" {
+		t.Fatalf("a wildcard listen must be dialled on loopback, got %q", settings.BaseURL)
+	}
+
+	t.Setenv(gxListenOverrideEnv, "nonsense")
+	if _, err := gxTorrentSettingsFromConfig(cfg); err == nil {
+		t.Fatal("a malformed override must be refused")
+	}
+}
+
 func TestAdoptedGxProcessDetectsExitAndStops(t *testing.T) {
 	sleeper := exec.Command("sleep", "30")
 	if err := sleeper.Start(); err != nil {

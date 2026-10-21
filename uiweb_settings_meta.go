@@ -111,7 +111,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	// Code e prestazioni
 	"torrent_dynamic_queue_min":           {DependsOn: "torrent_dynamic_queue"},
 	"torrent_dynamic_queue_max":           {DependsOn: "torrent_dynamic_queue"},
-	"torrent_max_connections_per_torrent": {Zero: "-1 = illimitato"},
+	"torrent_max_connections_per_torrent": {Zero: "-1 = nessun tetto"},
 	"torrent_ramdisk_dir":                 {DependsOn: "torrent_ramdisk_enabled"},
 	"torrent_ramdisk_threshold_gb":        {Unit: "GB", DependsOn: "torrent_ramdisk_enabled"},
 	"torrent_ramdisk_margin_gb":           {Unit: "GB", DependsOn: "torrent_ramdisk_enabled"},

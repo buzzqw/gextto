@@ -1923,7 +1923,8 @@ Recalculate scores* after changing weights.
 
 | Setting | What it does |
 |---|---|
-| Max connections per torrent | Connection limit per torrent (-1 = unlimited). It applies to every torrent without a limit of its own (*Limits* tab of the detail) and takes effect at once, running torrents included; gx-torrent only. *(-1 = unlimited)* |
+| Automatic connections (sized from the machine) | On (default): Gextto lets the engine decide how many connections to keep for each torrent from the machine's cores and RAM, and trims the ones on torrents that have made no progress for a couple of minutes despite many peers. The value below stays the ceiling. Turn it off to use a fixed number. gx-torrent only. |
+| Max connections per torrent | Ceiling on the connections per torrent (-1 = unlimited, the default). With automatic connections on it is the most the engine may use; with it off it is the fixed limit. It applies to every torrent without a limit of its own (*Limits* tab of the detail) and takes effect at once, running torrents included; gx-torrent only. |
 
 **RAM disk**
 

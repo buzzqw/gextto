@@ -268,6 +268,13 @@ type Daemon struct {
 	rateHist       rateHistory
 	// lastPeerNoiseReport rate-limits the periodic peer/tracker error summary.
 	lastPeerNoiseReport time.Time
+	// connAutoAt/connAutoState drive the automatic per-torrent peer cap
+	// (connauto.go): the last pass and what each torrent has delivered since.
+	// connAutoBase is the last machine allowance logged, so a stable cap is
+	// not repeated in the log every pass.
+	connAutoAt    time.Time
+	connAutoBase  int
+	connAutoState map[string]*connAutoProgress
 	// trackers drops trackers that never work (see tracker_health.go).
 	trackers *trackerHealth
 	// sessions holds the standalone login sessions (nil in managed).
@@ -982,6 +989,9 @@ func (d *Daemon) tick(now time.Time) {
 	// statfs on the download dir can block on a network mount: classify it
 	// outside d.mu.
 	d.refreshStorageClass(now)
+	// The automatic peer cap depends on the machine (cores, memory) and is
+	// recomputed on its own slower clock; do its reads before taking d.mu.
+	autoBase := d.autoConnectionsBase(now)
 	// The disk guard reads the free space of the storage folders, also with
 	// statfs: outside d.mu too.
 	guardPaths, guardMin := d.diskGuardPaths()
@@ -1012,6 +1022,9 @@ func (d *Daemon) tick(now time.Time) {
 		if sample, ok := collected[t.ID()]; ok {
 			statsOf[t.ID()] = d.adjustStatsLocked(t, sample.stats)
 		}
+	}
+	if autoBase > 0 {
+		d.applyAutoConnectionsLocked(now, torrents, statsOf, autoBase)
 	}
 	var totalDown, totalUp int64
 	for _, stats := range statsOf {
@@ -2293,8 +2306,16 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (queue.Config, erro
 	if previous.Sequential != next.Sequential {
 		d.applySequentialLocked(next.Sequential)
 	}
-	if previous.MaxConnectionsPerTorrent != next.MaxConnectionsPerTorrent {
+	if previous.MaxConnectionsPerTorrent != next.MaxConnectionsPerTorrent ||
+		!queue.SameBoolPtr(previous.ConnAuto, next.ConnAuto) {
 		d.applyDefaultMaxConnectionsLocked()
+		if !queue.SameBoolPtr(previous.ConnAuto, next.ConnAuto) {
+			// Recompute on the next tick: turning the automatic policy on must
+			// not wait for the old clock, turning it off has just restored the
+			// configured value.
+			d.connAutoAt = time.Time{}
+			d.connAutoBase = 0
+		}
 	}
 	// Peer limits, the cache TTL and preallocation are read by the engine only when
 	// the session opens.

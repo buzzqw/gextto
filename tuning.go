@@ -101,11 +101,12 @@ func ProposeTuning(facts SystemFacts, cfg *Config, manual map[string]bool) []Tun
 		}
 	}
 
-	// Connections per torrent: the engine does not manage this by itself, so the
-	// tuning picks a bounded value from the RAM (50 to 400).
+	// Connections per torrent: with the automatic cap on, Gextto sizes the
+	// value from the machine at run time, so the tuning sets the ceiling (a
+	// bounded value from the RAM, 50 to 150).
 	connections := proposedConnectionsPerTorrent(facts.MemTotal)
 	add("torrent_max_connections_per_torrent", strconv.FormatInt(connections, 10),
-		"%s di RAM: %d connessioni per torrent.", humanBytesString(facts.MemTotal), connections)
+		"%s di RAM: tetto di %d connessioni per torrent, sotto il limite automatico.", humanBytesString(facts.MemTotal), connections)
 
 	// RAM disk: recommend it when one is available, switch it off when none is.
 	if facts.RamdiskDir != "" {
@@ -295,10 +296,13 @@ func RunAdaptiveTuning(dataDir string, cfg *Config) int {
 }
 
 // Connections-per-torrent bounds and brackets: the engine does not auto-manage
-// this value, so the tuning keeps it between 50 and 400 by the RAM.
+// this value, so the tuning keeps it between 50 and 150 by the RAM. The CPU of
+// the engine grows with the number of peers (about 0.1 % of a core each, see
+// docs/measurements.md), so a large box does not need hundreds of connections
+// per torrent: the ceiling stays bounded.
 const (
 	connectionsFloor = int64(50)
-	connectionsCeil  = int64(400)
+	connectionsCeil  = int64(150)
 )
 
 func proposedConnectionsPerTorrent(memTotal uint64) int64 {
@@ -309,9 +313,9 @@ func proposedConnectionsPerTorrent(memTotal uint64) int64 {
 	case memTotal < 4*gib:
 		return 50
 	case memTotal < 8*gib:
-		return 100
+		return 75
 	case memTotal < 16*gib:
-		return 200
+		return 100
 	default:
 		return connectionsCeil
 	}

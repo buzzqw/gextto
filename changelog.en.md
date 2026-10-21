@@ -14,6 +14,25 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **The machine decides the connections, not a fixed number.** Gextto now lets
+  gx-torrent choose how many connections to keep for each torrent from the
+  machine's cores and RAM, and trims the ones on torrents that have made no
+  progress for a couple of minutes despite many peers: the useless connections
+  make room for the queued ones, CPU stays low and the speed does not drop.
+  Every change goes to the log («automatic peer cap: 55 connections per
+  torrent …», «peer cap for …»), so it is clear why the number moved. Under
+  **Settings → Performance → Connections** there is **Automatic connections
+  (sized from the machine)**, on by default; **Max connections per torrent**
+  stays the ceiling (-1 = no ceiling) and a limit chosen in a single torrent's
+  *Limits* tab always wins. The same option is on the gx-torrent daemon page
+  (*Automatic peer cap*). Anyone who prefers a fixed number turns the automatic
+  one off.
+- **One installation never touches another's engine.** If the gx-torrent of
+  another Gextto installation answers on the configured port, the new instance
+  now stops with a clear message instead of adopting it: before, it could
+  reload its IP filter and restart its session, interrupting the transfers in
+  progress. The automatic interface tests now use their own engine.
+
 - **IP filter: the default list is now eMule Security.** Gextto and gx-torrent
   start with the eMule Security list
   (`https://upd.emule-security.org/ipfilter.gz`) instead of the Aetherinox

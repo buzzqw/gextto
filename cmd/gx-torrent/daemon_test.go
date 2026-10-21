@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
+	"github.com/buzzqw/gextto/internal/queue"
 	"github.com/buzzqw/gextto/internal/settings"
 )
 
@@ -138,6 +139,9 @@ func newTestDaemonFull(t testing.TB, network NetworkOptions, store *settings.Sto
 		removeTestDir(data)
 		t.Fatal(err)
 	}
+	// The automatic peer cap is opt-in here: the tests that set connection
+	// limits assert exact numbers, and a background pass would rewrite them.
+	d.state.Config.ConnAuto = queue.BoolPtr(false)
 	stop := make(chan struct{})
 	done := make(chan struct{})
 	go func() { d.run(stop); close(done) }()

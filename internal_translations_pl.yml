@@ -5642,3 +5642,7 @@ pol:
   "Sezioni manutenzione": "Sekcje konserwacji"
   "Query in corso…": "Zapytanie w toku…"
   "Attendi: l'archivio può richiedere qualche secondo.": "Poczekaj: archiwum może potrzebować kilku sekund."
+  Connessioni automatiche (in base alla macchina): Automatyczne połączenia (zależnie od maszyny)
+  Tetto alle connessioni per singolo torrent, usato dal limite automatico o come limite fisso quando l'automatico è spento (-1 = illimitato).: Górny limit połączeń na torrent, używany przez limit automatyczny lub jako stały limit przy wyłączonym automacie (-1 = bez limitu).
+  Adatta il numero di connessioni di ogni torrent alla macchina (core e RAM) e riduce quelle dei torrent che non progrediscono; il valore qui sopra resta il tetto (-1 = nessun tetto).: Ustawia liczbę połączeń każdego torrentu na podstawie maszyny (rdzenie i RAM) i ogranicza torrenty bez postępu; powyższa wartość pozostaje górnym limitem (-1 = bez limitu).
+  -1 = nessun tetto: -1 = bez górnego limitu
