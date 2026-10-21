@@ -72,8 +72,11 @@ elencati per valore/sforzo, ciascuno dopo uno studio e senza copiare codice
   `DATA_DIR/amule`, password EC generata, porte scelte e supervisione.
 - **aMule remoto**: fatto (`amule_path_mappings`): la cartella di arrivo
   riportata da un core remoto viene tradotta prima dell'import.
-- **Copertura del fallback**: se accendere `ed2k_fallback` di default dipende da
-  un campione più grande di gap reali cercati via aMule — cioè aspetta dati.
+- **Fallback eD2k**: è una scelta esplicita dell'operatore, non un punto in
+  attesa. La copertura misurata sui gap reali è **7–13 %** (`measurements.md`
+  §4.10); su una libreria reale il fallback ha trovato circa **10 episodi su
+  100** mancanti. Basta per tenere l'opzione, non per accenderla di default: una
+  installazione nuova non deve contattare eD2k se l'operatore non lo chiede.
 
 ## 5. Perimetro in una riga
 

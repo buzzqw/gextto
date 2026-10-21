@@ -669,11 +669,12 @@ and queue scheduler of the same depth, which is not worth its cost for a
 last-resort source. The native daemon is preserved in the history, at commit
 `9f4e2b9` (the last `gx-ed2k` build, removed from the tree right after).
 
-Open points:
+The fallback is an explicit opt-in, not a pending decision: measured Kad
+coverage of real gaps is **7–13 %** (`measurements.md` §4.10) and one real
+library reports about **10 of 100** missing episodes found through it. That is
+enough to keep the switch, not to enable it by default: a new installation must
+not contact eD2k unless its operator asks.
 
-- **Fallback coverage.** Whether to turn `ed2k_fallback` on by default depends on
-  a larger sample of real gaps searched through aMule (Kad and global server
-  search), not on the native client's earlier samples.
 **Waiting for a measurement or a host.**
 
 - **Choking on a real swarm.** The controlled evidence is healthy (§4.6 of [`measurements.md`](measurements.md)): a real
