@@ -8,6 +8,10 @@ package main
 //	GX_MEASURE_REAL=/path/to/public.torrent \
 //	  go test ./cmd/gx-torrent/ -run MeasureRealSwarm -v -count=1 -timeout 20m
 //
+// GX_MEASURE_REAL takes a comma-separated list of torrents too: they run
+// together, which is the case the session budget of the automatic peer cap is
+// for (many active torrents), and the CPU of the process over the window is
+// reported with the bytes.
 // GX_MEASURE_REAL_SECONDS sets the measurement window (default 120).
 // GX_MEASURE_MAXCONN sets the per-torrent peer cap (default: the daemon's own,
 // no cap): the controlled half of the cap measurement, where the same swarm is
@@ -21,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,10 +43,6 @@ func TestMeasureRealSwarm(t *testing.T) {
 			window = time.Duration(n) * time.Second
 		}
 	}
-	data, err := os.ReadFile(torrentPath)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	d := newTestDaemonWith(t, NetworkOptions{
 		PortBegin: 45800, PortEnd: 45819,
@@ -57,11 +58,27 @@ func TestMeasureRealSwarm(t *testing.T) {
 			d.state.Config.MaxConnectionsPerTorrent = n
 		}
 	}
+	// Every torrent runs: the queue would keep all but three paused, and the
+	// point of a list is many active torrents at once.
+	paths := strings.Split(torrentPath, ",")
+	d.state.Config.ActiveDownloads = len(paths)
+	d.state.Config.ActiveLimit = 2 * len(paths)
+	d.state.Config.DynamicQueue = false
 	dst := filepath.Join(t.TempDir(), "dl")
-	hash, _, err := d.add(addRequest{TorrentData: data, Destination: dst, SeedRatio: -1, SeedDays: -1})
-	if err != nil {
-		t.Fatal(err)
+	var hashes []string
+	for _, path := range paths {
+		data, err := os.ReadFile(strings.TrimSpace(path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		hash, _, err := d.add(addRequest{TorrentData: data, Destination: dst, SeedRatio: -1, SeedDays: -1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		hashes = append(hashes, hash)
 	}
+	cpuStart := processCPU()
+	started := time.Now()
 
 	// Sample while the swarm is live: peak peers, peak uTP peers and the
 	// counters over the whole window.
@@ -78,10 +95,19 @@ func TestMeasureRealSwarm(t *testing.T) {
 		time.Sleep(2 * time.Second)
 	}
 
+	cpu := processCPU() - cpuStart
+	elapsed := time.Since(started)
 	st := d.session.Stats()
-	info, _ := findInfo(d, hash)
-	t.Logf("real swarm %s over %v: state=%s progress=%.1f%% downloaded=%d B · automatic cap: %t · max connections per torrent: %d",
-		filepath.Base(torrentPath), window, info.State, info.Progress, info.TotalDone, queue.BoolOn(d.state.Config.ConnAuto), d.state.Config.MaxConnectionsPerTorrent)
+	var done int64
+	for _, hash := range hashes {
+		info, _ := findInfo(d, hash)
+		done += info.TotalDone
+		t.Logf("real swarm %s: state=%s progress=%.1f%% downloaded=%d B", info.Name, info.State, info.Progress, info.TotalDone)
+	}
+	t.Logf("%d torrents over %v · automatic cap: %t · max connections per torrent: %d",
+		len(hashes), window, queue.BoolOn(d.state.Config.ConnAuto), d.state.Config.MaxConnectionsPerTorrent)
+	t.Logf("total: downloaded %d MB · CPU %.1f s (%.1f%% of a core) · %.2f s per 100 MB",
+		done>>20, cpu.Seconds(), 100*cpu.Seconds()/elapsed.Seconds(), cpu.Seconds()/max(float64(done)/(100<<20), 0.01))
 	t.Logf("peers: peak %d (peak uTP %d) | connections: utp outgoing %d / tcp outgoing %d, utp incoming %d",
 		peakPeers, peakUTPPeers, st.OutgoingUTP, st.OutgoingTCP, st.IncomingUTP)
 	t.Logf("uTP socket: dials %d (%d errors) / accepts %d (%d errors) | resends RTO %d fast %d | SYN drops %d",

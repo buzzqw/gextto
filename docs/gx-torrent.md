@@ -2021,18 +2021,35 @@ number of peers the unchoker keeps unblocked.
 **Automatic per-torrent cap** (`conn_auto` in the queue policy, on by default;
 *Automatic connections* on the daemon page, *Connessioni automatiche* in
 Gextto). Instead of a fixed number, the daemon sizes the cap of each torrent
-without a limit of its own from the machine — about ten connections per core
-plus a flat fifteen, bounded to 15–200, halved below 4 GiB of RAM and again
-under 768 MiB available — and trims a torrent that keeps at least ten peers
-with no progress for two minutes to half, so dead connections make room for
-queued addresses. The pass runs every 30 seconds on the queue loop, applies
-with `SetMaxConnections` (no session restart, no re-announce) and logs each new
-allowance and each change (`peer cap for «…»: 55 → 27 (no progress with 34
-peers)`). `max_connections_per_torrent` stays the ceiling when above zero, and
-a torrent's own limit always wins. The reason is in
-[`measurements.md`](measurements.md) §4.1: CPU grows with the number of
-established peers (about 0.1 % of a core each) and hardly with the bytes when
-the line is the limit.
+without a limit of its own from the machine. Two numbers come from it: the
+allowance of one torrent — about ten connections per core plus a flat fifteen,
+bounded to 15–200, at most 30 below 4 GiB of RAM and halved under 768 MiB
+available — and the budget of the whole session, 75 connections per core with
+the same memory rules (300 on a 4-core host). Each running torrent asks for its
+allowance; a seed asks for half (the upload line is the narrow one) and for the
+floor of 15 once nobody has downloaded from it for two minutes; a download that
+keeps at least ten peers without moving 256 KiB in two minutes asks for half,
+so dead connections make room for queued addresses. When the asks exceed the
+budget it is shared by weight — a moving download counts twice — with nobody
+under 15 or above its ask, and what a small ask leaves is shared again among
+the others. One torrent alone always gets its whole allowance, so the budget
+only binds when many torrents run together. The cores are `GOMAXPROCS`, which
+follows a container or systemd CPU quota. The pass runs every 30 seconds on the
+queue loop, applies with `SetMaxConnections` (no session restart, no
+re-announce) and logs each new allowance and each change (`peer cap for «…»: 55
+→ 27 (no progress with 34 peers)`; changes of one pass to the same value share a line,
+`peer cap 33 for 9 torrents (machine allowance, shared with 9 running torrents): …`).
+`max_connections_per_torrent` stays the ceiling when above zero, a torrent's
+own limit always wins, and the peers of such a torrent are taken out of the
+budget first. The reason is in [`measurements.md`](measurements.md) §4.1: CPU
+grows with the number of established peers (about 0.1 % of a core each) and
+hardly with the bytes when the line is the limit.
+
+**Seed-to-seed connections.** While a torrent seeds, a peer whose availability
+(bitfield, have-all or the last have) shows that it already holds every piece
+we hold is closed at once: both sides only upload, so the connection would cost
+a socket, keep-alives and a place in every per-peer loop for nothing
+(libtorrent does the same).
 
 ### Auto-speed on latency (anti-bufferbloat)
 

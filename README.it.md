@@ -313,7 +313,10 @@ coincidono.
   torrent lenti e fermi si fanno da parte; la cache disco si dimensiona da RAM e
   classe di storage (NVMe, SSD, HDD, NFS); i download si mettono in pausa prima
   che una cartella si riempia mentre il seeding continua; le code di richiesta
-  per peer si adattano e la connessione chiusa è quella più lenta e inattiva.
+  per peer si adattano e la connessione chiusa è quella più lenta e inattiva;
+  le connessioni si dimensionano dalla macchina — un tetto per torrent e un
+  totale per tutta la sessione (75 per core) diviso tra i torrent attivi, prima
+  i download — e due seed non restano mai collegati tra loro.
 - **Impronta leggera per progetto.** I pezzi si scrivono direttamente e la page
   cache del sistema unisce l'I/O; `fdatasync` a lotti, mai `O_SYNC` per
   scrittura; file

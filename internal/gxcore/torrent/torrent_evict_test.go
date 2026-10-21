@@ -3,6 +3,10 @@ package torrent
 import (
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
 
 // TestWorseRank checks the ordering used to pick the connection to drop: each
@@ -51,5 +55,38 @@ func TestWorseRankTotalOrder(t *testing.T) {
 	if worseRank(a, b) == worseRank(b, a) {
 		t.Fatalf("equal order for distinct peers: worseRank(a,b)=%v worseRank(b,a)=%v",
 			worseRank(a, b), worseRank(b, a))
+	}
+}
+
+// TestPeerWantsNothing: a seed recognises a peer that already holds every piece
+// it holds (full or partial seed) and keeps one that still misses something;
+// a downloader never applies the rule, and an unknown availability is kept.
+func TestPeerWantsNothing(t *testing.T) {
+	const n = 64
+	tr := &torrent{pieces: make([]piece.Piece, n), bitfield: bitfield.New(n)}
+	for i := uint32(0); i < 32; i++ {
+		tr.bitfield.Set(i) // a partial seed: the second half is deselected
+	}
+	pe := &peer.Peer{Bitfield: bitfield.New(n)}
+	for i := uint32(0); i < n; i++ {
+		pe.Bitfield.Set(i)
+	}
+	if tr.peerWantsNothing(pe) {
+		t.Fatal("a downloader applied the seed-to-seed rule")
+	}
+	tr.completed = true
+	if !tr.peerWantsNothing(pe) {
+		t.Fatal("a full seed was kept by a seed")
+	}
+	pe.Bitfield.Clear(40) // still holds all of ours
+	if !tr.peerWantsNothing(pe) {
+		t.Fatal("a peer with every piece we hold was kept")
+	}
+	pe.Bitfield.Clear(5)
+	if tr.peerWantsNothing(pe) {
+		t.Fatal("a peer missing one of our pieces was dropped")
+	}
+	if tr.peerWantsNothing(&peer.Peer{}) {
+		t.Fatal("a peer without a known bitfield was judged")
 	}
 }

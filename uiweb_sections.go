@@ -447,7 +447,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 		group("Backup", sectionForm(uiFormSection{
 			Title: "Impostazioni backup",
 			Hint:  "Il backup crea uno ZIP locale dei database. Puoi conservarne più copie, programmarlo a intervalli o a un orario preciso e inviarne una copia opzionale via FTP, in una cartella cloud locale sincronizzata o su Telegram. Lascia vuoti i collegamenti che non vuoi usare.",
-			Path:  "/api/backup/settings", Wrap: "values", Submit: "Salva backup", TestFTP: true,
+			Path:  "/api/backup/settings", Submit: "Salva backup", TestFTP: true,
 			Fields: []uiFormField{
 				{Name: "backup_retention", Label: "Backup da conservare", Kind: "number", Value: settingsOr(cfg, "backup_retention", "5"), Hint: "Numero di file ZIP locali da conservare nella cartella backups; i più vecchi vengono eliminati quando ne viene creato uno nuovo."},
 				{Name: "backup_schedule_hours", Label: "Intervallo (ore)", Kind: "number", Value: settingsOr(cfg, "backup_schedule_hours", "0"), Hint: "Intervallo del backup automatico in ore. 0 disattiva l'intervallo; se imposti Orario, l'orario giornaliero ha la precedenza."},
@@ -495,7 +495,6 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 				}}),
 				sectionForm(uiFormSection{
 					Title: "Impostazioni", Hint: "Usa il PIN dell'app Simkl per collegare l'account.", Path: "/api/simkl/settings", Submit: "Salva Simkl",
-					Wrap: "values",
 					Fields: []uiFormField{
 						{Name: "simkl_client_id", Label: "ID client", Value: settingsOr(cfg, "simkl_client_id", ""), Hint: "ID client dell'app Simkl."},
 						{Name: "simkl_calendar_days", Label: "Giorni calendario", Value: simklCalendarDays, Hint: "Quanti giorni avanti mostrare nel calendario Simkl."},

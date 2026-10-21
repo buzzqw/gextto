@@ -390,8 +390,14 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		}
 	}
+	failure := ""
 	if strings.HasPrefix(path, "/api/") {
-		v2InternalJSON(s, http.MethodPost, path, nil, encoded)
+		raw, status := v2InternalJSON(s, http.MethodPost, path, nil, encoded)
+		if status >= http.StatusBadRequest {
+			// A rejected save must say so: reloading the page alone looks
+			// like the values were lost.
+			failure, _ = v2ActionFlash(path, raw, status)
+		}
 	}
 	target := safeInternalRedirect(r.FormValue("redirect"), "")
 	if target == "" {
@@ -399,6 +405,15 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 			view = "dashboard"
 		}
 		target = "/?view=" + url.QueryEscape(view)
+	}
+	if failure != "" {
+		if parsed, err := url.Parse(target); err == nil {
+			query := parsed.Query()
+			query.Set("toast", failure)
+			query.Set("toast_err", "1")
+			parsed.RawQuery = query.Encode()
+			target = parsed.String()
+		}
 	}
 	w.Header().Set("HX-Redirect", target)
 	w.WriteHeader(http.StatusNoContent)

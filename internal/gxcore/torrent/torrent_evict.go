@@ -90,6 +90,26 @@ func (t *torrent) peerUseful(pe *peer.Peer) bool {
 	return t.peerHasWanted(pe)
 }
 
+// peerWantsNothing reports a peer that cannot take anything from a seed: it
+// already holds every piece we hold. Both sides only upload, so the
+// connection costs a socket, keep-alives and a slot in every per-peer loop for
+// nothing; libtorrent closes it the same way. It is judged only once the
+// peer's availability is known, and only while we seed.
+func (t *torrent) peerWantsNothing(pe *peer.Peer) bool {
+	return t.completed && pe.Bitfield != nil && t.bitfield != nil && !t.bitfield.HasAnyNotIn(pe.Bitfield)
+}
+
+// closeIfBothSeeds drops a seed-to-seed connection as soon as the peer's
+// availability shows it. It runs in the torrent goroutine.
+func (t *torrent) closeIfBothSeeds(pe *peer.Peer) bool {
+	if pe.Closed || !t.peerWantsNothing(pe) {
+		return false
+	}
+	t.log.Debugf("closing %s: both sides are seeds", pe.Addr().String())
+	t.closePeer(pe)
+	return true
+}
+
 // peerPriority returns the canonical BEP 40 priority of the peer to us, or 0
 // when it cannot be computed (no usable external IP).
 func (t *torrent) peerPriority(pe *peer.Peer) peerpriority.Priority {

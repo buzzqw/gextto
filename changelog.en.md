@@ -14,6 +14,40 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 21 October 2026
 
+- **Download notifications say where the torrent comes from.** The «New episode
+  download started» / «Movie download started» message (Telegram, email and the
+  other channels) now has a **📡 Source** line with the feed, the indexer or the
+  local archive the release was taken from, for example «ExtTo -
+  TheBlackKing», «Knaben (Jackett)» or «ExtTo (local release archive)».
+- **Backup and Simkl settings: «Save» now really saves.** In
+  **Maintenance → Backup** the *Save backup* button stored none of its fields
+  (neither *Files and folders to include* nor the others), and *Save Simkl* did
+  the same: the page reloaded as if everything had gone well. The values are
+  now saved, and a rejected value (for example a path that is not absolute)
+  shows a notice with the reason. Anyone who tried to change these settings
+  has to enter them once more.
+- **Many active torrents, CPU under control.** Besides the limit of a single
+  torrent, gx-torrent now keeps a total of connections for the whole machine
+  (75 per core: 300 on a 4-core mini PC), shared among the running torrents:
+  downloads come first, a seeding torrent asks for half and for the minimum
+  (15) when nobody downloads from it. A torrent on its own always gets all of
+  its connections, so the total only matters with many torrents together. A
+  torrent just added gets its limit at once instead of running without one for
+  the first 30 seconds, and a torrent moving a few bytes per second no longer
+  counts as «making progress». In the log, when the total trims a torrent the
+  line says so («shared with 9 running torrents»).
+- **Seed with seed: connection closed at once.** While a torrent seeds,
+  gx-torrent closes the connections to peers that already hold everything we
+  hold: there is nothing to exchange, and keeping them cost CPU and memory for
+  nothing.
+- **A less repetitive Gextto log.** The automatic speed tuning (Autotune) writes
+  a line when its mode changes and then a digest every 15 minutes (how many
+  adjustments, the range, the current values) instead of a line every minute;
+  the single steps stay in the debug log. «Search interrupted» appears once when
+  Gextto stops, the title search progress is not repeated when nothing changed
+  in the last minute, and gx-torrent's summary of peer network errors comes
+  every 30 minutes instead of every 10.
+
 - **The machine decides the connections, not a fixed number.** Gextto now lets
   gx-torrent choose how many connections to keep for each torrent from the
   machine's cores and RAM, and trims the ones on torrents that have made no

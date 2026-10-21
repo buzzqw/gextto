@@ -329,10 +329,13 @@ leave). Background noise below 256 KiB/s is not "someone else"; the detector nee
 majority of five reads. Peaks below 128 KiB/s are not recorded, so a dead swarm cannot
 become the tuning's ceiling. The first cap of a session is logged at once with the
 speed, the line maximum and the ping; the periodic line adopts it as its last
-one, so the same numbers are not repeated. After that the autotune line is
-printed at most once a minute, only when the speed changes by at least 10 % and
-the trend confirms it (a small reversal waits, a reversal of 20 % or more is
-logged). The Downloads badge
+one, so the same numbers are not repeated. After that an autotune step is
+considered at most once a minute, only when the speed changes by at least 10 % and
+the trend confirms it (a small reversal waits, a reversal of 20 % or more counts).
+The info log gets the first step of each mode (trial, control, free) and then one
+digest every 15 minutes — number of steps, download and upload range, current caps
+— while every single step stays in the debug log: the control loop moves the cap
+every minute and a line per step buried the rest of the log. The Downloads badge
 shows latency, reference and caps; `GET /api/torrents/temp-limits` carries
 `latency_guard`. Measurements: [`measurements.md`](measurements.md) §4.5 (historical
 figures, from the trial/router design).

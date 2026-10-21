@@ -15,6 +15,40 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Le notifiche di download dicono da dove arriva il torrent.** Il messaggio
+  «Nuovo episodio in download» / «Film in download» (Telegram, email e gli
+  altri canali) ora ha la riga **📡 Fonte** con il feed, l'indexer o l'archivio
+  locale da cui è stata presa la release, per esempio «ExtTo - TheBlackKing»,
+  «Knaben (Jackett)» o «ExtTo (archivio locale)».
+- **Impostazioni backup e Simkl: «Salva» ora salva davvero.** In
+  **Manutenzione → Backup** il pulsante *Salva backup* non registrava nessun
+  campo (né *File e cartelle da includere* né gli altri), e lo stesso accadeva a
+  *Salva Simkl*: la pagina si ricaricava come se fosse andato tutto bene. Ora i
+  valori vengono salvati, e se un valore viene rifiutato (per esempio un
+  percorso non assoluto) compare un avviso con il motivo. Chi aveva provato a
+  cambiare queste impostazioni deve reinserirle una volta.
+- **Molti torrent attivi, CPU sotto controllo.** Oltre al limite per singolo
+  torrent, gx-torrent ora ha un totale di connessioni per tutta la macchina (75
+  per core: 300 su un mini PC a 4 core), diviso tra i torrent in corso: chi sta
+  scaricando ha la precedenza, un torrent in seed ne chiede la metà e il minimo
+  (15) quando nessuno scarica da lui. Un torrent da solo ha sempre tutte le sue
+  connessioni, quindi il totale entra in gioco solo con molti torrent insieme.
+  Un torrent appena aggiunto ha subito il suo limite, invece di restare senza
+  tetto per i primi 30 secondi, e un torrent che si muove a pochi byte al
+  secondo non conta più come «in progresso». Nel log, quando il totale riduce
+  un torrent, la riga lo dice («shared with 9 running torrents»).
+- **Seed con seed: connessione chiusa subito.** Quando un torrent è in seed,
+  gx-torrent chiude le connessioni con chi ha già tutto quello che abbiamo noi:
+  non c'è niente da scambiare e tenerle aperte costava CPU e memoria per niente.
+- **Log di Gextto meno ripetitivo.** La regolazione automatica della velocità
+  (Autotune) scrive una riga quando cambia modalità e poi un riepilogo ogni 15
+  minuti (quanti aggiustamenti, da quanto a quanto, valori attuali) invece di
+  una riga al minuto; i singoli passi restano nel log di debug. «Ricerca
+  interrotta» compare una volta sola quando Gextto si ferma, l'avanzamento della
+  ricerca dei titoli non si ripete se nell'ultimo minuto non è cambiato niente,
+  e il riepilogo degli errori di rete dei peer di gx-torrent arriva ogni 30
+  minuti invece che ogni 10.
+
 - **Connessioni decise dalla macchina, non da un numero fisso.** Gextto ora
   lascia che gx-torrent scelga quante connessioni tenere per ogni torrent in
   base ai core e alla RAM della macchina, e riduce quelle dei torrent che non

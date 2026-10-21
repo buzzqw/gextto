@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -194,5 +195,39 @@ func TestSpeedPolicyAutotuneWindowIsUnlimited(t *testing.T) {
 	download, upload, source = speedPolicy(&cfg)
 	if source != speedSourceSchedule || download != 3000 || upload != 200 {
 		t.Fatalf("fixed window = %d/%d source %q, want 3000/200 %q", download, upload, source, speedSourceSchedule)
+	}
+}
+
+// TestAutotuneDigest: the first step of a mode is logged at once, the following
+// steps are gathered and summed up once per window, with unlimited as the top
+// of the range.
+func TestAutotuneDigest(t *testing.T) {
+	var g bg_autotuneDigest
+	start := time.Date(2026, 10, 21, 10, 0, 0, 0, time.UTC)
+	if !g.add(start, 400, 0, "control") {
+		t.Fatal("the first step was not logged")
+	}
+	for i, down := range []int64{128, 718, 128, 1057, 0} {
+		if g.add(start.Add(time.Duration(i+1)*time.Minute), down, 0, "control") {
+			t.Fatalf("step %d logged at info level", i)
+		}
+	}
+	if _, ok := g.summary(start.Add(10*time.Minute), 128, 0); ok {
+		t.Fatal("digest before its window")
+	}
+	line, ok := g.summary(start.Add(15*time.Minute), 128, 0)
+	if !ok {
+		t.Fatal("no digest after the window")
+	}
+	for _, want := range []string{"5 adjustments", "download 128 KB/s–unlimited", "upload unlimited", "now 128 KB/s / unlimited", "mode control"} {
+		if !strings.Contains(line, want) {
+			t.Errorf("digest %q lacks %q", line, want)
+		}
+	}
+	if _, ok := g.summary(start.Add(31*time.Minute), 128, 0); ok {
+		t.Fatal("digest without steps")
+	}
+	if !g.add(start.Add(32*time.Minute), 0, 0, "free") {
+		t.Fatal("a new mode was not logged at once")
 	}
 }

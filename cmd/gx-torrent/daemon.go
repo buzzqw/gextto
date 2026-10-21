@@ -270,11 +270,14 @@ type Daemon struct {
 	lastPeerNoiseReport time.Time
 	// connAutoAt/connAutoState drive the automatic per-torrent peer cap
 	// (connauto.go): the last pass and what each torrent has delivered since.
-	// connAutoBase is the last machine allowance logged, so a stable cap is
+	// connAutoLimits are the last machine limits logged, so a stable cap is
 	// not repeated in the log every pass.
-	connAutoAt    time.Time
-	connAutoBase  int
-	connAutoState map[string]*connAutoProgress
+	connAutoAt time.Time
+	// connAutoTorrents is the torrent count of the last pass: a new torrent
+	// makes the next pass due at once.
+	connAutoTorrents int
+	connAutoLimits   connAutoLimits
+	connAutoState    map[string]*connAutoProgress
 	// trackers drops trackers that never work (see tracker_health.go).
 	trackers *trackerHealth
 	// sessions holds the standalone login sessions (nil in managed).
@@ -947,7 +950,7 @@ type collectedTorrent struct {
 // peerNoiseReportEvery is how often the demoted peer/tracker errors are
 // summarised. They are not printed one by one (see swarmNoiseFilter), so an
 // idle log does not hide a growing connectivity problem.
-const peerNoiseReportEvery = 10 * time.Minute
+const peerNoiseReportEvery = 30 * time.Minute
 
 // reportPeerNoise logs the peer/tracker errors demoted since the last report.
 // It normally runs on the single queue-loop goroutine; the timestamp is taken
@@ -991,7 +994,7 @@ func (d *Daemon) tick(now time.Time) {
 	d.refreshStorageClass(now)
 	// The automatic peer cap depends on the machine (cores, memory) and is
 	// recomputed on its own slower clock; do its reads before taking d.mu.
-	autoBase := d.autoConnectionsBase(now)
+	autoLimits := d.autoConnectionsBase(now, len(torrents))
 	// The disk guard reads the free space of the storage folders, also with
 	// statfs: outside d.mu too.
 	guardPaths, guardMin := d.diskGuardPaths()
@@ -1023,8 +1026,8 @@ func (d *Daemon) tick(now time.Time) {
 			statsOf[t.ID()] = d.adjustStatsLocked(t, sample.stats)
 		}
 	}
-	if autoBase > 0 {
-		d.applyAutoConnectionsLocked(now, torrents, statsOf, autoBase)
+	if autoLimits.perTorrent > 0 {
+		d.applyAutoConnectionsLocked(now, torrents, statsOf, autoLimits)
 	}
 	var totalDown, totalUp int64
 	for _, stats := range statsOf {
@@ -2314,7 +2317,7 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (queue.Config, erro
 			// not wait for the old clock, turning it off has just restored the
 			// configured value.
 			d.connAutoAt = time.Time{}
-			d.connAutoBase = 0
+			d.connAutoLimits = connAutoLimits{}
 		}
 	}
 	// Peer limits, the cache TTL and preallocation are read by the engine only when

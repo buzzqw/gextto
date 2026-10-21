@@ -303,7 +303,9 @@ restarts: Gextto re-attaches when binary and options match.
   stalled torrents step aside; the disk cache sizes itself from RAM and storage
   class (NVMe, SSD, HDD, NFS); downloads pause before a folder fills up while
   seeding goes on; per-peer request queues adapt and the slowest idle
-  connection is the one pruned.
+  connection is the one pruned; the connections are sized from the machine — a
+  cap per torrent and a total for the whole session (75 per core) shared among
+  the running torrents, downloads first — and two seeds never stay connected.
 - **Footprint by design.** Pieces are written through and the OS page cache
   coalesces I/O; batched `fdatasync`, never `O_SYNC` per write; sparse files,
   `fallocate`, RAM-disk temp folders, opt-in mmap; zero-allocation hot paths

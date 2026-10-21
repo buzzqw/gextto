@@ -1983,7 +1983,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 
 | Impostazione | Cosa fa |
 |---|---|
-| Connessioni automatiche (in base alla macchina) | Attivo (predefinito): Gextto lascia decidere al motore quante connessioni tenere per ogni torrent in base a core e RAM della macchina, e riduce quelle dei torrent che non progrediscono da un paio di minuti pur avendo molti peer. Il valore qui sotto resta il tetto massimo. Spegnilo per usare un numero fisso. Solo gx-torrent. |
+| Connessioni automatiche (in base alla macchina) | Attivo (predefinito): Gextto lascia decidere al motore quante connessioni tenere per ogni torrent in base a core e RAM della macchina, e riduce quelle dei torrent che non progrediscono da un paio di minuti pur avendo molti peer. Con molti torrent attivi insieme il motore ha anche un totale di connessioni per tutta la macchina (75 per core), diviso tra i torrent con la precedenza a quelli che stanno scaricando; un torrent da solo ha sempre tutte le sue connessioni. Il valore qui sotto resta il tetto massimo. Spegnilo per usare un numero fisso. Solo gx-torrent. |
 | Connessioni max per torrent | Tetto alle connessioni per singolo torrent (-1 = illimitato, predefinito). Con le connessioni automatiche attive è il massimo che il motore può usare; con l'automatico spento è il limite fisso. Vale per ogni torrent che non ha un limite proprio (scheda *Limiti* del dettaglio) e si applica subito, anche ai torrent in corso; solo gx-torrent. |
 
 **RAM disk**

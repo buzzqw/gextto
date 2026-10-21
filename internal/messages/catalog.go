@@ -24,6 +24,7 @@ var catalogIT = map[string][4]string{
 	"File":                                {"Datei", "Fichier", "Archivo", "Plik"},
 	"File salvato nella cartella fumetti": {"Datei im Comic-Ordner gespeichert", "Fichier enregistré dans le dossier comics", "Archivo guardado en la carpeta de cómics", "Plik zapisany w folderze komiksów"},
 	"Film in download":                    {"Film wird heruntergeladen", "Film en téléchargement", "Película en descarga", "Film pobierany"},
+	"archivio locale":                     {"lokales Archiv", "archive locale", "archivo local", "lokalne archiwum"},
 	"Fonte":                               {"Quelle", "Source", "Fuente", "Źródło"},
 	"Fumetto in attesa":                   {"Comic wartet", "Comics en attente", "Cómic en espera", "Komiks oczekuje"},
 	"Fumetto in download":                 {"Comic wird heruntergeladen", "Comics en téléchargement", "Cómic en descarga", "Komiks pobierany"},

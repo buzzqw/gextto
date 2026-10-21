@@ -735,6 +735,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	lastAutotuneLog := time.Time{}
 	lastAutotuneDown, lastAutotuneUp := int64(0), int64(0)
 	haveAutotuneLog := false
+	var autotuneDigest bg_autotuneDigest
 	lastDebugLog := time.Now().Add(-300 * time.Second)
 	var lastPin *string
 	var lastSequential *bool
@@ -1033,11 +1034,22 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 							if maxText != "" {
 								suffix = maxText + " · " + ping
 							}
-							logging.Info(fmt.Sprintf("🎚️ Autotune: %s download, %s upload · %s · %s · mode %s", speedLimitLabel(downloadKib), speedLimitLabel(uploadKib), delta, suffix, mode))
+							// The control loop moves the cap every minute: each
+							// step goes to the debug log, the info log gets the
+							// first step of a mode and a digest every 15 minutes.
+							step := fmt.Sprintf("🎚️ Autotune: %s download, %s upload · %s · %s · mode %s", speedLimitLabel(downloadKib), speedLimitLabel(uploadKib), delta, suffix, mode)
+							if autotuneDigest.add(now, downloadKib, uploadKib, mode) {
+								logging.Info(step)
+							} else {
+								logging.Debug(step)
+							}
 							lastAutotuneLog = now
 							lastAutotuneDown, lastAutotuneUp = downloadKib, uploadKib
 						}
 					}
+				}
+				if line, ok := autotuneDigest.summary(now, downloadKib, uploadKib); ok {
+					logging.Info(line)
 				}
 				lastSpeed = &bg_speedPair{download: downloadKib, upload: uploadKib, source: source}
 			}
@@ -1749,6 +1761,86 @@ func bg_speedWorthLogging(prevLogged, current, prevApplied int64) bool {
 		return true
 	}
 	return bg_speedPct(prevLogged, current) >= 20
+}
+
+// bg_autotuneDigestEvery is how often the Autotune steps are summed up in the
+// info log.
+const bg_autotuneDigestEvery = 15 * time.Minute
+
+// bg_autotuneDigest gathers the Autotune steps between two info lines: the
+// range of the caps and how many steps there were. A mode change is reported at
+// once, the rest as one line every bg_autotuneDigestEvery.
+type bg_autotuneDigest struct {
+	mode             string
+	since            time.Time
+	steps            int
+	minDown, maxDown int64
+	minUp, maxUp     int64
+}
+
+// add records one step and reports whether it must be logged at info level
+// (the first step, or a new mode).
+func (g *bg_autotuneDigest) add(now time.Time, down, up int64, mode string) bool {
+	if g.since.IsZero() || mode != g.mode {
+		g.mode = mode
+		g.since, g.steps = now, 0
+		g.minDown, g.maxDown, g.minUp, g.maxUp = down, down, up, up
+		return true
+	}
+	if g.steps == 0 {
+		g.minDown, g.maxDown, g.minUp, g.maxUp = down, down, up, up
+	}
+	g.steps++
+	g.minDown, g.maxDown = bg_limitMin(g.minDown, down), bg_limitMax(g.maxDown, down)
+	g.minUp, g.maxUp = bg_limitMin(g.minUp, up), bg_limitMax(g.maxUp, up)
+	return false
+}
+
+// summary returns the digest line when it is due and there were steps since
+// the last one, and starts a new window.
+func (g *bg_autotuneDigest) summary(now time.Time, down, up int64) (string, bool) {
+	if g.steps == 0 || now.Sub(g.since) < bg_autotuneDigestEvery {
+		return "", false
+	}
+	line := fmt.Sprintf("🎚️ Autotune, last %s: %d adjustments · download %s · upload %s · now %s / %s · mode %s",
+		logging.HumanDuration(int64(now.Sub(g.since).Seconds())), g.steps,
+		bg_limitRange(g.minDown, g.maxDown), bg_limitRange(g.minUp, g.maxUp),
+		speedLimitLabel(down), speedLimitLabel(up), g.mode)
+	g.since, g.steps = now, 0
+	return line, true
+}
+
+// bg_limitMin/bg_limitMax order speed limits where 0 (or less) is unlimited,
+// the highest.
+func bg_limitMin(a, b int64) int64 {
+	if a <= 0 {
+		return b
+	}
+	if b <= 0 || a < b {
+		return a
+	}
+	return b
+}
+
+func bg_limitMax(a, b int64) int64 {
+	if a <= 0 || b <= 0 {
+		return 0
+	}
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// bg_limitRange renders "128–1057 KB/s", "up to unlimited" or a single value.
+func bg_limitRange(lo, hi int64) string {
+	if lo == hi {
+		return speedLimitLabel(lo)
+	}
+	if hi <= 0 {
+		return fmt.Sprintf("%d KB/s–unlimited", lo)
+	}
+	return fmt.Sprintf("%d–%d KB/s", lo, hi)
 }
 
 // bg_speedDeltaText renders the change against the previously logged value.

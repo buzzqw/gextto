@@ -743,11 +743,18 @@ func formatEvent(event string, data map[string]any) string {
 		return text("text")
 	case "download_started":
 		qualityScore, _ := jsonInt(mapLookup(data, "quality_score"))
+		// Where the torrent came from (feed, indexer, local archive): a line
+		// only when the release carries it.
+		sourceLine := ""
+		if source := notifySourceText(text("source")); source != "" {
+			sourceLine = "\n📡 " + messages.Pick("Fonte", "Source") + ": " + source
+		}
 		if text("kind") == "movie" {
 			return fmt.Sprintf(
-				"%s\n\n🏷️ Release: %s\n🏆 %s %d\n⚙️ %s: %s",
+				"%s\n\n🏷️ Release: %s%s\n🏆 %s %d\n⚙️ %s: %s",
 				messages.Pick("🎬 FILM IN DOWNLOAD!", "🎬 MOVIE DOWNLOAD STARTED!"),
 				text("title"),
+				sourceLine,
 				messages.Pick("Score Qualità:", "Quality score:"),
 				qualityScore,
 				messages.Pick("Motivo", "Reason"),
@@ -755,13 +762,14 @@ func formatEvent(event string, data map[string]any) string {
 			)
 		}
 		return fmt.Sprintf(
-			"%s\n\n🎬 %s: %s\n▶️ %s: %s\n🏷️ Release: %s\n🏆 %s %d\n⚙️ %s: %s",
+			"%s\n\n🎬 %s: %s\n▶️ %s: %s\n🏷️ Release: %s%s\n🏆 %s %d\n⚙️ %s: %s",
 			messages.Pick("📺 NUOVO EPISODIO IN DOWNLOAD!", "📺 NEW EPISODE DOWNLOAD STARTED!"),
 			messages.Pick("Serie", "Series"),
 			text("series"),
 			messages.Pick("Episodio", "Episode"),
 			episodeCode(),
 			text("title"),
+			sourceLine,
 			messages.Pick("Score Qualità:", "Quality score:"),
 			qualityScore,
 			messages.Pick("Motivo", "Reason"),
@@ -1426,4 +1434,30 @@ func deliverQueuedNotifications() {
 			logging.Debug("notification delivered", "event", item.event)
 		}
 	}
+}
+
+// notifySourceText renders the source recorded on a release for a person:
+// "ExtTo - TheBlackKing" stays as it is, "jackett:Knaben" becomes "Knaben
+// (Jackett)", "archive:…" says it came from the local release archive, and a
+// feed URL is reduced to its site.
+func notifySourceText(raw string) string {
+	value := strings.TrimSpace(raw)
+	switch {
+	case value == "":
+		return ""
+	case strings.HasPrefix(value, "archive:"):
+		inner := notifySourceText(strings.TrimPrefix(value, "archive:"))
+		archive := messages.Pick("archivio locale", "local release archive")
+		if inner == "" {
+			return archive
+		}
+		return inner + " (" + archive + ")"
+	case strings.EqualFold(value, "jackett"):
+		return "Jackett"
+	case strings.HasPrefix(strings.ToLower(value), "jackett:"):
+		return strings.TrimSpace(value[len("jackett:"):]) + " (Jackett)"
+	case strings.Contains(value, "://"):
+		return uiSourceLabel(value)
+	}
+	return value
 }

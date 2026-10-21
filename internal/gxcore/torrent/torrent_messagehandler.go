@@ -224,6 +224,9 @@ func (t *torrent) noteHave(pe *peer.Peer, msg peerprotocol.HaveMessage) {
 	if t.superSeedActive() {
 		t.superSeedHandleHave(pe, int32(msg.Index))
 	}
+	if t.closeIfBothSeeds(pe) {
+		return
+	}
 	t.updateInterestedState(pe)
 	t.fillPeerDownloads(pe)
 }
@@ -257,6 +260,9 @@ func (t *torrent) noteBitfield(pe *peer.Peer, msg peerprotocol.BitfieldMessage) 
 			pe.Bitfield.Set(i)
 		}
 	}
+	if t.closeIfBothSeeds(pe) {
+		return
+	}
 	t.updateInterestedState(pe)
 	t.fillPeerDownloads(pe)
 }
@@ -271,6 +277,14 @@ func (t *torrent) noteHaveAll(pe *peer.Peer, msg peerprotocol.HaveAllMessage) {
 		for _, pi := range t.pieces {
 			t.piecePicker.HandleHave(pe, pi.Index)
 		}
+	} else if pe.Bitfield != nil {
+		// No picker (we seed): the bit map is the only record of the peer.
+		for i := uint32(0); i < pe.Bitfield.Len(); i++ {
+			pe.Bitfield.Set(i)
+		}
+	}
+	if t.closeIfBothSeeds(pe) {
+		return
 	}
 	t.updateInterestedState(pe)
 	t.fillPeerDownloads(pe)

@@ -1409,15 +1409,22 @@ func releaseMatchesConfiguredEpisode(release *models.Release, series *SeriesConf
 
 // domainIs reports whether the optional domain equals value.
 // cycleCancelled reports whether the daemon is shutting down and the cycle must
-// stop before it touches the torrent engine again. It logs once per call site so
-// an aborted cycle is visible in the log.
+// stop before it touches the torrent engine again. The first call of a
+// cancelled cycle logs it, so an aborted cycle is visible in the log once and
+// not once per call site.
 func cycleCancelled(ctx context.Context) bool {
 	if ctx == nil || ctx.Err() == nil {
 		return false
 	}
-	logging.Info("⏹️ Search interrupted: Gextto is shutting down")
+	if _, logged := cycleCancelLogged.LoadOrStore(ctx, struct{}{}); !logged {
+		logging.Info("⏹️ Search interrupted: Gextto is shutting down")
+	}
 	return true
 }
+
+// cycleCancelLogged remembers the cancelled cycle contexts already logged. It
+// only grows when a cycle is cancelled, that is at shutdown.
+var cycleCancelLogged sync.Map
 
 // downloadPathFreeSpaceFloor returns the minimum free space to require on a
 // download target. The RAM disk is a small tmpfs with its own dedicated budget

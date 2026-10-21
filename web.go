@@ -1112,11 +1112,16 @@ type SettingsPatch struct {
 	Values map[string]any
 }
 
-// UnmarshalJSON captures every key of the flattened settings object.
+// UnmarshalJSON captures every key of the flattened settings object. A body
+// whose only key is a "values" object is unwrapped: older UI forms sent
+// {"values": {...}}, which would otherwise save nothing and still answer ok.
 func (s *SettingsPatch) UnmarshalJSON(data []byte) error {
 	values := map[string]any{}
 	if err := json.Unmarshal(data, &values); err != nil {
 		return err
+	}
+	if inner, ok := values["values"].(map[string]any); ok && len(values) == 1 {
+		values = inner
 	}
 	s.Values = values
 	return nil

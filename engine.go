@@ -323,12 +323,18 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 				defer recoverGoroutine("title search progress")
 				ticker := time.NewTicker(searchProgressInterval)
 				defer ticker.Stop()
+				lastLogged := -1
 				for {
 					select {
 					case <-progressDone:
 						return
 					case <-ticker.C:
 						completed := int(searchesCompleted.Load())
+						if completed == lastLogged {
+							// A minute without a finished title says nothing new.
+							continue
+						}
+						lastLogged = completed
 						remaining := targetsTotal - completed
 						if remaining < 0 {
 							remaining = 0

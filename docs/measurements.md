@@ -51,7 +51,7 @@ Cheap probes and opt-in tests, all outside CI:
 | `make measure-seeding` | local swarm, seeder plus 3 leechers by default, distinct `127.0.0.x` addresses. `GX_MEASURE_SUPERSEED=1` compares super-seeding, `GX_MEASURE_MESH=1` connects the leechers to each other, `GX_MEASURE_LEECHERS=N` sets the size |
 | `make measure-choking` | the choking campaign: a real **libtorrent** leecher on loopback (`scripts/libtorrent-leech.py`, needs `python3-libtorrent`), plus a real-swarm half that needs an inbound port |
 | `make measure-pipeline` | the adaptive request queue at shallow (4/4), default (50/250) and deep (200/500) depth; the knobs travel in `NetworkOptions` (`MaxRequestsOut`/`DefaultRequestsOut`) |
-| `make measure-realswarm GX_MEASURE_REAL=<public.torrent>` | a public torrent with DHT, trackers and uTP (`GX_MEASURE_REAL_SECONDS`, default 120 s): peers, uTP split, socket counters. A run that sees no peer fails, so it cannot pass hollow |
+| `make measure-realswarm GX_MEASURE_REAL=<public.torrent>` | a public torrent with DHT, trackers and uTP (`GX_MEASURE_REAL_SECONDS`, default 120 s): peers, uTP split, socket counters. A comma-separated list runs all the torrents together, all active, and adds the CPU of the process and the CPU per 100 MB. A run that sees no peer fails, so it cannot pass hollow |
 | `make measure-merge3` | Swarm Merging Phase 3 on real ISOs (§4.8) |
 | `make measure-dht` | the public DHT: routing-table fill and query success (`GX_MEASURE_DHT=5m`, `GX_MEASURE_DHT_INFOHASH=<40 hex>`) |
 | `TestMeasureLatencyGuard` | the latency guard against a second instance and a competing download on the real line (`GX_MEASURE_LATENCY_GUARD`, `GX_MEASURE_COMPETITOR_URL`) |
@@ -72,7 +72,7 @@ with the live service or a standalone instance as stated.
 |---|---|---|---|
 | gx-torrent idle | **60–64 MB RSS** (44–48 MB anonymous), 1–2 % CPU | 226 | clean restart with 3 seeds and 1 download, full IP filter; `ps`/`/proc` |
 | gx-torrent under load | **44–48 % of a core at 8–9 MB/s**, ~0.35–0.43 CPU per peer; picker 9 % of the profile | 226 | the peer-reader load test (9–10 releases, Auto, collector every 5 s, pprof 45 s) |
-| Automatic peer cap | **55 per torrent** on this 4-core/16 GiB host; 25–37 peers at 2.5–6.7 MB/s, no throughput penalty between 25 and 55 | 1932 (engine 244) | `GX_MEASURE_AUTO=1` / `GX_MEASURE_MAXCONN`, Ubuntu ISO, 90 s × 2 rounds (§4.1) |
+| Automatic peer cap | **55 per torrent, 300 in all** on this 4-core/16 GiB host; with 9 active torrents **−36 % peers and −12 % CPU** against a fixed 55 per torrent, throughput within the swarm noise (−4 %) | 1934 (engine 245) | `GX_MEASURE_AUTO=1` / `GX_MEASURE_MAXCONN`, 9 public ISOs together, 150 s × 2 interleaved rounds (§4.1) |
 | Memory under load | RssAnon peak **1105 MB** with 10 torrents and the NFS write cache; **507 MB outside the two caches** | 226 | same load, `pprof` heap at the end |
 | gexttod at rest | **46 CPU ticks/min (~0.7 %)**, 0 directory opens per 20 s, no write probe on the NAS | 1785 | `GEXTTO_PPROF`, `strace`, `/proc` over 60 s |
 | gexttod in the first minutes | **0.39 % of a core**, stale-temp sweep 0.21 s, 8 new TLS connections in 300 s | 1790 | profile from start, `strace -e connect` |
@@ -171,6 +171,28 @@ them the absolute CPU (about 0.1 % of a core per peer), stay bounded. The
 automatic cap did not bind in these runs (peers stayed below 55), so the table
 shows that 25–55 per torrent is safe, not the trimming path: that is covered by
 `TestDaemonAutoConnectionsFollowProgress`.
+
+**Session budget with many torrents** (2026-10-21, N97 4 cores/16 GiB, build 1934,
+engine 245). The cap of one torrent does not bound the CPU when many run:
+the session also has a budget of 75 connections per core (300 here) shared by
+weight among the running torrents, and a seed closes seed-to-seed connections at
+once. Nine public torrents together (Debian 13.7 netinst and DVD, Kali, Ubuntu
+22.04/24.04/25.10 desktop, 24.04 server, Kubuntu, Xubuntu), all active, 150 s
+window, two interleaved rounds per policy, CPU from `getrusage` of the test
+process (`GX_MEASURE_REAL=<list>`). The live Gextto was downloading on the same
+line, so the bytes carry its noise too:
+
+| Policy | Peak peers | Downloaded | CPU (share of a core) | CPU per 100 MB |
+|---|---|---|---|---|
+| budget (33 per torrent with 9) | 145 / 184 | 1028 / 1234 MB | 26.9 / 41.6 % | 3.9 / 5.1 s |
+| fixed 55 per torrent | 243 / 272 | 1235 / 1114 MB | 36.3 / 41.3 % | 4.4 / 5.6 s |
+
+On average the budget holds 36 % fewer peers (165 against 258) and spends 12 %
+less CPU (34 % against 39 % of a core, 4.5 against 5.0 s per 100 MB) for 4 % fewer
+bytes, inside the round-to-round spread of the same policy (±10 %). Before the
+pass ran on a change in the number of torrents, a torrent just added ran
+without a cap for up to 30 s: in the first runs of this campaign the automatic
+policy peaked higher than the fixed one for that reason.
 
 **uTP retransmission.** A 5 ms minimum-RTT floor keeps a fast path from collapsing the
 RTO; a per-connection backoff doubles on timeout and halves on delivery; a healthy

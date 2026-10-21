@@ -229,6 +229,22 @@ func TestNotifierFormatEventItalian(t *testing.T) {
 	if !strings.Contains(withGap, "Episodio mancante trovato") {
 		t.Fatalf("download_started did not translate gap_fill: %q", withGap)
 	}
+	// The source of the torrent is shown, readable, for episodes and movies.
+	for _, tc := range []struct{ source, want string }{
+		{"ExtTo - TheBlackKing", "📡 Fonte: ExtTo - TheBlackKing"},
+		{"jackett:Knaben", "📡 Fonte: Knaben (Jackett)"},
+		{"archive:ExtTo", "📡 Fonte: ExtTo (archivio locale)"},
+	} {
+		for _, kind := range []string{"series", "movie"} {
+			got := formatEvent("download_started", map[string]any{"kind": kind, "series": "FBI", "season": 2, "episode": 5, "title": "X", "source": tc.source})
+			if !strings.Contains(got, tc.want) {
+				t.Fatalf("%s from %q: %q lacks %q", kind, tc.source, got, tc.want)
+			}
+		}
+	}
+	if strings.Contains(started, "Fonte") {
+		t.Fatalf("a source line without a source: %q", started)
+	}
 	if got := formatEvent("message", map[string]any{"text": "ciao"}); got != "ciao" {
 		t.Fatalf("message = %q, want ciao", got)
 	}
