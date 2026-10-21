@@ -395,7 +395,7 @@ func ed2kManualEpisodeFallback(ctx context.Context, engine *Engine, cfg *Config,
 			"series", series.Name,
 			"season", season,
 			"episode", episode,
-			"found", len(accepted),
+			"candidates", len(accepted),
 			"elapsed_ms", time.Since(started).Milliseconds())
 	}
 	return accepted
@@ -689,7 +689,7 @@ func ed2kManualSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, 
 		logging.Info("manual eD2k season fallback",
 			"series", series.Name,
 			"season", season,
-			"found", len(accepted),
+			"candidates", len(accepted),
 			"elapsed_ms", time.Since(started).Milliseconds())
 	}
 	return accepted
