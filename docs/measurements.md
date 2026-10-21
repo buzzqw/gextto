@@ -107,7 +107,7 @@ when a change is meant to be an optimisation. A single pass is noise.
 | `BenchmarkTransferLoopback` (uTP, 16 KiB block) | 131–139 MB/s, 5.6 KB, 99 allocs | connection-id probe, lazy `Event` channels, reusable read window, `netip.AddrPort` key |
 | `BenchmarkUTPConnRemoteAddr` | 113 ns/op, 40 B, 3 allocs | addresses converted once at wrap |
 | `BenchmarkStorageWrite` / `StorageWriteMmap` | ~5.8 / ~7.4 GB/s | the disk is far above any network speed: `O_DIRECT` and io_uring are not justified |
-| `BenchmarkArchiveSaveBatch` (1,000 releases, ~400 B magnets) | 45.2–46.1 ms, 3.09 MB, 50,536 allocs | prepared statements per chunk; the guid identity adds ~2% (measured 2026-10-21 on the N97) |
+| `BenchmarkArchiveSaveBatch` (1,000 releases, ~400 B magnets) | 45.2–46.1 ms, 3.09 MB, 50,536 allocs (44.0–44.4 ms before the guid identity) | prepared statements per chunk; measured 2026-10-21 on the N97 |
 | `BenchmarkFeedArchiveSearch` (100,000 releases) | 7.4 ms | compact index on bbolt |
 | `BenchmarkMetricsScrape` (one torrent) | ~0.24 ms, 121 KB, 813 allocs | computed only when scraped |
 | `BenchmarkCriteriaMatch` (RSS rule, 4 names) | 142 ns/op, 0 B, 0 allocs | scans the title in place |
@@ -235,7 +235,7 @@ the Go scheduler's own wake-ups. No spinning loop, nothing to change.
 |---|---|
 | Size | 258 MB, 307,477 rows after the 2026-10-21 dedup (was 480 MB, 610,254) |
 | Identity | one row per torrent (infohash); the indexer guid for `.torrent`-only listings, the exact link as a last resort |
-| Insert | 45.2–46.1 ms per 1,000 releases (3.09 MB, 50,536 allocs) |
+| Insert | 45.2–46.1 ms per 1,000 releases (3.09 MB, 50,536 allocs; 44.0–44.4 ms before the guid identity) |
 | Archive API page (100 rows) | 7–23 ms |
 | Standalone feed search | 7.4 ms on 100,000 releases |
 
