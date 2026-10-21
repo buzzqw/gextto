@@ -26,7 +26,7 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   toccati. Una release con magnet resta riconosciuta dal suo torrent: se un
   feed pubblica un REPACK con lo stesso identificatore, entrano in archivio
   entrambi, ognuno con il suo titolo. Quando l'indexer offre il link
-  `.torrent`, Gextto scarica quello anche se conosce l'hash: con gli indexer
+  `.torrent`, Gextto scarica quello anche se conosce l'hash (Jackett e Prowlarr): con gli indexer
   privati un magnet senza tracker non troverebbe nessuno.
 - **Le notifiche di download dicono da dove arriva il torrent.** Il messaggio
   «Nuovo episodio in download» / «Film in download» (Telegram, email e gli

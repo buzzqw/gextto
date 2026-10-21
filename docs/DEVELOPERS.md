@@ -204,7 +204,15 @@ wizard once in `global-setup.ts` and drives the real interface in a browser:
 
 ```bash
 make test-ui              # pages, mobile layout, i18n, axe-core accessibility
+GEXTTO_TEST_UI_SERIAL=1 make test-ui   # old single process
 ```
+
+Locally `scripts/test-ui.sh` splits the specs into two independent groups — one
+with the settings, i18n and the smaller read-only specs, one with the
+accessibility and page specs — each with its own dry-run daemon, data directory
+and ports, and runs them concurrently. CI keeps the serial process. The script
+kills the test `gx-torrent` at the end; an interrupted run can leave one
+listening until its 15-minute orphan timeout.
 
 The suite also gives the test daemon its own gx-torrent: `playwright.config.ts`
 sets `GEXTTO_GXTORRENT_LISTEN=127.0.0.1:18893`, which replaces both the managed

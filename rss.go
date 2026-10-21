@@ -1798,8 +1798,11 @@ func parseProwlarrItems(items []map[string]any, source string) []models.Release 
 				magnet = download
 			}
 		}
-		if !strings.HasPrefix(magnet, "magnet:") {
-			// Prowlarr can omit the magnet but retain its v1/v2 infohash.
+		if !strings.HasPrefix(magnet, "magnet:") && prowlarrDownloadURL(item) == nil {
+			// Prowlarr can omit the magnet but retain its v1/v2 infohash. It
+			// becomes the magnet only when there is no `.torrent` link: a bare
+			// magnet has no tracker and finds no peers on a private indexer,
+			// while the file carries the announce with the passkey.
 			magnet = prowlarrInfoHashMagnet(jsonStringValue(item["infoHash"]), title)
 		}
 		label := source

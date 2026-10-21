@@ -63,10 +63,14 @@ test.describe("accessibilità automatizzata", () => {
         </div>`,
       });
     });
+    await page.clock.install();
     await page.goto("/?view=downloads");
+    // The first poll brings the test button into the table; focus it and let
+    // the next poll swap the table again. Fast-forwarding avoids two 5 s waits.
+    await page.clock.fastForward(5000);
     const pause = page.locator('[data-action="pause"][data-hash="focus-test"]');
     await pause.focus();
-    await page.waitForTimeout(3500);
+    await page.clock.fastForward(5000);
     await expect(pause).toBeFocused();
   });
 

@@ -25,7 +25,7 @@ manual is online: [English](docs/MANUAL.en.md) ·
   recognised by its torrent: when a feed publishes a REPACK under the same
   identifier, both enter the archive, each with its own title. When the
   indexer offers the `.torrent` link, Gextto downloads that even if it knows
-  the hash: on private indexers a magnet without trackers would find nobody.
+  the hash (Jackett and Prowlarr): on private indexers a magnet without trackers would find nobody.
 - **Download notifications say where the torrent comes from.** The «New episode
   download started» / «Movie download started» message (Telegram, email and the
   other channels) now has a **📡 Source** line with the feed, the indexer or the

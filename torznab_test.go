@@ -115,6 +115,21 @@ func TestParseProwlarrJSONRebuildsMagnetFromInfoHash(t *testing.T) {
 	}
 }
 
+// TestProwlarrKeepsTheTorrentLinkNextToAnInfoHash: with a `.torrent` link the
+// infohash does not turn into a bare magnet — on a private indexer it has no
+// tracker and finds no peers, while the file carries the passkey announce.
+func TestProwlarrKeepsTheTorrentLinkNextToAnInfoHash(t *testing.T) {
+	link := "http://prowlarr:9696/3/download?apikey=k&link=abc&file=Show"
+	body := `[{"title":"Show S01E02 1080p WEB-DL","infoHash":"0123456789abcdef0123456789abcdef01234567","downloadUrl":"` + link + `","size":1500000000,"protocol":"torrent","indexer":"PrivateHD"}]`
+	releases, err := parse_prowlarr_json(body, "Prowlarr")
+	if err != nil || len(releases) != 1 {
+		t.Fatalf("parse = %+v, %v", releases, err)
+	}
+	if releases[0].Magnet != "" || releases[0].TorrentURL == nil || *releases[0].TorrentURL != link {
+		t.Fatalf("release = magnet %q, torrent %v; want the .torrent link", releases[0].Magnet, releases[0].TorrentURL)
+	}
+}
+
 func TestProwlarrPreservesPublishDateAndV2InfoHash(t *testing.T) {
 	hash := strings.Repeat("a", 64)
 	body := `[{"title":"Show S01E02 1080p WEB-DL","infoHash":"` + hash + `","size":1500000000,"protocol":"torrent","publishDate":"2026-09-01T12:00:00Z"}]`
