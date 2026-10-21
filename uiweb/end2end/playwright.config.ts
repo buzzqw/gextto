@@ -1,6 +1,11 @@
 import { devices, defineConfig } from "@playwright/test";
 
-const testDataDir = `/tmp/opencode/gextto-playwright-${process.pid}`;
+const port = Number(process.env.GEXTTO_TEST_PORT || 15003);
+const enginePort = Number(process.env.GEXTTO_TEST_ENGINE_PORT || 18892);
+const gxtorrentPort = Number(process.env.GEXTTO_TEST_GXTORRENT_PORT || 18893);
+const testDataDir = process.env.GEXTTO_TEST_DATA_DIR || `/tmp/opencode/gextto-playwright-${process.pid}`;
+const outputDir = process.env.GEXTTO_TEST_OUTPUT_DIR || "test-results";
+const htmlReportDir = process.env.GEXTTO_TEST_HTML_DIR || "playwright-report";
 
 /**
  * Read environment variables from file.
@@ -31,14 +36,16 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: "html",
+  /* Reporter to use. See https://playwright.dev/docs/test-reporters.
+     The line reporter keeps the terminal useful when several groups run in
+     parallel; the HTML report is still written for the post-run analysis. */
+  reporter: [["line"], ["html", { outputFolder: htmlReportDir, open: "never" }]],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
     actionTimeout: 0,
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: "http://127.0.0.1:15003",
+    baseURL: `http://127.0.0.1:${port}`,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
@@ -84,16 +91,16 @@ export default defineConfig({
   ],
 
   /* Folder for test artifacts such as screenshots, videos, traces, etc. */
-  // outputDir: 'test-results/',
+  outputDir,
 
   /* Run your local dev server before starting the tests */
   webServer: {
     // GEXTTO_GXTORRENT_LISTEN gives the suite its own gx-torrent: without it a
     // daemon already listening on the default 8890 (a live installation) would
     // be adopted and reconfigured by the test instance.
-    command: `GEXTTO_DATA_DIR=${testDataDir} GEXTTO_LISTEN=127.0.0.1:15003 GEXTTO_ENGINE_LISTEN=127.0.0.1:18892 GEXTTO_GXTORRENT_LISTEN=127.0.0.1:18893 bin/gexttod --dry-run`,
+    command: `GEXTTO_DATA_DIR=${testDataDir} GEXTTO_LISTEN=127.0.0.1:${port} GEXTTO_ENGINE_LISTEN=127.0.0.1:${enginePort} GEXTTO_GXTORRENT_LISTEN=127.0.0.1:${gxtorrentPort} bin/gexttod --dry-run`,
     cwd: "../..",
-    port: 15003,
-    reuseExistingServer: !process.env.CI,
+    port,
+    reuseExistingServer: process.env.GEXTTO_TEST_REUSE !== "0" && !process.env.CI,
   },
 });
