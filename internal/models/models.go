@@ -87,6 +87,8 @@ func (q *Quality) ScoreBreakdown() []ScoreBreakdownItem {
 		audio = 100
 	case strings.Contains(q.Audio, "ddp") || strings.Contains(q.Audio, "eac3"):
 		audio = 80
+	case strings.Contains(q.Audio, "7.1"):
+		audio = 60
 	case strings.Contains(q.Audio, "ac3") || strings.Contains(q.Audio, "5.1"):
 		audio = 50
 	case strings.Contains(q.Audio, "aac"):
@@ -194,6 +196,32 @@ func (q *Quality) SourceRank() int {
 	}
 }
 
+// audioRank orders the audio codecs by the same preference used by the score.
+// A candidate with a lower rank cannot win through the generic score delta:
+// size, release group or swarm health must not hide an audio downgrade.
+func audioRank(value string) int {
+	switch {
+	case strings.Contains(value, "truehd"):
+		return 7
+	case strings.Contains(value, "dts-hd"):
+		return 6
+	case strings.Contains(value, "dts"):
+		return 5
+	case strings.Contains(value, "ddp") || strings.Contains(value, "eac3"):
+		return 4
+	case strings.Contains(value, "7.1"):
+		return 4
+	case strings.Contains(value, "ac3") || strings.Contains(value, "5.1"):
+		return 3
+	case strings.Contains(value, "aac"):
+		return 2
+	case strings.Contains(value, "mp3"):
+		return 1
+	default:
+		return 0
+	}
+}
+
 // UpgradeReason explains why q may replace old, or "" when the change is not
 // worth a re-download.
 func (q *Quality) UpgradeReason(old *Quality, newScore, oldScore, minScoreDiff int64) string {
@@ -224,6 +252,9 @@ func (q *Quality) UpgradeReason(old *Quality, newScore, oldScore, minScoreDiff i
 		return "proper"
 	}
 	if old.Source == "unknown" && q.Source != "unknown" && q.sameNonSourceQuality(old) {
+		return ""
+	}
+	if audioRank(q.Audio) < audioRank(old.Audio) {
 		return ""
 	}
 	if newScore > oldScore && newScore-oldScore >= minScoreDiff {
@@ -300,6 +331,8 @@ func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
 		adjust(100, true, "score_audio_dts")
 	case strings.Contains(q.Audio, "ddp") || strings.Contains(q.Audio, "eac3"):
 		adjust(80, true, "score_audio_ddp")
+	case strings.Contains(q.Audio, "7.1"):
+		adjust(60, true, "score_audio_7.1")
 	case strings.Contains(q.Audio, "ac3"):
 		adjust(50, true, "score_audio_ac3")
 	case strings.Contains(q.Audio, "5.1"):

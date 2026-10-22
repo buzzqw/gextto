@@ -29,8 +29,12 @@ var ErrInferiorDuplicate = errors.New("release inferior to existing file")
 // recursively, groups video files by `(season, episode)` and keeps the file
 // with the highest score. It implements the legacy
 // `_best_quality_in_path`/`episode_archive_presence` helpers.
-func IndexArchive(seriesName, archivePath string, settings map[string]string) models.ArchiveQualityIndex {
+func IndexArchive(seriesName, archivePath string, cfg *Config) models.ArchiveQualityIndex {
 	index := models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}}
+	settings := map[string]string{}
+	if cfg != nil {
+		settings = cfg.Settings
+	}
 	if archivePath == "" {
 		return index
 	}
@@ -87,6 +91,12 @@ func IndexArchive(seriesName, archivePath string, settings map[string]string) mo
 		}
 		quality := ParseQuality(name)
 		score := ScoreQuality(&quality, settings)
+		if cfg != nil {
+			// Keep the archive score on the same basis as the acquisition score
+			// (size included); comparing a size/health-enhanced candidate with a
+			// quality-only old score caused false upgrades.
+			score = cfg.FileScore(file, "series", seriesName)
+		}
 		key := [2]int64{season, episode}
 		existing, found := index.Best[key]
 		if !found || score > existing.Score {

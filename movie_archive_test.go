@@ -97,7 +97,7 @@ func TestSeriesFileOnDiskBlocksEqualDownload(t *testing.T) {
 	writeFile(t, filepath.Join(root, "Show.S01E01.1080p.WEB-DL.mkv"), make([]byte, 100))
 	cfg := DefaultConfig()
 	cfg.Series = []SeriesConfig{{Name: "Show", ArchivePath: root}}
-	index := IndexArchive("Show", root, cfg.Settings)
+	index := IndexArchive("Show", root, &cfg)
 	season, episode := int64(1), int64(1)
 	series := "Show"
 	release := models.Release{

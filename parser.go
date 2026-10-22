@@ -557,14 +557,18 @@ func ParseQuality(title string) models.Quality {
 	// --- Audio (ordine di priorità legacy) ---
 	audio := "unknown"
 	switch {
+	case strings.Contains(low, "truehd") || strings.Contains(low, "true hd"):
+		audio = "truehd"
 	case strings.Contains(low, "dts-hd") || strings.Contains(low, "dtshd"):
 		audio = "dts-hd"
 	case strings.Contains(low, "dts"):
 		audio = "dts"
-	case strings.Contains(low, "ddp5.1") || strings.Contains(low, "ddp 5.1") || strings.Contains(low, "eac3"):
+	case strings.Contains(low, "ddp") || strings.Contains(low, "eac3") || strings.Contains(low, "dd+"):
 		audio = "ddp"
-	case strings.Contains(low, "ac3") || strings.Contains(low, "dd5.1"):
+	case strings.Contains(low, "ac3") || strings.Contains(low, "dd5.1") || strings.Contains(low, "dd 5.1"):
 		audio = "ac3"
+	case audio71Re.MatchString(low):
+		audio = "7.1"
 	case audio51Re.MatchString(low):
 		audio = "5.1"
 	case strings.Contains(low, "mp3"):
@@ -1172,8 +1176,9 @@ func releaseYear(title string) *int64 {
 
 var (
 	// "5.1" must stand alone: it also appears across digits in "x265.10bit" or
-	// "2024.05.12".
+	// "2024.05.12". The same applies to 7.1.
 	audio51Re = regexp.MustCompile(`(?:^|[^0-9])5\.1(?:[^0-9]|$)`)
+	audio71Re = regexp.MustCompile(`(?:^|[^0-9])7\.1(?:[^0-9]|$)`)
 	hdWordRe  = regexp.MustCompile(`(?:^|[^a-z0-9-])hd(?:[^a-z0-9-]|$)|hdtv`)
 	palWordRe = regexp.MustCompile(`\bpal\b`)
 )

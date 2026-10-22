@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **TV series: no false upgrades from audio or score drift.** The pre-download decision compared the new release score with the quality-only score of the archived file, while completion compared size and other bonuses too: an identical file could look like an upgrade, be downloaded again and then discarded. The archived file now uses the same `FileScore` as completion, the approval score no longer includes the swarm-health bonus, and a lower-ranked audio codec cannot win through the score alone. The parser also recognises `TrueHD`, `7.1`, `DD+` and the common variants, so an unrecognised audio track no longer skews the comparison.
+
 - **Movies already on the NAS: no wasted download.** Before downloading a movie, Gextto now also checks the file in the archive folder, not only the database row. If the file exists and is equal or better, the download does not start; if the database was rebuilt or the row was missing, the file on disk still counts. The same information appears in the decision explanation.
 
 - **eD2k: safer import and more complete searches.** Gextto now waits until aMule has actually moved a completed file into the incoming folder, with the expected size and stable for a moment, before importing it; a file still being copied from another disk or Docker mount is no longer treated as ready. eD2k/Kad queries are normalized (accents, typographic apostrophes, parentheses) and, when `SxxExx` finds nothing, Gextto also tries `1x05`, `1x5` and `01x05`. With qBittorrent, a completion with no importable video now names the files it skipped, and the idle-seed limit is sent as `inactiveSeedingTimeLimit`.

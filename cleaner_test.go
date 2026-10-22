@@ -40,7 +40,7 @@ func TestIndexArchiveKeepsBestFilePerEpisode(t *testing.T) {
 	// Un'altra serie nella stessa cartella non deve entrare nell'indice.
 	cleanerWrite(t, filepath.Join(archive, "Altro - S01E01 - X - [2160p][h265][IT].mkv"), "x")
 
-	index := IndexArchive("Example", archive, map[string]string{})
+	index := IndexArchive("Example", archive, nil)
 	best, ok := index.BestFor(1, 1)
 	assertTrue(t, ok, "E01 presente")
 	assertEqual(t, best.Quality.Resolution, "2160p")
@@ -63,7 +63,7 @@ func TestIndexArchiveRecognizesSeasonSubfolderEpisodes(t *testing.T) {
 	cleanerWrite(t, filepath.Join(seasonDir, "S01E01 - [1080p][IT].mkv"), "hd")
 	cleanerWrite(t, filepath.Join(seasonDir, "02 - Titolo - [720p][IT].mkv"), "hd2")
 
-	index := IndexArchive("Example", archive, map[string]string{})
+	index := IndexArchive("Example", archive, nil)
 	best1, ok1 := index.BestFor(1, 1)
 	assertTrue(t, ok1, "S01E01 riconosciuto da sottocartella")
 	assertEqual(t, best1.Quality.Resolution, "1080p")
@@ -745,5 +745,29 @@ func TestRemoveTrashContentsRemovesSymlinks(t *testing.T) {
 	}
 	if _, err := os.Stat(kept); err != nil {
 		t.Fatalf("symlink target must be preserved: %v", err)
+	}
+}
+
+func TestIndexArchiveUsesSizeAwareScore(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "Example")
+	if err := os.MkdirAll(archive, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	small := filepath.Join(archive, "Example - S01E01 - Small - [1080p][h265][DDP].mkv")
+	large := filepath.Join(archive, "Example - S01E01 - Large - [1080p][h265][DDP].mkv")
+	cleanerWrite(t, small, "x")
+	cleanerWrite(t, large, "x")
+	if err := os.Truncate(large, 500*1024*1024); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	index := IndexArchive("Example", archive, &cfg)
+	best, ok := index.BestFor(1, 1)
+	if !ok {
+		t.Fatal("episode not found")
+	}
+	if best.Score != cfg.FileScore(large, "series", "Example") {
+		t.Fatalf("archive score = %d, want the file score %d", best.Score, cfg.FileScore(large, "series", "Example"))
 	}
 }

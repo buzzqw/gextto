@@ -6280,7 +6280,7 @@ func (d *Database) allowArchiveReset() bool {
 // season, read from the episodes table. It is the cheap counterpart of
 // IndexArchive (which walks the library folder) for the in-download pack
 // inspection, where a NAS scan at every tick would block the event loop.
-func (d *Database) SeriesQualityIndex(seriesName string, season int64) *models.ArchiveQualityIndex {
+func (d *Database) SeriesQualityIndex(seriesName string, season int64, cfg *Config) *models.ArchiveQualityIndex {
 	index := &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}}
 	if d == nil || d.db == nil {
 		return index
@@ -6303,6 +6303,12 @@ func (d *Database) SeriesQualityIndex(seriesName string, season int64) *models.A
 		// them so the upgrade rules (HDR, WEB-DL, REMUX…) can judge the pack
 		// against the real library file, not only the numeric score.
 		quality := ParseQuality(filepath.Base(archivePath))
+		if cfg != nil {
+			// Use the same score basis as the acquisition decision; the stored
+			// score may carry an old swarm-health bonus that is not part of the
+			// file's quality.
+			score = cfg.FileScore(archivePath, "series", seriesName)
+		}
 		index.Best[[2]int64{episodeSeason, episode}] = models.ArchiveQuality{Quality: quality, Score: score}
 	}
 	return index

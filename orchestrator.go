@@ -878,7 +878,10 @@ func RunCycleDomain(
 				isReadyPending = true
 			}
 		}
-		releaseScore := cfg.AcquisitionScore(&release)
+		// AcquisitionScore chooses between candidates; the approval and the
+		// stored score must use ReleaseScore, so a swarm-health bonus can never
+		// masquerade as an upgrade of a file already in the library.
+		releaseScore := cfg.ReleaseScore(&release)
 		// A candidate that fills a known archive gap, or that scores above the
 		// bypass threshold, is never held by a delay profile.
 		gapEpisodes := gapEpisodesForRelease(&release, gapTargets)
@@ -936,7 +939,7 @@ func RunCycleDomain(
 					if resolved := cfg.ResolveArchivePath(series); resolved != nil {
 						archivePath = *resolved
 					}
-					indexed := IndexArchive(series.Name, archivePath, cfg.Settings)
+					indexed := IndexArchive(series.Name, archivePath, cfg)
 					computed = &indexed
 				}
 				archiveIndexCache[key] = computed
@@ -2074,7 +2077,7 @@ func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
 // cfg *Config, preferredPath *string) (bool, error)
 //	transfer_policy.go FreeSpaceBytes(path string) *uint64
 //	cleaner.IndexArchive(seriesName, archivePath string,
-// settings map[string]string) models.ArchiveQualityIndex
+// cfg *Config) models.ArchiveQualityIndex
 //	postprocess.DownloadDirFor(release *models.Release, cfg *Config) (string, bool)
 //
 // The comics module was implemented separately; this file assumes:

@@ -71,7 +71,7 @@ func ArchiveQuality(cfg *Config, release *models.Release) *models.ArchiveQuality
 	if archivePath == nil {
 		return nil
 	}
-	index := IndexArchive(series.Name, *archivePath, cfg.Settings)
+	index := IndexArchive(series.Name, *archivePath, cfg)
 	if release.Season == nil || release.Episode == nil {
 		return nil
 	}

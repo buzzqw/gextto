@@ -131,12 +131,12 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, check
 			needed = seriesGapsForSeason(db, seriesName, *candidate.release.Season)
 			gapCache[cacheKey] = needed
 		}
-		index := db.SeriesQualityIndex(seriesName, *candidate.release.Season)
+		index := db.SeriesQualityIndex(seriesName, *candidate.release.Season, cfg)
 		forbidUpgrade := false
 		if series := cfg.FindSeriesMatch(seriesName, candidate.release.Season); series != nil {
 			forbidUpgrade = series.DisableUpgrades
 		}
-		score := cfg.AcquisitionScore(&candidate.release)
+		score := cfg.ReleaseScore(&candidate.release)
 		decisions := packEpisodeDecisions(&candidate.release, found, needed, index, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade)
 		useful := false
 		for _, decision := range decisions {

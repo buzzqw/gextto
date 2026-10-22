@@ -528,3 +528,21 @@ func TestParsesDateBasedEpisode(t *testing.T) {
 		t.Fatal("expected not is_pack")
 	}
 }
+
+func TestParsesAudioCodecsWithoutFalseUpgradeBasis(t *testing.T) {
+	cases := map[string]string{
+		"Show.S01E01.1080p.WEB-DL.TrueHD.7.1.Atmos.mkv": "truehd",
+		"Show.S01E01.1080p.WEB-DL.DTS-HD.MA.5.1.mkv":    "dts-hd",
+		"Show.S01E01.1080p.WEB-DL.DDP5.1.Atmos.mkv":     "ddp",
+		"Show.S01E01.1080p.WEB-DL.DD+.5.1.mkv":          "ddp",
+		"Show.S01E01.1080p.WEB-DL.EAC3.5.1.mkv":         "ddp",
+		"Show.S01E01.1080p.WEB-DL.AC3.5.1.mkv":          "ac3",
+		"Show.S01E01.1080p.WEB-DL.AAC.mkv":              "aac",
+		"Show.S01E01.1080p.WEB-DL.7.1.mkv":              "7.1",
+	}
+	for title, want := range cases {
+		if got := ParseQuality(title).Audio; got != want {
+			t.Errorf("Audio(%q) = %q, want %q", title, got, want)
+		}
+	}
+}

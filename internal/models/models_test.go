@@ -185,3 +185,18 @@ func TestConfiguredScoreBreakdownSumsToConfiguredScore(t *testing.T) {
 		t.Fatalf("configured breakdown %d != score %d", sum, got)
 	}
 }
+
+func TestAudioDowngradeCannotWinThroughScoreAlone(t *testing.T) {
+	old := Quality{Resolution: "1080p", Source: "webdl", Codec: "h265", Audio: "truehd", HDR: "HDR10"}
+	worse := old
+	worse.Audio = "ac3"
+	if got := worse.UpgradeReason(&old, 1400, 1200, 0); got != "" {
+		t.Fatalf("audio downgrade reason = %q, want none", got)
+	}
+	better := Quality{Resolution: "1080p", Source: "webdl", Codec: "h265", Audio: "dts-hd", HDR: "HDR10"}
+	betterOld := better
+	betterOld.Audio = "ac3"
+	if got := better.UpgradeReason(&betterOld, 1250, 1200, 0); got == "" {
+		t.Fatal("a higher-ranked audio codec should still be able to win")
+	}
+}
