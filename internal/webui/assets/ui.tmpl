@@ -791,7 +791,7 @@ function rowOf(el){return el&&el.closest?el.closest('#torrents tbody tr'):null;}
 function rowByHash(h){return rows().find(function(r){return r.dataset.hash===h;});}
 function dataByHash(h){
   if(state.virtual){return state.allRows.find(function(r){return r.Hash===h;})||null;}
-  var r=rowByHash(h);return r?{Name:r.dataset.name,Category:r.dataset.cat,Tags:r.dataset.tags,State:r.dataset.state}:null;
+  var r=rowByHash(h);return r?{Name:r.dataset.name,Category:r.dataset.cat,Tags:r.dataset.tags,State:r.dataset.state,AutoTMM:r.dataset.tmm==='1'}:null;
 }
 function selHashes(){return Array.from(state.selected);}
 function renderSelection(){
@@ -923,6 +923,11 @@ function renderVirtual(force){
   for(var i=start;i<end;i++)html+=rowHTML(view[i]);
   if(end<view.length)html+='<tr class="vpad" aria-hidden="true"><td colspan="'+cols+'" style="height:'+((view.length-end)*rowH)+'px;padding:0;border:0"></td></tr>';
   tb.innerHTML=html;
+  var table=tb.closest('table');
+  if(table){table.setAttribute('aria-rowcount',String(view.length+1));}
+  var rendered=tb.querySelectorAll('tr[data-hash]');
+  for(var n=0;n<rendered.length;n++){rendered[n].setAttribute('aria-rowindex',String(start+n+2));}
+  renderSelection();
   state.winStart=start;state.winEnd=end;state.winLen=view.length;
   // The first real row gives the exact height, so the spacers stay aligned
   // after a theme or zoom change.
@@ -938,8 +943,13 @@ document.addEventListener('scroll',function(e){
   virtualScrollFrame=requestAnimationFrame(function(){virtualScrollFrame=0;renderVirtual(false);});
 },true);
 
+function resetVirtualScroll(){
+  var tb=$('#torrent-rows');
+  var sc=tb&&tb.closest('.listwrap');
+  if(sc)sc.scrollTop=0;
+}
 function applyFilters(){
-  if(state.virtual){applyDataView(true);return;}
+  if(state.virtual){resetVirtualScroll();applyDataView(true);return;}
   var q=state.q.toLowerCase(),f=state.filter,shown=0;
   rows().forEach(function(r){
     var ok=matchStatus(r,f.status)&&(f.cat===null||r.dataset.cat===f.cat)
@@ -980,7 +990,7 @@ function applySort(){
   list.forEach(function(r){tb.appendChild(r);});
   $$('#torrents th[data-sort]').forEach(function(th){th.setAttribute('aria-sort',th.dataset.sort===s.key?(s.asc?'ascending':'descending'):'none');});
 }
-function setSort(key){var s=state.sort;state.sort={key:key,asc:s.key===key?!s.asc:true};store.set('sort',state.sort);applySort();}
+function setSort(key){var s=state.sort;state.sort={key:key,asc:s.key===key?!s.asc:true};store.set('sort',state.sort);if(state.virtual)resetVirtualScroll();applySort();}
 
 // ---------- columns: chooser and widths ----------
 function colPrefs(){return store.get('cols',{});}
@@ -1070,6 +1080,7 @@ function updateTable(data){
   var rows=data.Rows||[];
   if(!rows.length||data.RowsLimited||!window.__thead){
     state.virtual=false;state.allRows=[];state.viewRows=[];state.winStart=-1;state.winEnd=-1;state.winLen=0;
+    var old=$('#torrents');if(old)old.removeAttribute('aria-rowcount');
     return legacyTable();
   }
   var tb=$('#torrent-rows');
@@ -1081,7 +1092,7 @@ function updateTable(data){
   state.allRows=rows;
   state.virtual=rows.length>virtualMinRows&&virtualAllowed();
   var more=$('#live .more-rows');if(more&&!data.RowsLimited)more.remove();
-  if(!state.virtual){state.viewRows=rows;state.winStart=-1;state.winEnd=-1;tb.innerHTML=rows.map(rowHTML).join('');return Promise.resolve();}
+  if(!state.virtual){state.viewRows=rows;state.winStart=-1;state.winEnd=-1;var table=tb.closest('table');if(table)table.removeAttribute('aria-rowcount');tb.innerHTML=rows.map(rowHTML).join('');return Promise.resolve();}
   applyDataView(true);
   return Promise.resolve();
 }
@@ -1110,7 +1121,7 @@ function refresh(){
   // Desktop asks for the whole session and virtualises it; the mobile layout
   // keeps the old paged window (300 rows + Show more), because a CSS-grid card
   // cannot use the spacer rows the windowing relies on.
-  var rowsParam=state.rows?('?rows='+state.rows):(virtualAllowed()?'?rows=all':'');
+  var rowsParam=virtualAllowed()?'?rows=all':(state.rows?('?rows='+state.rows):'');
   // The rows travel as JSON (small, no chrome rebuild); the filters, speeds
   // and status travel as HTML (server-translated). Both derive from the same
   // snapshot, so they never disagree.
@@ -1231,8 +1242,8 @@ function copyMagnet(hash){
   fetch('/ui/magnet?hash='+encodeURIComponent(hash),{cache:'no-store'}).then(function(r){return r.ok?r.text():Promise.reject(new Error(r.status));}).then(function(m){copyText(m,t('Magnet copied'));}).catch(function(){toast(t('Copy failed'),true);});
 }
 function editCategory(hashes){
-  var dlg=$('#dlg-cat'),r=rowByHash(hashes[0]);
-  dlg._hashes=hashes;$('input[name=category]',dlg).value=r?r.dataset.cat:'';$('input[name=tags]',dlg).value=r?r.dataset.tags.split(',').map(function(s){return s.trim();}).filter(Boolean).join(', '):'';$('input[name=auto_tmm]',dlg).checked=!!(r&&r.dataset.tmm);openDialog(dlg);
+  var dlg=$('#dlg-cat'),r=dataByHash(hashes[0]);
+  dlg._hashes=hashes;$('input[name=category]',dlg).value=r?r.Category:'';$('input[name=tags]',dlg).value=r?(r.Tags||'').split(',').map(function(s){return s.trim();}).filter(Boolean).join(', '):'';$('input[name=auto_tmm]',dlg).checked=!!(r&&r.AutoTMM);openDialog(dlg);
 }
 function renameTorrentDialog(hashes){
   var dlg=$('#dlg-rename'),r=rowByHash(hashes[0]);

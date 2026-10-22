@@ -852,8 +852,8 @@ func parseDLNASearch(raw string) dlnaSearchQuery {
 // matches reports whether one media entry satisfies the query.
 func (q dlnaSearchQuery) matches(title string, video bool) bool {
 	switch strings.ToLower(q.class) {
-	case "":
-	case "object.item", "object.item.videoitem":
+	case "", "object.item":
+	case "object.item.videoitem":
 		if !video {
 			return false
 		}
