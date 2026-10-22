@@ -1,0 +1,51 @@
+{{define "v2_import"}}
+<div class="panel v2-import">
+  <h2>Importa un file esistente</h2>
+  <p class="muted">Scegli un file o una cartella: Gextto legge il nome, propone la serie o il film e la destinazione. Nulla viene spostato finché non confermi.</p>
+  <form class="toolbar" hx-get="/import/preview" hx-target="#v2-import-result" hx-swap="innerHTML" hx-indicator="#v2-import-busy">
+    <label class="field" style="flex:1"><span>Percorso del file o della cartella</span><input class="input" type="text" name="path" value="{{.Path}}" autocomplete="off" title="Percorso di un video o di una cartella che contiene video da importare"></label>
+    <button class="btn primary" type="submit" title="Leggi i nomi e proponi l'abbinamento">Analizza</button>
+    <span id="v2-import-busy" class="htmx-indicator muted" role="status">Analisi…</span>
+  </form>
+  <div id="v2-import-result"></div>
+</div>
+{{end}}
+
+{{define "v2_import_candidates"}}
+{{if .Error}}<p class="err" role="alert">{{.Error}}</p>{{end}}
+{{if .Result}}
+{{range .Result}}
+<form class="panel import-row" hx-post="/import/apply" hx-target="#v2-import-result" hx-swap="innerHTML" hx-disabled-elt="find button">
+  <input type="hidden" name="path" value="{{.Path}}">
+  <input type="hidden" name="kind" value="{{.Kind}}">
+  <h3>{{.Name}}</h3>
+  {{if .Error}}
+  <p class="err" role="alert">{{.Error}}</p>
+  {{else}}
+  <p class="muted">{{.ParsedTitle}}</p>
+  {{if eq .Kind "series"}}
+  <div class="toolbar">
+    <label class="field"><span>Serie</span><select class="input" name="series">{{$sel := .Series}}{{range $.Series}}<option value="{{.}}"{{if eq . $sel}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+    <label class="field"><span>Stagione</span><input class="input compact" type="number" min="0" name="season" value="{{.Season}}" title="Stagione del file"></label>
+    <label class="field"><span>Episodio</span><input class="input compact" type="number" min="0" name="episode" value="{{.Episode}}" title="Episodio del file"></label>
+  </div>
+  {{else}}
+  <div class="toolbar">
+    <label class="field"><span>Film</span><select class="input" name="movie">{{$sel := .ParsedTitle}}{{range $.Movies}}<option value="{{.Name}}"{{if eq .Name $sel}} selected{{end}}>{{.Name}} ({{.Year}})</option>{{end}}</select></label>
+    <label class="field"><span>Anno</span><input class="input compact" type="number" min="0" name="year" value="{{.Year}}" title="Anno del film"></label>
+  </div>
+  {{end}}
+  <p class="muted"><span>Destinazione</span>: <code>{{.Destination}}</code></p>
+  <div class="toolbar">
+    <label class="check" title="Sostituisce la copia già presente nella destinazione, spostandola nel cestino"><input type="checkbox" name="replace" value="1"> Sostituisci il file esistente</label>
+    <button class="btn primary" type="submit" title="Rinomina, sposta e registra questo file">Importa ora</button>
+  </div>
+  {{end}}
+</form>
+{{end}}
+{{end}}
+{{end}}
+
+{{define "v2_import_done"}}
+{{if .Error}}<p class="err" role="alert">{{.Error}}</p>{{else}}<p class="ok" role="status"><span>Importato in</span> <code>{{.Message}}</code></p>{{end}}
+{{end}}

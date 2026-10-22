@@ -441,6 +441,23 @@ func (t *TmdbClient) SearchMovie(ctx context.Context, name string, year *int64) 
 	return item, nil
 }
 
+// FindSeriesByTvdbID resolves a TVDB series id to the TMDB series (the
+// /find endpoint), or nil when TMDB does not know it.
+func (t *TmdbClient) FindSeriesByTvdbID(ctx context.Context, tvdbID int64) (*TmdbItem, error) {
+	var found struct {
+		TvResults []TmdbItem `json:"tv_results"`
+	}
+	rawURL := fmt.Sprintf("%s/find/%d", tmdbAPIBaseURL, tvdbID)
+	params := [][2]string{{"external_source", "tvdb_id"}, {"language", t.language}}
+	if err := t.getJSON(ctx, rawURL, params, &found); err != nil {
+		return nil, err
+	}
+	if len(found.TvResults) == 0 {
+		return nil, nil
+	}
+	return &found.TvResults[0], nil
+}
+
 // MovieDetails mirrors `movie_details`.
 func (t *TmdbClient) MovieDetails(ctx context.Context, tmdbID string) (*TmdbMovieDetails, error) {
 	id, err := strconv.ParseInt(strings.TrimSpace(tmdbID), 10, 64)

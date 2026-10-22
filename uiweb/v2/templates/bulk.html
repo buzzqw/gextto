@@ -1,0 +1,74 @@
+{{define "v2_bulk"}}
+<div class="panel v2-bulk">
+  <h2>Modifica più titoli insieme</h2>
+  <p class="muted">Spunta le serie e i film, scegli i valori da cambiare e premi Applica. I valori che non spunti restano come sono in ogni titolo.</p>
+  {{if .Error}}<p class="err" role="alert">{{.Error}}</p>{{end}}
+  <form hx-post="/library/bulk" hx-target="#v2-bulk-result" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]">
+    <div class="v2-bulk-lists">
+      <fieldset class="panel v2-bulk-group">
+        <legend>Serie TV</legend>
+        {{if .Series}}
+        <label class="check" title="Seleziona o deseleziona tutte le serie"><input type="checkbox" data-v2-check-all="series"> Seleziona tutte</label>
+        <ul class="v2-bulk-list">
+          {{range .Series}}<li><label class="check"><input type="checkbox" name="series" value="{{.Value}}" data-v2-check-member="series"> {{.Name}}</label> <span class="muted">{{.Quality}} {{.Language}}</span>{{if .Paused}} <span class="badge warn">in pausa</span>{{end}}</li>{{end}}
+        </ul>
+        {{else}}<p class="muted">Nessuna serie monitorata.</p>{{end}}
+      </fieldset>
+      <fieldset class="panel v2-bulk-group">
+        <legend>Film</legend>
+        {{if .Movies}}
+        <label class="check" title="Seleziona o deseleziona tutti i film"><input type="checkbox" data-v2-check-all="movies"> Seleziona tutti</label>
+        <ul class="v2-bulk-list">
+          {{range .Movies}}<li><label class="check"><input type="checkbox" name="movie" value="{{.Value}}" data-v2-check-member="movies"> {{.Name}}</label> <span class="muted">{{.Quality}} {{.Language}}</span>{{if .Paused}} <span class="badge warn">in pausa</span>{{end}}</li>{{end}}
+        </ul>
+        {{else}}<p class="muted">Nessun film monitorizzato.</p>{{end}}
+      </fieldset>
+    </div>
+    <fieldset class="panel v2-bulk-group">
+      <legend>Valori da applicare</legend>
+      {{if .Profiles}}
+      <label class="field"><span>Parti da un profilo</span>
+        <select class="input" name="profile" hx-get="/library/bulk/profile" hx-target="#v2-bulk-values" hx-swap="innerHTML" hx-trigger="change" title="Copia nei campi i valori di un profilo: è un modello, i titoli restano modificabili uno per uno">
+          <option value="">— nessuno —</option>
+          {{range .Profiles}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+        </select>
+      </label>
+      {{end}}
+      <div id="v2-bulk-values">{{template "v2_bulk_values" .}}</div>
+      <div class="form-grid">
+        <label class="field"><span>Upgrade</span>
+          <select class="input" name="upgrades" title="Se sostituire un file già scaricato quando esce una versione migliore">
+            <option value="">Lascia com'è</option>
+            <option value="allow">Consenti gli upgrade</option>
+            <option value="deny">Non sostituire i file scaricati</option>
+          </select>
+        </label>
+        <label class="field"><span>Stato</span>
+          <select class="input" name="state" title="Attiva o metti in pausa la ricerca dei titoli selezionati">
+            <option value="">Lascia com'è</option>
+            <option value="active">Attivo</option>
+            <option value="paused">In pausa</option>
+          </select>
+        </label>
+      </div>
+    </fieldset>
+    <div class="toolbar">
+      <button class="btn primary" type="submit" title="Scrive i valori spuntati in tutti i titoli selezionati">Applica ai titoli selezionati</button>
+    </div>
+  </form>
+  <div id="v2-bulk-result" aria-live="polite"></div>
+</div>
+{{end}}
+
+{{define "v2_bulk_values"}}
+<div class="form-grid">
+  <div class="field"><label class="check" title="Spunta per scrivere la qualità nei titoli selezionati (vuoto = nessun requisito)"><input type="checkbox" name="set_quality" value="1"{{if .Marked}} checked{{end}}> Cambia la qualità</label><input class="input" name="quality" value="{{.Values.Quality}}" aria-label="Qualità" placeholder="es. 1080p" title="Risoluzione richiesta: 1080p, un intervallo 720p-1080p o un massimo &lt;1080p"></div>
+  <div class="field"><label class="check" title="Spunta per scrivere la lingua nei titoli selezionati"><input type="checkbox" name="set_language" value="1"{{if .Marked}} checked{{end}}> Cambia la lingua</label><input class="input" name="language" value="{{.Values.Language}}" aria-label="Lingua" placeholder="es. ita" title="Lingua dell'audio richiesta, ad esempio ita o ita,eng"></div>
+  <div class="field"><label class="check" title="Spunta per scrivere i sottotitoli nei titoli selezionati"><input type="checkbox" name="set_subtitle" value="1"{{if .Marked}} checked{{end}}> Cambia i sottotitoli</label><input class="input" name="subtitle" value="{{.Values.Subtitle}}" aria-label="Sottotitoli" title="Sottotitoli preferiti, ad esempio ita"></div>
+  <div class="field"><label class="check" title="Spunta per scrivere le esclusioni nei titoli selezionati"><input type="checkbox" name="set_exclude" value="1"{{if .Marked}} checked{{end}}> Cambia le esclusioni</label><input class="input" name="exclude" value="{{.Values.Exclude}}" aria-label="Esclusioni" title="Parole che scartano una release, separate da virgola"></div>
+</div>
+{{end}}
+
+{{define "v2_bulk_done"}}
+{{if .Error}}<p class="err" role="alert">{{.Error}}</p>{{else}}<p class="ok" role="status"><span>Titoli modificati</span>: {{.Message}}</p>{{end}}
+{{end}}

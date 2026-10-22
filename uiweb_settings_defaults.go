@@ -162,6 +162,7 @@ var uiSettingDefaults = map[string]string{
 	"tvdb_language":          "ita",
 	"tmdb_language":          "it-IT",
 	"default_language":       "ita",
+	"quality_profiles":       "[]",
 	"cleanup_upgrades":       "true",
 	"movies_flat_files":      "yes",
 	"upgrade_min_score_diff": "200",

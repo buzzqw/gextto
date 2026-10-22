@@ -231,6 +231,10 @@ func v2ListEditorByKey(key string) (uiListEditor, bool) {
 			if key == "seed_rules" {
 				return editor, true
 			}
+		case "/api/quality-profiles":
+			if key == "quality_profiles" {
+				return editor, true
+			}
 		}
 	}
 	return uiListEditor{}, false
@@ -318,6 +322,8 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		canonicalKey = "watched_folders"
 	case "seed_rules":
 		canonicalKey = "seed_rules"
+	case "quality_profiles":
+		canonicalKey = "quality_profiles"
 	default:
 		http.Error(w, "editor sconosciuto", http.StatusNotFound)
 		return

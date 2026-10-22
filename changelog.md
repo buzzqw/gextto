@@ -24,6 +24,32 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 21 ottobre 2026
 
+- **Import manuale di un file già presente.** La nuova pagina **Importa file**
+  (menu Libreria) legge un video o una cartella già sul disco, propone serie,
+  stagione ed episodio (o film e anno) e la destinazione; puoi correggerli e
+  confermare. Gextto rinomina, sposta, registra l'episodio o il film e aggiorna
+  Jellyfin/Plex. Se esiste già un file con lo stesso nome l'import si ferma,
+  salvo la spunta **Sostituisci il file esistente** (la copia vecchia va nel
+  cestino). I file multi-episodio vengono registrati per ogni episodio.
+- **Profili di qualità nominati e API v3 per Jellyseerr.** In Configurazione →
+  Sorgenti puoi dare un nome alle combinazioni di qualità, lingua, sottotitoli
+  ed esclusioni; Gextto genera un profilo per ogni combinazione già presente
+  nella libreria (il primo è **Default**). Jellyseerr trova i profili e può
+  aggiungere serie e film da `/api/v3` (`system/status`, `qualityprofile`,
+  `languageprofile`, `rootfolder`, `tag`, `series/lookup`, `POST series`,
+  `movie/lookup`, `POST movie`, `queue`). Gextto segue solo le stagioni
+  richieste; una richiesta su una serie già in libreria aggiunge le nuove
+  stagioni, e un film già presente non viene duplicato. Ogni profilo mantiene
+  il suo numero anche se ne togli o riordini altri, così Jellyseerr applica
+  sempre quello scelto. Non è una compatibilità completa con Sonarr/Radarr.
+  I profili sono **modelli**: i loro valori vengono copiati nel titolo, che
+  resta libero di cambiare; cambiare un profilo non modifica i titoli già
+  creati.
+- **Modifica in blocco.** La nuova pagina **Modifica in blocco** (menu
+  Libreria) cambia qualità, lingua, sottotitoli, esclusioni, upgrade o stato su
+  più serie e film insieme: spunti i titoli, spunti i valori da cambiare e
+  applichi. Puoi partire dai valori di un profilo. Tutto il resto di ogni
+  titolo non viene toccato.
 - **gx-torrent si presenta con la sua versione, e può usare un'identità compatibile.** Prima diceva sempre `gx-core 0.0.0` a peer e tracker. Ora annuncia la versione reale (`gx-core 1.1.xxx`) e, se vuoi, può presentarsi come qBittorrent, Transmission, Rain o anacrolix/torrent con una versione scelta. Cambia solo l'identità annunciata: alcuni tracker privati accettano solo client in whitelist, quindi controlla le loro regole prima di usarla.
 
 - **Download con migliaia di torrent: la tabella resta fluida.** Oltre 500

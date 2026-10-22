@@ -92,6 +92,27 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/comics/weekly/settings` | weekly-pack settings |
 | DELETE | `/api/comics/{id}` | remove a comic |
 | POST | `/api/comics/{id}/enabled` | enable or disable a comic |
+| GET | `/api/quality-profiles` | named quality profiles (the list behind the v3 qualityprofile endpoint) |
+| POST | `/api/quality-profiles` | save the named quality profiles |
+| GET | `/api/v3/system/status` | Sonarr/Radarr v3 system status for a request manager |
+| GET | `/api/v3/qualityprofile` | v3 quality profiles: the named profiles, with stable ids |
+| GET | `/api/v3/qualityProfile` | same as /api/v3/qualityprofile (the spelling Jellyseerr uses) |
+| GET | `/api/v3/languageprofile` | v3 language profile (the default language) |
+| GET | `/api/v3/rootfolder` | v3 root folders (archive root and each series archive path) |
+| GET | `/api/v3/tag` | v3 tags |
+| GET | `/api/v3/series/lookup` | v3 series lookup (?term=, also tvdb:ID: a configured series comes back with its id and monitored seasons) |
+| POST | `/api/v3/series` | v3 add series (only the seasons marked monitored are followed) |
+| PUT | `/api/v3/series` | v3 update series: adds the newly monitored seasons to an existing series |
+| GET | `/api/v3/movie/lookup` | v3 movie lookup (?term=, also tmdb:ID: a configured movie comes back with its id, monitored and hasFile) |
+| POST | `/api/v3/movie` | v3 add movie (the response carries the library id) |
+| PUT | `/api/v3/movie` | v3 update movie: monitors a movie already in the library |
+| GET | `/api/v3/queue` | v3 queue (the torrent session) |
+| GET | `/api/import/preview` | manual import: the video files of a path with their match and destination (?path=) |
+| POST | `/api/import` | manual import: rename, move and register one file |
+| GET | `/library/bulk/profile` | bulk edit page: the value fields filled from a quality profile (?profile=ID) |
+| POST | `/library/bulk` | bulk edit page: apply the ticked values to the selected series and movies |
+| GET | `/import/preview` | manual import page: preview fragment |
+| POST | `/import/apply` | manual import page: confirm one file |
 | GET | `/api/config` | read the configuration |
 | POST | `/api/config` | save the configuration |
 | POST | `/api/config/add-all-from-archive` | add the series found in the archive folder to the configuration |
