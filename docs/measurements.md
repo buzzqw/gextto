@@ -749,6 +749,20 @@ against a cycle of minutes. `RecordTorrentLinkFailure` runs only for the links
 that actually fail (tens per cycle at most) and `ClearTorrentLinkFailure` only
 for the ones that are downloaded.
 
+### Test suite duration — 22 October 2026
+
+`make test` on the N97 (4 cores, Go build cache warm, service running):
+
+| Run | Wall time |
+| --- | --- |
+| `make test-serial` (plain `go test ./...`, root package serial) | 65 s, root package 59.7 s |
+| `make test` (root package in 4 processes, `scripts/go-test-sharded.sh`) | 22–24 s (35 s with the test binary rebuilt) |
+
+The root package holds 1,284 tests; run serially they spent half their time waiting
+(CPU 52 s for 100 s of wall time under `nice` and `GOMAXPROCS=2`). 25 tests over 1 s
+were 64 s of the 89 s total; the eD2k tests waited a full aMule search window against a
+fake core that answers at once (now shortened in the tests: 33 s → 3.5 s).
+
 ### Packaging
 
 The release archive root is **0755** (`mktemp -d` made it 0700, which tar applied to the

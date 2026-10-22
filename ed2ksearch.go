@@ -178,6 +178,17 @@ var ed2kState struct {
 // second search would replace the first one's results.
 var ed2kSearchMu sync.Mutex
 
+// The timing of one aMule search: the least time results are collected for,
+// a cap on it (0 = none, the configured timeout applies), the interval between
+// reads (0 = the client's default) and the pause before a retry (0 = default).
+// Tests shorten them: a fake core answers at once.
+var (
+	ed2kMinSearchWait = 2 * time.Second
+	ed2kMaxSearchWait time.Duration
+	ed2kSearchPoll    time.Duration
+	ed2kSearchRetry   time.Duration
+)
+
 // ed2kClient returns the client for the configured core, reusing the open
 // session while the address and password stay the same.
 func ed2kClient(cfg *Config) (*amule.Client, error) {
@@ -489,14 +500,17 @@ func searchAmuleOnce(ctx context.Context, settings ed2kSettings, client *amule.C
 			wait = remaining
 		}
 	}
-	if wait < 2*time.Second {
-		wait = 2 * time.Second
+	if wait < ed2kMinSearchWait {
+		wait = ed2kMinSearchWait
+	}
+	if ed2kMaxSearchWait > 0 && wait > ed2kMaxSearchWait {
+		wait = ed2kMaxSearchWait
 	}
 	ed2kSearchMu.Lock()
 	defer ed2kSearchMu.Unlock()
 	searchCtx, cancel := context.WithTimeout(ctx, wait+ed2kRequestTime)
 	defer cancel()
-	return client.Search(searchCtx, query, amule.SearchOptions{Type: searchType, Wait: wait})
+	return client.Search(searchCtx, query, amule.SearchOptions{Type: searchType, Wait: wait, Poll: ed2kSearchPoll, Retry: ed2kSearchRetry})
 }
 
 func ed2kReleases(results []amule.SearchResult, source string) []models.Release {

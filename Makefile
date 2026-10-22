@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast gx-torrent test test-race test-engine test-dht test-ui screenshots fuzz-smoke container vet fmt check-ui check-scripts installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 cache-refresh
+.PHONY: all build fast gx-torrent test test-serial test-race test-engine test-dht test-ui screenshots fuzz-smoke container vet fmt check-ui check-scripts installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 cache-refresh
 
 all: build
 
@@ -30,7 +30,14 @@ gx-torrent:
 container:
 	docker build --build-arg GX_BUILD="$$(cat gx-torrent.build_number 2>/dev/null || echo 0)" --build-arg GX_SERIES="$$(cat gx_torrent.version_series 2>/dev/null || echo 1.1)" -t gx-torrent .
 
+# The Go tests run with the root package split across processes (see
+# scripts/go-test-sharded.sh): it holds most of the tests and they share
+# package state, so they cannot be marked t.Parallel. GEXTTO_TEST_SHARDS sets
+# the number of processes. `make test-serial` is the plain `go test ./...`.
 test: check-ui check-scripts installer-test test-dht
+	scripts/go-test-sharded.sh
+
+test-serial: check-ui check-scripts installer-test test-dht
 	CGO_ENABLED=0 go test ./...
 
 # Tests of the gx-core engine. It lives in internal/gxcore as part of the main

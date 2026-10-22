@@ -188,7 +188,8 @@ Run these checks before a commit:
 
 ```bash
 gofmt -w changed.go
-make test                 # pure Go: check-ui + installer self-test + test-dht + CGO_ENABLED=0 go test ./...
+make test                 # pure Go: check-ui + installer self-test + test-dht + Go tests (root package split across processes)
+make test-serial          # the same with a plain CGO_ENABLED=0 go test ./...
 make test-engine            # tests of the gx-core engine
 make test-ui              # UI end2end (Playwright): pages, mobile, a11y (needs Node + a browser)
 CGO_ENABLED=1 go test -race ./...   # race detector needs cgo (a C compiler)
@@ -196,7 +197,12 @@ node --check uiweb/v2/static/v2-core.js
 git diff --check
 ```
 
-`make test` is pure Go.
+`make test` is pure Go. The root package's tests run in several processes
+(`scripts/go-test-sharded.sh`, round-robin by test name): a test must not
+depend on another having run before it in the same process, and a slow test
+that only waits (a timeout, a retry, a poll) should get its wait shortened
+through a package variable the test sets, as the eD2k search timing does
+(`ed2kMinSearchWait`, `ed2kMaxSearchWait`, `ed2kSearchPoll`, `ed2kSearchRetry`).
 
 The end-to-end suite is under `uiweb/end2end` (Playwright + Node). `make test-ui`
 builds the daemon, starts it in dry-run on its own port, completes the first-run

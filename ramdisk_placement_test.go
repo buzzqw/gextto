@@ -264,13 +264,19 @@ func TestRamdiskEffectiveFreeBytesCapsByHostMemory(t *testing.T) {
 	if base == nil {
 		t.Fatal("the temp dir must report a filesystem free space")
 	}
-	if got := ramdiskEffectiveFreeBytes(dir); got == nil || *got != *base {
+	// The free space of a shared filesystem moves while other processes write
+	// to it: compare with a margin, not to the byte.
+	near := func(got *uint64) bool {
+		const margin = 64 << 20
+		return got != nil && *got+margin >= *base && *got <= *base+margin
+	}
+	if got := ramdiskEffectiveFreeBytes(dir); !near(got) {
 		t.Fatalf("unknown host memory must keep the filesystem free space: got %v want %v", got, base)
 	}
 
 	// Plenty of host memory: the filesystem free space is the smaller figure.
 	withHostMemory(t, ^uint64(0), true)
-	if got := ramdiskEffectiveFreeBytes(dir); got == nil || *got != *base {
+	if got := ramdiskEffectiveFreeBytes(dir); !near(got) {
 		t.Fatalf("ample host memory must keep the filesystem free space: got %v want %v", got, base)
 	}
 }

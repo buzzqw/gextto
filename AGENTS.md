@@ -194,7 +194,11 @@ not to break.
     management, fs metadata and installer/updater are Unix (see
     `docs/gx-torrent.md`, *Standalone use → Platforms*).
 - `make test` — `check-ui` + `check-scripts` + `installer-test` + `test-dht` +
-  `CGO_ENABLED=0 go test ./...` (pure Go).
+  the Go tests, pure Go, through `scripts/go-test-sharded.sh`: the root package
+  (most tests, with shared package state, so no `t.Parallel`) is split across
+  processes of one test binary, the other packages run with `go test` at the
+  same time. `GEXTTO_TEST_SHARDS` sets the processes; `make test-serial` is the
+  plain `CGO_ENABLED=0 go test ./...`.
 - **Static UI guards** (they run with `go test ./...`):
   `TestUIActionPathsAreRegisteredRoutes` (every `Path: "/api/…"` of a
   button/action in the UI must be a registered route: a removed endpoint cannot

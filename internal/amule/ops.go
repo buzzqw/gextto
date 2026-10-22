@@ -636,6 +636,9 @@ type SearchOptions struct {
 	Wait time.Duration
 	// Poll is the interval between result reads (default 750 ms).
 	Poll time.Duration
+	// Retry is the pause before searching again when another client replaced
+	// the result list (default 500 ms).
+	Retry time.Duration
 }
 
 // ErrSearchRefused is the core declining a search (for example Kad not
@@ -660,6 +663,9 @@ func (c *Client) Search(ctx context.Context, query string, options SearchOptions
 	}
 	if options.Wait <= 0 {
 		options.Wait = 20 * time.Second
+	}
+	if options.Retry <= 0 {
+		options.Retry = 500 * time.Millisecond
 	}
 	if options.Poll <= 0 {
 		options.Poll = 750 * time.Millisecond
@@ -689,7 +695,7 @@ func (c *Client) Search(ctx context.Context, query string, options SearchOptions
 		if attempt == attempts-1 {
 			break
 		}
-		timer := time.NewTimer(500 * time.Millisecond)
+		timer := time.NewTimer(options.Retry)
 		select {
 		case <-ctx.Done():
 			// The caller gave up (or ran out of time) while waiting to retry:
