@@ -56,6 +56,7 @@ type uiSeriesDetail struct {
 	ArchivePath     string
 	Exclude         string
 	Subtitle        string
+	TmdbID          string
 	TvdbID          string
 	Aliases         string
 	Enabled         bool
@@ -298,6 +299,7 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		ArchivePath:     series.ArchivePath,
 		Exclude:         series.Exclude,
 		Subtitle:        series.Subtitle,
+		TmdbID:          series.TmdbID,
 		TvdbID:          series.TvdbID,
 		Aliases:         strings.Join(series.Aliases, ", "),
 		Enabled:         series.Enabled,

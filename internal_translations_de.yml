@@ -1401,6 +1401,7 @@ deu:
   I weekly pack di getcomics escono tipicamente il giovedì e contengono tutti i fumetti Marvel/DC/Image della settimana.: Die Weekly Packs von
     getcomics erscheinen normalerweise donnerstags und enthalten alle Marvel/DC/Image-Comics der Woche.
   ID TMDB della serie (per titoli episodi e poster): Serien-TMDB-ID (für Episodentitel und Poster)
+  "ID TheTVDB della serie (usato per i metadati quando TMDB non è configurato)": "TheTVDB-ID der Serie (wird für Metadaten verwendet, wenn TMDB nicht konfiguriert ist)"
   ID TheTVDB del film (usato dalla ricerca metadati TVDB). Per il dettaglio film i metadati vengono da TMDB.: Die TVDB-ID des Films (wird von
     der TVDB-Metadatensuche verwendet). Für die Filmdetails stammen die Metadaten aus TMDB.
   ID della chat/canale dove inviare le notifiche.: ID des Chats/Kanals, an den Benachrichtigungen gesendet werden sollen.

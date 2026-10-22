@@ -1769,6 +1769,47 @@ func TestV2TableRowActionsPreserveToolbarSearch(t *testing.T) {
 // TestV2LibraryEditsKeepFieldsOutsideTheListView guards against rewriting the
 // library from /api/config/library, which does not carry tvdb_id or
 // disable_upgrades and reports computed ignored seasons.
+// The series form exposes both ids: TMDB is the metadata source by default,
+// TVDB is the fallback. Saving one must keep the other.
+func TestV2SeriesPageShowsAndSavesBothMetadataIDs(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveLibrary(state.cfg.DataDir,
+		[]SeriesConfig{{Name: "Show", Seasons: "1+", Quality: "1080p", Language: "ita", TmdbID: "11", TvdbID: "77", Enabled: true}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=series&series=Show", nil)
+	if code != http.StatusOK {
+		t.Fatalf("series page -> %d", code)
+	}
+	tmdb := strings.Index(body, `<span>TMDB ID</span><input class="input" name="tmdb_id" value="11"`)
+	tvdb := strings.Index(body, `<span>TVDB ID</span><input class="input" name="tvdb_id" value="77"`)
+	if tmdb < 0 || tvdb < 0 || tmdb > tvdb {
+		t.Fatalf("both ids must be on the page, TMDB first: tmdb=%d tvdb=%d", tmdb, tvdb)
+	}
+
+	form := url.Values{"name": {"Show"}, "seasons": {"1+"}, "tmdb_id": {"22"}, "tvdb_id": {"77"},
+		"flags": {"1"}, "anime": {"false"}}
+	if code, body := v2Request(t, server, http.MethodPost, "/series/save", form); code >= 400 {
+		t.Fatalf("save -> %d %s", code, body)
+	}
+	got := latestConfig(state).Series[0]
+	if got.TmdbID != "22" || got.TvdbID != "77" {
+		t.Fatalf("ids after save = TMDB %q, TVDB %q", got.TmdbID, got.TvdbID)
+	}
+
+	// An old page without the TMDB field must not clear the stored id.
+	form = url.Values{"name": {"Show"}, "seasons": {"1+"}, "tvdb_id": {"77"}, "flags": {"1"}, "anime": {"false"}}
+	if code, body := v2Request(t, server, http.MethodPost, "/series/save", form); code >= 400 {
+		t.Fatalf("save without tmdb field -> %d %s", code, body)
+	}
+	if got := latestConfig(state).Series[0]; got.TmdbID != "22" || got.TvdbID != "77" {
+		t.Fatalf("a page without the TMDB field cleared the id: %+v", got)
+	}
+}
+
 func TestV2LibraryEditsKeepFieldsOutsideTheListView(t *testing.T) {
 	state := newTestAppState(t)
 	series := SeriesConfig{Name: "Test Show", Seasons: "2+", Quality: "1080p", Language: "ita", TvdbID: "77", DisableUpgrades: true, Enabled: true}

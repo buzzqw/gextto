@@ -659,6 +659,7 @@ The most important fields are:
 | Language | requires the configured language when it is recognisable in the title |
 | Subtitles | controls preference without accepting hardcoded subtitles |
 | Seasons | decides which seasons are monitored; ranges are supported |
+| TMDB ID / TVDB ID | the series ids in the two services. **TMDB is the default source** of metadata (episode titles, overviews, posters) when the TMDB key is set; TVDB is used when only that key is configured. They are independent fields: saving one does not clear the other, and a wrong id is fixed here |
 | Aliases | links alternate names to the same series |
 | Exclusions | words in a title that must block the release |
 | Allow upgrades | **Yes** (default): a better release replaces the archived file; **No**: the archived files of this series stay. It comes from the quality profile when adding and is changed with *Edit selected*: it is not on the title page, so there is no second place to set it |

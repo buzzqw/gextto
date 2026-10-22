@@ -958,6 +958,7 @@ eng:
   "I titoli TMDB con la valutazione più alta": "TMDB titles with the highest rating"
   "I titoli più popolari su TMDB": "The most popular titles on TMDB"
   "ID TMDB della serie (per titoli episodi e poster)": "TMDB ID of the series (for episode titles and posters)"
+  "ID TheTVDB della serie (usato per i metadati quando TMDB non è configurato)": "TheTVDB ID of the series (used for metadata when TMDB is not configured)"
   "Il monitoraggio è globale: quando attivo, il weekly pack viene cercato e scaricato automaticamente. Per scaricare un solo pack specifico usa la ricerca qui sotto.": "Monitoring is global: when enabled, the weekly pack is searched and downloaded automatically. To download a single specific pack use the search below."
   "Il torrent resta in seeding senza limite di ratio né di tempo finché non lo rimuovi": "The torrent keeps seeding with no ratio or time limit until you remove it"
   "Import eseguito": "Import completed"

@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **Series page: the TMDB ID is there too.** The series page showed only **TVDB ID**, even though TMDB is the default metadata source when the TMDB key is configured. Both fields are now there, with **TMDB** first: saving one keeps the other, and a wrong id can be fixed without touching the library.
+
 - **Upgrades: no re-download when the copy's name lost its source or group.** When the archived copy does not declare the source or the group (for example a file imported or renamed with the title only), those fields are no longer credited to the release found: without proof that the copy is worse, it is not replaced. `ffprobe` also fills the audio channels when the name has lost them. A library file called just `[1080p][h264][EAC3]` is therefore not re-downloaded just because the release found is the same one with the full name `WEB-DL DDP5.1 ...`.
 
 - **Upgrades: the score no longer re-downloads files already in the library.** The rule that requires a real technical gain, not just a higher score, now applies everywhere. Season packs already downloading no longer fetch episodes already present at the same quality, a file of the same quality no longer replaces the archived copy after the download, and a pack episode is scored with its own size instead of the whole pack's. **Allow upgrades: No** is honoured even when the archive scan cannot find the file (a moved folder, an unreachable disk), as long as the library says where it is. The *Library impact* panel now looks at the files actually present, like the cycle does.

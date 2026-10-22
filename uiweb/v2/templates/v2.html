@@ -3068,7 +3068,8 @@
         <input type="hidden" name="name" value="{{.Name}}" />
         <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
         {{template "v2_title_profile" .Profiles}}
-        <label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
+        <label class="field" title="ID TMDB della serie (per titoli episodi e poster)"><span>TMDB ID</span><input class="input" name="tmdb_id" value="{{.TmdbID}}" /></label>
+        <label class="field" title="ID TheTVDB della serie (usato per i metadati quando TMDB non è configurato)"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
         <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" /></label>
          <label class="field span-full"><span>Percorso archivio (NAS)</span><span class="field-row"><input class="input" name="archive_path" value="{{.ArchivePath}}" data-v2-browse-input /><button class="btn sm" type="button" data-v2-browse-for="archive_path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label>
         <label class="field span-full"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>

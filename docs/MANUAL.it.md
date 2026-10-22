@@ -675,6 +675,7 @@ I campi più importanti sono:
 | Lingua | richiede la lingua configurata quando è riconoscibile nel titolo |
 | Sottotitoli | gestisce la preferenza senza accettare sottotitoli hardcoded |
 | Stagioni | decide quali stagioni sono monitorate; gli intervalli sono supportati |
+| ID TMDB / ID TVDB | identificativi della serie nei due servizi. **TMDB è la fonte predefinita** dei metadati (titoli degli episodi, trame, locandine) quando la chiave TMDB è impostata; TVDB si usa quando è configurata solo quella chiave. Sono due campi indipendenti: salvarne uno non cancella l'altro, e un ID sbagliato si corregge qui |
 | Alias | aiuta a collegare titoli diversi alla stessa serie |
 | Esclusioni | parole nel titolo che devono bloccare la release |
 | Permetti upgrade | **Sì** (predefinito): una release migliore sostituisce il file archiviato; **No**: i file già archiviati di questa serie restano. Arriva dal profilo di qualità all'aggiunta e si cambia con *Modifica selezionati*: non è nella scheda del titolo, così non c'è un secondo posto dove impostarlo |

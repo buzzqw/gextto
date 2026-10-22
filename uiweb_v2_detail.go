@@ -52,10 +52,16 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		// Only the edited fields: the per-series endpoint keeps everything else.
 		fields := map[string]any{
 			"seasons":      r.FormValue("seasons"),
-			"tvdb_id":      r.FormValue("tvdb_id"),
 			"archive_path": r.FormValue("archive_path"),
 			"exclude":      r.FormValue("exclude"),
 			"aliases":      aliases,
+		}
+		// The ids are written only when the page carries them: a tab opened
+		// before the TMDB field existed must not clear the stored id.
+		for _, key := range []string{"tmdb_id", "tvdb_id"} {
+			if _, ok := r.Form[key]; ok {
+				fields[key] = r.FormValue(key)
+			}
 		}
 		// Quality, language and subtitles come from the quality profile chosen
 		// on the page (0 = keep the current values); they are still accepted
