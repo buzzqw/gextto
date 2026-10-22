@@ -265,13 +265,30 @@ func ternaryString(cond bool, whenTrue, whenFalse string) string {
 	return whenFalse
 }
 
+func v2OptionsContain(options []uiListFieldOption, value string) bool {
+	for _, option := range options {
+		if option.Value == value {
+			return true
+		}
+	}
+	return false
+}
+
 func v2ListRowFrom(fields []uiListField, item map[string]any, index int) v2ListRow {
 	row := v2ListRow{Index: index}
 	for _, field := range fields {
+		value := v2FieldValueString(item[field.Name], field.Kind)
+		options := field.Options
+		// A stored value the choices no longer offer (a free-text quality saved
+		// before the field became a list, a legacy audio value) stays selected
+		// as an extra choice: saving the row must not silently change it.
+		if field.Kind == "select" && !v2OptionsContain(options, value) {
+			options = append(append([]uiListFieldOption{}, options...), uiListFieldOption{Value: value, Label: value})
+		}
 		row.Fields = append(row.Fields, v2ListFieldValue{
 			Name: field.Name, Label: field.Label, Kind: field.Kind,
-			Placeholder: field.Placeholder, Options: field.Options, Wide: field.Wide, Browse: field.Browse,
-			Value: v2FieldValueString(item[field.Name], field.Kind),
+			Placeholder: field.Placeholder, Options: options, Wide: field.Wide, Browse: field.Browse,
+			Value: value,
 		})
 	}
 	return row

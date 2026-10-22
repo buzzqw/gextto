@@ -1206,7 +1206,10 @@ torrent spiega il motivo (swarm morto, nessun peer, tracker irraggiungibile).
 
 In **Configurazione → Qualità e upgrade**, sotto *Profili di qualità*, dai un nome alle
 combinazioni di qualità, audio minimo, lingua, sottotitoli, esclusioni e
-upgrade («Permetti upgrade») che usi. Gextto
+upgrade («Permetti upgrade») che usi. La **Qualità** del profilo si sceglie da
+un elenco con le risoluzioni che Gextto riconosce (360p … 2160p, il minimo con
+«+», l'intervallo 720p-1080p, oppure Qualsiasi); un valore scritto a mano in
+passato resta selezionato finché non lo cambi. Gextto
 genera automaticamente un profilo per ogni combinazione già presente nella
 libreria e li espone a Jellyseerr tramite `/api/v3/qualityprofile`; il primo
 profilo è **Default**.

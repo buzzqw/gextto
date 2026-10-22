@@ -440,7 +440,7 @@ var uiAdvancedEditors = []uiListEditor{
 		GetPath: "/api/quality-profiles", Unwrap: "items", PostPath: "/api/quality-profiles",
 		Fields: []uiListField{
 			{Name: "name", Label: "Nome", Kind: "text", Wide: true},
-			{Name: "quality", Label: "Qualità", Kind: "text", Placeholder: "es. 1080p"},
+			{Name: "quality", Label: "Qualità", Kind: "select", Options: uiQualityPresetOptions},
 			{Name: "audio", Label: "Audio minimo", Kind: "select", Options: uiAudioPresetOptions},
 			{Name: "language", Label: "Lingua", Kind: "text", Placeholder: "es. ita"},
 			{Name: "subtitle", Label: "Sottotitoli", Kind: "text"},
@@ -461,6 +461,22 @@ var uiAdvancedEditors = []uiListEditor{
 			{Name: "delete_after", Label: "Elimina dopo", Kind: "bool"},
 		},
 	},
+}
+
+// uiQualityPresetOptions are the resolutions Gextto recognises, as the title
+// forms offer them (v2_quality_options): a value, a minimum («+») or a range.
+var uiQualityPresetOptions = []uiListFieldOption{
+	{Value: "", Label: "Qualsiasi"},
+	{Value: "360p", Label: "360p"},
+	{Value: "480p", Label: "480p"},
+	{Value: "576p", Label: "576p"},
+	{Value: "720p", Label: "720p"},
+	{Value: "720p+", Label: "720p+"},
+	{Value: "720p-1080p", Label: "720p-1080p"},
+	{Value: "1080p", Label: "1080p"},
+	{Value: "1080p+", Label: "1080p+"},
+	{Value: "2160p", Label: "2160p 4K"},
+	{Value: "2160p+", Label: "2160p+ 4K+"},
 }
 
 // uiAudioPresetOptions are the minimum-audio presets of the title forms

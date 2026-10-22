@@ -2475,3 +2475,26 @@ func TestV2AddFormOffersProfilesAndStoresNoUpgrades(t *testing.T) {
 		}
 	}
 }
+
+func TestV2QualityProfileEditorOffersTheResolutions(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey, `[{"id":1,"name":"Default","quality":"1080p+","language":"ita"},{"id":2,"name":"Vecchio","quality":"<1080p","language":"ita"}]`); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=scores", nil)
+	if code != http.StatusOK || !strings.Contains(body, `<select class="input" name="quality__0">`) {
+		t.Fatalf("the profile quality must be a list: %d", code)
+	}
+	if !strings.Contains(body, `<option value="1080p&#43;" selected>`) && !strings.Contains(body, `<option value="1080p+" selected>`) {
+		t.Fatal("the stored resolution is not selected")
+	}
+	if !strings.Contains(body, `<option value="2160p">2160p 4K</option>`) {
+		t.Fatal("the supported resolutions are not offered")
+	}
+	// A value saved before the list existed stays, selected.
+	if !strings.Contains(body, `<option value="&lt;1080p" selected>`) {
+		t.Fatal("a stored free-text quality was dropped from the list")
+	}
+}

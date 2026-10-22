@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 22 ottobre 2026
 
+- **Profili di qualità: risoluzione da elenco.** Nell'editor dei profili (*Qualità e upgrade*) il campo **Qualità** è ora un menu con le risoluzioni che Gextto riconosce, le stesse della scheda dei titoli, invece di un testo libero. Un valore scritto a mano in passato resta selezionato finché non lo cambi.
+
 - **"Niente upgrade" diventa "Permetti upgrade".** Nelle schede di serie e film, nei profili di qualità e nella TUI l'interruttore si chiama ora **Permetti upgrade**, con **Sì** (predefinito: una release migliore sostituisce il file archiviato) o **No** (il file archiviato resta). È la stessa impostazione di prima, scritta al positivo: nessun titolo cambia comportamento.
 
 - **Upgrade verificati con MediaInfo prima di entrare in libreria.** Quando un download completo deve sostituire un episodio o un film già archiviato, Gextto legge con `ffprobe` il file nuovo (ancora nella cartella di download) e la copia in libreria prima di spostare o copiare qualsiasi cosa. Se il nome prometteva più del contenuto reale (un «2160p» ingrandito da un 1080p, un «HDR» falso, un audio diverso da quello dichiarato) e la qualità vera non è un upgrade, il download viene scartato e messo in blocklist, e la copia in libreria resta. Senza `ffprobe` vale la decisione presa prima del download; i pack di stagione non sono ancora verificati così.

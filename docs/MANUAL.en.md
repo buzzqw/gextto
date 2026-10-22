@@ -1170,7 +1170,10 @@ torrent page explains why (dead swarm, no peers, tracker unreachable).
 
 In **Configuration → Quality and upgrades**, under *Quality profiles*, name the combinations
 of quality, minimum audio, language, subtitles, exclusions and upgrades («Allow
-upgrades») you use. Gextto generates a
+upgrades») you use. The profile **Quality** is picked from a list of the
+resolutions Gextto recognises (360p … 2160p, a minimum with «+», the 720p-1080p
+range, or Any); a value typed by hand in the past stays selected until you change
+it. Gextto generates a
 profile for every combination already present in the library and exposes them to
 Jellyseerr through `/api/v3/qualityprofile`; the first profile is **Default**.
 **Profiles are templates, not rules.** When you use a profile (by choosing it in
