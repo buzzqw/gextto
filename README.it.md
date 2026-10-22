@@ -257,16 +257,19 @@ descritte nel [manuale italiano](docs/MANUAL.it.md) e nell'
 ## Numeri
 
 Questi numeri vengono dall'installazione reale e da swarm, indexer e linea
-veri. Ognuno è in [`docs/measurements.md`](docs/measurements.md) con la
-macchina, la data e il comando per rifarlo.
+veri. **Le misure di trasferimento sono su una FTTC 100/15 Mbit/s (100 in
+download, 15 in upload): il limite era la linea, non il motore; con una FTTH la
+stessa configurazione non è più limitata dalla linea.** Ognuno è in
+[`docs/measurements.md`](docs/measurements.md) con la macchina, la data e il
+comando per rifarlo.
 
 | Area | Risultato |
 |---|---|
-| **Swarm reale** | **9,3–9,4 MB/s** sulla ISO di Ubuntu, contro **6,3–7,1 MB/s** di libtorrent sullo stesso swarm (una campagna di misura) |
+| **Swarm reale** | **9,3–9,4 MB/s** sulla ISO di Ubuntu su FTTC 100/15, contro **6,3–7,1 MB/s** di libtorrent sullo stesso swarm (una campagna di misura) |
 | **Memoria del motore** | **60–64 MB** a riposo. Con 10 torrent in download verso un NAS: **~507 MB** fuori dalle due cache; la cache di scrittura si dimensiona dalla RAM libera |
 | **CPU del motore** | **44–48 % di un core** a 8–9 MB/s con ~110–130 peer: **0,35–0,43 % per peer**, di cui il piece picker occupa il 9 %; 1–2 % a riposo |
 | **Ricerche sugli indexer** | Jackett e Prowlarr interrogati un indexer alla volta: un ciclo di 30 titoli in **110 s**, **205 richieste e nessuna fallita**, **5.935 release** |
-| **Dividere la linea** | Un download a piena linea aggiunge ~40 ms di latenza a tutta la casa. Da solo sulla linea Gextto la usa tutta (**8,5 MB/s**); con un altro dispositivo che scarica, quel dispositivo ottiene **6,8–7,3 MB/s** dei 9 MB/s della linea |
+| **Dividere la linea** | Un download a piena linea aggiunge ~40 ms di latenza a tutta la casa. Da solo sulla linea Gextto la usa tutta (**8,5 MB/s**); con un altro dispositivo che scarica, quel dispositivo ottiene **6,8–7,3 MB/s** dei 9 MB/s della linea FTTC |
 | **Riuso dei dati locali** | Un torrent che condivide file con uno già su disco prende dalla rete solo il **25 %** del file (ISO Debian e Arch), anche dopo un riavvio e in qualunque ordine si aggiungano |
 | **Scritture su disco** | Scritture da 16 KiB su NFS a **81 MiB/s** con durabilità a lotti; mmap opzionale ~7,0 GB/s su tmpfs |
 | **Archivio dei feed** | **447.000 release in 320 MB**, una riga per torrent; 1.000 release archiviate in **41 ms**; l'archivio standalone cerca su 100.000 release in **7,4 ms** |

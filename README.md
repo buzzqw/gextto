@@ -249,17 +249,19 @@ by the [English manual](docs/MANUAL.en.md) and the
 ## Numbers
 
 These figures come from the live installation and from real swarms, indexers
-and the home line. Each one is in
+and the home line. **Throughput was measured on an FTTC line (100 Mbit/s down,
+15 Mbit/s up): the line was the limit, not the engine; on FTTH the same setup is
+no longer capped by the line.** Each figure is in
 [`docs/measurements.md`](docs/measurements.md) with the machine, the date and
 the command to reproduce it.
 
 | Area | Result |
 |---|---|
-| **Real swarm** | **9.3–9.4 MB/s** on the Ubuntu ISO, against **6.3–7.1 MB/s** for libtorrent on the same swarm (one measured campaign) |
+| **Real swarm** | **9.3–9.4 MB/s** on the Ubuntu ISO over FTTC 100/15, against **6.3–7.1 MB/s** for libtorrent on the same swarm (one measured campaign) |
 | **Engine memory** | **60–64 MB** idle. With 10 torrents downloading to a NAS: **~507 MB** outside the two caches; the write cache sizes itself from free RAM |
 | **Engine CPU** | **44–48 % of one core** at 8–9 MB/s with ~110–130 peers: **0.35–0.43 % per peer**, of which the piece picker takes 9 %; 1–2 % at rest |
 | **Indexer searches** | Jackett and Prowlarr searched one indexer at a time: a cycle of 30 titles in **110 s**, **205 requests and none failed**, **5,935 releases** |
-| **Sharing the line** | A saturated download adds ~40 ms of latency to the whole house. Alone on the line Gextto keeps all of it (**8.5 MB/s**); with another device downloading, that device gets **6.8–7.3 MB/s** of the 9 MB/s line |
+| **Sharing the line** | A saturated download adds ~40 ms of latency to the whole house. Alone on the line Gextto keeps all of it (**8.5 MB/s**); with another device downloading, that device gets **6.8–7.3 MB/s** of the 9 MB/s FTTC line |
 | **Reusing local data** | A torrent sharing files with one already on disk takes only **25 %** of the file from the network (Debian and Arch ISOs), also after a restart and in any adding order |
 | **Disk writes** | 16 KiB writes on NFS at **81 MiB/s** with batched durability; opt-in mmap ~7.0 GB/s on tmpfs |
 | **Feed archive** | **447,000 releases in 320 MB**, one row per torrent; 1,000 releases archived in **41 ms**; the standalone archive searches 100,000 releases in **7.4 ms** |
