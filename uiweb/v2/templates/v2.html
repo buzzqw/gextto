@@ -2721,13 +2721,13 @@
 
 {{define "v2_audio_options"}}
 <option value=""{{if eq . ""}} selected{{end}}>Qualsiasi</option>
-<option value="lossless-5.1"{{if eq . "lossless-5.1"}} selected{{end}}>Lossless 5.1+ (TrueHD / DTS-HD)</option>
-<option value="lossless-7.1"{{if eq . "lossless-7.1"}} selected{{end}}>Lossless 7.1 (TrueHD / DTS-HD)</option>
-<option value="high-5.1"{{if eq . "high-5.1"}} selected{{end}}>DTS / DD+ 5.1+</option>
-<option value="high-7.1"{{if eq . "high-7.1"}} selected{{end}}>DTS / DD+ 7.1</option>
+<option value="compressed-5.1"{{if eq . "compressed-5.1"}} selected{{end}}>AAC / Opus 5.1+</option>
 <option value="standard-5.1"{{if eq . "standard-5.1"}} selected{{end}}>AC3 / 5.1</option>
 <option value="standard-7.1"{{if eq . "standard-7.1"}} selected{{end}}>AC3 7.1</option>
-<option value="compressed-5.1"{{if eq . "compressed-5.1"}} selected{{end}}>AAC / Opus 5.1+</option>
+<option value="high-5.1"{{if eq . "high-5.1"}} selected{{end}}>DTS / DD+ 5.1+</option>
+<option value="high-7.1"{{if eq . "high-7.1"}} selected{{end}}>DTS / DD+ 7.1</option>
+<option value="lossless-5.1"{{if eq . "lossless-5.1"}} selected{{end}}>Lossless 5.1+ (TrueHD / DTS-HD)</option>
+<option value="lossless-7.1"{{if eq . "lossless-7.1"}} selected{{end}}>Lossless 7.1 (TrueHD / DTS-HD)</option>
 {{if and . (not (or (eq . "") (eq . "lossless-5.1") (eq . "lossless-7.1") (eq . "high-5.1") (eq . "high-7.1") (eq . "standard-5.1") (eq . "standard-7.1") (eq . "compressed-5.1")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
 {{end}}
 
