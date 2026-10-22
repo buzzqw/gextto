@@ -129,6 +129,15 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"torrent_stall_giveup_min":      {Unit: "minuti", Zero: "0 = mai"},
 	"torrent_dead_swarm_giveup_min": {Unit: "minuti", Zero: "0 = usa la soglia generale"},
 
+	// Identità annunciata dal motore gx-torrent.
+	"gxtorrent_client_identity": {Kind: "select", Options: []uiFormOption{
+		{Value: "gx-core", Label: "gx-core"},
+		{Value: "qbittorrent", Label: "qBittorrent"},
+		{Value: "transmission", Label: "Transmission"},
+		{Value: "rain", Label: "Rain"},
+		{Value: "anacrolix", Label: "anacrolix/torrent"},
+	}},
+
 	// Libreria e rinomina
 	"rename_verify_interval": {Unit: "ore"},
 

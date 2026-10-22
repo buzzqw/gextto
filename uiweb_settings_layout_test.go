@@ -247,6 +247,11 @@ func TestSettingsEnginePanelsAndUnusedOptions(t *testing.T) {
 	if !strings.Contains(body, `name="redirect" value="/?view=settings&amp;tab=backend"`) {
 		t.Fatalf("engine actions must come back to the Motore torrent section")
 	}
+	if !strings.Contains(body, `select class="input" name="value" id="input-gxtorrent_client_identity"`) ||
+		!strings.Contains(body, `<option value="qbittorrent"`) ||
+		!strings.Contains(body, `<option value="transmission"`) {
+		t.Fatalf("client identity must be a select with the presets: %s", body)
+	}
 	// Expert knobs start closed.
 	_, body = v2Request(t, server, http.MethodGet, "/settings/body?tab=performance", nil)
 	if !strings.Contains(body, `<summary class="panel-head"><h3>Per esperti</h3>`) {
