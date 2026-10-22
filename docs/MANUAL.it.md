@@ -2006,6 +2006,11 @@ La pagina parte da ciò che serve più spesso e lascia i pesi per ultimi:
    migliore sostituisce quella in libreria (tabella qui sotto).
 2. **Esempi con i pesi attuali** — punteggi di riferimento (1080p WEB-DL,
    1080p H.265 DD+, 2160p Dolby Vision) e soglia di stop.
+   **Impatto sulla libreria** — **Verifica ora** ripassa le release già viste
+   nei feed con le regole e i pesi attuali e dice quanti episodi archiviati
+   verrebbero sostituiti, con alcuni esempi. Usala dopo aver cambiato pesi o
+   soglie: un numero alto vuol dire che i prossimi cicli riscaricherebbero molto.
+   Non scarica nulla; le serie con «Niente upgrade» non contano.
 3. **Prova una release** — incolla il nome di una release: Gextto mostra il
    punteggio voce per voce, la copia già in libreria con il suo punteggio e se
    la sostituirebbe, con il motivo. Non scarica nulla.

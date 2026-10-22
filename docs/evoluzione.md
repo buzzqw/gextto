@@ -111,7 +111,20 @@ accepted. It applies to the cycle, missing episodes, season packs and movies, an
 WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p ≈ 2480. The minimum
 difference (`upgrade_min_score_diff`) remains, deciding *by how much* a release must
 improve against *up to where* it is accepted, and the per-title "No upgrade" block
-is in the series tab.
+is in the series and movie forms, in the add form and in the quality profiles. A
+"score" upgrade also needs the technical quality score (configured weights, no size,
+subtitle or swarm-health bonus) to improve by the minimum difference, so a
+same-quality release never replaces an archived copy. The score fingerprint includes
+`scoreAlgorithmVersion`: a change of the built-in scorer or parser rescores the
+library once, like a change of the weights. *Impatto sulla libreria*
+(`upgrade_impact.go`) replays the archived feed releases through the dry-run series
+decision and reports the episodes they would replace.
+
+Open point: the comparison after download still reads the quality from the file
+names; MediaInfo of the incoming file is read only once it is in the library. A
+check of the real streams before the old copy is removed would catch mislabelled
+releases (upscaled 2160p, fake HDR). Gate: an ffprobe pass that does not slow the
+completion of a pack.
 
 **A pack is downloaded only when it is useful.** A whole-season pack may be approved
 only to fill a real gap or to upgrade an existing episode: its target episodes come
@@ -240,8 +253,10 @@ default. Guard: `TestNumericSettingRejectsGarbage`.
 **Settings that explain themselves.** Read-only insights
 (`uiweb_v2_settings_insights.go`) sit next to the controls: the Sorgenti tab links
 indexers, feeds and web engines with the active count and the last cycle outcome; the
-stuck-download panels show one timeline; the Punteggi tab scores reference releases with
-the current weights. Settings search also reaches the indexer editor by concept
+stuck-download panels show one timeline; the Qualità e upgrade tab leads with the upgrade
+rules, scores reference releases with the current weights, tests a release name against
+the library copy and reports the impact of the current rules on the library; the weight
+cards follow, closed. Settings search also reaches the indexer editor by concept
 ("Prowlarr").
 
 **Guided tuning.** The performance tab proposes values from RAM, CPU, volumes and storage

@@ -1935,6 +1935,11 @@ The page starts with what is needed most often and leaves the weights last:
    replaces the one in the library (table below).
 2. **Examples with the current weights** — reference scores (1080p WEB-DL,
    1080p H.265 DD+, 2160p Dolby Vision) and the stop threshold.
+   **Impact on the library** — **Check now** replays the releases already seen
+   in the feeds with the current rules and weights and says how many archived
+   episodes would be replaced, with a few examples. Use it after changing the
+   weights or thresholds: a high number means the next cycles would re-download
+   a lot. It downloads nothing; series with “No upgrades” do not count.
 3. **Test a release** — paste a release name: Gextto shows the score item by
    item, the copy already in the library with its score and whether it would
    replace it, with the reason. It downloads nothing.

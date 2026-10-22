@@ -175,6 +175,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /settings/qbittorrent-mappings", V2SettingsQbittorrentMappings)
 	v2Handle(s, mux, "POST /settings/score-groups", V2SettingsScoreGroup)
 	v2Handle(s, mux, "POST /settings/score-test", V2SettingsScoreTest)
+	v2Handle(s, mux, "POST /settings/upgrade-impact", V2SettingsUpgradeImpact)
 	v2Handle(s, mux, "POST /settings/tuning/apply", V2SettingsTuningApply)
 	v2Handle(s, mux, "POST /settings/feed", V2SettingsFeed)
 	v2Handle(s, mux, "POST /settings/checkbox", V2SettingsCheckbox)

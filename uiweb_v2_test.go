@@ -2413,6 +2413,10 @@ func TestV2ScoreTestScoresAReleaseAndComparesTheLibrary(t *testing.T) {
 	if !strings.Contains(body, "Nessuna copia in libreria") {
 		t.Fatalf("an unknown release has no library copy: %s", body)
 	}
+	code, body = v2Request(t, server, http.MethodPost, "/settings/upgrade-impact", nil)
+	if code != http.StatusOK || !strings.Contains(body, "Nessun episodio archiviato verrebbe sostituito") {
+		t.Fatalf("upgrade impact on an empty library -> %d: %s", code, body)
+	}
 	code, body = v2Request(t, server, http.MethodPost, "/settings/score-test", url.Values{"title": {""}})
 	if code != http.StatusOK || !strings.Contains(body, "role=\"alert\"") {
 		t.Fatalf("empty title must be reported: %d %s", code, body)

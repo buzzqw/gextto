@@ -398,3 +398,39 @@ func v2ScoreTestFill(s *AppState, view *v2ScoreTestView) {
 // scoreTestMagnet is a placeholder infohash: the test never downloads, but the
 // decision needs a hash to check the blocklist.
 const scoreTestMagnet = "magnet:?xt=urn:btih:0123456789012345678901234567890123456789"
+
+// --- Upgrade impact ----------------------------------------------------------
+
+// upgradeImpactWarnShare is the share of archived episodes above which the
+// impact report is shown as a warning.
+const upgradeImpactWarnShare = 0.05
+
+type v2UpgradeImpactView struct {
+	Error   string
+	Summary string
+	Warn    bool
+	Items   []upgradeImpactItem
+}
+
+// V2SettingsUpgradeImpact runs UpgradeImpact and renders its summary.
+func V2SettingsUpgradeImpact(w http.ResponseWriter, r *http.Request, s *AppState) {
+	tr := func(italian string) string { return uiText(s, italian) }
+	view := v2UpgradeImpactView{}
+	report, err := UpgradeImpact(latestConfig(s), s.db, s.archive)
+	switch {
+	case err != nil:
+		view.Error = err.Error()
+	case report.Episodes == 0:
+		view.Summary = fmt.Sprintf(tr("Nessun episodio archiviato verrebbe sostituito (%d release controllate per %d serie)."), report.Releases, report.Series)
+	default:
+		view.Summary = fmt.Sprintf(tr("%d episodi archiviati verrebbero sostituiti (%d release controllate per %d serie)."), report.Episodes, report.Releases, report.Series)
+		view.Items = report.Items
+		archived := 0
+		if s.db != nil {
+			_ = s.db.db.QueryRow("SELECT COUNT(*) FROM episodes WHERE COALESCE(archive_path,'')<>''").Scan(&archived)
+		}
+		view.Warn = archived > 0 && float64(report.Episodes) > upgradeImpactWarnShare*float64(archived)
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_upgrade_impact_result", view, dict, eng)
+}

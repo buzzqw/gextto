@@ -749,6 +749,18 @@ against a cycle of minutes. `RecordTorrentLinkFailure` runs only for the links
 that actually fail (tens per cycle at most) and `ClearTorrentLinkFailure` only
 for the ones that are downloaded.
 
+### Upgrade decisions on the live library — 22 October 2026
+
+Copy of the live databases (read-only backup), N97, `nice -n 15`.
+
+| Check | Result |
+|---|---|
+| Archived episodes whose stored score differs from a rescore with the current code | **0 / 1861** |
+| Archived episodes that their own release title or file name would re-download | **0 / 1861** |
+| Custom groups with capitals that never received their bonus (before the migration) | **4 / 6** (`Me7alh`, `MeM.GP`, `Pir8`, `TheBlackKing`) |
+| *Impatto sulla libreria*: feed releases replayed through the dry-run decision | **259** releases, **55** series, **1.46 s** |
+| Archived episodes those releases would replace | **2** (1080p WEBRip AAC x265 → 1080p WEB-DL DDP 5.1 H.264, «source» rule) |
+
 ### Test suite duration — 22 October 2026
 
 `make test` on the N97 (4 cores, Go build cache warm, service running):

@@ -895,7 +895,7 @@
     {{if .Ed2k}}{{template "v2_settings_ed2k" .Ed2k}}{{end}}
     {{range .LeadGroups}}{{template "v2_setting_group" .}}{{end}}
     {{if .ScoreExamples}}{{template "v2_score_examples" .ScoreExamples}}{{end}}
-    {{if eq .ActiveID "scores"}}{{template "v2_score_test" .}}{{template "v2_settings_editors" .}}{{end}}
+    {{if eq .ActiveID "scores"}}{{template "v2_upgrade_impact" .}}{{template "v2_score_test" .}}{{template "v2_settings_editors" .}}{{end}}
     {{if .Tuning}}{{template "v2_tuning_panel" .Tuning}}{{end}}
     {{if .Actions}}
     <div class="panel settings-panel settings-actions-panel">
@@ -1036,6 +1036,27 @@
     <ul class="score-examples">{{range .}}<li>{{.}}</li>{{end}}</ul>
   </div>
 </div>
+{{end}}
+
+{{define "v2_upgrade_impact"}}
+<div class="panel settings-panel" id="v2-upgrade-impact">
+  <div class="panel-head"><h3>Impatto sulla libreria</h3><small class="muted">Non scarica nulla</small></div>
+  <div class="panel-body">
+    <p class="hint">Ripassa le release già viste nei feed con le regole e i pesi attuali e conta quanti episodi archiviati verrebbero sostituiti. Usala dopo aver cambiato i pesi o le soglie: se il numero è alto, i prossimi cicli riscaricherebbero molto.</p>
+    <form class="form-actions" method="post" action="/settings/upgrade-impact" hx-post="/settings/upgrade-impact" hx-target="#v2-upgrade-impact-result" hx-swap="innerHTML">
+      <button class="btn sm primary" type="submit" hx-disabled-elt="this">Verifica ora</button>
+    </form>
+    <div id="v2-upgrade-impact-result" aria-live="polite"></div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_upgrade_impact_result"}}
+{{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{else}}
+<p class="settings-summary{{if .Warn}} warn{{end}}" role="note">{{.Summary}}</p>
+{{if .Items}}<ul class="score-examples">{{range .Items}}<li><strong>{{.Target}}</strong> ← {{.Candidate}} ({{.Score}})</li>{{end}}</ul>
+<p class="hint">Per capire il motivo di una sostituzione incolla il nome della release in «Prova una release».</p>{{end}}
+{{end}}
 {{end}}
 
 {{define "v2_score_test"}}
