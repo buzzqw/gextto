@@ -55,7 +55,7 @@ one.
 | **Protocol** | BitTorrent v1, v2 and hybrid (BEP 52) · 34 BEPs implemented and tested ([list](docs/bep.md)) |
 | **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP proxy · VPN killswitch |
 | **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr) · RSS · web search · stuck-download replacement |
-| **Integrations** | Jellyfin, Plex, aMule (eD2k and Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
+| **Integrations** | Jellyfin, Plex, Jellyseerr (v3 API subset), aMule (eD2k and Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
 | **Interfaces** | Web UI (SSR + HTMX, pure Go, installable PWA) · terminal TUI over SSH · JSON API |
 | **Build** | Pure Go (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent also on Windows |
 
@@ -175,6 +175,15 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   ceiling stops upgrades. The settings page scores
   reference releases live with the current weights. `ffprobe` reads the real
   quality of archived media.
+- **Named quality profiles.** In *Quality and upgrades* name the combinations
+  you use — quality, minimum audio, language, subtitles, exclusions and
+  upgrades. They are templates: choosing one in the add form, on the series or
+  movie page or in *Edit selected* copies its values into the title, which stays
+  editable. Profiles that already exist in a library are generated as *Default*
+  plus one per combination, and the same list is served to **Jellyseerr** through
+  the `/api/v3` subset (`system/status`, `qualityprofile`, `rootfolder`,
+  `series`/`movie` lookup and add, `queue`). Each profile keeps its number when
+  renamed or reordered.
 - **TV, movies, comics.** Standard `ComicInfo.xml` for CBZ archives (Komga,
   Kavita, readers).
 - **Season packs only when useful.** A pack is downloaded only to fill a real
@@ -211,6 +220,17 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   download is crash-safe.
 - **Recycle bin**: files replaced by an upgrade and data removed "with data" go
   to the trash first, after the torrent has left the engine.
+- **No pointless replacements**: a score-only difference — size, subtitles,
+  swarm health, a preferred group below the minimum — never replaces a file of
+  the same quality, neither in the cycle nor at completion, in season packs or
+  in the cleanup. A real technical gain, a REPACK/PROPER or the configured
+  minimum difference still does. *Library impact* replays the archived releases
+  through the same rules before anything is downloaded.
+- **Library tools**: tick rows in the Series and Movies tables to change
+  quality, language, subtitles, exclusions or the upgrade switch on many titles
+  at once; *Maintenance → Import file* reads a video already on disk (or a
+  folder), proposes series/season/episode or movie/year and archives it with the
+  normal rename and MediaInfo checks.
 
 ### Bandwidth and the shared line
 

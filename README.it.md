@@ -56,7 +56,7 @@ altro.
 | **Protocollo** | BitTorrent v1, v2 e ibrido (BEP 52) · 34 BEP implementati e testati ([elenco](docs/bep.md)) |
 | **Rete** | TCP + uTP su una porta · UPnP, NAT-PMP, PCP · holepunching BEP 55 · proxy SOCKS5/HTTP · killswitch VPN |
 | **Automazione** | Serie TV, film, fumetti · Torznab (Jackett, Prowlarr) · RSS · ricerca web · sostituzione dei download bloccati |
-| **Integrazioni** | Jellyfin, Plex, aMule (eD2k e Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
+| **Integrazioni** | Jellyfin, Plex, Jellyseerr (sottoinsieme API v3), aMule (eD2k e Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
 | **Interfacce** | Web UI (SSR + HTMX, Go puro, PWA installabile) · TUI da terminale via SSH · API JSON |
 | **Build** | Go puro (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent anche su Windows |
 
@@ -178,6 +178,16 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   già i canali; i file di libreria di qualità superiore sono protetti; un tetto
   opzionale ferma gli upgrade. La pagina impostazioni dà il punteggio a release di riferimento con i
   pesi correnti. `ffprobe` legge la qualità reale dei file archiviati.
+- **Profili di qualità con un nome.** In *Qualità e upgrade* dai un nome alle
+  combinazioni che usi — qualità, audio minimo, lingua, sottotitoli, esclusioni
+  e upgrade. Sono modelli: sceglierne uno nel modulo di aggiunta, nella scheda
+  di una serie o di un film o in *Modifica selezionati* copia i suoi valori nel
+  titolo, che resta modificabile. I profili già presenti in una libreria
+  vengono generati come *Default* più uno per combinazione, e la stessa lista è
+  quella che vede **Jellyseerr** tramite il sottoinsieme `/api/v3`
+  (`system/status`, `qualityprofile`, `rootfolder`, lookup e aggiunta di
+  `series`/`movie`, `queue`). Ogni profilo mantiene il suo numero anche se lo
+  rinomini o riordini.
 - **Serie TV, film, fumetti.** `ComicInfo.xml` standard per gli archivi CBZ
   (Komga, Kavita, lettori).
 - **Season pack solo quando servono.** Un pack si scarica solo per riempire un
@@ -214,6 +224,18 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   spostamenti interrotti riprendono. L'avvio di un download resiste ai crash.
 - **Cestino**: i file sostituiti da un upgrade e i dati rimossi "con i dati"
   vanno prima nel cestino, dopo che il torrent ha lasciato il motore.
+- **Nessuna sostituzione inutile**: una differenza di solo punteggio — dimensione,
+  sottotitoli, salute dello swarm, un gruppo preferito sotto la soglia minima —
+  non sostituisce mai un file della stessa qualità, né nel ciclo né al
+  completamento, nei season pack o nel cleanup. Un guadagno tecnico reale, un
+  REPACK/PROPER o la differenza minima configurata continuano a farlo.
+  *Impatto sulla libreria* ripassa le release archiviate con le stesse regole
+  prima di scaricare qualcosa.
+- **Strumenti per la libreria**: spunta le righe nelle tabelle Serie TV e Film
+  per cambiare qualità, lingua, sottotitoli, esclusioni o l'interruttore degli
+  upgrade su più titoli insieme; *Manutenzione → Importa file* legge un video
+  già sul disco (o una cartella), propone serie/stagione/episodio o film/anno e
+  lo archivia con la rinomina e i controlli MediaInfo normali.
 
 ### Banda e linea condivisa
 
