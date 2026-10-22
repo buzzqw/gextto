@@ -1152,6 +1152,7 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 			}
 		}
 		if err := AddEd2kLink(latestConfig(s), link.String()); err != nil {
+			logging.Warn("manual eD2k download refused by aMule", "title", link.Name, "error", err.Error(), "hash", strings.ToLower(link.Hash))
 			status := http.StatusBadGateway
 			if strings.Contains(strings.ToLower(err.Error()), "already") {
 				status = http.StatusConflict
@@ -1162,6 +1163,8 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 			// Not a video (a pdf, a program, an archive): it is aMule's
 			// download only, like a torrent added by hand, and stays in the
 			// incoming folder instead of going through the library import.
+			logging.Info("manual eD2k download queued; not a video, it stays in aMule's incoming folder",
+				"title", link.Name, "hash", strings.ToLower(link.Hash))
 			return http.StatusAccepted, map[string]any{
 				"ok":         true,
 				"title":      link.Name,
@@ -1180,6 +1183,9 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 			return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
 		}
 		_ = s.db.SetTorrentReason(strings.ToLower(link.Hash), "manual")
+		// Logged after the registration, so the history row gets the title,
+		// series and episode of the download.
+		logging.Info("manual eD2k download queued", "title", release.Title, "score", score, "hash", strings.ToLower(link.Hash))
 		return http.StatusAccepted, map[string]any{
 			"ok":     true,
 			"title":  release.Title,

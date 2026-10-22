@@ -49,6 +49,12 @@ manual is online: [English](docs/MANUAL.en.md) ·
   **Edit selected** and change quality, language, subtitles, exclusions,
   upgrades or state on all of them. You can start from a profile's values.
   Everything else in each title is left alone.
+- **eD2k downloads in the log and in the history.** eD2k downloads started by
+  hand (from "Download" in a search or from a pasted link) now appear in the
+  log as soon as they are added, or with the reason if aMule refuses them.
+  Every line of an eD2k download carries its `acq:` code and goes into the
+  download's **History**, as for torrents: the history of eD2k downloads used
+  to stay empty. It applies to new downloads.
 - **Aligned buttons.** In Configuration the "Default" and "Save" buttons of the
   options with a note under the field (e.g. "0 = unlimited") now sit level with
   the field instead of lower. "Add" in Add torrent, the Custom groups rows and

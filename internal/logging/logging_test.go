@@ -197,3 +197,27 @@ func TestAcquisitionIDReplacesHashAndReachesSink(t *testing.T) {
 		t.Fatalf("unexpected second event: %+v", events[1])
 	}
 }
+
+// An eD2k download is named by its 32-digit MD4 file hash: its lines carry an
+// acquisition id and reach the history like a torrent's.
+func TestEd2kHashNamesAnAcquisition(t *testing.T) {
+	dir := t.TempDir()
+	closeLog := Init(dir, "acq.log", 1<<20, 2)
+	defer closeLog()
+	var events []Event
+	SetEventSink(func(event Event) { events = append(events, event) })
+	defer SetEventSink(nil)
+
+	hash := "EA33E6FA0B1C2D3E4F5061728394A5B6"
+	Info("manual eD2k download queued", "hash", hash, "title", "Scrubs S02E03")
+	data, err := os.ReadFile(FilePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "acq: "+AcqID(hash)) {
+		t.Fatalf("eD2k line without acquisition id: %q", data)
+	}
+	if len(events) != 1 || events[0].Hash != strings.ToLower(hash) {
+		t.Fatalf("eD2k line did not reach the history: %+v", events)
+	}
+}

@@ -1566,7 +1566,9 @@ la pulizia degli altri.
   sono nascosti nel log utente.
 - **ID acquisizione e storia dei download** — le righe che riguardano un
   download finiscono con `acq: 7f3a2c`: un ID corto che resta lo stesso
-  dall'avvio del download all'arrivo in libreria. Scrivendolo nel filtro del log
+  dall'avvio del download all'arrivo in libreria, per i torrent come per i
+  download eD2k (anche quelli avviati a mano da «Scarica» o da un link
+  incollato). Scrivendolo nel filtro del log
   si vede solo quel download. Le stesse righe (INFO, WARN ed ERROR, anche con il
   log impostato su `warn`) vengono salvate come **storia**: scheda *Storia* nel
   dettaglio del torrent, pulsante 📜 su ogni puntata e pannello *Storia dei

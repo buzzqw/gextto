@@ -1511,7 +1511,8 @@ the others.
   name or title; torrent hashes are hidden from the user-facing log.
 - **Acquisition ID and download history** — lines about a download end with
   `acq: 7f3a2c`: a short ID that stays the same from the start of the download
-  to its arrival in the library. Typing it in the log filter shows only that
+  to its arrival in the library, for torrents and eD2k downloads alike (also
+  those started by hand from "Download" or a pasted link). Typing it in the log filter shows only that
   download. The same lines (INFO, WARN and ERROR, even with the log set to
   `warn`) are stored as its **history**: the *History* tab in the torrent
   detail, the 📜 button on every episode and the *Download history* panel on

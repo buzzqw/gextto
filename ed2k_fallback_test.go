@@ -7,8 +7,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/amule/amuletest"
+	"github.com/buzzqw/gextto/internal/ed2k"
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -249,4 +252,32 @@ func TestBatchDownloadQueuesED2KLink(t *testing.T) {
 	if len(downloads) != 1 || downloads[0].Hash != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
 		t.Fatalf("aMule downloads = %+v", downloads)
 	}
+}
+
+// TestManualEd2kAddIsLogged covers the download the operator starts by hand
+// (the eD2k «Scarica» of a manual search, or a pasted link): the start is
+// logged under the download's own hash, so the line carries its acquisition
+// id and the download history is not empty.
+func TestManualEd2kAddIsLogged(t *testing.T) {
+	_, coreCfg := ed2kTestCore(t, nil)
+	state := ed2kFallbackState(t, coreCfg)
+	var events []logging.Event
+	logging.SetEventSink(func(event logging.Event) { events = append(events, event) })
+	defer logging.SetEventSink(nil)
+
+	const link = "ed2k://|file|Scrubs%20S02E03%20720p%20ITA.mkv|900000000|cccccccccccccccccccccccccccccccc|/"
+	file, err := ed2k.ParseFileLink(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := ParseEd2kRelease(file.Name, link, "ed2k:link", file.Size, 0, time.Now().UTC())
+	if status, value := gh3AddParsedRelease(state, *release); status != http.StatusAccepted {
+		t.Fatalf("add -> %d %+v", status, value)
+	}
+	for _, event := range events {
+		if event.Hash == "cccccccccccccccccccccccccccccccc" && event.Message == "manual eD2k download queued" {
+			return
+		}
+	}
+	t.Fatalf("the manual eD2k start was not logged under its hash: %+v", events)
 }

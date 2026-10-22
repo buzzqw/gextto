@@ -51,6 +51,12 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   apri **Modifica selezionati** e cambi qualità, lingua, sottotitoli,
   esclusioni, upgrade o stato su tutte insieme. Puoi partire dai valori di un
   profilo. Tutto il resto di ogni titolo non viene toccato.
+- **Download eD2k nel log e nella storia.** I download eD2k avviati a mano
+  (da «Scarica» in una ricerca o da un link incollato) ora compaiono nel log
+  appena aggiunti, o con il motivo se aMule li rifiuta. Tutte le righe di un
+  download eD2k portano il suo codice `acq:` e finiscono nella **Storia** del
+  download, come per i torrent: prima la storia dei download eD2k restava
+  vuota. Vale per i download nuovi.
 - **Pulsanti allineati.** In Configurazione i pulsanti «Predefinito» e «Salva»
   delle opzioni con una nota sotto il campo (es. «0 = illimitato») ora stanno
   all'altezza del campo invece che più in basso. Sono allineati anche

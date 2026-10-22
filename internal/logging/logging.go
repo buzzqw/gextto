@@ -184,7 +184,9 @@ const AcqField = "acq"
 // not the subject of the line.
 var acquisitionHashKeys = map[string]bool{"hash": true, "magnet_hash": true, "torrent_hash": true, "info_hash": true}
 
-var acquisitionHashPattern = regexp.MustCompile(`(?i)^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
+// A download is named by its BitTorrent info hash (40 or 64 hex digits) or by
+// its eD2k file hash (MD4, 32 hex digits): both name an acquisition.
+var acquisitionHashPattern = regexp.MustCompile(`(?i)^(?:[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{64})$`)
 
 // acquisitionHash returns the lower-case torrent hash a line is about, or "".
 func acquisitionHash(kv []any) string {
