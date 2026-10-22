@@ -1820,9 +1820,15 @@ func TestV2SeriesSaveAnimeAndUpgradeToggles(t *testing.T) {
 	if got := latestConfig(state).Series[0]; !got.Anime || !got.DisableUpgrades {
 		t.Fatalf("checked boxes not saved: %+v", got)
 	}
-	v2Request(t, server, http.MethodPost, "/series/save", form(nil))
-	if got := latestConfig(state).Series[0]; got.Anime || got.DisableUpgrades {
-		t.Fatalf("unchecked boxes must turn the flags off: %+v", got)
+	// Anime is a Sì/No choice on the page; «Permetti upgrade» is not on the
+	// page, so a save without it keeps the stored value.
+	v2Request(t, server, http.MethodPost, "/series/save", form(url.Values{"anime": {"false"}}))
+	if got := latestConfig(state).Series[0]; got.Anime || !got.DisableUpgrades {
+		t.Fatalf("anime must turn off and the upgrade switch stay: %+v", got)
+	}
+	v2Request(t, server, http.MethodPost, "/series/save", form(url.Values{"disable_upgrades": {"false"}}))
+	if got := latestConfig(state).Series[0]; got.DisableUpgrades {
+		t.Fatalf("an explicit disable_upgrades=false must still apply: %+v", got)
 	}
 }
 

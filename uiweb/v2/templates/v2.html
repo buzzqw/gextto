@@ -3071,7 +3071,6 @@
          <label class="field span-full"><span>Percorso archivio (NAS)</span><span class="field-row"><input class="input" name="archive_path" value="{{.ArchivePath}}" data-v2-browse-input /><button class="btn sm" type="button" data-v2-browse-for="archive_path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label>
         <label class="field span-full"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
         <input type="hidden" name="flags" value="1" />
-        <label class="field" title="Sì: una release migliore sostituisce il file già archiviato. No: il file archiviato resta."><span>Permetti upgrade</span><select class="input" name="disable_upgrades"><option value="false"{{if not .DisableUpgrades}} selected{{end}}>Sì</option><option value="true"{{if .DisableUpgrades}} selected{{end}}>No</option></select></label>
         <label class="field" title="Le release degli anime numerano gli episodi dall'inizio senza stagioni («Titolo - 1071»): Gextto converte il numero in stagione ed episodio con i dati TMDB e cerca anche il numero assoluto."><span>Anime (numerazione assoluta)</span><select class="input" name="anime"><option value="false"{{if not .Anime}} selected{{end}}>No</option><option value="true"{{if .Anime}} selected{{end}}>Sì</option></select></label>
         <div class="form-actions"><button class="btn primary" type="submit">Salva serie</button></div>
       </form>
@@ -3117,8 +3116,6 @@
          <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
         <label class="field" title="Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti."><span>Sottotitoli obbligatori</span><select class="input" name="subtitle_required"><option value="false"{{if not .SubtitleRequired}} selected{{end}}>No</option><option value="true"{{if .SubtitleRequired}} selected{{end}}>Sì</option></select></label>
         <input type="hidden" name="_v2_kind_subtitle_required" value="select" />
-        <label class="field" title="Sì: una release migliore sostituisce il file già archiviato. No: il file archiviato resta."><span>Permetti upgrade</span><select class="input" name="disable_upgrades"><option value="false"{{if not .DisableUpgrades}} selected{{end}}>Sì</option><option value="true"{{if .DisableUpgrades}} selected{{end}}>No</option></select></label>
-        <input type="hidden" name="_v2_kind_disable_upgrades" value="select" />
         <label class="field span-full"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" placeholder="es. un altro titolo con lo stesso nome" /></label>
         <input type="hidden" name="tmdb_id" value="{{.TmdbID}}" />
         <input type="hidden" name="tvdb_id" value="{{.TvdbID}}" />

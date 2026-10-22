@@ -16,7 +16,7 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 22 ottobre 2026
 
-- **Schede di serie e film più ordinate.** Il campo **Audio minimo** non è più nella scheda del titolo: arriva dal profilo di qualità quando aggiungi una serie o un film, e si cambia per più titoli insieme con **Modifica selezionati**. Il valore già impostato su ogni titolo resta e continua a valere. Nella scheda serie i campi sono riallineati (Escludi su tutta la riga, **Permetti upgrade** e **Anime** affiancati come scelte Sì/No).
+- **Schede di serie e film più ordinate.** I campi **Audio minimo** e **Permetti upgrade** non sono più nella scheda del titolo: arrivano dal profilo di qualità quando aggiungi una serie o un film, e si cambiano per più titoli insieme con **Modifica selezionati**. Il valore già impostato su ogni titolo resta e continua a valere. Nella scheda serie i campi sono riallineati (Escludi su tutta la riga, **Anime** come scelta Sì/No).
 
 - **Scheda film: un campo per ogni cosa.** Spariscono **Lingue richieste** e **Requisiti sottotitoli**, che duplicavano **Lingua** e **Sottotitoli** (e se compilati vincevano in silenzio). Al primo avvio i valori vengono riportati nei campi che restano, senza cambiare le decisioni: un film con lingua «any» ma lingua richiesta «chi» ha ora Lingua `chi`. Al posto dei requisiti dei sottotitoli c'è **Sottotitoli obbligatori: Sì/No**. Il campo **Escludi** occupa tutta la riga.
 
@@ -24,7 +24,7 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 - **Profili di qualità: risoluzione da elenco.** Nell'editor dei profili (*Qualità e upgrade*) il campo **Qualità** è ora un menu con le risoluzioni che Gextto riconosce, le stesse della scheda dei titoli, invece di un testo libero. Un valore scritto a mano in passato resta selezionato finché non lo cambi.
 
-- **"Niente upgrade" diventa "Permetti upgrade".** Nelle schede di serie e film, nei profili di qualità e nella TUI l'interruttore si chiama ora **Permetti upgrade**, con **Sì** (predefinito: una release migliore sostituisce il file archiviato) o **No** (il file archiviato resta). È la stessa impostazione di prima, scritta al positivo: nessun titolo cambia comportamento.
+- **"Niente upgrade" diventa "Permetti upgrade".** Nei profili di qualità, in **Modifica selezionati** e nella TUI l'interruttore si chiama ora **Permetti upgrade**, con **Sì** (predefinito: una release migliore sostituisce il file archiviato) o **No** (il file archiviato resta). È la stessa impostazione di prima, scritta al positivo: nessun titolo cambia comportamento.
 
 - **Upgrade verificati con MediaInfo prima di entrare in libreria.** Quando un download completo deve sostituire un episodio o un film già archiviato, Gextto legge con `ffprobe` il file nuovo (ancora nella cartella di download) e la copia in libreria prima di spostare o copiare qualsiasi cosa. Se il nome prometteva più del contenuto reale (un «2160p» ingrandito da un 1080p, un «HDR» falso, un audio diverso da quello dichiarato) e la qualità vera non è un upgrade, il download viene scartato e messo in blocklist, e la copia in libreria resta. Senza `ffprobe` vale la decisione presa prima del download; i pack di stagione non sono ancora verificati così.
 

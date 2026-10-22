@@ -69,7 +69,11 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		// form carried them, so an absent box means false.
 		if r.FormValue("flags") != "" {
 			fields["anime"] = r.FormValue("anime") == "true"
-			fields["disable_upgrades"] = r.FormValue("disable_upgrades") == "true"
+			// «Permetti upgrade» is set by the profile and by Modifica
+			// selezionati: sent only when the form carries it.
+			if _, ok := r.Form["disable_upgrades"]; ok {
+				fields["disable_upgrades"] = r.FormValue("disable_upgrades") == "true"
+			}
 		}
 		body, _ := json.Marshal(fields)
 		v2InternalJSON(s, http.MethodPost, "/api/series/"+url.PathEscape(name), nil, body)

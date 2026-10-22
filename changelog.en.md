@@ -15,7 +15,7 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
-- **Tidier series and movie pages.** The **Minimum audio** field is no longer on the title page: it comes from the quality profile when you add a series or a movie, and is changed for several titles at once with **Edit selected**. The value already set on each title stays and still applies. On the series page the fields are realigned (Exclude on the whole row, **Allow upgrades** and **Anime** side by side as Yes/No choices).
+- **Tidier series and movie pages.** The **Minimum audio** and **Allow upgrades** fields are no longer on the title page: they come from the quality profile when you add a series or a movie, and are changed for several titles at once with **Edit selected**. The value already set on each title stays and still applies. On the series page the fields are realigned (Exclude on the whole row, **Anime** as a Yes/No choice).
 
 - **Movie page: one field per value.** **Required languages** and **Subtitle requirements** are gone: they duplicated **Language** and **Subtitles** (and, when filled, silently won). At the first start their values are moved into the remaining fields without changing any decision: a movie with language «any» but required language «chi» now has Language `chi`. Instead of the subtitle requirements there is **Subtitles required: Yes/No**. The **Exclude** field takes the whole row.
 
@@ -23,7 +23,7 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 - **Quality profiles: resolution from a list.** In the profile editor (*Quality and upgrades*) the **Quality** field is now a menu of the resolutions Gextto recognises, the same as on the title pages, instead of free text. A value typed by hand in the past stays selected until you change it.
 
-- **"No upgrades" becomes "Allow upgrades".** On the series and movie pages, in the quality profiles and in the TUI the switch is now called **Allow upgrades**, with **Yes** (default: a better release replaces the archived file) or **No** (the archived file stays). It is the same setting as before, worded positively: no title changes behaviour.
+- **"No upgrades" becomes "Allow upgrades".** In the quality profiles, in **Edit selected** and in the TUI the switch is now called **Allow upgrades**, with **Yes** (default: a better release replaces the archived file) or **No** (the archived file stays). It is the same setting as before, worded positively: no title changes behaviour.
 
 - **Upgrades checked with MediaInfo before entering the library.** When a completed download is about to replace an archived episode or movie, Gextto reads with `ffprobe` the new file (still in the download folder) and the copy in the library before moving or copying anything. If the name promised more than the real content (a «2160p» upscaled from 1080p, a fake «HDR», audio other than declared) and the real quality is not an upgrade, the download is discarded and blocklisted and the library copy stays. Without `ffprobe` the decision taken before the download stands; season packs are not checked this way yet.
 

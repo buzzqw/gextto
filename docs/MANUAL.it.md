@@ -677,7 +677,7 @@ I campi più importanti sono:
 | Stagioni | decide quali stagioni sono monitorate; gli intervalli sono supportati |
 | Alias | aiuta a collegare titoli diversi alla stessa serie |
 | Esclusioni | parole nel titolo che devono bloccare la release |
-| Permetti upgrade | **Sì** (predefinito): una release migliore sostituisce il file archiviato; **No**: i file già archiviati di questa serie restano. C'è anche nella scheda dei film e nei profili di qualità |
+| Permetti upgrade | **Sì** (predefinito): una release migliore sostituisce il file archiviato; **No**: i file già archiviati di questa serie restano. Arriva dal profilo di qualità all'aggiunta e si cambia con *Modifica selezionati*: non è nella scheda del titolo, così non c'è un secondo posto dove impostarlo |
 
 Lascia le stagioni non ancora disponibili abilitate se vuoi che il calendario e
 la ricerca dei mancanti continuino a funzionare. Usa *Ignora* solo per episodi
@@ -754,7 +754,8 @@ essere una singola puntata o un altro pack.
   card con la copertina (la scelta è condivisa con la pagina Serie TV).
 - L'editor gestisce qualità, **Lingua**, **Sottotitoli** con
   **Sottotitoli obbligatori** (Sì: una release senza quei sottotitoli è scartata;
-  No: sono solo preferiti), **Permetti upgrade** ed esclusioni. Ogni valore ha un
+  No: sono solo preferiti) ed esclusioni; **Permetti upgrade** e audio minimo si
+  cambiano con *Modifica selezionati*. Ogni valore ha un
   solo campo: le vecchie «Lingue richieste» sono confluite in **Lingua** (che vale
   `chi`, `ita,eng`… anche oltre le voci dell'elenco) senza cambiare le decisioni.
 - **Dettaglio film**: locandina, trama, cast, modifica, riscarica, **Cerca subito**,
@@ -1319,8 +1320,8 @@ motivo, così il log `INFO` di produzione resta pulito; abilita il debug per
 vederli. Anche la protezione dagli
 episodi vecchi è fissa: Gextto non riscarica un episodio precedente fuori dai
 buchi riconosciuti quando possiede già episodi successivi (gap-fill e azioni
-manuali restano sempre permessi). Per congelare un titolo usa **Consenti
-aggiornamenti** nella scheda di serie/film.
+manuali restano sempre permessi). Per congelare un titolo imposta **Permetti
+upgrade** su No con *Modifica selezionati*.
 
 I dati reali dei file (`ffprobe`: HDR, codec, audio, lingue) sono salvati per
 episodio/film e **usati nei confronti di upgrade**: il file archiviato viene
@@ -2066,7 +2067,7 @@ verifica.
 | Impostazione | Cosa fa |
 |---|---|
 | Differenza minima score per upgrade | Differenza minima di punteggio per sostituire un file con un upgrade migliore. Conta solo la qualità: dimensione, sottotitoli e salute dello swarm non bastano a superarla. |
-| Smetti di migliorare oltre questo punteggio | Tetto agli upgrade: quando il file in libreria ha almeno questo punteggio non viene più sostituito da release migliori; resta accettato solo un REPACK o PROPER, che corregge una release difettosa. Riferimenti con i punteggi predefiniti: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. Si somma alla differenza minima: la prima dice *di quanto* deve migliorare, questa *fino a dove*. Per fermare del tutto gli upgrade di un solo titolo c'è «Permetti upgrade: No» nella sua scheda. «Perché non questa?» indica quando una release è scartata per questa soglia. *(0 = migliora sempre: nessun tetto)* |
+| Smetti di migliorare oltre questo punteggio | Tetto agli upgrade: quando il file in libreria ha almeno questo punteggio non viene più sostituito da release migliori; resta accettato solo un REPACK o PROPER, che corregge una release difettosa. Riferimenti con i punteggi predefiniti: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. Si somma alla differenza minima: la prima dice *di quanto* deve migliorare, questa *fino a dove*. Per fermare gli upgrade di un solo titolo imposta «Permetti upgrade» su No con *Modifica selezionati* (o nel profilo con cui lo aggiungi). «Perché non questa?» indica quando una release è scartata per questa soglia. *(0 = migliora sempre: nessun tetto)* |
 | Sostituisci le versioni già archiviate | Sostituisce versioni inferiori già archiviate con upgrade migliori. |
 | Differenza minima score per cleanup | Differenza minima di punteggio per sostituire un file esistente con uno migliore (cleanup). |
 

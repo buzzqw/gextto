@@ -661,7 +661,7 @@ The most important fields are:
 | Seasons | decides which seasons are monitored; ranges are supported |
 | Aliases | links alternate names to the same series |
 | Exclusions | words in a title that must block the release |
-| Allow upgrades | **Yes** (default): a better release replaces the archived file; **No**: the archived files of this series stay. It is also on the movie page and in the quality profiles |
+| Allow upgrades | **Yes** (default): a better release replaces the archived file; **No**: the archived files of this series stay. It comes from the quality profile when adding and is changed with *Edit selected*: it is not on the title page, so there is no second place to set it |
 
 Leave future seasons enabled if you want calendar and missing searches to keep
 working. Use *Ignore* only for episodes that should no longer be searched;
@@ -737,7 +737,8 @@ eligible, and the alternative may be a single episode or another pack.
   page).
 - The editor supports quality, **Language**, **Subtitles** with
   **Subtitles required** (Yes: a release without those subtitles is rejected; No:
-  they are only preferred), **Allow upgrades** and exclusions. Each value has one
+  they are only preferred) and exclusions; **Allow upgrades** and minimum audio
+  are changed with *Edit selected*. Each value has one
   field only: the old “Required languages” were folded into **Language** (which
   takes `chi`, `ita,eng`… beyond the list entries too) without changing any
   decision.
@@ -1279,7 +1280,7 @@ title, resolution, size and reason, so the production `INFO` log stays clean;
 enable debug logging to inspect them. The older-episode protection is fixed too:
 Gextto never re-downloads an earlier episode outside a recognised gap while it
 already owns later ones (gap-fill and manual actions always pass). To freeze a
-title, use **Allow upgrades** in the series/movie editor.
+title, set **Allow upgrades** to No with *Edit selected*.
 
 The real file data (`ffprobe`: HDR, codec, audio, languages) is stored per
 episode/movie and **used in upgrade comparisons**, so the archived file is read
@@ -1993,7 +1994,7 @@ the download stands. Season packs do not go through this check.
 | Setting | What it does |
 |---|---|
 | Min score difference for upgrade | Minimum score difference to replace a file with a better upgrade. Only quality counts: size, subtitles and swarm health are not enough to reach it. |
-| Stop upgrading above this score | Upgrade ceiling: once the library file scores at least this much it is no longer replaced by better releases; only a REPACK or PROPER, which fixes a defective release, is still accepted. With the default scores: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. It adds to the minimum difference: that one says *by how much* a release must improve, this one *up to where*. To stop upgrades for a single title set “Allow upgrades” to No on its page. “Why not this one?” says when a release is skipped because of this ceiling. *(0 = always upgrade: no ceiling)* |
+| Stop upgrading above this score | Upgrade ceiling: once the library file scores at least this much it is no longer replaced by better releases; only a REPACK or PROPER, which fixes a defective release, is still accepted. With the default scores: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. It adds to the minimum difference: that one says *by how much* a release must improve, this one *up to where*. To stop upgrades for a single title set “Allow upgrades” to No with *Edit selected* (or in the profile you add it with). “Why not this one?” says when a release is skipped because of this ceiling. *(0 = always upgrade: no ceiling)* |
 | Replace versions already archived | Replaces lower versions already archived with better upgrades. |
 | Min score difference for cleanup | Minimum score difference to replace an existing file with a better one (cleanup). |
 
