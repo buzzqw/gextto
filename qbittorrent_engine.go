@@ -1151,6 +1151,35 @@ func (e *qbittorrentEngine) Files(hash string) ([]models.FileView, bool, error) 
 	return out, true, nil
 }
 
+// SkippedVideoFiles reports the video files qBittorrent deliberately left
+// out. A completed torrent can still have no importable video when the file
+// was excluded by extension or set to priority 0; the completion handler then
+// names it instead of reporting a generic missing file.
+func (e *qbittorrentEngine) SkippedVideoFiles(hash string) ([]string, bool, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	files, err := e.client.Files(ctx, hash)
+	if err != nil {
+		return nil, false, err
+	}
+	var skipped []string
+	completeVideo := false
+	for _, file := range files {
+		if !isVideoExtension(filepath.Base(file.Name)) {
+			continue
+		}
+		if file.Priority == 0 || file.Progress < 0.999 {
+			skipped = append(skipped, file.Name)
+			continue
+		}
+		completeVideo = true
+	}
+	if completeVideo {
+		return nil, true, nil
+	}
+	return skipped, true, nil
+}
+
 func (e *qbittorrentEngine) Peers(hash string) ([]models.PeerView, bool, error) {
 	ctx, cancel := e.requestContext()
 	defer cancel()
@@ -1341,9 +1370,35 @@ func (e *qbittorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit in
 		if err := e.client.SetShareLimits(ctx, ratio, minutes, hash); err != nil {
 			return false, err
 		}
+		if idle := e.inactiveSeedMinutes(seedRatio, seedDays); idle > 0 {
+			if err := e.client.SetInactiveSeedingTimeLimit(ctx, idle, hash); err != nil {
+				return false, err
+			}
+		}
 		applied = true
 	}
 	return applied, nil
+}
+
+// inactiveSeedMinutes returns the inactivity limit to hand qBittorrent, or 0
+// when the effective ratio/time is infinite (Gextto's rule: an infinite limit
+// disables inactivity too).
+func (e *qbittorrentEngine) inactiveSeedMinutes(seedRatio float64, seedDays int64) int64 {
+	if e.cfg == nil || e.cfg.Transfer.SeedIdleMinutes <= 0 {
+		return 0
+	}
+	ratio := seedRatio
+	if ratio < 0 {
+		ratio = e.cfg.Transfer.SeedRatio
+	}
+	days := seedDays
+	if days < 0 {
+		days = e.cfg.Transfer.SeedTimeDays
+	}
+	if ratio <= 0 || (days <= 0 && e.cfg.Transfer.SeedTimeMinutes <= 0) {
+		return 0
+	}
+	return e.cfg.Transfer.SeedIdleMinutes
 }
 
 func (e *qbittorrentEngine) SetGlobalSpeedLimits(downloadKib, uploadKib int64) (bool, error) {
@@ -1495,14 +1550,27 @@ func (e *qbittorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) 
 	return translated, nil
 }
 
-func (e *qbittorrentEngine) addOptions(options AddOptions) qbittorrent.AddOptions {
-	return qbittorrent.AddOptions{
+func (e *qbittorrentEngine) addOptions(options AddOptions, cfg *Config) qbittorrent.AddOptions {
+	if cfg == nil {
+		cfg = e.cfg
+	}
+	opts := qbittorrent.AddOptions{
 		Category:   e.settings.Category,
 		Tags:       e.settings.Tag,
 		Paused:     options.Paused,
 		Sequential: options.Sequential,
 		FirstLast:  options.FirstLast || e.firstLastDefault.Load(),
 	}
+	// Do not ask qBittorrent to stop an inactivity seed that Gextto itself
+	// considers infinite: the global ratio and time must both be finite. Per
+	// torrent and seed-rule limits are still enforced by Gextto.
+	if cfg != nil && cfg.Transfer.SeedIdleMinutes > 0 &&
+		cfg.Transfer.SeedRatio > 0 &&
+		(cfg.Transfer.SeedTimeDays > 0 || cfg.Transfer.SeedTimeMinutes > 0) {
+		minutes := cfg.Transfer.SeedIdleMinutes
+		opts.InactiveSeedingTimeLimit = &minutes
+	}
+	return opts
 }
 
 // SetFirstLastDefault implements TorrentEngine.
@@ -1539,7 +1607,7 @@ func (e *qbittorrentEngine) AddWithOptions(magnet string, cfg *Config, preferred
 			}
 		}
 	}
-	addOpts := e.addOptions(options)
+	addOpts := e.addOptions(options, cfg)
 	addOpts.SavePath = savePath
 	hash, err := e.client.AddMagnet(ctx, magnet, addOpts)
 	if err != nil {
@@ -1583,7 +1651,7 @@ func (e *qbittorrentEngine) AddTorrentFileWithOptions(torrentPath string, cfg *C
 	e.ensureCategory(ctx)
 
 	before := e.currentHashSet()
-	addOpts := e.addOptions(options)
+	addOpts := e.addOptions(options, cfg)
 	addOpts.SavePath = savePath
 	if err := e.client.AddTorrentFile(ctx, torrentPath, addOpts); err != nil {
 		return nil, err

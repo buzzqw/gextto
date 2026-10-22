@@ -149,6 +149,10 @@ Three places, all through aMule:
 - **Archive**: tick **Also search eD2k** to get a block of eD2k results under
   the archived releases.
 
+Queries are normalized: accents, typographic apostrophes and parentheses no
+longer prevent a search; for an episode, when `SxxExx` finds nothing Gextto also
+tries `1x05`, `1x5` and `01x05`.
+
 The network is the one chosen in **eD2k search network**:
 **Kad** (default: a distributed network, no server needed), **Kad + eD2k
 servers** (both searches, results merged by hash), **eD2k servers (global)**
@@ -190,8 +194,10 @@ already holds an equal or better file, the download is discarded (moved to the
 trash, or deleted according to the cleanup action) and never copied.
 
 aMule 2.3 keeps a finished file in its download queue; aMule 3.x drops it at
-once, so Gextto finds it among the shared files, also after a restart. eD2k
-episodes and movies follow the **Move episodes/packs into the archive** option: when it is
+once, so Gextto finds it among the shared files, also after a restart. Before
+importing, Gextto waits until the file is actually in the incoming folder, with
+the expected size and stable: a file aMule is still copying from temp is not
+treated as ready. eD2k episodes and movies follow the **Move episodes/packs into the archive** option: when it is
 on they are moved into the library and removed from the incoming folder (aMule
 stops sharing them); when it is off they are imported by **hardlink or copy**
 and aMule keeps sharing the original. For eD2k the move happens at completion,

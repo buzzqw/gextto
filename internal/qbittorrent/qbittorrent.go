@@ -96,6 +96,11 @@ type AddOptions struct {
 	Paused     bool
 	Sequential bool
 	FirstLast  bool
+	// Share limits applied by qBittorrent as soon as the torrent is added.
+	// Pointers because 0 is a meaningful limit on qBittorrent's scale.
+	RatioLimit               *float64
+	SeedingTimeLimit         *int64
+	InactiveSeedingTimeLimit *int64
 }
 
 // Torrent is the subset of /torrents/info this client consumes. It is wider
@@ -443,6 +448,15 @@ func (c *Client) add(ctx context.Context, magnet, torrentPath string, opts AddOp
 	if opts.FirstLast {
 		field("firstLastPiecePrio", "true")
 	}
+	if opts.RatioLimit != nil {
+		field("ratioLimit", strconv.FormatFloat(*opts.RatioLimit, 'f', -1, 64))
+	}
+	if opts.SeedingTimeLimit != nil {
+		field("seedingTimeLimit", strconv.FormatInt(*opts.SeedingTimeLimit, 10))
+	}
+	if opts.InactiveSeedingTimeLimit != nil {
+		field("inactiveSeedingTimeLimit", strconv.FormatInt(*opts.InactiveSeedingTimeLimit, 10))
+	}
 	if torrentPath != "" && writeErr == nil {
 		clean := filepath.Clean(torrentPath)
 		if !filepath.IsAbs(clean) {
@@ -536,6 +550,17 @@ func (c *Client) SetShareLimits(ctx context.Context, ratio float64, minutes int6
 		"hashes":           {joinHashes(hashes)},
 		"ratioLimit":       {strconv.FormatFloat(ratio, 'f', -1, 64)},
 		"seedingTimeLimit": {strconv.FormatInt(minutes, 10)},
+	}
+	return c.postForm(ctx, "/api/v2/torrents/setShareLimits", form)
+}
+
+// SetInactiveSeedingTimeLimit sets the per-torrent inactivity limit (minutes).
+// qBittorrent applies the same setShareLimits endpoint used for the ratio and
+// total seeding time; a torrent that uploads nothing for this long stops.
+func (c *Client) SetInactiveSeedingTimeLimit(ctx context.Context, minutes int64, hashes ...string) error {
+	form := url.Values{
+		"hashes":                   {joinHashes(hashes)},
+		"inactiveSeedingTimeLimit": {strconv.FormatInt(minutes, 10)},
 	}
 	return c.postForm(ctx, "/api/v2/torrents/setShareLimits", form)
 }

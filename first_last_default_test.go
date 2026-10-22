@@ -24,14 +24,14 @@ func TestGxFirstLastDefaultReachesEveryAdd(t *testing.T) {
 
 func TestQbittorrentFirstLastDefault(t *testing.T) {
 	engine := &qbittorrentEngine{}
-	if engine.addOptions(AddOptions{}).FirstLast {
+	if engine.addOptions(AddOptions{}, nil).FirstLast {
 		t.Fatal("first/last must stay off without the setting")
 	}
-	if !engine.addOptions(AddOptions{FirstLast: true}).FirstLast {
+	if !engine.addOptions(AddOptions{FirstLast: true}, nil).FirstLast {
 		t.Fatal("the per-torrent option must still work")
 	}
 	engine.SetFirstLastDefault(true)
-	if !engine.addOptions(AddOptions{}).FirstLast {
+	if !engine.addOptions(AddOptions{}, nil).FirstLast {
 		t.Fatal("first/last default not applied")
 	}
 }

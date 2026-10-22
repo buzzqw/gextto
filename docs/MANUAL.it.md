@@ -960,8 +960,10 @@ alto e un Kad non dietro firewall, cioè più fonti.
 I download aggiunti compaiono in **Scarico**. Un link a un file che non è un
 video (pdf, programma, archivio) viene solo scaricato da aMule e resta nella
 cartella di arrivo, come un torrent aggiunto a mano. Quando aMule completa un
-video, Gextto lo tratta come un torrent completato: lo rinomina, lo importa in
-libreria, lo controlla con MediaInfo e manda la notifica. Lo stesso controllo di
+video, Gextto aspetta che il file sia davvero nella cartella di arrivo, con la
+dimensione attesa e stabile, poi lo tratta come un torrent completato: lo
+rinomina, lo importa in libreria, lo controlla con MediaInfo e manda la
+notifica. Lo stesso controllo di
 qualità dei torrent gira prima dell'importazione: se in libreria c'è già un file
 uguale o migliore il download viene scartato nel Cestino e non importato. Gli episodi e i film eD2k
 seguono l'opzione **Sposta gli episodi/pack in archivio**: se è attiva vengono
@@ -2201,7 +2203,7 @@ spazio del `tmpfs`, come prima.
 | Seed ratio globale | Rapporto upload/download dopo cui fermare il seeding. 0 = infinito: basta questo perché il seed non finisca mai e il file non venga spostato, anche con un limite di tempo. *(0 = infinito)* |
 | Seed massimo | Limite principale di seeding in giorni; se maggiore di 0 prevale sul limite in minuti. Con giorni e minuti a 0 il tempo è infinito. *(Unità: giorni; 0 = usa il limite in minuti)* |
 | Seed massimo (fallback) | Limite di seeding in minuti, usato solo se Seed massimo (giorni) è 0. Con giorni e minuti a 0 il tempo è infinito: il seed non finisce mai e il file non viene spostato. *(Unità: minuti)* |
-| Ferma il seed inattivo dopo | Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione. *(Unità: minuti; 0 = disattivato)* |
+| Ferma il seed inattivo dopo | Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione. Con qBittorrent il valore viene inviato anche come `inactiveSeedingTimeLimit`. *(Unità: minuti; 0 = disattivato)* |
 
 **Editor**
 

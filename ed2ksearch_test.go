@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -74,6 +76,17 @@ func ed2kTestCore(t *testing.T, extra map[string]string) (*amuletest.Core, *Conf
 	}
 	ed2kInvalidateHealth()
 	ed2kForgetQueue()
+	previousStable := ed2kFileStableFor
+	ed2kFileStableFor = 0
+	ed2kReadyMu.Lock()
+	ed2kReadySince = map[string]ed2kReadyState{}
+	ed2kReadyMu.Unlock()
+	t.Cleanup(func() {
+		ed2kFileStableFor = previousStable
+		ed2kReadyMu.Lock()
+		ed2kReadySince = map[string]ed2kReadyState{}
+		ed2kReadyMu.Unlock()
+	})
 	// The fake core answers at once: poll it fast instead of waiting the
 	// seconds a real network search needs.
 	minWait, maxWait, poll, retry := ed2kMinSearchWait, ed2kMaxSearchWait, ed2kSearchPoll, ed2kSearchRetry
@@ -103,6 +116,96 @@ func TestSearchED2KThroughAmule(t *testing.T) {
 	}
 	if got := core.Searches(); len(got) != 1 || got[0] != "The Matrix 1999" {
 		t.Fatalf("searches = %v", got)
+	}
+}
+
+func TestNormalizeEd2kQuery(t *testing.T) {
+	cases := map[string]string{
+		"Amélie (2001)":         "Amelie 2001",
+		"L’uomo che sussurrava": "L'uomo che sussurrava",
+		"Città  (film)":         "Citta film",
+		"e\u0301lite":           "elite",
+		"Ajándék [Live]":        "Ajandek [Live]",
+	}
+	for input, want := range cases {
+		if got := normalizeEd2kQuery(input); got != want {
+			t.Errorf("normalizeEd2kQuery(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestSearchED2KSendsTheNormalizedQuery(t *testing.T) {
+	core, cfg := ed2kTestCore(t, nil)
+	core.SetResults(nil, "")
+	_ = SearchED2K(context.Background(), cfg, "Amélie (2001)")
+	searches := core.Searches()
+	if len(searches) != 1 || searches[0] != "Amelie 2001" {
+		t.Fatalf("searches = %v, want the normalized query", searches)
+	}
+}
+
+func TestEd2kEpisodeQueryStrings(t *testing.T) {
+	forms := ed2kEpisodeQueryStrings("Show", 1, 5)
+	want := []string{"Show S01E05", "Show 1x05", "Show 1x5", "Show 01x05"}
+	if len(forms) != len(want) {
+		t.Fatalf("forms = %v, want %v", forms, want)
+	}
+	for index := range want {
+		if forms[index] != want[index] {
+			t.Fatalf("forms = %v, want %v", forms, want)
+		}
+	}
+}
+
+func TestEd2kSeriesFallsBackToEpisodeForms(t *testing.T) {
+	core, cfg := ed2kTestCore(t, nil)
+	core.SetResults(nil, "")
+	series := &SeriesConfig{Name: "Show"}
+	engine := &Engine{}
+	if got := engine.SearchSeriesED2K(context.Background(), cfg, series, 1, 5, true); len(got) != 0 {
+		t.Fatalf("no-results search returned %+v", got)
+	}
+	searches := core.Searches()
+	want := []string{"Show S01E05", "Show 1x05", "Show 1x5", "Show 01x05"}
+	if len(searches) != len(want) {
+		t.Fatalf("searches = %v, want %v", searches, want)
+	}
+	for index := range want {
+		if searches[index] != want[index] {
+			t.Fatalf("searches = %v, want %v", searches, want)
+		}
+	}
+}
+
+func TestEd2kFileReadyWaitsForSizeAndStability(t *testing.T) {
+	previous := ed2kFileStableFor
+	ed2kFileStableFor = 20 * time.Millisecond
+	ed2kReadyMu.Lock()
+	ed2kReadySince = map[string]ed2kReadyState{}
+	ed2kReadyMu.Unlock()
+	defer func() {
+		ed2kFileStableFor = previous
+		ed2kReadyMu.Lock()
+		ed2kReadySince = map[string]ed2kReadyState{}
+		ed2kReadyMu.Unlock()
+	}()
+
+	path := filepath.Join(t.TempDir(), "file.mkv")
+	if err := os.WriteFile(path, []byte("partial"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if ed2kFileReady("hash", path, 10) {
+		t.Fatal("a partial file must not be ready")
+	}
+	if err := os.WriteFile(path, make([]byte, 10), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if ed2kFileReady("hash", path, 10) {
+		t.Fatal("the first full-size sighting must not be ready yet")
+	}
+	time.Sleep(30 * time.Millisecond)
+	if !ed2kFileReady("hash", path, 10) {
+		t.Fatal("a stable full-size file must be ready")
 	}
 }
 
@@ -251,6 +354,9 @@ func TestEd2kLinkAddAndDownloadActions(t *testing.T) {
 
 func TestEd2kSessionReportsCompletion(t *testing.T) {
 	core, cfg := ed2kTestCore(t, nil)
+	incoming := t.TempDir()
+	core.Incoming = incoming
+	writeFile(t, filepath.Join(incoming, "Rare Show S02E03.mkv"), make([]byte, 100))
 	resetPoll := func() {
 		ed2kEventsMu.Lock()
 		ed2kLastPoll = time.Time{}
@@ -273,7 +379,7 @@ func TestEd2kSessionReportsCompletion(t *testing.T) {
 	}
 	resetPoll()
 	events := session.PollEvents()
-	if len(events) != 1 || events[0].Kind != "torrent_finished" || events[0].SavePath != core.Incoming || events[0].Name != "Rare Show S02E03.mkv" {
+	if len(events) != 1 || events[0].Kind != "torrent_finished" || events[0].SavePath != incoming || events[0].Name != "Rare Show S02E03.mkv" {
 		t.Fatalf("events = %+v", events)
 	}
 	resetPoll()
@@ -306,6 +412,9 @@ func TestEd2kSessionFindsFilesThatLeftTheQueue(t *testing.T) {
 	reset()
 	const seen = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	const restarted = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "Seen S01E01.mkv"), make([]byte, 100))
+	writeFile(t, filepath.Join(dir, "Restarted S01E02.mkv"), make([]byte, 100))
 	core.SetDownloads([]amuletest.File{
 		{Hash: seen, Name: "Seen S01E01.mkv", Size: 100, Done: 10},
 		{Hash: restarted, Name: "Restarted S01E02.mkv", Size: 100, Done: 10},
@@ -315,9 +424,9 @@ func TestEd2kSessionFindsFilesThatLeftTheQueue(t *testing.T) {
 	if events := poll(session); len(events) != 0 {
 		t.Fatalf("events before completion: %+v", events)
 	}
-	core.Finish(seen, "/data/amule")
+	core.Finish(seen, dir)
 	events := poll(session)
-	if len(events) != 1 || events[0].Hash != seen || events[0].SavePath != "/data/amule" || events[0].Name != "Seen S01E01.mkv" {
+	if len(events) != 1 || events[0].Hash != seen || events[0].SavePath != dir || events[0].Name != "Seen S01E01.mkv" {
 		t.Fatalf("events = %+v", events)
 	}
 	if again := poll(session); len(again) != 0 {
@@ -329,7 +438,7 @@ func TestEd2kSessionFindsFilesThatLeftTheQueue(t *testing.T) {
 	// Gextto restarts while aMule finishes the second file: only the pending
 	// list from the database knows about it.
 	reset()
-	core.Finish(restarted, "/data/amule")
+	core.Finish(restarted, dir)
 	events = poll(session)
 	if len(events) != 1 || events[0].Hash != restarted {
 		t.Fatalf("events after restart = %+v", events)

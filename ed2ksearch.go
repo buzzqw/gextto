@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/buzzqw/gextto/internal/amule"
 	"github.com/buzzqw/gextto/internal/constants"
@@ -414,6 +415,88 @@ func ed2kManualEpisodeFallback(ctx context.Context, engine *Engine, cfg *Config,
 	return accepted
 }
 
+// ed2kFold maps the accented letters commonly found in release names to the
+// plain ASCII spelling. aMule's eD2k servers use one encoding for accented
+// letters and Kad does not treat accented and plain letters as equivalent, so
+// searching the plain spelling finds the file regardless of how it was
+// published. This is a deliberate small table, not a full Unicode normalizer.
+var ed2kFold = map[rune]string{
+	'À': "A", 'Á': "A", 'Â': "A", 'Ã': "A", 'Ä': "A", 'Å': "A", 'Æ': "AE",
+	'à': "a", 'á': "a", 'â': "a", 'ã': "a", 'ä': "a", 'å': "a", 'æ': "ae",
+	'Ç': "C", 'ç': "c", 'Ð': "D", 'ð': "d",
+	'È': "E", 'É': "E", 'Ê': "E", 'Ë': "E", 'è': "e", 'é': "e", 'ê': "e", 'ë': "e",
+	'Ì': "I", 'Í': "I", 'Î': "I", 'Ï': "I", 'ì': "i", 'í': "i", 'î': "i", 'ï': "i",
+	'Ł': "L", 'ł': "l", 'Ñ': "N", 'ñ': "n",
+	'Ò': "O", 'Ó': "O", 'Ô': "O", 'Õ': "O", 'Ö': "O", 'Ø': "O", 'Œ': "OE",
+	'ò': "o", 'ó': "o", 'ô': "o", 'õ': "o", 'ö': "o", 'ø': "o", 'œ': "oe",
+	'Š': "S", 'š': "s", 'ß': "ss",
+	'Ù': "U", 'Ú': "U", 'Û': "U", 'Ü': "U", 'ù': "u", 'ú': "u", 'û': "u", 'ü': "u",
+	'Ý': "Y", 'ý': "y", 'ÿ': "y", 'Þ': "TH", 'þ': "th",
+	'Ž': "Z", 'ž': "z",
+}
+
+// normalizeEd2kQuery makes a search safe for aMule: it folds accents to ASCII,
+// turns typographic apostrophes into the plain one, removes the combining
+// marks left by decomposed text, and replaces parentheses (which aMule reads
+// as boolean syntax) with spaces. It never changes the words themselves.
+func normalizeEd2kQuery(query string) string {
+	var out strings.Builder
+	for _, r := range strings.TrimSpace(query) {
+		switch r {
+		case '’', '‘', 'ʼ':
+			r = '\''
+		case '“', '”':
+			r = '"'
+		case '(', ')':
+			r = ' '
+		}
+		if folded, ok := ed2kFold[r]; ok {
+			out.WriteString(folded)
+			continue
+		}
+		if unicode.Is(unicode.Mn, r) {
+			continue
+		}
+		out.WriteRune(r)
+	}
+	return strings.Join(strings.Fields(out.String()), " ")
+}
+
+// ed2kEpisodeQueryStrings returns the common episode spellings. The first one
+// is the canonical SxxExx form; the other forms are tried only when it finds
+// nothing, because aMule runs one search at a time.
+func ed2kEpisodeQueryStrings(name string, season, episode int64) []string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil
+	}
+	return []string{
+		fmt.Sprintf("%s S%02dE%02d", name, season, episode),
+		fmt.Sprintf("%s %dx%02d", name, season, episode),
+		fmt.Sprintf("%s %dx%d", name, season, episode),
+		fmt.Sprintf("%s %02dx%02d", name, season, episode),
+	}
+}
+
+func mergeEd2kReleases(groups ...[]models.Release) []models.Release {
+	seen := map[string]struct{}{}
+	var out []models.Release
+	for _, group := range groups {
+		for _, release := range group {
+			key, ok := releaseDedupKey(&release)
+			if !ok {
+				continue
+			}
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, release)
+		}
+	}
+	return out
+}
+
 // SearchED2K searches eD2k/Kad through aMule and normalizes the results. It
 // returns nil when the integration is disabled, unreachable or finds nothing:
 // an eD2k failure must never fail the torrent search that called it.
@@ -440,7 +523,7 @@ func SearchED2KManual(ctx context.Context, cfg *Config, query string) []models.R
 // searchAmule runs one search on the configured network. network overrides
 // the setting when it is not nil.
 func searchAmule(ctx context.Context, cfg *Config, query string, network *uint8) ([]amule.SearchResult, error) {
-	query = strings.TrimSpace(query)
+	query = normalizeEd2kQuery(query)
 	if query == "" {
 		return nil, nil
 	}
@@ -570,9 +653,24 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 	if !manual {
 		network = ed2kSearchBoth
 	}
+	forms := ed2kEpisodeQueryStrings(series.Name, season, episode)
 	candidates := e.searchED2KSeriesQueries(ctx, cfg, series, network, func(name string) string {
-		return fmt.Sprintf("%s S%02dE%02d", name, season, episode)
+		if len(forms) == 0 {
+			return ""
+		}
+		return strings.Replace(forms[0], series.Name, name, 1)
 	})
+	// Only the common SxxExx form is tried first. If it found nothing, try the
+	// 1x05 / 1x5 / 01x05 spellings aMule also indexes, one at a time.
+	for _, form := range forms[1:] {
+		if len(candidates) > 0 || ctx.Err() != nil {
+			break
+		}
+		extra := e.searchED2KSeriesQueries(ctx, cfg, series, network, func(name string) string {
+			return strings.Replace(form, series.Name, name, 1)
+		})
+		candidates = mergeEd2kReleases(candidates, extra)
+	}
 	if manual {
 		return candidates
 	}

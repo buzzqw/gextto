@@ -2511,6 +2511,34 @@ func logLibraryImport(cfg *Config, hash, target string, size int64, path, suffix
 		strings.Join(names, ", "), action), "hash", hash)
 }
 
+// tev_skippedVideoError explains a completion whose payload has no importable
+// video because the backend deliberately skipped it (qBittorrent's excluded
+// file names or a priority-0 file). It returns nil for backends that cannot
+// answer and for a normal completion.
+func tev_skippedVideoError(torrents TorrentSession, hash string) error {
+	reporter, ok := torrents.(TorrentSkippedFiles)
+	if !ok {
+		return nil
+	}
+	names, supported, err := reporter.SkippedVideoFiles(hash)
+	if err != nil {
+		logging.Debug("could not inspect skipped torrent files", "hash", hash, "error", err.Error())
+		return nil
+	}
+	if !supported || len(names) == 0 {
+		return nil
+	}
+	shown := names
+	if len(shown) > 5 {
+		shown = shown[:5]
+	}
+	message := strings.Join(shown, ", ")
+	if len(names) > len(shown) {
+		message += fmt.Sprintf(" (+%d)", len(names)-len(shown))
+	}
+	return fmt.Errorf("no video file was downloaded; qBittorrent skipped: %s", message)
+}
+
 func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, tmdb *TmdbClient, preserveSource bool) (bool, error) {
 	// Record the episode under the configured series, not the raw parsed name.
 	normalizeReleaseSeries(cfg, release)
@@ -2544,6 +2572,11 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 			}
 		}
 		if !found {
+			if skippedErr := tev_skippedVideoError(torrents, event.Hash); skippedErr != nil {
+				logging.Warn("completed torrent has no importable video because the backend skipped it",
+					"hash", event.Hash, "name", event.Name, "path", path, "error", skippedErr.Error())
+				return false, skippedErr
+			}
 			logging.Warn("completed torrent file not found (already moved or renamed); marking completion as failed",
 				"hash", event.Hash, "name", event.Name, "path", path)
 			return false, fmt.Errorf("completed torrent file not found: %s", path)

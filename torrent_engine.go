@@ -74,6 +74,15 @@ type TorrentEngineIdentity interface {
 	EngineVersion() (label, version string)
 }
 
+// TorrentSkippedFiles is optionally implemented by a backend that can tell
+// which video files it deliberately did not download (qBittorrent's excluded
+// file names or a file left at priority 0). Gextto uses it when a completed
+// torrent has no importable video: the error names the skipped files instead
+// of leaving a generic "file not found" in the queue.
+type TorrentSkippedFiles interface {
+	SkippedVideoFiles(hash string) (names []string, supported bool, err error)
+}
+
 // TorrentPieceRun is a compact run of consecutive pieces that share a state.
 // Exposed by GET /api/torrents/{hash}/pieces for backends that support it.
 type TorrentPieceRun struct {

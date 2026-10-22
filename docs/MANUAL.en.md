@@ -935,7 +935,8 @@ which means more sources.
 Added downloads appear in **Downloads**. A link to a file that is not a video
 (a pdf, a program, an archive) is only downloaded by aMule and stays in the
 incoming folder, like a torrent added by hand. When aMule completes a video,
-Gextto treats it like a completed torrent: it renames it, imports it into the library,
+Gextto waits until the file is actually in the incoming folder, with the expected
+size and stable, then treats it like a completed torrent: it renames it, imports it into the library,
 checks it with MediaInfo and sends the notification. The same quality check as a
 torrent runs before the import: if the library already holds an equal or better
 file, the download is discarded to the trash and never imported. eD2k episodes and movies follow the
@@ -2132,7 +2133,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Global seed ratio | Upload/download ratio after which seeding stops. 0 = infinite: this alone makes the seed never end and the file is not moved, even with a time limit. *(0 = infinite)* |
 | Maximum seeding | Primary seeding limit in days; when greater than 0 it takes precedence over the limit in minutes. With days and minutes at 0 the time is infinite. *(Unit: days; 0 = use the limit in minutes)* |
 | Maximum seeding (fallback) | Seeding limit in minutes, used only when Maximum seed (days) is 0. With days and minutes at 0 the time is infinite: the seed never ends and the file is not moved. *(Unit: minutes)* |
-| Stop an idle seed after | Stops a seeding torrent that has sent no data for this many minutes (only time spent actively seeding counts). Like the other limits, the end of the seed is followed by archiving or removal. *(Unit: minutes; 0 = off)* |
+| Stop an idle seed after | Stops a seeding torrent that has sent no data for this many minutes (only time spent actively seeding counts). Like the other limits, the end of the seed is followed by archiving or removal. With qBittorrent the value is also sent as `inactiveSeedingTimeLimit`. *(Unit: minutes; 0 = off)* |
 
 **Editor**
 

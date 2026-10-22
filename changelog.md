@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 22 ottobre 2026
 
+- **eD2k: import sicuro e ricerche più complete.** Gextto ora aspetta che aMule abbia davvero spostato un file completato nella cartella di arrivo, con la dimensione attesa e stabile per qualche istante, prima di importarlo: un file ancora in copia da un altro disco o da un mount Docker non viene più trattato come pronto. Le ricerche eD2k/Kad vengono normalizzate (accenti, apostrofi tipografici, parentesi) e, quando `SxxExx` non trova nulla, Gextto prova anche `1x05`, `1x5` e `01x05`. Con qBittorrent un completamento senza video importabile indica ora quali file sono stati saltati, e il limite di seed inattivo viene inviato come `inactiveSeedingTimeLimit`.
+
 - **Identità client: ora si sceglie da una tendina.** In **Configurazione → Motore torrent** il campo dell'identità annunciata da gx-torrent mostra i preset (`gx-core`, qBittorrent, Transmission, Rain, anacrolix/torrent) in un menu a discesa, non più come testo libero; la versione resta un campo separato.
 
 - **eD2k rispetta sposta/copia.** Anche i download completati con aMule seguono l'opzione **Sposta gli episodi/pack in archivio**: con l'opzione attiva il file viene spostato in libreria e rimosso dalla cartella di arrivo (aMule smette di condividerlo), con l'opzione spenta viene copiato o collegato e resta nella cartella di arrivo per la condivisione. Per eD2k lo spostamento avviene al completamento, perché il seeding è gestito da aMule e Gextto non ha un fine seed da attendere.

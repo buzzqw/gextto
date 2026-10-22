@@ -469,3 +469,29 @@ func TestEd2kUnlimitedSeedKeepsTheFileInAmule(t *testing.T) {
 		t.Fatalf("an unlimited seed must keep the movie in aMule's incoming folder: %v", err)
 	}
 }
+
+type skippedMovieSession struct {
+	movieCopySession
+	names []string
+}
+
+func (s *skippedMovieSession) SkippedVideoFiles(string) ([]string, bool, error) {
+	return s.names, true, nil
+}
+
+func TestCompletedTorrentReportsSkippedVideoFiles(t *testing.T) {
+	f := newMovieImportFixture(t)
+	if err := os.Remove(f.source); err != nil {
+		t.Fatal(err)
+	}
+	session := &skippedMovieSession{names: []string{"Example.Movie.2024.1080p.WEB-DL.mkv"}}
+	processed, err := tev_completeTorrentOptions(
+		&f.cfg, f.db, session, &f.event, f.release, NewTmdbClient(nil), true,
+	)
+	if processed {
+		t.Fatal("a completion with only skipped files must not be imported")
+	}
+	if err == nil || !strings.Contains(err.Error(), "qBittorrent skipped") {
+		t.Fatalf("error = %v, want the skipped-file explanation", err)
+	}
+}

@@ -221,6 +221,33 @@ func TestAddMagnetSendsFields(t *testing.T) {
 	}
 }
 
+func TestAddMagnetSendsInactiveSeedingLimit(t *testing.T) {
+	fake, client := newFakeServer(t)
+	minutes := int64(30)
+	_, err := client.AddMagnet(context.Background(),
+		"magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF01&dn=x",
+		AddOptions{InactiveSeedingTimeLimit: &minutes})
+	if err != nil {
+		t.Fatalf("AddMagnet: %v", err)
+	}
+	if got := fake.lastAdd.Get("inactiveSeedingTimeLimit"); got != "30" {
+		t.Fatalf("inactiveSeedingTimeLimit = %q, want 30", got)
+	}
+}
+
+func TestSetInactiveSeedingTimeLimit(t *testing.T) {
+	fake, client := newFakeServer(t)
+	if err := client.SetInactiveSeedingTimeLimit(context.Background(), 45, "ABC"); err != nil {
+		t.Fatalf("SetInactiveSeedingTimeLimit: %v", err)
+	}
+	if got := fake.lastShareLimits.Get("inactiveSeedingTimeLimit"); got != "45" {
+		t.Fatalf("inactiveSeedingTimeLimit = %q, want 45", got)
+	}
+	if got := fake.lastShareLimits.Get("hashes"); got != "abc" {
+		t.Fatalf("hashes = %q, want abc", got)
+	}
+}
+
 func TestPauseFallsBackToLegacyEndpoint(t *testing.T) {
 	fake, client := newFakeServer(t)
 	ctx := context.Background()

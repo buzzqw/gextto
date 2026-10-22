@@ -24,6 +24,7 @@ type fakeQB struct {
 	token     string
 	fail      bool
 	torrents  []qbittorrent.Torrent
+	files     []qbittorrent.File
 	calls     map[string]int
 	forms     map[string]url.Values
 	locations map[string]string
@@ -42,6 +43,12 @@ func (f *fakeQB) setTorrents(torrents []qbittorrent.Torrent) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.torrents = torrents
+}
+
+func (f *fakeQB) setFiles(files []qbittorrent.File) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.files = files
 }
 
 func (f *fakeQB) record(path string, form url.Values) {
@@ -124,7 +131,11 @@ func (f *fakeQB) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 	case "/api/v2/torrents/files":
-		_ = json.NewEncoder(w).Encode([]qbittorrent.File{{Name: "movie.mkv", Size: 1000, Progress: 0.5, Priority: 1}})
+		files := f.files
+		if files == nil {
+			files = []qbittorrent.File{{Name: "movie.mkv", Size: 1000, Progress: 0.5, Priority: 1}}
+		}
+		_ = json.NewEncoder(w).Encode(files)
 	case "/api/v2/torrents/export":
 		f.exports++
 		_, _ = w.Write([]byte("d4:infod4:name8:meta.bin ee"))
@@ -397,9 +408,45 @@ func TestQbittorrentEngineAddAndLimits(t *testing.T) {
 	if fake.forms["/api/v2/torrents/setShareLimits"].Get("seedingTimeLimit") != "2880" {
 		t.Fatalf("seeding time = %v", fake.forms["/api/v2/torrents/setShareLimits"])
 	}
+	engine.cfg.Transfer.SeedRatio = 1.5
+	engine.cfg.Transfer.SeedTimeDays = 7
+	engine.cfg.Transfer.SeedIdleMinutes = 30
+	engine.cfg.Transfer.SeedTimeMinutes = 0
+	if ok, err := engine.Add("magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF02&dn=y", engine.cfg); err != nil || !ok {
+		t.Fatalf("Add with idle limit = %v, %v", ok, err)
+	}
+	if got := fake.forms["/api/v2/torrents/add"].Get("inactiveSeedingTimeLimit"); got != "30" {
+		t.Fatalf("add inactiveSeedingTimeLimit = %q, want 30", got)
+	}
+	if _, err := engine.SetLimits("abc", -1, -1, 1.5, 2); err != nil {
+		t.Fatalf("SetLimits with idle: %v", err)
+	}
+	if got := fake.forms["/api/v2/torrents/setShareLimits"].Get("inactiveSeedingTimeLimit"); got != "30" {
+		t.Fatalf("set inactiveSeedingTimeLimit = %q, want 30", got)
+	}
 	// An empty mapping means "same namespace": the path is passed unchanged.
 	if got := fake.forms["/api/v2/torrents/add"].Get("paused"); got != "" {
 		t.Fatalf("unexpected paused = %q", got)
+	}
+}
+
+func TestQbittorrentEngineReportsSkippedVideoFiles(t *testing.T) {
+	fake, engine, _ := newFakeQBEngine(t)
+	fake.setFiles([]qbittorrent.File{
+		{Name: "Show.S01E01.mkv", Size: 1000, Progress: 0, Priority: 0},
+		{Name: "Show.S01E01.nfo", Size: 10, Progress: 1, Priority: 1},
+	})
+	names, supported, err := engine.SkippedVideoFiles("abc")
+	if err != nil || !supported || len(names) != 1 || names[0] != "Show.S01E01.mkv" {
+		t.Fatalf("SkippedVideoFiles = %v, %v, %v", names, supported, err)
+	}
+	fake.setFiles([]qbittorrent.File{
+		{Name: "Show.S01E01.mkv", Size: 1000, Progress: 1, Priority: 1},
+		{Name: "Show.S01E01.srt", Size: 10, Progress: 0, Priority: 0},
+	})
+	names, supported, err = engine.SkippedVideoFiles("abc")
+	if err != nil || !supported || len(names) != 0 {
+		t.Fatalf("SkippedVideoFiles with a complete video = %v, %v, %v", names, supported, err)
 	}
 }
 

@@ -150,6 +150,10 @@ Tre punti, tutti attraverso aMule:
 - **Archivio**: spunta **Cerca anche su eD2k** per avere un blocco di risultati
   eD2k sotto le release archiviate.
 
+Le query vengono normalizzate: accenti, apostrofi tipografici e parentesi non
+impediscono più la ricerca; per un episodio, se `SxxExx` non trova nulla, Gextto
+prova anche `1x05`, `1x5` e `01x05`.
+
 La rete è quella scelta in **Rete delle ricerche eD2k**: **Kad** (default: rete
 distribuita, non serve un server), **Kad + server eD2k** (entrambe le ricerche,
 risultati uniti per hash), **Server eD2k (globale)** (tutti i server della lista
@@ -190,8 +194,10 @@ compresi: se c'è già un file uguale o migliore il download viene scartato
 (spostato nel Cestino, o eliminato secondo l'azione di pulizia) e mai copiato.
 
 aMule 2.3 tiene il file finito nella coda dei download; aMule 3.x lo toglie
-subito, quindi Gextto lo ritrova tra i file condivisi, anche dopo un riavvio. Gli
-episodi e film eD2k seguono l'opzione **Sposta gli episodi/pack in archivio**: con
+subito, quindi Gextto lo ritrova tra i file condivisi, anche dopo un riavvio.
+Prima dell'import aspetta che il file sia davvero nella cartella di arrivo, con
+la dimensione attesa e stabile: se aMule lo sta ancora copiando dal temp, non
+viene trattato come pronto. Gli episodi e film eD2k seguono l'opzione **Sposta gli episodi/pack in archivio**: con
 l'opzione attiva vengono spostati in libreria e rimossi dalla cartella di arrivo
 (aMule smette di condividerli); con l'opzione spenta entrano con **hardlink o
 copia** e aMule continua a condividere l'originale. Per eD2k lo spostamento

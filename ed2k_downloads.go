@@ -12,6 +12,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -223,6 +225,62 @@ const ed2kReportRetry = 10 * time.Minute
 // download queue.
 const ed2kPollInterval = 5 * time.Second
 
+// ed2kFileStableFor makes sure aMule has finished moving a completed file from
+// its temporary folder into the incoming/category folder before Gextto imports
+// it. On a separate disk or Docker mount that move is a copy, and aMule can
+// already report the download as complete while the file is still growing.
+// The value is a variable so tests do not have to sleep through it.
+var ed2kFileStableFor = 2 * time.Second
+
+type ed2kReadyState struct {
+	size    int64
+	modTime time.Time
+	since   time.Time
+}
+
+var (
+	ed2kReadyMu    sync.Mutex
+	ed2kReadySince = map[string]ed2kReadyState{}
+)
+
+// ed2kFileReady reports whether the completed file is present with the size
+// aMule promised and has not changed for ed2kFileStableFor.
+func ed2kFileReady(hash, path string, expected int64) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		ed2kForgetReady(hash)
+		return false
+	}
+	if expected > 0 && info.Size() != expected {
+		ed2kForgetReady(hash)
+		return false
+	}
+	if ed2kFileStableFor <= 0 {
+		ed2kForgetReady(hash)
+		return true
+	}
+	now := time.Now()
+	ed2kReadyMu.Lock()
+	previous, seen := ed2kReadySince[hash]
+	if !seen || previous.size != info.Size() || !previous.modTime.Equal(info.ModTime()) {
+		ed2kReadySince[hash] = ed2kReadyState{size: info.Size(), modTime: info.ModTime(), since: now}
+		ed2kReadyMu.Unlock()
+		return false
+	}
+	stable := now.Sub(previous.since) >= ed2kFileStableFor
+	ed2kReadyMu.Unlock()
+	if stable {
+		ed2kForgetReady(hash)
+	}
+	return stable
+}
+
+func ed2kForgetReady(hash string) {
+	ed2kReadyMu.Lock()
+	delete(ed2kReadySince, hash)
+	ed2kReadyMu.Unlock()
+}
+
 func (s ed2kSession) List() []models.TorrentView {
 	downloads := Ed2kDownloads(s.cfg)
 	incoming := ed2kIncomingDir(s.cfg)
@@ -280,25 +338,55 @@ func (s ed2kSession) PollEvents() []models.TorrentEvent {
 	if ed2kEventsKey != settings.Address {
 		ed2kLastStatus = map[string]bool{}
 		ed2kReported = map[string]time.Time{}
+		ed2kReadyMu.Lock()
+		ed2kReadySince = map[string]ed2kReadyState{}
+		ed2kReadyMu.Unlock()
 		ed2kEventsKey = settings.Address
 	}
 	var events []models.TorrentEvent
 	present := make(map[string]struct{}, len(downloads))
-	completeInQueue := false
-	for _, download := range downloads {
-		present[download.Hash] = struct{}{}
-		complete := download.Complete()
-		wasComplete, seen := ed2kLastStatus[download.Hash]
-		ed2kLastStatus[download.Hash] = complete
-		if complete && (!seen || !wasComplete) {
-			completeInQueue = true
-			events = append(events, models.TorrentEvent{Kind: "torrent_finished", Hash: download.Hash, Name: download.Name})
-		}
-	}
 	candidates := map[string]struct{}{}
+	incoming := ed2kIncomingDir(s.cfg)
+	for _, download := range downloads {
+		hash := strings.ToLower(download.Hash)
+		name := filepath.Base(strings.TrimSpace(download.Name))
+		present[hash] = struct{}{}
+		if !download.Complete() {
+			ed2kLastStatus[hash] = false
+			continue
+		}
+		// A file that aMule marked complete may still be moving from TEMP to
+		// the incoming/category folder. Do not report it until it is there,
+		// with the right size, and stable for a moment.
+		path := ""
+		if incoming != "" && name != "" {
+			path = filepath.Join(incoming, name)
+		}
+		if path != "" && ed2kFileReady(hash, path, download.Size) {
+			wasComplete, seen := ed2kLastStatus[hash]
+			ed2kLastStatus[hash] = true
+			if !seen || !wasComplete {
+				events = append(events, models.TorrentEvent{
+					Kind:     "torrent_finished",
+					Hash:     hash,
+					Name:     name,
+					SavePath: incoming,
+				})
+			}
+			continue
+		}
+		// The queue entry is complete but the file is not at the expected
+		// path yet. Let the shared-file lookup below find its real folder
+		// (a category folder, for example) instead of giving up.
+		ed2kLastStatus[hash] = false
+		candidates[hash] = struct{}{}
+	}
 	for hash := range ed2kLastStatus {
 		if _, ok := present[hash]; !ok {
 			delete(ed2kLastStatus, hash)
+			if reportedAt, reported := ed2kReported[hash]; reported && time.Since(reportedAt) < ed2kReportRetry {
+				continue
+			}
 			candidates[hash] = struct{}{}
 		}
 	}
@@ -321,16 +409,6 @@ func (s ed2kSession) PollEvents() []models.TorrentEvent {
 	}
 	ed2kEventsMu.Unlock()
 
-	if completeInQueue {
-		// aMule 2.3: the file is in the incoming folder under its name.
-		incoming := ed2kIncomingDir(s.cfg)
-		if incoming == "" {
-			return nil
-		}
-		for index := range events {
-			events[index].SavePath = incoming
-		}
-	}
 	if len(candidates) == 0 {
 		return events
 	}
@@ -345,14 +423,23 @@ func (s ed2kSession) PollEvents() []models.TorrentEvent {
 	ed2kEventsMu.Lock()
 	defer ed2kEventsMu.Unlock()
 	for _, file := range shared {
-		if _, wanted := candidates[file.Hash]; !wanted || file.Dir == "" || file.Name == "" {
+		hash := strings.ToLower(file.Hash)
+		if _, wanted := candidates[hash]; !wanted || file.Dir == "" || file.Name == "" {
 			continue
 		}
-		ed2kReported[file.Hash] = time.Now()
+		if reportedAt, reported := ed2kReported[hash]; reported && time.Since(reportedAt) < ed2kReportRetry {
+			continue
+		}
+		path := filepath.Join(file.Dir, filepath.Base(file.Name))
+		if !ed2kFileReady(hash, path, file.Size) {
+			continue
+		}
+		ed2kReported[hash] = time.Now()
+		ed2kLastStatus[hash] = true
 		events = append(events, models.TorrentEvent{
 			Kind:     "torrent_finished",
-			Hash:     file.Hash,
-			Name:     file.Name,
+			Hash:     hash,
+			Name:     filepath.Base(file.Name),
 			SavePath: file.Dir,
 		})
 	}
