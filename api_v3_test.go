@@ -270,6 +270,47 @@ func TestV3RoutesUseTheJellyseerrSpelling(t *testing.T) {
 	}
 }
 
+func TestV3AddCarriesTheProfileAudioAndUpgrades(t *testing.T) {
+	state := v3TestState(t)
+	profiles := `[{"id":1,"name":"Default","language":"ita"},` +
+		`{"id":5,"name":"4K lossless senza upgrade","quality":"2160p","audio":"lossless-5.1","language":"eng","disable_upgrades":true}]`
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey, profiles); err != nil {
+		t.Fatal(err)
+	}
+	TouchConfigGeneration()
+	body := `{"title":"Lossless Show","tvdbId":4321,"qualityProfileId":5,"monitored":true}`
+	rec := httptest.NewRecorder()
+	V3SeriesAdd(rec, httptest.NewRequest("POST", "/api/v3/series", bytes.NewBufferString(body)), state)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("add -> %d %s", rec.Code, rec.Body.String())
+	}
+	series := v3FindSeries(t, state, "Lossless Show")
+	if series.Quality != "2160p" || series.Audio != "lossless-5.1" || series.Language != "eng" || !series.DisableUpgrades {
+		t.Fatalf("series = %+v, want the audio and the upgrade switch of the profile", series)
+	}
+}
+
+// The automatic profiles are a migration of the per-title data: they carry the
+// minimum audio and the upgrade switch too, not just quality and language.
+func TestV3GeneratedProfilesKeepAudioAndUpgrades(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Settings = map[string]string{qualityProfilesKey: `[{"id":1,"name":"Default","language":"ita"}]`}
+	cfg.Series = []SeriesConfig{{Name: "A", Quality: "2160p", Audio: "lossless-5.1",
+		Language: "eng", Subtitle: "ita", DisableUpgrades: true}}
+	profiles := v3Profiles(&cfg)
+	if len(profiles) != 2 {
+		t.Fatalf("profiles = %+v, want Default plus the library combination", profiles)
+	}
+	generated := profiles[1]
+	if generated.Quality != "2160p" || generated.Audio != "lossless-5.1" || generated.Language != "eng" ||
+		generated.Subtitle != "ita" || !generated.DisableUpgrades {
+		t.Fatalf("generated profile = %+v", generated)
+	}
+	if !bytes.Contains([]byte(generated.Name), []byte("lossless-5.1")) {
+		t.Fatalf("the generated name must say which audio it requires: %q", generated.Name)
+	}
+}
+
 func TestV3ProfilesIgnoreTitleExclusionsAndAny(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Settings = map[string]string{qualityProfilesKey: `[{"id":1,"name":"Default","language":"ita"}]`}

@@ -1306,10 +1306,7 @@ func v2ProfileSummary(s *AppState, profile QualityProfile) string {
 	if profile.Audio != "" {
 		parts = append(parts, tr("audio")+" "+profile.Audio)
 	}
-	language := strings.TrimSpace(profile.Language)
-	if language == "" {
-		language = "ita"
-	}
+	language := qualityProfileLanguage(latestConfig(s), profile.Language)
 	parts = append(parts, tr("lingua")+" "+language)
 	if profile.Subtitle != "" {
 		parts = append(parts, tr("sottotitoli")+" "+profile.Subtitle)
@@ -1335,12 +1332,17 @@ type v2TitleProfiles struct {
 
 func v2TitleProfilesFor(s *AppState, values profileTitleValues) v2TitleProfiles {
 	profiles := ensureQualityProfiles(s)
-	match := matchingQualityProfile(profiles, values)
+	cfg := latestConfig(s)
+	defaultLanguage := "ita"
+	if cfg != nil {
+		defaultLanguage = cfg.DefaultLanguage()
+	}
+	match := matchingQualityProfile(profiles, values, defaultLanguage)
 	view := v2TitleProfiles{Matched: match > 0}
 	for _, profile := range profiles {
 		view.Choices = append(view.Choices, v2ProfileChoice{ID: profile.ID, Name: profile.Name, Summary: v2ProfileSummary(s, profile), Selected: profile.ID == match})
 	}
-	view.CurrentSummary = v2ProfileSummary(s, QualityProfile{Quality: values.Quality, Audio: values.Audio, Language: values.Language, Subtitle: values.Subtitle, DisableUpgrades: values.DisableUpgrades})
+	view.CurrentSummary = v2ProfileSummary(s, QualityProfile{Quality: values.Quality, Audio: values.Audio, Language: values.Language, Subtitle: values.Subtitle, Exclude: values.Exclude, DisableUpgrades: values.DisableUpgrades})
 	return view
 }
 

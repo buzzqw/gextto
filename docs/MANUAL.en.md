@@ -653,7 +653,7 @@ The most important fields are:
 
 | Field | Effect |
 |---|---|
-| Quality profile | when adding and on the title page: gives the title the quality, minimum audio, language, subtitles and “Allow upgrades” of the profile and adds its exclusions to the title's own (see *Quality profiles*). On the page the profile matching the title's values is preselected; when none matches, **Current values** appears, and saving with it changes nothing. A profile is a template: changing it later does not touch titles already created |
+| Quality profile | when adding and on the title page: gives the title the quality, minimum audio, language, subtitles and “Allow upgrades” of the profile and adds its exclusions to the title's own (see *Quality profiles*). On the page the profile matching the title's values is preselected, exclusions included; when none matches, **Current values** appears, and saving with it changes nothing. A profile is a template: changing it later does not touch titles already created |
 | Quality | restricts acceptable releases and contributes to the score |
 | Minimum audio | comes from the quality profile when adding and is changed with *Edit selected* (it is not on the title page); a preset that already includes the channels: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Any** imposes no limit and is the default, including for existing series |
 | Language | requires the configured language when it is recognisable in the title |
@@ -1174,11 +1174,13 @@ upgrades») you use. The profile **Quality** is picked from a list of the
 resolutions Gextto recognises (360p … 2160p, a minimum with «+», the 720p-1080p
 range, or Any); a value typed by hand in the past stays selected until you change
 it. **Language** and **Subtitles** suggest the usual choices (ita, eng, ita,eng,
-multi, any) but also take a value typed by hand, such as `fre` or `ita,eng,fre`. Gextto generates a
-profile for every combination of quality, language and subtitles already present
-in the library (a single title's exclusions and the `any` quality, the same as no
-limit, do not make profiles of their own) and exposes them to
-Jellyseerr through `/api/v3/qualityprofile`; the first profile is **Default**.
+multi, any) but also take a value typed by hand, such as `fre` or `ita,eng,fre`.
+An empty language means the default language of Gextto. Gextto generates a
+profile for every combination of quality, minimum audio, language, subtitles and
+“Allow upgrades” already present in the library (a single title's exclusions and
+the `any` quality, the same as no limit, do not make profiles of their own) and
+exposes them to Jellyseerr through `/api/v3/qualityprofile`; the first profile is
+**Default**.
 **Profiles are templates, not rules.** When you use a profile (by choosing it in
 the **Quality profile** field of the add form of a series or a movie, from
 Jellyseerr or from *Edit selected* in the Series and Movies tables), Gextto

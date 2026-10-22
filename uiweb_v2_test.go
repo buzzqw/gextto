@@ -2451,11 +2451,6 @@ func TestV2AddFormOffersProfilesAndStoresNoUpgrades(t *testing.T) {
 	if !strings.Contains(body, `>Archivio 4K</option>`) || !strings.Contains(body, `id="v2-profile-summary" aria-live="polite">qualsiasi qualità · lingua ita</small>`) {
 		t.Fatalf("profile options or summary not rendered as expected: %s", body)
 	}
-	// The options carry the name only; the summary of the chosen one is shown
-	// under the list (here the preselected Default).
-	if !strings.Contains(body, `>Archivio 4K</option>`) || !strings.Contains(body, `id="v2-profile-summary" aria-live="polite">qualsiasi qualità · lingua ita</small>`) {
-		t.Fatalf("profile options or summary not rendered as expected: %s", body)
-	}
 	for _, field := range []string{`name="quality"`, `name="language"`, `name="subtitle"`, `name="audio"`, `name="disable_upgrades"`} {
 		if strings.Contains(body, field) {
 			t.Fatalf("the add form still has %s next to the profile", field)
@@ -2576,7 +2571,7 @@ func TestV2TitlePagesApplyAQualityProfile(t *testing.T) {
 	// No profile has 720p+ · ita: the page offers «Valori attuali»; the movie
 	// matches Default, which is preselected.
 	code, body := v2Request(t, server, http.MethodGet, "/?view=series&series=Show", nil)
-	if code != http.StatusOK || !strings.Contains(body, `<option value="0" data-summary="720p&#43; · lingua ita" selected>Valori attuali</option>`) || strings.Contains(body, `name="quality"`) {
+	if code != http.StatusOK || !strings.Contains(body, `<option value="0" data-summary="720p&#43; · lingua ita · escludi spinoff" selected>Valori attuali</option>`) || strings.Contains(body, `name="quality"`) {
 		t.Fatalf("series page profile choice: %d %s", code, body)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=3", nil)
@@ -2606,6 +2601,34 @@ func TestV2TitlePagesApplyAQualityProfile(t *testing.T) {
 	}
 	if got := latestConfig(state).Movies[0]; got.Quality != "1080p+" || got.Language != "eng" || got.Subtitle != "ita" || !got.DisableUpgrades || got.Exclude != "cam" {
 		t.Fatalf("movie after profile = %+v", got)
+	}
+}
+
+// A title whose values match a profile but whose exclusions differ must not
+// preselect that profile: saving an unrelated field would add the profile's
+// exclusions without the operator asking for it.
+func TestV2TitlePageKeepsExclusionsWhenNoProfileMatchesExactly(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey, `[{"id":1,"name":"Senza cam","quality":"1080p","language":"ita","exclude":"cam"}]`); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveLibrary(state.cfg.DataDir,
+		[]SeriesConfig{{Name: "Show", Seasons: "1+", Quality: "1080p", Language: "ita", Exclude: "spinoff", Enabled: true}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=series&series=Show", nil)
+	if code != http.StatusOK || !strings.Contains(body, `selected>Valori attuali</option>`) {
+		t.Fatalf("the page must offer the current values: %d %s", code, body)
+	}
+	if code, body := v2Request(t, server, http.MethodPost, "/series/save", url.Values{"name": {"Show"}, "seasons": {"1+"},
+		"exclude": {"spinoff"}, "quality_profile_id": {"0"}, "flags": {"1"}, "anime": {"false"}}); code >= 400 {
+		t.Fatalf("save -> %d %s", code, body)
+	}
+	if got := latestConfig(state).Series[0]; got.Exclude != "spinoff" || got.Quality != "1080p" {
+		t.Fatalf("an unrelated save changed the title: %+v", got)
 	}
 }
 

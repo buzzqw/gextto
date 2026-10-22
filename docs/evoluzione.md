@@ -773,9 +773,11 @@ remains here.
 **The gap with Sonarr/Radarr** (§1), by value per effort, after a study and without
 copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
 
-- **Named profiles as templates**: *Configuration → Sources → Quality profiles*,
-  with a generated profile for every override combination in the library,
-  "Default" first and a stable id per profile. A profile is copied into a title
+- **Named profiles as templates**: *Configuration → Quality and upgrades → Quality
+  profiles*, with a generated profile for every combination of quality, minimum
+  audio, language, subtitles and upgrade switch in the library (a title's own
+  exclusions make no profile), "Default" first and a stable id per profile. A
+  profile is copied into a title
   (from Jellyseerr or from *Edit selected* in the Series and Movies tables,
   which also edits many titles at once); it does not govern it. The *Sonarr* semantics (ordered qualities,
   cutoff, custom formats) stay out by choice (§1).

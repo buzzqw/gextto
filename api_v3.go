@@ -28,9 +28,13 @@ type v3QualityProfile struct {
 	Cutoff         int    `json:"cutoff"`
 	Items          []any  `json:"items"`
 	Quality        string `json:"-"`
+	Audio          string `json:"-"`
 	Language       string `json:"-"`
 	Subtitle       string `json:"-"`
 	Exclude        string `json:"-"`
+	// DisableUpgrades is «Permetti upgrade: No». UpgradeAllowed, which the v3
+	// clients read, is its opposite.
+	DisableUpgrades bool `json:"-"`
 }
 
 type v3LanguageProfile struct {
@@ -112,10 +116,12 @@ type v3QueueItem struct {
 }
 
 // v3Profiles derives the named profiles from the per-title overrides: every
-// distinct combination becomes one profile, so an existing library is migrated
-// without a rewrite and the first profile is always "Default". It seeds the
-// saved list once (ensureQualityProfiles); afterwards the saved list, with its
-// stable ids, is the only source.
+// distinct combination of quality, minimum audio, language, subtitles and
+// upgrade switch becomes one profile, so an existing library is migrated
+// without a rewrite and the first profile is always "Default". Exclusions are
+// the title's own and never make a profile. It seeds the saved list once
+// (ensureQualityProfiles); afterwards the saved list, with its stable ids, is
+// the only source.
 func v3Profiles(cfg *Config) []v3QualityProfile {
 	defaultLanguage := ""
 	if cfg != nil {
@@ -124,18 +130,20 @@ func v3Profiles(cfg *Config) []v3QualityProfile {
 	seen := map[string]bool{}
 	usedNames := map[string]bool{}
 	out := []v3QualityProfile{}
-	add := func(name, quality, language, subtitle, exclude string) {
+	add := func(name, quality, audio, language, subtitle, exclude string, disableUpgrades bool) {
 		// "any" sets no resolution limit, exactly like an empty quality.
 		if strings.EqualFold(strings.TrimSpace(quality), "any") {
 			quality = ""
 		}
-		key := strings.Join([]string{quality, language, subtitle, exclude}, "\x00")
+		audio = normalizeAudioRequirement(audio)
+		key := strings.Join([]string{quality, audio, language, subtitle, exclude,
+			strconv.FormatBool(disableUpgrades)}, "\x00")
 		if seen[key] {
 			return
 		}
 		seen[key] = true
 		parts := []string{}
-		for _, part := range []string{quality, language, subtitle} {
+		for _, part := range []string{quality, audio, language, subtitle} {
 			if strings.TrimSpace(part) != "" {
 				parts = append(parts, strings.TrimSpace(part))
 			}
@@ -151,8 +159,9 @@ func v3Profiles(cfg *Config) []v3QualityProfile {
 		}
 		usedNames[strings.ToLower(name)] = true
 		out = append(out, v3QualityProfile{
-			ID: len(out) + 1, Name: name, Quality: quality, Language: language,
-			Subtitle: subtitle, Exclude: exclude, Items: []any{},
+			ID: len(out) + 1, Name: name, Quality: quality, Audio: audio, Language: language,
+			Subtitle: subtitle, Exclude: exclude, DisableUpgrades: disableUpgrades,
+			Items: []any{},
 		})
 	}
 	// The named profiles come first, in their saved order; the first one is the
@@ -165,10 +174,11 @@ func v3Profiles(cfg *Config) []v3QualityProfile {
 		}
 	}
 	if !hasDefault {
-		add("Default", "", defaultLanguage, "", "")
+		add("Default", "", "", defaultLanguage, "", "", false)
 	}
 	for _, profile := range stored {
-		add(profile.Name, profile.Quality, profile.Language, profile.Subtitle, profile.Exclude)
+		add(profile.Name, profile.Quality, profile.Audio, profile.Language, profile.Subtitle,
+			profile.Exclude, profile.DisableUpgrades)
 	}
 	// Every combination found in the library that has no name yet becomes a
 	// profile too: this is the automatic migration from the per-title data.
@@ -176,10 +186,12 @@ func v3Profiles(cfg *Config) []v3QualityProfile {
 	// spin-off): they never make a profile of their own.
 	if cfg != nil {
 		for _, series := range cfg.Series {
-			add("", series.Quality, series.Language, series.Subtitle, "")
+			add("", series.Quality, series.Audio, qualityProfileLanguage(cfg, series.Language),
+				series.Subtitle, "", series.DisableUpgrades)
 		}
 		for _, movie := range cfg.Movies {
-			add("", movie.Quality, movie.Language, movie.Subtitle, "")
+			add("", movie.Quality, movie.Audio, qualityProfileLanguage(cfg, movie.Language),
+				movie.Subtitle, "", movie.DisableUpgrades)
 		}
 	}
 	return out
@@ -262,7 +274,9 @@ func V3QualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 	out := make([]v3QualityProfile, 0, len(profiles))
 	for _, profile := range profiles {
 		out = append(out, v3QualityProfile{ID: profile.ID, Name: profile.Name, Quality: profile.Quality,
-			Language: profile.Language, Subtitle: profile.Subtitle, Exclude: profile.Exclude, Items: []any{}})
+			Audio: profile.Audio, Language: profile.Language, Subtitle: profile.Subtitle,
+			Exclude: profile.Exclude, DisableUpgrades: profile.DisableUpgrades,
+			UpgradeAllowed: !profile.DisableUpgrades, Items: []any{}})
 	}
 	v3JSON(w, http.StatusOK, out)
 }

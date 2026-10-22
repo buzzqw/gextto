@@ -17,6 +17,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 - **Quality profiles: renaming no longer changes the number.** A profile's number is what Jellyseerr remembers: before, renaming a profile in the editor (or saving from a page opened before a change) gave it a new number. Now every editor row carries its own number.
 
+- **Quality profiles: the title page no longer adds exclusions by itself.** A profile is preselected only when the exclusions match too: before, quality, audio, language, subtitles and upgrades were enough, and saving any field (seasons, for example) could add the profile's exclusions without choosing it. The **Current values** entry now shows the title's exclusions too. An empty language in a profile also means Gextto's default language, as in the add form, instead of accepting any language on the page and in the v3 API.
+
+- **Generated quality profiles: minimum audio and upgrades too.** The profiles created automatically from the library (the ones Jellyseerr sees too) now carry the minimum audio and **Allow upgrades** of the titles they come from, not only quality, language and subtitles; their name also says which audio they require. A request added from Jellyseerr with that profile no longer loses these two constraints.
+
 - **Series and movie pages: the quality profile instead of single fields.** On the title page **Quality**, **Language** and **Subtitles** make room for **Quality profile**, as in the add form. The profile matching the title's values is preselected, with its summary; when none matches, **Current values** appears, and saving with it changes nothing. Choosing a profile and saving copies its quality, minimum audio, language, subtitles and **Allow upgrades** into the title and adds the profile's exclusions to the title's. The profile stays a template: editing it in *Quality and upgrades* does not change titles already created.
 
 - **Series page: the read-only Name field is gone.** It repeated the title already shown in the header and looked editable without being so. To fix a wrong name, delete the series and add it again.

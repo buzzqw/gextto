@@ -428,9 +428,13 @@ The items of `GET`/`POST /api/quality-profiles` carry `id`, `name`, `quality`,
 `audio` (one of the presets above, empty = any), `language`, `subtitle`,
 `exclude`, `disable_upgrades` and `upgrades` (`allow`/`deny`, the same switch as the profile editor writes it). A profile is a template: the add form and the
 v3 endpoints (`POST /api/v3/series`, `POST /api/v3/movie`) copy its values,
-`audio` and `disable_upgrades` included, into the new title.
+`audio` and `disable_upgrades` included, into the new title. An empty
+`language` means the configured default language. The v3 list reports
+`upgradeAllowed` as the opposite of `disable_upgrades`; the profiles generated
+from the library (until the list is saved for the first time) carry the quality,
+minimum audio, language, subtitles and upgrade switch of the titles they come
+from—never a single title's exclusions.
 
-## gx-torrent daemon routes
 ## gx-torrent daemon routes
 
 The `gx-torrent` daemon (also usable standalone, without Gextto) serves its own

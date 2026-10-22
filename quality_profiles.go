@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 )
 
@@ -128,7 +129,26 @@ func qualityProfilesFromConfig(cfg *Config) []QualityProfile {
 	if cfg == nil {
 		return nil
 	}
-	return decodeQualityProfiles(cfg.Settings[qualityProfilesKey])
+	profiles := decodeQualityProfiles(cfg.Settings[qualityProfilesKey])
+	// An empty language means the configured default language, exactly like an
+	// empty language field in the add form. Filling it at read time keeps the
+	// title pages, the add form and the v3 API on the same rule.
+	for index := range profiles {
+		profiles[index].Language = qualityProfileLanguage(cfg, profiles[index].Language)
+	}
+	return profiles
+}
+
+// qualityProfileLanguage is the language a profile gives a title: an empty
+// value means the configured default language.
+func qualityProfileLanguage(cfg *Config, language string) string {
+	if trimmed := strings.TrimSpace(language); trimmed != "" {
+		return trimmed
+	}
+	if cfg != nil {
+		return cfg.DefaultLanguage()
+	}
+	return "ita"
 }
 
 // ensureQualityProfiles materialises the profiles the library already implies
@@ -140,8 +160,12 @@ func ensureQualityProfiles(s *AppState) []QualityProfile {
 		return profiles
 	}
 	for _, profile := range v3Profiles(cfg) {
-		profiles = append(profiles, QualityProfile{ID: profile.ID, Name: profile.Name, Quality: profile.Quality,
-			Language: profile.Language, Subtitle: profile.Subtitle, Exclude: profile.Exclude})
+		seeded := QualityProfile{ID: profile.ID, Name: profile.Name, Quality: profile.Quality,
+			Audio: profile.Audio, Language: profile.Language, Subtitle: profile.Subtitle,
+			Exclude: profile.Exclude, DisableUpgrades: profile.DisableUpgrades}
+		// Both spellings travel to the editor, which writes «upgrades».
+		normalizeProfileUpgrades(&seeded)
+		profiles = append(profiles, seeded)
 	}
 	if raw, err := json.Marshal(profiles); err == nil && cfg != nil {
 		_ = SaveSetting(cfg.DataDir, qualityProfilesKey, string(raw))
@@ -164,8 +188,8 @@ func applyQualityProfileToAdd(input *TmdbAddInput, profile QualityProfile) {
 
 // profileTitleValues are the values a profile gives a title.
 type profileTitleValues struct {
-	Quality, Audio, Language, Subtitle string
-	DisableUpgrades                    bool
+	Quality, Audio, Language, Subtitle, Exclude string
+	DisableUpgrades                             bool
 }
 
 // qualityProfileExact returns the profile with id, if it exists (no fallback:
@@ -180,11 +204,16 @@ func qualityProfileExact(profiles []QualityProfile, id int) (QualityProfile, boo
 }
 
 // matchingQualityProfile returns the id of the first profile whose values are
-// the title's (quality «any» = no limit, empty language = ita), or 0.
-func matchingQualityProfile(profiles []QualityProfile, title profileTitleValues) int {
+// the title's, or 0. Exclusions count: applying a profile adds its exclusions
+// to the title's, so a title whose exclusions differ would change on the next
+// save even if the operator edited an unrelated field.
+func matchingQualityProfile(profiles []QualityProfile, title profileTitleValues, defaultLanguage string) int {
 	norm := func(values profileTitleValues) profileTitleValues {
 		if strings.EqualFold(strings.TrimSpace(values.Quality), "any") {
 			values.Quality = ""
+		}
+		if strings.TrimSpace(values.Language) == "" {
+			values.Language = defaultLanguage
 		}
 		if strings.TrimSpace(values.Language) == "" {
 			values.Language = "ita"
@@ -197,11 +226,46 @@ func matchingQualityProfile(profiles []QualityProfile, title profileTitleValues)
 	}
 	want := norm(title)
 	for _, profile := range profiles {
-		if norm(profileTitleValues{profile.Quality, profile.Audio, profile.Language, profile.Subtitle, profile.DisableUpgrades}) == want {
+		candidate := norm(profileTitleValues{Quality: profile.Quality, Audio: profile.Audio,
+			Language: profile.Language, Subtitle: profile.Subtitle,
+			DisableUpgrades: profile.DisableUpgrades})
+		if candidate.Quality == want.Quality && candidate.Audio == want.Audio &&
+			candidate.Language == want.Language && candidate.Subtitle == want.Subtitle &&
+			candidate.DisableUpgrades == want.DisableUpgrades &&
+			sameExclusions(profile.Exclude, title.Exclude) {
 			return profile.ID
 		}
 	}
 	return 0
+}
+
+// sameExclusions compares two exclusion lists as sets: the order and the
+// duplicates mergeExclusions removes do not make a different policy.
+func sameExclusions(a, b string) bool {
+	words := func(list string) []string {
+		seen := map[string]bool{}
+		out := []string{}
+		for _, word := range strings.Split(list, ",") {
+			word = strings.ToLower(strings.TrimSpace(word))
+			if word == "" || seen[word] {
+				continue
+			}
+			seen[word] = true
+			out = append(out, word)
+		}
+		sort.Strings(out)
+		return out
+	}
+	left, right := words(a), words(b)
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }
 
 // mergeExclusions joins comma-separated exclusion lists, dropping empty and
@@ -248,6 +312,7 @@ func SaveQualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		payload.Items = direct
 	}
+	cfg := latestConfig(s)
 	cleaned := make([]QualityProfile, 0, len(payload.Items))
 	seen := map[string]bool{}
 	for _, profile := range payload.Items {
@@ -259,12 +324,11 @@ func SaveQualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 		normalizeProfileUpgrades(&profile)
 		cleaned = append(cleaned, QualityProfile{
 			ID: profile.ID, Name: profile.Name, Quality: strings.TrimSpace(profile.Quality),
-			Language: strings.TrimSpace(profile.Language), Subtitle: strings.TrimSpace(profile.Subtitle),
+			Language: qualityProfileLanguage(cfg, profile.Language), Subtitle: strings.TrimSpace(profile.Subtitle),
 			Exclude: strings.TrimSpace(profile.Exclude), Audio: normalizeAudioRequirement(profile.Audio),
 			DisableUpgrades: profile.DisableUpgrades, Upgrades: profile.Upgrades,
 		})
 	}
-	cfg := latestConfig(s)
 	cleaned = assignQualityProfileIDs(cleaned, qualityProfilesFromConfig(cfg))
 	raw, _ := json.Marshal(cleaned)
 	if err := validateSettingValue(qualityProfilesKey, string(raw), cfg); err != nil {

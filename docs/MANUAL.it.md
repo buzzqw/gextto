@@ -669,7 +669,7 @@ I campi più importanti sono:
 
 | Campo | Effetto |
 |---|---|
-| Profilo di qualità | all'aggiunta e nella scheda del titolo: dà al titolo qualità, audio minimo, lingua, sottotitoli e «Permetti upgrade» del profilo e somma le sue esclusioni a quelle del titolo (vedi *Profili di qualità*). Nella scheda è preselezionato il profilo che corrisponde ai valori del titolo; se nessuno corrisponde compare **Valori attuali**, che salvando non cambia nulla. Il profilo è un modello: cambiarlo dopo non tocca i titoli già creati |
+| Profilo di qualità | all'aggiunta e nella scheda del titolo: dà al titolo qualità, audio minimo, lingua, sottotitoli e «Permetti upgrade» del profilo e somma le sue esclusioni a quelle del titolo (vedi *Profili di qualità*). Nella scheda è preselezionato il profilo che corrisponde ai valori del titolo, esclusioni comprese; se nessuno corrisponde compare **Valori attuali**, che salvando non cambia nulla. Il profilo è un modello: cambiarlo dopo non tocca i titoli già creati |
 | Qualità | restringe le release accettabili e partecipa allo score |
 | Audio minimo | arriva dal profilo di qualità all'aggiunta e si cambia con *Modifica selezionati* (non c'è nella scheda del titolo); preset che include già i canali: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Qualsiasi** non impone nulla ed è il default, anche per le serie già caricate |
 | Lingua | richiede la lingua configurata quando è riconoscibile nel titolo |
@@ -1210,11 +1210,13 @@ un elenco con le risoluzioni che Gextto riconosce (360p … 2160p, il minimo con
 «+», l'intervallo 720p-1080p, oppure Qualsiasi); un valore scritto a mano in
 passato resta selezionato finché non lo cambi. **Lingua** e **Sottotitoli**
 propongono le scelte comuni (ita, eng, ita,eng, multi, any) ma accettano
-anche un valore scritto a mano, per esempio `fre` o `ita,eng,fre`. Gextto
-genera automaticamente un profilo per ogni combinazione di qualità, lingua e
-sottotitoli già presente nella libreria (le esclusioni di un singolo titolo e la
-qualità `any`, uguale a nessun limite, non creano profili a parte) e li espone a Jellyseerr tramite `/api/v3/qualityprofile`; il primo
-profilo è **Default**.
+anche un valore scritto a mano, per esempio `fre` o `ita,eng,fre`; una lingua
+lasciata vuota vale la lingua predefinita di Gextto. Gextto
+genera automaticamente un profilo per ogni combinazione di qualità, audio
+minimo, lingua, sottotitoli e «Permetti upgrade» già presente nella libreria (le
+esclusioni di un singolo titolo e la qualità `any`, uguale a nessun limite, non
+creano profili a parte) e li espone a Jellyseerr tramite
+`/api/v3/qualityprofile`; il primo profilo è **Default**.
 
 **I profili sono modelli, non regole.** Quando usi un profilo (scegliendolo nel
 campo **Profilo di qualità** del modulo di aggiunta di una serie o di un film, da
