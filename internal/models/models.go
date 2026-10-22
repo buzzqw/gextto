@@ -371,7 +371,10 @@ func (l *LiveDownloads) IsEmpty() bool {
 
 // ApprovalContext carries extra data for the approval decision.
 type ApprovalContext struct {
-	Archive       *ArchiveQualityIndex
+	Archive *ArchiveQualityIndex
+	// MovieArchive is the best matching movie already on the archive volume.
+	// Series use Archive; this covers a movie whose database row is missing.
+	MovieArchive  *ArchiveQuality
 	Live          *LiveDownloads
 	ForbidUpgrade bool
 	// UpgradeUntilScore stops upgrades once the existing copy scores at least

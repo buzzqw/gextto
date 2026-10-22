@@ -1148,6 +1148,63 @@ func cleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, new
 	return removed, nil
 }
 
+// ArchiveMovieQuality finds the best matching movie already present in the
+// configured archive root. It is the pre-download counterpart of
+// DiscardIfInferiorMovie: a movie file can exist on the library volume while
+// its database row is missing (legacy import, manual copy, a removed row or a
+// rebuilt database). Without this check the cycle would download it again and
+// only discard it after completion, wasting the whole transfer.
+func ArchiveMovieQuality(cfg *Config, release *models.Release) *models.ArchiveQuality {
+	if cfg == nil || release == nil || release.Kind != "movie" || cfg.ArchiveRoot == nil {
+		return nil
+	}
+	root := strings.TrimSpace(*cfg.ArchiveRoot)
+	title := strings.TrimSpace(release.Title)
+	if root == "" || title == "" {
+		return nil
+	}
+	words := make([]string, 0)
+	for _, word := range strings.Fields(NormalizeSeriesName(title)) {
+		if len(word) > 1 {
+			words = append(words, word)
+		}
+	}
+	if len(words) == 0 {
+		return nil
+	}
+	yearPattern, err := utils.CachedRegex(`\b(19\d{2}|20\d{2})\b`)
+	if err != nil {
+		return nil
+	}
+	files, err := VideoFiles(root)
+	if err != nil {
+		return nil
+	}
+	var best *models.ArchiveQuality
+	for _, file := range files {
+		if _, ok := cleanerName(file); !ok || !cleanerContainsAllWords(NormalizeSeriesName(file), words) {
+			continue
+		}
+		if release.Year != nil {
+			capture := yearPattern.FindStringSubmatch(file)
+			if capture == nil || capture[1] == "" {
+				continue
+			}
+			oldYear, err := strconv.ParseInt(capture[1], 10, 64)
+			if err != nil || absInt64(oldYear-*release.Year) > 1 {
+				continue
+			}
+		}
+		quality := ParseQuality(file)
+		score := cfg.FileScore(file, "movie", title)
+		if best == nil || score > best.Score {
+			value := models.ArchiveQuality{Quality: quality, Score: score}
+			best = &value
+		}
+	}
+	return best
+}
+
 // DiscardIfInferiorMovie reports whether the incoming movie file must be
 // discarded because an existing file of the same movie is better.
 func DiscardIfInferiorMovie(cfg *Config, movie string, year *int64, newScore int64, newFile, archivePath string) (bool, error) {

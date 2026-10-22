@@ -168,18 +168,28 @@ func archiveComparison(
 		var mediaInfoJSON string
 		query := "SELECT COALESCE(m.title,''), m.quality_score, m.downloaded_at, COALESCE(t.metadata_json,''), COALESCE(m.media_info_json,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE m.removed_at IS NULL AND m.name=?1 AND (m.year IS ?2 OR (?2 IS NOT NULL AND m.year IS NOT NULL AND abs(m.year - ?2) <= 1)) ORDER BY (m.year IS ?2) DESC, m.id DESC LIMIT 1"
 		err := db.db.QueryRow(query, release.Title, release.Year).Scan(&title, &oldScore, &downloadedAt, &metadataJSON, &mediaInfoJSON)
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) && disk == nil {
 			return nil, nil
 		}
-		if err != nil {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
 		oldQuality := currentQuality(title)
-		var metadata models.TorrentMeta
-		if err := json.Unmarshal([]byte(metadataJSON), &metadata); err == nil {
-			oldQuality = metadata.Release.Quality
+		if metadataJSON != "" {
+			var metadata models.TorrentMeta
+			if err := json.Unmarshal([]byte(metadataJSON), &metadata); err == nil {
+				oldQuality = metadata.Release.Quality
+			}
 		}
 		enrichQualityWithMediaInfo(mediaInfoJSON, &oldQuality)
+		downloaded := downloadedAt.Valid
+		if disk != nil {
+			oldQuality = MergeQuality(disk.Quality, oldQuality)
+			if disk.Score > oldScore {
+				oldScore = disk.Score
+			}
+			downloaded = true
+		}
 		var upgradeReason any
 		if value := upgradeReasonUntil(&release.Quality, &oldQuality, score, oldScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore); value != "" {
 			upgradeReason = value
@@ -189,7 +199,7 @@ func archiveComparison(
 			"title":           title,
 			"quality":         oldQuality,
 			"score":           oldScore,
-			"downloaded":      downloadedAt.Valid,
+			"downloaded":      downloaded,
 			"upgrade_allowed": !forbidUpgrade,
 			"upgrade_reason":  upgradeReason,
 		}, nil
@@ -262,6 +272,9 @@ func archiveComparison(
 // decision.
 func Explain(cfg *Config, db *Database, release *models.Release) (*DecisionTrace, error) {
 	disk := ArchiveQuality(cfg, release)
+	if release != nil && release.Kind == "movie" {
+		disk = ArchiveMovieQuality(cfg, release)
+	}
 	return ExplainWithArchive(cfg, db, release, disk)
 }
 
@@ -556,9 +569,13 @@ func ExplainWithArchive(
 	if (series != nil || movie != nil) && hash != nil {
 		approvalContext := &models.ApprovalContext{
 			Archive:           indexFromDisk(disk, release),
+			MovieArchive:      nil,
 			ForbidUpgrade:     forbidUpgrade,
 			UpgradeUntilScore: cfg.UpgradeUntilScore,
 			DryRun:            true,
+		}
+		if release.Kind == "movie" {
+			approvalContext.MovieArchive = disk
 		}
 		var approved bool
 		var realReason string

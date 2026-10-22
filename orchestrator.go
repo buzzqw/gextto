@@ -770,6 +770,7 @@ func RunCycleDomain(
 
 	emptyArchiveIndex := &models.ArchiveQualityIndex{}
 	archiveIndexCache := map[string]*models.ArchiveQualityIndex{}
+	movieArchiveCache := map[string]*models.ArchiveQuality{}
 	// Downloads currently in the libtorrent session: do not propose an existing
 	// hash or episode again, even when the database has not recorded it yet.
 	liveDownloads := &models.LiveDownloads{
@@ -942,6 +943,22 @@ func RunCycleDomain(
 				archiveIndex = computed
 			}
 		}
+		// A movie file already on the archive volume is authoritative even when
+		// its database row is missing. Scan once per cycle for the same title
+		// and year: a full archive walk for every candidate would be wasteful.
+		var movieArchive *models.ArchiveQuality
+		if release.Kind == "movie" {
+			key := strings.ToLower(release.Title) + "\x00"
+			if release.Year != nil {
+				key += strconv.FormatInt(*release.Year, 10)
+			}
+			if cached, ok := movieArchiveCache[key]; ok {
+				movieArchive = cached
+			} else {
+				movieArchive = ArchiveMovieQuality(cfg, &release)
+				movieArchiveCache[key] = movieArchive
+			}
+		}
 		// Per-title "allow upgrades" toggle (default on). The gap flag feeds the
 		// always-on "no orphan older episode" best practice.
 		forbidUpgrade := false
@@ -988,6 +1005,7 @@ func RunCycleDomain(
 		}
 		approvalContext := &models.ApprovalContext{
 			Archive:           archiveIndex,
+			MovieArchive:      movieArchive,
 			Live:              liveDownloads,
 			ForbidUpgrade:     forbidUpgrade,
 			UpgradeUntilScore: cfg.UpgradeUntilScore,
@@ -1466,10 +1484,12 @@ func evaluateReleaseApproval(db *Database, release *models.Release, score, minSc
 		return db.CheckSeriesScored(release, score, minScoreDiff, &evaluation)
 	}
 	upgradeUntil := int64(0)
+	var movieArchive *models.ArchiveQuality
 	if approvalContext != nil {
 		upgradeUntil = approvalContext.UpgradeUntilScore
+		movieArchive = approvalContext.MovieArchive
 	}
-	return db.checkMovieScoredWith(release, score, minScoreDiff, upgradeUntil, forbidUpgrade, dryRun)
+	return db.checkMovieScoredWithDisk(release, score, minScoreDiff, upgradeUntil, forbidUpgrade, dryRun, movieArchive)
 }
 
 // commitReleaseApproval records the approval of a release whose torrent is

@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **Movies already on the NAS: no wasted download.** Before downloading a movie, Gextto now also checks the file in the archive folder, not only the database row. If the file exists and is equal or better, the download does not start; if the database was rebuilt or the row was missing, the file on disk still counts. The same information appears in the decision explanation.
+
 - **eD2k: safer import and more complete searches.** Gextto now waits until aMule has actually moved a completed file into the incoming folder, with the expected size and stable for a moment, before importing it; a file still being copied from another disk or Docker mount is no longer treated as ready. eD2k/Kad queries are normalized (accents, typographic apostrophes, parentheses) and, when `SxxExx` finds nothing, Gextto also tries `1x05`, `1x5` and `01x05`. With qBittorrent, a completion with no importable video now names the files it skipped, and the idle-seed limit is sent as `inactiveSeedingTimeLimit`.
 
 - **Client identity is now a drop-down.** In **Configuration → Torrent engine** the identity announced by gx-torrent shows the presets (`gx-core`, qBittorrent, Transmission, Rain, anacrolix/torrent) in a select menu instead of a free-text field; the version stays a separate field.

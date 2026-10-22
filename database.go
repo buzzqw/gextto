@@ -1691,6 +1691,14 @@ func (d *Database) CheckMovieScoredWith(release *models.Release, score, minScore
 // in dry-run the decision is computed but no movie row is created, restored or
 // upgraded.
 func (d *Database) checkMovieScoredWith(release *models.Release, score, minScoreDiff, upgradeUntil int64, forbidUpgrade bool, dryRun bool) (bool, string, error) {
+	return d.checkMovieScoredWithDisk(release, score, minScoreDiff, upgradeUntil, forbidUpgrade, dryRun, nil)
+}
+
+// checkMovieScoredWithDisk is checkMovieScoredWith with the movie file already
+// found on the archive volume. The file is the truth when the database row is
+// missing or stale, and it prevents a re-download that would only be discarded
+// as equal or inferior after completion.
+func (d *Database) checkMovieScoredWithDisk(release *models.Release, score, minScoreDiff, upgradeUntil int64, forbidUpgrade bool, dryRun bool, disk *models.ArchiveQuality) (bool, string, error) {
 	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return false, "", err
@@ -1724,36 +1732,38 @@ func (d *Database) checkMovieScoredWith(release *models.Release, score, minScore
 		return false, "", removedErr
 	}
 	var id, existingScore int64
-	var metadataJSON, existingMedia string
+	var dbTitle, metadataJSON, existingMedia string
 	var downloadedAt sql.NullString
 	// Match exact year if null/same, or allow +/- 1 year tolerance to align with disk cleanup logic
-	query := "SELECT m.id,m.quality_score,COALESCE(t.metadata_json,''),m.downloaded_at,COALESCE(m.media_info_json,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE m.removed_at IS NULL AND m.name=?1 AND (m.year IS ?2 OR (?2 IS NOT NULL AND m.year IS NOT NULL AND abs(m.year - ?2) <= 1)) ORDER BY (m.year IS ?2) DESC, m.id DESC LIMIT 1"
-	rowErr := d.db.QueryRow(query, release.Title, release.Year).Scan(&id, &existingScore, &metadataJSON, &downloadedAt, &existingMedia)
+	query := "SELECT COALESCE(m.title,''),m.id,m.quality_score,COALESCE(t.metadata_json,''),m.downloaded_at,COALESCE(m.media_info_json,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE m.removed_at IS NULL AND m.name=?1 AND (m.year IS ?2 OR (?2 IS NOT NULL AND m.year IS NOT NULL AND abs(m.year - ?2) <= 1)) ORDER BY (m.year IS ?2) DESC, m.id DESC LIMIT 1"
+	rowErr := d.db.QueryRow(query, release.Title, release.Year).Scan(&dbTitle, &id, &existingScore, &metadataJSON, &downloadedAt, &existingMedia)
 	if rowErr != nil && !errors.Is(rowErr, sql.ErrNoRows) {
 		return false, "", rowErr
 	}
 	if rowErr == nil {
 		// Quality profile cutoff reached on a real imported file: never replace
 		// it.
-		if forbidUpgrade && downloadedAt.Valid {
+		if forbidUpgrade && (downloadedAt.Valid || disk != nil) {
 			return false, "upgrades_disabled", nil
 		}
-		var hardUpgrade *bool
+		// The database title may be a clean display name; the file on disk and
+		// its MediaInfo are the truth. Merge all available evidence before the
+		// upgrade decision.
+		existingQuality := ParseQuality(dbTitle)
 		if metadataJSON != "" {
 			var metadata models.TorrentMeta
 			if err := json.Unmarshal([]byte(metadataJSON), &metadata); err == nil {
-				enrichQualityWithMediaInfo(existingMedia, &metadata.Release.Quality)
-				value := upgradeReasonUntil(&release.Quality, &metadata.Release.Quality, score, existingScore, minScoreDiff, upgradeUntil) != ""
-				hardUpgrade = &value
+				existingQuality = metadata.Release.Quality
 			}
 		}
-		upgrade := false
-		if hardUpgrade != nil {
-			upgrade = *hardUpgrade
-		} else {
-			upgrade = score > existingScore && score-existingScore >= minScoreDiff &&
-				(upgradeUntil <= 0 || existingScore < upgradeUntil)
+		enrichQualityWithMediaInfo(existingMedia, &existingQuality)
+		if disk != nil {
+			existingQuality = MergeQuality(disk.Quality, existingQuality)
+			if disk.Score > existingScore {
+				existingScore = disk.Score
+			}
 		}
+		upgrade := upgradeReasonUntil(&release.Quality, &existingQuality, score, existingScore, minScoreDiff, upgradeUntil) != ""
 		if !upgrade {
 			return false, "duplicate", nil
 		}
@@ -1786,6 +1796,18 @@ func (d *Database) checkMovieScoredWith(release *models.Release, score, minScore
 		}
 		upgradeCommitted = true
 		return true, "upgrade", nil
+	}
+	if disk != nil {
+		// No database row, but the archive already holds this movie.
+		if forbidUpgrade {
+			return false, "upgrades_disabled", nil
+		}
+		if upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, minScoreDiff, upgradeUntil) == "" {
+			return false, "duplicate", nil
+		}
+		if dryRun {
+			return true, "upgrade", nil
+		}
 	}
 	if dryRun {
 		return true, "approved", nil
