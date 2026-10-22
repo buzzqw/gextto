@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -431,19 +432,21 @@ func TestSeedAppliesTranslationFixesOnlyToUntouchedRows(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(translationFixes), &fixes); err != nil {
 		t.Fatal(err)
 	}
+	// Both keys come from the same language: picking them across languages
+	// (map order) could pick the same key twice and overwrite the fixed row.
 	var lang, fixedKey, keptKey string
 	var fixedValues [2]string
 	for l, entries := range fixes {
-		for key, values := range entries {
-			if fixedKey == "" {
-				lang, fixedKey, fixedValues = l, key, values
-			} else if keptKey == "" {
-				keptKey = key
-			}
+		if len(entries) < 2 {
+			continue
 		}
-		if keptKey != "" {
-			break
+		keys := make([]string, 0, len(entries))
+		for key := range entries {
+			keys = append(keys, key)
 		}
+		sort.Strings(keys)
+		lang, fixedKey, fixedValues, keptKey = l, keys[0], entries[keys[0]], keys[1]
+		break
 	}
 	if keptKey == "" {
 		t.Skip("fewer than two fixes in one language")
