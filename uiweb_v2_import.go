@@ -11,7 +11,8 @@ import (
 	"strings"
 )
 
-// v2ImportView is the page model of /?view=import.
+// v2ImportView is the model of the Import file tab of Maintenance
+// (/?view=maintenance&tab=import).
 type v2ImportView struct {
 	Path     string
 	Message  string

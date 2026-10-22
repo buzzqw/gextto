@@ -529,7 +529,7 @@ test("il filtro del log funziona anche con lo scorrimento fermo", async ({ page 
 
 
 test("la pagina Importa file analizza un percorso", async ({ page }) => {
-  await page.goto("/?view=import");
+  await page.goto("/?view=maintenance&tab=import");
   await expect(page.getByRole("heading", { name: "Importa un file esistente" })).toBeVisible();
   const input = page.locator('input[name="path"]');
   await expect(input).toBeVisible();
@@ -538,9 +538,9 @@ test("la pagina Importa file analizza un percorso", async ({ page }) => {
   await expect(page.locator("#v2-import-result [role=alert]")).toBeVisible();
 });
 
-test("la pagina Modifica in blocco mostra le liste e i valori", async ({ page }) => {
-  await page.goto("/?view=bulk");
-  await expect(page.getByRole("heading", { name: "Modifica più titoli insieme" })).toBeVisible();
+test("la tabella delle serie modifica le righe selezionate", async ({ page }) => {
+  await page.goto("/?view=series&layout=list");
+  await page.getByText("Modifica selezionati").click();
   await expect(page.getByRole("button", { name: "Applica ai titoli selezionati" })).toBeVisible();
   await expect(page.locator('input[name="set_quality"]')).toBeVisible();
 });

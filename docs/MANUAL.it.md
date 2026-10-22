@@ -751,7 +751,7 @@ manualmente il JSON se non stai usando direttamente l'API.
 
 ### Importare un file già presente
 
-**Importa file** (menu Libreria) serve per un video che hai già sul disco e che
+**Importa file** (scheda di **Manutenzione**) serve per un video che hai già sul disco e che
 Gextto non ha scaricato: un episodio recuperato a mano, una vecchia stagione, un
 film copiato da un altro disco. Scegli un file o una cartella e premi
 **Analizza**: Gextto legge i nomi, propone la serie o il film configurato, la
@@ -766,22 +766,26 @@ episodio che contengono.
 
 ### Modificare più titoli insieme
 
-**Modifica in blocco** (menu Libreria) cambia gli stessi valori su molte serie
-e film in un colpo solo, ad esempio portare tutti i film a `2160p` o mettere
-in pausa più serie.
+Nelle tabelle **Serie TV** e **Film** (vista *Elenco*) ogni riga ha una
+casella: con **Modifica selezionati** cambi gli stessi valori su tutte le righe
+spuntate in un colpo solo, ad esempio portare più film a `2160p` o mettere in
+pausa più serie.
 
-1. Spunta i titoli nelle liste *Serie TV* e *Film* (c'è anche *Seleziona
-   tutte*).
-2. In *Valori da applicare* spunta solo i campi da cambiare (qualità, lingua,
-   sottotitoli, esclusioni) e scrivi il nuovo valore. Un campo spuntato e
-   lasciato vuoto viene svuotato; un campo non spuntato resta com'è in ogni
-   titolo. *Upgrade* e *Stato* cambiano solo se scegli un valore diverso da
-   «Lascia com'è».
+1. Spunta le righe nella tabella. La casella nell'intestazione spunta tutte le
+   righe visibili: combinala con *Filtra l'elenco…* per prendere, ad esempio,
+   tutti i titoli in `720p`.
+2. Apri **Modifica selezionati** sopra la tabella e spunta solo i campi da
+   cambiare (qualità, lingua, sottotitoli, esclusioni), scrivendo il nuovo
+   valore. Un campo spuntato e lasciato vuoto viene svuotato; un campo non
+   spuntato resta com'è in ogni titolo. *Upgrade* e *Stato* cambiano solo se
+   scegli un valore diverso da «Lascia com'è».
 3. *Parti da un profilo* riempie i quattro campi con i valori di un profilo e
    li spunta: è un modo veloce per applicare un profilo come modello.
-4. Premi **Applica ai titoli selezionati**: Gextto dice quanti titoli ha
-   modificato. Gli altri valori di ogni titolo (stagioni, cartella, alias…)
-   non vengono toccati.
+4. Premi **Applica ai titoli selezionati**: la pagina si ricarica con i nuovi
+   valori nelle colonne. Gli altri valori di ogni titolo (stagioni, cartella,
+   alias…) non vengono toccati.
+
+Nella vista *Locandine* le caselle non ci sono: passa a *Elenco*.
 
 ## 6. Esplora, Archivio, Fumetti
 
@@ -1156,10 +1160,10 @@ libreria e li espone a Jellyseerr tramite `/api/v3/qualityprofile`; il primo
 profilo è **Default**.
 
 **I profili sono modelli, non regole.** Quando usi un profilo (da Jellyseerr o
-da *Modifica in blocco*), Gextto **copia** i suoi valori nel titolo; da quel
+da *Modifica selezionati* nelle tabelle Serie TV e Film), Gextto **copia** i suoi valori nel titolo; da quel
 momento a decidere sono i campi del titolo, come sempre. Se poi cambi il
 profilo, i titoli già creati non cambiano: per aggiornarne molti insieme usa
-*Libreria → Modifica in blocco*. A Gextto non serve una gestione "alla
+*Modifica selezionati* nelle tabelle Serie TV e Film. A Gextto non serve una gestione "alla
 Sonarr" in cui il profilo governa i titoli: il campo Qualità accetta già un
 minimo (`1080p`), un massimo (`<1080p`) o un intervallo (`720p-1080p`), e
 lingua, sottotitoli, esclusioni e upgrade si impostano per titolo. Ogni
@@ -1385,6 +1389,8 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   La verifica di rinomina esegue la stessa pulizia automaticamente e la pulizia
   degli upgrade ora rispetta anche i motivi "forti" (risoluzione/sorgente/HDR/
   repack).
+- **Importa file** — tab per importare un video già sul disco che Gextto non
+  ha scaricato: vedi *Importare un file già presente*.
 - **Manutenzione SQL dell'archivio** — tab avanzato e distruttivo per
   l'Archivio release. In cima un selettore sceglie la **lingua per le
   operazioni**; il tab elenca le operazioni incluse in `scripts/sql`: release

@@ -604,6 +604,8 @@ type v2PanelsView struct {
 	Tabs       []v2PanelTab
 	ActiveTab  string
 	ArchiveSQL *v2ArchiveSQLView
+	// Import is the manual import, a Maintenance tab.
+	Import *v2ImportView
 }
 
 // v2BuildInfo is the line that pins down exactly which binary is running: the
@@ -657,14 +659,20 @@ func v2PanelsViewFrom(s *AppState, r *http.Request, view string) v2PanelsView {
 	page := v2PanelsView{}
 	if view == "maintenance" {
 		page.ActiveTab = strings.TrimSpace(r.FormValue("tab"))
-		if page.ActiveTab != "archive-sql" {
+		if page.ActiveTab != "archive-sql" && page.ActiveTab != "import" {
 			page.ActiveTab = "general"
 		}
 		page.Tabs = []v2PanelTab{
 			{ID: "general", Label: "Generale", Href: "/?view=maintenance", Active: page.ActiveTab == "general"},
 			{ID: "archive-sql", Label: "Manutenzione SQL dell'archivio", Href: "/?view=maintenance&tab=archive-sql", Active: page.ActiveTab == "archive-sql"},
+			{ID: "import", Label: "Importa file", Href: "/?view=maintenance&tab=import", Active: page.ActiveTab == "import"},
 		}
 		page.Build = v2BuildInfoFor(constants.AppVersion(), constants.Build, constants.Commit)
+		if page.ActiveTab == "import" {
+			widget := v2ImportViewFrom(s)
+			page.Import = &widget
+			return page
+		}
 		if page.ActiveTab == "archive-sql" {
 			widget := v2ArchiveSQLViewFrom(s, r)
 			page.ArchiveSQL = &widget
@@ -718,10 +726,6 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 		return "v2_license", uiLicenseData{Text: uiLicenseText, ThirdParty: uiThirdPartyText}
 	case "movies":
 		return "v2_movies", v2MovieLibraryViewFrom(s, r)
-	case "import":
-		return "v2_import", v2ImportViewFrom(s)
-	case "bulk":
-		return "v2_bulk", v2BulkViewFrom(s)
 	case "series", "gaps", "archive", "blocklist", "maintenance", "integrations":
 		return "v2_panels_page", v2PanelsViewFrom(s, r, view)
 	case "search":

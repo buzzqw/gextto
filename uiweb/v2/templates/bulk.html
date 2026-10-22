@@ -1,63 +1,39 @@
-{{define "v2_bulk"}}
-<div class="panel v2-bulk">
-  <h2>Modifica più titoli insieme</h2>
-  <p class="muted">Spunta le serie e i film, scegli i valori da cambiare e premi Applica. I valori che non spunti restano come sono in ogni titolo.</p>
-  {{if .Error}}<p class="err" role="alert">{{.Error}}</p>{{end}}
-  <form hx-post="/library/bulk" hx-target="#v2-bulk-result" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]">
-    <div class="v2-bulk-lists">
-      <fieldset class="panel v2-bulk-group">
-        <legend>Serie TV</legend>
-        {{if .Series}}
-        <label class="check" title="Seleziona o deseleziona tutte le serie"><input type="checkbox" data-v2-check-all="series"> Seleziona tutte</label>
-        <ul class="v2-bulk-list">
-          {{range .Series}}<li><label class="check"><input type="checkbox" name="series" value="{{.Value}}" data-v2-check-member="series"> {{.Name}}</label> <span class="muted">{{.Quality}} {{.Language}}</span>{{if .Paused}} <span class="badge warn">in pausa</span>{{end}}</li>{{end}}
-        </ul>
-        {{else}}<p class="muted">Nessuna serie monitorata.</p>{{end}}
-      </fieldset>
-      <fieldset class="panel v2-bulk-group">
-        <legend>Film</legend>
-        {{if .Movies}}
-        <label class="check" title="Seleziona o deseleziona tutti i film"><input type="checkbox" data-v2-check-all="movies"> Seleziona tutti</label>
-        <ul class="v2-bulk-list">
-          {{range .Movies}}<li><label class="check"><input type="checkbox" name="movie" value="{{.Value}}" data-v2-check-member="movies"> {{.Name}}</label> <span class="muted">{{.Quality}} {{.Language}}</span>{{if .Paused}} <span class="badge warn">in pausa</span>{{end}}</li>{{end}}
-        </ul>
-        {{else}}<p class="muted">Nessun film monitorizzato.</p>{{end}}
-      </fieldset>
-    </div>
-    <fieldset class="panel v2-bulk-group">
-      <legend>Valori da applicare</legend>
-      {{if .Profiles}}
-      <label class="field"><span>Parti da un profilo</span>
-        <select class="input" name="profile" hx-get="/library/bulk/profile" hx-target="#v2-bulk-values" hx-swap="innerHTML" hx-trigger="change" title="Copia nei campi i valori di un profilo: è un modello, i titoli restano modificabili uno per uno">
-          <option value="">— nessuno —</option>
-          {{range .Profiles}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+{{define "v2_bulk_panel"}}
+<details class="v2-bulk-panel">
+  <summary class="btn sm" title="Cambia gli stessi valori su tutte le righe spuntate nella tabella">Modifica selezionati</summary>
+  <form id="v2-bulk-form-{{.View}}" class="v2-bulk-form" hx-post="/library/bulk" hx-target="#v2-bulk-result-{{.View}}" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]">
+    <p class="muted">Spunta le righe nella tabella, poi i valori da cambiare. I valori che non spunti restano come sono in ogni titolo.</p>
+    {{if .Profiles}}
+    <label class="field"><span>Parti da un profilo</span>
+      <select class="input" name="profile" hx-get="/library/bulk/profile?view={{.View}}" hx-target="#v2-bulk-values-{{.View}}" hx-swap="innerHTML" hx-trigger="change" title="Copia nei campi i valori di un profilo: è un modello, i titoli restano modificabili uno per uno">
+        <option value="">— nessuno —</option>
+        {{range .Profiles}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+      </select>
+    </label>
+    {{end}}
+    <div id="v2-bulk-values-{{.View}}">{{template "v2_bulk_values" .}}</div>
+    <div class="form-grid">
+      <label class="field"><span>Upgrade</span>
+        <select class="input" name="upgrades" title="Se sostituire un file già scaricato quando esce una versione migliore">
+          <option value="">Lascia com'è</option>
+          <option value="allow">Consenti gli upgrade</option>
+          <option value="deny">Non sostituire i file scaricati</option>
         </select>
       </label>
-      {{end}}
-      <div id="v2-bulk-values">{{template "v2_bulk_values" .}}</div>
-      <div class="form-grid">
-        <label class="field"><span>Upgrade</span>
-          <select class="input" name="upgrades" title="Se sostituire un file già scaricato quando esce una versione migliore">
-            <option value="">Lascia com'è</option>
-            <option value="allow">Consenti gli upgrade</option>
-            <option value="deny">Non sostituire i file scaricati</option>
-          </select>
-        </label>
-        <label class="field"><span>Stato</span>
-          <select class="input" name="state" title="Attiva o metti in pausa la ricerca dei titoli selezionati">
-            <option value="">Lascia com'è</option>
-            <option value="active">Attivo</option>
-            <option value="paused">In pausa</option>
-          </select>
-        </label>
-      </div>
-    </fieldset>
+      <label class="field"><span>Stato</span>
+        <select class="input" name="state" title="Attiva o metti in pausa la ricerca dei titoli selezionati">
+          <option value="">Lascia com'è</option>
+          <option value="active">Attivo</option>
+          <option value="paused">In pausa</option>
+        </select>
+      </label>
+    </div>
     <div class="toolbar">
-      <button class="btn primary" type="submit" title="Scrive i valori spuntati in tutti i titoli selezionati">Applica ai titoli selezionati</button>
+      <button class="btn sm primary" type="submit" title="Scrive i valori spuntati in tutti i titoli selezionati">Applica ai titoli selezionati</button>
+      <span id="v2-bulk-result-{{.View}}" aria-live="polite"></span>
     </div>
   </form>
-  <div id="v2-bulk-result" aria-live="polite"></div>
-</div>
+</details>
 {{end}}
 
 {{define "v2_bulk_values"}}
@@ -70,5 +46,5 @@
 {{end}}
 
 {{define "v2_bulk_done"}}
-{{if .Error}}<p class="err" role="alert">{{.Error}}</p>{{else}}<p class="ok" role="status"><span>Titoli modificati</span>: {{.Message}}</p>{{end}}
+{{if .Error}}<span class="err" role="alert">{{.Error}}</span>{{else}}<span class="ok" role="status"><span>Titoli modificati</span>: {{.Message}}</span>{{end}}
 {{end}}

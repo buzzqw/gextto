@@ -1,7 +1,7 @@
 package gextto
 
 // library_bulk.go is the bulk editor of the library: the operator ticks
-// several series and movies and sets the same quality, language, subtitles,
+// rows of the Series or Movies table and sets the same quality, language, subtitles,
 // exclusions, upgrade policy or state on all of them at once. Only the fields
 // the operator marks are written; every other value of each title is kept. A
 // quality profile can fill the form as a template: the values are copied into
@@ -99,10 +99,10 @@ func ApplyLibraryBulkEdit(series []SeriesConfig, movies []MovieConfig, edit Libr
 	return outSeries, outMovies, changed, nil
 }
 
-// v2BulkView is the page model of /?view=bulk.
-type v2BulkView struct {
-	Series   []v2BulkTitle
-	Movies   []v2BulkTitle
+// v2BulkPanel is the "Edit selected" panel above the Series and Movies
+// tables: the rows are ticked in the table, the panel holds the values.
+type v2BulkPanel struct {
+	View     string
 	Profiles []QualityProfile
 	Values   QualityProfile
 	Marked   bool
@@ -110,42 +110,19 @@ type v2BulkView struct {
 	Error    string
 }
 
-// v2BulkTitle is one selectable row: the form value and what the title has.
-type v2BulkTitle struct {
-	Value    string
-	Name     string
-	Quality  string
-	Language string
-	Paused   bool
-}
-
-func v2BulkViewFrom(s *AppState) v2BulkView {
-	view := v2BulkView{}
-	cfg := latestConfig(s)
-	if cfg == nil {
-		view.Error = "configuration unavailable"
-		return view
+// v2BulkPanelFor builds the panel of a library table, or nil for a table
+// whose rows cannot be selected.
+func v2BulkPanelFor(s *AppState, view string, spec uiTableSpec) *v2BulkPanel {
+	if spec.SelectName == "" {
+		return nil
 	}
-	for _, series := range cfg.Series {
-		view.Series = append(view.Series, v2BulkTitle{Value: series.Name, Name: series.Name,
-			Quality: series.Quality, Language: series.Language, Paused: !series.Enabled})
-	}
-	for _, movie := range cfg.Movies {
-		name := movie.Name
-		if strings.TrimSpace(movie.Year) != "" {
-			name += " (" + movie.Year + ")"
-		}
-		view.Movies = append(view.Movies, v2BulkTitle{Value: strconv.FormatInt(movie.ID, 10), Name: name,
-			Quality: movie.Quality, Language: movie.Language, Paused: !movie.Enabled})
-	}
-	view.Profiles = ensureQualityProfiles(s)
-	return view
+	return &v2BulkPanel{View: view, Profiles: ensureQualityProfiles(s)}
 }
 
 // V2LibraryBulkProfile is GET /library/bulk/profile?id=…: the value fields
 // filled from a quality profile, each marked to be applied.
 func V2LibraryBulkProfile(w http.ResponseWriter, r *http.Request, s *AppState) {
-	view := v2BulkView{}
+	view := v2BulkPanel{View: strings.TrimSpace(r.FormValue("view"))}
 	if id, err := strconv.Atoi(strings.TrimSpace(r.FormValue("profile"))); err == nil && id > 0 {
 		view.Values = qualityProfileByID(ensureQualityProfiles(s), id)
 		view.Marked = true
@@ -189,7 +166,7 @@ func V2LibraryBulkApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 	edit.Subtitle, edit.Exclude = text("subtitle"), text("exclude")
 	edit.Upgrades = choice("upgrades", "allow", "deny")
 	edit.Enabled = choice("state", "active", "paused")
-	view := v2BulkView{}
+	view := v2BulkPanel{}
 	cfg := latestConfig(s)
 	series, movies, changed, err := ApplyLibraryBulkEdit(cfg.Series, cfg.Movies, edit)
 	if err == nil {
@@ -199,6 +176,9 @@ func V2LibraryBulkApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 		view.Error = err.Error()
 	} else {
 		view.Message = strconv.Itoa(changed)
+		// The table shows the old values: reload the page so the edited
+		// columns are visible at once.
+		w.Header().Set("HX-Refresh", "true")
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_bulk_done", view, dict, eng)

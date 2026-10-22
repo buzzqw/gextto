@@ -141,8 +141,6 @@
       </script>{{end}}
       {{if eq .Body "v2_dashboard"}}{{template "v2_dashboard" .Content}}
       {{else if eq .Body "v2_downloads"}}{{template "v2_downloads" .Content}}
-      {{else if eq .Body "v2_import"}}{{template "v2_import" .Content}}
-      {{else if eq .Body "v2_bulk"}}{{template "v2_bulk" .Content}}
       {{else if eq .Body "v2_settings"}}{{template "v2_settings" .Content}}
       {{else if eq .Body "v2_health"}}{{template "v2_health" .Content}}
       {{else if eq .Body "v2_logs"}}{{template "v2_logs" .Content}}
@@ -1969,6 +1967,7 @@
         {{if .Refresh}}<button class="btn sm" type="submit">Aggiorna</button>{{end}}
         {{end}}
       </form>{{end}}
+       {{if and .Bulk (ne .Layout "cards")}}{{template "v2_bulk_panel" .Bulk}}{{end}}
        {{if eq .Layout "cards"}}{{template "v2_library_cards" .}}{{else}}{{template "v2_table_body" .}}{{end}}
        {{if or .FooterForm .FooterActions}}
        <div class="table-panel-footer">
@@ -2011,9 +2010,9 @@
   <div class="table-wrap" tabindex="0" role="region" aria-label="{{.Title}}">
     <table class="data-table {{.Class}}">
       <caption class="sr-only">{{.Title}}</caption>
-      <thead><tr>{{range .Columns}}<th scope="col"{{if .Sortable}} class="th-sort"{{end}}>{{if .Sortable}}<button class="table-sort-button" type="button" hx-get="/table?view={{$.View}}&amp;sort={{.Key}}&amp;dir={{if and (eq $.Sort .Key) (eq $.Dir "asc")}}desc{{else}}asc{{end}}{{if $.Query}}&amp;q={{$.Query}}{{end}}{{if $.FilterQuery}}&amp;f={{$.FilterQuery}}{{end}}{{if $.WebSearch}}&amp;web=1{{end}}{{if $.Ed2kSearch}}&amp;ed2k=1{{end}}" hx-target="#v2-table-body-{{$.View}}" hx-swap="outerHTML"><span>{{.Label}}</span>{{arrow $.Sort $.Dir .Key}}</button>{{else}}{{.Label}}{{end}}</th>{{end}}{{if .HasActions}}<th scope="col">Azioni</th>{{end}}</tr></thead>
+      <thead><tr>{{if .SelectName}}<th scope="col" class="select-col"><input type="checkbox" data-v2-check-all="{{.View}}" aria-label="Seleziona tutte le righe" title="Seleziona o deseleziona tutte le righe visibili"></th>{{end}}{{range .Columns}}<th scope="col"{{if .Sortable}} class="th-sort"{{end}}>{{if .Sortable}}<button class="table-sort-button" type="button" hx-get="/table?view={{$.View}}&amp;sort={{.Key}}&amp;dir={{if and (eq $.Sort .Key) (eq $.Dir "asc")}}desc{{else}}asc{{end}}{{if $.Query}}&amp;q={{$.Query}}{{end}}{{if $.FilterQuery}}&amp;f={{$.FilterQuery}}{{end}}{{if $.WebSearch}}&amp;web=1{{end}}{{if $.Ed2kSearch}}&amp;ed2k=1{{end}}" hx-target="#v2-table-body-{{$.View}}" hx-swap="outerHTML"><span>{{.Label}}</span>{{arrow $.Sort $.Dir .Key}}</button>{{else}}{{.Label}}{{end}}</th>{{end}}{{if .HasActions}}<th scope="col">Azioni</th>{{end}}</tr></thead>
       <tbody>
-        {{if .Rows}}{{range .Rows}}<tr>{{range .Cells}}<td>{{.HTML}}</td>{{end}}{{if $.HasActions}}<td class="row-actions">{{.Actions}}</td>{{end}}</tr>{{end}}
+        {{if .Rows}}{{range .Rows}}<tr>{{if $.SelectName}}<td class="select-col"><input type="checkbox" name="{{$.SelectName}}" value="{{.Select}}" form="v2-bulk-form-{{$.View}}" data-v2-check-member="{{$.View}}" aria-label="Seleziona la riga"></td>{{end}}{{range .Cells}}<td>{{.HTML}}</td>{{end}}{{if $.HasActions}}<td class="row-actions">{{.Actions}}</td>{{end}}</tr>{{end}}
         {{else}}<tr><td class="muted" colspan="{{.Colspan}}">{{.Empty}}</td></tr>{{end}}
       </tbody>
     </table>
@@ -2043,6 +2042,8 @@
   {{end}}
   {{if .ArchiveSQL}}
     {{with .ArchiveSQL}}{{template "v2_archive_sql_panel" .}}{{end}}
+  {{else if .Import}}
+    {{template "v2_import" .Import}}
   {{else}}
     {{range .Groups}}
       <section class="section-group">

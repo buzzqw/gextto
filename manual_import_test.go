@@ -109,7 +109,7 @@ func TestManualImportPageAndPreview(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := httptest.NewRecorder()
-	V2Page(rec, httptest.NewRequest("GET", "/?view=import", nil), state)
+	V2Page(rec, httptest.NewRequest("GET", "/?view=maintenance&tab=import", nil), state)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Importa un file esistente") {
 		t.Fatalf("page = %d", rec.Code)
 	}

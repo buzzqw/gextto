@@ -72,6 +72,11 @@ type uiTableSpec struct {
 	DownloadsActionsJSON string
 	FooterForm           *uiFormSection
 	FooterActions        []uiActionButton
+	// SelectName adds a checkbox to each row, submitted as SelectName with
+	// the row's SelectKey value, and the "Edit selected" panel above the
+	// table (the library bulk editor).
+	SelectName string
+	SelectKey  string
 }
 
 // uiSearchPage drives the Esplora page: a query form, a generic result table and
@@ -1485,8 +1490,10 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 				{Label: "Pausa", Kind: "library-toggle", Method: "POST", Path: "", Body: `{"enabled":false}`, Confirm: ""},
 				{Label: "Elimina", Class: "danger", Kind: "library-remove", Method: "POST", Path: "", Body: "{}", Confirm: "Eliminare questa serie dalla libreria?"},
 			}),
-			Empty:  "Nessuna serie monitorata.",
-			Filter: true,
+			Empty:      "Nessuna serie monitorata.",
+			Filter:     true,
+			SelectName: "series",
+			SelectKey:  "name",
 		}, true
 	case "movies":
 		return uiTableSpec{
@@ -1505,8 +1512,10 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 				{Label: "Pausa", Kind: "library-toggle", Method: "POST", Path: "", Body: `{"enabled":false}`},
 				{Label: "Elimina", Class: "danger", Kind: "library-remove", Method: "POST", Path: "", Body: "{}", Confirm: "Eliminare questo film dalla libreria?"},
 			}),
-			Empty:  "Nessun film monitorizzato.",
-			Filter: true,
+			Empty:      "Nessun film monitorizzato.",
+			Filter:     true,
+			SelectName: "movie",
+			SelectKey:  "id",
 		}, true
 	case "movie-history":
 		return uiTableSpec{

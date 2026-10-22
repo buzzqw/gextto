@@ -733,7 +733,7 @@ are using the API directly.
 
 ### Importing a file that already exists
 
-**Import file** (Library menu) is for a video already on disk that Gextto did
+**Import file** (a **Maintenance** tab) is for a video already on disk that Gextto did
 not download: an episode fetched by hand, an old season, a movie copied from
 another disk. Choose a file or a folder and press **Analyze**: Gextto reads the
 names, proposes the configured series or movie, the season and the episode and
@@ -747,20 +747,25 @@ recorded for every episode they contain.
 
 ### Editing several titles at once
 
-**Bulk edit** (Library menu) sets the same values on many series and movies in
-one go, for example moving every movie to `2160p` or pausing several series.
+In the **Series** and **Movies** tables (*List* view) every row has a
+checkbox: **Edit selected** sets the same values on every ticked row in one go,
+for example moving several movies to `2160p` or pausing several series.
 
-1. Tick the titles in the *Series* and *Movies* lists (there is also *Select
-   all*).
-2. In *Values to apply* tick only the fields to change (quality, language,
-   subtitles, exclusions) and type the new value. A ticked field left empty is
-   cleared; a field that is not ticked stays as it is in each title. *Upgrades*
-   and *State* change only if you pick something other than "Leave as is".
+1. Tick the rows in the table. The checkbox in the header ticks every visible
+   row: combine it with *Filter the list…* to take, for example, every title in
+   `720p`.
+2. Open **Edit selected** above the table and tick only the fields to change
+   (quality, language, subtitles, exclusions), typing the new value. A ticked
+   field left empty is cleared; a field that is not ticked stays as it is in
+   each title. *Upgrades* and *State* change only if you pick something other
+   than "Leave as is".
 3. *Start from a profile* fills the four fields with a profile's values and
    ticks them: a quick way to apply a profile as a template.
-4. Press **Apply to the selected titles**: Gextto says how many titles it
-   changed. The other values of each title (seasons, folder, aliases…) are not
-   touched.
+4. Press **Apply to the selected titles**: the page reloads with the new values
+   in the columns. The other values of each title (seasons, folder, aliases…)
+   are not touched.
+
+The *Posters* view has no checkboxes: switch to *List*.
 
 ## 6. Explore, Archive, Comics
 
@@ -1120,10 +1125,10 @@ of quality, language, subtitles and exclusions you use. Gextto generates a
 profile for every combination already present in the library and exposes them to
 Jellyseerr through `/api/v3/qualityprofile`; the first profile is **Default**.
 **Profiles are templates, not rules.** When you use a profile (from Jellyseerr
-or from *Bulk edit*), Gextto **copies** its values into the title; from then
+or from *Edit selected* in the Series and Movies tables), Gextto **copies** its values into the title; from then
 on the title's own fields decide, as always. If you later change the profile,
 the titles already created do not change: to update many of them at once use
-*Library → Bulk edit*. Gextto does not need a Sonarr-style mode where the
+*Edit selected* in the Series and Movies tables. Gextto does not need a Sonarr-style mode where the
 profile governs its titles: the Quality field already takes a minimum
 (`1080p`), a maximum (`<1080p`) or a range (`720p-1080p`), and language,
 subtitles, exclusions and upgrades are set per title. Each profile keeps its number when
@@ -1339,6 +1344,8 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   session are protected, and emptied sub-folders are removed. The rename
   verification also performs this cleanup automatically, and upgrade cleanup now
   also honours the "hard" upgrade reasons (resolution/source/HDR/repack).
+- **Import file** — a tab to import a video already on disk that Gextto did not
+  download: see *Importing a file that already exists*.
 - **Archive SQL maintenance** — an advanced, destructive tab for the release
   Archive. A selector at the top chooses the **language for the operations**;
   the tab lists the operations bundled in `scripts/sql`: releases older than 6

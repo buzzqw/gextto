@@ -56,7 +56,8 @@ with a SQLite database, an integrated torrent engine and a server-rendered web U
   **explainability** — the explanation API says why a release is accepted, rejected
   or preferred ("Why not this one?" in the UI). Named quality profiles exist
   only as **templates**: their values are copied into a title, whose own fields
-  stay the only rule; *Bulk edit* changes many titles at once. Profiles that
+  stay the only rule; *Edit selected* in the Series and Movies tables changes
+  many titles at once. Profiles that
   govern their titles, ordered qualities with a cutoff and a custom-format regex
   engine like `*arr` are not adopted: the per-title fields already express a
   minimum, a maximum or a range of resolutions, the languages, the exclusions
@@ -753,8 +754,8 @@ copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
 - **Named profiles as templates**: *Configuration → Sources → Quality profiles*,
   with a generated profile for every override combination in the library,
   "Default" first and a stable id per profile. A profile is copied into a title
-  (from Jellyseerr or from *Library → Bulk edit*, which also edits many titles
-  at once); it does not govern it. The *Sonarr* semantics (ordered qualities,
+  (from Jellyseerr or from *Edit selected* in the Series and Movies tables,
+  which also edits many titles at once); it does not govern it. The *Sonarr* semantics (ordered qualities,
   cutoff, custom formats) stay out by choice (§1).
 - **A `/api/v3` subset for Jellyseerr** (`system/status`, `qualityprofile`,
   `languageprofile`, `rootfolder`, `tag`, `series/lookup` + `POST series`,
@@ -762,7 +763,7 @@ copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
   calls Jellyseerr makes (lookup by `tvdb:`/`tmdb:` id, only the monitored
   seasons, the library id in the answer); full compatibility is not claimed, and
   a real Jellyseerr run remains the acceptance test.
-- **Manual import**: the *Import file* page matches an existing file, lets the
+- **Manual import**: the *Import file* tab of Maintenance matches an existing file, lets the
   operator correct series/movie/season/episode and destination, replaces an existing
   copy only on request and records every episode of a multi-episode file.
 

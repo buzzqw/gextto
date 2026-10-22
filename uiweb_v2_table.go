@@ -11,6 +11,7 @@ package gextto
 // without duplicating data access.
 
 import (
+	"fmt"
 	"bytes"
 	"encoding/json"
 	stdhtml "html"
@@ -105,6 +106,8 @@ type v2Cell struct{ HTML template.HTML }
 type v2TableRow struct {
 	Cells   []v2Cell
 	Actions template.HTML
+	// Select is the value of the row's checkbox (selectable tables only).
+	Select string
 }
 
 type v2TableData struct {
@@ -152,6 +155,10 @@ type v2TableData struct {
 	Ed2kSearch    bool
 	Ed2k          *v2Ed2kSearchView
 	Notice        *v2ActionNotice
+	// SelectName and Bulk are set on the selectable library tables: each row
+	// has a checkbox bound to the Bulk panel's form.
+	SelectName string
+	Bulk       *v2BulkPanel
 }
 
 type v2ActionNotice struct {
@@ -305,6 +312,12 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 		data.BaseView = view[:separator]
 	}
 
+	data.Bulk = v2BulkPanelFor(s, data.BaseView, spec)
+	if data.Bulk != nil {
+		data.SelectName = spec.SelectName
+		data.Colspan++
+	}
+
 	// Manual tables (source health) must not load on their own: the check is
 	// slow and is triggered explicitly by the Aggiorna button.
 	if spec.ManualOnly && r.FormValue("load") != "1" {
@@ -330,6 +343,9 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 		if data.HasActions {
 			data.Colspan++
 		}
+		if data.SelectName != "" {
+			data.Colspan++
+		}
 	}
 
 	if filter := strings.ToLower(strings.TrimSpace(data.FilterQuery)); filter != "" {
@@ -353,6 +369,9 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 
 	for _, item := range items {
 		row := v2TableRow{}
+		if data.Bulk != nil {
+			row.Select = v2SelectValue(item[spec.SelectKey])
+		}
 		for _, column := range columns {
 			row.Cells = append(row.Cells, v2Cell{HTML: v2FormatCell(item, column)})
 		}
@@ -395,6 +414,20 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 		}
 	}
 	return data
+}
+
+// v2SelectValue is the checkbox value of a row: JSON numbers arrive as
+// float64 and must keep their integer form (an id, never 1e+06).
+func v2SelectValue(value any) string {
+	switch typed := value.(type) {
+	case float64:
+		return strconv.FormatFloat(typed, 'f', -1, 64)
+	case string:
+		return typed
+	case nil:
+		return ""
+	}
+	return fmt.Sprint(value)
 }
 
 // v2RenderTableBody writes a table body as an HTMX fragment: the poster cards

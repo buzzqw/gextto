@@ -2216,10 +2216,11 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   .v2-archive-sql-op-actions { justify-content: flex-start; }
 }
 
-/* Library bulk editor (/?view=bulk). */
-.v2-bulk-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.v2-bulk-group { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; }
-.v2-bulk-group legend { font-weight: 600; padding: 0 4px; }
-.v2-bulk-list { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow-y: auto; }
-.v2-bulk-list li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--line-soft); }
-@media (max-width: 760px) { .v2-bulk-lists { grid-template-columns: 1fr; } }
+/* Library bulk editor: row checkboxes and the "Edit selected" panel above
+   the Series and Movies tables. */
+.data-table .select-col { width: 36px; text-align: center; }
+.data-table .select-col input { width: 18px; height: 18px; accent-color: var(--accent); }
+.v2-bulk-panel { margin: 0 0 12px; }
+.v2-bulk-panel > summary { list-style: none; display: inline-flex; cursor: pointer; }
+.v2-bulk-panel > summary::-webkit-details-marker { display: none; }
+.v2-bulk-form { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }

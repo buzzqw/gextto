@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
@@ -49,12 +50,22 @@ func TestLibraryBulkEditChangesOnlyTheMarkedFields(t *testing.T) {
 	}
 }
 
-func TestLibraryBulkPageAppliesAProfileAsATemplate(t *testing.T) {
+func TestLibraryTablesEditTheSelectedRows(t *testing.T) {
 	state := v3TestState(t)
-	rec := httptest.NewRecorder()
-	V2Page(rec, httptest.NewRequest("GET", "/?view=bulk", nil), state)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Modifica più titoli insieme") || !strings.Contains(rec.Body.String(), `value="Show"`) {
-		t.Fatalf("page = %d", rec.Code)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	var movieID int64
+	for _, movie := range latestConfig(state).Movies {
+		movieID = movie.ID
+	}
+	for view, want := range map[string]string{
+		"series": `name="series" value="Show" form="v2-bulk-form-series`,
+		"movies": `name="movie" value="` + strconv.FormatInt(movieID, 10) + `" form="v2-bulk-form-movies`,
+	} {
+		code, body := v2Request(t, server, http.MethodGet, "/?view="+view+"&layout=list", nil)
+		if code != 200 || !strings.Contains(body, "Modifica selezionati") || !strings.Contains(body, `id="v2-bulk-form-`+view) || !strings.Contains(body, want) {
+			t.Fatalf("%s table without row selection (%d): want %s", view, code, want)
+		}
 	}
 	profiles := ensureQualityProfiles(state)
 	var picked QualityProfile
@@ -66,14 +77,10 @@ func TestLibraryBulkPageAppliesAProfileAsATemplate(t *testing.T) {
 	if picked.ID == 0 {
 		t.Fatalf("no 2160p profile in %+v", profiles)
 	}
-	rec = httptest.NewRecorder()
+	rec := httptest.NewRecorder()
 	V2LibraryBulkProfile(rec, httptest.NewRequest("GET", "/library/bulk/profile?profile="+strconv.Itoa(picked.ID), nil), state)
 	if body := rec.Body.String(); !strings.Contains(body, `value="2160p"`) || !strings.Contains(body, "checked") {
 		t.Fatalf("profile values = %s", body)
-	}
-	var movieID int64
-	for _, movie := range latestConfig(state).Movies {
-		movieID = movie.ID
 	}
 	form := url.Values{"series": {"Show"}, "movie": {strconv.FormatInt(movieID, 10)},
 		"set_quality": {"1"}, "quality": {"2160p"}, "language": {"ignored"}, "state": {"paused"}}

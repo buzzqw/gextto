@@ -91,7 +91,7 @@ func TestEnd2EndSelectorsReferenceRealSettings(t *testing.T) {
 	selector := regexp.MustCompile(`#(?:input|v2-setting)-([a-zA-Z0-9_]+)`)
 	tab := regexp.MustCompile(`tab=([a-zA-Z0-9_-]+)`)
 	// `tab=` is also used by the Maintenance tabs, which are not settings tabs.
-	maintenanceTabs := map[string]bool{"general": true, "archive-sql": true}
+	maintenanceTabs := map[string]bool{"general": true, "archive-sql": true, "import": true}
 	var missing []string
 	checked := 0
 	for _, path := range tests {
