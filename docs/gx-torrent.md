@@ -840,8 +840,10 @@ the Tools menu, or `POST /api/v1/dht-feed/publish` with
 `{"name": "...", "hashes": ["<40 hex>", ...]}` (empty hashes = every torrent of
 the session). The daemon keeps an ed25519 key in `settings.json`, bumps the BEP
 44 sequence on every successful put and returns the `dht://<pubkey>` URL, which
-a feed (or Gextto) subscribes to. Only standalone mode publishes: in managed
-mode acquisition belongs to Gextto.
+a feed (or Gextto) subscribes to. A BEP 44 item is capped at **1000 bytes**, so
+a feed with many or very long names publishes the first entries that fit and
+the daemon logs the tail it left out. Only standalone mode publishes: in
+managed mode acquisition belongs to Gextto.
 
 With the `rules` key (JSON array) you switch to the **ordered rule set**, like
 BiglyBT: the first rule that matches decides (`fail: true` discards, otherwise
