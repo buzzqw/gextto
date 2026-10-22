@@ -2041,6 +2041,20 @@ WEB-DL e WEBRip lo stesso peso, per Gextto sono la stessa qualità e un WEB-DL n
 sostituisce più un WEBRip (restano validi HDR, risoluzione, REPACK/PROPER e il
 punteggio).
 
+**Verifica MediaInfo prima di entrare in libreria.** Quando un download completo
+deve sostituire un episodio o un film già archiviato, Gextto legge con `ffprobe`
+il file nuovo, ancora nella cartella di download, e la copia in libreria, prima
+di spostare, collegare o copiare qualsiasi cosa. Risoluzione, codec video, audio,
+canali e HDR10/HLG vengono presi dai flussi reali, non dal nome. Se il nome
+prometteva più di quanto c'è (un «2160p» che è un 1080p ingrandito, un «HDR» senza
+HDR, un «DDP 5.1» che è AAC stereo) e la qualità reale non è un upgrade, il
+download viene scartato e messo in blocklist e la copia in libreria resta com'è;
+il log lo spiega con «Upgrade not confirmed by MediaInfo». Sorgente, Dolby Vision
+e REPACK/PROPER restano quelli del nome, perché `ffprobe` non li distingue in modo
+affidabile. Senza `ffprobe`, o con la copia archiviata irraggiungibile, vale la
+decisione presa prima del download. I pack di stagione non passano da questa
+verifica.
+
 **Upgrade e sostituzione**
 
 | Impostazione | Cosa fa |

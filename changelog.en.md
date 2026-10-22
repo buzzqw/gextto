@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **Upgrades checked with MediaInfo before entering the library.** When a completed download is about to replace an archived episode or movie, Gextto reads with `ffprobe` the new file (still in the download folder) and the copy in the library before moving or copying anything. If the name promised more than the real content (a «2160p» upscaled from 1080p, a fake «HDR», audio other than declared) and the real quality is not an upgrade, the download is discarded and blocklisted and the library copy stays. Without `ffprobe` the decision taken before the download stands; season packs are not checked this way yet.
+
 - **WEB-DL and WEBRip: you decide whether they are the same quality.** The rule that always replaced a WEBRip or HDTV with a WEB-DL now follows the **Source** weights of *Quality and upgrades*: when WEB-DL and WEBRip weigh the same, a WEB-DL no longer replaces a WEBRip already in the library. HDR, a higher resolution, REPACK/PROPER and a score better by at least the minimum difference still count.
 
 - **Quality and upgrades: check the impact before re-downloading.** The new **Impact on the library** panel replays the releases already seen in the feeds with the current rules and weights and says how many archived episodes the next cycles would replace, with a few examples, without downloading anything. Use it after changing weights or thresholds: if the number is high, review the change before a mass re-download starts. The result turns into a warning above 5% of the archived episodes.

@@ -5035,6 +5035,20 @@ func restoreUpgradeBackupTx(tx *sql.Tx, backup upgradeBackup) error {
 }
 
 // RestoreUpgrade restores a previous release from its upgrade backup.
+// UpgradeBackupsFor returns the archived copies an upgrade with this hash is
+// replacing (none for a new episode or movie).
+func (d *Database) UpgradeBackupsFor(hash string) ([]upgradeBackup, error) {
+	var payload sql.NullString
+	err := d.db.QueryRow("SELECT payload_json FROM upgrade_backup WHERE new_hash=?1", strings.ToLower(hash)).Scan(&payload)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && !payload.Valid) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return decodeUpgradeBackups(payload.String)
+}
+
 func (d *Database) RestoreUpgrade(hash string) (bool, error) {
 	normalized := strings.ToLower(hash)
 	var payload sql.NullString

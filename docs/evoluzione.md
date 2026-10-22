@@ -120,11 +120,16 @@ library once, like a change of the weights. *Impatto sulla libreria*
 (`upgrade_impact.go`) replays the archived feed releases through the dry-run series
 decision and reports the episodes they would replace.
 
-Open point: the comparison after download still reads the quality from the file
-names; MediaInfo of the incoming file is read only once it is in the library. A
-check of the real streams before the old copy is removed would catch mislabelled
-releases (upscaled 2160p, fake HDR). Gate: an ffprobe pass that does not slow the
-completion of a pack.
+Before a completed single episode or movie that replaces an archived copy is moved,
+linked or copied into the library, `mediainfo_gate.go` probes both files with
+ffprobe and compares the measurable attributes (resolution, video codec, audio
+family and channels, HDR10/HLG); an upgrade the streams do not confirm is
+discarded, blocklisted and the archived row restored. Source, Dolby Vision and
+REPACK/PROPER stay as named. Without ffprobe the earlier decision stands.
+
+Open point: season packs are not probed before the rename; their files are still
+compared by name after placement. Gate: a per-file probe that does not slow the
+completion of a large pack.
 
 **A pack is downloaded only when it is useful.** A whole-season pack may be approved
 only to fill a real gap or to upgrade an existing episode: its target episodes come

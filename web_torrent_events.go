@@ -2225,6 +2225,9 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 	if release.Series != nil {
 		seriesName = *release.Series
 	}
+	if reason := mediaInfoUpgradeRejection(cfg, db, event.Hash, video, release); reason != "" {
+		return false, tev_rejectUnconfirmedUpgrade(cfg, db, torrents, event, release, reason)
+	}
 	if resolved, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "series", seriesName); resolveErr != nil {
 		return false, resolveErr
 	} else if resolved {
@@ -2283,6 +2286,26 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 	return processed, nil
 }
 
+// tev_rejectUnconfirmedUpgrade discards a completed upgrade that MediaInfo
+// does not confirm, before it reaches the library: the archived copy and its
+// database row are restored, and the release is blocklisted so the next cycle
+// does not download it again on the strength of its name.
+func tev_rejectUnconfirmedUpgrade(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, reason string) error {
+	if _, err := db.RestoreUpgrade(event.Hash); err != nil {
+		return err
+	}
+	if err := db.Blocklist(release, reason); err != nil {
+		logging.Warn("could not blocklist the unconfirmed upgrade", "hash", event.Hash, "error", err)
+	}
+	if err := db.MarkTorrentError(event.Hash, reason); err != nil {
+		return err
+	}
+	tev_discardCompletedSource(cfg, db, torrents, event, reason)
+	logging.Warn(fmt.Sprintf("🔍 Upgrade not confirmed by MediaInfo: «%s» discarded, the copy in the library stays", event.Name),
+		"hash", event.Hash, "reason", reason)
+	return nil
+}
+
 // tev_importsByCopy reports whether the active session cannot relocate storage
 // itself, so a completed file must be imported by link or copy while the
 // download stays where the backend saved it. aMule's eD2k session is the only
@@ -2323,6 +2346,9 @@ func tev_completeMovieWithArchive(cfg *Config, db *Database, torrents TorrentSes
 		return false, err
 	}
 	target := filepath.Join(destination, filepath.Base(video))
+	if reason := mediaInfoUpgradeRejection(cfg, db, event.Hash, video, release); reason != "" {
+		return false, tev_rejectUnconfirmedUpgrade(cfg, db, torrents, event, release, reason)
+	}
 	if resolved, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "movie", release.Title); resolveErr != nil {
 		return false, resolveErr
 	} else if resolved {
@@ -2609,6 +2635,11 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 		return false, fmt.Errorf("integrity validation failed: %w", err)
 	}
 	logging.Debug("completed file passed integrity check", "name", event.Name, "path", path)
+	if !release.IsPack && !recoveredExisting {
+		if reason := mediaInfoUpgradeRejection(cfg, db, event.Hash, path, release); reason != "" {
+			return false, tev_rejectUnconfirmedUpgrade(cfg, db, torrents, event, release, reason)
+		}
+	}
 	size, err := SizeOfPath(path)
 	if err != nil {
 		return false, err
