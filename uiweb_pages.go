@@ -785,22 +785,48 @@ func uiSettingsGroups(tab string, fields []uiSettingField) []uiSettingGroup {
 		}
 		grouped[title] = append(grouped[title], field)
 	}
+	if tab == "scores" {
+		// The upgrade rules lead the tab and the weights follow, whatever the
+		// order of the fields: most people only need the rules.
+		sort.SliceStable(order, func(i, j int) bool {
+			return uiScoreGroupRank(order[i]) < uiScoreGroupRank(order[j])
+		})
+	}
 	groups := make([]uiSettingGroup, 0, len(order))
 	for _, title := range order {
 		group := uiSettingGroup{Title: title, Fields: grouped[title], Collapsed: uiCollapsedSettingGroups[title]}
 		// The score weights read best as a compact two-column grid. Each macro
 		// card keeps its logical subgroups (4K/FHD/HD/SD, Codec video, Sorgente,
-		// HDR/DV; audio codec groups; thresholds/corrections) so collapsing the
-		// page into macro-cards does not hide the previous grouping.
+		// HDR/DV; audio codec groups; release fixes) so collapsing the page into
+		// macro-cards does not hide the previous grouping. The weights are
+		// closed by default: they are a detail, the upgrade rules are not.
 		if tab == "scores" && len(grouped[title]) > 0 {
-			_, group.Grid = uiScoreGroupTitle(grouped[title][0].Key)
 			group.Hint = uiScoreGroupHint(title)
-			group.Subgroups = uiScoreSubgroups(grouped[title])
+			if _, weights := uiScoreGroupTitle(grouped[title][0].Key); weights {
+				group.Grid = true
+				group.Collapsed = true
+				group.Subgroups = uiScoreSubgroups(grouped[title])
+			}
 		}
 		groups = append(groups, group)
 	}
 	return groups
 }
+
+// uiScoreGroupRank orders the panels of the Qualità e upgrade tab: upgrade
+// rules first, then the video, audio and release weights.
+func uiScoreGroupRank(title string) int {
+	for index, known := range []string{uiScoreRulesGroup, "Video", "Audio", "Correzioni release"} {
+		if title == known {
+			return index
+		}
+	}
+	return 10
+}
+
+// uiScoreRulesGroup is the panel of the upgrade rules (thresholds and the
+// replacement switch), the first one of the Qualità e upgrade tab.
+const uiScoreRulesGroup = "Upgrade e sostituzione"
 
 // uiSourcesCheckboxGroups builds the two checkbox editors of the Sorgenti tab
 // (Motori web, Filtri contenuto) from the stored JSON arrays.
@@ -909,7 +935,7 @@ func uiScoreGroupTitle(key string) (string, bool) {
 	case strings.HasPrefix(lowered, "score_audio_"), strings.HasPrefix(lowered, "score_channels_"):
 		return "Audio", true
 	case lowered == "score_bonus_proper", lowered == "score_bonus_repack", lowered == "score_bonus_real":
-		return "Upgrade e sostituzione", true
+		return "Correzioni release", true
 	case strings.HasPrefix(lowered, "score_bonus_"):
 		return "Bonus", true
 	case strings.HasPrefix(lowered, "score_group_"):
@@ -929,6 +955,10 @@ func uiScoreSubgroups(fields []uiSettingField) []uiSettingSubgroup {
 			order = append(order, title)
 		}
 		grouped[title] = append(grouped[title], field)
+	}
+	// A card with a single block needs no inner title.
+	if len(order) < 2 {
+		return nil
 	}
 	subgroups := make([]uiSettingSubgroup, 0, len(order))
 	for _, title := range order {
@@ -969,21 +999,21 @@ func uiScoreSubgroupTitle(key string) string {
 		return "Canali e oggetti"
 	case lowered == "score_bonus_proper", lowered == "score_bonus_repack", lowered == "score_bonus_real":
 		return "Correzioni"
-	case strings.HasPrefix(lowered, "upgrade_"), lowered == "cleanup_upgrades":
-		return "Soglie e pulizia"
 	}
 	return "Altre impostazioni"
 }
 
-// uiScoreGroupHint explains the three macro-cards of the score editor.
+// uiScoreGroupHint explains the panels of the score editor.
 func uiScoreGroupHint(title string) string {
 	switch title {
 	case "Video":
 		return "Pesi per risoluzione, sorgente, codec video e HDR/Dolby Vision."
 	case "Audio":
 		return "Pesi per codec audio, canali e audio a oggetti."
-	case "Upgrade e sostituzione":
-		return "Correzioni e soglie che decidono quando una release migliore sostituisce quella archiviata."
+	case "Correzioni release":
+		return "Pesi per le correzioni PROPER, REPACK e REAL. I bonus per release group sono nel pannello Gruppi custom."
+	case uiScoreRulesGroup:
+		return "Quando una release migliore sostituisce quella in libreria. Conta solo la qualità: dimensione, sottotitoli e salute dello swarm aiutano a scegliere tra release equivalenti, ma da soli non fanno mai riscaricare."
 	}
 	return ""
 }
@@ -1042,7 +1072,8 @@ var uiSchedSingleWindowKeys = map[string]bool{
 // uiSettingsTabEditors returns the structured list editors shown on a tab.
 func uiSettingsTabEditors(tab string) []uiListEditor {
 	paths := map[string][]string{
-		"sources": {"/api/config/source-filters", "/api/watched-folders", "/api/quality-profiles"},
+		"sources": {"/api/config/source-filters", "/api/watched-folders"},
+		"scores":  {"/api/quality-profiles"},
 		"rename":  {"/api/tag-dir-rules"},
 		"notify":  {"/api/event-hooks"},
 		"seeding": {"/api/seed-rules"},
@@ -1069,7 +1100,7 @@ var uiSettingsEditorSearchEntries = []uiSearchEntry{
 	{Key: "", Label: "Filtri contenuto esclusi", Tab: "sources"},
 	{Key: "", Label: "Filtri per sorgente", Tab: "sources"},
 	{Key: "", Label: "Cartelle osservate", Tab: "sources"},
-	{Key: "", Label: "Profili di qualità", Tab: "sources", Terms: "profilo qualità jellyseerr sonarr radarr"},
+	{Key: "", Label: "Profili di qualità", Tab: "scores", Terms: "profilo qualità jellyseerr sonarr radarr"},
 	{Key: "", Label: "Gruppi custom", Tab: "scores"},
 	{Key: "", Label: "Composizione del nome", Tab: "rename"},
 	{Key: "", Label: "Regole tag → cartella", Tab: "rename"},

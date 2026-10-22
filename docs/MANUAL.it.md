@@ -1028,13 +1028,16 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   porte** verifica inoltre il bind locale delle porte indicate: non sostituisce
   il controllo del port-forwarding sul router/firewall.
 - **Punteggi** — pesi per categoria, gestione dei gruppi custom (aggiungi, modifica
-  o rimuovi il gruppo e assegna un bonus/penalità) e simulatore live. I pesi
+  o rimuovi il gruppo e assegna un bonus/penalità) e **Prova una release**. In
+  testa ci sono le regole di upgrade, poi esempi, prova e profili di qualità; i
+  pesi seguono in schede chiuse. I pesi
   audio sono una scheda per gruppo: Lossless (TrueHD, DTS-HD, FLAC, PCM),
   DTS/DD+ (con DTS-HD HRA), AC3/5.1, AAC/Opus e MP3; canali e Atmos/DTS:X stanno
   nella stessa scheda Audio. I pesi video sono in un'unica scheda **Video**
   con i sottogruppi 4K, Full HD, HD, SD, Codec video, Sorgente e HDR/DV;
-  **Upgrade e sostituzione** raccoglie correzioni, soglie e pulizia nei propri
-  sottogruppi. Il totale audio resta sotto la soglia di
+  **Correzioni release** raccoglie PROPER, REPACK e REAL, mentre
+  **Upgrade e sostituzione** (in testa alla pagina) contiene soglie e
+  sostituzione. Il totale audio resta sotto la soglia di
   upgrade, quindi l'audio contribuisce al confronto ma non fa scaricare da solo
   un'altra release. Il nome del
   gruppo deve coincidere con il tag release finale, per esempio `TBK`. La lingua
@@ -1196,7 +1199,7 @@ torrent spiega il motivo (swarm morto, nessun peer, tracker irraggiungibile).
 
 ### Profili di qualità
 
-In **Configurazione → Sorgenti**, sotto *Profili di qualità*, dai un nome alle
+In **Configurazione → Qualità e upgrade**, sotto *Profili di qualità*, dai un nome alle
 combinazioni di qualità, lingua, sottotitoli ed esclusioni che usi. Gextto
 genera automaticamente un profilo per ogni combinazione già presente nella
 libreria e li espone a Jellyseerr tramite `/api/v3/qualityprofile`; il primo
@@ -1951,7 +1954,6 @@ salvata** finché non li salvi.
 | Filtri contenuto esclusi | Le release che contengono queste parole o script (es. [porno]) vengono escluse. |
 | Filtri per sorgente | Parole chiave da accettare o scartare per una singola sorgente, con attivazione per riga. |
 | Cartelle osservate | I .torrent e i .magnet trovati nelle cartelle indicate vengono **scaricati** e aggiunti automaticamente alla sessione (ricorsiva, elimina dopo). |
-| Profili di qualità | Nomi per le combinazioni di qualità, lingua, sottotitoli ed esclusioni: sono modelli, i valori vengono copiati nel titolo. Il primo è Default e la lista è quella esposta a Jellyseerr. |
 
 #### eD2k e Kad
 
@@ -1991,8 +1993,23 @@ TCP e UDP di aMule.
 
 *Come vengono confrontate le release e quando una versione migliore sostituisce quella in libreria.*
 
-I pesi sono raggruppati in Risoluzione, Sorgente, Codec, Audio e Bonus (Dolby
-Vision, HDR, PROPER, REPACK, REAL). Per ognuno: **più alto = più preferito**.
+La pagina parte da ciò che serve più spesso e lascia i pesi per ultimi:
+
+1. **Upgrade e sostituzione** — le regole che decidono quando una release
+   migliore sostituisce quella in libreria (tabella qui sotto).
+2. **Esempi con i pesi attuali** — punteggi di riferimento (1080p WEB-DL,
+   1080p H.265 DD+, 2160p Dolby Vision) e soglia di stop.
+3. **Prova una release** — incolla il nome di una release: Gextto mostra il
+   punteggio voce per voce, la copia già in libreria con il suo punteggio e se
+   la sostituirebbe, con il motivo. Non scarica nulla.
+4. **Profili di qualità** — i modelli di qualità, lingua, sottotitoli ed
+   esclusioni (vedi *Profili di qualità*); la lista è quella esposta a
+   Jellyseerr.
+5. **Video**, **Audio**, **Correzioni release** — i pesi, in schede chiuse:
+   aprile solo se vuoi cambiare le preferenze. Per ognuno: **più alto = più
+   preferito**.
+6. **Gruppi custom**.
+
 Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release group
 (il nome deve corrispondere al tag finale della release, es. TBK; maiuscole e
 minuscole non contano). I punteggi della libreria vengono ricalcolati da soli

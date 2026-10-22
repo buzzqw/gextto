@@ -201,6 +201,8 @@ func v2ListEditorTab(key string) string {
 		return "notify"
 	case "seed_rules":
 		return "seeding"
+	case "quality_profiles":
+		return "scores"
 	}
 	return "sources"
 }

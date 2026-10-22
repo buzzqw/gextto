@@ -174,6 +174,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /settings/save", V2SettingsSave)
 	v2Handle(s, mux, "POST /settings/qbittorrent-mappings", V2SettingsQbittorrentMappings)
 	v2Handle(s, mux, "POST /settings/score-groups", V2SettingsScoreGroup)
+	v2Handle(s, mux, "POST /settings/score-test", V2SettingsScoreTest)
 	v2Handle(s, mux, "POST /settings/tuning/apply", V2SettingsTuningApply)
 	v2Handle(s, mux, "POST /settings/feed", V2SettingsFeed)
 	v2Handle(s, mux, "POST /settings/checkbox", V2SettingsCheckbox)
@@ -2285,10 +2286,14 @@ type v2SettingsView struct {
 	Intro       string
 	// Brief is the Facilitata mode: internals are hidden. BriefURL/ExpertURL are
 	// the switches, which keep the current section.
-	Brief       bool
-	BriefURL    string
-	ExpertURL   string
-	Groups      []v2SettingGroup
+	Brief     bool
+	BriefURL  string
+	ExpertURL string
+	Groups    []v2SettingGroup
+	// LeadGroups are rendered before the tab tools (Qualità e upgrade: the
+	// upgrade rules come before the release test, the profiles and the
+	// weights).
+	LeadGroups  []v2SettingGroup
 	Note        string
 	Empty       string
 	Highlight   string
@@ -2435,6 +2440,17 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 	for i := range view.Groups {
 		view.Groups[i].ID = fmt.Sprintf("v2-settings-group-%d", i)
 	}
+	if page.ActiveID == "scores" {
+		rest := view.Groups[:0:0]
+		for _, group := range view.Groups {
+			if group.Title == uiScoreRulesGroup {
+				view.LeadGroups = append(view.LeadGroups, group)
+				continue
+			}
+			rest = append(rest, group)
+		}
+		view.Groups = rest
+	}
 	view.EditorsFirst = page.EditorsFirst
 	if page.ShowSources {
 		view.ShowFeeds = true
@@ -2559,6 +2575,8 @@ func v2ListEditorKey(editor uiListEditor) (string, bool) {
 		return "watched_folders", true
 	case "/api/seed-rules":
 		return "seed_rules", true
+	case "/api/quality-profiles":
+		return "quality_profiles", true
 	}
 	return "", false
 }

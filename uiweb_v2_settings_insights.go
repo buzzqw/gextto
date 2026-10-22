@@ -1,7 +1,9 @@
 package gextto
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/buzzqw/gextto/internal/models"
@@ -272,3 +274,127 @@ func v2SettingsEd2kFrom(s *AppState) *v2SettingsEd2k {
 	ed2kRememberIncoming(prefs.IncomingDir)
 	return panel
 }
+
+// --- Release test ------------------------------------------------------------
+
+// v2ScoreTestView is the result of «Prova una release»: how a release name is
+// scored with the current weights and what Gextto would do with it against the
+// copy already in the library.
+type v2ScoreTestView struct {
+	Title        string
+	Error        string
+	Breakdown    []v2ScoreTestItem
+	QualityScore int64
+	ReleaseScore int64
+	// Decision is the verdict of the automatic decision (approved/rejected).
+	Decision string
+	Reason   string
+	Target   string
+	// Library describes the copy already archived, when there is one.
+	Library      string
+	LibraryScore int64
+	HasLibrary   bool
+	// Upgrade is the upgrade verdict against the archived copy: a translated
+	// sentence, Replace says whether it would replace it.
+	Upgrade string
+	Replace bool
+}
+
+type v2ScoreTestItem struct {
+	Label string
+	Value int64
+}
+
+// v2ScoreTestUpgradeReasons turns the upgrade reasons of the decision into a
+// sentence.
+var v2ScoreTestUpgradeReasons = map[string]string{
+	"resolution": "Sostituirebbe la copia in libreria: risoluzione più alta.",
+	"remux":      "Sostituirebbe la copia in libreria: remux.",
+	"source":     "Sostituirebbe la copia in libreria: sorgente WEB-DL migliore.",
+	"hdr":        "Sostituirebbe la copia in libreria: HDR.",
+	"repack":     "Sostituirebbe la copia in libreria: REPACK che corregge la release.",
+	"proper":     "Sostituirebbe la copia in libreria: PROPER che corregge la release.",
+	"score":      "Sostituirebbe la copia in libreria: qualità migliore di almeno la differenza minima.",
+}
+
+// V2SettingsScoreTest scores a release name with the current weights and
+// explains the decision, without downloading anything.
+func V2SettingsScoreTest(w http.ResponseWriter, r *http.Request, s *AppState) {
+	tr := func(italian string) string { return uiText(s, italian) }
+	view := v2ScoreTestView{Title: strings.TrimSpace(r.FormValue("title"))}
+	if view.Title == "" || len(view.Title) > 512 {
+		view.Error = tr("Scrivi il nome di una release (al massimo 512 caratteri).")
+	} else {
+		v2ScoreTestFill(s, &view)
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_score_test_result", view, dict, eng)
+}
+
+func v2ScoreTestFill(s *AppState, view *v2ScoreTestView) {
+	tr := func(italian string) string { return uiText(s, italian) }
+	body, _ := json.Marshal(map[string]string{"title": view.Title})
+	raw, status := v2InternalJSON(s, http.MethodPost, "/api/score/preview", nil, body)
+	if status >= 400 {
+		view.Error = v2JSONError(raw)
+		return
+	}
+	var preview struct {
+		BaseScore int64 `json:"base_score"`
+		Score     int64 `json:"score"`
+		Breakdown []struct {
+			Label string `json:"label"`
+			Value int64  `json:"value"`
+		} `json:"breakdown"`
+	}
+	if err := json.Unmarshal(raw, &preview); err != nil {
+		view.Error = tr("Risposta non valida.")
+		return
+	}
+	view.QualityScore, view.ReleaseScore = preview.BaseScore, preview.Score
+	for _, item := range preview.Breakdown {
+		view.Breakdown = append(view.Breakdown, v2ScoreTestItem{Label: tr(item.Label), Value: item.Value})
+	}
+	release := ParseRelease(view.Title, scoreTestMagnet, "simulator")
+	if release == nil {
+		return
+	}
+	body, _ = json.Marshal(map[string]any{"release": release})
+	raw, status = v2InternalJSON(s, http.MethodPost, "/api/search/explain", nil, body)
+	if status >= 400 {
+		view.Error = v2JSONError(raw)
+		return
+	}
+	var explained struct {
+		Trace DecisionTrace `json:"trace"`
+	}
+	if err := json.Unmarshal(raw, &explained); err != nil {
+		view.Error = tr("Risposta non valida.")
+		return
+	}
+	trace := explained.Trace
+	view.Decision, view.Reason, view.Target = trace.Decision, trace.Reason, trace.Target
+	if trace.Comparison == nil {
+		return
+	}
+	view.HasLibrary = true
+	view.Library, _ = trace.Comparison["title"].(string)
+	if score, ok := trace.Comparison["score"].(float64); ok {
+		view.LibraryScore = int64(score)
+	}
+	switch reason, _ := trace.Comparison["upgrade_reason"].(string); {
+	case reason == "":
+		view.Upgrade = tr("Non sostituirebbe la copia in libreria: è già uguale o migliore, oppure il miglioramento è sotto la differenza minima o oltre la soglia di stop.")
+	case v2ScoreTestUpgradeReasons[reason] != "":
+		view.Upgrade, view.Replace = tr(v2ScoreTestUpgradeReasons[reason]), true
+	default:
+		view.Upgrade, view.Replace = tr("Sostituirebbe la copia in libreria."), true
+	}
+	if allowed, ok := trace.Comparison["upgrade_allowed"].(bool); ok && !allowed && view.Replace {
+		view.Upgrade, view.Replace = tr("Non sostituirebbe la copia in libreria: per questo titolo gli upgrade sono spenti («Niente upgrade»)."), false
+	}
+}
+
+// scoreTestMagnet is a placeholder infohash: the test never downloads, but the
+// decision needs a hash to check the blocklist.
+const scoreTestMagnet = "magnet:?xt=urn:btih:0123456789012345678901234567890123456789"

@@ -886,14 +886,16 @@
       {{if .Intro}}<p class="settings-intro">{{.Intro}}</p>{{end}}
       {{if .Flash}}<p class="{{if .FlashErr}}alert{{else}}muted{{end}}" role="{{if .FlashErr}}alert{{else}}status{{end}}"><span>{{.Flash}}</span></p>{{end}}
     </div>
-    {{if gt (len .Groups) 1}}<nav class="settings-group-index" aria-label="Gruppi di questa sezione">
+    {{if or (gt (len .Groups) 1) .LeadGroups}}<nav class="settings-group-index" aria-label="Gruppi di questa sezione">
       <span class="settings-group-index-label">In questa sezione</span>
-      <ul>{{range .Groups}}{{if not .Collapsed}}<li><a class="settings-group-chip" href="#{{.ID}}">{{.Title}}</a></li>{{end}}{{end}}</ul>
+      <ul>{{range .LeadGroups}}<li><a class="settings-group-chip" href="#{{.ID}}">{{.Title}}</a></li>{{end}}{{if eq .ActiveID "scores"}}<li><a class="settings-group-chip" href="#v2-score-test">Prova una release</a></li>{{end}}{{range .Groups}}{{if not .Collapsed}}<li><a class="settings-group-chip" href="#{{.ID}}">{{.Title}}</a></li>{{end}}{{end}}</ul>
     </nav>{{end}}
     {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
     {{if .Sources}}{{template "v2_sources_index" .Sources}}{{end}}
     {{if .Ed2k}}{{template "v2_settings_ed2k" .Ed2k}}{{end}}
+    {{range .LeadGroups}}{{template "v2_setting_group" .}}{{end}}
     {{if .ScoreExamples}}{{template "v2_score_examples" .ScoreExamples}}{{end}}
+    {{if eq .ActiveID "scores"}}{{template "v2_score_test" .}}{{template "v2_settings_editors" .}}{{end}}
     {{if .Tuning}}{{template "v2_tuning_panel" .Tuning}}{{end}}
     {{if .Actions}}
     <div class="panel settings-panel settings-actions-panel">
@@ -907,7 +909,7 @@
     {{if .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
     {{range .Groups}}{{template "v2_setting_group" .}}{{end}}
     {{if .Rename}}{{template "v2_rename_editor" .Rename}}{{end}}
-    {{if not .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
+    {{if and (not .EditorsFirst) (ne .ActiveID "scores")}}{{template "v2_settings_editors" .}}{{end}}
     {{if .I18n}}{{template "v2_i18n_editor" .I18n}}{{end}}
     {{if and (not .Groups) (not .I18n) (not .ShowFeeds) (not .Tuning) (not .Sources) (not .ScoreExamples) .Empty}}<p class="muted">{{.Empty}}</p>{{end}}
     {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
@@ -1034,6 +1036,36 @@
     <ul class="score-examples">{{range .}}<li>{{.}}</li>{{end}}</ul>
   </div>
 </div>
+{{end}}
+
+{{define "v2_score_test"}}
+<div class="panel settings-panel" id="v2-score-test">
+  <div class="panel-head"><h3>Prova una release</h3><small class="muted">Non scarica nulla</small></div>
+  <div class="panel-body">
+    <p class="hint">Incolla il nome di una release: Gextto mostra il punteggio voce per voce con i pesi attuali e se sostituirebbe la copia già in libreria.</p>
+    <form class="form-actions" method="post" action="/settings/score-test" hx-post="/settings/score-test" hx-target="#v2-score-test-result" hx-swap="innerHTML">
+      <label class="field span-full"><span>Nome della release</span><input class="input" name="title" required maxlength="512" placeholder="es. Serie.S01E01.1080p.WEB-DL.DDP5.1.H.264-GRUPPO" autocomplete="off" /></label>
+      <button class="btn sm primary" type="submit" hx-disabled-elt="this">Prova</button>
+    </form>
+    <div id="v2-score-test-result" aria-live="polite"></div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_score_test_result"}}
+{{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{else}}
+<div class="stat-grid">
+  <div class="row"><span>Punteggio qualità</span><strong>{{.QualityScore}}</strong></div>
+  <div class="row"><span>Punteggio release</span><strong>{{.ReleaseScore}}</strong></div>
+  {{if .Target}}<div class="row"><span>Obiettivo</span><strong>{{.Target}}</strong></div>{{end}}
+</div>
+<ul class="score-examples">{{range .Breakdown}}{{if ne .Value 0}}<li>{{.Label}}: {{.Value}}</li>{{end}}{{end}}</ul>
+{{if .HasLibrary}}
+<p><span>In libreria:</span> <strong>{{if .Library}}{{.Library}}{{else}}—{{end}}</strong> · <span>punteggio</span> {{.LibraryScore}}</p>
+<p><span class="badge {{if .Replace}}ok{{else}}warn{{end}}">{{if .Replace}}upgrade{{else}}nessun upgrade{{end}}</span> {{.Upgrade}}</p>
+{{else}}<p class="muted">Nessuna copia in libreria per questa release.</p>{{end}}
+{{if .Decision}}<p class="muted"><span>Decisione automatica:</span> <span class="badge {{if or (eq .Decision "approved") (eq .Decision "accept")}}ok{{else}}warn{{end}}">{{.Decision}}</span>{{if .Reason}} — {{.Reason}}{{end}}</p>{{end}}
+{{end}}
 {{end}}
 
 {{define "v2_ipfilter_action"}}

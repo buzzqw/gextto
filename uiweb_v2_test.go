@@ -2386,3 +2386,35 @@ func TestV2SeriesSaveStoresAudioMinimum(t *testing.T) {
 	}
 	t.Fatal("series not found")
 }
+
+func TestV2ScoreTestScoresAReleaseAndComparesTheLibrary(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	// The page leads with the upgrade rules, then the release test and the
+	// quality profiles, then the weight cards.
+	code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=scores", nil)
+	if code != http.StatusOK {
+		t.Fatalf("scores tab -> %d", code)
+	}
+	rules := strings.Index(body, "id=\"input-upgrade_min_score_diff\"")
+	test := strings.Index(body, "id=\"v2-score-test\"")
+	profiles := strings.Index(body, "Profili di qualità")
+	weights := strings.Index(body, "id=\"input-score_res_2160p\"")
+	if rules < 0 || test < 0 || profiles < 0 || weights < 0 || !(rules < test && test < profiles && profiles < weights) {
+		t.Fatalf("scores tab order: rules=%d test=%d profiles=%d weights=%d", rules, test, profiles, weights)
+	}
+
+	code, body = v2Request(t, server, http.MethodPost, "/settings/score-test", url.Values{"title": {"Show.S01E01.1080p.WEB-DL.H264-GRP"}})
+	if code != http.StatusOK || !strings.Contains(body, "Punteggio qualità") || !strings.Contains(body, "1250") {
+		t.Fatalf("score test -> %d: %s", code, body)
+	}
+	if !strings.Contains(body, "Nessuna copia in libreria") {
+		t.Fatalf("an unknown release has no library copy: %s", body)
+	}
+	code, body = v2Request(t, server, http.MethodPost, "/settings/score-test", url.Values{"title": {""}})
+	if code != http.StatusOK || !strings.Contains(body, "role=\"alert\"") {
+		t.Fatalf("empty title must be reported: %d %s", code, body)
+	}
+}

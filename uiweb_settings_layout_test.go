@@ -93,7 +93,7 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 	// Editors, panels and actions without a single key.
 	for tab, markers := range map[string][]string{
 		"sources":     {"Feed RSS", "Motori web", "Filtri contenuto esclusi", "Filtri per sorgente", "Cartelle osservate", "Pulisci i risultati già archiviati"},
-		"scores":      {"Gruppi custom", "Aggiungi gruppo"},
+		"scores":      {"Gruppi custom", "Aggiungi gruppo", "Prova una release", "Profili di qualità"},
 		"backend":     {"Applica motore", "Installa / Ottimizza qBittorrent-nox", "Stato qBittorrent-nox", "Test connessione"},
 		"network":     {"v2-ipfilter-panel", "Carica / aggiorna ora"},
 		"performance": {"Ottimizza"},
@@ -286,7 +286,17 @@ func TestScoreMacroCardsKeepTheirSubgroups(t *testing.T) {
 	want := map[string][]string{
 		"Video":                  {"4K", "Full HD", "SD", "Codec video", "Sorgente", "HDR / Dolby Vision"},
 		"Audio":                  {"Lossless", "DTS / DD+", "Canali e oggetti"},
-		"Upgrade e sostituzione": {"Correzioni", "Soglie e pulizia"},
+		"Correzioni release": {},
+	}
+	// The upgrade rules lead the tab, open and without weight subgroups; the
+	// weight cards follow, closed.
+	if groups[0].Title != uiScoreRulesGroup || groups[0].Collapsed || len(groups[0].Subgroups) != 0 {
+		t.Fatalf("first group = %+v, want the open upgrade rules", groups[0])
+	}
+	for _, group := range groups[1:] {
+		if !group.Collapsed {
+			t.Errorf("weight card %s must be closed by default", group.Title)
+		}
 	}
 	for _, group := range groups {
 		expected, ok := want[group.Title]

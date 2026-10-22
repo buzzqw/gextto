@@ -1001,13 +1001,16 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   listening and outgoing traffic to a chosen interface (e.g. `tun0`, `wg0`);
   the list is read from the server, and the change applies after a restart.
 - **Scores** — category weights, custom-group management (add, edit or remove a
-  group and set its bonus/penalty), and a live simulator. The group name must
+  group and set its bonus/penalty), and **Test a release**. The upgrade rules
+  come first, then examples, the release test and the quality profiles; the
+  weights follow in closed cards. The group name must
   match the release's final group tag, for example `TBK`. Audio weights are one
   card per group: Lossless (TrueHD, DTS-HD, FLAC, PCM), DTS/DD+ (including
   DTS-HD HRA), AC3/5.1, AAC/Opus and MP3; channels and Atmos/DTS:X live in a
   same Audio card. Video weights live in one **Video** card (4K, Full HD, HD,
-  SD, Video codec, Source and HDR/DV subgroups; **Upgrade and replacement**
-  holds corrections, thresholds and cleanup in its own subgroups. The audio total stays below the upgrade threshold, so audio contributes
+  SD, Video codec, Source and HDR/DV subgroups); **Release fixes** holds
+  PROPER, REPACK and REAL, while **Upgrades and replacement** (at the top of
+  the page) holds the thresholds and the replacement switch. The audio total stays below the upgrade threshold, so audio contributes
   to the comparison but does not download another release by itself. Audio language is a per-title eligibility requirement, not a fixed
   Italian bonus, so English can be preferred instead. Preferred subtitles add a small optional bonus without
   making a release mandatory. One effective score is used for acquisition,
@@ -1160,7 +1163,7 @@ torrent page explains why (dead swarm, no peers, tracker unreachable).
 
 ### Quality profiles
 
-In **Configuration → Sources**, under *Quality profiles*, name the combinations
+In **Configuration → Quality and upgrades**, under *Quality profiles*, name the combinations
 of quality, language, subtitles and exclusions you use. Gextto generates a
 profile for every combination already present in the library and exposes them to
 Jellyseerr through `/api/v3/qualityprofile`; the first profile is **Default**.
@@ -1881,7 +1884,6 @@ them.
 | Excluded content filters | Releases containing these words or scripts (e.g. [porno]) are excluded. |
 | Source filters | Keywords to accept or reject for a single source, enabled per row. |
 | Watched folders | The .torrent and .magnet files found in the given folders are **downloaded** and added to the session automatically (recursive, delete after). |
-| Quality profiles | Names for the combinations of quality, language, subtitles and exclusions: they are templates, their values are copied into the title. The first is Default and the list is the one exposed to Jellyseerr. |
 
 #### eD2k and Kad
 
@@ -1920,9 +1922,23 @@ it is limited, open aMule's TCP and UDP ports on the router.
 
 *How releases are compared and when a better version replaces the one in the library.*
 
-Weights are grouped into Resolution, Source, Codec, Audio and Bonus (Dolby
-Vision, HDR, PROPER, REPACK, REAL). For each: **higher = more preferred**. The
-**Custom groups** panel adds a bonus or a penalty to a release group (the name
+The page starts with what is needed most often and leaves the weights last:
+
+1. **Upgrades and replacement** — the rules that decide when a better release
+   replaces the one in the library (table below).
+2. **Examples with the current weights** — reference scores (1080p WEB-DL,
+   1080p H.265 DD+, 2160p Dolby Vision) and the stop threshold.
+3. **Test a release** — paste a release name: Gextto shows the score item by
+   item, the copy already in the library with its score and whether it would
+   replace it, with the reason. It downloads nothing.
+4. **Quality profiles** — the templates of quality, language, subtitles and
+   exclusions (see *Quality profiles*); the list is the one exposed to
+   Jellyseerr.
+5. **Video**, **Audio**, **Release fixes** — the weights, in closed cards: open
+   them only to change the preferences. For each: **higher = more preferred**.
+6. **Custom groups**.
+
+The **Custom groups** panel adds a bonus or a penalty to a release group (the name
 must match the final tag of the release, e.g. TBK; case does not matter). The
 library scores are recomputed automatically when you change the weights or when
 a Gextto update changes the scoring rules, so a change is never mistaken for an
