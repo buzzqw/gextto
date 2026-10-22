@@ -67,7 +67,7 @@ network, pass the API key with `GEXTTO_API_KEY=<key>`: it is sent in the
 7. **Blocklist** — blocked releases, with interactive removal.
 8. **Library** — monitored TV series, movies and comics. Series and movies are
    managed from here: adding by searching TMDB, editing the requirements with a
-   field form (for series, among others, *No upgrades*), pause and deletion.
+   field form (for series, among others, *Allow upgrades*), pause and deletion.
    The detail of a series shows one season at a time with the state of each
    episode (✓ present, ✗ missing, ↓ downloading, `·` upcoming, `-` ignored);
    from there seasons are switched on or off, releases are searched and

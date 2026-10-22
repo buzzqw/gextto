@@ -642,7 +642,7 @@ For a new series, TMDB search is the safest method:
 1. open **Explore**, search for the title and select the correct result;
 2. check title, year, network and poster;
 3. choose the **Quality profile**: it decides the new title's quality, minimum
-   audio, language, subtitles, exclusions and “No upgrades” (the form has no
+   audio, language, subtitles, exclusions and “Allow upgrades” (the form has no
    other fields for these values, so they cannot contradict each other); add
    any **Extra exclusions** for this title only, which are added to the
    profile's, and the monitored seasons;
@@ -653,7 +653,7 @@ The most important fields are:
 
 | Field | Effect |
 |---|---|
-| Quality profile | only when adding: gives the title the quality, minimum audio, language, subtitles, exclusions and “No upgrades” of the profile (see *Quality profiles*); the single values can be changed later on the title's page |
+| Quality profile | only when adding: gives the title the quality, minimum audio, language, subtitles, exclusions and “Allow upgrades” of the profile (see *Quality profiles*); the single values can be changed later on the title's page |
 | Quality | restricts acceptable releases and contributes to the score |
 | Minimum audio | a preset that already includes the channels: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Any** imposes no limit and is the default, including for existing series |
 | Language | requires the configured language when it is recognisable in the title |
@@ -661,7 +661,7 @@ The most important fields are:
 | Seasons | decides which seasons are monitored; ranges are supported |
 | Aliases | links alternate names to the same series |
 | Exclusions | words in a title that must block the release |
-| No upgrades | a better release no longer replaces the archived files of this series; it is also in the add form and in the movie form |
+| Allow upgrades | **Yes** (default): a better release replaces the archived file; **No**: the archived files of this series stay. It is also on the movie page and in the quality profiles |
 
 Leave future seasons enabled if you want calendar and missing searches to keep
 working. Use *Ignore* only for episodes that should no longer be searched;
@@ -1169,7 +1169,7 @@ torrent page explains why (dead swarm, no peers, tracker unreachable).
 ### Quality profiles
 
 In **Configuration → Quality and upgrades**, under *Quality profiles*, name the combinations
-of quality, minimum audio, language, subtitles, exclusions and upgrades («No
+of quality, minimum audio, language, subtitles, exclusions and upgrades («Allow
 upgrades») you use. Gextto generates a
 profile for every combination already present in the library and exposes them to
 Jellyseerr through `/api/v3/qualityprofile`; the first profile is **Default**.
@@ -1941,7 +1941,7 @@ The page starts with what is needed most often and leaves the weights last:
    in the feeds with the current rules and weights and says how many archived
    episodes would be replaced, with a few examples. Use it after changing the
    weights or thresholds: a high number means the next cycles would re-download
-   a lot. It downloads nothing; series with “No upgrades” do not count.
+   a lot. It downloads nothing; series with “Allow upgrades” set to No do not count.
 3. **Test a release** — paste a release name: Gextto shows the score item by
    item, the copy already in the library with its score and whether it would
    replace it, with the reason. It downloads nothing.
@@ -1988,7 +1988,7 @@ the download stands. Season packs do not go through this check.
 | Setting | What it does |
 |---|---|
 | Min score difference for upgrade | Minimum score difference to replace a file with a better upgrade. Only quality counts: size, subtitles and swarm health are not enough to reach it. |
-| Stop upgrading above this score | Upgrade ceiling: once the library file scores at least this much it is no longer replaced by better releases; only a REPACK or PROPER, which fixes a defective release, is still accepted. With the default scores: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. It adds to the minimum difference: that one says *by how much* a release must improve, this one *up to where*. To stop upgrades for a single title use “No upgrades” on its page. “Why not this one?” says when a release is skipped because of this ceiling. *(0 = always upgrade: no ceiling)* |
+| Stop upgrading above this score | Upgrade ceiling: once the library file scores at least this much it is no longer replaced by better releases; only a REPACK or PROPER, which fixes a defective release, is still accepted. With the default scores: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. It adds to the minimum difference: that one says *by how much* a release must improve, this one *up to where*. To stop upgrades for a single title set “Allow upgrades” to No on its page. “Why not this one?” says when a release is skipped because of this ceiling. *(0 = always upgrade: no ceiling)* |
 | Replace versions already archived | Replaces lower versions already archived with better upgrades. |
 | Min score difference for cleanup | Minimum score difference to replace an existing file with a better one (cleanup). |
 

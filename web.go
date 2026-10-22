@@ -1027,10 +1027,11 @@ type TmdbAddInput struct {
 	CreateFolder bool `json:"create_folder"`
 	// SeasonSubfolders archives episodes in a per-season subfolder.
 	SeasonSubfolders bool `json:"season_subfolders"`
-	// DisableUpgrades is «Niente upgrade»: an archived file is never replaced.
+	// DisableUpgrades is «Permetti upgrade: No»: an archived file is never
+	// replaced.
 	DisableUpgrades bool `json:"disable_upgrades"`
 	// QualityProfileID, when set, gives the title the quality, audio,
-	// language, subtitles, exclusions and «Niente upgrade» of that profile;
+	// language, subtitles, exclusions and «Permetti upgrade» of that profile;
 	// Exclude is then added to the profile's exclusions.
 	QualityProfileID int `json:"quality_profile_id"`
 }

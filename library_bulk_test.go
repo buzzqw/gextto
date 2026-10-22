@@ -149,3 +149,17 @@ func TestBulkProfileFillsAudioAndUpgrades(t *testing.T) {
 		t.Fatalf("bulk profile values -> %d: %s", code, page)
 	}
 }
+
+func TestQualityProfileUpgradesChoiceMapsToDisableUpgrades(t *testing.T) {
+	state := v3TestState(t)
+	body := `{"items":[{"name":"Fermo","upgrades":"deny"},{"name":"Libero","upgrades":"allow","disable_upgrades":true}]}`
+	rec := httptest.NewRecorder()
+	SaveQualityProfiles(rec, httptest.NewRequest("POST", "/api/quality-profiles", strings.NewReader(body)), state)
+	if rec.Code != 200 {
+		t.Fatalf("save -> %d %s", rec.Code, rec.Body.String())
+	}
+	profiles := ensureQualityProfiles(state)
+	if len(profiles) != 2 || !profiles[0].DisableUpgrades || profiles[0].Upgrades != "deny" || profiles[1].DisableUpgrades || profiles[1].Upgrades != "allow" {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+}

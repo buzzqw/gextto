@@ -391,7 +391,7 @@ func v2ScoreTestFill(s *AppState, view *v2ScoreTestView) {
 		view.Upgrade, view.Replace = tr("Sostituirebbe la copia in libreria."), true
 	}
 	if allowed, ok := trace.Comparison["upgrade_allowed"].(bool); ok && !allowed && view.Replace {
-		view.Upgrade, view.Replace = tr("Non sostituirebbe la copia in libreria: per questo titolo gli upgrade sono spenti («Niente upgrade»)."), false
+		view.Upgrade, view.Replace = tr("Non sostituirebbe la copia in libreria: per questo titolo «Permetti upgrade» è No."), false
 	}
 }
 

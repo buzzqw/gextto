@@ -658,7 +658,7 @@ Per una serie nuova il metodo più sicuro è la ricerca TMDB:
 1. apri **Esplora**, cerca il titolo e seleziona il risultato corretto;
 2. controlla titolo, anno, rete e poster;
 3. scegli il **Profilo di qualità**: è lui a decidere qualità, audio minimo,
-   lingua, sottotitoli, esclusioni e «Niente upgrade» del nuovo titolo (il
+   lingua, sottotitoli, esclusioni e «Permetti upgrade» del nuovo titolo (il
    modulo non ha altri campi per questi valori, così non possono contraddirsi);
    aggiungi eventuali **Esclusioni in più** solo per questo titolo, che si
    sommano a quelle del profilo, e le stagioni da monitorare;
@@ -669,7 +669,7 @@ I campi più importanti sono:
 
 | Campo | Effetto |
 |---|---|
-| Profilo di qualità | solo all'aggiunta: dà al titolo qualità, audio minimo, lingua, sottotitoli, esclusioni e «Niente upgrade» del profilo (vedi *Profili di qualità*); nella scheda del titolo i singoli valori si possono poi cambiare |
+| Profilo di qualità | solo all'aggiunta: dà al titolo qualità, audio minimo, lingua, sottotitoli, esclusioni e «Permetti upgrade» del profilo (vedi *Profili di qualità*); nella scheda del titolo i singoli valori si possono poi cambiare |
 | Qualità | restringe le release accettabili e partecipa allo score |
 | Audio minimo | preset che include già i canali: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Qualsiasi** non impone nulla ed è il default, anche per le serie già caricate |
 | Lingua | richiede la lingua configurata quando è riconoscibile nel titolo |
@@ -677,7 +677,7 @@ I campi più importanti sono:
 | Stagioni | decide quali stagioni sono monitorate; gli intervalli sono supportati |
 | Alias | aiuta a collegare titoli diversi alla stessa serie |
 | Esclusioni | parole nel titolo che devono bloccare la release |
-| Niente upgrade | una release migliore non sostituisce più i file già archiviati di questa serie; c'è anche nel modulo di aggiunta e in quello dei film |
+| Permetti upgrade | **Sì** (predefinito): una release migliore sostituisce il file archiviato; **No**: i file già archiviati di questa serie restano. C'è anche nella scheda dei film e nei profili di qualità |
 
 Lascia le stagioni non ancora disponibili abilitate se vuoi che il calendario e
 la ricerca dei mancanti continuino a funzionare. Usa *Ignora* solo per episodi
@@ -1206,7 +1206,7 @@ torrent spiega il motivo (swarm morto, nessun peer, tracker irraggiungibile).
 
 In **Configurazione → Qualità e upgrade**, sotto *Profili di qualità*, dai un nome alle
 combinazioni di qualità, audio minimo, lingua, sottotitoli, esclusioni e
-upgrade («Niente upgrade») che usi. Gextto
+upgrade («Permetti upgrade») che usi. Gextto
 genera automaticamente un profilo per ogni combinazione già presente nella
 libreria e li espone a Jellyseerr tramite `/api/v3/qualityprofile`; il primo
 profilo è **Default**.
@@ -2012,7 +2012,7 @@ La pagina parte da ciò che serve più spesso e lascia i pesi per ultimi:
    nei feed con le regole e i pesi attuali e dice quanti episodi archiviati
    verrebbero sostituiti, con alcuni esempi. Usala dopo aver cambiato pesi o
    soglie: un numero alto vuol dire che i prossimi cicli riscaricherebbero molto.
-   Non scarica nulla; le serie con «Niente upgrade» non contano.
+   Non scarica nulla; le serie con «Permetti upgrade» su No non contano.
 3. **Prova una release** — incolla il nome di una release: Gextto mostra il
    punteggio voce per voce, la copia già in libreria con il suo punteggio e se
    la sostituirebbe, con il motivo. Non scarica nulla.
@@ -2062,7 +2062,7 @@ verifica.
 | Impostazione | Cosa fa |
 |---|---|
 | Differenza minima score per upgrade | Differenza minima di punteggio per sostituire un file con un upgrade migliore. Conta solo la qualità: dimensione, sottotitoli e salute dello swarm non bastano a superarla. |
-| Smetti di migliorare oltre questo punteggio | Tetto agli upgrade: quando il file in libreria ha almeno questo punteggio non viene più sostituito da release migliori; resta accettato solo un REPACK o PROPER, che corregge una release difettosa. Riferimenti con i punteggi predefiniti: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. Si somma alla differenza minima: la prima dice *di quanto* deve migliorare, questa *fino a dove*. Per fermare del tutto gli upgrade di un solo titolo c'è «Niente upgrade» nella sua scheda. «Perché non questa?» indica quando una release è scartata per questa soglia. *(0 = migliora sempre: nessun tetto)* |
+| Smetti di migliorare oltre questo punteggio | Tetto agli upgrade: quando il file in libreria ha almeno questo punteggio non viene più sostituito da release migliori; resta accettato solo un REPACK o PROPER, che corregge una release difettosa. Riferimenti con i punteggi predefiniti: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. Si somma alla differenza minima: la prima dice *di quanto* deve migliorare, questa *fino a dove*. Per fermare del tutto gli upgrade di un solo titolo c'è «Permetti upgrade: No» nella sua scheda. «Perché non questa?» indica quando una release è scartata per questa soglia. *(0 = migliora sempre: nessun tetto)* |
 | Sostituisci le versioni già archiviate | Sostituisce versioni inferiori già archiviate con upgrade migliori. |
 | Differenza minima score per cleanup | Differenza minima di punteggio per sostituire un file esistente con uno migliore (cleanup). |
 

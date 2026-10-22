@@ -445,7 +445,10 @@ var uiAdvancedEditors = []uiListEditor{
 			{Name: "language", Label: "Lingua", Kind: "text", Placeholder: "es. ita"},
 			{Name: "subtitle", Label: "Sottotitoli", Kind: "text"},
 			{Name: "exclude", Label: "Esclusioni", Kind: "text", Wide: true},
-			{Name: "disable_upgrades", Label: "Niente upgrade", Kind: "bool"},
+			{Name: "upgrades", Label: "Permetti upgrade", Kind: "select", Options: []uiListFieldOption{
+				{Value: "allow", Label: "Sì"},
+				{Value: "deny", Label: "No"},
+			}},
 		},
 	},
 	{

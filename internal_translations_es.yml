@@ -5990,3 +5990,7 @@ spa:
   "escludi": "excluir"
   "niente upgrade": "sin mejoras"
   "audio": "audio"
+  "Permetti upgrade": "Permitir mejoras"
+  "Sì: una release migliore sostituisce il file già archiviato. No: il file archiviato resta.": "Sí: una release mejor sustituye el archivo archivado. No: el archivo archivado se queda."
+  "upgrade: no": "mejoras: no"
+  "Non sostituirebbe la copia in libreria: per questo titolo «Permetti upgrade» è No.": "No sustituiría la copia de la biblioteca: «Permitir mejoras» está en No para este título."

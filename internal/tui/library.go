@@ -573,7 +573,9 @@ func seriesEditForm(tr *Translator, series SeriesConfig) *Form {
 		textField(tr, "tvdb_id", series.TvdbID),
 		boolField(tr, "season_subfolders", series.SeasonSubfolders),
 		boolField(tr, "anime", series.Anime),
-		boolField(tr, "disable_upgrades", series.DisableUpgrades),
+		// Shown as «Permetti upgrade» (yes = upgrades allowed), saved as the
+		// API's disable_upgrades.
+		boolField(tr, "allow_upgrades", !series.DisableUpgrades),
 	}}
 }
 
@@ -680,6 +682,8 @@ func (m *Model) submitForm() Action {
 				continue
 			}
 			switch {
+			case field.Key == "allow_upgrades":
+				fields["disable_upgrades"] = field.Value != "true"
 			case field.Bool:
 				fields[field.Key] = field.Value == "true"
 			case field.Key == "aliases":

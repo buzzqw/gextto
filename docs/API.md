@@ -402,7 +402,7 @@ before this feature, defaults to no constraint. The same field is returned by
 `7.1`) is still accepted for API compatibility and is folded into the combined
 preset on load.
 
-### No upgrades and quality profiles
+### Upgrade switch and quality profiles
 
 `POST /api/tmdb/add` also accepts `quality_profile_id`: the new title then takes
 `quality`, `audio`, `language`, `subtitle` and `disable_upgrades` from that
@@ -410,12 +410,12 @@ profile, whatever the request says, and `exclude` is added to the profile's
 exclusions.
 
 `POST /api/tmdb/add` and `POST /api/movies/{id}` accept `disable_upgrades`
-(boolean, «Niente upgrade»): a better release never replaces the archived file
+(boolean; the interface shows it as «Permetti upgrade: No»): a better release never replaces the archived file
 of that title. `POST /api/series/{name}` already accepted it.
 
 The items of `GET`/`POST /api/quality-profiles` carry `id`, `name`, `quality`,
 `audio` (one of the presets above, empty = any), `language`, `subtitle`,
-`exclude` and `disable_upgrades`. A profile is a template: the add form and the
+`exclude`, `disable_upgrades` and `upgrades` (`allow`/`deny`, the same switch as the profile editor writes it). A profile is a template: the add form and the
 v3 endpoints (`POST /api/v3/series`, `POST /api/v3/movie`) copy its values,
 `audio` and `disable_upgrades` included, into the new title.
 

@@ -18,7 +18,9 @@ import (
 const qualityProfilesKey = "quality_profiles"
 
 // QualityProfile is one named combination of selection overrides. Audio is
-// the minimum audio preset (empty = any); DisableUpgrades is «Niente upgrade».
+// the minimum audio preset (empty = any); DisableUpgrades is «Permetti
+// upgrade: No». Upgrades is the same switch as the profile editor writes it
+// ("allow"/"deny"): normalizeProfileUpgrades keeps the two in step.
 type QualityProfile struct {
 	ID              int    `json:"id"`
 	Name            string `json:"name"`
@@ -28,6 +30,22 @@ type QualityProfile struct {
 	Subtitle        string `json:"subtitle"`
 	Exclude         string `json:"exclude"`
 	DisableUpgrades bool   `json:"disable_upgrades,omitempty"`
+	Upgrades        string `json:"upgrades,omitempty"`
+}
+
+// normalizeProfileUpgrades reads the editor's "upgrades" choice when present
+// and then writes it back from DisableUpgrades, so both spellings agree.
+func normalizeProfileUpgrades(profile *QualityProfile) {
+	switch strings.ToLower(strings.TrimSpace(profile.Upgrades)) {
+	case "deny":
+		profile.DisableUpgrades = true
+	case "allow":
+		profile.DisableUpgrades = false
+	}
+	profile.Upgrades = "allow"
+	if profile.DisableUpgrades {
+		profile.Upgrades = "deny"
+	}
 }
 
 func decodeQualityProfiles(raw string) []QualityProfile {
@@ -44,6 +62,7 @@ func decodeQualityProfiles(raw string) []QualityProfile {
 		}
 		profile.Quality = strings.TrimSpace(profile.Quality)
 		profile.Audio = normalizeAudioRequirement(profile.Audio)
+		normalizeProfileUpgrades(&profile)
 		profile.Language = strings.TrimSpace(profile.Language)
 		profile.Subtitle = strings.TrimSpace(profile.Subtitle)
 		profile.Exclude = strings.TrimSpace(profile.Exclude)
@@ -195,11 +214,12 @@ func SaveQualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 			continue
 		}
 		seen[strings.ToLower(profile.Name)] = true
+		normalizeProfileUpgrades(&profile)
 		cleaned = append(cleaned, QualityProfile{
 			ID: profile.ID, Name: profile.Name, Quality: strings.TrimSpace(profile.Quality),
 			Language: strings.TrimSpace(profile.Language), Subtitle: strings.TrimSpace(profile.Subtitle),
 			Exclude: strings.TrimSpace(profile.Exclude), Audio: normalizeAudioRequirement(profile.Audio),
-			DisableUpgrades: profile.DisableUpgrades,
+			DisableUpgrades: profile.DisableUpgrades, Upgrades: profile.Upgrades,
 		})
 	}
 	cfg := latestConfig(s)

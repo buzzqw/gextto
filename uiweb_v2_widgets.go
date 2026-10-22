@@ -1311,7 +1311,7 @@ func v2ProfileChoices(s *AppState, profiles []QualityProfile) []v2ProfileChoice 
 			parts = append(parts, tr("escludi")+" "+profile.Exclude)
 		}
 		if profile.DisableUpgrades {
-			parts = append(parts, tr("niente upgrade"))
+			parts = append(parts, tr("upgrade: no"))
 		}
 		out = append(out, v2ProfileChoice{ID: profile.ID, Name: profile.Name, Summary: strings.Join(parts, " · "), Selected: index == 0})
 	}
