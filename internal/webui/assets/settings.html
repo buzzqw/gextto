@@ -83,6 +83,8 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label>Outgoing interface (VPN killswitch)<input type="text" name="outgoing-interface" value="{{OUT_IFACE}}" autocomplete="off" title="Network interface for outgoing traffic (VPN killswitch)"></label>
     <label>Proxy (socks5:// or http://)<input type="text" name="proxy" value="{{PROXY}}" autocomplete="off" title="SOCKS5 or HTTP proxy URL for peer traffic"></label>
     <label>API token<input type="text" name="token" value="{{TOKEN}}" autocomplete="off" title="Authentication token for API requests"></label>
+    <label>Client identity<select name="client-identity" title="What peers and trackers see: gx-core with its real version by default, or a compatibility preset. Some private trackers only accept whitelisted clients; check their rules before using a preset.">{{CLIENT_IDENTITY_OPTIONS}}</select></label>
+    <label>Client version (empty = preset)<input type="text" name="client-identity-version" value="{{CLIENT_IDENTITY_VERSION}}" autocomplete="off" placeholder="5.2.3" title="Version announced with the preset; empty uses the preset version"></label>
     <label class="chk"><input type="checkbox" name="web-sources-allow-private" value="1"{{WEB_PRIVATE}} title="Web seeds and magnet sources (xs=/as=) come from torrent data: by default they cannot reach the local network, so a torrent from a feed cannot make the client request the router or the NAS"> Allow web seeds and magnet sources on the local network</label>
   </div>
   <div class="actions"><button type="button" class="secondary sm" id="port-test" title="Test whether the peer port is reachable from the Internet (uses the port saved above)">Test port</button></div>

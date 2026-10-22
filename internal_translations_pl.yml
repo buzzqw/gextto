@@ -5824,3 +5824,8 @@ pol:
   "Un nome per ogni combinazione di qualità, lingua, sottotitoli ed esclusioni. I profili sono la lista che vede Jellyseerr (/api/v3/qualityprofile); le combinazioni già presenti nella libreria vengono aggiunte automaticamente.": "Nazwa dla każdej kombinacji jakości, języka, napisów i wykluczeń. Profile to lista widoczna w Jellyseerr (/api/v3/qualityprofile); kombinacje już obecne w bibliotece są dodawane automatycznie."
   "es. 1080p": "np. 1080p"
   "es. ita": "np. ita"
+  "gx-torrent — identità del client annunciata": "gx-torrent — ogłaszana tożsamość klienta"
+  "Cosa vedono peer e tracker: gx-core con la versione reale (default), oppure un preset qBittorrent, Transmission, Rain o anacrolix/torrent. È solo l'identità annunciata; alcuni tracker privati accettano solo client in whitelist, controlla le regole prima di usarlo.": "Co widzą peery i trackery: gx-core z prawdziwą wersją (domyślnie) lub profil qBittorrent, Transmission, Rain albo anacrolix/torrent. To tylko ogłaszana tożsamość; niektóre prywatne trackery akceptują tylko klienty z listy dozwolonych — sprawdź zasady przed użyciem."
+  "gx-torrent — versione del client annunciata": "gx-torrent — ogłaszana wersja klienta"
+  "Versione annunciata con il preset; vuoto usa la versione predefinita del preset.": "Wersja ogłaszana z profilem; puste używa domyślnej wersji profilu."
+  "vuoto = preset": "puste = profil"

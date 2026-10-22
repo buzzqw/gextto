@@ -21,7 +21,7 @@ gx-torrent:
 	GX_SERIES="$$(tr -d '[:space:]' < gx_torrent.version_series 2>/dev/null || true)"; \
 	[ -n "$$GX_SERIES" ] || GX_SERIES="1.1"; \
 	CGO_ENABLED=0 go build -trimpath -buildvcs=false \
-		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=$$GX_SERIES -X github.com/buzzqw/gextto/internal/constants.Commit=$$(git rev-parse HEAD 2>/dev/null) -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=$$GX_SERIES -X github.com/buzzqw/gextto/internal/gxcore/torrent.Version=$$GX_SERIES.$$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$$(git rev-parse HEAD 2>/dev/null) -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 		-o bin/gx-torrent ./cmd/gx-torrent; \
 	printf 'built bin/gx-torrent (build %s)\n' "$$GX_BUILD"
 

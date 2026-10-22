@@ -238,6 +238,9 @@ func (t *torrent) getClientVersion() string {
 	if t.info() != nil && t.info().Private {
 		return t.session.config.PrivateExtensionHandshakeClientVersion
 	}
+	if version := t.session.config.PublicExtensionHandshakeClientVersion; version != "" {
+		return version
+	}
 	return publicExtensionHandshakeClientVersion
 }
 

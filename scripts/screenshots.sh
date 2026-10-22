@@ -74,7 +74,7 @@ PKG=github.com/buzzqw/gextto/internal/constants
         -ldflags "-s -w -X $PKG.Version=$VERSION -X $PKG.VersionSeries=$SERIES -X $PKG.Build=$BUILD -X $PKG.Commit=$COMMIT" \
         -o "$WORK/bin/gexttod" ./cmd/gexttod
     CGO_ENABLED=0 nice -n 10 go build -trimpath -buildvcs=false \
-        -ldflags "-s -w -X $PKG.GxTorrentBuild=$GX_BUILD -X $PKG.GxVersionSeries=$GX_SERIES -X $PKG.Commit=$COMMIT" \
+        -ldflags "-s -w -X $PKG.GxTorrentBuild=$GX_BUILD -X $PKG.GxVersionSeries=$GX_SERIES -X github.com/buzzqw/gextto/internal/gxcore/torrent.Version=$GX_SERIES.$GX_BUILD -X $PKG.Commit=$COMMIT" \
         -o "$WORK/bin/gx-torrent" ./cmd/gx-torrent
 )
 printf 'built gexttod %s (build %s) and gx-torrent (build %s) in %s\n' "$VERSION" "$BUILD" "$GX_BUILD" "$WORK/bin"

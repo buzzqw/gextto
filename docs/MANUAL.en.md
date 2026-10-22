@@ -1875,6 +1875,8 @@ Recalculate scores* after changing weights.
 | gx-torrent — listen address (LAN) | Listen address of the managed daemon. Default `127.0.0.1:8890`: the web page and API stay on this host only. To expose them on the LAN use `0.0.0.0:8890` and set `gxtorrent_token` (without a token Gextto starts the daemon in `-insecure`). The port is aligned with the URL. |
 | gx-torrent — automatic management (cache and queue) | Turns on gx-torrent self-management: dynamic queue and adaptive cache (sized on available memory, active downloads/seeds and storage type). On by default. Turn it off to set cache and slots by hand. |
 | gx-torrent — proxy (socks5:// or http://) | Proxy for peers, HTTP trackers and web seeds; with a proxy, DHT and UDP trackers are disabled (not shown). |
+| gx-torrent — announced client identity | What peers and trackers see: `gx-core` with the real version (default) or a qBittorrent, Transmission, Rain or anacrolix/torrent preset. It changes only the announced identity, not the protocol: some private trackers only accept whitelisted clients, check their rules. |
+| gx-torrent — announced client version | Version used with the preset; empty uses the preset's default. |
 | gx-torrent — request timeout | Timeout in seconds for HTTP requests to gx-torrent. *(Unit: seconds)* |
 | gx-torrent — polling interval | Minimum interval in milliseconds between torrent status reads (the daemon owns the queue). *(Unit: ms)* |
 | gx-torrent — DLNA/UPnP server | Enables the daemon's DLNA/UPnP media server: the torrents' **completed** media is visible to TVs and consoles on the local network. Local network only, no authentication; off by default. Works with the gx-torrent engine. |

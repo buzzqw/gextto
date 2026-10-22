@@ -3,6 +3,7 @@ package torrent
 import (
 	"io/fs"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
@@ -20,6 +21,14 @@ var (
 
 func init() {
 	metainfo.Creator = publicExtensionHandshakeClientVersion
+}
+
+// SetCreator changes the "created by" field of .torrent files minted after
+// this call. The daemon sets it to the announced client identity.
+func SetCreator(value string) {
+	if strings.TrimSpace(value) != "" {
+		metainfo.Creator = value
+	}
 }
 
 // Config tunes a Session. Copy DefaultConfig and adjust — never use the zero
@@ -48,8 +57,13 @@ type Config struct {
 	// Resume data (bitfield & stats) are saved to disk at interval to keep IO lower.
 	ResumeWriteInterval time.Duration `yaml:"resume-write-interval"`
 	// Peer id is prefixed with this string. See BEP 20. Remaining bytes of peer id will be randomized.
-	// Only applies to private torrents.
+	// PublicPeerIDPrefix applies to every torrent; PrivatePeerIDPrefix only to
+	// private torrents (a tracker whitelist sometimes wants a different one).
+	PublicPeerIDPrefix  string `yaml:"public-peer-id-prefix"`
 	PrivatePeerIDPrefix string `yaml:"private-peer-id-prefix"`
+	// Client version sent in the BEP 10 handshake and the tracker User-Agent.
+	PublicExtensionHandshakeClientVersion string `yaml:"public-extension-handshake-client-version"`
+	PublicTrackerHTTPUserAgent            string `yaml:"public-tracker-http-user-agent"`
 	// Client version that is sent in BEP 10 handshake message.
 	// Only applies to private torrents.
 	PrivateExtensionHandshakeClientVersion string `yaml:"private-extension-handshake-client-version"`
@@ -299,7 +313,9 @@ var DefaultConfig = Config{
 	MaxOpenFiles:                           10240,
 	PEXEnabled:                             true,
 	ResumeWriteInterval:                    30 * time.Second,
+	PublicPeerIDPrefix:                     "-GX" + Version + "-",
 	PrivatePeerIDPrefix:                    "-GX" + Version + "-",
+	PublicExtensionHandshakeClientVersion:  "gx-core " + Version,
 	PrivateExtensionHandshakeClientVersion: "gx-core " + Version,
 	BlocklistUpdateInterval:                24 * time.Hour,
 	BlocklistUpdateTimeout:                 10 * time.Minute,
@@ -328,6 +344,7 @@ var DefaultConfig = Config{
 	TrackerStopTimeout:          5 * time.Second,
 	TrackerMinAnnounceInterval:  time.Minute,
 	TrackerHTTPTimeout:          10 * time.Second,
+	PublicTrackerHTTPUserAgent:  "gx-core/" + Version,
 	TrackerHTTPPrivateUserAgent: "gx-core/" + Version,
 	TrackerHTTPMaxResponseSize:  2 << 20,
 	TrackerHTTPVerifyTLS:        true,

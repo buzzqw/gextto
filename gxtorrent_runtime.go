@@ -230,6 +230,12 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 		args = append(args, "-insecure")
 		logging.Debug("gx-torrent listens on the network without a token: set gxtorrent_token to protect its API", "listen", listen)
 	}
+	if id := strings.TrimSpace(cfg.Settings["gxtorrent_client_identity"]); id != "" && !strings.EqualFold(id, "gx-core") {
+		args = append(args, "-client-identity", id)
+	}
+	if version := strings.TrimSpace(cfg.Settings["gxtorrent_client_identity_version"]); version != "" {
+		args = append(args, "-client-identity-version", version)
+	}
 	if dir := strings.TrimSpace(cfg.DownloadDir); dir != "" {
 		if absolute, absErr := filepath.Abs(dir); absErr == nil {
 			args = append(args, "-download-dir", absolute)

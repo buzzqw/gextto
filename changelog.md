@@ -31,6 +31,7 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   `languageprofile`, `rootfolder`, `tag`, `series/lookup`, `POST series`,
   `movie/lookup`, `POST movie`, `queue`). Non è una compatibilità completa con
   Sonarr/Radarr.
+- **gx-torrent si presenta con la sua versione, e può usare un'identità compatibile.** Prima diceva sempre `gx-core 0.0.0` a peer e tracker. Ora annuncia la versione reale (`gx-core 1.1.xxx`) e, se vuoi, può presentarsi come qBittorrent, Transmission, Rain o anacrolix/torrent con una versione scelta. Cambia solo l'identità annunciata: alcuni tracker privati accettano solo client in whitelist, quindi controlla le loro regole prima di usarla.
 
 - **Download con migliaia di torrent: la tabella resta fluida.** Oltre 500
   torrent la tabella mostra solo le righe vicine a ciò che stai guardando e

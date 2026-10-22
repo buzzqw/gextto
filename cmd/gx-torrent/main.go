@@ -265,6 +265,8 @@ func main() {
 	gexttoLog := flag.String("gextto-log", envOr("GX_TORRENT_GEXTTO_LOG", ""), "Gextto log file shown in the web page's Gextto log tab")
 	notify := flag.String("notify-url", envOr("GX_TORRENT_NOTIFY_URL", ""), "webhook URL posted on feed match/error (empty = disabled)")
 	mmapStorage := flag.Bool("mmap", envBool("GX_TORRENT_MMAP", false), "serve torrent files from a shared memory mapping (Linux, experimental): writes are page-cache memcpy and reads avoid a syscall")
+	clientIdentity := flag.String("client-identity", envOr("GX_TORRENT_CLIENT_IDENTITY", ""), "announced client identity: gx-core, qbittorrent, transmission, rain or anacrolix (empty = gx-core)")
+	clientIdentityVersion := flag.String("client-identity-version", envOr("GX_TORRENT_CLIENT_IDENTITY_VERSION", ""), "version announced with -client-identity (empty = the preset's version)")
 	dlnaEnabled := flag.Bool("dlna", envBool("GX_TORRENT_DLNA", false), "enable the DLNA/UPnP media server for the completed media (LAN only)")
 	dlnaListen := flag.String("dlna-listen", envOr("GX_TORRENT_DLNA_LISTEN", ""), "DLNA media server HTTP bind address (default :8200)")
 	dlnaName := flag.String("dlna-name", envOr("GX_TORRENT_DLNA_NAME", ""), "DLNA media server friendly name (default gx-torrent)")
@@ -389,22 +391,24 @@ func main() {
 			DHTReadOnly:            dhtReadOnlyValue,
 			WebSourcesAllowPrivate: webSourcesAllowPrivateValue,
 		},
-		Debug:          *debug,
-		Mode:           modeValue,
-		Settings:       settingsStore,
-		Fingerprint:    *fingerprint,
-		GexttoLog:      strings.TrimSpace(*gexttoLog),
-		IPFilterSource: strings.TrimSpace(*ipFilterSource),
-		Lang:           langValue,
-		NotifyURL:      notifyURLValue,
-		Mmap:           *mmapStorage,
-		DLNAEnabled:    dlnaEnabledValue,
-		DLNAListen:     dlnaListenValue,
-		DLNAName:       dlnaNameValue,
-		DLNAFolders:    dlnaFolders,
-		DLNAExclude:    dlnaExclude,
-		Tick:           3 * time.Second,
-		ProbeWindow:    15 * time.Minute,
+		Debug:                 *debug,
+		Mode:                  modeValue,
+		Settings:              settingsStore,
+		Fingerprint:           *fingerprint,
+		GexttoLog:             strings.TrimSpace(*gexttoLog),
+		IPFilterSource:        strings.TrimSpace(*ipFilterSource),
+		Lang:                  langValue,
+		NotifyURL:             notifyURLValue,
+		Mmap:                  *mmapStorage,
+		DLNAEnabled:           dlnaEnabledValue,
+		DLNAListen:            dlnaListenValue,
+		DLNAName:              dlnaNameValue,
+		DLNAFolders:           dlnaFolders,
+		DLNAExclude:           dlnaExclude,
+		ClientIdentity:        *clientIdentity,
+		ClientIdentityVersion: *clientIdentityVersion,
+		Tick:                  3 * time.Second,
+		ProbeWindow:           15 * time.Minute,
 	}
 	// Started by the Windows Service Control Manager: run the same daemon under
 	// the service dispatcher instead of the interactive signal loop.

@@ -1197,6 +1197,14 @@ RPC server is disabled.
   - All torrents share it. The handshake, even encrypted, chooses the
     torrent from the info hash.
   - `-peer-ports 0` returns to the original per-torrent port.
+- **Client identity.** By default the daemon announces `gx-core` with its real
+  build version: BEP 20 peer id `-GX<version>-`, BEP 10 client
+  `gx-core <version>`, tracker `User-Agent: gx-core/<version>`. The settings
+  page (and `-client-identity` in managed mode) can announce a preset instead:
+  qBittorrent, Transmission, Rain or anacrolix/torrent, with an optional
+  version override. Only the announced strings change, not the protocol
+  behaviour. Some private trackers whitelist clients and versions; check their
+  rules, because a preset is not a guarantee of acceptance.
 - **Opening on the router.**
   - UPnP (IGD v1 and v2), then **PCP** (RFC 6887, on the default gateway) and finally
     NAT-PMP, tried in this order; mappings are renewed every 20 minutes and

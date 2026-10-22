@@ -77,7 +77,7 @@ if [[ "${GEXTTO_SKIP_GXTORRENT:-0}" != "1" ]]; then
         (
             cd "$ROOT"
             CGO_ENABLED=0 go build -trimpath -buildvcs=false \
-                -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=$GX_SERIES -X github.com/buzzqw/gextto/internal/constants.Commit=$COMMIT -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$BUILT_AT -X github.com/buzzqw/gextto/internal/constants.GxReleaseChannel=${GEXTTO_GX_CHANNEL:-}" \
+                -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=$GX_SERIES -X github.com/buzzqw/gextto/internal/gxcore/torrent.Version=$GX_SERIES.$GX_BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$COMMIT -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$BUILT_AT -X github.com/buzzqw/gextto/internal/constants.GxReleaseChannel=${GEXTTO_GX_CHANNEL:-}" \
                 -o "$GX_OUT.new" ./cmd/gx-torrent
         )
         mv -f "$GX_OUT.new" "$GX_OUT"
