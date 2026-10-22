@@ -528,9 +528,14 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 @media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }
 .field-row { display: flex; align-items: center; gap: 8px; }
 .field-row .input { flex: 1; min-width: 0; }
+.audio-pref-row { display: flex; align-items: end; gap: 8px; }
+.audio-pref-row .audio-pref-field { flex: 1 1 0; min-width: 0; }
+.audio-pref-row select { min-height: 38px; padding: 7px 9px; font-size: 0.92rem; }
 .movie-detail-form .field-row .movie-language-preset { flex: 0 1 230px; min-width: 190px; }
 .movie-detail-form .field-row input { flex: 1 1 260px; }
 @media (max-width: 560px) {
+  .audio-pref-row { flex-direction: column; align-items: stretch; }
+  .audio-pref-row .audio-pref-field { flex: 1 1 auto; }
   .movie-detail-form .field-row { flex-direction: column; align-items: stretch; }
   .movie-detail-form .field-row .movie-language-preset,
   .movie-detail-form .field-row input { width: 100%; min-width: 0; flex: 1 1 auto; }
