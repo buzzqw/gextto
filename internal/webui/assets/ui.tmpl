@@ -902,9 +902,19 @@ function renderVirtual(force){
   var tb=$('#torrent-rows');if(!tb)return;
   var view=state.viewRows||[];
   var rowH=state.rowH||38;
-  var top=tb.getBoundingClientRect().top+window.scrollY;
-  var start=Math.max(0,Math.floor((window.scrollY-top)/rowH)-15);
-  var end=Math.min(view.length,Math.ceil((window.scrollY+window.innerHeight-top)/rowH)+15);
+  // The table scrolls inside .listwrap, not with the page. Measure that
+  // viewport; fall back to the page when the shell uses a different layout.
+  var scroller=tb.closest('.listwrap');
+  var offset=0,viewHeight=window.innerHeight;
+  if(scroller){
+    var sr=scroller.getBoundingClientRect();
+    offset=sr.top-tb.getBoundingClientRect().top;
+    viewHeight=scroller.clientHeight;
+  }else{
+    offset=window.scrollY-(tb.getBoundingClientRect().top+window.scrollY);
+  }
+  var start=Math.max(0,Math.floor(offset/rowH)-15);
+  var end=Math.min(view.length,Math.ceil((offset+viewHeight)/rowH)+15);
   if(end-start<40)end=Math.min(view.length,start+40);
   if(!force&&start===state.winStart&&end===state.winEnd&&view.length===state.winLen)return;
   var cols=$$('#torrents thead th').length||1;
@@ -920,10 +930,13 @@ function renderVirtual(force){
   if(first){var h=first.getBoundingClientRect().height;if(h>10&&Math.abs(h-state.rowH)>1){state.rowH=h;state.winStart=-1;renderVirtual(false);}}
 }
 var virtualScrollFrame=0;
-window.addEventListener('scroll',function(){
+// Scroll events do not bubble: capture them so the .listwrap container is
+// heard, while the window remains a fallback for a non-scrolling shell.
+document.addEventListener('scroll',function(e){
   if(!state.virtual||virtualScrollFrame)return;
+  if(e.target&&e.target!==document&&e.target!==window&&!(e.target.classList&&e.target.classList.contains('listwrap')))return;
   virtualScrollFrame=requestAnimationFrame(function(){virtualScrollFrame=0;renderVirtual(false);});
-},{passive:true});
+},true);
 
 function applyFilters(){
   if(state.virtual){applyDataView(true);return;}
