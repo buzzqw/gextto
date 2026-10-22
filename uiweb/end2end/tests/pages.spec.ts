@@ -540,7 +540,13 @@ test("la pagina Importa file analizza un percorso", async ({ page }) => {
 
 test("la tabella delle serie modifica le righe selezionate", async ({ page }) => {
   await page.goto("/?view=series&layout=list");
-  await page.getByText("Modifica selezionati").click();
+  const toggle = page.getByRole("button", { name: "Modifica selezionati" });
+  const refresh = page.getByRole("button", { name: "Aggiorna elenco" });
+  // The two buttons sit on the same toolbar row, "Modifica selezionati" first.
+  const [t, r] = [await toggle.boundingBox(), await refresh.boundingBox()];
+  expect(t && r && Math.abs(t.y - r.y) < 4 && t.x < r.x).toBeTruthy();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("button", { name: "Applica ai titoli selezionati" })).toBeVisible();
   await expect(page.locator('input[name="set_quality"]')).toBeVisible();
 });

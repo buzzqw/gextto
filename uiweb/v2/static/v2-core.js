@@ -902,6 +902,21 @@
     }
   });
 
+  // "Modifica selezionati" in the Series/Movies toolbar opens the bulk panel
+  // under the toolbar and moves the focus to its first field.
+  document.addEventListener("click", function (event) {
+    var toggle = event.target.closest && event.target.closest("[data-v2-bulk-toggle]");
+    if (!toggle) return;
+    var panel = document.getElementById(toggle.getAttribute("data-v2-bulk-toggle"));
+    if (!panel) return;
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute("aria-expanded", panel.hidden ? "false" : "true");
+    if (!panel.hidden) {
+      var first = panel.querySelector("select, input");
+      if (first) first.focus();
+    }
+  });
+
   document.addEventListener("click", function (event) {
     if (!event.target.closest || !event.target.closest("[data-v2-clear-selection]")) return;
     var rows = document.querySelectorAll("[data-v2-select]:checked");

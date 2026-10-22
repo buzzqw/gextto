@@ -754,7 +754,8 @@ for example moving several movies to `2160p` or pausing several series.
 1. Tick the rows in the table. The checkbox in the header ticks every visible
    row: combine it with *Filter the list…* to take, for example, every title in
    `720p`.
-2. Open **Edit selected** above the table and tick only the fields to change
+2. Press **Edit selected**, next to *Refresh list*: the fields open below.
+   Tick only the fields to change
    (quality, language, subtitles, exclusions), typing the new value. A ticked
    field left empty is cleared; a field that is not ticked stays as it is in
    each title. *Upgrades* and *State* change only if you pick something other
@@ -765,7 +766,8 @@ for example moving several movies to `2160p` or pausing several series.
    in the columns. The other values of each title (seasons, folder, aliases…)
    are not touched.
 
-The *Posters* view has no checkboxes: switch to *List*.
+The *Posters* view has no checkboxes: switch to *List*. **Refresh list**
+changes nothing: it reloads the table with the filter you typed.
 
 ## 6. Explore, Archive, Comics
 

@@ -774,7 +774,8 @@ pausa più serie.
 1. Spunta le righe nella tabella. La casella nell'intestazione spunta tutte le
    righe visibili: combinala con *Filtra l'elenco…* per prendere, ad esempio,
    tutti i titoli in `720p`.
-2. Apri **Modifica selezionati** sopra la tabella e spunta solo i campi da
+2. Premi **Modifica selezionati**, accanto ad *Aggiorna elenco*: sotto si
+   aprono i campi. Spunta solo quelli da
    cambiare (qualità, lingua, sottotitoli, esclusioni), scrivendo il nuovo
    valore. Un campo spuntato e lasciato vuoto viene svuotato; un campo non
    spuntato resta com'è in ogni titolo. *Upgrade* e *Stato* cambiano solo se
@@ -785,7 +786,8 @@ pausa più serie.
    valori nelle colonne. Gli altri valori di ogni titolo (stagioni, cartella,
    alias…) non vengono toccati.
 
-Nella vista *Locandine* le caselle non ci sono: passa a *Elenco*.
+Nella vista *Locandine* le caselle non ci sono: passa a *Elenco*. **Aggiorna
+elenco** invece non modifica nulla: rilegge la tabella con il filtro scritto.
 
 ## 6. Esplora, Archivio, Fumetti
 

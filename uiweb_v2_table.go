@@ -312,7 +312,9 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 		data.BaseView = view[:separator]
 	}
 
-	data.Bulk = v2BulkPanelFor(s, data.BaseView, spec)
+	// The panel, its form and the row checkboxes share the table's own view
+	// id (series-t0 on the panels page), not the base view.
+	data.Bulk = v2BulkPanelFor(s, data.View, spec)
 	if data.Bulk != nil {
 		data.SelectName = spec.SelectName
 		data.Colspan++

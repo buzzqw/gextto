@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -63,8 +64,15 @@ func TestLibraryTablesEditTheSelectedRows(t *testing.T) {
 		"movies": `name="movie" value="` + strconv.FormatInt(movieID, 10) + `" form="v2-bulk-form-movies`,
 	} {
 		code, body := v2Request(t, server, http.MethodGet, "/?view="+view+"&layout=list", nil)
-		if code != 200 || !strings.Contains(body, "Modifica selezionati") || !strings.Contains(body, `id="v2-bulk-form-`+view) || !strings.Contains(body, want) {
+		if code != 200 || !strings.Contains(body, "Modifica selezionati") || !strings.Contains(body, want) {
 			t.Fatalf("%s table without row selection (%d): want %s", view, code, want)
+		}
+		// The checkboxes, the toggle and the panel must name the same form and
+		// panel ids, or ticking a row would submit nothing.
+		form := regexp.MustCompile(`form="(v2-bulk-form-[^"]+)"`).FindStringSubmatch(body)
+		toggle := regexp.MustCompile(`data-v2-bulk-toggle="([^"]+)"`).FindStringSubmatch(body)
+		if form == nil || toggle == nil || !strings.Contains(body, `id="`+form[1]+`"`) || !strings.Contains(body, `id="`+toggle[1]+`"`) {
+			t.Fatalf("%s: row checkboxes or toggle point to a missing form/panel (%v %v)", view, form, toggle)
 		}
 	}
 	profiles := ensureQualityProfiles(state)

@@ -1,6 +1,5 @@
 {{define "v2_bulk_panel"}}
-<details class="v2-bulk-panel">
-  <summary class="btn sm" title="Cambia gli stessi valori su tutte le righe spuntate nella tabella">Modifica selezionati</summary>
+<div class="v2-bulk-panel" id="v2-bulk-panel-{{.View}}" hidden>
   <form id="v2-bulk-form-{{.View}}" class="v2-bulk-form" hx-post="/library/bulk" hx-target="#v2-bulk-result-{{.View}}" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]">
     <p class="muted">Spunta le righe nella tabella, poi i valori da cambiare. I valori che non spunti restano come sono in ogni titolo.</p>
     {{if .Profiles}}
@@ -33,7 +32,7 @@
       <span id="v2-bulk-result-{{.View}}" aria-live="polite"></span>
     </div>
   </form>
-</details>
+</div>
 {{end}}
 
 {{define "v2_bulk_values"}}

@@ -1964,7 +1964,8 @@
         <button class="btn sm primary" type="submit">Cerca</button>
         <span class="htmx-indicator muted archive-indicator">Ricerca online in corso…</span>
         {{else}}
-        {{if .Refresh}}<button class="btn sm" type="submit">Aggiorna</button>{{end}}
+        {{if and .Bulk (ne .Layout "cards")}}<button class="btn sm" type="button" data-v2-bulk-toggle="v2-bulk-panel-{{.View}}" aria-expanded="false" aria-controls="v2-bulk-panel-{{.View}}" title="Apre i campi per cambiare gli stessi valori su tutte le righe spuntate nella tabella">Modifica selezionati</button>{{end}}
+        {{if .Refresh}}<button class="btn sm" type="submit" title="Ricarica l'elenco qui sotto con il filtro attuale: non modifica nulla">{{if .Bulk}}Aggiorna elenco{{else}}Aggiorna{{end}}</button>{{end}}
         {{end}}
       </form>{{end}}
        {{if and .Bulk (ne .Layout "cards")}}{{template "v2_bulk_panel" .Bulk}}{{end}}
