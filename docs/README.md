@@ -11,6 +11,8 @@ needs.
 | [Visita guidata](TOUR.it.md) | Screenshots of the main screens, generated with `make screenshots`. |
 | [Guided tour](TOUR.en.md) | English version of the screenshot tour. |
 | [Changelog (italiano)](../changelog.md) | What changed for users, day by day. |
+| [Docker: stack completo (Italiano)](DOCKER.it.md) | Gextto, gx-torrent, Jackett, Prowlarr, FlareSolverr e aMule in un solo `docker compose`; avvio, configurazione, aggiornamento e problemi comuni. |
+| [Docker: full stack](DOCKER.en.md) | English version: Gextto, gx-torrent, Jackett, Prowlarr, FlareSolverr and aMule in one `docker compose`; start, configuration, updating and troubleshooting. |
 | [Changelog (English)](../changelog.en.md) | English version of the user-facing changelog. |
 | [Chiavi di accesso](api-keys.it.md) | The Gextto API key and the gx-torrent token: what they are, how to generate and use them. |
 | [Access keys](api-keys.md) | English version: the Gextto API key and the gx-torrent token. |

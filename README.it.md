@@ -95,6 +95,8 @@ Leap 15.6+/Tumbleweed, Arch. Da root:
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
 
+Preferisci Docker? Lo [stack completo](docs/DOCKER.it.md) avvia insieme Gextto, `gx-torrent`, Jackett, Prowlarr, FlareSolverr e aMule con `docker compose`.
+
 Installa in `/opt/gextto`, tiene i dati in `/var/lib/gextto` e serve la UI
 sulla porta 5000, con `gx-torrent` accanto a `gexttod` — Go puro, nient'altro da
 installare per i torrent. eD2k e Kad sono facoltativi e richiedono un `amuled`
@@ -390,7 +392,7 @@ Cosa gira a ogni push (`make test`, `make test-ui`, `make fuzz-smoke` e CI):
 | **Fuzzing** | 23 parser esposti alla rete (DHT, bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE) sotto fuzzing in CI; ogni crash trovato diventa un seed committato |
 | **Misure sul mondo reale** | 14 misure opzionali: swarm pubblici reali, la DHT pubblica, un peer libtorrent reale, riuso locale su ISO reali, choking e pipelining, i Jackett/Prowlarr in uso, la latenza della linea di casa |
 | **Guardie statiche** | Ogni bottone della UI punta a una rotta registrata, ogni chiamata interna si risolve sul router reale, ogni impostazione è salvabile, tradotta in sei lingue e ha il suo tooltip, ogni rotta API è documentata |
-| **Piattaforme e pacchetti** | La CI cross-compila motore e demone per Windows ed esegue i test di piattaforma Windows e un'installazione reale del servizio; gli installer hanno auto-test (ogni opzione, un dry-run che non cambia nulla) e l'immagine Docker standalone viene costruita e provata; CodeQL analizza ogni push |
+| **Piattaforme e pacchetti** | La CI cross-compila motore e demone per Windows ed esegue i test di piattaforma Windows e un'installazione reale del servizio; gli installer hanno auto-test (ogni opzione, un dry-run che non cambia nulla) e le immagini Docker standalone e completa vengono costruite e provate; CodeQL analizza ogni push |
 | **Benchmark** | 45 benchmark Go sui percorsi caldi (picker, storage, uTP, archivio, riuso, logging), lanciati prima e dopo ogni modifica a un percorso dati |
 
 ## Accessibilità

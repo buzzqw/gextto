@@ -1,0 +1,108 @@
+# Gextto full stack: Gextto (with the managed gx-torrent), Jackett, Prowlarr,
+# FlareSolverr and aMule. Use it on a Linux Docker host.
+#
+#   cp docker-full/env.example docker-full/.env
+#   # edit .env (passwords, PUID/PGID)
+#   scripts/docker-full-build.sh
+#   docker compose -f docker-full/docker-compose.yml up -d
+#
+# Gextto and aMule use host networking: aMule's UPnP needs the host network,
+# and Gextto reaches the published services on 127.0.0.1 exactly as it does in
+# a normal install. Read docs/DOCKER.it.md or docs/DOCKER.en.md before starting.
+name: gextto-full
+
+services:
+  gextto:
+    build:
+      context: ..
+      dockerfile: docker-full/Dockerfile
+      args:
+        GEXTTO_SERIES: ${GEXTTO_SERIES:-1.1}
+        GEXTTO_BUILD: ${GEXTTO_BUILD:-0}
+        GX_SERIES: ${GX_SERIES:-1.1}
+        GX_BUILD: ${GX_BUILD:-0}
+    image: gextto-full:local
+    container_name: gextto-full
+    network_mode: host
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      TZ: ${TZ:-Europe/Rome}
+      GEXTTO_DATA_DIR: /data
+      GEXTTO_LISTEN: 0.0.0.0:5000
+      GEXTTO_ENGINE_LISTEN: 127.0.0.1:8889
+      GEXTTO_LOG: ${GEXTTO_LOG:-info}
+    volumes:
+      - ./data/gextto:/data
+      - ./media:/media
+      - ./library:/library
+      - ./media/amule/incoming:/amule/incoming
+    depends_on:
+      - amuled
+      - jackett
+      - prowlarr
+      - flaresolverr
+    restart: unless-stopped
+
+  amuled:
+    image: ngosang/amule:latest
+    container_name: gextto-amuled
+    # Host network: UPnP on the router and the EC port on 127.0.0.1, the same
+    # layout documented for a normal Gextto + aMule install.
+    network_mode: host
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Europe/Rome}
+      # aMule derives ECPassword (MD5) from GUI_PWD. Gextto's amule_password
+      # setting is the same value in clear.
+      GUI_PWD: ${AMULE_EC_PASSWORD:-change-me}
+      WEBUI_PWD: ${AMULE_WEBUI_PASSWORD:-change-me}
+      INCOMING_DIR: /amule/incoming
+      TEMP_DIR: /amule/temp
+      FIX_PERMISSIONS: "false"
+    volumes:
+      - ./data/amule:/home/amule/.aMule
+      # Same path inside aMule and Gextto: completed files can be imported.
+      - ./media/amule/incoming:/amule/incoming
+      - ./media/amule/temp:/amule/temp
+    restart: unless-stopped
+
+  jackett:
+    image: lscr.io/linuxserver/jackett:latest
+    container_name: gextto-jackett
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Europe/Rome}
+      AUTO_UPDATE: "true"
+    volumes:
+      - ./data/jackett:/config
+      - ./media:/downloads
+    ports:
+      - "127.0.0.1:9117:9117"
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: gextto-prowlarr
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Europe/Rome}
+    volumes:
+      - ./data/prowlarr:/config
+    ports:
+      - "127.0.0.1:9696:9696"
+    restart: unless-stopped
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: gextto-flaresolverr
+    environment:
+      LOG_LEVEL: ${FLARESOLVERR_LOG_LEVEL:-info}
+      TZ: ${TZ:-Europe/Rome}
+    volumes:
+      - ./data/flaresolverr:/config
+    ports:
+      - "127.0.0.1:8191:8191"
+    restart: unless-stopped

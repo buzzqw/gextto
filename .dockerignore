@@ -9,3 +9,13 @@ uiweb/v2/end2end
 *.log
 *.tar.gz
 gx-torrent.build_number
+
+# docker-full runtime data
+docker-full/data
+docker-full/media
+docker-full/library
+
+# Local docker-full secrets
+.env
+.env.*
+docker-full/.env

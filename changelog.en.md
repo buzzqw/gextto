@@ -13,6 +13,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
+## 22 October 2026
+
+- **Docker: the whole stack in one command.** The new `docker-full/docker-compose.yml` starts Gextto with `gx-torrent`, Jackett, Prowlarr, FlareSolverr and aMule, with folders, ports and permissions already laid out. The image builds Gextto and `gx-torrent` from the checkout; the Italian and English guides cover first configuration, indexers, eD2k, updating, backup and troubleshooting. The client identity was verified with real qBittorrent 5.3.0 and Transmission 4.1.3 in Docker: they see `gx-core 1.1.252` by default and `qBittorrent 5.2.3` with the preset.
+
 ## 21 October 2026
 
 - **gx-torrent announces its real version, and can use a compatible identity.** It used to say `gx-core 0.0.0` to peers and trackers. It now announces the real version (`gx-core 1.1.xxx`) and, if you want, can present itself as qBittorrent, Transmission, Rain or anacrolix/torrent with a chosen version. Only the announced identity changes: some private trackers only accept whitelisted clients, so check their rules before using it.

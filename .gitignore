@@ -59,3 +59,9 @@ uiweb/end2end/playwright-report/
 /gx-torrent.exe
 # personal convenience build script (not part of the project)
 /builda-tutto.sh
+
+# docker-full runtime data (keep the example environment)
+docker-full/data/
+docker-full/media/
+docker-full/library/
+!docker-full/.env.example

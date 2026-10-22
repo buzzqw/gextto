@@ -94,6 +94,8 @@ Leap 15.6+/Tumbleweed, Arch. Run as root:
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
 
+Prefer Docker? The [full stack](docs/DOCKER.en.md) starts Gextto, `gx-torrent`, Jackett, Prowlarr, FlareSolverr and aMule together with `docker compose`.
+
 It installs to `/opt/gextto`, keeps data in `/var/lib/gextto` and serves the UI
 on port 5000, with `gx-torrent` alongside `gexttod` — pure Go, nothing else to
 install for torrents. eD2k and Kad are optional and need an `amuled` you run
@@ -375,7 +377,7 @@ What runs on every push (`make test`, `make test-ui`, `make fuzz-smoke` and CI):
 | **Fuzzing** | 23 network-facing parsers (DHT, bencode, magnet, BEP 10/52, trackers, Torznab, RSS, MSE) fuzzed in CI; every crash found becomes a committed seed |
 | **Real-world harnesses** | 14 opt-in measurements: real public swarms, the public DHT, a real libtorrent peer, local merge on real ISOs, choking and pipelining, the live Jackett/Prowlarr, the latency of the home line |
 | **Static guards** | Every UI button points at a registered route, every internal call resolves on the real router, every setting is writable, translated in six languages and has its tooltip, every API route is documented |
-| **Platforms and packaging** | CI cross-compiles engine and daemon for Windows and runs the Windows platform tests and a real service install; the installers are self-tested (every flag, a dry-run that changes nothing) and the standalone Docker image is built and smoke-tested; CodeQL scans every push |
+| **Platforms and packaging** | CI cross-compiles engine and daemon for Windows and runs the Windows platform tests and a real service install; the installers are self-tested (every flag, a dry-run that changes nothing) and the standalone and full Docker images are built and smoke-tested; CodeQL scans every push |
 | **Benchmarks** | 45 Go benchmarks on the hot paths (picker, storage, uTP, archive, merge, logging), run before and after every data-path change |
 
 ## Accessibility

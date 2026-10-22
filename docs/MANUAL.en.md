@@ -247,6 +247,8 @@ GEXTTO_DATA_DIR="$HOME/gextto-data" \
 systemctl --user status gextto.service
 ```
 
+For Docker (Gextto, gx-torrent, Jackett, Prowlarr, FlareSolverr and aMule together) see [Docker: full stack](DOCKER.en.md).
+
 The user service listens on port 5000 on all interfaces by default. Restrict
 access with a firewall or reverse proxy; use
 `loginctl enable-linger "$USER"` if it must run after logout.
