@@ -896,11 +896,14 @@ video (pdf, programma, archivio) viene solo scaricato da aMule e resta nella
 cartella di arrivo, come un torrent aggiunto a mano. Quando aMule completa un
 video, Gextto lo tratta come un torrent completato: lo rinomina, lo importa in
 libreria, lo controlla con MediaInfo e manda la notifica. Lo stesso controllo di
-qualità dei torrent gira prima della copia: se in libreria c'è già un file
-uguale o migliore il download viene scartato nel Cestino e non importato. Gli episodi eD2k
-entrano in libreria sempre con **hardlink o copia**, mai spostati, così aMule
-continua a condividerli dalla cartella di arrivo (l'hardlink non occupa spazio
-in più se le due cartelle sono sullo stesso disco).
+qualità dei torrent gira prima dell'importazione: se in libreria c'è già un file
+uguale o migliore il download viene scartato nel Cestino e non importato. Gli episodi e i film eD2k
+seguono l'opzione **Sposta gli episodi/pack in archivio**: se è attiva vengono
+spostati in libreria e rimossi dalla cartella di arrivo (aMule smette di
+condividerli), se è spenta entrano con **hardlink o copia** e aMule continua a
+condividerli (l'hardlink non occupa spazio in più se le due cartelle sono sullo
+stesso disco). Per eD2k lo spostamento avviene al completamento, perché il
+seeding è gestito da aMule e Gextto non ha un momento di fine seed da attendere.
 
 Per la guida completa — installazione di aMule, Docker, risoluzione dei
 problemi e dettagli del protocollo — vedi [`docs/amule.it.md`](amule.it.md).
@@ -2099,7 +2102,7 @@ spazio del `tmpfs`, come prima.
 | Impostazione | Cosa fa |
 |---|---|
 | Elimina i completati dopo il seed | Attivo: a fine seed il torrent completato viene tolto dalla sessione (come «Pulisci completati»). Spento: a fine seed il torrent resta nell'elenco come Completato e lo rimuovi tu con «Pulisci completati». Non influisce su dove vengono spostati i file. |
-| Sposta gli episodi/pack in archivio (non copiare) | Attivo: al termine del seed la sorgente scaricata viene eliminata (il file resta in libreria). Spento: la sorgente scaricata viene copiata in libreria e mantenuta. |
+| Sposta gli episodi/pack in archivio (non copiare) | Attivo: la sorgente scaricata viene spostata in libreria e rimossa dalla cartella download (per i torrent al termine del seed; per eD2k al completamento, perché il seeding è gestito da aMule). Spento: la sorgente viene copiata o collegata e mantenuta per la condivisione. |
 | Hardlink invece della copia durante il seed | Attivo (predefinito): un file che resta in seed entra in libreria come hardlink, senza occupare spazio due volte; se download e libreria sono su filesystem diversi si copia. Vedi «Hardlink al posto della copia». |
 
 **Controllo dei pack**

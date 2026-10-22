@@ -191,8 +191,11 @@ compresi: se c'è già un file uguale o migliore il download viene scartato
 
 aMule 2.3 tiene il file finito nella coda dei download; aMule 3.x lo toglie
 subito, quindi Gextto lo ritrova tra i file condivisi, anche dopo un riavvio. Gli
-episodi eD2k entrano in libreria sempre con **hardlink o copia** (mai spostati),
-così aMule continua a condividere l'originale dalla cartella di arrivo;
+episodi e film eD2k seguono l'opzione **Sposta gli episodi/pack in archivio**: con
+l'opzione attiva vengono spostati in libreria e rimossi dalla cartella di arrivo
+(aMule smette di condividerli); con l'opzione spenta entrano con **hardlink o
+copia** e aMule continua a condividere l'originale. Per eD2k lo spostamento
+avviene al completamento, perché il seeding è gestito da aMule;
 l'hardlink non occupa spazio in più quando le due cartelle sono sullo stesso
 filesystem.
 

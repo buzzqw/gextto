@@ -873,11 +873,14 @@ Added downloads appear in **Downloads**. A link to a file that is not a video
 incoming folder, like a torrent added by hand. When aMule completes a video,
 Gextto treats it like a completed torrent: it renames it, imports it into the library,
 checks it with MediaInfo and sends the notification. The same quality check as a
-torrent runs before the copy: if the library already holds an equal or better
-file, the download is discarded to the trash and never imported. eD2k episodes always enter
-the library by **hardlink or copy**, never moved, so aMule keeps sharing them
-from its incoming folder (a hardlink takes no extra space when both folders are
-on the same disk).
+torrent runs before the import: if the library already holds an equal or better
+file, the download is discarded to the trash and never imported. eD2k episodes and movies follow the
+**Move episodes/packs into the archive** option: when it is on they are moved
+into the library and removed from the incoming folder (aMule stops sharing
+them); when it is off they enter by **hardlink or copy** and aMule keeps
+sharing them (a hardlink takes no extra space when both folders are on the same
+disk). For eD2k the move happens at completion, because seeding is managed by
+aMule and Gextto has no end-of-seed moment to wait for.
 
 For the complete guide — installing aMule, Docker, troubleshooting and the
 protocol details — see [`docs/amule.md`](amule.md).
@@ -2035,7 +2038,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Setting | What it does |
 |---|---|
 | Remove completed items after seeding | On: at the end of seeding the completed torrent is removed from the session (like “Clean completed”). Off: at the end of seeding the torrent stays in the list as Completed and you remove it with “Clean completed”. It does not affect where files are moved. |
-| Move episodes/packs to the archive (do not copy) | On: at the end of seeding the downloaded source is deleted (the file stays in the library). Off: the downloaded source is copied to the library and kept. |
+| Move episodes/packs to the archive (do not copy) | On: the downloaded source is moved into the library and removed from the download folder (for torrents at the end of the seed; for eD2k at completion, because seeding is managed by aMule). Off: the source is copied or linked and kept for sharing. |
 | Hardlink instead of copy while seeding | On (default): a file that keeps seeding enters the library as a hardlink, without using the space twice; when downloads and library are on different filesystems it is copied. See “Hardlinks instead of copies”. |
 
 **Pack inspection**

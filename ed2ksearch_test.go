@@ -272,9 +272,6 @@ func TestEd2kSessionReportsCompletion(t *testing.T) {
 	if again := session.PollEvents(); len(again) != 0 {
 		t.Fatalf("completion reported twice: %+v", again)
 	}
-	if cfgCopy := ed2kImportConfig(cfg); cfgCopy.Settings["move_episodes"] != "false" || cfg.Settings["move_episodes"] == "false" {
-		t.Fatal("eD2k files must be imported by copy without changing the caller's configuration")
-	}
 }
 
 // TestEd2kSessionFindsFilesThatLeftTheQueue covers aMule 3.x, which drops a

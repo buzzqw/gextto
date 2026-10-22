@@ -2196,12 +2196,12 @@ func tev_resolveEpisodeCompletedFile(path string, release *models.Release) (stri
 	return "", fmt.Errorf("completed episode folder %s contains %d ambiguous video files", path, len(files))
 }
 
-// tev_completeEpisodeFolderWithArchive copies only the episode video to the
+// tev_completeEpisodeFolderWithArchive imports the episode video into the
 // configured series archive, for both a single episode file and a folder that
-// contains it. The source stays in the download folder while the torrent seeds;
-// RemoveSeededCompleted drops the torrent after the configured seed limit when
-// automatic removal is enabled, and keeps the source in copy mode.
-func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, destination string, tmdb *TmdbClient) (bool, error) {
+// contains it. With moveSource false the source stays in the download folder
+// while the torrent seeds (copy/hardlink); with moveSource true it is moved and
+// the source disappears, which is what eD2k does when move mode is selected.
+func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, destination string, tmdb *TmdbClient, moveSource bool) (bool, error) {
 	source := CompletionPath(event)
 	video, err := tev_resolveEpisodeCompletedFile(source, release)
 	if err != nil {
@@ -2238,13 +2238,20 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 			"hash", event.Hash, "name", event.Name, "title", release.Title)
 		return false, nil
 	} else {
-		value, err := linkOrCopyFile(cfg, video, target)
-		if err != nil {
-			return false, err
+		if moveSource {
+			if err := moveIntoLibrary(video, target); err != nil {
+				return false, err
+			}
+			sourceHandled = true
+		} else {
+			value, err := linkOrCopyFile(cfg, video, target)
+			if err != nil {
+				return false, err
+			}
+			linked = value
+			sourceHandled = true
+			sourcePreserved = true
 		}
-		linked = value
-		sourceHandled = true
-		sourcePreserved = true
 	}
 	processedEvent := *event
 	processedEvent.SavePath = destination
@@ -2254,10 +2261,14 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 		return false, err
 	}
 	if processed && sourceHandled {
-		if linked {
+		switch {
+		case moveSource:
+			logging.Info(fmt.Sprintf("📁 «%s» moved into the library; the source leaves aMule's incoming folder", event.Name),
+				"library_file", target, "hash", event.Hash)
+		case linked:
 			logging.Info(fmt.Sprintf("📁 «%s» linked into the library (hardlink, no extra space); the download stays to keep sharing it", event.Name),
 				"library_file", target, "hash", event.Hash)
-		} else {
+		default:
 			logging.Info(fmt.Sprintf("📁 «%s» copied to the library; the download stays to keep sharing it", event.Name),
 				"library_file", target, "hash", event.Hash)
 		}
@@ -2274,10 +2285,28 @@ func tev_importsByCopy(torrents TorrentSession) bool {
 	return ok && importer.ImportCompletedByCopy()
 }
 
-// tev_completeMovieWithArchive imports a completed movie by link or copy: the
-// same quality gate as an episode runs before the file reaches the library, and
-// the source stays in the backend's folder so it keeps being shared.
-func tev_completeMovieWithArchive(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, destination string, tmdb *TmdbClient) (bool, error) {
+// tev_movesCompletedImmediately reports a backend that cannot defer the move
+// to the end of a seed. aMule is the case today: its eD2k sharing is outside
+// Gextto's seed policy, so move mode moves at completion.
+func tev_movesCompletedImmediately(torrents TorrentSession) bool {
+	mover, ok := torrents.(interface{ MoveCompletedImmediately() bool })
+	return ok && mover.MoveCompletedImmediately()
+}
+
+// moveIntoLibrary moves a completed file into the library, creating the
+// destination folders and falling back to copy + remove across filesystems.
+func moveIntoLibrary(source, target string) error {
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	return moveAcrossDevices(source, target)
+}
+
+// tev_completeMovieWithArchive imports a completed movie by link/copy or move:
+// the same quality gate as an episode runs before the file reaches the library.
+// With moveSource false the source stays in the backend's folder so it keeps
+// being shared; with moveSource true it is moved out (eD2k move mode).
+func tev_completeMovieWithArchive(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, destination string, tmdb *TmdbClient, moveSource bool) (bool, error) {
 	source := CompletionPath(event)
 	video, err := resolveMovieCompletedFile(source)
 	if err != nil {
@@ -2307,22 +2336,34 @@ func tev_completeMovieWithArchive(cfg *Config, db *Database, torrents TorrentSes
 			"hash", event.Hash, "name", event.Name, "title", release.Title)
 		return false, nil
 	}
-	linked, err := linkOrCopyFile(cfg, video, target)
-	if err != nil {
-		return false, err
+	linked := false
+	if moveSource {
+		if err := moveIntoLibrary(video, target); err != nil {
+			return false, err
+		}
+	} else {
+		value, err := linkOrCopyFile(cfg, video, target)
+		if err != nil {
+			return false, err
+		}
+		linked = value
 	}
 	processedEvent := *event
 	processedEvent.SavePath = destination
 	processedEvent.Name = filepath.Base(target)
-	processed, err := tev_completeTorrentOptions(cfg, db, torrents, &processedEvent, release, tmdb, true)
+	processed, err := tev_completeTorrentOptions(cfg, db, torrents, &processedEvent, release, tmdb, !moveSource)
 	if err != nil {
 		return false, err
 	}
 	if processed {
-		if linked {
+		switch {
+		case moveSource:
+			logging.Info(fmt.Sprintf("📁 «%s» moved into the library; the source leaves aMule's incoming folder", event.Name),
+				"library_file", target, "hash", event.Hash)
+		case linked:
 			logging.Info(fmt.Sprintf("📁 «%s» linked into the library (hardlink, no extra space); the download stays to keep sharing it", event.Name),
 				"library_file", target, "hash", event.Hash)
-		} else {
+		default:
 			logging.Info(fmt.Sprintf("📁 «%s» copied to the library; the download stays to keep sharing it", event.Name),
 				"library_file", target, "hash", event.Hash)
 		}
@@ -2923,7 +2964,13 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 					// Folder episodes, single files in copy mode, and any torrent
 					// configured to seed forever are imported by copying the video
 					// while the source stays in the download folder for seeding.
-					return tev_completeEpisodeFolderWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb)
+					return tev_completeEpisodeFolderWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, false)
+				}
+				// aMule has no seed policy in Gextto: with move mode on, the eD2k
+				// source is moved at completion instead of being kept for a seed
+				// that Gextto cannot end.
+				if tev_movesCompletedImmediately(torrents) {
+					return tev_completeEpisodeFolderWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, true)
 				}
 				// Move mode: keep the source in the download folder so the torrent
 				// can actually seed; the move and rename into the library happen at
@@ -3157,7 +3204,24 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		// stays in aMule's incoming folder so it keeps being shared.
 		if release.Kind == "movie" && tev_importsByCopy(torrents) {
 			if hasArchiveDestination {
-				return tev_completeMovieWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb)
+				return tev_completeMovieWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, false)
+			}
+			size, sizeErr := SizeOfPath(source)
+			if sizeErr != nil {
+				return false, sizeErr
+			}
+			if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
+				return false, err
+			}
+			logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
+			return true, nil
+		}
+		// aMule has no seed policy in Gextto: in move mode its completed movie
+		// is moved now, either to the library or, without a library folder, it
+		// is left in the incoming folder and marked complete.
+		if release.Kind == "movie" && tev_movesCompletedImmediately(torrents) {
+			if hasArchiveDestination {
+				return tev_completeMovieWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, settingsBool(cfg, "move_episodes", false))
 			}
 			size, sizeErr := SizeOfPath(source)
 			if sizeErr != nil {

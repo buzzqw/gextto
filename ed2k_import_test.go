@@ -10,8 +10,8 @@ import (
 	"github.com/buzzqw/gextto/internal/models"
 )
 
-// movieCopySession stands in for aMule's eD2k session: the backend cannot move
-// storage, so a completed movie is imported by link or copy.
+// movieCopySession stands in for aMule's eD2k session in copy mode: the file is
+// imported by link or copy and stays in the incoming folder for sharing.
 type movieCopySession struct {
 	nullEngine
 	removed []string
@@ -126,7 +126,7 @@ func TestEd2kMovieIsImportedByCopy(t *testing.T) {
 	f := newMovieImportFixture(t)
 	session := &movieCopySession{}
 
-	processed, err := tev_completeMovieWithArchive(&f.cfg, f.db, session, &f.event, f.release, f.archive, NewTmdbClient(nil))
+	processed, err := tev_completeMovieWithArchive(&f.cfg, f.db, session, &f.event, f.release, f.archive, NewTmdbClient(nil), false)
 	if err != nil {
 		t.Fatalf("completion: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestEd2kMovieInferiorIsDiscardedBeforeCopy(t *testing.T) {
 	}
 
 	session := &movieCopySession{}
-	processed, err := tev_completeMovieWithArchive(&f.cfg, f.db, session, &f.event, f.release, f.archive, NewTmdbClient(nil))
+	processed, err := tev_completeMovieWithArchive(&f.cfg, f.db, session, &f.event, f.release, f.archive, NewTmdbClient(nil), false)
 	if err != nil {
 		t.Fatalf("completion: %v", err)
 	}
@@ -254,9 +254,81 @@ func TestEd2kMovieCompletionTakesTheCopyPath(t *testing.T) {
 	}
 }
 
+func TestEd2kMovieMoveModeMovesIntoLibrary(t *testing.T) {
+	f := newMovieImportFixture(t)
+	f.cfg.Settings["move_episodes"] = "true"
+	session := ed2kSession{cfg: &f.cfg}
+	if session.ImportCompletedByCopy() {
+		t.Fatal("move mode must not force the copy import")
+	}
+	if !session.MoveCompletedImmediately() {
+		t.Fatal("eD2k move mode must move at completion")
+	}
+
+	processed, err := HandleTorrentEvent(
+		&f.cfg,
+		session,
+		f.db,
+		map[string]struct{}{},
+		map[string]struct{}{},
+		map[string]StorageMoveRetry{},
+		f.event,
+		NewTmdbClient(nil),
+		NewNotifier(),
+	)
+	if err != nil {
+		t.Fatalf("HandleTorrentEvent: %v", err)
+	}
+	if !processed {
+		t.Fatal("the completion handler did not import the movie")
+	}
+	if got := countVideos(t, f.archive); got != 1 {
+		t.Fatalf("videos in the library = %d, want 1", got)
+	}
+	if _, err := os.Stat(f.source); !os.IsNotExist(err) {
+		t.Fatalf("move mode must remove the source from aMule's incoming folder, stat err = %v", err)
+	}
+	if status, _ := f.db.TorrentStatus(f.hash); status == nil || *status != "completed" {
+		t.Fatalf("status = %v, want completed", status)
+	}
+}
+
+func TestEd2kMovieCopyModeKeepsIncoming(t *testing.T) {
+	f := newMovieImportFixture(t)
+	f.cfg.Settings["move_episodes"] = "false"
+	session := ed2kSession{cfg: &f.cfg}
+	if !session.ImportCompletedByCopy() {
+		t.Fatal("copy mode must use the copy import")
+	}
+
+	processed, err := HandleTorrentEvent(
+		&f.cfg,
+		session,
+		f.db,
+		map[string]struct{}{},
+		map[string]struct{}{},
+		map[string]StorageMoveRetry{},
+		f.event,
+		NewTmdbClient(nil),
+		NewNotifier(),
+	)
+	if err != nil {
+		t.Fatalf("HandleTorrentEvent: %v", err)
+	}
+	if !processed {
+		t.Fatal("the completion handler did not import the movie")
+	}
+	if got := countVideos(t, f.archive); got != 1 {
+		t.Fatalf("videos in the library = %d, want 1", got)
+	}
+	if _, err := os.Stat(f.source); err != nil {
+		t.Fatalf("copy mode must keep the source in aMule's incoming folder: %v", err)
+	}
+}
+
 func TestCompletedEd2kDownloadReachesTheHistory(t *testing.T) {
 	f := newMovieImportFixture(t)
-	if _, err := tev_completeMovieWithArchive(&f.cfg, f.db, &movieCopySession{}, &f.event, f.release, f.archive, NewTmdbClient(nil)); err != nil {
+	if _, err := tev_completeMovieWithArchive(&f.cfg, f.db, &movieCopySession{}, &f.event, f.release, f.archive, NewTmdbClient(nil), false); err != nil {
 		t.Fatalf("completion: %v", err)
 	}
 	// The entry point of the event worker: without this the row keeps
