@@ -1,6 +1,8 @@
 package gextto
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -1144,5 +1146,67 @@ func TestMigratesOldAudioScoreDefaults(t *testing.T) {
 	}
 	if cfg.Settings["_audio_score_groups_v1"] != "1" {
 		t.Fatal("audio score migration marker missing")
+	}
+}
+
+func TestMigratesMixedCaseScoreGroupKeys(t *testing.T) {
+	dir := t.TempDir()
+	for key, value := range map[string]string{
+		"score_group_Me7alh":  "30",
+		"score_group_NAHOM":   "10", // the lower-case spelling below wins
+		"score_group_nahom":   "50",
+		"score_group_mircrew": "30",
+	} {
+		if err := SaveSetting(dir, key, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"score_group_me7alh": "30", "score_group_nahom": "50", "score_group_mircrew": "30"}
+	for key, value := range want {
+		if got := cfg.Settings[key]; got != value {
+			t.Errorf("%s = %q, want %q", key, got, value)
+		}
+	}
+	for _, key := range []string{"score_group_Me7alh", "score_group_NAHOM"} {
+		if _, ok := cfg.Settings[key]; ok {
+			t.Errorf("%s still present after the migration", key)
+		}
+	}
+	// The bonus now reaches a release of that group.
+	quality := ParseQuality("Show.S01E01.1080p.WEB-DL.H264-Me7alh")
+	plain := ParseQuality("Show.S01E01.1080p.WEB-DL.H264-NOGRP")
+	if got := cfg.QualityScore(&quality) - cfg.QualityScore(&plain); got != 30 {
+		t.Fatalf("group bonus = %d, want 30", got)
+	}
+	// And it survives a reload from the database.
+	again := DefaultConfig()
+	again.DataDir = dir
+	if err := again.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	if again.Settings["score_group_me7alh"] != "30" || again.Settings["score_group_Me7alh"] != "" {
+		t.Fatalf("migration not persisted: %v", again.Settings)
+	}
+}
+
+func TestScoreWeightsFingerprintIncludesScorerVersion(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Settings = map[string]string{"score_res_1080p": "1000"}
+	first := cfg.ScoreWeightsFingerprint()
+	if first != cfg.ScoreWeightsFingerprint() {
+		t.Fatal("fingerprint is not stable")
+	}
+	// The fingerprint of no setting at all still depends on the scorer: a
+	// fresh install with only default weights must rescore after a scorer
+	// change too.
+	empty := DefaultConfig()
+	empty.Settings = map[string]string{}
+	if empty.ScoreWeightsFingerprint() == hex.EncodeToString(sha256.New().Sum(nil)) {
+		t.Fatal("the scorer version is not part of the fingerprint")
 	}
 }

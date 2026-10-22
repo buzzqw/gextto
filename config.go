@@ -832,10 +832,17 @@ func ScoreQuality(quality *models.Quality, settings map[string]string) int64 {
 	return quality.ScoreWithSettings(settings)
 }
 
-// ScoreWeightsFingerprint is a stable hash of every score-* setting. The daemon
-// compares it across restarts to detect a scoring change: stored quality scores
-// are then recomputed so a weight edit cannot masquerade as an upgrade and
-// trigger pointless re-downloads.
+// scoreAlgorithmVersion names the scorer and parser rules built into the code
+// (default weights, audio tiers, tag recognition). Raise it whenever a change
+// can move the score of an already archived release: the fingerprint then
+// changes and the stored scores are recomputed before the next cycle, so a code
+// change cannot masquerade as an upgrade either.
+const scoreAlgorithmVersion = "2"
+
+// ScoreWeightsFingerprint is a stable hash of every score-* setting and of the
+// scorer version. The daemon compares it across restarts to detect a scoring
+// change: stored quality scores are then recomputed so a weight edit cannot
+// masquerade as an upgrade and trigger pointless re-downloads.
 func (c *Config) ScoreWeightsFingerprint() string {
 	keys := make([]string, 0, len(c.Settings))
 	for key := range c.Settings {
@@ -845,6 +852,7 @@ func (c *Config) ScoreWeightsFingerprint() string {
 	}
 	sort.Strings(keys)
 	hash := sha256.New()
+	hash.Write([]byte("scorer=" + scoreAlgorithmVersion + "\n"))
 	for _, key := range keys {
 		hash.Write([]byte(key))
 		hash.Write([]byte("="))
@@ -2196,6 +2204,9 @@ func (c *Config) loadConfigDB() error {
 	if err := migrateAudioScoreGroups(conn, c); err != nil {
 		return err
 	}
+	if err := migrateScoreGroupKeys(conn, c); err != nil {
+		return err
+	}
 	if value, ok := c.Settings["url"]; ok {
 		var feeds []string
 		if strings.HasPrefix(strings.TrimSpace(value), "[") {
@@ -2622,6 +2633,32 @@ func migrateAudioScoreGroups(conn *sql.DB, c *Config) error {
 		return err
 	}
 	c.Settings[versionKey] = "1"
+	return nil
+}
+
+// migrateScoreGroupKeys stores every custom release-group score under the
+// lower-case key the scorer looks up (the parser lowers the group tag). Groups
+// saved with capitals by older versions ("score_group_Me7alh") never matched a
+// release, and the editor, which lists them lower-cased, could not delete them.
+// When both spellings exist the lower-case one, saved by the current editor,
+// wins.
+func migrateScoreGroupKeys(conn *sql.DB, c *Config) error {
+	for key, value := range c.Settings {
+		lower := strings.ToLower(key)
+		if key == lower || !strings.HasPrefix(lower, "score_group_") {
+			continue
+		}
+		if _, exists := c.Settings[lower]; !exists {
+			if _, err := conn.Exec("INSERT INTO settings(key,value) VALUES (?1,?2) ON CONFLICT(key) DO NOTHING", lower, value); err != nil {
+				return err
+			}
+			c.Settings[lower] = value
+		}
+		if _, err := conn.Exec("DELETE FROM settings WHERE key=?1", key); err != nil {
+			return err
+		}
+		delete(c.Settings, key)
+	}
 	return nil
 }
 

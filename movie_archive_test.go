@@ -50,7 +50,7 @@ func TestMovieEqualOrLowerOnDiskIsRejectedBeforeDownload(t *testing.T) {
 	db := newTestDB(t)
 	score := cfg.ReleaseScore(&release)
 
-	approved, reason, err := db.checkMovieScoredWithDisk(&release, score, 0, 0, false, true, disk)
+	approved, reason, err := db.checkMovieScoredWithDisk(&release, score, 0, 0, false, true, disk, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestMovieEqualOrLowerOnDiskIsRejectedBeforeDownload(t *testing.T) {
 
 	lower := release
 	lower.Quality = models.Quality{Resolution: "720p", Source: "webdl", Codec: "h264"}
-	approved, reason, err = db.checkMovieScoredWithDisk(&lower, cfg.ReleaseScore(&lower), 0, 0, false, true, disk)
+	approved, reason, err = db.checkMovieScoredWithDisk(&lower, cfg.ReleaseScore(&lower), 0, 0, false, true, disk, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestMovieEqualOrLowerOnDiskIsRejectedBeforeDownload(t *testing.T) {
 	better := release
 	better.Magnet = "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	better.Quality = models.Quality{Resolution: "2160p", Source: "webdl", Codec: "h265"}
-	approved, reason, err = db.checkMovieScoredWithDisk(&better, cfg.ReleaseScore(&better), 0, 0, false, true, disk)
+	approved, reason, err = db.checkMovieScoredWithDisk(&better, cfg.ReleaseScore(&better), 0, 0, false, true, disk, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

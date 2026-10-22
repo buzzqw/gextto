@@ -1012,7 +1012,9 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   Italian bonus, so English can be preferred instead. Preferred subtitles add a small optional bonus without
   making a release mandatory. One effective score is used for acquisition,
   searches, upgrades, post-processing, archive records and rescoring; it also
-  includes the size bonus. Use **Maintenance → Rescore** after changing weights.
+  includes the size bonus, which on its own is never enough for an upgrade.
+  Library scores are recomputed automatically after a change of the weights or
+  of the scoring rules.
   - **Rename** — rename enable, template editor with tokens and live preview,
   TMDB/TVDB keys, language and upgrade thresholds. One file holding several
   contiguous episodes is named with the range (`S01E01-E02`), so media servers
@@ -1921,14 +1923,22 @@ it is limited, open aMule's TCP and UDP ports on the router.
 Weights are grouped into Resolution, Source, Codec, Audio and Bonus (Dolby
 Vision, HDR, PROPER, REPACK, REAL). For each: **higher = more preferred**. The
 **Custom groups** panel adds a bonus or a penalty to a release group (the name
-must match the final tag of the release, e.g. TBK). Use *Maintenance →
-Recalculate scores* after changing weights.
+must match the final tag of the release, e.g. TBK; case does not matter). The
+library scores are recomputed automatically when you change the weights or when
+a Gextto update changes the scoring rules, so a change is never mistaken for an
+upgrade; *Maintenance → Recalculate scores* is still there to force it.
+
+An upgrade **by score** needs a real quality gain: resolution, source, codec,
+audio, HDR/DV, fixes and group must be worth at least the minimum difference
+more. File size, subtitles and swarm health help choose between equivalent
+releases, but on their own they never re-download an episode or a movie of the
+same quality.
 
 **Upgrades and replacement**
 
 | Setting | What it does |
 |---|---|
-| Min score difference for upgrade | Minimum score difference to replace a file with a better upgrade. |
+| Min score difference for upgrade | Minimum score difference to replace a file with a better upgrade. Only quality counts: size, subtitles and swarm health are not enough to reach it. |
 | Stop upgrading above this score | Upgrade ceiling: once the library file scores at least this much it is no longer replaced by better releases; only a REPACK or PROPER, which fixes a defective release, is still accepted. With the default scores: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. It adds to the minimum difference: that one says *by how much* a release must improve, this one *up to where*. To stop upgrades for a single title use “No upgrades” on its page. “Why not this one?” says when a release is skipped because of this ceiling. *(0 = always upgrade: no ceiling)* |
 | Replace versions already archived | Replaces lower versions already archived with better upgrades. |
 | Min score difference for cleanup | Minimum score difference to replace an existing file with a better one (cleanup). |

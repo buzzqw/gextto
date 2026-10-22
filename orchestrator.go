@@ -1012,6 +1012,7 @@ func RunCycleDomain(
 			Live:              liveDownloads,
 			ForbidUpgrade:     forbidUpgrade,
 			UpgradeUntilScore: cfg.UpgradeUntilScore,
+			ScoreSettings:     cfg.Settings,
 			GapEpisode:        isGap,
 			DryRun:            cfg.DryRun,
 			StallAlternatives: stallAlternatives,
@@ -1346,11 +1347,16 @@ func prioritizeArchiveGapDownloads(
 			Live:              live,
 			ForbidUpgrade:     series.DisableUpgrades,
 			UpgradeUntilScore: cfg.UpgradeUntilScore,
+			ScoreSettings:     cfg.Settings,
 			GapEpisode:        true,
 			StallAlternatives: stallAlternatives,
 			StallScoreDrop:    stallScoreDrop,
 		}
-		approved, reason, err := evaluateReleaseApproval(db, &release, candidate.score, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades, true)
+		// candidate.score includes the swarm health, which only picks the best
+		// copy among the hits: the decision and the stored score use the
+		// release score, like the main cycle.
+		releaseScore := cfg.ReleaseScore(&release)
+		approved, reason, err := evaluateReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades, true)
 		if err != nil {
 			return err
 		}
@@ -1369,9 +1375,9 @@ func prioritizeArchiveGapDownloads(
 			return torrents.AddWithPath(release.Magnet, cfg, preferredPath)
 		}
 		commit := func() (bool, string, error) {
-			return commitReleaseApproval(db, &release, candidate.score, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades)
+			return commitReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades)
 		}
-		if outcome, commitReason, err := startApprovedRelease(db, torrents, &release, candidate.score, false, add, commit); outcome != "" {
+		if outcome, commitReason, err := startApprovedRelease(db, torrents, &release, releaseScore, false, add, commit); outcome != "" {
 			logStartFailure(stats, &release, outcome, commitReason, err)
 			continue
 		}
@@ -1388,11 +1394,11 @@ func prioritizeArchiveGapDownloads(
 			gapMessage += " → " + destination
 		}
 		logging.Info(gapMessage,
-			"release", release.Title, "from", release.Source, "score", candidate.score, "hash", hash)
+			"release", release.Title, "from", release.Source, "score", releaseScore, "hash", hash)
 		if err := notifier.NotifyEvent("download_started", map[string]any{
 			"title": release.Title, "kind": release.Kind, "series": release.Series, "season": release.Season,
 			"episode": release.Episode, "source": release.Source, "magnet_hash": hash,
-			"quality_score": candidate.score, "reason": "gap_filled", "approval_reason": reason,
+			"quality_score": releaseScore, "reason": "gap_filled", "approval_reason": reason,
 		}); err != nil {
 			logging.Warn("download notification failed", "error", err)
 		}
@@ -1488,11 +1494,13 @@ func evaluateReleaseApproval(db *Database, release *models.Release, score, minSc
 	}
 	upgradeUntil := int64(0)
 	var movieArchive *models.ArchiveQuality
+	var scoreSettings map[string]string
 	if approvalContext != nil {
 		upgradeUntil = approvalContext.UpgradeUntilScore
 		movieArchive = approvalContext.MovieArchive
+		scoreSettings = approvalContext.ScoreSettings
 	}
-	return db.checkMovieScoredWithDisk(release, score, minScoreDiff, upgradeUntil, forbidUpgrade, dryRun, movieArchive)
+	return db.checkMovieScoredWithDisk(release, score, minScoreDiff, upgradeUntil, forbidUpgrade, dryRun, movieArchive, scoreSettings)
 }
 
 // commitReleaseApproval records the approval of a release whose torrent is

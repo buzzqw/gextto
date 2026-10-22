@@ -561,7 +561,11 @@ type ApprovalContext struct {
 	// UpgradeUntilScore stops upgrades once the existing copy scores at least
 	// this much (0 = never stop); only a REPACK/PROPER of it is still taken.
 	UpgradeUntilScore int64
-	GapEpisode        bool
+	// ScoreSettings are the configured score weights (nil = the defaults): a
+	// "score" upgrade must improve the quality score computed with them, not
+	// only the size, subtitle or swarm-health parts of the release score.
+	ScoreSettings map[string]string
+	GapEpisode    bool
 	// DryRun evaluates the decision without writing placeholders, torrent rows
 	// or upgrades to the database. Used by the automatic cycle in dry-run mode.
 	DryRun bool

@@ -9,18 +9,18 @@ import (
 func TestUpgradeReasonUntilStopsAtCutoffButKeepsRepacks(t *testing.T) {
 	existing := models.Quality{Resolution: "1080p", Source: "webdl", Codec: "h264"}
 	better := models.Quality{Resolution: "2160p", Source: "webdl", Codec: "h265"}
-	if got := upgradeReasonUntil(&better, &existing, 2480, 1280, 200, 0); got == "" {
+	if got := upgradeReasonUntil(&better, &existing, 2480, 1280, 200, 0, nil); got == "" {
 		t.Fatal("without a cutoff the 2160p release is an upgrade")
 	}
-	if got := upgradeReasonUntil(&better, &existing, 2480, 1280, 200, 1200); got != "" {
+	if got := upgradeReasonUntil(&better, &existing, 2480, 1280, 200, 1200, nil); got != "" {
 		t.Fatalf("cutoff reached: expected no upgrade, got %q", got)
 	}
-	if got := upgradeReasonUntil(&better, &existing, 2480, 1280, 200, 1500); got == "" {
+	if got := upgradeReasonUntil(&better, &existing, 2480, 1280, 200, 1500, nil); got == "" {
 		t.Fatal("cutoff not reached yet: the upgrade must still be taken")
 	}
 	repack := existing
 	repack.IsRepack = true
-	if got := upgradeReasonUntil(&repack, &existing, 1300, 1280, 200, 1200); got != "repack" {
+	if got := upgradeReasonUntil(&repack, &existing, 1300, 1280, 200, 1200, nil); got != "repack" {
 		t.Fatalf("a REPACK must pass the cutoff, got %q", got)
 	}
 }
@@ -83,13 +83,69 @@ func TestUpgradeUntilBlocksMovieReplacement(t *testing.T) {
 	upgrade := old
 	upgrade.Magnet = "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	upgrade.Quality.Resolution = "2160p"
-	approved, _, err := db.checkMovieScoredWith(&upgrade, upgrade.Quality.Score(), 200, 0, false, true)
+	approved, _, err := db.checkMovieScoredWith(&upgrade, upgrade.Quality.Score(), 200, 0, false, true, nil)
 	if err != nil || !approved {
 		t.Fatalf("without a cutoff the 2160p movie is an upgrade: %v", err)
 	}
-	approved, reason, err := db.checkMovieScoredWith(&upgrade, upgrade.Quality.Score(), 200, old.Quality.Score(), false, true)
+	approved, reason, err := db.checkMovieScoredWith(&upgrade, upgrade.Quality.Score(), 200, old.Quality.Score(), false, true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assertTrue(t, !approved, "cutoff reached: expected a refusal, got "+reason)
+}
+
+func TestScoreUpgradeNeedsATechnicalGain(t *testing.T) {
+	existing := models.Quality{Resolution: "1080p", Source: "webdl", Codec: "h264", Group: "nogrp"}
+	same := existing
+	same.Group = "mircrew"
+	settings := map[string]string{"score_group_mircrew": "30"}
+	// Same quality: a bigger file, subtitles and a healthy swarm can push the
+	// release score well past the minimum difference, but that is no upgrade.
+	if got := upgradeReasonUntil(&same, &existing, 1580, 1280, 200, 0, settings); got != "" {
+		t.Fatalf("same quality with only size/health bonuses must not upgrade, got %q", got)
+	}
+	// A real codec + audio gain of at least the minimum difference still is.
+	better := existing
+	better.Codec = "h265"
+	better.Audio = "truehd"
+	if got := upgradeReasonUntil(&better, &existing, 1650, 1280, 200, 0, settings); got != "score" {
+		t.Fatalf("technical gain >= min diff must upgrade, got %q", got)
+	}
+	// A gain below the minimum difference does not, whatever the total says.
+	small := existing
+	small.Codec = "h265"
+	if got := upgradeReasonUntil(&small, &existing, 1700, 1280, 200, 0, settings); got != "" {
+		t.Fatalf("technical gain below min diff must not upgrade, got %q", got)
+	}
+}
+
+func TestSeriesSameQualityIsNotAnUpgradeBecauseOfSize(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := db.db.QueryRow("SELECT id FROM series WHERE name='Show'").Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,quality_score,downloaded_at,archive_path) VALUES (?1,1,1,'Show.S01E01.1080p.WEB-DL.H264-NOGRP',1250,'2024-01-01T00:00:00+00:00','/nas/Show.S01E01.1080p.WEB-DL.H264-NOGRP.mkv')", seriesID); err != nil {
+		t.Fatal(err)
+	}
+	candidate := testRelease()
+	candidate.Title = "Show.S01E01.1080p.WEB-DL.H264-OTHER"
+	candidate.Series = stringPtr("Show")
+	candidate.Season = int64Ptr(1)
+	candidate.Episode = int64Ptr(1)
+	candidate.IsPack = false
+	candidate.Quality = ParseQuality(candidate.Title)
+	// 1250 of quality + 100 of size + 150 of swarm health.
+	score := int64(1500)
+	context := &models.ApprovalContext{Live: &models.LiveDownloads{}, DryRun: true, ScoreSettings: map[string]string{}}
+	approved, reason, err := db.CheckSeriesScored(&candidate, score, 200, context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if approved {
+		t.Fatalf("a same-quality release must not replace the archived episode (reason %q)", reason)
+	}
 }

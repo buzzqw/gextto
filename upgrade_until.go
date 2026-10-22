@@ -7,8 +7,17 @@ import "github.com/buzzqw/gextto/internal/models"
 // it is good enough and no better release replaces it. A REPACK or PROPER is
 // still accepted because it fixes a defective release rather than improving
 // the quality. until <= 0 disables the cutoff.
-func upgradeReasonUntil(candidate, existing *models.Quality, newScore, oldScore, minScoreDiff, until int64) string {
+//
+// A "score" upgrade must also be a real quality gain: settings are the score
+// weights (nil = the defaults), and the technical score of the candidate has to
+// beat the existing copy by the same minimum difference. Size, subtitles and
+// swarm health are part of the release score but never justify replacing a
+// copy of the same quality on their own.
+func upgradeReasonUntil(candidate, existing *models.Quality, newScore, oldScore, minScoreDiff, until int64, settings map[string]string) string {
 	reason := candidate.UpgradeReason(existing, newScore, oldScore, minScoreDiff)
+	if reason == "score" && !technicalScoreGain(candidate, existing, minScoreDiff, settings) {
+		return ""
+	}
 	if reason == "" || !upgradeCutoffReached(oldScore, until) {
 		return reason
 	}
@@ -16,6 +25,14 @@ func upgradeReasonUntil(candidate, existing *models.Quality, newScore, oldScore,
 		return reason
 	}
 	return ""
+}
+
+// technicalScoreGain reports whether the quality alone (resolution, source,
+// codec, audio, HDR, release fixes and group, with the configured weights)
+// improves by at least minScoreDiff, and by at least one point.
+func technicalScoreGain(candidate, existing *models.Quality, minScoreDiff int64, settings map[string]string) bool {
+	gain := ScoreQuality(candidate, settings) - ScoreQuality(existing, settings)
+	return gain > 0 && gain >= minScoreDiff
 }
 
 func upgradeCutoffReached(oldScore, until int64) bool {

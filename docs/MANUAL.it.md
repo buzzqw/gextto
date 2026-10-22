@@ -1042,8 +1042,9 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   l'italiano: si può quindi preferire l'inglese. I sottotitoli preferiti danno
   invece un piccolo bonus opzionale, senza rendere la release obbligatoria. Il
   punteggio effettivo è unico per acquisizione, ricerche, upgrade,
-  post-processing, archivio e rescore; comprende anche il bonus dimensione. Usa
-  **Manutenzione → Ricalcola scoring** dopo aver cambiato i pesi.
+  post-processing, archivio e rescore; comprende anche il bonus dimensione, che
+  però non basta mai da solo per un upgrade. I punteggi della libreria si
+  ricalcolano da soli dopo un cambio dei pesi o delle regole di calcolo.
   - **Rinomina** — abilita rinomina, editor del template con token e anteprima,
   chiavi TMDB/TVDB, lingua e soglie di upgrade. Un file che copre più episodi
   contigui viene nominato con l'intervallo (`S01E01-E02`), così i media server
@@ -1993,14 +1994,23 @@ TCP e UDP di aMule.
 I pesi sono raggruppati in Risoluzione, Sorgente, Codec, Audio e Bonus (Dolby
 Vision, HDR, PROPER, REPACK, REAL). Per ognuno: **più alto = più preferito**.
 Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release group
-(il nome deve corrispondere al tag finale della release, es. TBK). Usa
-*Manutenzione → Ricalcola punteggi* dopo aver cambiato i pesi.
+(il nome deve corrispondere al tag finale della release, es. TBK; maiuscole e
+minuscole non contano). I punteggi della libreria vengono ricalcolati da soli
+quando cambi i pesi o quando un aggiornamento di Gextto cambia le regole di
+calcolo, così una modifica non viene scambiata per un upgrade;
+*Manutenzione → Ricalcola punteggi* resta disponibile per forzarlo.
+
+Un upgrade **per punteggio** richiede un miglioramento reale della qualità:
+risoluzione, sorgente, codec, audio, HDR/DV, correzioni e gruppo devono valere
+almeno la differenza minima in più. Dimensione del file, sottotitoli e salute
+dello swarm aiutano a scegliere tra release equivalenti, ma da soli non fanno
+mai riscaricare un episodio o un film della stessa qualità.
 
 **Upgrade e sostituzione**
 
 | Impostazione | Cosa fa |
 |---|---|
-| Differenza minima score per upgrade | Differenza minima di punteggio per sostituire un file con un upgrade migliore. |
+| Differenza minima score per upgrade | Differenza minima di punteggio per sostituire un file con un upgrade migliore. Conta solo la qualità: dimensione, sottotitoli e salute dello swarm non bastano a superarla. |
 | Smetti di migliorare oltre questo punteggio | Tetto agli upgrade: quando il file in libreria ha almeno questo punteggio non viene più sostituito da release migliori; resta accettato solo un REPACK o PROPER, che corregge una release difettosa. Riferimenti con i punteggi predefiniti: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. Si somma alla differenza minima: la prima dice *di quanto* deve migliorare, questa *fino a dove*. Per fermare del tutto gli upgrade di un solo titolo c'è «Niente upgrade» nella sua scheda. «Perché non questa?» indica quando una release è scartata per questa soglia. *(0 = migliora sempre: nessun tetto)* |
 | Sostituisci le versioni già archiviate | Sostituisce versioni inferiori già archiviate con upgrade migliori. |
 | Differenza minima score per cleanup | Differenza minima di punteggio per sostituire un file esistente con uno migliore (cleanup). |

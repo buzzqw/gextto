@@ -1177,7 +1177,7 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 					comparisonScore = dbScore
 				}
 			}
-			if upgradeReasonUntil(&release.Quality, &comparisonQuality, score, comparisonScore, context.StallAdjustedMinDiff(minScoreDiff, episodeKey), context.UpgradeUntilScore) == "" {
+			if upgradeReasonUntil(&release.Quality, &comparisonQuality, score, comparisonScore, context.StallAdjustedMinDiff(minScoreDiff, episodeKey), context.UpgradeUntilScore, context.ScoreSettings) == "" {
 				return false, "duplicate", nil
 			}
 		}
@@ -1208,7 +1208,7 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 		// A stuck download's placeholder carries the stuck release's score: while
 		// the tolerance applies, the alternative is allowed below it (the
 		// candidate was already bounded by StallScoreDrop above).
-		if !manual && !missingArchivedFile && !stallAlternative && upgradeReasonUntil(&release.Quality, &oldQuality, score, dbScore, minScoreDiff, context.UpgradeUntilScore) == "" {
+		if !manual && !missingArchivedFile && !stallAlternative && upgradeReasonUntil(&release.Quality, &oldQuality, score, dbScore, minScoreDiff, context.UpgradeUntilScore, context.ScoreSettings) == "" {
 			return false, "duplicate", nil
 		}
 		if dryRun {
@@ -1547,7 +1547,7 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 		if !existing {
 			if archive != nil {
 				if disk, ok := archive.BestFor(season, episode); ok {
-					if upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, context.StallAdjustedMinDiff(minScoreDiff, key), context.UpgradeUntilScore) == "" {
+					if upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, context.StallAdjustedMinDiff(minScoreDiff, key), context.UpgradeUntilScore, context.ScoreSettings) == "" {
 						continue
 					}
 				}
@@ -1584,7 +1584,7 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 			accept = !context.ForbidUpgrade
 			if archive != nil {
 				if disk, ok := archive.BestFor(season, episode); ok {
-					accept = accept && upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, context.StallAdjustedMinDiff(minScoreDiff, key), context.UpgradeUntilScore) != ""
+					accept = accept && upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, context.StallAdjustedMinDiff(minScoreDiff, key), context.UpgradeUntilScore, context.ScoreSettings) != ""
 				}
 			}
 		} else {
@@ -1597,7 +1597,7 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 				}
 			}
 			enrichQualityWithMediaInfo(state.MediaInfo, &oldQuality)
-			accept = upgradeReasonUntil(&release.Quality, &oldQuality, score, oldScore, minScoreDiff, context.UpgradeUntilScore) != "" && !context.ForbidUpgrade
+			accept = upgradeReasonUntil(&release.Quality, &oldQuality, score, oldScore, minScoreDiff, context.UpgradeUntilScore, context.ScoreSettings) != "" && !context.ForbidUpgrade
 		}
 		if manual || accept {
 			previous, err := d.loadSeriesUpgradeBackup(tx, state.ID, seriesName)
@@ -1639,7 +1639,7 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 			inserted++
 		} else {
 			oldQuality := ParseQuality(existingTitle)
-			if upgradeReasonUntil(&release.Quality, &oldQuality, score, existingScore, minScoreDiff, context.UpgradeUntilScore) != "" {
+			if upgradeReasonUntil(&release.Quality, &oldQuality, score, existingScore, minScoreDiff, context.UpgradeUntilScore, context.ScoreSettings) != "" {
 				var episodeHash any
 				if hashAvailable {
 					episodeHash = hash
@@ -1684,21 +1684,21 @@ func (d *Database) CheckMovieScored(release *models.Release, score, minScoreDiff
 // CheckMovieScoredWith refuses to replace a real imported movie when
 // `forbidUpgrade` is set.
 func (d *Database) CheckMovieScoredWith(release *models.Release, score, minScoreDiff int64, forbidUpgrade bool) (bool, string, error) {
-	return d.checkMovieScoredWith(release, score, minScoreDiff, 0, forbidUpgrade, false)
+	return d.checkMovieScoredWith(release, score, minScoreDiff, 0, forbidUpgrade, false, nil)
 }
 
 // checkMovieScoredWith is CheckMovieScoredWith with an explicit dry-run switch:
 // in dry-run the decision is computed but no movie row is created, restored or
 // upgraded.
-func (d *Database) checkMovieScoredWith(release *models.Release, score, minScoreDiff, upgradeUntil int64, forbidUpgrade bool, dryRun bool) (bool, string, error) {
-	return d.checkMovieScoredWithDisk(release, score, minScoreDiff, upgradeUntil, forbidUpgrade, dryRun, nil)
+func (d *Database) checkMovieScoredWith(release *models.Release, score, minScoreDiff, upgradeUntil int64, forbidUpgrade bool, dryRun bool, settings map[string]string) (bool, string, error) {
+	return d.checkMovieScoredWithDisk(release, score, minScoreDiff, upgradeUntil, forbidUpgrade, dryRun, nil, settings)
 }
 
 // checkMovieScoredWithDisk is checkMovieScoredWith with the movie file already
 // found on the archive volume. The file is the truth when the database row is
 // missing or stale, and it prevents a re-download that would only be discarded
 // as equal or inferior after completion.
-func (d *Database) checkMovieScoredWithDisk(release *models.Release, score, minScoreDiff, upgradeUntil int64, forbidUpgrade bool, dryRun bool, disk *models.ArchiveQuality) (bool, string, error) {
+func (d *Database) checkMovieScoredWithDisk(release *models.Release, score, minScoreDiff, upgradeUntil int64, forbidUpgrade bool, dryRun bool, disk *models.ArchiveQuality, settings map[string]string) (bool, string, error) {
 	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return false, "", err
@@ -1763,7 +1763,7 @@ func (d *Database) checkMovieScoredWithDisk(release *models.Release, score, minS
 				existingScore = disk.Score
 			}
 		}
-		upgrade := upgradeReasonUntil(&release.Quality, &existingQuality, score, existingScore, minScoreDiff, upgradeUntil) != ""
+		upgrade := upgradeReasonUntil(&release.Quality, &existingQuality, score, existingScore, minScoreDiff, upgradeUntil, settings) != ""
 		if !upgrade {
 			return false, "duplicate", nil
 		}
@@ -1802,7 +1802,7 @@ func (d *Database) checkMovieScoredWithDisk(release *models.Release, score, minS
 		if forbidUpgrade {
 			return false, "upgrades_disabled", nil
 		}
-		if upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, minScoreDiff, upgradeUntil) == "" {
+		if upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, minScoreDiff, upgradeUntil, settings) == "" {
 			return false, "duplicate", nil
 		}
 		if dryRun {

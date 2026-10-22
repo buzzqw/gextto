@@ -191,7 +191,7 @@ func archiveComparison(
 			downloaded = true
 		}
 		var upgradeReason any
-		if value := upgradeReasonUntil(&release.Quality, &oldQuality, score, oldScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore); value != "" {
+		if value := upgradeReasonUntil(&release.Quality, &oldQuality, score, oldScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, cfg.Settings); value != "" {
 			upgradeReason = value
 		}
 		return map[string]any{
@@ -221,7 +221,7 @@ func archiveComparison(
 			return nil, nil
 		}
 		var upgradeReason any
-		if value := upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore); value != "" {
+		if value := upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, cfg.Settings); value != "" {
 			upgradeReason = value
 		}
 		return map[string]any{
@@ -248,7 +248,7 @@ func archiveComparison(
 		oldQuality = currentQuality(title)
 	}
 	var upgradeReason any
-	if value := upgradeReasonUntil(&release.Quality, &oldQuality, score, oldScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore); value != "" {
+	if value := upgradeReasonUntil(&release.Quality, &oldQuality, score, oldScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, cfg.Settings); value != "" {
 		upgradeReason = value
 	}
 	source := "database"
@@ -572,6 +572,7 @@ func ExplainWithArchive(
 			MovieArchive:      nil,
 			ForbidUpgrade:     forbidUpgrade,
 			UpgradeUntilScore: cfg.UpgradeUntilScore,
+			ScoreSettings:     cfg.Settings,
 			DryRun:            true,
 		}
 		if release.Kind == "movie" {
@@ -582,7 +583,7 @@ func ExplainWithArchive(
 		if series != nil {
 			approved, realReason, err = db.CheckSeriesScored(&evaluated, score, cfg.UpgradeMinScoreDiff, approvalContext)
 		} else {
-			approved, realReason, err = db.checkMovieScoredWith(&evaluated, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, true)
+			approved, realReason, err = db.checkMovieScoredWith(&evaluated, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, true, cfg.Settings)
 		}
 		if err != nil {
 			// An incomplete release (for example a pack without a season) must
