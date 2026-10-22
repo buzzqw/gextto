@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 22 ottobre 2026
 
+- **Scheda film: un campo per ogni cosa.** Spariscono **Lingue richieste** e **Requisiti sottotitoli**, che duplicavano **Lingua** e **Sottotitoli** (e se compilati vincevano in silenzio). Al primo avvio i valori vengono riportati nei campi che restano, senza cambiare le decisioni: un film con lingua «any» ma lingua richiesta «chi» ha ora Lingua `chi`. Al posto dei requisiti dei sottotitoli c'è **Sottotitoli obbligatori: Sì/No**. Il campo **Escludi** occupa tutta la riga.
+
 - **Profili di qualità: lingua e sottotitoli da scegliere o scrivere, meno doppioni.** Nell'editor dei profili **Lingua** e **Sottotitoli** propongono le scelte comuni (ita, eng, ita,eng, multi, any) e accettano anche un valore scritto a mano. I profili generati in automatico dalla libreria (quelli che vede anche Jellyseerr) non nascono più dalle esclusioni di un singolo titolo né dalla qualità `any`, che equivale a nessun limite: niente più profili doppi come *any · ita* accanto a *Default*.
 
 - **Profili di qualità: risoluzione da elenco.** Nell'editor dei profili (*Qualità e upgrade*) il campo **Qualità** è ora un menu con le risoluzioni che Gextto riconosce, le stesse della scheda dei titoli, invece di un testo libero. Un valore scritto a mano in passato resta selezionato finché non lo cambi.

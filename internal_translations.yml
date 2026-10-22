@@ -5385,3 +5385,5 @@ eng:
   "upgrade: no": "upgrades: no"
   "Non sostituirebbe la copia in libreria: per questo titolo «Permetti upgrade» è No.": "It would not replace the copy in the library: «Allow upgrades» is No for this title."
   "vuoto = nessuno": "empty = none"
+  "Sottotitoli obbligatori": "Subtitles required"
+  "Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti.": "Yes: a release without these subtitles is rejected. No: the subtitles are only preferred."

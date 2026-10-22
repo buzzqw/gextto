@@ -1094,6 +1094,10 @@ type MovieUpdateInput struct {
 	TmdbId               string  `json:"tmdb_id"`
 	TvdbId               string  `json:"tvdb_id"`
 	DisableUpgrades      *bool   `json:"disable_upgrades"`
+	// SubtitleRequired is «Sottotitoli obbligatori»: when set it makes the
+	// subtitle language a requirement (true) or only a preference (false),
+	// replacing SubtitleRequirements.
+	SubtitleRequired *bool `json:"subtitle_required"`
 }
 
 // MovieMetadataSearchInput is the input of `movie_metadata_search`.

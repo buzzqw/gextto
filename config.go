@@ -683,7 +683,12 @@ func OpenConfigDB(path string) (*sql.DB, error) {
 }
 
 // CleanupMovieRequirements is a one-time cleanup of legacy/imported dirty movie
-// requirement rows.
+// requirement rows. It also folds the legacy «Lingue richieste» into the
+// movie's single «Lingua»: when present the requirement decided alone, so the
+// language becomes the required list and the requirement is cleared (the
+// decision does not change). A subtitle requirement without a preferred
+// subtitle language gives it one: «Sottotitoli obbligatori» is then just the
+// switch on that language.
 func CleanupMovieRequirements(dataDir string) error {
 	path := filepath.Join(dataDir, "gextto_config.db")
 	if info, err := os.Stat(path); err != nil || info.IsDir() {
@@ -694,31 +699,43 @@ func CleanupMovieRequirements(dataDir string) error {
 		return err
 	}
 	defer conn.Close()
-	rows, err := conn.Query("SELECT id,COALESCE(language_requirements,''),COALESCE(subtitle_requirements,'') FROM movies_config")
+	rows, err := conn.Query("SELECT id,COALESCE(language,''),COALESCE(subtitle,''),COALESCE(language_requirements,''),COALESCE(subtitle_requirements,'') FROM movies_config")
 	if err != nil {
 		return err
 	}
 	type requirementRow struct {
-		id       int64
-		language string
-		subtitle string
+		id                 int64
+		language, subtitle string
+		languageReq        string
+		subtitleReq        string
 	}
 	var entries []requirementRow
 	for rows.Next() {
 		var row requirementRow
-		if err := rows.Scan(&row.id, &row.language, &row.subtitle); err != nil {
+		if err := rows.Scan(&row.id, &row.language, &row.subtitle, &row.languageReq, &row.subtitleReq); err != nil {
 			continue
 		}
 		entries = append(entries, row)
 	}
 	rows.Close()
 	for _, row := range entries {
-		cleanLanguage := SanitizeLanguageRequirements(row.language)
-		cleanSubtitle := SanitizeSubtitleRequirements(row.subtitle)
-		if cleanLanguage != row.language || cleanSubtitle != row.subtitle {
+		language := row.language
+		if required := parseLanguageRequirements(SanitizeLanguageRequirements(row.languageReq)); len(required) > 0 {
+			language = strings.Join(required, ",")
+		}
+		subtitleReq := SanitizeSubtitleRequirements(row.subtitleReq)
+		subtitle := row.subtitle
+		if strings.TrimSpace(subtitle) == "" && subtitleReq != "" {
+			if required := parseLanguageRequirements(subtitleReq); len(required) > 0 {
+				subtitle = strings.Join(required, ",")
+			} else {
+				subtitle = subtitleReq
+			}
+		}
+		if language != row.language || subtitle != row.subtitle || row.languageReq != "" || subtitleReq != row.subtitleReq {
 			if _, err := conn.Exec(
-				"UPDATE movies_config SET language_requirements=?1, subtitle_requirements=?2 WHERE id=?3",
-				cleanLanguage, cleanSubtitle, row.id,
+				"UPDATE movies_config SET language=?1, subtitle=?2, language_requirements='', subtitle_requirements=?3 WHERE id=?4",
+				language, subtitle, subtitleReq, row.id,
 			); err != nil {
 				return err
 			}
@@ -1784,6 +1801,15 @@ func (c *Config) movieQualityAllowed(movie *MovieConfig, quality *models.Quality
 		}
 	}
 	return false
+}
+
+// movieEffectiveLanguage is the audio language a movie really asks for: the
+// legacy «Lingue richieste» when set (it decides alone), otherwise «Lingua».
+func movieEffectiveLanguage(movie *MovieConfig) string {
+	if required := parseLanguageRequirements(movie.LanguageRequirements); len(required) > 0 {
+		return strings.Join(required, ",")
+	}
+	return movie.Language
 }
 
 // titleExcluded reports whether a release title contains one of the

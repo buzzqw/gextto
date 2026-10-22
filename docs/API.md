@@ -409,6 +409,12 @@ preset on load.
 profile, whatever the request says, and `exclude` is added to the profile's
 exclusions.
 
+`POST /api/movies/{id}` accepts `subtitle_required` (boolean, «Sottotitoli
+obbligatori»): true makes `subtitle` a requirement, false only a preference; it
+replaces `subtitle_requirements`. `language_requirements` is still read for
+compatibility, but the interface no longer writes it: at startup Gextto folds it
+into `language`, which it overrode.
+
 `POST /api/tmdb/add` and `POST /api/movies/{id}` accept `disable_upgrades`
 (boolean; the interface shows it as «Permetti upgrade: No»): a better release never replaces the archived file
 of that title. `POST /api/series/{name}` already accepted it.

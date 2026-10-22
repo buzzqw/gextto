@@ -5995,3 +5995,5 @@ spa:
   "upgrade: no": "mejoras: no"
   "Non sostituirebbe la copia in libreria: per questo titolo «Permetti upgrade» è No.": "No sustituiría la copia de la biblioteca: «Permitir mejoras» está en No para este título."
   "vuoto = nessuno": "vacío = ninguno"
+  "Sottotitoli obbligatori": "Subtítulos obligatorios"
+  "Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti.": "Sí: una release sin estos subtítulos se descarta. No: los subtítulos solo son preferidos."

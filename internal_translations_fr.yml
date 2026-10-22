@@ -6041,3 +6041,5 @@ fra:
   "upgrade: no": "mises à niveau : non"
   "Non sostituirebbe la copia in libreria: per questo titolo «Permetti upgrade» è No.": "Ne remplacerait pas la copie de la bibliothèque : «Autoriser les mises à niveau» est sur Non pour ce titre."
   "vuoto = nessuno": "vide = aucun"
+  "Sottotitoli obbligatori": "Sous-titres obligatoires"
+  "Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti.": "Oui : une release sans ces sous-titres est écartée. Non : les sous-titres sont seulement préférés."

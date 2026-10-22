@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **Movie page: one field per value.** **Required languages** and **Subtitle requirements** are gone: they duplicated **Language** and **Subtitles** (and, when filled, silently won). At the first start their values are moved into the remaining fields without changing any decision: a movie with language «any» but required language «chi» now has Language `chi`. Instead of the subtitle requirements there is **Subtitles required: Yes/No**. The **Exclude** field takes the whole row.
+
 - **Quality profiles: language and subtitles to pick or type, fewer duplicates.** In the profile editor **Language** and **Subtitles** suggest the usual choices (ita, eng, ita,eng, multi, any) and also take a value typed by hand. The profiles generated from the library (the ones Jellyseerr sees too) no longer come from a single title's exclusions or from the `any` quality, which means no limit: no more duplicates such as *any · ita* next to *Default*.
 
 - **Quality profiles: resolution from a list.** In the profile editor (*Quality and upgrades*) the **Quality** field is now a menu of the resolutions Gextto recognises, the same as on the title pages, instead of free text. A value typed by hand in the past stays selected until you change it.

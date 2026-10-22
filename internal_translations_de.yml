@@ -6048,3 +6048,5 @@ deu:
   "upgrade: no": "Upgrades: nein"
   "Non sostituirebbe la copia in libreria: per questo titolo «Permetti upgrade» è No.": "Würde die Kopie in der Bibliothek nicht ersetzen: «Upgrades erlauben» steht für diesen Titel auf Nein."
   "vuoto = nessuno": "leer = keine"
+  "Sottotitoli obbligatori": "Untertitel erforderlich"
+  "Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti.": "Ja: eine Release ohne diese Untertitel wird verworfen. Nein: die Untertitel werden nur bevorzugt."

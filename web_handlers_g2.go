@@ -1274,6 +1274,12 @@ func UpdateMovie(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if input.DisableUpgrades != nil {
 		movie.DisableUpgrades = *input.DisableUpgrades
 	}
+	if input.SubtitleRequired != nil {
+		movie.SubtitleRequirements = ""
+		if *input.SubtitleRequired {
+			movie.SubtitleRequirements = SanitizeSubtitleRequirements(movie.Subtitle)
+		}
+	}
 	if err := SaveLibrary(s.cfg.DataDir, current.Series, movies); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return

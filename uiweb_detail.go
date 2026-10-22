@@ -148,29 +148,28 @@ func uiSourceLabel(raw string) string {
 }
 
 type uiMovieDetail struct {
-	ID                   int64
-	Name                 string
-	Year                 string
-	Quality              string
-	Audio                string
-	AudioChannels        string
-	Language             string
-	TmdbID               string
-	TvdbID               string
-	Overview             string
-	Subtitle             string
-	Exclude              string
-	LanguageRequirements string
-	SubtitleRequirements string
-	DisableUpgrades      bool
-	Enabled              bool
-	History              []MovieHistory
-	Matches              []uiMovieMatch
-	Poster               string
-	ReleaseDate          string
-	Cast                 []uiDetailPerson
-	TmdbURL              string
-	TvdbURL              string
+	ID               int64
+	Name             string
+	Year             string
+	Quality          string
+	Audio            string
+	AudioChannels    string
+	Language         string
+	TmdbID           string
+	TvdbID           string
+	Overview         string
+	Subtitle         string
+	Exclude          string
+	SubtitleRequired bool
+	DisableUpgrades  bool
+	Enabled          bool
+	History          []MovieHistory
+	Matches          []uiMovieMatch
+	Poster           string
+	ReleaseDate      string
+	Cast             []uiDetailPerson
+	TmdbURL          string
+	TvdbURL          string
 }
 
 // uiMagnetURL only trusts links with a safe scheme so the archive match links
@@ -408,21 +407,20 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		Quality:       movie.Quality,
 		Audio:         audioPreferenceDisplay(movie.Audio, movie.AudioChannels),
 		AudioChannels: movie.AudioChannels,
-		Language:      movie.Language,
-		TmdbID:        movie.TmdbID,
-		TvdbID:        movie.TvdbID,
-		Overview:      movie.Overview,
-		Subtitle:      movie.Subtitle,
-		Exclude:       movie.Exclude,
-		// The persisted form is canonical JSON for the API/database. The edit
-		// form accepts the human-readable comma-separated representation.
-		LanguageRequirements: strings.Join(parseLanguageRequirements(movie.LanguageRequirements), ","),
-		SubtitleRequirements: movie.SubtitleRequirements,
-		DisableUpgrades:      movie.DisableUpgrades,
-		Enabled:              movie.Enabled,
-		Poster:               movie.PosterPath,
-		TmdbURL:              tmdbURL(movie.TmdbID, "movie"),
-		TvdbURL:              tvdbURL(movie.TvdbID, "movie"),
+		// One «Lingua»: a legacy «Lingue richieste» decides when present, so the
+		// form shows that (saving clears the legacy field).
+		Language:         movieEffectiveLanguage(movie),
+		TmdbID:           movie.TmdbID,
+		TvdbID:           movie.TvdbID,
+		Overview:         movie.Overview,
+		Subtitle:         movie.Subtitle,
+		Exclude:          movie.Exclude,
+		SubtitleRequired: strings.TrimSpace(movie.SubtitleRequirements) != "",
+		DisableUpgrades:  movie.DisableUpgrades,
+		Enabled:          movie.Enabled,
+		Poster:           movie.PosterPath,
+		TmdbURL:          tmdbURL(movie.TmdbID, "movie"),
+		TvdbURL:          tvdbURL(movie.TvdbID, "movie"),
 	}
 	if raw, status := v2InternalJSON(s, http.MethodGet, "/api/movies/"+strconv.FormatInt(movie.ID, 10), nil, nil); status < 400 {
 		var payload struct {

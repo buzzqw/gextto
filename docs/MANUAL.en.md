@@ -735,9 +735,12 @@ eligible, and the alternative may be a single episode or another pack.
   language). As for the series, the **List / Posters** switch
   reads the table as cards with the cover (the choice is shared with the Series
   page).
-- The editor supports quality, minimum audio, base language, subtitles,
-  exclusions and **Required languages**. The form shows a readable value such as `ita,eng`, not
-  the internal JSON representation.
+- The editor supports quality, minimum audio, **Language**, **Subtitles** with
+  **Subtitles required** (Yes: a release without those subtitles is rejected; No:
+  they are only preferred), **Allow upgrades** and exclusions. Each value has one
+  field only: the old “Required languages” were folded into **Language** (which
+  takes `chi`, `ita,eng`… beyond the list entries too) without changing any
+  decision.
 - **Movie detail**: poster, plot, cast with TMDB links, edit, re-download,
   **Search now**, a “best matches” table from the sources and an **archive
   matches** table where each row offers **Why not this one?**.
@@ -746,7 +749,7 @@ eligible, and the alternative may be a single episode or another pack.
 
 1. find the movie in **Explore** and check year and original title;
 2. add it to the library;
-3. set quality, minimum audio, language, subtitles and exclusions;
+3. choose the **Quality profile** and add any exclusions for this movie only;
 4. use **Search now** to inspect results without waiting for a cycle;
 5. open **Why not this one?** before queueing a borderline release.
 
@@ -754,11 +757,7 @@ Movies are identified by title and year when available. Avoid creating duplicate
 with different spellings: correct the monitored movie metadata instead of adding
 it again.
 
-Required languages are entered as comma-separated codes, for example `ita,eng`.
-The database/API may keep the canonical JSON form, but the UI converts it to a
-readable value before displaying it. Internal rules distinguish mandatory
-requirements from optional preferences; do not edit the JSON manually unless you
-are using the API directly.
+Several languages are written as comma-separated codes, for example `ita,eng`.
 
 ### Importing a file that already exists
 

@@ -5989,3 +5989,5 @@ pol:
   "upgrade: no": "ulepszenia: nie"
   "Non sostituirebbe la copia in libreria: per questo titolo «Permetti upgrade» è No.": "Nie zastąpiłoby kopii w bibliotece: «Zezwalaj na ulepszenia» ma dla tego tytułu wartość Nie."
   "vuoto = nessuno": "puste = brak"
+  "Sottotitoli obbligatori": "Napisy wymagane"
+  "Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti.": "Tak: wydanie bez tych napisów jest odrzucane. Nie: napisy są tylko preferowane."

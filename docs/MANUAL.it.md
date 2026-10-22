@@ -752,9 +752,11 @@ essere una singola puntata o un altro pack.
 
 - Tab **Monitorati / Scaricati**; colonne ordinabili (nome, anno, qualità, lingua). Come per le serie, il selettore **Elenco / Locandine** legge la tabella come
   card con la copertina (la scelta è condivisa con la pagina Serie TV).
-- L'editor gestisce qualità, audio minimo, lingua base, sottotitoli,
-  esclusioni e **Lingue richieste**. Nel form il valore è mostrato in formato leggibile, per esempio
-  `ita,eng`, non come JSON interno.
+- L'editor gestisce qualità, audio minimo, **Lingua**, **Sottotitoli** con
+  **Sottotitoli obbligatori** (Sì: una release senza quei sottotitoli è scartata;
+  No: sono solo preferiti), **Permetti upgrade** ed esclusioni. Ogni valore ha un
+  solo campo: le vecchie «Lingue richieste» sono confluite in **Lingua** (che vale
+  `chi`, `ita,eng`… anche oltre le voci dell'elenco) senza cambiare le decisioni.
 - **Dettaglio film**: locandina, trama, cast, modifica, riscarica, **Cerca subito**,
   nomi del cast collegati alle schede TMDB, tabella dei “migliori trovati” dalle
   sorgenti e tabella **corrispondenze archivio** dove ogni riga offre **Perché
@@ -764,7 +766,7 @@ essere una singola puntata o un altro pack.
 
 1. cerca il film in **Esplora** e controlla anno e titolo originale;
 2. aggiungilo alla libreria;
-3. imposta qualità, audio minimo, lingua, sottotitoli ed eventuali esclusioni;
+3. scegli il **Profilo di qualità** e aggiungi eventuali esclusioni del solo film;
 4. usa **Cerca subito** per vedere i risultati senza aspettare il ciclo;
 5. apri **Perché non questa?** prima di accodare una release borderline.
 
@@ -772,11 +774,7 @@ Il film viene identificato usando titolo e anno quando disponibili. Evita di
 creare duplicati con lo stesso film scritto in modi diversi: correggi i metadati
 del film monitorato invece di aggiungerlo nuovamente.
 
-Le lingue richieste sono inserite nel form come codici separati da virgola, per
-esempio `ita,eng`. Il database/API può conservarle nella forma JSON canonica,
-ma la UI converte il valore in una forma leggibile prima di mostrarlo. Le regole
-interne distinguono requisiti obbligatori e preferenze opzionali; non modificare
-manualmente il JSON se non stai usando direttamente l'API.
+Più lingue si indicano come codici separati da virgola, per esempio `ita,eng`.
 
 ### Importare un file già presente
 

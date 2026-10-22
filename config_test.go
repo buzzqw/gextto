@@ -4,6 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -1208,5 +1211,73 @@ func TestScoreWeightsFingerprintIncludesScorerVersion(t *testing.T) {
 	empty.Settings = map[string]string{}
 	if empty.ScoreWeightsFingerprint() == hex.EncodeToString(sha256.New().Sum(nil)) {
 		t.Fatal("the scorer version is not part of the fingerprint")
+	}
+}
+
+func TestCleanupMovieRequirementsFoldsIntoLanguageAndSubtitle(t *testing.T) {
+	dir := t.TempDir()
+	movies := []MovieConfig{
+		{ID: 1, Name: "Same", Language: "ita", LanguageRequirements: `[{"language":"ita","required":true}]`, Enabled: true},
+		{ID: 2, Name: "Chinese", Language: "any", LanguageRequirements: `[{"language":"chi","required":true}]`, Subtitle: "eng", SubtitleRequirements: "eng", Enabled: true},
+		{ID: 3, Name: "OnlyRequired", Language: "ita", SubtitleRequirements: "eng", Enabled: true},
+	}
+	if err := SaveLibrary(dir, nil, movies); err != nil {
+		t.Fatal(err)
+	}
+	if err := CleanupMovieRequirements(dir); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]MovieConfig{}
+	for _, movie := range cfg.Movies {
+		byName[movie.Name] = movie
+	}
+	if m := byName["Same"]; m.Language != "ita" || m.LanguageRequirements != "" {
+		t.Fatalf("Same = %+v", m)
+	}
+	// The requirement decided alone: it becomes the language.
+	if m := byName["Chinese"]; m.Language != "chi" || m.LanguageRequirements != "" || m.Subtitle != "eng" || m.SubtitleRequirements == "" {
+		t.Fatalf("Chinese = %+v", m)
+	}
+	// A subtitle requirement without a preferred language gives it one.
+	if m := byName["OnlyRequired"]; m.Subtitle != "eng" || m.SubtitleRequirements == "" {
+		t.Fatalf("OnlyRequired = %+v", m)
+	}
+	// Running it again changes nothing.
+	if err := CleanupMovieRequirements(dir); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMovieUpdateSubtitleRequiredSwitch(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveLibrary(state.cfg.DataDir, nil, []MovieConfig{{ID: 5, Name: "Film", Language: "eng", Subtitle: "eng", Enabled: true}}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	post := func(required string) MovieConfig {
+		form := url.Values{"view": {"movies"}, "path": {"/api/movies/5"}, "name": {"Film"}, "language": {"eng"}, "subtitle": {"eng"},
+			"subtitle_required": {required}, "_v2_kind_subtitle_required": {"select"}}
+		if code, body := v2Request(t, server, http.MethodPost, "/section/form", form); code >= 400 {
+			t.Fatalf("save -> %d %s", code, body)
+		}
+		for _, movie := range latestConfig(state).Movies {
+			if movie.ID == 5 {
+				return movie
+			}
+		}
+		t.Fatal("movie lost")
+		return MovieConfig{}
+	}
+	if m := post("true"); m.SubtitleRequirements == "" {
+		t.Fatalf("Sì must make the subtitles required: %+v", m)
+	}
+	if m := post("false"); m.SubtitleRequirements != "" {
+		t.Fatalf("No must leave the subtitles as a preference: %+v", m)
 	}
 }

@@ -80,6 +80,10 @@ func runDaemon(dryRun bool, configOption *string) error {
 	}
 	if err := gextto.CleanupMovieRequirements(cfg.DataDir); err != nil {
 		logging.Warn("movie requirements cleanup failed", "error", err)
+	} else if reloaded, err := gextto.LoadConfig(configPath); err == nil {
+		// The cleanup may have rewritten movie rows: start from them.
+		reloaded.DryRun = cfg.DryRun
+		cfg = reloaded
 	}
 
 	cache.Init(cfg.DataDir)

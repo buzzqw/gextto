@@ -1053,7 +1053,10 @@ func TestV2DetailPagesRender(t *testing.T) {
 		t.Fatalf("root series detail -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=7", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Test Movie") || !strings.Contains(body, `name="language_requirements" value="ita"`) || strings.Contains(body, `name="language_requirements" value="[{\"language\":\"ita\"`) {
+	// One «Lingua» (the legacy requirement decides, so it is what the form
+	// shows) and no separate requirement fields.
+	if code != http.StatusOK || !strings.Contains(body, "Test Movie") || !strings.Contains(body, `<option value="ita" selected>`) ||
+		strings.Contains(body, `name="language_requirements"`) || strings.Contains(body, `name="subtitle_requirements"`) || !strings.Contains(body, `name="subtitle_required"`) {
 		t.Fatalf("movie detail -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=7", nil)

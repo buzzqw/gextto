@@ -3121,11 +3121,11 @@
          {{template "v2_audio_pref_field" .}}
          <label class="field"><span>Lingua</span><select class="input" name="language">{{template "v2_language_options" .Language}}</select></label>
          <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
-        <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
-        <label class="field span-full"><span>Lingue richieste</span><input class="input" name="language_requirements" value="{{.LanguageRequirements}}" /></label>
-        <label class="field span-full"><span>Requisiti sottotitoli</span><input class="input" name="subtitle_requirements" value="{{.SubtitleRequirements}}" /></label>
+        <label class="field" title="Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti."><span>Sottotitoli obbligatori</span><select class="input" name="subtitle_required"><option value="false"{{if not .SubtitleRequired}} selected{{end}}>No</option><option value="true"{{if .SubtitleRequired}} selected{{end}}>Sì</option></select></label>
+        <input type="hidden" name="_v2_kind_subtitle_required" value="select" />
         <label class="field" title="Sì: una release migliore sostituisce il file già archiviato. No: il file archiviato resta."><span>Permetti upgrade</span><select class="input" name="disable_upgrades"><option value="false"{{if not .DisableUpgrades}} selected{{end}}>Sì</option><option value="true"{{if .DisableUpgrades}} selected{{end}}>No</option></select></label>
         <input type="hidden" name="_v2_kind_disable_upgrades" value="select" />
+        <label class="field span-full"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" placeholder="es. un altro titolo con lo stesso nome" /></label>
         <input type="hidden" name="tmdb_id" value="{{.TmdbID}}" />
         <input type="hidden" name="tvdb_id" value="{{.TvdbID}}" />
         <div class="form-actions"><button class="btn primary" type="submit">Salva</button></div>
