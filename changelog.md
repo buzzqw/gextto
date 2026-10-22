@@ -51,6 +51,10 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   apri **Modifica selezionati** e cambi qualità, lingua, sottotitoli,
   esclusioni, upgrade o stato su tutte insieme. Puoi partire dai valori di un
   profilo. Tutto il resto di ogni titolo non viene toccato.
+- **Sorgenti che non rispondono: ora il log dice quale e perché.** L'avviso
+  di fine ricerca diceva solo «1 indexer». Ora nomina ogni sorgente che ha
+  fallito, quante ricerche su quante e l'ultimo errore, ad esempio «indexer
+  Jackett: 3 of 106 searches failed — timeout».
 - **Episodi eD2k: sposta o copia come i film.** Con **Sposta gli
   episodi/pack in archivio** attiva, anche gli episodi scaricati con aMule
   vengono spostati in libreria al completamento, come già i film; prima

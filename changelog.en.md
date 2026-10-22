@@ -49,6 +49,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
   **Edit selected** and change quality, language, subtitles, exclusions,
   upgrades or state on all of them. You can start from a profile's values.
   Everything else in each title is left alone.
+- **Sources that do not answer: the log now says which and why.** The
+  end-of-search warning only said "1 indexer". It now names every source that
+  failed, how many of its searches failed and the last error, for example
+  "indexer Jackett: 3 of 106 searches failed — timeout".
 - **eD2k episodes: move or copy like movies.** With **Move episodes/packs to
   the archive** on, episodes downloaded with aMule are moved into the library
   at completion too, as movies already were; before, they could be copied and

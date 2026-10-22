@@ -526,15 +526,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		failedSources[entry.Kind]++
 	}
 	if len(providerFailures) > 0 {
-		var failed []string
-		for _, kind := range []struct{ key, singular, pluralForm string }{
-			{"feed", "feed", "feeds"}, {"indexer", "indexer", "indexers"}, {"web", "search engine", "search engines"},
-		} {
-			if count := failedSources[kind.key]; count > 0 {
-				failed = append(failed, countLabel(count, kind.singular, kind.pluralForm))
-			}
-		}
-		logging.Warn("⚠️ Some sources did not answer in this search: " + strings.Join(failed, ", "))
+		logging.Warn("⚠️ Some sources did not answer in this search: " + failedSourcesSummary(sourceStats))
 		logging.Debug("provider failures in cycle",
 			"feed_failures", providerFailures["feed"],
 			"feed_sources", failedSources["feed"],
@@ -917,6 +909,48 @@ func printSourceReport(stats []logging.SourceStatEntry) {
 			logging.Debug(fmt.Sprintf("   ⚠️ [%s] %s: %d ok / %d failed, %d releases — %s", entry.Kind, entry.Name, stat.OK, stat.Fail, stat.Results, lastError))
 		}
 	}
+}
+
+// failedSourcesSummary names the sources that failed in a cycle, with how
+// many of their searches failed and the last error, so the warning says which
+// source to look at and why ("indexer Jackett: 3 of 106 searches failed —
+// timeout"). The first five are named; the rest are counted.
+func failedSourcesSummary(stats []logging.SourceStatEntry) string {
+	labels := map[string]string{"feed": "feed", "indexer": "indexer", "web": "search engine"}
+	const named = 5
+	var parts []string
+	failed := 0
+	for _, entry := range stats {
+		stat := entry.Stats
+		if stat.Fail == 0 {
+			continue
+		}
+		failed++
+		if len(parts) == named {
+			continue
+		}
+		kind := labels[entry.Kind]
+		if kind == "" {
+			kind = entry.Kind
+		}
+		part := fmt.Sprintf("%s %s: %s", kind, entry.Name, plural(stat.Fail, "search failed", "searches failed"))
+		if stat.OK > 0 {
+			part = fmt.Sprintf("%s %s: %d of %d searches failed", kind, entry.Name, stat.Fail, stat.OK+stat.Fail)
+		} else if stat.Fail > 1 {
+			part = fmt.Sprintf("%s %s: all %d searches failed", kind, entry.Name, stat.Fail)
+		}
+		if reason := strings.TrimSpace(stat.LastError); reason != "" {
+			if len([]rune(reason)) > 140 {
+				reason = string([]rune(reason)[:140]) + "…"
+			}
+			part += " — " + reason
+		}
+		parts = append(parts, part)
+	}
+	if failed > named {
+		parts = append(parts, fmt.Sprintf("and %d more", failed-named))
+	}
+	return strings.Join(parts, "; ")
 }
 
 // sourceBreakdown renders the per-feed outcome for the "Sources:" summary.
