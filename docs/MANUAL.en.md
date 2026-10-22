@@ -641,9 +641,11 @@ For a new series, TMDB search is the safest method:
 
 1. open **Explore**, search for the title and select the correct result;
 2. check title, year, network and poster;
-3. choose a **Quality profile** to fill quality, minimum audio, language,
-   subtitles, exclusions and “No upgrades” in one go, or pick the values by
-   hand; then the monitored seasons;
+3. choose the **Quality profile**: it decides the new title's quality, minimum
+   audio, language, subtitles, exclusions and “No upgrades” (the form has no
+   other fields for these values, so they cannot contradict each other); add
+   any **Extra exclusions** for this title only, which are added to the
+   profile's, and the monitored seasons;
 4. set a per-series archive path only if you do not want the global path;
 5. save in dry-run and inspect the detail page.
 
@@ -651,7 +653,7 @@ The most important fields are:
 
 | Field | Effect |
 |---|---|
-| Quality profile | only when adding: copies the values of a profile into the fields (see *Quality profiles*), where they stay editable |
+| Quality profile | only when adding: gives the title the quality, minimum audio, language, subtitles, exclusions and “No upgrades” of the profile (see *Quality profiles*); the single values can be changed later on the title's page |
 | Quality | restricts acceptable releases and contributes to the score |
 | Minimum audio | a preset that already includes the channels: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Any** imposes no limit and is the default, including for existing series |
 | Language | requires the configured language when it is recognisable in the title |
@@ -1174,8 +1176,8 @@ Jellyseerr through `/api/v3/qualityprofile`; the first profile is **Default**.
 **Profiles are templates, not rules.** When you use a profile (by choosing it in
 the **Quality profile** field of the add form of a series or a movie, from
 Jellyseerr or from *Edit selected* in the Series and Movies tables), Gextto
-**copies** its values into the title; in the add form they appear in the fields
-and you can still change them before confirming; from then
+**copies** its values into the title (the exclusions written in the add form are
+added to the profile's); from then
 on the title's own fields decide, as always. If you later change the profile,
 the titles already created do not change: to update many of them at once use
 *Edit selected* in the Series and Movies tables. Gextto does not need a Sonarr-style mode where the

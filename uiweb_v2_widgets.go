@@ -1219,6 +1219,9 @@ func V2TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		SeasonSubfolders: r.FormValue("season_subfolders") != "",
 		DisableUpgrades:  r.FormValue("disable_upgrades") != "",
 	}
+	if id, err := strconv.Atoi(strings.TrimSpace(r.FormValue("quality_profile_id"))); err == nil && id > 0 {
+		payload.QualityProfileID = id
+	}
 	if payload.Kind == "" {
 		payload.Kind = "series"
 	}
@@ -1260,38 +1263,57 @@ func V2TmdbManual(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := map[string]any{
 		"Kind": kind, "Name": name,
 		"Year": strings.TrimSpace(r.FormValue("year")), "TmdbID": strings.TrimSpace(r.FormValue("tmdb_id")),
-		"TvdbID": strings.TrimSpace(r.FormValue("tvdb_id")), "Quality": strings.TrimSpace(r.FormValue("quality")),
-		"Audio": strings.TrimSpace(r.FormValue("audio")), "AudioChannels": strings.TrimSpace(r.FormValue("audio_channels")),
-		"Language": strings.TrimSpace(r.FormValue("language")), "Seasons": "1+",
-		"Subtitle": strings.TrimSpace(r.FormValue("subtitle")), "Exclude": strings.TrimSpace(r.FormValue("exclude")),
-		"DisableUpgrades": r.FormValue("disable_upgrades") != "",
-		"ArchivePath":     v2ProposedArchivePath(s, name),
-		"Redirect":        strings.TrimSpace(r.FormValue("redirect")),
+		"TvdbID": strings.TrimSpace(r.FormValue("tvdb_id")), "Seasons": "1+",
+		"Exclude":     strings.TrimSpace(r.FormValue("exclude")),
+		"ArchivePath": v2ProposedArchivePath(s, name),
+		"Redirect":    strings.TrimSpace(r.FormValue("redirect")),
 	}
 	if view["Redirect"] == "" {
 		view["Redirect"] = "/?view=search"
 	}
-	view["Profiles"] = v2ProfileChoices(ensureQualityProfiles(s))
+	view["Profiles"] = v2ProfileChoices(s, ensureQualityProfiles(s))
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_tmdb_manual", view, dict, eng)
 }
 
-// v2ProfileChoice is one quality profile offered by the add form: choosing it
-// copies Values into the form fields (profiles are templates, not rules).
+// v2ProfileChoice is one quality profile offered by the add form, with a
+// one-line summary of what it gives the new title. The first one (Default) is
+// preselected.
 type v2ProfileChoice struct {
-	ID     int
-	Name   string
-	Values string
+	ID       int
+	Name     string
+	Summary  string
+	Selected bool
 }
 
-func v2ProfileChoices(profiles []QualityProfile) []v2ProfileChoice {
+func v2ProfileChoices(s *AppState, profiles []QualityProfile) []v2ProfileChoice {
+	tr := func(italian string) string { return uiText(s, italian) }
 	out := make([]v2ProfileChoice, 0, len(profiles))
-	for _, profile := range profiles {
-		values, _ := json.Marshal(map[string]any{
-			"quality": profile.Quality, "audio": profile.Audio, "language": profile.Language,
-			"subtitle": profile.Subtitle, "exclude": profile.Exclude, "disable_upgrades": profile.DisableUpgrades,
-		})
-		out = append(out, v2ProfileChoice{ID: profile.ID, Name: profile.Name, Values: string(values)})
+	for index, profile := range profiles {
+		parts := []string{}
+		if quality := strings.TrimSpace(profile.Quality); quality != "" && !strings.EqualFold(quality, "any") {
+			parts = append(parts, quality)
+		} else {
+			parts = append(parts, tr("qualsiasi qualità"))
+		}
+		if profile.Audio != "" {
+			parts = append(parts, tr("audio")+" "+profile.Audio)
+		}
+		language := strings.TrimSpace(profile.Language)
+		if language == "" {
+			language = "ita"
+		}
+		parts = append(parts, tr("lingua")+" "+language)
+		if profile.Subtitle != "" {
+			parts = append(parts, tr("sottotitoli")+" "+profile.Subtitle)
+		}
+		if profile.Exclude != "" {
+			parts = append(parts, tr("escludi")+" "+profile.Exclude)
+		}
+		if profile.DisableUpgrades {
+			parts = append(parts, tr("niente upgrade"))
+		}
+		out = append(out, v2ProfileChoice{ID: profile.ID, Name: profile.Name, Summary: strings.Join(parts, " · "), Selected: index == 0})
 	}
 	return out
 }

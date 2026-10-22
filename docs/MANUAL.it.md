@@ -657,9 +657,11 @@ Per una serie nuova il metodo più sicuro è la ricerca TMDB:
 
 1. apri **Esplora**, cerca il titolo e seleziona il risultato corretto;
 2. controlla titolo, anno, rete e poster;
-3. scegli un **Profilo di qualità** per riempire in un colpo qualità, audio
-   minimo, lingua, sottotitoli, esclusioni e «Niente upgrade», oppure scegli i
-   valori a mano; poi le stagioni da monitorare;
+3. scegli il **Profilo di qualità**: è lui a decidere qualità, audio minimo,
+   lingua, sottotitoli, esclusioni e «Niente upgrade» del nuovo titolo (il
+   modulo non ha altri campi per questi valori, così non possono contraddirsi);
+   aggiungi eventuali **Esclusioni in più** solo per questo titolo, che si
+   sommano a quelle del profilo, e le stagioni da monitorare;
 4. imposta il percorso archivio solo se non vuoi usare quello globale;
 5. salva in dry-run e controlla la pagina di dettaglio.
 
@@ -667,7 +669,7 @@ I campi più importanti sono:
 
 | Campo | Effetto |
 |---|---|
-| Profilo di qualità | solo all'aggiunta: copia nei campi i valori di un profilo (vedi *Profili di qualità*), che restano modificabili |
+| Profilo di qualità | solo all'aggiunta: dà al titolo qualità, audio minimo, lingua, sottotitoli, esclusioni e «Niente upgrade» del profilo (vedi *Profili di qualità*); nella scheda del titolo i singoli valori si possono poi cambiare |
 | Qualità | restringe le release accettabili e partecipa allo score |
 | Audio minimo | preset che include già i canali: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Qualsiasi** non impone nulla ed è il default, anche per le serie già caricate |
 | Lingua | richiede la lingua configurata quando è riconoscibile nel titolo |
@@ -1212,8 +1214,8 @@ profilo è **Default**.
 **I profili sono modelli, non regole.** Quando usi un profilo (scegliendolo nel
 campo **Profilo di qualità** del modulo di aggiunta di una serie o di un film, da
 Jellyseerr o da *Modifica selezionati* nelle tabelle Serie TV e Film), Gextto
-**copia** i suoi valori nel titolo; nel modulo di aggiunta li vedi comparire nei
-campi e puoi ancora cambiarli prima di confermare; da quel
+**copia** i suoi valori nel titolo (le esclusioni scritte nel modulo di aggiunta
+si sommano a quelle del profilo); da quel
 momento a decidere sono i campi del titolo, come sempre. Se poi cambi il
 profilo, i titoli già creati non cambiano: per aggiornarne molti insieme usa
 *Modifica selezionati* nelle tabelle Serie TV e Film. A Gextto non serve una gestione "alla

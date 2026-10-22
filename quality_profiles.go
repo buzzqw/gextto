@@ -130,6 +130,37 @@ func ensureQualityProfiles(s *AppState) []QualityProfile {
 	return profiles
 }
 
+// applyQualityProfileToAdd gives a title being added the values of profile:
+// the profile decides quality, audio, language, subtitles and upgrades, and
+// the title's own exclusions are added to the profile's ones.
+func applyQualityProfileToAdd(input *TmdbAddInput, profile QualityProfile) {
+	input.Quality = profile.Quality
+	input.Audio = profile.Audio
+	input.AudioChannels = ""
+	input.Language = profile.Language
+	input.Subtitle = profile.Subtitle
+	input.DisableUpgrades = profile.DisableUpgrades
+	input.Exclude = mergeExclusions(profile.Exclude, input.Exclude)
+}
+
+// mergeExclusions joins comma-separated exclusion lists, dropping empty and
+// repeated words (case-insensitive) and keeping the first spelling.
+func mergeExclusions(lists ...string) string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, list := range lists {
+		for _, word := range strings.Split(list, ",") {
+			word = strings.TrimSpace(word)
+			if word == "" || seen[strings.ToLower(word)] {
+				continue
+			}
+			seen[strings.ToLower(word)] = true
+			out = append(out, word)
+		}
+	}
+	return strings.Join(out, ", ")
+}
+
 // QualityProfilesView is GET /api/quality-profiles.
 func QualityProfilesView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	profiles := ensureQualityProfiles(s)

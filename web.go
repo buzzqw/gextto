@@ -1029,6 +1029,10 @@ type TmdbAddInput struct {
 	SeasonSubfolders bool `json:"season_subfolders"`
 	// DisableUpgrades is «Niente upgrade»: an archived file is never replaced.
 	DisableUpgrades bool `json:"disable_upgrades"`
+	// QualityProfileID, when set, gives the title the quality, audio,
+	// language, subtitles, exclusions and «Niente upgrade» of that profile;
+	// Exclude is then added to the profile's exclusions.
+	QualityProfileID int `json:"quality_profile_id"`
 }
 
 // DiscoverInput is the input of `tmdb_discover`.

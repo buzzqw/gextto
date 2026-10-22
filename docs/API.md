@@ -404,6 +404,11 @@ preset on load.
 
 ### No upgrades and quality profiles
 
+`POST /api/tmdb/add` also accepts `quality_profile_id`: the new title then takes
+`quality`, `audio`, `language`, `subtitle` and `disable_upgrades` from that
+profile, whatever the request says, and `exclude` is added to the profile's
+exclusions.
+
 `POST /api/tmdb/add` and `POST /api/movies/{id}` accept `disable_upgrades`
 (boolean, «Niente upgrade»): a better release never replaces the archived file
 of that title. `POST /api/series/{name}` already accepted it.

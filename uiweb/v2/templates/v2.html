@@ -1235,7 +1235,7 @@
 {{end}}
 
 {{define "v2_list_editor"}}
-<div class="card editor-card">
+<div class="card editor-card" id="v2-editor-{{.Key}}">
   <h3>{{.Title}}</h3>
   {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
   <form method="post" action="/settings/editor-save" hx-post="/settings/editor-save" hx-swap="none" data-v2-track>
@@ -2827,12 +2827,9 @@
     <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="source" value="discover"><input type="hidden" name="redirect" value="{{.Redirect}}">
     <label class="field"><span>Titolo</span><input class="input" name="name" value="{{.Name}}" required></label><label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}"></label>
     <label class="field"><span>TMDB ID</span><input class="input" name="tmdb_id" value="{{.TmdbID}}" required></label><label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}"></label>
-    {{if .Profiles}}<label class="field span-full"><span>Profilo di qualità</span><select class="input" data-v2-profile title="Copia nei campi qui sotto qualità, audio, lingua, sottotitoli, esclusioni e upgrade del profilo; puoi poi cambiarli"><option value="">Nessuno: scegli i valori a mano</option>{{range .Profiles}}<option value="{{.ID}}" data-values="{{.Values}}">{{.Name}}</option>{{end}}</select></label>{{end}}
-    <label class="field"><span>Qualità richiesta</span><select class="input" name="quality">{{template "v2_quality_options" .Quality}}</select></label>{{template "v2_audio_pref_field" .}}<label class="field"><span>Lingue</span><select class="input" name="language">{{template "v2_language_options" .Language}}</select></label>
-    <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
+    <label class="field span-full"><span>Profilo di qualità</span><select class="input" name="quality_profile_id" required title="Qualità, audio minimo, lingua, sottotitoli, esclusioni e upgrade del nuovo titolo vengono da questo profilo">{{range .Profiles}}<option value="{{.ID}}"{{if .Selected}} selected{{end}}>{{.Name}} — {{.Summary}}</option>{{end}}</select><small class="hint"><span>Qualità, audio, lingua, sottotitoli, esclusioni e upgrade vengono dal profilo; dopo l'aggiunta si possono cambiare nella scheda del titolo.</span> <a href="/?view=settings&amp;tab=scores#v2-editor-quality_profiles">Gestisci i profili</a></small></label>
     {{if eq .Kind "series"}}<label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}"></label><label class="field"><span>Alias</span><input class="input" name="aliases"></label><label class="field span-full"><span>Percorso NAS</span><span class="field-row"><input class="input" name="archive_path" data-v2-browse-input value="{{.ArchivePath}}"{{if .ArchivePath}} readonly{{end}}><button class="btn sm" type="button" data-v2-browse-for="archive_path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label><label class="check"><input type="checkbox" name="create_folder" value="1" data-v2-create-folder{{if .ArchivePath}} checked{{end}} /> <span>Crea cartella</span></label><label class="check" title="Archivia gli episodi in una cartella Stagione 01, Stagione 02, … dentro la cartella archivio della serie"><input type="checkbox" name="season_subfolders" value="1" /> <span>Sottocartelle per stagione</span></label>{{end}}
-    <label class="field span-full"><span>Esclusioni</span><input class="input" name="exclude" value="{{.Exclude}}" placeholder="cam, ts"></label>
-    <label class="check" title="Una release migliore non sostituirà un file già archiviato di questo titolo."><input type="checkbox" name="disable_upgrades" value="true"{{if .DisableUpgrades}} checked{{end}} /> <span>Niente upgrade</span></label>
+    <label class="field span-full"><span>Esclusioni in più (solo per questo titolo)</span><input class="input" name="exclude" value="{{.Exclude}}" placeholder="es. un altro titolo con lo stesso nome" title="Parole che scartano una release di questo titolo, aggiunte a quelle del profilo"></label>
     <div class="form-actions"><button class="btn primary" type="submit">Conferma</button><small id="v2-tmdb-add-result" class="muted" role="alert" aria-live="assertive"></small></div>
   </form></div>
 </div></div>

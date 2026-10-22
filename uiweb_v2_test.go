@@ -2425,27 +2425,39 @@ func TestV2ScoreTestScoresAReleaseAndComparesTheLibrary(t *testing.T) {
 
 func TestV2AddFormOffersProfilesAndStoresNoUpgrades(t *testing.T) {
 	state := newTestAppState(t)
-	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey, `[{"id":1,"name":"Archivio 4K","quality":"2160p","audio":"lossless-5.1","disable_upgrades":true}]`); err != nil {
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey, `[{"id":1,"name":"Default","language":"ita"},{"id":2,"name":"Archivio 4K","quality":"2160p","audio":"lossless-5.1","language":"eng","subtitle":"ita","exclude":"cam, ts","disable_upgrades":true}]`); err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
+	// The add form asks only for the profile: no second quality or language
+	// that could disagree with it.
 	code, body := v2Request(t, server, http.MethodGet, "/tmdb/manual?kind=movie&name=Film", nil)
-	if code != http.StatusOK || !strings.Contains(body, "data-v2-profile") || !strings.Contains(body, "Archivio 4K") || !strings.Contains(body, "lossless-5.1") {
+	if code != http.StatusOK || !strings.Contains(body, `name="quality_profile_id"`) || !strings.Contains(body, "Archivio 4K") {
 		t.Fatalf("add form must offer the quality profiles: %d %s", code, body)
 	}
-	form := url.Values{"kind": {"movie"}, "name": {"Film Senza Upgrade"}, "year": {"2020"}, "tmdb_id": {"77"}, "disable_upgrades": {"true"}}
+	for _, field := range []string{`name="quality"`, `name="language"`, `name="subtitle"`, `name="audio"`, `name="disable_upgrades"`} {
+		if strings.Contains(body, field) {
+			t.Fatalf("the add form still has %s next to the profile", field)
+		}
+	}
+	form := url.Values{"kind": {"movie"}, "name": {"Film Senza Upgrade"}, "year": {"2020"}, "tmdb_id": {"77"},
+		"quality_profile_id": {"2"}, "exclude": {"Accidental Partners, CAM"}}
 	if code, body := v2Request(t, server, http.MethodPost, "/tmdb/add", form); code != http.StatusOK && code != http.StatusNoContent {
 		t.Fatalf("movie add -> %d: %s", code, body)
 	}
 	var movieID int64
 	for _, movie := range latestConfig(state).Movies {
-		if movie.Name == "Film Senza Upgrade" {
-			if !movie.DisableUpgrades {
-				t.Fatal("«Niente upgrade» was not stored on the new movie")
-			}
-			movieID = movie.ID
+		if movie.Name != "Film Senza Upgrade" {
+			continue
+		}
+		movieID = movie.ID
+		if movie.Quality != "2160p" || movie.Audio != "lossless-5.1" || movie.Language != "eng" || movie.Subtitle != "ita" || !movie.DisableUpgrades {
+			t.Fatalf("the profile did not decide the new movie: %+v", movie)
+		}
+		if movie.Exclude != "cam, ts, Accidental Partners" {
+			t.Fatalf("exclusions = %q, want the profile's plus the title's", movie.Exclude)
 		}
 	}
 	if movieID == 0 {

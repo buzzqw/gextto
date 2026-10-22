@@ -1553,6 +1553,9 @@ func TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "TMDB item is incomplete")
 		return
 	}
+	if input.QualityProfileID > 0 {
+		applyQualityProfileToAdd(&input, qualityProfileByID(ensureQualityProfiles(s), input.QualityProfileID))
+	}
 	cfg, err := LoadConfig(s.config_path)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
