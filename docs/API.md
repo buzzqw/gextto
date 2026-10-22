@@ -109,6 +109,7 @@ change. `/ui` is not served. For operational checks use
 | GET | `/api/v3/queue` | v3 queue (the torrent session) |
 | GET | `/api/import/preview` | manual import: the video files of a path with their match and destination (?path=) |
 | POST | `/api/import` | manual import: rename, move and register one file |
+| POST | `/series/gaps/search` | Series → Missing tab: search every missing episode of one series (form field series) and show the outcome |
 | GET | `/library/bulk/profile` | Series/Movies "Edit selected" panel: the value fields filled from a quality profile (?profile=ID&view=) |
 | POST | `/library/bulk` | Series/Movies "Edit selected" panel: apply the ticked values to the ticked rows |
 | GET | `/import/preview` | manual import page: preview fragment |

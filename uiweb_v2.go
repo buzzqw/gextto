@@ -726,7 +726,9 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 		return "v2_license", uiLicenseData{Text: uiLicenseText, ThirdParty: uiThirdPartyText}
 	case "movies":
 		return "v2_movies", v2MovieLibraryViewFrom(s, r)
-	case "series", "gaps", "archive", "blocklist", "maintenance", "integrations":
+	case "series":
+		return "v2_series_page", v2SeriesPageFrom(s, r)
+	case "archive", "blocklist", "maintenance", "integrations":
 		return "v2_panels_page", v2PanelsViewFrom(s, r, view)
 	case "search":
 		return "v2_search", v2SearchView{}
@@ -759,6 +761,12 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// redirect, while the menu links straight to GitHub.
 	if view == "manual" {
 		http.Redirect(w, r, manualOnlineHref(s), http.StatusSeeOther)
+		return
+	}
+	// The missing episodes are a tab of the Series page: the old page
+	// address keeps working.
+	if view == "gaps" {
+		http.Redirect(w, r, "/?view=series&tab=gaps", http.StatusSeeOther)
 		return
 	}
 	body, content := v2Content(s, r, view)

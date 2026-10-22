@@ -654,6 +654,20 @@ reactivating them makes them candidates again in later cycles.
 
 ### Missing episodes and packs
 
+Every aired episode that is not in the library is in the **Missing** tab of
+**Series** (next to *Monitored series*; the number says how many). They are
+grouped by series, each one collapsible, with a line per season and the
+episodes as buttons (`S04E03`):
+
+- **a click on an episode** searches it and opens the results, first from the
+  local archive and then online, each with **Download**;
+- **Search missing** searches every missing episode of that series and, when
+  the search ends, writes next to it how many results it found; a click on the
+  episodes then shows them;
+- **Filter by series** shows only the series containing the typed text.
+
+The old address of the *Missing* page leads to this tab.
+
 From **Search missing** or an episode detail:
 
 1. check that the season is monitored;

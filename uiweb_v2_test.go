@@ -944,7 +944,8 @@ func TestV2LibraryPagesKeepTheirPanelFlows(t *testing.T) {
 	wants := map[string][]string{
 		"series":  {"Aggiungi una serie", "Serie monitorate"},
 		"movies":  {"Aggiungi un film", "Film monitorati"},
-		"gaps":    {"Cerca un episodio mancante", "Episodi mancanti"},
+		// The old Missing page leads to the Missing tab of the Series page.
+		"gaps": {"Puntate mancanti", "Filtra per serie", `aria-selected="true" href="/?view=series&amp;tab=gaps"`},
 		"archive": {"Aggiungi all&#39;archivio", "Cerca anche nel web", "archive-search-input", "gexttoArchiveLiveAllowed"},
 	}
 	for view, markers := range wants {

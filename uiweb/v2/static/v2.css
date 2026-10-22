@@ -2240,3 +2240,13 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 
 /* Video files in the server picker (manual import): after the folders. */
 .path-item.path-file { color: var(--accent); }
+
+/* Series → Missing tab: one collapsible block per series, one line per
+   season, the episodes as small buttons that open the search window. */
+.v2-gap-series { border-top: 1px solid var(--line-soft); padding: 8px 0; }
+.v2-gap-series > summary { cursor: pointer; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 36px; }
+.v2-gap-body { display: flex; flex-direction: column; gap: 8px; padding: 6px 0 4px 18px; }
+.v2-gap-season { display: flex; align-items: flex-start; gap: 10px; }
+.v2-gap-season-label { flex: none; min-width: 92px; padding-top: 6px; color: var(--muted); font-size: 0.86rem; }
+.v2-gap-episodes { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2-gap-ep { cursor: pointer; font-variant-numeric: tabular-nums; }

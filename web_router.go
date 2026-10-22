@@ -41,6 +41,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/import", ManualImportAPI)
 	handle(s, mux, "GET /import/preview", V2ImportPreview)
 	handle(s, mux, "POST /import/apply", V2ImportApply)
+	handle(s, mux, "POST /series/gaps/search", V2SeriesGapsSearch)
 	handle(s, mux, "GET /library/bulk/profile", V2LibraryBulkProfile)
 	handle(s, mux, "POST /library/bulk", V2LibraryBulkApply)
 	// The Sonarr/Radarr v3 subset a request manager (Jellyseerr) speaks.

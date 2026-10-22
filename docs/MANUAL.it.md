@@ -670,6 +670,20 @@ che non vuoi più cercare: riattivandoli tornano candidati nei cicli successivi.
 
 ### Episodi mancanti e pack
 
+Tutte le puntate già uscite che non sono in libreria sono nella scheda
+**Mancanti** di **Serie TV** (accanto a *Serie monitorate*; il numero dice
+quante sono). Sono raggruppate per serie, ognuna richiudibile, con una riga per
+stagione e le puntate come pulsanti (`S04E03`):
+
+- **un clic su una puntata** la cerca e apre i risultati, prima dall'archivio
+  locale e poi online, ognuno con **Scarica**;
+- **Cerca mancanti** cerca tutte le puntate mancanti di quella serie e, finita
+  la ricerca, scrive accanto quanti risultati ha trovato; poi un clic sulle
+  puntate li mostra;
+- **Filtra per serie** mostra solo le serie che contengono il testo scritto.
+
+Il vecchio indirizzo della pagina *Mancanti* porta a questa scheda.
+
 Da **Cerca mancanti** o dalla scheda episodio:
 
 1. controlla che la stagione sia monitorata;

@@ -49,6 +49,12 @@ manual is online: [English](docs/MANUAL.en.md) ·
   **Edit selected** and change quality, language, subtitles, exclusions,
   upgrades or state on all of them. You can start from a profile's values.
   Everything else in each title is left alone.
+- **Missing becomes a tab of Series, grouped by series.** Instead of a list of
+  episodes one under another, the **Missing** tab of Series shows a block per
+  series with a line per season and the episodes as buttons. A click on an
+  episode opens the results to download; **Search missing** shows it is working
+  and writes the outcome next to the series (before, a click on Search gave no
+  feedback). There is a series filter; the Missing menu entry is gone.
 - **Sources that do not answer: the log now says which and why.** The
   end-of-search warning only said "1 indexer". It now names every source that
   failed, how many of its searches failed and the last error, for example

@@ -861,30 +861,56 @@ func DownloadTagsList(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // Gaps implements `gaps`.
 func Gaps(w http.ResponseWriter, r *http.Request, s *AppState) {
-	items, err := s.db.ArchiveGaps()
+	gaps, err := libraryGaps(s)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	result := []map[string]any{}
+	for _, gap := range gaps {
+		result = append(result, map[string]any{
+			"series":   gap.Series,
+			"season":   gap.Season,
+			"episode":  gap.Episode,
+			"air_date": gap.AirDate,
+			"aliases":  gap.Aliases,
+		})
+	}
+	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "count": len(result), "items": result})
+}
+
+// libraryGap is one missing episode of a monitored series.
+type libraryGap struct {
+	Series  string
+	Season  int64
+	Episode int64
+	AirDate string
+	Aliases []string
+}
+
+// libraryGaps lists the missing episodes of the monitored series: the API
+// (GET /api/gaps) and the Missing tab of the Series page read the same list.
+func libraryGaps(s *AppState) ([]libraryGap, error) {
+	items, err := s.db.ArchiveGaps()
+	if err != nil {
+		return nil, err
+	}
 	cfg := latestConfig(s)
 	airDates, _ := s.db.EpisodeAirDates()
-	result := []map[string]any{}
+	result := []libraryGap{}
 	for _, gap := range items {
 		season := gap.Season
 		series := cfg.FindSeriesMatch(gap.Series, &season)
 		if series == nil {
 			continue
 		}
-		airDate := airDates[airDateKey{Series: gap.Series, Season: gap.Season, Episode: gap.Episode}]
-		result = append(result, map[string]any{
-			"series":   gap.Series,
-			"season":   gap.Season,
-			"episode":  gap.Episode,
-			"air_date": airDate,
-			"aliases":  series.Aliases,
+		result = append(result, libraryGap{
+			Series: gap.Series, Season: gap.Season, Episode: gap.Episode,
+			AirDate: airDates[airDateKey{Series: gap.Series, Season: gap.Season, Episode: gap.Episode}],
+			Aliases: series.Aliases,
 		})
 	}
-	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "count": len(result), "items": result})
+	return result, nil
 }
 
 // MarkTorrentFailed implements `mark_torrent_failed`.

@@ -553,3 +553,11 @@ test("la tabella delle serie modifica le righe selezionate", async ({ page }) =>
   await expect(page.getByRole("button", { name: "Applica ai titoli selezionati" })).toBeVisible();
   await expect(page.locator('input[name="set_quality"]')).toBeVisible();
 });
+
+test("Serie TV ha la scheda Mancanti al posto della pagina separata", async ({ page }) => {
+  await page.goto("/?view=gaps");
+  await expect(page).toHaveURL(/view=series&tab=gaps/);
+  await expect(page.getByRole("tab", { name: /Mancanti/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Puntate mancanti" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Filtra per serie" })).toBeVisible();
+});

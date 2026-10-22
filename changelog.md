@@ -51,6 +51,13 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   apri **Modifica selezionati** e cambi qualità, lingua, sottotitoli,
   esclusioni, upgrade o stato su tutte insieme. Puoi partire dai valori di un
   profilo. Tutto il resto di ogni titolo non viene toccato.
+- **Mancanti diventa una scheda di Serie TV, raggruppata per serie.** Al posto
+  dell'elenco di puntate una sotto l'altra, la scheda **Mancanti** di Serie TV
+  mostra un blocco per serie con una riga per stagione e le puntate come
+  pulsanti. Un clic su una puntata apre i risultati da scaricare; **Cerca
+  mancanti** mostra mentre lavora e scrive l'esito accanto alla serie (prima un
+  clic su Cerca non dava nessun riscontro). C'è un filtro per serie; la voce di
+  menu Mancanti non c'è più.
 - **Sorgenti che non rispondono: ora il log dice quale e perché.** L'avviso
   di fine ricerca diceva solo «1 indexer». Ora nomina ogni sorgente che ha
   fallito, quante ricerche su quante e l'ultimo errore, ad esempio «indexer

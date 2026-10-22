@@ -149,6 +149,7 @@
        {{else if eq .Body "v2_ed2k"}}{{template "v2_ed2k" .Content}}
        {{else if eq .Body "v2_table_page"}}{{template "v2_table_panel" .Content}}
        {{else if eq .Body "v2_panels_page"}}{{template "v2_panels_page" .Content}}
+		{{else if eq .Body "v2_series_page"}}{{template "v2_series_page" .Content}}
 		{{else if eq .Body "v2_movies"}}{{template "v2_movies" .Content}}
        {{else if eq .Body "v2_search"}}{{template "v2_search" .Content}}
       {{else if eq .Body "v2_setup"}}{{template "v2_setup" .Content}}
