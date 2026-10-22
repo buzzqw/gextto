@@ -63,7 +63,9 @@
   // picks a folder instead of typing it. Any <button class="browse"
   // data-target="fieldId"> opens it and writes the chosen path back into that
   // field; with data-append the field is a list (one path per line, ";" also
-  // accepted) and the path is added to it instead of replacing it. It is a native dialog, so it stacks
+  // accepted) and the path is added to it instead of replacing it. A button
+  // with data-path proposes that fixed path without opening the dialog (the
+  // DLNA "Download folder" shortcut). It is a native dialog, so it stacks
   // above an already open modal (the add-torrent form) that a plain overlay
   // could not.
   (function () {
