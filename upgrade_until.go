@@ -14,10 +14,7 @@ import "github.com/buzzqw/gextto/internal/models"
 // swarm health are part of the release score but never justify replacing a
 // copy of the same quality on their own.
 func upgradeReasonUntil(candidate, existing *models.Quality, newScore, oldScore, minScoreDiff, until int64, settings map[string]string) string {
-	reason := candidate.UpgradeReason(existing, newScore, oldScore, minScoreDiff)
-	if reason == "score" && !technicalScoreGain(candidate, existing, minScoreDiff, settings) {
-		return ""
-	}
+	reason := upgradeReasonWith(candidate, existing, newScore, oldScore, minScoreDiff, settings)
 	if reason == "" || !upgradeCutoffReached(oldScore, until) {
 		return reason
 	}
@@ -25,6 +22,40 @@ func upgradeReasonUntil(candidate, existing *models.Quality, newScore, oldScore,
 		return reason
 	}
 	return ""
+}
+
+// upgradeReasonWith is Quality.UpgradeReason read with the configured weights
+// (nil = the defaults). The WEB-DL-over-WEBRip/HDTV rule holds only while the
+// configured source weight of the candidate is higher: whoever weighs WEB-DL
+// and WEBRip the same treats them as the same quality, and the candidate is
+// then judged as if it had the archived copy's source (HDR, a resolution step
+// or a REPACK still count). A "score" upgrade must also be a technical gain.
+func upgradeReasonWith(candidate, existing *models.Quality, newScore, oldScore, minScoreDiff int64, settings map[string]string) string {
+	reason := sourceAwareUpgradeReason(candidate, existing, newScore, oldScore, minScoreDiff, settings)
+	if reason == "score" && !technicalScoreGain(candidate, existing, minScoreDiff, settings) {
+		return ""
+	}
+	return reason
+}
+
+// sourceAwareUpgradeReason is the source part of upgradeReasonWith alone. The
+// cleaner uses it after the download: the incoming file is often already
+// renamed without quality tags, so only the decision before the download can
+// judge the technical gain.
+func sourceAwareUpgradeReason(candidate, existing *models.Quality, newScore, oldScore, minScoreDiff int64, settings map[string]string) string {
+	reason := candidate.UpgradeReason(existing, newScore, oldScore, minScoreDiff)
+	if reason == "source" && sourceWeight(candidate.Source, settings) <= sourceWeight(existing.Source, settings) {
+		sameSource := *candidate
+		sameSource.Source = existing.Source
+		reason = sameSource.UpgradeReason(existing, newScore, oldScore, minScoreDiff)
+	}
+	return reason
+}
+
+// sourceWeight is the configured score of a release source alone.
+func sourceWeight(source string, settings map[string]string) int64 {
+	quality := models.Quality{Source: source}
+	return ScoreQuality(&quality, settings)
 }
 
 // technicalScoreGain reports whether the quality alone (resolution, source,

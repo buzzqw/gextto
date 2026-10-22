@@ -1962,6 +1962,12 @@ more. File size, subtitles and swarm health help choose between equivalent
 releases, but on their own they never re-download an episode or a movie of the
 same quality.
 
+The rule that prefers a WEB-DL source to a WEBRip or HDTV one follows the
+weights too: it holds only while the WEB-DL **Source** weight is higher. Give
+WEB-DL and WEBRip the same weight and Gextto treats them as the same quality: a
+WEB-DL no longer replaces a WEBRip (HDR, resolution, REPACK/PROPER and the score
+still count).
+
 **Upgrades and replacement**
 
 | Setting | What it does |

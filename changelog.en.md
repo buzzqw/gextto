@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **WEB-DL and WEBRip: you decide whether they are the same quality.** The rule that always replaced a WEBRip or HDTV with a WEB-DL now follows the **Source** weights of *Quality and upgrades*: when WEB-DL and WEBRip weigh the same, a WEB-DL no longer replaces a WEBRip already in the library. HDR, a higher resolution, REPACK/PROPER and a score better by at least the minimum difference still count.
+
 - **Quality and upgrades: check the impact before re-downloading.** The new **Impact on the library** panel replays the releases already seen in the feeds with the current rules and weights and says how many archived episodes the next cycles would replace, with a few examples, without downloading anything. Use it after changing weights or thresholds: if the number is high, review the change before a mass re-download starts. The result turns into a warning above 5% of the archived episodes.
 
 - **Adding series and movies: profiles and "No upgrades".** The add form has a new **Quality profile** field: choosing a profile copies quality, minimum audio, language, subtitles, exclusions and **No upgrades** into the fields, where they can still be changed before confirming. The fields now offer the same choices as the edit form (every resolution and range, subtitles from a list). **No upgrades** can be set right when adding, and in the movie edit form too. Quality profiles gain two fields, **Minimum audio** and **No upgrades**, which are also applied to titles added from Jellyseerr and with **Edit selected**, where the minimum audio of several titles can now be changed at once. Also fixed an error that could occasionally reject a form save on the detail pages (for example a yes/no switch).

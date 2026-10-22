@@ -149,3 +149,23 @@ func TestSeriesSameQualityIsNotAnUpgradeBecauseOfSize(t *testing.T) {
 		t.Fatalf("a same-quality release must not replace the archived episode (reason %q)", reason)
 	}
 }
+
+func TestSourceRuleFollowsTheConfiguredSourceWeights(t *testing.T) {
+	webrip := models.Quality{Resolution: "1080p", Source: "webrip", Codec: "h265", Audio: "aac"}
+	webdl := models.Quality{Resolution: "1080p", Source: "webdl", Codec: "h264", Audio: "ddp"}
+	// Default weights: WEB-DL (200) is above WEBRip (150), the rule applies.
+	if got := upgradeReasonUntil(&webdl, &webrip, 1350, 1266, 200, 0, nil); got != "source" {
+		t.Fatalf("default weights: got %q, want source", got)
+	}
+	// The same weight for both: same quality, no upgrade.
+	same := map[string]string{"score_source_webrip": "200"}
+	if got := upgradeReasonUntil(&webdl, &webrip, 1350, 1266, 200, 0, same); got != "" {
+		t.Fatalf("equal source weights: got %q, want no upgrade", got)
+	}
+	// Other gains still count: an HDR WEB-DL is an HDR upgrade.
+	hdr := webdl
+	hdr.HDR = "HDR10"
+	if got := upgradeReasonUntil(&hdr, &webrip, 1450, 1266, 200, 0, same); got != "hdr" {
+		t.Fatalf("HDR WEB-DL over WEBRip with equal sources: got %q, want hdr", got)
+	}
+}

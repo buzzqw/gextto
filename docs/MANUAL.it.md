@@ -2035,6 +2035,12 @@ almeno la differenza minima in più. Dimensione del file, sottotitoli e salute
 dello swarm aiutano a scegliere tra release equivalenti, ma da soli non fanno
 mai riscaricare un episodio o un film della stessa qualità.
 
+Anche la regola che preferisce una sorgente WEB-DL a un WEBRip o un HDTV segue i
+pesi: vale solo finché il peso **Sorgente** del WEB-DL è più alto. Se dai a
+WEB-DL e WEBRip lo stesso peso, per Gextto sono la stessa qualità e un WEB-DL non
+sostituisce più un WEBRip (restano validi HDR, risoluzione, REPACK/PROPER e il
+punteggio).
+
 **Upgrade e sostituzione**
 
 | Impostazione | Cosa fa |
