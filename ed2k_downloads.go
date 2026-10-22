@@ -363,9 +363,18 @@ func (s ed2kSession) Pause(hash string) (bool, error) {
 	return true, Ed2kDownloadAction(s.cfg, "pause", hash)
 }
 
-// ImportCompletedByCopy reports that aMule cannot relocate a finished file:
-// a completed download is imported by link or copy, never by a storage move.
-func (ed2kSession) ImportCompletedByCopy() bool { return true }
+// ImportCompletedByCopy reports the configured copy mode for aMule: copy and
+// hardlink keep the source in the incoming folder for sharing. In move mode it
+// returns false and MoveCompletedImmediately moves the source at completion.
+func (s ed2kSession) ImportCompletedByCopy() bool {
+	return !settingsBool(s.cfg, "move_episodes", false)
+}
+
+// MoveCompletedImmediately reports that aMule cannot defer a storage move to
+// the end of a seed: eD2k has no seed policy controlled by Gextto, so with
+// move mode on the source is moved when the download completes. With copy
+// mode off, the source stays in aMule's incoming folder and keeps being shared.
+func (ed2kSession) MoveCompletedImmediately() bool { return true }
 
 func (s ed2kSession) Resume(hash string) (bool, error) {
 	return true, Ed2kDownloadAction(s.cfg, "resume", hash)
@@ -379,20 +388,6 @@ func (s ed2kSession) Remove(hash string, deleteFiles bool) (bool, error) {
 		return false, err
 	}
 	return true, nil
-}
-
-// ed2kImportConfig is the configuration the completion handler uses for an
-// eD2k file: the episode is always imported by link or copy, never moved, so
-// aMule keeps sharing the original from its incoming folder (a hardlink costs
-// no extra space when library and incoming folder share a filesystem).
-func ed2kImportConfig(cfg *Config) *Config {
-	copy := *cfg
-	copy.Settings = make(map[string]string, len(cfg.Settings)+1)
-	for key, value := range cfg.Settings {
-		copy.Settings[key] = value
-	}
-	copy.Settings["move_episodes"] = "false"
-	return &copy
 }
 
 // ed2kStallDays is how long an automatically chosen eD2k download may go

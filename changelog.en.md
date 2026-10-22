@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **eD2k respects move/copy.** Downloads completed by aMule also follow the **Move episodes/packs into the archive** option: when it is on the file is moved into the library and removed from the incoming folder (aMule stops sharing it); when it is off the file is copied or linked and stays in the incoming folder for sharing. For eD2k the move happens at completion, because seeding is managed by aMule and Gextto has no end-of-seed moment to wait for.
+
 - **Docker: the whole stack in one command.** The new `docker-full/docker-compose.yml` starts Gextto with `gx-torrent`, Jackett, Prowlarr, FlareSolverr and aMule, with folders, ports and permissions already laid out. The image builds Gextto and `gx-torrent` from the checkout; the Italian and English guides cover first configuration, indexers, eD2k, updating, backup and troubleshooting. The client identity was verified with real qBittorrent 5.3.0 and Transmission 4.1.3 in Docker: they see `gx-core 1.1.252` by default and `qBittorrent 5.2.3` with the preset.
 
 ## 21 October 2026

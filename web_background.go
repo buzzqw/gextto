@@ -1250,7 +1250,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			cfg := cfg
 			if _, isEd2k := ed2kHashes[strings.ToLower(hash)]; isEd2k {
 				torrents = ed2kFiles
-				cfg = ed2kImportConfig(cfg)
 			}
 			if event.Kind == "torrent_finished" || event.Kind == "storage_moved" {
 				completionSeen = true

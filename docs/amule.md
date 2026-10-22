@@ -191,9 +191,12 @@ trash, or deleted according to the cleanup action) and never copied.
 
 aMule 2.3 keeps a finished file in its download queue; aMule 3.x drops it at
 once, so Gextto finds it among the shared files, also after a restart. eD2k
-episodes are always imported by **hardlink or copy** (never moved), so aMule
-keeps sharing the original from its incoming folder; a hardlink costs no extra
-space when both folders are on the same filesystem.
+episodes and movies follow the **Move episodes/packs into the archive** option: when it is
+on they are moved into the library and removed from the incoming folder (aMule
+stops sharing them); when it is off they are imported by **hardlink or copy**
+and aMule keeps sharing the original. For eD2k the move happens at completion,
+because seeding is managed by aMule; a hardlink costs no extra space when both
+folders are on the same filesystem.
 
 Notifications use the same events as torrents: **Download started** when Gextto
 itself picks a result (the automatic eD2k fallback included), **Download
