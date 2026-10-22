@@ -914,7 +914,9 @@ function renderVirtual(force){
     offset=window.scrollY-(tb.getBoundingClientRect().top+window.scrollY);
   }
   var start=Math.max(0,Math.floor(offset/rowH)-15);
+  if(start>view.length)start=view.length;
   var end=Math.min(view.length,Math.ceil((offset+viewHeight)/rowH)+15);
+  if(end<start)end=start;
   if(end-start<40)end=Math.min(view.length,start+40);
   if(!force&&start===state.winStart&&end===state.winEnd&&view.length===state.winLen)return;
   var cols=$$('#torrents thead th').length||1;
