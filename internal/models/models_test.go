@@ -17,9 +17,9 @@ func TestQualityScoreBreakdownSumsToTotal(t *testing.T) {
 	if total != quality.Score() {
 		t.Fatalf("breakdown %d != score %d", total, quality.Score())
 	}
-	// 1080p + webdl + h264 + aac + HDR = 1000 + 200 + 50 + 30 + 100
-	if quality.Score() != 1380 {
-		t.Fatalf("score = %d, want 1380", quality.Score())
+	// 1080p + webdl + h264 + aac + HDR = 1000 + 200 + 50 + 40 + 100
+	if quality.Score() != 1390 {
+		t.Fatalf("score = %d, want 1390", quality.Score())
 	}
 }
 
@@ -72,7 +72,7 @@ func TestMissingArchivedSourceDoesNotCreateUpgrade(t *testing.T) {
 func TestScoreWithSettingsOverrides(t *testing.T) {
 	quality := Quality{Codec: "h265", Audio: "aac"}
 	settings := map[string]string{"score_codec_h265": "500", "score_audio_aac": "100"}
-	if got := quality.ScoreWithSettings(settings); got != quality.Score()+300+70 {
+	if got := quality.ScoreWithSettings(settings); got != quality.Score()+300+60 {
 		t.Fatalf("score with settings = %d", got)
 	}
 }
@@ -136,7 +136,7 @@ func TestScoreSettingsUseOneKeyPerToken(t *testing.T) {
 	// Legacy alias keys (x265, eac3, ...) are no longer read: each parsed token
 	// has exactly one configurable key.
 	h265 := Quality{Codec: "h265", Audio: "ddp"}
-	if got, want := h265.ScoreWithSettings(map[string]string{"score_codec_h265": "500"}), int64(580); got != want {
+	if got, want := h265.ScoreWithSettings(map[string]string{"score_codec_h265": "500"}), int64(590); got != want {
 		t.Fatalf("canonical codec score = %d, want %d", got, want)
 	}
 	if got, want := h265.ScoreWithSettings(map[string]string{"score_codec_x265": "999"}), h265.Score(); got != want {
@@ -151,8 +151,8 @@ func TestScoreSettingsUseOneKeyPerToken(t *testing.T) {
 		t.Fatalf("ac3 score = %d, want %d", got, want)
 	}
 	fiveOne := Quality{Audio: "5.1"}
-	if got, want := fiveOne.ScoreWithSettings(map[string]string{"score_audio_5.1": "77"}), int64(77); got != want {
-		t.Fatalf("5.1 score = %d, want %d", got, want)
+	if got, want := fiveOne.ScoreWithSettings(map[string]string{"score_audio_5.1": "77"}), int64(87); got != want {
+		t.Fatalf("5.1 score = %d, want %d (codec plus channel bonus)", got, want)
 	}
 }
 
@@ -198,5 +198,45 @@ func TestAudioDowngradeCannotWinThroughScoreAlone(t *testing.T) {
 	betterOld.Audio = "ac3"
 	if got := better.UpgradeReason(&betterOld, 1250, 1200, 0); got == "" {
 		t.Fatal("a higher-ranked audio codec should still be able to win")
+	}
+}
+
+func TestAudioGroupsAndChannelFactor(t *testing.T) {
+	cases := []struct {
+		name     string
+		quality  Quality
+		wantTier int
+		want     int64
+	}{
+		{"TrueHD 5.1", Quality{Audio: "truehd", AudioChannels: "5.1"}, 5, 160},
+		{"DTS-HD MA 5.1", Quality{Audio: "dts-hd", AudioChannels: "5.1"}, 5, 160},
+		{"DTS-HD HRA 5.1", Quality{Audio: "dts-hd-hra", AudioChannels: "5.1"}, 4, 130},
+		{"DTS 5.1", Quality{Audio: "dts", AudioChannels: "5.1"}, 4, 100},
+		{"DDP 5.1", Quality{Audio: "ddp", AudioChannels: "5.1"}, 4, 100},
+		{"AC3 5.1", Quality{Audio: "ac3", AudioChannels: "5.1"}, 3, 60},
+		{"bare 5.1", Quality{Audio: "5.1", AudioChannels: "5.1"}, 3, 60},
+		{"AAC 5.1", Quality{Audio: "aac", AudioChannels: "5.1"}, 2, 50},
+		{"AAC 2.0", Quality{Audio: "aac", AudioChannels: "2.0"}, 2, 40},
+		{"TrueHD 7.1 Atmos", Quality{Audio: "truehd", AudioChannels: "7.1", AudioObjects: "atmos"}, 5, 190},
+	}
+	for _, tc := range cases {
+		if got := tc.quality.AudioTier(); got != tc.wantTier {
+			t.Errorf("%s tier = %d, want %d", tc.name, got, tc.wantTier)
+		}
+		if got := tc.quality.Score(); got != tc.want {
+			t.Errorf("%s score = %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestAudioRankIncludesChannels(t *testing.T) {
+	fiveOne := Quality{Audio: "ac3", AudioChannels: "5.1"}
+	sevenOne := Quality{Audio: "ac3", AudioChannels: "7.1"}
+	if sevenOne.AudioRank() <= fiveOne.AudioRank() {
+		t.Fatalf("7.1 rank %d should exceed 5.1 rank %d", sevenOne.AudioRank(), fiveOne.AudioRank())
+	}
+	lossless := Quality{Audio: "truehd", AudioChannels: "5.1"}
+	if lossless.AudioRank() <= sevenOne.AudioRank() {
+		t.Fatal("lossless 5.1 should outrank lossy 7.1")
 	}
 }

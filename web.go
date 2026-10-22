@@ -1008,18 +1008,20 @@ type TmdbQuery struct {
 
 // TmdbAddInput is the input of `tmdb_add`.
 type TmdbAddInput struct {
-	Kind        string `json:"kind"`
-	Name        string `json:"name"`
-	Year        string `json:"year"`
-	TmdbId      string `json:"tmdb_id"`
-	TvdbId      string `json:"tvdb_id"`
-	Quality     string `json:"quality"`
-	Language    string `json:"language"`
-	Seasons     string `json:"seasons"`
-	ArchivePath string `json:"archive_path"`
-	Exclude     string `json:"exclude"`
-	Subtitle    string `json:"subtitle"`
-	Aliases     string `json:"aliases"`
+	Kind          string `json:"kind"`
+	Name          string `json:"name"`
+	Year          string `json:"year"`
+	TmdbId        string `json:"tmdb_id"`
+	TvdbId        string `json:"tvdb_id"`
+	Quality       string `json:"quality"`
+	Audio         string `json:"audio"`
+	AudioChannels string `json:"audio_channels"`
+	Language      string `json:"language"`
+	Seasons       string `json:"seasons"`
+	ArchivePath   string `json:"archive_path"`
+	Exclude       string `json:"exclude"`
+	Subtitle      string `json:"subtitle"`
+	Aliases       string `json:"aliases"`
 	// CreateFolder makes the series' archive folder (ArchivePath, or
 	// <archive_root>/<name> when empty) before adding the series.
 	CreateFolder bool `json:"create_folder"`
@@ -1071,17 +1073,19 @@ type SeriesPathInput struct {
 
 // MovieUpdateInput is the input of `update_movie`.
 type MovieUpdateInput struct {
-	Name                 string `json:"name"`
-	Year                 string `json:"year"`
-	Quality              string `json:"quality"`
-	Language             string `json:"language"`
-	Subtitle             string `json:"subtitle"`
-	Exclude              string `json:"exclude"`
-	LanguageRequirements string `json:"language_requirements"`
-	SubtitleRequirements string `json:"subtitle_requirements"`
-	Enabled              *bool  `json:"enabled"`
-	TmdbId               string `json:"tmdb_id"`
-	TvdbId               string `json:"tvdb_id"`
+	Name                 string  `json:"name"`
+	Year                 string  `json:"year"`
+	Quality              string  `json:"quality"`
+	Audio                *string `json:"audio"`
+	AudioChannels        *string `json:"audio_channels"`
+	Language             string  `json:"language"`
+	Subtitle             string  `json:"subtitle"`
+	Exclude              string  `json:"exclude"`
+	LanguageRequirements string  `json:"language_requirements"`
+	SubtitleRequirements string  `json:"subtitle_requirements"`
+	Enabled              *bool   `json:"enabled"`
+	TmdbId               string  `json:"tmdb_id"`
+	TvdbId               string  `json:"tvdb_id"`
 }
 
 // MovieMetadataSearchInput is the input of `movie_metadata_search`.

@@ -169,8 +169,10 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
 ### Finding and choosing releases
 
 - **Quality-aware scoring.** Deterministic scores on quality, source, codec,
-  audio, HDR/Dolby Vision, language and size; higher-grade library files are
-  protected; an optional ceiling stops upgrades. The settings page scores
+  grouped audio (lossless, DTS/DD+, AC3/5.1) with 5.1/7.1 and Atmos/DTS:X
+  factors, HDR/Dolby Vision, language and size; per-title minimum audio and
+  channels; higher-grade library files are protected; an optional ceiling stops
+  upgrades. The settings page scores
   reference releases live with the current weights. `ffprobe` reads the real
   quality of archived media.
 - **TV, movies, comics.** Standard `ComicInfo.xml` for CBZ archives (Komga,

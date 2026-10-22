@@ -1022,3 +1022,107 @@ func TestPrepareDirsReportOnlyRequiresDataAndState(t *testing.T) {
 		t.Fatal("an unavailable data folder must stop the start")
 	}
 }
+
+func TestAudioAllowedUsesMinimumTierAndChannels(t *testing.T) {
+	cases := []struct {
+		name     string
+		quality  models.Quality
+		minAudio string
+		minChans string
+		want     bool
+	}{
+		{"any accepts unknown", models.Quality{}, "", "", true},
+		{"lossless accepts truehd", models.Quality{Audio: "truehd"}, "lossless", "", true},
+		{"lossless accepts dts-hd", models.Quality{Audio: "dts-hd"}, "lossless", "", true},
+		{"lossless rejects hra", models.Quality{Audio: "dts-hd-hra"}, "lossless", "", false},
+		{"lossless rejects ddp", models.Quality{Audio: "ddp"}, "lossless", "", false},
+		{"high accepts dts", models.Quality{Audio: "dts"}, "high", "", true},
+		{"high accepts ddp", models.Quality{Audio: "ddp"}, "high", "", true},
+		{"high rejects ac3", models.Quality{Audio: "ac3"}, "high", "", false},
+		{"standard accepts ac3", models.Quality{Audio: "ac3"}, "standard", "", true},
+		{"standard rejects aac", models.Quality{Audio: "aac"}, "standard", "", false},
+		{"channels 5.1 accepts 5.1", models.Quality{Audio: "ac3", AudioChannels: "5.1"}, "", "5.1", true},
+		{"channels 5.1 accepts 7.1", models.Quality{Audio: "ac3", AudioChannels: "7.1"}, "", "5.1", true},
+		{"channels 7.1 rejects 5.1", models.Quality{Audio: "ac3", AudioChannels: "5.1"}, "", "7.1", false},
+		{"channels 7.1 rejects unknown", models.Quality{Audio: "ac3"}, "", "7.1", false},
+	}
+	for _, tc := range cases {
+		if got := AudioAllowed(&tc.quality, tc.minAudio, tc.minChans); got != tc.want {
+			t.Errorf("%s: allowed = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestSavesAudioPreferencesForSeriesAndMovies(t *testing.T) {
+	dir := t.TempDir()
+	if err := SaveLibrary(dir,
+		[]SeriesConfig{{Name: "Show", Quality: "1080p", Audio: "lossless", AudioChannels: "5.1", Enabled: true}},
+		[]MovieConfig{{Name: "Film", Year: "2024", Audio: "high", AudioChannels: "7.1", Enabled: true}},
+	); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Series) != 1 || cfg.Series[0].Audio != "lossless" || cfg.Series[0].AudioChannels != "5.1" {
+		t.Fatalf("series audio = %#v", cfg.Series)
+	}
+	if len(cfg.Movies) != 1 || cfg.Movies[0].Audio != "high" || cfg.Movies[0].AudioChannels != "7.1" {
+		t.Fatalf("movie audio = %#v", cfg.Movies)
+	}
+}
+
+func TestOldLibraryRowsDefaultToAnyAudio(t *testing.T) {
+	dir := t.TempDir()
+	if err := SaveLibrary(dir, []SeriesConfig{{Name: "Old Show", Enabled: true}}, []MovieConfig{{Name: "Old Film", Year: "1999", Enabled: true}}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Series[0].Audio != "" || cfg.Series[0].AudioChannels != "" {
+		t.Fatalf("old series audio = %#v", cfg.Series[0])
+	}
+	if cfg.Movies[0].Audio != "" || cfg.Movies[0].AudioChannels != "" {
+		t.Fatalf("old movie audio = %#v", cfg.Movies[0])
+	}
+}
+
+func TestMigratesOldAudioScoreDefaults(t *testing.T) {
+	dir := t.TempDir()
+	for key, value := range map[string]string{
+		"score_audio_dts-hd": "120",
+		"score_audio_dts":    "100",
+		"score_audio_ddp":    "80",
+		"score_audio_aac":    "30",
+		"score_audio_truehd": "999", // user override: must survive
+	} {
+		if err := SaveSetting(dir, key, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"score_audio_dts-hd": "150",
+		"score_audio_dts":    "90",
+		"score_audio_ddp":    "90",
+		"score_audio_aac":    "40",
+		"score_audio_truehd": "999",
+	}
+	for key, value := range want {
+		if got := cfg.Settings[key]; got != value {
+			t.Errorf("%s = %q, want %q", key, got, value)
+		}
+	}
+	if cfg.Settings["_audio_score_groups_v1"] != "1" {
+		t.Fatal("audio score migration marker missing")
+	}
+}

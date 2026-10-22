@@ -173,9 +173,10 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
 ### Trovare e scegliere le release
 
 - **Punteggio attento alla qualità.** Punteggi deterministici su qualità,
-  sorgente, codec, audio, HDR/Dolby Vision, lingua e dimensione; i file di
-  libreria di qualità superiore sono protetti; un tetto opzionale ferma gli
-  upgrade. La pagina impostazioni dà il punteggio a release di riferimento con i
+  sorgente, codec, audio raggruppato (lossless, DTS/DD+, AC3/5.1) con fattore
+  5.1/7.1 e Atmos/DTS:X, HDR/Dolby Vision, lingua e dimensione; audio e canali
+  minimi per singolo titolo; i file di libreria di qualità superiore sono
+  protetti; un tetto opzionale ferma gli upgrade. La pagina impostazioni dà il punteggio a release di riferimento con i
   pesi correnti. `ffprobe` legge la qualità reale dei file archiviati.
 - **Serie TV, film, fumetti.** `ComicInfo.xml` standard per gli archivi CBZ
   (Komga, Kavita, lettori).

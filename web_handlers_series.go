@@ -11,6 +11,8 @@ import (
 type SeriesUpdateInput struct {
 	Seasons          *string   `json:"seasons"`
 	Quality          *string   `json:"quality"`
+	Audio            *string   `json:"audio"`
+	AudioChannels    *string   `json:"audio_channels"`
 	Language         *string   `json:"language"`
 	Subtitle         *string   `json:"subtitle"`
 	Exclude          *string   `json:"exclude"`
@@ -72,6 +74,12 @@ func UpdateSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	text(&series.ArchivePath, input.ArchivePath)
 	text(&series.TmdbID, input.TmdbID)
 	text(&series.TvdbID, input.TvdbID)
+	if input.Audio != nil {
+		series.Audio = normalizeAudioRequirement(*input.Audio)
+	}
+	if input.AudioChannels != nil {
+		series.AudioChannels = normalizeAudioChannels(*input.AudioChannels)
+	}
 	if strings.TrimSpace(series.Seasons) == "" {
 		jsonError(w, http.StatusBadRequest, "seasons must not be empty")
 		return

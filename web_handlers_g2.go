@@ -1255,6 +1255,12 @@ func UpdateMovie(w http.ResponseWriter, r *http.Request, s *AppState) {
 	movie.Name = strings.TrimSpace(input.Name)
 	movie.Year = input.Year
 	movie.Quality = input.Quality
+	if input.Audio != nil {
+		movie.Audio = normalizeAudioRequirement(*input.Audio)
+	}
+	if input.AudioChannels != nil {
+		movie.AudioChannels = normalizeAudioChannels(*input.AudioChannels)
+	}
 	movie.Language = input.Language
 	movie.Subtitle = input.Subtitle
 	movie.Exclude = input.Exclude

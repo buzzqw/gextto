@@ -122,7 +122,7 @@ func audioDowngradeAtSameResolution(newQuality, oldQuality *models.Quality) bool
 	// Only an explicitly recognised, worse audio track counts: an archive name
 	// that omits the audio tag must not turn a better incoming file into a
 	// downgrade by accident.
-	return newQuality.AudioRank() > 0 &&
+	return newQuality.AudioTier() > 0 &&
 		newQuality.ResolutionRank() <= oldQuality.ResolutionRank() &&
 		newQuality.AudioRank() < oldQuality.AudioRank()
 }

@@ -51,8 +51,10 @@ with a SQLite database, an integrated torrent engine and a server-rendered web U
 - **Field**: whoever has a server with a media server (Jellyfin/Plex) and wants
   "find, download, rename, archive" from a single daemon; very likely they already
   have Jackett or Prowlarr.
-- **Selection policy**: global defaults (resolution, source, codec, audio, HDR,
-  language, size) plus **per-title overrides and exclusions** plus
+- **Selection policy**: global defaults (resolution, source, codec, grouped
+  audio with separate channels and object audio, HDR, language, size) plus
+  **per-title overrides and exclusions** (including minimum audio and channels)
+  plus
   **explainability** — the explanation API says why a release is accepted, rejected
   or preferred ("Why not this one?" in the UI). Named quality profiles exist
   only as **templates**: their values are copied into a title, whose own fields

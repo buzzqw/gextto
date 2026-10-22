@@ -12,6 +12,8 @@ type Quality struct {
 	Source            string   `json:"source"`
 	Codec             string   `json:"codec"`
 	Audio             string   `json:"audio"`
+	AudioChannels     string   `json:"audio_channels,omitempty"`
+	AudioObjects      string   `json:"audio_objects,omitempty"`
 	HDR               string   `json:"hdr"`
 	Group             string   `json:"group"`
 	IsIta             bool     `json:"is_ita"`
@@ -77,25 +79,7 @@ func (q *Quality) ScoreBreakdown() []ScoreBreakdownItem {
 	case "h264", "x264", "avc":
 		codec = 50
 	}
-	audio := int64(0)
-	switch {
-	case strings.Contains(q.Audio, "truehd"):
-		audio = 150
-	case strings.Contains(q.Audio, "dts-hd"):
-		audio = 120
-	case strings.Contains(q.Audio, "dts"):
-		audio = 100
-	case strings.Contains(q.Audio, "ddp") || strings.Contains(q.Audio, "eac3"):
-		audio = 80
-	case strings.Contains(q.Audio, "7.1"):
-		audio = 60
-	case strings.Contains(q.Audio, "ac3") || strings.Contains(q.Audio, "5.1"):
-		audio = 50
-	case strings.Contains(q.Audio, "aac"):
-		audio = 30
-	case strings.Contains(q.Audio, "mp3"):
-		audio = 10
-	}
+	audio := audioCodecPoints(q.Audio) + audioChannelPoints(q.AudioChannelLayout()) + audioObjectPoints(q.AudioObjectMetadata())
 	hdr := int64(0)
 	// HDR is additive with Dolby Vision. The parser tags a DV release with
 	// HDR="DV", so a Dolby Vision release gets both the HDR and the DV bonus
@@ -196,24 +180,23 @@ func (q *Quality) SourceRank() int {
 	}
 }
 
-// audioRank orders the audio codecs by the same preference used by the score.
-// A candidate with a lower rank cannot win through the generic score delta:
-// size, release group or swarm health must not hide an audio downgrade.
-func audioRank(value string) int {
+// AudioTier groups codecs by perceptual level: lossless, lossy high, lossy
+// standard, compressed and low. The tier drives the per-title audio minimum.
+func (q *Quality) AudioTier() int {
+	value := strings.ToLower(strings.TrimSpace(q.Audio))
 	switch {
-	case strings.Contains(value, "truehd"):
-		return 7
-	case strings.Contains(value, "dts-hd"):
-		return 6
-	case strings.Contains(value, "dts"):
+	case strings.Contains(value, "dts-hd-hra"), strings.Contains(value, "dtshd-hra"):
+		return 4
+	case strings.Contains(value, "truehd"), strings.Contains(value, "dts-hd"),
+		strings.Contains(value, "dtshd"), strings.Contains(value, "flac"),
+		strings.Contains(value, "pcm"), strings.Contains(value, "lpcm"):
 		return 5
-	case strings.Contains(value, "ddp") || strings.Contains(value, "eac3"):
+	case strings.Contains(value, "dts"), strings.Contains(value, "ddp"),
+		strings.Contains(value, "eac3"):
 		return 4
-	case strings.Contains(value, "7.1"):
-		return 4
-	case strings.Contains(value, "ac3") || strings.Contains(value, "5.1"):
+	case strings.Contains(value, "ac3"), value == "5.1", value == "7.1":
 		return 3
-	case strings.Contains(value, "aac"):
+	case strings.Contains(value, "aac"), strings.Contains(value, "opus"):
 		return 2
 	case strings.Contains(value, "mp3"):
 		return 1
@@ -222,9 +205,101 @@ func audioRank(value string) int {
 	}
 }
 
-// AudioRank orders the audio codec for comparisons. It is exported for the
-// archive cleaner, which must not replace a better audio track with a lower one.
-func (q *Quality) AudioRank() int { return audioRank(q.Audio) }
+// AudioChannelLayout returns the channel layout from the dedicated field, with
+// a fallback for quality metadata written before the field existed.
+func (q *Quality) AudioChannelLayout() string {
+	if value := strings.TrimSpace(q.AudioChannels); value != "" && !strings.EqualFold(value, "unknown") {
+		return value
+	}
+	value := strings.ToLower(q.Audio)
+	switch {
+	case strings.Contains(value, "7.1"):
+		return "7.1"
+	case strings.Contains(value, "5.1"):
+		return "5.1"
+	case strings.Contains(value, "2.0"):
+		return "2.0"
+	}
+	return ""
+}
+
+// AudioObjectMetadata returns the dedicated object-audio field, with a
+// fallback for quality metadata written before that field existed.
+func (q *Quality) AudioObjectMetadata() string {
+	if value := strings.TrimSpace(q.AudioObjects); value != "" {
+		return value
+	}
+	return q.Audio
+}
+
+// AudioChannelRank orders channel layouts. 0 means unknown.
+func (q *Quality) AudioChannelRank() int {
+	switch q.AudioChannelLayout() {
+	case "7.1":
+		return 3
+	case "5.1":
+		return 2
+	case "2.0":
+		return 1
+	default:
+		return 0
+	}
+}
+
+// AudioRank combines codec, channels and object audio. A candidate with a lower
+// rank cannot win through a generic score delta: size, release group or swarm
+// health must not hide an audio downgrade.
+func (q *Quality) AudioRank() int {
+	rank := q.AudioTier()*10 + q.AudioChannelRank()
+	if audioObjectPoints(q.AudioObjectMetadata()) > 0 {
+		rank++
+	}
+	return rank
+}
+
+func audioCodecPoints(value string) int64 {
+	value = strings.ToLower(strings.TrimSpace(value))
+	switch {
+	case strings.Contains(value, "dts-hd-hra"), strings.Contains(value, "dtshd-hra"):
+		return 120
+	case strings.Contains(value, "truehd"), strings.Contains(value, "dts-hd"),
+		strings.Contains(value, "dtshd"), strings.Contains(value, "flac"):
+		return 150
+	case strings.Contains(value, "pcm"), strings.Contains(value, "lpcm"):
+		return 140
+	case strings.Contains(value, "dts"), strings.Contains(value, "ddp"),
+		strings.Contains(value, "eac3"):
+		return 90
+	case strings.Contains(value, "ac3"), strings.Contains(value, "5.1"),
+		strings.Contains(value, "7.1"):
+		return 50
+	case strings.Contains(value, "aac"), strings.Contains(value, "opus"):
+		return 40
+	case strings.Contains(value, "mp3"):
+		return 10
+	default:
+		return 0
+	}
+}
+
+func audioChannelPoints(layout string) int64 {
+	switch {
+	case strings.Contains(layout, "7.1"):
+		return 20
+	case strings.Contains(layout, "5.1"):
+		return 10
+	default:
+		return 0
+	}
+}
+
+func audioObjectPoints(objects string) int64 {
+	value := strings.ToLower(objects)
+	if strings.Contains(value, "atmos") || strings.Contains(value, "dtsx") || strings.Contains(value, "dts:x") {
+		return 20
+	}
+	return 0
+}
 
 // UpgradeReason explains why q may replace old, or "" when the change is not
 // worth a re-download.
@@ -275,6 +350,8 @@ func (q *Quality) sameNonSourceQuality(other *Quality) bool {
 	return q.Resolution == other.Resolution &&
 		q.Codec == other.Codec &&
 		q.Audio == other.Audio &&
+		q.AudioChannels == other.AudioChannels &&
+		q.AudioObjects == other.AudioObjects &&
 		q.HDR == other.HDR &&
 		q.IsDV == other.IsDV &&
 		q.IsRepack == other.IsRepack &&
@@ -327,27 +404,49 @@ func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
 	adjust(200, q.Codec == "h265" || q.Codec == "x265" || q.Codec == "hevc", "score_codec_h265")
 	adjust(50, q.Codec == "h264" || q.Codec == "x264" || q.Codec == "avc", "score_codec_h264")
 
-	// Audio is a single parsed token. Each audio value has exactly one key;
-	// DTS/DTS-HD and AC3/5.1 stay independent (eac3 normalizes to ddp).
+	// Audio is a codec plus a separate layout and optional object metadata. Each
+	// parsed token has exactly one key; EAC3 normalizes to DDP and bare DTS-HD
+	// is treated as the lossless MA variant.
 	switch {
+	case strings.Contains(q.Audio, "dts-hd-hra") || strings.Contains(q.Audio, "dtshd-hra"):
+		adjust(120, true, "score_audio_dts-hd-hra")
 	case strings.Contains(q.Audio, "truehd"):
 		adjust(150, true, "score_audio_truehd")
-	case strings.Contains(q.Audio, "dts-hd"):
-		adjust(120, true, "score_audio_dts-hd")
+	case strings.Contains(q.Audio, "dts-hd") || strings.Contains(q.Audio, "dtshd"):
+		adjust(150, true, "score_audio_dts-hd")
+	case strings.Contains(q.Audio, "flac"):
+		adjust(150, true, "score_audio_flac")
+	case strings.Contains(q.Audio, "pcm") || strings.Contains(q.Audio, "lpcm"):
+		adjust(140, true, "score_audio_pcm")
 	case strings.Contains(q.Audio, "dts"):
-		adjust(100, true, "score_audio_dts")
+		adjust(90, true, "score_audio_dts")
 	case strings.Contains(q.Audio, "ddp") || strings.Contains(q.Audio, "eac3"):
-		adjust(80, true, "score_audio_ddp")
+		adjust(90, true, "score_audio_ddp")
 	case strings.Contains(q.Audio, "7.1"):
-		adjust(60, true, "score_audio_7.1")
+		adjust(50, true, "score_audio_7.1")
 	case strings.Contains(q.Audio, "ac3"):
 		adjust(50, true, "score_audio_ac3")
 	case strings.Contains(q.Audio, "5.1"):
 		adjust(50, true, "score_audio_5.1")
 	case strings.Contains(q.Audio, "aac"):
-		adjust(30, true, "score_audio_aac")
+		adjust(40, true, "score_audio_aac")
+	case strings.Contains(q.Audio, "opus"):
+		adjust(40, true, "score_audio_opus")
 	case strings.Contains(q.Audio, "mp3"):
 		adjust(10, true, "score_audio_mp3")
+	}
+	switch q.AudioChannelLayout() {
+	case "7.1":
+		adjust(20, true, "score_channels_7.1")
+	case "5.1":
+		adjust(10, true, "score_channels_5.1")
+	}
+	objects := strings.ToLower(q.AudioObjectMetadata())
+	if strings.Contains(objects, "atmos") {
+		adjust(20, true, "score_audio_atmos")
+	}
+	if strings.Contains(objects, "dtsx") || strings.Contains(objects, "dts:x") {
+		adjust(20, true, "score_audio_dtsx")
 	}
 	// HDR and Dolby Vision are additive; a DV release carries HDR="DV", so it
 	// receives both bonuses.

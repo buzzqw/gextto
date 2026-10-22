@@ -2322,3 +2322,69 @@ func TestOtherPanelsHaveNoBuildInfo(t *testing.T) {
 		t.Fatal("Integrations must not show Maintenance's build footer")
 	}
 }
+
+func TestV2TmdbAddStoresAudioMinimum(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	form := url.Values{
+		"kind":           {"series"},
+		"name":           {"Audio Preference Show"},
+		"tmdb_id":        {"424242"},
+		"language":       {"ita"},
+		"seasons":        {"1+"},
+		"audio":          {"lossless"},
+		"audio_channels": {"5.1"},
+	}
+	if code, body := v2Request(t, server, http.MethodPost, "/tmdb/add", form); code != http.StatusOK && code != http.StatusNoContent {
+		t.Fatalf("series add -> %d: %s", code, body)
+	}
+	cfg, err := LoadConfig(state.config_path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, series := range cfg.Series {
+		if series.Name != "Audio Preference Show" {
+			continue
+		}
+		if series.Audio != "lossless" || series.AudioChannels != "5.1" {
+			t.Fatalf("audio = %q/%q, want lossless/5.1", series.Audio, series.AudioChannels)
+		}
+		return
+	}
+	t.Fatal("series was not added")
+}
+
+func TestV2SeriesSaveStoresAudioMinimum(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Audio Save Show", Quality: "1080p", Enabled: true}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	code, body := v2Request(t, server, http.MethodPost, "/series/save", url.Values{
+		"name":           {"Audio Save Show"},
+		"seasons":        {"1+"},
+		"quality":        {"1080p"},
+		"audio":          {"high"},
+		"audio_channels": {"7.1"},
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("series save -> %d: %s", code, body)
+	}
+	cfg, err := LoadConfig(state.config_path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, series := range cfg.Series {
+		if series.Name == "Audio Save Show" {
+			if series.Audio != "high" || series.AudioChannels != "7.1" {
+				t.Fatalf("audio = %q/%q, want high/7.1", series.Audio, series.AudioChannels)
+			}
+			return
+		}
+	}
+	t.Fatal("series not found")
+}

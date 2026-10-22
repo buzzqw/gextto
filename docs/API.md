@@ -380,6 +380,22 @@ and Cloudflare 1.1.1.1/1.0.0.1 on port 443) and `torrent_line_max_down_kib` /
 controller discovers it). The caps are driven by the latency, not by the
 router; the controller ramps while the ping is good and cuts when it rises.
 
+### Audio preferences
+
+`POST /api/tmdb/add`, `POST /api/series/{name}` and `POST /api/movies/{id}`
+accept two optional fields:
+
+- `audio`: `""` or `any` (no constraint), `lossless` (TrueHD, DTS-HD, FLAC,
+  PCM), `high` (DTS, DD+ or better), `standard` (AC3, generic 5.1 or better),
+  `compressed` (AAC, Opus or better);
+- `audio_channels`: `""` or `any` (no constraint), `5.1` (5.1 or 7.1), `7.1`
+  (7.1 only).
+
+The values are minimum requirements: a release below the selected level is
+rejected. A title that has never set them, including every library row created
+before this feature, defaults to no constraint. The same fields are returned by
+`GET /api/series/{name}` and `GET /api/movies/{id}`.
+
 ## gx-torrent daemon routes
 
 The `gx-torrent` daemon (also usable standalone, without Gextto) serves its own

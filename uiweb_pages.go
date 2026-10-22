@@ -852,7 +852,7 @@ func settingListContains(cfg *Config, key, value string) bool {
 // curated index (score weights, internal keys) so a raw key is never shown as
 // the field name.
 func uiSettingAutoLabel(key string) string {
-	for _, prefix := range []string{"score_res_", "score_source_", "score_codec_", "score_audio_", "score_bonus_"} {
+	for _, prefix := range []string{"score_res_", "score_source_", "score_codec_", "score_audio_", "score_channels_", "score_bonus_"} {
 		if strings.HasPrefix(key, prefix) {
 			return strings.TrimPrefix(key, prefix)
 		}
@@ -893,6 +893,8 @@ func uiScoreGroupTitle(key string) (string, bool) {
 		return "Codec", true
 	case strings.HasPrefix(lowered, "score_audio_"):
 		return "Audio", true
+	case strings.HasPrefix(lowered, "score_channels_"):
+		return "Canali", true
 	case strings.HasPrefix(lowered, "score_bonus_"):
 		return "Bonus", true
 	case strings.HasPrefix(lowered, "score_group_"):

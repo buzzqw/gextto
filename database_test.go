@@ -1688,9 +1688,9 @@ func TestRescoreUsesMediaInfoWhenTheNameSaysNothing(t *testing.T) {
 	if err := db.db.QueryRow("SELECT quality_score FROM episodes WHERE id=1").Scan(&got); err != nil {
 		t.Fatal(err)
 	}
-	// 1080p (1000) + H.265 (200) + EAC3/DDP (80) = 1280.
-	if got != 1280 {
-		t.Fatalf("score = %d, want 1280 from the media info", got)
+	// 1080p (1000) + H.265 (200) + EAC3/DDP (90) = 1290.
+	if got != 1290 {
+		t.Fatalf("score = %d, want 1290 from the media info", got)
 	}
 }
 

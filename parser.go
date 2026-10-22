@@ -38,6 +38,8 @@ func MergeQuality(primary, fallback models.Quality) models.Quality {
 		Source:            pick(primary.Source, fallback.Source),
 		Codec:             pick(primary.Codec, fallback.Codec),
 		Audio:             pick(primary.Audio, fallback.Audio),
+		AudioChannels:     pick(primary.AudioChannels, fallback.AudioChannels),
+		AudioObjects:      pick(primary.AudioObjects, fallback.AudioObjects),
 		HDR:               pick(primary.HDR, fallback.HDR),
 		Group:             pick(primary.Group, fallback.Group),
 		IsIta:             primary.IsIta || fallback.IsIta,
@@ -554,27 +556,52 @@ func ParseQuality(title string) models.Quality {
 		codec = "h264"
 	}
 
-	// --- Audio (ordine di priorità legacy) ---
+	// --- Audio: codec, canali e audio a oggetti sono campi separati. ---
+	// Il layout non deve scegliere il codec: "AAC 5.1" è AAC, non "5.1".
+	audioChannels := ""
+	if audio71Re.MatchString(low) {
+		audioChannels = "7.1"
+	} else if audio51Re.MatchString(low) {
+		audioChannels = "5.1"
+	}
+	audioObjects := []string{}
+	if strings.Contains(low, "atmos") {
+		audioObjects = append(audioObjects, "atmos")
+	}
+	if strings.Contains(low, "dtsx") || strings.Contains(low, "dts:x") || strings.Contains(low, "dts-x") {
+		audioObjects = append(audioObjects, "dtsx")
+	}
+
 	audio := "unknown"
 	switch {
 	case strings.Contains(low, "truehd") || strings.Contains(low, "true hd"):
 		audio = "truehd"
 	case strings.Contains(low, "dts-hd") || strings.Contains(low, "dtshd"):
-		audio = "dts-hd"
+		if strings.Contains(low, "hra") {
+			audio = "dts-hd-hra"
+		} else {
+			audio = "dts-hd"
+		}
+	case strings.Contains(low, "flac"):
+		audio = "flac"
+	case strings.Contains(low, "pcm") || strings.Contains(low, "lpcm"):
+		audio = "pcm"
 	case strings.Contains(low, "dts"):
 		audio = "dts"
 	case strings.Contains(low, "ddp") || strings.Contains(low, "eac3") || strings.Contains(low, "dd+"):
 		audio = "ddp"
 	case strings.Contains(low, "ac3") || strings.Contains(low, "dd5.1") || strings.Contains(low, "dd 5.1"):
 		audio = "ac3"
-	case audio71Re.MatchString(low):
-		audio = "7.1"
-	case audio51Re.MatchString(low):
-		audio = "5.1"
-	case strings.Contains(low, "mp3"):
-		audio = "mp3"
+	case strings.Contains(low, "opus"):
+		audio = "opus"
 	case strings.Contains(low, "aac"):
 		audio = "aac"
+	case strings.Contains(low, "mp3"):
+		audio = "mp3"
+	case audioChannels == "7.1":
+		audio = "7.1"
+	case audioChannels == "5.1":
+		audio = "5.1"
 	}
 
 	// --- Gruppo ---
@@ -599,19 +626,21 @@ func ParseQuality(title string) models.Quality {
 		language = "eng"
 	}
 	return models.Quality{
-		Resolution: resolution,
-		Source:     source,
-		Codec:      codec,
-		Audio:      audio,
-		HDR:        hdr,
-		Group:      group,
-		IsIta:      ita,
-		IsDV:       isDV,
-		IsRepack:   strings.Contains(low, "repack") || strings.Contains(low, "rerip"),
-		IsProper:   strings.Contains(low, "proper"),
-		IsReal:     utils.MustCachedRegex(`\breal\b`).MatchString(low),
-		Language:   language,
-		Languages:  languages,
+		Resolution:    resolution,
+		Source:        source,
+		Codec:         codec,
+		Audio:         audio,
+		AudioChannels: audioChannels,
+		AudioObjects:  strings.Join(audioObjects, ","),
+		HDR:           hdr,
+		Group:         group,
+		IsIta:         ita,
+		IsDV:          isDV,
+		IsRepack:      strings.Contains(low, "repack") || strings.Contains(low, "rerip"),
+		IsProper:      strings.Contains(low, "proper"),
+		IsReal:        utils.MustCachedRegex(`\breal\b`).MatchString(low),
+		Language:      language,
+		Languages:     languages,
 		HasSubtitle: utils.MustCachedRegex(
 			`(?i)(^|[._ \-\[\]\(\)+])(sub|subs|subtitle|subtitles)([._ \-\[\]\(\)+]|$)`,
 		).MatchString(title),

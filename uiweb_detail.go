@@ -50,6 +50,8 @@ type uiSeriesDetail struct {
 	PathName        string
 	Seasons         string
 	Quality         string
+	Audio           string
+	AudioChannels   string
 	Language        string
 	ArchivePath     string
 	Exclude         string
@@ -150,6 +152,8 @@ type uiMovieDetail struct {
 	Name                 string
 	Year                 string
 	Quality              string
+	Audio                string
+	AudioChannels        string
 	Language             string
 	TmdbID               string
 	TvdbID               string
@@ -284,6 +288,8 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		PathName:        escaped,
 		Seasons:         series.Seasons,
 		Quality:         series.Quality,
+		Audio:           series.Audio,
+		AudioChannels:   series.AudioChannels,
 		Language:        series.Language,
 		ArchivePath:     series.ArchivePath,
 		Exclude:         series.Exclude,
@@ -395,16 +401,18 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		return uiMovieDetail{}, false
 	}
 	detail := uiMovieDetail{
-		ID:       movie.ID,
-		Name:     movie.Name,
-		Year:     movie.Year,
-		Quality:  movie.Quality,
-		Language: movie.Language,
-		TmdbID:   movie.TmdbID,
-		TvdbID:   movie.TvdbID,
-		Overview: movie.Overview,
-		Subtitle: movie.Subtitle,
-		Exclude:  movie.Exclude,
+		ID:            movie.ID,
+		Name:          movie.Name,
+		Year:          movie.Year,
+		Quality:       movie.Quality,
+		Audio:         movie.Audio,
+		AudioChannels: movie.AudioChannels,
+		Language:      movie.Language,
+		TmdbID:        movie.TmdbID,
+		TvdbID:        movie.TvdbID,
+		Overview:      movie.Overview,
+		Subtitle:      movie.Subtitle,
+		Exclude:       movie.Exclude,
 		// The persisted form is canonical JSON for the API/database. The edit
 		// form accepts the human-readable comma-separated representation.
 		LanguageRequirements: strings.Join(parseLanguageRequirements(movie.LanguageRequirements), ","),

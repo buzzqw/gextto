@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -538,11 +539,31 @@ func TestParsesAudioCodecsWithoutFalseUpgradeBasis(t *testing.T) {
 		"Show.S01E01.1080p.WEB-DL.EAC3.5.1.mkv":         "ddp",
 		"Show.S01E01.1080p.WEB-DL.AC3.5.1.mkv":          "ac3",
 		"Show.S01E01.1080p.WEB-DL.AAC.mkv":              "aac",
+		"Show.S01E01.1080p.WEB-DL.AAC.5.1.mkv":          "aac",
+		"Show.S01E01.1080p.WEB-DL.DTS-HD.HRA.5.1.mkv":   "dts-hd-hra",
+		"Show.S01E01.1080p.WEB-DL.FLAC.5.1.mkv":         "flac",
+		"Show.S01E01.1080p.WEB-DL.Opus.mkv":             "opus",
+		"Show.S01E01.1080p.WEB-DL.5.1.mkv":              "5.1",
 		"Show.S01E01.1080p.WEB-DL.7.1.mkv":              "7.1",
 	}
 	for title, want := range cases {
 		if got := ParseQuality(title).Audio; got != want {
 			t.Errorf("Audio(%q) = %q, want %q", title, got, want)
 		}
+	}
+}
+
+func TestParsesAudioLayoutAndObjectMetadata(t *testing.T) {
+	quality := ParseQuality("Show.S01E01.1080p.WEB-DL.TrueHD.7.1.Atmos.mkv")
+	if quality.Audio != "truehd" || quality.AudioChannels != "7.1" || quality.AudioObjects != "atmos" {
+		t.Fatalf("audio = %#v", quality)
+	}
+	aac := ParseQuality("Show.S01E01.1080p.WEB-DL.AAC.5.1.mkv")
+	if aac.Audio != "aac" || aac.AudioChannels != "5.1" {
+		t.Fatalf("AAC 5.1 parsed as %#v", aac)
+	}
+	dtsx := ParseQuality("Show.S01E01.1080p.WEB-DL.DTS-HD.MA.7.1.DTS-X.mkv")
+	if dtsx.Audio != "dts-hd" || dtsx.AudioChannels != "7.1" || !strings.Contains(dtsx.AudioObjects, "dtsx") {
+		t.Fatalf("DTS-HD DTS:X parsed as %#v", dtsx)
 	}
 }
