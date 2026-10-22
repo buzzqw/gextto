@@ -780,6 +780,7 @@ func uiSettingsGroups(tab string, fields []uiSettingField) []uiSettingGroup {
 		// The score weights read best as a compact two-column grid.
 		if tab == "scores" && len(grouped[title]) > 0 {
 			_, group.Grid = uiScoreGroupTitle(grouped[title][0].Key)
+			group.Hint = uiScoreGroupHint(title)
 		}
 		groups = append(groups, group)
 	}
@@ -885,32 +886,34 @@ func uiSettingGroupTitle(tab, key string) string {
 func uiScoreGroupTitle(key string) (string, bool) {
 	lowered := strings.ToLower(key)
 	switch {
-	case lowered == "score_res_2160p":
-		return "4K", true
-	case lowered == "score_res_1080p":
-		return "Full HD", true
-	case lowered == "score_res_720p":
-		return "HD", true
-	case lowered == "score_res_360p", lowered == "score_res_480p", lowered == "score_res_576p":
-		return "SD", true
-	case strings.HasPrefix(lowered, "score_res_"):
-		return "Risoluzione", true
-	case strings.HasPrefix(lowered, "score_source_"):
-		return "Sorgente", true
-	case strings.HasPrefix(lowered, "score_codec_"):
-		return "Codec video", true
-	case lowered == "score_audio_objects":
-		return "Canali e oggetti", true
-	case strings.HasPrefix(lowered, "score_audio_"):
+	case strings.HasPrefix(lowered, "score_res_"), strings.HasPrefix(lowered, "score_source_"),
+		strings.HasPrefix(lowered, "score_codec_"):
+		return "Video", true
+	case lowered == "score_bonus_dv", lowered == "score_bonus_hdr":
+		return "Video", true
+	case strings.HasPrefix(lowered, "score_audio_"), strings.HasPrefix(lowered, "score_channels_"):
 		return "Audio", true
-	case strings.HasPrefix(lowered, "score_channels_"):
-		return "Canali e oggetti", true
+	case lowered == "score_bonus_proper", lowered == "score_bonus_repack", lowered == "score_bonus_real":
+		return "Upgrade e sostituzione", true
 	case strings.HasPrefix(lowered, "score_bonus_"):
 		return "Bonus", true
 	case strings.HasPrefix(lowered, "score_group_"):
 		return "Gruppi custom", true
 	}
 	return "", false
+}
+
+// uiScoreGroupHint explains the three macro-cards of the score editor.
+func uiScoreGroupHint(title string) string {
+	switch title {
+	case "Video":
+		return "Pesi per risoluzione, sorgente, codec video e HDR/Dolby Vision."
+	case "Audio":
+		return "Pesi per codec audio, canali e audio a oggetti."
+	case "Upgrade e sostituzione":
+		return "Correzioni e soglie che decidono quando una release migliore sostituisce quella archiviata."
+	}
+	return ""
 }
 
 // uiCollapsedSettingGroups are panels closed by default: rarely needed knobs.
