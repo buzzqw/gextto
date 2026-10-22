@@ -229,7 +229,7 @@ build() {
   built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "building gx-torrent from $ROOT ($commit) into $DIR/bin"
   (cd "$ROOT" && CGO_ENABLED=0 go build -trimpath \
-    -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$gx_build -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=$gx_series -X github.com/buzzqw/gextto/internal/constants.Commit=$commit -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$built_at" \
+    -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$gx_build -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=$gx_series -X github.com/buzzqw/gextto/internal/gxcore/torrent.Version=$gx_series.$gx_build -X github.com/buzzqw/gextto/internal/constants.Commit=$commit -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$built_at" \
     -o "$DIR/bin/gx-torrent.new" ./cmd/gx-torrent)
   # Rename over the old file: a running test daemon keeps its own copy.
   mv -f "$DIR/bin/gx-torrent.new" "$DIR/bin/gx-torrent"

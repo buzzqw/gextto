@@ -247,6 +247,8 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	store.Set("dht-read-only", strconv.FormatBool(formBool(r, "dht-read-only")))
 	store.Set("web-sources-allow-private", strconv.FormatBool(formBool(r, "web-sources-allow-private")))
+	store.Set(clientIdentityKey, normalizeClientIdentity(r.FormValue(clientIdentityKey)))
+	store.Set(clientIdentityVersionKey, validClientIdentityVersion(r.FormValue(clientIdentityVersionKey)))
 	// DLNA media server (settings.json, applied by the DLNA loop).
 	store.Set(dlnaEnabledKey, strconv.FormatBool(formBool(r, "dlna-enabled")))
 	store.Set(dlnaListenKey, strings.TrimSpace(r.FormValue("dlna-listen")))
@@ -527,6 +529,8 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{MAX_TIME}}", strconv.Itoa(d.settingInt(maxSeedingTimeKey, -1)))
 	repl("{{MAX_IDLE_ON}}", checkedIf(boolSetting(maxInactiveSeedingTimeEnabledKey)))
 	repl("{{MAX_IDLE}}", strconv.Itoa(d.settingInt(maxInactiveSeedingTimeKey, -1)))
+	repl("{{CLIENT_IDENTITY_OPTIONS}}", clientIdentityOptions(store.Get(clientIdentityKey, defaultClientIdentity)))
+	repl("{{CLIENT_IDENTITY_VERSION}}", html.EscapeString(clientIdentityVersion(store.Get(clientIdentityVersionKey, ""))))
 	repl("{{WATCH_FOLDERS}}", get("watch-folders"))
 	repl("{{COOKIES}}", html.EscapeString(d.cookiesPretty()))
 	repl("{{ALT_WEBUI_ON}}", checkedIf(d.altWebUIEnabled()))

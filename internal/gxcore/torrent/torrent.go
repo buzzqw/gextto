@@ -472,7 +472,11 @@ func (t *torrent) copyPeerIDPrefix() int {
 	if t.info() != nil && t.info().Private {
 		return copy(t.peerID[:], t.session.config.PrivatePeerIDPrefix)
 	}
-	return copy(t.peerID[:], publicPeerIDPrefix)
+	prefix := t.session.config.PublicPeerIDPrefix
+	if prefix == "" {
+		prefix = publicPeerIDPrefix
+	}
+	return copy(t.peerID[:], prefix)
 }
 
 // getPeersForUnchoker snapshots the peers for the unchoke round.

@@ -49,6 +49,10 @@ type Options struct {
 	// Settings is the standalone settings store (nil in managed, where the
 	// flags are the only source of truth).
 	Settings *settings.Store
+	// ClientIdentity and ClientIdentityVersion are the announced BEP 20/10
+	// identity (managed mode: Gextto flags; standalone: settings.json wins).
+	ClientIdentity        string
+	ClientIdentityVersion string
 	// Fingerprint is reported by /api/v1/health so Gextto can adopt a daemon
 	// it started earlier with the same binary and options.
 	Fingerprint string
@@ -592,6 +596,30 @@ func (d *Daemon) nextPosLocked() int64 {
 // session
 // ---------------------------------------------------------------------------
 
+// applyClientIdentity sets the BEP 20/10 and tracker identity. The default is
+// gx-core with the real gx-torrent version; a preset or a version override
+// changes only what peers and trackers see.
+func (d *Daemon) applyClientIdentity(cfg *torrent.Config) {
+	name, version := d.opts.ClientIdentity, d.opts.ClientIdentityVersion
+	if d.opts.Settings != nil {
+		if v := strings.TrimSpace(d.opts.Settings.Get(clientIdentityKey, "")); v != "" {
+			name = v
+		}
+		if v := strings.TrimSpace(d.opts.Settings.Get(clientIdentityVersionKey, "")); v != "" {
+			version = v
+		}
+	}
+	identity := resolveClientIdentity(name, version)
+	cfg.PublicPeerIDPrefix = identity.PeerID
+	cfg.PrivatePeerIDPrefix = identity.PeerID
+	cfg.PublicExtensionHandshakeClientVersion = identity.Client
+	cfg.PrivateExtensionHandshakeClientVersion = identity.Client
+	cfg.PublicTrackerHTTPUserAgent = identity.UserAgent
+	cfg.TrackerHTTPPrivateUserAgent = identity.UserAgent
+	torrent.SetCreator(identity.Client)
+	logf("client identity: %s %s (peer id %s)", identity.Name, identity.Version, identity.PeerID)
+}
+
 func (d *Daemon) sessionConfig() torrent.Config {
 	cfg := torrent.DefaultConfig
 	cfg.Database = d.opts.DBPath
@@ -622,6 +650,7 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	if d.state.Config.MaxPeerAccept > 0 {
 		cfg.MaxPeerAccept = d.state.Config.MaxPeerAccept
 	}
+	d.applyClientIdentity(&cfg)
 	cfg.CustomLogHandler = engineLogHandler(d.opts.Debug)
 	// The user-managed cookies (qBittorrent API) are supplied to the .torrent
 	// and metadata HTTP fetches.

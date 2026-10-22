@@ -59,7 +59,7 @@ trap 'rm -rf "$STAGE"' EXIT
 
 echo "building gx-torrent.exe (windows/$ARCH, build $GX_BUILD)…"
 ( cd "$ROOT" && GOOS=windows GOARCH="$ARCH" CGO_ENABLED=0 go build -trimpath -buildvcs=false \
-    -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=${GX_BUILD} -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=${GX_SERIES} -X github.com/buzzqw/gextto/internal/constants.Commit=${GX_COMMIT} -X github.com/buzzqw/gextto/internal/constants.BuiltAt=${GX_BUILT_AT} -X github.com/buzzqw/gextto/internal/constants.GxReleaseChannel=${GEXTTO_GX_CHANNEL:-}" \
+    -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=${GX_BUILD} -X github.com/buzzqw/gextto/internal/constants.GxVersionSeries=${GX_SERIES} -X github.com/buzzqw/gextto/internal/gxcore/torrent.Version=${GX_SERIES}.${GX_BUILD} -X github.com/buzzqw/gextto/internal/constants.Commit=${GX_COMMIT} -X github.com/buzzqw/gextto/internal/constants.BuiltAt=${GX_BUILT_AT} -X github.com/buzzqw/gextto/internal/constants.GxReleaseChannel=${GEXTTO_GX_CHANNEL:-}" \
     -o "$STAGE/gx-torrent.exe" ./cmd/gx-torrent )
 
 cat > "$STAGE/install-service.ps1" <<'PS1'

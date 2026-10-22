@@ -5200,3 +5200,8 @@ eng:
   "su": "of"
   "Cartella dati": "Data folder"
   "codice": "code"
+  "gx-torrent — identità del client annunciata": "gx-torrent — identità del client annunciata"
+  "Cosa vedono peer e tracker: gx-core con la versione reale (default), oppure un preset qBittorrent, Transmission, Rain o anacrolix/torrent. È solo l'identità annunciata; alcuni tracker privati accettano solo client in whitelist, controlla le regole prima di usarlo.": "Cosa vedono peer e tracker: gx-core con la versione reale (default), oppure un preset qBittorrent, Transmission, Rain o anacrolix/torrent. È solo l'identità annunciata; alcuni tracker privati accettano solo client in whitelist, controlla le regole prima di usarlo."
+  "gx-torrent — versione del client annunciata": "gx-torrent — versione del client annunciata"
+  "Versione annunciata con il preset; vuoto usa la versione predefinita del preset.": "Versione annunciata con il preset; vuoto usa la versione predefinita del preset."
+  "vuoto = preset": "vuoto = preset"

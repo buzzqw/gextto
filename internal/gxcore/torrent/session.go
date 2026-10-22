@@ -433,6 +433,9 @@ func (s *Session) getTrackerUserAgent(private bool) string {
 	if private {
 		return s.config.TrackerHTTPPrivateUserAgent
 	}
+	if agent := s.config.PublicTrackerHTTPUserAgent; agent != "" {
+		return agent
+	}
 	return trackerHTTPPublicUserAgent
 }
 

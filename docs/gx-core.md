@@ -45,7 +45,8 @@ Gextto would end up with the worse of the two engines.
 **What standalone adds**, all of it living under `/ui` or `/api/v2` so that the frozen
 v1 API used by Gextto is only *added to*, never changed: persistent settings from the
 page (`settings.json`), the first-run wizard, login and sessions, categories and tags
-with a path per category, the virtualised torrent table (above 500 rows; the first
+with the announced client identity (gx-core with the real version by default, or
+a qBittorrent/Transmission/Rain/anacrolix preset), a path per category, the virtualised torrent table (above 500 rows; the first
 300 with *Show more* remain the no-JavaScript fallback), the bandwidth
 scheduler with
 alternative limits (**one choice per day — Off, Limit or Auto**, where Auto lifts the

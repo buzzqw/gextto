@@ -46,8 +46,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 	if got := len(uiSettingsKeysBeforeReorganization); got != 133 {
 		t.Fatalf("frozen list has %d keys, want 133", got)
 	}
-	if got := len(uiSettingsIndex); got != 166 {
-		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default, the 4 DLNA media server options, the update check interval, the per-day speed schedule, the adaptive tuning switch, the automatic speed policy and its latency guard (switch, source, target and line maxima), the idle-seed limit, the in-download pack inspection (abort and file priorities), the speed rule choice, the 9 eD2k/Kad (aMule) options and the automatic peer cap, minus cleanup_min_score_diff (folded into upgrade_min_score_diff)", got)
+	if got := len(uiSettingsIndex); got != 168 {
+		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default, the 4 DLNA media server options, the update check interval, the per-day speed schedule, the adaptive tuning switch, the automatic speed policy and its latency guard (switch, source, target and line maxima), the idle-seed limit, the in-download pack inspection (abort and file priorities), the speed rule choice, the 9 eD2k/Kad (aMule) options, the two gx-torrent client-identity options and the automatic peer cap, minus cleanup_min_score_diff (folded into upgrade_min_score_diff)", got)
 	}
 	if got := len(uiScoreSettingDefs); got != 27 {
 		t.Fatalf("score weights = %d, want 27", got)
@@ -86,8 +86,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		}
 		found++
 	}
-	if found != 193 {
-		t.Fatalf("rendered %d options, want 193", found)
+	if found != 195 {
+		t.Fatalf("rendered %d options, want 195", found)
 	}
 
 	// Editors, panels and actions without a single key.

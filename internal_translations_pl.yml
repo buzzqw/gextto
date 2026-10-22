@@ -5804,3 +5804,8 @@ pol:
   "su": "z"
   "Cartella dati": "Folder danych"
   "codice": "kod"
+  "gx-torrent — identità del client annunciata": "gx-torrent — ogłaszana tożsamość klienta"
+  "Cosa vedono peer e tracker: gx-core con la versione reale (default), oppure un preset qBittorrent, Transmission, Rain o anacrolix/torrent. È solo l'identità annunciata; alcuni tracker privati accettano solo client in whitelist, controlla le regole prima di usarlo.": "Co widzą peery i trackery: gx-core z prawdziwą wersją (domyślnie) lub profil qBittorrent, Transmission, Rain albo anacrolix/torrent. To tylko ogłaszana tożsamość; niektóre prywatne trackery akceptują tylko klienty z listy dozwolonych — sprawdź zasady przed użyciem."
+  "gx-torrent — versione del client annunciata": "gx-torrent — ogłaszana wersja klienta"
+  "Versione annunciata con il preset; vuoto usa la versione predefinita del preset.": "Wersja ogłaszana z profilem; puste używa domyślnej wersji profilu."
+  "vuoto = preset": "puste = profil"
