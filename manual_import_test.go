@@ -159,3 +159,85 @@ func TestManualImportMovie(t *testing.T) {
 		t.Fatalf("movie size = %d", size)
 	}
 }
+
+func TestManualImportRegistersTheCorrectedEpisode(t *testing.T) {
+	dir := t.TempDir()
+	// The name claims E01-E02; the operator corrects it to E05.
+	source := filepath.Join(dir, "Show.S01E01E02.1080p.mkv")
+	archive := filepath.Join(dir, "library")
+	if err := os.WriteFile(source, make([]byte, 100), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := manualImportConfig(t, archive)
+	db := newTestDB(t)
+	final, err := ManualImport(context.Background(), cfg, db, ManualImportRequest{Path: source, Kind: "series", Series: "Show", Season: 1, Episode: 5})
+	if err != nil {
+		t.Fatalf("ManualImport: %v", err)
+	}
+	if !strings.Contains(filepath.Base(final), "S01E05") {
+		t.Fatalf("final name %q, want the corrected S01E05", final)
+	}
+	var episodes []int64
+	rows, err := db.db.Query("SELECT e.episode FROM episodes e JOIN series s ON s.id=e.series_id WHERE s.name='Show' AND COALESCE(e.archive_path,'') <> '' ORDER BY e.episode")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var episode int64
+		_ = rows.Scan(&episode)
+		episodes = append(episodes, episode)
+	}
+	if len(episodes) != 1 || episodes[0] != 5 {
+		t.Fatalf("registered episodes = %v, want [5]", episodes)
+	}
+}
+
+func TestManualImportMatchesAMovieWithoutAYear(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "Film.1080p.mkv")
+	archive := filepath.Join(dir, "library")
+	if err := os.WriteFile(source, make([]byte, 100), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := manualImportConfig(t, archive)
+	db := newTestDB(t)
+	// The page sends the chosen movie with year 0 when the name has none.
+	final, err := ManualImport(context.Background(), cfg, db, ManualImportRequest{Path: source, Kind: "movie", Movie: "Film"})
+	if err != nil {
+		t.Fatalf("ManualImport: %v", err)
+	}
+	var year int64
+	if err := db.db.QueryRow("SELECT year FROM movies WHERE name='Film'").Scan(&year); err != nil || year != 2020 {
+		t.Fatalf("movie row year = %d, %v; want the configured 2020", year, err)
+	}
+	if !strings.Contains(filepath.Base(final), "2020") {
+		t.Fatalf("final name %q has no year", final)
+	}
+}
+
+func TestManualImportRestoresTheNameOfARefusedMovie(t *testing.T) {
+	dir := t.TempDir()
+	archive := filepath.Join(dir, "library")
+	cfg := manualImportConfig(t, archive)
+	db := newTestDB(t)
+	first := filepath.Join(dir, "in1", "Film.2020.1080p.mkv")
+	second := filepath.Join(dir, "in2", "Film.2020.1080p.WEB.mkv")
+	for _, path := range []string{first, second} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, make([]byte, 100), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := ManualImport(context.Background(), cfg, db, ManualImportRequest{Path: first, Kind: "movie", Movie: "Film", Year: 2020}); err != nil {
+		t.Fatalf("first import: %v", err)
+	}
+	if _, err := ManualImport(context.Background(), cfg, db, ManualImportRequest{Path: second, Kind: "movie", Movie: "Film", Year: 2020}); err == nil {
+		t.Fatal("the second copy must be refused without replace")
+	}
+	if _, err := os.Stat(second); err != nil {
+		t.Fatalf("the refused file must keep its original name: %v", err)
+	}
+}

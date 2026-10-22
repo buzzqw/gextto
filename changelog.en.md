@@ -36,8 +36,11 @@ manual is online: [English](docs/MANUAL.en.md) ·
   in the library (the first is **Default**). Jellyseerr sees the profiles and
   can add series and movies through `/api/v3` (`system/status`,
   `qualityprofile`, `languageprofile`, `rootfolder`, `tag`, `series/lookup`,
-  `POST series`, `movie/lookup`, `POST movie`, `queue`). This is not full
-  Sonarr/Radarr compatibility.
+  `POST series`, `movie/lookup`, `POST movie`, `queue`). Gextto follows only the
+  requested seasons; a request for a series already in the library adds the new
+  seasons, and a movie already there is not added twice. Each profile keeps its
+  number when you remove or reorder others, so Jellyseerr always applies the
+  one it picked. This is not full Sonarr/Radarr compatibility.
 - **gx-torrent announces its real version, and can use a compatible identity.** It used to say `gx-core 0.0.0` to peers and trackers. It now announces the real version (`gx-core 1.1.xxx`) and, if you want, can present itself as qBittorrent, Transmission, Rain or anacrolix/torrent with a chosen version. Only the announced identity changes: some private trackers only accept whitelisted clients, so check their rules before using it.
 
 - **Downloads with thousands of torrents: the table stays smooth.** Above 500

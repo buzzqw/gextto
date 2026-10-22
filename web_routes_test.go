@@ -35,7 +35,7 @@ func TestAPIDocumentationMatchesRouter(t *testing.T) {
 		}
 		method := strings.TrimSpace(strings.TrimPrefix(parts[0], "|"))
 		method = strings.TrimSpace(strings.TrimSuffix(method, "|"))
-		if method == "GET" || method == "POST" || method == "DELETE" {
+		if method == "GET" || method == "POST" || method == "PUT" || method == "DELETE" {
 			if description := strings.TrimSpace(strings.Trim(strings.TrimSpace(parts[2]), "|")); description == "" {
 				t.Errorf("route %s %s has no description", method, parts[1])
 			}

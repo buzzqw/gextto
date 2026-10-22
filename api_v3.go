@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -55,21 +56,23 @@ type v3Tag struct {
 }
 
 type v3Series struct {
-	ID                int        `json:"id"`
-	Title             string     `json:"title"`
-	TitleSlug         string     `json:"titleSlug"`
-	TvdbID            int64      `json:"tvdbId,omitempty"`
-	TmdbID            int64      `json:"tmdbId,omitempty"`
-	Year              int        `json:"year,omitempty"`
-	Overview          string     `json:"overview,omitempty"`
-	RemotePoster      string     `json:"remotePoster,omitempty"`
-	RootFolderPath    string     `json:"rootFolderPath"`
-	QualityProfileID  int        `json:"qualityProfileId"`
-	LanguageProfileID int        `json:"languageProfileId"`
-	SeasonFolder      bool       `json:"seasonFolder"`
-	Monitored         bool       `json:"monitored"`
-	Seasons           []v3Season `json:"seasons,omitempty"`
-	Tags              []int      `json:"tags"`
+	ID                int    `json:"id"`
+	Title             string `json:"title"`
+	TitleSlug         string `json:"titleSlug"`
+	TvdbID            int64  `json:"tvdbId,omitempty"`
+	TmdbID            int64  `json:"tmdbId,omitempty"`
+	Year              int    `json:"year,omitempty"`
+	Overview          string `json:"overview,omitempty"`
+	RemotePoster      string `json:"remotePoster,omitempty"`
+	RootFolderPath    string `json:"rootFolderPath"`
+	QualityProfileID  int    `json:"qualityProfileId"`
+	LanguageProfileID int    `json:"languageProfileId"`
+	SeasonFolder      bool   `json:"seasonFolder"`
+	Monitored         bool   `json:"monitored"`
+	// Seasons is always present: Jellyseerr maps over the lookup result's
+	// seasons to build the add request.
+	Seasons []v3Season `json:"seasons"`
+	Tags    []int      `json:"tags"`
 }
 
 type v3Season struct {
@@ -88,6 +91,8 @@ type v3Movie struct {
 	RootFolderPath   string `json:"rootFolderPath"`
 	QualityProfileID int    `json:"qualityProfileId"`
 	Monitored        bool   `json:"monitored"`
+	HasFile          bool   `json:"hasFile"`
+	IsAvailable      bool   `json:"isAvailable"`
 	Tags             []int  `json:"tags"`
 }
 
@@ -107,7 +112,9 @@ type v3QueueItem struct {
 
 // v3Profiles derives the named profiles from the per-title overrides: every
 // distinct combination becomes one profile, so an existing library is migrated
-// without a rewrite and the first profile is always "Default".
+// without a rewrite and the first profile is always "Default". It seeds the
+// saved list once (ensureQualityProfiles); afterwards the saved list, with its
+// stable ids, is the only source.
 func v3Profiles(cfg *Config) []v3QualityProfile {
 	defaultLanguage := ""
 	if cfg != nil {
@@ -169,16 +176,6 @@ func v3Profiles(cfg *Config) []v3QualityProfile {
 		}
 	}
 	return out
-}
-
-func v3ProfileByID(cfg *Config, id int) v3QualityProfile {
-	profiles := v3Profiles(cfg)
-	for _, profile := range profiles {
-		if profile.ID == id {
-			return profile
-		}
-	}
-	return profiles[0]
 }
 
 func v3RootFolders(cfg *Config) []v3RootFolder {
@@ -256,8 +253,8 @@ func V3SystemStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 func V3QualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 	profiles := ensureQualityProfiles(s)
 	out := make([]v3QualityProfile, 0, len(profiles))
-	for i, profile := range profiles {
-		out = append(out, v3QualityProfile{ID: i + 1, Name: profile.Name, Quality: profile.Quality,
+	for _, profile := range profiles {
+		out = append(out, v3QualityProfile{ID: profile.ID, Name: profile.Name, Quality: profile.Quality,
 			Language: profile.Language, Subtitle: profile.Subtitle, Exclude: profile.Exclude, Items: []any{}})
 	}
 	v3JSON(w, http.StatusOK, out)
@@ -292,6 +289,10 @@ func V3SeriesLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
+	if id, ok := v3TermID(term, "tvdb"); ok {
+		v3JSON(w, http.StatusOK, []v3Series{v3SeriesByTvdbID(r.Context(), cfg, id)})
+		return
+	}
 	out := []v3Series{}
 	// Sonarr addresses a series by TVDB id: use TVDB when it is configured,
 	// otherwise fall back to TMDB (whose id is reported as tmdbId only).
@@ -311,7 +312,8 @@ func V3SeriesLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
 				}
 				out = append(out, v3Series{ID: v3IntID(item["tvdb_id"]), TvdbID: v3Int(item["tvdb_id"]),
 					Title: title, TitleSlug: v3Slug(title), Year: year, Overview: v3Any(item["overview"]),
-					RemotePoster: v3Any(item["image"]), QualityProfileID: 1, LanguageProfileID: 1, Monitored: true})
+					RemotePoster: v3Any(item["image"]), QualityProfileID: 1, LanguageProfileID: 1, Monitored: true,
+					Seasons: []v3Season{}, Tags: []int{}})
 			}
 		}
 		if len(out) > 0 {
@@ -332,6 +334,7 @@ func V3SeriesLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
 					TmdbID: item.ID, Year: v3ItemYear(item),
 					Overview: v3ItemOverview(item), RemotePoster: v3ItemPoster(item),
 					QualityProfileID: 1, LanguageProfileID: 1, Monitored: true,
+					Seasons: []v3Season{}, Tags: []int{},
 				})
 			}
 		}
@@ -361,22 +364,166 @@ func v3IntID(value any) int {
 	return int(n)
 }
 
-func V3SeriesAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
-	var body struct {
-		Title             string     `json:"title"`
-		TitleSlug         string     `json:"titleSlug"`
-		TvdbID            int64      `json:"tvdbId"`
-		TmdbID            int64      `json:"tmdbId"`
-		Year              int        `json:"year"`
-		RootFolderPath    string     `json:"rootFolderPath"`
-		QualityProfileID  int        `json:"qualityProfileId"`
-		LanguageProfileID int        `json:"languageProfileId"`
-		SeasonFolder      bool       `json:"seasonFolder"`
-		Monitored         bool       `json:"monitored"`
-		Seasons           []v3Season `json:"seasons"`
+// v3TermID reads the "tvdb:123"/"tmdb:123" form of a lookup term, which is
+// how Jellyseerr looks up the title it is about to add.
+func v3TermID(term, source string) (int64, bool) {
+	prefix, value, found := strings.Cut(term, ":")
+	if !found || !strings.EqualFold(strings.TrimSpace(prefix), source) {
+		return 0, false
 	}
+	id, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	return id, err == nil && id > 0
+}
+
+// v3SeriesByTvdbID answers a "tvdb:" lookup. A configured series is returned
+// with its id, so Jellyseerr updates it instead of adding a duplicate; an
+// unknown one is described from TVDB, or TMDB, with its season list, which
+// Jellyseerr needs to say which seasons are requested. Without metadata the
+// record carries only the id and Jellyseerr's own title is used on add.
+func v3SeriesByTvdbID(ctx context.Context, cfg *Config, tvdbID int64) v3Series {
+	out := v3Series{TvdbID: tvdbID, QualityProfileID: 1, LanguageProfileID: 1, Seasons: []v3Season{}, Tags: []int{}}
+	var seasons []int64
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if tvdb := tvdbClientFor(cfg); tvdb.Configured() {
+		if data, err := tvdb.SeriesExtended(ctx, tvdbID); err == nil {
+			out.Title = v3Any(v3Field(data, "name"))
+			out.Overview = v3Any(v3Field(data, "overview"))
+			out.RemotePoster = v3Any(v3Field(data, "image"))
+			if year, err := strconv.Atoi(v3Any(v3Field(data, "year"))); err == nil {
+				out.Year = year
+			}
+			seasons = v3TvdbSeasons(v3Field(data, "seasons"))
+		}
+	}
+	if out.Title == "" {
+		client := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
+		if client.Configured() {
+			if item, err := client.FindSeriesByTvdbID(ctx, tvdbID); err == nil && item != nil {
+				out.Title, out.TmdbID, out.Year = v3ItemName(*item), item.ID, v3ItemYear(*item)
+				out.Overview, out.RemotePoster = v3ItemOverview(*item), v3ItemPoster(*item)
+				if counts, err := client.SeasonCounts(ctx, strconv.FormatInt(item.ID, 10)); err == nil {
+					seasons = seasons[:0]
+					for season := range counts {
+						seasons = append(seasons, season)
+					}
+				}
+			}
+		}
+	}
+	index := v3SeriesIndex(cfg, tvdbID, out.Title)
+	if index >= 0 {
+		series := cfg.Series[index]
+		out.ID, out.Title, out.Monitored = index+1, series.Name, series.Enabled
+		out.RootFolderPath, out.SeasonFolder = series.ArchivePath, series.SeasonSubfolders
+	}
+	sort.Slice(seasons, func(i, j int) bool { return seasons[i] < seasons[j] })
+	for _, season := range seasons {
+		monitored := false
+		if index >= 0 {
+			monitored = seasonAllowed(cfg.Series[index].Seasons, season) &&
+				!containsInt64(cfg.Series[index].IgnoredSeasons, season)
+		}
+		out.Seasons = append(out.Seasons, v3Season{SeasonNumber: int(season), Monitored: monitored})
+	}
+	out.TitleSlug = v3Slug(out.Title)
+	return out
+}
+
+// v3Field reads one key of a decoded JSON object.
+func v3Field(value any, key string) any {
+	if object, ok := value.(map[string]any); ok {
+		return object[key]
+	}
+	return nil
+}
+
+// v3TvdbSeasons lists the season numbers of the official (aired) order of a
+// TVDB extended record.
+func v3TvdbSeasons(value any) []int64 {
+	items, _ := value.([]any)
+	seen := map[int64]bool{}
+	var out []int64
+	for _, item := range items {
+		kind := strings.ToLower(v3Any(v3Field(v3Field(item, "type"), "type")))
+		if kind != "" && kind != "official" {
+			continue
+		}
+		raw := v3Any(v3Field(item, "number"))
+		number, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || seen[number] {
+			continue
+		}
+		seen[number] = true
+		out = append(out, number)
+	}
+	return out
+}
+
+// v3SeriesIndex finds a configured series by TVDB id, then by name.
+func v3SeriesIndex(cfg *Config, tvdbID int64, title string) int {
+	if cfg == nil {
+		return -1
+	}
+	if tvdbID > 0 {
+		id := strconv.FormatInt(tvdbID, 10)
+		for i, series := range cfg.Series {
+			if strings.TrimSpace(series.TvdbID) == id {
+				return i
+			}
+		}
+	}
+	title = strings.TrimSpace(title)
+	for i, series := range cfg.Series {
+		if title != "" && strings.EqualFold(series.Name, title) {
+			return i
+		}
+	}
+	return -1
+}
+
+// v3SeasonSpec is the seasons field for the monitored seasons of a request.
+// Jellyseerr sends every season and marks the requested ones as monitored;
+// with no season marked the whole series is followed from season 1.
+func v3SeasonSpec(seasons []v3Season) string {
+	values := []string{}
+	for _, season := range seasons {
+		if season.Monitored && season.SeasonNumber >= 0 {
+			values = append(values, strconv.Itoa(season.SeasonNumber))
+		}
+	}
+	if len(values) == 0 {
+		return "1+"
+	}
+	return strings.Join(values, ",")
+}
+
+type v3SeriesBody struct {
+	ID                int        `json:"id"`
+	Title             string     `json:"title"`
+	TvdbID            int64      `json:"tvdbId"`
+	TmdbID            int64      `json:"tmdbId"`
+	RootFolderPath    string     `json:"rootFolderPath"`
+	QualityProfileID  int        `json:"qualityProfileId"`
+	LanguageProfileID int        `json:"languageProfileId"`
+	SeasonFolder      bool       `json:"seasonFolder"`
+	Monitored         bool       `json:"monitored"`
+	Seasons           []v3Season `json:"seasons"`
+	Tags              []int      `json:"tags"`
+}
+
+func v3DecodeSeries(w http.ResponseWriter, r *http.Request) (v3SeriesBody, bool) {
+	var body v3SeriesBody
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil {
 		v3Error(w, http.StatusBadRequest, "invalid JSON body")
+		return body, false
+	}
+	return body, true
+}
+
+func V3SeriesAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
+	body, ok := v3DecodeSeries(w, r)
+	if !ok {
 		return
 	}
 	title := strings.TrimSpace(body.Title)
@@ -385,40 +532,87 @@ func V3SeriesAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	for _, series := range cfg.Series {
-		if strings.EqualFold(series.Name, title) {
-			v3Error(w, http.StatusConflict, "series already exists")
-			return
-		}
+	if v3SeriesIndex(cfg, body.TvdbID, title) >= 0 {
+		v3Error(w, http.StatusConflict, "series already exists")
+		return
 	}
-	profile := v3ProfileByID(cfg, body.QualityProfileID)
-	seasons := "1+"
-	if len(body.Seasons) > 0 {
-		values := make([]string, 0, len(body.Seasons))
-		for _, season := range body.Seasons {
-			if season.SeasonNumber >= 0 {
-				values = append(values, strconv.Itoa(season.SeasonNumber))
-			}
-		}
-		if len(values) > 0 {
-			seasons = strings.Join(values, ",")
-		}
-	}
-	series := SeriesConfig{
-		Name: title, Seasons: seasons, Quality: profile.Quality, Language: profile.Language,
+	profile := qualityProfileByID(ensureQualityProfiles(s), body.QualityProfileID)
+	added := SeriesConfig{
+		Name: title, Seasons: v3SeasonSpec(body.Seasons), Quality: profile.Quality, Language: profile.Language,
 		ArchivePath: strings.TrimSpace(body.RootFolderPath), TmdbID: v3ID(body.TmdbID), TvdbID: v3ID(body.TvdbID),
 		Subtitle: profile.Subtitle, Exclude: profile.Exclude, Enabled: true,
 		SeasonSubfolders: body.SeasonFolder,
 	}
-	cfg.Series = append(cfg.Series, series)
-	if err := SaveLibrary(cfg.DataDir, cfg.Series, cfg.Movies); err != nil {
+	// The cached configuration is shared: build a new slice, never append to it.
+	series := append(append([]SeriesConfig{}, cfg.Series...), added)
+	if err := SaveLibrary(cfg.DataDir, series, cfg.Movies); err != nil {
 		v3Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	v3JSON(w, http.StatusCreated, v3Series{ID: len(cfg.Series), Title: title, TitleSlug: v3Slug(title),
-		TvdbID: body.TvdbID, TmdbID: body.TmdbID, RootFolderPath: series.ArchivePath,
+	v3JSON(w, http.StatusCreated, v3Series{ID: len(series), Title: title, TitleSlug: v3Slug(title),
+		TvdbID: body.TvdbID, TmdbID: body.TmdbID, RootFolderPath: added.ArchivePath,
 		QualityProfileID: profile.ID, LanguageProfileID: 1, SeasonFolder: body.SeasonFolder,
-		Monitored: true, Seasons: body.Seasons})
+		Monitored: true, Seasons: v3NonNilSeasons(body.Seasons), Tags: []int{}})
+}
+
+// V3SeriesUpdate is PUT /api/v3/series: Jellyseerr sends it when a request
+// adds seasons to a series that is already in the library. The newly
+// monitored seasons are added to the series' season list; nothing is removed.
+func V3SeriesUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
+	body, ok := v3DecodeSeries(w, r)
+	if !ok {
+		return
+	}
+	cfg := latestConfig(s)
+	index := v3SeriesIndex(cfg, body.TvdbID, body.Title)
+	if index < 0 && body.ID > 0 && body.ID <= len(cfg.Series) {
+		index = body.ID - 1
+	}
+	if index < 0 {
+		v3Error(w, http.StatusNotFound, "series not found")
+		return
+	}
+	series := append([]SeriesConfig{}, cfg.Series...)
+	updated := series[index]
+	for _, season := range body.Seasons {
+		number := int64(season.SeasonNumber)
+		if !season.Monitored || number < 0 {
+			continue
+		}
+		if !seasonAllowed(updated.Seasons, number) {
+			if strings.TrimSpace(updated.Seasons) == "" {
+				updated.Seasons = strconv.FormatInt(number, 10)
+			} else {
+				updated.Seasons += "," + strconv.FormatInt(number, 10)
+			}
+		}
+		ignored := updated.IgnoredSeasons[:0:0]
+		for _, value := range updated.IgnoredSeasons {
+			if value != number {
+				ignored = append(ignored, value)
+			}
+		}
+		updated.IgnoredSeasons = ignored
+	}
+	if body.Monitored {
+		updated.Enabled = true
+	}
+	series[index] = updated
+	if err := SaveLibrary(cfg.DataDir, series, cfg.Movies); err != nil {
+		v3Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	v3JSON(w, http.StatusAccepted, v3Series{ID: index + 1, Title: updated.Name, TitleSlug: v3Slug(updated.Name),
+		TvdbID: body.TvdbID, TmdbID: body.TmdbID, RootFolderPath: updated.ArchivePath,
+		QualityProfileID: body.QualityProfileID, LanguageProfileID: 1, SeasonFolder: updated.SeasonSubfolders,
+		Monitored: updated.Enabled, Seasons: v3NonNilSeasons(body.Seasons), Tags: []int{}})
+}
+
+func v3NonNilSeasons(seasons []v3Season) []v3Season {
+	if seasons == nil {
+		return []v3Season{}
+	}
+	return seasons
 }
 
 func V3MovieLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -428,6 +622,10 @@ func V3MovieLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
+	if id, ok := v3TermID(term, "tmdb"); ok {
+		v3JSON(w, http.StatusOK, []v3Movie{v3MovieByTmdbID(r.Context(), s, cfg, id)})
+		return
+	}
 	out := []v3Movie{}
 	client := NewTmdbClient(cfg.TmdbAPIKey)
 	if client.Configured() {
@@ -439,25 +637,108 @@ func V3MovieLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
 				title := v3ItemName(item)
 				out = append(out, v3Movie{ID: int(item.ID), Title: title, TitleSlug: v3Slug(title),
 					TmdbID: item.ID, Year: v3ItemYear(item), Overview: v3ItemOverview(item),
-					RemotePoster: v3ItemPoster(item), QualityProfileID: 1, Monitored: true})
+					RemotePoster: v3ItemPoster(item), QualityProfileID: 1, Monitored: true, Tags: []int{}})
 			}
 		}
 	}
 	v3JSON(w, http.StatusOK, out)
 }
 
-func V3MovieAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
-	var body struct {
-		Title            string `json:"title"`
-		TitleSlug        string `json:"titleSlug"`
-		TmdbID           int64  `json:"tmdbId"`
-		Year             int    `json:"year"`
-		RootFolderPath   string `json:"rootFolderPath"`
-		QualityProfileID int    `json:"qualityProfileId"`
-		Monitored        bool   `json:"monitored"`
+// v3MovieIndex finds a configured movie by TMDB id, then by title and year.
+func v3MovieIndex(cfg *Config, tmdbID int64, title string, year int) int {
+	if cfg == nil {
+		return -1
 	}
+	if tmdbID > 0 {
+		id := strconv.FormatInt(tmdbID, 10)
+		for i, movie := range cfg.Movies {
+			if strings.TrimSpace(movie.TmdbID) == id {
+				return i
+			}
+		}
+	}
+	title = strings.TrimSpace(title)
+	for i, movie := range cfg.Movies {
+		if title == "" || !strings.EqualFold(movie.Name, title) {
+			continue
+		}
+		if year > 0 && strings.TrimSpace(movie.Year) != "" && movie.Year != strconv.Itoa(year) {
+			continue
+		}
+		return i
+	}
+	return -1
+}
+
+// v3MovieRecord is the v3 view of a configured movie: its library id, whether
+// it is monitored and whether it is already archived.
+func v3MovieRecord(s *AppState, movie MovieConfig) v3Movie {
+	out := v3Movie{ID: int(movie.ID), Title: movie.Name, TitleSlug: v3Slug(movie.Name),
+		TmdbID: v3Int(movie.TmdbID), Monitored: movie.Enabled, IsAvailable: true,
+		QualityProfileID: 1, Tags: []int{}}
+	var year *int64
+	if parsed, err := strconv.ParseInt(strings.TrimSpace(movie.Year), 10, 64); err == nil {
+		out.Year = int(parsed)
+		year = &parsed
+	}
+	if s != nil && s.db != nil {
+		if size, err := s.db.MovieArchivedSize(movie.Name, year); err == nil && size != nil {
+			out.HasFile = true
+		}
+	}
+	return out
+}
+
+// v3MovieByTmdbID answers a "tmdb:" lookup: the configured movie with its id,
+// or the TMDB description of a new one (id 0, so Jellyseerr adds it).
+func v3MovieByTmdbID(ctx context.Context, s *AppState, cfg *Config, tmdbID int64) v3Movie {
+	if index := v3MovieIndex(cfg, tmdbID, "", 0); index >= 0 {
+		return v3MovieRecord(s, cfg.Movies[index])
+	}
+	out := v3Movie{TmdbID: tmdbID, QualityProfileID: 1, Tags: []int{}}
+	client := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
+	if !client.Configured() {
+		return out
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	details, err := client.MovieDetails(ctx, strconv.FormatInt(tmdbID, 10))
+	if err != nil || details == nil {
+		return out
+	}
+	item := TmdbItem{ID: details.ID, Title: details.Title, Overview: details.Overview,
+		PosterPath: details.PosterPath, ReleaseDate: details.ReleaseDate}
+	out.Title, out.Year = v3ItemName(item), v3ItemYear(item)
+	out.Overview, out.RemotePoster = v3ItemOverview(item), v3ItemPoster(item)
+	out.TitleSlug = v3Slug(out.Title)
+	if index := v3MovieIndex(cfg, 0, out.Title, out.Year); index >= 0 {
+		return v3MovieRecord(s, cfg.Movies[index])
+	}
+	return out
+}
+
+type v3MovieBody struct {
+	ID               int    `json:"id"`
+	Title            string `json:"title"`
+	TmdbID           int64  `json:"tmdbId"`
+	Year             int    `json:"year"`
+	RootFolderPath   string `json:"rootFolderPath"`
+	QualityProfileID int    `json:"qualityProfileId"`
+	Monitored        bool   `json:"monitored"`
+}
+
+func v3DecodeMovie(w http.ResponseWriter, r *http.Request) (v3MovieBody, bool) {
+	var body v3MovieBody
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil {
 		v3Error(w, http.StatusBadRequest, "invalid JSON body")
+		return body, false
+	}
+	return body, true
+}
+
+func V3MovieAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
+	body, ok := v3DecodeMovie(w, r)
+	if !ok {
 		return
 	}
 	title := strings.TrimSpace(body.Title)
@@ -466,28 +747,65 @@ func V3MovieAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	for _, movie := range cfg.Movies {
-		if strings.EqualFold(movie.Name, title) {
-			v3Error(w, http.StatusConflict, "movie already exists")
-			return
-		}
+	if v3MovieIndex(cfg, body.TmdbID, title, body.Year) >= 0 {
+		v3Error(w, http.StatusConflict, "movie already exists")
+		return
 	}
-	profile := v3ProfileByID(cfg, body.QualityProfileID)
+	profile := qualityProfileByID(ensureQualityProfiles(s), body.QualityProfileID)
 	year := ""
 	if body.Year > 0 {
 		year = strconv.Itoa(body.Year)
 	}
-	movie := MovieConfig{Name: title, Year: year, TmdbID: v3ID(body.TmdbID),
+	added := MovieConfig{Name: title, Year: year, TmdbID: v3ID(body.TmdbID),
 		Quality: profile.Quality, Language: profile.Language, Subtitle: profile.Subtitle,
 		Exclude: profile.Exclude, Enabled: true}
-	cfg.Movies = append(cfg.Movies, movie)
-	if err := SaveLibrary(cfg.DataDir, cfg.Series, cfg.Movies); err != nil {
+	// The cached configuration is shared: build a new slice, never append to it.
+	movies := append(append([]MovieConfig{}, cfg.Movies...), added)
+	if err := SaveLibrary(cfg.DataDir, cfg.Series, movies); err != nil {
 		v3Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	v3JSON(w, http.StatusCreated, v3Movie{ID: int(movie.ID), Title: title, TitleSlug: v3Slug(title),
-		TmdbID: body.TmdbID, Year: body.Year, RootFolderPath: body.RootFolderPath,
-		QualityProfileID: profile.ID, Monitored: true})
+	// Jellyseerr treats a response without an id as a failed add: the id is
+	// the one the library database assigned on save.
+	saved := latestConfig(s)
+	index := v3MovieIndex(saved, body.TmdbID, title, body.Year)
+	if index < 0 || saved.Movies[index].ID <= 0 {
+		v3Error(w, http.StatusInternalServerError, "the movie was saved but its id is unavailable")
+		return
+	}
+	out := v3MovieRecord(s, saved.Movies[index])
+	out.RootFolderPath, out.QualityProfileID = body.RootFolderPath, profile.ID
+	v3JSON(w, http.StatusCreated, out)
+}
+
+// V3MovieUpdate is PUT /api/v3/movie: Jellyseerr sends it for a movie that is
+// in the library but not monitored, to monitor it again.
+func V3MovieUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
+	body, ok := v3DecodeMovie(w, r)
+	if !ok {
+		return
+	}
+	cfg := latestConfig(s)
+	index := -1
+	for i, movie := range cfg.Movies {
+		if body.ID > 0 && int(movie.ID) == body.ID {
+			index = i
+		}
+	}
+	if index < 0 {
+		index = v3MovieIndex(cfg, body.TmdbID, body.Title, body.Year)
+	}
+	if index < 0 {
+		v3Error(w, http.StatusNotFound, "movie not found")
+		return
+	}
+	movies := append([]MovieConfig{}, cfg.Movies...)
+	movies[index].Enabled = body.Monitored
+	if err := SaveLibrary(cfg.DataDir, cfg.Series, movies); err != nil {
+		v3Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	v3JSON(w, http.StatusAccepted, v3MovieRecord(s, movies[index]))
 }
 
 func V3Queue(w http.ResponseWriter, r *http.Request, s *AppState) {

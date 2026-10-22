@@ -1103,7 +1103,10 @@ of quality, language, subtitles and exclusions you use. Gextto generates a
 profile for every combination already present in the library and exposes them to
 Jellyseerr through `/api/v3/qualityprofile`; the first profile is **Default**.
 Profiles are presets: when Jellyseerr adds a series or a movie with a profile,
-Gextto copies those values into the title.
+Gextto copies those values into the title. Each profile keeps its number when
+you remove or reorder others: Jellyseerr remembers the number, not the name. If
+you remove every profile, Gextto generates them again from the library on the
+next read.
 
 ### Configuring a Torznab indexer
 
@@ -1229,6 +1232,14 @@ Gextto exposes a subset of the Sonarr/Radarr v3 API for Jellyseerr:
 (Configuration → Access) as the key. This is not full compatibility: requests
 Gextto does not handle answer 404, and quality profiles/custom formats do not
 reproduce the *arr* semantics.
+
+What happens to a request: for a new series Gextto follows only the seasons
+requested in Jellyseerr (no season given = from season 1 on); if the series is
+already in the library, the requested seasons are added to the ones it already
+follows, none removed. A movie already in the library is not added twice: if it
+was disabled it is enabled again. Jellyseerr's "search now" (`/api/v3/command`)
+is not handled: the added title is searched by Gextto's normal acquisition
+cycles.
 
 ### Connecting an external service
 

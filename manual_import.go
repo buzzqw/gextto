@@ -286,8 +286,11 @@ func ManualImport(ctx context.Context, cfg *Config, db *Database, req ManualImpo
 		release.Series = &series.Name
 		release.Season = &season
 		release.Episode = &episode
-		if len(release.EpisodeRange) == 0 {
+		// A corrected episode replaces the parsed run: keeping it would register
+		// the episodes the name claimed, not the one the operator chose.
+		if len(release.EpisodeRange) == 0 || !containsInt64(release.EpisodeRange, episode) {
 			release.EpisodeRange = []int64{episode}
+			release.IsPack = false
 		}
 		source, target, ok, err := episodeTarget(ctx, abs, release, cfg, tmdb)
 		if err != nil {
@@ -324,15 +327,27 @@ func ManualImport(ctx context.Context, cfg *Config, db *Database, req ManualImpo
 		if year == 0 && release.Year != nil {
 			year = *release.Year
 		}
-		movie := cfg.FindMovieMatchManual(movieName, &year)
+		// Year 0 means "not given": a pointer to 0 would rule out every movie
+		// with a configured year.
+		var yearFilter *int64
+		if year > 0 {
+			yearFilter = &year
+		}
+		movie := cfg.FindMovieMatchManual(movieName, yearFilter)
 		if movie == nil && movieName == "" {
 			movie = cfg.FindMovieMatchManual(release.Title, release.Year)
 		}
 		if movie == nil {
 			return "", fmt.Errorf("movie %q is not configured", movieName)
 		}
+		if year == 0 {
+			year, _ = strconv.ParseInt(strings.TrimSpace(movie.Year), 10, 64)
+		}
 		release.Kind = "movie"
 		release.Title = movie.Name
+		if year > 0 {
+			release.Year = &year
+		}
 		renamed, err := RenameMovie(ctx, abs, release, cfg, tmdb)
 		if err != nil {
 			return "", err
@@ -346,6 +361,13 @@ func ManualImport(ctx context.Context, cfg *Config, db *Database, req ManualImpo
 		}
 		final, err := manualImportPlace(renamed, filepath.Base(renamed), destination, req.Replace, cfg)
 		if err != nil {
+			// RenameMovie renames in place: a refused import must leave the
+			// file under its original name.
+			if !SamePath(renamed, abs) {
+				if undo := moveAcrossDevices(renamed, abs); undo != nil {
+					logging.Warn("manual import: cannot restore the original name", "path", renamed, "error", undo.Error())
+				}
+			}
 			return "", err
 		}
 		movieSize := int64(0)

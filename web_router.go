@@ -44,13 +44,17 @@ func Router(s *AppState) *http.ServeMux {
 	// The Sonarr/Radarr v3 subset a request manager (Jellyseerr) speaks.
 	handle(s, mux, "GET /api/v3/system/status", V3SystemStatus)
 	handle(s, mux, "GET /api/v3/qualityprofile", V3QualityProfiles)
+	// Jellyseerr asks for /qualityProfile; Sonarr's routes ignore case, Go's do not.
+	handle(s, mux, "GET /api/v3/qualityProfile", V3QualityProfiles)
 	handle(s, mux, "GET /api/v3/languageprofile", V3LanguageProfiles)
 	handle(s, mux, "GET /api/v3/rootfolder", V3RootFolders)
 	handle(s, mux, "GET /api/v3/tag", V3Tags)
 	handle(s, mux, "GET /api/v3/series/lookup", V3SeriesLookup)
 	handle(s, mux, "POST /api/v3/series", V3SeriesAdd)
+	handle(s, mux, "PUT /api/v3/series", V3SeriesUpdate)
 	handle(s, mux, "GET /api/v3/movie/lookup", V3MovieLookup)
 	handle(s, mux, "POST /api/v3/movie", V3MovieAdd)
+	handle(s, mux, "PUT /api/v3/movie", V3MovieUpdate)
 	handle(s, mux, "GET /api/v3/queue", V3Queue)
 	handle(s, mux, "GET /api/config/library", LibraryView)
 	handle(s, mux, "POST /api/config/library", SaveLibraryHandler)
