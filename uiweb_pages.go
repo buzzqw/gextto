@@ -336,7 +336,7 @@ type uiListFieldOption struct {
 type uiListField struct {
 	Name        string
 	Label       string
-	Kind        string // text | number | bool | tags | secret | select | combo (suggestions + free text)
+	Kind        string // text | number | bool | tags | secret | select | combo (suggestions + free text) | id (hidden record id)
 	Placeholder string
 	// Options are the choices of a select field.
 	Options []uiListFieldOption
@@ -439,6 +439,9 @@ var uiAdvancedEditors = []uiListEditor{
 		Title: "Profili di qualità", Hint: "Un nome per ogni combinazione di qualità, audio minimo, lingua, sottotitoli, esclusioni e upgrade. Sono modelli: scegliendo un profilo quando aggiungi una serie o un film, i suoi valori vengono copiati nel titolo e restano modificabili. La stessa lista è quella che vede Jellyseerr (/api/v3/qualityprofile); le combinazioni già presenti nella libreria vengono aggiunte automaticamente.",
 		GetPath: "/api/quality-profiles", Unwrap: "items", PostPath: "/api/quality-profiles",
 		Fields: []uiListField{
+			// The id travels with the row: renaming a profile keeps its number,
+			// which is what a request manager (Jellyseerr) remembers.
+			{Name: "id", Kind: "id"},
 			{Name: "name", Label: "Nome", Kind: "text", Wide: true},
 			{Name: "quality", Label: "Qualità", Kind: "select", Options: uiQualityPresetOptions},
 			{Name: "audio", Label: "Audio minimo", Kind: "select", Options: uiAudioPresetOptions},

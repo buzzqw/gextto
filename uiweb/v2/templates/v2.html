@@ -1257,13 +1257,14 @@
 <div class="card list-row">
   {{range .Row.Fields}}
   {{$value := .Value}}{{$name := .Name}}{{$index := $.Row.Index}}
+   {{if eq .Kind "id"}}<input type="hidden" name="{{$name}}__{{$index}}" value="{{$value}}" />{{else}}
    <label class="field{{if .Wide}} wide{{end}}" title="{{.Label}}"><span>{{.Label}}</span>
     {{if eq .Kind "bool"}}<select class="input" name="{{$name}}__{{$index}}"><option value="true"{{if eq $value "true"}} selected{{end}}>Sì</option><option value="false"{{if eq $value "false"}} selected{{end}}>No</option></select>
     {{else if eq .Kind "number"}}<input class="input" type="number" name="{{$name}}__{{$index}}" value="{{$value}}" />
     {{else if eq .Kind "select"}}<select class="input" name="{{$name}}__{{$index}}">{{range .Options}}<option value="{{.Value}}"{{if eq $value .Value}} selected{{end}}>{{.Label}}</option>{{end}}</select>
     {{else if eq .Kind "combo"}}<input class="input" name="{{$name}}__{{$index}}" value="{{$value}}" placeholder="{{.Placeholder}}" list="v2-combo-{{$name}}-{{$index}}" autocomplete="off" /><datalist id="v2-combo-{{$name}}-{{$index}}">{{range .Options}}<option value="{{.Value}}">{{.Label}}</option>{{end}}</datalist>
     {{else}}<span class="field-row"><input class="input" name="{{$name}}__{{$index}}" value="{{$value}}" placeholder="{{.Placeholder}}"{{if .Browse}} data-v2-browse-input{{end}} />{{if .Browse}}<button class="btn sm" type="button" data-v2-browse-for="{{$name}}__{{$index}}" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button>{{end}}</span>{{end}}
-  </label>
+  </label>{{end}}
   {{end}}
   <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML" title="Testa questa riga">Testa</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/empty" hx-target="closest .list-row" hx-swap="outerHTML" data-v2-marks-dirty title="Rimuovi questa riga (da salvare)">Rimuovi</button></div>
 </div>

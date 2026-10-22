@@ -512,6 +512,11 @@ func v2FieldRawValue(fields []uiListField, name, value string) any {
 		switch field.Kind {
 		case "bool":
 			return value == "true"
+		case "id":
+			if number, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil && number > 0 {
+				return number
+			}
+			return 0
 		case "number":
 			// An empty number is "not set" (null): a list whose records
 			// distinguish "inherit" from 0 (the seed rules) keeps the

@@ -1227,7 +1227,7 @@ profilo, i titoli già creati non cambiano: per aggiornarne molti insieme usa
 Sonarr" in cui il profilo governa i titoli: il campo Qualità accetta già un
 minimo (`1080p`), un massimo (`<1080p`) o un intervallo (`720p-1080p`), e
 lingua, sottotitoli, esclusioni e upgrade si impostano per titolo. Ogni
-profilo mantiene il suo numero anche se ne togli o riordini altri: Jellyseerr
+profilo mantiene il suo numero anche se lo rinomini o ne togli e riordini altri: Jellyseerr
 ricorda il numero, non il nome. Se togli tutti i profili, alla lettura
 successiva Gextto li rigenera dalla libreria.
 

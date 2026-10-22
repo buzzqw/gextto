@@ -1190,7 +1190,7 @@ the titles already created do not change: to update many of them at once use
 profile governs its titles: the Quality field already takes a minimum
 (`1080p`), a maximum (`<1080p`) or a range (`720p-1080p`), and language,
 subtitles, exclusions and upgrades are set per title. Each profile keeps its number when
-you remove or reorder others: Jellyseerr remembers the number, not the name. If
+you rename it or remove or reorder others: Jellyseerr remembers the number, not the name. If
 you remove every profile, Gextto generates them again from the library on the
 next read.
 

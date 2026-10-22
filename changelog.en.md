@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **Quality profiles: renaming no longer changes the number.** A profile's number is what Jellyseerr remembers: before, renaming a profile in the editor (or saving from a page opened before a change) gave it a new number. Now every editor row carries its own number.
+
 - **Series and movie pages: the quality profile instead of single fields.** On the title page **Quality**, **Language** and **Subtitles** make room for **Quality profile**, as in the add form. The profile matching the title's values is preselected, with its summary; when none matches, **Current values** appears, and saving with it changes nothing. Choosing a profile and saving copies its quality, minimum audio, language, subtitles and **Allow upgrades** into the title and adds the profile's exclusions to the title's. The profile stays a template: editing it in *Quality and upgrades* does not change titles already created.
 
 - **Series page: the read-only Name field is gone.** It repeated the title already shown in the header and looked editable without being so. To fix a wrong name, delete the series and add it again.

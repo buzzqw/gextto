@@ -2608,3 +2608,27 @@ func TestV2TitlePagesApplyAQualityProfile(t *testing.T) {
 		t.Fatalf("movie after profile = %+v", got)
 	}
 }
+
+func TestV2QualityProfileRenameKeepsItsID(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey, `[{"id":1,"name":"Default","language":"ita"},{"id":11,"name":"720p-1080p · ita","quality":"720p-1080p","language":"ita"}]`); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=scores", nil)
+	if code != http.StatusOK || !strings.Contains(body, `<input type="hidden" name="id__1" value="11" />`) {
+		t.Fatalf("the row must carry the profile id: %d", code)
+	}
+	form := url.Values{"editor": {"quality_profiles"}, "tab": {"scores"},
+		"id__0": {"1"}, "name__0": {"Default"}, "language__0": {"ita"},
+		"id__1": {"11"}, "name__1": {"HD o Full HD · ita"}, "quality__1": {"720p-1080p"}, "language__1": {"ita"},
+		"id__2": {""}, "name__2": {"Nuovo"}, "quality__2": {"1080p+"}, "language__2": {"eng"}}
+	if code, body := v2Request(t, server, http.MethodPost, "/settings/editor-save", form); code >= 400 {
+		t.Fatalf("save -> %d %s", code, body)
+	}
+	profiles := ensureQualityProfiles(state)
+	if len(profiles) != 3 || profiles[1].ID != 11 || profiles[1].Name != "HD o Full HD · ita" || profiles[2].ID != 12 {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+}
