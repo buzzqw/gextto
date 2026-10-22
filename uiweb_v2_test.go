@@ -1055,7 +1055,7 @@ func TestV2DetailPagesRender(t *testing.T) {
 	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=7", nil)
 	// One «Lingua» (the legacy requirement decides, so it is what the form
 	// shows) and no separate requirement fields.
-	if code != http.StatusOK || !strings.Contains(body, "Test Movie") || !strings.Contains(body, `<option value="ita" selected>`) ||
+	if code != http.StatusOK || !strings.Contains(body, "Test Movie") || !strings.Contains(body, `name="quality_profile_id"`) || !strings.Contains(body, `<input type="hidden" name="language" value="ita" />`) ||
 		strings.Contains(body, `name="language_requirements"`) || strings.Contains(body, `name="subtitle_requirements"`) || !strings.Contains(body, `name="subtitle_required"`) {
 		t.Fatalf("movie detail -> %d", code)
 	}
@@ -2557,5 +2557,54 @@ func TestV2SeriesSaveWithoutAudioKeepsTheMinimum(t *testing.T) {
 		if series.Name == "Keep Audio" && (series.Audio != "high-5.1" || series.Quality != "720p") {
 			t.Fatalf("series after save = %+v", series)
 		}
+	}
+}
+
+func TestV2TitlePagesApplyAQualityProfile(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey, `[{"id":1,"name":"Default","language":"ita"},{"id":7,"name":"Full HD eng","quality":"1080p+","audio":"high-5.1","language":"eng","subtitle":"ita","exclude":"cam","disable_upgrades":true}]`); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveLibrary(state.cfg.DataDir,
+		[]SeriesConfig{{Name: "Show", Seasons: "1+", Quality: "720p+", Language: "ita", Exclude: "spinoff", Enabled: true}},
+		[]MovieConfig{{ID: 3, Name: "Film", Year: "2020", Quality: "", Language: "ita", Enabled: true}}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	// No profile has 720p+ · ita: the page offers «Valori attuali»; the movie
+	// matches Default, which is preselected.
+	code, body := v2Request(t, server, http.MethodGet, "/?view=series&series=Show", nil)
+	if code != http.StatusOK || !strings.Contains(body, `<option value="0" data-summary="720p&#43; · lingua ita" selected>Valori attuali</option>`) || strings.Contains(body, `name="quality"`) {
+		t.Fatalf("series page profile choice: %d %s", code, body)
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=3", nil)
+	if code != http.StatusOK || !strings.Contains(body, `data-summary="qualsiasi qualità · lingua ita" selected>Default</option>`) || strings.Contains(body, "Valori attuali") {
+		i := strings.Index(body, "quality_profile_id")
+		t.Fatalf("movie page profile choice: %d %s", code, body[i:min(len(body), i+900)])
+	}
+
+	// «Valori attuali» keeps everything.
+	if code, body := v2Request(t, server, http.MethodPost, "/series/save", url.Values{"name": {"Show"}, "seasons": {"1+"}, "exclude": {"spinoff"}, "quality_profile_id": {"0"}, "flags": {"1"}, "anime": {"false"}}); code >= 400 {
+		t.Fatalf("keep -> %d %s", code, body)
+	}
+	if got := latestConfig(state).Series[0]; got.Quality != "720p+" || got.Language != "ita" {
+		t.Fatalf("keep changed the series: %+v", got)
+	}
+	// A profile copies its values and adds its exclusions to the title's.
+	if code, body := v2Request(t, server, http.MethodPost, "/series/save", url.Values{"name": {"Show"}, "seasons": {"1+"}, "exclude": {"spinoff"}, "quality_profile_id": {"7"}, "flags": {"1"}, "anime": {"false"}}); code >= 400 {
+		t.Fatalf("apply -> %d %s", code, body)
+	}
+	if got := latestConfig(state).Series[0]; got.Quality != "1080p+" || got.Audio != "high-5.1" || got.Language != "eng" || got.Subtitle != "ita" || !got.DisableUpgrades || got.Exclude != "cam, spinoff" {
+		t.Fatalf("series after profile = %+v", got)
+	}
+	form := url.Values{"view": {"movies"}, "path": {"/api/movies/3"}, "name": {"Film"}, "year": {"2020"}, "quality": {""}, "language": {"ita"}, "subtitle": {""},
+		"quality_profile_id": {"7"}, "_v2_kind_quality_profile_id": {"number"}}
+	if code, body := v2Request(t, server, http.MethodPost, "/section/form", form); code >= 400 {
+		t.Fatalf("movie apply -> %d %s", code, body)
+	}
+	if got := latestConfig(state).Movies[0]; got.Quality != "1080p+" || got.Language != "eng" || got.Subtitle != "ita" || !got.DisableUpgrades || got.Exclude != "cam" {
+		t.Fatalf("movie after profile = %+v", got)
 	}
 }

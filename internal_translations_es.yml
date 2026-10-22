@@ -5995,3 +5995,7 @@ spa:
   "vuoto = nessuno": "vacío = ninguno"
   "Sottotitoli obbligatori": "Subtítulos obligatorios"
   "Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti.": "Sí: una release sin estos subtítulos se descarta. No: los subtítulos solo son preferidos."
+  "Non sostituirebbe la copia in libreria: per questo titolo gli upgrade sono spenti («Niente upgrade»).": "No sustituiría la copia de la biblioteca: las mejoras están desactivadas para este título («Sin mejoras»)."
+  "Valori attuali": "Valores actuales"
+  "Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue.": "Al elegir un perfil y guardar, sus valores se copian en este título; las exclusiones de abajo se suman a las del perfil."
+  "Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo": "Al elegir un perfil y guardar, la calidad, el audio mínimo, el idioma, los subtítulos y permitir mejoras del perfil se copian en este título"

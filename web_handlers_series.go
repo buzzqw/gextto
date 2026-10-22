@@ -25,6 +25,10 @@ type SeriesUpdateInput struct {
 	DisableUpgrades  *bool     `json:"disable_upgrades"`
 	Anime            *bool     `json:"anime"`
 	Timeframe        *int64    `json:"timeframe"`
+	// QualityProfileID, when above 0, copies that profile's quality, audio,
+	// language, subtitles and upgrade switch into the series and adds its
+	// exclusions to the series' own (the profile is a template).
+	QualityProfileID *int `json:"quality_profile_id"`
 }
 
 // seriesIndex returns the position of the series called name (or with that
@@ -107,6 +111,17 @@ func UpdateSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	if input.Timeframe != nil {
 		series.Timeframe = max(*input.Timeframe, 0)
+	}
+	if input.QualityProfileID != nil && *input.QualityProfileID > 0 {
+		profile, ok := qualityProfileExact(ensureQualityProfiles(s), *input.QualityProfileID)
+		if !ok {
+			jsonError(w, http.StatusBadRequest, "quality profile not found")
+			return
+		}
+		series.Quality, series.Language, series.Subtitle = profile.Quality, profile.Language, profile.Subtitle
+		series.Audio, series.AudioChannels = profile.Audio, ""
+		series.DisableUpgrades = profile.DisableUpgrades
+		series.Exclude = mergeExclusions(profile.Exclude, series.Exclude)
 	}
 	updated := *series
 	if err := SaveLibrary(s.cfg.DataDir, list, cfg.Movies); err != nil {

@@ -1274,6 +1274,18 @@ func UpdateMovie(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if input.DisableUpgrades != nil {
 		movie.DisableUpgrades = *input.DisableUpgrades
 	}
+	if input.QualityProfileID != nil && *input.QualityProfileID > 0 {
+		profile, ok := qualityProfileExact(ensureQualityProfiles(s), *input.QualityProfileID)
+		if !ok {
+			jsonError(w, http.StatusBadRequest, "quality profile not found")
+			return
+		}
+		movie.Quality, movie.Language, movie.Subtitle = profile.Quality, profile.Language, profile.Subtitle
+		movie.Audio, movie.AudioChannels = profile.Audio, ""
+		movie.LanguageRequirements = ""
+		movie.DisableUpgrades = profile.DisableUpgrades
+		movie.Exclude = mergeExclusions(profile.Exclude, movie.Exclude)
+	}
 	if input.SubtitleRequired != nil {
 		movie.SubtitleRequirements = ""
 		if *input.SubtitleRequired {

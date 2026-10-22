@@ -12,6 +12,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -51,13 +52,21 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		// Only the edited fields: the per-series endpoint keeps everything else.
 		fields := map[string]any{
 			"seasons":      r.FormValue("seasons"),
-			"quality":      r.FormValue("quality"),
-			"language":     r.FormValue("language"),
-			"subtitle":     r.FormValue("subtitle"),
 			"tvdb_id":      r.FormValue("tvdb_id"),
 			"archive_path": r.FormValue("archive_path"),
 			"exclude":      r.FormValue("exclude"),
 			"aliases":      aliases,
+		}
+		// Quality, language and subtitles come from the quality profile chosen
+		// on the page (0 = keep the current values); they are still accepted
+		// when posted directly.
+		for _, key := range []string{"quality", "language", "subtitle"} {
+			if _, ok := r.Form[key]; ok {
+				fields[key] = r.FormValue(key)
+			}
+		}
+		if id, err := strconv.Atoi(strings.TrimSpace(r.FormValue("quality_profile_id"))); err == nil && id > 0 {
+			fields["quality_profile_id"] = id
 		}
 		// Audio minimo is set by the quality profile (and Modifica selezionati):
 		// the page has no field for it, so it is sent only when posted.

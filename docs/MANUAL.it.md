@@ -669,7 +669,7 @@ I campi più importanti sono:
 
 | Campo | Effetto |
 |---|---|
-| Profilo di qualità | solo all'aggiunta: dà al titolo qualità, audio minimo, lingua, sottotitoli, esclusioni e «Permetti upgrade» del profilo (vedi *Profili di qualità*); nella scheda del titolo i singoli valori si possono poi cambiare |
+| Profilo di qualità | all'aggiunta e nella scheda del titolo: dà al titolo qualità, audio minimo, lingua, sottotitoli e «Permetti upgrade» del profilo e somma le sue esclusioni a quelle del titolo (vedi *Profili di qualità*). Nella scheda è preselezionato il profilo che corrisponde ai valori del titolo; se nessuno corrisponde compare **Valori attuali**, che salvando non cambia nulla. Il profilo è un modello: cambiarlo dopo non tocca i titoli già creati |
 | Qualità | restringe le release accettabili e partecipa allo score |
 | Audio minimo | arriva dal profilo di qualità all'aggiunta e si cambia con *Modifica selezionati* (non c'è nella scheda del titolo); preset che include già i canali: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Qualsiasi** non impone nulla ed è il default, anche per le serie già caricate |
 | Lingua | richiede la lingua configurata quando è riconoscibile nel titolo |

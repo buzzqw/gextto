@@ -61,6 +61,8 @@ type uiSeriesDetail struct {
 	Enabled         bool
 	Anime           bool
 	DisableUpgrades bool
+	// Profiles is the «Profilo di qualità» choice of the page.
+	Profiles        v2TitleProfiles
 	Episodes        []uiEpisodeRow
 	SeasonGroups    []uiSeasonGroup
 	Gaps            int
@@ -162,14 +164,16 @@ type uiMovieDetail struct {
 	Exclude          string
 	SubtitleRequired bool
 	DisableUpgrades  bool
-	Enabled          bool
-	History          []MovieHistory
-	Matches          []uiMovieMatch
-	Poster           string
-	ReleaseDate      string
-	Cast             []uiDetailPerson
-	TmdbURL          string
-	TvdbURL          string
+	// Profiles is the «Profilo di qualità» choice of the page.
+	Profiles    v2TitleProfiles
+	Enabled     bool
+	History     []MovieHistory
+	Matches     []uiMovieMatch
+	Poster      string
+	ReleaseDate string
+	Cast        []uiDetailPerson
+	TmdbURL     string
+	TvdbURL     string
 }
 
 // uiMagnetURL only trusts links with a safe scheme so the archive match links
@@ -299,6 +303,8 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		Enabled:         series.Enabled,
 		Anime:           series.Anime,
 		DisableUpgrades: series.DisableUpgrades,
+		Profiles: v2TitleProfilesFor(s, profileTitleValues{Quality: series.Quality, Audio: audioPreferenceDisplay(series.Audio, series.AudioChannels),
+			Language: series.Language, Subtitle: series.Subtitle, DisableUpgrades: series.DisableUpgrades}),
 		Episodes:        rows,
 		SeasonGroups:    seasonGroups,
 		Gaps:            gaps,
@@ -417,10 +423,12 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		Exclude:          movie.Exclude,
 		SubtitleRequired: strings.TrimSpace(movie.SubtitleRequirements) != "",
 		DisableUpgrades:  movie.DisableUpgrades,
-		Enabled:          movie.Enabled,
-		Poster:           movie.PosterPath,
-		TmdbURL:          tmdbURL(movie.TmdbID, "movie"),
-		TvdbURL:          tvdbURL(movie.TvdbID, "movie"),
+		Profiles: v2TitleProfilesFor(s, profileTitleValues{Quality: movie.Quality, Audio: audioPreferenceDisplay(movie.Audio, movie.AudioChannels),
+			Language: movieEffectiveLanguage(movie), Subtitle: movie.Subtitle, DisableUpgrades: movie.DisableUpgrades}),
+		Enabled: movie.Enabled,
+		Poster:  movie.PosterPath,
+		TmdbURL: tmdbURL(movie.TmdbID, "movie"),
+		TvdbURL: tvdbURL(movie.TvdbID, "movie"),
 	}
 	if raw, status := v2InternalJSON(s, http.MethodGet, "/api/movies/"+strconv.FormatInt(movie.ID, 10), nil, nil); status < 400 {
 		var payload struct {

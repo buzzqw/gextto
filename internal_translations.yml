@@ -5385,3 +5385,7 @@ eng:
   "vuoto = nessuno": "empty = none"
   "Sottotitoli obbligatori": "Subtitles required"
   "Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti.": "Yes: a release without these subtitles is rejected. No: the subtitles are only preferred."
+  "Non sostituirebbe la copia in libreria: per questo titolo gli upgrade sono spenti («Niente upgrade»).": "It would not replace the copy in the library: upgrades are off for this title («No upgrades»)."
+  "Valori attuali": "Current values"
+  "Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue.": "Choosing a profile and saving copies its values into this title; the exclusions below are added to the profile's."
+  "Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo": "Choosing a profile and saving copies its quality, minimum audio, language, subtitles and allow-upgrades into this title"

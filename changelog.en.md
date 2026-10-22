@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **Series and movie pages: the quality profile instead of single fields.** On the title page **Quality**, **Language** and **Subtitles** make room for **Quality profile**, as in the add form. The profile matching the title's values is preselected, with its summary; when none matches, **Current values** appears, and saving with it changes nothing. Choosing a profile and saving copies its quality, minimum audio, language, subtitles and **Allow upgrades** into the title and adds the profile's exclusions to the title's. The profile stays a template: editing it in *Quality and upgrades* does not change titles already created.
+
 - **Series page: the read-only Name field is gone.** It repeated the title already shown in the header and looked editable without being so. To fix a wrong name, delete the series and add it again.
 
 - **Tidier series and movie pages.** The **Minimum audio** and **Allow upgrades** fields are no longer on the title page: they come from the quality profile when you add a series or a movie, and are changed for several titles at once with **Edit selected**. The value already set on each title stays and still applies. On the series page the fields are realigned (Exclude on the whole row, **Anime** as a Yes/No choice).

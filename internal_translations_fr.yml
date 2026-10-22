@@ -6041,3 +6041,7 @@ fra:
   "vuoto = nessuno": "vide = aucun"
   "Sottotitoli obbligatori": "Sous-titres obligatoires"
   "Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti.": "Oui : une release sans ces sous-titres est écartée. Non : les sous-titres sont seulement préférés."
+  "Non sostituirebbe la copia in libreria: per questo titolo gli upgrade sono spenti («Niente upgrade»).": "Ne remplacerait pas la copie de la bibliothèque : les mises à niveau sont désactivées pour ce titre («Pas de mise à niveau»)."
+  "Valori attuali": "Valeurs actuelles"
+  "Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue.": "Choisir un profil et enregistrer copie ses valeurs dans ce titre ; les exclusions ci-dessous s'ajoutent à celles du profil."
+  "Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo": "Choisir un profil et enregistrer copie dans ce titre la qualité, l'audio minimum, la langue, les sous-titres et l'autorisation des mises à niveau du profil"

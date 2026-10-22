@@ -1287,35 +1287,61 @@ type v2ProfileChoice struct {
 }
 
 func v2ProfileChoices(s *AppState, profiles []QualityProfile) []v2ProfileChoice {
-	tr := func(italian string) string { return uiText(s, italian) }
 	out := make([]v2ProfileChoice, 0, len(profiles))
 	for index, profile := range profiles {
-		parts := []string{}
-		if quality := strings.TrimSpace(profile.Quality); quality != "" && !strings.EqualFold(quality, "any") {
-			parts = append(parts, quality)
-		} else {
-			parts = append(parts, tr("qualsiasi qualità"))
-		}
-		if profile.Audio != "" {
-			parts = append(parts, tr("audio")+" "+profile.Audio)
-		}
-		language := strings.TrimSpace(profile.Language)
-		if language == "" {
-			language = "ita"
-		}
-		parts = append(parts, tr("lingua")+" "+language)
-		if profile.Subtitle != "" {
-			parts = append(parts, tr("sottotitoli")+" "+profile.Subtitle)
-		}
-		if profile.Exclude != "" {
-			parts = append(parts, tr("escludi")+" "+profile.Exclude)
-		}
-		if profile.DisableUpgrades {
-			parts = append(parts, tr("upgrade: no"))
-		}
-		out = append(out, v2ProfileChoice{ID: profile.ID, Name: profile.Name, Summary: strings.Join(parts, " · "), Selected: index == 0})
+		out = append(out, v2ProfileChoice{ID: profile.ID, Name: profile.Name, Summary: v2ProfileSummary(s, profile), Selected: index == 0})
 	}
 	return out
+}
+
+// v2ProfileSummary is the one-line description of what a profile sets.
+func v2ProfileSummary(s *AppState, profile QualityProfile) string {
+	tr := func(italian string) string { return uiText(s, italian) }
+	parts := []string{}
+	if quality := strings.TrimSpace(profile.Quality); quality != "" && !strings.EqualFold(quality, "any") {
+		parts = append(parts, quality)
+	} else {
+		parts = append(parts, tr("qualsiasi qualità"))
+	}
+	if profile.Audio != "" {
+		parts = append(parts, tr("audio")+" "+profile.Audio)
+	}
+	language := strings.TrimSpace(profile.Language)
+	if language == "" {
+		language = "ita"
+	}
+	parts = append(parts, tr("lingua")+" "+language)
+	if profile.Subtitle != "" {
+		parts = append(parts, tr("sottotitoli")+" "+profile.Subtitle)
+	}
+	if profile.Exclude != "" {
+		parts = append(parts, tr("escludi")+" "+profile.Exclude)
+	}
+	if profile.DisableUpgrades {
+		parts = append(parts, tr("upgrade: no"))
+	}
+	return strings.Join(parts, " · ")
+}
+
+// v2TitleProfiles is the «Profilo di qualità» choice of a title page. The
+// profile whose values are the title's is preselected; when none is, the
+// page offers «Valori attuali» (id 0, nothing changes on save) with the
+// summary of the title's own values.
+type v2TitleProfiles struct {
+	Choices        []v2ProfileChoice
+	Matched        bool
+	CurrentSummary string
+}
+
+func v2TitleProfilesFor(s *AppState, values profileTitleValues) v2TitleProfiles {
+	profiles := ensureQualityProfiles(s)
+	match := matchingQualityProfile(profiles, values)
+	view := v2TitleProfiles{Matched: match > 0}
+	for _, profile := range profiles {
+		view.Choices = append(view.Choices, v2ProfileChoice{ID: profile.ID, Name: profile.Name, Summary: v2ProfileSummary(s, profile), Selected: profile.ID == match})
+	}
+	view.CurrentSummary = v2ProfileSummary(s, QualityProfile{Quality: values.Quality, Audio: values.Audio, Language: values.Language, Subtitle: values.Subtitle, DisableUpgrades: values.DisableUpgrades})
+	return view
 }
 
 // v2ProposedArchivePath is the default series folder offered by the add modal:

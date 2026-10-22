@@ -1098,6 +1098,9 @@ type MovieUpdateInput struct {
 	// subtitle language a requirement (true) or only a preference (false),
 	// replacing SubtitleRequirements.
 	SubtitleRequired *bool `json:"subtitle_required"`
+	// QualityProfileID, when above 0, copies that profile's values into the
+	// movie (see SeriesUpdateInput).
+	QualityProfileID *int `json:"quality_profile_id"`
 }
 
 // MovieMetadataSearchInput is the input of `movie_metadata_search`.

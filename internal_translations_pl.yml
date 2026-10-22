@@ -5989,3 +5989,7 @@ pol:
   "vuoto = nessuno": "puste = brak"
   "Sottotitoli obbligatori": "Napisy wymagane"
   "Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti.": "Tak: wydanie bez tych napisów jest odrzucane. Nie: napisy są tylko preferowane."
+  "Non sostituirebbe la copia in libreria: per questo titolo gli upgrade sono spenti («Niente upgrade»).": "Nie zastąpiłoby kopii w bibliotece: ulepszenia są wyłączone dla tego tytułu («Bez ulepszeń»)."
+  "Valori attuali": "Bieżące wartości"
+  "Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue.": "Wybranie profilu i zapis kopiuje jego wartości do tego tytułu; wykluczenia poniżej dodają się do wykluczeń profilu."
+  "Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo": "Wybranie profilu i zapis kopiuje do tego tytułu jakość, minimalne audio, język, napisy i zezwolenie na ulepszenia z profilu"

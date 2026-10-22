@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 22 ottobre 2026
 
+- **Schede di serie e film: il profilo di qualità al posto dei singoli campi.** Nella scheda del titolo **Qualità**, **Lingua** e **Sottotitoli** lasciano il posto a **Profilo di qualità**, come nel modulo di aggiunta. È preselezionato il profilo che corrisponde ai valori del titolo, con il suo riassunto; se nessuno corrisponde compare **Valori attuali**, che salvando non cambia nulla. Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e **Permetti upgrade** del profilo vengono copiati nel titolo e le esclusioni del profilo si sommano a quelle del titolo. Il profilo resta un modello: modificarlo in *Qualità e upgrade* non cambia i titoli già creati.
+
 - **Scheda serie: via il campo Nome in sola lettura.** Ripeteva il titolo già scritto in testata e sembrava modificabile senza esserlo. Per correggere un nome sbagliato si cancella la serie e la si aggiunge di nuovo.
 
 - **Schede di serie e film più ordinate.** I campi **Audio minimo** e **Permetti upgrade** non sono più nella scheda del titolo: arrivano dal profilo di qualità quando aggiungi una serie o un film, e si cambiano per più titoli insieme con **Modifica selezionati**. Il valore già impostato su ogni titolo resta e continua a valere. Nella scheda serie i campi sono riallineati (Escludi su tutta la riga, **Anime** come scelta Sì/No).

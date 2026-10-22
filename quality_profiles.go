@@ -162,6 +162,48 @@ func applyQualityProfileToAdd(input *TmdbAddInput, profile QualityProfile) {
 	input.Exclude = mergeExclusions(profile.Exclude, input.Exclude)
 }
 
+// profileTitleValues are the values a profile gives a title.
+type profileTitleValues struct {
+	Quality, Audio, Language, Subtitle string
+	DisableUpgrades                    bool
+}
+
+// qualityProfileExact returns the profile with id, if it exists (no fallback:
+// a title page applies only the profile it was given).
+func qualityProfileExact(profiles []QualityProfile, id int) (QualityProfile, bool) {
+	for _, profile := range profiles {
+		if profile.ID == id {
+			return profile, true
+		}
+	}
+	return QualityProfile{}, false
+}
+
+// matchingQualityProfile returns the id of the first profile whose values are
+// the title's (quality «any» = no limit, empty language = ita), or 0.
+func matchingQualityProfile(profiles []QualityProfile, title profileTitleValues) int {
+	norm := func(values profileTitleValues) profileTitleValues {
+		if strings.EqualFold(strings.TrimSpace(values.Quality), "any") {
+			values.Quality = ""
+		}
+		if strings.TrimSpace(values.Language) == "" {
+			values.Language = "ita"
+		}
+		values.Audio = normalizeAudioRequirement(values.Audio)
+		values.Quality = strings.TrimSpace(values.Quality)
+		values.Language = strings.ToLower(strings.TrimSpace(values.Language))
+		values.Subtitle = strings.ToLower(strings.TrimSpace(values.Subtitle))
+		return values
+	}
+	want := norm(title)
+	for _, profile := range profiles {
+		if norm(profileTitleValues{profile.Quality, profile.Audio, profile.Language, profile.Subtitle, profile.DisableUpgrades}) == want {
+			return profile.ID
+		}
+	}
+	return 0
+}
+
 // mergeExclusions joins comma-separated exclusion lists, dropping empty and
 // repeated words (case-insensitive) and keeping the first spelling.
 func mergeExclusions(lists ...string) string {

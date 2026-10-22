@@ -404,6 +404,11 @@ preset on load.
 
 ### Upgrade switch and quality profiles
 
+`POST /api/series/{name}` and `POST /api/movies/{id}` accept
+`quality_profile_id` too (0 or absent = keep the current values): the title takes
+the profile's `quality`, `audio`, `language`, `subtitle` and `disable_upgrades`,
+and its `exclude` is merged with the profile's. An unknown id answers 400.
+
 `POST /api/tmdb/add` also accepts `quality_profile_id`: the new title then takes
 `quality`, `audio`, `language`, `subtitle` and `disable_upgrades` from that
 profile, whatever the request says, and `exclude` is added to the profile's

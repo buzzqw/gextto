@@ -653,7 +653,7 @@ The most important fields are:
 
 | Field | Effect |
 |---|---|
-| Quality profile | only when adding: gives the title the quality, minimum audio, language, subtitles, exclusions and “Allow upgrades” of the profile (see *Quality profiles*); the single values can be changed later on the title's page |
+| Quality profile | when adding and on the title page: gives the title the quality, minimum audio, language, subtitles and “Allow upgrades” of the profile and adds its exclusions to the title's own (see *Quality profiles*). On the page the profile matching the title's values is preselected; when none matches, **Current values** appears, and saving with it changes nothing. A profile is a template: changing it later does not touch titles already created |
 | Quality | restricts acceptable releases and contributes to the score |
 | Minimum audio | comes from the quality profile when adding and is changed with *Edit selected* (it is not on the title page); a preset that already includes the channels: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Any** imposes no limit and is the default, including for existing series |
 | Language | requires the configured language when it is recognisable in the title |

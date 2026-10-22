@@ -2797,6 +2797,10 @@
 {{if and . (not (or (eq . "") (eq . "lossless-5.1") (eq . "lossless-7.1") (eq . "high-5.1") (eq . "high-7.1") (eq . "standard-5.1") (eq . "standard-7.1") (eq . "compressed-5.1")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
 {{end}}
 
+{{define "v2_title_profile"}}
+<label class="field span-full"><span>Profilo di qualità</span><select class="input" name="quality_profile_id" data-v2-profile-summary="v2-title-profile-summary" aria-describedby="v2-title-profile-summary" title="Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo">{{if not .Matched}}<option value="0" data-summary="{{.CurrentSummary}}" selected>Valori attuali</option>{{end}}{{range .Choices}}<option value="{{.ID}}" data-summary="{{.Summary}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}</select><small class="hint" id="v2-title-profile-summary" aria-live="polite">{{if .Matched}}{{range .Choices}}{{if .Selected}}{{.Summary}}{{end}}{{end}}{{else}}{{.CurrentSummary}}{{end}}</small><small class="hint">Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue.</small></label>
+{{end}}
+
 {{define "v2_language_options"}}
 <option value=""{{if eq . ""}} selected{{end}}>Predefinita (ita)</option>
 <option value="ita"{{if eq . "ita"}} selected{{end}}>Italiano</option>
@@ -3062,9 +3066,7 @@
       <form class="form-grid" method="post" action="/series/save" hx-post="/series/save" hx-swap="none">
         <input type="hidden" name="name" value="{{.Name}}" />
         <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
-         <label class="field"><span>Qualità</span><select class="input" name="quality">{{template "v2_quality_options" .Quality}}</select></label>
-         <label class="field"><span>Lingue</span><select class="input" name="language">{{template "v2_language_options" .Language}}</select></label>
-         <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
+        {{template "v2_title_profile" .Profiles}}
         <label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
         <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" /></label>
          <label class="field span-full"><span>Percorso archivio (NAS)</span><span class="field-row"><input class="input" name="archive_path" value="{{.ArchivePath}}" data-v2-browse-input /><button class="btn sm" type="button" data-v2-browse-for="archive_path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label>
@@ -3110,9 +3112,9 @@
         <input type="hidden" name="path" value="/api/movies/{{.ID}}" />
         <label class="field"><span>Nome</span><input class="input" name="name" value="{{.Name}}" /></label>
         <label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}" /></label>
-         <label class="field"><span>Qualità</span><select class="input" name="quality">{{template "v2_quality_options" .Quality}}</select></label>
-         <label class="field"><span>Lingua</span><select class="input" name="language">{{template "v2_language_options" .Language}}</select></label>
-         <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
+        {{template "v2_title_profile" .Profiles}}
+        <input type="hidden" name="_v2_kind_quality_profile_id" value="number" />
+        <input type="hidden" name="quality" value="{{.Quality}}" /><input type="hidden" name="language" value="{{.Language}}" /><input type="hidden" name="subtitle" value="{{.Subtitle}}" />
         <label class="field" title="Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti."><span>Sottotitoli obbligatori</span><select class="input" name="subtitle_required"><option value="false"{{if not .SubtitleRequired}} selected{{end}}>No</option><option value="true"{{if .SubtitleRequired}} selected{{end}}>Sì</option></select></label>
         <input type="hidden" name="_v2_kind_subtitle_required" value="select" />
         <label class="field span-full"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" placeholder="es. un altro titolo con lo stesso nome" /></label>
