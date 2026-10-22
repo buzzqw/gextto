@@ -347,3 +347,85 @@ func TestCompletedEd2kDownloadReachesTheHistory(t *testing.T) {
 		t.Fatalf("history item = %+v", items[0])
 	}
 }
+
+// listedEd2kSession is aMule's session with the finished file still in its
+// queue: the view carries no seed limits, which the seed policy reads as
+// "seed forever".
+type listedEd2kSession struct {
+	ed2kSession
+	hash string
+}
+
+func (s listedEd2kSession) List() []models.TorrentView {
+	return []models.TorrentView{{Hash: s.hash, Network: networkEd2k, State: "seeding", Progress: 100}}
+}
+
+// newEpisodeImportFixture builds a completed eD2k episode in aMule's incoming
+// folder, with the series configured and its library folder empty.
+func newEpisodeImportFixture(t *testing.T, move bool) (Config, *Database, string, string, models.TorrentEvent) {
+	t.Helper()
+	root := t.TempDir()
+	incoming := filepath.Join(root, "incoming")
+	archive := filepath.Join(root, "library", "Example Show")
+	for _, dir := range []string{incoming, archive} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const name = "Example.Show.S01E02.1080p.WEB-DL.mkv"
+	source := filepath.Join(incoming, name)
+	writeFile(t, source, validMKV(4096))
+	link := "ed2k://|file|" + name + "|4096|a1b2c3d4e5f60718293a4b5c6d7e8f90|/"
+	release := ParseEd2kRelease(name, link, "ed2k:link", 4096, 4, time.Now().UTC())
+	if release == nil || release.Kind != "series" {
+		t.Fatalf("release = %+v, want an eD2k episode", release)
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = filepath.Join(root, "data")
+	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg.DownloadDir = incoming
+	cfg.RenameEpisodes = true
+	cfg.DryRun = false
+	cfg.Series = []SeriesConfig{{Name: "Example Show", Seasons: "1+", ArchivePath: archive, Enabled: true}}
+	cfg.Settings["move_episodes"] = map[bool]string{true: "true", false: "false"}[move]
+	db, err := OpenDatabase(filepath.Join(root, "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := db.RegisterTorrentScored(release, 10); err != nil {
+		t.Fatalf("RegisterTorrentScored: %v", err)
+	}
+	hash, err := releaseIdentityHash(release)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg, db, archive, source, models.TorrentEvent{Kind: "torrent_finished", Hash: hash, Name: name, SavePath: incoming}
+}
+
+// TestEd2kEpisodeFollowsMoveOrCopy: an eD2k episode follows only the move/copy
+// option, even while aMule still lists the file with no seed limits (which
+// once made every eD2k episode a copy, while movies were moved).
+func TestEd2kEpisodeFollowsMoveOrCopy(t *testing.T) {
+	for _, move := range []bool{true, false} {
+		cfg, db, archive, source, event := newEpisodeImportFixture(t, move)
+		session := listedEd2kSession{ed2kSession: ed2kSession{cfg: &cfg}, hash: event.Hash}
+		processed, err := HandleTorrentEvent(&cfg, session, db, map[string]struct{}{}, map[string]struct{}{},
+			map[string]StorageMoveRetry{}, event, NewTmdbClient(nil), NewNotifier())
+		if err != nil || !processed {
+			t.Fatalf("move=%v: processed=%v err=%v", move, processed, err)
+		}
+		if got := countVideos(t, archive); got != 1 {
+			t.Fatalf("move=%v: videos in the library = %d, want 1", move, got)
+		}
+		_, statErr := os.Stat(source)
+		if move && !os.IsNotExist(statErr) {
+			t.Fatalf("move mode must take the episode out of aMule's incoming folder, stat err = %v", statErr)
+		}
+		if !move && statErr != nil {
+			t.Fatalf("copy mode must keep the episode in aMule's incoming folder: %v", statErr)
+		}
+	}
+}

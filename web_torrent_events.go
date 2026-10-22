@@ -2960,7 +2960,11 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 					logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
 					return true, nil
 				}
-				if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) || tev_seedsForeverByPolicy(cfg, db, torrents, event.Hash) {
+				// eD2k has no seed policy in Gextto (aMule reports no limits, which
+				// would read as "seed forever"): for it only the move/copy option
+				// decides, as for its movies.
+				seedsForever := !tev_movesCompletedImmediately(torrents) && tev_seedsForeverByPolicy(cfg, db, torrents, event.Hash)
+				if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) || seedsForever {
 					// Folder episodes, single files in copy mode, and any torrent
 					// configured to seed forever are imported by copying the video
 					// while the source stays in the download folder for seeding.

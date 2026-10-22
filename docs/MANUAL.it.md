@@ -947,6 +947,9 @@ condividerli), se è spenta entrano con **hardlink o copia** e aMule continua a
 condividerli (l'hardlink non occupa spazio in più se le due cartelle sono sullo
 stesso disco). Per eD2k lo spostamento avviene al completamento, perché il
 seeding è gestito da aMule e Gextto non ha un momento di fine seed da attendere.
+Per lo stesso motivo le regole di seed (rapporto, tempo, «seed ∞») non valgono
+per eD2k e sui suoi download non compare il badge «seed ∞»: decide solo
+l'opzione Sposta.
 
 Per la guida completa — installazione di aMule, Docker, risoluzione dei
 problemi e dettagli del protocollo — vedi [`docs/amule.it.md`](amule.it.md).

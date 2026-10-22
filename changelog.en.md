@@ -49,6 +49,12 @@ manual is online: [English](docs/MANUAL.en.md) ·
   **Edit selected** and change quality, language, subtitles, exclusions,
   upgrades or state on all of them. You can start from a profile's values.
   Everything else in each title is left alone.
+- **eD2k episodes: move or copy like movies.** With **Move episodes/packs to
+  the archive** on, episodes downloaded with aMule are moved into the library
+  at completion too, as movies already were; before, they could be copied and
+  left in aMule, because an eD2k download looked set to "seed forever". The
+  "seed ∞" badge no longer shows on eD2k downloads: seed rules do not apply to
+  aMule.
 - **eD2k downloads in the log and in the history.** eD2k downloads started by
   hand (from "Download" in a search or from a pasted link) now appear in the
   log as soon as they are added, or with the reason if aMule refuses them.

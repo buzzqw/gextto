@@ -51,6 +51,12 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   apri **Modifica selezionati** e cambi qualità, lingua, sottotitoli,
   esclusioni, upgrade o stato su tutte insieme. Puoi partire dai valori di un
   profilo. Tutto il resto di ogni titolo non viene toccato.
+- **Episodi eD2k: sposta o copia come i film.** Con **Sposta gli
+  episodi/pack in archivio** attiva, anche gli episodi scaricati con aMule
+  vengono spostati in libreria al completamento, come già i film; prima
+  potevano essere copiati e lasciati in aMule, perché un download eD2k
+  sembrava impostato su «seed infinito». Il badge «seed ∞» non compare più sui
+  download eD2k: le regole di seed non valgono per aMule.
 - **Download eD2k nel log e nella storia.** I download eD2k avviati a mano
   (da «Scarica» in una ricerca o da un link incollato) ora compaiono nel log
   appena aggiunti, o con il motivo se aMule li rifiuta. Tutte le righe di un

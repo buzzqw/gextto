@@ -921,7 +921,9 @@ into the library and removed from the incoming folder (aMule stops sharing
 them); when it is off they enter by **hardlink or copy** and aMule keeps
 sharing them (a hardlink takes no extra space when both folders are on the same
 disk). For eD2k the move happens at completion, because seeding is managed by
-aMule and Gextto has no end-of-seed moment to wait for.
+aMule and Gextto has no end-of-seed moment to wait for. For the same reason the
+seed rules (ratio, time, "seed ∞") do not apply to eD2k and its downloads show
+no "seed ∞" badge: only the Move option decides.
 
 For the complete guide — installing aMule, Docker, troubleshooting and the
 protocol details — see [`docs/amule.md`](amule.md).
