@@ -2437,6 +2437,16 @@ func TestV2AddFormOffersProfilesAndStoresNoUpgrades(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `name="quality_profile_id"`) || !strings.Contains(body, "Archivio 4K") {
 		t.Fatalf("add form must offer the quality profiles: %d %s", code, body)
 	}
+	// The options carry the name only; the summary of the chosen one is shown
+	// under the list (here the preselected Default).
+	if !strings.Contains(body, `>Archivio 4K</option>`) || !strings.Contains(body, `id="v2-profile-summary" aria-live="polite">qualsiasi qualità · lingua ita</small>`) {
+		t.Fatalf("profile options or summary not rendered as expected: %s", body)
+	}
+	// The options carry the name only; the summary of the chosen one is shown
+	// under the list (here the preselected Default).
+	if !strings.Contains(body, `>Archivio 4K</option>`) || !strings.Contains(body, `id="v2-profile-summary" aria-live="polite">qualsiasi qualità · lingua ita</small>`) {
+		t.Fatalf("profile options or summary not rendered as expected: %s", body)
+	}
 	for _, field := range []string{`name="quality"`, `name="language"`, `name="subtitle"`, `name="audio"`, `name="disable_upgrades"`} {
 		if strings.Contains(body, field) {
 			t.Fatalf("the add form still has %s next to the profile", field)
@@ -2496,5 +2506,26 @@ func TestV2QualityProfileEditorOffersTheResolutions(t *testing.T) {
 	// A value saved before the list existed stays, selected.
 	if !strings.Contains(body, `<option value="&lt;1080p" selected>`) {
 		t.Fatal("a stored free-text quality was dropped from the list")
+	}
+}
+
+func TestV2QualityProfileLanguagesAreChooseOrType(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey, `[{"id":1,"name":"Default","language":"ita,fre","subtitle":"eng"}]`); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=scores", nil)
+	if code != http.StatusOK {
+		t.Fatalf("scores tab -> %d", code)
+	}
+	for _, want := range []string{
+		`name="language__0" value="ita,fre"`, `list="v2-combo-language-0"`, `<datalist id="v2-combo-language-0"><option value="ita">`,
+		`name="subtitle__0" value="eng"`, `list="v2-combo-subtitle-0"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %s", want)
+		}
 	}
 }

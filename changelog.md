@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 22 ottobre 2026
 
+- **Profili di qualità: lingua e sottotitoli da scegliere o scrivere, meno doppioni.** Nell'editor dei profili **Lingua** e **Sottotitoli** propongono le scelte comuni (ita, eng, ita,eng, multi, any) e accettano anche un valore scritto a mano. I profili generati in automatico dalla libreria (quelli che vede anche Jellyseerr) non nascono più dalle esclusioni di un singolo titolo né dalla qualità `any`, che equivale a nessun limite: niente più profili doppi come *any · ita* accanto a *Default*.
+
 - **Profili di qualità: risoluzione da elenco.** Nell'editor dei profili (*Qualità e upgrade*) il campo **Qualità** è ora un menu con le risoluzioni che Gextto riconosce, le stesse della scheda dei titoli, invece di un testo libero. Un valore scritto a mano in passato resta selezionato finché non lo cambi.
 
 - **"Niente upgrade" diventa "Permetti upgrade".** Nelle schede di serie e film, nei profili di qualità e nella TUI l'interruttore si chiama ora **Permetti upgrade**, con **Sì** (predefinito: una release migliore sostituisce il file archiviato) o **No** (il file archiviato resta). È la stessa impostazione di prima, scritta al positivo: nessun titolo cambia comportamento.

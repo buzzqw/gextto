@@ -1457,6 +1457,13 @@
     }
   }, true);
   document.addEventListener("change", function (event) {
+    // Quality profile select: show the summary of the chosen profile.
+    var profileTarget = event.target.getAttribute && event.target.getAttribute("data-v2-profile-summary");
+    if (profileTarget) {
+      var chosen = event.target.options[event.target.selectedIndex];
+      var summary = document.getElementById(profileTarget);
+      if (summary && chosen) summary.textContent = chosen.getAttribute("data-summary") || "";
+    }
     var select = event.target.matches && event.target.matches("[data-v2-discover-select]") ? event.target : null;
     if (!select) return;
     setDiscoverKind(select.value);

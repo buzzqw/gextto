@@ -336,7 +336,7 @@ type uiListFieldOption struct {
 type uiListField struct {
 	Name        string
 	Label       string
-	Kind        string // text | number | bool | tags | secret | select
+	Kind        string // text | number | bool | tags | secret | select | combo (suggestions + free text)
 	Placeholder string
 	// Options are the choices of a select field.
 	Options []uiListFieldOption
@@ -442,8 +442,8 @@ var uiAdvancedEditors = []uiListEditor{
 			{Name: "name", Label: "Nome", Kind: "text", Wide: true},
 			{Name: "quality", Label: "Qualità", Kind: "select", Options: uiQualityPresetOptions},
 			{Name: "audio", Label: "Audio minimo", Kind: "select", Options: uiAudioPresetOptions},
-			{Name: "language", Label: "Lingua", Kind: "text", Placeholder: "es. ita"},
-			{Name: "subtitle", Label: "Sottotitoli", Kind: "text"},
+			{Name: "language", Label: "Lingua", Kind: "combo", Placeholder: "es. ita", Options: uiLanguagePresetOptions},
+			{Name: "subtitle", Label: "Sottotitoli", Kind: "combo", Placeholder: "vuoto = nessuno", Options: uiLanguagePresetOptions},
 			{Name: "exclude", Label: "Esclusioni", Kind: "text", Wide: true},
 			{Name: "upgrades", Label: "Permetti upgrade", Kind: "select", Options: []uiListFieldOption{
 				{Value: "allow", Label: "Sì"},
@@ -477,6 +477,17 @@ var uiQualityPresetOptions = []uiListFieldOption{
 	{Value: "1080p+", Label: "1080p+"},
 	{Value: "2160p", Label: "2160p 4K"},
 	{Value: "2160p+", Label: "2160p+ 4K+"},
+}
+
+// uiLanguagePresetOptions are the usual audio/subtitle language choices of
+// the title forms (v2_language_options): suggestions of a field that also
+// takes any other code (fre, spa, ita,eng,fre, ...).
+var uiLanguagePresetOptions = []uiListFieldOption{
+	{Value: "ita", Label: "Italiano"},
+	{Value: "eng", Label: "Inglese"},
+	{Value: "ita,eng", Label: "Italiano + Inglese"},
+	{Value: "multi", Label: "Multi"},
+	{Value: "any", Label: "Qualsiasi"},
 }
 
 // uiAudioPresetOptions are the minimum-audio presets of the title forms

@@ -1209,9 +1209,12 @@ combinazioni di qualità, audio minimo, lingua, sottotitoli, esclusioni e
 upgrade («Permetti upgrade») che usi. La **Qualità** del profilo si sceglie da
 un elenco con le risoluzioni che Gextto riconosce (360p … 2160p, il minimo con
 «+», l'intervallo 720p-1080p, oppure Qualsiasi); un valore scritto a mano in
-passato resta selezionato finché non lo cambi. Gextto
-genera automaticamente un profilo per ogni combinazione già presente nella
-libreria e li espone a Jellyseerr tramite `/api/v3/qualityprofile`; il primo
+passato resta selezionato finché non lo cambi. **Lingua** e **Sottotitoli**
+propongono le scelte comuni (ita, eng, ita,eng, multi, any) ma accettano
+anche un valore scritto a mano, per esempio `fre` o `ita,eng,fre`. Gextto
+genera automaticamente un profilo per ogni combinazione di qualità, lingua e
+sottotitoli già presente nella libreria (le esclusioni di un singolo titolo e la
+qualità `any`, uguale a nessun limite, non creano profili a parte) e li espone a Jellyseerr tramite `/api/v3/qualityprofile`; il primo
 profilo è **Default**.
 
 **I profili sono modelli, non regole.** Quando usi un profilo (scegliendolo nel

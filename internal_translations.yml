@@ -5384,3 +5384,4 @@ eng:
   "Sì: una release migliore sostituisce il file già archiviato. No: il file archiviato resta.": "Yes: a better release replaces the archived file. No: the archived file stays."
   "upgrade: no": "upgrades: no"
   "Non sostituirebbe la copia in libreria: per questo titolo «Permetti upgrade» è No.": "It would not replace the copy in the library: «Allow upgrades» is No for this title."
+  "vuoto = nessuno": "empty = none"

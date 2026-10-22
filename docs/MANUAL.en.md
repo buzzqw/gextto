@@ -1173,8 +1173,11 @@ of quality, minimum audio, language, subtitles, exclusions and upgrades («Allow
 upgrades») you use. The profile **Quality** is picked from a list of the
 resolutions Gextto recognises (360p … 2160p, a minimum with «+», the 720p-1080p
 range, or Any); a value typed by hand in the past stays selected until you change
-it. Gextto generates a
-profile for every combination already present in the library and exposes them to
+it. **Language** and **Subtitles** suggest the usual choices (ita, eng, ita,eng,
+multi, any) but also take a value typed by hand, such as `fre` or `ita,eng,fre`. Gextto generates a
+profile for every combination of quality, language and subtitles already present
+in the library (a single title's exclusions and the `any` quality, the same as no
+limit, do not make profiles of their own) and exposes them to
 Jellyseerr through `/api/v3/qualityprofile`; the first profile is **Default**.
 **Profiles are templates, not rules.** When you use a profile (by choosing it in
 the **Quality profile** field of the add form of a series or a movie, from

@@ -125,6 +125,10 @@ func v3Profiles(cfg *Config) []v3QualityProfile {
 	usedNames := map[string]bool{}
 	out := []v3QualityProfile{}
 	add := func(name, quality, language, subtitle, exclude string) {
+		// "any" sets no resolution limit, exactly like an empty quality.
+		if strings.EqualFold(strings.TrimSpace(quality), "any") {
+			quality = ""
+		}
 		key := strings.Join([]string{quality, language, subtitle, exclude}, "\x00")
 		if seen[key] {
 			return
@@ -168,12 +172,14 @@ func v3Profiles(cfg *Config) []v3QualityProfile {
 	}
 	// Every combination found in the library that has no name yet becomes a
 	// profile too: this is the automatic migration from the per-title data.
+	// A title's exclusions are its own (another film with the same name, a
+	// spin-off): they never make a profile of their own.
 	if cfg != nil {
 		for _, series := range cfg.Series {
-			add("", series.Quality, series.Language, series.Subtitle, series.Exclude)
+			add("", series.Quality, series.Language, series.Subtitle, "")
 		}
 		for _, movie := range cfg.Movies {
-			add("", movie.Quality, movie.Language, movie.Subtitle, movie.Exclude)
+			add("", movie.Quality, movie.Language, movie.Subtitle, "")
 		}
 	}
 	return out

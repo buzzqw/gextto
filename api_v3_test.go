@@ -269,3 +269,19 @@ func TestV3RoutesUseTheJellyseerrSpelling(t *testing.T) {
 		}
 	}
 }
+
+func TestV3ProfilesIgnoreTitleExclusionsAndAny(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Settings = map[string]string{qualityProfilesKey: `[{"id":1,"name":"Default","language":"ita"}]`}
+	cfg.Series = []SeriesConfig{{Name: "A", Quality: "any", Language: "ita"}}
+	cfg.Movies = []MovieConfig{
+		{Name: "Hope", Quality: "720p+", Language: "ita", Exclude: "without"},
+		{Name: "Other", Quality: "720p+", Language: "ita"},
+	}
+	profiles := v3Profiles(&cfg)
+	// Default, plus one 720p+ · ita: "any" is the Default and a title's own
+	// exclusion is not a profile.
+	if len(profiles) != 2 || profiles[1].Quality != "720p+" || profiles[1].Exclude != "" {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+}

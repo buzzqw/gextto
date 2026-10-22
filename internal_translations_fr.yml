@@ -6040,3 +6040,4 @@ fra:
   "Sì: una release migliore sostituisce il file già archiviato. No: il file archiviato resta.": "Oui : une meilleure release remplace le fichier archivé. Non : le fichier archivé reste."
   "upgrade: no": "mises à niveau : non"
   "Non sostituirebbe la copia in libreria: per questo titolo «Permetti upgrade» è No.": "Ne remplacerait pas la copie de la bibliothèque : «Autoriser les mises à niveau» est sur Non pour ce titre."
+  "vuoto = nessuno": "vide = aucun"
