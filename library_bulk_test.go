@@ -117,3 +117,35 @@ func TestLibraryTablesEditTheSelectedRows(t *testing.T) {
 		t.Fatalf("movie = %+v", cfg.Movies[0])
 	}
 }
+
+func TestLibraryBulkEditSetsTheMinimumAudio(t *testing.T) {
+	series := []SeriesConfig{{Name: "A", Audio: "standard", AudioChannels: "5.1", Enabled: true}}
+	audio := "high-7.1"
+	outSeries, _, changed, err := ApplyLibraryBulkEdit(series, nil, LibraryBulkEdit{Series: []string{"A"}, Audio: &audio})
+	if err != nil || changed != 1 {
+		t.Fatalf("changed = %d, err = %v", changed, err)
+	}
+	if outSeries[0].Audio != "high-7.1" || outSeries[0].AudioChannels != "" {
+		t.Fatalf("audio = %q/%q, want the high-7.1 preset", outSeries[0].Audio, outSeries[0].AudioChannels)
+	}
+}
+
+func TestBulkProfileFillsAudioAndUpgrades(t *testing.T) {
+	state := v3TestState(t)
+	body := `{"items":[{"name":"Archivio","quality":"1080p","audio":"lossless-5.1","language":"ita","disable_upgrades":true}]}`
+	rec := httptest.NewRecorder()
+	SaveQualityProfiles(rec, httptest.NewRequest("POST", "/api/quality-profiles", strings.NewReader(body)), state)
+	if rec.Code != 200 {
+		t.Fatalf("save -> %d %s", rec.Code, rec.Body.String())
+	}
+	profiles := ensureQualityProfiles(state)
+	if len(profiles) != 1 || profiles[0].Audio != "lossless-5.1" || !profiles[0].DisableUpgrades {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, page := v2Request(t, server, http.MethodGet, "/library/bulk/profile?view=series&profile="+strconv.Itoa(profiles[0].ID), nil)
+	if code != http.StatusOK || !strings.Contains(page, `<option value="lossless-5.1" selected>`) || !strings.Contains(page, `<option value="deny" selected>`) {
+		t.Fatalf("bulk profile values -> %d: %s", code, page)
+	}
+}

@@ -17,14 +17,17 @@ import (
 
 const qualityProfilesKey = "quality_profiles"
 
-// QualityProfile is one named combination of selection overrides.
+// QualityProfile is one named combination of selection overrides. Audio is
+// the minimum audio preset (empty = any); DisableUpgrades is «Niente upgrade».
 type QualityProfile struct {
-	ID       int    `json:"id"`
-	Name     string `json:"name"`
-	Quality  string `json:"quality"`
-	Language string `json:"language"`
-	Subtitle string `json:"subtitle"`
-	Exclude  string `json:"exclude"`
+	ID              int    `json:"id"`
+	Name            string `json:"name"`
+	Quality         string `json:"quality"`
+	Audio           string `json:"audio,omitempty"`
+	Language        string `json:"language"`
+	Subtitle        string `json:"subtitle"`
+	Exclude         string `json:"exclude"`
+	DisableUpgrades bool   `json:"disable_upgrades,omitempty"`
 }
 
 func decodeQualityProfiles(raw string) []QualityProfile {
@@ -40,6 +43,7 @@ func decodeQualityProfiles(raw string) []QualityProfile {
 			continue
 		}
 		profile.Quality = strings.TrimSpace(profile.Quality)
+		profile.Audio = normalizeAudioRequirement(profile.Audio)
 		profile.Language = strings.TrimSpace(profile.Language)
 		profile.Subtitle = strings.TrimSpace(profile.Subtitle)
 		profile.Exclude = strings.TrimSpace(profile.Exclude)
@@ -163,7 +167,8 @@ func SaveQualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 		cleaned = append(cleaned, QualityProfile{
 			ID: profile.ID, Name: profile.Name, Quality: strings.TrimSpace(profile.Quality),
 			Language: strings.TrimSpace(profile.Language), Subtitle: strings.TrimSpace(profile.Subtitle),
-			Exclude: strings.TrimSpace(profile.Exclude),
+			Exclude: strings.TrimSpace(profile.Exclude), Audio: normalizeAudioRequirement(profile.Audio),
+			DisableUpgrades: profile.DisableUpgrades,
 		})
 	}
 	cfg := latestConfig(s)

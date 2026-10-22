@@ -1271,6 +1271,9 @@ func UpdateMovie(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if input.Enabled != nil {
 		movie.Enabled = *input.Enabled
 	}
+	if input.DisableUpgrades != nil {
+		movie.DisableUpgrades = *input.DisableUpgrades
+	}
 	if err := SaveLibrary(s.cfg.DataDir, current.Series, movies); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return

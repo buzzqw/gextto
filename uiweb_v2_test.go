@@ -2418,3 +2418,44 @@ func TestV2ScoreTestScoresAReleaseAndComparesTheLibrary(t *testing.T) {
 		t.Fatalf("empty title must be reported: %d %s", code, body)
 	}
 }
+
+func TestV2AddFormOffersProfilesAndStoresNoUpgrades(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey, `[{"id":1,"name":"Archivio 4K","quality":"2160p","audio":"lossless-5.1","disable_upgrades":true}]`); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/tmdb/manual?kind=movie&name=Film", nil)
+	if code != http.StatusOK || !strings.Contains(body, "data-v2-profile") || !strings.Contains(body, "Archivio 4K") || !strings.Contains(body, "lossless-5.1") {
+		t.Fatalf("add form must offer the quality profiles: %d %s", code, body)
+	}
+	form := url.Values{"kind": {"movie"}, "name": {"Film Senza Upgrade"}, "year": {"2020"}, "tmdb_id": {"77"}, "disable_upgrades": {"true"}}
+	if code, body := v2Request(t, server, http.MethodPost, "/tmdb/add", form); code != http.StatusOK && code != http.StatusNoContent {
+		t.Fatalf("movie add -> %d: %s", code, body)
+	}
+	var movieID int64
+	for _, movie := range latestConfig(state).Movies {
+		if movie.Name == "Film Senza Upgrade" {
+			if !movie.DisableUpgrades {
+				t.Fatal("«Niente upgrade» was not stored on the new movie")
+			}
+			movieID = movie.ID
+		}
+	}
+	if movieID == 0 {
+		t.Fatal("movie was not added")
+	}
+	// The movie form turns it off again (the unchecked box sends the hidden false).
+	form = url.Values{"view": {"movies"}, "path": {"/api/movies/" + strconv.FormatInt(movieID, 10)}, "name": {"Film Senza Upgrade"}, "year": {"2020"},
+		"disable_upgrades": {"false"}, "_v2_kind_disable_upgrades": {"select"}}
+	if code, body := v2Request(t, server, http.MethodPost, "/section/form", form); code >= 400 {
+		t.Fatalf("movie save -> %d: %s", code, body)
+	}
+	for _, movie := range latestConfig(state).Movies {
+		if movie.ID == movieID && movie.DisableUpgrades {
+			t.Fatal("the movie form did not turn «Niente upgrade» off")
+		}
+	}
+}

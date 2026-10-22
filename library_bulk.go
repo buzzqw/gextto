@@ -21,6 +21,7 @@ type LibraryBulkEdit struct {
 	Series   []string
 	Movies   []int64
 	Quality  *string
+	Audio    *string
 	Language *string
 	Subtitle *string
 	Exclude  *string
@@ -29,7 +30,7 @@ type LibraryBulkEdit struct {
 }
 
 func (e LibraryBulkEdit) changesSomething() bool {
-	return e.Quality != nil || e.Language != nil || e.Subtitle != nil || e.Exclude != nil ||
+	return e.Quality != nil || e.Audio != nil || e.Language != nil || e.Subtitle != nil || e.Exclude != nil ||
 		e.Upgrades != nil || e.Enabled != nil
 }
 
@@ -64,6 +65,9 @@ func ApplyLibraryBulkEdit(series []SeriesConfig, movies []MovieConfig, edit Libr
 			continue
 		}
 		set(&item.Quality, edit.Quality)
+		if edit.Audio != nil {
+			item.Audio, item.AudioChannels = normalizeAudioRequirement(*edit.Audio), ""
+		}
 		set(&item.Language, edit.Language)
 		set(&item.Subtitle, edit.Subtitle)
 		set(&item.Exclude, edit.Exclude)
@@ -82,6 +86,9 @@ func ApplyLibraryBulkEdit(series []SeriesConfig, movies []MovieConfig, edit Libr
 			continue
 		}
 		set(&item.Quality, edit.Quality)
+		if edit.Audio != nil {
+			item.Audio, item.AudioChannels = normalizeAudioRequirement(*edit.Audio), ""
+		}
 		set(&item.Language, edit.Language)
 		set(&item.Subtitle, edit.Subtitle)
 		set(&item.Exclude, edit.Exclude)
@@ -162,7 +169,7 @@ func V2LibraryBulkApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		return nil
 	}
-	edit.Quality, edit.Language = text("quality"), text("language")
+	edit.Quality, edit.Audio, edit.Language = text("quality"), text("audio"), text("language")
 	edit.Subtitle, edit.Exclude = text("subtitle"), text("exclude")
 	edit.Upgrades = choice("upgrades", "allow", "deny")
 	edit.Enabled = choice("state", "active", "paused")

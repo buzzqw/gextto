@@ -402,6 +402,18 @@ before this feature, defaults to no constraint. The same field is returned by
 `7.1`) is still accepted for API compatibility and is folded into the combined
 preset on load.
 
+### No upgrades and quality profiles
+
+`POST /api/tmdb/add` and `POST /api/movies/{id}` accept `disable_upgrades`
+(boolean, «Niente upgrade»): a better release never replaces the archived file
+of that title. `POST /api/series/{name}` already accepted it.
+
+The items of `GET`/`POST /api/quality-profiles` carry `id`, `name`, `quality`,
+`audio` (one of the presets above, empty = any), `language`, `subtitle`,
+`exclude` and `disable_upgrades`. A profile is a template: the add form and the
+v3 endpoints (`POST /api/v3/series`, `POST /api/v3/movie`) copy its values,
+`audio` and `disable_upgrades` included, into the new title.
+
 ## gx-torrent daemon routes
 ## gx-torrent daemon routes
 

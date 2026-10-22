@@ -329,16 +329,20 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 	wrap := strings.TrimSpace(r.FormValue("wrap"))
 
 	values := map[string]any{}
+	// The kinds are read first: r.Form is a map, so in a single pass a field
+	// could be converted before its kind marker has been seen.
 	kinds := map[string]string{}
+	for key, list := range r.Form {
+		if strings.HasPrefix(key, "_v2_kind_") && len(list) > 0 {
+			kinds[strings.TrimPrefix(key, "_v2_kind_")] = list[0]
+		}
+	}
 	for key, list := range r.Form {
 		switch key {
 		case "view", "path", "wrap", "render", "redirect":
 			continue
 		}
 		if strings.HasPrefix(key, "_v2_kind_") {
-			if len(list) > 0 {
-				kinds[strings.TrimPrefix(key, "_v2_kind_")] = list[0]
-			}
 			continue
 		}
 		if len(list) == 0 {

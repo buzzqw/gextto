@@ -1217,6 +1217,7 @@ func V2TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 		CreateFolder:     r.FormValue("create_folder") != "",
 		SeasonSubfolders: r.FormValue("season_subfolders") != "",
+		DisableUpgrades:  r.FormValue("disable_upgrades") != "",
 	}
 	if payload.Kind == "" {
 		payload.Kind = "series"
@@ -1256,20 +1257,43 @@ func V2TmdbManual(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if name == "" {
 		name = strings.TrimSpace(r.FormValue("query"))
 	}
-	view := map[string]string{
+	view := map[string]any{
 		"Kind": kind, "Name": name,
 		"Year": strings.TrimSpace(r.FormValue("year")), "TmdbID": strings.TrimSpace(r.FormValue("tmdb_id")),
 		"TvdbID": strings.TrimSpace(r.FormValue("tvdb_id")), "Quality": strings.TrimSpace(r.FormValue("quality")),
 		"Audio": strings.TrimSpace(r.FormValue("audio")), "AudioChannels": strings.TrimSpace(r.FormValue("audio_channels")),
 		"Language": strings.TrimSpace(r.FormValue("language")), "Seasons": "1+",
-		"ArchivePath": v2ProposedArchivePath(s, name),
-		"Redirect":    strings.TrimSpace(r.FormValue("redirect")),
+		"Subtitle": strings.TrimSpace(r.FormValue("subtitle")), "Exclude": strings.TrimSpace(r.FormValue("exclude")),
+		"DisableUpgrades": r.FormValue("disable_upgrades") != "",
+		"ArchivePath":     v2ProposedArchivePath(s, name),
+		"Redirect":        strings.TrimSpace(r.FormValue("redirect")),
 	}
 	if view["Redirect"] == "" {
 		view["Redirect"] = "/?view=search"
 	}
+	view["Profiles"] = v2ProfileChoices(ensureQualityProfiles(s))
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_tmdb_manual", view, dict, eng)
+}
+
+// v2ProfileChoice is one quality profile offered by the add form: choosing it
+// copies Values into the form fields (profiles are templates, not rules).
+type v2ProfileChoice struct {
+	ID     int
+	Name   string
+	Values string
+}
+
+func v2ProfileChoices(profiles []QualityProfile) []v2ProfileChoice {
+	out := make([]v2ProfileChoice, 0, len(profiles))
+	for _, profile := range profiles {
+		values, _ := json.Marshal(map[string]any{
+			"quality": profile.Quality, "audio": profile.Audio, "language": profile.Language,
+			"subtitle": profile.Subtitle, "exclude": profile.Exclude, "disable_upgrades": profile.DisableUpgrades,
+		})
+		out = append(out, v2ProfileChoice{ID: profile.ID, Name: profile.Name, Values: string(values)})
+	}
+	return out
 }
 
 // v2ProposedArchivePath is the default series folder offered by the add modal:

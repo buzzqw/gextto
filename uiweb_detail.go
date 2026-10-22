@@ -162,6 +162,7 @@ type uiMovieDetail struct {
 	Exclude              string
 	LanguageRequirements string
 	SubtitleRequirements string
+	DisableUpgrades      bool
 	Enabled              bool
 	History              []MovieHistory
 	Matches              []uiMovieMatch
@@ -417,6 +418,7 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		// form accepts the human-readable comma-separated representation.
 		LanguageRequirements: strings.Join(parseLanguageRequirements(movie.LanguageRequirements), ","),
 		SubtitleRequirements: movie.SubtitleRequirements,
+		DisableUpgrades:      movie.DisableUpgrades,
 		Enabled:              movie.Enabled,
 		Poster:               movie.PosterPath,
 		TmdbURL:              tmdbURL(movie.TmdbID, "movie"),

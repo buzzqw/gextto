@@ -1027,6 +1027,8 @@ type TmdbAddInput struct {
 	CreateFolder bool `json:"create_folder"`
 	// SeasonSubfolders archives episodes in a per-season subfolder.
 	SeasonSubfolders bool `json:"season_subfolders"`
+	// DisableUpgrades is «Niente upgrade»: an archived file is never replaced.
+	DisableUpgrades bool `json:"disable_upgrades"`
 }
 
 // DiscoverInput is the input of `tmdb_discover`.
@@ -1086,6 +1088,7 @@ type MovieUpdateInput struct {
 	Enabled              *bool   `json:"enabled"`
 	TmdbId               string  `json:"tmdb_id"`
 	TvdbId               string  `json:"tvdb_id"`
+	DisableUpgrades      *bool   `json:"disable_upgrades"`
 }
 
 // MovieMetadataSearchInput is the input of `movie_metadata_search`.

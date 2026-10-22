@@ -1587,7 +1587,7 @@ func TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 			Exclude:              strings.TrimSpace(input.Exclude),
 			LanguageRequirements: "",
 			SubtitleRequirements: "",
-			DisableUpgrades:      false,
+			DisableUpgrades:      input.DisableUpgrades,
 		})
 	} else {
 		for index := range cfg.Series {
@@ -1636,7 +1636,7 @@ func TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 			Enabled:          true,
 			IgnoredSeasons:   nil,
 			SeasonSubfolders: input.SeasonSubfolders,
-			DisableUpgrades:  false,
+			DisableUpgrades:  input.DisableUpgrades,
 		})
 	}
 	if err := SaveLibrary(s.cfg.DataDir, cfg.Series, cfg.Movies); err != nil {

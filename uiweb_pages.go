@@ -436,14 +436,16 @@ var uiAdvancedEditors = []uiListEditor{
 		},
 	},
 	{
-		Title: "Profili di qualità", Hint: "Un nome per ogni combinazione di qualità, lingua, sottotitoli ed esclusioni. I profili sono la lista che vede Jellyseerr (/api/v3/qualityprofile); le combinazioni già presenti nella libreria vengono aggiunte automaticamente.",
+		Title: "Profili di qualità", Hint: "Un nome per ogni combinazione di qualità, audio minimo, lingua, sottotitoli, esclusioni e upgrade. Sono modelli: scegliendo un profilo quando aggiungi una serie o un film, i suoi valori vengono copiati nel titolo e restano modificabili. La stessa lista è quella che vede Jellyseerr (/api/v3/qualityprofile); le combinazioni già presenti nella libreria vengono aggiunte automaticamente.",
 		GetPath: "/api/quality-profiles", Unwrap: "items", PostPath: "/api/quality-profiles",
 		Fields: []uiListField{
 			{Name: "name", Label: "Nome", Kind: "text", Wide: true},
 			{Name: "quality", Label: "Qualità", Kind: "text", Placeholder: "es. 1080p"},
+			{Name: "audio", Label: "Audio minimo", Kind: "select", Options: uiAudioPresetOptions},
 			{Name: "language", Label: "Lingua", Kind: "text", Placeholder: "es. ita"},
 			{Name: "subtitle", Label: "Sottotitoli", Kind: "text"},
 			{Name: "exclude", Label: "Esclusioni", Kind: "text", Wide: true},
+			{Name: "disable_upgrades", Label: "Niente upgrade", Kind: "bool"},
 		},
 	},
 	{
@@ -456,6 +458,19 @@ var uiAdvancedEditors = []uiListEditor{
 			{Name: "delete_after", Label: "Elimina dopo", Kind: "bool"},
 		},
 	},
+}
+
+// uiAudioPresetOptions are the minimum-audio presets of the title forms
+// (v2_audio_options), from the lowest to the highest.
+var uiAudioPresetOptions = []uiListFieldOption{
+	{Value: "", Label: "Qualsiasi"},
+	{Value: "compressed-5.1", Label: "AAC / Opus 5.1+"},
+	{Value: "standard-5.1", Label: "AC3 / 5.1"},
+	{Value: "standard-7.1", Label: "AC3 7.1"},
+	{Value: "high-5.1", Label: "DTS / DD+ 5.1+"},
+	{Value: "high-7.1", Label: "DTS / DD+ 7.1"},
+	{Value: "lossless-5.1", Label: "Lossless 5.1+ (TrueHD / DTS-HD)"},
+	{Value: "lossless-7.1", Label: "Lossless 7.1 (TrueHD / DTS-HD)"},
 }
 
 type uiSearchEntry struct {

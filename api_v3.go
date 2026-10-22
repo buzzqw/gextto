@@ -545,7 +545,7 @@ func V3SeriesAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Name: title, Seasons: v3SeasonSpec(body.Seasons), Quality: profile.Quality, Language: profile.Language,
 		ArchivePath: strings.TrimSpace(body.RootFolderPath), TmdbID: v3ID(body.TmdbID), TvdbID: v3ID(body.TvdbID),
 		Subtitle: profile.Subtitle, Exclude: profile.Exclude, Enabled: true,
-		SeasonSubfolders: body.SeasonFolder,
+		SeasonSubfolders: body.SeasonFolder, Audio: profile.Audio, DisableUpgrades: profile.DisableUpgrades,
 	}
 	// The cached configuration is shared: build a new slice, never append to it.
 	series := append(append([]SeriesConfig{}, cfg.Series...), added)
@@ -762,7 +762,7 @@ func V3MovieAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	added := MovieConfig{Name: title, Year: year, TmdbID: v3ID(body.TmdbID),
 		Quality: profile.Quality, Language: profile.Language, Subtitle: profile.Subtitle,
-		Exclude: profile.Exclude, Enabled: true}
+		Exclude: profile.Exclude, Enabled: true, Audio: profile.Audio, DisableUpgrades: profile.DisableUpgrades}
 	// The cached configuration is shared: build a new slice, never append to it.
 	movies := append(append([]MovieConfig{}, cfg.Movies...), added)
 	if err := SaveLibrary(cfg.DataDir, cfg.Series, movies); err != nil {

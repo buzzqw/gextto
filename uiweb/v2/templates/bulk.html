@@ -12,13 +12,6 @@
     {{end}}
     <div id="v2-bulk-values-{{.View}}">{{template "v2_bulk_values" .}}</div>
     <div class="form-grid">
-      <label class="field"><span>Upgrade</span>
-        <select class="input" name="upgrades" title="Se sostituire un file già scaricato quando esce una versione migliore">
-          <option value="">Lascia com'è</option>
-          <option value="allow">Consenti gli upgrade</option>
-          <option value="deny">Non sostituire i file scaricati</option>
-        </select>
-      </label>
       <label class="field"><span>Stato</span>
         <select class="input" name="state" title="Attiva o metti in pausa la ricerca dei titoli selezionati">
           <option value="">Lascia com'è</option>
@@ -38,9 +31,17 @@
 {{define "v2_bulk_values"}}
 <div class="form-grid">
   <div class="field"><label class="check" title="Spunta per scrivere la qualità nei titoli selezionati (vuoto = nessun requisito)"><input type="checkbox" name="set_quality" value="1"{{if .Marked}} checked{{end}}> Cambia la qualità</label><input class="input" name="quality" value="{{.Values.Quality}}" aria-label="Qualità" placeholder="es. 1080p" title="Risoluzione richiesta: 1080p, un intervallo 720p-1080p o un massimo &lt;1080p"></div>
+  <div class="field"><label class="check" title="Spunta per scrivere l'audio minimo nei titoli selezionati"><input type="checkbox" name="set_audio" value="1"{{if .Marked}} checked{{end}}> Cambia l'audio minimo</label><select class="input" name="audio" aria-label="Audio minimo" title="Audio minimo accettato, con i canali già compresi nel preset. Qualsiasi non impone nulla.">{{template "v2_audio_options" .Values.Audio}}</select></div>
   <div class="field"><label class="check" title="Spunta per scrivere la lingua nei titoli selezionati"><input type="checkbox" name="set_language" value="1"{{if .Marked}} checked{{end}}> Cambia la lingua</label><input class="input" name="language" value="{{.Values.Language}}" aria-label="Lingua" placeholder="es. ita" title="Lingua dell'audio richiesta, ad esempio ita o ita,eng"></div>
   <div class="field"><label class="check" title="Spunta per scrivere i sottotitoli nei titoli selezionati"><input type="checkbox" name="set_subtitle" value="1"{{if .Marked}} checked{{end}}> Cambia i sottotitoli</label><input class="input" name="subtitle" value="{{.Values.Subtitle}}" aria-label="Sottotitoli" title="Sottotitoli preferiti, ad esempio ita"></div>
   <div class="field"><label class="check" title="Spunta per scrivere le esclusioni nei titoli selezionati"><input type="checkbox" name="set_exclude" value="1"{{if .Marked}} checked{{end}}> Cambia le esclusioni</label><input class="input" name="exclude" value="{{.Values.Exclude}}" aria-label="Esclusioni" title="Parole che scartano una release, separate da virgola"></div>
+  <label class="field"><span>Upgrade</span>
+    <select class="input" name="upgrades" title="Se sostituire un file già scaricato quando esce una versione migliore">
+      <option value=""{{if not .Marked}} selected{{end}}>Lascia com'è</option>
+      <option value="allow"{{if and .Marked (not .Values.DisableUpgrades)}} selected{{end}}>Consenti gli upgrade</option>
+      <option value="deny"{{if and .Marked .Values.DisableUpgrades}} selected{{end}}>Non sostituire i file scaricati</option>
+    </select>
+  </label>
 </div>
 {{end}}
 

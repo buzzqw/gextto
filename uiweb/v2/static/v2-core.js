@@ -1456,13 +1456,35 @@
       setDiscoverChoice(form.getAttribute("data-v2-discover-choice"));
     }
   }, true);
+  // A quality profile is a template: choosing it copies its values into the
+  // fields of the same form, which stay editable.
+  function applyQualityProfile(select) {
+    var option = select.options[select.selectedIndex];
+    var raw = option && option.getAttribute("data-values");
+    var form = select.closest("form");
+    if (!raw || !form) return;
+    var values;
+    try { values = JSON.parse(raw); } catch (_) { return; }
+    Object.keys(values).forEach(function (name) {
+      var field = form.querySelector('[name="' + name + '"]');
+      if (!field) return;
+      var value = values[name];
+      if (field.type === "checkbox") {
+        field.checked = value === true;
+        return;
+      }
+      value = value == null ? "" : String(value);
+      if (field.tagName === "SELECT" && !Array.prototype.some.call(field.options, function (item) { return item.value === value; })) {
+        var extra = document.createElement("option");
+        extra.value = value;
+        extra.textContent = value;
+        field.appendChild(extra);
+      }
+      field.value = value;
+    });
+  }
   document.addEventListener("change", function (event) {
-    var preset = event.target.closest && event.target.closest("[data-preset-for]");
-    if (preset && preset.value) {
-      var scope = preset.closest("form") || preset.closest(".form-grid") || preset.closest(".panel");
-      var input = scope && scope.querySelector('[name="' + preset.getAttribute("data-preset-for") + '"]');
-      if (input) input.value = preset.value;
-    }
+    if (event.target.matches && event.target.matches("[data-v2-profile]")) applyQualityProfile(event.target);
     var select = event.target.matches && event.target.matches("[data-v2-discover-select]") ? event.target : null;
     if (!select) return;
     setDiscoverKind(select.value);

@@ -284,8 +284,8 @@ func TestScoreMacroCardsKeepTheirSubgroups(t *testing.T) {
 	}
 	groups := uiSettingsGroups("scores", fields)
 	want := map[string][]string{
-		"Video":                  {"4K", "Full HD", "SD", "Codec video", "Sorgente", "HDR / Dolby Vision"},
-		"Audio":                  {"Lossless", "DTS / DD+", "Canali e oggetti"},
+		"Video":              {"4K", "Full HD", "SD", "Codec video", "Sorgente", "HDR / Dolby Vision"},
+		"Audio":              {"Lossless", "DTS / DD+", "Canali e oggetti"},
 		"Correzioni release": {},
 	}
 	// The upgrade rules lead the tab, open and without weight subgroups; the
