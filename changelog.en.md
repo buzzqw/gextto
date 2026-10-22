@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **Series page: the read-only Name field is gone.** It repeated the title already shown in the header and looked editable without being so. To fix a wrong name, delete the series and add it again.
+
 - **Tidier series and movie pages.** The **Minimum audio** and **Allow upgrades** fields are no longer on the title page: they come from the quality profile when you add a series or a movie, and are changed for several titles at once with **Edit selected**. The value already set on each title stays and still applies. On the series page the fields are realigned (Exclude on the whole row, **Anime** as a Yes/No choice).
 
 - **Movie page: one field per value.** **Required languages** and **Subtitle requirements** are gone: they duplicated **Language** and **Subtitles** (and, when filled, silently won). At the first start their values are moved into the remaining fields without changing any decision: a movie with language «any» but required language «chi» now has Language `chi`. Instead of the subtitle requirements there is **Subtitles required: Yes/No**. The **Exclude** field takes the whole row.

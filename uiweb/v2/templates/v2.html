@@ -3061,7 +3061,6 @@
     <div class="panel-body">
       <form class="form-grid" method="post" action="/series/save" hx-post="/series/save" hx-swap="none">
         <input type="hidden" name="name" value="{{.Name}}" />
-        <label class="field"><span>Nome</span><input class="input" value="{{.Name}}" readonly /></label>
         <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
          <label class="field"><span>Qualità</span><select class="input" name="quality">{{template "v2_quality_options" .Quality}}</select></label>
          <label class="field"><span>Lingue</span><select class="input" name="language">{{template "v2_language_options" .Language}}</select></label>

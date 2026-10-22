@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 22 ottobre 2026
 
+- **Scheda serie: via il campo Nome in sola lettura.** Ripeteva il titolo già scritto in testata e sembrava modificabile senza esserlo. Per correggere un nome sbagliato si cancella la serie e la si aggiunge di nuovo.
+
 - **Schede di serie e film più ordinate.** I campi **Audio minimo** e **Permetti upgrade** non sono più nella scheda del titolo: arrivano dal profilo di qualità quando aggiungi una serie o un film, e si cambiano per più titoli insieme con **Modifica selezionati**. Il valore già impostato su ogni titolo resta e continua a valere. Nella scheda serie i campi sono riallineati (Escludi su tutta la riga, **Anime** come scelta Sì/No).
 
 - **Scheda film: un campo per ogni cosa.** Spariscono **Lingue richieste** e **Requisiti sottotitoli**, che duplicavano **Lingua** e **Sottotitoli** (e se compilati vincevano in silenzio). Al primo avvio i valori vengono riportati nei campi che restano, senza cambiare le decisioni: un film con lingua «any» ma lingua richiesta «chi» ha ora Lingua `chi`. Al posto dei requisiti dei sottotitoli c'è **Sottotitoli obbligatori: Sì/No**. Il campo **Escludi** occupa tutta la riga.
