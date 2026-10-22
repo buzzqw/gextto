@@ -222,6 +222,10 @@ func audioRank(value string) int {
 	}
 }
 
+// AudioRank orders the audio codec for comparisons. It is exported for the
+// archive cleaner, which must not replace a better audio track with a lower one.
+func (q *Quality) AudioRank() int { return audioRank(q.Audio) }
+
 // UpgradeReason explains why q may replace old, or "" when the change is not
 // worth a re-download.
 func (q *Quality) UpgradeReason(old *Quality, newScore, oldScore, minScoreDiff int64) string {
@@ -229,6 +233,12 @@ func (q *Quality) UpgradeReason(old *Quality, newScore, oldScore, minScoreDiff i
 	oldRes := old.ResolutionRank()
 	if newRes > oldRes {
 		return "resolution"
+	}
+	// A resolution upgrade can justify a different audio mix; at the same (or
+	// lower) resolution a worse audio codec is a downgrade, not an upgrade,
+	// whatever size or release-group bonus the score carries.
+	if q.AudioRank() < old.AudioRank() {
+		return ""
 	}
 	if q.IsRemux() && !old.IsRemux() && newRes >= oldRes && newScore >= oldScore {
 		return "remux"
@@ -252,9 +262,6 @@ func (q *Quality) UpgradeReason(old *Quality, newScore, oldScore, minScoreDiff i
 		return "proper"
 	}
 	if old.Source == "unknown" && q.Source != "unknown" && q.sameNonSourceQuality(old) {
-		return ""
-	}
-	if audioRank(q.Audio) < audioRank(old.Audio) {
 		return ""
 	}
 	if newScore > oldScore && newScore-oldScore >= minScoreDiff {

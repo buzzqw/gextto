@@ -771,3 +771,32 @@ func TestIndexArchiveUsesSizeAwareScore(t *testing.T) {
 		t.Fatalf("archive score = %d, want the file score %d", best.Score, cfg.FileScore(large, "series", "Example"))
 	}
 }
+
+func TestAudioDowngradeCannotReplaceBetterTrack(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "archive")
+	trash := filepath.Join(root, "trash")
+	if err := os.MkdirAll(archive, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	existing := filepath.Join(archive, "Example - S01E01 - Pilot - [1080p][h265][TrueHD 7.1][IT+EN].mkv")
+	newFile := filepath.Join(archive, "Example - S01E01 - Pilot - [1080p][h265][AC3 5.1][IT+EN].mkv")
+	cleanerWrite(t, existing, "old")
+	cleanerWrite(t, newFile, "new")
+
+	cfg := DefaultConfig()
+	cfg.CleanupUpgrades = true
+	cfg.TrashPath = &trash
+	// The candidate is deliberately given a much higher score: size or group
+	// bonuses must not make an AC3 file replace a TrueHD one.
+	incoming := ParseQuality("Example.S01E01.1080p.WEB-DL.AC3.5.1.x265-GROUP.mkv")
+	discarded, err := DiscardIfInferiorWithQuality(&cfg, "Example", 1, 1, 99999, newFile, archive, &incoming)
+	if err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+	assertTrue(t, discarded, "l'AC3 deve essere scartato davanti al TrueHD")
+	assertTrue(t, cleanerFileExists(existing), "la traccia TrueHD resta")
+	if _, err := os.Stat(newFile); !os.IsNotExist(err) {
+		t.Fatalf("il nuovo file audio inferiore deve sparire")
+	}
+}

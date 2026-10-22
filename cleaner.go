@@ -112,6 +112,21 @@ func qualityUpgradeAllowed(newQuality, oldQuality *models.Quality, newScore, old
 	return newQuality.UpgradeReason(oldQuality, newScore, oldScore, minDiff) != ""
 }
 
+// audioDowngradeAtSameResolution reports a candidate whose audio is worse than
+// the existing copy without a resolution improvement. Such a file must not
+// replace the archived one merely because its size or group score is higher.
+func audioDowngradeAtSameResolution(newQuality, oldQuality *models.Quality) bool {
+	if newQuality == nil || oldQuality == nil {
+		return false
+	}
+	// Only an explicitly recognised, worse audio track counts: an archive name
+	// that omits the audio tag must not turn a better incoming file into a
+	// downgrade by accident.
+	return newQuality.AudioRank() > 0 &&
+		newQuality.ResolutionRank() <= oldQuality.ResolutionRank() &&
+		newQuality.AudioRank() < oldQuality.AudioRank()
+}
+
 // languageMatch implements the `LanguageMatch` enum.
 type languageMatch int
 
@@ -572,6 +587,9 @@ func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int
 		newQuality := cleanerQualityFromPath(newFile)
 		if candidateQuality != nil {
 			newQuality = MergeQuality(newQuality, *candidateQuality)
+		}
+		if audioDowngradeAtSameResolution(&newQuality, &oldQuality) {
+			continue
 		}
 		if oldQuality.ResolutionRank() > 0 && oldQuality.ResolutionRank() == newQuality.ResolutionRank() {
 			switch languageMatchFor(name, preferred) {
@@ -1043,11 +1061,14 @@ func discardIfInferiorWithQuality(cfg *Config, series string, season, episode, n
 		oldScore := cfg.FileScore(file, "series", "")
 		newQuality := ParseQuality(newName)
 		if incoming != nil {
-			// A normalized archive name intentionally omits release markers and
-			// can also abbreviate source/audio information. Preserve all metadata
-			// learned before the rename, using the final filename where it is more
-			// specific and the original release as a fallback.
 			newQuality = MergeQuality(newQuality, *incoming)
+		}
+		if audioDowngradeAtSameResolution(&newQuality, &oldQuality) {
+			if err := handleDuplicate(newFile, cfg); err != nil {
+				return true, err
+			}
+			removeEmptyParents(newFile, archivePath)
+			return true, nil
 		}
 		if oldQuality.ResolutionRank() > 0 && oldQuality.ResolutionRank() == newQuality.ResolutionRank() {
 			switch languageMatchFor(name, preferred) {
@@ -1129,6 +1150,11 @@ func cleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, new
 		oldQuality := ParseQuality(name)
 		oldScore := cfg.FileScore(file, "movie", movie)
 		newQuality := ParseQuality(newName)
+		if audioDowngradeAtSameResolution(&newQuality, &oldQuality) {
+			// Keep the better archived track; the incoming file is handled by
+			// DiscardIfInferiorMovie, not by the old-file cleanup.
+			continue
+		}
 		if oldQuality.ResolutionRank() > 0 && oldQuality.ResolutionRank() == newQuality.ResolutionRank() {
 			switch languageMatchFor(name, preferred) {
 			case languagePreferred:
@@ -1266,6 +1292,13 @@ func DiscardIfInferiorMovie(cfg *Config, movie string, year *int64, newScore int
 		oldQuality := ParseQuality(name)
 		oldScore := cfg.FileScore(file, "movie", movie)
 		newQuality := ParseQuality(newName)
+		if audioDowngradeAtSameResolution(&newQuality, &oldQuality) {
+			if err := handleDuplicate(newFile, cfg); err != nil {
+				return true, err
+			}
+			removeEmptyParents(newFile, archivePath)
+			return true, nil
+		}
 		if oldQuality.ResolutionRank() > 0 && oldQuality.ResolutionRank() == newQuality.ResolutionRank() {
 			switch languageMatchFor(name, preferred) {
 			case languagePreferred:
