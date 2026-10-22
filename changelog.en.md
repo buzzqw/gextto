@@ -49,6 +49,11 @@ manual is online: [English](docs/MANUAL.en.md) ·
   **Edit selected** and change quality, language, subtitles, exclusions,
   upgrades or state on all of them. You can start from a profile's values.
   Everything else in each title is left alone.
+- **Aligned buttons.** In Configuration the "Default" and "Save" buttons of the
+  options with a note under the field (e.g. "0 = unlimited") now sit level with
+  the field instead of lower. "Add" in Add torrent, the Custom groups rows and
+  the Log toolbar are aligned too; there "Stop scrolling", "Filter" and "Copy"
+  no longer break onto two lines.
 - **gx-torrent announces its real version, and can use a compatible identity.** It used to say `gx-core 0.0.0` to peers and trackers. It now announces the real version (`gx-core 1.1.xxx`) and, if you want, can present itself as qBittorrent, Transmission, Rain or anacrolix/torrent with a chosen version. Only the announced identity changes: some private trackers only accept whitelisted clients, so check their rules before using it.
 
 - **Downloads with thousands of torrents: the table stays smooth.** Above 500

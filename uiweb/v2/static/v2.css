@@ -996,7 +996,7 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(120px, 180px) auto;
   gap: 12px;
-  align-items: end;
+  align-items: center;
 }
 .v2-score-group-row .setting-info,
 .v2-score-group-row .setting-control,
@@ -1014,6 +1014,10 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
 }
 .v2-score-group-add .field {
   flex: 1 1 180px;
+}
+/* Bottom-aligned with labelled fields: as tall as them, or it sits low. */
+.v2-score-group-add .btn {
+  min-height: 44px;
 }
 @media (max-width: 560px) {
   .v2-score-group-row {
@@ -1779,6 +1783,17 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 .setting-input > select.input { flex: 0 1 auto; }
 .setting-unit { color: var(--muted); font-size: 0.82rem; white-space: nowrap; }
 .setting-zero { display: block; margin-top: 3px; color: var(--muted); font-size: 0.75rem; }
+/* A hint under the field ("0 = illimitato") made the control taller, so the
+   buttons, centred on the whole control, sat lower than the field. On the
+   three-column layout the hint gets a grid line of its own: field and buttons
+   share the first line and stay centred on each other. */
+@media (min-width: 861px) {
+  .setting-row:has(.setting-zero):not(:has(.setting-control-browse)):not(:has(.setting-week)) > .setting-info { grid-column: 1; grid-row: 1 / span 2; }
+  .setting-row:has(.setting-zero):not(:has(.setting-control-browse)):not(:has(.setting-week)) > .setting-control { display: contents; }
+  .setting-row:has(.setting-zero):not(:has(.setting-control-browse)):not(:has(.setting-week)) .setting-input { grid-column: 2; grid-row: 1; }
+  .setting-row:has(.setting-zero):not(:has(.setting-control-browse)):not(:has(.setting-week)) .setting-zero { grid-column: 2; grid-row: 2; margin-top: -7px; }
+  .setting-row:has(.setting-zero):not(:has(.setting-control-browse)):not(:has(.setting-week)) > .setting-actions { grid-column: 3; grid-row: 1; }
+}
 .setting-days { display: flex; flex-wrap: wrap; gap: 6px; }
 .setting-days .check { min-height: 36px; }
 /* The per-day speed schedule is a table: it takes a line of its own across

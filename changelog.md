@@ -51,6 +51,11 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   apri **Modifica selezionati** e cambi qualità, lingua, sottotitoli,
   esclusioni, upgrade o stato su tutte insieme. Puoi partire dai valori di un
   profilo. Tutto il resto di ogni titolo non viene toccato.
+- **Pulsanti allineati.** In Configurazione i pulsanti «Predefinito» e «Salva»
+  delle opzioni con una nota sotto il campo (es. «0 = illimitato») ora stanno
+  all'altezza del campo invece che più in basso. Sono allineati anche
+  «Aggiungi» in Aggiungi torrent, le righe dei Gruppi custom e la barra del
+  Log, dove «Ferma scorrimento», «Filtra» e «Copia» non vanno più a capo.
 - **gx-torrent si presenta con la sua versione, e può usare un'identità compatibile.** Prima diceva sempre `gx-core 0.0.0` a peer e tracker. Ora annuncia la versione reale (`gx-core 1.1.xxx`) e, se vuoi, può presentarsi come qBittorrent, Transmission, Rain o anacrolix/torrent con una versione scelta. Cambia solo l'identità annunciata: alcuni tracker privati accettano solo client in whitelist, quindi controlla le loro regole prima di usarla.
 
 - **Download con migliaia di torrent: la tabella resta fluida.** Oltre 500

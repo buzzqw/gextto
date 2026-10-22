@@ -514,8 +514,11 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .oauth-poll-form { display: inline-flex; align-items: center; gap: 8px; }
 .oauth-poll-form .input { width: 180px; }
-.logs-toolbar { flex-wrap: nowrap; }
-.logs-toolbar [data-logs-filter] { flex: 1 1 auto; min-width: 120px; }
+/* The buttons keep their label on one line (squeezed, "Ferma scorrimento"
+   broke in two and the row lost its height); the row wraps instead. */
+.logs-toolbar { flex-wrap: wrap; }
+.logs-toolbar .btn { flex: none; white-space: nowrap; }
+.logs-toolbar [data-logs-filter] { flex: 1 1 200px; min-width: 160px; }
 .logs-toolbar [data-logs-lines] { flex: 0 0 76px; width: 76px; min-width: 76px; }
 .logs-toolbar select[name="log"] { flex: 0 0 auto; width: auto; min-width: 230px; }
 .form-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -891,7 +894,9 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
   align-items: end;
   gap: 12px;
 }
-.torrent-add-action { display: flex; align-items: center; gap: 8px; min-height: 72px; white-space: nowrap; }
+/* The fields above have a label: the button sits at the bottom of its box so
+   it lines up with the fields, not with their labels. */
+.torrent-add-action { display: flex; align-items: flex-end; gap: 8px; min-height: 72px; white-space: nowrap; }
 .torrent-options { margin-top: 12px; flex-wrap: wrap; }
 
 /* ------------------------------------------------------------- settings */
