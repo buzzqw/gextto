@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -419,6 +420,9 @@ func v3SeriesByTvdbID(ctx context.Context, cfg *Config, tvdbID int64) v3Series {
 	}
 	sort.Slice(seasons, func(i, j int) bool { return seasons[i] < seasons[j] })
 	for _, season := range seasons {
+		if season < 0 || season > math.MaxInt32 {
+			continue
+		}
 		monitored := false
 		if index >= 0 {
 			monitored = seasonAllowed(cfg.Series[index].Seasons, season) &&
@@ -677,7 +681,7 @@ func v3MovieRecord(s *AppState, movie MovieConfig) v3Movie {
 		TmdbID: v3Int(movie.TmdbID), Monitored: movie.Enabled, IsAvailable: true,
 		QualityProfileID: 1, Tags: []int{}}
 	var year *int64
-	if parsed, err := strconv.ParseInt(strings.TrimSpace(movie.Year), 10, 64); err == nil {
+	if parsed, err := strconv.ParseInt(strings.TrimSpace(movie.Year), 10, 32); err == nil {
 		out.Year = int(parsed)
 		year = &parsed
 	}
