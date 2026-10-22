@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
@@ -58,7 +59,7 @@ type wsConn struct {
 }
 
 // dialWebSocket opens and handshakes a ws:// or wss:// connection to rawURL.
-func dialWebSocket(ctx context.Context, dial dialFunc, rawURL *url.URL, skipVerify bool, timeout time.Duration) (*wsConn, error) {
+func dialWebSocket(ctx context.Context, dial dialFunc, rawURL *url.URL, skipVerify bool, timeout time.Duration, userAgent string) (*wsConn, error) {
 	if rawURL.Scheme != "ws" && rawURL.Scheme != "wss" {
 		return nil, fmt.Errorf("wstracker: unsupported scheme %q", rawURL.Scheme)
 	}
@@ -108,7 +109,7 @@ func dialWebSocket(ctx context.Context, dial dialFunc, rawURL *url.URL, skipVeri
 		"Sec-WebSocket-Key: " + key + "\r\n" +
 		"Sec-WebSocket-Version: 13\r\n" +
 		"Origin: http://" + rawURL.Host + "\r\n" +
-		"User-Agent: gx-core\r\n\r\n"
+		"User-Agent: " + wsUserAgent(userAgent) + "\r\n\r\n"
 	if timeout > 0 {
 		_ = raw.SetDeadline(time.Now().Add(timeout))
 	}
@@ -273,6 +274,13 @@ func (c *wsConn) readFrame() (fin bool, opcode byte, payload []byte, err error) 
 }
 
 // Close closes the underlying connection.
+func wsUserAgent(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "gx-core"
+	}
+	return value
+}
+
 func (c *wsConn) Close() error { return c.conn.Close() }
 
 // SetDeadline bounds one exchange.

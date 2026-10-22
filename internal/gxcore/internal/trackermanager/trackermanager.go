@@ -85,7 +85,7 @@ func (m *TrackerManager) Get(s string, httpTimeout time.Duration, httpUserAgent 
 	case "udp":
 		return udptracker.New(s, u, m.udpTransport), nil
 	case "ws", "wss":
-		wt := wstracker.New(s, u, httpTimeout, m.dial, m.tlsSkipVerify)
+		wt := wstracker.New(s, u, httpTimeout, m.dial, m.tlsSkipVerify, httpUserAgent)
 		m.mu.Lock()
 		m.wsTrackers = append(m.wsTrackers, wt)
 		m.mu.Unlock()

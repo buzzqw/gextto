@@ -27,6 +27,7 @@ type Tracker struct {
 	timeout    time.Duration
 	dial       dialFunc
 	skipVerify bool
+	userAgent  string
 
 	mu   sync.Mutex
 	conn *wsConn
@@ -35,13 +36,18 @@ type Tracker struct {
 // New builds a WebSocket tracker for rawURL. dial routes through the session
 // egress (the same closure the HTTP transport uses); skipVerify follows the
 // session TLS policy.
-func New(rawURL string, u *url.URL, timeout time.Duration, dial func(ctx context.Context, network, addr string) (net.Conn, error), skipVerify bool) *Tracker {
+func New(rawURL string, u *url.URL, timeout time.Duration, dial func(ctx context.Context, network, addr string) (net.Conn, error), skipVerify bool, userAgent ...string) *Tracker {
+	agent := ""
+	if len(userAgent) > 0 {
+		agent = userAgent[0]
+	}
 	return &Tracker{
 		rawURL:     rawURL,
 		parsed:     u,
 		timeout:    timeout,
 		dial:       dial,
 		skipVerify: skipVerify,
+		userAgent:  agent,
 	}
 }
 
@@ -128,7 +134,7 @@ func (t *Tracker) exchange(ctx context.Context, params map[string]any) (map[stri
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.conn == nil {
-		conn, err := dialWebSocket(ctx, t.dial, t.parsed, t.skipVerify, t.timeout)
+		conn, err := dialWebSocket(ctx, t.dial, t.parsed, t.skipVerify, t.timeout, t.userAgent)
 		if err != nil {
 			return nil, err
 		}
