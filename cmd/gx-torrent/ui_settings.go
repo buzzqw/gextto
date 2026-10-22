@@ -508,6 +508,9 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{AUTOSPEED_STATUS}}", html.EscapeString(d.autoSpeedStatus(time.Now())))
 
 	repl("{{DOWNLOAD_DIR}}", get("download-dir"))
+	// The same value is proposed in the DLNA library-folders field; a distinct
+	// placeholder is needed because repl replaces only the first occurrence.
+	repl("{{DLNA_DOWNLOAD_DIR}}", get("download-dir"))
 	if strings.TrimSpace(store.Get("download-dir", "")) == "" {
 		repl("{{DOWNLOAD_DIR_DISABLED}}", " disabled")
 	} else {
