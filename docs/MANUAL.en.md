@@ -655,7 +655,7 @@ The most important fields are:
 |---|---|
 | Quality profile | only when adding: gives the title the quality, minimum audio, language, subtitles, exclusions and “Allow upgrades” of the profile (see *Quality profiles*); the single values can be changed later on the title's page |
 | Quality | restricts acceptable releases and contributes to the score |
-| Minimum audio | a preset that already includes the channels: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Any** imposes no limit and is the default, including for existing series |
+| Minimum audio | comes from the quality profile when adding and is changed with *Edit selected* (it is not on the title page); a preset that already includes the channels: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Any** imposes no limit and is the default, including for existing series |
 | Language | requires the configured language when it is recognisable in the title |
 | Subtitles | controls preference without accepting hardcoded subtitles |
 | Seasons | decides which seasons are monitored; ranges are supported |
@@ -735,7 +735,7 @@ eligible, and the alternative may be a single episode or another pack.
   language). As for the series, the **List / Posters** switch
   reads the table as cards with the cover (the choice is shared with the Series
   page).
-- The editor supports quality, minimum audio, **Language**, **Subtitles** with
+- The editor supports quality, **Language**, **Subtitles** with
   **Subtitles required** (Yes: a release without those subtitles is rejected; No:
   they are only preferred), **Allow upgrades** and exclusions. Each value has one
   field only: the old “Required languages” were folded into **Language** (which

@@ -2797,10 +2797,6 @@
 {{if and . (not (or (eq . "") (eq . "lossless-5.1") (eq . "lossless-7.1") (eq . "high-5.1") (eq . "high-7.1") (eq . "standard-5.1") (eq . "standard-7.1") (eq . "compressed-5.1")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
 {{end}}
 
-{{define "v2_audio_pref_field"}}
-<label class="field"><span>Audio minimo</span><select class="input" name="audio" title="Audio minimo accettato, con i canali già compresi nel preset. Qualsiasi non impone nulla.">{{template "v2_audio_options" .Audio}}</select></label>
-{{end}}
-
 {{define "v2_language_options"}}
 <option value=""{{if eq . ""}} selected{{end}}>Predefinita (ita)</option>
 <option value="ita"{{if eq . "ita"}} selected{{end}}>Italiano</option>
@@ -3068,16 +3064,15 @@
         <label class="field"><span>Nome</span><input class="input" value="{{.Name}}" readonly /></label>
         <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
          <label class="field"><span>Qualità</span><select class="input" name="quality">{{template "v2_quality_options" .Quality}}</select></label>
-         {{template "v2_audio_pref_field" .}}
          <label class="field"><span>Lingue</span><select class="input" name="language">{{template "v2_language_options" .Language}}</select></label>
          <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
         <label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
         <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" /></label>
          <label class="field span-full"><span>Percorso archivio (NAS)</span><span class="field-row"><input class="input" name="archive_path" value="{{.ArchivePath}}" data-v2-browse-input /><button class="btn sm" type="button" data-v2-browse-for="archive_path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label>
-        <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
+        <label class="field span-full"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
         <input type="hidden" name="flags" value="1" />
-        <label class="check" title="Le release degli anime numerano gli episodi dall'inizio senza stagioni («Titolo - 1071»): Gextto converte il numero in stagione ed episodio con i dati TMDB e cerca anche il numero assoluto."><input type="checkbox" name="anime" value="true"{{if .Anime}} checked{{end}} /> <span>Anime (numerazione assoluta)</span></label>
         <label class="field" title="Sì: una release migliore sostituisce il file già archiviato. No: il file archiviato resta."><span>Permetti upgrade</span><select class="input" name="disable_upgrades"><option value="false"{{if not .DisableUpgrades}} selected{{end}}>Sì</option><option value="true"{{if .DisableUpgrades}} selected{{end}}>No</option></select></label>
+        <label class="field" title="Le release degli anime numerano gli episodi dall'inizio senza stagioni («Titolo - 1071»): Gextto converte il numero in stagione ed episodio con i dati TMDB e cerca anche il numero assoluto."><span>Anime (numerazione assoluta)</span><select class="input" name="anime"><option value="false"{{if not .Anime}} selected{{end}}>No</option><option value="true"{{if .Anime}} selected{{end}}>Sì</option></select></label>
         <div class="form-actions"><button class="btn primary" type="submit">Salva serie</button></div>
       </form>
     </div>
@@ -3118,7 +3113,6 @@
         <label class="field"><span>Nome</span><input class="input" name="name" value="{{.Name}}" /></label>
         <label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}" /></label>
          <label class="field"><span>Qualità</span><select class="input" name="quality">{{template "v2_quality_options" .Quality}}</select></label>
-         {{template "v2_audio_pref_field" .}}
          <label class="field"><span>Lingua</span><select class="input" name="language">{{template "v2_language_options" .Language}}</select></label>
          <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
         <label class="field" title="Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti."><span>Sottotitoli obbligatori</span><select class="input" name="subtitle_required"><option value="false"{{if not .SubtitleRequired}} selected{{end}}>No</option><option value="true"{{if .SubtitleRequired}} selected{{end}}>Sì</option></select></label>

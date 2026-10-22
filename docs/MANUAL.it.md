@@ -671,7 +671,7 @@ I campi più importanti sono:
 |---|---|
 | Profilo di qualità | solo all'aggiunta: dà al titolo qualità, audio minimo, lingua, sottotitoli, esclusioni e «Permetti upgrade» del profilo (vedi *Profili di qualità*); nella scheda del titolo i singoli valori si possono poi cambiare |
 | Qualità | restringe le release accettabili e partecipa allo score |
-| Audio minimo | preset che include già i canali: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Qualsiasi** non impone nulla ed è il default, anche per le serie già caricate |
+| Audio minimo | arriva dal profilo di qualità all'aggiunta e si cambia con *Modifica selezionati* (non c'è nella scheda del titolo); preset che include già i canali: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Qualsiasi** non impone nulla ed è il default, anche per le serie già caricate |
 | Lingua | richiede la lingua configurata quando è riconoscibile nel titolo |
 | Sottotitoli | gestisce la preferenza senza accettare sottotitoli hardcoded |
 | Stagioni | decide quali stagioni sono monitorate; gli intervalli sono supportati |
@@ -752,7 +752,7 @@ essere una singola puntata o un altro pack.
 
 - Tab **Monitorati / Scaricati**; colonne ordinabili (nome, anno, qualità, lingua). Come per le serie, il selettore **Elenco / Locandine** legge la tabella come
   card con la copertina (la scelta è condivisa con la pagina Serie TV).
-- L'editor gestisce qualità, audio minimo, **Lingua**, **Sottotitoli** con
+- L'editor gestisce qualità, **Lingua**, **Sottotitoli** con
   **Sottotitoli obbligatori** (Sì: una release senza quei sottotitoli è scartata;
   No: sono solo preferiti), **Permetti upgrade** ed esclusioni. Ogni valore ha un
   solo campo: le vecchie «Lingue richieste» sono confluite in **Lingua** (che vale

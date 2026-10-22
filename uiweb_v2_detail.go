@@ -50,16 +50,20 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		// Only the edited fields: the per-series endpoint keeps everything else.
 		fields := map[string]any{
-			"seasons":        r.FormValue("seasons"),
-			"quality":        r.FormValue("quality"),
-			"audio":          r.FormValue("audio"),
-			"audio_channels": r.FormValue("audio_channels"),
-			"language":       r.FormValue("language"),
-			"subtitle":       r.FormValue("subtitle"),
-			"tvdb_id":        r.FormValue("tvdb_id"),
-			"archive_path":   r.FormValue("archive_path"),
-			"exclude":        r.FormValue("exclude"),
-			"aliases":        aliases,
+			"seasons":      r.FormValue("seasons"),
+			"quality":      r.FormValue("quality"),
+			"language":     r.FormValue("language"),
+			"subtitle":     r.FormValue("subtitle"),
+			"tvdb_id":      r.FormValue("tvdb_id"),
+			"archive_path": r.FormValue("archive_path"),
+			"exclude":      r.FormValue("exclude"),
+			"aliases":      aliases,
+		}
+		// Audio minimo is set by the quality profile (and Modifica selezionati):
+		// the page has no field for it, so it is sent only when posted.
+		if _, ok := r.Form["audio"]; ok {
+			fields["audio"] = r.FormValue("audio")
+			fields["audio_channels"] = r.FormValue("audio_channels")
 		}
 		// Checkboxes send nothing when unchecked: the "flags" marker says the
 		// form carried them, so an absent box means false.

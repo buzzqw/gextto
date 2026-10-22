@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **Tidier series and movie pages.** The **Minimum audio** field is no longer on the title page: it comes from the quality profile when you add a series or a movie, and is changed for several titles at once with **Edit selected**. The value already set on each title stays and still applies. On the series page the fields are realigned (Exclude on the whole row, **Allow upgrades** and **Anime** side by side as Yes/No choices).
+
 - **Movie page: one field per value.** **Required languages** and **Subtitle requirements** are gone: they duplicated **Language** and **Subtitles** (and, when filled, silently won). At the first start their values are moved into the remaining fields without changing any decision: a movie with language «any» but required language «chi» now has Language `chi`. Instead of the subtitle requirements there is **Subtitles required: Yes/No**. The **Exclude** field takes the whole row.
 
 - **Quality profiles: language and subtitles to pick or type, fewer duplicates.** In the profile editor **Language** and **Subtitles** suggest the usual choices (ita, eng, ita,eng, multi, any) and also take a value typed by hand. The profiles generated from the library (the ones Jellyseerr sees too) no longer come from a single title's exclusions or from the `any` quality, which means no limit: no more duplicates such as *any · ita* next to *Default*.

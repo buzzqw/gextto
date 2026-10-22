@@ -2532,3 +2532,24 @@ func TestV2QualityProfileLanguagesAreChooseOrType(t *testing.T) {
 		}
 	}
 }
+
+func TestV2SeriesSaveWithoutAudioKeepsTheMinimum(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Keep Audio", Quality: "1080p", Audio: "high-5.1", Enabled: true}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	code, body := v2Request(t, server, http.MethodGet, "/?view=series&series=Keep%20Audio", nil)
+	if code != http.StatusOK || strings.Contains(body, `name="audio"`) {
+		t.Fatalf("the series page must not offer the minimum audio: %d", code)
+	}
+	if code, body := v2Request(t, server, http.MethodPost, "/series/save", url.Values{"name": {"Keep Audio"}, "seasons": {"*"}, "quality": {"720p"}, "flags": {"1"}, "disable_upgrades": {"false"}, "anime": {"false"}}); code >= 400 {
+		t.Fatalf("save -> %d %s", code, body)
+	}
+	for _, series := range latestConfig(state).Series {
+		if series.Name == "Keep Audio" && (series.Audio != "high-5.1" || series.Quality != "720p") {
+			t.Fatalf("series after save = %+v", series)
+		}
+	}
+}
