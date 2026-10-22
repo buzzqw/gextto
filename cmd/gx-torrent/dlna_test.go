@@ -366,6 +366,9 @@ func TestDLNASearchCriteria(t *testing.T) {
 	if q := parseDLNASearch("*"); q.title != "" || q.class != "" || !q.matches("anything", true) {
 		t.Fatalf("* must match everything: %+v", q)
 	}
+	if q := parseDLNASearch(`upnp:class = "object.item"`); !q.matches("movie", true) || !q.matches("song", false) {
+		t.Fatalf("object.item must match video and audio: %+v", q)
+	}
 	if q := parseDLNASearch(`upnp:class = "object.item.audioItem.musicTrack"`); q.matches("song", true) || !q.matches("song", false) {
 		t.Fatalf("audio query = %+v", q)
 	}
