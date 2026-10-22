@@ -2721,25 +2721,18 @@
 
 {{define "v2_audio_options"}}
 <option value=""{{if eq . ""}} selected{{end}}>Qualsiasi</option>
-<option value="lossless"{{if eq . "lossless"}} selected{{end}}>Lossless (TrueHD / DTS-HD)</option>
-<option value="high"{{if eq . "high"}} selected{{end}}>DTS / DD+</option>
-<option value="standard"{{if eq . "standard"}} selected{{end}}>AC3 / 5.1</option>
-<option value="compressed"{{if eq . "compressed"}} selected{{end}}>AAC / Opus</option>
-{{if and . (not (or (eq . "lossless") (eq . "high") (eq . "standard") (eq . "compressed")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
+<option value="lossless-5.1"{{if eq . "lossless-5.1"}} selected{{end}}>Lossless 5.1+ (TrueHD / DTS-HD)</option>
+<option value="lossless-7.1"{{if eq . "lossless-7.1"}} selected{{end}}>Lossless 7.1 (TrueHD / DTS-HD)</option>
+<option value="high-5.1"{{if eq . "high-5.1"}} selected{{end}}>DTS / DD+ 5.1+</option>
+<option value="high-7.1"{{if eq . "high-7.1"}} selected{{end}}>DTS / DD+ 7.1</option>
+<option value="standard-5.1"{{if eq . "standard-5.1"}} selected{{end}}>AC3 / 5.1</option>
+<option value="standard-7.1"{{if eq . "standard-7.1"}} selected{{end}}>AC3 7.1</option>
+<option value="compressed-5.1"{{if eq . "compressed-5.1"}} selected{{end}}>AAC / Opus 5.1+</option>
+{{if and . (not (or (eq . "") (eq . "lossless-5.1") (eq . "lossless-7.1") (eq . "high-5.1") (eq . "high-7.1") (eq . "standard-5.1") (eq . "standard-7.1") (eq . "compressed-5.1")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
 {{end}}
 
-{{define "v2_audio_channel_options"}}
-<option value=""{{if eq . ""}} selected{{end}}>Qualsiasi</option>
-<option value="5.1"{{if eq . "5.1"}} selected{{end}}>5.1 o superiore</option>
-<option value="7.1"{{if eq . "7.1"}} selected{{end}}>7.1</option>
-{{if and . (not (or (eq . "5.1") (eq . "7.1")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
-{{end}}
-
-{{define "v2_audio_pref_fields"}}
-<div class="field span-full audio-pref-row">
-  <label class="field audio-pref-field"><span>Audio minimo</span><select class="input" name="audio" title="Audio minimo accettato: le release con una traccia inferiore vengono scartate. Qualsiasi non impone nulla.">{{template "v2_audio_options" .Audio}}</select></label>
-  <label class="field audio-pref-field"><span>Canali minimi</span><select class="input" name="audio_channels" title="Layout minimo accettato: 5.1 accetta anche 7.1, 7.1 richiede un layout 7.1. Qualsiasi non impone nulla.">{{template "v2_audio_channel_options" .AudioChannels}}</select></label>
-</div>
+{{define "v2_audio_pref_field"}}
+<label class="field"><span>Audio minimo</span><select class="input" name="audio" title="Audio minimo accettato, con i canali già compresi nel preset. Qualsiasi non impone nulla.">{{template "v2_audio_options" .Audio}}</select></label>
 {{end}}
 
 {{define "v2_language_options"}}
@@ -2769,7 +2762,7 @@
     <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="source" value="discover"><input type="hidden" name="redirect" value="{{.Redirect}}">
     <label class="field"><span>Titolo</span><input class="input" name="name" value="{{.Name}}" required></label><label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}"></label>
     <label class="field"><span>TMDB ID</span><input class="input" name="tmdb_id" value="{{.TmdbID}}" required></label><label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}"></label>
-    <label class="field"><span>Qualità richiesta</span><select class="input" name="quality"><option value=""{{if eq .Quality ""}} selected{{end}}>Qualsiasi</option><option value="720p"{{if eq .Quality "720p"}} selected{{end}}>720p</option><option value="720p+"{{if eq .Quality "720p+"}} selected{{end}}>720p+</option><option value="1080p"{{if eq .Quality "1080p"}} selected{{end}}>1080p</option><option value="1080p+"{{if eq .Quality "1080p+"}} selected{{end}}>1080p+</option><option value="2160p"{{if eq .Quality "2160p"}} selected{{end}}>2160p 4K</option><option value="2160p+"{{if eq .Quality "2160p+"}} selected{{end}}>2160p+ 4K+</option></select></label>{{template "v2_audio_pref_fields" .}}<label class="field"><span>Lingue</span><select class="input" name="language"><option value=""{{if eq .Language ""}} selected{{end}}>Predefinita (ita)</option><option value="ita"{{if eq .Language "ita"}} selected{{end}}>Italiano</option><option value="eng"{{if eq .Language "eng"}} selected{{end}}>Inglese</option><option value="ita,eng"{{if eq .Language "ita,eng"}} selected{{end}}>Italiano + Inglese</option><option value="multi"{{if eq .Language "multi"}} selected{{end}}>Multi</option><option value="any"{{if eq .Language "any"}} selected{{end}}>Qualsiasi</option></select></label>
+    <label class="field"><span>Qualità richiesta</span><select class="input" name="quality"><option value=""{{if eq .Quality ""}} selected{{end}}>Qualsiasi</option><option value="720p"{{if eq .Quality "720p"}} selected{{end}}>720p</option><option value="720p+"{{if eq .Quality "720p+"}} selected{{end}}>720p+</option><option value="1080p"{{if eq .Quality "1080p"}} selected{{end}}>1080p</option><option value="1080p+"{{if eq .Quality "1080p+"}} selected{{end}}>1080p+</option><option value="2160p"{{if eq .Quality "2160p"}} selected{{end}}>2160p 4K</option><option value="2160p+"{{if eq .Quality "2160p+"}} selected{{end}}>2160p+ 4K+</option></select></label>{{template "v2_audio_pref_field" .}}<label class="field"><span>Lingue</span><select class="input" name="language"><option value=""{{if eq .Language ""}} selected{{end}}>Predefinita (ita)</option><option value="ita"{{if eq .Language "ita"}} selected{{end}}>Italiano</option><option value="eng"{{if eq .Language "eng"}} selected{{end}}>Inglese</option><option value="ita,eng"{{if eq .Language "ita,eng"}} selected{{end}}>Italiano + Inglese</option><option value="multi"{{if eq .Language "multi"}} selected{{end}}>Multi</option><option value="any"{{if eq .Language "any"}} selected{{end}}>Qualsiasi</option></select></label>
     <label class="field"><span>Sottotitoli</span><span class="field-row"><select class="input" data-preset-for="subtitle" title="Preset rapidi"><option value="">Preset…</option><option value="ita">Italiano</option><option value="eng">Inglese</option><option value="ita,eng">Italiano + Inglese</option><option value="multi">Multi</option><option value="any">Qualsiasi</option></select><input class="input" name="subtitle" placeholder="es. ita,eng" title="Sottotitoli richiesti, separati da virgola"></span></label>
     {{if eq .Kind "series"}}<label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}"></label><label class="field"><span>Alias</span><input class="input" name="aliases"></label><label class="field span-full"><span>Percorso NAS</span><span class="field-row"><input class="input" name="archive_path" data-v2-browse-input value="{{.ArchivePath}}"{{if .ArchivePath}} readonly{{end}}><button class="btn sm" type="button" data-v2-browse-for="archive_path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label><label class="check"><input type="checkbox" name="create_folder" value="1" data-v2-create-folder{{if .ArchivePath}} checked{{end}} /> <span>Crea cartella</span></label><label class="check" title="Archivia gli episodi in una cartella Stagione 01, Stagione 02, … dentro la cartella archivio della serie"><input type="checkbox" name="season_subfolders" value="1" /> <span>Sottocartelle per stagione</span></label>{{end}}
     <label class="field span-full"><span>Esclusioni</span><input class="input" name="exclude" placeholder="cam, ts"></label>
@@ -3010,7 +3003,7 @@
         <label class="field"><span>Nome</span><input class="input" value="{{.Name}}" readonly /></label>
         <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
          <label class="field"><span>Qualità</span><select class="input" name="quality">{{template "v2_quality_options" .Quality}}</select></label>
-         {{template "v2_audio_pref_fields" .}}
+         {{template "v2_audio_pref_field" .}}
          <label class="field"><span>Lingue</span><select class="input" name="language">{{template "v2_language_options" .Language}}</select></label>
          <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
         <label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
@@ -3060,7 +3053,7 @@
         <label class="field"><span>Nome</span><input class="input" name="name" value="{{.Name}}" /></label>
         <label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}" /></label>
          <label class="field"><span>Qualità</span><select class="input" name="quality">{{template "v2_quality_options" .Quality}}</select></label>
-         {{template "v2_audio_pref_fields" .}}
+         {{template "v2_audio_pref_field" .}}
          <label class="field"><span>Lingua</span><select class="input" name="language">{{template "v2_language_options" .Language}}</select></label>
          <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
         <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>

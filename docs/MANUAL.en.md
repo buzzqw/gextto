@@ -650,8 +650,7 @@ The most important fields are:
 | Field | Effect |
 |---|---|
 | Quality | restricts acceptable releases and contributes to the score |
-| Minimum audio | requires a track at least equal to the selected group (`Lossless`, `DTS / DD+`, `AC3 / 5.1`, `AAC / Opus`); **Any** imposes no limit and is the default, including for existing series |
-| Minimum channels | requires at least 5.1 or 7.1 when the layout is recognisable; **Any** imposes no limit and is the default |
+| Minimum audio | a preset that already includes the channels: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Any** imposes no limit and is the default, including for existing series |
 | Language | requires the configured language when it is recognisable in the title |
 | Subtitles | controls preference without accepting hardcoded subtitles |
 | Seasons | decides which seasons are monitored; ranges are supported |
@@ -731,8 +730,8 @@ eligible, and the alternative may be a single episode or another pack.
   language). As for the series, the **List / Posters** switch
   reads the table as cards with the cover (the choice is shared with the Series
   page).
-- The editor supports quality, minimum audio, minimum channels, base language,
-  subtitles, exclusions and **Required languages**. The form shows a readable value such as `ita,eng`, not
+- The editor supports quality, minimum audio, base language, subtitles,
+  exclusions and **Required languages**. The form shows a readable value such as `ita,eng`, not
   the internal JSON representation.
 - **Movie detail**: poster, plot, cast with TMDB links, edit, re-download,
   **Search now**, a “best matches” table from the sources and an **archive
@@ -742,7 +741,7 @@ eligible, and the alternative may be a single episode or another pack.
 
 1. find the movie in **Explore** and check year and original title;
 2. add it to the library;
-3. set quality, minimum audio, minimum channels, language, subtitles and exclusions;
+3. set quality, minimum audio, language, subtitles and exclusions;
 4. use **Search now** to inspect results without waiting for a cycle;
 5. open **Why not this one?** before queueing a borderline release.
 
@@ -1003,12 +1002,12 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   the list is read from the server, and the change applies after a restart.
 - **Scores** — category weights, custom-group management (add, edit or remove a
   group and set its bonus/penalty), and a live simulator. The group name must
-  match the release's final group tag, for example `TBK`. Audio weights are
-  grouped by level: TrueHD and DTS-HD MA together, DTS and DD+ together, AC3 and
-  generic 5.1 together; the 5.1/7.1 layout and Atmos/DTS:X have a separate
-  weight. The audio total stays below the upgrade threshold, so audio
-  contributes to the comparison but does not download another release by
-  itself. Audio language is a per-title eligibility requirement, not a fixed
+  match the release's final group tag, for example `TBK`. Audio weights are one
+  card per group: Lossless (TrueHD, DTS-HD, FLAC, PCM), DTS/DD+ (including
+  DTS-HD HRA), AC3/5.1, AAC/Opus and MP3; channels and Atmos/DTS:X live in a
+  separate card. Video weights are grouped too: 4K, Full HD, HD, SD and Video
+  codec. The audio total stays below the upgrade threshold, so audio contributes
+  to the comparison but does not download another release by itself. Audio language is a per-title eligibility requirement, not a fixed
   Italian bonus, so English can be preferred instead. Preferred subtitles add a small optional bonus without
   making a release mandatory. One effective score is used for acquisition,
   searches, upgrades, post-processing, archive records and rescoring; it also

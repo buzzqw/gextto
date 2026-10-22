@@ -749,7 +749,7 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 		entries = append(entries, uiSearchEntry{Key: def.Key, Label: def.Label, Tab: def.Tab})
 	}
 	for _, key := range keys {
-		if strings.HasPrefix(strings.ToLower(key), "score") {
+		if strings.HasPrefix(strings.ToLower(key), "score") && !uiDeprecatedScoreSettingKeys[key] {
 			entries = append(entries, uiSearchEntry{Key: key, Label: uiSettingAutoLabel(key), Tab: "scores"})
 		}
 	}
@@ -885,16 +885,26 @@ func uiSettingGroupTitle(tab, key string) string {
 func uiScoreGroupTitle(key string) (string, bool) {
 	lowered := strings.ToLower(key)
 	switch {
+	case lowered == "score_res_2160p":
+		return "4K", true
+	case lowered == "score_res_1080p":
+		return "Full HD", true
+	case lowered == "score_res_720p":
+		return "HD", true
+	case lowered == "score_res_360p", lowered == "score_res_480p", lowered == "score_res_576p":
+		return "SD", true
 	case strings.HasPrefix(lowered, "score_res_"):
 		return "Risoluzione", true
 	case strings.HasPrefix(lowered, "score_source_"):
 		return "Sorgente", true
 	case strings.HasPrefix(lowered, "score_codec_"):
-		return "Codec", true
+		return "Codec video", true
+	case lowered == "score_audio_objects":
+		return "Canali e oggetti", true
 	case strings.HasPrefix(lowered, "score_audio_"):
 		return "Audio", true
 	case strings.HasPrefix(lowered, "score_channels_"):
-		return "Canali", true
+		return "Canali e oggetti", true
 	case strings.HasPrefix(lowered, "score_bonus_"):
 		return "Bonus", true
 	case strings.HasPrefix(lowered, "score_group_"):

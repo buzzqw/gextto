@@ -657,7 +657,7 @@ Per una serie nuova il metodo più sicuro è la ricerca TMDB:
 
 1. apri **Esplora**, cerca il titolo e seleziona il risultato corretto;
 2. controlla titolo, anno, rete e poster;
-3. scegli qualità, audio minimo, canali minimi, lingua, sottotitoli e stagioni da monitorare;
+3. scegli qualità, audio minimo, lingua, sottotitoli e stagioni da monitorare;
 4. imposta il percorso archivio solo se non vuoi usare quello globale;
 5. salva in dry-run e controlla la pagina di dettaglio.
 
@@ -666,8 +666,7 @@ I campi più importanti sono:
 | Campo | Effetto |
 |---|---|
 | Qualità | restringe le release accettabili e partecipa allo score |
-| Audio minimo | richiede una traccia almeno pari al gruppo scelto (`Lossless`, `DTS / DD+`, `AC3 / 5.1`, `AAC / Opus`); **Qualsiasi** non impone nulla ed è il default, anche per le serie già caricate |
-| Canali minimi | richiede almeno 5.1 o 7.1 quando il layout è riconoscibile; **Qualsiasi** non impone nulla ed è il default |
+| Audio minimo | preset che include già i canali: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Qualsiasi** non impone nulla ed è il default, anche per le serie già caricate |
 | Lingua | richiede la lingua configurata quando è riconoscibile nel titolo |
 | Sottotitoli | gestisce la preferenza senza accettare sottotitoli hardcoded |
 | Stagioni | decide quali stagioni sono monitorate; gli intervalli sono supportati |
@@ -748,8 +747,8 @@ essere una singola puntata o un altro pack.
 
 - Tab **Monitorati / Scaricati**; colonne ordinabili (nome, anno, qualità, lingua). Come per le serie, il selettore **Elenco / Locandine** legge la tabella come
   card con la copertina (la scelta è condivisa con la pagina Serie TV).
-- L'editor gestisce qualità, audio minimo, canali minimi, lingua base,
-  sottotitoli, esclusioni e **Lingue richieste**. Nel form il valore è mostrato in formato leggibile, per esempio
+- L'editor gestisce qualità, audio minimo, lingua base, sottotitoli,
+  esclusioni e **Lingue richieste**. Nel form il valore è mostrato in formato leggibile, per esempio
   `ita,eng`, non come JSON interno.
 - **Dettaglio film**: locandina, trama, cast, modifica, riscarica, **Cerca subito**,
   nomi del cast collegati alle schede TMDB, tabella dei “migliori trovati” dalle
@@ -760,7 +759,7 @@ essere una singola puntata o un altro pack.
 
 1. cerca il film in **Esplora** e controlla anno e titolo originale;
 2. aggiungilo alla libreria;
-3. imposta qualità, audio minimo, canali minimi, lingua, sottotitoli ed eventuali esclusioni;
+3. imposta qualità, audio minimo, lingua, sottotitoli ed eventuali esclusioni;
 4. usa **Cerca subito** per vedere i risultati senza aspettare il ciclo;
 5. apri **Perché non questa?** prima di accodare una release borderline.
 
@@ -1029,11 +1028,13 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   porte** verifica inoltre il bind locale delle porte indicate: non sostituisce
   il controllo del port-forwarding sul router/firewall.
 - **Punteggi** — pesi per categoria, gestione dei gruppi custom (aggiungi, modifica
-  o rimuovi il gruppo e assegna un bonus/penalità) e simulatore live. I pesi audio
-  sono raggruppati per livello: TrueHD e DTS-HD MA insieme, DTS e DD+ insieme,
-  AC3 e 5.1 generico insieme; il layout 5.1/7.1 e Atmos/DTS:X hanno un peso
-  separato. Il totale audio resta sotto la soglia di upgrade, quindi l'audio
-  contribuisce al confronto ma non fa scaricare da solo un'altra release. Il nome del
+  o rimuovi il gruppo e assegna un bonus/penalità) e simulatore live. I pesi
+  audio sono una scheda per gruppo: Lossless (TrueHD, DTS-HD, FLAC, PCM),
+  DTS/DD+ (con DTS-HD HRA), AC3/5.1, AAC/Opus e MP3; canali e Atmos/DTS:X stanno
+  in una scheda separata. Anche i pesi video sono raggruppati per scheda: 4K,
+  Full HD, HD, SD e Codec video. Il totale audio resta sotto la soglia di
+  upgrade, quindi l'audio contribuisce al confronto ma non fa scaricare da solo
+  un'altra release. Il nome del
   gruppo deve coincidere con il tag release finale, per esempio `TBK`. La lingua
   audio è un requisito di ammissibilità per titolo, non un bonus fisso per
   l'italiano: si può quindi preferire l'inglese. I sottotitoli preferiti danno

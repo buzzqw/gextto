@@ -257,29 +257,97 @@ func (q *Quality) AudioRank() int {
 	return rank
 }
 
-func audioCodecPoints(value string) int64 {
+func audioGroupName(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
 	switch {
 	case strings.Contains(value, "dts-hd-hra"), strings.Contains(value, "dtshd-hra"):
-		return 120
+		return "high"
 	case strings.Contains(value, "truehd"), strings.Contains(value, "dts-hd"),
-		strings.Contains(value, "dtshd"), strings.Contains(value, "flac"):
-		return 150
-	case strings.Contains(value, "pcm"), strings.Contains(value, "lpcm"):
-		return 140
+		strings.Contains(value, "dtshd"), strings.Contains(value, "flac"),
+		strings.Contains(value, "pcm"), strings.Contains(value, "lpcm"):
+		return "lossless"
 	case strings.Contains(value, "dts"), strings.Contains(value, "ddp"),
 		strings.Contains(value, "eac3"):
-		return 90
+		return "high"
 	case strings.Contains(value, "ac3"), strings.Contains(value, "5.1"),
 		strings.Contains(value, "7.1"):
-		return 50
+		return "standard"
 	case strings.Contains(value, "aac"), strings.Contains(value, "opus"):
-		return 40
+		return "compressed"
 	case strings.Contains(value, "mp3"):
+		return "mp3"
+	default:
+		return ""
+	}
+}
+
+func audioGroupPoints(group string) int64 {
+	switch group {
+	case "lossless":
+		return 150
+	case "high":
+		return 90
+	case "standard":
+		return 50
+	case "compressed":
+		return 40
+	case "mp3":
 		return 10
 	default:
 		return 0
 	}
+}
+
+// audioLegacyKeys returns the old per-codec keys still read when the grouped
+// key has never been saved. This keeps existing custom weights working while the
+// UI exposes one control per group.
+func audioLegacyKeys(value string) []string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	switch audioGroupName(value) {
+	case "lossless":
+		switch {
+		case strings.Contains(value, "truehd"):
+			return []string{"score_audio_truehd"}
+		case strings.Contains(value, "dts-hd"), strings.Contains(value, "dtshd"):
+			return []string{"score_audio_dts-hd"}
+		case strings.Contains(value, "flac"):
+			return []string{"score_audio_flac"}
+		case strings.Contains(value, "pcm"), strings.Contains(value, "lpcm"):
+			return []string{"score_audio_pcm"}
+		}
+	case "high":
+		switch {
+		case strings.Contains(value, "hra"):
+			return []string{"score_audio_dts-hd-hra"}
+		case strings.Contains(value, "dts"):
+			return []string{"score_audio_dts"}
+		case strings.Contains(value, "ddp"), strings.Contains(value, "eac3"):
+			return []string{"score_audio_ddp"}
+		}
+	case "standard":
+		switch {
+		case strings.Contains(value, "ac3"):
+			return []string{"score_audio_ac3"}
+		case strings.Contains(value, "7.1"):
+			return []string{"score_audio_7.1"}
+		case strings.Contains(value, "5.1"):
+			return []string{"score_audio_5.1"}
+		}
+	case "compressed":
+		switch {
+		case strings.Contains(value, "aac"):
+			return []string{"score_audio_aac"}
+		case strings.Contains(value, "opus"):
+			return []string{"score_audio_opus"}
+		}
+	case "mp3":
+		return []string{"score_audio_mp3"}
+	}
+	return nil
+}
+
+func audioCodecPoints(value string) int64 {
+	return audioGroupPoints(audioGroupName(value))
 }
 
 func audioChannelPoints(layout string) int64 {
@@ -404,36 +472,13 @@ func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
 	adjust(200, q.Codec == "h265" || q.Codec == "x265" || q.Codec == "hevc", "score_codec_h265")
 	adjust(50, q.Codec == "h264" || q.Codec == "x264" || q.Codec == "avc", "score_codec_h264")
 
-	// Audio is a codec plus a separate layout and optional object metadata. Each
-	// parsed token has exactly one key; EAC3 normalizes to DDP and bare DTS-HD
-	// is treated as the lossless MA variant.
-	switch {
-	case strings.Contains(q.Audio, "dts-hd-hra") || strings.Contains(q.Audio, "dtshd-hra"):
-		adjust(120, true, "score_audio_dts-hd-hra")
-	case strings.Contains(q.Audio, "truehd"):
-		adjust(150, true, "score_audio_truehd")
-	case strings.Contains(q.Audio, "dts-hd") || strings.Contains(q.Audio, "dtshd"):
-		adjust(150, true, "score_audio_dts-hd")
-	case strings.Contains(q.Audio, "flac"):
-		adjust(150, true, "score_audio_flac")
-	case strings.Contains(q.Audio, "pcm") || strings.Contains(q.Audio, "lpcm"):
-		adjust(140, true, "score_audio_pcm")
-	case strings.Contains(q.Audio, "dts"):
-		adjust(90, true, "score_audio_dts")
-	case strings.Contains(q.Audio, "ddp") || strings.Contains(q.Audio, "eac3"):
-		adjust(90, true, "score_audio_ddp")
-	case strings.Contains(q.Audio, "7.1"):
-		adjust(50, true, "score_audio_7.1")
-	case strings.Contains(q.Audio, "ac3"):
-		adjust(50, true, "score_audio_ac3")
-	case strings.Contains(q.Audio, "5.1"):
-		adjust(50, true, "score_audio_5.1")
-	case strings.Contains(q.Audio, "aac"):
-		adjust(40, true, "score_audio_aac")
-	case strings.Contains(q.Audio, "opus"):
-		adjust(40, true, "score_audio_opus")
-	case strings.Contains(q.Audio, "mp3"):
-		adjust(10, true, "score_audio_mp3")
+	// Audio has one configurable weight per group, plus separate channel and
+	// object metadata weights. The legacy per-codec keys are still read when the
+	// grouped key has never been saved, so existing custom weights survive the
+	// transition without appearing as extra controls.
+	if group := audioGroupName(q.Audio); group != "" {
+		keys := append([]string{"score_audio_" + group}, audioLegacyKeys(q.Audio)...)
+		adjust(audioGroupPoints(group), true, keys...)
 	}
 	switch q.AudioChannelLayout() {
 	case "7.1":
@@ -442,11 +487,8 @@ func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
 		adjust(10, true, "score_channels_5.1")
 	}
 	objects := strings.ToLower(q.AudioObjectMetadata())
-	if strings.Contains(objects, "atmos") {
-		adjust(20, true, "score_audio_atmos")
-	}
-	if strings.Contains(objects, "dtsx") || strings.Contains(objects, "dts:x") {
-		adjust(20, true, "score_audio_dtsx")
+	if strings.Contains(objects, "atmos") || strings.Contains(objects, "dtsx") || strings.Contains(objects, "dts:x") {
+		adjust(20, true, "score_audio_objects", "score_audio_atmos", "score_audio_dtsx")
 	}
 	// HDR and Dolby Vision are additive; a DV release carries HDR="DV", so it
 	// receives both bonuses.

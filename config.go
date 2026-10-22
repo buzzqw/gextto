@@ -1605,7 +1605,7 @@ func QualityAllowed(quality *models.Quality, requirement string, language string
 		languageSubtitleAllowed(quality, language, subtitle)
 }
 
-// AudioAllowed applies the per-title minimum audio tier and channel layout.
+// AudioAllowed applies the per-title minimum audio group and channel layout.
 // The empty value (the UI "Qualsiasi") accepts every audio track, so existing
 // titles keep their behaviour. A title with a requirement rejects releases
 // whose track is below it; a missing or unrecognised track never guesses.
@@ -1613,8 +1613,11 @@ func AudioAllowed(quality *models.Quality, requirement, channels string) bool {
 	if quality == nil {
 		return false
 	}
-	requirement = normalizeAudioRequirement(requirement)
-	switch requirement {
+	group, requiredChannels := audioRequirementParts(requirement)
+	if requiredChannels == "" {
+		requiredChannels = normalizeAudioChannels(channels)
+	}
+	switch group {
 	case "lossless":
 		if quality.AudioTier() < 5 {
 			return false
@@ -1632,7 +1635,7 @@ func AudioAllowed(quality *models.Quality, requirement, channels string) bool {
 			return false
 		}
 	}
-	switch normalizeAudioChannels(channels) {
+	switch requiredChannels {
 	case "5.1":
 		if quality.AudioChannelRank() < 2 {
 			return false
@@ -1645,21 +1648,73 @@ func AudioAllowed(quality *models.Quality, requirement, channels string) bool {
 	return true
 }
 
-func normalizeAudioRequirement(value string) string {
-	switch strings.ToLower(strings.TrimSpace(value)) {
+// audioRequirementParts splits a stored or submitted preference into its audio
+// group and channel suffix. The UI writes values such as "lossless-7.1"; the
+// older "lossless" plus audio_channels pair remains accepted for the API and
+// for titles saved before the presets existed.
+func audioRequirementParts(value string) (string, string) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	channels := ""
+	for _, layout := range []string{"7.1", "5.1"} {
+		for _, separator := range []string{"-", "+", " "} {
+			if strings.HasSuffix(value, separator+layout) {
+				value = strings.TrimSpace(strings.TrimSuffix(value, separator+layout))
+				channels = layout
+				break
+			}
+		}
+		if channels != "" {
+			break
+		}
+	}
+	group := ""
+	switch value {
 	case "", "any", "*", "none", "custom":
-		return ""
+		group = ""
 	case "lossless", "truehd", "dts-hd", "flac":
-		return "lossless"
-	case "high", "dts", "ddp", "eac3":
-		return "high"
-	case "standard", "ac3", "5.1", "7.1":
-		return "standard"
+		group = "lossless"
+	case "high", "dts", "ddp", "eac3", "hra", "dts-hd-hra":
+		group = "high"
+	case "standard", "ac3":
+		group = "standard"
+	case "5.1":
+		group, channels = "standard", "5.1"
+	case "7.1":
+		group, channels = "standard", "7.1"
 	case "compressed", "aac", "opus":
-		return "compressed"
-	default:
+		group = "compressed"
+	case "mp3":
+		group = "mp3"
+	}
+	return group, channels
+}
+
+func normalizeAudioRequirement(value string) string {
+	group, channels := audioRequirementParts(value)
+	if group == "" {
 		return ""
 	}
+	if channels == "" {
+		return group
+	}
+	return group + "-" + channels
+}
+
+// audioPreferenceDisplay returns the preset value to show in a title form: it
+// folds a legacy audio + audio_channels pair into the corresponding combined
+// preset.
+func audioPreferenceDisplay(audio, channels string) string {
+	group, layout := audioRequirementParts(audio)
+	if group == "" {
+		return ""
+	}
+	if layout == "" {
+		layout = normalizeAudioChannels(channels)
+	}
+	if layout == "" {
+		return group
+	}
+	return group + "-" + layout
 }
 
 func normalizeAudioChannels(value string) string {
@@ -2183,6 +2238,9 @@ func (c *Config) loadConfigDB() error {
 	if value, ok := c.Settings["_migrated_series"]; ok {
 		var series []SeriesConfig
 		if err := json.Unmarshal([]byte(value), &series); err == nil {
+			for i := range series {
+				series[i].Audio = normalizeAudioRequirement(audioPreferenceDisplay(series[i].Audio, series[i].AudioChannels))
+			}
 			c.Series = series
 		} else {
 			c.Series = []SeriesConfig{}
@@ -2289,7 +2347,7 @@ func (c *Config) loadConfigDB() error {
 				OriginalTitle:        originalTitle,
 				Overview:             overview,
 				PosterPath:           posterPath,
-				Audio:                normalizeAudioRequirement(audio),
+				Audio:                normalizeAudioRequirement(audioPreferenceDisplay(audio, audioChannels)),
 				AudioChannels:        normalizeAudioChannels(audioChannels),
 				DisableUpgrades:      disable != 0,
 			})

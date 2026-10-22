@@ -383,19 +383,26 @@ router; the controller ramps while the ping is good and cuts when it rises.
 ### Audio preferences
 
 `POST /api/tmdb/add`, `POST /api/series/{name}` and `POST /api/movies/{id}`
-accept two optional fields:
+accept an optional `audio` preset:
 
-- `audio`: `""` or `any` (no constraint), `lossless` (TrueHD, DTS-HD, FLAC,
-  PCM), `high` (DTS, DD+ or better), `standard` (AC3, generic 5.1 or better),
-  `compressed` (AAC, Opus or better);
-- `audio_channels`: `""` or `any` (no constraint), `5.1` (5.1 or 7.1), `7.1`
-  (7.1 only).
+- `""` or `any`: no constraint;
+- `lossless-5.1` / `lossless-7.1`: TrueHD, DTS-HD, FLAC or PCM, with at least
+  5.1 or 7.1 channels;
+- `high-5.1` / `high-7.1`: DTS or DD+ (DTS-HD HRA included), with at least 5.1
+  or 7.1 channels;
+- `standard-5.1` / `standard-7.1`: AC3 or generic 5.1, with at least 5.1 or 7.1
+  channels;
+- `compressed-5.1`: AAC or Opus, with at least 5.1 channels.
 
-The values are minimum requirements: a release below the selected level is
-rejected. A title that has never set them, including every library row created
-before this feature, defaults to no constraint. The same fields are returned by
-`GET /api/series/{name}` and `GET /api/movies/{id}`.
+The values are minimum requirements: a release below the selected preset is
+rejected. A title that has never set one, including every library row created
+before this feature, defaults to no constraint. The same field is returned by
+`GET /api/series/{name}` and `GET /api/movies/{id}`. The older pair of `audio`
+(`lossless`, `high`, `standard`, `compressed`) and `audio_channels` (`5.1`,
+`7.1`) is still accepted for API compatibility and is folded into the combined
+preset on load.
 
+## gx-torrent daemon routes
 ## gx-torrent daemon routes
 
 The `gx-torrent` daemon (also usable standalone, without Gextto) serves its own

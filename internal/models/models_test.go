@@ -210,7 +210,7 @@ func TestAudioGroupsAndChannelFactor(t *testing.T) {
 	}{
 		{"TrueHD 5.1", Quality{Audio: "truehd", AudioChannels: "5.1"}, 5, 160},
 		{"DTS-HD MA 5.1", Quality{Audio: "dts-hd", AudioChannels: "5.1"}, 5, 160},
-		{"DTS-HD HRA 5.1", Quality{Audio: "dts-hd-hra", AudioChannels: "5.1"}, 4, 130},
+		{"DTS-HD HRA 5.1", Quality{Audio: "dts-hd-hra", AudioChannels: "5.1"}, 4, 100},
 		{"DTS 5.1", Quality{Audio: "dts", AudioChannels: "5.1"}, 4, 100},
 		{"DDP 5.1", Quality{Audio: "ddp", AudioChannels: "5.1"}, 4, 100},
 		{"AC3 5.1", Quality{Audio: "ac3", AudioChannels: "5.1"}, 3, 60},
@@ -238,5 +238,27 @@ func TestAudioRankIncludesChannels(t *testing.T) {
 	lossless := Quality{Audio: "truehd", AudioChannels: "5.1"}
 	if lossless.AudioRank() <= sevenOne.AudioRank() {
 		t.Fatal("lossless 5.1 should outrank lossy 7.1")
+	}
+}
+
+func TestGroupedAudioScoreSettings(t *testing.T) {
+	trueHD := Quality{Audio: "truehd"}
+	if got := trueHD.ScoreWithSettings(map[string]string{"score_audio_lossless": "200"}); got != 200 {
+		t.Fatalf("lossless group score = %d, want 200", got)
+	}
+	dtsHD := Quality{Audio: "dts-hd"}
+	if got := dtsHD.ScoreWithSettings(map[string]string{"score_audio_lossless": "200", "score_audio_dts-hd": "120"}); got != 200 {
+		t.Fatalf("group must win over legacy key, got %d", got)
+	}
+	if got := dtsHD.ScoreWithSettings(map[string]string{"score_audio_dts-hd": "120"}); got != 120 {
+		t.Fatalf("legacy key fallback = %d, want 120", got)
+	}
+	ac3 := Quality{Audio: "ac3", AudioChannels: "5.1"}
+	if got := ac3.ScoreWithSettings(map[string]string{"score_audio_standard": "70", "score_channels_5.1": "15"}); got != 85 {
+		t.Fatalf("group + channel score = %d, want 85", got)
+	}
+	atmos := Quality{Audio: "truehd", AudioChannels: "7.1", AudioObjects: "atmos"}
+	if got := atmos.ScoreWithSettings(map[string]string{"score_audio_objects": "30"}); got != 200 {
+		t.Fatalf("group + channels + object score = %d, want 200", got)
 	}
 }

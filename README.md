@@ -168,11 +168,11 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
 
 ### Finding and choosing releases
 
-- **Quality-aware scoring.** Deterministic scores on quality, source, codec,
-  grouped audio (lossless, DTS/DD+, AC3/5.1) with 5.1/7.1 and Atmos/DTS:X
-  factors, HDR/Dolby Vision, language and size; per-title minimum audio and
-  channels; higher-grade library files are protected; an optional ceiling stops
-  upgrades. The settings page scores
+- **Quality-aware scoring.** Deterministic scores grouped into video cards
+  (4K, Full HD, HD, SD, codec) and audio cards (lossless, DTS/DD+, AC3/5.1,
+  AAC/Opus, MP3), plus 5.1/7.1 and Atmos/DTS:X; per-title minimum audio presets
+  include the channels; higher-grade library files are protected; an optional
+  ceiling stops upgrades. The settings page scores
   reference releases live with the current weights. `ffprobe` reads the real
   quality of archived media.
 - **TV, movies, comics.** Standard `ComicInfo.xml` for CBZ archives (Komga,

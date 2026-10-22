@@ -2329,13 +2329,12 @@ func TestV2TmdbAddStoresAudioMinimum(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	form := url.Values{
-		"kind":           {"series"},
-		"name":           {"Audio Preference Show"},
-		"tmdb_id":        {"424242"},
-		"language":       {"ita"},
-		"seasons":        {"1+"},
-		"audio":          {"lossless"},
-		"audio_channels": {"5.1"},
+		"kind":     {"series"},
+		"name":     {"Audio Preference Show"},
+		"tmdb_id":  {"424242"},
+		"language": {"ita"},
+		"seasons":  {"1+"},
+		"audio":    {"lossless-5.1"},
 	}
 	if code, body := v2Request(t, server, http.MethodPost, "/tmdb/add", form); code != http.StatusOK && code != http.StatusNoContent {
 		t.Fatalf("series add -> %d: %s", code, body)
@@ -2348,8 +2347,8 @@ func TestV2TmdbAddStoresAudioMinimum(t *testing.T) {
 		if series.Name != "Audio Preference Show" {
 			continue
 		}
-		if series.Audio != "lossless" || series.AudioChannels != "5.1" {
-			t.Fatalf("audio = %q/%q, want lossless/5.1", series.Audio, series.AudioChannels)
+		if series.Audio != "lossless-5.1" {
+			t.Fatalf("audio = %q, want lossless-5.1", series.Audio)
 		}
 		return
 	}
@@ -2365,11 +2364,10 @@ func TestV2SeriesSaveStoresAudioMinimum(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, body := v2Request(t, server, http.MethodPost, "/series/save", url.Values{
-		"name":           {"Audio Save Show"},
-		"seasons":        {"1+"},
-		"quality":        {"1080p"},
-		"audio":          {"high"},
-		"audio_channels": {"7.1"},
+		"name":    {"Audio Save Show"},
+		"seasons": {"1+"},
+		"quality": {"1080p"},
+		"audio":   {"high-7.1"},
 	})
 	if code != http.StatusNoContent {
 		t.Fatalf("series save -> %d: %s", code, body)
@@ -2380,8 +2378,8 @@ func TestV2SeriesSaveStoresAudioMinimum(t *testing.T) {
 	}
 	for _, series := range cfg.Series {
 		if series.Name == "Audio Save Show" {
-			if series.Audio != "high" || series.AudioChannels != "7.1" {
-				t.Fatalf("audio = %q/%q, want high/7.1", series.Audio, series.AudioChannels)
+			if series.Audio != "high-7.1" {
+				t.Fatalf("audio = %q, want high-7.1", series.Audio)
 			}
 			return
 		}

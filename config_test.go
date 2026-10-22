@@ -1045,10 +1045,30 @@ func TestAudioAllowedUsesMinimumTierAndChannels(t *testing.T) {
 		{"channels 5.1 accepts 7.1", models.Quality{Audio: "ac3", AudioChannels: "7.1"}, "", "5.1", true},
 		{"channels 7.1 rejects 5.1", models.Quality{Audio: "ac3", AudioChannels: "5.1"}, "", "7.1", false},
 		{"channels 7.1 rejects unknown", models.Quality{Audio: "ac3"}, "", "7.1", false},
+		{"lossless 7.1 accepts truehd 7.1", models.Quality{Audio: "truehd", AudioChannels: "7.1"}, "lossless-7.1", "", true},
+		{"lossless 7.1 rejects truehd 5.1", models.Quality{Audio: "truehd", AudioChannels: "5.1"}, "lossless-7.1", "", false},
+		{"high 5.1 accepts dts 5.1", models.Quality{Audio: "dts", AudioChannels: "5.1"}, "high-5.1", "", true},
+		{"standard 5.1 accepts ac3 5.1", models.Quality{Audio: "ac3", AudioChannels: "5.1"}, "standard-5.1", "", true},
+		{"compressed 5.1 rejects aac 2.0", models.Quality{Audio: "aac", AudioChannels: "2.0"}, "compressed-5.1", "", false},
+		{"legacy channels still apply", models.Quality{Audio: "truehd", AudioChannels: "7.1"}, "lossless", "7.1", true},
 	}
 	for _, tc := range cases {
 		if got := AudioAllowed(&tc.quality, tc.minAudio, tc.minChans); got != tc.want {
 			t.Errorf("%s: allowed = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestAudioPreferenceDisplayCombinesLegacyFields(t *testing.T) {
+	cases := []struct{ audio, channels, want string }{
+		{"lossless", "5.1", "lossless-5.1"},
+		{"high", "7.1", "high-7.1"},
+		{"standard-5.1", "7.1", "standard-5.1"},
+		{"", "", ""},
+	}
+	for _, tc := range cases {
+		if got := audioPreferenceDisplay(tc.audio, tc.channels); got != tc.want {
+			t.Errorf("display(%q,%q) = %q, want %q", tc.audio, tc.channels, got, tc.want)
 		}
 	}
 }
@@ -1066,10 +1086,10 @@ func TestSavesAudioPreferencesForSeriesAndMovies(t *testing.T) {
 	if err := cfg.loadConfigDB(); err != nil {
 		t.Fatal(err)
 	}
-	if len(cfg.Series) != 1 || cfg.Series[0].Audio != "lossless" || cfg.Series[0].AudioChannels != "5.1" {
+	if len(cfg.Series) != 1 || cfg.Series[0].Audio != "lossless-5.1" {
 		t.Fatalf("series audio = %#v", cfg.Series)
 	}
-	if len(cfg.Movies) != 1 || cfg.Movies[0].Audio != "high" || cfg.Movies[0].AudioChannels != "7.1" {
+	if len(cfg.Movies) != 1 || cfg.Movies[0].Audio != "high-7.1" {
 		t.Fatalf("movie audio = %#v", cfg.Movies)
 	}
 }
