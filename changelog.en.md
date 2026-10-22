@@ -24,7 +24,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 ## 21 October 2026
 
 - **Manual import of a file that already exists.** The new **Import file** tab
-  of **Maintenance** reads a video or a folder already on disk, proposes series,
+  of **Maintenance** reads a video or a folder already on disk (typed, or picked
+  with **Browse**, which shows folders and videos), proposes series,
   season and episode (or movie and year) and the destination; you can correct
   them and confirm. Gextto renames, moves, records the episode or movie and
   refreshes Jellyfin/Plex. If a file with the same name already exists the

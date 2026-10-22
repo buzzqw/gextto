@@ -530,6 +530,9 @@ test("il filtro del log funziona anche con lo scorrimento fermo", async ({ page 
 
 test("la pagina Importa file analizza un percorso", async ({ page }) => {
   await page.goto("/?view=maintenance&tab=import");
+  await page.getByRole("button", { name: "Sfoglia" }).click();
+  await expect(page.getByRole("dialog", { name: "Scegli un video o una cartella" })).toBeVisible();
+  await page.getByRole("button", { name: "Chiudi" }).click();
   await expect(page.getByRole("heading", { name: "Importa un file esistente" })).toBeVisible();
   const input = page.locator('input[name="path"]');
   await expect(input).toBeVisible();

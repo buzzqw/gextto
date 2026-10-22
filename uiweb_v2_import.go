@@ -14,7 +14,10 @@ import (
 // v2ImportView is the model of the Import file tab of Maintenance
 // (/?view=maintenance&tab=import).
 type v2ImportView struct {
-	Path     string
+	Path string
+	// Start is where «Sfoglia» opens when the field is empty: the download
+	// folder, where the files to import usually are.
+	Start    string
 	Message  string
 	Error    string
 	Series   []string
@@ -36,6 +39,7 @@ func v2ImportViewFrom(s *AppState) v2ImportView {
 		view.Error = "configuration unavailable"
 		return view
 	}
+	view.Start = cfg.DownloadDir
 	for _, series := range cfg.Series {
 		view.Series = append(view.Series, series.Name)
 	}

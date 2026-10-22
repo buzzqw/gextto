@@ -753,7 +753,10 @@ manualmente il JSON se non stai usando direttamente l'API.
 
 **Importa file** (scheda di **Manutenzione**) serve per un video che hai già sul disco e che
 Gextto non ha scaricato: un episodio recuperato a mano, una vecchia stagione, un
-film copiato da un altro disco. Scegli un file o una cartella e premi
+film copiato da un altro disco. Scrivi il percorso, oppure premi **Sfoglia**:
+si apre l'elenco delle cartelle del server (parte dalla cartella download) con
+i video di ogni cartella; un clic su un video lo sceglie, **Seleziona** prende
+la cartella intera. Poi premi
 **Analizza**: Gextto legge i nomi, propone la serie o il film configurato, la
 stagione e l'episodio e mostra la cartella di destinazione. Puoi correggere
 serie, stagione, episodio (o film e anno) prima di confermare. **Importa ora**

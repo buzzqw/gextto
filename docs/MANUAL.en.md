@@ -735,7 +735,10 @@ are using the API directly.
 
 **Import file** (a **Maintenance** tab) is for a video already on disk that Gextto did
 not download: an episode fetched by hand, an old season, a movie copied from
-another disk. Choose a file or a folder and press **Analyze**: Gextto reads the
+another disk. Type the path, or press **Browse**: it lists the server's
+folders (starting from the download folder) with the videos in each one; a
+click on a video picks it, **Select** takes the whole folder. Then press
+**Analyze**: Gextto reads the
 names, proposes the configured series or movie, the season and the episode and
 shows the destination folder. You can correct the series, season, episode (or
 movie and year) before confirming. **Import now** renames the file with the

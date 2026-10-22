@@ -66,3 +66,38 @@ func TestBrowseDirKeepsNavigable(t *testing.T) {
 		t.Fatalf("file path -> %q, want its directory %q", got.Path, sub)
 	}
 }
+
+// TestBrowseDirListsVideosOnRequest covers the manual-import picker: with
+// files=video the listing adds the folder's video files (only videos), and
+// without it the folder picker stays folders-only.
+func TestBrowseDirListsVideosOnRequest(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	base := t.TempDir()
+	for _, name := range []string{"Show.S01E01.mkv", "notes.txt"} {
+		if err := os.WriteFile(filepath.Join(base, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(base, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Dirs  []string `json:"dirs"`
+		Files []string `json:"files"`
+	}
+	status, _, body := webGet(t, server, "/api/browse_dir?files=video&path="+url.QueryEscape(base))
+	if status != http.StatusOK || json.Unmarshal(body, &got) != nil {
+		t.Fatalf("browse -> %d: %s", status, body)
+	}
+	if len(got.Dirs) != 1 || len(got.Files) != 1 || filepath.Base(got.Files[0]) != "Show.S01E01.mkv" {
+		t.Fatalf("listing = %+v, want one folder and only the video", got)
+	}
+	got.Files = nil
+	status, _, body = webGet(t, server, "/api/browse_dir?path="+url.QueryEscape(base))
+	if status != http.StatusOK || json.Unmarshal(body, &got) != nil || got.Files != nil {
+		t.Fatalf("the folder picker must not list files: %s", body)
+	}
+}

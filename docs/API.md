@@ -68,7 +68,7 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/backup/test-ftp` | test the FTP backup destination |
 | GET | `/api/blocklist` | blocked releases |
 | POST | `/api/blocklist/{hash}/remove` | remove a blocklist entry |
-| GET | `/api/browse_dir` | list a directory for the folder picker |
+| GET | `/api/browse_dir` | list a directory for the folder picker (?path=; files=video also lists its video files) |
 | GET | `/api/browser-handlers/download` | download a browser integration script or .desktop file |
 | GET | `/api/calendar` | upcoming episodes (calendar) |
 | GET | `/api/comics` | list comics |

@@ -746,7 +746,7 @@
     var list = overlay.querySelector("[data-v2-browse-list]");
     var path = overlay.querySelector("[data-v2-browse-path]");
     list.textContent = t("Caricamento…");
-    fetch("/api/browse_dir?path=" + encodeURIComponent(overlay._current || ""), { credentials: "same-origin" })
+    fetch("/api/browse_dir?path=" + encodeURIComponent(overlay._current || "") + (overlay._files ? "&files=video" : ""), { credentials: "same-origin" })
       .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || t("Impossibile leggere le cartelle")); return data; }); })
       .then(function (data) {
         overlay._current = String(data.path || overlay._current || "");
@@ -756,7 +756,8 @@
         var message = overlay.querySelector("[data-v2-browse-message]");
         if (message) message.textContent = data.error || "";
         var dirs = data.dirs || [];
-        if (!dirs.length) { list.textContent = t("Nessuna sottocartella."); return; }
+        var files = overlay._files ? (data.files || []) : [];
+        if (!dirs.length && !files.length) { list.textContent = t(overlay._files ? "Nessuna sottocartella né video." : "Nessuna sottocartella."); return; }
         dirs.forEach(function (dir) {
           var button = document.createElement("button");
           button.className = "path-item";
@@ -764,6 +765,20 @@
           button.title = dir;
           button.textContent = dir;
           button.addEventListener("click", function () { overlay._current = dir; loadFolderBrowser(overlay); });
+          list.appendChild(button);
+        });
+        // In file mode the videos follow the folders: a click picks the file.
+        files.forEach(function (file) {
+          var button = document.createElement("button");
+          button.className = "path-item path-file";
+          button.type = "button";
+          button.title = t("Usa questo file");
+          button.textContent = "\u25B6 " + file.split("/").pop();
+          button.addEventListener("click", function () {
+            overlay._target.value = file;
+            overlay._target.dispatchEvent(new Event("input", { bubbles: true }));
+            closeFolderBrowser();
+          });
           list.appendChild(button);
         });
         ensureTooltips(overlay);
@@ -780,7 +795,11 @@
       .then(function () { overlay._target.value = target; overlay._target.dispatchEvent(new Event("input", { bubbles: true })); closeFolderBrowser(); })
       .catch(function (error) { overlay.querySelector("[data-v2-browse-message]").textContent = error.message; });
   }
-  function openFolderBrowser(input) {
+  // openFolderBrowser opens the server folder picker for input. options.files
+  // also lists the video files (a click picks one); options.start is where it
+  // opens when the field is empty.
+  function openFolderBrowser(input, options) {
+    options = options || {};
     closeFolderBrowser();
     var overlay = document.createElement("div");
     overlay.id = "v2-browse-overlay";
@@ -788,7 +807,14 @@
     overlay.innerHTML = '<div class="modal path-modal" role="dialog" aria-modal="true" aria-labelledby="v2-browse-title"><div class="modal-head"><h3 id="v2-browse-title">' + th("Sfoglia cartelle") + '</h3><button class="btn sm" type="button" data-v2-browse-close>' + th("Chiudi") + '</button></div><div class="modal-body"><div class="toolbar"><button class="btn sm" type="button" data-v2-browse-up title="' + th("Vai alla cartella superiore") + '">\u2191 ' + th("Su") + '</button><input class="input mono" type="text" data-v2-browse-path aria-label="' + th("Percorso corrente") + '" title="' + th("Modifica il percorso e premi Invio per navigare") + '" /><button class="btn sm primary" type="button" data-v2-browse-select title="' + th("Usa questa cartella") + '">' + th("Seleziona") + '</button><button class="btn sm" type="button" data-v2-browse-create-prompt title="' + th("Crea una nuova cartella dentro quella corrente") + '">' + th("Crea cartella") + '</button></div><div class="path-list" data-v2-browse-list></div><div class="toolbar"><input class="input" data-v2-browse-new aria-label="' + th("Nome nuova cartella") + '" placeholder="' + th("Nuova cartella") + '" title="' + th("Nome della nuova cartella") + '" /><button class="btn sm primary" type="button" data-v2-browse-create title="' + th("Crea la cartella e selezionala") + '">' + th("Crea e usa") + '</button></div><small class="muted" data-v2-browse-message aria-live="polite"></small></div></div>';
     document.body.appendChild(overlay);
     overlay._target = input;
-    overlay._current = String(input.value || "").trim();
+    overlay._files = !!options.files;
+    overlay._current = String(input.value || "").trim() || String(options.start || "");
+    if (overlay._files) {
+      // Choosing a file: the title says so and creating folders has no use.
+      overlay.querySelector("#v2-browse-title").textContent = t("Scegli un video o una cartella");
+      var hide = overlay.querySelectorAll("[data-v2-browse-create-prompt], [data-v2-browse-new], [data-v2-browse-create]");
+      for (var h = 0; h < hide.length; h++) hide[h].hidden = true;
+    }
     folderBrowser = overlay;
     overlay.addEventListener("click", function (event) {
       if (event.target === overlay || event.target.closest("[data-v2-browse-close]")) closeFolderBrowser();
@@ -1353,7 +1379,7 @@
         scope.querySelector("[data-v2-browse-input]") ||
         scope.querySelector('[name="value"]')
       );
-      if (input) openFolderBrowser(input);
+      if (input) openFolderBrowser(input, { files: browse.hasAttribute("data-v2-browse-files"), start: browse.getAttribute("data-v2-browse-start") });
       return;
     }
     var generate = event.target.closest && event.target.closest("[data-v2-generate]");

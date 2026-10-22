@@ -25,7 +25,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 ## 21 ottobre 2026
 
 - **Import manuale di un file già presente.** La nuova scheda **Importa file**
-  di **Manutenzione** legge un video o una cartella già sul disco, propone serie,
+  di **Manutenzione** legge un video o una cartella già sul disco (da scrivere o
+  da scegliere con **Sfoglia**, che mostra cartelle e video), propone serie,
   stagione ed episodio (o film e anno) e la destinazione; puoi correggerli e
   confermare. Gextto rinomina, sposta, registra l'episodio o il film e aggiorna
   Jellyfin/Plex. Se esiste già un file con lo stesso nome l'import si ferma,

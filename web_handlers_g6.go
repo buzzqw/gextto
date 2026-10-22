@@ -551,7 +551,8 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, map[string]any{"ok": true, "movie": updated.Movies[index]})
 }
 
-// BrowseDir implements `browse_dir`.
+// BrowseDir implements `browse_dir`. With files=video it also lists the video
+// files of the folder, for the pickers that choose a file (manual import).
 func BrowseDir(w http.ResponseWriter, r *http.Request, s *AppState) {
 	requested := strings.TrimSpace(queryParam(r, "path"))
 	if requested == "" {
@@ -578,6 +579,8 @@ func BrowseDir(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 
 	dirs := []string{}
+	files := []string{}
+	withVideos := queryParam(r, "files") == "video"
 	message := ""
 	entries, err := os.ReadDir(canonical)
 	if err != nil {
@@ -589,10 +592,13 @@ func BrowseDir(w http.ResponseWriter, r *http.Request, s *AppState) {
 			child := filepath.Join(canonical, entry.Name())
 			if gh6_isDir(child) {
 				dirs = append(dirs, child)
+			} else if withVideos && entry.Type().IsRegular() && isVideoExtension(entry.Name()) {
+				files = append(files, child)
 			}
 		}
 	}
 	sort.Strings(dirs)
+	sort.Strings(files)
 	var parent any
 	if canonical != "/" {
 		parent = filepath.Dir(canonical)
@@ -602,6 +608,9 @@ func BrowseDir(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"path":   canonical,
 		"parent": parent,
 		"dirs":   dirs,
+	}
+	if withVideos {
+		response["files"] = files
 	}
 	if message != "" {
 		response["error"] = message
