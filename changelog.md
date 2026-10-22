@@ -14,6 +14,10 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 22 ottobre 2026
+
+- **Docker: tutto lo stack in un comando.** Il nuovo `docker-full/docker-compose.yml` avvia Gextto con `gx-torrent`, Jackett, Prowlarr, FlareSolverr e aMule, con cartelle, porte e permessi già predisposti. L'immagine compila Gextto e `gx-torrent` dal checkout; la guida in italiano e inglese spiega prima configurazione, indexer, eD2k, aggiornamento, backup e problemi comuni. L'identità del client è stata verificata con qBittorrent 5.3.0 e Transmission 4.1.3 reali in Docker: vedono `gx-core 1.1.252` per default e `qBittorrent 5.2.3` con il preset.
+
 ## 21 ottobre 2026
 
 - **Import manuale di un file già presente.** La nuova pagina **Importa file**

@@ -201,3 +201,49 @@ jobs:
           docker logs gx-torrent-ci || true
           docker rm -f gx-torrent-ci
           [ "$code" = "303" ] || { echo "wizard redirect not seen (code=$code)"; exit 1; }
+
+  # Build the full docker-full image too: it carries both gexttod and gx-torrent
+  # and is the base of the compose stack documented in docs/DOCKER.*.md.
+  container-full:
+    name: full container image (x86_64)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Build the image
+        run: |
+          GEXTTO_SERIES="$(tr -d '[:space:]' < version_series)"
+          GEXTTO_BUILD="$(tr -dc '0-9' < build_number)"
+          GX_SERIES="$(tr -d '[:space:]' < gx_torrent.version_series 2>/dev/null || echo 1.1)"
+          GX_BUILD="$(tr -dc '0-9' < gx-torrent.build_number)"
+          docker build -f docker-full/Dockerfile \
+            --build-arg GEXTTO_SERIES="$GEXTTO_SERIES" \
+            --build-arg GEXTTO_BUILD="$GEXTTO_BUILD" \
+            --build-arg GX_SERIES="$GX_SERIES" \
+            --build-arg GX_BUILD="$GX_BUILD" \
+            -t gextto-full:ci .
+
+      - name: Smoke-test Gextto and the managed gx-torrent
+        run: |
+          mkdir -p /tmp/gextto-full-ci/{data,media,library}
+          chmod -R 777 /tmp/gextto-full-ci
+          docker run -d --name gextto-full-ci -p 15000:5000 \
+            -v /tmp/gextto-full-ci/data:/data \
+            -v /tmp/gextto-full-ci/media:/media \
+            -v /tmp/gextto-full-ci/library:/library \
+            gextto-full:ci
+          code=""
+          for _ in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:15000/api/status || true)
+            [ "$code" = "200" ] && break
+            sleep 1
+          done
+          docker logs gextto-full-ci || true
+          for _ in $(seq 1 30); do
+            docker exec gextto-full-ci curl -fsS http://127.0.0.1:8890/api/v1/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+          docker exec gextto-full-ci curl -fsS http://127.0.0.1:8890/api/v1/health >/dev/null
+          docker rm -f gextto-full-ci
+          [ "$code" = "200" ] || { echo "Gextto status not reachable (code=$code)"; exit 1; }

@@ -1204,7 +1204,10 @@ RPC server is disabled.
   qBittorrent, Transmission, Rain or anacrolix/torrent, with an optional
   version override. Only the announced strings change, not the protocol
   behaviour. Some private trackers whitelist clients and versions; check their
-  rules, because a preset is not a guarantee of acceptance.
+  rules, because a preset is not a guarantee of acceptance. The identity was
+  checked with real Dockerized clients: qBittorrent 5.3.0 and Transmission
+  4.1.3 see `gx-core 1.1.252` by default and `qBittorrent 5.2.3` with the
+  preset (see [the Docker guide](DOCKER.en.md)).
 - **Opening on the router.**
   - UPnP (IGD v1 and v2), then **PCP** (RFC 6887, on the default gateway) and finally
     NAT-PMP, tried in this order; mappings are renewed every 20 minutes and
