@@ -804,7 +804,7 @@ func StagePackFile(
 	source, destination string,
 	destinationFiles []string,
 	cfg *Config,
-	releaseQualityScore int64,
+	releaseQuality models.Quality,
 ) (string, bool, error) {
 	name := filepath.Base(file.Path)
 	if name == "" || name == "." || name == ".." {
@@ -813,9 +813,15 @@ func StagePackFile(
 	season := file.Season
 	episode := file.Episode
 	if existing, ok := BestEpisodeFileFromFiles(destinationFiles, season, episode); ok {
+		existingQuality := ParseQuality(filepath.Base(existing))
+		incomingQuality := MergeQuality(ParseQuality(filepath.Base(file.Path)), releaseQuality)
 		existingScore := cfg.FileScore(existing, "series", "")
 		incomingScore := cfg.FileScore(file.Path, "series", "")
-		if existingScore >= maxInt64(incomingScore, releaseQualityScore) {
+		// The same rule as the acquisition decision: an equal-quality pack file
+		// does not replace the archived one because its size or group scores
+		// higher. A real technical gain (resolution, source, codec, audio, HDR,
+		// a REPACK/PROPER) still copies it.
+		if upgradeReasonWith(&incomingQuality, &existingQuality, incomingScore, existingScore, cfg.UpgradeMinScoreDiff, cfg.Settings) == "" {
 			return "", false, nil
 		}
 	}
@@ -957,9 +963,15 @@ func ProcessPackFiles(
 			finalPath = renamed
 		}
 		archive := filepath.Dir(finalPath)
+		// The pack release carries the whole pack's size: each episode must be
+		// scored with its own file, or the size bonus would make an equal copy
+		// look like an upgrade.
+		if info, statErr := os.Stat(finalPath); statErr == nil {
+			episodeRelease.SizeBytes = info.Size()
+		}
 		score := cfg.ReleaseScore(&episodeRelease)
 		trashCount := 0
-		discarded, err := DiscardIfInferior(
+		discarded, err := DiscardIfInferiorWithQuality(
 			cfg,
 			series,
 			season,
@@ -967,6 +979,7 @@ func ProcessPackFiles(
 			score,
 			finalPath,
 			archive,
+			&episodeRelease.Quality,
 		)
 		if err != nil {
 			return nil, err
@@ -1037,6 +1050,7 @@ func RenameEpisode(
 		cfg,
 		"series",
 		series,
+		&release.Quality,
 	)
 	if err != nil {
 		return "", err
@@ -1450,6 +1464,7 @@ func RenameMovie(
 		cfg,
 		"movie",
 		release.Title,
+		&release.Quality,
 	)
 	if err != nil {
 		return "", err

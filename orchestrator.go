@@ -985,7 +985,7 @@ func RunCycleDomain(
 		if torrentFile != nil && release.IsPack && release.InProgressEpisodes > 0 {
 			reason, checkErr := incompletePackReason(
 				*torrentFile, &release, gapEpisodes, archiveIndex,
-				releaseScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade,
+				releaseScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, cfg.Settings,
 			)
 			if checkErr != nil {
 				logging.Debug("could not read the pack torrent contents",

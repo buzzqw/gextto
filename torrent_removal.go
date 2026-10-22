@@ -415,7 +415,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		processed := []PackFileResult{}
 		for index := range matching {
 			file := matching[index]
-			placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, cfg.ReleaseScore(release))
+			placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, release.Quality)
 			if err != nil {
 				return false, err
 			}

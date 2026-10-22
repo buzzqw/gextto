@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 func sameInode(t *testing.T, left, right string) bool {
@@ -164,7 +166,7 @@ func TestStagePackFileLinksEpisode(t *testing.T) {
 		t.Fatal(err)
 	}
 	file := PackSourceFile{Path: packFile, Season: 1, Episode: 2}
-	placed, ok, err := StagePackFile(&file, source, destination, nil, &cfg, 400)
+	placed, ok, err := StagePackFile(&file, source, destination, nil, &cfg, models.Quality{Resolution: "1080p", Source: "webdl"})
 	if err != nil || !ok {
 		t.Fatalf("staging failed: placed=%q ok=%v err=%v", placed, ok, err)
 	}

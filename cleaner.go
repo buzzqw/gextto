@@ -107,8 +107,15 @@ func IndexArchive(seriesName, archivePath string, cfg *Config) models.ArchiveQua
 }
 
 // qualityUpgradeAllowed reports whether the semantic upgrade rules allow `new`
-// to replace `old`.
-func qualityUpgradeAllowed(newQuality, oldQuality *models.Quality, newScore, oldScore, minDiff int64, settings map[string]string) bool {
+// to replace `old`. When candidateQuality carries the approved release, the
+// score-only rule also requires a technical gain: the same rule the acquisition
+// decision applies, so a bigger file or a preferred subtitle cannot replace a
+// copy of the same quality after the download. Callers that only have the two
+// file names (archive maintenance) keep the source-aware rule.
+func qualityUpgradeAllowed(newQuality, oldQuality, candidateQuality *models.Quality, newScore, oldScore, minDiff int64, settings map[string]string) bool {
+	if candidateQuality != nil {
+		return upgradeReasonWith(newQuality, oldQuality, newScore, oldScore, minDiff, settings) != ""
+	}
 	return sourceAwareUpgradeReason(newQuality, oldQuality, newScore, oldScore, minDiff, settings) != ""
 }
 
@@ -486,14 +493,17 @@ func copySparse(writer *os.File, reader io.Reader) error {
 // ResolveExistingTarget decides whether an incoming file must be discarded
 // because an equal/better target already exists. It returns true when the
 // incoming source was handled as a duplicate.
-func ResolveExistingTarget(source, target string, newScore int64, cfg *Config, kind, title string) (bool, error) {
+func ResolveExistingTarget(source, target string, newScore int64, cfg *Config, kind, title string, incoming *models.Quality) (bool, error) {
 	if !cleanerExists(target) {
 		return false, nil
 	}
 	oldScore := cfg.FileScore(target, kind, title)
 	oldQuality := cleanerQualityFromPath(target)
 	newQuality := cleanerQualityFromPath(source)
-	if !qualityUpgradeAllowed(&newQuality, &oldQuality, newScore, oldScore, cfg.UpgradeMinScoreDiff, cfg.Settings) {
+	if incoming != nil {
+		newQuality = MergeQuality(newQuality, *incoming)
+	}
+	if !qualityUpgradeAllowed(&newQuality, &oldQuality, incoming, newScore, oldScore, cfg.UpgradeMinScoreDiff, cfg.Settings) {
 		if err := handleDuplicate(source, cfg); err != nil {
 			return true, err
 		}
@@ -608,7 +618,7 @@ func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int
 				}
 			}
 		}
-		if !qualityUpgradeAllowed(&newQuality, &oldQuality, newScore, oldScore, cfg.CleanupMinScoreDiff, cfg.Settings) {
+		if !qualityUpgradeAllowed(&newQuality, &oldQuality, candidateQuality, newScore, oldScore, cfg.CleanupMinScoreDiff, cfg.Settings) {
 			continue
 		}
 		if err := handleDuplicate(file, cfg); err != nil {
@@ -840,14 +850,14 @@ func sameResolutionInferior(cfg *Config, files []string, preferredLanguage strin
 	topPreferred := languageMatchFor(filepath.Base(top.path), preferredLanguage) == languagePreferred
 	var inferior []inferiorCopy
 	for _, item := range items[1:] {
-		if item.quality.UpgradeReason(&top.quality, item.score, top.score, cfg.CleanupMinScoreDiff) != "" {
+		if upgradeReasonWith(&item.quality, &top.quality, item.score, top.score, cfg.CleanupMinScoreDiff, cfg.Settings) != "" {
 			continue
 		}
 		if !topPreferred && languageMatchFor(filepath.Base(item.path), preferredLanguage) == languagePreferred {
 			continue
 		}
 		switch {
-		case top.quality.UpgradeReason(&item.quality, top.score, item.score, cfg.CleanupMinScoreDiff) != "":
+		case upgradeReasonWith(&top.quality, &item.quality, top.score, item.score, cfg.CleanupMinScoreDiff, cfg.Settings) != "":
 			inferior = append(inferior, inferiorCopy{item.path, "quality"})
 		case item.size > 0 && item.size == top.size:
 			inferior = append(inferior, inferiorCopy{item.path, "identical"})
@@ -1086,7 +1096,7 @@ func discardIfInferiorWithQuality(cfg *Config, series string, season, episode, n
 				}
 			}
 		}
-		if !qualityUpgradeAllowed(&newQuality, &oldQuality, newScore, oldScore, cfg.CleanupMinScoreDiff, cfg.Settings) &&
+		if !qualityUpgradeAllowed(&newQuality, &oldQuality, incoming, newScore, oldScore, cfg.CleanupMinScoreDiff, cfg.Settings) &&
 			oldScore >= saturatingAddInt64(newScore, cfg.CleanupMinScoreDiff) {
 			if err := handleDuplicate(newFile, cfg); err != nil {
 				return true, err
@@ -1100,7 +1110,7 @@ func discardIfInferiorWithQuality(cfg *Config, series string, season, episode, n
 // cleanupOldMovie removes archived files of the same movie that are clearly
 // inferior to the new file and returns their paths, so the caller can log a
 // single line about the upgrade.
-func cleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, newFile, archivePath string) ([]string, error) {
+func cleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, newFile, archivePath string, incoming *models.Quality) ([]string, error) {
 	if !cfg.CleanupUpgrades || !localPath(archivePath) {
 		return nil, nil
 	}
@@ -1150,6 +1160,9 @@ func cleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, new
 		oldQuality := ParseQuality(name)
 		oldScore := cfg.FileScore(file, "movie", movie)
 		newQuality := ParseQuality(newName)
+		if incoming != nil {
+			newQuality = MergeQuality(newQuality, *incoming)
+		}
 		if audioDowngradeAtSameResolution(&newQuality, &oldQuality) {
 			// Keep the better archived track; the incoming file is handled by
 			// DiscardIfInferiorMovie, not by the old-file cleanup.
@@ -1172,7 +1185,7 @@ func cleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, new
 				}
 			}
 		}
-		if !qualityUpgradeAllowed(&newQuality, &oldQuality, newScore, oldScore, cfg.CleanupMinScoreDiff, cfg.Settings) {
+		if !qualityUpgradeAllowed(&newQuality, &oldQuality, incoming, newScore, oldScore, cfg.CleanupMinScoreDiff, cfg.Settings) {
 			continue
 		}
 		if err := handleDuplicate(file, cfg); err != nil {
@@ -1243,7 +1256,7 @@ func ArchiveMovieQuality(cfg *Config, release *models.Release) *models.ArchiveQu
 
 // DiscardIfInferiorMovie reports whether the incoming movie file must be
 // discarded because an existing file of the same movie is better.
-func DiscardIfInferiorMovie(cfg *Config, movie string, year *int64, newScore int64, newFile, archivePath string) (bool, error) {
+func DiscardIfInferiorMovie(cfg *Config, movie string, year *int64, newScore int64, newFile, archivePath string, incoming *models.Quality) (bool, error) {
 	if !cfg.CleanupUpgrades || !localPath(archivePath) {
 		return false, nil
 	}
@@ -1292,6 +1305,9 @@ func DiscardIfInferiorMovie(cfg *Config, movie string, year *int64, newScore int
 		oldQuality := ParseQuality(name)
 		oldScore := cfg.FileScore(file, "movie", movie)
 		newQuality := ParseQuality(newName)
+		if incoming != nil {
+			newQuality = MergeQuality(newQuality, *incoming)
+		}
 		if audioDowngradeAtSameResolution(&newQuality, &oldQuality) {
 			if err := handleDuplicate(newFile, cfg); err != nil {
 				return true, err
@@ -1315,7 +1331,7 @@ func DiscardIfInferiorMovie(cfg *Config, movie string, year *int64, newScore int
 				}
 			}
 		}
-		if !qualityUpgradeAllowed(&newQuality, &oldQuality, newScore, oldScore, cfg.CleanupMinScoreDiff, cfg.Settings) &&
+		if !qualityUpgradeAllowed(&newQuality, &oldQuality, incoming, newScore, oldScore, cfg.CleanupMinScoreDiff, cfg.Settings) &&
 			oldScore >= saturatingAddInt64(newScore, cfg.CleanupMinScoreDiff) {
 			if err := handleDuplicate(newFile, cfg); err != nil {
 				return true, err

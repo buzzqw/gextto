@@ -583,7 +583,7 @@ func ExplainWithArchive(
 		if series != nil {
 			approved, realReason, err = db.CheckSeriesScored(&evaluated, score, cfg.UpgradeMinScoreDiff, approvalContext)
 		} else {
-			approved, realReason, err = db.checkMovieScoredWith(&evaluated, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, true, cfg.Settings)
+			approved, realReason, err = db.checkMovieScoredWithDisk(&evaluated, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, true, disk, cfg.Settings)
 		}
 		if err != nil {
 			// An incomplete release (for example a pack without a season) must

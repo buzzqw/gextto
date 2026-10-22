@@ -413,7 +413,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			}
 			score := cfg.ReleaseScore(&release)
 			if execute {
-				discarded, err := DiscardIfInferior(cfg, series.Name, season, episodeNumber, score, file, resolvedArchive)
+				discarded, err := DiscardIfInferiorWithQuality(cfg, series.Name, season, episodeNumber, score, file, resolvedArchive, &release.Quality)
 				if err != nil {
 					logging.Warn("archive duplicate check failed", "file", file, "error", err)
 					continue
@@ -469,7 +469,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 				bg_linkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, file)
 				continue
 			}
-			_, _ = CleanupOldEpisode(cfg, series.Name, season, episodeNumber, score, target, filepath.Dir(target))
+			_, _ = CleanupOldEpisodeWithQuality(cfg, series.Name, season, episodeNumber, score, target, filepath.Dir(target), release.Quality)
 			bg_linkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, target)
 			items = append(items, map[string]any{
 				"season":   season,

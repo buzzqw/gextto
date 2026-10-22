@@ -75,11 +75,10 @@ func tev_salvagePackEpisodes(cfg *Config, torrents TorrentSession, db *Database,
 	defer guard.Release()
 	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
 	destinationFiles, _ := VideoFiles(destination)
-	score := cfg.ReleaseScore(&release)
 	entries := []PackEpisode{}
 	for index := range ready {
 		file := ready[index]
-		placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, score)
+		placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, release.Quality)
 		if err != nil {
 			logging.Warn("pack salvage: episode not imported", "hash", torrent.Hash, "file", filepath.Base(file.Path), "error", err)
 			continue

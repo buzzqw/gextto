@@ -2042,7 +2042,9 @@ Un upgrade **per punteggio** richiede un miglioramento reale della qualità:
 risoluzione, sorgente, codec, audio, HDR/DV, correzioni e gruppo devono valere
 almeno la differenza minima in più. Dimensione del file, sottotitoli e salute
 dello swarm aiutano a scegliere tra release equivalenti, ma da soli non fanno
-mai riscaricare un episodio o un film della stessa qualità.
+mai riscaricare un episodio o un film della stessa qualità. La stessa regola
+vale per i season pack e dopo il download: un file della stessa qualità non
+sostituisce la copia archiviata solo perché ha un punteggio più alto.
 
 Anche la regola che preferisce una sorgente WEB-DL a un WEBRip o un HDTV segue i
 pesi: vale solo finché il peso **Sorgente** del WEB-DL è più alto. Se dai a

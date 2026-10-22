@@ -1157,7 +1157,8 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	}
 	var dbID, dbScore int64
 	var dbTitle, dbArchivePath, dbMediaInfo string
-	dbRowErr := d.db.QueryRow("SELECT id,quality_score,COALESCE(title,''),COALESCE(archive_path,''),COALESCE(media_info_json,'') FROM episodes WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode).Scan(&dbID, &dbScore, &dbTitle, &dbArchivePath, &dbMediaInfo)
+	var dbDownloaded sql.NullString
+	dbRowErr := d.db.QueryRow("SELECT id,quality_score,COALESCE(title,''),COALESCE(archive_path,''),COALESCE(media_info_json,''),downloaded_at FROM episodes WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode).Scan(&dbID, &dbScore, &dbTitle, &dbArchivePath, &dbMediaInfo, &dbDownloaded)
 	dbRow := dbRowErr == nil
 	if dbRowErr != nil && !errors.Is(dbRowErr, sql.ErrNoRows) {
 		return false, "", dbRowErr
@@ -1167,6 +1168,9 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 		if disk, ok := archive.BestFor(season, episode); ok {
 			if manual {
 				return false, "duplicate", nil
+			}
+			if context.ForbidUpgrade {
+				return false, "upgrades_disabled", nil
 			}
 			comparisonQuality := disk.Quality
 			comparisonScore := disk.Score
@@ -1187,12 +1191,16 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 			return false, "duplicate", nil
 		}
 		// Quality profile cutoff reached: a real archived file is never
-		// replaced.
+		// replaced. The database path counts too: the archive scan may miss a
+		// file (a different folder, an unreachable mount), and "Allow upgrades:
+		// No" must still be honoured.
 		if context.ForbidUpgrade {
-			if archive != nil {
-				if _, ok := archive.BestFor(season, episode); ok {
-					return false, "upgrades_disabled", nil
-				}
+			archived := dbDownloaded.Valid || strings.TrimSpace(dbArchivePath) != ""
+			if !archived && archive != nil {
+				_, archived = archive.BestFor(season, episode)
+			}
+			if archived {
+				return false, "upgrades_disabled", nil
 			}
 		}
 		oldQuality := ParseQuality(dbTitle)
@@ -1547,6 +1555,11 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 		if !existing {
 			if archive != nil {
 				if disk, ok := archive.BestFor(season, episode); ok {
+					// The file is on disk but the database row is missing:
+					// «Allow upgrades: No» still protects it.
+					if context.ForbidUpgrade {
+						continue
+					}
 					if upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, context.StallAdjustedMinDiff(minScoreDiff, key), context.UpgradeUntilScore, context.ScoreSettings) == "" {
 						continue
 					}
@@ -1622,11 +1635,15 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 	// stagionale, come faceva la versione precedente.
 	if len(targets) == 0 && complete {
 		var id, existingScore int64
-		var existingTitle string
-		existingErr := tx.QueryRow("SELECT id,quality_score,COALESCE(title,'') FROM episodes WHERE series_id=?1 AND season=?2 AND episode=0", seriesID, season).Scan(&id, &existingScore, &existingTitle)
+		var existingTitle, existingPath string
+		var existingDownloaded sql.NullString
+		existingErr := tx.QueryRow("SELECT id,quality_score,COALESCE(title,''),COALESCE(archive_path,''),downloaded_at FROM episodes WHERE series_id=?1 AND season=?2 AND episode=0", seriesID, season).Scan(&id, &existingScore, &existingTitle, &existingPath, &existingDownloaded)
 		existing := existingErr == nil
 		if existingErr != nil && !errors.Is(existingErr, sql.ErrNoRows) {
 			return false, "", existingErr
+		}
+		if existing && context.ForbidUpgrade && (existingDownloaded.Valid || strings.TrimSpace(existingPath) != "") {
+			return false, "upgrades_disabled", nil
 		}
 		if !existing {
 			var episodeHash any

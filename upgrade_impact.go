@@ -55,6 +55,14 @@ func UpgradeImpact(cfg *Config, db *Database, archive *Archive) (upgradeImpactRe
 		if len(results) > upgradeImpactPerSeries {
 			results = results[:upgradeImpactPerSeries]
 		}
+		// The cycle compares against the files actually on disk as well as the
+		// database rows: without the index this report would count upgrades the
+		// real decision refuses. Build it once per series, like the cycle.
+		archiveIndex := &models.ArchiveQualityIndex{}
+		if resolved := cfg.ResolveArchivePath(series); resolved != nil {
+			indexed := IndexArchive(series.Name, *resolved, cfg)
+			archiveIndex = &indexed
+		}
 		for _, result := range results {
 			release := ParseRelease(result[0], result[1], result[2])
 			if release == nil || release.Kind != "series" || release.IsPack || release.Series == nil || release.Season == nil || release.Episode == nil {
@@ -71,6 +79,7 @@ func UpgradeImpact(cfg *Config, db *Database, archive *Archive) (upgradeImpactRe
 			report.Releases++
 			score := cfg.ReleaseScore(release)
 			context := &models.ApprovalContext{
+				Archive:           archiveIndex,
 				Live:              &models.LiveDownloads{Hashes: map[string]struct{}{}, Episodes: map[models.LiveEpisodeKey]struct{}{}},
 				UpgradeUntilScore: cfg.UpgradeUntilScore,
 				ScoreSettings:     cfg.Settings,

@@ -2228,7 +2228,7 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 	if reason := mediaInfoUpgradeRejection(cfg, db, event.Hash, video, release); reason != "" {
 		return false, tev_rejectUnconfirmedUpgrade(cfg, db, torrents, event, release, reason)
 	}
-	if resolved, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "series", seriesName); resolveErr != nil {
+	if resolved, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "series", seriesName, &release.Quality); resolveErr != nil {
 		return false, resolveErr
 	} else if resolved {
 		restored, err := db.RestoreUpgrade(event.Hash)
@@ -2349,7 +2349,7 @@ func tev_completeMovieWithArchive(cfg *Config, db *Database, torrents TorrentSes
 	if reason := mediaInfoUpgradeRejection(cfg, db, event.Hash, video, release); reason != "" {
 		return false, tev_rejectUnconfirmedUpgrade(cfg, db, torrents, event, release, reason)
 	}
-	if resolved, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "movie", release.Title); resolveErr != nil {
+	if resolved, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "movie", release.Title, &release.Quality); resolveErr != nil {
 		return false, resolveErr
 	} else if resolved {
 		restored, err := db.RestoreUpgrade(event.Hash)
@@ -2725,14 +2725,14 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 		}
 		if haveNewFile {
 			score := cfg.ReleaseScore(release)
-			value, err := DiscardIfInferiorMovie(cfg, release.Title, release.Year, score, newFile, archive)
+			value, err := DiscardIfInferiorMovie(cfg, release.Title, release.Year, score, newFile, archive, &release.Quality)
 			if err != nil {
 				return false, err
 			}
 			if value {
 				discarded = true
 			} else {
-				replaced, err = cleanupOldMovie(cfg, release.Title, release.Year, score, newFile, archive)
+				replaced, err = cleanupOldMovie(cfg, release.Title, release.Year, score, newFile, archive, &release.Quality)
 				if err != nil {
 					return false, err
 				}
@@ -3134,7 +3134,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			destinationFiles, _ := VideoFiles(destination)
 			for index := range matching {
 				file := matching[index]
-				placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, cfg.ReleaseScore(&release))
+				placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, release.Quality)
 				if err != nil {
 					return false, err
 				}

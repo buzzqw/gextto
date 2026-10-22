@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 22 ottobre 2026
 
+- **Upgrade: il punteggio non fa più riscaricare file già in libreria.** La regola che chiede un miglioramento tecnico reale, non solo un punteggio più alto, ora vale in tutti i percorsi. I season pack già in download non scaricano più episodi presenti della stessa qualità, un file della stessa qualità non sostituisce quello archiviato dopo il download e i punteggi degli episodi di un pack usano la dimensione del singolo episodio, non quella dell'intero pack. **Permetti upgrade: No** viene rispettato anche quando la scansione dell'archivio non trova il file (per esempio una cartella spostata o un disco non raggiungibile), purché la libreria indichi dove si trova. Corretto anche il pannello *Impatto sulla libreria*, che ora guarda i file realmente presenti come fa il ciclo.
+
 - **Profili di qualità: rinominare non cambia più il numero.** Il numero di un profilo è quello che Jellyseerr ricorda: prima, rinominando un profilo dall'editor (o salvando da una pagina aperta prima di una modifica) il profilo riceveva un numero nuovo. Ora ogni riga dell'editor porta con sé il proprio numero.
 
 - **Profili di qualità: la scheda del titolo non aggiunge più esclusioni da sola.** Un profilo viene preselezionato solo se corrispondono anche le esclusioni: prima bastavano qualità, audio, lingua, sottotitoli e upgrade, e salvando un campo qualsiasi (per esempio le stagioni) potevano comparire le esclusioni del profilo senza averlo scelto. La voce **Valori attuali** mostra ora anche le esclusioni del titolo. Inoltre una lingua vuota in un profilo vale la lingua predefinita di Gextto, come nel modulo di aggiunta, invece di accettare qualsiasi lingua nella scheda e nell'API v3.

@@ -549,6 +549,34 @@ func TestCompletePackFillingARealGapIsApproved(t *testing.T) {
 	assertTrue(t, approved, "a complete pack that fills a real gap must be approved: "+reason)
 }
 
+// A pack must not add a placeholder for an episode already on disk when the
+// title has «Allow upgrades: No», even if the database row is missing.
+func TestPackDisableUpgradesKeepsDiskOnlyFile(t *testing.T) {
+	db := newTestDB(t)
+	series, season := "Show", int64(1)
+	pack := models.Release{
+		Title: "Show.S01.2160p.WEB-DL.H265", Magnet: "magnet:?xt=urn:btih:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		Source: "rss", Quality: models.Quality{Resolution: "2160p", Source: "webdl", Codec: "h265"},
+		Kind: "series", Series: &series, Season: &season, Episode: int64Ptr(0),
+		IsPack: true, EpisodeRange: []int64{1}, Seeders: -1, Peers: -1,
+	}
+	hash := mustHash(t, pack.Magnet)
+	context := &models.ApprovalContext{
+		Archive: &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{
+			{1, 1}: {Quality: models.Quality{Resolution: "1080p", Source: "webdl"}, Score: 1000},
+		}},
+		Live:          &models.LiveDownloads{},
+		ForbidUpgrade: true,
+	}
+	approved, reason, err := db.checkSeriesPack(&pack, hash, pack.Quality.Score(), 200, context, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if approved {
+		t.Fatalf("a pack was approved for a disk-only episode with upgrades disabled: %s", reason)
+	}
+}
+
 func TestArchiveIndexBlocksReleaseAlreadyPresentOnDisk(t *testing.T) {
 	db := newTestDB(t)
 	release := testRelease()
@@ -2142,6 +2170,77 @@ func TestDisableUpgradesBlocksReplacement(t *testing.T) {
 	}
 	assertTrue(t, !approved, "expected upgrades_disabled")
 	assertEqual(t, reason, "upgrades_disabled")
+}
+
+// The archive scan can miss a file that the database still points to (a moved
+// folder, an unreachable mount). «Allow upgrades: No» must not depend on that
+// scan.
+func TestDisableUpgradesBlocksWithDatabaseFileOnly(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "Show - S01E01 - Pilot - [1080p][h264].mkv")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := db.db.QueryRow("SELECT id FROM series WHERE name='Show'").Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,quality_score,downloaded_at,archive_path) VALUES (?1,1,1,'Show.S01E01.1080p',1000,datetime('now'),?2)", seriesID, file); err != nil {
+		t.Fatal(err)
+	}
+	candidate := testRelease()
+	candidate.Series = stringPtr("Show")
+	candidate.Season = int64Ptr(1)
+	candidate.Episode = int64Ptr(1)
+	candidate.IsPack = false
+	candidate.Quality = models.Quality{Resolution: "2160p", Source: "webdl"}
+	score := candidate.Quality.Score()
+
+	context := &models.ApprovalContext{
+		Archive:       &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}},
+		Live:          &models.LiveDownloads{},
+		ForbidUpgrade: true,
+	}
+	approved, reason, err := db.CheckSeriesScored(&candidate, score, 200, context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if approved || reason != "upgrades_disabled" {
+		t.Fatalf("approved=%v reason=%q, want upgrades_disabled", approved, reason)
+	}
+}
+
+// The same protection applies to a file found only on disk (the database row
+// is missing or was rebuilt): without it a series with «Allow upgrades: No»
+// would download a better release and only discard it after completion.
+func TestDisableUpgradesBlocksDiskFileWithoutDatabaseRow(t *testing.T) {
+	db := newTestDB(t)
+	candidate := testRelease()
+	candidate.Series = stringPtr("Show")
+	candidate.Season = int64Ptr(1)
+	candidate.Episode = int64Ptr(1)
+	candidate.IsPack = false
+	candidate.Quality = models.Quality{Resolution: "2160p", Source: "webdl"}
+	score := candidate.Quality.Score()
+	context := &models.ApprovalContext{
+		Archive: &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{
+			{1, 1}: {Quality: models.Quality{Resolution: "1080p"}, Score: 1000},
+		}},
+		Live:          &models.LiveDownloads{},
+		ForbidUpgrade: true,
+		DryRun:        true,
+	}
+	approved, reason, err := db.CheckSeriesScored(&candidate, score, 200, context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if approved || reason != "upgrades_disabled" {
+		t.Fatalf("approved=%v reason=%q, want upgrades_disabled", approved, reason)
+	}
 }
 
 func TestSmartEpisodeIsAlwaysOnButExemptsGapsAndUpgrades(t *testing.T) {

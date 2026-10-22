@@ -926,12 +926,40 @@ func TestStagePackFileSkipsInferiorEpisode(t *testing.T) {
 		Season:  1,
 		Episode: 1,
 	}
-	placed, ok, err := StagePackFile(&file, filepath.Dir(packSource), dir, files, &cfg, 400)
+	placed, ok, err := StagePackFile(&file, filepath.Dir(packSource), dir, files, &cfg, models.Quality{Resolution: "720p", Source: "hdtv"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if ok || placed != "" {
 		t.Fatalf("expected inferior pack file to be skipped, got placed=%q, ok=%v", placed, ok)
+	}
+}
+
+// An equal-quality episode is not copied out of a pack just because its score
+// is higher: only a technical upgrade is worth replacing the archived file.
+func TestStagePackFileSkipsEqualQualityEpisode(t *testing.T) {
+	dir := t.TempDir()
+	existingFile := filepath.Join(dir, "Show.S01E01.1080p.WEB-DL.H264.mkv")
+	if err := os.WriteFile(existingFile, []byte("good video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files, err := VideoFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	packSource := filepath.Join(t.TempDir(), "Show.S01E01.1080p.WEB-DL.H264.mkv")
+	if err := os.WriteFile(packSource, []byte("equal video with a longer name and another score"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	file := PackSourceFile{Path: packSource, Season: 1, Episode: 1}
+	placed, ok, err := StagePackFile(&file, filepath.Dir(packSource), dir, files, &cfg,
+		models.Quality{Resolution: "1080p", Codec: "h264", Source: "webdl"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok || placed != "" {
+		t.Fatalf("an equal-quality pack file was copied, placed=%q ok=%v", placed, ok)
 	}
 }
 

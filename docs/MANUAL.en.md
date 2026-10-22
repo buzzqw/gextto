@@ -1970,7 +1970,9 @@ An upgrade **by score** needs a real quality gain: resolution, source, codec,
 audio, HDR/DV, fixes and group must be worth at least the minimum difference
 more. File size, subtitles and swarm health help choose between equivalent
 releases, but on their own they never re-download an episode or a movie of the
-same quality.
+same quality. The same rule holds for season packs and after the download: a
+file of the same quality does not replace the archived copy just because its
+score is higher.
 
 The rule that prefers a WEB-DL source to a WEBRip or HDTV one follows the
 weights too: it holds only while the WEB-DL **Source** weight is higher. Give

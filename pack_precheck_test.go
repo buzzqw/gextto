@@ -48,15 +48,19 @@ func testInProgressRelease(available int64) *models.Release {
 
 // testArchive puts one episode on disk with the given quality score.
 func testArchive(episode, score int64) *models.ArchiveQualityIndex {
+	return testArchiveWith(episode, models.Quality{Resolution: "1080p"}, score)
+}
+
+func testArchiveWith(episode int64, quality models.Quality, score int64) *models.ArchiveQualityIndex {
 	index := &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}}
-	index.Best[[2]int64{1, episode}] = models.ArchiveQuality{Quality: models.Quality{Resolution: "1080p"}, Score: score}
+	index.Best[[2]int64{1, episode}] = models.ArchiveQuality{Quality: quality, Score: score}
 	return index
 }
 
 func checkPack(t *testing.T, files []string, available int64, needed []int64, index *models.ArchiveQualityIndex, forbidUpgrade bool) string {
 	t.Helper()
 	path := writeTestTorrent(t, files...)
-	reason, err := incompletePackReason(path, testInProgressRelease(available), needed, index, 1000, 100, 0, forbidUpgrade)
+	reason, err := incompletePackReason(path, testInProgressRelease(available), needed, index, 1000, 100, 0, forbidUpgrade, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,7 +79,7 @@ func TestIncompletePackReason(t *testing.T) {
 		{"complete pack", []string{"Show.S01E01.mkv", "Show.S01E02.mkv"}, 2, []int64{2}, testArchive(1, 2000), true},
 		{"stale pack for a missing episode already better on disk", []string{"Show.S01E01.mkv"}, 2, []int64{2}, testArchive(1, 2000), false},
 		{"stale pack that holds the episode we need", []string{"Show.S01E01.mkv"}, 2, []int64{1}, testArchive(1, 2000), true},
-		{"stale pack with an episode that is a real upgrade", []string{"Show.S01E01.mkv"}, 2, []int64{2}, testArchive(1, 500), true},
+		{"stale pack with an episode that is a real upgrade", []string{"Show.S01E01.mkv"}, 2, []int64{2}, testArchiveWith(1, models.Quality{Resolution: "720p"}, 500), true},
 		{"stale pack with an episode not on disk", []string{"Show.S01E01.mkv"}, 2, []int64{2}, &models.ArchiveQualityIndex{}, true},
 		{"multi-episode file covers the range", []string{"Show.S01E01-E02.mkv"}, 2, []int64{2}, testArchive(1, 2000), true},
 		{"multi-episode without dash", []string{"Show.S01E01E02.mkv"}, 2, []int64{2}, testArchive(1, 2000), true},
@@ -108,7 +112,7 @@ func TestIncompletePackReasonKeepsHDRUpgradeWithEqualScore(t *testing.T) {
 		Quality: models.Quality{Resolution: "1080p", Codec: "h265"},
 		Score:   1000,
 	}
-	reason, err := incompletePackReason(path, release, []int64{2}, index, 1000, 200, 0, false)
+	reason, err := incompletePackReason(path, release, []int64{2}, index, 1000, 200, 0, false, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -136,7 +140,7 @@ func TestPackEpisodeDecisionsNameBothSides(t *testing.T) {
 	index := &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}}
 	index.Best[[2]int64{1, 1}] = models.ArchiveQuality{Quality: old, Score: 125}
 
-	decisions := packEpisodeDecisions(release, map[int64]struct{}{1: {}}, nil, index, 1000, 100, 0, false)
+	decisions := packEpisodeDecisions(release, map[int64]struct{}{1: {}}, nil, index, 1000, 100, 0, false, nil)
 	details := packDecisionDetails(1, release.Quality, 1000, decisions, 8)
 	want := "S01E01 480p h264 aac ITA (score 125) → 1080p h264 (score 1000): upgrade: resolution"
 	if details != want {
@@ -145,11 +149,23 @@ func TestPackEpisodeDecisionsNameBothSides(t *testing.T) {
 
 	better := &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}}
 	better.Best[[2]int64{1, 1}] = models.ArchiveQuality{Quality: models.Quality{Resolution: "1080p"}, Score: 2000}
-	decisions = packEpisodeDecisions(release, map[int64]struct{}{1: {}}, nil, better, 1000, 100, 0, false)
+	decisions = packEpisodeDecisions(release, map[int64]struct{}{1: {}}, nil, better, 1000, 100, 0, false, nil)
 	details = packDecisionDetails(1, release.Quality, 1000, decisions, 8)
 	want = "S01E01 1080p (score 2000) vs 1080p h264 (score 1000): already equal or better"
 	if details != want {
 		t.Fatalf("details = %q, want %q", details, want)
+	}
+}
+
+// A higher numeric score alone (size, group, subtitles) is not a reason to
+// download a pack episode already in the library at the same quality.
+func TestPackInspectionIgnoresScoreOnlyUpgrades(t *testing.T) {
+	release := testInProgressRelease(2)
+	release.Quality = models.Quality{Resolution: "1080p", Codec: "h264", Source: "webdl"}
+	index := testArchiveWith(1, models.Quality{Resolution: "1080p", Codec: "h264", Source: "webdl"}, 1000)
+	decisions := packEpisodeDecisions(release, map[int64]struct{}{1: {}}, nil, index, 5000, 200, 0, false, nil)
+	if len(decisions) != 1 || decisions[0].Keep {
+		t.Fatalf("score-only difference kept an equal episode: %+v", decisions)
 	}
 }
 
@@ -164,7 +180,7 @@ func TestIncompletePackReasonNamesTheComparison(t *testing.T) {
 func TestIncompletePackReasonIgnoresNormalPacks(t *testing.T) {
 	path := writeTestTorrent(t, "Show.S01E01.mkv")
 	release := testInProgressRelease(0)
-	reason, err := incompletePackReason(path, release, []int64{2}, testArchive(1, 2000), 1000, 100, 0, false)
+	reason, err := incompletePackReason(path, release, []int64{2}, testArchive(1, 2000), 1000, 100, 0, false, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

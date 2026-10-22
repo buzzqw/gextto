@@ -162,6 +162,7 @@ func packEpisodeDecisions(
 	archiveIndex *models.ArchiveQualityIndex,
 	releaseScore, upgradeMinScoreDiff, upgradeUntilScore int64,
 	forbidUpgrade bool,
+	settings map[string]string,
 ) []packEpisodeDecision {
 	if release == nil || release.Season == nil || len(found) == 0 {
 		return nil
@@ -203,8 +204,8 @@ func packEpisodeDecisions(
 		}
 		// Use the same semantic rules as the acquisition decision: a DV/HDR
 		// release or a WEB-DL over a WEBRip is an upgrade even when the numeric
-		// score delta is small.
-		if reason := release.Quality.UpgradeReason(&existing.Quality, releaseScore, existing.Score, upgradeMinScoreDiff); reason != "" {
+		// score delta is small, while size, group and subtitles alone are not.
+		if reason := upgradeReasonUntil(&release.Quality, &existing.Quality, releaseScore, existing.Score, upgradeMinScoreDiff, upgradeUntilScore, settings); reason != "" {
 			decision.Keep = true
 			decision.Reason = "upgrade: " + reason
 			decisions = append(decisions, decision)
@@ -225,8 +226,9 @@ func packEpisodesUseful(
 	archiveIndex *models.ArchiveQualityIndex,
 	releaseScore, upgradeMinScoreDiff, upgradeUntilScore int64,
 	forbidUpgrade bool,
+	settings map[string]string,
 ) bool {
-	for _, decision := range packEpisodeDecisions(release, found, needed, archiveIndex, releaseScore, upgradeMinScoreDiff, upgradeUntilScore, forbidUpgrade) {
+	for _, decision := range packEpisodeDecisions(release, found, needed, archiveIndex, releaseScore, upgradeMinScoreDiff, upgradeUntilScore, forbidUpgrade, settings) {
 		if decision.Keep {
 			return true
 		}
@@ -289,6 +291,7 @@ func incompletePackReason(
 	archiveIndex *models.ArchiveQualityIndex,
 	releaseScore, upgradeMinScoreDiff, upgradeUntilScore int64,
 	forbidUpgrade bool,
+	settings map[string]string,
 ) (string, error) {
 	if release == nil || release.Season == nil || release.InProgressEpisodes <= 0 {
 		return "", nil
@@ -310,7 +313,7 @@ func incompletePackReason(
 	for _, episode := range neededEpisodes {
 		needed[episode] = struct{}{}
 	}
-	decisions := packEpisodeDecisions(release, found, needed, archiveIndex, releaseScore, upgradeMinScoreDiff, upgradeUntilScore, forbidUpgrade)
+	decisions := packEpisodeDecisions(release, found, needed, archiveIndex, releaseScore, upgradeMinScoreDiff, upgradeUntilScore, forbidUpgrade, settings)
 	for _, decision := range decisions {
 		if decision.Keep {
 			return "", nil

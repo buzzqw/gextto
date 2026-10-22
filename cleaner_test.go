@@ -157,6 +157,36 @@ func TestCleanupOldEpisodeReportsRemovedPaths(t *testing.T) {
 	}
 }
 
+// A bigger file of the same quality must not replace the archived copy after
+// the download: the size bonus and a high release score are not a technical
+// upgrade, exactly as at acquisition time.
+func TestEqualQualityScoreDoesNotReplaceArchivedFile(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "archive")
+	trash := filepath.Join(root, "trash")
+	if err := os.MkdirAll(archive, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	old := filepath.Join(archive, "Example.S01E01.1080p.WEB-DL.H264.mkv")
+	newFile := filepath.Join(archive, "Example - S01E01 - Pilot - [1080p][h264][WEB-DL].mkv")
+	cleanerWrite(t, old, "old")
+	cleanerWrite(t, newFile, "new")
+
+	cfg := DefaultConfig()
+	cfg.CleanupUpgrades = true
+	cfg.TrashPath = &trash
+	incoming := ParseQuality("Example.S01E01.1080p.WEB-DL.H264.mkv")
+	removed, err := CleanupOldEpisodeWithQuality(&cfg, "Example", 1, 1, 99999, newFile, archive, incoming)
+	if err != nil {
+		t.Fatalf("cleanup: %v", err)
+	}
+	if removed != 0 {
+		t.Fatalf("an equal-quality copy replaced the archived file: %d removed", removed)
+	}
+	assertTrue(t, cleanerFileExists(old), "the archived copy stays")
+	assertTrue(t, cleanerFileExists(newFile), "the new copy is not trashed by cleanup")
+}
+
 func TestMovesCompletedPackDirectoryToTrash(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "download")
