@@ -887,6 +887,12 @@
       if (cfPath) cfPath.readOnly = event.target.checked;
       return;
     }
+    if (event.target.matches && event.target.matches("[data-v2-check-all]")) {
+      var group = event.target.getAttribute("data-v2-check-all");
+      var members = document.querySelectorAll('[data-v2-check-member="' + group + '"]');
+      for (var m = 0; m < members.length; m++) members[m].checked = event.target.checked;
+      return;
+    }
     if (event.target.matches && event.target.matches("[data-v2-select-all]")) {
       var rows = document.querySelectorAll("[data-v2-select]");
       for (var i = 0; i < rows.length; i++) rows[i].checked = event.target.checked;

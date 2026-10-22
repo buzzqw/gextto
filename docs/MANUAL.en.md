@@ -745,6 +745,23 @@ with the same name the import stops: tick **Replace the existing file** to move
 the old copy to the trash and put the new one in place. Multi-episode files are
 recorded for every episode they contain.
 
+### Editing several titles at once
+
+**Bulk edit** (Library menu) sets the same values on many series and movies in
+one go, for example moving every movie to `2160p` or pausing several series.
+
+1. Tick the titles in the *Series* and *Movies* lists (there is also *Select
+   all*).
+2. In *Values to apply* tick only the fields to change (quality, language,
+   subtitles, exclusions) and type the new value. A ticked field left empty is
+   cleared; a field that is not ticked stays as it is in each title. *Upgrades*
+   and *State* change only if you pick something other than "Leave as is".
+3. *Start from a profile* fills the four fields with a profile's values and
+   ticks them: a quick way to apply a profile as a template.
+4. Press **Apply to the selected titles**: Gextto says how many titles it
+   changed. The other values of each title (seasons, folder, aliases…) are not
+   touched.
+
 ## 6. Explore, Archive, Comics
 
 - **Explore** — TMDB trending/today/popular/top-rated/now playing/upcoming, TMDB
@@ -1102,8 +1119,14 @@ In **Configuration → Sources**, under *Quality profiles*, name the combination
 of quality, language, subtitles and exclusions you use. Gextto generates a
 profile for every combination already present in the library and exposes them to
 Jellyseerr through `/api/v3/qualityprofile`; the first profile is **Default**.
-Profiles are presets: when Jellyseerr adds a series or a movie with a profile,
-Gextto copies those values into the title. Each profile keeps its number when
+**Profiles are templates, not rules.** When you use a profile (from Jellyseerr
+or from *Bulk edit*), Gextto **copies** its values into the title; from then
+on the title's own fields decide, as always. If you later change the profile,
+the titles already created do not change: to update many of them at once use
+*Library → Bulk edit*. Gextto does not need a Sonarr-style mode where the
+profile governs its titles: the Quality field already takes a minimum
+(`1080p`), a maximum (`<1080p`) or a range (`720p-1080p`), and language,
+subtitles, exclusions and upgrades are set per title. Each profile keeps its number when
 you remove or reorder others: Jellyseerr remembers the number, not the name. If
 you remove every profile, Gextto generates them again from the library on the
 next read.
@@ -1810,7 +1833,7 @@ them.
 | Excluded content filters | Releases containing these words or scripts (e.g. [porno]) are excluded. |
 | Source filters | Keywords to accept or reject for a single source, enabled per row. |
 | Watched folders | The .torrent and .magnet files found in the given folders are **downloaded** and added to the session automatically (recursive, delete after). |
-| Quality profiles | Names for the combinations of quality, language, subtitles and exclusions; the first is Default and the list is the one exposed to Jellyseerr. |
+| Quality profiles | Names for the combinations of quality, language, subtitles and exclusions: they are templates, their values are copied into the title. The first is Default and the list is the one exposed to Jellyseerr. |
 
 #### eD2k and Kad
 

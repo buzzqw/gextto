@@ -54,9 +54,14 @@ with a SQLite database, an integrated torrent engine and a server-rendered web U
 - **Selection policy**: global defaults (resolution, source, codec, audio, HDR,
   language, size) plus **per-title overrides and exclusions** plus
   **explainability** — the explanation API says why a release is accepted, rejected
-  or preferred ("Why not this one?" in the UI). No quality profiles and no
-  custom-format regex engine like `*arr`: those are the most complex — and the most
-  misconfigured — part of that model.
+  or preferred ("Why not this one?" in the UI). Named quality profiles exist
+  only as **templates**: their values are copied into a title, whose own fields
+  stay the only rule; *Bulk edit* changes many titles at once. Profiles that
+  govern their titles, ordered qualities with a cutoff and a custom-format regex
+  engine like `*arr` are not adopted: the per-title fields already express a
+  minimum, a maximum or a range of resolutions, the languages, the exclusions
+  and the upgrade policy, and that model is the most complex — and the most
+  misconfigured — part of `*arr`.
 - **Non-goals**: `*arr` `/api/v3` compatibility and the quality-profile/
   custom-format semantics; multi-user authentication (remote exposure goes through
   a reverse proxy, `docs/SECURITY.md`). The differences with Sonarr/Radarr are
@@ -745,13 +750,18 @@ remains here.
 **The gap with Sonarr/Radarr** (§1), by value per effort, after a study and without
 copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
 
-- **Named profiles**: *Configuration → Sources → Quality profiles*, with a generated
-  profile for every override combination in the library and "Default" first. The
-  *Sonarr* semantics (ordered qualities, cutoff, custom formats) stay out by choice.
+- **Named profiles as templates**: *Configuration → Sources → Quality profiles*,
+  with a generated profile for every override combination in the library,
+  "Default" first and a stable id per profile. A profile is copied into a title
+  (from Jellyseerr or from *Library → Bulk edit*, which also edits many titles
+  at once); it does not govern it. The *Sonarr* semantics (ordered qualities,
+  cutoff, custom formats) stay out by choice (§1).
 - **A `/api/v3` subset for Jellyseerr** (`system/status`, `qualityprofile`,
   `languageprofile`, `rootfolder`, `tag`, `series/lookup` + `POST series`,
-  `movie/lookup` + `POST movie`, `queue`); full compatibility is not claimed, and a
-  real Jellyseerr run remains the acceptance test.
+  `movie/lookup` + `POST movie`, `PUT series`/`PUT movie`, `queue`), following the
+  calls Jellyseerr makes (lookup by `tvdb:`/`tmdb:` id, only the monitored
+  seasons, the library id in the answer); full compatibility is not claimed, and
+  a real Jellyseerr run remains the acceptance test.
 - **Manual import**: the *Import file* page matches an existing file, lets the
   operator correct series/movie/season/episode and destination, replaces an existing
   copy only on request and records every episode of a multi-episode file.

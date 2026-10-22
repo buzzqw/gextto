@@ -142,6 +142,7 @@
       {{if eq .Body "v2_dashboard"}}{{template "v2_dashboard" .Content}}
       {{else if eq .Body "v2_downloads"}}{{template "v2_downloads" .Content}}
       {{else if eq .Body "v2_import"}}{{template "v2_import" .Content}}
+      {{else if eq .Body "v2_bulk"}}{{template "v2_bulk" .Content}}
       {{else if eq .Body "v2_settings"}}{{template "v2_settings" .Content}}
       {{else if eq .Body "v2_health"}}{{template "v2_health" .Content}}
       {{else if eq .Body "v2_logs"}}{{template "v2_logs" .Content}}

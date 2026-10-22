@@ -537,3 +537,10 @@ test("la pagina Importa file analizza un percorso", async ({ page }) => {
   await page.getByRole("button", { name: "Analizza" }).click();
   await expect(page.locator("#v2-import-result [role=alert]")).toBeVisible();
 });
+
+test("la pagina Modifica in blocco mostra le liste e i valori", async ({ page }) => {
+  await page.goto("/?view=bulk");
+  await expect(page.getByRole("heading", { name: "Modifica più titoli insieme" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Applica ai titoli selezionati" })).toBeVisible();
+  await expect(page.locator('input[name="set_quality"]')).toBeVisible();
+});

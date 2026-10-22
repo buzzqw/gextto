@@ -40,7 +40,13 @@ manual is online: [English](docs/MANUAL.en.md) ·
   requested seasons; a request for a series already in the library adds the new
   seasons, and a movie already there is not added twice. Each profile keeps its
   number when you remove or reorder others, so Jellyseerr always applies the
-  one it picked. This is not full Sonarr/Radarr compatibility.
+  one it picked. This is not full Sonarr/Radarr compatibility. Profiles are
+  **templates**: their values are copied into the title, which stays free to
+  change; changing a profile does not modify titles already created.
+- **Bulk edit.** The new **Bulk edit** page (Library menu) changes quality,
+  language, subtitles, exclusions, upgrades or state on several series and
+  movies at once: tick the titles, tick the values to change and apply. You can
+  start from a profile's values. Everything else in each title is left alone.
 - **gx-torrent announces its real version, and can use a compatible identity.** It used to say `gx-core 0.0.0` to peers and trackers. It now announces the real version (`gx-core 1.1.xxx`) and, if you want, can present itself as qBittorrent, Transmission, Rain or anacrolix/torrent with a chosen version. Only the announced identity changes: some private trackers only accept whitelisted clients, so check their rules before using it.
 
 - **Downloads with thousands of torrents: the table stays smooth.** Above 500

@@ -764,6 +764,25 @@ spunta **Sostituisci il file esistente** per spostare la copia vecchia nel
 cestino e mettere la nuova. I file multi-episodio vengono registrati per ogni
 episodio che contengono.
 
+### Modificare più titoli insieme
+
+**Modifica in blocco** (menu Libreria) cambia gli stessi valori su molte serie
+e film in un colpo solo, ad esempio portare tutti i film a `2160p` o mettere
+in pausa più serie.
+
+1. Spunta i titoli nelle liste *Serie TV* e *Film* (c'è anche *Seleziona
+   tutte*).
+2. In *Valori da applicare* spunta solo i campi da cambiare (qualità, lingua,
+   sottotitoli, esclusioni) e scrivi il nuovo valore. Un campo spuntato e
+   lasciato vuoto viene svuotato; un campo non spuntato resta com'è in ogni
+   titolo. *Upgrade* e *Stato* cambiano solo se scegli un valore diverso da
+   «Lascia com'è».
+3. *Parti da un profilo* riempie i quattro campi con i valori di un profilo e
+   li spunta: è un modo veloce per applicare un profilo come modello.
+4. Premi **Applica ai titoli selezionati**: Gextto dice quanti titoli ha
+   modificato. Gli altri valori di ogni titolo (stagioni, cartella, alias…)
+   non vengono toccati.
+
 ## 6. Esplora, Archivio, Fumetti
 
 - **Esplora** — TMDB: tendenze oggi/settimana, popolari, più votati, in
@@ -1134,8 +1153,16 @@ In **Configurazione → Sorgenti**, sotto *Profili di qualità*, dai un nome all
 combinazioni di qualità, lingua, sottotitoli ed esclusioni che usi. Gextto
 genera automaticamente un profilo per ogni combinazione già presente nella
 libreria e li espone a Jellyseerr tramite `/api/v3/qualityprofile`; il primo
-profilo è **Default**. I profili sono preset: quando Jellyseerr aggiunge una
-serie o un film con un profilo, Gextto copia quei valori nel titolo. Ogni
+profilo è **Default**.
+
+**I profili sono modelli, non regole.** Quando usi un profilo (da Jellyseerr o
+da *Modifica in blocco*), Gextto **copia** i suoi valori nel titolo; da quel
+momento a decidere sono i campi del titolo, come sempre. Se poi cambi il
+profilo, i titoli già creati non cambiano: per aggiornarne molti insieme usa
+*Libreria → Modifica in blocco*. A Gextto non serve una gestione "alla
+Sonarr" in cui il profilo governa i titoli: il campo Qualità accetta già un
+minimo (`1080p`), un massimo (`<1080p`) o un intervallo (`720p-1080p`), e
+lingua, sottotitoli, esclusioni e upgrade si impostano per titolo. Ogni
 profilo mantiene il suo numero anche se ne togli o riordini altri: Jellyseerr
 ricorda il numero, non il nome. Se togli tutti i profili, alla lettura
 successiva Gextto li rigenera dalla libreria.
@@ -1873,7 +1900,7 @@ salvata** finché non li salvi.
 | Filtri contenuto esclusi | Le release che contengono queste parole o script (es. [porno]) vengono escluse. |
 | Filtri per sorgente | Parole chiave da accettare o scartare per una singola sorgente, con attivazione per riga. |
 | Cartelle osservate | I .torrent e i .magnet trovati nelle cartelle indicate vengono **scaricati** e aggiunti automaticamente alla sessione (ricorsiva, elimina dopo). |
-| Profili di qualità | Nomi per le combinazioni di qualità, lingua, sottotitoli ed esclusioni; il primo è Default e la lista è quella esposta a Jellyseerr. |
+| Profili di qualità | Nomi per le combinazioni di qualità, lingua, sottotitoli ed esclusioni: sono modelli, i valori vengono copiati nel titolo. Il primo è Default e la lista è quella esposta a Jellyseerr. |
 
 #### eD2k e Kad
 

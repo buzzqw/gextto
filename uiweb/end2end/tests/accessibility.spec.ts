@@ -15,7 +15,7 @@ const scan = async (page: import("@playwright/test").Page, path: string) => {
 };
 
 test.describe("accessibilità automatizzata", () => {
-  for (const path of ["/", "/?view=downloads", "/?view=import", "/?view=settings", "/?view=maintenance", "/?view=maintenance&tab=archive-sql", "/?view=integrations", "/?view=health", "/?view=logs", "/?view=ed2k"]) {
+  for (const path of ["/", "/?view=downloads", "/?view=import", "/?view=bulk", "/?view=settings", "/?view=maintenance", "/?view=maintenance&tab=archive-sql", "/?view=integrations", "/?view=health", "/?view=logs", "/?view=ed2k"]) {
     test(`nessuna violazione axe su ${path}`, async ({ page }) => {
       await scan(page, path);
     });

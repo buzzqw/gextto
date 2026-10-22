@@ -2215,3 +2215,11 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   .v2-archive-sql-op { flex-direction: column; }
   .v2-archive-sql-op-actions { justify-content: flex-start; }
 }
+
+/* Library bulk editor (/?view=bulk). */
+.v2-bulk-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.v2-bulk-group { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; }
+.v2-bulk-group legend { font-weight: 600; padding: 0 4px; }
+.v2-bulk-list { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow-y: auto; }
+.v2-bulk-list li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--line-soft); }
+@media (max-width: 760px) { .v2-bulk-lists { grid-template-columns: 1fr; } }

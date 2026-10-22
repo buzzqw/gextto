@@ -109,6 +109,8 @@ change. `/ui` is not served. For operational checks use
 | GET | `/api/v3/queue` | v3 queue (the torrent session) |
 | GET | `/api/import/preview` | manual import: the video files of a path with their match and destination (?path=) |
 | POST | `/api/import` | manual import: rename, move and register one file |
+| GET | `/library/bulk/profile` | bulk edit page: the value fields filled from a quality profile (?profile=ID) |
+| POST | `/library/bulk` | bulk edit page: apply the ticked values to the selected series and movies |
 | GET | `/import/preview` | manual import page: preview fragment |
 | POST | `/import/apply` | manual import page: confirm one file |
 | GET | `/api/config` | read the configuration |
