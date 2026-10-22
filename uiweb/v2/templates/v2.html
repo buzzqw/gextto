@@ -929,9 +929,21 @@
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
     {{if .Summary}}<p class="settings-summary{{if .SummaryWarn}} warn{{end}}" role="note">{{.Summary}}</p>{{end}}
     {{if .Links}}<div class="toolbar settings-group-links">{{range .Links}}<a class="btn sm" href="{{.Href}}" target="_blank" rel="noopener noreferrer"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}</a>{{end}}</div>{{end}}
+    {{if .Subgroups}}
+      {{range .Subgroups}}
+      <section class="settings-subgroup">
+        <h4 class="settings-subgroup-title">{{.Title}}</h4>
+        {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+        <div class="{{if .Grid}}form-grid{{else}}settings-rows{{end}}">
+          {{range .Fields}}{{template "v2_setting_field" .}}{{end}}
+        </div>
+      </section>
+      {{end}}
+    {{else}}
     <div class="{{if .Grid}}form-grid{{else}}settings-rows{{end}}">
       {{range .Fields}}{{template "v2_setting_field" .}}{{end}}
     </div>
+    {{end}}
     {{if .Buttons}}<div class="toolbar settings-group-actions">{{range .Buttons}}{{template "v2_button" .}}{{end}}</div>{{end}}
   </div>
 {{if .Collapsed}}</details>{{else}}</div>{{end}}

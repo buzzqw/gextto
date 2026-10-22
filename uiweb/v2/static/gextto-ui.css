@@ -603,6 +603,9 @@ label.field, .field {
 }
 label.field > span, .field > span, .field-label { color: var(--muted); font-size: 0.85rem; }
 .field.span-full { grid-column: 1 / -1; }
+.settings-subgroup { margin: 0; }
+.settings-subgroup + .settings-subgroup { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.settings-subgroup-title { margin: 0 0 8px; color: var(--muted); font-size: 0.82rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 
 /* badges + progress */
 .badge {

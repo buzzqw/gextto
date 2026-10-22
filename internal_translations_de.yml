@@ -5983,3 +5983,7 @@ deu:
   "Pesi per risoluzione, sorgente, codec video e HDR/Dolby Vision.": "Gewichte für Auflösung, Quelle, Videocodec und HDR/Dolby Vision."
   "Pesi per codec audio, canali e audio a oggetti.": "Gewichte für Audiocodecs, Kanäle und objektbasiertes Audio."
   "Correzioni e soglie che decidono quando una release migliore sostituisce quella archiviata.": "Korrekturen und Schwellen, die entscheiden, wann eine bessere Veröffentlichung die archivierte ersetzt."
+  "HDR / Dolby Vision": "HDR / Dolby Vision"
+  "Correzioni": "Korrekturen"
+  "Soglie e pulizia": "Schwellen und Bereinigung"
+  "Altre impostazioni": "Weitere Einstellungen"

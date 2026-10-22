@@ -1032,8 +1032,9 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   audio sono una scheda per gruppo: Lossless (TrueHD, DTS-HD, FLAC, PCM),
   DTS/DD+ (con DTS-HD HRA), AC3/5.1, AAC/Opus e MP3; canali e Atmos/DTS:X stanno
   nella stessa scheda Audio. I pesi video sono in un'unica scheda **Video**
-  (4K, Full HD, HD, SD, sorgente, codec e HDR/DV); **Upgrade e sostituzione**
-  raccoglie soglie, correzioni e pulizia. Il totale audio resta sotto la soglia di
+  con i sottogruppi 4K, Full HD, HD, SD, Codec video, Sorgente e HDR/DV;
+  **Upgrade e sostituzione** raccoglie correzioni, soglie e pulizia nei propri
+  sottogruppi. Il totale audio resta sotto la soglia di
   upgrade, quindi l'audio contribuisce al confronto ma non fa scaricare da solo
   un'altra release. Il nome del
   gruppo deve coincidere con il tag release finale, per esempio `TBK`. La lingua

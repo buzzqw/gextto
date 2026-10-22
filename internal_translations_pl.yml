@@ -5924,3 +5924,7 @@ pol:
   "Pesi per risoluzione, sorgente, codec video e HDR/Dolby Vision.": "Wagi dla rozdzielczości, źródła, kodeka wideo i HDR/Dolby Vision."
   "Pesi per codec audio, canali e audio a oggetti.": "Wagi dla kodeków audio, kanałów i dźwięku obiektowego."
   "Correzioni e soglie che decidono quando una release migliore sostituisce quella archiviata.": "Poprawki i progi decydujące, kiedy lepsze wydanie zastępuje zarchiwizowane."
+  "HDR / Dolby Vision": "HDR / Dolby Vision"
+  "Correzioni": "Poprawki"
+  "Soglie e pulizia": "Progi i czyszczenie"
+  "Altre impostazioni": "Inne ustawienia"

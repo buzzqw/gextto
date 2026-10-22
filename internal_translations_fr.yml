@@ -5976,3 +5976,7 @@ fra:
   "Pesi per risoluzione, sorgente, codec video e HDR/Dolby Vision.": "Poids pour la résolution, la source, le codec vidéo et HDR/Dolby Vision."
   "Pesi per codec audio, canali e audio a oggetti.": "Poids pour les codecs audio, les canaux et l’audio à objets."
   "Correzioni e soglie che decidono quando una release migliore sostituisce quella archiviata.": "Corrections et seuils qui décident quand une meilleure version remplace celle archivée."
+  "HDR / Dolby Vision": "HDR / Dolby Vision"
+  "Correzioni": "Corrections"
+  "Soglie e pulizia": "Seuils et nettoyage"
+  "Altre impostazioni": "Autres réglages"

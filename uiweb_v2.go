@@ -2220,6 +2220,7 @@ type v2SettingGroup struct {
 	Summary     string
 	SummaryWarn bool
 	Fields      []v2Field
+	Subgroups   []v2SettingSubgroup
 	Buttons     []v2Button
 	Links       []v2Link
 	Grid        bool
@@ -2228,6 +2229,14 @@ type v2SettingGroup struct {
 	Inactive bool
 	// ID is the anchor of the panel, used by the section's group index.
 	ID string
+}
+
+// v2SettingSubgroup is a titled block inside a v2SettingGroup.
+type v2SettingSubgroup struct {
+	Title  string
+	Hint   string
+	Fields []v2Field
+	Grid   bool
 }
 
 // v2Link is one external link shown under a settings group (documentation on
@@ -2400,6 +2409,13 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 				continue
 			}
 			converted.Fields = append(converted.Fields, v2Field{uiSettingField: field})
+		}
+		for _, subgroup := range group.Subgroups {
+			convertedSubgroup := v2SettingSubgroup{Title: subgroup.Title, Hint: subgroup.Hint, Grid: subgroup.Grid}
+			for _, field := range subgroup.Fields {
+				convertedSubgroup.Fields = append(convertedSubgroup.Fields, v2Field{uiSettingField: field})
+			}
+			converted.Subgroups = append(converted.Subgroups, convertedSubgroup)
 		}
 		if allDisabled {
 			converted.Collapsed, converted.Inactive = true, true

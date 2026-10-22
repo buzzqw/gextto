@@ -248,10 +248,21 @@ type uiRenameToken struct {
 
 // uiSettingGroup is one titled block of settings rows. rextto groups the fields
 // of a tab into labelled panels instead of a grid of cards.
-type uiSettingGroup struct {
+// uiSettingSubgroup is a titled block inside a macro-card. It is used by the
+// score editor to keep resolution, codec, source, audio groups and upgrade
+// thresholds readable inside the Video, Audio and Upgrade cards.
+type uiSettingSubgroup struct {
 	Title  string
 	Hint   string
 	Fields []uiSettingField
+	Grid   bool
+}
+
+type uiSettingGroup struct {
+	Title     string
+	Hint      string
+	Fields    []uiSettingField
+	Subgroups []uiSettingSubgroup
 	// Buttons are optional API actions rendered inside the group panel (the
 	// qBittorrent-nox tile, for example).
 	Buttons []uiActionButton
@@ -777,10 +788,14 @@ func uiSettingsGroups(tab string, fields []uiSettingField) []uiSettingGroup {
 	groups := make([]uiSettingGroup, 0, len(order))
 	for _, title := range order {
 		group := uiSettingGroup{Title: title, Fields: grouped[title], Collapsed: uiCollapsedSettingGroups[title]}
-		// The score weights read best as a compact two-column grid.
+		// The score weights read best as a compact two-column grid. Each macro
+		// card keeps its logical subgroups (4K/FHD/HD/SD, Codec video, Sorgente,
+		// HDR/DV; audio codec groups; thresholds/corrections) so collapsing the
+		// page into macro-cards does not hide the previous grouping.
 		if tab == "scores" && len(grouped[title]) > 0 {
 			_, group.Grid = uiScoreGroupTitle(grouped[title][0].Key)
 			group.Hint = uiScoreGroupHint(title)
+			group.Subgroups = uiScoreSubgroups(grouped[title])
 		}
 		groups = append(groups, group)
 	}
@@ -901,6 +916,63 @@ func uiScoreGroupTitle(key string) (string, bool) {
 		return "Gruppi custom", true
 	}
 	return "", false
+}
+
+// uiScoreSubgroups groups the fields of one score macro-card into the titled
+// blocks shown inside it, preserving field order.
+func uiScoreSubgroups(fields []uiSettingField) []uiSettingSubgroup {
+	order := []string{}
+	grouped := map[string][]uiSettingField{}
+	for _, field := range fields {
+		title := uiScoreSubgroupTitle(field.Key)
+		if _, ok := grouped[title]; !ok {
+			order = append(order, title)
+		}
+		grouped[title] = append(grouped[title], field)
+	}
+	subgroups := make([]uiSettingSubgroup, 0, len(order))
+	for _, title := range order {
+		subgroups = append(subgroups, uiSettingSubgroup{Title: title, Fields: grouped[title], Grid: true})
+	}
+	return subgroups
+}
+
+// uiScoreSubgroupTitle maps a score key to the block inside its macro-card.
+func uiScoreSubgroupTitle(key string) string {
+	lowered := strings.ToLower(key)
+	switch {
+	case lowered == "score_res_2160p":
+		return "4K"
+	case lowered == "score_res_1080p":
+		return "Full HD"
+	case lowered == "score_res_720p":
+		return "HD"
+	case lowered == "score_res_360p", lowered == "score_res_480p", lowered == "score_res_576p":
+		return "SD"
+	case strings.HasPrefix(lowered, "score_codec_"):
+		return "Codec video"
+	case strings.HasPrefix(lowered, "score_source_"):
+		return "Sorgente"
+	case lowered == "score_bonus_dv", lowered == "score_bonus_hdr":
+		return "HDR / Dolby Vision"
+	case lowered == "score_audio_lossless":
+		return "Lossless"
+	case lowered == "score_audio_high":
+		return "DTS / DD+"
+	case lowered == "score_audio_standard":
+		return "AC3 / 5.1"
+	case lowered == "score_audio_compressed":
+		return "AAC / Opus"
+	case lowered == "score_audio_mp3":
+		return "MP3"
+	case lowered == "score_audio_objects", strings.HasPrefix(lowered, "score_channels_"):
+		return "Canali e oggetti"
+	case lowered == "score_bonus_proper", lowered == "score_bonus_repack", lowered == "score_bonus_real":
+		return "Correzioni"
+	case strings.HasPrefix(lowered, "upgrade_"), lowered == "cleanup_upgrades":
+		return "Soglie e pulizia"
+	}
+	return "Altre impostazioni"
 }
 
 // uiScoreGroupHint explains the three macro-cards of the score editor.

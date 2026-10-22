@@ -5320,3 +5320,7 @@ eng:
   "Pesi per risoluzione, sorgente, codec video e HDR/Dolby Vision.": "Weights for resolution, source, video codec and HDR/Dolby Vision."
   "Pesi per codec audio, canali e audio a oggetti.": "Weights for audio codecs, channels and object audio."
   "Correzioni e soglie che decidono quando una release migliore sostituisce quella archiviata.": "Corrections and thresholds that decide when a better release replaces the archived one."
+  "HDR / Dolby Vision": "HDR / Dolby Vision"
+  "Correzioni": "Corrections"
+  "Soglie e pulizia": "Thresholds and cleanup"
+  "Altre impostazioni": "Other settings"

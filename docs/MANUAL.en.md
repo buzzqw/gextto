@@ -1006,8 +1006,8 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   card per group: Lossless (TrueHD, DTS-HD, FLAC, PCM), DTS/DD+ (including
   DTS-HD HRA), AC3/5.1, AAC/Opus and MP3; channels and Atmos/DTS:X live in a
   same Audio card. Video weights live in one **Video** card (4K, Full HD, HD,
-  SD, source, codec and HDR/DV); **Upgrade and replacement** holds thresholds,
-  corrections and cleanup. The audio total stays below the upgrade threshold, so audio contributes
+  SD, Video codec, Source and HDR/DV subgroups; **Upgrade and replacement**
+  holds corrections, thresholds and cleanup in its own subgroups. The audio total stays below the upgrade threshold, so audio contributes
   to the comparison but does not download another release by itself. Audio language is a per-title eligibility requirement, not a fixed
   Italian bonus, so English can be preferred instead. Preferred subtitles add a small optional bonus without
   making a release mandatory. One effective score is used for acquisition,

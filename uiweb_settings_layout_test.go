@@ -274,3 +274,32 @@ func TestSettingsSearchCoversScoresAndEditors(t *testing.T) {
 		t.Fatalf("old wording must still find the setting: %s", body)
 	}
 }
+
+func TestScoreMacroCardsKeepTheirSubgroups(t *testing.T) {
+	fields := []uiSettingField{
+		{Key: "score_res_2160p"}, {Key: "score_res_1080p"}, {Key: "score_res_360p"},
+		{Key: "score_codec_h265"}, {Key: "score_source_webdl"}, {Key: "score_bonus_dv"},
+		{Key: "score_audio_lossless"}, {Key: "score_audio_high"}, {Key: "score_channels_5.1"},
+		{Key: "score_bonus_proper"}, {Key: "upgrade_min_score_diff"}, {Key: "cleanup_upgrades"},
+	}
+	groups := uiSettingsGroups("scores", fields)
+	want := map[string][]string{
+		"Video":                  {"4K", "Full HD", "SD", "Codec video", "Sorgente", "HDR / Dolby Vision"},
+		"Audio":                  {"Lossless", "DTS / DD+", "Canali e oggetti"},
+		"Upgrade e sostituzione": {"Correzioni", "Soglie e pulizia"},
+	}
+	for _, group := range groups {
+		expected, ok := want[group.Title]
+		if !ok {
+			continue
+		}
+		if len(group.Subgroups) != len(expected) {
+			t.Fatalf("%s subgroups = %d, want %d (%v)", group.Title, len(group.Subgroups), len(expected), group.Subgroups)
+		}
+		for i, title := range expected {
+			if group.Subgroups[i].Title != title {
+				t.Errorf("%s subgroup %d = %q, want %q", group.Title, i, group.Subgroups[i].Title, title)
+			}
+		}
+	}
+}
