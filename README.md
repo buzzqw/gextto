@@ -37,7 +37,10 @@ one.
 - The engine is our own Go code: BitTorrent v1, v2 and hybrid, TCP and uTP on
   one port, holepunching, IPv6 DHT, streaming. On a real Ubuntu swarm it
   downloads at 9.3–9.4 MB/s where libtorrent gets 6.3–7.1 MB/s, and it idles at
-  60–64 MB. The same binary is [gx-torrent](https://github.com/buzzqw/gextto/releases), a
+  60–64 MB. Those figures were measured on an **FTTC line (100 Mbit/s down,
+  15 Mbit/s up)**: the line was the limit, not the engine. On FTTH the line no
+  longer caps the same setup, so 9.3–9.4 MB/s is not an engine ceiling. The same
+  binary is [gx-torrent](https://github.com/buzzqw/gextto/releases), a
   standalone client for Linux and Windows.
 - Queue, cache and bandwidth follow the machine and the line. On Auto the whole
   line is Gextto's while nobody else needs it, and it gives way when someone
@@ -47,7 +50,7 @@ one.
 
 | | |
 |---|---|
-| **Speed** | 9.3–9.4 MB/s on a real Ubuntu swarm, against 6.3–7.1 MB/s for libtorrent on the same swarm |
+| **Speed** | 9.3–9.4 MB/s on a real Ubuntu swarm over FTTC 100/15, against 6.3–7.1 MB/s for libtorrent on the same swarm |
 | **Footprint** | 60–64 MB and 1–2 % of a core idle; 44–48 % of one Intel N97 core at 8–9 MB/s |
 | **Protocol** | BitTorrent v1, v2 and hybrid (BEP 52) · 34 BEPs implemented and tested ([list](docs/bep.md)) |
 | **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP proxy · VPN killswitch |

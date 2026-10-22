@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 22 ottobre 2026
 
+- **Identità client: ora si sceglie da una tendina.** In **Configurazione → Motore torrent** il campo dell'identità annunciata da gx-torrent mostra i preset (`gx-core`, qBittorrent, Transmission, Rain, anacrolix/torrent) in un menu a discesa, non più come testo libero; la versione resta un campo separato.
+
 - **eD2k rispetta sposta/copia.** Anche i download completati con aMule seguono l'opzione **Sposta gli episodi/pack in archivio**: con l'opzione attiva il file viene spostato in libreria e rimosso dalla cartella di arrivo (aMule smette di condividerlo), con l'opzione spenta viene copiato o collegato e resta nella cartella di arrivo per la condivisione. Per eD2k lo spostamento avviene al completamento, perché il seeding è gestito da aMule e Gextto non ha un fine seed da attendere.
 
 - **Docker: tutto lo stack in un comando.** Il nuovo `docker-full/docker-compose.yml` avvia Gextto con `gx-torrent`, Jackett, Prowlarr, FlareSolverr e aMule, con cartelle, porte e permessi già predisposti. L'immagine compila Gextto e `gx-torrent` dal checkout; la guida in italiano e inglese spiega prima configurazione, indexer, eD2k, aggiornamento, backup e problemi comuni. L'identità del client è stata verificata con qBittorrent 5.3.0 e Transmission 4.1.3 reali in Docker: vedono `gx-core 1.1.252` per default e `qBittorrent 5.2.3` con il preset.

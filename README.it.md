@@ -38,8 +38,12 @@ altro.
 - Il motore è codice Go nostro: BitTorrent v1, v2 e ibrido, TCP e uTP su una
   porta, holepunching, DHT IPv6, streaming. Su uno swarm reale di Ubuntu scarica
   a 9,3–9,4 MB/s dove libtorrent arriva a 6,3–7,1 MB/s, e a riposo occupa
-  60–64 MB. Lo stesso binario è [gx-torrent](https://github.com/buzzqw/gextto/releases), un
-  client autonomo per Linux e Windows.
+  60–64 MB. Quei numeri sono stati misurati su una **linea FTTC (100 Mbit/s in
+  download, 15 Mbit/s in upload)**: il limite era la linea, non il motore. Con
+  una FTTH la stessa configurazione non è più limitata dalla linea, quindi
+  9,3–9,4 MB/s non è il tetto del motore. Lo stesso binario è
+  [gx-torrent](https://github.com/buzzqw/gextto/releases), un client autonomo
+  per Linux e Windows.
 - Coda, cache e banda seguono la macchina e la linea. Su Auto la linea è tutta
   di Gextto finché nessun altro ne ha bisogno, e la cede quando serve.
 
@@ -47,7 +51,7 @@ altro.
 
 | | |
 |---|---|
-| **Velocità** | 9,3–9,4 MB/s su uno swarm reale di Ubuntu, contro 6,3–7,1 MB/s di libtorrent sullo stesso swarm |
+| **Velocità** | 9,3–9,4 MB/s su uno swarm reale di Ubuntu su FTTC 100/15, contro 6,3–7,1 MB/s di libtorrent sullo stesso swarm |
 | **Consumi** | 60–64 MB e 1–2 % di un core a riposo; 44–48 % di un core Intel N97 a 8–9 MB/s |
 | **Protocollo** | BitTorrent v1, v2 e ibrido (BEP 52) · 34 BEP implementati e testati ([elenco](docs/bep.md)) |
 | **Rete** | TCP + uTP su una porta · UPnP, NAT-PMP, PCP · holepunching BEP 55 · proxy SOCKS5/HTTP · killswitch VPN |

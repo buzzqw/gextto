@@ -30,8 +30,9 @@ var i18nAllowlist = map[string]bool{
 	"LimeTorrents": true, "Nyaa": true, "TorrentsCSV": true, "Torrentz2": true,
 	// Product tagline (the expansion of the name, same in every language).
 	"EXpert Torrent Transfer Orchestrator": true,
-	// Notification providers and signature label.
+	// Notification providers, client presets and signature label.
 	"Discord": true, "Gotify": true, "Pushover": true, "Slack": true,
+	"qBittorrent": true, "Transmission": true, "Rain": true,
 	"Gextto (JSON firmato)": true,
 	// Prometheus-style name filters: bracketed language/kind tags.
 	"[arabo]": true, "[cirillico]": true, "[cjk]": true, "[ebraico]": true,

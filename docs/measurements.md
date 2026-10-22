@@ -87,7 +87,7 @@ with the live service or a standalone instance as stated.
 | Latency guard | alone **8,503 KiB/s kept**; with a competing download the other device gets **+55 % (router counters)** or **+66 % (trials only)** | 1794 | `TestMeasureLatencyGuard` |
 | Merge on real data | **25.0 % from the network** (Debian and Arch ISOs), also after a restart and in any add order | — | `TestMeasureMergePhase3` |
 | DHT | **1,290 nodes in ~80 s**, 314/1,432 queries answered (21.9 %), peers found for a real infohash | — | `make measure-dht` |
-| Real swarm throughput | **9.3–9.4 MB/s** on the Ubuntu ISO, against 6.3–7.1 MB/s of libtorrent on the same swarm (one campaign) | — | `make measure-realswarm` |
+| Real swarm throughput | **9.3–9.4 MB/s** on the Ubuntu ISO over an FTTC 100/15 line (100 Mbit/s down, 15 Mbit/s up), against 6.3–7.1 MB/s of libtorrent on the same swarm (one campaign) | — | `make measure-realswarm` |
 | Web UI rows | **9,831 B per tick**, ~1.7 KB per row | — | `/ui/rows` on the live page |
 | Web UI transfer (2026-10-21, build 1945) | dashboard **33.3 KB → 8.0 KB**, downloads **70.7 KB → 12.3 KB**, archive **473.2 KB → 38.8 KB**, maintenance **118.7 KB → 17.2 KB** gzipped; CSS+JS **285.2 KB → 75.3 KB** and cached immutable (repeat request **304, 0 bytes**) | 1945 | N97, live service: `curl -H 'Accept-Encoding: gzip' -w '%{size_download}' 'http://127.0.0.1:5000/?view=archive'`; asset revalidation with `If-None-Match` |
 | Prometheus scrape | **~0.24 ms, 121 KB, 813 allocs** per scrape | 232 | `BenchmarkMetricsScrape` |
@@ -327,7 +327,7 @@ block, **6,745 KiB/s** at the default depth, and **161.6 / 161.9 / 162.4 MB/s**
 on the loopback swarm at shallow/default/deep depth; the loopback pair is at the
 local ceiling and does not rank the queue depth.
 
-Real swarm (Ubuntu 24.04.3, the same machine, 40 s window): gx-core **9.3–9.4 MiB/s**
+Real swarm (Ubuntu 24.04.3, the same machine, 40 s window, FTTC 100/15 line): gx-core **9.3–9.4 MiB/s**
 against libtorrent 2.0.11 at 6.3–7.1 MiB/s, metadata in 3 s and comparable peer counts.
 `make measure-realswarm`: 276 MB in 90 s (75 peers), 793 MB in 180 s (80 peers), 1.08 GB
 in 180 s (85 peers), `utp_syn_drops` 0 everywhere.
