@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	bencode "github.com/jackpal/bencode-go"
@@ -15,7 +16,20 @@ import (
 
 // searchRetryPeriod re-queries a node after this silence: answers freshness
 // for both pending and past queries in wasContactedRecently.
-var searchRetryPeriod = 15 * time.Second
+// It is read by every DHT goroutine, hence atomic.
+var searchRetryPeriodNanos atomic.Int64
+
+func init() { searchRetryPeriodNanos.Store(int64(15 * time.Second)) }
+
+func searchRetryPeriod() time.Duration { return time.Duration(searchRetryPeriodNanos.Load()) }
+
+// SetSearchRetryPeriod changes how long a node stays unqueried before it is
+// asked again (15 s by default) and returns the previous value. It is meant
+// for tests on the loopback, where every answer is immediate; it applies to
+// every DHT in the process.
+func SetSearchRetryPeriod(period time.Duration) time.Duration {
+	return time.Duration(searchRetryPeriodNanos.Swap(int64(period)))
+}
 
 // remoteNode is one DHT contact: address, id, in-flight and answered
 // queries, reachability, downloads it announced, and the anti-Sybil
@@ -127,7 +141,7 @@ func (r *remoteNode) wasContactedRecently(ih InfoHash) bool {
 	if len(r.pendingQueries) == 0 && len(r.pastQueries) == 0 {
 		return false
 	}
-	if !r.lastResponseTime.IsZero() && time.Since(r.lastResponseTime) > searchRetryPeriod {
+	if !r.lastResponseTime.IsZero() && time.Since(r.lastResponseTime) > searchRetryPeriod() {
 		return false
 	}
 	for _, q := range r.pendingQueries {
@@ -135,7 +149,7 @@ func (r *remoteNode) wasContactedRecently(ih InfoHash) bool {
 			return true
 		}
 	}
-	if !r.lastSearchTime.IsZero() && time.Since(r.lastSearchTime) > searchRetryPeriod {
+	if !r.lastSearchTime.IsZero() && time.Since(r.lastSearchTime) > searchRetryPeriod() {
 		return false
 	}
 	for _, q := range r.pastQueries {

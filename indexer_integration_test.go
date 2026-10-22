@@ -262,7 +262,13 @@ func TestSlowIndexerDoesNotBlockTheSearch(t *testing.T) {
 	}))
 	defer fast.Close()
 	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(1 * time.Second)
+		// Slower than the 200 ms timeout below, but returning as soon as the
+		// client gives up: Close waits for running handlers.
+		select {
+		case <-time.After(time.Second):
+		case <-r.Context().Done():
+			return
+		}
 		_, _ = io.WriteString(w, `<rss><channel></channel></rss>`)
 	}))
 	defer slow.Close()

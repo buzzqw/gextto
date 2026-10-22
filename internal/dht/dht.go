@@ -1000,7 +1000,7 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 		// Allow searching this node immediately, since it's telling us
 		// it has an infohash. Enables faster upgrade of other nodes to
 		// "peer" of an infohash, if the announcement is valid.
-		node.lastResponseTime = time.Now().Add(-searchRetryPeriod)
+		node.lastResponseTime = time.Now().Add(-searchRetryPeriod())
 		localPort := d.peerStore.hasLocalDownload(ih)
 		if localPort != 0 {
 			d.PeersRequestResults <- map[InfoHash][]string{ih: {encodeCompactPeerAddr(peerAddr.String())}}

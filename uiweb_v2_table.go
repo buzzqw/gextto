@@ -11,9 +11,9 @@ package gextto
 // without duplicating data access.
 
 import (
-	"fmt"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	stdhtml "html"
 	"html/template"
 	"io"

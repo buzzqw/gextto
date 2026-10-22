@@ -384,6 +384,9 @@ func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedP
 	return process, nil
 }
 
+// gxAdoptedPollInterval is how often an adopted daemon's pid is checked.
+var gxAdoptedPollInterval = 2 * time.Second
+
 // adoptGxProcess follows a daemon started by a previous Gextto run: it is not
 // a child of this process, so its exit is detected by polling the pid.
 func adoptGxProcess(pid int) *gxManagedProcess {
@@ -391,7 +394,7 @@ func adoptGxProcess(pid int) *gxManagedProcess {
 	go func() {
 		defer recoverGoroutine("gx-torrent adopted process watch")
 		for gxPidAlive(pid) {
-			time.Sleep(2 * time.Second)
+			time.Sleep(gxAdoptedPollInterval)
 		}
 		process.done <- errors.New("exited")
 		close(process.done)

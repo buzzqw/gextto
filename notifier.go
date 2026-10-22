@@ -30,6 +30,14 @@ import (
 	"github.com/buzzqw/gextto/internal/messages"
 )
 
+// The pacing of the notifications: the retry back-off unit (retries wait 1,
+// then 2 units) and the least gap between two Telegram messages (its rate
+// limit). The tests shorten them.
+var (
+	notifierRetryUnit = time.Second
+	telegramMinGap    = time.Second
+)
+
 // Notifier delivers notifications over Telegram, an HTTP webhook and SMTP,
 // and dispatches the configured external event hooks. It is a faithful implementation of
 // gextto's `notifier::Notifier`.
@@ -234,7 +242,7 @@ func (n *Notifier) NotifyBackupDocument(path, caption string) (int, error) {
 		partName := telegramBackupPartName(filename, index, total)
 		sendErr := n.sendTelegramDocument(partName, partCaption, buffer[:read])
 		for attempt := 0; sendErr != nil && attempt < 2; attempt++ {
-			time.Sleep(time.Duration(uint64(2)<<uint(attempt)) * time.Second)
+			time.Sleep(time.Duration(uint64(2)<<uint(attempt)) * notifierRetryUnit)
 			sendErr = n.sendTelegramDocument(partName, partCaption, buffer[:read])
 		}
 		if sendErr != nil {
@@ -324,7 +332,7 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 					break
 				}
 				// Back off before retrying (1 s, then 2 s), like the webhook.
-				time.Sleep(time.Duration(uint64(1)<<uint(attempt)) * time.Second)
+				time.Sleep(time.Duration(uint64(1)<<uint(attempt)) * notifierRetryUnit)
 				result = send()
 			}
 			if result != nil {
@@ -346,7 +354,7 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 			if result == nil {
 				break
 			}
-			time.Sleep(time.Duration(uint64(1)<<uint(attempt)) * time.Second)
+			time.Sleep(time.Duration(uint64(1)<<uint(attempt)) * notifierRetryUnit)
 			result = send()
 		}
 		if result != nil && firstError == nil {
@@ -459,8 +467,8 @@ func (n *Notifier) throttleTelegram() {
 	now := time.Now()
 	if n.lastTelegram.last != nil {
 		elapsed := now.Sub(*n.lastTelegram.last)
-		if elapsed < time.Second {
-			time.Sleep(time.Second - elapsed)
+		if elapsed < telegramMinGap {
+			time.Sleep(telegramMinGap - elapsed)
 		}
 	}
 	n.lastTelegram.last = &now

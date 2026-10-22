@@ -43,6 +43,10 @@ func defaultEventHookEnabled() bool { return true }
 
 func defaultEventHookTimeoutSecs() uint64 { return 60 }
 
+// hookTimeoutUnit is what one unit of TimeoutSecs lasts: a second; the tests
+// of the timeout shorten it.
+var hookTimeoutUnit = time.Second
+
 // EventHook is one external program bound to a set of events.
 type EventHook struct {
 	Name string `json:"name"`
@@ -538,7 +542,7 @@ func RunHook(hook EventHook, event string, payload map[string]any) (HookRun, err
 	if timeoutSecs > 86_400 {
 		timeoutSecs = 86_400
 	}
-	timeout := time.Duration(timeoutSecs) * time.Second
+	timeout := time.Duration(timeoutSecs) * hookTimeoutUnit
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

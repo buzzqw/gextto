@@ -203,6 +203,11 @@ depend on another having run before it in the same process, and a slow test
 that only waits (a timeout, a retry, a poll) should get its wait shortened
 through a package variable the test sets, as the eD2k search timing does
 (`ed2kMinSearchWait`, `ed2kMaxSearchWait`, `ed2kSearchPoll`, `ed2kSearchRetry`).
+The pacing waits that every test should skip (retry back-offs, per-host gaps,
+polls) are shortened once in `main_test.go` (`TestMain`) of the root package
+and of `cmd/gx-torrent`; a test about one of those waits sets the variable
+itself. `make test-ui` runs three groups (three daemons and three Chromium):
+the mini PC it runs on does not take more.
 
 The end-to-end suite is under `uiweb/end2end` (Playwright + Node). `make test-ui`
 builds the daemon, starts it in dry-run on its own port, completes the first-run

@@ -79,7 +79,9 @@ func ed2kTestCore(t *testing.T, extra map[string]string) (*amuletest.Core, *Conf
 	minWait, maxWait, poll, retry := ed2kMinSearchWait, ed2kMaxSearchWait, ed2kSearchPoll, ed2kSearchRetry
 	ed2kMinSearchWait, ed2kMaxSearchWait = 100*time.Millisecond, 300*time.Millisecond
 	ed2kSearchPoll, ed2kSearchRetry = 10*time.Millisecond, 20*time.Millisecond
-	t.Cleanup(func() { ed2kMinSearchWait, ed2kMaxSearchWait, ed2kSearchPoll, ed2kSearchRetry = minWait, maxWait, poll, retry })
+	t.Cleanup(func() {
+		ed2kMinSearchWait, ed2kMaxSearchWait, ed2kSearchPoll, ed2kSearchRetry = minWait, maxWait, poll, retry
+	})
 	return core, cfg
 }
 

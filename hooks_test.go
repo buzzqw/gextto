@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHookEnvDoesNotLeakDaemonSecrets(t *testing.T) {
@@ -348,6 +349,9 @@ func TestRunHookEnforcesTimeout(t *testing.T) {
 	hook.Program = shell
 	hook.Args = script
 	hook.TimeoutSecs = 1
+	unit := hookTimeoutUnit
+	hookTimeoutUnit = 100 * time.Millisecond
+	defer func() { hookTimeoutUnit = unit }()
 
 	_, err := RunHook(hook, "message", map[string]any{})
 	if err == nil {

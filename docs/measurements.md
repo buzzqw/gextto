@@ -757,6 +757,24 @@ for the ones that are downloaded.
 | --- | --- |
 | `make test-serial` (plain `go test ./...`, root package serial) | 65 s, root package 59.7 s |
 | `make test` (root package in 4 processes, `scripts/go-test-sharded.sh`) | 22–24 s (35 s with the test binary rebuilt) |
+| `make test`, waits shortened in the tests (`TestMain`, below), no test cache | 27 s (`make test-serial`: 34 s) |
+| `make test`, same, warm test cache | 15 s |
+| `make test-ui`, 2 groups → 3 groups (3 Chromium) | about 75 s → 63–72 s |
+
+The waits that only pace real servers are package variables that `TestMain`
+shortens in the root package (feed retries and per-host gap, rate-limit penalty,
+notifier retries and Telegram gap, TMDB and comic retries, adopted gx-torrent
+poll) and in `cmd/gx-torrent` (`feedHostGap`). Per package, with no cache: root
+60 s → 28 s serial; `cmd/gx-torrent` 34 s → 18 s; `internal/gxcore/torrent`
+18 s → 0.9 s (the IPv6 DHT test waited the 15 s DHT re-query period; the test now
+sets it to 100 ms with `dht.SetSearchRetryPeriod`). A route test went from 6.8 s
+to 0.6 s once each route was registered once: every `Router()` call appended the
+whole list again. `cmd/gx-torrent` stays in one process: its tests share fixed
+port ranges.
+
+The DHT re-query period became an atomic read; `wasContactedRecently`, 5 runs
+of 2,000,000 calls on the N97: before 92.2–98.4 ns/op (median 92.9), after
+91.2–101.2 ns/op (median 93.4), 0 allocations both — unchanged.
 
 The root package holds 1,284 tests; run serially they spent half their time waiting
 (CPU 52 s for 100 s of wall time under `nice` and `GOMAXPROCS=2`). 25 tests over 1 s

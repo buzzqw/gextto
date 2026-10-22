@@ -609,8 +609,13 @@ type HandlerFunc func(w http.ResponseWriter, r *http.Request, s *AppState)
 const maxRequestBodyBytes = 16 << 20 // 16 MiB
 
 func handle(s *AppState, mux *http.ServeMux, pattern string, fn HandlerFunc) {
+	// Every Router call registers its routes again (the tests build hundreds
+	// of routers): each pattern is listed once.
 	routeMu.Lock()
-	registeredRouteList = append(registeredRouteList, pattern)
+	if !registeredRouteSet[pattern] {
+		registeredRouteSet[pattern] = true
+		registeredRouteList = append(registeredRouteList, pattern)
+	}
 	routeMu.Unlock()
 	core := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil {
@@ -634,6 +639,7 @@ func RegisteredRoutes() []string {
 var (
 	routeMu             sync.Mutex
 	registeredRouteList []string
+	registeredRouteSet  = map[string]bool{}
 )
 
 // jsonResponse writes value as a 200 application/json response.

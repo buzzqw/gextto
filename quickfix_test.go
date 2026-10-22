@@ -49,6 +49,10 @@ func TestHookTimeoutKillsChildren(t *testing.T) {
 	// The child keeps stdout open after the shell itself is killed.
 	hook.Args = `-c "sleep 30 & sleep 30"`
 	hook.TimeoutSecs = 1
+	// One timeout unit of 100 ms: the test is about the kill, not the wait.
+	unit := hookTimeoutUnit
+	hookTimeoutUnit = 100 * time.Millisecond
+	defer func() { hookTimeoutUnit = unit }()
 	started := time.Now()
 	if _, err := RunHook(hook, "download_started", map[string]any{}); err == nil {
 		t.Fatal("expected a timeout error")
@@ -76,7 +80,7 @@ func TestNotificationErrorsHideTokens(t *testing.T) {
 func TestSMTPTimeoutOnSilentServer(t *testing.T) {
 	// 10.255.255.1 is a non-routable address: the dial hangs until the timeout.
 	started := time.Now()
-	err := sendMailWithTimeout("10.255.255.1:25", "10.255.255.1", nil, "a@b", []string{"c@d"}, []byte("x"), time.Second)
+	err := sendMailWithTimeout("10.255.255.1:25", "10.255.255.1", nil, "a@b", []string{"c@d"}, []byte("x"), 100*time.Millisecond)
 	if err == nil {
 		t.Fatal("expected an error")
 	}

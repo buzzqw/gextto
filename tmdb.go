@@ -19,6 +19,10 @@ import (
 // package-level var so tests can point it at an httptest server.
 var tmdbAPIBaseURL = "https://api.themoviedb.org/3"
 
+// tmdbRetryUnit is the back-off step between TMDB retries (250 ms, then
+// 500 ms…); the tests shorten it.
+var tmdbRetryUnit = 250 * time.Millisecond
+
 // TmdbImageBaseURL is the TMDB image CDN prefix. Callers append a size segment
 // (for example "w154") and the poster path, exactly as the web module did with
 // "https://image.tmdb.org/t/p/w154{path}".
@@ -278,7 +282,7 @@ func tmdbRetryWait(ctx context.Context, attempt int) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-time.After(time.Duration(250*(attempt+1)) * time.Millisecond):
+	case <-time.After(time.Duration(attempt+1) * tmdbRetryUnit):
 		return nil
 	}
 }

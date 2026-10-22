@@ -517,7 +517,9 @@ func host_semaphore(rawURL string) chan struct{} {
 // Minimum spacing between request starts to the same host. Concurrency alone is
 // not enough: torrentgalaxy answers `429` when a burst of parallel requests
 // arrives. 250 ms caps the host at 4 req/s.
-const HOST_MIN_INTERVAL = 250 * time.Millisecond
+// hostMinInterval is the least gap between two requests to the same site
+// (250 ms); the tests shorten it.
+var hostMinInterval = 250 * time.Millisecond
 
 var (
 	hostLastRequestMu sync.Mutex
@@ -535,8 +537,8 @@ func throttle_host(ctx context.Context, rawURL string) {
 		var wait time.Duration
 		hostLastRequestMu.Lock()
 		now := time.Now()
-		if previous, ok := hostLastRequest[domain]; ok && previous.Add(HOST_MIN_INTERVAL).After(now) {
-			wait = previous.Add(HOST_MIN_INTERVAL).Sub(now)
+		if previous, ok := hostLastRequest[domain]; ok && previous.Add(hostMinInterval).After(now) {
+			wait = previous.Add(hostMinInterval).Sub(now)
 		} else {
 			hostLastRequest[domain] = now
 		}
@@ -1024,6 +1026,13 @@ func flaresolverr_or(ctx context.Context, client *http.Client, flaresolverr, raw
 // si può riscaricare.
 const FEED_FETCH_ATTEMPTS = 3
 
+// The pacing of feed fetches: the retry back-off unit (1, then 2 units) and
+// the pause imposed on a site that answered 429. The tests shorten them.
+var (
+	feedRetryUnit        = time.Second
+	feedRateLimitPenalty = 2 * time.Second
+)
+
 // Timeout del singolo tentativo.
 const FEED_FETCH_TIMEOUT = 20 * time.Second
 
@@ -1101,7 +1110,7 @@ func fetch_body_direct(ctx context.Context, client *http.Client, rawURL string, 
 		return fetchAttempt{kind: fetchAttemptCloudflare, value: fmt.Sprintf("direct status %d", status)}
 	}
 	if status == 429 {
-		penalize_host(rawURL, 2*time.Second)
+		penalize_host(rawURL, feedRateLimitPenalty)
 		logging.Warn("⚠️ A feed site asked to slow down (too many requests); it will be read again later", "feed_url", rawURL)
 		return fetchAttempt{kind: fetchAttemptTransient, value: fmt.Sprintf("HTTP %d", status)}
 	}
@@ -1205,7 +1214,7 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 					"error", lastTransient,
 				)
 				select {
-				case <-time.After(time.Duration(attempt) * time.Second):
+				case <-time.After(time.Duration(attempt) * feedRetryUnit):
 				case <-ctx.Done():
 				}
 			}

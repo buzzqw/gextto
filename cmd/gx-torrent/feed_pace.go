@@ -16,9 +16,11 @@ import (
 	"time"
 )
 
+// feedHostGap is the minimum gap between two requests to the same host; the
+// tests shorten it.
+var feedHostGap = 2 * time.Second
+
 const (
-	// feedHostGap is the minimum gap between two requests to the same host.
-	feedHostGap = 2 * time.Second
 	// feedHostCooldown is how long a host is left alone after it answers 429:
 	// long enough for the site's window to pass, short enough that a feed is not
 	// left stale for a whole polling interval.

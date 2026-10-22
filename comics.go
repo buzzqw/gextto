@@ -35,6 +35,10 @@ import (
 	"github.com/buzzqw/gextto/internal/utils"
 )
 
+// comicsRetryUnit paces the comic download retries (2, then 4 units); the
+// tests shorten it.
+var comicsRetryUnit = time.Second
+
 // ComicMonitored is one monitored GetComics tag or post.
 type ComicMonitored struct {
 	ID                    int64   `json:"id"`
@@ -1276,7 +1280,7 @@ func downloadHTTPRegistered(client *http.Client, rawURL, targetDir, title, id st
 		}
 		if attempt < comicsHTTPDownloadAttempts {
 			logging.Warn("comic download attempt failed; retrying", "attempt", attempt, "error", wrapped)
-			time.Sleep(time.Duration(2*attempt) * time.Second)
+			time.Sleep(time.Duration(2*attempt) * comicsRetryUnit)
 		}
 		lastErr = wrapped
 	}

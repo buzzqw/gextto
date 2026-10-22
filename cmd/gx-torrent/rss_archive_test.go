@@ -437,7 +437,8 @@ func TestFeedArchiveRebuildsIndexAndClampsPage(t *testing.T) {
 // slowly must not freeze the daemon (API, page, queue) for the whole wait.
 func TestAddDoesNotHoldTheLockWhileResolving(t *testing.T) {
 	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		time.Sleep(1500 * time.Millisecond)
+		// Still answering when the lock is checked at 300 ms.
+		time.Sleep(800 * time.Millisecond)
 		http.NotFound(w, nil)
 	}))
 	defer slow.Close()

@@ -19,6 +19,11 @@ func TestDHTIPv6AnnounceAndDiscover(t *testing.T) {
 	if !ipv6LoopbackAvailable() {
 		t.Skip("no IPv6 loopback")
 	}
+	// On the loopback every answer is immediate: re-query a node after 100 ms
+	// instead of the 15 s a real network needs, or the second search (the one
+	// that finds the announced peer) waits the full period.
+	previous := dht.SetSearchRetryPeriod(100 * time.Millisecond)
+	t.Cleanup(func() { dht.SetSearchRetryPeriod(previous) })
 	// Both nodes push results on a buffered channel of size 1; a goroutine
 	// drains them so the DHT loop never blocks (and Stop can complete).
 	results := make(chan string, 64)
@@ -91,7 +96,7 @@ func TestDHTIPv6AnnounceAndDiscover(t *testing.T) {
 			if addr := cp.Addr(); addr.IP.Equal(net.ParseIP("::1")) && addr.Port == aPort {
 				return
 			}
-		case <-time.After(2 * time.Second):
+		case <-time.After(200 * time.Millisecond):
 		}
 	}
 	t.Fatal("no IPv6 DHT announce/discovery within the deadline")
