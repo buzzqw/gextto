@@ -162,6 +162,9 @@ qBittorrent-nox.
 | `web_handlers_compat.go` | compatibility/diagnostics endpoints. |
 | `web_handlers_jobs.go`, `web_handlers_torrent_backend.go`, `web_handlers_torrent_diag.go` | specific handlers (jobs, backend, diagnostics). |
 | `web_handlers_series.go`, `web_handlers_torrent_stream.go` | series handlers (`/api/series/{name}`) and redirect to the streaming of the gx-torrent daemon, with the token added server-side. |
+| `quality_profiles.go` | named quality profiles (`/api/quality-profiles`): the saved list with stable ids, the title values a profile gives, the exact match of a title page, and the seed generated from the library until the list is saved. |
+| `api_v3.go` | the Sonarr/Radarr v3 subset a request manager (Jellyseerr) speaks: status, quality/language profiles, root folders, tags, lookup and add of series/movies, queue. |
+| `library_bulk.go` | *Edit selected* of the Series and Movies tables: the same values on many titles, with a quality profile as a template. |
 | `web_torrent_events.go` | event machine of the torrent lifecycle. |
 | `web_background.go` | long-running background workers. |
 | `web_workers_media.go` | media workers: scheduled backup, MediaInfo backfill, calendar. |

@@ -1294,6 +1294,17 @@ func v2ProfileChoices(s *AppState, profiles []QualityProfile) []v2ProfileChoice 
 	return out
 }
 
+// v2EditorAudioLabel is the editor's label of a minimum-audio preset, so a
+// summary says «Lossless 5.1+ (TrueHD / DTS-HD)» instead of the stored value.
+func v2EditorAudioLabel(value string) string {
+	for _, option := range uiAudioPresetOptions {
+		if option.Value == value {
+			return option.Label
+		}
+	}
+	return value
+}
+
 // v2ProfileSummary is the one-line description of what a profile sets.
 func v2ProfileSummary(s *AppState, profile QualityProfile) string {
 	tr := func(italian string) string { return uiText(s, italian) }
@@ -1304,7 +1315,7 @@ func v2ProfileSummary(s *AppState, profile QualityProfile) string {
 		parts = append(parts, tr("qualsiasi qualità"))
 	}
 	if profile.Audio != "" {
-		parts = append(parts, tr("audio")+" "+profile.Audio)
+		parts = append(parts, tr("audio")+" "+tr(v2EditorAudioLabel(profile.Audio)))
 	}
 	language := qualityProfileLanguage(latestConfig(s), profile.Language)
 	parts = append(parts, tr("lingua")+" "+language)
@@ -1332,11 +1343,9 @@ type v2TitleProfiles struct {
 
 func v2TitleProfilesFor(s *AppState, values profileTitleValues) v2TitleProfiles {
 	profiles := ensureQualityProfiles(s)
-	cfg := latestConfig(s)
-	defaultLanguage := "ita"
-	if cfg != nil {
-		defaultLanguage = cfg.DefaultLanguage()
-	}
+	// The same rule as a profile's language: empty means the configured
+	// default (qualityProfileLanguage falls back to «ita»).
+	defaultLanguage := qualityProfileLanguage(latestConfig(s), "")
 	match := matchingQualityProfile(profiles, values, defaultLanguage)
 	view := v2TitleProfiles{Matched: match > 0}
 	for _, profile := range profiles {

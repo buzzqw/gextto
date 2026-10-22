@@ -221,3 +221,43 @@ test("il filtro «Solo modificate» mostra solo le impostazioni cambiate", async
   await expect(rows).toHaveCount(before);
   await expect(page.locator(".settings-group-index")).toBeVisible();
 });
+
+// The profile editor is a real list editor: a row added and saved survives a
+// reload, and a duplicated name is reported instead of losing the row.
+test("i profili di qualità si aggiungono e si rimuovono", async ({ page }) => {
+  await page.goto("/?view=settings&tab=scores");
+  const editor = page.locator("#v2-editor-quality_profiles");
+  await expect(editor).toBeVisible();
+  const names = editor.locator('input[name^="name__"]');
+  const before = await names.count();
+  await editor.getByRole("button", { name: "Aggiungi riga" }).click();
+  await expect(names).toHaveCount(before + 1);
+  await names.last().fill("E2E 1080p");
+  await editor.locator('select[name^="quality__"]').last().selectOption("1080p");
+  await editor.getByRole("button", { name: "Salva", exact: true }).click();
+  await expect(page.locator('input[name^="name__"][value="E2E 1080p"]')).toHaveCount(1);
+
+  // Remove it again, so the shared dry-run data directory is left as found.
+  const row = editor.locator(".list-row").filter({ has: page.locator('input[value="E2E 1080p"]') });
+  await row.getByRole("button", { name: "Rimuovi" }).click();
+  await editor.getByRole("button", { name: "Salva", exact: true }).click();
+  await expect(page.locator('input[value="E2E 1080p"]')).toHaveCount(0);
+});
+
+test("un nome di profilo doppio viene segnalato", async ({ page }) => {
+  await page.goto("/?view=settings&tab=scores");
+  const editor = page.locator("#v2-editor-quality_profiles");
+  const names = editor.locator('input[name^="name__"]');
+  const before = await names.count();
+  await editor.getByRole("button", { name: "Aggiungi riga" }).click();
+  await expect(names).toHaveCount(before + 1);
+  await names.last().fill("E2E Doppio");
+  await editor.getByRole("button", { name: "Aggiungi riga" }).click();
+  await expect(names).toHaveCount(before + 2);
+  await names.last().fill("E2E Doppio");
+  await editor.getByRole("button", { name: "Salva", exact: true }).click();
+  // The save is refused and the reason is shown on the section.
+  await expect(page.locator('.settings-section-head p[role="alert"]')).toContainText("Nome del profilo già usato: E2E Doppio");
+  // Nothing was stored: the rejected rows are not in the saved list.
+  await expect(page.locator('input[value="E2E Doppio"]')).toHaveCount(0);
+});

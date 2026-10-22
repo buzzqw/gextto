@@ -789,15 +789,23 @@ for example moving several movies to `2160p` or pausing several series.
    `720p`.
 2. Press **Edit selected**, next to *Refresh list*: the fields open below.
    Tick only the fields to change
-   (quality, language, subtitles, exclusions), typing the new value. A ticked
-   field left empty is cleared; a field that is not ticked stays as it is in
-   each title. *Upgrades* and *State* change only if you pick something other
-   than "Leave as is".
-3. *Start from a profile* fills the four fields with a profile's values and
-   ticks them: a quick way to apply a profile as a template.
+   (quality, minimum audio, language, subtitles, exclusions), typing the new
+   value. A ticked field left empty is cleared; a field that is not ticked stays
+   as it is in each title. *Allow upgrades* and *State* change only if you pick
+   something other than "Leave as is".
+3. *Start from a profile* copies a profile's quality, minimum audio, language,
+   subtitles, exclusions and upgrades into the fields and ticks them, except the
+   **exclusions**: they belong to each title (on the title page the profile's are
+   added to them), so they stay unticked and are ticked only if you want to
+   replace them with the profile's.
 4. Press **Apply to the selected titles**: the page reloads with the new values
    in the columns. The other values of each title (seasons, folder, aliases…)
    are not touched.
+
+A movie's hard requirements (**Subtitles required**, and the required languages
+where present) follow the value they qualify: changing the language or the
+subtitles with **Edit selected** updates the requirement too, so the title does
+not keep asking for the old one.
 
 The *Posters* view has no checkboxes: switch to *List*. **Refresh list**
 changes nothing: it reloads the table with the filter you typed.
@@ -1176,12 +1184,16 @@ resolutions Gextto recognises (360p … 2160p, a minimum with «+», the 720p-10
 range, or Any); a value typed by hand in the past stays selected until you change
 it. **Language** and **Subtitles** suggest the usual choices (ita, eng, ita,eng,
 multi, any) but also take a value typed by hand, such as `fre` or `ita,eng,fre`.
-An empty language means the default language of Gextto. Gextto generates a
+An empty language means the default language of Gextto (saving writes the
+default of that moment). Gextto generates a
 profile for every combination of quality, minimum audio, language, subtitles and
 “Allow upgrades” already present in the library (a single title's exclusions and
 the `any` quality, the same as no limit, do not make profiles of their own) and
 exposes them to Jellyseerr through `/api/v3/qualityprofile`; the first profile is
-**Default**.
+**Default**. The automatic generation happens **until you save the list**: from
+then on the profiles are the ones you saved, and new combinations are not added
+by themselves. Two profiles cannot share a name: saving a name that is already
+used is refused with a message, instead of losing a row.
 **Profiles are templates, not rules.** When you use a profile (by choosing it in
 the **Quality profile** field of the add form of a series or a movie, from
 Jellyseerr or from *Edit selected* in the Series and Movies tables), Gextto

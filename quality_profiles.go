@@ -10,13 +10,26 @@ package gextto
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"sort"
 	"strings"
+
+	"github.com/buzzqw/gextto/internal/logging"
 )
 
-const qualityProfilesKey = "quality_profiles"
+const (
+	qualityProfilesKey = "quality_profiles"
+	// maxQualityProfiles and maxQualityProfileName bound what a script may
+	// store: every profile is rendered on each title page and served to the
+	// request manager, so a runaway list would slow both down.
+	maxQualityProfiles    = 200
+	maxQualityProfileName = 120
+	// duplicateProfileNameError prefixes the 400 of a repeated name. The
+	// settings editor recognises it to show a translated message with the name.
+	duplicateProfileNameError = "duplicate profile name: "
+)
 
 // QualityProfile is one named combination of selection overrides. Audio is
 // the minimum audio preset (empty = any); DisableUpgrades is «Permetti
@@ -54,7 +67,11 @@ func decodeQualityProfiles(raw string) []QualityProfile {
 	if strings.TrimSpace(raw) == "" {
 		return nil
 	}
-	_ = json.Unmarshal([]byte(raw), &profiles)
+	if err := json.Unmarshal([]byte(raw), &profiles); err != nil {
+		// A corrupted value is rebuilt from the library on the next read; say
+		// so once, so the operator knows the old list was no longer readable.
+		logging.Warn("quality profiles: stored list is not valid JSON; rebuilding it from the library", "error", err.Error())
+	}
 	out := make([]QualityProfile, 0, len(profiles))
 	for _, profile := range profiles {
 		profile.Name = strings.TrimSpace(profile.Name)
@@ -168,7 +185,11 @@ func ensureQualityProfiles(s *AppState) []QualityProfile {
 		profiles = append(profiles, seeded)
 	}
 	if raw, err := json.Marshal(profiles); err == nil && cfg != nil {
-		_ = SaveSetting(cfg.DataDir, qualityProfilesKey, string(raw))
+		if err := SaveSetting(cfg.DataDir, qualityProfilesKey, string(raw)); err != nil {
+			// The list is still returned and stays usable: the seed will be
+			// attempted again on the next read.
+			logging.Warn("quality profiles: could not save the generated list", "error", err.Error())
+		}
 	}
 	return profiles
 }
@@ -203,25 +224,53 @@ func qualityProfileExact(profiles []QualityProfile, id int) (QualityProfile, boo
 	return QualityProfile{}, false
 }
 
+// normalizeQualityValue folds a quality requirement into the form the release
+// check compares: lower case, and the "any" sentinel as no limit. A title
+// stored as "1080P" therefore matches a profile's "1080p", exactly as
+// resolutionAllowed reads both (it lower-cases the requirement too).
+func normalizeQualityValue(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "any" {
+		return ""
+	}
+	return value
+}
+
+// normalizeLanguageList folds a comma-separated language list into a canonical
+// set: every code goes through normalizeLanguageCode (it = ita, en = eng),
+// empty and repeated entries are dropped and the list is sorted. "eng,ita"
+// and "ITA,eng" are the same requirement.
+func normalizeLanguageList(value string) string {
+	seen := map[string]bool{}
+	parts := []string{}
+	for _, item := range strings.Split(value, ",") {
+		code := normalizeLanguageCode(item)
+		if code == "" || seen[code] {
+			continue
+		}
+		seen[code] = true
+		parts = append(parts, code)
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, ",")
+}
+
 // matchingQualityProfile returns the id of the first profile whose values are
 // the title's, or 0. Exclusions count: applying a profile adds its exclusions
 // to the title's, so a title whose exclusions differ would change on the next
 // save even if the operator edited an unrelated field.
 func matchingQualityProfile(profiles []QualityProfile, title profileTitleValues, defaultLanguage string) int {
 	norm := func(values profileTitleValues) profileTitleValues {
-		if strings.EqualFold(strings.TrimSpace(values.Quality), "any") {
-			values.Quality = ""
-		}
 		if strings.TrimSpace(values.Language) == "" {
 			values.Language = defaultLanguage
 		}
 		if strings.TrimSpace(values.Language) == "" {
 			values.Language = "ita"
 		}
+		values.Quality = normalizeQualityValue(values.Quality)
+		values.Language = normalizeLanguageList(values.Language)
+		values.Subtitle = normalizeLanguageList(values.Subtitle)
 		values.Audio = normalizeAudioRequirement(values.Audio)
-		values.Quality = strings.TrimSpace(values.Quality)
-		values.Language = strings.ToLower(strings.TrimSpace(values.Language))
-		values.Subtitle = strings.ToLower(strings.TrimSpace(values.Subtitle))
 		return values
 	}
 	want := norm(title)
@@ -313,19 +362,36 @@ func SaveQualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 		payload.Items = direct
 	}
 	cfg := latestConfig(s)
+	if len(payload.Items) > maxQualityProfiles {
+		jsonError(w, http.StatusBadRequest, fmt.Sprintf("too many quality profiles (max %d)", maxQualityProfiles))
+		return
+	}
 	cleaned := make([]QualityProfile, 0, len(payload.Items))
 	seen := map[string]bool{}
 	for _, profile := range payload.Items {
 		profile.Name = strings.TrimSpace(profile.Name)
-		if profile.Name == "" || seen[strings.ToLower(profile.Name)] {
+		// A row left without a name is an empty row of the editor, not a
+		// profile: it is dropped. A repeated name is a mistake the operator has
+		// to see, not a row to lose silently.
+		if profile.Name == "" {
 			continue
 		}
-		seen[strings.ToLower(profile.Name)] = true
+		if len([]rune(profile.Name)) > maxQualityProfileName {
+			jsonError(w, http.StatusBadRequest,
+				fmt.Sprintf("profile name too long (max %d characters): %s", maxQualityProfileName, profile.Name))
+			return
+		}
+		key := strings.ToLower(profile.Name)
+		if seen[key] {
+			jsonError(w, http.StatusBadRequest, duplicateProfileNameError+profile.Name)
+			return
+		}
+		seen[key] = true
 		normalizeProfileUpgrades(&profile)
 		cleaned = append(cleaned, QualityProfile{
 			ID: profile.ID, Name: profile.Name, Quality: strings.TrimSpace(profile.Quality),
 			Language: qualityProfileLanguage(cfg, profile.Language), Subtitle: strings.TrimSpace(profile.Subtitle),
-			Exclude: strings.TrimSpace(profile.Exclude), Audio: normalizeAudioRequirement(profile.Audio),
+			Exclude: mergeExclusions(profile.Exclude), Audio: normalizeAudioRequirement(profile.Audio),
 			DisableUpgrades: profile.DisableUpgrades, Upgrades: profile.Upgrades,
 		})
 	}

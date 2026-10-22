@@ -589,6 +589,9 @@ func movieEditForm(tr *Translator, movie MovieConfig) *Form {
 		textField(tr, "exclude", movie.Exclude),
 		textField(tr, "tmdb_id", movie.TmdbID),
 		textField(tr, "tvdb_id", movie.TvdbID),
+		// Shown as «Permetti upgrade» (yes = upgrades allowed), saved as the
+		// API's disable_upgrades, exactly like a series.
+		boolField(tr, "allow_upgrades", !movie.DisableUpgrades),
 	}}
 }
 
@@ -712,6 +715,7 @@ func (m *Model) submitForm() Action {
 		movie.Exclude = form.value("exclude")
 		movie.TmdbID = form.value("tmdb_id")
 		movie.TvdbID = form.value("tvdb_id")
+		movie.DisableUpgrades = form.value("allow_upgrades") != "true"
 		if movie.Name == "" {
 			m.Message = m.Tr.T("msg.namerequired")
 			return Action{}

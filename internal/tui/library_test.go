@@ -299,3 +299,27 @@ func TestFlattenReleases(t *testing.T) {
 		t.Fatalf("flatten = %+v", flat)
 	}
 }
+
+// The movie editor has the same «Permetti upgrade» switch as a series: it is
+// the same per-title setting the web page and the bulk editor write.
+func TestMovieEditHasTheAllowUpgradesSwitch(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabLibrary
+	m.Update(kindKey(KeyRight))
+	movie := MovieConfig{ID: 7, Name: "Film", Enabled: true}
+	m.SetLibraryData(nil, []MovieConfig{movie})
+	m.Update(kindKey(KeyEnter))
+	m.SetMovieDetail(MovieDetail{Movie: movie})
+	m.Update(runeKey('e'))
+	if m.Form == nil || m.Form.Kind != FormMovieEdit {
+		t.Fatal("e should open the movie edit form")
+	}
+	for m.Form.Fields[m.Form.Selected].Key != "allow_upgrades" {
+		m.Update(kindKey(KeyDown))
+	}
+	m.Update(runeKey(' '))
+	action := m.Update(runeKey('s'))
+	if action.Kind != ActionSaveMovie || !action.Movie.DisableUpgrades {
+		t.Fatalf("save = %+v, want upgrades denied", action)
+	}
+}

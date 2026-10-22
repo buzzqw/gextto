@@ -15,6 +15,20 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **"Edit selected": a movie's requirements follow the value they qualify.** Changing the language or the subtitles of several movies, a profile included, now updates the matching hard requirement too: before, the old one stayed and the movies accepted no release at all until their page was opened again. The switch is now called **Allow upgrades**, with **Yes**/**No**, like the rest of the interface.
+
+- **Quality profiles: a repeated name is reported, it no longer loses a row.** Saving two profiles with the same name (even with different capitals) is refused with a message in the section: before, the second row disappeared without explanation. The same notice now covers any rejected save of the structured lists.
+
+- **Quality profiles: "Start from a profile" no longer erases the titles' exclusions.** In **Edit selected** the profile fills the fields but leaves the exclusions unticked, because they belong to each title: tick them only to replace them. On the title page they are still added, as before. A profile removed in the meantime no longer fills the fields from another profile: a warning appears.
+
+- **Quality profiles: Jellyseerr no longer receives a number that does not exist.** The v3 list of titles reports the first saved profile instead of the fixed number 1; a request naming a removed profile is refused (400) instead of silently applying another one, as the title pages already did.
+
+- **Quality profiles: recognised with different capitals and codes too.** The title page preselects the profile also when the quality is written `1080P` or the language is `it` instead of `ita` (or `ita,eng` in another order): before, **Current values** appeared for a difference of spelling only.
+
+- **Quality profiles: the editor says when they are generated.** The section text now says that the library combinations are added by themselves **until you save the list**, and that removing every profile generates them again; the default language and the exclusions are described as they actually behave.
+
+- **TUI: "Allow upgrades" for movies too.** The movie edit form has the same switch as the series, and the value is saved.
+
 - **Series page: the TMDB ID is there too.** The series page showed only **TVDB ID**, even though TMDB is the default metadata source when the TMDB key is configured. Both fields are now there, with **TMDB** first: saving one keeps the other, and a wrong id can be fixed without touching the library.
 
 - **Upgrades: no re-download when the copy's name lost its source or group.** When the archived copy does not declare the source or the group (for example a file imported or renamed with the title only), those fields are no longer credited to the release found: without proof that the copy is worse, it is not replaced. `ffprobe` also fills the audio channels when the name has lost them. A library file called just `[1080p][h264][EAC3]` is therefore not re-downloaded just because the release found is the same one with the full name `WEB-DL DDP5.1 ...`.

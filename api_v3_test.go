@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -324,5 +325,74 @@ func TestV3ProfilesIgnoreTitleExclusionsAndAny(t *testing.T) {
 	// exclusion is not a profile.
 	if len(profiles) != 2 || profiles[1].Quality != "720p+" || profiles[1].Exclude != "" {
 		t.Fatalf("profiles = %+v", profiles)
+	}
+}
+
+// A profile id that no longer exists (the operator removed the profile
+// Jellyseerr still lists) must be refused, not silently replaced by another
+// policy. An absent id keeps the default, as a missing profile does in Sonarr.
+func TestV3AddRefusesAStaleProfile(t *testing.T) {
+	state := v3TestState(t)
+	rec := httptest.NewRecorder()
+	SaveQualityProfiles(rec, httptest.NewRequest("POST", "/api/quality-profiles",
+		strings.NewReader(`[{"name":"Default","quality":"1080p"}]`)), state)
+
+	rec = httptest.NewRecorder()
+	V3SeriesAdd(rec, httptest.NewRequest("POST", "/api/v3/series",
+		bytes.NewBufferString(`{"title":"Stale Show","tvdbId":999,"qualityProfileId":42}`)), state)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("series with a stale profile -> %d %s", rec.Code, rec.Body.String())
+	}
+	for _, series := range latestConfig(state).Series {
+		if series.Name == "Stale Show" {
+			t.Fatal("the series was added with a profile that does not exist")
+		}
+	}
+
+	rec = httptest.NewRecorder()
+	V3MovieAdd(rec, httptest.NewRequest("POST", "/api/v3/movie",
+		bytes.NewBufferString(`{"title":"Stale Film","tmdbId":455,"year":2024,"qualityProfileId":42}`)), state)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("movie with a stale profile -> %d %s", rec.Code, rec.Body.String())
+	}
+
+	// Without a profile the default policy applies, as Sonarr does.
+	rec = httptest.NewRecorder()
+	V3SeriesAdd(rec, httptest.NewRequest("POST", "/api/v3/series",
+		bytes.NewBufferString(`{"title":"Defaulted Show","tvdbId":1000,"qualityProfileId":0}`)), state)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("series without a profile -> %d %s", rec.Code, rec.Body.String())
+	}
+	if series := v3FindSeries(t, state, "Defaulted Show"); series.Quality != "1080p" {
+		t.Fatalf("quality = %q, want the default profile's 1080p", series.Quality)
+	}
+}
+
+// The v3 records report the first profile of the saved list, not the number
+// 1: after the operator removes the seeded profile, 1 no longer exists.
+func TestV3LookupReportsTheFirstProfile(t *testing.T) {
+	state := v3TestState(t)
+	rec := httptest.NewRecorder()
+	SaveQualityProfiles(rec, httptest.NewRequest("POST", "/api/quality-profiles",
+		strings.NewReader(`[{"id":40,"name":"Mio","quality":"1080p"}]`)), state)
+
+	rec = httptest.NewRecorder()
+	V3MovieLookup(rec, httptest.NewRequest("GET", "/api/v3/movie/lookup?term=tmdb:123", nil), state)
+	var movies []v3Movie
+	if err := json.Unmarshal(rec.Body.Bytes(), &movies); err != nil || len(movies) != 1 {
+		t.Fatalf("lookup = %s, %v", rec.Body.String(), err)
+	}
+	if movies[0].QualityProfileID != 40 {
+		t.Fatalf("qualityProfileId = %d, want the first profile 40", movies[0].QualityProfileID)
+	}
+
+	rec = httptest.NewRecorder()
+	V3SeriesLookup(rec, httptest.NewRequest("GET", "/api/v3/series/lookup?term=tvdb:4242", nil), state)
+	var shows []v3Series
+	if err := json.Unmarshal(rec.Body.Bytes(), &shows); err != nil || len(shows) != 1 {
+		t.Fatalf("lookup = %s, %v", rec.Body.String(), err)
+	}
+	if shows[0].QualityProfileID != 40 {
+		t.Fatalf("qualityProfileId = %d, want the first profile 40", shows[0].QualityProfileID)
 	}
 }

@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -96,5 +97,78 @@ func TestSaveQualityProfilesFillsTheDefaultLanguage(t *testing.T) {
 	profiles := ensureQualityProfiles(state)
 	if len(profiles) != 1 || profiles[0].Language != "eng" {
 		t.Fatalf("profiles = %+v, want language eng", profiles)
+	}
+}
+
+// A repeated name is a mistake the operator has to see: the row must not
+// disappear silently from the stored list.
+func TestSaveQualityProfilesRefusesADuplicateName(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey,
+		`[{"id":1,"name":"Default","language":"ita"}]`); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	body := `[{"id":1,"name":"Default"},{"id":2,"name":"default","quality":"2160p"}]`
+	SaveQualityProfiles(rec, httptest.NewRequest(http.MethodPost, "/api/quality-profiles", strings.NewReader(body)), state)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "duplicate profile name") {
+		t.Fatalf("save -> %d %s, want a 400 naming the duplicate", rec.Code, rec.Body.String())
+	}
+	// The stored list is untouched: a rejected save changes nothing.
+	if profiles := ensureQualityProfiles(state); len(profiles) != 1 || profiles[0].Quality != "" {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+}
+
+func TestSaveQualityProfilesRefusesARunawayList(t *testing.T) {
+	state := newTestAppState(t)
+	items := make([]string, 0, maxQualityProfiles+1)
+	for index := 0; index <= maxQualityProfiles; index++ {
+		items = append(items, fmt.Sprintf(`{"name":"P%d"}`, index))
+	}
+	rec := httptest.NewRecorder()
+	SaveQualityProfiles(rec, httptest.NewRequest(http.MethodPost, "/api/quality-profiles",
+		strings.NewReader("["+strings.Join(items, ",")+"]")), state)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("save -> %d %s, want 400", rec.Code, rec.Body.String())
+	}
+}
+
+// The exact match folds the quality case and the language codes, as the
+// release check does: a title stored as "1080P" with "it" is the profile of
+// "1080p" and "ita", and the order of a list does not make a new policy.
+func TestMatchingQualityProfileFoldsCaseAndLanguageCodes(t *testing.T) {
+	profiles := []QualityProfile{{
+		ID: 2, Name: "HD", Quality: "1080p", Language: "ita,eng", Subtitle: "ita",
+	}}
+	if id := matchingQualityProfile(profiles, profileTitleValues{
+		Quality: "1080P", Language: "it,en", Subtitle: "ITA",
+	}, "ita"); id != 2 {
+		t.Fatalf("matching profile = %d, want 2", id)
+	}
+	if id := matchingQualityProfile(profiles, profileTitleValues{
+		Quality: "1080p", Language: "eng,ita", Subtitle: "ita",
+	}, "ita"); id != 2 {
+		t.Fatalf("the list order must not make a different policy, got %d", id)
+	}
+	if id := matchingQualityProfile(profiles, profileTitleValues{
+		Quality: "2160p", Language: "ita,eng", Subtitle: "ita",
+	}, "ita"); id != 0 {
+		t.Fatalf("a different quality must not match, got %d", id)
+	}
+}
+
+// The exclusions of a profile are stored as a canonical list, so saving the
+// editor twice does not grow the value with duplicates and spaces.
+func TestSaveQualityProfilesNormalizesExclusions(t *testing.T) {
+	state := newTestAppState(t)
+	rec := httptest.NewRecorder()
+	SaveQualityProfiles(rec, httptest.NewRequest(http.MethodPost, "/api/quality-profiles",
+		strings.NewReader(`[{"name":"Senza cam","exclude":" Cam , ts,CAM "}]`)), state)
+	if rec.Code != 200 {
+		t.Fatalf("save -> %d %s", rec.Code, rec.Body.String())
+	}
+	if profiles := ensureQualityProfiles(state); len(profiles) != 1 || profiles[0].Exclude != "Cam, ts" {
+		t.Fatalf("profiles = %+v", profiles)
 	}
 }

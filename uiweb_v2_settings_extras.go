@@ -54,27 +54,37 @@ func V2SettingsFeed(w http.ResponseWriter, r *http.Request, s *AppState) {
 	v2SettingsRedirect(w, r, "sources")
 }
 
-func v2SettingsRedirect(w http.ResponseWriter, r *http.Request, tab string) {
+// v2SettingsTarget is the settings page URL of a tab. The tab comes from
+// server-owned constants only, never from the request: the editor can derive
+// it from a submitted form, so keep this boundary explicit.
+func v2SettingsTarget(tab string) string {
 	target := "/?view=settings"
-	// Select the destination from server-owned constants rather than echoing
-	// even a validated tab value into a redirect URL. The settings editor can
-	// derive `tab` from a submitted form, so keep this boundary explicit.
-	// uiSettingsCanonicalTab returns the ID from the server-owned tab table
-	// (resolving the aliases of the previous layout), never the input.
 	if canonical := uiSettingsCanonicalTab(tab); canonical != "" {
 		target += "&tab=" + canonical
 		tab = ""
 	}
 	switch tab {
-	case "rules":
-		target += "&tab=rules"
-	case "indexers":
-		target += "&tab=indexers"
-	case "torrents":
-		target += "&tab=torrents"
-	case "general":
-		target += "&tab=general"
+	case "rules", "indexers", "torrents", "general":
+		target += "&tab=" + tab
 	}
+	return target
+}
+
+func v2SettingsRedirect(w http.ResponseWriter, r *http.Request, tab string) {
+	v2SettingsRedirectTo(w, r, v2SettingsTarget(tab))
+}
+
+// v2SettingsRedirectError goes back to the tab with a one-shot message: an
+// editor that saved nothing must say so instead of looking like a success.
+func v2SettingsRedirectError(w http.ResponseWriter, r *http.Request, tab, message string) {
+	target := v2SettingsTarget(tab)
+	if strings.TrimSpace(message) != "" {
+		target += "&flash=" + url.QueryEscape(message) + "&flash_err=1"
+	}
+	v2SettingsRedirectTo(w, r, target)
+}
+
+func v2SettingsRedirectTo(w http.ResponseWriter, r *http.Request, target string) {
 	if r.Header.Get("HX-Request") == "" {
 		http.Redirect(w, r, target, http.StatusSeeOther)
 		return
@@ -471,8 +481,9 @@ func V2SettingsEditorSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	default:
 		body = encoded
 	}
+	raw, status := []byte(nil), 0
 	if strings.HasPrefix(editor.PostPath, "/api/") {
-		v2InternalJSON(s, http.MethodPost, editor.PostPath, nil, body)
+		raw, status = v2InternalJSON(s, http.MethodPost, editor.PostPath, nil, body)
 	}
 	tab := r.FormValue("tab")
 	if tab == "" {
@@ -489,7 +500,28 @@ func V2SettingsEditorSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	default:
 		tab = v2ListEditorTab(key)
 	}
+	if status >= http.StatusBadRequest {
+		// A rejected save must say so: a redirect alone looks like a success
+		// and the rows vanish (a duplicate profile name, for example).
+		message := v2JSONError(raw)
+		if key == "quality_profiles" {
+			message = v2QualityProfileEditorError(s, message)
+		}
+		v2SettingsRedirectError(w, r, tab, message)
+		return
+	}
 	v2SettingsRedirect(w, r, tab)
+}
+
+// v2QualityProfileEditorError turns the API error into a message the profile
+// editor can show. A repeated name is the mistake the rows can carry: the
+// operator has to see which profile is the duplicate.
+func v2QualityProfileEditorError(s *AppState, message string) string {
+	if strings.HasPrefix(message, duplicateProfileNameError) {
+		return uiText(s, "Nome del profilo già usato") + ": " +
+			strings.TrimSpace(strings.TrimPrefix(message, duplicateProfileNameError))
+	}
+	return uiText(s, "Salvataggio non riuscito") + ": " + message
 }
 
 func v2SplitIndexedField(name string) (string, int, bool) {

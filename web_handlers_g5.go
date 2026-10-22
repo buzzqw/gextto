@@ -1554,7 +1554,14 @@ func TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	if input.QualityProfileID > 0 {
-		applyQualityProfileToAdd(&input, qualityProfileByID(ensureQualityProfiles(s), input.QualityProfileID))
+		// An explicit id must exist: a stale profile (deleted after the page
+		// was opened) must not silently become another policy.
+		profile, ok := qualityProfileExact(ensureQualityProfiles(s), input.QualityProfileID)
+		if !ok {
+			jsonError(w, http.StatusBadRequest, "quality profile not found")
+			return
+		}
+		applyQualityProfileToAdd(&input, profile)
 	}
 	cfg, err := LoadConfig(s.config_path)
 	if err != nil {

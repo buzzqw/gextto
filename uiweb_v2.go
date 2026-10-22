@@ -718,6 +718,15 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 	case "settings":
 		settings := v2SettingsViewFrom(s, r.FormValue("tab"), r.FormValue("highlight"), v2SettingsMode(r))
 		settings.Flash, settings.FlashErr = v2Ed2kFlash(r.FormValue("msg"))
+		if settings.Flash == "" {
+			// A list editor whose save was rejected comes back with the reason,
+			// so the rows do not simply vanish without explanation.
+			settings.Flash = strings.TrimSpace(r.URL.Query().Get("flash"))
+			if runes := []rune(settings.Flash); len(runes) > 300 {
+				settings.Flash = string(runes[:300])
+			}
+			settings.FlashErr = r.URL.Query().Get("flash_err") == "1"
+		}
 		return "v2_settings", settings
 	case "health":
 		return "v2_health", v2HealthViewFrom(s, r)

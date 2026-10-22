@@ -2696,3 +2696,44 @@ func TestV2QualityProfileRenameKeepsItsID(t *testing.T) {
 		t.Fatalf("profiles = %+v", profiles)
 	}
 }
+
+// A rejected save must not look like a success: a repeated profile name comes
+// back to the editor as a message and the stored list stays untouched.
+func TestV2QualityProfileDuplicateNameIsReported(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey,
+		`[{"id":1,"name":"Default","language":"ita"}]`); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	form := url.Values{"editor": {"quality_profiles"}, "tab": {"scores"},
+		"id__0": {"1"}, "name__0": {"Default"}, "language__0": {"ita"},
+		"id__1": {""}, "name__1": {"default"}, "quality__1": {"2160p"}, "language__1": {"ita"}}
+	request, err := http.NewRequest(http.MethodPost, server.URL+"/settings/editor-save", strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("HX-Request", "true")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	target := response.Header.Get("HX-Redirect")
+	if !strings.Contains(target, "flash_err=1") || !strings.Contains(target, "tab=scores") {
+		t.Fatalf("a rejected save must come back with the reason: %d %q", response.StatusCode, target)
+	}
+	// Following the redirect shows the message on the section.
+	code, body := v2Request(t, server, http.MethodGet, target, nil)
+	if code != http.StatusOK || !strings.Contains(body, `role="alert"`) ||
+		!strings.Contains(body, "Nome del profilo già usato: default") {
+		t.Fatalf("the reason is not on the page: %d", code)
+	}
+	// Nothing was stored: the rejected list did not replace the saved one.
+	if profiles := ensureQualityProfiles(state); len(profiles) != 1 || profiles[0].Quality != "" {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+}

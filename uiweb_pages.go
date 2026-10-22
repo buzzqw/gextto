@@ -436,7 +436,7 @@ var uiAdvancedEditors = []uiListEditor{
 		},
 	},
 	{
-		Title: "Profili di qualità", Hint: "Un nome per ogni combinazione di qualità, audio minimo, lingua, sottotitoli, esclusioni e upgrade. Sono modelli: scegliendo un profilo quando aggiungi una serie o un film, i suoi valori vengono copiati nel titolo e restano modificabili. La stessa lista è quella che vede Jellyseerr (/api/v3/qualityprofile); le combinazioni già presenti nella libreria vengono aggiunte automaticamente.",
+		Title: "Profili di qualità", Hint: "Un nome per ogni combinazione di qualità, audio minimo, lingua, sottotitoli, esclusioni e upgrade. Sono modelli: scegliendo un profilo quando aggiungi una serie o un film, i suoi valori vengono copiati nel titolo e restano modificabili. La stessa lista è quella che vede Jellyseerr (/api/v3/qualityprofile). Le combinazioni già presenti nella libreria vengono aggiunte da sole finché non salvi la lista; se togli tutti i profili, vengono rigenerate dalla libreria.",
 		GetPath: "/api/quality-profiles", Unwrap: "items", PostPath: "/api/quality-profiles",
 		Fields: []uiListField{
 			// The id travels with the row: renaming a profile keeps its number,
@@ -466,8 +466,8 @@ var uiAdvancedEditors = []uiListEditor{
 	},
 }
 
-// uiQualityPresetOptions are the resolutions Gextto recognises, as the title
-// forms offer them (v2_quality_options): a value, a minimum («+») or a range.
+// uiQualityPresetOptions are the resolutions Gextto recognises, offered by the
+// profile editor as a value, a minimum («+») or a range.
 var uiQualityPresetOptions = []uiListFieldOption{
 	{Value: "", Label: "Qualsiasi"},
 	{Value: "360p", Label: "360p"},
@@ -482,9 +482,9 @@ var uiQualityPresetOptions = []uiListFieldOption{
 	{Value: "2160p+", Label: "2160p+ 4K+"},
 }
 
-// uiLanguagePresetOptions are the usual audio/subtitle language choices of
-// the title forms (v2_language_options): suggestions of a field that also
-// takes any other code (fre, spa, ita,eng,fre, ...).
+// uiLanguagePresetOptions are the usual audio/subtitle language choices of the
+// profile editor: suggestions of a field that also takes any other code (fre,
+// spa, ita,eng,fre, ...).
 var uiLanguagePresetOptions = []uiListFieldOption{
 	{Value: "ita", Label: "Italiano"},
 	{Value: "eng", Label: "Inglese"},

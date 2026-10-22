@@ -74,6 +74,7 @@ type MovieConfig struct {
 	Exclude              string `json:"exclude"`
 	LanguageRequirements string `json:"language_requirements"`
 	SubtitleRequirements string `json:"subtitle_requirements"`
+	DisableUpgrades      bool   `json:"disable_upgrades"`
 }
 
 // MovieHistoryItem is one past download of a movie.
@@ -233,6 +234,7 @@ func (c *Client) UpdateMovie(ctx context.Context, movie MovieConfig) error {
 		"exclude":               movie.Exclude,
 		"language_requirements": movie.LanguageRequirements,
 		"subtitle_requirements": movie.SubtitleRequirements,
+		"disable_upgrades":      movie.DisableUpgrades,
 		"enabled":               movie.Enabled,
 		"tmdb_id":               movie.TmdbID,
 		"tvdb_id":               movie.TvdbID,

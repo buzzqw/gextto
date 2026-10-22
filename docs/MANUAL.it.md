@@ -808,15 +808,23 @@ pausa più serie.
    tutti i titoli in `720p`.
 2. Premi **Modifica selezionati**, accanto ad *Aggiorna elenco*: sotto si
    aprono i campi. Spunta solo quelli da
-   cambiare (qualità, lingua, sottotitoli, esclusioni), scrivendo il nuovo
-   valore. Un campo spuntato e lasciato vuoto viene svuotato; un campo non
-   spuntato resta com'è in ogni titolo. *Upgrade* e *Stato* cambiano solo se
-   scegli un valore diverso da «Lascia com'è».
-3. *Parti da un profilo* riempie i quattro campi con i valori di un profilo e
-   li spunta: è un modo veloce per applicare un profilo come modello.
+   cambiare (qualità, audio minimo, lingua, sottotitoli, esclusioni), scrivendo
+   il nuovo valore. Un campo spuntato e lasciato vuoto viene svuotato; un campo
+   non spuntato resta com'è in ogni titolo. *Permetti upgrade* e *Stato*
+   cambiano solo se scegli un valore diverso da «Lascia com'è».
+3. *Parti da un profilo* copia nei campi qualità, audio minimo, lingua,
+   sottotitoli, esclusioni e upgrade di un profilo e li spunta, tranne le
+   **esclusioni**: sono di ogni titolo (nella scheda del titolo quelle del
+   profilo si sommano alle sue), quindi restano deselezionate e si spuntano solo
+   se vuoi sostituirle con quelle del profilo.
 4. Premi **Applica ai titoli selezionati**: la pagina si ricarica con i nuovi
    valori nelle colonne. Gli altri valori di ogni titolo (stagioni, cartella,
    alias…) non vengono toccati.
+
+I requisiti obbligatori di un film (**Sottotitoli obbligatori**, e le
+eventuali lingue richieste) seguono il valore che qualificano: cambiando lingua
+o sottotitoli con **Modifica selezionati** viene aggiornato anche il requisito,
+così il titolo non continua a chiedere quello vecchio.
 
 Nella vista *Locandine* le caselle non ci sono: passa a *Elenco*. **Aggiorna
 elenco** invece non modifica nulla: rilegge la tabella con il filtro scritto.
@@ -1212,12 +1220,17 @@ un elenco con le risoluzioni che Gextto riconosce (360p … 2160p, il minimo con
 passato resta selezionato finché non lo cambi. **Lingua** e **Sottotitoli**
 propongono le scelte comuni (ita, eng, ita,eng, multi, any) ma accettano
 anche un valore scritto a mano, per esempio `fre` o `ita,eng,fre`; una lingua
-lasciata vuota vale la lingua predefinita di Gextto. Gextto
+lasciata vuota vale la lingua predefinita di Gextto (salvando viene scritta la
+predefinita del momento). Gextto
 genera automaticamente un profilo per ogni combinazione di qualità, audio
 minimo, lingua, sottotitoli e «Permetti upgrade» già presente nella libreria (le
 esclusioni di un singolo titolo e la qualità `any`, uguale a nessun limite, non
 creano profili a parte) e li espone a Jellyseerr tramite
-`/api/v3/qualityprofile`; il primo profilo è **Default**.
+`/api/v3/qualityprofile`; il primo profilo è **Default**. La generazione
+automatica avviene **finché non salvi la lista**: da quel momento i profili sono
+quelli che hai salvato, e le combinazioni nuove non si aggiungono da sole.
+Due profili non possono avere lo stesso nome: salvando un nome già usato la
+modifica viene rifiutata con un messaggio, invece di far sparire una riga.
 
 **I profili sono modelli, non regole.** Quando usi un profilo (scegliendolo nel
 campo **Profilo di qualità** del modulo di aggiunta di una serie o di un film, da

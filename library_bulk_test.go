@@ -163,3 +163,70 @@ func TestQualityProfileUpgradesChoiceMapsToDisableUpgrades(t *testing.T) {
 		t.Fatalf("profiles = %+v", profiles)
 	}
 }
+
+// A movie's hard requirements override the language and the subtitles in the
+// release check: changing one of them in bulk must carry the requirement with
+// it, otherwise the title keeps demanding the old one and nothing matches.
+func TestLibraryBulkEditCarriesTheMovieRequirements(t *testing.T) {
+	movies := []MovieConfig{{
+		ID: 1, Name: "Film", Enabled: true,
+		Language: "eng", LanguageRequirements: `[{"language":"eng","required":true}]`,
+		Subtitle: "eng", SubtitleRequirements: "eng",
+	}}
+	language, subtitle := "ita", "ita"
+	_, out, changed, err := ApplyLibraryBulkEdit(nil, movies,
+		LibraryBulkEdit{Movies: []int64{1}, Language: &language, Subtitle: &subtitle})
+	if err != nil || changed != 1 {
+		t.Fatalf("changed = %d, err = %v", changed, err)
+	}
+	if out[0].Language != "ita" || out[0].Subtitle != "ita" {
+		t.Fatalf("movie = %+v", out[0])
+	}
+	if required := parseLanguageRequirements(out[0].LanguageRequirements); len(required) != 1 || required[0] != "ita" {
+		t.Fatalf("language requirement = %q, want ita", out[0].LanguageRequirements)
+	}
+	if out[0].SubtitleRequirements != "ita" {
+		t.Fatalf("subtitle requirement = %q, want ita", out[0].SubtitleRequirements)
+	}
+	// A title without the requirement does not gain one.
+	plain := []MovieConfig{{ID: 2, Name: "Altro", Subtitle: "eng", Enabled: true}}
+	_, out, _, err = ApplyLibraryBulkEdit(nil, plain, LibraryBulkEdit{Movies: []int64{2}, Subtitle: &subtitle})
+	if err != nil || out[0].Subtitle != "ita" || out[0].SubtitleRequirements != "" {
+		t.Fatalf("plain movie = %+v, err = %v", out[0], err)
+	}
+}
+
+// A profile fills the values but leaves the exclusions unticked: they are each
+// title's own, and the title page adds the profile's to them instead of
+// replacing them. The panel says so, and a profile that no longer exists does
+// not fill the fields from another one.
+func TestBulkProfileLeavesTheExclusionsUnticked(t *testing.T) {
+	state := v3TestState(t)
+	body := `{"items":[{"id":9,"name":"Senza cam","quality":"1080p","language":"ita","exclude":"cam"}]}`
+	rec := httptest.NewRecorder()
+	SaveQualityProfiles(rec, httptest.NewRequest("POST", "/api/quality-profiles", strings.NewReader(body)), state)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, page := v2Request(t, server, http.MethodGet, "/library/bulk/profile?view=series&profile=9", nil)
+	if code != http.StatusOK {
+		t.Fatalf("bulk profile -> %d %s", code, page)
+	}
+	if !strings.Contains(page, `<input type="checkbox" name="set_quality" value="1" checked>`) {
+		t.Fatalf("the other fields must be marked: %s", page)
+	}
+	if strings.Contains(page, `<input type="checkbox" name="set_exclude" value="1" checked>`) {
+		t.Fatalf("the exclusions must not be marked by a profile: %s", page)
+	}
+	if !strings.Contains(page, "Da un profilo le esclusioni non vengono applicate") {
+		t.Fatalf("the panel must explain the exclusions: %s", page)
+	}
+
+	code, page = v2Request(t, server, http.MethodGet, "/library/bulk/profile?view=series&profile=99", nil)
+	if code != http.StatusOK || !strings.Contains(page, "Profilo di qualità non trovato.") {
+		t.Fatalf("an unknown profile must be reported: %d %s", code, page)
+	}
+	if strings.Contains(page, `name="set_quality" value="1" checked`) {
+		t.Fatalf("an unknown profile must not fill the fields: %s", page)
+	}
+}

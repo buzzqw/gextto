@@ -16,6 +16,20 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 22 ottobre 2026
 
+- **«Modifica selezionati»: i requisiti dei film seguono il valore che qualificano.** Cambiando lingua o sottotitoli di più film, anche partendo da un profilo, viene aggiornato anche il requisito obbligatorio corrispondente: prima restava quello vecchio e i film non accettavano più nessuna release finché non si riapriva la scheda. L'interruttore si chiama ora **Permetti upgrade**, con **Sì**/**No**, come nel resto dell'interfaccia.
+
+- **Profili di qualità: un nome doppio viene segnalato, non fa sparire una riga.** Salvando due profili con lo stesso nome (anche con maiuscole diverse) la modifica viene rifiutata con un messaggio nella sezione: prima la seconda riga spariva senza spiegazioni. Lo stesso avviso compare ora per qualsiasi salvataggio rifiutato degli elenchi strutturati.
+
+- **Profili di qualità: «Parti da un profilo» non cancella le esclusioni dei titoli.** In **Modifica selezionati** il profilo riempie i campi ma lascia deselezionate le esclusioni, che sono di ogni titolo: si spuntano solo se le si vuole sostituire. Nella scheda del titolo restano sommate, come prima. Un profilo eliminato nel frattempo non riempie più i campi con un altro profilo: compare un avviso.
+
+- **Profili di qualità: Jellyseerr non riceve più un numero inesistente.** L'elenco v3 dei titoli riporta il primo profilo salvato invece del numero 1 fisso; una richiesta con un profilo eliminato viene rifiutata (400) invece di applicarne un altro in silenzio, come già facevano le schede dei titoli.
+
+- **Profili di qualità: riconosciuti anche con maiuscole e codici diversi.** La scheda del titolo preseleziona il profilo anche quando la qualità è scritta `1080P` o la lingua è `it` invece di `ita` (o `ita,eng` in ordine diverso): prima compariva **Valori attuali** per una differenza solo di scrittura.
+
+- **Profili di qualità: l'editor spiega quando si generano.** Il testo della sezione dice ora che le combinazioni della libreria vengono aggiunte da sole **finché non salvi la lista**, e che togliendo tutti i profili vengono rigenerate; lingua predefinita ed esclusioni sono descritte come si comportano davvero.
+
+- **TUI: «Permetti upgrade» anche per i film.** La scheda di modifica di un film ha ora lo stesso interruttore della serie, e il valore viene salvato.
+
 - **Scheda serie: c'è anche l'ID TMDB.** La scheda di una serie mostrava solo **TVDB ID**, anche se TMDB è la fonte predefinita dei metadati quando la chiave TMDB è configurata. Ora ci sono entrambi i campi, con **TMDB** per primo: salvando un ID l'altro resta, e un ID sbagliato si può correggere senza toccare la libreria.
 
 - **Upgrade: niente riscarico quando il nome della copia ha perso sorgente o gruppo.** Se la copia archiviata non dichiara la sorgente o il gruppo (per esempio un file importato o rinominato con il solo titolo), quei campi non vengono più accreditati alla release trovata: senza la prova che la copia sia peggiore non viene sostituita. `ffprobe` completa anche i canali audio quando il nome li ha persi. Un file già in libreria chiamato solo `[1080p][h264][EAC3]` non viene quindi riscaricato solo perché la release trovata è la stessa con il nome completo `WEB-DL DDP5.1 ...`.

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
 
 	"github.com/buzzqw/gextto/internal/constants"
 )
@@ -281,11 +282,49 @@ func V3QualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 	v3JSON(w, http.StatusOK, out)
 }
 
+// v3DefaultQualityProfileID is the profile a v3 record reports when it has no
+// profile of its own: the first of the saved list, the same one the add form
+// preselects. It is never a hard-coded number, which a client could no longer
+// resolve after the operator removed that profile.
+func v3DefaultQualityProfileID(s *AppState) int {
+	if profiles := ensureQualityProfiles(s); len(profiles) > 0 {
+		return profiles[0].ID
+	}
+	return 1
+}
+
+// v3ProfileForAdd resolves the profile of a v3 add request. A positive id must
+// exist: a stale id (the profile Jellyseerr still lists was removed) is
+// refused instead of silently becoming another profile. 0 or absent means the
+// default policy, as a missing profile does in Sonarr.
+func v3ProfileForAdd(s *AppState, id int) (QualityProfile, bool) {
+	profiles := ensureQualityProfiles(s)
+	if id > 0 {
+		return qualityProfileExact(profiles, id)
+	}
+	return qualityProfileByID(profiles, 0), true
+}
+
+// v3Title capitalises the words of a language name ("ita,eng" -> "Ita,Eng")
+// for the single v3 language profile, without strings.Title (deprecated, and
+// wrong on punctuation).
+func v3Title(value string) string {
+	runes := []rune(strings.TrimSpace(value))
+	upper := true
+	for index, r := range runes {
+		if upper && unicode.IsLetter(r) {
+			runes[index] = unicode.ToUpper(r)
+		}
+		upper = r == ',' || r == '/' || unicode.IsSpace(r)
+	}
+	return string(runes)
+}
+
 func V3LanguageProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	name := "Default"
 	if cfg != nil && strings.TrimSpace(cfg.DefaultLanguage()) != "" {
-		name = strings.Title(strings.TrimSpace(cfg.DefaultLanguage()))
+		name = v3Title(cfg.DefaultLanguage())
 	}
 	profile := v3LanguageProfile{ID: 1, Name: name, Cutoff: 1}
 	profile.Languages = append(profile.Languages, struct {
@@ -310,8 +349,9 @@ func V3SeriesLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
+	profileID := v3DefaultQualityProfileID(s)
 	if id, ok := v3TermID(term, "tvdb"); ok {
-		v3JSON(w, http.StatusOK, []v3Series{v3SeriesByTvdbID(r.Context(), cfg, id)})
+		v3JSON(w, http.StatusOK, []v3Series{v3SeriesByTvdbID(r.Context(), cfg, id, profileID)})
 		return
 	}
 	out := []v3Series{}
@@ -333,7 +373,7 @@ func V3SeriesLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
 				}
 				out = append(out, v3Series{ID: v3IntID(item["tvdb_id"]), TvdbID: v3Int(item["tvdb_id"]),
 					Title: title, TitleSlug: v3Slug(title), Year: year, Overview: v3Any(item["overview"]),
-					RemotePoster: v3Any(item["image"]), QualityProfileID: 1, LanguageProfileID: 1, Monitored: true,
+					RemotePoster: v3Any(item["image"]), QualityProfileID: profileID, LanguageProfileID: 1, Monitored: true,
 					Seasons: []v3Season{}, Tags: []int{}})
 			}
 		}
@@ -354,7 +394,7 @@ func V3SeriesLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
 					ID: int(item.ID), Title: title, TitleSlug: v3Slug(title),
 					TmdbID: item.ID, Year: v3ItemYear(item),
 					Overview: v3ItemOverview(item), RemotePoster: v3ItemPoster(item),
-					QualityProfileID: 1, LanguageProfileID: 1, Monitored: true,
+					QualityProfileID: profileID, LanguageProfileID: 1, Monitored: true,
 					Seasons: []v3Season{}, Tags: []int{},
 				})
 			}
@@ -401,8 +441,8 @@ func v3TermID(term, source string) (int64, bool) {
 // unknown one is described from TVDB, or TMDB, with its season list, which
 // Jellyseerr needs to say which seasons are requested. Without metadata the
 // record carries only the id and Jellyseerr's own title is used on add.
-func v3SeriesByTvdbID(ctx context.Context, cfg *Config, tvdbID int64) v3Series {
-	out := v3Series{TvdbID: tvdbID, QualityProfileID: 1, LanguageProfileID: 1, Seasons: []v3Season{}, Tags: []int{}}
+func v3SeriesByTvdbID(ctx context.Context, cfg *Config, tvdbID int64, profileID int) v3Series {
+	out := v3Series{TvdbID: tvdbID, QualityProfileID: profileID, LanguageProfileID: 1, Seasons: []v3Season{}, Tags: []int{}}
 	var seasons []int64
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -560,7 +600,11 @@ func V3SeriesAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		v3Error(w, http.StatusConflict, "series already exists")
 		return
 	}
-	profile := qualityProfileByID(ensureQualityProfiles(s), body.QualityProfileID)
+	profile, ok := v3ProfileForAdd(s, body.QualityProfileID)
+	if !ok {
+		v3Error(w, http.StatusBadRequest, "quality profile not found")
+		return
+	}
 	added := SeriesConfig{
 		Name: title, Seasons: v3SeasonSpec(body.Seasons), Quality: profile.Quality, Language: profile.Language,
 		ArchivePath: strings.TrimSpace(body.RootFolderPath), TmdbID: v3ID(body.TmdbID), TvdbID: v3ID(body.TvdbID),
@@ -626,9 +670,15 @@ func V3SeriesUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
 		v3Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// The series does not store a profile: report the one the request chose,
+	// or the default policy when it did not choose.
+	profileID := body.QualityProfileID
+	if profileID <= 0 {
+		profileID = v3DefaultQualityProfileID(s)
+	}
 	v3JSON(w, http.StatusAccepted, v3Series{ID: index + 1, Title: updated.Name, TitleSlug: v3Slug(updated.Name),
 		TvdbID: body.TvdbID, TmdbID: body.TmdbID, RootFolderPath: updated.ArchivePath,
-		QualityProfileID: body.QualityProfileID, LanguageProfileID: 1, SeasonFolder: updated.SeasonSubfolders,
+		QualityProfileID: profileID, LanguageProfileID: 1, SeasonFolder: updated.SeasonSubfolders,
 		Monitored: updated.Enabled, Seasons: v3NonNilSeasons(body.Seasons), Tags: []int{}})
 }
 
@@ -646,8 +696,9 @@ func V3MovieLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
+	profileID := v3DefaultQualityProfileID(s)
 	if id, ok := v3TermID(term, "tmdb"); ok {
-		v3JSON(w, http.StatusOK, []v3Movie{v3MovieByTmdbID(r.Context(), s, cfg, id)})
+		v3JSON(w, http.StatusOK, []v3Movie{v3MovieByTmdbID(r.Context(), s, cfg, id, profileID)})
 		return
 	}
 	out := []v3Movie{}
@@ -661,7 +712,7 @@ func V3MovieLookup(w http.ResponseWriter, r *http.Request, s *AppState) {
 				title := v3ItemName(item)
 				out = append(out, v3Movie{ID: int(item.ID), Title: title, TitleSlug: v3Slug(title),
 					TmdbID: item.ID, Year: v3ItemYear(item), Overview: v3ItemOverview(item),
-					RemotePoster: v3ItemPoster(item), QualityProfileID: 1, Monitored: true, Tags: []int{}})
+					RemotePoster: v3ItemPoster(item), QualityProfileID: profileID, Monitored: true, Tags: []int{}})
 			}
 		}
 	}
@@ -695,11 +746,12 @@ func v3MovieIndex(cfg *Config, tmdbID int64, title string, year int) int {
 }
 
 // v3MovieRecord is the v3 view of a configured movie: its library id, whether
-// it is monitored and whether it is already archived.
-func v3MovieRecord(s *AppState, movie MovieConfig) v3Movie {
+// it is monitored and whether it is already archived. profileID is the profile
+// the v3 client should show for a title that does not store one.
+func v3MovieRecord(s *AppState, movie MovieConfig, profileID int) v3Movie {
 	out := v3Movie{ID: int(movie.ID), Title: movie.Name, TitleSlug: v3Slug(movie.Name),
 		TmdbID: v3Int(movie.TmdbID), Monitored: movie.Enabled, IsAvailable: true,
-		QualityProfileID: 1, Tags: []int{}}
+		QualityProfileID: profileID, Tags: []int{}}
 	var year *int64
 	if parsed, err := strconv.ParseInt(strings.TrimSpace(movie.Year), 10, 32); err == nil {
 		out.Year = int(parsed)
@@ -715,11 +767,11 @@ func v3MovieRecord(s *AppState, movie MovieConfig) v3Movie {
 
 // v3MovieByTmdbID answers a "tmdb:" lookup: the configured movie with its id,
 // or the TMDB description of a new one (id 0, so Jellyseerr adds it).
-func v3MovieByTmdbID(ctx context.Context, s *AppState, cfg *Config, tmdbID int64) v3Movie {
+func v3MovieByTmdbID(ctx context.Context, s *AppState, cfg *Config, tmdbID int64, profileID int) v3Movie {
 	if index := v3MovieIndex(cfg, tmdbID, "", 0); index >= 0 {
-		return v3MovieRecord(s, cfg.Movies[index])
+		return v3MovieRecord(s, cfg.Movies[index], profileID)
 	}
-	out := v3Movie{TmdbID: tmdbID, QualityProfileID: 1, Tags: []int{}}
+	out := v3Movie{TmdbID: tmdbID, QualityProfileID: profileID, Tags: []int{}}
 	client := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
 	if !client.Configured() {
 		return out
@@ -736,7 +788,7 @@ func v3MovieByTmdbID(ctx context.Context, s *AppState, cfg *Config, tmdbID int64
 	out.Overview, out.RemotePoster = v3ItemOverview(item), v3ItemPoster(item)
 	out.TitleSlug = v3Slug(out.Title)
 	if index := v3MovieIndex(cfg, 0, out.Title, out.Year); index >= 0 {
-		return v3MovieRecord(s, cfg.Movies[index])
+		return v3MovieRecord(s, cfg.Movies[index], profileID)
 	}
 	return out
 }
@@ -775,7 +827,11 @@ func V3MovieAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		v3Error(w, http.StatusConflict, "movie already exists")
 		return
 	}
-	profile := qualityProfileByID(ensureQualityProfiles(s), body.QualityProfileID)
+	profile, ok := v3ProfileForAdd(s, body.QualityProfileID)
+	if !ok {
+		v3Error(w, http.StatusBadRequest, "quality profile not found")
+		return
+	}
 	year := ""
 	if body.Year > 0 {
 		year = strconv.Itoa(body.Year)
@@ -797,7 +853,7 @@ func V3MovieAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		v3Error(w, http.StatusInternalServerError, "the movie was saved but its id is unavailable")
 		return
 	}
-	out := v3MovieRecord(s, saved.Movies[index])
+	out := v3MovieRecord(s, saved.Movies[index], profile.ID)
 	out.RootFolderPath, out.QualityProfileID = body.RootFolderPath, profile.ID
 	v3JSON(w, http.StatusCreated, out)
 }
@@ -829,7 +885,7 @@ func V3MovieUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
 		v3Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	v3JSON(w, http.StatusAccepted, v3MovieRecord(s, movies[index]))
+	v3JSON(w, http.StatusAccepted, v3MovieRecord(s, movies[index], v3DefaultQualityProfileID(s)))
 }
 
 func V3Queue(w http.ResponseWriter, r *http.Request, s *AppState) {

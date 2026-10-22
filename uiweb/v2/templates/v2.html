@@ -2771,21 +2771,6 @@
 
 {{define "v2_tmdb_add_result"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">aggiunto</span>{{end}}{{end}}
 
-{{define "v2_quality_options"}}
-<option value=""{{if eq . ""}} selected{{end}}>Qualsiasi</option>
-<option value="360p"{{if eq . "360p"}} selected{{end}}>360p</option>
-<option value="480p"{{if eq . "480p"}} selected{{end}}>480p</option>
-<option value="576p"{{if eq . "576p"}} selected{{end}}>576p</option>
-<option value="720p"{{if eq . "720p"}} selected{{end}}>720p</option>
-<option value="720p+"{{if eq . "720p+"}} selected{{end}}>720p+</option>
-<option value="720p-1080p"{{if eq . "720p-1080p"}} selected{{end}}>720p-1080p</option>
-<option value="1080p"{{if eq . "1080p"}} selected{{end}}>1080p</option>
-<option value="1080p+"{{if eq . "1080p+"}} selected{{end}}>1080p+</option>
-<option value="2160p"{{if eq . "2160p"}} selected{{end}}>2160p 4K</option>
-<option value="2160p+"{{if eq . "2160p+"}} selected{{end}}>2160p+ 4K+</option>
-{{if and . (not (or (eq . "360p") (eq . "480p") (eq . "576p") (eq . "720p") (eq . "720p+") (eq . "720p-1080p") (eq . "1080p") (eq . "1080p+") (eq . "2160p") (eq . "2160p+")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
-{{end}}
-
 {{define "v2_audio_options"}}
 <option value=""{{if eq . ""}} selected{{end}}>Qualsiasi</option>
 <option value="compressed-5.1"{{if eq . "compressed-5.1"}} selected{{end}}>AAC / Opus 5.1+</option>
@@ -2800,26 +2785,6 @@
 
 {{define "v2_title_profile"}}
 <label class="field span-full"><span>Profilo di qualità</span><select class="input" name="quality_profile_id" data-v2-profile-summary="v2-title-profile-summary" aria-describedby="v2-title-profile-summary" title="Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo">{{if not .Matched}}<option value="0" data-summary="{{.CurrentSummary}}" selected>Valori attuali</option>{{end}}{{range .Choices}}<option value="{{.ID}}" data-summary="{{.Summary}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}</select><small class="hint" id="v2-title-profile-summary" aria-live="polite">{{if .Matched}}{{range .Choices}}{{if .Selected}}{{.Summary}}{{end}}{{end}}{{else}}{{.CurrentSummary}}{{end}}</small><small class="hint">Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue.</small></label>
-{{end}}
-
-{{define "v2_language_options"}}
-<option value=""{{if eq . ""}} selected{{end}}>Predefinita (ita)</option>
-<option value="ita"{{if eq . "ita"}} selected{{end}}>Italiano</option>
-<option value="eng"{{if eq . "eng"}} selected{{end}}>Inglese</option>
-<option value="ita,eng"{{if eq . "ita,eng"}} selected{{end}}>Italiano + Inglese</option>
-<option value="multi"{{if eq . "multi"}} selected{{end}}>Multi</option>
-<option value="any"{{if eq . "any"}} selected{{end}}>Qualsiasi</option>
-{{if and . (not (or (eq . "ita") (eq . "eng") (eq . "ita,eng") (eq . "multi") (eq . "any")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
-{{end}}
-
-{{define "v2_subtitle_options"}}
-<option value=""{{if eq . ""}} selected{{end}}>Nessuno</option>
-<option value="ita"{{if eq . "ita"}} selected{{end}}>Italiano</option>
-<option value="eng"{{if eq . "eng"}} selected{{end}}>Inglese</option>
-<option value="ita,eng"{{if eq . "ita,eng"}} selected{{end}}>Italiano + Inglese</option>
-<option value="multi"{{if eq . "multi"}} selected{{end}}>Multi</option>
-<option value="any"{{if eq . "any"}} selected{{end}}>Qualsiasi</option>
-{{if and . (not (or (eq . "ita") (eq . "eng") (eq . "ita,eng") (eq . "multi") (eq . "any")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
 {{end}}
 
 {{define "v2_tmdb_manual"}}

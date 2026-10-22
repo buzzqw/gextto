@@ -92,6 +92,17 @@ func ApplyLibraryBulkEdit(series []SeriesConfig, movies []MovieConfig, edit Libr
 		set(&item.Language, edit.Language)
 		set(&item.Subtitle, edit.Subtitle)
 		set(&item.Exclude, edit.Exclude)
+		// A movie's hard requirements override Language and Subtitles in the
+		// release check (movieEffectiveLanguage, movieReleaseAllowed): changing
+		// one of those values in bulk must carry the requirement with it,
+		// otherwise the title keeps demanding the old one and nothing matches.
+		// SubtitleRequirements is «Sottotitoli obbligatori».
+		if edit.Language != nil && strings.TrimSpace(item.LanguageRequirements) != "" {
+			item.LanguageRequirements = SanitizeLanguageRequirements(item.Language)
+		}
+		if edit.Subtitle != nil && strings.TrimSpace(item.SubtitleRequirements) != "" {
+			item.SubtitleRequirements = SanitizeSubtitleRequirements(item.Subtitle)
+		}
 		if edit.Upgrades != nil {
 			item.DisableUpgrades = !*edit.Upgrades
 		}
@@ -113,8 +124,13 @@ type v2BulkPanel struct {
 	Profiles []QualityProfile
 	Values   QualityProfile
 	Marked   bool
-	Message  string
-	Error    string
+	// MarkExclude says the exclusions are ready to be written. A profile fills
+	// the other values but does not tick the exclusions: they belong to each
+	// title (the title page adds the profile's to them), so applying a profile
+	// to many titles must not erase them. The operator can tick the field.
+	MarkExclude bool
+	Message     string
+	Error       string
 }
 
 // v2BulkPanelFor builds the panel of a library table, or nil for a table
@@ -131,8 +147,14 @@ func v2BulkPanelFor(s *AppState, view string, spec uiTableSpec) *v2BulkPanel {
 func V2LibraryBulkProfile(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := v2BulkPanel{View: strings.TrimSpace(r.FormValue("view"))}
 	if id, err := strconv.Atoi(strings.TrimSpace(r.FormValue("profile"))); err == nil && id > 0 {
-		view.Values = qualityProfileByID(ensureQualityProfiles(s), id)
-		view.Marked = true
+		if profile, ok := qualityProfileExact(ensureQualityProfiles(s), id); ok {
+			view.Values = profile
+			view.Marked = true
+		} else {
+			// The page was opened before the profile was removed: say so
+			// instead of filling the fields from another profile.
+			view.Error = uiText(s, "Profilo di qualità non trovato.")
+		}
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_bulk_values", view, dict, eng)

@@ -412,7 +412,8 @@ and its `exclude` is merged with the profile's. An unknown id answers 400.
 `POST /api/tmdb/add` also accepts `quality_profile_id`: the new title then takes
 `quality`, `audio`, `language`, `subtitle` and `disable_upgrades` from that
 profile, whatever the request says, and `exclude` is added to the profile's
-exclusions.
+exclusions. An unknown id answers 400 here too: a stale profile never silently
+becomes another policy.
 
 `POST /api/movies/{id}` accepts `subtitle_required` (boolean, «Sottotitoli
 obbligatori»): true makes `subtitle` a requirement, false only a preference; it
@@ -429,11 +430,17 @@ The items of `GET`/`POST /api/quality-profiles` carry `id`, `name`, `quality`,
 `exclude`, `disable_upgrades` and `upgrades` (`allow`/`deny`, the same switch as the profile editor writes it). A profile is a template: the add form and the
 v3 endpoints (`POST /api/v3/series`, `POST /api/v3/movie`) copy its values,
 `audio` and `disable_upgrades` included, into the new title. An empty
-`language` means the configured default language. The v3 list reports
+`language` means the configured default language; `POST` stores the default of
+that moment, so a later change of the default does not move the profiles. Names
+must be unique (a repeated name answers 400, naming it), at most 120 characters;
+the list holds at most 200 profiles. The v3 list reports
 `upgradeAllowed` as the opposite of `disable_upgrades`; the profiles generated
 from the library (until the list is saved for the first time) carry the quality,
 minimum audio, language, subtitles and upgrade switch of the titles they come
-from—never a single title's exclusions.
+from—never a single title's exclusions. The v3 lookup records report the first
+profile of the saved list as their `qualityProfileId` (the profile the add form
+preselects), and `POST /api/v3/series`/`POST /api/v3/movie` answer 400 for a
+`qualityProfileId` that does not exist while 0 or absent means that default.
 
 ## gx-torrent daemon routes
 
