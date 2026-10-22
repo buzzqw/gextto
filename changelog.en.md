@@ -49,6 +49,15 @@ manual is online: [English](docs/MANUAL.en.md) ·
   **Edit selected** and change quality, language, subtitles, exclusions,
   upgrades or state on all of them. You can start from a profile's values.
   Everything else in each title is left alone.
+- **Seed forever: the ratio or the time is enough.** 0 means infinite for both
+  the seed ratio and the seed time, and now **either one** is enough for the
+  seed never to end: the torrent keeps seeding and, with *Move* on, a copy goes
+  into the library instead of a move. Before, a torrent with an infinite ratio
+  still stopped at the time limit and was moved. Note: setting only the ratio
+  and leaving the time at 0 now means an unlimited seed; to end the seed both
+  the ratio **and** the time must be greater than 0. It applies to eD2k
+  downloads too, which follow the seed rules and the global limits: with an
+  unlimited seed the file is copied and aMule keeps sharing it.
 - **Missing becomes a tab of Series, grouped by series.** Instead of a list of
   episodes one under another, the **Missing** tab of Series shows a block per
   series with a line per season and the episodes as buttons. A click on an
@@ -62,9 +71,9 @@ manual is online: [English](docs/MANUAL.en.md) ·
 - **eD2k episodes: move or copy like movies.** With **Move episodes/packs to
   the archive** on, episodes downloaded with aMule are moved into the library
   at completion too, as movies already were; before, they could be copied and
-  left in aMule, because an eD2k download looked set to "seed forever". The
-  "seed ∞" badge no longer shows on eD2k downloads: seed rules do not apply to
-  aMule.
+  left in aMule, because an eD2k download looked set to "seed forever" even
+  when the configured seed is finite. With an unlimited seed they are copied
+  and stay shared instead (see above).
 - **eD2k downloads in the log and in the history.** eD2k downloads started by
   hand (from "Download" in a search or from a pasted link) now appear in the
   log as soon as they are added, or with the reason if aMule refuses them.

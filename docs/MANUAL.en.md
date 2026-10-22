@@ -527,13 +527,22 @@ sets it wins:
    and completion → Seed rules*);
 3. the **global** limit on the same tab.
 
+**Seed forever.** 0 means infinite, for the ratio and for the time (days and
+minutes at 0). **Either one being infinite is enough** for the seed never to
+end: the torrent keeps seeding, is not stopped for inactivity either and, in
+*Move* mode, is not moved into the library (a copy, or a hardlink, goes in). A
+time limit does not stop a torrent with an infinite ratio, and vice versa. So to
+end the seed both the ratio **and** the time must be greater than 0. The same
+holds for eD2k downloads: with an unlimited seed the file is copied and aMule
+keeps sharing it.
+
 A rule names a **source** (the indexer the release came from, as shown in the
 download list: part of the name is enough, case-insensitive, so `mircrew` also
 matches `mircrew indexerr`) and/or a **category** (TV series, Movies, Comics,
 Other). It is the equivalent of qBittorrent 5.2's per-category limits, plus the
 source: a private tracker's rules follow the tracker, not the kind of content.
-In a rule an empty field uses the global limit and 0 removes the limit (the
-torrent keeps seeding even where the global limit would stop it). A torrent that
+In a rule an empty field uses the global limit and 0 means infinite (the
+torrent seeds forever even where the global limit would stop it). A torrent that
 came from Jackett's aggregate search (source `jackett` with no indexer name)
 does not carry the tracker's name: the category or the global limit applies.
 
@@ -935,9 +944,10 @@ into the library and removed from the incoming folder (aMule stops sharing
 them); when it is off they enter by **hardlink or copy** and aMule keeps
 sharing them (a hardlink takes no extra space when both folders are on the same
 disk). For eD2k the move happens at completion, because seeding is managed by
-aMule and Gextto has no end-of-seed moment to wait for. For the same reason the
-seed rules (ratio, time, "seed ∞") do not apply to eD2k and its downloads show
-no "seed ∞" badge: only the Move option decides.
+aMule and Gextto has no end-of-seed moment to wait for. An eD2k download has no
+seed limits of its own: the seed rules and the global limits apply. With an
+unlimited seed (ratio or time at 0) the file is copied and stays shared even
+with *Move* on, and its row shows the "seed ∞" badge.
 
 For the complete guide — installing aMule, Docker, troubleshooting and the
 protocol details — see [`docs/amule.md`](amule.md).
@@ -2119,9 +2129,9 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 
 | Setting | What it does |
 |---|---|
-| Global seed ratio | Upload/download ratio after which to stop seeding (0 = infinite). *(0 = infinite)* |
-| Maximum seeding | Primary seeding limit in days; when greater than 0 it takes precedence over the limit in minutes. *(Unit: days; 0 = use the limit in minutes)* |
-| Maximum seeding (fallback) | Seeding limit in minutes, used only when Maximum seed (days) is 0. *(Unit: minutes)* |
+| Global seed ratio | Upload/download ratio after which seeding stops. 0 = infinite: this alone makes the seed never end and the file is not moved, even with a time limit. *(0 = infinite)* |
+| Maximum seeding | Primary seeding limit in days; when greater than 0 it takes precedence over the limit in minutes. With days and minutes at 0 the time is infinite. *(Unit: days; 0 = use the limit in minutes)* |
+| Maximum seeding (fallback) | Seeding limit in minutes, used only when Maximum seed (days) is 0. With days and minutes at 0 the time is infinite: the seed never ends and the file is not moved. *(Unit: minutes)* |
 | Stop an idle seed after | Stops a seeding torrent that has sent no data for this many minutes (only time spent actively seeding counts). Like the other limits, the end of the seed is followed by archiving or removal. *(Unit: minutes; 0 = off)* |
 
 **Editor**

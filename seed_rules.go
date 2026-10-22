@@ -212,13 +212,14 @@ func (l seedLimits) none() bool {
 }
 
 // resolveSeedLimits combines the torrent's own limits, the matching rule and
-// the global ones. An explicit per-torrent zero (ratio or days) means infinite
-// seeding and switches every limit off, inactivity included.
+// the global ones: for the ratio and for the time the first that is set wins
+// (torrent, then rule, then global). A zero means infinite. When either the
+// ratio or the time that applies is infinite the seed never ends: every limit
+// is off, inactivity included, and the file stays where it is seeding (a
+// torrent is not moved at the end of a seed that never ends, an eD2k file is
+// copied instead of moved).
 func resolveSeedLimits(cfg *Config, rule *SeedRule, seedRatio float64, seedDays int64) seedLimits {
 	limits := seedLimits{}
-	if seedRatio == 0 || seedDays == 0 {
-		return limits
-	}
 	if rule != nil {
 		limits.Rule = rule.Name
 		if limits.Rule == "" {
@@ -228,29 +229,34 @@ func resolveSeedLimits(cfg *Config, rule *SeedRule, seedRatio float64, seedDays 
 	positiveFloat := func(value float64) *float64 { return &value }
 	positiveSeconds := func(value int64) *int64 { return &value }
 
+	// The ratio that applies: torrent (>= 0 is set), rule, global.
+	var ratio float64
 	switch {
-	case seedRatio > 0:
-		limits.Ratio = positiveFloat(seedRatio)
+	case seedRatio >= 0:
+		ratio = seedRatio
 	case rule != nil && rule.Ratio != nil:
-		if *rule.Ratio > 0 {
-			limits.Ratio = positiveFloat(*rule.Ratio)
-		}
-	case cfg != nil && cfg.Transfer.SeedRatio > 0:
-		limits.Ratio = positiveFloat(cfg.Transfer.SeedRatio)
+		ratio = *rule.Ratio
+	case cfg != nil:
+		ratio = cfg.Transfer.SeedRatio
 	}
-
+	// The time that applies, in seconds: torrent days, rule days, global days
+	// or minutes.
+	var seconds int64
 	switch {
-	case seedDays > 0:
-		limits.Seconds = positiveSeconds(tev_saturatingMulInt64(seedDays, 86_400))
+	case seedDays >= 0:
+		seconds = tev_saturatingMulInt64(seedDays, 86_400)
 	case rule != nil && rule.SeedDays != nil:
-		if *rule.SeedDays > 0 {
-			limits.Seconds = positiveSeconds(int64(math.Round(*rule.SeedDays * 86_400)))
-		}
+		seconds = int64(math.Round(*rule.SeedDays * 86_400))
 	case cfg != nil && cfg.Transfer.SeedTimeDays > 0:
-		limits.Seconds = positiveSeconds(tev_saturatingMulInt64(cfg.Transfer.SeedTimeDays, 86_400))
-	case cfg != nil && cfg.Transfer.SeedTimeMinutes > 0:
-		limits.Seconds = positiveSeconds(tev_saturatingMulInt64(cfg.Transfer.SeedTimeMinutes, 60))
+		seconds = tev_saturatingMulInt64(cfg.Transfer.SeedTimeDays, 86_400)
+	case cfg != nil:
+		seconds = tev_saturatingMulInt64(cfg.Transfer.SeedTimeMinutes, 60)
 	}
+	if ratio <= 0 || seconds <= 0 {
+		return seedLimits{Rule: limits.Rule}
+	}
+	limits.Ratio = positiveFloat(ratio)
+	limits.Seconds = positiveSeconds(seconds)
 
 	switch {
 	case rule != nil && rule.IdleMinutes != nil:

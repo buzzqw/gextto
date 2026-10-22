@@ -101,6 +101,8 @@ func seedTestSetup(t *testing.T) (*Database, *Config, models.TorrentView, string
 
 	cfg := DefaultConfig()
 	cfg.Transfer.SeedRatio = 0.5
+	// A finite time too: an infinite one would make the seed endless.
+	cfg.Transfer.SeedTimeDays = 365
 	cfg.Settings = map[string]string{}
 
 	view := models.TorrentView{
@@ -433,17 +435,26 @@ func TestTeVeSeedsForever(t *testing.T) {
 		t.Fatal("per-torrent ratio 0 must mean infinite seed")
 	}
 	session.list[0].SeedRatio = 2.0
-	if tev_seedsForever(&cfg, session, seedTestHash) {
-		t.Fatal("finite per-torrent limit must not be infinite")
+	if !tev_seedsForever(&cfg, session, seedTestHash) {
+		t.Fatal("a finite ratio with the time inherited infinite must still seed forever")
 	}
+	session.list[0].SeedDays = 5
+	if tev_seedsForever(&cfg, session, seedTestHash) {
+		t.Fatal("a finite per-torrent ratio and time must not be infinite")
+	}
+	session.list[0].SeedDays = -1
 	session.list[0].SeedRatio = -1.0
 	session.list[0].SeedDays = -1
 	if !tev_seedsForever(&cfg, session, seedTestHash) {
 		t.Fatal("no per-torrent and no global limit must mean infinite seed")
 	}
 	cfg.Transfer.SeedRatio = 1.5
+	if !tev_seedsForever(&cfg, session, seedTestHash) {
+		t.Fatal("a global ratio with the time left infinite must still seed forever")
+	}
+	cfg.Transfer.SeedTimeMinutes = 60
 	if tev_seedsForever(&cfg, session, seedTestHash) {
-		t.Fatal("global ratio limit must make the policy finite")
+		t.Fatal("a finite global ratio and time must make the policy finite")
 	}
 }
 

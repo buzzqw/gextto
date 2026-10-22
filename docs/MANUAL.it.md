@@ -537,14 +537,23 @@ primo livello che lo imposta:
    e completamento → Regole di seed*);
 3. il limite **globale** della stessa scheda.
 
+**Seed infinito.** 0 vuol dire infinito, per il rapporto come per il tempo
+(giorni e minuti a 0). **Basta che uno dei due sia infinito** perché il seed non
+finisca mai: il torrent resta in seed, non viene fermato nemmeno per
+inattività e, in modalità *Sposta*, non viene spostato in libreria (ne entra una
+copia, o un hardlink). Un limite di tempo non ferma un torrent con rapporto
+infinito, e viceversa. Quindi, per fermare il seed, rapporto **e** tempo devono
+essere entrambi maggiori di 0. Lo stesso vale per i download eD2k: con seed
+infinito il file viene copiato e aMule continua a condividerlo.
+
 Una regola indica una **sorgente** (l'indexer da cui è arrivata la release, come
 appare nell'elenco dei download: basta una parte del nome, senza distinguere
 maiuscole e minuscole, quindi `mircrew` vale anche per `mircrew indexerr`) e/o
 una **categoria** (Serie TV, Film, Fumetti, Altro). È l'equivalente dei limiti per
 categoria di qBittorrent 5.2, con in più la sorgente: le regole di un tracker
 privato seguono il tracker, non il tipo di contenuto. Nei campi della regola un
-valore vuoto usa il limite globale, 0 toglie il limite (il torrent resta in seed
-anche se il globale lo fermerebbe). Un torrent arrivato dalla ricerca aggregata
+valore vuoto usa il limite globale, 0 vuol dire infinito (il torrent resta in
+seed per sempre anche se il globale lo fermerebbe). Un torrent arrivato dalla ricerca aggregata
 di Jackett (sorgente `jackett` senza nome dell'indexer) non porta il nome del
 tracker: per lui valgono la categoria o il globale.
 
@@ -961,9 +970,9 @@ condividerli), se è spenta entrano con **hardlink o copia** e aMule continua a
 condividerli (l'hardlink non occupa spazio in più se le due cartelle sono sullo
 stesso disco). Per eD2k lo spostamento avviene al completamento, perché il
 seeding è gestito da aMule e Gextto non ha un momento di fine seed da attendere.
-Per lo stesso motivo le regole di seed (rapporto, tempo, «seed ∞») non valgono
-per eD2k e sui suoi download non compare il badge «seed ∞»: decide solo
-l'opzione Sposta.
+Un download eD2k non ha limiti di seed propri: valgono le regole di seed e i
+limiti globali. Con seed infinito (rapporto o tempo a 0) il file viene copiato e
+resta condiviso anche con *Sposta* attiva, e la riga mostra il badge «seed ∞».
 
 Per la guida completa — installazione di aMule, Docker, risoluzione dei
 problemi e dettagli del protocollo — vedi [`docs/amule.it.md`](amule.it.md).
@@ -2189,9 +2198,9 @@ spazio del `tmpfs`, come prima.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Seed ratio globale | Rapporto upload/download dopo cui fermare il seeding (0 = infinito). *(0 = infinito)* |
-| Seed massimo | Limite principale di seeding in giorni; se maggiore di 0 prevale sul limite in minuti. *(Unità: giorni; 0 = usa il limite in minuti)* |
-| Seed massimo (fallback) | Limite di seeding in minuti, usato solo se Seed massimo (giorni) è 0. *(Unità: minuti)* |
+| Seed ratio globale | Rapporto upload/download dopo cui fermare il seeding. 0 = infinito: basta questo perché il seed non finisca mai e il file non venga spostato, anche con un limite di tempo. *(0 = infinito)* |
+| Seed massimo | Limite principale di seeding in giorni; se maggiore di 0 prevale sul limite in minuti. Con giorni e minuti a 0 il tempo è infinito. *(Unità: giorni; 0 = usa il limite in minuti)* |
+| Seed massimo (fallback) | Limite di seeding in minuti, usato solo se Seed massimo (giorni) è 0. Con giorni e minuti a 0 il tempo è infinito: il seed non finisce mai e il file non viene spostato. *(Unità: minuti)* |
 | Ferma il seed inattivo dopo | Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione. *(Unità: minuti; 0 = disattivato)* |
 
 **Editor**

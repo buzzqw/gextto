@@ -862,10 +862,10 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 				row.TotalDone = row.TotalSize
 			}
 		}
-		// An eD2k download has no seed limits in Gextto (aMule shares it while
-		// the file is in its incoming folder): no "seed ∞" badge for it.
-		if (view.State == "seeding" || view.State == "finished") && view.Network != networkEd2k {
-			row.SeedInfinite = policy.limitsFor(&view).none()
+		// An eD2k download follows the configured seed (rules and global
+		// limits): the badge says when it is kept sharing.
+		if view.State == "seeding" || view.State == "finished" {
+			row.SeedInfinite = policy.limitsFor(seedViewForPolicy(view)).none()
 		}
 		rows = append(rows, row)
 	}

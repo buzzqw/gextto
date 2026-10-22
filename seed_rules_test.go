@@ -74,11 +74,29 @@ func TestResolveSeedLimitsPrecedence(t *testing.T) {
 		t.Fatalf("per-torrent limits must win: %+v", limits)
 	}
 
-	// A rule's 0 removes a global limit; a nil field inherits it.
-	noRatio := &SeedRule{Source: "x", Ratio: floatPtr(0), IdleMinutes: floatPtr(0)}
-	limits = resolveSeedLimits(&cfg, noRatio, -1, -1)
-	if limits.Ratio != nil || limits.IdleSeconds != nil || limits.Seconds == nil || *limits.Seconds != 7*86_400 {
-		t.Fatalf("rule 0 must remove the limit and nil inherit: %+v", limits)
+	// A nil rule field inherits the global limit.
+	onlyRatio := &SeedRule{Source: "x", Ratio: floatPtr(4)}
+	limits = resolveSeedLimits(&cfg, onlyRatio, -1, -1)
+	if *limits.Ratio != 4 || limits.Seconds == nil || *limits.Seconds != 7*86_400 || *limits.IdleSeconds != 120*60 {
+		t.Fatalf("a nil rule field must inherit the global one: %+v", limits)
+	}
+
+	// A rule's 0 is infinite: an infinite ratio or time alone seeds forever,
+	// the other limits and idle included.
+	noRatio := &SeedRule{Source: "x", Ratio: floatPtr(0)}
+	if limits := resolveSeedLimits(&cfg, noRatio, -1, -1); !limits.none() {
+		t.Fatalf("an infinite rule ratio must seed forever: %+v", limits)
+	}
+	noTime := &SeedRule{Source: "x", SeedDays: floatPtr(0)}
+	if limits := resolveSeedLimits(&cfg, noTime, -1, -1); !limits.none() {
+		t.Fatalf("an infinite rule time must seed forever: %+v", limits)
+	}
+	// The same for the global limits: a ratio with the time left at 0
+	// (infinite) seeds forever.
+	globalRatioOnly := DefaultConfig()
+	globalRatioOnly.Transfer.SeedRatio = 2
+	if limits := resolveSeedLimits(&globalRatioOnly, nil, -1, -1); !limits.none() {
+		t.Fatalf("a global ratio with an infinite time must seed forever: %+v", limits)
 	}
 
 	// An explicit per-torrent zero seeds forever, rules and idle included.
@@ -173,6 +191,8 @@ func TestEnforceSeedPolicyStopsIdleSeed(t *testing.T) {
 
 	cfg := DefaultConfig()
 	cfg.Transfer.SeedIdleMinutes = 30
+	// Inactivity stops only a seed with finite limits.
+	cfg.Transfer.SeedRatio, cfg.Transfer.SeedTimeDays = 100, 365
 	view := models.TorrentView{
 		Hash: seedTestHash, Name: "Idle.S01E01.mkv", State: "seeding", Progress: 100,
 		TotalSize: 10, TotalDone: 10, SeedRatio: -1, SeedDays: -1, AllTimeUpload: 5,
@@ -201,6 +221,7 @@ func TestSeedIdleStopSurvivesRestart(t *testing.T) {
 	state := newTestAppState(t)
 	cfg := DefaultConfig()
 	cfg.Transfer.SeedIdleMinutes = 30
+	cfg.Transfer.SeedRatio, cfg.Transfer.SeedTimeDays = 100, 365
 	paused := models.TorrentView{
 		Hash: seedTestHash, State: "paused", Progress: 100, TotalSize: 10, TotalDone: 10,
 		SeedRatio: -1, SeedDays: -1, AllTimeUpload: 5,

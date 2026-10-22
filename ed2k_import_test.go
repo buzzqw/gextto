@@ -75,6 +75,8 @@ func newMovieImportFixture(t *testing.T) movieImportFixture {
 	cfg.RenameEpisodes = true
 	cfg.DryRun = false
 	cfg.Movies = []MovieConfig{{Name: "Example Movie", Year: "2024", Enabled: true}}
+	// A finite seed (ratio and time): an unlimited one keeps eD2k files in aMule.
+	cfg.Transfer.SeedRatio, cfg.Transfer.SeedTimeDays = 1, 7
 
 	db, err := OpenDatabase(filepath.Join(root, "test.db"))
 	if err != nil {
@@ -390,6 +392,7 @@ func newEpisodeImportFixture(t *testing.T, move bool) (Config, *Database, string
 	cfg.DryRun = false
 	cfg.Series = []SeriesConfig{{Name: "Example Show", Seasons: "1+", ArchivePath: archive, Enabled: true}}
 	cfg.Settings["move_episodes"] = map[bool]string{true: "true", false: "false"}[move]
+	cfg.Transfer.SeedRatio, cfg.Transfer.SeedTimeDays = 1, 7
 	db, err := OpenDatabase(filepath.Join(root, "test.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -405,9 +408,11 @@ func newEpisodeImportFixture(t *testing.T, move bool) (Config, *Database, string
 	return cfg, db, archive, source, models.TorrentEvent{Kind: "torrent_finished", Hash: hash, Name: name, SavePath: incoming}
 }
 
-// TestEd2kEpisodeFollowsMoveOrCopy: an eD2k episode follows only the move/copy
-// option, even while aMule still lists the file with no seed limits (which
-// once made every eD2k episode a copy, while movies were moved).
+// TestEd2kEpisodeFollowsMoveOrCopy: an eD2k episode follows the move/copy
+// option under a finite seed, even while aMule still lists the file with no
+// limits of its own (which once read as "seed forever" and made every eD2k
+// episode a copy). An unlimited configured seed keeps it in aMule: see
+// TestEd2kUnlimitedSeedKeepsTheFileInAmule.
 func TestEd2kEpisodeFollowsMoveOrCopy(t *testing.T) {
 	for _, move := range []bool{true, false} {
 		cfg, db, archive, source, event := newEpisodeImportFixture(t, move)
@@ -427,5 +432,40 @@ func TestEd2kEpisodeFollowsMoveOrCopy(t *testing.T) {
 		if !move && statErr != nil {
 			t.Fatalf("copy mode must keep the episode in aMule's incoming folder: %v", statErr)
 		}
+	}
+}
+
+// TestEd2kUnlimitedSeedKeepsTheFileInAmule: with the seed configured as
+// unlimited (no ratio and no time limit) an eD2k episode or movie is copied
+// into the library and stays in aMule's incoming folder, shared, even in move
+// mode, like a torrent that seeds forever.
+func TestEd2kUnlimitedSeedKeepsTheFileInAmule(t *testing.T) {
+	cfg, db, archive, source, event := newEpisodeImportFixture(t, true)
+	// Only the ratio is infinite: that alone keeps the file sharing.
+	cfg.Transfer.SeedRatio = 0
+	session := listedEd2kSession{ed2kSession: ed2kSession{cfg: &cfg}, hash: event.Hash}
+	if processed, err := HandleTorrentEvent(&cfg, session, db, map[string]struct{}{}, map[string]struct{}{},
+		map[string]StorageMoveRetry{}, event, NewTmdbClient(nil), NewNotifier()); err != nil || !processed {
+		t.Fatalf("episode: processed=%v err=%v", processed, err)
+	}
+	if countVideos(t, archive) != 1 {
+		t.Fatal("the episode did not reach the library")
+	}
+	if _, err := os.Stat(source); err != nil {
+		t.Fatalf("an unlimited seed must keep the episode in aMule's incoming folder: %v", err)
+	}
+
+	f := newMovieImportFixture(t)
+	f.cfg.Settings["move_episodes"] = "true"
+	f.cfg.Transfer.SeedRatio = 0
+	if processed, err := HandleTorrentEvent(&f.cfg, ed2kSession{cfg: &f.cfg}, f.db, map[string]struct{}{}, map[string]struct{}{},
+		map[string]StorageMoveRetry{}, f.event, NewTmdbClient(nil), NewNotifier()); err != nil || !processed {
+		t.Fatalf("movie: processed=%v err=%v", processed, err)
+	}
+	if countVideos(t, f.archive) != 1 {
+		t.Fatal("the movie did not reach the library")
+	}
+	if _, err := os.Stat(f.source); err != nil {
+		t.Fatalf("an unlimited seed must keep the movie in aMule's incoming folder: %v", err)
 	}
 }

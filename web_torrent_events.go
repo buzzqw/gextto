@@ -1091,19 +1091,15 @@ func tev_needsInfiniteSeedResume(torrent *models.TorrentView) bool {
 // deferred until "end of seed" would then never happen, so the caller should
 // import the file immediately instead.
 func tev_seedsForever(cfg *Config, torrents TorrentSession, hash string) bool {
-	globalSet := cfg != nil && (cfg.Transfer.SeedRatio > 0.0 ||
-		cfg.Transfer.SeedTimeDays > 0 || cfg.Transfer.SeedTimeMinutes > 0 ||
-		cfg.Transfer.SeedIdleMinutes > 0)
+	view := models.TorrentView{Hash: hash, SeedRatio: -1, SeedDays: -1}
 	for _, torrent := range torrents.List() {
-		if !strings.EqualFold(torrent.Hash, hash) {
-			continue
+		if strings.EqualFold(torrent.Hash, hash) {
+			view = torrent
+			break
 		}
-		if torrent.SeedRatio >= 0.0 || torrent.SeedDays >= 0 {
-			return torrent.SeedRatio == 0.0 || torrent.SeedDays == 0
-		}
-		return !globalSet
 	}
-	return !globalSet
+	view = *seedViewForPolicy(view)
+	return resolveSeedLimits(cfg, nil, view.SeedRatio, view.SeedDays).none()
 }
 
 // tev_seedsForeverByPolicy is tev_seedsForever with the seed rules: a torrent
@@ -1117,7 +1113,18 @@ func tev_seedsForeverByPolicy(cfg *Config, db *Database, torrents TorrentSession
 			break
 		}
 	}
-	return newSeedPolicy(cfg, db).limitsFor(&view).none()
+	return newSeedPolicy(cfg, db).limitsFor(seedViewForPolicy(view)).none()
+}
+
+// seedViewForPolicy is the view the seed policy reads. An eD2k download has no
+// limits of its own (aMule reports zeros, which would read as an explicit
+// "seed forever"): it inherits the seed rules and the global limits, so an
+// eD2k file is kept sharing exactly when the configured seed is unlimited.
+func seedViewForPolicy(view models.TorrentView) *models.TorrentView {
+	if view.Network == networkEd2k {
+		view.SeedRatio, view.SeedDays = -1, -1
+	}
+	return &view
 }
 
 // tev_effectiveDownloadForRatio implements `effective_download_for_ratio`.
@@ -2960,11 +2967,10 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 					logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
 					return true, nil
 				}
-				// eD2k has no seed policy in Gextto (aMule reports no limits, which
-				// would read as "seed forever"): for it only the move/copy option
-				// decides, as for its movies.
-				seedsForever := !tev_movesCompletedImmediately(torrents) && tev_seedsForeverByPolicy(cfg, db, torrents, event.Hash)
-				if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) || seedsForever {
+				// For eD2k the seed policy is the configured one (seed rules and
+				// global limits): with an unlimited seed the episode is copied and
+				// aMule keeps sharing it, as a torrent seeding forever.
+				if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) || tev_seedsForeverByPolicy(cfg, db, torrents, event.Hash) {
 					// Folder episodes, single files in copy mode, and any torrent
 					// configured to seed forever are imported by copying the video
 					// while the source stays in the download folder for seeding.
@@ -3225,7 +3231,10 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		// is left in the incoming folder and marked complete.
 		if release.Kind == "movie" && tev_movesCompletedImmediately(torrents) {
 			if hasArchiveDestination {
-				return tev_completeMovieWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, settingsBool(cfg, "move_episodes", false))
+				// An unlimited seed keeps the movie in aMule's incoming folder,
+				// shared, and imports a copy, as for its episodes.
+				move := settingsBool(cfg, "move_episodes", false) && !tev_seedsForeverByPolicy(cfg, db, torrents, event.Hash)
+				return tev_completeMovieWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, move)
 			}
 			size, sizeErr := SizeOfPath(source)
 			if sizeErr != nil {

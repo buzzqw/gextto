@@ -51,6 +51,15 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   apri **Modifica selezionati** e cambi qualità, lingua, sottotitoli,
   esclusioni, upgrade o stato su tutte insieme. Puoi partire dai valori di un
   profilo. Tutto il resto di ogni titolo non viene toccato.
+- **Seed infinito: basta il rapporto o il tempo.** 0 vuol dire infinito sia nel
+  rapporto sia nel tempo di seed, e ora **basta uno dei due** perché il seed non
+  finisca mai: il torrent resta in seed e, con *Sposta* attiva, in libreria ne
+  entra una copia invece di spostarlo. Prima un torrent con rapporto infinito si
+  fermava comunque al limite di tempo e veniva spostato. Attenzione: chi imposta
+  solo il rapporto e lascia il tempo a 0 ora ha un seed infinito; per fermare il
+  seed servono rapporto **e** tempo maggiori di 0. Vale anche per i download
+  eD2k, che seguono le regole di seed e i limiti globali: con seed infinito il
+  file viene copiato e aMule continua a condividerlo.
 - **Mancanti diventa una scheda di Serie TV, raggruppata per serie.** Al posto
   dell'elenco di puntate una sotto l'altra, la scheda **Mancanti** di Serie TV
   mostra un blocco per serie con una riga per stagione e le puntate come
@@ -66,8 +75,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
   episodi/pack in archivio** attiva, anche gli episodi scaricati con aMule
   vengono spostati in libreria al completamento, come già i film; prima
   potevano essere copiati e lasciati in aMule, perché un download eD2k
-  sembrava impostato su «seed infinito». Il badge «seed ∞» non compare più sui
-  download eD2k: le regole di seed non valgono per aMule.
+  sembrava impostato su «seed infinito» anche quando il seed configurato è
+  finito. Con il seed infinito restano invece copiati e condivisi (vedi sopra).
 - **Download eD2k nel log e nella storia.** I download eD2k avviati a mano
   (da «Scarica» in una ricerca o da un link incollato) ora compaiono nel log
   appena aggiunti, o con il motivo se aMule li rifiuta. Tutte le righe di un
