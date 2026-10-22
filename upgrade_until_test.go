@@ -94,6 +94,55 @@ func TestUpgradeUntilBlocksMovieReplacement(t *testing.T) {
 	assertTrue(t, !approved, "cutoff reached: expected a refusal, got "+reason)
 }
 
+// A legacy or renamed copy may have lost its source and group tags. A
+// same-size re-release must not look like an upgrade just because the
+// candidate still carries them; a real resolution/codec gain still must.
+func TestUnknownArchivedSourceAndGroupAreNotCredited(t *testing.T) {
+	existing := models.Quality{Resolution: "1080p", Codec: "h264", Audio: "eac3", AudioChannels: "5.1", Source: "unknown", Group: "unknown"}
+	candidate := existing
+	candidate.Source = "webdl"
+	candidate.Group = "MeM.GP"
+	if got := upgradeReasonUntil(&candidate, &existing, 1360, 1150, 200, 0, nil); got != "" {
+		t.Fatalf("a richer name on the same quality must not upgrade, got %q", got)
+	}
+	// Even when another field differs, the unknown source is not credited as a
+	// 200-point gain: a 5.1 -> 7.1 step is real but below the minimum.
+	channels := candidate
+	channels.AudioChannels = "7.1"
+	if got := upgradeReasonUntil(&channels, &existing, 1370, 1150, 200, 0, nil); got != "" {
+		t.Fatalf("an unknown source must not be credited as a technical gain, got %q", got)
+	}
+	// A known source still counts: WEB-DL over an archived HDTV is a real
+	// source upgrade.
+	hdtv := existing
+	hdtv.Source = "hdtv"
+	if got := upgradeReasonUntil(&candidate, &hdtv, 1360, 1050, 200, 0, nil); got != "source" {
+		t.Fatalf("WEB-DL over HDTV must remain a source upgrade, got %q", got)
+	}
+	// And a real resolution gain is untouched.
+	better := candidate
+	better.Resolution = "2160p"
+	if got := upgradeReasonUntil(&better, &existing, 2560, 1150, 200, 0, nil); got != "resolution" {
+		t.Fatalf("a resolution gain must still upgrade, got %q", got)
+	}
+}
+
+// The real case: a library file renamed with the standard format keeps only
+// resolution, codec and audio, and its name is also the stored title. A release
+// of the same episode, same size and same streams, but with the full name
+// (WEB-DL, channels, group), must not look like a score upgrade.
+func TestRenamedLegacyCopyIsNotReDownloaded(t *testing.T) {
+	oldName := "Only Murders in the Building - S05E09 - LESTR - [1080p][h264][EAC3][IT+EN]"
+	newName := "Only.Murders.in.the.Building.S05E09.LESTR.ITA.ENG.1080p.DSNP.WEB-DL.DDP5.1.H.264-MeM.GP.mkv"
+	oldQuality := ParseQuality(oldName)
+	MediaInfo{VideoCodec: "h264", AudioCodec: "eac3", AudioChannels: 6,
+		Width: 1920, Height: 1080}.ApplyToQuality(&oldQuality)
+	newQuality := ParseQuality(newName)
+	if got := upgradeReasonUntil(&newQuality, &oldQuality, 1361, 1151, 200, 0, nil); got != "" {
+		t.Fatalf("the same file with a richer name must not be re-downloaded, got %q", got)
+	}
+}
+
 func TestScoreUpgradeNeedsATechnicalGain(t *testing.T) {
 	existing := models.Quality{Resolution: "1080p", Source: "webdl", Codec: "h264", Group: "nogrp"}
 	same := existing

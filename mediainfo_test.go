@@ -276,6 +276,7 @@ func TestMediaInfoApplyToQualityIsAdditiveOnly(t *testing.T) {
 		HDR:            "HDR10",
 		VideoCodec:     "hevc",
 		AudioCodec:     "eac3",
+		AudioChannels:  6,
 		Width:          1920,
 		Height:         1080,
 		AudioLanguages: []string{"ita"},
@@ -291,6 +292,9 @@ func TestMediaInfoApplyToQualityIsAdditiveOnly(t *testing.T) {
 	}
 	if unknown.Audio != "ddp" {
 		t.Fatalf("Audio = %q, want ddp", unknown.Audio)
+	}
+	if unknown.AudioChannels != "5.1" {
+		t.Fatalf("AudioChannels = %q, want 5.1", unknown.AudioChannels)
 	}
 	if got, want := unknown.Languages, []string{"ita"}; !equalStrings(got, want) {
 		t.Fatalf("Languages = %#v, want %#v", got, want)

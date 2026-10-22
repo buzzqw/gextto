@@ -1,6 +1,10 @@
 package gextto
 
-import "github.com/buzzqw/gextto/internal/models"
+import (
+	"strings"
+
+	"github.com/buzzqw/gextto/internal/models"
+)
 
 // upgradeReasonUntil is Quality.UpgradeReason with the "upgrade until" cutoff
 // (setting upgrade_until_score): once the existing copy scores at least until,
@@ -49,6 +53,14 @@ func sourceAwareUpgradeReason(candidate, existing *models.Quality, newScore, old
 		sameSource.Source = existing.Source
 		reason = sameSource.UpgradeReason(existing, newScore, oldScore, minScoreDiff)
 	}
+	// A legacy or renamed copy may have lost its source tag: without it we
+	// cannot prove that a REMUX is an upgrade, and a same-size re-release of
+	// the same content must not replace it.
+	if reason == "remux" && unknownQualityToken(existing.Source) {
+		sameSource := *candidate
+		sameSource.Source = existing.Source
+		reason = sameSource.UpgradeReason(existing, newScore, oldScore, minScoreDiff)
+	}
 	return reason
 }
 
@@ -61,9 +73,31 @@ func sourceWeight(source string, settings map[string]string) int64 {
 // technicalScoreGain reports whether the quality alone (resolution, source,
 // codec, audio, HDR, release fixes and group, with the configured weights)
 // improves by at least minScoreDiff, and by at least one point.
+//
+// A field the archived copy does not carry (a legacy import renamed without
+// its source or group, or a name that never had them) is not credited to the
+// candidate: the copy may well be the same release and we cannot prove it is
+// worse. Resolution, codec, audio, HDR and REPACK/PROPER still count, so a real
+// upgrade passes; a same-size re-release with a richer name does not.
 func technicalScoreGain(candidate, existing *models.Quality, minScoreDiff int64, settings map[string]string) bool {
-	gain := ScoreQuality(candidate, settings) - ScoreQuality(existing, settings)
+	if candidate == nil || existing == nil {
+		return false
+	}
+	scoredCandidate := *candidate
+	if unknownQualityToken(existing.Source) {
+		scoredCandidate.Source = existing.Source
+	}
+	if unknownQualityToken(existing.Group) {
+		scoredCandidate.Group = existing.Group
+	}
+	gain := ScoreQuality(&scoredCandidate, settings) - ScoreQuality(existing, settings)
 	return gain > 0 && gain >= minScoreDiff
+}
+
+// unknownQualityToken reports a quality field the archived copy does not carry.
+func unknownQualityToken(value string) bool {
+	trimmed := strings.ToLower(strings.TrimSpace(value))
+	return trimmed == "" || trimmed == "unknown"
 }
 
 func upgradeCutoffReached(oldScore, until int64) bool {

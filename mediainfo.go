@@ -97,6 +97,18 @@ func (m MediaInfo) ApplyToQuality(quality *models.Quality) {
 			quality.Resolution = resolution
 		}
 	}
+	// The streams know the channel layout even when the archive name dropped it
+	// (the standard rename keeps only resolution and codec).
+	if channels := strings.TrimSpace(quality.AudioChannels); channels == "" || strings.EqualFold(channels, "unknown") {
+		switch {
+		case m.AudioChannels >= 8:
+			quality.AudioChannels = "7.1"
+		case m.AudioChannels >= 6:
+			quality.AudioChannels = "5.1"
+		case m.AudioChannels > 0:
+			quality.AudioChannels = "2.0"
+		}
+	}
 	if len(quality.Languages) == 0 && len(m.AudioLanguages) > 0 {
 		quality.Languages = slices.Clone(m.AudioLanguages)
 	}

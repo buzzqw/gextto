@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 22 ottobre 2026
 
+- **Upgrade: niente riscarico quando il nome della copia ha perso sorgente o gruppo.** Se la copia archiviata non dichiara la sorgente o il gruppo (per esempio un file importato o rinominato con il solo titolo), quei campi non vengono più accreditati alla release trovata: senza la prova che la copia sia peggiore non viene sostituita. `ffprobe` completa anche i canali audio quando il nome li ha persi. Un file già in libreria chiamato solo `[1080p][h264][EAC3]` non viene quindi riscaricato solo perché la release trovata è la stessa con il nome completo `WEB-DL DDP5.1 ...`.
+
 - **Upgrade: il punteggio non fa più riscaricare file già in libreria.** La regola che chiede un miglioramento tecnico reale, non solo un punteggio più alto, ora vale in tutti i percorsi. I season pack già in download non scaricano più episodi presenti della stessa qualità, un file della stessa qualità non sostituisce quello archiviato dopo il download e i punteggi degli episodi di un pack usano la dimensione del singolo episodio, non quella dell'intero pack. **Permetti upgrade: No** viene rispettato anche quando la scansione dell'archivio non trova il file (per esempio una cartella spostata o un disco non raggiungibile), purché la libreria indichi dove si trova. Corretto anche il pannello *Impatto sulla libreria*, che ora guarda i file realmente presenti come fa il ciclo.
 
 - **Profili di qualità: rinominare non cambia più il numero.** Il numero di un profilo è quello che Jellyseerr ricorda: prima, rinominando un profilo dall'editor (o salvando da una pagina aperta prima di una modifica) il profilo riceveva un numero nuovo. Ora ogni riga dell'editor porta con sé il proprio numero.

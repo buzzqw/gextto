@@ -2044,7 +2044,12 @@ almeno la differenza minima in più. Dimensione del file, sottotitoli e salute
 dello swarm aiutano a scegliere tra release equivalenti, ma da soli non fanno
 mai riscaricare un episodio o un film della stessa qualità. La stessa regola
 vale per i season pack e dopo il download: un file della stessa qualità non
-sostituisce la copia archiviata solo perché ha un punteggio più alto.
+sostituisce la copia archiviata solo perché ha un punteggio più alto. Se la
+copia archiviata non dichiara la sorgente o il gruppo (per esempio un file
+importato o rinominato con il solo titolo), quei campi non vengono accreditati
+alla release trovata: senza la prova che la copia sia peggiore non viene
+sostituita. `ffprobe` completa risoluzione, codec, audio e canali quando il nome
+li ha persi.
 
 Anche la regola che preferisce una sorgente WEB-DL a un WEBRip o un HDTV segue i
 pesi: vale solo finché il peso **Sorgente** del WEB-DL è più alto. Se dai a

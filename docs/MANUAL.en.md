@@ -1972,7 +1972,11 @@ more. File size, subtitles and swarm health help choose between equivalent
 releases, but on their own they never re-download an episode or a movie of the
 same quality. The same rule holds for season packs and after the download: a
 file of the same quality does not replace the archived copy just because its
-score is higher.
+score is higher. When the archived copy does not declare the source or the
+group (for example a file imported or renamed with the title only), those
+fields are not credited to the release found: without proof that the copy is
+worse, it is not replaced. `ffprobe` fills resolution, codec, audio and channels
+when the name has lost them.
 
 The rule that prefers a WEB-DL source to a WEBRip or HDTV one follows the
 weights too: it holds only while the WEB-DL **Source** weight is higher. Give

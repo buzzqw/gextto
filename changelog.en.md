@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 22 October 2026
 
+- **Upgrades: no re-download when the copy's name lost its source or group.** When the archived copy does not declare the source or the group (for example a file imported or renamed with the title only), those fields are no longer credited to the release found: without proof that the copy is worse, it is not replaced. `ffprobe` also fills the audio channels when the name has lost them. A library file called just `[1080p][h264][EAC3]` is therefore not re-downloaded just because the release found is the same one with the full name `WEB-DL DDP5.1 ...`.
+
 - **Upgrades: the score no longer re-downloads files already in the library.** The rule that requires a real technical gain, not just a higher score, now applies everywhere. Season packs already downloading no longer fetch episodes already present at the same quality, a file of the same quality no longer replaces the archived copy after the download, and a pack episode is scored with its own size instead of the whole pack's. **Allow upgrades: No** is honoured even when the archive scan cannot find the file (a moved folder, an unreachable disk), as long as the library says where it is. The *Library impact* panel now looks at the files actually present, like the cycle does.
 
 - **Quality profiles: renaming no longer changes the number.** A profile's number is what Jellyseerr remembers: before, renaming a profile in the editor (or saving from a page opened before a change) gave it a new number. Now every editor row carries its own number.
