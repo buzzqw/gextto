@@ -153,7 +153,7 @@ func createSnapshot(dataDir, backupRoot string, retain int, extras []string) (st
 	// Serialize in-process backups: a manual and a scheduled backup starting
 	// together must not write the same archive.
 	if !backupMu.TryLock() {
-		return "", fmt.Errorf("backup già in corso")
+		return "", fmt.Errorf("a backup is already running")
 	}
 	defer backupMu.Unlock()
 
@@ -202,14 +202,14 @@ func createSnapshot(dataDir, backupRoot string, retain int, extras []string) (st
 		if err != nil {
 			// Permission and I/O errors must not be mistaken for an optional DB:
 			// publishing a partial backup would make disaster recovery unreliable.
-			return "", fmt.Errorf("impossibile leggere %s per il backup: %w", name, err)
+			return "", fmt.Errorf("cannot read %s for the backup: %w", name, err)
 		}
 		if !info.Mode().IsRegular() {
-			return "", fmt.Errorf("database %s non è un file regolare", name)
+			return "", fmt.Errorf("database %s is not a regular file", name)
 		}
 		snapshot := filepath.Join(temp, name)
 		if err := snapshotDatabase(source, snapshot); err != nil {
-			return "", fmt.Errorf("snapshot di %s fallito: %w", name, err)
+			return "", fmt.Errorf("snapshot of %s failed: %w", name, err)
 		}
 		snapshots = append(snapshots, dbSnapshot{name: name, path: snapshot})
 	}
@@ -255,7 +255,7 @@ func createSnapshot(dataDir, backupRoot string, retain int, extras []string) (st
 	// Verify the archive is readable before publishing it.
 	if err := verifyZipArchive(tmpZip); err != nil {
 		_ = os.Remove(tmpZip)
-		return "", fmt.Errorf("verifica archivio fallita: %w", err)
+		return "", fmt.Errorf("archive verification failed: %w", err)
 	}
 	if err := os.Rename(tmpZip, destination); err != nil {
 		_ = os.Remove(tmpZip)
@@ -457,7 +457,7 @@ func TestFTP(host, user, password, remotePath string) FtpTestReport {
 func UploadFTP(archive, host, user, password, remotePath string) error {
 	conn, err := ftp.Dial(ftpEndpoint(host))
 	if err != nil {
-		return fmt.Errorf("connessione FTP fallita: %w", err)
+		return fmt.Errorf("FTP connection failed: %w", err)
 	}
 	defer func() { _ = conn.Quit() }()
 	if err := conn.Login(user, password); err != nil {
@@ -534,7 +534,7 @@ func addExtraPaths(writer *zip.Writer, dataDir string, extras []string) error {
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("backup: impossibile leggere %s: %w", path, err)
+			return fmt.Errorf("backup: cannot read %s: %w", path, err)
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
 			// Following a symlink could pull in a whole disk outside the

@@ -65,6 +65,18 @@ func buildIdentity() string {
 	return identity
 }
 
+// restartDivider draws the eye to a restart in a long log. The banner under it
+// says what happened; the line is only the boundary.
+const restartDivider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+// startupSeparator is the divider before a restart, empty on the first start.
+func startupSeparator(prev runState) string {
+	if prev.Runs <= 0 {
+		return ""
+	}
+	return restartDivider
+}
+
 // startupDetails is what the start line says besides the version: where the
 // interface listens, whether downloads are enabled and which engine is used.
 // They are the facts a person wants after a restart, not a second line.
@@ -115,6 +127,9 @@ func shutdownBanner(s runState, now time.Time, reason string) string {
 func logStartupBanner(dataDir string, details startupDetails) runState {
 	prev := loadRunState(dataDir)
 	now := time.Now().UTC()
+	if separator := startupSeparator(prev); separator != "" {
+		logging.Info(separator)
+	}
 	logging.Info(startupBanner(prev, now, details))
 	saveRunState(dataDir, runState{
 		Runs:      prev.Runs + 1,

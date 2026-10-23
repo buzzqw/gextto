@@ -116,6 +116,23 @@ func TestBGSpeedMaxTextShowsTheConfiguredCeiling(t *testing.T) {
 	}
 }
 
+func TestAutotuneDigestAllUnlimited(t *testing.T) {
+	var g bg_autotuneDigest
+	start := time.Date(2026, 10, 23, 10, 0, 0, 0, time.UTC)
+	if !g.add(start, 0, 0, "free") {
+		t.Fatal("the first step was not logged")
+	}
+	g.add(start.Add(time.Minute), 0, 0, "free")
+	line, ok := g.summary(start.Add(15*time.Minute), 0, 0)
+	if !ok {
+		t.Fatal("no digest")
+	}
+	want := "🎚️ Autotune (last 15m 00s): 1 adjustment, no speed limit the whole time."
+	if line != want {
+		t.Fatalf("digest = %q, want %q", line, want)
+	}
+}
+
 func TestAutotuneStepTextDoesNotRepeatUnlimited(t *testing.T) {
 	if got := bg_autotuneStepText(0, 0, []string{"upload to unlimited"}, "", ""); got != "🎚️ Autotune: no speed limit" {
 		t.Fatalf("both unlimited = %q", got)

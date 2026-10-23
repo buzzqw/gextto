@@ -1072,7 +1072,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 			break
 		}
 		if hash == nil {
-			runErr = fmt.Errorf("torrent non aggiunto")
+			runErr = fmt.Errorf("torrent not added")
 			break
 		}
 		_ = os.Remove(path)
@@ -1097,7 +1097,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		result = map[string]any{"method": "magnet"}
 	default:
-		runErr = fmt.Errorf("metodo comics non supportato")
+		runErr = fmt.Errorf("unsupported comics method")
 	}
 	if runErr != nil {
 		jsonError(w, http.StatusBadGateway, runErr.Error())
@@ -1506,9 +1506,9 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 		}
 		if _, err := os.Stat(target.Path); err != nil {
 			skipped++
-			reason := "file non esistente"
+			reason := "file does not exist"
 			if !os.IsNotExist(err) {
-				reason = "errore di accesso: " + err.Error()
+				reason = "access error: " + err.Error()
 			}
 			missingFiles = append(missingFiles, target.Path+" ("+reason+")")
 			missingItems = append(missingItems, map[string]any{
@@ -1521,7 +1521,7 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 				"year":    target.Year,
 				"reason":  reason,
 			})
-			logging.Debug("media info backfill: file assente, salto",
+			logging.Debug("media info backfill: file missing, skipped",
 				"kind", target.Kind, "series", target.Series, "season", target.Season,
 				"episode", target.Episode, "name", target.Name, "path", target.Path)
 			continue
@@ -1557,7 +1557,7 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 			}
 		} else {
 			failed++
-			gh0_logMediaInfoFailure(target, "nessuna riga corrispondente nel database (episodio o film non trovato)", &failedItems)
+			gh0_logMediaInfoFailure(target, "no matching row in the database (episode or movie not found)", &failedItems)
 		}
 	}
 	return map[string]any{

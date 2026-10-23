@@ -86,7 +86,7 @@ func rollbackGxTorrentBinary(binary string) (bool, error) {
 	if err := os.Rename(prev, binary); err != nil {
 		// Put the current binary back so the daemon still has something to run.
 		if restoreErr := os.Rename(failed, binary); restoreErr != nil {
-			return false, fmt.Errorf("rollback gx-torrent: %w (il binario attuale non è stato ripristinato: %v)", err, restoreErr)
+			return false, fmt.Errorf("gx-torrent rollback: %w (the current binary was not restored: %v)", err, restoreErr)
 		}
 		return false, fmt.Errorf("rollback gx-torrent: %w", err)
 	}

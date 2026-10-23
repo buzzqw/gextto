@@ -16,7 +16,9 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 23 ottobre 2026
 
-- **Il log parla la lingua di chi usa Gextto.** Le righe di avvio, ricerca, velocità e download sono ora frasi leggibili invece di elenchi di campi tecnici: «Gextto restarted (run #594) — 1.1.2013 · it was down for 6 seconds · web interface at …», «Speed: no speed limit (Auto)», «Searching: 25% done (26 of 104 titles)». I dettagli tecnici restano nel log di debug, dove servono.
+- **Il log parla la lingua di chi usa Gextto, sempre in inglese.** Le righe di avvio, ricerca, velocità e download sono ora frasi leggibili invece di elenchi di campi tecnici: «Gextto restarted (run #594) — 1.1.2013 · it was down for 6 seconds · web interface at …», «Speed: no speed limit (Auto)», «Searching: 25% done (26 of 104 titles)». Titoli, episodi e nomi dei file restano nella loro lingua; la frase intorno e gli errori tecnici sono in inglese. I dettagli tecnici restano nel log di debug, dove servono.
+
+- **Un riavvio si vede subito.** Prima della riga di riavvio c'è una riga divisoria evidente, così in un log lungo il punto in cui Gextto è ripartito si trova a colpo d'occhio. Il primo avvio non ha la riga divisoria.
 
 - **Meno ripetizioni e meno decorazioni.** Un riavvio non occupa più sei righe (avvio, riavvio, prossima ricerca e velocità sono una riga sola), i separatori di trattini e di uguali sono spariti, l'avanzamento della ricerca compare a quarti invece che ogni minuto, e l'attesa della lista file di un torrent si ripete ogni sei ore invece che ogni ora.
 

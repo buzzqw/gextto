@@ -159,7 +159,7 @@ func readEngineFallbackState(dataDir string) engineFallbackState {
 
 func writeEngineFallbackState(dataDir string, state engineFallbackState) error {
 	if strings.TrimSpace(dataDir) == "" {
-		return errors.New("directory dati Gextto non configurata")
+		return errors.New("Gextto data directory is not configured")
 	}
 	raw, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {

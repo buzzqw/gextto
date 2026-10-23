@@ -413,7 +413,7 @@ func ProbeBestResult(path string) (MediaInfo, error) {
 	if err == nil && info.IsDir() {
 		entries, readErr := os.ReadDir(path)
 		if readErr != nil {
-			return MediaInfo{}, fmt.Errorf("cartella non leggibile: %w", readErr)
+			return MediaInfo{}, fmt.Errorf("folder not readable: %w", readErr)
 		}
 		bestSize := int64(-1)
 		bestPath := ""
@@ -439,15 +439,15 @@ func ProbeBestResult(path string) (MediaInfo, error) {
 		case bestSize >= 0:
 			return ProbeResult(bestPath)
 		case anyVideo:
-			return MediaInfo{}, errors.New("nessun file video leggibile nella cartella")
+			return MediaInfo{}, errors.New("no readable video file in the folder")
 		default:
-			return MediaInfo{}, errors.New("cartella vuota o senza file video")
+			return MediaInfo{}, errors.New("empty folder or no video files")
 		}
 	}
 	if err == nil {
-		return MediaInfo{}, errors.New("percorso non valido: non è un file né una cartella")
+		return MediaInfo{}, errors.New("invalid path: it is neither a file nor a folder")
 	}
-	return MediaInfo{}, errors.New("file o cartella non trovata")
+	return MediaInfo{}, errors.New("file or folder not found")
 }
 
 // Available reports whether `ffprobe` can be executed. It lets the scheduler
@@ -472,12 +472,12 @@ func Probe(path string) *MediaInfo {
 func ProbeResult(path string) (MediaInfo, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
-		return MediaInfo{}, errors.New("percorso vuoto")
+		return MediaInfo{}, errors.New("empty path")
 	}
 	// Reject a leading dash so the path can never be parsed as an ffprobe
 	// option (argument injection). The daemon only probes local media.
 	if strings.HasPrefix(path, "-") {
-		return MediaInfo{}, errors.New("percorso non valido")
+		return MediaInfo{}, errors.New("invalid path")
 	}
 	// A bounded timeout keeps a hung probe from pinning a worker, and the
 	// protocol whitelist keeps ffprobe from following remote URLs (SSRF).
@@ -500,20 +500,20 @@ func ProbeResult(path string) (MediaInfo, error) {
 			stderr := strings.TrimSpace(strings.ToValidUTF8(string(exitError.Stderr), "\uFFFD"))
 			if stderr == "" {
 				if code := exitError.ExitCode(); code >= 0 {
-					return MediaInfo{}, fmt.Errorf("ffprobe è uscito con stato exit status: %d", code)
+					return MediaInfo{}, fmt.Errorf("ffprobe exited with status: %d", code)
 				}
-				return MediaInfo{}, fmt.Errorf("ffprobe è uscito con stato %s", exitError.ProcessState)
+				return MediaInfo{}, fmt.Errorf("ffprobe exited with status %s", exitError.ProcessState)
 			}
 			return MediaInfo{}, errors.New(miTruncateRunes(stderr, 300))
 		}
-		return MediaInfo{}, fmt.Errorf("impossibile eseguire ffprobe: %w", err)
+		return MediaInfo{}, fmt.Errorf("cannot run ffprobe: %w", err)
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(output))
 	decoder.UseNumber()
 	var root any
 	if err := decoder.Decode(&root); err != nil {
-		return MediaInfo{}, fmt.Errorf("output ffprobe non valido: %w", err)
+		return MediaInfo{}, fmt.Errorf("invalid ffprobe output: %w", err)
 	}
 	if object, ok := root.(map[string]any); ok {
 		return ParseFfprobe(object), nil

@@ -952,7 +952,7 @@ func applyIPFilter(ctx context.Context, s *AppState) (int, string, error) {
 	cfg := latestConfig(s)
 	target := strings.TrimSpace(cfg.Transfer.IpFilterPath)
 	if target == "" {
-		return 0, "", fmt.Errorf("nessun IP filter configurato")
+		return 0, "", fmt.Errorf("no IP filter configured")
 	}
 	localPath := target
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {

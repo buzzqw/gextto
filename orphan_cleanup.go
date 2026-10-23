@@ -124,7 +124,7 @@ func FindOrphanedDownloads(cfg *Config, db *Database, torrents TorrentEngine) []
 // when the trash path is not configured.
 func CleanOrphanedDownloads(cfg *Config, db *Database, torrents TorrentEngine) (int, int64, error) {
 	if cfg == nil || cfg.TrashPath == nil || strings.TrimSpace(*cfg.TrashPath) == "" {
-		return 0, 0, fmt.Errorf("cartella cestino non configurata")
+		return 0, 0, fmt.Errorf("trash folder is not configured")
 	}
 	items := FindOrphanedDownloads(cfg, db, torrents)
 	moved, movedBytes := 0, int64(0)

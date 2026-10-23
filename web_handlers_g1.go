@@ -146,7 +146,7 @@ func gh1_mediaTestError(provider string, status int) string {
 	case 401, 403:
 		return fmt.Sprintf("%s: credenziali non valide", provider)
 	case 404:
-		return fmt.Sprintf("%s: endpoint non trovato, controlla l'URL", provider)
+		return fmt.Sprintf("%s: endpoint not found, check the URL", provider)
 	default:
 		return fmt.Sprintf("%s: HTTP %d", provider, status)
 	}

@@ -499,7 +499,7 @@ func TestBackupConcurrentSnapshotsAreSafe(t *testing.T) {
 			readBackupZip(t, results[i])
 			continue
 		}
-		if !strings.Contains(errs[i].Error(), "in corso") {
+		if !strings.Contains(errs[i].Error(), "already running") {
 			t.Fatalf("unexpected concurrent error: %v", errs[i])
 		}
 	}

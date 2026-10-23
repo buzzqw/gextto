@@ -45,7 +45,7 @@ func speedModeWrites(mode string) ([][2]string, error) {
 	case speedModeSchedule:
 		return [][2]string{{"torrent_sched_enabled", "true"}}, nil
 	}
-	return nil, fmt.Errorf("modalità velocità non valida: %q (auto, fixed o schedule)", mode)
+	return nil, fmt.Errorf("invalid speed mode: %q (auto, fixed or schedule)", mode)
 }
 
 // speedExceptionDurations are the durations of the exception offered in

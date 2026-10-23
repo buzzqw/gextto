@@ -28,6 +28,12 @@ var logSnakeCase = regexp.MustCompile(`\b[a-z][a-z0-9]*_[a-z0-9_]+\b`)
 // of passed as an argument: " · released: 3".
 var logEmbeddedField = regexp.MustCompile(` · [A-Za-z_][A-Za-z0-9_]*: `)
 
+// logItalianText finds an Italian sentence in a message. Titles and release
+// names arrive as arguments and keep their language; the sentence around them
+// is English.
+var logItalianText = regexp.MustCompile(`(?i)\b(il|una|della|delle|degli|nella|nelle|negli|sono|hanno|essere|fatto|fatta|più|anche|questo|questa|questi|queste|dalla|dagli|dalle|senza|dopo|sempre|errore|errori|impossibile|nessun|nessuna|recupero|salvataggio|scaricato|scaricata|scaricare|titolo|titoli|episodio|episodi|cartella|cartelle|percorso|percorsi|giorno|giorni|minuti|secondi|avviso|avvisi|attenzione|fallito|fallita|mancante|mancanti|trovato|trovata|letto|letta|scritto|scritta|spostato|spostata|rimosso|rimossa|chiuso|chiusa|aperto|aperta|controllo|verifica|inizio|configurazione|impostazione|valore|valori|elenco|riga|righe|nuovo|nuova|vecchio|vecchia|primo|ultimo|assente|salto|disponibile|riuscito|riuscita|provato|tentativo|attesa|pronto|pronta|caricato|caricata|salvato|salvata|eliminato|eliminata|aggiunto|aggiunta|creato|creata|perché|perche|cioè|cioe|già|gia|può|puo|deve|devono|viene|vengono)\b`)
+var logItalianLetters = regexp.MustCompile(`[àèéìòùÀÈÉÌÒÙ]`)
+
 func TestLogCallsAreReadable(t *testing.T) {
 	files, err := filepath.Glob("*.go")
 	if err != nil {
@@ -57,6 +63,14 @@ func TestLogCallsAreReadable(t *testing.T) {
 				}
 				if found := logEmbeddedField.FindString(message); found != "" {
 					t.Errorf("%s:%d: message %q embeds the field %q; pass the value as a logging argument",
+						name, line, message, found)
+				}
+				if found := logItalianText.FindString(message); found != "" {
+					t.Errorf("%s:%d: message %q contains the Italian word %q; the log is always in English",
+						name, line, message, found)
+				}
+				if found := logItalianLetters.FindString(message); found != "" {
+					t.Errorf("%s:%d: message %q contains the non-English character %q",
 						name, line, message, found)
 				}
 			}

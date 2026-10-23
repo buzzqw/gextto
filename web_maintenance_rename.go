@@ -176,18 +176,18 @@ func MaintenanceRenameFolderApply(w http.ResponseWriter, r *http.Request, s *App
 func folderRenameRoot(value string) (string, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return "", fmt.Errorf("percorso cartella vuoto")
+		return "", fmt.Errorf("empty folder path")
 	}
 	root, err := filepath.Abs(trimmed)
 	if err != nil {
-		return "", fmt.Errorf("percorso non valido: %w", err)
+		return "", fmt.Errorf("invalid path: %w", err)
 	}
 	info, err := os.Stat(root)
 	if err != nil {
-		return "", fmt.Errorf("cartella non accessibile: %w", err)
+		return "", fmt.Errorf("folder not accessible: %w", err)
 	}
 	if !info.IsDir() {
-		return "", fmt.Errorf("il percorso non è una cartella")
+		return "", fmt.Errorf("the path is not a folder")
 	}
 	return filepath.Clean(root), nil
 }
@@ -195,30 +195,30 @@ func folderRenameRoot(value string) (string, error) {
 func folderRenameValidatePair(root, sourceValue, targetValue string) (string, string, error) {
 	source, err := filepath.Abs(strings.TrimSpace(sourceValue))
 	if err != nil {
-		return "", "", fmt.Errorf("sorgente non valida")
+		return "", "", fmt.Errorf("invalid source")
 	}
 	target, err := filepath.Abs(strings.TrimSpace(targetValue))
 	if err != nil {
-		return "", "", fmt.Errorf("destinazione non valida")
+		return "", "", fmt.Errorf("invalid destination")
 	}
 	if !folderRenameWithin(root, source) || !folderRenameWithin(root, target) {
-		return "", "", fmt.Errorf("sorgente o destinazione fuori dalla cartella analizzata")
+		return "", "", fmt.Errorf("source or destination is outside the scanned folder")
 	}
 	if filepath.Dir(source) != filepath.Dir(target) {
-		return "", "", fmt.Errorf("la destinazione deve restare nella stessa sottocartella")
+		return "", "", fmt.Errorf("the destination must stay in the same subfolder")
 	}
 	if filepath.Base(target) == "." || filepath.Base(target) == ".." || strings.ContainsRune(filepath.Base(target), 0) {
-		return "", "", fmt.Errorf("nome destinazione non valido")
+		return "", "", fmt.Errorf("invalid destination name")
 	}
 	info, err := os.Lstat(source)
 	if err != nil {
-		return "", "", fmt.Errorf("sorgente non accessibile: %w", err)
+		return "", "", fmt.Errorf("source not accessible: %w", err)
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return "", "", fmt.Errorf("la sorgente è un collegamento simbolico")
+		return "", "", fmt.Errorf("the source is a symbolic link")
 	}
 	if !info.Mode().IsRegular() {
-		return "", "", fmt.Errorf("la sorgente non è un file regolare")
+		return "", "", fmt.Errorf("the source is not a regular file")
 	}
 	return filepath.Clean(source), filepath.Clean(target), nil
 }
@@ -242,7 +242,7 @@ func folderRenameScan(ctx context.Context, root string, cfg *Config) ([]folderRe
 		}
 		paths = append(paths, path)
 		if len(paths) > folderRenameMaxFiles {
-			return fmt.Errorf("la cartella contiene più di %d video: restringi il percorso", folderRenameMaxFiles)
+			return fmt.Errorf("the folder contains more than %d videos: narrow the path", folderRenameMaxFiles)
 		}
 		return nil
 	})
@@ -484,7 +484,7 @@ func folderRenameSortCandidates(candidates []folderRenameCandidate) []folderRena
 
 func folderRenameEpisodeTitle(ctx context.Context, cfg *Config, candidate folderRenameCandidate, season, episode int64) (string, error) {
 	if candidate.ID == "" {
-		return "", fmt.Errorf("episodio non disponibile")
+		return "", fmt.Errorf("episode not available")
 	}
 	// The id belongs to the provider that found the candidate.
 	var title *string
@@ -493,17 +493,17 @@ func folderRenameEpisodeTitle(ctx context.Context, cfg *Config, candidate folder
 	case "tvdb":
 		tvdb := tvdbClientFor(cfg)
 		if !tvdb.Configured() {
-			return "", fmt.Errorf("episodio non disponibile")
+			return "", fmt.Errorf("episode not available")
 		}
 		title, err = tvdb.EpisodeTitle(ctx, candidate.ID, season, episode)
 	default:
 		if cfg.TmdbAPIKey == nil {
-			return "", fmt.Errorf("episodio non disponibile")
+			return "", fmt.Errorf("episode not available")
 		}
 		title, err = NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage()).EpisodeTitle(ctx, candidate.ID, season, episode)
 	}
 	if err != nil || title == nil {
-		return "", fmt.Errorf("episodio non disponibile")
+		return "", fmt.Errorf("episode not available")
 	}
 	return strings.TrimSpace(*title), nil
 }

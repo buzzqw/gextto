@@ -361,7 +361,7 @@ func TestTvdbSeriesCharactersOutputCappedAtTen(t *testing.T) {
 func TestTvdbKeyError(t *testing.T) {
 	for _, key := range []*string{nil, ptr("   ")} {
 		_, err := New(key).SearchSeries(context.Background(), "x")
-		if err == nil || err.Error() != "TVDB API key non configurata" {
+		if err == nil || err.Error() != "TVDB API key is not configured" {
 			t.Fatalf("key %v: error = %v", key, err)
 		}
 	}
@@ -382,7 +382,7 @@ func TestTvdbLoginWithoutToken(t *testing.T) {
 		tvdbWriteJSON(t, w, `{"data":{}}`)
 	})
 	_, err := New(ptr("key")).SearchSeries(context.Background(), "x")
-	if err == nil || err.Error() != "TVDB login senza token" {
+	if err == nil || err.Error() != "TVDB login returned no token" {
 		t.Fatalf("error = %v", err)
 	}
 }

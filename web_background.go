@@ -1804,12 +1804,17 @@ func (g *bg_autotuneDigest) summary(now time.Time, down, up int64) (string, bool
 	if g.steps == 0 || now.Sub(g.since) < bg_autotuneDigestEvery {
 		return "", false
 	}
-	line := fmt.Sprintf("🎚️ Autotune (last %s): %d adjustments. Download %s, upload %s; now %s.",
-		logging.HumanDuration(int64(now.Sub(g.since).Seconds())), g.steps,
-		bg_limitRange(g.minDown, g.maxDown), bg_limitRange(g.minUp, g.maxUp),
-		speedPairText(down, up))
+	elapsed := logging.HumanDuration(int64(now.Sub(g.since).Seconds()))
+	steps := g.steps
 	g.since, g.steps = now, 0
-	return line, true
+	if down <= 0 && up <= 0 && g.minDown <= 0 && g.maxDown <= 0 && g.minUp <= 0 && g.maxUp <= 0 {
+		return fmt.Sprintf("🎚️ Autotune (last %s): %s, no speed limit the whole time.",
+			elapsed, countLabel(steps, "adjustment", "adjustments")), true
+	}
+	return fmt.Sprintf("🎚️ Autotune (last %s): %s. Download %s, upload %s; now %s.",
+		elapsed, countLabel(steps, "adjustment", "adjustments"),
+		bg_limitRange(g.minDown, g.maxDown), bg_limitRange(g.minUp, g.maxUp),
+		speedPairText(down, up)), true
 }
 
 // bg_limitMin/bg_limitMax order speed limits where 0 (or less) is unlimited,

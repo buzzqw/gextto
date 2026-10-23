@@ -396,7 +396,11 @@ through the API.
 ### Log lines are for the user
 The log is read by the person running Gextto, not by a developer. Every INFO,
 WARN and ERROR line is a sentence in natural language saying what happened and,
-when relevant, why.
+when relevant, why. **The log is always in English**: titles, release names,
+episodes and paths keep their original language, the sentence around them does
+not. Error strings reachable from a log line are English too.
+- A restart is one divider line (`━…`) followed by one sentence; the first
+  start has neither.
 - No `key: value` trails (`releases_examined: 15064`), no internal state names
   (`downloading_metadata`). Field labels are written in words by the logger
   (`downloaded bytes`, not `downloaded_bytes`); use the structured arguments
@@ -408,7 +412,8 @@ when relevant, why.
 - Keep the `acq` id when it helps follow one download; keep hashes out of the
   message.
 - `log_readability_test.go` enforces the mechanical part: a new call with a
-  `snake_case` message or a ` · key: ` field inside the message fails the tests.
+  `snake_case` message, a ` · key: ` field inside the message or an Italian
+  sentence fails the tests.
 
 ### Documentation and manuals
 - **Manuals** (`docs/MANUAL.it.md` and `docs/MANUAL.en.md`): they are updated

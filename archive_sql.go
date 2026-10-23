@@ -95,7 +95,7 @@ func archiveSQLLanguageParams(code string) (tokensJSON, rawJSON, normalized stri
 	}
 	language, ok := archiveSQLLanguageByCode(normalized)
 	if !ok {
-		return "", "", normalized, fmt.Errorf("lingua non valida: %s", code)
+		return "", "", normalized, fmt.Errorf("invalid language: %s", code)
 	}
 	tokens, err := json.Marshal(language.tokens)
 	if err != nil {
@@ -139,13 +139,13 @@ func LoadArchiveSQLOperations() ([]ArchiveSQLOperation, error) {
 func loadArchiveSQLOperations(fsys fs.FS, dir string) ([]ArchiveSQLOperation, error) {
 	matches, err := fs.Glob(fsys, dir+"/*.select.sql")
 	if err != nil {
-		return nil, fmt.Errorf("elenco script SQL: %w", err)
+		return nil, fmt.Errorf("listing the SQL scripts: %w", err)
 	}
 	operations := make([]ArchiveSQLOperation, 0, len(matches))
 	for _, selectPath := range matches {
 		raw, err := fs.ReadFile(fsys, selectPath)
 		if err != nil {
-			return nil, fmt.Errorf("lettura %s: %w", selectPath, err)
+			return nil, fmt.Errorf("reading %s: %w", selectPath, err)
 		}
 		meta, previewSQL, err := parseArchiveSQLFile(string(raw))
 		if err != nil {
@@ -165,10 +165,10 @@ func loadArchiveSQLOperations(fsys fs.FS, dir string) ([]ArchiveSQLOperation, er
 			PreviewSQL:    previewSQL,
 		}
 		if operation.NeedsLanguage && (!strings.Contains(previewSQL, ":tokens") || !strings.Contains(previewSQL, ":raw")) {
-			return nil, fmt.Errorf("%s: un'operazione con param=language deve usare :tokens e :raw", selectPath)
+			return nil, fmt.Errorf("%s: an operation with param=language must use :tokens and :raw", selectPath)
 		}
 		if !operation.NeedsLanguage && strings.Contains(previewSQL, ":tokens") {
-			return nil, fmt.Errorf("%s: :tokens richiede param=language", selectPath)
+			return nil, fmt.Errorf("%s: :tokens requires param=language", selectPath)
 		}
 		if operation.Title == "" {
 			operation.Title = strings.ReplaceAll(id, "_", " ")
@@ -189,17 +189,17 @@ func loadArchiveSQLOperations(fsys fs.FS, dir string) ([]ArchiveSQLOperation, er
 				return nil, fmt.Errorf("%s: %w", deletePath, err)
 			}
 			if operation.NeedsLanguage && (!strings.Contains(deleteSQL, ":tokens") || !strings.Contains(deleteSQL, ":raw")) {
-				return nil, fmt.Errorf("%s: un'operazione con param=language deve usare :tokens e :raw", deletePath)
+				return nil, fmt.Errorf("%s: an operation with param=language must use :tokens and :raw", deletePath)
 			}
 			if !operation.NeedsLanguage && strings.Contains(deleteSQL, ":tokens") {
-				return nil, fmt.Errorf("%s: :tokens richiede param=language", deletePath)
+				return nil, fmt.Errorf("%s: :tokens requires param=language", deletePath)
 			}
 			operation.Destructive = true
 			operation.DeleteSQL = deleteSQL
 		case errors.Is(err, fs.ErrNotExist):
 			// Read-only operation.
 		default:
-			return nil, fmt.Errorf("lettura %s: %w", deletePath, err)
+			return nil, fmt.Errorf("reading %s: %w", deletePath, err)
 		}
 
 		operations = append(operations, operation)
@@ -224,7 +224,7 @@ func parseArchiveSQLFile(raw string) (map[string]string, string, error) {
 		if strings.HasPrefix(trimmed, "-- gextto:") {
 			key, value, ok := strings.Cut(strings.TrimPrefix(trimmed, "-- gextto:"), "=")
 			if !ok {
-				return nil, "", fmt.Errorf("intestazione non valida: %s", trimmed)
+				return nil, "", fmt.Errorf("invalid header: %s", trimmed)
 			}
 			meta[strings.TrimSpace(key)] = strings.TrimSpace(value)
 			continue
@@ -233,7 +233,7 @@ func parseArchiveSQLFile(raw string) (map[string]string, string, error) {
 	}
 	sqlText := strings.TrimSpace(strings.Join(body, "\n"))
 	if sqlText == "" {
-		return nil, "", errors.New("script SQL vuoto")
+		return nil, "", errors.New("empty SQL script")
 	}
 	return meta, sqlText, nil
 }
@@ -249,41 +249,41 @@ func trimArchiveSQL(query string) string {
 func validateArchiveSQL(query string, deleteStatement bool) error {
 	query = trimArchiveSQL(query)
 	if query == "" {
-		return errors.New("script SQL vuoto")
+		return errors.New("empty SQL script")
 	}
 	if strings.Contains(query, ";") {
-		return errors.New("sono ammessi solo comandi singoli, senza ';' intermedi")
+		return errors.New("only single statements are allowed, with no intermediate ';'")
 	}
 	keywords := sqlTopLevelKeywords(query)
 	if len(keywords) == 0 {
-		return errors.New("comando SQL non riconosciuto")
+		return errors.New("unrecognised SQL statement")
 	}
 	for _, keyword := range keywords {
 		switch keyword {
 		case "ATTACH", "DETACH", "PRAGMA", "VACUUM", "CREATE", "DROP", "ALTER", "INSERT", "UPDATE", "REPLACE":
-			return fmt.Errorf("comando non consentito: %s", keyword)
+			return fmt.Errorf("statement not allowed: %s", keyword)
 		}
 	}
 	if !deleteStatement {
 		if keywords[0] != "SELECT" && keywords[0] != "WITH" {
-			return errors.New("l'anteprima deve essere una SELECT o una WITH ... SELECT")
+			return errors.New("the preview must be a SELECT or a WITH ... SELECT")
 		}
 		for _, keyword := range keywords {
 			if keyword == "DELETE" {
-				return errors.New("l'anteprima non può contenere un DELETE")
+				return errors.New("the preview cannot contain a DELETE")
 			}
 		}
 		return nil
 	}
 	if keywords[0] != "DELETE" && keywords[0] != "WITH" {
-		return errors.New("l'eliminazione deve essere un DELETE o una WITH ... DELETE")
+		return errors.New("the delete must be a DELETE or a WITH ... DELETE")
 	}
 	for _, keyword := range keywords {
 		if keyword == "DELETE" {
 			return nil
 		}
 	}
-	return errors.New("l'eliminazione non contiene un DELETE")
+	return errors.New("the delete does not contain a DELETE")
 }
 
 // sqlTopLevelKeywords returns the SQL words outside parentheses, strings and
@@ -360,7 +360,7 @@ func isArchiveSQLWordPart(c byte) bool {
 // rows plus the total number of matching rows.
 func (a *Archive) PreviewArchiveSQL(ctx context.Context, operation ArchiveSQLOperation, language string) (ArchiveSQLPreview, error) {
 	if a == nil || a.db == nil {
-		return ArchiveSQLPreview{}, errors.New("archivio non disponibile")
+		return ArchiveSQLPreview{}, errors.New("archive not available")
 	}
 	query := trimArchiveSQL(operation.PreviewSQL)
 	if err := validateArchiveSQL(query, false); err != nil {
@@ -381,7 +381,7 @@ func (a *Archive) PreviewArchiveSQL(ctx context.Context, operation ArchiveSQLOpe
 		queryArgs...,
 	)
 	if err != nil {
-		return ArchiveSQLPreview{}, fmt.Errorf("anteprima: %w", err)
+		return ArchiveSQLPreview{}, fmt.Errorf("preview: %w", err)
 	}
 	defer rows.Close()
 	columns, err := rows.Columns()
@@ -389,7 +389,7 @@ func (a *Archive) PreviewArchiveSQL(ctx context.Context, operation ArchiveSQLOpe
 		return ArchiveSQLPreview{}, err
 	}
 	if len(columns) == 0 {
-		return ArchiveSQLPreview{}, errors.New("anteprima senza colonne")
+		return ArchiveSQLPreview{}, errors.New("preview without columns")
 	}
 	// Drop the helper column from the table shown to the user.
 	dataColumns := len(columns) - 1
@@ -401,7 +401,7 @@ func (a *Archive) PreviewArchiveSQL(ctx context.Context, operation ArchiveSQLOpe
 			destinations[index] = &values[index]
 		}
 		if err := rows.Scan(destinations...); err != nil {
-			return ArchiveSQLPreview{}, fmt.Errorf("lettura anteprima: %w", err)
+			return ArchiveSQLPreview{}, fmt.Errorf("reading the preview: %w", err)
 		}
 		if result.Total == 0 {
 			result.Total = archiveSQLInt64(values[dataColumns])
@@ -413,7 +413,7 @@ func (a *Archive) PreviewArchiveSQL(ctx context.Context, operation ArchiveSQLOpe
 		result.Rows = append(result.Rows, row)
 	}
 	if err := rows.Err(); err != nil {
-		return ArchiveSQLPreview{}, fmt.Errorf("lettura anteprima: %w", err)
+		return ArchiveSQLPreview{}, fmt.Errorf("reading the preview: %w", err)
 	}
 	result.Shown = len(result.Rows)
 	result.Limited = result.Total > int64(result.Shown)
@@ -424,10 +424,10 @@ func (a *Archive) PreviewArchiveSQL(ctx context.Context, operation ArchiveSQLOpe
 // number of removed archive rows.
 func (a *Archive) DeleteArchiveSQL(ctx context.Context, operation ArchiveSQLOperation, language string) (int64, error) {
 	if a == nil || a.db == nil {
-		return 0, errors.New("archivio non disponibile")
+		return 0, errors.New("archive not available")
 	}
 	if !operation.Destructive || strings.TrimSpace(operation.DeleteSQL) == "" {
-		return 0, errors.New("operazione di sola lettura")
+		return 0, errors.New("read-only operation")
 	}
 	query := trimArchiveSQL(operation.DeleteSQL)
 	if err := validateArchiveSQL(query, true); err != nil {
@@ -444,7 +444,7 @@ func (a *Archive) DeleteArchiveSQL(ctx context.Context, operation ArchiveSQLOper
 	defer func() { _ = tx.Rollback() }()
 	result, err := tx.ExecContext(ctx, query, queryArgs...)
 	if err != nil {
-		return 0, fmt.Errorf("eliminazione: %w", err)
+		return 0, fmt.Errorf("delete: %w", err)
 	}
 	removed, err := result.RowsAffected()
 	if err != nil {

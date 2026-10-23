@@ -102,7 +102,7 @@ func cloneConfigWithSettings(cfg *Config) *Config {
 func managedQbittorrentConfig(cfg *Config) (*Config, error) {
 	prepared := cloneConfigWithSettings(cfg)
 	if prepared == nil {
-		return nil, errors.New("configurazione Gextto assente")
+		return nil, errors.New("Gextto configuration is missing")
 	}
 	baseURL := strings.TrimSpace(prepared.Settings["qbittorrent_url"])
 	if baseURL == "" {
@@ -110,17 +110,17 @@ func managedQbittorrentConfig(cfg *Config) (*Config, error) {
 	}
 	parsed, err := url.Parse(baseURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
-		return nil, errors.New("URL qBittorrent gestito non valido")
+		return nil, errors.New("invalid managed qBittorrent URL")
 	}
 	if parsed.Scheme != "http" {
-		return nil, errors.New("qBittorrent gestito richiede Web API HTTP locale")
+		return nil, errors.New("managed qBittorrent requires a local HTTP Web API")
 	}
 	host := parsed.Hostname()
 	if ip := net.ParseIP(host); ip != nil && !ip.IsLoopback() || ip == nil && !strings.EqualFold(host, "localhost") {
-		return nil, errors.New("qBittorrent gestito richiede un URL locale (localhost/loopback)")
+		return nil, errors.New("managed qBittorrent requires a local URL (localhost/loopback)")
 	}
 	if parsed.Path != "" && parsed.Path != "/" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil {
-		return nil, errors.New("qBittorrent gestito non supporta un prefisso URL")
+		return nil, errors.New("managed qBittorrent does not support a URL prefix")
 	}
 	parsed.Path = ""
 	parsed.RawPath = ""
@@ -133,7 +133,7 @@ func managedQbittorrentConfig(cfg *Config) (*Config, error) {
 	if password == "" {
 		bytes := make([]byte, 24)
 		if _, err := rand.Read(bytes); err != nil {
-			return nil, fmt.Errorf("generazione password qBittorrent: %w", err)
+			return nil, fmt.Errorf("generating the qBittorrent password: %w", err)
 		}
 		password = hex.EncodeToString(bytes)
 	}
@@ -172,7 +172,7 @@ func qbittorrentManagedBinary(cfg *Config) string {
 func ensureQbittorrentManagedDir(cfg *Config) (string, error) {
 	dir := qbittorrentManagedDir(cfg)
 	if dir == "" {
-		return "", errors.New("directory dati Gextto non configurata")
+		return "", errors.New("Gextto data directory is not configured")
 	}
 	info, err := os.Lstat(dir)
 	if errors.Is(err, os.ErrNotExist) {
@@ -185,7 +185,7 @@ func ensureQbittorrentManagedDir(cfg *Config) (string, error) {
 		return "", err
 	}
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return "", fmt.Errorf("cartella qBittorrent gestita non valida: %s", dir)
+		return "", fmt.Errorf("invalid managed qBittorrent folder: %s", dir)
 	}
 	if err := os.Chmod(dir, 0o700); err != nil {
 		return "", err
@@ -199,7 +199,7 @@ func qbittorrentManagedEnabled(cfg *Config) bool {
 
 func qbittorrentAssetArch() (string, error) {
 	if runtime.GOOS != "linux" {
-		return "", fmt.Errorf("qBittorrent statico disponibile solo per Linux, non per %s", runtime.GOOS)
+		return "", fmt.Errorf("static qBittorrent is available on Linux only, not on %s", runtime.GOOS)
 	}
 	switch runtime.GOARCH {
 	case "amd64":
@@ -227,7 +227,7 @@ func qbittorrentAssetArch() (string, error) {
 	case "loong64":
 		return "loongarch64", nil
 	default:
-		return "", fmt.Errorf("qBittorrent static build non disponibile per %s/%s", runtime.GOOS, runtime.GOARCH)
+		return "", fmt.Errorf("no static qBittorrent build for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 }
 
@@ -341,25 +341,25 @@ func fetchQbittorrentLatestRemote(ctx context.Context) (qbittorrentRelease, qbit
 		}
 	}
 	if !ok {
-		return qbittorrentRelease{}, qbittorrentAsset{}, fmt.Errorf("nessun asset qBittorrent libtorrent v2 per %s", arch)
+		return qbittorrentRelease{}, qbittorrentAsset{}, fmt.Errorf("no qBittorrent libtorrent v2 asset for %s", arch)
 	}
 	if !strings.HasPrefix(asset.Digest, "sha256:") {
-		return qbittorrentRelease{}, qbittorrentAsset{}, errors.New("GitHub non ha pubblicato il digest SHA-256 dell'asset")
+		return qbittorrentRelease{}, qbittorrentAsset{}, errors.New("GitHub did not publish the asset SHA-256 digest")
 	}
 	parsed, err := url.Parse(asset.DownloadURL)
 	digest := strings.TrimPrefix(asset.Digest, "sha256:")
 	if err != nil || parsed.Scheme != "https" || parsed.Host != "github.com" || !strings.HasPrefix(parsed.Path, "/userdocs/qbittorrent-nox-static/releases/download/") || len(digest) != sha256.Size*2 {
-		return qbittorrentRelease{}, qbittorrentAsset{}, errors.New("URL asset GitHub non attendibile")
+		return qbittorrentRelease{}, qbittorrentAsset{}, errors.New("untrusted GitHub asset URL")
 	}
 	if _, err := hex.DecodeString(digest); err != nil {
-		return qbittorrentRelease{}, qbittorrentAsset{}, errors.New("digest SHA-256 GitHub non valido")
+		return qbittorrentRelease{}, qbittorrentAsset{}, errors.New("invalid GitHub SHA-256 digest")
 	}
 	return release, asset, nil
 }
 
 func getQbittorrentRuntimeStatus(ctx context.Context, cfg *Config) (qbittorrentRuntimeStatus, error) {
 	if cfg == nil {
-		return qbittorrentRuntimeStatus{}, errors.New("configurazione Gextto assente")
+		return qbittorrentRuntimeStatus{}, errors.New("Gextto configuration is missing")
 	}
 	status := qbittorrentRuntimeStatus{
 		Managed:      qbittorrentManagedEnabled(cfg),
@@ -387,7 +387,7 @@ func installQbittorrentRuntime(ctx context.Context, cfg *Config) (qbittorrentRun
 	qbittorrentInstallMu.Lock()
 	defer qbittorrentInstallMu.Unlock()
 	if cfg == nil {
-		return qbittorrentRuntimeStatus{}, errors.New("configurazione Gextto assente")
+		return qbittorrentRuntimeStatus{}, errors.New("Gextto configuration is missing")
 	}
 	release, asset, err := fetchQbittorrentLatest(ctx)
 	if err != nil {
@@ -395,7 +395,7 @@ func installQbittorrentRuntime(ctx context.Context, cfg *Config) (qbittorrentRun
 	}
 	dir, err := ensureQbittorrentManagedDir(cfg)
 	if err != nil {
-		return qbittorrentRuntimeStatus{}, fmt.Errorf("creazione cartella qBittorrent: %w", err)
+		return qbittorrentRuntimeStatus{}, fmt.Errorf("creating the qBittorrent folder: %w", err)
 	}
 	tmp, err := os.CreateTemp(dir, ".qbittorrent-nox.download-*")
 	if err != nil {
@@ -415,10 +415,10 @@ func installQbittorrentRuntime(ctx context.Context, cfg *Config) (qbittorrentRun
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return qbittorrentRuntimeStatus{}, fmt.Errorf("download qBittorrent: HTTP %s", response.Status)
+		return qbittorrentRuntimeStatus{}, fmt.Errorf("qBittorrent download: HTTP %s", response.Status)
 	}
 	if asset.Size > qbittorrentMaxBinary {
-		return qbittorrentRuntimeStatus{}, fmt.Errorf("asset qBittorrent troppo grande: %d byte", asset.Size)
+		return qbittorrentRuntimeStatus{}, fmt.Errorf("qBittorrent asset too large: %d bytes", asset.Size)
 	}
 	hash := sha256.New()
 	written, err := io.Copy(io.MultiWriter(tmp, hash), io.LimitReader(response.Body, qbittorrentMaxBinary+1))
@@ -426,11 +426,11 @@ func installQbittorrentRuntime(ctx context.Context, cfg *Config) (qbittorrentRun
 		return qbittorrentRuntimeStatus{}, err
 	}
 	if written != asset.Size {
-		return qbittorrentRuntimeStatus{}, fmt.Errorf("download incompleto: %d/%d byte", written, asset.Size)
+		return qbittorrentRuntimeStatus{}, fmt.Errorf("incomplete download: %d/%d bytes", written, asset.Size)
 	}
 	want := strings.TrimPrefix(asset.Digest, "sha256:")
 	if !strings.EqualFold(hex.EncodeToString(hash.Sum(nil)), want) {
-		return qbittorrentRuntimeStatus{}, errors.New("verifica SHA-256 qBittorrent fallita")
+		return qbittorrentRuntimeStatus{}, errors.New("qBittorrent SHA-256 verification failed")
 	}
 	if err := tmp.Chmod(0o755); err != nil {
 		return qbittorrentRuntimeStatus{}, err
@@ -444,7 +444,7 @@ func installQbittorrentRuntime(ctx context.Context, cfg *Config) (qbittorrentRun
 		return qbittorrentRuntimeStatus{}, err
 	}
 	if err := os.Rename(tmpPath, binary); err != nil {
-		return qbittorrentRuntimeStatus{}, fmt.Errorf("installazione binario qBittorrent: %w", err)
+		return qbittorrentRuntimeStatus{}, fmt.Errorf("installing the qBittorrent binary: %w", err)
 	}
 	metadata := qbittorrentInstallMetadata{
 		Tag: release.TagName, Name: release.Name, Asset: asset.Name,
@@ -483,14 +483,14 @@ func qbittorrentProfileConfigPath(cfg *Config) string {
 // already created by qBittorrent.
 func writeManagedQbittorrentConfig(cfg *Config, settings qbittorrentSettings) error {
 	if cfg == nil {
-		return errors.New("configurazione Gextto assente")
+		return errors.New("Gextto configuration is missing")
 	}
 	if settings.Client.Username == "" || settings.Client.Password == "" {
-		return errors.New("credenziali qBittorrent gestito non configurate")
+		return errors.New("managed qBittorrent credentials are not configured")
 	}
 	hash, err := qbittorrentPasswordHash(settings.Client.Password)
 	if err != nil {
-		return fmt.Errorf("hash password qBittorrent: %w", err)
+		return fmt.Errorf("hashing the qBittorrent password: %w", err)
 	}
 	path := qbittorrentProfileConfigPath(cfg)
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -498,7 +498,7 @@ func writeManagedQbittorrentConfig(cfg *Config, settings qbittorrentSettings) er
 	}
 	data, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("lettura profilo qBittorrent: %w", err)
+		return fmt.Errorf("reading the qBittorrent profile: %w", err)
 	}
 	content := string(data)
 	content = qbittorrentINISet(content, "Preferences", "WebUI\\Enabled", "true")
@@ -516,11 +516,11 @@ func writeManagedQbittorrentConfig(cfg *Config, settings qbittorrentSettings) er
 	content = qbittorrentINISet(content, "LegalNotice", "Accepted", "true")
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, []byte(content), 0o600); err != nil {
-		return fmt.Errorf("scrittura profilo qBittorrent: %w", err)
+		return fmt.Errorf("writing the qBittorrent profile: %w", err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
 		_ = os.Remove(tmp)
-		return fmt.Errorf("installazione configurazione qBittorrent: %w", err)
+		return fmt.Errorf("installing the qBittorrent configuration: %w", err)
 	}
 	return nil
 }
@@ -583,10 +583,10 @@ func backupQbittorrentBinary(binary string) (string, error) {
 		return "", nil
 	}
 	if err != nil {
-		return "", fmt.Errorf("verifica binario qBittorrent esistente: %w", err)
+		return "", fmt.Errorf("verifying the existing qBittorrent binary: %w", err)
 	}
 	if !info.Mode().IsRegular() {
-		return "", fmt.Errorf("il percorso del binario qBittorrent non è un file regolare: %s", binary)
+		return "", fmt.Errorf("the qBittorrent binary path is not a regular file: %s", binary)
 	}
 	backup := fmt.Sprintf("%s.backup-%s", binary, time.Now().UTC().Format("20060102T150405.000000000Z"))
 	if err := os.Link(binary, backup); err == nil {
@@ -596,21 +596,21 @@ func backupQbittorrentBinary(binary string) (string, error) {
 	// exclusively-created backup without ever overwriting an older backup.
 	source, err := os.Open(binary)
 	if err != nil {
-		return "", fmt.Errorf("backup binario qBittorrent: %w", err)
+		return "", fmt.Errorf("backing up the qBittorrent binary: %w", err)
 	}
 	defer source.Close()
 	destination, err := os.OpenFile(backup, os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode().Perm())
 	if err != nil {
-		return "", fmt.Errorf("creazione backup binario qBittorrent: %w", err)
+		return "", fmt.Errorf("creating the qBittorrent binary backup: %w", err)
 	}
 	if _, copyErr := io.Copy(destination, source); copyErr != nil {
 		_ = destination.Close()
 		_ = os.Remove(backup)
-		return "", fmt.Errorf("copia backup binario qBittorrent: %w", copyErr)
+		return "", fmt.Errorf("copying the qBittorrent binary backup: %w", copyErr)
 	}
 	if err := destination.Close(); err != nil {
 		_ = os.Remove(backup)
-		return "", fmt.Errorf("chiusura backup binario qBittorrent: %w", err)
+		return "", fmt.Errorf("closing the qBittorrent binary backup: %w", err)
 	}
 	return verifyQbittorrentBackup(binary, backup)
 }
@@ -618,14 +618,14 @@ func backupQbittorrentBinary(binary string) (string, error) {
 func verifyQbittorrentBackup(original, backup string) (string, error) {
 	originalHash, err := sha256QbittorrentFile(original)
 	if err != nil {
-		return "", fmt.Errorf("verifica binario qBittorrent originale: %w", err)
+		return "", fmt.Errorf("verifying the original qBittorrent binary: %w", err)
 	}
 	backupHash, err := sha256QbittorrentFile(backup)
 	if err != nil {
-		return "", fmt.Errorf("verifica backup binario qBittorrent: %w", err)
+		return "", fmt.Errorf("verifying the qBittorrent binary backup: %w", err)
 	}
 	if originalHash != backupHash {
-		return "", errors.New("backup binario qBittorrent non corrisponde all'originale")
+		return "", errors.New("the qBittorrent binary backup does not match the original")
 	}
 	return backup, nil
 }
@@ -681,18 +681,18 @@ func startManagedQbittorrent(cfg *Config, settings qbittorrentSettings) (*manage
 	}
 	binary := qbittorrentManagedBinary(cfg)
 	if binary == "" || !fileExists(binary) {
-		return nil, fmt.Errorf("qBittorrent gestito non installato: usa il pulsante di download nella configurazione")
+		return nil, fmt.Errorf("managed qBittorrent is not installed: use the download button in the settings")
 	}
 	parsed, err := url.Parse(settings.Client.BaseURL)
 	if err != nil || parsed.Hostname() == "" {
-		return nil, errors.New("URL qBittorrent non valido per l'avvio gestito")
+		return nil, errors.New("invalid qBittorrent URL for the managed start")
 	}
 	if parsed.Scheme != "http" {
-		return nil, errors.New("qBittorrent gestito richiede Web API HTTP locale")
+		return nil, errors.New("managed qBittorrent requires a local HTTP Web API")
 	}
 	host := parsed.Hostname()
 	if ip := net.ParseIP(host); ip != nil && !ip.IsLoopback() || ip == nil && !strings.EqualFold(host, "localhost") {
-		return nil, errors.New("qBittorrent gestito richiede un URL locale (localhost/loopback)")
+		return nil, errors.New("managed qBittorrent requires a local URL (localhost/loopback)")
 	}
 	port := parsed.Port()
 	if port == "" {

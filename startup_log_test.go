@@ -31,6 +31,18 @@ func TestStartupBannerColdRestartAndUnclean(t *testing.T) {
 	}
 }
 
+func TestStartupSeparatorMarksOnlyRestarts(t *testing.T) {
+	if got := startupSeparator(runState{}); got != "" {
+		t.Fatalf("the first start must not be preceded by a divider: %q", got)
+	}
+	if got := startupSeparator(runState{Runs: 2}); got != restartDivider {
+		t.Fatalf("restart separator = %q, want the divider", got)
+	}
+	if !strings.Contains(restartDivider, "━") {
+		t.Fatal("the restart divider must be a visible line")
+	}
+}
+
 func TestRunStateCounterAndShutdown(t *testing.T) {
 	dir := t.TempDir()
 

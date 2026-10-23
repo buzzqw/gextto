@@ -101,7 +101,7 @@ func (c *TvdbClient) Configured() bool {
 // token returns a cached login token, obtaining a fresh one when expired.
 func (c *TvdbClient) token(ctx context.Context) (string, error) {
 	if c.key == nil || strings.TrimSpace(*c.key) == "" {
-		return "", fmt.Errorf("TVDB API key non configurata")
+		return "", fmt.Errorf("TVDB API key is not configured")
 	}
 	cacheKey := c.tokenKey()
 	tvdbTokens.Lock()
@@ -132,7 +132,7 @@ func (c *TvdbClient) token(ctx context.Context) (string, error) {
 	}
 	token, ok := tvdbString(tvdbGet(tvdbGet(value, "data"), "token"))
 	if !ok {
-		return "", fmt.Errorf("TVDB login senza token")
+		return "", fmt.Errorf("TVDB login returned no token")
 	}
 	tvdbTokens.Lock()
 	tvdbTokens.items[cacheKey] = tvdbToken{value: token, expiry: time.Now().Add(23 * time.Hour)}

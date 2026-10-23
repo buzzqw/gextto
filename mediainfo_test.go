@@ -357,8 +357,8 @@ func TestMediaInfoResolutionBuckets(t *testing.T) {
 // `probe_best_result_names_a_missing_file` test.
 func TestMediaInfoProbeBestResultNamesMissingFile(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "gextto-mediainfo-missing")
-	if _, err := ProbeBestResult(missing); err == nil || !strings.Contains(err.Error(), "non trovata") {
-		t.Fatalf("ProbeBestResult(missing) error = %v, want 'non trovata'", err)
+	if _, err := ProbeBestResult(missing); err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("ProbeBestResult(missing) error = %v, want 'not found'", err)
 	}
 }
 
@@ -441,13 +441,13 @@ func TestMediaInfoProbeBestResultFolderErrors(t *testing.T) {
 	miInstallFakeFfprobe(t, miFakeFfprobeSuccess)
 
 	empty := t.TempDir()
-	if _, err := ProbeBestResult(empty); err == nil || !strings.Contains(err.Error(), "cartella vuota o senza file video") {
+	if _, err := ProbeBestResult(empty); err == nil || !strings.Contains(err.Error(), "empty folder or no video files") {
 		t.Fatalf("empty folder error = %v", err)
 	}
 
 	noVideo := t.TempDir()
 	mustWriteFile(t, filepath.Join(noVideo, "readme.txt"), "hello")
-	if _, err := ProbeBestResult(noVideo); err == nil || !strings.Contains(err.Error(), "cartella vuota o senza file video") {
+	if _, err := ProbeBestResult(noVideo); err == nil || !strings.Contains(err.Error(), "empty folder or no video files") {
 		t.Fatalf("no-video folder error = %v", err)
 	}
 }

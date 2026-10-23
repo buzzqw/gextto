@@ -300,7 +300,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		}
 	}
 	if targetTorrent == nil {
-		return false, fmt.Errorf("torrent %s non trovato nella sessione attiva", hash)
+		return false, fmt.Errorf("torrent %s not found in the active session", hash)
 	}
 
 	// Guard against archiving an incomplete download
@@ -312,7 +312,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 	}
 	done := (targetTorrent.Progress >= 99.99 && targetTorrent.TotalSize > 0 && targetTorrent.TotalDone >= targetTorrent.TotalSize) || isCompletedDB
 	if !done {
-		return false, fmt.Errorf("impossibile archiviare un download non completato (progresso: %.1f%%)", targetTorrent.Progress)
+		return false, fmt.Errorf("cannot archive an incomplete download (progress: %.1f%%)", targetTorrent.Progress)
 	}
 
 	// Fetch release metadata from DB if present
@@ -383,7 +383,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
-		return false, fmt.Errorf("file sorgente non trovato: %s: %w", source, err)
+		return false, fmt.Errorf("source file not found: %s: %w", source, err)
 	}
 
 	// Resolve destination: configured archive destination (NAS) or DownloadDir fallback
@@ -394,7 +394,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		}
 	}
 	if err := os.MkdirAll(destination, 0o755); err != nil {
-		return false, fmt.Errorf("impossibile creare la cartella di destinazione: %w", err)
+		return false, fmt.Errorf("cannot create the destination folder: %w", err)
 	}
 
 	removalName, removalState, _ := manualTorrentRemovalInfo(s, hash)
@@ -406,7 +406,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 			return false, err
 		}
 		if len(matching) == 0 {
-			return false, fmt.Errorf("nessun file corrispondente alla stagione trovato nel season pack: %s", source)
+			return false, fmt.Errorf("no file matching the season found in the season pack: %s", source)
 		}
 		guard := AcquireArchiveImport(release.Series)
 		defer guard.Release()
@@ -443,7 +443,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 				Name:     targetTorrent.Name,
 				SavePath: targetTorrent.SavePath,
 			}, "season pack inferior to existing files")
-			return false, fmt.Errorf("tutti gli episodi del season pack sono risultati inferiori ai file esistenti")
+			return false, fmt.Errorf("every episode in the season pack was inferior to the existing files")
 		}
 		entries := []PackEpisode{}
 		// Newly added episodes and episodes that replaced an inferior copy are
@@ -558,7 +558,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 				return false, err
 			}
 			if err := moveAcrossDevices(video, target); err != nil {
-				return false, fmt.Errorf("spostamento del file nella destinazione non riuscito: %w", err)
+				return false, fmt.Errorf("moving the file to the destination failed: %w", err)
 			}
 			if sourceInfo.IsDir() {
 				ApplySidecarsTo(video, target, cfg)
@@ -581,7 +581,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		}
 		processed, procErr := tev_completeTorrentOptions(cfg, s.db, s.activeEngine(), &processedEvent, release, s.tmdb, false)
 		if procErr != nil {
-			return false, fmt.Errorf("post-processing non riuscito: %w", procErr)
+			return false, fmt.Errorf("post-processing failed: %w", procErr)
 		}
 		if !processed {
 			logging.Warn("archive postprocessing did not keep release (inferior or discarded)", "hash", hash)
@@ -612,11 +612,11 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 	if !SamePath(source, target) {
 		if sourceInfo.IsDir() {
 			if err := moveDirAcrossDevices(source, target); err != nil {
-				return false, fmt.Errorf("spostamento della cartella non riuscito: %w", err)
+				return false, fmt.Errorf("moving the folder failed: %w", err)
 			}
 		} else {
 			if err := moveAcrossDevices(source, target); err != nil {
-				return false, fmt.Errorf("spostamento del file non riuscito: %w", err)
+				return false, fmt.Errorf("moving the file failed: %w", err)
 			}
 		}
 	}

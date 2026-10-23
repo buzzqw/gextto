@@ -706,7 +706,7 @@ func (a *Archive) BrowsePage(query string, page, limit int) (*ArchivePage, error
 // Unicode-script rules intentionally share titleIsContentFiltered with intake.
 func (a *Archive) BrowseContentFilteredPage(query string, filters []string, page, limit int) (*ArchivePage, error) {
 	if len(filters) == 0 {
-		return nil, fmt.Errorf("selezionare almeno un pre-filtro")
+		return nil, fmt.Errorf("select at least one pre-filter")
 	}
 	if page < 1 {
 		page = 1
@@ -750,7 +750,7 @@ func (a *Archive) BrowseContentFilteredPage(query string, filters []string, page
 // deletion cannot accidentally target the entire catalogue.
 func (a *Archive) DeleteContentFiltered(query string, filters []string) (int, error) {
 	if len(filters) == 0 {
-		return 0, fmt.Errorf("selezionare almeno un pre-filtro")
+		return 0, fmt.Errorf("select at least one pre-filter")
 	}
 	rows, err := a.contentFilterCandidates(query)
 	if err != nil {
@@ -853,7 +853,7 @@ func (a *Archive) DeleteIDs(ids []int64) (int, error) {
 func (a *Archive) DeleteMatching(query string) (int, error) {
 	includes, excludes := parseArchiveFilter(query)
 	if len(includes) == 0 {
-		return 0, fmt.Errorf("inserire almeno una parola da cercare")
+		return 0, fmt.Errorf("enter at least one word to search for")
 	}
 	term := ftsMatchExpression(includes, excludes)
 	result, err := a.db.Exec(
