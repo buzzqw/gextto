@@ -14,6 +14,20 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 23 ottobre 2026
+
+- **Il log parla la lingua di chi usa Gextto.** Le righe di avvio, ricerca, velocità e download sono ora frasi leggibili invece di elenchi di campi tecnici: «Gextto restarted (run #594) — 1.1.2013 · it was down for 6 seconds · web interface at …», «Speed: no speed limit (Auto)», «Searching: 25% done (26 of 104 titles)». I dettagli tecnici restano nel log di debug, dove servono.
+
+- **Meno ripetizioni e meno decorazioni.** Un riavvio non occupa più sei righe (avvio, riavvio, prossima ricerca e velocità sono una riga sola), i separatori di trattini e di uguali sono spariti, l'avanzamento della ricerca compare a quarti invece che ogni minuto, e l'attesa della lista file di un torrent si ripete ogni sei ore invece che ogni ora.
+
+- **Un episodio mancante non viene più chiamato «versione migliore».** Se la copia in libreria non c'è, il download dice «fills a missing episode» anche quando il confronto lo aveva classificato come upgrade. La riga del download dice ora «replacing» per la copia che rimpiazza, così non si confonde più con la sorgente da cui arriva.
+
+- **Un solo racconto per un upgrade scartato.** Quando MediaInfo non conferma un miglioramento, il log lo dice con una riga sola che spiega il confronto e che la copia in libreria resta; i passaggi interni (rimozione dalla sessione, spostamento nel cestino) passano al dettaglio. La stessa riga non compare più due volte quando due controlli guardano lo stesso file sparito.
+
+- **Meno rumore di manutenzione.** Le sessioni browser chiuse perché inattive non occupano più il log normale; le rimozioni dei download falliti dicono anche il motivo riportato dal motore. Il log di gx-torrent resta quello tecnico del motore, invariato.
+
+- **Il controllo automatico tiene la regola.** Un test legge il codice e rifiuta un messaggio INFO, WARN o ERROR scritto con nomi interni o con campi tecnici dentro la frase: la leggibilità non dipende più dal ricordarsene.
+
 ## 22 ottobre 2026
 
 - **«Modifica selezionati»: i requisiti dei film seguono il valore che qualificano.** Cambiando lingua o sottotitoli di più film, anche partendo da un profilo, viene aggiornato anche il requisito obbligatorio corrispondente: prima restava quello vecchio e i film non accettavano più nessuna release finché non si riapriva la scheda. L'interruttore si chiama ora **Permetti upgrade**, con **Sì**/**No**, come nel resto dell'interfaccia.

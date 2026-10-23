@@ -455,7 +455,7 @@ func (e *gxTorrentEngine) adoptOrReplace(cfg *Config, health gxHealth) {
 	}
 	if health.Fingerprint == spec.fingerprint && gxPidAlive(health.Pid) {
 		e.process = adoptGxProcess(health.Pid)
-		logging.Info(fmt.Sprintf("🔗 gx-torrent %s was already running: kept as it is, transfers were not interrupted", health.Version))
+		logging.Info(fmt.Sprintf("🔗 gx-torrent %s is still running: transfers were not interrupted", health.Version))
 		if gxEnsureIPFilter(cfg, false) {
 			if path := gxIPFilterPath(cfg); path != "" {
 				if _, err := e.LoadIPFilter(path); err != nil {

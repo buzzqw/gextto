@@ -34,10 +34,6 @@ import (
 	"github.com/buzzqw/gextto/internal/utils"
 )
 
-// cycleDivider is the visual boundary that makes each cycle easy to locate in
-// the log.
-const cycleDivider = "══════════════════════════════════════════════════════════════"
-
 // RunCycle runs a full cycle (no domain restriction).
 func RunCycle(
 	ctx context.Context,
@@ -71,7 +67,6 @@ func RunCycleDomain(
 	if domain != nil {
 		mode = *domain
 	}
-	logging.Info(cycleDivider)
 	logging.Info(fmt.Sprintf("🔄 Search started (%s)", cycleModeLabel(mode)))
 	if cycleCancelled(ctx) {
 		return stats, nil
@@ -1106,7 +1101,11 @@ func RunCycleDomain(
 					why = "fills a missing episode, better quality"
 				}
 			case approvalReason == "upgrade":
-				why = "better version than the one you have"
+				if archiveCoversRelease(approvalContext.Archive, &release) {
+					why = "better version than the one you have"
+				} else {
+					why = "fills a missing episode"
+				}
 			}
 			if stallApplies {
 				why = "an alternative while the current download is stuck"
@@ -1120,14 +1119,14 @@ func RunCycleDomain(
 			}
 			if approvalReason == "upgrade" {
 				if from := upgradeSourceText(approvalContext.Archive, &release); from != "" {
-					logMessage += " · from: " + from
+					logMessage += " · replacing: " + from
 				}
 			}
 			if destination := downloadDestinationLabel(cfg, preferredPath); destination != "" {
 				logMessage += " → " + destination
 			}
 			logHash, _ := releaseHash(&release)
-			logging.Info(logMessage, "release", release.Title, "from", release.Source, "score", score, "hash", logHash)
+			logging.Info(logMessage, "release", shortTorrentName(release.Title), "from", release.Source, "hash", logHash)
 			logging.Debug("download decision",
 				"target", releaseTarget(&release),
 				"quality", releaseQualityLabel(&release),
@@ -1219,7 +1218,6 @@ func RunCycleDomain(
 		return nil, err
 	}
 	logging.Info(cycleReportText(logDuration(time.Duration(elapsed)*time.Second), stats, upgrades, newItems, skips))
-	logging.Info(cycleDivider)
 	return stats, nil
 }
 
@@ -2165,7 +2163,6 @@ func finishCycleWithoutDownloads(db *Database, stats *models.CycleStats) (*model
 	}
 	logging.Info(fmt.Sprintf("📊 Search finished: %s checked, %s matched your titles, but nothing was downloaded because of disk space%s",
 		countLabel(stats.Scraped, "release", "releases"), logCount(stats.Candidates), cycleErrorsSuffix(stats.Errors)))
-	logging.Info(cycleDivider)
 	return stats, nil
 }
 

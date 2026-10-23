@@ -154,8 +154,9 @@ func logf(level Level, message string, kv []any) {
 	}
 }
 
-// renderFields formats the structured fields as ` · key: value`, leaving out
-// every field that carries a torrent hash or magnet.
+// renderFields formats the structured fields as ` · label: value`, leaving out
+// every field that carries a torrent hash or magnet. The label is the one the
+// user reads, not the identifier used in the code.
 func renderFields(kv []any) string {
 	var sb strings.Builder
 	for i := 0; i+1 < len(kv); i += 2 {
@@ -167,11 +168,112 @@ func renderFields(kv []any) string {
 			continue
 		}
 		sb.WriteString(" · ")
-		sb.WriteString(key)
+		sb.WriteString(HumanFieldKey(key))
 		sb.WriteString(": ")
 		sb.WriteString(redactTorrentHashes(formatValue(kv[i+1])))
 	}
 	return sb.String()
+}
+
+// HumanFieldKey turns an internal field name into the label shown after the
+// message. Call sites may keep the short identifier (job_id, retry_in_secs) or
+// pass a plain label; either way the line never shows a developer's
+// snake_case. Technical counters still belong in DEBUG.
+func HumanFieldKey(key string) string {
+	key = strings.TrimSpace(key)
+	switch key {
+	case "job_id":
+		return "job"
+	case "app_version":
+		return "version"
+	case "downloaded_bytes":
+		return "downloaded"
+	case "checked_bytes":
+		return "checked"
+	case "total_bytes":
+		return "total"
+	case "elapsed_ms":
+		return "elapsed"
+	case "duration_ms":
+		return "duration"
+	case "timeout_secs":
+		return "timeout"
+	case "refresh_secs":
+		return "refresh"
+	case "retry_in", "retry_in_secs":
+		return "retry in"
+	case "restarts_in_window":
+		return "restarts"
+	case "window_minutes":
+		return "window"
+	case "data_dir":
+		return "data folder"
+	case "data_dir_writable":
+		return "data folder writable"
+	case "feed_url":
+		return "feed"
+	case "exit_code":
+		return "exit code"
+	case "failed_links":
+		return "failed links"
+	case "consecutive_panics":
+		return "consecutive panics"
+	case "duplicates_removed":
+		return "duplicates removed"
+	case "keep_min":
+		return "keep at least"
+	case "from_date":
+		return "from"
+	case "torrent_name":
+		return "torrent"
+	case "declared_season":
+		return "declared season"
+	case "torrent_season":
+		return "torrent season"
+	case "restored_upgrade":
+		return "previous copy restored"
+	case "previous_release":
+		return "previous release"
+	case "kept_episodes":
+		return "kept episodes"
+	case "skipped_episodes":
+		return "skipped episodes"
+	case "max_attempts":
+		return "attempts"
+	case "dry_run":
+		return "test mode"
+	case "parts_sent":
+		return "parts sent"
+	case "movie_id":
+		return "movie"
+	case "feed_matches":
+		return "feed matches"
+	case "password_configured":
+		return "password set"
+	case "test_file":
+		return "test file"
+	case "logged_in":
+		return "logged in"
+	case "entered_path":
+		return "path"
+	case "crash_log":
+		return "crash log"
+	case "listen_port":
+		return "listen port"
+	case "url_port":
+		return "URL port"
+	case "stuck_score":
+		return "stuck score"
+	case "candidate_score":
+		return "candidate score"
+	case "last_fallback":
+		return "last fallback"
+	case "unresponsive_for":
+		return "unresponsive for"
+	case "download_id":
+		return "download"
+	}
+	return strings.ReplaceAll(key, "_", " ")
 }
 
 // AcqField is the log field that names an acquisition: the path of one

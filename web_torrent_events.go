@@ -88,7 +88,10 @@ const (
 	// download state machine below.
 	tev_metadataRetryInterval = 10 * time.Minute
 	// Report a continuing metadata problem periodically, not on every retry.
-	tev_metadataWarnInterval = time.Hour
+	// The first warning still comes with the first retry (about ten minutes);
+	// after that, every six hours is enough to follow a wait that may last a
+	// day.
+	tev_metadataWarnInterval = 6 * time.Hour
 )
 
 // ---------------------------------------------------------------------------
@@ -165,6 +168,40 @@ func tev_torrentDisplayName(torrents TorrentSession, hash string) string {
 	return "unnamed torrent"
 }
 
+// tev_metadataWaitText is the periodic note about a torrent whose file list
+// has not arrived: what it is, how long it has waited, and the one detail that
+// tells a dead link from a slow swarm.
+func tev_metadataWaitText(label string, waited time.Duration, peers int, received int64) string {
+	detail := "no peer has answered yet"
+	if peers > 0 {
+		if received > 0 {
+			detail = fmt.Sprintf("%s connected, %s received so far",
+				countLabel(peers, "peer", "peers"), logging.HumanBytesI64(received))
+		} else {
+			detail = fmt.Sprintf("%s connected, nothing received yet",
+				countLabel(peers, "peer", "peers"))
+		}
+	}
+	return fmt.Sprintf("⏳ %s — still no file list after %s (%s); retrying.",
+		label, logDuration(waited), detail)
+}
+
+// tev_userLabel names a torrent the way the user knows it: the title and
+// episode from its release when available, else a trimmed display name.
+func tev_userLabel(db *Database, torrent models.TorrentView) string {
+	if db != nil {
+		if metadata, err := db.TorrentMeta(torrent.Hash); err == nil && metadata != nil {
+			if label := strings.TrimSpace(logTarget(&metadata.Release)); label != "" {
+				return label
+			}
+		}
+	}
+	if name := strings.TrimSpace(torrent.Name); name != "" {
+		return shortTorrentName(name)
+	}
+	return "unnamed torrent"
+}
+
 // tev_packFileNames renders a compact, bounded list of the outcomes of a season
 // pack so the log names what was kept and what was discarded without flooding.
 func tev_packFileNames(items []PackFileResult) string {
@@ -208,19 +245,28 @@ func tev_archivedFileNames(paths []string) string {
 func tev_removeFailedTorrent(torrents TorrentSession, hash string) bool {
 	name := tev_torrentDisplayName(torrents, hash)
 	incomplete := false
+	reason := ""
 	for _, torrent := range torrents.List() {
 		if strings.EqualFold(torrent.Hash, hash) {
 			incomplete = torrent.Progress < 99.99 && torrent.State != "seeding" && torrent.State != "finished"
+			reason = strings.TrimSpace(torrent.Error)
 			break
 		}
 	}
 	removed, err := torrents.Remove(hash, incomplete)
 	if err != nil {
-		logging.Warn("failed torrent removal failed", "hash", hash, "name", name, "error", err.Error())
+		logging.Warn("Could not remove the failed download «"+shortTorrentName(name)+"»", "hash", hash, "error", err.Error())
 		return false
 	}
 	if removed {
-		logging.Info(fmt.Sprintf("🧹 Failed download removed from the list: «%s»", name), "hash", hash)
+		message := fmt.Sprintf("🧹 Removed the failed download «%s»", shortTorrentName(name))
+		if incomplete {
+			message += " and deleted its partial files"
+		}
+		if reason != "" {
+			message += ". The engine reported: " + sourceFailureReason(reason)
+		}
+		logging.Info(message, "hash", hash)
 	} else {
 		logging.Debug("failed torrent already removed", "hash", hash, "name", name)
 	}
@@ -974,10 +1020,8 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 		if torrent.HasMetadata {
 			if started, ok := firstSeen[torrent.Hash]; ok {
 				if waited := now.Sub(started); waited >= time.Minute {
-					logging.Info(fmt.Sprintf("✅ «%s»: received the file list after %s; the download can start",
-						torrent.Name, logDuration(waited)), "hash", torrent.Hash,
-						"waited", logDuration(waited), "peers", torrent.NumConnections,
-						"downloaded_bytes", torrent.TotalDone)
+					logging.Info(fmt.Sprintf("✅ %s — the file list arrived after %s; the download can start.",
+						tev_userLabel(db, torrent), logDuration(waited)), "hash", torrent.Hash)
 				}
 			}
 			tev_forgetMetadataWait(db, torrent.Hash, waitStart, firstSeen, lastWarning)
@@ -994,8 +1038,8 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 			// repeating forever after a state flap.
 			if started, ok := firstSeen[torrent.Hash]; ok {
 				if waited := now.Sub(started); waited >= 5*time.Minute {
-					logging.Info(fmt.Sprintf("⏳ «%s»: metadata wait restarted after %s because the state is now %s",
-						torrent.Name, logDuration(waited), torrent.State), "hash", torrent.Hash, "state", torrent.State)
+					logging.Info(fmt.Sprintf("⏳ %s — the wait for the file list started again after %s, because the download changed state.",
+						tev_userLabel(db, torrent), logDuration(waited)), "hash", torrent.Hash)
 				}
 			}
 			tev_forgetMetadataWait(db, torrent.Hash, waitStart, firstSeen, lastWarning)
@@ -1021,8 +1065,8 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 			}
 			restored, _ := db.RestoreUpgrade(torrent.Hash)
 			_ = db.MarkTorrentError(torrent.Hash, "metadata timeout")
-			logging.Warn(fmt.Sprintf("❌ Gave up on «%s»: in %s nobody provided its list of files (the link is probably dead). It is removed",
-				torrent.Name, logDuration(time.Duration(giveupMinutes*float64(time.Minute)))), "hash", torrent.Hash)
+			logging.Warn(fmt.Sprintf("❌ Giving up on %s: nobody provided the file list in %s, so the link is probably dead. The download is removed.",
+				tev_userLabel(db, torrent), logDuration(time.Duration(giveupMinutes*float64(time.Minute)))), "hash", torrent.Hash)
 			if tev_removeFailedTorrent(torrents, torrent.Hash) {
 				_ = db.MarkTorrentRemovedAt(torrent.Hash)
 			}
@@ -1042,11 +1086,8 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 			} else if value {
 				previousWarning := lastWarning[torrent.Hash]
 				if tev_metadataRetryWarningDue(previousWarning, now) {
-					logging.Warn(fmt.Sprintf("⏳ «%s»: after %s nobody has provided its list of files yet (state %s, peers %d, received %s, since %s); still trying",
-						torrent.Name, logDuration(now.Sub(started)), torrent.State, torrent.NumConnections,
-						logging.HumanBytesI64(torrent.TotalDone), started.Format("15:04:05")),
-						"hash", torrent.Hash, "peers", torrent.NumConnections, "swarm_peers", torrent.NumPeers,
-						"seeds", torrent.NumSeeds, "downloaded_bytes", torrent.TotalDone, "since", started.Format(time.RFC3339))
+					logging.Warn(tev_metadataWaitText(tev_userLabel(db, torrent), now.Sub(started),
+						torrent.NumConnections, torrent.TotalDone), "hash", torrent.Hash)
 					lastWarning[torrent.Hash] = now
 				} else {
 					logging.Debug("torrent metadata retry still pending",
@@ -2116,7 +2157,7 @@ func tev_discardCompletedSource(cfg *Config, db *Database, torrents TorrentSessi
 		return
 	}
 	if removed {
-		logging.Info("rejected completed torrent removed from the session",
+		logging.Debug("rejected completed torrent removed from the session",
 			"hash", event.Hash, "name", event.Name)
 	} else {
 		logging.Debug("rejected torrent was already removed",
@@ -2133,7 +2174,7 @@ func tev_discardCompletedSource(cfg *Config, db *Database, torrents TorrentSessi
 			logging.Error("could not move rejected completed download to trash",
 				"hash", event.Hash, "name", event.Name, "source", source, "error", err.Error())
 		} else {
-			logging.Info(fmt.Sprintf("rejected completed download moved to trash — «%s» · %s → %s", event.Name, source, target), "hash", event.Hash)
+			logging.Debug(fmt.Sprintf("rejected completed download moved to trash — «%s» · %s → %s", event.Name, source, target), "hash", event.Hash)
 		}
 		return
 	}
@@ -2148,7 +2189,7 @@ func tev_discardCompletedSource(cfg *Config, db *Database, torrents TorrentSessi
 		logging.Error("could not remove rejected completed download",
 			"hash", event.Hash, "name", event.Name, "source", source, "error", result.Error())
 	} else {
-		logging.Info(fmt.Sprintf("rejected completed download removed — «%s» · %s", event.Name, source), "hash", event.Hash)
+		logging.Debug(fmt.Sprintf("rejected completed download removed — «%s» · %s", event.Name, source), "hash", event.Hash)
 	}
 }
 
@@ -2244,8 +2285,8 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 			return false, err
 		}
 		tev_discardCompletedSource(cfg, db, torrents, event, "release inferior to existing file")
-		logging.Warn("completed release discarded as inferior",
-			"hash", event.Hash, "name", event.Name, "title", release.Title)
+		logging.Warn(fmt.Sprintf("🗑️ %s discarded: the file is not better than the copy already in the library.",
+			shortTorrentName(event.Name)), "hash", event.Hash)
 		return false, nil
 	} else {
 		if moveSource {
@@ -2301,8 +2342,8 @@ func tev_rejectUnconfirmedUpgrade(cfg *Config, db *Database, torrents TorrentSes
 		return err
 	}
 	tev_discardCompletedSource(cfg, db, torrents, event, reason)
-	logging.Warn(fmt.Sprintf("🔍 Upgrade not confirmed by MediaInfo: «%s» discarded, the copy in the library stays", event.Name),
-		"hash", event.Hash, "reason", reason)
+	logging.Warn(fmt.Sprintf("🔍 %s discarded: %s. The copy in the library stays.",
+		shortTorrentName(event.Name), reason), "hash", event.Hash)
 	return nil
 }
 
@@ -2365,8 +2406,8 @@ func tev_completeMovieWithArchive(cfg *Config, db *Database, torrents TorrentSes
 			return false, err
 		}
 		tev_discardCompletedSource(cfg, db, torrents, event, "release inferior to existing file")
-		logging.Warn("completed release discarded as inferior",
-			"hash", event.Hash, "name", event.Name, "title", release.Title)
+		logging.Warn(fmt.Sprintf("🗑️ %s discarded: the file is not better than the copy already in the library.",
+			shortTorrentName(event.Name)), "hash", event.Hash)
 		return false, nil
 	}
 	linked := false
@@ -2766,8 +2807,8 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 			return false, err
 		}
 		tev_discardCompletedSource(cfg, db, torrents, event, "release inferior to existing file")
-		logging.Warn("completed release discarded as inferior",
-			"hash", event.Hash, "name", event.Name, "title", release.Title)
+		logging.Warn(fmt.Sprintf("🗑️ %s discarded: the file is not better than the copy already in the library.",
+			shortTorrentName(event.Name)), "hash", event.Hash)
 		return false, nil
 	}
 	if err := tev_markReleaseCompleted(cfg, db, release, processedPath, size); err != nil {

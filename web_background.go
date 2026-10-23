@@ -621,16 +621,19 @@ func bg_restoredTorrentNames(torrents TorrentSession, db *Database, hashes []str
 	names := make([]string, 0, len(hashes))
 	for _, hash := range hashes {
 		key := strings.ToLower(strings.TrimSpace(hash))
-		name := live[key]
-		if name == "" && db != nil {
+		name := ""
+		if db != nil {
 			if meta, err := db.TorrentMeta(key); err == nil && meta != nil {
-				name = strings.TrimSpace(meta.Release.Title)
+				name = strings.TrimSpace(logTarget(&meta.Release))
 			}
+		}
+		if name == "" {
+			name = live[key]
 		}
 		if name == "" {
 			name = key
 		}
-		names = append(names, name)
+		names = append(names, shortTorrentName(name))
 	}
 	sort.Strings(names)
 	return names
@@ -699,21 +702,21 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	// The metadata give-up clock lives in the database: without it a restart
 	// would hand a dead magnet a full new window every time.
 	if restored, err := db.LoadMetadataWaits(); err != nil {
-		logging.Warn("could not restore metadata wait state", "error", err)
+		logging.Warn("Could not restore the downloads waiting for their file list", "error", err)
 	} else if len(restored) > 0 {
 		metadataFirstSeen = restored
 		names := bg_restoredTorrentNames(torrents, db, bg_torrentHashes(restored))
-		logging.Info("restored metadata wait state", "torrents", len(restored),
-			"names", bg_restoredTorrentNamesLine(names, 8))
+		logging.Info(fmt.Sprintf("♻️ Restored the wait for the file list of %s: %s",
+			countLabel(len(restored), "download", "downloads"), bg_restoredTorrentNamesLine(names, 8)))
 	}
 	stallWaitStart := map[string]StallWatch{}
 	if restored, err := db.LoadStallWatches(); err != nil {
-		logging.Warn("could not restore stalled torrent retry state", "error", err)
+		logging.Warn("Could not restore the state of the stalled downloads", "error", err)
 	} else if len(restored) > 0 {
 		stallWaitStart = restored
 		names := bg_restoredTorrentNames(torrents, db, bg_torrentHashes(restored))
-		logging.Info("restored stalled torrent retry state", "torrents", len(restored),
-			"names", bg_restoredTorrentNamesLine(names, 8))
+		logging.Info(fmt.Sprintf("♻️ Restored the retry state of %s: %s",
+			countLabel(len(restored), "stalled download", "stalled downloads"), bg_restoredTorrentNamesLine(names, 8)))
 	}
 	// Periodic RAM-disk reconciliation: the metadata event fires once, so a
 	// missed event (restart/race) used to leave an oversized torrent on the
@@ -999,11 +1002,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 							label += " · latency guard"
 						}
 					}
-					suffix := ping
-					if maxText != "" {
-						suffix = maxText + " · " + ping
-					}
-					logging.Info(fmt.Sprintf("🚦 Speed set to %s download, %s upload (%s) · %s", speedLimitLabel(downloadKib), speedLimitLabel(uploadKib), label, suffix))
+					logging.Info(bg_speedStatusText(downloadKib, uploadKib, label, maxText, ping))
 					lastAutotuneLog = now
 					lastAutotuneDown, lastAutotuneUp = downloadKib, uploadKib
 					haveAutotuneLog = true
@@ -1022,23 +1021,18 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 							prevDown, prevUp = lastSpeed.download, lastSpeed.upload
 						}
 						if bg_speedWorthLogging(lastAutotuneDown, downloadKib, prevDown) || bg_speedWorthLogging(lastAutotuneUp, uploadKib, prevUp) {
-							delta := "DL " + bg_speedDeltaText(lastAutotuneDown, downloadKib)
+							changes := make([]string, 0, 2)
+							if downloadKib != lastAutotuneDown {
+								changes = append(changes, "download "+bg_speedDeltaText(lastAutotuneDown, downloadKib))
+							}
 							if uploadKib != lastAutotuneUp {
-								delta += " · UL " + bg_speedDeltaText(lastAutotuneUp, uploadKib)
-							}
-							mode := st.Mode
-							if !st.Active {
-								mode = "free"
-							}
-							suffix := ping
-							if maxText != "" {
-								suffix = maxText + " · " + ping
+								changes = append(changes, "upload "+bg_speedDeltaText(lastAutotuneUp, uploadKib))
 							}
 							// The control loop moves the cap every minute: each
 							// step goes to the debug log, the info log gets the
 							// first step of a mode and a digest every 15 minutes.
-							step := fmt.Sprintf("🎚️ Autotune: %s download, %s upload · %s · %s · mode %s", speedLimitLabel(downloadKib), speedLimitLabel(uploadKib), delta, suffix, mode)
-							if autotuneDigest.add(now, downloadKib, uploadKib, mode) {
+							step := bg_autotuneStepText(downloadKib, uploadKib, changes, maxText, ping)
+							if autotuneDigest.add(now, downloadKib, uploadKib, st.Mode) {
 								logging.Info(step)
 							} else {
 								logging.Debug(step)
@@ -1810,10 +1804,10 @@ func (g *bg_autotuneDigest) summary(now time.Time, down, up int64) (string, bool
 	if g.steps == 0 || now.Sub(g.since) < bg_autotuneDigestEvery {
 		return "", false
 	}
-	line := fmt.Sprintf("🎚️ Autotune, last %s: %d adjustments · download %s · upload %s · now %s / %s · mode %s",
+	line := fmt.Sprintf("🎚️ Autotune (last %s): %d adjustments. Download %s, upload %s; now %s.",
 		logging.HumanDuration(int64(now.Sub(g.since).Seconds())), g.steps,
 		bg_limitRange(g.minDown, g.maxDown), bg_limitRange(g.minUp, g.maxUp),
-		speedLimitLabel(down), speedLimitLabel(up), g.mode)
+		speedPairText(down, up))
 	g.since, g.steps = now, 0
 	return line, true
 }
@@ -1840,15 +1834,19 @@ func bg_limitMax(a, b int64) int64 {
 	return b
 }
 
-// bg_limitRange renders "128–1057 KB/s", "up to unlimited" or a single value.
+// bg_limitRange renders "128 KB/s–1.0 MB/s", "up to unlimited" or a single
+// value, in the unit a person reads.
 func bg_limitRange(lo, hi int64) string {
 	if lo == hi {
-		return speedLimitLabel(lo)
+		return speedLimitText(lo)
 	}
 	if hi <= 0 {
-		return fmt.Sprintf("%d KB/s–unlimited", lo)
+		return speedLimitText(lo) + "–unlimited"
 	}
-	return fmt.Sprintf("%d–%d KB/s", lo, hi)
+	if lo >= 1024 && hi >= 1024 {
+		return fmt.Sprintf("%.1f–%.1f MB/s", float64(lo)/1024, float64(hi)/1024)
+	}
+	return speedLimitText(lo) + "–" + speedLimitText(hi)
 }
 
 // bg_speedDeltaText renders the change against the previously logged value.
@@ -1873,37 +1871,86 @@ func bg_speedDeltaText(prev, next int64) string {
 // policy has none either: both say "no line max". Showing the inactive
 // schedule's 8000 next to a 14166 KiB/s cap would be a contradiction.
 func bg_speedMaxText(cfg *Config) string {
-	down, up, source := speedPolicy(cfg)
-	if speedSourceIsAuto(source) {
-		if ld, lu := latencyGuardLineMaxKib(cfg); ld > 0 || lu > 0 {
-			return "line max " + bg_speedPairText(ld, lu)
-		}
-		return "no line max"
+	_, _, source := speedPolicy(cfg)
+	if !speedSourceIsAuto(source) {
+		// The line already names the limits in force; repeating them as a
+		// "maximum" would just say the same number twice.
+		return ""
 	}
-	if down == 0 && up == 0 {
-		return "no line max"
+	if ld, lu := latencyGuardLineMaxKib(cfg); ld > 0 || lu > 0 {
+		return "line max " + bg_speedPairText(ld, lu)
 	}
-	return "max " + bg_speedPairText(down, up)
+	return "no line max"
 }
 
-// bg_speedPairText renders a download/upload pair in KiB/s.
+// bg_speedPairText renders a download/upload pair in the unit a person reads.
 func bg_speedPairText(down, up int64) string {
 	switch {
 	case down > 0 && up > 0:
-		return fmt.Sprintf("%d/%d KB/s", down, up)
+		return speedLimitText(down) + " down, " + speedLimitText(up) + " up"
 	case down > 0:
-		return fmt.Sprintf("%d KB/s down, upload unlimited", down)
+		return speedLimitText(down) + " down, upload unlimited"
 	default:
-		return fmt.Sprintf("upload %d KB/s, download unlimited", up)
+		return "download unlimited, " + speedLimitText(up) + " up"
 	}
 }
 
-// bg_pingText renders the latency measured by the guard next to the speed.
+// bg_pingText renders the latency measured by the guard next to the speed, or
+// nothing when the probe has not measured it yet.
 func bg_pingText(st latencyGuardStatus) string {
 	if st.LatencyMs <= 0 {
-		return "ping n/a"
+		return ""
 	}
-	return fmt.Sprintf("ping %d/%d ms", st.LatencyMs, st.BaselineMs)
+	if st.BaselineMs > 0 {
+		return fmt.Sprintf("ping %d ms (baseline %d ms)", st.LatencyMs, st.BaselineMs)
+	}
+	return fmt.Sprintf("ping %d ms", st.LatencyMs)
+}
+
+// bg_speedStatusText is the one line that says which limits are in force and
+// why. The internal mode names stay out of it.
+func bg_speedStatusText(down, up int64, label, maxText, ping string) string {
+	line := "🚦 Speed: " + speedPairText(down, up)
+	if label != "" {
+		line += " (" + label + ")"
+	}
+	return line + bg_speedDetailSuffix(maxText, ping)
+}
+
+// bg_autotuneStepText is one Autotune adjustment: the limits now in force and
+// the change, without repeating "unlimited" twice.
+func bg_autotuneStepText(down, up int64, changes []string, maxText, ping string) string {
+	step := "🎚️ Autotune: " + speedPairText(down, up)
+	// "no limit" is already the new state: a "to unlimited" change would say
+	// it again, and when both sides are unlimited there is nothing to add.
+	if down > 0 || up > 0 {
+		kept := make([]string, 0, len(changes))
+		for _, change := range changes {
+			if !strings.HasSuffix(change, "to unlimited") {
+				kept = append(kept, change)
+			}
+		}
+		if len(kept) > 0 {
+			step += " · " + strings.Join(kept, ", ")
+		}
+	}
+	return step + bg_speedDetailSuffix(maxText, ping)
+}
+
+// bg_speedDetailSuffix adds the line maximum and the measured ping, omitting
+// the ones that carry no information ("no line max", no measurement).
+func bg_speedDetailSuffix(maxText, ping string) string {
+	details := make([]string, 0, 2)
+	if maxText != "" && maxText != "no line max" {
+		details = append(details, maxText)
+	}
+	if ping != "" {
+		details = append(details, ping)
+	}
+	if len(details) == 0 {
+		return ""
+	}
+	return " · " + strings.Join(details, " · ")
 }
 
 func bg_residentKB() uint64 {
@@ -2411,9 +2458,8 @@ func cycleWorker(state *AppState) {
 				if lastAt, ok := state.db.LastCycleAt(); ok {
 					due := lastAt.Add(durationFromSeconds(refresh))
 					if remaining := time.Until(due); remaining > 0 {
-						logging.Info(fmt.Sprintf("⏰ Next search %s (in %s; searches run every %s)",
-							formatScheduledCycleTime(time.Now(), due.Local()), logDuration(remaining),
-							logDuration(durationFromSeconds(refresh))))
+						logging.Info(fmt.Sprintf("⏰ Next search %s (in %s)",
+							formatScheduledCycleTime(time.Now(), due.Local()), logDuration(remaining)))
 						for {
 							remaining = time.Until(due)
 							if remaining <= 0 {

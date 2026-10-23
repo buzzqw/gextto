@@ -82,17 +82,7 @@ func (s *cycleWarningLogState) observe(key string, now time.Time) string {
 // cycleSourceErrorLabel turns a source's last error into a short reason for
 // the warning: a timeout says the source is slow, not down.
 func cycleSourceErrorLabel(lastError string) string {
-	lower := strings.ToLower(lastError)
-	switch {
-	case lower == "":
-		return ""
-	case strings.Contains(lower, "deadline exceeded") || strings.Contains(lower, "timeout"):
-		return "risposte troppo lente: richieste scadute"
-	case len(lastError) > 80:
-		return lastError[:80] + "…"
-	default:
-		return lastError
-	}
+	return sourceFailureReason(lastError)
 }
 
 // cycleProblems describes what the cycle history shows as a problem. Cycles
@@ -139,7 +129,7 @@ func cycleProblems(cycles []models.CycleHistoryEntry, interval time.Duration, no
 	for _, key := range keys {
 		entry := tally[key]
 		if entry.failures >= cycleSourceFailCount {
-			problem := fmt.Sprintf("la sorgente %s ha fallito in %d delle ultime %d ricerche",
+			problem := fmt.Sprintf("the source %s failed in %d of the last %d searches",
 				entry.name, entry.failures, entry.attempts)
 			if reason := cycleSourceErrorLabel(entry.lastError); reason != "" {
 				problem += " (" + reason + ")"
@@ -152,7 +142,7 @@ func cycleProblems(cycles []models.CycleHistoryEntry, interval time.Duration, no
 	if cycles[0].DurationSeconds > int(cycleSlowWarning.Seconds()) {
 		problems = append(problems, cycleProblem{
 			key: "slow",
-			text: fmt.Sprintf("l'ultima ricerca ha impiegato %s",
+			text: fmt.Sprintf("the last search took %s",
 				logging.HumanDuration(int64(cycles[0].DurationSeconds))),
 		})
 	}
@@ -180,7 +170,7 @@ func cycleProblems(cycles []models.CycleHistoryEntry, interval time.Duration, no
 		if !since.IsZero() && now.Sub(since) > threshold {
 			problems = append(problems, cycleProblem{
 				key: "stale",
-				text: fmt.Sprintf("nessuna ricerca senza errori da %s",
+				text: fmt.Sprintf("no clean search for %s",
 					logging.HumanDuration(int64(now.Sub(since).Seconds()))),
 			})
 		}
@@ -280,12 +270,12 @@ func cycleHealthWorker(state *AppState) {
 		now := time.Now()
 		switch logState.observe(key, now) {
 		case "warning":
-			logging.Warn("search needs attention", "reason", reason)
+			logging.Warn("⚠️ Searches need attention: " + reason)
 			if state.notifier != nil {
 				_ = state.notifier.NotifyEvent("cycle_warning", map[string]any{"reason": reason})
 			}
 		case "recovered":
-			logging.Info("search healthy again")
+			logging.Info("✅ Searches are healthy again")
 			if state.notifier != nil {
 				_ = state.notifier.NotifyEvent("cycle_recovered", map[string]any{})
 			}

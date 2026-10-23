@@ -100,25 +100,54 @@ func TestBGSpeedDeltaText(t *testing.T) {
 // maximum the user configured, not the controller's internal ceiling.
 func TestBGSpeedMaxTextShowsTheConfiguredCeiling(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Settings = map[string]string{"torrent_speed_auto": "1"}
+	if got := bg_speedMaxText(&cfg); got != "no line max" {
+		t.Fatalf("auto max text = %q, want no line max", got)
+	}
+	cfg.Settings["torrent_line_max_down_kib"] = "20000"
+	cfg.Settings["torrent_line_max_up_kib"] = "2000"
+	if got := bg_speedMaxText(&cfg); got != "line max 19.5 MB/s down, 2.0 MB/s up" {
+		t.Fatalf("line max text = %q", got)
+	}
 	cfg.Settings = map[string]string{}
 	cfg.Transfer.DownloadLimitKib, cfg.Transfer.UploadLimitKib = 8000, 1000
-	if got := bg_speedMaxText(&cfg); got != "max 8000/1000 KB/s" {
-		t.Fatalf("max text = %q, want max 8000/1000 KB/s", got)
+	if got := bg_speedMaxText(&cfg); got != "" {
+		t.Fatalf("fixed limits should not repeat the maximum, got %q", got)
 	}
-	cfg.Transfer.DownloadLimitKib, cfg.Transfer.UploadLimitKib = 0, 0
-	if got := bg_speedMaxText(&cfg); got != "no line max" {
-		t.Fatalf("unlimited max text = %q, want no line max", got)
+}
+
+func TestAutotuneStepTextDoesNotRepeatUnlimited(t *testing.T) {
+	if got := bg_autotuneStepText(0, 0, []string{"upload to unlimited"}, "", ""); got != "🎚️ Autotune: no speed limit" {
+		t.Fatalf("both unlimited = %q", got)
+	}
+	if got := bg_autotuneStepText(128, 0, []string{"download -78%"}, "", ""); got != "🎚️ Autotune: download 128 KB/s, upload unlimited · download -78%" {
+		t.Fatalf("download step = %q", got)
+	}
+	if got := bg_autotuneStepText(0, 71, []string{"upload from unlimited"}, "", ""); got != "🎚️ Autotune: download unlimited, upload 71 KB/s · upload from unlimited" {
+		t.Fatalf("upload step = %q", got)
+	}
+}
+
+func TestSpeedStatusTextSpeaksPlainly(t *testing.T) {
+	if got := bg_speedStatusText(0, 0, "Auto", "no line max", ""); got != "🚦 Speed: no speed limit (Auto)" {
+		t.Fatalf("unlimited speed line = %q", got)
+	}
+	if got := bg_speedStatusText(19170, 214, "Auto", "", "ping 15 ms (baseline 13 ms)"); got != "🚦 Speed: download 18.7 MB/s, upload 214 KB/s (Auto) · ping 15 ms (baseline 13 ms)" {
+		t.Fatalf("capped speed line = %q", got)
+	}
+	if got := bg_speedStatusText(500, 0, "scheduled limit", "line max 19.5 MB/s down, 2.0 MB/s up", ""); got != "🚦 Speed: download 500 KB/s, upload unlimited (scheduled limit) · line max 19.5 MB/s down, 2.0 MB/s up" {
+		t.Fatalf("scheduled speed line = %q", got)
 	}
 }
 
 // TestBGPingTextRendersLatency: the speed line carries the guard's latency and
 // its idle reference.
 func TestBGPingTextRendersLatency(t *testing.T) {
-	if got := bg_pingText(latencyGuardStatus{LatencyMs: 23, BaselineMs: 14}); got != "ping 23/14 ms" {
+	if got := bg_pingText(latencyGuardStatus{LatencyMs: 23, BaselineMs: 14}); got != "ping 23 ms (baseline 14 ms)" {
 		t.Fatalf("ping text = %q", got)
 	}
-	if got := bg_pingText(latencyGuardStatus{}); got != "ping n/a" {
-		t.Fatalf("missing ping text = %q", got)
+	if got := bg_pingText(latencyGuardStatus{}); got != "" {
+		t.Fatalf("missing ping text = %q, want no detail", got)
 	}
 }
 
@@ -219,7 +248,7 @@ func TestAutotuneDigest(t *testing.T) {
 	if !ok {
 		t.Fatal("no digest after the window")
 	}
-	for _, want := range []string{"5 adjustments", "download 128 KB/s–unlimited", "upload unlimited", "now 128 KB/s / unlimited", "mode control"} {
+	for _, want := range []string{"5 adjustments", "Download 128 KB/s–unlimited", "upload no limit", "now download 128 KB/s, upload unlimited"} {
 		if !strings.Contains(line, want) {
 			t.Errorf("digest %q lacks %q", line, want)
 		}

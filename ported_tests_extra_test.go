@@ -163,8 +163,11 @@ func TestMetadataRetryWarningIsRateLimited(t *testing.T) {
 	if tev_metadataRetryWarningDue(now.Add(-30*time.Minute), now) {
 		t.Fatal("metadata retry warning should be rate limited")
 	}
-	if !tev_metadataRetryWarningDue(now.Add(-time.Hour), now) {
-		t.Fatal("metadata retry warning should reappear after the interval")
+	if tev_metadataRetryWarningDue(now.Add(-time.Hour), now) {
+		t.Fatal("one hour is still inside the six-hour window")
+	}
+	if !tev_metadataRetryWarningDue(now.Add(-6*time.Hour), now) {
+		t.Fatal("metadata retry warning should reappear after six hours")
 	}
 }
 

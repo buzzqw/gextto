@@ -9,29 +9,33 @@ import (
 func TestStartupBannerColdRestartAndUnclean(t *testing.T) {
 	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 
-	cold := startupBanner(runState{}, now)
-	if !strings.Contains(cold, "first start") {
-		t.Fatalf("cold start banner = %q, want a first-start line", cold)
+	details := startupDetails{WebAddr: "0.0.0.0:5000", Mode: "downloads are enabled", Engine: "gx-torrent"}
+
+	cold := startupBanner(runState{}, now, details)
+	for _, want := range []string{"started for the first time", "web interface at http://0.0.0.0:5000", "downloads are enabled", "engine gx-torrent"} {
+		if !strings.Contains(cold, want) {
+			t.Fatalf("cold start banner = %q, want %q", cold, want)
+		}
 	}
 
-	restart := startupBanner(runState{Runs: 2, StoppedAt: now.Add(-90 * time.Second).Format(time.RFC3339)}, now)
-	for _, want := range []string{"RESTARTED", "run #3", "down for 1m 30s"} {
+	restart := startupBanner(runState{Runs: 2, StoppedAt: now.Add(-90 * time.Second).Format(time.RFC3339)}, now, details)
+	for _, want := range []string{"restarted", "run #3", "it was down for 1m 30s"} {
 		if !strings.Contains(restart, want) {
 			t.Fatalf("restart banner = %q, want %q", restart, want)
 		}
 	}
 
-	unclean := startupBanner(runState{Runs: 1}, now)
-	if !strings.Contains(unclean, "unclean") {
-		t.Fatalf("banner without a stop time = %q, want an unclean shutdown note", unclean)
+	unclean := startupBanner(runState{Runs: 1}, now, details)
+	if !strings.Contains(unclean, "the previous stop was not recorded") {
+		t.Fatalf("banner without a stop time = %q, want a note about the missing stop time", unclean)
 	}
 }
 
 func TestRunStateCounterAndShutdown(t *testing.T) {
 	dir := t.TempDir()
 
-	logStartupBanner(dir)
-	logStartupBanner(dir)
+	logStartupBanner(dir, startupDetails{})
+	logStartupBanner(dir, startupDetails{})
 
 	s := loadRunState(dir)
 	if s.Runs != 2 {
@@ -53,7 +57,7 @@ func TestRunStateCounterAndShutdown(t *testing.T) {
 func TestShutdownBannerUptime(t *testing.T) {
 	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 	line := shutdownBanner(runState{StartedAt: now.Add(-2 * time.Hour).Format(time.RFC3339)}, now, "SIGTERM/SIGINT")
-	if !strings.Contains(line, "stopping") || !strings.Contains(line, "uptime 2h 0m") {
+	if !strings.Contains(line, "stopped") || !strings.Contains(line, "after 2h 0m") {
 		t.Fatalf("shutdown banner = %q", line)
 	}
 }

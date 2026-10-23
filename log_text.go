@@ -56,6 +56,17 @@ func logCount[T logInteger](value T) string {
 	return out.String()
 }
 
+// searchProgressText is the periodic line of a title search: it says how far
+// the search has got without repeating the total twice.
+func searchProgressText(completed, total int) string {
+	if total <= 0 {
+		return ""
+	}
+	percent := completed * 100 / total
+	return fmt.Sprintf("🔎 Searching: %d%% done (%s of %s titles)",
+		percent, logCount(completed), logCount(total))
+}
+
 // logPercent rounds a progress percentage for display: "9%", "99.5%".
 // shortTorrentName trims a torrent display name for the one-line download
 // summary: long release names would make the periodic status unreadable.
@@ -120,12 +131,40 @@ func stallReasonForLog(code string, torrent *models.TorrentView) string {
 	}
 }
 
-// speedLimitLabel shows a KB/s limit, with 0 meaning no limit.
+// speedLimitText shows a KB/s limit in the unit a person reads, 0 meaning no
+// limit: "597 KB/s", "2.5 MB/s", "no limit".
+func speedLimitText(kib int64) string {
+	if kib <= 0 {
+		return "no limit"
+	}
+	if kib >= 1024 {
+		return fmt.Sprintf("%.1f MB/s", float64(kib)/1024)
+	}
+	return fmt.Sprintf("%d KB/s", kib)
+}
+
+// speedLimitLabel is the older spelling used where the sentence already says
+// "unlimited"; new lines use speedLimitText.
 func speedLimitLabel(kib int64) string {
 	if kib <= 0 {
 		return "unlimited"
 	}
-	return fmt.Sprintf("%d KB/s", kib)
+	return speedLimitText(kib)
+}
+
+// speedPairText describes a download/upload limit pair in words:
+// "no speed limit", "download 2.5 MB/s, upload unlimited".
+func speedPairText(down, up int64) string {
+	switch {
+	case down <= 0 && up <= 0:
+		return "no speed limit"
+	case down <= 0:
+		return "download unlimited, upload " + speedLimitText(up)
+	case up <= 0:
+		return "download " + speedLimitText(down) + ", upload unlimited"
+	default:
+		return "download " + speedLimitText(down) + ", upload " + speedLimitText(up)
+	}
 }
 
 // logTarget names what a release is for, the way a person would say it:
@@ -293,7 +332,7 @@ func upgradeSourceText(archive *models.ArchiveQualityIndex, release *models.Rele
 	groups := map[string][]int64{}
 	for _, episode := range episodes {
 		existing, onDisk := archive.BestFor(*release.Season, episode)
-		label := "not in the library"
+		label := "missing from the library"
 		if onDisk {
 			label = fmt.Sprintf("%s (score %d)", qualityDetailText(existing.Quality), existing.Score)
 		}
@@ -311,6 +350,25 @@ func upgradeSourceText(archive *models.ArchiveQualityIndex, release *models.Rele
 		}
 	}
 	return strings.Join(parts, ", ")
+}
+
+// archiveCoversRelease reports whether at least one episode of the release
+// already has a copy in the library index. It separates a real upgrade from an
+// episode that is simply missing, which the same approval path can carry.
+func archiveCoversRelease(archive *models.ArchiveQualityIndex, release *models.Release) bool {
+	if release == nil || release.Season == nil {
+		return false
+	}
+	episodes := release.EpisodeRange
+	if len(episodes) == 0 && release.Episode != nil && *release.Episode > 0 {
+		episodes = []int64{*release.Episode}
+	}
+	for _, episode := range episodes {
+		if _, ok := archive.BestFor(*release.Season, episode); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // skipReasonText explains why a candidate was not downloaded.
@@ -549,8 +607,8 @@ func recordTorrentErrorNotice(hash, kind string, now time.Time) bool {
 // mediaInfoMismatchText explains a file whose real quality differs from the
 // release title stored in the database. It is the line that makes a stale
 // upgrade row visible: "the file says 480p h264, the recorded release says
-// 1080p h265; the file wins". Empty when the two agree or the title carries no
-// quality at all.
+// 1080p h265; using the file on disk". Empty when the two agree or the title
+// carries no quality at all.
 func mediaInfoMismatchText(name string, recorded, onDisk models.Quality) string {
 	known := func(value string) bool {
 		value = strings.TrimSpace(value)
@@ -567,7 +625,7 @@ func mediaInfoMismatchText(name string, recorded, onDisk models.Quality) string 
 		!different(recorded.Audio, onDisk.Audio) {
 		return ""
 	}
-	return fmt.Sprintf("🔎 «%s»: the library file is %s, the recorded release says %s; the file wins",
+	return fmt.Sprintf("🔎 %s: the file on disk is %s, while the release was recorded as %s; using the file on disk",
 		name, qualityDetailText(onDisk), qualityDetailText(recorded))
 }
 
@@ -587,7 +645,7 @@ func mediaInfoBackfillText(names []string, failed, missing int) string {
 			more = fmt.Sprintf(" and %d more", len(listed)-shown)
 			listed = listed[:shown]
 		}
-		text = fmt.Sprintf("🔬 Read the real quality (resolution, HDR, audio) of %s: %s%s. Future upgrades will be compared with what is actually on disk",
+		text = fmt.Sprintf("🔬 Read the real quality of %s (%s%s): future upgrades will compare with what is actually on disk",
 			countLabel(len(names), "library file", "library files"), strings.Join(listed, ", "), more)
 	} else {
 		text = "🔬 Library quality check"

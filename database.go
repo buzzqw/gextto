@@ -37,7 +37,26 @@ const (
 	// archiveResetBurstWindow is longer than a typical cycle, so a mass reset
 	// spanning a single cycle still hits the ceiling.
 	archiveResetBurstWindow = 10 * time.Minute
+	// missingArchiveWarnTTL coalesces the same vanished file checked twice in
+	// parallel: both workers read the old row before either resets it, and the
+	// user needs to read the warning once.
+	missingArchiveWarnTTL = 10 * time.Minute
 )
+
+// missingArchiveWarned remembers the vanished files already reported, so a
+// duplicate check within missingArchiveWarnTTL stays silent.
+var missingArchiveWarned sync.Map // path -> time.Time
+
+func missingArchiveWarnDue(path string) bool {
+	now := time.Now()
+	if previous, ok := missingArchiveWarned.Load(path); ok {
+		if at, ok := previous.(time.Time); ok && now.Sub(at) < missingArchiveWarnTTL {
+			return false
+		}
+	}
+	missingArchiveWarned.Store(path, now)
+	return true
+}
 
 // DefaultUpgradeMinScoreDiff is the default upgrade threshold used by callers
 // without a `Config`.
@@ -982,7 +1001,7 @@ func (d *Database) migrate() error {
 	// I torrent già rimossi prima dell'introduzione di `removed_at` devono
 	// comunque comparire nello "Storico download".
 	if _, err := d.db.Exec("UPDATE torrent_meta SET removed_at=COALESCE(NULLIF(completed_at,''), updated_at) WHERE status='removed' AND removed_at IS NULL"); err != nil {
-		logging.Warn("schema migration: torrent removed_at backfill failed", "error", err)
+		logging.Warn("Could not record when the already removed torrents were deleted", "error", err)
 	}
 	// Le righe registrate prima di salvare la sorgente hanno il dato dentro
 	// `metadata_json`: lo si riporta nella colonna dedicata.
@@ -1092,7 +1111,10 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 					}
 				}
 				missingArchivedFile = true
-				logging.Warn("archive file missing; episode made eligible for recovery", "series", seriesName, "season", season, "episode", episode, "path", persistedArchivePath)
+				if missingArchiveWarnDue(persistedArchivePath) {
+					logging.Warn(fmt.Sprintf("The library file of %s S%02dE%02d is no longer on disk, so the episode can be downloaded again",
+						seriesName, season, episode), "path", persistedArchivePath)
+				}
 			}
 		}
 	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -4524,7 +4546,7 @@ func (d *Database) ReconcileMissingTorrents(liveHashes map[string]struct{}) (int
 	completedRows.Close()
 	for _, hash := range cleared {
 		if err := d.MarkTorrentRemovedAt(hash); err != nil {
-			logging.Warn("reconcile: cannot record removed_at for completed torrent", "hash", hash, "error", err)
+			logging.Warn("Could not record when a completed torrent was removed", "hash", hash, "error", err)
 		}
 	}
 	return reconciled, nil

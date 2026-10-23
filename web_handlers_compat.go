@@ -126,7 +126,8 @@ func AddAllFromArchive(w http.ResponseWriter, r *http.Request, s *AppState) {
 			jsonError(w, http.StatusInternalServerError, fmt.Sprintf("salvataggio libreria fallito: %v", err))
 			return
 		}
-		logging.Info("add_all_from_archive", "root", root, "added", added)
+		logging.Info(fmt.Sprintf("Added %s from the archive to the library",
+			countLabel(int64(added), "title", "titles")), "root", root)
 	}
 
 	jsonStatus(w, http.StatusOK, map[string]any{

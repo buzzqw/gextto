@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	gextto "github.com/buzzqw/gextto"
 	"github.com/buzzqw/gextto/internal/cache"
@@ -90,7 +89,6 @@ func runDaemon(dryRun bool, configOption *string) error {
 
 	closeLog := logging.Init(cfg.DataDir, "gextto.log", 5*1024*1024, 4)
 	defer closeLog()
-	logging.Info(strings.Repeat("-", 80))
 	filter := "info"
 	if cfg.DebugEnabled() {
 		filter = "debug"

@@ -253,40 +253,10 @@ func gh4_versionIsNewer(candidate, current string) bool {
 	return false
 }
 
-// gh4_torrentDisplayName mirrors the web module `torrent_display_name`.
-func gh4_torrentDisplayName(torrents TorrentSession, hash string) string {
-	for _, torrent := range torrents.List() {
-		if strings.EqualFold(torrent.Hash, hash) {
-			if strings.TrimSpace(torrent.Name) != "" {
-				return torrent.Name
-			}
-			break
-		}
-	}
-	return "unnamed torrent"
-}
-
-// gh4_removeFailedTorrent mirrors the web module `remove_failed_torrent`.
+// gh4_removeFailedTorrent uses the same removal path as the automatic cleanup,
+// so a manual failure and an automatic one read the same in the log.
 func gh4_removeFailedTorrent(torrents TorrentSession, hash string) bool {
-	name := gh4_torrentDisplayName(torrents, hash)
-	incomplete := false
-	for _, torrent := range torrents.List() {
-		if strings.EqualFold(torrent.Hash, hash) {
-			incomplete = torrent.Progress < 99.99 && torrent.State != "seeding" && torrent.State != "finished"
-			break
-		}
-	}
-	removed, err := torrents.Remove(hash, incomplete)
-	if err != nil {
-		logging.Warn("failed torrent removal failed", "hash", hash, "name", name, "error", err.Error())
-		return false
-	}
-	if removed {
-		logging.Info("failed download removed from the session", "name", name)
-	} else {
-		logging.Debug("failed torrent already removed", "hash", hash, "name", name)
-	}
-	return true
+	return tev_removeFailedTorrent(torrents, hash)
 }
 
 // ---------------------------------------------------------------------------

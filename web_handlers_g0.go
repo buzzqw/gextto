@@ -1553,7 +1553,7 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 				"episode", target.Episode, "name", target.Name, "resolution", info.Resolution(),
 				"hdr", info.HDR, "bit_depth", info.BitDepth, "path", target.Path)
 			if text := mediaInfoMismatchText(target.displayName(), ParseQuality(target.Title), ParseQuality(filepath.Base(target.Path))); text != "" {
-				logging.Info(text, "kind", target.Kind, "path", target.Path)
+				logging.Info(text, "path", target.Path)
 			}
 		} else {
 			failed++

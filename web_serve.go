@@ -271,14 +271,13 @@ func Serve(state *AppState) error {
 	} else if state.cfg.Active {
 		mode = "downloads are enabled"
 	}
-	prevRun := logStartupBanner(state.cfg.DataDir)
-	notifyRestart(state, prevRun)
 	engineName := "-"
 	if active := state.activeEngine(); active != nil {
 		engineName = active.Name()
 	}
-	logging.Info(fmt.Sprintf("🚀 Gextto started — web interface at http://%s · %s · engine: %s", webAddr, mode, engineName))
-	logging.Debug("startup details", "engine_api", "http://"+engineAddr)
+	prevRun := logStartupBanner(state.cfg.DataDir, startupDetails{WebAddr: webAddr, Mode: mode, Engine: engineName})
+	notifyRestart(state, prevRun)
+	logging.Debug("build details", "identity", buildIdentity(), "engine api", "http://"+engineAddr)
 
 	// Before the workers: the first cycle marks downloads missing from the
 	// session as lost, so add back those an unclean stop dropped.

@@ -129,7 +129,7 @@ func TestCycleSimulationWarnsOnRepeatedSourceFailures(t *testing.T) {
 	}
 
 	reason := cycleWarningReason(cycles, 6*time.Hour, time.Now())
-	if !strings.Contains(reason, "ha fallito") {
+	if !strings.Contains(reason, "failed") {
 		t.Fatalf("repeated source failures not warned: %q", reason)
 	}
 }

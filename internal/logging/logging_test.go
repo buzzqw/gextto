@@ -7,6 +7,23 @@ import (
 	"testing"
 )
 
+func TestRenderFieldsUsesLabelsForPeople(t *testing.T) {
+	got := renderFields([]any{"job_id", 7, "downloaded_bytes", HumanBytes(2048), "retry_in", "5 minutes"})
+	want := " · job: 7 · downloaded: 2.0 KB · retry in: 5 minutes"
+	if got != want {
+		t.Fatalf("renderFields = %q, want %q", got, want)
+	}
+	if strings.Contains(got, "_") {
+		t.Fatalf("rendered fields still contain a developer identifier: %q", got)
+	}
+	if HumanFieldKey("elapsed_ms") != "elapsed" {
+		t.Fatalf("HumanFieldKey(elapsed_ms) = %q", HumanFieldKey("elapsed_ms"))
+	}
+	if HumanFieldKey("already plain") != "already plain" {
+		t.Fatalf("HumanFieldKey changed a plain label")
+	}
+}
+
 func TestHumanFormatters(t *testing.T) {
 	cases := []struct {
 		got, want string

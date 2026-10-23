@@ -316,7 +316,6 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		timeoutQueries := make(chan string, len(targets))
 		var searchWG sync.WaitGroup
 		var searchesCompleted atomic.Int32
-		searchStarted := time.Now()
 		progressDone := make(chan struct{})
 		if targetsTotal > 0 {
 			go func() {
@@ -324,6 +323,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 				ticker := time.NewTicker(searchProgressInterval)
 				defer ticker.Stop()
 				lastLogged := -1
+				nextMilestone := 25
 				for {
 					select {
 					case <-progressDone:
@@ -335,15 +335,18 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 							continue
 						}
 						lastLogged = completed
-						remaining := targetsTotal - completed
-						if remaining < 0 {
-							remaining = 0
+						if completed >= targetsTotal {
+							// The end of the search has its own line.
+							continue
 						}
-						logging.Info("title search progress",
-							"completed", completed,
-							"total", targetsTotal,
-							"remaining", remaining,
-							"elapsed", logging.HumanDuration(int64(time.Since(searchStarted).Seconds())))
+						percent := completed * 100 / targetsTotal
+						if percent < nextMilestone {
+							continue
+						}
+						for percent >= nextMilestone {
+							nextMilestone += 25
+						}
+						logging.Info(searchProgressText(completed, targetsTotal))
 					}
 				}
 			}()
@@ -469,7 +472,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 			}
 			all = append(all, result.Items...)
 		}
-		logging.Info(fmt.Sprintf("🔎 Indexer search done: suitable releases for %d of %s (%s in total)",
+		logging.Info(fmt.Sprintf("🔎 Found releases for %d of %s (%s in total)",
 			targetsWithHits, countLabel(int64(targetsDone), "title", "titles"),
 			countLabel(int64(step2Usable), "release", "releases")))
 		engineFailures := TakeEngineFailures()
@@ -939,10 +942,7 @@ func failedSourcesSummary(stats []logging.SourceStatEntry) string {
 		} else if stat.Fail > 1 {
 			part = fmt.Sprintf("%s %s: all %d searches failed", kind, entry.Name, stat.Fail)
 		}
-		if reason := strings.TrimSpace(stat.LastError); reason != "" {
-			if len([]rune(reason)) > 140 {
-				reason = string([]rune(reason)[:140]) + "…"
-			}
+		if reason := sourceFailureReason(stat.LastError); reason != "" {
 			part += " — " + reason
 		}
 		parts = append(parts, part)
@@ -951,6 +951,30 @@ func failedSourcesSummary(stats []logging.SourceStatEntry) string {
 		parts = append(parts, fmt.Sprintf("and %d more", failed-named))
 	}
 	return strings.Join(parts, "; ")
+}
+
+// sourceFailureReason turns the engine's error chain into the short reason a
+// person needs. The full text stays in the source's own diagnostics.
+func sourceFailureReason(reason string) string {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return ""
+	}
+	lower := strings.ToLower(reason)
+	switch {
+	case strings.Contains(lower, "login failed") || strings.Contains(lower, "no form found"):
+		return "login failed"
+	case strings.Contains(lower, "deadline exceeded") || strings.Contains(lower, "timeout") || strings.Contains(lower, "timed out"):
+		return "no answer in time"
+	case strings.Contains(lower, "connection refused"):
+		return "connection refused"
+	case strings.Contains(lower, "no such host") || strings.Contains(lower, "name resolution"):
+		return "address not found"
+	}
+	if len([]rune(reason)) > 100 {
+		reason = string([]rune(reason)[:100]) + "…"
+	}
+	return reason
 }
 
 // sourceBreakdown renders the per-feed outcome for the "Sources:" summary.

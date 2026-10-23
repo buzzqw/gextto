@@ -162,8 +162,8 @@ func gxManagedListen(settings gxTorrentSettings) (string, error) {
 			return "", fmt.Errorf("gxtorrent_listen must be host:port, got %q", listen)
 		}
 		if port != urlPort {
-			logging.Warn("gxtorrent_listen port differs from gxtorrent_url: using the URL port to stay reachable",
-				"listen_port", port, "url_port", urlPort)
+			logging.Warn("The gx-torrent address and its URL use different ports; using the URL port so it stays reachable",
+				"listen port", port, "URL port", urlPort)
 			port = urlPort
 		}
 		return net.JoinHostPort(strings.TrimSpace(host), port), nil

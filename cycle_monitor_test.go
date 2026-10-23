@@ -48,7 +48,7 @@ func TestCycleWarningReasonSourceStreak(t *testing.T) {
 			models.CycleSourceStat{Kind: "feed", Name: "TGx", Fail: 1, LastError: "timeout"}))
 	}
 	got := cycleWarningReason(cycles, 6*time.Hour, now)
-	if !strings.Contains(got, "TGx") || !strings.Contains(got, "3 delle ultime 3") {
+	if !strings.Contains(got, "TGx") || !strings.Contains(got, "3 of the last 3") {
 		t.Fatalf("repeated source failures not reported: %q", got)
 	}
 }
@@ -66,7 +66,7 @@ func TestCycleWarningReasonSourceFailsAcrossWindow(t *testing.T) {
 		testCycle(now.Add(-5*time.Hour), 60, 1, models.CycleSourceStat{Kind: "feed", Name: "TGx", Fail: 1}),
 	}
 	got := cycleWarningReason(cycles, 6*time.Hour, now)
-	if !strings.Contains(got, "TGx") || !strings.Contains(got, "3 delle ultime 3") {
+	if !strings.Contains(got, "TGx") || !strings.Contains(got, "3 of the last 3") {
 		t.Fatalf("windowed source failures not reported: %q", got)
 	}
 }
@@ -77,7 +77,7 @@ func TestCycleWarningReasonSlowCycle(t *testing.T) {
 		testCycle(now, int((cycleSlowWarning + time.Hour).Seconds()), 0),
 	}
 	got := cycleWarningReason(cycles, 6*time.Hour, now)
-	if !strings.Contains(got, "impiegato") {
+	if !strings.Contains(got, "took") {
 		t.Fatalf("slow cycle not reported: %q", got)
 	}
 }
@@ -90,7 +90,7 @@ func TestCycleWarningReasonStaleSearch(t *testing.T) {
 	// Interval one hour -> threshold max(2h, 3h) = 3h; the last clean cycle is
 	// more than five hours old.
 	got := cycleWarningReason(cycles, time.Hour, now)
-	if !strings.Contains(got, "senza errori") {
+	if !strings.Contains(got, "no clean search") {
 		t.Fatalf("stale search not reported: %q", got)
 	}
 }
@@ -110,7 +110,7 @@ func TestCycleWarningReasonIgnoresDeadTorrentLinks(t *testing.T) {
 	real := testCycle(now.Add(-time.Hour), 60, 1)
 	real.ErrorDetails = map[string]int{"min_free_space": 1}
 	got = cycleWarningReason([]models.CycleHistoryEntry{real, clean}, 6*time.Hour, now)
-	if !strings.Contains(got, "senza errori") {
+	if !strings.Contains(got, "no clean search") {
 		t.Fatalf("a real cycle error was ignored: %q", got)
 	}
 }
@@ -167,7 +167,7 @@ func TestCycleWarningReasonCountsMostlyFailedCycles(t *testing.T) {
 		t.Fatalf("a source answering most requests warned: %q", got)
 	}
 	got := cycleWarningReason(slow, 6*time.Hour, now)
-	if !strings.Contains(got, "prowlarr") || !strings.Contains(got, "richieste scadute") {
+	if !strings.Contains(got, "prowlarr") || !strings.Contains(got, "no answer in time") {
 		t.Fatalf("a mostly timing-out source not reported as slow: %q", got)
 	}
 }

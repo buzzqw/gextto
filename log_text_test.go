@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -72,6 +73,41 @@ func TestEpisodeRangeLabelCompactsConsecutiveEpisodes(t *testing.T) {
 	}
 }
 
+func TestMissingArchiveWarningIsNotRepeated(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "Show - S01E01.mkv")
+	if !missingArchiveWarnDue(path) {
+		t.Fatal("the first vanished file must be reported")
+	}
+	if missingArchiveWarnDue(path) {
+		t.Fatal("the same vanished file checked again must stay silent")
+	}
+}
+
+func TestMetadataWaitTextIsReadable(t *testing.T) {
+	got := tev_metadataWaitText("Star Trek: Starfleet Academy S01E09", 13*time.Hour, 0, 0)
+	want := "⏳ Star Trek: Starfleet Academy S01E09 — still no file list after 13 hours (no peer has answered yet); retrying."
+	if got != want {
+		t.Fatalf("metadata wait = %q, want %q", got, want)
+	}
+	got = tev_metadataWaitText("Silo S01E01", 2*time.Hour, 3, 0)
+	if !strings.Contains(got, "3 peers connected, nothing received yet") {
+		t.Fatalf("metadata wait with peers = %q", got)
+	}
+	got = tev_metadataWaitText("Silo S01E01", 90*time.Minute, 1, 2048)
+	if !strings.Contains(got, "1 peer connected, 2.0 KB received so far") {
+		t.Fatalf("metadata wait with data = %q", got)
+	}
+}
+
+func TestSearchProgressTextIsReadable(t *testing.T) {
+	if got := searchProgressText(26, 104); got != "🔎 Searching: 25% done (26 of 104 titles)" {
+		t.Fatalf("progress = %q", got)
+	}
+	if got := searchProgressText(1200, 2000); got != "🔎 Searching: 60% done (1,200 of 2,000 titles)" {
+		t.Fatalf("progress with thousands = %q", got)
+	}
+}
+
 func TestUpgradeSourceTextNamesTheLibraryCopy(t *testing.T) {
 	series := "Criminal Record"
 	season := int64(1)
@@ -84,7 +120,7 @@ func TestUpgradeSourceTextNamesTheLibraryCopy(t *testing.T) {
 	index := &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}}
 	index.Best[[2]int64{1, 1}] = models.ArchiveQuality{Quality: old, Score: 125}
 	index.Best[[2]int64{1, 2}] = models.ArchiveQuality{Quality: old, Score: 125}
-	want := "S01E01–S01E02 480p h264 aac ITA (score 125), S01E03 not in the library"
+	want := "S01E01–S01E02 480p h264 aac ITA (score 125), S01E03 missing from the library"
 	if got := upgradeSourceText(index, release); got != want {
 		t.Fatalf("upgradeSourceText = %q, want %q", got, want)
 	}
@@ -158,7 +194,7 @@ func TestComicPendingNoticeOncePerPost(t *testing.T) {
 
 func TestMediaInfoBackfillTextNamesTheFiles(t *testing.T) {
 	got := mediaInfoBackfillText([]string{"Wolf Like Me S01E01", "Wolf Like Me S01E02", "Silo S03E04"}, 0, 0)
-	want := "🔬 Read the real quality (resolution, HDR, audio) of 3 library files: Wolf Like Me S01E01, Wolf Like Me S01E02, Silo S03E04. Future upgrades will be compared with what is actually on disk"
+	want := "🔬 Read the real quality of 3 library files (Wolf Like Me S01E01, Wolf Like Me S01E02, Silo S03E04): future upgrades will compare with what is actually on disk"
 	if got != want {
 		t.Fatalf("got %q", got)
 	}
@@ -175,7 +211,7 @@ func TestMediaInfoMismatchTextNamesTheRecordedRelease(t *testing.T) {
 	recorded := models.Quality{Resolution: "1080p", Codec: "h265", Audio: "ac3"}
 	onDisk := models.Quality{Resolution: "480p", Codec: "h264", Audio: "aac"}
 	got := mediaInfoMismatchText("Criminal Record S01E01", recorded, onDisk)
-	want := "🔎 «Criminal Record S01E01»: the library file is 480p h264 aac, the recorded release says 1080p h265 ac3; the file wins"
+	want := "🔎 Criminal Record S01E01: the file on disk is 480p h264 aac, while the release was recorded as 1080p h265 ac3; using the file on disk"
 	if got != want {
 		t.Fatalf("mismatch = %q, want %q", got, want)
 	}

@@ -499,7 +499,7 @@ func BackupExtraPaths(value string) []string {
 			continue
 		}
 		if !filepath.IsAbs(path) {
-			logging.Warn("backup_extra_paths: percorso relativo ignorato", "path", path)
+			logging.Warn("Ignoring the backup folder " + path + ": it is not an absolute path")
 			continue
 		}
 		path = filepath.Clean(path)

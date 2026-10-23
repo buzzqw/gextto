@@ -265,7 +265,7 @@ func applyEngineFallback(ctx context.Context, cfg *Config, current string, notif
 		}
 	}
 	if err := SaveSetting(cfg.DataDir, "torrent_backend", plan.Backend); err != nil {
-		logging.Error("engine fallback: saving torrent_backend failed", "backend", plan.Backend, "error", err.Error())
+		logging.Error("Could not save the torrent engine to use", "engine", plan.Backend, "error", err.Error())
 		engineFallbackNotify(notifier, "engine_recovery", map[string]any{"from": current, "reason": err.Error()})
 		return false
 	}

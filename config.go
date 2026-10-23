@@ -2299,7 +2299,7 @@ func (c *Config) loadConfigDB() error {
 	}
 	columns, err := tableColumns(conn, "movies_config")
 	if err != nil {
-		logging.Warn("loadConfigDB: cannot read movies_config schema", "error", err)
+		logging.Warn("Could not read the movie settings from the database; using the defaults", "error", err)
 		columns = map[string]bool{}
 	}
 	hasMovieMetadata := columns["tmdb_id"] && columns["tvdb_id"] && columns["original_title"] && columns["overview"] && columns["poster_path"]

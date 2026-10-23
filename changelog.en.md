@@ -13,6 +13,20 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
+## 23 October 2026
+
+- **The log speaks the language of the people who use Gextto.** The start, search, speed and download lines are now readable sentences instead of lists of technical fields: "Gextto restarted (run #590) — 1.1.2009 · it was down for 6 seconds · web interface at …", "Speed: no speed limit (Auto)", "Searching: 25% done (26 of 104 titles)". Technical detail stays in the debug log, where it belongs.
+
+- **Fewer repetitions and fewer decorations.** A restart no longer takes six lines (start, restart, next search and speed are one line), the rows of dashes and equals signs are gone, search progress appears at each quarter instead of every minute, and a torrent waiting for its file list repeats every six hours instead of every hour.
+
+- **A missing episode is no longer called a "better version".** When the library has no copy, the download says "fills a missing episode" even if the comparison had classed it as an upgrade. The download line now says "replacing" for the copy it replaces, so it is no longer confused with the source it comes from.
+
+- **One story for a rejected upgrade.** When MediaInfo does not confirm an improvement, the log says so in one line that explains the comparison and that the library copy stays; the internal steps (removal from the session, move to the trash) go to the detail. The same line no longer appears twice when two checks look at the same vanished file.
+
+- **Less housekeeping noise.** Browser sessions closed as idle no longer fill the normal log; failed download removals also say the reason reported by the engine. The gx-torrent log remains the engine's technical log, unchanged.
+
+- **An automatic check keeps the rule.** A test reads the code and rejects an INFO, WARN or ERROR message written with internal names or with technical fields inside the sentence: readability no longer depends on remembering it.
+
 ## 22 October 2026
 
 - **"Edit selected": a movie's requirements follow the value they qualify.** Changing the language or the subtitles of several movies, a profile included, now updates the matching hard requirement too: before, the old one stayed and the movies accepted no release at all until their page was opened again. The switch is now called **Allow upgrades**, with **Yes**/**No**, like the rest of the interface.

@@ -65,19 +65,40 @@ func buildIdentity() string {
 	return identity
 }
 
-// startupBanner is the log line for a start: an unmistakable "restart" marker
-// with the run counter and how long the previous run was down, or a plain "first
-// start" line. Pure so it is easy to test.
-func startupBanner(prev runState, now time.Time) string {
-	identity := buildIdentity()
+// startupDetails is what the start line says besides the version: where the
+// interface listens, whether downloads are enabled and which engine is used.
+// They are the facts a person wants after a restart, not a second line.
+type startupDetails struct {
+	WebAddr string
+	Mode    string
+	Engine  string
+}
+
+// startupBanner is the log line for a start: one sentence with the version and
+// what the user needs to know, or the restart marker with the run counter and
+// how long the previous run was down. Pure so it is easy to test.
+func startupBanner(prev runState, now time.Time, details startupDetails) string {
+	parts := make([]string, 0, 4)
 	if prev.Runs <= 0 {
-		return "🟢 Gextto first start — " + identity
+		parts = append(parts, "🟢 Gextto started for the first time — "+constants.VersionLabel())
+	} else {
+		down := "the previous stop was not recorded"
+		if t, err := time.Parse(time.RFC3339, prev.StoppedAt); err == nil && !t.IsZero() {
+			down = "it was down for " + humanDuration(int64(now.Sub(t).Seconds()))
+		}
+		parts = append(parts, fmt.Sprintf("♻️ Gextto restarted (run #%d) — %s · %s",
+			prev.Runs+1, constants.VersionLabel(), down))
 	}
-	down := "previous stop not recorded (unclean shutdown?)"
-	if t, err := time.Parse(time.RFC3339, prev.StoppedAt); err == nil && !t.IsZero() {
-		down = "down for " + humanDuration(int64(now.Sub(t).Seconds()))
+	if details.WebAddr != "" {
+		parts = append(parts, "web interface at http://"+details.WebAddr)
 	}
-	return fmt.Sprintf("♻️ Gextto RESTARTED (run #%d) — %s · %s", prev.Runs+1, identity, down)
+	if details.Mode != "" {
+		parts = append(parts, details.Mode)
+	}
+	if details.Engine != "" {
+		parts = append(parts, "engine "+details.Engine)
+	}
+	return strings.Join(parts, " · ")
 }
 
 // shutdownBanner is the line written on a clean stop.
@@ -86,15 +107,15 @@ func shutdownBanner(s runState, now time.Time, reason string) string {
 	if t, err := time.Parse(time.RFC3339, s.StartedAt); err == nil && !t.IsZero() {
 		uptime = humanDuration(int64(now.Sub(t).Seconds()))
 	}
-	return fmt.Sprintf("🛑 Gextto stopping gracefully (%s) — uptime %s", reason, uptime)
+	return fmt.Sprintf("🛑 Gextto stopped (%s) after %s", reason, uptime)
 }
 
 // logStartupBanner logs the start line, records the run and returns the
 // previous run (zero for a first start) so callers can notify on a restart.
-func logStartupBanner(dataDir string) runState {
+func logStartupBanner(dataDir string, details startupDetails) runState {
 	prev := loadRunState(dataDir)
 	now := time.Now().UTC()
-	logging.Info(startupBanner(prev, now))
+	logging.Info(startupBanner(prev, now, details))
 	saveRunState(dataDir, runState{
 		Runs:      prev.Runs + 1,
 		StartedAt: now.Format(time.RFC3339),

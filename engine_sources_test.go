@@ -15,8 +15,21 @@ func TestFailedSourcesSummaryNamesTheSource(t *testing.T) {
 		{Kind: "feed", Name: "ok feed", Stats: logging.SourceStat{OK: 4}},
 	}
 	got := failedSourcesSummary(stats)
-	want := "indexer Jackett: ilcorsaronero: 3 of 106 searches failed — timeout after 15s; search engine bt4g: all 2 searches failed — HTTP 503"
+	want := "indexer Jackett: ilcorsaronero: 3 of 106 searches failed — no answer in time; search engine bt4g: all 2 searches failed — HTTP 503"
 	if got != want {
 		t.Fatalf("summary =\n %q\nwant\n %q", got, want)
+	}
+}
+
+func TestSourceFailureReasonIsShort(t *testing.T) {
+	reason := "HTTP 400: Torznab 900: Jackett.Common.IndexerException: Exception (ilcorsaroblu): Login failed: No form found on https://ilcorsaroblu.org/index"
+	if got := sourceFailureReason(reason); got != "login failed" {
+		t.Fatalf("login failure = %q", got)
+	}
+	if got := sourceFailureReason("context deadline exceeded"); got != "no answer in time" {
+		t.Fatalf("timeout = %q", got)
+	}
+	if got := sourceFailureReason(""); got != "" {
+		t.Fatalf("empty reason = %q", got)
 	}
 }

@@ -393,6 +393,23 @@ It must be exposed **both** in Gextto's UI (`uiweb/v2`) **and**, where it makes
 sense, in the daemon's web page (`cmd/gx-torrent/ui.go`): never reachable only
 through the API.
 
+### Log lines are for the user
+The log is read by the person running Gextto, not by a developer. Every INFO,
+WARN and ERROR line is a sentence in natural language saying what happened and,
+when relevant, why.
+- No `key: value` trails (`releases_examined: 15064`), no internal state names
+  (`downloading_metadata`). Field labels are written in words by the logger
+  (`downloaded bytes`, not `downloaded_bytes`); use the structured arguments
+  only for values a person would also say, and send technical detail to DEBUG.
+- Call titles, episodes, files and sources by the name the user sees in the UI.
+- Do not repeat in a field a value already written in the sentence.
+- Aggregate periodic or identical events (`9 failed downloads removed`) instead
+  of one line each; a periodic message says only what changed.
+- Keep the `acq` id when it helps follow one download; keep hashes out of the
+  message.
+- `log_readability_test.go` enforces the mechanical part: a new call with a
+  `snake_case` message or a ` · key: ` field inside the message fails the tests.
+
 ### Documentation and manuals
 - **Manuals** (`docs/MANUAL.it.md` and `docs/MANUAL.en.md`): they are updated
   in the same commit when anything visible or operational changes — templates,

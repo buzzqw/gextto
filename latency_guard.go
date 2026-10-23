@@ -23,7 +23,6 @@ package gextto
 // daemon.
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -655,8 +654,8 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 	g.mu.Unlock()
 	if started {
 		st := g.status()
-		logging.Info(fmt.Sprintf("🎚️ Autotune: first cap %s download, %s upload · %s · ping %d/%d ms · mode %s",
-			speedLimitLabel(downCap), speedLimitLabel(upCap), bg_speedMaxText(cfg), st.LatencyMs, st.BaselineMs, st.Mode))
+		logging.Info("🎚️ Autotune: starting with " + speedPairText(downCap, upCap) +
+			bg_speedDetailSuffix(bg_speedMaxText(cfg), bg_pingText(st)))
 	}
 	if !changed || engine == nil {
 		return
