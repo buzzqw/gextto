@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 func openTestComicsDb(t *testing.T) *ComicsDb {
@@ -408,6 +410,81 @@ func TestUpsertWeeklyFillsMissingLinksAndReportsEligibility(t *testing.T) {
 	}
 	if len(pending) != 0 {
 		t.Errorf("pending = %d, want 0", len(pending))
+	}
+}
+
+func TestWeeklyPackInTransferFindsThePackThatIsAlreadyThere(t *testing.T) {
+	date := "2026-10-14"
+	if got := weeklyPackName(date); got != "2026.10.14 Weekly Pack" {
+		t.Fatalf("weeklyPackName = %q", got)
+	}
+	engine := &mockTorrentEngine{torrents: []models.TorrentView{{Name: "2026.10.14 Weekly Pack"}}}
+	if where, present := weeklyPackInTransfer(engine, t.TempDir(), date); !present || where != "in the download list" {
+		t.Fatalf("torrent present = %v (%q), want the download list", present, where)
+	}
+	dir := t.TempDir()
+	if _, present := weeklyPackInTransfer(&mockTorrentEngine{}, dir, date); present {
+		t.Fatal("an empty download folder must not count as the pack")
+	}
+	folder := filepath.Join(dir, weeklyPackName(date), "2026.10.14 DC Week")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(folder, "Action Comics 1103.cbz"), []byte("pages"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if where, present := weeklyPackInTransfer(&mockTorrentEngine{}, dir, date); !present || where != "in the download folder" {
+		t.Fatalf("folder present = %v (%q), want the download folder", present, where)
+	}
+}
+
+func TestQueueWeeklyPackSkipsAPackAlreadyInTransfer(t *testing.T) {
+	db := openTestComicsDb(t)
+	defer db.Close()
+	dir := t.TempDir()
+	folder := filepath.Join(dir, weeklyPackName("2026-10-14"))
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(folder, "Comic.cbz"), []byte("pages"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The client, notifier and main database are nil on purpose: a pack that is
+	// already there must be skipped before any of them is used.
+	if _, err := db.UpsertWeeklyLinks("2026-10-14", "magnet:?xt=urn:btih:0123456789012345678901234567890123456789", ""); err != nil {
+		t.Fatal(err)
+	}
+	if !queueWeeklyPack(db, nil, &mockTorrentEngine{}, nil, dir, nil, nil, "2026-10-14", "magnet:?xt=urn:btih:0123456789012345678901234567890123456789", "", "", "test") {
+		t.Fatal("a pack already in the download folder should count as handled")
+	}
+	sent, err := db.WeeklySent("2026-10-14")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sent {
+		t.Error("a skipped pack should be marked as sent so it is not checked again")
+	}
+}
+
+func TestWeeklyLinksReportsTheLinksAlreadyRecorded(t *testing.T) {
+	db := openTestComicsDb(t)
+	defer db.Close()
+	if _, _, known, err := db.WeeklyLinks("2026-10-14"); err != nil || known {
+		t.Fatalf("unknown pack: known=%v err=%v", known, err)
+	}
+	if _, err := db.UpsertWeeklyLinks("2026-10-14", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	magnet, torrent, known, err := db.WeeklyLinks("2026-10-14")
+	if err != nil || !known || magnet != "" || torrent != "" {
+		t.Fatalf("recorded without links: magnet=%q torrent=%q known=%v err=%v", magnet, torrent, known, err)
+	}
+	if _, err := db.UpsertWeeklyLinks("2026-10-14", "magnet:?xt=urn:btih:0123456789012345678901234567890123456789", "https://example/t.torrent"); err != nil {
+		t.Fatal(err)
+	}
+	magnet, torrent, _, err = db.WeeklyLinks("2026-10-14")
+	if err != nil || magnet == "" || torrent != "https://example/t.torrent" {
+		t.Fatalf("links not recorded: magnet=%q torrent=%q err=%v", magnet, torrent, err)
 	}
 }
 

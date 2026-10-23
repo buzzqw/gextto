@@ -621,6 +621,20 @@ func (d *ComicsDb) WeeklySent(packDate string) (bool, error) {
 	return exists, err
 }
 
+// WeeklyLinks returns the links already recorded for a weekly pack, before the
+// row is updated with the links of this cycle. It reports whether the pack was
+// known at all, so the caller can say in the log why it is being downloaded now.
+func (d *ComicsDb) WeeklyLinks(packDate string) (magnet, torrentURL string, known bool, err error) {
+	row := d.db.QueryRow("SELECT COALESCE(magnet,''),COALESCE(torrent_url,'') FROM comics_weekly WHERE pack_date=?1", packDate)
+	if scanErr := row.Scan(&magnet, &torrentURL); scanErr != nil {
+		if errors.Is(scanErr, sql.ErrNoRows) {
+			return "", "", false, nil
+		}
+		return "", "", false, scanErr
+	}
+	return magnet, torrentURL, true, nil
+}
+
 // UpsertWeeklyLinks records the links of a weekly pack, filling a row that was
 // created before the torrent was available. It returns true when the row now
 // has a link and is still to be sent.
@@ -1906,23 +1920,17 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 		if err != nil {
 			return downloaded, err
 		}
-		logging.Info("comics: checking weekly packs", "from_date", weeklyFromDate)
+		logging.Info("Looking for weekly packs on GetComics")
+		target := weeklyPackDirectory(cfg, defaultRoot)
 		// 1A. Retry packs that were recorded but never sent.
 		pendingWeekly, _ := db.PendingWeekly()
 		for _, pending := range pendingWeekly {
-			accepted, err := sendWeeklyPack(db, client, torrents, notifier, defaultRoot, mainDB, cfg, pending.PackDate, pending.Magnet, pending.TorrentURL, "")
-			if err != nil {
-				logging.Warn("comics: pending weekly pack failed", "date", pending.PackDate, "error", err)
-			} else if accepted {
-				logging.Info("comics: pending weekly pack sent", "date", pending.PackDate)
-			} else {
-				logging.Debug("comics: pending weekly pack not accepted", "date", pending.PackDate)
-			}
+			queueWeeklyPack(db, client, torrents, notifier, target, mainDB, cfg, pending.PackDate, pending.Magnet, pending.TorrentURL, "", "it was recorded earlier and had not been downloaded yet")
 		}
 		// 1B. Find new packs with a single search, like the legacy extto.
 		weeklyChecked := 0
 		if _, posts, err := client.SearchPosts("Weekly Pack"); err != nil {
-			logging.Warn("comics: weekly pack search failed", "error", err)
+			logging.Warn(fmt.Sprintf("Could not look for weekly packs on GetComics: %v", err))
 		} else {
 			for _, post := range posts {
 				title := strings.ToLower(post.Title)
@@ -1954,7 +1962,7 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 						return downloaded, err
 					}
 					if firstComicPendingNotice(post.URL) {
-						logging.Info("comics: weekly pack found without Download Now or torrent link yet", "date", date)
+						logging.Info(fmt.Sprintf("Weekly Pack %s has no download link yet: GetComics has not published it, so it will be checked again", date))
 						_ = notifier.NotifyEvent("comic_pending", map[string]any{
 							"title":    fmt.Sprintf("Weekly Pack %s", date),
 							"post_url": post.URL,
@@ -1965,6 +1973,10 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 					}
 					continue
 				}
+				priorMagnet, priorTorrentURL, known, err := db.WeeklyLinks(date)
+				if err != nil {
+					return downloaded, err
+				}
 				eligible, err := db.UpsertWeeklyLinks(date, magnet, torrentURL)
 				if err != nil {
 					return downloaded, err
@@ -1974,24 +1986,26 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 					return downloaded, err
 				}
 				shouldSend := !sent && (eligible || directURL != "")
-				logging.Info("comics: weekly pack recorded", "date", date, "eligible", shouldSend)
 				if !shouldSend {
+					logging.Debug("comics: weekly pack already recorded", "date", date, "eligible", eligible, "sent", sent)
 					continue
 				}
-				accepted, err := sendWeeklyPack(db, client, torrents, notifier, defaultRoot, mainDB, cfg, date, magnet, torrentURL, directURL)
-				if err != nil {
-					logging.Warn("comics: weekly pack failed", "date", date, "error", err)
-				} else if accepted {
-					logging.Info("comics: weekly pack queued", "date", date)
+				reason := "new pack of the week"
+				if known {
+					if priorMagnet == "" && priorTorrentURL == "" {
+						reason = "its download link is available now"
+					} else {
+						reason = "it had not been downloaded yet"
+					}
+				}
+				if queueWeeklyPack(db, client, torrents, notifier, target, mainDB, cfg, date, magnet, torrentURL, directURL, reason) {
 					break
-				} else {
-					logging.Debug("comics: weekly pack not accepted", "date", date)
 				}
 			}
 		}
-		logging.Info("comics: weekly check done", "checked", weeklyChecked)
+		logging.Info(fmt.Sprintf("Checked %d weekly packs on GetComics", weeklyChecked))
 	} else if weeklyEnabled != "yes" {
-		logging.Info("comics: weekly packs disabled")
+		logging.Info("Weekly packs are turned off")
 	}
 	if err := db.PruneConfiguredHistory(); err != nil {
 		return downloaded, err
@@ -1999,29 +2013,82 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 	return downloaded, nil
 }
 
+// weeklyPackDirectory is the folder where Gextto saves comics and weekly packs.
+func weeklyPackDirectory(cfg *Config, defaultRoot string) string {
+	if dir := comicDownloadDir(cfg); dir != nil {
+		return *dir
+	}
+	return defaultRoot
+}
+
+// weeklyPackName is the name GetComics gives a weekly pack torrent: the date
+// with dots, e.g. `2026.10.14 Weekly Pack`.
+func weeklyPackName(date string) string {
+	return strings.ReplaceAll(strings.TrimSpace(date), "-", ".") + " Weekly Pack"
+}
+
+// weeklyPackInTransfer reports where a weekly pack already is, if anywhere: in
+// the download list of the engine or in the download folder. It keeps Gextto
+// from downloading the pack a second time, for example after the user removed
+// it from the list keeping its files or after restoring an older database.
+func weeklyPackInTransfer(torrents TorrentEngine, target, date string) (string, bool) {
+	name := weeklyPackName(date)
+	if torrents != nil {
+		for _, torrent := range torrents.List() {
+			if strings.EqualFold(strings.TrimSpace(torrent.Name), name) {
+				return "in the download list", true
+			}
+		}
+	}
+	if strings.TrimSpace(target) != "" {
+		if entries, err := os.ReadDir(filepath.Join(target, name)); err == nil && len(entries) > 0 {
+			return "in the download folder", true
+		}
+	}
+	return "", false
+}
+
+// queueWeeklyPack downloads one weekly pack unless it is already in transfer.
+// It says in the log why it is downloading it (or why it is not) and returns
+// true when the pack was accepted or was already there.
+func queueWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents TorrentEngine, notifier *Notifier, target string, mainDB *Database, cfg *Config, date, magnet, torrentURL, directURL, reason string) bool {
+	if where, present := weeklyPackInTransfer(torrents, target, date); present {
+		// Mark it as sent: the pack is there, and without this it would be
+		// checked and skipped again at every comics cycle.
+		_ = db.MarkWeeklySent(date)
+		logging.Info(fmt.Sprintf("Weekly Pack %s is already %s: not downloading it again", date, where))
+		return true
+	}
+	logging.Info(fmt.Sprintf("📥 Downloading Weekly Pack %s — %s", date, reason))
+	accepted, err := sendWeeklyPack(db, client, torrents, notifier, target, mainDB, cfg, date, magnet, torrentURL, directURL)
+	if err != nil {
+		logging.Warn(fmt.Sprintf("Weekly Pack %s could not be downloaded: %v", date, err))
+		return false
+	}
+	if !accepted {
+		logging.Debug("comics: weekly pack not accepted", "date", date)
+	}
+	return accepted
+}
+
 // sendWeeklyPack sends a weekly pack (magnet, `.torrent` or direct file) to the
 // client. It returns true when it was accepted and marked as sent.
-func sendWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents TorrentEngine, notifier *Notifier, defaultRoot string, mainDB *Database, cfg *Config, date, magnet, torrentURL, directURL string) (bool, error) {
-	target := comicDownloadDir(cfg)
-	if target == nil {
-		value := defaultRoot
-		target = &value
-	}
-	_ = os.MkdirAll(*target, 0o755)
+func sendWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents TorrentEngine, notifier *Notifier, target string, mainDB *Database, cfg *Config, date, magnet, torrentURL, directURL string) (bool, error) {
+	_ = os.MkdirAll(target, 0o755)
 	// A Weekly Pack commonly exposes the same torrent both as a magnet and as a
 	// GetComics `/dls/` redirect. Prefer torrent transports so a metainfo file
 	// is never mistaken for the pack itself and saved with a `.cbz` extension.
 	if magnet != "" {
 		hash, ok := utils.MagnetHash(magnet)
 		if ok {
-			added, err := torrents.AddWithPath(magnet, cfg, target)
+			added, err := torrents.AddWithPath(magnet, cfg, &target)
 			if err != nil {
 				return false, err
 			}
 			if added {
 				title := fmt.Sprintf("Weekly Pack %s", date)
 				_ = mainDB.SetTorrentTag(hash, "Comic")
-				if err := db.AddTorrent(hash, fmt.Sprintf("weekly:%s", date), title, *target); err != nil {
+				if err := db.AddTorrent(hash, fmt.Sprintf("weekly:%s", date), title, target); err != nil {
 					return false, err
 				}
 				if err := db.MarkWeeklySent(date); err != nil {
@@ -2030,23 +2097,30 @@ func sendWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents TorrentEngin
 				_ = notifier.NotifyEvent("comic_queued", map[string]any{"title": title, "hash": hash, "method": "torrent"})
 				return true, nil
 			}
+			// The engine already has this magnet: the pack is in transfer, so
+			// there is nothing to add and no second notification to send.
+			if err := db.MarkWeeklySent(date); err != nil {
+				return false, err
+			}
+			logging.Info(fmt.Sprintf("Weekly Pack %s is already in the download list: not downloading it again", date))
+			return true, nil
 		}
 	}
 	if torrentURL != "" {
 		title := fmt.Sprintf("Weekly Pack %s", date)
-		torrentDir := filepath.Join(*target, ".torrents")
+		torrentDir := filepath.Join(target, ".torrents")
 		path, err := client.DownloadTorrent(torrentURL, torrentDir)
 		if err != nil {
 			return false, err
 		}
-		hash, err := torrents.AddTorrentFile(path, *target)
+		hash, err := torrents.AddTorrentFile(path, target)
 		if err != nil {
 			return false, err
 		}
 		if hash != nil {
 			_ = os.Remove(path)
 			_ = mainDB.SetTorrentTag(*hash, "Comic")
-			if err := db.AddTorrent(*hash, fmt.Sprintf("weekly:%s", date), title, *target); err != nil {
+			if err := db.AddTorrent(*hash, fmt.Sprintf("weekly:%s", date), title, target); err != nil {
 				return false, err
 			}
 			if err := db.MarkWeeklySent(date); err != nil {
@@ -2058,7 +2132,7 @@ func sendWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents TorrentEngin
 	}
 	if directURL != "" {
 		title := fmt.Sprintf("Weekly Pack %s", date)
-		path, err := client.DownloadDirect(directURL, *target, title)
+		path, err := client.DownloadDirect(directURL, target, title)
 		if err != nil {
 			return false, err
 		}
