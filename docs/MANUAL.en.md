@@ -859,13 +859,13 @@ changes nothing: it reloads the table with the filter you typed.
   cover and metadata, then uses that post for downloading instead of replacing
   it with a similarly named issue. The monitored list, post link extraction,
   weekly-pack settings and resend/delete/force history are also available. A
-  weekly pack is queued only once: before downloading it Gextto checks whether
-  it is already in the download list or whether its folder is already in the
-  download directory (for example after you removed it from the list keeping
-  the files), and in that case it leaves it alone and says so in the log. The
-  log line also says why it downloads it: a new pack of the week, or the
-  download link that became available after the pack was found without one.
-  Direct
+  weekly pack is queued only once: before downloading it Gextto looks in its
+  own history for an earlier download (and checks whether it is still in the
+  download list), so a pack you already downloaded is not fetched again even
+  when you deleted its folder after reading it. The log line also says why it
+  downloads it: a new pack of the week, or the download link that became
+  available after the pack was found without one, or that it was already
+  downloaded and is left alone. Direct
   HTTP downloads appear in **Downloads in session** with status, bytes, progress,
   speed and pause/resume actions. A comic completed by its own pipeline shows as
   **Completed · archived** at 100% even when the pack's torrent is paused and

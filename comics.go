@@ -2027,36 +2027,66 @@ func weeklyPackName(date string) string {
 	return strings.ReplaceAll(strings.TrimSpace(date), "-", ".") + " Weekly Pack"
 }
 
-// weeklyPackInTransfer reports where a weekly pack already is, if anywhere: in
-// the download list of the engine or in the download folder. It keeps Gextto
-// from downloading the pack a second time, for example after the user removed
-// it from the list keeping its files or after restoring an older database.
-func weeklyPackInTransfer(torrents TorrentEngine, target, date string) (string, bool) {
+// weeklyPackInDownloadList reports whether the engine is already transferring
+// the pack of the given date (downloading or seeding).
+func weeklyPackInDownloadList(torrents TorrentEngine, date string) bool {
+	if torrents == nil {
+		return false
+	}
 	name := weeklyPackName(date)
-	if torrents != nil {
-		for _, torrent := range torrents.List() {
-			if strings.EqualFold(strings.TrimSpace(torrent.Name), name) {
-				return "in the download list", true
-			}
+	for _, torrent := range torrents.List() {
+		if strings.EqualFold(strings.TrimSpace(torrent.Name), name) {
+			return true
 		}
 	}
-	if strings.TrimSpace(target) != "" {
-		if entries, err := os.ReadDir(filepath.Join(target, name)); err == nil && len(entries) > 0 {
-			return "in the download folder", true
+	return false
+}
+
+// weeklyPackDownloaded reports when Gextto already downloaded a weekly pack,
+// reading its own history: the pack recorded as sent, or the torrent queued for
+// it. The download folder is deliberately not consulted: the pack may have been
+// deleted after reading it, and the history is what remembers it.
+func weeklyPackDownloaded(db *ComicsDb, date string) (string, bool) {
+	if db == nil || db.db == nil {
+		return "", false
+	}
+	var sentAt sql.NullString
+	if err := db.db.QueryRow("SELECT sent_at FROM comics_weekly WHERE pack_date=?1", date).Scan(&sentAt); err == nil && sentAt.Valid {
+		if value := strings.TrimSpace(sentAt.String); value != "" {
+			return value, true
+		}
+	}
+	var queuedAt string
+	if err := db.db.QueryRow("SELECT COALESCE(queued_at,'') FROM comics_torrents WHERE post_url=?1 ORDER BY queued_at DESC LIMIT 1", "weekly:"+date).Scan(&queuedAt); err == nil {
+		if value := strings.TrimSpace(queuedAt); value != "" {
+			return value, true
 		}
 	}
 	return "", false
 }
 
-// queueWeeklyPack downloads one weekly pack unless it is already in transfer.
-// It says in the log why it is downloading it (or why it is not) and returns
-// true when the pack was accepted or was already there.
+// weeklyDownloadDay renders a stored timestamp as the day shown to the user.
+func weeklyDownloadDay(value string) string {
+	if len(value) >= 10 {
+		return value[:10]
+	}
+	return value
+}
+
+// queueWeeklyPack downloads one weekly pack unless it is already in transfer or
+// already in Gextto's history. It says in the log why it downloads it (or why
+// it does not) and returns true when the pack was accepted or already handled.
 func queueWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents TorrentEngine, notifier *Notifier, target string, mainDB *Database, cfg *Config, date, magnet, torrentURL, directURL, reason string) bool {
-	if where, present := weeklyPackInTransfer(torrents, target, date); present {
-		// Mark it as sent: the pack is there, and without this it would be
+	if weeklyPackInDownloadList(torrents, date) {
+		// Mark it as sent: it is already there, and without this it would be
 		// checked and skipped again at every comics cycle.
 		_ = db.MarkWeeklySent(date)
-		logging.Info(fmt.Sprintf("Weekly Pack %s is already %s: not downloading it again", date, where))
+		logging.Info(fmt.Sprintf("Weekly Pack %s is already in the download list: not downloading it again", date))
+		return true
+	}
+	if when, done := weeklyPackDownloaded(db, date); done {
+		_ = db.MarkWeeklySent(date)
+		logging.Info(fmt.Sprintf("Weekly Pack %s was already downloaded on %s: not downloading it again", date, weeklyDownloadDay(when)))
 		return true
 	}
 	logging.Info(fmt.Sprintf("📥 Downloading Weekly Pack %s — %s", date, reason))

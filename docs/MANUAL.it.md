@@ -884,11 +884,12 @@ elenco** invece non modifica nulla: rilegge la tabella con il filtro scritto.
   sostituirlo con un albo omonimo. Sono inoltre disponibili lista monitorati,
   estrazione link da un post, impostazioni weekly pack e storico con
   reinvia/elimina/forza. Un weekly pack viene accodato una volta sola: prima di
-  scaricarlo Gextto controlla se è già nella lista dei download o se la sua
-  cartella è già nella cartella di scaricamento (per esempio dopo che l'hai
-  tolto dalla lista tenendo i file), e in quel caso non lo tocca e lo dice nel
-  log. La riga del log spiega anche il perché: nuovo pack della settimana,
-  oppure link di download arrivato dopo che il pack era stato trovato senza.
+  scaricarlo Gextto guarda nel suo storico se lo ha già preso (e controlla se è
+  ancora nella lista dei download), così un pack già scaricato non viene
+  ripreso nemmeno se dopo averlo letto hai cancellato la cartella. La riga del
+  log spiega anche il perché: nuovo pack della settimana, link di download
+  arrivato dopo che il pack era stato trovato senza, oppure già scaricato in
+  passato e quindi lasciato stare.
   I download HTTP diretti compaiono in **Download in sessione** con stato,
   byte, progressione, velocità e azioni pausa/riprendi.
   Un fumetto completato dal suo pipeline compare come **Completato · archiviato**

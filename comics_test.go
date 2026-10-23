@@ -413,56 +413,72 @@ func TestUpsertWeeklyFillsMissingLinksAndReportsEligibility(t *testing.T) {
 	}
 }
 
-func TestWeeklyPackInTransferFindsThePackThatIsAlreadyThere(t *testing.T) {
+func TestWeeklyPackInDownloadListRecognisesTheTorrentName(t *testing.T) {
 	date := "2026-10-14"
 	if got := weeklyPackName(date); got != "2026.10.14 Weekly Pack" {
 		t.Fatalf("weeklyPackName = %q", got)
 	}
-	engine := &mockTorrentEngine{torrents: []models.TorrentView{{Name: "2026.10.14 Weekly Pack"}}}
-	if where, present := weeklyPackInTransfer(engine, t.TempDir(), date); !present || where != "in the download list" {
-		t.Fatalf("torrent present = %v (%q), want the download list", present, where)
+	if !weeklyPackInDownloadList(&mockTorrentEngine{torrents: []models.TorrentView{{Name: " 2026.10.14 Weekly Pack "}}}, date) {
+		t.Fatal("the pack in the engine list should be recognised")
 	}
-	dir := t.TempDir()
-	if _, present := weeklyPackInTransfer(&mockTorrentEngine{}, dir, date); present {
-		t.Fatal("an empty download folder must not count as the pack")
-	}
-	folder := filepath.Join(dir, weeklyPackName(date), "2026.10.14 DC Week")
-	if err := os.MkdirAll(folder, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(folder, "Action Comics 1103.cbz"), []byte("pages"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if where, present := weeklyPackInTransfer(&mockTorrentEngine{}, dir, date); !present || where != "in the download folder" {
-		t.Fatalf("folder present = %v (%q), want the download folder", present, where)
+	if weeklyPackInDownloadList(&mockTorrentEngine{torrents: []models.TorrentView{{Name: "2026.10.07 Weekly Pack"}}}, date) {
+		t.Fatal("another week's pack must not match")
 	}
 }
 
-func TestQueueWeeklyPackSkipsAPackAlreadyInTransfer(t *testing.T) {
+func TestWeeklyPackDownloadedReadsGexttoHistory(t *testing.T) {
 	db := openTestComicsDb(t)
 	defer db.Close()
-	dir := t.TempDir()
-	folder := filepath.Join(dir, weeklyPackName("2026-10-14"))
-	if err := os.MkdirAll(folder, 0o755); err != nil {
+	date := "2026-10-14"
+	if _, done := weeklyPackDownloaded(db, date); done {
+		t.Fatal("an unknown pack is not in the history")
+	}
+	// A pack that was queued but whose weekly row lost sent_at is still in the
+	// history through the torrent it queued.
+	if err := db.AddTorrent("84714ea099ed5feb13a3636f6f0686c89e0e4e71", "weekly:"+date, "Weekly Pack "+date, t.TempDir()); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(folder, "Comic.cbz"), []byte("pages"), 0o644); err != nil {
+	when, done := weeklyPackDownloaded(db, date)
+	if !done || when == "" {
+		t.Fatal("the queued torrent should count as already downloaded")
+	}
+	if err := db.MarkWeeklySent(date); err != nil {
 		t.Fatal(err)
 	}
-	// The client, notifier and main database are nil on purpose: a pack that is
-	// already there must be skipped before any of them is used.
-	if _, err := db.UpsertWeeklyLinks("2026-10-14", "magnet:?xt=urn:btih:0123456789012345678901234567890123456789", ""); err != nil {
+	if _, done := weeklyPackDownloaded(db, date); !done {
+		t.Fatal("a sent pack should count as already downloaded")
+	}
+	// The day shown in the log is the date part of the stored timestamp.
+	if got := weeklyDownloadDay("2026-10-23 14:25:19"); got != "2026-10-23" {
+		t.Fatalf("weeklyDownloadDay = %q", got)
+	}
+}
+
+func TestQueueWeeklyPackSkipsAPackAlreadyDownloadedEvenWithoutItsFolder(t *testing.T) {
+	db := openTestComicsDb(t)
+	defer db.Close()
+	date := "2026-10-14"
+	if _, err := db.UpsertWeeklyLinks(date, "magnet:?xt=urn:btih:0123456789012345678901234567890123456789", ""); err != nil {
 		t.Fatal(err)
 	}
-	if !queueWeeklyPack(db, nil, &mockTorrentEngine{}, nil, dir, nil, nil, "2026-10-14", "magnet:?xt=urn:btih:0123456789012345678901234567890123456789", "", "", "test") {
-		t.Fatal("a pack already in the download folder should count as handled")
-	}
-	sent, err := db.WeeklySent("2026-10-14")
-	if err != nil {
+	if err := db.MarkWeeklySent(date); err != nil {
 		t.Fatal(err)
 	}
-	if !sent {
-		t.Error("a skipped pack should be marked as sent so it is not checked again")
+	// No pack folder on disk: the history alone must be enough. The client,
+	// notifier and main database are nil on purpose, so a download attempt
+	// would fail the test.
+	if !queueWeeklyPack(db, nil, &mockTorrentEngine{}, nil, t.TempDir(), nil, nil, date, "magnet:?xt=urn:btih:0123456789012345678901234567890123456789", "", "", "test") {
+		t.Fatal("a pack already in the history should count as handled")
+	}
+}
+
+func TestQueueWeeklyPackSkipsAPackAlreadyInTheDownloadList(t *testing.T) {
+	db := openTestComicsDb(t)
+	defer db.Close()
+	date := "2026-10-14"
+	engine := &mockTorrentEngine{torrents: []models.TorrentView{{Name: weeklyPackName(date)}}}
+	if !queueWeeklyPack(db, nil, engine, nil, t.TempDir(), nil, nil, date, "magnet:?xt=urn:btih:0123456789012345678901234567890123456789", "", "", "test") {
+		t.Fatal("a pack already in the download list should count as handled")
 	}
 }
 
