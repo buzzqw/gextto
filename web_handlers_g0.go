@@ -548,7 +548,7 @@ func gh0_runDbAction(s *AppState, action string) (gh0_dbActionResult, error) {
 		return result, err
 	}
 	if err := s.comics.Optimize(action); err != nil {
-		logging.Error("db maintenance failed on comics db", "action", action, "error", err)
+		logging.Error(fmt.Sprintf("Could not optimise the comics database: %v", err))
 		return result, err
 	}
 	if conn, err := OpenConfigDB(configPath); err == nil {
@@ -1038,7 +1038,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 				return
 			}
 			if _, historyErr := s.comics.AddHistory(0, historyURL, strings.TrimSpace(input.Title), "", ""); historyErr != nil {
-				logging.Warn("comic manual download history record failed", "title", input.Title, "error", historyErr)
+				logging.Warn(fmt.Sprintf("Could not record the manual download of «%s» in the comics history: %v", input.Title, historyErr))
 			}
 		})
 		if err != nil {
@@ -1110,7 +1110,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		if historyURL != "" {
 			if _, err := s.comics.AddHistory(0, historyURL, strings.TrimSpace(input.Title), "", ""); err != nil {
-				logging.Warn("comic manual download history record failed", "title", input.Title, "error", err)
+				logging.Warn(fmt.Sprintf("Could not record the manual download of «%s» in the comics history: %v", input.Title, err))
 			}
 		}
 	}

@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 23 ottobre 2026
 
+- **Anche i fumetti raccontano cosa fanno, nel log.** Il controllo dei fumetti non elenca più righe tecniche («comics: candidate posts · posts: 1», «title checked · queued: 0»): dice quante testate sta controllando, cosa scarica e perché («📥 Downloading «Poison Ivy #41 (2026)» — new comic on GetComics»), quando una testata è già aggiornata o non ha novità, e quando un albo non ha ancora il link di download. Anche gli errori sono frasi con il titolo e il motivo.
+
 - **Weekly Pack: scaricato una volta sola e il log dice perché.** Prima di accodare un Weekly Pack, Gextto controlla nel suo storico se è già stato scaricato (e se è ancora nella lista dei download): se lo ha già preso — anche se dopo averlo letto hai cancellato la cartella o lo hai tolto dalla lista — non lo riscarica e lo segna come già gestito. La riga del log ora spiega il motivo: «📥 Downloading Weekly Pack 2026-10-14 — its download link is available now» quando il link arriva dopo che il pack era stato trovato senza, «… — new pack of the week» per un pack appena pubblicato, «Weekly Pack … was already downloaded on 2026-10-14: not downloading it again» quando lo storico dice che c'è già stato.
 
 - **Il log parla la lingua di chi usa Gextto, sempre in inglese.** Le righe di avvio, ricerca, velocità e download sono ora frasi leggibili invece di elenchi di campi tecnici: «Gextto restarted (run #594) — 1.1.2013 · it was down for 6 seconds · web interface at …», «Speed: no speed limit (Auto)», «Searching: 25% done (26 of 104 titles)». Titoli, episodi e nomi dei file restano nella loro lingua; la frase intorno e gli errori tecnici sono in inglese. I dettagli tecnici restano nel log di debug, dove servono.

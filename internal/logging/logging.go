@@ -78,6 +78,15 @@ func FilePath() string {
 	return filePath
 }
 
+// SetOutput replaces the destination of the normal log, which is stdout by
+// default. It is meant for tests and embeddings; Init overwrites it with the
+// rotating file writer.
+func SetOutput(w io.Writer) {
+	logMu.Lock()
+	logWriter = w
+	logMu.Unlock()
+}
+
 // SetLevel sets the minimum level from a tracing-style filter such as
 // `gextto=debug` or `debug`.
 func SetLevel(filter string) {

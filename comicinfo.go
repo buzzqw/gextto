@@ -142,8 +142,7 @@ func tagDownloadedComic(path, title string) {
 	changed, err := addComicInfo(path, comicInfoFromTitle(title))
 	switch {
 	case err != nil:
-		logging.Warn(fmt.Sprintf("Could not add ComicInfo.xml to «%s»; the comic is kept as downloaded", filepath.Base(path)),
-			"error", err.Error())
+		logging.Warn(fmt.Sprintf("Could not add ComicInfo.xml to «%s»; the comic is kept as downloaded: %v", filepath.Base(path), err))
 	case changed:
 		logging.Debug("ComicInfo.xml added", "file", path, "title", title)
 	}

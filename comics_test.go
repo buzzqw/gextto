@@ -1,6 +1,8 @@
 package gextto
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -14,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -501,6 +504,76 @@ func TestWeeklyLinksReportsTheLinksAlreadyRecorded(t *testing.T) {
 	magnet, torrent, _, err = db.WeeklyLinks("2026-10-14")
 	if err != nil || magnet == "" || torrent != "https://example/t.torrent" {
 		t.Fatalf("links not recorded: magnet=%q torrent=%q err=%v", magnet, torrent, err)
+	}
+}
+
+func TestComicsCycleLogLinesAreReadable(t *testing.T) {
+	var captured bytes.Buffer
+	logging.SetOutput(&captured)
+	defer logging.SetOutput(os.Stdout)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/tag/test-comic/":
+			fmt.Fprint(w, `<html><body><article class="post">
+  <h1 class="post-title"><a href="/test-comic-1/">Test Comic #1 (2026)</a></h1>
+  <time datetime="2026-10-20">2026-10-20</time>
+</article></body></html>`)
+		case "/test-comic-1/":
+			fmt.Fprint(w, `<html><body><a href="/test-comic-1.cbz">Download</a></body></html>`)
+		case "/test-comic-1.cbz":
+			w.Header().Set("Content-Type", "application/octet-stream")
+			_, _ = w.Write([]byte("comic pages"))
+		default:
+			fmt.Fprint(w, `<html><body></body></html>`)
+		}
+	}))
+	defer server.Close()
+
+	db := openTestComicsDb(t)
+	defer db.Close()
+	if _, err := db.AddMonitored("Test Comic #1 (2026)", "/tag/test-comic/", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.AddMonitored("Spawn #9 (2026)", "/tag/spawn/", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	client := &GetComicsClient{client: server.Client(), baseURL: server.URL}
+	downloadDir := t.TempDir()
+	downloaded, err := RunComicsCycle(context.Background(), db, client, NewNotifier(), downloadDir, &mockTorrentEngine{}, nil, &Config{})
+	if err != nil {
+		t.Fatalf("comics cycle: %v", err)
+	}
+	if downloaded != 1 {
+		t.Fatalf("downloaded = %d, want 1", downloaded)
+	}
+	logText := captured.String()
+	for _, want := range []string{
+		"📚 Checking 2 monitored comics on GetComics",
+		"📥 Downloading «Test Comic #1 (2026)» — new comic on GetComics",
+		"«Spawn #9 (2026)»: nothing new on GetComics",
+	} {
+		if !strings.Contains(logText, want) {
+			t.Fatalf("missing %q in the log:\n%s", want, logText)
+		}
+	}
+	for _, unwanted := range []string{"comics:", " · ", "queued:"} {
+		if strings.Contains(logText, unwanted) {
+			t.Fatalf("the log still contains the technical style %q:\n%s", unwanted, logText)
+		}
+	}
+
+	// The next run finds the same post already in the history and says so.
+	offset := captured.Len()
+	downloaded, err = RunComicsCycle(context.Background(), db, client, NewNotifier(), downloadDir, &mockTorrentEngine{}, nil, &Config{})
+	if err != nil {
+		t.Fatalf("second comics cycle: %v", err)
+	}
+	if downloaded != 0 {
+		t.Fatalf("second run downloaded = %d, want 0", downloaded)
+	}
+	if !strings.Contains(captured.String()[offset:], "«Test Comic #1 (2026)» is already up to date") {
+		t.Fatalf("missing the already-up-to-date line:\n%s", captured.String()[offset:])
 	}
 }
 

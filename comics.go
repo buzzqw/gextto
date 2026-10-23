@@ -1219,7 +1219,7 @@ func startHTTPDownloadWithCompletion(client *http.Client, rawURL, targetDir, tit
 	id := registerHTTPDownload(title, "http", rawURL)
 	control := installHTTPControl(id, client, rawURL, targetDir, title)
 	control.onComplete = onComplete
-	logging.Info("comic HTTP download started", "title", title, "download_id", id)
+	logging.Info(fmt.Sprintf("📥 Downloading «%s» (direct file)", title))
 	go runHTTPDownload(id)
 	return id
 }
@@ -1247,7 +1247,7 @@ func handleHTTPOutcome(id string, control *httpControl, outcome comicHTTPOutcome
 			download.SpeedBytes = 0
 			download.ETASeconds = nil
 		})
-		logging.Warn("comic download failed", "title", control.title, "download_id", id, "error", err)
+		logging.Warn(fmt.Sprintf("Could not download the comic «%s»: %v", control.title, err))
 		return "", err
 	case outcome == comicHTTPCompleted:
 		updateHTTPDownload(id, func(download *ComicDownload) {
@@ -1260,7 +1260,7 @@ func handleHTTPOutcome(id string, control *httpControl, outcome comicHTTPOutcome
 		if control.onComplete != nil {
 			control.onComplete(path)
 		}
-		logging.Info("comic HTTP download completed", "title", control.title, "download_id", id, "path", path)
+		logging.Info(fmt.Sprintf("🎉 «%s» downloaded (direct file): %s", control.title, path))
 		return path, nil
 	case outcome == comicHTTPPaused:
 		updateHTTPDownload(id, func(download *ComicDownload) {
@@ -1293,7 +1293,7 @@ func downloadHTTPRegistered(client *http.Client, rawURL, targetDir, title, id st
 			return comicHTTPCompleted, "", wrapped
 		}
 		if attempt < comicsHTTPDownloadAttempts {
-			logging.Warn("comic download attempt failed; retrying", "attempt", attempt, "error", wrapped)
+			logging.Warn(fmt.Sprintf("Download of «%s» failed (attempt %d of %d); trying again: %v", title, attempt, comicsHTTPDownloadAttempts, wrapped))
 			time.Sleep(time.Duration(2*attempt) * comicsRetryUnit)
 		}
 		lastErr = wrapped
@@ -1681,14 +1681,14 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 		return 0, err
 	}
 	downloaded := 0
-	logging.Info("comics cycle: checking monitored titles", "monitored", len(monitored))
+	logging.Info(fmt.Sprintf("📚 Checking %s on GetComics", countLabel(int64(len(monitored)), "monitored comic", "monitored comics")))
 	for _, comic := range monitored {
 		// Stop between titles when the daemon shuts down.
 		if ctx.Err() != nil {
-			logging.Info("comics cycle interrupted", "downloaded", downloaded)
+			logging.Info(fmt.Sprintf("Comics check stopped after %s because Gextto is shutting down", countLabel(int64(downloaded), "download", "downloads")))
 			return downloaded, nil
 		}
-		logging.Info("comics: checking title", "comic", comic.Title, "tag", comic.TagURL)
+		logging.Debug("comics: checking title", "comic", comic.Title, "tag", comic.TagURL)
 		// A numbered monitor identifies one exact issue: its publication date
 		// may be older than the generic monitoring start date, so that date
 		// must not hide the requested issue.
@@ -1736,7 +1736,7 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 		if exactPostURL == nil && clean != "" {
 			_, found, searchErr := client.SearchPosts(clean)
 			if searchErr != nil {
-				logging.Warn("comics: name search failed", "comic", comic.Title, "error", searchErr)
+				logging.Warn(fmt.Sprintf("Could not search GetComics by name for «%s»: %v", comic.Title, searchErr))
 			} else {
 				searchPosts = found
 			}
@@ -1744,7 +1744,7 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 		if tagError != nil && len(searchPosts) > 0 {
 			logging.Debug("comics: tag unavailable, using name search", "comic", comic.Title, "error", *tagError)
 		} else if tagError != nil && len(searchPosts) == 0 {
-			logging.Warn("comics tag fetch failed and name search returned nothing", "comic", comic.Title, "error", *tagError)
+			logging.Warn(fmt.Sprintf("Could not read the GetComics tag of «%s» and the name search found nothing: %v", comic.Title, *tagError))
 		}
 		merged := map[string]ComicPost{}
 		for _, post := range posts {
@@ -1772,11 +1772,11 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 			keys = append(keys, key)
 		}
 		sort.Strings(keys)
-		logging.Info("comics: candidate posts", "comic", comic.Title, "posts", len(keys))
-		queued := 0
+		logging.Debug("comics: candidate posts", "comic", comic.Title, "posts", len(keys))
+		queued, pending, already := 0, 0, 0
 		for _, key := range keys {
 			if ctx.Err() != nil {
-				logging.Info("comics cycle interrupted", "downloaded", downloaded)
+				logging.Info(fmt.Sprintf("Comics check stopped after %s because Gextto is shutting down", countLabel(int64(downloaded), "download", "downloads")))
 				return downloaded, nil
 			}
 			post := merged[key]
@@ -1785,15 +1785,16 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 				return downloaded, err
 			}
 			if alreadySent {
+				already++
 				continue
 			}
 			links, err := client.Links(post.URL)
 			if err != nil {
-				logging.Warn("comics post fetch failed", "post", post.URL, "error", err)
+				logging.Warn(fmt.Sprintf("Could not open the GetComics page of «%s»: %v", post.Title, err))
 				continue
 			}
 			if cfg.DryRun {
-				logging.Info("dry-run: comic release discovered, download skipped", "title", post.Title)
+				logging.Info(fmt.Sprintf("Dry run: «%s» is on GetComics and would be downloaded", post.Title))
 				continue
 			}
 			target := comicDownloadDir(cfg)
@@ -1808,6 +1809,7 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 			// A magnet honours a preferred path only when it is already a
 			// directory: create it first so the "Comic" category is honoured.
 			_ = os.MkdirAll(*target, 0o755)
+			logging.Info(fmt.Sprintf("📥 Downloading «%s» — new comic on GetComics", post.Title))
 			var result comicQueuedDownload
 			var resultErr error
 			if direct := firstComicString(links.Direct); direct != "" {
@@ -1868,8 +1870,9 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 					}
 				}
 			} else {
+				pending++
 				if firstComicPendingNotice(post.URL) {
-					logging.Info("comics post found but has no Download Now or torrent link yet; leaving it pending", "post", post.URL, "title", post.Title)
+					logging.Info(fmt.Sprintf("«%s» has no download link yet on GetComics: it will be checked again", post.Title))
 					_ = notifier.NotifyEvent("comic_pending", map[string]any{"title": post.Title, "post_url": post.URL, "kind": "comic"})
 				} else {
 					logging.Debug("comics post still pending", "post", post.URL, "title", post.Title)
@@ -1877,7 +1880,7 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 				continue
 			}
 			if resultErr != nil {
-				logging.Warn("comic direct download failed", "post", post.URL, "error", resultErr)
+				logging.Warn(fmt.Sprintf("Could not download «%s» from GetComics: %v", post.Title, resultErr))
 				continue
 			}
 			added, err := db.AddHistory(comic.ID, post.URL, post.Title, firstComicString(links.Magnets), firstComicString(links.Torrents))
@@ -1902,14 +1905,20 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 			// "downloaded" notification comes when the torrent finishes.
 			if result.method != "torrent" {
 				if err := notifier.NotifyComicComplete(post.Title, result.path, size, result.method); err != nil {
-					logging.Warn("comic notification failed", "error", err)
+					logging.Warn(fmt.Sprintf("Could not send the notification for «%s»: %v", post.Title, err))
 				}
 			}
 		}
 		if err := db.MarkChecked(comic.ID); err != nil {
 			return downloaded, err
 		}
-		logging.Info("comics: title checked", "comic", comic.Title, "queued", queued)
+		if queued == 0 && pending == 0 {
+			if already > 0 {
+				logging.Info(fmt.Sprintf("«%s» is already up to date", comic.Title))
+			} else {
+				logging.Info(fmt.Sprintf("«%s»: nothing new on GetComics", comic.Title))
+			}
+		}
 	}
 	weeklyEnabled, err := db.Setting("weekly_enabled", "no")
 	if err != nil {

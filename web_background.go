@@ -1302,8 +1302,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 							"title": comic.Title,
 							"error": err.Error(),
 						})
-						logging.Error("comic torrent completion persistence failed",
-							"error", err, "hash", event.Hash, "title", comic.Title)
+						logging.Error(fmt.Sprintf("Could not save the completed comic «%s»: %v", comic.Title, err))
 					} else {
 						comicSize, _ := SizeOfPath(CompletionPath(&event))
 						if err := notifier.NotifyEvent("comic_completed", map[string]any{
@@ -1314,11 +1313,11 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 							"size_bytes": comicSize,
 							"method":     "torrent",
 						}); err != nil {
-							logging.Warn("completion notification failed", "hash", hash, "title", comic.Title, "error", err)
+							logging.Warn(fmt.Sprintf("Could not send the notification for the comic «%s»: %v", comic.Title, err))
 						} else {
 							logging.Debug("completion notification sent", "hash", hash, "title", comic.Title)
 						}
-						logging.Info(fmt.Sprintf("comic completed — «%s» · %s", comic.Title, event.SavePath))
+						logging.Info(fmt.Sprintf("🎉 Comic «%s» downloaded and archived in %s", comic.Title, event.SavePath))
 					}
 				}
 				eventLog.Push(publicEvent)
