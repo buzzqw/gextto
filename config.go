@@ -782,7 +782,7 @@ func DefaultConfig() Config {
 		CleanupUpgrades:           true,
 		CleanupMinScoreDiff:       0,
 		UpgradeMinScoreDiff:       200,
-		StallAlternativeAfterMin:  360,
+		StallAlternativeAfterMin:  30,
 		StallAlternativeScoreDrop: 100,
 		CleanupAction:             "move",
 		Listen:                    listen,
@@ -2556,7 +2556,7 @@ func (c *Config) loadConfigDB() error {
 	if c.UpgradeUntilScore < 0 {
 		c.UpgradeUntilScore = 0
 	}
-	c.StallAlternativeAfterMin = numberSettingInt(c.Settings, "stall_alternative_after_min", 360)
+	c.StallAlternativeAfterMin = numberSettingInt(c.Settings, "stall_alternative_after_min", 30)
 	if c.StallAlternativeAfterMin < 0 {
 		c.StallAlternativeAfterMin = 0
 	}

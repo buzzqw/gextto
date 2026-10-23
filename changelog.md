@@ -18,6 +18,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 - **Il log parla la lingua di chi usa Gextto, sempre in inglese.** Le righe di avvio, ricerca, velocità e download sono ora frasi leggibili invece di elenchi di campi tecnici: «Gextto restarted (run #594) — 1.1.2013 · it was down for 6 seconds · web interface at …», «Speed: no speed limit (Auto)», «Searching: 25% done (26 of 104 titles)». Titoli, episodi e nomi dei file restano nella loro lingua; la frase intorno e gli errori tecnici sono in inglese. I dettagli tecnici restano nel log di debug, dove servono.
 
+- **Un download da uno swarm già morto non parte più.** Se la fonte dichiara zero seeder e zero peer, la release viene scartata. Se è un upgrade e non ha seeder, Gextto non lo avvia e lascia la copia in libreria. Per le fonti che non dichiarano i seeder, una sonda di 15 minuti (30 per un magnet che non trova nessun peer) controlla se qualcuno risponde: se nessun peer si collega, il download viene scartato e la release messa in blocklist, così la ricerca successiva non la ripropone. I tempi di attesa scendono: swarm senza seeder 30 minuti (prima 72 ore), metadati 3 ore (prima 24), alternativa dopo 30 minuti (prima 6 ore).
+
 - **Un riavvio si vede subito.** Prima della riga di riavvio c'è una riga divisoria evidente, così in un log lungo il punto in cui Gextto è ripartito si trova a colpo d'occhio. Il primo avvio non ha la riga divisoria.
 
 - **Meno ripetizioni e meno decorazioni.** Un riavvio non occupa più sei righe (avvio, riavvio, prossima ricerca e velocità sono una riga sola), i separatori di trattini e di uguali sono spariti, l'avanzamento della ricerca compare a quarti invece che ogni minuto, e l'attesa della lista file di un torrent si ripete ogni sei ore invece che ogni ora.

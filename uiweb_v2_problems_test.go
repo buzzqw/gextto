@@ -167,7 +167,7 @@ func TestDashboardProblemsPanel(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("panel -> %d", code)
 	}
-	giveUp := since.Add(72 * time.Hour).Local().Format("02/01 15:04")
+	giveUp := v2ProblemTime(since.Add(30*time.Minute), time.Now())
 	for _, want := range []string{"Morgane.S04", "Nessun seeder nello swarm.", giveUp, "Marshals.S01E10", "/nas/Marshals", "Gave up on FBI", "/series/history?hash=" + gone} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("panel lacks %q: %s", want, body)

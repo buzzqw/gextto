@@ -26,7 +26,7 @@ func TestScoreExamplesTrackWeights(t *testing.T) {
 func TestStallPolicySummaryTracksValues(t *testing.T) {
 	state := newTestAppState(t)
 	before := stallPolicySummary(state, latestConfig(state))
-	if !strings.Contains(before, "360") {
+	if !strings.Contains(before, "provo un'alternativa dopo 30 minuti") {
 		t.Fatalf("stall summary %q does not mention the alternative window", before)
 	}
 	// 43200 minutes = 30 days.
@@ -37,7 +37,7 @@ func TestStallPolicySummaryTracksValues(t *testing.T) {
 	if after == before {
 		t.Fatalf("stall summary did not change after the give-up window changed: %q", after)
 	}
-	if !strings.Contains(after, "30") {
+	if !strings.Contains(after, "30 giorni") {
 		t.Fatalf("stall summary %q does not mention the new 30-day window", after)
 	}
 }

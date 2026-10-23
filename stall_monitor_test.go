@@ -132,6 +132,54 @@ func TestMonitorStalledParksProbesAndKeepsItsClock(t *testing.T) {
 	}
 }
 
+func TestDeadSwarmWindowAppliesWithoutACompletePeer(t *testing.T) {
+	cfg := &Config{Settings: map[string]string{
+		"torrent_dead_swarm_giveup_min": "30",
+		"torrent_stall_giveup_min":      "10080",
+	}}
+	torrent := &models.TorrentView{State: "downloading", HasMetadata: true}
+	if _, minutes, ok := tev_stallGiveupWindow(cfg, torrent); !ok || minutes != 30 {
+		t.Fatalf("no peer and no complete seed must use the dead-swarm window, got %v/%v", minutes, ok)
+	}
+	// A known complete seed exists: the swarm may still connect, so keep the
+	// general window.
+	torrent.NumComplete = 4
+	if _, minutes, ok := tev_stallGiveupWindow(cfg, torrent); !ok || minutes != 10080 {
+		t.Fatalf("a seeded swarm must use the general window, got %v/%v", minutes, ok)
+	}
+}
+
+func TestFreshProbeExpiresOnlyWhenNobodyAnswers(t *testing.T) {
+	now := time.Now()
+	torrent := models.TorrentView{State: "downloading", Progress: 0, TotalDone: 0}
+	if !tev_freshProbeExpired(now.Add(-16*time.Minute), now, &torrent) {
+		t.Fatal("a download with no byte and no peer after 15 minutes must be abandoned")
+	}
+	if tev_freshProbeExpired(now.Add(-14*time.Minute), now, &torrent) {
+		t.Fatal("the probe fired before its window")
+	}
+	torrent.TotalDone = 1
+	if tev_freshProbeExpired(now.Add(-16*time.Minute), now, &torrent) {
+		t.Fatal("a download that received a byte must not be probed")
+	}
+	// A magnet without metadata gets the probe only when nobody is connected:
+	// a connected peer may still deliver the file list.
+	metadata := models.TorrentView{State: "downloading", HasMetadata: false, NumConnections: 1}
+	if tev_freshProbeExpired(now.Add(-16*time.Minute), now, &metadata) {
+		t.Fatal("a metadata fetch with a connected peer must be given time")
+	}
+	metadata.NumConnections = 0
+	if !tev_freshProbeExpired(now.Add(-16*time.Minute), now, &metadata) {
+		t.Fatal("a metadata fetch with nobody connected must be abandoned")
+	}
+	// A swarm that has seeders but no connected one is not dead: retry it.
+	seeded := models.TorrentView{State: "stalled", Stalled: true, HasMetadata: true, TotalDone: 0, NumSeeds: 0, NumComplete: 2}
+	code, _, _ := DiagnoseTorrent(&seeded)
+	if code != "no_connected_seed" || tev_freshProbeDead(code, &seeded) {
+		t.Fatalf("a seeded swarm must not be abandoned by the fresh probe: %q", code)
+	}
+}
+
 func TestMonitorStalledGivesUpOnTheOriginalClock(t *testing.T) {
 	db := newTestDB(t)
 	cfg := &Config{Settings: map[string]string{"torrent_dead_swarm_giveup_min": "4320"}}

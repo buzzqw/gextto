@@ -1482,6 +1482,19 @@ func downloadPathFreeSpaceFloor(cfg *Config, path string, global *uint64) *uint6
 // and only then record the approval with commitReleaseApproval, so a release
 // that is never started (space guard, engine refusal) leaves nothing to undo.
 func evaluateReleaseApproval(db *Database, release *models.Release, score, minScoreDiff int64, approvalContext *models.ApprovalContext, forbidUpgrade, dryRun bool) (bool, string, error) {
+	approved, reason, err := evaluateReleaseApprovalRaw(db, release, score, minScoreDiff, approvalContext, forbidUpgrade, dryRun)
+	if err != nil || !approved {
+		return approved, reason, err
+	}
+	if blocked := swarmBlockReason(release, reason); blocked != "" {
+		return false, blocked, nil
+	}
+	return true, reason, nil
+}
+
+// evaluateReleaseApprovalRaw is the database decision, before the swarm gate:
+// a release the library would accept is still refused when nobody can serve it.
+func evaluateReleaseApprovalRaw(db *Database, release *models.Release, score, minScoreDiff int64, approvalContext *models.ApprovalContext, forbidUpgrade, dryRun bool) (bool, string, error) {
 	if release.Kind == "series" {
 		evaluation := models.ApprovalContext{}
 		if approvalContext != nil {
@@ -1924,10 +1937,52 @@ func seederTieBreak(a *models.Release, b *models.Release) bool {
 	return a.Seeders > 0 && a.Seeders > b.Seeders
 }
 
+// swarmTier ranks a release by what the indexer said about its swarm. A known
+// leechers-only or empty swarm must lose to a release whose swarm is alive or
+// unknown, whatever the quality: a better resolution that nobody can serve is
+// not a better download. Unknown (-1) stays level with healthy because most
+// public sources do not report seeders at all.
+func swarmTier(release *models.Release) int {
+	switch {
+	case release == nil:
+		return 2
+	case release.Seeders < 0:
+		return 2 // unknown: the fresh-download probe will tell
+	case release.Seeders > 0:
+		return 2
+	case release.Peers > 0:
+		return 1 // leechers only: it may complete, but it is the last resort
+	default:
+		return 0 // nobody is sharing it
+	}
+}
+
+// swarmBlockReason refuses a release before it takes a slot. A completely
+// empty swarm never downloads, and a leechers-only swarm must not replace a
+// copy already in the library: the library copy stays. An unknown count is
+// left to the probe that checks the first minutes of the download.
+func swarmBlockReason(release *models.Release, approvalReason string) string {
+	if release == nil || release.Seeders < 0 {
+		return ""
+	}
+	if release.Seeders == 0 && release.Peers <= 0 {
+		return "dead_swarm_empty"
+	}
+	if release.Seeders == 0 && approvalReason == "upgrade" {
+		return "dead_swarm_upgrade"
+	}
+	return ""
+}
+
 // releaseStrictlyBetter reports whether a must replace b: a higher score, or at
 // equal score a REMUX against a non-REMUX, or a known-healthier swarm. It is the
 // negation of incumbentWins.
 func releaseStrictlyBetter(a *models.Release, aScore int64, b *models.Release, bScore int64) bool {
+	// A release whose swarm is known to be dead must not win a slot over one
+	// that can actually download, even when its quality score is higher.
+	if aTier, bTier := swarmTier(a), swarmTier(b); aTier != bTier {
+		return aTier > bTier
+	}
 	if aScore != bScore {
 		return aScore > bScore
 	}
@@ -1942,6 +1997,11 @@ func releaseStrictlyBetter(a *models.Release, aScore int64, b *models.Release, b
 // the remux of an episode that was already selected or downloaded, and a
 // healthier swarm breaks a remaining tie.
 func incumbentWins(candidate *models.Release, candidateScore int64, incumbent *models.Release, cfg *Config) bool {
+	// A candidate whose swarm is known to be dead does not replace one that can
+	// download, even when its quality score is higher.
+	if candidateTier, incumbentTier := swarmTier(candidate), swarmTier(incumbent); candidateTier != incumbentTier {
+		return incumbentTier > candidateTier
+	}
 	// Use the same policy-aware score the candidate was ranked with, so score
 	// rules and custom formats cannot make the two sides inconsistent.
 	incumbentScore := cfg.AcquisitionScore(incumbent)

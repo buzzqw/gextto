@@ -81,7 +81,7 @@ var uiSettingDefaults = map[string]string{
 	"torrent_stall_after_min":             "60",
 	"torrent_stall_retry_min":             "60",
 	"torrent_stall_giveup_min":            "20160",
-	"torrent_dead_swarm_giveup_min":       "4320",
+	"torrent_dead_swarm_giveup_min":       "30",
 	"torrent_sequential":                  "false",
 	"torrent_first_last":                  "false",
 	"torrent_active_downloads":            "3",
@@ -169,7 +169,7 @@ var uiSettingDefaults = map[string]string{
 	"upgrade_until_score":    "0",
 	// A stuck download keeps retrying, but after this long without progress the
 	// search may start an alternative that scores up to this many points less.
-	"stall_alternative_after_min":  "360",
+	"stall_alternative_after_min":  "30",
 	"stall_alternative_score_drop": "100",
 
 	// --- Avanzate -----------------------------------------------------------

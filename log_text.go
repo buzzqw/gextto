@@ -386,6 +386,10 @@ func skipReasonText(approvalReason string) string {
 		return "it is already downloading"
 	case "duplicate":
 		return "the library already has it in the same or better quality"
+	case "dead_swarm_empty":
+		return "nobody is sharing it: no seeders and no peers"
+	case "dead_swarm_upgrade":
+		return "the upgrade has no seeders; the copy in the library stays"
 	case "":
 		return "no reason given"
 	default:

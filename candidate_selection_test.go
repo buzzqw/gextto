@@ -31,6 +31,56 @@ func selectionRelease(id int, episodes []int64, score int64, remux bool) models.
 
 func selectionScore(release *models.Release) int64 { return release.SizeBytes }
 
+func TestSelectionPrefersALiveSwarmOverABetterDeadOne(t *testing.T) {
+	dead := selectionRelease(1, []int64{1}, 2000, false)
+	dead.Seeders, dead.Peers = 0, 5
+	live := selectionRelease(2, []int64{1}, 1000, false)
+	live.Seeders, live.Peers = 3, 10
+	if got := selectRun([]models.Release{dead, live}); got != "r2" {
+		t.Fatalf("selection = %q, want the live swarm r2", got)
+	}
+	// Unknown seeders stay level with a healthy swarm: the score decides.
+	unknown := selectionRelease(3, []int64{1}, 1500, false)
+	unknown.Seeders, unknown.Peers = -1, -1
+	if got := selectRun([]models.Release{unknown, live}); got != "r3" {
+		t.Fatalf("selection = %q, want the higher-score unknown r3", got)
+	}
+}
+
+func TestMovieSelectionPrefersALiveSwarm(t *testing.T) {
+	cfg := &Config{Settings: map[string]string{}}
+	dead := &models.Release{Kind: "movie", Title: "X", Seeders: 0, Peers: 5}
+	live := &models.Release{Kind: "movie", Title: "X", Seeders: 3, Peers: 10}
+	if !incumbentWins(dead, cfg.AcquisitionScore(dead), live, cfg) {
+		t.Fatal("a dead movie candidate replaced a live one")
+	}
+	if incumbentWins(live, cfg.AcquisitionScore(live), dead, cfg) {
+		t.Fatal("a live movie candidate did not replace a dead one")
+	}
+}
+
+func TestSwarmBlockReasonRefusesKnownDeadSwarms(t *testing.T) {
+	release := &models.Release{Seeders: 0, Peers: 0}
+	if got := swarmBlockReason(release, "approved"); got != "dead_swarm_empty" {
+		t.Fatalf("empty swarm = %q", got)
+	}
+	release.Peers = 4
+	if got := swarmBlockReason(release, "upgrade"); got != "dead_swarm_upgrade" {
+		t.Fatalf("leechers-only upgrade = %q", got)
+	}
+	if got := swarmBlockReason(release, "approved"); got != "" {
+		t.Fatalf("a missing episode may use the only leechers-only source: %q", got)
+	}
+	release.Seeders = -1
+	if got := swarmBlockReason(release, "upgrade"); got != "" {
+		t.Fatalf("unknown seeders must reach the probe: %q", got)
+	}
+	release.Seeders = 3
+	if got := swarmBlockReason(release, "upgrade"); got != "" {
+		t.Fatalf("healthy swarm refused: %q", got)
+	}
+}
+
 func selectRun(releases []models.Release) string {
 	var best []models.Release
 	for _, release := range releases {

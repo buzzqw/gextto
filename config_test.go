@@ -620,8 +620,8 @@ func TestStallAlternativeDefaultsAreActive(t *testing.T) {
 	if err := cfg.loadConfigDB(); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.StallAlternativeAfterMin != 360 || cfg.StallAlternativeScoreDrop != 100 {
-		t.Fatalf("defaults = %d/%d, want 360/100", cfg.StallAlternativeAfterMin, cfg.StallAlternativeScoreDrop)
+	if cfg.StallAlternativeAfterMin != 30 || cfg.StallAlternativeScoreDrop != 100 {
+		t.Fatalf("defaults = %d/%d, want 30/100", cfg.StallAlternativeAfterMin, cfg.StallAlternativeScoreDrop)
 	}
 	if err := saveConfigSetting(dir, "stall_alternative_after_min", "0"); err != nil {
 		t.Fatal(err)

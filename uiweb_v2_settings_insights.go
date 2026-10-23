@@ -43,7 +43,7 @@ func stallPolicySummary(s *AppState, cfg *Config) string {
 		window(numberSettingInt(cfg.Settings, "torrent_stall_retry_min", 60)),
 		window(cfg.StallAlternativeAfterMin),
 		cfg.StallAlternativeScoreDrop,
-		window(numberSettingInt(cfg.Settings, "torrent_dead_swarm_giveup_min", 4320)),
+		window(numberSettingInt(cfg.Settings, "torrent_dead_swarm_giveup_min", 30)),
 		window(numberSettingInt(cfg.Settings, "torrent_stall_giveup_min", 20160)),
 	)
 }

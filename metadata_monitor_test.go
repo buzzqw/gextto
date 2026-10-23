@@ -55,6 +55,35 @@ func TestMetadataGiveUpSurvivesARestart(t *testing.T) {
 	}
 }
 
+// A magnet that has met nobody after the probe window is abandoned without
+// waiting for the full metadata give-up; a connected peer keeps it alive.
+func TestMetadataProbeGivesUpWhenNobodyAnswers(t *testing.T) {
+	db := newTestDB(t)
+	cfg := metadataTestConfig("180")
+	insertMetadataTestTorrent(t, db, metadataTestHash, "Dead.Magnet")
+	session := &stubTorrentSession{list: []models.TorrentView{{
+		Hash: metadataTestHash, Name: "Dead.Magnet", State: "downloading_metadata",
+	}}}
+	started := time.Now().Add(-tev_metadataProbeWindow - time.Minute)
+	MonitorMetadata(&cfg, session, db, FromConfig(&cfg),
+		map[string]time.Time{metadataTestHash: started}, map[string]time.Time{metadataTestHash: started}, map[string]time.Time{})
+	if len(session.removed) != 1 {
+		t.Fatalf("a magnet with no peer after the probe was not removed: %v", session.removed)
+	}
+
+	// A connected peer may still deliver the file list: the probe leaves it.
+	db = newTestDB(t)
+	insertMetadataTestTorrent(t, db, metadataTestHash, "Slow.Magnet")
+	session = &stubTorrentSession{list: []models.TorrentView{{
+		Hash: metadataTestHash, Name: "Slow.Magnet", State: "downloading_metadata", NumConnections: 1,
+	}}}
+	MonitorMetadata(&cfg, session, db, FromConfig(&cfg),
+		map[string]time.Time{metadataTestHash: started}, map[string]time.Time{metadataTestHash: started}, map[string]time.Time{})
+	if len(session.removed) != 0 {
+		t.Fatalf("a magnet with a connected peer was removed too early: %v", session.removed)
+	}
+}
+
 // The wait is saved while it runs and cleared as soon as the file list
 // arrives, so a restart resumes it and a completed magnet leaves no row.
 func TestMetadataWaitIsSavedAndCleared(t *testing.T) {

@@ -35,6 +35,10 @@ type StallWatch struct {
 	// while owning no piece that is still needed.
 	lastProgressAt time.Time
 	lastDone       int64
+	// firstSeen is when the monitor first saw this download. A new download
+	// that has received no byte after tev_freshProbeWindow is abandoned
+	// instead of occupying a slot until the stall give-up window.
+	firstSeen time.Time
 	// stalledSince, once set, means the torrent is stalled but retained in the
 	// session; it is periodically reannounced instead of occupying an active
 	// download slot.
@@ -682,6 +686,16 @@ func tev_stallExpired(lastProgressAt *time.Time, lastDone *int64, now time.Time,
 // retry, waiting for a seeder to answer the reannounce.
 const tev_stallProbeWindow = 10 * time.Minute
 
+// tev_freshProbeWindow is how long a brand-new download may stay at zero bytes
+// with nobody answering before it is abandoned. A dead magnet must not occupy
+// a slot until the stall give-up window.
+const tev_freshProbeWindow = 15 * time.Minute
+
+// tev_metadataProbeWindow gives a magnet without a single peer a little longer
+// than a data download: some trackers answer the file list late, but waiting
+// the full metadata give-up window (hours) is not worth it.
+const tev_metadataProbeWindow = 30 * time.Minute
+
 // tev_stallPersistAfter is how long a download must go without a byte before
 // its progress clock is saved, so it survives a restart.
 const tev_stallPersistAfter = 5 * time.Minute
@@ -729,8 +743,8 @@ func tev_scheduleStallRetry(entry *StallWatch, now time.Time, base time.Duration
 // expires the gap is retried immediately.
 func tev_stallGiveupWindow(cfg *Config, torrent *models.TorrentView) (time.Duration, float64, bool) {
 	minutes := tev_configuredStallGiveupMinutes(cfg)
-	if deadSwarm := tev_settingFloatOr(cfg, "torrent_dead_swarm_giveup_min", 4320.0); deadSwarm > 0 {
-		if code, _, _ := DiagnoseTorrent(torrent); code == "dead_swarm" {
+	if deadSwarm := tev_settingFloatOr(cfg, "torrent_dead_swarm_giveup_min", 30.0); deadSwarm > 0 {
+		if tev_isDeadSwarm(torrent) {
 			minutes = deadSwarm
 		}
 	}
@@ -738,6 +752,123 @@ func tev_stallGiveupWindow(cfg *Config, torrent *models.TorrentView) (time.Durat
 		return 0, 0, false
 	}
 	return time.Duration(minutes * 60.0 * float64(time.Second)), minutes, true
+}
+
+// tev_isDeadSwarm reports whether no connected peer has the complete file and
+// the tracker knows of none either. The engine may still call such a torrent
+// "downloading" while a probe runs, but waiting cannot complete it.
+func tev_isDeadSwarm(torrent *models.TorrentView) bool {
+	if torrent == nil {
+		return false
+	}
+	code, _, _ := DiagnoseTorrent(torrent)
+	if code == "dead_swarm" {
+		return true
+	}
+	return code == "no_peers" && torrent.NumSeeds == 0 && torrent.NumComplete <= 0
+}
+
+// tev_freshProbeDead reports whether the diagnosis says that waiting longer
+// cannot help a download that has received no byte.
+func tev_freshProbeDead(code string, torrent *models.TorrentView) bool {
+	switch code {
+	case "dead_swarm", "no_peers":
+		return true
+	case "metadata":
+		// No piece has arrived and nobody is even connected: the magnet is
+		// not going to produce a file list.
+		return torrent != nil && torrent.NumConnections == 0 && torrent.NumPeers == 0 && torrent.NumComplete <= 0
+	}
+	return false
+}
+
+// tev_freshProbeExpired reports whether a new download has spent its probe
+// window at zero bytes without a peer or seeder answering.
+func tev_freshProbeExpired(firstSeen, now time.Time, torrent *models.TorrentView) bool {
+	if firstSeen.IsZero() || torrent == nil || now.Sub(firstSeen) < tev_freshProbeWindow {
+		return false
+	}
+	if torrent.TotalDone != 0 || torrent.Progress != 0 {
+		return false
+	}
+	code, _, _ := DiagnoseTorrent(torrent)
+	return tev_freshProbeDead(code, torrent)
+}
+
+// tev_upgradeHasLibraryCopy reports whether the previous version an upgrade
+// would replace is a real file, not just a database row left behind by an
+// earlier attempt.
+func tev_upgradeHasLibraryCopy(db *Database, hash string) bool {
+	backups, err := db.UpgradeBackupsFor(hash)
+	if err != nil {
+		return false
+	}
+	for _, backup := range backups {
+		if backup.ArchivePath == nil {
+			continue
+		}
+		path := strings.TrimSpace(*backup.ArchivePath)
+		if path == "" {
+			continue
+		}
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return true
+		}
+	}
+	return false
+}
+
+// tev_abandonTorrent removes a download that cannot complete, restores the
+// previous library copy when it was an upgrade, blocklists the release and
+// clears the gap so the next search can look for another version.
+func tev_abandonTorrent(cfg *Config, db *Database, torrents TorrentSession, notifier *Notifier, torrent models.TorrentView, watch map[string]StallWatch, why, code string) {
+	var metadata *models.TorrentMeta
+	if value, err := db.TorrentMeta(torrent.Hash); err == nil && value != nil {
+		metadata = value
+	}
+	hasLibraryCopy := tev_upgradeHasLibraryCopy(db, torrent.Hash)
+	salvaged, salvageRestored := tev_salvagePackEpisodes(cfg, torrents, db, torrent, metadata)
+	restored, _ := db.RestoreUpgrade(torrent.Hash)
+	restored = restored || salvageRestored
+	_ = db.MarkTorrentError(torrent.Hash, code)
+	if metadata != nil {
+		_ = db.Blocklist(&metadata.Release, "dead_swarm")
+	}
+	nextStep := "the next search will look for another version"
+	if hasLibraryCopy {
+		nextStep = "the copy in the library stays"
+	}
+	if salvaged > 0 {
+		nextStep = "the next search will look for the episodes still missing"
+	}
+	logging.Warn(fmt.Sprintf("❌ Gave up on %s: %s. It is removed; %s.",
+		tev_userLabel(db, torrent), why, nextStep), "hash", torrent.Hash)
+	if tev_removeFailedTorrent(torrents, torrent.Hash) {
+		_ = db.MarkTorrentRemovedAt(torrent.Hash)
+	}
+	if metadata != nil && metadata.Release.Series != nil && metadata.Release.Season != nil {
+		episodes := metadata.Release.EpisodeRange
+		if len(episodes) == 0 && metadata.Release.Episode != nil {
+			episodes = []int64{*metadata.Release.Episode}
+		}
+		for _, episode := range episodes {
+			if episode > 0 {
+				_ = db.ClearGapSearched(*metadata.Release.Series, *metadata.Release.Season, episode)
+			}
+		}
+	}
+	if notifier != nil {
+		_ = notifier.NotifyEvent("download_failed", map[string]any{
+			"hash":              torrent.Hash,
+			"title":             torrent.Name,
+			"error":             code,
+			"upgrade_restored":  restored,
+			"salvaged_episodes": salvaged,
+		})
+	}
+	delete(watch, torrent.Hash)
+	torrents.ClearStalled(torrent.Hash)
+	_ = db.DeleteStallWatch(torrent.Hash)
 }
 
 // MonitorStalled implements `monitor_stalled`.
@@ -789,7 +920,14 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 		}
 		if !parked {
 			if !watched {
-				entry = StallWatch{lastProgressAt: now, lastDone: torrent.TotalDone}
+				entry = StallWatch{lastProgressAt: now, lastDone: torrent.TotalDone, firstSeen: now}
+			} else if entry.firstSeen.IsZero() {
+				entry.firstSeen = now
+			}
+			if tev_freshProbeExpired(entry.firstSeen, now, &torrent) {
+				tev_abandonTorrent(cfg, db, torrents, notifier, torrent, watch,
+					"no peer or seeder answered in "+logDuration(tev_freshProbeWindow), "probe timeout")
+				continue
 			}
 			progressAt := entry.lastProgressAt
 			lastDone := entry.lastDone
@@ -858,7 +996,7 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 					"hash", torrent.Hash, "recovered_bytes", torrent.TotalDone-entry.lastDone, "progress", torrent.Progress)
 				torrents.ClearStalled(torrent.Hash)
 				_ = db.DeleteStallWatch(torrent.Hash)
-				watch[torrent.Hash] = StallWatch{lastProgressAt: now, lastDone: torrent.TotalDone}
+				watch[torrent.Hash] = StallWatch{lastProgressAt: now, lastDone: torrent.TotalDone, firstSeen: now}
 				continue
 			}
 			entry.lastDone = torrent.TotalDone
@@ -866,51 +1004,9 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 		stalledSince := *entry.stalledSince
 		entryGiveup, entryGiveupMinutes, hasEntryGiveup := tev_stallGiveupWindow(cfg, &torrent)
 		if hasEntryGiveup && now.Sub(stalledSince) >= entryGiveup {
-			var metadata *models.TorrentMeta
-			failedTitle := ""
-			if value, err := db.TorrentMeta(torrent.Hash); err == nil && value != nil {
-				metadata = value
-				failedTitle = value.Release.Title
-			}
-			// The complete episodes of a season pack reach the library before
-			// the torrent and its partial data are removed.
-			salvaged, salvageRestored := tev_salvagePackEpisodes(cfg, torrents, db, torrent, metadata)
-			restored, _ := db.RestoreUpgrade(torrent.Hash)
-			restored = restored || salvageRestored
-			_ = db.MarkTorrentError(torrent.Hash, "stalled download")
-			// The log promises another version: without the blocklist the next
-			// search can pick the very same dead release again (it happened with
-			// an archive hit a few hours after the give-up).
-			if metadata != nil {
-				_ = db.Blocklist(&metadata.Release, "stalled_dead_swarm")
-			}
-			nextStep := "the next search will look for another version"
-			if salvaged > 0 {
-				nextStep = "the next search will look for the episodes still missing"
-			}
-			logging.Warn(fmt.Sprintf("❌ Gave up on «%s»: stuck at %s for %s. It is removed and %s",
-				torrent.Name, logPercent(torrent.Progress),
-				logDuration(time.Duration(entryGiveupMinutes*float64(time.Minute))), nextStep),
-				"title", failedTitle, "hash", torrent.Hash)
-			if tev_removeFailedTorrent(torrents, torrent.Hash) {
-				_ = db.MarkTorrentRemovedAt(torrent.Hash)
-			}
-			// 2b: after a dead-swarm give-up, retry an alternative release on the
-			// next cycle instead of waiting for the gap-search throttle to expire.
-			if metadata != nil && metadata.Release.Series != nil &&
-				metadata.Release.Season != nil && metadata.Release.Episode != nil {
-				_ = db.ClearGapSearched(*metadata.Release.Series, *metadata.Release.Season, *metadata.Release.Episode)
-			}
-			_ = notifier.NotifyEvent("download_failed", map[string]any{
-				"hash":              torrent.Hash,
-				"title":             failedTitle,
-				"error":             "stalled download",
-				"upgrade_restored":  restored,
-				"salvaged_episodes": salvaged,
-			})
-			delete(watch, torrent.Hash)
-			torrents.ClearStalled(torrent.Hash)
-			_ = db.DeleteStallWatch(torrent.Hash)
+			why := fmt.Sprintf("stuck at %s for %s", logPercent(torrent.Progress),
+				logDuration(time.Duration(entryGiveupMinutes*float64(time.Minute))))
+			tev_abandonTorrent(cfg, db, torrents, notifier, torrent, watch, why, "stalled download")
 			continue
 		}
 		switch {
@@ -1002,7 +1098,7 @@ func tev_forgetMetadataWait(db *Database, hash string, waitStart, firstSeen, las
 // start is kept in the database so a restart does not restart the give-up
 // clock.
 func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, waitStart, firstSeen, lastWarning map[string]time.Time) {
-	giveupMinutes := tev_settingFloatOr(cfg, "torrent_metadata_giveup_min", 1440.0)
+	giveupMinutes := tev_settingFloatOr(cfg, "torrent_metadata_giveup_min", 180.0)
 	if giveupMinutes <= 0 {
 		for hash := range firstSeen {
 			_ = db.ClearMetadataWait(hash)
@@ -1057,6 +1153,16 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 		if !ok {
 			retryAt = now
 			waitStart[torrent.Hash] = now
+		}
+		// A magnet that has not met a single peer after the probe window is not
+		// going to produce a file list: do not keep it for the full metadata
+		// give-up window.
+		if now.Sub(started) >= tev_metadataProbeWindow &&
+			torrent.NumConnections == 0 && torrent.NumPeers == 0 && torrent.NumComplete <= 0 {
+			tev_abandonTorrent(cfg, db, torrents, notifier, torrent, nil,
+				"no peer answered in "+logDuration(tev_metadataProbeWindow)+" while waiting for the file list", "metadata timeout")
+			tev_forgetMetadataWait(db, torrent.Hash, waitStart, firstSeen, lastWarning)
+			continue
 		}
 		if now.Sub(started) >= giveup {
 			metadata, _ := db.TorrentMeta(torrent.Hash)
