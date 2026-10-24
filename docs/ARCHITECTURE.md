@@ -82,6 +82,7 @@ qBittorrent-nox.
 | `appstate.go` | construction of the shared state `AppState` (`NewAppState`). |
 | `engine.go` | scrape/search engine: HTML/RSS feeds, Torznab, web engines. |
 | `orchestrator.go` | one complete acquisition cycle. |
+| `release_dedup.go` | copies of the same torrent from several sources merged into one release (infohash, declared hash, name + size within rounding; different hashes never), the others kept as mirrors the cycle falls back to when a link fails. |
 | `torrent_link_quarantine.go` | dead `.torrent` links (`dead_torrent_links`): a URL that fails in two different cycles is skipped for 6h, 24h, then a week, so the archive stops proposing it and the cycle stops counting it as an error; a success clears the row. |
 | `indexer_failure.go` | repeated `.torrent` failures from one source (an expired login, a dead proxy): a warning in the log and, at most every 12 hours, a notification naming the source and the action (sign in again, disable it in the searches); a resolved link re-arms it. |
 | `torrent_add_intent.go` | starting an approved release (add → approval → `torrent_meta`) and recovery of adds interrupted by a crash. |

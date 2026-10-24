@@ -14,6 +14,10 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 24 ottobre 2026
+
+- **Le copie della stessa release non si moltiplicano più, e una fa da riserva all'altra.** Lo stesso torrent arriva spesso da più fonti (feed e ricerca dello stesso indexer, Jackett, Prowlarr, indexarr) e i siti che danno solo il link `.torrent` lo facevano sembrare ogni volta una release diversa. Ora Gextto unisce le copie quando hanno lo stesso infohash (anche se dichiarato accanto al link `.torrent` o scritto in base32) e, quando l'infohash manca, quando nome e dimensione coincidono a meno dell'arrotondamento. Nel dubbio non unisce: due infohash diversi, o nomi che differiscono per gruppo, risoluzione, lingua, PROPER o episodio, restano release distinte. Della release unita usa la copia con lo swarm migliore e tiene le altre come riserva: se il link scelto non funziona o è in quarantena, prova subito la stessa release da un'altra fonte invece di aspettare il ciclo successivo. Nel log compare una riga «🔁 … trying the same release from …». Nella ricerca manuale ogni torrent compare una volta sola.
+
 ## 23 ottobre 2026
 
 - **Anche i fumetti raccontano cosa fanno, nel log.** Il controllo dei fumetti non elenca più righe tecniche («comics: candidate posts · posts: 1», «title checked · queued: 0»): dice quante testate sta controllando, cosa scarica e perché («📥 Downloading «Poison Ivy #41 (2026)» — new comic on GetComics»), quando una testata è già aggiornata o non ha novità, e quando un albo non ha ancora il link di download. Anche gli errori sono frasi con il titolo e il motivo.

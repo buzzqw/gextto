@@ -485,7 +485,6 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		}
 	}
 
-	seen := map[string]struct{}{}
 	kept := make([]models.Release, 0, len(all))
 	for _, release := range all {
 		if reason := cfg.AllReleaseDeniedReason(&release); reason != "" {
@@ -497,26 +496,19 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		// A feed with only a `.torrent` link (e.g. TorrentLeech) has no magnet:
 		// do not drop it here, the infohash is resolved in the cycle. In that
 		// case deduplicate by URL.
-		dedupKey, ok := releaseDedupKey(&release)
-		if !ok {
+		if _, ok := releaseDedupKey(&release); !ok {
 			logging.Debug("filter skipped",
 				"title", release.Title,
 				"source", release.Source,
 				"reason", "missing magnet hash")
 			continue
 		}
-		if _, duplicate := seen[dedupKey]; duplicate {
-			logging.Debug("filter skipped duplicate",
-				"title", release.Title,
-				"source", release.Source,
-				"reason", "duplicate infohash")
-			continue
-		}
-		seen[dedupKey] = struct{}{}
 		kept = append(kept, release)
 	}
-	all = kept
-	logging.Debug(fmt.Sprintf("scraping: %d unique releases after filters", len(all)))
+	// Copies of the same torrent from different sources become one release
+	// with mirrors (release_dedup.go).
+	all = mergeDuplicateReleases(kept)
+	logging.Debug(fmt.Sprintf("scraping: %d unique releases after filters, %d duplicate copies merged", len(all), len(kept)-len(all)))
 	sourceStats := append([]logging.SourceStatEntry{}, feedStats...)
 	sourceStats = append(sourceStats, logging.TakeSourceStats()...)
 	providerFailures := map[string]int{}
@@ -862,7 +854,6 @@ func searchOneWithDBType(
 		all = append(all, webResults...)
 	}
 
-	seen := map[string]struct{}{}
 	kept := make([]models.Release, 0, len(all))
 	for _, release := range all {
 		if !includeRejected {
@@ -873,16 +864,12 @@ func searchOneWithDBType(
 				continue
 			}
 		}
-		dedupKey, ok := releaseDedupKey(&release)
-		if !ok {
+		if _, ok := releaseDedupKey(&release); !ok {
 			continue
 		}
-		if _, duplicate := seen[dedupKey]; !duplicate {
-			seen[dedupKey] = struct{}{}
-			kept = append(kept, release)
-		}
+		kept = append(kept, release)
 	}
-	return kept
+	return mergeDuplicateReleases(kept)
 }
 
 // printSourceReport is one readable line per source (feed, indexer, web engine)

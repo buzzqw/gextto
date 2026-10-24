@@ -372,6 +372,23 @@ selezione e accodamento. Il numero di release trovate non equivale al numero di
 download: una release può essere esclusa perché non monitorata, troppo vecchia,
 bloccata, già presente o inferiore al file archiviato.
 
+**Copie della stessa release.** Lo stesso torrent arriva spesso da più fonti: il
+feed e la ricerca dello stesso indexer, Jackett e Prowlarr, indexarr. Gextto le
+unisce in una sola release:
+- quando hanno lo stesso infohash, anche se una fonte lo dichiara accanto a un
+  link `.torrent` o lo scrive in base32;
+- quando una fonte non dà l'infohash, ma nome e dimensione coincidono, a meno
+  dell'arrotondamento con cui gli indexer scrivono le dimensioni.
+
+Due torrent con infohash diversi restano sempre separati, anche se hanno lo
+stesso nome. Restano separati anche i nomi che differiscono per gruppo,
+risoluzione, lingua, PROPER o episodio: nel dubbio Gextto non unisce.
+
+Della release unita usa la copia migliore: swarm vivo, più seeder, infohash
+noto. Tiene le altre copie come riserva: se il link `.torrent` scelto non
+funziona o è in quarantena, prova subito la stessa release da un'altra fonte,
+invece di lasciare l'episodio al ciclo successivo.
+
 ## 3. Scarico
 
 - **Cerca una release**: il pannello in cima a Scarico cerca su archivio,

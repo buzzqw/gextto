@@ -365,6 +365,23 @@ queueing. The number of releases found is not the number of downloads: a release
 may be excluded because it is unmonitored, too old, blocked, already present or
 inferior to the archived file.
 
+**Copies of the same release.** The same torrent often comes from several
+sources: the feed and the search of the same indexer, Jackett and Prowlarr,
+indexarr. Gextto merges them into one release:
+- when they have the same infohash, even when a source declares it next to a
+  `.torrent` link or writes it in base32;
+- when a source gives no infohash but name and size match, within the rounding
+  indexers use for sizes.
+
+Two torrents with different infohashes always stay apart, even with the same
+name. Names that differ in group, resolution, language, PROPER or episode also
+stay apart: when in doubt, Gextto does not merge.
+
+Of a merged release it uses the best copy: a live swarm, more seeders, a known
+infohash. It keeps the other copies as spares: when the chosen `.torrent` link
+fails or is in quarantine, it tries the same release from another source right
+away, instead of leaving the episode to the next cycle.
+
 ## 3. Downloads
 
 - **Search a release**: the panel at the top of Downloads searches the archive,

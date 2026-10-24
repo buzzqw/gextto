@@ -170,6 +170,14 @@ func TestParseFeedBodyKeepsGUIDAndTorznabTorrentIdentity(t *testing.T) {
 		releases[1].TorrentURL == nil || *releases[1].TorrentURL != "http://jackett:9117/dl/test/?path=two" {
 		t.Fatalf("infohash release with a link = %+v", releases[1])
 	}
+	// The declared hash is kept as identity, so the same torrent from another
+	// source is recognised as a duplicate.
+	if releases[1].InfoHash != hash {
+		t.Fatalf("infohash identity = %q, want %q", releases[1].InfoHash, hash)
+	}
+	if releases[2].InfoHash != "" {
+		t.Fatalf("url-only release has an infohash identity: %q", releases[2].InfoHash)
+	}
 	// Without a link the infohash is all there is: it becomes the magnet.
 	if releases[3].GUID != "https://tracker.example/details/4" || !strings.Contains(releases[3].Magnet, hash) {
 		t.Fatalf("infohash-only release = %+v", releases[3])

@@ -13,6 +13,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
+## 24 October 2026
+
+- **Copies of the same release no longer multiply, and one is a spare for the other.** The same torrent often comes from several sources (feed and search of the same indexer, Jackett, Prowlarr, indexarr), and sites that only give a `.torrent` link made it look like a different release every time. Gextto now merges the copies when they have the same infohash (even when it is declared next to the `.torrent` link or written in base32) and, when the infohash is missing, when name and size match within rounding. When in doubt it does not merge: two different infohashes, or names that differ in group, resolution, language, PROPER or episode, stay separate releases. Of a merged release it uses the copy with the best swarm and keeps the others as spares: when the chosen link fails or is in quarantine, it tries the same release from another source right away instead of waiting for the next cycle. The log shows a line «🔁 … trying the same release from …». In the manual search every torrent appears once.
+
 ## 23 October 2026
 
 - **Comics tell what they are doing too, in the log.** The comics check no longer lists technical lines ("comics: candidate posts · posts: 1", "title checked · queued: 0"): it says how many titles it is checking, what it downloads and why («📥 Downloading «Poison Ivy #41 (2026)» — new comic on GetComics»), when a title is already up to date or has nothing new, and when an issue has no download link yet. Errors are sentences with the title and the reason too.

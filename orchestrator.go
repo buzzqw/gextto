@@ -643,10 +643,13 @@ func RunCycleDomain(
 		// instead of picking it and failing at the download step.
 		if release.Magnet == "" && release.TorrentURL != nil {
 			if reason, dead := quarantinedLinks[*release.TorrentURL]; dead {
-				logging.Debug("release skipped: its torrent link is in quarantine",
-					"target", releaseTarget(&release),
-					"reason", reason)
-				continue
+				// Another copy of the same torrent can still compete.
+				if !switchToMirror(&release, mirrorNotQuarantined(quarantinedLinks)) {
+					logging.Debug("release skipped: its torrent link is in quarantine",
+						"target", releaseTarget(&release),
+						"reason", reason)
+					continue
+				}
 			}
 		}
 		if release.Kind == "series" {
@@ -808,24 +811,28 @@ func RunCycleDomain(
 		// have no magnet: download the file, derive its infohash, and retain the
 		// file for adding it (private trackers require it for announcing).
 		var torrentFile *string
-		if strings.TrimSpace(release.Magnet) == "" {
-			if release.TorrentURL != nil {
-				magnet, path, err := resolveTorrentURL(ctx, engine, cfg, *release.TorrentURL, &release.Title)
-				if err != nil {
-					if errors.Is(err, errTorrentNotAvailable) {
-						// The indexer knows the release but cannot serve it yet
-						// (mircrew: "no magnet for this request" until the topic
-						// is thanked, or a login that needs renewing). It is not
-						// a dead link: keep it eligible, no cycle error and no
-						// strike. The next cycle retries it. It still counts for
-						// the "indexer keeps failing" notice.
-						logging.Debug("torrent link not available yet",
-							"target", releaseTarget(&release),
-							"source", release.Source,
-							"error", err)
-						noteTorrentLinkFailure(linkFailures, release.Source, *release.TorrentURL, err, notifier)
-						continue
-					}
+		// A mirror is another copy of the same torrent from another source
+		// (release_dedup.go): when this link fails, the next copy is tried in
+		// the same cycle instead of leaving the episode for the next one.
+		mirrorUsable := mirrorNotQuarantined(quarantinedLinks)
+		linkResolved := true
+		for strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil {
+			magnet, path, err := resolveTorrentURL(ctx, engine, cfg, *release.TorrentURL, &release.Title)
+			if err != nil {
+				failedSource := release.Source
+				if errors.Is(err, errTorrentNotAvailable) {
+					// The indexer knows the release but cannot serve it yet
+					// (mircrew: "no magnet for this request" until the topic
+					// is thanked, or a login that needs renewing). It is not
+					// a dead link: keep it eligible, no cycle error and no
+					// strike. The next cycle retries it. It still counts for
+					// the "indexer keeps failing" notice.
+					logging.Debug("torrent link not available yet",
+						"target", releaseTarget(&release),
+						"source", release.Source,
+						"error", err)
+					noteTorrentLinkFailure(linkFailures, release.Source, *release.TorrentURL, err, notifier)
+				} else {
 					// Two failures in different cycles mean the link is dead:
 					// quarantine it so the archive stops proposing it (and the
 					// cycle stops counting it as an error) until the retry.
@@ -845,26 +852,35 @@ func RunCycleDomain(
 					if source := strings.TrimSpace(release.Source); source != "" {
 						noteTorrentLinkFailure(linkFailures, source, *release.TorrentURL, err, notifier)
 					}
+				}
+				if switchToMirror(&release, mirrorUsable) {
+					logging.Info(fmt.Sprintf("🔁 %s: the link from %s did not work, trying the same release from %s",
+						logTarget(&release), failedSource, release.Source))
 					continue
 				}
-				// The link works: forget any previous failure so it is eligible
-				// again if the indexer breaks later.
-				_ = db.ClearTorrentLinkFailure(*release.TorrentURL)
-				clearIndexerFailureNotice(release.Source)
-				release.Magnet = magnet
-				// The feed was persisted before selection. Replace its
-				// short-lived Jackett URL with the stable magnet so a later
-				// archive search can use it without re-downloading an already
-				// expired link. Skipped in dry-run: it rewrites the archive DB.
-				if !cfg.DryRun {
-					if err := archive.CanonicalizeRelease(&release, release.Magnet); err != nil {
-						logging.Warn("could not canonicalize archived torrent URL", "error", err)
-					}
-				}
-				if path != "" {
-					torrentFile = &path
+				linkResolved = false
+				break
+			}
+			// The link works: forget any previous failure so it is eligible
+			// again if the indexer breaks later.
+			_ = db.ClearTorrentLinkFailure(*release.TorrentURL)
+			clearIndexerFailureNotice(release.Source)
+			release.Magnet = magnet
+			// The feed was persisted before selection. Replace its
+			// short-lived Jackett URL with the stable magnet so a later
+			// archive search can use it without re-downloading an already
+			// expired link. Skipped in dry-run: it rewrites the archive DB.
+			if !cfg.DryRun {
+				if err := archive.CanonicalizeRelease(&release, release.Magnet); err != nil {
+					logging.Warn("could not canonicalize archived torrent URL", "error", err)
 				}
 			}
+			if path != "" {
+				torrentFile = &path
+			}
+		}
+		if !linkResolved {
+			continue
 		}
 		reconcilePackIdentityFromMagnet(&release)
 		isReadyPending := false
@@ -2226,19 +2242,9 @@ func finishCycleWithoutDownloads(db *Database, stats *models.CycleStats) (*model
 	return stats, nil
 }
 
-// dedupeReleasesByHash drops releases whose info-hash already appeared earlier
-// in the list. Releases without a magnet hash (a .torrent link only) are kept.
+// dedupeReleasesByHash folds the copies of the same torrent collected by the
+// different passes (feeds, archive, gap and pending searches) into one release
+// with mirrors. Releases without any identity are kept.
 func dedupeReleasesByHash(releases []models.Release) []models.Release {
-	seen := make(map[string]struct{}, len(releases))
-	kept := releases[:0]
-	for i := range releases {
-		if hash, ok := utils.MagnetHash(releases[i].Magnet); ok {
-			if _, dup := seen[hash]; dup {
-				continue
-			}
-			seen[hash] = struct{}{}
-		}
-		kept = append(kept, releases[i])
-	}
-	return kept
+	return mergeDuplicateReleases(releases)
 }

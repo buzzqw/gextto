@@ -618,15 +618,24 @@ type Release struct {
 	// Torznab <guid>, the Prowlarr guid). It is not a torrent infohash: the
 	// archive uses it to recognise the same listing again when the download URL
 	// is regenerated at every request and no magnet is exposed.
-	GUID         string  `json:"guid,omitempty"`
-	Source       string  `json:"source"`
-	Quality      Quality `json:"quality"`
-	Kind         string  `json:"kind"`
-	Series       *string `json:"series"`
-	Season       *int64  `json:"season"`
-	Episode      *int64  `json:"episode"`
-	IsPack       bool    `json:"is_pack"`
-	EpisodeRange []int64 `json:"episode_range"`
+	GUID string `json:"guid,omitempty"`
+	// InfoHash is the infohash an indexer declared for a release kept as a
+	// `.torrent` link (the file carries the announce with the passkey, so no
+	// magnet is built). It is only an identity, used to recognise the same
+	// torrent from another source: the transfer still uses TorrentURL.
+	InfoHash string `json:"info_hash,omitempty"`
+	// Mirrors are other copies of the same torrent from other sources, folded
+	// into this release by the duplicate merge. The acquisition falls back to
+	// them when the link of this copy fails. Never persisted.
+	Mirrors      []Release `json:"-"`
+	Source       string    `json:"source"`
+	Quality      Quality   `json:"quality"`
+	Kind         string    `json:"kind"`
+	Series       *string   `json:"series"`
+	Season       *int64    `json:"season"`
+	Episode      *int64    `json:"episode"`
+	IsPack       bool      `json:"is_pack"`
+	EpisodeRange []int64   `json:"episode_range"`
 	// Network names the acquisition network: "" or "torrent" for BitTorrent,
 	// "ed2k" for a file found on Kad/eD2k. The provider sets it so the UI can
 	// label a result without guessing from the link.

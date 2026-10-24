@@ -301,6 +301,11 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 					}
 					if release := ParseReleaseSource(title, magnet, torrentPtr, itemSource, discoveredAt); release != nil {
 						release.GUID = guid
+						if magnet == "" {
+							// The link stays the transfer; the declared hash
+							// still recognises this torrent from other sources.
+							release.InfoHash = canonicalInfoHash(infohash)
+						}
 						if sizeBytes != nil {
 							rounded := int64(math.Round(*sizeBytes))
 							if rounded > 0 {
@@ -1857,6 +1862,9 @@ func parseProwlarrItems(items []map[string]any, source string) []models.Release 
 			continue
 		}
 		release.GUID = prowlarrGUID(item)
+		if release.Magnet == "" {
+			release.InfoHash = canonicalInfoHash(jsonStringValue(item["infoHash"]))
+		}
 		release.TmdbID = jsonIdentifierValue(item["tmdbId"])
 		if size := jsonNumberInt(item["size"]); size != nil && *size > 0 {
 			// Drop samples/NFO fragments that are never the episode.
@@ -2006,6 +2014,11 @@ func releaseDedupKey(release *models.Release) (string, bool) {
 		return "", false
 	}
 	if hash, ok := utils.MagnetHash(release.Magnet); ok {
+		return hash, true
+	}
+	// A `.torrent` link whose indexer declared the infohash is that torrent,
+	// whichever listing it came from.
+	if hash := canonicalInfoHash(release.InfoHash); hash != "" {
 		return hash, true
 	}
 	// A stable listing id survives the ephemeral download URL. It is the true
