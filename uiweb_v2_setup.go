@@ -479,9 +479,9 @@ func V2SetupSources(w http.ResponseWriter, r *http.Request, s *AppState) {
 			v2SetupRedirect(w, r, 3, "Indirizzo dell'indexer non valido: usa http://host:porta.", true)
 			return
 		}
-		manager := r.FormValue("indexer_manager")
-		if manager != "jackett" {
-			manager = "prowlarr"
+		manager := normalizeManagerKind(r.FormValue("indexer_manager"))
+		if manager == "" {
+			manager = ManagerProwlarr
 		}
 		name := strings.TrimSpace(r.FormValue("indexer_name"))
 		if name == "" {

@@ -24,10 +24,23 @@ func TestExplicitManagerOverridesHeuristic(t *testing.T) {
 	if got := torznab_endpoint(jackett); got != "http://host:5001/api/v2.0/indexers/all/results/torznab/api" {
 		t.Fatalf("explicit jackett endpoint = %q", got)
 	}
+	// indexarr keeps its own native Torznab endpoint for the aggregate search;
+	// its indexer list and per-indexer lanes use the Jackett-compatible paths.
+	indexarr := IndexerConfig{Name: "custom", URL: "http://host:5001", Enabled: true, Manager: ManagerIndexarr}
+	if got := torznab_endpoint(indexarr); got != "http://host:5001/api" {
+		t.Fatalf("explicit indexarr endpoint = %q", got)
+	}
 	// Without a manager, the historical heuristic still applies.
 	legacy := IndexerConfig{Name: "my-indexer", URL: "http://host:9696", Enabled: true}
 	if got := torznab_endpoint(legacy); got != "http://host:9696/api/v1/search" {
 		t.Fatalf("heuristic endpoint = %q", got)
+	}
+	heuristicIndexarr := IndexerConfig{Name: "indexarr", URL: "http://host:8484", Enabled: true}
+	if got := managerKind(heuristicIndexarr); got != ManagerIndexarr {
+		t.Fatalf("heuristic indexarr manager = %q", got)
+	}
+	if !isManagerSource(heuristicIndexarr) {
+		t.Fatal("indexarr must be a manager source (no FlareSolverr)")
 	}
 }
 

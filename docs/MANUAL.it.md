@@ -137,7 +137,7 @@ Gextto gira come un unico servizio. Apri la UI all'indirizzo `http://<host>:5000
   il selettore delle cartelle del server e può crearne di nuove; **Verifica**
   controlla con l'utente del servizio se ogni cartella esiste ed è scrivibile,
   il tipo di disco, NAS compreso, lo spazio libero e se sta sullo stesso disco
-  della libreria), *Fonti* (un indexer Prowlarr/Jackett e la chiave TMDB,
+  della libreria), *Fonti* (un indexer Prowlarr/Jackett/indexarr e la chiave TMDB,
   consigliata, oppure in alternativa la chiave TVDB con l'eventuale PIN),
   *Primo titolo* (la ricerca su TMDB, o su TVDB se manca la chiave TMDB, con il
   pulsante per aggiungere) e *Attiva*
@@ -1027,13 +1027,16 @@ servizi, Diagnostica e traduzioni). Le modifiche non salvate sono
 evidenziate con la barra “Salva tutte”. L'elenco completo di ogni voce, tab per
 tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
 
-- **Sorgenti** — lista feed RSS, indexer (Jackett/Prowlarr) con pulsante
-  *Verifica*, URL FlareSolverr + test, motori web, filtri contenuto, blacklist.
-  Per Jackett puoi indicare l'URL base, ad esempio `http://host:9117`, e la
-  relativa API key: Gextto costruisce l'endpoint Torznab
+- **Sorgenti** — lista feed RSS, indexer (Jackett, Prowlarr, indexarr o un
+  Torznab diretto) con pulsante *Verifica*, URL FlareSolverr + test, motori web,
+  filtri contenuto, blacklist. Per Jackett puoi indicare l'URL base, ad esempio
+  `http://host:9117`, e la relativa API key: Gextto costruisce l'endpoint Torznab
   `/api/v2.0/indexers/all/results/torznab/api`. Il controllo di salute usa
   `t=caps` con la stessa API key, quindi verifica l'API e non soltanto la home di
-  Jackett. Nei risultati la sorgente può apparire come `jackett:NomeTracker`.
+  Jackett. Per indexarr l'URL base è di solito `http://host:8484`: la ricerca
+  aggregata usa l'endpoint nativo `/api`, mentre l'elenco degli indexer e le
+  singole lane usano i percorsi compatibili con Jackett. Nei risultati la
+  sorgente può apparire come `jackett:NomeTracker` o `indexarr:NomeTracker`.
 - **eD2k e Kad** — collegamento ad aMule (indirizzo, porta e password delle
   connessioni esterne), rete di ricerca (Kad, server o entrambi), ripiego
   automatico quando i torrent non trovano nulla e rinuncia ai download fermi.
@@ -1277,19 +1280,30 @@ Per Jackett:
 
 1. crea o verifica almeno un indexer dentro Jackett;
 2. copia la API key dalla pagina Jackett;
-3. in Gextto premi **+ Jackett**;
+3. in Gextto premi **+ Jackett** (o aggiungi una riga alla lista *Indexer
+   Torznab* e scegli **Jackett** come tipo);
 4. inserisci URL base, ad esempio `http://jackett:9117`, e API key;
 5. salva e premi **Verifica**;
 6. controlla *Salute → Stato API*.
 
-Con Jackett e Prowlarr Gextto legge l'elenco degli indexer dal manager e ne
-interroga **uno alla volta** (l'endpoint Torznab del singolo indexer per Jackett,
-la ricerca per `indexerIds` per Prowlarr): ogni tracker ha così il proprio
-timeout e la propria salute, senza che il più lento blocchi gli altri. Se
-l'elenco non è leggibile torna alla ricerca aggregata. Non aggiungere il percorso
-Torznab all'URL base: basta l'indirizzo del manager (Prowlarr normalmente sulla
-porta `9696`). Un percorso Torznab personalizzato già completo va lasciato come
-endpoint esplicito.
+Per indexarr:
+
+1. copia la API key da indexarr;
+2. in Gextto aggiungi una riga alla lista *Indexer Torznab* e scegli **indexarr**
+   come tipo;
+3. inserisci l'URL base, ad esempio `http://indexarr:8484`, e la API key;
+4. salva e premi **Verifica**;
+5. controlla *Salute → Stato API*.
+
+Con Jackett, Prowlarr e indexarr Gextto legge l'elenco degli indexer dal manager
+e ne interroga **uno alla volta** (l'endpoint Torznab del singolo indexer per
+Jackett e indexarr, la ricerca per `indexerIds` per Prowlarr): ogni tracker ha
+così il proprio timeout e la propria salute, senza che il più lento blocchi gli
+altri. Se l'elenco non è leggibile torna alla ricerca aggregata: per Jackett è
+`/api/v2.0/indexers/all/results/torznab/api`, per indexarr è il suo `/api`. Non
+aggiungere il percorso Torznab all'URL base: basta l'indirizzo del manager
+(Prowlarr normalmente sulla porta `9696`, indexarr sulla `8484`). Un percorso
+Torznab personalizzato già completo va lasciato come endpoint esplicito.
 
 Un indexer può essere raggiungibile ma non sano: per esempio Jackett può
 rispondere HTTP 200 con un errore Torznab dovuto a API key errata o nessun
@@ -1831,13 +1845,16 @@ dopo 30 secondi.
 
 - **Una sorgente non risponde** — controlla *Integrazioni → Verifica sorgenti*
   e il pannello stato sorgenti; per Jackett verifica URL base, API key e che
-  almeno un indexer sia abilitato in Jackett. Gli errori Torznab vengono mostrati
-  anche quando Jackett risponde HTTP 200. I siti protetti da Cloudflare
-  richiedono un FlareSolverr funzionante.
+  almeno un indexer sia abilitato in Jackett; per indexarr controlla la API key
+  e che l'URL base sia quello di indexarr (di solito porta `8484`). Gli errori
+  Torznab vengono mostrati anche quando il manager risponde HTTP 200. I siti
+  protetti da Cloudflare richiedono un FlareSolverr funzionante.
 - **Jackett è raggiungibile ma mostra errore API** — copia nuovamente la API key,
   controlla che almeno un indexer sia abilitato in Jackett e verifica che l'URL
   inserito in Gextto sia quello base corretto. Non aggiungere due volte il
-  percorso `/api/v2.0/indexers/all/results/torznab/api`.
+  percorso `/api/v2.0/indexers/all/results/torznab/api`. Lo stesso vale per
+  indexarr: usa l'URL base (`http://host:8484`), non un percorso già completo,
+  e scegli **indexarr** come tipo.
 - **Non scarica nulla** — verifica la *modalità attiva*, che serie/film siano
   abilitati, e controlla filtri qualità/lingua e il limite di spazio libero.
 - **Una puntata archiviata non si riscarica** — usa **↻ Riscarica** nel
@@ -2666,20 +2683,20 @@ l'accesso protetto (vedi *Accesso*) aggiungi `?apikey=<chiave>` all'indirizzo.
 
 | Campo / azione | Cosa fa |
 |---|---|
-| Nome | Etichetta dell'indexer (es. `jackett` / `prowlarr`). |
+| Nome | Etichetta dell'indexer (es. `jackett` / `prowlarr` / `indexarr`). |
 | URL base | URL base del servizio; Gextto aggiunge il percorso Torznab. |
 | API key | Chiave API dell'indexer. |
-| Tipo | Rilevato automaticamente, Prowlarr o Jackett. |
+| Tipo | Rilevato automaticamente, Prowlarr, Jackett o indexarr. |
 | Attivo | Abilita o disabilita l'indexer. |
-| Verifica | Testa l'indexer (per Jackett usa `t=caps`). |
+| Verifica | Testa l'indexer (per Jackett e indexarr usa `t=caps`). |
 
-Un indexer Torznab **diretto** (non Jackett/Prowlarr), per esempio il servizio
+Un indexer Torznab **diretto** (non gestito da Jackett, Prowlarr o indexarr), per esempio il servizio
 `mircrew-indexer` sulla stessa macchina o in LAN, si aggiunge qui con l'indirizzo
 base (es. `http://192.168.1.10:9118`) o con quello che finisce in `/api`: Gextto
 usa `<base>/api`, la stessa regola di gx-torrent, quindi l'indirizzo da scrivere
 è identico nei due. Le ricerche automatiche hanno un budget di **100 secondi per titolo**: un
 indexer dietro Prowlarr può attendere fino a **90 secondi** (Prowlarr serve una
-ricerca alla volta per indexer), un indexer diretto o Jackett fino a **45**. Una
+ricerca alla volta per indexer), un indexer diretto, Jackett o indexarr fino a **45**. Una
 lane la cui coda supererebbe il budget viene saltata senza contare come errore,
 così un tracker lento non ferma il ciclo. Se un indexer su un indirizzo locale o di rete privata chiude la
 connessione o non risponde, Gextto **non** ritenta via FlareSolverr (Cloudflare

@@ -14,6 +14,10 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 26 ottobre 2026
+
+- **indexarr è un tipo di indexer a sé.** Nella lista *Integrazioni → Indexer Torznab* e nella configurazione iniziale ora puoi scegliere **indexarr** come tipo, con l'URL base (di solito `http://host:8484`) e la API key; non serve più farlo passare per Jackett. Gextto usa l'endpoint Torznab nativo `/api` per la ricerca aggregata e i percorsi compatibili con Jackett per leggere l'elenco degli indexer e interrogare un tracker alla volta, come già fa con Jackett e Prowlarr. La verifica dell'indexer e il controllo di salute usano `t=caps` e riconoscono indexarr, quindi un problema di API key o di URL viene segnalato come per gli altri manager. Le righe già configurate come Jackett continuano a funzionare: per usare l'endpoint nativo basta cambiare il tipo in **indexarr**.
+
 ## 25 ottobre 2026
 
 - **La verifica della libreria non rinomina più lo stesso episodio avanti e indietro.** Il controllo periodico dei nomi confrontava due modi di scrivere lo stesso audio (`EAC3` e `ddp`) e, a seconda di quale risposta arrivava per prima, rinominava il file ogni sei ore: «Wolf Like Me» S01E05 e S01E06 cambiavano nome a ogni passaggio e il conteggio diceva «4 rinominati» per due file. Ora la verifica mantiene la grafia già presente nel nome e rinomina solo quando il codec è davvero diverso; un file già corretto non viene più rinominato una seconda volta nello stesso controllo. Vale anche per l'HDR (`DV` e `DV HDR10`) e per i film.

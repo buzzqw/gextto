@@ -98,7 +98,7 @@ qBittorrent-nox.
 | `config.go` | the `Config` model: read/write, generation, defaults. |
 | `database.go` | SQLite store: series, movies, torrents, feed history, provider backoff. |
 | `sqlite.go` | opening a SQLite DB with shared pragmas. |
-| `indexer_lanes.go` | Jackett/Prowlarr searched one indexer at a time: lanes read from the manager's list (10 min cache), per-lane slots, timeout, health and budget skip, cross-manager dedup by tracker. |
+| `indexer_lanes.go` | Jackett, Prowlarr and indexarr searched one indexer at a time: lanes read from the manager's list (10 min cache), per-lane slots, timeout, health and budget skip, cross-manager dedup by tracker. |
 | `archive.go` | durable catalogue of archived releases (SQLite + FTS5 on titles): one row per magnet, stable indexer guid (for `.torrent`-only listings) or exact URL (`magnet_key`, a 16-byte digest) and one per infohash (`idx_archive_hash`; a new listing of a known torrent refreshes its row). The guid keeps one row when Jackett regenerates its download URL at every request. |
 | `archive_sql.go` | small engine for the curated `scripts/sql/*.sql` operations: loads them (embedded), validates one read-only SELECT or one DELETE, binds the selected language marker arrays to `:tokens`/`:raw`, runs previews and transactional deletions. |
 | `migrate.go` | migration of the data directory. |
@@ -234,7 +234,7 @@ qBittorrent-nox.
 | `internal/notify` | gx-torrent notifications: Telegram, e-mail, webhook (JSON, Discord, Slack, Gotify, ntfy, Pushover). |
 | `internal/rss` | parsing of RSS/Atom/Torznab feeds and HTML listings (ext.to, TorrentGalaxy: `listing.go`), ordered rules and episode filter. |
 | `internal/settings` | persistent key/value store of the gx-torrent standalone mode. |
-| `internal/torznab` | client for Torznab indexers (Jackett, Prowlarr and similar). |
+| `internal/torznab` | client for Torznab indexers (Jackett, Prowlarr, indexarr and similar). |
 | `internal/utp` | BEP 29 uTP socket and transport implementation in pure Go (EUPL-1.2). |
 | `internal/webui` | templates and embedded assets of the gx-torrent daemon UI (see §8). |
 

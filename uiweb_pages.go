@@ -367,20 +367,21 @@ type uiListEditor struct {
 
 var uiIndexerEditor = uiListEditor{
 	Title:        "Indexer Torznab",
-	Hint:         "Jackett, Prowlarr o altri indexer Torznab. L'URL è la base (Gextto aggiunge il percorso Torznab).",
+	Hint:         "Jackett, Prowlarr, indexarr o altri indexer Torznab. L'URL è la base (Gextto aggiunge il percorso Torznab).",
 	GetPath:      "/api/config",
 	Unwrap:       "indexers",
 	PostPath:     "/api/config/settings",
 	PostKey:      "indexers",
 	TestEndpoint: "/api/indexer/test",
 	Fields: []uiListField{
-		{Name: "name", Label: "Nome", Kind: "text", Placeholder: "jackett / prowlarr"},
+		{Name: "name", Label: "Nome", Kind: "text", Placeholder: "jackett / prowlarr / indexarr"},
 		{Name: "url", Label: "URL base", Kind: "text", Placeholder: "http://127.0.0.1:9117", Wide: true},
 		{Name: "api_key", Label: "API key", Kind: "secret", Wide: true},
 		{Name: "manager", Label: "Tipo", Kind: "select", Options: []uiListFieldOption{
 			{Value: "", Label: "Rilevato automaticamente"},
 			{Value: "prowlarr", Label: "Prowlarr"},
 			{Value: "jackett", Label: "Jackett"},
+			{Value: "indexarr", Label: "indexarr"},
 		}},
 		{Name: "enabled", Label: "Attivo", Kind: "bool"},
 	},
@@ -1142,7 +1143,7 @@ func uiSettingsTabEditors(tab string) []uiListEditor {
 var uiSettingsEditorSearchEntries = []uiSearchEntry{
 	// The indexer/manager editor lives in the Integrazioni page; the result
 	// opens the Sorgenti tab, whose entry point links to it.
-	{Key: "", Label: "Indexer e manager", Tab: "sources", Terms: "prowlarr jackett torznab indexer manager sorgenti fonti"},
+	{Key: "", Label: "Indexer e manager", Tab: "sources", Terms: "prowlarr jackett indexarr torznab indexer manager sorgenti fonti"},
 	{Key: "", Label: "Feed RSS", Tab: "sources"},
 	{Key: "", Label: "Motori web", Tab: "sources"},
 	{Key: "", Label: "Filtri contenuto esclusi", Tab: "sources"},

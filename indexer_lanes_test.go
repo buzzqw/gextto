@@ -227,6 +227,94 @@ func TestManagerWithoutListFallsBackToTheAggregate(t *testing.T) {
 	}
 }
 
+// TestIndexarrSearchedPerIndexer pins indexarr's first-class lane behaviour:
+// the indexer list and the per-indexer searches use the Jackett-compatible
+// paths, while the aggregate /api endpoint is not touched.
+func TestIndexarrSearchedPerIndexer(t *testing.T) {
+	resetLaneState()
+	var listCalls, laneCalls, aggregateCalls atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/v2.0/indexers/all/results/torznab"):
+			listCalls.Add(1)
+			fmt.Fprint(w, `<?xml version="1.0"?><indexers><indexer id="limetorrents" configured="true"><title>LimeTorrents</title></indexer><indexer id="1337x" configured="true"><title>1337x</title></indexer></indexers>`)
+		case strings.HasPrefix(r.URL.Path, "/api/v2.0/indexers/"):
+			parts := strings.Split(r.URL.Path, "/")
+			id := ""
+			if len(parts) > 4 {
+				id = parts[4]
+			}
+			laneCalls.Add(1)
+			if r.URL.Query().Get("t") == "caps" {
+				fmt.Fprint(w, `<caps><searching><search available="yes" supportedParams="q"/><tv-search available="yes" supportedParams="q,season,ep"/></searching></caps>`)
+				return
+			}
+			hash := fmt.Sprintf("%040x", len(id)*1000)
+			fmt.Fprintf(w, `<?xml version="1.0"?><rss><channel><item><title>Show S01E01 1080p %s</title><link>magnet:?xt=urn:btih:%s</link></item></channel></rss>`, id, hash)
+		case r.URL.Path == "/api":
+			aggregateCalls.Add(1)
+			fmt.Fprint(w, `<?xml version="1.0"?><rss><channel><item><title>SHOULD-NOT-BE-USED</title><link>magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</link></item></channel></rss>`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	cfg := &Config{Indexers: []IndexerConfig{{Name: "indexarr", URL: server.URL, APIKey: "k", Enabled: true, Manager: ManagerIndexarr}}}
+	got := searchOneWithDBType(context.Background(), cfg, "Show S01E01", nil, nil, nil, true, searchTypeTV, false)
+	if listCalls.Load() == 0 || laneCalls.Load() == 0 {
+		t.Fatalf("indexarr list=%d lanes=%d, want both used", listCalls.Load(), laneCalls.Load())
+	}
+	if aggregateCalls.Load() != 0 {
+		t.Fatalf("the aggregate /api was queried %d times with working lanes", aggregateCalls.Load())
+	}
+	if len(got) == 0 {
+		t.Fatal("no release from the indexarr lanes")
+	}
+	for _, release := range got {
+		if strings.Contains(release.Title, "SHOULD-NOT-BE-USED") {
+			t.Fatal("the aggregate result was used")
+		}
+	}
+	names := []string{}
+	for _, lane := range expandSearchLanes(context.Background(), cfg.Indexers) {
+		names = append(names, lane.health)
+	}
+	joined := strings.Join(names, ",")
+	if !strings.Contains(joined, "indexarr · LimeTorrents") || !strings.Contains(joined, "indexarr · 1337x") {
+		t.Fatalf("lanes = %v", names)
+	}
+}
+
+// TestIndexarrAggregateUsesNativeEndpoint pins the fallback: when the indexer
+// list cannot be read, the aggregate goes to indexarr's own /api endpoint, not
+// to the Jackett all-indexers path.
+func TestIndexarrAggregateUsesNativeEndpoint(t *testing.T) {
+	resetLaneState()
+	var aggregate, jackettPath atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api" {
+			aggregate.Add(1)
+			fmt.Fprint(w, `<?xml version="1.0"?><rss><channel></channel></rss>`)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/v2.0/indexers/all/results/torznab") {
+			jackettPath.Add(1)
+			http.Error(w, "nope", http.StatusUnauthorized)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(server.Close)
+	cfg := &Config{Indexers: []IndexerConfig{{Name: "indexarr", URL: server.URL, APIKey: "k", Enabled: true, Manager: ManagerIndexarr}}}
+	searchOneWithDBType(context.Background(), cfg, "Show S01E01", nil, nil, nil, true, searchTypeTV, false)
+	if aggregate.Load() == 0 {
+		t.Fatal("the native /api aggregate was not queried after the list failed")
+	}
+	if jackettPath.Load() != 1 {
+		t.Fatalf("the indexer list was queried %d times, want 1", jackettPath.Load())
+	}
+}
+
 // TestLaneSkippedWhenItsQueueOutlastsTheSearch pins the budget check: with the
 // lane's only slot taken and its searches averaging longer than what is left
 // of the title's budget, the title skips it at once instead of waiting; with

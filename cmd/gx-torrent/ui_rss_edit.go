@@ -34,13 +34,14 @@ type uiIndexerPreset struct {
 }
 
 // uiIndexerPresets are the indexer products gx-torrent speaks to directly.
-// Prowlarr and Jackett are Torznab managers with well-known ports; any other
-// Torznab endpoint (a MirCrew indexer, a remote manager) is added as a custom
-// name and URL. The wizard template repeats these values by hand: keep them in
-// sync with setup.html.
+// Prowlarr, Jackett and indexarr are Torznab managers with well-known ports;
+// any other Torznab endpoint (a MirCrew indexer, a remote manager) is added as
+// a custom name and URL. The wizard template repeats these values by hand: keep
+// them in sync with setup.html.
 var uiIndexerPresets = []uiIndexerPreset{
 	{Name: "Prowlarr", URL: "http://127.0.0.1:9696"},
 	{Name: "Jackett", URL: "http://127.0.0.1:9117"},
+	{Name: "indexarr", URL: "http://127.0.0.1:8484"},
 	// MirCrew's local indexer serves Torznab on a port of its choosing (often
 	// 9118): the URL is typed by hand, the name just fills the field.
 	{Name: "MIRCrew", URL: ""},

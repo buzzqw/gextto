@@ -2422,11 +2422,11 @@
 
       {{else if eq .Step 3}}
       <h3>Da dove cercare</h3>
-      <p class="hint">Gextto cerca le release negli indexer di Prowlarr o Jackett e prende titoli, stagioni, episodi, locandine e calendario da TMDB (consigliato) oppure da TVDB. Basta una delle due chiavi: se ci sono entrambe vince TMDB. Puoi aggiungere altro dopo, in Impostazioni.</p>
+      <p class="hint">Gextto cerca le release negli indexer di Prowlarr, Jackett o indexarr e prende titoli, stagioni, episodi, locandine e calendario da TMDB (consigliato) oppure da TVDB. Basta una delle due chiavi: se ci sono entrambe vince TMDB. Puoi aggiungere altro dopo, in Impostazioni.</p>
       {{if .Indexers}}<p><span class="badge ok">Indexer configurati</span> {{range .Indexers}}<code>{{.Name}}</code> {{end}}</p>{{end}}
       <form method="post" action="/setup/sources" class="v2-setup-form">
         <fieldset class="v2-setup-fields"><legend>Aggiungi un indexer</legend>
-          <label><span>Tipo</span><select class="input" name="indexer_manager"><option value="prowlarr">Prowlarr</option><option value="jackett">Jackett</option></select></label>
+          <label><span>Tipo</span><select class="input" name="indexer_manager"><option value="prowlarr">Prowlarr</option><option value="jackett">Jackett</option><option value="indexarr">indexarr</option></select></label>
           <label><span>Nome</span><input class="input" name="indexer_name" placeholder="prowlarr" /></label>
           <label><span>URL base</span><input class="input" name="indexer_url" placeholder="http://127.0.0.1:9696" inputmode="url" spellcheck="false" /></label>
           <label><span>API key</span><input class="input" type="password" name="indexer_api_key" autocomplete="off" /></label>

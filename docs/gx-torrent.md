@@ -622,9 +622,9 @@ in Italian, `telechargements`, `descargas`, `pobrane`; the temporary one is
 always `download-temp`): they are only proposals, acceptable, editable or
 clearable, so that an archive installation keeps the downloads next to itself. The
 **Indexer** field is a drop-down of the already supported products (Prowlarr,
-Jackett, MIRCrew, others): choosing Prowlarr or
-Jackett pre-fills the URL with their usual local address and port
-(`127.0.0.1:9696` / `127.0.0.1:9117`), still editable. The wizard writes
+Jackett, indexarr, MIRCrew, others): choosing Prowlarr, Jackett or indexarr
+pre-fills the URL with their usual local address and port
+(`127.0.0.1:9696` / `127.0.0.1:9117` / `127.0.0.1:8484`), still editable. The wizard writes
 `settings.json` and marks the setup as completed; language and bandwidth limits apply
 immediately (if the limits are not applied, the error is shown on the page and the
 setup is not marked as completed), folder and port at the next startup (the
@@ -763,12 +763,13 @@ The **indexer search** (standalone) uses the `indexers` key of
 Prowlarr): `GET /ui/search?q=…` queries all of them, merges the results and sorts them
 by seed. With at least one indexer configured the **search box** appears on the page,
 with the results and an *Add* button to add the torrent. In
-managed it is not available. **Jackett, Prowlarr and MIRCrew** are configured
+managed it is not available. **Jackett, Prowlarr, indexarr and MIRCrew** are configured
 in the same way, with the **base address** (an address ending in `/api` is also
 accepted): Jackett gets its aggregate Torznab path
 (`/api/v2.0/indexers/all/results/torznab/api`), a direct Torznab service such as
 the `mircrew-indexer` gets `<base>/api` (for MIRCrew the port is chosen by hand, it
-has no default), and **Prowlarr** (`:9696` or `prowlarr` in the URL) is queried
+has no default), **indexarr** uses its native `<base>/api` aggregate, and **Prowlarr**
+(`:9696` or `prowlarr` in the URL) is queried
 through its aggregate search `/api/v1/search` (`query`/`type`/`limit=100`), which
 answers JSON: `internal/torznab` reads it (usenet results skipped, magnet built
 from the infohash when missing) and the connection test uses

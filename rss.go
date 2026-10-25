@@ -1652,6 +1652,10 @@ func extract_magnet(body string) string {
 const (
 	ManagerProwlarr = "prowlarr"
 	ManagerJackett  = "jackett"
+	// ManagerIndexarr is the indexarr manager. It speaks the Jackett Torznab
+	// layout for the indexer list and the per-indexer lanes, and its own /api
+	// endpoint for the aggregate search.
+	ManagerIndexarr = "indexarr"
 
 	searchTypeAuto    = ""
 	searchTypeGeneric = "search"
@@ -1666,6 +1670,8 @@ func normalizeManagerKind(kind string) string {
 		return ManagerProwlarr
 	case ManagerJackett:
 		return ManagerJackett
+	case ManagerIndexarr:
+		return ManagerIndexarr
 	default:
 		return ""
 	}
@@ -1688,6 +1694,10 @@ func managerKind(indexer IndexerConfig) string {
 	if strings.Contains(lowerURL, "prowlarr") || strings.Contains(lowerURL, ":9696") ||
 		strings.Contains(lowerName, "prowlarr") {
 		return ManagerProwlarr
+	}
+	if strings.Contains(lowerURL, "indexarr") || strings.Contains(lowerURL, ":8484") ||
+		strings.Contains(lowerName, "indexarr") {
+		return ManagerIndexarr
 	}
 	return ManagerJackett
 }
@@ -1716,8 +1726,11 @@ func isManagerSource(indexer IndexerConfig) bool {
 	lowerURL := strings.ToLower(strings.TrimSpace(indexer.URL))
 	lowerName := strings.ToLower(strings.TrimSpace(indexer.Name))
 	return strings.Contains(lowerURL, "prowlarr") || strings.Contains(lowerURL, "jackett") ||
+		strings.Contains(lowerURL, "indexarr") ||
 		strings.Contains(lowerURL, ":9696") || strings.Contains(lowerURL, ":9117") ||
-		strings.Contains(lowerName, "prowlarr") || strings.Contains(lowerName, "jackett")
+		strings.Contains(lowerURL, ":8484") ||
+		strings.Contains(lowerName, "prowlarr") || strings.Contains(lowerName, "jackett") ||
+		strings.Contains(lowerName, "indexarr")
 }
 
 // torznab_endpoint builds the search endpoint for an indexer. An explicit /api
@@ -1733,10 +1746,17 @@ func torznab_endpoint(indexer IndexerConfig) string {
 	if !isManagerSource(indexer) {
 		return base + "/api"
 	}
-	if managerKind(indexer) == ManagerProwlarr {
+	switch managerKind(indexer) {
+	case ManagerProwlarr:
 		return base + "/api/v1/search"
+	case ManagerIndexarr:
+		// The aggregate search is indexarr's own Torznab endpoint. Its indexer
+		// list and per-indexer lanes use the Jackett-compatible paths (see
+		// indexer_lanes.go), so only the aggregate differs.
+		return base + "/api"
+	default:
+		return base + "/api/v2.0/indexers/all/results/torznab/api"
 	}
-	return base + "/api/v2.0/indexers/all/results/torznab/api"
 }
 
 // jsonNumberInt converts a JSON number (decoded with UseNumber) to *int64.

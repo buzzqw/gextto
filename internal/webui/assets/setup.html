@@ -52,12 +52,13 @@ h3{margin:22px 0 0;font-size:12px;color:var(--subtle);text-transform:uppercase;l
 <option value="" data-url="">None</option>
 <option value="Prowlarr" data-url="http://127.0.0.1:9696">Prowlarr</option>
 <option value="Jackett" data-url="http://127.0.0.1:9117">Jackett</option>
+<option value="indexarr" data-url="http://127.0.0.1:8484">indexarr</option>
 <option value="MIRCrew" data-url="">MIRCrew</option>
 <option value="other" data-url="">Other</option>
 </select></label>
 <label>Indexer URL<input type="text" name="indexer-url" id="indexer-url" placeholder="http://127.0.0.1:9117" autocomplete="off" title="Torznab endpoint URL"></label>
 <label>Indexer API key<input type="text" name="indexer-key" autocomplete="off" title="API key for authentication with the Torznab indexer"></label>
-<p class="m">Pick an indexer to enable the search; leave it empty to add one later from the RSS page. Prowlarr and Jackett fill the URL with their usual local address and port. For any other Torznab service (a MirCrew indexer, a remote manager) choose Other and type its URL.</p>
+<p class="m">Pick an indexer to enable the search; leave it empty to add one later from the RSS page. Prowlarr, Jackett and indexarr fill the URL with their usual local address and port. For any other Torznab service (a MirCrew indexer, a remote manager) choose Other and type its URL.</p>
 <p class="m">The download folder and the peer port apply at the next start.</p>
 <p class="m">The bandwidth limits apply immediately.</p>
 <button type="submit" title="Complete setup and start using gx-torrent">Finish setup</button>
